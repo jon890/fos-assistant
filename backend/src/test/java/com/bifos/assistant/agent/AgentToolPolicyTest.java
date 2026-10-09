@@ -34,6 +34,17 @@ class AgentToolPolicyTest {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("내부 원본 조회 도구는 사용자 설정과 스킬 발행 뒤에도 유지한다")
+    void internalOriginalInspectionSurvivesUserToolAndSkillPublishUpdates() {
+        List<String> result = AgentToolPolicy.requestedForWrite(OWNER, agent(AgentVisibility.PRIVATE),
+                List.of("web", "skills"), List.of("fos-assistant", "fos-attachments"), Set.of());
+        assertThat(result).contains("fos-attachments");
+        assertThat(AgentToolPolicy.isKnown("fos-attachments")).isFalse();
+        assertThat(AgentToolPolicy.requestedForWrite(OWNER, agent(AgentVisibility.GROUP), List.of("web"),
+                List.of("fos-assistant", "fos-attachments"), Set.of())).doesNotContain("fos-attachments");
+    }
+
+    @Test
     @DisplayName("주인은 관리자 등급을 새로 켤 수 없다")
     void ownerCannotNewlyEnableAdminTier() {
         assertThatThrownBy(() -> AgentToolPolicy.requestedForWrite(

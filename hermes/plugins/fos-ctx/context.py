@@ -81,6 +81,27 @@ def _read_token():
     return get_secret(KEY_NAME)
 
 
+def top_level_session(session_id: str) -> bool:
+    """압축 사슬과 subagent 사슬을 나눈다. 읽지 못한 사슬은 최상위로 증명하지 않는다."""
+    con = sqlite3.connect(f"file:{_state_db_path()}?mode=ro", uri=True, timeout=1.0)
+    try:
+        seen = set()
+        current = session_id
+        for _ in range(MAX_DEPTH):
+            if current in seen:
+                return False
+            seen.add(current)
+            row = con.execute("SELECT parent_session_id, source FROM sessions WHERE id = ?", (current,)).fetchone()
+            if not row or row[1] == "subagent":
+                return False
+            if not row[0]:
+                return True
+            current = row[0]
+        return False
+    finally:
+        con.close()
+
+
 def build_context(tool: str, session_id: str, tool_call_id: str):
     """서명한 `_fos_ctx` 를 만든다. 재료가 하나라도 없으면 None 이다."""
     if not session_id or not tool_call_id:

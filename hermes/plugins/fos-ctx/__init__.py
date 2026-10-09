@@ -157,7 +157,12 @@ from .subagent import (
 
 
 
+from .attachment_inspect import TOOL as INSPECT_TOOL, SCHEMA as INSPECT_SCHEMA, handle as inspect_attachment
+
+
 def register(ctx):
+    ctx.register_tool(name=INSPECT_TOOL, toolset="fos-attachments", schema=INSPECT_SCHEMA,
+                      handler=inspect_attachment)
     ctx.register_hook("pre_tool_call", pre_tool_call)
     ctx.register_hook("subagent_start", subagent_start)
     ctx.register_hook("transform_tool_result", transform_tool_result)

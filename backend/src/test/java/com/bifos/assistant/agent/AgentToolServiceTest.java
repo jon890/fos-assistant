@@ -68,6 +68,28 @@ class AgentToolServiceTest {
     }
 
     @Test
+    @org.junit.jupiter.api.DisplayName("기존 개인 profile에 원본 조회를 자동 제공하고 도구 설정을 보존한다")
+    void originalInspectionIsAddedAutomaticallyToExistingPrivateProfile() {
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of("web", "fos-assistant"), List.of("web", "fos-assistant", "fos-attachments"));
+        service.ensureAttachmentInspection(agent);
+        org.mockito.Mockito.verify(toolsets).writeApiServer(agent.hermesProfile(),
+                List.of("web", "fos-assistant", "fos-attachments"), agent.sandboxOwner());
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("커넥터와 공유 profile에는 원본 조회를 자동 제공하지 않는다")
+    void connectorAndSharedProfilesAreNotGivenOriginalInspection() {
+        Agent isolated = mock(Agent.class);
+        when(isolated.connectorManaged()).thenReturn(true);
+        service.ensureAttachmentInspection(isolated);
+        Agent shared = mock(Agent.class);
+        when(shared.acceptsAttachments()).thenReturn(false);
+        service.ensureAttachmentInspection(shared);
+        org.mockito.Mockito.verifyNoInteractions(toolsets);
+    }
+
+    @Test
     @DisplayName("저장 뒤 다른 목록이 오면 적용되지 않은 오류를 돌린다")
     void returnsNotAppliedErrorWhenDifferentListComesBackAfterSave() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of(), List.of());

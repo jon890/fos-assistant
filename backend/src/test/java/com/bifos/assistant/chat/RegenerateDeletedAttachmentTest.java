@@ -25,6 +25,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,14 @@ import org.springframework.transaction.annotation.Transactional;
 /** 보관 기간이 지나 사라진 사진은 다시 생성 Hermes 입력에 넣지 않는다. */
 @BackendIntegrationTest
 class RegenerateDeletedAttachmentTest {
+    @Autowired
+    com.bifos.assistant.hermes.HermesToolsetClient attachmentTools;
+
+    @org.junit.jupiter.api.BeforeEach
+    void enableOriginalInspectionTool() {
+        org.mockito.Mockito.when(attachmentTools.readEnabled(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of("fos-assistant", "fos-attachments"));
+    }
 
     @Autowired
     ChatService chat;
@@ -107,10 +116,10 @@ class RegenerateDeletedAttachmentTest {
         chat.regenerate(dad, first.conversationId(), event -> {});
 
         assertThat(stub().received()).hasSize(2);
-        // 지운 사진의 단락은 빠지고 결과물 폴더 단락만 사용자가 쓴 글 앞에 붙는다.
+        // 삭제된 참조도 복원해 원본을 볼 수 없는 이유를 명시한다.
         assertThat(stub().received().get(1).input())
-                .isEqualTo(artifactService.agentPreamble(
-                                conversations.findById(first.conversationId()).orElseThrow()) + "사진을 설명해 줘");
+                .contains("attachment_id=" + attachment.id(), "[보관 종료]", "판독 실패")
+                .endsWith("사진을 설명해 줘");
     }
 
     @Test
@@ -142,10 +151,11 @@ class RegenerateDeletedAttachmentTest {
 
         String input = stub().received().get(1).input();
         assertThat(input)
-                .contains("- 1번째 사진: " + lastPhoto.storedName())
-                .contains("- 3번째 사진: " + firstPhoto.storedName())
-                .doesNotContain("2번째 사진", deletedMiddle.storedName());
-        assertThat(input.indexOf(lastPhoto.storedName())).isLessThan(input.indexOf(firstPhoto.storedName()));
+                .contains("- 1번째 사진: attachment_id=" + lastPhoto.id())
+                .contains("- 3번째 사진: attachment_id=" + firstPhoto.id())
+                .contains("- 2번째 사진: attachment_id=" + deletedMiddle.id(), "[보관 종료]");
+        assertThat(input.indexOf("attachment_id=" + lastPhoto.id()))
+                .isLessThan(input.indexOf("attachment_id=" + firstPhoto.id()));
     }
 
     private ChatAttachment createAttachment(Long conversationId, CurrentUser user, String name) {

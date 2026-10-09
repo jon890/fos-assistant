@@ -51,6 +51,8 @@ public class SecurityConfig {
                         // 커넥터가 부르는 브라우저 중계다. 경로의 접근 표식이 인증이고 BrowserGateway 가 확인한다.
                         .requestMatchers("/internal/browser-gateway/**")
                         .permitAll()
+                        .requestMatchers("/internal/hermes/attachment-inspect")
+                        .hasRole("MCP")
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

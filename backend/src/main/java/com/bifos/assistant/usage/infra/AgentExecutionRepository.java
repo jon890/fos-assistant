@@ -24,6 +24,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AgentExecutionRepository extends JpaRepository<AgentExecution, Long> {
+    /** 엔티티 캐시를 거치지 않고 원본 조회 중 실행의 현재 상태를 확인한다. */
+    boolean existsByIdAndStatus(Long id, ExecutionStatus status);
 
     /** 알 수 없는 자식 수 대신 사건 관측이 빠진 실행을 센다. 과거 UNKNOWN 과 실행 중인 줄은 뺀다. */
     @Query("""

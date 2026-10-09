@@ -200,7 +200,7 @@ final class AgentImageResizer {
     }
 
     /** 긴 변을 {@code longSide} 이하로 줄이고 방향을 바로잡아 흰 바탕에 그린다. */
-    private static BufferedImage draw(BufferedImage source, int orientation, int longSide) {
+    static BufferedImage draw(BufferedImage source, int orientation, int longSide) {
         int sourceWidth = source.getWidth();
         int sourceHeight = source.getHeight();
         Dimension size = scaledSize(sourceWidth, sourceHeight, longSide);
@@ -227,7 +227,7 @@ final class AgentImageResizer {
     /**
      * 줄인 크기 {@code width}×{@code height} 의 사진을 EXIF 방향대로 바로 세우는 변환이다. 5~8 은 가로와 세로가 바뀐다.
      */
-    private static AffineTransform orientationTransform(int orientation, int width, int height) {
+    static AffineTransform orientationTransform(int orientation, int width, int height) {
         return switch (orientation) {
             case 2 -> new AffineTransform(-1, 0, 0, 1, width, 0);
             case 3 -> new AffineTransform(-1, 0, 0, -1, width, height);

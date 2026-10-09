@@ -103,6 +103,8 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261009 / tool-request-flow](ADR-20261009-tool-request-flow.md) | 도구 사용 요청은 따로 저장하고 관리자는 반영을 확인한 뒤 승인한다 | backend, frontend | Accepted. ADR-029의 관리자 도구 변경에 주인의 요청과 결정 이력을 더한다 |
 | [ADR-20261009 / workspace-explorer](ADR-20261009-workspace-explorer.md) | 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다 | backend, frontend | Accepted. ADR-086 의 사용자별 `/workspace` 를 사람이 보는 길이다. HTML 미리보기는 ADR-027 의 격리를 쓴다 |
 
+| [ADR-20261010 / attachment-inspect](ADR-20261010-attachment-inspect.md) | 현재 실행이 같은 대화의 원본 사진을 native 도구 결과로 다시 읽는다 | backend, hermes | Accepted |
+
 ## 보관
 
 결정 전체가 대체되거나 퇴역한 ADR 이다. 파일은 `archive/` 에 있다.

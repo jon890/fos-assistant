@@ -3,6 +3,7 @@ package com.bifos.assistant.mcp.application;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
+import com.bifos.assistant.orchestration.application.DelegationParentResolver;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -38,6 +39,7 @@ public class McpCallerResolver {
     private final SessionOwnerResolver owners;
     private final AppUserRepository users;
     private final AgentRepository agents;
+    private final DelegationParentResolver parents;
 
     /**
      * @param principal 요청을 인증한 토큰
@@ -47,11 +49,23 @@ public class McpCallerResolver {
      */
     @Transactional(readOnly = true)
     public McpCaller resolve(McpPrincipal principal, String toolName, JsonNode fosCtx) {
+        return resolve(principal, toolName, fosCtx, false);
+    }
+
+    /** 원본 조회 전용이다. hook이 추가 서명한 최상위 사슬만 현재 루트 실행으로 해석한다. */
+    @Transactional(readOnly = true)
+    public McpCaller resolveAttachmentInspection(McpPrincipal principal, JsonNode fosCtx, boolean topLevel) {
+        return resolve(principal, "attachment_inspect", fosCtx, topLevel);
+    }
+
+    private McpCaller resolve(McpPrincipal principal, String toolName, JsonNode fosCtx, boolean topLevel) {
         if (principal == null) {
             throw reject(toolName, "인증 주체가 MCP 토큰이 아니다");
         }
         McpCallContext context = McpCallContext.verify(toolName, fosCtx, principal.tokenHash());
-        AgentExecution origin = owners.resolve(principal.profileName(), context.rootSessionId(), context.sessionId());
+        AgentExecution origin = topLevel
+                ? parents.resolve(principal.profileName(), context.rootSessionId())
+                : owners.resolve(principal.profileName(), context.rootSessionId(), context.sessionId());
         if (isConnectorAgent(origin.agentId())) {
             throw reject(toolName, "커넥터 에이전트는 Control Plane 도구를 쓰지 못한다");
         }

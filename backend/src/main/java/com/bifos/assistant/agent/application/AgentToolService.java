@@ -31,6 +31,23 @@ public class AgentToolService {
     private final AgentConnectorBindings connectorBindings;
     private final ToolsetVisibilityService visibility;
 
+    /** 사진이 있는 일반 turn 제출 전에 기존 profile에도 원본 조회 도구를 자동 제공한다. */
+    public void ensureAttachmentInspection(Agent agent) {
+        if (agent.connectorManaged() || !agent.acceptsAttachments()) {
+            return;
+        }
+        List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+        if (enabled.contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
+            return;
+        }
+        List<String> desired = new ArrayList<>(enabled);
+        desired.add(AgentToolPolicy.ATTACHMENT_INSPECTION);
+        toolsets.writeApiServer(agent.hermesProfile(), desired, agent.sandboxOwner());
+        if (!toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).contains(AgentToolPolicy.ATTACHMENT_INSPECTION)) {
+            throw new ApiException(ErrorCode.AGENT_TOOLS_NOT_APPLIED, "original inspection tool was not applied");
+        }
+    }
+
     public AgentToolsetsView read(CurrentUser user, Agent agent) {
         return read(user, agent, false);
     }
@@ -95,6 +112,7 @@ public class AgentToolService {
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> desiredBuiltin = desired.stream()
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
+                .filter(name -> !AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name))
                 .filter(name -> !connectorServers.contains(name))
                 .toList();
         List<String> controlledApplied = applied.stream()
@@ -189,6 +207,7 @@ public class AgentToolService {
             boolean adminView) {
         List<String> unclassified = enabled.stream()
                 .filter(name -> !AgentToolPolicy.isKnown(name))
+                .filter(name -> !AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name))
                 .filter(name -> !AgentToolPolicy.MEMORY.equals(name))
                 .filter(name -> !AgentToolPolicy.CONTROL_PLANE_MCP.equals(name))
                 .filter(name -> !connectorServers.contains(name))

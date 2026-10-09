@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import urllib.request
+from .attachment_inspect import TOOL as INSPECT_TOOL, authorize as authorize_inspect
 from .connector_policy import (
     CODE_EXECUTION_MESSAGE,
     CODE_EXECUTION_TOOL,
@@ -85,7 +86,7 @@ def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", **_):
     if tool_name == "delegate_task" and not _delegate_images_allowed(args):
         return _block(DELEGATE_IMAGE_MESSAGE)
     control_plane = tool_name.startswith(TOOL_PREFIX)
-    guarded = tool_name.startswith(MCP_PREFIX) or tool_name == CODE_EXECUTION_TOOL
+    guarded = tool_name.startswith(MCP_PREFIX) or tool_name in {CODE_EXECUTION_TOOL, INSPECT_TOOL}
     # 대응 파일을 Control Plane MCP 의 접두사보다 먼저 본다. 접두사를 먼저 보면 등록 이름이 그 접두사로 시작하는
     # 커넥터 도구가 판정 없이 `_fos_ctx` 를 받는다.
     try:
@@ -94,6 +95,8 @@ def pre_tool_call(tool_name="", args=None, session_id="", tool_call_id="", **_):
         # 옛 설치 profile 일 수 있다. 그 profile 에는 Control Plane MCP 가 없으므로 그 접두사의 도구도 막는다.
         logger.warning("fos-ctx: 이름 대응 파일을 읽지 못했다: %s", type(exc).__name__)
         return _block(POLICY_BLOCK_MESSAGE) if guarded else None
+    if tool_name == INSPECT_TOOL:
+        return authorize_inspect(args, session_id or "", tool_call_id or "", isolated)
     if servers is None:
         # 커넥터를 설치한 profile 이 아니다. 여기까지가 커넥터 정책이 없던 때와 같은 동작이다.
         return _control_plane_context(tool_name, session_id, tool_call_id) if control_plane else None

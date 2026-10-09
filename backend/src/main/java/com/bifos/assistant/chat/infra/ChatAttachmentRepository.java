@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ChatAttachmentRepository extends JpaRepository<ChatAttachment, Long> {
+    /** 엔티티 캐시와 관계없이 보낸 원본의 소유·보관 상태를 다시 확인한다. */
+    boolean existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+            Long id, Long conversationId, Long uploadedByUserId, Instant now);
 
     /** 첨부는 언제나 대화 번호와 함께 찾는다. 번호만으로 찾으면 남의 대화의 첨부에 닿는다. */
     Optional<ChatAttachment> findByIdAndConversationId(Long id, Long conversationId);

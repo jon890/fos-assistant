@@ -197,6 +197,8 @@ public enum ErrorCode {
      */
     SKILL_COMMAND_UNKNOWN(HttpStatus.BAD_REQUEST),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
+    ATTACHMENT_INSPECTION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY),
+    ATTACHMENT_INSPECTION_LIMIT(HttpStatus.UNPROCESSABLE_ENTITY),
     /**
      * 그룹이 숨긴 provider 나 모델을 고르거나 그것으로 실행하려 했다. 다른 모델로 바꾸지 않는다(ADR-054).
      *

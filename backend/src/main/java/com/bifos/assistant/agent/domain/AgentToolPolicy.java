@@ -24,6 +24,8 @@ public final class AgentToolPolicy {
     public static final String TERMINAL = "terminal";
     /** Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다. */
     public static final String CONTROL_PLANE_MCP = "fos-assistant";
+    /** 모델의 원본 재조회 도구다. 사용자에게 설정 항목으로 노출하지 않는다. */
+    public static final String ATTACHMENT_INSPECTION = "fos-attachments";
 
     private static final Set<String> OWNER_TOOLSETS =
             Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
@@ -151,6 +153,9 @@ public final class AgentToolPolicy {
                     ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
         result.add(CONTROL_PLANE_MCP);
+        if (!agent.connectorManaged() && agent.acceptsAttachments() && currentlyEnabled.contains(ATTACHMENT_INSPECTION)) {
+            result.add(ATTACHMENT_INSPECTION);
+        }
         result.addAll(connectorServers);
         return List.copyOf(result);
     }

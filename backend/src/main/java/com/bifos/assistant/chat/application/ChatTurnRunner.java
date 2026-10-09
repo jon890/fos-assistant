@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.agent.application.AgentToolService;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
 import com.bifos.assistant.context.AssembledContext;
@@ -40,6 +41,7 @@ class ChatTurnRunner {
     private final ChatTurnRouting chatTurnRouting;
     private final ChatTurnLifecycle chatTurnLifecycle;
     private final ChatRunEvents chatRunEvents;
+    private final AgentToolService agentTools;
     private final ChatTurnStopper chatTurnStopper;
 
     /**
@@ -147,6 +149,15 @@ class ChatTurnRunner {
             String runId = null;
             HermesRunResult result;
             try {
+                if (attachments.allOf(conversation.id()).stream().anyMatch(photo -> photo.messageId() != null)) {
+                    try {
+                        agentTools.ensureAttachmentInspection(routed.agent());
+                    } catch (RuntimeException ex) {
+                        executions.fail(pending.execution(), "ATTACHMENT_INSPECTION_UNAVAILABLE");
+                        chatRunEvents.append(pending, ExecutionEventType.RUN_FAILED, "ATTACHMENT_INSPECTION_UNAVAILABLE");
+                        throw ex;
+                    }
+                }
                 runId = chatRunEvents.submit(pending);
                 // 한 번에 받는 경로도 사건 스트림을 연다. 화면으로 흘릴 곳은 없고 도구 사건을 실행 기록에 남기려는 것이다(ADR-090).
                 chatRunEvents.relay(pending, runId, handle, streaming ? onEvent : null);
