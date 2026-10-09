@@ -118,12 +118,13 @@ Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / na
 
 - 답이 사진 내용을 말하고, 그 실행의 도구 사건에 `vision_analyze` 가 없다
 - 그 실행에 413 이나 `invalid_image_url` 같은 오류가 없다
-- 다음 메시지에서 지난 사진을 물으면 에이전트가 `vision_analyze` 로 파일을 본다
+- 다음 메시지에서 지난 사진을 물으면 에이전트가 `vision_analyze` 로 사본 파일을 본다
+- 11장 이상을 보내면 11번째부터 사본 파일을 `vision_analyze` 로 보고, 잘림 오류가 없다
 
 ## 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
-입력에 싣지 못한 사진과 지난 메시지의 사진은 이 도구로 본다.
+입력에 싣지 못한 사진과 지난 메시지의 사진은 이 도구로 원본 옆의 줄인 사본(`{첨부 번호}.small.jpg`)을 본다. 사본은 대개 1MB 아래다.
 
 실행 공간(Docker)의 파일은 컨테이너 안에서 `head -c <50MB+1> < 경로 | base64` 로 읽는다(`tools/image_source.py`).
 운영에서 3MB 를 넘는 사진이 가끔 「image file is truncated」 로 실패했다. Pillow 가 디코딩하다 바이트가 모자란 것이다.
