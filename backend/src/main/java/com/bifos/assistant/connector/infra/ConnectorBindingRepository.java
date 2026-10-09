@@ -2,10 +2,13 @@ package com.bifos.assistant.connector.infra;
 
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.DueBinding;
+import com.bifos.assistant.connector.domain.ReadyBinding;
+import com.bifos.assistant.connector.domain.type.BindingStatus;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -37,4 +40,17 @@ public interface ConnectorBindingRepository extends JpaRepository<ConnectorBindi
             + " where b.applyDueAt <= :now and b.restartRequired = false"
             + " order by b.applyDueAt")
     List<DueBinding> findApplyDue(@Param("now") Instant now);
+
+    /**
+     * 그 상태이고 번호가 {@code after} 보다 큰 바인딩을 번호 순으로 읽는다(ADR-20261009 / connector-install-drift).
+     *
+     * <p>정의 어긋남 점검이 {@code READY} 바인딩을 한 주기에 {@code page} 크기만큼 읽고 다음 주기는 그 뒤부터 읽는다. 생성자 식을
+     * 문자열로 두는 까닭은 {@link #findApplyDue} 와 같다.
+     */
+    @Query("select new com.bifos.assistant.connector.domain.ReadyBinding(b.id, b.agent.id, b.connection.userId,"
+            + " b.agent.hermesProfile, b.connection.connectorId, b.agent.connectorManaged)"
+            + " from ConnectorBinding b"
+            + " where b.status = :status and b.id > :after"
+            + " order by b.id")
+    List<ReadyBinding> findReadyAfter(@Param("status") BindingStatus status, @Param("after") Long after, Pageable page);
 }

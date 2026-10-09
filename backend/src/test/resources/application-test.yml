@@ -63,6 +63,8 @@ assistant:
     binding:
       # 검사가 뜰 때마다 반영 예정 확인이 함께 돌지 않게 끈다. 검사는 그 메서드를 직접 부른다
       apply-cron: "-"
+      # 정의 어긋남 점검도 끈다. 검사는 resyncDrifted 를 직접 부른다
+      drift-cron: "-"
   proactive-check:
     # 아래 hermes.run-timeout(1s) 보다 짧아야 기동한다. 살펴보기 turn 을 돌리는 검사는 두 값을 함께 올린다
     max-duration: 500ms

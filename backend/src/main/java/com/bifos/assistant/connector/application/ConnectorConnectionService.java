@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorOption;
 import com.bifos.assistant.connector.application.model.ConnectorSummary;
+import com.bifos.assistant.connector.application.model.ResyncOutcome;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
@@ -405,7 +406,7 @@ public class ConnectorConnectionService {
         }
         boolean failed = false;
         for (ConnectorBinding binding : bound) {
-            failed |= bindingService.resync(binding, manifest, false);
+            failed |= bindingService.resync(binding, manifest, false) == ResyncOutcome.CALL_FAILED;
         }
         bindings.saveAll(bound);
         ConnectionSnapshot stored = ConnectionSnapshot.from(connections.save(connection), bound);
