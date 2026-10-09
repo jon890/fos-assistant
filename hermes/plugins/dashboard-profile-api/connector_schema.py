@@ -27,7 +27,8 @@ ISOLATED_MODE = "isolated"
 CONNECTOR_SKILL_PARTS = ("references", "templates")
 
 
-# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다(`docs/backend/skill.md`).
+# 커넥터 스킬 하나의 상한이다. Control Plane 이 올린 스킬에 거는 제한과 같다.
+# 그 값은 `SkillService` 의 `MAX_FILES` 와 `MAX_CHARS_PER_FILE` 이 갖는다. 바꾸면 함께 고친다.
 CONNECTOR_SKILL_MAX_FILES = 20
 
 
