@@ -44,4 +44,4 @@ Hermes v2026.9.24의 [도구 계산](https://github.com/NousResearch/hermes-agen
 [기억 저장](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/tools/memory_tool.py)은
 `memory_enabled`, `user_profile_enabled`를 각각 읽는다.
 도구만 끄거나 `memory.enabled`만 정하는 것으로 기억 주입까지 차단했다고 판단하지 않는다.
-세부 계약은 [가치 평가](../backend/value-evaluation.md)가 갖는다.
+세부 계약은 [가치 평가](../../backend/docs/flow.md)가 갖는다.

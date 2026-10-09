@@ -21,7 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 /**
  * 로그인한 사용자 자신의 알림을 다루는 경로다(ADR-070). 요청 본문이 받는 사람을 정하지 못한다.
  *
- * <p>계약은 {@code docs/backend/notification.md} 의 「API」 가 갖는다.
+ * <p>계약은 {@code backend/docs/flow.md} 의 「API(알림)」 가 갖는다.
  */
 @RestController
 @RequestMapping("/api/v1/notifications")

@@ -67,7 +67,7 @@ public class ContextAssembler implements OmittedMemories {
             도구 결과가 제안으로 남았다고 하면 사용자가 받아들여야 기억한다는 것을 답에서 알린다. 사용자가 기억해 달라고 했으면 기억했는지 답에서 알린다.
             """.stripTrailing();
 
-    /** 개인 사실 구역의 머리 줄과 안내 글이다. 구역을 고르는 규칙은 {@code docs/backend/memory.md} 의 「개인 사실 구역」 이 갖는다. */
+    /** 개인 사실 구역의 머리 줄과 안내 글이다. 구역을 고르는 규칙은 {@code backend/docs/flow.md} 의 「개인 사실 구역」 이 갖는다. */
     private static final String FACTS_HEADER = """
             # 지금 묻는 사람에 대해 기억한 것
 

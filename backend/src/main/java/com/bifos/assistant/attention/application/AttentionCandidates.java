@@ -23,7 +23,7 @@ public interface AttentionCandidates {
     /** 요청자의 원래 기록을 읽어 후보를 낸다. 다른 패키지의 기록을 고치지 않는다. */
     List<AttentionCandidate> read(CurrentUser user, Instant now);
 
-    /** 상태 지문이다. 재료는 {@code docs/backend/attention.md} 「후보와 trigger」 표의 「{@code stateKey} 의 재료」 칸이다. */
+    /** 상태 지문이다. 재료는 {@code backend/docs/flow.md} 「후보와 trigger」 표의 「{@code stateKey} 의 재료」 칸이다. */
     static String stateKey(AttentionTrigger trigger, String material) {
         return Sha256.hex16(trigger.name() + "|" + material);
     }

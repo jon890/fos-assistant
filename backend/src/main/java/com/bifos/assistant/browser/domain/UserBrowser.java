@@ -24,7 +24,7 @@ import lombok.experimental.Accessors;
 /**
  * 사용자 한 사람의 브라우저 한 줄이다.
  *
- * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 가 갖고, 상태 전이는 {@code docs/backend/user-browser.md} 의
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 가 갖고, 상태 전이는 {@code backend/docs/flow.md} 의
  * 「상태 전이」 가 갖는다. 쿠키와 저장소, 열린 주소는 이 줄에 없다. 로그인 세션은 프로필 디렉터리에만 남는다.
  *
  * <p>전이는 {@link Version} 의 낙관적 잠금으로 하나씩만 일어난다. 허용하지 않는 전이는 {@link ErrorCode#BROWSER_BUSY} 다.

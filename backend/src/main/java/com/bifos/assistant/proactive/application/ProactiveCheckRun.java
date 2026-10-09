@@ -27,7 +27,7 @@ import java.util.List;
  * 먼저 살펴보기 한 번의 {@link CheckTurn} 이다(ADR-080, ADR-081). 살펴보기마다 새로 만들고 빈으로 두지 않는다.
  *
  * <p>{@code instructions}, {@code input}, {@code session_id} 에 싣는 것은 이 클래스가 조립한다. 지시를 고르는 규칙과 대화에
- * 남기는 때는 {@code docs/backend/proactive-check.md} 의 「Control Plane 지시」 와 「대화에 남는 것」 이 갖는다.
+ * 남기는 때는 {@code backend/docs/flow.md} 의 「Control Plane 지시」 와 「대화에 남는 것」 이 갖는다.
  * {@link ProactiveCheckResults} 가 결과와 셈을 들고, 이 조정자는 {@link #record} 로
  * 그 값을 살펴보기 줄에 한 번 적는다. 스트림 스레드와 turn 스레드가 같은 엔티티를 함께 고치지 않게 하기 위해서다.
  *

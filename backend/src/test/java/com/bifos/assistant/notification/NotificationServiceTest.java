@@ -41,7 +41,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 알림을 만들고 읽고 읽음으로 표시하는 흐름을 실제 DB 로 확인한다(ADR-070).
  *
- * <p>계약은 {@code docs/backend/notification.md} 다. 받는 사람은 번호로만 두므로 사용자 줄을 만들지 않고 다른 검사와 겹치지
+ * <p>계약은 {@code backend/docs/flow.md} 다. 받는 사람은 번호로만 두므로 사용자 줄을 만들지 않고 다른 검사와 겹치지
  * 않는 번호를 쓴다.
  */
 @BackendIntegrationTest

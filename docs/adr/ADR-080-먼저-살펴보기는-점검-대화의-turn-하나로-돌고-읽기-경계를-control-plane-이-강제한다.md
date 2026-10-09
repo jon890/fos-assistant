@@ -78,4 +78,4 @@
     외부 변화는 Control Plane 이 알지 못하므로 `NO_CHANGE` 선행 판정은 목표의 `next_check_after` 가 생기는 다음 단계로 미룬다.
   - **비용과 효과 요약.** 관리자 영역에 살펴보기마다의 트리 비용, 「새로 알릴 것」 하나당 비용, 받아들인 제안 수를 보인다. 받아들인 수는 할 일([ADR-073](ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md)) 줄로 센다
   - **커넥터 manifest 의 `agent_skills`.** 커넥터 plugin 이 일반 에이전트용 `proactive-check` 스킬을 선언하고 Control Plane 이 게시한다.
-- **적용 범위**: `proactive` 패키지, `ChatService` 의 살펴보기 turn, 커넥터 도구 판정, Control Plane MCP, `agent_delegate`. 흐름은 [`docs/backend/proactive-check.md`](../backend/proactive-check.md) 가 갖는다.
+- **적용 범위**: `proactive` 패키지, `ChatService` 의 살펴보기 turn, 커넥터 도구 판정, Control Plane MCP, `agent_delegate`. 흐름은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 가 갖는다.

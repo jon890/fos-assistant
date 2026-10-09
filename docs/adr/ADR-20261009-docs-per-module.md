@@ -25,15 +25,21 @@
 | --- | --- |
 | `docs/privacy.md` | 바깥 주소가 고정이다. Google OAuth 동의 화면이 이 경로를 가리킨다 |
 | `hermes/docs/hermes-contract.md` | 우리 모듈이 아니라 upstream Hermes 의 동작이다. `hermes/tests/hermes_contract.py` 와 짝이고 Hermes 를 올릴 때만 바뀐다 |
-| 코드 옆 README(`hermes/README.md`, plugin 의 README, `hermes/connectors/` 의 README) | 그 디렉터리를 고치는 PR 의 diff 에 함께 보인다 |
+| 코드 옆 README(`hermes/README.md`, plugin 의 README, `hermes/connectors/` 의 README 등) | 그 디렉터리를 고치는 PR 의 diff 에 함께 보인다 |
+| `docs/self-hosting.md` | 정리 전이다. 구현 전인 계획서가 이 파일의 환경 변수 표를 고친다. 그 계획이 끝나면 README 와 설정 파일 주석으로 옮긴다 |
 | `README.md`, `README.ko.md`, `AGENTS.md` | 문서가 아니라 입구와 규칙이다 |
+
+두 검사가 이 결정을 지킨다.
+
+- `test/unit/doc-files.test.ts`: 정해진 이름과 위 예외 밖에 `.md` 가 생기면 실패한다. 예외는 그 파일의 목록에 까닭과 함께 더한다.
+- `scripts/check-file-length.mjs`: 루트와 모듈 `docs/` 바로 아래 문서가 한 파일 1,000줄을 넘으면 `알림:` 을 낸다. 실패로 막지 않는다. 정해진 파일이라 나눌 수 없고 새 기능은 그 파일의 절로 더해야 하기 때문이다. ADR 은 보지 않는다.
 
 **코드와 설정이 이미 가진 값을 문서에 옮겨 적지 않는다.**
 API 경로와 응답 칸의 목록, 설정 키 표, enum 값 목록, 마이그레이션의 칸 표, 상수와 클래스 값이 여기 든다.
 문서는 코드만 읽어서는 알 수 없는 것을 적는다. 왜 그렇게 했는지, 어느 분기에서 무엇이 갈리는지, 지울 때 무엇이 함께 지워지는지다.
 화면 문구처럼 확인 기준이 되는 값은 시험이 문서를 읽어 코드와 맞춰 볼 때만 남긴다(`attention.test.ts` 의 「이유 문구」 표).
 
-이 결정으로 `docs/frontend/` 의 여섯 파일을 `web/docs/` 의 셋으로, `docs/hermes/` 와 커넥터 문서를 hermes 모듈의 계약 문서와 코드 옆 README 로 옮겼다. backend 는 저장 모델과 패키지 문서를 `backend/docs/` 의 `data-schema.md` 와 `code-architecture.md` 로 옮겼고, 기능 문서와 루트 문서는 같은 방식으로 이어 옮긴다.
+이 결정으로 `docs/frontend/` 의 여섯 파일을 `web/docs/` 의 셋으로, `docs/hermes/` 와 커넥터 문서를 hermes 모듈의 계약 문서와 코드 옆 README 로 옮겼다. backend 는 저장 모델과 패키지 문서를 `data-schema.md` 와 `code-architecture.md` 로, 기능 문서와 모델 단계 문서를 `flow.md` 로 옮겼다. 루트 문서는 같은 방식으로 이어 정리한다.
 
 ### 맥락
 
@@ -53,6 +59,7 @@ web 문서에서도 관리자 메뉴 다섯(코드는 일곱), 지금 화면의 
 
 ### 감당할 것
 
-`backend/docs/flow.md` 는 한 파일이 1,000줄 가까이 될 것으로 본다. 파일 머리의 절 목차와 기능 이름 절로 찾게 한다.
-여러 문서를 한 파일로 합치면 같은 이름의 절이 생길 수 있어 절 이름을 기능 이름으로 짓는다. 헤딩 중복 검사가 모듈 `docs/` 를 본다.
+`backend/docs/flow.md` 는 코드 값의 복사본을 지운 뒤에도 약 5,900줄이다. 파일 머리의 절 목차와 기능 이름 절로 찾게 한다.
+더 줄이는 것은 이후 그 기능을 고치는 PR 이 맡는다. 파일 길이 검사는 한도를 넘는 동안 알림을 내 리뷰에서 보이게 한다.
+여러 문서를 한 파일로 합치면 같은 이름의 절이 생긴다. 하위 절은 「API(알림)」 처럼 괄호에 기능 이름을 붙여 나눈다. 헤딩 중복 검사가 모듈 `docs/` 를 본다.
 옮기는 동안 열린 브랜치가 옛 경로의 문서를 고치면 합칠 때 새 파일의 절로 옮겨 적어야 한다. 그래서 그 모듈을 고치는 브랜치가 머지된 뒤에 옮긴다.

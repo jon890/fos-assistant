@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>그 실행의 트리 루트({@link AgentExecution#treeRootId()})가 {@code proactive_check.root_execution_id} 에 있으면 살펴보기
  * 트리다. 커넥터 도구 판정, Control Plane MCP, 위임이 이 판정으로 읽기 경계를 건다. 쓰기 도구를 허용한 살펴보기(ADR-082)는
- * 커넥터 판정과 Control Plane MCP 의 경계가 넓어진다. 경계는 {@code docs/backend/proactive-check.md} 의 「읽기 경계」 가 갖는다.
+ * 커넥터 판정과 Control Plane MCP 의 경계가 넓어진다. 경계는 {@code backend/docs/flow.md} 의 「읽기 경계」 가 갖는다.
  */
 @Component
 @RequiredArgsConstructor

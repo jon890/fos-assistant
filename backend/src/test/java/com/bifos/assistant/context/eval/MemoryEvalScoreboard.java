@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 사례마다의 조립 판정을 모아 지표와 보고서를 만든다. 지표의 정의는 {@code docs/backend/memory-eval.md} 의 「지표」 가 갖는다.
+ * 사례마다의 조립 판정을 모아 지표와 보고서를 만든다. 지표의 정의는 {@code backend/docs/flow.md} 의 「지표(Memory 회수 측정)」 가 갖는다.
  *
  * <p>모드마다, 범주마다 센다. 보고서는 모드를 열로 둔다. 분모가 0 인 비율은 숫자 대신 「해당 없음」(JSON 은 {@code null}) 이다.
  */

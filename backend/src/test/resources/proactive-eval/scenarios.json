@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "합성 데이터다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다. 칸의 뜻은 docs/backend/proactive-eval.md 가 갖는다.",
+  "note": "합성 데이터다. 실제 사람, 메일, 계정, 금액, 대화 내용을 쓰지 않는다. 칸의 뜻은 backend/docs/flow.md 가 갖는다.",
   "providers": {
     "fixture-a": {
       "description": "근거와 비용을 보수적으로 읽는 판단 기록. 느리고 비싼 모델을 흉내 낸다",

@@ -99,7 +99,7 @@ CONNECTOR_TOOLSETS = frozenset({"vision"})
 
 
 # `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
-# 표는 `docs/backend/connector-tool-policy.md` 의 「도구 정책」 과 같다.
+# 표는 `backend/docs/flow.md` 의 「도구 정책」 과 같다.
 TOOL_RISKS = ("READ", "SENSITIVE", "WRITE", "DESTRUCTIVE", "FINANCIAL")
 
 

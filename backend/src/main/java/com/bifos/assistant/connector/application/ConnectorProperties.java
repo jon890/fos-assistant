@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 선택지 조회, 등록, 연결 확인을 사용자마다 제한하는 한도다({@code docs/backend/connector-tool-policy.md} 의 「사용자별 호출 제한」).
+ * 선택지 조회, 등록, 연결 확인을 사용자마다 제한하는 한도다({@code backend/docs/flow.md} 의 「사용자별 호출 제한」).
  *
  * @param maxConcurrentCalls 한 사용자가 동시에 돌릴 수 있는 호출 수
  * @param callsPerMinute 한 사용자가 60초 동안 돌릴 수 있는 호출 수

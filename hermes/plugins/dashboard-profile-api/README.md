@@ -6,7 +6,7 @@ Hermes 대시보드에 설치하는 plugin 이다. Control Plane 이 profile 과
 ## dashboard-profile-api 가 여는 것
 
 인증은 모두 `Authorization: Bearer <대시보드 서비스 토큰>` 이고 없거나 틀리면 401 이다.
-Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문서가 갖는다. 커넥터 경로는 [커넥터 설치](../../../docs/backend/connector-install.md) 의 「대시보드 plugin 계약」 이, 에이전트 만들기는 [에이전트](../../../docs/backend/agent.md) 가 갖는다.
+Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문서가 갖는다. 커넥터 경로는 [커넥터 설치](../../../backend/docs/flow.md) 의 「대시보드 plugin 계약」 이, 에이전트 만들기는 [에이전트](../../../backend/docs/flow.md) 가 갖는다.
 
 | 요청 | 쓰임 | 본문이나 query | 성공 | 실패 |
 | --- | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `GET /api/skills?profile=<p>` | 지정한 profile 의 스킬 목록을 읽는다 | query `profile` 하나 | 200 `[{name, description, category, enabled, usage, provenance}]`. `enabled` 는 전역 `skills.disabled` 만 반영 | 400 query 누락, 둘 이상, `default`. 404 |
 | `PUT /api/skills/toggle` | 지정한 profile 의 스킬 하나를 켜고 끈다 | `{profile, name, enabled}` | 200 `{ok, name, enabled}` | 400, 404 |
 | `GET PUT /api/profiles/<이름>/soul` | 그 profile 의 SOUL.md 를 읽고 쓴다 | `PUT` 은 `{content}` | 200 | |
-| `GET /api/profiles/<이름>/model-defaults` | 그 profile 설정의 `provider`, `model`, `reasoningEffort` 세 값만 읽는다. 기본 profile 도 읽는다 | 없음 | 200 `{provider, model, reasoningEffort}`. 없는 값은 `null`. 설정 전체와 비밀값은 반환하지 않는다. [모델 단계와 실행 기록](../../../docs/model-tiers.md) 의 「profile 기본 강도」 를 따른다 | 400 이름 형식. 404 없는 profile. 503 설정을 읽지 못함 |
+| `GET /api/profiles/<이름>/model-defaults` | 그 profile 설정의 `provider`, `model`, `reasoningEffort` 세 값만 읽는다. 기본 profile 도 읽는다 | 없음 | 200 `{provider, model, reasoningEffort}`. 없는 값은 `null`. 설정 전체와 비밀값은 반환하지 않는다. [모델 단계와 실행 기록](../../../backend/docs/flow.md) 의 「profile 기본 강도」 를 따른다 | 400 이름 형식. 404 없는 profile. 503 설정을 읽지 못함 |
 | `GET /api/profiles/<이름>/sessions/<session id>/provider` | 그 profile 의 자식 session 한 줄에서 provider 와 모델만 읽는다. 기본 profile 도 읽는다 | 없음 | 200 `{provider, model}`. 아래 「자식 session 의 provider」 가 칸을 갖는다 | 400 이름이나 session 번호 형식. 404 없는 profile, 없는 session, 자식이 아닌 session. 503 저장소를 읽지 못함 |
 
 표의 「그 profile」 은 있고 `default` 가 아닌 이름이다.
@@ -99,7 +99,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 
 **plugin 은 커넥터의 이름을 코드에 두지 않는다.**
 운영 목록의 plugin 디렉터리마다 `connector.json` 을 읽어 카탈로그로 내고, 선택지와 확인 도구를 대신 부른다.
-`connector.json` 의 형식은 [커넥터 연결](../../connectors/README.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../../../docs/backend/connector-install.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
+`connector.json` 의 형식은 [커넥터 연결](../../connectors/README.md) 의 「connector.json」 이 소유한다. 커넥터 경로가 설치와 확인에서 뜻하는 것은 [커넥터 설치](../../../backend/docs/flow.md) 의 「대시보드 plugin 계약」 이 소유한다. 근거는 [ADR-043](../../../backend/docs/adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md) 에 있다.
 
 **운영 목록은 환경 변수 `FOS_ASSISTANT_CONNECTOR_ROOTS` 로 받는다.** 커넥터 이름마다 값 하나를 둔 JSON object 다.
 
@@ -146,7 +146,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 인자와 결과를 로그에 싣지 않는다
 - 실행되지 않은 것이 분명한 실패는 `{ok: false}` 로, 시간 초과와 도구 호출을 보낸 뒤의 실패는 504 로 답한다. 504 는 실행됐는지 모른다는 뜻이다
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. `call` 에서는 그 코드를 `unavailable` 로 돌려준다
-- 요청과 응답은 [커넥터 연결](../../../docs/connectors.md) 의 「승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
+- 요청과 응답은 [커넥터 연결](../../../backend/docs/flow.md) 의 「커넥터 승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
 **소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖는다.** 옛 설치는 요청마다 지금의 manifest 와 같은지 검증한다. 아래 표는 옛 설치의 판정이다.
 
@@ -160,7 +160,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 값이 바뀌어 503 이 된 profile 은 값을 되돌리면 다시 읽힌다.
 바인딩의 실행과 probe 는 요청이 가리키는 커넥터의 항목만 견준다. 상태 조회는 바뀐 바인딩 항목만 `configured: false` 로 답하고, 같은 profile 의 다른 커넥터는 probe 와 실행과 붙이기가 그대로 된다.
 바인딩 설치는 기록의 형식과 실제 설정의 소유권을 확인한 뒤, command, args, env 가 바뀌었어도 새 manifest 로 다시 설치한다. 보관 파일과 연결 값은 유지한다. 떼기는 바인딩 항목을 지금 manifest 와 견주지 않는다.
-연결 확인과 관리자 반영 완료의 재설치·재시작 대기 흐름은 [커넥터 설치](../../../docs/backend/connector-install.md) 의 「바인딩의 반영 맞추기」 가 갖는다.
+연결 확인과 관리자 반영 완료의 재설치·재시작 대기 흐름은 [커넥터 설치](../../../backend/docs/flow.md) 의 「바인딩의 반영 맞추기」 가 갖는다.
 **운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 옛 설치의 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
 
 **설치는 두 가지다.** 소유 기록 항목의 `mode` 가 방식을 적는다. 칸이 없으면 옛 설치다.
@@ -189,7 +189,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 옛 설치와 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
-`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 도구 정책](../../../docs/backend/connector-tool-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
+`GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일과 `tools.exclude` 가 지금 manifest 와 맞을 때만 참이며, 조건은 [커넥터 도구 정책](../../../backend/docs/flow.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
 **한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록의 필드 모양·운영자 env 표현을 받는다**([ADR-041](../../../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)). 옛 설치는 실행 정의의 command·args 가 지금 manifest 와 다른 기록을 받지 않는다. 바인딩은 위 재설치 경로로 새 정의를 적용한다.
 

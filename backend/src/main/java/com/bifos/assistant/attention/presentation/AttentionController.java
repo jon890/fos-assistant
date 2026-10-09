@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 요청자 자신의 지금 화면 카드를 읽고, 그 항목을 숨기거나 미루고, 항목에 한 일을 남기는 경로다. 요청자의 기록만 읽고 쓴다.
  *
- * <p>계약은 {@code docs/backend/attention.md} 의 「API」 가 갖는다. {@code itemKey} 에 {@code :} 와 UUID 가 들어 있어 경로 대신
+ * <p>계약은 {@code backend/docs/flow.md} 의 「API(먼저 알리기와 지금 화면의 판정)」 가 갖는다. {@code itemKey} 에 {@code :} 와 UUID 가 들어 있어 경로 대신
  * 본문으로 받는다.
  */
 @RestController
