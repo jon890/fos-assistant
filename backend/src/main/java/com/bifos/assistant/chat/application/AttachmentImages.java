@@ -47,6 +47,13 @@ public class AttachmentImages {
     static final long SEND_WAIT_SECONDS = 5;
 
     /**
+     * 한 번 보낼 때 디코딩 차례를 기다리는 시간의 합 상한(초)이다. {@link #SEND_WAIT_SECONDS} 의 세 배다. 사진마다 차례를
+     * 기다리면 서른 장에서 대기 합이 몇 분까지 길어져 실행 시작이 그만큼 늦는다. 마감이 지나면 기다리지 않고 비어 있는
+     * 차례만 쓴다.
+     */
+    static final long SEND_DEADLINE_SECONDS = SEND_WAIT_SECONDS * 3;
+
+    /**
      * 한 턴에 싣는 사진의 화소 합 상한이다. 1600×1200 열 장이다. 같은 턴의 도구 호출마다 이미지가 다시 실리므로 도구 호출 한
      * 번의 이미지 토큰을 묶는다. 근거는 ADR-20261009 / native-image-input 의 「상한의 근거」 에 있다.
      */
@@ -57,10 +64,10 @@ public class AttachmentImages {
 
     /**
      * 가장 작은 단계(768)에서 {@code data:} 주소 길이 합이 넘칠 때 차례로 낮추는 JPEG 품질이다. 큰 단계에서 품질을 낮추기보다
-     * 긴 변을 줄이는 쪽이 글씨 판독에 덜 해로워 가장 작은 단계에서만 낮춘다. 완전한 잡음 사진 30장도 품질 0.4 면 예산 안에
-     * 든다. 근거는 ADR-20261009 / native-image-input 의 「상한의 근거」 에 있다.
+     * 긴 변을 줄이는 쪽이 글씨 판독에 덜 해로워 가장 작은 단계에서만 낮춘다. 완전한 잡음 사진 30장도 4:3 이면 품질 0.4,
+     * 정사각형이면 품질 0.3 에서 예산 안에 든다. 근거는 ADR-20261009 / native-image-input 의 「상한의 근거」 에 있다.
      */
-    static final List<Float> SMALLEST_QUALITIES = List.of(AgentImageResizer.QUALITY, 0.6f, 0.4f);
+    static final List<Float> SMALLEST_QUALITIES = List.of(AgentImageResizer.QUALITY, 0.6f, 0.4f, 0.3f);
 
     /**
      * 한 턴에 싣는 {@code data:} 주소 길이 합의 상한이다. Hermes 요청 본문 상한 10MB 에서 기억 문맥과 지시문, 입력 글의
@@ -80,20 +87,21 @@ public class AttachmentImages {
      * @return 사본이 있으면 참. 차례를 얻지 못했거나 만들지 못했으면 거짓
      */
     public boolean prepareSmall(ChatAttachment attachment) {
-        return prepareSmall(attachment, DECODING_WAIT_SECONDS);
+        return prepareSmall(attachment, TimeUnit.SECONDS.toNanos(DECODING_WAIT_SECONDS));
     }
 
     /**
-     * 줄인 사본이 없으면 만든다. 디코딩 차례를 {@code waitSeconds} 초까지 기다린다. 트랜잭션 밖에서 부른다.
+     * 줄인 사본이 없으면 만든다. 디코딩 차례를 {@code waitNanos} 나노초까지 기다린다. 0 이면 기다리지 않는다. 트랜잭션 밖에서
+     * 부른다.
      *
      * @return 사본이 있으면 참. 차례를 얻지 못했거나 만들지 못했으면 거짓
      */
-    public boolean prepareSmall(ChatAttachment attachment, long waitSeconds) {
+    private boolean prepareSmall(ChatAttachment attachment, long waitNanos) {
         try {
             if (store.hasSmall(attachment)) {
                 return true;
             }
-            if (!decoding.tryAcquire(waitSeconds, TimeUnit.SECONDS)) {
+            if (!decoding.tryAcquire(waitNanos, TimeUnit.NANOSECONDS)) {
                 return false;
             }
             try {
@@ -122,7 +130,7 @@ public class AttachmentImages {
      * 보내는 메시지의 사진마다 에이전트에게 어떻게 보일지를 첨부 순서대로 정한다.
      *
      * <p>{@code embed} 가 참이면 사본이 없는 사진은 디코딩 차례를 {@link #SEND_WAIT_SECONDS} 초까지 기다려 한 번 만들어
-     * 본다. 사본을 읽고 크기를 안 사진을 모두 같은 긴 변 단계({@link #LONG_SIDES})로 싣는다. 화소 합이
+     * 본다. 사본을 만들 때와 다시 줄일 때의 대기는 이 호출을 시작한 때부터 {@link #SEND_DEADLINE_SECONDS} 초 안으로 줄인다. 사본을 읽고 크기를 안 사진을 모두 같은 긴 변 단계({@link #LONG_SIDES})로 싣는다. 화소 합이
      * {@link #MAX_PIXELS} 안에 드는 가장 큰 단계부터 보고, {@code data:} 주소 길이 합이 {@link #MAX_ENCODED_BYTES} 를 넘으면
      * 한 단계 내린다. 가장 작은 단계에서도 넘치면 JPEG 품질을 {@link #SMALLEST_QUALITIES} 차례로 낮춘다. 1600 단계는 사본을
      * 그대로 싣고, 그보다 작은 단계와 낮춘 품질은 사본을 다시 줄여 싣는다. 다시 줄인 것은 파일로 남기지 않는다.
@@ -133,8 +141,8 @@ public class AttachmentImages {
      *
      * <p>{@code embed} 가 거짓이면 사본을 만들지도 싣지도 않고, 있는 사본만 본다.
      *
-     * <p>사진 한 장의 실패는 삼킨다. 사본을 읽지 못하면 그 사진을 싣지 않고 원본 이름으로 안내한다. 사본의 크기를 모르거나
-     * 다시 줄이지 못하면 그 사진을 싣지 않고 사본 이름으로 안내한다.
+     * <p>사진 한 장의 실패는 삼킨다. 사본을 읽지 못하거나, 사본의 크기를 모르거나, 다시 줄이지 못한 사진은 싣지 않고 지시문이
+     * 싣지 못했다고 안내한다. {@link AgentPhoto#agentFileName()} 은 흐름 경로의 안내에 쓴다.
      *
      * @param order 첨부 번호마다 그 대화에서 몇 번째 사진인지. 보낸 사진은 모두 들어 있어야 한다
      */
@@ -142,12 +150,15 @@ public class AttachmentImages {
         List<Integer> ordinals = new ArrayList<>(attached.size());
         List<String> agentFileNames = new ArrayList<>(attached.size());
         List<Candidate> candidates = new ArrayList<>();
+        long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(SEND_DEADLINE_SECONDS);
         for (ChatAttachment attachment : attached) {
             Integer ordinal = order.get(attachment.id());
             if (ordinal == null) {
                 throw new IllegalStateException("attachment " + attachment.id() + " is not bound to a message");
             }
-            boolean small = embed ? prepareSmall(attachment, SEND_WAIT_SECONDS) : hasSmallQuietly(attachment);
+            boolean small = embed
+                    ? prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime()))
+                    : hasSmallQuietly(attachment);
             if (small && embed) {
                 byte[] copy = readSmallQuietly(attachment);
                 small = copy != null;
@@ -161,17 +172,20 @@ public class AttachmentImages {
             agentFileNames.add(small ? AttachmentStore.smallName(attachment.id()) : attachment.storedName());
         }
         String[] dataUrls = new String[attached.size()];
-        int longSide = embedCandidates(candidates, dataUrls);
+        embedCandidates(candidates, dataUrls, deadlineNanos);
         List<AgentPhoto> photos = new ArrayList<>(attached.size());
         for (int i = 0; i < attached.size(); i++) {
-            photos.add(new AgentPhoto(
-                    attached.get(i).id(),
-                    ordinals.get(i),
-                    agentFileNames.get(i),
-                    dataUrls[i],
-                    dataUrls[i] == null ? 0 : longSide));
+            photos.add(new AgentPhoto(attached.get(i).id(), ordinals.get(i), agentFileNames.get(i), dataUrls[i]));
         }
         return photos;
+    }
+
+    /**
+     * 마감 {@code deadlineNanos} 까지 남은 시간과 {@link #SEND_WAIT_SECONDS} 가운데 짧은 쪽(나노초)이다. 마감이 지났으면
+     * 0 이다. 두 시각은 {@link System#nanoTime()} 기준이다.
+     */
+    static long sendWaitNanos(long deadlineNanos, long nowNanos) {
+        return Math.max(0, Math.min(TimeUnit.SECONDS.toNanos(SEND_WAIT_SECONDS), deadlineNanos - nowNanos));
     }
 
     /** 긴 변을 {@code longSide} 로 줄였을 때의 화소 수다. 작은 사진은 키우지 않으므로 받은 크기 그대로 센다. */
@@ -210,41 +224,40 @@ public class AttachmentImages {
     }
 
     /**
-     * 후보를 한 단계로 싣는다. 실은 사진의 {@code data:} 주소를 {@code dataUrls} 의 제자리에 채우고 그 단계를 돌려준다.
+     * 후보를 한 단계로 싣는다. 실은 사진의 {@code data:} 주소를 {@code dataUrls} 의 제자리에 채운다.
      * 가장 작은 단계보다 큰 단계는 품질 {@link AgentImageResizer#QUALITY} 로 만든 주소를 모두 담을 수 있을 때만 고른다.
      * 가장 작은 단계는 {@link #SMALLEST_QUALITIES} 를 차례로 보며, 마지막 품질 앞까지는 모두 담을 수 있을 때만 확정하고
      * 마지막 품질에서만 앞에서부터 담는다.
      */
-    private int embedCandidates(List<Candidate> candidates, String[] dataUrls) {
-        int first = LONG_SIDES.indexOf(
-                chooseLongSide(candidates.stream().map(Candidate::size).toList(), MAX_PIXELS));
+    private void embedCandidates(List<Candidate> candidates, String[] dataUrls, long deadlineNanos) {
+        int first = LONG_SIDES.indexOf(chooseLongSide(sizes(candidates), MAX_PIXELS));
         for (int step = first; step < LONG_SIDES.size() - 1; step++) {
-            int longSide = LONG_SIDES.get(step);
-            if (placeAll(candidates, longSide, AgentImageResizer.QUALITY, dataUrls)) {
-                return longSide;
+            if (placeAll(candidates, LONG_SIDES.get(step), AgentImageResizer.QUALITY, dataUrls, deadlineNanos)) {
+                return;
             }
         }
         int smallest = LONG_SIDES.getLast();
         for (int i = 0; i < SMALLEST_QUALITIES.size() - 1; i++) {
-            if (placeAll(candidates, smallest, SMALLEST_QUALITIES.get(i), dataUrls)) {
-                return smallest;
+            if (placeAll(candidates, smallest, SMALLEST_QUALITIES.get(i), dataUrls, deadlineNanos)) {
+                return;
             }
         }
-        List<String> encoded = encodeAt(candidates, smallest, SMALLEST_QUALITIES.getLast(), Long.MAX_VALUE);
-        place(candidates, admitInOrder(candidates, encoded, smallest), dataUrls);
-        return smallest;
+        List<String> encoded =
+                encodeAt(candidates, smallest, SMALLEST_QUALITIES.getLast(), Long.MAX_VALUE, deadlineNanos);
+        place(candidates, admitInOrder(sizes(candidates), encoded, smallest), dataUrls);
     }
 
     /**
      * 긴 변 {@code longSide}, 품질 {@code quality} 로 만든 주소를 모두 담을 수 있으면 {@code dataUrls} 에 채우고 참을
      * 돌려준다. 하나라도 담지 못하면 아무것도 채우지 않고 거짓이다.
      */
-    private boolean placeAll(List<Candidate> candidates, int longSide, float quality, String[] dataUrls) {
-        List<String> encoded = encodeAt(candidates, longSide, quality, MAX_ENCODED_BYTES);
+    private boolean placeAll(
+            List<Candidate> candidates, int longSide, float quality, String[] dataUrls, long deadlineNanos) {
+        List<String> encoded = encodeAt(candidates, longSide, quality, MAX_ENCODED_BYTES, deadlineNanos);
         if (encoded == null) {
             return false;
         }
-        List<String> admitted = admitInOrder(candidates, encoded, longSide);
+        List<String> admitted = admitInOrder(sizes(candidates), encoded, longSide);
         if (!admitted.equals(encoded)) {
             return false;
         }
@@ -257,11 +270,12 @@ public class AttachmentImages {
      * 이다. 길이 합이 {@code maxEncodedBytes} 를 넘으면 남은 사진을 줄이지 않고 null 을 돌려준다. 이 단계로는 모두 싣지
      * 못하기 때문이다.
      */
-    private List<String> encodeAt(List<Candidate> candidates, int longSide, float quality, long maxEncodedBytes) {
+    private List<String> encodeAt(
+            List<Candidate> candidates, int longSide, float quality, long maxEncodedBytes, long deadlineNanos) {
         List<String> encoded = new ArrayList<>(candidates.size());
         long total = 0;
         for (Candidate candidate : candidates) {
-            String dataUrl = encodedAt(candidate, longSide, quality);
+            String dataUrl = encodedAt(candidate, longSide, quality, deadlineNanos);
             if (dataUrl != null) {
                 total += dataUrl.length();
                 if (total > maxEncodedBytes) {
@@ -275,10 +289,10 @@ public class AttachmentImages {
 
     /**
      * 사본 하나를 긴 변 {@code longSide}, 품질 {@code quality} 의 {@code data:} 주소로 만든다. 크기가 그대로이고 품질이
-     * {@link AgentImageResizer#QUALITY} 이면 사본을 그대로 쓰고, 아니면 디코딩 차례를 얻어 다시 줄인다. 차례를 얻지
-     * 못했거나 줄이지 못했으면 null 이다.
+     * {@link AgentImageResizer#QUALITY} 이면 사본을 그대로 쓰고, 아니면 디코딩 차례를 얻어 다시 줄인다. 차례는
+     * {@link #sendWaitNanos} 만큼 기다린다. 차례를 얻지 못했거나 줄이지 못했으면 null 이다.
      */
-    private String encodedAt(Candidate candidate, int longSide, float quality) {
+    private String encodedAt(Candidate candidate, int longSide, float quality, long deadlineNanos) {
         Dimension size = candidate.size();
         if (quality == AgentImageResizer.QUALITY
                 && AgentImageResizer.scaledSize(size.width, size.height, longSide)
@@ -286,7 +300,7 @@ public class AttachmentImages {
             return dataUrl(candidate.copy());
         }
         try {
-            if (!decoding.tryAcquire(SEND_WAIT_SECONDS, TimeUnit.SECONDS)) {
+            if (!decoding.tryAcquire(sendWaitNanos(deadlineNanos, System.nanoTime()), TimeUnit.NANOSECONDS)) {
                 return null;
             }
             try {
@@ -311,8 +325,11 @@ public class AttachmentImages {
     /**
      * 앞 사진부터 {@link #admits} 로 담는다. 주소가 없는 사진은 건너뛰고, 담지 못하는 사진을 만나면 그 뒤는 담지 않는다. 담은
      * 사진의 자리에만 주소가 있다.
+     *
+     * @param sizes 사진마다 사본의 가로와 세로. {@code encoded} 와 같은 차례다
+     * @param encoded 사진마다 만든 {@code data:} 주소. 만들지 못한 자리는 null 이다
      */
-    private static List<String> admitInOrder(List<Candidate> candidates, List<String> encoded, int longSide) {
+    static List<String> admitInOrder(List<Dimension> sizes, List<String> encoded, int longSide) {
         List<String> admitted = new ArrayList<>(Collections.nCopies(encoded.size(), (String) null));
         long pixels = 0;
         long encodedBytes = 0;
@@ -321,7 +338,7 @@ public class AttachmentImages {
             if (dataUrl == null) {
                 continue;
             }
-            long nextPixels = pixelsAt(candidates.get(i).size(), longSide);
+            long nextPixels = pixelsAt(sizes.get(i), longSide);
             if (!admits(pixels, encodedBytes, nextPixels, dataUrl.length(), MAX_PIXELS, MAX_ENCODED_BYTES)) {
                 break;
             }
@@ -330,6 +347,10 @@ public class AttachmentImages {
             encodedBytes += dataUrl.length();
         }
         return admitted;
+    }
+
+    private static List<Dimension> sizes(List<Candidate> candidates) {
+        return candidates.stream().map(Candidate::size).toList();
     }
 
     private static void place(List<Candidate> candidates, List<String> admitted, String[] dataUrls) {

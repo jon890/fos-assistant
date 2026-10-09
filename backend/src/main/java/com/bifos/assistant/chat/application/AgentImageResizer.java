@@ -30,6 +30,8 @@ import lombok.NoArgsConstructor;
  * <p>원본 해상도를 그대로 디코딩하지 않고 줄여 읽어(subsampling) 메모리를 결과 크기에 가깝게 둔다. EXIF 회전을
  * 반영하고 투명한 부분은 흰색으로 채운다. 작은 사진은 키우지 않는다. 읽는 리더가 없는 형식(WebP), 화소가
  * {@link #MAX_PIXELS} 를 넘는 사진, 디코딩이나 인코딩이 실패한 사진은 빈 값이다.
+ *
+ * <p>{@link #shrink} 는 보낼 때 사진이 많으면 이 사본을 더 작은 긴 변과 낮춘 JPEG 품질로 다시 줄인다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class AgentImageResizer {

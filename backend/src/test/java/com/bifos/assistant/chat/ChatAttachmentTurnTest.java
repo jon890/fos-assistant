@@ -90,6 +90,10 @@ class ChatAttachmentTurnTest {
     private static final String AGENT_ROOT = "/agent-side/attachments";
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
 
+    /** 지시문에서 「입력에 싣지 못한 사진: …번째 사진. 」 뒤에 붙는 안내다. */
+    private static final String NOT_EMBEDDED_GUIDANCE = "이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다."
+            + " WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n";
+
     @Autowired
     ChatService chat;
 
@@ -234,7 +238,8 @@ class ChatAttachmentTurnTest {
                 .append("사진은 모두 30장이다.\n")
                 .append("입력에 싣지 못한 사진: ")
                 .append(String.join(", ", ordinals))
-                .append(" 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 JPEG 나 PNG 로 다시 올려 달라고 한다.\n");
+                .append(" 사진. ")
+                .append(NOT_EMBEDDED_GUIDANCE);
         expected.append("지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다. read_file 로 읽지 않는다.\n")
                 .append("지난 사진을 vision_analyze 로 볼 때는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n")
                 .append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
@@ -271,7 +276,7 @@ class ChatAttachmentTurnTest {
                 .contains(
                         "사진은 모두 2장이다.\n",
                         "이 메시지에 이미지로 함께 실은 사진: 1번째 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n",
-                        "입력에 싣지 못한 사진: 2번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고" + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n",
+                        "입력에 싣지 못한 사진: 2번째 사진. " + NOT_EMBEDDED_GUIDANCE,
                         "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .doesNotContain("싣지 못한 사진은 아래 경로를", "- 1번째 사진: " + agentDirectory(conversationId));
     }
@@ -398,6 +403,41 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
+    @DisplayName("정사각형 잡음 사진 서른 장은 768 단계에서 품질을 0.3 까지 낮춰 모두 싣는다")
+    void embedsThirtySquareNoiseImagesAtLowestQuality() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        byte[] noise = noisePng(768, 768);
+        List<ChatAttachment> photos = new ArrayList<>();
+        for (int i = 1; i <= properties.maxFiles(); i++) {
+            photos.add(uploadPng(dad, conversationId, "정사각형-" + i + ".png", noise));
+        }
+
+        chat.send(
+                dad,
+                conversationId,
+                "서른 장",
+                null,
+                photos.stream().map(ChatAttachment::id).toList());
+
+        // 768 단계는 품질 0.85 에서 약 17.9MB, 0.6 에서 약 9.95MB, 0.4 에서 약 7.42MB(7,422,330)로 넘치고,
+        // 0.3 에서 약 6.86MB(6,858,570)로 들어간다. 화소 합은 약 1,770만이라 예산 안이다.
+        HermesRunCommand command = stub().received().getFirst();
+        List<String> expectedLabels = new ArrayList<>();
+        for (int i = 1; i <= properties.maxFiles(); i++) {
+            expectedLabels.add(i + "번째 사진");
+        }
+        assertThat(command.images()).extracting(HermesImage::label).containsExactlyElementsOf(expectedLabels);
+        assertThat(command.images().stream()
+                        .mapToLong(image -> image.dataUrl().length())
+                        .sum())
+                .isLessThanOrEqualTo(7L * 1024 * 1024);
+        for (HermesImage image : command.images()) {
+            assertThat(imageSize(image)).as(image.label()).isEqualTo(new Dimension(768, 768));
+        }
+        assertThat(command.input()).doesNotContain("입력에 싣지 못한 사진");
+    }
+
+    @Test
     @DisplayName("잡음 사진 스물네 장과 작은 사진 한 장은 768 단계의 낮춘 품질로 스물다섯 장 모두 싣는다")
     void embedsAllTwentyFiveImagesAtSmallestStepWithLowerQuality() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
@@ -481,7 +521,7 @@ class ChatAttachmentTurnTest {
         assertThat(command.input())
                 .contains(
                         "- 1번째 사진: " + photo.id() + ".png (올린 이름: a.png)\n",
-                        "입력에 싣지 못한 사진: 1번째 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고" + " JPEG 나 PNG 로 다시 올려 달라고 한다.\n")
+                        "입력에 싣지 못한 사진: 1번째 사진. " + NOT_EMBEDDED_GUIDANCE)
                 .doesNotContain("이미지로 함께 실은 사진");
     }
 

@@ -190,7 +190,7 @@ public class AttachmentService {
      *
      * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣는다. 사진이 많으면 모든 사진을
      * 더 작은 긴 변 단계와 낮춘 품질로 줄여 싣는다. 싣지 못한 사진(사본이 없거나 다시 줄이지 못한 사진)은 순번만 적고, 도구로
-     * 읽지 말고 사용자에게 다시 올려 달라고 하게 한다. 운영에서 사본 읽기도 잘렸기 때문이다. 근거는 ADR-20261009 /
+     * 읽지 말고 사용자에게 다시 보내 달라고 하게 한다. 운영에서 사본 읽기도 잘렸기 때문이다. 근거는 ADR-20261009 /
      * native-image-input 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내해
      * {@code vision_analyze} 로 보게 한다.
      * 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
@@ -243,7 +243,7 @@ public class AttachmentService {
 
     /**
      * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. {@code embedImages} 가 참이면 싣지 못한 사진의 순번을 한
-     * 줄에 적고 도구로 읽지 말고 사용자에게 다시 올려 달라고 하게 한다. 거짓(흐름)이면 사진마다 경로를 적어
+     * 줄에 적고 도구로 읽지 말고 사용자에게 다시 보내 달라고 하게 한다. 거짓(흐름)이면 사진마다 경로를 적어
      * {@code vision_analyze} 로 보게 한다.
      */
     private static String photoGuidance(String directory, List<AgentPhoto> photos, boolean embedImages) {
@@ -267,8 +267,8 @@ public class AttachmentService {
                     .append(notEmbedded.stream()
                             .map(photo -> photo.ordinal() + "번째")
                             .collect(Collectors.joining(", ")))
-                    .append(" 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고")
-                    .append(" JPEG 나 PNG 로 다시 올려 달라고 한다.\n");
+                    .append(" 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다.")
+                    .append(" WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n");
         } else {
             guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
             for (AgentPhoto photo : notEmbedded) {
