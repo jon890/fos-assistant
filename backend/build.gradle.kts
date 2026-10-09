@@ -40,6 +40,8 @@ dependencies {
 
     implementation(libs.springdoc.openapi.starter.webmvc.ui)
 
+    implementation(libs.commons.compress)
+
     compileOnly(libs.lombok)
     annotationProcessor(libs.lombok)
     testCompileOnly(libs.lombok)
