@@ -5,7 +5,12 @@ export type EditorErrorCode =
   | "place_not_unique"
   | "photo_upload_failed"
   | "editor_failed"
-  | "save_unconfirmed";
+  | "save_unconfirmed"
+  | "draft_not_found"
+  | "draft_changed"
+  | "changes_mismatch"
+  | "component_not_found"
+  | "backup_failed";
 
 /** 편집기 단계의 실패. `message` 에는 CDP 주소와 파일 경로, 초안 본문을 싣지 않는다. */
 export class EditorError extends Error {
