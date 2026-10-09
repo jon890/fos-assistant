@@ -9,7 +9,7 @@ export type Props = {
   value: string;
   disabled: boolean;
   onChange(value: string): void;
-  /** 전송이 실제로 끝났는지를 돌려준다. 실패하면 미리보기를 지우지 않는다 */
+  /** 메시지가 받아들여졌는지 돌려준다. 거절되면 내 메시지에서 다시 보낼 수 있게 남긴다. */
   onSend(
     attachmentIds: number[],
     text?: string,

@@ -83,7 +83,7 @@ export function useConversationSend({
   consumeTurnStream,
   finishSentTurn,
 }: Context) {
-  /** 전송이 실제로 끝났는지를 돌려준다. `Composer` 는 이 값을 보고 실패했을 때 미리보기를 남긴다 */
+  /** 메시지가 받아들여졌는지 돌려준다. 거절된 사진 메시지는 말풍선에서 다시 보낼 수 있게 남긴다. */
   async function send(
     attachmentIds: number[],
     replacementText?: string,

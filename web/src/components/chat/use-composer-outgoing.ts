@@ -33,6 +33,7 @@ export function useComposerOutgoing({
   onSend,
   onOutgoingChange,
   running,
+  savingModel,
   canQueue,
   updateItem,
   uploadOne,
@@ -77,6 +78,7 @@ export function useComposerOutgoing({
       !message ||
       submitting.current ||
       running ||
+      savingModel ||
       message.items.some((item) => item.status !== "done")
     )
       return;
@@ -111,7 +113,15 @@ export function useComposerOutgoing({
         });
       }
     }
-  }, [outgoingRef, running, sendingItemsRef, onSend, mountedRef, publish]);
+  }, [
+    outgoingRef,
+    running,
+    savingModel,
+    sendingItemsRef,
+    onSend,
+    mountedRef,
+    publish,
+  ]);
 
   function trySend() {
     if (sendDisabled || outgoingRef.current || (running && !canQueue)) return;
