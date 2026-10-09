@@ -5,7 +5,7 @@
   MCP 토큰이 정한 사용자가 주인인 대화만 받고, Control Plane 이 그 대화의 결과물 폴더에 대신 쓴다.
   Hermes 의 `file`, `terminal` toolset 을 닫은 profile 은 그대로 둔다.
 - **대체된 부분**: 「MCP 토큰이 정한 사용자」 는 [ADR-032](ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 이 대체했다. 대화 주인을 판정하는 사용자는 서명한 `_fos_ctx` 로 찾은 부모 실행의 사용자다. 같은 사용자의 다른 대화에 쓰는 정책은 그대로다. 「사용자가 정하는 범위」 와 「대안 기각」 의 「MCP 호출에는 실행을 가리키는 값이 없다」 는 전제도 [ADR-031](ADR-031-mcp-호출의-부모-실행은-profile-플러그인이-서명한-루트-session-으로-잇는다.md) 이 바꿨다. 이제 profile 플러그인이 서명한 `_fos_ctx` 가 호출한 실행을 가리킨다.
-- **더해진 부분**: 서버 이름을 2026-09-29 에 `fos-assistant` 로 바꿨다. Hermes 가 도구 이름 앞에 서버 이름을 붙여 결과물 쓰기가 `mcp__fos_assistant_memory__artifact_write` 로 보였기 때문이다. 한 서버에 도구를 모으는 결정은 그대로다. 바꾸는 순서는 [`backend/mcp-caller.md`](../../../docs/backend/mcp-caller.md#control-plane-mcp) 에 있다.
+- **더해진 부분**: 서버 이름을 2026-09-29 에 `fos-assistant` 로 바꿨다. Hermes 가 도구 이름 앞에 서버 이름을 붙여 결과물 쓰기가 `mcp__fos_assistant_memory__artifact_write` 로 보였기 때문이다. 한 서버에 도구를 모으는 결정은 그대로다. 바꾸는 순서는 [`backend/docs/flow.md`](../flow.md#control-plane-mcp) 에 있다.
 
 ### 맥락
 
@@ -20,7 +20,7 @@
 
 Hermes v0.21.0 의 `HERMES_WRITE_SAFE_ROOT` 는 프로세스 환경값이다.
 profile 별 쓰기 범위를 정하지 못하며, 읽는 범위를 대화 폴더로 제한하는 기능도 아니다.
-근거와 MCP 계약은 [`mcp-caller.md`](../../../docs/backend/mcp-caller.md#결과물-쓰기-도구) 에 있다.
+근거와 MCP 계약은 [`backend/docs/flow.md`](../flow.md#결과물-쓰기-도구) 에 있다.
 
 ### 사용자가 정하는 범위
 

@@ -28,7 +28,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 쓰지 않는 브라우저를 멈추고 표와 실제 컨테이너를 맞춘다. 규칙은 {@code docs/backend/user-browser.md} 의 「상태 전이」 가 갖는다.
+ * 쓰지 않는 브라우저를 멈추고 표와 실제 컨테이너를 맞춘다. 규칙은 {@code backend/docs/flow.md} 의 「상태 전이」 가 갖는다.
  *
  * <p>{@code assistant.browser.sweep-interval} 마다 돌고 기동 때 한 번 돈다. 기능이 꺼져 있으면 아무것도 하지 않는다. 한 줄이나 한
  * 컨테이너의 실패는 로그만 남기고 다음으로 넘어간다.

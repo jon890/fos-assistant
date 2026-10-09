@@ -78,7 +78,7 @@ grep -rn 'style={{' web/src/
 | 실행 트리 | 작업 과정 |
 | 하위 에이전트 | 도우미 |
 | 설정 지문 | 설정별 사용량. 비교는 「설정 차이」, 값은 「설정 구분값」 |
-| provider | 모델 제공사. 표시 규칙은 [`../docs/model-tiers.md`](../docs/model-tiers.md) 가 갖는다 |
+| provider | 모델 제공사. 표시 규칙은 [`backend/docs/flow.md`](../backend/docs/flow.md) 가 갖는다 |
 | Hermes API 주소 | 에이전트 연결 주소 |
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리자 영역에서만) |

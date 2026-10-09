@@ -9,7 +9,7 @@ import java.util.List;
  * 문맥 묶음의 항목 하나다. 원래 기록 하나를 가리키고 합치거나 요약하지 않는다(ADR-071).
  *
  * <p>값의 뜻은 각 enum 이 갖고, {@code ref} 의 형식과 {@code scope}, {@code sensitivity} 를 채우는 규칙은
- * {@code docs/backend/context-bundle.md} 의 「항목의 칸」 이 갖는다. {@code title} 과 {@code body} 는 글로 옮길
+ * {@code backend/docs/flow.md} 의 「항목의 칸」 이 갖는다. {@code title} 과 {@code body} 는 글로 옮길
  * 때만 쓰고 저장하거나 로그에 내지 않는다. 그래서 {@link #toString()} 은 {@code source} 와 {@code ref} 만 낸다.
  *
  * @param ref 원래 기록의 참조. Memory 는 {@code memory:<번호>} 다

@@ -42,7 +42,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 발화기가 예정 시각이 된 작업의 발화를 한 번만 만드는지 실제 DB 로 본다. 규칙은 {@code docs/backend/task.md} 의 「발화」 다.
+ * 발화기가 예정 시각이 된 작업의 발화를 한 번만 만드는지 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「발화」 다.
  *
  * <p>시각은 검사가 {@link TaskFiring#fireDue} 에 넘기는 값이 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지
  * 않게 한다.

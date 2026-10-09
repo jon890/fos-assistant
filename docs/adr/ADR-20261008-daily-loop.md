@@ -65,4 +65,4 @@ export 의 결정 하나(`check:<번호>`)에서 후보, 평가, 판정과 규�
 
 ### 근거와 결과
 
-진입 조건, 순서, 기록, 설정, API 는 [매일 루프](../backend/proactive-loop.md)가 갖는다.
+진입 조건, 순서, 기록, 설정, API 는 [매일 루프](../../backend/docs/flow.md)가 갖는다.

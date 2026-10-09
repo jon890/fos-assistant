@@ -57,7 +57,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 실제 HTTP 경계에서 {@code memory_remember} 의 계약을 확인한다. 계약은 {@code docs/backend/memory.md} 의 「에이전트가 기억을
+ * 실제 HTTP 경계에서 {@code memory_remember} 의 계약을 확인한다. 계약은 {@code backend/docs/flow.md} 의 「에이전트가 기억을
  * 남기는 길」 이 갖는다(ADR-20261007 / memory-remember).
  *
  * <p>바로 저장은 사람이 보낸 turn 의 루트 실행이고, 부정 표지가 질문과 본문에 함께 있거나 함께 없고, 그 실행이 바깥 도구를 부르지

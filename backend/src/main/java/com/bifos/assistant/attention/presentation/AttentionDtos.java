@@ -22,7 +22,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 먼저 알리기 경로의 응답 모양이다. 계약은 {@code docs/backend/attention.md} 의 「API」 가 갖는다.
+ * 먼저 알리기 경로의 응답 모양이다. 계약은 {@code backend/docs/flow.md} 의 「API(먼저 알리기와 지금 화면의 판정)」 가 갖는다.
  *
  * <p>실행의 오류 코드, 모델, 토큰, 금액 칸을 두지 않는다. 일반 경로라 역할과 상관없이 뺀다(ADR-063).
  */
@@ -81,7 +81,7 @@ public final class AttentionDtos {
      */
     public record MetricsResponse(int days, List<MetricRow> rows) {}
 
-    /** 뜻은 {@code docs/backend/attention.md} 의 「지표」 가 갖는다. */
+    /** 뜻은 {@code backend/docs/flow.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다. */
     public record MetricRow(
             String trigger,
             long shown,

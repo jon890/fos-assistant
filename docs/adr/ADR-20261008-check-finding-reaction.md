@@ -49,4 +49,4 @@ replay 읽기 모델의 첫 반응 규칙은 그대로다. 지금 반응은 다�
 
 ### 근거와 결과
 
-기록 지점과 반응 읽기는 [판단 피드백](../backend/decision-feedback.md)이, 되풀이 판정과 입력은 [먼저 살펴보기](../backend/proactive-check.md)가 갖는다.
+기록 지점과 반응 읽기는 [판단 피드백](../../backend/docs/flow.md)이, 되풀이 판정과 입력은 [먼저 살펴보기](../../backend/docs/flow.md)가 갖는다.

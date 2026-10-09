@@ -3,7 +3,7 @@
 사용자의 Gmail 계정에 붙는 범용 커넥터다. 코드는 [`hermes/connectors/gmail/`](.) 에 있다.
 이 문서는 도구와 정책, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
 초기 결정은 [ADR-066](../../docs/adr/ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md), TypeScript 전환과 필터 권한은 [ADR-084](../../docs/adr/ADR-084-gmail-typescript-filters.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../../../docs/connectors.md) 과 [커넥터 도구 정책](../../../docs/backend/connector-tool-policy.md) 이 갖는다.
+커넥터 공통 계약은 [커넥터 연결](../../../docs/connectors.md) 과 [커넥터 도구 정책](../../../backend/docs/flow.md) 이 갖는다.
 
 ## 등록 칸
 
@@ -165,7 +165,7 @@ Bun `1.3.14` 와 lockfile 을 고정해 CI 의 재빌드 결과가 커밋한 파
 | 도구 결과 | 읽기 도구의 결과는 `fos-ctx` 가 `<external-data>` 로 감싸고 지시로 따르지 말라는 줄을 앞에 붙인다. Hermes 도 MCP 결과를 `<untrusted_tool_result>` 로 한 번 더 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다 |
 | 쓰기 | 초안, 라벨, 보내기, 답장은 모두 승인 뒤에만 실행된다. 보내기와 답장은 상시 허락이 없어 호출마다 승인한다 |
 | 승인한 것과 실행한 것 | 승인 카드는 받는 사람(`to`, `cc`, `bcc`), 제목(`subject`), 본문(`body`)을 마크다운이나 HTML 로 읽지 않고 글자로 보인다. 토큰처럼 보이는 긴 글만 `[가림]` 으로 바꿔 보인다. 승인하면 Control Plane 이 저장한 인자 그대로 한 번만 실행한다. 결과를 모르면 다시 실행하지 않는다([ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
-| 옛 커넥터 에이전트 | 옮겨 가기 전에 만든 Gmail 에이전트는 남아 있는 동안 자기 MCP 서버의 도구만 받고 Memory 와 Control Plane 도구를 받지 않는다. 다른 에이전트가 그 에이전트에 맡긴 일의 답은 Control Plane 이 `<external-data>` 로 감싸 전한다([커넥터 설치](../../../docs/backend/connector-install.md) 의 「옛 커넥터 에이전트」) |
+| 옛 커넥터 에이전트 | 옮겨 가기 전에 만든 Gmail 에이전트는 남아 있는 동안 자기 MCP 서버의 도구만 받고 Memory 와 Control Plane 도구를 받지 않는다. 다른 에이전트가 그 에이전트에 맡긴 일의 답은 Control Plane 이 `<external-data>` 로 감싸 전한다([커넥터 설치](../../../backend/docs/flow.md) 의 「옛 커넥터 에이전트」) |
 
 서버가 하는 것도 있다.
 

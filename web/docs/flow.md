@@ -61,7 +61,7 @@ flowchart TD
 없어진 `ConversationSession` 이 받던 스트림은 서버에서 계속 돌지만, 늦게 온 사건은 화면과 주소를 바꾸지 않는다.
 
 **대화 식별자는 두 자리에서 생긴다.** 첫 메시지의 `started` 와, 새 대화에서 첫 사진을 올리기 전에 만드는 빈 대화다.
-빈 대화의 규칙은 [`docs/backend/attachment.md`](../../docs/backend/attachment.md) 의 「경로」 절이 갖는다.
+빈 대화의 규칙은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「경로(사진 첨부)」 절이 갖는다.
 두 자리 모두 식별자를 받는 즉시 주소를 `/chat/{id}` 로 바꾼다.
 그래서 상태를 비우는 것은 주소가 `/` 로 **바뀌었을 때**나 「새 대화」 를 눌렀을 때뿐이다.
 주소가 `/` 인 채 식별자를 들고 있는 것만 보고 비우면, 사진을 올리는 순간 방금 만든 대화가 지워진다.
@@ -77,10 +77,10 @@ flowchart TD
 | 옛 주소의 번호 조회가 없는 대화가 아닌 까닭으로 실패했다 | `/` 로 넘기지 않고 오류 화면을 보인다. 서버 오류를 첫 화면으로 덮지 않는다 |
 | 대화 식별자가 UUID 모양이 아니다 | `/` 로 넘긴다 |
 | 대화 식별자에 대문자가 섞였다 | 소문자 주소 `/chat/{id}` 로 넘긴다. 사이드바가 주소를 소문자 식별자와 그대로 비교한다 |
-| 보내는 중이다 | 보내기 단추 옆에 중지 단추가 나온다. 보내기는 그대로 눌린다. [`docs/backend/turn-control.md`](../../docs/backend/turn-control.md) 의 「응답 중에 보낼 때」 절이 갖는다 |
+| 보내는 중이다 | 보내기 단추 옆에 중지 단추가 나온다. 보내기는 그대로 눌린다. [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「응답 중에 보낼 때」 절이 갖는다 |
 | `started` 전에 실패했다 | 쓴 문장을 입력창에 되돌려 다시 보낼 수 있게 한다. 서버에 아무것도 남지 않았다 |
 | `started` 뒤에 실패했다 | 사용자 메시지는 서버에 남았다. 입력창에 되돌리지 않고 그 메시지 아래에 오류와 「다시 시도」 를 보인다 |
-| 앞의 답이 끝나기 전에 또 보냈다 | 두 번째 글은 대기 메시지로 쌓인다. 다른 탭에서 보내도 같다. [`docs/backend/turn-control.md`](../../docs/backend/turn-control.md) 의 「응답 중에 보낼 때」 절이 갖는다 |
+| 앞의 답이 끝나기 전에 또 보냈다 | 두 번째 글은 대기 메시지로 쌓인다. 다른 탭에서 보내도 같다. [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「응답 중에 보낼 때」 절이 갖는다 |
 | 보내는 중에 다른 대화를 고른다 | 고를 수 있다. 앞 실행은 서버에서 계속 돌고 끝나면 저장된다 |
 
 실패한 요청의 문장을 되돌리는 것이 중요하다.
@@ -91,7 +91,7 @@ flowchart TD
 ## 모델을 고를 때
 
 에이전트는 모델을 갖지 않는다. 사용자가 대화에서 모델과 reasoning effort 를 고른다.
-선택은 `DEFAULT`, `TIER`, `CUSTOM` 세 모드다. 고르지 않은 대화가 어느 모델로 도는지는 [모델 단계](../../docs/model-tiers.md) 의 「모델 선택」 이 정한다.
+선택은 `DEFAULT`, `TIER`, `CUSTOM` 세 모드다. 고르지 않은 대화가 어느 모델로 도는지는 [모델 단계](../../backend/docs/flow.md) 의 「모델 선택」 이 정한다.
 근거는 [ADR-030](../../backend/docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 에 있다.
 
 ```mermaid
@@ -146,7 +146,7 @@ sequenceDiagram
 | --- | --- |
 | Hermes 가 목록을 주지 못하고 들고 있던 목록이 있다 | 들고 있던 옛 목록을 보인다 |
 | Hermes 가 목록을 주지 못하고 그 profile 의 목록을 한 번도 읽지 못했다 | `HERMES_UNAVAILABLE` 이다. 목록 창에 불러오지 못했다고 보인다. 대화는 기본값으로 계속 보낼 수 있다. 다만 그룹에 숨김이 있고 에이전트 기본 모델이 없는 에이전트는 판정할 수 없어 실행도 `HERMES_UNAVAILABLE` 로 거절한다 |
-| 그룹에 숨김이 있고 요청에 모델을 싣지 않는 실행이다 | 들고 있는 목록의 profile 기본 모델을 숨김과 견준다. 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패한다. 자세한 것은 [모델 단계와 실행 기록](../../docs/model-tiers.md)의 「요청에 모델을 싣지 않는 실행」 에 있다 |
+| 그룹에 숨김이 있고 요청에 모델을 싣지 않는 실행이다 | 들고 있는 목록의 profile 기본 모델을 숨김과 견준다. 숨긴 모델이면 제출하지 않고 `MODEL_HIDDEN` 으로 실패한다. 자세한 것은 [모델 단계와 실행 기록](../../backend/docs/flow.md)의 「요청에 모델을 싣지 않는 실행」 에 있다 |
 | 목록에 `authenticated` 가 거짓인 provider 가 있다 | 뺀다. 부를 수 없는 provider 다 |
 | 고른 모델이 나중에 목록에서 빠졌다 | 대화에 적힌 값을 그대로 보낸다. 모델을 찾지 못하면 Hermes 가 그 실행을 실패로 끝내고, 사용자가 다른 모델을 고른다. 고르는 창은 목록에 없거나 목록을 읽지 못해도 대화에 적힌 모델을 선택지에 남긴다. effort 만 바꿔도 모델이 「기본」 으로 돌아가지 않게 한다 |
 | provider 와 모델 중 하나만 온다 | 거절한다. 둘은 함께 채우거나 함께 비운다 |
@@ -328,7 +328,7 @@ flowchart TD
 | --- | --- |
 | 대상이 마지막 메시지가 아니다 | `MESSAGE_NOT_LATEST`. 화면이 이력을 다시 읽는다 |
 | 그 대화에서 도는 실행이 있다 | `CONVERSATION_BUSY`. 끝난 뒤에 다시 누르게 한다 |
-| 그 사용자가 동시 실행 한도를 모두 쓰고 있다 | `USER_BUSY`. 진행 중인 작업이 끝난 뒤 다시 누르게 한다([`docs/backend/execution-limit.md`](../../docs/backend/execution-limit.md)) |
+| 그 사용자가 동시 실행 한도를 모두 쓰고 있다 | `USER_BUSY`. 진행 중인 작업이 끝난 뒤 다시 누르게 한다([`backend/docs/flow.md`](../../backend/docs/flow.md)) |
 | 다시 생성이 실패했다 | 이전 판이 그대로 남는다. 새 판은 생기지 않는다 |
 
 **판은 답 한 줄 단위다.**
@@ -339,7 +339,7 @@ flowchart TD
 
 맡긴 일의 결과를 부모 에이전트가 정리하지 못했으면, 그 결과의 알림 줄 아래에 상태와 「결과 다시 전달」 이 보인다.
 누르면 저장된 결과만 다시 넘겨 답을 받는다. 맡긴 일이나 승인한 동작을 다시 실행하지 않는다.
-결정은 [ADR-075](../../docs/adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 서버의 판정은 [`docs/backend/agent-delegation.md`](../../docs/backend/agent-delegation.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
+결정은 [ADR-075](../../docs/adr/ADR-075-결과-전달은-묶음과-시도로-남기고-사용자가-저장된-결과만-다시-전달한다.md), 서버의 판정은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「결과 전달이 끝나지 않았을 때」 에 있다.
 
 이력 API 의 `SYSTEM` 줄에는 `delivery` 가 붙을 수 있다. `{ "id": 12, "status": "FAILED" }` 모양이고, 그 묶음의 마지막 시도가 저장한 마지막 알림 줄에만 붙는다.
 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세에서 본다.
@@ -367,7 +367,7 @@ flowchart TD
 | 상황 | 화면 |
 | --- | --- |
 | `CONVERSATION_BUSY` | 지금 도는 답이 끝난 뒤 다시 누르게 한다. 버튼은 남는다 |
-| `USER_BUSY` | 진행 중인 작업이 끝난 뒤 다시 누르게 한다([`docs/backend/execution-limit.md`](../../docs/backend/execution-limit.md)). 버튼은 남는다 |
+| `USER_BUSY` | 진행 중인 작업이 끝난 뒤 다시 누르게 한다([`backend/docs/flow.md`](../../backend/docs/flow.md)). 버튼은 남는다 |
 | `DELIVERY_NOT_RETRYABLE` | 「지금은 이 결과를 다시 전할 수 없어요」 를 보이고 이력을 다시 읽는다 |
 | `DELIVERY_NOT_FOUND`, `AGENT_NOT_FOUND`, `AGENT_DISABLED` | 그 안내를 보인다. 이력을 다시 읽는다 |
 | 다른 창에서 같은 묶음을 다시 전달하고 있다 | 이력을 다시 읽을 때 `DELIVERING` 이라 버튼이 사라진다. 그 turn 은 「다른 창에서 답하는 중일 때」 처럼 보인다 |
@@ -394,7 +394,7 @@ flowchart TD
 
 ## 점검 대화
 
-먼저 살펴보기의 결과가 남는 대화다([`docs/backend/proactive-check.md`](../../docs/backend/proactive-check.md)).
+먼저 살펴보기의 결과가 남는 대화다([`backend/docs/flow.md`](../../backend/docs/flow.md)).
 대화 응답의 `purpose` 가 `CHECK` 이면 머리 줄의 에이전트 이름 옆에 「지금 살펴보기」 단추를 둔다.
 
 | 때 | 하는 일 |
@@ -419,7 +419,7 @@ flowchart TD
 | 단추를 누른다 | `PUT /api/v1/check-findings/{번호}/reaction`. 처리하는 동안 그 줄의 단추를 끄고, 끝나면 목록을 다시 읽는다. 실패하면 그 줄 아래에 「반응을 남기지 못했어요. 잠시 뒤 다시 눌러 주세요.」 를 보인다 |
 | 목록 아래 | 「관심 없음을 고른 주제는 그 발견을 알린 날부터 {dismissWindowDays}일 동안 다시 알리지 않아요.」 |
 
-동작의 뜻은 [`docs/backend/proactive-check.md`](../../docs/backend/proactive-check.md) 의 「발견 반응」 이 갖는다.
+동작의 뜻은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「발견 반응」 이 갖는다.
 
 ## 실행 하나를 다시 볼 때
 

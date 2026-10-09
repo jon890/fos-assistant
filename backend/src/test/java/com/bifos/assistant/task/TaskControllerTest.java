@@ -49,7 +49,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 예약 작업 경로의 응답 모양과 본문 검사를 본다. 계약은 {@code docs/backend/task.md} 의 「API」 다. */
+/** 예약 작업 경로의 응답 모양과 본문 검사를 본다. 계약은 {@code backend/docs/flow.md} 의 「API(예약 작업)」 다. */
 @BackendIntegrationTest
 class TaskControllerTest {
 

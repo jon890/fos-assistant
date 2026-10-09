@@ -15,7 +15,7 @@ import org.springframework.scheduling.support.CronExpression;
 /**
  * 예약 작업의 시각을 읽고 계산한다(ADR-077, ADR-079).
  *
- * <p>규칙은 {@code docs/backend/task.md} 의 「시각」 이 갖는다. 사람이 쓰는 cron 은 5필드이고 Spring {@link CronExpression} 은
+ * <p>규칙은 {@code backend/docs/flow.md} 의 「시각」 이 갖는다. 사람이 쓰는 cron 은 5필드이고 Spring {@link CronExpression} 은
  * 초를 더한 6필드라, 앞에 {@code "0 "} 을 붙여 읽는다. 예정 시각은 그 작업의 시간대로 계산한다. 서머타임에 없는 시각은 그날
  * 건너뛰고 겹친 시각은 서로 다른 두 순간이 된다. 이 계산은 Spring 의 것을 그대로 따른다.
  */

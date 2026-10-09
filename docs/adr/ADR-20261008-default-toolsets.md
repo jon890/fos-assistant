@@ -61,4 +61,4 @@ local 셸은 Hermes 프로세스의 사용자로 돌아 다른 profile 의 `.env
   - **plugin 을 Control Plane 보다 먼저 배포한다.** 옛 plugin 은 `require_sandbox` 를 몰라 400 으로 거절하고, 그때 Control Plane 은 아무 도구도 켜지 않고 경고만 남긴다. 사람의 도구 저장은 이 칸을 싣지 않아 영향이 없다.
   - 기존 기본 에이전트에는 적용되지 않는다. 관리자 도구 화면에서 켠다. 절차는 운영 저장소가 갖는다.
 
-- **적용 범위**: `agent/application/AgentDefaultToolsets`, `PeopleProperties` 의 `defaultToolsets`, `people/application/FirstAgentCreator`, `HermesToolsetClient.writeApiServerInSandbox`, 대시보드 plugin 의 `PUT /api/config` 의 `require_sandbox`. 흐름은 [`backend/people.md`](../backend/people.md) 의 「첫 에이전트의 기본 도구」 가 갖는다.
+- **적용 범위**: `agent/application/AgentDefaultToolsets`, `PeopleProperties` 의 `defaultToolsets`, `people/application/FirstAgentCreator`, `HermesToolsetClient.writeApiServerInSandbox`, 대시보드 plugin 의 `PUT /api/config` 의 `require_sandbox`. 흐름은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「첫 에이전트의 기본 도구」 가 갖는다.

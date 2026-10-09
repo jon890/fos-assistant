@@ -24,7 +24,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 예정 시각이 된 작업의 발화를 {@code task_run} 줄로 한 번만 만든다(ADR-077).
  *
- * <p>규칙은 {@code docs/backend/task.md} 의 「발화」 가 갖는다. 발화는 짧은 트랜잭션이고 turn 은 {@link TaskRunStarter} 가
+ * <p>규칙은 {@code backend/docs/flow.md} 의 「발화」 가 갖는다. 발화는 짧은 트랜잭션이고 turn 은 {@link TaskRunStarter} 가
  * 트랜잭션 밖에서 연다. trigger 마다 트랜잭션 하나에서 줄을 잠그고 다시 읽는다. 한 trigger 의 실패는 그 trigger 만
  * 되돌리고 다음 tick 에 다시 시도된다. 같은 {@code (trigger_id, scheduled_for)} 줄은 먼저 보고 거르며, 유일 제약이 마지막
  * 방어선이다.
