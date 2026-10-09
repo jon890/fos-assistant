@@ -12,6 +12,8 @@
 | --- | --- | --- | --- | --- |
 | `APPROVAL_REQUESTED` | 승인이 필요한 커넥터 호출이 새 승인 줄(`connector_action` 의 `PENDING`)을 만들 때 | 승인을 기다리는 요청이 있어요 | 「도구 제목」 | 그 요청이 나온 대화 |
 | `APPROVAL_EXPIRED` | 그 승인 줄이 24시간 안에 답을 받지 못해 `EXPIRED` 가 될 때 | 승인 요청이 만료됐어요 | 「도구 제목」 | 그 요청이 나온 대화 |
+| `TOOLSET_REQUESTED` | 에이전트 주인이 새 도구 사용 요청을 저장할 때 | 도구 사용 요청이 있어요 | 요청자와 에이전트 이름 | 관리자 에이전트 상세의 요청 |
+| `TOOLSET_REQUEST_DECIDED` | 도구 사용 요청이 승인, 거절 또는 만료될 때 | 승인됐으면 도구 사용 요청이 승인됐어요, 나머지는 도구 사용 요청 결과가 있어요 | 승인 안내 또는 사유 | 요청자 결과 화면 |
 
 도구 제목은 승인 카드와 대화의 알림 줄이 쓰는 제목과 같다. 커넥터 선언의 도구 제목이고, 없거나 공백이면 「이름 없는 동작」 이다. 도구의 원래 이름은 내부 값이라 쓰지 않는다.
 제목과 본문은 칸 길이(200자, 500자)를 넘으면 잘라 저장한다. 선언의 도구 제목에는 길이 상한이 없다.
@@ -24,6 +26,9 @@
 그 트랜잭션이 끝난 뒤에 사용자 단위 SSE 로 알린다. 화면이 사건을 받고 다시 읽을 때 줄이 있어야 한다.
 
 예약 작업의 `TASK_SUCCEEDED`, `TASK_FAILED`, `TASK_SKIPPED` 는 [`task.md`](task.md) 의 「알림」 이 갖는다.
+도구 사용 요청의 상태와 권한은 [`agent.md`](agent.md)의 「도구 사용 요청」이 갖는다.
+새 요청은 같은 그룹의 차단되지 않은 관리자들에게 알리고 결과는 원래 요청자에게 알린다.
+중복 요청과 끝난 요청의 반복 결정, 요청자 취소는 새 알림을 만들지 않는다.
 
 아직 만들지 않은 종류는 [`../code-architecture.md`](../code-architecture.md) 의 「아직 만들지 않은 것」 이 갖는다.
 
@@ -76,7 +81,8 @@ sequenceDiagram
 | GET | `/notifications/events` | `text/event-stream`. 아래 사건 |
 
 `NotificationView` 는 `id`(공개 식별자), `kind`, `title`, `body`, `targetType`, `targetId`, `createdAt`, `readAt` 이다.
-`targetType` 은 `CONVERSATION` 이나 `TASK` 이고 `targetId` 는 그 대화나 예약 작업의 공개 식별자다. 갈 곳이 없으면 둘 다 비어 있다.
+`targetType`은 `CONVERSATION`, `TASK`, `ADMIN_TOOL_REQUEST`, `TOOLSET_REQUEST`다.
+`targetId`는 그 대화, 예약 작업 또는 도구 사용 요청의 공개 식별자다. 갈 곳이 없으면 둘 다 비어 있다.
 
 사건은 대화 SSE 와 같은 모양이다. `data:` 줄 하나에 JSON 하나이고 종류는 `type` 칸으로 구분한다. 열자마자 주석 `connected` 를 보내고 정해 둔 간격마다 주석 `ping` 을 보낸다.
 
