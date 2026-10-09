@@ -370,7 +370,7 @@ sequenceDiagram
     C->>C: 실행, 승인 줄, Memory 제안, 할 일, 대화를 요청자 것만 읽는다
     C->>C: 숨기기와 미루기를 읽고 후보마다 NOW, LATER, SUPPRESSED 를 정한다
     C->>C: 보인 항목마다 SHOWN 사건을 한 번 남긴다
-    C-->>W: 카드 넷, 항목의 이유와 출처
+    C-->>W: 카드 다섯, 항목의 이유와 출처
     W-->>B: 지금 화면
     opt 숨기기나 미루기
         B->>W: hide 나 snooze
@@ -560,7 +560,7 @@ flowchart LR
 | RF-12 | `artifact_write` 결과물로 | 허용 | `SAME_OWNER_SINK` | Control Plane. 대화 주인만 읽고 스크립트와 외부 이미지를 막는 머리글을 붙인다. 결과물 안의 링크는 사용자가 누르면 새 창으로 열린다 | `ArtifactTest` 의 머리글 시험과 남의 대화 시험, `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
 | RF-13 | `memory_remember` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 대화에 바깥 도구가 있으면 제안이다 | `McpMemoryRememberToolTest` 의 커넥터 READ 시험과 바깥 도구 시험 |
 | RF-14 | `follow_up_propose` 로 | 사용자 승인 | `PROPOSAL_ONLY` | Control Plane. 사람이 받아들여야 할 일이 된다 | `McpFollowUpToolTest` |
-| RF-15 | `agent_delegate` 의 `task` 로 다른 에이전트에 | 허용. 결과가 돌아올 때 감싸지 않는다 | `SAME_OWNER_SINK`, `OPEN_GAP` | Control Plane. 대상은 요청자 소유이거나 그룹 공개 에이전트다. 자식 실행은 요청자 명의이고 대상 에이전트의 도구로 돈다. 그 도구로 가는 흐름은 이 표의 다른 줄이 정한다. 결과는 다음 turn 전달과 `agent_status` 두 길로 돌아온다 | `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
+| RF-15 | `agent_delegate` 의 `task` 로 다른 에이전트에 | 허용. 연결이 붙은 에이전트의 결과는 돌아올 때 `ExternalData` 로 감싼다(`McpToolService`, `ChatDeliveryInput`) | `SAME_OWNER_SINK` | Control Plane. 대상은 요청자 소유이거나 그룹 공개 에이전트다. 자식 실행은 요청자 명의이고 대상 에이전트의 도구로 돈다. 그 도구로 가는 흐름은 이 표의 다른 줄이 정한다. 결과는 다음 turn 전달과 `agent_status` 두 길로 돌아온다 | `test_read_data_flow` `test_control_plane_sinks_keep_body_and_get_signed_context` |
 | RF-16 | 실행 기록의 도구 내용으로 | 허용(가림). 트리에서 커넥터 호출 뒤에는 일반 도구도 이름과 받은 내용의 길이만 남긴다(#319) | `REDACTED_RECORD` | `ToolDetailRedactor`, `HermesRunEventStream`. 커넥터 정책 기록으로 루트와 자식, 형제를 함께 확인한다. 이력 조회 실패도 가린다 | `ToolDetailRedactorTest`의 다른 도구 인자 시험, `ToolDetailEventStreamTest`의 호출 전후와 트리 이력 시험, `ConnectorCallHistoryTest` |
 | RF-17 | 승인 줄로 | 허용 | `SAME_OWNER_SINK` | 승인 줄에 인자 원문이 16KB 까지, 결과 글이 남는다. 주인 화면은 가린 인자를 받는다 | `ConnectorActionServiceTest` |
 | RF-18 | `fos-ctx` 와 backend 로그로 | 허용(가림) | `REDACTED_RECORD` | hook 은 인자와 결과 본문을 로그에 남기지 않는다. backend 는 도구 인자와 결과를 로그에 남기는 줄이 없다(코드 확인, 시험 없음). Hermes core 의 로그는 확인하지 않았다 | `test_fos_ctx` 의 `test_logs_hide_token_signature_and_args`, `test_unreadable_tool_map_returns_none_without_leaking` |
@@ -592,7 +592,6 @@ RF-21은 Hermes v0.21.5(태그 `v2026.9.24`)의 소스로 확인했다.
 | 틈 | 지금 | 고칠 방향 |
 | --- | --- | --- |
 | 이전 turn의 본문 | 커넥터 호출 뒤 일반 도구와 하위 에이전트 목표는 가리지만, 새 실행 트리는 이전 turn에서 읽은 본문까지 추적하지 않는다. 이미 저장된 사건도 다시 가리지 않는다 | 대화 이력을 포함한 가림 범위는 별도 결정이 필요하다 |
-| 바인딩 에이전트의 위임 결과 | 위임 결과를 `ExternalData` 로 감싸는 판정이 옛 커넥터 에이전트(`connectorManaged`)만 본다. 다음 turn 으로 전하는 길(`ChatDeliveryInput.isExternalResult`)과 `agent_status` 의 답(`McpToolService`)이 같다. 연결을 붙인 일반 에이전트의 결과는 두 길 모두 감싸지 않는다 | 두 길 모두 연결이 붙은 에이전트의 결과도 감싼다 |
 
 ### 실행 공간이 해결한 것과 남은 것
 
