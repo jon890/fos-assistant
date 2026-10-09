@@ -5,11 +5,16 @@ export type NotificationKind =
   | "TOOLSET_REQUEST_DECIDED"
   | "TASK_SUCCEEDED"
   | "TASK_FAILED"
-  | "TASK_SKIPPED";
+  | "TASK_SKIPPED"
+  | "CONNECTOR_REINSTALLED";
 
-/** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다 */
+/** 알림을 누르면 갈 곳의 종류다. 갈 곳이 없는 알림은 `null` 이다. `ADMIN_CONNECTIONS` 는 목록 화면이라 `targetId` 가 없다 */
 export type NotificationTargetType =
-  "CONVERSATION" | "TASK" | "ADMIN_TOOL_REQUEST" | "TOOLSET_REQUEST";
+  | "CONVERSATION"
+  | "TASK"
+  | "ADMIN_TOOL_REQUEST"
+  | "TOOLSET_REQUEST"
+  | "ADMIN_CONNECTIONS";
 
 export type NotificationView = {
   id: string;
@@ -38,6 +43,7 @@ export type NotificationEvent = {
 
 /** 알림을 누르면 갈 주소다. 갈 곳이 없으면 null 이다 */
 export function notificationHref(view: NotificationView): string | null {
+  if (view.targetType === "ADMIN_CONNECTIONS") return "/admin/connections";
   if (view.targetType === "ADMIN_TOOL_REQUEST" && view.targetId)
     return `/admin/tool-requests/${view.targetId}`;
   if (view.targetType === "TOOLSET_REQUEST" && view.targetId)

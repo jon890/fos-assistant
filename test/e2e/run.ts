@@ -254,6 +254,8 @@ function startControlPlane(
       // 재시작이 필요 없는 붙이기를 Control Plane 이 스스로 확인하는 것을 기본값 150초를 기다리지 않고 본다.
       ASSISTANT_CONNECTOR_BINDING_APPLY_DELAY: "10s",
       ASSISTANT_CONNECTOR_BINDING_APPLY_CRON: "* * * * * *",
+      // 정의 어긋남 점검이 시나리오 도중 돌면 바인딩 상태가 실행 시각에 따라 달라진다. 끈다.
+      ASSISTANT_CONNECTOR_BINDING_DRIFT_CRON: "-",
       // 예약 작업이 정한 시각에 발화하는 것을 기본값 30초를 기다리지 않고 본다.
       ASSISTANT_TASK_DISPATCH_CRON: "* * * * * *",
       HERMES_PROFILE_KEY_DIR: keyDir,

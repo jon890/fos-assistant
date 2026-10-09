@@ -19,5 +19,7 @@ public enum NotificationKind {
     /** 에이전트가 쓸 관리자 등급 도구의 사용 요청이다. */
     TOOLSET_REQUESTED,
     /** 도구 사용 요청의 승인, 거절 또는 만료가 확정됐다. */
-    TOOLSET_REQUEST_DECIDED
+    TOOLSET_REQUEST_DECIDED,
+    /** 정의 어긋남 점검이 다시 맞춘 연결에 관리자가 할 일이 남았다(ADR-20261009 / connector-install-drift). */
+    CONNECTOR_REINSTALLED
 }

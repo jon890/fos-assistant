@@ -140,6 +140,8 @@ assistant:
       apply-delay: 150s
       # 반영 예정 시각이 지난 바인딩을 찾는 주기
       apply-cron: "*/30 * * * * *"
+      # READY 바인딩의 설치가 manifest 와 어긋났는지 읽고 다시 설치하는 주기(ADR-20261009 / connector-install-drift)
+      drift-cron: "0 */10 * * * *"
   restart-reconcile:
     # 기동할 때 RUNNING 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061). 끄면 그 줄이 그대로 남는다
     enabled: true
