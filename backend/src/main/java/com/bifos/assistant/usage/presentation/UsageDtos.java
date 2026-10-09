@@ -130,7 +130,7 @@ public final class UsageDtos {
             String code = cost.agentId() == null
                     ? "system-decision"
                     : cost.agentCode() == null ? String.valueOf(cost.agentId()) : cost.agentCode();
-            String label = cost.agentId() == null ? "시스템 판단" : cost.agentName() == null ? code : cost.agentName();
+            String label = cost.agentId() == null ? "시스템 판단" : cost.agentName() == null ? "지운 에이전트" : cost.agentName();
             return new BreakdownRow(
                     code,
                     label,

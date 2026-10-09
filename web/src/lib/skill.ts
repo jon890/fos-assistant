@@ -54,10 +54,11 @@ export type SkillDetailView = {
  *
  * <p>`lastConversationId` 는 마지막 호출이 속한 대화의 공개 식별자이고, 그 대화를 지웠으면 null 이다.
  * `agentCode` 는 관리자에게만 오고 그 밖의 사용자에게는 null 이다.
+ * 행이 없는 에이전트는 `agentName` 이 null 이다.
  */
 export type SkillUsageRow = {
   agentCode: string | null;
-  agentName: string;
+  agentName: string | null;
   skillName: string;
   count: number;
   lastInvokedAt: string;

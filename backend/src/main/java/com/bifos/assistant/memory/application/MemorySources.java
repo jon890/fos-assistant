@@ -38,7 +38,13 @@ public class MemorySources {
             if (memory.proposedByExecutionId() == null) {
                 continue;
             }
-            Agent agent = agentById.get(agentByExecution.get(memory.proposedByExecutionId()));
+            Long agentId = agentByExecution.get(memory.proposedByExecutionId());
+            Agent agent = agentById.get(agentId);
+            if (agentId != null && agent == null) {
+                // 정리 작업이 행을 지운 에이전트다. 이름 없이 지웠다는 표시만 싣는다.
+                result.put(memory.id(), new MemorySource(null, true));
+                continue;
+            }
             result.put(memory.id(), describe(user, agent));
         }
         return result;
