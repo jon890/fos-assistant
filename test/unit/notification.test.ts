@@ -32,6 +32,11 @@ test("대상이 없는 알림은 갈 곳이 없다", () => {
   assert.equal(notificationHref(view({ targetId: null })), null);
 });
 
+test("도구 요청 알림은 관리자 확인 경로로, 결과 알림은 요청자 경로로 간다", () => {
+  assert.equal(notificationHref(view({ kind: "TOOLSET_REQUESTED", targetType: "ADMIN_TOOL_REQUEST" })), `/admin/tool-requests/${CONVERSATION_ID}`);
+  assert.equal(notificationHref(view({ kind: "TOOLSET_REQUEST_DECIDED", targetType: "TOOLSET_REQUEST" })), `/tool-requests/${CONVERSATION_ID}`);
+});
+
 test("읽지 않은 알림이 없으면 배지를 그리지 않는다", () => {
   assert.equal(unreadBadge(0), null);
   assert.equal(unreadBadge(-1), null);
