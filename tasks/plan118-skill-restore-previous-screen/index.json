@@ -1,0 +1,11 @@
+{
+  "name": "plan118-skill-restore-previous-screen",
+  "description": "스킬 편집 화면에서 이전 버전을 남긴 시각을 보이고 「이전 버전으로」 로 되돌린다",
+  "status": "pending",
+  "created_at": "2026-10-09",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}
