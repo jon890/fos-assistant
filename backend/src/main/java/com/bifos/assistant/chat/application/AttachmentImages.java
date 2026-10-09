@@ -178,7 +178,8 @@ public class AttachmentImages {
      */
     static int chooseLongSide(List<Dimension> sizes, long maxPixels) {
         for (int longSide : LONG_SIDES) {
-            long total = sizes.stream().mapToLong(size -> pixelsAt(size, longSide)).sum();
+            long total =
+                    sizes.stream().mapToLong(size -> pixelsAt(size, longSide)).sum();
             if (total <= maxPixels) {
                 return longSide;
             }
@@ -205,8 +206,8 @@ public class AttachmentImages {
      * 가장 작은 단계보다 큰 단계는 만든 주소를 모두 담을 수 있을 때만 고른다.
      */
     private int embedCandidates(List<Candidate> candidates, String[] dataUrls) {
-        int first = LONG_SIDES.indexOf(chooseLongSide(
-                candidates.stream().map(Candidate::size).toList(), MAX_PIXELS));
+        int first = LONG_SIDES.indexOf(
+                chooseLongSide(candidates.stream().map(Candidate::size).toList(), MAX_PIXELS));
         for (int step = first; step < LONG_SIDES.size() - 1; step++) {
             int longSide = LONG_SIDES.get(step);
             List<String> encoded = encodeAt(candidates, longSide, MAX_ENCODED_BYTES);
