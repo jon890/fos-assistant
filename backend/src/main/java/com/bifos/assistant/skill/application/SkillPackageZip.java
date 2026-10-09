@@ -144,11 +144,8 @@ public class SkillPackageZip {
         if (name.startsWith("/") || DRIVE_LETTER.matcher(name).find()) {
             return false;
         }
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            if (c < 32 || c == 127) {
-                return false;
-            }
+        if (name.codePoints().anyMatch(SkillPackageZip::isInvisible)) {
+            return false;
         }
         String path = entry.isDirectory() ? name.substring(0, name.length() - 1) : name;
         for (String segment : path.split("/", -1)) {
@@ -157,6 +154,18 @@ public class SkillPackageZip {
             }
         }
         return true;
+    }
+
+    /**
+     * 제어 문자(C0, DEL, C1), 서식 문자(U+202E 같은 방향 바꿈), 줄과 문단 구분자다. 화면에 보이는 이름과 실제 이름이 달라지거나
+     * 줄이 나뉠 수 있다.
+     */
+    private static boolean isInvisible(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.CONTROL
+                || type == Character.FORMAT
+                || type == Character.LINE_SEPARATOR
+                || type == Character.PARAGRAPH_SEPARATOR;
     }
 
     /** 심볼릭 링크, 장치 파일처럼 unix mode 의 파일 종류가 일반 파일도 디렉터리도 아닌 항목이다. */

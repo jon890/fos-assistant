@@ -36,7 +36,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 class SkillPackageZipTest {
 
     private static final int MIB = 1024 * 1024;
+    private static final int LOCAL_HEADER_FLAGS_OFFSET = 6;
     private static final int LOCAL_HEADER_METHOD_OFFSET = 8;
+    private static final int CENTRAL_HEADER_FLAGS_OFFSET = 8;
     private static final int CENTRAL_HEADER_METHOD_OFFSET = 10;
     private static final int END_OF_CENTRAL_DIRECTORY_BYTES = 22;
     private static final int END_OF_CENTRAL_DIRECTORY_CD_OFFSET = 16;
@@ -163,8 +165,40 @@ class SkillPackageZipTest {
 
         ReceivedSkillPackage received = skillPackageZip.read(zip);
 
-        assertThat(received.entries()).isEmpty();
-        assertThat(received.problem().reason()).isEqualTo(SkillPackageReason.UNSAFE_ENTRY);
+        // 라이브러리가 바꾼 이름이 문제의 경로다.
+        assertProblem(skillPackageZip.read(zip), SkillPackageReason.UNSAFE_ENTRY, "a/b.md");
+    }
+
+    @Test
+    @DisplayName("암호 비트가 켜진 항목은 위험한 항목이다")
+    void rejectsEncryptedEntry() throws IOException {
+        byte[] zip = zip(out -> write(out, entry("x.md", ZipEntry.STORED), "hello".getBytes(StandardCharsets.UTF_8)));
+        // 쓰는 쪽은 항목의 암호 비트를 머리에 옮기지 않으므로 두 머리의 general purpose bit 0 을 직접 켠다.
+        zip[(int) localHeaderOffset(zip, "x.md") + LOCAL_HEADER_FLAGS_OFFSET] |= 1;
+        zip[centralDirectoryOffset(zip) + CENTRAL_HEADER_FLAGS_OFFSET] |= 1;
+
+        assertProblem(skillPackageZip.read(zip), SkillPackageReason.UNSAFE_ENTRY, "x.md");
+    }
+
+    @Test
+    @DisplayName("unix mode 가 문자 장치인 항목은 위험한 항목이다")
+    void rejectsCharacterDevice() throws IOException {
+        byte[] zip = zip(out -> {
+            ZipArchiveEntry device = entry("dev.md", ZipEntry.STORED);
+            device.setUnixMode(0020644);
+            write(out, device, new byte[] {'x'});
+        });
+
+        assertProblem(skillPackageZip.read(zip), SkillPackageReason.UNSAFE_ENTRY, "dev.md");
+    }
+
+    @Test
+    @DisplayName("위험한 경로가 길면 문제의 경로는 앞 200자만 남는다")
+    void truncatesLongProblemPath() throws IOException {
+        String name = "../" + "a".repeat(297);
+        byte[] zip = zip(out -> write(out, entry(name, ZipEntry.STORED), new byte[] {'x'}));
+
+        assertProblem(skillPackageZip.read(zip), SkillPackageReason.UNSAFE_ENTRY, name.substring(0, 200));
     }
 
     @Test
@@ -201,7 +235,7 @@ class SkillPackageZipTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"../evil.md", "/etc/x", "C:/x.md", "a//b.md", "a/./b.md", "a/\tb.md"})
+    @ValueSource(strings = {"../evil.md", "/etc/x", "C:/x.md", "a//b.md", "a/./b.md", "a/\tb.md", "a\u202Eb.md"})
     @DisplayName("위험한 경로는 그 이름과 함께 위험한 항목이다")
     void rejectsUnsafePaths(String name) throws IOException {
         byte[] zip = zip(out -> {

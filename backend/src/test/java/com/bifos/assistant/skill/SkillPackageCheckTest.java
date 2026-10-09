@@ -111,6 +111,16 @@ class SkillPackageCheckTest {
         assertThat(checked.hasScripts()).isFalse();
     }
 
+    @ParameterizedTest
+    @CsvSource({"skill.md", "Skill.md"})
+    @DisplayName("맨 위에서 대소문자만 다른 SKILL.md 는 다른 자리의 SKILL.md 가 아니라 PATH_NOT_ALLOWED 다")
+    void rejectsTopLevelSkillMdWithOtherCase(String path) {
+        CheckedSkillPackage checked = check.check(received(text("SKILL.md", SKILL_MD), text(path, SKILL_MD)));
+
+        assertThat(checked.problems()).containsExactly(new SkillPackageProblem(PATH_NOT_ALLOWED, path));
+        assertThat(checked.files()).isEmpty();
+    }
+
     @Test
     @DisplayName("NUL 이 든 파일은 UTF-8 로 읽혀도 글이 아니다")
     void rejectsTextWithNul() {

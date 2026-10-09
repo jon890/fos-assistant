@@ -166,9 +166,10 @@ public class SkillPackageCheck {
             if (path.equals(SKILL_MD)) {
                 continue;
             }
-            String last = path.substring(path.lastIndexOf('/') + 1);
-            if (last.equalsIgnoreCase(SKILL_MD)) {
-                problems.add(NESTED_SKILL_MD, path);
+            int slash = path.lastIndexOf('/');
+            if (path.substring(slash + 1).equalsIgnoreCase(SKILL_MD)) {
+                // 맨 위의 skill.md 는 다른 자리의 SKILL.md 가 아니라 이름을 잘못 적은 파일이다.
+                problems.add(slash < 0 ? PATH_NOT_ALLOWED : NESTED_SKILL_MD, path);
                 continue;
             }
             try {
