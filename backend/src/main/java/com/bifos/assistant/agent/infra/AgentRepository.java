@@ -37,7 +37,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Query("select a.id from Agent a where a.code = :code")
     Optional<Long> findIdByCode(@Param("code") String code);
 
-    /** 도구와 기본 모델 변경은 경합하면 {@code AGENT_BUSY} 로 곧바로 거절해 오래 기다리지 않는다. */
+    /** 도구와 기본 모델 변경, 관리자의 에이전트 수정은 경합하면 {@code AGENT_BUSY} 로 곧바로 거절해 오래 기다리지 않는다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))
     @Query("select a from Agent a where a.code = :code")

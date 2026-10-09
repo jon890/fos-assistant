@@ -29,7 +29,6 @@ test("가짜 Hermes의 진입 파일과 분리 모듈은 Hermes 연동 라벨이
 
 test("Hermes 문서에서 옮겨 온 절을 가진 backend 문서는 Hermes 연동 라벨이 붙는다", () => {
   assert.deepEqual(labelsFor("backend/docs/flow.md"), ["위험:Hermes연동"]);
-  assert.deepEqual(labelsFor("backend/docs/flow.md"), ["위험:Hermes연동"]);
 });
 
 test("Hermes 절이 없는 backend 문서는 Hermes 연동 라벨이 붙지 않는다", () => {

@@ -259,7 +259,7 @@ A general-purpose connector is one directory, `hermes/connectors/<id>/`. A pull 
 - Calls that write require approval. Tools that send data to people outside the account also declare `"grant": false`, so each call is approved by a person. Tools that delete are not exposed.
 - Secrets come in only through environment variables declared in `fields`, and the smallest OAuth scope or permission that works.
 - An MCP server in TypeScript, bundled with its dependencies into one committed JavaScript file for Bun. Connector tests live alongside the source and use a local fake of the service.
-- A setup guide under `docs/connectors/` and an owner line in `.github/CODEOWNERS`.
+- A setup guide in `hermes/connectors/<id>/README.md` and an owner line in `.github/CODEOWNERS`.
 
 `hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new connector is checked as soon as it is added.
 The full guide is [`hermes/connectors/README.md`](hermes/connectors/README.md) (Korean), and [`hermes/connectors/gmail/`](hermes/connectors/gmail) is the reference to copy from.
