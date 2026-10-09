@@ -7,11 +7,12 @@ import java.util.Iterator;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.MemoryCacheImageInputStream;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /** MPO의 MPF 구간과 보조 사진만 제거한다. 판정이나 디코딩이 실패하면 원본을 돌려준다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MpoJpegNormalizer {
-
-    private MpoJpegNormalizer() {}
 
     public static byte[] normalize(byte[] original) {
         if (original.length < 4 || unsigned(original[0]) != 0xff || unsigned(original[1]) != 0xd8) {
@@ -61,12 +62,7 @@ public final class MpoJpegNormalizer {
             if (length < 2 || length > original.length - offset) {
                 return original;
             }
-            boolean isMpf = marker == 0xe2
-                    && length >= 6
-                    && original[offset + 2] == 'M'
-                    && original[offset + 3] == 'P'
-                    && original[offset + 4] == 'F'
-                    && original[offset + 5] == 0;
+            boolean isMpf = isMpf(original, offset, marker, length);
             offset += length;
             if (isMpf) {
                 mpf = true;
@@ -77,6 +73,15 @@ public final class MpoJpegNormalizer {
             scan = marker == 0xda;
         }
         return original;
+    }
+
+    private static boolean isMpf(byte[] image, int offset, int marker, int length) {
+        return marker == 0xe2
+                && length >= 6
+                && image[offset + 2] == 'M'
+                && image[offset + 3] == 'P'
+                && image[offset + 4] == 'F'
+                && image[offset + 5] == 0;
     }
 
     private static int unsigned(byte value) {
