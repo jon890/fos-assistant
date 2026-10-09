@@ -6,7 +6,7 @@
 
 `backend/docs/flow.md`, `web/docs/flow.md`, `web/docs/prd.md`, `docs/flow.md` 의 절과 `docs/prd.md` 의 기능별 절을 **문장을 바꾸지 않고** `docs/features/` 의 기능 파일 15개로 옮긴다.
 옛 파일 넷을 지우고, 저장소 전체의 링크와 코드 주석의 문서 참조(「절」 이름 포함)를 새 자리로 고친다.
-문서 이름 규칙 시험이 모듈 `prd.md` 와 `flow.md`, 루트 `flow.md` 를 더는 받지 않게 한다.
+문서 이름 규칙을 엄격하게 바꾸는 것은 phase 03 이 따로 커밋한다.
 
 **범위 외**: 문장을 고치거나 줄이는 것, 같은 흐름을 한 번만 남기는 것, mermaid 흐름을 더하는 것, `backend/docs/data-schema.md` 를 줄이는 것, 기능 파일 머리의 `covers:` 줄. 모두 이 PR 다음의 PR 이 한다.
 옮기며 문장을 다듬으면 이 커밋의 diff 에 섞여 리뷰어가 옮긴 것과 바뀐 것을 구분하지 못한다.
@@ -28,21 +28,21 @@
 
 | 새 파일 | 제목 | 옮길 절 |
 | --- | --- | --- |
-| `docs/features/chat.md` | 대화 | B 「대화와 실행 사건」 의 머리글과 `### 대화`, B 「대기열과 중지」 / WF 「대화 이력」, 「에이전트가 물을 때」, 「다른 창에서 답하는 중일 때」, 「다시 생성」 / WP 「대화 목록」, 「기다리는 동안 보이는 것」, 「새 대화 화면」, 「메시지 동작」 / RF 「대화 한 번」 |
+| `docs/features/chat.md` | 대화와 대기열 | B 「대화와 실행 사건」 의 머리글과 `### 대화`, B 「대기열과 중지」 / WF 「대화 이력」, 「에이전트가 물을 때」, 「다른 창에서 답하는 중일 때」, 「다시 생성」 / WP 「대화 목록」, 「기다리는 동안 보이는 것」, 「새 대화 화면」, 「메시지 동작」 / RF 「대화 한 번」 |
 | `docs/features/execution.md` | 실행 기록과 한도 | B 「대화와 실행 사건」 의 `### 실행 사건`, `### 모델 단계와 자식 기록`, `### 도구 내용 가리기`(새 `## 실행 기록` 아래에 둔다), B 「사용자 실행 한도」 / WF 「실행 하나를 다시 볼 때」 / WP 「작업 과정 블록」 / RF 「실행이 실패할 때」 |
 | `docs/features/model-usage.md` | 모델과 사용량 | B 「모델 단계와 실행 기록」 / WF 「모델을 고를 때」 / WP 「사용량 화면의 탭」 |
 | `docs/features/attachment.md` | 사진 첨부와 결과물 | B 「사진 첨부」, 「결과물 파일」 / WF 「사진을 보낼 때」 |
-| `docs/features/workspace.md` | 파일 공간 | WP 「파일 공간」 / RF 「파일 공간을 열 때」 |
-| `docs/features/agent-skill.md` | 에이전트와 스킬 | B 「에이전트」, 「다른 에이전트에게 맡기기」, 「스킬」 / WF 「결과 다시 전달」 / WP 「에이전트 화면」(아래 셋째 단락에서 다른 파일로 가는 `###` 제외), WP 「관리자 영역」 의 `### 도구 사용 요청`, `### 화면에 보일 도구` / RP 「언제 에이전트를 나누는가」 |
+| `docs/features/workspace.md` | 파일 공간 기능 | WP 「파일 공간」 / RF 「파일 공간을 열 때」 |
+| `docs/features/agent-skill.md` | 에이전트와 스킬 | B 「에이전트」, 「다른 에이전트에게 맡기기」, 「스킬」 / WF 「결과 다시 전달」 / WP 「에이전트 화면」 의 머리글(그 아래 `###` 다섯은 모두 memory, connector, proactive 로 간다), WP 「관리자 영역」 의 `### 도구 사용 요청`, `### 화면에 보일 도구` / RP 「언제 에이전트를 나누는가」 |
 | `docs/features/mcp.md` | MCP 와 토큰 | B 「MCP 요청자」 / RF 「두 방향과 두 토큰」 |
 | `docs/features/users.md` | 사용자와 로그인 | B 「사용자를 더할 때」 / RF 「로그인 활동 기록」 / WF 「꺼진 사용자의 세션」 / WP 「관리자 영역」 의 머리글(`###` 둘 제외) |
-| `docs/features/user-browser.md` | 사용자 브라우저 | B 「사용자 브라우저」 |
+| `docs/features/user-browser.md` | 사용자 브라우저 기능 | B 「사용자 브라우저」 |
 | `docs/features/connector.md` | 커넥터 연결 | B 「커넥터 설치」, 「커넥터 연결 API」 / RF 「커넥터를 붙일 때」 / WP 「에이전트 화면」 의 `### 연결 절`, `### 연결 뒤 에이전트 고르기` / RP 「커넥터」 |
 | `docs/features/connector-policy.md` | 커넥터 도구 정책과 승인 | B 「커넥터 도구 정책」, 「커넥터 승인」 / RF 「커넥터 READ 데이터의 흐름」 / WP 「이번에 연 원문」, 「동작을 승인할 때」 |
-| `docs/features/memory.md` | Memory | B 「Memory」, 「문맥 묶음」, 「Memory 회수 측정」 / WP 「기억 화면」, 「참고한 기억」, 「에이전트 화면」 의 `### 기억 영역 절` / RF 「기억을 남길 때」 / RP 「Memory 에서 아직 만들지 않은 것」 |
+| `docs/features/memory.md` | 기억 | B 「Memory」, 「문맥 묶음」, 「Memory 회수 측정」 / WP 「기억 화면」, 「참고한 기억」, 「에이전트 화면」 의 `### 기억 영역 절` / RF 「기억을 남길 때」 / RP 「Memory 에서 아직 만들지 않은 것」 |
 | `docs/features/attention.md` | 지금 화면과 알림, 할 일 | B 「먼저 알리기와 지금 화면의 판정」, 「할 일」, 「알림」 / WP 「지금 화면」 / RF 「지금 화면을 열 때」, 「할 일을 제안할 때」 |
-| `docs/features/schedule.md` | 예약 작업 | B 「예약 작업」 |
-| `docs/features/proactive.md` | 먼저 살펴보기 | B 「먼저 살펴보기」, 「매일 루프」, 「문제 후보의 가치 평가」, 「행동 정책」, 「판단 피드백」, 「먼저 살펴보기 루프 평가」 / WF 「점검 대화」 / WP 「에이전트 화면」 의 `### 먼저 살펴보기 절`, `### 가치 평가 절` / RF 「먼저 살펴보기」 / RP 「답하는 비서에서 먼저 챙기는 비서로」 |
+| `docs/features/schedule.md` | 예약 작업 기능 | B 「예약 작업」 |
+| `docs/features/proactive.md` | 먼저 살펴보기 기능 | B 「먼저 살펴보기」, 「매일 루프」, 「문제 후보의 가치 평가」, 「행동 정책」, 「판단 피드백」, 「먼저 살펴보기 루프 평가」 / WF 「점검 대화」 / WP 「에이전트 화면」 의 `### 먼저 살펴보기 절`, `### 가치 평가 절` / RF 「먼저 살펴보기」 / RP 「답하는 비서에서 먼저 챙기는 비서로」 |
 
 - 원재료의 `##` 절은 기능 파일에서도 `##` 다. 부모 없이 옮기는 `###` 절은 `##` 로 한 단 올린다. 그 아래 `####` 도 한 단씩 올린다. 헤딩 글은 바꾸지 않는다.
 - 한 파일 안의 순서: RP 절, WP 절(요구와 화면), RF 절(전체 흐름), WF 절(화면 흐름), B 절(backend 흐름). 같은 원재료 안에서는 원래 순서를 지킨다.
@@ -51,7 +51,8 @@
 
 ### 헤딩이 겹칠 때
 
-한 기능 파일에 같은 헤딩 글(정규화 뒤)이 둘 이상 생기면, B 에서 온 헤딩은 그대로 두고 다른 원재료에서 온 헤딩 끝에 원재료 표시를 괄호로 붙인다: WP 는 `(화면)`, WF 는 `(화면 흐름)`, RF 는 `(전체 흐름)`, RP 는 `(제품 범위)`. 둘 다 B 가 아니면 뒤에 오는 쪽에 붙인다.
+한 기능 파일에 같은 헤딩 글(정규화 뒤)이 둘 이상 생기면, B 에서 온 헤딩은 그대로 두고 다른 원재료에서 온 헤딩 끝에 원재료 표시를 공백 없이 괄호로 붙인다(원재료의 `설정(사용자 실행 한도)` 와 같은 꼴): WP 는 `(화면)`, WF 는 `(화면 흐름)`, RF 는 `(전체 흐름)`, RP 는 `(제품 범위)`.
+파일 제목(`#`)은 위 표의 제목을 쓰며 본문 헤딩과 겹치지 않게 정했다. 원재료가 바뀌어 제목이 본문 헤딩과 겹치면 제목을 바꾸고 원재료 헤딩은 건드리지 않는다. `test/unit/doc-references.test.ts` 의 `duplicateHeadings` 는 단계가 달라도 글이 같으면 중복으로 센다. 둘 다 B 가 아니면 뒤에 오는 쪽에 붙인다.
 붙인 뒤에도 겹치면 멈추고 `PHASE_BLOCKED: 헤딩 중복 <파일> 「<글>」` 을 낸다.
 
 ## 의도 메모
@@ -59,38 +60,35 @@
 - 스크립트로 옮긴다. 손으로 자르고 붙이면 줄을 잃는다. 스크립트는 scratchpad 에 두고 저장소에 넣지 않는다.
 - 스크립트가 만드는 대응표 `(옛 파일, 옛 절 이름) → (새 파일, 새 절 이름)` 를 링크 고치기와 참조 고치기 모두에 쓴다. 대응표에는 `##`~`####` 헤딩과 굵은 항목 이름(`sectionNames` 가 읽는 것)을 모두 넣는다.
 - 원재료에 위 표에 없는 `##` 절이 있으면(다른 브랜치가 더했을 수 있다) 멈추고 `PHASE_BLOCKED: 옮기는 표에 없는 절 <파일> 「<이름>」` 을 낸다.
-- `AGENTS.md` 계열은 링크만 고친다. 예외는 루트 `AGENTS.md` 의 「모듈마다 `docs/` 에 `prd.md`, `flow.md`, …」 한 문장이다. 이 phase 뒤에는 틀린 규칙이 되므로, 기능 파일은 `docs/features/` 에 두고 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md` 만 둔다는 한 문장으로 바꾼다.
+- `AGENTS.md` 계열은 링크만 고친다. 예외는 둘이다. `web/AGENTS.md` 의 「화면 문서는 이 모듈의 `docs/` 에 셋이 있다.」 는 `web/docs/code-architecture.md` 하나와 `docs/features/` 를 가리키게 고친다. 다른 하나는 루트 `AGENTS.md` 의 「모듈마다 `docs/` 에 `prd.md`, `flow.md`, …」 한 문장이다. 이 phase 뒤에는 틀린 규칙이 되므로, 기능 파일은 `docs/features/` 에 두고 모듈 `docs/` 에는 `code-architecture.md` 와 backend 의 `data-schema.md` 만 둔다는 한 문장으로 바꾼다.
 
 ## 작업 항목
 
 ### 1. 기능 파일 만들기
 
-1. 원재료 다섯 파일을 코드 펜스를 건너뛰며 헤딩 단위로 자르고, 위 표대로 15개 파일에 붙인다. 옮긴 줄 수를 원재료별로 세어, 「원재료 줄 수 − 옮기지 않은 머리와 RP 에 남는 절 = 기능 파일에 들어간 원재료 줄」 이 맞는지 스크립트로 확인한다.
+1. 원재료 다섯 파일을 코드 펜스를 건너뛰며 헤딩 단위로 자르고, 위 표대로 15개 파일에 붙인다. 옮긴 줄 수를 원재료별로 세어, 「원재료 줄 수 − 옮기지 않은 머리와 RP 에 남는 절 = 기능 파일에 들어간 원재료 줄」 이 맞는지 스크립트로 확인한다. 이 대조는 작업 항목 1 직후, 참조를 고치기 전의 스크립트 산출에서 한다. 기능 파일 쪽에서는 새 파일 머리와 더한 헤딩 줄(`execution.md` 의 `## 실행 기록`)을 빼고 센다.
 2. `git rm backend/docs/flow.md web/docs/flow.md web/docs/prd.md docs/flow.md` 하고, `docs/prd.md` 에서 옮긴 네 절을 지운다.
-3. 옮긴 본문의 상대 링크를 고친다. 링크 대상을 원래 파일 자리 기준으로 풀어 저장소 경로를 얻고, `docs/features/` 기준 상대 경로로 다시 쓴다. 대상이 옮긴 문서(옛 파일 넷, 또는 RP 의 옮긴 절)면 뒤에 붙은 「절」 로 대응표에서 새 파일과 새 절 이름을 찾는다. 같은 기능 파일이면 `](<같은 파일>.md)` 로 쓴다.
+3. 옮긴 본문의 상대 링크를 고친다. 링크에 앵커(`#…`)가 있으면 앵커가 가리키는 헤딩으로 대응표에서 새 파일을 찾고, 헤딩 이름이 바뀌었으면 앵커도 다시 만든다(`doc-links` 시험은 앵커를 보지 않으므로, 옮긴 뒤 앵커가 그 파일의 헤딩 slug 와 맞는지 scratchpad 스크립트로 대조해 0건을 확인한다). 링크 대상을 원래 파일 자리 기준으로 풀어 저장소 경로를 얻고, `docs/features/` 기준 상대 경로로 다시 쓴다. 대상이 옮긴 문서(옛 파일 넷, 또는 RP 의 옮긴 절)면 뒤에 붙은 「절」 로 대응표에서 새 파일과 새 절 이름을 찾는다. 같은 기능 파일이면 `](<같은 파일>.md)` 로 쓴다.
 
 ### 2. 저장소 전체의 참조 고치기
 
-4. 옛 경로를 가리키는 모든 줄을 찾는다: `git grep -nE "(backend|web)/docs/(flow|prd)\.md|(^|[^/a-zA-Z])docs/flow\.md"`, 그리고 `backend/docs/`, `web/docs/` 안에서 `](flow.md`, `](prd.md` 로 건 링크, `docs/prd.md` 「옮긴 절」 참조.
+4. 옛 경로를 가리키는 모든 줄을 찾는다: `git grep -nE "(backend|web)/docs/(flow|prd)\.md|(^|[^/a-zA-Z])docs/flow\.md"`, 그리고 `backend/docs/`, `web/docs/`, 루트 `docs/` 안에서 `](flow.md`, `](prd.md` 로 건 링크(앵커 포함, `git grep -nE '(flow|prd)\.md#'`), `docs/prd.md` 「옮긴 절」 참조. 루트 `docs/prd.md` 의 남는 절 안에서 옮긴 절을 가리키는 자기 링크(`](prd.md)`)도 새 기능 파일로 바꾼다.
+   - 옛 경로가 줄 끝에 있고 「절」 이 다음 줄 머리에 오는 참조(약 16곳, 예: `AttentionJudge.java`, `McpMemoryRemember.java`, `UserBrowser.java`)는 다음 줄의 「」 를 같은 참조의 절로 보고 대응표로 바꾼다. `doc-references` 시험의 정규식은 한 줄만 보므로 이 참조를 확인하지 못한다.
    - 뒤에 「절」 이 붙은 참조: 대응표의 새 파일과 새 절 이름으로 바꾼다. 「A」, 「B」 처럼 이어 적은 절이 서로 다른 파일로 갔으면 문장을 나눠 각 파일을 적는다.
    - 절 없는 참조: 문맥(그 코드의 패키지, 문서 절의 주제)으로 기능 파일 하나를 고른다. 고를 수 없으면 폴더 `docs/features/` 로 쓴다.
    - Markdown 링크는 그 파일 자리 기준 상대 경로로 고친다. 링크 글자의 옛 경로도 새 경로로 바꾼다.
+   - ADR 은 링크만 고친다. 과거 배치를 적은 산문(「`backend/docs/flow.md` 는 약 5,900줄이다」 같은 문장)은 당시 기록이라 그대로 둔다.
    - 대상 파일 종류: Java, TypeScript, Python 의 주석, `.github/workflows/*.txt` 프롬프트, `README.md`, `README.ko.md`, 모든 `AGENTS.md`, `hermes/**/README.md`, 남는 모듈 문서(`*/docs/code-architecture.md`, `backend/docs/data-schema.md`, `hermes/docs/hermes-contract.md`, `docs/code-architecture.md`, `docs/privacy.md`, `docs/self-hosting.md`), 모든 `docs/adr/**`.
    - 예외: `test/unit/` 의 문서 검사 시험이 예시 문자열로 쓴 옛 경로(`doc-references.test.ts` 의 `PATH_FIXTURE_FILES` 에 든 파일과 파서 시험의 입력)는 그대로 둔다.
-   - Java 주석의 줄이 길어져 Checkstyle 줄 길이를 넘으면 그 주석만 줄바꿈한다.
+   - Java 주석의 줄이 길어져 Spotless(palantir, `backend/build.gradle.kts`) 줄 길이 120자를 넘으면 그 주석만 줄바꿈한다. web 의 주석도 `pnpm format:check` 를 지킨다.
 5. 모듈 `AGENTS.md` 의 문서 링크 표나 목록에서 지운 파일을 가리키던 줄은 해당 기능 파일 또는 폴더 `docs/features/` 링크로 바꾼다. 루트 `AGENTS.md` 의 「읽기 순서」 표의 `docs/flow.md` 줄은 `docs/features/` 폴더 링크로 바꾸고 설명 칸은 「기능마다 요구와 화면, Control Plane, Hermes 를 가로지르는 흐름」 으로 바꾼다.
 6. `test/unit/attention.test.ts` 의 `NOW_DOC` 를 `docs/features/attention.md` 로, 시험 이름과 메시지의 `web/docs/prd.md` 를 새 경로로 바꾼다.
-7. `scripts/pr-risk-labels.sh` 의 `backend/docs/flow.md` 를 `docs/features/*.md` 로 바꾼다(옛 파일도 모든 기능을 담았으므로 같은 넓이다). `test/unit/pr-risk-labels.test.ts` 의 단언을 `docs/features/mcp.md` 로 바꾸고, `backend/docs/code-architecture.md` 가 라벨이 없는 단언은 그대로 둔다.
+7. `scripts/pr-risk-labels.sh` 의 `backend/docs/flow.md` 를 `docs/features/*.md` 로 바꾼다. 옛 파일이 모든 기능의 backend 흐름을 담았으므로 기능 파일 전부가 그 자리를 잇는다. 다만 예전에는 라벨이 없던 화면 쪽 절(옛 web 문서)을 고쳐도 이제 `위험:Hermes연동` 이 붙어 대상이 넓어진다. 이 변화를 커밋 메시지에 적는다. `doc-references` 시험이 `.sh` 의 문서 경로도 확인하므로 이 phase 에서 바꿔야 한다.
+   `test/unit/pr-risk-labels.test.ts` 의 단언을 `docs/features/mcp.md` 로 바꾸고 시험 이름(「Hermes 문서에서 옮겨 온 절을 가진 backend 문서는…」)도 새 자리에 맞게 바꾼다. `backend/docs/code-architecture.md` 가 라벨이 없는 단언은 그대로 둔다.
 
-### 3. 문서 이름 규칙을 새 배치에 맞춘다
+### 3. 이 phase 를 검증하는 시험
 
-8. `test/unit/doc-files.test.ts`
-   - 모듈(`backend/`, `web/`, `hermes/`)의 `docs/` 바로 아래에는 `code-architecture.md` 와 `data-schema.md` 만 통과한다. 루트 `docs/` 바로 아래에는 `prd.md` 와 `code-architecture.md` 만 통과한다. 예외 목록(`EXCEPTIONS`)과 `docs/features/<이름>.md` 는 그대로 통과한다.
-   - 기존 시험 입력 중 `web/docs/flow.md` 는 이제 실패 쪽으로 옮기고, `backend/docs/flow.md`, `web/docs/prd.md`, `docs/flow.md` 실패를 더한다. 오류 문구 「새 주제는 prd, flow, code-architecture, data-schema 의 절로 더한다」 는 「기능은 docs/features/ 의 기능 파일이나 그 절로 더한다」 로 바꾼다.
-
-### 4. 이 phase 를 검증하는 시험
-
-9. 위 6~8 의 시험이 새 경로와 새 규칙의 통과 입력과 실패 입력을 단언한다. 문서 검사 시험 넷(`doc-files`, `doc-links`, `doc-references`, `doc-code-references`)이 옮긴 결과 전체를 본다.
+8. 위 6, 7 의 시험이 새 경로의 통과 입력과 실패 입력을 단언한다. 문서 검사 시험 넷(`doc-files`, `doc-links`, `doc-references`, `doc-code-references`)이 옮긴 결과 전체를 본다.
 
 ## 검증
 
@@ -99,14 +97,15 @@ node --test test/unit/doc-files.test.ts test/unit/doc-code-references.test.ts te
 node --test 'test/unit/**/*.test.ts'
 node scripts/check-file-length.mjs
 test -z "$(git ls-files backend/docs/flow.md web/docs/flow.md web/docs/prd.md docs/flow.md)"
-test "$(git grep -nE '(backend|web)/docs/(flow|prd)\.md|(^|[^/a-zA-Z])docs/flow\.md' -- ':!test/unit/doc-*.test.ts' ':!test/unit/file-length.test.ts' ':!tasks/' | wc -l | tr -d ' ')" = "0"
-cd backend && ./gradlew checkstyleMain checkstyleTest --quiet
-cd backend && ./gradlew test --tests '*.AttentionControlServiceTest' --tests '*.AttentionJudgeTest' --tests '*.AttentionMetricsServiceTest' --tests '*.AttentionServiceTest' --tests '*.FollowUpAttentionSourceTest' --tests '*.SurfacedProblemCandidatesTest' --tests '*.BrowserGatewayTest' --tests '*.GatewayRewriterTest' --tests '*.UserBrowserServiceTest' --tests '*.BrowserPropertiesTest' --tests '*.BrowserGatewayControllerTest' --tests '*.BrowserGatewayHandshakeTest' --tests '*.BrowserGatewaySocketTest' --tests '*.UserBrowserControllerTest' --tests '*.UserBrowserScreenControllerTest' --tests '*.ConnectorActionDeliveryTest' --tests '*.MemoryUseServiceTest' --tests '*.ResultDeliveryRetryTest' --tests '*.ApprovalNotificationTest' --tests '*.ConnectorActionServiceTest' --tests '*.ConnectorPolicyEndpointTest' --tests '*.ConnectorPolicyRequestTest' --tests '*.MemoryRecallEvalTest' --tests '*.FollowUpProposalTest' --tests '*.FollowUpServiceTest' --tests '*.ToolDetailRedactorTest' --tests '*.McpFollowUpToolTest' --tests '*.McpMemoryRememberToolTest' --tests '*.NotificationServiceTest' --tests '*.SurfacedProblemsTest' --tests '*.TaskControllerTest' --tests '*.TaskFiringTest' --tests '*.TaskRunRecoveryTest' --tests '*.TaskRunStarterTest' --tests '*.TaskScheduleTest' --tests '*.TaskServiceTest'
-node --test test/unit/artifact-attachment-route.test.ts test/unit/attention.test.ts test/unit/pr-risk-labels.test.ts test/unit/pr-size.test.ts
-cd hermes && python3 -m pytest -q tests/test_read_data_flow.py tests/test_fos_ctx.py
+git grep -nE '(backend|web)/docs/(flow|prd)\.md|(^|[^/a-zA-Z])docs/flow\.md' -- ':!test/unit/doc-*.test.ts' ':!test/unit/file-length.test.ts' ':!tasks/' ':!docs/adr/' ':!*/docs/adr/'; test $? -eq 1
+(cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck --quiet)
+(cd backend && ./gradlew test --tests '*.AttentionControlServiceTest' --tests '*.AttentionJudgeTest' --tests '*.AttentionMetricsServiceTest' --tests '*.AttentionServiceTest' --tests '*.FollowUpAttentionSourceTest' --tests '*.SurfacedProblemCandidatesTest' --tests '*.BrowserGatewayTest' --tests '*.GatewayRewriterTest' --tests '*.UserBrowserServiceTest' --tests '*.BrowserPropertiesTest' --tests '*.BrowserGatewayControllerTest' --tests '*.BrowserGatewayHandshakeTest' --tests '*.BrowserGatewaySocketTest' --tests '*.UserBrowserControllerTest' --tests '*.UserBrowserScreenControllerTest' --tests '*.ConnectorActionDeliveryTest' --tests '*.MemoryUseServiceTest' --tests '*.ResultDeliveryRetryTest' --tests '*.ApprovalNotificationTest' --tests '*.ConnectorActionServiceTest' --tests '*.ConnectorPolicyEndpointTest' --tests '*.ConnectorPolicyRequestTest' --tests '*.MemoryRecallEvalTest' --tests '*.FollowUpProposalTest' --tests '*.FollowUpServiceTest' --tests '*.ToolDetailRedactorTest' --tests '*.McpFollowUpToolTest' --tests '*.McpMemoryRememberToolTest' --tests '*.NotificationServiceTest' --tests '*.SurfacedProblemsTest' --tests '*.TaskControllerTest' --tests '*.TaskFiringTest' --tests '*.TaskRunRecoveryTest' --tests '*.TaskRunStarterTest' --tests '*.TaskScheduleTest' --tests '*.TaskServiceTest')
+node --test test/unit/artifact-attachment-route.test.ts test/unit/attention.test.ts test/unit/pr-risk-labels.test.ts
+(cd web && pnpm format:check)
+(cd hermes && python3 -m pytest -q tests/test_read_data_flow.py tests/test_fos_ctx.py)
 ```
 
-- 모든 줄이 종료 코드 0 이다. 셋째 줄의 기능 파일 500줄 알림은 있어도 된다(다음 PR 이 줄인다).
+- 모든 줄이 종료 코드 0 이다. 다섯째 줄의 `git grep` 은 찾은 것이 없을 때 1 이고 그때만 통과한다(오류 128 은 실패). ADR 은 과거 기록이라 대상에서 뺀다. ADR 의 링크는 `doc-links` 시험이 본다. 셋째 줄의 기능 파일 500줄 알림은 있어도 된다(다음 PR 이 줄인다).
 - 줄 수: 커밋 메시지 본문에 원재료 다섯 파일의 줄 수와 기능 파일 15개의 줄 수를 적는다. 기능 파일 합계는 원재료 합계에서 옮기지 않은 머리와 RP 에 남은 절을 빼고 새 머리를 더한 값과 맞아야 한다.
 - backend 시험과 hermes 시험은 주석 경로만 바뀌었으므로 기존과 같게 통과한다. hermes 시험 환경이 없으면 `PHASE_BLOCKED` 대신 회신에 「돌리지 못함」 과 까닭을 적는다.
 
@@ -213,7 +212,6 @@ cd hermes && python3 -m pytest -q tests/test_read_data_flow.py tests/test_fos_ct
 | `test/unit/artifact-attachment-route.test.ts` | 수정 |
 | `test/unit/attention.test.ts` | 수정 |
 | `test/unit/pr-risk-labels.test.ts` | 수정 |
-| `test/unit/pr-size.test.ts` | 수정 |
 | `web/src/components/agent/agent-admin-section.tsx` | 수정 |
 | `web/src/components/browser/browser-screen.tsx` | 수정 |
 | `web/src/components/browser/use-screen-stream.ts` | 수정 |

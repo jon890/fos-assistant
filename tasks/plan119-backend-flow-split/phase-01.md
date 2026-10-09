@@ -47,7 +47,7 @@
 - 감당할 것: 코드 주석과 문서가 기능 파일 이름까지 적어야 하고, 기능을 다른 파일로 옮기면 참조를 함께 고친다(`doc-references` 시험이 잡는다). 기능 경계가 애매한 절은 주로 바뀌는 코드가 있는 기능에 둔다.
 
 `docs/adr/ADR-20261009-docs-per-module.md` 의 「결정」 절 첫머리에 `대체된 부분` 한 줄을 두어 새 ADR 을 링크하고, 새 ADR 에서도 그 ADR 을 링크한다.
-`docs/adr/INDEX.md` 결정 목록에 새 ADR 을 날짜와 슬러그 순서로 더하고, `docs-per-module` 줄의 상태 칸에 「모듈 prd 와 flow 를 두는 부분은 ADR-20261009 / feature-docs 가 대체한다」 를 붙인다.
+`docs/adr/INDEX.md` 결정 목록에 새 ADR 을 날짜와 슬러그 순서로 더하고(층 칸은 `공통`, 상태 칸은 `Accepted`), `docs-per-module` 줄의 상태 칸에 「모듈 prd 와 flow 를 두는 부분은 ADR-20261009 / feature-docs 가 대체한다」 를 붙인다.
 
 ### 2. `test/unit/doc-files.test.ts`
 
