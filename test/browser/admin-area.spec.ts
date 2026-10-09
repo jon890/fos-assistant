@@ -54,7 +54,7 @@ test("화면 높이가 360px 여도 관리자 입구는 뷰포트 안에 있고 
   await expect(page.getByTestId("admin-entry")).toBeInViewport({ ratio: 1 });
 
   // 메뉴 구역이 줄어들어도 마지막 링크까지 스크롤해 닿을 수 있고, 그 뒤에도 입구는 그대로 보인다.
-  const lastLink = page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "사용량", exact: true });
+  const lastLink = page.getByRole("navigation", { name: "주요 화면" }).getByRole("link", { name: "내 브라우저", exact: true });
   await lastLink.scrollIntoViewIfNeeded();
   await expect(lastLink).toBeInViewport();
   await expect(page.getByTestId("admin-entry")).toBeInViewport({ ratio: 1 });
