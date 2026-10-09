@@ -697,6 +697,9 @@ class SkillServiceTest {
         assertThat(skills.adminList(ADMIN, GROUP).skills())
                 .extracting(SkillListItem::name)
                 .containsExactly("connector-notes", "hermes-help", "weekly-plan");
+        CurrentUser otherAdmin = new CurrentUser(83L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
+        assertCode(() -> skills.adminList(otherAdmin, OWNED), ErrorCode.AGENT_NOT_FOUND);
+        assertCode(() -> skills.adminToggle(otherAdmin, OWNED, "hermes-help", false), ErrorCode.AGENT_NOT_FOUND);
         assertCode(() -> skills.adminList(OWNER, GROUP), ErrorCode.FORBIDDEN);
         assertCode(() -> skills.adminToggle(OWNER, GROUP, "hermes-help", false), ErrorCode.FORBIDDEN);
         assertCode(() -> skills.toggle(OWNER, GROUP, "hermes-help", false), ErrorCode.SKILL_NOT_FOUND);

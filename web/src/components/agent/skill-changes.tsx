@@ -12,7 +12,7 @@ export function SkillChanges({
   files: SkillFileEntry[];
 }) {
   const before = new Map([
-    ["SKILL.md", initial?.body ?? ""],
+    ...(initial ? [["SKILL.md", initial.body] as const] : []),
     ...(initial?.files ?? []).map((file) => [file.path, file.content] as const),
   ]);
   const after = new Map([

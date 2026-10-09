@@ -40,7 +40,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 | `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
 | `PUT /api/v1/agents/{code}/skills/{name}/enabled` | 관리하는 사람만. 올린 스킬만 받는다. `{ "enabled" }`. 기본·커넥터 스킬은 `SKILL_NOT_FOUND` 다 |
-| `GET /api/v1/admin/agents/{code}/skills` | 관리자만. 올린 스킬과 기본·커넥터 스킬 전체를 준다. 다른 사람의 비공개 에이전트도 읽는다 |
+| `GET /api/v1/admin/agents/{code}/skills` | 관리자만. 읽을 수 있는 에이전트의 올린 스킬과 기본·커넥터 스킬 전체를 준다 |
 | `PUT /api/v1/admin/agents/{code}/skills/{name}/enabled` | 관리자만. 기본·커넥터 스킬까지 켜고 끈다 |
 
 일반 경로는 관리자 역할로 요청해도 `UPLOADED` 만 준다. Hermes 번들과 커넥터가 설치한 스킬의 이름·설명은 관리자 영역에서만 보인다.
