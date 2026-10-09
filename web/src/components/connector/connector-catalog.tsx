@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -75,7 +77,7 @@ export function ConnectorCatalog({
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="mx-auto w-full max-w-6xl">
       <h1 className="text-xl font-semibold">외부 서비스 연결</h1>
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
         쓰는 서비스의 계정을 연결하면 에이전트가 그 서비스로 일을 도와요.
@@ -98,46 +100,59 @@ export function ConnectorCatalog({
           description="관리자가 서비스를 열면 여기에 나타나요."
         />
       ) : (
-        <ul className="space-y-3">
+        <ul
+          data-testid="connector-grid"
+          className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+        >
           {connectors.map((connector) => (
-            <li key={connector.id}>
+            <li key={connector.id} className="min-w-0">
               <Card
                 data-testid="connector-card"
-                className="relative transition-colors hover:bg-accent has-[[data-slot=card-link]:focus-visible]:ring-3 has-[[data-slot=card-link]:focus-visible]:ring-ring/50"
+                className="relative h-full min-w-0 transition-colors duration-fast hover:bg-accent has-[[data-slot=card-link]:focus-visible]:ring-3 has-[[data-slot=card-link]:focus-visible]:ring-ring/50"
               >
                 <CardHeader>
                   <div className="flex min-w-0 items-start gap-3">
                     <ConnectorIcon icon={connector.icon} />
                     <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                        <CardTitle className="min-w-0 break-words">
-                          <Link
-                            data-slot="card-link"
-                            prefetch={false}
-                            href={connectionHref(connector.id, preferredAgent)}
-                            className="after:absolute after:inset-0 focus-visible:outline-none"
-                          >
+                      <CardTitle className="min-w-0" title={connector.title}>
+                        <Link
+                          data-slot="card-link"
+                          prefetch={false}
+                          href={connectionHref(connector.id, preferredAgent)}
+                          className="after:absolute after:inset-0 focus-visible:outline-none"
+                        >
+                          <span className="block truncate">
                             {connector.title}
-                          </Link>
-                        </CardTitle>
-                        <Badge variant="outline">
-                          {connectionStatusLabel(connector.myStatus)}
-                        </Badge>
-                      </div>
-                      {connector.description ? (
-                        <CardDescription className="break-words">
-                          {connector.description}
-                        </CardDescription>
-                      ) : null}
+                          </span>
+                        </Link>
+                      </CardTitle>
+                      <CardDescription
+                        className="min-h-5 line-clamp-1 break-words"
+                        title={connector.description ?? undefined}
+                      >
+                        {connector.description}
+                      </CardDescription>
                     </div>
                   </div>
+                  <Badge
+                    className="mt-3"
+                    variant={
+                      connector.myStatus === "READY"
+                        ? "success"
+                        : connector.myStatus === "PENDING"
+                          ? "warning"
+                          : "outline"
+                    }
+                  >
+                    {connectionStatusLabel(connector.myStatus)}
+                  </Badge>
                 </CardHeader>
                 {hasCardContent(connector) ? (
                   <CardContent className="min-w-0 space-y-1">
                     {connector.available ? (
                       connector.tools.length > 0 ? (
                         <p
-                          className="text-sm text-muted-foreground"
+                          className="line-clamp-2 break-words text-sm text-muted-foreground"
                           data-testid="connector-tool-summary"
                         >
                           {toolSummary(connector.tools)}
@@ -152,7 +167,7 @@ export function ConnectorCatalog({
                         connector,
                       ) ? (
                       <p
-                        className="text-sm text-foreground"
+                        className="line-clamp-2 break-words text-sm text-foreground"
                         data-testid="connector-binding-count"
                       >
                         아직 쓰는 에이전트가 없어요. 눌러서 쓸 에이전트를 골라
@@ -173,6 +188,20 @@ export function ConnectorCatalog({
                     />
                   </CardContent>
                 ) : null}
+                <CardFooter className="mt-auto">
+                  <Button asChild className="relative z-10 w-full">
+                    <Link
+                      data-testid="connector-action"
+                      prefetch={false}
+                      href={connectionHref(connector.id, preferredAgent)}
+                    >
+                      {connector.myStatus === "DISCONNECTED"
+                        ? "연결하기"
+                        : "연결 확인"}
+                      <span className="sr-only">({connector.title})</span>
+                    </Link>
+                  </Button>
+                </CardFooter>
               </Card>
             </li>
           ))}

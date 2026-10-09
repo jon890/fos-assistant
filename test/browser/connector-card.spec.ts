@@ -58,7 +58,7 @@ test("아이콘과 링크가 있는 카드가 도구 요약과 함께 보인다"
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
   await expect(
     card.getByRole("link", { name: /검사용 rich-card/ }),
-  ).toHaveCount(2);
+  ).toHaveCount(3);
   await expect(link).toHaveAccessibleName(/검사용 rich-card/);
   await expect(card.getByTestId("connector-tool-summary")).toHaveText(
     "도구 3개 · 조회 1 · 쓰기 1 · 되돌리기 어려운 쓰기 1",
@@ -203,10 +203,104 @@ test("폭 360 에서 공백 없는 긴 이름과 설명이 카드 밖으로 넘�
       client: node.clientWidth,
     }));
     expect(overflow.client, `${slot} clientWidth`).toBeGreaterThan(0);
-    expect(overflow.scroll, `${slot} scrollWidth`).toBeLessThanOrEqual(
-      overflow.client,
+    if (slot === "card-title") {
+      await expect(element.locator("span")).toHaveCSS(
+        "text-overflow",
+        "ellipsis",
+      );
+    } else {
+      expect(overflow.scroll, `${slot} scrollWidth`).toBeLessThanOrEqual(
+        overflow.client,
+      );
+    }
+  }
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("두 화면 폭에서 열 수와 카드 높이, 주 단추 위치를 맞추고 넘치지 않는다", async ({
+  page,
+}) => {
+  await listConnectors(page, [
+    connector("long-grid", {
+      title: "긴서비스".repeat(30),
+      description: "공백없는긴설명".repeat(60),
+      icon: SVG_ICON,
+    }),
+    rich,
+    connector("ready-grid", { myStatus: "READY" }),
+    connector("pending-grid", { myStatus: "PENDING", description: "" }),
+    connector("unavailable-grid", { available: false }),
+    connector("bare-grid", { description: "" }),
+  ]);
+  await page.goto("/connections");
+  const cards = page.getByTestId("connector-card");
+  await expect(cards).toHaveCount(6);
+  const expectedColumns = page.viewportSize()!.width >= 1280 ? 3 : 1;
+  const grid = page.getByTestId("connector-grid");
+  expect(
+    await grid.evaluate(
+      (node) => getComputedStyle(node).gridTemplateColumns.split(" ").length,
+    ),
+  ).toBe(expectedColumns);
+
+  const layout = await cards.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const card = node.getBoundingClientRect();
+      const positions = [
+        "[data-slot=card-title]",
+        "[data-slot=card-description]",
+        "[data-slot=badge]",
+        "[data-testid=connector-action]",
+      ].map(
+        (selector) =>
+          node.querySelector(selector)!.getBoundingClientRect().top - card.top,
+      );
+      return { height: card.height, positions, left: card.left, top: card.top };
+    }),
+  );
+  for (const item of layout) {
+    expect(item.height).toBeCloseTo(layout[0].height, 0);
+    item.positions.forEach((position, index) =>
+      expect(position).toBeCloseTo(layout[0].positions[index], 0),
     );
   }
+  expect(new Set(layout.map((item) => item.left)).size).toBe(expectedColumns);
+  expect(layout.filter((item) => item.top === layout[0].top)).toHaveLength(
+    expectedColumns,
+  );
+  await expect(
+    cards.nth(0).getByTestId("connector-action"),
+  ).toHaveAccessibleName(/^연결하기/);
+  await expect(
+    cards.nth(2).getByTestId("connector-action"),
+  ).toHaveAccessibleName(/^연결 확인/);
+  await expect(cards.nth(0).locator("[data-slot=card-description]")).toHaveCSS(
+    "-webkit-line-clamp",
+    "1",
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("중간 폭에서는 두 열로 보인다", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  await listConnectors(page, [connector("first"), connector("second"), rich]);
+  await page.goto("/connections");
+  await expect(page.getByTestId("connector-card")).toHaveCount(3);
+  expect(
+    await page
+      .getByTestId("connector-grid")
+      .evaluate(
+        (node) => getComputedStyle(node).gridTemplateColumns.split(" ").length,
+      ),
+  ).toBe(2);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
