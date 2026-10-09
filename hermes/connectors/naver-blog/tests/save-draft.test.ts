@@ -222,10 +222,13 @@ const OVERWRITE = {
   body: "가상국수에 또 다녀왔어요\n[기존 사진 1]",
 };
 
-test("overwrite_draft 는 새 사진 줄이 든 본문이면 작업을 만들지 않고 NAVER_BLOG_INVALID_INPUT 이다", async () => {
+test.each([
+  ["새 사진 줄이 든 본문", { body: `${OVERWRITE.body}\n[사진 1: 101.jpg]` }],
+  ["승인 카드가 가릴 바뀌는 내용", { changes: `${OVERWRITE.changes}\n- 링크 ${"a".repeat(32)}` }],
+])("overwrite_draft 는 %s 이면 작업을 만들지 않고 NAVER_BLOG_INVALID_INPUT 이다", async (_, extra) => {
   const { cdp, jobDir, call } = await setup();
 
-  const result = await call("overwrite_draft", { ...OVERWRITE, body: `${OVERWRITE.body}\n[사진 1: 101.jpg]` });
+  const result = await call("overwrite_draft", { ...OVERWRITE, ...extra });
 
   expect(result).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_INVALID_INPUT" } } });
   expect(cdp.httpRequests).toEqual([]);

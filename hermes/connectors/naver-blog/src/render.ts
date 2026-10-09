@@ -126,7 +126,10 @@ function renderOverwrite(input: RenderInput, base: OverwriteContent): RenderResu
   if (changes.length > CHANGES_MAX) problems.push("바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요.");
   // 바뀌는 내용에는 원래 글의 줄도 실린다. 그 줄이 가려져도 승인할 수 없다.
   // 고친 글의 칸에서 이미 알렸으면 같은 까닭을 두 번 적지 않는다.
-  else if (cardWouldMask(changes) && !problems.some((problem) => problem.includes("승인 카드가 가리는")))
+  else if (
+    cardWouldMask(changes) &&
+    ![input.title, input.category, input.body, ...input.tags].some(cardWouldMask)
+  )
     problems.push(maskedProblem("바뀌는 내용"));
   if (problems.length > 0) return { problems, html: null, assets: [] };
 

@@ -308,6 +308,14 @@ test("바뀐 줄 옆의 원래 줄이 승인 카드에 가려지면 덮어쓸 �
   ]);
 });
 
+test("지운 원래 줄만 승인 카드에 가려져도 바뀌는 내용에서 덮어쓸 수 없다는 problems 다", async () => {
+  const base = { ...BASE, body: BASE.body.replace("끝", `링크 https://example.com/${"x".repeat(32)}`) };
+  const result = await renderDraft(overwriteInput({ base }), attachmentDir);
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual([expect.stringContaining("바뀌는 내용에 승인 카드가 가리는")]);
+});
+
 test("base 를 주어도 원래 글과 같으면 바뀐 것이 없다는 problems 다", async () => {
   const result = await renderDraft(
     overwriteInput({ tags: [...BASE.tags], body: BASE.body }),

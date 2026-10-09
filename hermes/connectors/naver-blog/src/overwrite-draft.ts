@@ -52,6 +52,8 @@ export function validateOverwrite(
   if (input.tags.some(cardWouldMask)) problems.push(maskedProblem("태그"));
   const maskedLine = lines.findIndex(cardWouldMask);
   if (maskedLine >= 0) problems.push(maskedProblem(`본문 ${maskedLine + 1}번째 줄`));
+  // 카드는 본문 전체에 규칙을 건다. 줄을 넘는 모양(`password` 와 값이 다른 줄)도 본다.
+  else if (cardWouldMask(input.body)) problems.push(maskedProblem("본문"));
 
   if (blocks.some((block) => block.type !== "text"))
     problems.push(
