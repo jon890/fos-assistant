@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.ToolsetRequestService;
@@ -35,10 +37,15 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
@@ -162,6 +169,72 @@ class ToolsetRequestFlowTest {
                 .isEqualTo(second.orTimeout(10, TimeUnit.SECONDS).join().id());
         assertThat(service.list(owner, agent.code(), false)).hasSize(1);
         assertThat(notifications.page(admin, null, 100).items()).hasSize(1);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"reject", "cancel"})
+    @DisplayName("승인 중 시작된 거절과 취소는 이전 읽기 시점에서도 승인 결과를 보고 도구와 알림을 반복하지 않는다")
+    void preservesApprovalAfterConcurrentDecision(String action) throws Exception {
+        ToolsetRequestView row = service.request(owner, agent.code(), "image_gen");
+        CountDownLatch applying = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch snapshotRead = new CountDownLatch(1);
+        doAnswer(call -> {
+                    applying.countDown();
+                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                    enabled.set(call.getArgument(1));
+                    return null;
+                })
+                .when(hermes)
+                .writeApiServer(anyString(), anyList(), anyString());
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ToolsetRequestView> approval = pool.submit(() -> service.decide(admin, row.id(), true, null));
+            assertThat(applying.await(10, TimeUnit.SECONDS)).isTrue();
+            Future<ToolsetRequestView> competing = pool.submit(() -> transactions.execute(status -> {
+                // 승인 커밋 전에 MySQL의 읽기 시점을 고정해 잠금 뒤 이전 상태를 읽는 회귀를 재현한다.
+                assertThat(requests.findAgentIdByPublicId(row.id())).contains(agent.id());
+                snapshotRead.countDown();
+                return action.equals("cancel")
+                        ? service.cancel(owner, row.id())
+                        : service.decide(admin, row.id(), false, "다음에 확인할게요.");
+            }));
+            assertThat(snapshotRead.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(competing.isDone()).isFalse();
+            release.countDown();
+            assertThat(approval.get(10, TimeUnit.SECONDS).status()).isEqualTo(ToolsetRequestStatus.APPROVED);
+            assertThat(competing.get(10, TimeUnit.SECONDS).status()).isEqualTo(ToolsetRequestStatus.APPROVED);
+            assertThat(service.read(owner, row.id(), false).status()).isEqualTo(ToolsetRequestStatus.APPROVED);
+            assertThat(enabled.get()).contains("image_gen");
+            verify(hermes, times(1)).writeApiServer(anyString(), anyList(), anyString());
+            assertThat(notifications.page(owner, null, 100).items()).hasSize(1);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+            assertThat(pool.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
+    @DisplayName("조건부 갱신은 먼저 결정된 요청의 상태와 결정자를 덮어쓰지 않는다")
+    void updatesOnlyPendingRequest() {
+        ToolsetRequestView row = service.request(owner, agent.code(), "image_gen");
+        Instant decidedAt = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        transactions.executeWithoutResult(status -> {
+            assertThat(requests.finishPending(
+                            row.id(), ToolsetRequestStatus.REJECTED, admin.id(), "다음에 확인할게요.", decidedAt))
+                    .isEqualTo(1);
+            assertThat(requests.finishPending(
+                            row.id(), ToolsetRequestStatus.CANCELLED, null, null, decidedAt.plusSeconds(1)))
+                    .isZero();
+            AgentToolsetRequest stored =
+                    requests.findByPublicIdForUpdate(row.id()).orElseThrow();
+            assertThat(stored.status()).isEqualTo(ToolsetRequestStatus.REJECTED);
+            assertThat(stored.decidedByUserId()).isEqualTo(admin.id());
+            assertThat(stored.reason()).isEqualTo("다음에 확인할게요.");
+            assertThat(stored.decidedAt()).isEqualTo(decidedAt);
+            assertThat(stored.pendingSlot()).isNull();
+        });
     }
 
     @Test

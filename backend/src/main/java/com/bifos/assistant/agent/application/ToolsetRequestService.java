@@ -27,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 에이전트 잠금 아래 요청과 결정을 저장하고 기존 도구 서비스로 승인한 도구를 반영한다. */
+/** 사용자, 에이전트, 요청 순서로 잠그고 기존 도구 서비스로 승인한 도구를 반영한다. */
 @Service
 @RequiredArgsConstructor
 public class ToolsetRequestService {
@@ -42,6 +42,7 @@ public class ToolsetRequestService {
 
     @Transactional
     public ToolsetRequestView request(CurrentUser user, String code, String toolset) {
+        users.findByIdForUpdate(user.id()).orElseThrow(ToolsetRequestService::notFound);
         Long agentId = agents.findIdByCode(code).orElseThrow(ToolsetRequestService::notFound);
         Agent agent = agents.findByIdForUpdate(agentId).orElseThrow(ToolsetRequestService::notFound);
         requireCurrent(user, false);
@@ -93,7 +94,7 @@ public class ToolsetRequestService {
     @Transactional(readOnly = true)
     public ToolsetRequestView read(CurrentUser user, UUID id, boolean adminView) {
         requireCurrent(user, adminView);
-        AgentToolsetRequest row = requireRequest(user, id, adminView);
+        AgentToolsetRequest row = requireRequest(user, id, adminView, false);
         return view(row, agents.findById(row.agentId()).orElseThrow(ToolsetRequestService::notFound));
     }
 
@@ -101,7 +102,7 @@ public class ToolsetRequestService {
     public ToolsetRequestView decide(CurrentUser user, UUID id, boolean approve, String reason) {
         Agent agent = lockAgent(id);
         requireCurrent(user, true);
-        AgentToolsetRequest row = requireRequest(user, id, true);
+        AgentToolsetRequest row = requireRequest(user, id, true, true);
         if (row.status() != ToolsetRequestStatus.PENDING) {
             return view(row, agent);
         }
@@ -140,8 +141,11 @@ public class ToolsetRequestService {
             result = ToolsetRequestStatus.REJECTED;
             reason = reason.strip();
         }
-        row.finish(result, user.id(), reason, clock.instant());
-        requests.saveAndFlush(row);
+        int changed = requests.finishPending(id, result, user.id(), reason, clock.instant());
+        AgentToolsetRequest finished = requireRequest(user, id, true, true);
+        if (changed == 0) {
+            return view(finished, agent);
+        }
         String body =
                 result == ToolsetRequestStatus.APPROVED ? "「" + agent.name() + "」에서 요청한 도구를 다음 실행부터 쓸 수 있어요." : reason;
         notifications.notify(
@@ -150,28 +154,31 @@ public class ToolsetRequestService {
                 result == ToolsetRequestStatus.APPROVED ? "도구 사용 요청이 승인됐어요" : "도구 사용 요청 결과가 있어요",
                 body,
                 new NotificationTarget(NotificationTargetType.TOOLSET_REQUEST, row.publicId()));
-        return view(row, agent);
+        return view(finished, agent);
     }
 
     @Transactional
     public ToolsetRequestView cancel(CurrentUser user, UUID id) {
         Agent agent = lockAgent(id);
         requireCurrent(user, false);
-        AgentToolsetRequest row = requireRequest(user, id, false);
+        AgentToolsetRequest row = requireRequest(user, id, false, true);
         if (row.status() == ToolsetRequestStatus.PENDING) {
-            row.finish(ToolsetRequestStatus.CANCELLED, null, null, clock.instant());
-            requests.saveAndFlush(row);
+            requests.finishPending(id, ToolsetRequestStatus.CANCELLED, null, null, clock.instant());
+            row = requireRequest(user, id, false, true);
         }
         return view(row, agent);
     }
 
     private Agent lockAgent(UUID id) {
+        Long requester = requests.findRequesterUserIdByPublicId(id).orElseThrow(ToolsetRequestService::notFound);
+        users.findByIdForUpdate(requester).orElseThrow(ToolsetRequestService::notFound);
         Long agentId = requests.findAgentIdByPublicId(id).orElseThrow(ToolsetRequestService::notFound);
         return agents.findByIdForUpdate(agentId).orElseThrow(ToolsetRequestService::notFound);
     }
 
-    private AgentToolsetRequest requireRequest(CurrentUser user, UUID id, boolean adminView) {
-        AgentToolsetRequest row = requests.findByPublicId(id).orElseThrow(ToolsetRequestService::notFound);
+    private AgentToolsetRequest requireRequest(CurrentUser user, UUID id, boolean adminView, boolean forUpdate) {
+        AgentToolsetRequest row = (forUpdate ? requests.findByPublicIdForUpdate(id) : requests.findByPublicId(id))
+                .orElseThrow(ToolsetRequestService::notFound);
         if (!Objects.equals(row.groupId(), user.groupId())
                 || (!adminView && !Objects.equals(row.requesterUserId(), user.id()))) {
             throw notFound();
