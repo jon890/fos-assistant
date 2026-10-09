@@ -1055,7 +1055,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 색인은 마지막 살펴보기 읽기, session 을 바꿀지 세기, 열지 않은 보고 찾기에 쓴다.
 
-지운 에이전트를 정리할 때 그 에이전트의 줄을 지운다. 발견, 문제, 평가, 자율 판정, 매일 루프 실행의 줄은 FK 의 `ON DELETE CASCADE` 와 `ON DELETE SET NULL` 이 함께 지우거나 비운다. 비용은 `agent_execution` 에 남는다.
+지운 에이전트를 정리할 때 그 에이전트의 줄을 지운다. 발견, 문제, 평가, 자율 판정, 매일 루프 실행, 판단 피드백의 줄은 FK 의 `ON DELETE CASCADE` 와 `ON DELETE SET NULL` 이 함께 지우거나 비운다. 비용은 `agent_execution` 에 남는다.
 
 `trigger` 는 MySQL 의 예약어라 칸 이름을 `trigger_type` 으로 둔다.
 

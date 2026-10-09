@@ -31,8 +31,7 @@ public class AgentPurgeWriter {
     /** 그 에이전트를 지금 지울 수 있는가. 지운 지 cutoff 앞이고 기다리라는 참여자가 없어야 한다. 잠그지 않는다. */
     @Transactional(readOnly = true)
     public boolean ready(Long agentId, Instant cutoff) {
-        Agent agent = agents.findById(agentId).orElse(null);
-        if (agent == null || agent.deletedAt() == null || agent.deletedAt().isAfter(cutoff)) {
+        if (!purgeable(agents.findById(agentId).orElse(null), cutoff)) {
             return false;
         }
         return participants.stream().noneMatch(participant -> participant.blocksPurge(agentId));
@@ -41,8 +40,7 @@ public class AgentPurgeWriter {
     /** 지운 지 cutoff 앞인 에이전트 하나를 지운다. */
     @Transactional
     public AgentPurgeOutcome purge(Long agentId, Instant cutoff) {
-        Agent agent = agents.findByIdForUpdate(agentId).orElse(null);
-        if (agent == null || agent.deletedAt() == null || agent.deletedAt().isAfter(cutoff)) {
+        if (!purgeable(agents.findByIdForUpdate(agentId).orElse(null), cutoff)) {
             return AgentPurgeOutcome.GONE;
         }
         if (participants.stream().anyMatch(participant -> participant.blocksPurge(agentId))) {
@@ -54,5 +52,10 @@ public class AgentPurgeWriter {
         collections.deleteAllOfAgent(agentId);
         agents.deletePurged(agentId);
         return AgentPurgeOutcome.PURGED;
+    }
+
+    /** 행이 있고, 지운 에이전트이고, 지운 시각이 cutoff 뒤가 아니어야 지울 수 있다. */
+    private static boolean purgeable(Agent agent, Instant cutoff) {
+        return agent != null && agent.deletedAt() != null && !agent.deletedAt().isAfter(cutoff);
     }
 }

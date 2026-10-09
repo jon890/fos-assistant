@@ -42,6 +42,28 @@ class AgentPurgeWriterMysqlTest extends AgentPurgeWriterTest {
                 owner.id(),
                 "proactive_check:" + attached.checkId(),
                 attached.checkId());
+        jdbc.update(
+                "INSERT INTO proactive_value_evaluation (check_id, user_id, outcome, evidence_json, created_at)"
+                        + " VALUES (?, ?, 'SURFACE', JSON_OBJECT(), CURRENT_TIMESTAMP(6))",
+                attached.checkId(),
+                owner.id());
+        Long evaluationId = jdbc.queryForObject(
+                "SELECT id FROM proactive_value_evaluation WHERE check_id = ?", Long.class, attached.checkId());
+        jdbc.update(
+                "INSERT INTO proactive_autonomy_decision"
+                        + " (user_id, evaluation_id, candidate_id, source_check_id, action_level, reasons_json,"
+                        + " inputs_json, policy_version, execution_check_id, created_at)"
+                        + " VALUES (?, ?, 1, ?, 'SUGGEST', JSON_ARRAY(), JSON_OBJECT(), 1, ?, CURRENT_TIMESTAMP(6))",
+                owner.id(),
+                evaluationId,
+                attached.checkId(),
+                attached.checkId());
+        jdbc.update(
+                "INSERT INTO proactive_loop_run (user_id, source_check_id, status, evaluation_id, created_at)"
+                        + " VALUES (?, ?, 'DONE', ?, CURRENT_TIMESTAMP(6))",
+                owner.id(),
+                attached.checkId(),
+                evaluationId);
         markAgentDeleted(DELETED_AT);
 
         AgentPurgeOutcome outcome = writer.purge(agent.id(), CUTOFF);
@@ -60,5 +82,17 @@ class AgentPurgeWriterMysqlTest extends AgentPurgeWriterTest {
                 .as("판단 피드백 줄은 남고 살펴보기 칸만 비운다")
                 .singleElement()
                 .isNull();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM proactive_value_evaluation WHERE user_id = ?", Long.class, owner.id()))
+                .as("가치 평가 줄은 살펴보기와 함께 지운다")
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM proactive_autonomy_decision WHERE user_id = ?", Long.class, owner.id()))
+                .as("행동 정책 판정 줄은 원천 살펴보기와 가치 평가를 따라 지운다")
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM proactive_loop_run WHERE user_id = ?", Long.class, owner.id()))
+                .as("루프 시도 줄은 원천 살펴보기와 함께 지운다")
+                .isZero();
     }
 }

@@ -92,11 +92,14 @@ public class AgentPurger {
             }
             try {
                 AgentPurgeOutcome outcome = purgeOne(agentId, cutoff);
-                if (outcome == AgentPurgeOutcome.PURGED) {
-                    purged++;
-                    backoffs.remove(agentId);
-                } else if (outcome == AgentPurgeOutcome.WAITING) {
+                if (outcome == AgentPurgeOutcome.WAITING) {
                     waiting++;
+                } else {
+                    // 지웠거나 더 볼 것이 없는 에이전트다. 기다리는 간격을 남겨 두지 않는다.
+                    backoffs.remove(agentId);
+                    if (outcome == AgentPurgeOutcome.PURGED) {
+                        purged++;
+                    }
                 }
             } catch (RuntimeException ex) {
                 failed++;

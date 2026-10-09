@@ -88,12 +88,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
 `connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
-`agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 둘로 부른다. `connector` 가 `agent` 보다 위라서다.
+`agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 셋으로 부른다. `connector` 가 `agent` 보다 위라서다.
 
 | port | 하는 일 | 구현 | 부르는 곳 |
 | --- | --- | --- | --- |
 | `AgentConnectorBindings` | `hasBindings`, `connectorServers`, `connectorToolPrefixes`. 저장한 바인딩만 읽고 대시보드를 부르지 않는다 | `ConnectorBindingLookup` | 공개 범위 변경과 관리자 수정(비공개 유지), 도구 저장과 스킬 게시(붙은 서버 이름을 함께 보낸다), 실행 기록의 도구 내용 가림, 먼저 살펴보기의 시작 전 점검과 지시 |
 | `AgentConnectorDetacher` | `detachAll`. 그 에이전트의 바인딩을 모두 뗀다 | `ConnectorBindingService` | 에이전트 지우기 |
+| `AgentPurgeParticipant` | 지운 에이전트를 정리할 때 바인딩을 지우고, 연결과 승인 줄의 `agent_id` 를 비운다 | `ConnectorAgentPurge` | 지운 에이전트 정리 |
 
 옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
