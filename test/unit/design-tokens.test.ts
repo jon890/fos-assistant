@@ -170,8 +170,11 @@ test("화면 코드가 토큰 밖의 모서리 값을 쓰지 않는다", async (
   assert.deepEqual(found, [], `토큰 밖의 모서리 값: ${found.join(", ")}`);
 });
 
-/** web/src 의 .ts 와 .tsx 를 줄 단위로 읽어 `pattern` 에 걸린 곳을 `파일:줄 낱말` 로 모은다. */
-async function findInSources(pattern: RegExp, allowed: (match: RegExpMatchArray) => boolean = () => false): Promise<string[]> {
+/** web/src 의 .ts 와 .tsx 를 줄 단위로 읽어 `pattern` 에 걸린 곳을 `파일:줄 낱말` 로 모은다. `allowed` 는 걸린 낱말과 그 바로 윗줄을 받는다. */
+async function findInSources(
+  pattern: RegExp,
+  allowed: (match: RegExpMatchArray, previousLine: string) => boolean = () => false,
+): Promise<string[]> {
   const entries = await readdir(WEB_SRC, { recursive: true, withFileTypes: true });
   const files = entries
     .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
@@ -183,7 +186,7 @@ async function findInSources(pattern: RegExp, allowed: (match: RegExpMatchArray)
     const lines = (await readFile(file, "utf-8")).split("\n");
     lines.forEach((line, index) => {
       for (const match of line.matchAll(pattern)) {
-        if (!allowed(match)) found.push(`${relative(WEB_SRC, file)}:${index + 1} ${match[0]}`);
+        if (!allowed(match, lines[index - 1] ?? "")) found.push(`${relative(WEB_SRC, file)}:${index + 1} ${match[0]}`);
       }
     });
   }
@@ -200,4 +203,10 @@ test("motion-reduce: 는 끝없이 도는 움직임을 끄고 대체 문장으�
   const allowedTargets = new Set(["animate-none", "hidden", "flex", "inline"]);
   const found = await findInSources(/motion-reduce:([\w-]+)/g, (match) => allowedTargets.has(match[1]));
   assert.deepEqual(found, [], `motion-reduce: 를 허용하지 않는 곳에 썼다: ${found.join(", ")}`);
+});
+
+test("화면 코드가 까닭 주석 없이 인라인 스타일을 쓰지 않는다", async () => {
+  // 값이 이어지는 수라서 클래스로 만들 수 없는 곳만 예외다. 그 줄 바로 위에 까닭을 주석으로 남긴다.
+  const found = await findInSources(/style=\{\{/g, (_match, previousLine) => /^\s*(?:\/\/|\{?\/\*|\*)/.test(previousLine));
+  assert.deepEqual(found, [], `까닭 주석 없는 인라인 스타일: ${found.join(", ")}`);
 });
