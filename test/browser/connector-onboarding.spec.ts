@@ -240,8 +240,14 @@ test("붙일 수 있는 에이전트가 없으면 연결된 카드와 고르기 
   await page.goto("/connections");
   const card = page.getByTestId("connector-card").filter({ hasText: TITLE });
   await expect(card.getByTestId("connector-binding-count")).toHaveText(
-    "아직 쓰는 에이전트가 없어요. 눌러서 쓸 에이전트를 골라 주세요.",
+    "붙인 에이전트 0개",
   );
+  await expect(
+    card.getByText(
+      "아직 쓰는 에이전트가 없어요. 눌러서 쓸 에이전트를 골라 주세요.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await card.click();
 
   await expect(
