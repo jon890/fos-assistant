@@ -15,7 +15,7 @@
     "web/src/components/agent/skill-editor.tsx": 495,
     "web/src/components/chat/conversation-session.tsx": 2242,
     "web/src/components/chat/model-picker.tsx": 691,
-    "web/src/components/connector/connector-connection-panel.tsx": 444,
+    "web/src/components/connector/connector-connection-panel.tsx": 438,
     "web/src/components/shell/conversation-nav.tsx": 470
   }
 }

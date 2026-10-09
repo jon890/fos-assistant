@@ -1,0 +1,3 @@
+# 검사 전용 KEK 다. 운영 값이 아니다. 글자 fos-assistant-test-kek-012345678 과 fos-assistant-test-kek-987654321 의 base64 다
+test-kek-1:Zm9zLWFzc2lzdGFudC10ZXN0LWtlay0wMTIzNDU2Nzg=
+test-kek-0:Zm9zLWFzc2lzdGFudC10ZXN0LWtlay05ODc2NTQzMjE=

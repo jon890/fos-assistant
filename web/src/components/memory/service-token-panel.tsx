@@ -34,7 +34,7 @@ export function ServiceTokenPanel({
   return (
     <section className="mb-8" aria-labelledby="service-tokens-heading">
       <h2 id="service-tokens-heading" className="mb-1 text-lg font-semibold">
-        외부 서비스 연결
+        문서 읽기 토큰
       </h2>
       <p className="mb-3 max-w-2xl text-sm leading-6 text-muted-foreground">
         다른 프로그램이 내 문서를 읽을 때 쓰는 토큰이에요. 문서를 읽기만 하고

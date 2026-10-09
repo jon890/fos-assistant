@@ -260,9 +260,14 @@ function ShellBody({
             >
               <Menu aria-hidden="true" className="size-5" />
             </TooltipButton>
-            <span className="min-w-0 flex-1 truncate text-center text-sm font-medium">
-              {title ?? appName}
-            </span>
+            <Link
+              href="/"
+              aria-label={`${appName} 홈`}
+              onClick={startNew}
+              className="flex h-full min-w-0 flex-1 items-center justify-center rounded-md px-2 text-sm font-medium hover:bg-muted active:bg-accent"
+            >
+              <span className="min-w-0 truncate">{title ?? appName}</span>
+            </Link>
             <NotificationBell size="icon" />
             <TooltipButton label="새 대화" size="icon" asChild>
               <Link href="/" onClick={startNew}>
