@@ -40,6 +40,9 @@ const CODE_EXTENSIONS = [
 const REFERENCE =
   /(?<![\w.-]|[\w-]\/)((?:(?:backend|web|hermes)\/)?docs\/[^\s`'"()[\]{}<>」,]+?\.md|(?:(?:backend|web|hermes)\/)?AGENTS\.md|hermes\/(?:[\w.-]+\/)*README\.md)(?:[`})]{0,2} ?(?:의)? ?「([^」]+)」)?/g;
 
+/** 첫 절 뒤에 쉼표나 「와」, 「과」 로 이어 적은 절이다. */
+const MORE_SECTION = /^\s*(?:,|와|과|및)\s*「([^」]+)」/;
+
 /** Markdown 링크의 대상 앞부분이다. 링크 안의 경로는 그 파일 자리 기준으로 푼다. */
 const LINK_PREFIX = /\]\(((?:\.\.\/)*)$/;
 
@@ -66,6 +69,13 @@ export function findDocReferences(text: string, file = "README.md"): DocReferenc
         : match[1];
       if (path.includes("NNN") || path.includes("%")) continue;
       found.push({ path, section: match[2], line: index + 1 });
+      if (match[2] === undefined) continue;
+      // 「A」, 「B」 와 「C」 처럼 이어 적은 절도 같은 문서의 절로 읽는다
+      let rest = lineText.slice((match.index ?? 0) + match[0].length);
+      for (let more = MORE_SECTION.exec(rest); more; more = MORE_SECTION.exec(rest)) {
+        found.push({ path, section: more[1], line: index + 1 });
+        rest = rest.slice(more[0].length);
+      }
     }
   });
   return found;
@@ -205,6 +215,13 @@ test("AGENTS.md 는 하위 경로와 절 이름까지 읽는다", () => {
   const [reference] = findDocReferences("{@code backend/AGENTS.md} 「패키지 배치」");
   assert.equal(reference.path, "backend/AGENTS.md");
   assert.equal(reference.section, "패키지 배치");
+});
+
+test("쉼표와 「와」 로 이어 적은 절도 같은 문서의 절로 읽는다", () => {
+  const sections = findDocReferences("{@code docs/flow.md} 의 「작업」, 「시각」, 「API」 와 「알림」 이 갖는다").map(
+    (reference) => reference.section,
+  );
+  assert.deepEqual(sections, ["작업", "시각", "API", "알림"]);
 });
 
 test("모듈의 docs 경로를 루트 docs 로 읽지 않는다", () => {
