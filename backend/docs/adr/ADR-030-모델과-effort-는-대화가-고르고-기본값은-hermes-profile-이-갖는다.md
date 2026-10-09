@@ -10,7 +10,7 @@
   - 같은 에이전트로도 가벼운 일과 무거운 일을 번갈아 한다. 블로그 초안처럼 절차가 정해진 일은 싼 모델로 충분한지 반복해 써 보며 견주려 한다(2026-09-29 사용자).
     에이전트를 바꾸지 않고 모델과 effort 만 바꾸는 길이 필요했다.
   - 모델 목록과 기본 모델을 우리 표에 복사해 두면 Hermes 와 어긋난다. 실제로 Hermes 목록이 오래돼 `gpt-6-luna` 가 빠진 일이 있었고, 원인은 Hermes 판과 폐기된 로그인 토큰이었다. Hermes 를 고친 뒤에는 목록이 맞았다.
-  - 한 provider 안에서 계정을 돌려 쓰고 막힌 계정을 쉬게 하는 것은 Hermes 의 `hermes auth` 가 이미 한다([`hermes/runs-api.md`](../../../docs/hermes/runs-api.md#소진은-본문으로만-알-수-있다)).
+  - 한 provider 안에서 계정을 돌려 쓰고 막힌 계정을 쉬게 하는 것은 Hermes 의 `hermes auth` 가 이미 한다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md#소진은-본문으로만-알-수-있다)).
   - 원칙: Hermes 가 관리할 것은 Hermes 에 두고 정말 필요한 것만 동기화한다.
 - **대체된 부분**: ADR-007 의 대안 기각 「요청마다 모델을 지정한다」 를 뒤집는다. 그때 버린 까닭(같은 대화에서 모델이 섞여 비용 기록을 읽기 어렵다)은 실행마다 실제로 돈 모델과 요청한 effort 를 기록해 푼다.
   [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 의 「첫 로그인에 에이전트가 안 생길 수 있다」 도 대체한다. 첫 로그인은 모델을 읽지 않고 에이전트를 만든다.
@@ -21,10 +21,10 @@
   - **전역 기본 모델과 effort 를 우리 DB 에 둔다.** Hermes profile 의 기본값과 둘이 되어 어느 쪽이 맞는지 판단해야 한다.
   - **모델 목록을 주기적으로 우리 표에 동기화한다.** 목록이 필요한 때는 사용자가 고르는 순간뿐이다. 그때 물어 짧게 들고 있으면 된다.
   - **관리자가 모델 이름을 직접 적어 목록에 더한다.** 목록이 빠진 원인은 Hermes 쪽에 있었고, 그것을 고치자 필요가 없어졌다.
-  - **provider 가 막히면 Control Plane 이 다른 모델로 넘긴다.** 넘길 순서를 우리가 가져야 한다. 대신 모델은 Hermes profile 의 `fallback_providers` 몫이다. 지금은 비워 두어 한 사람의 요청이 다른 모델로 넘어가지 않는다([`hermes/README.md`](../../../docs/hermes/README.md)).
+  - **provider 가 막히면 Control Plane 이 다른 모델로 넘긴다.** 넘길 순서를 우리가 가져야 한다. 대신 모델은 Hermes profile 의 `fallback_providers` 몫이다. 지금은 비워 두어 한 사람의 요청이 다른 모델로 넘어가지 않는다([`hermes/README.md`](../../../hermes/docs/hermes-contract.md)).
 - **결과**:
   - 얻는 것:
-    - 대화 안에서 모델과 effort 를 바꿔 이어 간다. 모델을 바꿔도 같은 session 을 쓰므로 맥락이 남는다([`hermes/runs-api.md`](../../../docs/hermes/runs-api.md#모델을-바꿔-이어도-맥락이-남는다))
+    - 대화 안에서 모델과 effort 를 바꿔 이어 간다. 모델을 바꿔도 같은 session 을 쓰므로 맥락이 남는다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md#모델을-바꿔-이어도-맥락이-남는다))
     - 실행마다 모델과 effort 가 남아, 쓰면서 모은 기록으로 모델을 견준다
     - 모델 목록, 기본 모델, 막힌 계정을 우리가 따로 들고 있지 않는다
   - 감당할 것:

@@ -23,7 +23,7 @@
 
 Hermes 의 `PUT /api/config` 는 쓸 수 있는 키를 제한하지 않는다. 본문의 `profile` 이 query 보다 먼저 선택되고, 요청자가 그 profile 의 주인인지 보지 않는다.
 대시보드 토큰에는 profile 신원이 없다.
-v0.21.3 에서 plugin 이 본문을 먼저 읽고 같은 요청을 처리기에 넘길 수 있음을 확인했다. 근거는 [`hermes/tools-and-skills.md`](../../../docs/hermes/tools-and-skills.md#설정-api와-profile-경계) 에 있다.
+v0.21.3 에서 plugin 이 본문을 먼저 읽고 같은 요청을 처리기에 넘길 수 있음을 확인했다. 근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md#설정-api와-profile-경계) 에 있다.
 
 ### 도구 등급
 
@@ -46,7 +46,7 @@ profile 분리는 이 도구의 파일 접근을 격리하지 않아, 그룹에 
 `session_search` 는 처음에 주인 등급에 두었다가 관리자 등급으로 옮겼다(2026-09-29).
 이 도구는 그 profile 의 모든 플랫폼 대화를 찾고, `profile` 인자를 주면 다른 profile 의 대화 기록을 읽기 전용으로 연다.
 Hermes 는 그 profile 이 있는지만 본다. 그룹에 공개된 에이전트에서 켜면 그룹 사용자가 주인의 다른 대화를 읽고,
-주인 등급이면 누구나 자기 에이전트에서 켜서 다른 사용자의 대화를 읽는다. 근거는 [`hermes/tools-and-skills.md`](../../../docs/hermes/tools-and-skills.md#지난-대화-검색의-범위) 에 있다.
+주인 등급이면 누구나 자기 에이전트에서 켜서 다른 사용자의 대화를 읽는다. 근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md#지난-대화-검색의-범위) 에 있다.
 사용자마다 자기 대화만 찾게 하는 기능은 Hermes 의 이 도구가 아니라 Control Plane 이 권한을 거는 도구로 따로 만든다.
 
 ### 대안 기각

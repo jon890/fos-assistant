@@ -11,7 +11,7 @@
 3. 홈서버에 들어가 Hermes profile 을 만들고 key 파일을 놓은 뒤, 관리 화면에서 에이전트를 등록한다
 
 세 번째가 문제다. **관리자가 홈서버에 들어갈 수 있어야 사람이 늘어난다.**
-[`prd.md`](../../../docs/prd.md) 는 「사람이 늘어도 같은 방식으로 는다」를 지키는 것으로 적었고,
+[`docs/prd.md`](../../../docs/prd.md) 는 「사람이 늘어도 같은 방식으로 는다」를 지키는 것으로 적었고,
 「한 사람을 더하는 것이 관리자의 판단 하나로 끝나야 한다」고 썼다.
 지금은 그렇지 않다.
 
@@ -25,7 +25,7 @@ Control Plane 이 그것을 할 길이 없다고 보았다.
 
 **그 전제가 틀렸다는 것을 실측으로 확인했다.**
 Hermes 대시보드에 profile 관리 API 가 있고, 기계용 인증 자리가 따로 열려 있다.
-확인한 내용은 [`hermes/profiles.md`](../../../docs/hermes/profiles.md) 의
+확인한 내용은 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의
 「profile 을 HTTP 로 만드는 길」이 갖는다.
 
 ## 결정
@@ -53,7 +53,7 @@ Hermes 대시보드에 profile 관리 API 가 있고, 기계용 인증 자리가
 
 - 위 표의 「경로 둘만 토큰으로 연다」 와 아래 「여는 경로를 둘로 한정한다」 는 당시의 서술이다.
   지금 plugin 은 `register_token_route` 로 둘만 여는 것이 아니라 미들웨어를 감싸 profile 관리, env, 도구 설정, 스킬, 커넥터 경로를 더 많이 받는다.
-  지금 열려 있는 경로의 목록은 [`hermes/README.md`](../../../hermes/README.md) 의 「dashboard-profile-api 가 여는 것」 이 갖는다.
+  지금 열려 있는 경로의 목록은 [`hermes/README.md`](../../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 이 갖는다.
 - 「첫 로그인에 에이전트가 안 생길 수 있다」 는 [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 이 대체했다.
   [ADR-030](ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md) 뒤로 첫 로그인은 모델을 읽지 않고 에이전트를 만든다. 모델을 읽지 못해 에이전트가 안 생기는 경우는 없어졌다.
 - 이 결정은 [ADR-007](ADR-007-에이전트가-모델과-도구를-함께-정한다.md) 의 「결과」 가운데 profile 을 웹이 만들지 않는다는 한 줄을 뒤집는다.

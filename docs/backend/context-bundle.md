@@ -40,7 +40,7 @@ Memory 의 층과 예산과 `memory_read` 는 [`memory.md`](memory.md) 가 그�
 **`EXECUTION_STATE` 와 `FOLLOW_UP` 은 대화 turn 에 싣지 않는다.** 지금 화면과 먼저 알리기가 「왜 보였는가」 의 `sources` 에 이 `source` 이름과 `ref` 형식을 쓴다. 판정은 `attention` 이 요청자의 기록만 읽는 조회로 하고, 이 문서의 항목 타입을 import 하지 않아도 된다. 대화마다 실으면 할 일이 지식처럼 쓰여 새 Memory 층이 된다([ADR-073](../adr/ADR-073-할-일은-에이전트가-제안하고-사람이-받아들인-것만-챙긴다.md)).
 
 **커넥터의 실시간 데이터는 source 가 아니다.** Control Plane 은 커넥터를 직접 부르지 않는다.
-일정 같은 커넥터 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어온다. 그 결과는 묶음을 거치지 않고 Hermes 의 도구 결과 자리에 놓이며 `fos-ctx` 가 `<external-data>` 로 감싼다([`../hermes/fos-ctx.md`](../hermes/fos-ctx.md)).
+일정 같은 커넥터 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어온다. 그 결과는 묶음을 거치지 않고 Hermes 의 도구 결과 자리에 놓이며 `fos-ctx` 가 `<external-data>` 로 감싼다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)).
 묶음에 드는 것은 승인한 호출의 결과(`CONNECTOR_RESULT`)와 남아 있는 옛 커넥터 에이전트의 위임 결과(`DELEGATION_RESULT`)뿐이다.
 일정 커넥터가 생기면 그 결과를 읽는 source 를 이 표에 더한다.
 
@@ -60,7 +60,7 @@ ADR-071 의 다섯 규칙을 코드에서 지키는 자리다.
 
 ## Hermes 에 넘기는 형식
 
-Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-api.md`](../hermes/runs-api.md)).
+Runs API 는 `instructions` 와 `input` 두 글을 받는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)).
 
 ### 공통 실행 지침
 
@@ -69,7 +69,7 @@ Runs API 는 `instructions` 와 `input` 두 글을 받는다([`../hermes/runs-ap
 새 profile 과 기존 profile 모두 다음 실행부터 받는다.
 
 로컬 MCP 도구는 같은 서버의 읽기 도구라도 각각 호출하도록 안내한다.
-Hermes 의 단건 제한과 원격 도구 구분은 [도구 hook 과 승인](../hermes/connector-policy.md#tool_call-의-단건-제한)이 갖는다.
+Hermes 의 단건 제한과 원격 도구 구분은 [도구 hook 과 승인](../../hermes/docs/hermes-contract.md#tool_call-의-단건-제한)이 갖는다.
 
 이 안내는 묶음 실행 기능이나 서버의 권한 검사를 바꾸지 않는다.
 모델이 안내를 따르는지는 배포 뒤 실제 실행의 호출과 거절 기록으로 확인한다.
@@ -162,7 +162,7 @@ Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는�
 - **로그에는 사용자 번호, 실행 번호, 항목의 `source` 와 `ref`, 개수, 글자 수만 낸다.** 제목과 본문은 내지 않는다
 - **묶음의 원문은 저장하지 않는다.** 실행 기록에는 지금처럼 `context_chars`, `context_omitted_items`, `instructions_hash` 를 남긴다
 - **실행마다 실은 항목의 참조를 남긴다.** `execution_context_source` 표다([`schema/execution.md`](schema/execution.md) 의 「execution_context_source」). 제목과 본문은 남기지 않는다
-- **도구 사건에 Memory 본문을 남기지 않는다.** Hermes 의 `tool.completed` 사건은 결과를 싣지 않는다([`../hermes/runs-api.md`](../hermes/runs-api.md) 의 「실행 이벤트가 실제로 오는 형태」). Hermes 가 뒤에 `result` 를 싣기 시작해도, `memory_read` 사건의 `detail` 은 `tool.started` 의 `preview`(인자)만 쓴다
+- **도구 사건에 Memory 본문을 남기지 않는다.** Hermes 의 `tool.completed` 사건은 결과를 싣지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 이벤트가 실제로 오는 형태」). Hermes 가 뒤에 `result` 를 싣기 시작해도, `memory_read` 사건의 `detail` 은 `tool.started` 의 `preview`(인자)만 쓴다
 
 ## 합성 시나리오
 

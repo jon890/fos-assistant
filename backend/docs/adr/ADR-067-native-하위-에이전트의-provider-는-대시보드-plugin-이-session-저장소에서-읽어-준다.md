@@ -7,7 +7,7 @@
   읽지 못한 자식은 지금처럼 `PROVIDER_UNKNOWN` 으로 남긴다.
 - **맥락**: [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) 가 native 자식의 토큰을 원장에 적지만,
   v0.21.5 의 `GET /api/sessions/{id}` 는 provider 를 내보내지 않아 금액이 모두 비었다.
-  Hermes 는 그 값을 session 저장소의 `sessions.billing_provider` 에 적는다([`hermes/delegation.md`](../../../docs/hermes/delegation.md) 의 「자식 session 의 provider 는 저장소에만 있다」).
+  Hermes 는 그 값을 session 저장소의 `sessions.billing_provider` 에 적는다([`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「자식 session 의 provider 는 저장소에만 있다」).
   2026-10-02 에 운영 Hermes v0.21.5 에서 자식 session 115줄을 읽기 전용으로 집계했다. 115줄 모두 `billing_provider` 가 채워져 있었고, 줄마다 모델과 provider 의 짝이 하나였다.
   [ADR-001](../../../docs/adr/ADR-001-hermes를-런타임으로-두고-core를-고치지-않는다.md) 의 검토 순서로 보면 profile 설정에는 이 값이 없고, API server 의 어느 경로도 이 값을 주지 않는다.
   남는 것은 plugin 이다.
@@ -33,4 +33,4 @@
     - 종료 자식마다 대시보드를 한 번 더 부른다. 대시보드가 답하지 못하면 자식이 끝난 뒤 10분 동안만 다시 부르고, 그 뒤에는 `PROVIDER_UNKNOWN` 으로 적는다.
       10분은 Hermes 가 적은 종료 시각과 Control Plane 의 시계로 센다. 자식이 부모보다 10분 넘게 먼저 끝났으면 다시 부르지 않는다.
     - 배포는 plugin 묶음을 먼저 올린다. 옛 plugin 은 이 경로를 401 로 답하고, Control Plane 은 그 답을 「읽지 못함」 으로 적는다. 그렇게 적힌 줄은 다시 조회하지 않는다.
-- **적용 범위**: `hermes/plugins/dashboard-profile-api/` 의 읽기 경로와 `usage` 패키지의 재조회. 경로의 계약은 [`hermes/README.md`](../../../hermes/README.md) 가, 원장 줄에 적는 규칙은 [`model-tiers.md`](../../../docs/model-tiers.md) 의 「원장 줄에 적는 것」 이 갖는다.
+- **적용 범위**: `hermes/plugins/dashboard-profile-api/` 의 읽기 경로와 `usage` 패키지의 재조회. 경로의 계약은 [`hermes/README.md`](../../../hermes/README.md) 가, 원장 줄에 적는 규칙은 [`docs/model-tiers.md`](../../../docs/model-tiers.md) 의 「원장 줄에 적는 것」 이 갖는다.

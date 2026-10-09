@@ -122,7 +122,7 @@ sequenceDiagram
 ### 하위 에이전트 session 을 등록할 때
 
 Hermes 의 하위 에이전트는 부모 run 보다 오래 살 수 있다. 그래서 만들어지는 순간 주인을 적는다.
-계약은 [`hermes/fos-ctx.md`](../hermes/fos-ctx.md#하위-에이전트-session-등록-계약), 결정은 [ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+계약은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md#하위-에이전트-session-등록-계약), 결정은 [ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ```mermaid
 sequenceDiagram
@@ -185,7 +185,7 @@ FOS 실행 #105 같은 대화의 다음 turn          ← 돌아도 S1 은 #100 
 | 프로토콜 | Streamable HTTP `2025-03-26` |
 | 인증 | profile마다 다른 Bearer 토큰. 토큰은 그 profile 을 증명할 뿐 사용자를 정하지 않는다 |
 | 도구 | `memory_read`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `memory_remember` |
-| 요청자 | 모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`../hermes/fos-ctx.md`](../hermes/fos-ctx.md#부모-실행을-잇는-방법) 에 있다 |
+| 요청자 | 모든 도구가 위 「MCP 호출의 요청자를 정할 때」 의 판정을 지난다. 서명하는 쪽의 계약은 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md#부모-실행을-잇는-방법) 에 있다 |
 
 **먼저 살펴보기 트리에서는 `memory_read`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` 만 받는다.** 쓰기 도구를 허용한 살펴보기는 그 살펴보기의 점검 대화에 쓰는 `artifact_write` 만 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md)).
 요청자를 정한 뒤 `ProactiveCheckGuard.checkOf` 가 살펴보기 줄을 찾으면 나머지 도구는 「먼저 살펴보기에서는 쓸 수 없는 도구입니다.」 오류 결과(`isError: true`)다. 읽기 경계의 살펴보기에서는 지금 `artifact_write`, `follow_up_propose`, `memory_remember` 가 여기 걸린다.
@@ -270,7 +270,7 @@ origin 실행의 사용자로 `ConversationAccess.requireOwn(CurrentUser, UUID)`
 없는 대화, 지운 대화, 다른 사용자의 대화는 같은 `isError: true` 결과로 숨긴다.
 같은 사용자의 다른 대화는 허용한다.
 도구 입력에 사용자 번호나 profile 을 넣어 요청자를 바꿀 수 없다.
-실행을 가리키는 값은 모델이 주는 인자가 아니라 플러그인이 서명한 `_fos_ctx` 로만 온다. 그 까닭은 [도구 호출에는 실행을 가리키는 값이 없다](../hermes/fos-ctx.md#도구-호출에는-실행을-가리키는-값이-없다) 절이 갖는다.
+실행을 가리키는 값은 모델이 주는 인자가 아니라 플러그인이 서명한 `_fos_ctx` 로만 온다. 그 까닭은 [도구 호출에는 실행을 가리키는 값이 없다](../../hermes/plugins/fos-ctx/README.md#도구-호출에는-실행을-가리키는-값이-없다) 절이 갖는다.
 
 성공은 기존 MCP 결과의 `content[0].text` 에 JSON 문자열을 담아 반환한다.
 그 JSON 은 `{"path":"test/index.html","byteSize":123}` 모양이며 `isError` 는 `false` 다.

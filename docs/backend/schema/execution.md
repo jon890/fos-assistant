@@ -24,7 +24,7 @@
 | `hermes_session_id` | VARCHAR(128) NULL | 이 실행이 속한 Hermes session. 대화 turn 은 그 대화의 루트 session 이고, 루트가 없는 옛 대화는 보낸 session 이다. 압축 교체 뒤에는 보낸 session 과 다를 수 있다. 흐름의 하위 실행과 위임한 자식은 Control Plane 이 정한 `fos-<uuid>` 다. 제출하기 전에 적는다. 최상위 session 의 MCP 호출과 최상위 자식의 등록이 서명한 루트 session 과 `profile_name` 으로 도는 실행을 찾을 때 쓴다([ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)). 하위 에이전트 session 은 이 칸이 아니라 `hermes_session_binding` 으로 찾는다. 이 칸이 생기기 전의 실행과 Memory 제안, 추천 질문을 만드는 실행은 비어 있다 |
 | `delegation_key` | VARCHAR(64) NULL, 유일 | `agent_delegate` 로 만든 실행만 채운다. `v1`, 부모 실행의 `profile_name`, 루트 session, 그 호출의 session, `tool_call_id` 를 줄바꿈으로 이은 글의 SHA-256 소문자 16진수다. 같은 호출이 다시 와도 실행을 하나만 만든다. `agent_status` 와 `agent_stop` 은 이 칸이 있는 실행만 답한다. 정의는 [ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 에 있다 |
 | `output_text` | MEDIUMTEXT NULL | `agent_delegate` 로 만든 실행이 끝났을 때의 답. `agent_status` 와 `agent_stop` 이 `SUCCEEDED` 와 `CANCELLED` 에서 돌려준다. 끝난 상태와 같은 저장에서 적는다. `assistant.delegation.output-max-chars`(기본 100,000자)를 넘으면 자르고 잘렸다는 한 줄을 붙인다. 다른 실행은 채우지 않는다(대화 답은 `chat_message` 가 갖는다) |
-| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`proactive-check.md`](../proactive-check.md) 의 「끝날 때」). 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`) |
+| `result_delivered_at` | DATETIME(6) NULL | 위임 실행의 끝난 결과를 부모에게 전한 시각. 부모가 `agent_status` 나 `agent_stop` 으로 끝난 상태를 받았거나, Control Plane 이 부모 대화를 깨운 turn 에 넣었을 때 적는다. `agent_delegate` 가 줄을 만든 뒤 제출 전에 끝나 `SUBMIT_FAILED` 를 돌려줄 때도 적는다. 부모가 번호를 모르는 결과를 다시 전하지 않기 위해서다. 이 칸이 생기기 전에 끝난 위임 실행은 마이그레이션이 `finished_at`(없으면 그때 시각)으로 채워 깨우지 않는다. 그때 `RUNNING` 이던 줄은 비워 두며, 기동 정리가 끝난 상태로 적은 뒤 전한다([`docs/backend/turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」). 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 깨울 대상이다([ADR-040](../../../backend/docs/adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)). 먼저 살펴보기가 끝나면 그 트리의 위임 줄에 도는 중이어도 적는다([`docs/backend/proactive-check.md`](../proactive-check.md) 의 「끝날 때」). 저장소의 조건부 update 로만 채우고 엔티티 저장에서는 빠진다(`updatable = false`) |
 | `provider`, `model` | VARCHAR | 실제로 돈 provider 와 모델. Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다 |
 | `reasoning_effort` | VARCHAR(16) NULL | 이 실행에 요청한 effort. 기본값으로 보냈으면 비어 있다. 이 칸이 생기기 전의 실행도 비어 있다 |
 | `reasoning_defaults_checked_at` | DATETIME(6) NULL | `reasoning_effort`가 비어 있고 profile 기본값을 정상 응답으로 읽어 확인한 시각. 응답에 effort가 없어도 적어 같은 실행을 다시 조회하지 않는다. 조회 실패면 비워 다시 시도한다 |
@@ -52,7 +52,7 @@
 실행 안에서 LLM 호출이 여러 번 일어나고 그 내역은 오지 않는다.
 
 자식 실행의 토큰은 부모의 합계에 들어 있지 않다.
-근거는 [`hermes/delegation.md`](../../hermes/delegation.md) 의 「자식 session 으로 결과와 토큰을 보완한다」 절에 있다.
+근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「자식 session 으로 결과와 토큰을 보완한다」 절에 있다.
 그래서 부모와 자식을 더한 합계는 실행 트리의 줄을 더해서 만든다.
 실행 줄이 없는 native 자식은 `subagent_usage_job` 줄을 더한다.
 어느 줄도 두 번 세지 않는다.
@@ -82,7 +82,7 @@
 아직 안 끝난 것과 가격을 모르는 것이 한 숫자에 섞인다.
 
 기동할 때 `RUNNING` 으로 남아 있는 줄은 Hermes 에 물어 정한다.
-절차는 [`turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」 가 갖는다.
+절차는 [`docs/backend/turn-control.md`](../turn-control.md) 의 「기동할 때 남은 실행 정리」 가 갖는다.
 그 경로가 실패로 적을 때 쓰는 `error_code` 는 넷이다.
 
 | `error_code` | 뜻 |
@@ -121,7 +121,7 @@ Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 
 **`hermes_session_id`, `model`, 토큰은 SSE 또는 종료된 자식 session 조회에서 확인한 값이다.**
-[`hermes/delegation.md`](../../hermes/delegation.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
+[`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 절이
 `subagent.start` 와 `subagent.complete` 에 오는 칸을 적는다.
 `child_session_id` 를 `hermes_session_id` 에, `goal` 을 `detail` 에 옮긴다.
 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.

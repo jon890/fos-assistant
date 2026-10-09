@@ -2,7 +2,7 @@
 
 에이전트를 관리하는 사람이 화면에서 스킬을 올리고 고치고 지운다. 승인 절차는 없다.
 이 파일은 올린 스킬의 저장과 게시, 입력창의 스킬 커맨드 해석, 호출 이력을 갖는다.
-Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 가 갖는다.
+Hermes 가 스킬을 읽는 방식은 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 가 갖는다.
 근거는 [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md) 에 있다.
 
 **본문은 데이터베이스에 두지 않는다.** Control Plane 이 공유 디렉터리에 쓰고 Hermes 는 읽기만 한다.
@@ -41,7 +41,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
 | `PUT /api/v1/agents/{code}/skills/{name}/enabled` | 관리하는 사람만. `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
 
-목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/skills.md`](../hermes/skills.md) 의 「스킬 커맨드와 API server」).
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「스킬 커맨드와 API server」).
 출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 올린 스킬 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
 올린 스킬 이름은 지금 버전과, 지금 버전보다 새로 쓰였지만 표식이 없는 버전에 있는 이름이다. 표식 없는 버전은 게시가 timeout 이나 5xx 로 끝난 것이라 Hermes 가 이미 가리키고 있을 수 있다.
 그 이름은 목록에서 올린 스킬로 보이고, 원문 읽기와 같은 이름으로 다시 저장하기와 지우기가 된다. 다시 저장할 때 본문을 생략한 파일은 그 버전의 내용을 쓴다. 지우면 지금 버전을 다시 게시해 Hermes 가 그 버전에서 벗어난다.
@@ -69,7 +69,7 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 
 ## 호출 이력
 
-`execution_skill_use` 한 표에 둔다([`backend/schema/execution.md`](schema/execution.md)).
+`execution_skill_use` 한 표에 둔다([`docs/backend/schema/execution.md`](schema/execution.md)).
 
 | 출처 | 적는 곳 |
 | --- | --- |

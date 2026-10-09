@@ -61,4 +61,4 @@ Hermes 에 설치하는 묶음과 그때 받는 값은 [`hermes/README.md`](../h
 AI credential 은 이 저장소와 데이터베이스 어디에도 두지 않고 Hermes 쪽에 둔다.
 provider API key 는 profile `.env` 에 둔다. OAuth 로그인은 profile 에 자기 `auth.json` 이 없으면 Hermes 루트의 로그인을 여러 profile 이 함께 쓴다.
 그래서 profile 을 나눠도 대화와 Memory 는 갈리지만 AI 계정과 과금은 함께 쓸 수 있다.
-무엇이 갈리고 무엇을 함께 쓰는지는 [`hermes/README.md`](hermes/README.md) 의 OAuth credential 절이 갖는다.
+무엇이 갈리고 무엇을 함께 쓰는지는 [`hermes/README.md`](../hermes/docs/hermes-contract.md) 의 OAuth credential 절이 갖는다.

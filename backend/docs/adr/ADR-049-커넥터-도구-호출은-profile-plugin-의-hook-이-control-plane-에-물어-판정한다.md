@@ -38,7 +38,7 @@
 그래서 연결용 profile 의 모델은 그 서버의 도구를 모두 받았고, 쓰기 도구도 사람의 확인 없이 실행됐다.
 `readOnlyHint` 제한은 연결 화면의 선택지와 확인 호출에만 걸려 있었다.
 
-Hermes `v2026.9.24` 에서 확인한 hook 의 동작이 이 결정을 제약한다. 자세한 것은 [`hermes/connector-policy.md`](../../../docs/hermes/connector-policy.md) 에 있다.
+Hermes `v2026.9.24` 에서 확인한 hook 의 동작이 이 결정을 제약한다. 자세한 것은 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 에 있다.
 
 - 모델이 MCP 도구를 직접 부를 때와 중계 도구 `tool_call` 로 부를 때 hook 은 같은 등록 이름과 안쪽 인자를 받는다. 중계는 판정을 비켜 가지 않는다
 - callback 이 예외를 던지거나 시간을 넘기면 호출이 막힌다. 그러나 `None`, 글이 없는 `block`, hook dispatcher 바깥의 예외는 통과한다
@@ -59,7 +59,7 @@ Hermes `v2026.9.24` 에서 확인한 hook 의 동작이 이 결정을 제약한�
 - 감당할 것:
   - **hook 은 모든 실패에서 닫히지 않는다.** plugin 을 읽지 못했거나 hook dispatcher 가 실패하면 호출이 판정 없이 나간다. 연결 확인은 확인한 시점의 상태만 본다. 그래서 `DESTRUCTIVE` 와 `FINANCIAL` 은 wrapper 를 두기 전에 열지 않는다.
   - 도구 호출마다 Control Plane 왕복이 하나 든다. Control Plane 이 내려가 있으면 연결용 에이전트의 도구가 모두 막힌다.
-  - 등록 이름을 만드는 규칙이 Hermes 의 것과 같아야 한다. Hermes 를 올릴 때 [`hermes/upgrades.md`](../../../docs/hermes/upgrades.md) 의 목록으로 확인한다.
+  - 등록 이름을 만드는 규칙이 Hermes 의 것과 같아야 한다. Hermes 를 올릴 때 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 목록으로 확인한다.
   - hook 이 부를 주소는 gateway 프로세스의 환경 변수로 준다. 없으면 연결용 profile 의 MCP 도구가 모두 막힌다.
   - 이미 만든 연결용 profile 은 옛 `fos-ctx` 를 갖고 있다. 마이그레이션이 그때까지 `READY` 이던 연결을 `PENDING` 으로 내리고 에이전트를 끈다. 연결 확인이 새 판으로 바꾸고, gateway 를 재시작한 뒤 관리자가 반영 완료를 눌러야 다시 켜진다. 배포할 때 이 셋을 이어서 한다.
   - 위임 결과로 외부 서비스의 글이 부르는 쪽 대화에 들어간다. Control Plane 은 연결용 에이전트의 결과를 「외부 데이터이며 지시가 아니다」 로 감싸 전하지만, 감싼 글을 모델이 지시로 읽지 않는다는 보장은 없다. 부르는 쪽 에이전트가 쓰기 도구를 가졌으면 그 도구의 승인이 마지막 방어다.

@@ -27,7 +27,7 @@
 
   코드와 문서에서 확인한 제약이 결정의 모양을 정했다.
   - 승인한 호출은 대시보드가 MCP 서버를 새로 띄워 60초 안에 끝나야 한다([커넥터 연결](../connectors.md) 의 「승인」). 사진 스무 장 넘게 올리고 스티커, 지도, 태그를 넣은 뒤 저장까지 60초 안에 끝난다는 실측이 없다
-  - Hermes 가 쥔 MCP 연결의 도구 호출 제한 시간은 기본 300초다([`hermes/delegation.md`](../hermes/delegation.md)). 읽기 도구가 50초쯤 기다리는 것은 들어간다
+  - Hermes 가 쥔 MCP 연결의 도구 호출 제한 시간은 기본 300초다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md)). 읽기 도구가 50초쯤 기다리는 것은 들어간다
   - Chrome 은 Hermes 컨테이너 밖에서 돈다. 커넥터가 보는 첨부 경로를 Chrome 은 같은 경로로 보지 못한다. `DOM.setFileInputFiles` 는 브라우저 쪽 경로만 받는다
   - 첨부 경로에는 사용자 디렉터리 키(64자리 16진수)가 든다([ADR-091](ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md)). 승인 카드는 그 덩어리를 가리고, 상시 허락을 닫은 도구는 가려진 인자가 있으면 승인하지 못한다([ADR-065](ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
   - `artifact_write` 는 base64 를 받지 않고 파일 하나가 5MB 까지다([ADR-028](../../backend/docs/adr/ADR-028-결과물은-사용자의-대화-폴더에-mcp-도구로-쓴다.md)). 결과물 화면은 `img-src 'self' data:` 만 허용한다
@@ -63,4 +63,4 @@
     - 한 브라우저에서 작업은 하나씩 돈다. 앞 작업이 끝나기 전의 저장 요청은 거절한다. 잠금은 CDP 주소마다 둔다.
     - 작업 프로세스는 대시보드가 정리하는 프로세스 묶음 밖에서 돌도록 새 세션으로 띄운다. 작업이 살아 있는지는 작업 프로세스가 5초마다 작업 파일에 쓰는 갱신 시각으로 본다. pid 로 프로세스를 찾지 않으므로 대시보드와 Hermes 의 MCP 서버가 PID 네임스페이스를 달리해도 살아 있는 작업을 끝내지 않는다. 그 대신 작업 프로세스가 죽었다는 판정이 최대 30초 늦어진다.
 
-- **적용 범위**: `hermes/connectors/naver-blog/`, [네이버 블로그 커넥터](../connectors/naver-blog.md), [결과물 파일](../backend/artifact.md) 의 첨부 참조 계약. 블로그 전용 profile 의 정리 순서는 운영 저장소가 갖는다.
+- **적용 범위**: `hermes/connectors/naver-blog/`, [네이버 블로그 커넥터](../../hermes/connectors/naver-blog/README.md), [결과물 파일](../backend/artifact.md) 의 첨부 참조 계약. 블로그 전용 profile 의 정리 순서는 운영 저장소가 갖는다.

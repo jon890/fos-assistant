@@ -7,7 +7,7 @@ Control Plane 이다. Spring Boot 4 와 MySQL 8.4 를 쓴다.
 
 - 패키지와 경계: [`../docs/backend/packages.md`](../docs/backend/packages.md)
 - 표와 칸: [`../docs/backend/schema/README.md`](../docs/backend/schema/README.md)
-- Hermes 호출: [`../docs/hermes/README.md`](../docs/hermes/README.md)
+- Hermes 호출: [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md)
 - 그 밖의 주제: [`../docs/README.md`](../docs/README.md) 의 backend 표
 
 ## 패키지 배치

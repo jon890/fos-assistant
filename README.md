@@ -149,7 +149,7 @@ Some Memory screens, such as editing the collection list and viewing earlier rev
 
 ### Execution spaces
 
-- **An execution space per user, in docker.** For profiles registered in the operator's policy, the shell, file, and code execution tools run in an execution space in docker. There is one container per profile, and each user gets a separate working directory. Inside it, other users' files, other profiles' secrets, and the Hermes settings are out of reach. The only exception is paths the operator mounts read-only. Profiles not registered in the policy do not get this isolation, and coverage is extended one profile at a time ([ADR-086](docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), [`docs/hermes/sandbox.md`](docs/hermes/sandbox.md)).
+- **An execution space per user, in docker.** For profiles registered in the operator's policy, the shell, file, and code execution tools run in an execution space in docker. There is one container per profile, and each user gets a separate working directory. Inside it, other users' files, other profiles' secrets, and the Hermes settings are out of reach. The only exception is paths the operator mounts read-only. Profiles not registered in the policy do not get this isolation, and coverage is extended one profile at a time ([ADR-086](docs/adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md), [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md)).
 - **Scripts do the arithmetic.** When a connector writes the full list for a period as a read-only file in that agent's execution space and returns only the path, totals and statistics are computed by a script instead of being estimated by the model. This needs a connector that declares file output, a profile registered in an execution space policy that sets an output path, and an agent with the code execution tool on. The Gmail and Naver Blog connectors in this repository do not declare file output ([ADR-20261008 / connector-output-files](hermes/docs/adr/ADR-20261008-connector-output-files.md)).
 - **A browser per user (in progress).** The Control Plane manages one browser per user, and the user signs in to services directly on the web app's "My browser" screen. Connectors reach that browser only through the Control Plane's relay. The code is in, but it is off by default and still in progress ([ADR-20261007 / user-browser](docs/adr/ADR-20261007-user-browser.md), [`docs/backend/user-browser.md`](docs/backend/user-browser.md)).
 
@@ -160,7 +160,7 @@ The full scope, with how each item is verified, is in [`docs/prd.md`](docs/prd.m
 - **It does not modify Hermes core.** Only the official extension points are used: profiles, the API server, and plugin hooks.
 - **It does not remember right away what you did not say.** The only thing stored at once is a fact you stated yourself in a conversation a person sent. Everything else is used only after a person accepts it. Hermes' built-in memory tool is not given to agents. The Control Plane is the only path to memory.
 - **It does not widen what it does on a model's judgment alone.** Deterministic Control Plane rules decide how far to go, and the only thing those rules start on their own is a read-only check. A connector write call goes through an approval card or a standing grant you gave ([ADR-20261007 / autonomy-policy](backend/docs/adr/ADR-20261007-autonomy-policy.md)).
-- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side, and service tokens are stored only as hashes. Browser login sessions are not stored in the database either. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`docs/hermes/README.md`](docs/hermes/README.md).
+- **It does not store secrets in the database.** AI credentials and connector tokens stay on the Hermes side, and service tokens are stored only as hashes. Browser login sessions are not stored in the database either. Separate profiles do not by themselves mean separate AI accounts: an OAuth login can be shared across profiles. How credentials are separated or shared is in [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md).
 - **It is not an open sign-up service.** An administrator adds people to a group.
 - **It does not run scripts in agent-made pages.**
 - **It does not carry operating procedures.** Deployment and host-specific values belong to whoever runs it.
@@ -244,7 +244,7 @@ Environment variables and the tech stack are in [`docs/self-hosting.md`](docs/se
 
 Issues and pull requests are welcome in English or Korean.
 The internal documents (`docs/`, `AGENTS.md`, commit messages) are written in Korean, so the documents linked from this page are in Korean too.
-How this project uses Hermes is described in [`docs/hermes/README.md`](docs/hermes/README.md).
+How this project uses Hermes is described in [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md).
 
 - [`AGENTS.md`](AGENTS.md) has the rules of the repository, including what must never be written into a public repository.
 - [`docs/README.md`](docs/README.md) is the index of all documents.
@@ -262,7 +262,7 @@ A general-purpose connector is one directory, `hermes/connectors/<id>/`. A pull 
 - A setup guide under `docs/connectors/` and an owner line in `.github/CODEOWNERS`.
 
 `hermes/tests/test_connectors_contract.py` checks the contract for every directory under `hermes/connectors/`, so a new connector is checked as soon as it is added.
-The full guide is [`docs/connector-authoring.md`](docs/connector-authoring.md) (Korean), and [`hermes/connectors/gmail/`](hermes/connectors/gmail) is the reference to copy from.
+The full guide is [`hermes/connectors/README.md`](hermes/connectors/README.md) (Korean), and [`hermes/connectors/gmail/`](hermes/connectors/gmail) is the reference to copy from.
 
 ## License
 

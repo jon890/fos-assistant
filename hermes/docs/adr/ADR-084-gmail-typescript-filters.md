@@ -43,5 +43,5 @@ Python 서버의 실행 정의를 가진 기존 profile 은 배포 전에 Gmail 
 - 얻는 것: 라벨과 새 메일의 자동 분류, 기존 메일 정리를 같은 커넥터에서 수행한다. 실행 파일은 의존성을 포함하며 기존 연결 값과 도구 계약을 유지한다.
 - 감당할 것: 필터를 쓰려면 사용자가 권한을 더 받아야 한다. 서버 언어가 바뀌므로 운영 실행 파일 목록도 바꾸고 배포 뒤 기존 연결의 `get_profile` 을 왕복 확인해야 한다. 수가 같아도 조회와 적용 사이에 대상이 바뀌는 것은 API 가 원자적으로 막지 못한다.
 
-도구와 설정 절차는 [Gmail 커넥터](../../../docs/connectors/gmail.md)가 갖는다.
+도구와 설정 절차는 [Gmail 커넥터](../../connectors/gmail/README.md)가 갖는다.
 권한의 근거는 [필터 생성](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.settings.filters/create), 일괄 변경의 근거는 [batchModify](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/batchModify)다.

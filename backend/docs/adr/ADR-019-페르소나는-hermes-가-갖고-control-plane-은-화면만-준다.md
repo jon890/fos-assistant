@@ -7,7 +7,7 @@
 에이전트의 성격은 그 profile 의 `SOUL.md` 가 정한다.
 지금 그 글을 고치려면 개발자가 비공개 저장소의 파일을 고치고 배포해야 한다.
 
-[`prd.md`](../../../docs/prd.md) 는 「자기 것이다. 에이전트의 모델과 도구와 기억을 그 사람이 정한다」 로 적었다.
+[`docs/prd.md`](../../../docs/prd.md) 는 「자기 것이다. 에이전트의 모델과 도구와 기억을 그 사람이 정한다」 로 적었다.
 모델은 관리 화면에서 고르고 기억은 `/memory` 에서 고치는데, 성격만 그렇지 않다.
 
 [ADR-018](ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md) 이 사람을 더하는 일을 화면으로 옮겼다.
@@ -16,7 +16,7 @@
 
 Hermes 대시보드에 `SOUL.md` 를 읽는 경로와 쓰는 경로가 모두 있다.
 두 경로가 받고 돌려주는 것은
-[`hermes/profiles.md`](../../../docs/hermes/profiles.md) 의 「`SOUL.md` 를 읽고 쓰는 두 경로」가 갖는다.
+[`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「`SOUL.md` 를 읽고 쓰는 두 경로」가 갖는다.
 
 ### 이 ADR 을 한 번 고쳐 썼다
 
@@ -105,7 +105,7 @@ profile 디렉터리에는 `.env` 와 `auth.json` 이 함께 있다.
 
 **Hermes 안에서 갈라지는 자식에게 성격이 가지 않아서 버렸다.**
 부모 실행의 `instructions` 는 `delegate_task` 로 만든 자식에게 전달되지 않는다.
-근거는 [`hermes/delegation.md`](../../../docs/hermes/delegation.md) 의
+근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의
 「부모의 `instructions` 는 자식에게 가지 않는다」 절이 갖는다.
 부모에게 표식이 든 줄을 넣고 부모와 자식에게 같은 것을 물어, 자식만 그 줄을 모르는 것을 확인했다.
 `SOUL.md` 는 그 자식도 읽는다.

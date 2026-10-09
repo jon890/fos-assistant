@@ -205,7 +205,7 @@ SSE 완료 기록이 먼저 생겼으면 새 사건을 만들지 않고 작업 �
 종료를 확인한 자식은 작업 줄에 provider, 모델, 일반 입력, cache read, cache write, 출력 토큰을 따로 적고 `DONE` 으로 바꾼다.
 provider 는 session 응답의 `provider`, 없으면 `billing_provider` 에서 읽는다.
 둘 다 없으면 대시보드 plugin 의 `GET /api/profiles/<이름>/sessions/<session id>/provider` 를 부른다([ADR-067](../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md)).
-경로의 계약은 [`hermes/README.md`](../hermes/README.md) 의 「자식 session 의 provider」 가 갖는다.
+경로의 계약은 [`hermes/README.md`](../hermes/plugins/dashboard-profile-api/README.md) 의 「자식 session 의 provider」 가 갖는다.
 
 | 대시보드의 답 | 원장 줄 |
 | --- | --- |
@@ -229,7 +229,7 @@ session 응답에 provider 가 있으면 대시보드를 부르지 않는다.
 | `USAGE_UNKNOWN` | 입력이나 출력 토큰을 읽지 못했다 |
 | `PRICE_UNKNOWN` | 가격표에 그 provider 와 모델이 없다 |
 
-v0.21.5 의 session 응답은 provider 를 주지 않는다([`hermes/runs-api.md`](hermes/runs-api.md)). 그래서 지금 native 자식의 provider 는 모두 대시보드에서 온다.
+v0.21.5 의 session 응답은 provider 를 주지 않는다([`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md)). 그래서 지금 native 자식의 provider 는 모두 대시보드에서 온다.
 한 번 `PROVIDER_UNKNOWN` 으로 적힌 줄은 다시 조회하지 않는다.
 
 ### 합계와 완전성
@@ -249,7 +249,7 @@ v0.21.5 의 session 응답은 provider 를 주지 않는다([`hermes/runs-api.md
 
 `pricedSubagents` 는 금액이 있는 `DONE` 줄의 수다.
 
-종료된 session 을 다시 조회해도 값이 같다는 실측은 [`hermes/delegation.md`](hermes/delegation.md#자식-session-으로-결과와-토큰을-보완한다) 에 있다.
+종료된 session 을 다시 조회해도 값이 같다는 실측은 [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md#자식-session-으로-결과와-토큰을-보완한다) 에 있다.
 
 ## 표시와 검증
 

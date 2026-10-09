@@ -84,7 +84,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 ### 주제가 아니라 내용으로 나눈다
 
 **Hermes 가 어떻게 동작하는지는 이 저장소가 소유한다.**
-[`docs/hermes/README.md`](docs/hermes/README.md) 가 그 자리다.
+[`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md) 가 그 자리다.
 우리 환경의 값만 비공개 저장소로 간다.
 
 | 성격 | 어디 | 예 |

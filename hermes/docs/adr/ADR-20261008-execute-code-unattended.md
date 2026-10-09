@@ -15,7 +15,7 @@
 | 그대로 두는 것 | `approvals` 의 다른 키(`mode`, `deny`, `timeout`, `cron_mode` 등)와 셸 계열 도구를 건드리지 않는 저장 |
 | 기대는 Hermes 동작 | gateway 가 `HERMES_EXEC_ASK` 를 켜서, API 경로의 셸 위험 명령과 plugin 승인 요청이 `unattended_mode` 와 무관하게 승인 카드로 간다. 계약 시험이 이 동작을 확인한다 |
 
-Hermes 가 이 판정을 어떻게 하는지는 [실행 공간](../../../docs/hermes/sandbox.md) 의 「`execute_code` 의 승인 판정」 이 갖는다.
+Hermes 가 이 판정을 어떻게 하는지는 [실행 공간](../hermes-contract.md) 의 「`execute_code` 의 승인 판정」 이 갖는다.
 
 ### 맥락
 

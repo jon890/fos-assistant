@@ -59,4 +59,4 @@ Hermes 는 50,000자를 넘는 MCP 결과를 profile 의 `cache/spillover` 에 �
   - 정책에 키를 넣기 전에 붙인 커넥터는 빈 값을 갖는다. 연결 확인이나 반영 완료로 다시 설치해야 값이 들어간다.
   - Hermes 를 올릴 때 `SANDBOX_ALLOWED_TOOLS` 를 다시 본다. 커넥터 도구를 스크립트에서 부를 수 있게 되면 이 결정을 다시 검토한다.
 
-- **적용 범위**: 대시보드 plugin 의 실행 공간 정책 검증, 셸 저장의 마운트, manifest 검증, 바인딩 설치와 떼기, 확인 도구와 승인 실행의 env. 계약은 [`hermes/README.md`](../../README.md) 의 「셸 실행 공간」, [커넥터 연결](../../../docs/connectors.md) 의 「connector.json」, 만드는 쪽의 규칙은 [커넥터 만들기](../../../docs/connector-authoring.md) 가 갖는다.
+- **적용 범위**: 대시보드 plugin 의 실행 공간 정책 검증, 셸 저장의 마운트, manifest 검증, 바인딩 설치와 떼기, 확인 도구와 승인 실행의 env. 계약은 [`hermes/README.md`](../../README.md) 의 「셸 실행 공간」, [커넥터 연결](../../connectors/README.md) 의 「connector.json」, 만드는 쪽의 규칙은 [커넥터 만들기](../../connectors/README.md) 가 갖는다.

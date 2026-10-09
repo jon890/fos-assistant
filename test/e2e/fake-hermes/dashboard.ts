@@ -306,7 +306,7 @@ export function createConfigRoutes(state: FakeHermesState, { boundServers }: Ret
       let nextDirs: string[] | undefined;
       if (configKeys.includes("skills")) {
         const dirs = body.config?.skills?.external_dirs;
-        // 게시 거절 규칙은 docs/hermes/profiles.md 의 표를 따른다. 경로 형식, 다른 profile 의 prefix, 둘 이상,
+        // 게시 거절 규칙은 hermes/plugins/dashboard-profile-api/README.md 의 경로 표를 따른다. 경로 형식, 다른 profile 의 prefix, 둘 이상,
         // 심볼릭 링크, 없는 디렉터리, skills 도구가 꺼진 채 게시가 모두 400 이다.
         if (Object.keys(body.config?.skills ?? {}).length !== 1 || !Array.isArray(dirs) || dirs.length > 1
             || !dirs.every((dir) => typeof dir === "string")) {

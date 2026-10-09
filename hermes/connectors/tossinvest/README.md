@@ -1,9 +1,9 @@
 # 토스증권 커넥터
 
-사용자의 토스증권 계좌를 읽는 범용 커넥터다. 코드는 [`hermes/connectors/tossinvest/`](../../hermes/connectors/tossinvest) 에 있다.
+사용자의 토스증권 계좌를 읽는 범용 커넥터다. 코드는 [`hermes/connectors/tossinvest/`](.) 에 있다.
 이 문서는 도구와 정책, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
-결정은 [ADR-20261008 / tossinvest-connector](../../hermes/docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../connectors.md) 과 [커넥터 도구 정책](../backend/connector-tool-policy.md) 이 갖는다.
+결정은 [ADR-20261008 / tossinvest-connector](../../docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
+커넥터 공통 계약은 [커넥터 연결](../../../docs/connectors.md) 과 [커넥터 도구 정책](../../../docs/backend/connector-tool-policy.md) 이 갖는다.
 
 **이 커넥터는 주문하지 않는다.** 주문, 정정, 취소 도구가 없다. 매수와 매도는 사용자가 토스증권 앱이나 웹에서 한다.
 
@@ -23,7 +23,7 @@
 | `single_binding` | 참 | 토스증권은 client 마다 유효한 토큰이 하나다. 두 에이전트에 붙이면 서로의 토큰을 무효로 만든다 |
 | `sandbox_required` | 참 | 키에 권한 범위가 없어 조회용 키로도 주문할 수 있다. 셸이 `.env` 를 읽는 profile 에 붙이지 않는다 |
 
-규칙은 [ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md) 가 갖는다.
+규칙은 [ADR-20261008 / connector-binding-guards](../../../docs/adr/ADR-20261008-connector-binding-guards.md) 가 갖는다.
 
 ## 도구와 정책
 
@@ -110,7 +110,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 ## 보안
 
 - **돈이 움직이는 도구가 없다.** 그러나 키 자체는 주문할 수 있다. 키가 새면 허용 IP 에서 주문할 수 있다. 실행 공간도 같은 공인 IP 로 나가므로 허용 IP 는 셸에 샌 키를 막지 못한다. 그래서 `sandbox_required` 다.
-- 외부 글이 모델을 속였을 때 닿는 범위: 이 커넥터에는 쓰는 도구가 없다. 속은 모델이 할 수 있는 것은 읽은 계좌 데이터를 다른 도구(셸, 웹)로 내보내는 것이다. 그 길은 [READ 데이터 흐름](../read-data-flow.md) 의 RF-08, RF-09 와 같다.
+- 외부 글이 모델을 속였을 때 닿는 범위: 이 커넥터에는 쓰는 도구가 없다. 속은 모델이 할 수 있는 것은 읽은 계좌 데이터를 다른 도구(셸, 웹)로 내보내는 것이다. 그 길은 [READ 데이터 흐름](../../../docs/read-data-flow.md) 의 RF-08, RF-09 와 같다.
 - 보유와 잔고가 모델 공급자에게 간다(RF-20). 사용자가 받아들였다.
 - 토스증권 이용 약관은 시세의 제3자 제공을 금지한다. 모델 공급자 전송이 여기 드는지는 확인하지 못했다.
 

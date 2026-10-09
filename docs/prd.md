@@ -125,7 +125,7 @@
   근거는 [ADR-022](adr/ADR-022-다시-생성과-수정은-같은-session-에-판으로-쌓는다.md) 에 있다.
 - **Hermes 가 스스로 띄운 background 하위 에이전트는 중지로 멈추지 않는다.**
   `delegate_task` 의 background 자식은 부모 run 에서 떨어져 돌고, Hermes API server 에 그 자식을 멈추는 HTTP 경로가 없다.
-  그 사실은 [`hermes/delegation.md`](hermes/delegation.md#native-하위-에이전트를-멈추는-길) 의 「native 하위 에이전트를 멈추는 길」 절이 갖는다.
+  그 사실은 [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md#native-하위-에이전트를-멈추는-길) 의 「native 하위 에이전트를 멈추는 길」 절이 갖는다.
 - **대화를 데이터베이스에서 지우지 않는다.** 지우면 목록에서 숨긴다.
   실행 기록이 그 대화를 가리키고 비용이 거기서 나온다.
 - **결과물의 스크립트를 돌리지 않는다.** 에이전트가 만든 HTML 은 읽기만 한다.

@@ -8,7 +8,7 @@
   스킬을 올린 에이전트는 `skills` toolset 이 켜져 있어야 한다.
   누가 어느 실행에서 어느 스킬을 썼는지는 Control Plane 이 실행 줄에 딸린 표로 남긴다.
 - **맥락**:
-  - Hermes 가 스킬을 붙이는 정식 설정은 `skills.external_dirs` 다. 대시보드 `POST /api/skills` 는 `SKILL.md` 하나만 만들고, 이미 색인을 계산한 gateway 는 재시작 전까지 새 스킬을 보지 못한다. 반면 `external_dirs` 에 새 경로를 더하면 같은 프로세스의 다음 색인에 나타난다. 근거는 [`hermes/tools-and-skills.md`](../../../docs/hermes/tools-and-skills.md) 의 「스킬 파일과 색인 적용 시점」 이다.
+  - Hermes 가 스킬을 붙이는 정식 설정은 `skills.external_dirs` 다. 대시보드 `POST /api/skills` 는 `SKILL.md` 하나만 만들고, 이미 색인을 계산한 gateway 는 재시작 전까지 새 스킬을 보지 못한다. 반면 `external_dirs` 에 새 경로를 더하면 같은 프로세스의 다음 색인에 나타난다. 근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「스킬 파일과 색인 적용 시점」 이다.
   - 대시보드에는 스킬을 지우는 경로가 없다.
   - `skills` toolset 에는 `skill_manage` 가 함께 들어 있어, 쓰기 가능한 외부 스킬은 모델이 고칠 수 있다.
   - 에이전트와 profile 은 하나씩 짝이다(`agent.hermes_profile` 이 유일하다). 에이전트에 올린다는 것은 그 profile 에 붙인다는 것이다.
@@ -75,7 +75,7 @@ Hermes v0.21.5 에는 `skill_view` 를 두고 `skill_manage` 만 도구 목록�
 `agent.disabled_toolsets` 는 toolset 단위라 `skills` 를 빼면 `skill_view` 와 색인까지 사라진다.
 plugin 이 남의 도구를 등록 해제하려면 운영자의 `allow_tool_override` 가 필요하고, 전역 plugin 의 해제는 같은 프로세스의 모든 profile 에 걸린다.
 `skill_manage` 를 빼도 색인 안내문의 `skill_manage` 문장은 남는다.
-근거는 [`hermes/skills.md`](../../../docs/hermes/skills.md) 의 「`skill_manage` 만 빼는 설정」 이다.
+근거는 [`hermes/docs/hermes-contract.md`](../../../hermes/docs/hermes-contract.md) 의 「`skill_manage` 만 빼는 설정」 이다.
 
 그래서 두 겹으로 막는다.
 

@@ -26,7 +26,7 @@
   Hermes 에 중지를 한 번 보내고, 실행 조회가 끝났다거나 그 run 을 모른다(404)고 답할 때 돌려준다.
   `assistant.user-execution.remote-end-max-wait` 를 넘기면 경고 로그를 남기고 돌려준다.
 - **맥락**: 기존 한도는 대화 하나에 turn 하나, 루트 하나에 위임 자식 4개, 서버 전체에 위임 16개였다.
-  한 사용자가 여러 대화를 열고 대화마다 루트당 한도 안에서 위임하면 그 합이 Hermes 의 공유 listener 자리를 모두 차지할 수 있다([`hermes/concurrency.md`](../hermes/concurrency.md) 의 「동시 실행 한도는 listener 단위다」).
+  한 사용자가 여러 대화를 열고 대화마다 루트당 한도 안에서 위임하면 그 합이 Hermes 의 공유 listener 자리를 모두 차지할 수 있다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「동시 실행 한도는 listener 단위다」).
   listener 에는 profile 단위의 한도가 없어, 다른 사용자의 turn 이 같은 자리를 두고 다투다 429 로 실패한다.
   흐름은 Chief 의 루트 줄이 `SUCCEEDED` 가 된 뒤 자식이 돌고, 대화 turn 은 질문을 저장한 뒤에야 루트 줄이 생긴다.
   실행 줄만 세면 두 틈에서 그 turn 이 쥔 자리가 0 으로 보인다.
@@ -49,4 +49,4 @@
     - **원격 종료 확인 자리는 재기동하면 사라진다.** 그 실행 줄은 이미 끝나 있어 기동 정리([ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md))도 다시 보지 않는다. 그 run 이 Hermes 에서 끝날 때까지 한도가 그만큼 덜 센다.
     - Hermes 의 native 하위 에이전트와 cron 은 Control Plane 이 제출하지 않아 세지 못한다.
     - 이 한도는 Hermes 에 동시에 맡기는 실행 수의 상한이다. OS 격리나 CPU, 메모리, 비용의 상한이 아니다.
-- **적용 범위**: 기존 대화 잠금, 루트당 위임 한도, 서버 전체 위임 한도는 그대로 둔다. 네 한도의 관계와 진입점 목록은 [`backend/execution-limit.md`](../backend/execution-limit.md) 가 갖는다.
+- **적용 범위**: 기존 대화 잠금, 루트당 위임 한도, 서버 전체 위임 한도는 그대로 둔다. 네 한도의 관계와 진입점 목록은 [`docs/backend/execution-limit.md`](../backend/execution-limit.md) 가 갖는다.

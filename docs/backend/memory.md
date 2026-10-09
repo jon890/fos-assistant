@@ -122,12 +122,12 @@ Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다.
 | `memory.application.AgentMemorySettingService` | 관리 화면이 보는 collection 목록과 빠진 항목 수, 최근 변경을 모으고 고른 collection 을 검사한다 |
 | `memory.presentation.AgentMemorySettingController` | `/api/v1/admin/agents/{code}/memory-collections` |
 
-근거는 [`adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](../../backend/docs/adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
-[`adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md`](../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 와
-[`adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md`](../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 와
-[`adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`](../../backend/docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) 와
-[`adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`](../adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) 와
-[`adr/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md`](../adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 에 있다.
+근거는 [`backend/docs/adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md`](../../backend/docs/adr/ADR-052-memory-는-collection-종류-꺼내는-방식-민감도-판-출처를-가진다.md) 와
+[`backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md`](../../backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) 와
+[`backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md`](../../backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) 와
+[`backend/docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md`](../../backend/docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) 와
+[`docs/adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md`](../adr/ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) 와
+[`docs/adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md`](../adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 에 있다.
 
 ### 관리자가 에이전트의 collection 을 바꿀 때
 
@@ -226,7 +226,7 @@ sequenceDiagram
 `memory_read` 가 본문을 내 주면 Control Plane 이 그 호출의 origin 실행의 `execution_context_source` 마지막 줄 뒤에 `source=MEMORY_READ`, `source_ref=memory:<번호>`, `body_mode=INLINE`, `freshness=UNKNOWN` 줄을 하나 덧붙인다.
 읽지 못한 호출은 남기지 않는다. 답마다 참고한 기억이 이 줄을 읽는다.
 
-- 실행 사건(`execution_event`)에서 번호를 읽지 않는 까닭은 Hermes 의 `tool.started` 사건이 이 도구의 인자를 싣지 않기 때문이다. 그 사건의 `preview` 는 주요 인자 하나뿐이고 `id` 는 그 목록에 없다([`../hermes/runs-api.md`](../hermes/runs-api.md) 의 「붙은 커넥터 서버의 도구 사건」).
+- 실행 사건(`execution_event`)에서 번호를 읽지 않는 까닭은 Hermes 의 `tool.started` 사건이 이 도구의 인자를 싣지 않기 때문이다. 그 사건의 `preview` 는 주요 인자 하나뿐이고 `id` 는 그 목록에 없다([`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「붙은 커넥터 서버의 도구 사건」).
 - 저장은 새 트랜잭션에서 하고 실패해도 도구 결과를 바꾸지 않는다. 같은 실행의 읽기가 겹쳐 순서 번호가 부딪치면 한 번 다시 읽어 시도하고, 그래도 실패하면 실행 번호만 경고 로그로 남긴다. 관측용 기록이기 때문이다.
 - 이 줄은 조립 결과가 아니라 실행 뒤의 기록이다. `context_chars` 와 `instructions_hash`, `context_omitted_items` 에 들지 않는다.
 
