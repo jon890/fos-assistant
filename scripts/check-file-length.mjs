@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 파일 전체 길이는 빈 줄과 주석을 포함한다. 기존 긴 파일은 기준값보다 늘어나지 못한다.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+// 모듈 문서의 한도는 ADR-20261009 / docs-per-module 이 정하고, 넘으면 실패가 아니라 알림이다.
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,7 +17,12 @@ export function lineCount(text) {
   return lines.length - (lines.at(-1) === "" ? 1 : 0);
 }
 
+/** 루트와 모듈의 `docs/` 바로 아래 문서다. ADR 은 `adr/` 아래라 빠진다. */
+const MODULE_DOC = /^(?:(?:backend|web|hermes)\/)?docs\/[^/]+\.md$/;
+const SCAN_DIRS = ["backend/src/main", "web/src", "hermes", "scripts", "docs", "backend/docs", "web/docs"];
+
 export function limitFor(file) {
+  if (MODULE_DOC.test(file)) return 1000;
   const parts = file.split("/");
   if (parts.some((part) => SKIP_DIRS.has(part)) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)) return null;
   if (file.startsWith("backend/src/main/") && file.endsWith(".java")) return 500;
@@ -65,13 +71,15 @@ export function checkFileLengths(root, { update = false } = {}) {
   const counts = new Map();
   const errors = [];
   const notices = [];
-  for (const file of ["backend/src/main", "web/src", "hermes", "scripts"]
+  for (const file of SCAN_DIRS.filter((directory) => existsSync(join(root, directory)))
     .flatMap((directory) => sourceFiles(root, directory)).sort()) {
     if (file in baseline.exclusions) continue;
     const count = lineCount(readFileSync(join(root, file), "utf8"));
     counts.set(file, count);
     const allowed = baseline.files[file] ?? limitFor(file);
-    if (count > allowed) errors.push(`${file}: ${count}줄 > ${allowed}줄. 파일을 나눈다.`);
+    // 모듈 문서는 정해진 파일이라 나눌 수 없다. 새 기능은 그 파일의 절로 더하므로 넘으면 알리기만 한다.
+    if (count > allowed && MODULE_DOC.test(file)) notices.push(`${file}: ${count}줄 > ${allowed}줄. 코드가 가진 값의 복사본을 지워 줄인다.`);
+    else if (count > allowed) errors.push(`${file}: ${count}줄 > ${allowed}줄. 파일을 나눈다.`);
   }
   for (const [file, previous] of Object.entries(baseline.files)) {
     const actual = counts.get(file);

@@ -34,20 +34,6 @@ Hermes 가 Control Plane 을 부르는 반대 방향도 있고 토큰이 서로 
 둘은 만드는 방법이 달라 설정도 다르다.
 `fos-home-infra` 가 그 차이를 소유한다.
 
-## Memory 에서 아직 만들지 않은 것
-
-아래는 아직 만들지 않았다. 스키마와 판정은 이미 받을 수 있게 되어 있다.
-
-- collection 탭, 문서의 판 이력 화면, 출처 표시
-- 신원 항목의 들이기. 암호화와 문서 읽기 경계와 `identity` 권한을 운영에서 확인한 뒤에 연다. 조건은 [ADR-058](adr/archive/ADR-058-기존-개인-지식-저장소는-주인이-검토한-묶음을-화면에서-올려-들여온다.md) 이 정했다
-- 민감 항목 본문의 완전 삭제
-- `always_inject` 칸 제거
-
-Memory 의 기본 근거는 [`backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md`](../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md) 와
-[`backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md`](../backend/docs/adr/ADR-012-memory-는-사람이-승인한-것만-남는다.md) 에 있다.
-층을 나누는 근거는
-[`backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md`](../backend/docs/adr/ADR-015-memory-는-층을-나눠-싣는다.md) 에 있다.
-
 ## 화면을 검증하는 방법
 
 테스트는 확인하는 대상을 나눠 둔다.
@@ -79,24 +65,23 @@ Memory 의 기본 근거는 [`backend/docs/adr/ADR-003-memory-권한은-주입�
 `agent` 는 profile 이름과 주소만 적는다.
 profile key 와 AI credential 은 계속 홈서버 파일에 둔다.
 
-## 아직 만들지 않은 것
+## 커넥터 비밀값을 두는 곳
 
-- Hermes 안의 `delegate_task` 하위 에이전트가 자기 실행 줄을 남기는 경로.
-  그 하위 에이전트는 Hermes 안에서만 돌고 사건으로만 보인다.
-  우리 실행 줄이 생기는 자식은 `agent_delegate`, 흐름의 하위 실행, Memory 제안이다.
-  사용량과 금액은 실행 줄 없이 `subagent_usage_job` 줄에 남겨 합계에 더한다([ADR-062](../backend/docs/adr/ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md)).
-  그 자식의 provider 는 대시보드 plugin 의 읽기 경로로 받는다([ADR-067](../backend/docs/adr/ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md))
-- `agent_stop` 이 그 실행 아래의 실행까지 멈추는 것. 지금은 그 실행만 멈춘다
-- 사용자가 turn 을 중지할 때 Hermes `delegate_task` 하위 에이전트를 실제로 멈추는 것.
-  지금은 origin 실행이나 그 루트 실행이 `CANCELLED` 인 하위 에이전트의 Control Plane MCP 호출만 거절한다([ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)).
-  루트와 origin 사이의 중간 실행만 중지된 경우는 보지 않는다.
-  멈출 수 있는 길은 profile 플러그인 쪽에 있고, 부모 run 이 끝난 뒤의 자식은 그 길로도 멈추지 못한다([`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md#native-하위-에이전트를-멈추는-길))
-- 여러 Control Plane 이 함께 세는 사용자 실행 한도. 지금은 한 프로세스 안의 사용자 잠금으로 세고 만든다([`backend/docs/flow.md`](../backend/docs/flow.md) 의 「서버 한 대 전제」)
-- Hermes native 하위 에이전트와 cron 을 사용자 실행 한도에 넣는 것. Control Plane 이 제출하지 않아 세지 못한다
-- 스킬 zip 묶음의 받기와 미리보기, 올리기와 그 화면. 지금은 저장 기반(넓힌 경로, scripts 와 실행 공간, 이전 버전)만 있다([ADR-20261009 / skill-package](adr/ADR-20261009-skill-package.md))
-- `connector_action` 줄의 보관 기한과 정리. 지금은 도구 호출마다 남긴 줄을 지우지 않는다
-- 커넥터 연결에 다시 인증이 필요하다는 알림. 연결 상태에 재인증 상태가 없고, 토큰이 거절된 것을 연결 상태로 옮기는 지점도 없다. 그 상태를 정한 뒤 알림 종류를 더한다([`backend/docs/flow.md`](../backend/docs/flow.md))
-- 예약 작업의 실패 다시 하기와 일시 정지, 도구 미리 허락, 작업 제안. 목록과 넣지 않기로 한 것은 [`backend/docs/flow.md`](../backend/docs/flow.md) 의 「다음 단계」 가 갖는다
-- 알림을 웹 밖으로 보내는 채널. 첫 채널은 브라우저 웹 푸시로 정했다. 지금은 웹 안의 알림 단추와 목록뿐이다
-- 먼저 살펴보기의 목표별 변화 판정. 외부 변화를 Control Plane 이 알지 못해 `NO_CHANGE` 로 모델을 건너뛰지 않는다. 남은 것은 [ADR-080](adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) 의 「다음 단계」 가 갖는다
-- 커넥터 plugin 이 일반 에이전트용 `proactive-check` 스킬을 선언하는 manifest 칸. 지금은 그 스킬을 에이전트에 따로 둔다
+`connector_connection` 은 사용자, 커넥터, 상태, 칸 값, 마지막 확인 시각, 값을 보관 파일에 두었는지, 선언하지 않은 도구 수를 저장한다.
+에이전트에 붙인 것은 `agent_connector_binding` 이 바인딩마다 상태와 재시작 대기를 저장한다([`backend/docs/data-schema.md`](../backend/docs/data-schema.md)).
+비밀 칸은 원문과 해시를 저장하지 않고, 값이 충분히 길 때만 앞부분을 남긴다. 길이 기준과 저장 칸은 [`backend/docs/data-schema.md`](../backend/docs/data-schema.md) 의 「connector_connection」 이 갖는다.
+화면은 연결된 상태에서 앞부분이 없는 필수 비밀 칸을 「입력됨」 으로만 보인다. 앞부분이 없는 선택 비밀 칸은 입력 여부를 응답으로 알 수 없어 보이지 않는다.
+브라우저는 등록을 제출한 직후 비밀 칸 입력을 비우고 다시 표시하지 않는다. 선택지를 고르는 동안은 작성 중인 입력을 쓰고, 조회가 실패해도 입력을 비운다.
+요청 record 의 문자열 표현, 외부 오류, 로그와 응답에 비밀 원문을 남기지 않는다.
+`connector_action` 은 도구 호출마다의 판정과 승인 줄을 저장한다. 인자 원문은 승인 줄에만 두고 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다.
+
+**칸 값의 원문은 Hermes 쪽 두 곳에만 있다.**
+
+| 어디 | 무엇 | 언제 지워지는가 |
+| --- | --- | --- |
+| 보관 파일 | 연결마다 하나인 원본. 대시보드 plugin 이 둔다 | 연결을 해제할 때 |
+| 붙인 에이전트 profile 의 `.env` | 붙일 때 보관 파일에서 복사한 값. 서버 정의의 `env` 는 `${이름}` 참조만 갖고 그 profile 의 secret scope 에서 풀린다 | 그 에이전트에서 뗄 때. 연결 해제는 붙은 바인딩을 모두 떼므로 함께 지워진다 |
+
+값을 바꾸면 보관 파일을 다시 쓰고 붙은 profile 마다 복사본을 다시 쓴다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있어 그 바인딩들이 재시작 대기가 된다.
+설정 백업은 `.env` 와 보관 파일을 담지 않는다. 그래서 떼거나 해제한 뒤에는 그 profile 디렉터리의 어느 파일에도 칸 값의 원문이 남지 않는다.
+옛 커넥터 에이전트는 남아 있는 동안 자기 profile 의 `.env` 에 값을 갖는다. 연결 확인이 그 값을 보관 파일로 옮기고, 그 에이전트를 지우면 그 profile 이 거둬진다.

@@ -120,9 +120,9 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 ### 커넥터와 승인
 
-- **한 번 연결하고 여러 에이전트에 붙인다.** 커넥터는 에이전트에게 외부 서비스의 도구를 쥐어 주어 그 에이전트의 역할을 넓힌다. 연결 화면에서 계정을 한 번 연결하고 그 연결을 내 비공개 에이전트에 붙이면, 그 에이전트가 서비스의 도구를 직접 부른다([`docs/connectors.md`](docs/connectors.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+- **한 번 연결하고 여러 에이전트에 붙인다.** 커넥터는 에이전트에게 외부 서비스의 도구를 쥐어 주어 그 에이전트의 역할을 넓힌다. 연결 화면에서 계정을 한 번 연결하고 그 연결을 내 비공개 에이전트에 붙이면, 그 에이전트가 서비스의 도구를 직접 부른다([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 - **붙이면 재시작 없이 반영된다.** 처음 붙인 커넥터는 공유 gateway 를 재시작하지 않고 잠시 뒤의 실행부터 쓰인다. 그동안 다른 사용자의 대화가 끊기지 않는다([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
-- **연결 화면의 커넥터 카드.** 커넥터마다 아이콘과 소개 링크, 도구 요약을 카드로 보인다. 아이콘은 plugin 안의 파일만 쓰고 외부 주소를 부르지 않는다([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/connectors.md`](docs/connectors.md)).
+- **연결 화면의 커넥터 카드.** 커넥터마다 아이콘과 소개 링크, 도구 요약을 카드로 보인다. 아이콘은 plugin 안의 파일만 쓰고 외부 주소를 부르지 않는다([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
 - **쓰기는 승인 카드에서.** 외부 서비스에 쓰는 호출은 보낼 내용을 그대로 보이는 카드에서 기다리고, 사용자가 승인한 뒤에 승인한 인자 그대로 한 번만 실행된다. 상시 허락을 줄 수 있는 도구는 사용자가 허락한 기간 동안 카드 없이 실행되고, 외부로 내보내는 도구는 상시 허락을 막아 둔다. 같은 도구의 승인은 묶어 보이고, 승인 요청과 만료는 어느 화면에서든 알림으로 온다([`backend/docs/flow.md`](backend/docs/flow.md), [`backend/docs/flow.md`](backend/docs/flow.md)).
 
 ### 먼저 살펴보기와 지금 화면
@@ -146,7 +146,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 - **collection 과 민감 항목.** 항목은 collection 에 속하고, 에이전트는 허용된 collection 만 받고, 관리자가 관리자 영역의 에이전트 상세에서 그 허용을 고친다. 민감 항목의 본문은 암호화해 저장한다. 항목을 고치거나 지워도 그 전의 값이 남는다([ADR-053](backend/docs/adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md), [ADR-055](backend/docs/adr/ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md)).
 - **다른 서비스의 읽기 전용 접근.** 사용자에 묶인 서비스 토큰으로 다른 서비스가 그 사용자의 문서만 읽는다([ADR-056](backend/docs/adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)).
 
-collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/code-architecture.md`](docs/code-architecture.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.
+collection 목록을 고치는 화면과 항목의 앞선 판을 읽는 화면처럼 Memory 의 일부 화면은 아직 만들지 않았다. 지금 목록은 [`docs/code-architecture.md`](docs/prd.md) 의 「Memory 에서 아직 만들지 않은 것」 에 있다.
 
 ### 실행 공간
 
@@ -248,7 +248,7 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 이 프로젝트가 Hermes 를 어떻게 쓰는지는 [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md) 에 있다.
 
 - [`AGENTS.md`](AGENTS.md) 에 저장소의 규칙이 있다. 공개 저장소에 적으면 안 되는 것도 거기 있다.
-- [`docs/README.md`](docs/README.md) 는 문서 전체의 색인이다.
+- 문서를 읽는 순서는 [`AGENTS.md`](AGENTS.md) 의 「읽기 순서」 절에 있다. 모듈마다 자기 `docs/` 디렉터리에 문서를 둔다.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) 는 되돌리기 어려운 결정의 목록이다.
 - `scripts/check-local.sh` 는 push 전에 고친 화면의 브라우저 spec 을 인자로 주어 돌린다. 인자가 없으면 브라우저 검사 전체를 돌린다. 머지는 지금 main 과 합친 상태에서 실행한 PR CI 의 필수 검사 통과로 판정한다. CI 가 돌지 못하면 로컬에서 전체 검사를 돌린다. 자세한 것은 [`AGENTS.md`](AGENTS.md) 의 「확인」 절에 있다.
 

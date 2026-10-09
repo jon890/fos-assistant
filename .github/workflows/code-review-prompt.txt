@@ -4,7 +4,7 @@ backend 는 Spring Boot 4, Java 21, MySQL, Flyway 이고 web 은 Next.js 16, Rea
 검사는 backend 의 JUnit, `test/e2e`(가짜 Hermes), `test/browser`(Playwright), `test/unit`(node:test) 입니다.
 
 기본은 **직접** 검토한다. 변경이 크면 backend, web, hermes 등 디렉터리별로 하위 에이전트에 나눠 읽게 한다. 각 에이전트에 담당 경로와 관련 지침을 주고, 디렉터리 사이의 계약과 결과 취합은 당신이 맡는다.
-점검 기준은 저장소의 지침이 소유한다. 루트 `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `docs/` 와 ADR 이다. ADR 은 `docs/adr/` 와 `backend/docs/adr/`, `web/docs/adr/`, `hermes/docs/adr/` 에 있다. `docs/` 의 색인은 `docs/README.md` 다.
+점검 기준은 저장소의 지침이 소유한다. 루트 `AGENTS.md`, `backend/AGENTS.md`, `web/AGENTS.md`, `docs/` 와 ADR 이다. ADR 은 `docs/adr/` 와 `backend/docs/adr/`, `web/docs/adr/`, `hermes/docs/adr/` 에 있다. 문서의 읽기 순서는 루트 `AGENTS.md` 「읽기 순서」 가 갖고, 모듈마다 `docs/` 에 문서를 둔다.
 diff 가 건드리는 영역의 지침을 먼저 읽는다. 판정 기준을 이 프롬프트에 옮겨 적지 않는다. 아래는 그 지침 가운데 리뷰에서 특히 볼 곳을 가리킬 뿐이다.
 그 뒤 GitHub review API 를 한 번 호출해 **요약과 인라인을 리뷰 하나로 묶어 게시**한다.
 요약은 리뷰의 `body` 에, 인라인 발견사항은 같은 리뷰의 `comments` 배열에 담는다.

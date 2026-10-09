@@ -119,9 +119,9 @@ Adding a user is a single decision by an administrator, and it must not slow any
 
 ### Connectors and approval
 
-- **Connect once, attach to several agents.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/connectors.md`](docs/connectors.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+- **Connect once, attach to several agents.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 - **Attaching needs no restart.** A newly attached connector is picked up by runs shortly afterwards, without restarting the shared gateway, so nobody else's conversation is cut off in the meantime ([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
-- **Connector cards.** The connections screen shows each connector as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/connectors.md`](docs/connectors.md)).
+- **Connector cards.** The connections screen shows each connector as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
 - **Writes wait on an approval card.** A call that writes to an outside service waits on a card that shows exactly what will be sent, and runs only after you approve it, once, with exactly the arguments you approved. A tool that allows a standing grant runs without a card while the grant you gave lasts, and tools that send data out have standing grants closed. Approvals for the same tool are grouped, and approval requests and expiries reach you as notifications on any screen ([`backend/docs/flow.md`](backend/docs/flow.md), [`backend/docs/flow.md`](backend/docs/flow.md)).
 
 ### Proactive checks and the Now screen
@@ -247,7 +247,7 @@ The internal documents (`docs/`, `AGENTS.md`, commit messages) are written in Ko
 How this project uses Hermes is described in [`hermes/docs/hermes-contract.md`](hermes/docs/hermes-contract.md).
 
 - [`AGENTS.md`](AGENTS.md) has the rules of the repository, including what must never be written into a public repository.
-- [`docs/README.md`](docs/README.md) is the index of all documents.
+- The reading order of the documents is in the 「읽기 순서」 section of [`AGENTS.md`](AGENTS.md). Each module keeps its documents in its own `docs/` directory.
 - [`docs/adr/INDEX.md`](docs/adr/INDEX.md) lists the decisions that are hard to reverse.
 - Run `scripts/check-local.sh` before pushing, passing the browser specs for the screens you changed; with no arguments it runs the whole browser suite. Merge decisions use the required PR CI checks run against the current main merged with the PR. If CI cannot run, run the full local checks. See the 「확인」 section of [`AGENTS.md`](AGENTS.md).
 

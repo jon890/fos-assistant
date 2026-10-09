@@ -10,7 +10,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** 승인 줄과 상시 허락 경로의 요청과 응답 모양이다. 계약은 {@code docs/connectors.md} 의 「승인」 이 갖는다. */
+/** 승인 줄과 상시 허락 경로의 요청과 응답 모양이다. 계약은 {@code backend/docs/flow.md} 의 「커넥터 승인」 이 갖는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ConnectorActionDtos {
 
