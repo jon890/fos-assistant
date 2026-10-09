@@ -51,8 +51,8 @@
 
 ### 헤딩이 겹칠 때
 
-한 기능 파일에 같은 헤딩 글(정규화 뒤)이 둘 이상 생기면, B 에서 온 헤딩은 그대로 두고 다른 원재료에서 온 헤딩 끝에 원재료 표시를 공백 없이 괄호로 붙인다(원재료의 `설정(사용자 실행 한도)` 와 같은 꼴): WP 는 `(화면)`, WF 는 `(화면 흐름)`, RF 는 `(전체 흐름)`, RP 는 `(제품 범위)`.
-파일 제목(`#`)은 위 표의 제목을 쓰며 본문 헤딩과 겹치지 않게 정했다. 원재료가 바뀌어 제목이 본문 헤딩과 겹치면 제목을 바꾸고 원재료 헤딩은 건드리지 않는다. `test/unit/doc-references.test.ts` 의 `duplicateHeadings` 는 단계가 달라도 글이 같으면 중복으로 센다. 둘 다 B 가 아니면 뒤에 오는 쪽에 붙인다.
+한 기능 파일에 같은 헤딩 글(정규화 뒤)이 둘 이상 생기면, B 에서 온 헤딩은 그대로 두고 다른 원재료에서 온 헤딩 끝에 원재료 표시를 공백 없이 괄호로 붙인다(원재료의 `설정(사용자 실행 한도)` 와 같은 꼴): WP 는 `(화면)`, WF 는 `(화면 흐름)`, RF 는 `(전체 흐름)`, RP 는 `(제품 범위)`. 둘 다 B 가 아니면 뒤에 오는 쪽에 붙인다.
+파일 제목(`#`)은 위 표의 제목을 쓰며 본문 헤딩과 겹치지 않게 정했다. 원재료가 바뀌어 제목이 본문 헤딩과 겹치면 제목을 바꾸고 원재료 헤딩은 건드리지 않는다. `test/unit/doc-references.test.ts` 의 `duplicateHeadings` 는 단계가 달라도 글이 같으면 중복으로 센다.
 붙인 뒤에도 겹치면 멈추고 `PHASE_BLOCKED: 헤딩 중복 <파일> 「<글>」` 을 낸다.
 
 ## 의도 메모
@@ -68,7 +68,7 @@
 
 1. 원재료 다섯 파일을 코드 펜스를 건너뛰며 헤딩 단위로 자르고, 위 표대로 15개 파일에 붙인다. 옮긴 줄 수를 원재료별로 세어, 「원재료 줄 수 − 옮기지 않은 머리와 RP 에 남는 절 = 기능 파일에 들어간 원재료 줄」 이 맞는지 스크립트로 확인한다. 이 대조는 작업 항목 1 직후, 참조를 고치기 전의 스크립트 산출에서 한다. 기능 파일 쪽에서는 새 파일 머리와 더한 헤딩 줄(`execution.md` 의 `## 실행 기록`)을 빼고 센다.
 2. `git rm backend/docs/flow.md web/docs/flow.md web/docs/prd.md docs/flow.md` 하고, `docs/prd.md` 에서 옮긴 네 절을 지운다.
-3. 옮긴 본문의 상대 링크를 고친다. 링크에 앵커(`#…`)가 있으면 앵커가 가리키는 헤딩으로 대응표에서 새 파일을 찾고, 헤딩 이름이 바뀌었으면 앵커도 다시 만든다(`doc-links` 시험은 앵커를 보지 않으므로, 옮긴 뒤 앵커가 그 파일의 헤딩 slug 와 맞는지 scratchpad 스크립트로 대조해 0건을 확인한다). 링크 대상을 원래 파일 자리 기준으로 풀어 저장소 경로를 얻고, `docs/features/` 기준 상대 경로로 다시 쓴다. 대상이 옮긴 문서(옛 파일 넷, 또는 RP 의 옮긴 절)면 뒤에 붙은 「절」 로 대응표에서 새 파일과 새 절 이름을 찾는다. 같은 기능 파일이면 `](<같은 파일>.md)` 로 쓴다.
+3. 옮긴 본문의 상대 링크를 고친다. 링크에 앵커(`#…`)가 있으면 앵커가 가리키는 헤딩으로 대응표에서 새 파일을 찾고, 헤딩 이름이 바뀌었으면 앵커도 다시 만든다(`doc-links` 시험은 앵커를 보지 않으므로, 작업 항목 4 까지 끝낸 뒤 저장소 전체에서 `(flow|prd)\.md#` 와 `docs/features/*.md#` 앵커가 그 파일의 헤딩 slug 와 맞는지 scratchpad 스크립트로 대조해 어긋남 0건을 확인한다). 링크 대상을 원래 파일 자리 기준으로 풀어 저장소 경로를 얻고, `docs/features/` 기준 상대 경로로 다시 쓴다. 대상이 옮긴 문서(옛 파일 넷, 또는 RP 의 옮긴 절)면 뒤에 붙은 「절」 로 대응표에서 새 파일과 새 절 이름을 찾는다. 같은 기능 파일이면 `](<같은 파일>.md)` 로 쓴다.
 
 ### 2. 저장소 전체의 참조 고치기
 
@@ -97,11 +97,11 @@ node --test test/unit/doc-files.test.ts test/unit/doc-code-references.test.ts te
 node --test 'test/unit/**/*.test.ts'
 node scripts/check-file-length.mjs
 test -z "$(git ls-files backend/docs/flow.md web/docs/flow.md web/docs/prd.md docs/flow.md)"
-git grep -nE '(backend|web)/docs/(flow|prd)\.md|(^|[^/a-zA-Z])docs/flow\.md' -- ':!test/unit/doc-*.test.ts' ':!test/unit/file-length.test.ts' ':!tasks/' ':!docs/adr/' ':!*/docs/adr/'; test $? -eq 1
+git grep -nE '(backend|web)/docs/(flow|prd)\.md|(^|[^/a-zA-Z])docs/flow\.md' -- ':!test/unit/doc-*.test.ts' ':!test/unit/file-length.test.ts' ':!tasks/' ':!docs/adr/' ':!backend/docs/adr/' ':!web/docs/adr/' ':!hermes/docs/adr/'; test $? -eq 1
 (cd backend && ./gradlew checkstyleMain checkstyleTest spotlessCheck --quiet)
 (cd backend && ./gradlew test --tests '*.AttentionControlServiceTest' --tests '*.AttentionJudgeTest' --tests '*.AttentionMetricsServiceTest' --tests '*.AttentionServiceTest' --tests '*.FollowUpAttentionSourceTest' --tests '*.SurfacedProblemCandidatesTest' --tests '*.BrowserGatewayTest' --tests '*.GatewayRewriterTest' --tests '*.UserBrowserServiceTest' --tests '*.BrowserPropertiesTest' --tests '*.BrowserGatewayControllerTest' --tests '*.BrowserGatewayHandshakeTest' --tests '*.BrowserGatewaySocketTest' --tests '*.UserBrowserControllerTest' --tests '*.UserBrowserScreenControllerTest' --tests '*.ConnectorActionDeliveryTest' --tests '*.MemoryUseServiceTest' --tests '*.ResultDeliveryRetryTest' --tests '*.ApprovalNotificationTest' --tests '*.ConnectorActionServiceTest' --tests '*.ConnectorPolicyEndpointTest' --tests '*.ConnectorPolicyRequestTest' --tests '*.MemoryRecallEvalTest' --tests '*.FollowUpProposalTest' --tests '*.FollowUpServiceTest' --tests '*.ToolDetailRedactorTest' --tests '*.McpFollowUpToolTest' --tests '*.McpMemoryRememberToolTest' --tests '*.NotificationServiceTest' --tests '*.SurfacedProblemsTest' --tests '*.TaskControllerTest' --tests '*.TaskFiringTest' --tests '*.TaskRunRecoveryTest' --tests '*.TaskRunStarterTest' --tests '*.TaskScheduleTest' --tests '*.TaskServiceTest')
 node --test test/unit/artifact-attachment-route.test.ts test/unit/attention.test.ts test/unit/pr-risk-labels.test.ts
-(cd web && pnpm format:check)
+(cd web && pnpm install --frozen-lockfile && pnpm format:check)
 (cd hermes && python3 -m pytest -q tests/test_read_data_flow.py tests/test_fos_ctx.py)
 ```
 
