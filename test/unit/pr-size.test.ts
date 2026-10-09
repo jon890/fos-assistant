@@ -42,7 +42,7 @@ test("시험과 문서는 별도로 표시하고 운영 코드만 상한에 넣�
   for (const file of tests) assert.equal(category(file), "tests", file);
   for (const file of docs) assert.equal(category(file), "docs", file);
   for (const file of production) assert.equal(category(file), "production", file);
-  const counts = countChanges("400\t0\tweb/src/app.ts\0" + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/README.md\0");
+  const counts = countChanges("400\t0\tweb/src/app.ts\0" + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/prd.md\0");
   assert.deepEqual(counts, { production: 400, tests: 6000, docs: 7000, ignored: 0 });
   assert.deepEqual(classify(counts.production), { large: false, pass: true });
   assert.deepEqual(countChanges("1\t2\t\0scripts/check.sh\0test/check.sh\0"), { production: 3, tests: 0, docs: 0, ignored: 0 });

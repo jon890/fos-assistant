@@ -34,7 +34,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 승인 줄의 승인과 거절, 승인한 호출의 실행, 상시 허락, 만료를 맡는다(ADR-050).
  *
- * <p>계약은 {@code docs/connectors.md} 의 「승인」 이 갖는다. 줄의 주인만 다룬다. 남의 줄은 관리자에게도 없는 줄과 같은
+ * <p>계약은 {@code backend/docs/flow.md} 의 「커넥터 승인」 이 갖는다. 줄의 주인만 다룬다. 남의 줄은 관리자에게도 없는 줄과 같은
  * 응답이다. 인자 원문과 실행 결과는 로그에 싣지 않는다.
  *
  * <p>한 번만 실행하는 것은 두 가지로 지킨다. {@code PENDING} 에서 {@code EXECUTING} 으로 가는 전이를 행 잠금 아래에서

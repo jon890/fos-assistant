@@ -300,7 +300,7 @@ class McpMemoryRememberToolTest {
     @Test
     @DisplayName("붙은 커넥터의 READ 도구를 시작한 대화의 기억은 근거가 질문에 있어도 제안이다")
     void proposesAfterConnectorReadTool() throws Exception {
-        // docs/read-data-flow.md 의 RF-13 이다. 메일 본문의 숨은 지시가 사용자의 말을 근거로 내세워도 바로 저장되지 않는다.
+        // docs/flow.md 의 RF-13 이다. 메일 본문의 숨은 지시가 사용자의 말을 근거로 내세워도 바로 저장되지 않는다.
         askedInThisTurn();
         toolStarted("mcp__gmail__get_message");
 
