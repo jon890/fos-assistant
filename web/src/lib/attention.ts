@@ -1,7 +1,7 @@
 /**
  * 지금 화면이 읽는 `GET /api/v1/attention` 응답의 모양과, 그 응답을 화면 글로 바꾸는 순수 함수다.
  *
- * <p>칸은 `docs/backend/attention.md` 의 「API」 가 정한다. 문구는 `web/docs/prd.md` 의 「카드」 와 「이유 문구」 표 그대로다.
+ * <p>칸은 Control Plane 의 `AttentionDtos` 가 정한다. 문구는 `web/docs/prd.md` 의 「카드」 와 「이유 문구」 표 그대로다.
  * 이유 문구를 서버가 보내지 않고 여기서 정하는 것은 모델이 쓴 글로 이유를 만들지 않기 위해서다.
  *
  * <p>단위 테스트가 `node --test` 로 직접 읽으므로 다른 모듈을 import 하지 않는다.
@@ -173,7 +173,7 @@ export function allCardsEmpty(cards: AttentionCard[]): boolean {
 }
 
 /**
- * 제목 링크가 갈 원래 기록이다. `docs/backend/attention.md` 의 「카드의 단추와 승인 경계」 를 따른다.
+ * 제목 링크가 갈 원래 기록이다. `backend/docs/flow.md` 의 「카드의 단추와 승인 경계」 를 따른다.
  *
  * @returns 갈 곳이 없으면 `null`
  */

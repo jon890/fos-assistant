@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
  * 적용하고 끝난 뒤 기동 값으로 되돌린다. 컨텍스트는 새로 뜨지 않는다. 검사 클래스와 그 상위 클래스, 메타 주석의 값을 모두 모으고, 같은 키는
  * 검사 클래스에 가까운 값이 이긴다.
  *
- * <p>{@code LiveProperties} 로 읽지 않는 키를 적으면 적용할 때 실패한다. 쓰는 법은 {@code docs/backend/testing.md} 「설정 바꾸기」
+ * <p>{@code LiveProperties} 로 읽지 않는 키를 적으면 적용할 때 실패한다. 쓰는 법은 {@code backend/docs/code-architecture.md} 「설정 바꾸기」
  * 가 갖는다.
  */
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})

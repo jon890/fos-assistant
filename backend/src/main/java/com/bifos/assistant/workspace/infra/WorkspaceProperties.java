@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * 실행 공간 파일의 설정이다({@code docs/code-architecture.md} 의 「실행 공간 파일」).
+ * 실행 공간 파일의 설정이다({@code backend/docs/code-architecture.md} 의 「실행 공간 파일」).
  *
  * <p>두 값 모두 비어 있어도 기동한다.
  *

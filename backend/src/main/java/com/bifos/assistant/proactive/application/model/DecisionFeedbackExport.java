@@ -23,14 +23,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 판단 피드백의 offline replay 읽기 모델이다. 상황, 후보, 판단, 정책, 사용자 반응, 실행 결과를 결정 하나로 묶는다. 칸의 뜻은 {@code
- * docs/backend/decision-feedback.md} 의 「replay 읽기 모델」 이 갖는다.
+ * 판단 피드백의 offline replay 읽기 모델이다. 상황, 후보, 판단, 정책, 사용자 반응, 실행 결과를 결정 하나로 묶는다. 이 모양이 그대로 API
+ * 계약이다. 사건을 결정에 묶는 순서는 {@code backend/docs/flow.md} 의 「replay 읽기 모델」 이 갖는다.
  *
  * <p>모델이 쓴 글(후보의 문제와 행동, 축의 설명), 할 일 제목, Memory 본문, 커넥터 인자와 결과는 싣지 않는다. 번호, 열쇠, 해시, 판단 값만
  * 싣는다.
  *
- * @param version 이 모양의 버전
+ * @param version 이 모양의 버전. 모양이 바뀌면 {@link #VERSION} 을 올린다
  * @param labelVersion 반응 읽기 규칙의 버전
+ * @param from 읽은 기간의 시작
+ * @param to 읽은 기간의 끝
  */
 public record DecisionFeedbackExport(
         int version, int labelVersion, Instant from, Instant to, List<DecisionRecord> records) {

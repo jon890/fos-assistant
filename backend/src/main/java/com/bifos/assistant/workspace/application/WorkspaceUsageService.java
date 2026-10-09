@@ -32,7 +32,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
- * 관리자가 보는 실행 공간별 용량을 요청할 때 센다. 계약은 {@code docs/code-architecture.md} 의 「관리자 용량」 이 갖는다.
+ * 관리자가 보는 실행 공간별 용량을 요청할 때 센다. 계약은 {@code backend/docs/code-architecture.md} 의 「관리자 용량」 이 갖는다.
  *
  * <p>루트 바로 아래에서 이름이 {@code u<번호>} 나 {@code a<번호>} 이고 링크가 아닌 디렉터리만 센다. 번호가 0 으로 시작하면 세지 않는다.
  * 공간마다 항목 수 상한과 요청 전체의 시간 상한이 있다. 결과와 로그에 파일 이름과 경로를 싣지 않는다.

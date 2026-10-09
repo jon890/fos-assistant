@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 요청자의 실행 공간 디렉터리 {@code u<사용자 번호>} 를 읽는다. 계약은 {@code docs/code-architecture.md} 의 「실행 공간 파일」 이 갖는다.
+ * 요청자의 실행 공간 디렉터리 {@code u<사용자 번호>} 를 읽는다. 계약은 {@code backend/docs/code-architecture.md} 의 「실행 공간 파일」 이 갖는다.
  *
  * <p>주인 디렉터리는 요청자로만 정한다. 요청 값은 그 디렉터리 안의 상대 경로뿐이다. 읽기의 오류 로그에는 사용자 번호와 예외 종류만
  * 남기고 경로를 남기지 않는다. 지우기는 도우미의 결과마다 경로를 포함한 {@code INFO} 로그 한 줄을 남긴다.

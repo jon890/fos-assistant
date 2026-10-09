@@ -54,7 +54,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * 커넥터 도구 호출 하나를 판정하고 {@code connector_action} 에 한 줄을 남긴다(ADR-049).
  *
- * <p>순서는 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 이 갖는다. 줄을 남기지 않는 호출은 두 가지다. 실행이나 연결을
+ * <p>순서는 {@code backend/docs/flow.md} 의 「도구 호출 판정」 이 갖는다. 줄을 남기지 않는 호출은 두 가지다. 실행이나 연결을
  * 찾지 못한 호출은 줄에 적을 사용자와 에이전트를 알 수 없어서이고, 같은 키로 다른 도구나 다른 인자를 보낸 호출은 키가
  * 유니크라 새 줄을 만들 수 없어서다.
  *

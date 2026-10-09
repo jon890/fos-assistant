@@ -28,7 +28,7 @@ import org.hibernate.type.SqlTypes;
 /**
  * 커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다(ADR-049, ADR-050).
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/connector.md} 의 「connector_action」 이 갖는다. 허용과 거절도 한 줄씩 남긴다. 사용자와
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「connector_action」 이 갖는다. 허용과 거절도 한 줄씩 남긴다. 사용자와
  * 에이전트는 번호로만 둔다. 실행과 대화는 지워져도 이 줄을 남기므로 외래 키를 걸지 않는다.
  */
 @Entity

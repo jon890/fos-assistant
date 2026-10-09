@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 /**
  * 결과 항목 하나의 출처 머리줄과 신선도를 만든다(ADR-071).
  *
- * <p>형식은 {@code docs/backend/context-bundle.md} 의 「Hermes 에 넘기는 형식」 이 갖는다. 자동 turn 과 다시 전달이 같은 함수로
- * 머리줄을 만들어, 몇 시간 뒤에 다시 전한 결과도 같은 형식으로 오래됐다고 알린다.
+ * <p>머리줄의 칸과 시각 형식, {@code FAILED} 일 때 붙는 오류 칸과 복구 안내, 신선도 안내 줄은 이 클래스가 갖는다. 자동 turn 과
+ * 다시 전달이 같은 함수로 머리줄을 만들어, 몇 시간 뒤에 다시 전한 결과도 같은 형식으로 오래됐다고 알린다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ResultHeader {

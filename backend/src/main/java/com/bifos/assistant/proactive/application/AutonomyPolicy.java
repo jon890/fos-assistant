@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 /**
  * 후보마다 행동 수준을 정한다(ADR-20261007 autonomy-policy). DB 와 모델을 모르는 함수다.
  *
- * <p>규칙은 {@code docs/backend/autonomy-policy.md} 의 「까닭 코드와 수준」 표와 같다. 모델이 쓴 값(확신, 부작용 힌트, 축 판단)은 까닭을
+ * <p>규칙은 {@code backend/docs/flow.md} 의 「까닭 코드와 수준」 표와 같다. 모델이 쓴 값(확신, 부작용 힌트, 축 판단)은 까닭을
  * 더할 수만 있다. 수준을 올리는 입력은 모두 Control Plane 의 기록이다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

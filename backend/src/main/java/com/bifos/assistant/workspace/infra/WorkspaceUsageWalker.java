@@ -15,7 +15,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
- * 실행 공간 디렉터리 하나의 용량을 센다. 규칙은 {@code docs/code-architecture.md} 의 「관리자 용량」 이 갖는다.
+ * 실행 공간 디렉터리 하나의 용량을 센다. 규칙은 {@code backend/docs/code-architecture.md} 의 「관리자 용량」 이 갖는다.
  *
  * <p>{@link WorkspaceTree} 처럼 링크를 따라가지 않는다. 링크는 항목으로 세되 크기에 넣지 않고, 일반 파일만 크기에 더한다. 읽지 못한
  * 디렉터리는 건너뛰고 일부만 센 것으로 둔다. 결과에 파일 이름과 경로를 싣지 않는다.

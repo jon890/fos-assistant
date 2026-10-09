@@ -32,7 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-/** 관리자 용량 경로의 권한과 응답 모양을 HTTP 경계에서 본다. 계약은 {@code docs/code-architecture.md} 의 「관리자 용량」 이다. */
+/** 관리자 용량 경로의 권한과 응답 모양을 HTTP 경계에서 본다. 계약은 {@code backend/docs/code-architecture.md} 의 「관리자 용량」 이다. */
 @BackendIntegrationTest
 class WorkspaceAdminControllerTest {
 

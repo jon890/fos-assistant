@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * 한 사용자가 Hermes 에 동시에 맡긴 실행의 수를 센다(ADR-069, {@code docs/backend/execution-limit.md}).
+ * 한 사용자가 Hermes 에 동시에 맡긴 실행의 수를 센다(ADR-069, {@code backend/docs/flow.md}).
  *
  * <p>사용자가 쥔 자리는 turn 자리, 원격 종료 확인 자리, 대화 turn 의 루트가 아닌 {@code RUNNING} 실행 줄의 합이다. 판정과
  * 자리 만들기는 사용자 잠금 하나 안에서 한다. turn 자리와 실행 줄을 각자 세고 각자 만들면 두 경로가 나란히 통과해 합이 한도를

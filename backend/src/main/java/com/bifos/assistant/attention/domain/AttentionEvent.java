@@ -23,7 +23,7 @@ import lombok.experimental.Accessors;
 /**
  * 먼저 알리기의 지표 사건 한 줄이다.
  *
- * <p>칸의 뜻은 {@code docs/backend/schema/attention.md} 의 「attention_event」 가 갖는다. 같은 사용자, 항목, 상태, 사건 종류, 판정에 한
+ * <p>칸의 뜻은 {@code backend/docs/data-schema.md} 의 「attention_event」 가 갖는다. 같은 사용자, 항목, 상태, 사건 종류, 판정에 한
  * 줄만 남긴다. 같은 상태에서 {@code LATER} 가 {@code NOW} 로 바뀌면 {@code NOW} 의 줄이 따로 남는다. 제목과 본문을 담지 않는다.
  */
 @Entity

@@ -1,6 +1,7 @@
 /**
  * 로그인 화면의 포인터와 키를 `POST /api/browser/screen/input` 본문으로 바꾼다.
- * 칸과 범위는 `docs/backend/user-browser.md` 의 「로그인 화면」 이 정한다.
+ * 본문 모양은 아래 `ScreenInput` 이 갖는다. 서버는 같은 칸과 범위를 `UserBrowserDtos.ScreenInputRequest` 에서 검사하므로
+ * 상한을 바꾸면 함께 고친다.
  */
 
 export type ScreenInput =

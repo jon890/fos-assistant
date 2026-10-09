@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 관리자가 실행 공간마다 용량을 보는 경로다. 파일 이름과 경로는 주지 않는다.
  *
- * <p>{@code ADMIN} 만 부른다. 계약은 {@code docs/code-architecture.md} 의 「관리자 용량」 이 갖는다.
+ * <p>{@code ADMIN} 만 부른다. 계약은 {@code backend/docs/code-architecture.md} 의 「관리자 용량」 이 갖는다.
  */
 @RestController
 @RequestMapping("/api/v1/admin/workspaces")

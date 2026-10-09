@@ -43,7 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * 실제 HTTP 경계에서 할 일 제안 도구 {@code follow_up_propose} 의 계약을 확인한다. 계약은 {@code docs/backend/follow-up.md} 의
+ * 실제 HTTP 경계에서 할 일 제안 도구 {@code follow_up_propose} 의 계약을 확인한다. 계약은 {@code backend/docs/flow.md} 의
  * 「제안 도구」 가 갖는다.
  *
  * <p>토큰은 이 검사의 profile 에 묶이고, 도구 호출은 그 profile 로 아빠의 대화에서 도는 실행 루트로 서명한다(ADR-032).

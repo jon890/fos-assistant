@@ -1,4 +1,4 @@
-/** 에이전트가 받는 Memory 영역의 관리 화면 값이다. 칸의 뜻은 `docs/backend/memory.md` 가 갖는다. */
+/** 에이전트가 받는 Memory 영역의 관리 화면 값이다. 칸의 뜻은 `backend/docs/flow.md` 가 갖는다. */
 
 export type AgentMemoryCollection = {
   key: string;

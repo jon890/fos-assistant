@@ -62,5 +62,5 @@
     - 새 최상위 패키지를 만들 때마다 순서의 어느 자리인지 정해야 한다.
     - `people` 은 MCP 토큰을 발급하므로 `mcp` 보다 위에 있어야 한다.
     - `chat` 이 흐름의 계약과 추천 질문까지 가져 더 커진다.
-- **적용 범위**: `backend/src/main/java/com/bifos/assistant` 의 최상위 패키지. 패키지마다 맡는 책임은 [`backend/packages.md`](../../../docs/backend/packages.md) 가, 검사는 `ArchitectureRules.java` 가 갖는다.
+- **적용 범위**: `backend/src/main/java/com/bifos/assistant` 의 최상위 패키지. 패키지마다 맡는 책임은 [`backend/docs/code-architecture.md`](../code-architecture.md) 가, 검사는 `ArchitectureRules.java` 가 갖는다.
   패키지 안의 층 방향(`presentation`, `application`, `infra`, `domain`)은 이 결정과 따로이고 `LAYER_DIRECTION` 이 검사한다.

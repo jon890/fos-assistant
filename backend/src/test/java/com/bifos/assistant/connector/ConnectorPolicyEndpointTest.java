@@ -59,7 +59,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * 실제 HTTP 경계에서 커넥터 도구 호출 판정 경로의 인증과 판정과 기록을 확인한다(ADR-049).
  *
- * <p>계약은 {@code docs/backend/connector-tool-policy.md} 의 「도구 호출 판정」 이다. 본문 서명은 운영 코드가 아니라 {@link McpCallSigner}
+ * <p>계약은 {@code backend/docs/flow.md} 의 「도구 호출 판정」 이다. 본문 서명은 운영 코드가 아니라 {@link McpCallSigner}
  * 가 따로 계산한다. 카탈로그는 대역이 내고, 보관 시간에 걸리지 않게 검사마다 시계를 보관 시간보다 멀리 옮긴다.
  */
 @BackendIntegrationTest

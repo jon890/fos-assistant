@@ -43,7 +43,7 @@
     - 사용자가 멈추지 않았어도 Hermes 가 run 을 `cancelled` 로 끝내면 실행이 `CANCELLED` 로 적혀 같이 거절된다
     - 취소한 origin 의 자식도 등록은 받는다. 그 자식의 호출이 판정에서 거절된다
     - 플러그인이 `subagent_start` hook 을 보내야 한다. 배치와 확인은 `fos-home-infra` 가 갖는다
-- **적용 범위**: ADR-032 의 「도는 부모 실행 하나를 찾는다」 는 최상위 session 에만 남고, 하위 에이전트 session 은 이 결정을 따른다. ADR-031 의 `_fos_ctx` 서명할 글과 key 는 그대로다. 등록 경로의 계약과 오류 코드는 [`hermes/plugins/fos-ctx/README.md`](../../../hermes/plugins/fos-ctx/README.md#하위-에이전트-session-등록-계약) 에, 저장 모델은 [`docs/backend/schema/execution.md`](../../../docs/backend/schema/execution.md#hermes_session_binding) 에 있다.
+- **적용 범위**: ADR-032 의 「도는 부모 실행 하나를 찾는다」 는 최상위 session 에만 남고, 하위 에이전트 session 은 이 결정을 따른다. ADR-031 의 `_fos_ctx` 서명할 글과 key 는 그대로다. 등록 경로의 계약과 오류 코드는 [`hermes/plugins/fos-ctx/README.md`](../../../hermes/plugins/fos-ctx/README.md#하위-에이전트-session-등록-계약) 에, 저장 모델은 [`backend/docs/data-schema.md`](../data-schema.md#hermes_session_binding) 에 있다.
 
 ### 판정 순서
 

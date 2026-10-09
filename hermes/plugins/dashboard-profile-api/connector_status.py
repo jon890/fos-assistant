@@ -98,7 +98,7 @@ def _tool_map_drift(profile_dir: pathlib.Path, state: dict) -> set[str] | None:
 def _policy_hook_failure(profile_dir: pathlib.Path, config: dict, state: dict, drift=_UNSET) -> str | None:
     """그 profile 에서 커넥터 도구 호출이 정책 hook 을 거치지 않는 첫 조건의 이름이다. 모두 통과하면 `None` 이다.
 
-    조건은 `docs/backend/connector-tool-policy.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
+    조건은 `backend/docs/flow.md` 의 「hook 이 켜져 있는지」 가 갖는다. 확인한 시점의 파일만 본다.
     `drift` 는 같은 요청에서 이미 계산한 `_tool_map_drift` 의 값이다. 주지 않으면 여기서 계산한다.
 
     - `plugin_config`: 설정이 `fos-ctx` 를 켜지 않았거나 도구 덮어쓰기를 막지 않는다

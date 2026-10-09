@@ -78,7 +78,7 @@ grep -rn 'style={{' web/src/
 | 실행 트리 | 작업 과정 |
 | 하위 에이전트 | 도우미 |
 | 설정 지문 | 설정별 사용량. 비교는 「설정 차이」, 값은 「설정 구분값」 |
-| provider | 모델 제공사. 표시 규칙은 [`../docs/model-tiers.md`](../docs/model-tiers.md) 가 갖는다 |
+| provider | 모델 제공사. 표시 규칙은 [`backend/docs/flow.md`](../backend/docs/flow.md) 가 갖는다 |
 | Hermes API 주소 | 에이전트 연결 주소 |
 | credential 범위 | AI 계정 사용 범위 |
 | Hermes profile | profile (관리자 영역에서만) |
@@ -106,7 +106,7 @@ grep -rn 'style={{' web/src/
 ### 파일 길이
 
 파일 길이는 언어 공통 검사로 강제한다. 범위, 상한, 기준 목록과 갱신 방법은
-[`../docs/backend/quality.md`](../docs/backend/quality.md)의 「파일 길이 기준 목록」이 갖는다.
+[`backend/docs/code-architecture.md`](../backend/docs/code-architecture.md)의 「파일 길이 기준 목록」이 갖는다.
 함수 길이 경고는 ESLint가 계속 검사한다.
 
 ### 상대 경로 import 예외

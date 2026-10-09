@@ -22,5 +22,5 @@
     - **Control Plane 한 대를 전제로 한다.** 사용자 단위 허브는 프로세스 메모리에 있다. 여러 대로 늘리면 사건을 나눠 줄 길이 따로 필요하다. 표는 이미 공유되므로 화면이 다시 읽으면 맞는다.
     - 알림은 정해 둔 기간이 지나면 지운다. 원인이 된 승인 줄과 실행 기록은 그대로 남으므로 지워도 사실은 잃지 않는다.
     - 알림을 만들다 실패하면 원인의 저장도 되돌린다. 알림 표 하나가 승인 저장의 실패 원인이 될 수 있다.
-- **적용 범위**: 알림 종류, API, 화면은 [`backend/notification.md`](../backend/notification.md) 가, 칸은 [`backend/schema/notification.md`](../backend/schema/notification.md) 가 갖는다.
+- **적용 범위**: 알림 종류, API, 화면은 [`backend/docs/flow.md`](../../backend/docs/flow.md) 가, 칸은 [`backend/docs/data-schema.md`](../../backend/docs/data-schema.md) 가 갖는다.
   커넥터 재연결이 필요하다는 알림과 외부 채널은 이 결정의 다음 단계다.

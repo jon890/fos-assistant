@@ -57,7 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 시작한다.
  *
  * <p>판정과 실행 키는 한 트랜잭션에 저장하고, 커밋한 뒤 트랜잭션 밖에서 시작한다. 시작은 기존 살펴보기 경로의 검사를 모두 다시 거친다. 순서와
- * 실패 처리는 {@code docs/backend/autonomy-policy.md} 의 「자동 실행」 이 갖는다.
+ * 실패 처리는 {@code backend/docs/flow.md} 의 「자동 실행」 이 갖는다.
  */
 @Slf4j
 @Service

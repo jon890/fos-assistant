@@ -29,7 +29,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 운영의 권한 도우미를 unix socket 으로 불러 지운다. 계약은 {@code docs/code-architecture.md} 의 「지우기」 가 갖는다.
+ * 운영의 권한 도우미를 unix socket 으로 불러 지운다. 계약은 {@code backend/docs/code-architecture.md} 의 「지우기」 가 갖는다.
  *
  * <p>요청 하나에 연결 하나다. 연결과 쓰기와 읽기를 합쳐 제한 시간 안에 끝내지 못하면 채널을 닫는다. 제한 시간은 non-blocking 채널과
  * {@link Selector} 로 건다.
