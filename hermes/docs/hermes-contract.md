@@ -1668,12 +1668,20 @@ proxy 검사와 유휴 정리, 복구는 이 label 로 정책의 profile 을 식
 | `/workspace` | `<sandbox dir>/docker/<task id>/workspace`. `docker_volumes` 에 `:/workspace` 가 있으면 그것 | 쓴다 |
 | `/root/.hermes/skills` | 그 profile 의 `skills/` | 읽기 전용 |
 | `/root/.hermes/external_skills/<n>` | `skills.external_dirs` | 읽기 전용 |
+| `<FOS_ASSISTANT_SKILL_AGENT_ROOT>/<profile>`(Hermes 와 같은 경로) | 정책에 `skill_root` 가 있고 그 profile 의 스킬 디렉터리가 있을 때 plugin 이 붙인다. 그 profile 의 모든 스킬 버전이다. scripts 가 있는지는 보지 않으므로, `skill_root` 를 넣은 뒤에는 스킬 디렉터리가 있는 profile 마다 다음 셸 설정 쓰기에서 컨테이너 키가 한 번 바뀐다 | 읽기 전용 |
 | `/root/.hermes/cache/*`, `images`, `attachments` | 그 profile 의 media cache | 읽기 전용 |
 | `/root/.hermes/<상대 경로>` | `terminal.credential_files` 와 스킬이 선언한 `required_credential_files` | 읽기 전용 |
 | `<connector_output_root>/users/<sha256(주인)>/<profile>`(같은 경로) | 정책에 그 키가 있을 때 plugin 이 붙인다. 커넥터가 계산할 목록을 쓴다 | 읽기 전용 |
 | `docker_volumes` 의 나머지 | 운영자가 정한 것 | 적힌 대로 |
 
 `/workspace` 와 `/root` 밖의 파일 시스템은 이미지의 것이고 컨테이너를 지우면 사라진다.
+
+**`external_skills/<n>` 는 컨테이너를 만들 때의 버전 디렉터리다.**
+Hermes 는 컨테이너를 만들 때만 `skills.external_dirs` 를 붙이고(`tools/environments/docker.py` 의 `_readonly_skill_mount_args`), 컨테이너 키의 지문에는 스킬 경로가 없다.
+그래서 스킬을 다시 게시해도 같은 컨테이너는 옛 버전을 보고, 그 버전이 정리되면 빈 디렉터리를 본다.
+또 `skill_view` 가 모델에게 주는 `skill_dir` 는 Hermes 쪽 경로다(`tools/skills_tool.py`). 실행 공간에는 그 경로가 없다.
+올린 스킬의 스크립트는 이 마운트에 기대지 않고, plugin 이 profile 스킬 디렉터리를 Hermes 와 같은 경로에 붙인 것으로 돈다([ADR-20261009 / skill-package](../../docs/adr/ADR-20261009-skill-package.md)).
+`skill_view` 의 `linked_files` 는 `scripts/` 바로 아래의 `*.py`, `*.sh`, `*.bash`, `*.js`, `*.ts`, `*.rb` 만 보인다. 다른 파일도 경로로 부르면 돈다.
 
 **마운트 원본 경로는 Docker daemon 쪽 경로로 해석된다.**
 Hermes 가 컨테이너 안에서 Docker 를 부르면 `-v` 의 원본은 Hermes 컨테이너의 경로가 아니라 Docker 호스트의 경로다.

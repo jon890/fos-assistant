@@ -243,6 +243,47 @@ class ProfileApiToolconfigTest(support.ProfileApiRouteTest):
         # 스킬 루트가 없어도 도구 목록 쓰기는 그대로 된다.
         self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.toolset_body()), 200)
 
+    def sandboxed_skills_body(self, version, toolsets=("delegation", "fos-assistant", "skills", "terminal")):
+        """`scripts/` 가 든 스킬 게시처럼 지금 도구 목록과 `require_sandbox: true` 를 함께 보낸다."""
+        body = self.skills_body([version], list(toolsets) if toolsets is not None else None)
+        body["sandbox_owner"] = "user-1"
+        body["require_sandbox"] = True
+        return body
+
+    def test_sandboxed_skill_publish_writes_skill_dirs_and_mounted_terminal(self):
+        """셸 도구, 등록된 profile, `skill_root` 가 모두 있으면 스킬 경로와 스킬 마운트가 든 terminal 을 함께 쓴다."""
+        self.set_sandbox_policy(self.sandbox_policy(skill_root=self.skill_host_root))
+        version = self.make_skill_version("owner", "v1")
+
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=self.sandboxed_skills_body(version)), 200)
+
+        saved = self.saved_config()
+        self.assertEqual(saved["skills"]["external_dirs"], [version])
+        self.assertEqual(saved["terminal"], self.expected_terminal(
+            "user-1", ["/srv/shared:/opt/shared", "/srv/owner-skills:/opt/owner-skills"], skill_mount=True))
+
+    def test_sandboxed_skill_publish_is_unavailable_without_its_conditions(self):
+        """`require_sandbox` 인 스킬 게시는 셸 도구, 등록된 profile, `skill_root` 가운데 하나라도 없으면 409 다."""
+        version = self.make_skill_version("owner", "v1")
+        with_skill_root = self.sandbox_policy(skill_root=self.skill_host_root)
+        cases = [
+            ("policy without skill_root", self.sandbox_policy(), self.sandboxed_skills_body(version)),
+            ("no toolset list", with_skill_root, self.sandboxed_skills_body(version, toolsets=None)),
+            ("no shell toolset", with_skill_root,
+             self.sandboxed_skills_body(version, toolsets=("delegation", "fos-assistant", "skills"))),
+            ("unlisted profile", self.sandbox_policy(skill_root=self.skill_host_root, profiles={"alice": {}}),
+             self.sandboxed_skills_body(version)),
+        ]
+        path = self.root / "owner/config.yaml"
+        original = path.read_bytes()
+        for label, policy, body in cases:
+            with self.subTest(label=label):
+                self.set_sandbox_policy(policy)
+                response = self.request("/api/config", "PUT", token="valid", body=body, full_response=True)
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.body["code"], "sandbox_unavailable")
+                self.assertEqual(path.read_bytes(), original)
+
     def test_toolset_update_rejects_invalid_requests_without_writing(self):
         """잘못된 toolset 갱신 요청은 아무것도 쓰지 않고 거절한다."""
         cases = []
