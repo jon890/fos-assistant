@@ -35,13 +35,19 @@ Hermes 가 스킬을 읽는 방식은 [`hermes/skills.md`](../hermes/skills.md) 
 
 | 경로 | 하는 일 |
 | --- | --- |
-| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED" \| "HERMES", "enabled", "usage"? }], "editable", "skillsToolsetEnabled", "uploadLimit" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다. `uploadLimit` 은 올릴 수 있는 스킬 수의 한도다 |
-| `GET /api/v1/agents/{code}/skills/{name}` | 관리하는 사람만. 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이고 `size` 는 UTF-8 바이트다 |
+| `GET /api/v1/agents/{code}/skills` | `{ "skills": [{ "name", "description", "source": "UPLOADED", "enabled", "usage"? }], "editable", "skillsToolsetEnabled", "uploadLimit" }`. `usage`(`{count, lastInvokedAt}`)는 관리하는 사람에게만 준다. `uploadLimit` 은 올릴 수 있는 스킬 수의 한도다 |
+| `GET /api/v1/agents/{code}/skills/{name}` | 관리하는 사람만. 올린 스킬의 `{ "name", "description", "body", "files": [{ "path", "size", "content" }] }`. `body` 는 앞머리를 포함한 `SKILL.md` 원문이다. `size` 는 UTF-8 바이트이고 `content` 는 참고 파일 원문이다 |
 | `PUT /api/v1/agents/{code}/skills/{name}` | `{ "skillMd", "files": [{ "path", "content"? }] }` 로 스킬 하나를 통째로 바꾼다. 없으면 만든다. `content` 를 생략한 파일은 지금 버전의 같은 경로 내용을 그대로 둔다 |
 | `DELETE /api/v1/agents/{code}/skills/{name}` | 올린 스킬을 지운다 |
-| `PUT /api/v1/agents/{code}/skills/{name}/enabled` | 관리하는 사람만. `{ "enabled" }`. 대시보드의 스킬 켜고 끄기를 쓴다 |
+| `PUT /api/v1/agents/{code}/skills/{name}/enabled` | 관리하는 사람만. 올린 스킬만 받는다. `{ "enabled" }`. 기본·커넥터 스킬은 `SKILL_NOT_FOUND` 다 |
+| `GET /api/v1/admin/agents/{code}/skills` | 관리자만. 올린 스킬과 기본·커넥터 스킬 전체를 준다. 다른 사람의 비공개 에이전트도 읽는다 |
+| `PUT /api/v1/admin/agents/{code}/skills/{name}/enabled` | 관리자만. 기본·커넥터 스킬까지 켜고 끈다 |
 
-목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 전역 토글만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/skills.md`](../hermes/skills.md) 의 「스킬 커맨드와 API server」).
+일반 경로는 관리자 역할로 요청해도 `UPLOADED` 만 준다. Hermes 번들과 커넥터가 설치한 스킬의 이름·설명은 관리자 영역에서만 보인다.
+공개된 에이전트의 올린 스킬 목록은 그 에이전트를 쓸 수 있는 사람도 읽지만, 원문은 주인과 관리자만 읽는다.
+숨긴 스킬 이름과 새 스킬 이름이 겹치면 저장은 `SKILL_NAME_TAKEN` 으로 거절하고 화면은 다른 이름을 고르라고 안내한다.
+
+목록은 대시보드 `GET /api/skills?profile=` 에서 읽는다. 켜고 끄기는 지정한 profile 의 모든 platform 에 적용되는 `skills.disabled` 만 쓰고 `skills.platform_disabled.api_server` 는 쓰지 않는다([`hermes/skills.md`](../hermes/skills.md) 의 「스킬 커맨드와 API server」).
 출처는 Hermes 가 올린 스킬과 모델이 만든 로컬 스킬을 모두 `agent` 로 주므로 쓰지 않는다. 올린 스킬 이름이 `UPLOADED`, 나머지가 `HERMES` 다.
 올린 스킬 이름은 지금 버전과, 지금 버전보다 새로 쓰였지만 표식이 없는 버전에 있는 이름이다. 표식 없는 버전은 게시가 timeout 이나 5xx 로 끝난 것이라 Hermes 가 이미 가리키고 있을 수 있다.
 그 이름은 목록에서 올린 스킬로 보이고, 원문 읽기와 같은 이름으로 다시 저장하기와 지우기가 된다. 다시 저장할 때 본문을 생략한 파일은 그 버전의 내용을 쓴다. 지우면 지금 버전을 다시 게시해 Hermes 가 그 버전에서 벗어난다.
