@@ -15,6 +15,8 @@ import { useComposerState } from "./use-composer-state";
 import { useComposerModel } from "./use-composer-model";
 import { useComposerAttachments } from "./use-composer-attachments";
 import { useComposerInput } from "./use-composer-input";
+import { useComposerOutgoing } from "./use-composer-outgoing";
+import { useOutgoingNavigation } from "./use-outgoing-navigation";
 
 export function Composer(props: Props) {
   const composing = useRef(false);
@@ -46,7 +48,7 @@ export function Composer(props: Props) {
     setCaret,
     fileInputRef,
     sendDisabled,
-    uploading,
+    outgoing,
   } = state;
   const composerModel = useComposerModel({ ...state, ...props });
   const { saveModelChoice, saveModelTier } = composerModel;
@@ -55,13 +57,20 @@ export function Composer(props: Props) {
     ...props,
     ...composerModel,
   });
-  const { handleFiles, removeItem, trySend } = composerAttachments;
+  const { handleFiles, removeItem } = composerAttachments;
+  const { trySend } = useComposerOutgoing({
+    ...state,
+    ...props,
+    ...composerAttachments,
+  });
+  useOutgoingNavigation(outgoing !== null);
   const composerInput = useComposerInput({
     composing,
     ...state,
     ...props,
     ...composerModel,
     ...composerAttachments,
+    trySend,
   });
   const {
     changeValue,
@@ -216,7 +225,7 @@ export function Composer(props: Props) {
               accept={ACCEPTED_TYPES.join(",")}
               multiple
               hidden
-              disabled={disabled || running}
+              disabled={disabled || running || outgoing !== null}
               data-testid="attachment-input"
               onChange={(event) => void handleFiles(event)}
             />
@@ -225,7 +234,7 @@ export function Composer(props: Props) {
               variant="outline"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || running}
+              disabled={disabled || running || outgoing !== null}
               className="size-10 shrink-0 rounded-full"
             >
               <ImagePlus aria-hidden="true" className="size-5" />
@@ -253,14 +262,7 @@ export function Composer(props: Props) {
           size="icon"
           className="size-10 shrink-0 rounded-full"
         >
-          {uploading ? (
-            <LoaderCircle
-              aria-hidden="true"
-              className="size-4 animate-spin motion-reduce:animate-none"
-            />
-          ) : (
-            <ArrowUp aria-hidden="true" className="size-5" />
-          )}
+          <ArrowUp aria-hidden="true" className="size-5" />
         </TooltipButton>
       </div>
       {/* 알약 안에 두면 좁은 폭에서 입력칸이 줄어든다. 그래서 알약 아래 줄에 둔다. */}

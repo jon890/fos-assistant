@@ -77,8 +77,8 @@ class ChatTurnRunner {
             artifactStore.ensureFolder(conversation.id());
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
-            String input = artifacts.agentPreamble(conversation)
-                    + attachments.agentInput(conversation.id(), routed.attached(), asked);
+            AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked, true);
+            String input = artifacts.agentPreamble(conversation) + agentInput.text();
             // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
             AssembledContext context = routed.agent().connectorManaged()
                     ? AssembledContext.empty()
@@ -101,6 +101,7 @@ class ChatTurnRunner {
                         user,
                         routed,
                         input,
+                        agentInput.images(),
                         context,
                         snapshot,
                         ModelChoice.defaults(),
@@ -118,6 +119,7 @@ class ChatTurnRunner {
                     user,
                     routed,
                     input,
+                    agentInput.images(),
                     context,
                     snapshot,
                     choice,
@@ -204,7 +206,9 @@ class ChatTurnRunner {
             Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             String input = artifacts.agentPreamble(conversation)
-                    + attachments.agentInput(conversation.id(), routed.attached(), text);
+                    + attachments
+                            .agentInput(conversation.id(), routed.attached(), text, false)
+                            .text();
             AtomicReference<Long> rootExecutionId = new AtomicReference<>();
             ChatTurn turn;
             try {

@@ -2,7 +2,7 @@ name: Claude 코드 리뷰
 
 on:
   pull_request:
-    types: [opened]
+    types: [opened, ready_for_review]
   issue_comment:
     types: [created]
 
@@ -15,6 +15,7 @@ jobs:
       github.actor != 'dependabot[bot]' &&
       github.actor != 'claude[bot]' && (
         (github.event_name == 'pull_request' &&
+         github.event.pull_request.draft == false &&
          github.event.pull_request.head.repo.full_name == github.repository) ||
         (github.event_name == 'issue_comment' &&
          github.event.issue.pull_request != null &&
