@@ -145,7 +145,6 @@ Draft CI, main 합치기, 리뷰 반영, 머지 판정의 순서를 그 파일�
 
 GitHub Actions 의 [CI](.github/workflows/ci.yml) 는 backend(MySQL 마이그레이션 검사 포함), web, e2e, unit, hermes(커넥터 검사 포함), quality, public-safe 와 전체 브라우저 검사를 돌린다.
 job 구조와 shard, 매일 실행, 실패 이슈는 그 파일이 갖는다.
-PR 실패는 그 PR 에서 고친다. 모인 실패 이슈는 고치거나 까닭을 적어 닫는다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
@@ -166,10 +165,6 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 
 `scripts/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
 그 뒤 라벨이 실제 위험과 맞았는지 보고, 라벨이 붙은 PR 의 머지 전에 사람 확인을 받을지 정한다.
-
-## 주간 점검
-
-`점검` 라벨 이슈는 결함 후보다. 고치기 전에 코드에서 사실인지 확인한다. 사실이 아니면 까닭을 적고 닫는다.
 
 ## 커밋
 
