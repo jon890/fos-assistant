@@ -144,10 +144,14 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 
 ## 지울 때
 
-에이전트 행은 지우지 않는다. 사용자가 에이전트를 지우면 `deleted_at` 을 적고 `enabled` 를 내린다.
+사용자가 에이전트를 지우면 `deleted_at` 을 적고 `enabled` 를 내린다. 행은 7일 동안 남는다.
 `profile_managed` 가 참이면 그 Hermes profile 과 올린 스킬 디렉터리를 지우고 그 profile 의 MCP 토큰을 폐기한다.
 거짓이면 운영에서 만든 profile 이라 profile 은 남긴다.
-대화와 실행 기록과 스킬 호출 이력은 남는다.
+지운 지 `assistant.agents.purge-after` 가 지나면 정리 작업이 에이전트 행을 지운다.
+그 에이전트의 설정과 권한(`agent_memory_collection`, `agent_memory_collection_change`, `agent_toolset_request`, `agent_connector_binding`, `proactive_loop_setting`)과 살펴보기 기록(`proactive_check`)을 함께 지운다.
+`connector_connection.agent_id` 와 `connector_action.agent_id` 는 비우고 줄은 남긴다.
+대화와 실행 기록과 스킬 호출 이력, 예약 작업은 남고 「지운 에이전트」 로 보인다.
+무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md) 가 갖는다.
 
 대화 줄은 지우지 않는다. 사용자가 지우면 `conversation.deleted_at` 을 적고 목록에서 숨긴다.
 같은 트랜잭션에서 두 가지를 함께 지운다.
@@ -170,8 +174,8 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
-에이전트를 지워도 `agent_memory_collection` 의 줄은 그대로 둔다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
-그 변경 기록(`agent_memory_collection_change`)도 지우지 않는다. 누가 언제 민감 허용을 열었는지가 남아야 한다.
+에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
+그 변경 기록(`agent_memory_collection_change`)도 그동안 남는다. 누가 언제 민감 허용을 열었는지가 남아야 한다. 에이전트 행을 정리할 때 둘을 함께 지운다.
 서비스 토큰은 폐기해도 줄이 남는다. 언제까지 쓰였는지가 남아야 한다.
 
 허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다. 그 사람의 서비스 토큰은 모두 폐기한다.
@@ -230,7 +234,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 - `visibility` 에는 기본값이 없다. 만들 때 늘 정한다
 - `owner_user_id` 는 주인이다. `PRIVATE` 일 때 필요하고, `GROUP` 으로 공개해도 지우지 않는다
 - `profile_managed` 가 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다. 에이전트를 지울 때 profile 까지 지우는 것은 이 값이 참일 때뿐이다
-- `deleted_at` 이 적히면 목록과 새 대화에서 빠지고 그 에이전트의 대화는 읽기만 된다
+- `deleted_at` 이 적히면 목록과 새 대화에서 빠지고 그 에이전트의 대화는 읽기만 된다. 7일 뒤 정리 작업이 행을 지운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md))
 - `flow` 는 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름이다. 비어 있으면 Hermes 를 한 번 부른다
 - `connector_managed` 가 참이면 바인딩이 생기기 전에 커넥터를 연결할 때 만든 옛 커넥터 에이전트다. 지금은 새로 참이 되지 않고, 남은 에이전트는 사용자가 옮긴 뒤 지운다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))
 - `connector_attachments` 가 참이면 그 옛 커넥터 에이전트가 사진을 받는다. 커넥터가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만 참이다
@@ -281,7 +285,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 - `decided_by_user_id` 는 결정한 관리자다. 요청자가 취소하면 비운다
 - `reason` 은 거절 사유 한 줄이거나 조건이 바뀌어 만료된 사유다
 - **대기 요청을 하나만 두려고 `pending_slot` 을 쓴다.** 대기 중에만 1 이고 끝나면 NULL 이다. `(group_id, agent_id, requester_user_id, toolset, pending_slot)` 이 유일하므로 대기 요청은 겹치지 못하고, 끝난 요청의 NULL 은 서로 겹쳐도 저장되어 이력이 남는다. CHECK 제약이 상태와 슬롯을 함께 검사한다
-- `agent_id` 는 `agent` 를, 요청자와 결정한 관리자는 `app_user` 를 FK 로 가리킨다. 에이전트를 지워도 행과 요청 이력을 남긴다
+- `agent_id` 는 `agent` 를, 요청자와 결정한 관리자는 `app_user` 를 FK 로 가리킨다. 에이전트를 지워도 행과 요청 이력을 남기고, 지운 에이전트를 정리할 때 함께 지운다
 
 ### agent_token
 
@@ -348,11 +352,9 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 숨긴 대화는 「보고할 것 없음」 으로 끝난 예약 작업만 만들고, 하루에 만드는 수는 사용자당 하루 발화 상한(`assistant.task.max-runs-per-day`)을 넘지 않아 색인에 더하지 않는다. 다른 경로가 대화를 숨기게 되면 색인에 `hidden_at` 을 더한다.
 
 **`agent_id` 에 FK 를 두지 않는다.** 칸도 NULL 을 받는다(V4 가 칸을 더하며 그렇게 만들었다).
-에이전트를 지우는 것은 `deleted_at` 을 적는 것이라 정상 경로에서는 행이 사라지지 않는다.
-그래도 행이 없는 대화가 운영에서 나왔고, 그 대화를 읽는 경로는 행이 없어도 실패하지 않게 고쳤다
-([`backend/docs/flow.md`](flow.md) 의 「에이전트 만들기와 지우기」 절).
-FK 를 더하려면 이미 행이 없는 대화를 먼저 정리해야 하고, 그 정리는 대화 이력을 지우거나 가짜 에이전트 행을 만드는 일이 된다.
-행이 사라진 원인을 찾은 뒤 다시 판단한다.
+지운 에이전트는 7일 뒤 정리 작업이 행을 지우고, 그 에이전트의 대화는 남는다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
+그 대화를 읽는 경로는 행이 없어도 실패하지 않는다([`backend/docs/flow.md`](flow.md) 의 「에이전트 만들기와 지우기」 절).
+그 전에도 행이 없는 대화가 운영에서 나온 적이 있다.
 
 **`id` 는 Control Plane 밖으로 나가지 않는다.** 화면과 API 는 대화를 `public_id` 로만 가리킨다.
 근거는 [ADR-025](../../docs/adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md)에 있다.
@@ -806,7 +808,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 
 ### agent_memory_collection_change
 
-`agent_memory_collection` 의 줄 하나가 바뀐 것이 한 줄이다. 지우지 않는다. 근거는 [ADR-20261008 / agent-memory-grants-admin](../../docs/adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
+`agent_memory_collection` 의 줄 하나가 바뀐 것이 한 줄이다. 에이전트 행이 있는 동안 지우지 않는다. 지운 에이전트를 정리할 때 함께 지운다. 근거는 [ADR-20261008 / agent-memory-grants-admin](../../docs/adr/ADR-20261008-agent-memory-grants-admin.md) 에 있다.
 
 - `allow_sensitive` 는 `GRANTED` 와 `SENSITIVE_CHANGED` 면 바꾼 뒤의 값이고, `REVOKED` 면 떼기 전의 값이다
 - `changed_by_user_id` 는 바꾼 `ADMIN` 이다. 외래 키를 걸지 않는다
@@ -845,8 +847,8 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `schema: 1` 은 0 이다
 - `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다. 옛 연결은 연결 확인이 옛 profile 의 값을 보관 파일로 옮길 때 참이 된다
 - `(user_id, connector_id)` 가 유니크다. 한 사람이 같은 커넥터를 둘 연결하지 못한다
-- `agent_id`, `restart_required`, `desired_enabled` 는 연결을 에이전트에 붙이는 바인딩([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))이 생기며 쓰지 않는 칸이 됐다. 이전 이미지로 되돌릴 때를 위해 남겨 두고, 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리할 때 둔다. `agent_id` 의 유일 제약과 FK 는 남아 있고 비어 있는 값은 유일 제약에 걸리지 않는다
-- 엔티티는 이 세 칸을 매핑하지 않는다. 새 행에서 `agent_id` 는 비고 두 boolean 칸은 기본값 거짓으로 저장된다. 옛 행의 값은 고치지 않아 그대로 남는다
+- `agent_id`, `restart_required`, `desired_enabled` 는 연결을 에이전트에 붙이는 바인딩([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))이 생기며 쓰지 않는 칸이 됐다. 이전 이미지로 되돌릴 때를 위해 남겨 두고, 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리할 때 둔다. `agent_id` 의 유일 제약과 FK 는 남아 있고 비어 있는 값은 유일 제약에 걸리지 않는다. 지운 에이전트를 정리할 때 그 에이전트를 가리키는 값을 비운다
+- 엔티티는 두 boolean 칸을 매핑하지 않고 `agent_id` 는 넣지도 고치지도 않는 읽기 전용(`legacyAgentId`)으로만 매핑한다. 새 행에서 `agent_id` 는 비고 두 boolean 칸은 기본값 거짓으로 저장된다. 옛 행의 값은 지운 에이전트를 정리할 때만 비운다
 - 해제해도 행은 남기고 `fields` 를 `{"values": {}, "secretPrefixes": {}}` 로 비운다. 지우는 경로는 없다
 - 칸 값이 비밀이 아닌지는 DB 가 아니라 Control Plane 이 manifest 의 `secret` 으로 판정해 지킨다
 - `fields` 를 MySQL `JSON` 타입이 아니라 문자열로 둔다. 칸 안을 SQL 로 찾을 일이 없고, 검사가 쓰는 H2 와 MySQL 의 JSON 리터럴 문법이 달라 이관 SQL 을 한 벌로 쓸 수 없다. 엔티티는 변환기로 record 로 읽는다
@@ -881,7 +883,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 커넥터 도구 호출 하나의 판정과, 승인이 필요했던 호출의 승인 줄이다. 근거는 [ADR-049](adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 과 [ADR-050](adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
 
 - `public_id` 는 화면과 모델에 보이는 승인 요청 번호다. 대화의 공개 식별자와 같은 방식이다([ADR-025](../../docs/adr/ADR-025-대화는-주소에-공개-식별자를-쓰고-번호는-안에만-둔다.md))
-- `agent_id` 는 판정한 실행의 에이전트다. 그 에이전트에 붙은 바인딩으로 판정했고, 승인하면 그 에이전트의 profile 에서 실행한다. 바인딩 전에 남은 옛 줄은 옛 커넥터 에이전트를 가리킨다
+- `agent_id` 는 판정한 실행의 에이전트다. 그 에이전트에 붙은 바인딩으로 판정했고, 승인하면 그 에이전트의 profile 에서 실행한다. 바인딩 전에 남은 옛 줄은 옛 커넥터 에이전트를 가리킨다. 지운 에이전트를 정리하면 비운다. 비어 있는 줄은 붙은 바인딩이 없어 승인해도 실행하지 않는다
 - `tool_name` 은 MCP 서버의 원래 도구 이름이고 `hermes_tool` 은 hook 이 받은 등록 이름이다. 대응 파일에서 찾지 못했거나 등록 이름과 맞는 것을 확인하지 못한 호출은 `tool_name` 을 비운다
 - `risk` 와 `approval_mode` 는 판정 당시의 값이다. 정책을 읽지 못했거나, 선언이 없었거나, 연결이 준비되지 않아 거절한 호출은 비운다
 - `passed` 는 hook 에 통과로 답했는가다. `decision` 이 `ALLOWED` 일 때만 참이다
@@ -894,7 +896,7 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 - `result_delivered_at` 은 결과나 거절, 만료를 대화에 전한 시각이다. `agent_execution` 의 같은 이름 칸과 뜻이 같다
 - 허용과 거절도 한 줄씩 남긴다. 사용자 수가 적어 양이 문제가 되지 않는다
 - `NEEDS_APPROVAL` 인 줄은 `passed` 가 거짓이고 `status` 가 `PENDING` 으로 시작하며 `args_json` 과 `expires_at` 을 갖는다. 승인 엔진이 켜지기 전에 남은 `NEEDS_APPROVAL` 줄은 `status` 와 `args_json` 이 비어 있어 승인 줄로 다루지 않는다
-- 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다
+- 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비우고 줄은 남긴다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
 
 ### connector_tool_grant
@@ -1052,6 +1054,8 @@ V47 이전 판으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리기 
 `report_opened_at` 은 요청자가 「보고 열기」 를 누르거나, 점검 대화를 처음 읽거나, 그 대화에 메시지를 보낸 때 채운다.
 
 색인은 마지막 살펴보기 읽기, session 을 바꿀지 세기, 열지 않은 보고 찾기에 쓴다.
+
+지운 에이전트를 정리할 때 그 에이전트의 줄을 지운다. 발견, 문제, 평가, 자율 판정, 매일 루프 실행의 줄은 FK 의 `ON DELETE CASCADE` 와 `ON DELETE SET NULL` 이 함께 지우거나 비운다. 비용은 `agent_execution` 에 남는다.
 
 `trigger` 는 MySQL 의 예약어라 칸 이름을 `trigger_type` 으로 둔다.
 
