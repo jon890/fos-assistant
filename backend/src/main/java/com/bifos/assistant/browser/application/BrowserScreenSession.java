@@ -191,7 +191,6 @@ public class BrowserScreenSession {
     private void attach(String id, String url) {
         long attached;
         CdpConnection previous;
-        Map<String, Object> resized = metrics;
         synchronized (lock) {
             if (resizeTask != null) {
                 resizeTask.cancel(false);
@@ -218,6 +217,7 @@ public class BrowserScreenSession {
         }
         try {
             opened.send("Page.enable", Map.of());
+            Map<String, Object> resized = metrics;
             if (resized != null) {
                 command(opened, "Emulation.setDeviceMetricsOverride", resized);
             }

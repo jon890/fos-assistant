@@ -343,6 +343,22 @@ class BrowserScreenSessionTest {
     }
 
     @Test
+    @DisplayName("크기 변경을 기다리는 중에 탭을 옮기면 새 탭에 마지막 크기를 한 번만 적용한다")
+    void appliesPendingResizeOnceToNewTab() throws Exception {
+        cdp.pages.add(new CdpTarget("T2", "둘째", "https://example.com/b"));
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+        session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
+        session.input(input(Kind.TAB, null, null, null, "T2"));
+        scheduler.schedule(() -> {}, 250, TimeUnit.MILLISECONDS).get(2, TimeUnit.SECONDS);
+        assertThat(cdp.sent("Emulation.setDeviceMetricsOverride"))
+                .extracting(FakeCdp.Sent::targetId)
+                .containsExactly("T2");
+        assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
+                .containsEntry("width", 390)
+                .containsEntry("height", 844);
+    }
+
+    @Test
     @DisplayName("연이은 크기 변경은 마지막 값만 적용하고 닫힌 뒤에는 보내지 않는다")
     void debouncesViewportAndCancelsOnClose() throws InterruptedException {
         BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
