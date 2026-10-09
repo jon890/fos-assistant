@@ -34,7 +34,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.adapter.NativeWebSocketSession;
 
 /**
- * 브라우저 중계의 WebSocket 처리기를 직접 불러 조각을 잇고 닫는 일을 본다. 계약은 {@code docs/backend/user-browser.md} 의
+ * 브라우저 중계의 WebSocket 처리기를 직접 불러 조각을 잇고 닫는 일을 본다. 계약은 {@code backend/docs/flow.md} 의
  * 「WebSocket」 이다.
  *
  * <p>Chrome 쪽은 보낸 조각을 기록하는 대역이, 받은 쪽 세션은 보낸 메시지와 닫힘을 기록하는 대역이 맡는다.

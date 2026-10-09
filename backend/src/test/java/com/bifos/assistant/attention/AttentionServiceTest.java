@@ -61,7 +61,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 원래 기록을 읽어 카드 넷을 계산하는 흐름을 실제 DB 로 본다. 규칙은 {@code docs/backend/attention.md} 의 「후보와 trigger」 다.
+ * 원래 기록을 읽어 카드 넷을 계산하는 흐름을 실제 DB 로 본다. 규칙은 {@code backend/docs/flow.md} 의 「후보와 trigger」 다.
  *
  * <p>시각은 이 검사의 시계가 정한다. 사용자는 검사마다 새로 만들어 다른 검사의 줄과 섞이지 않게 하고, 끝나면 그 사용자의 줄을
  * 지운다. 커넥터 카탈로그는 대역이 답한다.

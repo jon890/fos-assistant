@@ -173,7 +173,7 @@ export function allCardsEmpty(cards: AttentionCard[]): boolean {
 }
 
 /**
- * 제목 링크가 갈 원래 기록이다. `docs/backend/attention.md` 의 「카드의 단추와 승인 경계」 를 따른다.
+ * 제목 링크가 갈 원래 기록이다. `backend/docs/flow.md` 의 「카드의 단추와 승인 경계」 를 따른다.
  *
  * @returns 갈 곳이 없으면 `null`
  */

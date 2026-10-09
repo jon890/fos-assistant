@@ -4,7 +4,7 @@
 - **결정**: 먼저 살펴보기가 찾은 발견에서 「이 사용자가 풀 가치가 있는 문제」 를 뽑는 일(문제 찾기, #213)은 새 실행이나 새 모델 호출로 만들지 않는다.
   [ADR-081](ADR-081-살펴보기-결과는-답-끝의-구조화-블록으로-받고-control-plane-이-검사해-그린다.md)의 결과 블록을 버전 3으로 넓혀,
   살펴보기 turn 이 발견과 함께 `problemCandidates` 배열에 문제 후보를 3개까지 낸다.
-  칸과 상한은 [`docs/backend/proactive-check.md`](../../../docs/backend/proactive-check.md) 의 「문제 후보」 가 갖는다.
+  칸과 상한은 [`backend/docs/flow.md`](../flow.md) 의 「문제 후보」 가 갖는다.
 
   **관찰과 문제와 행동을 칸으로 나눈다.** 관찰은 같은 블록의 발견이고 후보는 그 발견의 `topicKey` 를 `evidence` 로 가리킨다.
   문제는 `problem`, 그 문제가 닿는 사용자의 목표나 맥락은 `relatedGoal`, 다음 행동이나 조사는 `proposedAction` 이다.

@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 후보와 제어로 카드 다섯을 정하는 규칙을 본다. 규칙은 {@code docs/backend/attention.md} 의 「억제 신호」 와 「API」 다. */
+/** 후보와 제어로 카드 다섯을 정하는 규칙을 본다. 규칙은 {@code backend/docs/flow.md} 의 「억제 신호」 와 「API」 다. */
 class AttentionJudgeTest {
 
     private static final Instant NOW = Instant.parse("2026-10-04T09:00:00Z");

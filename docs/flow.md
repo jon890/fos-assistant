@@ -36,7 +36,7 @@ flowchart LR
 | ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다 |
 
 **①은 사용자를 정하고 ③은 profile 만 정한다.** 둘은 성질도 다르다.
-①을 받을 때마다 Control Plane 이 그 사용자가 허용 목록에서 꺼졌는지 확인한다. 꺼졌으면 401 `ACCESS_REVOKED` 로 답하고 웹이 세션을 끊는다. 흐름은 [`backend/people.md`](backend/people.md#사용자를-껐을-때) 의 「사용자를 껐을 때」 가 갖는다.
+①을 받을 때마다 Control Plane 이 그 사용자가 허용 목록에서 꺼졌는지 확인한다. 꺼졌으면 401 `ACCESS_REVOKED` 로 답하고 웹이 세션을 끊는다. 흐름은 [`backend/docs/flow.md`](../backend/docs/flow.md#사용자를-껐을-때) 의 「사용자를 껐을 때」 가 갖는다.
 ④는 사용자 한 사람과 받는 collection 을 정한다. 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다.
 
 | 축 | ① 웹 토큰 | ③ agent_token |
@@ -55,7 +55,7 @@ Hermes 가 Control Plane 을 부를 때는 Control Plane 이 그 요청의 주�
 
 그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다.
 profile 플러그인이 도구 인자에 서명해 넣은 `_fos_ctx` 로 origin 실행 하나를 찾고, 그 실행의 `user_id` 가 요청자다. 하위 에이전트 session 은 만들 때 등록한 실행이, 최상위 session 은 지금 도는 실행이 origin 이다.
-[`backend/mcp-caller.md`](backend/mcp-caller.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
+[`backend/docs/flow.md`](../backend/docs/flow.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 그 흐름이다. 결정은 [ADR-032](../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md) 와 [ADR-037](../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md) 에 있다.
 
 ## 로그인 활동 기록
 
@@ -84,7 +84,7 @@ sequenceDiagram
 
 일반 요청과 세션 갱신은 로그인 활동을 기록하지 않는다.
 관리자 목록은 기록이 없을 때 「기록 없음」을 보인다.
-응답과 저장 계약은 [`backend/people.md`](backend/people.md#관리자에게-보이는-최근-활동)가 갖는다.
+응답과 저장 계약은 [`backend/docs/flow.md`](../backend/docs/flow.md#관리자에게-보이는-최근-활동)가 갖는다.
 
 ## 대화 한 번
 
@@ -194,7 +194,7 @@ flowchart TD
     G -- 상한이나 중지 --> L[멈췄다는 알림 줄]
 ```
 
-흐름의 세부와 경계는 [`backend/proactive-check.md`](backend/proactive-check.md) 가 갖는다.
+흐름의 세부와 경계는 [`backend/docs/flow.md`](../backend/docs/flow.md) 가 갖는다.
 
 ### 발견에 반응할 때
 
@@ -227,7 +227,7 @@ sequenceDiagram
 ## 커넥터를 붙일 때
 
 커넥터는 에이전트에게 쥐어 주는 도구 묶음이다. 계정은 「연결」 화면에서 한 번 연결하고, 그 연결을 에이전트 상세에서 붙인다.
-순서와 실패 처리는 [`backend/connector-install.md`](backend/connector-install.md) 의 「설치와 실패 처리」, 판정은 [`backend/connector-tool-policy.md`](backend/connector-tool-policy.md) 의 「도구 호출 판정」 이 갖는다.
+순서와 실패 처리는 [`backend/docs/flow.md`](../backend/docs/flow.md) 의 「설치와 실패 처리」, 판정은 [`backend/docs/flow.md`](../backend/docs/flow.md) 의 「도구 호출 판정」 이 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -325,17 +325,17 @@ sequenceDiagram
 | `EXECUTION_NOT_RUNNING` | 중지하려는 실행이 이미 끝났다 | 알리지 않고 곧 올 끝 사건을 기다린다 |
 | `MESSAGE_NOT_LATEST` | 다시 생성하려는 답이 마지막이 아니다 | 이력을 다시 읽는다 |
 | `CONVERSATION_BUSY` | 그 대화에서 도는 turn 이 있다. 보내기와 다시 생성과 결과 다시 전달이 받는다 | 글만 보낸 것이면 대기 메시지로 다시 넣는다. 사진이 붙었거나 다시 생성이거나 흐름이 붙은 에이전트면 끝난 뒤에 다시 보내게 하고 쓴 문장을 입력창에 되돌린다 |
-| `USER_BUSY` | 그 사용자가 다른 대화와 위임으로 동시 실행 한도를 모두 쓰고 있다([`backend/execution-limit.md`](backend/execution-limit.md)). 보내기, 다시 생성, 결과 다시 전달, 대기 메시지 turn, 흐름 단계가 받는다 | 진행 중인 작업이 끝난 뒤 다시 보내도록 안내한다. 쓴 문장은 입력창에 되돌리고 대기 메시지로 넣지 않는다. 대기 메시지 turn 이면 대기 줄이 멈춘 채 남는다 |
+| `USER_BUSY` | 그 사용자가 다른 대화와 위임으로 동시 실행 한도를 모두 쓰고 있다([`backend/docs/flow.md`](../backend/docs/flow.md)). 보내기, 다시 생성, 결과 다시 전달, 대기 메시지 turn, 흐름 단계가 받는다 | 진행 중인 작업이 끝난 뒤 다시 보내도록 안내한다. 쓴 문장은 입력창에 되돌리고 대기 메시지로 넣지 않는다. 대기 메시지 turn 이면 대기 줄이 멈춘 채 남는다 |
 | `PENDING_QUEUE_FULL` | 대기 메시지가 5개이거나, 더하면 합친 길이가 8000자를 넘는다 | 답이 끝난 뒤 보내도록 안내한다. 쓴 문장은 입력창에 되돌린다 |
 | `PENDING_MESSAGE_NOT_FOUND` | 취소하려는 대기 메시지가 이미 보내졌거나 없다 | 입력창에 되돌리지 않고 대기 줄을 다시 읽는다 |
 | `EXECUTION_NOT_FOUND` | 없는 실행이거나 남의 실행이다 | 사용량 목록으로 되돌린다 |
-| `AUTONOMY_DECISION_NOT_FOUND` | 반응할 판정이 없다. 남의 것이거나 매일 루프가 보인 판정이 아니다([`backend/proactive-loop.md`](backend/proactive-loop.md) 의 「사용자에게 보이는 것」) | 서버 문구를 항목 아래에 보이고 지금 화면을 다시 읽는다 |
-| `PROACTIVE_LOOP_UNAVAILABLE` | 설치가 매일 루프를 열지 않아 켤 수 없다([`backend/proactive-loop.md`](backend/proactive-loop.md) 의 「사용자 설정」) | 켜기를 막고 설치에서 꺼져 있다고 보인다. 끄기와 쉬기는 된다 |
-| `PROACTIVE_CHECK_UNAVAILABLE` | 먼저 살펴보기를 시작할 수 없다. 까닭은 상태 조회가 준다([`backend/proactive-check.md`](backend/proactive-check.md) 의 「시작 전 점검」) | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다 |
+| `AUTONOMY_DECISION_NOT_FOUND` | 반응할 판정이 없다. 남의 것이거나 매일 루프가 보인 판정이 아니다([`backend/docs/flow.md`](../backend/docs/flow.md) 의 「사용자에게 보이는 것」) | 서버 문구를 항목 아래에 보이고 지금 화면을 다시 읽는다 |
+| `PROACTIVE_LOOP_UNAVAILABLE` | 설치가 매일 루프를 열지 않아 켤 수 없다([`backend/docs/flow.md`](../backend/docs/flow.md) 의 「사용자 설정」) | 켜기를 막고 설치에서 꺼져 있다고 보인다. 끄기와 쉬기는 된다 |
+| `PROACTIVE_CHECK_UNAVAILABLE` | 먼저 살펴보기를 시작할 수 없다. 까닭은 상태 조회가 준다([`backend/docs/flow.md`](../backend/docs/flow.md) 의 「시작 전 점검」) | 상태를 다시 읽어 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 이름을 보인다 |
 | `DELIVERY_NOT_FOUND` | 다시 전달하려는 결과 묶음이 그 대화에 없다 | 안내를 보이고 이력을 다시 읽는다 |
 | `DELIVERY_NOT_RETRYABLE` | 다시 전달하려는 묶음이 이미 전하는 중이거나 끝났다. 묶음의 결과가 남지 않았거나 대화에 흐름이 붙은 때도 같다 | 안내를 보이고 이력을 다시 읽는다 |
 
-사용자가 보낸 요청이 `HERMES_BUSY` 나 `USER_BUSY` 를 받으면 Control Plane 은 다시 보내지 않는다. 위임 결과 자동 turn 의 재시도는 [`backend/execution-limit.md`](backend/execution-limit.md) 의 「한도에 닿을 때」 가 갖는다.
+사용자가 보낸 요청이 `HERMES_BUSY` 나 `USER_BUSY` 를 받으면 Control Plane 은 다시 보내지 않는다. 위임 결과 자동 turn 의 재시도는 [`backend/docs/flow.md`](../backend/docs/flow.md) 의 「한도에 닿을 때」 가 갖는다.
 한도에 닿은 상태에서 다시 보내면 한도를 더 밀어붙인다. 다시 보낼지는 사람이 정한다.
 
 `EXECUTION_NOT_FOUND` 는 두 원인을 같은 응답으로 숨긴다.
@@ -347,7 +347,7 @@ sequenceDiagram
 
 ## 지금 화면을 열 때
 
-판정 표는 [`backend/attention.md`](backend/attention.md), 화면은 [`web/docs/prd.md`](../web/docs/prd.md) 가 갖는다.
+판정 표는 [`backend/docs/flow.md`](../backend/docs/flow.md), 화면은 [`web/docs/prd.md`](../web/docs/prd.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -388,7 +388,7 @@ source 하나를 읽지 못하면 그 카드만 「불러오지 못했다」 로
 
 ## 기억을 남길 때
 
-계약은 [`backend/memory.md`](backend/memory.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
+계약은 [`backend/docs/flow.md`](../backend/docs/flow.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
 
 ```mermaid
 sequenceDiagram
@@ -419,7 +419,7 @@ sequenceDiagram
 
 ## 할 일을 제안할 때
 
-계약은 [`backend/follow-up.md`](backend/follow-up.md) 가 갖는다.
+계약은 [`backend/docs/flow.md`](../backend/docs/flow.md) 가 갖는다.
 
 ```mermaid
 sequenceDiagram

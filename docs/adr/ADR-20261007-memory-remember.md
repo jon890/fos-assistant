@@ -109,4 +109,4 @@ Control Plane MCP 도구는 `memory_read`, `artifact_write`, `agent_*`, `follow_
 
 ### 적용 범위
 
-도구의 입력과 결과, 판정 순서, 표의 칸, API 는 [`backend/memory.md`](../backend/memory.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.
+도구의 입력과 결과, 판정 순서, 표의 칸, API 는 [`backend/docs/flow.md`](../../backend/docs/flow.md) 의 「에이전트가 기억을 남기는 길」 이 갖는다.

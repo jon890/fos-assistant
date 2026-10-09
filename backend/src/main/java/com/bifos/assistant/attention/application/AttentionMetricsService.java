@@ -22,7 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 /**
- * 지표 사건을 {@code trigger} 별로 센다. 셈은 {@code docs/backend/attention.md} 의 「지표」 가 갖는다.
+ * 지표 사건을 {@code trigger} 별로 센다. 셈은 {@code backend/docs/flow.md} 의 「지표(먼저 알리기와 지금 화면의 판정)」 가 갖는다.
  *
  * <p>항목 하나는 같은 사용자의 같은 {@code (itemKey, stateKey)} 다. 기간 안에 {@code SHOWN} 이 있는 항목만 세고, 그 항목의
  * {@code trigger} 는 그 {@code SHOWN} 의 것이다.

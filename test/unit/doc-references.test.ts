@@ -123,7 +123,6 @@ export function duplicateHeadings(markdown: string): string[] {
 /** 같은 헤딩이 되풀이되면 안 되는 문서 디렉터리다. 하위 디렉터리는 따로 적는다. */
 const UNIQUE_HEADING_DIRECTORIES = [
   "docs",
-  "docs/backend",
   "backend/docs",
   "web/docs",
   "hermes/docs",

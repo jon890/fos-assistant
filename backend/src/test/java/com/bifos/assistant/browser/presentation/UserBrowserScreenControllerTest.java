@@ -44,7 +44,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 /**
- * 로그인 화면 경로가 HTTP 경계에서 돌려주는 상태 코드를 본다. 계약은 {@code docs/backend/user-browser.md} 의 「로그인 화면」 이다.
+ * 로그인 화면 경로가 HTTP 경계에서 돌려주는 상태 코드를 본다. 계약은 {@code backend/docs/flow.md} 의 「로그인 화면」 이다.
  *
  * <p>요청자는 인증 필터가 채우는 것과 같은 보안 문맥으로 넣는다. 서비스는 실제 DB 와 대역 proxy, 대역 CDP 로 돈다.
  */

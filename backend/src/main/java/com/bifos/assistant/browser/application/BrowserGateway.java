@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 /**
  * 브라우저 중계의 판정이다. 접근 표식에서 주인을 찾아 그 브라우저를 켜 둔다. 중계의 HTTP 와 WebSocket 은 이 서비스만 부른다.
  *
- * <p>판정 순서는 {@code docs/backend/user-browser.md} 의 「받는 것」 이다. 표식은 열 때마다 표에서 주인을 다시 읽는다. 거절한 까닭은
+ * <p>판정 순서는 {@code backend/docs/flow.md} 의 「받는 것」 이다. 표식은 열 때마다 표에서 주인을 다시 읽는다. 거절한 까닭은
  * 종류만 로그에 남기고 표식과 서명은 싣지 않는다.
  */
 @Slf4j

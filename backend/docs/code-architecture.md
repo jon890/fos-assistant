@@ -18,13 +18,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `shared/concurrent` | 요청 밖 작업을 띄우는 `BackgroundTasks`. 직접 가상 스레드를 띄우지 않는 까닭은 [ADR-20261007 / background-tasks](adr/ADR-20261007-background-tasks.md) |
 | `shared/domain/type` | 모든 패키지가 권한 판정에 읽는 역할 값 |
 | `user` | 사용자와 첫 로그인 처리 |
-| `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기, 브라우저 중계의 접근 표식과 HTTP 창구, WebSocket([`docs/backend/user-browser.md`](../../docs/backend/user-browser.md)) |
+| `browser` | 사용자마다 하나씩 두는 브라우저의 상태와 전이, 브라우저 proxy 로 컨테이너 켜기와 끄기, 자동 중지와 상태 맞추기, 브라우저 중계의 접근 표식과 HTTP 창구, WebSocket([`backend/docs/flow.md`](flow.md)) |
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록 |
-| `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/backend/execution-limit.md`](../../docs/backend/execution-limit.md)) |
-| `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`docs/backend/decision-feedback.md`](../../docs/backend/decision-feedback.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
+| `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`backend/docs/flow.md`](flow.md)) |
+| `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`backend/docs/flow.md`](flow.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
 | `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
@@ -32,11 +32,11 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 커넥터 도구 호출의 판정과 기록 |
-| `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`docs/backend/task.md`](../../docs/backend/task.md)) |
-| `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`docs/backend/notification.md`](../../docs/backend/notification.md)) |
-| `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`docs/backend/follow-up.md`](../../docs/backend/follow-up.md)) |
-| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`docs/backend/proactive-check.md`](../../docs/backend/proactive-check.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`docs/backend/proactive-loop.md`](../../docs/backend/proactive-loop.md)) |
-| `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`docs/backend/attention.md`](../../docs/backend/attention.md)) |
+| `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`backend/docs/flow.md`](flow.md)) |
+| `notification` | 사용자에게 대화 밖에서 알리는 줄의 저장과 읽음 표시, 사용자 단위 SSE, 오래된 줄 정리([`backend/docs/flow.md`](flow.md)) |
+| `followup` | 할 일의 저장과 상태 전이, 사람이 쓰는 API, 에이전트의 제안 저장([`backend/docs/flow.md`](flow.md)) |
+| `proactive` | 먼저 살펴보기의 시작 전 점검, 점검 대화의 살펴보기 turn, 상한, 결과 계약의 검사와 그리기, 문제 후보의 검사와 저장, 살펴보기 트리 판정([`backend/docs/flow.md`](flow.md)), 판단 피드백의 replay 읽기 모델, 매일 루프의 이음매와 보일 판정, 판정 반응([`backend/docs/flow.md`](flow.md)) |
+| `attention` | 먼저 알리기의 판정과 지금 화면이 읽는 카드. 다른 패키지의 기록을 읽기만 한다([`backend/docs/flow.md`](flow.md)) |
 
 검사: `ArchitectureRules.SHARED_DOES_NOT_DEPEND_ON_DOMAINS`
 
@@ -69,9 +69,9 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 문제 후보의 가치 평가는 `ValueEvaluationService`와 `ValueEvaluator`가 맡는다.
 `DecisionProvider`는 모델과 무관한 판단 port이며 첫 adapter는 도구 없는 시스템 profile에 Hermes Runs로 묻는다.
-권한과 행동 정책을 결정하지 않는다([가치 평가](../../docs/backend/value-evaluation.md)).
-행동 수준은 모델을 모르는 `AutonomyPolicy` 가 정하고 `AutonomyPolicyService` 가 판정을 남긴다. `EXECUTE` 는 `ProactiveCheckService.startAutonomous` 로 읽기 전용 살펴보기를 시작한다([행동 정책](../../docs/backend/autonomy-policy.md)).
-매일 깨우기 뒤 두 서비스를 잇는 것은 `ProactiveLoopCoordinator` 다. `ProactiveCheckService` 가 낸 `ProactiveCheckSettled` 사건을 받아 순환 의존 없이 부른다([매일 루프](../../docs/backend/proactive-loop.md)).
+권한과 행동 정책을 결정하지 않는다([가치 평가](flow.md)).
+행동 수준은 모델을 모르는 `AutonomyPolicy` 가 정하고 `AutonomyPolicyService` 가 판정을 남긴다. `EXECUTE` 는 `ProactiveCheckService.startAutonomous` 로 읽기 전용 살펴보기를 시작한다([행동 정책](flow.md)).
+매일 깨우기 뒤 두 서비스를 잇는 것은 `ProactiveLoopCoordinator` 다. `ProactiveCheckService` 가 낸 `ProactiveCheckSettled` 사건을 받아 순환 의존 없이 부른다([매일 루프](flow.md)).
 
 `proactive` 는 `followup` 바로 위다. 살펴보기 turn 은 `ChatService.runProactiveCheck` 가 돌리고, 살펴보기만의 일은 `chat` 이 가진 port `CheckTurn` 을 `proactive` 가 구현해 넘긴다.
 `chat` 은 `proactive` 를 import 하지 않는다. 기동 정리가 끝낸 살펴보기 turn 의 답을 대화에 남기지 않도록, `chat` 의 port `RecoveredAnswerGuard` 도 `proactive` 가 구현한다. 사용자가 점검 대화를 읽으면 그 대화의 보고를 연 것으로 적도록 `chat` 의 port `CheckReportReads` 도 `proactive` 가 구현한다.
@@ -119,10 +119,10 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 3. `ContextAssembler` 가 이 실행에 넣을 `instructions` 를 조립한다. 순서는 아래 표다.
 4. `ExecutionRecorder` 가 `RUNNING` 상태로 실행 한 줄을 먼저 만든다.
 5. `HermesProfileKeyStore` 가 그 profile 이름의 key 파일을 읽는다. 없으면 거기서 끝난다.
-6. `HttpHermesRunsClient` 가 실행을 제출하고 받은 `run_id` 를 그 자리에서 실행 줄에 적는다. 싣는 모델과 effort 는 [모델 단계와 실행 기록](../../docs/model-tiers.md) 의 「모델 선택」 이 정한다.
+6. `HttpHermesRunsClient` 가 실행을 제출하고 받은 `run_id` 를 그 자리에서 실행 줄에 적는다. 싣는 모델과 effort 는 [모델 단계와 실행 기록](flow.md) 의 「모델 선택」 이 정한다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다. 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다([ADR-004](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
-9. `ExecutionRecorder` 가 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../../docs/model-tiers.md) 의 「합계와 완전성」 이 갖는다.
+9. `ExecutionRecorder` 가 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](flow.md) 의 「합계와 완전성」 이 갖는다.
 
 `instructions` 를 조립하는 순서는 아래와 같다.
 
@@ -130,14 +130,14 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | --- | --- |
 | 1 | 공통 답변 지침. 답변 형식과 도구 호출 지침이다(`ContextAssembler.withResponseInstructions`) |
 | 2 | 「# 기억」 지침. `memory_remember` 를 받는 실행에만 붙는다 |
-| 3 | Memory 문맥. 층과 그 순서는 [`docs/backend/memory.md`](../../docs/backend/memory.md) 의 「범위와 조립」 이 갖는다 |
+| 3 | Memory 문맥. 층과 그 순서는 [`backend/docs/flow.md`](flow.md) 의 「범위와 조립」 이 갖는다 |
 | 4 | 묻는 형식 안내(`chat/application/AskFormat`). 사용자가 직접 답하는 대화 실행에만 붙는다 |
 | 5 | 이 turn 에만 붙는 지시(`TurnIntent`). 다시 생성, 결과 전달, 예약 작업, 먼저 살펴보기가 저마다 지시를 붙인다 |
 
 3 만 Memory 의 글자 상한 안에서 고르는 몫이고, 나머지는 상한과 따로 붙는다.
 묻는 형식은 `web/src/lib/ask.ts` 가 카드로 읽는다. 둘이 같은 형식을 말해야 한다.
 
-3 에 어느 항목이 드는지는 [`docs/backend/memory.md`](../../docs/backend/memory.md) 의 「에이전트의 실행에 보이는 항목」 이 갖는다.
+3 에 어느 항목이 드는지는 [`backend/docs/flow.md`](flow.md) 의 「에이전트의 실행에 보이는 항목」 이 갖는다.
 
 ## 가격표
 

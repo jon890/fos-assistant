@@ -208,7 +208,7 @@ public final class MemoryDtos {
     public record ReplaceAgentMemoryRequest(
             @NotNull @Size(max = 64) List<@Valid @NotNull AgentMemoryGrantBody> collections) {}
 
-    /** 관리자가 보는 에이전트의 Memory collection 설정이다. 칸의 뜻은 {@code docs/backend/memory.md} 가 갖는다. */
+    /** 관리자가 보는 에이전트의 Memory collection 설정이다. 칸의 뜻은 {@code backend/docs/flow.md} 가 갖는다. */
     public record AgentMemorySettingView(
             String countedFor,
             String ownerName,

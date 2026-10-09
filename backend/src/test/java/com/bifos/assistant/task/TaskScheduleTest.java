@@ -18,7 +18,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.scheduling.support.CronExpression;
 
-/** 예약 작업의 시각 계산을 본다. 규칙은 {@code docs/backend/task.md} 의 「시각」 이다. */
+/** 예약 작업의 시각 계산을 본다. 규칙은 {@code backend/docs/flow.md} 의 「시각」 이다. */
 class TaskScheduleTest {
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
