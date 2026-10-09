@@ -286,6 +286,11 @@ assistant:
     # 커넥터가 브라우저에 닿는 중계의 주소와 접근 표식의 서명 비밀. 둘 중 하나라도 비면 중계만 꺼진다
     gateway-base-url: ${ASSISTANT_BROWSER_GATEWAY_BASE_URL:}
     gateway-secret: ${ASSISTANT_BROWSER_GATEWAY_SECRET:}
+  sandbox-workspace:
+    # assistant.sandbox-workspace.root: 실행 공간 루트를 Control Plane 에서 본 경로. 읽기 전용으로 붙인다. 비면 파일 공간의 모든 경로가 503 이고 상태 조회는 available false 다
+    root: ${ASSISTANT_SANDBOX_WORKSPACE_ROOT:}
+    # 실행 공간 파일을 지우는 운영 도우미의 unix socket. 비면 상태 조회의 deletable 이 거짓이고 지우기를 열지 않는다
+    delete-socket: ${ASSISTANT_SANDBOX_WORKSPACE_DELETE_SOCKET:}
   decision-feedback:
     # 판단 피드백 사건을 남기는 기간. 지난 줄은 cleanup-cron 에 지운다
     retention: 365d
