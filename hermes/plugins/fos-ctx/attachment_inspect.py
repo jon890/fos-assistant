@@ -71,7 +71,9 @@ def authorize(args, session_id, tool_call_id, isolated=False):
         if not ctx or not token:
             return {"action": "block", "message": FAILURE}
         issued = time.time_ns() // 1_000_000
-        top_level = ctx["session_id"] == ctx["root_session_id"] or top_level_session(session_id)
+        top_level = top_level_session(session_id)
+        if top_level is None:
+            return {"action": "block", "message": FAILURE}
         proof = {"issued_at_ms": issued, "top_level": top_level,
                  "sig": sign_request(signing_key(token), ctx, issued, digest(args), top_level)}
         return {"action": "modify", "args": {"_fos_ctx": ctx, "_fos_inspect": proof}}

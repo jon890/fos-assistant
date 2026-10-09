@@ -95,7 +95,21 @@ class AttachmentInspectTest(unittest.TestCase):
                 self.assertTrue(context.top_level_session("compressed"))
                 self.assertFalse(context.top_level_session("child"))
                 self.assertFalse(context.top_level_session("child-compressed"))
-                self.assertFalse(context.top_level_session("missing"))
+                self.assertIsNone(context.top_level_session("missing"))
+                with patch.object(self.inspect, "build_context", return_value={
+                    "v": 1, "root_session_id": "root", "session_id": "root",
+                    "tool_call_id": "actual", "sig": "signed",
+                }), patch.object(self.inspect, "_read_token", return_value="fake"):
+                    for session, top in [("root", True), ("compressed", True),
+                                         ("child", False), ("child-compressed", False)]:
+                        result = self.plugin.pre_tool_call("attachment_inspect", {"attachment_id": 7}, session, "actual")
+                        self.assertEqual(result["action"], "modify")
+                        self.assertIs(result["args"]["_fos_inspect"]["top_level"], top)
+                    result = self.plugin.pre_tool_call("attachment_inspect", {"attachment_id": 7}, "missing", "actual")
+                    self.assertEqual(result["action"], "block")
+                    with patch.object(context.sqlite3, "connect", side_effect=sqlite3.OperationalError):
+                        result = self.plugin.pre_tool_call("attachment_inspect", {"attachment_id": 7}, "root", "actual")
+                        self.assertEqual(result["action"], "block")
 
     def test_limit_error_requests_crop_but_corruption_does_not(self):
         import urllib.error
