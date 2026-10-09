@@ -133,3 +133,31 @@ export function saveSkill(
     body: JSON.stringify(input),
   });
 }
+
+/** 스킬 zip 묶음을 미리본다. 서버에 아무것도 남지 않는다. */
+export function previewSkillPackage(
+  code: string,
+  file: File,
+): Promise<Response> {
+  const form = new FormData();
+  form.append("file", file);
+  return fetch(`/api/agents/${code}/skill-packages/preview`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+/** 미리본 것과 같은 zip 을 올린다. 덮어쓰면 미리보기가 준 `baseDigest` 를 함께 보낸다. */
+export function uploadSkillPackage(
+  code: string,
+  file: File,
+  baseDigest: string | null,
+): Promise<Response> {
+  const form = new FormData();
+  form.append("file", file);
+  if (baseDigest) form.append("baseDigest", baseDigest);
+  return fetch(`/api/agents/${code}/skill-packages`, {
+    method: "POST",
+    body: form,
+  });
+}
