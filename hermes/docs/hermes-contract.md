@@ -2591,7 +2591,7 @@ execution은 `{v:1,protocol,ticket,argsJson,argsSha256}`이고 protocol은 `appr
 argsJson은 저장 원문 그대로이며 해시와 SDK 인자의 키·값·타입·추가 키를 모두 대조한다.
 ticket의 payload 14키와 MICROS·최대 60초 계약을 읽고 실제 인증과 현재 권한은 claim이 판정한다.
 실행 자식만 `FOS_APPROVAL_TICKET`, `FOS_APPROVAL_ARGS_JSON`, `FOS_APPROVAL_CLAIM_URL`을 받는다.
-앞의 두 값은 설치 정의에 선언할 수 없고 종료 뒤 폐기한다.
+세 env 이름 모두 설치 정의에 선언할 수 없고 실행용 값은 호출 종료 뒤 폐기한다.
 주소는 호스트의 `FOS_CONNECTOR_EXECUTIONS_BASE_URL`에서만 정한다.
 지원 확인은 같은 운영 주소에 기존 대시보드 서비스 인증과 fresh nonce를 실어 보낸다.
 nonce와 성공 원문을 저장하거나 자식에 서비스 비밀값을 전달하지 않는다.
