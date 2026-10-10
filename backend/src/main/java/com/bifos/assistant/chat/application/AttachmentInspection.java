@@ -50,9 +50,7 @@ public class AttachmentInspection {
                             new SequenceInputStream(new ByteArrayInputStream(header), in), MAX_SOURCE_BYTES)
                     : AgentImageResizer.orientation(header);
             return AgentImageResizer.dimensions(header)
-                    .map(size -> orientation >= 5
-                            ? size.height + "x" + size.width
-                            : size.width + "x" + size.height)
+                    .map(size -> orientation >= 5 ? size.height + "x" + size.width : size.width + "x" + size.height)
                     .orElse("확인 불가");
         } catch (IOException | RuntimeException ex) {
             return "확인 불가";

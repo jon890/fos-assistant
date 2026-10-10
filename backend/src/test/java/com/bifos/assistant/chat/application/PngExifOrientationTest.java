@@ -29,17 +29,21 @@ class PngExifOrientationTest {
             for (int orientation = 1; orientation <= 8; orientation++) {
                 byte[] original = withExif(source, tiff(orientation, order));
                 byte[] unchanged = original.clone();
-                BufferedImage expected = ImageIO.read(new ByteArrayInputStream(resource("overview-" + orientation + ".png")));
-                BufferedImage full = ImageIO.read(new ByteArrayInputStream(
-                        AttachmentInspection.inspect(original, "image/png", null).bytes()));
+                BufferedImage expected =
+                        ImageIO.read(new ByteArrayInputStream(resource("overview-" + orientation + ".png")));
+                BufferedImage full =
+                        ImageIO.read(new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", null)
+                                .bytes()));
                 assertPixels(full, expected, 0, 0, expected.getWidth(), expected.getHeight());
                 List<Integer> region = List.of(0, expected.getHeight() - 6, 10, expected.getHeight());
-                BufferedImage crop = ImageIO.read(new ByteArrayInputStream(
-                        AttachmentInspection.inspect(original, "image/png", region).bytes()));
+                BufferedImage crop = ImageIO.read(
+                        new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", region)
+                                .bytes()));
                 assertPixels(crop, expected, 0, expected.getHeight() - 6, 10, 6);
                 assertThat(original).isEqualTo(unchanged);
                 assertThat(AgentImageResizer.orientation(original)).isEqualTo(orientation);
-                BufferedImage copy = ImageIO.read(new ByteArrayInputStream(AgentImageResizer.toJpeg(original).orElseThrow()));
+                BufferedImage copy = ImageIO.read(new ByteArrayInputStream(
+                        AgentImageResizer.toJpeg(original).orElseThrow()));
                 assertThat(copy.getWidth()).isEqualTo(expected.getWidth());
                 assertThat(copy.getHeight()).isEqualTo(expected.getHeight());
                 AttachmentStore store = mock(AttachmentStore.class);
@@ -66,14 +70,16 @@ class PngExifOrientationTest {
         ImageIO.write(source, "png", encoded);
         byte[] png = encoded.toByteArray();
         assertThat(png.length).isGreaterThan(256 * 1024);
-        byte[] original = withChunk(png, png.length - 12, new byte[] {'e', 'X', 'I', 'f'}, tiff(6, ByteOrder.BIG_ENDIAN));
+        byte[] original =
+                withChunk(png, png.length - 12, new byte[] {'e', 'X', 'I', 'f'}, tiff(6, ByteOrder.BIG_ENDIAN));
         AttachmentStore store = mock(AttachmentStore.class);
         ChatAttachment attachment = mock(ChatAttachment.class);
         when(attachment.isVisible()).thenReturn(true);
         when(store.open(attachment)).thenReturn(new ByteArrayInputStream(original));
         assertThat(new AttachmentInspection(store).displaySize(attachment)).isEqualTo("300x400");
-        BufferedImage crop = ImageIO.read(new ByteArrayInputStream(
-                AttachmentInspection.inspect(original, "image/png", List.of(0, 394, 10, 400)).bytes()));
+        BufferedImage crop = ImageIO.read(
+                new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", List.of(0, 394, 10, 400))
+                        .bytes()));
         assertThat(crop.getWidth()).isEqualTo(10);
         assertThat(crop.getHeight()).isEqualTo(6);
         for (int y = 0; y < 6; y++) {
@@ -89,7 +95,8 @@ class PngExifOrientationTest {
         byte[] source = resource("source.png");
         byte[] original = withExif(source, tiff(6, ByteOrder.BIG_ENDIAN));
         for (int end = 0; end < 71; end++) {
-            assertThat(AgentImageResizer.orientation(Arrays.copyOf(original, end))).isEqualTo(1);
+            assertThat(AgentImageResizer.orientation(Arrays.copyOf(original, end)))
+                    .isEqualTo(1);
         }
         byte[] badCrc = original.clone();
         badCrc[70] ^= 1;
@@ -113,12 +120,14 @@ class PngExifOrientationTest {
             for (int offset : List.of(0, 7, 28, Integer.MAX_VALUE, -1)) {
                 byte[] tiff = tiff(6, order);
                 ByteBuffer.wrap(tiff).order(order).putInt(4, offset);
-                assertThat(AgentImageResizer.orientation(withExif(source, tiff))).isEqualTo(1);
+                assertThat(AgentImageResizer.orientation(withExif(source, tiff)))
+                        .isEqualTo(1);
             }
             for (int count : List.of(0, 2, -1)) {
                 byte[] tiff = tiff(6, order);
                 ByteBuffer.wrap(tiff).order(order).putInt(14, count);
-                assertThat(AgentImageResizer.orientation(withExif(source, tiff))).isEqualTo(1);
+                assertThat(AgentImageResizer.orientation(withExif(source, tiff)))
+                        .isEqualTo(1);
             }
             for (int orientation : List.of(0, 9, 65535)) {
                 assertThat(AgentImageResizer.orientation(withExif(source, tiff(orientation, order))))
@@ -126,13 +135,16 @@ class PngExifOrientationTest {
             }
             byte[] wrongType = tiff(6, order);
             ByteBuffer.wrap(wrongType).order(order).putShort(12, (short) 4);
-            assertThat(AgentImageResizer.orientation(withExif(source, wrongType))).isEqualTo(1);
+            assertThat(AgentImageResizer.orientation(withExif(source, wrongType)))
+                    .isEqualTo(1);
             byte[] wrongEndian = tiff(6, order);
             wrongEndian[0] = 'X';
-            assertThat(AgentImageResizer.orientation(withExif(source, wrongEndian))).isEqualTo(1);
+            assertThat(AgentImageResizer.orientation(withExif(source, wrongEndian)))
+                    .isEqualTo(1);
             byte[] wrongMagic = tiff(6, order);
             wrongMagic[2] ^= 1;
-            assertThat(AgentImageResizer.orientation(withExif(source, wrongMagic))).isEqualTo(1);
+            assertThat(AgentImageResizer.orientation(withExif(source, wrongMagic)))
+                    .isEqualTo(1);
             assertThat(AgentImageResizer.orientation(withExif(source, Arrays.copyOf(tiff(6, order), 21))))
                     .isEqualTo(1);
         }
@@ -172,7 +184,8 @@ class PngExifOrientationTest {
         return result.toByteArray();
     }
 
-    private static void assertPixels(BufferedImage actual, BufferedImage expected, int left, int top, int width, int height) {
+    private static void assertPixels(
+            BufferedImage actual, BufferedImage expected, int left, int top, int width, int height) {
         assertThat(actual.getWidth()).isEqualTo(width);
         assertThat(actual.getHeight()).isEqualTo(height);
         for (int y = 0; y < height; y++) {
