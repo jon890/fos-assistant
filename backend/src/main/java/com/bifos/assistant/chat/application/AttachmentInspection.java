@@ -13,6 +13,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -37,15 +38,19 @@ public class AttachmentInspection {
     private final AttachmentStore store;
     private final Semaphore decoding = new Semaphore(1, true);
 
-    /** 매 turn에 복원할 표시 크기다. 머리만 읽고 디코딩하지 않는다. */
+    /** 매 turn에 복원할 표시 크기다. 크기와 방향만 읽고 영상은 디코딩하지 않는다. */
     public String displaySize(ChatAttachment attachment) {
         if (!attachment.isVisible()) {
             return "보관 종료";
         }
         try (InputStream in = store.open(attachment)) {
             byte[] header = in.readNBytes(256 * 1024);
+            int orientation = AgentImageResizer.isPng(header)
+                    ? AgentImageResizer.pngOrientation(
+                            new SequenceInputStream(new ByteArrayInputStream(header), in), MAX_SOURCE_BYTES)
+                    : AgentImageResizer.orientation(header);
             return AgentImageResizer.dimensions(header)
-                    .map(size -> AgentImageResizer.orientation(header) >= 5
+                    .map(size -> orientation >= 5
                             ? size.height + "x" + size.width
                             : size.width + "x" + size.height)
                     .orElse("확인 불가");
