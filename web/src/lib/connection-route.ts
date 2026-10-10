@@ -194,6 +194,11 @@ function safeSummary(value: unknown) {
     description: text(item.description ?? ""),
     icon: connectorIconSrc(typeof item.icon === "string" ? item.icon : null),
     link: connectorLinkHref(typeof item.link === "string" ? item.link : null),
+    ownerBrowserLoginUrl: connectorLinkHref(
+      typeof item.ownerBrowserLoginUrl === "string"
+        ? item.ownerBrowserLoginUrl
+        : null,
+    ),
     fields: list(item.fields ?? []).map(safeField),
     tools: safeTools(item.tools),
     myStatus: status(item.myStatus),
