@@ -2,6 +2,8 @@
 
 사용자가 에이전트의 실행 공간에 있는 파일을 화면에서 열어 보는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`
+
 ## 목록 페이지
 
 디렉터리 전체에서 정렬 키 뒤의 항목을 골라 한 페이지씩 보여 준다. 고정된 목록은 끝까지 누락과 중복 없이 탐색할 수 있다.
@@ -37,8 +39,6 @@ sequenceDiagram
 로컬 합성 10,000건을 10번 조회한 마지막 측정은 p50 136ms, p95 152ms였다. 조회 전후 JVM 사용 힙은 2,747,720바이트 감소했다. 이 차이는 GC 시점과 임시 할당을 포함하므로 유지 메모리의 상한을 뜻하지 않는다. 후보 최대 힙은 시험에서 1,001건을 넘지 않음을 별도로 확인한다. 운영 파일 시스템의 성능은 아직 측정하지 않았다.
 
 `workspace-pages.spec.ts`는 합성 사용자와 임시 실행 공간을 나눠 실제 Next → Control Plane → WorkspaceTree 왕복을 두 화면 폭에서 확인한다. 모바일 시트가 목록을 덮는 동안 선택 상태 검사는 페이지 단추의 클릭 핸들러로 요청을 보내며, 미리보기와 주소의 유지 여부를 확인한다. 삭제 후 페이지 초기화와 409의 재조회 생략은 기존 응답 대역 검사에서 확인한다. 실제 삭제 도우미의 운영 검증은 #370이 갖는다.
-
-covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`
 
 ## 요구
 
