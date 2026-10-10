@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { ACCOUNT_SEQ, NAME_MAX_CHARS, QUOTE_SYMBOLS_MAX, SYMBOL } from "./constants.ts";
+import { NAME_MAX_CHARS, QUOTE_SYMBOLS_MAX, SYMBOL } from "./constants.ts";
+import { envelopeMetadata } from "./api-contract.ts";
 import { TossinvestError } from "./errors.ts";
 import { decimalValue, serviceValue, truncateCodePoints } from "./values.ts";
 import type { Tossinvest } from "./client.ts";
@@ -14,9 +15,7 @@ const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 };
 
 const rows = (value: any): any[] =>
-  Array.isArray(value?.result)
-    ? value.result.filter((row: unknown) => row && typeof row === "object")
-    : [];
+  value.result;
 
 /** 쉼표로 나누고 공백을 뗀 뒤 비지 않은 것만 남긴다. 개수와 형식이 틀리면 요청 없이 거절한다. */
 export function parseSymbols(value: string): string[] {
@@ -35,26 +34,22 @@ export function parseSymbols(value: string): string[] {
 
 export function registerReadTools(register: RegisterTool, client: Tossinvest) {
   // 확인 도구이자 선택지 도구다. 계좌가 아직 없으므로 계좌 헤더를 보내지 않는다.
-  // 순번은 자르면 값이 바뀌므로 `account` 칸 형식에 맞지 않는 계좌를 결과에서 뺀다.
-  register("list_accounts", {}, { readOnlyHint: true }, async () => ({
-    accounts: rows(await client.request("/api/v1/accounts"))
-      .filter(
-        (row: any) =>
-          (typeof row.accountSeq === "string" ||
-            typeof row.accountSeq === "number") &&
-          ACCOUNT_SEQ.test(String(row.accountSeq)),
-      )
-      .map((row: any) => {
+  register("list_accounts", {}, { readOnlyHint: true }, async () => {
+    const envelope = await client.request("/api/v1/accounts");
+    const safe = rows(envelope).map((row: any) => ({ ...row, accountNo: `****${row.accountNo.replace(/\D/g, "").slice(-4)}` }));
+    return {
+      result: safe, metadata: envelopeMetadata(envelope),
+      accounts: safe.map((row: any) => {
         const type = serviceValue(row.accountType);
         const known = typeof type === "string" ? ACCOUNT_TYPE_LABELS[type] : undefined;
-        const digits = String(row.accountNo ?? "").replace(/\D/g, "");
         return {
-          account_seq: String(row.accountSeq),
+          account_seq: row.accountSeq,
           account_type: type,
-          label: `${known ?? "기타"} ****${digits.slice(-4)}`,
+          label: `${known ?? "기타"} ${row.accountNo}`,
         };
       }),
-  }));
+    };
+  });
   register(
     "get_quotes",
     { symbols: z.string().default("") },
@@ -73,8 +68,9 @@ export function registerReadTools(register: RegisterTool, client: Tossinvest) {
         if (typeof row.symbol === "string" && typeof row.name === "string")
           names.set(row.symbol, truncateCodePoints(row.name, NAME_MAX_CHARS));
       return {
+        result: { prices: prices.result, stocks: stocks.result },
+        metadata: { prices: envelopeMetadata(prices), stocks: envelopeMetadata(stocks) },
         quotes: rows(prices)
-          .filter((row: any) => typeof row.symbol === "string")
           .map((row: any) => ({
             symbol: serviceValue(row.symbol),
             name: names.get(row.symbol) ?? null,

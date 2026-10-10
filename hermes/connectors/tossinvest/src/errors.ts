@@ -16,6 +16,7 @@ const fail = (error: unknown) => {
 };
 const ok = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value) }],
+  structuredContent: value as Record<string, unknown>,
 });
 export const guard = async (work: () => Promise<unknown>) => {
   try {
