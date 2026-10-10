@@ -2,12 +2,11 @@
 
 - **status**: `accepted`
 - Date: 2026-10-11
-- **적용 상태**: 구현 전 확정 설계다. 현재 서비스는 PR411의 저장 계약으로 동작한다.
 
 ### 맥락
 
 [관찰 저장 ADR](ADR-20261010-media-observation-storage.md)은 불변 revision과 영속 UUID alias를 제공한다.
-같은 조건의 완료 제출도 새 revision을 만드는 현재 동작을, 최신 완료 결과 재사용으로 확장한다.
+같은 조건의 완료 제출도 새 revision을 만들던 동작을 최신 완료 결과 재사용으로 확장한다.
 분석 실행을 생략하는 provider cache API는 이번 결정의 대상이 아니다.
 
 ### 결정
@@ -85,4 +84,4 @@ Jackson 3으로 배열과 문자열만 직렬화하며 숫자는 schemaVersion�
 실제 새 결과 두 요청이 같은 expectedRevision으로 경쟁하면 한 요청만 새 revision을 만들고 다른 요청은 409다.
 추가 원본 재검사는 응답마다 파일 I/O를 늘리지만 권한과 원본 검사를 생략하지 않는다.
 실제 provider 성공, 분석 비용 절감, API/MCP/UI 완성과 운영 검증은 이 결정으로 주장하지 않는다.
-저장 ADR의 같은 MODEL 완료 제출도 항상 새 revision이라는 부분만 구현 시 대체하며 나머지는 보존한다.
+저장 ADR의 같은 MODEL 완료 제출도 항상 새 revision이라는 부분만 대체하며 나머지는 보존한다.

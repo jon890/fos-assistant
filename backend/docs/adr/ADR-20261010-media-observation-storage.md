@@ -11,6 +11,9 @@
 
 ### 결정
 
+같은 MODEL 완료 제출도 새 revision을 만들던 부분은 [완료 결과 재사용 ADR](ADR-20261011-media-observation-cache.md)이 대체한다.
+나머지 저장·UUID·암호화·삭제 계약은 유지한다.
+
 `media_observation`은 첨부별 불변 revision이다. 새 요청 UUID는 현재 revision에 대한 CAS를 통과하면 같은 모델 결과라도 새 revision을 만든다.
 새 MODEL 제출은 현재 USER 정정을 대체할 수 없다. 요청 UUID마다 `media_observation_request`에 최초 수락한 revision과 고정 요청 hash를 함께 적는다.
 같은 UUID와 같은 내용은 CAS에 앞서 그 revision을 반환하고, 내용이 다르면 현재 revision만 담은 409를 낸다.
@@ -46,7 +49,7 @@ alias의 첨부·관찰 복합 FK는 다른 첨부의 관찰을 연결하지 못
 ### 결과와 범위
 
 저장과 조회는 동기 application 서비스로 제공한다. REST/MCP/UI와 실제 분석 호출은 아직 노출하지 않는다.
-완료 결과 캐시, analysis key와 캐시 색인도 만들지 않는다.
+최신 완료 결과의 재사용과 analysis key는 후속 ADR이 정하며 별도 캐시 색인은 만들지 않는다.
 목록 조회는 원본을 읽고 hash를 계산하는 비용이 들며, 요청마다 최대 100개 첨부로 제한한다.
 revision은 첨부 수명 안에만 남고, 삭제 후 분석 결과를 복구하는 이력을 두지 않는다.
 본문·OCR·암호문과 외부 오류 원문은 로그에 남기지 않는다.

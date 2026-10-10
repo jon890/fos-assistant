@@ -134,7 +134,7 @@ class MediaObservationServiceTest extends ObservationFixture {
                 .isEqualTo("ANALYSIS_STALE");
         assertThat(observations.count()).isEqualTo(1);
         var second = record(1, UUID.randomUUID(), input(), model());
-        var third = record(2, UUID.randomUUID(), input(), model());
+        var third = record(2, UUID.randomUUID(), input(), changedModel());
         assertThat(first.revision()).isEqualTo(1);
         assertThat(second.revision()).isEqualTo(2);
         assertThat(third.revision()).isEqualTo(3);
@@ -145,7 +145,7 @@ class MediaObservationServiceTest extends ObservationFixture {
                         "provider",
                         "provider-v2",
                         "model",
-                        "model-v3",
+                        "model-v4",
                         1,
                         "media-observation-v1",
                         clock.instant()));
@@ -331,6 +331,7 @@ class MediaObservationServiceTest extends ObservationFixture {
         return new AttachmentStore(properties) {
             @Override
             public InputStream open(ChatAttachment attachment) {
+                closed.set(false);
                 return new FilterInputStream(new ByteArrayInputStream(mode == 2 ? new byte[1] : IMAGE)) {
                     @Override
                     public int read(byte[] buffer, int offset, int length) throws IOException {
@@ -362,7 +363,7 @@ class MediaObservationServiceTest extends ObservationFixture {
                 ChatAttachmentRepository.class,
                 attachments,
                 "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
-                2);
+                3);
         assertThatThrownBy(() -> local(trackingStore(closed, 0), bodies, observations, requests, broken, access)
                         .list(owner, conversation.id(), null, 10))
                 .isInstanceOf(DataAccessResourceFailureException.class);
@@ -550,6 +551,20 @@ abstract class ObservationFixture {
                 1,
                 "media-observation-v1",
                 Instant.EPOCH);
+    }
+
+    static ObservationProvenance changedModel() {
+        var source = model();
+        return new ObservationProvenance(
+                source.kind(),
+                source.executionId(),
+                source.provider(),
+                source.providerVersion(),
+                source.model(),
+                "model-v4",
+                source.schemaVersion(),
+                source.promptVersion(),
+                source.observedAt());
     }
 
     static void code(Runnable action, ErrorCode expected) {

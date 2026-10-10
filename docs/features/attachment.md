@@ -26,7 +26,7 @@ READ_COMMITTED 새 트랜잭션에서 주인과 대상 상태를 다시 확인�
 ## 관찰 저장과 사용자 정정
 
 `MediaObservationService`는 보낸 첨부의 관찰을 저장하고 목록으로 읽는 동기 서비스다.
-REST/MCP/UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지 않는다.
+REST/MCP/UI와 실제 분석 호출은 아직 제공하지 않는다.
 결정과 기각 근거는 [ADR-20261010 / media-observation-storage](../../backend/docs/adr/ADR-20261010-media-observation-storage.md)가 갖는다.
 
 쓰기 전에 현재 대화 주인과 업로더, 삭제·만료 상태를 확인하고 원본의 SHA-256과 크기를 직접 계산한다.
@@ -35,12 +35,12 @@ REST/MCP/UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지
 
 | 제출과 조회 | 결과 |
 | --- | --- |
-| 새 UUID와 현재 revision | revision을 하나 늘린다. 같은 MODEL 완료 결과도 새 revision이다 |
+| 새 UUID와 현재 revision | 최신 MODEL 완료 결과의 분석 조건과 검증한 본문이 같으면 alias만 추가한다. 그 밖에는 revision을 하나 늘린다 |
 | 같은 UUID와 같은 내용 | 최초 수락한 revision과 서버 관측 시각을 반환한다. 이후 revision은 바꾸지 않는다 |
 | 같은 UUID와 다른 내용, 새 UUID와 오래된 revision | 현재 revision만 담은 409다 |
 | 현재 USER 정정에 새 MODEL 제출 | revision이 맞아도 409다. 과거 UUID 재시도는 원래 revision만 읽는다 |
 | 같은 크기로 원본을 교체 | 신규·기존 UUID 쓰기는 409다. 목록은 현재 지문과 NEEDS_REVIEW/CONTENT_UNAVAILABLE를 내며 본문은 없다 |
-| 암호화할 수 없음 | 503으로 거절하고 관찰과 alias를 함께 되돌린다 |
+| 새 본문을 암호화할 수 없음 | 503으로 거절하고 관찰과 alias를 함께 되돌린다. 이미 복호화한 결과의 재사용은 허용한다 |
 | 본문 복호화·JSON 검증 실패 | 본문 없이 NEEDS_REVIEW/CONTENT_UNAVAILABLE다. USER 출처는 유지한다 |
 | PROCESSING이 15분 지남 | 목록에서 NEEDS_REVIEW/ANALYSIS_STALE로 해석한다. DB revision과 alias는 바꾸지 않는다 |
 | 관찰 없는 유효 첨부 | NOT_ANALYZED와 revision 0이다. 조회만으로 행을 만들지 않는다 |
@@ -51,11 +51,9 @@ REST/MCP/UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지
 summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관찰 JSON은 UTF-8 32KiB로 제한한다.
 관찰과 alias는 원본 첨부보다 오래 보관하지 않는다.
 
-## 완료 결과 재사용 설계
+## 완료 결과 재사용
 
-**구현 전 확정 설계다.** 위 「관찰 저장과 사용자 정정」은 현재 구현을 설명한다.
 재사용의 분석 조건과 수명은 [완료 결과 재사용 ADR](../../backend/docs/adr/ADR-20261011-media-observation-cache.md)이 갖는다.
-구현 PR에서 이 구분을 해소하고 현재 서비스 설명과 표를 갱신한다.
 
 새 UUID의 MODEL 완료 제출은 현재 최신 MODEL 완료 행만 재사용할 수 있다.
 권한과 원본 검사, 기존 UUID 재시도, CAS와 USER 보호를 먼저 적용한다.
@@ -77,6 +75,7 @@ summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관�
 응답 전에 접근을 확인하고 새 원본 스트림에서 SHA와 크기를 검사한 뒤 스트림을 닫는다.
 그 다음 최신 SQL로 소유·삭제·만료 상태를 다시 확인하고 현재 시계와 관찰 만료 시각을 확인한다.
 원본 읽기 중 커밋한 삭제 요청이나 소유 변경도 본문 응답을 막는다.
+마지막 검사 뒤에 발생하는 외부 파일 변경까지 원자적으로 막지는 않는다.
 재사용에도 별도 보관 기간이나 cache 전용 상태를 두지 않는다.
 
 ## 합성 사진 검증

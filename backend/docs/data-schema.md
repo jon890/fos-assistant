@@ -294,7 +294,7 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이고, �
 현재 소유자를 바꿔 관찰을 이관하거나 재암호화하지 않는다.
 CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 갖는다.
 
-**완료 결과 재사용의 구현 전 설계**: `analysis_key CHAR(64) NULL`을 새 마이그레이션으로 추가한다.
+완료 결과 재사용을 위해 `analysis_key CHAR(64) NULL`을 저장한다.
 기존 행은 null을 유지하며 자동 backfill과 재분석을 하지 않는다.
 신규 MODEL 완료 행에만 서버가 계산한 분석 key를 넣고, 나머지 행은 null이다.
 cache 후보는 `body_key_id`가 null이 아닌 행으로 제한한다. 기존 평문 호환 읽기는 보존한다.

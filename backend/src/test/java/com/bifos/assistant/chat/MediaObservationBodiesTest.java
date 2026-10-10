@@ -87,7 +87,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
         assertThat(new MediaObservationBodies(missing).open(row, owner.id())).isEmpty();
         code(
                 () -> local(store, new MediaObservationBodies(disabled), observations, requests, attachments, access)
-                        .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
+                        .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), changedModel()),
                 ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
@@ -163,11 +163,12 @@ class MediaObservationBodiesTest extends ObservationFixture {
         var fresh = new DataKeyService(keks, localWriter, failingKeys, cryptoProperties, clock);
         var writing = local(store, new MediaObservationBodies(fresh), observations, requests, attachments, access);
         UUID request = UUID.randomUUID();
-        assertThatThrownBy(() -> writing.record(owner, conversation.id(), photo.id(), 1, request, input(), model()))
+        assertThatThrownBy(
+                        () -> writing.record(owner, conversation.id(), photo.id(), 1, request, input(), changedModel()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
-        assertThat(writing.record(owner, conversation.id(), photo.id(), 1, request, input(), model())
+        assertThat(writing.record(owner, conversation.id(), photo.id(), 1, request, input(), changedModel())
                         .revision())
                 .isEqualTo(2);
         assertThat(requests.count()).isEqualTo(2);
@@ -187,6 +188,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
                 source.providerVersion(),
                 source.model(),
                 source.modelVersion(),
+                source.analysisKey(),
                 source.createdAt());
         ReflectionTestUtils.setField(result, "id", source.id());
         result.seal(source.body(), source.bodyKeyId());
