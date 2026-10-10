@@ -1,5 +1,11 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.admin.application;
 
+import com.bifos.assistant.agent.admin.application.model.AgentCreateCommand;
+import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.AgentEndpointProbe;
+import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;

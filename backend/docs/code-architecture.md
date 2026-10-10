@@ -66,6 +66,25 @@ HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는
 profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
 
+### 에이전트 관리자 등록
+
+수동 profile 등록과 변경은 `agent.admin.application.AgentAdminService`가 맡고,
+`AgentCreateCommand`와 `AgentUpdateCommand`는 그 아래 `application.model`에 둔다.
+관리 등록·목록·수정의 HTTP 경로는 `agent.admin.presentation.AgentAdminController`가,
+두 요청 record와 `AdminAgentView`는 같은 패키지의 `AgentAdminDtos`가 갖는다.
+변환기는 package-private이며 컨트롤러와 함께 둔다.
+
+이 경계는 공유 lifecycle과 `AgentEndpointProbe`, `agent.domain`과 기존 Repository를 호출한다.
+기본 모델을 맡는 `AgentService`는 기존 `agent.application`에 남는다. 영속 타입은 admin에 두지 않고,
+domain과 infra는 admin을 import하지 않는다.
+각 mapped 메서드는 `CurrentUserProvider.requireAdmin`을 호출하며 HTTP 권한 거절 회귀도 함께 검사한다.
+검사: `ArchitectureRules.AGENT_ADMIN_APPLICATION_PLACEMENT`, `ArchitectureRules.AGENT_ADMIN_HTTP_CONTRACT`
+
+위 검사는 전체 운영 루트에서 소유 타입 8개를 패키지와 독립적인 이름으로 선택한다.
+기대 FQN과 각 대상 수 1을 강제해 원래 위치로 되돌림, 누락·중복·빈 선택도 실패시킨다.
+현재 admin 범위의 Service·공개 application record·HTTP record·설정 선언의 역할과 의존도 검사하며,
+기존 위반 기준 파일로 얼리지 않는다. 목적별 하위 패키지도 기존 층·웹 의존 방향 검사의 대상이다.
+
 ### 최상위 패키지의 층 순서
 
 최상위 패키지의 순서는 `TopLevelPackageOrder.ORDER` 가 아래에서 위로 적어 갖는다.

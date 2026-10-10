@@ -28,7 +28,20 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 검사: `ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS`
 
 한 패키지에 컨트롤러가 여럿이어도 `*Dtos.java` 는 하나다.
-`AgentController` 와 `AgentAdminController` 가 `AgentDtos` 를 함께 쓴다.
+`agent.presentation`은 `AgentDtos`를 쓰고,
+관리 등록·목록·수정은 `agent.admin.presentation`의 `AgentAdminDtos`를 쓴다.
+
+### 관리자 등록 업무
+
+수동 profile 등록과 변경은 `agent.admin.application.AgentAdminService`가 맡는다.
+등록·변경 명령은 그 아래 `application.model`에 둔다.
+HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 모으며,
+각 mapped 메서드는 `CurrentUserProvider.requireAdmin`을 호출한다.
+검사: `ArchitectureRules.AGENT_ADMIN_APPLICATION_PLACEMENT`, `ArchitectureRules.AGENT_ADMIN_HTTP_CONTRACT`
+
+이 소유 타입은 운영 루트 전체에서 이름으로 찾고 기대 FQN과 대상 수 1을 강제한다.
+누락·중복·빈 선택도 실패하며 기존 위반 기준 파일을 쓰지 않는다.
+공유 lifecycle과 기본 모델, endpoint probe와 영속 타입은 기존 위치를 유지한다.
 
 `application` 과 `domain` 은 타입 하나에 파일 하나다.
 

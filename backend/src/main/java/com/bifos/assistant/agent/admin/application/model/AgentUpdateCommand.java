@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.admin.application.model;
 
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 
