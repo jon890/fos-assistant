@@ -1,6 +1,7 @@
 """커넥터 소유 기록과 도구 이름 대응, profile 파일의 공통 규칙이다."""
 
 from __future__ import annotations
+from .connector_guard import _binding_guard
 
 import json
 import os
@@ -144,12 +145,14 @@ def _connector_state(value, target: str | None = None) -> dict:
     roots = _connector_roots()
     for plugin, entry in value.items():
         if (not isinstance(entry, dict) or not {"server", "allowlist_added"} <= set(entry)
-                or set(entry) - {"server", "allowlist_added", "mcp_server", "mode", "vault", "skills"}
+                or set(entry) - {"server", "allowlist_added", "mcp_server", "mode", "vault", "skills", "guard"}
                 or not isinstance(entry["allowlist_added"], bool)
                 or not isinstance(entry.get("mcp_server", ""), str)
                 or entry.get("mode", ISOLATED_MODE) not in (ISOLATED_MODE, BIND_MODE)):
             raise ValueError("connector 소유 기록의 필드가 올바르지 않다")
         if entry.get("mode") == BIND_MODE:
+            if "guard" in entry:
+                _binding_guard(entry["guard"])
             skills = entry.get("skills")
             if (not {"mcp_server", "vault", "skills"} <= set(entry)
                     or not SERVER_NAME_RE.match(entry["mcp_server"])
@@ -158,7 +161,7 @@ def _connector_state(value, target: str | None = None) -> dict:
                     or any(not isinstance(name, str) or not SKILL_NAME_RE.match(name) or ".." in name
                            for name in skills)):
                 raise ValueError("connector 소유 기록의 바인딩 필드가 올바르지 않다")
-        elif "vault" in entry or "skills" in entry:
+        elif "vault" in entry or "skills" in entry or "guard" in entry:
             raise ValueError("옛 설치의 소유 기록에 바인딩 필드가 있다")
         server = entry["server"]
         tools = server.get("tools") if isinstance(server, dict) else None

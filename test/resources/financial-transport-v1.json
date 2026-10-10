@@ -1,0 +1,6 @@
+{
+  "argsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+  "argsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+  "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+  "manifestSha256": "173a51f3f8641f4144b2eca7af90e7aa97c1781a55ef1f80008732434c4a5bae"
+}

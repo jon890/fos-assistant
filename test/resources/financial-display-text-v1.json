@@ -1,0 +1,17 @@
+{
+  "isoControlRanges": [[0, 31], [127, 159]],
+  "cases": [
+    {"name": "nul", "value": "X\u0000", "valid": false},
+    {"name": "newline", "value": "X\n", "valid": false},
+    {"name": "unit-separator", "value": "X\u001f", "valid": false},
+    {"name": "del", "value": "X\u007f", "valid": false},
+    {"name": "c1-first", "value": "X\u0080", "valid": false},
+    {"name": "c1-last", "value": "X\u009f", "valid": false},
+    {"name": "unpaired-high-surrogate", "value": "\ud800", "valid": false},
+    {"name": "unpaired-low-surrogate", "value": "\udfff", "valid": false},
+    {"name": "space-boundary", "value": "X ", "valid": true},
+    {"name": "del-before", "value": "X~", "valid": true},
+    {"name": "c1-after", "value": "X\u00a0", "valid": true},
+    {"name": "korean-and-supplementary", "value": "한글😀", "valid": true}
+  ]
+}

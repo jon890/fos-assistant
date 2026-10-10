@@ -7,6 +7,8 @@ import json
 import os
 import pathlib
 import re
+from .connector_guard import _guard_request_body, EXECUTION_ENV
+from .connector_prepare import _guard_operation, _run_connector_prepare, _prepare_answer, _guard_result_safe
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -228,7 +230,7 @@ def _installed_owner_browser(installed_env: dict, manifest: dict) -> str:
     return value
 
 
-async def _connector_execute_request(request, connector_id: str):
+async def _connector_execute_request(request, connector_id: str, prepare=False):
     """Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다(ADR-050).
 
     승인 여부는 다시 확인하지 않는다. 서비스 토큰을 가진 Control Plane 이 승인한 줄로만 부른다.
@@ -246,8 +248,8 @@ async def _connector_execute_request(request, connector_id: str):
     manifest = _connector_manifest(connector_id) if CONNECTOR_ID_RE.match(connector_id) else None
     if manifest is None:
         return _rejected("없는 connector 다", 404)
-    body = await _json_object(request)
-    if (body is None or set(body) != {"profile", "hermes_tool", "args"} or not isinstance(body["args"], dict)
+    body = await _guard_request_body(request)
+    if (body is None or set(body) - ({"execution"} if not prepare else set()) != {"profile", "hermes_tool", "args"} or not isinstance(body["args"], dict)
             or not isinstance(body["hermes_tool"], str) or not 1 <= len(body["hermes_tool"]) <= 128):
         return _rejected("profile, hermes_tool, args 만 필요하다")
     rejected = _profile_rejection(body["profile"], request)
@@ -300,7 +302,12 @@ async def _connector_execute_request(request, connector_id: str):
         env[manifest["owner_browser_env"]] = owner_browser
     # 대시보드 프로세스의 PATH 를 물려주지 않는다. 실행 파일이 있는 디렉터리만 준다.
     env["PATH"] = os.path.dirname(server["command"])
-
+    guarded_tool = None
+    try:
+        if prepare or "execution" in body or manifest["schema"] == 2:
+            guarded_tool = await _guard_operation(body["profile"], manifest, state[connector_id], body, env, prepare)
+    except Exception:
+        return _rejected("금융 보호 맥락을 확인하지 못했다", 409)
     problem = _mcp_sdk_problem()
     if problem is not None:
         logger.warning("dashboard-profile-api: mcp SDK %s 로는 커넥터 도구를 부르지 않는다: %s",
@@ -316,9 +323,13 @@ async def _connector_execute_request(request, connector_id: str):
     try:
         # 시간을 넘기면 취소가 SDK 의 정리 구간을 돌려 자식 프로세스를 끝낸 뒤에 돌아온다.
         result = await asyncio.wait_for(
+            _run_connector_prepare(manifest, guarded_tool, body["args"], env) if prepare else
             _run_connector_execute(manifest, hermes_tool, body["args"], env, progress),
-            CONNECTOR_EXECUTE_TIMEOUT_SECONDS)
-        answer = None if result is None else _connector_execute_answer(manifest, result)
+            2 if prepare else CONNECTOR_EXECUTE_TIMEOUT_SECONDS)
+        answer = (_prepare_answer(result, body["args"], manifest, guarded_tool, env) if prepare else
+                  None if result is None else _connector_execute_answer(manifest, result))
+        if "execution" in body:
+            _guard_result_safe(answer, env)
     except asyncio.TimeoutError:
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 시간 제한을 넘겼다", connector_id, hermes_tool)
         return _rejected("도구가 시간 제한을 넘겨 실행 결과를 모른다", 504)
@@ -333,6 +344,8 @@ async def _connector_execute_request(request, connector_id: str):
         return failed("unavailable")
     finally:
         _connector_calls -= 1
+        for name in EXECUTION_ENV:
+            env.pop(name, None)
     if answer is None:
         return _rejected("실행할 수 없는 도구다")
     if answer.get("error") == OUTCOME_UNKNOWN:

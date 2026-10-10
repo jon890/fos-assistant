@@ -37,6 +37,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 class HttpHermesConnectorClientTest {
     private static final String BASE = "https://dashboard.example.test";
@@ -69,6 +70,36 @@ class HttpHermesConnectorClientTest {
         ReflectionTestUtils.setField(client, "client", builder.build());
         // 실행 경로는 읽기 제한이 다른 클라이언트를 쓴다. 같은 대역 서버에 붙인다.
         ReflectionTestUtils.setField(client, "executeClient", builder.build());
+        ReflectionTestUtils.setField(client, "prepareClient", builder.build());
+    }
+
+    @Test
+    @DisplayName("바인딩 보호 맥락은 선택 본문으로 전달하고 옛 상태의 누락은 미지원이다")
+    void bindingGuardIsOptionalAndOldStateIsUnsupported() {
+        var guard = JsonMapper.builder().build().readTree("""
+                {"v":1,"protocol":"approval-claim-v1","bindingId":"14","connectionId":"13",
+                 "connectionUpdatedAt":"2026-10-10T00:00:00Z","manifestSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                """);
+        server.expect(requestTo(BASE + "/api/connectors"))
+                .andExpect(content().json("""
+                        {"profile":"user-demo","plugin":"demo-notes","enabled":true,"sandbox_owner":"owner",
+                         "bind":{"vault":"c1","guard":{"v":1,"protocol":"approval-claim-v1","bindingId":"14","connectionId":"13",
+                         "connectionUpdatedAt":"2026-10-10T00:00:00Z","manifestSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess("""
+                        {"profile":"user-demo","plugin":"demo-notes","enabled":true,"restart_required":false}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors?profile=" + PROFILE))
+                .andRespond(withSuccess("""
+                        {"profile":"user-demo","connectors":[{"plugin":"demo-notes","enabled":true,"configured":true}]}
+                        """, MediaType.APPLICATION_JSON));
+        client.bindConnector(PROFILE, DEMO, "c1", "owner", null, guard);
+        assertThat(client.readConnector(PROFILE, DEMO)
+                        .executionGuard()
+                        .path("state")
+                        .stringValue())
+                .isEqualTo("unsupported");
+        server.verify();
     }
 
     @Test

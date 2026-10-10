@@ -1,0 +1,4 @@
+{
+  "argsJson": "{\n  \"symbol\":\"AAPL\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"100.25\",\"timeInForce\":\"DAY\",\"account_seq\":\"000007\",\"market\":\"코스피😀\",\"currency\":\"USD\",\"clientOrderId\":\"123e4567-e89b-12d3-a456-426614174000\"\n}\n",
+  "argsSha256": "b3eb3066d70a87df3cd7264ee11de0ee4866c9fb55c0a1ca7697f397ddd8de40"
+}
