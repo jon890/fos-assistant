@@ -4,6 +4,18 @@
 
 covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
 
+## 합성 사진 검증
+
+[합성 fixture](../../test/support/media-pipeline-fixture.ts)는 원본 바이트와 예상 표식, ID의 대응을 기록한다.
+[JDK 생성기](../../test/support/MediaFixtureGenerator.java)는 JPEG/PNG/GIF를 만들고 다시 디코딩하여 격자 중심의 픽셀에서 ID를 회수한다.
+EXIF는 원본 픽셀과 표시 방향 좌표를 따로 검사하며 기본 ImageIO의 자동 회전을 가정하지 않는다.
+투명 PNG는 alpha를, 두 프레임 GIF는 첫 프레임 표식과 확인 범위를 검사한다.
+작은 한국어 글씨는 OS 글꼴 대신 고정 bitmap을 사용한다. 표식 회수는 실제 OCR 의미 판독을 증명하지 않는다.
+WebP는 바이트와 픽셀을 만들지 않는 metadata 사례이며 실제 관찰은 미측정으로 남긴다.
+손상·미지원·크기 초과는 양성 이미지와 별도 사례로 구분한다.
+실제 WebP 첫 프레임은 기존 runtime 변환 회귀가 검증하며 합성 성공으로 대신하지 않는다.
+단계별 ID와 미측정의 판정은 [단계별 증거](content-draft.md#단계별-증거)가 갖는다.
+
 ## 요구
 
 - 사진을 고르면 그 자리에서 올라가고, 보내기를 눌러야 에이전트가 그 사진을 받는다.
