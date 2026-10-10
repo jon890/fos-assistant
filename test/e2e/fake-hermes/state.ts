@@ -21,7 +21,7 @@ export function createFakeHermesState(
   const sessions = new Map<string, Session>();
   /** 자식 session 의 모델과 provider 다. provider 는 session 응답이 아니라 대시보드의 provider 경로가 준다. 비우면 provider 없이 `example-fast` 를 준다. */
   const childUsages = new Map<string, { profile: string; parent: string; reads: number; delayed: boolean;
-    model?: string; provider?: string }>();
+    model?: string; provider?: string; observation?: ChildUsageObservation }>();
   /** 대시보드로 만든 profile 과 그 profile 의 `.env` 다. */
   const profiles = new Map<string, Record<string, string>>();
   const apiServerToolsets = new Map(
@@ -227,6 +227,17 @@ export type ConnectorCall = { hermesTool: string; argsJson: string };
  */
 export type Session = { model: string; provider: string | null };
 
+/** session GET 없이 읽는 해당 자식 fixture의 등록과 실제 요청 기록이다. 본문과 인증 값은 담지 않는다. */
+export type ChildUsageObservation = {
+  childSessionId: string;
+  parentSessionId: string;
+  registeredAt: string;
+  parentStreamClosedAt: string | null;
+  releasedAt: string | null;
+  reads: number;
+  requests: { at: string; status: number; endedAt: number | null }[];
+};
+
 /**
  * 입력 글 하나에 줄 답과 사건 스트림이다. README 에 싣는 화면을 찍는 스크립트가 `POST /__test/script` 로 넣는다.
  *
@@ -264,6 +275,10 @@ export type ProactiveScript = {
 
 export type FakeHermes = {
   readonly baseUrl: string;
+  /** 대역 내부 상태를 복사해 읽는다. 실제 session GET이나 reads 증가는 없다. */
+  childUsageObservations(): ChildUsageObservation[];
+  /** 늦은 자식의 첫 정상 GET을 관찰한 뒤 종료를 해제한다. 먼저 부르면 false다. */
+  releaseChildUsage(childSessionId: string): boolean;
   lastSubmittedInstructions(): string | undefined;
   /** 마지막 실행 요청의 입력 글. 목록 입력이면 마지막 항목의 첫 글 파트다. Control Plane 이 사용자가 쓴 글 앞에 덧붙인 것까지 담는다 */
   lastSubmittedInput(): string | undefined;

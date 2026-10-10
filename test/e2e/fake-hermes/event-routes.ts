@@ -191,6 +191,8 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
               : run.session_id;
             state.childUsages.set(childSessionId, { profile: profile!, parent: parentSessionId,
               reads: 0, delayed: run.input === "자식 늦은 완료 검사",
+              observation: { childSessionId, parentSessionId, registeredAt: new Date().toISOString(),
+                parentStreamClosedAt: null, releasedAt: null, reads: 0, requests: [] },
               ...(run.input === SUBAGENT_PROVIDER_PROBE ? { model: "example-model-large", provider: "anthropic" } : {}) });
             const child = { subagent_id: `sa-${run.run_id}`, goal: "부모 뒤에 끝나는 조사",
               model: "example-fast", child_session_id: childSessionId };
@@ -199,6 +201,7 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
             // 부모 스트림을 먼저 닫는다. 늦은 자식 완료는 첫 session 조회 뒤에만 보이며,
             // 이미 닫힌 부모 스트림에는 완료 사건을 전달할 수 없다.
             response.end();
+            state.childUsages.get(childSessionId)!.observation!.parentStreamClosedAt = new Date().toISOString();
             return;
           }
           if (run.input === "병렬 하위 에이전트 검사") {
