@@ -28,7 +28,7 @@ import lombok.experimental.Accessors;
  *
  * <p>상태를 바꾸는 메서드는 시각을 인자로 받는다. 비밀 칸의 값을 받는 메서드는 두지 않는다.
  *
- * <p>옛 커넥터 에이전트({@link Agent#connectorManaged()})의 바인딩만 에이전트를 켜고 끈다. 그 에이전트는 이 바인딩 하나로
+ * <p>옛 커넥터 에이전트({@code Agent.connectorManaged()})의 바인딩만 에이전트를 켜고 끈다. 그 에이전트는 이 바인딩 하나로
  * 돌기 때문이다. 다른 에이전트의 바인딩은 에이전트를 건드리지 않는다. 그 바인딩의 도구는 판정이 막는다.
  */
 @Entity
