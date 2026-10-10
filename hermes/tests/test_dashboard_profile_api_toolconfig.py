@@ -2,11 +2,22 @@
 
 import os
 import yaml
+from unittest.mock import patch
 from dashboard_profile_api_support import fake_platform_tools
 import dashboard_profile_api_support as support
 
 
 class ProfileApiToolconfigTest(support.ProfileApiRouteTest):
+    def test_registered_original_inspection_is_saved_and_unknown_one_is_rejected(self):
+        """실제로 등록한 원본 조회 toolset만 설정에 저장할 수 있다."""
+        body = self.toolset_body()
+        body["config"]["platform_toolsets"]["api_server"].append("fos-attachments")
+        self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 400)
+        with patch.object(self.tools, "_get_plugin_toolset_keys", return_value={"fos-attachments"}):
+            self.assertEqual(self.request("/api/config", "PUT", token="valid", body=body), 200)
+        saved = yaml.safe_load((self.root / "owner/config.yaml").read_text(encoding="utf-8"))
+        self.assertIn("fos-attachments", fake_platform_tools(saved, "api_server"))
+
     def test_toolset_update_saves_only_checked_lists(self):
         """toolset 갱신은 검사를 통과한 목록만 저장한다."""
         body = self.toolset_body()

@@ -31,6 +31,7 @@ plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `defaul
 | 셸 실행 공간 | 대시보드 프로세스의 환경 변수 `FOS_ASSISTANT_SANDBOX` | 값의 모양은 아래 「셸 실행 공간」 에 있다. 없거나 읽지 못하면 `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 을 켜는 도구 저장을 409 로 거절한다 |
 | 커넥터 정책을 물을 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_POLICY_URL` | Control Plane 의 `/internal/hermes/connector-policy` 다. 없으면 `fos-ctx` 가 커넥터를 설치한 profile 의 커넥터 도구를 모두 막는다 |
 | 자식 session 을 등록할 주소 | gateway 프로세스의 환경 변수 `FOS_CTX_SUBAGENT_URL` | 없으면 등록하지 않는다. 등록이 없는 자식의 호출은 Control Plane 이 거절한다 |
+| 사진 원본을 조회할 주소 | gateway 프로세스의 환경 변수 `FOS_ATTACHMENT_INSPECT_URL` | Control Plane의 `/internal/hermes/attachment-inspect`다. 없으면 원본 도구가 명시한 실패를 반환한다. profile의 `fos-attachments` toolset을 함께 켠다 |
 
 ### 셸 실행 공간
 

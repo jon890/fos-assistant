@@ -42,6 +42,7 @@ export const TOOLSET_CATALOG = [
   { name: "homeassistant", label: "Home Assistant", description: "집 기기를 제어한다" },
   { name: "spotify", label: "Spotify", description: "음악을 제어한다" },
   { name: "discord", label: "Discord", description: "Discord를 제어한다" },
+  { name: "fos-attachments", label: "Attachment inspection", description: "원본 사진을 다시 읽는다" },
 ] as const;
 
 export const CONTROL_PLANE_MCP = "fos-assistant";
@@ -57,7 +58,7 @@ export const DEFAULT_API_SERVER_TOOLSETS = [
  *
  * <p>셸과 파일 등급이 없다. 미리 심어 둔 profile 은 이 경로를 거치지 않으므로 그대로 기본 목록으로 답한다.
  */
-export const PLUGIN_TEMPLATE_TOOLSETS = ["web", "skills", "todo", CONTROL_PLANE_MCP];
+export const PLUGIN_TEMPLATE_TOOLSETS = ["web", "skills", "todo", CONTROL_PLANE_MCP, "fos-attachments"];
 
 /**
  * 동시 실행 한도를 넘겼을 때 실제 Hermes 가 내는 본문이다.

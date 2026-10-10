@@ -11,6 +11,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
+import com.bifos.assistant.orchestration.application.DelegationParentResolver;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -19,11 +20,13 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 커넥터 에이전트의 실행에서 온 Control Plane 도구 호출을 요청자 판정에서 거절하는 것을 고정한다(ADR-045).
@@ -44,7 +47,8 @@ class McpCallerResolverTest {
     private final AgentRepository agents = mock(AgentRepository.class);
     private final AgentExecution origin = mock(AgentExecution.class);
     private final McpPrincipal principal = new McpPrincipal(1L, PROFILE, AgentTokenService.hash(TOKEN));
-    private final McpCallerResolver resolver = new McpCallerResolver(owners, users, agents);
+    private final DelegationParentResolver parents = mock(DelegationParentResolver.class);
+    private final McpCallerResolver resolver = new McpCallerResolver(owners, users, agents, parents);
 
     @BeforeEach
     void setUp() {
@@ -58,6 +62,38 @@ class McpCallerResolverTest {
         when(origin.userId()).thenReturn(USER_ID);
         when(origin.agentId()).thenReturn(AGENT_ID);
         when(owners.resolve(PROFILE, ROOT_SESSION_ID, ROOT_SESSION_ID)).thenReturn(origin);
+    }
+
+    @Test
+    @DisplayName("압축한 최상위 session은 현재 루트를 쓰고 하위 session은 origin을 유지한다")
+    void inspectUsesCurrentRootForProvenTopLevelCompressionAndKeepsSubagentOrigin() {
+        String session = "compressed-session";
+        var ctx = JsonMapper.builder().build().createObjectNode();
+        ctx.put("v", 1)
+                .put("root_session_id", ROOT_SESSION_ID)
+                .put("session_id", session)
+                .put("tool_call_id", "actual")
+                .put(
+                        "sig",
+                        HexFormat.of()
+                                .formatHex(McpCallContext.hmac(
+                                        principal.tokenHash(),
+                                        String.join(
+                                                "\n",
+                                                "v1",
+                                                "attachment_inspect",
+                                                ROOT_SESSION_ID,
+                                                session,
+                                                "actual"))));
+        AgentExecution past = mock(AgentExecution.class);
+        when(past.userId()).thenReturn(USER_ID);
+        when(parents.resolve(PROFILE, ROOT_SESSION_ID)).thenReturn(origin);
+        when(owners.resolve(PROFILE, ROOT_SESSION_ID, ROOT_SESSION_ID)).thenReturn(past);
+        when(owners.resolve(PROFILE, ROOT_SESSION_ID, session)).thenReturn(past);
+        assertThat(resolver.resolveAttachmentInspection(principal, ctx, true).originExecution())
+                .isSameAs(origin);
+        assertThat(resolver.resolveAttachmentInspection(principal, ctx, false).originExecution())
+                .isSameAs(past);
     }
 
     @Test

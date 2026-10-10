@@ -28,6 +28,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,11 +43,12 @@ class AgentToolServiceTest {
     private final HermesToolsetClient toolsets = mock(HermesToolsetClient.class);
     private final ProfileSkillFiles skillFiles = mock(ProfileSkillFiles.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
+    private final AgentRepository agents = mock(AgentRepository.class);
     private final AgentToolService service = new AgentToolService(
             toolsets,
             skillFiles,
             mock(AgentService.class),
-            mock(AgentRepository.class),
+            agents,
             connectorBindings,
             mock(ToolsetVisibilityService.class));
     private final CurrentUser owner = new CurrentUser(1L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
@@ -65,6 +67,33 @@ class AgentToolServiceTest {
     void setUp() {
         when(toolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("web", "Web", "검색")));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of(), List.of());
+    }
+
+    @Test
+    @DisplayName("기존 개인 profile에 원본 조회를 자동 제공하고 도구 설정을 보존한다")
+    void originalInspectionIsAddedAutomaticallyToExistingPrivateProfile() {
+        when(agents.findByCodeForUpdate(agent.code())).thenReturn(Optional.of(agent));
+        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("mcp-demo"));
+        when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenReturn(List.of("web"), List.of("web", "fos-attachments"));
+        service.ensureAttachmentInspection(agent);
+        Mockito.verify(toolsets)
+                .writeApiServer(
+                        agent.hermesProfile(),
+                        List.of("web", "fos-assistant", "fos-attachments", "mcp-demo"),
+                        agent.sandboxOwner());
+    }
+
+    @Test
+    @DisplayName("커넥터와 공유 profile에는 원본 조회를 자동 제공하지 않는다")
+    void connectorAndSharedProfilesAreNotGivenOriginalInspection() {
+        Agent isolated = mock(Agent.class);
+        when(isolated.connectorManaged()).thenReturn(true);
+        service.ensureAttachmentInspection(isolated);
+        Agent shared = mock(Agent.class);
+        when(shared.acceptsAttachments()).thenReturn(false);
+        service.ensureAttachmentInspection(shared);
+        Mockito.verifyNoInteractions(toolsets);
     }
 
     @Test

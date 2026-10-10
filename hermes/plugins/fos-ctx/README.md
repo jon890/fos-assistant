@@ -3,6 +3,56 @@
 profile 에 설치하는 plugin 이다. MCP 호출에 실행 맥락을 서명해 붙이고, 하위 에이전트 session 을 Control Plane 에 등록하고, 커넥터 도구 호출을 Control Plane 에 묻는다.
 설치와 운영 값은 [`hermes/README.md`](../../README.md), Hermes 쪽 동작은 [`hermes/docs/hermes-contract.md`](../../docs/hermes-contract.md) 가 갖는다.
 
+## 원본 사진 조회 계약
+
+`register_tool`로 독립 `attachment_inspect` 도구를 `fos-attachments` toolset에 등록한다.
+기존 도구를 덮어쓰지 않는다. profile의 API 허용 목록과 gateway의 `FOS_ATTACHMENT_INSPECT_URL`을
+함께 설정한다. 주소의 경로는 `/internal/hermes/attachment-inspect`이며 실제 운영 값은 운영 저장소가 갖는다.
+
+입력은 양의 정수 `attachment_id`와 선택 정수 배열 `region=[x1,y1,x2,y2]`다.
+region은 EXIF를 반영한 원본 표시 좌표이고 오른쪽·아래 끝은 제외한다.
+모델이 임의 경로, URL, 사용자, profile을 정하지 못한다.
+hook은 실제 session과 tool call id로 `_fos_ctx`와 `_fos_inspect`를 덮어쓴다.
+커넥터 격리 profile과 서명 재료 누락은 hook에서 막으며 서버도 같은 요청을 거절한다.
+
+`_fos_inspect`는 `issued_at_ms`, boolean `top_level`, `sig`다.
+요청 digest는 첨부 번호의 십진 표현, 개행, region의 쉼표 구분 정수 표현(없으면 빈 문자열)을
+SHA-256한 소문자 hex다. 서명은 기존 토큰 해시 문자열 key로 다음 UTF-8 글의 HMAC-SHA256을 계산한다.
+
+```text
+v1-attachment-inspect
+root_session_id
+session_id
+tool_call_id
+issued_at_ms
+request_digest
+top_level이 참이면 1, 거짓이면 0
+```
+
+최상위 증명은 읽기 전용 state.db의 부모 사슬에 `source=subagent`가 없음을 확인한다.
+압축된 최상위 session은 현재 correlation root 실행에서 읽고, subagent 사슬은 기존 origin에서 읽는다.
+현재 실행 시작 전·60초 초과·미래 시각·한 시간 넘은 실행의 proof는 거절한다.
+CP와 gateway의 시계를 동기화해야 하며 서로 다른 turn의 proof를 재사용할 수 없다.
+요청자·대화·업로더·메시지 연결·삭제·만료와 실행 취소를 검증한다.
+
+원본은 20MiB/60M 픽셀, 결과는 10MiB/16M 픽셀로 제한한다.
+crop 영역을 먼저 decode하고 픽셀을 줄이지 않는다. JPEG/PNG 전체의 정상 방향은 원본 bytes를 유지한다.
+회전·crop은 흰 배경으로 합성한 PNG이고 전체 PNG bytes는 투명을 보존한다.
+GIF/WebP는 이 도구에서 지원하지 않으며 판독 실패를 반환한다.
+decode는 동시에 한 장이며 병렬 호출은 15초까지 차례를 기다리고 실행 취소를 확인한다.
+plugin HTTP timeout은 30초이고 redirect를 거절하며 출력 bytes를 제한해서 읽는다.
+
+성공은 `_multimodal=True` dict이며 native `image_url.detail=original`을 돌려준다.
+native 지원이 없어 요약만 모델에 남으면 판독 실패를 알리도록 조건문을 넣는다.
+조회 완료 사건은 이미지 수신과 판독 품질을 보장하지 않는다.
+실패는 JSON `error` 문자열이다. 서버 422의 `ATTACHMENT_INSPECTION_LIMIT`만 작은 영역으로
+한 번 다시 조회하게 하고 손상·형식 불지원·다른 거절·timeout은 실패로 알린다.
+사진별 3회, 같은 호출 2회, 실행 전체 90회까지이며 30장 모두 전체·영역 조회를 할 수 있다.
+
+근거는 [ADR-20261010 / attachment-inspect](../../../docs/adr/ADR-20261010-attachment-inspect.md)다.
+등록·서명·HTTP 실패는 `test_attachment_inspect.py`, 실제 Hermes 함수의 native 변환과 오류 사건은
+`test_attachment_native_contract.py`가 `HERMES_SOURCE`를 받아 확인한다. 실제 provider 수용은 배포 뒤 왕복으로 확인한다.
+
 ## fos-ctx 가 붙이는 것
 
 `delegate_task` 의 `images` 와 `tasks[].images` 는 HTTP(S) 주소와 이미지 data URL 만 받는다.

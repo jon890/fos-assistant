@@ -102,6 +102,21 @@ SYMBOLS = {
     ("toolsets", "TOOLSETS"): Value(),
 }
 
+# fos-ctx 원본 도구가 기대는 native 이미지 반환 경로다. 함수 본문을 분리 실행하는 검사가 판 변경을 거른다.
+NATIVE_ATTACHMENT_REGISTRATION = ("hermes_cli/plugins.py", "register_tool",
+                                Call(keywords=("name", "toolset", "schema", "handler")))
+NATIVE_ATTACHMENT_FUNCTIONS = {
+    "tools/registry.py": ("_normalize_handler_result",),
+    "agent/tool_dispatch_helpers.py": ("_is_multimodal_tool_result", "_is_text_part", "_multimodal_text_summary"),
+    "agent/vision_message_prep.py": ("_is_image_part", "_provider_model_key", "_tool_result_content_for_active_model"),
+    "agent/codex_responses_adapter.py": ("_nonblank", "_nonempty_str", "_as_list", "_part_type", "_text_type_for",
+        "_iter_content_parts", "_input_image_part", "_chat_content_to_responses_parts", "_split_responses_tool_id",
+        "_canonical_call_id_from_fc", "_clamp_responses_call_id", "_tool_output_items"),
+    "agent/display.py": ("_detect_tool_failure",),
+    "agent/tool_executor.py": ("_persist_multimodal_text_parts",),
+}
+NATIVE_TOOL_EVENT_FIELDS = ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS")
+
 # 대시보드가 요청마다 이 import 를 다시 해야 바꿔 끼운 함수가 쓰인다.
 # 모듈 머리에서 한 번만 import 하게 바뀌면 plugin 이 감싼 것이 쓰이지 않고 토큰 경로가 모두 닫힌다.
 # 이 import 를 하는 미들웨어는 `token_authenticated` 를 읽는 미들웨어보다 바깥(나중 등록)이어야 한다.
@@ -116,7 +131,7 @@ SESSION_DB_FILE = "state.db"
 SESSION_DB_MODULE = "hermes_state.py"
 SESSION_DB_HOME = "get_hermes_home"
 SESSION_COLUMNS = {
-    "sessions": ("id", "source", "model", "billing_provider"),
+    "sessions": ("id", "source", "parent_session_id", "model", "billing_provider"),
     "session_model_usage": ("session_id", "model", "billing_provider", "task"),
 }
 # `sessions.source` 에서 native 하위 에이전트를 가리키는 값이다.

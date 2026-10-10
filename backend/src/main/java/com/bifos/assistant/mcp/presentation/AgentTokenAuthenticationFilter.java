@@ -32,8 +32,11 @@ public class AgentTokenAuthenticationFilter extends AgentTokenFilter {
      * 판정 경로(ADR-049)가 같은 토큰을 쓴다.
      * 사용자 JWT 필터 {@code ControlPlaneJwtFilter} 는 같은 경로를 건너뛴다. 경로를 더하면 두 곳을 함께 고친다.
      */
-    private static final Set<String> AGENT_TOKEN_PATHS =
-            Set.of("/mcp", "/internal/hermes/session-bindings/subagent", "/internal/hermes/connector-policy");
+    private static final Set<String> AGENT_TOKEN_PATHS = Set.of(
+            "/mcp",
+            "/internal/hermes/session-bindings/subagent",
+            "/internal/hermes/connector-policy",
+            "/internal/hermes/attachment-inspect");
 
     private static final String BEARER = "Bearer ";
     private static final String MCP_AUTHORITY = "ROLE_MCP";

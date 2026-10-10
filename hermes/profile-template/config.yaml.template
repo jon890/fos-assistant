@@ -38,6 +38,7 @@ platform_toolsets:
   api_server:
     - delegation
     - fos-assistant
+    - fos-attachments
 
 agent:
   # The Control Plane decides what the agent may know and may do. Toolsets that reach the host,

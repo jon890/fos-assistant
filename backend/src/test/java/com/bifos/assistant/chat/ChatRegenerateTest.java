@@ -413,7 +413,7 @@ class ChatRegenerateTest {
                 .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
                 .findFirst()
                 .orElseThrow();
-        assertThat(chief.input()).contains("[이번 메시지에 올린 사진]", attachment.id() + ".png", "사진 질문");
+        assertThat(chief.input()).contains("[이 대화의 사진 참조]", attachment.id() + ".png", "사진 질문");
     }
 
     @Test
