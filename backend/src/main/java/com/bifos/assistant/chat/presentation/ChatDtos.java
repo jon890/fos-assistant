@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.AgentModelSettings;
 import com.bifos.assistant.chat.application.HiddenModels;
+import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.MemoryUse;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
@@ -12,11 +13,17 @@ import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.chat.application.model.LatencyRow;
 import com.bifos.assistant.chat.application.model.LatencyStat;
 import com.bifos.assistant.chat.application.model.LatencySummary;
+import com.bifos.assistant.chat.application.model.MediaObservationInput;
+import com.bifos.assistant.chat.application.model.MediaObservationPage;
+import com.bifos.assistant.chat.application.model.MediaObservationView;
+import com.bifos.assistant.chat.application.model.ObservationProvenance;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
+import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
+import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import com.bifos.assistant.memory.application.model.CapturedMemory;
@@ -33,12 +40,71 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import tools.jackson.databind.JsonNode;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ChatDtos {
+    public record MediaObservationCorrectionRequest(long expectedRevision, UUID requestId, JsonNode observation) {
+        public static MediaObservationCorrectionRequest from(JsonNode node) {
+            MediaObservationInputReader.fields(node, Set.of("expectedRevision", "requestId", "observation"));
+            return new MediaObservationCorrectionRequest(
+                    MediaObservationInputReader.revision(node.get("expectedRevision")),
+                    MediaObservationInputReader.requestId(node.get("requestId")),
+                    node.get("observation"));
+        }
+
+        @Override
+        public String toString() {
+            return "MediaObservationCorrectionRequest[body omitted]";
+        }
+    }
+
+    public record MediaObservationPageResponse(List<MediaObservationResponse> items, String nextAfterAssetId) {
+        public static MediaObservationPageResponse from(MediaObservationPage page) {
+            return new MediaObservationPageResponse(
+                    page.items().stream().map(MediaObservationResponse::from).toList(), page.nextAfterAssetId());
+        }
+    }
+
+    public record MediaObservationResponse(
+            String assetId,
+            int ordinal,
+            String sourceFingerprint,
+            Long revision,
+            ObservationStatus status,
+            MediaObservationInput observation,
+            ObservationProvenance provenance,
+            Instant expiresAt,
+            String errorCode,
+            String sourceAssurance) {
+        public static MediaObservationResponse from(MediaObservationView view) {
+            String assurance = view.observation() == null || view.provenance() == null
+                    ? null
+                    : view.provenance().kind() == ObservationProvenanceKind.USER_CORRECTION
+                            ? "USER_CORRECTION"
+                            : "MODEL_UNVERIFIED";
+            return new MediaObservationResponse(
+                    view.assetId(),
+                    view.ordinal(),
+                    view.sourceFingerprint(),
+                    view.revision(),
+                    view.status(),
+                    view.observation(),
+                    view.provenance(),
+                    view.expiresAt(),
+                    view.errorCode(),
+                    assurance);
+        }
+
+        @Override
+        public String toString() {
+            return "MediaObservationResponse[body omitted]";
+        }
+    }
 
     /**
      * @param conversationId 이어 쓸 대화의 공개 식별자. 없으면 새 대화를 만든다

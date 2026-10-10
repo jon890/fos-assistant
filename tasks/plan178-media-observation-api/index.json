@@ -1,0 +1,20 @@
+{
+  "name": "plan178-media-observation-api",
+  "description": "실제 main의 첨부 관찰 저장 서비스를 REST와 서명된 MCP에 연결한다",
+  "status": "pending",
+  "created_at": "2026-10-11",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    },
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
