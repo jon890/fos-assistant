@@ -293,9 +293,9 @@ public class Agent {
      */
     public boolean acceptsAttachments() {
         return visibility == AgentVisibility.PRIVATE
-               && ownerUserId != null
-               && (!connectorManaged || connectorAttachments)
-               && (flow == null || flow.isBlank());
+            && ownerUserId != null
+            && (!connectorManaged || connectorAttachments)
+            && (flow == null || flow.isBlank());
     }
 
 

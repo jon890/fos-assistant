@@ -12,7 +12,7 @@ import java.io.Serializable;
 public record AgentMemoryCollectionId(
     @Column(name = "agent_id", nullable = false) Long agentId,
 
-    @Column(name = "collection", nullable = false, length = 64)
-    String collection)
-    implements Serializable {
+    @Column(name = "collection", nullable = false, length = 64) String collection)
+    implements
+        Serializable {
 }

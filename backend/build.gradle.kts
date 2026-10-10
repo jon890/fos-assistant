@@ -1,9 +1,6 @@
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import com.diffplug.spotless.FormatterFunc
-import com.diffplug.spotless.FormatterStep
-import java.security.MessageDigest
 
 plugins {
     id("java")
@@ -151,113 +148,13 @@ tasks.register("qualityCheck") {
     dependsOn("archTest", "checkstyleMain", "checkstyleTest", "spotlessCheck")
 }
 
-// IntelliJ 는 build 사본만 한 번에 포맷한다. Spotless 가 비교와 원본 적용을 맡는다.
-val javaFormatSources = fileTree("src") {
-    include("main/java/**/*.java", "test/java/**/*.java")
-}
-val intellijFormatDirectory = layout.buildDirectory.dir("intellij-format")
-val intellijFormatSettings = file("config/intellij/code-style.xml")
-val intellijFormatScripts = listOf(
-    file("../scripts/install-intellij-formatter.py"),
-    file("../scripts/prepare-intellij-format.py"),
-)
-val intellijFormatInputs = intellijFormatScripts + intellijFormatSettings +
-    listOf(file("gradle/libs.versions.toml"), file("build.gradle.kts"))
-val intellijEngineFile = layout.buildDirectory.file("intellij-engine.txt")
-val validateIntellijEngine = tasks.register("validateIntellijEngine") {
-    group = "formatting"
-    description = "포맷 캐시를 소비하기 전에 설치 내용과 엔진 식별값을 확인한다."
-    // Gradle의 UP-TO-DATE와 build cache보다 먼저 실제 설치를 확인한다.
-    outputs.upToDateWhen { false }
-    doLast {
-        val installation = providers.exec {
-            commandLine("python3", intellijFormatScripts[0], "--catalog", file("gradle/libs.versions.toml"), "--identity")
-            isIgnoreExitValue = true
-        }
-        if (installation.result.get().exitValue != 0) {
-            delete(intellijFormatDirectory, intellijEngineFile)
-            logger.error(installation.standardError.asText.get())
-        }
-        installation.result.get().assertNormalExitValue()
-        val content = installation.standardOutput.asText.get()
-        val engineFile = intellijEngineFile.get().asFile
-        if (!engineFile.isFile || engineFile.readText() != content) {
-            engineFile.parentFile.mkdirs()
-            engineFile.writeText(content)
-        }
-    }
-}
-
-val prepareIntellijFormat = tasks.register("prepareIntellijFormat") {
-    group = "formatting"
-    description = "고정 IntelliJ 엔진으로 모든 Java 사본을 한 번에 포맷한다."
-    inputs.files(javaFormatSources).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(intellijFormatInputs).withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(validateIntellijEngine)
-    inputs.file(intellijEngineFile).withPathSensitivity(PathSensitivity.NONE)
-    outputs.dir(intellijFormatDirectory)
-    doLast {
-        // 설치 확인이 실패해도 이전 포맷 결과를 사용하지 않는다.
-        delete(intellijFormatDirectory)
-        val binary = intellijEngineFile.get().asFile.readLines().first()
-        val batch = providers.exec {
-            commandLine(
-                "python3", intellijFormatScripts[1],
-                "--backend", projectDir,
-                "--output", intellijFormatDirectory.get().asFile,
-                "--settings", intellijFormatSettings,
-                "--binary", binary,
-            )
-            isIgnoreExitValue = true
-        }
-        logger.lifecycle(batch.standardOutput.asText.get())
-        if (batch.result.get().exitValue != 0) logger.error(batch.standardError.asText.get())
-        batch.result.get().assertNormalExitValue()
-    }
-}
-
-// Spotless 내부 캐시도 설정과 전체 입력 목록(삭제 포함)이 바뀌면 무효화한다.
-val intellijFormatHash = MessageDigest.getInstance("SHA-256")
-(intellijFormatInputs + javaFormatSources.files.sortedBy { it.path }).forEach {
-    intellijFormatHash.update(it.relativeTo(projectDir.parentFile).path.toByteArray())
-    intellijFormatHash.update(0.toByte())
-    // Docker 의 assemble 은 포맷 파일 없이도 구성된다. 필수 파일은 포맷 태스크를 실행할 때 확인한다.
-    if (it.isFile) intellijFormatHash.update(it.readBytes())
-    else intellijFormatHash.update("missing".toByteArray())
-    intellijFormatHash.update(0.toByte())
-}
-val intellijFormatState = arrayListOf(
-    projectDir.absolutePath,
-    intellijFormatDirectory.get().asFile.absolutePath,
-    intellijFormatHash.digest().joinToString("") { "%02x".format(it) },
-)
-
 spotless {
-    // 기본은 변경 파일만 지킨다. 통일 작업을 명시적으로 실행할 때만 전체 범위를 연다.
-    if (!providers.gradleProperty("intellijFormatAll").map { it.toBooleanStrict() }.getOrElse(false)) {
-        ratchetFrom("origin/main")
-    }
+    // 기본은 변경 파일만 검사한다. 전체 사본 검증이나 명시적 전체 적용에서만 해제한다.
+    if (!providers.gradleProperty("formatAll").map(String::toBoolean).getOrElse(false)) ratchetFrom("origin/main")
     java {
         target("src/main/java/**/*.java", "src/test/java/**/*.java")
-        addStep(FormatterStep.createLazy("intellij-batch", {
-            // 검증 태스크가 만든 내용 식별값을 Spotless 내부 상태에도 넣는다.
-            ArrayList(intellijFormatState).apply { add(intellijEngineFile.get().asFile.readText()) }
-        }) { state ->
-            FormatterFunc.NeedsFile { input, source ->
-                val relative = Path.of(state[0]).relativize(source.toPath().toAbsolutePath())
-                val original = Files.readString(Path.of(state[1], "original").resolve(relative)).replace("\r\n", "\n")
-                val formatted = Files.readString(Path.of(state[1], "formatted").resolve(relative)).replace("\r\n", "\n")
-                // Spotless 가 멱등성을 검사할 때 두 번째 입력은 이미 포맷된 문자열이다.
-                check(input == original || input == formatted) { "IntelliJ 사본과 입력이 다르다. 다시 실행한다: $source" }
-                formatted
-            }
-        })
+        eclipse(libs.versions.eclipse.jdt.get()).configFile("config/spotless/eclipse-formatter.xml")
     }
-}
-
-tasks.matching { it.name.startsWith("spotlessJava") }.configureEach {
-    dependsOn(prepareIntellijFormat)
-    inputs.dir(intellijFormatDirectory).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
 /**

@@ -41,8 +41,7 @@ public final class AgentToolPolicy {
      */
     public static final String ATTACHMENT_INSPECTION = "fos-attachments";
 
-    private static final Set<String> OWNER_TOOLSETS =
-        Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
+    private static final Set<String> OWNER_TOOLSETS = Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
     private static final Set<String> ADMIN_TOOLSETS = Set.of(
         "terminal",
         "file",
@@ -70,8 +69,7 @@ public final class AgentToolPolicy {
     /**
      * 사용자별 실행 공간에서 도는 toolset 이다. 켜진 동안은 주인을 바꾸지 못한다(ADR-086).
      */
-    private static final Set<String> SANDBOX_TOOLSETS =
-        Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
+    private static final Set<String> SANDBOX_TOOLSETS = Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
     /**
      * 커넥터 manifest 가 연결용 에이전트에 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구뿐이다(ADR-044).
      */
@@ -79,12 +77,12 @@ public final class AgentToolPolicy {
 
     private static final Set<String> CONFIGURABLE_TOOLSETS;
 
-
     static {
         LinkedHashSet<String> names = new LinkedHashSet<>(OWNER_TOOLSETS);
         names.addAll(ADMIN_TOOLSETS);
         CONFIGURABLE_TOOLSETS = Set.copyOf(names);
     }
+
 
     public enum Tier {
         OWNER,
@@ -115,8 +113,8 @@ public final class AgentToolPolicy {
 
     public static boolean mayEdit(CurrentUser user, Agent agent, String name) {
         return tierOf(name) == Tier.OWNER
-               ? (user.isAdmin() || Objects.equals(user.id(), agent.ownerUserId()))
-               : user.isAdmin();
+            ? (user.isAdmin() || Objects.equals(user.id(), agent.ownerUserId()))
+            : user.isAdmin();
     }
 
 

@@ -247,33 +247,39 @@ class UserExecutionLimitBackgroundTest { ... }
 
 기준 파일을 갱신하거나 규칙을 뺄 때 읽는 절차를 갖는다.
 
-### IntelliJ 와 Spotless 의 Java 포맷
+### Eclipse JDT와 Spotless의 Java 포맷
 
-Java 포맷은 IntelliJ IDEA 2026.1.3(build 261.25134.95)와 `config/intellij/code-style.xml` 로 고정한다.
-IntelliJ 에서 이 XML 을 Code Style scheme 으로 가져오면 같은 엔진과 설정으로 정리할 수 있다.
-프로젝트 설정을 내보낸 뒤 포맷을 바꿀 때는 이 XML 을 고친다. 사용자 전역 설정은 수정하지 않는다.
-자동 import 최적화는 하지 않는다. 명시 import 와 순서를 보존하고 wildcard 는 Checkstyle 이 금지한다.
+Java 포맷의 규칙 정본은 `config/spotless/eclipse-formatter.xml`이다.
+Spotless 8.10.3의 공식 `eclipse(version).configFile(...)` 통합을 쓰고 JDT 4.35를 version catalog로 고정한다.
+이 버전의 공식 lockfile은 JDT core와 ecj 3.41.0을 고정하며 Java 21 소스를 처리한다.
+제품 실행 의존에는 추가하지 않는다. Gradle이 포맷에 필요한 Maven 의존만 받으므로 IDE 설치와 별도 배치·설치 검증 코드가 필요하지 않다.
 
-Spotless 의 기본 `idea()` 는 파일마다 IDE 를 기동한다. 대신 `prepareIntellijFormat` 이 main/test Java 의 사본을
-`build/intellij-format` 에 만들고 IntelliJ CLI 를 한 번 기동한다. Spotless 는 이 결과를 비교하고 적용한다.
-`spotlessCheck` 는 소스를 바꾸지 않는다. 설정, 버전, 실행 스크립트와 Java 입력 목록이 바뀌면 사본을 다시 만든다.
-IDE 는 별도 config/system/plugins/log 디렉터리로 실행해 열려 있는 개발자 IDE 와 격리한다.
-실패하거나 제한 시간을 넘거나 일부 파일만 처리하면 이전 결과를 쓰지 않고 검사와 적용을 실패시킨다.
+사용자가 IntelliJ에서 정리한 표본의 규칙 목표를 JDT 설정으로 옮겼다.
+IntelliJ scheme XML을 JDT가 직접 읽는 것은 아니다. 아래 이름은 `org.eclipse.jdt.core.formatter.` 뒤의 설정 키다.
 
-개발자는 고정 버전의 설치 디렉터리를 `INTELLIJ_FORMAT_HOME` 으로 지정한다. 지정하지 않은 Linux 에서는
-공식 배포본의 SHA256 을 검증해 내려받는다. 버전과 checksum 은 version catalog 와 설치 스크립트가 갖는다.
-첫 다운로드는 약 1.6GB 이며 CI 는 배포본 archive와 설치를 캐시한다.
-포맷을 요청할 때마다 archive를 코드에 고정한 SHA256으로 다시 검증하고 설치의 경로·권한·링크·내용을 대조한다.
-손상된 설치는 보관한 archive에서 다시 설치한다. archive의 checksum이 다르면 캐시 archive를 지우고 다시 설치한다.
-성공 stamp나 캐시 안의 manifest만으로 공식 배포본이라고 판단하지 않는다.
-사용자 설치는 launcher·JBR·플랫폼·Java plugin의 필수 파일을 확인하고 엔진 내용과 설치 경로를 식별한다.
-사용자 설치와 IDE 설정에는 쓰지 않는다. `validateIntellijEngine`은 포맷 캐시를 재사용할 때도 실행하고
-검증된 식별값을 준비 태스크 입력과 Spotless 상태에 넣는다. 일반 `dependencies`·`assemble`은 설치를 확인하지 않는다.
-실제 Gradle의 삭제·변조·설치 경로 전환 회귀는 `python3 test/intellij-engine.test.py --gradle`로 실행한다.
-기본 Spotless 범위는 `origin/main` 과의 공통 조상 뒤 바뀐 파일이다.
-`-PintellijFormatAll=true` 를 넘기면 main/test Java 전체를 검사하거나 적용한다.
+| 목표 | JDT 설정과 차이 |
+| --- | --- |
+| 4칸 들여쓰기 | `tabulation.char=space`, `tabulation.size=4`, `indentation.size=4` |
+| continuation 4칸 | `continuation_indentation=1`. 값은 칸 수가 아니라 들여쓰기 단위다. 열에 맞추는 인자는 이 값보다 더 들어갈 수 있다. |
+| 메서드 사이 빈 줄 2개 | `blank_lines_before_method=2`, `blank_lines_before_abstract_method=2`. 첫 선언 앞은 `blank_lines_before_first_class_body_declaration=0`이다. |
+| 빈 줄 보존과 초기화 구역 | `number_of_empty_lines_to_preserve=1`, `blank_lines_before_new_chunk=2`. 새 멤버 묶음과 초기화 구역의 판단은 IntelliJ와 다르다. |
+| 여러 줄 인자와 체인 정렬 | 인자·매개변수·selector의 `alignment_for_*=20`은 필요할 때 compact wrap과 열 정렬을 적용한다. `join_wrapped_lines=false`로 기존 줄바꿈을 보존한다. 체인을 정렬하는 기준 열은 IntelliJ와 다를 수 있다. |
+| RIGHT_MARGIN 500 | `lineSplit=500`. 자동 줄바꿈 기준을 120열로 바꾸지 않는다. 긴 문자열이나 나눌 수 없는 토큰은 이 값보다 길 수 있다. |
+| SOFT_MARGINS 200 | IDE의 안내선이므로 JDT에는 대응하는 포맷 설정이 없다. 개발자가 IntelliJ의 시각 안내선으로 선택할 수 있다. |
+| Javadoc과 일반 주석 | `comment.line_length=500`, `join_lines_in_comments=false`, `comment.new_lines_at_javadoc_boundaries=true`. Javadoc은 정리하되 기존 문단 줄바꿈을 유지하고 일반·행 주석의 본문 재배치는 끈다. `<p>`와 태그 설명 배치는 IntelliJ와 다를 수 있다. |
+| 문자열과 text block | 문자열 내용을 바꾸는 단계를 쓰지 않는다. `text_block_indentation=3`은 기존 text block 들여쓰기를 보존한다. |
+| 명시 import | import 삭제·wildcard 확장·순서 정렬과 멤버 재정렬을 켜지 않는다. wildcard는 기존 Checkstyle이 금지한다. |
+
+[Spotless JDT 통합 문서](https://github.com/diffplug/spotless/blob/gradle/8.10.3/plugin-gradle/README.md#eclipse-jdt)와
+[JDT 4.35 설정 정의](https://github.com/eclipse-jdt/eclipse.jdt.core/blob/R4_35/org.eclipse.jdt.core/formatter/org/eclipse/jdt/core/formatter/DefaultCodeFormatterConstants.java)가 설정의 근거다.
+IntelliJ의 Reformat Code와 완전히 같은 결과는 보장하지 않는다. IDE에서도 저장소와 같은 결과가 필요하면
+Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같은 태스크를 실행한다. 전역 Code Style이나 plugin 설치를 변경할 필요는 없다.
+
+`spotlessCheck`는 원본을 바꾸지 않고 위반이 있으면 실패한다. 설정 파일과 고정 엔진은 Spotless의 태스크 입력에 포함된다.
+실제 Gradle 회귀 `test/spotless-jdt.test.py`가 들여쓰기·빈 줄·주석·Java 컴파일·check 원본 불변·설정 변경 감지·2회 멱등성·위반 실패를 검사한다. Linux CI도 이 회귀를 실행한다.
+기본 범위는 `origin/main`과의 공통 조상 뒤 바뀐 파일이다. `-PformatAll=true`로 main/test Java 전체를 확인하거나 적용한다.
 전체 통일 전에 파일 길이와 품질 기준도 충족해야 한다. 포맷만으로 기준을 넘으면 파일 분리는 별도 관심사로 진행한다.
-실행 명령과 커밋 분리는 `backend/AGENTS.md` 의 「포맷」 절이 갖는다.
+실행 명령과 커밋 분리는 `backend/AGENTS.md`의 「포맷」 절이 갖는다.
 
 ### 구조 규칙의 기준 파일
 
