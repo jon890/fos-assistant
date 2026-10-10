@@ -1,6 +1,6 @@
 /** 실제 대화 실행의 서명으로 관찰 REST와 MCP를 왕복한다. 합성 사진만 쓰고 provider를 호출하지 않는다. */
 import { randomUUID } from "node:crypto";
-import { call, expect, expectStatus, fail, step, upload, type Context, type Scenario } from "../harness.ts";
+import { call, expect, expectStatus, fail, step, upload, type Scenario } from "../harness.ts";
 import { callTool, contextFor, openStream, within, type ToolResult } from "../delegation-support.ts";
 import { signedCallContext, signedSubagentRegistration } from "../mcp-context.ts";
 
@@ -24,11 +24,12 @@ export const mediaObservationMcpScenario: Scenario = {
     expectStatus(await call(context, "/admin/agents", { method: "POST", token: context.tokens.dad, body: {
       code: AGENT, name: "사진 관찰 검사", hermesProfile: MEDIA_OBSERVATION_PROFILE,
       apiBaseUrl: `${context.hermesBaseUrl}/p/${MEDIA_OBSERVATION_PROFILE}`, costMode: "SUBSCRIPTION",
-      credentialScope: "SHARED_HOUSEHOLD", visibility: "GROUP", ownerEmail: null,
+      credentialScope: "DEDICATED", visibility: "PRIVATE", ownerEmail: "dad@example.com",
     } }), 200, "관찰 에이전트 등록");
     let issued: { id: number; token: string } | undefined;
     let conversationId: string | undefined;
     let completed: Promise<unknown> | undefined;
+    let failed = false;
     try {
       issued = expectStatus(await call(context, "/admin/agent-tokens", { method: "POST", token: context.tokens.dad,
         body: { profileName: MEDIA_OBSERVATION_PROFILE, label: "observation-e2e" } }), 200, "관찰 토큰 발급").json();
@@ -48,7 +49,13 @@ export const mediaObservationMcpScenario: Scenario = {
         body: { conversationId, text: "합성 사진 관찰 검사", agentCode: AGENT, attachmentIds: ids } });
       firstTurn.catch(() => undefined);
       completed = firstTurn;
-      await within(context.hermes.waitForHeldRun(), 5_000, "관찰 실행을 받지 못했다");
+      await within(Promise.race([
+        context.hermes.waitForHeldRun(),
+        firstTurn.then((response) => {
+          expectStatus(response, 200, "사진을 붙인 관찰 실행 시작");
+          fail("유지해야 할 관찰 실행이 먼저 끝났다");
+        }),
+      ]), 5_000, "관찰 실행을 받지 못했다");
       const session = context.hermes.heldRun()?.sessionId;
       if (session === undefined) fail("관찰 실행 session이 없다");
       expect(context.hermes.lastSubmittedImages().length === ids.length, "기존 native 이미지 입력이 사라졌다");
@@ -115,7 +122,7 @@ export const mediaObservationMcpScenario: Scenario = {
         body: JSON.stringify(signedSubagentRegistration(token, nextSession, nextSession, child)),
       })).status === 201, "중지할 native 자식 등록 실패");
       const executionId = await turn.executionId;
-      expectStatus(await call(context, `/chat/executions/${executionId}/stop`, { method: "POST", token: context.tokens.dad }), 200, "관찰 실행 중지");
+      expectStatus(await call(context, `/chat/executions/${executionId}/stop`, { method: "POST", token: context.tokens.dad }), 202, "관찰 실행 중지");
       context.hermes.releaseHeldRun();
       await turn.completed;
       const cancelled = await callTool(context, token, LIST, {}, signedCallContext(token, LIST, nextSession, child, `call_${randomUUID()}`));
@@ -124,13 +131,25 @@ export const mediaObservationMcpScenario: Scenario = {
       const revoked = await fetch(`${context.api.replace(/\/api\/v1$/, "")}/mcp`, { method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: "{\"method\":\"tools/list\"}" });
       expect(revoked.status === 401, "폐기 토큰을 허용했다");
+    } catch (error) {
+      failed = true;
+      throw error;
     } finally {
       context.hermes.releaseHeldRun();
       await completed?.catch(() => undefined);
-      if (issued !== undefined) expectStatus(await call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad }), 200, "관찰 토큰 정리");
-      if (conversationId !== undefined) expectStatus(await call(context, `/chat/conversations/${conversationId}`, { method: "DELETE", token: context.tokens.dad }), 200, "관찰 대화 정리");
-      expectStatus(await call(context, `/admin/agents/${AGENT}`, { method: "PATCH", token: context.tokens.dad,
-        body: { enabled: false, visibility: "GROUP", ownerEmail: null } }), 200, "관찰 에이전트 정리");
+      const cleanup: Promise<unknown>[] = [];
+      if (issued !== undefined) cleanup.push(call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad })
+        .then((response) => expectStatus(response, 200, "관찰 토큰 정리")));
+      if (conversationId !== undefined) cleanup.push(call(context, `/chat/conversations/${conversationId}`, { method: "DELETE", token: context.tokens.dad })
+        .then((response) => expectStatus(response, 204, "관찰 대화 정리")));
+      cleanup.push(call(context, `/admin/agents/${AGENT}`, { method: "PATCH", token: context.tokens.dad,
+        body: { enabled: false, visibility: "PRIVATE", ownerEmail: "dad@example.com" } })
+        .then((response) => expectStatus(response, 200, "관찰 에이전트 정리")));
+      const results = await Promise.allSettled(cleanup);
+      if (!failed) {
+        const rejected = results.find((result) => result.status === "rejected");
+        if (rejected?.status === "rejected") throw rejected.reason;
+      }
     }
   },
 };
