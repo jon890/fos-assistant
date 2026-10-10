@@ -11,10 +11,10 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.AgentToolService;
-import com.bifos.assistant.agent.application.AgentToolView;
 import com.bifos.assistant.agent.application.ProfileSkillFiles;
-import com.bifos.assistant.agent.application.ToolsetVisibilityService;
+import com.bifos.assistant.agent.application.model.AgentToolView;
+import com.bifos.assistant.agent.application.toolset.AgentToolService;
+import com.bifos.assistant.agent.application.toolset.ToolsetVisibilityService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;

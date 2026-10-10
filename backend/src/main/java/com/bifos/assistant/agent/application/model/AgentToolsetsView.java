@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.application.model;
 
 import java.util.List;
 

@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.application;
 
+import com.bifos.assistant.agent.application.toolset.AgentDefaultToolsets;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;

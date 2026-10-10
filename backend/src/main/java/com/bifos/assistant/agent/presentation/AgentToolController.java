@@ -1,8 +1,8 @@
 package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.AgentToolService;
-import com.bifos.assistant.agent.application.AgentToolsetsView;
+import com.bifos.assistant.agent.application.model.AgentToolsetsView;
+import com.bifos.assistant.agent.application.toolset.AgentToolService;
 import com.bifos.assistant.agent.presentation.AgentDtos.ToolsetView;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateToolsetsRequest;
 import com.bifos.assistant.shared.auth.CurrentUser;

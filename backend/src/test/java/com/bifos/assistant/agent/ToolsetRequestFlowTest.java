@@ -10,9 +10,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.ToolsetRequestService;
-import com.bifos.assistant.agent.application.ToolsetRequestView;
-import com.bifos.assistant.agent.application.ToolsetVisibilityService;
+import com.bifos.assistant.agent.application.model.ToolsetRequestView;
+import com.bifos.assistant.agent.application.toolset.ToolsetRequestService;
+import com.bifos.assistant.agent.application.toolset.ToolsetVisibilityService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolsetRequest;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
