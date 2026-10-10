@@ -128,3 +128,42 @@ test("실패 요약은 관련 WARN을 보존하고 로그의 인증·주소·본
     assert.equal(masked.includes(raw), false, raw);
   }
 });
+
+test("구조화 로그는 JSON 헤더와 중첩 문자열 본문을 가리고 관찰 필드를 보존한다", () => {
+  const secret = 'probe-"quoted"-secret';
+  const cases = [
+    { Cookie: "sid=probe-short-cookie" },
+    { Authorization: "Basic YTpi" },
+    { payload: JSON.stringify({ input: "probe-private-body" }) },
+    { payload: JSON.stringify({ token: "tiny" }) },
+    { result: "probe-tool-result" },
+    { note: secret },
+    { headers: { authorization: "Basic YTpi" }, result: { content: "probe-nested-result" } },
+    { payload: JSON.stringify({ payload: JSON.stringify({ input: "probe-deep-body" }) }) },
+  ];
+  for (const sensitive of cases) {
+    const metadata = { logger: "HttpHermesRunsClient", level: "WARN", at: "2026-01-01T00:00:00Z",
+      sessionId: "child-fixture", status: 401 };
+    const masked = maskBackendLog(JSON.stringify({ ...metadata, ...sensitive }), [secret]);
+    const decoded = JSON.parse(masked);
+    for (const [key, value] of Object.entries(metadata)) assert.equal(decoded[key], value);
+    for (const raw of ["probe-short-cookie", "YTpi", "probe-private-body", "tiny", "probe-tool-result",
+      "quoted", "probe-nested-result", "probe-deep-body"]) assert.equal(masked.includes(raw), false);
+    assert.match(backendFailureExcerpt(masked), /HttpHermesRunsClient/);
+  }
+});
+
+test("해석할 수 없는 본문 덤프는 차단하고 WARN 시각과 session 관찰을 남긴다", () => {
+  const prefix = "2026-01-01T00:00:00Z WARN SubagentUsageReconciler sessionId=child-fixture ";
+  for (const dump of ['payload={\\"input\\":\\"probe-opaque-body\\"}',
+    '{"result":"probe-opaque-body"', 'body=probe-opaque-body token=tiny']) {
+    const masked = maskBackendLog(prefix + dump, []);
+    assert.equal(masked.includes("probe-opaque-body"), false);
+    assert.equal(masked.includes("tiny"), false);
+    assert.ok(masked.startsWith(prefix));
+    assert.match(masked, /\[본문 가림\]/);
+    assert.ok(backendFailureExcerpt(masked).split("\n").includes(masked));
+  }
+  const observation = prefix + "재조회 응답 없음 status=401 reads=1";
+  assert.equal(maskBackendLog(observation, []), observation);
+});
