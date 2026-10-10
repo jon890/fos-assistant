@@ -92,9 +92,17 @@ def _decimal(value, zero=False):
     _require(Decimal(value) >= 0 if zero else Decimal(value) > 0)
 
 
+def _display_text(value, maximum):
+    _require(isinstance(value, str))
+    value.encode("utf-8")
+    # producer의 Java String.length와 ISO control 판정을 따른다. 본문 byte 상한은 _bounded가 맡는다.
+    _require(1 <= len(value.encode("utf-16-le")) // 2 <= maximum
+             and not any(ord(ch) <= 0x1f or 0x7f <= ord(ch) <= 0x9f for ch in value))
+
+
 def _order(value, original=False):
     _require(isinstance(value["symbol"], str) and re.fullmatch(r"[A-Za-z0-9.-]{1,32}", value["symbol"]))
-    _require(isinstance(value["market"], str) and 1 <= len(value["market"]) <= 16)
+    _display_text(value["market"], 16)
     _require(isinstance(value["currency"], str) and re.fullmatch(r"[A-Z]{3}", value["currency"]))
     _require(value["side"] in ("BUY", "SELL") and value["orderType"] in ("LIMIT", "MARKET")
              and value["timeInForce"] in ("DAY", "CLS", "OPG"))
@@ -104,7 +112,8 @@ def _order(value, original=False):
     _require((value["price"] is not None) == (value["orderType"] == "LIMIT"))
     _require(value["orderAmount"] is None or value["orderType"] == "MARKET")
     if original:
-        _require(value["quantity"] is not None and isinstance(value["status"], str) and 1 <= len(value["status"]) <= 32)
+        _require(value["quantity"] is not None)
+        _display_text(value["status"], 32)
         _decimal(value["filledQuantity"], zero=True)
 
 
