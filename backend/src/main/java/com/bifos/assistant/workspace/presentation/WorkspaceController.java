@@ -40,8 +40,9 @@ public class WorkspaceController {
     }
 
     @GetMapping("/entries")
-    public ListingView entries(@RequestParam(required = false) String path) {
-        return ListingView.of(workspace.list(currentUser.require(), path));
+    public ListingView entries(
+            @RequestParam(required = false) String path, @RequestParam(required = false) String cursor) {
+        return ListingView.of(workspace.list(currentUser.require(), path, cursor));
     }
 
     /** 경로 하나를 지운다. 이름에 주소 조각으로 쓸 수 없는 문자가 있어도 인자로 받으므로 지울 수 있다. */

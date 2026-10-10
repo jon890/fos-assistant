@@ -64,10 +64,14 @@ public class WorkspaceService {
     }
 
     public WorkspaceListing list(CurrentUser user, String rawPath) {
+        return list(user, rawPath, null);
+    }
+
+    public WorkspaceListing list(CurrentUser user, String rawPath, String cursor) {
         Path ownerDir = requireOwnerDir(user);
         WorkspacePath path = WorkspacePath.parse(rawPath);
         try {
-            return WorkspaceTree.list(ownerDir, path, LIST_LIMIT).orElseThrow(WorkspaceService::notFound);
+            return WorkspaceTree.list(ownerDir, path, LIST_LIMIT, cursor).orElseThrow(WorkspaceService::notFound);
         } catch (IOException ex) {
             throw readFailed(user, ex);
         }

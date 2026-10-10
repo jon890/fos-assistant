@@ -389,7 +389,7 @@ Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한�
 | 경로 | 하는 일 | 응답 |
 | --- | --- | --- |
 | `GET /api/v1/workspace` | 공간의 상태 | `{available, deletable, exists, runningExecutions, agents: [{code, name, shared}]}`. `exists` 는 사용자 디렉터리가 있는지다. `agents` 는 요청자가 주인이고 켜져 있으며 지우지 않은 에이전트이고, `shared` 는 그룹에 공개했는지다. `runningExecutions` 는 사용자 실행 한도가 세는 지금 쥔 자리 수다 |
-| `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 읽는 순서로 1,001개까지 읽고, 그 가운데 1,000개를 디렉터리 먼저, 이름 순서로 준다. 1,001번째가 있으면 `truncated` 가 참이고, 그때는 순서상 앞선 항목도 빠질 수 있다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
+| `GET /api/v1/workspace/entries?path=&cursor=` | 디렉터리 한 페이지. 두 인자는 선택이다 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated, nextCursor}`. 전체 스트림에서 cursor 뒤의 가장 작은 1,001건을 유지하고 디렉터리 먼저, Java 이름 순서로 1,000건을 준다. `truncated`는 다음 페이지가 있다는 뜻이며 `nextCursor`는 표시한 마지막 키다. 끝이면 null이다. `size`는 `FILE`만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다. cursor 검사와 2초 순회 예산, 동시 변경의 한계는 [`파일 공간`](../../docs/features/workspace.md)의 「목록 페이지」가 갖는다 |
 | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
 | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
 | `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |
