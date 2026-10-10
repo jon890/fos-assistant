@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { draftChanges, draftRevision } from "../src/changes.ts";
 import { PHOTO_DIRECTORY_PROBLEM, photoProblem } from "../src/draft.ts";
+import { CHANGES_MAX } from "../src/overwrite-draft.ts";
 import { renderDraft, type RenderInput } from "../src/render.ts";
 import { createServer } from "../src/server.ts";
 
@@ -48,6 +50,18 @@ const input = (extra: Partial<RenderInput> = {}): RenderInput => ({
   photo_notes: { "1": "가게 앞 간판", "2": "비빔국수 한 그릇" },
   artifact_path: "noodle-review/index.html",
   ...extra,
+});
+
+test("비교 상한을 넘는 변경은 꾸밈 보존 안내와 함께 미리보기를 거절한다", async () => {
+  const original = { title: "원본", category: "일상", tags: [], body: Array(2000).fill("가").join("\n") };
+  const result = await renderDraft(input({
+    ...original, base: original, kind: "preview", photo_dir: undefined,
+    body: Array(2000).fill("나").join("\n"),
+  }), undefined);
+  expect(result.problems).toEqual([expect.stringContaining("문단의 꾸밈을 안전하게 보존할 수 없습니다")]);
+  expect(result.html).toBeNull();
+  expect(result.assets).toEqual([]);
+  expect("changes" in result).toBe(false);
 });
 
 test("미리보기는 첨부 이름의 사진만 첨부 주소로 부르고 설명을 붙인다", async () => {
@@ -236,4 +250,132 @@ test("render_draft 도구는 없는 사진과 서명이 틀린 사진을 같은 
 
   expect(problems).toEqual([photoProblem(1), photoProblem(2)]);
   expect(photoProblem(1)).toBe("1번째 사진 자리의 사진을 쓸 수 없습니다.");
+});
+
+const BASE = {
+  title: "동네 국숫집",
+  category: "맛집",
+  tags: ["가상국수", "국수"],
+  body: ["안녕하세요", "[기존 사진 1]", "간판이 정겹다", "[기존 사진 2]", "끝"].join("\n"),
+};
+
+/** 덮어쓸 글. 본문 한 줄과 태그 하나를 고치고 기존 사진의 차례를 바꾼다. */
+const overwriteInput = (extra: Partial<RenderInput> = {}): RenderInput => ({
+  title: BASE.title,
+  category: BASE.category,
+  tags: ["가상국수", "점심"],
+  body: ["안녕하세요", "[기존 사진 2]", "간판부터 <정겹다>", "[기존 사진 1]", "끝"].join("\n"),
+  artifact_path: "noodle-review/index.html",
+  base: BASE,
+  ...extra,
+});
+
+test("base 를 주면 바뀌는 내용과 원래 글의 지문을 돌려주고 본문 위에 바뀌는 내용을 보인다", async () => {
+  const request = overwriteInput();
+  const result = await renderDraft(request, attachmentDir);
+
+  expect(result.problems).toEqual([]);
+  if (result.html === null) throw new Error("html 이 null 이다");
+  expect(result.changes).toBe(draftChanges(BASE, request));
+  expect(result.changes).not.toBe("");
+  expect(result.base_revision).toBe(draftRevision(BASE));
+  expect(result.html).toContain("<h2>바뀌는 내용</h2>");
+  expect(result.html).toContain("+ 간판부터 &lt;정겹다&gt;");
+  expect(result.html).toContain('<p class="placeholder">기존 사진 1</p>');
+  expect(result.html).toContain('<p class="placeholder">기존 사진 2</p>');
+  expect(result.html).not.toContain("[기존 사진 1]</p>");
+  expect(result.html.indexOf("바뀌는 내용")).toBeLessThan(result.html.indexOf("<article>"));
+});
+
+test("base 없는 미리보기에는 바뀌는 내용과 지문이 없다", async () => {
+  const result = await renderDraft(input(), attachmentDir);
+
+  expect(result.html).not.toContain("바뀌는 내용");
+  expect("changes" in result).toBe(false);
+  expect("base_revision" in result).toBe(false);
+});
+
+test.each([
+  ["kind package", { kind: "package" as const }, "덮어쓰기 미리보기는 kind preview 만 받습니다."],
+  ["photo_dir", { photo_dir: "/tmp/photos" }, "덮어쓰기에는 photo_dir 을 주지 않습니다."],
+])("base 와 %s 를 함께 주면 html 없이 problems 를 돌려준다", async (_, extra, problem) => {
+  const result = await renderDraft(overwriteInput(extra), attachmentDir);
+
+  expect(result.html).toBeNull();
+  expect(result.assets).toEqual([]);
+  expect(result.problems).toEqual([problem]);
+});
+
+test("바뀐 줄 옆의 원래 줄이 승인 카드에 가려지면 덮어쓸 수 없다는 problems 다", async () => {
+  const hidden = `링크 https://example.com/${"x".repeat(32)}`;
+  const base = { ...BASE, body: BASE.body.replace("끝", hidden) };
+  const result = await renderDraft(
+    overwriteInput({ base, body: overwriteInput().body.replace("끝", hidden) }),
+    attachmentDir,
+  );
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual([
+    expect.stringContaining("본문 5번째 줄에 승인 카드가 가리는"),
+  ]);
+});
+
+test("지운 원래 줄만 승인 카드에 가려져도 바뀌는 내용에서 덮어쓸 수 없다는 problems 다", async () => {
+  const base = { ...BASE, body: BASE.body.replace("끝", `링크 https://example.com/${"x".repeat(32)}`) };
+  const result = await renderDraft(overwriteInput({ base }), attachmentDir);
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual([expect.stringContaining("바뀌는 내용에 승인 카드가 가리는")]);
+});
+
+test("base 를 주어도 원래 글과 같으면 바뀐 것이 없다는 problems 다", async () => {
+  const result = await renderDraft(
+    overwriteInput({ tags: [...BASE.tags], body: BASE.body }),
+    attachmentDir,
+  );
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual(["바뀐 것이 없습니다."]);
+});
+
+test("바뀌는 내용이 CHANGES_MAX 를 넘으면 html 없이 problems 다", async () => {
+  const longBase = { ...BASE, body: "가".repeat(CHANGES_MAX) };
+  const result = await renderDraft(
+    overwriteInput({ base: longBase, tags: [...BASE.tags], body: "끝" }),
+    attachmentDir,
+  );
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual(["바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요."]);
+});
+
+test("base 없이 기존 구성요소 줄을 주면 새 글 문장으로 거절한다", async () => {
+  const { base: _, ...request } = overwriteInput();
+  const result = await renderDraft(request, attachmentDir);
+
+  expect(result.html).toBeNull();
+  expect(result.problems).toEqual([
+    "[기존 사진 2] 같은 기존 구성요소 줄은 새 글에 넣을 수 없습니다. 그 줄을 지우거나 [사진 N: 파일 이름] 으로 바꿉니다.",
+  ]);
+});
+
+test("render_draft 도구는 base 를 받아 changes 와 base_revision 을 결과 글에 담는다", async () => {
+  const client = new Client({ name: "naver-blog-test", version: "1.0.0" });
+  const server = createServer({ NAVER_BLOG_ATTACHMENT_DIR: attachmentDir });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const request = overwriteInput();
+  try {
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    const result = await client.callTool({ name: "render_draft", arguments: request });
+    const body = JSON.parse((result.content as Array<{ text: string }>)[0]!.text);
+
+    expect(result.isError).not.toBe(true);
+    expect(body.problems).toEqual([]);
+    expect(body.changes).toBe(draftChanges(BASE, request));
+    expect(body.base_revision).toBe(draftRevision(BASE));
+  } finally {
+    await client.close();
+    await server.close();
+  }
 });

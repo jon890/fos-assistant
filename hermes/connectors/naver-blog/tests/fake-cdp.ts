@@ -207,6 +207,9 @@ export type FakeDraft = {
   tags: string[];
 };
 
+/** 편집기 문서. `getDocumentData()` 와 `setDocumentData()` 가 주고받는 모양이다. */
+type FakeDocument = { documentId?: unknown; document?: { components?: unknown[] } };
+
 const TITLE_SELECTOR = JSON.stringify(".se-documentTitle .se-text-paragraph");
 const BODY_SELECTOR = JSON.stringify(".se-component.se-text .se-text-paragraph");
 
@@ -215,6 +218,16 @@ function quoted(expression: string, after: string) {
   const start = expression.indexOf(after);
   const match = /"(?:[^"\\]|\\.)*"/.exec(expression.slice(start + after.length));
   return match ? (JSON.parse(match[0]) as string) : "";
+}
+
+/** 편집기 문서의 제목 구성요소 글. */
+function titleOf(components: unknown[]) {
+  const title = components.find(
+    (component) => (component as { "@ctype"?: unknown })?.["@ctype"] === "documentTitle",
+  ) as { title?: Array<{ nodes?: Array<{ value?: unknown }> }> } | undefined;
+  return (title?.title ?? [])
+    .map((paragraph) => (paragraph.nodes ?? []).map((node) => (typeof node.value === "string" ? node.value : "")).join(""))
+    .join("");
 }
 
 /** 식 안에서 `[<숫자>]` 로 고른 순번을 꺼낸다. */
@@ -279,6 +292,16 @@ export class FakeEditor {
   /** 참이면 목록 응답을 부르는 식에 답하지 않는다. */
   hangList = false;
   listOpen = false;
+  /** 지금 편집기 문서. 비면 `loaded` 로 답한다. `setDocumentData` 가 바꾼다. */
+  document: FakeDocument | null = null;
+  /** 지금 편집기 문서의 번호. 비면 새 글이다. */
+  documentId = "";
+  /** 참이면 불러온 글의 저장 단추가 그 글을 고치지 않는다. 저장되지 않은 덮어쓰기를 만든다. */
+  ignoreUpdate = false;
+  /** 참이면 글을 고칠 때 고친 시각을 읽을 수 없는 값으로 둔다. 목록이 `saved_at: null` 을 준다. */
+  loseModiDateOnUpdate = false;
+  /** 참이면 새 글의 저장 단추가 새 글 대신 불러온 글을 고친다. 사본 저장이 원래 글을 고친 상황을 만든다. */
+  backupUpdatesLoaded = false;
 
   private readonly storage = new Map<string, string>();
   private focused: "title" | "body" | "search" | "tag" | null = null;
@@ -397,7 +420,7 @@ export class FakeEditor {
         this.results = this.places[this.search] ?? [];
         this.selectedResult = -1;
       } else if (this.focused === "tag") {
-        this.tags.push(this.tagInput);
+        if (!this.tags.includes(this.tagInput)) this.tags.push(this.tagInput);
         this.tagInput = "";
       }
       return;
@@ -420,7 +443,11 @@ export class FakeEditor {
       };
     if (finder.includes(".se-popup button")) {
       if (!this.popup || quoted(finder, "===") !== "취소") return null;
-      return () => (this.popup = "");
+      return () => {
+        this.popup = "";
+        this.document = null;
+        this.documentId = "";
+      };
     }
     if (finder.includes("button.se-image-toolbar-button")) return this.photoAction;
     if (finder.includes(".se-module-image")) {
@@ -470,6 +497,8 @@ export class FakeEditor {
       if (!this.listOpen || !draft) return null;
       return () => {
         this.loaded = this.loadInstead ?? draft;
+        this.document = { document: { components: structuredClone(this.loaded.components) } };
+        this.documentId = String(this.loaded.logNo);
         this.listOpen = false;
         this.category = draft.category;
         this.tags = [...draft.tags];
@@ -484,15 +513,55 @@ export class FakeEditor {
         this.categoryListOpen = false;
       };
     }
+    if (finder.includes("tag-item-") && finder.endsWith("?.querySelector('button')")) {
+      const tag = quoted(finder, "===");
+      if (!this.settingsOpen || !this.tags.includes(tag)) return null;
+      return () => (this.tags = this.tags.filter((item) => item !== tag));
+    }
     if (finder.includes('document.querySelectorAll("button")') && quoted(finder, "===") === "저장")
-      return () => {
-        if (this.saveIncrements) this.saved += 1;
-      };
+      return () => this.save();
     return null;
+  }
+
+  /**
+   * 저장 단추. 문서가 없으면 새 글 시험처럼 수만 늘린다.
+   * 문서 번호가 목록의 글이면 그 글을 지금 문서와 설정으로 고치고, 비었으면 새 글로 맨 앞에 넣는다.
+   */
+  private save() {
+    if (!this.saveIncrements) return;
+    if (!this.document) {
+      this.saved += 1;
+      return;
+    }
+    const components = structuredClone(this.document.document?.components ?? []);
+    const content = { components, title: titleOf(components), category: this.category, tags: [...this.tags] };
+    const target = this.drafts.find((draft) => String(draft.logNo) === this.documentId);
+    if (target) {
+      if (this.ignoreUpdate) return;
+      Object.assign(target, content, {
+        modiDate: this.loseModiDateOnUpdate ? Number.NaN : target.modiDate + 1000,
+      });
+      return;
+    }
+    if (this.documentId) return;
+    if (this.backupUpdatesLoaded && this.loaded) {
+      Object.assign(this.loaded, content, { modiDate: this.loaded.modiDate + 1000 });
+      return;
+    }
+    const logNo = Math.max(224000000000, ...this.drafts.map((draft) => draft.logNo)) + 1;
+    const modiDate = Math.max(0, ...this.drafts.map((draft) => draft.modiDate)) + 1000;
+    this.drafts.unshift({ logNo, modiDate, ...content });
+    this.saved += 1;
   }
 
   /** 식 하나에 화면 상태로 답한다. */
   private evaluate(expression: string): unknown {
+    if (expression.includes("editor.setDocumentData(")) {
+      const doc = JSON.parse(quoted(expression, "const doc = ")) as FakeDocument;
+      this.document = doc;
+      this.documentId = String(doc.documentId ?? "");
+      return true;
+    }
     if (expression.includes("TempPostList.naver")) {
       const tempPostList = this.drafts.map(({ logNo, title, modiDate }) => ({
         blogNo: 1,
@@ -505,6 +574,8 @@ export class FakeEditor {
       const text = this.listStatus === 200 ? `\n${JSON.stringify(body)}` : upstreamText;
       return JSON.stringify({ status: this.listStatus, text });
     }
+    if (expression.includes("getDocumentData") && this.document)
+      return JSON.stringify({ ...this.document, documentId: this.documentId });
     if (expression.includes("getDocumentData"))
       return JSON.stringify(
         this.loaded
