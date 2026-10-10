@@ -113,4 +113,3 @@ class NativeImageContractTest(unittest.TestCase):
             self.assertIn("판독 실패", fallback)
             self.assertIn("첫 프레임", fallback)
             self.assertIn("축소한 전체 개요", fallback)
-
