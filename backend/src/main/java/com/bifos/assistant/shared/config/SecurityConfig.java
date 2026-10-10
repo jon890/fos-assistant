@@ -6,6 +6,7 @@ import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -52,7 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/internal/browser-gateway/**")
                         .permitAll()
                         // 본문의 일회성 ticket은 claim controller가 직접 인증한다.
-                        .requestMatchers("/internal/connector-executions/claim")
+                        .requestMatchers(HttpMethod.POST, "/internal/connector-executions/claim")
                         .permitAll()
                         .requestMatchers(
                                 "/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate")

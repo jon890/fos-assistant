@@ -8,6 +8,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
@@ -35,6 +36,8 @@ import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -54,8 +57,12 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.Calendar;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -154,6 +161,166 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         assertThat(claims.claim(input(raw)).allowed()).isTrue();
         assertThat(row(f).consumedAt()).isEqualTo(NOW);
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {30, 300})
+    @DisplayName("나노초 Clock의 실제 발급과 소비를 MICROS로 저장하고 승인 만료와 60초 중 먼저 만료한다")
+    void normalizesNanoClockAndLimitsExpiry(long approvalSeconds) {
+        Instant approvalExpiry = NOW.plusSeconds(approvalSeconds);
+        Fixture f = fixture(approvalExpiry);
+        clock.set(NOW.plusNanos(789));
+        String raw = tickets.issue(f.action());
+        var payload = tickets.authenticate(raw);
+        Instant expiry = NOW.plusSeconds(Math.min(60, approvalSeconds));
+        assertThat(payload.issuedAt()).isEqualTo(NOW);
+        assertThat(payload.expiresAt()).isEqualTo(expiry);
+        assertThat(row(f).ticketExpiresAt()).isEqualTo(expiry);
+        assertThat(jdbc.<Instant>queryForObject(
+                        "select ticket_expires_at from connector_action_execution where action_id = ?",
+                        (result, number) -> result.getTimestamp(1, Calendar.getInstance(TimeZone.getTimeZone("UTC")))
+                                .toInstant(),
+                        f.actionId()))
+                .isEqualTo(expiry);
+        assertThat(claims.claim(input(raw)).allowed()).isTrue();
+        assertThat(row(f).consumedAt()).isEqualTo(clock.instant().truncatedTo(ChronoUnit.MICROS));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("짧은 승인 만료가 실제 commit 직전에 도달하면 발급과 소비를 롤백한다")
+    void rejectsShortApprovalExpiryAtCommit(boolean consume) {
+        Fixture f = fixture(NOW.plusSeconds(30));
+        clock.set(NOW.plusNanos(789));
+        String raw = consume ? tickets.issue(f.action()) : null;
+        var before = row(f);
+        var reached = new AtomicBoolean();
+        PlatformTransactionManager expiring = new PlatformTransactionManager() {
+            @Override
+            public TransactionStatus getTransaction(TransactionDefinition definition) {
+                var status = manager.getTransaction(definition);
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void beforeCommit(boolean readOnly) {
+                        reached.set(true);
+                        clock.set(NOW.plusSeconds(30));
+                    }
+                });
+                return status;
+            }
+
+            @Override
+            public void commit(TransactionStatus status) {
+                manager.commit(status);
+            }
+
+            @Override
+            public void rollback(TransactionStatus status) {
+                manager.rollback(status);
+            }
+        };
+        var issuing =
+                new ConnectorExecutionTicket(current, codec, actions, contents, users, expiring, clock, properties);
+        var consuming =
+                new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, expiring, clock);
+        assertThatThrownBy(() -> {
+                    if (consume) {
+                        consuming.claim(input(raw));
+                    } else {
+                        issuing.issue(f.action());
+                    }
+                })
+                .isInstanceOf(ApiException.class);
+        assertThat(reached).isTrue();
+        assertUnchanged(f, before);
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "inactive",
+                "readOnly",
+                "originMissing",
+                "originUser",
+                "originAgent",
+                "owner",
+                "profile",
+                "connectionRevision",
+                "bindingRevision"
+            })
+    @DisplayName("발급 뒤 현재 권한·origin·소유자·profile·각 revision이 달라지면 claim과 외부 실행을 거절한다")
+    void rejectsChangedClaimContextWithoutConsuming(String defect) {
+        Fixture f = fixture();
+        String raw = tickets.issue(f.action());
+        var before = row(f);
+        injectContextDefect(f, defect);
+        assertThatThrownBy(() -> claims.claim(input(raw)))
+                .isInstanceOf(ApiException.class)
+                .extracting("code")
+                .isEqualTo(ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        assertUnchanged(f, before);
+        assertThat(EXECUTE_REQUESTS.get()).isZero();
+    }
+
+    private void injectContextDefect(Fixture f, String defect) {
+        var context = current.readContext(f.action());
+        // 정상 발급과 분리한 DB 결함 주입이다. 실제 서비스의 선행 커밋 검사는 별도 시험이 맡는다.
+        switch (defect) {
+            case "inactive" ->
+                jdbc.update(
+                        "update allowed_person set enabled = false where email = ?",
+                        f.user().email());
+            case "readOnly" ->
+                tx().executeWithoutResult(status -> {
+                    var conversation = Conversation.startedForCheck(f.user().id(), "검사", context.agentId(), NOW);
+                    em.persist(conversation);
+                    em.flush();
+                    var check = ProactiveCheck.started(
+                            f.user().id(), context.agentId(), conversation.id(), CheckTrigger.MANUAL, false, NOW);
+                    check.attachRoot(context.originExecutionId(), "test-root");
+                    em.persist(check);
+                });
+            case "originMissing" ->
+                jdbc.update("delete from agent_execution where id = ?", context.originExecutionId());
+            case "owner" -> {
+                var other = users.saveAndFlush(
+                        AppUser.of(UUID.randomUUID() + "@example.test", "다른 주인", 1L, UserRole.MEMBER, NOW));
+                jdbc.update("update connector_connection set user_id = ? where id = ?", other.id(), f.connection());
+            }
+            case "originUser", "originAgent" -> {
+                Fixture other = fixture();
+                var otherContext = current.readContext(other.action());
+                switch (defect) {
+                    case "originUser" ->
+                        jdbc.update(
+                                "update agent_execution set user_id = ? where id = ?",
+                                other.user().id(),
+                                context.originExecutionId());
+                    case "originAgent" ->
+                        jdbc.update(
+                                "update agent_execution set agent_id = ? where id = ?",
+                                otherContext.agentId(),
+                                context.originExecutionId());
+                    default -> throw new IllegalArgumentException(defect);
+                }
+            }
+            case "profile" ->
+                jdbc.update(
+                        "update agent set hermes_profile = ? where id = ?",
+                        "changed-" + UUID.randomUUID(),
+                        context.agentId());
+            case "connectionRevision" ->
+                jdbc.update(
+                        "update connector_connection set updated_at = ? where id = ?",
+                        Timestamp.from(NOW.plusSeconds(1)),
+                        f.connection());
+            case "bindingRevision" ->
+                jdbc.update(
+                        "update agent_connector_binding set updated_at = ? where id = ?",
+                        Timestamp.from(NOW.plusSeconds(1)),
+                        f.binding());
+            default -> throw new IllegalArgumentException(defect);
+        }
     }
 
     @ParameterizedTest
@@ -524,6 +691,10 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
     }
 
     Fixture fixture() {
+        return fixture(NOW.plusSeconds(300));
+    }
+
+    Fixture fixture(Instant approvalExpiry) {
         return tx().execute(status -> {
             String id = UUID.randomUUID().toString();
             var user = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER, NOW));
@@ -569,7 +740,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                     Sha256.hex(id),
                     Sha256.hex(args),
                     NOW);
-            action.awaitApproval(args, NOW.plusSeconds(300));
+            action.awaitApproval(args, approvalExpiry);
             actions.saveAndFlush(action);
             contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
                     action,

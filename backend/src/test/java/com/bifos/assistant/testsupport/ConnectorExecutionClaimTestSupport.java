@@ -33,7 +33,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 실제 커넥터 HTTP 대역과 세 검사가 공유하는 Spring 컨텍스트다. */
+/** 실제 커넥터 HTTP 대역과 발급·claim·벡터 검사가 공유하는 Spring 컨텍스트다. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Import(IntegrationTestDoubles.class)
@@ -65,6 +65,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
     protected static final AtomicReference<String> CATALOG_BODY = new AtomicReference<>(CATALOG);
     protected static final AtomicReference<Barrier> BARRIER = new AtomicReference<>();
     protected static final AtomicInteger CATALOG_REQUESTS = new AtomicInteger();
+    protected static final AtomicInteger EXECUTE_REQUESTS = new AtomicInteger();
     protected static final AtomicBoolean FAIL_CATALOG = new AtomicBoolean();
     protected static final AtomicBoolean CONFIGURED = new AtomicBoolean(true);
     protected static final HttpServer REMOTE = server();
@@ -89,6 +90,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
         FAIL_CATALOG.set(false);
         CONFIGURED.set(true);
         BARRIER.set(null);
+        EXECUTE_REQUESTS.set(0);
     }
 
     @AfterEach
@@ -163,6 +165,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
         } else if ("/api/connector-vault".equals(uri)) {
             response = "{\"ok\":true,\"changed\":true}";
         } else if ("/api/connectors/demo-financial/call".equals(uri)) {
+            EXECUTE_REQUESTS.incrementAndGet();
             response = "{\"ok\":true,\"result\":{\"verified\":true}}";
         } else if ("/api/mcp/servers/demo/test".equals(uri)) {
             response = "{\"ok\":true,\"tools\":[{\"name\":\"prepare\"},{\"name\":\"place_order\"}]}";

@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 
@@ -74,6 +76,42 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
         for (String uri : new String[] {CLAIM + "/extra", CLAIM + "-extra", "/internal/connector-executions/support"}) {
             assertThat(post(uri, "{}", null, false).statusCode()).isIn(401, 403);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"})
+    @DisplayName("ticket 없는 비 POST claim은 실제 HTTP 필터의 인증 경계에서 거절된다")
+    void rejectsAnonymousNonPostClaim(String method) throws Exception {
+        Fixture f = fixture();
+        tickets.issue(f.action());
+        var before = row(f);
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + CLAIM))
+                .timeout(Duration.ofSeconds(10))
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .build();
+        try (var client = HttpClient.newHttpClient()) {
+            assertThat(client.send(request, HttpResponse.BodyHandlers.ofString())
+                            .statusCode())
+                    .isIn(401, 403);
+            String jwt = Jwts.builder()
+                    .subject(f.user().email())
+                    .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8)))
+                    .compact();
+            jdbc.update(
+                    "update allowed_person set enabled = false where email = ?",
+                    f.user().email());
+            var revoked = HttpRequest.newBuilder(request.uri())
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "Bearer " + jwt)
+                    .method(method, HttpRequest.BodyPublishers.noBody())
+                    .build();
+            assertThat(client.send(revoked, HttpResponse.BodyHandlers.ofString())
+                            .statusCode())
+                    .isEqualTo(401);
+        }
+        assertThat(row(f).ticketId()).isEqualTo(before.ticketId());
+        assertThat(row(f).ticketExpiresAt()).isEqualTo(before.ticketExpiresAt());
+        assertThat(row(f).consumedAt()).isNull();
     }
 
     private HttpResponse<String> post(String uri, String body, String token, boolean chunked) throws Exception {

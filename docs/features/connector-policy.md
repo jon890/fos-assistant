@@ -439,7 +439,8 @@ ticket은 padding 없는 canonical base64url payload와 32바이트 HMAC-SHA256 
 ticket 원문과 서명, 복호화 본문을 DB, 로그, 오류, 화면과 모델에 남기지 않는다.
 
 `POST /internal/connector-executions/claim`은 정확히 `{ticket,tool,argsSha256,scope}`를 받는다.
-이 정확한 URI에서만 본문의 ticket으로 인증하며 JWT와 profile Bearer로 대신하지 않는다.
+이 URI의 POST만 JWT 인증 예외다. 다른 HTTP 메서드는 기존 사용자 인증을 거친다.
+이 POST 요청은 본문의 ticket으로 인증하며 JWT와 profile Bearer로 대신하지 않는다.
 scope는 선언한 키와 문자열 값으로 대조하므로 JSON 키 순서나 공백은 해시에 영향을 주지 않는다.
 성공 응답은 정확히 `{v:1,allowed:true,ticketId,expiresAt}`이며 소비 트랜잭션의 실제 커밋 뒤에 반환한다.
 

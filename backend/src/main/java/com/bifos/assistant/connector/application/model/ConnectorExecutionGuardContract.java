@@ -3,7 +3,7 @@ package com.bifos.assistant.connector.application.model;
 import java.util.List;
 import java.util.Map;
 
-/** 型とキーを検証した保護宣言だ。宣言の存在だけでは金融呼び出しを開かない。 */
+/** 타입과 키를 검증한 보호 선언이다. 선언이 있다는 이유만으로 금융 호출을 허용하지 않는다. */
 public record ConnectorExecutionGuardContract(
         String protocol, String prepareTool, List<ScopeField> scopeFields, Map<String, String> operations) {
     public ConnectorExecutionGuardContract {
