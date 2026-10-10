@@ -148,19 +148,12 @@ tasks.register("qualityCheck") {
     dependsOn("archTest", "checkstyleMain", "checkstyleTest", "spotlessCheck")
 }
 
-/**
- * Java 포맷은 Spotless 와 palantir-java-format 이 정한다.
- * ratchetFrom 은 HEAD 와 origin/main 의 공통 조상에서 바뀐 파일만 검사하고 고친다.
- * 저장소 전체를 한 번에 바꾸지 않고, 파일을 처음 고칠 때 그 파일 전체가 포맷된다.
- * 선택 까닭은 ADR-042 에 있고, 사용법은 backend/AGENTS.md 의 「포맷」 절에 있다.
- */
 spotless {
-    ratchetFrom("origin/main")
+    // 기본은 변경 파일만 검사한다. 전체 사본 검증이나 명시적 전체 적용에서만 해제한다.
+    if (!providers.gradleProperty("formatAll").map(String::toBoolean).getOrElse(false)) ratchetFrom("origin/main")
     java {
         target("src/main/java/**/*.java", "src/test/java/**/*.java")
-        palantirJavaFormat(libs.versions.palantir.java.format.get())
-        trimTrailingWhitespace()
-        endWithNewline()
+        eclipse(libs.versions.eclipse.jdt.get()).configFile("config/spotless/eclipse-formatter.xml")
     }
 }
 

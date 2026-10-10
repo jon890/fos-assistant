@@ -4,59 +4,75 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** 에이전트가 쓸 수 있는 toolset과 변경 권한을 한곳에서 판정한다. */
+/**
+ * 에이전트가 쓸 수 있는 toolset과 변경 권한을 한곳에서 판정한다.
+ */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AgentToolPolicy {
 
     public static final String MEMORY = "memory";
-    /** 올린 스킬을 모델이 읽는 toolset 이다. 올린 스킬이 있는 동안은 끄지 못한다(ADR-034). */
+    /**
+     * 올린 스킬을 모델이 읽는 toolset 이다. 올린 스킬이 있는 동안은 끄지 못한다(ADR-034).
+     */
     public static final String SKILLS = "skills";
-    /** 사진을 읽는 toolset 이다. 사진을 받는 커넥터는 이것을 함께 선언한다(ADR-044). */
+    /**
+     * 사진을 읽는 toolset 이다. 사진을 받는 커넥터는 이것을 함께 선언한다(ADR-044).
+     */
     public static final String VISION = "vision";
-    /** 실행 공간의 셸 toolset 이다. {@code scripts/} 가 든 스킬은 이것이 켜진 에이전트에만 저장한다(ADR-20261009-skill-package). */
+    /**
+     * 실행 공간의 셸 toolset 이다. {@code scripts/} 가 든 스킬은 이것이 켜진 에이전트에만 저장한다(ADR-20261009-skill-package).
+     */
     public static final String TERMINAL = "terminal";
-    /** Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다. */
+    /**
+     * Control Plane 이 여는 MCP 서버의 Hermes 등록 이름이며, 도구 저장 때 허용 목록에 늘 남긴다.
+     */
     public static final String CONTROL_PLANE_MCP = "fos-assistant";
-    /** 모델의 원본 재조회 도구다. 사용자에게 설정 항목으로 노출하지 않는다. */
+    /**
+     * 모델의 원본 재조회 도구다. 사용자에게 설정 항목으로 노출하지 않는다.
+     */
     public static final String ATTACHMENT_INSPECTION = "fos-attachments";
 
-    private static final Set<String> OWNER_TOOLSETS =
-            Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
+    private static final Set<String> OWNER_TOOLSETS = Set.of("web", "vision", "todo", "clarify", "skills", "tts", "delegation");
     private static final Set<String> ADMIN_TOOLSETS = Set.of(
-            "terminal",
-            "file",
-            "code_execution",
-            "browser",
-            "computer_use",
-            "cronjob",
-            "image_gen",
-            "video_gen",
-            "homeassistant",
-            "spotify",
-            "discord",
-            "session_search");
+        "terminal",
+        "file",
+        "code_execution",
+        "browser",
+        "computer_use",
+        "cronjob",
+        "image_gen",
+        "video_gen",
+        "homeassistant",
+        "spotify",
+        "discord",
+        "session_search");
     // session_search 는 그 profile 의 모든 플랫폼 대화와, `profile` 인자로 다른 profile 의 대화까지 읽는다.
     private static final Set<String> PRIVATE_ONLY_TOOLSETS = Set.of(
-            "terminal",
-            "file",
-            "code_execution",
-            "vision",
-            "image_gen",
-            "video_gen",
-            "browser",
-            "computer_use",
-            "session_search");
-    /** 사용자별 실행 공간에서 도는 toolset 이다. 켜진 동안은 주인을 바꾸지 못한다(ADR-086). */
-    private static final Set<String> SANDBOX_TOOLSETS =
-            Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
-    /** 커넥터 manifest 가 연결용 에이전트에 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구뿐이다(ADR-044). */
+        "terminal",
+        "file",
+        "code_execution",
+        "vision",
+        "image_gen",
+        "video_gen",
+        "browser",
+        "computer_use",
+        "session_search");
+    /**
+     * 사용자별 실행 공간에서 도는 toolset 이다. 켜진 동안은 주인을 바꾸지 못한다(ADR-086).
+     */
+    private static final Set<String> SANDBOX_TOOLSETS = Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
+    /**
+     * 커넥터 manifest 가 연결용 에이전트에 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구뿐이다(ADR-044).
+     */
     private static final Set<String> CONNECTOR_TOOLSETS = Set.of(AgentToolPolicy.VISION);
 
     private static final Set<String> CONFIGURABLE_TOOLSETS;
@@ -67,14 +83,17 @@ public final class AgentToolPolicy {
         CONFIGURABLE_TOOLSETS = Set.copyOf(names);
     }
 
+
     public enum Tier {
         OWNER,
         ADMIN
     }
 
+
     public static boolean isKnown(String name) {
         return CONFIGURABLE_TOOLSETS.contains(name);
     }
+
 
     public static Tier tierOf(String name) {
         if (OWNER_TOOLSETS.contains(name)) {
@@ -86,15 +105,18 @@ public final class AgentToolPolicy {
         throw new IllegalArgumentException("unknown toolset");
     }
 
+
     public static boolean requiresPrivate(String name) {
         return PRIVATE_ONLY_TOOLSETS.contains(name);
     }
 
+
     public static boolean mayEdit(CurrentUser user, Agent agent, String name) {
         return tierOf(name) == Tier.OWNER
-                ? (user.isAdmin() || Objects.equals(user.id(), agent.ownerUserId()))
-                : user.isAdmin();
+            ? (user.isAdmin() || Objects.equals(user.id(), agent.ownerUserId()))
+            : user.isAdmin();
     }
+
 
     /**
      * 요청자가 보낸 전체 목록을 검사하고 Hermes에 저장할 목록을 계산한다.
@@ -105,11 +127,11 @@ public final class AgentToolPolicy {
      * @param connectorServers 그 에이전트에 붙은 커넥터의 MCP 서버 이름
      */
     public static List<String> requestedForWrite(
-            CurrentUser user,
-            Agent agent,
-            List<String> requested,
-            List<String> currentlyEnabled,
-            Set<String> connectorServers) {
+        CurrentUser user,
+        Agent agent,
+        List<String> requested,
+        List<String> currentlyEnabled,
+        Set<String> connectorServers) {
         if (requested == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "enabled toolsets are required");
         }
@@ -119,10 +141,10 @@ public final class AgentToolPolicy {
                 continue;
             }
             if (name == null
-                    || name.isBlank()
-                    || MEMORY.equals(name)
-                    || CONTROL_PLANE_MCP.equals(name)
-                    || !isKnown(name)) {
+                || name.isBlank()
+                || MEMORY.equals(name)
+                || CONTROL_PLANE_MCP.equals(name)
+                || !isKnown(name)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "the requested toolset is not allowed");
             }
             if (!requestedSet.add(name)) {
@@ -150,31 +172,39 @@ public final class AgentToolPolicy {
         }
         if (agent.visibility() == AgentVisibility.GROUP && result.stream().anyMatch(AgentToolPolicy::requiresPrivate)) {
             throw new ApiException(
-                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
+                ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
         result.add(CONTROL_PLANE_MCP);
         if (!agent.connectorManaged()
-                && agent.acceptsAttachments()
-                && currentlyEnabled.contains(ATTACHMENT_INSPECTION)) {
+            && agent.acceptsAttachments()
+            && currentlyEnabled.contains(ATTACHMENT_INSPECTION)) {
             result.add(ATTACHMENT_INSPECTION);
         }
         result.addAll(connectorServers);
         return List.copyOf(result);
     }
 
-    /** 커넥터가 선언한 toolset 이 모두 manifest 로 열 수 있는 것인가. */
+
+    /**
+     * 커넥터가 선언한 toolset 이 모두 manifest 로 열 수 있는 것인가.
+     */
     public static boolean allowedForConnector(List<String> declared) {
         return CONNECTOR_TOOLSETS.containsAll(declared);
     }
+
 
     public static boolean hasPrivateOnlyToolset(List<String> enabled) {
         return enabled.stream().anyMatch(AgentToolPolicy::requiresPrivate);
     }
 
-    /** 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 이 하나라도 켜졌는가(ADR-091). */
+
+    /**
+     * 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 이 하나라도 켜졌는가(ADR-091).
+     */
     public static boolean hasSandboxToolset(List<String> enabled) {
         return enabled.stream().anyMatch(SANDBOX_TOOLSETS::contains);
     }
+
 
     /**
      * 첫 로그인의 기본 도구로 둘 수 있는가. 주인 등급이거나 실행 공간에서만 도는 도구다.
@@ -186,12 +216,18 @@ public final class AgentToolPolicy {
         return OWNER_TOOLSETS.contains(name) || SANDBOX_TOOLSETS.contains(name);
     }
 
-    /** 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 을 뺀 목록이다. 실행 공간이 없는 profile 에 기본 도구를 켤 때 쓴다. */
+
+    /**
+     * 사용자별 실행 공간에서 도는 셸·파일·사진 toolset 을 뺀 목록이다. 실행 공간이 없는 profile 에 기본 도구를 켤 때 쓴다.
+     */
     public static List<String> withoutSandboxToolsets(List<String> names) {
         return names.stream().filter(name -> !SANDBOX_TOOLSETS.contains(name)).toList();
     }
 
-    /** 연결을 붙일 때 셸과 파일 접근 위험을 알려야 하는 도구가 켜졌는가. */
+
+    /**
+     * 연결을 붙일 때 셸과 파일 접근 위험을 알려야 하는 도구가 켜졌는가.
+     */
     public static boolean hasShellOrFileToolset(List<String> enabled) {
         return enabled.contains("terminal") || enabled.contains("file") || enabled.contains("code_execution");
     }

@@ -12,9 +12,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -139,30 +141,37 @@ public class Agent {
     @Getter
     private String defaultModelProvider;
 
-    /** 이 에이전트의 기본 모델이다. */
+    /**
+     * 이 에이전트의 기본 모델이다.
+     */
     @Column(name = "default_model", length = 128)
     @Getter
     private String defaultModel;
 
-    /** 이 에이전트의 기본 effort 다. 모델 없이 이 값만 둘 수 있다. */
+    /**
+     * 이 에이전트의 기본 effort 다. 모델 없이 이 값만 둘 수 있다.
+     */
     @Column(name = "default_reasoning_effort", length = 16)
     @Getter
     private String defaultReasoningEffort;
 
-    /** 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다. */
+    /**
+     * 아직 한 번도 저장하지 않은 새 에이전트다. 데이터베이스에서 읽은 에이전트는 거짓이다.
+     */
     @Transient
     private boolean created;
 
+
     private Agent(
-            String code,
-            String name,
-            String hermesProfile,
-            String apiBaseUrl,
-            CostMode costMode,
-            CredentialScope credentialScope,
-            AgentVisibility visibility,
-            Long ownerUserId,
-            Instant now) {
+        String code,
+        String name,
+        String hermesProfile,
+        String apiBaseUrl,
+        CostMode costMode,
+        CredentialScope credentialScope,
+        AgentVisibility visibility,
+        Long ownerUserId,
+        Instant now) {
         this.code = code;
         this.name = name;
         this.hermesProfile = hermesProfile;
@@ -176,6 +185,7 @@ public class Agent {
         this.created = true;
     }
 
+
     /**
      * 처음 저장할 때 {@link AgentCreated} 를 한 번 낸다. 저장소의 저장이 끝난 직후 Spring Data 가 읽는다.
      *
@@ -186,45 +196,58 @@ public class Agent {
         return created ? List.of(new AgentCreated(this)) : List.of();
     }
 
+
     @AfterDomainEventPublication
     void clearCreatedEvents() {
         created = false;
     }
 
+
     public static Agent of(
-            String code,
-            String name,
-            String hermesProfile,
-            String apiBaseUrl,
-            CostMode costMode,
-            CredentialScope credentialScope,
-            AgentVisibility visibility,
-            Long ownerUserId,
-            Instant now) {
+        String code,
+        String name,
+        String hermesProfile,
+        String apiBaseUrl,
+        CostMode costMode,
+        CredentialScope credentialScope,
+        AgentVisibility visibility,
+        Long ownerUserId,
+        Instant now) {
         return new Agent(
-                code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId, now);
+            code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId, now);
     }
+
 
     private static String stripTrailingSlash(String url) {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
-    /** 기본 모델과 effort 를 바꾼다. 검증은 부르는 쪽이 끝낸 값만 받는다. 모두 null 이면 profile 의 값으로 돌아간다. */
+
+    /**
+     * 기본 모델과 effort 를 바꾼다. 검증은 부르는 쪽이 끝낸 값만 받는다. 모두 null 이면 profile 의 값으로 돌아간다.
+     */
     public void changeDefaultModel(String provider, String model, String reasoningEffort) {
         this.defaultModelProvider = provider;
         this.defaultModel = model;
         this.defaultReasoningEffort = reasoningEffort;
     }
 
-    /** Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다. */
+
+    /**
+     * Control Plane 이 이 에이전트의 profile 을 만들었다고 적는다. 지울 때 그 profile 까지 거둔다.
+     */
     public void markManagedProfile() {
         this.profileManaged = true;
     }
 
-    /** connector 가 만든 에이전트는 일반 설정 화면에서 바꾸지 않는다. */
+
+    /**
+     * connector 가 만든 에이전트는 일반 설정 화면에서 바꾸지 않는다.
+     */
     public void markConnectorManaged() {
         this.connectorManaged = true;
     }
+
 
     /**
      * 연결용 에이전트가 사진을 받는지 적는다. 연결용 에이전트에만 뜻이 있다.
@@ -234,6 +257,7 @@ public class Agent {
     public void acceptConnectorAttachments(boolean accepted) {
         this.connectorAttachments = accepted;
     }
+
 
     /**
      * 지운 에이전트로 적고 끈다.
@@ -245,14 +269,19 @@ public class Agent {
         this.enabled = false;
     }
 
+
     public boolean isDeleted() {
         return deletedAt != null;
     }
 
-    /** 흐름 이름을 붙이거나 뗀다. 빈 문자열은 비운 것과 같게 본다. */
+
+    /**
+     * 흐름 이름을 붙이거나 뗀다. 빈 문자열은 비운 것과 같게 본다.
+     */
     public void assignFlow(String flow) {
         this.flow = flow == null || flow.isBlank() ? null : flow.strip();
     }
+
 
     /**
      * 이 에이전트의 대화에 사진을 붙일 수 있다.
@@ -264,10 +293,11 @@ public class Agent {
      */
     public boolean acceptsAttachments() {
         return visibility == AgentVisibility.PRIVATE
-                && ownerUserId != null
-                && (!connectorManaged || connectorAttachments)
-                && (flow == null || flow.isBlank());
+            && ownerUserId != null
+            && (!connectorManaged || connectorAttachments)
+            && (flow == null || flow.isBlank());
     }
+
 
     /**
      * Hermes 가 셸·파일·사진 도구를 돌릴 격리 실행 공간의 주인 키다(ADR-091).
@@ -280,20 +310,26 @@ public class Agent {
         return ownerUserId != null ? "u" + ownerUserId : "a" + id;
     }
 
+
     public boolean isReadableBy(Long userId) {
         return visibility == AgentVisibility.GROUP || Objects.equals(ownerUserId, userId);
     }
 
-    /** 「먼저 살펴보기에 쓰기 도구 허용」 을 켜거나 끈다. 관리자 경로만 부른다. */
+
+    /**
+     * 「먼저 살펴보기에 쓰기 도구 허용」 을 켜거나 끈다. 관리자 경로만 부른다.
+     */
     public void changeProactiveCheckWritesAllowed(boolean allowed) {
         this.proactiveCheckWritesAllowed = allowed;
     }
+
 
     public void changeAccess(boolean enabled, AgentVisibility visibility, Long ownerUserId) {
         this.enabled = enabled;
         this.visibility = visibility;
         this.ownerUserId = ownerUserId;
     }
+
 
     /**
      * Hermes API 주소를 바꾼다.
