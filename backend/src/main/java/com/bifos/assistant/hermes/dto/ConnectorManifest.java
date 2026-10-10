@@ -1,6 +1,7 @@
 package com.bifos.assistant.hermes.dto;
 
 import java.util.List;
+import tools.jackson.databind.JsonNode;
 
 /**
  * 대시보드 카탈로그가 내는 커넥터 하나의 선언이다(ADR-043).
@@ -36,7 +37,8 @@ public record ConnectorManifest(
         ConnectorAppearance appearance,
         boolean singleBinding,
         boolean ownerBrowser,
-        String ownerBrowserLoginUrl) {
+        String ownerBrowserLoginUrl,
+        JsonNode executionGuard) {
 
     public ConnectorManifest {
         description = description == null ? "" : description;
@@ -45,6 +47,42 @@ public record ConnectorManifest(
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+    /** 보호 선언을 모르는 기존 카탈로그 생성자다. 누락은 미지원이다. */
+    public ConnectorManifest(
+            String id,
+            String title,
+            String description,
+            List<ConnectorField> fields,
+            String verifyTool,
+            String mcpServer,
+            List<String> toolsets,
+            boolean attachments,
+            int schema,
+            List<ConnectorTool> tools,
+            List<String> skills,
+            ConnectorAppearance appearance,
+            boolean singleBinding,
+            boolean ownerBrowser,
+            String ownerBrowserLoginUrl) {
+        this(
+                id,
+                title,
+                description,
+                fields,
+                verifyTool,
+                mcpServer,
+                toolsets,
+                attachments,
+                schema,
+                tools,
+                skills,
+                appearance,
+                singleBinding,
+                ownerBrowser,
+                ownerBrowserLoginUrl,
+                null);
     }
 
     /** 연결을 에이전트 하나로 제한하지 않고 사용자 브라우저를 쓰지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */

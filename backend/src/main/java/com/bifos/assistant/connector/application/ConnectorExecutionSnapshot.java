@@ -133,10 +133,8 @@ public final class ConnectorExecutionSnapshot {
         require(action.argsJson() != null && Sha256.hex(action.argsJson()).equals(action.argsSha256()));
         ConnectorExecutionSnapshot snapshot =
                 validate(action.argsJson(), executionArgsJson, summaryJson, scopeJson, operation);
-        declaredScope(
-                scopeFieldsJson,
-                object(scopeJson, 2 * 1024),
-                binding.connection().fields().values());
+        snapshot.validateDeclaredScope(
+                scopeFieldsJson, binding.connection().fields().values());
         String key = snapshot.requestKey(action.userId(), binding.connection().id(), action.toolName());
         String[] plain = {executionArgsJson, summaryJson, scopeJson};
         String[] columns = {"execution_args_json", "summary_json", "scope_json"};
@@ -225,7 +223,9 @@ public final class ConnectorExecutionSnapshot {
         return Sha256.hex(body.toString());
     }
 
-    private static void declaredScope(String raw, JsonNode scope, Map<String, String> publicFields) {
+    /** 저장 scope를 현재 공개 칸과 대조하며 원문을 다시 직렬화하지 않는다. */
+    public void validateDeclaredScope(String raw, Map<String, String> publicFields) {
+        JsonNode scope = object(scopeJson, 2 * 1024);
         JsonNode fields = parse(raw, 2 * 1024);
         require(fields.isArray() && !fields.isEmpty() && fields.size() <= 8);
         Set<String> args = new HashSet<>();

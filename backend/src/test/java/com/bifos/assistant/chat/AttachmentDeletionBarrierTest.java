@@ -11,6 +11,8 @@ import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ConversationPurger;
 import com.bifos.assistant.chat.application.ConversationWriter;
+import com.bifos.assistant.chat.application.MediaObservationCleaner;
+import com.bifos.assistant.chat.application.MediaObservationService;
 import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -18,6 +20,8 @@ import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.chat.infra.MediaObservationRepository;
+import com.bifos.assistant.chat.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -103,6 +107,18 @@ public class AttachmentDeletionBarrierTest {
     ChatContentMutationCoordinator mutations;
 
     @Autowired
+    MediaObservationCleaner observations;
+
+    @Autowired
+    MediaObservationService observationService;
+
+    @Autowired
+    MediaObservationRepository observationRows;
+
+    @Autowired
+    MediaObservationRequestRepository observationRequests;
+
+    @Autowired
     TestClock clock;
 
     @Autowired
@@ -138,10 +154,22 @@ public class AttachmentDeletionBarrierTest {
     @Test
     @DisplayName("삭제 요청 커밋과 파일 작업 전후에 접근을 막고 완료 기록 전 종료를 기동 정리로 복구한다")
     protected void retainsBarrierBeforeDuringAndAfterFileDeletion() {
+        observationService.record(
+                owner,
+                conversation.id(),
+                photo.id(),
+                0,
+                UUID.randomUUID(),
+                ObservationFixture.input(),
+                ObservationFixture.model());
         AttachmentStore interruptedStore = new AttachmentStore(properties) {
             @Override
             public synchronized void delete(ChatAttachment attachment) {
                 assertBlocked();
+                assertThat(observationRows.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()))
+                        .isEmpty();
+                assertThat(observationRequests.findAll())
+                        .noneMatch(row -> photo.id().equals(row.attachmentId()));
                 assertThat(file(photo)).exists();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt())
                         .isNull();
@@ -151,13 +179,13 @@ public class AttachmentDeletionBarrierTest {
                 throw new IllegalStateException("synthetic stop before completion commit");
             }
         };
-        var interrupted = new AttachmentCleaner(attachments, interruptedStore, clock, mutations);
+        var interrupted = new AttachmentCleaner(attachments, interruptedStore, clock, mutations, observations);
         assertThatThrownBy(() -> interrupted.delete(photo, NOW)).isInstanceOf(IllegalStateException.class);
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
                 .isEqualTo(NOW);
         assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt()).isNull();
         clock.advance(Duration.ofSeconds(1));
-        var restarted = new AttachmentCleaner(attachments, store, clock, mutations);
+        var restarted = new AttachmentCleaner(attachments, store, clock, mutations, observations);
         restarted.runScheduled();
         var completed = attachments.findById(photo.id()).orElseThrow();
         assertThat(completed.deletionRequestedAt()).isEqualTo(NOW);
@@ -339,7 +367,7 @@ public class AttachmentDeletionBarrierTest {
                 super.delete(attachment);
             }
         };
-        var expiring = new AttachmentCleaner(attachments, validating, clock, mutations);
+        var expiring = new AttachmentCleaner(attachments, validating, clock, mutations, observations);
         assertThat(expiring.cleanExpired(clock.instant())).isEqualTo(1);
         assertThat(checked).isTrue();
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
@@ -410,7 +438,7 @@ public class AttachmentDeletionBarrierTest {
                 super.delete(attachment);
             }
         };
-        return new AttachmentCleaner(attachments, paused, clock, mutations);
+        return new AttachmentCleaner(attachments, paused, clock, mutations, observations);
     }
 
     private void assertBlocked() {

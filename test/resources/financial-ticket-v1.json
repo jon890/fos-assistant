@@ -1,0 +1,9 @@
+{
+  "token": "claim-test-secret",
+  "payload": "{\"v\":1,\"ticketId\":\"11111111-1111-4111-8111-111111111111\",\"actionId\":\"22222222-2222-4222-8222-222222222222\",\"userId\":11,\"agentId\":12,\"connectionId\":13,\"bindingId\":14,\"profile\":\"test-profile\",\"connectorId\":\"demo-financial\",\"tool\":\"place_order\",\"argsSha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"scopeSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"issuedAt\":\"2026-10-10T00:00:02.123456Z\",\"expiresAt\":\"2026-10-10T00:01:02.123456Z\"}",
+  "payloadBase64Url": "eyJ2IjoxLCJ0aWNrZXRJZCI6IjExMTExMTExLTExMTEtNDExMS04MTExLTExMTExMTExMTExMSIsImFjdGlvbklkIjoiMjIyMjIyMjItMjIyMi00MjIyLTgyMjItMjIyMjIyMjIyMjIyIiwidXNlcklkIjoxMSwiYWdlbnRJZCI6MTIsImNvbm5lY3Rpb25JZCI6MTMsImJpbmRpbmdJZCI6MTQsInByb2ZpbGUiOiJ0ZXN0LXByb2ZpbGUiLCJjb25uZWN0b3JJZCI6ImRlbW8tZmluYW5jaWFsIiwidG9vbCI6InBsYWNlX29yZGVyIiwiYXJnc1NoYTI1NiI6ImFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJzY29wZVNoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiLCJpc3N1ZWRBdCI6IjIwMjYtMTAtMTBUMDA6MDA6MDIuMTIzNDU2WiIsImV4cGlyZXNBdCI6IjIwMjYtMTAtMTBUMDA6MDE6MDIuMTIzNDU2WiJ9",
+  "signatureBase64Url": "-eV0tgxaRH9thxpz1lyj6T0ZMZM9r9KyrFUqdYh4aJg",
+  "wrongTokenSignature": "wamswzhhK0eX-pyFjFwXomOKct0Jrn1mEAl-XL0qQgM",
+  "wrongKeyDomainSignature": "ZI-otFJoOKiwgSIAoAdi-LHh7Ht5kJwSz-pzUFJmYxo",
+  "wrongSignDomainSignature": "inM6frOsnnfzXC2kARarzz89ZfqEEtEztclizv6OsC8"
+}

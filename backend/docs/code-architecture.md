@@ -22,7 +22,7 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
-| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록 |
+| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록, 첨부 관찰 revision과 요청 alias |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/features/execution.md`](../../docs/features/execution.md)) |
 | `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
 | `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
@@ -49,6 +49,14 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
 처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
+
+### 첨부 관찰
+
+첨부 관찰의 권한·원본 검사와 CAS/USER 보호는 `MediaObservationService`가 맡는다.
+`MediaObservationBodies`는 `crypto.domain.TextCipher`로 본문 한 칸을 암호화하며 메시지의 owner 캐시는 사용하지 않는다.
+저장과 삭제는 기존 `ChatContentMutationCoordinator`의 사용자·대화·첨부 잠금에 참가한다.
+`MediaObservationCleaner`의 참가 메서드는 MANDATORY이며 첨부·대화 삭제의 사전 callback에서 호출한다.
+만료 정리는 대상마다 별도 coordinator 트랜잭션을 연다. [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 서비스 범위를 갖는다.
 
 ### 에이전트 도구
 
