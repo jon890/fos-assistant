@@ -2,6 +2,8 @@
 
 대화에 사진을 올려 에이전트에게 보내고, 에이전트가 만든 HTML 결과물을 보관하고 보이는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
+
 ## 요구
 
 - 사진을 고르면 그 자리에서 올라가고, 보내기를 눌러야 에이전트가 그 사진을 받는다.

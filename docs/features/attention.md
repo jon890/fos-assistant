@@ -2,6 +2,8 @@
 
 사용자가 묻지 않아도 지금 볼 항목을 골라 지금 화면에 보이고, 할 일과 알림을 남기는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/attention/`, `backend/src/main/java/com/bifos/assistant/followup/`, `backend/src/main/java/com/bifos/assistant/notification/`, `web/src/components/now/`, `web/src/components/notification/`, `web/src/app/now/`, `web/src/app/notifications/`, `web/src/lib/attention-api.ts`, `web/src/lib/notification-api.ts`
+
 ## 요구
 
 - **지금 화면**(`/now`)은 요청자 자신의 Control Plane 기록에서 지금 볼 항목을 골라 정해진 카드에 모은다. 판정은 Hermes 를 부르지 않고 실행, 커넥터 호출, Memory 쓰기, 할 일 만들기를 시작하지 않는다. 기본값이 알리지 않음인 까닭은 [ADR-072](../adr/ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md), 원래 기록을 읽어 만든 view 인 까닭은 [ADR-074](../../web/docs/adr/ADR-074-지금-화면은-원래-기록을-읽어-만든-view-이고-정해진-카드-넷만-그린다.md) 가 갖는다

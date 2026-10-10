@@ -2,6 +2,8 @@
 
 사용자가 에이전트를 만들고 고치고, 에이전트가 다른 에이전트에게 일을 맡기고, 스킬을 붙여 쓰는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/skill/`, `backend/src/main/java/com/bifos/assistant/agent/`, `web/src/components/agent/`, `web/src/app/agents/`, `web/src/lib/agent-api.ts`
+
 ## 요구
 
 - 모든 사용자가 화면에서 자기 에이전트를 만들고, 성격과 도구와 스킬을 고치고, 그룹에 공개하거나 지운다. 승인 절차는 없다. 공개해도 만든 사람이 주인이다([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md)).
