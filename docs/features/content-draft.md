@@ -1,31 +1,29 @@
 # 사진 참조를 고정한 원고 compiler
 
+covers: `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`
+
 typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으로 변환한다.
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.
 저장·권한 조회·미리보기 API·승인·job·화면 연동은 후속 구현이 담당한다.
 
 ## 정적 canonical 계약
 
-`CanonicalDraftV1`은 `{schemaVersion:1,draftId,revision,conversationId,title,category,tags,blocks}`다.
-draftId와 conversationId는 UUID 문자열이고 revision은 1 이상의 안전한 정수다.
-제목은 Unicode code point 1자에서 100자까지, category는 1자에서 50자까지다.
-tags는 30개까지이며 하나당 1자에서 30자까지, #과 쉼표를 금지한다.
+필드와 타입, 문자열 형식, 길이와 개수의 상한은 [`content-draft.ts`](../../hermes/connectors/naver-blog/src/content-draft.ts)의 schema 정의를 따른다.
+문자열 길이는 Unicode code point로 센다.
+
+| 대상 | 정의 위치 |
+| --- | --- |
+| canonical 원고 `CanonicalDraftV1` | `canonicalDraftV1Schema` |
+| 원고 블록 `CanonicalBlock` | `canonicalBlockSchema`와 그 정의가 참조하는 문자열 검증 함수 |
+| 호출자가 검증한 원본 참조 `ResolvedAsset` | `resolvedAssetSchema` |
+| 컴파일 결과 `CompiledSnapshotV1` | `compiledSnapshotV1Schema`와 `canonicalBlockTupleSchema` |
+
 trim과 소문자로 비교했을 때 중복 태그를 거절한다.
 태그 값 자체는 자동 정규화하지 않는다.
-blocks는 최대 500개다.
-
-| block | 필드 | 규칙 |
-| --- | --- | --- |
-| paragraph | `{type:"paragraph",text}` | 한 줄. CR/LF 금지. 빈 문단 허용 |
-| image | `{type:"image",assetId,caption?,observationRef?}` | assetId와 observationRef.id는 십진 문자열. caption은 300자까지. observationRef는 `{id,revision}`이며 같은 asset의 관찰만 허용 |
-| sticker | `{type:"sticker",code}` | 기존 DSL의 영숫자·밑줄·하이픈 1~64자 |
-| map | `{type:"map",name,address}` | 각각 1~200자. CR/LF와 `]`, name의 `|` 금지 |
-
 알 수 없는 필드와 block 종류는 거절한다.
 원본 사진의 중복 참조는 허용하고 블록 position으로 구별한다.
 누락은 허용하되 호출자가 preview에 포함 ID와 빠진 ID의 subset을 표시하며 모두 사용했다고 말하지 않는다.
 같은 사진이 두 번 나오면 업로드 자리 수는 2, 고유 asset 수는 1이다.
-사진 50개, 스티커 30개, 지도 30개, 컴파일된 body 20,000 code point까지다.
 caption은 이미지 바로 뒤의 실제 문단으로 컴파일한다.
 photo_notes는 관찰 설명이며 미리보기에만 보이는 안내로 표시한다.
 photo_notes는 canonical caption을 대체하지 않는다.
@@ -35,22 +33,18 @@ paragraph 또는 caption이 기존 사진·스티커·지도·기존 구성요�
 
 ### 순수 compiler와 포트
 
-`hermes/connectors/naver-blog/src/content-draft.ts`가 위 타입과 엄격한 schema를 갖는다.
-`hermes/connectors/naver-blog/src/content-compiler.ts`의 `compileContentDraft(draft:CanonicalDraftV1,assets:ResolvedAsset[]):CompiledSnapshotV1`은 순수 함수다.
+[`content-compiler.ts`](../../hermes/connectors/naver-blog/src/content-compiler.ts)의 `compileContentDraft`는 순수 함수다.
 FS, DB, HTTP, 날짜, random, Java 타입을 import하지 않는다.
-`ResolvedAsset`는 `{assetId,sourceFingerprint,fileName,photoDir,ordinal,observationNote?}`다.
 권한과 원본 지문, observationRef가 같은 asset의 관찰인지 검증하는 일은 호출자가 끝낸다.
 컴파일러는 missing asset, 상이한 photoDir, 중복 asset 정의와 `.small.jpg` 이름을 거절한다.
-sourceFingerprint는 SHA-256 소문자 64자리이며 ordinal은 1 이상의 안전한 정수다.
-fileName은 기존 DSL이 받는 원본 이름이고 photoDir은 `..` 조각과 NUL이 없는 절대 경로다.
+원본 이름과 경로의 허용 형식은 `resolvedAssetSchema`가 참조하는 `fileName`과 `photoDir` 정의를 따른다.
 이미지 DSL 순번은 문서 이미지 자리의 1부터 시작하며 기존 화면 순번은 호출자가 preview 안내에 따로 표시한다.
 fileName과 photoDir은 서버가 `ChatAttachment.storedName`과 설정에서 정한 원본 경로다.
 모델 원고 스키마에는 두 칸이 없다.
 
-`CompiledSnapshotV1`은 `{schemaVersion:1,compilerVersion:"content-compiler-v1",draftId,revision,canonicalBlocks,payload,photoNotes,assetManifest,payloadFingerprint,snapshotHash}`다.
-payload는 기존 `DraftInput`의 다섯 칸이며 photo_dir는 사진이 없으면 null 대신 생략한다.
-photoNotes는 이미지 자리 번호 문자열을 키로 하고 300자 설명을 값으로 한 map이다.
-assetManifest는 이미지 블록 순서대로 `{position,assetId,sourceFingerprint,fileName}`를 담는다.
+payload는 기존 `DraftInput`으로 전달하며 photo_dir는 사진이 없으면 null 대신 생략한다.
+photoNotes는 관찰 설명을 이미지 DSL 순번에 대응시킨다.
+assetManifest는 이미지 블록 순서대로 원본 참조를 담는다.
 position은 canonicalBlocks의 0부터 시작하는 배열 인덱스다. 이미지 DSL의 1부터 시작하는 사진 순번과 구분한다.
 title/category/tags/body와 원본 manifest, caption, 미리보기 설명, compiler/schema 버전이 해시에 들어간다.
 입력 객체를 바꿔도 snapshot이 바뀌지 않으며 반환된 JSON의 모든 객체와 배열을 고정한다.
