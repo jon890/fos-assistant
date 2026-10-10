@@ -48,10 +48,10 @@ async function probe(page: EditorPage, selector: string, scope: string) {
   const nodes = document.querySelectorAll(${JSON.stringify(selector)});
   const el = ${scope === ".se-documentTitle" ? "nodes.length === 1" : "nodes.length > 0"} ? nodes[0] : null;
   if (el) el.scrollIntoView({behavior: "instant", block: "center"});
-  const r = el?.getBoundingClientRect(), style = el && getComputedStyle(el);
+  const r = el?.getBoundingClientRect();
   const sized = !!r && r.width > 0 && r.height > 0;
-  const editable = !!el?.isContentEditable && style.visibility === "visible" &&
-    style.display !== "none" && Number(style.opacity) > 0;
+  const editable = !!el?.isContentEditable &&
+    el.checkVisibility({opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true});
   const x = r ? r.left + r.width / 2 : 0, y = r ? r.top + r.height / 2 : 0;
   const top = sized ? document.elementFromPoint(x, y) : null;
   const classify = n => {

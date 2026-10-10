@@ -48,9 +48,9 @@ export async function open(page: EditorPage, { keepDraftNotice = false } = {}) {
   const nodes = document.querySelectorAll(${JSON.stringify(TITLE_SELECTOR)});
   if (nodes.length !== 1) return false;
   const el = nodes[0];
-  const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+  const r = el.getBoundingClientRect();
   return el.isContentEditable && r.width > 0 && r.height > 0 &&
-    s.visibility === "visible" && s.display !== "none" && Number(s.opacity) > 0;
+    el.checkVisibility({opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true});
 })()`);
     if (!ready) continue;
     await clearProgress(page);

@@ -64,18 +64,21 @@ test("제목이 숨겨져도 읽기 경로는 작성 중인 글 알림을 먼저
   expect(browser.calls.slice(start)).not.toContain("Input.dispatchMouseEvent");
 });
 
-for (const direct of [true, false]) for (const scenario of ["replacement", "hidden"] as const) {
+for (const direct of [true, false]) for (const scenario of ["replacement", "hidden", "ancestorOpacity", "ancestorDisplay"] as const) {
   test(`실제 Chrome ${direct ? "직접" : "중계"} 연결의 readiness 직후 ${scenario}는 회복하고 입력을 대조한다`, async () => {
     const page = await ready({}, direct);
     await page.js(scenario === "replacement"
       ? `(() => {const old=document.getElementById('title'), parent=old.parentElement;
           const next=old.cloneNode(true);old.remove();setTimeout(()=>parent.append(next),120)})()`
-      : `(() => {const el=document.getElementById('title');el.style.display='none';
-          setTimeout(()=>el.style.display='',120)})()`);
+      : scenario === "hidden" ? `(() => {const el=document.getElementById('title');el.style.display='none';
+          setTimeout(()=>el.style.display='',120)})()`
+      : `(() => {const el=document.getElementById('title').parentElement;
+          el.style.${scenario === "ancestorOpacity" ? "opacity='0'" : "display='none'"};
+          setTimeout(()=>el.style.${scenario === "ancestorOpacity" ? "opacity" : "display"}='',120)})()`);
     const result = await focusTitle(page);
     expect(result.focused).toBe(true);
     expect(result.diagnostics.attempts).toBeGreaterThan(1);
-    expect(result.diagnostics.samples.some((s) => !s.sized)).toBe(true);
+    expect(result.diagnostics.samples.some((s) => !s.sized || !s.editable)).toBe(true);
     await fill(page, draft.title, parseBody(draft.body), "synthetic-hash");
     expect(await page.js<string>("document.getElementById('title').textContent")).toBe(draft.title);
     expect(await page.js<string>("document.getElementById('body').textContent")).toBe(draft.body);
@@ -84,6 +87,8 @@ for (const direct of [true, false]) for (const scenario of ["replacement", "hidd
 
 const failures = [
   { name: "끝까지 숨김", script: "document.getElementById('title').style.display='none'", expected: { sized: false } },
+  { name: "투명한 제목 조상", script: "document.getElementById('title').parentElement.style.opacity='0'", expected: { editable: false } },
+  { name: "표시하지 않는 제목 조상", script: "document.getElementById('title').parentElement.style.display='none'", expected: { sized: false } },
   { name: "가리는 overlay", script: overlay, expected: { hit: "other" } },
   { name: "원문 접근을 금지한 DOM", script: `${overlay}
     for(const id of ['title','body']) {
@@ -118,12 +123,45 @@ for (const scenario of failures) {
     expect(calls).not.toContain("Input.insertText");
     expect(calls).not.toContain("Input.dispatchKeyEvent");
     expect(calls).not.toContain("Page.setInterceptFileChooserDialog");
-    if (["가리는 overlay", "원문 접근을 금지한 DOM", "끝까지 숨김", "제목 없음", "편집 불가", "복수 제목"].includes(scenario.name))
+    if (["가리는 overlay", "원문 접근을 금지한 DOM", "끝까지 숨김", "투명한 제목 조상", "표시하지 않는 제목 조상", "제목 없음", "편집 불가", "복수 제목"].includes(scenario.name))
       expect(calls).not.toContain("Input.dispatchMouseEvent");
     const diagnostic = JSON.stringify(error.extra);
     for (const sensitive of [draft.title, draft.body, "synthetic-private", browser.url, "se-documentTitle", "#title"])
       expect(diagnostic).not.toContain(sensitive);
     expect(diagnostic.length).toBeLessThan(2500);
+  });
+}
+
+for (const property of ["opacity", "display"] as const) for (const recovers of [false, true]) {
+  test(`실제 Chrome 준비 판정은 제목 조상의 ${property} 숨김을 ${recovers ? "회복" : "거절"}한다`, async () => {
+    const { page, targetId } = await browser.tab({ openSeconds: recovers ? 0.5 : 0.15 });
+    cleanups.push(async () => { page.close(); await closeTab(browser.url, targetId); });
+    await page.js(`(() => {const parent=document.getElementById('title').parentElement;
+      parent.style.${property}='${property === "opacity" ? "0" : "none"}';
+      ${recovers ? `setTimeout(()=>parent.style.${property}='',120);` : ""}})()`);
+    if (recovers) expect(await open(page)).toBe("ready");
+    else expect((await open(page).catch(error => error)).message).toBe("글쓰기 화면이 뜨지 않았다");
+  });
+}
+
+for (const recovers of [false, true]) {
+  test(`실제 Chrome 커서는 본문 조상의 투명 상태를 ${recovers ? "회복" : "거절"}한다`, async () => {
+    const page = await ready();
+    await page.js(`(() => {const parent=document.getElementById('body').parentElement;
+      parent.style.opacity='0';${recovers ? "setTimeout(()=>parent.style.opacity='',120);" : ""}})()`);
+    const start = browser.calls.length;
+    const result = await focusField(page, ".se-component.se-text .se-text-paragraph", ".se-component.se-text");
+    expect(result.focused).toBe(recovers);
+    expect(result.diagnostics.samples.some(s => !s.editable)).toBe(true);
+    if (recovers) {
+      await fill(page, draft.title, parseBody(draft.body), "synthetic-hash");
+      expect(await page.js<string>("document.getElementById('title').textContent")).toBe(draft.title);
+      expect(await page.js<string>("document.getElementById('body').textContent")).toBe(draft.body);
+    } else {
+      expect(result.diagnostics.attempts).toBe(10);
+      expect(browser.calls.slice(start)).not.toContain("Input.dispatchMouseEvent");
+      expect(browser.calls.slice(start)).not.toContain("Input.insertText");
+    }
   });
 }
 

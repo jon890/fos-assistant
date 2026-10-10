@@ -227,6 +227,7 @@ MCP 서버 이름은 `naver-blog` 다.
 ### 입력 준비와 커서 실패 진단
 
 글쓰기 화면은 제목 문단이 하나이고, 보이는 크기와 편집 가능한 상태를 갖출 때 준비된 것으로 본다.
+제목과 본문의 표시 판정은 조상의 투명도와 표시 전환도 확인한다.
 작성 중인 글 알림의 유지·취소 정책을 먼저 적용한다.
 준비 직후 문단이 교체되거나 잠깐 숨겨지면 입력 단계는 기존 10회, 기본 대기 합계 3초 안에서 다시 찾는다.
 제목 가운데를 다른 요소가 가리면 그 요소를 누르거나 우회하지 않는다.
@@ -313,7 +314,22 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 커서 회귀는 전용 임시 profile의 로컬 headless Chrome에서 합성 HTML을 열어 실제 DOM과 CDP 입력을 검증한다.
 제목·본문 입력 회귀는 `Control+A`를 쓰는 기존 키 계약에 맞춰 Linux Chrome 환경에서 실행한다.
 실제 네이버와 사용자 브라우저에는 닿지 않는다. Chrome이 없으면 테스트를 생략하지 않고 실패한다.
-테스트용 실행 파일은 `FOS_TEST_CHROME`으로 지정할 수 있고, 지정하지 않으면 macOS와 Linux의 기본 설치 경로를 찾는다.
+기본 `bun run test`는 Linux에서 설치된 Chrome을 쓰고, macOS에서는 `scripts/test.Dockerfile`로 Linux Chromium과 Bun 1.3.14를 실행한다.
+`scripts/check-connectors.sh`도 이 기본 경로를 부른다. macOS에는 실행 중인 Docker와 Git이 필요하다.
+첫 실행은 이미지를 내려받아 만들고, 각 실행은 잠금 파일에 정해진 패키지를 설치한다.
+검사에는 Git으로 추적하는 공개 코드와 합성 fixture만 복사한다. 개인 환경 파일, 사진과 실제 profile은 넣지 않고, 실행마다 임시 profile과 자기 컨테이너를 정리한다.
+macOS Chrome의 기존 본문 Delete 명령 대기는 아직 해결하지 않았다. Linux 검사 성공은 macOS Chrome이나 실제 SmartEditor의 성공을 증명하지 않는다.
+테스트용 실행 파일은 `FOS_TEST_CHROME`으로 지정할 수 있다. macOS 기본 검사에서는 컨테이너 안의 Linux 실행 경로로 해석한다.
+직접 `bun test`를 부르면 Docker 실행기를 거치지 않으므로 macOS에서 같은 키 대기 문제가 남는다.
+
+```bash
+# cwd: 저장소 root
+bun run --cwd hermes/connectors/naver-blog test
+bun run --cwd hermes/connectors/naver-blog test -- ./tests/editor-focus.chrome.test.ts
+bash scripts/check-connectors.sh
+```
+
+Chrome 부재, 이미지 생성·패키지 설치 실패와 회귀 실패는 비영 종료 코드로 전달한다. Linux CI는 기존 native Chrome 검사를 계속 실행한다.
 합성 화면은 빈 입력 칸에서 입력과 사후 대조를 확인하며 SmartEditor의 내부 구현이나 운영 복구를 증명하지 않는다.
 그 서버는 중계 주소의 경로 아래만 받고, 중계처럼 `Origin` 머리가 있는 WebSocket 연결을 거절한다.
 
