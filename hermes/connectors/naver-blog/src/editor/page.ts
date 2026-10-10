@@ -3,6 +3,7 @@ import { BLOG_ID_PATTERN } from "../session.ts";
 import { EditorError, type EditorErrorCode } from "./editor-error.ts";
 
 export { EditorError, type EditorErrorCode } from "./editor-error.ts";
+export { focus, focusField } from "./focus.ts";
 
 /**
  * 기다리는 시간의 상한(초). 기본값은 원본이 실측으로 정한 값이다.
@@ -348,23 +349,6 @@ export async function paragraphs(page: EditorPage, selector: string): Promise<st
       " return c.textContent; }))",
   );
   return JSON.parse(raw || "[]");
-}
-
-/**
- * 선택자 자리를 눌러 커서가 scope 안에 들어간 것을 확인한다.
- * 화면을 막 연 직후 편집기가 본문으로 초점을 옮길 수 있어, 누른 뒤에도 자리를 보고 아니면 다시 누른다.
- */
-export async function focus(page: EditorPage, selector: string, scope: string, tries = 10) {
-  const inside =
-    "(() => { const n = getSelection().anchorNode;" +
-    " const e = n && (n.nodeType === 1 ? n : n.parentElement);" +
-    ` return !!(e && e.closest(${q(scope)})); })()`;
-  for (let i = 0; i < tries; i++) {
-    if (!(await click(page, selector))) return false;
-    await page.sleep(page.step(0.3));
-    if (await page.js(inside)) return true;
-  }
-  return false;
 }
 
 /**
