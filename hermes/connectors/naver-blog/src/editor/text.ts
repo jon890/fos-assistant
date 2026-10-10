@@ -3,7 +3,7 @@ import {
   BODY_SELECTOR,
   clearField,
   type EditorPage,
-  focus,
+  focusField,
   newParagraph,
   normalize,
   paragraphs,
@@ -65,13 +65,19 @@ export async function fill(page: EditorPage, title: string, blocks: Block[], dra
   const note = await requireClearScreen(page);
   if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 글자를 넣지 못한다");
 
-  if (!(await focus(page, TITLE_SELECTOR, ".se-documentTitle")))
-    throw page.fail("editor_failed", "제목 자리에 커서를 두지 못했다");
+  const titleFocus = await focusField(page, TITLE_SELECTOR, ".se-documentTitle");
+  if (!titleFocus.focused)
+    throw page.fail("editor_failed", "제목 자리에 커서를 두지 못했다", {
+      focus_diagnostics: titleFocus.diagnostics,
+    });
   await clearField(page);
   await typeLine(page, TITLE_SELECTOR, title);
 
-  if (!(await focus(page, BODY_SELECTOR, ".se-component.se-text")))
-    throw page.fail("editor_failed", "본문 자리에 커서를 두지 못했다");
+  const bodyFocus = await focusField(page, BODY_SELECTOR, ".se-component.se-text");
+  if (!bodyFocus.focused)
+    throw page.fail("editor_failed", "본문 자리에 커서를 두지 못했다", {
+      focus_diagnostics: bodyFocus.diagnostics,
+    });
   await clearField(page);
   const lines = bodyLines(blocks);
   for (const [index, line] of lines.entries()) {

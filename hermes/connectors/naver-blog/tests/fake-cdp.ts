@@ -602,6 +602,21 @@ export class FakeEditor {
         host: this.host,
         ready: this.host === "blog.naver.com",
       });
+    if (expression.includes("const focusProbe = true")) {
+      const selector = quoted(expression, "querySelectorAll(");
+      const action = this.clickAction(`document.querySelector(${JSON.stringify(selector)})`);
+      const area = selector.includes("documentTitle") ? "title" : "body";
+      return {
+        focused: this.focused === area,
+        spot: action ? { x: this.spot(action), y: 1 } : null,
+        sample: { elements: 1, sized: true, editable: true,
+          page_focused: true, page_visible: true, hit: area,
+          anchor: this.focused ?? "none", end: this.focused ?? "none",
+          active: this.focused ?? "other", collapsed: true },
+      };
+    }
+    if (expression.includes("const nodes = document.querySelectorAll(") &&
+        expression.includes("el.isContentEditable")) return this.host === "blog.naver.com";
     if (expression.includes("JSON.stringify({x: r.left")) {
       const finder = /const el = ([\s\S]*?);\n {2}if \(!el\)/.exec(expression)?.[1] ?? "";
       const action = this.clickAction(finder);
