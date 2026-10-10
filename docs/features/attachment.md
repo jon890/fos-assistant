@@ -35,7 +35,7 @@ REST/MCP/UI와 실제 분석 호출은 아직 제공하지 않는다.
 
 | 제출과 조회 | 결과 |
 | --- | --- |
-| 새 UUID와 현재 revision | 최신 MODEL 완료 결과의 분석 조건과 검증한 본문이 같으면 alias만 추가한다. 그 밖에는 revision을 하나 늘린다 |
+| 새 UUID와 현재 revision | 최신 MODEL 완료 결과와 분석 조건이 같고 후보의 암호화 본문 검증에 성공하면 alias만 추가한다. 그 밖에는 revision을 하나 늘린다 |
 | 같은 UUID와 같은 내용 | 최초 수락한 revision과 서버 관측 시각을 반환한다. 이후 revision은 바꾸지 않는다 |
 | 같은 UUID와 다른 내용, 새 UUID와 오래된 revision | 현재 revision만 담은 409다 |
 | 현재 USER 정정에 새 MODEL 제출 | revision이 맞아도 409다. 과거 UUID 재시도는 원래 revision만 읽는다 |
