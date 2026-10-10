@@ -30,11 +30,11 @@ class MediaObservationRequestTest extends ObservationFixture {
         UUID b = UUID.randomUUID();
         var first = record(0, a, input(), model());
         clock.advance(Duration.ofSeconds(1));
-        var second = record(1, b, input(), model());
+        var second = record(1, b, input(), changedModel());
         var restarted = local(store, bodies, observations, requests, attachments, access);
         assertThat(restarted.record(owner, conversation.id(), photo.id(), 0, a, input(), model()))
                 .isEqualTo(first);
-        assertThat(restarted.record(owner, conversation.id(), photo.id(), 1, b, input(), model()))
+        assertThat(restarted.record(owner, conversation.id(), photo.id(), 1, b, input(), changedModel()))
                 .isEqualTo(second);
         code(() -> record(1, b, input("변경"), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         code(() -> record(0, UUID.randomUUID(), input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
@@ -48,6 +48,10 @@ class MediaObservationRequestTest extends ObservationFixture {
         UUID id = UUID.randomUUID();
         var source = model();
         var first = record(0, id, input(), source);
+        jdbc.update(
+                "update media_observation_request set request_hash=? where request_id=?",
+                "773b2831653352837aa15a2ac9a8083629014e353d72a46612f7ddbf51a69b33",
+                id.toString());
         var changedTimestamp = new ObservationProvenance(
                 source.kind(),
                 source.executionId(),
@@ -72,6 +76,7 @@ class MediaObservationRequestTest extends ObservationFixture {
                 1,
                 "media-observation-v1"));
         assertThat(requests.findAll().getFirst().requestHash())
+                .isEqualTo("773b2831653352837aa15a2ac9a8083629014e353d72a46612f7ddbf51a69b33")
                 .isEqualTo(HexFormat.of().formatHex(digest.digest(fixed)));
         var changedModel = new ObservationProvenance(
                 source.kind(),

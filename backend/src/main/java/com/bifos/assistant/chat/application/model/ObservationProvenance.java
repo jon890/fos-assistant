@@ -16,4 +16,6 @@ public record ObservationProvenance(
         Instant observedAt) {
     public static final int SCHEMA_VERSION = 1;
     public static final String PROMPT_VERSION = "media-observation-v1";
+    /** provider 또는 model을 확인하지 못한 제출에 쓰며 분석 결과 재사용에서는 제외한다. */
+    public static final String UNKNOWN_IDENTITY = "UNKNOWN";
 }

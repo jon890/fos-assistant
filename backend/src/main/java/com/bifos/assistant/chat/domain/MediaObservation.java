@@ -82,6 +82,9 @@ public class MediaObservation {
     @Column(name = "model_version", length = 128)
     private String modelVersion;
 
+    @Column(name = "analysis_key", columnDefinition = "CHAR(64)")
+    private String analysisKey;
+
     @Column(columnDefinition = "LONGTEXT")
     private String body;
 
@@ -112,6 +115,7 @@ public class MediaObservation {
             String providerVersion,
             String model,
             String modelVersion,
+            String analysisKey,
             Instant now) {
         this.attachmentId = attachment.id();
         this.conversationId = attachment.conversationId();
@@ -127,6 +131,7 @@ public class MediaObservation {
         this.providerVersion = providerVersion;
         this.model = model;
         this.modelVersion = modelVersion;
+        this.analysisKey = analysisKey;
         this.createdAt = now;
         this.expiresAt = attachment.expiresAt();
     }

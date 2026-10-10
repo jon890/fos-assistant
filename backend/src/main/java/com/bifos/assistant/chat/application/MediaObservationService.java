@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -94,14 +95,14 @@ public class MediaObservationService {
             result.add(view(user, attachment, ordinal, fingerprint, row));
         }
         access.requireOwn(user, conversationId);
-        return result.stream()
-                .map(view -> readable(user, conversationId, Long.valueOf(view.assetId()))
-                                && (view.expiresAt() == null || view.expiresAt().isAfter(clock.instant()))
-                        ? view
-                        : blocked(Long.valueOf(view.assetId()), view.ordinal()))
+        var checked = result.stream()
+                .map(view -> recheckList(user, conversationId, view))
                 .toList();
+        access.requireOwn(user, conversationId);
+        return checked;
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public MediaObservationView record(
             CurrentUser user,
             Long conversationId,
@@ -155,29 +156,103 @@ public class MediaObservationService {
                                         && source.kind() == ObservationProvenanceKind.MODEL_RESULT) {
                             throw conflict(revision);
                         }
-                        bodies.requireEncryption();
-                        row = observations.saveAndFlush(new MediaObservation(
-                                attachment,
-                                revision + 1,
-                                fingerprint,
-                                input.status(),
-                                source.kind(),
-                                source.schemaVersion(),
-                                source.promptVersion(),
-                                source.executionId(),
-                                source.provider(),
-                                source.providerVersion(),
-                                source.model(),
-                                source.modelVersion(),
-                                clock.instant().truncatedTo(ChronoUnit.MICROS)));
-                        bodies.seal(row, plain);
+                        String analysisKey = completed(source.kind(), input.status())
+                                ? MediaObservationAnalysisKey.compute(json, fingerprint, source, input.coverage())
+                                : null;
+                        if (reusable(latest, user.id(), analysisKey)) {
+                            row = latest;
+                        } else {
+                            bodies.requireEncryption();
+                            row = observations.saveAndFlush(new MediaObservation(
+                                    attachment,
+                                    revision + 1,
+                                    fingerprint,
+                                    input.status(),
+                                    source.kind(),
+                                    source.schemaVersion(),
+                                    source.promptVersion(),
+                                    source.executionId(),
+                                    source.provider(),
+                                    source.providerVersion(),
+                                    source.model(),
+                                    source.modelVersion(),
+                                    analysisKey,
+                                    clock.instant().truncatedTo(ChronoUnit.MICROS)));
+                            bodies.seal(row, plain);
+                        }
                         requests.saveAndFlush(
                                 new MediaObservationRequest(attachmentId, requestId, requestHash, row.id()));
                     }
                     return view(user, attachment, ordinal(sent(conversationId), attachmentId), fingerprint, row);
                 });
+        var attachment = requireReadable(user, conversationId, attachmentId);
+        String currentFingerprint = fingerprint(attachment);
         requireReadable(user, conversationId, attachmentId);
+        if (result.expiresAt() != null && !result.expiresAt().isAfter(clock.instant())) {
+            throw gone();
+        }
+        if (!currentFingerprint.equals(result.sourceFingerprint())) {
+            long revision = observations
+                    .findFirstByAttachmentIdOrderByRevisionDesc(attachmentId)
+                    .map(MediaObservation::revision)
+                    .orElse(0L);
+            throw conflict(revision);
+        }
         return result;
+    }
+
+    private boolean reusable(MediaObservation row, Long owner, String analysisKey) {
+        if (analysisKey == null
+                || row == null
+                || row.bodyKeyId() == null
+                || !completed(row.provenanceKind(), row.status())
+                || MediaObservationAnalysisKey.hasUnknownIdentity(provenance(row))
+                || !analysisKey.equals(row.analysisKey())) {
+            return false;
+        }
+        return openValidatedBody(row, owner)
+                .filter(body -> analysisKey.equals(MediaObservationAnalysisKey.compute(
+                        json, row.sourceFingerprint(), provenance(row), body.coverage())))
+                .isPresent();
+    }
+
+    private static boolean completed(ObservationProvenanceKind kind, ObservationStatus status) {
+        return kind == ObservationProvenanceKind.MODEL_RESULT
+                && (status == ObservationStatus.SUCCEEDED
+                        || status == ObservationStatus.PARTIAL
+                        || status == ObservationStatus.NEEDS_REVIEW);
+    }
+
+    private MediaObservationView recheckList(CurrentUser user, Long conversationId, MediaObservationView view) {
+        Long id = Long.valueOf(view.assetId());
+        if (view.status() == ObservationStatus.UNAVAILABLE) {
+            return view;
+        }
+        try {
+            String currentFingerprint = fingerprint(requireReadable(user, conversationId, id));
+            requireReadable(user, conversationId, id);
+            if (view.expiresAt() != null && !view.expiresAt().isAfter(clock.instant())) {
+                return blocked(id, view.ordinal());
+            }
+            if (!currentFingerprint.equals(view.sourceFingerprint())) {
+                return new MediaObservationView(
+                        view.assetId(),
+                        view.ordinal(),
+                        currentFingerprint,
+                        view.revision(),
+                        view.revision() == 0 ? ObservationStatus.NOT_ANALYZED : ObservationStatus.NEEDS_REVIEW,
+                        null,
+                        view.provenance(),
+                        view.expiresAt(),
+                        view.revision() == 0 ? null : "CONTENT_UNAVAILABLE");
+            }
+            return view;
+        } catch (ApiException ex) {
+            if (ex.code() != ErrorCode.ATTACHMENT_GONE && ex.code() != ErrorCode.CONVERSATION_NOT_FOUND) {
+                throw ex;
+            }
+            return blocked(id, view.ordinal());
+        }
     }
 
     private void checkStored(CurrentUser user, MediaObservation row, String fingerprint, long revision) {
@@ -212,34 +287,10 @@ public class MediaObservationService {
         if (!user.id().equals(row.ownerUserId()) || !row.expiresAt().isAfter(clock.instant())) {
             return blocked(attachment.id(), ordinal);
         }
-        ObservationProvenance source = new ObservationProvenance(
-                row.provenanceKind(),
-                row.originExecutionId(),
-                row.provider(),
-                row.providerVersion(),
-                row.model(),
-                row.modelVersion(),
-                row.schemaVersion(),
-                row.promptVersion(),
-                row.createdAt());
-        MediaObservationInput body = null;
-        if (fingerprint.equals(row.sourceFingerprint())) {
-            var opened = bodies.open(row, user.id());
-            if (opened.isPresent()
-                    && opened.get().getBytes(StandardCharsets.UTF_8).length <= MediaObservationInput.MAX_BODY_BYTES) {
-                try {
-                    body = json.readValue(opened.get(), MediaObservationInput.class);
-                    if (body != null) {
-                        body.validate(source);
-                        if (body.status() != row.status()) {
-                            body = null;
-                        }
-                    }
-                } catch (JacksonException | ApiException ex) {
-                    body = null;
-                }
-            }
-        }
+        ObservationProvenance source = provenance(row);
+        MediaObservationInput body = fingerprint.equals(row.sourceFingerprint())
+                ? openValidatedBody(row, user.id()).orElse(null)
+                : null;
         String error = body == null ? "CONTENT_UNAVAILABLE" : body.errorCode();
         ObservationStatus status = body == null ? ObservationStatus.NEEDS_REVIEW : row.status();
         if (status == ObservationStatus.PROCESSING
@@ -257,6 +308,38 @@ public class MediaObservationService {
                 source,
                 row.expiresAt(),
                 error);
+    }
+
+    private static ObservationProvenance provenance(MediaObservation row) {
+        return new ObservationProvenance(
+                row.provenanceKind(),
+                row.originExecutionId(),
+                row.provider(),
+                row.providerVersion(),
+                row.model(),
+                row.modelVersion(),
+                row.schemaVersion(),
+                row.promptVersion(),
+                row.createdAt());
+    }
+
+    private Optional<MediaObservationInput> openValidatedBody(MediaObservation row, Long owner) {
+        var opened = bodies.open(row, owner);
+        if (opened.isPresent()
+                && opened.get().getBytes(StandardCharsets.UTF_8).length <= MediaObservationInput.MAX_BODY_BYTES) {
+            try {
+                var body = json.readValue(opened.get(), MediaObservationInput.class);
+                if (body != null) {
+                    body.validate(provenance(row));
+                    if (body.status() == row.status()) {
+                        return Optional.of(body);
+                    }
+                }
+            } catch (JacksonException | ApiException ex) {
+                return Optional.empty();
+            }
+        }
+        return Optional.empty();
     }
 
     private ChatAttachment requireReadable(CurrentUser user, Long conversationId, Long attachmentId) {
