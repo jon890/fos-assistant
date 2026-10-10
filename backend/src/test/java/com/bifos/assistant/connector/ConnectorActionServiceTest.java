@@ -767,11 +767,17 @@ class ConnectorActionServiceTest {
         catalogBecomes(declaring);
         String args = "{\"draft_id\":\"123456789\"  }";
         assertThat(askInCheck(tool.name(), args, false).allowed()).isFalse();
-        assertThat(actions.findAll()).isEmpty();
+        assertThat(onlyAction().decision()).isEqualTo(ActionDecision.DENIED);
+        assertThat(onlyAction().denyReason()).isEqualTo(ActionDenyReason.READ_ONLY_RUN);
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
         ConnectorPolicyAnswer answer = ask(tool.name(), args);
         assertThat(answer.allowed()).isFalse();
-        assertThat(onlyAction().argsJson()).isEqualTo(args);
+        assertThat(actions.findAll().stream()
+                        .filter(action -> action.publicId().equals(answer.actionId()))
+                        .findFirst()
+                        .orElseThrow()
+                        .argsJson())
+                .isEqualTo(args);
         assertThat(service.listForConversation(me, CONVERSATION).getFirst().grantAllowed())
                 .isFalse();
         assertCode(() -> service.approve(me, answer.actionId(), GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
