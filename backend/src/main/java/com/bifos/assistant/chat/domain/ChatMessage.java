@@ -101,7 +101,7 @@ public class ChatMessage {
     /**
      * 본문을 낸다. 암호문이면 처음 부를 때 풀어 둔다. 풀지 못하면 {@link #UNREADABLE_CONTENT} 다.
      *
-     * <p>본문을 내는 곳은 모두 이 메서드를 거친다. 저장된 글이 필요하면 {@link #storedContent()} 를 쓴다.
+     * <p>본문을 내는 곳은 모두 이 메서드를 거친다. 저장된 글이 필요하면 {@code storedContent()} 를 쓴다.
      */
     public String content() {
         if (contentKeyId == null) {
