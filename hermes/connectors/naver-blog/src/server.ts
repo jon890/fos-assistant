@@ -138,7 +138,7 @@ async function startJob(env: Env, input: Record<string, unknown>, deps: ServerDe
   for (;;) {
     const state = await readState(dir, jobId);
     if (state?.pid != null && (state.stage !== "queued" || state.status !== "running"))
-      return { job_id: jobId, status: "running" };
+      return { job_id: jobId, status: state.status };
     if (Date.now() >= deadline) throw new ToolError("NAVER_BLOG_START_UNKNOWN");
     await Bun.sleep(Math.min(100, Math.max(1, deadline - Date.now())));
   }
