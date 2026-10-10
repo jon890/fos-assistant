@@ -267,7 +267,8 @@ class AgentAdminServicePlacementTest {
         sources.put(lifecycle, source(lifecycle, "public class AgentLifecycleService { public void execute() {} }"));
         sources.put(auth, source(auth, "public class CurrentUserProvider { public void requireAdmin() {} }"));
         sources.put(SERVICE, source(SERVICE, """
-                @org.springframework.stereotype.Service
+                import org.springframework.stereotype.Service;
+                @Service
                 public class AgentAdminService {
                     %s lifecycle;
                     public void execute() { lifecycle.execute(); }
@@ -285,16 +286,21 @@ class AgentAdminServicePlacementTest {
                 }
                 """));
         sources.put(CONTROLLER, source(CONTROLLER, """
-                @org.springframework.web.bind.annotation.RestController
-                @org.springframework.web.bind.annotation.RequestMapping("/api/v1/admin/agents")
+                import org.springframework.web.bind.annotation.RestController;
+                import org.springframework.web.bind.annotation.RequestMapping;
+                import org.springframework.web.bind.annotation.PostMapping;
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.PatchMapping;
+                @RestController
+                @RequestMapping("/api/v1/admin/agents")
                 public class AgentAdminController {
                     %s service;
                     %s currentUser;
-                    @org.springframework.web.bind.annotation.PostMapping
+                    @PostMapping
                     public void create() { currentUser.requireAdmin(); service.execute(); }
-                    @org.springframework.web.bind.annotation.GetMapping
+                    @GetMapping
                     public void list() { currentUser.requireAdmin(); service.execute(); }
-                    @org.springframework.web.bind.annotation.PatchMapping("/{code}")
+                    @PatchMapping("/{code}")
                     public void update() { currentUser.requireAdmin(); service.execute(); }
                 }
                 """.formatted(SERVICE, auth)));

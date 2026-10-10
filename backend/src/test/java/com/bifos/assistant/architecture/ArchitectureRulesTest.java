@@ -103,15 +103,18 @@ class ArchitectureRulesTest {
                 Map.of(
                         "com.bifos.assistant.fixture.admin.presentation.Controller", """
                         package com.bifos.assistant.fixture.admin.presentation;
-                        public class Controller { com.bifos.assistant.fixture.admin.application.UseCase service; }
+                        import com.bifos.assistant.fixture.admin.application.UseCase;
+                        public class Controller { UseCase service; }
                         """,
                         "com.bifos.assistant.fixture.admin.application.UseCase", """
                         package com.bifos.assistant.fixture.admin.application;
-                        public class UseCase { com.bifos.assistant.fixture.infra.Store store; }
+                        import com.bifos.assistant.fixture.infra.Store;
+                        public class UseCase { Store store; }
                         """,
                         "com.bifos.assistant.fixture.infra.Store", """
                         package com.bifos.assistant.fixture.infra;
-                        public class Store { com.bifos.assistant.fixture.domain.Policy policy; }
+                        import com.bifos.assistant.fixture.domain.Policy;
+                        public class Store { Policy policy; }
                         """,
                         "com.bifos.assistant.fixture.domain.Policy", """
                         package com.bifos.assistant.fixture.domain;
@@ -130,7 +133,8 @@ class ArchitectureRulesTest {
                 Map.of(
                         "com.bifos.assistant.fixture.admin.presentation.Controller", """
                         package com.bifos.assistant.fixture.admin.presentation;
-                        public class Controller { com.bifos.assistant.fixture.infra.Store store; }
+                        import com.bifos.assistant.fixture.infra.Store;
+                        public class Controller { Store store; }
                         """,
                         "com.bifos.assistant.fixture.infra.Store", """
                         package com.bifos.assistant.fixture.infra;
@@ -152,9 +156,11 @@ class ArchitectureRulesTest {
                 Map.of(
                         "com.bifos.assistant.fixture.admin.domain.Policy", """
                         package com.bifos.assistant.fixture.admin.domain;
+                        import com.bifos.assistant.fixture.admin.presentation.Controller;
+                        import org.springframework.http.HttpStatus;
                         public class Policy {
-                            com.bifos.assistant.fixture.admin.presentation.Controller controller;
-                            org.springframework.http.HttpStatus status;
+                            Controller controller;
+                            HttpStatus status;
                         }
                         """,
                         "com.bifos.assistant.fixture.admin.presentation.Controller", """

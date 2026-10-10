@@ -74,8 +74,8 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 두 요청 record와 `AdminAgentView`는 같은 패키지의 `AgentAdminDtos`가 갖는다.
 변환기는 package-private이며 컨트롤러와 함께 둔다.
 
-이 경계는 공유 lifecycle과 `AgentEndpointProbe`, `AgentService`의 기본 모델 업무,
-`agent.domain`과 기존 Repository를 호출한다. 영속 타입은 admin에 두지 않고,
+이 경계는 공유 lifecycle과 `AgentEndpointProbe`, `agent.domain`과 기존 Repository를 호출한다.
+기본 모델을 맡는 `AgentService`는 기존 `agent.application`에 남는다. 영속 타입은 admin에 두지 않고,
 domain과 infra는 admin을 import하지 않는다.
 각 mapped 메서드는 `CurrentUserProvider.requireAdmin`을 호출하며 HTTP 권한 거절 회귀도 함께 검사한다.
 검사: `ArchitectureRules.AGENT_ADMIN_APPLICATION_PLACEMENT`, `ArchitectureRules.AGENT_ADMIN_HTTP_CONTRACT`
