@@ -104,6 +104,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261009 / workspace-explorer](ADR-20261009-workspace-explorer.md) | 실행 공간 파일은 Control Plane 이 읽기 전용으로 붙여 주인에게만 보이고, 지우기는 운영의 권한 도우미에 맡긴다 | backend, frontend | Accepted. ADR-086 의 사용자별 `/workspace` 를 사람이 보는 길이다. HTML 미리보기는 ADR-027 의 격리를 쓴다 |
 
 | [ADR-20261010 / attachment-inspect](ADR-20261010-attachment-inspect.md) | 현재 실행이 같은 대화의 원본 사진을 native 도구 결과로 다시 읽는다 | backend, hermes | Accepted |
+| [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) | 금융 실행 내용은 승인 이력에 묶어 불변으로 저장한다 | backend, hermes | Accepted |
 
 ## 보관
 

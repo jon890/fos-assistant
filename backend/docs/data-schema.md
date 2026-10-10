@@ -12,7 +12,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
-| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_tool_grant` |
+| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -50,6 +50,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | `agent_execution` | `output_text` | 아직 |
 | `execution_event` | `detail` | 아직 |
 | `connector_action` | `args_json`, `result_text` | 아직 |
+| `connector_action_execution` | `execution_args_json`, `summary_json`, `scope_json` | 함. 세 칸이 같은 `content_key_id`를 사용하며 key가 없던 줄은 평문이다 |
 | `notification` | `title`, `body` | 아직 |
 | `follow_up` | `title` | 아직 |
 | `task` | `title`, `instruction` | 아직 |
@@ -529,6 +530,48 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+
+### connector_action_execution
+
+승인 줄 하나에 속한 금융 실행 내용이다.
+저장과 검증 모델만 구현했으며 현재 금융 호출은 계속 차단한다.
+인증과 권한 소비, 준비 API 및 주문 실행은 후속 구현이 맡는다.
+JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md)의 「금융 실행 내용의 저장과 검증」이 갖는다.
+
+| 컬럼 | 타입과 제약 |
+| --- | --- |
+| `action_id` | BIGINT NOT NULL, PK 및 `connector_action` FK, ON DELETE CASCADE |
+| `connection_id`, `binding_id` | BIGINT NOT NULL, FK가 없는 이력 번호 |
+| `connection_updated_at`, `binding_updated_at` | DATETIME(6) NOT NULL, 준비 당시 각 행의 `updated_at` |
+| `execution_args_json`, `summary_json`, `scope_json` | MEDIUMTEXT NOT NULL, 원문 또는 암호문 |
+| `content_key_id` | BIGINT NULL, `user_data_key` 식별자, FK 없음 |
+| `execution_args_sha256`, `scope_sha256` | VARCHAR(64) NOT NULL, 암호화 전 UTF-8 원문의 SHA-256 |
+| `request_key` | VARCHAR(64) NOT NULL, 중복 의도 조회용 일반 인덱스 |
+| `supersedes_unknown_action_id` | BIGINT NULL UNIQUE, 자기 참조 FK가 없는 이력 식별자 |
+| `protocol` | VARCHAR(32) NOT NULL, 고정 값 `approval-claim-v1` |
+| `ticket_id` | BINARY(16) NULL UNIQUE, 권한 원문과 구분한 UUID 식별자 |
+| `ticket_expires_at`, `consumed_at` | DATETIME(6) NULL |
+| `created_at` | DATETIME(6) NOT NULL |
+
+`ConnectorExecutionSnapshot.capture`가 연결의 공개 칸과 실행 args, 표시 값을 검증한 뒤 저장할 내용을 만든다.
+읽을 때 protocol이 `approval-claim-v1`과 다르면 거절한다.
+연결과 바인딩의 소유자 및 에이전트가 승인 줄과 같아야 한다.
+기존 `connector_action.args_json`과 `args_sha256`은 원래 요청의 중복 판정용으로 남긴다.
+실행 원문과 표시 값, scope 및 두 revision은 저장한 뒤 바꾸지 않는다.
+권한 발급·소비 시각과 ticket 식별자, 새 요청의 선조 식별자는 현재 저장 함수가 채우지 않는다.
+
+세 본문은 기존 `TextCipher`로 각각 암호화하며 동일한 keyId여야 저장한다.
+AAD는 `connector_action_execution:<action_id>:column:<컬럼 이름>:user:<소유자 번호>`다.
+암호화가 꺼져 있으면 평문과 NULL keyId를 저장한다.
+읽기는 저장된 keyId로 정하므로 NULL이면 현재 설정과 관계없이 평문을 읽고,
+비NULL이면 현재 암호화가 꺼져 있어도 복호화를 거친다.
+암복호화 실패, keyId 불일치와 원문 해시 불일치는 저장·읽기를 거절한다.
+본문과 key 값, 권한 원문은 로그와 예외 메시지에 남기지 않는다.
+
+action을 지우면 실행 내용도 지운다.
+연결·바인딩과 이전 UNKNOWN의 번호는 당시 이력 값이며 해당 행 삭제에 따라 실행 내용을 지우지 않는다.
+`supersedes_unknown_action_id`는 명시적 새 요청 경로를 구현하기 전까지 NULL로 둔다.
+근거는 [ADR-20261010 / financial-execution-guard](../../docs/adr/ADR-20261010-financial-execution-guard.md)다.
 
 ### connector_tool_grant
 
