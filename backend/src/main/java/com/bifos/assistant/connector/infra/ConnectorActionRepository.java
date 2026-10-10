@@ -19,6 +19,8 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
 
     Optional<ConnectorAction> findByDedupeKey(String dedupeKey);
 
+    Optional<ConnectorAction> findByPublicId(UUID publicId);
+
     /** 호출 허용에 앞서 저장한 판정 줄로 자식과 형제를 포함한 트리의 커넥터 호출 이력을 확인한다. */
     @Query("""
             select case when count(a) > 0 then true else false end

@@ -71,6 +71,46 @@ class HttpHermesConnectorClientTest {
         ReflectionTestUtils.setField(client, "executeClient", builder.build());
     }
 
+    @Test
+    @DisplayName("보호 선언은 타입 보충과 키 삭제 없이 원형으로 전달한다")
+    void preservesExecutionGuardWithoutCoercion() {
+        String raw = CATALOG.replace(
+                "\"mcp_server\":\"demo\"",
+                "\"mcp_server\":\"demo\"," + "\"execution_guard\":{\"protocol\":false,\"extra\":7}");
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
+        var guard = client.readCatalog().getFirst().executionGuard();
+        assertThat(guard.propertyNames()).containsExactlyInAnyOrder("protocol", "extra");
+        assertThat(guard.get("protocol").isBoolean()).isTrue();
+        assertThat(guard.get("extra").intValue()).isEqualTo(7);
+    }
+
+    @Test
+    @DisplayName("카탈로그와 보호 선언의 중복 키 및 뒤따르는 JSON을 원문 파싱에서 거절한다")
+    void rejectsDuplicateAndTrailingCatalogJson() {
+        for (String raw : new String[] {
+            CATALOG + "[]",
+            CATALOG.replace(
+                    "\"mcp_server\":\"demo\"",
+                    "\"mcp_server\":\"demo\",\"execution_guard\":{\"protocol\":1,\"protocol\":2}")
+        }) {
+            server.reset();
+            server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                    .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
+            assertThatThrownBy(client::readCatalog)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasNoCause();
+        }
+    }
+
+    @Test
+    @DisplayName("옛 카탈로그의 보호 선언 누락은 null로 남는다")
+    void preservesMissingExecutionGuardAsUnsupported() {
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        assertThat(client.readCatalog().getFirst().executionGuard()).isNull();
+    }
+
     @DisplayName("카탈로그에서 칸의 env, 선택지, 확인 도구, MCP 서버 이름을 읽는다")
     @Test
     void readsCatalogWithEnvOptionsVerifyToolAndMcpServer() {
