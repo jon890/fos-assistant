@@ -77,14 +77,11 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
 
     @Override
     public List<ConnectorManifest> readCatalog() {
-        JsonNode body = request(() -> client.get()
+        JsonNode body = request(() -> ConnectorCatalogTools.parseCatalog(client.get()
                 .uri(baseUrl + "/api/connectors/catalog")
                 .header(AUTHORIZATION, bearer())
                 .retrieve()
-                .body(JsonNode.class));
-        if (!body.isArray()) {
-            throw new IllegalStateException();
-        }
+                .body(String.class)));
         List<ConnectorManifest> manifests = new ArrayList<>();
         for (JsonNode item : body) {
             manifests.add(manifest(item));
@@ -458,7 +455,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 ConnectorAppearances.read(item),
                 optionalBoolean(item, "single_binding", false),
                 optionalBoolean(item, "owner_browser", false),
-                loginUrl(item));
+                loginUrl(item),
+                item.get("execution_guard"));
     }
 
     /** 로그인 안내 주소다. 문자열이고 {@code https://} 로 시작할 때만 읽고, 아니면 null 이다. 카탈로그 전체를 버리지 않는다. */
