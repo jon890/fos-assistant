@@ -49,11 +49,11 @@ test("시험과 문서는 별도로 표시하고 운영 코드만 상한에 넣�
 });
 
 test("경계와 예외 라벨을 판정한다", () => {
-  for (const [lines, large, pass] of [[0, false, true], [400, false, true], [401, true, true], [1000, true, true], [1001, true, false]] as const) {
+  for (const [lines, large, pass] of [[0, false, true], [400, false, true], [401, true, true], [1000, true, true], [1001, true, true], [1500, true, true], [1501, true, false]] as const) {
     assert.deepEqual(classify(lines), { large, pass });
   }
-  assert.deepEqual(classify(1001, ["규모:예외"]), { large: true, pass: true });
-  assert.equal(classify(1001, ["규모:큼"]).pass, false);
+  assert.deepEqual(classify(1501, ["규모:예외"]), { large: true, pass: true });
+  assert.equal(classify(1501, ["규모:큼"]).pass, false);
 });
 
 test("잘못된 numstat는 조용히 통과시키지 않는다", () => {
@@ -86,8 +86,13 @@ test("공통 조상부터 세므로 base의 새 변경은 포함하지 않고 �
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /운영 코드 2줄, 시험 2000줄, 문서 2000줄/);
     git("checkout", "--detach", head);
-    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(1001));
+    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(1500));
     git("add", "."); git("commit", "-qm", "large");
+    const boundary = spawnSync("node", [SCRIPT, head], { cwd, encoding: "utf8", env: CLI_ENV });
+    assert.equal(boundary.status, 0, boundary.stderr);
+    assert.match(boundary.stdout, /운영 코드 1500줄.*상한 1500줄, 통과/);
+    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(1501));
+    git("add", "."); git("commit", "-qm", "over-limit");
     assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: CLI_ENV }).status, 1);
     assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: { ...CLI_ENV, PR_LABELS: '["규모:예외"]' } }).status, 0);
   } finally {
