@@ -35,13 +35,14 @@ public final class WorkspaceDtos {
         }
     }
 
-    public record ListingView(String path, List<EntryView> entries, boolean truncated) {
+    public record ListingView(String path, List<EntryView> entries, boolean truncated, String nextCursor) {
 
         static ListingView of(WorkspaceListing listing) {
             return new ListingView(
                     listing.path(),
                     listing.entries().stream().map(EntryView::of).toList(),
-                    listing.truncated());
+                    listing.truncated(),
+                    listing.nextCursor());
         }
     }
 

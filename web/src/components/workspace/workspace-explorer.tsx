@@ -28,7 +28,12 @@ import {
 
 /** 읽은 결과다. 실패하면 응답 상태를 둔다. 연결이 끊긴 실패는 0 이다. */
 type Read<T> = { ok: true; data: T } | { ok: false; status: number };
-type Listing = { path: string; read: Read<WorkspaceListing> };
+type Listing = {
+  path: string;
+  read: Read<WorkspaceListing>;
+  cursor: string | null;
+  previous: (string | null)[];
+};
 
 async function readJson<T>(request: () => Promise<Response>): Promise<Read<T>> {
   try {
@@ -47,7 +52,6 @@ function Muted({ text }: { text: string }) {
 const EMPTY = <Muted text="아직 에이전트가 만든 파일이 없어요" />;
 const LOADING = <Muted text="불러오는 중…" />;
 
-/** 머리의 안내다. 이 공간을 함께 쓰는 에이전트와 그룹 공개 여부를 보인다. */
 function SharedAgents({ status }: { status: WorkspaceStatus }) {
   return (
     <div className="space-y-1 text-sm text-muted-foreground">
@@ -67,7 +71,6 @@ function SharedAgents({ status }: { status: WorkspaceStatus }) {
   );
 }
 
-/** 「파일 공간」 부터 연 디렉터리까지의 경로 줄이다. 마지막 조각은 지금 연 곳이라 링크가 아니다. */
 function Crumbs({ path }: { path: string }) {
   const parts = crumbs(path);
   return (
@@ -138,11 +141,8 @@ const DELETE_FAILURES: Record<number, string> = {
 
 /**
  * 지우기 확인 창과 그 결과다. 창을 열 때 상태를 다시 읽어 도는 실행을 본다. 읽지 못하면 경고 없이 연다.
- *
- * <p>끝나면 `settle` 에 지운 경로와 실패 상태(성공이면 null, 연결이 끊긴 실패는 0)를 넘긴다. 실패 안내는 그 디렉터리에서만 보인다.
- *
- * <p>상태를 읽는 동안과 창이 열려 있는 동안에는 새 지우기 요청을 받지 않는다. 늦게 온 상태 응답이 열린 창의 대상을 바꾸면
- * 사용자가 본 이름과 다른 경로가 지워진다.
+ * `settle`에 경로와 실패 상태(성공 null, 연결 실패 0)를 넘긴다. 실패 안내는 그 디렉터리에서만 보인다.
+ * 상태 조회부터 창을 닫을 때까지 새 요청을 막아 사용자가 확인한 대상을 지킨다.
  */
 function useEntryDeletion(
   dir: string,
@@ -204,10 +204,7 @@ function useEntryDeletion(
 
 /**
  * 사용자 실행 공간의 목록과 미리보기다. 연 디렉터리와 미리 보는 파일은 주소의 `path`, `file` 이 정한다.
- *
- * <p>상태와 목록은 브라우저에서 읽는다. 실패하면 이 자리에서 다시 읽는다. 지우기는 상태의 `deletable` 이 참일 때만 그린다.
- * 지운 뒤에는 목록만 다시 읽고(409 는 아무것도 지우지 않았으므로 그대로 둔다), 미리 보던 파일이나 그 파일이 든 디렉터리를 지웠으면
- * 주소의 `file` 을 지워 미리보기를 닫는다.
+ * 지우기는 `deletable`일 때만 열며 409를 제외하면 목록을 다시 읽는다. 미리 보던 파일을 지우면 `file`을 지운다.
  */
 export function WorkspaceExplorer() {
   const params = useSearchParams();
@@ -217,12 +214,41 @@ export function WorkspaceExplorer() {
   const wide = useMediaQuery("(min-width: 1024px)");
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<Read<WorkspaceStatus> | null>(null);
-  // `path` 는 이 목록이 어느 디렉터리의 것인지다. 주소가 바뀌면 새 목록이 올 때까지 불러오는 중으로 그린다.
   const [listing, setListing] = useState<Listing | null>(null);
-  // 지운 뒤 목록만 다시 읽게 하는 값이다. 다시 읽는 동안에는 앞 목록을 그대로 그린다.
+  const [pageBusy, setPageBusy] = useState(false);
+  const [pageFailure, setPageFailure] = useState<number | null>(null);
+  // 선택한 파일 한 건만 페이지 이동 중에도 보관한다.
+  const [selectedFile, setSelectedFile] = useState<{
+    path: string;
+    entry: WorkspaceEntry;
+  } | null>(null);
+  const generation = useRef(0);
+  const pageLocked = useRef(false);
   const [reload, setReload] = useState(0);
+  const read = listing?.path === path ? listing.read : null;
+  const currentSelection = read?.ok
+    ? read.data.entries.find(
+        (entry) =>
+          entry.kind === "FILE" &&
+          entry.readable &&
+          entry.openable &&
+          addressable(path) &&
+          joinPath(path, entry.name) === file,
+      )
+    : undefined;
+  const selected =
+    currentSelection ??
+    (selectedFile?.path === file ? selectedFile.entry : undefined);
+  const reloadPage = () => {
+    if (selected !== undefined && file !== null)
+      setSelectedFile({ path: file, entry: selected });
+    generation.current++;
+    pageLocked.current = true;
+    setPageBusy(true);
+    setReload((value) => value + 1);
+  };
   const deletion = useEntryDeletion(path, (target, failure) => {
-    if (failure !== 409) setReload((value) => value + 1);
+    if (failure !== 409) reloadPage();
     if (
       failure === null &&
       file !== null &&
@@ -246,9 +272,15 @@ export function WorkspaceExplorer() {
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
+    const requestGeneration = ++generation.current;
+    pageLocked.current = true;
     void readJson<WorkspaceListing>(() => fetchWorkspaceEntries(path)).then(
       (read) => {
-        if (!cancelled) setListing({ path, read });
+        if (cancelled || generation.current !== requestGeneration) return;
+        setListing({ path, read, cursor: null, previous: [] });
+        setPageBusy(false);
+        setPageFailure(null);
+        pageLocked.current = false;
       },
     );
     return () => {
@@ -257,9 +289,30 @@ export function WorkspaceExplorer() {
   }, [ready, attempt, reload, path]);
 
   const retry = () => {
+    generation.current++;
+    pageLocked.current = true;
     setStatus(null);
     setListing(null);
     setAttempt((value) => value + 1);
+  };
+
+  const movePage = (cursor: string | null, previous: (string | null)[]) => {
+    if (pageLocked.current) return;
+    pageLocked.current = true;
+    const requestGeneration = ++generation.current;
+    if (selected !== undefined && file !== null)
+      setSelectedFile({ path: file, entry: selected });
+    setPageBusy(true);
+    setPageFailure(null);
+    void readJson<WorkspaceListing>(() =>
+      fetchWorkspaceEntries(path, cursor),
+    ).then((read) => {
+      if (generation.current !== requestGeneration) return;
+      if (read.ok) setListing({ path, read, cursor, previous });
+      else setPageFailure(read.status);
+      setPageBusy(false);
+      pageLocked.current = false;
+    });
   };
 
   if (status === null) return LOADING;
@@ -272,43 +325,36 @@ export function WorkspaceExplorer() {
     );
   }
 
-  const read = listing?.path === path ? listing.read : null;
   let content = EMPTY;
-  let preview = null;
   if (status.data.exists && read === null) {
     content = LOADING;
   } else if (read !== null && !read.ok) {
     content = <Failure status={read.status} onRetry={retry} />;
-  } else if (read !== null && read.data.entries.length > 0) {
-    const { entries, truncated } = read.data;
-    const selected = entries.find(
-      (entry) =>
-        entry.kind === "FILE" &&
-        entry.readable &&
-        entry.openable &&
-        addressable(path) &&
-        joinPath(path, entry.name) === file,
-    );
+  } else if (read !== null && listing !== null) {
+    const { entries, nextCursor } = read.data;
     content = (
       <WorkspaceEntryList
         path={path}
         entries={entries}
-        truncated={truncated}
+        nextCursor={nextCursor}
+        hasPrevious={listing.previous.length > 0}
+        busy={pageBusy}
+        onNext={() => {
+          if (nextCursor !== null)
+            movePage(nextCursor, [...listing.previous, listing.cursor]);
+        }}
+        onPrevious={() => {
+          if (listing.previous.length > 0)
+            movePage(
+              listing.previous.at(-1) ?? null,
+              listing.previous.slice(0, -1),
+            );
+        }}
+        onReload={reloadPage}
         selected={selected === undefined ? null : file}
         onDelete={status.data.deletable ? deletion.ask : null}
       />
     );
-    if (selected !== undefined && file !== null) {
-      preview = (
-        <WorkspacePreview
-          path={file}
-          name={selected.name}
-          size={selected.size}
-          wide={wide}
-          onClose={() => router.push(explorerHref(path), { scroll: false })}
-        />
-      );
-    }
   }
 
   return (
@@ -323,8 +369,19 @@ export function WorkspaceExplorer() {
             </Notice>
           )}
           {content}
+          {pageFailure === null ? null : (
+            <Failure status={pageFailure} onRetry={reloadPage} />
+          )}
         </div>
-        {preview}
+        {selected === undefined || file === null ? null : (
+          <WorkspacePreview
+            path={file}
+            name={selected.name}
+            size={selected.size}
+            wide={wide}
+            onClose={() => router.push(explorerHref(path), { scroll: false })}
+          />
+        )}
       </div>
       {deletion.target === null ? null : (
         <DeleteEntryDialog

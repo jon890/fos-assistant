@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.workspace.domain.WorkspaceCursor;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceEntryKind;
 import com.bifos.assistant.workspace.domain.WorkspaceListing;
@@ -18,8 +19,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.PriorityQueue;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.IntStream;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /** 실행 공간을 읽을 때 링크와 특수 파일과 남의 공간을 어떻게 다루는지 실제 임시 디렉터리로 본다. */
@@ -38,6 +49,303 @@ class WorkspaceTreeTest {
 
     private Path owner;
     private Path sibling;
+
+    @Test
+    @DisplayName("1,002개를 역순으로 만들어도 첫 페이지는 전체 정렬의 앞 1,000개다")
+    void selectsFirstPageFromEntireDirectory() throws IOException {
+        for (int i = 1_001; i >= 0; i--) {
+            Files.createFile(owner.resolve(String.format("f%04d", i)));
+        }
+        List<String> expected = IntStream.range(0, 1_000)
+                .mapToObj(i -> String.format("f%04d", i))
+                .toList();
+        assertThat(list(owner, "").orElseThrow().entries())
+                .extracting(WorkspaceEntry::name)
+                .containsExactlyElementsOf(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "0,false",
+        "1,false",
+        "999,false",
+        "1000,false",
+        "1001,false",
+        "1002,false",
+        "10000,false",
+        "0,true",
+        "1,true",
+        "999,true",
+        "1000,true",
+        "1001,true",
+        "1002,true",
+        "10000,true"
+    })
+    @DisplayName("역순과 무작위 생성 목록을 secure와 대체 경로 모두 끝까지 누락과 중복 없이 탐색한다")
+    void reachesEveryEntryInFullSortOrder(int count, boolean shuffled) throws IOException {
+        List<WorkspaceEntry> expected = new ArrayList<>();
+        List<Integer> order = new ArrayList<>(IntStream.range(0, count).boxed().toList());
+        if (shuffled) {
+            Collections.shuffle(order, new Random(371));
+        } else {
+            Collections.reverse(order);
+        }
+        for (int i : order) {
+            String name = String.format(
+                    "%05d-%s",
+                    i,
+                    switch (i % 4) {
+                        case 0 -> "대문자A";
+                        case 1 -> "소문자a";
+                        case 2 -> "é";
+                        default -> "e\u0301";
+                    });
+            boolean directory = i % 7 == 0;
+            if (directory) {
+                Files.createDirectory(owner.resolve(name));
+            } else {
+                Files.createFile(owner.resolve(name));
+            }
+            expected.add(testEntry(name, directory));
+        }
+        Comparator<WorkspaceEntry> sorted = Comparator.comparing(
+                        (WorkspaceEntry entry) -> entry.kind() != WorkspaceEntryKind.DIRECTORY)
+                .thenComparing(WorkspaceEntry::name);
+        expected.sort(sorted);
+        for (boolean checked : new boolean[] {false, true}) {
+            List<String> actual = new ArrayList<>();
+            String cursor = null;
+            int pages = 0;
+            do {
+                WorkspaceListing page = WorkspaceTree.list(
+                                owner, WorkspacePath.parse(""), 1_000, cursor, checked, () -> {}, System::nanoTime)
+                        .orElseThrow();
+                assertThat(page.entries()).hasSizeLessThanOrEqualTo(1_000);
+                assertThat(page.truncated()).isEqualTo(page.nextCursor() != null);
+                actual.addAll(page.entries().stream().map(WorkspaceEntry::name).toList());
+                cursor = page.nextCursor();
+                assertThat(++pages).isLessThanOrEqualTo(11);
+            } while (cursor != null);
+            assertThat(actual)
+                    .containsExactlyElementsOf(
+                            expected.stream().map(WorkspaceEntry::name).toList());
+            assertThat(actual).doesNotHaveDuplicates();
+        }
+    }
+
+    @Test
+    @DisplayName("같은 이름의 대소문자와 Unicode 정규화 차이를 cursor에서 합치지 않는다")
+    void preservesRawCaseAndUnicodeSortKeys() throws IOException {
+        List<String> names = List.of("A", "a", "é", "e\u0301", "한글");
+        for (String name : names) {
+            Assumptions.assumeFalse(Files.exists(owner.resolve(name)), "이 파일 시스템은 이름을 정규화한다");
+            Files.createFile(owner.resolve(name));
+        }
+        List<String> actual = new ArrayList<>();
+        String cursor = null;
+        do {
+            WorkspaceListing page = WorkspaceTree.list(owner, WorkspacePath.parse(""), 1, cursor)
+                    .orElseThrow();
+            actual.add(page.entries().get(0).name());
+            cursor = page.nextCursor();
+        } while (cursor != null);
+        assertThat(actual).containsExactlyElementsOf(names.stream().sorted().toList());
+    }
+
+    @Test
+    @DisplayName("Linux의 역슬래시와 주소 불가능 이름을 cursor 정렬 값에서 누락하지 않는다")
+    void pagesUnaddressableNames() throws IOException {
+        Files.createFile(owner.resolve("a\\b"));
+        Files.createFile(owner.resolve("c%"));
+        Files.createFile(owner.resolve("d\n"));
+        WorkspaceListing first = WorkspaceTree.list(owner, WorkspacePath.parse(""), 1, (String) null)
+                .orElseThrow();
+        assertThat(first.entries().get(0).name()).isEqualTo("a\\b");
+        assertThat(first.entries().get(0).openable()).isFalse();
+        WorkspaceListing second = WorkspaceTree.list(owner, WorkspacePath.parse(""), 1, first.nextCursor())
+                .orElseThrow();
+        WorkspaceListing third = WorkspaceTree.list(owner, WorkspacePath.parse(""), 1, second.nextCursor())
+                .orElseThrow();
+        assertThat(second.entries()).extracting(WorkspaceEntry::name).containsExactly("c%");
+        assertThat(third.entries()).extracting(WorkspaceEntry::name).containsExactly("d\n");
+        assertThat(third.nextCursor()).isNull();
+    }
+
+    @Test
+    @DisplayName("다음 페이지는 마지막 표시 키 뒤에서 시작하고 생성 삭제 이름 변경은 best-effort로 다룬다")
+    void continuesAfterShownKeyDuringChanges() throws IOException {
+        for (String name : List.of("b", "d", "f", "h")) {
+            Files.createFile(owner.resolve(name));
+        }
+        WorkspacePath path = WorkspacePath.parse("");
+        WorkspaceListing first =
+                WorkspaceTree.list(owner, path, 2, (String) null).orElseThrow();
+        assertThat(WorkspaceCursor.decode(first.nextCursor(), path).name()).isEqualTo("d");
+        Files.createFile(owner.resolve("a"));
+        Files.createFile(owner.resolve("e"));
+        Files.delete(owner.resolve("f"));
+        Files.move(owner.resolve("b"), owner.resolve("g"));
+        WorkspaceListing second =
+                WorkspaceTree.list(owner, path, 2, first.nextCursor()).orElseThrow();
+        assertThat(second.entries()).extracting(WorkspaceEntry::name).containsExactly("e", "g");
+        Files.delete(owner.resolve("h"));
+        WorkspaceListing empty =
+                WorkspaceTree.list(owner, path, 2, second.nextCursor()).orElseThrow();
+        assertThat(empty.entries()).isEmpty();
+        assertThat(empty.nextCursor()).isNull();
+        assertThat(WorkspaceTree.list(owner, path, 2).orElseThrow().entries())
+                .extracting(WorkspaceEntry::name)
+                .containsExactly("a", "d");
+    }
+
+    @Test
+    @DisplayName("시간 예산을 넘으면 일부 목록 대신 IOException으로 실패한다")
+    void failsAtDeadlineWithoutPartialPage() throws IOException {
+        Files.createFile(owner.resolve("a"));
+        for (boolean checked : new boolean[] {false, true}) {
+            AtomicLong clock = new AtomicLong();
+            assertThatThrownBy(() -> WorkspaceTree.list(
+                            owner,
+                            WorkspacePath.parse(""),
+                            1,
+                            null,
+                            checked,
+                            () -> {},
+                            () -> clock.getAndAdd(2_000_000_000L)))
+                    .isInstanceOf(IOException.class);
+            assertThat(list(owner, "").orElseThrow().entries()).hasSize(1);
+        }
+    }
+
+    @Test
+    @DisplayName("최대 힙은 10,000건을 넣어도 lookahead 포함 1,001건을 넘지 않는다")
+    void boundsHeapIncludingLookahead() {
+        PriorityQueue<WorkspaceEntry> heap =
+                new PriorityQueue<>(Comparator.comparing(WorkspaceEntry::name).reversed());
+        int maximum = 0;
+        for (int i = 9_999; i >= 0; i--) {
+            WorkspaceTree.retainNext(heap, testEntry(String.format("f%05d", i), false), 1_000);
+            maximum = Math.max(maximum, heap.size());
+            assertThat(heap).hasSizeLessThanOrEqualTo(1_001);
+        }
+        assertThat(maximum).isEqualTo(1_001);
+        assertThat(heap.element().name()).isEqualTo("f01000");
+    }
+
+    @Test
+    @DisplayName("최대 4,096바이트 경로와 255바이트 이름의 cursor는 4,096자 안에서 왕복한다")
+    void roundTripsMaximumPathAndNameWithoutEmbeddingPath() {
+        String raw = String.join("/", Collections.nCopies(15, "x".repeat(255))) + "/" + "x".repeat(254) + "/x";
+        assertThat(raw.getBytes(StandardCharsets.UTF_8)).hasSize(4_096);
+        WorkspacePath path = WorkspacePath.parse(raw);
+        String cursor = WorkspaceCursor.encode(path, testEntry("한".repeat(85), false));
+        assertThat(cursor.length()).isLessThanOrEqualTo(4_096);
+        assertThat(WorkspaceCursor.decode(cursor, path).name()).isEqualTo("한".repeat(85));
+        assertThat(Base64.getUrlEncoder()
+                        .encodeToString(raw.getBytes(StandardCharsets.UTF_8))
+                        .length())
+                .isGreaterThan(4_096);
+    }
+
+    @Test
+    @DisplayName("실제 파일 시스템에서 가능한 긴 경로도 다음 페이지로 이어진다")
+    void pagesPhysicalLongPath() throws IOException {
+        String segment = "x".repeat(255);
+        Path dir = owner;
+        List<String> segments = new ArrayList<>();
+        // macOS는 전체 경로 한도가 더 작다. codec의 최대 경로 검사는 별도로 한다.
+        int depth = System.getProperty("os.name").equals("Linux") ? 13 : 2;
+        for (int i = 0; i < depth; i++) {
+            segments.add(segment);
+            dir = Files.createDirectory(dir.resolve(segment));
+        }
+        WorkspacePath path = WorkspacePath.ofSegments(segments);
+        if (depth == 13) {
+            assertThat(path.value().getBytes(StandardCharsets.UTF_8)).hasSize(3_327);
+        }
+        Files.createFile(dir.resolve("a".repeat(255)));
+        Files.createFile(dir.resolve("z".repeat(255)));
+        WorkspaceListing first = WorkspaceTree.list(owner, path, 1).orElseThrow();
+        assertThat(WorkspaceTree.list(owner, path, 1, first.nextCursor())
+                        .orElseThrow()
+                        .entries())
+                .extracting(WorkspaceEntry::name)
+                .containsExactly("z".repeat(255));
+    }
+
+    @Test
+    @DisplayName("cursor는 canonical base64url과 strict UTF-8 JSON 및 정확한 키 타입 버전을 검사한다")
+    void rejectsMalformedCursors() {
+        WorkspacePath path = WorkspacePath.parse("");
+        String valid = WorkspaceCursor.encode(path, testEntry("a", false));
+        String json = new String(Base64.getUrlDecoder().decode(valid), StandardCharsets.UTF_8);
+        List<String> invalid = new ArrayList<>(List.of(
+                "",
+                "!",
+                "a",
+                valid + "=",
+                "a".repeat(4_097),
+                Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[] {(byte) 0xc0, (byte) 0xaf})));
+        for (String malformed : List.of(
+                "[]",
+                json + "{}",
+                json.replace("\"version\":1", "\"version\":2"),
+                json.replace("\"version\":1", "\"version\":1.0"),
+                json.replace("\"version\":1", "\"version\":\"1\""),
+                json.replace("\"directory\":false", "\"directory\":0"),
+                json.replace("\"name\":\"a\"", "\"name\":null"),
+                json.replace("\"name\":\"a\"", "\"name\":\"a/b\""),
+                json.replace("\"name\":\"a\"", "\"name\":\"..\""),
+                json.replace("\"name\":\"a\"", "\"name\":\"\\uD800\""),
+                json.replace("\"name\":\"a\"", "\"name\":\"\\u0000\""),
+                json.replace("\"name\":\"a\"", "\"name\":\"" + "x".repeat(256) + "\""),
+                json.replaceFirst("\\{", "{\"extra\":1,"),
+                json.replaceFirst("\\{", "{\"version\":1,"),
+                json.replace("pathHash", "other"))) {
+            invalid.add(
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(malformed.getBytes(StandardCharsets.UTF_8)));
+        }
+        for (String cursor : invalid) {
+            assertCode(() -> WorkspaceCursor.decode(cursor, path), ErrorCode.VALIDATION_FAILED);
+        }
+        assertCode(() -> WorkspaceCursor.decode(valid, WorkspacePath.parse("other")), ErrorCode.VALIDATION_FAILED);
+        assertCode(
+                () -> WorkspaceCursor.decode(
+                        WorkspaceCursor.encode(WorkspacePath.parse("A"), testEntry("a", false)),
+                        WorkspacePath.parse("a")),
+                ErrorCode.VALIDATION_FAILED);
+    }
+
+    @Test
+    @DisplayName("10,000건의 한 페이지 조회 지연과 힙 차이를 합성 측정한다")
+    void measuresSyntheticTenThousandEntryPage() throws IOException {
+        for (int i = 0; i < 10_000; i++) {
+            Files.createFile(owner.resolve(String.format("f%05d", i)));
+        }
+        List<Long> millis = new ArrayList<>();
+        Runtime runtime = Runtime.getRuntime();
+        long before = runtime.totalMemory() - runtime.freeMemory();
+        for (int i = 0; i < 10; i++) {
+            long start = System.nanoTime();
+            assertThat(list(owner, "").orElseThrow().entries()).hasSize(1_000);
+            millis.add((System.nanoTime() - start) / 1_000_000);
+        }
+        long delta = runtime.totalMemory() - runtime.freeMemory() - before;
+        Collections.sort(millis);
+        System.out.printf(
+                "synthetic listing samples=10 p50_ms=%d p95_ms=%d heap_delta_bytes=%d max_candidates=1001%n",
+                millis.get(4), millis.get(9), delta);
+    }
+
+    private static WorkspaceEntry testEntry(String name, boolean directory) {
+        return new WorkspaceEntry(
+                name,
+                directory ? WorkspaceEntryKind.DIRECTORY : WorkspaceEntryKind.FILE,
+                directory ? null : 0L,
+                Instant.EPOCH,
+                true,
+                WorkspacePath.addressable(name));
+    }
 
     @BeforeEach
     void setUp() throws IOException {

@@ -26,6 +26,10 @@ import com.bifos.assistant.shared.util.SandboxedContentPolicy;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.workspace.application.WorkspaceService;
+import com.bifos.assistant.workspace.domain.WorkspaceCursor;
+import com.bifos.assistant.workspace.domain.WorkspaceEntry;
+import com.bifos.assistant.workspace.domain.WorkspaceEntryKind;
+import com.bifos.assistant.workspace.domain.WorkspacePath;
 import com.bifos.assistant.workspace.infra.WorkspaceProperties;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -47,6 +51,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 파일 공간 경로가 HTTP 경계에서 돌려주는 상태 코드와 머리글을 본다. 계약은 {@code backend/docs/code-architecture.md} 의 「실행 공간 파일」 이다.
@@ -75,6 +80,55 @@ class WorkspaceControllerTest {
     JdbcTemplate jdbc;
 
     private final List<String> createdAgents = new ArrayList<>();
+
+    @Test
+    @DisplayName("목록 HTTP는 마지막 표시 키의 cursor와 다음 페이지 여부를 함께 돌려준다")
+    void returnsCursorAndCompleteLastPage() throws Exception {
+        Path owner = Files.createDirectory(root.resolve("u301"));
+        for (int i = 1_001; i >= 0; i--) {
+            Files.createFile(owner.resolve(String.format("f%04d", i)));
+        }
+        MockMvc mvc = mvc(root.toString());
+        String body = mvc.perform(get("/api/v1/workspace/entries"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries.length()").value(1_000))
+                .andExpect(jsonPath("$.truncated").value(true))
+                .andExpect(jsonPath("$.nextCursor").isString())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String cursor =
+                JsonMapper.builder().build().readTree(body).get("nextCursor").asString();
+        mvc.perform(get("/api/v1/workspace/entries").param("cursor", cursor))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entries[*].name", contains("f1000", "f1001")))
+                .andExpect(jsonPath("$.truncated").value(false))
+                .andExpect(jsonPath("$.nextCursor").isEmpty());
+    }
+
+    @Test
+    @DisplayName("잘못된 cursor는 400이고 미인증과 설정 해제와 주인 교체도 기존 거절을 유지한다")
+    void rejectsInvalidCursorAndRechecksOwner() throws Exception {
+        write("a", "own");
+        String cursor = WorkspaceCursor.encode(
+                WorkspacePath.parse(""),
+                new WorkspaceEntry("a", WorkspaceEntryKind.FILE, 0L, Instant.EPOCH, true, true));
+        MockMvc mvc = mvc(root.toString());
+        mvc.perform(get("/api/v1/workspace/entries").param("cursor", "!"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(get("/api/v1/workspace/entries").param("path", "other").param("cursor", cursor))
+                .andExpect(status().isBadRequest());
+        mvc("").perform(get("/api/v1/workspace/entries").param("cursor", cursor))
+                .andExpect(status().isServiceUnavailable());
+        SecurityContextHolder.clearContext();
+        mvc.perform(get("/api/v1/workspace/entries").param("cursor", cursor)).andExpect(status().isUnauthorized());
+        setUp();
+        Path owner = root.resolve("u301");
+        Files.move(owner, root.resolve("old"));
+        Files.createSymbolicLink(owner, root.resolve("old"));
+        mvc.perform(get("/api/v1/workspace/entries").param("cursor", cursor)).andExpect(status().isNotFound());
+    }
 
     @BeforeEach
     void setUp() {

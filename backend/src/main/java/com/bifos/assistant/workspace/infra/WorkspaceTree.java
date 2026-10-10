@@ -5,6 +5,7 @@ import static java.nio.file.StandardOpenOption.READ;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.workspace.domain.WorkspaceCursor;
 import com.bifos.assistant.workspace.domain.WorkspaceEntry;
 import com.bifos.assistant.workspace.domain.WorkspaceEntryKind;
 import com.bifos.assistant.workspace.domain.WorkspaceListing;
@@ -29,8 +30,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +56,7 @@ import lombok.extern.slf4j.Slf4j;
 public final class WorkspaceTree {
 
     private static final AtomicBoolean FALLBACK_WARNING_LOGGED = new AtomicBoolean();
+    private static final long LIST_BUDGET_NANOS = 2_000_000_000L;
     private static final Comparator<WorkspaceEntry> DIRECTORIES_FIRST = Comparator.comparing(
                     (WorkspaceEntry entry) -> entry.kind() != WorkspaceEntryKind.DIRECTORY)
             .thenComparing(WorkspaceEntry::name);
@@ -63,13 +67,18 @@ public final class WorkspaceTree {
     }
 
     /**
-     * 디렉터리 하나의 목록이다. 항목은 {@code limit + 1} 개까지만 읽고, 그 가운데 {@code limit} 개를 디렉터리 먼저 이름 순서로 준다.
+     * 디렉터리 전체에서 다음 {@code limit + 1} 개만 유지하고 {@code limit} 개를 디렉터리 먼저 이름 순서로 준다.
      *
      * <p>주인 디렉터리가 없으면 빈 경로에만 빈 목록을 준다. 주인 디렉터리가 링크이거나, 조각이 링크이거나 디렉터리가 아니거나 없으면
      * 비어 있다.
      */
     public static Optional<WorkspaceListing> list(Path ownerDir, WorkspacePath path, int limit) throws IOException {
         return list(ownerDir, path, limit, false, () -> {});
+    }
+
+    public static Optional<WorkspaceListing> list(Path ownerDir, WorkspacePath path, int limit, String rawCursor)
+            throws IOException {
+        return list(ownerDir, path, limit, rawCursor, false, () -> {}, System::nanoTime);
     }
 
     /**
@@ -79,6 +88,24 @@ public final class WorkspaceTree {
     static Optional<WorkspaceListing> list(
             Path ownerDir, WorkspacePath path, int limit, boolean checkedPath, Runnable beforeRecheck)
             throws IOException {
+        return list(ownerDir, path, limit, null, checkedPath, beforeRecheck, System::nanoTime);
+    }
+
+    /** 시험이 시간을 제어해 실제 대기 없이 예산 초과를 확인한다. 운영에서는 nanoTime만 쓴다. */
+    static Optional<WorkspaceListing> list(
+            Path ownerDir,
+            WorkspacePath path,
+            int limit,
+            String rawCursor,
+            boolean checkedPath,
+            Runnable beforeRecheck,
+            LongSupplier nanoTime)
+            throws IOException {
+        if (limit < 1 || limit > 1_000) {
+            throw new IllegalArgumentException("workspace page size is invalid");
+        }
+        WorkspaceCursor cursor = WorkspaceCursor.decode(rawCursor, path);
+        long started = nanoTime.getAsLong();
         if (Files.notExists(ownerDir, NOFOLLOW_LINKS)) {
             return path.isRoot() ? Optional.of(new WorkspaceListing("", List.of(), false)) : Optional.empty();
         }
@@ -88,14 +115,15 @@ public final class WorkspaceTree {
                 return Optional.empty();
             }
             boolean checked = checked(checkedPath, opened.get());
-            List<WorkspaceEntry> entries = new ArrayList<>();
+            PriorityQueue<WorkspaceEntry> next = new PriorityQueue<>(limit + 1, DIRECTORIES_FIRST.reversed());
             try (DirectoryStream<Path> dir = opened.get()) {
                 for (Path entry : dir) {
-                    if (entries.size() > limit) {
-                        break;
-                    }
+                    checkListDeadline(started, nanoTime);
                     try {
-                        entries.add(entryOf(dir, entry));
+                        WorkspaceEntry candidate = entryOf(dir, entry);
+                        if (cursor == null || cursor.precedes(candidate)) {
+                            retainNext(next, candidate, limit);
+                        }
                     } catch (NoSuchFileException ignored) {
                         // 읽는 사이에 지워진 항목은 목록에 넣지 않는다.
                     }
@@ -106,14 +134,33 @@ public final class WorkspaceTree {
             if (checked && !stillInside(ownerDir, path.segments(), beforeRecheck)) {
                 return Optional.empty();
             }
+            checkListDeadline(started, nanoTime);
+            List<WorkspaceEntry> entries = new ArrayList<>(next);
             boolean truncated = entries.size() > limit;
             entries.sort(DIRECTORIES_FIRST);
             List<WorkspaceEntry> shown = List.copyOf(entries.subList(0, Math.min(limit, entries.size())));
-            return Optional.of(new WorkspaceListing(path.value(), shown, truncated));
+            String nextCursor = truncated ? WorkspaceCursor.encode(path, shown.get(shown.size() - 1)) : null;
+            return Optional.of(new WorkspaceListing(path.value(), shown, truncated, nextCursor));
         } catch (NoSuchFileException | NotDirectoryException ex) {
             return Optional.empty();
         } catch (AccessDeniedException ex) {
             throw unreadable();
+        }
+    }
+
+    /** 최대 힙의 용량은 lookahead를 포함한 limit + 1을 한 순간도 넘지 않는다. */
+    static void retainNext(PriorityQueue<WorkspaceEntry> next, WorkspaceEntry candidate, int limit) {
+        if (next.size() < limit + 1) {
+            next.add(candidate);
+        } else if (DIRECTORIES_FIRST.compare(candidate, next.element()) < 0) {
+            next.remove();
+            next.add(candidate);
+        }
+    }
+
+    private static void checkListDeadline(long started, LongSupplier nanoTime) throws IOException {
+        if (nanoTime.getAsLong() - started >= LIST_BUDGET_NANOS) {
+            throw new IOException("workspace listing deadline exceeded");
         }
     }
 
