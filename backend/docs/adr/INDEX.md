@@ -70,6 +70,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
 | [ADR-20261010 / attachment-deletion-request](ADR-20261010-attachment-deletion-request.md) | 첨부 삭제 요청을 파일 작업 전에 커밋한다 | Accepted |
 | [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted |
+| [ADR-20261011 / media-observation-cache](ADR-20261011-media-observation-cache.md) | 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다 | Accepted. 구현 전 확정 설계 |
 
 ## 보관
 
