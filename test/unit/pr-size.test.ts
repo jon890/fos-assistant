@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { category, classify, compare, countChanges, excluded } from "../../scripts/pr-size.mjs";
+import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded } from "../../scripts/pr-size.mjs";
 
 const SCRIPT = new URL("../../scripts/pr-size.mjs", import.meta.url).pathname;
 // 시험 자식이 CI 작업의 출력과 요약을 바꾸거나 예외 라벨을 물려받지 않게 한다.
@@ -42,18 +42,22 @@ test("시험과 문서는 별도로 표시하고 운영 코드만 상한에 넣�
   for (const file of tests) assert.equal(category(file), "tests", file);
   for (const file of docs) assert.equal(category(file), "docs", file);
   for (const file of production) assert.equal(category(file), "production", file);
-  const counts = countChanges("400\t0\tweb/src/app.ts\0" + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/prd.md\0");
-  assert.deepEqual(counts, { production: 400, tests: 6000, docs: 7000, ignored: 0 });
+  const counts = countChanges(`${LARGE_THRESHOLD}\t0\tweb/src/app.ts\0` + "6000\t0\ttest/unit/a.test.ts\0" + "7000\t0\tdocs/prd.md\0");
+  assert.deepEqual(counts, { production: LARGE_THRESHOLD, tests: 6000, docs: 7000, ignored: 0 });
   assert.deepEqual(classify(counts.production), { large: false, pass: true });
   assert.deepEqual(countChanges("1\t2\t\0scripts/check.sh\0test/check.sh\0"), { production: 3, tests: 0, docs: 0, ignored: 0 });
 });
 
-test("경계와 예외 라벨을 판정한다", () => {
-  for (const [lines, large, pass] of [[0, false, true], [400, false, true], [401, true, true], [1000, true, true], [1001, true, true], [1500, true, true], [1501, true, false]] as const) {
-    assert.deepEqual(classify(lines), { large, pass });
-  }
-  assert.deepEqual(classify(1501, ["규모:예외"]), { large: true, pass: true });
-  assert.equal(classify(1501, ["규모:큼"]).pass, false);
+test("현재 정책의 경계와 예외 라벨을 판정한다", () => {
+  assert.ok(Number.isSafeInteger(LARGE_THRESHOLD) && LARGE_THRESHOLD > 0);
+  assert.ok(Number.isSafeInteger(MAX_LINES) && MAX_LINES > LARGE_THRESHOLD);
+  assert.deepEqual(classify(0), { large: false, pass: true });
+  assert.deepEqual(classify(LARGE_THRESHOLD), { large: false, pass: true });
+  assert.deepEqual(classify(LARGE_THRESHOLD + 1), { large: true, pass: true });
+  assert.deepEqual(classify(MAX_LINES), { large: true, pass: true });
+  assert.deepEqual(classify(MAX_LINES + 1), { large: true, pass: false });
+  assert.deepEqual(classify(MAX_LINES + 1, ["규모:예외"]), { large: true, pass: true });
+  assert.equal(classify(MAX_LINES + 1, ["규모:큼"]).pass, false);
 });
 
 test("잘못된 numstat는 조용히 통과시키지 않는다", () => {
@@ -79,19 +83,20 @@ test("공통 조상부터 세므로 base의 새 변경은 포함하지 않고 �
     git("add", "."); git("commit", "-qm", "head");
     const head = git("rev-parse", "HEAD");
     git("checkout", "--detach", ancestor);
-    writeFileSync(join(cwd, "base.ts"), "base\n".repeat(1500));
+    writeFileSync(join(cwd, "base.ts"), "base\n".repeat(MAX_LINES + 1));
     git("add", "."); git("commit", "-qm", "base");
     assert.deepEqual(compare("HEAD", head, cwd), { production: 2, tests: 2000, docs: 2000, ignored: 2000 });
     const result = spawnSync("node", [SCRIPT, "HEAD", head], { cwd, encoding: "utf8", env: CLI_ENV });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /운영 코드 2줄, 시험 2000줄, 문서 2000줄/);
     git("checkout", "--detach", head);
-    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(1500));
+    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(MAX_LINES));
     git("add", "."); git("commit", "-qm", "large");
     const boundary = spawnSync("node", [SCRIPT, head], { cwd, encoding: "utf8", env: CLI_ENV });
     assert.equal(boundary.status, 0, boundary.stderr);
-    assert.match(boundary.stdout, /운영 코드 1500줄.*상한 1500줄, 통과/);
-    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(1501));
+    assert.ok(boundary.stdout.includes(`운영 코드 ${MAX_LINES}줄`), boundary.stdout);
+    assert.ok(boundary.stdout.includes(`상한 ${MAX_LINES}줄, 통과`), boundary.stdout);
+    writeFileSync(join(cwd, "large.ts"), "change\n".repeat(MAX_LINES + 1));
     git("add", "."); git("commit", "-qm", "over-limit");
     assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: CLI_ENV }).status, 1);
     assert.equal(spawnSync("node", [SCRIPT, head], { cwd, env: { ...CLI_ENV, PR_LABELS: '["규모:예외"]' } }).status, 0);
