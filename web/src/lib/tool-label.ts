@@ -27,6 +27,7 @@ const LABELS: Record<string, Label> = {
     done: "결과물을 저장했어요",
   },
   memory_read: { running: "기억을 떠올리고 있어요", done: "기억을 떠올렸어요" },
+  memory_search: { running: "기억을 찾고 있어요", done: "기억을 찾았어요" },
   memory_remember: {
     running: "기억해 두고 있어요",
     done: "기억해 뒀어요",

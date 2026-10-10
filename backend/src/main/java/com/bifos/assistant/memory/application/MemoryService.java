@@ -6,6 +6,8 @@ import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.model.MemorySearchItem;
+import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
@@ -32,15 +34,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Memory 를 읽고 쓴다.
- *
- * <p>에이전트의 실행이 받는 항목은 세 조건을 모두 지난 것이다. 범위(USER 의 주인, GROUP 의 같은 그룹), 그 에이전트가
- * 받는 collection, 그 collection 에서 허용받은 민감도다(ADR-053). 사람이 화면에서 보는 목록은 범위만 본다.
- *
- * <p>민감 항목의 본문은 암호문으로 저장한다(ADR-055).
+ * Memory를 읽고 쓴다. 실행은 범위·collection·민감도를 검사하고(ADR-053), 사람의 목록은 범위만 검사한다.
+ * 민감 본문은 암호문으로 저장한다(ADR-055).
  */
 @Service
 @RequiredArgsConstructor
@@ -104,11 +103,7 @@ public class MemoryService {
         return memory;
     }
 
-    /**
-     * 요청자의 그룹이 쓰는 collection 이다. 그룹이 없으면 빈 목록이다.
-     *
-     * <p>줄이 없는 그룹이면 기본 목록을 저장하므로 읽기 전용 트랜잭션으로 두지 않는다.
-     */
+    /** 그룹의 collection을 낸다. 그룹이 없으면 비어 있고, 기본 목록을 저장할 수 있어 쓰기 트랜잭션을 쓴다. */
     @Transactional
     public List<MemoryCollection> collectionsFor(CurrentUser user) {
         return user.groupId() == null ? List.of() : collections.collectionsOf(user.groupId());
@@ -165,13 +160,7 @@ public class MemoryService {
         return revise(user, memory, content, memory.retrieval(), sensitivity);
     }
 
-    /**
-     * 그 에이전트의 실행이 받는 collection 이다.
-     *
-     * <p>커넥터 에이전트, 찾지 못한 에이전트, 에이전트가 없는 실행은 아무것도 받지 않는다.
-     *
-     * @param agentId 실행의 에이전트 번호. 없는 실행이면 null 이다
-     */
+    /** 실행 에이전트의 collection 허용이다. agentId가 null이거나 찾지 못했거나 커넥터 에이전트면 비어 있다. */
     public MemoryAccess accessOf(Long agentId) {
         AgentMemoryGrants grants = agentCollections.grantsOf(agentId);
         return MemoryAccess.of(grants.collections(), grants.sensitiveCollections());
@@ -187,11 +176,40 @@ public class MemoryService {
         return injectableFor(user, access, MemoryRetrieval.SEARCH);
     }
 
+    /** 제목을 찾는다. 외부 트랜잭션과 분리해 검색 statement에만 2초 제한을 적용한다. */
+    @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 2)
+    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, Long afterId) {
+        if (query == null
+                || query.strip().isEmpty()
+                || query.strip().codePointCount(0, query.strip().length()) > 200
+                || limit < 1
+                || limit > 50
+                || (afterId != null && afterId <= 0)) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid memory search arguments");
+        }
+        if (access.isEmpty()) {
+            return new MemorySearchPage(List.of(), null);
+        }
+        List<MemorySearchItem> found = memories.findBy(
+                MemoryQueries.searchFor(
+                        user.id(),
+                        user.groupId(),
+                        access.unrestricted() ? null : access.collections(),
+                        access.sensitiveCollections(),
+                        query,
+                        afterId),
+                selected -> selected.as(MemorySearchItem.class)
+                        .sortBy(BY_ID)
+                        .limit(limit + 1)
+                        .all());
+        boolean more = found.size() > limit;
+        List<MemorySearchItem> items = List.copyOf(found.subList(0, Math.min(limit, found.size())));
+        return new MemorySearchPage(items, more ? items.getLast().id() : null);
+    }
+
     /**
-     * 제목만 실렸던 ACCEPTED 항목의 본문을 낸다.
-     *
-     * <p>볼 수 없는 항목, 승인 전인 항목, 색인에 실리지 않는 항목, 이 실행이 받지 않는 collection 의 항목, 허용받지 않은
-     * 민감 항목은 모두 없는 항목과 같은 MEMORY_NOT_FOUND 다. 다르게 답하면 그 항목이 있다는 사실이 새어 나간다.
+     * 현재 실행이 읽을 수 있는 ACCEPTED·SEARCH 항목의 본문을 낸다.
+     * 범위·collection·민감도 밖의 항목도 없는 항목과 같은 MEMORY_NOT_FOUND로 숨긴다.
      */
     public Memory bodyFor(CurrentUser user, MemoryAccess access, Long id) {
         Memory memory = requireReadable(user, id);
@@ -326,11 +344,7 @@ public class MemoryService {
         memories.delete(memory);
     }
 
-    /**
-     * 한 항목의 물러난 판을 오래된 것부터 낸다. 지운 항목도 그 번호로 찾는다.
-     *
-     * <p>판이 적어 둔 범위와 주인으로 볼 수 있는 것만 낸다. 남의 항목과 없는 항목은 똑같이 빈 목록이다.
-     */
+    /** 물러난 판을 범위와 주인으로 검사해 오래된 순서로 낸다. 삭제한 번호도 찾되 남의 항목과 없는 항목은 빈 목록이다. */
     public List<MemoryRevision> revisionsOf(CurrentUser user, Long id) {
         return revisions.findByIdMemoryIdOrderByIdRevisionAsc(id).stream()
                 .filter(revision -> revision.scope() == MemoryScope.USER
@@ -340,8 +354,7 @@ public class MemoryService {
     }
 
     /**
-     * 본문을 평문으로 낸다. 본문을 밖으로 내는 자리는 엔티티의 {@code content()} 가 아니라 이것을 쓴다.
-     *
+     * 저장 본문을 밖으로 낼 때는 엔티티의 content() 대신 이 메서드로 평문을 읽는다.
      * @throws ApiException 암호화 key 가 없을 때. MEMORY_ENCRYPTION_UNAVAILABLE
      */
     public String contentOf(Memory memory) {
@@ -401,12 +414,8 @@ public class MemoryService {
     }
 
     /**
-     * 고치거나 지우거나 승인 상태를 바꿀 항목을 쓰기 잠금으로 읽고 쓸 수 있는지 본다.
-     *
-     * <p>승인과 거절도 잠근다. 잠그지 않고 읽은 값을 통째로 저장하면 그 사이에 커밋된 수정의 본문과 판 번호를 옛 값으로
-     * 되돌린다.
-     *
-     * <p>잠근 뒤에 읽은 값으로 판을 남겨야 하므로, 이 트랜잭션에서 그 항목을 먼저 읽어 두지 않는다.
+     * 수정·삭제·승인·거절은 쓰기 잠금 뒤에 현재 값을 읽고 판을 남긴다.
+     * 미리 읽어 둔 값으로 저장하면 그 사이 커밋된 본문과 판 번호를 되돌리므로, 잠그기 전에 읽지 않는다.
      */
     private Memory requireWritableForUpdate(CurrentUser user, Long id) {
         Memory memory = memories.findByIdForUpdate(id).orElseThrow(MemoryService::notFound);

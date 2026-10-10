@@ -89,9 +89,13 @@ Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서
 
 | 도구 | 서명하지 못할 때 |
 | --- | --- |
-| `agent_*`, `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember` | 막는다. 모델에게 막은 이유가 간다 |
+| `agent_*`, `memory_read`, `memory_search`, `artifact_write`, `follow_up_propose`, `memory_remember` | 막는다. 모델에게 막은 이유가 간다 |
 | 그 밖의 Control Plane MCP 도구 | 막지 않고 원래 인자 그대로 보낸다 |
 | Control Plane MCP 가 아닌 도구 | 건드리지 않는다. `skill_manage` 만 아래처럼 막는다 |
+
+`memory_search`는 색인에서 빠진 항목도 현재 origin의 권한으로 제목에서 찾는 읽기 도구다.
+필수 서명이 없으면 호출 전에 막는다. 호출된 서버의 지연·SQL 실패는 빈 결과로 처리하지 않는다.
+검색 규격과 본문을 읽는 순서는 [`docs/features/memory.md`](../../../docs/features/memory.md)의 「제목 검색의 구현 계약」이 갖는다.
 
 **v2026.9.24 는 MCP 도구를 `tool_call` 중계 도구 뒤에 둔다.** 기본 설정 `tools.tool_search` 가 켜져 있어서다.
 모델은 `tool_call` 로 `mcp__fos_assistant__<도구>` 를 부르고, Hermes 는 그때도 실제 도구 이름으로 `pre_tool_call` 을 부른다.

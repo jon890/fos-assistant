@@ -57,3 +57,11 @@ test("memory_remember 는 기억해 두는 말로 보인다", () => {
   assert.equal(toolLabel("mcp__fos_assistant__memory_remember", true), "기억해 두고 있어요");
   assert.equal(toolLabel("mcp__fos_assistant__memory_remember", false), "기억해 뒀어요");
 });
+
+test("memory_search 는 이름을 보여주지 않고 기억을 찾는 말로 보인다", () => {
+  for (const name of ["memory_search", "mcp__fos_assistant__memory_search"]) {
+    assert.equal(toolLabel(name, true), "기억을 찾고 있어요");
+    assert.equal(toolLabel(name, false), "기억을 찾았어요");
+    assert.equal(isReadableDetail(name), false);
+  }
+});

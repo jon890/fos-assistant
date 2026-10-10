@@ -10,6 +10,7 @@ import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -91,7 +92,7 @@ public class McpToolService {
                         "name",
                         "memory_read",
                         "description",
-                        "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인에 있다.",
+                        "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인, memory_search 결과에 있다.",
                         "inputSchema",
                         Map.of(
                                 "type",
@@ -212,14 +213,30 @@ public class McpToolService {
                                         Map.of("type", "boolean")),
                                 "required",
                                 List.of("title"))),
-                memoryRemember.definition());
+                memoryRemember.definition(),
+                Map.of(
+                        "name", "memory_search",
+                        "description",
+                                "색인에 없는 기억도 현재 실행의 권한으로 제목에서 찾는다. query는 제목의 일부이며 본문은 검색하지 않는다. 결과의 id로 memory_read를 불러 본문을 읽는다. nextAfterId가 있으면 after_id에 넣어 다음 페이지를 읽는다.",
+                        "inputSchema",
+                                Map.of(
+                                        "type",
+                                        "object",
+                                        "additionalProperties",
+                                        false,
+                                        "properties",
+                                        Map.of(
+                                                "query", Map.of("type", "string", "minLength", 1, "maxLength", 200),
+                                                "limit",
+                                                        Map.of(
+                                                                "type", "integer", "minimum", 1, "maximum", 50,
+                                                                "default", 10),
+                                                "after_id", Map.of("type", "integer", "minimum", 1)),
+                                        "required",
+                                        List.of("query"))));
     }
 
-    /**
-     * 요청자를 정하지 못한 호출의 도구 결과다.
-     *
-     * <p>서명 오류, profile 불일치, 부모 없음, 부모 둘 이상, 사용자 없음을 모두 이 결과 하나로 답한다(ADR-032).
-     */
+    /** 서명·profile·부모·사용자 판정 실패는 모두 같은 도구 결과로 숨긴다(ADR-032). */
     public Map<String, Object> invalidContext() {
         return result(INVALID_CONTEXT, true);
     }
@@ -246,6 +263,20 @@ public class McpToolService {
             }
             throw ex;
         }
+    }
+
+    /** 제목만 반환한다. 본문 사용 기록은 뒤이은 성공한 memory_read가 남긴다. */
+    public Map<String, Object> searchMemory(McpCaller caller, String query, int limit, Long afterId) {
+        MemorySearchPage page = memories.searchFor(
+                caller.user(), memories.accessOf(caller.originExecution().agentId()), query, limit, afterId);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("items", page.items());
+        data.put("nextAfterId", page.nextAfterId());
+        log.info(
+                "memory search executionId={} resultCount={}",
+                caller.executionId(),
+                page.items().size());
+        return result(ExternalData.wrap(JSON.writeValueAsString(data)), false);
     }
 
     public Map<String, Object> writeArtifact(McpCaller caller, ArtifactWriteRequest request) {
@@ -286,18 +317,12 @@ public class McpToolService {
     }
 
     /**
-     * 맡긴 실행 하나의 상태를 JSON 글로 돌려준다.
+     * 맡긴 실행의 상태를 JSON으로 낸다. SUCCEEDED는 답, FAILED는 오류 코드, CANCELLED는 남은 답만 싣는다.
+     * run·profile·비용·토큰·예외 문구는 숨기고 물을 수 없는 실행은 없는 실행과 같은 결과다.
+     * 끝난 결과는 부모가 받은 것으로 적어 다음 대화에 다시 전하지 않는다.
+     * 커넥터가 붙었거나 에이전트를 알 수 없는 실행의 답은 ExternalData로 감싼다(ADR-049).
      *
-     * <p>{@code SUCCEEDED} 는 답을, {@code FAILED} 는 오류 코드를, {@code CANCELLED} 는 답이 있으면 답을 싣는다.
-     * run 번호, profile, 토큰 수, 금액, 예외 문구는 싣지 않는다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
-     *
-     * <p>끝난 결과를 돌려주면 부모가 받은 것으로 적는다. 그 결과를 부모 대화에 다시 전하지 않기 위해서다.
-     *
-     * <p>연결용 에이전트의 답은 외부 서비스의 글을 담으므로 부모 대화에 전할 때와 같이 {@code <external-data>} 로
-     * 감싼다. 에이전트 행이 없는 실행도 출처를 모르므로 감싼다(ADR-049).
-     *
-     * @param wait 그 실행이 끝나기를 기다릴 시간. 0 이면 곧바로 답한다. 먼저 살펴보기 트리가 아니면 기다리지 않고 상한은
-     *     {@link AgentDelegationService} 가 줄인다
+     * @param wait 먼저 살펴보기 트리에서만 기다리는 시간. 0이면 즉시 답하고 상한은 AgentDelegationService가 줄인다
      */
     public Map<String, Object> agentStatus(McpCaller caller, Long executionId, Duration wait) {
         return delegations
@@ -310,13 +335,9 @@ public class McpToolService {
     }
 
     /**
-     * 맡긴 실행 하나를 멈추고 그 뒤의 상태를 {@link #agentStatus} 와 같은 모양의 JSON 글로 돌려준다.
-     *
-     * <p>짧게 기다려도 아직 {@code RUNNING} 이고 이번 호출이 실제로 중지 표시를 켰거나 Hermes 에 중지를 보냈으면
-     * {@code stop_requested: true} 를 더한다. run 번호가 없어 아무것도 보내지 못한 끊긴 실행은 {@code RUNNING} 만 준다.
-     * 이미 끝난 실행은 멈추지 않고 끝난 상태를 준다. 물을 수 없는 실행은 없는 실행과 같은 결과다.
-     *
-     * <p>끝난 결과를 돌려주면 {@link #agentStatus} 처럼 부모가 받은 것으로 적는다.
+     * 맡긴 실행을 멈추고 agentStatus와 같은 상태를 낸다. 아직 RUNNING이고 실제로 중지를 요청했으면 stop_requested를 더한다.
+     * run 번호가 없으면 RUNNING만 주고, 끝난 실행은 멈추지 않고 부모가 결과를 받았다고 적는다.
+     * 물을 수 없는 실행은 없는 실행과 같은 결과다.
      */
     public Map<String, Object> agentStop(McpCaller caller, Long executionId) {
         return delegations
@@ -356,11 +377,7 @@ public class McpToolService {
     }
 
     /**
-     * 할 일을 {@code PROPOSED} 로 제안하고 그 결과를 한 줄 글로 돌려준다. 결과마다의 글과 {@code isError} 는 이 메서드가 갖는다.
-     *
-     * <p>주인과 대화는 origin 실행에서 정한다. 인자로 받지 않는다(ADR-032). 값이 틀린 인자는 모델이 고쳐 다시 부를 수 있게
-     * {@code isError} 와 무엇이 틀렸는지 한 줄로 답한다.
-     *
+     * 할 일을 PROPOSED로 제안한다. 주인과 대화는 origin에서 정하며 인자 오류는 isError와 한 줄 이유로 답한다(ADR-032).
      * @param dueAt 모델이 준 기한 글. 없으면 null
      */
     public Map<String, Object> proposeFollowUp(McpCaller caller, String title, String dueAt, boolean waiting) {

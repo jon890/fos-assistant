@@ -9,6 +9,7 @@ import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import java.util.Locale;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -74,5 +75,26 @@ public final class MemoryQueries {
         Predicate shared = builder.and(
                 builder.equal(root.get("scope"), MemoryScope.GROUP), builder.equal(root.get("groupId"), groupId));
         return builder.or(own, shared);
+    }
+
+    /** 현재 실행이 읽을 수 있는 SEARCH 항목의 제목만 찾는다. LIKE의 특수 문자는 글자로 다룬다. */
+    public static Specification<Memory> searchFor(
+            Long userId,
+            Long groupId,
+            Set<String> collections,
+            Set<String> sensitiveCollections,
+            String text,
+            Long afterId) {
+        String pattern = "%"
+                + text.strip()
+                        .toLowerCase(Locale.ROOT)
+                        .replace("\\", "\\\\")
+                        .replace("%", "\\%")
+                        .replace("_", "\\_") + "%";
+        Specification<Memory> title = (root, query, builder) -> builder.and(
+                builder.like(builder.lower(root.get("title")), pattern, '\\'),
+                afterId == null ? builder.conjunction() : builder.greaterThan(root.get("id"), afterId));
+        return injectable(userId, groupId, MemoryRetrieval.SEARCH, collections, sensitiveCollections)
+                .and(title);
     }
 }
