@@ -43,6 +43,16 @@ export async function open(page: EditorPage, { keepDraftNotice = false } = {}) {
       note = await requireClearScreen(page);
     }
     if (note) throw page.fail("editor_failed", "알림이 떠 있어 멈춘다");
+    // 존재 확인 뒤 알림을 처리하는 동안 문단이 교체되거나 숨겨질 수 있다.
+    const ready = await page.js<boolean>(`(() => {
+  const nodes = document.querySelectorAll(${JSON.stringify(TITLE_SELECTOR)});
+  if (nodes.length !== 1) return false;
+  const el = nodes[0];
+  const r = el.getBoundingClientRect(), s = getComputedStyle(el);
+  return el.isContentEditable && r.width > 0 && r.height > 0 &&
+    s.visibility === "visible" && s.display !== "none" && Number(s.opacity) > 0;
+})()`);
+    if (!ready) continue;
     await clearProgress(page);
     return "ready";
   }

@@ -3,6 +3,7 @@ import { basename, dirname } from "node:path";
 import { type DraftInput, parseBody } from "./draft.ts";
 import { type OverwriteInput, type OverwriteStage, runOverwrite } from "./editor/overwrite.ts";
 import { EditorError, runDraft, type RunStage } from "./editor/run.ts";
+import { filterFocusDiagnostics } from "./editor/focus.ts";
 import {
   checkJobDir,
   finishClaimed,
@@ -99,8 +100,12 @@ async function takeInput(dir: string, jobId: string) {
 
 /** `EditorError` 를 작업 상태의 `error` 로 옮긴다. 그 밖의 예외는 원문을 싣지 않는다. */
 function errorOf(error: unknown, stage: string): Record<string, unknown> {
-  if (error instanceof EditorError)
-    return { code: error.code, stage: error.stage, message: error.message, ...error.extra };
+  if (error instanceof EditorError) {
+    const { focus_diagnostics, ...extra } = error.extra;
+    const safe = filterFocusDiagnostics(focus_diagnostics);
+    return { code: error.code, stage: error.stage, message: error.message, ...extra,
+      ...(safe ? { focus_diagnostics: safe } : {}) };
+  }
   return { code: "editor_failed", stage };
 }
 
