@@ -59,14 +59,23 @@ test("manifest 도구 선언은 MCP 서버 도구와 정확히 같다", async ()
   expect(new Set(tools.map((tool) => tool.name))).toEqual(new Set(Object.keys(manifest.tools)));
 });
 
-test("도구 여섯을 선언하고 임시저장만 승인 카드 제목이 있는 계정 안 쓰기다", async () => {
+test("글 불러오기와 임시저장은 계정 안 쓰기이고 불러오기는 상시 허락을 닫는다", async () => {
   const tools = await listTools();
 
   expect(tools.map((tool) => tool.name).sort()).toEqual(
     ["draft_job", "list_drafts", "read_draft", "render_draft", "save_draft", "session_status"],
   );
   expect(manifest.tools.list_drafts).toEqual({ risk: "READ" });
-  expect(manifest.tools.read_draft).toEqual({ risk: "READ" });
+  expect(manifest.tools.read_draft).toEqual({
+    risk: "WRITE",
+    approval: "required",
+    grant: false,
+    title: "네이버 임시저장 글 불러오기 · 자동저장 가능",
+    outbound: false,
+  });
+  const readDraft = tools.find((tool) => tool.name === "read_draft")!;
+  expect(readDraft.annotations?.readOnlyHint).toBe(false);
+  expect(readDraft.description).toContain("자동저장");
   expect(manifest.tools.save_draft).toEqual({
     risk: "WRITE",
     title: "네이버 블로그에 임시저장",

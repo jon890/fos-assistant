@@ -24,6 +24,7 @@ import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorCheckReportApprovals;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
+import com.bifos.assistant.connector.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
@@ -32,10 +33,13 @@ import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
+import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
+import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
@@ -69,6 +73,8 @@ import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -716,6 +722,67 @@ class ConnectorActionServiceTest {
         // 허락 없이는 승인할 수 있고, 허락이 없으므로 다음 호출은 다시 승인을 기다린다.
         assertThat(service.approve(me, actionId, null).grantAllowed()).isFalse();
         assertThat(ask("send_note", "{\"text\":\"다음 글\"}").allowed()).isFalse();
+    }
+
+    @Test
+    @DisplayName("네이버 글 불러오기는 READ 전용 실행에서 막히고 정확한 인자로 매번 승인받으며 상시 허락을 줄 수 없다")
+    void naverReadDraftRequiresApprovalBeforeExecutingStoredArguments() throws Exception {
+        // 실제 manifest 를 읽어 분류가 되돌아가면 승인 경계 검사도 함께 실패하게 한다.
+        var spec = JSON.readTree(Files.readString(Path.of("../hermes/connectors/naver-blog/connector.json")))
+                .path("tools")
+                .path("read_draft");
+        String risk = spec.path("risk").asText();
+        ConnectorTool tool = new ConnectorTool(
+                "read_draft",
+                risk,
+                spec.path("approval").asText("READ".equals(risk) ? "none" : "required"),
+                spec.path("title").asText(null),
+                spec.has("grant") ? spec.path("grant").asBoolean() : null);
+        ConnectorManifest declaring =
+                manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null, null), tool));
+        var policy = ConnectorToolPolicies.find(declaring, tool.name());
+        for (boolean granted : new boolean[] {false, true}) {
+            assertThat(ToolPolicyDecision.decide(
+                                    ConnectionStatus.READY,
+                                    true,
+                                    2,
+                                    policy,
+                                    granted,
+                                    2,
+                                    ToolPolicyDecision.CheckBoundary.READ_ONLY)
+                            .denyReason())
+                    .isEqualTo(ActionDenyReason.READ_ONLY_RUN);
+            assertThat(ToolPolicyDecision.decide(
+                                    ConnectionStatus.READY,
+                                    true,
+                                    2,
+                                    policy,
+                                    granted,
+                                    2,
+                                    ToolPolicyDecision.CheckBoundary.NOT_CHECK)
+                            .decision())
+                    .isEqualTo(ActionDecision.NEEDS_APPROVAL);
+        }
+        assertThat(policy.orElseThrow().risk()).isEqualTo(ToolRisk.WRITE);
+        catalogBecomes(declaring);
+        String args = "{\"draft_id\":\"123456789\"  }";
+        assertThat(askInCheck(tool.name(), args, false).allowed()).isFalse();
+        assertThat(actions.findAll()).isEmpty();
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+        ConnectorPolicyAnswer answer = ask(tool.name(), args);
+        assertThat(answer.allowed()).isFalse();
+        assertThat(onlyAction().argsJson()).isEqualTo(args);
+        assertThat(service.listForConversation(me, CONVERSATION).getFirst().grantAllowed())
+                .isFalse();
+        assertCode(() -> service.approve(me, answer.actionId(), GrantPeriod.HOUR), ErrorCode.VALIDATION_FAILED);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+
+        ConnectorActionView approved = service.approve(me, answer.actionId(), null);
+        assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(approved.title()).isEqualTo("네이버 임시저장 글 불러오기 · 자동저장 가능");
+        verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__read_draft", args);
+        assertThat(grants.findAll()).isEmpty();
+        assertThat(ask(tool.name(), "{\"draft_id\":\"987654321\"}").allowed()).isFalse();
     }
 
     @Test
@@ -1418,6 +1485,10 @@ class ConnectorActionServiceTest {
      * 쓰기 도구를 허용한 살펴보기 turn 을 루트로 둔 커넥터 에이전트의 위임 실행을 만들고, 그 실행에서 부른 새 호출 하나를 판정한다.
      */
     private ConnectorPolicyAnswer askInWritesAllowedCheck(String tool, String args) {
+        return askInCheck(tool, args, true);
+    }
+
+    private ConnectorPolicyAnswer askInCheck(String tool, String args, boolean allowWrites) {
         Instant started = Instant.parse("2026-10-01T00:00:00Z");
         AgentExecution checkTurn = executions.save(AgentExecution.builder()
                 .userId(owner.id())
@@ -1429,7 +1500,7 @@ class ConnectorActionServiceTest {
                 .startedAt(started)
                 .build());
         ProactiveCheck check =
-                ProactiveCheck.started(owner.id(), agent.id(), CONVERSATION, CheckTrigger.MANUAL, true, started);
+                ProactiveCheck.started(owner.id(), agent.id(), CONVERSATION, CheckTrigger.MANUAL, allowWrites, started);
         check.attachRoot(checkTurn.id(), checkTurn.hermesSessionId());
         createdChecks.add(checks.save(check).id());
         String childRoot = "fos-" + UUID.randomUUID();
