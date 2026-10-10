@@ -1,22 +1,19 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
-import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -52,10 +49,10 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     /** 실행 경로의 읽기 제한이다. 대시보드의 실행 제한 60초보다 길어야 대시보드가 내는 시간 초과 응답을 받는다. */
     private static final Duration EXECUTE_READ_TIMEOUT = Duration.ofSeconds(75);
     /** 실행 경로가 호출을 실행하지 않고 거절했다는 뜻의 상태다. */
-    private static final Set<Integer> EXECUTE_NOT_RUN = Set.of(400, 401, 404);
-
     private final RestClient client;
+
     private final RestClient executeClient;
+    private final RestClient prepareClient;
     private final String baseUrl;
     private final String token;
     private final SandboxAttachmentDirectory attachmentDirectory;
@@ -70,6 +67,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         executeFactory.setReadTimeout(EXECUTE_READ_TIMEOUT);
         // 읽기 제한만 다르다. 나머지 구성은 위의 클라이언트와 함께 쓴다.
         this.executeClient = client.mutate().requestFactory(executeFactory).build();
+        this.prepareClient = HttpHermesConnectorGuard.prepareClient(client, properties);
         this.baseUrl = properties.dashboardBaseUrl().replaceAll("/$", "");
         this.token = properties.dashboardToken();
         this.attachmentDirectory = attachmentDirectory;
@@ -188,42 +186,28 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         body.put(PROFILE, profile);
         body.put("hermes_tool", hermesTool);
         body.set("args", args);
-        final ResponseEntity<String> response;
-        try {
-            response = executeClient
-                    .post()
-                    .uri(baseUrl + "/api/connectors/{id}/execute", connectorId)
-                    .header(AUTHORIZATION, bearer())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body.toString().getBytes(StandardCharsets.UTF_8))
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, (request, ignored) -> {})
-                    .toEntity(String.class);
-        } catch (RestClientException ex) {
-            throw new ConnectorExecutionUnknown();
-        }
-        int status = response.getStatusCode().value();
-        if (EXECUTE_NOT_RUN.contains(status)) {
-            return CallResult.failure(ConnectorCallError.UNAVAILABLE);
-        }
-        if (status != 200 || response.getBody() == null) {
-            throw new ConnectorExecutionUnknown();
-        }
-        try {
-            JsonNode answer = MAPPER.readTree(response.getBody());
-            if (requiredBoolean(answer, "ok")) {
-                JsonNode result = answer.get("result");
-                if (result == null || result.isNull()) {
-                    throw new ConnectorExecutionUnknown();
-                }
-                return CallResult.success(result);
-            }
-            return CallResult.failure(
-                    ConnectorCallError.fromWord(text(answer, "error")).orElseThrow(ConnectorExecutionUnknown::new),
-                    ConnectorErrorDetail.fromAnswer(answer).orElse(null));
-        } catch (JacksonException | IllegalStateException ex) {
-            throw new ConnectorExecutionUnknown();
-        }
+        return HttpHermesConnectorGuard.execute(executeClient, baseUrl, token, connectorId, body);
+    }
+
+    @Override
+    public CallResult prepare(String profile, String connectorId, String hermesTool, String argsJson) {
+        return HttpHermesConnectorGuard.prepare(
+                prepareClient,
+                baseUrl,
+                token,
+                connectorId,
+                HttpHermesConnectorGuard.body(profile, hermesTool, argsJson));
+    }
+
+    @Override
+    public CallResult executeApproved(
+            String profile, String connectorId, String hermesTool, ConnectorApprovedExecution execution) {
+        return HttpHermesConnectorGuard.execute(
+                executeClient,
+                baseUrl,
+                token,
+                connectorId,
+                HttpHermesConnectorGuard.approved(profile, hermesTool, execution));
     }
 
     /** 승인 줄에 저장한 인자 글을 JSON object 로 읽는다. object 로 읽을 수 없으면 null 이다. */
@@ -255,6 +239,17 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     @Override
     public InstallResult bindConnector(
             String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser) {
+        return bindConnector(profile, connectorId, vault, sandboxOwner, ownerBrowser, null);
+    }
+
+    @Override
+    public InstallResult bindConnector(
+            String profile,
+            String connectorId,
+            String vault,
+            String sandboxOwner,
+            String ownerBrowser,
+            JsonNode guard) {
         // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-20261007 connector-owner-attachments).
         // 만들기는 최선 노력이다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 멈추지 않게 하고, 선언한 커넥터는
         // 대시보드가 디렉터리를 확인하지 못해 409 로 거절하므로 경계는 그대로다.
@@ -273,7 +268,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                                 ENABLED,
                                 true,
                                 "bind",
-                                Map.of(VAULT, vault),
+                                guard == null ? Map.of(VAULT, vault) : Map.of(VAULT, vault, "guard", guard),
                                 "sandbox_owner",
                                 sandboxOwner),
                         ownerBrowser),
@@ -357,7 +352,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                         requiredBoolean(item, "configured"),
                         false,
                         policyHook,
-                        mode == null ? MODE_ISOLATED : mode);
+                        mode == null ? MODE_ISOLATED : mode,
+                        HttpHermesConnectorGuard.supportState(item.get("execution_guard")));
             }
         }
         // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.
@@ -456,7 +452,8 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 optionalBoolean(item, "single_binding", false),
                 optionalBoolean(item, "owner_browser", false),
                 loginUrl(item),
-                item.get("execution_guard"));
+                item.get("execution_guard"),
+                text(item, "execution_guard_manifest_sha256"));
     }
 
     /** 로그인 안내 주소다. 문자열이고 {@code https://} 로 시작할 때만 읽고, 아니면 null 이다. 카탈로그 전체를 버리지 않는다. */

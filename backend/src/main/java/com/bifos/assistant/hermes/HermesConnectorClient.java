@@ -1,9 +1,12 @@
 package com.bifos.assistant.hermes;
 
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
+import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import java.util.List;
 import java.util.Map;
+import tools.jackson.databind.JsonNode;
 
 /**
  * 대시보드 plugin 의 커넥터 경로를 부른다.
@@ -31,7 +34,19 @@ public interface HermesConnectorClient {
             boolean configured,
             boolean restartRequired,
             boolean policyHook,
-            String mode) {}
+            String mode,
+            JsonNode executionGuard) {
+        /** 기존 상태 생성자는 보호 지원이 없는 상태다. */
+        public ConnectorState(
+                String profile,
+                boolean enabled,
+                boolean configured,
+                boolean restartRequired,
+                boolean policyHook,
+                String mode) {
+            this(profile, enabled, configured, restartRequired, policyHook, mode, null);
+        }
+    }
 
     /**
      * 설치 요청의 결과다.
@@ -97,6 +112,17 @@ public interface HermesConnectorClient {
      */
     CallResult execute(String profile, String connectorId, String hermesTool, String argsJson);
 
+    /** 읽기 전용 금융 준비다. 옛 구현의 미지원은 금융 차단으로 읽는다. */
+    default CallResult prepare(String profile, String connectorId, String hermesTool, String argsJson) {
+        return CallResult.failure(ConnectorCallError.UNAVAILABLE);
+    }
+
+    /** 원문과 일회성 권한을 단 한 번 전송한다. 기존 execute로 우회하지 않는다. */
+    default CallResult executeApproved(
+            String profile, String connectorId, String hermesTool, ConnectorApprovedExecution execution) {
+        return CallResult.failure(ConnectorCallError.UNAVAILABLE);
+    }
+
     /**
      * 커넥터 전용 profile 에 옛 방식으로 설치하거나 끈다. 바인딩 칸 없이 보낸다.
      *
@@ -122,6 +148,20 @@ public interface HermesConnectorClient {
      */
     InstallResult bindConnector(
             String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser);
+
+    /** 비밀이 아닌 guard 맥락을 싣는다. 옛 요청의 본문과 시그니처는 유지한다. */
+    default InstallResult bindConnector(
+            String profile,
+            String connectorId,
+            String vault,
+            String sandboxOwner,
+            String ownerBrowser,
+            JsonNode guard) {
+        if (guard != null) {
+            throw new IllegalStateException();
+        }
+        return bindConnector(profile, connectorId, vault, sandboxOwner, ownerBrowser);
+    }
 
     /**
      * 그 profile 에 붙인 커넥터를 뗀다. 요청은 옛 설치를 끄는 것과 같다. 대시보드가 소유 기록의 방식으로 떼는 법을 고른다.

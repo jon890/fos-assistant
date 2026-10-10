@@ -38,7 +38,8 @@ public record ConnectorManifest(
         boolean singleBinding,
         boolean ownerBrowser,
         String ownerBrowserLoginUrl,
-        JsonNode executionGuard) {
+        JsonNode executionGuard,
+        String executionGuardManifestSha256) {
 
     public ConnectorManifest {
         description = description == null ? "" : description;
@@ -47,6 +48,44 @@ public record ConnectorManifest(
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+    /** 해시 칸을 모르는 기존 producer 소비 생성자다. */
+    public ConnectorManifest(
+            String id,
+            String title,
+            String description,
+            List<ConnectorField> fields,
+            String verifyTool,
+            String mcpServer,
+            List<String> toolsets,
+            boolean attachments,
+            int schema,
+            List<ConnectorTool> tools,
+            List<String> skills,
+            ConnectorAppearance appearance,
+            boolean singleBinding,
+            boolean ownerBrowser,
+            String ownerBrowserLoginUrl,
+            JsonNode executionGuard) {
+        this(
+                id,
+                title,
+                description,
+                fields,
+                verifyTool,
+                mcpServer,
+                toolsets,
+                attachments,
+                schema,
+                tools,
+                skills,
+                appearance,
+                singleBinding,
+                ownerBrowser,
+                ownerBrowserLoginUrl,
+                executionGuard,
+                null);
     }
 
     /** 보호 선언을 모르는 기존 카탈로그 생성자다. 누락은 미지원이다. */
