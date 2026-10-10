@@ -76,8 +76,8 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
     @Test
     @DisplayName("미확인 모델의 별개 실행은 다른 본문을 새 revision에 저장하고 UUID 재시도는 보존한다")
     void storesSeparateUnknownExecutionsAndPreservesUuidRetry() {
-        for (var names : List.of(
-                List.of("UNKNOWN", "model"), List.of("provider", "UNKNOWN"), List.of("UNKNOWN", "UNKNOWN"))) {
+        for (var names :
+                List.of(List.of("UNKNOWN", "model"), List.of("provider", "UNKNOWN"), List.of("UNKNOWN", "UNKNOWN"))) {
             photo = photo();
             UUID firstId = UUID.randomUUID();
             var initialSource = source(names.get(0), null, names.get(1), null, 123L);
@@ -89,7 +89,10 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
             assertThat(second.revision()).isEqualTo(2);
             assertThat(second.observation()).isEqualTo(submitted);
             assertThat(second.provenance().executionId()).isEqualTo(456L);
-            assertThat(observations.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()).orElseThrow().analysisKey())
+            assertThat(observations
+                            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                            .orElseThrow()
+                            .analysisKey())
                     .isNull();
             assertThat(record(0, firstId, initial, initialSource)).isEqualTo(first);
             code(() -> record(1, UUID.randomUUID(), submitted, laterSource), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
@@ -110,10 +113,19 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
             String legacyKey = Sha256.hex(json.writer()
                     .without(SerializationFeature.INDENT_OUTPUT)
                     .writeValueAsString(Arrays.asList(
-                            first.sourceFingerprint(), 1, "media-observation-v1", names.get(0), null,
-                            names.get(1), null, Arrays.asList("ORIGINAL", null, null))));
+                            first.sourceFingerprint(),
+                            1,
+                            "media-observation-v1",
+                            names.get(0),
+                            null,
+                            names.get(1),
+                            null,
+                            Arrays.asList("ORIGINAL", null, null))));
             jdbc.update("update media_observation set analysis_key=? where attachment_id=?", legacyKey, photo.id());
-            assertThat(observations.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()).orElseThrow().analysisKey())
+            assertThat(observations
+                            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                            .orElseThrow()
+                            .analysisKey())
                     .isEqualTo(legacyKey);
             var submitted = complete(ObservationStatus.SUCCEEDED, "새 미확인 결과", input().coverage(), "456");
             var second = record(1, UUID.randomUUID(), submitted, source(names.get(0), null, names.get(1), null, 456L));
@@ -132,7 +144,9 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         var submitted = complete(ObservationStatus.SUCCEEDED, "다른 본문", input().coverage(), "456");
         assertThat(record(1, UUID.randomUUID(), submitted, source("provider", null, "model", null, 456L)))
                 .isEqualTo(first);
-        assertThat(observations.findAll()).singleElement().satisfies(row -> assertThat(row.analysisKey()).isNotNull());
+        assertThat(observations.findAll())
+                .singleElement()
+                .satisfies(row -> assertThat(row.analysisKey()).isNotNull());
         assertThat(requests.count()).isEqualTo(2);
     }
 
