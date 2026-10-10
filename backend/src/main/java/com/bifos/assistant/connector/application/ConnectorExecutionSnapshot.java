@@ -47,24 +47,24 @@ public final class ConnectorExecutionSnapshot {
     private static final Set<String> SUMMARY = Set.of(("account,symbol,market,currency,side,quantity,orderAmount,price,"
                     + "orderType,timeInForce,operation,orderId,original,normalization")
             .split(","));
-    private static final Set<String> ORIGINAL = Set.of(
-            "orderId",
-            "symbol",
-            "market",
-            "currency",
-            "side",
-            "quantity",
-            "orderAmount",
-            "price",
-            "orderType",
-            "timeInForce",
-            "status",
-            "filledQuantity");
+    private static final Set<String> ORIGINAL =
+            Set.of(("orderId,symbol,market,currency,side,quantity,orderAmount,price,"
+                            + "orderType,timeInForce,status,filledQuantity")
+                    .split(","));
     private static final Set<String> EXPECTED = Set.of(
             ("orderId,symbol,currency,side,quantity,orderAmount,price," + "orderType,timeInForce,status,execution")
                     .split(","));
     private static final Set<String> ORDER_VALUES =
             Set.of("symbol", "side", "quantity", "orderAmount", "price", "orderType", "timeInForce");
+    private static final Set<String> RESERVED_SCOPE_NAMES;
+
+    static {
+        Set<String> names = new HashSet<>(ORIGINAL);
+        names.addAll(EXPECTED);
+        names.addAll(
+                Set.of("clientOrderId", "expected_order", "confirmHighValueOrder", "userId", "connectionId", "tool"));
+        RESERVED_SCOPE_NAMES = Set.copyOf(names);
+    }
 
     @Getter
     private final String executionArgsJson;
@@ -94,6 +94,7 @@ public final class ConnectorExecutionSnapshot {
         require(!scope.isEmpty() && scope.size() <= 8);
         for (var entry : scope.properties()) {
             require(entry.getKey().matches("[A-Za-z][A-Za-z0-9_]{0,63}"));
+            require(!RESERVED_SCOPE_NAMES.contains(entry.getKey()));
             text(entry.getValue(), 1, 128);
             require(bytes(entry.getValue().stringValue()) <= 128);
             equal(entry.getValue(), args.get(entry.getKey()));
@@ -236,6 +237,7 @@ public final class ConnectorExecutionSnapshot {
             String arg = item.get("arg").stringValue();
             String field = item.get("field").stringValue();
             require(arg.matches("[A-Za-z][A-Za-z0-9_]{0,63}") && field.matches("[A-Za-z][A-Za-z0-9_]{0,63}"));
+            require(!RESERVED_SCOPE_NAMES.contains(arg));
             require(args.add(arg) && names.add(field) && publicFields.containsKey(field));
             equal(scope.get(arg), JSON.valueToTree(publicFields.get(field)));
         }

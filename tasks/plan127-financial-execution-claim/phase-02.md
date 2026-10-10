@@ -84,4 +84,3 @@ cd backend && ./gradlew qualityCheck
 | `backend/src/main/java/com/bifos/assistant/shared/auth/ControlPlaneJwtFilter.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/ConnectorExecutionClaimTest.java` | 신규 |
 | `docs/adr/ADR-20261010-financial-execution-guard.md` | 수정 |
-

@@ -48,6 +48,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,6 +61,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -72,6 +74,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /** 공유 vector와 실제 사용자 암호화·저장소로 저장 및 읽기의 실패 경계를 확인한다. 외부 요청은 보내지 않는다. */
 @BackendIntegrationTest
@@ -146,6 +149,147 @@ class ConnectorActionExecutionTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessage("invalid financial execution snapshot");
         }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("collisionCases")
+    @DisplayName("side 변경 우회와 clientOrderId scope 충돌을 저장 전과 DB 읽기에서 거절한다")
+    void rejectsSharedScopeCollisionsBeforeCaptureAndAfterReload(String name, JsonNode sample) {
+        Fixture fixture = fixture();
+        ConnectorBinding binding = fixture.binding();
+        Map<String, String> publicFields = new HashMap<>();
+        for (var entry : sample.get("publicFields").properties()) {
+            publicFields.put(entry.getKey(), entry.getValue().stringValue());
+        }
+        binding.connection().connected(new ConnectionFields(publicFields, Map.of()), NOW);
+        ConnectorAction action = action(binding, value(sample, "modelArgsJson"));
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.capture(
+                        action,
+                        binding,
+                        value(sample, "operation"),
+                        sample.get("scopeFields").toString(),
+                        value(sample, "executionArgsJson"),
+                        value(sample, "summaryJson"),
+                        value(sample, "scopeJson"),
+                        cipher,
+                        NOW))
+                .as(name)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid financial execution snapshot");
+        assertThat(contents.existsById(action.id())).isFalse();
+
+        // 과거 저장 내용을 재현해 원문 해시가 맞아도 strict 검증에서 거절하는지 확인한다.
+        contents.saveAndFlush(ConnectorActionExecution.stored(
+                action,
+                binding.connection().id(),
+                binding.id(),
+                binding.connection().updatedAt(),
+                binding.updatedAt(),
+                value(sample, "executionArgsJson"),
+                value(sample, "summaryJson"),
+                value(sample, "scopeJson"),
+                null,
+                Sha256.hex(value(sample, "executionArgsJson")),
+                Sha256.hex(value(sample, "scopeJson")),
+                "0".repeat(64),
+                ConnectorExecutionSnapshot.PROTOCOL,
+                NOW));
+        em.clear();
+        ConnectorAction reloaded = actions.findById(action.id()).orElseThrow();
+        ConnectorActionExecution row = contents.findById(action.id()).orElseThrow();
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid financial execution snapshot")
+                .satisfies(error -> assertThat(error.getStackTrace())
+                        .extracting(StackTraceElement::getMethodName)
+                        .contains("validate"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {
+                "orderId",
+                "symbol",
+                "market",
+                "currency",
+                "side",
+                "quantity",
+                "orderAmount",
+                "price",
+                "orderType",
+                "timeInForce",
+                "status",
+                "filledQuantity",
+                "execution",
+                "clientOrderId",
+                "expected_order",
+                "confirmHighValueOrder",
+                "userId",
+                "connectionId",
+                "tool"
+            })
+    @DisplayName("주문 필드 전체와 내부 메타데이터의 이름은 scope로 쓸 수 없다")
+    void rejectsEveryReservedScopeName(String name) {
+        ObjectNode args = (ObjectNode) JSON.readTree(value(BASE, "executionArgsJson"));
+        JsonNode existing = args.get(name);
+        String scopeValue = existing != null && existing.isString() ? existing.stringValue() : "reserved";
+        args.put(name, scopeValue);
+        ObjectNode scope = JSON.createObjectNode().put("account_seq", "000007").put(name, scopeValue);
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.validate(
+                        value(BASE, "modelArgsJson"),
+                        args.toString(),
+                        value(BASE, "summaryJson"),
+                        scope.toString(),
+                        "CREATE"))
+                .isInstanceOf(IllegalArgumentException.class);
+        Fixture fixture = fixture();
+        fixture.binding()
+                .connection()
+                .connected(new ConnectionFields(Map.of("account", "000007", "reserved", scopeValue), Map.of()), NOW);
+        String declaration =
+                "[{\"arg\":\"account_seq\",\"field\":\"account\"},{\"arg\":\"" + name + "\",\"field\":\"reserved\"}]";
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.capture(
+                        fixture.action(),
+                        fixture.binding(),
+                        "CREATE",
+                        declaration,
+                        args.toString(),
+                        value(BASE, "summaryJson"),
+                        scope.toString(),
+                        cipher,
+                        NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(contents.existsById(fixture.action().id())).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+            strings = {"account", "tenant", "user", "connection", "side_scope", "clientOrderId_scope", "tool_scope"})
+    @DisplayName("예약 이름과 다른 정상 scope 및 주문 이름의 공개 연결 칸을 유지한다")
+    void preservesNonReservedScopeNamesAndPublicFieldNames(String name) {
+        Fixture fixture = fixture();
+        fixture.binding().connection().connected(new ConnectionFields(Map.of("side", "000007"), Map.of()), NOW);
+        String args = value(BASE, "executionArgsJson").replace("account_seq", name);
+        String scope = value(BASE, "scopeJson").replace("account_seq", name);
+        String declaration = "[{\"arg\":\"" + name + "\",\"field\":\"side\"}]";
+        ConnectorActionExecution row = contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
+                fixture.action(),
+                fixture.binding(),
+                "CREATE",
+                declaration,
+                args,
+                value(BASE, "summaryJson"),
+                scope,
+                cipher,
+                NOW));
+        em.clear();
+        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(
+                actions.findById(row.actionId()).orElseThrow(),
+                contents.findById(row.actionId()).orElseThrow(),
+                cipher);
+        assertThat(opened.executionArgsJson()).isEqualTo(args);
+        assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
+        assertThat(opened.scopeJson()).isEqualTo(scope);
     }
 
     @Test
@@ -318,42 +462,113 @@ class ConnectorActionExecutionTest {
         }));
     }
 
-    @Test
-    @DisplayName("실제 암호문을 다른 행이나 칸, 소유자로 바꾸면 열지 못한다")
-    void aadBindsActualCiphertextToOwnerRowAndColumn() {
-        Fixture fixture = fixture();
-        ConnectorActionExecution row = save(fixture, cipher);
-        ConnectorAction other = action(fixture.binding(), value(BASE, "modelArgsJson"));
-        ConnectorActionExecution copy = contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
-                other,
-                fixture.binding(),
-                "CREATE",
-                DECLARATION,
-                value(BASE, "executionArgsJson"),
-                value(BASE, "summaryJson"),
-                value(BASE, "scopeJson"),
-                cipher,
-                NOW));
-        jdbc.update(
-                "UPDATE connector_action_execution SET execution_args_json = ? WHERE action_id = ?",
-                row.executionArgsJson(),
-                copy.actionId());
-        em.clear();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-                        other, contents.findById(copy.actionId()).orElseThrow(), cipher))
-                .isInstanceOf(IllegalStateException.class);
-        jdbc.update(
-                "UPDATE connector_action_execution SET summary_json = ? WHERE action_id = ?",
-                row.scopeJson(),
-                row.actionId());
-        em.clear();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-                        fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
-                .isInstanceOf(IllegalStateException.class);
-        ReflectionTestUtils.setField(
-                fixture.action(), "userId", fixture.action().userId() + 1000);
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, cipher))
-                .isInstanceOf(IllegalStateException.class);
+    @ParameterizedTest(name = "{0}: {1}")
+    @MethodSource("aadCases")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @DisplayName("커밋한 정상 본문을 다른 행·칸·소유자에 옮기면 새 DB 읽기에서 거절한다")
+    void aadBindsActualCiphertextToOwnerRowAndColumn(String boundary, String column) {
+        TransactionTemplate transactions = new TransactionTemplate(transactionManager);
+        withCommittedFixture(source -> {
+            boolean anotherOwner = boundary.startsWith("owner");
+            Fixture target = "column".equals(boundary)
+                    ? source
+                    : transactions.execute(status -> {
+                        Fixture created = anotherOwner
+                                ? fixture()
+                                : new Fixture(action(source.binding(), value(BASE, "modelArgsJson")), source.binding());
+                        save(created, cipher);
+                        return created;
+                    });
+            try {
+                // REQUIRES_NEW로 만든 key도 보이는 새 트랜잭션에서 정상 읽기를 먼저 확인한다.
+                cipher.forgetCachedKeys();
+                transactions.executeWithoutResult(status -> {
+                    em.clear();
+                    assertPersistedBodies(source);
+                    if (target != source) {
+                        assertPersistedBodies(target);
+                    }
+                    ConnectorActionExecution sourceRow =
+                            contents.findById(source.action().id()).orElseThrow();
+                    ConnectorActionExecution targetRow =
+                            contents.findById(target.action().id()).orElseThrow();
+                    if (anotherOwner) {
+                        assertThat(source.action().userId())
+                                .isNotEqualTo(target.action().userId());
+                        assertThat(sourceRow.contentKeyId()).isNotEqualTo(targetRow.contentKeyId());
+                    } else {
+                        assertThat(sourceRow.contentKeyId()).isEqualTo(targetRow.contentKeyId());
+                    }
+                });
+                transactions.executeWithoutResult(status -> {
+                    em.clear();
+                    ConnectorActionExecution sourceRow =
+                            contents.findById(source.action().id()).orElseThrow();
+                    ConnectorActionExecution targetRow =
+                            contents.findById(target.action().id()).orElseThrow();
+                    String fromColumn = "column".equals(boundary)
+                            ? ("scope_json".equals(column) ? "summary_json" : "scope_json")
+                            : column;
+                    String sealed = jdbc.queryForObject(
+                            "SELECT " + fromColumn + " FROM connector_action_execution WHERE action_id = ?",
+                            String.class,
+                            sourceRow.actionId());
+                    Long movedKey =
+                            "owner-source-key".equals(boundary) ? sourceRow.contentKeyId() : targetRow.contentKeyId();
+                    assertThat(jdbc.update(
+                                    "UPDATE connector_action_execution SET " + column
+                                            + " = ?, content_key_id = ? WHERE action_id = ?",
+                                    sealed,
+                                    movedKey,
+                                    targetRow.actionId()))
+                            .isEqualTo(1);
+                    em.clear();
+                });
+                cipher.forgetCachedKeys();
+                transactions.executeWithoutResult(status -> {
+                    em.clear();
+                    ConnectorAction reloaded =
+                            actions.findById(target.action().id()).orElseThrow();
+                    ConnectorActionExecution row =
+                            contents.findById(reloaded.id()).orElseThrow();
+                    assertThat(keys.existsById(row.contentKeyId())).isTrue();
+                    assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher))
+                            .isInstanceOf(IllegalStateException.class)
+                            .hasMessage("financial snapshot decryption failed");
+                });
+            } finally {
+                if (target != source) {
+                    transactions.executeWithoutResult(status -> {
+                        if (anotherOwner) {
+                            deleteFixture(target);
+                        } else {
+                            jdbc.update(
+                                    "DELETE FROM connector_action WHERE id = ?",
+                                    target.action().id());
+                            jdbc.update(
+                                    "DELETE FROM agent_execution WHERE id = ?",
+                                    target.action().originExecutionId());
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private void assertPersistedBodies(Fixture fixture) {
+        ConnectorAction action = actions.findById(fixture.action().id()).orElseThrow();
+        ConnectorActionExecution row = contents.findById(action.id()).orElseThrow();
+        assertThat(keys.existsById(row.contentKeyId())).isTrue();
+        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, row, cipher);
+        assertThat(opened.executionArgsJson()).isEqualTo(value(BASE, "executionArgsJson"));
+        assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
+        assertThat(opened.scopeJson()).isEqualTo(value(BASE, "scopeJson"));
+    }
+
+    private static Stream<Arguments> aadCases() {
+        return Stream.of("row", "column", "owner-source-key", "owner-target-key")
+                .flatMap(boundary -> Stream.of("execution_args_json", "summary_json", "scope_json")
+                        .map(column -> Arguments.of(boundary, column)));
     }
 
     @Test
@@ -505,32 +720,27 @@ class ConnectorActionExecutionTest {
         try {
             assertion.accept(fixture);
         } finally {
-            transactions.executeWithoutResult(status -> {
-                jdbc.update(
-                        "DELETE FROM connector_action WHERE id = ?",
-                        fixture.action().id());
-                jdbc.update(
-                        "DELETE FROM agent_execution WHERE id = ?",
-                        fixture.action().originExecutionId());
-                jdbc.update(
-                        "DELETE FROM agent_connector_binding WHERE id = ?",
-                        fixture.binding().id());
-                jdbc.update(
-                        "DELETE FROM connector_connection WHERE id = ?",
-                        fixture.binding().connection().id());
-                jdbc.update(
-                        "DELETE FROM agent_memory_collection WHERE agent_id = ?",
-                        fixture.binding().agent().id());
-                jdbc.update(
-                        "DELETE FROM agent WHERE id = ?",
-                        fixture.binding().agent().id());
-                jdbc.update(
-                        "DELETE FROM user_data_key WHERE user_id = ?",
-                        fixture.action().userId());
-                jdbc.update(
-                        "DELETE FROM app_user WHERE id = ?", fixture.action().userId());
-            });
+            transactions.executeWithoutResult(status -> deleteFixture(fixture));
         }
+    }
+
+    private void deleteFixture(Fixture fixture) {
+        jdbc.update(
+                "DELETE FROM connector_action WHERE id = ?", fixture.action().id());
+        jdbc.update("DELETE FROM agent_execution WHERE id = ?", fixture.action().originExecutionId());
+        jdbc.update(
+                "DELETE FROM agent_connector_binding WHERE id = ?",
+                fixture.binding().id());
+        jdbc.update(
+                "DELETE FROM connector_connection WHERE id = ?",
+                fixture.binding().connection().id());
+        jdbc.update(
+                "DELETE FROM agent_memory_collection WHERE agent_id = ?",
+                fixture.binding().agent().id());
+        jdbc.update("DELETE FROM agent WHERE id = ?", fixture.binding().agent().id());
+        jdbc.update(
+                "DELETE FROM user_data_key WHERE user_id = ?", fixture.action().userId());
+        jdbc.update("DELETE FROM app_user WHERE id = ?", fixture.action().userId());
     }
 
     private Fixture fixture() {
@@ -539,7 +749,7 @@ class ConnectorActionExecutionTest {
         Agent agent = agents.saveAndFlush(Agent.of(
                 "execution-" + UUID.randomUUID(),
                 "검사용 에이전트",
-                "execution-test",
+                "execution-test-" + UUID.randomUUID(),
                 "http://localhost",
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
@@ -560,7 +770,7 @@ class ConnectorActionExecutionTest {
         AgentExecution run = runs.saveAndFlush(AgentExecution.builder()
                 .userId(binding.connection().userId())
                 .agentId(binding.agent().id())
-                .profileName("execution-test")
+                .profileName(binding.agent().hermesProfile())
                 .hermesSessionId("fos-" + UUID.randomUUID())
                 .costMode(CostMode.SUBSCRIPTION)
                 .status(ExecutionStatus.RUNNING)
@@ -588,6 +798,13 @@ class ConnectorActionExecutionTest {
                 value(sample, "summaryJson"),
                 value(sample, "scopeJson"),
                 value(sample, "operation"));
+    }
+
+    private static Stream<Arguments> collisionCases() {
+        return VECTOR.get("cases")
+                .valueStream()
+                .filter(sample -> value(sample, "name").startsWith("scope-collision-"))
+                .map(sample -> Arguments.of(value(sample, "name"), sample));
     }
 
     private static Stream<Arguments> sharedCases() {

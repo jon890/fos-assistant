@@ -548,12 +548,13 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 | `execution_args_sha256`, `scope_sha256` | VARCHAR(64) NOT NULL, 암호화 전 UTF-8 원문의 SHA-256 |
 | `request_key` | VARCHAR(64) NOT NULL, 중복 의도 조회용 일반 인덱스 |
 | `supersedes_unknown_action_id` | BIGINT NULL UNIQUE, 자기 참조 FK가 없는 이력 식별자 |
-| `protocol` | VARCHAR(32) NOT NULL |
+| `protocol` | VARCHAR(32) NOT NULL, 고정 값 `approval-claim-v1` |
 | `ticket_id` | BINARY(16) NULL UNIQUE, 권한 원문과 구분한 UUID 식별자 |
 | `ticket_expires_at`, `consumed_at` | DATETIME(6) NULL |
 | `created_at` | DATETIME(6) NOT NULL |
 
 `ConnectorExecutionSnapshot.capture`가 연결의 공개 칸과 실행 args, 표시 값을 검증한 뒤 저장할 내용을 만든다.
+읽을 때 protocol이 `approval-claim-v1`과 다르면 거절한다.
 연결과 바인딩의 소유자 및 에이전트가 승인 줄과 같아야 한다.
 기존 `connector_action.args_json`과 `args_sha256`은 원래 요청의 중복 판정용으로 남긴다.
 실행 원문과 표시 값, scope 및 두 revision은 저장한 뒤 바꾸지 않는다.

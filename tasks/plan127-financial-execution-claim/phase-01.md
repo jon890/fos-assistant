@@ -148,4 +148,3 @@ scripts/check-mysql-migration.sh
 | `docs/adr/ADR-20261010-financial-execution-guard.md` | 신규 |
 | `docs/adr/INDEX.md` | 수정 |
 | `test/fixtures/financial-approval-v1.json` | 신규 |
-

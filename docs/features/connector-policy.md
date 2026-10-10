@@ -329,6 +329,10 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 scope_fields는 1개 이상 8개 이하의 `{arg,field}` 배열이다.
 각 항목에는 이 두 키만 있고 값은 `[A-Za-z][A-Za-z0-9_]{0,63}` 문자열이다.
 arg와 field는 각각 중복될 수 없으며 field는 연결의 공개 칸이어야 한다.
+arg는 주문과 내부 메타데이터의 예약 이름을 쓸 수 없다.
+예약 이름은 `orderId,symbol,market,currency,side,quantity,orderAmount,price,orderType,timeInForce,status,filledQuantity,execution`과
+`clientOrderId,expected_order,confirmHighValueOrder,userId,connectionId,tool`이다.
+저장 전과 읽기 검증에서 같은 경계를 적용하며 공개 연결 칸의 field 이름에는 이 제한을 적용하지 않는다.
 scope에는 선언한 arg만 있고 값은 비어 있지 않은 UTF-8 128바이트 이하 문자열이다.
 각 값은 연결의 공개 칸 및 실행 args의 같은 arg 값과 문자열 그대로 같아야 한다.
 실제 자식 env 대조와 서비스별 시장·통화 조합은 커넥터 구현이 맡는다.
@@ -376,7 +380,8 @@ normalization.field는 symbol, quantity, orderAmount, price, timeInForce 중 하
 
 미사용 수량·금액·가격은 실행 args에서 키 자체가 없고 summary에서는 null이다.
 정정에서 quantity가 없으면 원래 주문 수량을 표시한다.
-클라이언트가 실행 args에 기본값이나 미선언 키를 넣는 것은 이 저장 계약이 허용하지 않는다.
+저장 검증 함수는 기본값을 자동 보충하지 않는다.
+준비 과정에서 보충한 값은 normalization에 기록해야 하며 미선언 키는 거절한다.
 원래 입력의 confirmHighValueOrder는 CREATE/MODIFY에서 boolean false만 선택적으로 허용하며 실행 args에 남기지 않는다.
 
 ### 원문 해시와 중복 의도 키
