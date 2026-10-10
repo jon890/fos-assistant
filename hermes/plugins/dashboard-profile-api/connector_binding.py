@@ -1,6 +1,7 @@
 """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다."""
 
 from __future__ import annotations
+from .connector_guard import _binding_guard
 
 import ast
 import json
@@ -105,7 +106,7 @@ def _skills_with_index_marker(skills_config) -> dict | None:
 def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool,
                            vault: str | None = None, values: dict | None = None,
                            owner_attachments: str | None = None, owner_output: str | None = None,
-                           owner_browser: str | None = None) -> dict:
+                           owner_browser: str | None = None, guard: dict | None = None) -> dict:
     """일반 에이전트의 profile 에 커넥터를 붙이거나 뗀다. 실패하면 같은 요청 안에서 이 요청이 쓴 파일만 되돌린다.
 
     붙이기는 보관 파일의 값(`values`)을 그 profile `.env` 에 쓰고, 서버를 더하고, API 도구 목록에 서버 이름을 더하고,
@@ -230,11 +231,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 owner_output if isinstance(owner_output, str) and OWNER_OUTPUT_VALUE_RE.fullmatch(owner_output) else "")
         if manifest["owner_browser_env"] is not None:
             # 중계가 꺼져 주소가 없어도 붙이기는 막지 않는다. 빈 값을 받은 커넥터는 브라우저에 닿지 못한다고 답한다.
-            # 같은 바인딩은 늘 같은 주소를 받으므로 다시 설치해도 서버 정의가 바뀌지 않는다.
             server["env"][manifest["owner_browser_env"]] = (
                 owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser)
                 else "")
-        # 바꾸기 전의 정의다. gateway 는 같은 이름의 서버를 다시 연결하지 않으므로 정의가 바뀌면 재시작해야 한다.
         previous = servers.get(name)
         servers[name] = server
         allowed = [item for item in allowed if item != "no_mcp"]
@@ -266,7 +265,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 raise FileExistsError("이미 있는 스킬 디렉터리와 이름이 겹친다")
         state[plugin] = {"server": server, "allowlist_added": True, "mcp_server": name,
                          "mode": BIND_MODE, "vault": vault, "skills": skills}
-        # 뗀 기록은 같은 이름일 때만 지운다. 그 사이 서버 이름이 바뀌었으면 옛 이름을 쥔 실행이 아직 있을 수 있다.
+        if guard is not None:
+            state[plugin]["guard"] = _binding_guard(guard)
         if detached.get(plugin) == name:
             detached.pop(plugin)
         desired = {skills_dir / skill / relative: data

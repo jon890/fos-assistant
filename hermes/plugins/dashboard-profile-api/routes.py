@@ -126,6 +126,7 @@ CONNECTORS_PATH = "/api/connectors"
 CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
+PREPARE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/prepare$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
 DECISION_READINESS_RE = re.compile(r"^/api/profiles/([^/]+)/decision-readiness$")
 # native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
@@ -330,8 +331,9 @@ def _install_gate() -> bool:
 
         call = CALL_ROUTE_RE.match(path) if method == "POST" else None
         execute = EXECUTE_ROUTE_RE.match(path) if method == "POST" else None
+        prepare = PREPARE_ROUTE_RE.match(path) if method == "POST" else None
         if ((path == CONNECTORS_PATH and method in {"GET", "PUT"})
-                or (path == CATALOG_PATH and method == "GET") or call is not None or execute is not None):
+                or (path == CATALOG_PATH and method == "GET") or call is not None or execute is not None or prepare is not None):
             principal, _ = seam.authenticate_token(request)
             if principal is None or getattr(principal, "provider", None) != ProfileApiProvider.name:
                 return _rejected("Control Plane 토큰이 필요하다", 401)
@@ -343,6 +345,8 @@ def _install_gate() -> bool:
             if execute is not None:
                 # `call` 과 같은 까닭으로 profile 쓰기 잠금 밖에서 돈다.
                 return await _connector_execute_request(request, execute.group(1))
+            if prepare is not None:
+                return await _connector_execute_request(request, prepare.group(1), prepare=True)
             async with PROFILE_WRITE_LOCK:
                 return await _connector_request(request)
 

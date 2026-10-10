@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import os
 import pathlib
+from .connector_guard import _guard_manifest, _strict_json
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -89,7 +89,7 @@ def _connector_roots() -> dict[str, dict]:
     if not raw:
         return {}
     try:
-        value = json.loads(raw)
+        value = _strict_json(raw)
     except ValueError:
         value = None
     if not isinstance(value, dict) or any(not isinstance(entry, (str, dict)) for entry in value.values()):
@@ -128,7 +128,7 @@ def _read_connector_json(root: pathlib.Path, relative: str):
     path = root / relative
     if path.resolve() != path or not path.is_file():
         raise ValueError("%s 가 없거나 링크다" % relative)
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _strict_json(path.read_text(encoding="utf-8"))
 
 
 def _appearance_or_none(connector_id: str, name: str, read):
@@ -312,7 +312,7 @@ def _connector_manifest(connector_id: str) -> dict | None:
         logger.warning("dashboard-profile-api: 커넥터 %r 가 운영 목록에 없다", connector_id)
         return None
     try:
-        return _load_connector(connector_id, entry)
+        return _guard_manifest(_load_connector(connector_id, entry), _read_connector_json(entry["root"], "connector.json"))
     except Exception as error:
         # 파일 내용과 운영 경로를 로그에 싣지 않는다. 직접 낸 사유만 그대로 적는다.
         reason = str(error) if type(error) is ValueError else type(error).__name__
@@ -380,7 +380,6 @@ def _connector_catalog_response():
 
     `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름이다. 이름 순이다.
     `owner_browser` 는 사용자 브라우저를 쓰는 커넥터인지이고, `owner_browser_login_url` 은 로그인 안내 주소나 null 이다.
-    env 이름은 내지 않는다.
     """
     from starlette.responses import JSONResponse
 
@@ -392,6 +391,7 @@ def _connector_catalog_response():
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
+          **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
           # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
           "tools": {name: {key: value for key, value in policy.items() if value is not None}
                     for name, policy in manifest["tools"].items()}}
