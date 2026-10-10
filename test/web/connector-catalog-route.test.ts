@@ -23,6 +23,7 @@ function summary(change: Record<string, unknown> = {}) {
     myStatus: "DISCONNECTED",
     available: true,
     bindings: [],
+    ownerBrowserLoginUrl: null,
     ...change,
   };
 }
@@ -80,8 +81,57 @@ test("웹 카탈로그 라우트는 SVG와 PNG 아이콘, 링크를 유지하고
   ]);
 });
 
-test("아이콘과 링크가 없는 옛 카탈로그도 두 칸을 null로 내려준다", async () => {
-  const response = await getCatalog([summary()]);
+test("웹 카탈로그 라우트는 HTTPS 로그인 안내 주소를 유지하고 선언하지 않은 칸은 버린다", async () => {
+  const loginUrl = "https://example.com/login?return_to=%2Fblog";
+  const response = await getCatalog([
+    summary({
+      ownerBrowserLoginUrl: loginUrl,
+      secret: "옮기면 안 되는 값",
+      undeclared: "선언하지 않은 값",
+    }),
+  ]);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), [
+    summary({ icon: null, link: null, ownerBrowserLoginUrl: loginUrl }),
+  ]);
+});
+
+test("로그인 안내 주소가 없거나 틀려도 카탈로그 행을 유지하고 주소만 null로 내려준다", async () => {
+  const invalidUrls: unknown[] = [
+    undefined,
+    null,
+    7,
+    true,
+    { url: LINK },
+    [LINK],
+    "",
+    "주소 아님",
+    "/login",
+    "http://example.com/login",
+    "javascript:alert(1)",
+    "data:text/html,login",
+    "https://user@example.com/login",
+    "https://:password@example.com/login",
+    "https://user:password@example.com/login",
+  ];
+  const response = await getCatalog([
+    ...invalidUrls.map((ownerBrowserLoginUrl) =>
+      summary({ icon: PNG, link: LINK, ownerBrowserLoginUrl }),
+    ),
+  ]);
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    await response.json(),
+    Array.from({ length: invalidUrls.length }, () =>
+      summary({ icon: PNG, link: LINK, ownerBrowserLoginUrl: null }),
+    ),
+  );
+});
+
+test("아이콘과 링크, 로그인 안내 주소가 없는 옛 카탈로그도 세 칸을 null로 내려준다", async () => {
+  const legacy = summary();
+  Reflect.deleteProperty(legacy, "ownerBrowserLoginUrl");
+  const response = await getCatalog([legacy]);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), [
     summary({ icon: null, link: null }),
