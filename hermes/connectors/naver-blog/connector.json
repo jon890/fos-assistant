@@ -24,7 +24,7 @@
   "tools": {
     "session_status": { "risk": "READ" },
     "list_drafts": { "risk": "READ" },
-    "read_draft": { "risk": "READ" },
+    "read_draft": { "risk": "WRITE", "approval": "required", "grant": false, "title": "네이버 임시저장 글 불러오기 · 자동저장 가능", "outbound": false },
     "render_draft": { "risk": "READ" },
     "save_draft": { "risk": "WRITE", "title": "네이버 블로그에 임시저장", "outbound": false },
     "overwrite_draft": { "risk": "WRITE", "title": "네이버 블로그 임시저장 글 덮어쓰기", "outbound": false, "grant": false },

@@ -221,11 +221,11 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
     "read_draft",
     {
       description:
-        "임시저장 글 하나의 제목, 카테고리, 태그, 본문과 지문(revision)을 읽습니다. 본문에서 사진, 스티커, 지도는 [기존 사진 1] 같은 줄입니다. 글을 바꾸지 않습니다.",
+        "사용자의 매번 승인 후 임시저장 글을 편집기에 불러와 제목, 카테고리, 태그, 본문과 지문(revision)을 읽습니다. 불러오면서 네이버 자동저장이 발생할 수 있습니다. 저장 단추와 발행 단추는 누르지 않습니다. 본문에서 사진, 스티커, 지도는 [기존 사진 1] 같은 줄입니다.",
       inputSchema: {
         draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("list_drafts 가 돌려준 draft_id"),
       },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: false },
     },
     ({ draft_id }) => guard(() => readDraft(env, draft_id)),
   );
