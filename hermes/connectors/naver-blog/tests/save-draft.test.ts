@@ -11,6 +11,7 @@ import { FakeCdp, upstreamText } from "./fake-cdp.ts";
 
 /** 같은 작업 프로세스를 가짜 `runDraft` 로 돌리는 시험 전용 진입 파일. */
 const FAKE_WORKER_ENTRY = join(import.meta.dir, "fake-worker-entry.ts");
+const START_WORKER_ENTRY = join(import.meta.dir, "fake-start-worker-entry.ts");
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 const LOGGED_IN = [
   { name: "NID_AUT", domain: ".naver.com" },
@@ -221,6 +222,81 @@ const OVERWRITE = {
   tags: ["점심"],
   body: "가상국수에 또 다녀왔어요\n[기존 사진 1]",
 };
+
+/** 분리 작업 프로세스가 기록한 파일 신호를 기다린다. 완료 시간을 임의로 추정하지 않는다. */
+async function waitForFile(dir: string, suffix: string) {
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const name = (await readdir(dir)).find((name) => name.endsWith(suffix));
+    if (name) return join(dir, name);
+    if (Date.now() >= deadline) throw new Error(`START_FIXTURE_FILE_TIMEOUT: ${suffix}`);
+    await Bun.sleep(10);
+  }
+}
+
+for (const tool of ["save_draft", "overwrite_draft"] as const) {
+  test.each(["running", "succeeded", "failed", "unknown"] as const)(
+    `${tool} 시작 응답은 분리 프로세스에서 확인한 %s 상태와 job_id를 보존한다`,
+    async (status) => {
+      const { jobDir, call, draft } = await setup({ deps: { workerEntry: START_WORKER_ENTRY } });
+      const started = call(tool, { ...(tool === "save_draft" ? draft : OVERWRITE), title: status });
+      const ready = await waitForFile(jobDir, ".json.ready");
+      const jobFile = ready.slice(0, -".ready".length);
+      const jobId = jobFile.split("/").at(-1)!.slice(0, -".json".length);
+      const queued = await readState(jobDir, jobId);
+      expect(queued).toMatchObject({ status: "running", stage: "queued", pid: expect.any(Number) });
+      expect(queued!.pid).not.toBe(process.pid);
+      // 실패하더라도 대역이 종료 신호를 받고 끝날 때까지 작업 디렉터리를 보존한다.
+      cleanups.push(async () => {
+        await writeFile(`${jobFile}.finish`, "");
+        await waitForFile(jobDir, ".json.done");
+      });
+      await writeFile(`${jobFile}.continue`, "");
+
+      expect(await started).toEqual({ isError: false, body: { job_id: jobId, status } });
+      const details = await call("draft_job", { job_id: jobId, wait_seconds: 0 });
+      expect(details.isError).toBe(false);
+      expect(details.body).toMatchObject({ job_id: jobId, status });
+      expect(details.body).not.toContainKey("pid");
+      expect(details.body).not.toContainKey("heartbeat_at");
+      if (status === "succeeded") {
+        expect(details.body).toMatchObject({
+          error: null, result: { state: null, saved_before: 0, saved_after: 1 },
+        });
+      } else if (status === "failed" || status === "unknown") {
+        expect(details.body).toMatchObject({
+          result: null,
+          save_clicked: status === "unknown",
+          error: { code: status === "unknown" ? "save_unconfirmed" : "editor_failed" },
+        });
+      } else {
+        expect(details.body).toMatchObject({ stage: "fill", finished_at: null, result: null, error: null });
+      }
+      expect((await readdir(jobDir)).filter((name) => /^[0-9a-f-]{36}\.json$/.test(name)))
+        .toEqual([`${jobId}.json`]);
+    },
+  );
+
+  test(`${tool} 시작 응답은 pid가 있어도 queued/running이면 START_UNKNOWN이고 잠금을 보존한다`, async () => {
+    const { jobDir, call, draft } = await setup({
+      deps: { workerEntry: START_WORKER_ENTRY, startWaitMs: 1_000 },
+    });
+    const input = { ...(tool === "save_draft" ? draft : OVERWRITE), title: "queued" };
+    const started = call(tool, input);
+    const ready = await waitForFile(jobDir, ".json.ready");
+    const jobFile = ready.slice(0, -".ready".length);
+    cleanups.push(async () => {
+      await writeFile(`${jobFile}.finish`, "");
+      await waitForFile(jobDir, ".json.done");
+    });
+    await writeFile(`${jobFile}.continue`, "");
+
+    expect(await started).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_START_UNKNOWN" } } });
+    const state = JSON.parse(await readFile(jobFile, "utf8"));
+    expect(state).toMatchObject({ status: "running", stage: "queued", pid: expect.any(Number) });
+    expect(await call(tool, input)).toEqual({ isError: true, body: { error: { code: "NAVER_BLOG_BUSY" } } });
+  });
+}
 
 test.each([
   ["새 사진 줄이 든 본문", { body: `${OVERWRITE.body}\n[사진 1: 101.jpg]` }],

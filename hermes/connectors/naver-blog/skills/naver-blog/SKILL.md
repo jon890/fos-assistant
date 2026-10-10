@@ -102,7 +102,9 @@ native 사진이 없거나 조회가 실패하면 보았다고 하지 말고 판
 
 `save_draft` 를 부르면 사용자에게 승인 카드가 간다. **승인을 기다리는 동안이나 결과를 받은 뒤에 같은 도구를 다시 부르지 않는다.** 같은 글이 두 번 저장될 수 있다.
 
-승인 결과로 `job_id` 를 받으면 바로 `draft_job` 을 부른다. `status` 가 `running` 이면 `draft_job` 을 다시 부른다.
+승인 결과의 `{job_id, status}` 는 시작 확인 때 읽은 작업 상태다. 확인하는 동안 작업이 끝나면 `succeeded`, `failed`, `unknown` 일 수 있다.
+`job_id` 를 받으면 시작 응답의 상태와 관계없이 바로 `draft_job` 을 불러 상세 결과와 오류를 확인한다. `status` 가 `running` 이면 `draft_job` 을 다시 부른다.
+승인 엔진의 도구 호출 성공만으로 임시저장 완료라고 알리지 않는다. 아래 표는 `draft_job` 의 결과에 적용한다.
 
 | `status` | 할 일 |
 | --- | --- |
@@ -127,5 +129,6 @@ native 사진이 없거나 조회가 실패하면 보았다고 하지 말고 판
 | `NAVER_BLOG_LOGIN_REQUIRED` | 「내 브라우저」 에서 네이버에 로그인한 뒤 다시 시도해 달라고 안내한다 |
 | `NAVER_BLOG_BROWSER_UNREACHABLE` | 브라우저를 켜는 중일 수 있다. 잠시 뒤 같은 도구를 한 번만 다시 부른다. 다시 실패하면 알린다 |
 | `NAVER_BLOG_BUSY` | 그 블로그에서 앞 작업이 돌고 있다. 잠시 뒤 다시 할지 묻는다 |
+| `NAVER_BLOG_START_UNKNOWN` | 작업이 시작됐는지 확인하지 못했다. 다시 저장하지 않고 네이버의 임시저장 목록 확인을 부탁한다 |
 | `NAVER_BLOG_DRAFT_NOT_FOUND` | 그 글이 임시저장 목록에 없다. `list_drafts` 로 다시 찾는다 |
 | `NAVER_BLOG_EDITOR_IN_USE` | 네이버 글쓰기 화면에 작성 중인 글이 남아 있다. 사용자에게 네이버에서 그 글을 임시저장하거나 정리한 뒤 다시 시도해 달라고 안내한다 |
