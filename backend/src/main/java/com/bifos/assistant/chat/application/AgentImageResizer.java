@@ -1,6 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
@@ -29,6 +30,8 @@ import lombok.NoArgsConstructor;
  * <p>원본 해상도를 그대로 디코딩하지 않고 줄여 읽어(subsampling) 메모리를 결과 크기에 가깝게 둔다. EXIF 회전을
  * 반영하고 투명한 부분은 흰색으로 채운다. 작은 사진은 키우지 않는다. 읽는 리더가 없는 형식(WebP), 화소가
  * {@link #MAX_PIXELS} 를 넘는 사진, 디코딩이나 인코딩이 실패한 사진은 빈 값이다.
+ *
+ * <p>{@link #shrink} 는 보낼 때 사진이 많으면 이 사본을 더 작은 긴 변과 낮춘 JPEG 품질로 다시 줄인다.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class AgentImageResizer {
@@ -56,7 +59,75 @@ final class AgentImageResizer {
             if (decoded == null) {
                 return Optional.empty();
             }
-            return Optional.of(encode(draw(decoded, orientation(original))));
+            return Optional.of(encode(draw(decoded, orientation(original), LONG_SIDE), QUALITY));
+        } catch (IOException | RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 긴 변이 {@code longSide} 를 넘으면 그 길이로 줄인 크기를, 넘지 않으면 받은 크기를 그대로 돌려준다. 짧은 변은 비율대로
+     * 줄이되 1 아래로 내리지 않는다. 가로와 세로가 같으면 가로를 긴 변으로 본다. 단계를 고를 때 계산한 화소와 실제로 줄인 사진의
+     * 화소가 어긋나지 않게 {@link #draw} 가 이 함수로 크기를 정한다.
+     */
+    static Dimension scaledSize(int width, int height, int longSide) {
+        if (Math.max(width, height) <= longSide) {
+            return new Dimension(width, height);
+        }
+        if (width >= height) {
+            return new Dimension(longSide, Math.max(1, (int) Math.round((double) height * longSide / width)));
+        }
+        return new Dimension(Math.max(1, (int) Math.round((double) width * longSide / height)), longSide);
+    }
+
+    /** 디코딩하지 않고 머리의 가로와 세로만 읽는다. 읽는 리더가 없거나 읽지 못하면 빈 값이다. */
+    static Optional<Dimension> dimensions(byte[] image) {
+        if (image == null || image.length == 0) {
+            return Optional.empty();
+        }
+        try (ImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(image))) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) {
+                return Optional.empty();
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(input, true, true);
+                return Optional.of(new Dimension(reader.getWidth(0), reader.getHeight(0)));
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException | RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide} 로 다시 줄인다. 품질은 {@link #QUALITY} 다. 긴 변이 이미
+     * {@code longSide} 이하이면 받은 바이트를 그대로 돌려준다. 읽거나 쓰지 못하면 빈 값이다.
+     */
+    static Optional<byte[]> shrink(byte[] jpeg, int longSide) {
+        return shrink(jpeg, longSide, QUALITY);
+    }
+
+    /**
+     * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide}, JPEG 품질 {@code quality} 로 다시 줄인다. 사본은 EXIF 가
+     * 없고 이미 바로 서 있어 방향을 읽지 않는다. 긴 변이 이미 {@code longSide} 이하이고 품질이 {@link #QUALITY} 이면 받은
+     * 바이트를 그대로 돌려준다. 긴 변이 이하라도 품질이 다르면 같은 크기로 다시 인코딩한다. 읽거나 쓰지 못하면 빈 값이다.
+     */
+    static Optional<byte[]> shrink(byte[] jpeg, int longSide, float quality) {
+        if (jpeg == null || jpeg.length == 0) {
+            return Optional.empty();
+        }
+        try {
+            BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(jpeg));
+            if (decoded == null) {
+                return Optional.empty();
+            }
+            if (Math.max(decoded.getWidth(), decoded.getHeight()) <= longSide && quality == QUALITY) {
+                return Optional.of(jpeg);
+            }
+            return Optional.of(encode(draw(decoded, DEFAULT_ORIENTATION, longSide), quality));
         } catch (IOException | RuntimeException ex) {
             return Optional.empty();
         }
@@ -128,21 +199,13 @@ final class AgentImageResizer {
         }
     }
 
-    /** 긴 변을 {@link #LONG_SIDE} 이하로 줄이고 방향을 바로잡아 흰 바탕에 그린다. */
-    private static BufferedImage draw(BufferedImage source, int orientation) {
+    /** 긴 변을 {@code longSide} 이하로 줄이고 방향을 바로잡아 흰 바탕에 그린다. */
+    private static BufferedImage draw(BufferedImage source, int orientation, int longSide) {
         int sourceWidth = source.getWidth();
         int sourceHeight = source.getHeight();
-        int width = sourceWidth;
-        int height = sourceHeight;
-        if (Math.max(sourceWidth, sourceHeight) > LONG_SIDE) {
-            if (sourceWidth >= sourceHeight) {
-                width = LONG_SIDE;
-                height = Math.max(1, (int) Math.round((double) sourceHeight * LONG_SIDE / sourceWidth));
-            } else {
-                height = LONG_SIDE;
-                width = Math.max(1, (int) Math.round((double) sourceWidth * LONG_SIDE / sourceHeight));
-            }
-        }
+        Dimension size = scaledSize(sourceWidth, sourceHeight, longSide);
+        int width = size.width;
+        int height = size.height;
         boolean swapsSides = orientation >= 5 && orientation <= 8;
         BufferedImage result =
                 new BufferedImage(swapsSides ? height : width, swapsSides ? width : height, BufferedImage.TYPE_INT_RGB);
@@ -177,7 +240,7 @@ final class AgentImageResizer {
         };
     }
 
-    private static byte[] encode(BufferedImage image) throws IOException {
+    private static byte[] encode(BufferedImage image, float quality) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
         if (!writers.hasNext()) {
             throw new IOException("no jpeg writer");
@@ -187,7 +250,7 @@ final class AgentImageResizer {
         try (ImageOutputStream output = new MemoryCacheImageOutputStream(bytes)) {
             ImageWriteParam parameters = writer.getDefaultWriteParam();
             parameters.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            parameters.setCompressionQuality(QUALITY);
+            parameters.setCompressionQuality(quality);
             writer.setOutput(output);
             writer.write(null, new IIOImage(image, null, null), parameters);
         } finally {

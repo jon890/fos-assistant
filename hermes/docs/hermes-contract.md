@@ -501,7 +501,9 @@ v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 운영 Hermes 에서 왕
 | API 오류 | 요청 전체를 `request_dump_*.json` 으로 남긴다. base64 가 들어간다 |
 | `pre_llm_call`, `post_llm_call` hook | `user_message` 로 목록을 그대로 받는다. 우리 plugin 은 두 hook 을 쓰지 않는다 |
 | 사용량 | 이미지 토큰을 따로 나누지 않는다. provider 가 준 입력 토큰에 섞인다 |
-| `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다 |
+| `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다. openai-codex 의 클라이언트는 `low` 를 지원하지 않는다며 막는다 |
+| `http(s)` 이미지 주소 | Hermes 는 받아 provider 에 그대로 넘긴다(Responses 는 `input_image` 의 `image_url`). 그러나 openai-codex 쪽은 2026-06 에 공식 클라이언트가 이 경로를 막았다(openai/codex #29417, #29419). 백엔드가 주소를 받아 가는 경로는 느리고 권장하지 않는다고 적혀 있다. Control Plane 은 `data:` 만 보낸다 |
+| 이미지 토큰 | `gpt-6.1-sol` 에서 화소 수에 거의 비례한다(약 850화소에 1토큰, 2026-10-09 측정). 긴 변 1600px 4:3 사진 한 장이 약 2,300 토큰이다. 모델은 32px 패치로 보고 `high`, `auto` 에서 패치 2,500개(긴 변 2048px)까지는 줄이지 않는다 |
 
 Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md) 에 있다.
 
@@ -514,16 +516,22 @@ Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / na
 - 답이 사진 내용을 말하고, 그 실행의 도구 사건에 `vision_analyze` 가 없다
 - 그 실행에 413 이나 `invalid_image_url` 같은 오류가 없다
 - 다음 메시지에서 지난 사진을 물으면 에이전트가 `vision_analyze` 로 사본 파일을 본다
-- 11장 이상을 보내면 11번째부터 사본 파일을 `vision_analyze` 로 보고, 잘림 오류가 없다
+- 11장 이상, 30장까지 보내면 모든 사진이 줄인 크기로 입력에 실리고, 그 실행에 413 이 없으며 이번 메시지 사진에 `vision_analyze` 가 없다
+- 지난 사진 여러 장을 물으면 `vision_analyze` 를 한 장씩 차례로 부른다
 
 ### 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
-입력에 싣지 못한 사진과 지난 메시지의 사진은 이 도구로 원본 옆의 줄인 사본(`{첨부 번호}.small.jpg`)을 본다. 사본은 대개 1MB 아래다.
+지난 메시지의 사진과 흐름이 붙은 에이전트의 사진은 이 도구로 원본 옆의 줄인 사본(`{첨부 번호}.small.jpg`)을 본다. 사본은 대개 1MB 아래다.
 
 실행 공간(Docker)의 파일은 컨테이너 안에서 `head -c <50MB+1> < 경로 | base64` 로 읽는다(`tools/image_source.py`).
 운영에서 3MB 를 넘는 사진이 가끔 「image file is truncated」 로 실패했다. Pillow 가 디코딩하다 바이트가 모자란 것이다.
 어디서 잘리는지는 확인하지 못했다. 파이프의 종료 코드가 마지막 명령의 것이라 읽기 오류가 가려진다.
+1.2MB에서 3MB 사이의 원본 여덟 장을 동시에 부른 호출이 모두 실패한 적도 있다.
+150KB에서 400KB 사이의 사본 아홉 장을 동시에 부른 호출도 여덟 장이 실패했고(끝의 1바이트에서 67바이트를 처리하지 못했다는 오류), 차례로 부른 호출도 실패한 적이 있다.
+로컬 Docker 에서 같은 명령을 같은 `DockerEnvironment.execute` 로 0.65MB에서 2.6MB 사이의 파일 여덟 장씩 동시에 640번 읽었을 때는(CPU 부하를 더한 경우 포함) 잘림이 없었다.
+끝의 몇 바이트를 잃는 증상이라 Hermes 의 출력 수집, 운영의 Docker 중계, Docker exec 가운데 어느 층인지 따로 조사한다.
+그래서 Control Plane 은 이번 메시지의 사진을 모두 입력에 싣고, 지난 사진만 한 장씩 차례로 이 도구로 보게 안내한다.
 
 ### 모델은 실행마다 정한다
 
@@ -1469,7 +1477,7 @@ hook 이 `{"action": "approve", "message": "<사유>", "rule_key": "<키>"}` 를
 - 대시보드 plugin 을 올린 뒤 카탈로그에 커넥터가 그대로 있는지. 스킬 본문 검증이 새로 생겨, 전에는 나오던 커넥터가 빠질 수 있다
 - Control Plane 을 옛 판으로 되돌렸다가 다시 올렸으면 사진을 받는 연결을 한 번 연결 확인한다. 옛 판은 `vision` 을 선언 밖의 도구로 보고 목록에서 뺀다
 - 떠 있는 공유 gateway 가 바뀐 `SOUL.md` 를 재시작 없이 다음 실행부터 읽는지. 읽지 않으면 지침 갱신에도 재시작과 관리자 반영 완료가 필요하다
-- `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 11번째부터의 사진과 지난 메시지의 사진을 에이전트가 보지 못한다
+- `file` toolset 없이 `vision` 만 켠 에이전트에서 `vision_analyze` 가 입력에 싣지 못한 사진의 사본 경로를 읽는지. 읽지 못하면 지난 메시지의 사진을 에이전트가 보지 못한다
 
 ### 승인 방식 `smart` 는 추론 모델에서 `manual` 과 같아진다
 
