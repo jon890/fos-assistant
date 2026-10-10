@@ -68,6 +68,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261008 / data-encryption](ADR-20261008-data-encryption.md) | 사용자 본문은 서버 KEK 로 감싼 사용자별 데이터 key 로 저장할 때 암호화하고, 대화 메시지부터 적용한다 | Accepted. ADR-055 의 암호문 모양과 알고리즘을 그대로 쓴다 |
 | [ADR-20261009 / agent-purge](ADR-20261009-agent-purge.md) | 지운 에이전트는 7일 뒤 정리 작업이 행을 지우고, 설정과 권한은 함께 지우되 대화와 실행과 승인 이력은 남긴다 | Accepted. ADR-033 이 기각한 「지우면 에이전트 행도 지운다」 를 7일 뒤에 한해 뒤집는다 |
 | [ADR-20261009 / native-image-input](ADR-20261009-native-image-input.md) | 사진마다 줄인 사본 파일을 원본 옆에 두고, 이번 메시지의 사진은 그 사본을 실행 입력에 직접 싣는다 | Accepted. ADR-020 의 「대화 본문에 사진을 실을 수 없다」 를 바꾼다 |
+| [ADR-20261010 / attachment-deletion-request](ADR-20261010-attachment-deletion-request.md) | 첨부 삭제 요청을 파일 작업 전에 커밋한다 | Accepted |
 
 ## 보관
 

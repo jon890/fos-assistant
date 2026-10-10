@@ -174,6 +174,7 @@ class ConversationPurgerTest {
         assertThat(attachmentFile(filled.attachment())).exists();
         assertThat(conversations.findById(filled.conversationId()).orElseThrow().purgedAt())
                 .isNull();
+
         assertThat(deletedSessionIds()).doesNotContain(filled.sessionId());
     }
 
@@ -237,6 +238,10 @@ class ConversationPurgerTest {
                 .isNull();
 
         hermes.failSessionDeletes(null);
+        ChatAttachment blocked = attachments.findById(filled.attachment().id()).orElseThrow();
+        assertThat(blocked.deletionRequestedAt()).isEqualTo(failedAt);
+        assertThat(blocked.deletedAt()).isNull();
+        assertThat(attachmentFile(blocked)).exists();
         purger.purgeDue(failedAt.plusSeconds(30));
         assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
                 .as("기다리는 간격 안에서는 다시 시도하지 않는다")

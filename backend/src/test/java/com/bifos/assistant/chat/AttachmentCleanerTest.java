@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 보관 기간이 지난 첨부의 파일만 지우고 행은 남기는지 확인한다. 일정을 기다리지 않고 직접 부른다. */
 @BackendIntegrationTest
@@ -55,11 +57,22 @@ class AttachmentCleanerTest {
     @Autowired
     ConversationWriter conversationWriter;
 
+    @Autowired
+    JdbcTemplate jdbc;
+
+    @Autowired
+    TestClock clock;
+
     private Path root;
     private Long conversationId;
 
     @BeforeEach
     void setUp() throws IOException {
+        clock.set(NOW);
+        if (jdbc.queryForObject("select count(*) from app_user where id=9201", Long.class) == 0) {
+            jdbc.update("insert into app_user(id,email,display_name,group_id,role,created_at)"
+                    + " values (9201,'cleaner@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");
+        }
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
@@ -140,7 +153,9 @@ class AttachmentCleanerTest {
         int deleted = cleaner.cleanExpired(NOW);
 
         assertThat(deleted).isEqualTo(1);
-        assertThat(reload(broken).isVisible()).isTrue();
+        assertThat(reload(broken).isVisible()).isFalse();
+        assertThat(reload(broken).deletionRequestedAt()).isEqualTo(NOW);
+        assertThat(reload(broken).deletedAt()).isNull();
         assertThat(fileOf(fine)).doesNotExist();
         assertThat(reload(fine).deletedAt()).isEqualTo(NOW);
     }
