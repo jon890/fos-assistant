@@ -42,8 +42,13 @@ public final class Sha256 {
 
     private static byte[] digest(String value) {
         String source = value == null ? "" : value;
+        return newDigest().digest(source.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** 원본을 나누어 읽는 호출마다 독립적인 SHA-256 digest를 만든다. */
+    public static MessageDigest newDigest() {
         try {
-            return MessageDigest.getInstance("SHA-256").digest(source.getBytes(StandardCharsets.UTF_8));
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is unavailable", ex);
         }

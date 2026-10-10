@@ -9,6 +9,10 @@ public enum ErrorCode {
     ACCESS_REVOKED(HttpStatus.UNAUTHORIZED),
     FORBIDDEN(HttpStatus.FORBIDDEN),
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND),
+    /** 요청 UUID의 내용 또는 현재 관찰 revision이 다르다. */
+    MEDIA_OBSERVATION_CONFLICT(HttpStatus.CONFLICT),
+    /** 관찰 본문을 암호화할 수 없어 새 저장을 거절한다. */
+    MEDIA_ENCRYPTION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     AGENT_NOT_FOUND(HttpStatus.NOT_FOUND),
     TOOLSET_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND),
     TOOLSET_REQUEST_UNAVAILABLE(HttpStatus.CONFLICT),
