@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { groupLimit } from "../src/rate-limit.ts";
 import { Tossinvest } from "../src/client.ts";
 import { createTossinvestServer } from "../src/server.ts";
 import { FakeToss, apiError, credentials, json, tool, withMcp } from "./support.ts";
@@ -15,8 +16,8 @@ const accountBodies = {
 const groups = {
   "/api/v1/accounts": { name: "ACCOUNT", interval: 1_000 },
   "/api/v1/holdings": { name: "ASSET", interval: 200 },
-  "/api/v1/buying-power": { name: "ORDER_INFO", interval: 334 },
-  "/api/v1/sellable-quantity": { name: "ORDER_INFO", interval: 334 },
+  "/api/v1/buying-power": { name: "ORDER_INFO", interval: Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())) },
+  "/api/v1/sellable-quantity": { name: "ORDER_INFO", interval: Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())) },
   "/api/v1/orders": { name: "ORDER_HISTORY", interval: 200 },
 } as const;
 
@@ -85,7 +86,7 @@ describe("계좌 조회 호출 간격", () => {
       expect(limit.rejected()).toBe(0);
       const orderInfo = limit.arrivals.filter((arrival) => arrival.group === "ORDER_INFO");
       expect(orderInfo).toHaveLength(2);
-      expect(orderInfo[1]!.at - orderInfo[0]!.at).toBeGreaterThanOrEqual(334);
+      expect(orderInfo[1]!.at - orderInfo[0]!.at).toBeGreaterThanOrEqual(Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())));
     } finally {
       fake.stop();
     }
@@ -154,7 +155,7 @@ describe("계좌 조회 호출 간격", () => {
       expect(limit.rejected()).toBe(0);
       expect(limit.arrivals).toHaveLength(4);
       for (let index = 1; index < limit.arrivals.length; index++)
-        expect(limit.arrivals[index]!.at - limit.arrivals[index - 1]!.at).toBeGreaterThanOrEqual(334);
+        expect(limit.arrivals[index]!.at - limit.arrivals[index - 1]!.at).toBeGreaterThanOrEqual(Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())));
     } finally {
       fake.stop();
     }

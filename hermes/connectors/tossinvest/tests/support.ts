@@ -2,6 +2,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { expect } from "bun:test";
+import { CURRENT_OPERATIONS, OPERATIONS, matchesOperation } from "../src/api-contract.ts";
+import { clearClientState } from "../src/client.ts";
 
 /** 모두 지어낸 값이다. 실제 계정이나 사람과 관계가 없다. */
 export const credentials = {
@@ -33,7 +35,7 @@ export class FakeToss {
   issued = 0;
   private allowed = true;
 
-  constructor() {
+  constructor(allowedOperations: ReadonlySet<string> = CURRENT_OPERATIONS) {
     this.server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
@@ -47,7 +49,7 @@ export class FakeToss {
           body: await request.text(),
         };
         this.requests.push(recorded);
-        if (!isAllowed(recorded.method, recorded.path)) this.allowed = false;
+        if (!OPERATIONS.some(operation => allowedOperations.has(operation.id) && matchesOperation(operation, recorded.method, recorded.path))) this.allowed = false;
         const route = this.routes.get(`${recorded.method} ${recorded.path}`);
         if (!route)
           return json(
@@ -105,22 +107,9 @@ export class FakeToss {
 
   stop() {
     this.server.stop(true);
+    clearClientState(this.url);
     expect(this.allowed).toBe(true);
   }
-}
-
-/** 도구가 계약 밖의 경로(주문 등)를 부르면 모든 시험이 실패한다. */
-function isAllowed(method: string, path: string) {
-  return new Set([
-    "POST /oauth2/token",
-    "GET /api/v1/accounts",
-    "GET /api/v1/prices",
-    "GET /api/v1/stocks",
-    "GET /api/v1/holdings",
-    "GET /api/v1/buying-power",
-    "GET /api/v1/sellable-quantity",
-    "GET /api/v1/orders",
-  ]).has(`${method} ${path}`);
 }
 
 export function json(body: unknown, status = 200, headers?: HeadersInit) {

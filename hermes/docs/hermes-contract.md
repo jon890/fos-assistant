@@ -2589,3 +2589,45 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 | `mcp_servers.<서버>.tools.exclude` | `approval: always` 인 도구가 모델에게 보인다. 호출은 여전히 Control Plane 이 거절한다 |
 | `PluginContext.call_mcp` 가 `mcp_allowlist` 없는 서버를 부르지 못한다 | plugin 의 직접 호출이 판정 없이 나간다 |
 | `transform_tool_result` hook 은 처음 돌려준 글이 결과를 바꾸고, hook 이 실패하면 원래 결과가 가며, 판정이 막은 호출에는 닿지 않는다 | 바인딩 profile 의 커넥터 결과가 `<external-data>` 없이 들어가거나, 판정이 막은 안내 글까지 외부 글로 감싸져 모델이 승인을 기다리라는 안내를 따르지 않을 수 있다. 결과 hook 이 도는 자리를 다시 확인하고 `fos-ctx` 를 고친다 |
+
+## 토스증권 REST 전체 지원의 호출 한도
+
+서비스별 계약은 [커넥터 연결](../../docs/features/connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
+Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 커넥터의 기존 client와 범용 승인 plugin 경계를 사용한다.
+Bun client는 공식 41 operation의 고정 계약과 19그룹 예산을 갖는다. 현재 인증·조회 8개 operation이 이 큐를 사용하며 후속 도구의 producer는 아직 구현하지 않았다.
+
+### 그룹별 예산
+
+| 그룹 | 공식 기본 초당 한도 | 적용 |
+| --- | --- | --- |
+| AUTH | 5 | token 발급·재발급도 큐 사용 |
+| ACCOUNT, STOCK_ALL | 1 | 서로 다른 그룹 |
+| ASSET, STOCK, RANKING, SECTOR, SECTOR_RANKING, ORDER_HISTORY, CONDITIONAL_ORDER | 5 | 그룹별 독립 큐 |
+| MARKET_INFO | 3 | 환율과 두 캘린더 공유 |
+| MARKET_DATA | 15 | 호가·시세·체결·상하한가 공유 |
+| MARKET_DATA_CHART | 20 | 종목 캔들 |
+| STOCK_TRADING_TREND, MARKET_INDICATOR, MARKET_INDICATOR_PRICE, CONDITIONAL_ORDER_HISTORY | 10 | 각각 독립 그룹. 실제 operation 그룹은 기준 JSON 적용 |
+| MARKET_INDICATOR_CHART | 5 | 지표 캔들 |
+| ORDER | 10 | 정정·취소 포함. 피크도 10 |
+| ORDER_INFO | 6, 09:00~09:10 KST는 3 | 기존 보수적 334ms보다 공식 조건을 정확히 반영 |
+
+canonical JSON의 지표 prices 설명은 MARKET_INDICATOR이고 개요에는 MARKET_INDICATOR_PRICE도 있다.
+임의로 다른 그룹으로 옮기지 않는다. 구현 직전 공식 JSON과 해당 응답 헤더를 대조해 차이를 남기며 기본은 JSON의 MARKET_INDICATOR다.
+X-RateLimit-Limit, Remaining, Reset과 Retry-After를 읽어 더 낮은 허용 한도를 우선한다. Reset은 epoch가 아니라 재충전까지 예상 초다.
+모든 요청과 재시도는 한도 큐를 통과한다. 같은 프로세스에서 그룹 예산은 origin/client ID별로 공유한다.
+토큰 캐시와 발급 single-flight의 identity는 정규화한 API origin, trim한 client ID, 메모리 내 credential identity의 조합이다.
+origin은 URL.origin으로 scheme·host·기본 port를 정규화한다. apiBase는 고정 origin만 허용하고 사용자정보·query·fragment·추가 path는 거절한다. production 입력에는 apiBase를 노출하지 않는다.
+credential identity는 실제 발급에 쓴 trim한 secret이 같은 동안만 공유하는 프로세스 내부 불투명 식별자다. secret이 교체되면 새 identity이며 secret이나 그 해시를 로그·파일·오류·모델 결과에 남기지 않는다.
+그룹 예산은 origin/client ID별로 공유해 secret 교체로 한도를 우회하지 않는다. 토큰은 다른 origin 또는 credential identity와 공유하지 않는다.
+각 요청은 사용한 token 값을 캡처한다. 재발급 가능한 401도 실패한 token이 현재 캐시 값과 일치할 때만 무효화한다. 늦은 401은 새 token을 버리지 않고 현재 token으로 유한 재시도한다.
+캐시는 공식 expires_in에서 기존 TOKEN_MARGIN_MS를 뺀 수명 안에서만 유효하다. 짧은 양의 수명은 기존 규칙을 유지하되 공식 만료를 넘기지 않는다. 0·음수·범위 초과 수명은 발급 오류이며 fallback으로 수명을 발명하지 않는다.
+만료·실패 시 token과 완료된 issuing 참조를 제거한다. identity 저장소는 요청 acquire/release로 사용 수를 관리하고 진행 중 발급·요청이 없는 만료 entry를 다음 acquire/release 때 제거한다. 프로세스 종료와 시험 teardown에서 전체 참조를 정리한다.
+동일 identity 단일 발급, 다른 origin/secret 분리, 교체 중 발급 결과의 identity 격리, stale 401의 새 token 보존, 만료·실패·teardown 정리와 반복 revoke의 유한 실패를 직접 단언한다.
+현재 single_binding은 연결 하나의 바인딩 중복만 막는다. probe, verify/options, prepare, 승인 실행은 별도 stdio 프로세스일 수 있으므로 프로세스 메모리 큐만으로 전역 예산을 보장하지 않는다.
+별도 token broker나 비밀 디스크 캐시를 추가하지 않는다. 커넥터 전용 client를 사용하고 각 프로세스는 응답 헤더와 유한 재시도로 경쟁을 처리한다.
+두 프로세스가 동시에 발급하면 이전 토큰이 철회될 수 있음을 로컬 시험으로 검증한다. 반복 token-revoked는 명확한 UNAVAILABLE이며 영구 재발급 반복을 하지 않는다.
+GET은 429 재시도 최대 1회, expired-token/token-revoked 재발급 최대 1회와 전체 전송 최대 3회를 적용한다. 5xx와 일반 401/403은 자동 재전송하지 않는다.
+큐 대기도 전체 호출 deadline 안에 포함하며 준비 RPC 2초와 실행 권한 60초를 넘겨 쓰기를 시작하지 않는다.
+금융 POST/DELETE는 1회 전송만 허용한다. token 확보와 대기 후 승인 만료·revision·baseline을 다시 확인하고 처음 전송하기 전까지 실패하면 HTTP 쓰기 0회다.
+전송 뒤 timeout, 네트워크 단절과 해석 불가능한 결과는 UNKNOWN이며 credential 재발급이나 429로 쓰기를 다시 보내지 않는다.
+Authorization, secret, ticket, 계좌번호 원문과 upstream 오류 본문은 로그와 모델 응답에 싣지 않는다. 오류는 허용한 code와 안전한 reason으로 전달한다.

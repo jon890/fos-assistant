@@ -348,7 +348,6 @@ describe("토큰", () => {
 
   test.each([
     [{ expires_in: 30 }, "expires_in 이 여유 60초보다 짧다"],
-    [{}, "expires_in 이 없다"],
   ])("토큰 응답 %j(%s)이어도 잇단 두 호출은 토큰을 한 번만 받는다", async (extra) => {
     const { fake, server } = setup();
     fake.routes.set("POST /oauth2/token", () => {
@@ -367,6 +366,15 @@ describe("토큰", () => {
     } finally {
       fake.stop();
     }
+  });
+
+  test("expires_in이 없으면 발급 오류이며 API를 보내지 않는다", async () => {
+    const { fake, server } = setup();
+    fake.on("POST", "/oauth2/token", { access_token: "fake", token_type: "Bearer" });
+    try {
+      await withMcp(server, client => expectFailure(client, "TOSSINVEST_UNAVAILABLE", "list_accounts"));
+      expect(fake.seen("GET")).toHaveLength(0);
+    } finally { fake.stop(); }
   });
 
   test("다시 보낸 요청도 token-revoked 면 UNAVAILABLE 이다", async () => {
