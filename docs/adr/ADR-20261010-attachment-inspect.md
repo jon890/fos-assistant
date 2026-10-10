@@ -8,7 +8,7 @@
 `fos-ctx`가 독립 도구 `attachment_inspect`를 공식 `register_tool`로 등록한다.
 Control Plane은 `/internal/hermes/attachment-inspect`에서 profile 토큰과 실제 hook 호출의
 `_fos_ctx`를 `McpCallerResolver`로 검증한다. 커넥터 격리 정책은 그대로 적용한다.
-입력은 정수 `attachment_id`, 선택 `region=[x1,y1,x2,y2]`뿐이다. 경로와 URL은 받지 않는다.
+입력은 정수 `attachment_id`, 선택 `region=[x1,y1,x2,y2]` 또는 명시적 `overview=true`다. 경로와 URL은 받지 않는다.
 
 새 profile 틀은 `fos-attachments`를 포함한다. 기존 개인 에이전트는 사진이 있는 일반 turn을
 제출하기 전에 Control Plane이 이 toolset을 자동 적용하고 확인한다. 적용에 실패하면 실행 실패를 기록한다.
@@ -26,6 +26,8 @@ hook이 `_fos_inspect`를 덮어쓰며 발급 시각과 요청 digest를 추가�
 서명할 UTF-8 글은 `v1-attachment-inspect`, root session, session, 실제 tool call,
 `issued_at_ms`, 요청 digest, 최상위 증명 `1` 또는 `0`을 개행으로 잇는다. key는 기존 토큰 해시 문자열이다.
 digest는 `attachment_id`와 region의 쉼표 구분 정수(없으면 빈 문자열)를 개행으로 이은 글의 SHA-256이다.
+명시적 개요가 true이면 개행과 `overview=1`을 덧붙인다. 생략·false는 기존 digest다.
+개요와 region은 함께 받지 않으며 fetch와 validate 모두 이 모드를 검증한다.
 발급 시각은 현재 실행 시작 이후이며 서버 현재 시각 이전이고 60초 이내여야 한다.
 따라서 과거 실행의 proof는 현재 실행에서도 쓰지 못한다. 두 서버의 시계는 동기화되어야 한다.
 한 실행의 조회는 90회, 첨부별 3회, 같은 tool call은 2회로 제한한다.
@@ -41,9 +43,43 @@ region은 EXIF 방향을 반영한 원본 표시 좌표이며 오른쪽·아래 
 입력은 20MiB, 출력은 10MiB, decode는 동시에 한 장으로 제한한다.
 병렬 호출은 공정한 큐에서 15초까지 기다리고 기다리는 동안 실행 취소를 검사한다.
 한도를 넘으면 축소 성공으로 숨기지 않고 영역을 지정해 다시 조회하도록 오류를 낸다.
-JPEG/PNG만 지원하고 원본 방향이 정상인 전체 조회는 decode 검증 후 bytes를 그대로 돌려준다.
+JPEG/PNG는 원본 방향이 정상인 전체 조회에서 decode 검증 후 bytes를 그대로 돌려준다.
 회전·crop 결과는 픽셀을 줄이지 않은 PNG다. 이때 투명 부분은 기존 사본 처리처럼 흰 배경으로 합성한다.
-전체 PNG 원본을 그대로 돌려줄 때는 투명 픽셀도 그대로 보존한다. GIF와 WebP는 명시한 실패로 반환한다.
+전체 PNG 원본을 그대로 돌려줄 때는 투명 픽셀도 그대로 보존한다.
+GIF/WebP 원본은 CP가 decode하지 않고 최대 20MiB bytes로 반환한다. plugin의 기존 Pillow가 첫 표시 프레임을
+EXIF 방향과 alpha를 보존한 PNG로 만든다. 움직임과 뒤 프레임을 확인하지 않았음을 native text와 fallback에 명시한다.
+원본 파일은 다시 쓰지 않는다. WebP 최초 사본이 없어도 같은 모델의 도구 조회로 픽셀을 전달한다.
+
+큰 전체 원본이 결과 한도를 넘고 지난 turn의 사본도 없으면 치수만으로 crop 위치를 고를 수 없다.
+따라서 `overview=true`일 때 네 MIME 모두 CP가 검증한 원본을 helper로 넘겨 긴 변 1600픽셀 이하의
+전체 개요를 만든다. 이 결과는 축소 개요임과 원본 표시 치수·실제 결과 치수를 명시하며 원본 성공으로 숨기지 않는다.
+모델은 개요를 본 뒤 원본 표시 좌표의 region을 자동 요청한다. 작은 글자는 개요만으로 판독했다고 하지 않는다.
+전체 실패→개요→crop 3회 또는 개요→crop 2회가 기존 예산 안에 들어간다.
+JPEG의 공개 Pillow draft 최적화는 개요에서만 적용한다. 기본 JPEG/PNG 원본과 crop은 기존 Java 결과를 유지한다.
+
+GIF 논리 화면·첫 descriptor와 WebP RIFF 길이·padding·VP8X canvas·VP8/VP8L bitstream·ANMF의
+모든 frame 치수를 Pillow open 전에 검사한다. codec size와 사전 치수도 비교한다.
+원본 60M·결과 16M·PNG 10MiB를 유지하며 큰 전체 결과는 안전한 표시 치수와 `region_required` 오류다.
+
+profile namespace 밖의 plugin 소유 표준 모듈에 FIFO runtime 하나를 원자적으로 게시한다.
+reload는 진행 중 runtime을 바꾸지 않으며 버전 변경은 프로세스 재시작으로 적용한다.
+원본 수신 전에 차례를 확보해 대기 요청의 원본 배열 누적을 막는다. JPEG/PNG Java 슬롯과 lease로 묶지 않는다.
+이 제한은 프로세스별이며 여러 gateway 프로세스의 슬롯 수와 머신 전체 메모리는 운영 확인 대상이다.
+
+큐 15초를 포함한 handler 전체 30초 안에서 shell 없는 helper 프로세스와 제한된 익명 pipe를 감독한다.
+Linux helper는 Pillow open 전에 주소 공간 1.5GiB를 적용한다. 60M은 원본 허용 최대치이며
+모든 최대 원본의 변환 성공을 보장하지 않는다. 제한 불가 환경은 실패로 끝낸다.
+부모 종료 SIGKILL과 프로세스 그룹 terminate·kill·wait 뒤 슬롯 반환을 적용한다.
+합성 Linux 검사에서 crop 뒤 RGBA 변환으로 전체 복사를 줄인 48M·60M EXIF6 WebP crop이
+1.5GiB 한도 안에서 성공했다. peak RSS는 각각 761.3MiB·944.7MiB였다.
+이 수치는 모든 최대 원본의 처리 성공이나 실제 동시 부하의 메모리를 보장하지 않는다.
+
+`POST /internal/hermes/attachment-inspect/validate`는 같은 서명·시각·Origin·ROLE_MCP 경계를 검사하고
+현재 실행·루트 취소·대화·첨부 상태를 SQL로 확인한 뒤 204만 반환한다. 조회 예산을 소비하지 않고
+bytes·새 proof·grant·lease를 만들지 않는다. 원 proof의 60초·실행 한 시간 기한을 연장하지 않는다.
+개요는 대기부터, 기본 GIF/WebP는 MIME 수신부터 약 500ms마다 검증하고 종료 직전에도 검증해 관측된 삭제·만료·취소 결과를 버린다.
+기본 JPEG/PNG는 기존 CP의 decode 전후 검증을 유지하므로 옛 CP에서도 동작한다.
+마지막 검증과 provider 전송 사이의 짧은 경쟁과 이미 보낸 픽셀의 회수는 이 HTTP 경계가 보장하지 않는다.
 
 plugin은 30초 timeout과 제한된 HTTP 읽기를 쓰고 redirect를 따르지 않는다.
 성공은 문자열 JSON이 아닌 `_multimodal=True` dict로 반환하며 `image_url.detail=original`을 보존한다.

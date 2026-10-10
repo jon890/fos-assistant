@@ -29,6 +29,17 @@ Control Plane은 `/v1/runs`의 `_make_run_event_callback`을 사용한다. 별�
 `_tool_progress`는 kwargs를 버리므로 그 경로에서는 같은 실패 사건을 보장하지 않는다.
 이 성공 envelope와 detail이 실제 provider에서 수용되는지는 배포 뒤 왕복으로 검증해야 한다.
 
+고정 core의 `pyproject.toml`은 Pillow 12.3.0을 이미 의존성으로 고정한다. GIF/WebP 변환 helper는
+이 Pillow와 공개 Image·ImageOps API를 쓰며 WebP codec 가용성도 따로 확인한다.
+PNG 원본·crop과 명시적 축소 개요는 같은 native dict 계약을 쓰되 text와 fallback에서 서로 구분한다.
+GIF/WebP는 첫 표시 프레임만 확인하며 움직임과 뒤 프레임은 확인하지 않았다고 안내한다.
+
+`plugins_loader.py`는 profile scope마다 다른 directory module 이름을 만들고 reload 때 그 하위 모듈도 지운다.
+따라서 profile 상대 module의 전역 Semaphore를 프로세스 공유 한도로 사용하지 않는다.
+plugin 소유 FIFO는 별도 고정 module 이름에 완성된 객체를 게시해 profile과 reload 사이에 유지한다.
+`NATIVE_IMAGE_PLUGIN_LOADER`의 실제 함수를 실행하는 계약 검사가 namespace 분리와 공유 module 보존을 확인한다.
+한도는 Python 프로세스별이며 여러 gateway 프로세스의 topology는 운영에서 확인한다.
+
 `fos-ctx`의 서버 권한과 EXIF 표시 좌표, 실패·반복 조회 한도는
 [plugin README](../plugins/fos-ctx/README.md)의 원본 사진 조회 계약이 갖는다.
 

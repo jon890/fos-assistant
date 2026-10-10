@@ -2,7 +2,6 @@
 import ast
 import copy
 import hashlib
-import io
 import importlib
 import json
 import logging
@@ -11,6 +10,7 @@ import pathlib
 import sys
 import types
 import unittest
+import threading
 from unittest.mock import patch
 
 import hermes_contract as contract
@@ -23,6 +23,34 @@ class NativeImageContractTest(unittest.TestCase):
     def setUp(self):
         self.plugin = load_ctx(self.addCleanup)
         self.inspect = importlib.import_module(self.plugin.__name__ + ".attachment_inspect")
+
+    def test_actual_profile_loader_names_and_reload_preserve_shared_runtime(self):
+        relative, namespace, evict = contract.NATIVE_IMAGE_PLUGIN_LOADER
+        tree = ast.parse((pathlib.Path(os.environ["HERMES_SOURCE"]) / relative).read_text())
+        selected = [copy.deepcopy(next(node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == name)) for name in (namespace, evict)]
+        env = {"sys": types.SimpleNamespace(modules={}), "hashlib": hashlib,
+               "manifest_key": lambda manifest: manifest.name, "_NS_PARENT": "hermes_plugins",
+               "_BARE_MODULE_SCOPE": {}, "_MODULE_NAMESPACE_LOCK": threading.Lock()}
+        module = ast.Module(body=[ast.ImportFrom(module="__future__", level=0,
+            names=[ast.alias(name="annotations")]), *selected], type_ignores=[])
+        exec(compile(ast.fix_missing_locations(module), relative, "exec"), env)
+        manifest = types.SimpleNamespace(name="fos-ctx")
+        first = env[namespace](types.SimpleNamespace(scope_key="first-profile"), manifest)
+        second = env[namespace](types.SimpleNamespace(scope_key="second-profile"), manifest)
+        self.assertNotEqual(first, second)
+        runtime = importlib.import_module(self.plugin.__name__ + ".image_runtime").shared_runtime()
+        env["sys"].modules.update({first: object(), first + ".image_runtime": object(),
+                                   second: object(), "_fos_owned_image_runtime_v1": runtime})
+        env[evict](first)
+        self.assertNotIn(first + ".image_runtime", env["sys"].modules)
+        self.assertIs(env["sys"].modules["_fos_owned_image_runtime_v1"], runtime)
+        self.assertIn(second, env["sys"].modules)
+
+    def test_pillow_is_already_pinned_in_runtime_core(self):
+        import tomllib
+        project = tomllib.loads((pathlib.Path(os.environ["HERMES_SOURCE"]) / "pyproject.toml").read_text())
+        self.assertIn("Pillow==" + contract.NATIVE_IMAGE_PILLOW_VERSION, project["project"]["dependencies"])
 
     def test_plugin_result_reaches_responses_as_native_image(self):
         source = pathlib.Path(os.environ["HERMES_SOURCE"])
@@ -56,8 +84,8 @@ class NativeImageContractTest(unittest.TestCase):
         with patch.dict(sys.modules, {prep.__name__: prep}), \
              patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
              patch.object(self.inspect, "_read_token", return_value="fake"), \
-             patch.object(self.inspect, "_open", return_value=self.response()):
-            envelope = self.inspect.handle({"attachment_id": 7, "_fos_ctx": {}, "_fos_inspect": {}})
+             patch.object(self.inspect, "supervise", return_value=({"mime": "image/png", "first_frame": True, "overview": True, "display_width": 5000, "display_height": 4000, "result_width": 1600, "result_height": 1280}, b"\x89PNG\r\n\x1a\nmore")):
+            envelope = self.inspect.handle({"attachment_id": 7, "overview": True, "_fos_ctx": {}, "_fos_inspect": {}})
             normalized = env["_normalize_handler_result"]("attachment_inspect", envelope)
             self.assertIs(normalized, envelope)
             persisted = env["_persist_multimodal_text_parts"](normalized, "attachment_inspect", "actual", None, None)
@@ -83,9 +111,5 @@ class NativeImageContractTest(unittest.TestCase):
             fallback = env["_tool_result_content_for_active_model"](model, "attachment_inspect", normalized)
             self.assertIsInstance(fallback, str)
             self.assertIn("판독 실패", fallback)
-
-    @staticmethod
-    def response():
-        class Response(io.BytesIO):
-            headers = {"Content-Type": "image/png", "Content-Length": "12"}
-        return Response(b"\x89PNG\r\n\x1a\nmore")
+            self.assertIn("첫 프레임", fallback)
+            self.assertIn("축소한 전체 개요", fallback)

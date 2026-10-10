@@ -30,6 +30,35 @@ public class AttachmentInspectService {
 
     public InspectedImage inspect(McpPrincipal principal, JsonNode body) {
         AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
+        McpCaller caller = authorize(principal, body, request);
+        AgentExecution execution = caller.originExecution();
+        consume(caller, request.attachmentId());
+        InspectedImage result = request.overview()
+                ? attachments.inspectOverview(caller.user(), execution.conversationId(), request.attachmentId())
+                : attachments.inspect(
+                        caller.user(),
+                        execution.conversationId(),
+                        request.attachmentId(),
+                        request.region(),
+                        () -> active(execution.id()));
+        if (!active(execution.id())) {
+            throw invalid();
+        }
+        return result;
+    }
+
+    /** 원래 proof를 재검증하며 조회 예산과 파일에는 손대지 않는다. */
+    public void validate(McpPrincipal principal, JsonNode body) {
+        AttachmentInspectRequest request = AttachmentInspectRequest.from(body);
+        McpCaller caller = authorize(principal, body, request);
+        attachments.validateInspection(
+                caller.user(), caller.originExecution().conversationId(), request.attachmentId());
+        if (!active(caller.executionId())) {
+            throw invalid();
+        }
+    }
+
+    private McpCaller authorize(McpPrincipal principal, JsonNode body, AttachmentInspectRequest request) {
         JsonNode proof = body.get("_fos_inspect");
         if (proof == null
                 || !proof.isObject()
@@ -42,17 +71,10 @@ public class AttachmentInspectService {
         AgentExecution execution = caller.originExecution();
         requireRunning(execution);
         verify(principal, caller, request, body.get("_fos_inspect"));
-        consume(caller, request.attachmentId());
-        InspectedImage result = attachments.inspect(
-                caller.user(),
-                execution.conversationId(),
-                request.attachmentId(),
-                request.region(),
-                () -> active(execution.id()));
         if (!active(execution.id())) {
             throw invalid();
         }
-        return result;
+        return caller;
     }
 
     private boolean active(Long executionId) {

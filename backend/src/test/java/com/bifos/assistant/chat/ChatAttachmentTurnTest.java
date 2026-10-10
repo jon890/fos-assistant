@@ -288,6 +288,31 @@ class ChatAttachmentTurnTest {
     }
 
     @Test
+    @DisplayName("WebP 사본이 없어도 첫 답변과 다음 질문 전에 원본 도구와 명시적 개요로 안내한다")
+    void guidesFirstAndNextWebpTurnsWithoutAskingForConversion() {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        byte[] raw = Base64.getDecoder().decode("UklGRiAAAABXRUJQVlA4TBQAAAAvB0ABAAcQ/Y/+BwCC8L9tIqL/IQ==");
+        ChatAttachment photo = attachments.upload(
+                dad, conversationId, "합성.webp", "image/webp", raw.length, new ByteArrayResource(raw));
+        chat.send(dad, conversationId, "사진의 오른쪽을 설명해 줘", null, List.of(photo.id()));
+        assertThat(stub().received().getLast().images()).isEmpty();
+        assertThat(stub().received().getLast().input())
+                .contains(
+                        "attachment_id=" + photo.id(),
+                        "입력에 싣지 못한 사진",
+                        "attachment_inspect로 원본을 자동 조회",
+                        "overview=true",
+                        "첫 표시 프레임만 본다");
+        chat.send(dad, conversationId, "아까 사진의 작은 글자는?", null, List.of());
+        assertThat(stub().received().getLast().input())
+                .contains(
+                        "attachment_id=" + photo.id(),
+                        "overview=true",
+                        "원본 region을 고른다",
+                        "사용자에게 재업로드나 분할 전송을 요구하지 않는다");
+    }
+
+    @Test
     @DisplayName("사진과 이미지가 아닌 파일을 함께 보내면 사진만 이미지로 싣고 나머지는 싣지 못했다고 안내한다")
     void embedsOnlyDecodableImageAndGuidesOtherAsNotEmbedded() throws IOException {
         Long conversationId = chat.startEmpty(dad, "dad").id();
