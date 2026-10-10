@@ -2,6 +2,8 @@
 
 사용자가 에이전트와 대화를 주고받고, 응답 중에 보낸 메시지를 대기열에 두거나 실행을 멈추는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/chat/`, `web/src/components/chat/`, `web/src/app/chat/`, `web/src/lib/chat-api.ts`
+
 ## 요구
 
 - 사용자는 `/` 에서 에이전트를 골라 대화를 시작한다. 첫 메시지가 대화의 에이전트를 정하고, 그 대화에서 에이전트는 바뀌지 않는다.

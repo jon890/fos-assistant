@@ -2,6 +2,8 @@
 
 사용자가 에이전트의 실행 공간에 있는 파일을 화면에서 열어 보는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/workspace/`, `web/src/components/workspace/`, `web/src/app/admin/workspaces/`, `web/src/app/files/`, `web/src/lib/workspace-api.ts`, `web/src/lib/workspace-file.ts`
+
 ## 요구
 
 - 사용자는 `/files` 에서 자기 에이전트들이 함께 쓰는 실행 공간을 보고, 미리 보고, 내려받고, 지운다. 다른 사용자의 공간은 보이지 않는다.
