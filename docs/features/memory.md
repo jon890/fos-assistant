@@ -2,6 +2,8 @@
 
 에이전트가 실행할 때 받는 사용자의 기억을 남기고 고르고 보이는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/memory/`, `web/src/components/memory/`, `web/src/app/memory/`, `web/src/components/chat/memory-*`, `web/src/components/chat/use-memory-*`, `web/src/lib/memory-api.ts`, `web/src/lib/memory-capture-api.ts`, `web/src/lib/memory-use-api.ts`, `hermes/plugins/fos-ctx/`
+
 ## 제목 검색의 구현 계약
 
 `memory_search`는 색인 예산에서 빠진 항목도 현재 실행의 권한으로 제목에서 찾는다. 결과 번호로 기존 `memory_read`를 불러 본문을 읽는다. #285의 첫 범위이며 본문 검색과 운영 acceptance는 아직 끝나지 않았다.
@@ -50,8 +52,6 @@ sequenceDiagram
 | MySQL | 5,000 | 2.700 | 3.468 | 899 | +7.5 |
 
 번호 자릿수와 DB 시각 표현 때문에 결과 길이는 DB마다 다르다. 별도 MySQL 지연 회귀는 바깥 트랜잭션에 30초 제한을 둬도 검색 JDBC statement의 제한이 2초임을 확인했고, 5초 지연을 넣은 검색은 2,070ms에 실패했다. 네 칸 SELECT와 count·본문 미조회, 다른 조회의 timeout 미변경도 같은 도우미로 검사한다.
-
-covers: `backend/src/main/java/com/bifos/assistant/memory/`, `web/src/components/memory/`, `web/src/app/memory/`, `web/src/components/chat/memory-*`, `web/src/components/chat/use-memory-*`, `web/src/lib/memory-api.ts`, `web/src/lib/memory-capture-api.ts`, `web/src/lib/memory-use-api.ts`, `hermes/plugins/fos-ctx/`
 
 ## 요구
 
