@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-import com.bifos.assistant.agent.application.ToolsetVisibilityService;
+import com.bifos.assistant.agent.application.toolset.ToolsetVisibilityService;
 import com.bifos.assistant.agent.infra.ToolsetHiddenRepository;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.shared.auth.CurrentUser;

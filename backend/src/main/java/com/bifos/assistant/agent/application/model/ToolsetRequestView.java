@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.application.model;
 
 import com.bifos.assistant.agent.domain.type.ToolsetRequestStatus;
 import java.time.Instant;

@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.ToolsetCatalogService;
-import com.bifos.assistant.agent.application.ToolsetVisibilityService;
+import com.bifos.assistant.agent.application.toolset.ToolsetCatalogService;
+import com.bifos.assistant.agent.application.toolset.ToolsetVisibilityService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;

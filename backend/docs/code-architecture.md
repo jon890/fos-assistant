@@ -50,6 +50,14 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
+### 에이전트 도구
+
+`agent.application.toolset`은 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
+이 서비스들의 공개 반환값은 `agent.application.model`에 둔다.
+HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.
+profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
+도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
+
 ### 최상위 패키지의 층 순서
 
 최상위 패키지의 순서는 `TopLevelPackageOrder.ORDER` 가 아래에서 위로 적어 갖는다.

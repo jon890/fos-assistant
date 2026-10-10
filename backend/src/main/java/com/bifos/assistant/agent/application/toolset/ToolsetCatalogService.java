@@ -1,5 +1,7 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.application.toolset;
 
+import com.bifos.assistant.agent.application.model.EnabledToolsetAgent;
+import com.bifos.assistant.agent.application.model.ToolsetCatalogView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.infra.AgentRepository;

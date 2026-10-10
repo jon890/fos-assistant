@@ -1,7 +1,7 @@
 package com.bifos.assistant.agent.presentation;
 
-import com.bifos.assistant.agent.application.ToolsetCatalogService;
-import com.bifos.assistant.agent.application.ToolsetVisibilityService;
+import com.bifos.assistant.agent.application.toolset.ToolsetCatalogService;
+import com.bifos.assistant.agent.application.toolset.ToolsetVisibilityService;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;

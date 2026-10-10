@@ -1,9 +1,9 @@
 package com.bifos.assistant.agent.presentation;
 
-import com.bifos.assistant.agent.application.AgentToolView;
 import com.bifos.assistant.agent.application.PersonaSnapshot;
-import com.bifos.assistant.agent.application.ToolsetCatalogView;
-import com.bifos.assistant.agent.application.ToolsetRequestView;
+import com.bifos.assistant.agent.application.model.AgentToolView;
+import com.bifos.assistant.agent.application.model.ToolsetCatalogView;
+import com.bifos.assistant.agent.application.model.ToolsetRequestView;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
