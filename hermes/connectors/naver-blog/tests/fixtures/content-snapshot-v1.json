@@ -1,0 +1,139 @@
+{
+  "positionConvention": "canonicalBlocks의 0부터 시작하는 배열 인덱스. DSL 사진 번호는 1부터 시작한다.",
+  "draft": {
+    "schemaVersion": 1,
+    "draftId": "11111111-1111-4111-8111-111111111111",
+    "revision": 7,
+    "conversationId": "22222222-2222-4222-8222-222222222222",
+    "title": "가족 \"사진\" / 😀",
+    "category": "일상",
+    "tags": [
+      " Photo ",
+      "한글"
+    ],
+    "blocks": [
+      {
+        "type": "paragraph",
+        "text": " é / 예시 😀 "
+      },
+      {
+        "type": "image",
+        "assetId": "101",
+        "caption": "첫 사진 / 😀",
+        "observationRef": {
+          "id": "901",
+          "revision": 2
+        }
+      },
+      {
+        "type": "sticker",
+        "code": "ogq_abc-1"
+      },
+      {
+        "type": "map",
+        "name": "가상 가게",
+        "address": "예시|주소"
+      },
+      {
+        "type": "image",
+        "assetId": "101",
+        "caption": ""
+      },
+      {
+        "type": "paragraph",
+        "text": ""
+      }
+    ]
+  },
+  "assets": [
+    {
+      "assetId": "101",
+      "sourceFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "fileName": "101.jpg",
+      "photoDir": "/tmp/content-compiler-golden",
+      "ordinal": 9,
+      "observationNote": "관찰 안내 / 😀"
+    },
+    {
+      "assetId": "102",
+      "sourceFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "fileName": "102.png",
+      "photoDir": "/tmp/content-compiler-golden",
+      "ordinal": 10
+    }
+  ],
+  "snapshot": {
+    "schemaVersion": 1,
+    "compilerVersion": "content-compiler-v1",
+    "draftId": "11111111-1111-4111-8111-111111111111",
+    "revision": 7,
+    "canonicalBlocks": [
+      [
+        "paragraph",
+        " é / 예시 😀 "
+      ],
+      [
+        "image",
+        "101",
+        "첫 사진 / 😀",
+        [
+          "901",
+          2
+        ]
+      ],
+      [
+        "sticker",
+        "ogq_abc-1"
+      ],
+      [
+        "map",
+        "가상 가게",
+        "예시|주소"
+      ],
+      [
+        "image",
+        "101",
+        "",
+        null
+      ],
+      [
+        "paragraph",
+        ""
+      ]
+    ],
+    "payload": {
+      "title": "가족 \"사진\" / 😀",
+      "category": "일상",
+      "tags": [
+        " Photo ",
+        "한글"
+      ],
+      "body": " é / 예시 😀 \n[사진 1: 101.jpg]\n첫 사진 / 😀\n[스티커: ogq_abc-1]\n[지도: 가상 가게 | 예시|주소]\n[사진 2: 101.jpg]\n\n",
+      "photo_dir": "/tmp/content-compiler-golden"
+    },
+    "photoNotes": {
+      "1": "관찰 안내 / 😀",
+      "2": "관찰 안내 / 😀"
+    },
+    "assetManifest": [
+      {
+        "position": 1,
+        "assetId": "101",
+        "sourceFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fileName": "101.jpg"
+      },
+      {
+        "position": 4,
+        "assetId": "101",
+        "sourceFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fileName": "101.jpg"
+      }
+    ],
+    "payloadFingerprint": "94ab4acb3bfb97615452cf2908ea3ada1c512862060d40bbd84e16a610916915",
+    "snapshotHash": "6561ed8946ba6e9be1f66fafaa0f1f3463379ba67b0fe50606fd2d1eefcc56da"
+  },
+  "payloadCompactJson": "[\"가족 \\\"사진\\\" / 😀\",\"일상\",[\" Photo \",\"한글\"],\" é / 예시 😀 \\n[사진 1: 101.jpg]\\n첫 사진 / 😀\\n[스티커: ogq_abc-1]\\n[지도: 가상 가게 | 예시|주소]\\n[사진 2: 101.jpg]\\n\\n\",\"/tmp/content-compiler-golden\"]",
+  "payloadUtf8Hex": "5b22eab080eca1b1205c22ec82aceca7845c22202f20f09f9880222c22ec9dbcec8381222c5b222050686f746f20222c22ed959ceab880225d2c222065cc81202f20ec9888ec8b9c20f09f9880205c6e5bec82aceca78420313a203130312e6a70675d5c6eecb2ab20ec82aceca784202f20f09f98805c6e5bec8aa4ed8bb0ecbba43a206f67715f6162632d315d5c6e5beca780eb8f843a20eab080ec838120eab080eab28c207c20ec9888ec8b9c7ceca3bcec868c5d5c6e5bec82aceca78420323a203130312e6a70675d5c6e5c6e222c222f746d702f636f6e74656e742d636f6d70696c65722d676f6c64656e225d",
+  "snapshotCompactJson": "[1,\"content-compiler-v1\",\"11111111-1111-4111-8111-111111111111\",7,[[\"paragraph\",\" é / 예시 😀 \"],[\"image\",\"101\",\"첫 사진 / 😀\",[\"901\",2]],[\"sticker\",\"ogq_abc-1\"],[\"map\",\"가상 가게\",\"예시|주소\"],[\"image\",\"101\",\"\",null],[\"paragraph\",\"\"]],[[1,\"101\",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"101.jpg\"],[4,\"101\",\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"101.jpg\"]],\"94ab4acb3bfb97615452cf2908ea3ada1c512862060d40bbd84e16a610916915\",[[1,\"관찰 안내 / 😀\"],[2,\"관찰 안내 / 😀\"]]]",
+  "snapshotUtf8Hex": "5b312c22636f6e74656e742d636f6d70696c65722d7631222c2231313131313131312d313131312d343131312d383131312d313131313131313131313131222c372c5b5b22706172616772617068222c222065cc81202f20ec9888ec8b9c20f09f988020225d2c5b22696d616765222c22313031222c22ecb2ab20ec82aceca784202f20f09f9880222c5b22393031222c325d5d2c5b22737469636b6572222c226f67715f6162632d31225d2c5b226d6170222c22eab080ec838120eab080eab28c222c22ec9888ec8b9c7ceca3bcec868c225d2c5b22696d616765222c22313031222c22222c6e756c6c5d2c5b22706172616772617068222c22225d5d2c5b5b312c22313031222c2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c223130312e6a7067225d2c5b342c22313031222c2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c223130312e6a7067225d5d2c2239346162346163623362666239373631353435326366323930386561336164613163353132383632303630643430626264383465313661363130393136393135222c5b5b312c22eab480ecb0b020ec9588eb82b4202f20f09f9880225d2c5b322c22eab480ecb0b020ec9588eb82b4202f20f09f9880225d5d5d"
+}
