@@ -75,7 +75,7 @@ class ProfileApiProfilesTest(support.ProfileApiRouteTest):
         self.assertEqual(config["platform_toolsets"], template["platform_toolsets"])
         self.assertEqual(config["agent"], template["agent"])
         self.assertEqual(
-            fake_platform_tools(config, "api_server"), {"delegation", "fos-assistant"}
+            fake_platform_tools(config, "api_server"), {"delegation", "fos-assistant", "fos-attachments"}
         )
         self.assertTrue((self.root / "alice/.no-bundled-skills").is_file())
         self.assertEqual(self.deleted, [])

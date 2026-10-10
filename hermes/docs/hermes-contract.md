@@ -7,6 +7,31 @@ Hermes 내부 지점에 새로 기대면 같은 커밋에서 `hermes_contract.py
 
 ## 확장 지점
 
+### plugin 도구의 native 이미지 결과
+
+고정 v2026.9.24의 공식 `PluginContext.register_tool`은 독립 이름과 toolset, schema, handler를 등록한다.
+handler에는 session과 task는 전달하지만 실제 tool call id는 전달하지 않는다.
+실제 id는 `pre_tool_call` payload에서 읽고 `action=modify`의 args로 전달한다.
+등록 계약은 [공식 plugins.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/hermes_cli/plugins.py)에 있다.
+
+반환은 JSON 문자열이나 bare list가 아닌 `_multimodal=True`, `content` list인 Python dict다.
+registry가 dict를 보존하고 executor가 긴 text만 spill하며 image 파트는 그대로 둔다.
+활성 모델의 vision과 tool 이미지 지원이 참이면 tool content list가 유지되고,
+Responses adapter가 `image_url`을 native `input_image`로 옮기며 detail을 보존한다.
+MCP ImageContent는 MEDIA 글로 바뀌므로 이 native 경로를 대신하지 못한다.
+이 계약은 `hermes/tests/hermes_contract.py`의 `NATIVE_ATTACHMENT_FUNCTIONS`와 소스 실행 검사가 고정한다.
+
+지원 판정에서 이미지가 빠지면 `text_summary`가 모델에 전달된다. 원본 도구의 요약은
+native 사진이 없는 경우 판독 실패를 알리라는 조건문이다. 조회 성공과 실제 모델의 픽셀 판독 성공은 구분한다.
+HTTP 실패·timeout·손상 결과는 JSON `error` 문자열로 반환해야 `_detect_tool_failure`가 실패로 판정한다.
+executor의 `tool.completed.is_error`를 Runs API가 `error`로 내보내며 Control Plane이 대화 사건의 `failed`로 전달한다.
+Control Plane은 `/v1/runs`의 `_make_run_event_callback`을 사용한다. 별도 session streaming의
+`_tool_progress`는 kwargs를 버리므로 그 경로에서는 같은 실패 사건을 보장하지 않는다.
+이 성공 envelope와 detail이 실제 provider에서 수용되는지는 배포 뒤 왕복으로 검증해야 한다.
+
+`fos-ctx`의 서버 권한과 EXIF 표시 좌표, 실패·반복 조회 한도는
+[plugin README](../plugins/fos-ctx/README.md)의 원본 사진 조회 계약이 갖는다.
+
 | 문서 | 내용 |
 | --- | --- |
 | [Runs API](hermes-contract.md) | 실행 요청, 조회 응답과 사건의 모양 |

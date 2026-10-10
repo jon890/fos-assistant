@@ -83,6 +83,10 @@ public class ProactiveCheckReadiness {
      * 커넥터 서버는 이 판정 앞에서 따로 받는다.
      */
     private static boolean allowed(String name, boolean writesAllowed) {
+        // 사용자 설정에 노출하지 않는 원본 조회는 현재 실행의 대화만 읽으므로 자동 추가 뒤에도 살펴보기를 막지 않는다.
+        if (AgentToolPolicy.ATTACHMENT_INSPECTION.equals(name)) {
+            return true;
+        }
         if (!writesAllowed) {
             return ALLOWED_TOOLSETS.contains(name);
         }

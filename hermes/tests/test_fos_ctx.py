@@ -873,6 +873,8 @@ class TransformToolResultTest(PluginFixture):
         registered = {}
 
         class Context:
+            def register_tool(self, **kwargs):
+                pass
             def register_hook(self, name, callback):
                 registered[name] = callback
 

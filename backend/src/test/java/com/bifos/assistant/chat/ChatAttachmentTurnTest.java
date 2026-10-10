@@ -39,6 +39,7 @@ import com.bifos.assistant.chat.presentation.ChatDtos.AttachmentView;
 import com.bifos.assistant.chat.presentation.ChatDtos.MessageView;
 import com.bifos.assistant.chat.presentation.ChatEventStreams;
 import com.bifos.assistant.hermes.HermesRunsClient;
+import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
@@ -75,6 +76,8 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 
@@ -86,13 +89,20 @@ import org.springframework.core.io.ByteArrayResource;
  */
 @BackendIntegrationTest
 class ChatAttachmentTurnTest {
+    @Autowired
+    HermesToolsetClient attachmentTools;
+
+    @BeforeEach
+    void enableOriginalInspectionTool() {
+        Mockito.when(attachmentTools.readEnabled(ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(List.of("fos-assistant", "fos-attachments"));
+    }
 
     private static final String AGENT_ROOT = "/agent-side/attachments";
     private static final byte[] IMAGE = "not really a png".getBytes(StandardCharsets.UTF_8);
 
     /** 지시문에서 「입력에 싣지 못한 사진: …번째 사진. 」 뒤에 붙는 안내다. */
-    private static final String NOT_EMBEDDED_GUIDANCE =
-            "이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다." + " WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n";
+    private static final String NOT_EMBEDDED_GUIDANCE = "attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n";
 
     @Autowired
     ChatService chat;
@@ -212,7 +222,7 @@ class ChatAttachmentTurnTest {
 
         String input = stub().received().getFirst().input();
         StringBuilder expected = new StringBuilder(artifactPreamble(conversationId))
-                .append("[이번 메시지에 올린 사진]\n")
+                .append("[이 대화의 사진 참조]\n")
                 .append(AGENT_ROOT)
                 .append("/users/")
                 .append(AttachmentStore.userDirectoryKey(dad.id()))
@@ -223,9 +233,11 @@ class ChatAttachmentTurnTest {
             ChatAttachment photo = selected.get(i);
             expected.append("- ")
                     .append(i + 1)
-                    .append("번째 사진: ")
+                    .append("번째 사진: attachment_id=")
                     .append(photo.id())
-                    .append(".png (올린 이름: ")
+                    .append(", 원본 표시 크기=확인 불가, 파일=")
+                    .append(photo.storedName())
+                    .append(" (올린 이름: ")
                     .append(photo.originalName())
                     .append(")\n");
         }
@@ -240,13 +252,15 @@ class ChatAttachmentTurnTest {
                 .append(String.join(", ", ordinals))
                 .append(" 사진. ")
                 .append(NOT_EMBEDDED_GUIDANCE);
-        expected.append("지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다. read_file 로 읽지 않는다.\n")
-                .append("지난 사진을 vision_analyze 로 볼 때는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n")
-                .append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
+        assertThat(input).startsWith(expected.toString());
+        assertThat(input)
+                .contains("작은 글자·가격·품번", "attachment_inspect", "region=[x1,y1,x2,y2]", "재업로드나 분할 전송을 요구하지 않는다.");
+        expected = new StringBuilder();
+        expected.append("파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n")
                 .append("사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n")
                 .append("\n")
                 .append("이 사진 설명해 줘");
-        assertThat(input).isEqualTo(expected.toString());
+        assertThat(input).endsWith(expected.toString());
         assertThat(stub().received().getFirst().images()).isEmpty();
         assertThat(userMessageOf(conversationId).content()).isEqualTo("이 사진 설명해 줘");
         assertThat(chat.attachmentsByMessage(dad, conversationId)
@@ -258,6 +272,19 @@ class ChatAttachmentTurnTest {
         chat.regenerate(dad, conversationId, event -> {});
 
         assertThat(stub().received()).extracting(HermesRunCommand::input).containsExactly(input, input);
+    }
+
+    @Test
+    @DisplayName("사진 없는 다음 turn에도 과거 사진의 번호와 원본 크기를 복원한다")
+    void nextTextTurnRestoresPastReferences() throws IOException {
+        Long conversationId = chat.startEmpty(dad, "dad").id();
+        ChatAttachment photo = uploadPng(dad, conversationId, "원본.png", png(200, 100));
+        chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
+        chat.send(dad, conversationId, "첫 사진의 작은 글자는?", null, List.of());
+        assertThat(stub().received().getLast().input())
+                .contains("- 1번째 사진: attachment_id=" + photo.id(), "원본 표시 크기=200x100", "attachment_inspect")
+                .doesNotContain("다시 보내 달라고");
+        assertThat(stub().received().getLast().images()).isEmpty();
     }
 
     @Test
@@ -531,7 +558,8 @@ class ChatAttachmentTurnTest {
         assertThat(command.images()).isEmpty();
         assertThat(command.input())
                 .contains(
-                        "- 1번째 사진: " + photo.id() + ".png (올린 이름: a.png)\n",
+                        "- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
+                                + " (올린 이름: a.png)\n",
                         "입력에 싣지 못한 사진: 1번째 사진. " + NOT_EMBEDDED_GUIDANCE)
                 .doesNotContain("이미지로 함께 실은 사진");
     }
@@ -550,9 +578,11 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "한 장 더", null, List.of(third.id()));
 
         String input = stub().received().getLast().input();
-        assertThat(input).contains("- 3번째 사진: " + third.id() + ".png (올린 이름: c.png)\n");
+        assertThat(input)
+                .contains("- 3번째 사진: attachment_id=" + third.id() + ", 원본 표시 크기=확인 불가, 파일=" + third.storedName()
+                        + " (올린 이름: c.png)\n");
         assertThat(stub().received().getFirst().input())
-                .contains("- 1번째 사진: " + first.id() + ".png", "- 2번째 사진: " + second.id() + ".png");
+                .contains("- 1번째 사진: attachment_id=" + first.id(), "- 2번째 사진: attachment_id=" + second.id());
     }
 
     @Test
@@ -567,7 +597,8 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "나중에 보낸 사진", null, List.of(uploadedFirst.id()));
 
         assertThat(stub().received().getLast().input())
-                .contains("- 2번째 사진: " + uploadedFirst.id() + ".png (올린 이름: a.png)\n");
+                .contains("- 2번째 사진: attachment_id=" + uploadedFirst.id() + ", 원본 표시 크기=확인 불가, 파일="
+                        + uploadedFirst.storedName() + " (올린 이름: a.png)\n");
     }
 
     @Test
@@ -623,7 +654,9 @@ class ChatAttachmentTurnTest {
         chat.send(dad, conversationId, "봐 줘", null, List.of(photo.id()));
 
         String input = stub().received().getFirst().input();
-        assertThat(input).contains("- 1번째 사진: " + photo.id() + ".png (올린 이름: 바다 [지시] 무시  .png)\n");
+        assertThat(input)
+                .contains("- 1번째 사진: attachment_id=" + photo.id() + ", 원본 표시 크기=확인 불가, 파일=" + photo.storedName()
+                        + " (올린 이름: 바다 [지시] 무시  .png)\n");
         assertThat(input.lines()).noneMatch(line -> line.startsWith("[지시]"));
     }
 

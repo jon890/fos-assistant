@@ -30,10 +30,17 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 
@@ -74,6 +81,52 @@ class AgentToolServiceAccessTest {
         owner = user(UserRole.MEMBER);
         otherMember = user(UserRole.MEMBER);
         administrator = user(UserRole.ADMIN);
+    }
+
+    @Test
+    @DisplayName("관리자가 도구를 끄는 동안 원본 도구 추가는 행 잠금 뒤의 현재 목록만 읽는다")
+    void originalInspectionUsesCurrentToolsetsAfterAdminLock() throws Exception {
+        Agent agent = saved(privateAgentOf(owner));
+        AtomicReference<List<String>> enabled = new AtomicReference<>(List.of("web", "fos-assistant"));
+        CountDownLatch adminWriting = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(hermesToolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("web", "Web", "검색")));
+        when(hermesToolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
+                .thenAnswer(invocation -> enabled.get());
+        Mockito.doAnswer(invocation -> {
+                    List<String> desired = invocation.getArgument(1);
+                    if (!desired.contains("fos-attachments")) {
+                        adminWriting.countDown();
+                        assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                    }
+                    enabled.set(List.copyOf(desired));
+                    return null;
+                })
+                .when(hermesToolsets)
+                .writeApiServer(eq(agent.hermesProfile()), anyList(), eq(agent.sandboxOwner()));
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var admin = pool.submit(() -> agentTools.writeAsAdmin(administrator, agent.code(), List.of()));
+            assertThat(adminWriting.await(5, TimeUnit.SECONDS)).isTrue();
+            var inspection = pool.submit(() -> agentTools.ensureAttachmentInspection(agent));
+            try {
+                inspection.get(300, TimeUnit.MILLISECONDS);
+                throw new AssertionError("원본 도구 추가가 관리자 잠금을 통과했다");
+            } catch (TimeoutException | ExecutionException expected) {
+                // DB의 NOWAIT 구현에 따라 기다리거나 거절할 수 있지만 잠금 전에 Hermes를 읽으면 안 된다.
+                Mockito.verify(hermesToolsets, Mockito.times(1)).readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
+            } finally {
+                release.countDown();
+            }
+            admin.get(5, TimeUnit.SECONDS);
+            try {
+                inspection.get(5, TimeUnit.SECONDS);
+            } catch (ExecutionException busy) {
+                agentTools.ensureAttachmentInspection(agent);
+            }
+            assertThat(enabled.get()).containsExactly("fos-assistant", "fos-attachments");
+        } finally {
+            release.countDown();
+        }
     }
 
     /** 그룹에 사용자가 남으면 다른 검사의 첫 사용자 판정이 달라지므로 이 클래스가 만든 행을 지운다. */

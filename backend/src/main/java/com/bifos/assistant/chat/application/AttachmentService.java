@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamSource;
@@ -46,6 +47,37 @@ public class AttachmentService {
     private final AttachmentProperties properties;
     private final Clock clock;
     private final AttachmentImages images;
+    private final AttachmentInspection inspection;
+
+    /** 보낸 원본만 읽는다. 만료된 파일이 아직 정리되지 않았어도 도구에는 주지 않는다. */
+    public InspectedImage inspect(CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region) {
+        return inspect(user, conversationId, attachmentId, region, () -> true);
+    }
+
+    /** decode 차례를 기다리는 동안에도 실행 취소를 검사한다. */
+    public InspectedImage inspect(
+            CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
+        ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
+        InspectedImage result = inspection.read(attachment, region, active);
+        requireInspectable(user, conversationId, attachmentId);
+        return result;
+    }
+
+    private ChatAttachment requireInspectable(CurrentUser user, Long conversationId, Long attachmentId) {
+        ChatAttachment attachment = requireOwnAttachment(user, conversationId, attachmentId);
+        if (!user.id().equals(attachment.uploadedByUserId()) || attachment.messageId() == null) {
+            throw notAttachable();
+        }
+        if (!attachment.isVisible() || !attachment.expiresAt().isAfter(clock.instant())) {
+            throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
+        }
+        if (!attachments
+                .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                        attachmentId, conversationId, user.id(), clock.instant())) {
+            throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
+        }
+        return attachment;
+    }
 
     /**
      * 사진 한 장을 올린다.
@@ -189,10 +221,9 @@ public class AttachmentService {
      * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름, 사진을 어떻게 볼지를 사용자가 쓴 글 앞에 붙인다.
      *
      * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣는다. 바이트 예산을 넘으면 모든 사진을
-     * 더 작은 긴 변 단계와 낮춘 품질로 줄여 싣는다. 싣지 못한 사진(사본이 없거나 다시 줄이지 못한 사진)은 순번만 적고, 도구로
-     * 읽지 말고 사용자에게 다시 보내 달라고 하게 한다. 운영에서 사본 읽기도 잘렸기 때문이다. 근거는 ADR-20261009 /
-     * native-image-input 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내해
-     * {@code vision_analyze} 로 보게 한다.
+     * 더 작은 긴 변 단계와 낮춘 품질로 줄여 싣는다. 싣지 못한 사진과 지난 사진은 원본 조회 도구로 보게 한다.
+     * 모든 보낸 첨부의 번호와 표시 크기를 복원한다. 원본 조회의 권한과 실패 경계는 ADR-20261010 /
+     * attachment-inspect 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘긴다.
      * 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
      * 이름은 알아보라고 괄호로만 붙인다. 파일을 올리거나 고치는 도구에는 원본을 쓰라고 함께 적는다.
      *
@@ -204,10 +235,14 @@ public class AttachmentService {
      * 이것을 쓰지 않는다.
      */
     public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
-        if (attached == null || attached.isEmpty()) {
+        List<ChatAttachment> sent = allOf(conversationId).stream()
+                .filter(it -> it.messageId() != null)
+                .toList();
+        if (sent.isEmpty()) {
             return new AgentInput(text, List.of());
         }
-        Long ownerUserId = attached.getFirst().uploadedByUserId();
+        attached = attached == null ? List.of() : attached;
+        Long ownerUserId = sent.getFirst().uploadedByUserId();
         boolean sameOwnerAndConversation = attached.stream()
                 .allMatch(attachment -> ownerUserId.equals(attachment.uploadedByUserId())
                         && conversationId.equals(attachment.conversationId()));
@@ -217,19 +252,27 @@ public class AttachmentService {
         String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
                 + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
-        String files = attached.stream()
-                .map(it ->
-                        "- " + order.get(it.id()) + "번째 사진: " + it.storedName() + " (올린 이름: " + it.originalName() + ")")
+        String files = sent.stream()
+                .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id() + ", 원본 표시 크기="
+                        + (it.expiresAt().isAfter(clock.instant()) ? inspection.displaySize(it) : "보관 종료")
+                        + ", 파일=" + it.storedName() + " (올린 이름: " + it.originalName() + ")"
+                        + (it.isVisible() && it.expiresAt().isAfter(clock.instant()) ? "" : " [보관 종료]"))
                 .collect(Collectors.joining("\n"));
         List<AgentPhoto> photos = images.photos(attached, order, embedImages);
-        String input = "[이번 메시지에 올린 사진]\n"
+        String input = "[이 대화의 사진 참조]\n"
                 + directory + "\n"
                 + files + "\n"
                 + "\n"
                 + photoGuidance(directory, photos, embedImages)
-                + "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
-                + " read_file 로 읽지 않는다.\n"
-                + "지난 사진을 vision_analyze 로 볼 때는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n"
+                + (embedImages
+                        ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
+                                + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
+                                + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
+                                + "한도 오류는 작은 영역으로 한 번만 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
+                                + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
+                                + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
+                        : "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
+                                + " read_file 로 읽지 않는다.\n")
                 + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
                 + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
@@ -243,8 +286,7 @@ public class AttachmentService {
 
     /**
      * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. {@code embedImages} 가 참이면 싣지 못한 사진의 순번을 한
-     * 줄에 적고 도구로 읽지 말고 사용자에게 다시 보내 달라고 하게 한다. 거짓(흐름)이면 사진마다 경로를 적어
-     * {@code vision_analyze} 로 보게 한다.
+     * 줄에 적고 원본 도구로 조회하게 한다. 거짓(흐름)이면 기존 사본 경로 안내를 유지한다.
      */
     private static String photoGuidance(String directory, List<AgentPhoto> photos, boolean embedImages) {
         StringBuilder guidance =
@@ -267,8 +309,7 @@ public class AttachmentService {
                     .append(notEmbedded.stream()
                             .map(photo -> photo.ordinal() + "번째")
                             .collect(Collectors.joining(", ")))
-                    .append(" 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다.")
-                    .append(" WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n");
+                    .append(" 사진. attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n");
         } else {
             guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
             for (AgentPhoto photo : notEmbedded) {
