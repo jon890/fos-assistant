@@ -1,8 +1,8 @@
 package com.bifos.assistant.agent.presentation;
 
-import com.bifos.assistant.agent.application.AgentAdminService;
-import com.bifos.assistant.agent.application.AgentCreateCommand;
-import com.bifos.assistant.agent.application.AgentUpdateCommand;
+import com.bifos.assistant.agent.admin.application.AgentAdminService;
+import com.bifos.assistant.agent.admin.application.model.AgentCreateCommand;
+import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
 import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
 import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;

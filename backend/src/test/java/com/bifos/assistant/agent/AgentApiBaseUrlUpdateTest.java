@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentAdminService;
+import com.bifos.assistant.agent.admin.application.AgentAdminService;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentConnectorDetacher;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
