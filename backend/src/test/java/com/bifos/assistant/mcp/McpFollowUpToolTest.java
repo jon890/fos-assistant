@@ -123,7 +123,10 @@ class McpFollowUpToolTest {
         JsonNode listed = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
 
         JsonNode tools = listed.path("result").path("tools");
-        assertThat(tools).hasSize(8);
+        assertThat(tools)
+                .extracting(item -> item.path("name").asString())
+                .doesNotHaveDuplicates()
+                .contains(TOOL);
         JsonNode tool = tools.get(6);
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         JsonNode schema = tool.path("inputSchema");

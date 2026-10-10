@@ -4,6 +4,18 @@ Hermes 가 Control Plane MCP 를 부를 때 토큰으로 profile 을 증명하�
 
 covers: `backend/src/main/java/com/bifos/assistant/mcp/`, `hermes/plugins/fos-ctx/`
 
+## 관찰 도구 연결 설계
+
+list_media_observations와 record_media_observation은 같은 Control Plane MCP 서버에 등록되어 있다.
+입력·응답·출처와 예산은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결-설계)이 갖는다.
+fos-ctx REQUIRED_TOOLS에 두 도구를 추가해 서명을 만들지 못하면 막는다.
+새 정의는 memory_remember 앞에 넣고 작업 기준의 기존 도구 전체와 상대 등록 순서를 보존한다.
+memory_search가 합쳐진 기준에서는 그 정의·서명·살펴보기 허용과 이름·schema 기반 검사를 유지한다.
+도구 개수나 마지막 도구를 과거 값으로 고정하지 않는다.
+서명 규격과 native 자식 등록, Memory 도구의 인자·권한·본문 반환 규격은 바꾸지 않는다.
+McpController 한정 JSON 파싱 실패는 다른 도구에도 -32700/id=null을 반환하되 기존 인증 필터의 401/403은 유지한다.
+파싱 실패와 유효 JSON의 인자 오류 -32602를 구분하고 입력 원문·예외 cause를 로그에 남기지 않는다.
+
 ## 요구
 
 - Control Plane 이 Hermes 에 여는 도구는 MCP 서버 하나(`fos-assistant`)에 모은다.

@@ -83,6 +83,7 @@ public class McpToolService {
     private final AgentConnectorBindings bindings;
     private final FollowUpService followUps;
     private final McpMemoryRemember memoryRemember;
+    private final McpMediaObservationTools mediaObservations;
     private final Clock clock;
 
     public List<Map<String, Object>> tools() {
@@ -212,6 +213,8 @@ public class McpToolService {
                                         Map.of("type", "boolean")),
                                 "required",
                                 List.of("title"))),
+                mediaObservations.listDefinition(),
+                mediaObservations.recordDefinition(),
                 memoryRemember.definition());
     }
 

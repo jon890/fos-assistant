@@ -5,6 +5,17 @@
 Hermes 내부 지점에 새로 기대면 같은 커밋에서 `hermes_contract.py` 에 선언한다.
 우리 plugin 의 계약은 [`hermes/plugins/fos-ctx/README.md`](../plugins/fos-ctx/README.md) 와 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 가 갖는다.
 
+## 관찰 도구 연결 설계
+
+구현한 관찰 도구의 계약은 [사진 첨부의 관찰 연결](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)이 갖는다.
+fos-ctx는 기존 pre_tool_call로 두 관찰 도구의 _fos_ctx를 덮어쓰고 서명이 없으면 막는다.
+새 hook이나 Hermes 내부 지점을 추가하지 않는다.
+기존 attachment_inspect, 최초 native 이미지 입력과 delegate_task의 이미지 전달을 유지한다.
+새 도구는 모델 선언을 저장하며 실제 provider·model이나 이미지 판독 품질을 증명하지 않는다.
+Control Plane은 두 도구의 bare/prefixed 이름에 대해 start/complete/fail detail과 text를 수집 전에 null로 만든다.
+root/data에 담긴 preview/detail/result와 delta/text/output도 가리며 ADMIN/MEMBER와 커넥터 호출 전후에 같은 규칙을 적용한다.
+기존 Memory 검색의 가림·REQUIRED_TOOLS 등록과 native 이미지·coverage의 선언 의미를 유지한다.
+
 ## 확장 지점
 
 ### plugin 도구의 native 이미지 결과

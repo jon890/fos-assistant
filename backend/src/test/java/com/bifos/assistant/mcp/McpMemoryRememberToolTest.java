@@ -45,6 +45,7 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -145,13 +146,17 @@ class McpMemoryRememberToolTest {
     }
 
     @Test
-    @DisplayName("도구 목록의 마지막이 memory_remember 이고 title 과 content 가 필수다")
+    @DisplayName("memory_remember 는 중복 없이 등록되고 title 과 content 가 필수다")
     void listsMemoryRememberLast() throws Exception {
         JsonNode tools = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
                 .path("result")
                 .path("tools");
 
-        JsonNode tool = tools.get(tools.size() - 1);
+        assertThat(tools).extracting(item -> item.path("name").asString()).doesNotHaveDuplicates();
+        JsonNode tool = StreamSupport.stream(tools.spliterator(), false)
+                .filter(item -> TOOL.equals(item.path("name").asString()))
+                .findFirst()
+                .orElseThrow();
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         assertThat(tool.path("inputSchema").path("required").toString()).isEqualTo("[\"title\",\"content\"]");
         assertThat(tool.path("inputSchema").path("additionalProperties").asBoolean())

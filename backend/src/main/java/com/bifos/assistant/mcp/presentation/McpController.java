@@ -5,10 +5,13 @@ import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.McpCallContext;
 import com.bifos.assistant.mcp.application.McpCaller;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
+import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.FollowUpProposeArguments;
+import com.bifos.assistant.mcp.presentation.McpDtos.MediaObservationListArguments;
+import com.bifos.assistant.mcp.presentation.McpDtos.MediaObservationRecordArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryRememberArguments;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
@@ -28,7 +31,9 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -55,25 +60,34 @@ public class McpController {
             Set.of("title", "content", "evidence", "memory_id", "collection", "sensitive");
     private static final String WAIT_SECONDS = "wait_seconds";
     /** 먼저 살펴보기에서 읽기, 위임과 사람이 받아들여야 하는 할 일 제안을 받는다. */
-    private static final Set<String> CHECK_TREE_TOOLS =
-            Set.of(MEMORY_READ, AGENT_LIST, AGENT_DELEGATE, AGENT_STATUS, AGENT_STOP, FOLLOW_UP_PROPOSE);
+    private static final Set<String> CHECK_TREE_TOOLS = Set.of(
+            MEMORY_READ,
+            AGENT_LIST,
+            AGENT_DELEGATE,
+            AGENT_STATUS,
+            AGENT_STOP,
+            FOLLOW_UP_PROPOSE,
+            McpMediaObservationTools.LIST);
     /** 쓰기 도구를 허용한 살펴보기가 더 받는 도구. 그 살펴보기의 점검 대화에만 쓰고 결과물은 그 폴더에 남는다(ADR-082). */
     private static final Set<String> CHECK_TREE_WRITE_TOOLS = Set.of(ARTIFACT_WRITE);
 
     private final McpToolService tools;
     private final McpCallerResolver callers;
+    private final McpMediaObservationTools mediaObservations;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
-    private final Map<String, ToolHandler> handlers = Map.of(
-            MEMORY_READ, this::readMemory,
-            ARTIFACT_WRITE, this::writeArtifact,
-            AGENT_LIST, this::listAgents,
-            AGENT_STATUS, this::agentStatus,
-            AGENT_DELEGATE, this::agentDelegate,
-            AGENT_STOP, this::agentStop,
-            FOLLOW_UP_PROPOSE, this::proposeFollowUp,
-            MEMORY_REMEMBER, this::remember);
+    private final Map<String, ToolHandler> handlers = Map.ofEntries(
+            Map.entry(MEMORY_READ, this::readMemory),
+            Map.entry(ARTIFACT_WRITE, this::writeArtifact),
+            Map.entry(AGENT_LIST, this::listAgents),
+            Map.entry(AGENT_STATUS, this::agentStatus),
+            Map.entry(AGENT_DELEGATE, this::agentDelegate),
+            Map.entry(AGENT_STOP, this::agentStop),
+            Map.entry(FOLLOW_UP_PROPOSE, this::proposeFollowUp),
+            Map.entry(MEMORY_REMEMBER, this::remember),
+            Map.entry(McpMediaObservationTools.LIST, this::listMediaObservations),
+            Map.entry(McpMediaObservationTools.RECORD, this::recordMediaObservation));
 
     /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
     @FunctionalInterface
@@ -190,6 +204,33 @@ public class McpController {
         ObjectNode copy = ((ObjectNode) arguments).deepCopy();
         copy.remove(McpCallContext.FIELD);
         return copy;
+    }
+
+    /** 역직렬화가 끝나기 전 실패도 원문과 cause를 공통 오류 로그로 보내지 않는다. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> malformed() {
+        return ResponseEntity.ok(error(null, -32700, "Parse error"));
+    }
+
+    private Map<String, Object> listMediaObservations(McpCaller caller, JsonNode id, JsonNode arguments) {
+        try {
+            var value = MediaObservationListArguments.from(arguments);
+            return response(id, mediaObservations.list(caller, value.afterAssetId(), value.limit()));
+        } catch (ApiException ex) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+    }
+
+    private Map<String, Object> recordMediaObservation(McpCaller caller, JsonNode id, JsonNode arguments) {
+        try {
+            var value = MediaObservationRecordArguments.from(arguments);
+            return response(
+                    id,
+                    mediaObservations.record(
+                            caller, value.assetId(), value.expectedRevision(), value.requestId(), value.observation()));
+        } catch (ApiException ex) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
     }
 
     private Map<String, Object> readMemory(McpCaller caller, JsonNode id, JsonNode arguments) {

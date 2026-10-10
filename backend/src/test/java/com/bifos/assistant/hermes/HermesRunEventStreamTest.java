@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.RunEvent;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,32 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>실행 상태 응답의 형태는 {@link RealHermesResponseShapeTest} 가 갖는다. 여기는 스트림 사건만 본다.
  */
 class HermesRunEventStreamTest {
+    @Test
+    @DisplayName("관찰 도구의 모든 사건 본문 칸은 root와 data에서 수집 전에 두 필드를 비운다")
+    void suppressesBothObservationFieldsBeforeCreatingRunEvent() {
+        var mapper = JsonMapper.builder().build();
+        String marker = "SYNTHETIC_OCR_PRIVATE_6318";
+        for (String tool : List.of(
+                "list_media_observations",
+                "record_media_observation",
+                "mcp__fos_assistant__list_media_observations",
+                "mcp__fos_assistant__record_media_observation")) {
+            for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
+                for (boolean nested : new boolean[] {false, true}) {
+                    for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
+                        var root = mapper.createObjectNode();
+                        var payload = nested ? root.putObject("data") : root;
+                        payload.put("event", event).put("tool", tool).put(field, marker);
+                        RunEvent parsed = HermesRunEventStream.toRunEvent(root, ToolDetailScope.NONE);
+                        assertThat(parsed.detail()).isNull();
+                        assertThat(parsed.text()).isNull();
+                        assertThat(parsed.toString()).doesNotContain(marker);
+                        assertThat(mapper.writeValueAsString(parsed)).doesNotContain(marker);
+                    }
+                }
+            }
+        }
+    }
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 

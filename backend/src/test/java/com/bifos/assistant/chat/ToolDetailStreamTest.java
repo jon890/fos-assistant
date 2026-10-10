@@ -2,6 +2,7 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -24,6 +25,8 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.presentation.ChatController;
 import com.bifos.assistant.chat.presentation.ChatEventStreams;
+import com.bifos.assistant.hermes.HermesProfileKeyStore;
+import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -44,11 +47,14 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.application.UserDisplayNameService;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,6 +78,95 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @BackendIntegrationTest
 class ToolDetailStreamTest {
+    @Test
+    @DisplayName("실제로 파싱한 관찰 사건은 ADMIN MEMBER의 대화 SSE와 저장에 본문을 남기지 않는다")
+    void neverPersistsOrStreamsObservationBodiesAfterRealSseParsing() throws Exception {
+        String marker = "SYNTHETIC_OCR_PRIVATE_1486";
+        StringBuilder raw = new StringBuilder();
+        for (boolean afterConnector : new boolean[] {false, true}) {
+            if (afterConnector) {
+                raw.append(
+                        "data: {\"event\":\"tool.started\",\"tool\":\"mcp__demo__read\",\"preview\":\"connector\"}\n\n");
+            }
+            for (String tool : List.of(
+                    "list_media_observations",
+                    "record_media_observation",
+                    "mcp__fos_assistant__list_media_observations",
+                    "mcp__fos_assistant__record_media_observation")) {
+                for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
+                    for (boolean nested : new boolean[] {false, true}) {
+                        for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
+                            var root = json.createObjectNode();
+                            var payload = nested ? root.putObject("data") : root;
+                            payload.put("event", event).put("tool", tool).put(field, marker);
+                            raw.append("data: ")
+                                    .append(json.writeValueAsString(root))
+                                    .append("\n\n");
+                        }
+                    }
+                }
+            }
+        }
+        raw.append("data: {\"event\":\"run.completed\"}\n\n");
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/runs/run-one/events", exchange -> {
+            byte[] body = raw.toString().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, body.length);
+            try (var output = exchange.getResponseBody()) {
+                output.write(body);
+            }
+        });
+        server.start();
+        try {
+            var keys = mock(HermesProfileKeyStore.class);
+            when(keys.resolve(anyString())).thenReturn("test-key");
+            var parser = new HermesRunEventStream(
+                    keys, new HermesProperties(null, null, null, null, null, null, null, null), json);
+            for (UserRole role : List.of(UserRole.ADMIN, UserRole.MEMBER)) {
+                var parsed = new ArrayList<RunEvent>();
+                parser.open(
+                        "http://127.0.0.1:" + server.getAddress().getPort(),
+                        "test-profile",
+                        "run-one",
+                        parsed::add,
+                        opened -> {},
+                        ToolDetailScope.prefixes(Set.of("mcp__demo__")));
+                var observationEvents = parsed.stream()
+                        .filter(event ->
+                                event.toolName() != null && event.toolName().contains("media_observation"))
+                        .toList();
+                assertThat(observationEvents).isNotEmpty().allSatisfy(event -> {
+                    assertThat(event.detail()).isNull();
+                    assertThat(event.text()).isNull();
+                    assertThat(event.toString()).doesNotContain(marker);
+                    assertThat(json.writeValueAsString(event)).doesNotContain(marker);
+                });
+                hermesStreams(parsed.toArray(RunEvent[]::new));
+                var current = signedIn("observation-stream-" + role, role);
+                var emitted = sent(current);
+                assertThat(json.writeValueAsString(emitted)).doesNotContain(marker);
+                Long executionId = emitted.getLast().path("executionId").asLong();
+                var stored =
+                        executionEvents
+                                .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId))
+                                .stream()
+                                .filter(event -> event.toolName() != null
+                                        && event.toolName().contains("media_observation"))
+                                .toList();
+                long persistable = observationEvents.stream()
+                        .filter(event -> !"tool.failed".equals(event.type()))
+                        .count();
+                assertThat(stored).hasSize((int) persistable).allSatisfy(event -> {
+                    assertThat(event.detail()).isNull();
+                    assertThat(event.eventType())
+                            .isIn(ExecutionEventType.TOOL_STARTED, ExecutionEventType.TOOL_COMPLETED);
+                });
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
 
     private static final String COMMAND = "python3 run.py";
     private static final String QUERY = "제주 날씨";

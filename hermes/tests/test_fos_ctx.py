@@ -238,7 +238,8 @@ class HookTest(PluginFixture):
 
     def test_memory_and_artifact_tools_block_without_signature(self):
         """서명이 없으면 memory, artifact, 할 일 제안 도구 호출을 막는다."""
-        for tool in ("memory_read", "artifact_write", "follow_up_propose", "memory_remember"):
+        for tool in ("memory_read", "artifact_write", "follow_up_propose", "memory_remember",
+                     "list_media_observations", "record_media_observation"):
             name = "mcp__fos_assistant__" + tool
             with self.subTest(tool=tool, state="signed"):
                 self.token, self.secret_error = FAKE_MCP_CREDENTIAL, None
@@ -255,6 +256,23 @@ class HookTest(PluginFixture):
         """그 밖의 control plane 도구는 서명이 없어도 통과한다."""
         self.token = None
         self.assertIsNone(self.call("mcp__fos_assistant__other_tool"))
+
+    def test_observation_tools_replace_forged_context_and_require_material(self):
+        """사진 관찰도 위조된 맥락을 덮어쓰고 session과 호출 ID가 없으면 막는다."""
+        for tool in ("list_media_observations", "record_media_observation"):
+            name = "mcp__fos_assistant__" + tool
+            with self.subTest(tool=tool, state="forged native context"):
+                self.token, self.secret_error = FAKE_MCP_CREDENTIAL, None
+                forged = {"_fos_ctx": {"session_id": "forged"}}
+                result = self.call(name, args=forged)
+                merged = {**forged, **result["args"]}
+                self.assertEqual(merged["_fos_ctx"]["session_id"], VECTOR_SESSION)
+                self.assertEqual(merged["_fos_ctx"]["root_session_id"], VECTOR_ROOT)
+                self.assertEqual(merged["_fos_ctx"]["tool_call_id"], VECTOR_CALL)
+                self.assertTrue(merged["_fos_ctx"]["sig"])
+            for session, call_id in (("", VECTOR_CALL), (VECTOR_SESSION, "")):
+                with self.subTest(tool=tool, session=session, call_id=call_id):
+                    self.assertEqual(self.call(name, session=session, call_id=call_id)["action"], "block")
 
     def test_skill_manage_is_blocked(self):
         """skill_manage 호출은 막는다."""

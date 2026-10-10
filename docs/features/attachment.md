@@ -26,7 +26,7 @@ READ_COMMITTED 새 트랜잭션에서 주인과 대상 상태를 다시 확인�
 ## 관찰 저장과 사용자 정정
 
 `MediaObservationService`는 보낸 첨부의 관찰을 저장하고 목록으로 읽는 동기 서비스다.
-REST/MCP/UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지 않는다.
+REST 조회·사용자 정정과 서명된 MCP 조회·기록을 제공한다. 전용 UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지 않는다.
 결정과 기각 근거는 [ADR-20261010 / media-observation-storage](../../backend/docs/adr/ADR-20261010-media-observation-storage.md)가 갖는다.
 
 쓰기 전에 현재 대화 주인과 업로더, 삭제·만료 상태를 확인하고 원본의 SHA-256과 크기를 직접 계산한다.
@@ -50,6 +50,180 @@ REST/MCP/UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지
 삭제된 첨부도 전체 순번에 포함한다. cursor는 직전 첨부 ID이며 자기 대화의 유효한 보낸 첨부여야 한다.
 summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관찰 JSON은 UTF-8 32KiB로 제한한다.
 관찰과 alias는 원본 첨부보다 오래 보관하지 않는다.
+
+
+### 관찰 API와 MCP 연결 설계
+
+REST 조회·사용자 정정, MCP 조회·기록과 페이지·제출 본문 검사는 구현되었다.
+`MediaObservationService.list/record`를 그대로 호출한다.
+완료 결과 캐시의 머지를 선행 조건으로 두지 않는다.
+저장 서비스, 암호화, DDL과 삭제 장벽은 변경하지 않는다.
+
+record에는 캐시 재사용이 없어 새 MODEL UUID마다 새 revision과 본문을 저장한다.
+캐시가 추가된 기준에서는 provider/model 미확인 관찰의 analysisKey 생성과 결과 재사용을 저장 producer가 둘 다 꺼야 한다.
+캐시를 추가할 때는 같은 record 시그니처와 두 제외 조건을 유지하고, 다른 실행·UUID·본문을 새로 저장하는 회귀를 통과해야 한다.
+list와 USER 정정 REST는 이 캐시 제외 producer에 의존하지 않는다.
+
+사진 업로드·전송과 Hermes의 native 이미지 입력은 기존 경로를 유지한다.
+에이전트는 현재 대화의 관찰을 읽고 필요한 사진을 기존 `attachment_inspect`로 확인한 뒤 모델 관찰을 제출한다.
+새 도구는 provider를 호출하거나 분석 완료를 자동 기록하지 않는다.
+원고·미리보기·승인된 네이버 임시저장은 별도 흐름이며 이 연결만으로 전체 흐름이 완성되지는 않는다.
+
+```mermaid
+sequenceDiagram
+    participant U as 사용자
+    participant C as Control Plane
+    participant H as Hermes
+    U->>C: 사진 업로드 후 메시지 전송
+    C->>H: 기존 native 이미지 입력
+    H->>C: list_media_observations
+    C-->>H: 현재 대화의 관찰 페이지
+    alt 관찰이 없거나 확인 범위가 부족함
+        H->>C: 기존 attachment_inspect
+        C-->>H: 권한을 확인한 native 이미지
+        H->>H: 기존 provider 경로로 사진 확인
+        H->>C: record_media_observation
+        alt 현재 revision과 UUID가 유효함
+            C-->>H: 최초 수락 revision
+        else USER 정정 또는 revision 충돌
+            C-->>H: 현재 revision만 담은 오류
+        end
+    else 삭제 또는 만료
+        C-->>H: 본문 없는 UNAVAILABLE
+    end
+    Note over U,H: 이후 원고·미리보기·승인된 임시저장은 별도 구현 범위
+```
+
+#### 공개 경로와 페이지
+
+REST의 기준 경로는 `/api/v1/chat/conversations/{conversationId}/media-observations`다.
+대화의 공개 UUID를 `ConversationAccess.requireOwnId(CurrentUser, UUID)`로 내부 `Long` ID로 바꾼다.
+첨부 `assetId`는 양의 Long을 담은 십진 문자열이며 UUID가 아니다.
+모델 도구에는 사용자, profile과 대화 식별자 인자를 두지 않는다.
+
+| 표면 | 입력 | 응답 |
+| --- | --- | --- |
+| REST GET | `afterAssetId?: string`, `limit?: integer` | `{items,nextAfterAssetId}` |
+| REST PUT `/{assetId}` | `{expectedRevision,requestId,observation}` | 단일 관찰 응답 |
+| MCP list_media_observations | GET과 같은 선택 인자 | ExternalData로 감싼 페이지 JSON |
+| MCP record_media_observation | `{assetId,expectedRevision,requestId,observation}` | ExternalData로 감싼 단일 관찰 JSON |
+
+새 API의 limit은 1부터 30까지이며 기본은 30이다. 서비스의 기존 1부터 100까지 제한은 그대로 둔다.
+페이지는 최대 30항목이며 포함한 observation JSON의 UTF-8 크기 합은 32KiB 이하이다.
+메타데이터와 ExternalData 안내문은 이 본문 예산에 포함하지 않는다.
+각 본문은 서버 evidence를 붙인 저장형 JSON으로 크기를 계산한다.
+다음 본문이 예산을 넘기면 그 항목 직전에서 끝내고 실제 반환한 마지막 assetId를 cursor로 낸다.
+limit+1개를 서비스로 읽어 다음 항목을 확인하며 마지막 페이지의 cursor는 null이다.
+단일 본문은 저장 상한 이내이므로 첫 항목은 항상 진행한다.
+반환하지 않은 항목을 cursor로 건너뛰거나 본문을 잘라 내지 않는다.
+빈 대화는 빈 items와 null cursor이며 조회로 행을 만들지 않는다.
+
+항목은 기존 MediaObservationView의 `assetId,ordinal,sourceFingerprint,revision,status,observation,provenance,expiresAt,errorCode`와
+새 응답 칸 `sourceAssurance`를 갖는다. 누락 가능한 칸은 null이다.
+UNAVAILABLE은 ID·순번·상태만 의미가 있고 나머지는 null이다.
+보낸 첨부, 순번, cursor 소속, 업로더·대화 주인, 삭제·만료와 응답 직전 상태는 기존 서비스로 판정한다.
+
+#### 제출과 정정
+
+requestId는 정규 UUID 문자열이고 expectedRevision은 0 이상의 JSON 정수다.
+모르는 칸은 최상위와 중첩 객체에서 거절한다. 소수·문자열 정수와 overflow도 거절한다.
+observation은 `status,summary,claims,uncertainties,coverage,errorCode`만 받는다.
+evidence, provenance와 실행·provider·model·버전·시각은 제출 인자가 아니다.
+서버가 evidence를 만들고 기존 MediaObservationInput.validate를 적용한다.
+
+| 본문 | 기존 검증과 새 표면의 제한 |
+| --- | --- |
+| summary | 선택 문자열, Unicode code point 최대 2,000자 |
+| claims | 최대 50개. `{kind,text,confidence,evidence}`. text와 evidence 문자열은 각각 최대 500자, 근거 배열은 비어 있지 않음 |
+| uncertainties | 최대 30개. 문자열마다 비어 있지 않고 최대 500자 |
+| coverage | `{mode,region?,frame?}`. ORIGINAL, OVERVIEW, CROP, FIRST_FRAME 중 하나 |
+| region | CROP에만 `{x,y,width,height}`. 유한 수, 양의 크기, 정규화 좌표 0~1 경계 |
+| frame | FIRST_FRAME에만 정수 0 |
+| status | NOT_ANALYZED와 UNAVAILABLE은 조회 전용. PARTIAL에는 uncertainty가 필요하고 SUCCEEDED에는 없어야 함 |
+| FAILED | 대문자 오류 코드만 받음. summary·claims·uncertainties·coverage·evidence는 없음 |
+
+REST PUT은 로그인한 대화 주인의 USER_CORRECTION만 저장한다.
+정정은 SUCCEEDED 또는 PARTIAL이며 claim의 kind는 USER만 받는다.
+MCP record는 MODEL_RESULT이며 claim의 kind는 VISUAL 또는 OCR만 받는다.
+confidence는 CONFIRMED 또는 UNCERTAIN으로 제출자의 판단이다. 서버가 사실을 검증했다는 뜻은 아니다.
+MCP는 PROCESSING, SUCCEEDED, PARTIAL, FAILED, NEEDS_REVIEW를 받으며 기존 상태별 검증을 그대로 적용한다.
+FAILED 외의 evidence는 서버가 MODEL_RESULT와 origin 실행 ID 문자열 또는 USER_CORRECTION과 같은 문자열로 만든다.
+FAILED의 evidence는 null이다.
+정정 REST는 USER 이후 MODEL 보호를 공개 API에서 확인하기 위해 같은 관심사에 넣는다. UI는 만들지 않는다.
+
+#### 출처의 검증 범위
+
+진행 중 AgentExecution.provider/model은 요청값이거나 미확인 값이며 native 자식의 실제 분석 경로라는 증거가 아니다.
+새 MCP는 이 두 칸을 모델 인자로 받지 않는다.
+현재 저장 검증이 비어 있지 않은 provider/model을 요구하므로 두 저장 칸에는 명시적인 미확인 표식 UNKNOWN을 쓴다.
+이 표식은 실제 provider나 모델의 이름이 아니다. 새 응답도 UNKNOWN을 그대로 내며 버전은 null이다.
+
+| 출처 칸 | 정하는 주체와 검증 범위 |
+| --- | --- |
+| kind | 서버가 REST는 USER_CORRECTION, MCP는 MODEL_RESULT로 고정함 |
+| executionId | 서명·session 등록으로 찾은 origin ID. native 자식은 독립 FOS 실행 ID가 없어 부모 origin에 연결됨 |
+| provider, model | 새 MCP에서는 UNKNOWN. 요청 모델·부모 모델·모델 자기 선언으로 실제 경로를 추정하지 않음 |
+| providerVersion, modelVersion | 관측하지 못했으므로 null |
+| schemaVersion, promptVersion | 서버 상수 1과 media-observation-v1. 제출 프로토콜 버전이며 실제 분석 prompt의 증거가 아님 |
+| observedAt | 저장 서비스가 고정한 최초 수락 revision의 서버 시각 |
+| sourceFingerprint | 저장 서비스가 원본에서 직접 계산한 SHA-256 |
+| 관찰 본문과 coverage | 모델 또는 사용자 선언. native 원본 전체 확인이나 OCR 정확도를 서버가 검증한 결과가 아님 |
+
+USER 정정의 실행·provider·model과 각 버전은 모두 null이다.
+sourceAssurance는 observation이 null이면 provenance가 남아 있어도 null이다.
+본문이 있을 때 USER는 USER_CORRECTION, MODEL은 MODEL_UNVERIFIED다.
+원본 교체·복호화 실패·본문 검증 실패는 NEEDS_REVIEW와 CONTENT_UNAVAILABLE, null observation으로 반환되므로 assurance도 null이다.
+본문이 남은 ANALYSIS_STALE 또는 NEEDS_REVIEW는 출처 kind에 따른 assurance를 유지한다.
+현재 schema에 실제 provider 검증 표시가 없으므로 기존 MODEL_RESULT도 보수적으로 MODEL_UNVERIFIED로 낸다.
+SYNTHETIC_MEASUREMENT는 제출할 수 없다. 합성 fixture 품질과 실제 모델 품질은 구분한다.
+분석 조건에 따른 저장 재사용은 별도 캐시 계약이다.
+UNKNOWN 조합을 검증된 provider 결과로 해석하지 않으며 provider 호출 생략·재분석 방지·100% 정확도는 제공하지 않는다.
+다른 실행에서 같은 사진·coverage를 제출해도 UNKNOWN MODEL은 새 요청 UUID마다 해당 실행의 새 본문을 저장한다.
+다른 실행 결과를 재사용하지 않는 회귀가 이 계약을 지킨다.
+provider/model 버전이나 promptVersion에 실행 번호를 넣거나 USER provenance로 위장해 캐시 key를 바꾸지 않는다.
+
+#### 권한과 오류
+
+기존 McpCallerResolver.resolve와 v1 HMAC 서명을 그대로 사용한다.
+caller.originExecution().conversationId()만 쓰며 모델 본문을 서명된 것으로 취급하지 않는다.
+등록된 native 자식은 부모 turn이 끝나도 같은 origin을 유지한다. 최근 실행으로 바꾸지 않는다.
+새 도구는 호출 직전과 응답 직전에 최신 origin·루트 취소, 현재 session 등록,
+사용자 허용 상태와 origin 에이전트의 enabled·삭제·공개 범위·hermesProfile을 다시 확인한다.
+에이전트의 현재 hermesProfile은 origin.profileName과 같아야 한다.
+현재 main에 별도 사용자-profile 바인딩 표는 없으며 에이전트의 profile 연결이 이 검사 근거다.
+토큰 폐기는 기존 인증의 401이며 사용자 JWT는 MCP 인증을 대신하지 않는다.
+읽기 전용 살펴보기는 list만 허용한다. record는 쓰기 허용 여부와 관계없이 살펴보기에서 차단한다.
+
+| 조건 | REST | MCP |
+| --- | --- | --- |
+| JSON 파싱 실패 | controller 한정 고정 400 VALIDATION_FAILED | HTTP 200, JSON-RPC -32700, id=null, 고정 Parse error |
+| 유효 JSON의 인자·중첩 본문·크기 위반 | 400 VALIDATION_FAILED | JSON-RPC -32602, 고정 문구 |
+| 없는 대화·남의 대화·다른 대화 첨부/cursor | 404 CONVERSATION_NOT_FOUND | isError와 같은 공개 오류 코드 |
+| 없는 cursor·미전송 cursor | 400 VALIDATION_FAILED | -32602 |
+| 삭제·만료·미전송 첨부에 쓰기 | 기존 서비스의 410 ATTACHMENT_GONE | isError와 같은 코드 |
+| revision·UUID 내용 충돌·USER 이후 MODEL | 409 MEDIA_OBSERVATION_CONFLICT, message는 revision=N | isError와 코드 및 currentRevision만 포함 |
+| 암호화 불가 | 503 MEDIA_ENCRYPTION_UNAVAILABLE | isError와 같은 코드 |
+| 서명·origin·session·취소·현재 권한 불일치 | 해당 없음 | 기존 MCP_CALL_CONTEXT_INVALID와 같은 고정 결과 |
+
+저장은 기존 사용자·대화·첨부 잠금 안에서 선형화된다.
+실행 취소·접근 철회는 그 잠금과 함께 커밋되는 계약이 아니다.
+호출 직전 이미 철회된 권한은 읽기·쓰기에 도달하지 않는다.
+권한 검사 뒤 저장과 철회가 경합하면 커밋한 revision은 남을 수 있으나 응답 직전 재검사가 본문을 차단한다.
+이를 저장 취소의 원자적 보장이라고 설명하지 않는다.
+
+두 MCP 성공 응답 JSON은 ExternalData.wrap으로 감싼다.
+사진·OCR의 지시와 닫는 표시는 데이터로 취급한다.
+두 도구의 bare 이름과 MCP 접두사가 붙은 이름 모두 start/complete/fail의 detail과 text를 수집 전에 null로 만든다.
+root/data의 preview/detail/result와 delta/text/output 모두 이 규칙을 적용하며 역할과 커넥터 사용 여부는 영향을 주지 않는다.
+로그에는 본문·OCR·암호문·외부 오류 원문·서명·토큰을 넣지 않는다.
+도구 로그를 남기면 도구 이름·실행 ID·공개 오류 코드만 남긴다.
+새 도구는 memory_remember의 INTERNAL_TOOLS에 추가하지 않아 개인 기억의 바로 저장 조건을 완화하지 않는다.
+
+MCP의 JSON 파싱 실패는 @RequestBody JsonNode를 역직렬화하는 동안 발생하므로 controller·도구 handler에 진입하기 전이다.
+McpController에 한정한 HttpMessageNotReadableException 처리로 응답하며 원문·예외 메시지·cause를 공통 예외 로그로 넘기지 않는다.
+이 처리는 관찰뿐 아니라 같은 /mcp의 다른 도구와 initialize/tools/list의 잘못된 JSON에도 적용된다.
+인증 필터의 토큰 누락·오류·폐기는 기존 401, Origin 거절은 기존 403을 유지하고 parse error로 바꾸지 않는다.
+유효 JSON의 도구 인자 오류와 기존 성공 응답 계약도 유지한다.
 
 ## 합성 사진 검증
 
