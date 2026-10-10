@@ -309,7 +309,8 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 금융 실행 원문과 승인 표시 값을 함께 검증하고 저장하는 모델이다.
 현재 `FINANCIAL`과 `DESTRUCTIVE` 호출은 계속 `RISK_NOT_OPEN`으로 거절하며 상시 허락을 만들지 않는다.
-준비 API, 금융 승인 경로, claim 인증과 실제 주문 실행은 아직 구현하지 않았다.
+준비 API, 금융 승인 경로와 실제 주문 실행은 아직 구현하지 않았다.
+일회성 ticket의 발급 함수와 claim 인증은 아래 계약으로 구현하며 운영 승인 경로에는 연결하지 않는다.
 저장 컬럼과 수명은 [저장 모델](../../backend/docs/data-schema.md)의 「connector_action_execution」이,
 결정의 근거는 [ADR-20261010 / financial-execution-guard](../adr/ADR-20261010-financial-execution-guard.md)가 갖는다.
 
@@ -398,6 +399,72 @@ request_key는 원래 인자 해시나 실행 원문 해시를 대신하지 않�
 공통 자료는 `test/fixtures/financial-approval-v1.json`이다.
 정상·거절 사례와 원문·기대 해시·summary·scope를 Java, Python과 Bun에서 같은 값으로 읽을 수 있다.
 현재 Java의 실제 소비 함수와 독립 Python 해시 계산을 대조하며 다른 언어의 실행 경로는 후속 구현에서 검증한다.
+
+### 일회성 실행 권한
+
+발급은 `EXECUTING`인 미만료 승인 줄을 받는 application 함수다.
+카탈로그를 요청마다 한 번 읽고 현재 소유자, 활성 사용자, 현재 바인딩의 profile,
+연결과 바인딩의 `READY`, `desiredEnabled`, 두 revision과 공개 scope를 검증한다.
+원래 실행이 읽기 전용 살펴보기이면 거절한다.
+snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 값을 다시 대조한다.
+발급 함수를 운영 승인이나 controller에서 호출하지 않으며 금융 위험도 판정을 바꾸지 않는다.
+
+카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
+정확한 키는 `protocol,prepare_tool,scope_fields,operations`이며 protocol은 `approval-claim-v1`이다.
+prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
+operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
+scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다.
+카탈로그 원문에서 중복 키와 뒤따르는 JSON을 먼저 거절하고, 보호 선언의 타입이나 키를 보충하지 않는다.
+이 읽기 계약은 plugin producer나 설치 지원 확인, 금융 노출의 근거가 아니다.
+
+ticket은 padding 없는 canonical base64url payload와 32바이트 HMAC-SHA256 서명을 점으로 이은 문자열이다.
+서명 key는 설정의 dashboardToken UTF-8 바이트를 key로,
+`fos-approval-signing-key-v1` ASCII를 data로 한 HMAC-SHA256 결과다.
+서명 입력은 `fos-approval-claim-v1` ASCII 다음에 payload의 base64url ASCII를 구분자 없이 붙인 바이트다.
+서명은 상수 시간으로 비교한다. 비어 있는 서비스 토큰으로 발급하거나 인증하지 않는다.
+
+| payload 칸 | 타입 |
+| --- | --- |
+| `v` | JSON 정수 1 |
+| `ticketId`, `actionId` | canonical 소문자 UUID 문자열. actionId는 승인 줄의 공개 UUID다 |
+| `userId`, `agentId`, `connectionId`, `bindingId` | 양의 JSON Long 정수 |
+| `profile`, `connectorId`, `tool` | 비어 있지 않은 문자열, 각각 64·64·128자 이하 |
+| `argsSha256`, `scopeSha256` | 저장 원문 UTF-8 바이트의 소문자 SHA-256 문자열 |
+| `issuedAt`, `expiresAt` | UTC Instant.toString() canonical 문자열, MICROS 정밀도 |
+
+정확히 이 14개 키만 허용하며 중복, 추가, 누락, null, coercion, 지수와 소수 표현, overflow를 거절한다.
+발급 시각은 서명 전에 MICROS로 절삭하고 만료는 발급 후 60초와 승인 만료의 MICROS 절삭값 중 빠른 쪽이다.
+`issuedAt <= now < expiresAt`이며 clock skew는 허용하지 않는다.
+한 번 발급하거나 소비한 권한은 만료, 응답 유실과 서버 재시작 뒤에도 다시 사용할 수 없다.
+ticket 원문과 서명, 복호화 본문을 DB, 로그, 오류, 화면과 모델에 남기지 않는다.
+
+`POST /internal/connector-executions/claim`은 정확히 `{ticket,tool,argsSha256,scope}`를 받는다.
+이 URI의 POST만 JWT 인증 예외다. 다른 HTTP 메서드는 기존 사용자 인증을 거친다.
+이 POST 요청은 본문의 ticket으로 인증하며 JWT와 profile Bearer로 대신하지 않는다.
+scope는 선언한 키와 문자열 값으로 대조하므로 JSON 키 순서나 공백은 해시에 영향을 주지 않는다.
+성공 응답은 정확히 `{v:1,allowed:true,ticketId,expiresAt}`이며 소비 트랜잭션의 실제 커밋 뒤에 반환한다.
+
+| 입력 | 독립 상한 |
+| --- | --- |
+| 전체 본문 | UTF-8 8 KiB, Content-Length 없는 chunked도 실제 바이트로 제한 |
+| ticket | ASCII 4096자 |
+| decoded payload | UTF-8 3 KiB |
+| 수신 scope JSON | UTF-8 2 KiB, 1~8개 키, 값마다 UTF-8 128바이트 |
+| JSON 깊이 | 5 |
+
+원문과 strict 타입 오류는 400, ticket 부재나 서명 실패는 401이다.
+서명은 맞지만 만료, 상태, 소유자, 정책, revision, 해시나 scope가 달라지면 409이며 내부 이유를 응답에 싣지 않는다.
+인증은 DB와 HTTP 전에 끝낸다. 외부 트랜잭션이 있는 호출은 거절한다.
+짧은 읽기 트랜잭션에서 불변 공개 맥락을 복사한 뒤 DB 연결과 잠금 없이 fresh HTTP를 읽는다.
+새 쓰기 트랜잭션의 첫 DB 문장은 사용자 잠금이고 승인 줄, 실행 내용 순으로 잠근다.
+같은 persistence context를 재사용하지 않고 최신 맥락을 모두 다시 대조한 뒤 발급하거나 소비한다.
+소비와 커밋 직전에 만료를 다시 확인하고 커밋 실패에서 원문이나 허용 응답을 반환하지 않는다.
+
+기존 `EXECUTING` 승인 줄의 연결 등록·해제·떼기 차단은 유지한다.
+그 서비스가 HTTP 대기 중 정상 거절되는 것은 변경 불변성의 근거이며 최신 DB 재검증의 근거는 아니다.
+반영 완료는 재검증 결과 `PENDING`과 revision을 커밋한 뒤 오류를 반환할 수 있다.
+실제 반영 완료가 HTTP 대기 중 먼저 커밋한 변경도 마지막 권한 검증에서 거절한다.
+후속 transport와 준비·지원 API는 이 보호 계약 소비 함수를 재사용한다.
 
 ## 커넥터 READ 데이터의 흐름
 

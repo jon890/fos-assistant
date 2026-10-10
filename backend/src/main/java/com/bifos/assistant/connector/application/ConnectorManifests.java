@@ -17,7 +17,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-final class ConnectorManifests {
+public final class ConnectorManifests {
 
     /**
      * 카탈로그를 요청마다 다시 읽고 받는 manifest 만 남긴다. 운영자가 목록을 바꾸면 화면에 바로 보여야 하기 때문이다.
@@ -36,7 +36,7 @@ final class ConnectorManifests {
     }
 
     /** 그 번호의 manifest 다. 카탈로그에 없거나 받지 않는 선언이면 빈 값이다. */
-    static Optional<ConnectorManifest> find(HermesConnectorClient connector, String connectorId) {
+    public static Optional<ConnectorManifest> find(HermesConnectorClient connector, String connectorId) {
         return read(connector).stream()
                 .filter(manifest -> manifest.id().equals(connectorId))
                 .findFirst();

@@ -6,6 +6,7 @@ import jakarta.servlet.DispatcherType;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -50,6 +51,9 @@ public class SecurityConfig {
                         .permitAll()
                         // 커넥터가 부르는 브라우저 중계다. 경로의 접근 표식이 인증이고 BrowserGateway 가 확인한다.
                         .requestMatchers("/internal/browser-gateway/**")
+                        .permitAll()
+                        // 본문의 일회성 ticket은 claim controller가 직접 인증한다.
+                        .requestMatchers(HttpMethod.POST, "/internal/connector-executions/claim")
                         .permitAll()
                         .requestMatchers(
                                 "/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate")
