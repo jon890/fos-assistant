@@ -159,21 +159,22 @@ class McpMemoryToolTest {
                 .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));
         assertThat(listed.path("id").asInt()).isEqualTo(18);
-        assertThat(listed.path("result").path("tools")).hasSize(8);
-        assertThat(listed.path("result").path("tools").get(0).path("name").asString())
-                .isEqualTo("memory_read");
-        assertThat(listed.path("result").path("tools").get(1).path("name").asString())
-                .isEqualTo("artifact_write");
-        assertThat(listed.path("result").path("tools").get(2).path("name").asString())
-                .isEqualTo("agent_list");
-        assertThat(listed.path("result").path("tools").get(3).path("name").asString())
-                .isEqualTo("agent_delegate");
-        assertThat(listed.path("result").path("tools").get(4).path("name").asString())
-                .isEqualTo("agent_status");
-        assertThat(listed.path("result").path("tools").get(5).path("name").asString())
-                .isEqualTo("agent_stop");
-        assertThat(listed.path("result").path("tools").get(6).path("name").asString())
-                .isEqualTo("follow_up_propose");
+        List<String> names = StreamSupport.stream(
+                        listed.path("result").path("tools").spliterator(), false)
+                .map(tool -> tool.path("name").asString())
+                .toList();
+        assertThat(names)
+                .doesNotHaveDuplicates()
+                .containsExactly(
+                        "memory_read",
+                        "artifact_write",
+                        "agent_list",
+                        "agent_delegate",
+                        "agent_status",
+                        "agent_stop",
+                        "follow_up_propose",
+                        "memory_remember",
+                        "memory_search");
         HttpResponse<String> notification =
                 mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);

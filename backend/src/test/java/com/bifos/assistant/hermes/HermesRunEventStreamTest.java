@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.hermes.dto.RunEvent;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,24 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>실행 상태 응답의 형태는 {@link RealHermesResponseShapeTest} 가 갖는다. 여기는 스트림 사건만 본다.
  */
 class HermesRunEventStreamTest {
+    @Test
+    @DisplayName("검색어와 민감 제목은 일반 이름과 MCP 이름의 시작 완료 실패 사건에 남지 않는다")
+    void hidesMemorySearchDetailInEveryEvent() {
+        for (String tool : List.of("memory_search", "mcp__fos_assistant__memory_search")) {
+            for (String type : List.of("tool.started", "tool.completed", "tool.failed")) {
+                RunEvent event = parse("{\"data\":{\"event\":\"" + type + "\",\"tool\":\"" + tool
+                        + "\",\"preview\":\"합성검색어\",\"detail\":\"합성민감제목\",\"result\":{\"items\":[\"합성본문\"]}}}");
+                assertThat(event.detail()).isNull();
+                assertThat(event.toolName()).isEqualTo(tool);
+                assertThat(event.toString()).doesNotContain("합성검색어", "합성민감제목", "합성본문");
+            }
+        }
+        for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
+            RunEvent event =
+                    parse("{\"event\":\"tool.failed\",\"tool\":\"memory_search\",\"" + field + "\":\"합성민감표식\"}");
+            assertThat(event.toString()).doesNotContain("합성민감표식");
+        }
+    }
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 

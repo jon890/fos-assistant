@@ -38,6 +38,8 @@ public class HermesRunEventStream {
      * 서버 이름을 앞에 붙여 보낸다.
      */
     private static final String MEMORY_READ_TOOL_SUFFIX = "memory_read";
+    /** 검색어와 제목도 시작과 끝의 실행 사건에서 가린다. */
+    private static final String MEMORY_SEARCH_TOOL_SUFFIX = "memory_search";
 
     /** 인자를 {@code preview} 에 싣는 도구 시작 사건이다. */
     private static final String MEMORY_READ_STARTED = "tool.started";
@@ -168,6 +170,7 @@ public class HermesRunEventStream {
         String type = firstText(root, payload, "event", "type");
         String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
         String detail = firstDetail(root, payload);
+        boolean memorySearch = toolName != null && toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX);
         boolean toolEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.");
         boolean subagentEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.");
         boolean afterConnector =
@@ -178,6 +181,7 @@ public class HermesRunEventStream {
         }
         if (toolName != null
                 && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)
+                        || toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX)
                         || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX))) {
             // 시작의 preview 에 할 일 제목이나 기억할 사실이 실린다. 관리자가 실행 기록에서 남의 글을 읽지 못하게
             // 시작과 끝 모두 남기지 않는다
@@ -203,7 +207,7 @@ public class HermesRunEventStream {
         }
         return new RunEvent(
                 type,
-                firstText(root, payload, "delta", "text", "output"),
+                memorySearch ? null : firstText(root, payload, "delta", "text", "output"),
                 toolName,
                 detail,
                 durationMs(root, payload),

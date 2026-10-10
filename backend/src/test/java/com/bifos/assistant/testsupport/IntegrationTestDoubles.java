@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.boot.task.ThreadPoolTaskSchedulerBuilder;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,18 @@ import org.springframework.test.context.DynamicPropertyRegistrar;
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class IntegrationTestDoubles {
+
+    /** 꺼져 있을 때는 SQL을 바꾸지 않는다. 검사마다 별도 Spring 컨텍스트를 띄우지 않는다. */
+    @Bean
+    HibernatePropertiesCustomizer memorySearchSqlInspection() {
+        return properties ->
+                properties.put("hibernate.session_factory.statement_inspector", new MemorySearchSqlProbe());
+    }
+
+    @Bean
+    static BeanPostProcessor memorySearchStatementObservation() {
+        return MemorySearchSqlProbe.observeStatements();
+    }
 
     /** 표본 가격표 파일의 실제 경로를 담는 속성이다. {@link SamplePriceCatalog} 가 자리표시자로 읽는다. */
     public static final String SAMPLE_PRICE_CATALOG_PATH = "test.sample-price-catalog-path";

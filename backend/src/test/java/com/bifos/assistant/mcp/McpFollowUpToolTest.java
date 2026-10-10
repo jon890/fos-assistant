@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -118,13 +119,16 @@ class McpFollowUpToolTest {
     }
 
     @Test
-    @DisplayName("도구 목록의 일곱째가 follow_up_propose 이고 title 만 필수이며 모르는 키를 받지 않는다")
-    void listsFollowUpProposeSeventh() throws Exception {
+    @DisplayName("도구 목록에 follow_up_propose가 하나 있고 title만 필수이며 모르는 키를 받지 않는다")
+    void listsFollowUpProposeSchema() throws Exception {
         JsonNode listed = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"));
 
         JsonNode tools = listed.path("result").path("tools");
-        assertThat(tools).hasSize(8);
-        JsonNode tool = tools.get(6);
+        List<JsonNode> matches = StreamSupport.stream(tools.spliterator(), false)
+                .filter(value -> TOOL.equals(value.path("name").asString()))
+                .toList();
+        assertThat(matches).hasSize(1);
+        JsonNode tool = matches.getFirst();
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         JsonNode schema = tool.path("inputSchema");
         assertThat(schema.path("required").toString()).isEqualTo("[\"title\"]");

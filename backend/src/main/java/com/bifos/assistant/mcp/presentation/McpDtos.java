@@ -9,6 +9,23 @@ import tools.jackson.databind.JsonNode;
 public final class McpDtos {
     public record MemoryReadArguments(Long id) {}
 
+    /** 검색어를 로그에 남기지 않는 제목 검색 인자다. */
+    public record MemorySearchArguments(String query, int limit, Long afterId) {
+        static MemorySearchArguments from(JsonNode arguments) {
+            JsonNode limit = arguments.get("limit");
+            JsonNode after = arguments.get("after_id");
+            return new MemorySearchArguments(
+                    arguments.get("query").asString().strip(),
+                    limit == null ? 10 : limit.intValue(),
+                    after == null ? null : after.longValue());
+        }
+
+        @Override
+        public String toString() {
+            return "MemorySearchArguments[limit=" + limit + ", afterId=" + afterId + "]";
+        }
+    }
+
     public record ArtifactWriteArguments(String conversationId, String path, String content, String sourceUrl) {
         /** JSON의 snake_case 이름을 Java record의 이름으로 바꾼다. */
         static ArtifactWriteArguments from(JsonNode arguments) {

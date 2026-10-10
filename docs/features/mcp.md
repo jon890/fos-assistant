@@ -102,7 +102,7 @@ Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` 가 모두 이 길을 지난다.
+`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` 가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
@@ -146,12 +146,12 @@ Hermes 의 하위 에이전트는 부모 run 보다 오래 살 수 있다. 그�
 
 ### Control Plane MCP
 
-Memory 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기를 Control Plane 의 MCP 서버 하나가 맡는다.
+Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른 에이전트에게 맡기기를 Control Plane 의 MCP 서버 하나가 맡는다.
 서버 이름, 경로, 프로토콜 버전, 도구 목록은 `McpController` 와 `McpToolService` 가 갖는다. Hermes 는 이 서버의 도구를 `mcp__fos_assistant__<도구>` 로 보인다.
 
 **먼저 살펴보기 트리에서는 받는 도구를 줄인다.** 받는 도구는 `McpController` 의 `CHECK_TREE_TOOLS` 와 `CHECK_TREE_WRITE_TOOLS` 가 갖고, 그 밖의 도구는 `McpToolService.notAllowedInCheck()` 의 오류 결과다.
 
-- 읽기와 위임 도구는 받는다
+- 제목 검색을 포함한 읽기와 위임 도구는 받는다
 - 쓰기 도구를 허용한 살펴보기는 점검 대화에 쓰는 `artifact_write` 를 더 받는다([ADR-082](../adr/ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md))
 - `follow_up_propose` 는 쓰기 도구 허용과 관계없이 받는다. 할 일은 제안만 하고 사람이 받아들여야 챙긴다([ADR-085](../adr/ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md))
 - `memory_remember` 는 쓰기 도구를 허용한 살펴보기에서도 받지 않는다. 살펴보기는 바깥 글을 읽는 실행이라 기억을 남기면 프롬프트 주입의 길이 된다([ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md))
@@ -161,6 +161,7 @@ Memory 본문 읽기, 기억 남기기, 결과물 쓰기, 할 일 제안, 다른
 | 도구 | 계약을 갖는 곳 |
 | --- | --- |
 | `memory_read` | [`docs/features/memory.md`](memory.md) 의 「Memory 본문을 읽는 길」 |
+| `memory_search` | [`docs/features/memory.md`](memory.md) 의 「제목 검색의 구현 계약」. 현재 origin의 권한으로 제목만 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
 | `artifact_write` | 아래 「결과물 쓰기 도구」 |
 | `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`docs/features/agent-skill.md`](agent-skill.md) 의 「다른 에이전트에게 맡기기」 |
 | `follow_up_propose` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 |

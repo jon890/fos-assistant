@@ -4,6 +4,55 @@
 
 covers: `backend/src/main/java/com/bifos/assistant/memory/`, `web/src/components/memory/`, `web/src/app/memory/`, `web/src/components/chat/memory-*`, `web/src/components/chat/use-memory-*`, `web/src/lib/memory-api.ts`, `web/src/lib/memory-capture-api.ts`, `web/src/lib/memory-use-api.ts`, `hermes/plugins/fos-ctx/`
 
+## 제목 검색의 구현 계약
+
+`memory_search`는 색인 예산에서 빠진 항목도 현재 실행의 권한으로 제목에서 찾는다. 결과 번호로 기존 `memory_read`를 불러 본문을 읽는다. #285의 첫 범위이며 본문 검색과 운영 acceptance는 아직 끝나지 않았다.
+
+- 기존 MCP 서버가 읽기 전용 `memory_search(query, limit?, after_id?)`를 받는다. `query`는 앞뒤 공백을 뺀 1자부터 200자까지, `limit`는 기본 10, 1부터 50까지이고 `after_id`는 양의 정수다. 모르는 인자와 잘못된 타입, 선택 인자의 null은 기존 MCP의 `-32602`로 거절한다.
+- 첫 범위는 제목의 대소문자를 구별하지 않는 부분 일치다. `%`, `_`, 역슬래시는 검색 문법이 아니라 글자로 다룬다. 본문과 암호문은 검색하지 않는다. 결과는 번호 오름차순이며 `limit + 1`건만 읽어 다음 페이지가 있는지 정한다.
+- 결과는 `{items: [{id, title, revision, updatedAt}], nextAfterId}`다. 다음 페이지가 없으면 `nextAfterId`는 null이다. 총건수와 본문, 소유자, 비밀값, 출처 원문의 식별자를 내지 않는다. 빈 결과는 성공이다.
+- 검색 SQL은 번호·제목·revision·updatedAt만 조회하며 전체 count와 본문·암호문을 읽지 않는다. 기존 권한 조건의 fluent DTO 투영과 `limit + 1`을 사용한다. 검색에만 독립된 읽기 전용 트랜잭션과 2초 제한을 적용한다. 지연·SQL 실패는 호출 실패로 전파되며 HTTP 경계는 내부 원문 없이 500으로 답한다. 빈 검색 결과와 구별된다.
+- 서명한 호출의 origin 실행에서 사용자와 에이전트를 정한다. 매 호출마다 현재 collection 허용을 읽고, DB 질의에 사용자·그룹 범위, `ACCEPTED`, `SEARCH`, `SOURCE` 제외, collection과 민감도 조건을 먼저 건다. 인자나 페이지 번호가 권한을 정하지 못한다.
+- 검색 후 `memory_read(id)`는 현재 권한을 다시 검사한다. 그 사이 삭제·거절·권한 철회가 있으면 기존의 읽을 수 없다는 응답을 준다. 검색은 본문을 읽지 않았으므로 「참고한 기억」에 본문을 읽은 것으로 기록하지 않는다. 본문을 낸 기존 `MEMORY_READ` 기록은 유지한다.
+- 검색 결과와 제목은 `<external-data>`로 감싼다. 일반 이름과 MCP 접두사가 붙은 이름 모두 시작·완료·실패 사건의 detail과 text를 가린다. 로그에는 실행 번호와 결과 개수만 남긴다. 기존 컨텍스트 예산과 기본 조립 결과는 바꾸지 않는다. 도구 설명이 검색 호출 방법을 안내한다.
+- 페이지 사이에 항목이 바뀌면 최신 권한과 제목으로 다시 질의한다. 이미 지난 번호의 새 일치는 처음부터 다시 검색해야 한다. 고정된 자료는 끝까지 누락·중복 없이 탐색한다. 별도 snapshot이나 검색 캐시는 만들지 않는다.
+
+```mermaid
+sequenceDiagram
+    participant H as Hermes
+    participant C as Control Plane
+    participant D as Memory DB
+    H->>C: memory_search와 서명한 호출 맥락
+    C->>C: 현재 실행과 사용자, collection 권한 확인
+    C->>D: 권한 조건과 제목 조건, 번호와 결과 상한
+    D-->>C: 제목과 안전한 참조 또는 빈 목록
+    C-->>H: 감싼 검색 결과
+    H->>C: memory_read(id)
+    C->>C: 현재 권한과 항목 상태 재검사
+    alt 읽을 수 있다
+        C-->>H: 기존 본문과 읽기 기록
+    else 삭제되거나 권한이 바뀌었다
+        C-->>H: 읽을 수 없다는 기존 응답
+    end
+```
+
+`MemorySearchTest`와 `MemorySearchMysqlTest`는 제목이 모두 일치하는 50/500/5,000건을 만들어 번호 페이지를 끝까지 읽는다. 모든 페이지를 합친 누락과 중복은 0건이다. 타 사용자·다른 그룹·미허용 collection·민감 허용 없음·승인 전·거절·SOURCE·ARCHIVE의 제목 노출도 0건이다. 실제 조립 예산의 `OMITTED` 항목을 검색한 뒤 본문을 읽어야 `MEMORY_READ`가 생기는 것은 `McpMemorySearchToolTest`가 검사한다.
+
+제목이 모두 일치하므로 첫 5건의 Recall@5는 각각 0.1/0.01/0.001, 첫 10건의 Recall@10은 0.2/0.02/0.002다. 이는 결과 상한에 따른 회수율이며 관련도 순위의 평가가 아니다. 본문에만 있고 제목에는 없는 질의의 회수율은 0이다. 본문 검색과 실제 opt-in 파일럿은 별도 미완료 항목이다. 새 벡터·Graph 저장소와 대화 검색, 개인 사실의 값 대체는 이 범위에 넣지 않는다.
+
+2026-10-11 로컬 합성 검사에서 첫 10건을 30회 조회한 값이다. 지연은 트랜잭션과 질의를 포함한 서비스 호출 시간이고, 결과 글자 수는 JSON과 외부 데이터 표시까지 센다. 힙은 결과 직렬화를 포함한 검사 프로세스의 전후 차이여서 GC와 다른 검사에 따라 달라진다. 운영 부하나 한 호출의 최대 메모리를 뜻하지 않는다.
+
+| DB | 자료 수 | p50(ms) | p95(ms) | 결과 글자 수 | 힙 증감(MiB) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| H2 | 50 | 0.561 | 0.958 | 910 | +7.5 |
+| H2 | 500 | 0.422 | 0.758 | 910 | +7.0 |
+| H2 | 5,000 | 0.375 | 1.944 | 910 | +7.0 |
+| MySQL | 50 | 7.713 | 9.638 | 879 | +9.5 |
+| MySQL | 500 | 4.895 | 8.364 | 888 | +7.5 |
+| MySQL | 5,000 | 2.700 | 3.468 | 899 | +7.5 |
+
+번호 자릿수와 DB 시각 표현 때문에 결과 길이는 DB마다 다르다. 별도 MySQL 지연 회귀는 바깥 트랜잭션에 30초 제한을 둬도 검색 JDBC statement의 제한이 2초임을 확인했고, 5초 지연을 넣은 검색은 2,070ms에 실패했다. 네 칸 SELECT와 count·본문 미조회, 다른 조회의 timeout 미변경도 같은 도우미로 검사한다.
+
 ## 요구
 
 - Memory 는 에이전트가 실행할 때 `instructions` 로 받는 사실이다. 단일 소스는 Control Plane 데이터베이스이고 Hermes 의 내장 memory 는 쓰지 않는다. 권한은 주입으로 강제한다([ADR-003](../../backend/docs/adr/ADR-003-memory-권한은-주입으로-강제한다.md))
@@ -88,7 +137,7 @@ sequenceDiagram
 - `retrieval` 이 `ALWAYS` 면 항상 층에 본문을, `SEARCH` 면 색인 층에 제목과 번호만 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 싣지 않는다. 짧은 개인 항목은 아래 「개인 사실 구역」 에 본문까지 싣는다
 - `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. 그래서 민감 본문은 `instructions` 에 실리지 않는다
 - 조립한 Memory 문맥은 `assistant.context.max-chars` 로 제한한다. 들어가지 않는 항목은 그 항목만 빼고 다음 항목을 계속 담는다. **넘친 항목을 잘라서 싣지 않는다.** 잘린 사실은 틀린 사실이 될 수 있다
-- **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인이 빠지면 `memory_read` 로 읽을 번호도 사라져 에이전트가 나머지 Memory 에 닿을 길이 없어진다
+- **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 제목과 번호를 찾고 `memory_read` 로 읽을 수 있다
 - 빠진 항목 수는 실행의 `context_omitted_items` 에 남기고 `/memory` 목록의 그 항목에 표시를 단다. 대화 화면에는 끼우지 않는다. 목록의 표시는 `assembleForOwner` 가 collection 을 거르지 않고 조립한 결과로 정한다
 - 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. turn 전용 지시는 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
 - 본문이나 `retrieval` 이나 `sensitivity` 를 고치면 고치기 전의 값을 `memory_revision` 에 남기고 판 번호를 올린다. 지울 때도 마지막 값을 남긴다
