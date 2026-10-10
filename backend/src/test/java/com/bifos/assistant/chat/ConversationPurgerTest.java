@@ -8,8 +8,10 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ConversationPurger;
 import com.bifos.assistant.chat.application.ConversationWriter;
+import com.bifos.assistant.chat.application.MediaObservationService;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -21,7 +23,10 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.chat.infra.ExecutionQuestionRepository;
+import com.bifos.assistant.chat.infra.MediaObservationRepository;
+import com.bifos.assistant.chat.infra.MediaObservationRequestRepository;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -99,6 +104,18 @@ class ConversationPurgerTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    MediaObservationService observationService;
+
+    @Autowired
+    AttachmentService attachmentService;
+
+    @Autowired
+    MediaObservationRepository observations;
+
+    @Autowired
+    MediaObservationRequestRepository observationRequests;
 
     private AppUser owner;
     private Agent agent;
@@ -226,11 +243,27 @@ class ConversationPurgerTest {
     @DisplayName("Hermes session 을 지우지 못하면 본문을 남기고, 기다린 뒤 다시 시도해 지운다")
     void keepsBodiesWhenHermesFailsAndRetriesLater() throws Exception {
         Filled filled = filledConversation(ExecutionStatus.SUCCEEDED);
+        attachmentService.attach(
+                100L, filled.conversationId(), List.of(filled.attachment().id()));
+        observationService.record(
+                new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role()),
+                filled.conversationId(),
+                filled.attachment().id(),
+                0,
+                UUID.randomUUID(),
+                ObservationFixture.input(),
+                ObservationFixture.model());
         conversationWriter.deleteIfActive(filled.conversationId(), owner.id(), NOW.minusSeconds(60));
         Instant failedAt = NOW.plus(Duration.ofDays(1));
         hermes.failSessionDeletes(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
         purger.purgeDue(failedAt);
+
+        assertThat(observations.findFirstByAttachmentIdOrderByRevisionDesc(
+                        filled.attachment().id()))
+                .isEmpty();
+        assertThat(observationRequests.findAll())
+                .noneMatch(row -> row.attachmentId().equals(filled.attachment().id()));
 
         assertThat(messages.findByConversationIdOrderByIdAsc(filled.conversationId()))
                 .hasSize(2);
