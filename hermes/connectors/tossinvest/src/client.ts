@@ -1,5 +1,5 @@
 import {
-  ACCOUNT_SEQ,
+  validAccountSeq,
   API_BASE,
   REQUEST_TIMEOUT_MS,
   RESPONSE_MAX_BYTES,
@@ -192,7 +192,7 @@ export class Tossinvest {
     if (!result.ok) throw new TossinvestError(tokenErrorCode(result));
     const value = result.data?.access_token;
     const seconds = result.data?.expires_in;
-    if (typeof value !== "string" || !value || !((typeof seconds === "number" && Number.isSafeInteger(seconds)) || typeof seconds === "string"))
+    if (typeof value !== "string" || !value || result.data?.token_type !== "Bearer" || !((typeof seconds === "number" && Number.isSafeInteger(seconds)) || typeof seconds === "string"))
       throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
     let lifetime: bigint;
     try { lifetime = BigInt(seconds) * 1000n; }
@@ -206,7 +206,7 @@ export class Tossinvest {
   }
   private accountSeq(): string {
     const seq = this.env.TOSSINVEST_ACCOUNT_SEQ ?? "";
-    if (!ACCOUNT_SEQ.test(seq)) throw new TossinvestError("TOSSINVEST_ACCOUNT_NOT_FOUND");
+    if (!validAccountSeq(seq)) throw new TossinvestError("TOSSINVEST_ACCOUNT_NOT_FOUND");
     return seq;
   }
 

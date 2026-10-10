@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   NAME_MAX_CHARS,
-  ORDER_PERIOD_MAX_DAYS,
   ORDERS_MAX,
   SYMBOL,
 } from "./constants.ts";
@@ -9,11 +8,11 @@ import { TossinvestError } from "./errors.ts";
 import { decimalValue as decimal, serviceValue as value, truncateCodePoints } from "./values.ts";
 import type { Tossinvest } from "./client.ts";
 import type { RegisterTool } from "./tool-registration.ts";
+import { envelopeMetadata } from "./api-contract.ts";
 
 const CURRENCIES = new Set(["KRW", "USD"]);
 const ORDER_STATUSES = new Set(["OPEN", "CLOSED"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const isObject = (value: unknown): value is Record<string, any> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -23,7 +22,7 @@ const money = (raw: unknown) =>
   isObject(raw) ? { krw: decimal(raw.krw), usd: decimal(raw.usd) } : null;
 
 const objects = (raw: unknown): Record<string, any>[] =>
-  Array.isArray(raw) ? raw.filter(isObject) : [];
+  raw as Record<string, any>[];
 
 const result = (data: any): Record<string, any> =>
   isObject(data?.result) ? data.result : {};
@@ -61,11 +60,12 @@ export interface OrderInput {
   from?: string;
   to?: string;
   symbol?: string;
+  cursor?: string;
+  limit?: number;
 }
 
 /**
- * 주문 내역 질의를 검사해 만든다. 쪽을 넘기는 `cursor` 와 `limit` 은 싣지 않는다.
- * 기간은 `from` 과 `to` 를 모두 포함해 센다. 틀리면 요청 없이 거절한다.
+ * 실제 날짜와 순서를 검사한다. CLOSED는 공식 cursor/limit을 그대로 보낸다.
  */
 export function orderQuery(input: OrderInput): URLSearchParams {
   const status = input.status?.trim() ?? "";
@@ -77,14 +77,18 @@ export function orderQuery(input: OrderInput): URLSearchParams {
   const fromTime = from === null ? null : parseDate(from);
   const toTime = to === null ? null : parseDate(to);
   if (fromTime !== null && toTime !== null) {
-    const days = (toTime - fromTime) / DAY_MS + 1;
-    if (days < 1 || days > ORDER_PERIOD_MAX_DAYS)
+    if (toTime < fromTime)
       throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
   }
   const query = new URLSearchParams({ status });
   if (symbol !== null) query.set("symbol", symbol);
   if (from !== null) query.set("from", from);
   if (to !== null) query.set("to", to);
+  if (input.limit !== undefined && (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > ORDERS_MAX)) throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
+  if (status === "CLOSED") {
+    query.set("limit", String(input.limit ?? 20));
+    if (input.cursor !== undefined) query.set("cursor", input.cursor);
+  }
   return query;
 }
 
@@ -92,10 +96,11 @@ export function orderQuery(input: OrderInput): URLSearchParams {
 export function orderRow(row: Record<string, any>) {
   const execution = isObject(row.execution) ? row.execution : {};
   return {
-    order_id: value(row.orderId),
-    symbol: value(row.symbol),
+    order_id: row.orderId,
+    symbol: row.symbol,
     side: value(row.side),
     order_type: value(row.orderType),
+    time_in_force: row.timeInForce,
     status: value(row.status),
     price: decimal(row.price),
     quantity: decimal(row.quantity),
@@ -163,9 +168,18 @@ function holdingsItem(row: Record<string, any>) {
 }
 
 export function registerAccountTools(register: RegisterTool, client: Tossinvest) {
-  register("get_holdings", {}, { readOnlyHint: true }, async () => {
-    const data = result(await client.request("/api/v1/holdings", { account: true }));
-    return { total: holdingsTotal(data), items: objects(data.items).map(holdingsItem) };
+  register("get_holdings", { symbol: z.string().optional() }, { readOnlyHint: true }, async ({ symbol }) => {
+    const stock = parseSymbol(symbol);
+    const envelope = await client.request("/api/v1/holdings", { account: true, query: stock === null ? undefined : new URLSearchParams({ symbol: stock }) });
+    const data = result(envelope);
+    return { result: data, metadata: envelopeMetadata(envelope), total: holdingsTotal(data), items: objects(data.items).map(holdingsItem) };
+  });
+
+  register("get_sellable_quantity", { symbol: z.string() }, { readOnlyHint: true }, async ({ symbol }) => {
+    const stock = parseSymbol(symbol);
+    if (stock === null) throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
+    const envelope = await client.request("/api/v1/sellable-quantity", { account: true, query: new URLSearchParams({ symbol: stock }) });
+    return { result: envelope.result, metadata: envelopeMetadata(envelope), sellable_quantity: decimal(envelope.result.sellableQuantity) };
   });
 
   register(
@@ -193,6 +207,8 @@ export function registerAccountTools(register: RegisterTool, client: Tossinvest)
       const powerResult = result(power);
       const currencyValue = value(powerResult.currency);
       return {
+        result: { buyingPower: powerResult, sellableQuantity: sellable === null ? null : sellable.result },
+        metadata: { buyingPower: envelopeMetadata(power), sellableQuantity: sellable === null ? null : envelopeMetadata(sellable) },
         currency: typeof currencyValue === "string" ? currencyValue : code,
         cash_buying_power: decimal(powerResult.cashBuyingPower),
         sellable_quantity:
@@ -208,21 +224,22 @@ export function registerAccountTools(register: RegisterTool, client: Tossinvest)
       from: z.string().optional(),
       to: z.string().optional(),
       symbol: z.string().optional(),
+      cursor: z.string().optional(),
+      limit: z.number().optional(),
     },
     { readOnlyHint: true },
     async (input) => {
       const query = orderQuery(input);
       const closed = query.get("status") === "CLOSED";
-      // 끝난 주문은 한 쪽만 읽는다. 미체결은 API 가 커서와 limit 없이 전량을 준다.
-      if (closed) query.set("limit", String(ORDERS_MAX));
-      const data = result(
-        await client.request("/api/v1/orders", { query, account: true }),
-      );
+      const envelope = await client.request("/api/v1/orders", { query, account: true });
+      const data = result(envelope);
       const orders = objects(data.orders);
       return {
-        orders: orders.slice(0, ORDERS_MAX).map(orderRow),
-        has_more:
-          orders.length > ORDERS_MAX || (closed && data.hasNext === true),
+        result: data, metadata: envelopeMetadata(envelope),
+        orders: orders.map(orderRow),
+        nextCursor: data.nextCursor,
+        hasNext: data.hasNext,
+        has_more: closed && data.hasNext === true,
       };
     },
   );

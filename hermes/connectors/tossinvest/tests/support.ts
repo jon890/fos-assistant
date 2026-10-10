@@ -14,6 +14,25 @@ export const accountNo = "12345678901";
 export const tokenPrefix = "fake-access-token-";
 export const upstreamText = "upstream-error-text-for-tests";
 
+/** 공식 필수 필드를 명시한 합성 응답이다. schema를 순회해 성공 fixture를 발명하지 않는다. */
+export const emptyHoldings = {
+  totalPurchaseAmount: { krw: "0", usd: null },
+  marketValue: { amount: { krw: "0", usd: null }, amountAfterCost: { krw: "0", usd: null } },
+  profitLoss: { amount: { krw: "0", usd: null }, amountAfterCost: { krw: "0", usd: null }, rate: "0", rateAfterCost: "0" },
+  dailyProfitLoss: { amount: { krw: "0", usd: null }, rate: "0" }, items: [],
+};
+export const stockInfo = (symbol: string, name: string) => ({
+  symbol, name, englishName: "Synthetic", isinCode: "FAKE00000000", market: "NASDAQ",
+  securityType: "STOCK", isCommonShare: false, status: "ACTIVE", currency: "USD",
+  sharesOutstanding: "100", listDate: null, delistDate: null, leverageFactor: null, koreanMarketDetail: null,
+});
+export const sampleOrder = (id = "synthetic-order") => ({
+  orderId: id, symbol: "AAPL", side: "BUY", orderType: "LIMIT", timeInForce: "DAY", status: "PENDING",
+  quantity: "0.9876543210987654321098765432", price: "-0.000000000000000000000000001", currency: "USD",
+  orderedAt: "2026-01-01T00:00:00Z", canceledAt: null,
+  execution: { filledQuantity: "0", averageFilledPrice: null, filledAmount: null, commission: null, tax: null, filledAt: null, settlementDate: null },
+});
+
 export type RecordedRequest = {
   method: string;
   path: string;

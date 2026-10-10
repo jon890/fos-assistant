@@ -422,3 +422,240 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 - 선택지 조회, 등록, 연결 확인은 사용자별 호출 제한을 먼저 지난다. [커넥터 도구 정책](connector-policy.md) 의 「사용자별 호출 제한」 이 갖는다
 - 에이전트의 연결 목록은 그 에이전트의 주인만 읽는다. 해제한 연결은 빠지고, 붙일 수 없는 까닭은 `blockedReason` 이 `AgentConnectionsView` 의 값으로 준다
 - 바인딩마다 재시작 대기가 있다. 연결 상태 응답의 `bindings[]` 와 관리자 목록이 바인딩 상태와 재시작 대기를 함께 낸다
+
+## 토스증권 REST 전체 지원 (구현 전)
+
+공식 REST의 정상 기능을 MCP 사용자에게 모두 제공한다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
+현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
+
+### 공식 기준과 완료 조건
+
+2026-10-11에 [공식 OpenAPI JSON](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)의 1.2.24, OpenAPI 3.1.0, 41 operation을 확인했다.
+원문 SHA-256은 `7e753c21dc4b938d8f9610ce3efd6542783018977cb030e39db5a006f5b59d40`이다.
+[공식 개요](https://openapi.tossinvest.com/openapi-docs/overview.md)는 호출 한도와 오류의 근거다.
+구현을 시작할 때 버전, method/path 집합, 참조 schema, 설명의 조건과 오류를 다시 대조한다.
+차이가 있으면 변경점을 기능 문서와 fixture에 반영하고 범위를 재검토한 뒤 구현한다. 과거 검색 색인을 쓰지 않는다.
+[공식 llms 안내](https://developers.tossinvest.com/llms.txt)의 JWKS 소개는 canonical paths에 없으므로 42번째 완료 조건으로 세지 않는다.
+
+완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
+HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+
+### 도구 입력과 결과
+
+새 도구는 아래 공식 camelCase 입력 이름을 그대로 쓴다. 기존 `get_quotes(symbols)`, `get_buying_power(currency,symbol)`과 `list_orders(status,from,to,symbol)`은 유지하고 선택 입력을 더한다.
+`get_market_calendar`는 필수 `market: KR/US`로 고정된 두 주소 중 하나를 고른다.
+API의 account 헤더는 입력에 노출하지 않는다. 연결 env의 계좌만 사용하며 모델의 계좌, URL, 토큰과 clientOrderId 입력은 거절한다.
+읽기 도구는 공식 `result`와 필요한 envelope 메타데이터를 무손실로 제공한다. 기존 snake_case 표시 필드는 호환을 위해 유지하고 공식 `result`를 추가한다.
+`get_quotes`의 공식 결과는 `{prices,stocks}`이며 각각 공식 배열이다. `get_stocks`도 별도로 등록해 이름 이외의 참조 정보를 읽는다.
+`get_holdings`는 선택 `symbol`을 추가한다. `get_sellable_quantity`는 단독 호출도 가능하게 한다.
+get_buying_power의 result는 symbol 부재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: null}, symbol 존재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: SellableQuantityResponse}다. 각 값은 공식 result 전체이며 후자는 두 GET을 각각 한 번 호출한다.
+envelope 메타데이터는 result 밖의 metadata: {buyingPower: {...}, sellableQuantity: {...} | null}에 둔다. 각 객체는 해당 upstream envelope에서 result만 제외한 공식 필드를 보존하며 부재를 null로 발명하지 않는다. 현재 ApiResponse에는 result 이외 필드가 없어 {}다.
+단독 get_sellable_quantity는 result: SellableQuantityResponse와 metadata: {}를 반환한다. get_quotes는 result: {prices,stocks}, metadata: {prices: {}, stocks: {}}로 같은 규칙을 쓴다. 한 호출 실패나 schema 위반을 부분 성공/null로 숨기지 않는다.
+기존 currency/cash_buying_power/sellable_quantity 표시와 선택지 accounts/account_seq/label을 유지한다. symbol 부재의 기존 sellable_quantity는 null이다.
+producer가 schema 검증 뒤 accountNo를 끝 네 자리로 마스킹한 복사본에서 표시·result·metadata·structuredContent·content를 함께 만든다. 선택지와 오류·로그에도 계좌 원문을 싣지 않으며 표시 helper에만 마스킹을 맡기지 않는다.
+계좌번호 원문은 예외다. `list_accounts`는 `accountNo`를 끝 네 자리로 마스킹하고 `accountSeq`와 `accountType`을 보존한다. 이 제한을 설명과 결과 schema에 명시한다.
+계좌 순번의 현재 10자리 제한과 목록 행 삭제는 제거한다. 공식 int64 범위의 양의 식별자를 원문에서 정확한 10진수 문자열로 읽어 연결 env와 헤더에 사용한다.
+무손실 파싱 경계는 client.ts의 exchange → api-contract.ts의 parseApiResponse(rawText, operation, status)다. bounded 1 MiB 본문을 UTF-8로 읽은 직후 호출하며 일반 JSON.parse의 손실한 값을 producer에 먼저 돌려주지 않는다.
+Bun 1.3.14의 native JSON.parse reviver 세 번째 인자 context.source를 사용한다. reviver에서 number primitive의 원문을 holder 객체/키별 WeakMap에 보관한 다음 operation/status의 응답 schema를 따라 객체·배열·$ref·allOf를 순회해 지정 위치만 변환한다. 같은 이름인 다른 필드나 문자열은 변환하지 않는다.
+schema 위치와 출력 변환은 api-contract.ts의 응답 descriptor가 소유한다. canonical 1.2.24의 int64 위치는 Account.accountSeq와 OAuth2TokenResponse.expires_in 두 곳이다. 원문 schema를 수정하지 않고 MCP 출력 descriptor에 변환을 선언한다.
+Account.accountSeq는 항상 정규 10진수 문자열이며 1..9223372036854775807이다. 다른 int64는 -9223372036854775808..9223372036854775807에서 schema의 추가 제약을 적용하고 안전 정수는 number, 그 밖은 정규 10진수 문자열로 반환한다. expires_in은 추가로 양수여야 한다.
+expires_in의 정확한 초→ms 계산은 BigInt로 하고 안전한 Date.now()/expiresAt 표현 범위를 넘으면 발급 오류로 거절한다. token을 모델 결과에 내보내지 않는다.
+JSON integer 계약은 1.0, 1e3처럼 수학적으로 정수인 표기도 허용한다. source의 부호·계수·소수 자리·지수를 문자열로 분해해 정확한 정수성과 signed int64 범위를 검사한다. 1.5와 1e-1은 거절한다. 지수가 크면 1 MiB 본문 안에서도 자리수 비교로 조기 거절하고 큰 0 문자열을 할당하지 않는다.
+Number(value)나 반올림한 Number로 범위를 판정하지 않는다. primitive 문자열의 가짜 숫자는 그대로 두며 구문 오류는 native parser가 거절한다. context.source가 없으면 정확성을 가장하지 않고 실패한다. JSON 정규식 재작성과 새 의존성은 금지한다.
+raw fixture의 기대값은 손으로 적은 10진수 문자열/BigInt 상수에서 만든다. 2^53-1·2^53·2^53+1, 인접 큰 정수, int64 최대·초과·최소·미만, accountSeq의 0·음수, nested 배열, 같은 이름의 비schema 필드, 문자열 속 가짜 숫자, 정수 지수/소수와 비정수 표기·문법 오류를 검사한다.
+실제 tools/call의 structuredContent와 content JSON, list_accounts 선택지와 env 헤더, 표시 호환과 raw result 모두 정확한 값을 단언한다. parser 단위 시험만으로 완료하지 않는다.
+형식이 잘못된 계좌 행은 전체 응답 오류로 알리고 정상 행처럼 누락시키지 않는다. 모델이 계좌를 지정하는 입력은 계속 받지 않는다.
+기존의 이름 100자, 일반 문자열 64자 절단은 표시 필드에만 적용한다. 공식 `result`, orderId, cursor와 decimal을 자르지 않는다.
+decimal은 string 그대로 유지하고 산술이 필요하면 정확한 문자열 연산을 쓴다. 응답의 null, boolean, 배열, 음수와 unknown enum을 버리지 않는다.
+요청 enum은 공식 지원값만 허용한다. 읽기 결과의 새 enum은 그대로 전달하되 금융 준비에서는 지원을 확인하지 못한 값으로 실행하지 않는다.
+schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 일부 행을 삭제하지 않는다.
+
+### 공식 operation과 producer
+
+`!`는 필수, `?`는 선택이며 `/null`은 null 허용이다. header는 env에서 생성한다.
+중첩 schema 이름은 아래 「필드 계약」에서 찾는다. 단계는 구현 관심사의 구분이며 PR 개수는 아니다.
+
+| 번호 | method/path | 도구 또는 인증 | 권한과 한도 그룹 | 공식 입력 | 공식 성공 응답 | 공식 오류 status/code | 현재 상태 | 단계 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | `POST /oauth2/token` | `내부 Tossinvest.token/issue` | 내부 인증; AUTH | body(application/x-www-form-urlencoded): OAuth2TokenRequest | OAuth2TokenResponse | 400(invalid_request,unsupported_grant_type); 401(invalid_client); 403(access_denied); 429(rate-limit-exceeded) | 기반 구현 | 기반 |
+| 2 | `GET /api/v1/orderbook` | `get_orderbook` | READ/none; MARKET_DATA | query.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"] | allOf(ApiResponse,{result?:OrderbookResponse}) | 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시세 |
+| 3 | `GET /api/v1/prices` | `get_quotes` | READ/none; MARKET_DATA | query.symbols!: string [pattern="^[A-Za-z0-9.,\\-]+$"] | allOf(ApiResponse,{result?:array<PriceResponse>}) | 400(invalid-request); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 기반 구현 | 기반 |
+| 4 | `GET /api/v1/trades` | `get_trades` | READ/none; MARKET_DATA | query.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.count?: integer [minimum=1, maximum=50, default=50] | allOf(ApiResponse,{result?:array<Trade>}) | 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시세 |
+| 5 | `GET /api/v1/price-limits` | `get_price_limits` | READ/none; MARKET_DATA | query.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"] | allOf(ApiResponse,{result?:PriceLimitResponse}) | 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시세 |
+| 6 | `GET /api/v1/candles` | `get_candles` | READ/none; MARKET_DATA_CHART | query.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.interval!: string [enum=["1m","1d"]]; query.count?: integer [minimum=1, maximum=200, default=100]; query.before?: string [format="date-time"]; query.adjusted?: boolean [default=true] | allOf(ApiResponse,{result?:CandlePageResponse}) | 400(invalid-request); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시세 |
+| 7 | `GET /api/v1/stocks` | `get_stocks` | READ/none; STOCK | query.symbols!: string [pattern="^[A-Za-z0-9.,\\-]+$"] | allOf(ApiResponse,{result?:array<StockInfo>}) | 400(invalid-request); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 429(rate-limit-exceeded); 500(internal-error) | get_quotes 구현; get_stocks 미등록 | 종목 |
+| 8 | `GET /api/v1/stocks/all` | `list_stocks` | READ/none; STOCK_ALL | query.market!: string [enum=["KOSPI","KOSDAQ","NYSE","NASDAQ","AMEX","KR_ETC","US_ETC"]]; query.status?: string [enum=["SCHEDULED","ACTIVE","DELISTED"], default="ACTIVE"]; query.securityType?: string [enum=["STOCK","FOREIGN_STOCK","DEPOSITARY_RECEIPT","INFRASTRUCTURE_FUND","REIT","ETF","FOREIGN_ETF","ETN","STOCK_WARRANTS"]]; query.commonShare?: boolean | allOf(ApiResponse,{result?:array<ListedStock>}) | 400(invalid-request); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 9 | `GET /api/v1/stocks/{symbol}/warnings` | `get_stock_warnings` | READ/none; STOCK | path.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"] | allOf(ApiResponse,{result?:array<StockWarning>}) | 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 10 | `GET /api/v1/stocks/{symbol}/investor-trading` | `get_stock_investor_trading` | READ/none; STOCK_TRADING_TREND | path.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.count?: integer [minimum=1, maximum=100, default=10]; query.until?: string [format="date"] | allOf(ApiResponse,{result?:StockInvestorTradingResponse}) | 400(invalid-request,unsupported-market); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 11 | `GET /api/v1/stocks/{symbol}/program-trades` | `get_stock_program_trades` | READ/none; STOCK_TRADING_TREND | path.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.count?: integer [minimum=1, maximum=100, default=10]; query.until?: string [format="date"] | allOf(ApiResponse,{result?:ProgramTradesResponse}) | 400(invalid-request,unsupported-market); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 12 | `GET /api/v1/stocks/{symbol}/short-selling` | `get_stock_short_selling` | READ/none; STOCK_TRADING_TREND | path.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.count?: integer [minimum=1, maximum=100, default=10]; query.until?: string [format="date"] | allOf(ApiResponse,{result?:ShortSellingResponse}) | 400(invalid-request,unsupported-market); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 13 | `GET /api/v1/stocks/{symbol}/credit-trades` | `get_stock_credit_trades` | READ/none; STOCK_TRADING_TREND | path.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.count?: integer [minimum=1, maximum=100, default=10]; query.until?: string [format="date"] | allOf(ApiResponse,{result?:CreditTradesResponse}) | 400(invalid-request,unsupported-market); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 14 | `GET /api/v1/stocks/{symbol}/securities-lending` | `get_stock_securities_lending` | READ/none; STOCK_TRADING_TREND | path.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.count?: integer [minimum=1, maximum=100, default=10]; query.until?: string [format="date"] | allOf(ApiResponse,{result?:SecuritiesLendingResponse}) | 400(invalid-request,unsupported-market); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 403(forbidden); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 종목 |
+| 15 | `GET /api/v1/exchange-rate` | `get_exchange_rate` | READ/none; MARKET_INFO | query.dateTime?: string [format="date-time"]; query.baseCurrency!: Currency; query.quoteCurrency!: Currency | allOf(ApiResponse,{result?:ExchangeRateResponse}) | 400(invalid-request); 404(exchange-rate-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시장 일정 |
+| 16 | `GET /api/v1/market-calendar/KR` | `get_market_calendar(market=KR)` | READ/none; MARKET_INFO | query.date?: string [format="date"] | allOf(ApiResponse,{result?:KrMarketCalendarResponse}) | 400(unsupported-date); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시장 일정 |
+| 17 | `GET /api/v1/market-calendar/US` | `get_market_calendar(market=US)` | READ/none; MARKET_INFO | query.date?: string [format="date"] | allOf(ApiResponse,{result?:UsMarketCalendarResponse}) | 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 시장 일정 |
+| 18 | `GET /api/v1/rankings` | `get_rankings` | READ/none; RANKING | query.type!: string [enum=["MARKET_TRADING_AMOUNT","MARKET_TRADING_VOLUME","TOP_GAINERS","TOP_LOSERS","TOSS_SECURITIES_TRADING_AMOUNT","TOSS_SECURITIES_TRADING_VOLUME"]]; query.marketCountry!: MarketCountry; query.duration!: string [enum=["realtime","1d","1w","1mo","3mo","6mo","1y"]]; query.excludeInvestmentCaution?: boolean [default=false]; query.count?: integer [minimum=1, maximum=100, default=100] | allOf(ApiResponse,{result?:RankingResponse}) | 400(invalid-request,unsupported-ranking-duration); 429(rate-limit-exceeded); 500 | 미연결 | 랭킹·지표 |
+| 19 | `GET /api/v1/market-indicators/prices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | query.symbols!: string [pattern="^[A-Za-z0-9_,]+$"] | allOf(ApiResponse,{result?:array<MarketIndicatorPriceResponse>}) | 400(invalid-request,unsupported-symbol); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 랭킹·지표 |
+| 20 | `GET /api/v1/market-indicators/{symbol}/candles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | path.symbol!: string [pattern="^[A-Za-z0-9_]+$"]; query.interval!: string [enum=["1m","1d"]]; query.count?: integer [minimum=1, maximum=200, default=100]; query.before?: string [format="date-time"] | allOf(ApiResponse,{result?:MarketIndicatorCandlePageResponse}) | 400(invalid-request,unsupported-symbol); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 랭킹·지표 |
+| 21 | `GET /api/v1/market-indicators/{symbol}/investor-trading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | path.symbol!: string [enum=["KOSPI","KOSDAQ"]]; query.interval!: string [enum=["1d","1w","1mo","1y"]]; query.count?: integer [minimum=1, maximum=100, default=10]; query.until?: string [format="date"] | allOf(ApiResponse,{result?:InvestorTradingResponse}) | 400(invalid-request,unsupported-symbol); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 랭킹·지표 |
+| 22 | `GET /api/v1/sectors` | `list_sectors` | READ/none; SECTOR | 없음 | allOf(ApiResponse,{result?:SectorsResponse}) | 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 섹터 |
+| 23 | `GET /api/v1/sectors/rankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | query.type!: string [enum=["TOP_GAINERS","MARKET_TRADING_AMOUNT"]]; query.marketCountry!: MarketCountry; query.duration!: string [enum=["1d","1w","1mo","3mo","6mo","1y"]] | allOf(ApiResponse,{result?:SectorRankingResponse}) | 400(invalid-request); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 섹터 |
+| 24 | `GET /api/v1/sectors/{sectorId}` | `get_sector` | READ/none; SECTOR | path.sectorId!: string [pattern="^[A-Za-z0-9_-]{1,40}$"]; query.marketCountry!: MarketCountry | allOf(ApiResponse,{result?:SectorDetailResponse}) | 400(invalid-request); 404(sector-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 섹터 |
+| 25 | `GET /api/v1/sectors/{sectorId}/stocks` | `get_sector_stocks` | READ/none; SECTOR | path.sectorId!: string [pattern="^[A-Za-z0-9_-]{1,40}$"]; query.marketCountry!: MarketCountry | allOf(ApiResponse,{result?:SectorStocksResponse}) | 400(invalid-request); 404(sector-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 섹터 |
+| 26 | `GET /api/v1/sectors/{sectorId}/etfs` | `get_sector_etfs` | READ/none; SECTOR | path.sectorId!: string [pattern="^[A-Za-z0-9_-]{1,40}$"]; query.marketCountry!: MarketCountry | allOf(ApiResponse,{result?:SectorEtfsResponse}) | 400(invalid-request); 404(sector-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 섹터 |
+| 27 | `GET /api/v1/accounts` | `list_accounts` | READ/none; ACCOUNT | 없음 | allOf(ApiResponse,{result?:array<Account>}) | 401(expired-token,invalid-token,login-user-not-found,token-revoked); 429(rate-limit-exceeded); 500(internal-error) | 기반 구현 | 기반 |
+| 28 | `GET /api/v1/holdings` | `get_holdings` | READ/none; ASSET | header.X-Tossinvest-Account!: integer [format="int64"]; query.symbol?: string [pattern="^[A-Za-z0-9.\\-]+$"] | allOf(ApiResponse,{result?:HoldingsOverview}) | 400(account-header-required); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 기반 구현 | 기반 |
+| 29 | `GET /api/v1/orders` | `list_orders` | READ/none; ORDER_HISTORY | header.X-Tossinvest-Account!: integer [format="int64"]; query.status!: string [enum=["OPEN","CLOSED"]]; query.symbol?: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.from?: string [format="date"]; query.to?: string [format="date"]; query.cursor?: string; query.limit?: integer [minimum=1, maximum=100, default=20] | allOf(ApiResponse,{result?:PaginatedOrderResponse}) | 400(account-header-required,invalid-request); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 기반 구현 | 기반 |
+| 30 | `POST /api/v1/orders` | `create_order` | FINANCIAL/always; ORDER | header.X-Tossinvest-Account!: integer [format="int64"]; body(application/json): OrderCreateRequest | allOf(ApiResponse,{result?:OrderResponse}) | 400(account-header-required,confirm-high-value-required,invalid-request); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 409(opposite-pending-order-exists,request-in-progress); 422(account-restricted,amount-order-outside-regular-hours,fractional-quantity-outside-regular-hours,idempotency-key-conflict,insufficient-buying-power,investor-exchange-not-integrated,market-not-supported-for-stock,max-order-amount-exceeded,order-hours-closed,order-type-not-allowed,prerequisite-required,price-out-of-range,stock-restricted); 429(rate-limit-exceeded); 500(internal-error,maintenance) | 미연결 | 일반주문 |
+| 31 | `GET /api/v1/orders/{orderId}` | `get_order` | READ/none; ORDER_HISTORY | header.X-Tossinvest-Account!: integer [format="int64"]; path.orderId!: string | allOf(ApiResponse,{result?:Order}) | 400(account-header-required); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(order-not-found); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 일반주문 |
+| 32 | `POST /api/v1/orders/{orderId}/modify` | `modify_order` | FINANCIAL/always; ORDER | header.X-Tossinvest-Account!: integer [format="int64"]; path.orderId!: string; body(application/json): OrderModifyRequest | allOf(ApiResponse,{result?:OrderOperationResponse}) | 400(account-header-required,confirm-high-value-required,invalid-request,us-modify-quantity-not-supported); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(account-not-found,order-not-found); 409(already-canceled,already-filled,already-modified,already-processing,already-rejected); 422(account-restricted,investor-exchange-not-integrated,max-order-amount-exceeded,modify-restricted,order-hours-closed,prerequisite-required); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 일반주문 |
+| 33 | `POST /api/v1/orders/{orderId}/cancel` | `cancel_order` | FINANCIAL/always; ORDER | header.X-Tossinvest-Account!: integer [format="int64"]; path.orderId!: string; body(application/json): object | allOf(ApiResponse,{result?:OrderOperationResponse}) | 400(account-header-required); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(order-not-found); 409(already-canceled,already-filled,already-modified,already-processing,already-rejected); 422(cancel-restricted,order-hours-closed); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 일반주문 |
+| 34 | `POST /api/v1/conditional-orders` | `create_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | header.X-Tossinvest-Account!: integer [format="int64"]; body(application/json): ConditionalOrderCreateRequest | allOf(ApiResponse,{result?:ConditionalOrderCreateResponse}) | 400(invalid-request); 404(stock-not-found); 422 | 미연결 | 조건주문 |
+| 35 | `GET /api/v1/conditional-orders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | header.X-Tossinvest-Account!: integer [format="int64"]; query.status!: string [enum=["OPEN","CLOSED"]]; query.symbol?: string [pattern="^[A-Za-z0-9.\\-]+$"]; query.cursor?: string [pattern="^[A-Za-z0-9_\\-]+$"]; query.limit?: integer [minimum=1, maximum=100, default=20] | allOf(ApiResponse,{result?:PaginatedConditionalOrderResponse}) | 400(invalid-request); 422 | 미연결 | 조건 조회 |
+| 36 | `GET /api/v1/conditional-orders/{conditionalOrderId}` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | header.X-Tossinvest-Account!: integer [format="int64"]; path.conditionalOrderId!: string | allOf(ApiResponse,{result?:ConditionalOrderDetailResponse}) | 400; 404 | 미연결 | 조건 조회 |
+| 37 | `DELETE /api/v1/conditional-orders/{conditionalOrderId}` | `cancel_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | header.X-Tossinvest-Account!: integer [format="int64"]; path.conditionalOrderId!: string | 204, 본문 없음 | 400; 404 | 미연결 | 조건주문 |
+| 38 | `POST /api/v1/conditional-orders/{conditionalOrderId}/modify` | `modify_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | header.X-Tossinvest-Account!: integer [format="int64"]; path.conditionalOrderId!: string; body(application/json): ConditionalOrderModifyRequest | allOf(ApiResponse,{result?:ConditionalOrderResponse}) | 400(invalid-request); 404(conditional-order-not-found); 422 | 미연결 | 조건주문 |
+| 39 | `GET /api/v1/buying-power` | `get_buying_power` | READ/none; ORDER_INFO | header.X-Tossinvest-Account!: integer [format="int64"]; query.currency!: Currency | allOf(ApiResponse,{result?:BuyingPowerResponse}) | 400(account-header-required,invalid-request); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(account-not-found); 429(rate-limit-exceeded); 500(internal-error) | 기반 구현 | 기반 |
+| 40 | `GET /api/v1/sellable-quantity` | `get_sellable_quantity` | READ/none; ORDER_INFO | header.X-Tossinvest-Account!: integer [format="int64"]; query.symbol!: string [pattern="^[A-Za-z0-9.\\-]+$"] | allOf(ApiResponse,{result?:SellableQuantityResponse}) | 400(account-header-required,account-not-found); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 404(stock-not-found); 429(rate-limit-exceeded); 500(internal-error) | 기반 구현 | 기반 |
+| 41 | `GET /api/v1/commissions` | `get_commissions` | READ/none; ORDER_INFO | header.X-Tossinvest-Account!: integer [format="int64"] | allOf(ApiResponse,{result?:array<Commission>}) | 400(account-header-required,account-not-found); 401(expired-token,invalid-token,login-user-not-found,token-revoked); 429(rate-limit-exceeded); 500(internal-error) | 미연결 | 일반주문 |
+
+### 필드 계약
+
+다음은 위 기준 JSON의 모든 schema를 참조 가능한 형태로 옮긴 것이다. 객체 내부의 `!`와 `?`도 필수와 선택을 뜻한다.
+타입, enum, format, pattern, 범위, 길이와 기본값을 보존한다. description에만 있는 시장·주문 조합은 정책 문서와 아래 조건에서 함께 확인한다.
+표의 오류 code는 공식 예시에 있는 값이며 모든 오류 code의 폐쇄된 enum이 아니다. 공통 인증·IP·maintenance 오류도 공식 개요에 따라 검사한다.
+각 operation의 HTTP 오류 status와 error schema도 기준 JSON을 fixture로 보존하고 전수 시험한다. 성공 schema만으로 요청을 만들지 않는다.
+
+| 공식 schema | 필드와 제약 |
+| --- | --- |
+| `ApiResponse` | {result!:} |
+| `ErrorResponse` | {error!:ApiError} |
+| `ApiError` | {requestId!:string; code!:string; message!:string; data?:object/null [additionalProperties=true]} |
+| `Currency` | string [enum=["KRW","USD"]] |
+| `MarketCountry` | string [enum=["KR","US"]] |
+| `OAuth2TokenRequest` | {grant_type!:string [enum=["client_credentials"]]; client_id!:string; client_secret!:string [format="password"]} |
+| `OAuth2TokenResponse` | {access_token!:string; token_type!:string [enum=["Bearer"]]; expires_in!:integer [format="int64"]} |
+| `OAuth2ErrorResponse` | {error!:string [enum=["invalid_request","invalid_client","invalid_grant","unauthorized_client","unsupported_grant_type","access_denied"]]; error_description?:string; error_uri?:string [format="uri"]} |
+| `OrderbookEntry` | {price!:string [format="decimal", maxLength=30]; volume!:string [format="decimal", maxLength=30]} |
+| `OrderbookResponse` | {timestamp?:string/null [format="date-time"]; currency!:Currency; asks!:array<OrderbookEntry>; bids!:array<OrderbookEntry>} |
+| `PriceResponse` | {symbol!:string; timestamp?:string/null [format="date-time"]; lastPrice!:string [format="decimal", maxLength=30]; currency!:Currency} |
+| `Trade` | {price!:string [format="decimal", maxLength=30]; volume!:string [format="decimal", maxLength=30]; timestamp!:string [format="date-time"]; currency!:Currency} |
+| `PriceLimitResponse` | {timestamp!:string [format="date-time"]; upperLimitPrice?:string/null [format="decimal", maxLength=30]; lowerLimitPrice?:string/null [format="decimal", maxLength=30]; currency!:Currency} |
+| `CandlePageResponse` | {candles!:array<Candle>; nextBefore?:string/null [format="date-time"]} |
+| `Candle` | {timestamp!:string [format="date-time"]; openPrice!:string [format="decimal", maxLength=30]; highPrice!:string [format="decimal", maxLength=30]; lowPrice!:string [format="decimal", maxLength=30]; closePrice!:string [format="decimal", maxLength=30]; volume!:string [format="decimal", maxLength=30]; currency!:Currency} |
+| `StockInfo` | {symbol!:string; name!:string; englishName!:string; isinCode!:string; market!:string [enum=["KOSPI","KOSDAQ","NYSE","NASDAQ","AMEX","KR_ETC","US_ETC"]]; securityType!:string [enum=["STOCK","FOREIGN_STOCK","DEPOSITARY_RECEIPT","INFRASTRUCTURE_FUND","REIT","ETF","FOREIGN_ETF","ETN","STOCK_WARRANTS"]]; isCommonShare!:boolean; status!:string [enum=["SCHEDULED","ACTIVE","DELISTED"]]; currency!:Currency; listDate?:string/null [format="date"]; delistDate?:string/null [format="date"]; sharesOutstanding!:string [format="decimal", maxLength=30]; leverageFactor?:string/null [format="decimal", maxLength=30]; koreanMarketDetail?:oneOf(KrMarketDetail,null)} |
+| `KrMarketDetail` | {liquidationTrading!:boolean; nxtSupported!:boolean; krxTradingSuspended!:boolean; nxtTradingSuspended?:boolean/null} |
+| `StockWarning` | {warningType!:string [enum=["LIQUIDATION_TRADING","OVERHEATED","INVESTMENT_WARNING","INVESTMENT_RISK","VI_STATIC_AND_DYNAMIC","VI_STATIC","VI_DYNAMIC","STOCK_WARRANTS"]]; exchange?:string/null; startDate?:string/null [format="date"]; endDate?:string/null [format="date"]} |
+| `ListedStock` | {symbol!:string; name!:string; securityType!:string [enum=["STOCK","FOREIGN_STOCK","DEPOSITARY_RECEIPT","INFRASTRUCTURE_FUND","REIT","ETF","FOREIGN_ETF","ETN","STOCK_WARRANTS"]]; isCommonShare!:boolean; isinCode!:string} |
+| `StockInvestorTradingResponse` | {nextUntil?:string/null [format="date"]; records!:array<StockInvestorTradingRecord>} |
+| `StockInvestorTradingRecord` | {date!:string [format="date"]; updatedAt!:string [format="date-time"]; individual?:oneOf(InvestorTradingVolume,null); foreigner!:allOf(InvestorTradingVolume); institution!:allOf(StockInstitutionTradingVolume); otherCorporation?:oneOf(InvestorTradingVolume,null); foreignerHolding?:oneOf(ForeignerHolding,null); cfd?:oneOf(CfdBalance,null)} |
+| `InvestorTradingVolume` | {buyVolume!:string [format="decimal", maxLength=30]; sellVolume!:string [format="decimal", maxLength=30]; netBuyVolume!:string [format="decimal", maxLength=30]} |
+| `StockInstitutionTradingVolume` | {buyVolume!:string [format="decimal", maxLength=30]; sellVolume!:string [format="decimal", maxLength=30]; netBuyVolume!:string [format="decimal", maxLength=30]; breakdown?:oneOf(StockInstitutionTradingBreakdown,null)} |
+| `StockInstitutionTradingBreakdown` | {financialInvestment!:allOf(InvestorTradingVolume); insurance!:allOf(InvestorTradingVolume); trust!:allOf(InvestorTradingVolume); privateEquityFund!:allOf(InvestorTradingVolume); bank!:allOf(InvestorTradingVolume); otherFinancialInstitution!:allOf(InvestorTradingVolume); pensionFund!:allOf(InvestorTradingVolume)} |
+| `ForeignerHolding` | {holdingQuantity!:string [format="decimal", maxLength=30]; limitQuantity!:string [format="decimal", maxLength=30]; holdingRate!:string [format="decimal", maxLength=30]} |
+| `CfdBalance` | {buyBalanceQuantity!:string [format="decimal", maxLength=30]; buyBalanceRate!:string [format="decimal", maxLength=30]; sellBalanceQuantity!:string [format="decimal", maxLength=30]; sellBalanceRate!:string [format="decimal", maxLength=30]} |
+| `ProgramTradesResponse` | {nextUntil?:string/null [format="date"]; records!:array<ProgramTradeRecord>} |
+| `ProgramTradeRecord` | {date!:string [format="date"]; arbitrage!:allOf(ProgramTradingVolume); nonArbitrage!:allOf(ProgramTradingVolume)} |
+| `ProgramTradingVolume` | {buyVolume!:string [format="decimal", maxLength=30]; sellVolume!:string [format="decimal", maxLength=30]; netBuyVolume!:string [format="decimal", maxLength=30]} |
+| `ShortSellingResponse` | {nextUntil?:string/null [format="date"]; records!:array<ShortSellingRecord>} |
+| `ShortSellingRecord` | {date!:string [format="date"]; updatedAt!:string [format="date-time"]; shortSellingVolume!:string [format="decimal", maxLength=30]; shortSellingAmount!:string [format="decimal", maxLength=30]; shortSellingVolumeRate?:string/null [format="decimal", maxLength=30]; shortSellingAmountRate?:string/null [format="decimal", maxLength=30]} |
+| `CreditTradesResponse` | {nextUntil?:string/null [format="date"]; records!:array<CreditTradeRecord>} |
+| `CreditTradeRecord` | {date!:string [format="date"]; updatedAt!:string [format="date-time"]; marginLoan?:oneOf(CreditTradeDetail,null); stockLoan?:oneOf(CreditTradeDetail,null)} |
+| `CreditTradeDetail` | {newQuantity!:string [format="decimal", maxLength=30]; returnQuantity!:string [format="decimal", maxLength=30]; balanceQuantity!:string [format="decimal", maxLength=30]; balanceRate!:string [format="decimal", maxLength=30]; tradingRate!:string [format="decimal", maxLength=30]} |
+| `SecuritiesLendingResponse` | {nextUntil?:string/null [format="date"]; records!:array<SecuritiesLendingRecord>} |
+| `SecuritiesLendingRecord` | {date!:string [format="date"]; updatedAt!:string [format="date-time"]; executionQuantity!:string [format="decimal", maxLength=30]; repaymentQuantity!:string [format="decimal", maxLength=30]; balanceQuantity!:string [format="decimal", maxLength=30]; balanceAmount!:string [format="decimal", maxLength=30]} |
+| `ExchangeRateResponse` | {baseCurrency!:Currency; quoteCurrency!:Currency; rate!:string [format="decimal", maxLength=30]; midRate!:string [format="decimal", maxLength=30]; basisPoint!:string [format="decimal", maxLength=30]; rateChangeType!:string [enum=["UP","EQUAL","DOWN"]]; validFrom!:string [format="date-time"]; validUntil!:string [format="date-time"]} |
+| `KrMarketCalendarResponse` | {today!:KrMarketDay; previousBusinessDay!:KrMarketDay; nextBusinessDay!:KrMarketDay} |
+| `KrMarketDay` | {date!:string [format="date"]; integrated?:oneOf(IntegratedHour,null)} |
+| `IntegratedHour` | {preMarket?:oneOf(PreMarketSession,null); regularMarket?:oneOf(RegularMarketSession,null); afterMarket?:oneOf(AfterMarketSession,null)} |
+| `PreMarketSession` | {startTime!:string [format="date-time"]; singlePriceAuctionStartTime?:oneOf(string [format="date-time"],null); endTime!:string [format="date-time"]} |
+| `RegularMarketSession` | {startTime!:string [format="date-time"]; singlePriceAuctionStartTime?:oneOf(string [format="date-time"],null); endTime!:string [format="date-time"]} |
+| `AfterMarketSession` | {startTime!:string [format="date-time"]; singlePriceAuctionEndTime?:oneOf(string [format="date-time"],null); endTime!:string [format="date-time"]} |
+| `UsMarketCalendarResponse` | {today!:UsMarketDay; previousBusinessDay!:UsMarketDay; nextBusinessDay!:UsMarketDay} |
+| `UsMarketDay` | {date!:string [format="date"]; dayMarket?:oneOf(UsDayMarketSession,null); preMarket?:oneOf(UsPreMarketSession,null); regularMarket?:oneOf(UsRegularMarketSession,null); afterMarket?:oneOf(UsAfterMarketSession,null)} |
+| `UsDayMarketSession` | {startTime!:string [format="date-time"]; endTime!:string [format="date-time"]} |
+| `UsPreMarketSession` | {startTime!:string [format="date-time"]; endTime!:string [format="date-time"]} |
+| `UsRegularMarketSession` | {startTime!:string [format="date-time"]; endTime!:string [format="date-time"]} |
+| `UsAfterMarketSession` | {startTime!:string [format="date-time"]; endTime!:string [format="date-time"]} |
+| `RankingResponse` | {rankedAt?:string/null [format="date-time"]; rankings!:array<RankingItem>} |
+| `RankingItem` | {rank!:integer; symbol!:string; currency!:Currency; price!:RankingPrice; tradingVolume!:string [format="decimal", maxLength=30]; tradingAmount!:string [format="decimal", maxLength=30]} |
+| `RankingPrice` | {lastPrice!:string [format="decimal", maxLength=30]; basePrice!:string [format="decimal", maxLength=30]; changeRate?:string/null [format="decimal", maxLength=30]} |
+| `MarketIndicatorPriceResponse` | {symbol!:string; timestamp?:string/null [format="date-time"]; lastPrice!:string [format="decimal", maxLength=30]} |
+| `MarketIndicatorCandlePageResponse` | {candles!:array<MarketIndicatorCandle>; nextBefore?:string/null [format="date-time"]} |
+| `MarketIndicatorCandle` | {timestamp!:string [format="date-time"]; openPrice!:string [format="decimal", maxLength=30]; highPrice!:string [format="decimal", maxLength=30]; lowPrice!:string [format="decimal", maxLength=30]; closePrice!:string [format="decimal", maxLength=30]; volume!:string [format="decimal", maxLength=30]} |
+| `InvestorTradingResponse` | {nextUntil?:string/null [format="date"]; records!:array<InvestorTradingRecord>} |
+| `InvestorTradingRecord` | {date!:string [format="date"]; updatedAt!:string [format="date-time"]; individual!:allOf(InvestorTradingAmount); foreigner!:allOf(InvestorTradingAmount); institution!:allOf(InstitutionTradingAmount); otherCorporation!:allOf(InvestorTradingAmount)} |
+| `InvestorTradingAmount` | {buyAmount!:string [format="decimal", maxLength=30]; sellAmount!:string [format="decimal", maxLength=30]} |
+| `InstitutionTradingAmount` | {buyAmount!:string [format="decimal", maxLength=30]; sellAmount!:string [format="decimal", maxLength=30]; breakdown!:InstitutionTradingBreakdown} |
+| `InstitutionTradingBreakdown` | {financialInvestment!:allOf(InvestorTradingAmount); insurance!:allOf(InvestorTradingAmount); trust!:allOf(InvestorTradingAmount); privateEquityFund!:allOf(InvestorTradingAmount); bank!:allOf(InvestorTradingAmount); otherFinancialInstitution!:allOf(InvestorTradingAmount); pensionFund!:allOf(InvestorTradingAmount)} |
+| `SectorsResponse` | {sectors!:array<Sector>} |
+| `Sector` | {sectorId!:string; name!:string; depth!:integer; parentSectorId!:string/null} |
+| `SectorDetailResponse` | {sectorId!:string; name!:string; depth!:integer; parentSectorId!:string/null; summary!:string/null; performance!:SectorPerformance} |
+| `SectorPerformance` | {changeRates!:array<SectorChangeRate>} |
+| `SectorChangeRate` | {duration!:string [enum=["1d","1w","1mo","3mo","6mo","1y"]]; changeRate!:string/null [format="decimal", maxLength=30]} |
+| `SectorStocksResponse` | {stocks!:array<SectorStock>} |
+| `SectorStock` | {symbol!:string; name!:string; volume!:string/null [format="decimal", maxLength=30]; tradingAmount!:string/null [format="decimal", maxLength=30]; marketCapitalization!:string/null [format="decimal", maxLength=30]; currency!:Currency} |
+| `SectorEtfsResponse` | {etfs!:array<SectorEtf>} |
+| `SectorEtf` | {symbol!:string; name!:string} |
+| `SectorRankingResponse` | {rankings!:array<SectorRankingItem>} |
+| `SectorRankingItem` | {rank!:integer; sectorId!:string; name!:string; changeRate!:string/null [format="decimal", maxLength=30]; tradingAmount!:string/null [format="decimal", maxLength=30]; marketCapitalization!:string/null [format="decimal", maxLength=30]; currency!:Currency} |
+| `Account` | {accountNo!:string; accountSeq!:integer [format="int64"]; accountType!:string [enum=["BROKERAGE","OVERSEAS_DERIVATIVES","PENSION_SAVINGS","RESHORING_INVESTMENT"]]} |
+| `HoldingsOverview` | {totalPurchaseAmount!:allOf(Price); marketValue!:OverviewMarketValue; profitLoss!:OverviewProfitLoss; dailyProfitLoss!:OverviewDailyProfitLoss; items!:array<HoldingsItem>} |
+| `HoldingsItem` | {symbol!:string; name!:string; marketCountry!:MarketCountry; currency!:Currency; quantity!:string [format="decimal", maxLength=30]; lastPrice!:string [format="decimal", maxLength=30]; averagePurchasePrice!:string [format="decimal", maxLength=30]; marketValue!:MarketValue; profitLoss!:ProfitLoss; dailyProfitLoss!:DailyProfitLoss; cost!:Cost} |
+| `Price` | {krw!:string [format="decimal", maxLength=30]; usd?:string/null [format="decimal", maxLength=30]} |
+| `OverviewMarketValue` | {amount!:allOf(Price); amountAfterCost!:allOf(Price)} |
+| `OverviewProfitLoss` | {amount!:allOf(Price); amountAfterCost!:allOf(Price); rate!:string [format="decimal", maxLength=30]; rateAfterCost!:string [format="decimal", maxLength=30]} |
+| `OverviewDailyProfitLoss` | {amount!:allOf(Price); rate!:string [format="decimal", maxLength=30]} |
+| `MarketValue` | {purchaseAmount!:string [format="decimal", maxLength=30]; amount!:string [format="decimal", maxLength=30]; amountAfterCost!:string [format="decimal", maxLength=30]} |
+| `ProfitLoss` | {amount!:string [format="decimal", maxLength=30]; amountAfterCost!:string [format="decimal", maxLength=30]; rate!:string [format="decimal", maxLength=30]; rateAfterCost!:string [format="decimal", maxLength=30]} |
+| `DailyProfitLoss` | {amount!:string [format="decimal", maxLength=30]; rate!:string [format="decimal", maxLength=30]} |
+| `Cost` | {commission!:string [format="decimal", maxLength=30]; tax?:string/null [format="decimal", maxLength=30]} |
+| `OrderCreateRequest` | oneOf({clientOrderId?:string [pattern="^[a-zA-Z0-9\\-_]+$", maxLength=36]; symbol!:string; side!:string [enum=["BUY","SELL"]]; orderType!:string [enum=["LIMIT","MARKET"]]; timeInForce?:string [enum=["DAY","CLS","OPG"], default="DAY"]; quantity!:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; price?:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; confirmHighValueOrder?:boolean [default=false]},{clientOrderId?:string [pattern="^[a-zA-Z0-9\\-_]+$", maxLength=36]; symbol!:string; side!:string [enum=["BUY","SELL"]]; orderType!:string [enum=["MARKET"]]; orderAmount!:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; confirmHighValueOrder?:boolean [default=false]}) |
+| `OrderModifyRequest` | {orderType!:string [enum=["LIMIT","MARKET"]]; quantity?:string [format="decimal", pattern="^\\d+$", maxLength=30]; price?:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; confirmHighValueOrder?:boolean [default=false]} |
+| `OrderResponse` | {orderId!:string; clientOrderId?:string/null} |
+| `OrderOperationResponse` | {orderId!:string} |
+| `ConditionalOrderCreateRequest` | {symbol!:string; type!:string [enum=["SINGLE","OCO","OTO"]]; quantity!:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; orderType!:string [enum=["LIMIT","MARKET"]]; clientOrderId?:string [pattern="^[a-zA-Z0-9\\-_]+$", maxLength=36]; expireDate!:string [format="date"]; first!:allOf(ConditionRequest); second?:/nullallOf(ConditionRequest); confirmHighValueOrder?:boolean [default=false]} |
+| `ConditionalOrderModifyRequest` | {type!:string [enum=["SINGLE","OCO","OTO"]]; quantity!:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; orderType!:string [enum=["LIMIT","MARKET"]]; expireDate!:string [format="date"]; first!:allOf(ConditionRequest); second?:/nullallOf(ConditionRequest); confirmHighValueOrder?:boolean [default=false]} |
+| `ConditionRequest` | {orderSide!:string [enum=["BUY","SELL"]]; triggerPrice!:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]; orderPrice?:string [format="decimal", pattern="^\\d+(\\.\\d+)?$", maxLength=30]} |
+| `ConditionalOrderResponse` | {conditionalOrderId!:string} |
+| `PaginatedConditionalOrderResponse` | {conditionalOrders!:array<ConditionalOrderDetailResponse>; nextCursor?:string/null; hasNext!:boolean} |
+| `ConditionalOrderDetailResponse` | {conditionalOrderId!:string; type!:string [enum=["SINGLE","OCO","OTO"]]; status!:string [enum=["WATCHING","PAUSED","ORDERING","ORDERED","COMPLETED","EXPIRED"]]; symbol!:string; market!:string [enum=["KR","US"]]; quantity!:string [format="decimal"]; orderType!:string [enum=["LIMIT","MARKET"]]; expireDate?:string [format="date"]; first!:allOf(ConditionalOrderCondition); second?:/nullallOf(ConditionalOrderCondition); createdAt!:string [format="date-time"]} |
+| `ConditionalOrderCondition` | {type!:string [enum=["STOP","PROFIT_RATE"]]; status!:string [enum=["WATCHING","HOLDING","PAUSED","ORDERING","ORDERED","COMPLETED","EXPIRED","CANCELED"]]; orderSide!:string [enum=["BUY","SELL"]]; triggerPrice?:string/null [format="decimal"]; targetProfitRate?:string/null [format="decimal"]; orderPrice?:string/null [format="decimal"]; triggeredOrderId?:string/null} |
+| `PaginatedOrderResponse` | {orders!:array<Order>; nextCursor!:string/null; hasNext!:boolean} |
+| `Order` | {orderId!:string; symbol!:string; side!:string [enum=["BUY","SELL"]]; orderType!:string [enum=["LIMIT","MARKET"]]; timeInForce!:string [enum=["DAY","CLS","OPG"]]; status!:OrderStatus; price?:string/null [format="decimal", maxLength=30]; quantity!:string [format="decimal", maxLength=30]; orderAmount?:string/null [format="decimal", maxLength=30]; currency!:Currency; orderedAt!:string [format="date-time"]; canceledAt?:string/null [format="date-time"]; execution!:objectallOf(OrderExecution)} |
+| `OrderExecution` | {filledQuantity!:string [format="decimal", maxLength=30]; averageFilledPrice!:string/null [format="decimal", maxLength=30]; filledAmount!:string/null [format="decimal", maxLength=30]; commission!:string/null [format="decimal", maxLength=30]; tax!:string/null [format="decimal", maxLength=30]; filledAt!:string/null [format="date-time"]; settlementDate!:string/null [format="date"]} |
+| `OrderStatus` | string [enum=["PENDING","PENDING_CANCEL","PENDING_REPLACE","PARTIAL_FILLED","FILLED","CANCELED","REJECTED","CANCEL_REJECTED","REPLACE_REJECTED","REPLACED"]] |
+| `BuyingPowerResponse` | {currency!:Currency; cashBuyingPower!:string [format="decimal", maxLength=30]} |
+| `SellableQuantityResponse` | {sellableQuantity!:string [format="decimal", maxLength=30]} |
+| `Commission` | {marketCountry!:MarketCountry; commissionRate!:string [format="decimal", maxLength=30]; startDate?:string/null [format="date"]; endDate?:string/null [format="date"]} |
+| `ConditionalOrderCreateResponse` | {conditionalOrderId!:string; clientOrderId?:string/null} |
+
+### 페이지와 시장별 조건
+
+| 대상 | 지원 계약 |
+| --- | --- |
+| prices, stocks | 공식 최대 200종목을 허용한다. 단일 symbol에는 쉼표를 허용하지 않고 공식 pattern을 적용하며 임의 12자 제한은 제거한다. 금융 저장의 32자 제한은 별도 보호 계약으로 명시한다 |
+| candles | `interval=1m/1d`, `count=1..200`, `before`, `adjusted`를 지원한다. nextBefore를 다음 before에 그대로 전달하고 마지막 null을 보존한다. 시간대의 +는 URLSearchParams로 인코딩한다 |
+| stocks/all | 공식 market/status/securityType/commonShare 필터를 모두 지원한다. 공식 페이징이 없는 전량 응답을 임의 cursor로 바꾸지 않는다 |
+| 종목 수급 5개 | 국내 종목만 지원한다. count=1..100, until은 실제 날짜로 검사하며 응답의 잠정·확정 값과 null을 보존한다. nextUntil을 다음 until에 그대로 전달하고 null이면 종료한다 |
+| exchange-rate | baseCurrency/quoteCurrency와 선택 dateTime을 지원한다. 참고용 표시 환율을 주문 체결 환율로 설명하지 않는다 |
+| KR/US calendar | 시장별 영업일, KRX/NXT와 미국 세션, 시간대·서머타임을 원문대로 전달한다. 날짜 미지정은 공식 현재일 기준이며 UTC 날짜로 임의 치환하지 않는다 |
+| rankings | 6종 type, KR/US, 7종 duration, excludeInvestmentCaution, count를 모두 제공한다. TOP_GAINERS/TOP_LOSERS에는 realtime 금지다. 시장 전체와 토스 체결 기준, 기간 시작값과 전일 기준값을 구분한다. 빈 rankings와 rankedAt=null도 정상이다 |
+| market indicators | KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y만 시세·일봉을 지원한다. 분봉은 지수만, investor-trading은 KOSPI/KOSDAQ와 1d/1w/1mo/1y만 지원한다 |
+| sectors | 목록·랭킹·상세·주식·ETF의 5개 조회다. 계층 0/1/2와 여러 섹터 소속, KR/US 차이와 빈 목록을 보존한다 |
+| orders OPEN | 공식 전량을 보존하고 100건으로 자르지 않는다. limit/cursor는 upstream이 무시하며 from/to는 KST orderedAt 날짜 필터다 |
+| orders CLOSED | limit=1..100, 기본 20과 opaque cursor를 노출한다. nextCursor/hasNext를 보존하고 마지막 페이지에서 커서를 만들지 않는다. 임의 366일 제한은 제거한다 |
+| conditional-orders | OPEN/CLOSED 모두 cursor/limit 페이지를 지원한다. 다른 채널의 주문도 조회한다. 응답 PROFIT_RATE는 읽되 ConditionRequest에 없는 생성 필드를 발명하지 않는다 |
+| 큰 응답 | 1 MiB 상한과 4초 HTTP timeout을 유지한다. 공식 페이지가 있으면 사용자가 다음 페이지를 읽는다. 페이지가 없는 큰 응답은 명확한 크기 초과 오류로 끝내며 몰래 일부 행을 남기지 않는다 |
+
+### 요청 경계와 시험
+
+API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`하고 query는 URLSearchParams로 만든다.
+조회는 GET과 body 없음, 공식 계좌 대상만 env의 계좌 헤더를 사용한다. redirect와 프록시 경유를 허용하지 않는다.
+기존 Bun `FakeToss`와 실제 MCP 등록을 사용해 method, URL, query, header와 body를 검증한다.
+공식 예시의 모든 필드, nullable, 긴 decimal과 cursor, 빈 결과와 여러 페이지를 검사한다.
+잘못된 입력은 HTTP 0회이고 429, 5xx, timeout, credential/IP/revoke, malformed, 응답 크기 초과를 각 도구 그룹에서 검사한다.
+소스 AST와 자체 복제 schema의 일치만으로 통과시키지 않는다. 빌드한 bundle의 SDK 호출이 로컬 HTTP 목적지에 도달해야 한다.
+CI의 `hermes` job과 `scripts/check-connectors.sh`가 새 시험을 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.

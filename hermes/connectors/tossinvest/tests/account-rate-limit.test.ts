@@ -2,15 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { groupLimit } from "../src/rate-limit.ts";
 import { Tossinvest } from "../src/client.ts";
 import { createTossinvestServer } from "../src/server.ts";
-import { FakeToss, apiError, credentials, json, tool, withMcp } from "./support.ts";
+import { FakeToss, emptyHoldings, apiError, credentials, json, tool, withMcp } from "./support.ts";
 
 const env = { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "7" };
 const accountBodies = {
   "/api/v1/accounts": { result: [] },
-  "/api/v1/holdings": { result: { items: [] } },
+  "/api/v1/holdings": { result: emptyHoldings },
   "/api/v1/buying-power": { result: { currency: "KRW", cashBuyingPower: "1000" } },
   "/api/v1/sellable-quantity": { result: { sellableQuantity: "2" } },
-  "/api/v1/orders": { result: { orders: [], hasNext: false } },
+  "/api/v1/orders": { result: { orders: [], nextCursor: null, hasNext: false } },
 };
 
 const groups = {
@@ -80,6 +80,7 @@ describe("계좌 조회 호출 간격", () => {
         for (const result of results) expect(result.result.isError).toBeUndefined();
         expect(results[0]!.body).toEqual({
           currency: "KRW", cash_buying_power: "1000", sellable_quantity: "2",
+          result: { buyingPower: { currency: "KRW", cashBuyingPower: "1000" }, sellableQuantity: { sellableQuantity: "2" } }, metadata: { buyingPower: {}, sellableQuantity: {} },
         });
       });
       expect(limit.arrivals).toHaveLength(5);

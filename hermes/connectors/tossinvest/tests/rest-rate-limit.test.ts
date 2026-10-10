@@ -18,6 +18,54 @@ test("19그룹 예산과 KST 피크 전후를 제어 시계로 검증한다", as
   clearRateLimits();
 });
 
+test("큐가 KST 피크 진입과 종료를 가로지르는 요청의 간격을 다시 검사한다", async () => {
+  const tomorrow = new Date(Date.now() + 86400000);
+  tomorrow.setUTCHours(0, 0, 0, 0);
+  for (const [transition, beforeLimit, afterLimit] of [[tomorrow.getTime(), 6, 3], [tomorrow.getTime() + 600000, 3, 6]]) {
+    let now = transition! - 100;
+    const arrivals: number[] = [];
+    const timer = { now: () => now, sleep: async (ms: number) => { now += ms; } };
+    const identity = `transition-${transition}`;
+    expect(groupLimit("ORDER_INFO", now)).toBe(beforeLimit);
+    await queueRequest(identity, "ORDER_INFO", now + 5000, async () => { arrivals.push(now); }, timer);
+    await queueRequest(identity, "ORDER_INFO", now + 5000, async () => { arrivals.push(now); }, timer);
+    expect(groupLimit("ORDER_INFO", now)).toBe(afterLimit);
+    expect(arrivals[1]! - arrivals[0]!).toBeGreaterThanOrEqual(Math.ceil(1000 / afterLimit!));
+  }
+  clearRateLimits();
+});
+
+test("대기 없는 만료 큐는 다음 acquire에서 제거된다", async () => {
+  clearRateLimits();
+  let now = Date.now() + 10000;
+  const timer = { now: () => now, sleep: async (ms: number) => { now += ms; } };
+  await queueRequest("expired-client", "AUTH", now + 5000, async () => {}, timer);
+  expect(rateLimitStateSize()).toBe(1);
+  now += 5000;
+  await queueRequest("new-client", "AUTH", now + 5000, async () => {}, timer);
+  expect(rateLimitStateSize()).toBe(1);
+  clearRateLimits();
+});
+
+test("예산은 같은 client ID끼리 공유하며 다른 client ID는 기다리지 않는다", async () => {
+  const fake = new FakeToss(); const arrivals: Array<{ at: number; token: string | null }> = [];
+  fake.routes.set("GET /api/v1/accounts", request => { arrivals.push({ at: Date.now(), token: request.headers.get("authorization") }); return json({ result: [] }); });
+  try {
+    const first = new Tossinvest({ apiBase: fake.url, env: credentials });
+    const same = new Tossinvest({ apiBase: fake.url, env: credentials });
+    const different = new Tossinvest({ apiBase: fake.url, env: { ...credentials, TOSSINVEST_CLIENT_ID: "different-client" } });
+    await Promise.all([first.token(), different.token()]);
+    await first.request("/api/v1/accounts");
+    const queued = same.request("/api/v1/accounts");
+    await different.request("/api/v1/accounts");
+    expect(arrivals).toHaveLength(2);
+    await queued;
+    expect(arrivals[2]!.at - arrivals[0]!.at).toBeGreaterThanOrEqual(1000);
+    expect(arrivals[1]!.at - arrivals[0]!.at).toBeLessThan(500);
+    expect(fake.issued).toBe(2);
+  } finally { fake.stop(); }
+});
+
 test("같은 identity는 한 번 발급하며 secret/origin은 토큰을 분리한다", async () => {
   const a = new FakeToss(); const b = new FakeToss();
   try {
@@ -39,7 +87,7 @@ test("교체 중 발급은 원래 secret identity에만 남는다", async () => 
   fake.routes.set("POST /oauth2/token", async request => {
     const old = new URLSearchParams(request.body).get("client_secret") === credentials.TOSSINVEST_CLIENT_SECRET;
     if (old) { started(); await held; }
-    return json({ access_token: old ? "old" : "new", expires_in: 3600 });
+    return json({ access_token: old ? "old" : "new", expires_in: 3600, token_type: "Bearer" });
   });
   try {
     const client = new Tossinvest({ apiBase: fake.url, env });
@@ -94,10 +142,10 @@ test("큐 대기도 deadline에 포함하고 만료한 대기는 HTTP를 보내�
 test("실패와 만료, teardown은 identity와 큐 참조를 거둔다", async () => {
   const fake = new FakeToss();
   try {
-    fake.on("POST", "/oauth2/token", { access_token: "short", expires_in: 0 });
+    fake.on("POST", "/oauth2/token", { access_token: "short", expires_in: 0, token_type: "Bearer" });
     await expect(new Tossinvest({ apiBase: fake.url, env: credentials }).token()).rejects.toMatchObject({ code: "TOSSINVEST_UNAVAILABLE" });
     expect(clientStateSize()).toBe(0);
-    fake.on("POST", "/oauth2/token", { access_token: "short", expires_in: 1 });
+    fake.on("POST", "/oauth2/token", { access_token: "short", expires_in: 1, token_type: "Bearer" });
     await new Tossinvest({ apiBase: fake.url, env: credentials }).token();
     expect(clientStateSize()).toBe(1); await Bun.sleep(1010); expect(clientStateSize()).toBe(0);
   } finally { fake.stop(); clearClientState(); }
