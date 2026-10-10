@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 
 // 수치와 제외 규칙은 이 파일에서 관리한다.
 export const LARGE_THRESHOLD = 400;
-export const MAX_LINES = 1000;
+export const MAX_LINES = 1500;
 
 export function excluded(file) {
   return /(^|\/)(pnpm-lock\.yaml|bun\.lockb?|package-lock\.json|yarn\.lock|npm-shrinkwrap\.json|Cargo\.lock|poetry\.lock|uv\.lock|Pipfile\.lock|composer\.lock|Gemfile\.lock)$/.test(file) ||
