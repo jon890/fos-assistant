@@ -547,27 +547,38 @@ Control Plane 이 이 모양으로 사진을 싣는 결정은 [ADR-20261009 / na
 
 #### 운영에서 확인할 것
 
-배포한 뒤 사진을 붙여 한 번 보내 본다. 실제 명령은 `fos-home-infra` 가 갖는다.
+배포한 뒤 일반 turn에서 사진을 붙여 보내 본다. 실제 명령은 `fos-home-infra` 가 갖는다.
 
 - 답이 사진 내용을 말하고, 그 실행의 도구 사건에 `vision_analyze` 가 없다
 - 그 실행에 413 이나 `invalid_image_url` 같은 오류가 없다
-- 다음 메시지에서 지난 사진을 물으면 에이전트가 `vision_analyze` 로 사본 파일을 본다
-- 11장 이상, 30장까지 보내면 모든 사진이 줄인 크기로 입력에 실리고, 그 실행에 413 이 없으며 이번 메시지 사진에 `vision_analyze` 가 없다
-- 지난 사진 여러 장을 물으면 `vision_analyze` 를 한 장씩 차례로 부른다
+- 다음 메시지에서 지난 사진을 물으면 매 turn 복원한 첨부 참조로 `attachment_inspect`를 자동 호출하고 현재 실행 권한으로 원본을 조회한다
+- 사본 생성·읽기·치수 판정과 필요한 재축소에 성공하고 최종 바이트 예산 안에 드는 11장 이상, 30장까지의 표본에서 모든 사본이 최초 입력에 실리고, 그 실행에 413 이 없으며 `vision_analyze` 가 없다
+- 사본 처리·대기 실패나 최종 예산 초과 표본에서는 최초 입력에 빠진 사진의 순번을 안내하고 `attachment_inspect`로 원본을 자동 조회한다. 원본도 읽지 못하면 판독 실패를 알린다
+- 지난 사진 여러 장은 `attachment_inspect`로 한 장씩 조회한다. 큰 사진은 원본 `region`을 조회하고, 위치를 모르면 `overview=true`로 축소 전체 개요를 본 뒤 원본 영역을 고른다
+- 원본 조회가 실패하거나 모델에 native 이미지가 전달되지 않으면 판독 실패를 알린다. 개요만 보고 작은 글자를 읽었다고 하거나 사용자에게 재업로드·분할 전송을 요구하지 않는다
+
+참조 복원과 조회 안내의 정본은 [`AttachmentService.agentInput`](../../backend/src/main/java/com/bifos/assistant/chat/application/AttachmentService.java)이다.
+`vision_analyze` 사본 조회 안내는 `embedImages=false` 분기에만 남아 있다. 원본 조회 실패·미지원 때 그 도구로 전환하는 조건은 아니다.
+도구의 native 반환과 실패 처리는 [`attachment_inspect.py`](../plugins/fos-ctx/attachment_inspect.py)가 갖는다.
+실제 provider 수용과 30장 비교 정확도는 위 운영 왕복으로 따로 검증해야 한다.
 
 ### 이미지 파일은 `vision_analyze` 로 본다
 
 `read_file` 이 이미지 확장자를 만나면 내용을 돌려주지 않고 `vision_analyze` 를 쓰라는 안내를 낸다.
-지난 메시지의 사진과 흐름이 붙은 에이전트의 사진은 이 도구로 원본 옆의 줄인 사본(`{첨부 번호}.small.jpg`)을 본다. 사본은 대개 1MB 아래다.
+Control Plane의 `embedImages=false`인 흐름 실행은 지난 메시지 사진을 이 도구로 원본 옆의 줄인 사본(`{첨부 번호}.small.jpg`)에서 읽고, 사본이 없으면 원본을 읽도록 안내한다.
+일반 turn의 지난 사진은 앞 절처럼 `attachment_inspect`로 조회하며, 원본 조회 실패는 `vision_analyze`로 전환하는 조건이 아니다.
 
 실행 공간(Docker)의 파일은 컨테이너 안에서 `head -c <50MB+1> < 경로 | base64` 로 읽는다(`tools/image_source.py`).
+아래는 과거 `vision_analyze` 호출에서 관측한 잘림 기록이며, 현재 일반 turn의 원본 조회 결과를 검증한 기록은 아니다.
 운영에서 3MB 를 넘는 사진이 가끔 「image file is truncated」 로 실패했다. Pillow 가 디코딩하다 바이트가 모자란 것이다.
 어디서 잘리는지는 확인하지 못했다. 파이프의 종료 코드가 마지막 명령의 것이라 읽기 오류가 가려진다.
 1.2MB에서 3MB 사이의 원본 여덟 장을 동시에 부른 호출이 모두 실패한 적도 있다.
 150KB에서 400KB 사이의 사본 아홉 장을 동시에 부른 호출도 여덟 장이 실패했고(끝의 1바이트에서 67바이트를 처리하지 못했다는 오류), 차례로 부른 호출도 실패한 적이 있다.
 로컬 Docker 에서 같은 명령을 같은 `DockerEnvironment.execute` 로 0.65MB에서 2.6MB 사이의 파일 여덟 장씩 동시에 640번 읽었을 때는(CPU 부하를 더한 경우 포함) 잘림이 없었다.
 끝의 몇 바이트를 잃는 증상이라 Hermes 의 출력 수집, 운영의 Docker 중계, Docker exec 가운데 어느 층인지 따로 조사한다.
-그래서 Control Plane 은 이번 메시지의 사진을 모두 입력에 싣고, 지난 사진만 한 장씩 차례로 이 도구로 보게 안내한다.
+현재 일반 turn은 사본 처리에 성공하고 바이트 예산에 들어가는 이번 메시지 사진만 최초 입력에 싣는다.
+누락 사진과 지난 사진은 `attachment_inspect`로 조회하도록 안내하며, 실제 자동 호출과 판독 품질은 앞 절의 운영 확인 대상이다.
+`vision_analyze` 사본 조회 안내는 `embedImages=false`인 흐름 실행에 한정한다.
 
 ### 모델은 실행마다 정한다
 
