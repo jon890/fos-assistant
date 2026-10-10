@@ -9,7 +9,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 절 | 표 |
 | --- | --- |
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token`, `service_token`, `service_token_collection` |
-| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
+| 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
 | 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant` |
@@ -29,6 +29,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 칸과 재시도 색인은 `V20261010004638__attachment_deletion_request.sql`이 갖는다.
 
 사전 트랜잭션은 요청을 커밋하고 파일 작업은 트랜잭션 밖에서 수행한다.
+관찰과 요청 alias도 삭제 요청과 같은 트랜잭션에서 물리 삭제한다.
 파일 작업 성공 뒤 별도 트랜잭션에서 완료 시각을 기록한다.
 파일이 이미 없으면 멱등 성공이며 파일 삭제 뒤 완료 기록 전 종료도 복구한다.
 실패는 요청 상태와 완료 시각의 빈 값을 보존한다.
@@ -45,6 +46,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 표 | 칸 | 암호화 |
 | --- | --- | --- |
 | `chat_message` | `content` | 함. 옆 칸 `content_key_id`. 이 결정 앞의 줄은 평문이다 |
+| `media_observation` | `body` | 함. 옆 칸 `body_key_id`. 신규 저장은 암호화 필수이며 null-key 본문은 호환 읽기만 허용한다 |
 | `chat_pending_message` | `content` | 아직 |
 | `conversation` | `title` | 아직 |
 | `agent_execution` | `output_text` | 아직 |
@@ -274,7 +276,23 @@ turn 이 도는 동안 사용자가 보낸 메시지 하나가 한 행이고, �
 `position` 은 같은 메시지에 붙인 사진의 고른 순서다. 화면, Hermes 입력, 사용자가 보는 사진 순번에 함께 쓰고, 지운 사진도 그 자리를 차지한다.
 **보관 기간으로는 행을 지우지 않는다.** 파일을 지우고 `deleted_at` 만 적는다. 그래야 지난 대화를 열었을 때 화면이 「보관 기간이 지나 볼 수 없습니다」를 보일 수 있다.
 사용자가 대화를 지우면 정리 작업이 첨부 파일과 행을 함께 지운다. 지운 대화는 다시 열 수 없어 자리를 남길 까닭이 없다.
-`deleted_at` 이 비어 있는지가 볼 수 있는지를 정하고, `expires_at` 은 언제 지울지만 정한다. 둘로 판정하면 지우는 일이 늦었을 때 화면과 디스크가 어긋난다.
+읽기는 현재 대화 주인과 업로더, `deletion_requested_at`, `deleted_at`과 `expires_at`을 함께 확인한다.
+삭제 요청이나 만료가 있으면 파일 정리가 아직 끝나지 않았어도 원본과 관찰 본문을 제공하지 않는다.
+
+### media_observation와 media_observation_request
+
+관찰은 첨부별 불변 revision으로 저장한다. 현재 관찰은 가장 큰 revision이고 별도 현재 행 표는 없다.
+본문 JSON의 summary, claims, uncertainties, coverage와 evidence는 `body` 한 칸에만 암호화한다.
+`body`가 null이면 본문이 없고, 본문은 있는데 `body_key_id`가 null이면 호환 평문이다.
+새 저장에서 암호화가 꺼지거나 key를 얻지 못하면 전체 쓰기를 거절하며 평문을 새로 적지 않는다.
+본문과 key ID가 모두 있으면 enabled와 관계없이 복호화한다.
+
+요청 alias는 첨부와 UUID로 유일하다. 고정 요청 hash와 최초 수락한 관찰 ID를 가지며 자체 만료 칸은 없다.
+첨부·관찰 복합 FK가 다른 첨부의 revision을 참조하지 못하게 한다.
+관찰의 만료 시각은 첨부와 같고, 관찰·첨부 물리 삭제는 alias까지 cascade한다.
+삭제 요청, 만료와 소유 불일치 정리도 같은 사용자 잠금 안에서 관찰과 alias를 지운다.
+현재 소유자를 바꿔 관찰을 이관하거나 재암호화하지 않는다.
+CAS와 USER 보호, 서버 관측 시각의 의미는 [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 갖는다.
 
 ### chat_artifact
 

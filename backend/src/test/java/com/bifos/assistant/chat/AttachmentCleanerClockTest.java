@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
+import com.bifos.assistant.chat.application.MediaObservationCleaner;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
@@ -50,6 +51,9 @@ class AttachmentCleanerClockTest {
     ChatContentMutationCoordinator mutations;
 
     @Autowired
+    MediaObservationCleaner observations;
+
+    @Autowired
     JdbcTemplate jdbc;
 
     private Long conversationId;
@@ -73,7 +77,7 @@ class AttachmentCleanerClockTest {
         ChatAttachment expired = stored(NOW.minus(Duration.ofDays(1)));
         ChatAttachment live = stored(NOW.plus(Duration.ofDays(1)));
         AttachmentCleaner cleaner =
-                new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations);
+                new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations, observations);
 
         cleaner.runScheduled();
 
@@ -94,7 +98,7 @@ class AttachmentCleanerClockTest {
                 progressingClock.advance(Duration.ofSeconds(60));
             }
         };
-        var cleaner = new AttachmentCleaner(attachments, progressingStore, progressingClock, mutations);
+        var cleaner = new AttachmentCleaner(attachments, progressingStore, progressingClock, mutations, observations);
 
         assertThat(cleaner.delete(attachment, progressingClock.instant())).isTrue();
         var completed = attachments.findById(attachment.id()).orElseThrow();
