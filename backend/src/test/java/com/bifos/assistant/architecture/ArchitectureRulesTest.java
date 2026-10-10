@@ -61,17 +61,24 @@ class ArchitectureRulesTest {
         assertThat(compiler).as("fixture 컴파일은 JDK 를 요구한다").isNotNull();
         var diagnostics = new DiagnosticCollector<JavaFileObject>();
         try (var manager = compiler.getStandardFileManager(diagnostics, null, StandardCharsets.UTF_8)) {
-            List<String> options = List.of("-proc:none", "-classpath", fixtureClasspath(), "-d", classesRoot.toString());
-            boolean compiled = compiler.getTask(null, manager, diagnostics, options, null,
-                    manager.getJavaFileObjectsFromFiles(files)).call();
-            assertThat(compiled).as("fixture 컴파일 진단: %s", diagnostics.getDiagnostics()).isTrue();
+            List<String> options =
+                    List.of("-proc:none", "-classpath", fixtureClasspath(), "-d", classesRoot.toString());
+            boolean compiled = compiler.getTask(
+                            null, manager, diagnostics, options, null, manager.getJavaFileObjectsFromFiles(files))
+                    .call();
+            assertThat(compiled)
+                    .as("fixture 컴파일 진단: %s", diagnostics.getDiagnostics())
+                    .isTrue();
         }
         return new ClassFileImporter().importPath(classesRoot);
     }
 
     private static String fixtureClasspath() {
-        Set<String> entries = new LinkedHashSet<>(List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
-        for (ClassLoader loader = Thread.currentThread().getContextClassLoader(); loader != null; loader = loader.getParent()) {
+        Set<String> entries = new LinkedHashSet<>(
+                List.of(System.getProperty("java.class.path").split(File.pathSeparator)));
+        for (ClassLoader loader = Thread.currentThread().getContextClassLoader();
+                loader != null;
+                loader = loader.getParent()) {
             if (loader instanceof URLClassLoader urls) {
                 for (var url : urls.getURLs()) {
                     entries.add(new File(url.getPath()).toString());
@@ -79,7 +86,11 @@ class ArchitectureRulesTest {
             }
         }
         for (Class<?> anchor : List.of(Service.class, Entity.class, RequestMapping.class)) {
-            entries.add(new File(anchor.getProtectionDomain().getCodeSource().getLocation().getPath()).toString());
+            entries.add(new File(anchor.getProtectionDomain()
+                            .getCodeSource()
+                            .getLocation()
+                            .getPath())
+                    .toString());
         }
         return String.join(File.pathSeparator, entries);
     }
@@ -87,20 +98,22 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("기존 층 규칙은 목적별 하위 패키지의 정상 흐름도 허용한다")
     void acceptsLayerFixture() throws IOException {
-        JavaClasses fixture = compileFixture(temporary, Map.of(
-                "com.bifos.assistant.fixture.admin.presentation.Controller", """
+        JavaClasses fixture = compileFixture(
+                temporary,
+                Map.of(
+                        "com.bifos.assistant.fixture.admin.presentation.Controller", """
                         package com.bifos.assistant.fixture.admin.presentation;
                         public class Controller { com.bifos.assistant.fixture.admin.application.UseCase service; }
                         """,
-                "com.bifos.assistant.fixture.admin.application.UseCase", """
+                        "com.bifos.assistant.fixture.admin.application.UseCase", """
                         package com.bifos.assistant.fixture.admin.application;
                         public class UseCase { com.bifos.assistant.fixture.infra.Store store; }
                         """,
-                "com.bifos.assistant.fixture.infra.Store", """
+                        "com.bifos.assistant.fixture.infra.Store", """
                         package com.bifos.assistant.fixture.infra;
                         public class Store { com.bifos.assistant.fixture.domain.Policy policy; }
                         """,
-                "com.bifos.assistant.fixture.domain.Policy", """
+                        "com.bifos.assistant.fixture.domain.Policy", """
                         package com.bifos.assistant.fixture.domain;
                         public class Policy {}
                         """));
@@ -112,39 +125,54 @@ class ArchitectureRulesTest {
     @Test
     @DisplayName("기존 층 규칙은 목적별 컨트롤러에서 infra 로 바로 가는 의존을 거절한다")
     void rejectsControllerInfraFixture() throws IOException {
-        JavaClasses fixture = compileFixture(temporary, Map.of(
-                "com.bifos.assistant.fixture.admin.presentation.Controller", """
+        JavaClasses fixture = compileFixture(
+                temporary,
+                Map.of(
+                        "com.bifos.assistant.fixture.admin.presentation.Controller", """
                         package com.bifos.assistant.fixture.admin.presentation;
                         public class Controller { com.bifos.assistant.fixture.infra.Store store; }
                         """,
-                "com.bifos.assistant.fixture.infra.Store", """
+                        "com.bifos.assistant.fixture.infra.Store", """
                         package com.bifos.assistant.fixture.infra;
                         public class Store {}
                         """));
         assertThat(fixture).hasSize(2);
-        assertThat(ArchitectureRules.LAYER_DIRECTION.evaluate(fixture).getFailureReport().toString())
+        assertThat(ArchitectureRules.LAYER_DIRECTION
+                        .evaluate(fixture)
+                        .getFailureReport()
+                        .toString())
                 .contains("fixture.admin.presentation.Controller", "fixture.infra.Store", "층은 presentation");
     }
 
     @Test
     @DisplayName("기존 domain 규칙은 presentation 과 Spring Web 의존을 거절한다")
     void rejectsDomainWebFixture() throws IOException {
-        JavaClasses fixture = compileFixture(temporary, Map.of(
-                "com.bifos.assistant.fixture.admin.domain.Policy", """
+        JavaClasses fixture = compileFixture(
+                temporary,
+                Map.of(
+                        "com.bifos.assistant.fixture.admin.domain.Policy", """
                         package com.bifos.assistant.fixture.admin.domain;
                         public class Policy {
                             com.bifos.assistant.fixture.admin.presentation.Controller controller;
                             org.springframework.http.HttpStatus status;
                         }
                         """,
-                "com.bifos.assistant.fixture.admin.presentation.Controller", """
+                        "com.bifos.assistant.fixture.admin.presentation.Controller", """
                         package com.bifos.assistant.fixture.admin.presentation;
                         public class Controller {}
                         """));
         assertThat(fixture).hasSize(2);
-        assertThat(ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB.evaluate(fixture).getFailureReport().toString())
-                .contains("fixture.admin.domain.Policy", "fixture.admin.presentation.Controller", "HttpStatus", "domain 은 웹 계층");
-        assertThat(ArchitectureRules.LAYER_DIRECTION.evaluate(fixture).hasViolation()).isTrue();
+        assertThat(ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB
+                        .evaluate(fixture)
+                        .getFailureReport()
+                        .toString())
+                .contains(
+                        "fixture.admin.domain.Policy",
+                        "fixture.admin.presentation.Controller",
+                        "HttpStatus",
+                        "domain 은 웹 계층");
+        assertThat(ArchitectureRules.LAYER_DIRECTION.evaluate(fixture).hasViolation())
+                .isTrue();
     }
 
     @Test

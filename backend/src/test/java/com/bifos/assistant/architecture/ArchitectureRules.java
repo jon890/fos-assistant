@@ -37,15 +37,15 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import jakarta.persistence.Entity;
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
 import java.lang.annotation.Annotation;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.List;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -179,7 +179,8 @@ public final class ArchitectureRules {
             .as("domain 은 웹 계층에 의존하지 않는다");
 
     /** 관리자 서비스와 명령은 지정한 application 소유 경계에 각각 하나씩 있고 저장 타입을 갖지 않는다. */
-    public static final ArchRule AGENT_ADMIN_APPLICATION_PLACEMENT = agentAdminApplicationPlacement("com.bifos.assistant");
+    public static final ArchRule AGENT_ADMIN_APPLICATION_PLACEMENT =
+            agentAdminApplicationPlacement("com.bifos.assistant");
 
     /** 관리자 HTTP 계약은 지정한 presentation 에 각각 하나씩 있고 모든 mapped 메서드가 requireAdmin 을 부른다. */
     public static final ArchRule AGENT_ADMIN_HTTP_CONTRACT = agentAdminHttpContract("com.bifos.assistant");
@@ -190,7 +191,9 @@ public final class ArchitectureRules {
                 "AgentAdminService", "agent.admin.application.AgentAdminService",
                 "AgentCreateCommand", "agent.admin.application.model.AgentCreateCommand",
                 "AgentUpdateCommand", "agent.admin.application.model.AgentUpdateCommand");
-        return classes().that().resideInAPackage(root + "..")
+        return classes()
+                .that()
+                .resideInAPackage(root + "..")
                 .should(ownedTypes(root, owners))
                 .andShould(adminApplicationRoles(root))
                 .as("AGENT_ADMIN_APPLICATION_PLACEMENT: 관리자 서비스와 명령의 소유 경계를 지킨다");
@@ -204,7 +207,9 @@ public final class ArchitectureRules {
                 "CreateAgentRequest", "agent.admin.presentation.AgentAdminDtos$CreateAgentRequest",
                 "UpdateAgentRequest", "agent.admin.presentation.AgentAdminDtos$UpdateAgentRequest",
                 "AdminAgentView", "agent.admin.presentation.AgentAdminDtos$AdminAgentView");
-        return classes().that().resideInAPackage(root + "..")
+        return classes()
+                .that()
+                .resideInAPackage(root + "..")
                 .should(ownedTypes(root, owners))
                 .andShould(adminHttpRoles(root))
                 .as("AGENT_ADMIN_HTTP_CONTRACT: 관리자 HTTP 배치와 requireAdmin 호출을 지킨다");
@@ -250,16 +255,29 @@ public final class ArchitectureRules {
             public void check(JavaClass item, ConditionEvents events) {
                 String boundary = root + ".agent.admin.";
                 if (item.getPackageName().startsWith(boundary)) {
-                    require(item, !item.isAnnotatedWith(Entity.class) && !item.isAnnotatedWith(Embeddable.class)
-                            && !item.isAnnotatedWith(Repository.class) && !item.getSimpleName().endsWith("Repository"),
-                            "Entity, Embeddable, Repository 는 admin 밖에 있다", events);
+                    require(
+                            item,
+                            !item.isAnnotatedWith(Entity.class)
+                                    && !item.isAnnotatedWith(Embeddable.class)
+                                    && !item.isAnnotatedWith(Repository.class)
+                                    && !item.getSimpleName().endsWith("Repository"),
+                            "Entity, Embeddable, Repository 는 admin 밖에 있다",
+                            events);
                     if (item.isAnnotatedWith(Service.class)) {
-                        require(item, item.getPackageName().equals(boundary + "application"), "Service 는 admin.application 에 있다", events);
+                        require(
+                                item,
+                                item.getPackageName().equals(boundary + "application"),
+                                "Service 는 admin.application 에 있다",
+                                events);
                     }
-                    if (item.isRecord() && item.getModifiers().contains(JavaModifier.PUBLIC)
+                    if (item.isRecord()
+                            && item.getModifiers().contains(JavaModifier.PUBLIC)
                             && item.getPackageName().contains(".application")) {
-                        require(item, item.getPackageName().equals(boundary + "application.model"),
-                                "공개 application record 는 application.model 에 있다", events);
+                        require(
+                                item,
+                                item.getPackageName().equals(boundary + "application.model"),
+                                "공개 application record 는 application.model 에 있다",
+                                events);
                     }
                     if (item.isAnnotatedWith(ConfigurationProperties.class)) {
                         require(item, item.getPackageName().equals(boundary + "config"), "설정 선언은 config 에 있다", events);
@@ -269,15 +287,21 @@ public final class ArchitectureRules {
                     require(item, item.isAnnotatedWith(Service.class), "AgentAdminService 는 Service 다", events);
                 }
                 if (Set.of("AgentCreateCommand", "AgentUpdateCommand").contains(item.getSimpleName())) {
-                    require(item, item.isRecord() && item.getModifiers().contains(JavaModifier.PUBLIC),
-                            "관리 명령은 공개 record 다", events);
+                    require(
+                            item,
+                            item.isRecord() && item.getModifiers().contains(JavaModifier.PUBLIC),
+                            "관리 명령은 공개 record 다",
+                            events);
                 }
-                if (item.getPackageName().contains(".domain.") || item.getPackageName().endsWith(".domain")
-                        || item.getPackageName().contains(".infra.") || item.getPackageName().endsWith(".infra")) {
+                if (item.getPackageName().contains(".domain.")
+                        || item.getPackageName().endsWith(".domain")
+                        || item.getPackageName().contains(".infra.")
+                        || item.getPackageName().endsWith(".infra")) {
                     item.getDirectDependenciesFromSelf().stream()
-                            .filter(dependency -> dependency.getTargetClass().getName().startsWith(boundary))
-                            .forEach(dependency -> events.add(SimpleConditionEvent.violated(item,
-                                    dependency.getDescription() + ": domain 과 infra 는 admin 을 쓰지 않는다")));
+                            .filter(dependency ->
+                                    dependency.getTargetClass().getName().startsWith(boundary))
+                            .forEach(dependency -> events.add(SimpleConditionEvent.violated(
+                                    item, dependency.getDescription() + ": domain 과 infra 는 admin 을 쓰지 않는다")));
                 }
             }
         };
@@ -288,27 +312,52 @@ public final class ArchitectureRules {
             @Override
             public void check(JavaClass item, ConditionEvents events) {
                 String presentation = root + ".agent.admin.presentation";
-                if (item.getPackageName().startsWith(root + ".agent.admin.") && item.isRecord()
+                if (item.getPackageName().startsWith(root + ".agent.admin.")
+                        && item.isRecord()
                         && !item.isAnnotatedWith(ConfigurationProperties.class)
                         && !item.getPackageName().contains(".application.")) {
-                    require(item, item.getPackageName().equals(presentation)
-                                    && item.getEnclosingClass().map(outer -> outer.getName().equals(presentation + ".AgentAdminDtos")).orElse(false),
-                            "HTTP record 는 admin.presentation.AgentAdminDtos 안에 있다", events);
+                    require(
+                            item,
+                            item.getPackageName().equals(presentation)
+                                    && item.getEnclosingClass()
+                                            .map(outer -> outer.getName().equals(presentation + ".AgentAdminDtos"))
+                                            .orElse(false),
+                            "HTTP record 는 admin.presentation.AgentAdminDtos 안에 있다",
+                            events);
                 }
                 if (!item.getSimpleName().equals("AgentAdminController")) {
                     return;
                 }
                 require(item, item.isAnnotatedWith(RestController.class), "관리 창구는 RestController 다", events);
-                require(item, item.tryGetAnnotationOfType(RequestMapping.class)
-                        .map(mapping -> List.of(mapping.value()).equals(List.of("/api/v1/admin/agents"))).orElse(false),
-                        "관리 HTTP 경로는 /api/v1/admin/agents 다", events);
-                List<JavaMethod> mapped = item.getMethods().stream().filter(ArchitectureRules::mapped).toList();
-                require(item, mapped.size() == 3 && mapped.stream().map(JavaMethod::getName).collect(Collectors.toSet()).equals(Set.of("create", "list", "update")), "관리 mapped 메서드는 등록·목록·수정 3개다", events);
+                require(
+                        item,
+                        item.tryGetAnnotationOfType(RequestMapping.class)
+                                .map(mapping -> List.of(mapping.value()).equals(List.of("/api/v1/admin/agents")))
+                                .orElse(false),
+                        "관리 HTTP 경로는 /api/v1/admin/agents 다",
+                        events);
+                List<JavaMethod> mapped = item.getMethods().stream()
+                        .filter(ArchitectureRules::mapped)
+                        .toList();
+                require(
+                        item,
+                        mapped.size() == 3
+                                && mapped.stream()
+                                        .map(JavaMethod::getName)
+                                        .collect(Collectors.toSet())
+                                        .equals(Set.of("create", "list", "update")),
+                        "관리 mapped 메서드는 등록·목록·수정 3개다",
+                        events);
                 for (JavaMethod method : mapped) {
                     boolean authorized = method.getMethodCallsFromSelf().stream()
-                            .anyMatch(call -> call.getTargetOwner().getName().equals(root + ".shared.auth.CurrentUserProvider")
-                                    && call.getName().equals("requireAdmin"));
-                    require(item, authorized, method.getFullName() + " 에서 CurrentUserProvider.requireAdmin 을 호출한다", events);
+                            .anyMatch(call ->
+                                    call.getTargetOwner().getName().equals(root + ".shared.auth.CurrentUserProvider")
+                                            && call.getName().equals("requireAdmin"));
+                    require(
+                            item,
+                            authorized,
+                            method.getFullName() + " 에서 CurrentUserProvider.requireAdmin 을 호출한다",
+                            events);
                 }
             }
         };
