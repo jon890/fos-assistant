@@ -168,10 +168,21 @@ public class HermesRunEventStream {
         String type = firstText(root, payload, "event", "type");
         String toolName = firstText(root, payload, "tool", "tool_name", "toolName", "name");
         String detail = firstDetail(root, payload);
+        String text = firstText(root, payload, "delta", "text", "output");
         boolean toolEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.");
         boolean subagentEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.");
         boolean afterConnector =
                 (toolEvent || subagentEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
+        if (toolEvent
+                && toolName != null
+                && (toolName.equals("list_media_observations")
+                        || toolName.endsWith("__list_media_observations")
+                        || toolName.equals("record_media_observation")
+                        || toolName.endsWith("__record_media_observation"))) {
+            // 사진·OCR 본문은 관리자와 커넥터 이력에 관계없이 사건을 만들기 전에 두 경로 모두 버린다.
+            detail = null;
+            text = null;
+        }
         if (memoryReadResult(type, toolName)) {
             // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
             detail = null;
@@ -203,7 +214,7 @@ public class HermesRunEventStream {
         }
         return new RunEvent(
                 type,
-                firstText(root, payload, "delta", "text", "output"),
+                text,
                 toolName,
                 detail,
                 durationMs(root, payload),

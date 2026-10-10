@@ -6,8 +6,8 @@ covers: `backend/src/main/java/com/bifos/assistant/mcp/`, `hermes/plugins/fos-ct
 
 ## 관찰 도구 연결 설계
 
-list_media_observations와 record_media_observation을 같은 Control Plane MCP 서버에 추가하는 확정 설계다.
-현재는 미구현이며 입력·응답·출처와 예산은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결-설계)이 갖는다.
+list_media_observations와 record_media_observation은 같은 Control Plane MCP 서버에 등록되어 있다.
+입력·응답·출처와 예산은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결-설계)이 갖는다.
 fos-ctx REQUIRED_TOOLS에 두 도구를 추가해 서명을 만들지 못하면 막는다.
 새 정의는 memory_remember 앞에 넣고 작업 기준의 기존 도구 전체와 상대 등록 순서를 보존한다.
 memory_search가 합쳐진 기준에서는 그 정의·서명·살펴보기 허용과 이름·schema 기반 검사를 유지한다.

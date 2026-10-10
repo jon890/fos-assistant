@@ -5,13 +5,13 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 
 ## 관찰 연결의 모듈 배치 설계
 
-REST와 chat.application의 페이지·본문 검사는 구현되었다. MCP 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)을 따른다.
+REST·MCP와 chat.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)을 따른다.
 chat.application의 기존 저장 서비스를 유지하고 MediaObservationPages와 MediaObservationInputReader를 새 소비자로 둔다.
 공개 페이지 타입은 chat.application.model.MediaObservationPage에 둔다.
 REST 요청·응답은 chat.presentation.ChatDtos, MCP 인자는 mcp.presentation.McpDtos에 모은다.
 mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
 HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수집 전에 null로 만든다.
-기존 Memory 검색의 두 경로 가림과 공용 시험 컨텍스트의 SQL 관측 대역을 보존한다.
+공용 시험 컨텍스트는 변경하지 않는다. Memory 검색이 추가되면 그 도구의 두 경로 가림과 SQL 관측 대역도 유지한다.
 JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
 MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원문·cause를 넘기지 않는다. 인증 실패는 기존 필터가 처리한다.
 

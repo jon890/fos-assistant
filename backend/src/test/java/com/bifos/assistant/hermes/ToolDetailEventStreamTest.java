@@ -18,6 +18,56 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 class ToolDetailEventStreamTest {
+    @Test
+    @DisplayName("실제 SSE의 관찰 본문은 scope와 커넥터 호출 전후에 관계없이 두 필드 모두 비운다")
+    void suppressesObservationBodiesInRealSseAcrossScopesAndConnectorHistory() throws IOException {
+        var mapper = JsonMapper.builder().build();
+        String marker = "SYNTHETIC_OCR_PRIVATE_3264";
+        StringBuilder raw = new StringBuilder();
+        for (boolean afterConnector : new boolean[] {false, true}) {
+            if (afterConnector) {
+                raw.append(
+                        "data: {\"event\":\"tool.started\",\"tool\":\"mcp__demo__read\",\"preview\":\"connector\"}\n\n");
+            }
+            for (String tool : List.of(
+                    "list_media_observations",
+                    "record_media_observation",
+                    "mcp__fos_assistant__list_media_observations",
+                    "mcp__fos_assistant__record_media_observation")) {
+                for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
+                    for (boolean nested : new boolean[] {false, true}) {
+                        for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
+                            var root = mapper.createObjectNode();
+                            var payload = nested ? root.putObject("data") : root;
+                            payload.put("event", event).put("tool", tool).put(field, marker);
+                            raw.append("data: ")
+                                    .append(mapper.writeValueAsString(root))
+                                    .append("\n\n");
+                        }
+                    }
+                }
+            }
+        }
+        HttpServer server = startServer(raw.toString());
+        try {
+            for (ToolDetailScope scope : List.of(
+                    ToolDetailScope.NONE, ToolDetailScope.ALL, ToolDetailScope.prefixes(Set.of("mcp__demo__")))) {
+                List<RunEvent> events = read(server, scope);
+                assertThat(events).isNotEmpty();
+                for (RunEvent event : events) {
+                    if (!"mcp__demo__read".equals(event.toolName())) {
+                        assertThat(event.detail()).isNull();
+                        assertThat(event.text()).isNull();
+                    }
+                    assertThat(event.toString()).doesNotContain(marker);
+                    assertThat(mapper.writeValueAsString(event)).doesNotContain(marker);
+                }
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private static final String RAW = """
             data: {"event":"tool.started","preview":"12345678-1234-5678-9012-123456789abc abcdef01-1234-5678-9012-123456789abc"}
 

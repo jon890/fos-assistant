@@ -26,7 +26,7 @@ READ_COMMITTED 새 트랜잭션에서 주인과 대상 상태를 다시 확인�
 ## 관찰 저장과 사용자 정정
 
 `MediaObservationService`는 보낸 첨부의 관찰을 저장하고 목록으로 읽는 동기 서비스다.
-REST/MCP/UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지 않는다.
+REST 조회·사용자 정정과 서명된 MCP 조회·기록을 제공한다. 전용 UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지 않는다.
 결정과 기각 근거는 [ADR-20261010 / media-observation-storage](../../backend/docs/adr/ADR-20261010-media-observation-storage.md)가 갖는다.
 
 쓰기 전에 현재 대화 주인과 업로더, 삭제·만료 상태를 확인하고 원본의 SHA-256과 크기를 직접 계산한다.
@@ -54,16 +54,14 @@ summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관�
 
 ### 관찰 API와 MCP 연결 설계
 
-REST 조회·사용자 정정과 페이지·제출 본문 검사는 구현되었다. MCP 연결은 아래의 확정 설계를 따른다.
-현재 main의 `MediaObservationService.list/record`를 그대로 호출한다.
+REST 조회·사용자 정정, MCP 조회·기록과 페이지·제출 본문 검사는 구현되었다.
+`MediaObservationService.list/record`를 그대로 호출한다.
 완료 결과 캐시의 머지를 선행 조건으로 두지 않는다.
 저장 서비스, 암호화, DDL과 삭제 장벽은 변경하지 않는다.
 
-현재 main의 record에는 캐시 재사용이 없어 새 MODEL UUID마다 새 revision과 본문을 저장한다.
+record에는 캐시 재사용이 없어 새 MODEL UUID마다 새 revision과 본문을 저장한다.
 캐시가 추가된 기준에서는 provider/model 미확인 관찰의 analysisKey 생성과 결과 재사용을 저장 producer가 둘 다 꺼야 한다.
-미머지 캐시 브랜치에는 두 제외 조건이 구현되어 있으나 현재 main에서 이용할 수는 없다.
-캐시가 합쳐지면 같은 record 시그니처와 두 제외 조건이 실제 main에 있는지, 다른 실행·UUID·본문을 새로 저장하는 회귀가 통과하는지 확인한다.
-브랜치에 구현된 것만으로 main의 조건을 충족했다고 판정하지 않는다.
+캐시를 추가할 때는 같은 record 시그니처와 두 제외 조건을 유지하고, 다른 실행·UUID·본문을 새로 저장하는 회귀를 통과해야 한다.
 list와 USER 정정 REST는 이 캐시 제외 producer에 의존하지 않는다.
 
 사진 업로드·전송과 Hermes의 native 이미지 입력은 기존 경로를 유지한다.

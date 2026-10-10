@@ -7,7 +7,7 @@ Hermes 내부 지점에 새로 기대면 같은 커밋에서 `hermes_contract.py
 
 ## 관찰 도구 연결 설계
 
-확정한 미구현 계약은 [사진 첨부의 관찰 연결](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)이 갖는다.
+구현한 관찰 도구의 계약은 [사진 첨부의 관찰 연결](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)이 갖는다.
 fos-ctx는 기존 pre_tool_call로 두 관찰 도구의 _fos_ctx를 덮어쓰고 서명이 없으면 막는다.
 새 hook이나 Hermes 내부 지점을 추가하지 않는다.
 기존 attachment_inspect, 최초 native 이미지 입력과 delegate_task의 이미지 전달을 유지한다.

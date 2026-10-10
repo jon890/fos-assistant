@@ -154,7 +154,6 @@ public final class ChatDtos {
 
     /**
      * 알림 줄 아래에 그리는 전달 묶음이다(ADR-075). 오류 코드는 싣지 않는다. 원인은 관리자 영역의 실행 상세가 보인다.
-     *
      * @param id 전달 묶음 번호. 다시 전달할 때 이 번호로 부른다
      * @param status {@code DELIVERING}, {@code DELIVERED}, {@code FAILED}, {@code STOPPED} 가운데 하나
      */
@@ -164,7 +163,6 @@ public final class ChatDtos {
 
     /**
      * 대화에 지금 도는 turn 이다. 같은 대화를 연 다른 창이 이것으로 답이 오는 중인지 안다.
-     *
      * @param executionId 그 turn 의 루트 실행 번호. 돌지 않거나 아직 번호가 붙기 전이면 null
      * @param startedAt 그 실행이 시작한 시각. 번호가 없거나 실행 줄을 찾지 못하면 null
      */
@@ -195,7 +193,6 @@ public final class ChatDtos {
 
     /**
      * 첨부 한 장이다. 본문과 주소를 담지 않는다. 화면이 대화의 공개 식별자와 첨부 번호로 본문 경로를 만든다.
-     *
      * @param visible 아직 볼 수 있다. 보관 기간이 지났거나 사용자가 지웠으면 false
      * @param expiresAt 파일을 지울 시각
      */
@@ -212,7 +209,6 @@ public final class ChatDtos {
 
     /**
      * 답에 묶인 결과물 파일 하나다. 화면이 대화의 공개 식별자와 이 경로로 본문 주소를 만든다.
-     *
      * @param path 대화 폴더 안의 상대 경로. {@code /} 로 나눈다
      * @param byteSize 답에 묶을 때의 크기
      * @param deleted 보관 기간이 지나 파일을 지웠다
@@ -225,7 +221,6 @@ public final class ChatDtos {
 
     /**
      * 대화 한 줄이다. 목록, 이름 바꾸기, 모델 선택이 같은 모양으로 돌려준다.
-     *
      * @param id 대화의 공개 식별자
      * @param agentCode 대화의 에이전트 코드. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
      * @param agentName 대화의 에이전트 이름. 에이전트 행이 없거나 대화에 에이전트가 없으면 null
@@ -253,7 +248,6 @@ public final class ChatDtos {
 
     /**
      * 대화 목록의 한 쪽이다.
-     *
      * @param items 최근에 바뀐 것부터 담은 대화
      * @param nextCursor 다음 쪽을 읽을 때 {@code cursor} 로 넘기는 값. 마지막 쪽이면 null
      */
@@ -284,7 +278,6 @@ public final class ChatDtos {
 
     /**
      * 그 에이전트의 profile 로 고를 수 있는 모델이다. 그룹이 숨긴 것은 빠져 있다.
-     *
      * @param defaultModel 고르지 않았을 때 도는 모델. 에이전트 기본값이 있으면 그 값이고 없으면 profile 의 값이다
      * @param defaultReasoningEffort 에이전트 기본 effort. 정하지 않았으면 null
      * @param defaultFromAgent 기본 모델을 에이전트 기본값이 정했는가
@@ -313,7 +306,6 @@ public final class ChatDtos {
 
     /**
      * 숨긴 provider 또는 모델 하나다.
-     *
      * @param model null 이면 그 provider 전체다
      */
     public record HiddenModelEntry(@NotNull String provider, String model) {}
@@ -344,7 +336,6 @@ public final class ChatDtos {
 
     /**
      * 관리자가 에이전트 기본 모델과 숨김을 정할 때 보는 값이다.
-     *
      * @param agentDefault 에이전트에 저장된 기본값
      * @param catalog 숨김을 적용하지 않은 목록. 기본 provider 와 기본 모델은 profile 의 값이다. Hermes 가 목록을
      *     답하지 못했으면 null 이다
@@ -397,7 +388,6 @@ public final class ChatDtos {
 
     /**
      * 새 대화 화면이 받는 추천 질문이다.
-     *
      * @param prompts 추천 질문. 보이는 차례대로다. {@code READY} 가 아니면 빈 목록
      * @param status {@code READY}, {@code GENERATING}, {@code NONE} 가운데 하나. {@code GENERATING} 이면
      *     화면이 잠시 뒤 다시 읽는다
@@ -410,7 +400,6 @@ public final class ChatDtos {
 
     /**
      * 관리자 사용량 화면의 첫 반응 시간 절이 받는 집계다.
-     *
      * @param days 집계한 기간의 일수
      * @param rows 날짜 오름차순이고 같은 날짜 안에서는 단계 순서다
      */
@@ -450,7 +439,6 @@ public final class ChatDtos {
 
     /**
      * 지표 하나의 건수와 백분위다. 값이 없는 지표는 {@code count} 가 0 이고 두 백분위가 null 이다.
-     *
      * @param p50Ms 중앙값. 밀리초
      * @param p90Ms 90번째 백분위. 밀리초
      */
@@ -462,7 +450,6 @@ public final class ChatDtos {
 
     /**
      * 대화의 답 아래에 그릴 기억 기록 하나다(ADR-20261007 / memory-remember).
-     *
      * <p>{@code kind} 는 {@code CREATED}, {@code UPDATED}, {@code PROPOSED} 이고 {@code status} 는 항목의 지금 승인 상태다. 민감
      * 항목은 본문을 싣지 않는다.
      */
@@ -497,7 +484,6 @@ public final class ChatDtos {
 
     /**
      * 대화의 답 아래에 접어 보일 참고한 기억 하나다(ADR-20261008 / memory-facts).
-     *
      * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code READ} 이고 본문은 싣지 않는다.
      */
     public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {

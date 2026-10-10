@@ -58,6 +58,7 @@ import { FOLLOW_UP_MCP_PROFILE, followUpMcpScenario } from "./scenarios/follow-u
 import { MEMORY_REMEMBER_MCP_PROFILE, memoryRememberMcpScenario } from "./scenarios/memory-remember-mcp.ts";
 import { agentLifecycleScenario } from "./scenarios/agent-lifecycle.ts";
 import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios/native-delegation-mcp.ts";
+import { MEDIA_OBSERVATION_PROFILE, mediaObservationMcpScenario } from "./scenarios/media-observation-mcp.ts";
 import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.ts";
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorBindingScenario } from "./scenarios/connector-binding.ts";
@@ -126,6 +127,7 @@ const SCENARIOS: readonly Scenario[] = [
   followUpMcpScenario,
   memoryRememberMcpScenario,
   nativeDelegationScenario,
+  mediaObservationMcpScenario,
   agentToolsScenario,
   // 아이의 개인 에이전트와 꺼진 에이전트가 목록에서 빠지는 것을 보므로 그 둘을 만드는 시나리오 뒤에 둔다.
   delegationScenario,
@@ -212,7 +214,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -242,6 +244,9 @@ function startControlPlane(
       DB_PASSWORD: "",
       SERVER_PORT: String(APP_PORT),
       ASSISTANT_JWT_SECRET: JWT_SECRET,
+      // 관찰 본문 저장은 공개 검사 전용 KEK만 쓴다.
+      ASSISTANT_DATA_ENCRYPTION_KEK_FILE: join(ROOT, "backend/src/test/resources/data-encryption/test-kek.keys"),
+      ASSISTANT_DATA_ENCRYPTION_ACTIVE_KEK_ID: "test-kek-1",
       // 민감 Memory 문서를 만드는 시나리오가 쓴다. 운영 값이 아니라 글자 0123456789abcdef0123456789abcdef 의 base64 다.
       ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID: "test-1",
       ASSISTANT_MEMORY_ENCRYPTION_KEYS: "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
@@ -373,6 +378,7 @@ async function main(): Promise<void> {
       [FOLLOW_UP_MCP_PROFILE]: PROFILE_KEY,
       [MEMORY_REMEMBER_MCP_PROFILE]: PROFILE_KEY,
       [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
+      [MEDIA_OBSERVATION_PROFILE]: PROFILE_KEY,
       [DELEGATION_PROFILE]: PROFILE_KEY,
       [CHAT_QUEUE_PROFILE]: PROFILE_KEY,
     }, undefined, {
@@ -383,6 +389,7 @@ async function main(): Promise<void> {
       [FOLLOW_UP_MCP_PROFILE]: ["fos-assistant"],
       [MEMORY_REMEMBER_MCP_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
+      [MEDIA_OBSERVATION_PROFILE]: ["fos-assistant"],
       [DELEGATION_PROFILE]: ["fos-assistant"],
       [CHAT_QUEUE_PROFILE]: ["fos-assistant"],
     }, skillRoot);

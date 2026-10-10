@@ -1,5 +1,8 @@
 package com.bifos.assistant.mcp.presentation;
 
+import com.bifos.assistant.chat.application.MediaObservationInputReader;
+import java.util.Set;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import tools.jackson.databind.JsonNode;
@@ -7,6 +10,48 @@ import tools.jackson.databind.JsonNode;
 /** MCP 도구가 받는 JSON 인자 모양과 하위 에이전트 session 등록의 응답 모양을 한곳에 둔다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpDtos {
+    public record MediaObservationListArguments(String afterAssetId, int limit) {
+        static MediaObservationListArguments from(JsonNode node) {
+            MediaObservationInputReader.fields(node, Set.of("afterAssetId", "limit"));
+            JsonNode cursor = node.get("afterAssetId");
+            if (cursor != null && !cursor.isNull() && !cursor.isTextual()) {
+                throw MediaObservationInputReader.invalid();
+            }
+            String after = cursor == null || cursor.isNull() ? null : cursor.asString();
+            if (after != null) {
+                MediaObservationInputReader.assetId(after);
+            }
+            JsonNode limit = node.get("limit");
+            long value = limit == null || limit.isNull() ? 30 : MediaObservationInputReader.revision(limit);
+            if (value < 1 || value > 30) {
+                throw MediaObservationInputReader.invalid();
+            }
+            return new MediaObservationListArguments(after, (int) value);
+        }
+    }
+
+    public record MediaObservationRecordArguments(
+            String assetId, long expectedRevision, UUID requestId, JsonNode observation) {
+        static MediaObservationRecordArguments from(JsonNode node) {
+            MediaObservationInputReader.fields(node, Set.of("assetId", "expectedRevision", "requestId", "observation"));
+            JsonNode asset = node.get("assetId");
+            if (asset == null || !asset.isTextual()) {
+                throw MediaObservationInputReader.invalid();
+            }
+            MediaObservationInputReader.assetId(asset.asString());
+            return new MediaObservationRecordArguments(
+                    asset.asString(),
+                    MediaObservationInputReader.revision(node.get("expectedRevision")),
+                    MediaObservationInputReader.requestId(node.get("requestId")),
+                    node.get("observation"));
+        }
+
+        @Override
+        public String toString() {
+            return "MediaObservationRecordArguments[body omitted]";
+        }
+    }
+
     public record MemoryReadArguments(Long id) {}
 
     public record ArtifactWriteArguments(String conversationId, String path, String content, String sourceUrl) {
