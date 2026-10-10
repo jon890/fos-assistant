@@ -213,7 +213,7 @@ export function useComposerAttachments({
     }
     if (overflowCount > 0) {
       notices.push(
-        `한 번에 ${MAX_ATTACHMENTS}장까지 올릴 수 있어요. ${overflowCount}장은 올리지 못했어요.`,
+        `사진이 너무 많으면 한 번에 이해하기 어려워요. 한 번에 ${MAX_ATTACHMENTS}장까지 보내고 나머지는 나눠 보내 주세요. ${overflowCount}장은 올리지 못했어요.`,
       );
     }
     if (oversize.length > 0) {
