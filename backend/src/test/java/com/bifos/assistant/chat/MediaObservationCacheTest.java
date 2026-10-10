@@ -23,9 +23,11 @@ import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.Sha256;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
+import tools.jackson.databind.SerializationFeature;
 
 class MediaObservationCacheTest extends MediaObservationRequestTest {
     @Autowired
@@ -68,6 +71,69 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
                 .isEqualTo(first);
         code(() -> record(1, alias, input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         code(() -> record(0, UUID.randomUUID(), submitted, source), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
+    }
+
+    @Test
+    @DisplayName("미확인 모델의 별개 실행은 다른 본문을 새 revision에 저장하고 UUID 재시도는 보존한다")
+    void storesSeparateUnknownExecutionsAndPreservesUuidRetry() {
+        for (var names : List.of(
+                List.of("UNKNOWN", "model"), List.of("provider", "UNKNOWN"), List.of("UNKNOWN", "UNKNOWN"))) {
+            photo = photo();
+            UUID firstId = UUID.randomUUID();
+            var initialSource = source(names.get(0), null, names.get(1), null, 123L);
+            var initial = input("첫 실행 결과");
+            var first = record(0, firstId, initial, initialSource);
+            var submitted = complete(ObservationStatus.SUCCEEDED, "다른 실행 결과", input().coverage(), "456");
+            var laterSource = source(names.get(0), null, names.get(1), null, 456L);
+            var second = record(1, UUID.randomUUID(), submitted, laterSource);
+            assertThat(second.revision()).isEqualTo(2);
+            assertThat(second.observation()).isEqualTo(submitted);
+            assertThat(second.provenance().executionId()).isEqualTo(456L);
+            assertThat(observations.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()).orElseThrow().analysisKey())
+                    .isNull();
+            assertThat(record(0, firstId, initial, initialSource)).isEqualTo(first);
+            code(() -> record(1, UUID.randomUUID(), submitted, laterSource), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
+        }
+        assertThat(observations.count()).isEqualTo(6);
+        assertThat(requests.count()).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("기존 미확인 행의 nonnull key도 후보로 쓰지 않고 과거 UUID는 읽는다")
+    void excludesLegacyUnknownRowsWithStoredKeysButPreservesUuidRetry() {
+        for (var names : List.of(List.of("UNKNOWN", "model"), List.of("provider", "UNKNOWN"))) {
+            photo = photo();
+            UUID firstId = UUID.randomUUID();
+            var initialSource = source(names.get(0), null, names.get(1), null, 123L);
+            var first = record(0, firstId, input(), initialSource);
+            // 수정 전 직렬화로 만든 key가 남은 구행을 재현한다.
+            String legacyKey = Sha256.hex(json.writer()
+                    .without(SerializationFeature.INDENT_OUTPUT)
+                    .writeValueAsString(Arrays.asList(
+                            first.sourceFingerprint(), 1, "media-observation-v1", names.get(0), null,
+                            names.get(1), null, Arrays.asList("ORIGINAL", null, null))));
+            jdbc.update("update media_observation set analysis_key=? where attachment_id=?", legacyKey, photo.id());
+            assertThat(observations.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()).orElseThrow().analysisKey())
+                    .isEqualTo(legacyKey);
+            var submitted = complete(ObservationStatus.SUCCEEDED, "새 미확인 결과", input().coverage(), "456");
+            var second = record(1, UUID.randomUUID(), submitted, source(names.get(0), null, names.get(1), null, 456L));
+            assertThat(second.revision()).isEqualTo(2);
+            assertThat(second.observation()).isEqualTo(submitted);
+            assertThat(record(0, firstId, input(), initialSource)).isEqualTo(first);
+        }
+        assertThat(observations.count()).isEqualTo(4);
+        assertThat(requests.count()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("알려진 provider와 model은 두 버전이 null이어도 다른 실행의 결과를 재사용한다")
+    void reusesKnownIdentityWithNullVersions() {
+        var first = record(0, UUID.randomUUID(), input(), source("provider", null, "model", null, 123L));
+        var submitted = complete(ObservationStatus.SUCCEEDED, "다른 본문", input().coverage(), "456");
+        assertThat(record(1, UUID.randomUUID(), submitted, source("provider", null, "model", null, 456L)))
+                .isEqualTo(first);
+        assertThat(observations.findAll()).singleElement().satisfies(row -> assertThat(row.analysisKey()).isNotNull());
+        assertThat(requests.count()).isEqualTo(2);
     }
 
     @Test

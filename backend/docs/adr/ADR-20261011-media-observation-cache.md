@@ -21,6 +21,11 @@
 평문 호환 행은 cache 후보에서 제외한다. 목록과 기존 UUID 재시도는 기존 평문 호환 읽기를 유지한다.
 본문은 현재 크기 제한, 저장 출처에 대한 `MediaObservationInput.validate`, 행과 본문의 상태 일치를 모두 통과해야 한다.
 후보의 저장 출처와 복호화한 coverage로 계산한 key도 저장 key와 같아야 한다.
+provider 또는 model의 정확한 문자열이 예약 표식 `UNKNOWN`이면 새 분석 key를 만들지 않는다.
+저장된 후보에도 이 표식이 있으면 기존 nonnull key가 있어도 재사용하지 않는다.
+미확인 정체성의 새 UUID 제출은 새 revision과 본문을 저장하며, 같은 UUID와 같은 내용의 재시도는 과거 revision을 반환한다.
+알려진 provider와 model의 providerVersion·modelVersion이 null인 경우는 기존 재사용 조건을 유지한다.
+표식 검사는 실제 provider나 모델의 신원을 검증하지 않는다. 일반 이름을 쓴 출처의 신뢰성까지 보장하는 계약은 아니다.
 본문을 열 수 없거나 key가 불일치하면 miss이며, 같은 CAS에서 제출한 새 암호화 revision을 만든다.
 SQL 장애는 miss로 바꾸지 않고 요청 실패로 전파한다.
 
@@ -58,7 +63,7 @@ Jackson 3으로 배열과 문자열만 직렬화하며 숫자는 schemaVersion�
 
 ### 저장과 수명
 
-`media_observation.analysis_key`는 nullable `CHAR(64)`이며 신규 MODEL 완료 행에만 채운다.
+`media_observation.analysis_key`는 nullable `CHAR(64)`이며 provider와 model에 `UNKNOWN`이 없는 신규 MODEL 완료 행에만 채운다.
 기존 행의 null은 재사용 불가다. 자동 backfill, lazy backfill과 재분석은 하지 않는다.
 기존 최신 revision 조회와 key 비교를 사용하며 새 색인, 유일 제약과 별도 cache 저장소는 만들지 않는다.
 현재 UNIQUE, 복합 FK, 삭제 cascade와 첨부 수명을 그대로 유지한다.

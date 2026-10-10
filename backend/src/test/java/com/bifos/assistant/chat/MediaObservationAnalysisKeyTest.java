@@ -33,6 +33,22 @@ class MediaObservationAnalysisKeyTest {
     }
 
     @Test
+    @DisplayName("미확인 provider 또는 model에는 분석 key를 만들지 않는다")
+    void omitsKeyForUnknownProviderOrModel() {
+        for (var unknown : List.of(
+                source(123L, "UNKNOWN", null, "model", null, 1, "media-observation-v1", Instant.EPOCH),
+                source(123L, "provider", null, "UNKNOWN", null, 1, "media-observation-v1", Instant.EPOCH),
+                source(123L, "UNKNOWN", null, "UNKNOWN", null, 1, "media-observation-v1", Instant.EPOCH))) {
+            assertThat(key(fingerprint, unknown, original)).isNull();
+        }
+        assertThat(key(
+                        fingerprint,
+                        source(123L, "provider", null, "model", null, 1, "media-observation-v1", Instant.EPOCH),
+                        original))
+                .isNotNull();
+    }
+
+    @Test
     @DisplayName("여덟 조건을 각각 구분하고 실행과 관측 시각을 제외한다")
     void distinguishesEachConditionButExcludesExecutionAndObservationTime() {
         String expected = key(fingerprint, source, original);

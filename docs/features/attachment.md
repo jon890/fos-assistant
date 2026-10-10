@@ -61,6 +61,13 @@ summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관�
 구행의 null key, 평문 호환 행, PROCESSING, FAILED, USER와 과거 revision은 재사용하지 않는다.
 평문 호환 행은 목록과 기존 UUID 재시도에서 계속 읽을 수 있다.
 
+provider 또는 model을 확인하지 못한 제출은 대문자 예약 표식 `UNKNOWN`을 쓴다.
+둘 중 하나에 이 표식이 있으면 새 analysis key를 만들지 않으며, 저장된 후보의 key가 nonnull이어도 재사용하지 않는다.
+새 UUID는 제출한 본문으로 새 revision을 만들고 같은 UUID·같은 내용은 처음 수락한 revision을 반환한다.
+알려진 provider와 model의 두 version이 null인 재사용은 유지한다.
+이 표식만 검사하며 실제 provider·model 신원까지 검증하지 않는다.
+executionId를 가짜 provider/modelVersion이나 promptVersion에 넣거나 USER 출처로 바꾸어 미확인 정체성을 숨기지 않는다.
+
 | 제출 | 재사용 뒤 응답과 저장 |
 | --- | --- |
 | 같은 분석 조건, 새 UUID, 현재 revision | 기존 결과를 반환하고 새 alias만 추가한다 |

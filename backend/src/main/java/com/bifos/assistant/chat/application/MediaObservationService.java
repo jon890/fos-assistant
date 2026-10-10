@@ -206,6 +206,7 @@ public class MediaObservationService {
                 || row == null
                 || row.bodyKeyId() == null
                 || !completed(row.provenanceKind(), row.status())
+                || MediaObservationAnalysisKey.hasUnknownIdentity(provenance(row))
                 || !analysisKey.equals(row.analysisKey())) {
             return false;
         }

@@ -11,12 +11,15 @@ import lombok.NoArgsConstructor;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 
-/** 검증된 분석 조건만 고정 배열로 직렬화한다. 결과 본문과 실행 시각은 포함하지 않는다. */
+/** 미확인 정체성을 제외한 분석 조건을 고정 배열로 직렬화한다. 실제 provider 신원을 검증하지는 않는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MediaObservationAnalysisKey {
 
     public static String compute(
             ObjectMapper json, String fingerprint, ObservationProvenance source, Coverage coverage) {
+        if (hasUnknownIdentity(source)) {
+            return null;
+        }
         var region = coverage.region();
         List<String> coordinates = region == null
                 ? null
@@ -36,6 +39,11 @@ public final class MediaObservationAnalysisKey {
                         source.model(),
                         source.modelVersion(),
                         Arrays.asList(coverage.mode(), coordinates, coverage.frame()))));
+    }
+
+    public static boolean hasUnknownIdentity(ObservationProvenance source) {
+        return ObservationProvenance.UNKNOWN_IDENTITY.equals(source.provider())
+                || ObservationProvenance.UNKNOWN_IDENTITY.equals(source.model());
     }
 
     private static String coordinate(double value) {
