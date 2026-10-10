@@ -2,6 +2,8 @@
 
 관리자가 사용자를 더하고 끄며, 사용자가 로그인하고 그 활동이 기록되는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/user/`, `backend/src/main/java/com/bifos/assistant/people/`, `web/src/app/signin/`, `web/src/app/signout/`, `web/src/app/admin/people/`, `web/src/lib/control-plane.ts`
+
 ## 요구
 
 - **관리자가 화면에서 한 번 더하면 끝난다.** 홈서버에 들어가지 않는다. Control Plane 이 허용 목록에 넣고 Hermes profile 과 key, 그 profile 에 묶인 MCP 토큰을 만든다.

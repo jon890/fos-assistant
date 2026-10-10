@@ -37,7 +37,7 @@ test("언어별 범위와 시험 및 생성물 제외를 판정한다", () => {
 });
 
 test("루트와 모듈의 docs 바로 아래 문서는 1000줄이고 ADR 과 그 밖의 Markdown 은 보지 않는다", () => {
-  for (const file of ["docs/prd.md", "backend/docs/flow.md", "web/docs/prd.md", "hermes/docs/hermes-contract.md"]) assert.equal(limitFor(file), 1000, file);
+  for (const file of ["docs/prd.md", "backend/docs/data-schema.md", "web/docs/code-architecture.md", "hermes/docs/hermes-contract.md"]) assert.equal(limitFor(file), 1000, file);
   for (const file of ["docs/adr/ADR-001-x.md", "backend/docs/adr/INDEX.md", "hermes/README.md", "README.md", "docs/images/a.md"]) assert.equal(limitFor(file), null, file);
 });
 
@@ -59,11 +59,11 @@ test("기능 문서는 500줄을 넘어도 실패하지 않고 알림 하나를 
 
 test("모듈 문서는 한도를 넘어도 실패하지 않고 알린다", (t) => {
   const f = fixture(t);
-  f.put("backend/docs/flow.md", 1001);
+  f.put("backend/docs/data-schema.md", 1001);
   const result = checkFileLengths(f.root);
   assert.deepEqual(result.errors, []);
   assert.equal(result.notices.length, 1);
-  assert.match(result.notices[0], /backend\/docs\/flow\.md: 1001줄 > 1000줄/);
+  assert.match(result.notices[0], /backend\/docs\/data-schema\.md: 1001줄 > 1000줄/);
 });
 
 test("새 파일은 상한까지 통과하고 한 줄만 초과해도 실패한다", (t) => {

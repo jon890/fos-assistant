@@ -2,6 +2,8 @@
 
 커넥터 도구 호출을 위험도와 정책으로 판정하고, 승인이 필요한 호출을 사용자가 승인하는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/chat/approval-*`, `web/src/components/connector/connector-tools.tsx`, `web/src/lib/connector-action.ts`, `hermes/plugins/dashboard-profile-api/connector_policy.py`, `hermes/plugins/fos-ctx/connector_policy.py`
+
 ## 요구
 
 - 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 남아 있는 옛 커넥터 에이전트도 같다

@@ -2,6 +2,8 @@
 
 사용자가 커넥터에 계정을 연결하고 그 연결을 에이전트에 붙이는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
+
 ## 요구
 
 **커넥터는 에이전트에게 도구를 쥐어 주는 것이고, 에이전트의 역할을 넓혀 주는 것이다.**
