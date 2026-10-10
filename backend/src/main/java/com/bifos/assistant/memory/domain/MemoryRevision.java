@@ -145,7 +145,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         this.contentKeyId = body.keyId();
     }
 
-    /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@link #id()} 와 같다. */
+    /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@code id()} 와 같다. */
     @Override
     public MemoryRevisionId getId() {
         return id();
