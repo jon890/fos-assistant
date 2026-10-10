@@ -6,11 +6,33 @@ import java.util.List;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
-/** 카탈로그 항목의 {@code tools} 칸을 도구 정책으로 읽는다. */
+/** 카탈로그 JSON을 검증하고 항목의 {@code tools} 칸을 도구 정책으로 읽는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorCatalogTools {
+    private static final JsonMapper CATALOG = JsonMapper.builder(JsonFactory.builder()
+                    .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                    .build())
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
+
+    /** tree 변환 전에 중복과 뒤따르는 JSON을 거절하며 원문과 cause를 오류 처리에 넘기지 않는다. */
+    static JsonNode parseCatalog(String raw) {
+        try {
+            JsonNode catalog = CATALOG.readTree(raw);
+            if (!catalog.isArray()) {
+                throw new IllegalStateException();
+            }
+            return catalog;
+        } catch (RuntimeException ignored) {
+            throw new IllegalStateException();
+        }
+    }
 
     static boolean readable(JsonNode declared) {
         return declared == null || declared.isNull() || declared.isObject();

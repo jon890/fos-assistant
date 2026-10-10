@@ -94,7 +94,7 @@ public class ConnectorActionExecution implements Persistable<Long> {
     @Column(name = "protocol", nullable = false, updatable = false, length = 32)
     private String protocol;
 
-    /** 권한 원문을 담지 않는다. 발급과 소비 경로는 별도 구현이 맡는다. */
+    /** 권한 원문을 담지 않고 일회성 발급 식별자만 보존한다. */
     @JdbcTypeCode(SqlTypes.BINARY)
     @Column(name = "ticket_id", columnDefinition = "BINARY(16)")
     private UUID ticketId;
@@ -147,6 +147,26 @@ public class ConnectorActionExecution implements Persistable<Long> {
     @Override
     public Long getId() {
         return actionId();
+    }
+
+    /** 한 번 발급한 권한은 만료되거나 응답이 유실돼도 다시 발급하지 않는다. */
+    public void issueTicket(UUID id, Instant expiry) {
+        if (ticketId != null || ticketExpiresAt != null || consumedAt != null) {
+            throw new IllegalStateException("financial execution unavailable");
+        }
+        ticketId = Objects.requireNonNull(id);
+        ticketExpiresAt = Objects.requireNonNull(expiry);
+    }
+
+    /** 같은 식별자의 미만료 권한만 한 번 소비한다. */
+    public void consumeTicket(UUID id, Instant now) {
+        if (!Objects.equals(ticketId, id)
+                || ticketExpiresAt == null
+                || consumedAt != null
+                || !now.isBefore(ticketExpiresAt)) {
+            throw new IllegalStateException("financial execution unavailable");
+        }
+        consumedAt = now;
     }
 
     @Override

@@ -552,8 +552,8 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 ### connector_action_execution
 
 승인 줄 하나에 속한 금융 실행 내용이다.
-저장과 검증 모델만 구현했으며 현재 금융 호출은 계속 차단한다.
-인증과 권한 소비, 준비 API 및 주문 실행은 후속 구현이 맡는다.
+저장과 검증, 일회성 ticket 발급·소비 모델을 구현했으며 현재 금융 호출은 계속 차단한다.
+운영 승인 연결, 준비 API 및 주문 실행은 후속 구현이 맡는다.
 JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md)의 「금융 실행 내용의 저장과 검증」이 갖는다.
 
 | 컬럼 | 타입과 제약 |
@@ -576,7 +576,13 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 연결과 바인딩의 소유자 및 에이전트가 승인 줄과 같아야 한다.
 기존 `connector_action.args_json`과 `args_sha256`은 원래 요청의 중복 판정용으로 남긴다.
 실행 원문과 표시 값, scope 및 두 revision은 저장한 뒤 바꾸지 않는다.
-권한 발급·소비 시각과 ticket 식별자, 새 요청의 선조 식별자는 현재 저장 함수가 채우지 않는다.
+저장 함수는 ticket 식별자와 발급·소비 시각을 NULL로 둔다.
+발급은 세 권한 칸이 모두 NULL일 때 ticket_id와 ticket_expires_at을 한 번만 채운다.
+소비는 같은 미만료 ticket_id이며 consumed_at이 NULL일 때 그 칸을 한 번만 채운다.
+ticket_expires_at과 consumed_at은 Java에서도 MICROS로 절삭해 MySQL DATETIME(6)과 정확히 대조한다.
+issued_at 컬럼과 ticket 원문·서명은 저장하지 않는다.
+발급·소비 응답은 실제 커밋 뒤에만 반환하며 실패와 롤백은 이전 권한 상태를 보존한다.
+새 요청의 선조 식별자는 현재 저장 함수가 채우지 않는다.
 
 세 본문은 기존 `TextCipher`로 각각 암호화하며 동일한 keyId여야 저장한다.
 AAD는 `connector_action_execution:<action_id>:column:<컬럼 이름>:user:<소유자 번호>`다.

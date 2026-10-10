@@ -91,6 +91,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
         return UNFILTERED_PATHS.contains(uri)
+                || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
                 || uri.startsWith(SERVICE_API_PREFIX)
                 || uri.startsWith(BROWSER_GATEWAY_PREFIX);
     }
