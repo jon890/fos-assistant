@@ -239,6 +239,27 @@ class UserExecutionLimitBackgroundTest { ... }
 
 기준 파일을 갱신하거나 규칙을 뺄 때 읽는 절차를 갖는다.
 
+### IntelliJ 와 Spotless 의 Java 포맷
+
+Java 포맷은 IntelliJ IDEA 2026.1.3(build 261.25134.95)와 `config/intellij/code-style.xml` 로 고정한다.
+IntelliJ 에서 이 XML 을 Code Style scheme 으로 가져오면 같은 엔진과 설정으로 정리할 수 있다.
+프로젝트 설정을 내보낸 뒤 포맷을 바꿀 때는 이 XML 을 고친다. 사용자 전역 설정은 수정하지 않는다.
+자동 import 최적화는 하지 않는다. 명시 import 와 순서를 보존하고 wildcard 는 Checkstyle 이 금지한다.
+
+Spotless 의 기본 `idea()` 는 파일마다 IDE 를 기동한다. 대신 `prepareIntellijFormat` 이 main/test Java 의 사본을
+`build/intellij-format` 에 만들고 IntelliJ CLI 를 한 번 기동한다. Spotless 는 이 결과를 비교하고 적용한다.
+`spotlessCheck` 는 소스를 바꾸지 않는다. 설정, 버전, 실행 스크립트와 Java 입력 목록이 바뀌면 사본을 다시 만든다.
+IDE 는 별도 config/system/plugins/log 디렉터리로 실행해 열려 있는 개발자 IDE 와 격리한다.
+실패하거나 제한 시간을 넘거나 일부 파일만 처리하면 이전 결과를 쓰지 않고 검사와 적용을 실패시킨다.
+
+개발자는 고정 버전의 설치 디렉터리를 `INTELLIJ_FORMAT_HOME` 으로 지정한다. 지정하지 않은 Linux 에서는
+공식 배포본의 SHA256 을 검증해 내려받는다. 버전과 checksum 은 version catalog 와 설치 스크립트가 갖는다.
+첫 다운로드는 약 1.6GB 이며 CI 는 검증된 배포본을 캐시한다.
+기본 Spotless 범위는 `origin/main` 과의 공통 조상 뒤 바뀐 파일이다.
+`-PintellijFormatAll=true` 를 넘기면 main/test Java 전체를 검사하거나 적용한다.
+전체 통일 전에 파일 길이와 품질 기준도 충족해야 한다. 포맷만으로 기준을 넘으면 파일 분리는 별도 관심사로 진행한다.
+실행 명령과 커밋 분리는 `backend/AGENTS.md` 의 「포맷」 절이 갖는다.
+
 ### 구조 규칙의 기준 파일
 
 `backend/config/archunit/store/` 의 기준 파일이 지금 있는 위반을 얼려 둔다. 기준의 뜻은 [ADR-042](../../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 가 갖는다.

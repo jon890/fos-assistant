@@ -93,13 +93,15 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 ./gradlew spotlessApply
 ```
 
-인터페이스 추상 메서드 선언 사이의 빈 줄은 레시피가 고치지 않는다. `BlankLines` 의 기본 모양이 0줄이라 손으로 고친다.
+메서드 사이의 빈 줄은 마지막 IntelliJ 포맷 단계가 프로젝트 설정에 맞춘다.
 `rewriteChanged` 는 `origin/main` 과의 공통 조상 뒤에 바뀐 파일만 고치므로 `git fetch origin` 뒤에 돌린다.
 daemon 이 `rewriteRun` 도중 멈추면 범위 밖 파일을 되돌리는 단계도 돌지 못한다. 바꾸기 전 내용을 떠 둔 디렉터리는 `rewriteChanged:` 로 시작하는 로그 줄에 있다.
 
 ## 포맷
 
-Java 포맷은 Spotless 의 palantir-java-format 이 정한다. 한 줄은 120자이고 한글 한 글자도 한 칸으로 센다.
+Java 포맷은 고정 IntelliJ 엔진과 `config/intellij/code-style.xml` 이 정한다.
+같은 버전의 IntelliJ 에서 이 XML 을 Code Style scheme 으로 가져온다.
+개발자 설치 디렉터리는 `INTELLIJ_FORMAT_HOME` 으로 지정한다. Linux 에서는 지정하지 않으면 고정 배포본을 검증해 캐시한다.
 
 ```bash
 # cwd: backend/
@@ -107,9 +109,12 @@ Java 포맷은 Spotless 의 palantir-java-format 이 정한다. 한 줄은 120�
 ./gradlew spotlessApply
 ```
 
-**파일을 처음 고치면 그 파일 전체가 포맷된다.** 고친 줄만 바뀌지 않는다.
-비교 기준이 `origin/main` 과의 공통 조상이므로 `git fetch origin` 뒤에 돌린다.
-Javadoc 본문은 포맷하지 않는다. 한국어 Javadoc 의 줄바꿈이 바뀌지 않는다.
+기본은 `origin/main` 과의 공통 조상 뒤 바뀐 파일만 검사하고 포맷한다. `git fetch origin` 뒤에 돌린다.
+main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-PintellijFormatAll=true` 를 더한다.
+Javadoc 도 같은 설정으로 정리한다.
+자동 import 최적화는 하지 않는다. 명시 import 를 유지하고 wildcard 는 Checkstyle 이 금지한다.
+`spotlessCheck` 는 build 사본만 포맷하며 원본을 바꾸지 않는다.
+batch 실행과 캐시, 실패 처리의 계약은 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 의 「IntelliJ 와 Spotless 의 Java 포맷」 이 갖는다.
 
 **기능 변경과 포맷은 다른 커밋으로 나눈다.**
 먼저 기능을 고쳐 커밋하고, 그 뒤 `./gradlew spotlessApply` 결과를 따로 커밋한다.
