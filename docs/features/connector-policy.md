@@ -305,6 +305,95 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 도구가 오류 없이 끝났는데 구조화 결과도 JSON 텍스트도 없으면 첫 텍스트 칸의 글로 성공을 답한다. 실행된 쓰기를 실패로 기록하지 않기 위해서다
 - 커넥터의 도구 하나는 프로세스 안의 상태에 기대지 않아야 한다. 이 경로는 Hermes 가 쥔 MCP 연결이 아니라 새 프로세스에서 돈다
 
+## 금융 실행 내용의 저장과 검증
+
+금융 실행 원문과 승인 표시 값을 함께 검증하고 저장하는 모델이다.
+현재 `FINANCIAL`과 `DESTRUCTIVE` 호출은 계속 `RISK_NOT_OPEN`으로 거절하며 상시 허락을 만들지 않는다.
+준비 API, 금융 승인 경로, claim 인증과 실제 주문 실행은 아직 구현하지 않았다.
+저장 컬럼과 수명은 [저장 모델](../../backend/docs/data-schema.md)의 「connector_action_execution」이,
+결정의 근거는 [ADR-20261010 / financial-execution-guard](../adr/ADR-20261010-financial-execution-guard.md)가 갖는다.
+
+### 원문과 scope
+
+`ConnectorExecutionSnapshot`은 저장 전과 읽은 뒤 같은 strict 소비 함수를 사용한다.
+누락·추가·중복 키, 타입 오류, 잘못된 JSON과 뒤에 붙은 JSON을 거절한다.
+기본값을 보충하거나 숫자를 문자열로 바꾸지 않으며 원문을 재직렬화하지 않는다.
+
+| 입력 | 상한 |
+| --- | --- |
+| 원래 args와 실행 args | 각각 UTF-8 16 KiB |
+| summary | UTF-8 8 KiB |
+| scope JSON | UTF-8 2 KiB |
+| JSON 중첩 깊이 | 5 |
+
+scope_fields는 1개 이상 8개 이하의 `{arg,field}` 배열이다.
+각 항목에는 이 두 키만 있고 값은 `[A-Za-z][A-Za-z0-9_]{0,63}` 문자열이다.
+arg와 field는 각각 중복될 수 없으며 field는 연결의 공개 칸이어야 한다.
+scope에는 선언한 arg만 있고 값은 비어 있지 않은 UTF-8 128바이트 이하 문자열이다.
+각 값은 연결의 공개 칸 및 실행 args의 같은 arg 값과 문자열 그대로 같아야 한다.
+실제 자식 env 대조와 서비스별 시장·통화 조합은 커넥터 구현이 맡는다.
+
+### 표시 값과 실행 인자
+
+summary에는 아래 키가 모두 있어야 하며 추가 키는 거절한다.
+null은 표가 허용하는 곳에만 쓴다.
+decimal 문법은 `[0-9]+(\.[0-9]+)?`이고 1자 이상 30자 이하 문자열이다.
+수량·금액·가격은 양수만 허용하고 filledQuantity만 0 이상을 허용한다.
+부호, 공백, 지수, 쉼표와 숫자 타입을 거절한다.
+
+| 키 | 타입과 대조 |
+| --- | --- |
+| `account` | 계좌 조회의 끝 네 자리 표시 값, 숫자 문자열 4자 |
+| `symbol` | `[A-Za-z0-9.-]{1,32}` 문자열, 실행 args 또는 expected_order와 일치 |
+| `market`, `currency` | 각각 1자 이상 16자 이하 시장 문자열과 ISO 통화 문자열 3자, 실행 args와 일치 |
+| `side` | BUY 또는 SELL |
+| `quantity`, `orderAmount`, `price` | 양의 decimal 문자열 또는 미사용을 뜻하는 null |
+| `orderType`, `timeInForce` | 각각 LIMIT/MARKET, DAY/CLS/OPG |
+| `operation` | CREATE/MODIFY/CANCEL, 호출자가 검증한 대상 동작과 일치 |
+| `orderId` | CREATE는 null, MODIFY/CANCEL은 제어 문자 없는 1자 이상 256자 이하 문자열 |
+| `original` | CREATE는 null, MODIFY/CANCEL은 원래 주문 object |
+| `normalization` | 0개 이상 8개 이하의 `{field,before,after}` 배열 |
+
+original은 `orderId,symbol,market,currency,side,quantity,orderAmount,price,orderType,timeInForce,status,filledQuantity`만 갖는다.
+공통 칸은 위 타입을 따르되 orderId와 quantity는 null을 허용하지 않는다.
+status는 비어 있지 않은 32자 이하 문자열이며 filledQuantity는 0 이상의 decimal 문자열이다.
+price는 LIMIT에만 값이 있고, orderAmount는 금액 주문에만 값이 있다.
+expected_order는 original에서 market과 filledQuantity를 뺀 칸 및 `{filledQuantity}`만 있는 execution을 갖는다.
+original은 이 execution을 펼치고 조회한 market을 더한 값이며 실행 args와 대조한다.
+취소는 원래 주문의 표시 값을 유지하고 정정은 변경 후 값과 original을 함께 보존한다.
+
+normalization.field는 symbol, quantity, orderAmount, price, timeInForce 중 하나이며 중복될 수 없다.
+각 항목에는 field, before, after만 있고 전후 값은 1자 이상 32자 이하 문자열 또는 누락을 뜻하는 null이다.
+기본값, 표기 변경과 가격 절삭의 모든 차이는 원래 args와 실행 args를 대조해 기록한다.
+변경이 없으면 빈 배열이며 기록한 전후 값이 실제 인자와 다르면 거절한다.
+정규화 계산과 조회 값의 출처 확인은 커넥터가 맡는다.
+
+| 동작 | 실행 args의 정확한 키 |
+| --- | --- |
+| CREATE | symbol, side, orderType, timeInForce, quantity/orderAmount 중 정확히 하나, LIMIT의 price, UUID clientOrderId, scope arg, market, currency |
+| MODIFY | orderId, orderType, 해당 quantity/price, scope arg, market, currency, expected_order |
+| CANCEL | orderId, scope arg, market, currency, expected_order |
+
+미사용 수량·금액·가격은 실행 args에서 키 자체가 없고 summary에서는 null이다.
+정정에서 quantity가 없으면 원래 주문 수량을 표시한다.
+클라이언트가 실행 args에 기본값이나 미선언 키를 넣는 것은 이 저장 계약이 허용하지 않는다.
+원래 입력의 confirmHighValueOrder는 CREATE/MODIFY에서 boolean false만 선택적으로 허용하며 실행 args에 남기지 않는다.
+
+### 원문 해시와 중복 의도 키
+
+원문 해시는 암호화 전 UTF-8 바이트의 소문자 SHA-256이며 복호화한 원문과 다시 대조한다.
+request_key는 사용자, 연결, 도구와 실행 args의 정규화한 문자열 필드로 만든다.
+scope arg, market, currency와 원래 orderId는 포함하고 clientOrderId와 expected_order는 제외한다.
+decimal은 앞의 0과 불필요한 소수점 끝 0을 제거한 정확한 문자열로 맞춘다.
+필드 이름을 ASCII 순으로 정렬하고 각 이름·값을 `UTF-8 바이트수:값`으로 붙인다.
+도메인 `fos-financial-intent-v1`도 같은 길이 접두사로 앞에 붙인 뒤 전체 바이트를 SHA-256으로 해시한다.
+request_key는 원래 인자 해시나 실행 원문 해시를 대신하지 않는다.
+현재 저장 모델은 이 키의 조회 인덱스만 제공하며 중복 의도의 승인·실행 차단은 후속 경로가 맡는다.
+
+공통 자료는 `test/fixtures/financial-approval-v1.json`이다.
+정상·거절 사례와 원문·기대 해시·summary·scope를 Java, Python과 Bun에서 같은 값으로 읽을 수 있다.
+현재 Java의 실제 소비 함수와 독립 Python 해시 계산을 대조하며 다른 언어의 실행 경로는 후속 구현에서 검증한다.
+
 ## 커넥터 READ 데이터의 흐름
 
 연결을 붙인 에이전트가 커넥터에서 읽은 글이 모델, 셸, 웹, 다른 커넥터, Memory, 결과물, 기록으로 가는 길을 갖는다.
