@@ -2576,6 +2576,30 @@ Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh
 [`hermes/tests/hermes_contract.py`](../tests/hermes_contract.py) 의 `LIVE_RELOAD` 가 이 지점을 선언하고, `HermesSourceTest.test_live_reload_points` 가 소스에서 확인한다.
 실패하면 붙인 커넥터가 재시작 전까지 보이지 않는데 Control Plane 은 반영됐다고 판정할 수 있다. ADR 의 판정을 다시 본다.
 
+### 금융 prepare와 실행 전용 전달
+
+대시보드의 prepare 본문은 `{profile,hermes_tool,args}`다.
+서비스 인증·profile 검사와 매번 지원 확인을 거쳐 manifest의 준비 도구 하나만 호출한다.
+MCP 입력은 `{v:1,tool,args}`이며 tool은 접두사를 뺀 금융 도구 이름이다.
+실제 목록에 같은 등록 이름이 하나이고 준비 도구의 `read_only_hint`가 참이어야 한다.
+준비 결과는 `{v:1,executionArgs,summary}`이며 크기·strict 타입·표시 값은
+[커넥터 정책](../../docs/features/connector-policy.md)의 저장 검증 계약을 따른다.
+일반 verify/options는 빈 args를 유지한다.
+
+금융 execute 본문은 기존 세 칸에 `execution`을 추가한다.
+execution은 `{v:1,protocol,ticket,argsJson,argsSha256}`이고 protocol은 `approval-claim-v1`이다.
+argsJson은 저장 원문 그대로이며 해시와 SDK 인자의 키·값·타입·추가 키를 모두 대조한다.
+ticket의 payload 14키와 MICROS·최대 60초 계약을 읽고 실제 인증과 현재 권한은 claim이 판정한다.
+실행 자식만 `FOS_APPROVAL_TICKET`, `FOS_APPROVAL_ARGS_JSON`, `FOS_APPROVAL_CLAIM_URL`을 받는다.
+앞의 두 값은 설치 정의에 선언할 수 없고 종료 뒤 폐기한다.
+주소는 호스트의 `FOS_CONNECTOR_EXECUTIONS_BASE_URL`에서만 정한다.
+지원 확인은 같은 운영 주소에 기존 대시보드 서비스 인증과 fresh nonce를 실어 보낸다.
+nonce와 성공 원문을 저장하거나 자식에 서비스 비밀값을 전달하지 않는다.
+
+이 소비자는 금융 도구의 exclude를 풀지 않는다. 실제 지원 제공자와 바인딩 반영,
+승인 hook·주문 producer 구현 전에는 금융 호출이 계속 차단된다.
+지원 상태의 verified는 현재 응답의 검증 결과이며 금융 거래 허가를 뜻하지 않는다.
+
 ### 커넥터 정책이 기대는 계약
 
 Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 커넥터 도구의 판정이 비켜 갈 수 있다.

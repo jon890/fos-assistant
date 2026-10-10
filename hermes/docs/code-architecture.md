@@ -39,6 +39,11 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 
 ## 범용 커넥터
 
+`connector_guard.py`는 보호 선언과 바인딩 지원 응답을 검증하고,
+`connector_guard_validation.py`는 원문·SDK 인자와 준비 결과를 대조한다.
+`connector_prepare.py`는 준비 도구만 호출하고 실행 자식의 일회성 환경을 구성한다.
+이 소비자들은 서비스 이름을 모르며 실제 지원 제공자와 승인 경로가 없으면 금융을 숨긴다.
+
 `hermes/connectors/<커넥터 이름>/` 은 이 저장소가 유지보수하는 커넥터다([ADR-064](adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md)).
 대시보드 plugin 이 읽는 plugin 디렉터리 모양 그대로이고, 운영자가 아래 「커넥터」 의 운영 목록에 그 디렉터리를 올려야 카탈로그에 나온다.
 설치 묶음에는 들어가지 않는다.
