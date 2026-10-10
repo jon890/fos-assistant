@@ -54,7 +54,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 반영 완료, 예약 확인은 사용자 행을 먼저, 에이전트 행을 다음에 잠근다. 공개 범위 변경과 관리자 수정도 같은 에이전트 행을
  * 잠그므로 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다.
  *
- * <p>옛 커넥터 에이전트({@link Agent#connectorManaged()})의 바인딩은 그 에이전트가 지워질 때까지 옛 방식으로 다룬다. 값은
+ * <p>옛 커넥터 에이전트({@code Agent.connectorManaged()})의 바인딩은 그 에이전트가 지워질 때까지 옛 방식으로 다룬다. 값은
  * 그 profile 의 {@code .env} 에 직접 쓰고 설치는 바인딩 칸 없이 보내며 사진 받기와 내장 도구 선언도 그대로 본다. 외부 호출은
  * 트랜잭션 안에서 한다. 순서와 실패 처리는 {@code docs/features/connector.md} 가 갖는다.
  *
