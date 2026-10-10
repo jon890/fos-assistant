@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { draftChanges, type DraftContent, draftRevision } from "../changes.ts";
+import { draftChanges, type DraftContent, draftRevision, LineComparisonError } from "../changes.ts";
 import {
   type DocumentDraft,
   DocumentShapeError,
@@ -298,6 +298,7 @@ export async function runOverwrite(
       state,
     };
   } catch (error) {
+    if (error instanceof LineComparisonError) throw page.fail("editor_failed", error.message);
     if (!backupId) throw error;
     // 사본을 확인한 뒤의 실패는 사용자가 사본을 찾을 수 있게 사본 번호를 싣는다.
     if (error instanceof EditorError)

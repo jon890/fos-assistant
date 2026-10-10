@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { draftChanges, draftRevision, type DraftContent } from "../src/changes.ts";
+import { validateOverwrite } from "../src/overwrite-draft.ts";
 
 const base: DraftContent = {
   title: "동네 국숫집",
@@ -19,6 +20,18 @@ test("지문은 같은 글이면 같고 한 글자만 달라도 다르다", () =
 
 test("같은 글이면 바뀌는 내용이 빈 문자열이다", () => {
   expect(draftChanges(base, base)).toBe("");
+});
+
+test("긴 동일 본문은 변경이 없고 제목만 바꾸면 제목 변경만 표시한다", () => {
+  const original = { ...base, body: Array(2000).fill("가").join("\n") };
+  expect(draftChanges(original, original)).toBe("");
+  expect(draftChanges(original, { ...original, title: "수정" })).toBe(`제목: ${original.title} → 수정`);
+});
+
+test("큰 변경을 검사하면 변경 없음이 아니라 비교 상한 안내를 돌려준다", () => {
+  const original = { ...base, body: Array(2000).fill("가").join("\n") };
+  expect(validateOverwrite({ ...original, body: Array(2000).fill("나").join("\n") }, original))
+    .toEqual([expect.stringContaining("나눠 고쳐 주세요")]);
 });
 
 test("제목, 카테고리, 태그와 바뀐 본문 줄을 앞뒤 한 줄과 함께 적는다", () => {

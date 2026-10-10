@@ -61,6 +61,26 @@ const inputFor = (edited: DraftContent): OverwriteInput => ({
   ...edited,
 });
 
+test("큰 변경 구간은 verify 에서 거절하고 사본이나 원본을 저장하지 않는다", async () => {
+  const { editor, stages, run } = await setup();
+  const body = Array(2000).fill("가").join("\n");
+  editor.drafts[0]!.components = [
+    DRAFTS[0]!.components[0]!,
+    { "@ctype": "text", value: Array.from({ length: 2000 }, () => paragraph("가")) },
+  ];
+  const original = structuredClone(editor.drafts);
+  const current = { ...BASE, body };
+  const error = await failure(run({
+    ...current, draft_id: ORIGINAL_ID, revision: draftRevision(current),
+    changes: "큰 변경", body: Array(2000).fill("나").join("\n"),
+  }));
+  expect(error.code).toBe("editor_failed");
+  expect(error.stage).toBe("verify");
+  expect(error.message).toContain("나눠 고쳐 주세요");
+  expect(stages).toEqual(["open", "load", "verify"]);
+  expect(editor.drafts).toEqual(original);
+});
+
 async function setup() {
   const cdp = new FakeCdp({ allowed: EDITOR_METHODS });
   cleanups.push(() => cdp.stop());

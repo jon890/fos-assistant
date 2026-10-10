@@ -1,5 +1,5 @@
 import { cardWouldMask } from "./card-mask.ts";
-import { draftChanges, type DraftContent } from "./changes.ts";
+import { draftChanges, type DraftContent, LineComparisonError } from "./changes.ts";
 import { EXISTING_LINE } from "./document.ts";
 import { draftShape, parseBody, validateDraft } from "./draft.ts";
 
@@ -30,8 +30,16 @@ export const maskedProblem = (where: string) =>
 export function validateOverwrite(
   input: OverwriteContent,
   base?: OverwriteContent,
-  changes = base ? draftChanges(base, input) : "",
+  changes?: string,
 ): string[] {
+  if (changes === undefined) {
+    try {
+      changes = base ? draftChanges(base, input) : "";
+    } catch (error) {
+      if (error instanceof LineComparisonError) return [error.message];
+      throw error;
+    }
+  }
   const lines = input.body.split("\n").map(trimLineEnd);
   const blocks = parseBody(input.body);
   // 구성요소 줄을 비워 새 글 검사에 넘긴다. 사진 디렉터리와 사진 파일 이름 문장은 나오지 않는다.

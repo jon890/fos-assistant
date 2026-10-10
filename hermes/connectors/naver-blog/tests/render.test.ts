@@ -52,6 +52,18 @@ const input = (extra: Partial<RenderInput> = {}): RenderInput => ({
   ...extra,
 });
 
+test("비교 상한을 넘는 변경은 꾸밈 보존 안내와 함께 미리보기를 거절한다", async () => {
+  const original = { title: "원본", category: "일상", tags: [], body: Array(2000).fill("가").join("\n") };
+  const result = await renderDraft(input({
+    ...original, base: original, kind: "preview", photo_dir: undefined,
+    body: Array(2000).fill("나").join("\n"),
+  }), undefined);
+  expect(result.problems).toEqual([expect.stringContaining("문단의 꾸밈을 안전하게 보존할 수 없습니다")]);
+  expect(result.html).toBeNull();
+  expect(result.assets).toEqual([]);
+  expect("changes" in result).toBe(false);
+});
+
 test("미리보기는 첨부 이름의 사진만 첨부 주소로 부르고 설명을 붙인다", async () => {
   const result = await renderDraft(input(), attachmentDir);
 

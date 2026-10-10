@@ -10,7 +10,7 @@ export type DraftContent = {
 
 /** 본문 비교에서 앞뒤로 남기는 같은 줄 수. */
 const CONTEXT_LINES = 1;
-/** 줄 비교 표의 칸 수 상한. 넘으면 본문 전체를 바뀐 것으로 적는다. */
+/** 같은 앞뒤 줄을 뺀 비교 표의 칸 수 상한. 넘으면 꾸밈 보존을 보장할 수 없어 거절한다. */
 const DIFF_CELLS_MAX = 4_000_000;
 
 const lines = (body: string) => body.replace(/\r\n/g, "\n").split("\n");
@@ -31,15 +31,33 @@ export function draftRevision(content: DraftContent) {
 
 export type Edit = { kind: "same" | "remove" | "add"; line: string };
 
-/** 두 줄 목록의 최장 공통 부분열로 편집 목록을 만든다. 표가 너무 크면 모두 지우고 모두 더한다. */
+/** 비교 상한 때문에 원래 문단과 안전하게 짝지을 수 없다. */
+export class LineComparisonError extends Error {
+  constructor() {
+    super("본문의 변경 구간이 너무 커 문단의 꾸밈을 안전하게 보존할 수 없습니다. 나눠 고쳐 주세요.");
+    this.name = "LineComparisonError";
+  }
+}
+
+/** 같은 앞뒤 줄을 먼저 보존하고 나머지 구간의 최장 공통 부분열로 편집 목록을 만든다. */
 export function lineEdits(before: string[], after: string[]): Edit[] {
+  let start = 0;
+  while (start < before.length && start < after.length && before[start] === after[start]) start++;
+  let end = 0;
+  while (end < before.length - start && end < after.length - start &&
+    before[before.length - end - 1] === after[after.length - end - 1]) end++;
+  const same = (line: string): Edit => ({ kind: "same", line });
+  return [
+    ...before.slice(0, start).map(same),
+    ...middleEdits(before.slice(start, before.length - end), after.slice(start, after.length - end)),
+    ...before.slice(before.length - end).map(same),
+  ];
+}
+
+function middleEdits(before: string[], after: string[]): Edit[] {
   const n = before.length;
   const m = after.length;
-  if ((n + 1) * (m + 1) > DIFF_CELLS_MAX)
-    return [
-      ...before.map((line) => ({ kind: "remove" as const, line })),
-      ...after.map((line) => ({ kind: "add" as const, line })),
-    ];
+  if ((n + 1) * (m + 1) > DIFF_CELLS_MAX) throw new LineComparisonError();
   const table = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--)
     for (let j = m - 1; j >= 0; j--)

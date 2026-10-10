@@ -8,7 +8,7 @@ import {
   type DraftInput,
 } from "./draft.ts";
 import { cardWouldMask } from "./card-mask.ts";
-import { draftChanges, draftRevision } from "./changes.ts";
+import { draftChanges, draftRevision, LineComparisonError } from "./changes.ts";
 import { EXISTING_LINE } from "./document.ts";
 import {
   CHANGES_MAX,
@@ -118,7 +118,13 @@ export async function renderDraft(
  * 승인 카드에 올릴 바뀌는 내용과 원래 글의 지문을 함께 돌려준다.
  */
 function renderOverwrite(input: RenderInput, base: OverwriteContent): RenderResult {
-  const changes = draftChanges(base, input);
+  let changes: string;
+  try {
+    changes = draftChanges(base, input);
+  } catch (error) {
+    if (error instanceof LineComparisonError) return { problems: [error.message], html: null, assets: [] };
+    throw error;
+  }
   const problems = [...validateRenderOptions(input), ...validateOverwrite(input, base, changes)];
   if (input.kind === "package") problems.push("덮어쓰기 미리보기는 kind preview 만 받습니다.");
   if (input.photo_dir !== undefined) problems.push("덮어쓰기에는 photo_dir 을 주지 않습니다.");

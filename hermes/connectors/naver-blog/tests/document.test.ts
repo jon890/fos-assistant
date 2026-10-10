@@ -126,6 +126,45 @@ const existingIds = (data: EditorDocument) =>
     .filter((component) => component["@ctype"] !== "documentTitle" && component["@ctype"] !== "text")
     .map((component) => component.id);
 
+/** 비교 표 상한을 넘고 같은 글자가 반복되는 문서. 사진 앞뒤 문단의 id 도 서로 다르다. */
+const longDocument = () => ({
+  document: { components: [
+    titleComponent("원본"),
+    { "@ctype": "text", value: Array.from({ length: 1000 }, (_, i) => styled(`앞-${i}`, i === 999 ? "끝" : "가")) },
+    { id: "사진", "@ctype": "image", src: "https://example.com/image.jpg" },
+    { "@ctype": "text", value: Array.from({ length: 1000 }, (_, i) => styled(`뒤-${i}`, "가")) },
+  ] },
+});
+
+test("2,000개 중복 문단의 제목만 고쳐도 문단 id, 꾸밈과 사진을 보존한다", () => {
+  const original = longDocument();
+  const result = draftToDocument(original, "수정", documentToDraft(original).body);
+  expect(components(result).map(c => c["@ctype"])).toEqual(components(original).map(c => c["@ctype"]));
+  expect(components(result)[1]!.value).toEqual(components(original)[1]!.value);
+  expect(components(result)[3]!.value).toEqual(components(original)[3]!.value);
+  expect(components(result)[2]).toEqual(components(original)[2]);
+});
+
+test.each(["교체", "삽입", "삭제"])("긴 본문 가운데 한 줄 %s 시 앞뒤 중복 문단과 사진을 보존한다", (change) => {
+  const original = longDocument();
+  const before = documentToDraft(original).body.split("\n");
+  before.splice(999, change === "삽입" ? 0 : 1, ...(change === "삭제" ? [] : ["수정"]));
+  const result = draftToDocument(original, "원본", before.join("\n"));
+  const paragraphs = components(result).filter(c => c["@ctype"] === "text").flatMap(c => c.value!);
+  expect(paragraphs.slice(0, 999)).toEqual(components(original)[1]!.value!.slice(0, 999));
+  expect(paragraphs.slice(-1000)).toEqual(components(original)[3]!.value!);
+  expect(components(result).find(c => c["@ctype"] === "image")).toEqual(components(original)[2]);
+  expect(documentToDraft(result).body).toBe(before.join("\n"));
+});
+
+test("앞뒤를 뺀 비교 구간도 상한을 넘으면 원본 꾸밈을 버리는 대신 거절한다", () => {
+  const original = longDocument();
+  const copy = structuredClone(original);
+  const after = Array.from({ length: 2000 }, (_, i) => i === 1000 ? "가" : "나").join("\n");
+  expect(() => draftToDocument(original, "원본", after)).toThrow("문단의 꾸밈을 안전하게 보존할 수 없습니다");
+  expect(original).toEqual(copy);
+});
+
 test("고친 글로 만든 문서는 기존 구성요소를 본문 차례로 옮기고 바뀌지 않은 문단은 원래 객체를 쓴다", () => {
   const original = sample();
   const copy = structuredClone(original);
