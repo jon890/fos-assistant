@@ -137,7 +137,7 @@ sequenceDiagram
 - `retrieval` 이 `ALWAYS` 면 항상 층에 본문을, `SEARCH` 면 색인 층에 제목과 번호만 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 싣지 않는다. 짧은 개인 항목은 아래 「개인 사실 구역」 에 본문까지 싣는다
 - `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. 그래서 민감 본문은 `instructions` 에 실리지 않는다
 - 조립한 Memory 문맥은 `assistant.context.max-chars` 로 제한한다. 들어가지 않는 항목은 그 항목만 빼고 다음 항목을 계속 담는다. **넘친 항목을 잘라서 싣지 않는다.** 잘린 사실은 틀린 사실이 될 수 있다
-- **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인이 빠지면 `memory_read` 로 읽을 번호도 사라져 에이전트가 나머지 Memory 에 닿을 길이 없어진다
+- **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 제목과 번호를 찾고 `memory_read` 로 읽을 수 있다
 - 빠진 항목 수는 실행의 `context_omitted_items` 에 남기고 `/memory` 목록의 그 항목에 표시를 단다. 대화 화면에는 끼우지 않는다. 목록의 표시는 `assembleForOwner` 가 collection 을 거르지 않고 조립한 결과로 정한다
 - 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. turn 전용 지시는 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
 - 본문이나 `retrieval` 이나 `sensitivity` 를 고치면 고치기 전의 값을 `memory_revision` 에 남기고 판 번호를 올린다. 지울 때도 마지막 값을 남긴다
