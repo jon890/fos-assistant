@@ -168,6 +168,7 @@ describe("계좌 순번", () => {
     ["int64 초과", "9223372036854775808"],
     ["0", "0"],
     ["음수", "-1"],
+    ["끝 줄바꿈", "1\n"],
   ])("env 가 %s 이면 요청 없이 TOSSINVEST_ACCOUNT_NOT_FOUND 다", async (_label, seq) => {
     const { fake, server } = setup({ ...credentials, TOSSINVEST_ACCOUNT_SEQ: seq });
     await run(fake, server, (client) =>

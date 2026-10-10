@@ -23,6 +23,6 @@ export const NAME_MAX_CHARS = 100;
 export const QUOTE_SYMBOLS_MAX = 200;
 /** connector.json 의 `account` 칸 형식과 같다. */
 export const ACCOUNT_SEQ = /^[1-9][0-9]{0,18}$/;
-export const validAccountSeq = (seq: string) => ACCOUNT_SEQ.test(seq) && BigInt(seq) <= 9223372036854775807n;
+export const validAccountSeq = (seq: string) => seq.trim() === seq && ACCOUNT_SEQ.test(seq) && BigInt(seq) <= 9223372036854775807n;
 /** 끝난 주문 한 페이지의 최대 limit이다. OPEN의 전량을 자르지 않는다. */
 export const ORDERS_MAX = 100;
