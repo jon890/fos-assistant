@@ -16,27 +16,35 @@ export type TempDraft = { draft_id: string; title: string; saved_at: string | nu
 
 /**
  * 편집기가 임시저장 목록을 열 때 부르는 목록 API 를 같은 탭에서 부른다(실측).
- * 응답은 앞에 줄바꿈이 붙은 JSON 이고 `result.tempPostList` 의 `logNo`, `title`, `modiDate` 를 쓴다.
+ * 응답은 앞에 줄바꿈이 붙은 JSON 이고 `result.tempPostList` 와 `result.totalCount` 를 돌려준다.
  * 모양이 다르면 `editor_failed` 다. 응답의 글은 싣지 않는다.
  */
-export async function tempDrafts(page: EditorPage, blogId: string): Promise<TempDraft[]> {
+async function tempPostList(page: EditorPage, blogId: string) {
   const raw = await page.js<string>(`(async () => {
   const response = await fetch(${q(`/TempPostList.naver?blogId=${encodeURIComponent(blogId)}&editorVersion=4&onlyCount=false`)}, {credentials: "include"});
   return JSON.stringify({status: response.status, text: await response.text()});
 })()`);
   let list: unknown;
+  let totalCount: unknown;
   try {
     const { status, text } = JSON.parse(raw || "{}") as { status?: number; text?: string };
     const body = JSON.parse((text ?? "").trim()) as {
       isSuccess?: unknown;
-      result?: { tempPostList?: unknown };
+      result?: { tempPostList?: unknown; totalCount?: unknown };
     };
     if (status !== 200 || body.isSuccess !== true) throw new Error("목록 응답이 실패다");
     list = body.result?.tempPostList;
+    totalCount = body.result?.totalCount;
   } catch {
     throw page.fail("editor_failed", "임시저장 목록 응답을 읽지 못했다");
   }
   if (!Array.isArray(list)) throw page.fail("editor_failed", "임시저장 목록 응답의 모양이 다르다");
+  return { list: list as unknown[], totalCount };
+}
+
+/** 임시저장 목록의 앞 200개 글을 `logNo`, `title`, `modiDate` 로 읽는다. */
+export async function tempDrafts(page: EditorPage, blogId: string): Promise<TempDraft[]> {
+  const { list } = await tempPostList(page, blogId);
   return list.slice(0, LIST_MAX).map((item) => {
     const { logNo, title, modiDate } = (item ?? {}) as Record<string, unknown>;
     const id = typeof logNo === "number" && Number.isSafeInteger(logNo) ? String(logNo) : "";
@@ -49,6 +57,17 @@ export async function tempDrafts(page: EditorPage, blogId: string): Promise<Temp
       saved_at: saved && !Number.isNaN(saved.getTime()) ? saved.toISOString() : null,
     };
   });
+}
+
+/**
+ * 임시저장 글 수. 목록은 200개에서 잘리므로 응답의 `totalCount` 를 쓰고, 그 칸이 수가 아니면 목록 길이를 센다.
+ * 저장 단추 옆의 수는 그 탭이 저장할 때만 새로 읽혀 다른 탭의 저장을 반영하지 않아 쓰지 않는다.
+ */
+export async function tempDraftCount(page: EditorPage, blogId: string): Promise<number> {
+  const { list, totalCount } = await tempPostList(page, blogId);
+  return typeof totalCount === "number" && Number.isSafeInteger(totalCount) && totalCount >= 0
+    ? totalCount
+    : list.length;
 }
 
 /** 편집기의 문서를 읽는다. 편집기 객체나 문서가 없으면 `editor_failed` 다. */

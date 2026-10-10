@@ -14,6 +14,7 @@ import {
 } from "./draft.ts";
 import { listDrafts, readDraft } from "./drafts.ts";
 import { DRAFT_ID_PATTERN } from "./editor/drafts.ts";
+import type { OverwriteInput } from "./editor/overwrite.ts";
 import { guard, ToolError } from "./errors.ts";
 import {
   acquireLock,
@@ -29,6 +30,8 @@ import {
   stateFile,
   writeInput,
 } from "./jobs.ts";
+import { cardWouldMask } from "./card-mask.ts";
+import { CHANGES_MAX, overwriteContentShape, validateOverwrite } from "./overwrite-draft.ts";
 import { renderDraft, renderShape, type RenderInput } from "./render.ts";
 import { readConnection, sessionStatus, type Env } from "./session.ts";
 import { runWorker } from "./worker.ts";
@@ -65,7 +68,7 @@ export type ServerDeps = {
   workerEntry: string;
   /** 작업 프로세스가 시작을 알리기를 기다리는 시간. */
   startWaitMs: number;
-  /** `save_draft` 가 작업을 띄우기 전에 브라우저와 로그인을 확인하는 함수. */
+  /** `save_draft` 와 `overwrite_draft` 가 작업을 띄우기 전에 브라우저와 로그인을 확인하는 함수. */
   checkSession: typeof sessionStatus;
 };
 
@@ -91,14 +94,11 @@ function workerEnvironment(env: Env) {
 }
 
 /**
- * 초안과 사진, 브라우저와 로그인을 확인한 뒤 잠금을 잡고 분리된 작업 프로세스를 띄운다.
+ * 브라우저와 로그인을 확인한 뒤 잠금을 잡고 입력 파일을 써서 분리된 작업 프로세스를 띄운다.
  * 작업 프로세스는 새 세션으로 떠서 대시보드가 이 서버의 프로세스 묶음을 정리해도 남는다.
  * 띄우기 전에 실패하면 잠금과 작업 파일을 지운다.
  */
-async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
-  if (validateDraft(input).length) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
-  if ((await checkPhotoFiles(input, env[ATTACHMENT_DIR_ENV])).length)
-    throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
+async function startJob(env: Env, input: Record<string, unknown>, deps: ServerDeps) {
   const { blogId } = readConnection(env);
   // 중계가 꺼진 브라우저를 켜는 데 30초까지 걸려 확인 도구의 8초보다 길게 기다린다.
   await deps.checkSession(env, { timeoutMs: 45_000 });
@@ -119,13 +119,7 @@ async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
       pid: null,
       heartbeat_at: null,
     });
-    await writeInput(dir, jobId, {
-      title: input.title,
-      category: input.category,
-      tags: input.tags,
-      body: input.body,
-      ...(input.photo_dir === undefined ? {} : { photo_dir: input.photo_dir }),
-    });
+    await writeInput(dir, jobId, input);
     const child = spawn(process.execPath, [deps.workerEntry, "--worker", path], {
       detached: true,
       stdio: "ignore",
@@ -148,6 +142,36 @@ async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
     if (Date.now() >= deadline) throw new ToolError("NAVER_BLOG_START_UNKNOWN");
     await Bun.sleep(Math.min(100, Math.max(1, deadline - Date.now())));
   }
+}
+
+/** 초안과 사진을 검사한 뒤 새 글 저장 작업을 띄운다. 입력 파일에는 `kind` 를 두지 않는다. */
+async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
+  if (validateDraft(input).length) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
+  if ((await checkPhotoFiles(input, env[ATTACHMENT_DIR_ENV])).length)
+    throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
+  return startJob(
+    env,
+    {
+      title: input.title,
+      category: input.category,
+      tags: input.tags,
+      body: input.body,
+      ...(input.photo_dir === undefined ? {} : { photo_dir: input.photo_dir }),
+    },
+    deps,
+  );
+}
+
+/** 고친 글의 모양을 검사한 뒤 `kind: "overwrite"` 입력 파일로 덮어쓰기 작업을 띄운다. */
+async function overwriteDraft(env: Env, input: OverwriteInput, deps: ServerDeps) {
+  const { draft_id, revision, changes, title, category, tags, body } = input;
+  if (validateOverwrite({ title, category, tags, body }).length || cardWouldMask(changes))
+    throw new ToolError("NAVER_BLOG_INVALID_INPUT");
+  return startJob(
+    env,
+    { kind: "overwrite", draft_id, revision, changes, title, category, tags, body },
+    deps,
+  );
 }
 
 /**
@@ -225,6 +249,27 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
     (input) => guard(() => saveDraft(env, input as DraftInput, deps)),
   );
   server.registerTool(
+    "overwrite_draft",
+    {
+      description:
+        "read_draft 로 읽고 render_draft 의 base 로 미리 본 임시저장 글을 고칩니다. 고치기 전에 원래 글을 [덮어쓰기 전 원본] 사본으로 남깁니다. 발행하지 않습니다. 결과는 draft_job 으로 읽습니다.",
+      inputSchema: {
+        draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("read_draft 로 읽은 글의 draft_id"),
+        revision: z
+          .string()
+          .regex(/^[0-9a-f]{16}$/)
+          .describe("render_draft 가 돌려준 base_revision"),
+        changes: z
+          .string()
+          .min(1)
+          .max(CHANGES_MAX)
+          .describe("render_draft 가 돌려준 changes 그대로"),
+        ...overwriteContentShape,
+      },
+    },
+    (input) => guard(() => overwriteDraft(env, input as OverwriteInput, deps)),
+  );
+  server.registerTool(
     "draft_job",
     {
       description:
@@ -233,7 +278,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
         job_id: z
           .string()
           .regex(JOB_ID_PATTERN)
-          .describe("save_draft 가 돌려준 작업 번호"),
+          .describe("save_draft 나 overwrite_draft 가 돌려준 작업 번호"),
         wait_seconds: z
           .number()
           .int()
