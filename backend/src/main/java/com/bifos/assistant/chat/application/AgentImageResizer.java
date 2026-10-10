@@ -9,8 +9,11 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Optional;
+import java.util.zip.CRC32;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReadParam;
@@ -48,6 +51,7 @@ final class AgentImageResizer {
     private static final int DEFAULT_ORIENTATION = 1;
     private static final int ORIENTATION_TAG = 0x0112;
     private static final int SHORT_TYPE = 3;
+    private static final byte[] PNG_SIGNATURE = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
 
     /** 줄인 JPEG 를 돌려준다. 읽지 못하면 빈 값이다. */
     static Optional<byte[]> toJpeg(byte[] original) {
@@ -139,9 +143,16 @@ final class AgentImageResizer {
     }
 
     /**
-     * JPEG 의 APP1 {@code Exif} 구간에서 IFD0 의 방향 태그(1~8)를 읽는다. JPEG 가 아니거나 읽지 못하면 1 이다.
+     * JPEG APP1 또는 PNG eXIf의 IFD0 방향 태그(1~8)를 읽는다. 메타데이터가 없거나 손상되었으면 1이다.
      */
     static int orientation(byte[] jpeg) {
+        if (isPng(jpeg)) {
+            try {
+                return pngOrientation(new ByteArrayInputStream(jpeg), jpeg.length);
+            } catch (IOException ex) {
+                return DEFAULT_ORIENTATION;
+            }
+        }
         if (jpeg == null || jpeg.length < 4 || unsigned(jpeg[0]) != 0xff || unsigned(jpeg[1]) != 0xd8) {
             return DEFAULT_ORIENTATION;
         }
@@ -170,6 +181,53 @@ final class AgentImageResizer {
                 return exifOrientation(jpeg, body + 6, end);
             }
             offset = end;
+        }
+        return DEFAULT_ORIENTATION;
+    }
+
+    static boolean isPng(byte[] image) {
+        return image != null
+                && image.length >= PNG_SIGNATURE.length
+                && Arrays.equals(image, 0, PNG_SIGNATURE.length, PNG_SIGNATURE, 0, PNG_SIGNATURE.length);
+    }
+
+    /**
+     * 최대 {@code maxBytes} 안에서 PNG 청크를 순차 탐색한다. 영상 청크는 건너뛰고 eXIf만 메모리에 담는다.
+     * 앞부분 밖의 eXIf도 읽되 청크 길이는 할당 전에 검사하고, TIFF를 해석하기 전에 CRC를 검증한다.
+     */
+    static int pngOrientation(InputStream input, int maxBytes) throws IOException {
+        if (maxBytes < PNG_SIGNATURE.length || !isPng(input.readNBytes(PNG_SIGNATURE.length))) {
+            return DEFAULT_ORIENTATION;
+        }
+        long consumed = PNG_SIGNATURE.length;
+        while (consumed + 12 <= maxBytes) {
+            byte[] header = input.readNBytes(8);
+            if (header.length != 8) {
+                return DEFAULT_ORIENTATION;
+            }
+            long length = readInt(header, 0, false);
+            if (length > maxBytes - consumed - 12) {
+                return DEFAULT_ORIENTATION;
+            }
+            consumed += length + 12;
+            long type = readInt(header, 4, false);
+            if (type == 0x65584966L) {
+                byte[] exif = input.readNBytes((int) length);
+                byte[] checksum = input.readNBytes(4);
+                if (exif.length != length || checksum.length != 4) {
+                    return DEFAULT_ORIENTATION;
+                }
+                CRC32 crc = new CRC32();
+                crc.update(header, 4, 4);
+                crc.update(exif);
+                return crc.getValue() == readInt(checksum, 0, false)
+                        ? exifOrientation(exif, 0, exif.length)
+                        : DEFAULT_ORIENTATION;
+            }
+            if (type == 0x49454e44L) {
+                return DEFAULT_ORIENTATION;
+            }
+            input.skipNBytes(length + 4);
         }
         return DEFAULT_ORIENTATION;
     }
@@ -297,7 +355,8 @@ final class AgentImageResizer {
                 return DEFAULT_ORIENTATION;
             }
             if (readShort(jpeg, entry, littleEndian) == ORIENTATION_TAG) {
-                if (readShort(jpeg, entry + 2, littleEndian) != SHORT_TYPE) {
+                if (readShort(jpeg, entry + 2, littleEndian) != SHORT_TYPE
+                        || readInt(jpeg, entry + 4, littleEndian) != 1) {
                     return DEFAULT_ORIENTATION;
                 }
                 int value = readShort(jpeg, entry + 8, littleEndian);

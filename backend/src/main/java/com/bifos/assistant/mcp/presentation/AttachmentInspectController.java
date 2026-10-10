@@ -33,4 +33,13 @@ public class AttachmentInspectController {
                 .contentLength(image.bytes().length)
                 .body(image.bytes());
     }
+
+    @PostMapping("/internal/hermes/attachment-inspect/validate")
+    public ResponseEntity<Void> validate(@AuthenticationPrincipal Object principal, @RequestBody JsonNode body) {
+        if (!(principal instanceof McpPrincipal mcp)) {
+            throw new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
+        }
+        inspections.validate(mcp, body);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
 }

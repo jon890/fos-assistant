@@ -9,7 +9,11 @@ profile 에 설치하는 plugin 이다. MCP 호출에 실행 맥락을 서명해
 기존 도구를 덮어쓰지 않는다. profile의 API 허용 목록과 gateway의 `FOS_ATTACHMENT_INSPECT_URL`을
 함께 설정한다. 주소의 경로는 `/internal/hermes/attachment-inspect`이며 실제 운영 값은 운영 저장소가 갖는다.
 
-입력은 양의 정수 `attachment_id`와 선택 정수 배열 `region=[x1,y1,x2,y2]`다.
+입력은 양의 정수 `attachment_id`, 선택 정수 배열 `region=[x1,y1,x2,y2]`, 선택 boolean `overview`다.
+`overview=true`와 `region`은 함께 받지 않는다. 개요 모드는 네 MIME 모두 CP 원본을 helper로 받아
+표시 방향의 긴 변 최대 1600픽셀로 줄인 전체 개요를 만든다. JPEG의 공개 `draft`도 이 모드에서만 쓴다.
+결과에는 개요임과 `display_width/height`, `result_width/height`를 명시한다.
+모델은 개요로 위치를 보고 원본 표시 좌표의 region을 요청한다. 개요만 보고 작은 글자를 읽었다고 답하지 않는다.
 region은 EXIF를 반영한 원본 표시 좌표이고 오른쪽·아래 끝은 제외한다.
 모델이 임의 경로, URL, 사용자, profile을 정하지 못한다.
 hook은 실제 session과 tool call id로 `_fos_ctx`와 `_fos_inspect`를 덮어쓴다.
@@ -17,7 +21,8 @@ hook은 실제 session과 tool call id로 `_fos_ctx`와 `_fos_inspect`를 덮어
 
 `_fos_inspect`는 `issued_at_ms`, boolean `top_level`, `sig`다.
 요청 digest는 첨부 번호의 십진 표현, 개행, region의 쉼표 구분 정수 표현(없으면 빈 문자열)을
-SHA-256한 소문자 hex다. 서명은 기존 토큰 해시 문자열 key로 다음 UTF-8 글의 HMAC-SHA256을 계산한다.
+SHA-256한 소문자 hex다. `overview=true`이면 끝에 개행과 `overview=1`을 덧붙여 해시한다.
+생략과 false는 기존 digest와 같아 한 배포 동안 옛 CP 호출도 지원한다. 서명은 기존 토큰 해시 문자열 key로 다음 UTF-8 글의 HMAC-SHA256을 계산한다.
 
 ```text
 v1-attachment-inspect
@@ -36,17 +41,35 @@ CP와 gateway의 시계를 동기화해야 하며 서로 다른 turn의 proof를
 요청자·대화·업로더·메시지 연결·삭제·만료와 실행 취소를 검증한다.
 
 원본은 20MiB/60M 픽셀, 결과는 10MiB/16M 픽셀로 제한한다.
-crop 영역을 먼저 decode하고 픽셀을 줄이지 않는다. JPEG/PNG 전체의 정상 방향은 원본 bytes를 유지한다.
+JPEG/PNG는 crop 영역을 먼저 decode하고 픽셀을 줄이지 않는다. 정상 방향 전체는 원본 bytes를 유지한다.
 회전·crop은 흰 배경으로 합성한 PNG이고 전체 PNG bytes는 투명을 보존한다.
-GIF/WebP는 이 도구에서 지원하지 않으며 판독 실패를 반환한다.
-decode는 동시에 한 장이며 병렬 호출은 15초까지 차례를 기다리고 실행 취소를 확인한다.
-plugin HTTP timeout은 30초이고 redirect를 거절하며 출력 bytes를 제한해서 읽는다.
+GIF/WebP는 CP가 원본을 20MiB까지 반환하고 Linux helper가 기존 Pillow로 첫 표시 프레임을 PNG로 변환한다.
+WebP의 RIFF 길이·padding·canvas·bitstream·모든 ANMF 치수와 GIF 논리 화면·첫 descriptor는 open 전에 검사한다.
+codec의 size와 사전 치수가 같아야 decode하며 EXIF 표시 좌표와 RGBA alpha를 보존한다.
+모든 뒤 프레임을 decode하지 않으며 움직임과 뒤 프레임은 확인하지 않았다고 native text와 요약에 적는다.
+전체 결과가 크면 `region_required`, `display_width`, `display_height`, `orientation_applied=true`, `frame_index=0`을 반환한다.
+
+plugin은 `_fos_owned_image_runtime_v1` 표준 모듈 이름으로 완성된 FIFO runtime을 원자적으로 게시한다.
+profile별 module namespace와 reload 밖에 유지하며 프로세스를 재시작해야 runtime 버전이 바뀐다.
+원본 수신 전에 프로세스당 한 handler의 차례를 확보한다. JPEG/PNG의 Java decode 슬롯은 별도다.
+큐 대기 15초를 포함한 전체 기한은 30초이며 redirect를 거절한다.
+신뢰한 helper와 현재 Python을 shell 없이 실행하고 요청은 최대 64KiB 익명 pipe로 전달한다.
+출력 PNG는 10MiB, 메타데이터는 64KiB까지 읽고 stderr와 core dump는 남기지 않는다.
+Linux helper는 Pillow open 전에 RLIMIT_AS 1.5GiB와 부모 종료 SIGKILL을 적용한다.
+제한 불가 환경에서 GIF/WebP를 무제한 변환하지 않는다. timeout·권한 거절은 프로세스 그룹을 terminate·kill·wait한 뒤 슬롯을 반환한다.
+
+`POST /internal/hermes/attachment-inspect/validate`는 원본과 같은 토큰·Origin·서명·freshness 경계를 거쳐 204를 반환한다.
+본문은 원본 요청과 같고 bytes·새 grant·lease는 반환하지 않는다. `consume`도 호출하지 않는다.
+개요 모드는 대기부터, GIF/WebP 기본 원본은 MIME 수신부터 약 500ms 간격과 종료 직전에 상태를 확인한다.
+기본 JPEG/PNG는 변환하지 않으며 옛 CP의 decode 전후 상태 검증으로 동작한다. 삭제·만료·취소를 관측하면 결과를 버린다.
+마지막 검증 뒤 provider 전송 전 경쟁까지 원자적으로 막거나 이미 보낸 픽셀을 회수하지는 못한다.
+여러 gateway 프로세스에는 별도 슬롯이 생긴다. 실제 topology와 peak RSS·자동 조회는 운영 왕복으로 확인한다.
 
 성공은 `_multimodal=True` dict이며 native `image_url.detail=original`을 돌려준다.
 native 지원이 없어 요약만 모델에 남으면 판독 실패를 알리도록 조건문을 넣는다.
 조회 완료 사건은 이미지 수신과 판독 품질을 보장하지 않는다.
-실패는 JSON `error` 문자열이다. 서버 422의 `ATTACHMENT_INSPECTION_LIMIT`만 작은 영역으로
-한 번 다시 조회하게 하고 손상·형식 불지원·다른 거절·timeout은 실패로 알린다.
+실패는 JSON `error` 문자열이다. 서버 422의 `ATTACHMENT_INSPECTION_LIMIT`과 helper의 `region_required`는 개요나 원본 영역으로
+사진별 3회 안에서 다시 조회하게 하고 손상·형식 불지원·다른 거절·timeout은 실패로 알린다.
 사진별 3회, 같은 호출 2회, 실행 전체 90회까지이며 30장 모두 전체·영역 조회를 할 수 있다.
 
 근거는 [ADR-20261010 / attachment-inspect](../../../docs/adr/ADR-20261010-attachment-inspect.md)다.

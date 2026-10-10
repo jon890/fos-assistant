@@ -7,9 +7,9 @@ import hmac
 import json
 import os
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
+
+from .image_runtime import supervise, check_status
 
 from .context import build_context, _read_token, signing_key, logger, top_level_session
 
@@ -24,10 +24,13 @@ def failure(message=FAILURE, code="original_unavailable"):
 SCHEMA = {
     "name": TOOL,
     "description": "같은 대화의 사진 원본을 다시 본다. 작은 글자·가격·품번은 자동 조회한다. "
+                   "위치를 모르는 큰 사진은 overview=true로 축소 개요를 먼저 보고 원본 region을 고른다. "
+                   "개요만 보고 작은 글자를 읽었다고 하지 않는다. overview와 region은 함께 쓰지 않는다. "
                    "큰 사진은 표시 원본 좌표 [x1,y1,x2,y2] 영역으로 조회한다. 한 번에 한 장씩 본다.",
     "parameters": {
         "type": "object", "additionalProperties": False,
         "properties": {
+            "overview": {"type": "boolean", "description": "원본 대신 축소 전체 개요를 명시적으로 요청한다."},
             "attachment_id": {"type": "integer", "minimum": 1},
             "region": {"type": "array", "items": {"type": "integer", "minimum": 0},
                        "minItems": 4, "maxItems": 4,
@@ -39,10 +42,14 @@ SCHEMA = {
 
 
 def valid_args(args):
-    if not isinstance(args, dict) or set(args) - {"attachment_id", "region", "_fos_ctx", "_fos_inspect"}:
+    if not isinstance(args, dict) or set(args) - {"attachment_id", "region", "overview", "_fos_ctx", "_fos_inspect"}:
         return False
     attachment = args.get("attachment_id")
     if type(attachment) is not int or not 0 < attachment <= 2**63 - 1:
+        return False
+    if "overview" in args and type(args["overview"]) is not bool:
+        return False
+    if args.get("overview") and "region" in args:
         return False
     region = args.get("region")
     return region is None or (isinstance(region, list) and len(region) == 4
@@ -53,6 +60,8 @@ def valid_args(args):
 def digest(args):
     region = args.get("region") or []
     text = str(args["attachment_id"]) + "\n" + ",".join(str(n) for n in region)
+    if args.get("overview"):
+        text += "\noverview=1"
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
@@ -82,19 +91,13 @@ def authorize(args, session_id, tool_call_id, isolated=False):
         return {"action": "block", "message": FAILURE}
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        raise urllib.error.HTTPError(request.full_url, code, "redirect refused", headers, response)
-
-
-def _open(request):
-    return urllib.request.build_opener(NoRedirect()).open(request, timeout=TIMEOUT)
-
-
 def handle(args, **_):
+    deadline = time.monotonic() + TIMEOUT
     if not valid_args(args) or not isinstance(args.get("_fos_ctx"), dict) \
             or not isinstance(args.get("_fos_inspect"), dict):
         return failure()
+    if args.get("overview") is False:
+        args = {key: value for key, value in args.items() if key != "overview"}
     try:
         url = os.environ.get("FOS_ATTACHMENT_INSPECT_URL", "")
         parsed = urllib.parse.urlsplit(url)
@@ -102,49 +105,42 @@ def handle(args, **_):
         if not token or parsed.scheme not in {"http", "https"} or not parsed.netloc \
                 or parsed.path != "/internal/hermes/attachment-inspect" or parsed.query or parsed.fragment:
             return failure()
-        request = urllib.request.Request(url, data=json.dumps(args).encode("utf-8"), method="POST",
-            headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
-        deadline = time.monotonic() + TIMEOUT
-        with _open(request) as response:
-            mime = response.headers.get("Content-Type", "").split(";")[0]
-            length = int(response.headers.get("Content-Length", "0"))
-            if mime not in {"image/jpeg", "image/png"} or not 0 < length <= MAX_BYTES:
-                return failure()
-            chunks, size = [], 0
-            while size <= MAX_BYTES:
-                if time.monotonic() > deadline:
-                    return failure()
-                chunk = response.read(min(65536, MAX_BYTES + 1 - size))
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                size += len(chunk)
-            body = b"".join(chunks)
-            if size != length or size > MAX_BYTES:
-                return failure()
-            if (mime == "image/png" and not body.startswith(b"\x89PNG\r\n\x1a\n")) \
-                    or (mime == "image/jpeg" and not body.startswith(b"\xff\xd8")):
-                return failure()
+        validations = 0
+
+        def validate():
+            nonlocal validations
+            if validations >= 61:
+                raise TimeoutError("validation limit")
+            validations += 1
+            check_status(url, token, args, deadline)
+
+        metadata, body = supervise(url, token, args, deadline, validate)
+        if metadata.get("code"):
+            if metadata["code"] == "region_required":
+                return json.dumps({**metadata, "error": "전체 원본의 안전 한도를 넘었다. 표시 치수 안의 작은 영역을 "
+                                   "지정한다. 위치를 모르면 overview=true로 전체 개요를 먼저 보고 원본 영역을 고른다. "
+                                   "사진별 3회 안에서 다시 조회하고 실패하면 판독하지 못했다고 알린다."}, ensure_ascii=False)
+            return failure()
+        mime = metadata["mime"]
+        if mime not in {"image/png", "image/jpeg"} or not 0 < len(body) <= MAX_BYTES:
+            return failure()
+        first_frame = " GIF/WebP의 첫 프레임만 확인했다. 정적 이미지는 전체이며 움직임과 뒤 프레임은 확인하지 않았다." \
+            if metadata.get("first_frame") else ""
+        overview_notice = ""
+        if metadata.get("overview"):
+            overview_notice = (" 축소한 전체 개요다. 원본 표시 크기=" + str(metadata["display_width"]) + "x"
+                + str(metadata["display_height"]) + ", 개요 크기=" + str(metadata["result_width"]) + "x"
+                + str(metadata["result_height"]) + ". 작은 글자·가격·품번은 이 개요만으로 판독하지 말고 "
+                "원본 표시 좌표의 region으로 다시 조회한다.")
         notice = "첨부 참조 " + str(args["attachment_id"]) + "의 원본" + (
             " 영역 " + str(args["region"]) if args.get("region") else " 전체")
         return {"_multimodal": True, "content": [
-            {"type": "text", "text": notice + ". 아래 native 사진을 직접 보고 판독한다."},
+            {"type": "text", "text": notice + ". 아래 native 사진을 직접 보고 판독한다." + first_frame + overview_notice},
             {"type": "image_url", "image_url": {
                 "url": "data:" + mime + ";base64," + base64.b64encode(body).decode("ascii"),
                 "detail": "original"}},
         ], "text_summary": "첨부 원본 조회 결과. 이 글만 있고 native 사진이 없으면 원본을 보았다고 하거나 "
-                           "글자를 추측하지 말고 판독 실패를 알린다."}
-    except urllib.error.HTTPError as exc:
-        try:
-            error = json.loads(exc.read(16384))
-        except (ValueError, OSError):
-            error = {}
-        finally:
-            exc.close()
-        if exc.code == 422 and error.get("code") == "ATTACHMENT_INSPECTION_LIMIT":
-            return failure("전체 원본의 안전 한도를 넘었다. 작은 영역을 지정해 한 번만 다시 조회한다. "
-                           "계속 실패하면 판독하지 못했다고 알린다.", "region_required")
-        return failure()
+                           "글자를 추측하지 말고 판독 실패를 알린다." + first_frame + overview_notice}
     except Exception as exc:
         logger.warning("fos-ctx: 원본 조회 실패: %s", type(exc).__name__)
         return failure()

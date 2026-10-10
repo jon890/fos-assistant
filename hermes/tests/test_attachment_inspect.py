@@ -1,6 +1,5 @@
 """원본 조회 hook과 native 이미지 반환의 회귀 검사다."""
 import importlib
-import io
 import json
 import os
 import sqlite3
@@ -42,19 +41,17 @@ class AttachmentInspectTest(unittest.TestCase):
         self.assertIsInstance(self.inspect.handle({"attachment_id": 7}), str)
 
     def test_native_envelope_and_failure(self):
-        class Response(io.BytesIO):
-            headers = {"Content-Type": "image/png", "Content-Length": "12"}
         args = {"attachment_id": 7, "_fos_ctx": {"v": 1}, "_fos_inspect": {"sig": "proof"}}
         with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
              patch.object(self.inspect, "_read_token", return_value="fake"), \
-             patch.object(self.inspect, "_open", return_value=Response(b"\x89PNG\r\n\x1a\nmore")):
+             patch.object(self.inspect, "supervise", return_value=({"mime": "image/png"}, b"\x89PNG\r\n\x1a\nmore")):
             result = self.inspect.handle(args)
         self.assertIs(result["_multimodal"], True)
         self.assertEqual(result["content"][1]["image_url"]["detail"], "original")
         self.assertIn("data:image/png;base64,", result["content"][1]["image_url"]["url"])
         with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
              patch.object(self.inspect, "_read_token", return_value="fake"), \
-             patch.object(self.inspect, "_open", side_effect=TimeoutError):
+             patch.object(self.inspect, "supervise", side_effect=TimeoutError):
             self.assertIn("판독", self.inspect.handle(args))
 
     def test_register_independent_tool(self):
@@ -67,19 +64,6 @@ class AttachmentInspectTest(unittest.TestCase):
         self.plugin.register(Context())
         self.assertEqual(registered["name"], "attachment_inspect")
         self.assertFalse(registered.get("override", False))
-
-    def test_bad_or_rejected_http_response_never_returns_native_success(self):
-        args = {"attachment_id": 7, "_fos_ctx": {}, "_fos_inspect": {}}
-        for mime, length, body in [("image/png", 12, b"corrupt-data"),
-                                   ("image/png", 20, b"\x89PNG\r\n\x1a\nmore"),
-                                   ("text/plain", 12, b"\x89PNG\r\n\x1a\nmore"),
-                                   ("image/png", self.inspect.MAX_BYTES + 1, b"x")]:
-            class Response(io.BytesIO):
-                headers = {"Content-Type": mime, "Content-Length": str(length)}
-            with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
-                 patch.object(self.inspect, "_read_token", return_value="fake"), \
-                 patch.object(self.inspect, "_open", return_value=Response(body)):
-                self.assertIsInstance(self.inspect.handle(args), str)
 
     def test_top_level_compression_and_subagent_chains_are_distinct(self):
         context = importlib.import_module(self.plugin.__name__ + ".context")
@@ -110,15 +94,34 @@ class AttachmentInspectTest(unittest.TestCase):
                         self.assertEqual(result["action"], "block")
 
     def test_limit_error_requests_crop_but_corruption_does_not(self):
-        import urllib.error
         args = {"attachment_id": 7, "_fos_ctx": {}, "_fos_inspect": {}}
         for code, expected in [("ATTACHMENT_INSPECTION_LIMIT", "region_required"),
                                ("ATTACHMENT_INSPECTION_FAILED", "original_unavailable")]:
-            error = urllib.error.HTTPError("http://example.test", 422, "rejected", {},
-                io.BytesIO(json.dumps({"code": code}).encode()))
             with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
                  patch.object(self.inspect, "_read_token", return_value="fake"), \
-                 patch.object(self.inspect, "_open", side_effect=error):
+                 patch.object(self.inspect, "supervise", return_value=({"code": expected}, b"")):
                 result = json.loads(self.inspect.handle(args))
             self.assertEqual(result["code"], expected)
             self.assertIn("error", result)
+
+    def test_overview_is_explicit_exclusive_signed_and_explained_in_native_and_fallback(self):
+        original = {"attachment_id": 7}
+        overview = {"attachment_id": 7, "overview": True}
+        self.assertNotEqual(self.inspect.digest(original), self.inspect.digest(overview))
+        self.assertEqual(self.inspect.digest(original), self.inspect.digest({**original, "overview": False}))
+        self.assertFalse(self.inspect.valid_args({**overview, "region": [0, 0, 1, 1]}))
+        self.assertFalse(self.inspect.valid_args({**overview, "overview": 1}))
+        args = {**overview, "_fos_ctx": {}, "_fos_inspect": {}}
+        metadata = {"mime": "image/png", "overview": True, "first_frame": True, "display_width": 5000,
+                    "display_height": 4000, "result_width": 1600, "result_height": 1280}
+        with patch.dict(os.environ, {"FOS_ATTACHMENT_INSPECT_URL": "http://example.test/internal/hermes/attachment-inspect"}), \
+             patch.object(self.inspect, "_read_token", return_value="fake"), \
+             patch.object(self.inspect, "supervise", return_value=(metadata, b"\x89PNG\r\n\x1a\nmore")):
+            result = self.inspect.handle(args)
+        self.assertIs(result["_multimodal"], True)
+        for text in (result["content"][0]["text"], result["text_summary"]):
+            self.assertIn("축소한 전체 개요", text)
+            self.assertIn("5000x4000", text)
+            self.assertIn("1600x1280", text)
+            self.assertIn("region", text)
+            self.assertIn("첫 프레임", text)

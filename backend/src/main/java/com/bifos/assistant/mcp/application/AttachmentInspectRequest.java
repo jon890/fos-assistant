@@ -9,17 +9,25 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import tools.jackson.databind.JsonNode;
 
-/** 원본 조회에 허용하는 첨부 번호와 표시 좌표다. 서명할 인자는 두 정수 표현만 사용한다. */
-public record AttachmentInspectRequest(long attachmentId, List<Integer> region) {
+/** 원본 조회에 허용하는 첨부 번호와 표시 좌표와 명시적 개요 모드다. */
+public record AttachmentInspectRequest(long attachmentId, List<Integer> region, boolean overview) {
     public static AttachmentInspectRequest from(JsonNode body) {
         if (body == null
                 || !body.isObject()
-                || !Set.of("attachment_id", "region", "_fos_ctx", "_fos_inspect")
+                || !Set.of("attachment_id", "region", "overview", "_fos_ctx", "_fos_inspect")
                         .containsAll(body.propertyNames())) {
             throw invalid();
         }
         JsonNode id = body.get("attachment_id");
         if (id == null || !id.isIntegralNumber() || !id.canConvertToLong() || id.longValue() <= 0) {
+            throw invalid();
+        }
+        JsonNode mode = body.get("overview");
+        if (mode != null && !mode.isBoolean()) {
+            throw invalid();
+        }
+        boolean overview = mode != null && mode.booleanValue();
+        if (overview && body.has("region")) {
             throw invalid();
         }
         JsonNode value = body.get("region");
@@ -40,13 +48,13 @@ public record AttachmentInspectRequest(long attachmentId, List<Integer> region) 
             }
             region = List.copyOf(region);
         }
-        return new AttachmentInspectRequest(id.longValue(), region);
+        return new AttachmentInspectRequest(id.longValue(), region, overview);
     }
 
     public String digest() {
         String coordinates =
                 region == null ? "" : region.stream().map(String::valueOf).collect(Collectors.joining(","));
-        return Sha256.hex(attachmentId + "\n" + coordinates);
+        return Sha256.hex(attachmentId + "\n" + coordinates + (overview ? "\noverview=1" : ""));
     }
 
     private static ApiException invalid() {
