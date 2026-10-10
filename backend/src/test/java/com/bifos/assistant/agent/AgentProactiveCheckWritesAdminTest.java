@@ -5,8 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -20,7 +23,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.presentation.AgentAdminController;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminController;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -37,6 +40,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -52,6 +57,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class AgentProactiveCheckWritesAdminTest {
 
     private static final String PATH = "/api/v1/admin/agents/career";
+    private static final String COLLECTION_PATH = "/api/v1/admin/agents";
+    private static final String CREATE_BODY = """
+            {"code":"manual","name":"수동 등록","hermesProfile":"fixture",
+             "apiBaseUrl":"http://agent-runtime.test/p/fixture","costMode":"SUBSCRIPTION",
+             "credentialScope":"SHARED_HOUSEHOLD","visibility":"GROUP"}
+            """;
     private static final CurrentUser ADMIN = new CurrentUser(1L, "admin@example.com", "관리자", 1L, UserRole.ADMIN);
     private static final CurrentUser MEMBER = new CurrentUser(2L, "member@example.com", "사용자", 1L, UserRole.MEMBER);
 
@@ -126,6 +137,56 @@ class AgentProactiveCheckWritesAdminTest {
         verify(agents, never()).save(any(Agent.class));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"create", "list", "update"})
+    @DisplayName("관리 등록·목록·수정 HTTP 는 MEMBER 를 403으로 거절하고 저장소를 부르지 않는다")
+    void rejectsMemberAcrossAdminRoutes(String method) throws Exception {
+        signIn(MEMBER);
+        adminRequest(method).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        verifyNoInteractions(agents);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"create", "list", "update"})
+    @DisplayName("관리 등록·목록·수정 HTTP 는 비로그인을 401로 거절하고 저장소를 부르지 않는다")
+    void rejectsAnonymousAcrossAdminRoutes(String method) throws Exception {
+        SecurityContextHolder.clearContext();
+        adminRequest(method).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+        verifyNoInteractions(agents);
+    }
+
+    @Test
+    @DisplayName("관리 등록·목록 HTTP 는 기존 요청 JSON 과 응답 필드·enum 문자열을 유지한다")
+    void preservesCreateAndListWireContract() throws Exception {
+        signIn(ADMIN);
+        mvc.perform(post(COLLECTION_PATH).contentType(MediaType.APPLICATION_JSON).content(CREATE_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("manual"))
+                .andExpect(jsonPath("$.name").value("수동 등록"))
+                .andExpect(jsonPath("$.hermesProfile").value("fixture"))
+                .andExpect(jsonPath("$.apiBaseUrl").value("http://agent-runtime.test/p/fixture"))
+                .andExpect(jsonPath("$.costMode").value("SUBSCRIPTION"))
+                .andExpect(jsonPath("$.credentialScope").value("SHARED_HOUSEHOLD"))
+                .andExpect(jsonPath("$.visibility").value("GROUP"))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.connectorManaged").value(false))
+                .andExpect(jsonPath("$.proactiveCheckWritesAllowed").value(false));
+        when(agents.findAll()).thenReturn(List.of(agent));
+        mvc.perform(get(COLLECTION_PATH)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("career"))
+                .andExpect(jsonPath("$[0].visibility").value("PRIVATE"));
+    }
+
+    @Test
+    @DisplayName("관리 등록 요청의 잘못된 코드 형식은 400이고 저장하지 않는다")
+    void preservesCreateValidation() throws Exception {
+        signIn(ADMIN);
+        mvc.perform(post(COLLECTION_PATH).contentType(MediaType.APPLICATION_JSON)
+                        .content(CREATE_BODY.replace("manual", "INVALID")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        verifyNoInteractions(agents);
+    }
+
     @Test
     @DisplayName("커넥터 에이전트에는 쓰기 허용 값을 저장하지 않는다")
     void connectorAgentNeverStoresWrites() throws Exception {
@@ -152,6 +213,15 @@ class AgentProactiveCheckWritesAdminTest {
 
     private ResultActions send(String body) throws Exception {
         return mvc.perform(patch(PATH).contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private ResultActions adminRequest(String method) throws Exception {
+        return switch (method) {
+            case "create" -> mvc.perform(post(COLLECTION_PATH).contentType(MediaType.APPLICATION_JSON).content(CREATE_BODY));
+            case "list" -> mvc.perform(get(COLLECTION_PATH));
+            case "update" -> send("{\"enabled\":true,\"visibility\":\"PRIVATE\"}");
+            default -> throw new IllegalArgumentException(method);
+        };
     }
 
     private static void signIn(CurrentUser user) {

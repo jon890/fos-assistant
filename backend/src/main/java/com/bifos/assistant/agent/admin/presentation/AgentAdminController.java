@@ -1,11 +1,11 @@
-package com.bifos.assistant.agent.presentation;
+package com.bifos.assistant.agent.admin.presentation;
 
 import com.bifos.assistant.agent.admin.application.AgentAdminService;
 import com.bifos.assistant.agent.admin.application.model.AgentCreateCommand;
 import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
-import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
-import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
-import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.AdminAgentView;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.CreateAgentRequest;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.UpdateAgentRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
