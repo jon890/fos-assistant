@@ -11,6 +11,7 @@ import com.bifos.assistant.usage.application.ConversationExecutionPurge;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -30,14 +31,16 @@ class ConversationPurgeWriter {
     private final ChatArtifactRepository artifacts;
     private final ExecutionQuestionRepository questions;
     private final ConversationExecutionPurge executions;
+    private final ChatContentMutationCoordinator mutations;
 
     /**
      * 그 대화의 본문을 지우고 지운 시각을 적는다.
      *
      * @return 지웠으면 참. 이미 정리했거나 지운 대화가 아니면 거짓
      */
-    @Transactional
+    @Transactional(propagation = Propagation.MANDATORY)
     public boolean purge(Long conversationId, Instant now) {
+        mutations.requireParticipant(conversationId);
         Conversation conversation =
                 conversations.findByIdForMessageWrite(conversationId).orElse(null);
         if (conversation == null || conversation.deletedAt() == null || conversation.purgedAt() != null) {

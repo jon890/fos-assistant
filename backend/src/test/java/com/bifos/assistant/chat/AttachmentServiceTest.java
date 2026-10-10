@@ -33,6 +33,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 사진을 받아 두고 돌려주는 규칙과 대화 주인 경계를 확인한다. */
 @BackendIntegrationTest
@@ -58,12 +59,25 @@ class AttachmentServiceTest {
     @Autowired
     ConversationWriter conversationWriter;
 
+    @Autowired
+    JdbcTemplate jdbc;
+
     private Path root;
     private Long mine;
     private Long theirs;
 
     @BeforeEach
     void setUp() throws IOException {
+        for (CurrentUser user : List.of(OWNER, STRANGER)) {
+            if (jdbc.queryForObject("select count(*) from app_user where id=?", Long.class, user.id()) == 0) {
+                jdbc.update(
+                        "insert into app_user(id,email,display_name,group_id,role,created_at)"
+                                + " values (?,?,?,1,'MEMBER',CURRENT_TIMESTAMP)",
+                        user.id(),
+                        user.email(),
+                        user.displayName());
+            }
+        }
         attachments.deleteAll();
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
@@ -387,6 +401,31 @@ class AttachmentServiceTest {
         assertThatThrownBy(action::run)
                 .isInstanceOfSatisfying(
                         ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+    }
+
+    @Test
+    @DisplayName("사용자 삭제 실패도 영속 차단하고 미전송 수와 메시지 연결에서 빼며 반복 삭제로 복구한다")
+    void retainsUserDeletionRequestUntilRetryCompletes() throws IOException {
+        ChatAttachment saved = upload(OWNER, mine, "image/png", IMAGE);
+        Path original = fileOf(saved);
+        Files.delete(original);
+        Files.createDirectory(original);
+        Files.write(original.resolve("inside"), IMAGE);
+        assertThatThrownBy(() -> service.deleteByUser(OWNER, mine, saved.id())).isInstanceOf(RuntimeException.class);
+        ChatAttachment failed = attachments.findById(saved.id()).orElseThrow();
+        assertThat(failed.deletedAt()).isNull();
+        assertThat(failed.deletionRequestedAt()).isNotNull();
+        assertCode(() -> service.read(OWNER, mine, saved.id()), ErrorCode.ATTACHMENT_GONE);
+        assertCode(() -> service.requireAttachable(mine, List.of(saved.id())), ErrorCode.VALIDATION_FAILED);
+        assertCode(() -> service.attach(1001L, mine, List.of(saved.id())), ErrorCode.VALIDATION_FAILED);
+        assertThat(attachments.countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(mine))
+                .isZero();
+        Files.delete(original.resolve("inside"));
+        Files.delete(original);
+        service.deleteByUser(OWNER, mine, saved.id());
+        ChatAttachment completed = attachments.findById(saved.id()).orElseThrow();
+        assertThat(completed.deletionRequestedAt()).isEqualTo(failed.deletionRequestedAt());
+        assertThat(completed.deletedAt()).isNotNull();
     }
 
     private static void deleteTree(Path path) throws IOException {

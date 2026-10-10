@@ -2,6 +2,7 @@ package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
@@ -69,6 +70,10 @@ class CollationMixQueryMysqlTest {
     /** V57 에는 가치 평가 표가 없어 현재 실행의 기동 복구를 실행하지 않는다. */
     @MockitoBean
     private ValueEvaluationRecovery valueEvaluationRecovery;
+
+    /** V57에는 삭제 요청 칸이 없으므로 현재 첨부의 기동 복구는 실행하지 않는다. */
+    @MockitoBean
+    private AttachmentCleaner attachmentCleaner;
 
     @DynamicPropertySource
     static void useMysqlBeforeUnify(DynamicPropertyRegistry registry) {

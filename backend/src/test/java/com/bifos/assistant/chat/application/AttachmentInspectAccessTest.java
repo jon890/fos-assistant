@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -14,15 +15,26 @@ import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class AttachmentInspectAccessTest {
     private final Instant now = Instant.parse("2026-10-10T00:00:00Z");
@@ -32,11 +44,23 @@ class AttachmentInspectAccessTest {
     private final AttachmentStore store = mock(AttachmentStore.class);
     private final AttachmentInspection inspection = mock(AttachmentInspection.class);
     private final ChatAttachment photo = mock(ChatAttachment.class);
-    private final AttachmentService service =
-            new AttachmentService(access, attachments, store, null, Clock.fixed(now, ZoneOffset.UTC), null, inspection);
+    private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final AttachmentService service = new AttachmentService(
+            access,
+            attachments,
+            store,
+            null,
+            Clock.fixed(now, ZoneOffset.UTC),
+            null,
+            inspection,
+            mock(AttachmentCleaner.class),
+            transactions);
 
     @BeforeEach
     void setUp() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(photo.id()).thenReturn(7L);
+        when(photo.conversationId()).thenReturn(2L);
         when(attachments.findByIdAndConversationId(7L, 2L)).thenReturn(Optional.of(photo));
         when(photo.uploadedByUserId()).thenReturn(1L);
         when(photo.messageId()).thenReturn(3L);
@@ -109,5 +133,71 @@ class AttachmentInspectAccessTest {
             return result;
         });
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("열기 뒤 SQL 검사에서 접근이 차단되면 스트림을 닫고 닫기 실패도 원래 거절을 가리지 않는다")
+    void closesOriginalWhenPostOpenCheckRejects(boolean failClose) {
+        var closed = new AtomicBoolean();
+        var closeFailure = new IOException("synthetic close failure");
+        when(store.open(photo)).thenReturn(trackedStream(closed, failClose ? closeFailure : null));
+        when(attachments.existsReadable(7L, 2L, 1L)).thenReturn(true, false);
+
+        assertThatThrownBy(() -> service.read(user, 2L, 7L)).isInstanceOfSatisfying(ApiException.class, ex -> {
+            assertThat(ex.code()).isEqualTo(ErrorCode.ATTACHMENT_GONE);
+            assertThat(ex.getSuppressed())
+                    .containsExactly(failClose ? new Throwable[] {closeFailure} : new Throwable[0]);
+        });
+        assertThat(closed).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("열기 뒤 SQLException이 발생하면 스트림을 닫고 닫기 IOException은 원래 SQL 예외에 붙인다")
+    void closesOriginalWhenPostOpenSqlFails(boolean failClose) {
+        var closed = new AtomicBoolean();
+        var closeFailure = new IOException("synthetic close failure");
+        var sqlFailure = new DataAccessResourceFailureException("synthetic query failure", new SQLException("offline"));
+        when(store.open(photo)).thenReturn(trackedStream(closed, failClose ? closeFailure : null));
+        when(attachments.existsReadable(7L, 2L, 1L)).thenReturn(true).thenThrow(sqlFailure);
+
+        assertThatThrownBy(() -> service.read(user, 2L, 7L)).isSameAs(sqlFailure);
+        assertThat(closed).isTrue();
+        assertThat(sqlFailure.getSuppressed())
+                .containsExactly(failClose ? new Throwable[] {closeFailure} : new Throwable[0]);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("열기 뒤 트랜잭션 시작 또는 커밋이 실패해도 스트림을 닫고 원래 예외를 전파한다")
+    void closesOriginalWhenPostOpenTransactionFails(boolean failCommit) {
+        var closed = new AtomicBoolean();
+        var failure = new CannotCreateTransactionException("synthetic transaction failure");
+        when(attachments.existsReadable(7L, 2L, 1L)).thenReturn(true);
+        when(store.open(photo)).thenAnswer(invocation -> {
+            if (failCommit) {
+                doThrow(failure).when(transactions).commit(any());
+            } else {
+                when(transactions.getTransaction(any())).thenThrow(failure);
+            }
+            return trackedStream(closed, null);
+        });
+
+        assertThatThrownBy(() -> service.read(user, 2L, 7L)).isSameAs(failure);
+        assertThat(closed).isTrue();
+    }
+
+    private static InputStream trackedStream(AtomicBoolean closed, IOException failure) {
+        return new ByteArrayInputStream(new byte[] {1}) {
+            @Override
+            public void close() throws IOException {
+                closed.set(true);
+                super.close();
+                if (failure != null) {
+                    throw failure;
+                }
+            }
+        };
     }
 }

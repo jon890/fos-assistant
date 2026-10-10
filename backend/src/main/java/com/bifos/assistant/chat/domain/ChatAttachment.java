@@ -70,10 +70,15 @@ public class ChatAttachment {
     @Getter
     private Instant expiresAt;
 
-    /** 파일을 실제로 지운 시각. 비어 있으면 아직 볼 수 있다. */
+    /** 파일을 실제로 지운 시각. 접근 가능 여부는 삭제 요청과 함께 판정한다. */
     @Column(name = "deleted_at")
     @Getter
     private Instant deletedAt;
+
+    /** 최초 삭제 요청이다. 파일 삭제가 실패해도 접근 차단을 유지한다. */
+    @Column(name = "deletion_requested_at")
+    @Getter
+    private Instant deletionRequestedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -120,6 +125,12 @@ public class ChatAttachment {
     }
 
     public boolean isVisible() {
-        return deletedAt == null;
+        return deletedAt == null && deletionRequestedAt == null;
+    }
+
+    public void requestDeletion(Instant now) {
+        if (deletionRequestedAt == null) {
+            deletionRequestedAt = now;
+        }
     }
 }
