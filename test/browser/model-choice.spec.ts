@@ -869,6 +869,15 @@ test("빈 대화를 만들지 못하면 입력창의 안내 하나만 보인다"
 test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기고 사진을 올려 보낼 수 있다", async ({
   page,
 }, testInfo) => {
+  // 슬롯 대기만 30초까지 허용된다. 응답 45초와 모델 선택·메시지 전송 시간을 따로 확보한다.
+  test.setTimeout(90_000);
+  await page.route("**/api/chat/conversations/*/attachments", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const response = await route.fetch();
+    // 기존 UI assertion의 기본 5초보다 늦게 실제 응답 본문을 전달한다.
+    await new Promise((resolve) => setTimeout(resolve, 5_500));
+    await route.fulfill({ response });
+  });
   await page.goto("/");
   const browserCard = page.getByRole("radio", { name: "브라우저 비서" });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");
@@ -885,6 +894,12 @@ test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기�
   await closeSettings(page);
   await expect(page.getByRole("radio", { name: "흐름 비서" })).toBeDisabled();
 
+  const uploaded = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/api\/chat\/conversations\/[^/]+\/attachments$/.test(response.url()),
+    { timeout: 45_000 },
+  );
   await page
     .getByTestId("attachment-input")
     .setInputFiles([
@@ -893,13 +908,72 @@ test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기�
   await expect(
     page.getByTestId("attachment-previews").locator("> div"),
   ).toHaveCount(1);
+  // 헤더 도착 뒤 본문까지 확인한다. 오류 응답도 uploading을 지우므로 완료 표시만으로 성공을 판단하지 않는다.
+  const response = await uploaded;
+  const attachment = (await response.json()) as { id?: number };
+  expect(response.status(), "사진 업로드 응답 상태").toBe(200);
+  expect(attachment.id, "사진 업로드 응답의 첨부 식별자").toBeGreaterThan(0);
   await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  await expect(page.getByTestId("attachment-previews")).toHaveText("");
 
   await sendAndWait(page, `모델 먼저 고르기 검사 ${testInfo.project.name}`);
   await expect(
     page.getByTestId("user-message").last().getByTestId("message-attachment"),
   ).toHaveCount(1);
   await expect(page.getByTestId("user-message")).toHaveCount(1);
+});
+
+test("새 대화에서 모델을 먼저 고른 뒤 사진 업로드가 실패하면 오류를 알리고 사진을 빼고 보낸다", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  await page.route("**/api/chat/conversations/*/attachments", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    await new Promise((resolve) => setTimeout(resolve, 5_500));
+    await route.fulfill({
+      status: 502,
+      json: { code: "INTERNAL_ERROR", message: "사진을 올리지 못했어요." },
+    });
+  });
+  await page.goto("/");
+  await openAdvancedPicker(page);
+  await expect(modelSelect(page)).toBeEnabled();
+  await effortSelect(page).selectOption("medium");
+  await dialog(page).getByRole("button", { name: "적용" }).click();
+  await expectSaved(page);
+  await closeSettings(page);
+
+  const uploaded = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/api\/chat\/conversations\/[^/]+\/attachments$/.test(response.url()),
+    { timeout: 45_000 },
+  );
+  await page.getByTestId("attachment-input").setInputFiles([
+    {
+      name: "model-first-failed.png",
+      mimeType: "image/png",
+      buffer: PNG_1X1,
+    },
+  ]);
+  await expect(page.getByTestId("attachment-uploading")).toBeVisible();
+  const response = await uploaded;
+  expect(response.status()).toBe(502);
+  expect((await response.json()).code).toBe("INTERNAL_ERROR");
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  await expect(page.getByTestId("attachment-previews")).toContainText(
+    "사진을 올리지 못했어요.",
+  );
+  await page.getByRole("button", { name: "사진 지우기" }).click();
+  await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
+  await sendAndWait(
+    page,
+    `모델 먼저 고르기 업로드 실패 검사 ${testInfo.project.name}`,
+  );
+  await expect(page.getByTestId("user-message")).toHaveCount(1);
+  await expect(
+    page.getByTestId("user-message").last().getByTestId("message-attachment"),
+  ).toHaveCount(0);
 });
 
 test("긴 모델 이름을 골라도 가로로 넘치지 않고 입력칸 폭이 남는다", async ({
