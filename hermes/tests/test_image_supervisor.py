@@ -10,7 +10,8 @@ import threading
 import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import Mock, patch
 
 from PIL import Image
 from test_fos_ctx import load_ctx
@@ -129,10 +130,63 @@ class ImageSupervisorTest(unittest.TestCase):
                 self.module.check_status("http://example.test", "fake-token", {}, time.monotonic() + .3)
         self.assert_reaped()
 
+    def assert_process_stopped(self, proc, deadline):
+        while time.monotonic() < deadline:
+            try:
+                stat = proc.read_text()
+            except FileNotFoundError:
+                return
+            # comm에는 공백과 괄호가 들어갈 수 있어 마지막 닫는 괄호 뒤에서 상태를 읽는다.
+            if stat.rsplit(")", 1)[1].split()[0] == "Z":
+                return
+            time.sleep(.01)
+        self.fail("helper remained active after parent exit")
+
+    def test_process_disappearing_at_stat_read_counts_as_stopped(self):
+        proc = Mock(spec=Path)
+        proc.exists.return_value = True
+        self.assertTrue(proc.exists())
+        proc.read_text.side_effect = FileNotFoundError("process exited before read")
+        self.assert_process_stopped(proc, time.monotonic() + 3)
+        proc.read_text.assert_called_once_with()
+
+    def test_process_state_after_comm_with_spaces_and_parentheses_is_polled(self):
+        proc = Mock(spec=Path)
+        proc.read_text.side_effect = ["123 (helper Z (worker)) S 1", "123 (helper Z (worker)) Z 1"]
+        with patch.object(time, "monotonic", side_effect=[0, .01]), patch.object(time, "sleep") as sleep:
+            self.assert_process_stopped(proc, 1)
+        self.assertEqual(proc.read_text.call_count, 2)
+        sleep.assert_called_once_with(.01)
+
+    def test_live_process_at_deadline_fails_exit_assertion(self):
+        proc = Mock(spec=Path)
+        proc.read_text.return_value = "123 (helper Z (worker)) S 1"
+        with patch.object(time, "monotonic", side_effect=[0, 1]), patch.object(time, "sleep") as sleep:
+            with self.assertRaisesRegex(self.failureException, "helper remained active"):
+                self.assert_process_stopped(proc, 1)
+        proc.read_text.assert_called_once_with()
+        sleep.assert_called_once_with(.01)
+
+    def test_process_stat_unexpected_read_errors_propagate(self):
+        for error in (PermissionError("denied"), OSError("unexpected I/O error")):
+            with self.subTest(error=type(error).__name__):
+                proc = Mock(spec=Path)
+                proc.read_text.side_effect = error
+                with self.assertRaises(type(error)) as raised:
+                    self.assert_process_stopped(proc, time.monotonic() + 3)
+                self.assertIs(raised.exception, error)
+
+    def test_process_stat_parse_errors_propagate(self):
+        for stat in ("invalid stat", "123 (helper)"):
+            with self.subTest(stat=stat):
+                proc = Mock(spec=Path)
+                proc.read_text.return_value = stat
+                with self.assertRaises(IndexError):
+                    self.assert_process_stopped(proc, time.monotonic() + 3)
+
     @unittest.skipUnless(sys.platform == "linux", "Linux의 실제 부모 종료 계약이다")
     def test_parent_death_signal_stops_child_even_after_parent_sigkill(self):
-        import pathlib
-        plugin_directory = str(pathlib.Path(self.module.__file__).parent)
+        plugin_directory = str(Path(self.module.__file__).parent)
         child_script = "import sys,os,time; sys.path.insert(0,sys.argv[1]); from image_helper import configure_limits; configure_limits(os.getppid()); print('ready',flush=True); time.sleep(60)"
         parent_script = "import subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]); print(p.pid,flush=True); time.sleep(60)"
         parent = self.real_popen([sys.executable, "-c", parent_script, child_script, plugin_directory], stdout=subprocess.PIPE)
@@ -141,14 +195,7 @@ class ImageSupervisorTest(unittest.TestCase):
             self.assertEqual(parent.stdout.readline().strip(), b"ready")
             parent.kill()
             parent.wait(timeout=3)
-            deadline = time.monotonic() + 3
-            while time.monotonic() < deadline:
-                proc = pathlib.Path("/proc") / str(child_pid) / "stat"
-                if not proc.exists() or proc.read_text().split()[2] == "Z":
-                    break
-                time.sleep(.01)
-            else:
-                self.fail("helper remained active after parent exit")
+            self.assert_process_stopped(Path("/proc") / str(child_pid) / "stat", time.monotonic() + 3)
         finally:
             if parent.poll() is None:
                 parent.kill()
