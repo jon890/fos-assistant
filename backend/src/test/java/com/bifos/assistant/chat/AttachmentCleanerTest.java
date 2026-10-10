@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -59,11 +60,15 @@ class AttachmentCleanerTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    TestClock clock;
+
     private Path root;
     private Long conversationId;
 
     @BeforeEach
     void setUp() throws IOException {
+        clock.set(NOW);
         if (jdbc.queryForObject("select count(*) from app_user where id=9201", Long.class) == 0) {
             jdbc.update("insert into app_user(id,email,display_name,group_id,role,created_at)"
                     + " values (9201,'cleaner@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");

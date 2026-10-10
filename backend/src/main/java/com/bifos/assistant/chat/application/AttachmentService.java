@@ -211,15 +211,19 @@ public class AttachmentService {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
         InputStream stream = store.open(attachment);
-        if (!readable(attachmentId, conversationId, user.id())) {
+        try {
+            if (!readable(attachmentId, conversationId, user.id())) {
+                throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
+            }
+            return new AttachmentContent(attachment.contentType(), attachment.byteSize(), stream);
+        } catch (RuntimeException | Error failure) {
             try {
                 stream.close();
             } catch (IOException ex) {
-                throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept", ex);
+                failure.addSuppressed(ex);
             }
-            throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
+            throw failure;
         }
-        return new AttachmentContent(attachment.contentType(), attachment.byteSize(), stream);
     }
 
     /** 보관 기간을 기다리지 않고 지운다. 이미 지워졌으면 아무것도 하지 않는다. 행은 남긴다. */

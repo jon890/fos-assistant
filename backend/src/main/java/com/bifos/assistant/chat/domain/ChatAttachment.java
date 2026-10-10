@@ -70,7 +70,7 @@ public class ChatAttachment {
     @Getter
     private Instant expiresAt;
 
-    /** 파일을 실제로 지운 시각. 비어 있으면 아직 볼 수 있다. */
+    /** 파일을 실제로 지운 시각. 접근 가능 여부는 삭제 요청과 함께 판정한다. */
     @Column(name = "deleted_at")
     @Getter
     private Instant deletedAt;

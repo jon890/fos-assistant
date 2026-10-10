@@ -11,6 +11,7 @@ import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -78,6 +79,32 @@ class AttachmentCleanerClockTest {
 
         assertThat(attachments.findById(expired.id()).orElseThrow().deletedAt()).isEqualTo(NOW);
         assertThat(attachments.findById(live.id()).orElseThrow().deletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("파일 작업 중 진행한 시각을 완료 트랜잭션에 기록하고 반복 삭제에도 최초 시각을 유지한다")
+    void recordsCompletionAfterFileDeletionAndPreservesFirstTimestamps() {
+        ChatAttachment attachment = stored(NOW.plus(Duration.ofDays(1)));
+        var progressingClock = new TestClock();
+        progressingClock.set(NOW);
+        AttachmentStore progressingStore = new AttachmentStore(properties) {
+            @Override
+            public synchronized void delete(ChatAttachment row) {
+                super.delete(row);
+                progressingClock.advance(Duration.ofSeconds(60));
+            }
+        };
+        var cleaner = new AttachmentCleaner(attachments, progressingStore, progressingClock, mutations);
+
+        assertThat(cleaner.delete(attachment, progressingClock.instant())).isTrue();
+        var completed = attachments.findById(attachment.id()).orElseThrow();
+        assertThat(completed.deletionRequestedAt()).isEqualTo(NOW);
+        assertThat(completed.deletedAt()).isEqualTo(NOW.plusSeconds(60));
+        progressingClock.advance(Duration.ofSeconds(60));
+        assertThat(cleaner.delete(attachment, progressingClock.instant())).isFalse();
+        var repeated = attachments.findById(attachment.id()).orElseThrow();
+        assertThat(repeated.deletionRequestedAt()).isEqualTo(NOW);
+        assertThat(repeated.deletedAt()).isEqualTo(NOW.plusSeconds(60));
     }
 
     private ChatAttachment stored(Instant expiresAt) {

@@ -41,15 +41,18 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -107,6 +110,9 @@ public class AttachmentDeletionBarrierTest {
 
     @Autowired
     ApplicationContext context;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     private CurrentUser owner;
     private Conversation conversation;
@@ -234,23 +240,32 @@ public class AttachmentDeletionBarrierTest {
     @Test
     @DisplayName("주인의 사용자 잠금에서 삭제가 대기하고 다른 사용자의 삭제는 독립적으로 끝난다")
     protected void serializesOwnerWithoutLockingOtherUsers() throws Exception {
+        Conversation waitingConversation =
+                conversations.save(Conversation.startedBy(owner.id(), "같은 주인의 다른 대화", null, NOW));
+        ChatAttachment waitingPhoto = photo(owner, waitingConversation);
         CurrentUser otherOwner = user();
         Conversation other = conversations.save(Conversation.startedBy(otherOwner.id(), "독립 정리", null, NOW));
         ChatAttachment otherPhoto = photo(otherOwner, other);
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
+        boolean mysql = jdbc.execute((ConnectionCallback<Boolean>)
+                connection -> "MySQL".equals(connection.getMetaData().getDatabaseProductName()));
+        var holdingSession = new AtomicReference<Long>();
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
-            var holding = pool.submit(() -> mutations.run(
-                    owner.id(), new ChatContentMutationTarget(conversation.id(), List.of(photo.id())), () -> {
-                        entered.countDown();
-                        await(release);
-                        return null;
-                    }));
+            // 사용자 행만 잠근다. 대화·첨부 잠금으로 사용자 잠금 누락을 가릴 수 없다.
+            var holding = pool.submit(() -> new TransactionTemplate(manager).execute(status -> {
+                holdingSession.set(
+                        jdbc.queryForObject(mysql ? "select connection_id()" : "select session_id()", Long.class));
+                users.findByIdForUpdate(owner.id()).orElseThrow();
+                entered.countDown();
+                await(release);
+                return null;
+            }));
             try {
                 assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-                var waiting = pool.submit(() -> service.deleteByUser(owner, conversation.id(), photo.id()));
-                assertThatThrownBy(() -> waiting.get(200, TimeUnit.MILLISECONDS))
-                        .isInstanceOf(TimeoutException.class);
+                var waiting =
+                        pool.submit(() -> service.deleteByUser(owner, waitingConversation.id(), waitingPhoto.id()));
+                assertUserLockWait(mysql, holdingSession.get(), waiting);
                 pool.submit(() -> service.deleteByUser(otherOwner, other.id(), otherPhoto.id()))
                         .get(10, TimeUnit.SECONDS);
                 assertThat(attachments.findById(otherPhoto.id()).orElseThrow().deletedAt())
@@ -258,12 +273,37 @@ public class AttachmentDeletionBarrierTest {
                 release.countDown();
                 waiting.get(10, TimeUnit.SECONDS);
                 holding.get(10, TimeUnit.SECONDS);
-                assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt())
+                assertThat(attachments.findById(waitingPhoto.id()).orElseThrow().deletedAt())
                         .isEqualTo(NOW);
             } finally {
                 release.countDown();
             }
         }
+    }
+
+    private void assertUserLockWait(boolean mysql, Long holdingSession, Future<?> waiting) throws InterruptedException {
+        String sql = mysql
+                ? "select count(*) from performance_schema.data_lock_waits w"
+                        + " join performance_schema.data_locks l on l.engine_lock_id=w.requesting_engine_lock_id"
+                        + " join performance_schema.threads t on t.thread_id=w.blocking_thread_id"
+                        + " where l.object_schema=database() and l.object_name='app_user' and t.processlist_id=?"
+                : "select count(*) from information_schema.sessions where blocker_id=?"
+                        + " and lower(executing_statement) like '%app_user%'"
+                        + " and lower(executing_statement) like '%for update%'";
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        boolean observed = false;
+        while (System.nanoTime() < deadline) {
+            if (jdbc.queryForObject(sql, Long.class, holdingSession) > 0) {
+                observed = true;
+                break;
+            }
+            if (waiting.isDone()) {
+                break;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(observed).as("DB가 보유 세션의 app_user 행 잠금을 기다리는 요청을 확인해야 한다").isTrue();
+        assertThat(waiting.isDone()).isFalse();
     }
 
     @Test

@@ -95,7 +95,7 @@ public class AttachmentCleaner {
         }
         store.delete(current);
         mutations.run(current.uploadedByUserId(), target, () -> {
-            attachments.findById(current.id()).orElseThrow().markDeleted(now);
+            attachments.findById(current.id()).orElseThrow().markDeleted(clock.instant());
             return null;
         });
         return true;
