@@ -1,0 +1,15 @@
+{
+  "name": "plan127-financial-execution-claim",
+  "description": "승인 내용을 저장하고 실행 권한을 한 번만 소비한다",
+  "status": "pending",
+  "created_at": "2026-10-10",
+  "total_phases": 1,
+  "current_phase": 2,
+  "phases": [
+    {
+      "number": 2,
+      "file": "phase-02.md",
+      "execution_profile": "deep"
+    }
+  ]
+}
