@@ -2,6 +2,8 @@
 
 정한 시각에 사용자의 권한으로 에이전트를 돌리는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/task/`, `backend/src/main/java/com/bifos/assistant/chat/**/ScheduledTurn*`, `web/src/components/task/`, `web/src/app/tasks/`, `web/src/lib/task-api.ts`
+
 ## 요구
 
 - 사용자가 작업을 만들고 고치고 멈추고 지운다. 작업은 에이전트, 지시, 시각, 대화 방식, 놓친 발화 처리, 알림 설정, 모델 단계를 갖는다.
