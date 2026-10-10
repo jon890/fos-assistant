@@ -1,4 +1,5 @@
 import { ATTACHMENT_DIR_ENV, readPhoto } from "../src/draft.ts";
+import type { runOverwrite } from "../src/editor/overwrite.ts";
 import type { runDraft } from "../src/editor/run.ts";
 import { runWorker } from "../src/worker.ts";
 
@@ -28,13 +29,27 @@ export const fakeRunDraft: typeof runDraft = async (env, blocks, input, onStage)
   };
 };
 
+/** 덮어쓰기 대역. 브라우저에 닿지 않고 잠깐 기다린 뒤 사본 하나를 남기고 고친 것처럼 성공한다. */
+export const fakeRunOverwrite: typeof runOverwrite = async (_env, input, onStage) => {
+  await onStage("open");
+  await Bun.sleep(800);
+  return {
+    draft_id: input.draft_id,
+    backup_draft_id: "1",
+    backup_title: "[덮어쓰기 전 원본] x",
+    saved_before: 1,
+    saved_after: 1,
+    state: null,
+  };
+};
+
 /**
  * 시험 전용 작업 프로세스 진입 파일. `ServerDeps.workerEntry` 로 넘기면 서버가 이 파일을
- * `--worker <작업 파일>` 로 띄우고, 같은 `runWorker` 를 가짜 `runDraft` 로 돌린다.
+ * `--worker <작업 파일>` 로 띄우고, 같은 `runWorker` 를 가짜 `runDraft` 와 `runOverwrite` 로 돌린다.
  */
 if (import.meta.main) {
   const index = process.argv.indexOf("--worker");
   const jobFile = index >= 0 ? process.argv[index + 1] : undefined;
-  if (jobFile) await runWorker(jobFile, { runDraft: fakeRunDraft });
+  if (jobFile) await runWorker(jobFile, { runDraft: fakeRunDraft, runOverwrite: fakeRunOverwrite });
   process.exit(0);
 }

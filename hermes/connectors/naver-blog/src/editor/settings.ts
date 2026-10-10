@@ -76,7 +76,7 @@ async function settingsOpen(page: EditorPage) {
  * 끝이 있는 애니메이션이 멈추기를 잠시 기다리고, 단추가 덮이지 않은 채 제자리에 있을 때 누른다. 레이어가 뜨지 않으면 몇 번 다시 누른다.
  * 누를 때마다 먼저 열렸는지 보므로 늦게 열린 레이어를 다시 눌러 닫지 않는다.
  */
-async function openSettings(page: EditorPage) {
+export async function openSettings(page: EditorPage) {
   for (let i = 0; i < OPEN_TRIES; i++) {
     if (await settingsOpen(page)) return true;
     await page.waitUntil(async () => !(await page.js(ANIMATING)), page.step(5));
@@ -102,14 +102,14 @@ async function publishDiagnosis(page: EditorPage) {
 }
 
 /** 연 단추를 다시 눌러 설정 레이어만 닫는다. */
-async function closeSettings(page: EditorPage) {
+export async function closeSettings(page: EditorPage) {
   if (!(await settingsOpen(page))) return true;
   if (!(await click(page, PUBLISH_SETTINGS_BUTTON))) return false;
   return page.waitUntil(async () => !(await settingsOpen(page)));
 }
 
 /** 열린 발행 설정의 카테고리와 태그를 읽는다. */
-async function settingsState(page: EditorPage) {
+export async function settingsState(page: EditorPage) {
   const raw = await page.js<string>(
     "JSON.stringify({" +
       ` category: document.querySelector(${q(CATEGORY_BUTTON)})?.textContent.trim() || '',` +
