@@ -188,9 +188,11 @@ public class AttachmentService {
     /**
      * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름, 사진을 어떻게 볼지를 사용자가 쓴 글 앞에 붙인다.
      *
-     * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣고, 상한 밖이거나
-     * 사본이 없어 싣지 못한 사진은 경로를 적어 같은 턴에 {@code vision_analyze} 로 보게 한다. 근거는 ADR-20261009 /
-     * native-image-input 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내한다.
+     * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣는다. 바이트 예산을 넘으면 모든 사진을
+     * 더 작은 긴 변 단계와 낮춘 품질로 줄여 싣는다. 싣지 못한 사진(사본이 없거나 다시 줄이지 못한 사진)은 순번만 적고, 도구로
+     * 읽지 말고 사용자에게 다시 보내 달라고 하게 한다. 운영에서 사본 읽기도 잘렸기 때문이다. 근거는 ADR-20261009 /
+     * native-image-input 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘기고, 그때는 모든 사진을 경로로 안내해
+     * {@code vision_analyze} 로 보게 한다.
      * 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
      * 이름은 알아보라고 괄호로만 붙인다. 파일을 올리거나 고치는 도구에는 원본을 쓰라고 함께 적는다.
      *
@@ -224,9 +226,10 @@ public class AttachmentService {
                 + directory + "\n"
                 + files + "\n"
                 + "\n"
-                + photoGuidance(directory, photos)
+                + photoGuidance(directory, photos, embedImages)
                 + "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
                 + " read_file 로 읽지 않는다.\n"
+                + "지난 사진을 vision_analyze 로 볼 때는 한 번에 한 장씩, 앞 호출의 결과를 받은 뒤 다음 사진을 부른다.\n"
                 + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
                 + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
                 + "\n"
@@ -238,8 +241,12 @@ public class AttachmentService {
         return new AgentInput(input, hermesImages);
     }
 
-    /** 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었고, 싣지 못한 사진은 어느 경로로 보는지 적는다. */
-    private static String photoGuidance(String directory, List<AgentPhoto> photos) {
+    /**
+     * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. {@code embedImages} 가 참이면 싣지 못한 사진의 순번을 한
+     * 줄에 적고 도구로 읽지 말고 사용자에게 다시 보내 달라고 하게 한다. 거짓(흐름)이면 사진마다 경로를 적어
+     * {@code vision_analyze} 로 보게 한다.
+     */
+    private static String photoGuidance(String directory, List<AgentPhoto> photos, boolean embedImages) {
         StringBuilder guidance =
                 new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
         List<AgentPhoto> embedded = photos.stream().filter(AgentPhoto::embedded).toList();
@@ -252,7 +259,17 @@ public class AttachmentService {
         }
         List<AgentPhoto> notEmbedded =
                 photos.stream().filter(photo -> !photo.embedded()).toList();
-        if (!notEmbedded.isEmpty()) {
+        if (notEmbedded.isEmpty()) {
+            return guidance.toString();
+        }
+        if (embedImages) {
+            guidance.append("입력에 싣지 못한 사진: ")
+                    .append(notEmbedded.stream()
+                            .map(photo -> photo.ordinal() + "번째")
+                            .collect(Collectors.joining(", ")))
+                    .append(" 사진. 이 사진은 도구로 읽지 말고, 사용자에게 볼 수 없었다고 알리고 다시 보내 달라고 한다.")
+                    .append(" WebP 처럼 읽지 못하는 형식이면 JPEG 나 PNG 로 바꿔 달라고 한다.\n");
+        } else {
             guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
             for (AgentPhoto photo : notEmbedded) {
                 guidance.append("- ")

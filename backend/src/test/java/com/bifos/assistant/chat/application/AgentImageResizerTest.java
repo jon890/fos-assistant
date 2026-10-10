@@ -3,6 +3,7 @@ package com.bifos.assistant.chat.application;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -94,6 +95,72 @@ class AgentImageResizerTest {
                 .isFalse();
         assertThat(AgentImageResizer.withinPixelLimit(8_000, 6_000, AgentImageResizer.MAX_PIXELS))
                 .isTrue();
+    }
+
+    @Test
+    @DisplayName("긴 변이 넘을 때만 비율대로 줄이고 짧은 변은 1 아래로 내리지 않는다")
+    void scalesSizeOnlyWhenLongSideExceedsLimit() {
+        assertThat(AgentImageResizer.scaledSize(1600, 1200, 768)).isEqualTo(new Dimension(768, 576));
+        assertThat(AgentImageResizer.scaledSize(1200, 1600, 1024)).isEqualTo(new Dimension(768, 1024));
+        assertThat(AgentImageResizer.scaledSize(800, 600, 1024)).isEqualTo(new Dimension(800, 600));
+        assertThat(AgentImageResizer.scaledSize(3000, 1, 768)).isEqualTo(new Dimension(768, 1));
+    }
+
+    @Test
+    @DisplayName("사본의 가로와 세로를 디코딩 없이 읽고 이미지가 아닌 바이트는 빈 값이다")
+    void readsDimensionsFromHeader() throws IOException {
+        byte[] copy = AgentImageResizer.toJpeg(png(new BufferedImage(4000, 3000, BufferedImage.TYPE_INT_RGB)))
+                .orElseThrow();
+
+        assertThat(AgentImageResizer.dimensions(copy)).contains(new Dimension(1600, 1200));
+        assertThat(AgentImageResizer.dimensions(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("1600 사본을 더 작은 긴 변으로 다시 줄인다")
+    void shrinksCopyToSmallerLongSide() throws IOException {
+        byte[] copy = AgentImageResizer.toJpeg(png(new BufferedImage(4000, 3000, BufferedImage.TYPE_INT_RGB)))
+                .orElseThrow();
+
+        BufferedImage result = jpegOf(AgentImageResizer.shrink(copy, 1024).orElseThrow());
+
+        assertThat(result.getWidth()).isEqualTo(1024);
+        assertThat(result.getHeight()).isEqualTo(768);
+    }
+
+    @Test
+    @DisplayName("긴 변이 이미 원하는 길이 이하인 사본은 받은 바이트를 그대로 돌려준다")
+    void returnsSameBytesWhenCopyIsNotLargerThanLongSide() throws IOException {
+        byte[] copy = AgentImageResizer.toJpeg(png(new BufferedImage(768, 576, BufferedImage.TYPE_INT_RGB)))
+                .orElseThrow();
+
+        assertThat(AgentImageResizer.shrink(copy, 1024).orElseThrow()).containsExactly(copy);
+    }
+
+    @Test
+    @DisplayName("긴 변이 이미 원하는 길이인 사본도 품질을 낮추면 같은 크기로 다시 인코딩해 바이트가 준다")
+    void reencodesAtLowerQualityWithoutChangingSize() throws IOException {
+        // 단색은 다시 인코딩해도 거의 줄지 않으므로 잡음을 섞은 768×576 사진을 쓴다.
+        byte[] copy = AgentImageResizer.toJpeg(png(noisyGradient(768, 576))).orElseThrow();
+
+        byte[] lower = AgentImageResizer.shrink(copy, 768, 0.4f).orElseThrow();
+        BufferedImage result = jpegOf(lower);
+
+        assertThat(result.getWidth()).isEqualTo(768);
+        assertThat(result.getHeight()).isEqualTo(576);
+        assertThat(lower.length).as("품질 0.4 로 다시 인코딩한 바이트 수").isLessThan(copy.length);
+        assertThat(AgentImageResizer.shrink(copy, 768, AgentImageResizer.QUALITY)
+                        .orElseThrow())
+                .as("품질이 그대로면 받은 바이트를 그대로 돌려준다")
+                .containsExactly(copy);
+    }
+
+    @Test
+    @DisplayName("이미지가 아닌 바이트는 다시 줄이지 못해 빈 값이다")
+    void returnsEmptyWhenShrinkingNonImageBytes() {
+        assertThat(AgentImageResizer.shrink(new byte[] {1, 2, 3, 4, 5, 6, 7, 8}, 1024))
+                .isEmpty();
     }
 
     private static BufferedImage jpegOf(byte[] bytes) throws IOException {
