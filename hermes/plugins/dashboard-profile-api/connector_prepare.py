@@ -91,7 +91,20 @@ def _prepare_answer(result, args, manifest, tool, env):
 
 
 def _guard_result_safe(answer, env):
-    # 커넥터가 권한을 돌려주더라도 결과·모델에 전달하지 않는다.
-    import json
-    text = json.dumps(answer, ensure_ascii=False)
-    _require(all(not env.get(name) or env[name] not in text for name in EXECUTION_ENV))
+    # JSON escape가 풀린 문자열 값과 키를 검사해 권한 원문이 결과·모델에 가지 않게 한다.
+    secrets = tuple(env[name] for name in EXECUTION_ENV if env.get(name))
+
+    def visit(value):
+        if isinstance(value, str):
+            _require(all(secret not in value for secret in secrets))
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                visit(key)
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+        else:
+            _require(value is None or type(value) in (bool, int, float))
+
+    visit(answer)
