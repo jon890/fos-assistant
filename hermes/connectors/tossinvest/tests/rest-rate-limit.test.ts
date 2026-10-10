@@ -79,6 +79,37 @@ test("같은 identity는 한 번 발급하며 secret/origin은 토큰을 분리�
   expect(clientStateSize()).toBe(0);
 });
 
+test("origin 정리 중인 조회와 발급은 마지막 참조 뒤 사라지고 다른 origin은 유지된다", async () => {
+  for (const path of ["/api/v1/prices", "/oauth2/token"]) {
+    const a = new FakeToss(new Set(["issueOAuth2Token", "getPrices"]));
+    const b = new FakeToss(new Set(["issueOAuth2Token"]));
+    let release!: () => void; let started!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const arrived = new Promise<void>(resolve => { started = resolve; });
+    a.routes.set(`${path === "/oauth2/token" ? "POST" : "GET"} ${path}`, async () => {
+      started(); await held;
+      return json(path === "/oauth2/token" ? { access_token: "held-token", expires_in: 3600, token_type: "Bearer" } : { result: [] });
+    });
+    const other = new Tossinvest({ apiBase: b.url, env: credentials });
+    let pending: Promise<unknown> | undefined;
+    try {
+      expect(await other.token()).toBe("fake-access-token-1");
+      const client = new Tossinvest({ apiBase: a.url, env: credentials });
+      pending = path === "/oauth2/token" ? client.token() : client.request(path);
+      await arrived;
+      expect(clientStateSize()).toBe(2);
+      clearClientState(a.url);
+      // 진행 중인 참조를 지우지는 않는다. 완료 뒤 캐시가 다시 생겨서도 안 된다.
+      expect(clientStateSize()).toBe(2);
+      release(); await pending;
+      expect(clientStateSize()).toBe(1);
+      expect(await other.token()).toBe("fake-access-token-1");
+      expect(b.issued).toBe(1);
+    } finally { release(); await pending?.catch(() => {}); a.stop(); b.stop(); }
+    expect(clientStateSize()).toBe(0);
+  }
+});
+
 test("교체 중 발급은 원래 secret identity에만 남는다", async () => {
   const fake = new FakeToss(); let release!: () => void; let started!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });

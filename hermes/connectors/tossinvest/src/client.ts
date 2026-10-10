@@ -103,19 +103,21 @@ function apiErrorCode(exchange: Exchange): string {
   return "TOSSINVEST_UNAVAILABLE";
 }
 
-type Identity = { origin: string; clientId: string; secret: string; users: number; cached: CachedToken | null; issuing: Promise<string> | null };
+type Identity = { origin: string; clientId: string; secret: string; users: number; clearing: boolean; cached: CachedToken | null; issuing: Promise<string> | null };
 // 객체 자체가 불투명 identity다. 비밀값이나 해시를 키, 파일, 로그에 남기지 않는다.
 const identities = new Set<Identity>();
 function sweep() {
   for (const state of identities) {
-    if (state.cached && state.cached.expiresAt <= Date.now()) state.cached = null;
+    if (state.clearing || state.cached && state.cached.expiresAt <= Date.now()) state.cached = null;
     if (!state.users && !state.issuing && !state.cached) identities.delete(state);
   }
 }
 export function clearClientState(origin?: string) {
   for (const state of identities) {
-    if ((!origin || state.origin === origin) && !state.users && !state.issuing) identities.delete(state);
+    // 병렬 요청 하나가 먼저 실패해도 나머지 요청의 마지막 참조가 끝나면 정리한다.
+    if (!origin || state.origin === origin) state.clearing = true;
   }
+  sweep();
   clearRateLimits(origin);
 }
 export function clientStateSize() { sweep(); return identities.size; }
@@ -142,9 +144,9 @@ export class Tossinvest {
     const clientId = this.env.TOSSINVEST_CLIENT_ID?.trim();
     const secret = this.env.TOSSINVEST_CLIENT_SECRET?.trim();
     if (!clientId || !secret) throw new TossinvestError("TOSSINVEST_UNAUTHORIZED");
-    let state = [...identities].find(item => item.origin === this.apiBase && item.clientId === clientId && item.secret === secret);
+    let state = [...identities].find(item => !item.clearing && item.origin === this.apiBase && item.clientId === clientId && item.secret === secret);
     if (!state) {
-      state = { origin: this.apiBase, clientId, secret, users: 0, cached: null, issuing: null };
+      state = { origin: this.apiBase, clientId, secret, users: 0, clearing: false, cached: null, issuing: null };
       identities.add(state);
     }
     state.users++;

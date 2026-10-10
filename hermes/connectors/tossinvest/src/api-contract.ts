@@ -326,7 +326,10 @@ export function parseApiResponse(raw: string, operation: Operation, status: numb
     if (types.length && !types.includes(kind) && !(types.includes("integer") && typeof value === "number" && Number.isSafeInteger(value))) return invalidResponse();
     if (kind === "number" && !Number.isFinite(value)) return invalidResponse();
     if (kind === "object") {
-      for (const required of schema.required ?? []) if (!Object.hasOwn(value, required)) return invalidResponse();
+      for (const required of schema.required ?? []) {
+        // 1.2.24 공식 ETF 예시만 영문명이 없다. 다른 분류·필드와 존재하는 값은 그대로 검증한다.
+        if (!Object.hasOwn(value, required) && !(owner === "StockInfo" && required === "englishName" && value.securityType === "ETF")) return invalidResponse();
+      }
       for (const [property, child] of Object.entries(schema.properties ?? {})) {
         if (Object.hasOwn(value, property)) value[property] = validate(value[property], child, value, property, owner);
       }
