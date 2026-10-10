@@ -3,6 +3,7 @@ import { call, expect, expectStatus, step, type Response, type Scenario } from "
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import { DAD_BINDING } from "./binding.ts";
 import { SUBAGENT_PROVIDER_PROBE, TOOL_DETAIL_SECRETS } from "../fake-hermes.ts";
+import { type ChildUsageObservation } from "../fake-hermes/state.ts";
 
 type ChatEvent = {
   type: "delta" | "tool" | "subagent" | "done" | "error";
@@ -31,10 +32,14 @@ type ExecutionEventView = {
   durationMs: number | null;
   failed: boolean | null;
   detail: string | null;
+  hermesSessionId: string | null;
+  occurredAt: string;
+  subagentUsageStatus: string | null;
 };
 type ExecutionNode = {
   truncated: boolean;
   executionId: number;
+  status: string;
   agentCode: string;
   requestReceivedAt: string | null;
   submittedAt: string | null;
@@ -44,6 +49,34 @@ type ExecutionNode = {
   children: ExecutionNode[];
 };
 type ExecutionTree = { root: ExecutionNode; truncated: boolean };
+
+/** 사용자 본문과 도구 내용을 제외하고, 실패한 단계와 마지막 트리의 수치를 남긴다. */
+export function childUsageDiagnostic(tree: ExecutionTree | undefined, fixture: ChildUsageObservation | undefined): string {
+  const completed = tree?.root.events.filter((item) => item.eventType === "SUBAGENT_COMPLETED") ?? [];
+  const successfulGets = fixture?.requests.filter((request) => request.status === 200) ?? [];
+  const phase = fixture === undefined ? "fixture 등록 없음"
+    : tree?.root.finishedAt == null ? "부모 종료 저장 없음"
+    : !tree.root.events.some((item) => item.eventType === "SUBAGENT_STARTED") ? "자식 시작 저장 없음"
+    : fixture.requests.length === 0 ? "첫 session GET 없음"
+    : successfulGets.length === 0 ? "정상 session GET 없음"
+    : !successfulGets.some((request) => request.endedAt !== null)
+      ? successfulGets.length === 1 ? "두 번째 정상 session GET 없음" : "자식 종료 응답 없음"
+    : completed.length === 0 ? "종료 응답 뒤 완료 사건 저장 없음"
+    : completed.length > 1 ? "완료 사건 중복" : "완료 사건 값 확인";
+  const node = (value: ExecutionNode): unknown => ({
+    executionId: value.executionId, status: value.status, truncated: value.truncated,
+    finishedAt: value.finishedAt,
+    events: value.events.map((event) => ({
+      sequence: event.sequence, eventType: event.eventType, occurredAt: event.occurredAt,
+      hermesSessionId: event.hermesSessionId, subagentUsageStatus: event.subagentUsageStatus,
+      inputTokens: event.inputTokens, outputTokens: event.outputTokens,
+      durationMs: event.durationMs, failed: event.failed,
+    })),
+    children: value.children.map(node),
+  });
+  return JSON.stringify({ phase, fixture: fixture ?? null,
+    lastTree: tree === undefined ? null : { truncated: tree.truncated, root: node(tree.root) } });
+}
 type MonthlyCostView = {
   estimatedCostMicros: number;
   pricedSubagents: number;
@@ -169,28 +202,41 @@ export const streamingScenario: Scenario = {
     const unpricedBefore = (await monthlyCost(context)).unpricedSubagents;
     for (const text of ["자식 늦은 완료 검사", "자식 완료 사건 없음 검사", "압축 뒤 자식 완료 검사"]) {
       step(`${text}: 부모 종료 뒤 session 사용량을 보완한다`);
-      const receivedChild = await events(expectStatus(await call(context, "/chat/messages/stream", {
-        method: "POST", token: context.tokens.dad, body: { text, agentCode: "dad" },
-      }), 200, text));
-      const doneChild = receivedChild.at(-1)!;
-      let recordedChild: ExecutionEventView | undefined;
-      const deadline = Date.now() + 20000;
-      while (Date.now() < deadline) {
-        const childTree = expectStatus(await call(context, `/usage/executions/${doneChild.executionId}/tree`, {
-          token: context.tokens.dad,
-        }), 200, "비동기 자식 실행 트리").json<ExecutionTree>();
-        const completedChildren = childTree.root.events.filter((item) => item.eventType === "SUBAGENT_COMPLETED");
-        expect(completedChildren.length <= 1, "자식 완료가 중복으로 기록됐다");
-        recordedChild = completedChildren.at(0);
-        if (recordedChild !== undefined) break;
-        await new Promise((resolve) => setTimeout(resolve, 250));
+      const previousChildren = new Set(context.hermes.childUsageObservations().map((child) => child.childSessionId));
+      let lastTree: ExecutionTree | undefined;
+      const fixture = () => context.hermes.childUsageObservations()
+        .find((child) => !previousChildren.has(child.childSessionId));
+      try {
+        const receivedChild = await events(expectStatus(await call(context, "/chat/messages/stream", {
+          method: "POST", token: context.tokens.dad, body: { text, agentCode: "dad" },
+        }), 200, text));
+        const doneChild = receivedChild.at(-1)!;
+        let recordedChild: ExecutionEventView | undefined;
+        const deadline = Date.now() + 20000;
+        while (Date.now() < deadline) {
+          lastTree = expectStatus(await call(context, `/usage/executions/${doneChild.executionId}/tree`, {
+            token: context.tokens.dad,
+          }), 200, "비동기 자식 실행 트리").json<ExecutionTree>();
+          // 첫 정상 GET이 null 종료 시각을 받은 것을 관찰한 뒤에만 늦은 자식을 끝낸다.
+          const observedChild = fixture();
+          if (text === "자식 늦은 완료 검사" && observedChild?.requests.some((request) => request.status === 200)) {
+            context.hermes.releaseChildUsage(observedChild.childSessionId);
+          }
+          const completedChildren = lastTree.root.events.filter((item) => item.eventType === "SUBAGENT_COMPLETED");
+          expect(completedChildren.length <= 1, "자식 완료가 중복으로 기록됐다");
+          recordedChild = completedChildren.at(0);
+          if (recordedChild !== undefined) break;
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+        expect(recordedChild?.inputTokens === 160 && recordedChild.outputTokens === 20,
+          "session의 일반 입력과 cache read/write를 합산하지 못했다");
+        expect(recordedChild?.durationMs === 2500, "자식 session의 종료 시각으로 시간을 계산하지 못했다");
+        expect(recordedChild?.failed === null, "agent_close만으로 자식의 성공을 추정했다");
+        expect(recordedChild?.subagentName?.startsWith("sa-") === true,
+          "이름이 없는 자식의 subagent_id를 표시 이름으로 보존하지 못했다");
+      } catch (error) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}; ${childUsageDiagnostic(lastTree, fixture())}`);
       }
-      expect(recordedChild?.inputTokens === 160 && recordedChild.outputTokens === 20,
-        "session의 일반 입력과 cache read/write를 합산하지 못했다");
-      expect(recordedChild?.durationMs === 2500, "자식 session의 종료 시각으로 시간을 계산하지 못했다");
-      expect(recordedChild?.failed === null, "agent_close만으로 자식의 성공을 추정했다");
-      expect(recordedChild?.subagentName?.startsWith("sa-") === true,
-        "이름이 없는 자식의 subagent_id를 표시 이름으로 보존하지 못했다");
     }
 
     step("대시보드에서 읽은 provider 와 session 의 모델로 자식 금액을 합계에 한 번만 더한다");

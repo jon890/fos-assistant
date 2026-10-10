@@ -24,7 +24,8 @@ import {
   type Context,
   type Scenario,
 } from "./harness.ts";
-import { FAKE_DASHBOARD_TOKEN, startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
+import { FAKE_DASHBOARD_TOKEN, TOOL_DETAIL_SECRETS, startFakeHermes, type FakeHermes } from "./fake-hermes.ts";
+import { maskBackendLog, backendFailureExcerpt } from "./backend-log.ts";
 import { authScenario } from "./scenarios/auth.ts";
 import { signInScenario } from "./scenarios/signin.ts";
 import { peopleScenario, NEW_PERSON } from "./scenarios/people.ts";
@@ -345,15 +346,15 @@ async function killControlPlane(app: ChildProcess): Promise<void> {
 }
 
 /** 실패한 자리에서 Control Plane 로그를 보여준다. */
-async function printAppLog(logPath: string): Promise<void> {
-  const log = await readFile(logPath, "utf-8").catch(() => "");
+async function printAppLog(logPath: string, secrets: readonly string[]): Promise<void> {
+  const log = maskBackendLog(await readFile(logPath, "utf-8").catch(() => ""), secrets);
   if (log.length === 0) return;
-  const interesting = log
-    .split("\n")
-    .filter((line) => /ERROR|Caused by|at com\.bifos/.test(line))
-    .slice(-30);
+  // Playwright 실패 산출물처럼 실행별 임시 폴더에 두며, 원문 로그와 DB는 기존 finally에서 지운다.
+  const results = await mkdtemp(join(tmpdir(), "fos-assistant-e2e-results-"));
+  await writeFile(join(results, "backend.log"), log, { mode: 0o600 });
+  console.error(`합성 Control Plane 로그: ${results}`);
   console.error("--- Control Plane 로그 ---");
-  console.error(interesting.length > 0 ? interesting.join("\n") : log.split("\n").slice(-20).join("\n"));
+  console.error(backendFailureExcerpt(log));
 }
 
 async function main(): Promise<void> {
@@ -434,7 +435,7 @@ async function main(): Promise<void> {
     console.log("\n모두 통과했다");
   } catch (error) {
     console.error(`\n실패: ${error instanceof ScenarioFailure ? error.message : String(error)}`);
-    await printAppLog(logPath);
+    await printAppLog(logPath, [JWT_SECRET, PROFILE_KEY, FAKE_DASHBOARD_TOKEN, ...TOOL_DETAIL_SECRETS]);
     process.exitCode = 1;
   } finally {
     if (app?.pid !== undefined) {

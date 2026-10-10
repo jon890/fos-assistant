@@ -76,6 +76,15 @@ export function startFakeHermes(
       }
       resolve({
         baseUrl: `http://127.0.0.1:${address.port}`,
+        childUsageObservations: () => [...state.childUsages.values()].flatMap((child) =>
+          child.observation === undefined ? [] : [{ ...child.observation, reads: child.reads,
+            requests: child.observation.requests.map((request) => ({ ...request })) }]),
+        releaseChildUsage: (childSessionId) => {
+          const observation = state.childUsages.get(childSessionId)?.observation;
+          if (observation === undefined || !observation.requests.some((request) => request.status === 200)) return false;
+          observation.releasedAt ??= new Date().toISOString();
+          return true;
+        },
         lastSubmittedInstructions: () => state.lastSubmittedInstructions,
         lastSubmittedInput: () => state.lastSubmittedInput,
         lastSubmittedImages: () => state.lastSubmittedImages,

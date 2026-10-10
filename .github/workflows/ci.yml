@@ -220,6 +220,14 @@ jobs:
           node-version: '22.18.0'
           package-manager-cache: false
       - run: node test/e2e/run.ts
+      - name: 실패한 E2E의 합성 백엔드 로그
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-backend-log-attempt-${{ github.run_attempt }}
+          path: /tmp/fos-assistant-e2e-results-*/backend.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   unit:
     name: unit

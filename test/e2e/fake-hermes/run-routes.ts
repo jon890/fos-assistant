@@ -297,13 +297,18 @@ export function createRuntimeRoutes(state: FakeHermesState, { authorized }: Retu
         const sessionMatch = SESSION_PATH.exec(path);
         if (sessionMatch) {
           const [, profile, sessionId] = sessionMatch;
+          const child = state.childUsages.get(sessionId!);
           if (!authorized(request, profile!)) {
+            if (child?.profile === profile) child.observation?.requests.push({
+              at: new Date().toISOString(), status: 401, endedAt: null,
+            });
             return send(response, 401, { error: "bad key for this profile" });
           }
-          const child = state.childUsages.get(sessionId!);
           if (child && child.profile === profile) {
             child.reads += 1;
-            const ended = !child.delayed || child.reads > 1;
+            const ended = !child.delayed || child.observation?.releasedAt != null;
+            child.observation?.requests.push({ at: new Date().toISOString(), status: 200,
+              endedAt: ended ? 1002.5 : null });
             return send(response, 200, { object: "session", session: {
               id: sessionId, source: "subagent", parent_session_id: child.parent,
               model: child.model ?? "example-fast", started_at: 1000, ended_at: ended ? 1002.5 : null,
