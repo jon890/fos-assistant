@@ -262,7 +262,14 @@ IDE 는 별도 config/system/plugins/log 디렉터리로 실행해 열려 있는
 
 개발자는 고정 버전의 설치 디렉터리를 `INTELLIJ_FORMAT_HOME` 으로 지정한다. 지정하지 않은 Linux 에서는
 공식 배포본의 SHA256 을 검증해 내려받는다. 버전과 checksum 은 version catalog 와 설치 스크립트가 갖는다.
-첫 다운로드는 약 1.6GB 이며 CI 는 검증된 배포본을 캐시한다.
+첫 다운로드는 약 1.6GB 이며 CI 는 배포본 archive와 설치를 캐시한다.
+포맷을 요청할 때마다 archive를 코드에 고정한 SHA256으로 다시 검증하고 설치의 경로·권한·링크·내용을 대조한다.
+손상된 설치는 보관한 archive에서 다시 설치한다. archive의 checksum이 다르면 캐시 archive를 지우고 다시 설치한다.
+성공 stamp나 캐시 안의 manifest만으로 공식 배포본이라고 판단하지 않는다.
+사용자 설치는 launcher·JBR·플랫폼·Java plugin의 필수 파일을 확인하고 엔진 내용과 설치 경로를 식별한다.
+사용자 설치와 IDE 설정에는 쓰지 않는다. `validateIntellijEngine`은 포맷 캐시를 재사용할 때도 실행하고
+검증된 식별값을 준비 태스크 입력과 Spotless 상태에 넣는다. 일반 `dependencies`·`assemble`은 설치를 확인하지 않는다.
+실제 Gradle의 삭제·변조·설치 경로 전환 회귀는 `python3 test/intellij-engine.test.py --gradle`로 실행한다.
 기본 Spotless 범위는 `origin/main` 과의 공통 조상 뒤 바뀐 파일이다.
 `-PintellijFormatAll=true` 를 넘기면 main/test Java 전체를 검사하거나 적용한다.
 전체 통일 전에 파일 길이와 품질 기준도 충족해야 한다. 포맷만으로 기준을 넘으면 파일 분리는 별도 관심사로 진행한다.

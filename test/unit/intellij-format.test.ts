@@ -88,6 +88,12 @@ test("개발자 설치의 IntelliJ 버전과 build 가 다르면 거절한다", 
   const binary = join(home, "bin/idea.sh");
   writeFileSync(binary, "#!/bin/sh\nexit 0\n");
   chmodSync(binary, 0o755);
+  for (const name of ["jbr/bin/java", "jbr/lib/modules", "lib/app.jar", "plugins/java/lib/java-impl.jar"]) {
+    const file = join(home, name);
+    mkdirSync(resolve(file, ".."), { recursive: true });
+    writeFileSync(file, "engine");
+    chmodSync(file, 0o755);
+  }
   const info = join(home, "product-info.json");
   const catalog = join(f.root, "versions.toml");
   writeFileSync(catalog, '[versions]\nintellij-idea = "2026.1.3"\nintellij-idea-build = "261.25134.95"\n');
@@ -132,4 +138,9 @@ test("source 디렉터리를 결과 경로로 지정해도 삭제하지 않는�
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /backend\/build/);
   assert.equal(readFileSync(f.source, "utf8"), "class App { int n=1; }\n");
+});
+
+test("설치 캐시는 공식 archive에 연결하고 사용자 엔진 변경도 식별한다", () => {
+  const result = spawnSync("python3", [resolve("test/intellij-engine.test.py")], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
 });

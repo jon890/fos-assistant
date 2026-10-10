@@ -163,11 +163,29 @@ val intellijFormatScripts = listOf(
 )
 val intellijFormatInputs = intellijFormatScripts + intellijFormatSettings +
     listOf(file("gradle/libs.versions.toml"), file("build.gradle.kts"))
-val intellijFormatHome = providers.environmentVariable("INTELLIJ_FORMAT_HOME")
-val intellijProductInfo = intellijFormatHome.map {
-    val home = file(it)
-    if (home.resolve("Contents").isDirectory) home.resolve("Contents/Resources/product-info.json")
-    else home.resolve("product-info.json")
+val intellijEngineFile = layout.buildDirectory.file("intellij-engine.txt")
+val validateIntellijEngine = tasks.register("validateIntellijEngine") {
+    group = "formatting"
+    description = "포맷 캐시를 소비하기 전에 설치 내용과 엔진 식별값을 확인한다."
+    // Gradle의 UP-TO-DATE와 build cache보다 먼저 실제 설치를 확인한다.
+    outputs.upToDateWhen { false }
+    doLast {
+        val installation = providers.exec {
+            commandLine("python3", intellijFormatScripts[0], "--catalog", file("gradle/libs.versions.toml"), "--identity")
+            isIgnoreExitValue = true
+        }
+        if (installation.result.get().exitValue != 0) {
+            delete(intellijFormatDirectory, intellijEngineFile)
+            logger.error(installation.standardError.asText.get())
+        }
+        installation.result.get().assertNormalExitValue()
+        val content = installation.standardOutput.asText.get()
+        val engineFile = intellijEngineFile.get().asFile
+        if (!engineFile.isFile || engineFile.readText() != content) {
+            engineFile.parentFile.mkdirs()
+            engineFile.writeText(content)
+        }
+    }
 }
 
 val prepareIntellijFormat = tasks.register("prepareIntellijFormat") {
@@ -175,19 +193,13 @@ val prepareIntellijFormat = tasks.register("prepareIntellijFormat") {
     description = "고정 IntelliJ 엔진으로 모든 Java 사본을 한 번에 포맷한다."
     inputs.files(javaFormatSources).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(intellijFormatInputs).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.property("intellijHome", intellijFormatHome.orElse("download"))
-    if (intellijFormatHome.isPresent) inputs.file(intellijProductInfo).withPathSensitivity(PathSensitivity.NONE)
+    dependsOn(validateIntellijEngine)
+    inputs.file(intellijEngineFile).withPathSensitivity(PathSensitivity.NONE)
     outputs.dir(intellijFormatDirectory)
     doLast {
         // 설치 확인이 실패해도 이전 포맷 결과를 사용하지 않는다.
         delete(intellijFormatDirectory)
-        val installation = providers.exec {
-            commandLine("python3", intellijFormatScripts[0], "--catalog", file("gradle/libs.versions.toml"))
-            isIgnoreExitValue = true
-        }
-        if (installation.result.get().exitValue != 0) logger.error(installation.standardError.asText.get())
-        installation.result.get().assertNormalExitValue()
-        val binary = installation.standardOutput.asText.get().trim()
+        val binary = intellijEngineFile.get().asFile.readLines().first()
         val batch = providers.exec {
             commandLine(
                 "python3", intellijFormatScripts[1],
@@ -227,7 +239,10 @@ spotless {
     }
     java {
         target("src/main/java/**/*.java", "src/test/java/**/*.java")
-        addStep(FormatterStep.create("intellij-batch", intellijFormatState) { state ->
+        addStep(FormatterStep.createLazy("intellij-batch", {
+            // 검증 태스크가 만든 내용 식별값을 Spotless 내부 상태에도 넣는다.
+            ArrayList(intellijFormatState).apply { add(intellijEngineFile.get().asFile.readText()) }
+        }) { state ->
             FormatterFunc.NeedsFile { input, source ->
                 val relative = Path.of(state[0]).relativize(source.toPath().toAbsolutePath())
                 val original = Files.readString(Path.of(state[1], "original").resolve(relative)).replace("\r\n", "\n")
