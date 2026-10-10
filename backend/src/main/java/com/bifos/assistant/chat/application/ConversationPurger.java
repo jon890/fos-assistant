@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ArtifactStore;
@@ -72,6 +73,7 @@ public class ConversationPurger {
     private final AttachmentStore attachmentStore;
     private final ArtifactStore artifactStore;
     private final Clock clock;
+    private final ChatContentMutationCoordinator mutations;
 
     /** 실패한 대화를 다음에 다시 볼 시각과 그때 기다릴 간격, 잇단 실패 수다. */
     private final Map<Long, Backoff> backoffs = new ConcurrentHashMap<>();
@@ -154,12 +156,26 @@ public class ConversationPurger {
             return false;
         }
         Conversation conversation = conversations.findById(conversationId).orElse(null);
-        if (conversation == null || conversation.purgedAt() != null) {
+        if (conversation == null) {
             return false;
         }
-        deleteHermesSessions(conversation);
+        var target = new ChatContentMutationTarget(conversationId, List.of());
+        Conversation prepared = mutations.run(conversation.userId(), target, () -> {
+            Conversation current = conversations.findById(conversationId).orElseThrow();
+            if (current.deletedAt() == null || current.purgedAt() != null || !executions.settled(conversationId, now)) {
+                return null;
+            }
+            for (ChatAttachment attachment : attachments.findByConversationIdOrderByIdAsc(conversationId)) {
+                attachment.requestDeletion(now);
+            }
+            return current;
+        });
+        if (prepared == null) {
+            return false;
+        }
+        deleteHermesSessions(prepared);
         deleteFiles(conversationId);
-        return writer.purge(conversationId, now);
+        return mutations.run(prepared.userId(), target, () -> writer.purge(conversationId, now));
     }
 
     private void deleteHermesSessions(Conversation conversation) {

@@ -27,7 +27,10 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamSource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 대화에 올린 사진을 받고 판정하고 행을 만든다.
@@ -50,6 +53,8 @@ public class AttachmentService {
     private final Clock clock;
     private final AttachmentImages images;
     private final AttachmentInspection inspection;
+    private final AttachmentCleaner cleaner;
+    private final PlatformTransactionManager transactions;
 
     /** 보낸 원본만 읽는다. 만료된 파일이 아직 정리되지 않았어도 도구에는 주지 않는다. */
     public InspectedImage inspect(CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region) {
@@ -122,9 +127,7 @@ public class AttachmentService {
         if (!attachment.isVisible() || !attachment.expiresAt().isAfter(clock.instant())) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
-        if (!attachments
-                .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
-                        attachmentId, conversationId, user.id(), clock.instant())) {
+        if (!inspectable(attachment)) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
         return attachment;
@@ -204,21 +207,25 @@ public class AttachmentService {
     /** 사진 한 장의 본문을 연다. 지워졌으면 있었다는 것만 알린다. */
     public AttachmentContent read(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireOwnAttachment(user, conversationId, attachmentId);
-        if (!attachment.isVisible()) {
+        if (!attachment.isVisible() || !readable(attachmentId, conversationId, user.id())) {
             throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
         }
-        return new AttachmentContent(attachment.contentType(), attachment.byteSize(), store.open(attachment));
+        InputStream stream = store.open(attachment);
+        if (!readable(attachmentId, conversationId, user.id())) {
+            try {
+                stream.close();
+            } catch (IOException ex) {
+                throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept", ex);
+            }
+            throw new ApiException(ErrorCode.ATTACHMENT_GONE, "this attachment is no longer kept");
+        }
+        return new AttachmentContent(attachment.contentType(), attachment.byteSize(), stream);
     }
 
     /** 보관 기간을 기다리지 않고 지운다. 이미 지워졌으면 아무것도 하지 않는다. 행은 남긴다. */
-    @Transactional
     public void deleteByUser(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireOwnAttachment(user, conversationId, attachmentId);
-        if (!attachment.isVisible()) {
-            return;
-        }
-        store.delete(attachment);
-        attachment.markDeleted(clock.instant());
+        cleaner.delete(attachment, clock.instant(), () -> requireOwnAttachment(user, conversationId, attachmentId));
     }
 
     /**
@@ -239,7 +246,10 @@ public class AttachmentService {
         }
         List<ChatAttachment> found = attachments.findByConversationIdAndIdIn(conversationId, attachmentIds);
         boolean allFree = found.size() == attachmentIds.size()
-                && found.stream().allMatch(it -> it.messageId() == null && it.isVisible());
+                && found.stream()
+                        .allMatch(it -> it.messageId() == null
+                                && it.isVisible()
+                                && readable(it.id(), conversationId, it.uploadedByUserId()));
         if (!allFree) {
             throw notAttachable();
         }
@@ -303,13 +313,21 @@ public class AttachmentService {
         String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
                 + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
+        Map<Long, AgentPhoto> prepared =
+                images.photos(attached.stream().filter(this::inspectable).toList(), order, embedImages).stream()
+                        .collect(Collectors.toMap(AgentPhoto::attachmentId, photo -> photo));
+        List<AgentPhoto> photos = attached.stream()
+                .map(attachment -> inspectable(attachment) && prepared.containsKey(attachment.id())
+                        ? prepared.get(attachment.id())
+                        : new AgentPhoto(attachment.id(), order.get(attachment.id()), null, null))
+                .toList();
         String files = sent.stream()
-                .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id() + ", 원본 표시 크기="
-                        + (it.expiresAt().isAfter(clock.instant()) ? inspection.displaySize(it) : "보관 종료")
-                        + ", 파일=" + it.storedName() + " (올린 이름: " + it.originalName() + ")"
-                        + (it.isVisible() && it.expiresAt().isAfter(clock.instant()) ? "" : " [보관 종료]"))
+                .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id()
+                        + (inspectable(it)
+                                ? ", 원본 표시 크기=" + inspection.displaySize(it) + ", 파일=" + it.storedName() + " (올린 이름: "
+                                        + it.originalName() + ")"
+                                : " [보관 종료]"))
                 .collect(Collectors.joining("\n"));
-        List<AgentPhoto> photos = images.photos(attached, order, embedImages);
         String input = "[이 대화의 사진 참조]\n"
                 + directory + "\n"
                 + files + "\n"
@@ -367,6 +385,9 @@ public class AttachmentService {
         } else {
             guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
             for (AgentPhoto photo : notEmbedded) {
+                if (photo.agentFileName() == null) {
+                    continue;
+                }
                 guidance.append("- ")
                         .append(photo.ordinal())
                         .append("번째 사진: ")
@@ -377,6 +398,31 @@ public class AttachmentService {
             }
         }
         return guidance.toString();
+    }
+
+    private boolean inspectable(ChatAttachment attachment) {
+        return attachment.isVisible()
+                && attachment.expiresAt().isAfter(clock.instant())
+                && latest(
+                        () -> attachments
+                                .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                                        attachment.id(),
+                                        attachment.conversationId(),
+                                        attachment.uploadedByUserId(),
+                                        clock.instant()));
+    }
+
+    private boolean readable(Long id, Long conversationId, Long owner) {
+        return latest(() -> attachments.existsReadable(id, conversationId, owner));
+    }
+
+    /** 호출자의 옛 snapshot과 엔티티 캐시를 피하여 응답 직전 상태를 읽는다. */
+    private boolean latest(BooleanSupplier query) {
+        var read = new TransactionTemplate(transactions);
+        read.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        read.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        read.setReadOnly(true);
+        return Boolean.TRUE.equals(read.execute(status -> query.getAsBoolean()));
     }
 
     /**

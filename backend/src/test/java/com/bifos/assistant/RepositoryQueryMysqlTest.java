@@ -3,16 +3,22 @@ package com.bifos.assistant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import com.bifos.assistant.chat.AttachmentDeletionBarrierTest;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.infra.MemoryQueries;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -135,5 +141,33 @@ class RepositoryQueryMysqlTest {
             current = current.getCause();
         }
         return current;
+    }
+}
+
+/** 삭제 잠금과 파일 장벽 회귀를 Flyway가 만든 실제 MySQL 스키마에서도 실행한다. */
+@Tag("mysql")
+class AttachmentDeletionBarrierMysqlTest extends AttachmentDeletionBarrierTest {
+    private static Path testFiles;
+
+    @DynamicPropertySource
+    static void useMysql(DynamicPropertyRegistry registry) throws IOException {
+        testFiles = Files.createTempDirectory("attachment-deletion-barrier-");
+        registry.add("assistant.attachment.root", () -> testFiles.toString());
+        MysqlTestDatabase database = MysqlTestDatabase.create();
+        registry.add("spring.datasource.url", database::url);
+        registry.add("spring.datasource.username", database::username);
+        registry.add("spring.datasource.password", database::password);
+        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+    }
+
+    @AfterAll
+    static void removeRoot() throws IOException {
+        try (var paths = Files.walk(testFiles)) {
+            for (Path file : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(file);
+            }
+        }
     }
 }

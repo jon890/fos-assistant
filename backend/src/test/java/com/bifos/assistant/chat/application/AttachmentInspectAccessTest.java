@@ -23,6 +23,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class AttachmentInspectAccessTest {
     private final Instant now = Instant.parse("2026-10-10T00:00:00Z");
@@ -32,11 +34,23 @@ class AttachmentInspectAccessTest {
     private final AttachmentStore store = mock(AttachmentStore.class);
     private final AttachmentInspection inspection = mock(AttachmentInspection.class);
     private final ChatAttachment photo = mock(ChatAttachment.class);
-    private final AttachmentService service =
-            new AttachmentService(access, attachments, store, null, Clock.fixed(now, ZoneOffset.UTC), null, inspection);
+    private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+    private final AttachmentService service = new AttachmentService(
+            access,
+            attachments,
+            store,
+            null,
+            Clock.fixed(now, ZoneOffset.UTC),
+            null,
+            inspection,
+            mock(AttachmentCleaner.class),
+            transactions);
 
     @BeforeEach
     void setUp() {
+        when(transactions.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        when(photo.id()).thenReturn(7L);
+        when(photo.conversationId()).thenReturn(2L);
         when(attachments.findByIdAndConversationId(7L, 2L)).thenReturn(Optional.of(photo));
         when(photo.uploadedByUserId()).thenReturn(1L);
         when(photo.messageId()).thenReturn(3L);

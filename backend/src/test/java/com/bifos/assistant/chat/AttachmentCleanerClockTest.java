@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 일정이 부르는 {@code runScheduled} 가 주입받은 시계의 시각을 기준으로 첨부를 지우는지 확인한다. */
 @BackendIntegrationTest
@@ -43,10 +45,20 @@ class AttachmentCleanerClockTest {
     @Autowired
     ConversationRepository conversations;
 
+    @Autowired
+    ChatContentMutationCoordinator mutations;
+
+    @Autowired
+    JdbcTemplate jdbc;
+
     private Long conversationId;
 
     @BeforeEach
     void setUp() throws IOException {
+        if (jdbc.queryForObject("select count(*) from app_user where id=9202", Long.class) == 0) {
+            jdbc.update("insert into app_user(id,email,display_name,group_id,role,created_at)"
+                    + " values (9202,'clock@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");
+        }
         attachments.deleteAll();
         deleteTree(Path.of(properties.root()).toAbsolutePath());
         conversationId = conversations
@@ -59,7 +71,8 @@ class AttachmentCleanerClockTest {
     void runScheduledDeletesOnlyAttachmentsExpiredBeforeClockInstant() {
         ChatAttachment expired = stored(NOW.minus(Duration.ofDays(1)));
         ChatAttachment live = stored(NOW.plus(Duration.ofDays(1)));
-        AttachmentCleaner cleaner = new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC));
+        AttachmentCleaner cleaner =
+                new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations);
 
         cleaner.runScheduled();
 

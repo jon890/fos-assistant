@@ -2,7 +2,26 @@
 
 대화에 사진을 올려 에이전트에게 보내고, 에이전트가 만든 HTML 결과물을 보관하고 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
+covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
+
+## 삭제 요청과 접근 차단
+
+파일을 지우기 전에 최초 삭제 요청을 DB에 커밋한다.
+요청 뒤에는 파일이 남아 있어도 원본 읽기, native inspect, 메시지 연결과 실행 입력에 사용할 수 없다.
+미전송 개수에서도 빼며 사진 전체 순번은 유지한다.
+decode 전후와 plugin 변환 뒤의 검사는 엔티티 캐시 대신 최신 SQL 상태를 읽는다.
+원본 스트림을 연 뒤 응답 직전에도 상태를 다시 확인한다.
+근거는 [ADR-20261010 / attachment-deletion-request](../../backend/docs/adr/ADR-20261010-attachment-deletion-request.md)이다.
+
+`ChatContentMutationCoordinator`는 트랜잭션 밖에서 시작하여 데이터 주인의 사용자, 대화, 첨부 ID 순으로 잠근다.
+READ_COMMITTED 새 트랜잭션에서 주인과 대상 상태를 다시 확인한다.
+다중 사용자 정리는 대상 하나마다 독립 커밋한다.
+대화 purge는 session과 파일 삭제 전에 같은 진입점에서 요청을 커밋한다.
+최종 DB 정리도 이 진입점을 거치며 `ConversationPurgeWriter`는 단독으로 호출할 수 없다.
+현재 단계는 첨부만 정리한다.
+관찰 저장은 후속 구현에서 이 진입점에 실제 관찰 정리를 연결한다.
+
+실패와 재시작, 요청과 완료 시각의 의미는 [저장 모델](../../backend/docs/data-schema.md#첨부-삭제-요청)이 갖는다.
 
 ## 요구
 
