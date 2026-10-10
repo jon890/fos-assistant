@@ -60,7 +60,7 @@ export function childUsageDiagnostic(tree: ExecutionTree | undefined, fixture: C
     : fixture.requests.length === 0 ? "첫 session GET 없음"
     : successfulGets.length === 0 ? "정상 session GET 없음"
     : !successfulGets.some((request) => request.endedAt !== null)
-      ? successfulGets.length === 1 ? "두 번째 session GET 없음" : "자식 종료 응답 없음"
+      ? successfulGets.length === 1 ? "두 번째 정상 session GET 없음" : "자식 종료 응답 없음"
     : completed.length === 0 ? "종료 응답 뒤 완료 사건 저장 없음"
     : completed.length > 1 ? "완료 사건 중복" : "완료 사건 값 확인";
   const node = (value: ExecutionNode): unknown => ({

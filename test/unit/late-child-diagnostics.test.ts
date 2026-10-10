@@ -92,7 +92,7 @@ test("실패 단계는 첫 조회·재조회·저장·값 오류를 나누고 �
   assert.equal(diagnostic().phase, "정상 session GET 없음");
   fixture.requests.push({ at, status: 200, endedAt: null });
   fixture.reads = 1;
-  assert.equal(diagnostic().phase, "두 번째 session GET 없음");
+  assert.equal(diagnostic().phase, "두 번째 정상 session GET 없음");
   fixture.requests.push({ at, status: 200, endedAt: 1002.5 });
   fixture.reads = 2;
   assert.equal(diagnostic().phase, "종료 응답 뒤 완료 사건 저장 없음");
@@ -107,6 +107,40 @@ test("실패 단계는 첫 조회·재조회·저장·값 오류를 나누고 �
   assert.doesNotMatch(childUsageDiagnostic(tree, fixture), /노출하면|detail|goal|content/);
   tree.root.events.push({ ...tree.root.events[1]!, sequence: 3 });
   assert.equal(diagnostic().phase, "완료 사건 중복");
+});
+
+test("재조회 진단은 실제 요청과 정상 reads를 보존하며 인증 실패를 조회 부재로 오인하지 않는다", () => {
+  const at = "2026-01-01T00:00:00Z";
+  type Tree = NonNullable<Parameters<typeof childUsageDiagnostic>[0]>;
+  const tree: Tree = { truncated: false, root: { truncated: false, executionId: 1, agentCode: "dad", status: "SUCCEEDED",
+    requestReceivedAt: at, submittedAt: at, firstDeltaAt: at, finishedAt: at, children: [], events: [{
+      sequence: 1, eventType: "SUBAGENT_STARTED", toolName: null, subagentName: "sa-fixture", model: null,
+      inputTokens: null, outputTokens: null, durationMs: null, failed: null, detail: null,
+      hermesSessionId: "child-fixture", occurredAt: at, subagentUsageStatus: "PENDING" }] } };
+  const vectors = [
+    { requests: [], reads: 0, phase: "첫 session GET 없음" },
+    { requests: [{ at, status: 401, endedAt: null }], reads: 0, phase: "정상 session GET 없음" },
+    { requests: [{ at, status: 200, endedAt: null }], reads: 1, phase: "두 번째 정상 session GET 없음" },
+    { requests: [{ at, status: 200, endedAt: null }, { at, status: 401, endedAt: null }], reads: 1,
+      phase: "두 번째 정상 session GET 없음" },
+    { requests: [{ at, status: 200, endedAt: null }, { at, status: 200, endedAt: null }], reads: 2,
+      phase: "자식 종료 응답 없음" },
+    { requests: [{ at, status: 200, endedAt: null }, { at, status: 200, endedAt: 1002.5 }], reads: 2,
+      phase: "종료 응답 뒤 완료 사건 저장 없음" },
+  ];
+  for (const { requests, reads, phase } of vectors) {
+    const fixture: ChildUsageObservation = { childSessionId: "child-fixture", parentSessionId: "parent-fixture",
+      registeredAt: at, parentStreamClosedAt: at, releasedAt: null, requests, reads };
+    const before = structuredClone(fixture);
+    const diagnostic = JSON.parse(childUsageDiagnostic(tree, fixture));
+    assert.equal(diagnostic.phase, phase);
+    assert.deepEqual(diagnostic.fixture, before);
+    assert.deepEqual(fixture, before);
+    assert.equal(JSON.parse(childUsageDiagnostic({ ...tree, root: { ...tree.root, finishedAt: null } }, fixture)).phase,
+      "부모 종료 저장 없음");
+    assert.equal(JSON.parse(childUsageDiagnostic({ ...tree, root: { ...tree.root, events: [] } }, fixture)).phase,
+      "자식 시작 저장 없음");
+  }
 });
 
 test("실패 요약은 관련 WARN을 보존하고 로그의 인증·주소·본문을 가린다", () => {
