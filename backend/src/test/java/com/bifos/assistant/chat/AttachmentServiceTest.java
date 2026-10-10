@@ -151,6 +151,19 @@ class AttachmentServiceTest {
     }
 
     @Test
+    @DisplayName("20MB 원본을 올리면 줄이지 않고 같은 크기로 보관한다")
+    void storesOriginalAtTwentyMegabyteLimit() throws IOException {
+        byte[] original = new byte[20 * 1024 * 1024];
+        System.arraycopy(IMAGE, 0, original, 0, IMAGE.length);
+        ChatAttachment saved = upload(OWNER, mine, "image/png", original);
+
+        assertThat(saved.byteSize()).isEqualTo(original.length);
+        try (InputStream content = service.read(OWNER, mine, saved.id()).body()) {
+            assertThat(content.readAllBytes()).isEqualTo(original);
+        }
+    }
+
+    @Test
     @DisplayName("한 장 상한을 넘으면 거절하고 행을 만들지 않는다")
     void rejectsOverPerImageLimitWithoutCreatingRow() {
         byte[] tooLarge = new byte[(int) (properties.maxBytes() + 1)];
@@ -167,6 +180,7 @@ class AttachmentServiceTest {
                 new AttachmentProperties("/attachments", "/agent-attachments", null, null, null);
 
         assertThat(defaults.maxFiles()).isEqualTo(30);
+        assertThat(defaults.maxBytes()).isEqualTo(20L * 1024 * 1024);
     }
 
     @Test

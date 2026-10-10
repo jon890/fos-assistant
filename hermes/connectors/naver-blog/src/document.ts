@@ -1,10 +1,15 @@
+import { randomUUID } from "node:crypto";
+import { lineEdits } from "./changes.ts";
+
 /**
  * 편집기의 `getDocumentData()` 가 돌려주는 문서. 실측으로 확인한 칸만 적는다.
  * 제목은 `documentTitle` 구성요소의 `title` 문단, 글은 `text` 구성요소의 `value` 문단이고 문단의 `nodes` 가 글 조각이다.
  */
-type DocumentNode = { value?: unknown };
-type DocumentParagraph = { nodes?: DocumentNode[] };
+type DocumentNode = { id?: unknown; value?: unknown; "@ctype"?: unknown };
+type DocumentParagraph = { id?: unknown; nodes?: DocumentNode[]; "@ctype"?: unknown };
 export type DocumentComponent = {
+  id?: unknown;
+  layout?: unknown;
   "@ctype"?: unknown;
   title?: DocumentParagraph[];
   value?: DocumentParagraph[];
@@ -45,6 +50,9 @@ export class DocumentShapeError extends Error {
   }
 }
 
+/** 줄 안의 줄바꿈을 공백으로 바꿔 한 문단이 한 줄을 지키게 한다. */
+const flat = (text: string) => text.replace(/[\r\n]+/g, " ");
+
 /** 문단의 글 조각을 잇는다. 글이 없는 조각은 건너뛴다. */
 function paragraphText(paragraph: DocumentParagraph) {
   if (!paragraph || !Array.isArray(paragraph.nodes)) throw new DocumentShapeError("문단에 nodes 가 없다");
@@ -60,7 +68,6 @@ export function documentToDraft(data: EditorDocument): DocumentDraft {
   if (!Array.isArray(components)) throw new DocumentShapeError("문서에 components 가 없다");
   const titles = components.filter((component) => component?.["@ctype"] === "documentTitle");
   if (titles.length !== 1) throw new DocumentShapeError("제목 구성요소가 하나가 아니다");
-  const flat = (text: string) => text.replace(/[\r\n]+/g, " ");
   const title = flat((titles[0]!.title ?? []).map(paragraphText).join(""));
 
   const counts = new Map<string, number>();
@@ -84,4 +91,93 @@ export function documentToDraft(data: EditorDocument): DocumentDraft {
     existing.push({ line, index });
   });
   return { title, body: lines.join("\n"), existing };
+}
+
+/** 편집기 문서에서 실측한 id 모양. */
+const newId = () => `SE-${randomUUID()}`;
+
+/** 글 한 줄로 새 문단을 만든다. 꾸밈 칸은 두지 않는다. */
+function newParagraph(text: string, paragraphId = newId(), nodeId = newId()): DocumentParagraph {
+  return {
+    id: paragraphId,
+    nodes: [{ id: nodeId, value: text, "@ctype": "textNode" }],
+    "@ctype": "paragraph",
+  };
+}
+
+function newTextComponent(paragraphs: DocumentParagraph[]): DocumentComponent {
+  return { id: newId(), layout: "default", value: paragraphs, "@ctype": "text" };
+}
+
+/**
+ * 원래 문서와 고친 제목, 본문으로 `setDocumentData()` 에 넣을 문서를 만든다. `original` 은 바꾸지 않는다.
+ * 기존 구성요소 줄은 원래 구성요소 객체를 그 자리에 두고, 원래 글과 줄 비교로 짝지은 글 줄은 원래 문단 객체를 그대로 써 꾸밈을 지킨다.
+ * 본문에 없는 기존 구성요소는 빠진다. 루트의 다른 칸은 뜻을 실측하지 못해 그대로 둔다.
+ */
+export function draftToDocument(original: EditorDocument, title: string, body: string): EditorDocument {
+  const { existing } = documentToDraft(original);
+  const result = structuredClone(original);
+  const components = result.document!.components!;
+
+  // 원래 글 줄과 그 문단. 기존 구성요소 줄은 짝 대상이 아니라 넣지 않는다.
+  const before: { line: string; paragraph: DocumentParagraph }[] = [];
+  for (const component of components)
+    if (component?.["@ctype"] === "text")
+      for (const paragraph of component.value!)
+        before.push({ line: flat(paragraphText(paragraph)), paragraph });
+
+  const after = body.split("\n").map((raw) => (raw.endsWith("\r") ? raw.slice(0, -1) : raw));
+  const isExisting = after.map((line) => EXISTING_LINE.test(line));
+  const indexOf = new Map(existing.map((item) => [item.line, item.index]));
+  const used = new Set<string>();
+  after.forEach((line, index) => {
+    if (!isExisting[index]) return;
+    if (!indexOf.has(line) || used.has(line))
+      throw new DocumentShapeError("기존 구성요소 줄이 원래 글에 없다");
+    used.add(line);
+  });
+
+  // 고친 글 줄 차례마다 다시 쓸 원래 문단. 짝짓지 못한 줄은 비어 있다.
+  const texts = after.filter((_, index) => !isExisting[index]);
+  const reused: (DocumentParagraph | undefined)[] = [];
+  let i = 0;
+  let j = 0;
+  for (const edit of lineEdits(before.map((item) => item.line), texts)) {
+    if (edit.kind === "same") reused[j++] = before[i++]!.paragraph;
+    else if (edit.kind === "remove") i++;
+    else j++;
+  }
+
+  const bodyComponents: DocumentComponent[] = [];
+  let current: DocumentParagraph[] | undefined;
+  let hasText = false;
+  let k = 0;
+  after.forEach((line, index) => {
+    if (isExisting[index]) {
+      bodyComponents.push(components[indexOf.get(line)!]!);
+      current = undefined;
+      return;
+    }
+    if (!current) {
+      current = [];
+      bodyComponents.push(newTextComponent(current));
+      hasText = true;
+    }
+    current.push(reused[k] ?? newParagraph(line));
+    k++;
+  });
+  if (!hasText) bodyComponents.push(newTextComponent([newParagraph("")]));
+
+  const titleComponent = components.find((component) => component?.["@ctype"] === "documentTitle")!;
+  const first = titleComponent.title?.[0];
+  const firstNode = first?.nodes?.[0];
+  titleComponent.title = [
+    newParagraph(
+      title,
+      typeof first?.id === "string" ? first.id : newId(),
+      typeof firstNode?.id === "string" ? firstNode.id : newId(),
+    ),
+  ];
+  result.document!.components = [titleComponent, ...bodyComponents];
+  return result;
 }

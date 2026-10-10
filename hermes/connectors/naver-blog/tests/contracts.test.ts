@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { CHANGES_MAX } from "../src/overwrite-draft.ts";
 import { createServer, isSupportedBunVersion } from "../src/server.ts";
 import { BLOG_ID_PATTERN, BROWSER_URL_PATTERN } from "../src/session.ts";
 
@@ -59,12 +60,18 @@ test("manifest 도구 선언은 MCP 서버 도구와 정확히 같다", async ()
   expect(new Set(tools.map((tool) => tool.name))).toEqual(new Set(Object.keys(manifest.tools)));
 });
 
-test("도구 여섯을 선언하고 임시저장만 승인 카드 제목이 있는 계정 안 쓰기다", async () => {
+test("도구 일곱을 선언하고 임시저장과 덮어쓰기만 승인 카드 제목이 있는 계정 안 쓰기다", async () => {
   const tools = await listTools();
 
-  expect(tools.map((tool) => tool.name).sort()).toEqual(
-    ["draft_job", "list_drafts", "read_draft", "render_draft", "save_draft", "session_status"],
-  );
+  expect(tools.map((tool) => tool.name).sort()).toEqual([
+    "draft_job",
+    "list_drafts",
+    "overwrite_draft",
+    "read_draft",
+    "render_draft",
+    "save_draft",
+    "session_status",
+  ]);
   expect(manifest.tools.list_drafts).toEqual({ risk: "READ" });
   expect(manifest.tools.read_draft).toEqual({ risk: "READ" });
   expect(manifest.tools.save_draft).toEqual({
@@ -72,7 +79,31 @@ test("도구 여섯을 선언하고 임시저장만 승인 카드 제목이 있�
     title: "네이버 블로그에 임시저장",
     outbound: false,
   });
+  // 덮어쓰기는 사용자가 쓴 글을 바꾸므로 매번 승인 카드를 거치게 상시 허락을 닫는다.
+  expect(manifest.tools.overwrite_draft).toEqual({
+    risk: "WRITE",
+    title: "네이버 블로그 임시저장 글 덮어쓰기",
+    outbound: false,
+    grant: false,
+  });
   expect(manifest.tools.draft_job).toEqual({ risk: "READ" });
+});
+
+test("overwrite_draft 는 일곱 칸을 받고 changes 를 1자부터 CHANGES_MAX 자까지 받는다", async () => {
+  const tools = await listTools();
+  const schema = tools.find((tool) => tool.name === "overwrite_draft")!.inputSchema as {
+    properties: Record<string, Record<string, unknown>>;
+    required: string[];
+  };
+
+  expect(Object.keys(schema.properties).sort()).toEqual(
+    ["body", "category", "changes", "draft_id", "revision", "tags", "title"],
+  );
+  expect([...schema.required].sort()).toEqual(
+    ["body", "category", "changes", "draft_id", "revision", "tags", "title"],
+  );
+  expect(schema.properties.changes).toMatchObject({ minLength: 1, maxLength: CHANGES_MAX });
+  expect(schema.properties.revision).toMatchObject({ pattern: "^[0-9a-f]{16}$" });
 });
 
 test("작업 오류 코드는 공통 어휘에 이어진다", () => {

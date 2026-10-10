@@ -7,6 +7,16 @@ import {
   type Block,
   type DraftInput,
 } from "./draft.ts";
+import { cardWouldMask } from "./card-mask.ts";
+import { draftChanges, draftRevision, LineComparisonError } from "./changes.ts";
+import { EXISTING_LINE } from "./document.ts";
+import {
+  CHANGES_MAX,
+  maskedProblem,
+  overwriteContentShape,
+  validateOverwrite,
+  type OverwriteContent,
+} from "./overwrite-draft.ts";
 
 /** `render_draft` 의 인자. 초안 다섯 칸에 미리보기만 쓰는 칸을 더한다. */
 export const renderShape = {
@@ -24,17 +34,30 @@ export const renderShape = {
     .enum(["preview", "package"])
     .default("preview")
     .describe("preview 는 모바일 미리보기, package 는 수동 등록용 묶음"),
+  base: z
+    .object(overwriteContentShape)
+    .optional()
+    .describe(
+      "덮어쓸 때 read_draft 가 준 원래 글의 title, category, tags, body. 주면 changes 와 base_revision 을 함께 돌려준다",
+    ),
 };
 
 export type RenderInput = DraftInput & {
   photo_notes?: Record<string, string>;
   artifact_path: string;
   kind?: "preview" | "package";
+  base?: OverwriteContent;
 };
 
 export type StickerAsset = { path: string; source_url: string };
 export type RenderResult =
-  | { problems: []; html: string; assets: StickerAsset[] }
+  | {
+      problems: [];
+      html: string;
+      assets: StickerAsset[];
+      changes?: string;
+      base_revision?: string;
+    }
   | { problems: string[]; html: null; assets: [] };
 
 // 조각마다 점으로 시작하지 않고 `/` 와 `\\` 가 없다. 폴더는 세 단계까지다.
@@ -76,6 +99,7 @@ export async function renderDraft(
   input: RenderInput,
   attachmentDir: string | undefined,
 ): Promise<RenderResult> {
+  if (input.base) return renderOverwrite(input, input.base);
   const problems = [...validateRenderOptions(input), ...validateDraft(input)];
   // 파일 이름이나 디렉터리 모양이 틀렸으면 그 경로의 파일을 열지 않는다.
   if (problems.length === 0) problems.push(...(await checkPhotoFiles(input, attachmentDir)));
@@ -87,6 +111,43 @@ export async function renderDraft(
     return { problems: [], html: packageHtml(input, blocks, attachments), assets: [] };
   const folder = input.artifact_path.slice(0, -"index.html".length);
   return { problems: [], ...previewHtml(input, blocks, folder, attachments) };
+}
+
+/**
+ * 덮어쓸 글의 미리보기. 새 글 검사와 사진 파일 확인 대신 덮어쓰기 규칙으로 검사하고,
+ * 승인 카드에 올릴 바뀌는 내용과 원래 글의 지문을 함께 돌려준다.
+ */
+function renderOverwrite(input: RenderInput, base: OverwriteContent): RenderResult {
+  let changes: string;
+  try {
+    changes = draftChanges(base, input);
+  } catch (error) {
+    if (error instanceof LineComparisonError) return { problems: [error.message], html: null, assets: [] };
+    throw error;
+  }
+  const problems = [...validateRenderOptions(input), ...validateOverwrite(input, base, changes)];
+  if (input.kind === "package") problems.push("덮어쓰기 미리보기는 kind preview 만 받습니다.");
+  if (input.photo_dir !== undefined) problems.push("덮어쓰기에는 photo_dir 을 주지 않습니다.");
+  // 덮어쓰기 도구의 인자 검사와 같은 셈(UTF-16 길이)이다.
+  if (changes.length > CHANGES_MAX) problems.push("바뀌는 내용이 너무 깁니다. 나눠 고쳐 주세요.");
+  // 바뀌는 내용에는 원래 글의 줄도 실린다. 그 줄이 가려져도 승인할 수 없다.
+  // 고친 글의 칸에서 이미 알렸으면 같은 까닭을 두 번 적지 않는다.
+  else if (
+    cardWouldMask(changes) &&
+    ![input.title, input.category, input.body, ...input.tags].some(cardWouldMask)
+  )
+    problems.push(maskedProblem("바뀌는 내용"));
+  if (problems.length > 0) return { problems, html: null, assets: [] };
+
+  const folder = input.artifact_path.slice(0, -"index.html".length);
+  const preview = previewHtml(
+    input,
+    parseBody(input.body),
+    folder,
+    attachmentBase(input.artifact_path),
+    changes,
+  );
+  return { problems: [], ...preview, changes, base_revision: draftRevision(base) };
 }
 
 /**
@@ -135,18 +196,29 @@ article p.blank{min-height:1.8em}
 .map{margin:12px 0;padding:12px 14px;border:1px solid #dfe3e8;border-radius:8px}
 .map strong{display:block;font-size:15px}
 .map span{color:#666;font-size:13px}
+.changes{margin:0 0 18px;padding:10px 12px;border:1px solid #dfe3e8;border-radius:8px}
+.changes h2{margin:0 0 6px;font-size:15px}
+.changes pre{margin:0;font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
 `;
 
-function previewHtml(input: RenderInput, blocks: Block[], folder: string, attachments: string) {
+function previewHtml(
+  input: RenderInput,
+  blocks: Block[],
+  folder: string,
+  attachments: string,
+  changes?: string,
+) {
   const assets: StickerAsset[] = [];
   const seenStickers = new Set<string>();
   const body = blocks
     .map((block) => {
       switch (block.type) {
         case "text":
-          return block.line === ""
-            ? `<p class="blank"></p>`
-            : `<p>${escapeHtml(block.line)}</p>`;
+          if (block.line === "") return `<p class="blank"></p>`;
+          // 기존 구성요소 줄은 대괄호를 뗀 이름표로 그린다.
+          if (EXISTING_LINE.test(block.line))
+            return `<p class="placeholder">${escapeHtml(block.line.slice(1, -1))}</p>`;
+          return `<p>${escapeHtml(block.line)}</p>`;
         case "image":
           return photoHtml(block, attachments, input.photo_notes?.[String(block.number)]);
         case "sticker": {
@@ -171,6 +243,10 @@ function previewHtml(input: RenderInput, blocks: Block[], folder: string, attach
   const tags = input.tags
     .map((tag) => `<span>#${escapeHtml(tag)}</span>`)
     .join("");
+  const changesSection =
+    changes === undefined
+      ? ""
+      : `<section class="changes"><h2>바뀌는 내용</h2><pre>${escapeHtml(changes)}</pre></section>\n`;
   const html = `<!doctype html>
 <html lang="ko">
 <head>
@@ -184,7 +260,7 @@ function previewHtml(input: RenderInput, blocks: Block[], folder: string, attach
 <p class="category">${escapeHtml(input.category)}</p>
 <h1>${escapeHtml(input.title)}</h1>
 <p class="tags">${tags}</p>
-<article>
+${changesSection}<article>
 ${body}
 </article>
 </main>

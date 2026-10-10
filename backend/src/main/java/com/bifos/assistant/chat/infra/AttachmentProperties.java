@@ -26,7 +26,7 @@ public record AttachmentProperties(
         String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
 
     private static final int DEFAULT_MAX_FILES = 30;
-    private static final long DEFAULT_MAX_BYTES = 10L * 1024 * 1024;
+    private static final long DEFAULT_MAX_BYTES = 20L * 1024 * 1024;
     private static final int DEFAULT_RETENTION_DAYS = 30;
 
     @ConstructorBinding

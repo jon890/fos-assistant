@@ -366,32 +366,55 @@ test("이미 열여섯 장을 붙인 뒤 열여섯 장을 더 고르면 열네 �
   await expect(page.getByTestId("attachment-notice")).toContainText("30장까지");
 });
 
-test("10MB 를 넘는 파일은 올라가지 않고 알린다", async ({ page }, testInfo) => {
+test("20MB 사진도 화면에서 서버까지 올라간다", async ({ page }, testInfo) => {
+  await openNewConversation(page, testInfo);
+
+  // PNG 뒤의 여분 바이트로 파일 크기 경계를 검사하며 디코딩 메모리는 작게 유지한다.
+  const buffer = Buffer.alloc(20 * 1024 * 1024);
+  PNG_1X1.copy(buffer);
+  const uploaded = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      /\/api\/chat\/conversations\/[^/]+\/attachments$/.test(response.url()),
+  );
+  await page
+    .getByTestId("attachment-input")
+    .setInputFiles([{ name: "large.png", mimeType: "image/png", buffer }]);
+
+  const response = await uploaded;
+  expect(response.ok()).toBe(true);
+  await expect(page.getByTestId("attachment-uploading")).toHaveCount(0);
+  await expect(
+    page.getByTestId("attachment-previews").locator("> div"),
+  ).toHaveCount(1);
+  await expect(page.getByTestId("attachment-notice")).toHaveCount(0);
+  await expectImageLoaded(page.getByTestId("attachment-previews").locator("img"));
+});
+
+test("20MB 를 넘는 파일은 올라가지 않고 알린다", async ({ page }, testInfo) => {
   await openNewConversation(page, testInfo);
 
   const big = {
     name: "big.png",
     mimeType: "image/png",
-    buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 1),
+    buffer: Buffer.alloc(20 * 1024 * 1024 + 1, 1),
   };
   await page.getByTestId("attachment-input").setInputFiles([big]);
 
   await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
-  await expect(page.getByTestId("attachment-notice")).toContainText("10MB");
+  await expect(page.getByTestId("attachment-notice")).toContainText("20MB");
 });
 
 test("이미지가 아닌 파일은 고르기에서 걸린다", async ({ page }, testInfo) => {
   await openNewConversation(page, testInfo);
 
-  await page
-    .getByTestId("attachment-input")
-    .setInputFiles([
-      {
-        name: "notes.txt",
-        mimeType: "text/plain",
-        buffer: Buffer.from("hello"),
-      },
-    ]);
+  await page.getByTestId("attachment-input").setInputFiles([
+    {
+      name: "notes.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("hello"),
+    },
+  ]);
 
   await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
 });
