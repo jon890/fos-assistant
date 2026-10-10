@@ -2,6 +2,8 @@
 
 사용자마다 하나씩 두는 브라우저를 띄우고 로그인 화면과 중계를 제공하는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/browser/`, `web/src/components/browser/`, `web/src/app/browser/`, `web/src/app/admin/browsers/`, `web/src/lib/browser-api.ts`
+
 ## 요구
 
 - 사용자는 웹의 「내 브라우저」(`/browser`)에서 자기 브라우저를 만들고 켜고 끄고 지운다. 그 화면에서 서비스에 직접 로그인한다.

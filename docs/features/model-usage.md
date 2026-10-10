@@ -2,6 +2,8 @@
 
 대화마다 모델과 단계를 고르고, 실행이 쓴 토큰과 사용량을 기록해 보이는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/model/`, `backend/src/main/java/com/bifos/assistant/usage/`, `backend/src/main/java/com/bifos/assistant/chat/**/Model*`, `web/src/components/usage/`, `web/src/app/usage/`, `web/src/app/admin/usage/`, `web/src/lib/usage-api.ts`, `web/src/lib/provider-label.ts`, `web/src/components/chat/model-picker.tsx`, `web/src/components/chat/use-composer-model.ts`, `web/src/lib/chat-api.ts`
+
 ## 요구
 
 - 대화마다 빠르게, 균형, 깊게 가운데 하나를 고르거나, 고급에서 provider 와 모델, reasoning effort 를 직접 고른다. 에이전트는 모델을 갖지 않는다([ADR-030](../../backend/docs/adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md)).

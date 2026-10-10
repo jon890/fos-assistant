@@ -2,6 +2,8 @@
 
 Hermes 가 Control Plane MCP 를 부를 때 토큰으로 profile 을 증명하고 요청자를 정하는 기능이다.
 
+covers: `backend/src/main/java/com/bifos/assistant/mcp/`, `hermes/plugins/fos-ctx/`
+
 ## 요구
 
 - Control Plane 이 Hermes 에 여는 도구는 MCP 서버 하나(`fos-assistant`)에 모은다.
