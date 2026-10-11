@@ -97,6 +97,8 @@ export const mediaObservationMcpScenario: Scenario = {
     let completed: Promise<unknown> | undefined;
     let failed = false;
     const fixtureDir = mkdtempSync(join(tmpdir(), "media30-cp-"));
+    const originalFetch = globalThis.fetch;
+    let recordRequests = 0;
     try {
       issued = expectStatus(
         await call(context, "/admin/agent-tokens", {
@@ -111,6 +113,22 @@ export const mediaObservationMcpScenario: Scenario = {
         "관찰 토큰 발급",
       ).json();
       const token = issued!.token;
+      const mcpUrl = context.api.replace(/\/api\/v1$/, "") + "/mcp";
+      // 실제 전송은 유지하고 이 시나리오 토큰의 record 요청만 센다.
+      globalThis.fetch = (input, init) => {
+        if (
+          String(input) === mcpUrl &&
+          init?.method === "POST" &&
+          new Headers(init.headers).get("Authorization") ===
+            `Bearer ${token}` &&
+          typeof init.body === "string"
+        ) {
+          const body = JSON.parse(init.body);
+          if (body.method === "tools/call" && body.params?.name === RECORD)
+            recordRequests++;
+        }
+        return originalFetch(input, init);
+      };
       conversationId = expectStatus(
         await call(context, "/chat/conversations", {
           method: "POST",
@@ -318,6 +336,7 @@ export const mediaObservationMcpScenario: Scenario = {
         );
         savedRows.push(saved);
       }
+      const recordRequestsAfterSave = recordRequests;
       const native = `native-${randomUUID()}`;
       const registered = await fetch(
         `${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/session-bindings/subagent`,
@@ -374,6 +393,13 @@ export const mediaObservationMcpScenario: Scenario = {
         "사진 없는 turn에 이미지를 다시 실었다",
       );
       const reread = await listAll(nextSession);
+      // 최초 저장 완료부터 사진 없는 후속 실행의 재조회 종료까지가 측정 구간이다.
+      const additionalRecords = recordRequests - recordRequestsAfterSave;
+      step(`관찰 재조회 구간의 추가 record 요청: ${additionalRecords}`);
+      expect(
+        additionalRecords === 0,
+        "관찰 재조회 구간에 record 요청이 추가됐다",
+      );
       expect(
         JSON.stringify(reread) === JSON.stringify(savedRows),
         "새 turn에서 30장의 첨부·SHA·순서·revision·본문이 바뀌었다",
@@ -384,7 +410,7 @@ export const mediaObservationMcpScenario: Scenario = {
           cpPreparedToFakeHermesPixels: 30,
           cpStoredMapping: 30,
           nextTurnReuse: 30,
-          additionalRecords: 0,
+          additionalRecords,
           crosslinked: "MARKER_MISMATCH",
           modelSummary: mapping.modelSummary,
           realProvider: mapping.realProvider,
@@ -540,6 +566,7 @@ export const mediaObservationMcpScenario: Scenario = {
       failed = true;
       throw error;
     } finally {
+      globalThis.fetch = originalFetch;
       context.hermes.releaseHeldRun();
       await completed?.catch(() => undefined);
       const cleanup: Promise<unknown>[] = [];
