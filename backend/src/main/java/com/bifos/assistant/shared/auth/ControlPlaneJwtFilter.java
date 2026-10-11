@@ -59,13 +59,14 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
      * {@code permitAll} 이어도 이 필터가 막는다.
      */
     private static final Set<String> UNFILTERED_PATHS = Set.of(
-            "/mcp",
-            "/internal/hermes/session-bindings/subagent",
-            "/internal/hermes/connector-policy",
-            "/internal/hermes/attachment-inspect",
-            "/internal/hermes/attachment-inspect/validate",
-            "/api/v1/signin/allowed",
-            "/api/v1/signin/completed");
+        "/mcp",
+        "/internal/hermes/session-bindings/subagent",
+        "/internal/hermes/connector-policy",
+        "/internal/hermes/attachment-inspect",
+        "/internal/hermes/attachment-inspect/validate",
+        "/api/v1/signin/allowed",
+        "/api/v1/signin/completed");
+
 
     /** 토큰 하나를 판정한 결과다. */
     private enum TokenOutcome {
@@ -77,9 +78,11 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         REVOKED
     }
 
+
     private final SecretKey key;
     private final TokenUserResolver users;
     private final ObjectMapper json;
+
 
     public ControlPlaneJwtFilter(AuthProperties properties, TokenUserResolver users, ObjectMapper json) {
         this.key = Keys.hmacShaKeyFor(properties.jwtSecret().getBytes(StandardCharsets.UTF_8));
@@ -87,18 +90,21 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         this.json = json;
     }
 
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
         return UNFILTERED_PATHS.contains(uri)
-                || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
-                || uri.startsWith(SERVICE_API_PREFIX)
-                || uri.startsWith(BROWSER_GATEWAY_PREFIX);
+            || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
+            || ("POST".equals(request.getMethod()) && "/internal/connector-executions/support".equals(uri))
+            || uri.startsWith(SERVICE_API_PREFIX)
+            || uri.startsWith(BROWSER_GATEWAY_PREFIX);
     }
+
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
+        throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith(BEARER)) {
             if (authenticate(header.substring(BEARER.length()).trim()) == TokenOutcome.REVOKED) {
@@ -110,6 +116,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
+
     /**
      * 토큰이 가리키는 사용자를 인증으로 올린다.
      *
@@ -119,26 +126,25 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     private TokenOutcome authenticate(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
             String email = claims.getSubject();
             String name = claims.get("name", String.class);
             if (email == null || email.isBlank()) {
                 return TokenOutcome.ANONYMOUS;
             }
-            Optional<CurrentUser> allowed =
-                    users.resolveCurrentUser(email, name == null || name.isBlank() ? email : name);
+            Optional<CurrentUser> allowed = users.resolveCurrentUser(email, name == null || name.isBlank() ? email : name);
             if (allowed.isEmpty()) {
                 return TokenOutcome.REVOKED;
             }
             CurrentUser principal = allowed.get();
             var authentication = new UsernamePasswordAuthenticationToken(
-                    principal,
-                    null,
-                    List.of(new SimpleGrantedAuthority(
-                            "ROLE_" + principal.role().name())));
+                principal,
+                null,
+                List.of(new SimpleGrantedAuthority(
+                    "ROLE_" + principal.role().name())));
             SecurityContextHolder.getContext().setAuthentication(authentication);
             return TokenOutcome.AUTHENTICATED;
         } catch (JwtException ex) {
@@ -146,6 +152,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             return TokenOutcome.ANONYMOUS;
         }
     }
+
 
     /**
      * 401 과 {@code ACCESS_REVOKED} 를 직접 쓴다.
@@ -157,7 +164,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter()
-                .write(json.writeValueAsString(
-                        new ErrorResponse(ErrorCode.ACCESS_REVOKED.name(), "access was revoked")));
+            .write(json.writeValueAsString(
+                new ErrorResponse(ErrorCode.ACCESS_REVOKED.name(), "access was revoked")));
     }
 }
