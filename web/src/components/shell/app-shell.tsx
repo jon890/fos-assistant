@@ -302,7 +302,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const signedIn = pathname !== "/signin";
+  const signedIn = pathname !== "/signin" && pathname !== "/privacy";
   const inAdminArea = isAdminArea(pathname);
   /** 레이아웃이 역할을 읽지 못했을 때 브라우저에서 다시 읽은 결과다 */
   const [reread, setReread] = useState<ClientMe | null>(null);
