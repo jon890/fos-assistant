@@ -19,12 +19,19 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 에이전트 도구 서비스는 `agent.application.toolset`에 두고,
 외부에서 쓰는 공개 반환 타입은 `agent.application.model`에 둔다.
 
+`agent.config`는 `AgentProperties`와 첫 에이전트 생성 정책인 `PeopleProperties`를 소유한다.
+설정 prefix는 각각 `assistant.agents`, `assistant.people`로 유지한다.
+서비스는 `application`, 공개 서비스 값은 `application.model`, HTTP 요청과 응답은 `presentation`에 둔다.
+설정 package에는 서비스, 저장소, 컨트롤러, 영속 타입, 일반 DTO와 enum을 두지 않는다.
+두 소유 설정 record 안의 중첩 값 record는 허용한다.
+검사: `ArchitectureRules.FEATURE_CONFIG_PLACEMENT`가 현재 두 설정과 `agent.config`만 기준 파일 없이 검사한다.
+
 ### crypto의 영속 타입
 
 `UserDataKey`와 새 crypto 엔티티는 `crypto.domain.entity`에 둔다.
-`@EmbeddedId`의 필드·getter와 영속 상속 선언에 적용되는 `@IdClass`의 실제 타입도 소유 엔티티와 같은 패키지에 둔다.
+`@EmbeddedId`의 필드와 getter, 영속 상속 선언에 적용되는 `@IdClass`의 실제 타입도 소유 엔티티와 같은 패키지에 둔다.
 정책과 port는 `crypto.domain`에 남기고 projection과 enum은 entity에 두지 않는다.
-entity 하위 패키지와 공개 중첩 DTO·model·enum·config·policy도 금지한다.
+entity 하위 패키지와 공개 중첩 DTO, model, enum, config, policy도 금지한다.
 예외는 private 비영속 구현 값뿐이며 참조되지 않은 `@Embeddable`은 영속 ID가 아니다.
 검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`.
 

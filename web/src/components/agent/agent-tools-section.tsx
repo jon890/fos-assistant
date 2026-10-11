@@ -29,7 +29,7 @@ import { toolsetText } from "@/lib/toolset-label";
 import { requestStatusText } from "@/lib/toolset-request";
 
 const CONNECTION_RISK_MESSAGE =
-  "격리를 적용하지 않은 에이전트는 붙은 연결의 비밀값을 이 도구로 읽고, 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
+  "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
 type ErrorPayload = {
   code: string;
@@ -54,7 +54,7 @@ function confirmationDescription(name: string): string {
     case "terminal":
     case "file":
     case "code_execution":
-      return "운영에서 격리를 적용한 에이전트는 사용자별 실행 공간에서 셸과 파일을 다뤄요. 적용하지 않은 에이전트는 서버에서 실행돼 다른 사용자의 파일과 설정에 닿을 수 있어요. 격리한 공간도 허용된 비밀 파일과 연결된 서비스, 사진 첨부를 읽거나 인터넷에 나갈 수 있어요.";
+      return "안전하게 분리되지 않은 에이전트는 다른 사용자의 파일과 서버 설정에 접근할 수 있어요. 분리된 에이전트도 허용된 파일과 서비스를 이용하고 파일이나 읽은 내용을 인터넷으로 보낼 수 있어요.";
     case "browser":
       return "이 도구는 웹 브라우저를 조작할 수 있어요.";
     case "session_search":
