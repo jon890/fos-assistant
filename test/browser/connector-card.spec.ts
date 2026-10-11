@@ -439,9 +439,9 @@ for (const viewport of [
       connector("description-card", {
         tools: [
           { ...tool("write_one", "WRITE"), description },
-          { ...tool("old_one", "READ") },
+          { ...tool("old_one", "READ"), approval: "NONE", grant: false },
           { ...tool("bad_one", "WRITE"), description: "글\u202e" },
-          { ...tool("empty_one", "READ"), description: " " },
+          { ...tool("empty_one", "READ"), approval: "NONE", grant: false, description: " " },
         ],
       }),
     ]);

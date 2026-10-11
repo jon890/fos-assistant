@@ -32,7 +32,7 @@ class ConnectorToolDescriptionHttpTest {
             String raw = "[{\"id\":\"demo-notes\",\"schema\":2,\"title\":\"검사\",\"description\":\"검사\","
                     + "\"fields\":[],\"verify\":{\"tool\":\"read_note\"},\"mcp_server\":\"demo\","
                     + "\"tools\":{\"read_note\":{\"risk\":\"READ\",\"approval\":\"none\",\"title\":\"읽기\",\"description\":"
-                    + mapper.writeValueAsString(vector.get("value")) + "}}}]";
+                    + asciiJson(mapper.writeValueAsString(vector.get("value"))) + "}}}]";
             server.expect(requestTo("https://example.test/api/connectors/catalog"))
                     .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
             var tool = client.readCatalog().getFirst().tools().getFirst();
@@ -57,4 +57,17 @@ class ConnectorToolDescriptionHttpTest {
         assertThat(oldest.identifiers()).isEmpty();
         assertThat(oldest.grant()).isFalse();
     }
+    /** HTTP의 UTF-8 인코더가 잘못된 surrogate를 ?로 바꾸기 전에 JSON escape로 보존한다. */
+    private static String asciiJson(String value) {
+        StringBuilder result = new StringBuilder();
+        for (char character : value.toCharArray()) {
+            if (character > 127) {
+                result.append(String.format("\\u%04x", (int) character));
+            } else {
+                result.append(character);
+            }
+        }
+        return result.toString();
+    }
+
 }
