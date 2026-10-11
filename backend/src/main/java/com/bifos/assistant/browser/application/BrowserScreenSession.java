@@ -39,8 +39,7 @@ import tools.jackson.databind.JsonNode;
 public class BrowserScreenSession {
 
     /** screencast 인자다. 프레임 하나가 수백 KB 다. */
-    static final Map<String, Object> SCREENCAST =
-            Map.of("format", "jpeg", "quality", 60, "maxWidth", 1600, "maxHeight", 2000);
+    static final Map<String, Object> SCREENCAST = Map.of("format", "jpeg", "quality", 60, "maxWidth", 1600, "maxHeight", 2000);
 
     static final String REPLACED = "replaced";
     static final String STOPPED = "stopped";
@@ -77,9 +76,11 @@ public class BrowserScreenSession {
     private volatile Viewport viewport;
     private ScheduledFuture<?> resizeTask;
 
+
     boolean closed() {
         return closed.get();
     }
+
 
     /** 지금 탭(없으면 새 빈 탭)에 붙어 screencast 를 시작한다. {@code url} 이 없으면 지금 주소에 머문다. 붙지 못하면 런타임 예외다. */
     void start(String url, Duration timeout, Duration tabInterval, Duration heartbeat) {
@@ -97,8 +98,9 @@ public class BrowserScreenSession {
         schedule(scheduler.schedule(() -> close(TIMEOUT), timeout.toMillis(), TimeUnit.MILLISECONDS));
         schedule(scheduler.scheduleWithFixedDelay(this::pollTabs, interval, interval, TimeUnit.MILLISECONDS));
         schedule(scheduler.scheduleWithFixedDelay(
-                this::heartbeat, heartbeat.toMillis(), heartbeat.toMillis(), TimeUnit.MILLISECONDS));
+            this::heartbeat, heartbeat.toMillis(), heartbeat.toMillis(), TimeUnit.MILLISECONDS));
     }
+
 
     /** 입력 하나를 CDP 명령으로 보내고 결과는 기다리지 않는다. 화면이 이미 닫혔으면 {@code BROWSER_SCREEN_CLOSED} 다. */
     void input(BrowserScreenInput input) {
@@ -119,13 +121,13 @@ public class BrowserScreenSession {
             // 사용자가 스크립트를 정하지 못한다. 페이지 처음과 끝에 쓰는 고정 식만 실행한다.
             case SCROLL ->
                 command(
-                        current,
-                        "Runtime.evaluate",
-                        Map.of(
-                                "expression",
-                                "window.scrollTo(0, "
-                                        + ("top".equals(input.action()) ? "0" : "document.documentElement.scrollHeight")
-                                        + ")"));
+                    current,
+                    "Runtime.evaluate",
+                    Map.of(
+                        "expression",
+                        "window.scrollTo(0, "
+                            + ("top".equals(input.action()) ? "0" : "document.documentElement.scrollHeight")
+                            + ")"));
             case KEY -> key(current, input.key());
             case TEXT -> command(current, "Input.insertText", Map.of("text", input.text()));
             case NAVIGATE -> command(current, "Page.navigate", Map.of("url", input.url()));
@@ -134,6 +136,7 @@ public class BrowserScreenSession {
             case RESIZE -> resize(input);
         }
     }
+
 
     /** 한 번만 닫는다. 예약한 일, 연결, 받는 쪽, 사용 핸들을 닫고 등록부에서 뺀다. 받는 쪽이 먼저 끊겼으면 {@code reason} 을 비운다. */
     void close(String reason) {
@@ -162,6 +165,7 @@ public class BrowserScreenSession {
         ended.accept(this);
     }
 
+
     /** 150ms 안에 겹친 크기 변경은 마지막 것만 현재 탭에 적용한다. */
     private void resize(BrowserScreenInput input) {
         synchronized (lock) {
@@ -173,18 +177,19 @@ public class BrowserScreenSession {
                 resizeTask.cancel(false);
             }
             resizeTask = scheduler.schedule(
-                    () -> {
-                        synchronized (lock) {
-                            if (!closed.get() && connection != null) {
-                                command(connection, "Emulation.setDeviceMetricsOverride", metrics);
-                            }
-                            resizeTask = null;
+                () -> {
+                    synchronized (lock) {
+                        if (!closed.get() && connection != null) {
+                            command(connection, "Emulation.setDeviceMetricsOverride", metrics);
                         }
-                    },
-                    150,
-                    TimeUnit.MILLISECONDS);
+                        resizeTask = null;
+                    }
+                },
+                150,
+                TimeUnit.MILLISECONDS);
         }
     }
+
 
     /** 그 탭에 붙는다. 앞의 연결은 닫는다. 세대가 바뀐 뒤의 사건과 명령 실패는 버린다. */
     private void attach(String id, String url) {
@@ -205,8 +210,7 @@ public class BrowserScreenSession {
         if (previous != null) {
             previous.close();
         }
-        CdpConnection opened =
-                connector.connect(cdp, id, event -> onEvent(attached, event), () -> onConnectionLost(attached));
+        CdpConnection opened = connector.connect(cdp, id, event -> onEvent(attached, event), () -> onConnectionLost(attached));
         synchronized (lock) {
             if (closed.get() || attached != generation) {
                 opened.close();
@@ -233,6 +237,7 @@ public class BrowserScreenSession {
         }
     }
 
+
     private void onEvent(long attached, CdpEvent event) {
         if (!"Page.screencastFrame".equals(event.method())) {
             return;
@@ -247,8 +252,8 @@ public class BrowserScreenSession {
         }
         JsonNode params = event.params();
         JsonNode metadata = params.path("metadata");
-        int width = (int) Math.round(metadata.path("deviceWidth").asDouble());
-        int height = (int) Math.round(metadata.path("deviceHeight").asDouble());
+        int width = (int)Math.round(metadata.path("deviceWidth").asDouble());
+        int height = (int)Math.round(metadata.path("deviceHeight").asDouble());
         if (width > 0 && height > 0) {
             viewport = new Viewport(width, height);
         }
@@ -258,11 +263,12 @@ public class BrowserScreenSession {
         }
         if (current != null) {
             command(
-                    current,
-                    "Page.screencastFrameAck",
-                    Map.of("sessionId", params.path("sessionId").asInt()));
+                current,
+                "Page.screencastFrameAck",
+                Map.of("sessionId", params.path("sessionId").asInt()));
         }
     }
+
 
     /** 붙은 탭의 연결이 끊겼다. 남은 탭으로 옮기고, 탭이 없거나 재연결 상한을 넘으면 화면을 닫는다. */
     private void onConnectionLost(long attached) {
@@ -294,6 +300,7 @@ public class BrowserScreenSession {
         }
     }
 
+
     /** 탭 목록을 본다. 바뀌면 알리고, 새 탭이 생겼으면 그리로 옮기고, 붙은 탭이 사라졌으면 남은 탭으로 옮긴다. */
     private void pollTabs() {
         guard("tab check", () -> {
@@ -310,10 +317,10 @@ public class BrowserScreenSession {
             }
             Set<String> known = before.stream().map(CdpTarget::id).collect(Collectors.toSet());
             String next = pages.stream()
-                    .map(CdpTarget::id)
-                    .filter(id -> !known.contains(id))
-                    .findFirst()
-                    .orElse(null);
+                .map(CdpTarget::id)
+                .filter(id -> !known.contains(id))
+                .findFirst()
+                .orElse(null);
             if (next == null && pages.stream().noneMatch(page -> page.id().equals(current))) {
                 next = pages.get(0).id();
             }
@@ -326,12 +333,14 @@ public class BrowserScreenSession {
         });
     }
 
+
     /** 받는 쪽이 끊겼으면 {@code closed} 없이 닫는다. */
     private void heartbeat() {
         if (!closed.get() && !sink.ping()) {
             close(null);
         }
     }
+
 
     /** 탭 목록을 읽는다. 탭이 하나도 없으면 {@code stopped} 로 닫고 {@code null} 이다. */
     private List<CdpTarget> listTabs() {
@@ -342,6 +351,7 @@ public class BrowserScreenSession {
         }
         return pages;
     }
+
 
     /** 고른 탭으로 옮긴다. 목록에 없는 탭은 무시한다. */
     private void selectTab(String id) {
@@ -354,6 +364,7 @@ public class BrowserScreenSession {
         sendTabs();
     }
 
+
     private void moveTo(String id) {
         try {
             targets.activate(cdp, id);
@@ -363,6 +374,7 @@ public class BrowserScreenSession {
         }
         attach(id, null);
     }
+
 
     /** 탭 목록을 알린다. 받는 쪽이 끊겼으면 화면을 닫는다. */
     private void sendTabs() {
@@ -382,6 +394,7 @@ public class BrowserScreenSession {
         }
     }
 
+
     /** 닫히지 않았으면 탭을 다루는 일을 돌린다. 실패하면 오류 종류만 남기고 {@code stopped} 로 닫는다. */
     private void guard(String step, Runnable work) {
         if (closed.get()) {
@@ -396,6 +409,7 @@ public class BrowserScreenSession {
         }
     }
 
+
     private void mouse(CdpConnection current, BrowserScreenInput input) {
         Map<String, Object> params = point(input);
         if (params == null) {
@@ -409,6 +423,7 @@ public class BrowserScreenSession {
         command(current, "Input.dispatchMouseEvent", BrowserScreenInputParams.mouse(params, input.action(), pressed));
     }
 
+
     private void wheel(CdpConnection current, BrowserScreenInput input) {
         Map<String, Object> params = point(input);
         if (params != null) {
@@ -416,6 +431,7 @@ public class BrowserScreenSession {
             command(current, "Input.dispatchMouseEvent", params);
         }
     }
+
 
     /** 비율 좌표를 마지막 프레임의 CSS 픽셀로 바꾼 인자다. 프레임이 아직 없으면 {@code null} 이다. */
     private Map<String, Object> point(BrowserScreenInput input) {
@@ -426,6 +442,7 @@ public class BrowserScreenSession {
         return BrowserScreenInputParams.point(input, size.width(), size.height());
     }
 
+
     /** 특수 키를 누르고 뗀다. 글자를 만드는 Enter 와 Space 는 {@code text} 를 싣는다. */
     private void key(CdpConnection current, String name) {
         for (Map<String, Object> params : BrowserScreenInputParams.key(name)) {
@@ -433,30 +450,34 @@ public class BrowserScreenSession {
         }
     }
 
+
     private void back(CdpConnection current) {
         current.send("Page.getNavigationHistory", Map.of())
-                .thenCompose(history -> {
-                    int index = history.path("currentIndex").asInt();
-                    JsonNode entries = history.path("entries");
-                    if (index < 1 || !entries.has(index - 1)) {
-                        return CompletableFuture.completedFuture(null);
-                    }
-                    return current.send(
-                            "Page.navigateToHistoryEntry",
-                            Map.of("entryId", entries.get(index - 1).path("id").asInt()));
-                })
-                .exceptionally(ex -> logFailure("Page.navigateToHistoryEntry"));
+            .thenCompose(history -> {
+                int index = history.path("currentIndex").asInt();
+                JsonNode entries = history.path("entries");
+                if (index < 1 || !entries.has(index - 1)) {
+                    return CompletableFuture.completedFuture(null);
+                }
+                return current.send(
+                    "Page.navigateToHistoryEntry",
+                    Map.of("entryId", entries.get(index - 1).path("id").asInt()));
+            })
+            .exceptionally(ex -> logFailure("Page.navigateToHistoryEntry"));
     }
+
 
     /** 결과를 기다리지 않고 보낸다. 실패는 명령 이름만 남긴다. */
     private void command(CdpConnection current, String method, Map<String, Object> params) {
         current.send(method, params).exceptionally(ex -> logFailure(method));
     }
 
+
     private JsonNode logFailure(String method) {
         log.debug("browser screen command failed id={} method={}", browserId, method);
         return null;
     }
+
 
     private void schedule(ScheduledFuture<?> task) {
         synchronized (lock) {
@@ -468,6 +489,8 @@ public class BrowserScreenSession {
         }
     }
 
+
     /** 마지막 프레임의 화면 크기다. */
-    private record Viewport(int width, int height) {}
+    private record Viewport(int width, int height) {
+    }
 }

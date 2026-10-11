@@ -19,6 +19,7 @@ final class BrowserScreenInputParams {
         return params;
     }
 
+
     /** 세션이 정한 버튼 상태를 좌표 인자에 싣는다. */
     static Map<String, Object> mouse(Map<String, Object> params, String action, boolean pressed) {
         String type = switch (action) {
@@ -36,6 +37,7 @@ final class BrowserScreenInputParams {
         return params;
     }
 
+
     /** 키의 누름과 뗌 인자다. 글자를 만드는 Enter 와 Space 는 누름에 text 를 싣는다. */
     static List<Map<String, Object>> key(String name) {
         Integer keyCode = BrowserScreenInput.KEYS.get(name);
@@ -43,8 +45,7 @@ final class BrowserScreenInputParams {
             return List.of();
         }
         boolean space = "Space".equals(name);
-        Map<String, Object> up =
-                Map.of("type", "keyUp", "key", space ? " " : name, "code", name, "windowsVirtualKeyCode", keyCode);
+        Map<String, Object> up = Map.of("type", "keyUp", "key", space ? " " : name, "code", name, "windowsVirtualKeyCode", keyCode);
         Map<String, Object> down = new HashMap<>(up);
         down.put("type", "Enter".equals(name) || space ? "keyDown" : "rawKeyDown");
         if ("Enter".equals(name) || space) {

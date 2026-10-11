@@ -34,6 +34,7 @@ class BrowserScreenSessionTest {
     private ScheduledExecutorService scheduler;
     private final AtomicBoolean ended = new AtomicBoolean();
 
+
     @BeforeEach
     void setUp() {
         cdp = new FakeCdp();
@@ -44,11 +45,13 @@ class BrowserScreenSessionTest {
         ended.set(false);
     }
 
+
     @AfterEach
     void tearDown() throws InterruptedException {
         scheduler.shutdownNow();
         assertThat(scheduler.awaitTermination(2, TimeUnit.SECONDS)).isTrue();
     }
+
 
     @Test
     @DisplayName("열면 지금 탭에 붙어 enable, navigate, startScreencast 차례로 보내고 탭 목록을 알린다")
@@ -58,15 +61,16 @@ class BrowserScreenSessionTest {
         assertThat(cdp.attached).containsExactly("T1");
         assertThat(cdp.methods()).containsExactly("Page.enable", "Page.navigate", "Page.startScreencast");
         assertThat(cdp.sent("Page.startScreencast").get(0).params())
-                .containsEntry("format", "jpeg")
-                .containsEntry("quality", 60)
-                .containsEntry("maxWidth", 1600)
-                .containsEntry("maxHeight", 2000);
+            .containsEntry("format", "jpeg")
+            .containsEntry("quality", 60)
+            .containsEntry("maxWidth", 1600)
+            .containsEntry("maxHeight", 2000);
         assertThat(sink.data("tabs"))
-                .containsExactly(
-                        List.of(Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", true)));
+            .containsExactly(
+                List.of(Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", true)));
         assertThat(usage.inUse(BROWSER_ID)).isTrue();
     }
+
 
     @Test
     @DisplayName("탭이 없으면 빈 탭을 열고 시작 주소가 없으면 navigate 를 보내지 않는다")
@@ -79,6 +83,7 @@ class BrowserScreenSessionTest {
         assertThat(cdp.methods()).containsExactly("Page.enable", "Page.startScreencast");
     }
 
+
     @Test
     @DisplayName("프레임을 받으면 바로 ack 하고 frame 사건으로 그림과 화면 크기를 넘긴다")
     void forwardsAndAcknowledgesFrames() {
@@ -89,6 +94,7 @@ class BrowserScreenSessionTest {
         assertThat(cdp.sent("Page.screencastFrameAck").get(0).params()).containsEntry("sessionId", 5);
         assertThat(sink.data("frame")).containsExactly(Map.of("data", "AAAA", "width", 390, "height", 844));
     }
+
 
     @Test
     @DisplayName("프레임 전의 좌표 입력은 버리고 프레임 뒤에는 비율에 화면 크기를 곱해 보낸다")
@@ -106,21 +112,22 @@ class BrowserScreenSessionTest {
 
         List<FakeCdp.Sent> mouse = cdp.sent("Input.dispatchMouseEvent");
         assertThat(mouse.get(0).params())
-                .containsEntry("type", "mousePressed")
-                .containsEntry("x", 200.0)
-                .containsEntry("y", 200.0)
-                .containsEntry("button", "left")
-                .containsEntry("clickCount", 1);
+            .containsEntry("type", "mousePressed")
+            .containsEntry("x", 200.0)
+            .containsEntry("y", 200.0)
+            .containsEntry("button", "left")
+            .containsEntry("clickCount", 1);
         assertThat(mouse.get(1).params())
-                .containsEntry("type", "mouseMoved")
-                .containsEntry("x", 300.0)
-                .containsEntry("buttons", 1);
+            .containsEntry("type", "mouseMoved")
+            .containsEntry("x", 300.0)
+            .containsEntry("buttons", 1);
         assertThat(mouse.get(2).params()).containsEntry("type", "mouseReleased");
         assertThat(mouse.get(3).params())
-                .containsEntry("type", "mouseWheel")
-                .containsEntry("y", 400.0)
-                .containsEntry("deltaY", -300);
+            .containsEntry("type", "mouseWheel")
+            .containsEntry("y", 400.0)
+            .containsEntry("deltaY", -300);
     }
+
 
     @Test
     @DisplayName("키, 글자, 주소, 뒤로, 새로고침, 크기 입력을 정한 CDP 명령으로 바꾼다")
@@ -136,9 +143,9 @@ class BrowserScreenSessionTest {
 
         List<FakeCdp.Sent> keys = cdp.sent("Input.dispatchKeyEvent");
         assertThat(keys.get(0).params())
-                .containsEntry("type", "keyDown")
-                .containsEntry("text", "\r")
-                .containsEntry("windowsVirtualKeyCode", 13);
+            .containsEntry("type", "keyDown")
+            .containsEntry("text", "\r")
+            .containsEntry("windowsVirtualKeyCode", 13);
         assertThat(keys.get(1).params()).containsEntry("type", "keyUp");
         assertThat(cdp.sent("Input.insertText").get(0).params()).containsEntry("text", "안녕하세요");
         assertThat(cdp.sent("Page.navigate").get(0).params()).containsEntry("url", "https://example.com/next");
@@ -146,11 +153,12 @@ class BrowserScreenSessionTest {
         assertThat(cdp.sent("Page.reload")).hasSize(1);
         await(() -> !cdp.sent("Emulation.setDeviceMetricsOverride").isEmpty());
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
-                .containsEntry("width", 390)
-                .containsEntry("height", 844)
-                .containsEntry("deviceScaleFactor", 1)
-                .containsEntry("mobile", false);
+            .containsEntry("width", 390)
+            .containsEntry("height", 844)
+            .containsEntry("deviceScaleFactor", 1)
+            .containsEntry("mobile", false);
     }
+
 
     @Test
     @DisplayName("Space와 방향 키는 누름과 뗌을 차례로 보내고 알 수 없는 키는 무시한다")
@@ -162,13 +170,14 @@ class BrowserScreenSessionTest {
         session.input(input(Kind.KEY, "UNKNOWN", null, null));
 
         assertThat(cdp.sent("Input.dispatchKeyEvent"))
-                .extracting(FakeCdp.Sent::params)
-                .containsExactly(
-                        Map.of("type", "keyDown", "key", " ", "code", "Space", "windowsVirtualKeyCode", 32, "text", " "),
-                        Map.of("type", "keyUp", "key", " ", "code", "Space", "windowsVirtualKeyCode", 32),
-                        Map.of("type", "rawKeyDown", "key", "ArrowLeft", "code", "ArrowLeft", "windowsVirtualKeyCode", 37),
-                        Map.of("type", "keyUp", "key", "ArrowLeft", "code", "ArrowLeft", "windowsVirtualKeyCode", 37));
+            .extracting(FakeCdp.Sent::params)
+            .containsExactly(
+                Map.of("type", "keyDown", "key", " ", "code", "Space", "windowsVirtualKeyCode", 32, "text", " "),
+                Map.of("type", "keyUp", "key", " ", "code", "Space", "windowsVirtualKeyCode", 32),
+                Map.of("type", "rawKeyDown", "key", "ArrowLeft", "code", "ArrowLeft", "windowsVirtualKeyCode", 37),
+                Map.of("type", "keyUp", "key", "ArrowLeft", "code", "ArrowLeft", "windowsVirtualKeyCode", 37));
     }
+
 
     @Test
     @DisplayName("새 탭이 생기면 screencast 를 그 탭으로 옮기고 탭 목록을 다시 알린다")
@@ -181,13 +190,14 @@ class BrowserScreenSessionTest {
         assertThat(cdp.activated).contains("T2");
         assertThat(cdp.closedByUs("T1")).isTrue();
         assertThat(cdp.sent("Page.startScreencast"))
-                .extracting(FakeCdp.Sent::targetId)
-                .containsExactly("T1", "T2");
+            .extracting(FakeCdp.Sent::targetId)
+            .containsExactly("T1", "T2");
         assertThat(sink.data("tabs").get(1))
-                .isEqualTo(List.of(
-                        Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", false),
-                        Map.of("id", "T2", "title", "로그인", "url", "https://example.com/popup", "active", true)));
+            .isEqualTo(List.of(
+                Map.of("id", "T1", "title", "첫 탭", "url", "https://example.com/", "active", false),
+                Map.of("id", "T2", "title", "로그인", "url", "https://example.com/popup", "active", true)));
     }
+
 
     @Test
     @DisplayName("고른 탭으로 옮기고 목록에 없는 탭은 무시한다")
@@ -202,8 +212,9 @@ class BrowserScreenSessionTest {
         assertThat(cdp.attached).containsExactly("T1", "T2");
         List<Object> tabs = sink.data("tabs");
         Object expected = Map.of("id", "T2", "title", "둘째", "url", "https://example.com/b", "active", true);
-        assertThat((List<Object>) tabs.get(tabs.size() - 1)).contains(expected);
+        assertThat((List<Object>)tabs.get(tabs.size() - 1)).contains(expected);
     }
+
 
     @Test
     @DisplayName("붙은 탭이 끊기면 남은 탭으로 옮기고 남은 탭이 없으면 stopped 로 닫는다")
@@ -222,6 +233,7 @@ class BrowserScreenSessionTest {
         assertThat(ended).isTrue();
     }
 
+
     @Test
     @DisplayName("열어 둘 수 있는 시간이 지나면 timeout 으로 닫고 사용 핸들과 연결을 닫는다")
     void closesOnTimeout() throws InterruptedException {
@@ -234,9 +246,10 @@ class BrowserScreenSessionTest {
         assertThat(cdp.closedByUs("T1")).isTrue();
         assertThat(ended).isTrue();
         assertThatThrownBy(() -> session.input(input(Kind.RELOAD, null, null, null)))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_SCREEN_CLOSED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_SCREEN_CLOSED));
     }
+
 
     @Test
     @DisplayName("받는 쪽이 끊기거나 쓰기가 실패하면 closed 를 보내지 않고 닫는다")
@@ -251,6 +264,7 @@ class BrowserScreenSessionTest {
         assertThat(usage.inUse(BROWSER_ID)).isFalse();
     }
 
+
     @Test
     @DisplayName("주석 줄 쓰기가 실패하면 closed 없이 닫고 사용 핸들을 놓는다")
     void closesWhenHeartbeatFails() throws InterruptedException {
@@ -262,6 +276,7 @@ class BrowserScreenSessionTest {
         assertThat(sink.data("closed")).isEmpty();
         assertThat(usage.inUse(BROWSER_ID)).isFalse();
     }
+
 
     @Test
     @DisplayName("앞 탭 옮기기의 연결을 뒤 탭 옮기기가 닫아 명령이 실패해도 화면을 닫지 않는다")
@@ -283,6 +298,7 @@ class BrowserScreenSessionTest {
         assertThat(cdp.closedByUs("T2")).isTrue();
     }
 
+
     @Test
     @DisplayName("프레임은 받는 쪽에 넘긴 뒤에 ack 한다")
     void acknowledgesAfterForwarding() throws InterruptedException {
@@ -297,6 +313,7 @@ class BrowserScreenSessionTest {
         reader.join(2000);
         assertThat(cdp.sent("Page.screencastFrameAck")).hasSize(1);
     }
+
 
     @Test
     @DisplayName("받는 쪽 쓰기가 막혀 있어도 닫기는 closed 를 건너뛰고 바로 돌아온다")
@@ -318,6 +335,7 @@ class BrowserScreenSessionTest {
         assertThat(sink.data("closed")).isEmpty();
         assertThat(cdp.sent("Page.screencastFrameAck")).isEmpty();
     }
+
 
     @Test
     @DisplayName("프레임 없이 연이어 세 번까지만 다시 잇고 넘으면 stopped 로 닫는다")
@@ -341,6 +359,7 @@ class BrowserScreenSessionTest {
         assertThat(cdp.attached).hasSize(7);
     }
 
+
     @Test
     @DisplayName("마지막 크기 입력을 기억했다가 탭을 옮기면 screencast 전에 새 탭에 다시 보낸다")
     void reappliesResizeAfterTabSwitch() throws InterruptedException {
@@ -355,10 +374,11 @@ class BrowserScreenSessionTest {
         assertThat(resized).extracting(FakeCdp.Sent::targetId).containsExactly("T1", "T2");
         assertThat(resized.get(1).params()).containsEntry("width", 390).containsEntry("height", 844);
         assertThat(cdp.sent.stream()
-                        .filter(command -> command.targetId().equals("T2"))
-                        .map(FakeCdp.Sent::method))
+            .filter(command -> command.targetId().equals("T2"))
+            .map(FakeCdp.Sent::method))
                 .containsExactly("Page.enable", "Emulation.setDeviceMetricsOverride", "Page.startScreencast");
     }
+
 
     @Test
     @DisplayName("크기 변경을 기다리는 중에 탭을 옮기면 새 탭에 마지막 크기를 한 번만 적용한다")
@@ -367,14 +387,16 @@ class BrowserScreenSessionTest {
         BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
         session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
         session.input(input(Kind.TAB, null, null, null, "T2"));
-        scheduler.schedule(() -> {}, 250, TimeUnit.MILLISECONDS).get(2, TimeUnit.SECONDS);
+        scheduler.schedule(() -> {
+        }, 250, TimeUnit.MILLISECONDS).get(2, TimeUnit.SECONDS);
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride"))
-                .extracting(FakeCdp.Sent::targetId)
-                .containsExactly("T2");
+            .extracting(FakeCdp.Sent::targetId)
+            .containsExactly("T2");
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
-                .containsEntry("width", 390)
-                .containsEntry("height", 844);
+            .containsEntry("width", 390)
+            .containsEntry("height", 844);
     }
+
 
     @Test
     @DisplayName("연이은 크기 변경은 마지막 값만 적용하고 닫힌 뒤에는 보내지 않는다")
@@ -386,15 +408,16 @@ class BrowserScreenSessionTest {
         await(() -> !cdp.sent("Emulation.setDeviceMetricsOverride").isEmpty());
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride")).hasSize(1);
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride").get(0).params())
-                .containsEntry("width", 1200)
-                .containsEntry("height", 800)
-                .containsEntry("mobile", false);
+            .containsEntry("width", 1200)
+            .containsEntry("height", 800)
+            .containsEntry("mobile", false);
         session.input(new BrowserScreenInput(Kind.RESIZE, null, 0, 0, 0, null, null, null, null, 390, 844));
         session.close(null);
         scheduler.shutdown();
         assertThat(scheduler.awaitTermination(2, TimeUnit.SECONDS)).isTrue();
         assertThat(cdp.sent("Emulation.setDeviceMetricsOverride")).hasSize(1);
     }
+
 
     @Test
     @DisplayName("페이지 처음과 끝은 고정 식만 실행하고 페이지 키와 공백도 누르고 뗀다")
@@ -403,17 +426,18 @@ class BrowserScreenSessionTest {
         session.input(new BrowserScreenInput(Kind.SCROLL, "top", 0, 0, 0, null, null, null, null, 0, 0));
         session.input(new BrowserScreenInput(Kind.SCROLL, "bottom", 0, 0, 0, null, null, null, null, 0, 0));
         assertThat(cdp.sent("Runtime.evaluate"))
-                .extracting(sent -> sent.params().get("expression"))
-                .containsExactly("window.scrollTo(0, 0)", "window.scrollTo(0, document.documentElement.scrollHeight)");
+            .extracting(sent -> sent.params().get("expression"))
+            .containsExactly("window.scrollTo(0, 0)", "window.scrollTo(0, document.documentElement.scrollHeight)");
         for (String key : List.of("PageUp", "PageDown", "Space")) {
             session.input(input(Kind.KEY, key, null, null));
         }
         assertThat(cdp.sent("Input.dispatchKeyEvent")).hasSize(6);
         assertThat(cdp.sent("Input.dispatchKeyEvent").get(4).params())
-                .containsEntry("key", " ")
-                .containsEntry("code", "Space")
-                .containsEntry("text", " ");
+            .containsEntry("key", " ")
+            .containsEntry("code", "Space")
+            .containsEntry("text", " ");
     }
+
 
     /** 붙은 탭을 끊고 다시 붙어 screencast 를 시작하기까지 기다린다. 붙기가 끝나기 전에 다시 끊으면 경합이 된다. */
     private void dropAndAwaitReattach(int screencasts) throws InterruptedException {
@@ -421,24 +445,29 @@ class BrowserScreenSessionTest {
         await(() -> cdp.sent("Page.startScreencast").size() == screencasts);
     }
 
+
     private BrowserScreenSession open(Duration timeout, Duration tabInterval, String url) {
         return open(timeout, tabInterval, Duration.ofHours(1), url);
     }
 
+
     private BrowserScreenSession open(Duration timeout, Duration tabInterval, Duration heartbeat, String url) {
         BrowserScreenSession session = new BrowserScreenSession(
-                BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, scheduler, closed -> ended.set(true));
+            BROWSER_ID, 201L, CDP, cdp, cdp, usage.open(BROWSER_ID), sink, scheduler, closed -> ended.set(true));
         session.start(url, timeout, tabInterval, heartbeat);
         return session;
     }
+
 
     private static BrowserScreenInput mouse(String action, double x, double y) {
         return new BrowserScreenInput(Kind.MOUSE, action, x, y, 0, null, null, null, null, 0, 0);
     }
 
+
     private static BrowserScreenInput input(Kind kind, String key, String text, String url) {
         return input(kind, key, text, url, null);
     }
+
 
     private static BrowserScreenInput input(Kind kind, String key, String text, String url, String targetId) {
         return new BrowserScreenInput(kind, null, 0, 0, 0, key, text, url, targetId, 0, 0);
