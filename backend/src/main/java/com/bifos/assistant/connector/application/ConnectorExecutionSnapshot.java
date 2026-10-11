@@ -84,7 +84,11 @@ public final class ConnectorExecutionSnapshot {
             require(bytes(entry.getValue().stringValue()) <= 128);
             equal(entry.getValue(), args.get(entry.getKey()));
         }
-        ConnectorOrderSnapshot.validate(input, args, summary, scope, operation);
+        if (conditional(summary)) {
+            ConnectorConditionalSnapshot.validate(input, args, summary, scope, operation);
+        } else {
+            ConnectorOrderSnapshot.validate(input, args, summary, scope, operation);
+        }
         return new ConnectorExecutionSnapshot(
             executionArgsJson, summaryJson, scopeJson, Sha256.hex(executionArgsJson), Sha256.hex(scopeJson), args);
     }
@@ -183,6 +187,10 @@ public final class ConnectorExecutionSnapshot {
             && connectionId > 0
             && tool != null
             && !tool.isBlank());
+        JsonNode summary = object(summaryJson, 8 * 1024);
+        if (conditional(summary)) {
+            return ConnectorConditionalSnapshot.requestKey(execution, userId, connectionId, tool, summary.get("operation").stringValue());
+        }
         return ConnectorOrderSnapshot.requestKey(execution, userId, connectionId, tool);
     }
 
@@ -192,6 +200,10 @@ public final class ConnectorExecutionSnapshot {
         JsonNode scope = object(scopeJson, 2 * 1024);
         JsonNode fields = parse(raw, 2 * 1024);
         require(fields.isArray() && !fields.isEmpty() && fields.size() <= 8);
+        if (conditional(object(summaryJson, 8 * 1024))) {
+            require(fields.size() == 1 && "account_seq".equals(text(fields.get(0).get("arg"), 1, 64))
+                && "account".equals(text(fields.get(0).get("field"), 1, 64)));
+        }
         Set<String> args = new HashSet<>();
         Set<String> names = new HashSet<>();
         for (JsonNode item : fields) {
@@ -228,8 +240,8 @@ public final class ConnectorExecutionSnapshot {
     }
 
 
-    private static String lengthPrefix(String value) {
-        return bytes(value) + ":" + value;
+    private static boolean conditional(JsonNode summary) {
+        return summary.has("orderKind") && "CONDITIONAL".equals(summary.get("orderKind").stringValue());
     }
 
 

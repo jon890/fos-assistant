@@ -589,6 +589,69 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | conditional-orders | OPEN/CLOSED 모두 cursor/limit 페이지를 지원한다. 다른 채널의 주문도 조회한다. 응답 PROFIT_RATE는 읽되 ConditionRequest에 없는 생성 필드를 발명하지 않는다 |
 | 큰 응답 | 1 MiB 상한과 4초 HTTP timeout을 유지한다. 공식 페이지가 있으면 사용자가 다음 페이지를 읽는다. 페이지가 없는 큰 응답은 명확한 크기 초과 오류로 끝내며 몰래 일부 행을 남기지 않는다 |
 
+### 조건주문 snapshot 소비 계약
+
+Python의 `connector_conditional_validation`과 Spring의 `ConnectorConditionalSnapshot`은 조건주문 prepare 결과를 검증한다.
+`summary.orderKind=CONDITIONAL`인 경우에만 이 분기를 고른다. 일반 주문은 기존 정규화 의미 보존 규칙을 유지하며 `ConnectorOrderSnapshot`이 검증한다.
+이 구현은 금융 권한을 발급하지 않는다. 금융 도구의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
+실제 producer, SDK 금융 전송, claim 뒤 원주문 조회, 등록과 운영 개방은 아직 연결하지 않았다.
+
+조건 summary는 정확히 다음 15개 키를 갖는다.
+`orderKind account operation conditionalOrderId symbol market currency type quantity orderType expireDate first second original normalization`.
+account는 끝 네 자리이고, scope와 선언은 연결 공개 account에 대응하는 `account_seq` 하나만 받는다.
+실행 시장은 KOSPI/KOSDAQ/KR_ETC이면 KRW와 KR, NYSE/NASDAQ/AMEX/US_ETC이면 USD와 US에 대응한다.
+실행에는 일곱 시장 원문을 저장하고 summary와 원주문에는 KR/US를 쓴다. 다른 통화 조합과 실행의 KR/US는 거절한다.
+
+| operation | 모델 입력과 실행 입력 | 표시와 원주문 |
+| --- | --- | --- |
+| CREATE | symbol/type/quantity/orderType/expireDate/first가 필수다. second와 false 동의만 선택이며 실행에는 scope·market·currency·UUID clientOrderId를 더한다 | conditionalOrderId와 original은 null이다. SINGLE의 표시 second는 null이고 실행에는 없다 |
+| MODIFY | conditionalOrderId와 새 쓰기 값 전체가 필수다. symbol과 clientOrderId는 받지 않으며 실행에 expected_conditional_order를 더한다 | 공식 원주문과 expected의 키·값·타입이 같아야 한다. 원주문 symbol을 표시하며 타입 전환을 허용한다 |
+| CANCEL | conditionalOrderId만 모델에서 받는다. 실행에는 scope·market·currency·expected_conditional_order만 더한다 | 원주문의 공식 상세와 leg를 표시한다. expireDate 부재는 표시에서만 null이며 원주문에는 부재로 남긴다 |
+
+쓰기 leg는 orderSide/triggerPrice와 LIMIT일 때 orderPrice만 받는다. SINGLE은 second를 생략하고 OCO는 SELL→SELL, OTO는 BUY→SELL이며 두 타입은 LIMIT만 받는다.
+quantity는 KR/US 모두 양의 1~30자 decimal 문자열이다. KR 소수 수량에 별도 정수 제약을 넣지 않는다.
+KR의 새 orderPrice는 정수, US는 1달러 미만 소수 네 자리·이상 두 자리까지다. 원주문의 가격을 새 쓰기 가격 규칙으로 다시 제한하지 않는다.
+OCO는 first.triggerPrice가 second.triggerPrice보다 커야 한다. 현재가 사이 관계는 실제 준비·전송 단계가 확인해야 한다.
+expireDate는 실제 YYYY-MM-DD인지 검증한다. 저장 원문은 지난 날짜에도 읽을 수 있어야 하므로 오늘부터 1년의 실행 시점 제한은 producer와 SDK가 별도로 확인해야 한다.
+금액·timeInForce·모델 scope·generated ID·expected 입력과 true 동의, 추가 키·숫자 decimal·잘못된 leg를 거절한다.
+
+원주문은 공식 `ConditionalOrderDetailResponse`와 `ConditionalOrderCondition`의 필드만 받는다.
+모든 공식 group/leg 상태와 STOP/PROFIT_RATE를 수용한다. OTO 첫 leg가 ORDERED/COMPLETED이고 둘째가 WATCHING인 CANCEL과 PROFIT_RATE 원주문에서 STOP으로 전체 재설정하는 MODIFY도 수용한다.
+PROFIT_RATE의 targetProfitRate는 퍼센트 원문을 그대로 둔다. 신규 쓰기에 PROFIT_RATE 필드를 만들지 않는다.
+부재와 null을 구분하고 createdAt/expireDate, leg 타입·상태·가격·발동 주문 ID까지 expected와 대조한다.
+이 대조는 새 prepare의 소비 검증이며 claim 뒤 원주문이 그대로인지 확인하는 실행 검증은 후속 연결의 책임이다.
+불투명 ID는 점 경로·공백·슬래시·역슬래시·query/hash/percent/colon·C0/C1·잘못된 surrogate를 거절한다.
+
+normalization은 symbol/quantity/first.triggerPrice/first.orderPrice/second.triggerPrice/second.orderPrice 순서의 실제 표기 변경만 `{field,before,after}`로 기록한다.
+ASCII symbol 대문자화와 decimal의 선행·후행 0 제거만 허용한다. before는 모델 원문, after는 실행 값이며 canonical(before)==after여야 한다.
+002→2와 00100.00→100은 허용하고 002→200은 거절한다. enum/date/ID/orderSide, leg 순서와 null/부재를 바꾸지 않는다.
+중복·누락·추가 기록, 같은 before/after, 없는 값 추가와 leg 배열화를 거절한다.
+
+조건 분기에서 거절하는 전체 예약 이름은 다음과 같다. 정확한 account_seq 하나만 받으므로 이 이름들은 scope에 들어갈 수 없다.
+`orderId symbol market currency side quantity orderAmount price orderType timeInForce status filledQuantity execution clientOrderId expected_order confirmHighValueOrder userId connectionId tool orderKind account operation original normalization conditionalOrderId type expireDate first second expected_conditional_order orderSide triggerPrice targetProfitRate orderPrice triggeredOrderId createdAt`.
+일반 주문과 manifest의 기존 19개 예약 이름은 유지한다. manifest에는 orderKind 분류 정보가 없고 기존 일반 snapshot은 account arg도 허용하므로 공통 집합을 확대하면 기존 저장 내용의 재검증을 거절하게 된다.
+조건 분기에서만 이 제약을 적용해 일반 계약을 보존한다. 연결의 공개 field 이름은 두 분기 모두 예약 검사의 대상이 아니다.
+
+조건 의도 키는 LP(`fos-conditional-intent-v1`) 뒤 경로마다 LP(경로)와 값 인코딩을 붙인 SHA-256이다.
+LP는 UTF-8 byte 길이의 10진수, 콜론, 원문 byte다. 문자열은 S+LP(값), 부재는 A, null은 N, 존재하는 leg 객체는 O이며 부재 객체의 하위 값도 A다.
+
+| operation | 고정 경로 순서 |
+| --- | --- |
+| 공통 | operation/userId/connectionId/tool/account_seq/market/currency |
+| CREATE | 공통 뒤 symbol/type/quantity/orderType/expireDate/first/first.orderSide/first.triggerPrice/first.orderPrice/second/second.orderSide/second.triggerPrice/second.orderPrice |
+| MODIFY | CREATE의 symbol 대신 conditionalOrderId를 넣는다 |
+| CANCEL | 공통 뒤 conditionalOrderId |
+
+userId/connectionId는 양의 정수의 10진 문자열이며 market은 실행 원문이다. clientOrderId와 expected는 의도 키에서 제외한다.
+다른 symbol·대상 ID·operation은 다른 키가 된다. UUID와 현재 원주문만 바꾸어 같은 의도를 우회하지 못하며 일반 주문 의도 키는 유지한다.
+실제 DB producer의 중복 의도 차단은 이 키 계산과 별도로 연결해야 한다.
+
+공통 [원문 vector](../../test/resources/conditional-snapshot-v1.json)는 model/execution/summary/scope를 정확한 UTF-8 문자열과 각각의 SHA로 보관한다.
+Python은 strict parser와 실제 prepare 소비를, Spring은 validate/capture와 실제 사용자 암호화·H2/MySQL 저장 후 open을 검사한다.
+Spring 원문 상한은 각각 16/16/8/2 KiB와 nesting5이며 중복 키와 trailing JSON을 거절한다. Python은 prepare 외피와 각 객체의 기존 byte·깊이 상한을 적용한다.
+저장 시 실행·scope 원문 SHA를 유지하고 세 원문을 다시 직렬화하지 않는다. 같은 keyId로 seal/open하며 AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`다.
+열·action·사용자·keyId와 저장 summary의 변조를 거절한다. table·migration·ticket·claim DTO와 암호화 형식은 바꾸지 않는다.
+
 ### 요청 경계와 시험
 
 API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`하고 query는 URLSearchParams로 만든다.
