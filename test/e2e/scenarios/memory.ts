@@ -4,6 +4,7 @@ import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 import { signedCallContext } from "../mcp-context.ts";
 import { AGENT_TOOLS_PROFILE } from "./agent-tools.ts";
 import { DAD_BINDING } from "./binding.ts";
+import { readEventStream } from "../../../web/src/lib/stream.ts";
 
 type MemoryView = {
   id: number;
@@ -22,7 +23,7 @@ type AgentToken = { id: number; token: string };
 const INVALID_CALL_CONTEXT = "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.";
 
 /** 사용량 시나리오보다 먼저 Memory 권한과 주입 확인을 위해 실행하는 대화 수다. */
-export const MEMORY_CONTEXT_TURNS = 3;
+export const MEMORY_CONTEXT_TURNS = 4;
 
 export const memoryScenario: Scenario = {
   name: "Memory 공개 범위",
@@ -314,6 +315,217 @@ export const memoryScenario: Scenario = {
         await call(context, `/memories/${memory.id}`, { method: "DELETE", token: context.tokens.dad }),
         200,
         "Memory 구역 모양 검사 정리",
+      );
+    }
+
+    step(
+      "실제 색인 예산에서 빠진 항목도 서명 검색으로 찾고 읽으며 권한 철회 뒤에는 읽지 못한다",
+    );
+    const created: MemoryView[] = [];
+    const issued = expectStatus(
+      await call(context, "/admin/agent-tokens", {
+        method: "POST",
+        token: context.tokens.dad,
+        body: {
+          profileName: DAD_BINDING.profileName,
+          label: "e2e-memory-search",
+        },
+      }),
+      200,
+      "제목 검색 MCP 토큰 발급",
+    ).json<AgentToken>();
+    const settingsPath = "/admin/agents/dad/memory-collections";
+    const settings = expectStatus(
+      await call(context, settingsPath, { token: context.tokens.dad }),
+      200,
+      "기존 Memory 허용 읽기",
+    ).json<{
+      collections: { key: string; granted: boolean; allowSensitive: boolean }[];
+    }>();
+    const previousGrants = settings.collections
+      .filter((item) => item.granted)
+      .map((item) => ({
+        collection: item.key,
+        allowSensitive: item.allowSensitive,
+      }));
+    let completed: Promise<void> | undefined;
+    try {
+      // 제목만으로도 조립 상한을 넘는 합성 자료를 만든다. 본문은 개인 사실 구역의 항목 상한보다 길다.
+      for (let i = 0; i < 50; i++) {
+        created.push(
+          expectStatus(
+            await call(context, "/memories", {
+              method: "POST",
+              token: context.tokens.dad,
+              body: {
+                scope: "USER",
+                title: `합성 색인 ${i} ${"가".repeat(180)}`,
+                content: "나".repeat(240),
+                alwaysInject: false,
+              },
+            }),
+            200,
+            "색인 예산용 합성 항목 생성",
+          ).json<MemoryView>(),
+        );
+      }
+      const target = expectStatus(
+        await call(context, "/memories", {
+          method: "POST",
+          token: context.tokens.dad,
+          body: {
+            scope: "USER",
+            title: "누락 검색 표식".padEnd(200, "라"),
+            content: "검색 후 읽을 합성 본문 " + "다".repeat(240),
+            alwaysInject: false,
+          },
+        }),
+        200,
+        "검색할 누락 항목 생성",
+      ).json<MemoryView>();
+      created.push(target);
+      context.hermes.holdNextRun();
+      const stream = await fetch(`${context.api}/chat/messages/stream`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${context.tokens.dad}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "색인 누락 제목 검색 검사",
+          agentCode: "dad",
+        }),
+      });
+      expect(stream.status === 200, "제목 검색용 실행을 시작하지 못했다");
+      let resolveStarted: () => void;
+      let rejectStarted: (error: Error) => void;
+      const started = new Promise<void>((resolve, reject) => {
+        resolveStarted = resolve;
+        rejectStarted = reject;
+      });
+      completed = readEventStream<{ type: string }>(stream, (event) => {
+        if (event.type === "started") resolveStarted!();
+      }).then(() => {
+        rejectStarted!(new Error("실행 시작을 관측하기 전에 스트림이 끝났다"));
+      });
+      completed.catch((error: unknown) =>
+        rejectStarted!(
+          error instanceof Error ? error : new Error(String(error)),
+        ),
+      );
+      await Promise.all([context.hermes.waitForHeldRun(), started]);
+      const root = context.hermes.heldRun()?.sessionId;
+      expect(root !== undefined, "가짜 Hermes 실행의 루트 session이 없다");
+      const contextInstructions = context.hermes.lastSubmittedInstructions();
+      expect(
+        contextInstructions !== undefined &&
+          !contextInstructions.includes(target.title),
+        "검색할 항목이 실제 색인 예산에서 빠지지 않았다",
+      );
+      const mcp = async (name: string, args: Record<string, unknown>) => {
+        const response = await fetch(context.api.replace("/api/v1", "/mcp"), {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${issued.token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/call",
+            params: {
+              name,
+              arguments: {
+                ...args,
+                _fos_ctx: signedCallContext(
+                  issued.token,
+                  name,
+                  root,
+                  root,
+                  `call_${randomUUID()}`,
+                ),
+              },
+            },
+          }),
+        });
+        expect(response.status === 200, "서명한 기억 도구 호출이 실패했다");
+        return (await response.json()) as {
+          result: { isError: boolean; content: { text: string }[] };
+        };
+      };
+      const found = await mcp("memory_search", { query: "누락 검색 표식" });
+      expect(!found.result.isError, "누락 항목의 제목 검색이 실패했다");
+      const wrapped = found.result.content[0]!.text;
+      expect(
+        wrapped.includes("<external-data>\n") &&
+          wrapped.endsWith("\n</external-data>"),
+        "검색 결과가 외부 데이터로 감싸지지 않았다",
+      );
+      const data = JSON.parse(
+        wrapped.slice(
+          wrapped.indexOf("<external-data>\n") + "<external-data>\n".length,
+          wrapped.lastIndexOf("\n</external-data>"),
+        ),
+      ) as { items: { id: number }[]; nextAfterId: number | null };
+      expect(
+        data.items.length === 1 &&
+          data.items[0]?.id === target.id &&
+          data.nextAfterId === null,
+        "누락 항목 검색 결과나 마지막 페이지가 다르다",
+      );
+      expect(
+        !wrapped.includes(target.content),
+        "제목 검색이 본문까지 반환했다",
+      );
+      const read = await mcp("memory_read", { id: target.id });
+      expect(
+        !read.result.isError && read.result.content[0]?.text === target.content,
+        "검색한 항목 본문을 읽지 못했다",
+      );
+      expectStatus(
+        await call(context, settingsPath, {
+          method: "PUT",
+          token: context.tokens.dad,
+          body: { collections: [] },
+        }),
+        200,
+        "검색 뒤 Memory 허용 철회",
+      );
+      const denied = await mcp("memory_read", { id: target.id });
+      expect(
+        denied.result.isError &&
+          denied.result.content[0]?.text === "Memory 항목을 읽을 수 없습니다.",
+        "권한 철회 뒤에도 본문을 읽었다",
+      );
+    } finally {
+      context.hermes.releaseHeldRun();
+      if (completed !== undefined) await completed;
+      expectStatus(
+        await call(context, settingsPath, {
+          method: "PUT",
+          token: context.tokens.dad,
+          body: { collections: previousGrants },
+        }),
+        200,
+        "Memory 허용 원상 복구",
+      );
+      for (const memory of created) {
+        expectStatus(
+          await call(context, `/memories/${memory.id}`, {
+            method: "DELETE",
+            token: context.tokens.dad,
+          }),
+          200,
+          "제목 검색 합성 항목 정리",
+        );
+      }
+      expectStatus(
+        await call(context, `/admin/agent-tokens/${issued.id}`, {
+          method: "DELETE",
+          token: context.tokens.dad,
+        }),
+        200,
+        "제목 검색 MCP 토큰 폐기",
       );
     }
 

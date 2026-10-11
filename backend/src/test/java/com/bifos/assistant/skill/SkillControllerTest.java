@@ -53,132 +53,153 @@ class SkillControllerTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new SkillController(skills, currentUser), new SkillAdminController(skills, currentUser))
-            .setControllerAdvice(new GlobalExceptionHandler())
-            .build();
+        new SkillController(skills, currentUser), new SkillAdminController(skills, currentUser))
+        .setControllerAdvice(new GlobalExceptionHandler())
+        .build();
+
 
     @BeforeEach
     void setUp() {
         when(currentUser.require()).thenReturn(OWNER);
     }
 
+
     @Test
     @DisplayName("목록은 출처와 편집 여부와 도구 상태와 올릴 수 있는 한도를 주고 사용량이 없으면 칸을 뺀다")
     void listGivesSourceEditabilityToolStatusAndUploadLimit() throws Exception {
         when(skills.list(OWNER, "dad"))
-                .thenReturn(new SkillList(
-                        List.of(new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
-                        true,
-                        true,
-                        30));
+            .thenReturn(new SkillList(
+                List.of(new SkillListItem("weekly-plan", "이번 주 계획", SkillSource.UPLOADED, false, null)),
+                true,
+                true,
+                30));
 
         mvc.perform(get("/api/v1/agents/dad/skills"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.skills.length()").value(1))
-                .andExpect(jsonPath("$.skills[0].name").value("weekly-plan"))
-                .andExpect(jsonPath("$.skills[0].source").value("UPLOADED"))
-                .andExpect(jsonPath("$.skills[0].usage").doesNotExist())
-                .andExpect(jsonPath("$.skills[0].enabled").value(false))
-                .andExpect(jsonPath("$.editable").value(true))
-                .andExpect(jsonPath("$.skillsToolsetEnabled").value(true))
-                .andExpect(jsonPath("$.uploadLimit").value(30));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.skills.length()").value(1))
+            .andExpect(jsonPath("$.skills[0].name").value("weekly-plan"))
+            .andExpect(jsonPath("$.skills[0].source").value("UPLOADED"))
+            .andExpect(jsonPath("$.skills[0].usage").doesNotExist())
+            .andExpect(jsonPath("$.skills[0].enabled").value(false))
+            .andExpect(jsonPath("$.editable").value(true))
+            .andExpect(jsonPath("$.skillsToolsetEnabled").value(true))
+            .andExpect(jsonPath("$.uploadLimit").value(30));
     }
+
 
     @Test
     @DisplayName("없는 스킬은 404 SKILL NOT FOUND 다")
     void missingSkillIs404SkillNotFound() throws Exception {
         when(skills.read(OWNER, "dad", "missing"))
-                .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
+            .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
 
         mvc.perform(get("/api/v1/agents/dad/skills/missing"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("저장은 본문을 생략한 파일을 null 본문으로 넘기고 원문과 파일 크기를 돌려준다")
     void saveSendsOmittedBodyAsNullAndReturnsOriginalAndFileSize() throws Exception {
         when(skills.save(eq(OWNER), eq("dad"), eq("weekly-plan"), anyString(), any()))
-                .thenReturn(new SkillDetail(
-                        "weekly-plan",
-                        "이번 주 계획",
-                        "---\nname: weekly-plan\n---\n",
-                        List.of(new SkillFileInfo("references/guide.md", 9L, "안내문")),
-                        null));
+            .thenReturn(new SkillDetail(
+                "weekly-plan",
+                "이번 주 계획",
+                "---\nname: weekly-plan\n---\n",
+                List.of(new SkillFileInfo("references/guide.md", 9L, "안내문")),
+                null));
 
         mvc.perform(
-                        write(
-                                "weekly-plan",
-                                "{\"skillMd\":\"---\\nname: weekly-plan\\n---\\n\","
-                                        + "\"files\":[{\"path\":\"references/guide.md\"},{\"path\":\"templates/t.md\",\"content\":\"x\"}]}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("weekly-plan"))
-                .andExpect(jsonPath("$.description").value("이번 주 계획"))
-                .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
-                .andExpect(jsonPath("$.files[0].path").value("references/guide.md"))
-                .andExpect(jsonPath("$.files[0].size").value(9))
-                .andExpect(jsonPath("$.files[0].content").value("안내문"))
-                .andExpect(content().string(containsString("\"previousSavedAt\":null")));
+            write(
+                "weekly-plan",
+                "{\"skillMd\":\"---\\nname: weekly-plan\\n---\\n\","
+                    + "\"files\":[{\"path\":\"references/guide.md\"},{\"path\":\"templates/t.md\",\"content\":\"x\"}]}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("weekly-plan"))
+            .andExpect(jsonPath("$.description").value("이번 주 계획"))
+            .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
+            .andExpect(jsonPath("$.files[0].path").value("references/guide.md"))
+            .andExpect(jsonPath("$.files[0].size").value(9))
+            .andExpect(jsonPath("$.files[0].content").value("안내문"))
+            .andExpect(content().string(containsString("\"previousSavedAt\":null")));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SkillFileInput>> files = ArgumentCaptor.forClass(List.class);
         verify(skills)
-                .save(eq(OWNER), eq("dad"), eq("weekly-plan"), eq("---\nname: weekly-plan\n---\n"), files.capture());
+            .save(eq(OWNER), eq("dad"), eq("weekly-plan"), eq("---\nname: weekly-plan\n---\n"), files.capture());
         assertThat(files.getValue())
-                .containsExactly(
-                        new SkillFileInput("references/guide.md", null), new SkillFileInput("templates/t.md", "x"));
+            .containsExactly(
+                new SkillFileInput("references/guide.md", null), new SkillFileInput("templates/t.md", "x"));
     }
+
 
     @Test
     @DisplayName("경로가 빈 파일과 본문이 없는 요청은 서비스에 닿기 전에 거절한다")
     void rejectsBlankPathFileAndBodylessRequestBeforeService() throws Exception {
         mvc.perform(write("weekly-plan", "{\"skillMd\":\"x\",\"files\":[{\"path\":\" \",\"content\":\"x\"}]}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
         mvc.perform(write("weekly-plan", "{\"files\":[]}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
 
         verifyNoInteractions(skills);
     }
+
+
+    @Test
+    @DisplayName("이전 시각이 없는 상세 읽기는 원문과 nullable 시각을 그대로 응답한다")
+    void readingDetailKeepsNullPreviousTime() throws Exception {
+        when(skills.read(OWNER, "dad", "weekly-plan"))
+            .thenReturn(new SkillDetail("weekly-plan", "이번 주 계획", "원문", List.of(), null));
+
+        mvc.perform(get("/api/v1/agents/dad/skills/weekly-plan"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.body").value("원문"))
+            .andExpect(content().string(containsString("\"previousSavedAt\":null")));
+    }
+
 
     @Test
     @DisplayName("이전 버전으로 되돌리기는 상세 모양과 이전 버전 시각을 주고 이전 버전이 없으면 404 다")
     void restorePreviousGivesDetailWithPreviousSavedAtAndMissingIs404() throws Exception {
         when(skills.restorePrevious(OWNER, "dad", "weekly-plan"))
-                .thenReturn(new SkillDetail(
-                        "weekly-plan",
-                        "이번 주 계획",
-                        "---\nname: weekly-plan\n---\n",
-                        List.of(new SkillFileInfo("scripts/run.sh", 4L, "echo")),
-                        Instant.parse("2026-10-09T01:02:03Z")));
+            .thenReturn(new SkillDetail(
+                "weekly-plan",
+                "이번 주 계획",
+                "---\nname: weekly-plan\n---\n",
+                List.of(new SkillFileInfo("scripts/run.sh", 4L, "echo")),
+                Instant.parse("2026-10-09T01:02:03Z")));
         when(skills.restorePrevious(OWNER, "dad", "missing"))
-                .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
+            .thenThrow(new ApiException(ErrorCode.SKILL_NOT_FOUND, "no such uploaded skill"));
 
         mvc.perform(post("/api/v1/agents/dad/skills/weekly-plan/restore-previous"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("weekly-plan"))
-                .andExpect(jsonPath("$.description").value("이번 주 계획"))
-                .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
-                .andExpect(jsonPath("$.files[0].path").value("scripts/run.sh"))
-                .andExpect(jsonPath("$.files[0].size").value(4))
-                .andExpect(jsonPath("$.files[0].content").value("echo"))
-                .andExpect(jsonPath("$.previousSavedAt").value("2026-10-09T01:02:03Z"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("weekly-plan"))
+            .andExpect(jsonPath("$.description").value("이번 주 계획"))
+            .andExpect(jsonPath("$.body").value("---\nname: weekly-plan\n---\n"))
+            .andExpect(jsonPath("$.files[0].path").value("scripts/run.sh"))
+            .andExpect(jsonPath("$.files[0].size").value(4))
+            .andExpect(jsonPath("$.files[0].content").value("echo"))
+            .andExpect(jsonPath("$.previousSavedAt").value("2026-10-09T01:02:03Z"));
         mvc.perform(post("/api/v1/agents/dad/skills/missing/restore-previous"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("Hermes 와 같은 이름은 409 SKILL NAME TAKEN 다")
     void nameSameAsHermesIs409SkillNameTaken() throws Exception {
         when(skills.save(eq(OWNER), eq("dad"), eq("hermes-help"), anyString(), any()))
-                .thenThrow(new ApiException(ErrorCode.SKILL_NAME_TAKEN, "taken"));
+            .thenThrow(new ApiException(ErrorCode.SKILL_NAME_TAKEN, "taken"));
 
         mvc.perform(write("hermes-help", "{\"skillMd\":\"---\\nname: hermes-help\\n---\\n\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NAME_TAKEN.name()));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.SKILL_NAME_TAKEN.name()));
     }
+
 
     @Test
     @DisplayName("지우기와 켜고 끄기는 본문 없이 204 다")
@@ -187,27 +208,29 @@ class SkillControllerTest {
         verify(skills).delete(OWNER, "dad", "weekly-plan");
 
         mvc.perform(put("/api/v1/agents/dad/skills/weekly-plan/enabled")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\":false}"))
-                .andExpect(status().isNoContent());
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"enabled\":false}"))
+            .andExpect(status().isNoContent());
         verify(skills).toggle(OWNER, "dad", "weekly-plan", false);
 
         mvc.perform(put("/api/v1/agents/dad/skills/weekly-plan/enabled")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
     }
+
 
     @Test
     @DisplayName("켜고 끄기는 점과 밑줄이 든 Hermes 스킬 이름을 그대로 넘긴다")
     void toggleSendsHermesSkillNameWithDotAndUnderscoreAsIs() throws Exception {
         mvc.perform(put("/api/v1/agents/dad/skills/note_taking.v2/enabled")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\":true}"))
-                .andExpect(status().isNoContent());
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"enabled\":true}"))
+            .andExpect(status().isNoContent());
         verify(skills).toggle(OWNER, "dad", "note_taking.v2", true);
     }
+
 
     @Test
     @DisplayName("관리자 목록과 기본 스킬 토글은 관리자 인증을 쓰고 일반 역할을 거절한다")
@@ -215,31 +238,32 @@ class SkillControllerTest {
         when(currentUser.requireAdmin()).thenThrow(new ApiException(ErrorCode.FORBIDDEN, "admin only"));
         mvc.perform(get("/api/v1/admin/agents/dad/skills")).andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/admin/agents/dad/skills/hermes-help/enabled")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\":false}"))
-                .andExpect(status().isForbidden());
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"enabled\":false}"))
+            .andExpect(status().isForbidden());
         verifyNoInteractions(skills);
         CurrentUser admin = new CurrentUser(7L, "dad@example.com", "아빠", 1L, UserRole.ADMIN);
         doReturn(admin).when(currentUser).requireAdmin();
         when(skills.adminList(admin, "dad"))
-                .thenReturn(new SkillList(
-                        List.of(new SkillListItem("hermes-help", "기본", SkillSource.HERMES, true, null)),
-                        true,
-                        true,
-                        30));
+            .thenReturn(new SkillList(
+                List.of(new SkillListItem("hermes-help", "기본", SkillSource.HERMES, true, null)),
+                true,
+                true,
+                30));
         mvc.perform(get("/api/v1/admin/agents/dad/skills"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.skills[0].source").value("HERMES"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.skills[0].source").value("HERMES"));
         mvc.perform(put("/api/v1/admin/agents/dad/skills/hermes-help/enabled")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"enabled\":false}"))
-                .andExpect(status().isNoContent());
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"enabled\":false}"))
+            .andExpect(status().isNoContent());
         verify(skills).adminToggle(admin, "dad", "hermes-help", false);
     }
 
+
     private static RequestBuilder write(String name, String json) {
         return put("/api/v1/agents/{code}/skills/{name}", "dad", name)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json);
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(json);
     }
 }

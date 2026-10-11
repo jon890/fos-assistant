@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { buildBundle } from "../scripts/build.ts";
+import { OPERATIONS, matchesOperation } from "../src/api-contract.ts";
 import { proxyFreeEnvironment } from "../src/runtime.ts";
 import { FakeToss, credentials, expectFailure, json, tool } from "./support.ts";
 
@@ -20,20 +21,27 @@ const cases = [
   ],
   ["/api/v1/market-calendar/KR", "get_market_calendar", { market: "KR" }],
   ["/api/v1/market-calendar/US", "get_market_calendar", { market: "US" }],
+  ["/api/v1/orderbook", "get_orderbook", { symbol: "005930" }],
+  ["/api/v1/trades", "get_trades", { symbol: "AAPL" }],
+  ["/api/v1/price-limits", "get_price_limits", { symbol: "AAPL" }],
+  ["/api/v1/candles", "get_candles", { symbol: "005930", interval: "1d" }],
 ] as const;
 const manifest = JSON.parse(
   readFileSync(`${import.meta.dir}/../connector.json`, "utf8"),
 );
 
-test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실제 HTTP로 보낸다", async () => {
-  const fake = new FakeToss(
-    new Set([
-      "issueOAuth2Token",
-      "getExchangeRate",
-      "getKrMarketCalendar",
-      "getUsMarketCalendar",
-    ]),
-  );
+test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 시세·시장 7 operation을 계좌 없이 실제 HTTP로 보낸다", async () => {
+  const allowed = new Set([
+    "issueOAuth2Token",
+    "getExchangeRate",
+    "getKrMarketCalendar",
+    "getUsMarketCalendar",
+    "getOrderbook",
+    "getTrades",
+    "getPriceLimit",
+    "getCandles",
+  ]);
+  const fake = new FakeToss(allowed);
   const directory = await mkdtemp(join(tmpdir(), "toss-market-stdio-"));
   const preload = join(directory, "loopback.ts");
   const bundle = join(directory, "tossinvest-mcp.js");
@@ -78,11 +86,12 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
     expect(tools.map((t) => t.name).sort()).toEqual(
       Object.keys(manifest.tools).sort(),
     );
-    expect(tools).toHaveLength(8);
+    expect(tools).toHaveLength(12);
     for (const [i, [, name, args]] of cases.entries()) {
       const definition = tools.find((t) => t.name === name)!;
       expect(definition.annotations?.readOnlyHint).toBe(true);
-      expect(definition.description).toContain("metadata");
+      expect(definition.description).toBeTruthy();
+      if (i < 3) expect(definition.description).toContain("metadata");
       expect(manifest.tools[name]).toEqual({ risk: "READ" });
       const { result, body } = await tool(client, name, args);
       expect(result.isError).toBeUndefined();
@@ -95,6 +104,7 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
       "get_exchange_rate",
       historical,
     );
+    const beforeInvalid = fake.requests.length;
     for (const dateTime of ["2026-03-25T09:30Z", "2026-03-25T09:30+09:00"])
       expect(
         (
@@ -104,8 +114,9 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
           })
         ).isError,
       ).toBe(true);
+    expect(fake.requests).toHaveLength(beforeInvalid);
     await client.close();
-    expect(fake.requests).toHaveLength(5);
+    expect(fake.requests).toHaveLength(9);
 
     // 한 프로세스의 줄 단위 trace를 직접 읽어 SDK가 감추는 stdout도 확인한다.
     const messages = [
@@ -129,7 +140,7 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
       })),
       {
         jsonrpc: "2.0",
-        id: 6,
+        id: 10,
         method: "tools/call",
         params: {
           name: "get_market_calendar",
@@ -138,13 +149,13 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
       },
       {
         jsonrpc: "2.0",
-        id: 7,
+        id: 11,
         method: "tools/call",
         params: { name: "get_exchange_rate", arguments: historical },
       },
       ...["2026-03-25T09:30Z", "2026-03-25T09:30+09:00"].map((dateTime, i) => ({
         jsonrpc: "2.0",
-        id: i + 8,
+        id: i + 12,
         method: "tools/call",
         params: {
           name: "get_exchange_rate",
@@ -164,7 +175,7 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
     const deadline = setTimeout(() => child.kill(), 10000);
     try {
       while (
-        ![1, 2, 3, 4, 5, 6, 7, 8, 9].every((id) =>
+        !Array.from({ length: 13 }, (_, i) => i + 1).every((id) =>
           trace
             .split("\n")
             .slice(0, -1)
@@ -196,13 +207,13 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
           metadata: {},
         });
       }
-      expect(replies.find((r) => r.id === 6).result.isError).toBe(true);
-      const notFound = replies.find((r) => r.id === 7).result;
+      expect(replies.find((r) => r.id === 10).result.isError).toBe(true);
+      const notFound = replies.find((r) => r.id === 11).result;
       expect(notFound.isError).toBe(true);
       expect(JSON.parse(notFound.content[0].text)).toEqual({
         error: { code: "TOSSINVEST_INVALID_INPUT" },
       });
-      for (const id of [8, 9])
+      for (const id of [12, 13])
         expect(replies.find((r) => r.id === id).result.isError).toBe(true);
     } finally {
       clearTimeout(deadline);
@@ -210,13 +221,33 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
       child.kill();
       await child.exited;
     }
-    expect(fake.requests).toHaveLength(10);
-    expect(fake.seen("GET").map((r) => r.path)).toEqual(
-      [...cases, cases[0], ...cases, cases[0]].map(([path]) => path),
+    expect(fake.requests).toHaveLength(18);
+    expect(
+      new Set(
+        fake.requests.map(
+          (request) =>
+            OPERATIONS.find((op) =>
+              matchesOperation(op, request.method, request.path),
+            )!.id,
+        ),
+      ),
+    ).toEqual(allowed);
+    // raw JSON-RPC는 여러 그룹을 함께 호출하므로 그룹 사이 도착 순서는 정하지 않는다.
+    expect(
+      fake
+        .seen("GET")
+        .map((r) => r.path)
+        .sort(),
+    ).toEqual(
+      [...cases, cases[0], ...cases, cases[0]].map(([path]) => path).sort(),
     );
-    for (const request of fake.seen("GET")) {
+    expect(fake.seen("POST", "/oauth2/token")).toHaveLength(2);
+    for (const [i, request] of fake.seen("GET").entries()) {
       expect(request.body).toBe("");
       expect(request.headers.get("x-tossinvest-account")).toBeNull();
+      expect(request.headers.get("authorization")).toBe(
+        `Bearer fake-access-token-${i < cases.length + 1 ? 1 : 2}`,
+      );
     }
   } finally {
     await client.close();

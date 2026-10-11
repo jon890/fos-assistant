@@ -70,11 +70,15 @@ for (const [path, name, args] of [
           const listed = await client.listTools();
           expect(listed.tools.map((t) => t.name).sort()).toEqual([
             "get_buying_power",
+            "get_candles",
             "get_exchange_rate",
             "get_holdings",
             "get_market_calendar",
+            "get_orderbook",
+            "get_price_limits",
             "get_quotes",
             "get_sellable_quantity",
+            "get_trades",
             "list_accounts",
             "list_orders",
           ]);
