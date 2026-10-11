@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { readFileSync } from "node:fs";
 import type {
   Page,
   Route,
@@ -6,6 +7,7 @@ import type {
 
 const ACTION_ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 const TOOL_NAME = "write_note";
+const PRODUCED_CATALOG = JSON.parse(readFileSync(new URL("../resources/connector-argument-catalog.json", import.meta.url), "utf8"));
 
 type Action = Record<string, unknown> & { status: string };
 
@@ -76,6 +78,46 @@ async function openWith(page: Page, label: string, first: Action) {
 
 test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("실제 Python 카탈로그의 메일 인자 이름과 선언 밖 충돌 키를 구분하고 승인 요청은 유지한다", async ({ page }) => {
+  const argLabels = PRODUCED_CATALOG[0].tools.send_message.arg_labels;
+  await openWith(page, "메일 인자 표시 이름", action({
+    argLabels, grantAllowed: false,
+    argsJson: JSON.stringify({ to: "friend@example.com", "받는 사람": "모델이 보낸 키", subject: "합성 제목", cc: "" }),
+  }));
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["받는 사람 (to)", "받는 사람 (받는 사람)", "제목"]);
+  await expect(card.locator("dd")).toHaveText(["friend@example.com", "모델이 보낸 키", "합성 제목"]);
+  await expect(card.getByTestId("approval-args-empty")).toHaveText("비어 있는 항목: 참조");
+  let submitted: unknown;
+  await page.route(`**/api/connector-actions/${ACTION_ID}/approve`, (route) => {
+    submitted = route.request().postDataJSON();
+    return route.fulfill({ json: action({ status: "SUCCEEDED", argLabels }) });
+  });
+  await card.getByTestId("approval-approve").click();
+  await expect.poll(() => submitted).toEqual({ grant: null });
+});
+
+test("네이버 본문 이름과 가림 안내는 표시만 바꾸며 승인 금지는 유지한다", async ({ page }) => {
+  const argLabels = PRODUCED_CATALOG[1].tools.save_draft.arg_labels;
+  await openWith(page, "블로그 인자 표시 이름", action({
+    argLabels, grantAllowed: false, hiddenArgs: true,
+    argsJson: JSON.stringify({ title: "합성 제목", body: "[가림]", "[가림]": "[가림]", tags: [] }),
+  }));
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["제목", "본문", "[가림]"]);
+  await expect(card.getByTestId("approval-hidden-args-reason")).toContainText("가려진 칸(본문, [가림])");
+  await expect(card.getByTestId("approval-args-empty")).toHaveText("비어 있는 항목: 태그");
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toBeVisible();
+});
+
+test("인자 표시 이름의 HTML은 요소를 만들지 않고 글자로 보인다", async ({ page }) => {
+  await openWith(page, "표시 이름 HTML", action({ argLabels: { title: "<b>제목</b>" } }));
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["<b>제목</b>", "count"]);
+  await expect(card.locator("dt b")).toHaveCount(0);
 });
 
 test("승인 줄이 없는 대화에는 카드 자리가 없다", async ({ page }) => {

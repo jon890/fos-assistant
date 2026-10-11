@@ -2,11 +2,48 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   approvalArgs,
+  approvalArgLabel,
+  approvalArgLabels,
   bulkApprovable,
   type ConnectorAction,
   hiddenArgKeys,
   readableArgs,
 } from "../../web/src/lib/connector-action.ts";
+
+test("인자 이름은 도구별이며 모르는 키와 가린 키는 유지한다", () => {
+  assert.equal(approvalArgLabel("body", { body: "본문" }), "본문");
+  assert.equal(approvalArgLabel("body", { body: "글 내용" }), "글 내용");
+  assert.equal(approvalArgLabel("unknown", { body: "본문" }), "unknown");
+  assert.equal(approvalArgLabel("[가림]", { token: "토큰" }), "[가림]");
+  assert.equal(approvalArgLabel("body", Object.create({ body: "가짜" })), "body");
+  assert.equal(approvalArgLabel("body", { body: "잘못\n된 이름" }), "body");
+});
+
+test("카드의 선언 밖 키가 표시 이름과 충돌하면 양쪽에 원래 키를 병기한다", () => {
+  const keys = ["to", "받는 사람"];
+  assert.equal(approvalArgLabel("to", { to: "받는 사람" }, keys), "받는 사람 (to)");
+  assert.equal(approvalArgLabel("받는 사람", { to: "받는 사람" }, keys), "받는 사람 (받는 사람)");
+});
+
+test("표시 이름의 Unicode와 UTF-8 및 항목 수 경계는 실제 compact JSON을 따른다", () => {
+  assert.deepEqual(approvalArgLabels({ a: "😀".repeat(80) }), { a: "😀".repeat(80) });
+  assert.deepEqual(approvalArgLabels({ a: "😀".repeat(81) }), {});
+  const labels = Object.fromEntries(Array.from({ length: 64 }, (_, index) => ["k" + index, "😀".repeat(60) + index]));
+  let remaining = 16384 - new TextEncoder().encode(JSON.stringify(labels)).length;
+  for (let index = 0; index < 64; index++) {
+    const added = Math.min(80 - [...labels["k" + index]].length, remaining);
+    labels["k" + index] += "x".repeat(added);
+    remaining -= added;
+  }
+  assert.equal(remaining, 0);
+  assert.deepEqual(approvalArgLabels(labels), labels);
+  labels.k63 += "x";
+  assert.deepEqual(approvalArgLabels(labels), {});
+  assert.deepEqual(approvalArgLabels(Object.fromEntries(Array.from({ length: 65 }, (_, index) => ["k" + index, "값" + index]))), {});
+  for (const code of [0, 9, 10, 31, 127, 159, 0x61c, 0x200e, 0x2028, 0x2029, 0x202e, 0x2066, 0xd800]) {
+    assert.deepEqual(approvalArgLabels({ a: "앞" + String.fromCharCode(code) + "뒤" }), {});
+  }
+});
 
 test("JSON 객체는 최상위 키마다 한 줄로 바뀐다", () => {
   const rows = readableArgs(JSON.stringify({ title: "장보기", count: 3, done: false, note: null }));

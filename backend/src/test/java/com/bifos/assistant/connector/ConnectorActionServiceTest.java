@@ -880,6 +880,47 @@ class ConnectorActionServiceTest {
     }
 
     @Test
+    @DisplayName("현재 도구의 표시 이름만 조회와 승인 및 거절에 전달하며 저장 원문과 해시는 유지한다")
+    void displaysCurrentToolLabelsWithoutChangingExecution() {
+        UUID approvedId = ask(WRITE, ARGS).actionId();
+        UUID rejectedId = ask(MAIL, ARGS).actionId();
+        ConnectorAction row = actions.findAll().stream().filter(found -> found.publicId().equals(approvedId))
+                .findFirst().orElseThrow();
+        String hash = row.argsSha256();
+        catalogBecomes(manifest(List.of(
+                new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null, List.of(), null,
+                        Map.of("text", "메모 내용")),
+                new ConnectorTool(MAIL, "WRITE", "required", "메모 보내기", false, List.of(), null,
+                        Map.of("text", "보낼 내용")))));
+        List<ConnectorActionView> listed = service.listForConversation(me, CONVERSATION);
+        assertThat(listed).extracting(ConnectorActionView::argLabels)
+                .containsExactly(Map.of("text", "메모 내용"), Map.of("text", "보낼 내용"));
+        assertThat(service.approve(me, approvedId, null).argLabels()).containsEntry("text", "메모 내용");
+        assertThat(service.reject(me, rejectedId).argLabels()).containsEntry("text", "보낼 내용");
+        ConnectorAction saved = actions.findAll().stream().filter(found -> found.publicId().equals(approvedId))
+                .findFirst().orElseThrow();
+        assertThat(saved.argsJson()).isEqualTo(ARGS);
+        assertThat(saved.argsSha256()).isEqualTo(hash);
+        verify(connector).execute(PROFILE, DEMO, "mcp__demo__write_note", ARGS);
+    }
+
+    @Test
+    @DisplayName("표시 이름이 있어도 가려진 인자의 승인 금지는 유지한다")
+    void keepsHiddenArgumentsBlockedWithLabels() {
+        catalogBecomes(manifest(List.of(new ConnectorTool("list_scopes", "READ", "none", null, null),
+                new ConnectorTool(MAIL, "WRITE", "required", "메모 보내기", false,
+                List.of(), null, Map.of("body", "본문", "token", "접근 키")))));
+        UUID actionId = ask(MAIL, "{\"body\":\"" + HIDDEN_TOKEN + "\",\"token\":\"비밀\"}").actionId();
+        ConnectorActionView listed = service.listForConversation(me, CONVERSATION).getFirst();
+        assertThat(listed.hiddenArgs()).isTrue();
+        assertThat(listed.argsJson()).doesNotContain(HIDDEN_TOKEN).contains("[가림]");
+        assertThat(listed.grantAllowed()).isFalse();
+        assertThat(service.approve(me, actionId, null).errorCode()).isEqualTo(ConnectorAction.HIDDEN_ARGS);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("상시 허락을 닫은 도구가 식별자로 선언한 칸의 긴 id 는 가리지 않고 hiddenArgs 가 거짓이며 승인하면 실행한다")
     void declaredIdentifierIsShownAndApproved() {
         catalogBecomes(withMailIdentifiers(List.of("note_id")));

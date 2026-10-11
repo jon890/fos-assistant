@@ -11,6 +11,7 @@ import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -192,7 +193,10 @@ class ConnectorActionDetails {
                 action,
                 manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())),
                 grantable(manifest, action),
-                hiddenArgs(manifest, action));
+                hiddenArgs(manifest, action),
+                manifest.flatMap(found -> found.tools().stream()
+                        .filter(tool -> Objects.equals(tool.name(), action.toolName()))
+                        .findFirst()).map(ConnectorTool::argLabels).orElse(Map.of()));
     }
 
     /**

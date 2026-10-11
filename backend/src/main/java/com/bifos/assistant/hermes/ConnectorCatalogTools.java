@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -61,7 +62,8 @@ final class ConnectorCatalogTools {
                 text(policy, "title"),
                 grant(policy),
                 identifiers(policy),
-                text(policy, "description")));
+                text(policy, "description"),
+                argLabels(policy)));
         }
         return List.copyOf(tools);
     }
@@ -107,5 +109,20 @@ final class ConnectorCatalogTools {
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isString() && !value.asString().isBlank() ? value.asString() : null;
+    }
+
+    private static Map<String, String> argLabels(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("arg_labels");
+        if (value == null || !value.isObject() || value.size() > 64) {
+            return Map.of();
+        }
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonNode> entry : value.properties()) {
+            if (!entry.getValue().isString()) {
+                return Map.of();
+            }
+            labels.put(entry.getKey(), entry.getValue().asString());
+        }
+        return labels;
     }
 }

@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,7 +55,8 @@ class ConnectorActionControllerTest {
             Instant.parse("2026-10-01T00:00:00Z"),
             Instant.parse("2026-10-02T00:00:00Z"),
             true,
-            true);
+            true,
+            Map.of("text", "내용"));
 
     private final ConnectorActionService service = mock(ConnectorActionService.class);
     private final ConversationAccess conversations = mock(ConversationAccess.class);
@@ -78,7 +80,7 @@ class ConnectorActionControllerTest {
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].length()").value(13))
+                .andExpect(jsonPath("$[0].length()").value(14))
                 .andExpect(jsonPath("$[0].actionId").value(ACTION.toString()))
                 .andExpect(jsonPath("$[0].connectorId").value("demo-notes"))
                 .andExpect(jsonPath("$[0].toolName").value("write_note"))
@@ -91,7 +93,8 @@ class ConnectorActionControllerTest {
                 .andExpect(jsonPath("$[0].createdAt").exists())
                 .andExpect(jsonPath("$[0].expiresAt").exists())
                 .andExpect(jsonPath("$[0].grantAllowed").value(true))
-                .andExpect(jsonPath("$[0].hiddenArgs").value(true));
+                .andExpect(jsonPath("$[0].hiddenArgs").value(true))
+                .andExpect(jsonPath("$[0].argLabels.text").value("내용"));
     }
 
     @Test
@@ -116,7 +119,8 @@ class ConnectorActionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"grant\":\"TODAY\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.actionId").value(ACTION.toString()));
+                .andExpect(jsonPath("$.actionId").value(ACTION.toString()))
+                .andExpect(jsonPath("$.argLabels.text").value("내용"));
     }
 
     @Test
@@ -165,7 +169,8 @@ class ConnectorActionControllerTest {
 
         mvc.perform(post("/api/v1/connector-actions/{id}/reject", ACTION))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.actionId").value(ACTION.toString()));
+                .andExpect(jsonPath("$.actionId").value(ACTION.toString()))
+                .andExpect(jsonPath("$.argLabels.text").value("내용"));
         mvc.perform(post("/api/v1/connector-actions/{id}/reject", foreign))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CONNECTOR_ACTION_NOT_FOUND"));

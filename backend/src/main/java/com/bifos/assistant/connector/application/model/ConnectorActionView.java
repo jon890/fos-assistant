@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,6 +24,7 @@ import java.util.UUID;
  *     본다(ADR-065)
  * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
  *     승인할 수 없다(ADR-065)
+ * @param argLabels 지금 카탈로그가 선언한 그 도구의 인자 표시 이름. 실행 인자와 가림에는 쓰지 않는다
  */
 public record ConnectorActionView(
         UUID actionId,
@@ -37,7 +39,20 @@ public record ConnectorActionView(
         Instant createdAt,
         Instant expiresAt,
         boolean grantAllowed,
-        boolean hiddenArgs) {
+        boolean hiddenArgs,
+        Map<String, String> argLabels) {
+
+    public ConnectorActionView {
+        argLabels = argLabels == null ? Map.of() : Map.copyOf(argLabels);
+    }
+
+    /** 표시 이름이 없는 기존 호출과 호환한다. */
+    public ConnectorActionView(UUID actionId, String connectorId, String toolName, String title, ToolRisk risk,
+            ActionStatus status, String argsJson, String resultText, String errorCode, Instant createdAt,
+            Instant expiresAt, boolean grantAllowed, boolean hiddenArgs) {
+        this(actionId, connectorId, toolName, title, risk, status, argsJson, resultText, errorCode, createdAt,
+                expiresAt, grantAllowed, hiddenArgs, Map.of());
+    }
 
     /** 선언한 이름이 없는 도구를 사용자에게 부르는 말이다. */
     public static final String UNNAMED_TITLE = "이름 없는 동작";
@@ -49,6 +64,12 @@ public record ConnectorActionView(
      */
     public static ConnectorActionView from(
             ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
+        return from(action, declared, grantable, hiddenArgs, Map.of());
+    }
+
+    /** 표시 이름은 현재 카탈로그에서 받으며 정책과 가림에는 쓰지 않는다. */
+    public static ConnectorActionView from(ConnectorAction action, Optional<ToolPolicy> declared,
+            boolean grantable, boolean hiddenArgs, Map<String, String> argLabels) {
         return new ConnectorActionView(
                 action.publicId(),
                 action.connectorId(),
@@ -62,7 +83,8 @@ public record ConnectorActionView(
                 action.createdAt(),
                 action.expiresAt(),
                 action.grantAllowed() && grantable,
-                hiddenArgs);
+                hiddenArgs,
+                argLabels);
     }
 
     /**

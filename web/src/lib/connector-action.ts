@@ -43,6 +43,8 @@ export type ConnectorAction = {
   grantAllowed: boolean;
   /** 가려진 내용이 있어 승인할 수 없는 줄인가. 참이면 승인 단추를 그리지 않는다. */
   hiddenArgs: boolean;
+  /** 도구별 표시 이름이다. 옛 서버는 이 칸을 내지 않는다. */
+  argLabels?: Record<string, string>;
 };
 
 /** 묻지 않고 실행하게 허락한 도구 한 개다. 화면에는 `title` 을 보인다. */
@@ -94,6 +96,40 @@ function argsObject(argsJson: string | null): Record<string, unknown> | null {
 
 /** Control Plane 이 가린 자리에 넣는 글이다. `ToolDetailRedactor` 의 것과 같다. */
 const HIDDEN_MARK = "[가림]";
+
+const LABEL_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
+const LABEL_RESERVED = new Set(["__proto__", "constructor", "prototype"]);
+const LABEL_FORBIDDEN = /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
+const LABEL_EDGE_SPACE = /^[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]|[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]$/;
+
+/** 불량 표시 이름만 버리고 승인 줄과 값은 유지한다. */
+export function approvalArgLabels(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const entries = Object.entries(value);
+  if (entries.length > 64) return {};
+  const names = new Set<string>();
+  const labels: Record<string, string> = {};
+  for (const [key, label] of entries) {
+    if (!LABEL_KEY.test(key) || LABEL_RESERVED.has(key) || typeof label !== "string"
+      || [...label].length < 1 || [...label].length > 80 || LABEL_EDGE_SPACE.test(label)
+      || LABEL_FORBIDDEN.test(label) || !label.isWellFormed() || names.has(label)
+      || (Object.hasOwn(value, label) && key !== label)) return {};
+    names.add(label);
+    labels[key] = label;
+  }
+  return new TextEncoder().encode(JSON.stringify(labels)).length <= 16384 ? labels : {};
+}
+
+/** 표시만 바꾸고 원래 키와 가림 표시는 유지한다. 충돌한 줄에는 원래 키를 병기한다. */
+export function approvalArgLabel(
+  key: string, labels?: Readonly<Record<string, string>>, rawKeys?: readonly string[],
+): string {
+  const checked = approvalArgLabels(labels);
+  const nameOf = (raw: string) => Object.hasOwn(checked, raw) ? checked[raw] : raw;
+  const label = nameOf(key);
+  return rawKeys?.some((raw) => raw !== key && (nameOf(raw) === label || raw === label || nameOf(raw) === key))
+    ? `${label} (${key})` : label;
+}
 
 /**
  * 가려진 글이 든 맨 위 인자의 키다. 승인할 수 없는 까닭으로 어느 칸이 가려졌는지 보인다(ADR-089).
@@ -161,7 +197,7 @@ export type ApprovalArgs = {
 /**
  * 승인 카드가 위에 보일 인자와 「자세히」 로 접을 인자를 나눈다.
  *
- * <p>커넥터 선언에는 인자의 표시 이름이나 중요도가 없다. 그래서 키는 원래 이름 그대로 두고, 값이 비어 있지 않은
+ * <p>표시 이름과 무관하게 키는 원래 이름 그대로 두고, 값이 비어 있지 않은
  * 인자 가운데 앞에서부터 한 줄로 짧게 읽히는 값 둘을 위에 보인다. 그런 값이 없으면 모든 인자를 위에 보인다.
  * 무엇을 접을지는 화면이 정하고, 상시 허락을 닫은 도구는 접지 않는다(ADR-065).
  */

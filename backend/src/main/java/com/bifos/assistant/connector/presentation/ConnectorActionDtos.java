@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -31,7 +32,8 @@ public final class ConnectorActionDtos {
             Instant createdAt,
             Instant expiresAt,
             boolean grantAllowed,
-            boolean hiddenArgs) {
+            boolean hiddenArgs,
+            Map<String, String> argLabels) {
 
         public static ActionView from(ConnectorActionView action) {
             return new ActionView(
@@ -47,7 +49,8 @@ public final class ConnectorActionDtos {
                     action.createdAt(),
                     action.expiresAt(),
                     action.grantAllowed(),
-                    action.hiddenArgs());
+                    action.hiddenArgs(),
+                    action.argLabels());
         }
     }
 

@@ -360,6 +360,11 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 
 ## 대시보드 plugin 계약
 
+카탈로그 도구의 `arg_labels`는 도구별 승인 인자 표시 이름이다.
+정책과 분리한 `tool_arg_labels`를 카탈로그에서만 합치며 DB와 설치 정책에는 저장하지 않는다.
+현재 도구 이름과 정확히 맞춘 표시 이름을 승인 조회·승인·거절 응답의 `argLabels`로 전달한다.
+검증과 옛 응답 호환은 [승인 인자 표시 이름](connector-policy.md#승인-인자-표시-이름)이 갖는다.
+
 Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의 커넥터 경로에 기대는 약속이다.
 경로마다의 요청과 응답, 두 설치 방식의 차이, 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.
 
