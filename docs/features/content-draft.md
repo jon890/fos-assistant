@@ -86,13 +86,17 @@ dashboard는 기존 설치 소유 기록과 profile 표식, 주인 첨부·브�
 private process는 dashboard가 붙인 `--content-snapshot-operation compile` 인자로만 열린다.
 공개 설치 args의 private flag와 manifest·profile의 `FOS_CONTENT_SNAPSHOT_OPERATION`, `FOS_CONTENT_SAVE_TICKET`, `FOS_CONTENT_SAVE_AUTHORIZE_URL` 선언은 거절한다.
 부모 env 전체를 복사하지 않으며 별도 private env를 일반 MCP 설치에 남기지 않는다.
+Naver 실행 선언의 `--no-env-file`로 Bun이 dashboard의 작업 디렉터리에서 `.env`를 자동으로 읽는 것도 차단한다.
 실제 private 도구 목록이 선언한 compile 하나와 다르면 호출하지 않는다.
 start·status와 미지원 operation은 자식 실행 전 409로 끝나며 일반 execute로 우회하지 않는다.
 
 성공 응답은 `{ok:true,result,capabilities}`이고 result는 기존 `CompiledSnapshotV1`이다.
 오류는 본문·경로·cause·stderr 없는 `{ok:false,error}`이며 compile timeout은 504다.
 전체 MCP 왕복은 5초로 제한하고 기존 call·execute와 동시 호출 4개 한도를 공유한다. 자동 재전송은 없다.
-원고와 인자·결과는 파일이나 로그에 남기지 않는다. renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거나 반환하지 않는다.
+adapter 자체는 원고와 인자·결과를 파일이나 로그에 남기지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
+Python MCP SDK는 잘못된 stdout을 `logger.exception`으로 기록하며 현재 그 본문은 가리지 않는다.
+SDK와 프레임워크 진단 전체의 본문 가림은 아직 구현·검증되지 않았다.
+renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거나 반환하지 않는다.
 
 | UTF-8 compact JSON 상한 | 검사 경계 |
 | --- | --- |
@@ -108,6 +112,7 @@ start·status와 미지원 operation은 자식 실행 전 409로 끝나며 일�
 합성 stdio·HTTP 검사는 Python mcp 2.0.0과 TypeScript SDK 1.28.0으로 수행한다.
 
 **본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
+후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
 이번 구현은 로컬 compile 경계이며 원고 최초 MCP 생성, snapshot 영속화, 승인과 실제 네이버 저장을 열지 않는다.
 
 ## 단계별 합성 판정

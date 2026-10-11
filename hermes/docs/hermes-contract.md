@@ -2648,10 +2648,14 @@ private 자식에만 `--content-snapshot-operation compile`을 붙인다. 공개
 설치 manifest와 profile은 private flag와 세 `FOS_CONTENT_*` snapshot env를 선언하지 못한다.
 기존 설치 소유 기록·profile 표식과 주인 첨부·브라우저 선택 규칙을 쓰며 dashboard 자식의 UID를 바꾸지 않는다.
 MCP 실제 목록에 read-only compile 하나만 있어야 호출한다. Python mcp 2.0.0과 TypeScript SDK 1.28.0 stdio 왕복을 합성 입력으로 검사한다.
-compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다. 자식 stderr는 버리고 오류 원문·인자·결과를 로그에 넣지 않는다.
+compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다.
+adapter 자체는 오류 원문·인자·결과를 로그에 넣지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
+Python MCP SDK는 잘못된 stdout을 `logger.exception`으로 기록하며 현재 그 본문은 가리지 않는다.
+SDK와 프레임워크 진단 전체의 본문 가림은 아직 구현·검증되지 않았다.
 입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#compile-전용-내부-transport)이 갖는다.
 
 본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
+후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
 최초 원고 MCP 생성·DB·승인·worker 시작·조회와 실제 네이버 접근은 이번 compile 경계의 범위 밖이다.
 
 ### 커넥터 정책이 기대는 계약
