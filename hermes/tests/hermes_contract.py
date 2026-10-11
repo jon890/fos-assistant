@@ -1,4 +1,4 @@
-"""dashboard-profile-api 가 기대는 Hermes 내부 지점을 한곳에 선언한다.
+"""plugin과 runtime addon이 기대는 Hermes 내부 지점을 한곳에 선언한다.
 
 이 plugin 은 공개 확장점만으로는 열 수 없는 자리를 쓴다(ADR-088).
 Hermes 를 올리면 이 지점이 조용히 바뀔 수 있다. v0.21.5 로 올릴 때 `PUT /api/config` 가 500 으로 깨진 것이 그 예다.
@@ -7,6 +7,8 @@ Hermes 를 올리면 이 지점이 조용히 바뀔 수 있다. v0.21.5 로 올�
 
 - plugin 이 import 하는 Hermes 이름이 모두 여기 있는지. Hermes 없이 늘 돈다
 - 지정한 Hermes 소스에서 여기 적은 지점이 그대로인지. `HERMES_SOURCE` 를 줄 때만 돈다
+
+본문 없는 writer와 관리 bootstrap의 별도 source 계약은 `test_bodyless_*_contract.py`가 확인한다.
 
 Hermes 를 올리기 전에 `scripts/check-hermes-contract.sh <tag>` 로 새 판의 소스를 확인한다.
 plugin 이 새 지점에 기대게 되면 같은 커밋에서 여기에 더한다.
@@ -139,6 +141,154 @@ BODYLESS_REQUEST_FILES = (
     BODYLESS_REQUEST_WRITER[0], BODYLESS_REQUEST_LAZY[0], BODYLESS_REQUEST_FORWARD[0],
     *BODYLESS_REQUEST_CALLS,
 )
+
+# 관리 bootstrap의 추가 의존이다. writer 설치 API와 다섯 파일 지문에 합치지 않는다.
+# 공식 고정 commit의 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
+# AST hash는 행 번호·공백·주석을 제외하고 함수 전체(시그니처·decorator·본문)를 제한한다.
+# 큰 함수도 선언한 함수만 검사한다. 상류 변경 때 이 계약과 private owner를 함께 검토한다.
+BODYLESS_MANAGED_FUNCTIONS = {
+    'agent/agent_init.py': {
+        'init_agent': (
+            ('agent, base_url: str=None, api_key: str=None, provider: str=None, api_mode: str=None, acp_command: '
+             'str=None, acp_args: list[str] | None=None, command: str=None, args: list[str] | None=None, model: '
+             "str='', max_iterations: int=sys.maxsize, enabled_toolsets: List[str]=None, disabled_toolsets: "
+             'List[str]=None, save_trajectories: bool=False, verbose_logging: bool=False, quiet_mode: bool=False, '
+             "tool_progress_mode: str='all', ephemeral_system_prompt: str=None, log_prefix_chars: int=100, "
+             "log_prefix: str='', providers_allowed: List[str]=None, providers_ignored: List[str]=None, "
+             'providers_order: List[str]=None, provider_sort: str=None, provider_require_parameters: bool=False, '
+             'provider_data_collection: str=None, openrouter_min_coding_score: Optional[float]=None, session_id: '
+             'str=None, tool_progress_callback: callable=None, tool_start_callback: callable=None, '
+             'tool_complete_callback: callable=None, thinking_callback: callable=None, reasoning_callback: '
+             'callable=None, clarify_callback: callable=None, read_terminal_callback: callable=None, '
+             'read_preview_callback: callable=None, drive_preview_callback: callable=None, '
+             'read_window_below_callback: callable=None, connection_callback: callable=None, tour_callback: '
+             'callable=None, step_callback: callable=None, stream_delta_callback: callable=None, '
+             'interim_assistant_callback: callable=None, tool_gen_callback: callable=None, status_callback: '
+             'callable=None, notice_callback: callable=None, notice_clear_callback: callable=None, event_callback:'
+             ' Optional[Callable[[str, dict], None]]=None, reaction_callback: Optional[Callable[[str], '
+             'None]]=None, max_tokens: int=None, reasoning_config: Dict[str, Any]=None, service_tier: str=None, '
+             'request_overrides: Dict[str, Any]=None, prefill_messages: List[Dict[str, Any]]=None, platform: '
+             'str=None, user_id: str=None, user_id_alt: str=None, user_name: str=None, chat_id: str=None, '
+             'chat_name: str=None, chat_type: str=None, thread_id: str=None, gateway_session_key: str=None, '
+             'skip_context_files: bool=False, load_soul_identity: bool=False, skip_memory: bool=False, '
+             'skip_background_review: bool=False, session_db=None, parent_session_id: str=None, iteration_budget: '
+             "'IterationBudget'=None, run_budget_seconds: Optional[float]=None, fallback_model: Dict[str, "
+             'Any]=None, credential_pool=None, checkpoints_enabled: bool=False, checkpoint_max_snapshots: int=20, '
+             'checkpoint_max_total_size_mb: int=500, checkpoint_max_file_size_mb: int=10, pass_session_id: '
+             'bool=False, requested_provider: str=None, capabilities: Optional[Dict[str, bool]]=None, cwd: '
+             'Optional[str]=None, side_agent: bool=False, memory_manager=None, tool_result_metadata_callback: '
+             'Optional[Callable[..., dict]]=None'),
+            None,
+            '24e81445f633b0cb893b31c8bf8308c91350eb1f2b1c10ea9ba8d61ad41b1ddc'),
+    },
+    'run_agent.py': {
+        'AIAgent.__init__': (
+            ('self, base_url: str=None, api_key: str=None, provider: str=None, api_mode: str=None, acp_command: '
+             'str=None, acp_args: list[str] | None=None, command: str=None, args: list[str] | None=None, model: '
+             "str='', max_iterations: int=sys.maxsize, tool_delay: float=None, enabled_toolsets: List[str]=None, "
+             'disabled_toolsets: List[str]=None, save_trajectories: bool=False, verbose_logging: bool=False, '
+             "quiet_mode: bool=False, tool_progress_mode: str='all', ephemeral_system_prompt: str=None, "
+             "log_prefix_chars: int=100, log_prefix: str='', providers_allowed: List[str]=None, providers_ignored:"
+             ' List[str]=None, providers_order: List[str]=None, provider_sort: str=None, '
+             'provider_require_parameters: bool=False, provider_data_collection: str=None, '
+             'openrouter_min_coding_score: Optional[float]=None, session_id: str=None, tool_progress_callback: '
+             'callable=None, tool_start_callback: callable=None, tool_complete_callback: callable=None, '
+             'thinking_callback: callable=None, reasoning_callback: callable=None, clarify_callback: '
+             'callable=None, read_terminal_callback: callable=None, read_preview_callback: callable=None, '
+             'drive_preview_callback: callable=None, read_window_below_callback: callable=None, '
+             'connection_callback: callable=None, tour_callback: callable=None, step_callback: callable=None, '
+             'stream_delta_callback: callable=None, interim_assistant_callback: callable=None, tool_gen_callback: '
+             'callable=None, status_callback: callable=None, notice_callback: callable=None, '
+             'notice_clear_callback: callable=None, event_callback: Optional[Callable[[str, dict], None]]=None, '
+             'reaction_callback: Optional[Callable[[str], None]]=None, max_tokens: int=None, reasoning_config: '
+             'Dict[str, Any]=None, service_tier: str=None, request_overrides: Dict[str, Any]=None, '
+             'prefill_messages: List[Dict[str, Any]]=None, platform: str=None, user_id: str=None, user_id_alt: '
+             'str=None, user_name: str=None, chat_id: str=None, chat_name: str=None, chat_type: str=None, '
+             'thread_id: str=None, gateway_session_key: str=None, skip_context_files: bool=False, '
+             'load_soul_identity: bool=False, skip_memory: bool=False, skip_background_review: bool=False, '
+             "session_db=None, parent_session_id: str=None, iteration_budget: 'IterationBudget'=None, "
+             'run_budget_seconds: Optional[float]=None, fallback_model: Dict[str, Any]=None, credential_pool=None,'
+             ' checkpoints_enabled: bool=False, checkpoint_max_snapshots: int=20, checkpoint_max_total_size_mb: '
+             'int=500, checkpoint_max_file_size_mb: int=10, pass_session_id: bool=False, requested_provider: '
+             'str=None, capabilities: Dict[str, bool] | None=None, cwd: str | None=None, side_agent: bool=False, '
+             'memory_manager=None, tool_result_metadata_callback: Optional[Callable[..., dict]]=None'),
+            None,
+            'a27921f79931c73411b3365c173c4f3e58917aefffbda1e79783fd2a5b7cf385'),
+        'AIAgent.close': (
+            ('self'),
+            'None',
+            'd30df6ba79ed730261abc8973319dddcfdb442ecd07c7033ba80a30a0df249c5'),
+    },
+    'tools/delegate_tool.py': {
+        '_build_child_agent': (
+            ('task_index: int, goal: str, context: Optional[str], toolsets: Optional[List[str]], model: '
+             'Optional[str], max_iterations: int, task_count: int, parent_agent, override_provider: '
+             'Optional[str]=None, override_base_url: Optional[str]=None, override_api_key: Optional[str]=None, '
+             'override_api_mode: Optional[str]=None, override_request_overrides: Optional[Dict[str, Any]]=None, '
+             'override_acp_command: Optional[str]=None, override_acp_args: Optional[List[str]]=None, routing_cfg: '
+             "Optional[Dict[str, Any]]=None, role: str='leaf'"),
+            None,
+            'b32c188da5f322e03285711ffa18520d65278f0edb636bb69aada9571ebf9ae5'),
+    },
+    'agent/secret_scope.py': {
+        'current_secret_scope_home': (
+            (''),
+            'Optional[str]',
+            '1e9bb7e35c02dcac823465bc5683cec951a9caf0d0a9de8d9c3f42b5240c8bd5'),
+        'build_profile_secret_scope': (
+            ('hermes_home: Path'),
+            'Dict[str, str]',
+            '6d74a2a909aa278f40b741c8f6cefd6b35bbcd32b7fabb60aba9043fbdb038a1'),
+        'set_secret_scope': (
+            ('secrets: Optional[Mapping[str, str]], *, profile_home: Optional[str]=None'),
+            'Token',
+            'b03ae1c99d79c007893d6cac6cefe35225d47abec486d7949ae9c6df4146c0e0'),
+        'reset_secret_scope': (
+            ('token: Token'),
+            'None',
+            'b9fca45295012a6a357c2798774479f293d9d0aa0ad815eabb4912b3a4b4a35a'),
+    },
+    'hermes_constants.py': {
+        'set_hermes_home_override': (
+            ('path: str | Path | None'),
+            'Token',
+            'b79f4b1af9d55ff229bffbd6ae1ef92f8dd84a41f5efd8df9f47e9b2111a16d0'),
+        'get_hermes_home_override': (
+            (''),
+            'str | None',
+            '08a5940033cc96d04c96b6c8f1131f1ab5cb4c224f04603a550f839530ee8cc2'),
+        'reset_hermes_home_override': (
+            ('token: Token'),
+            'None',
+            'cf9bfcd238776707dda832877e43e06204b016ad44143361e87f9f832731549b'),
+    },
+    'cron/scheduler.py': {
+        '_launch_external_cron_worker': (
+            ('job: dict'),
+            'bool',
+            'f4ee0cdb1cb564bcfb6e1bd4cbac48413a2e5f44092a752e69e331c63420cac4'),
+        '_run_external_worker_payload': (
+            ('payload_path: Path, ack_path: Path'),
+            'bool',
+            '44d2d5aaf7c9b0917d90d2652633bd1f948f558e2623e49627cbe80d91e3f5c8'),
+    },
+}
+
+# context-local 저장소와 cron의 module-global sys 조회, child 진입점도 함수 밖 계약이다.
+BODYLESS_MANAGED_MODULE_NODES = {
+    'agent/secret_scope.py': {
+        '_SECRET_SCOPE': 'e1d8ad0021ac4a95106cc9ca4eebf23585a9ed588e615423ecc9d03eb47924e8',
+        '_BoundScope': '77f0d9930ea6754d082810686e2be8e15c76712533f7767d07ca758f18c4d910',
+    },
+    'hermes_constants.py': {
+        '_HERMES_HOME_OVERRIDE': '98eaa1371fae960a502aed95e91d5d64b69e64a1d94702c00db8b5fcc309fd7c',
+        '_UNSET': '6eaf8669f559cd824f5088f162c8ea4f1edab6686f51f7fcea9fbaa6ad635ccb',
+    },
+    'cron/scheduler.py': {
+        'import sys': 'f7252e3c1dbe1d5edf1f34c020a58a05b55f706b2c1d9479eae91f9a9d4be275',
+        '__main__': 'a95554d31aa1030d555af64cc3ff46e9f34e686f0ff04edda0c53c1853107a1d',
+    },
+}
 
 # 대시보드가 요청마다 이 import 를 다시 해야 바꿔 끼운 함수가 쓰인다.
 # 모듈 머리에서 한 번만 import 하게 바뀌면 plugin 이 감싼 것이 쓰이지 않고 토큰 경로가 모두 닫힌다.

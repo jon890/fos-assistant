@@ -830,6 +830,37 @@ core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바�
 설치 실패와 진단 I/O 실패는 다르다. I/O 실패는 `None`이며 기존 오류 결과·session 저장·실패 실행 기록을 유지한다.
 이미 만들어진 부모 execution은 failed로 남길 수 있다. 범용 reservation·new run·provider 횟수 0을 요구하지 않는다.
 
+### 관리 bootstrap의 추가 내부 의존
+
+아래 계약은 private 관리 owner가 사용하는 일반 내부 경계다. 공개 writer 설치 API의 인자와
+`BODYLESS_REQUEST_FILES`의 다섯 파일 지문에는 추가하지 않는다.
+`hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 고정 공식 commit의 정확한
+위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
+`BODYLESS_MANAGED_MODULE_NODES`는 문맥 저장소와 cron module의 `sys` import·child 진입점을 선언한다.
+AST 지문은 행 번호·공백·주석을 제외하며 함수 본문의 변경도 재검토 대상으로 삼는다.
+
+| 내부 경계 | 관리 owner가 기대는 동작 |
+| --- | --- |
+| `agent.agent_init.init_agent` | 실제 초기화 경계다. owner는 정확한 agent class와 객체 identity를 확인해 먼저 등록하고, 초기화 실패 때 해제한다 |
+| `run_agent.AIAgent.__init__`·`close` | constructor는 호출 안에서 initializer를 import한다. close wrapper는 원래 함수를 부르며 성공·실패 모두에서 등록을 해제한다 |
+| `tools.delegate_tool._build_child_agent` | 명시 `parent_agent`를 받아 같은 interpreter의 `AIAgent`를 만든다. owner는 등록된 부모 identity에서 자식 capability를 전달한다 |
+| `agent.secret_scope` | `build_profile_secret_scope`에 명시 home을 주고 `set_secret_scope`에 그 home을 함께 기록한다. `current_secret_scope_home`으로 확인하고 token을 `reset_secret_scope`로 복원한다 |
+| `hermes_constants` | home override의 get·set·reset은 context-local이다. set이 준 token으로 이전 문맥을 복원한다 |
+| `cron.scheduler` | parent는 module-global `sys.executable`로 child argv를 만들고 module 이름·payload·ack 인자를 전달한다. 환경을 정리해 spawn하고 ack와 조기 종료를 확인한다. child는 payload를 읽고 소유권 인수·ack 뒤 job을 실행하며 문맥 token을 복원한다 |
+
+resolver는 약한 registry에 등록된 실제 agent identity만 읽는다. 등록되지 않은 부모와 다른 profile의
+capability, 현재 secret/home 문맥과 맞지 않는 capability는 생성 전에 거절한다.
+owner는 생성·close 실패와 순환 객체 수거 때 등록을 해제하고, profile plugin reload/unload와
+bootstrap 재import 뒤에도 같은 process owner identity를 유지해야 한다.
+thread로 문맥을 전달할 때는 명시적으로 복사하며 전역 home을 대체 값으로 쓰지 않는다.
+
+cron adapter는 scheduler module의 executable 조회만 proxy로 제한한다. 이 proxy는 공식 Hermes API가 아니다.
+프로세스 전체 `sys.executable`과 subprocess 전역을 교체하지 않는다.
+release 봉인과 런타임 callable·signature·code 대조, 관리 진입점 연결은 private owner의 책임이다.
+공개 source 계약 시험은 전체 `AIAgent`·실제 parent·provider 네트워크를 실행하지 않는다.
+private prototype의 합성 검증과 실제 image 시험·활성화 수락도 이 source 검사로 대체하지 않는다.
+공개 변경의 actual main 반영과 private 활성화는 아직 완료되지 않았다.
+
 ### resolver와 파일 쓰기
 
 `resolver(agent) -> str | None`은 bootstrap이 검증한 agent 바인딩의 기존 절대 디렉터리를 반환한다.

@@ -55,3 +55,5 @@ HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_hermes_contract.py' -v
 HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
   python3 -I -m unittest discover -s hermes/tests -p 'test_bodyless_request_contract.py' -v
+HERMES_SOURCE="${source_dir}" HERMES_CONTRACT_REQUIRED=1 \
+  python3 -I -m unittest discover -s hermes/tests -p 'test_bodyless_managed_contract.py' -v

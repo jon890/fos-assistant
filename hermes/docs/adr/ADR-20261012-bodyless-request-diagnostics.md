@@ -36,6 +36,13 @@ writer는 모든 부모를 `O_NOFOLLOW` dirfd로 열고 leaf를 `O_EXCL`, `O_NOF
 지원 형식과 불완전 집계의 의미는 [본문 없는 요청 진단](../hermes-contract.md#본문-없는-요청-진단)이 갖는다.
 
 내부 교체는 공식 upstream API가 아니다. 고정 source에서 helper code·signature와 다섯 파일 지문을 검사한다.
+관리 owner의 agent 초기화·constructor·close·delegate와 명시 secret/home 문맥,
+cron parent·child 진입점도 같은 고정 source의 별도 일반 계약으로 선언한다.
+constructor의 호출 시점 import와 명시 부모 identity가 있어야 정상 lifecycle에서 바인딩을 전달하고 해제할 수 있다.
+profile 설정과 Runs API는 이 identity 수명을 제어하지 못하고 plugin hook은 필수 early 설치를 보장하지 못한다.
+따라서 ADR-001의 예외 범위를 이 관리 경계까지 확장하되 core 파일과 프로세스 전역은 변경하지 않는다.
+cron module의 executable 조회만 제한하는 private proxy도 공식 Hermes API가 아니다.
+추가 선언은 공개 설치 API와 다섯 writer 파일 지문을 바꾸지 않는다.
 관리 manifest는 source와 writer bundle·adapter·interpreter·image를 독립적으로 봉인해야 한다.
 기동 중 관측한 자기 hash나 profile이 바꿀 수 있는 기대값은 신뢰 기준으로 쓰지 않는다.
 설치 실패 때 bootstrap은 credential과 요청을 읽거나 main을 시작하지 않고 고정 오류로 끝낸다.
@@ -47,6 +54,9 @@ writer는 모든 부모를 `O_NOFOLLOW` dirfd로 열고 leaf를 `O_EXCL`, `O_NOF
 오류·reason canary, 입력 불변, 임의 객체·cycle·깊이·파트·검사량 제한, 0600·symlink·충돌·동시 profile·I/O 실패를 확인한다.
 공식 source의 helper code와 lazy forward, 세 호출부를 분리 실행해 입력과 실패 분류·session 저장 결과를 대조한다.
 함수 분리 실행은 전체 Hermes import나 실제 provider 실행을 대신하지 않는다.
+추가 관리 의존은 정확한 signature·함수 AST·context-local 저장소·cron module 진입점의 source 검사다.
+initializer의 전역 alias 전환, 부모 인자 삭제, 전역 home fallback, 프로세스 전역 interpreter 교체와
+ack 게시 제거의 반례를 거절한다. 전체 agent와 실제 parent·provider 네트워크는 이 검사에서 실행하지 않는다.
 
 현재 source와 설치 plugin의 알려진 alias 범위에 한정한다. 기존 직접 callable alias와 설치 뒤 helper 변조는 우회 반례다.
 재설치는 identity 불일치를 검출하지만 실행 중 악성 코드와 임의 host 전체를 보호하는 보안 경계가 아니다.
@@ -54,3 +64,4 @@ writer는 모든 부모를 `O_NOFOLLOW` dirfd로 열고 leaf를 `O_EXCL`, `O_NOF
 SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 별도 수락 조건이다.
 이 writer가 새 진단을 가리는 것만으로 SDK·framework·session·trajectory 전체가 본문 없이 남는다고 판정하지 않는다.
 운영 배포와 실제 Hermes 왕복 전까지 운영 보호 완료로 보고하지 않는다.
+private prototype의 합성 검증은 별도 근거이며 공개 actual main 반영과 private 활성화 수락은 아직 남아 있다.
