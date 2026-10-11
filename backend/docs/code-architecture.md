@@ -356,6 +356,10 @@ MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
 **검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@Tag("mysql")` 검사는 예외다.
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
+
+`ContentDraftSnapshotJpaMigrationTest`는 공유 컨텍스트를 그대로 쓰며, 실제 Flyway·JPA 기동은 별도 H2 DB의 애플리케이션을 직접 띄워 검사 안에서 닫는다.
+기동용 컨텍스트를 Spring 검사 캐시에 넣으면 캐시에서 밀려난 `create-drop` 컨텍스트가 다른 검사의 공유 스키마를 지울 수 있다.
+`ContentDraftSnapshotContextIsolationTest`는 공유 검사와 claim 검사 컨텍스트가 이미 떠 있을 때도 기동과 종료 뒤에도 두 컨텍스트에서 공유 스키마를 읽을 수 있는지 확인한다.
 - 기반에 있는 타입은 `@Autowired` 로 받는다.
 - 설정 값을 바꿔야 하면 아래 「설정 바꾸기」 를 쓴다.
 - mock 이 필요하던 빈은 기반의 spy 로 올리고 `doReturn(...).when(spy)` 로 바꾼다. 정하지 않은 메서드는 실제로 돈다.
@@ -692,3 +696,17 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 줄은 `bytes` 가 큰 순서다.
 
 루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
+
+### 원고 snapshot의 참가 경계
+
+chat의 `ContentDraftSnapshots`가 preview 저장과 현재 원본 재검사를 소유한다.
+`ContentDraftSnapshotInputs`는 기존 원고·revision·asset 저장소와 복호화·reader를 사용하며 기존 `ContentDraftService`의 helper를 넓히지 않는다.
+`ContentDraftBindingAccess`는 DB 권한 검사와 잠금 밖의 선언 준비를 나누고 connector의 `ConnectorContentDraftBindings`가 구현한다.
+`ContentDraftBindingStamp`에는 식별자·수정 시각·profile·connector ID·정책 지문만 담는다. catalog 전체와 비밀값은 넘기지 않는다.
+`HttpContentDraftSnapshotClient`는 제한된 서비스 HTTP만 맡고, chat의 hash 검증은 요청과 응답 전체를 대조한다.
+독립 조회는 coordinator에 한 번 진입한다. 참가 API는 MANDATORY와 `requireParticipant`를 모두 확인한다.
+compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메인·port를 이유로 패키지 순서나 기존 구조 규칙을 바꾸지 않는다.
+참가 호출자는 밖에서 준비한 정책 포함 stamp를 반환 입력의 binding과 명시적으로 대조한 뒤 사용한다.
+참가 함수만으로 현재 catalog를 검증했다고 판단하지 않는다. 원격 catalog와 DB commit은 원자적이지 않다.
+`ContentDraftAuthorizationHash`는 서버의 캡처 값으로 권한 지문을 계산하여 같은 내용의 재사용 범위를 구별한다.
+저장된 캡처 값과 현재 권한·원본 검사를 유지하며 기존 행의 지문이나 캡처 값은 갱신하지 않는다.
