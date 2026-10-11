@@ -1104,6 +1104,61 @@ class SkillServiceTest {
         assertThat(SKILL_ROOT.resolve(OWNED_PROFILE)).isEmptyDirectory();
     }
 
+    @Test
+    @DisplayName("이전 버전 쓰기가 실패해도 새 본문이 게시되고 저장 응답의 이전 시각은 비어 있다")
+    void savingSucceedsWhenPreviousWriteFails() throws IOException {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        Files.writeString(SKILL_ROOT.resolve(OWNED_PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR), "막힌 경로");
+        clearInvocations(skillClient);
+
+        String changed = skillMd("weekly-plan") + "\n고침";
+        SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", changed, List.of());
+
+        assertThat(saved.body()).isEqualTo(changed);
+        assertThat(saved.previousSavedAt()).isNull();
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd()).isEqualTo(changed);
+        verify(skillClient).publish(eq(OWNED_PROFILE), anyList(), any(), anyString());
+        assertThat(applicationEvents.stream(SkillsChanged.class)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("이전 시각 파일이 손상돼도 원문 읽기는 성공하지만 엄격한 되돌리기는 실패한다")
+    void readingSucceedsWithNullPreviousTimeButRestoreRejectsCorruption() throws IOException {
+        skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        String changed = skillMd("weekly-plan") + "\n고침";
+        skills.save(OWNER, OWNED, "weekly-plan", changed, List.of());
+        Files.writeString(SKILL_ROOT.resolve(OWNED_PROFILE)
+                .resolve(PreviousSkillStore.PREVIOUS_DIR).resolve("weekly-plan")
+                .resolve(PreviousSkillStore.SAVED_AT), "손상된 시각");
+        clearInvocations(skillClient);
+
+        SkillDetail detail = skills.read(OWNER, OWNED, "weekly-plan");
+
+        assertThat(detail.body()).isEqualTo(changed);
+        assertThat(detail.previousSavedAt()).isNull();
+        assertCode(() -> skills.restorePrevious(OWNER, OWNED, "weekly-plan"), ErrorCode.INTERNAL_ERROR);
+        assertThat(store.readCurrent(OWNED_PROFILE).get("weekly-plan").skillMd()).isEqualTo(changed);
+        verify(skillClient, never()).publish(anyString(), anyList(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("이전 버전 삭제가 실패해도 새 스킬 저장과 기존 스킬 삭제의 게시와 사건은 성공한다")
+    void savingAndDeletingSucceedWhenPreviousDeleteFails() throws IOException {
+        skills.save(OWNER, OWNED, "shopping", skillMd("shopping"), List.of());
+        Files.writeString(SKILL_ROOT.resolve(OWNED_PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR), "막힌 경로");
+
+        SkillDetail saved = skills.save(OWNER, OWNED, "weekly-plan", skillMd("weekly-plan"), List.of());
+        assertThat(saved.previousSavedAt()).isNull();
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping", "weekly-plan");
+        clearInvocations(skillClient);
+
+        skills.delete(OWNER, OWNED, "weekly-plan");
+
+        assertThat(store.readCurrent(OWNED_PROFILE)).containsOnlyKeys("shopping");
+        verify(skillClient).publish(eq(OWNED_PROFILE), anyList(), any(), anyString());
+        assertThat(applicationEvents.stream(SkillsChanged.class)).hasSize(3);
+    }
+
     /** {@code skill-01} 부터 이름을 붙인 올린 스킬 {@code count} 개를 서비스를 거치지 않고 게시된 버전으로 둔다. */
     private void publishUploaded(int count) {
         Map<String, SkillBundle> bundles = new LinkedHashMap<>();

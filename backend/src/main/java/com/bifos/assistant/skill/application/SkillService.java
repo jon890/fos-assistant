@@ -82,6 +82,7 @@ public class SkillService {
     private final AgentConnectorBindings connectorBindings;
     private final SkillStore store;
     private final PreviousSkillStore previousStore;
+    private final PreviousSkillVersions previousVersions;
     private final SkillPublisher publisher;
     private final SkillUsageQuery usage;
     private final ApplicationEventPublisher events;
@@ -185,7 +186,7 @@ public class SkillService {
         if (bundle == null) {
             throw notFound();
         }
-        return detailOf(bundle, previousSavedAt(profile, name));
+        return detailOf(bundle, previousVersions.savedAt(profile, name));
     }
 
     /**
@@ -296,41 +297,11 @@ public class SkillService {
         publishVersion(user, agent, next, withScripts);
         events.publishEvent(new SkillsChanged(agent.id()));
         if (replaced != null) {
-            writePreviousQuietly(profile, replaced);
+            previousVersions.write(profile, replaced);
         } else {
-            deletePreviousQuietly(profile, bundle.name());
+            previousVersions.delete(profile, bundle.name());
         }
-        return detailOf(bundle, previousSavedAt(profile, bundle.name()));
-    }
-
-    private void writePreviousQuietly(String profile, SkillBundle replaced) {
-        try {
-            previousStore.writePrevious(profile, replaced);
-        } catch (RuntimeException ex) {
-            log.warn("바뀌기 전 스킬을 이전 버전으로 남기지 못했다 profile={} skill={}", profile, replaced.name(), ex);
-        }
-    }
-
-    /** 게시가 끝난 뒤 이전 버전을 지운다. 실패해도 저장과 지우기를 실패로 바꾸지 않고 경고 로그만 남긴다. */
-    private void deletePreviousQuietly(String profile, String name) {
-        try {
-            previousStore.deletePrevious(profile, name);
-        } catch (RuntimeException ex) {
-            log.warn("스킬의 이전 버전을 지우지 못했다 profile={} skill={}", profile, name, ex);
-        }
-    }
-
-    /**
-     * 이전 버전을 남긴 시각이다. 남긴 시각 파일만 읽는다. 없거나 읽지 못하면 {@code null} 이고 읽기와 저장을 막지
-     * 않는다.
-     */
-    private Instant previousSavedAt(String profile, String name) {
-        try {
-            return previousStore.previousSavedAt(profile, name).orElse(null);
-        } catch (RuntimeException ex) {
-            log.warn("스킬의 이전 버전을 읽지 못했다 profile={} skill={}", profile, name, ex);
-            return null;
-        }
+        return detailOf(bundle, previousVersions.savedAt(profile, bundle.name()));
     }
 
     /**
@@ -360,7 +331,7 @@ public class SkillService {
         } else {
             publishVersion(user, agent, remaining, false);
         }
-        deletePreviousQuietly(profile, name);
+        previousVersions.delete(profile, name);
         events.publishEvent(new SkillsChanged(agent.id()));
     }
 

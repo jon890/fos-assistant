@@ -143,6 +143,18 @@ class SkillControllerTest {
     }
 
     @Test
+    @DisplayName("이전 시각이 없는 상세 읽기는 원문과 nullable 시각을 그대로 응답한다")
+    void readingDetailKeepsNullPreviousTime() throws Exception {
+        when(skills.read(OWNER, "dad", "weekly-plan"))
+                .thenReturn(new SkillDetail("weekly-plan", "이번 주 계획", "원문", List.of(), null));
+
+        mvc.perform(get("/api/v1/agents/dad/skills/weekly-plan"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.body").value("원문"))
+                .andExpect(content().string(containsString("\"previousSavedAt\":null")));
+    }
+
+    @Test
     @DisplayName("이전 버전으로 되돌리기는 상세 모양과 이전 버전 시각을 주고 이전 버전이 없으면 404 다")
     void restorePreviousGivesDetailWithPreviousSavedAtAndMissingIs404() throws Exception {
         when(skills.restorePrevious(OWNER, "dad", "weekly-plan"))
