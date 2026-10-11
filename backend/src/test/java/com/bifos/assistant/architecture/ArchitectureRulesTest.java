@@ -96,6 +96,13 @@ class ArchitectureRulesTest {
 
 
     @Test
+    @DisplayName("MemoryCollection 생성 시각만 지정한 listener 와 시계 선언을 쓴다")
+    void checksAuditingDeclarations() {
+        ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK.check(MAIN);
+    }
+
+
+    @Test
     @DisplayName("기존 층 규칙은 기능별 하위 패키지의 정상 흐름도 허용한다")
     void acceptsFeatureLayerFixture() throws IOException {
         JavaClasses fixture = compileFixture(

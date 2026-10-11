@@ -3,6 +3,7 @@ package com.bifos.assistant.memory.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.List;
@@ -10,6 +11,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
  * 그룹이 쓰는 collection 하나다(ADR-052).
@@ -19,14 +22,14 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(name = "memory_collection")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MemoryCollection {
 
     /** 그룹마다 처음부터 두는 collection 의 key 다. 순서가 화면 순서다. */
-    public static final List<String> DEFAULT_KEYS =
-            List.of("core", "career", "learning", "health", "finance", "home", "identity");
+    public static final List<String> DEFAULT_KEYS = List.of("core", "career", "learning", "health", "finance", "home", "identity");
 
     private static final List<String> DEFAULT_NAMES = List.of("기본", "커리어", "학습", "건강", "재무", "집", "신원");
 
@@ -39,25 +42,28 @@ public class MemoryCollection {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    @CreatedDate
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    private MemoryCollection(Long groupId, String key, String displayName, int sortOrder, Instant now) {
+
+    private MemoryCollection(Long groupId, String key, String displayName, int sortOrder) {
         this.id = new MemoryCollectionId(groupId, key);
         this.displayName = displayName;
         this.sortOrder = sortOrder;
-        this.createdAt = now;
     }
 
+
     /** 한 그룹의 기본 collection 줄들이다. */
-    public static List<MemoryCollection> defaultsFor(Long groupId, Instant now) {
+    public static List<MemoryCollection> defaultsFor(Long groupId) {
         return DEFAULT_KEYS.stream()
-                .map(key -> {
-                    int index = DEFAULT_KEYS.indexOf(key);
-                    return new MemoryCollection(groupId, key, DEFAULT_NAMES.get(index), index + 1, now);
-                })
-                .toList();
+            .map(key -> {
+                int index = DEFAULT_KEYS.indexOf(key);
+                return new MemoryCollection(groupId, key, DEFAULT_NAMES.get(index), index + 1);
+            })
+            .toList();
     }
+
 
     public String key() {
         return id.key();
