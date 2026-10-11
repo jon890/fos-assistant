@@ -58,6 +58,12 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 
 **`mcp` 는 `orchestration` 을 부르고, `orchestration` 은 `mcp` 를 import 하지 않는다.**
 위임 서비스는 `McpCaller` 를 받지 않고 요청자와 origin 실행을 따로 받는다.
+
+`AgentDelegationService`는 위임 권한과 깊이·한도 판정, 같은 호출의 재조회, 루트 잠금과 제출 마감 시각을 소유한다.
+같은 패키지의 package-private `DelegationRuns`가 실제 실행과 실행 중인 위임의 등록·조회·중지, 서버 전체 자리와 종료 사건 발행을 맡는다.
+서비스의 공개 메서드와 생성자, 트랜잭션 경계 및 `BackgroundTasks` 실행기는 그대로 쓴다.
+실행 줄을 등록한 뒤 요청 스레드를 깨우며, 종료 때는 등록 해제, 루트 turn의 run 해제, 종료 표시, 자리 반환, 제출 대기 종료, 종료 사건 발행 순서를 지킨다.
+사용자 실행 한도 판정은 `DelegationRuns.isUserBusy` 하나를 서비스와 실행 경로가 함께 쓴다.
 두 패키지가 서로를 import 하면 한쪽을 바꿀 때 다른 쪽의 타입을 함께 바꿔야 하기 때문이다.
 검사: `ArchitectureRules.ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP`, `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 

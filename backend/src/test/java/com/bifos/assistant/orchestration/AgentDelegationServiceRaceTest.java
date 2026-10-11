@@ -2,6 +2,9 @@ package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,6 +27,8 @@ import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
@@ -48,6 +53,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * 위임 시작이 데이터베이스와 겹치는 자리를 대역으로 고정한다(ADR-017).
@@ -68,6 +74,7 @@ class AgentDelegationServiceRaceTest {
     private final CurrentUser user = new CurrentUser(1L, "race-a@example.com", "가", 1L, UserRole.MEMBER);
     private final AgentExecution origin = mock(AgentExecution.class);
     private final ProactiveCheckGuard checkGuard = mock(ProactiveCheckGuard.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     /** 서비스가 위임마다 읽는 설정이다. 서버 전체 한도를 바꾸는 검사만 새 값을 넣는다. */
     private final AtomicReference<DelegationProperties> settings = new AtomicReference<>(withMaxActive(1));
 
@@ -110,7 +117,7 @@ class AgentDelegationServiceRaceTest {
                 },
                 mock(TurnCancellation.class),
                 mock(HermesRunsClient.class),
-                event -> {},
+                events,
                 checkGuard,
                 Clock.systemUTC(),
                 backgroundTasks);
@@ -195,6 +202,53 @@ class AgentDelegationServiceRaceTest {
                 .isNull();
         assertThat(next.executionId()).as("다음 요청: %s", next).isEqualTo(78L);
         assertThat(next.status()).isEqualTo(ExecutionStatus.RUNNING);
+    }
+
+    @Test
+    @DisplayName("사용자 실행 한도는 BUSY 로, 다른 시작 실패는 SUBMIT FAILED 로 답하고 모두 자리를 돌려준다")
+    void distinguishesUserBusyFromSubmitFailureAndReturnsSlot() {
+        delegations = service(completingTasks());
+        when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenThrow(new ApiException(ErrorCode.USER_BUSY, "사용자 한도"))
+                .thenThrow(new IllegalStateException("실행 줄 저장 실패"));
+
+        DelegationResult busy = delegations.delegate(user, origin, key("call_user_busy"), WORKER, "사용자 한도");
+        DelegationResult failed = delegations.delegate(user, origin, key("call_row_failed"), WORKER, "줄 저장 실패");
+
+        assertThat(busy.failure()).isEqualTo(DelegationResult.Failure.BUSY);
+        assertThat(busy.executionId()).isNull();
+        assertThat(failed.failure()).isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
+        assertThat(failed.executionId()).isNull();
+        startsWithRow(79L);
+        assertThat(delegations.delegate(user, origin, key("call_after_row_failure"), WORKER, "다음 요청").executionId())
+                .isEqualTo(79L);
+    }
+
+    @Test
+    @DisplayName("종료 사건 발행이 실패해도 실행 자리를 돌려주고 다음 위임을 받는다")
+    void returnsSlotWhenFinishedEventCannotBePublished() {
+        delegations = service(completingTasks());
+        doThrow(new IllegalStateException("종료 사건 발행 실패")).when(events).publishEvent(any(Object.class));
+        startsWithRow(80L);
+
+        DelegationResult first = delegations.delegate(user, origin, key("call_event_failed"), WORKER, "첫 요청");
+        startsWithRow(81L);
+        DelegationResult next = delegations.delegate(user, origin, key("call_after_event_failure"), WORKER, "다음 요청");
+
+        assertThat(first.executionId()).isEqualTo(80L);
+        assertThat(next.executionId()).isEqualTo(81L);
+        assertThat(next.failure()).isNull();
+    }
+
+    /** 실행 종료와 다음 요청 사이의 순서를 고정한다. 실제 스레드 경합은 다른 검사에서 본다. */
+    private BackgroundTasks completingTasks() {
+        BackgroundTasks tasks = mock(BackgroundTasks.class);
+        when(tasks.start(anyString(), any())).thenAnswer(invocation -> {
+            Runnable task = invocation.getArgument(1);
+            task.run();
+            return Thread.currentThread();
+        });
+        return tasks;
     }
 
     @Test
@@ -332,14 +386,13 @@ class AgentDelegationServiceRaceTest {
     private void startsWithRow(Long executionId) {
         AgentExecution row = mock(AgentExecution.class);
         when(row.id()).thenReturn(executionId);
-        when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenAnswer(invocation -> {
+        doAnswer(invocation -> {
                     Consumer<AgentExecution> onStarted = invocation.getArgument(6);
                     BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
                     onStarted.accept(row);
                     onSubmitted.accept(row, "run-" + executionId);
                     return ChildResult.succeeded(executionId, "답");
-                });
+                }).when(children).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     private static DelegationKey key(String toolCallId) {
