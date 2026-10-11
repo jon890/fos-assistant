@@ -9,6 +9,7 @@ import os
 from .common import (CONNECTOR_HOST_MARKER, MANAGED_MARKER, _env_value, _env_line_key,
                      _missing_profile, _profile_rejection)
 from .connector_guard import _strict_json
+from .connector_diagnostics import snapshot_diagnostics_scope
 from .connector_guard_validation import _same_json
 from .connector_manifest import _connector_manifest, _entry_mode
 from .connector_mcp import _mcp_sdk_problem
@@ -100,7 +101,7 @@ async def _run_connector_snapshot(manifest, args, env):
     params = StdioServerParameters(command=server["command"],
                                   args=[*server["args"], SNAPSHOT_FLAG, "compile"], env=env)
     tool = manifest["snapshot"]["compile_tool"]
-    with open(os.devnull, "w", encoding="utf-8") as sink:
+    with snapshot_diagnostics_scope(), open(os.devnull, "w", encoding="utf-8") as sink:
         async with stdio_client(params, errlog=sink) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()

@@ -96,8 +96,13 @@ start·status와 미지원 operation은 자식 실행 전 409로 끝나며 일�
 오류는 본문·경로·cause·stderr 없는 `{ok:false,error}`이며 compile timeout은 504다.
 전체 MCP 왕복은 5초로 제한하고 기존 call·execute와 동시 호출 4개 한도를 공유한다. 자동 재전송은 없다.
 adapter 자체는 원고와 인자·결과를 파일이나 로그에 남기지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
-Python MCP SDK는 잘못된 stdout을 `logger.exception`으로 기록하며 현재 그 본문은 가리지 않는다.
-SDK와 프레임워크 진단 전체의 본문 가림은 아직 구현·검증되지 않았다.
+Python MCP SDK의 compile 진단은 `connector_diagnostics.py`가 호출별 ContextVar로 가린다.
+실제 emission logger 세 곳에 영구 Filter를 설치하고 stdio와 session 정리가 끝난 뒤 scope를 해제한다.
+scope 안에서는 msg, args, 예외, stack과 formatter의 cached message를 제거해 고정 문자열만 남긴다.
+logger 이름, ERROR/WARNING 등급과 record 수, 정상 RPC 결과는 유지하며 scope 밖 로그는 바꾸지 않는다.
+지원 source와 필터 상태를 확인하지 못하면 자식 생성 전 고정 unavailable 503으로 끝난다.
+정확한 SDK source 계약과 갱신 절차는 [Hermes 계약](../../hermes/docs/hermes-contract.md#compile-전용-sdk-진단)이 갖는다.
+framework, 기존 gateway task, trajectory와 session 저장, 공개 A1 request_dump writer는 이 보호의 범위 밖이다.
 renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거나 반환하지 않는다.
 
 | UTF-8 compact JSON 상한 | 검사 경계 |
@@ -113,8 +118,9 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 사진의 권한과 지문 대응은 호출자가 검증한다. compile의 파일 검사만으로 실제 provider의 사진 identity를 증명하지 않는다.
 합성 stdio·HTTP 검사는 Python mcp 2.0.0과 TypeScript SDK 1.28.0으로 수행한다.
 
-**본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
-후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
+**본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
+로컬 합성 시험은 잘못된 stdout과 JSONRPC·notification validation, callback 예외의 전후 본문 노출을 검사한다.
+운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
 compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다. 원고 최초 MCP 생성도 구현되어 있으며 공개 preview API·승인과 실제 네이버 저장은 후속 범위다.
 
 ## 불변 preview snapshot

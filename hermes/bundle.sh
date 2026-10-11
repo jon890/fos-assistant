@@ -90,6 +90,7 @@ FILLING=1
 mkdir -p -- "$OUT/profile-plugins"
 
 cp -- "$DASHBOARD_PLUGIN/"*.py "$DASHBOARD_PLUGIN/plugin.yaml" "$OUT/"
+cp -- "$DASHBOARD_PLUGIN/connector_diagnostics_source.json" "$OUT/"
 cp -- "$SCRIPT_DIR/decision-profile/config.yaml.template" "$OUT/decision-config.yaml.template"
 mkdir -- "$OUT/runtime"
 cp -- "$SCRIPT_DIR/runtime/"*.py "$OUT/runtime/"
