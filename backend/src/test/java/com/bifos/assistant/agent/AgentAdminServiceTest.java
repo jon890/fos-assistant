@@ -11,12 +11,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentAdminService;
+import com.bifos.assistant.agent.admin.application.AgentAdminService;
+import com.bifos.assistant.agent.admin.application.model.AgentCreateCommand;
+import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
-import com.bifos.assistant.agent.application.AgentCreateCommand;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
-import com.bifos.assistant.agent.application.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -47,13 +47,14 @@ class AgentAdminServiceTest {
     private final KnownFlows flows = mock(KnownFlows.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
 
-    private final AgentAdminService service =
-            new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, connectorBindings, Clock.systemUTC());
+    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, connectorBindings, Clock.systemUTC());
+
 
     @BeforeEach
     void setUp() {
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
     }
+
 
     @Test
     @DisplayName("그룹 공개 에이전트를 만들면 저장된 에이전트를 돌려준다")
@@ -63,18 +64,19 @@ class AgentAdminServiceTest {
         Agent created = service.create(groupCommand());
 
         assertThat(created)
-                .extracting(
-                        Agent::code,
-                        Agent::name,
-                        Agent::hermesProfile,
-                        Agent::apiBaseUrl,
-                        Agent::visibility,
-                        Agent::ownerUserId)
-                .containsExactly("group", "Group", "group-profile", API_BASE_URL, AgentVisibility.GROUP, null);
+            .extracting(
+                Agent::code,
+                Agent::name,
+                Agent::hermesProfile,
+                Agent::apiBaseUrl,
+                Agent::visibility,
+                Agent::ownerUserId)
+            .containsExactly("group", "Group", "group-profile", API_BASE_URL, AgentVisibility.GROUP, null);
         verify(agents).save(created);
         verify(endpointProbe).requireReachable(API_BASE_URL, "group-profile");
         verify(lifecycle).requireGroupSafe(API_BASE_URL, "group-profile");
     }
+
 
     @Test
     @DisplayName("이미 쓰는 코드면 VALIDATION FAILED 로 거절하고 주소가 닿는지 묻지 않는다")
@@ -82,13 +84,14 @@ class AgentAdminServiceTest {
         when(agents.findByCode("group")).thenReturn(Optional.of(mock(Agent.class)));
 
         assertThatThrownBy(() -> service.create(groupCommand()))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
         verifyNoInteractions(endpointProbe);
         verify(agents, never()).save(any(Agent.class));
     }
+
 
     @Test
     @DisplayName("지운 에이전트는 관리 목록에서 빠진다")
@@ -101,6 +104,7 @@ class AgentAdminServiceTest {
         assertThat(service.list()).containsExactly(live);
     }
 
+
     @Test
     @DisplayName("연결이 붙은 에이전트의 주인을 바꾸면 AGENT HAS CONNECTIONS 로 거절하고 저장하지 않는다")
     void rejectsOwnerChangeOfAgentWithConnections() {
@@ -111,13 +115,14 @@ class AgentAdminServiceTest {
         when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
 
         assertThatThrownBy(() -> service.update("dad", privateUpdate("new@example.com")))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.AGENT_HAS_CONNECTIONS);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.AGENT_HAS_CONNECTIONS);
 
         assertThat(agent.ownerUserId()).isEqualTo(1L);
         verify(agents, never()).save(any(Agent.class));
     }
+
 
     @Test
     @DisplayName("셸이나 파일 도구가 켜진 에이전트의 주인을 바꾸면 거절하고 주인을 그대로 둔다")
@@ -127,17 +132,18 @@ class AgentAdminServiceTest {
         when(next.id()).thenReturn(2L);
         when(users.findByEmail("next@example.com")).thenReturn(Optional.of(next));
         doThrow(new ApiException(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF, "shell is on"))
-                .when(lifecycle)
-                .requireOwnerChangeSafe(API_BASE_URL, "dad-profile");
+            .when(lifecycle)
+            .requireOwnerChangeSafe(API_BASE_URL, "dad-profile");
 
         assertThatThrownBy(() -> service.update("dad", privateUpdate("next@example.com")))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF);
 
         assertThat(agent.ownerUserId()).isEqualTo(1L);
         verify(agents, never()).save(any(Agent.class));
     }
+
 
     @Test
     @DisplayName("연결이 붙은 에이전트를 그룹으로 바꾸면 AGENT CONNECTIONS REQUIRE PRIVATE 로 거절한다")
@@ -145,16 +151,16 @@ class AgentAdminServiceTest {
         Agent agent = privateAgent(1L);
         when(connectorBindings.hasBindings(agent.id())).thenReturn(true);
 
-        assertThatThrownBy(() ->
-                        service.update("dad", new AgentUpdateCommand(true, AgentVisibility.GROUP, null, null, null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
+        assertThatThrownBy(() -> service.update("dad", new AgentUpdateCommand(true, AgentVisibility.GROUP, null, null, null)))
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
 
         assertThat(agent.visibility()).isEqualTo(AgentVisibility.PRIVATE);
         verify(agents, never()).save(any(Agent.class));
         verifyNoInteractions(lifecycle);
     }
+
 
     @Test
     @DisplayName("연결이 붙은 에이전트도 주인과 공개 범위를 그대로 두는 수정은 저장한다")
@@ -169,13 +175,14 @@ class AgentAdminServiceTest {
         verify(agents).save(agent);
     }
 
+
     @Test
     @DisplayName("주인이 그대로인 접근 변경은 셸 도구가 켜져 있어도 저장한다")
     void keepsAccessChangeWithSameOwner() {
         Agent agent = privateAgent(1L);
         doThrow(new ApiException(ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF, "shell is on"))
-                .when(lifecycle)
-                .requireOwnerChangeSafe(anyString(), anyString());
+            .when(lifecycle)
+            .requireOwnerChangeSafe(anyString(), anyString());
 
         Agent saved = service.update("dad", new AgentUpdateCommand(false, AgentVisibility.PRIVATE, null, null, null));
 
@@ -184,35 +191,38 @@ class AgentAdminServiceTest {
         verify(agents).save(agent);
     }
 
+
     private Agent privateAgent(Long ownerId) {
         Agent agent = Agent.of(
-                "dad",
-                "Dad",
-                "dad-profile",
-                API_BASE_URL,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerId,
-                Instant.now());
+            "dad",
+            "Dad",
+            "dad-profile",
+            API_BASE_URL,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerId,
+            Instant.now());
         when(agents.findByCodeForUpdate("dad")).thenReturn(Optional.of(agent));
         return agent;
     }
+
 
     private static AgentUpdateCommand privateUpdate(String ownerEmail) {
         return new AgentUpdateCommand(true, AgentVisibility.PRIVATE, ownerEmail, null, null);
     }
 
+
     private static AgentCreateCommand groupCommand() {
         return new AgentCreateCommand(
-                "group",
-                "Group",
-                "group-profile",
-                API_BASE_URL,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                null,
-                null);
+            "group",
+            "Group",
+            "group-profile",
+            API_BASE_URL,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null,
+            null);
     }
 }
