@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import os
 import pathlib
 
 from .common import logger
+from .connector_guard import _strict_json
 from .connector_schema import CONNECTOR_COMMAND_ENV, CONNECTOR_ROOTS_ENV
 
 
@@ -21,7 +21,7 @@ def _connector_roots() -> dict[str, dict]:
     if not raw:
         return {}
     try:
-        value = json.loads(raw)
+        value = _strict_json(raw)
     except ValueError:
         value = None
     if not isinstance(value, dict) or any(not isinstance(entry, (str, dict)) for entry in value.values()):
@@ -60,4 +60,4 @@ def _read_connector_json(root: pathlib.Path, relative: str):
     path = root / relative
     if path.resolve() != path or not path.is_file():
         raise ValueError("%s 가 없거나 링크다" % relative)
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _strict_json(path.read_text(encoding="utf-8"))

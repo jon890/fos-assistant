@@ -37,6 +37,7 @@ import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 class HttpHermesConnectorClientTest {
     private static final String BASE = "https://dashboard.example.test";
@@ -70,21 +71,57 @@ class HttpHermesConnectorClientTest {
         ReflectionTestUtils.setField(client, "client", builder.build());
         // 실행 경로는 읽기 제한이 다른 클라이언트를 쓴다. 같은 대역 서버에 붙인다.
         ReflectionTestUtils.setField(client, "executeClient", builder.build());
+        ReflectionTestUtils.setField(client, "prepareClient", builder.build());
     }
 
 
     @Test
-    @DisplayName("보호 선언은 타입 보충과 키 삭제 없이 원형으로 전달한다")
+    @DisplayName("바인딩 보호 맥락은 선택 본문으로 전달하고 옛 상태의 누락은 미지원이다")
+    void bindingGuardIsOptionalAndOldStateIsUnsupported() {
+        var guard = JsonMapper.builder().build().readTree("""
+                {"v":1,"protocol":"approval-claim-v1","bindingId":"14","connectionId":"13",
+                 "connectionUpdatedAt":"2026-10-10T00:00:00Z","manifestSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                """);
+        server.expect(requestTo(BASE + "/api/connectors"))
+            .andExpect(content().json("""
+                        {"profile":"user-demo","plugin":"demo-notes","enabled":true,"sandbox_owner":"owner",
+                         "bind":{"vault":"c1","guard":{"v":1,"protocol":"approval-claim-v1","bindingId":"14","connectionId":"13",
+                         "connectionUpdatedAt":"2026-10-10T00:00:00Z","manifestSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}
+                        """, JsonCompareMode.STRICT))
+            .andRespond(withSuccess("""
+                        {"profile":"user-demo","plugin":"demo-notes","enabled":true,"restart_required":false}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors?profile=" + PROFILE))
+            .andRespond(withSuccess("""
+                        {"profile":"user-demo","connectors":[{"plugin":"demo-notes","enabled":true,"configured":true}]}
+                        """, MediaType.APPLICATION_JSON));
+        client.bindConnector(PROFILE, DEMO, "c1", "owner", null, guard);
+        assertThat(client.readConnector(PROFILE, DEMO)
+            .executionGuard()
+            .path("state")
+            .stringValue())
+                .isEqualTo("unsupported");
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("보호 선언은 원형으로 전달하고 같은 manifest의 SHA-256도 보존한다")
     void preservesExecutionGuardWithoutCoercion() {
+        String manifestSha256 = "a".repeat(64);
         String raw = CATALOG.replace(
             "\"mcp_server\":\"demo\"",
-            "\"mcp_server\":\"demo\"," + "\"execution_guard\":{\"protocol\":false,\"extra\":7}");
+            "\"mcp_server\":\"demo\"," + "\"execution_guard\":{\"protocol\":false,\"extra\":7},"
+                + "\"execution_guard_manifest_sha256\":\"" + manifestSha256 + "\"");
         server.expect(requestTo(BASE + "/api/connectors/catalog"))
             .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
-        var guard = client.readCatalog().getFirst().executionGuard();
+        ConnectorManifest manifest = client.readCatalog().getFirst();
+        var guard = manifest.executionGuard();
         assertThat(guard.propertyNames()).containsExactlyInAnyOrder("protocol", "extra");
         assertThat(guard.get("protocol").isBoolean()).isTrue();
         assertThat(guard.get("extra").intValue()).isEqualTo(7);
+        assertThat(manifest.executionGuardManifestSha256()).isEqualTo(manifestSha256);
+        server.verify();
     }
 
 
@@ -112,7 +149,9 @@ class HttpHermesConnectorClientTest {
     void preservesMissingExecutionGuardAsUnsupported() {
         server.expect(requestTo(BASE + "/api/connectors/catalog"))
             .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
-        assertThat(client.readCatalog().getFirst().executionGuard()).isNull();
+        ConnectorManifest manifest = client.readCatalog().getFirst();
+        assertThat(manifest.executionGuard()).isNull();
+        assertThat(manifest.executionGuardManifestSha256()).isNull();
     }
 
 
@@ -200,17 +239,31 @@ class HttpHermesConnectorClientTest {
     @DisplayName("HTTP 카탈로그의 두 링크를 독립 검증하고 기존 정책과 구버전 응답을 유지한다")
     @Test
     void readsReadmeAndProjectFromHttpCatalog() {
+        String catalog = CATALOG.replace("\"items\":\"scopes\"", "\"items\":\"result.scopes\"")
+            .replace("\"value\":\"id\"", "\"value\":\"identity.id\"")
+            .replace("\"label\":\"name\"", "\"label\":\"display.name\"");
         String tail = "\"mcp_server\":\"demo\"";
         String metadata = ",\"link\":\"http://invalid.example.test/\",\"readme_url\":\"https://example.com/README.md\",\"link_kind\":\"project\"";
+        String guard = ",\"execution_guard\":{\"protocol\":false,\"extra\":7},"
+            + "\"execution_guard_manifest_sha256\":\"" + "a".repeat(64) + "\"";
         server.expect(requestTo(BASE + "/api/connectors/catalog"))
-            .andRespond(withSuccess(CATALOG.replace(tail, tail + metadata), MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess(catalog.replace(tail, tail + metadata + guard), MediaType.APPLICATION_JSON));
         server.expect(requestTo(BASE + "/api/connectors/catalog"))
-            .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+            .andRespond(withSuccess(catalog, MediaType.APPLICATION_JSON));
         ConnectorManifest read = client.readCatalog().get(0);
         ConnectorManifest legacy = client.readCatalog().get(0);
         assertThat(read.appearance()).isEqualTo(new ConnectorAppearance(null, null, "https://example.com/README.md", "project"));
         assertThat(read.tools()).isEqualTo(legacy.tools());
         assertThat(read.fields()).isEqualTo(legacy.fields());
+        var options = read.fields().get(1).options();
+        assertThat(options.items()).isEqualTo("result.scopes");
+        assertThat(options.value()).isEqualTo("identity.id");
+        assertThat(options.label()).isEqualTo("display.name");
+        assertThat(read.executionGuard().get("protocol").isBoolean()).isTrue();
+        assertThat(read.executionGuard().propertyNames()).containsExactlyInAnyOrder("protocol", "extra");
+        assertThat(read.executionGuardManifestSha256()).isEqualTo("a".repeat(64));
+        assertThat(legacy.executionGuard()).isNull();
+        assertThat(legacy.executionGuardManifestSha256()).isNull();
         assertThat(legacy.appearance()).isEqualTo(ConnectorAppearance.NONE);
         server.verify();
     }
