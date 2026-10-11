@@ -2787,13 +2787,44 @@ private 자식에만 `--content-snapshot-operation compile`을 붙인다. 공개
 MCP 실제 목록에 read-only compile 하나만 있어야 호출한다. Python mcp 2.0.0과 TypeScript SDK 1.28.0 stdio 왕복을 합성 입력으로 검사한다.
 compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다.
 adapter 자체는 오류 원문·인자·결과를 로그에 넣지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
-Python MCP SDK는 잘못된 stdout을 `logger.exception`으로 기록하며 현재 그 본문은 가리지 않는다.
-SDK와 프레임워크 진단 전체의 본문 가림은 아직 구현·검증되지 않았다.
+compile의 Python MCP SDK 진단은 아래 source 계약에 따라 본문 없이 남긴다.
 입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#compile-전용-내부-transport)이 갖는다.
 
-본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
-후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
+본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
+운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
 최초 원고 MCP 생성·DB·승인·worker 시작·조회와 실제 네이버 접근은 이번 compile 경계의 범위 밖이다.
+
+### compile 전용 SDK 진단
+
+`connector_diagnostics.py`의 내부 API는 `ensure_snapshot_diagnostics()`와 `snapshot_diagnostics_scope()`다.
+Python mcp 정확히 2.0.0의 전체 Python source 122개를 `connector_diagnostics_source.json`과 대조한다.
+최초 설치에서 파일 목록과 bytes SHA-256, import한 실행 module의 파일과 logger 객체·이름을 검사한다.
+공식 [PyPI mcp 2.0.0](https://pypi.org/project/mcp/2.0.0/) wheel SHA-256은 `1cb4c75d2d2c7b8c1d756355e5d82a39f2822cc7f13e22a2051d7ca3592349d6`다.
+logger는 `mcp.client.stdio`, `client`, `mcp.shared.jsonrpc_dispatcher`다.
+SDK source 계약 자료는 plugin 묶음에도 포함한다.
+
+Filter와 그 ContextVar는 프로세스 수명 동안 logger 객체에 남기고 profile reload에서도 재사용한다.
+매 compile은 같은 정책과 첫 filter 부착 상태를 확인한 뒤 SDK task를 만든다.
+알 수 없는 앞선 filter, 다른 정책, 지원 source 불일치나 읽기 실패는 자식 생성 전 고정 unavailable 503으로 끝난다.
+profile 관리 API 전체를 닫거나 unload에서 Filter를 제거하지 않는다.
+source 검사는 최초 설치 때 수행하며 설치된 source는 프로세스 실행 중 바뀌지 않는다는 계약을 전제로 한다.
+
+scope는 stdio와 ClientSession context 전체 및 취소 뒤 정리를 감싼다.
+SDK child task는 ContextVar를 상속하며 호출 task는 정리 뒤 token을 reset한다.
+scope 안에서 msg, args, exc_info, exc_text, stack_info와 cached message를 제거한다.
+원문을 format하거나 예외의 str/repr를 호출하지 않고 `mcp diagnostic body omitted`만 기록한다.
+logger 이름, severity, record 수와 정상 RPC 결과는 유지한다.
+source logger Filter이므로 direct·ancestor handler에 모두 적용되며 다른 logger와 scope 밖 로그는 그대로다.
+부모 logger Filter만으로는 descendant record를 보호하지 못한다.
+
+지원 SDK를 올리는 변경의 구현자가 새 공식 wheel 배포 SHA와 설치 source 전체의 byte 일치를 먼저 검증한다.
+그 뒤 source manifest를 갱신하고 reachable logger와 custom extra 사용을 검토하며 실제 표식 시험을 다시 통과시킨다.
+단순 version 갱신이나 세 emission 파일만의 hash 갱신으로 지원 source를 바꾸지 않는다.
+필수 회귀는 `test_connector_diagnostics.py`와 `test_connector_diagnostics_transport.py`가 갖는다.
+
+이 보장은 compile SDK 진단에 한정된다.
+Filter 전에 본문을 저장하는 record factory, logging 자체의 실패를 출력하는 custom handler와 framework 예외는 별도 정책이 필요하다.
+이미 열린 gateway task, trajectory·session 저장과 공개 A1 request_dump writer도 보호 완료로 판정하지 않는다.
 
 ### 커넥터 정책이 기대는 계약
 
