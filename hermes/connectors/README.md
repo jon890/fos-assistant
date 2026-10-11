@@ -235,6 +235,7 @@ root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 �
 `scripts/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
 이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓는다. 각 패키지의 `test`와 `check:bundle`은 먼저 소스로 entry를 빌드한다. 네이버의 macOS 합성 시험도 Docker 안에서 entry를 빌드한다. 기존 HTTP 대역과 실제 entry의 SDK stdio 검사, `check:bundle`을 실행한 뒤 Docker entry와 로컬 entry를 바이트로 대조한다.
 runner에서 별도로 만든 전체 묶음과 Docker 출력의 manifest 및 모든 파일을 대조해 빌드 환경 차이도 확인한다.
+검사가 성공하면 새 checkout에 빌드한 entry를 남겨 후속 Hermes 검사에서 실행한다. 원래 있던 entry는 보존하고, 실패하면 원래 파일 상태로 돌린다. Git index는 바꾸지 않는다.
 기존 stdio MCP 계약 검사와 Hermes 상류 계약 검사도 이어서 실행한다.
 CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않는다.
 

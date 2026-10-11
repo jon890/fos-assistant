@@ -9,6 +9,7 @@ work="$(mktemp -d "${TMPDIR:-/tmp}/connector-package.XXXXXX")"
 image="fos-connector-package-check:$(basename "$work" | tr '[:upper:]' '[:lower:]')"
 container=""
 connectors=()
+success=false
 cleanup() {
   if [ -n "$container" ]; then docker rm "$container" >/dev/null 2>&1 || true; fi
   docker image rm "$image" >/dev/null 2>&1 || true
@@ -16,7 +17,7 @@ cleanup() {
     local entry="hermes/connectors/$id/dist/$id-mcp.js"
     if [ -f "$work/original/$id" ]; then
       cp -p "$work/original/$id" "$entry"
-    else
+    elif [ "$success" = false ]; then
       rm -f "$entry"
     fi
   done
@@ -52,4 +53,6 @@ done
 bun run hermes/connectors/package.ts build "$work/runner" "$sha"
 bun run hermes/connectors/package.ts verify "$work/runner" "$sha"
 diff -r "$work/bundle" "$work/runner"
+# 새 checkout의 후속 Hermes 검사가 실행할 entry를 남긴다. 실패 때는 원래 상태로 돌린다.
+success=true
 echo "Docker와 runner의 전체 묶음, 소스에서 재빌드한 entry의 바이트가 일치했다"
