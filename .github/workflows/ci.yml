@@ -29,6 +29,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - name: 실제 plugin 왕복 시험의 Python 의존성
+        run: python -m pip install 'mcp==2.0.0' 'PyYAML==6.0.3'
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
       # Java HTTP 검사가 현재 Python catalog producer와 TS compiler를 합성 원고로 실행한다.
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
