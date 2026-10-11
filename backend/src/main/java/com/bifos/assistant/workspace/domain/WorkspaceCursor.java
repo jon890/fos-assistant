@@ -22,18 +22,20 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public record WorkspaceCursor(String pathHash, boolean directory, String name) {
 
+
     private static final int MAX_LENGTH = 4_096;
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
-                    .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-                    .build())
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
+        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+        .build())
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build();
 
     public WorkspaceCursor {
         if (pathHash == null || !pathHash.matches("[0-9a-f]{64}") || !validName(name)) {
             throw invalid();
         }
     }
+
 
     /** 없는 인자만 첫 페이지다. 빈 문자열 등 잘못된 인자는 400 이다. */
     public static WorkspaceCursor decode(String raw, WorkspacePath path) {
@@ -49,30 +51,30 @@ public record WorkspaceCursor(String pathHash, boolean directory, String name) {
                 throw invalid();
             }
             String text = StandardCharsets.UTF_8
-                    .newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes))
-                    .toString();
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
             JsonNode node = JSON.readTree(text);
             if (!node.isObject()
-                    || node.size() != 4
-                    || !node.has("version")
-                    || !node.get("version").isIntegralNumber()
-                    || !node.get("version").canConvertToInt()
-                    || node.get("version").asInt() != 1
-                    || !node.has("pathHash")
-                    || !node.get("pathHash").isString()
-                    || !node.has("directory")
-                    || !node.get("directory").isBoolean()
-                    || !node.has("name")
-                    || !node.get("name").isString()) {
+                || node.size() != 4
+                || !node.has("version")
+                || !node.get("version").isIntegralNumber()
+                || !node.get("version").canConvertToInt()
+                || node.get("version").asInt() != 1
+                || !node.has("pathHash")
+                || !node.get("pathHash").isString()
+                || !node.has("directory")
+                || !node.get("directory").isBoolean()
+                || !node.has("name")
+                || !node.get("name").isString()) {
                 throw invalid();
             }
             WorkspaceCursor cursor = new WorkspaceCursor(
-                    node.get("pathHash").asString(),
-                    node.get("directory").asBoolean(),
-                    node.get("name").asString());
+                node.get("pathHash").asString(),
+                node.get("directory").asBoolean(),
+                node.get("name").asString());
             if (!cursor.pathHash().equals(fingerprint(path))) {
                 throw invalid();
             }
@@ -83,13 +85,15 @@ public record WorkspaceCursor(String pathHash, boolean directory, String name) {
         }
     }
 
+
     public static String encode(WorkspacePath path, WorkspaceEntry lastShown) {
         WorkspaceCursor cursor = new WorkspaceCursor(
-                fingerprint(path), lastShown.kind() == WorkspaceEntryKind.DIRECTORY, lastShown.name());
+            fingerprint(path), lastShown.kind() == WorkspaceEntryKind.DIRECTORY, lastShown.name());
         byte[] json = JSON.writeValueAsBytes(Map.of(
-                "version", 1, "pathHash", cursor.pathHash(), "directory", cursor.directory(), "name", cursor.name()));
+            "version", 1, "pathHash", cursor.pathHash(), "directory", cursor.directory(), "name", cursor.name()));
         return Base64.getUrlEncoder().withoutPadding().encodeToString(json);
     }
+
 
     /** 디렉터리 먼저, Java 문자열 순서에서 이 키보다 뒤에 있는 항목인지다. */
     public boolean precedes(WorkspaceEntry entry) {
@@ -97,31 +101,33 @@ public record WorkspaceCursor(String pathHash, boolean directory, String name) {
         return kind > 0 || (kind == 0 && entry.name().compareTo(name) > 0);
     }
 
+
     private static String fingerprint(WorkspacePath path) {
         return Sha256.hex(path.value());
     }
 
+
     private static boolean validName(String name) {
         if (name == null
-                || name.isEmpty()
-                || name.equals(".")
-                || name.equals("..")
-                || name.indexOf('/') >= 0
-                || name.indexOf('\0') >= 0) {
+            || name.isEmpty()
+            || name.equals(".")
+            || name.equals("..")
+            || name.indexOf('/') >= 0
+            || name.indexOf('\0') >= 0) {
             return false;
         }
         try {
             return StandardCharsets.UTF_8
-                            .newEncoder()
-                            .onMalformedInput(CodingErrorAction.REPORT)
-                            .onUnmappableCharacter(CodingErrorAction.REPORT)
-                            .encode(CharBuffer.wrap(name))
-                            .remaining()
-                    <= 255;
+                .newEncoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .encode(CharBuffer.wrap(name))
+                .remaining() <= 255;
         } catch (CharacterCodingException ignored) {
             return false;
         }
     }
+
 
     private static ApiException invalid() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "workspace cursor is invalid");

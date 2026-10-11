@@ -58,13 +58,15 @@ public final class WorkspaceTree {
     private static final AtomicBoolean FALLBACK_WARNING_LOGGED = new AtomicBoolean();
     private static final long LIST_BUDGET_NANOS = 2_000_000_000L;
     private static final Comparator<WorkspaceEntry> DIRECTORIES_FIRST = Comparator.comparing(
-                    (WorkspaceEntry entry) -> entry.kind() != WorkspaceEntryKind.DIRECTORY)
-            .thenComparing(WorkspaceEntry::name);
+        (WorkspaceEntry entry) -> entry.kind() != WorkspaceEntryKind.DIRECTORY)
+        .thenComparing(WorkspaceEntry::name);
+
 
     /** 링크가 아닌 디렉터리면 참이다. */
     public static boolean isDirectoryNoFollow(Path dir) {
         return Files.isDirectory(dir, NOFOLLOW_LINKS);
     }
+
 
     /**
      * 디렉터리 전체에서 다음 {@code limit + 1} 개만 유지하고 {@code limit} 개를 디렉터리 먼저 이름 순서로 준다.
@@ -73,34 +75,39 @@ public final class WorkspaceTree {
      * 비어 있다.
      */
     public static Optional<WorkspaceListing> list(Path ownerDir, WorkspacePath path, int limit) throws IOException {
-        return list(ownerDir, path, limit, false, () -> {});
+        return list(ownerDir, path, limit, false, () -> {
+        });
     }
 
+
     public static Optional<WorkspaceListing> list(Path ownerDir, WorkspacePath path, int limit, String rawCursor)
-            throws IOException {
-        return list(ownerDir, path, limit, rawCursor, false, () -> {}, System::nanoTime);
+        throws IOException {
+        return list(ownerDir, path, limit, rawCursor, false, () -> {
+        }, System::nanoTime);
     }
+
 
     /**
      * 공개 메서드가 부르는 본체다. {@code checkedPath} 면 {@link SecureDirectoryStream} 이 있어도 대체 경로를 탄다.
      * {@code beforeRecheck} 는 대체 경로에서 읽기와 사후 확인 사이에 부른다. 둘 다 시험이 대체 경로를 직접 부르려고 둔다.
      */
     static Optional<WorkspaceListing> list(
-            Path ownerDir, WorkspacePath path, int limit, boolean checkedPath, Runnable beforeRecheck)
-            throws IOException {
+        Path ownerDir, WorkspacePath path, int limit, boolean checkedPath, Runnable beforeRecheck)
+        throws IOException {
         return list(ownerDir, path, limit, null, checkedPath, beforeRecheck, System::nanoTime);
     }
 
+
     /** 시험이 시간을 제어해 실제 대기 없이 예산 초과를 확인한다. 운영에서는 nanoTime만 쓴다. */
     static Optional<WorkspaceListing> list(
-            Path ownerDir,
-            WorkspacePath path,
-            int limit,
-            String rawCursor,
-            boolean checkedPath,
-            Runnable beforeRecheck,
-            LongSupplier nanoTime)
-            throws IOException {
+        Path ownerDir,
+        WorkspacePath path,
+        int limit,
+        String rawCursor,
+        boolean checkedPath,
+        Runnable beforeRecheck,
+        LongSupplier nanoTime)
+        throws IOException {
         if (limit < 1 || limit > 1_000) {
             throw new IllegalArgumentException("workspace page size is invalid");
         }
@@ -148,6 +155,7 @@ public final class WorkspaceTree {
         }
     }
 
+
     /** 최대 힙의 용량은 lookahead를 포함한 limit + 1을 한 순간도 넘지 않는다. */
     static void retainNext(PriorityQueue<WorkspaceEntry> next, WorkspaceEntry candidate, int limit) {
         if (next.size() < limit + 1) {
@@ -158,19 +166,23 @@ public final class WorkspaceTree {
         }
     }
 
+
     private static void checkListDeadline(long started, LongSupplier nanoTime) throws IOException {
         if (nanoTime.getAsLong() - started >= LIST_BUDGET_NANOS) {
             throw new IOException("workspace listing deadline exceeded");
         }
     }
 
+
     /** 마지막 조각을 링크를 따라가지 않고 본 목록 한 줄이다. 없거나 중간에 링크를 지나면 비어 있다. */
     public static Optional<WorkspaceEntry> stat(Path ownerDir, WorkspacePath path) throws IOException {
-        return stat(ownerDir, path, false, () -> {});
+        return stat(ownerDir, path, false, () -> {
+        });
     }
 
+
     static Optional<WorkspaceEntry> stat(Path ownerDir, WorkspacePath path, boolean checkedPath, Runnable beforeRecheck)
-            throws IOException {
+        throws IOException {
         if (path.isRoot()) {
             return Optional.empty();
         }
@@ -191,19 +203,22 @@ public final class WorkspaceTree {
         }
     }
 
+
     /**
      * 일반 파일 하나를 링크를 따라가지 않고 연다. 열기 직전에 종류를 다시 본다. FIFO 를 열면 스레드가 막히므로 일반 파일이 아니면 열지
      * 않는다.
      *
      * @throws ApiException 없거나 링크를 지나거나 일반 파일이 아니면 {@code WORKSPACE_ENTRY_NOT_FOUND}, 하드 링크가 둘 이상이거나 권한이
-     *     없으면 {@code WORKSPACE_ENTRY_UNREADABLE}
+     * 없으면 {@code WORKSPACE_ENTRY_UNREADABLE}
      */
     public static WorkspaceOpenedFile open(Path ownerDir, WorkspacePath path) throws IOException {
-        return open(ownerDir, path, false, () -> {});
+        return open(ownerDir, path, false, () -> {
+        });
     }
 
+
     static WorkspaceOpenedFile open(Path ownerDir, WorkspacePath path, boolean checkedPath, Runnable beforeRecheck)
-            throws IOException {
+        throws IOException {
         if (path.isRoot()) {
             throw notFound();
         }
@@ -222,18 +237,18 @@ public final class WorkspaceTree {
                     throw unreadable();
                 }
                 SeekableByteChannel channel = dir instanceof SecureDirectoryStream<Path> secure
-                        ? secure.newByteChannel(entry.getFileName(), Set.of(READ, NOFOLLOW_LINKS))
-                        : Files.newByteChannel(entry, READ, NOFOLLOW_LINKS);
+                    ? secure.newByteChannel(entry.getFileName(), Set.of(READ, NOFOLLOW_LINKS))
+                    : Files.newByteChannel(entry, READ, NOFOLLOW_LINKS);
                 try {
                     if (checked(checkedPath, dir)
-                            && !(stillInside(ownerDir, parentOf(path), beforeRecheck) && sameFile(entry, attributes))) {
+                        && !(stillInside(ownerDir, parentOf(path), beforeRecheck) && sameFile(entry, attributes))) {
                         throw notFound();
                     }
                     long size = channel.size();
                     return new WorkspaceOpenedFile(
-                            size,
-                            attributes.lastModifiedTime().toInstant(),
-                            limited(Channels.newInputStream(channel), size));
+                        size,
+                        attributes.lastModifiedTime().toInstant(),
+                        limited(Channels.newInputStream(channel), size));
                 } catch (IOException | RuntimeException ex) {
                     channel.close();
                     throw ex;
@@ -246,12 +261,13 @@ public final class WorkspaceTree {
         }
     }
 
+
     /**
      * 주인 디렉터리부터 조각마다 링크가 아닌 디렉터리인지 보고 열어 마지막 디렉터리의 스트림을 준다. 하나라도 아니면 비어 있다.
      * 스트림은 부르는 쪽이 닫는다.
      */
     private static Optional<DirectoryStream<Path>> openDirectory(
-            Path ownerDir, List<String> segments, boolean checkedPath) throws IOException {
+        Path ownerDir, List<String> segments, boolean checkedPath) throws IOException {
         if (!isDirectoryNoFollow(ownerDir)) {
             return Optional.empty();
         }
@@ -285,18 +301,20 @@ public final class WorkspaceTree {
         return Optional.of(dir);
     }
 
+
     /** 핸들 안의 이름이 링크가 아닌 디렉터리면 링크를 따라가지 않고 열고, 아니면 {@code null} 이다. */
     private static SecureDirectoryStream<Path> openChild(SecureDirectoryStream<Path> dir, Path name)
-            throws IOException {
+        throws IOException {
         try {
             BasicFileAttributes attributes = dir.getFileAttributeView(
-                            name, BasicFileAttributeView.class, NOFOLLOW_LINKS)
-                    .readAttributes();
+                name, BasicFileAttributeView.class, NOFOLLOW_LINKS)
+                .readAttributes();
             return attributes.isDirectory() ? dir.newDirectoryStream(name, NOFOLLOW_LINKS) : null;
         } catch (NoSuchFileException | NotDirectoryException ex) {
             return null;
         }
     }
+
 
     private static WorkspaceEntry entryOf(DirectoryStream<Path> dir, Path entry) throws IOException {
         BasicFileAttributes attributes = attributesOf(dir, entry);
@@ -308,22 +326,24 @@ public final class WorkspaceTree {
         };
         String name = entry.getFileName().toString();
         return new WorkspaceEntry(
-                name,
-                kind,
-                kind == WorkspaceEntryKind.FILE ? attributes.size() : null,
-                attributes.lastModifiedTime().toInstant(),
-                readable,
-                WorkspacePath.addressable(name));
+            name,
+            kind,
+            kind == WorkspaceEntryKind.FILE ? attributes.size() : null,
+            attributes.lastModifiedTime().toInstant(),
+            readable,
+            WorkspacePath.addressable(name));
     }
+
 
     /** 링크를 따라가지 않은 속성이다. 핸들이 있으면 그 핸들 안의 이름으로 본다. */
     private static BasicFileAttributes attributesOf(DirectoryStream<Path> dir, Path entry) throws IOException {
         if (dir instanceof SecureDirectoryStream<Path> secure) {
             return secure.getFileAttributeView(entry.getFileName(), BasicFileAttributeView.class, NOFOLLOW_LINKS)
-                    .readAttributes();
+                .readAttributes();
         }
         return Files.readAttributes(entry, BasicFileAttributes.class, NOFOLLOW_LINKS);
     }
+
 
     private static WorkspaceEntryKind kindOf(BasicFileAttributes attributes) {
         if (attributes.isSymbolicLink()) {
@@ -335,17 +355,19 @@ public final class WorkspaceTree {
         return attributes.isRegularFile() ? WorkspaceEntryKind.FILE : WorkspaceEntryKind.OTHER;
     }
 
+
     /** 핸들로 조각을 따라오지 않아 사후 확인이 필요한지다. 대체 경로가 연 마지막 스트림은 핸들이어도 경로로 연 것이다. */
     private static boolean checked(boolean checkedPath, DirectoryStream<Path> dir) {
         return checkedPath || !(dir instanceof SecureDirectoryStream);
     }
+
 
     /**
      * 대체 경로에서 읽은 뒤 다시 본다. 주인 디렉터리부터 조각이 모두 링크가 아닌 디렉터리이고, 마지막 디렉터리의 실제 경로가 주인
      * 디렉터리의 실제 경로 아래여야 참이다.
      */
     private static boolean stillInside(Path ownerDir, List<String> segments, Runnable beforeRecheck)
-            throws IOException {
+        throws IOException {
         beforeRecheck.run();
         Path dir = ownerDir;
         if (!isDirectoryNoFollow(dir)) {
@@ -364,22 +386,25 @@ public final class WorkspaceTree {
         }
     }
 
+
     /** 마지막 조각을 링크 없이 다시 본 파일이 열기 전과 같은지다. {@code fileKey} 가 없으면 크기와 수정 시각으로 본다. */
     private static boolean sameFile(Path entry, BasicFileAttributes before) throws IOException {
         try {
             BasicFileAttributes after = Files.readAttributes(entry, BasicFileAttributes.class, NOFOLLOW_LINKS);
             return before.fileKey() != null
-                    ? before.fileKey().equals(after.fileKey())
-                    : before.size() == after.size() && before.lastModifiedTime().equals(after.lastModifiedTime());
+                ? before.fileKey().equals(after.fileKey())
+                : before.size() == after.size() && before.lastModifiedTime().equals(after.lastModifiedTime());
         } catch (NoSuchFileException ex) {
             return false;
         }
     }
 
+
     /** 연 시점의 크기까지만 읽는다. 그 사이 파일이 커져도 본문이 {@code Content-Length} 를 넘지 않는다. */
     private static InputStream limited(InputStream in, long limit) {
         return new FilterInputStream(in) {
             private long left = limit;
+
 
             @Override
             public int read() throws IOException {
@@ -390,17 +415,19 @@ public final class WorkspaceTree {
                 return value;
             }
 
+
             @Override
             public int read(byte[] buffer, int offset, int length) throws IOException {
                 if (left <= 0) {
                     return length == 0 ? 0 : -1;
                 }
-                int read = super.read(buffer, offset, (int) Math.min(length, left));
+                int read = super.read(buffer, offset, (int)Math.min(length, left));
                 if (read > 0) {
                     left -= read;
                 }
                 return read;
             }
+
 
             @Override
             public long skip(long count) throws IOException {
@@ -409,25 +436,29 @@ public final class WorkspaceTree {
                 return skipped;
             }
 
+
             @Override
             public int available() throws IOException {
-                return (int) Math.min(super.available(), left);
+                return (int)Math.min(super.available(), left);
             }
         };
     }
 
+
     /** 하드 링크 수다. 그 속성을 읽지 못하는 파일 시스템이면 1 로 본다. */
     private static int linkCount(Path entry) throws IOException {
         try {
-            return (Integer) Files.getAttribute(entry, "unix:nlink", NOFOLLOW_LINKS);
+            return (Integer)Files.getAttribute(entry, "unix:nlink", NOFOLLOW_LINKS);
         } catch (UnsupportedOperationException | IllegalArgumentException ex) {
             return 1;
         }
     }
 
+
     private static List<String> parentOf(WorkspacePath path) {
         return path.segments().subList(0, path.segments().size() - 1);
     }
+
 
     private static void warnFallbackOnce() {
         if (FALLBACK_WARNING_LOGGED.compareAndSet(false, true)) {
@@ -435,9 +466,11 @@ public final class WorkspaceTree {
         }
     }
 
+
     private static ApiException notFound() {
         return new ApiException(ErrorCode.WORKSPACE_ENTRY_NOT_FOUND, "workspace entry not found");
     }
+
 
     private static ApiException unreadable() {
         return new ApiException(ErrorCode.WORKSPACE_ENTRY_UNREADABLE, "workspace entry is not readable");

@@ -30,6 +30,7 @@ class WorkspaceServiceTest {
     @TempDir
     Path root;
 
+
     @Test
     @DisplayName("다른 사용자의 cursor를 받아도 매 요청의 사용자 디렉터리만 읽는다")
     void usesRequesterDirectoryForEveryPage() throws IOException {
@@ -49,6 +50,7 @@ class WorkspaceServiceTest {
         assertCode(() -> service.list(user(2), "", cursor), ErrorCode.WORKSPACE_ENTRY_NOT_FOUND);
     }
 
+
     @Test
     @DisplayName("기능 설정과 주인 디렉터리와 cursor를 페이지마다 다시 검사한다")
     void rechecksConfigurationAndCursor() {
@@ -57,32 +59,37 @@ class WorkspaceServiceTest {
         assertCode(() -> service(root.toString()).list(user(1), "other", cursor()), ErrorCode.VALIDATION_FAILED);
     }
 
+
     private WorkspaceService service(String value) {
         return new WorkspaceService(
-                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(value, "")),
-                mock(AgentService.class),
-                mock(UserExecutionLimiter.class),
-                (owner, path, limit) -> {
-                    throw new AssertionError("목록 시험은 지우지 않는다");
-                });
+            LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(value, "")),
+            mock(AgentService.class),
+            mock(UserExecutionLimiter.class),
+            (owner, path, limit) -> {
+                throw new AssertionError("목록 시험은 지우지 않는다");
+            });
     }
+
 
     private static CurrentUser user(long id) {
         return new CurrentUser(id, "test@example.com", "시험 사용자", 1L, UserRole.MEMBER);
     }
 
+
     private static String cursor() {
         return WorkspaceCursor.encode(
-                WorkspacePath.parse(""),
-                new WorkspaceEntry("a", WorkspaceEntryKind.FILE, 0L, Instant.EPOCH, true, true));
+            WorkspacePath.parse(""),
+            new WorkspaceEntry("a", WorkspaceEntryKind.FILE, 0L, Instant.EPOCH, true, true));
     }
+
 
     private static void assertCode(Runnable request, ErrorCode expected) {
         assertThatThrownBy(request::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(expected);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(expected);
     }
+
 
     @Test
     @DisplayName("지우기 로그의 경로는 줄을 끊는 제어 문자와 구분자를 이스케이프하고 나머지 글자는 그대로 둔다")
@@ -90,6 +97,6 @@ class WorkspaceServiceTest {
         String raw = "보고서/a\nb\r\u0000\u007f\u0085\u009f\u2028\u2029 c.txt";
 
         assertThat(WorkspaceService.escapeForLog(raw))
-                .isEqualTo("보고서/a\\u000Ab\\u000D\\u0000\\u007F\\u0085\\u009F\\u2028\\u2029 c.txt");
+            .isEqualTo("보고서/a\\u000Ab\\u000D\\u0000\\u007F\\u0085\\u009F\\u2028\\u2029 c.txt");
     }
 }
