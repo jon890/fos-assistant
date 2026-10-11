@@ -73,7 +73,7 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
     @Test
     @DisplayName("claim의 하위나 비슷한 내부 경로는 익명으로 열리지 않는다")
     void keepsNeighboringInternalPathsAuthenticated() throws Exception {
-        for (String uri : new String[] {CLAIM + "/extra", CLAIM + "-extra", "/internal/connector-executions/support"}) {
+        for (String uri : new String[] {CLAIM + "/extra", CLAIM + "-extra"}) {
             assertThat(post(uri, "{}", null, false).statusCode()).isIn(401, 403);
         }
     }

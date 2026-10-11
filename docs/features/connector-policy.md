@@ -488,9 +488,23 @@ nonce와 성공 응답은 저장하지 않으므로 재시작 뒤 이전 verifie
 manifest 해시는 검증한 선언을 재귀 키 정렬·공백 없는 JSON·UTF-8·비ASCII 원문 보존으로 직렬화한 값이다.
 카탈로그의 `execution_guard_manifest_sha256`이 그 값을 전달한다.
 
-이 단계는 지원 확인의 소비자만 제공한다. 실제 backend 지원 endpoint와 바인딩 재반영,
+### 바인딩 지원 확인과 철회
+
+Control Plane의 `POST /internal/connector-executions/support`는 고정 서비스 Bearer만 상수 시간으로
+대조한다. 사용자 JWT, profile 토큰, ticket으로는 인증할 수 없다. 다른 메서드와 인접 경로는 열지 않는다.
+요청은 `v:1`, protocol, 문자열 bindingId·connectionId·connectionUpdatedAt·manifestSha256,
+UUID v4 nonce, profile, connectorId만 받는다. 중복·추가 키, 타입 보정, 비정규 값과 4096바이트 초과 본문은 거절한다.
+
+bindingId로 현재 바인딩·연결·에이전트를 읽어 소유자, 접근 허용, profile, READY 상태와 켜려는 의도,
+연결 revision을 확인한다. 매 요청 새 카탈로그의 원형 보호 선언과 manifest 전체 SHA를 대조하고
+HTTP 뒤 DB 상태를 다시 확인한다. 철회·재설치·카탈로그 변경·미지원은 모두 지원 확인을 거절한다.
+일치할 때만 guard 칸과 현재 nonce를 같은 타입으로 응답하며 nonce·본문·비밀값은 DB나 로그에 남기지 않는다.
+바인딩 revision과 설치 시도 번호는 소비자 wire에 추가하지 않는다.
+
+이 응답은 현재 요청의 지원 확인이며 거래 권한이 아니다. READY나 verified만으로 금융 snapshot 없는
+승인 줄을 실행하지 않는다. guard를 실은 설치 호출은 아직 연결하지 않았으며 후속 구현이 맡는다.
 금융 승인 hook과 주문 producer가 없으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
-로컬 HTTP 대역의 성공 응답은 실제 backend 지원 완료의 증거가 아니다.
+DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
 
 ## 커넥터 READ 데이터의 흐름
 
