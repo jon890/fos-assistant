@@ -152,7 +152,8 @@ class AgentPurgerPlacementTest {
         String outer = ROOT + ".agent.purge." + relative.substring(0, relative.lastIndexOf('.') + 1) + "Outer";
         sources.put(outer, source(outer, "class Outer { "
             + declaration.replace(relative.substring(relative.lastIndexOf('.') + 1), "Internal")
-                .replace("public class", "public static class") + " }"));
+                .replace("public class", "public static class")
+            + " }"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture).hasSize(6);
         assertViolation(fixture, outer + "$Internal", detail);
