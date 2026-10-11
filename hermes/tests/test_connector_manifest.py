@@ -137,12 +137,14 @@ class ConnectorCatalogTest(ConnectorGateCase):
         body = self.catalog()
         self.assertEqual(len(body), 1)
         entry = body[0]
-        self.assertEqual(set(entry), {"id", "schema", "title", "description", "icon", "link", "fields", "verify",
+        self.assertEqual(set(entry), {"id", "schema", "title", "description", "icon", "link", "readme_url", "link_kind", "fields", "verify",
                                       "mcp_server", "toolsets", "attachments", "single_binding", "owner_browser",
                                       "owner_browser_login_url", "tools", "skills"})
         # `icon` 과 `link` 를 선언하지 않은 커넥터는 두 칸이 null 이다.
         self.assertIsNone(entry["icon"])
         self.assertIsNone(entry["link"])
+        self.assertIsNone(entry["readme_url"])
+        self.assertEqual(entry["link_kind"], "service")
         # 두 칸이 없는 manifest 는 내장 도구를 열지 않고 사진을 받지 않는다.
         self.assertEqual(entry["toolsets"], [])
         self.assertIs(entry["attachments"], False)
@@ -1101,6 +1103,30 @@ class ConnectorAppearanceTest(ConnectorGateCase):
         finally:
             logging.disable(logging.CRITICAL)
         return "\n".join(logs.output)
+
+    def test_readme_and_service_links_are_independent_and_preserve_policy(self):
+        before = self.catalog_entry()
+        for field, other in (("link", "readme_url"), ("readme_url", "link")):
+            for url in ACCEPTED_LINKS:
+                with self.subTest(field=field, accepted=url[:60]):
+                    self.declare(**{field: url, other: "https://example.com/other", "link_kind": "project"})
+                    entry = self.catalog_entry()
+                    self.assertEqual(entry[field], url)
+                    self.assertEqual(entry[other], "https://example.com/other")
+            for url in [*REJECTED_LINKS, "https://example.com/\n", 7, {}, None]:
+                with self.subTest(field=field, rejected=url):
+                    self.declare(**{field: url, other: "https://example.com/other"})
+                    entry = self.catalog_entry()
+                    self.assertIsNone(entry[field])
+                    self.assertEqual(entry[other], "https://example.com/other")
+                    self.assertEqual(entry["tools"], before["tools"])
+                    self.assertEqual(entry["fields"], before["fields"])
+                    self.assertEqual(entry["verify"], before["verify"])
+        for kind in (None, "service", "unknown", 7, {}):
+            self.declare(link_kind=kind)
+            self.assertEqual(self.catalog_entry()["link_kind"], "service")
+        self.declare(link_kind="project")
+        self.assertEqual(self.catalog_entry()["link_kind"], "project")
 
     def test_declared_svg_icon_and_link_reach_the_catalog(self):
         """선언한 SVG 아이콘은 `media_type` 과 파일 원본의 base64 로, 링크는 그대로 나온다."""

@@ -317,7 +317,9 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
 | `title`, `description` | 화면에 그대로 보인다 |
 | `icon` | 선택. 커넥터 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |
-| `link` | 선택. 커넥터 소개나 그 서비스의 `https://` 주소. 카드가 새 탭으로 연다 |
+| `link` | 선택. 서비스의 공식 사이트나 프로젝트 GitHub의 HTTPS 주소 |
+| `readme_url` | 선택. 커넥터 README의 HTTPS 주소. `link`와 따로 검사한다 |
+| `link_kind` | 선택. `project`면 `link`를 「프로젝트 GitHub」로 표시한다. 없거나 다른 값이면 `service`로 읽고 「공식 사이트」로 표시한다 |
 | `fields[].key` | 칸 번호. 요청의 `values` 와 저장의 키다. `^[a-z][a-z0-9_]{0,31}$`, 커넥터 안에서 유일 |
 | `fields[].env` | 이 칸 값을 쓸 profile `.env` 이름. `.mcp.json` 의 서버 env 가 `${이름}` 으로 참조해야 한다 |
 | `fields[].secret` | 참이면 화면이 가리고 응답에 원문을 담지 않는다. 저장하는 것은 아래 「저장과 비밀값」 이 갖는다 |
@@ -341,7 +343,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `.mcp.json` 서버 env 는 `fields[].env` 와 `operator_env`, `owner_attachments_env`, `owner_output_env`, `owner_browser_env` 의 합과 같아야 한다. 다섯 이름은 겹치지 않는다. 하나라도 다르면 그 커넥터를 카탈로그에 내지 않는다
 - `toolsets` 가 목록이 아니거나, 이름이 겹치거나, `vision` 밖의 이름이 하나라도 있으면 그 커넥터를 카탈로그에 내지 않는다. 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다([ADR-044](../../backend/docs/adr/ADR-044-커넥터-manifest-는-읽기-전용-이미지-도구만-열-수-있다.md))
 - `attachments` 가 참인데 `toolsets` 에 `vision` 이 없으면 그 커넥터를 카탈로그에 내지 않는다. 이번 메시지의 사진은 실행 입력에 실리지만, 지난 메시지의 사진은 에이전트가 이미지 도구로 사본 파일을 보기 때문이다([ADR-020](../../backend/docs/adr/ADR-020-사진은-공유-디렉터리에-두고-에이전트가-파일로-읽는다.md), [ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md))
-- `icon` 이나 `link` 가 아래 「아이콘과 링크」 를 어기면 그 칸만 null 로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
+- `icon`, `link`, `readme_url`이 아래 「아이콘과 링크」를 어기면 그 칸만 null로 내고 경고 로그를 남긴다. 커넥터는 카탈로그에 그대로 나온다
 - 도구 결과는 MCP 응답의 첫 텍스트 칸을 JSON 으로 읽는다. `structuredContent` 가 있으면 그것을 먼저 쓴다. 실패는 `isError: true` 와 `{"error": {"code": "..."}}` 다
 
 ### 아이콘과 링크
@@ -351,9 +353,10 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 - `icon` 은 `^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$` 이고 `..` 조각이 없다. 가리키는 파일은 plugin 안에 있고 그 경로의 어느 조각도 링크가 아니며 32 KiB 이하다
 - 카탈로그는 아이콘 파일의 내용을 `icon: {media_type, data}` 로 싣는다. `media_type` 은 `image/svg+xml` 이나 `image/png` 이고 `data` 는 base64 다. 선언이 없으면 `icon: null` 이다
 - SVG 아이콘은 `xmlns="http://www.w3.org/2000/svg"` 를 선언한다. 없으면 `<img>` 가 아무것도 그리지 않는다. 색은 `currentColor` 가 아닌 고정 색이다. `<img>` 안의 SVG 는 글자색을 물려받지 않는다
-- `link` 의 모양은 ADR 의 「링크 모양」 이 갖는다. 선언이 없으면 `null` 이다
+- `link`와 `readme_url`은 각각 500자 이하의 HTTPS·ASCII 주소다. 모양은 ADR의 「링크 모양」을 따른다. 선언이 없으면 각각 `null`이고 주소 하나가 틀려도 다른 링크는 유지한다
+- 카탈로그는 `readme_url`, `link_kind`를 싣고 Control Plane은 웹에 `readmeUrl`, `linkKind`로 전달한다. 옛 응답에 칸이 없으면 README 주소는 `null`, 종류는 `service`로 읽는다. 로그인 안내 주소 `owner_browser_login_url`과는 다른 칸이다
 - Control Plane 은 같은 규칙으로 다시 검사한다. 어긋나면 그 칸만 `null` 로 두고 경고 로그에 커넥터 번호와 칸 이름만 남긴다. 대시보드는 코드가 정한 사유 글을 더하고, 둘 다 경로와 값은 싣지 않는다
-- 화면은 아이콘을 `<img>` 로만 그리고, 없으면 기본 아이콘을 보인다. 링크는 새 탭으로 열고 `rel="noopener noreferrer"` 다
+- 화면은 아이콘을 `<img>`로만 그리고, 없으면 기본 아이콘을 보인다. 목록 카드와 상세 머리는 `link`와 「커넥터 README」를 따로 표시한다. 두 링크는 새 탭으로 열고 `rel="noopener noreferrer"`를 붙이며, 웹에서도 브라우저가 해석할 수 있는 HTTPS 주소인지 검사한다
 - 상표 로고 파일을 복사하지 않는다. 직접 그린 단순한 도형을 쓴다
 
 공통 오류 어휘는 다섯이다.

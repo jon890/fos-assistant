@@ -51,6 +51,10 @@ export type ConnectorSummary = {
   icon: string | null;
   /** 서비스 소개 주소(`https://`)다. 옛 Control Plane 은 내지 않는다. */
   link: string | null;
+  /** 커넥터 README 주소다. 옛 Control Plane은 내지 않는다. */
+  readmeUrl?: string | null;
+  /** 첫 링크의 종류다. 옛 응답은 service로 읽는다. */
+  linkKind?: "service" | "project";
   fields: ConnectorField[];
   tools: ConnectorTool[];
   myStatus: ConnectionStatus;
@@ -302,6 +306,16 @@ export function connectorLinkHref(
   } catch {
     return null;
   }
+}
+
+/** 카드 링크는 Python·Java와 같은 ASCII 모양과 500자 상한으로 검사한다. 로그인 안내 주소의 계약과는 별개다. */
+export function connectorAppearanceLinkHref(
+  link: string | null | undefined,
+): string | null {
+  const shape =
+    /^https:\/\/[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*(?::[0-9]{1,5})?(?:[/?#](?:[A-Za-z0-9\-._~!$&'()*+,;=:@/?#]|%[0-9A-Fa-f]{2})*)?$/;
+  if (!link || link.length > 500 || shape.exec(link)?.[0] !== link) return null;
+  return connectorLinkHref(link);
 }
 
 const TOOL_RISK_ORDER: ToolRisk[] = [

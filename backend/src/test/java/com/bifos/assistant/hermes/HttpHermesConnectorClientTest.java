@@ -236,6 +236,39 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("HTTP 카탈로그의 두 링크를 독립 검증하고 기존 정책과 구버전 응답을 유지한다")
+    @Test
+    void readsReadmeAndProjectFromHttpCatalog() {
+        String catalog = CATALOG.replace("\"items\":\"scopes\"", "\"items\":\"result.scopes\"")
+            .replace("\"value\":\"id\"", "\"value\":\"identity.id\"")
+            .replace("\"label\":\"name\"", "\"label\":\"display.name\"");
+        String tail = "\"mcp_server\":\"demo\"";
+        String metadata = ",\"link\":\"http://invalid.example.test/\",\"readme_url\":\"https://example.com/README.md\",\"link_kind\":\"project\"";
+        String guard = ",\"execution_guard\":{\"protocol\":false,\"extra\":7},"
+            + "\"execution_guard_manifest_sha256\":\"" + "a".repeat(64) + "\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(catalog.replace(tail, tail + metadata + guard), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(catalog, MediaType.APPLICATION_JSON));
+        ConnectorManifest read = client.readCatalog().get(0);
+        ConnectorManifest legacy = client.readCatalog().get(0);
+        assertThat(read.appearance()).isEqualTo(new ConnectorAppearance(null, null, "https://example.com/README.md", "project"));
+        assertThat(read.tools()).isEqualTo(legacy.tools());
+        assertThat(read.fields()).isEqualTo(legacy.fields());
+        var options = read.fields().get(1).options();
+        assertThat(options.items()).isEqualTo("result.scopes");
+        assertThat(options.value()).isEqualTo("identity.id");
+        assertThat(options.label()).isEqualTo("display.name");
+        assertThat(read.executionGuard().get("protocol").isBoolean()).isTrue();
+        assertThat(read.executionGuard().propertyNames()).containsExactlyInAnyOrder("protocol", "extra");
+        assertThat(read.executionGuardManifestSha256()).isEqualTo("a".repeat(64));
+        assertThat(legacy.executionGuard()).isNull();
+        assertThat(legacy.executionGuardManifestSha256()).isNull();
+        assertThat(legacy.appearance()).isEqualTo(ConnectorAppearance.NONE);
+        server.verify();
+    }
+
+
     @DisplayName("카탈로그의 toolsets 와 attachments 를 읽고, 모양이 틀리면 거절한다")
     @Test
     void readsDeclaredToolsetsAndAttachments() {
