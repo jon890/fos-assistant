@@ -177,6 +177,8 @@ class McpMemoryToolTest {
                 "follow_up_propose",
                 "list_media_observations",
                 "record_media_observation",
+                "content_draft_write",
+                "content_draft_read",
                 "memory_remember",
                 "memory_search");
         JsonNode search = StreamSupport.stream(listed.path("result").path("tools").spliterator(), false)

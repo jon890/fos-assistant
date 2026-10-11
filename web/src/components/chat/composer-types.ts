@@ -21,7 +21,7 @@ export type Props = {
   agentCode: string;
   /** 이 에이전트의 대화에 사진을 붙일 수 있다. 거짓이면 사진 단추를 그리지 않는다 */
   acceptsAttachments: boolean;
-  onConversationCreated(id: string): void;
+  ensureConversation(): Promise<string | null>;
   /** 답을 만드는 중이다. 참이면 보내기 옆에 중지를 함께 보인다. */
   running: boolean;
   /** 답을 만드는 중에도 보내기를 받을 수 있다. 거짓이면 그동안 보내기와 Enter 를 막는다. */
