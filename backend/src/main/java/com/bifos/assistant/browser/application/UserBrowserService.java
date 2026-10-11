@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -41,6 +42,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserBrowserService {
 
     /** 켜다가 proxy 호출이 실패했다. */
@@ -67,25 +69,6 @@ public class UserBrowserService {
     private final BrowserActivityTracker activity;
     /** 중계가 다른 전이를 기다리는 동안 쉬는 함수다. 시험이 바꿔 끼워 그 사이에 줄을 바꾼다. */
     Consumer<Duration> sleeper = UserBrowserService::sleep;
-
-    /** 기존 주입 인자로 활동 기록기를 만든다. 공개 생성자와 실제 호출자의 인자는 유지한다. */
-    public UserBrowserService(
-            UserBrowserRepository browsers,
-            BrowserRuntime runtime,
-            BrowserProfileStore profiles,
-            CdpProbe cdp,
-            LiveProperties<BrowserProperties> properties,
-            Clock clock,
-            BrowserScreens screens) {
-        this.browsers = browsers;
-        this.runtime = runtime;
-        this.profiles = profiles;
-        this.cdp = cdp;
-        this.properties = properties;
-        this.clock = clock;
-        this.screens = screens;
-        this.activity = new BrowserActivityTracker(browsers, clock);
-    }
 
     /** 프로필 디렉터리 이름이다. 첨부 디렉터리 키와 같은 계산이지만 루트가 다르다. */
     public static String profileKey(Long userId) {

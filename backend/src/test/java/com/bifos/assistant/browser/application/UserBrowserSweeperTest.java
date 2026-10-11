@@ -288,7 +288,7 @@ class UserBrowserSweeperTest {
     }
 
     private UserBrowserService service(boolean enabled) {
-        return new UserBrowserService(
+        return UserBrowserServiceTestFactory.create(
                 repository,
                 runtime,
                 profiles(),

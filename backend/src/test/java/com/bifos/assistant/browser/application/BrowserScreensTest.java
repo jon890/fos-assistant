@@ -187,7 +187,7 @@ class BrowserScreensTest {
     }
 
     private UserBrowserService service(UserBrowserRepository browsers) {
-        return new UserBrowserService(
+        return UserBrowserServiceTestFactory.create(
                 browsers,
                 runtime,
                 profiles(),

@@ -46,6 +46,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.OptimisticLockingFailureException;
 
@@ -64,6 +65,18 @@ class UserBrowserServiceTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    UserBrowserService injectedService;
+
+    @Autowired
+    BrowserActivityTracker injectedActivity;
+
+    @Autowired
+    TestClock injectedClock;
+
+    @Autowired
+    ApplicationContext context;
 
     private FakeBrowserRuntime runtime;
     private final Set<String> profileDirs = ConcurrentHashMap.newKeySet();
@@ -453,6 +466,34 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("실제 Spring 서비스는 같은 저장소와 시계를 쓴 기록기 하나의 활동 캐시를 재사용한다")
+    void usesOneActivityTrackerInSpringContext() {
+        Long userId = 909101L;
+        Instant started = Instant.parse("2026-10-11T00:00:00Z");
+        injectedClock.set(started);
+        UserBrowserService fixture = service(true, 2, repository, injectedClock);
+        fixture.create(userId);
+        fixture.start(userId);
+        assertThat(context.getBeansOfType(BrowserActivityTracker.class).values()).containsExactly(injectedActivity);
+        try {
+            injectedClock.set(started.plusSeconds(60));
+            injectedService.touch(userId);
+            assertThat(repository.findByUserId(userId).orElseThrow().lastActiveAt()).isEqualTo(injectedClock.instant());
+
+            jdbc.update("UPDATE user_browser SET last_active_at = ? WHERE user_id = ?", Timestamp.from(started), userId);
+            injectedClock.set(started.plusSeconds(61));
+            injectedService.touch(userId);
+            assertThat(repository.findByUserId(userId).orElseThrow().lastActiveAt()).isEqualTo(started);
+
+            injectedClock.set(started.plusSeconds(120));
+            injectedService.touch(userId);
+            assertThat(repository.findByUserId(userId).orElseThrow().lastActiveAt()).isEqualTo(injectedClock.instant());
+        } finally {
+            injectedActivity.clear(userId);
+        }
+    }
+
+    @Test
     @DisplayName("1분 전에는 저장하지 않고 정확히 1분이 되면 DB 활동 시각을 갱신한다")
     void touchesAtExactMinuteBoundary() {
         TestClock clock = new TestClock();
@@ -830,7 +871,7 @@ class UserBrowserServiceTest {
                 profileDirs.remove(profileKey);
             }
         };
-        return new UserBrowserService(
+        return UserBrowserServiceTestFactory.create(
                 browsers,
                 runtime,
                 profiles,

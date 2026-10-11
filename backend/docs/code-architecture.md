@@ -83,8 +83,9 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 
 ### 브라우저 활동 시각
 
-`UserBrowserService`의 공개 호출과 생성자 인자는 그대로 두고,
-같은 패키지의 package-private `BrowserActivityTracker`가 활동 저장과 사용자별 1분 제한 캐시를 맡는다.
+`UserBrowserService`의 공개 호출은 그대로 두고,
+같은 패키지의 package-private Spring 컴포넌트 `BrowserActivityTracker`를 생성자로 주입한다.
+기록기는 같은 저장소와 시계로 활동을 저장하고 사용자별 1분 제한 캐시를 갖는다.
 `touch`, 화면 열기와 입력은 기존 시점에 기록기를 부르고, 중지는 화면을 닫은 뒤 캐시를 지우고 상태를 바꾼다.
 켜진 브라우저만 저장하며 시계 역행이나 엔티티의 기록 거절 때는 DB의 활동 시각을 기억한다.
 낙관적 잠금 실패 때는 캐시를 갱신하지 않아 다음 활동이 다시 시도한다.

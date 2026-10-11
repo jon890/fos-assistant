@@ -8,15 +8,16 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 /** ケ�진 브라우저의 활동 시각 저장과 사용자별 1분 제한 상태를 함께 갖는다. */
+@Component
 @RequiredArgsConstructor
+@Slf4j(topic = "com.bifos.assistant.browser.application.UserBrowserService")
 final class BrowserActivityTracker {
 
-    private static final Logger log = LoggerFactory.getLogger(UserBrowserService.class);
     // 활동을 다시 기록하기까지의 간격이다. UserBrowser.touch 와 같다
     private static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
 

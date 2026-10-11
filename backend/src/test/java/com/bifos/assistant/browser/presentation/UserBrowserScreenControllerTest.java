@@ -11,6 +11,7 @@ import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
 import com.bifos.assistant.browser.application.FakeCdp;
 import com.bifos.assistant.browser.application.UserBrowserService;
+import com.bifos.assistant.browser.application.UserBrowserServiceTestFactory;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.CdpTarget;
@@ -219,7 +220,7 @@ class UserBrowserScreenControllerTest {
     private MockMvc mvc(boolean enabled) {
         screens = new BrowserScreens(
                 cdp, cdp, new BrowserUsage(), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
-        UserBrowserService service = new UserBrowserService(
+        UserBrowserService service = UserBrowserServiceTestFactory.create(
                 repository,
                 runtime(),
                 profiles(),
