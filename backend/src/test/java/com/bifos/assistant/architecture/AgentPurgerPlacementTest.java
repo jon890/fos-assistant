@@ -135,10 +135,45 @@ class AgentPurgerPlacementTest {
     void ignoresNestedNames() throws IOException {
         Map<String, String> sources = sources();
         String outer = ROOT + ".agent.purge.application.Internal";
-        sources.put(outer, source(outer, "class Internal { record AgentPurgeOutcome() {} }"));
+        sources.put(outer, source(outer, "class Internal { "
+            + "record AgentPurger(int value) {} record AgentPurgeWriter(int value) {} "
+            + "record AgentPurgeParticipant(int value) {} record AgentPurgeOutcome(int value) {} }"));
+        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(9);
+        rule().check(fixture);
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidRoles")
+    @DisplayName("중첩 타입의 잘못된 서비스·공개 값·설정 역할도 거절한다")
+    void rejectsNestedInvalidRole(String relative, String declaration, String detail) throws IOException {
+        Map<String, String> sources = sources();
+        String outer = ROOT + ".agent.purge." + relative.substring(0, relative.lastIndexOf('.') + 1) + "Outer";
+        sources.put(outer, source(outer, "class Outer { "
+            + declaration.replace(relative.substring(relative.lastIndexOf('.') + 1), "Internal")
+                .replace("public class", "public static class") + " }"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture).hasSize(6);
-        rule().check(fixture);
+        assertViolation(fixture, outer + "$Internal", detail);
+    }
+
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("wrongDirections")
+    @DisplayName("중첩 타입의 실제 역방향과 웹 의존 및 참여 구현 참조도 거절한다")
+    void rejectsNestedWrongDirection(String relative, String targetRelative, String detail) throws IOException {
+        Map<String, String> sources = sources();
+        String outer = ROOT + ".agent.purge." + relative;
+        String target = targetRelative.startsWith("org.") ? targetRelative : ROOT + "." + targetRelative;
+        if (!targetRelative.startsWith("org.") && !sources.containsKey(target)) {
+            sources.put(target, source(target, "public class " + target.substring(target.lastIndexOf('.') + 1) + " {}"));
+        }
+        sources.put(outer, source(outer, "class " + outer.substring(outer.lastIndexOf('.') + 1)
+            + " { static class Internal { " + target + " dependency; } }"));
+        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(sources.size() + 1);
+        assertViolation(fixture, outer + "$Internal", detail);
     }
 
 

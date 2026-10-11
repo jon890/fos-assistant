@@ -224,10 +224,10 @@ public final class ArchitectureRules {
                         && (item.isRecord() || item.isEnum()) && !config) {
                         require(item, item.getPackageName().equals(application + ".model"), "공개 결과는 application.model 에 있다", events);
                     }
-                    if (Set.of("AgentPurger", "AgentPurgeWriter").contains(item.getSimpleName())) {
+                    if (Set.of("AgentPurger", "AgentPurgeWriter").contains(item.getSimpleName()) && item.getEnclosingClass().isEmpty()) {
                         require(item, item.isAnnotatedWith(Component.class), "정리 실행은 Component 다", events);
                     }
-                    if (item.getSimpleName().equals("AgentPurgeParticipant")) {
+                    if (item.getSimpleName().equals("AgentPurgeParticipant") && item.getEnclosingClass().isEmpty()) {
                         require(item, item.isInterface(), "참여 port 는 interface 다", events);
                     }
                     if (item.getSimpleName().equals("AgentPurgeOutcome") && item.getEnclosingClass().isEmpty()) {
