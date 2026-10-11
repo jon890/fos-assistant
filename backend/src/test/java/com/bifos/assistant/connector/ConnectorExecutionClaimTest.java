@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
+import com.bifos.assistant.connector.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaimCodec;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaims;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionCurrent;
@@ -99,6 +100,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
     @Autowired
     ConnectorExecutionCurrent current;
+
+    @Autowired
+    ConnectorFinancialConflicts conflicts;
 
     @Autowired
     HermesProperties properties;
@@ -222,7 +226,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var issuing =
                 new ConnectorExecutionTicket(current, codec, actions, contents, users, expiring, clock, properties);
         var consuming =
-                new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, expiring, clock);
+                new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, expiring, clock);
         assertThatThrownBy(() -> {
                     if (consume) {
                         consuming.claim(input(raw));
@@ -552,7 +556,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         };
         var issuing =
                 new ConnectorExecutionTicket(current, codec, actions, contents, users, failing, clock, properties);
-        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, failing, clock);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, failing, clock);
         assertThatThrownBy(() -> {
                     if (consume) {
                         consuming.claim(input(raw));
@@ -629,7 +633,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var freshTickets =
                 new ConnectorExecutionTicket(current, freshCodec, actions, contents, users, manager, clock, properties);
         var freshClaims = new ConnectorExecutionClaims(
-                freshTickets, freshCodec, current, users, actions, contents, manager, clock);
+                freshTickets, freshCodec, current, users, actions, contents, conflicts, manager, clock);
         assertThatThrownBy(() -> freshTickets.issue(f.action())).isInstanceOf(ApiException.class);
         assertThat(freshClaims.claim(input(raw)).allowed()).isTrue();
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);

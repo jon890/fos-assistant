@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.application.execution;
 
 import static com.bifos.assistant.connector.application.execution.ConnectorExecutionCurrent.require;
 
+import com.bifos.assistant.connector.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionClaimInput;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionClaimResult;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionReadContext;
@@ -26,6 +27,7 @@ public class ConnectorExecutionClaims {
     private final AppUserRepository users;
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
+    private final ConnectorFinancialConflicts conflicts;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 
@@ -55,6 +57,7 @@ public class ConnectorExecutionClaims {
                         && payload.argsSha256().equals(snapshot.executionArgsSha256())
                         && payload.scopeSha256().equals(snapshot.scopeSha256())
                         && codec.readScope(snapshot.scopeJson()).equals(input.scope()));
+                conflicts.requireAvailable(row.requestKey(), action.id());
                 row.consumeTicket(payload.ticketId(), now.truncatedTo(ChronoUnit.MICROS));
                 tickets.beforeCommit(action, payload);
                 return new ConnectorExecutionClaimResult(1, true, payload.ticketId(), payload.expiresAt());
