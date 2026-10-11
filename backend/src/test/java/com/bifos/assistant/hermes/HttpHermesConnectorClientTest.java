@@ -103,17 +103,22 @@ class HttpHermesConnectorClientTest {
     }
 
     @Test
-    @DisplayName("보호 선언은 타입 보충과 키 삭제 없이 원형으로 전달한다")
+    @DisplayName("보호 선언은 원형으로 전달하고 같은 manifest의 SHA-256도 보존한다")
     void preservesExecutionGuardWithoutCoercion() {
+        String manifestSha256 = "a".repeat(64);
         String raw = CATALOG.replace(
                 "\"mcp_server\":\"demo\"",
-                "\"mcp_server\":\"demo\"," + "\"execution_guard\":{\"protocol\":false,\"extra\":7}");
+                "\"mcp_server\":\"demo\"," + "\"execution_guard\":{\"protocol\":false,\"extra\":7},"
+                    + "\"execution_guard_manifest_sha256\":\"" + manifestSha256 + "\"");
         server.expect(requestTo(BASE + "/api/connectors/catalog"))
                 .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
-        var guard = client.readCatalog().getFirst().executionGuard();
+        ConnectorManifest manifest = client.readCatalog().getFirst();
+        var guard = manifest.executionGuard();
         assertThat(guard.propertyNames()).containsExactlyInAnyOrder("protocol", "extra");
         assertThat(guard.get("protocol").isBoolean()).isTrue();
         assertThat(guard.get("extra").intValue()).isEqualTo(7);
+        assertThat(manifest.executionGuardManifestSha256()).isEqualTo(manifestSha256);
+        server.verify();
     }
 
     @Test
@@ -139,7 +144,9 @@ class HttpHermesConnectorClientTest {
     void preservesMissingExecutionGuardAsUnsupported() {
         server.expect(requestTo(BASE + "/api/connectors/catalog"))
                 .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
-        assertThat(client.readCatalog().getFirst().executionGuard()).isNull();
+        ConnectorManifest manifest = client.readCatalog().getFirst();
+        assertThat(manifest.executionGuard()).isNull();
+        assertThat(manifest.executionGuardManifestSha256()).isNull();
     }
 
     @DisplayName("카탈로그에서 칸의 env, 선택지, 확인 도구, MCP 서버 이름을 읽는다")
