@@ -24,7 +24,7 @@
   - 저장은 `backend/src/main/java/com/bifos/assistant/chat/application/PendingMessageService.java` 의 `pendingMessages.save(ChatPendingMessage.queued(...))` 한 곳이다
   - 그 밖의 읽기는 `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` 의 대기 줄 응답이다
 - 위임 답
-  - 엔티티 `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` 의 `outputText`(`MEDIUMTEXT NULL`), 주인은 `userId`. 쓰기는 `recordOutput(String)` 하나이고 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` 의 두 자리(`execution.recordOutput(outputText)`)가 부른다
+  - 엔티티 `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` 의 `outputText`(`MEDIUMTEXT NULL`), 주인은 `userId`. 쓰기는 `recordOutput(String)` 하나이고 `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionCompletionRecorder.java` 의 두 자리(`execution.recordOutput(outputText)`)가 부른다
   - 읽기는 `backend/src/main/java/com/bifos/assistant/chat/application/ChatDeliveryInput.java` 의 `result.outputText()` 와 `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` 의 `execution.outputText()` 두 곳이다
   - 실행 줄은 시작할 때 이미 저장돼 번호가 있다. 그래서 `recordOutput` 때 바로 암호화할 수 있다
   - 지운 대화의 정리(`AgentExecutionRepository.clearOutputsOf`)는 칸을 null 로 비운다. 이때 옆 칸도 null 로 비운다
@@ -60,7 +60,7 @@ ALTER TABLE agent_execution ADD COLUMN output_key_id BIGINT NULL;
 ### 3. 위임 답
 
 - `AgentExecution` 에 `outputKeyId`(`@Column(name = "output_key_id")`, `@Getter`) 와 `recordSealedOutput(String sealed, Long keyId)` 를 더한다. 평문을 적는 `recordOutput(String)` 은 그대로 둔다. 시험 여러 곳(`git grep -n "recordOutput(" backend/src/test`)이 평문 답을 준비하는 데 쓰고, 그 줄은 옛 평문 줄과 같게 읽힌다
-- `ExecutionRecorder` 의 두 자리는 `TextCipher.seal(execution.userId(), aad, outputText)` 가 값을 주면 `recordSealedOutput` 을, 빈 값이면 지금처럼 `recordOutput` 을 부른다. `outputText` 가 null 이면 암호화하지 않는다
+- `ExecutionCompletionRecorder` 의 두 자리는 `TextCipher.seal(execution.userId(), aad, outputText)` 가 값을 주면 `recordSealedOutput` 을, 빈 값이면 지금처럼 `recordOutput` 을 부른다. `outputText` 가 null 이면 암호화하지 않는다
 - `usage.application.ExecutionOutputs` 를 더한다. `String open(AgentExecution)` 은 `outputKeyId` 가 null 이면 `outputText()` 를, 아니면 푼 글이나 `ChatMessage.UNREADABLE_CONTENT` 와 같은 글(`usage` 가 `chat` 을 import 하지 않게 같은 글을 상수로 둔다)을 낸다
 - `ChatDeliveryInput` 과 `McpToolService` 의 두 읽기를 `ExecutionOutputs.open` 으로 바꾼다. `ChatDeliveryInput` 이 받는 `result` 의 타입이 실행 엔티티가 아니면 그 값을 만드는 자리에서 푼다
 - `AgentExecutionRepository.clearOutputsOf` 의 JPQL 에 `e.outputKeyId = null` 을 더한다
@@ -72,7 +72,7 @@ ALTER TABLE agent_execution ADD COLUMN output_key_id BIGINT NULL;
   - 합친 글(`ChatPendingMessage.merged`)은 평문이다
   - 두 대기 줄의 `content` 를 맞바꾸면 둘 다 읽을 수 없는 글이다
 - `backend/src/test/java/com/bifos/assistant/usage/ExecutionOutputEncryptionTest.java`(신규, `@BackendIntegrationTest`)
-  - `ExecutionRecorder` 가 답을 적은 뒤 `output_text` 가 암호문이고 `ExecutionOutputs.open` 이 평문을 낸다
+  - `ExecutionRecorder` 가 `ExecutionCompletionRecorder` 에 위임해 답을 적은 뒤 `output_text` 가 암호문이고 `ExecutionOutputs.open` 이 평문을 낸다
   - `output_key_id` 가 null 인 옛 줄은 평문으로 읽힌다
   - `clearOutputsOf` 뒤 두 칸이 모두 null 이다
 
@@ -100,7 +100,7 @@ scripts/check-mysql-migration.sh
 | `backend/src/main/java/com/bifos/assistant/chat/application/PendingMessageService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/chat/application/ChatDeliveryInput.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionCompletionRecorder.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionOutputs.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/usage/infra/AgentExecutionRepository.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolService.java` | 수정 |
