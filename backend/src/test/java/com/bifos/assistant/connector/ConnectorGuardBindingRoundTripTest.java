@@ -369,8 +369,9 @@ class ConnectorGuardBindingRoundTripTest {
 
 
     private void observePending(ConnectorBindingAttempt attempt) {
-        try (var connection = dataSource.getConnection(); var query = connection.prepareStatement(
-            "select b.status, b.install_attempt_id, c.updated_at from agent_connector_binding b join connector_connection c on c.id = b.connection_id where b.id = ?")) {
+        try (var connection = dataSource.getConnection();
+            var query = connection.prepareStatement(
+                "select b.status, b.install_attempt_id, c.updated_at from agent_connector_binding b join connector_connection c on c.id = b.connection_id where b.id = ?")) {
             query.setLong(1, attempt.bindingId());
             try (var rows = query.executeQuery()) {
                 assertThat(rows.next()).isTrue();
