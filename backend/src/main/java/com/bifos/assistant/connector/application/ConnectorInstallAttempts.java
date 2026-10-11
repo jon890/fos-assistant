@@ -96,7 +96,11 @@ public class ConnectorInstallAttempts {
         }
         boolean desired = binding.desiredEnabled();
         UUID attemptId = UUID.randomUUID();
-        binding.beginInstall(attemptId, now);
+        if (waiting == null) {
+            binding.beginInstall(attemptId, now);
+        } else {
+            binding.recordInstallAttempt(attemptId, now);
+        }
         bindings.save(binding);
         return new ConnectorBindingAttempt(
             binding.id(), agent.id(), connection.userId(), connection.id(), connection.updatedAt(),

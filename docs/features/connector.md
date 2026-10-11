@@ -290,7 +290,7 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Contro
 등록, 연결 확인, 붙이기, 관리자 반영 완료와 예약·드리프트 확인은 같은 설치 경계를 쓴다.
 `ConnectorInstallAttempts`가 트랜잭션 경계를 맡고 `ConnectorBindingInstalls`가 불변 입력으로 외부 호출을 실행한다.
 
-1. 시작 트랜잭션은 소유 사용자, 에이전트 순서로 잠근 뒤 바인딩을 다시 읽는다. 바인딩마다 새 `install_attempt_id`와 `PENDING`, `desired_enabled=false`를 적고 설치 입력을 반환한다.
+1. 시작 트랜잭션은 소유 사용자, 에이전트 순서로 잠근 뒤 바인딩을 다시 읽는다. 바인딩마다 새 `install_attempt_id`와 `PENDING`을 적고 설치 입력을 반환한다. 설치를 보낼 때는 `desired_enabled=false`로 내리고, 재시작·반영 예정만 기다리는 확인은 기존 의도를 유지한다.
 2. 시작을 커밋한 뒤 DB 트랜잭션 밖에서 설치, 상태 조회와 probe를 실행한다. 입력에는 커밋된 연결 revision과 profile, credential, 보관 파일과 manifest의 선언만 담는다. JPA 엔티티와 lazy 참조는 넘기지 않는다.
 3. 결과 트랜잭션은 같은 잠금 순서로 현재 바인딩을 다시 읽는다. 접근 권한·소유자·profile·credential·연결 상태와 revision·시도 UUID가 모두 맞을 때만 결과를 적고 UUID를 비운다.
 

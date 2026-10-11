@@ -426,6 +426,18 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
+    @Test
+    @DisplayName("설치를 보내지 않는 재시작 대기 확인은 기존의 켜려는 의도를 보존한다")
+    void preservesInstallIntentWhileRestartIsPending() {
+        Target target = readyTarget();
+        jdbc.update("UPDATE agent_connector_binding SET restart_required = TRUE WHERE id = ?", target.bindingId());
+        ConnectorBindingAttempt waiting = capture(target);
+        assertThat(waiting.waiting()).isEqualTo(ResyncOutcome.RESTART_PENDING);
+        assertThat(attempts.execute(waiting)).contains(ResyncOutcome.RESTART_PENDING);
+        assertThat(bindings.findById(target.bindingId()).orElseThrow().desiredEnabled()).isTrue();
+    }
+
+
     private Target readyTarget() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         requests.register(owner, DEMO, VALUES);

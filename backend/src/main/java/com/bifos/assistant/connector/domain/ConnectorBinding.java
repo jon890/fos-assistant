@@ -136,8 +136,14 @@ public class ConnectorBinding {
 
     /** 시작 트랜잭션이 새 시도를 적고 설치 중인 바인딩을 실행 대상에서 내린다. */
     public void beginInstall(UUID attemptId, Instant now) {
-        this.installAttemptId = Objects.requireNonNull(attemptId);
         this.desiredEnabled = false;
+        recordInstallAttempt(attemptId, now);
+    }
+
+
+    /** 설치를 보내지 않는 대기 확인은 켜려는 의도를 보존하고 새 결과 대조 시도만 적는다. */
+    public void recordInstallAttempt(UUID attemptId, Instant now) {
+        this.installAttemptId = Objects.requireNonNull(attemptId);
         // 실행 승인의 바인딩 revision도 같은 시계 값에서 새 설치를 구분해야 한다.
         Instant revision = now.truncatedTo(ChronoUnit.MICROS);
         pending(revision.isAfter(updatedAt) ? revision : updatedAt.plus(1, ChronoUnit.MICROS));
