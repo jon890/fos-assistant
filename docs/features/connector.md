@@ -634,6 +634,8 @@ ASCII symbol 대문자화와 decimal의 선행·후행 0 제거만 허용한다.
 
 조건 의도 키는 LP(`fos-conditional-intent-v1`) 뒤 경로마다 LP(경로)와 값 인코딩을 붙인 SHA-256이다.
 LP는 UTF-8 byte 길이의 10진수, 콜론, 원문 byte다. 문자열은 S+LP(값), 부재는 A, null은 N, 존재하는 leg 객체는 O이며 부재 객체의 하위 값도 A다.
+조건 의도 키 primitive는 tool을 포함한 LP 문자열의 UTF-8 인코딩을 엄격히 검사한다. 잘못된 surrogate를 대체 문자로 바꾸지 않고 거절하며 한글과 정상 비 BMP 문자의 해시는 유지한다.
+manifest의 도구 이름은 기존 ASCII 등록 규칙을 유지한다. primitive에서 정상 UTF-8인 `tool?`의 키를 계산해도 그 이름을 등록할 수 있다는 뜻은 아니다.
 
 | operation | 고정 경로 순서 |
 | --- | --- |
@@ -649,6 +651,9 @@ userId/connectionId는 양의 정수의 10진 문자열이며 market은 실행 �
 공통 [원문 vector](../../test/resources/conditional-snapshot-v1.json)는 model/execution/summary/scope를 정확한 UTF-8 문자열과 각각의 SHA로 보관한다.
 Python은 strict parser와 실제 prepare 소비를, Spring은 validate/capture와 실제 사용자 암호화·H2/MySQL 저장 후 open을 검사한다.
 Spring 원문 상한은 각각 16/16/8/2 KiB와 nesting5이며 중복 키와 trailing JSON을 거절한다. Python은 prepare 외피와 각 객체의 기존 byte·깊이 상한을 적용한다.
+공통 179개에서 Spring 원문 경계의 기대와 실제는 수용 47개·거절 132개다. Python의 실제 `_strict_json`과 `_prepare_result` 객체 소비는 수용 51개·거절 128개다.
+차이인 `RAW-modelArgs-BYTES`, `RAW-executionArgs-BYTES`, `RAW-summary-BYTES`, `RAW-scope-BYTES`는 추가 공백이 객체 변환 뒤 사라져 Python에서 허용되며 나머지 175개는 기대가 같다.
+시험의 네 원문 길이 단언은 Spring 경계의 기대를 설명하는 검사이며 Python production의 거절로 세지 않는다. Python 외부 API는 기존 객체 계약을 유지한다.
 저장 시 실행·scope 원문 SHA를 유지하고 세 원문을 다시 직렬화하지 않는다. 같은 keyId로 seal/open하며 AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`다.
 열·action·사용자·keyId와 저장 summary의 변조를 거절한다. table·migration·ticket·claim DTO와 암호화 형식은 바꾸지 않는다.
 
