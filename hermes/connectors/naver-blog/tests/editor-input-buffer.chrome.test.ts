@@ -1,7 +1,13 @@
 import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
 import { parseBody } from "../src/draft.ts";
 import { open } from "../src/editor/open.ts";
-import { closeTab, TITLE_SELECTOR, focusField } from "../src/editor/page.ts";
+import {
+  closeTab,
+  TITLE_SELECTOR,
+  focusField,
+  type EditorPage,
+} from "../src/editor/page.ts";
+import { runDraft } from "../src/editor/run.ts";
 import { fill } from "../src/editor/text.ts";
 import { localChrome } from "./local-chrome.ts";
 import { installInputBuffer } from "./input-buffer-fixture.ts";
@@ -27,6 +33,62 @@ async function tab() {
   await installInputBuffer(page);
   return page;
 }
+
+async function activateEditableAncestor(page: EditorPage) {
+  await page.js(`(() => {
+    document.body.contentEditable='true';
+    document.addEventListener('mouseup',()=>{
+      document.body.focus();getSelection().collapse(document.getElementById('title'),0);
+    });
+  })()`);
+}
+
+test("buffer가 준비돼도 비편집 제목의 editable 조상 초점은 직접 편집으로 받지 않는다", async () => {
+  const page = await tab();
+  await activateEditableAncestor(page);
+  expect(await open(page)).toBe("ready");
+  const result = await focusField(page, TITLE_SELECTOR, ".se-documentTitle");
+  expect(
+    await page.js<boolean>("document.activeElement === document.body"),
+  ).toBe(true);
+  expect(
+    await page.js<boolean>(
+      "document.body.isContentEditable && !title.isContentEditable",
+    ),
+  ).toBe(true);
+  expect(result.diagnostics.samples.at(-1)).toMatchObject({
+    editable: true,
+    anchor: "title",
+    end: "title",
+    collapsed: true,
+    input_frame: false,
+  });
+  expect(result.focused).toBe(false);
+});
+
+test("비편집 제목의 editable 조상 초점은 실행에서 글 입력·키 입력·저장을 하지 않는다", async () => {
+  const stages: string[] = [],
+    start = browser.calls.length;
+  const error = await runDraft(
+    { NAVER_BLOG_BROWSER_URL: browser.url, NAVER_BLOG_ID: "synthetic-blog" },
+    parseBody(draft.body),
+    { ...draft, category: "", tags: [] },
+    async (stage) => {
+      stages.push(stage);
+      if (stage === "fill") {
+        const page = await browser.latest();
+        await installInputBuffer(page);
+        await activateEditableAncestor(page);
+      }
+    },
+    new AbortController().signal,
+    { stepSeconds: 0.6, openSeconds: 1 },
+  ).catch((error) => error);
+  expect(error.message).toBe("제목 자리에 커서를 두지 못했다");
+  expect(stages).toEqual(["open", "fill"]);
+  expect(browser.calls.slice(start)).not.toContain("Input.insertText");
+  expect(browser.calls.slice(start)).not.toContain("Input.dispatchKeyEvent");
+});
 
 test("비편집 모델 문단과 별도 입력 프레임은 실제 pointer·selection·CDP 입력으로 제목과 본문을 대조한다", async () => {
   const page = await tab();

@@ -126,7 +126,7 @@ Set the \`cycles\` parameter to \`"ref"\` to resolve cyclical schemas with defs.
     el.contains(top) && !!el.closest(${JSON.stringify(J)});
   const focused = clickable && !!s?.isCollapsed &&
     el.contains(s.anchorNode) && el.contains(s.focusNode) && (inputFrame ||
-      (!!active?.isContentEditable && (active.contains(el) || el.contains(active))));
+      (el.isContentEditable && !!active?.isContentEditable && (active.contains(el) || el.contains(active))));
   return { focused, spot: clickable ? {x, y} : null, sample: {
     elements: Math.min(nodes.length, 100), sized, editable,
     page_focused: pageFocused, page_visible: pageVisible,
