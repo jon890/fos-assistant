@@ -8,6 +8,7 @@ import {
   connectionErrorMessage,
   connectorIconSrc,
   connectorLinkHref,
+  connectorAppearanceLinkHref,
   type ConnectorTool,
   type ToolApproval,
   type ToolRisk,
@@ -193,7 +194,13 @@ function safeSummary(value: unknown) {
     title: text(item.title),
     description: text(item.description ?? ""),
     icon: connectorIconSrc(typeof item.icon === "string" ? item.icon : null),
-    link: connectorLinkHref(typeof item.link === "string" ? item.link : null),
+    link: connectorAppearanceLinkHref(
+      typeof item.link === "string" ? item.link : null,
+    ),
+    readmeUrl: connectorAppearanceLinkHref(
+      typeof item.readmeUrl === "string" ? item.readmeUrl : null,
+    ),
+    linkKind: item.linkKind === "project" ? "project" : "service",
     ownerBrowserLoginUrl: connectorLinkHref(
       typeof item.ownerBrowserLoginUrl === "string"
         ? item.ownerBrowserLoginUrl
