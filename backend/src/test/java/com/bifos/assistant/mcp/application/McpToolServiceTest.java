@@ -40,27 +40,28 @@ import org.slf4j.LoggerFactory;
 class McpToolServiceTest {
     private final CurrentUser user = new CurrentUser(7L, "user@example.com", "사용자", 1L, UserRole.MEMBER);
     private final ArtifactWriteRequest request = new ArtifactWriteRequest(
-            UUID.randomUUID(), "image.png", null, "https://images.example.com/a.png?private=value");
+        UUID.randomUUID(), "image.png", null, "https://images.example.com/a.png?private=value");
     private final ArtifactWriteService artifacts = mock(ArtifactWriteService.class);
     private final MemoryService memories = mock(MemoryService.class);
     private final McpToolService tools = new McpToolService(
-            memories,
-            artifacts,
-            mock(AgentDelegationService.class),
-            LiveProperties.fixed(
-                    DelegationProperties.class,
-                    new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20))),
-            mock(ExecutionDeliveryWriter.class),
-            mock(ExecutionContextSourceWriter.class),
-            mock(AgentRepository.class),
-            mock(AgentConnectorBindings.class),
-            mock(FollowUpService.class),
-            mock(McpMemoryRemember.class),
-            mock(McpMediaObservationTools.class),
-            Clock.systemUTC());
+        memories,
+        artifacts,
+        mock(AgentDelegationService.class),
+        LiveProperties.fixed(
+            DelegationProperties.class,
+            new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(20))),
+        mock(ExecutionDeliveryWriter.class),
+        mock(ExecutionContextSourceWriter.class),
+        mock(AgentRepository.class),
+        mock(AgentConnectorBindings.class),
+        mock(FollowUpService.class),
+        mock(McpMemoryRemember.class),
+        mock(McpMediaObservationTools.class),
+        Clock.systemUTC());
     private final AgentExecution parent = mock(AgentExecution.class);
     private McpCaller caller;
     private ListAppender<ILoggingEvent> logs;
+
 
     @BeforeEach
     void captureLogs() {
@@ -71,57 +72,61 @@ class McpToolServiceTest {
         logger().addAppender(logs);
     }
 
+
     @AfterEach
     void stopCapturingLogs() {
         logger().detachAppender(logs);
     }
 
+
     @Test
     @DisplayName("정해 둔 API 오류 문구와 코드만 남긴다")
     void keepsOnlyFixedApiErrorTextAndCode() {
         when(artifacts.write(any(), any()))
-                .thenThrow(new ApiException(
-                        ErrorCode.INTERNAL_ERROR,
-                        "artifact source download timed out",
-                        new IllegalStateException("private=value")));
+            .thenThrow(new ApiException(
+                ErrorCode.INTERNAL_ERROR,
+                "artifact source download timed out",
+                new IllegalStateException("private=value")));
 
         assertThat(tools.writeArtifact(caller, request).get("isError")).isEqualTo(true);
 
         assertThat(logs.list).hasSize(1);
         ILoggingEvent event = logs.list.getFirst();
         assertThat(event.getFormattedMessage())
-                .contains(
-                        "userId=7",
-                        "executionId=42",
-                        "exceptionClass=ApiException",
-                        "errorCode=INTERNAL_ERROR",
-                        "reason=artifact source download timed out")
-                .doesNotContain("private=value", "image.png");
+            .contains(
+                "userId=7",
+                "executionId=42",
+                "exceptionClass=ApiException",
+                "errorCode=INTERNAL_ERROR",
+                "reason=artifact source download timed out")
+            .doesNotContain("private=value", "image.png");
         assertThat(event.getThrowableProxy()).isNull();
     }
+
 
     @Test
     @DisplayName("알 수 없는 API 문구와 RuntimeException 문구는 로그에 남기지 않는다")
     void doesNotLogUnknownApiTextAndRuntimeExceptionText() {
         when(artifacts.write(any(), any()))
-                .thenThrow(new ApiException(ErrorCode.INTERNAL_ERROR, "private=value"))
-                .thenThrow(new IllegalStateException("private=value"));
+            .thenThrow(new ApiException(ErrorCode.INTERNAL_ERROR, "private=value"))
+            .thenThrow(new IllegalStateException("private=value"));
 
         assertThat(tools.writeArtifact(caller, request).get("isError")).isEqualTo(true);
         assertThat(tools.writeArtifact(caller, request).get("isError")).isEqualTo(true);
 
         assertThat(logs.list).hasSize(2);
         assertThat(logs.list.get(0).getFormattedMessage())
-                .contains("exceptionClass=ApiException", "errorCode=INTERNAL_ERROR", "reason=artifact write failed")
-                .doesNotContain("private=value");
+            .contains("exceptionClass=ApiException", "errorCode=INTERNAL_ERROR", "reason=artifact write failed")
+            .doesNotContain("private=value");
         assertThat(logs.list.get(1).getFormattedMessage())
-                .contains(
-                        "exceptionClass=IllegalStateException",
-                        "errorCode=INTERNAL_ERROR",
-                        "reason=unexpected artifact write failure")
-                .doesNotContain("private=value");
+            .contains(
+                "exceptionClass=IllegalStateException",
+                "errorCode=INTERNAL_ERROR",
+                "reason=unexpected artifact write failure")
+            .doesNotContain("private=value");
         assertThat(logs.list).allMatch(event -> event.getThrowableProxy() == null);
     }
+
 
     @Test
     @DisplayName("Memory 를 읽으면 부모 실행의 사용자로 읽고 실행 번호를 로그에 남긴다")
@@ -133,37 +138,40 @@ class McpToolServiceTest {
         assertThat(tools.readMemory(caller, 5L).get("isError")).isEqualTo(false);
 
         assertThat(logs.list)
-                .singleElement()
-                .extracting(ILoggingEvent::getFormattedMessage)
-                .isEqualTo("memory read userId=7 memoryId=5 executionId=42");
+            .singleElement()
+            .extracting(ILoggingEvent::getFormattedMessage)
+            .isEqualTo("memory read userId=7 memoryId=5 executionId=42");
     }
+
 
     @Test
     @DisplayName("호출 맥락 오류는 이유를 가리지 않는 한 가지 결과다")
     void callContextErrorIsOneResultRegardlessOfReason() {
         assertThat(tools.invalidContext())
-                .isEqualTo(Map.of(
-                        "content",
-                        List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),
-                        "isError",
-                        true));
+            .isEqualTo(Map.of(
+                "content",
+                List.of(Map.of("type", "text", "text", "호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.")),
+                "isError",
+                true));
     }
+
 
     @Test
     @DisplayName("agent status 설명은 기다리지 말라는 문장을 지키고 먼저 살펴보기에서만 설정한 상한까지 기다린다고 적는다")
     void agentStatusDescriptionKeepsNoWaitRuleAndStatesCheckWaitMax() {
         String description = tools.tools().stream()
-                .filter(tool -> "agent_status".equals(tool.get("name")))
-                .map(tool -> (String) tool.get("description"))
-                .findFirst()
-                .orElseThrow();
+            .filter(tool -> "agent_status".equals(tool.get("name")))
+            .map(tool -> (String)tool.get("description"))
+            .findFirst()
+            .orElseThrow();
 
         assertThat(description)
-                .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")
-                .endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 20초).");
+            .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")
+            .endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 20초).");
     }
 
+
     private static Logger logger() {
-        return (Logger) LoggerFactory.getLogger(McpToolService.class);
+        return (Logger)LoggerFactory.getLogger(McpToolService.class);
     }
 }

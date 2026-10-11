@@ -21,10 +21,10 @@ class HermesRunEventStreamTest {
         var mapper = JsonMapper.builder().build();
         String marker = "SYNTHETIC_OCR_PRIVATE_6318";
         for (String tool : List.of(
-                "list_media_observations",
-                "record_media_observation",
-                "mcp__fos_assistant__list_media_observations",
-                "mcp__fos_assistant__record_media_observation")) {
+            "list_media_observations",
+            "record_media_observation",
+            "mcp__fos_assistant__list_media_observations",
+            "mcp__fos_assistant__record_media_observation")) {
             for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
                 for (boolean nested : new boolean[] {false, true}) {
                     for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
@@ -42,11 +42,14 @@ class HermesRunEventStreamTest {
         }
     }
 
+
     private final JsonMapper mapper = JsonMapper.builder().build();
+
 
     private RunEvent parse(String raw) {
         return HermesRunEventStream.toRunEvent(mapper.readTree(raw));
     }
+
 
     @Test
     @DisplayName("도구 결과 객체와 문자열을 중계 전에 같은 규칙으로 가린다")
@@ -63,6 +66,7 @@ class HermesRunEventStreamTest {
         assertThat(text.detail()).isEqualTo("[가림]");
     }
 
+
     @Test
     @DisplayName("연결용 도구의 결과는 가리되 이름과 성공 여부와 걸린 시간은 남긴다")
     void hidesConnectorDetailAndPreservesToolMetadata() {
@@ -76,6 +80,7 @@ class HermesRunEventStreamTest {
         assertThat(event.failed()).isFalse();
     }
 
+
     @Test
     @DisplayName("32자를 넘는 스킬 이름은 설명에서 가리고 가리기 전에 꺼낸 이름을 따로 싣는다")
     void hidesLongSkillNameInDetailAndCarriesNameTakenBeforeRedaction() {
@@ -83,7 +88,7 @@ class HermesRunEventStreamTest {
 
         RunEvent nameOnly = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name + "\"}");
         RunEvent withPath = parse("{\"data\":{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + name
-                + " → references/list.md\"}}");
+            + " → references/list.md\"}}");
 
         assertThat(nameOnly.detail()).isEqualTo("[가림]");
         assertThat(nameOnly.skillName()).isEqualTo(name);
@@ -91,18 +96,19 @@ class HermesRunEventStreamTest {
         assertThat(withPath.skillName()).isEqualTo(name);
     }
 
+
     @Test
     @DisplayName("이름 규칙에 맞지 않는 skill view 미리보기에서는 이름을 싣지 않는다")
     void carriesNoSkillNameWhenSkillViewPreviewBreaksNameRule() {
         for (String preview : new String[] {"Shopping", "weekly shopping", "a".repeat(65), "", "../shopping"}) {
-            RunEvent event =
-                    parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + preview + "\"}");
+            RunEvent event = parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"" + preview + "\"}");
 
             assertThat(event.skillName()).as("미리보기 「%s」", preview).isNull();
         }
         assertThat(parse("{\"event\":\"tool.started\",\"tool\":\"skill_view\"}").skillName())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("skill view 가 아닌 도구와 도구 완료 사건과 연결용 실행에서는 스킬 이름을 싣지 않는다")
@@ -111,8 +117,8 @@ class HermesRunEventStreamTest {
         RunEvent completed = parse("{\"event\":\"tool.completed\",\"tool\":\"skill_view\",\"detail\":\"shopping\"}");
         RunEvent subagent = parse("{\"event\":\"subagent.start\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}");
         RunEvent connector = HermesRunEventStream.toRunEvent(
-                mapper.readTree("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}"),
-                ToolDetailScope.ALL);
+            mapper.readTree("{\"event\":\"tool.started\",\"tool\":\"skill_view\",\"preview\":\"shopping\"}"),
+            ToolDetailScope.ALL);
 
         assertThat(otherTool.skillName()).isNull();
         assertThat(completed.skillName()).isNull();
@@ -120,6 +126,7 @@ class HermesRunEventStreamTest {
         assertThat(connector.skillName()).isNull();
         assertThat(connector.detail()).isEqualTo("[연결 도구 내용 가림]");
     }
+
 
     @Test
     @DisplayName("초 단위 실수로 오는 걸린 시간을 밀리초 정수로 옮긴다")
@@ -131,12 +138,14 @@ class HermesRunEventStreamTest {
         assertThat(event.durationMs()).isEqualTo(1250L);
     }
 
+
     @Test
     @DisplayName("걸린 시간이 0이면 0밀리초가 된다")
     void zeroElapsedBecomesZeroMillis() {
         assertThat(parse("{\"event\": \"tool.completed\", \"duration\": 0}").durationMs())
-                .isZero();
+            .isZero();
     }
+
 
     @Test
     @DisplayName("걸린 시간을 보내지 않으면 비운다")
@@ -147,18 +156,19 @@ class HermesRunEventStreamTest {
         assertThat(event.failed()).isNull();
     }
 
+
     @Test
     @DisplayName("도구가 실패로 끝났는지를 읽는다")
     void readsWhetherToolEndedInFailure() {
         assertThat(parse("{\"event\": \"tool.completed\", \"error\": true}").failed())
-                .isTrue();
+            .isTrue();
         assertThat(parse("{\"event\": \"tool.completed\", \"error\": false}").failed())
-                .isFalse();
-        RunEvent inspection =
-                parse("{\"event\":\"tool.completed\",\"tool\":\"attachment_inspect\",\"error\":true,\"duration\":0.5}");
+            .isFalse();
+        RunEvent inspection = parse("{\"event\":\"tool.completed\",\"tool\":\"attachment_inspect\",\"error\":true,\"duration\":0.5}");
         assertThat(inspection.toolName()).isEqualTo("attachment_inspect");
         assertThat(inspection.failed()).isTrue();
     }
+
 
     @Test
     @DisplayName("글자 조각은 delta로 온다")
@@ -169,11 +179,12 @@ class HermesRunEventStreamTest {
         assertThat(event.text()).isEqualTo("안녕하");
     }
 
+
     @Test
     @DisplayName("사건이 data 안에 실려 와도 같은 칸을 읽는다")
     void readsSameFieldWhenEventIsNestedInData() {
         RunEvent event = parse("{\"data\": {\"event\": \"tool.completed\", \"tool\": \"grep\", \"duration\": 2.5,"
-                + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
+            + " \"error\": true, \"preview\": \"찾지 못했다\"}}");
 
         assertThat(event.type()).isEqualTo("tool.completed");
         assertThat(event.toolName()).isEqualTo("grep");
@@ -182,12 +193,13 @@ class HermesRunEventStreamTest {
         assertThat(event.detail()).isEqualTo("찾지 못했다");
     }
 
+
     @Test
     @DisplayName("하위 에이전트의 목표와 모델과 토큰을 읽는다")
     void readsSubagentGoalModelAndTokens() {
         RunEvent event = parse("{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-1\","
-                + "\"goal\":\"숙소 조사\",\"model\":\"model-a\",\"child_session_id\":\"child-1\","
-                + "\"input_tokens\":12300,\"output_tokens\":410,\"status\":\"completed\",\"duration_seconds\":1.5}");
+            + "\"goal\":\"숙소 조사\",\"model\":\"model-a\",\"child_session_id\":\"child-1\","
+            + "\"input_tokens\":12300,\"output_tokens\":410,\"status\":\"completed\",\"duration_seconds\":1.5}");
 
         assertThat(event.subagentId()).isEqualTo("sa-1");
         assertThat(event.goal()).isEqualTo("숙소 조사");
@@ -200,12 +212,13 @@ class HermesRunEventStreamTest {
         assertThat(event.failed()).isFalse();
     }
 
+
     @Test
     @DisplayName("data 안의 상태가 실패면 error 없이도 실패로 읽는다")
     void readsFailureFromStatusInDataEvenWithoutError() {
         RunEvent event = parse("{\"data\":{\"event\":\"subagent.complete\",\"subagent_id\":\"sa-2\","
-                + "\"goal\":\"조사\",\"model\":\"model-b\",\"child_session_id\":\"child-2\","
-                + "\"input_tokens\":5,\"output_tokens\":2,\"status\":\"failed\",\"duration_seconds\":0.25}}");
+            + "\"goal\":\"조사\",\"model\":\"model-b\",\"child_session_id\":\"child-2\","
+            + "\"input_tokens\":5,\"output_tokens\":2,\"status\":\"failed\",\"duration_seconds\":0.25}}");
 
         assertThat(event.subagentId()).isEqualTo("sa-2");
         assertThat(event.goal()).isEqualTo("조사");
@@ -218,19 +231,21 @@ class HermesRunEventStreamTest {
         assertThat(event.failed()).isTrue();
     }
 
+
     @Test
     @DisplayName("하위 에이전트의 목표와 preview 는 도구 내용과 같은 규칙으로 비밀값과 UUID 를 가린다")
     void redactsSubagentGoalAndPreviewLikeToolDetail() {
         String id = "12345678-1234-5678-9012-123456789abc";
         RunEvent withGoal = parse("{\"event\":\"subagent.start\",\"subagent_id\":\"sa-1\","
-                + "\"goal\":\"메일 정리 token=short-secret 대상 " + id + "\"}");
+            + "\"goal\":\"메일 정리 token=short-secret 대상 " + id + "\"}");
         RunEvent withPreview = parse(
-                "{\"event\":\"subagent.complete\",\"preview\":\"Bearer small-secret 로 조회\",\"status\":\"completed\"}");
+            "{\"event\":\"subagent.complete\",\"preview\":\"Bearer small-secret 로 조회\",\"status\":\"completed\"}");
 
         assertThat(withGoal.goal()).isEqualTo("메일 정리 token=[가림] 대상 [항목 1]");
         assertThat(withPreview.goal()).isNull();
         assertThat(withPreview.detail()).isEqualTo("[가림] 로 조회");
     }
+
 
     @Test
     @DisplayName("옛 커넥터 에이전트의 하위 에이전트 목표는 통째로 가리고 연결을 붙인 에이전트는 비밀값만 가린다")
@@ -238,13 +253,14 @@ class HermesRunEventStreamTest {
         String json = "{\"event\":\"subagent.start\",\"goal\":\"받은 메일 요약 password=abc\"}";
 
         assertThat(HermesRunEventStream.toRunEvent(mapper.readTree(json), ToolDetailScope.ALL)
-                        .goal())
+            .goal())
                 .isEqualTo("[연결 도구 내용 가림]");
         assertThat(HermesRunEventStream.toRunEvent(
-                                mapper.readTree(json), ToolDetailScope.prefixes(Set.of("mcp__mail__")))
-                        .goal())
+            mapper.readTree(json), ToolDetailScope.prefixes(Set.of("mcp__mail__")))
+            .goal())
                 .isEqualTo("받은 메일 요약 password=[가림]");
     }
+
 
     @Test
     @DisplayName("목표와 preview가 없으면 상태를 목표 대신 쓰지 않는다")

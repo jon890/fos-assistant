@@ -20,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 public class MediaObservationInputReader {
     private final ObjectMapper json;
 
+
     public MediaObservationInput read(JsonNode node, ObservationProvenance source) {
         try {
             fields(node, Set.of("status", "summary", "claims", "uncertainties", "coverage", "errorCode"));
@@ -74,24 +75,24 @@ public class MediaObservationInputReader {
             }
             for (MediaObservationInput.Claim claim : input.claims()) {
                 if (user
-                        ? !"USER".equals(claim.kind())
-                        : !Set.of("VISUAL", "OCR").contains(claim.kind())) {
+                    ? !"USER".equals(claim.kind())
+                    : !Set.of("VISUAL", "OCR").contains(claim.kind())) {
                     throw invalid();
                 }
             }
             var evidence = input.status() == ObservationStatus.FAILED
-                    ? null
-                    : new MediaObservationInput.Evidence(
-                            kind,
-                            user ? "USER_CORRECTION" : source.executionId().toString());
+                ? null
+                : new MediaObservationInput.Evidence(
+                    kind,
+                    user ? "USER_CORRECTION" : source.executionId().toString());
             input = new MediaObservationInput(
-                    input.status(),
-                    input.summary(),
-                    input.claims(),
-                    input.uncertainties(),
-                    input.coverage(),
-                    evidence,
-                    input.errorCode());
+                input.status(),
+                input.summary(),
+                input.claims(),
+                input.uncertainties(),
+                input.coverage(),
+                evidence,
+                input.errorCode());
             input.validate(source);
             if (json.writeValueAsBytes(input).length > MediaObservationInput.MAX_BODY_BYTES) {
                 throw invalid();
@@ -102,11 +103,13 @@ public class MediaObservationInputReader {
         }
     }
 
+
     public static void fields(JsonNode node, Set<String> allowed) {
         if (node == null || !node.isObject() || !allowed.containsAll(node.propertyNames())) {
             throw invalid();
         }
     }
+
 
     public static long revision(JsonNode node) {
         if (node == null || !node.isIntegralNumber() || !node.canConvertToLong() || node.longValue() < 0) {
@@ -115,15 +118,17 @@ public class MediaObservationInputReader {
         return node.longValue();
     }
 
+
     public static UUID requestId(JsonNode node) {
         if (node == null
-                || !node.isTextual()
-                || !node.asString()
-                        .matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
+            || !node.isTextual()
+            || !node.asString()
+                .matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
             throw invalid();
         }
         return UUID.fromString(node.asString());
     }
+
 
     public static Long assetId(String value) {
         try {
@@ -136,9 +141,11 @@ public class MediaObservationInputReader {
         }
     }
 
+
     public static ApiException invalid() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "invalid media observation");
     }
+
 
     private static void text(JsonNode value, int max, boolean required) {
         if (value == null || value.isNull()) {
@@ -146,17 +153,19 @@ public class MediaObservationInputReader {
                 throw invalid();
             }
         } else if (!value.isTextual()
-                || value.asString().codePointCount(0, value.asString().length()) > max
-                || required && value.asString().isBlank()) {
+            || value.asString().codePointCount(0, value.asString().length()) > max
+            || required && value.asString().isBlank()) {
             throw invalid();
         }
     }
+
 
     private static void array(JsonNode value, int max) {
         if (value != null && !value.isNull() && (!value.isArray() || value.size() > max)) {
             throw invalid();
         }
     }
+
 
     private static void budget(JsonNode node, int[] bytes) {
         if (node.isTextual()) {

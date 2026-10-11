@@ -16,6 +16,7 @@ public class MediaObservationPages {
     private final MediaObservationService observations;
     private final ObjectMapper json;
 
+
     public MediaObservationPage list(CurrentUser user, Long conversationId, String afterAssetId, int limit) {
         if (limit < 1 || limit > 30) {
             throw MediaObservationInputReader.invalid();

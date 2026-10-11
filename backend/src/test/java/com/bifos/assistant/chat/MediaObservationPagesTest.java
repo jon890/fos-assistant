@@ -17,6 +17,7 @@ class MediaObservationPagesTest extends ObservationFixture {
     @Autowired
     MediaObservationPages pages;
 
+
     @Test
     @DisplayName("본문 예산 커서를 끝까지 따라가도 보낸 첨부가 중복되거나 빠지지 않는다")
     void followsByteBudgetWithoutSkippingOrDuplicatingSentIds() {
@@ -29,7 +30,7 @@ class MediaObservationPagesTest extends ObservationFixture {
                 claims.add(new MediaObservationInput.Claim("OCR", "😀\\\"".repeat(120), "UNCERTAIN", List.of("합성 근거")));
             }
             var body = new MediaObservationInput(
-                    input().status(), "한글 😀", claims, List.of(), input().coverage(), input().evidence(), null);
+                input().status(), "한글 😀", claims, List.of(), input().coverage(), input().evidence(), null);
             service.record(owner, conversation.id(), attachment.id(), 0, UUID.randomUUID(), body, model());
         }
         attachmentCleaner.delete(photo, NOW);
@@ -40,12 +41,12 @@ class MediaObservationPagesTest extends ObservationFixture {
             var page = pages.list(owner, conversation.id(), cursor, 3);
             assertThat(page.items()).isNotEmpty().hasSizeLessThanOrEqualTo(3);
             assertThat(page.items().stream()
-                            .filter(item -> item.observation() != null)
-                            .mapToInt(item -> json.writeValueAsBytes(item.observation()).length)
-                            .sum())
+                .filter(item -> item.observation() != null)
+                .mapToInt(item -> json.writeValueAsBytes(item.observation()).length)
+                .sum())
                     .isLessThanOrEqualTo(32768);
             actual.addAll(
-                    page.items().stream().map(MediaObservationView::assetId).toList());
+                page.items().stream().map(MediaObservationView::assetId).toList());
             pageCount++;
             cursor = page.nextAfterAssetId();
             if (cursor != null) {
@@ -55,21 +56,22 @@ class MediaObservationPagesTest extends ObservationFixture {
         } while (cursor != null);
         assertThat(actual).containsExactlyElementsOf(expected);
         assertThat(pages.list(owner, conversation.id(), null, 30)
-                        .items()
-                        .getFirst()
-                        .ordinal())
+            .items()
+            .getFirst()
+            .ordinal())
                 .isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("페이지 한도와 빈 끝을 지키며 조회는 행을 만들지 않는다")
     void enforcesLimitAndEmptyEndWithoutCreatingRows() {
         code(() -> pages.list(owner, conversation.id(), null, 31), ErrorCode.VALIDATION_FAILED);
         assertThat(pages.list(owner, conversation.id(), photo.id().toString(), 1)
-                        .items())
+            .items())
                 .isEmpty();
         assertThat(pages.list(owner, conversation.id(), null, 1).nextAfterAssetId())
-                .isNull();
+            .isNull();
         assertThat(observations.count()).isZero();
     }
 }

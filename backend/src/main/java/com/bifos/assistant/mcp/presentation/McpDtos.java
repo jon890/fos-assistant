@@ -26,12 +26,12 @@ public final class McpDtos {
             if (value < 1 || value > 30) {
                 throw MediaObservationInputReader.invalid();
             }
-            return new MediaObservationListArguments(after, (int) value);
+            return new MediaObservationListArguments(after, (int)value);
         }
     }
 
     public record MediaObservationRecordArguments(
-            String assetId, long expectedRevision, UUID requestId, JsonNode observation) {
+        String assetId, long expectedRevision, UUID requestId, JsonNode observation) {
         static MediaObservationRecordArguments from(JsonNode node) {
             MediaObservationInputReader.fields(node, Set.of("assetId", "expectedRevision", "requestId", "observation"));
             JsonNode asset = node.get("assetId");
@@ -40,11 +40,12 @@ public final class McpDtos {
             }
             MediaObservationInputReader.assetId(asset.asString());
             return new MediaObservationRecordArguments(
-                    asset.asString(),
-                    MediaObservationInputReader.revision(node.get("expectedRevision")),
-                    MediaObservationInputReader.requestId(node.get("requestId")),
-                    node.get("observation"));
+                asset.asString(),
+                MediaObservationInputReader.revision(node.get("expectedRevision")),
+                MediaObservationInputReader.requestId(node.get("requestId")),
+                node.get("observation"));
         }
+
 
         @Override
         public String toString() {
@@ -52,17 +53,19 @@ public final class McpDtos {
         }
     }
 
-    public record MemoryReadArguments(Long id) {}
+    public record MemoryReadArguments(Long id) {
+    }
 
     public record ArtifactWriteArguments(String conversationId, String path, String content, String sourceUrl) {
         /** JSON의 snake_case 이름을 Java record의 이름으로 바꾼다. */
         static ArtifactWriteArguments from(JsonNode arguments) {
             return new ArtifactWriteArguments(
-                    arguments.get("conversation_id").asString(),
-                    arguments.get("path").asString(),
-                    optional(arguments, "content"),
-                    optional(arguments, "source_url"));
+                arguments.get("conversation_id").asString(),
+                arguments.get("path").asString(),
+                optional(arguments, "content"),
+                optional(arguments, "source_url"));
         }
+
 
         private static String optional(JsonNode arguments, String name) {
             JsonNode value = arguments.get(name);
@@ -82,10 +85,11 @@ public final class McpDtos {
             JsonNode dueAt = arguments.get("due_at");
             JsonNode waiting = arguments.get("waiting");
             return new FollowUpProposeArguments(
-                    arguments.get("title").asString(),
-                    dueAt == null || dueAt.isNull() ? null : dueAt.asString(),
-                    waiting == null || waiting.isNull() ? null : waiting.booleanValue());
+                arguments.get("title").asString(),
+                dueAt == null || dueAt.isNull() ? null : dueAt.asString(),
+                waiting == null || waiting.isNull() ? null : waiting.booleanValue());
         }
+
 
         /** 제목을 빼고 낸다. 제목을 로그에 남기지 않는다. */
         @Override
@@ -103,33 +107,36 @@ public final class McpDtos {
      * @param sensitive 민감한 내용인가. 없거나 {@code null} 이면 null
      */
     public record MemoryRememberArguments(
-            String title, String content, String evidence, Long memoryId, String collection, Boolean sensitive) {
+        String title, String content, String evidence, Long memoryId, String collection, Boolean sensitive) {
         /** JSON 의 snake_case 이름을 Java record 의 이름으로 바꾼다. {@code null} 값은 없는 것으로 본다. */
         static MemoryRememberArguments from(JsonNode arguments) {
             JsonNode memoryId = arguments.get("memory_id");
             JsonNode sensitive = arguments.get("sensitive");
             return new MemoryRememberArguments(
-                    arguments.get("title").asString(),
-                    arguments.get("content").asString(),
-                    optionalText(arguments, "evidence"),
-                    memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
-                    optionalText(arguments, "collection"),
-                    sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue());
+                arguments.get("title").asString(),
+                arguments.get("content").asString(),
+                optionalText(arguments, "evidence"),
+                memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
+                optionalText(arguments, "collection"),
+                sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue());
         }
+
 
         private static String optionalText(JsonNode arguments, String name) {
             JsonNode value = arguments.get(name);
             return value == null || value.isNull() ? null : value.asString();
         }
 
+
         /** 제목, 본문, 근거를 빼고 낸다. 로그에 남기지 않는다. */
         @Override
         public String toString() {
             return "MemoryRememberArguments[memoryId=" + memoryId + ", collection=" + collection + ", sensitive="
-                    + sensitive + "]";
+                + sensitive + "]";
         }
     }
 
     /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
-    public record SubagentRegistrationResponse(String result) {}
+    public record SubagentRegistrationResponse(String result) {
+    }
 }

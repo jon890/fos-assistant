@@ -154,6 +154,7 @@ class McpMediaObservationToolTest {
     private String token;
     private String root;
 
+
     @BeforeEach
     void prepare() {
         clock.set(Instant.parse("2026-10-10T01:00:00Z"));
@@ -166,18 +167,19 @@ class McpMediaObservationToolTest {
         people.save(AllowedPerson.of(user.email(), "주인", PROFILE, clock.instant()));
         agent = McpCallSigner.agentFor(agents, PROFILE);
         jdbc.update(
-                "update agent set enabled=true, deleted_at=null, visibility='GROUP', owner_user_id=null, hermes_profile=? where id=?",
-                PROFILE,
-                agent.id());
+            "update agent set enabled=true, deleted_at=null, visibility='GROUP', owner_user_id=null, hermes_profile=? where id=?",
+            PROFILE,
+            agent.id());
         conversation = conversations.save(Conversation.startedBy(user.id(), "사진 관찰", agent.id(), clock.instant()));
         photo = photo();
         token = tokens.issue(PROFILE, "관찰 시험").rawToken();
         root = McpCallSigner.newRoot();
         origin = McpCallSigner.running(executions, agents, user.id(), conversation.id(), PROFILE, root);
         jdbc.update(
-                "update agent_execution set provider='requested-provider', model='requested-model' where id=?",
-                origin.id());
+            "update agent_execution set provider='requested-provider', model='requested-model' where id=?",
+            origin.id());
     }
+
 
     @AfterEach
     void cleanup() throws Exception {
@@ -188,9 +190,9 @@ class McpMediaObservationToolTest {
         jdbc.update("delete from allowed_person where hermes_profile=?", PROFILE);
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         jdbc.update(
-                "update agent set enabled=true, deleted_at=null, visibility='GROUP', owner_user_id=null, hermes_profile=? where id=?",
-                PROFILE,
-                agent.id());
+            "update agent set enabled=true, deleted_at=null, visibility='GROUP', owner_user_id=null, hermes_profile=? where id=?",
+            PROFILE,
+            agent.id());
         for (Path directory : directories) {
             if (Files.exists(directory)) {
                 try (var files = Files.walk(directory)) {
@@ -202,56 +204,58 @@ class McpMediaObservationToolTest {
         }
     }
 
+
     @Test
     @DisplayName("도구 이름 순서와 중첩 schema는 기존 도구를 보존한다")
     void exposesSchemasWithoutRemovingOrDuplicatingExistingTools() throws Exception {
         var list = json.readTree(send("/mcp", token, "{\"id\":1,\"method\":\"tools/list\"}", false)
-                        .body())
-                .path("result")
-                .path("tools");
+            .body())
+            .path("result")
+            .path("tools");
         assertThat(list)
-                .extracting(item -> item.path("name").asString())
-                .doesNotHaveDuplicates()
-                .containsSubsequence(
-                        "memory_read",
-                        "artifact_write",
-                        "agent_list",
-                        "agent_delegate",
-                        "agent_status",
-                        "agent_stop",
-                        "follow_up_propose",
-                        McpMediaObservationTools.LIST,
-                        McpMediaObservationTools.RECORD,
-                        "memory_remember");
+            .extracting(item -> item.path("name").asString())
+            .doesNotHaveDuplicates()
+            .containsSubsequence(
+                "memory_read",
+                "artifact_write",
+                "agent_list",
+                "agent_delegate",
+                "agent_status",
+                "agent_stop",
+                "follow_up_propose",
+                McpMediaObservationTools.LIST,
+                McpMediaObservationTools.RECORD,
+                "memory_remember");
         for (JsonNode tool : list) {
             if (McpMediaObservationTools.RECORD.equals(tool.path("name").asString())) {
                 var schema = tool.path("inputSchema");
                 assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
                 assertThat(schema.path("required"))
-                        .extracting(JsonNode::asString)
-                        .containsExactlyInAnyOrder("assetId", "expectedRevision", "requestId", "observation");
+                    .extracting(JsonNode::asString)
+                    .containsExactlyInAnyOrder("assetId", "expectedRevision", "requestId", "observation");
                 assertThat(schema.path("properties")
-                                .path("observation")
-                                .path("additionalProperties")
-                                .asBoolean())
+                    .path("observation")
+                    .path("additionalProperties")
+                    .asBoolean())
                         .isFalse();
                 assertThat(schema.path("properties")
-                                .path("observation")
-                                .path("properties")
-                                .has("evidence"))
+                    .path("observation")
+                    .path("properties")
+                    .has("evidence"))
                         .isFalse();
             }
         }
     }
 
+
     @Test
     @DisplayName("서명한 HTTP 관찰 저장 재시도와 뒤 실행 조회는 UNKNOWN 출처를 보존한다")
     void roundTripsAndCreatesNewUnknownRevisionForAnotherExecution() throws Exception {
         assertThat(data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                        .path("items")
-                        .get(0)
-                        .path("revision")
-                        .asLong())
+            .path("items")
+            .get(0)
+            .path("revision")
+            .asLong())
                 .isZero();
         UUID id = UUID.randomUUID();
         var args = recording(photo.id(), 0, id, "첫 관찰");
@@ -264,7 +268,7 @@ class McpMediaObservationToolTest {
         clock.advance(Duration.ofSeconds(5));
         assertThat(data(call(McpMediaObservationTools.RECORD, args))).isEqualTo(first);
         assertThat(call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, id, "다른 본문"))
-                        .toString())
+            .toString())
                 .contains("MEDIA_OBSERVATION_CONFLICT", "currentRevision")
                 .doesNotContain("첫 관찰");
         jdbc.update("update agent_execution set status='SUCCEEDED' where id=?", origin.id());
@@ -275,17 +279,18 @@ class McpMediaObservationToolTest {
         assertThat(second.path("observation").path("summary").asString()).isEqualTo("둘째 관찰");
         assertThat(second.path("provenance").path("executionId").asLong()).isEqualTo(secondOrigin.id());
         assertThat(data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                        .path("items")
-                        .get(0))
+            .path("items")
+            .get(0))
                 .isEqualTo(second);
         assertThat(observations.count()).isEqualTo(2);
         assertThat(requests.count()).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("파싱 실패는 인증된 HTTP에서 고정 -32700이고 인증 오류는 401과 403이다")
     void parseAndAuthenticationFailuresNeverExposeBodyOrCauseOrWrite() throws Exception {
-        Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        Logger logger = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         var logs = new ListAppender<ILoggingEvent>();
         logs.start();
         logger.addAppender(logs);
@@ -294,14 +299,14 @@ class McpMediaObservationToolTest {
                 for (String tool : List.of(McpMediaObservationTools.RECORD, "memory_remember", "agent_list")) {
                     for (String end : List.of("", " invalid}")) {
                         String body = "{\"id\":37,\"method\":\"" + method + "\",\"params\":{\"name\":\"" + tool
-                                + "\",\"arguments\":{\"observation\":\"" + SECRET + "\"" + end;
+                            + "\",\"arguments\":{\"observation\":\"" + SECRET + "\"" + end;
                         var response = send("/mcp", token, body, false);
                         assertThat(response.statusCode()).isEqualTo(200);
                         var parsed = json.readTree(response.body());
                         assertThat(parsed.path("id").isNull()).isTrue();
                         assertThat(parsed.path("error").path("code").asInt()).isEqualTo(-32700);
                         assertThat(parsed.path("error").path("message").asString())
-                                .isEqualTo("Parse error");
+                            .isEqualTo("Parse error");
                         assertThat(response.body()).doesNotContain(SECRET);
                     }
                 }
@@ -309,17 +314,17 @@ class McpMediaObservationToolTest {
             String malformed = "{\"summary\":\"" + SECRET + "\", ";
             assertThat(send("/mcp", null, malformed, false).statusCode()).isEqualTo(401);
             assertThat(send("/mcp", "invalid-token", malformed, false).statusCode())
-                    .isEqualTo(401);
+                .isEqualTo(401);
             assertThat(send("/mcp", token, malformed, true).statusCode()).isEqualTo(403);
             tokens.revokeAllFor(PROFILE);
             assertThat(send("/mcp", token, malformed, false).statusCode()).isEqualTo(401);
             assertThat(new MediaObservationRecordArguments(
-                                    photo.id().toString(),
-                                    0,
-                                    UUID.randomUUID(),
-                                    json.createObjectNode().put("summary", SECRET))
-                            .toString())
-                    .doesNotContain(SECRET);
+                photo.id().toString(),
+                0,
+                UUID.randomUUID(),
+                json.createObjectNode().put("summary", SECRET))
+                    .toString())
+                        .doesNotContain(SECRET);
             assertThat(observations.count()).isZero();
             assertThat(requests.count()).isZero();
             for (ILoggingEvent log : logs.list) {
@@ -334,20 +339,21 @@ class McpMediaObservationToolTest {
         }
     }
 
+
     @Test
     @DisplayName("서명 뒤 유효 JSON의 잘못된 인자는 -32602이고 모델 출처 주입은 거절된다")
     void rejectsStrictArgumentsAndInjectedProvenance() throws Exception {
         var valid = recording(photo.id(), 0, UUID.randomUUID(), SECRET);
         for (String field : List.of("provider", "executionId", "provenance", "evidence")) {
             var args = valid.deepCopy();
-            ((ObjectNode) args.path("observation")).put(field, SECRET);
+            ((ObjectNode)args.path("observation")).put(field, SECRET);
             invalidArguments(call(McpMediaObservationTools.RECORD, args));
         }
         for (JsonNode invalid : List.of(
-                json.readTree("1.0"),
-                json.readTree("\"0\""),
-                json.readTree("null"),
-                json.readTree("9223372036854775808"))) {
+            json.readTree("1.0"),
+            json.readTree("\"0\""),
+            json.readTree("null"),
+            json.readTree("9223372036854775808"))) {
             var args = valid.deepCopy();
             args.set("expectedRevision", invalid);
             invalidArguments(call(McpMediaObservationTools.RECORD, args));
@@ -359,28 +365,29 @@ class McpMediaObservationToolTest {
         args.put("assetId", "9223372036854775808");
         invalidArguments(call(McpMediaObservationTools.RECORD, args));
         args = valid.deepCopy();
-        ((ObjectNode) args.path("observation"))
-                .putArray("claims")
-                .addObject()
-                .put("kind", "USER")
-                .put("text", SECRET)
-                .put("confidence", "CONFIRMED")
-                .putArray("evidence")
-                .add("사용자 선언");
+        ((ObjectNode)args.path("observation"))
+            .putArray("claims")
+            .addObject()
+            .put("kind", "USER")
+            .put("text", SECRET)
+            .put("confidence", "CONFIRMED")
+            .putArray("evidence")
+            .add("사용자 선언");
         invalidArguments(call(McpMediaObservationTools.RECORD, args));
         invalidArguments(
-                call(McpMediaObservationTools.LIST, json.createObjectNode().put("limit", 30.0)));
+            call(McpMediaObservationTools.LIST, json.createObjectNode().put("limit", 30.0)));
         invalidArguments(
-                call(McpMediaObservationTools.LIST, json.createObjectNode().put("conversationId", conversation.id())));
+            call(McpMediaObservationTools.LIST, json.createObjectNode().put("conversationId", conversation.id())));
         var optionalNull = json.createObjectNode().putNull("limit").putNull("afterAssetId");
         assertThat(call(McpMediaObservationTools.LIST, optionalNull)
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isFalse();
         assertThat(observations.count()).isZero();
         assertThat(requests.count()).isZero();
     }
+
 
     @Test
     @DisplayName("서명 맥락과 현재 허용 사용자 에이전트 profile 권한은 같은 오류로 차단한다")
@@ -388,23 +395,23 @@ class McpMediaObservationToolTest {
         var args = json.createObjectNode();
         var request = rpc(McpMediaObservationTools.LIST, args);
         assertInvalid(json.readTree(
-                send("/mcp", token, json.writeValueAsString(request), false).body()));
+            send("/mcp", token, json.writeValueAsString(request), false).body()));
         args.set("_fos_ctx", McpCallSigner.context(token, McpMediaObservationTools.RECORD, root));
         assertInvalid(json.readTree(
-                send("/mcp", token, json.writeValueAsString(rpc(McpMediaObservationTools.LIST, args)), false)
-                        .body()));
+            send("/mcp", token, json.writeValueAsString(rpc(McpMediaObservationTools.LIST, args)), false)
+                .body()));
         for (String change : List.of(
-                "enabled=false",
-                "deleted_at=CURRENT_TIMESTAMP",
-                "hermes_profile='different-profile'",
-                "visibility='PRIVATE',owner_user_id=999999")) {
+            "enabled=false",
+            "deleted_at=CURRENT_TIMESTAMP",
+            "hermes_profile='different-profile'",
+            "visibility='PRIVATE',owner_user_id=999999")) {
             jdbc.update("update agent set " + change + " where id=?", agent.id());
             assertInvalid(call(McpMediaObservationTools.LIST, json.createObjectNode()));
             assertInvalid(call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, UUID.randomUUID(), SECRET)));
             jdbc.update(
-                    "update agent set enabled=true,deleted_at=null,hermes_profile=?,visibility='GROUP',owner_user_id=null where id=?",
-                    PROFILE,
-                    agent.id());
+                "update agent set enabled=true,deleted_at=null,hermes_profile=?,visibility='GROUP',owner_user_id=null where id=?",
+                PROFILE,
+                agent.id());
         }
         jdbc.update("update allowed_person set enabled=false where email=?", user.email());
         assertInvalid(call(McpMediaObservationTools.LIST, json.createObjectNode()));
@@ -413,6 +420,7 @@ class McpMediaObservationToolTest {
         assertThat(requests.count()).isZero();
     }
 
+
     @Test
     @DisplayName("등록된 native 자식은 끝난 부모 출처를 유지하고 취소와 등록 삭제는 거절한다")
     void preservesFinishedNativeOriginWithoutPretendingRequestedModelIsActual() throws Exception {
@@ -420,10 +428,10 @@ class McpMediaObservationToolTest {
         var args = recording(photo.id(), 0, UUID.randomUUID(), "native 관찰");
         assertInvalid(callAt(McpMediaObservationTools.RECORD, args, child));
         var registered = send(
-                "/internal/hermes/session-bindings/subagent",
-                token,
-                json.writeValueAsString(McpCallSigner.subagentBody(token, root, root, child)),
-                false);
+            "/internal/hermes/session-bindings/subagent",
+            token,
+            json.writeValueAsString(McpCallSigner.subagentBody(token, root, root, child)),
+            false);
         assertThat(registered.statusCode()).as(registered.body()).isEqualTo(201);
         jdbc.update("update agent_execution set status='SUCCEEDED' where id=?", origin.id());
         var result = data(callAt(McpMediaObservationTools.RECORD, args, child));
@@ -432,8 +440,8 @@ class McpMediaObservationToolTest {
         assertThat(result.path("sourceAssurance").asString()).isEqualTo("MODEL_UNVERIFIED");
         jdbc.update("update agent_execution set status='FAILED' where id=?", origin.id());
         assertThat(data(callAt(McpMediaObservationTools.LIST, json.createObjectNode(), child))
-                        .path("items")
-                        .get(0))
+            .path("items")
+            .get(0))
                 .isEqualTo(result);
         jdbc.update("update agent_execution set status='CANCELLED' where id=?", origin.id());
         assertInvalid(callAt(McpMediaObservationTools.LIST, json.createObjectNode(), child));
@@ -443,43 +451,45 @@ class McpMediaObservationToolTest {
         assertThat(observations.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("USER 정정 이후 MODEL은 CAS와 UUID를 바꿔도 정정을 대체하지 못한다")
     void respectsUserProtectionAndAttachmentBarriers() throws Exception {
         var source = new ObservationProvenance(
-                ObservationProvenanceKind.USER_CORRECTION,
-                null,
-                null,
-                null,
-                null,
-                null,
-                1,
-                "media-observation-v1",
-                null);
+            ObservationProvenanceKind.USER_CORRECTION,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            "media-observation-v1",
+            null);
         var input = new MediaObservationInput(
-                ObservationStatus.SUCCEEDED,
-                "사용자 정정",
-                List.of(),
-                List.of(),
-                new MediaObservationInput.Coverage("ORIGINAL", null, null),
-                new MediaObservationInput.Evidence(source.kind(), "USER_CORRECTION"),
-                null);
+            ObservationStatus.SUCCEEDED,
+            "사용자 정정",
+            List.of(),
+            List.of(),
+            new MediaObservationInput.Coverage("ORIGINAL", null, null),
+            new MediaObservationInput.Evidence(source.kind(), "USER_CORRECTION"),
+            null);
         service.record(current(), conversation.id(), photo.id(), 0, UUID.randomUUID(), input, source);
         var denied = call(McpMediaObservationTools.RECORD, recording(photo.id(), 1, UUID.randomUUID(), SECRET));
         assertThat(denied.toString())
-                .contains("MEDIA_OBSERVATION_CONFLICT", "currentRevision")
-                .doesNotContain(SECRET, "사용자 정정");
+            .contains("MEDIA_OBSERVATION_CONFLICT", "currentRevision")
+            .doesNotContain(SECRET, "사용자 정정");
         attachmentService.deleteByUser(current(), conversation.id(), photo.id());
         assertThat(call(McpMediaObservationTools.RECORD, recording(photo.id(), 1, UUID.randomUUID(), SECRET))
-                        .toString())
+            .toString())
                 .contains("ATTACHMENT_GONE");
         assertThat(data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                        .path("items")
-                        .get(0)
-                        .path("sourceAssurance")
-                        .isNull())
+            .path("items")
+            .get(0)
+            .path("sourceAssurance")
+            .isNull())
                 .isTrue();
     }
+
 
     @Test
     @DisplayName("실제 HTTP에서 권한 snapshot 뒤 철회와 쓰기가 경합하면 저장은 남고 응답 본문은 차단한다")
@@ -488,18 +498,18 @@ class McpMediaObservationToolTest {
         CountDownLatch revoked = new CountDownLatch(1);
         AtomicInteger reads = new AtomicInteger();
         doAnswer(invocation -> {
-                    Object snapshot = invocation.callRealMethod();
-                    if (reads.incrementAndGet() == 1) {
-                        checked.countDown();
-                        assertThat(revoked.await(5, TimeUnit.SECONDS)).isTrue();
-                    }
-                    return snapshot;
-                })
-                .when(agentService)
-                .findById(eq(agent.id()));
+            Object snapshot = invocation.callRealMethod();
+            if (reads.incrementAndGet() == 1) {
+                checked.countDown();
+                assertThat(revoked.await(5, TimeUnit.SECONDS)).isTrue();
+            }
+            return snapshot;
+        })
+            .when(agentService)
+            .findById(eq(agent.id()));
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var pending = pool.submit(
-                    () -> call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, UUID.randomUUID(), SECRET)));
+                () -> call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, UUID.randomUUID(), SECRET)));
             try {
                 assertThat(checked.await(5, TimeUnit.SECONDS)).isTrue();
                 jdbc.update("update agent set enabled=false where id=?", agent.id());
@@ -510,15 +520,16 @@ class McpMediaObservationToolTest {
                 assertThat(observations.count()).isEqualTo(1);
                 assertThat(requests.count()).isEqualTo(1);
                 assertThat(service.list(current(), conversation.id(), null, 30)
-                                .getFirst()
-                                .observation()
-                                .summary())
+                    .getFirst()
+                    .observation()
+                    .summary())
                         .isEqualTo(SECRET);
             } finally {
                 revoked.countDown();
             }
         }
     }
+
 
     @Test
     @DisplayName("본문이 없는 관찰은 null assurance이고 stale 본문은 kind의 assurance를 유지한다")
@@ -529,63 +540,64 @@ class McpMediaObservationToolTest {
             Files.write(file(photo), IMAGE);
             var kind = userSource ? ObservationProvenanceKind.USER_CORRECTION : ObservationProvenanceKind.MODEL_RESULT;
             var source = new ObservationProvenance(
-                    kind,
-                    userSource ? null : origin.id(),
-                    userSource ? null : "UNKNOWN",
-                    null,
-                    userSource ? null : "UNKNOWN",
-                    null,
-                    1,
-                    "media-observation-v1",
-                    null);
+                kind,
+                userSource ? null : origin.id(),
+                userSource ? null : "UNKNOWN",
+                null,
+                userSource ? null : "UNKNOWN",
+                null,
+                1,
+                "media-observation-v1",
+                null);
             var input = new MediaObservationInput(
-                    ObservationStatus.PROCESSING,
-                    "합성 관찰",
-                    List.of(),
-                    List.of(),
-                    new MediaObservationInput.Coverage("ORIGINAL", null, null),
-                    new MediaObservationInput.Evidence(
-                            kind, userSource ? "USER_CORRECTION" : origin.id().toString()),
-                    null);
+                ObservationStatus.PROCESSING,
+                "합성 관찰",
+                List.of(),
+                List.of(),
+                new MediaObservationInput.Coverage("ORIGINAL", null, null),
+                new MediaObservationInput.Evidence(
+                    kind, userSource ? "USER_CORRECTION" : origin.id().toString()),
+                null);
             service.record(current(), conversation.id(), photo.id(), 0, UUID.randomUUID(), input, source);
             clock.advance(Duration.ofMinutes(15));
             var stale = data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                    .path("items")
-                    .get(0);
+                .path("items")
+                .get(0);
             assertThat(stale.path("errorCode").asString()).isEqualTo("ANALYSIS_STALE");
             assertThat(stale.path("sourceAssurance").asString())
-                    .isEqualTo(userSource ? "USER_CORRECTION" : "MODEL_UNVERIFIED");
+                .isEqualTo(userSource ? "USER_CORRECTION" : "MODEL_UNVERIFIED");
             var row = observations.findAll().getFirst();
             for (String damaged : List.of("{}", "{\"status\":\"SUCCEEDED\"}")) {
                 var sealed = cipher.seal(
-                                user.id(),
-                                "media_observation:" + row.id() + ":conversation:" + conversation.id() + ":user:"
-                                        + user.id(),
-                                damaged)
-                        .orElseThrow();
+                    user.id(),
+                    "media_observation:" + row.id() + ":conversation:" + conversation.id() + ":user:"
+                        + user.id(),
+                    damaged)
+                    .orElseThrow();
                 jdbc.update(
-                        "update media_observation set body=?,body_key_id=? where id=?",
-                        sealed.content(),
-                        sealed.keyId(),
-                        row.id());
+                    "update media_observation set body=?,body_key_id=? where id=?",
+                    sealed.content(),
+                    sealed.keyId(),
+                    row.id());
                 unavailable(data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                        .path("items")
-                        .get(0));
+                    .path("items")
+                    .get(0));
             }
             jdbc.update("update media_observation set body=? where id=?", "v1.corrupted", row.id());
             unavailable(data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                    .path("items")
-                    .get(0));
+                .path("items")
+                .get(0));
             bodies.seal(row, json.writeValueAsString(input));
             observations.saveAndFlush(row);
             byte[] changed = IMAGE.clone();
             changed[changed.length - 1]++;
             Files.write(file(photo), changed);
             unavailable(data(call(McpMediaObservationTools.LIST, json.createObjectNode()))
-                    .path("items")
-                    .get(0));
+                .path("items")
+                .get(0));
         }
     }
+
 
     @Test
     @DisplayName("먼저 살펴보기는 list만 허용하고 암호화 실패는 공개 코드만 반환한다")
@@ -594,43 +606,46 @@ class McpMediaObservationToolTest {
         try {
             ReflectionTestUtils.setField(keks, "activeKeyId", "");
             assertThat(call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, UUID.randomUUID(), SECRET))
-                            .toString())
+                .toString())
                     .contains("MEDIA_ENCRYPTION_UNAVAILABLE")
                     .doesNotContain(SECRET);
         } finally {
             ReflectionTestUtils.setField(keks, "activeKeyId", active);
         }
         var check = ProactiveCheck.started(
-                user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, clock.instant());
+            user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, clock.instant());
         check.attachRoot(origin.id(), root);
         checks.saveAndFlush(check);
         assertThat(call(McpMediaObservationTools.LIST, json.createObjectNode())
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isFalse();
         assertThat(call(McpMediaObservationTools.RECORD, recording(photo.id(), 0, UUID.randomUUID(), SECRET))
-                        .toString())
+            .toString())
                 .contains("먼저 살펴보기에서는 쓸 수 없는 도구");
         assertThat(observations.count()).isZero();
     }
 
+
     private ObjectNode recording(Long asset, long revision, UUID id, String summary) {
         var args = json.createObjectNode()
-                .put("assetId", asset.toString())
-                .put("expectedRevision", revision)
-                .put("requestId", id.toString());
+            .put("assetId", asset.toString())
+            .put("expectedRevision", revision)
+            .put("requestId", id.toString());
         args.putObject("observation")
-                .put("status", "SUCCEEDED")
-                .put("summary", summary)
-                .putObject("coverage")
-                .put("mode", "ORIGINAL");
+            .put("status", "SUCCEEDED")
+            .put("summary", summary)
+            .putObject("coverage")
+            .put("mode", "ORIGINAL");
         return args;
     }
+
 
     private JsonNode call(String tool, ObjectNode args) throws Exception {
         return callAt(tool, args, root);
     }
+
 
     private JsonNode callAt(String tool, ObjectNode args, String session) throws Exception {
         var signed = args.deepCopy();
@@ -640,35 +655,39 @@ class McpMediaObservationToolTest {
         return json.readTree(response.body());
     }
 
+
     private ObjectNode rpc(String tool, ObjectNode args) {
         var rpc = json.createObjectNode().put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call");
         rpc.putObject("params").put("name", tool).set("arguments", args);
         return rpc;
     }
 
+
     private JsonNode data(JsonNode response) {
         assertThat(response.path("result").path("isError").asBoolean())
-                .as(response.toString())
-                .isFalse();
-        String text =
-                response.path("result").path("content").get(0).path("text").asString();
+            .as(response.toString())
+            .isFalse();
+        String text = response.path("result").path("content").get(0).path("text").asString();
         assertThat(text).contains("<external-data>", "</external-data>");
         return json.readTree(text.substring(
-                text.indexOf("\n<external-data>\n") + "\n<external-data>\n".length(),
-                text.lastIndexOf("</external-data>")));
+            text.indexOf("\n<external-data>\n") + "\n<external-data>\n".length(),
+            text.lastIndexOf("</external-data>")));
     }
+
 
     private static void assertInvalid(JsonNode result) {
         assertThat(result.path("result").path("isError").asBoolean()).isTrue();
         assertThat(result.toString()).contains("호출 맥락을 확인할 수 없습니다");
     }
 
+
     private static void invalidArguments(JsonNode result) {
         assertThat(result.path("error").path("code").asInt())
-                .as(result.toString())
-                .isEqualTo(-32602);
+            .as(result.toString())
+            .isEqualTo(-32602);
         assertThat(result.toString()).doesNotContain(SECRET);
     }
+
 
     private static void unavailable(JsonNode result) {
         assertThat(result.path("observation").isNull()).isTrue();
@@ -677,35 +696,39 @@ class McpMediaObservationToolTest {
         assertThat(result.path("errorCode").asString()).isEqualTo("CONTENT_UNAVAILABLE");
     }
 
+
     private ChatAttachment photo() {
         directories.add(Path.of(properties.root(), "users", AttachmentStore.userDirectoryKey(user.id())));
         var row = attachmentService.upload(
-                current(),
-                conversation.id(),
-                "a.gif",
-                "image/gif",
-                IMAGE.length,
-                () -> new ByteArrayInputStream(IMAGE));
+            current(),
+            conversation.id(),
+            "a.gif",
+            "image/gif",
+            IMAGE.length,
+            () -> new ByteArrayInputStream(IMAGE));
         attachmentService.attach(100L + row.id(), conversation.id(), List.of(row.id()));
         return attachments.findById(row.id()).orElseThrow();
     }
 
+
     private Path file(ChatAttachment row) {
         return Path.of(
-                properties.root(),
-                "users",
-                AttachmentStore.userDirectoryKey(user.id()),
-                conversation.id().toString(),
-                row.storedName());
+            properties.root(),
+            "users",
+            AttachmentStore.userDirectoryKey(user.id()),
+            conversation.id().toString(),
+            row.storedName());
     }
+
 
     private CurrentUser current() {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private HttpResponse<String> send(String route, String bearer, String body, boolean originHeader) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + route))
-                .header("Content-Type", "application/json");
+            .header("Content-Type", "application/json");
         if (bearer != null) {
             request.header("Authorization", "Bearer " + bearer);
         }
@@ -713,6 +736,6 @@ class McpMediaObservationToolTest {
             request.header("Origin", "https://example.test");
         }
         return client.send(
-                request.POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+            request.POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
 }

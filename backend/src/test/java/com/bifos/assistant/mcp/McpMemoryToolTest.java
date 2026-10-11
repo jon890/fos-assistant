@@ -122,12 +122,13 @@ class McpMemoryToolTest {
     private static final String PROFILE = "mcp-memory-tool";
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
 
+
     @BeforeEach
     void setUp() {
         jdbc.update(
-                "DELETE FROM execution_context_source WHERE execution_id IN"
-                        + " (SELECT id FROM agent_execution WHERE profile_name = ?)",
-                PROFILE);
+            "DELETE FROM execution_context_source WHERE execution_id IN"
+                + " (SELECT id FROM agent_execution WHERE profile_name = ?)",
+            PROFILE);
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
@@ -139,55 +140,56 @@ class McpMemoryToolTest {
         dadRun = McpCallSigner.running(executions, agents, dad.id(), 1L, PROFILE, dadRoot);
     }
 
+
     @Test
     @DisplayName("initialize 목록과 알림은 계약한 응답을 낸다")
     void initializeListAndNotificationGiveContractedResponses() throws Exception {
         JsonNode initialized = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":17,\"method\":\"initialize\"}"));
         assertThat(initialized.path("id").asInt()).isEqualTo(17);
         assertThat(initialized.path("result").path("protocolVersion").asString())
-                .isEqualTo("2025-03-26");
+            .isEqualTo("2025-03-26");
         assertThat(initialized
-                        .path("result")
-                        .path("capabilities")
-                        .path("tools")
-                        .path("listChanged")
-                        .asBoolean())
+            .path("result")
+            .path("capabilities")
+            .path("tools")
+            .path("listChanged")
+            .asBoolean())
                 .isFalse();
         assertThat(initialized.path("result").path("serverInfo").path("name").asString())
-                .isEqualTo("fos-assistant");
+            .isEqualTo("fos-assistant");
         assertThat(initialized.path("result").path("serverInfo").path("version").asString())
-                .isEqualTo(buildProperties.getVersion());
+            .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));
         assertThat(listed.path("id").asInt()).isEqualTo(18);
         assertThat(listed.path("result").path("tools"))
-                .extracting(item -> item.path("name").asString())
-                .doesNotHaveDuplicates()
-                .contains(
-                        "memory_read",
-                        "artifact_write",
-                        "follow_up_propose",
-                        "memory_remember",
-                        "list_media_observations",
-                        "record_media_observation");
+            .extracting(item -> item.path("name").asString())
+            .doesNotHaveDuplicates()
+            .contains(
+                "memory_read",
+                "artifact_write",
+                "follow_up_propose",
+                "memory_remember",
+                "list_media_observations",
+                "record_media_observation");
         assertThat(listed.path("result").path("tools").get(0).path("name").asString())
-                .isEqualTo("memory_read");
+            .isEqualTo("memory_read");
         assertThat(listed.path("result").path("tools").get(1).path("name").asString())
-                .isEqualTo("artifact_write");
+            .isEqualTo("artifact_write");
         assertThat(listed.path("result").path("tools").get(2).path("name").asString())
-                .isEqualTo("agent_list");
+            .isEqualTo("agent_list");
         assertThat(listed.path("result").path("tools").get(3).path("name").asString())
-                .isEqualTo("agent_delegate");
+            .isEqualTo("agent_delegate");
         assertThat(listed.path("result").path("tools").get(4).path("name").asString())
-                .isEqualTo("agent_status");
+            .isEqualTo("agent_status");
         assertThat(listed.path("result").path("tools").get(5).path("name").asString())
-                .isEqualTo("agent_stop");
+            .isEqualTo("agent_stop");
         assertThat(listed.path("result").path("tools").get(6).path("name").asString())
-                .isEqualTo("follow_up_propose");
-        HttpResponse<String> notification =
-                mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
+            .isEqualTo("follow_up_propose");
+        HttpResponse<String> notification = mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);
         assertThat(notification.body()).isEmpty();
     }
+
 
     @Test
     @DisplayName("부모 실행의 사용자만 정하고 권한 오류는 동일하게 숨긴다")
@@ -197,11 +199,12 @@ class McpMemoryToolTest {
         JsonNode own = body(call(dadToken, indexed.id(), 999L));
         assertThat(own.path("result").path("isError").asBoolean()).isFalse();
         assertThat(own.path("result").path("content").get(0).path("text").asString())
-                .isEqualTo("아빠 본문");
+            .isEqualTo("아빠 본문");
         JsonNode unauthorized = body(call(dadToken, hidden.id(), null));
         JsonNode missing = body(call(dadToken, 999999L, null));
         assertThat(unauthorized.path("result")).isEqualTo(missing.path("result"));
     }
+
 
     @Test
     @DisplayName("읽기에 성공하면 그 실행의 문맥 기록 끝에 MEMORY_READ 줄이 붙고 읽지 못한 호출은 줄을 남기지 않는다")
@@ -210,40 +213,41 @@ class McpMemoryToolTest {
         Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
         Instant assembledAt = Instant.parse("2026-10-01T00:00:00Z");
         contextSources.saveAll(List.of(
-                ExecutionContextSource.of(
-                        dadRun.id(), 0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH", assembledAt),
-                ExecutionContextSource.of(
-                        dadRun.id(), 1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH", assembledAt)));
+            ExecutionContextSource.of(
+                dadRun.id(), 0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH", assembledAt),
+            ExecutionContextSource.of(
+                dadRun.id(), 1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH", assembledAt)));
 
         assertThat(body(call(dadToken, hidden.id(), null))
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isTrue();
         assertThat(body(call(dadToken, 999999L, null))
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isTrue();
         assertThat(body(call(dadToken, own.id(), null))
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isFalse();
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(dadRun.id()))
-                .as("실행 %s 의 문맥 기록", dadRun.id())
-                .extracting(
-                        ExecutionContextSource::position,
-                        ExecutionContextSource::source,
-                        ExecutionContextSource::sourceRef,
-                        ExecutionContextSource::bodyMode,
-                        ExecutionContextSource::freshness)
-                .containsExactly(
-                        tuple(0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH"),
-                        tuple(1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH"),
-                        tuple(2, "MEMORY_READ", "memory:" + own.id(), "INLINE", "UNKNOWN"));
+            .as("실행 %s 의 문맥 기록", dadRun.id())
+            .extracting(
+                ExecutionContextSource::position,
+                ExecutionContextSource::source,
+                ExecutionContextSource::sourceRef,
+                ExecutionContextSource::bodyMode,
+                ExecutionContextSource::freshness)
+            .containsExactly(
+                tuple(0, "MEMORY_FACTS", "memory:9001", "INLINE", "FRESH"),
+                tuple(1, "MEMORY_INDEX", "memory:9002", "TITLE_ONLY", "FRESH"),
+                tuple(2, "MEMORY_READ", "memory:" + own.id(), "INLINE", "UNKNOWN"));
     }
+
 
     @Test
     @DisplayName("같은 실행에서 두 번 읽으면 조립 줄이 없어도 position 0 부터 이어 붙는다")
@@ -255,35 +259,36 @@ class McpMemoryToolTest {
         body(call(dadToken, second.id(), null));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(dadRun.id()))
-                .as("실행 %s 의 문맥 기록", dadRun.id())
-                .extracting(
-                        ExecutionContextSource::position,
-                        ExecutionContextSource::source,
-                        ExecutionContextSource::sourceRef)
-                .containsExactly(
-                        tuple(0, "MEMORY_READ", "memory:" + first.id()),
-                        tuple(1, "MEMORY_READ", "memory:" + second.id()));
+            .as("실행 %s 의 문맥 기록", dadRun.id())
+            .extracting(
+                ExecutionContextSource::position,
+                ExecutionContextSource::source,
+                ExecutionContextSource::sourceRef)
+            .containsExactly(
+                tuple(0, "MEMORY_READ", "memory:" + first.id()),
+                tuple(1, "MEMORY_READ", "memory:" + second.id()));
     }
+
 
     @Test
     @DisplayName("에이전트가 받지 않는 collection 과 허용받지 않은 민감 항목은 없는 항목과 같은 응답이다")
     void itemsOutsideTheAgentsCollectionsLookLikeMissingItems() throws Exception {
         Memory career = memories.create(
-                current(dad),
-                MemoryScope.USER,
-                "커리어",
-                "커리어 본문",
-                "career",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.NORMAL);
+            current(dad),
+            MemoryScope.USER,
+            "커리어",
+            "커리어 본문",
+            "career",
+            MemoryRetrieval.SEARCH,
+            MemorySensitivity.NORMAL);
         Memory sensitive = memories.create(
-                current(dad),
-                MemoryScope.USER,
-                "신원",
-                "민감 본문",
-                "core",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.SENSITIVE);
+            current(dad),
+            MemoryScope.USER,
+            "신원",
+            "민감 본문",
+            "core",
+            MemoryRetrieval.SEARCH,
+            MemorySensitivity.SENSITIVE);
         Memory hidden = memories.create(current(kid), MemoryScope.USER, "비밀", "아이 본문", false);
         Memory core = memories.create(current(dad), MemoryScope.USER, "기본", "기본 본문", false);
 
@@ -295,37 +300,39 @@ class McpMemoryToolTest {
             assertThat(response.body()).doesNotContain("커리어 본문", "민감 본문", "아이 본문");
         }
         assertThat(body(call(dadToken, core.id(), null))
-                        .path("result")
-                        .path("content")
-                        .get(0)
-                        .path("text")
-                        .asString())
+            .path("result")
+            .path("content")
+            .get(0)
+            .path("text")
+            .asString())
                 .isEqualTo("기본 본문");
     }
+
 
     @Test
     @DisplayName("민감 허용을 받은 에이전트가 읽으면 암호화돼 저장된 민감 본문이 평문으로 나온다")
     void allowedAgentReadsSensitiveBodyAsPlaintext() throws Exception {
         Memory sensitive = memories.create(
-                current(dad),
-                MemoryScope.USER,
-                "신원",
-                "민감 본문",
-                "core",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.SENSITIVE);
+            current(dad),
+            MemoryScope.USER,
+            "신원",
+            "민감 본문",
+            "core",
+            MemoryRetrieval.SEARCH,
+            MemorySensitivity.SENSITIVE);
         agentCollections.save(AgentMemoryCollection.of(dadRun.agentId(), "core", true, Instant.now()));
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, sensitive.id()))
-                .doesNotContain("민감 본문");
+            .doesNotContain("민감 본문");
         assertThat(body(call(dadToken, sensitive.id(), null))
-                        .path("result")
-                        .path("content")
-                        .get(0)
-                        .path("text")
-                        .asString())
+            .path("result")
+            .path("content")
+            .get(0)
+            .path("text")
+            .asString())
                 .isEqualTo("민감 본문");
     }
+
 
     @Test
     @DisplayName("서명이 맞는 fos ctx 를 떼고 읽는다")
@@ -334,46 +341,48 @@ class McpMemoryToolTest {
         String fosCtx = McpCallSigner.context(dadToken, "memory_read", dadRoot).toString();
 
         JsonNode read = body(send(
-                dadToken,
-                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}",
-                false));
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
+                + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}",
+            false));
         JsonNode wrongId = body(send(
-                dadToken,
-                "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\",\"_fos_ctx\":"
-                        + fosCtx + "}}}",
-                false));
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\",\"_fos_ctx\":"
+                + fosCtx + "}}}",
+            false));
 
         assertThat(read.path("result").path("isError").asBoolean()).isFalse();
         assertThat(read.path("result").path("content").get(0).path("text").asString())
-                .isEqualTo("아빠 본문");
+            .isEqualTo("아빠 본문");
         assertThat(wrongId.path("error").path("code").asInt()).isEqualTo(-32602);
     }
+
 
     @Test
     @DisplayName("틀린 fos ctx 는 거절한다")
     void rejectsWrongFosCtx() throws Exception {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String zeroSig = "{\"v\":1,\"session_id\":\"" + dadRoot + "\",\"root_session_id\":\"" + dadRoot
-                + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
+            + "\",\"tool_call_id\":\"c\",\"sig\":\"" + "0".repeat(64) + "\"}";
 
         JsonNode rejected = body(send(
-                dadToken,
-                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + indexed.id() + ",\"_fos_ctx\":" + zeroSig + "}}}",
-                false));
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
+                + indexed.id() + ",\"_fos_ctx\":" + zeroSig + "}}}",
+            false));
         JsonNode missing = body(send(
-                dadToken,
-                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + indexed.id() + "}}}",
-                false));
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
+                + indexed.id() + "}}}",
+            false));
 
         assertThat(rejected.path("result").path("isError").asBoolean()).isTrue();
         assertThat(rejected.path("result").path("content").get(0).path("text").asString())
-                .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
+            .isEqualTo("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.");
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
         assertThat(missing).isEqualTo(rejected);
     }
+
 
     @Test
     @DisplayName("등록한 하위 에이전트는 부모 실행이 끝난 뒤에도 그 사용자로 읽고 등록이 없으면 거절한다")
@@ -385,24 +394,25 @@ class McpMemoryToolTest {
         // 루트의 실행이 도는 중이어도 등록이 없는 하위 session 은 그 실행으로 되돌아가지 않는다.
         JsonNode rejectedWhileRunning = body(subagentRead(unregistered, indexed.id()));
         jdbc.update(
-                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
+            "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
 
         JsonNode read = body(subagentRead(registered, indexed.id()));
         JsonNode rejected = body(subagentRead(unregistered, indexed.id()));
 
         assertThat(read.path("result").path("isError").asBoolean())
-                .as("등록한 하위 에이전트의 읽기: %s", read)
-                .isFalse();
+            .as("등록한 하위 에이전트의 읽기: %s", read)
+            .isFalse();
         assertThat(read.path("result").path("content").get(0).path("text").asString())
-                .isEqualTo("아빠 본문");
+            .isEqualTo("아빠 본문");
         JsonNode invalidContext = json.valueToTree(toolService.invalidContext());
         assertThat(rejectedWhileRunning.path("result"))
-                .as("부모 실행이 도는 중 등록이 없는 하위 session 의 결과")
-                .isEqualTo(invalidContext);
+            .as("부모 실행이 도는 중 등록이 없는 하위 session 의 결과")
+            .isEqualTo(invalidContext);
         assertThat(rejectedWhileRunning.toString()).doesNotContain("아빠 본문");
         assertThat(rejected.path("result")).as("등록이 없는 하위 session 의 결과").isEqualTo(invalidContext);
         assertThat(rejected.toString()).doesNotContain("아빠 본문");
     }
+
 
     @Test
     @DisplayName("등록한 하위 에이전트는 부모 실행이 취소되면 읽지 못한다")
@@ -412,41 +422,43 @@ class McpMemoryToolTest {
         registrar.register(PROFILE, dadRoot, dadRoot, child);
         JsonNode whileRunning = body(subagentRead(child, indexed.id()));
         jdbc.update(
-                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
+            "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.CANCELLED.name(), dadRun.id());
 
         JsonNode afterCancel = body(subagentRead(child, indexed.id()));
 
         assertThat(whileRunning
-                        .path("result")
-                        .path("content")
-                        .get(0)
-                        .path("text")
-                        .asString())
+            .path("result")
+            .path("content")
+            .get(0)
+            .path("text")
+            .asString())
                 .as("부모가 도는 동안의 읽기: %s", whileRunning)
                 .isEqualTo("아빠 본문");
         assertThat(afterCancel.path("result"))
-                .as("부모를 중지한 뒤의 결과")
-                .isEqualTo(json.valueToTree(toolService.invalidContext()));
+            .as("부모를 중지한 뒤의 결과")
+            .isEqualTo(json.valueToTree(toolService.invalidContext()));
         assertThat(afterCancel.toString()).doesNotContain("아빠 본문");
     }
+
 
     @Test
     @DisplayName("인증한 요청에 토큰 원문이 아닌 해시를 속성으로 싣는다")
     void authenticatedRequestCarriesHashNotRawTokenAsAttribute() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
+            .apply(springSecurity())
+            .build();
 
         mvc.perform(post("/mcp")
-                        .servletPath("/mcp")
-                        .header("Authorization", "Bearer " + dadToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
-                .andExpect(status().isOk())
-                .andExpect(request()
-                        .attribute(
-                                AgentTokenAuthenticationFilter.TOKEN_HASH_ATTRIBUTE, AgentTokenService.hash(dadToken)));
+            .servletPath("/mcp")
+            .header("Authorization", "Bearer " + dadToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
+            .andExpect(status().isOk())
+            .andExpect(request()
+                .attribute(
+                    AgentTokenAuthenticationFilter.TOKEN_HASH_ATTRIBUTE, AgentTokenService.hash(dadToken)));
     }
+
 
     @Test
     @DisplayName("제안과 항상 주입하는 항목은 본문을 돌려주지 않는다")
@@ -454,61 +466,63 @@ class McpMemoryToolTest {
         Memory proposed = memories.proposeUser(current(dad), "제안", "승인 전", 1L);
         Memory always = memories.create(current(dad), MemoryScope.USER, "항상", "이미 주입됨", true);
         assertThat(body(call(dadToken, proposed.id(), null))
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isTrue();
         assertThat(body(call(dadToken, always.id(), null))
-                        .path("result")
-                        .path("isError")
-                        .asBoolean())
+            .path("result")
+            .path("isError")
+            .asBoolean())
                 .isTrue();
     }
+
 
     @Test
     @DisplayName("인증 Origin JSON RPC 오류를 HTTP에서 검사한다")
     void checksAuthOriginAndJsonRpcErrorsOverHttp() throws Exception {
         assertThat(mcp(null, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(401);
         String revoked = tokens.issue(PROFILE, "revoked").rawToken();
         tokens.revoke(tokenRepository
-                .findByTokenHash(AgentTokenService.hash(revoked))
-                .orElseThrow()
-                .id());
+            .findByTokenHash(AgentTokenService.hash(revoked))
+            .orElseThrow()
+            .id());
         assertThat(mcp(revoked, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(401);
         assertThat(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", true)
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(403);
         assertThat(body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"unknown\"}"))
-                        .path("error")
-                        .path("code")
-                        .asInt())
+            .path("error")
+            .path("code")
+            .asInt())
                 .isEqualTo(-32601);
         assertThat(body(mcp(
-                                dadToken,
-                                "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{\"id\":1}}}"))
-                        .path("error")
-                        .path("code")
-                        .asInt())
-                .isEqualTo(-32601);
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"unknown\",\"arguments\":{\"id\":1}}}"))
+                .path("error")
+                .path("code")
+                .asInt())
+                    .isEqualTo(-32601);
         assertThat(body(mcp(
-                                dadToken,
-                                "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\"}}}"))
-                        .path("error")
-                        .path("code")
-                        .asInt())
-                .isEqualTo(-32602);
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":\"wrong\"}}}"))
+                .path("error")
+                .path("code")
+                .asInt())
+                    .isEqualTo(-32602);
         assertThat(body(mcp(
-                                dadToken,
-                                "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":1.5}}}"))
-                        .path("error")
-                        .path("code")
-                        .asInt())
-                .isEqualTo(-32602);
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":1.5}}}"))
+                .path("error")
+                .path("code")
+                .asInt())
+                    .isEqualTo(-32602);
     }
+
 
     @Test
     @DisplayName("관리자만 토큰을 발급하고 목록을 보고 폐기한다")
@@ -518,7 +532,7 @@ class McpMemoryToolTest {
         String issueBody = "{\"profileName\":\"kid-profile\",\"label\":\"profile\"}";
 
         assertThat(api("POST", "/api/v1/admin/agent-tokens", memberJwt, issueBody)
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(403);
 
         HttpResponse<String> issued = api("POST", "/api/v1/admin/agent-tokens", adminJwt, issueBody);
@@ -529,8 +543,8 @@ class McpMemoryToolTest {
         assertThat(rawToken).isNotBlank();
         assertThat(issuedBody.path("profileName").asString()).isEqualTo("kid-profile");
         assertThat(issuedBody.has("userEmail"))
-                .as("발급 응답에 사용자 칸이 없다: %s", issuedBody)
-                .isFalse();
+            .as("발급 응답에 사용자 칸이 없다: %s", issuedBody)
+            .isFalse();
 
         HttpResponse<String> listed = api("GET", "/api/v1/admin/agent-tokens", adminJwt, null);
         assertThat(listed.statusCode()).isEqualTo(200);
@@ -539,66 +553,71 @@ class McpMemoryToolTest {
         assertThat(listed.body()).doesNotContain(rawToken, "\"token\"");
         Map<Long, JsonNode> rows = rowsById(listBody);
         long dadTokenId = tokenRepository
-                .findByTokenHash(AgentTokenService.hash(dadToken))
-                .orElseThrow()
-                .id();
+            .findByTokenHash(AgentTokenService.hash(dadToken))
+            .orElseThrow()
+            .id();
         assertThat(rows.get(dadTokenId).path("profileName").asString()).isEqualTo(PROFILE);
         assertThat(rows.get(tokenId).path("profileName").asString()).isEqualTo("kid-profile");
         for (JsonNode row : listBody) {
             assertThat(row.has("userEmail")).as("목록 줄에 사용자 칸이 없다: %s", row).isFalse();
         }
         assertThat(api(
-                                "POST",
-                                "/api/v1/admin/agent-tokens",
-                                adminJwt,
-                                "{\"userEmail\":\"kid@example.com\",\"label\":\"old\"}")
-                        .statusCode())
-                .as("사용자로 발급하는 길은 없다")
-                .isEqualTo(400);
+            "POST",
+            "/api/v1/admin/agent-tokens",
+            adminJwt,
+            "{\"userEmail\":\"kid@example.com\",\"label\":\"old\"}")
+                .statusCode())
+                    .as("사용자로 발급하는 길은 없다")
+                    .isEqualTo(400);
 
         assertThat(api("DELETE", "/api/v1/admin/agent-tokens/" + tokenId, memberJwt, null)
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(403);
         assertThat(api("DELETE", "/api/v1/admin/agent-tokens/" + tokenId, adminJwt, null)
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(200);
         assertThat(mcp(rawToken, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(401);
     }
+
 
     /** 아빠의 루트 아래 하위 에이전트 session 에서 부른 것처럼 서명한 {@code memory_read} 를 보낸다. */
     private HttpResponse<String> subagentRead(String sessionId, Long id) throws Exception {
         String fosCtx = McpCallSigner.context(dadToken, "memory_read", dadRoot, sessionId, "call_" + UUID.randomUUID())
-                .toString();
+            .toString();
         return send(
-                dadToken,
-                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + id + ",\"_fos_ctx\":" + fosCtx + "}}}",
-                false);
+            dadToken,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
+                + id + ",\"_fos_ctx\":" + fosCtx + "}}}",
+            false);
     }
+
 
     private HttpResponse<String> call(String token, Long id, Long ignoredUserId) throws Exception {
         return mcp(
-                token,
-                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + id + (ignoredUserId == null ? "" : ",\"user_id\":" + ignoredUserId) + "}}}");
+            token,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
+                + id + (ignoredUserId == null ? "" : ",\"user_id\":" + ignoredUserId) + "}}}");
     }
+
 
     /** 도구 호출이면 아빠의 도는 실행 루트로 서명한 {@code _fos_ctx} 를 붙여 보낸다. */
     private HttpResponse<String> mcp(String token, String request) throws Exception {
         return mcp(token, request, false);
     }
 
+
     private HttpResponse<String> mcp(String token, String request, boolean origin) throws Exception {
         return send(token, token == null ? request : McpCallSigner.withContext(request, token, dadRoot), origin);
     }
 
+
     /** 본문을 그대로 보낸다. */
     private HttpResponse<String> send(String token, String request, boolean origin) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(request));
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(request));
         if (token != null) {
             builder.header("Authorization", "Bearer " + token);
         }
@@ -608,38 +627,43 @@ class McpMemoryToolTest {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+
     private HttpResponse<String> api(String method, String path, String token, String body) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                .header("Authorization", "Bearer " + token);
+            .header("Authorization", "Bearer " + token);
         if (body == null) {
             builder.method(method, HttpRequest.BodyPublishers.noBody());
         } else {
             builder.header("Content-Type", "application/json")
-                    .method(method, HttpRequest.BodyPublishers.ofString(body));
+                .method(method, HttpRequest.BodyPublishers.ofString(body));
         }
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+
     private static String jwt(AppUser user) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(user.email())
-                .claim("name", user.displayName())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(600)))
-                .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
-                .compact();
+            .subject(user.email())
+            .claim("name", user.displayName())
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusSeconds(600)))
+            .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
     }
+
 
     private static Map<Long, JsonNode> rowsById(JsonNode list) {
         return StreamSupport.stream(list.spliterator(), false)
-                .collect(Collectors.toMap(row -> row.path("id").asLong(), Function.identity()));
+            .collect(Collectors.toMap(row -> row.path("id").asLong(), Function.identity()));
     }
+
 
     private JsonNode body(HttpResponse<String> response) {
         assertThat(response.statusCode()).isEqualTo(200);
         return json.readTree(response.body());
     }
+
 
     private static CurrentUser current(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());

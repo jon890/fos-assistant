@@ -36,42 +36,45 @@ public class MediaObservationController {
     private final MediaObservationInputReader reader;
     private final MediaObservationService observations;
 
+
     @GetMapping
     public MediaObservationPageResponse list(
-            @PathVariable UUID conversationId,
-            @RequestParam(required = false) String afterAssetId,
-            @RequestParam(defaultValue = "30") int limit) {
+        @PathVariable UUID conversationId,
+        @RequestParam(required = false) String afterAssetId,
+        @RequestParam(defaultValue = "30") int limit) {
         var user = currentUser.require();
         return MediaObservationPageResponse.from(
-                pages.list(user, access.requireOwnId(user, conversationId), afterAssetId, limit));
+            pages.list(user, access.requireOwnId(user, conversationId), afterAssetId, limit));
     }
+
 
     @PutMapping("/{assetId}")
     public MediaObservationResponse correct(
-            @PathVariable UUID conversationId, @PathVariable String assetId, @RequestBody JsonNode body) {
+        @PathVariable UUID conversationId, @PathVariable String assetId, @RequestBody JsonNode body) {
         var user = currentUser.require();
         Long id = access.requireOwnId(user, conversationId);
         var request = MediaObservationCorrectionRequest.from(body);
         var source = new ObservationProvenance(
-                ObservationProvenanceKind.USER_CORRECTION,
-                null,
-                null,
-                null,
-                null,
-                null,
-                ObservationProvenance.SCHEMA_VERSION,
-                ObservationProvenance.PROMPT_VERSION,
-                null);
+            ObservationProvenanceKind.USER_CORRECTION,
+            null,
+            null,
+            null,
+            null,
+            null,
+            ObservationProvenance.SCHEMA_VERSION,
+            ObservationProvenance.PROMPT_VERSION,
+            null);
         var input = reader.read(request.observation(), source);
         return MediaObservationResponse.from(observations.record(
-                user,
-                id,
-                MediaObservationInputReader.assetId(assetId),
-                request.expectedRevision(),
-                request.requestId(),
-                input,
-                source));
+            user,
+            id,
+            MediaObservationInputReader.assetId(assetId),
+            request.expectedRevision(),
+            request.requestId(),
+            input,
+            source));
     }
+
 
     /** Jackson 오류의 메시지와 cause에는 제출 본문이 포함될 수 있다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
