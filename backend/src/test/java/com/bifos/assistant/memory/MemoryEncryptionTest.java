@@ -61,27 +61,32 @@ class MemoryEncryptionTest {
     @Autowired
     JdbcTemplate jdbc;
 
+
     @BeforeEach
     void clean() {
         revisionRepository.deleteAll();
         repository.deleteAll();
     }
 
+
     private Memory sensitive(MemoryScope scope, String content) {
         return memories.create(
-                ADMIN, scope, "신원 문서", content, "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+            ADMIN, scope, "신원 문서", content, "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
     }
+
 
     private Map<String, Object> memoryRow(Long id) {
         return jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", id);
     }
 
+
     private Map<String, Object> revisionRow(Long memoryId, int revision) {
         return jdbc.queryForMap(
-                "SELECT content, content_key_id, sensitivity FROM memory_revision WHERE memory_id = ? AND revision = ?",
-                memoryId,
-                revision);
+            "SELECT content, content_key_id, sensitivity FROM memory_revision WHERE memory_id = ? AND revision = ?",
+            memoryId,
+            revision);
     }
+
 
     @Test
     @DisplayName("민감 항목을 만들면 본문이 암호문으로 저장되고 contentOf 가 평문을 낸다")
@@ -89,11 +94,12 @@ class MemoryEncryptionTest {
         Memory memory = sensitive(MemoryScope.USER, FIRST);
 
         Map<String, Object> row = memoryRow(memory.id());
-        assertThat((String) row.get("CONTENT")).startsWith("v1.").doesNotContain(FIRST);
+        assertThat((String)row.get("CONTENT")).startsWith("v1.").doesNotContain(FIRST);
         assertThat(row.get("CONTENT_KEY_ID")).isEqualTo("test-1");
         assertThat(memories.contentOf(repository.findById(memory.id()).orElseThrow()))
-                .isEqualTo(FIRST);
+            .isEqualTo(FIRST);
     }
+
 
     @Test
     @DisplayName("고치면 물러난 판과 지금 줄이 모두 암호문이고 지우면 DELETED 판도 암호문이다")
@@ -103,20 +109,21 @@ class MemoryEncryptionTest {
         memories.update(ADMIN, memory.id(), SECOND, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
 
         Map<String, Object> revision = jdbc.queryForMap(
-                "SELECT content, content_key_id FROM memory_revision WHERE memory_id = ? AND revision = 1",
-                memory.id());
-        assertThat((String) revision.get("CONTENT")).doesNotContain(FIRST, SECOND);
+            "SELECT content, content_key_id FROM memory_revision WHERE memory_id = ? AND revision = 1",
+            memory.id());
+        assertThat((String)revision.get("CONTENT")).doesNotContain(FIRST, SECOND);
         assertThat(revision.get("CONTENT_KEY_ID")).isEqualTo("test-1");
-        assertThat((String) memoryRow(memory.id()).get("CONTENT")).doesNotContain(FIRST, SECOND);
+        assertThat((String)memoryRow(memory.id()).get("CONTENT")).doesNotContain(FIRST, SECOND);
 
         memories.delete(ADMIN, memory.id());
 
         String deleted = jdbc.queryForObject(
-                "SELECT content FROM memory_revision WHERE memory_id = ? AND change_type = 'DELETED'",
-                String.class,
-                memory.id());
+            "SELECT content FROM memory_revision WHERE memory_id = ? AND change_type = 'DELETED'",
+            String.class,
+            memory.id());
         assertThat(deleted).doesNotContain(FIRST, SECOND);
     }
+
 
     @Test
     @DisplayName("민감하지 않은 항목은 평문 그대로이고 content_key_id 가 비어 있다")
@@ -128,6 +135,7 @@ class MemoryEncryptionTest {
         assertThat(row.get("CONTENT_KEY_ID")).isNull();
     }
 
+
     @Test
     @DisplayName("일반 항목을 민감으로 고치면 지금 줄과 물러난 판이 모두 암호문이다")
     void normalToSensitive() {
@@ -135,15 +143,16 @@ class MemoryEncryptionTest {
 
         memories.update(ADMIN, memory.id(), FIRST, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
 
-        assertThat((String) memoryRow(memory.id()).get("CONTENT"))
-                .startsWith("v1.")
-                .doesNotContain(FIRST);
+        assertThat((String)memoryRow(memory.id()).get("CONTENT"))
+            .startsWith("v1.")
+            .doesNotContain(FIRST);
         Map<String, Object> revision = revisionRow(memory.id(), 1);
-        assertThat((String) revision.get("CONTENT")).startsWith("v1.").doesNotContain(FIRST);
+        assertThat((String)revision.get("CONTENT")).startsWith("v1.").doesNotContain(FIRST);
         assertThat(revision.get("CONTENT_KEY_ID")).isEqualTo("test-1");
         // 판의 뜻은 그대로다. 저장 모양만 바뀐다
         assertThat(revision.get("SENSITIVITY")).isEqualTo("NORMAL");
     }
+
 
     @Test
     @DisplayName("여러 번 고친 일반 항목을 민감으로 고치면 앞선 판이 모두 암호문이고 다른 항목의 판은 평문 그대로다")
@@ -152,8 +161,8 @@ class MemoryEncryptionTest {
         memories.update(ADMIN, memory.id(), SECOND, false);
         memories.update(ADMIN, memory.id(), THIRD, false);
         List<Map<String, Object>> before = jdbc.queryForList(
-                "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? ORDER BY revision",
-                memory.id());
+            "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? ORDER BY revision",
+            memory.id());
         Memory other = memories.create(ADMIN, MemoryScope.USER, "다른 항목", OTHER, false);
         memories.update(ADMIN, other.id(), "고친 글", false);
 
@@ -161,45 +170,47 @@ class MemoryEncryptionTest {
 
         for (int number = 1; number <= 3; number++) {
             Map<String, Object> revision = revisionRow(memory.id(), number);
-            assertThat((String) revision.get("CONTENT"))
-                    .as("판 %d 의 본문", number)
-                    .startsWith("v1.")
-                    .doesNotContain(FIRST, SECOND, THIRD);
+            assertThat((String)revision.get("CONTENT"))
+                .as("판 %d 의 본문", number)
+                .startsWith("v1.")
+                .doesNotContain(FIRST, SECOND, THIRD);
             assertThat(revision.get("CONTENT_KEY_ID")).as("판 %d 의 key", number).isEqualTo("test-1");
         }
         assertThat(jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM memory_revision WHERE memory_id = ? AND content_key_id IS NULL",
-                        Long.class,
-                        memory.id()))
+            "SELECT COUNT(*) FROM memory_revision WHERE memory_id = ? AND content_key_id IS NULL",
+            Long.class,
+            memory.id()))
                 .isZero();
         assertThat(jdbc.queryForList(
-                "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? AND revision < 3 ORDER BY revision",
-                memory.id())).isEqualTo(before);
+            "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? AND revision < 3 ORDER BY revision",
+            memory.id())).isEqualTo(before);
         assertThat(memories.revisionsOf(ADMIN, memory.id()))
-                .extracting(row -> cipher.open(row.content(), row.contentKeyId(), row.contentBinding()))
-                .containsExactly(FIRST, SECOND, THIRD);
+            .extracting(row -> cipher.open(row.content(), row.contentKeyId(), row.contentBinding()))
+            .containsExactly(FIRST, SECOND, THIRD);
         Map<String, Object> untouched = revisionRow(other.id(), 1);
         assertThat(untouched.get("CONTENT")).isEqualTo(OTHER);
         assertThat(untouched.get("CONTENT_KEY_ID")).isNull();
     }
 
+
     @Test
     @DisplayName("민감 항목은 목록의 수정 경로로 고치지 못하고 본문과 판이 그대로다")
     void sensitiveItemIsNotEditableFromList() {
         Memory memory = sensitive(MemoryScope.USER, FIRST);
-        String before = (String) memoryRow(memory.id()).get("CONTENT");
+        String before = (String)memoryRow(memory.id()).get("CONTENT");
 
         assertThatThrownBy(() -> memories.update(ADMIN, memory.id(), "x", false))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_SENSITIVE_NOT_EDITABLE));
 
         assertThat(memoryRow(memory.id()).get("CONTENT")).isEqualTo(before);
         assertThat(repository.findById(memory.id()).orElseThrow().revision()).isEqualTo(1);
         assertThat(jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM memory_revision WHERE memory_id = ?", Long.class, memory.id()))
+            "SELECT COUNT(*) FROM memory_revision WHERE memory_id = ?", Long.class, memory.id()))
                 .isZero();
     }
+
 
     @Test
     @DisplayName("일반 항목은 목록의 수정 경로로 고친다")
@@ -212,6 +223,7 @@ class MemoryEncryptionTest {
         assertThat(repository.findById(memory.id()).orElseThrow().revision()).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("민감 항목을 일반으로 고치면 지금 줄은 평문이고 물러난 판은 암호문이다")
     void sensitiveToNormal() {
@@ -223,19 +235,21 @@ class MemoryEncryptionTest {
         assertThat(row.get("CONTENT")).isEqualTo(FIRST);
         assertThat(row.get("CONTENT_KEY_ID")).isNull();
         String revision = jdbc.queryForObject(
-                "SELECT content FROM memory_revision WHERE memory_id = ? AND revision = 1", String.class, memory.id());
+            "SELECT content FROM memory_revision WHERE memory_id = ? AND revision = 1", String.class, memory.id());
         assertThat(revision).startsWith("v1.").doesNotContain(FIRST);
     }
+
 
     @Test
     @DisplayName("그룹 범위의 민감 항목도 암호화하고 contentOf 가 원래 글을 낸다")
     void groupScope() {
         Memory memory = sensitive(MemoryScope.GROUP, FIRST);
 
-        assertThat((String) memoryRow(memory.id()).get("CONTENT")).doesNotContain(FIRST);
+        assertThat((String)memoryRow(memory.id()).get("CONTENT")).doesNotContain(FIRST);
         assertThat(memories.contentOf(repository.findById(memory.id()).orElseThrow()))
-                .isEqualTo(FIRST);
+            .isEqualTo(FIRST);
     }
+
 
     @Test
     @DisplayName("민감 항목은 목록에서 본문이 비어 있고 sensitive 가 참이다")
@@ -253,6 +267,7 @@ class MemoryEncryptionTest {
         });
     }
 
+
     @Test
     @DisplayName("제안을 받아들여도 항목은 일반 평문이고 민감 항목이 되지 않는다")
     void acceptingProposalKeepsNormalPlain() {
@@ -263,8 +278,9 @@ class MemoryEncryptionTest {
         Map<String, Object> row = memoryRow(proposed.id());
         assertThat(row.get("CONTENT_KEY_ID")).isNull();
         assertThat(repository.findById(proposed.id()).orElseThrow().sensitivity())
-                .isEqualTo(MemorySensitivity.NORMAL);
+            .isEqualTo(MemorySensitivity.NORMAL);
     }
+
 
     @Test
     @DisplayName("민감 항목으로 고친 제안은 중복 키를 비워 본문의 지문을 남기지 않는다")
@@ -274,10 +290,10 @@ class MemoryEncryptionTest {
 
         memories.update(ADMIN, proposed.id(), SECOND, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
 
-        String key =
-                jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, proposed.id());
+        String key = jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, proposed.id());
         assertThat(key).isNull();
     }
+
 
     @Test
     @DisplayName("같은 본문을 고쳐도 판을 남기고 일반으로 되돌린 뒤 다시 민감하게 바꿔도 과거 판의 본문을 풀 수 있다")
@@ -291,9 +307,10 @@ class MemoryEncryptionTest {
         assertThat(current.revision()).isEqualTo(4);
         assertThat(memories.contentOf(current)).isEqualTo(THIRD);
         assertThat(memories.revisionsOf(ADMIN, memory.id()))
-                .extracting(row -> cipher.open(row.content(), row.contentKeyId(), row.contentBinding()))
-                .containsExactly(FIRST, FIRST, SECOND);
+            .extracting(row -> cipher.open(row.content(), row.contentKeyId(), row.contentBinding()))
+            .containsExactly(FIRST, FIRST, SECOND);
     }
+
 
     @Test
     @DisplayName("암호화 중 실패하면 현재 본문과 이전 판이 그대로 남는다")
@@ -302,7 +319,7 @@ class MemoryEncryptionTest {
         memories.update(ADMIN, memory.id(), SECOND, false);
 
         assertThatThrownBy(() -> memories.update(
-                ADMIN, memory.id(), null, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE))
+            ADMIN, memory.id(), null, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE))
                 .isInstanceOf(NullPointerException.class);
 
         Memory current = repository.findById(memory.id()).orElseThrow();
