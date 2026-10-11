@@ -6,9 +6,14 @@ import { lineEdits } from "./changes.ts";
  * 제목은 `documentTitle` 구성요소의 `title` 문단, 글은 `text` 구성요소의 `value` 문단이고 문단의 `nodes` 가 글 조각이다.
  */
 type DocumentNode = { id?: unknown; value?: unknown; "@ctype"?: unknown };
-type DocumentParagraph = { id?: unknown; nodes?: DocumentNode[]; "@ctype"?: unknown };
+type DocumentParagraph = {
+  id?: unknown;
+  nodes?: DocumentNode[];
+  "@ctype"?: unknown;
+};
 export type DocumentComponent = {
   id?: unknown;
+  fileName?: unknown;
   layout?: unknown;
   "@ctype"?: unknown;
   title?: DocumentParagraph[];
@@ -20,7 +25,11 @@ export type EditorDocument = {
 };
 
 /** 글이 아닌 기존 구성요소를 본문에서 가리키는 이름. 이 셋 밖의 구성요소는 「구성요소」 다. */
-const KIND_NAMES: Record<string, string> = { image: "사진", sticker: "스티커", placesMap: "지도" };
+const KIND_NAMES: Record<string, string> = {
+  image: "사진",
+  sticker: "스티커",
+  placesMap: "지도",
+};
 const OTHER_KIND = "구성요소";
 const CTYPE = /^[A-Za-z0-9_-]{1,40}$/;
 
@@ -42,6 +51,55 @@ export type DocumentDraft = {
   existing: ExistingComponent[];
 };
 
+export type DraftPhoto = {
+  position: number;
+  componentIndex: number;
+  componentId: string | null;
+  fileName: string | null;
+};
+
+const PHOTO_MAX = 50;
+const OPAQUE_ID = /^[A-Za-z0-9_-]{1,200}$/;
+const UNSAFE_FILENAME = /[\\/\\\\:?#\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u;
+
+/** 파일명만 허용한다. 잘못된 값은 자르거나 URL에서 보충하지 않는다. */
+function photoFileName(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0 || value.length > 255)
+    return null;
+  if (
+    value.trim() !== value ||
+    value === "." ||
+    value === ".." ||
+    UNSAFE_FILENAME.test(value)
+  )
+    return null;
+  return value;
+}
+
+/** 직접 놓인 image만 차례대로 읽는다. 다른 구성요소 안의 사진과 원본 바이트는 검사하지 않는다. */
+export function documentPhotos(data: EditorDocument) {
+  const photos: DraftPhoto[] = [];
+  let photo_count = 0;
+  const components = data?.document?.components;
+  if (!Array.isArray(components))
+    throw new DocumentShapeError("문서에 components 가 없다");
+  components.forEach((component, componentIndex) => {
+    if (component?.["@ctype"] !== "image") return;
+    photo_count += 1;
+    if (photos.length >= PHOTO_MAX) return;
+    photos.push({
+      position: photo_count,
+      componentIndex,
+      componentId:
+        typeof component.id === "string" && OPAQUE_ID.test(component.id)
+          ? component.id
+          : null,
+      fileName: photoFileName(component.fileName),
+    });
+  });
+  return { photos, photo_count, photos_truncated: photo_count > photos.length };
+}
+
 /** 문서의 모양이 예상과 다르다. 화면이나 문서의 글은 싣지 않는다. */
 export class DocumentShapeError extends Error {
   constructor(message: string) {
@@ -55,8 +113,11 @@ const flat = (text: string) => text.replace(/[\r\n]+/g, " ");
 
 /** 문단의 글 조각을 잇는다. 글이 없는 조각은 건너뛴다. */
 function paragraphText(paragraph: DocumentParagraph) {
-  if (!paragraph || !Array.isArray(paragraph.nodes)) throw new DocumentShapeError("문단에 nodes 가 없다");
-  return paragraph.nodes.map((node) => (typeof node?.value === "string" ? node.value : "")).join("");
+  if (!paragraph || !Array.isArray(paragraph.nodes))
+    throw new DocumentShapeError("문단에 nodes 가 없다");
+  return paragraph.nodes
+    .map((node) => (typeof node?.value === "string" ? node.value : ""))
+    .join("");
 }
 
 /**
@@ -65,9 +126,13 @@ function paragraphText(paragraph: DocumentParagraph) {
  */
 export function documentToDraft(data: EditorDocument): DocumentDraft {
   const components = data?.document?.components;
-  if (!Array.isArray(components)) throw new DocumentShapeError("문서에 components 가 없다");
-  const titles = components.filter((component) => component?.["@ctype"] === "documentTitle");
-  if (titles.length !== 1) throw new DocumentShapeError("제목 구성요소가 하나가 아니다");
+  if (!Array.isArray(components))
+    throw new DocumentShapeError("문서에 components 가 없다");
+  const titles = components.filter(
+    (component) => component?.["@ctype"] === "documentTitle",
+  );
+  if (titles.length !== 1)
+    throw new DocumentShapeError("제목 구성요소가 하나가 아니다");
   const title = flat((titles[0]!.title ?? []).map(paragraphText).join(""));
 
   const counts = new Map<string, number>();
@@ -77,15 +142,22 @@ export function documentToDraft(data: EditorDocument): DocumentDraft {
     const ctype = component?.["@ctype"];
     if (ctype === "documentTitle") return;
     if (ctype === "text") {
-      if (!Array.isArray(component.value)) throw new DocumentShapeError("글 구성요소에 value 가 없다");
-      for (const paragraph of component.value) lines.push(flat(paragraphText(paragraph)));
+      if (!Array.isArray(component.value))
+        throw new DocumentShapeError("글 구성요소에 value 가 없다");
+      for (const paragraph of component.value)
+        lines.push(flat(paragraphText(paragraph)));
       return;
     }
-    const name = typeof ctype === "string" ? (KIND_NAMES[ctype] ?? OTHER_KIND) : OTHER_KIND;
+    const name =
+      typeof ctype === "string"
+        ? (KIND_NAMES[ctype] ?? OTHER_KIND)
+        : OTHER_KIND;
     const number = (counts.get(name) ?? 0) + 1;
     counts.set(name, number);
     const label =
-      name === OTHER_KIND && typeof ctype === "string" && CTYPE.test(ctype) ? `: ${ctype}` : "";
+      name === OTHER_KIND && typeof ctype === "string" && CTYPE.test(ctype)
+        ? `: ${ctype}`
+        : "";
     const line = `[기존 ${name} ${number}${label}]`;
     lines.push(line);
     existing.push({ line, index });
@@ -97,7 +169,11 @@ export function documentToDraft(data: EditorDocument): DocumentDraft {
 const newId = () => `SE-${randomUUID()}`;
 
 /** 글 한 줄로 새 문단을 만든다. 꾸밈 칸은 두지 않는다. */
-function newParagraph(text: string, paragraphId = newId(), nodeId = newId()): DocumentParagraph {
+function newParagraph(
+  text: string,
+  paragraphId = newId(),
+  nodeId = newId(),
+): DocumentParagraph {
   return {
     id: paragraphId,
     nodes: [{ id: nodeId, value: text, "@ctype": "textNode" }],
@@ -106,7 +182,12 @@ function newParagraph(text: string, paragraphId = newId(), nodeId = newId()): Do
 }
 
 function newTextComponent(paragraphs: DocumentParagraph[]): DocumentComponent {
-  return { id: newId(), layout: "default", value: paragraphs, "@ctype": "text" };
+  return {
+    id: newId(),
+    layout: "default",
+    value: paragraphs,
+    "@ctype": "text",
+  };
 }
 
 /**
@@ -114,7 +195,11 @@ function newTextComponent(paragraphs: DocumentParagraph[]): DocumentComponent {
  * 기존 구성요소 줄은 원래 구성요소 객체를 그 자리에 두고, 원래 글과 줄 비교로 짝지은 글 줄은 원래 문단 객체를 그대로 써 꾸밈을 지킨다.
  * 본문에 없는 기존 구성요소는 빠진다. 루트의 다른 칸은 뜻을 실측하지 못해 그대로 둔다.
  */
-export function draftToDocument(original: EditorDocument, title: string, body: string): EditorDocument {
+export function draftToDocument(
+  original: EditorDocument,
+  title: string,
+  body: string,
+): EditorDocument {
   const { existing } = documentToDraft(original);
   const result = structuredClone(original);
   const components = result.document!.components!;
@@ -126,7 +211,9 @@ export function draftToDocument(original: EditorDocument, title: string, body: s
       for (const paragraph of component.value!)
         before.push({ line: flat(paragraphText(paragraph)), paragraph });
 
-  const after = body.split("\n").map((raw) => (raw.endsWith("\r") ? raw.slice(0, -1) : raw));
+  const after = body
+    .split("\n")
+    .map((raw) => (raw.endsWith("\r") ? raw.slice(0, -1) : raw));
   const isExisting = after.map((line) => EXISTING_LINE.test(line));
   const indexOf = new Map(existing.map((item) => [item.line, item.index]));
   const used = new Set<string>();
@@ -142,7 +229,10 @@ export function draftToDocument(original: EditorDocument, title: string, body: s
   const reused: (DocumentParagraph | undefined)[] = [];
   let i = 0;
   let j = 0;
-  for (const edit of lineEdits(before.map((item) => item.line), texts)) {
+  for (const edit of lineEdits(
+    before.map((item) => item.line),
+    texts,
+  )) {
     if (edit.kind === "same") reused[j++] = before[i++]!.paragraph;
     else if (edit.kind === "remove") i++;
     else j++;
@@ -168,7 +258,9 @@ export function draftToDocument(original: EditorDocument, title: string, body: s
   });
   if (!hasText) bodyComponents.push(newTextComponent([newParagraph("")]));
 
-  const titleComponent = components.find((component) => component?.["@ctype"] === "documentTitle")!;
+  const titleComponent = components.find(
+    (component) => component?.["@ctype"] === "documentTitle",
+  )!;
   const first = titleComponent.title?.[0];
   const firstNode = first?.nodes?.[0];
   titleComponent.title = [

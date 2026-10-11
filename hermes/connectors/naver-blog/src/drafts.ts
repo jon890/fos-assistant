@@ -1,11 +1,28 @@
 import { draftRevision } from "./changes.ts";
-import { DocumentShapeError, documentToDraft } from "./document.ts";
+import {
+  DocumentShapeError,
+  documentPhotos,
+  documentToDraft,
+} from "./document.ts";
 import { editorDocument, loadDraft, tempDrafts } from "./editor/drafts.ts";
 import { open } from "./editor/open.ts";
-import { closeTab, EditorError, type EditorOptions, type EditorPage, openWriteTab } from "./editor/page.ts";
+import {
+  closeTab,
+  EditorError,
+  type EditorOptions,
+  type EditorPage,
+  openWriteTab,
+} from "./editor/page.ts";
 import { readSettings } from "./editor/settings.ts";
 import { ToolError } from "./errors.ts";
-import { JOB_ID_PATTERN, jobAlive, lockFile, openJobDir, readLock, readState } from "./jobs.ts";
+import {
+  JOB_ID_PATTERN,
+  jobAlive,
+  lockFile,
+  openJobDir,
+  readLock,
+  readState,
+} from "./jobs.ts";
 import { readConnection, type Env } from "./session.ts";
 
 /** 읽기 도구 하나의 시간 상한. Hermes 의 도구 호출 제한(300초)보다 짧다. */
@@ -29,7 +46,9 @@ export async function assertIdle(dir: string, blogId: string) {
   const lock = await readLock(lockFile(dir, blogId));
   if (!lock) return;
   const holder =
-    lock.jobId && JOB_ID_PATTERN.test(lock.jobId) ? await readState(dir, lock.jobId) : null;
+    lock.jobId && JOB_ID_PATTERN.test(lock.jobId)
+      ? await readState(dir, lock.jobId)
+      : null;
   if (jobAlive(holder, lock.createdAt)) throw new ToolError("NAVER_BLOG_BUSY");
 }
 
@@ -51,7 +70,10 @@ async function withWriteTab<T>(
   const limit = setTimeout(() => controller.abort(), limitMs);
   let tab: Awaited<ReturnType<typeof openWriteTab>> | null = null;
   try {
-    tab = await openWriteTab(cdpUrl, blogId, { ...times, signal: controller.signal });
+    tab = await openWriteTab(cdpUrl, blogId, {
+      ...times,
+      signal: controller.signal,
+    });
     const opened = await open(tab.page, { keepDraftNotice: true });
     return await work(tab.page, blogId, opened === "draft_notice");
   } catch (error) {
@@ -86,22 +108,35 @@ export function listDrafts(env: Env, options: ReadOptions = {}) {
  * 승인 뒤 임시저장 글 하나를 편집기에 불러와 제목, 카테고리, 태그, 본문을 읽는다.
  * 저장 단추는 누르지 않지만 불러오면서 네이버 자동저장이 발생할 수 있어 WRITE 도구다.
  * 본문은 한 줄이 한 문단이고, 글이 아닌 구성요소는 `[기존 사진 1]` 같은 줄이다.
- * `revision` 은 그 네 칸의 지문이다.
+ * `revision` 은 그 네 칸의 지문이다. 별도로 읽는 사진 메타데이터는 지문에 넣지 않는다.
  * 「작성 중인 글」 알림이 떠 있으면 사용자가 쓰던 글이 편집기에 남은 것이라 불러오지 않고 `NAVER_BLOG_EDITOR_IN_USE` 다.
  */
-export function readDraft(env: Env, draftId: string, options: ReadOptions = {}) {
+export function readDraft(
+  env: Env,
+  draftId: string,
+  options: ReadOptions = {},
+) {
   return withWriteTab(env, options, async (page, blogId, notice) => {
     if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
     await loadDraft(page, blogId, draftId);
     let content;
+    let photos;
     try {
-      content = documentToDraft(await editorDocument(page));
+      const document = await editorDocument(page);
+      content = documentToDraft(document);
+      photos = documentPhotos(document);
     } catch (error) {
-      if (error instanceof DocumentShapeError) throw page.fail("editor_failed", error.message);
+      if (error instanceof DocumentShapeError)
+        throw page.fail("editor_failed", error.message);
       throw error;
     }
     const { category, tags } = await readSettings(page);
     const draft = { title: content.title, category, tags, body: content.body };
-    return { draft_id: draftId, revision: draftRevision(draft), ...draft };
+    return {
+      draft_id: draftId,
+      revision: draftRevision(draft),
+      ...draft,
+      ...photos,
+    };
   });
 }
