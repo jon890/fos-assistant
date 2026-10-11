@@ -74,5 +74,16 @@
     "NAVER_BLOG_EDITOR_IN_USE": "unavailable",
     "NAVER_BLOG_START_UNKNOWN": "outcome_unknown",
     "NAVER_BLOG_UNAVAILABLE": "unavailable"
+  },
+  "snapshot": {
+    "protocol": "content-snapshot-v1",
+    "compile_tool": "compile_content_snapshot",
+    "start_tool": "start_content_snapshot",
+    "status_tool": "content_snapshot_status",
+    "capabilities": {
+      "compile": true,
+      "start": false,
+      "status": false
+    }
   }
 }

@@ -72,18 +72,18 @@ class MediaObservationServiceTest extends ObservationFixture {
             ids.add(photo().id());
         }
         attachmentService.upload(
-                owner,
-                conversation.id(),
-                "pending.gif",
-                "image/gif",
-                IMAGE.length,
-                () -> new ByteArrayInputStream(IMAGE));
+            owner,
+            conversation.id(),
+            "pending.gif",
+            "image/gif",
+            IMAGE.length,
+            () -> new ByteArrayInputStream(IMAGE));
         attachmentCleaner.delete(photo, NOW);
         var page = service.list(owner, conversation.id(), null, 100);
         assertThat(page).hasSize(30);
         assertThat(page)
-                .extracting(MediaObservationView::assetId)
-                .containsExactlyElementsOf(ids.stream().map(Object::toString).toList());
+            .extracting(MediaObservationView::assetId)
+            .containsExactlyElementsOf(ids.stream().map(Object::toString).toList());
         assertThat(page.getFirst().status()).isEqualTo(ObservationStatus.UNAVAILABLE);
         assertThat(page.getFirst().revision()).isNull();
         assertThat(page.getFirst().sourceFingerprint()).isNull();
@@ -91,11 +91,12 @@ class MediaObservationServiceTest extends ObservationFixture {
         assertThat(page.get(1).revision()).isZero();
         assertThat(page.get(1).ordinal()).isEqualTo(2);
         assertThat(service.list(owner, conversation.id(), ids.get(19).toString(), 10))
-                .extracting(MediaObservationView::ordinal)
-                .containsExactly(21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
+            .extracting(MediaObservationView::ordinal)
+            .containsExactly(21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
         assertThat(observations.count()).isZero();
         assertThat(requests.count()).isZero();
     }
+
 
     @Test
     @DisplayName("읽기 전에 커서와 소유권을 검증한다")
@@ -109,49 +110,51 @@ class MediaObservationServiceTest extends ObservationFixture {
         Conversation another = conversations.save(Conversation.startedBy(other.id(), "다른 대화", null, NOW));
         ChatAttachment otherPhoto = photo(other, another);
         code(
-                () -> service.list(owner, conversation.id(), otherPhoto.id().toString(), 10),
-                ErrorCode.CONVERSATION_NOT_FOUND);
+            () -> service.list(owner, conversation.id(), otherPhoto.id().toString(), 10),
+            ErrorCode.CONVERSATION_NOT_FOUND);
         code(
-                () -> service.record(owner, conversation.id(), otherPhoto.id(), 0, UUID.randomUUID(), input(), model()),
-                ErrorCode.CONVERSATION_NOT_FOUND);
+            () -> service.record(owner, conversation.id(), otherPhoto.id(), 0, UUID.randomUUID(), input(), model()),
+            ErrorCode.CONVERSATION_NOT_FOUND);
         code(() -> service.list(other, conversation.id(), "x", 10), ErrorCode.CONVERSATION_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("캐시 없이 실제 provenance와 처리 상태 전환을 저장한다")
     void persistsRealProvenanceAndProcessingTransitionsWithoutCache() {
         var processing = new MediaObservationInput(
-                ObservationStatus.PROCESSING,
-                null,
-                List.of(),
-                List.of(),
-                new Coverage("ORIGINAL", null, null),
-                null,
-                null);
+            ObservationStatus.PROCESSING,
+            null,
+            List.of(),
+            List.of(),
+            new Coverage("ORIGINAL", null, null),
+            null,
+            null);
         MediaObservationView first = record(0, UUID.randomUUID(), processing, model());
         clock.advance(Duration.ofMinutes(15));
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst().errorCode())
-                .isEqualTo("ANALYSIS_STALE");
+            .isEqualTo("ANALYSIS_STALE");
         assertThat(observations.count()).isEqualTo(1);
         var second = record(1, UUID.randomUUID(), input(), model());
-        var third = record(2, UUID.randomUUID(), input(), model());
+        var third = record(2, UUID.randomUUID(), input(), changedModel());
         assertThat(first.revision()).isEqualTo(1);
         assertThat(second.revision()).isEqualTo(2);
         assertThat(third.revision()).isEqualTo(3);
         assertThat(third.provenance())
-                .isEqualTo(new ObservationProvenance(
-                        ObservationProvenanceKind.MODEL_RESULT,
-                        123L,
-                        "provider",
-                        "provider-v2",
-                        "model",
-                        "model-v3",
-                        1,
-                        "media-observation-v1",
-                        clock.instant()));
+            .isEqualTo(new ObservationProvenance(
+                ObservationProvenanceKind.MODEL_RESULT,
+                123L,
+                "provider",
+                "provider-v2",
+                "model",
+                "model-v4",
+                1,
+                "media-observation-v1",
+                clock.instant()));
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst()).isEqualTo(third);
         assertThat(requests.count()).isEqualTo(3);
     }
+
 
     @Test
     @DisplayName("코드포인트와 UTF-8 본문 한도를 검사하고 부분 행을 남기지 않는다")
@@ -163,100 +166,102 @@ class MediaObservationServiceTest extends ObservationFixture {
             claims.add(new MediaObservationInput.Claim("VISUAL", "😀".repeat(500), "CONFIRMED", List.of("근거")));
         }
         var oversized = new MediaObservationInput(
-                ObservationStatus.SUCCEEDED,
-                "관찰",
-                claims,
-                List.of(),
-                new Coverage("ORIGINAL", null, null),
-                input().evidence(),
-                null);
+            ObservationStatus.SUCCEEDED,
+            "관찰",
+            claims,
+            List.of(),
+            new Coverage("ORIGINAL", null, null),
+            input().evidence(),
+            null);
         code(() -> record(1, UUID.randomUUID(), oversized, model()), ErrorCode.VALIDATION_FAILED);
         var nullClaim = new MediaObservationInput(
-                ObservationStatus.SUCCEEDED,
-                "관찰",
-                Arrays.asList((MediaObservationInput.Claim) null),
-                List.of(),
-                new Coverage("ORIGINAL", null, null),
-                input().evidence(),
-                null);
+            ObservationStatus.SUCCEEDED,
+            "관찰",
+            Arrays.asList((MediaObservationInput.Claim)null),
+            List.of(),
+            new Coverage("ORIGINAL", null, null),
+            input().evidence(),
+            null);
         code(() -> record(1, UUID.randomUUID(), nullClaim, model()), ErrorCode.VALIDATION_FAILED);
         code(
-                () -> record(
-                        1,
-                        UUID.randomUUID(),
-                        input(),
-                        new ObservationProvenance(
-                                ObservationProvenanceKind.MODEL_RESULT,
-                                123L,
-                                null,
-                                null,
-                                "model",
-                                null,
-                                1,
-                                "media-observation-v1",
-                                null)),
-                ErrorCode.VALIDATION_FAILED);
-        var synthetic = new ObservationProvenance(
-                ObservationProvenanceKind.SYNTHETIC_MEASUREMENT,
-                null,
-                null,
-                null,
-                null,
-                null,
+            () -> record(
                 1,
-                "media-observation-v1",
-                null);
+                UUID.randomUUID(),
+                input(),
+                new ObservationProvenance(
+                    ObservationProvenanceKind.MODEL_RESULT,
+                    123L,
+                    null,
+                    null,
+                    "model",
+                    null,
+                    1,
+                    "media-observation-v1",
+                    null)),
+            ErrorCode.VALIDATION_FAILED);
+        var synthetic = new ObservationProvenance(
+            ObservationProvenanceKind.SYNTHETIC_MEASUREMENT,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            "media-observation-v1",
+            null);
         code(() -> record(1, UUID.randomUUID(), input(), synthetic), ErrorCode.VALIDATION_FAILED);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("잘못된 상태 coverage 근거를 거부한다")
     void rejectsInvalidStatusCoverageAndEvidence() {
         var crop = new Coverage("CROP", new MediaObservationInput.Region(0, 0, Double.NaN, 1), null);
         var invalidInputs = List.of(
-                new MediaObservationInput(ObservationStatus.NOT_ANALYZED, null, null, null, null, null, null),
-                new MediaObservationInput(ObservationStatus.UNAVAILABLE, null, null, null, null, null, null),
-                new MediaObservationInput(ObservationStatus.FAILED, "본문", null, null, null, null, "MODEL_ERROR"),
-                new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "raw error"),
-                new MediaObservationInput(
-                        ObservationStatus.PARTIAL, "관찰", null, null, input().coverage(), input().evidence(), null),
-                new MediaObservationInput(
-                        ObservationStatus.SUCCEEDED,
-                        "관찰",
-                        null,
-                        List.of("불확실"),
-                        input().coverage(),
-                        input().evidence(),
-                        null),
-                new MediaObservationInput(
-                        ObservationStatus.SUCCEEDED, "관찰", null, null, crop, input().evidence(), null),
-                new MediaObservationInput(
-                        ObservationStatus.SUCCEEDED,
-                        "관찰",
-                        null,
-                        null,
-                        new Coverage("FIRST_FRAME", null, 1),
-                        input().evidence(),
-                        null),
-                new MediaObservationInput(
-                        ObservationStatus.SUCCEEDED,
-                        "관찰",
-                        null,
-                        null,
-                        input().coverage(),
-                        new Evidence(ObservationProvenanceKind.MODEL_RESULT, "124"),
-                        null));
+            new MediaObservationInput(ObservationStatus.NOT_ANALYZED, null, null, null, null, null, null),
+            new MediaObservationInput(ObservationStatus.UNAVAILABLE, null, null, null, null, null, null),
+            new MediaObservationInput(ObservationStatus.FAILED, "본문", null, null, null, null, "MODEL_ERROR"),
+            new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "raw error"),
+            new MediaObservationInput(
+                ObservationStatus.PARTIAL, "관찰", null, null, input().coverage(), input().evidence(), null),
+            new MediaObservationInput(
+                ObservationStatus.SUCCEEDED,
+                "관찰",
+                null,
+                List.of("불확실"),
+                input().coverage(),
+                input().evidence(),
+                null),
+            new MediaObservationInput(
+                ObservationStatus.SUCCEEDED, "관찰", null, null, crop, input().evidence(), null),
+            new MediaObservationInput(
+                ObservationStatus.SUCCEEDED,
+                "관찰",
+                null,
+                null,
+                new Coverage("FIRST_FRAME", null, 1),
+                input().evidence(),
+                null),
+            new MediaObservationInput(
+                ObservationStatus.SUCCEEDED,
+                "관찰",
+                null,
+                null,
+                input().coverage(),
+                new Evidence(ObservationProvenanceKind.MODEL_RESULT, "124"),
+                null));
         invalidInputs.forEach(
-                value -> code(() -> record(0, UUID.randomUUID(), value, model()), ErrorCode.VALIDATION_FAILED));
+            value -> code(() -> record(0, UUID.randomUUID(), value, model()), ErrorCode.VALIDATION_FAILED));
         record(
-                0,
-                UUID.randomUUID(),
-                new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "MODEL_ERROR"),
-                model());
+            0,
+            UUID.randomUUID(),
+            new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "MODEL_ERROR"),
+            model());
         assertThat(requests.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("같은 크기 원본 교체를 조회와 새 요청 재시도에서 발견한다")
@@ -278,6 +283,7 @@ class MediaObservationServiceTest extends ObservationFixture {
         assertThat(requests.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("소유자 변경과 업로더 불일치를 alias 재시도에도 차단한다")
     void blocksOwnerChangesAndUploaderMismatchIncludingAliasRetry() {
@@ -287,18 +293,19 @@ class MediaObservationServiceTest extends ObservationFixture {
         jdbc.update("update conversation set user_id=? where id=?", other.id(), conversation.id());
         code(() -> record(0, request, input(), model()), ErrorCode.CONVERSATION_NOT_FOUND);
         code(
-                () -> service.record(other, conversation.id(), photo.id(), 0, request, input(), model()),
-                ErrorCode.CONVERSATION_NOT_FOUND);
+            () -> service.record(other, conversation.id(), photo.id(), 0, request, input(), model()),
+            ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(service.list(other, conversation.id(), null, 10).getFirst().observation())
-                .isNull();
+            .isNull();
         assertThat(service.list(other, conversation.id(), null, 10).getFirst().provenance())
-                .isNull();
+            .isNull();
         jdbc.update("update conversation set user_id=? where id=?", owner.id(), conversation.id());
         jdbc.update("update media_observation set owner_user_id=?", other.id());
         code(() -> record(0, request, input(), model()), ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst().status())
-                .isEqualTo(ObservationStatus.UNAVAILABLE);
+            .isEqualTo(ObservationStatus.UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("성공 IO 크기 만료 SQL 실패에서 원본 스트림을 닫는다")
@@ -312,25 +319,26 @@ class MediaObservationServiceTest extends ObservationFixture {
             closed.set(false);
             var failing = local(trackingStore(closed, mode), bodies, observations, requests, attachments, access);
             code(
-                    () -> failing.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
-                    ErrorCode.ATTACHMENT_GONE);
+                () -> failing.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
+                ErrorCode.ATTACHMENT_GONE);
             assertThat(closed).isTrue();
         }
         clock.set(NOW);
         closed.set(false);
-        var broken =
-                fail(MediaObservationRepository.class, observations, "findFirstByAttachmentIdOrderByRevisionDesc", 1);
+        var broken = fail(MediaObservationRepository.class, observations, "findFirstByAttachmentIdOrderByRevisionDesc", 1);
         assertThatThrownBy(() -> local(tracked, bodies, broken, requests, attachments, access)
-                        .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
+            .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(closed).isTrue();
         assertThat(observations.count()).isEqualTo(1);
     }
 
+
     private AttachmentStore trackingStore(AtomicBoolean closed, int mode) {
         return new AttachmentStore(properties) {
             @Override
             public InputStream open(ChatAttachment attachment) {
+                closed.set(false);
                 return new FilterInputStream(new ByteArrayInputStream(mode == 2 ? new byte[1] : IMAGE)) {
                     @Override
                     public int read(byte[] buffer, int offset, int length) throws IOException {
@@ -343,6 +351,7 @@ class MediaObservationServiceTest extends ObservationFixture {
                         return super.read(buffer, offset, length);
                     }
 
+
                     @Override
                     public void close() throws IOException {
                         closed.set(true);
@@ -353,18 +362,19 @@ class MediaObservationServiceTest extends ObservationFixture {
         };
     }
 
+
     @Test
     @DisplayName("조회 최종 SQL 실패를 전파하기 전에 스트림을 닫는다")
     void closesStreamBeforePropagatingFinalListSqlFailure() {
         record(0, UUID.randomUUID(), input(), model());
         AtomicBoolean closed = new AtomicBoolean();
         var broken = fail(
-                ChatAttachmentRepository.class,
-                attachments,
-                "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
-                2);
+            ChatAttachmentRepository.class,
+            attachments,
+            "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
+            3);
         assertThatThrownBy(() -> local(trackingStore(closed, 0), bodies, observations, requests, broken, access)
-                        .list(owner, conversation.id(), null, 10))
+            .list(owner, conversation.id(), null, 10))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(closed).isTrue();
         assertThat(observations.count()).isEqualTo(1);
@@ -440,6 +450,7 @@ abstract class ObservationFixture {
     ChatAttachment photo;
     private final List<Path> directories = new ArrayList<>();
 
+
     @BeforeEach
     void prepare() {
         clock.set(NOW);
@@ -450,6 +461,7 @@ abstract class ObservationFixture {
         conversation = conversations.save(Conversation.startedBy(owner.id(), "관찰 회귀", null, NOW));
         photo = photo();
     }
+
 
     @AfterEach
     void cleanup() throws IOException {
@@ -463,6 +475,7 @@ abstract class ObservationFixture {
             }
         }
     }
+
 
     CurrentUser user() {
         AppUser row = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "주인", 1L, UserRole.MEMBER, NOW));
@@ -480,83 +493,108 @@ abstract class ObservationFixture {
         return new CurrentUser(row.id(), row.email(), row.displayName(), row.groupId(), row.role());
     }
 
+
     ChatAttachment photo() {
         return photo(owner, conversation);
     }
 
+
     ChatAttachment photo(CurrentUser user, Conversation target) {
         var row = attachmentService.upload(
-                user, target.id(), "a.gif", "image/gif", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
+            user, target.id(), "a.gif", "image/gif", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
         attachmentService.attach(100L + row.id(), target.id(), List.of(row.id()));
         return attachments.findById(row.id()).orElseThrow();
     }
 
+
     Path file(ChatAttachment row) {
         return Path.of(
-                properties.root(),
-                "users",
-                AttachmentStore.userDirectoryKey(row.uploadedByUserId()),
-                row.conversationId().toString(),
-                row.storedName());
+            properties.root(),
+            "users",
+            AttachmentStore.userDirectoryKey(row.uploadedByUserId()),
+            row.conversationId().toString(),
+            row.storedName());
     }
 
+
     MediaObservationView record(
-            long revision, UUID request, MediaObservationInput input, ObservationProvenance source) {
+        long revision, UUID request, MediaObservationInput input, ObservationProvenance source) {
         return service.record(owner, conversation.id(), photo.id(), revision, request, input, source);
     }
 
+
     MediaObservationService local(
-            AttachmentStore localStore,
-            MediaObservationBodies localBodies,
-            MediaObservationRepository localRows,
-            MediaObservationRequestRepository localRequests,
-            ChatAttachmentRepository localAttachments,
-            ConversationAccess localAccess) {
+        AttachmentStore localStore,
+        MediaObservationBodies localBodies,
+        MediaObservationRepository localRows,
+        MediaObservationRequestRepository localRequests,
+        ChatAttachmentRepository localAttachments,
+        ConversationAccess localAccess) {
         return new MediaObservationService(
-                localAccess,
-                localAttachments,
-                localStore,
-                localRows,
-                localRequests,
-                localBodies,
-                mutations,
-                json,
-                clock);
+            localAccess,
+            localAttachments,
+            localStore,
+            localRows,
+            localRequests,
+            localBodies,
+            mutations,
+            json,
+            clock);
     }
+
 
     static MediaObservationInput input() {
         return input("관찰 표식");
     }
 
+
     static MediaObservationInput input(String summary) {
         return new MediaObservationInput(
-                ObservationStatus.SUCCEEDED,
-                summary,
-                List.of(),
-                List.of(),
-                new Coverage("ORIGINAL", null, null),
-                new Evidence(ObservationProvenanceKind.MODEL_RESULT, "123"),
-                null);
+            ObservationStatus.SUCCEEDED,
+            summary,
+            List.of(),
+            List.of(),
+            new Coverage("ORIGINAL", null, null),
+            new Evidence(ObservationProvenanceKind.MODEL_RESULT, "123"),
+            null);
     }
+
 
     static ObservationProvenance model() {
         return new ObservationProvenance(
-                ObservationProvenanceKind.MODEL_RESULT,
-                123L,
-                "provider",
-                "provider-v2",
-                "model",
-                "model-v3",
-                1,
-                "media-observation-v1",
-                Instant.EPOCH);
+            ObservationProvenanceKind.MODEL_RESULT,
+            123L,
+            "provider",
+            "provider-v2",
+            "model",
+            "model-v3",
+            1,
+            "media-observation-v1",
+            Instant.EPOCH);
     }
+
+
+    static ObservationProvenance changedModel() {
+        var source = model();
+        return new ObservationProvenance(
+            source.kind(),
+            source.executionId(),
+            source.provider(),
+            source.providerVersion(),
+            source.model(),
+            "model-v4",
+            source.schemaVersion(),
+            source.promptVersion(),
+            source.observedAt());
+    }
+
 
     static void code(Runnable action, ErrorCode expected) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
+
 
     static <T> T fail(Class<T> type, T delegate, String failingMethod, int failingCall) {
         AtomicInteger calls = new AtomicInteger();

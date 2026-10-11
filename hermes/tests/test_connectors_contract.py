@@ -135,8 +135,13 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     else:
         if server.get("command") != "bun":
             problems.append(".mcp.json 의 command 가 bun 이 아니다: %r" % server.get("command"))
-        if server.get("args") != ["${CLAUDE_PLUGIN_ROOT}/dist/%s-mcp.js" % name]:
+        entry = "dist/%s-mcp.js" % name
+        # Naver의 dotenv 차단은 필수다. 다른 옵션이나 인자 순서는 허용하지 않는다.
+        expected_args = (["--no-env-file"] if name == "naver-blog" else []) + ["${CLAUDE_PLUGIN_ROOT}/" + entry]
+        if server.get("args") != expected_args:
             problems.append(".mcp.json 이 빌드한 묶음 파일 하나를 실행하지 않는다")
+        if not (root / entry).is_file():
+            problems.append("빌드한 묶음 파일이 없다: %s" % entry)
         if not (root / "src/server.ts").is_file():
             problems.append("TypeScript 서버 소스가 없다")
         if (root / "server.py").exists():
@@ -267,6 +272,57 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
 
     def test_untouched_copy_passes(self):
         self.assertEqual(self.broken_copy(lambda root: None), [])
+
+    def test_built_copies_keep_source_commands_args_and_entry_bytes(self):
+        for source in connector_dirs():
+            with self.subTest(connector=source.name):
+                def check_copy(root):
+                    original = read_json(source / ".mcp.json")
+                    self.assertEqual(read_json(root / ".mcp.json"), original)
+                    server = original["mcpServers"][source.name]
+                    command = shutil.which(server["command"])
+                    loaded = self.plugin._load_connector(source.name, {"root": root, "command": command, "env": {}})
+                    self.assertEqual(loaded["server"]["command"], command)
+                    self.assertEqual(loaded["server"]["args"], [
+                        arg.replace("${CLAUDE_PLUGIN_ROOT}", str(root)) for arg in server["args"]])
+                    entry = "dist/%s-mcp.js" % source.name
+                    self.assertEqual((root / entry).read_bytes(), (source / entry).read_bytes())
+                self.assertEqual(self.broken_copy(check_copy, source), [])
+
+    def test_naver_blog_without_dotenv_blocking_option_is_reported(self):
+        self.assert_reported(self.broken_copy(self.edit_server(lambda server: server.update(
+            args=["${CLAUDE_PLUGIN_ROOT}/dist/naver-blog-mcp.js"])), CONNECTORS / "naver-blog"), "묶음 파일 하나")
+
+    def edit_server(self, mutate):
+        def change(root):
+            path = root / ".mcp.json"
+            value = read_json(path)
+            mutate(next(iter(value["mcpServers"].values())))
+            path.write_text(json.dumps(value), encoding="utf-8")
+        return change
+
+    def test_changed_launch_declarations_are_reported(self):
+        for source in connector_dirs():
+            server = read_json(source / ".mcp.json")["mcpServers"][source.name]
+            args = server["args"]
+            bad_values = [[], ["--env-file", *args], [*args, "--arbitrary-flag"],
+                          ["--no-env-files", *args[1:]], [*args, args[-1]],
+                          [arg.replace("-mcp.js", "-other.js") for arg in args]]
+            if source.name == "naver-blog":
+                bad_values.append(list(reversed(args)))
+            for bad_args in bad_values:
+                with self.subTest(connector=source.name, args=bad_args):
+                    self.assert_reported(self.broken_copy(self.edit_server(
+                        lambda server: server.update(args=bad_args)), source), "묶음 파일 하나")
+            with self.subTest(connector=source.name, command="python3"):
+                self.assert_reported(self.broken_copy(self.edit_server(
+                    lambda server: server.update(command="python3")), source), "command 가 bun")
+
+    def test_missing_built_entry_is_reported(self):
+        for source in connector_dirs():
+            with self.subTest(connector=source.name):
+                self.assert_reported(self.broken_copy(
+                    lambda root: (root / ("dist/%s-mcp.js" % root.name)).unlink(), source), "묶음 파일이 없다")
 
     def test_declaration_missing_a_server_tool_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"].pop("get_thread")))

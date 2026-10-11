@@ -34,7 +34,7 @@ class McpToolCatalogTest {
             .doesNotHaveDuplicates()
             .containsExactly("memory_read", "artifact_write", "agent_list", "agent_delegate", "agent_status",
                 "agent_stop", "follow_up_propose", McpMediaObservationTools.LIST, McpMediaObservationTools.RECORD,
-                "memory_remember");
+                "memory_remember", "memory_search");
         assertThat(first).contains(list, record, memory);
         assertThat(description(first))
             .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")

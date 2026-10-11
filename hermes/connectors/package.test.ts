@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 // 작은 실제 Bun 서버를 빌드한다. manifest에서 정상 fixture를 역으로 만들지 않는다.
-async function fixture() {
+async function fixture(args = ["${CLAUDE_PLUGIN_ROOT}/dist/sample-mcp.js"]) {
   const work = await mkdtemp(join(tmpdir(), "connector-package-test-"));
   temporary.push(work);
   const root = join(work, "source");
@@ -30,7 +30,8 @@ async function fixture() {
   const files = {
     "connector.json": '{"id":"sample"}\n',
     ".mcp.json":
-      '{"mcpServers":{"sample":{"command":"bun","args":["${CLAUDE_PLUGIN_ROOT}/dist/sample-mcp.js"]}}}\n',
+      JSON.stringify({ mcpServers: { sample: { command: "bun", args } } }) +
+      "\n",
     ".claude-plugin/plugin.json": '{"name":"sample"}\n',
     "src/server.ts": 'console.log("sample ready");\n',
     "scripts/build.ts":
@@ -65,6 +66,101 @@ async function fixture() {
   const output = join(work, "bundle");
   return { work, root, connector, commit, output, git, files };
 }
+
+test("dotenv 차단 옵션과 단일 entry를 실제 빌드와 설치 묶음에 그대로 보존한다", async () => {
+  const f = await fixture([
+    "--no-env-file",
+    "${CLAUDE_PLUGIN_ROOT}/dist/sample-mcp.js",
+  ]);
+  await buildPackage(f.root, f.output, f.commit);
+  await verifyPackage(f.root, f.output, f.commit);
+  const installed = join(f.output, "hermes/connectors/sample");
+  const bytes = await readFile(join(installed, ".mcp.json"), "utf8");
+  expect(bytes).toBe(f.files[".mcp.json"]);
+  const server = JSON.parse(bytes).mcpServers.sample;
+  expect(server.command).toBe("bun");
+  expect(server.args).toEqual([
+    "--no-env-file",
+    "${CLAUDE_PLUGIN_ROOT}/dist/sample-mcp.js",
+  ]);
+  expect(
+    execFileSync(
+      process.execPath,
+      server.args.map((arg: string) =>
+        arg.replace("${CLAUDE_PLUGIN_ROOT}", installed),
+      ),
+      { encoding: "utf8" },
+    ),
+  ).toBe("sample ready\n");
+});
+
+const entry = "${CLAUDE_PLUGIN_ROOT}/dist/sample-mcp.js";
+const invalidLaunches: [string, string, unknown][] = [
+  ["다른 command", "python3", [entry]],
+  ["빈 인자", "bun", []],
+  ["entry 누락", "bun", ["--no-env-file"]],
+  ["다른 옵션", "bun", ["--env-file", entry]],
+  ["옵션 오타", "bun", ["--no-env-files", entry]],
+  ["옵션 중복", "bun", ["--no-env-file", "--no-env-file", entry]],
+  ["옵션 순서", "bun", [entry, "--no-env-file"]],
+  ["단일 entry 뒤 추가 옵션", "bun", [entry, "--arbitrary-flag"]],
+  [
+    "차단 옵션 뒤 추가 옵션",
+    "bun",
+    ["--no-env-file", "--arbitrary-flag", entry],
+  ],
+  ["entry 중복", "bun", ["--no-env-file", entry, entry]],
+  [
+    "다른 bundle",
+    "bun",
+    ["--no-env-file", "${CLAUDE_PLUGIN_ROOT}/dist/other-mcp.js"],
+  ],
+  [
+    "source 경로",
+    "bun",
+    ["--no-env-file", "${CLAUDE_PLUGIN_ROOT}/src/server.ts"],
+  ],
+  [
+    "상위 경로",
+    "bun",
+    ["--no-env-file", "${CLAUDE_PLUGIN_ROOT}/dist/../dist/sample-mcp.js"],
+  ],
+  ["문자열 인자", "bun", entry],
+];
+for (const [name, command, args] of invalidLaunches) {
+  test(`생산 계약이 실행 선언을 거절한다: ${name}`, async () => {
+    const f = await fixture();
+    await buildPackage(f.root, f.output, f.commit);
+    await writeFile(
+      join(f.connector, ".mcp.json"),
+      JSON.stringify({ mcpServers: { sample: { command, args } } }),
+    );
+    await expect(
+      buildPackage(f.root, join(f.work, "bad"), f.commit),
+    ).rejects.toThrow("INVALID_CONNECTOR_ENTRY");
+    await expect(verifyPackage(f.root, f.output, f.commit)).rejects.toThrow(
+      "INVALID_CONNECTOR_ENTRY",
+    );
+  });
+}
+
+test("설치 선언에서 dotenv 차단을 지우고 해시까지 바꿔도 source 바이트 대조로 거절한다", async () => {
+  const f = await fixture(["--no-env-file", entry]);
+  await buildPackage(f.root, f.output, f.commit);
+  const bytes = JSON.stringify({
+    mcpServers: { sample: { command: "bun", args: [entry] } },
+  });
+  await writeFile(join(f.output, "hermes/connectors/sample/.mcp.json"), bytes);
+  const name = join(f.output, "manifest.json");
+  const manifest = JSON.parse(await readFile(name, "utf8"));
+  manifest.connectors.sample.files[".mcp.json"] = new Bun.CryptoHasher("sha256")
+    .update(bytes)
+    .digest("hex");
+  await writeFile(name, JSON.stringify(manifest));
+  await expect(verifyPackage(f.root, f.output, f.commit)).rejects.toThrow(
+    "BUNDLE_SOURCE_MISMATCH",
+  );
+});
 
 test("두 독립 빌드의 전체 바이트, 설치 파일과 git 실행 권한을 보존한다", async () => {
   const f = await fixture();
