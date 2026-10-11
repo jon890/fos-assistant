@@ -25,6 +25,7 @@ import {
   observeRateLimit,
   clearRateLimits,
   withDeadline,
+  clock,
 } from "./rate-limit.ts";
 
 export interface TossinvestOptions {
@@ -60,7 +61,7 @@ function sweep() {
   for (const state of identities) {
     if (
       state.clearing ||
-      (state.cached && state.cached.expiresAt <= Date.now())
+      (state.cached && state.cached.expiresAt <= clock.now())
     )
       state.cached = null;
     if (!state.users && !state.issuing && !state.cached)
@@ -161,7 +162,9 @@ export class Tossinvest {
           response = await fetch(`${this.apiBase}${path}`, {
             ...init,
             redirect: "manual",
-            signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+            signal: AbortSignal.timeout(
+              Math.max(1, Math.ceil(deadline - clock.now())),
+            ),
           });
         } catch {
           throw new TossinvestError("TOSSINVEST_NETWORK");
@@ -205,13 +208,13 @@ export class Tossinvest {
   async token(): Promise<string> {
     const state = this.acquire();
     try {
-      return await this.getToken(state, Date.now() + this.timeoutMs);
+      return await this.getToken(state, clock.now() + this.timeoutMs);
     } finally {
       this.release(state);
     }
   }
   private async getToken(state: Identity, deadline: number): Promise<string> {
-    if (state.cached && state.cached.expiresAt > Date.now())
+    if (state.cached && state.cached.expiresAt > clock.now())
       return state.cached.value;
     state.cached = null;
     if (!state.issuing)
@@ -259,8 +262,11 @@ export class Tossinvest {
     } catch {
       throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
     }
-    const now = Date.now();
-    if (lifetime <= 0n || lifetime > BigInt(Number.MAX_SAFE_INTEGER - now))
+    const now = clock.now();
+    if (
+      lifetime <= 0n ||
+      lifetime > BigInt(Number.MAX_SAFE_INTEGER) - BigInt(Math.ceil(now))
+    )
       throw new TossinvestError("TOSSINVEST_UNAVAILABLE");
     const ms = Number(lifetime);
     const ttl =
@@ -282,7 +288,7 @@ export class Tossinvest {
     const operation = operationFor("GET", path);
     const account = options.account ? this.accountSeq() : null;
     const state = this.acquire();
-    const deadline = Date.now() + this.timeoutMs;
+    const deadline = clock.now() + this.timeoutMs;
     try {
       let rateRetried = false;
       let tokenRetried = false;
