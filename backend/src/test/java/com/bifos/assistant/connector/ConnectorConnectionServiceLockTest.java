@@ -20,6 +20,7 @@ import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
 import com.bifos.assistant.connector.application.model.ConnectorInstallResult;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
+import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.hermes.ConnectorInstallConflict;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
@@ -38,9 +39,10 @@ import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Calendar;
+import java.util.TimeZone;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -414,8 +416,12 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         if (entry.equals("confirm")) {
             service.confirmApplied(user(UserRole.ADMIN, 1L), target.agent().code(), DEMO, null);
         } else if (entry.equals("scheduled")) {
-            jdbc.update("UPDATE agent_connector_binding SET status = 'PENDING', apply_due_at = ? WHERE id = ?",
-                Timestamp.from(clock.instant().minusSeconds(1)), target.bindingId());
+            transactions.executeWithoutResult(status -> {
+                ConnectorBinding binding = bindings.findById(target.bindingId()).orElseThrow();
+                binding.pending(clock.instant());
+                binding.scheduleApply(clock.instant().minusSeconds(1));
+                bindings.save(binding);
+            });
             assertThat(applier.applyDue()).isEqualTo(1);
         } else {
             assertThat(applier.resyncDrifted()).isEqualTo(1);
@@ -475,7 +481,8 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
                 byte[] raw = row.getBytes(2);
                 ByteBuffer bytes = raw == null ? null : ByteBuffer.wrap(raw);
                 UUID attempt = bytes == null ? null : new UUID(bytes.getLong(), bytes.getLong());
-                return new Observed(row.getTimestamp(1).toInstant(), attempt, row.getString(3), row.getBoolean(4));
+                return new Observed(row.getTimestamp(1, Calendar.getInstance(TimeZone.getTimeZone("UTC"))).toInstant(),
+                    attempt, row.getString(3), row.getBoolean(4));
             }
         }
     }
