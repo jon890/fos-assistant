@@ -135,13 +135,23 @@ function EntryRow({
 export function WorkspaceEntryList({
   path,
   entries,
-  truncated,
+  nextCursor,
+  hasPrevious,
+  busy,
+  onNext,
+  onPrevious,
+  onReload,
   selected,
   onDelete,
 }: {
   path: string;
   entries: WorkspaceEntry[];
-  truncated: boolean;
+  nextCursor: string | null;
+  hasPrevious: boolean;
+  busy: boolean;
+  onNext(): void;
+  onPrevious(): void;
+  onReload(): void;
   selected: string | null;
   onDelete: ((target: string, entry: WorkspaceEntry) => void) | null;
 }) {
@@ -170,9 +180,35 @@ export function WorkspaceEntryList({
           ))}
         </TableBody>
       </Table>
-      {truncated ? (
-        <p className="text-sm text-muted-foreground">1,000개까지만 보여요</p>
+      {entries.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          아직 에이전트가 만든 파일이 없어요
+        </p>
       ) : null}
+      <div className="flex flex-wrap gap-2" aria-label="목록 페이지">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || !hasPrevious}
+          onClick={onPrevious}
+        >
+          이전 목록
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || nextCursor === null}
+          onClick={onNext}
+        >
+          다음 목록
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy} onClick={onReload}>
+          다시 읽기
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        파일이 바뀌면 다시 읽어 주세요
+      </p>
     </div>
   );
 }

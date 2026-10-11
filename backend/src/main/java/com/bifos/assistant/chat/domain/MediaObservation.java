@@ -25,11 +25,11 @@ import org.hibernate.annotations.OnDeleteAction;
 /** 관찰은 수정하지 않고 새 revision을 만든다. 본문은 같은 트랜잭션에서 암호화한 뒤에만 커밋한다. */
 @Entity
 @Table(
-        name = "media_observation",
-        uniqueConstraints = {
-            @UniqueConstraint(columnNames = {"attachment_id", "revision"}),
-            @UniqueConstraint(columnNames = {"attachment_id", "id"})
-        })
+    name = "media_observation",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"attachment_id", "revision"}),
+        @UniqueConstraint(columnNames = {"attachment_id", "id"})
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -82,6 +82,9 @@ public class MediaObservation {
     @Column(name = "model_version", length = 128)
     private String modelVersion;
 
+    @Column(name = "analysis_key", columnDefinition = "CHAR(64)")
+    private String analysisKey;
+
     @Column(columnDefinition = "LONGTEXT")
     private String body;
 
@@ -99,20 +102,22 @@ public class MediaObservation {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private ChatAttachment attachment;
 
+
     public MediaObservation(
-            ChatAttachment attachment,
-            long revision,
-            String fingerprint,
-            ObservationStatus status,
-            ObservationProvenanceKind kind,
-            int schemaVersion,
-            String promptVersion,
-            Long executionId,
-            String provider,
-            String providerVersion,
-            String model,
-            String modelVersion,
-            Instant now) {
+        ChatAttachment attachment,
+        long revision,
+        String fingerprint,
+        ObservationStatus status,
+        ObservationProvenanceKind kind,
+        int schemaVersion,
+        String promptVersion,
+        Long executionId,
+        String provider,
+        String providerVersion,
+        String model,
+        String modelVersion,
+        String analysisKey,
+        Instant now) {
         this.attachmentId = attachment.id();
         this.conversationId = attachment.conversationId();
         this.ownerUserId = attachment.uploadedByUserId();
@@ -127,9 +132,11 @@ public class MediaObservation {
         this.providerVersion = providerVersion;
         this.model = model;
         this.modelVersion = modelVersion;
+        this.analysisKey = analysisKey;
         this.createdAt = now;
         this.expiresAt = attachment.expiresAt();
     }
+
 
     public void seal(String body, Long keyId) {
         this.body = body;
