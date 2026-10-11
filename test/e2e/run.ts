@@ -60,6 +60,7 @@ import { FOLLOW_UP_MCP_PROFILE, followUpMcpScenario } from "./scenarios/follow-u
 import { MEMORY_REMEMBER_MCP_PROFILE, memoryRememberMcpScenario } from "./scenarios/memory-remember-mcp.ts";
 import { agentLifecycleScenario } from "./scenarios/agent-lifecycle.ts";
 import { NATIVE_DELEGATION_PROFILE, nativeDelegationScenario } from "./scenarios/native-delegation-mcp.ts";
+import { CONTENT_DRAFT_PROFILE, contentDraftMcpScenario } from "./scenarios/content-draft-mcp.ts";
 import { MEDIA_OBSERVATION_PROFILE, mediaObservationMcpScenario } from "./scenarios/media-observation-mcp.ts";
 import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.ts";
 import { connectorScenario } from "./scenarios/connector.ts";
@@ -131,6 +132,7 @@ const SCENARIOS: readonly Scenario[] = [
   memoryRememberMcpScenario,
   nativeDelegationScenario,
   mediaObservationMcpScenario,
+  contentDraftMcpScenario,
   agentToolsScenario,
   // 아이의 개인 에이전트와 꺼진 에이전트가 목록에서 빠지는 것을 보므로 그 둘을 만드는 시나리오 뒤에 둔다.
   delegationScenario,
@@ -217,7 +219,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, CONTENT_DRAFT_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -382,6 +384,7 @@ async function main(): Promise<void> {
       [MEMORY_REMEMBER_MCP_PROFILE]: PROFILE_KEY,
       [NATIVE_DELEGATION_PROFILE]: PROFILE_KEY,
       [MEDIA_OBSERVATION_PROFILE]: PROFILE_KEY,
+      [CONTENT_DRAFT_PROFILE]: PROFILE_KEY,
       [DELEGATION_PROFILE]: PROFILE_KEY,
       [CHAT_QUEUE_PROFILE]: PROFILE_KEY,
     }, undefined, {
@@ -393,6 +396,7 @@ async function main(): Promise<void> {
       [MEMORY_REMEMBER_MCP_PROFILE]: ["fos-assistant"],
       [NATIVE_DELEGATION_PROFILE]: ["fos-assistant"],
       [MEDIA_OBSERVATION_PROFILE]: ["fos-assistant"],
+      [CONTENT_DRAFT_PROFILE]: ["fos-assistant"],
       [DELEGATION_PROFILE]: ["fos-assistant"],
       [CHAT_QUEUE_PROFILE]: ["fos-assistant"],
     }, skillRoot);

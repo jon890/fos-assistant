@@ -175,6 +175,9 @@ public class RepositoryQuerySweep {
             }
         }
         if (type instanceof Class<?> raw) {
+            if (raw == byte[].class) {
+                return new byte[32];
+            }
             if (raw == Long.class || raw == long.class) {
                 return 1L;
             }

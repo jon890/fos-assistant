@@ -1,6 +1,7 @@
 package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
+import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -10,6 +11,42 @@ import tools.jackson.databind.JsonNode;
 /** MCP 도구가 받는 JSON 인자 모양과 하위 에이전트 session 등록의 응답 모양을 한곳에 둔다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpDtos {
+    public record ContentDraftWriteArguments(UUID requestId, UUID draftId, Long expectedRevision, JsonNode draft) {
+        static ContentDraftWriteArguments from(JsonNode node) {
+            ContentDraftInputReader.fields(node, Set.of("draft"), Set.of("requestId", "draftId", "expectedRevision"));
+            boolean modifying = node.has("draftId");
+            if (modifying != node.has("expectedRevision") || modifying == node.has("requestId")) {
+                throw ContentDraftInputReader.invalid();
+            }
+            Long revision = modifying ? ContentDraftInputReader.revision(node.get("expectedRevision")) : null;
+            if (revision != null && revision == ContentDraftInputReader.MAX_REVISION) {
+                throw ContentDraftInputReader.invalid();
+            }
+            return new ContentDraftWriteArguments(modifying ? null : draftUuid(node.get("requestId")),
+                modifying ? draftUuid(node.get("draftId")) : null, revision, node.get("draft"));
+        }
+
+        @Override
+        public String toString() {
+            return "ContentDraftWriteArguments[body omitted]";
+        }
+    }
+
+    public record ContentDraftReadArguments(UUID draftId, Long revision) {
+        static ContentDraftReadArguments from(JsonNode node) {
+            ContentDraftInputReader.fields(node, Set.of("draftId"), Set.of("revision"));
+            return new ContentDraftReadArguments(draftUuid(node.get("draftId")),
+                node.has("revision") ? ContentDraftInputReader.revision(node.get("revision")) : null);
+        }
+    }
+
+    private static UUID draftUuid(JsonNode node) {
+        if (node == null || !node.isString()) {
+            throw ContentDraftInputReader.invalid();
+        }
+        return ContentDraftInputReader.uuid(node.stringValue());
+    }
+
     public record MediaObservationListArguments(String afterAssetId, int limit) {
         static MediaObservationListArguments from(JsonNode node) {
             MediaObservationInputReader.fields(node, Set.of("afterAssetId", "limit"));

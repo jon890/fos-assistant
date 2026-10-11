@@ -53,7 +53,7 @@ public class McpCurrentCallerGuard {
     }
 
 
-    public static ApiException invalidContext() {
+    private static ApiException invalidContext() {
         return new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
     }
 
