@@ -2653,7 +2653,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 
 서비스별 계약은 [커넥터 연결](../../docs/features/connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 커넥터의 기존 client와 범용 승인 plugin 경계를 사용한다.
-Bun client는 공식 41 operation의 고정 계약과 19그룹 예산을 갖는다. 현재 인증·조회 8개 operation이 이 큐를 사용하며 후속 도구의 producer는 아직 구현하지 않았다.
+Bun client는 공식 41 operation의 고정 계약과 19그룹 예산을 갖는다. 코드의 MCP 서버에 연결된 인증·조회 13개 operation이 이 큐를 사용하며 나머지 28개 operation의 producer는 아직 구현하지 않았다. 새 섹터 도구의 운영 반영은 배포 뒤 확인해야 한다.
 
 ### 그룹별 예산
 
