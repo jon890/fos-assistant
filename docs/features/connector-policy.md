@@ -309,7 +309,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 금융 실행 원문과 승인 표시 값을 함께 검증하고 저장하는 모델이다.
 현재 `FINANCIAL`과 `DESTRUCTIVE` 호출은 계속 `RISK_NOT_OPEN`으로 거절하며 상시 허락을 만들지 않는다.
-준비 API, 금융 승인 경로와 실제 주문 실행은 아직 구현하지 않았다.
+범용 준비 API와 실행 전용 전달 소비자는 구현했으며 금융 승인 경로와 실제 주문 실행은 아직 구현하지 않았다.
 일회성 ticket의 발급 함수와 claim 인증은 아래 계약으로 구현하며 운영 승인 경로에는 연결하지 않는다.
 저장 컬럼과 수명은 [저장 모델](../../backend/docs/data-schema.md)의 「connector_action_execution」이,
 결정의 근거는 [ADR-20261010 / financial-execution-guard](../adr/ADR-20261010-financial-execution-guard.md)가 갖는다.
@@ -465,6 +465,32 @@ scope는 선언한 키와 문자열 값으로 대조하므로 JSON 키 순서나
 반영 완료는 재검증 결과 `PENDING`과 revision을 커밋한 뒤 오류를 반환할 수 있다.
 실제 반영 완료가 HTTP 대기 중 먼저 커밋한 변경도 마지막 권한 검증에서 거절한다.
 후속 transport와 준비·지원 API는 이 보호 계약 소비 함수를 재사용한다.
+
+### 준비와 실행 전용 전달 소비자
+
+대시보드 plugin의 `POST /api/connectors/{id}/prepare`는 서비스 인증과 설치한 profile 검사 뒤
+manifest가 선언한 READ/none 준비 도구만 호출한다. 일반 확인·선택지 호출은 계속 빈 인자를 사용한다.
+대상 도구는 선언과 실제 MCP 목록에서 하나의 FINANCIAL/always 도구로 대조한다.
+준비 결과의 키·타입·scope·표시 값·정규화와 크기를 검사하며 읽기 전용 결과는 실행 권한이 아니다.
+
+`executeApproved`는 저장 원문과 해시 및 ticket을 실행 본문에 추가한다.
+plugin은 원문 해시, ticket의 인자 해시, SDK 인자의 모든 키·값·타입과 현재 공개 scope를 대조한다.
+실행 자식에만 원문과 ticket 및 고정 운영 설정의 claim 주소를 넣고 호출 종료 뒤 환경 값을 폐기한다.
+일반 설치 정의·profile·vault·로그·모델 결과에는 ticket을 남기지 않는다.
+기존 execute 본문은 유지하며 FINANCIAL과 DESTRUCTIVE를 실행하지 않는다.
+실행 결과를 모르는 응답은 UNKNOWN으로 읽고 자동 재실행하지 않는다.
+
+선택 `bind.guard`는 비밀이 아닌 바인딩·연결 번호와 revision·manifest 해시만 기록한다.
+설치·상태·준비·실행은 고정 운영 주소의 지원 endpoint에 fresh nonce로 한 번 묻는다.
+서비스 인증과 1초 제한을 쓰며 redirect·재시도·이전 성공 응답 재사용을 허용하지 않는다.
+지원 상태는 `unsupported`, `pending`, `verified`로 나누고 옛 응답의 누락은 미지원으로 읽는다.
+nonce와 성공 응답은 저장하지 않으므로 재시작 뒤 이전 verified를 되살릴 수 없다.
+manifest 해시는 검증한 선언을 재귀 키 정렬·공백 없는 JSON·UTF-8·비ASCII 원문 보존으로 직렬화한 값이다.
+카탈로그의 `execution_guard_manifest_sha256`이 그 값을 전달한다.
+
+이 단계는 지원 확인의 소비자만 제공한다. 실제 backend 지원 endpoint와 바인딩 재반영,
+금융 승인 hook과 주문 producer가 없으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
+로컬 HTTP 대역의 성공 응답은 실제 backend 지원 완료의 증거가 아니다.
 
 ## 커넥터 READ 데이터의 흐름
 

@@ -1,3 +1,9 @@
+import { fieldCandidates } from "./fields.ts";
+import {
+  filterOpenDiagnostics,
+  type OpenDiagnostics,
+  type OpenReason,
+} from "./open-diagnostics.ts";
 import {
   blockingPopup,
   clearProgress,
@@ -7,54 +13,78 @@ import {
   TITLE_SELECTOR,
 } from "./page.ts";
 
-const LOGIN_HOST = "nid.naver.com";
-const LOGIN_TITLE = "NAVER 로그인";
-// 실제 제목은 `<블로그 이름> : 네이버 블로그` 라 들어 있는지로 본다.
-const EDITOR_TITLE = "네이버 블로그";
 const OPEN_TRIES = 40;
 
-/**
- * 새 탭의 글쓰기 화면이 뜨기를 기다린다.
- * 로그인 화면으로 넘어가면 `login_required` 다. 캡차와 기기 인증도 같은 호스트 아래에 뜬다.
- * 「작성 중인 글이 있습니다」 알림은 「취소」 로 닫고, 다른 알림이 남아 있으면 멈춘다.
- * `keepDraftNotice` 면 그 알림을 닫지 않고 `"draft_notice"` 를 돌려준다. 「취소」 는 사용자가 쓰던 자동저장본을 버릴 수 있어
- * 승인 없이 부르는 읽기 도구는 닫지 않는다. 알림이 없으면 `"ready"` 다.
- */
+/** 원문 없이 최상위 문서와 프레임의 구조만 살핀다. 실행 문맥은 바꾸지 않는다. */
+async function probe(page: EditorPage, attempts: number) {
+  const last = await page.js(`(() => {
+  const openProbe = true;
+  ${fieldCandidates(TITLE_SELECTOR, true)}
+  const page = document.title.includes("NAVER 로그인") ? "login" :
+    document.title.includes("네이버 블로그") ? "editor" : "other";
+  const host = location.hostname === "nid.naver.com" ? "login" :
+    location.hostname === "blog.naver.com" ? "blog" : "other";
+  const frames = document.querySelectorAll('iframe, frame');
+  let frameCandidates = 0;
+  for (const frame of [...frames].slice(0, 100)) {
+    try { frameCandidates += frame.contentDocument?.querySelectorAll(${JSON.stringify(TITLE_SELECTOR)}).length ?? 0; }
+    catch { /* 다른 출처의 프레임은 읽지 않는다. */ }
+  }
+  const reason = page === "login" || host === "login" ? "login_required" :
+    page !== "editor" ? "page_loading" : nodes.length > 100 || prepared.length > 1 ? "title_ambiguous" :
+    !nodes.length ? (frameCandidates ? "frame_only" : "title_missing") : !el ? "title_unready" : "ready";
+  return {reason, page, host, document_state: document.readyState,
+    page_focused: document.hasFocus(), page_visible: document.visibilityState === "visible",
+    candidates: nodes.length, prepared: prepared.length,
+    sized: candidates.filter(c => c.sized).length, editable: candidates.filter(c => c.editable).length,
+    visible: candidates.filter(c => c.visible).length, frames: frames.length, frame_candidates: frameCandidates,
+    editors: editors.length, input_frames: inputFrames.length, buffer_ready: bufferReady};
+})()`);
+  return filterOpenDiagnostics({ attempts, last })!;
+}
+
+/** 새 탭의 유일한 준비 제목을 기다리고 읽기 경로의 작성 중인 글 알림은 보존한다. */
 export async function open(page: EditorPage, { keepDraftNotice = false } = {}) {
   const interval = page.times.openSeconds / OPEN_TRIES;
+  let diagnostics: OpenDiagnostics;
+  const fail = (
+    code: "login_required" | "editor_failed",
+    message: string,
+    reason?: OpenReason,
+  ) => {
+    if (reason) diagnostics.last.reason = reason;
+    return page.fail(code, message, { open_diagnostics: diagnostics });
+  };
   for (let i = 0; i < OPEN_TRIES; i++) {
     await page.sleep(interval);
-    const probe = JSON.parse(
-      (await page.js<string>(
-        "JSON.stringify({title: document.title, host: location.hostname," +
-          ` ready: !!document.querySelector(${JSON.stringify(TITLE_SELECTOR)})})`,
-      )) || "{}",
-    ) as { title?: string; host?: string; ready?: boolean };
-    const title = probe.title ?? "";
-    if (title.includes(LOGIN_TITLE) || probe.host === LOGIN_HOST)
-      throw page.fail("login_required", "로그인 화면으로 넘어갔다");
-    if (!title.includes(EDITOR_TITLE) || !probe.ready) continue;
+    diagnostics = await probe(page, i + 1);
+    if (diagnostics.last.reason === "login_required")
+      throw fail("login_required", "로그인 화면으로 넘어갔다");
+    if (diagnostics.last.page !== "editor") continue;
 
+    // 제목이 없거나 숨겨져 있어도 읽기 경로의 복구 알림을 먼저 보존한다.
     let note = await blockingPopup(page);
-    if (note.includes("작성 중인 글이 있습니다") && note.includes("이어서 작성하시겠습니까")) {
+    if (
+      note.includes("작성 중인 글이 있습니다") &&
+      note.includes("이어서 작성하시겠습니까")
+    ) {
       if (keepDraftNotice) return "draft_notice";
       if (!(await dismissPopup(page, "취소")))
-        throw page.fail("editor_failed", "작성 중인 글 알림을 닫지 못했다");
+        throw fail(
+          "editor_failed",
+          "작성 중인 글 알림을 닫지 못했다",
+          "draft_notice",
+        );
       note = await requireClearScreen(page);
     }
-    if (note) throw page.fail("editor_failed", "알림이 떠 있어 멈춘다");
-    // 존재 확인 뒤 알림을 처리하는 동안 문단이 교체되거나 숨겨질 수 있다.
-    const ready = await page.js<boolean>(`(() => {
-  const nodes = document.querySelectorAll(${JSON.stringify(TITLE_SELECTOR)});
-  if (nodes.length !== 1) return false;
-  const el = nodes[0];
-  const r = el.getBoundingClientRect();
-  return el.isContentEditable && r.width > 0 && r.height > 0 &&
-    el.checkVisibility({opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true});
-})()`);
-    if (!ready) continue;
+    if (note) throw fail("editor_failed", "알림이 떠 있어 멈춘다", "popup");
+    // 알림을 처리하는 동안 교체된 필드를 다시 판정한다.
+    diagnostics = await probe(page, i + 1);
+    if (diagnostics.last.reason === "login_required")
+      throw fail("login_required", "로그인 화면으로 넘어갔다");
+    if (diagnostics.last.reason !== "ready") continue;
     await clearProgress(page);
     return "ready";
   }
-  throw page.fail("editor_failed", "글쓰기 화면이 뜨지 않았다");
+  throw fail("editor_failed", "글쓰기 화면이 뜨지 않았다");
 }

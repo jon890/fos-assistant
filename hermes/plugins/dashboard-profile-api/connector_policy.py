@@ -87,17 +87,17 @@ def _hermes_tool_name(server: str, tool: str) -> str:
     return full[:HERMES_TOOL_NAME_MAX_CHARS - 9] + "_" + hashlib.sha256(full.encode("utf-8")).hexdigest()[:8]
 
 
-def _tool_identifiers(declared_tool: dict, approval: str) -> list:
+def _tool_identifiers(declared_tool: dict, approval: str, risk: str | None = None) -> list:
     """`tools.<이름>.identifiers` 를 검증해 선언한 순서대로 낸다. 틀리면 예외다.
 
-    승인 카드가 있는 도구에만 뜻이 있어 `approval` 이 `required` 인 도구에만 받는다.
+    required 승인 도구와 FINANCIAL/always 도구의 승인 카드에서만 받는다.
     비밀 키로 읽히는 이름은 Control Plane 이 어차피 가리므로, 선언한 사람이 잘못 안 것으로 보고 거절한다.
     """
     if "identifiers" not in declared_tool:
         return []
     identifiers = declared_tool["identifiers"]
-    if approval != "required":
-        raise ValueError("identifiers 는 approval 이 required 인 도구에만 선언한다")
+    if approval != "required" and not (risk == "FINANCIAL" and approval == "always"):
+        raise ValueError("identifiers 는 required 또는 FINANCIAL/always 도구에만 선언한다")
     if not isinstance(identifiers, list) or not all(
             isinstance(item, str) and TOOL_IDENTIFIER_RE.fullmatch(item) for item in identifiers):
         raise ValueError("identifiers 는 인자 이름의 배열이다")
@@ -169,7 +169,7 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         # 밖으로 나가는 도구는 호출마다 사람이 본다. 상시 허락이 열려 있으면 고쳐 읽지 않고 거절한다.
         if outbound and (approval != "required" or grant):
             raise ValueError("outbound 가 참인 도구는 approval 이 required 이고 grant 가 false 여야 한다")
-        identifiers = _tool_identifiers(declared_tool, approval)
+        identifiers = _tool_identifiers(declared_tool, approval, risk)
         policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound,
                           "identifiers": identifiers}
     for name in call_tools:
