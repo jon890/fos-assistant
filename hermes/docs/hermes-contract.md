@@ -839,7 +839,9 @@ core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바�
 `BODYLESS_MANAGED_MODULE_NODES`는 문맥 저장소와 `contextvars` import,
 cron module의 `sys` import·child 진입점을 선언한다.
 두 문맥 module의 `ContextVar`·`Token`과 선언된 저장소·함수 이름은 module scope에서 한 번만
-bind되는지 검사한다. 명시 home의 직접 helper인 `load_env_file`도 함수 AST를 별도로 선언한다.
+bind되는지 검사한다. 대입·삭제·import·정의 외에 exception target과 match capture도 센다.
+함수·class 안의 로컬 이름은 module binding으로 세지 않는다.
+명시 home의 직접 helper인 `load_env_file`도 함수 AST를 별도로 선언한다.
 AST 지문은 행 번호·공백·주석을 제외하며 함수 본문의 변경도 재검토 대상으로 삼는다.
 실제 source에서 선택한 get·set·reset을 실행해 복사 문맥의 격리와 token 복원을 확인한다.
 loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환 dict가 섞이지 않고,
@@ -856,7 +858,10 @@ loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환
 | `cron.scheduler` | parent는 module-global `sys.executable`로 child argv를 만들고 module 이름·payload·ack 인자를 전달한다. 환경을 정리해 spawn하고 ack와 조기 종료를 확인한다. child는 payload를 읽고 소유권 인수·ack 뒤 job을 실행하며 문맥 token을 복원한다 |
 
 `cron.scheduler.run_one_job`의 정확한 signature와 함수 AST도 별도로 선언한다.
-이 정의가 module의 같은 이름을 한 번만 bind하는지 확인해 후속 대입·재import·중복 정의를 거절한다.
+이 정의가 module의 같은 이름을 한 번만 bind하는지 확인해 후속 대입·삭제·재import·중복 정의와
+exception target·match capture를 거절한다. 조건문 안도 검사하며 함수·class 로컬 scope는 제외한다.
+이 검사는 명시된 source AST의 binding을 확인하며 동적인 `globals()` 변경까지 막는 보장은 아니다.
+전체 source hash와 실제 callable·code 검사는 별도의 private 보호다.
 worker는 호출 시점에 이 module binding을 조회한다. worker의 분리 실행은 검증한 payload 객체의
 `read_text(encoding="utf-8")`·`unlink(missing_ok=True)`를 소비하고 durable adoption과
 atomic ack 게시가 성공한 뒤 job을 호출하는지 확인한다. adoption·ack 실패 때 job을 호출하지 않고,

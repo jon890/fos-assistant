@@ -45,6 +45,25 @@ def check_job_binding(tree: ast.Module):
             if node.name == "run_one_job":
                 bindings.append(node)
 
+        def visit_ExceptHandler(self, node: ast.ExceptHandler):
+            if node.name == "run_one_job":
+                bindings.append(node)
+            self.generic_visit(node)
+
+        def visit_MatchAs(self, node: ast.MatchAs):
+            if node.name == "run_one_job":
+                bindings.append(node)
+            self.generic_visit(node)
+
+        def visit_MatchStar(self, node: ast.MatchStar):
+            if node.name == "run_one_job":
+                bindings.append(node)
+
+        def visit_MatchMapping(self, node: ast.MatchMapping):
+            if node.rest == "run_one_job":
+                bindings.append(node)
+            self.generic_visit(node)
+
     JobBinding().visit(tree)
     assert len(bindings) == 1 and isinstance(bindings[0], ast.FunctionDef), "cron job의 module binding 변경"
 
@@ -57,9 +76,35 @@ class ManagedCronSourceTest(unittest.TestCase):
     def test_current_module_job_binding(self):
         check_job_binding(self.tree())
 
+    def test_string_targets_are_rejected_and_change_actual_job_slot(self):
+        for source in (
+                'try:\n    raise RuntimeError("synthetic")\nexcept RuntimeError as run_one_job:\n    pass',
+                "match None:\n    case run_one_job:\n        pass",
+                "match [None]:\n    case [run_one_job as other]:\n        pass",
+                "match [None]:\n    case [*run_one_job]:\n        pass",
+                "match {}:\n    case {**run_one_job}:\n        pass"):
+            with self.subTest(source=source):
+                namespace: dict[str, Any] = {"run_one_job": lambda job: True}
+                exec(source, namespace)
+                self.assertFalse(callable(namespace.get("run_one_job")))
+                tree = self.tree()
+                tree.body.extend(ast.parse(source).body)
+                with self.assertRaises(AssertionError):
+                    check_job_binding(tree)
+
+    def test_function_and_class_local_targets_are_not_module_bindings(self):
+        local = "try:\n    pass\nexcept Exception as run_one_job:\n    pass\nmatch [None]:\n    case [*run_one_job]:\n        pass\nmatch {}:\n    case {**run_one_job}:\n        pass"
+        for header in ("def local():", "async def local():", "class Local:"):
+            with self.subTest(header=header):
+                tree = self.tree()
+                tree.body.extend(ast.parse(header + "\n" + "\n".join("    " + line for line in local.splitlines())).body)
+                check_job_binding(tree)
+
     def test_job_binding_and_worker_counterexamples_are_rejected(self):
         for source in ("run_one_job = replacement", "from other_module import run_one_job",
-                "def run_one_job(job): return True", "if True:\n    run_one_job = replacement"):
+                "def run_one_job(job): return True", "if True:\n    run_one_job = replacement",
+                "del run_one_job", "import other_module as run_one_job",
+                "async def run_one_job(job): return True", "class run_one_job: pass"):
             tree = self.tree()
             tree.body.extend(ast.parse(source).body)
             with self.subTest(source=source), self.assertRaises(AssertionError):

@@ -85,6 +85,25 @@ class ManagedSourceTest(unittest.TestCase):
             with self.subTest(file=relative):
                 check_context_bindings(self.tree(relative), relative)
 
+    def test_context_string_targets_are_rejected_but_local_targets_are_allowed(self):
+        for relative in ("hermes_constants.py", "agent/secret_scope.py"):
+            for source in (
+                    "try:\n    pass\nexcept Exception as ContextVar:\n    pass",
+                    "match None:\n    case ContextVar:\n        pass",
+                    "match [None]:\n    case [ContextVar as other]:\n        pass",
+                    "match []:\n    case [*ContextVar]:\n        pass",
+                    "match {}:\n    case {**ContextVar}:\n        pass"):
+                with self.subTest(file=relative, source=source):
+                    tree = self.tree(relative)
+                    tree.body.extend(ast.parse(source).body)
+                    with self.assertRaises(AssertionError):
+                        check_context_bindings(tree, relative)
+                    for header in ("def local():", "async def local():", "class Local:"):
+                        local_tree = self.tree(relative)
+                        local_tree.body.extend(ast.parse(header + "\n" + "\n".join(
+                            "    " + line for line in source.splitlines())).body)
+                        check_context_bindings(local_tree, relative)
+
     def test_actual_context_functions_isolate_and_restore_tokens(self):
         for relative in ("hermes_constants.py", "agent/secret_scope.py"):
             tree = self.tree(relative)
@@ -310,6 +329,20 @@ def check_context_bindings(tree: ast.Module, relative: str):
         def visit_ExceptHandler(self, node: ast.ExceptHandler):
             if node.name:
                 self.bound(node.name)
+            self.generic_visit(node)
+
+        def visit_MatchAs(self, node: ast.MatchAs):
+            if node.name:
+                self.bound(node.name)
+            self.generic_visit(node)
+
+        def visit_MatchStar(self, node: ast.MatchStar):
+            if node.name:
+                self.bound(node.name)
+
+        def visit_MatchMapping(self, node: ast.MatchMapping):
+            if node.rest:
+                self.bound(node.rest)
             self.generic_visit(node)
 
     Bindings().visit(tree)
