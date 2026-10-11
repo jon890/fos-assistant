@@ -667,3 +667,7 @@ chat의 `ContentDraftSnapshots`가 preview 저장과 현재 원본 재검사를 
 `HttpContentDraftSnapshotClient`는 제한된 서비스 HTTP만 맡고, chat의 hash 검증은 요청과 응답 전체를 대조한다.
 독립 조회는 coordinator에 한 번 진입한다. 참가 API는 MANDATORY와 `requireParticipant`를 모두 확인한다.
 compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메인·port를 이유로 패키지 순서나 기존 구조 규칙을 바꾸지 않는다.
+참가 호출자는 밖에서 준비한 정책 포함 stamp를 반환 입력의 binding과 명시적으로 대조한 뒤 사용한다.
+참가 함수만으로 현재 catalog를 검증했다고 판단하지 않는다. 원격 catalog와 DB commit은 원자적이지 않다.
+`ContentDraftAuthorizationHash`는 서버의 캡처 값으로 권한 지문을 계산하여 같은 내용의 재사용 범위를 구별한다.
+저장된 캡처 값과 현재 권한·원본 검사를 유지하며 기존 행의 지문이나 캡처 값은 갱신하지 않는다.

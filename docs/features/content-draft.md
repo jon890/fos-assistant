@@ -115,7 +115,7 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 
 **본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
 후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
-compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다. 원고 최초 MCP 생성, 승인과 실제 네이버 저장은 후속 범위다.
+compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다. 원고 최초 MCP 생성도 구현되어 있으며 공개 preview API·승인과 실제 네이버 저장은 후속 범위다.
 
 ## 불변 preview snapshot
 
@@ -139,10 +139,17 @@ observationRef는 고정한 attachment·owner·conversation·revision·지문과
 `readCurrentSnapshot`은 외부 트랜잭션 없이 coordinator에 한 번 들어가는 독립 조회다.
 `requireCurrentSnapshotParticipant`는 MANDATORY와 coordinator 참가 여부를 모두 확인하는 내부 API다.
 참가 함수는 저장소·본문 복호화·입력 reader·원본 검사를 직접 사용하고 기존 원고 서비스의 read나 private helper를 재호출하지 않는다.
-참가 경로의 호출자는 선언을 잠금 밖에서 준비해야 한다. 참가 함수에서 catalog나 compiler HTTP를 기다리지 않는다.
+참가 경로의 호출자는 선언과 정책 포함 stamp를 잠금 밖에서 준비하고 반환 입력의 binding과 명시적으로 대조한 뒤 사용해야 한다.
+참가 함수는 저장된 정책 지문을 반환하며 현재 catalog까지 검증하지 않는다. 참가 함수에서 catalog나 compiler HTTP를 기다리지 않는다.
 원격 catalog와 DB commit의 원자성을 보장하지 않으며 준비한 선언의 판과 현재 DB binding 판을 각각 검사한다.
 
-같은 owner·revision·binding·hash의 반복 preview는 같은 공개 snapshot ID를 반환한다.
+같은 owner·대화·revision·binding·compiler hash와 권한 지문의 반복·동시 preview는 같은 공개 snapshot ID를 반환한다.
+서버는 `[1,"content-draft-preview-authorization",ownerUserId,conversationId,revisionId,originExecutionId,agentId,connectionId,bindingId,connectionUpdatedAt,bindingUpdatedAt,profileHash,connectorId,policyFingerprint]`를 고정 순서 UTF-8 JSON tuple로 직렬화해 SHA-256 권한 지문을 계산한다.
+두 시각은 DB와 같은 MICRO 정밀도로 절삭하고 UTC 소수 여섯 자리로 적는다. profileHash는 profile 원문의 UTF-8 SHA-256이다.
+이 지문은 암호학적 서명이 아니며 현재 권한·캡처 값·기한·원본 검사를 대신하지 않는다. 모델이나 DTO에서 지문을 받지 않는다.
+유효한 binding·connection 판이나 정책이 바뀌거나 새 유효 origin으로 실행하면 같은 원고 revision에도 새 공개 ID를 만든다.
+옛 행과 job·승인의 identity 및 캡처 값은 바꾸거나 지우지 않으며 옛 권한은 계속 거절한다. CANCELLED origin은 새 지문을 만들어도 허용하지 않는다.
+현재 운영 API에는 agent profile 변경 기능이 없다. profile hash는 실행·설치 맥락을 구별하기 위한 캡처 값이다.
 UNIQUE 실패 뒤에는 새 owner 범위 읽기로 기존 행을 찾고, 기존 origin과 기한도 계속 검사한다.
 허용 목록 철회·binding 해제·원고 수정·첨부 교체·삭제 요청·만료는 새 snapshot을 수락하지 않는다.
 기존 snapshot과 job 이력은 자동 정리하지 않는다. 본문은 기존 암호화 revision에만 남는다.
@@ -456,7 +463,7 @@ revision·asset·현재 번호·만료 단축은 한 트랜잭션으로 커밋�
 
 ### 후속 경계와 완료 판정
 
-preview, snapshot의 Java 재계산, 승인, 영속 job, 웹 편집은 이 저장 기능의 후속이다.
+preview snapshot 서비스와 Java 재계산은 구현되어 있다. 공개 preview API·승인·job 실행과 웹 편집은 후속 범위다.
 승인 표·무효화 포트·빈 구현·preview 파일을 미리 만들지 않는다.
 승인을 구현할 때 PENDING 취소와 EXECUTING 판정, 사용자 다음 action 잠금 순서를 별도 검토한다.
 현재 일반 커넥터 승인을 원고 승인으로 취급하지 않는다.
