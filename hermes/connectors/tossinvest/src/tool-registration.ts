@@ -11,6 +11,14 @@ export type RegisterTool = (
 
 export function createToolRegistration(server: McpServer) {
   const descriptions: Record<string, string> = {
+    prepare_trade:
+      "일반 주문의 계좌와 종목, 원주문을 조회해 승인할 실행 인자와 표시 값을 준비합니다. 주문을 전송하지 않습니다.",
+    create_order:
+      "준비한 일반 주문의 실행 원문과 일회성 권한을 검증한 뒤 주문을 한 번 전송합니다. 결과가 불명확하면 재전송하지 않습니다.",
+    modify_order:
+      "준비한 정정의 실행 원문과 일회성 권한, 원주문과 체결 수량을 검증한 뒤 한 번 정정합니다.",
+    cancel_order:
+      "준비한 취소의 실행 원문과 일회성 권한, 원주문과 체결 수량을 검증한 뒤 일반 주문을 한 번 취소합니다.",
     list_accounts: "연결한 토스증권 계좌의 순번과 유형, 끝 네 자리를 읽습니다.",
     get_quotes:
       "종목 코드나 티커 200개까지의 현재가와 이름을 읽습니다. 예: symbols 에 005930,AAPL 을 넣습니다.",
