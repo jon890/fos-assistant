@@ -136,6 +136,39 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
             self.assertEqual(self.call()[0], 404)
             runner.assert_not_awaited()
 
+    def test_actual_sdk_child_blocks_dashboard_dotenv_with_declared_bun_args(self):
+        # 같은 cwd와 실제 SDK에서 옛 실행 선언의 노출과 새 선언의 차단을 비교한다.
+        launch = self.base / "launch"
+        launch.mkdir()
+        (launch / ".env").write_text(
+            "UNRELATED_PROFILE_SECRET=synthetic-only\nFOS_CONTENT_SAVE_TICKET=synthetic-only\n")
+        proof = self.base / "child-env.json"
+        (self.connector_root / "snapshot.js").write_text(
+            "import {runServer} from " + json.dumps(str(CONNECTOR / "dist/naver-blog-mcp.js")) + ";\n"
+            "await Bun.write(" + json.dumps(str(proof)) + ", JSON.stringify({"
+            "unrelated: Object.hasOwn(process.env, 'UNRELATED_PROFILE_SECRET'),"
+            "reserved: Object.hasOwn(process.env, 'FOS_CONTENT_SAVE_TICKET')}));\n"
+            "await runServer();\n")
+        declared = json.loads((CONNECTOR / ".mcp.json").read_text())["mcpServers"]["naver-blog"]["args"]
+        self.assertIn("--no-env-file", declared)
+        current_args = [arg.replace("/dist/naver-blog-mcp.js", "/snapshot.js") for arg in declared]
+        previous = os.getcwd()
+        try:
+            os.chdir(launch)
+            for label, args, expected in [
+                ("old", [arg for arg in current_args if arg != "--no-env-file"], True),
+                ("declared", current_args, False),
+            ]:
+                self.rewrite(".mcp.json", lambda value: value["mcpServers"]["demo"].update(args=args))
+                self.install_state()
+                status, answer = self.call()
+                self.assertEqual(status, 200, answer)
+                actual = json.loads(proof.read_text())
+                self.assertEqual(actual, {"unrelated": expected, "reserved": expected})
+                print("actual_child_dotenv", label, actual)
+        finally:
+            os.chdir(previous)
+
     def test_exact_post_route_keeps_other_cookie_routes(self):
         self.assertEqual(self.call(method="GET", token="valid")[0], 401)
         self.assertEqual(self.call(method="PUT", token="valid")[0], 401)
