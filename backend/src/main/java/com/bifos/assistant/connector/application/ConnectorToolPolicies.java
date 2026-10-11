@@ -73,7 +73,7 @@ public final class ConnectorToolPolicies {
         for (ConnectorTool tool : manifest.tools()) {
             policy(tool)
                     .map(policy -> new ConnectorToolSummary(
-                            tool.name(), policy.title(), policy.risk(), policy.approval(), policy.grantable()))
+                            tool.name(), policy.title(), policy.risk(), policy.approval(), policy.grantable(), tool.description()))
                     .ifPresent(summaries::add);
         }
         return List.copyOf(summaries);

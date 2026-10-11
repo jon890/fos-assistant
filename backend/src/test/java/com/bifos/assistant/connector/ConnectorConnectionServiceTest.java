@@ -152,7 +152,7 @@ class ConnectorConnectionServiceTest {
     /** 도구마다 정책을 선언한 커넥터다. 번호와 칸과 서버 이름은 {@link #DEMO_MANIFEST} 와 같다. */
     private static final ConnectorManifest POLICY_MANIFEST = policyManifest(List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
-            new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기", null),
+            new ConnectorTool("write_note", "WRITE", "required", "메모 쓰기", null, List.of(), "메모 한 건을 저장합니다."),
             new ConnectorTool("purge_notes", "DESTRUCTIVE", "always", null, null)));
 
     @Autowired
@@ -1200,7 +1200,7 @@ class ConnectorConnectionServiceTest {
         assertThat(listed.get(0).tools())
                 .containsExactly(
                         new ConnectorToolSummary("list_scopes", null, ToolRisk.READ, ToolApproval.NONE, false),
-                        new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true),
+                        new ConnectorToolSummary("write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true, "메모 한 건을 저장합니다."),
                         new ConnectorToolSummary(
                                 "purge_notes", null, ToolRisk.DESTRUCTIVE, ToolApproval.ALWAYS, false));
         // 도구를 선언하지 않는 판의 커넥터는 빈 목록이다.

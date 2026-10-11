@@ -56,14 +56,19 @@ public final class ConnectionDtos {
      *
      * @param grant 그 도구에 상시 허락을 줄 수 있는가
      */
-    public record ConnectorToolView(String name, String title, String risk, String approval, boolean grant) {
+    public record ConnectorToolView(String name, String title, String risk, String approval, boolean grant, String description) {
+        /** 상세 설명이 없는 옛 응답과 호환하는 생성자다. */
+        public ConnectorToolView(String name, String title, String risk, String approval, boolean grant) {
+            this(name, title, risk, approval, grant, null);
+        }
         static ConnectorToolView from(ConnectorToolSummary value) {
             return new ConnectorToolView(
                 value.name(),
                 value.title(),
                 value.risk().name(),
                 value.approval().name(),
-                value.grant());
+                value.grant(),
+                value.description());
         }
     }
 

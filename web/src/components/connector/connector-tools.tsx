@@ -1,3 +1,4 @@
+import { toolDescription } from "@/lib/connector-tool-description";
 import { Badge } from "@/components/ui/badge";
 import {
   toolBlocked,
@@ -37,6 +38,11 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
             <Badge variant="outline">{toolRiskLabel(tool.risk)}</Badge>
             <Badge variant={policyVariant(tool)}>{toolPolicyLabel(tool)}</Badge>
           </span>
+          {toolDescription(tool.description) && (
+            <p data-testid="connector-tool-description" className="w-full whitespace-pre-wrap break-words text-muted-foreground [overflow-wrap:anywhere]">
+              {toolDescription(tool.description)}
+            </p>
+          )}
         </li>
       ))}
     </ul>

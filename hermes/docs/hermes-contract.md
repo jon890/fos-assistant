@@ -2667,3 +2667,10 @@ GET은 429 재시도 최대 1회, expired-token/token-revoked 재발급 최대 1
 금융 POST/DELETE는 1회 전송만 허용한다. token 확보와 대기 후 승인 만료·revision·baseline을 다시 확인하고 처음 전송하기 전까지 실패하면 HTTP 쓰기 0회다.
 전송 뒤 timeout, 네트워크 단절과 해석 불가능한 결과는 UNKNOWN이며 credential 재발급이나 429로 쓰기를 다시 보내지 않는다.
 Authorization, secret, ticket, 계좌번호 원문과 upstream 오류 본문은 로그와 모델 응답에 싣지 않는다. 오류는 허용한 code와 안전한 reason으로 전달한다.
+
+
+## 카탈로그의 도구 상세 설명
+
+`/api/connectors/catalog`의 schema 2 `tools.<이름>.description`은 선택 평문이다. 원문 선언에서 별도 `tool_descriptions`로 정규화한 뒤 응답에만 합친다. 정책 dict에는 넣지 않으며, 누락하거나 표시 계약을 어긴 값은 응답에서 생략한다. 표시 문자·길이 계약과 SDK 정본 연결은 [커넥터 연결](../../docs/features/connector.md)의 「도구 상세 설명」이 갖는다.
+
+원문 전체 canonical SHA와 호환 순서는 [커넥터 도구 정책](../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」가 갖는다. 카탈로그 읽기는 MCP 프로세스나 서비스 API를 시작하지 않는다.

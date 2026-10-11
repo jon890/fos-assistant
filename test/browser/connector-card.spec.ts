@@ -424,3 +424,38 @@ test("README만 있는 카드와 프로젝트 링크는 키보드로 새 탭을 
     ),
   ).toBe(true);
 });
+
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
+  test(`상세 도구 설명은 평문과 개행을 보존하고 폭 ${viewport.width}에서 넘치지 않는다`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const description = "<img src=x onerror=alert(1)> **설명**\n" + "가".repeat(1900);
+    await listConnectors(page, [connector("description-card", {
+      tools: [
+        { ...tool("write_one", "WRITE"), description },
+        { ...tool("old_one", "READ") },
+        { ...tool("bad_one", "WRITE"), description: "글\u202e" },
+        { ...tool("empty_one", "READ"), description: " " },
+      ],
+    })]);
+    await page.route("**/api/connections/description-card", (route) => route.fulfill({ json: {
+      connectorId: "description-card", status: "DISCONNECTED", secretPrefixes: {},
+      values: {}, checkedAt: null, bindings: [], undeclaredTools: 0,
+    } }));
+    await page.goto("/connections/description-card");
+    const tools = page.getByTestId("connector-tools");
+    await expect(tools.getByTestId("connector-tool")).toHaveCount(4);
+    const text = tools.getByTestId("connector-tool-description");
+    await expect(text).toHaveCount(1);
+    expect(await text.textContent()).toBe(description);
+    await expect(text.locator("img")).toHaveCount(0);
+    await expect(tools.getByText("실행 전에 물어봐요", { exact: true })).toHaveCount(2);
+    await expect(text).toHaveCSS("white-space", "pre-wrap");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const firstLink = page.getByRole("link").first();
+    await firstLink.focus();
+    await expect(firstLink).toBeFocused();
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("BODY");
+  });
+}

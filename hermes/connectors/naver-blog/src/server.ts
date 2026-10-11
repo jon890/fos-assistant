@@ -1,3 +1,4 @@
+import manifest from "../connector.json";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { spawn } from "node:child_process";
@@ -200,8 +201,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "session_status",
     {
-      description:
-        "내 브라우저에 붙는지와 네이버 로그인 쿠키가 있는지 확인합니다. 탭을 열지 않습니다.",
+      description: manifest.tools.session_status.description,
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -210,8 +210,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "list_drafts",
     {
-      description:
-        "네이버 블로그의 임시저장 글 목록(draft_id, 제목, 고친 시각)을 읽습니다. 글을 바꾸지 않습니다.",
+      description: manifest.tools.list_drafts.description,
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -220,8 +219,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "read_draft",
     {
-      description:
-        "사용자의 매번 승인 후 임시저장 글을 편집기에 불러와 제목, 카테고리, 태그, 본문과 지문(revision)을 읽습니다. 불러오면서 네이버 자동저장이 발생할 수 있습니다. 저장 단추와 발행 단추는 누르지 않습니다. 본문에서 사진, 스티커, 지도는 [기존 사진 1] 같은 줄입니다.",
+      description: manifest.tools.read_draft.description,
       inputSchema: {
         draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("list_drafts 가 돌려준 draft_id"),
       },
@@ -232,8 +230,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "render_draft",
     {
-      description:
-        "초안을 검사하고 모바일 미리보기나 수동 등록용 HTML 을 돌려줍니다. 아무것도 저장하지 않습니다. problems 가 있으면 html 이 null 입니다.",
+      description: manifest.tools.render_draft.description,
       inputSchema: renderShape,
       annotations: { readOnlyHint: true },
     },
@@ -242,8 +239,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "save_draft",
     {
-      description:
-        "초안을 검사하고 브라우저와 로그인을 확인한 뒤 네이버 블로그 임시저장 작업을 시작합니다. 발행하지 않습니다. 결과는 draft_job 으로 읽습니다.",
+      description: manifest.tools.save_draft.description,
       inputSchema: draftShape,
     },
     (input) => guard(() => saveDraft(env, input as DraftInput, deps)),
@@ -251,8 +247,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "overwrite_draft",
     {
-      description:
-        "read_draft 로 읽고 render_draft 의 base 로 미리 본 임시저장 글을 고칩니다. 고치기 전에 원래 글을 [덮어쓰기 전 원본] 사본으로 남깁니다. 발행하지 않습니다. 결과는 draft_job 으로 읽습니다.",
+      description: manifest.tools.overwrite_draft.description,
       inputSchema: {
         draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("read_draft 로 읽은 글의 draft_id"),
         revision: z
@@ -272,8 +267,7 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
   server.registerTool(
     "draft_job",
     {
-      description:
-        "임시저장 작업의 진행과 결과를 읽습니다. 돌고 있으면 끝나거나 wait_seconds 가 찰 때까지 기다립니다.",
+      description: manifest.tools.draft_job.description,
       inputSchema: {
         job_id: z
           .string()

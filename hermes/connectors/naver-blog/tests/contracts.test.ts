@@ -72,8 +72,8 @@ test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기
     "save_draft",
     "session_status",
   ]);
-  expect(manifest.tools.list_drafts).toEqual({ risk: "READ" });
-  expect(manifest.tools.read_draft).toEqual({
+  expect(manifest.tools.list_drafts).toMatchObject({ risk: "READ" });
+  expect(manifest.tools.read_draft).toMatchObject({
     risk: "WRITE",
     approval: "required",
     grant: false,
@@ -83,19 +83,19 @@ test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기
   const readDraft = tools.find((tool) => tool.name === "read_draft")!;
   expect(readDraft.annotations?.readOnlyHint).toBe(false);
   expect(readDraft.description).toContain("자동저장");
-  expect(manifest.tools.save_draft).toEqual({
+  expect(manifest.tools.save_draft).toMatchObject({
     risk: "WRITE",
     title: "네이버 블로그에 임시저장",
     outbound: false,
   });
   // 덮어쓰기는 사용자가 쓴 글을 바꾸므로 매번 승인 카드를 거치게 상시 허락을 닫는다.
-  expect(manifest.tools.overwrite_draft).toEqual({
+  expect(manifest.tools.overwrite_draft).toMatchObject({
     risk: "WRITE",
     title: "네이버 블로그 임시저장 글 덮어쓰기",
     outbound: false,
     grant: false,
   });
-  expect(manifest.tools.draft_job).toEqual({ risk: "READ" });
+  expect(manifest.tools.draft_job).toMatchObject({ risk: "READ" });
 });
 
 test("overwrite_draft 는 일곱 칸을 받고 changes 를 1자부터 CHANGES_MAX 자까지 받는다", async () => {
@@ -133,7 +133,10 @@ test("READ 도구만 readOnlyHint 가 참이고 모든 도구에 설명이 있�
     .filter(([, spec]) => (spec as { risk: string }).risk === "READ")
     .map(([name]) => name);
   expect(new Set(readOnly)).toEqual(new Set(declaredRead));
-  for (const tool of tools) expect(tool.description?.trim().length).toBeGreaterThan(20);
+  for (const tool of tools) {
+    expect(tool.description).toBe(manifest.tools[tool.name].description);
+    expect(tool.description?.trim().length).toBeGreaterThan(20);
+  }
 });
 
 test.each([
