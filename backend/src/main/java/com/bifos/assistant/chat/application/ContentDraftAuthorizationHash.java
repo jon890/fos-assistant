@@ -15,6 +15,7 @@ public final class ContentDraftAuthorizationHash {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final DateTimeFormatter MICRO = new DateTimeFormatterBuilder().appendInstant(6).toFormatter();
 
+
     public static String fingerprint(Long ownerUserId, Long conversationId, ContentDraftSnapshotInput input) {
         var stamp = input.binding();
         var tuple = JSON.createArrayNode().add(1).add("content-draft-preview-authorization")

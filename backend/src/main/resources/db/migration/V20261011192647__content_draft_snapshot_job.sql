@@ -47,4 +47,3 @@ CREATE TABLE content_draft_job (
     UNIQUE KEY uk_content_job_id (job_id),
     KEY idx_content_draft_job_owner_conversation (owner_user_id, conversation_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-

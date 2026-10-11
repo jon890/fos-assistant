@@ -8,7 +8,10 @@ import com.bifos.assistant.chat.application.model.ContentDraftSnapshotInput;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.ArrayNode;
 
 class ContentDraftAuthorizationHashTest {
     private static final Instant CONNECTION = Instant.parse("2026-10-10T10:00:00.123456789Z");
@@ -18,7 +21,9 @@ class ContentDraftAuthorizationHashTest {
     private static final String POLICY = "a".repeat(64);
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     @Test
+    @DisplayName("권한 지문 namespace와 비BMP UTF-8 tuple 및 MICRO 직렬화를 고정한다")
     void fixesNamespaceUtf8TupleAndMicroSerialization() {
         var stamp = stamp(15L, 16L, 17L, CONNECTION, BINDING, PROFILE, CONNECTOR, POLICY);
         var expected = "17ff103d3efb84d414c016c53fb0db9c59bc8cc7fb97f81442b758f5db29d3eb";
@@ -29,7 +34,9 @@ class ContentDraftAuthorizationHashTest {
             CONNECTION.plusNanos(1000), BINDING, PROFILE, CONNECTOR, POLICY))).isNotEqualTo(expected);
     }
 
+
     @Test
+    @DisplayName("권한 지문의 모든 캡처 필드를 독립적으로 구별한다")
     void distinguishesEveryAuthorizationCaptureField() {
         var original = stamp(15L, 16L, 17L, CONNECTION, BINDING, PROFILE, CONNECTOR, POLICY);
         var expected = hash(11L, 12L, 13L, 14L, original);
@@ -43,7 +50,9 @@ class ContentDraftAuthorizationHashTest {
         }
     }
 
+
     @Test
+    @DisplayName("서버 입력과 반환 JSON을 복사하고 진단 문자열에서 원문을 가린다")
     void copiesInputAndOutputAndRedactsDiagnostic() {
         var draft = JSON.createObjectNode().put("secret", "원문");
         var assets = JSON.createArrayNode().add(JSON.createObjectNode().put("path", "private-path"));
@@ -51,17 +60,19 @@ class ContentDraftAuthorizationHashTest {
             stamp(15L, 16L, 17L, CONNECTION, BINDING, PROFILE, CONNECTOR, POLICY), draft, assets, BINDING);
         draft.put("secret", "changed");
         assets.removeAll();
-        ((tools.jackson.databind.node.ObjectNode)input.canonicalDraft()).put("secret", "changed-output");
-        ((tools.jackson.databind.node.ArrayNode)input.resolvedAssets()).removeAll();
+        ((ObjectNode)input.canonicalDraft()).put("secret", "changed-output");
+        ((ArrayNode)input.resolvedAssets()).removeAll();
         assertThat(input.canonicalDraft().path("secret").stringValue()).isEqualTo("원문");
         assertThat(input.resolvedAssets().size()).isEqualTo(1);
         assertThat(input.toString()).isEqualTo("ContentDraftSnapshotInput[redacted]");
     }
 
+
     private static ContentDraftBindingStamp stamp(Long agent, Long connection, Long binding, Instant connectionTime,
         Instant bindingTime, String profile, String connector, String policy) {
         return new ContentDraftBindingStamp(agent, connection, binding, connectionTime, bindingTime, profile, connector, policy);
     }
+
 
     private static String hash(Long owner, Long conversation, Long revision, Long origin, ContentDraftBindingStamp stamp) {
         return ContentDraftAuthorizationHash.fingerprint(owner, conversation,

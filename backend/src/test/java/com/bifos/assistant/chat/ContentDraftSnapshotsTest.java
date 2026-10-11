@@ -3,6 +3,9 @@ package com.bifos.assistant.chat;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.lang.reflect.Proxy;
 import java.util.Optional;
+import java.util.HexFormat;
+import com.bifos.assistant.connector.application.ConnectorCatalogCache;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import java.lang.reflect.InvocationTargetException;
 import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -91,7 +94,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     @Autowired
     HttpContentDraftSnapshotClient compiler;
     @Autowired
-    com.bifos.assistant.connector.application.ConnectorCatalogCache cache;
+    ConnectorCatalogCache cache;
     ConnectorBinding binding;
     AgentExecution origin;
     AllowedPerson person;
@@ -375,7 +378,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
             if (!fresh.equals(input.binding())) {
                 throw ContentDraftSnapshotInputs.stale();
             }
-        }).isInstanceOf(com.bifos.assistant.chat.domain.ContentDraftException.class);
+        }).isInstanceOf(ContentDraftException.class);
         assertRecovered(first, ErrorCode.CONTENT_DRAFT_STALE);
     }
 
@@ -446,7 +449,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     private Map<String, Object> history(UUID snapshotId) {
         var id = snapshotRows.findByPublicIdAndOwnerUserIdAndConversationId(snapshotId, owner.id(), conversation.id()).orElseThrow().id();
         var values = jdbc.queryForMap("select * from content_draft_snapshot where id=?", id);
-        values.replaceAll((key, value) -> value instanceof byte[] bytes ? java.util.HexFormat.of().formatHex(bytes) : value);
+        values.replaceAll((key, value) -> value instanceof byte[] bytes ? HexFormat.of().formatHex(bytes) : value);
         return values;
     }
 
