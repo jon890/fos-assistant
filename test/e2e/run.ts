@@ -44,6 +44,7 @@ import { conversationHistoryScenario } from "./scenarios/conversation-history.ts
 import { conversationManageScenario } from "./scenarios/conversation-manage.ts";
 import { usageCostScenario } from "./scenarios/usage-cost.ts";
 import { streamingScenario } from "./scenarios/streaming.ts";
+import { interimScenario } from "./scenarios/interim.ts";
 import { stopScenario } from "./scenarios/stop.ts";
 import { E2E_STREAM_HEARTBEAT, streamHeartbeatScenario } from "./scenarios/stream-heartbeat.ts";
 import { regenerateScenario } from "./scenarios/regenerate.ts";
@@ -118,6 +119,7 @@ const SCENARIOS: readonly Scenario[] = [
   conversationHistoryScenario,
   conversationManageScenario,
   streamingScenario,
+  interimScenario,
   stopScenario,
   streamHeartbeatScenario,
   regenerateScenario,
