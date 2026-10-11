@@ -32,6 +32,8 @@ public class AttachmentCleaner {
     private final Clock clock;
     private final ChatContentMutationCoordinator mutations;
     private final MediaObservationCleaner observations;
+    private final ContentDraftCleaner drafts;
+
 
     /** 하루에 한 번 돈다. 시각은 Control Plane 의 시간대를 따르고, 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
@@ -39,6 +41,7 @@ public class AttachmentCleaner {
     public void runScheduled() {
         cleanExpired(clock.instant());
     }
+
 
     /**
      * {@code now} 에 기간이 지났고 아직 지우지 않은 첨부를 지운다.
@@ -52,31 +55,33 @@ public class AttachmentCleaner {
         for (ChatAttachment attachment : expired) {
             try {
                 if (delete(
-                        attachment,
-                        now,
-                        () -> attachments
-                                .findById(attachment.id())
-                                .filter(it -> it.deletionRequestedAt() != null
-                                        || !it.expiresAt().isAfter(now))
-                                .orElse(null))) {
+                    attachment,
+                    now,
+                    () -> attachments
+                        .findById(attachment.id())
+                        .filter(it -> it.deletionRequestedAt() != null
+                            || !it.expiresAt().isAfter(now))
+                        .orElse(null))) {
                     deleted++;
                 }
             } catch (RuntimeException ex) {
                 failed++;
                 log.warn(
-                        "첨부 정리 실패 attachmentId={} error={}",
-                        attachment.id(),
-                        ex.getClass().getSimpleName());
+                    "첨부 정리 실패 attachmentId={} error={}",
+                    attachment.id(),
+                    ex.getClass().getSimpleName());
             }
         }
         log.info("expired attachments cleaned deleted={} failed={}", deleted, failed);
         return deleted;
     }
 
+
     /** 요청 커밋, 파일 작업, 완료 커밋을 나눈다. 파일이 이미 없으면 삭제도 성공한다. */
     public boolean delete(ChatAttachment candidate, Instant now) {
         return delete(candidate, now, () -> attachments.findById(candidate.id()).orElseThrow());
     }
+
 
     public boolean delete(ChatAttachment candidate, Instant now, Supplier<ChatAttachment> authorized) {
         var target = new ChatContentMutationTarget(candidate.conversationId(), List.of(candidate.id()));
@@ -89,6 +94,7 @@ public class AttachmentCleaner {
                 return null;
             }
             row.requestDeletion(now);
+            drafts.invalidateForAttachment(row.conversationId(), row.id());
             observations.deleteForAttachment(row.conversationId(), row.id());
             return row;
         });

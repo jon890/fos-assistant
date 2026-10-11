@@ -139,9 +139,17 @@ public enum ErrorCode {
      *
      * <p>있었다는 것을 알리는 응답이라 없는 첨부와 남의 첨부에는 쓰지 않는다. 그 둘은
      * {@code CONVERSATION_NOT_FOUND} 로 숨긴다. 없는 번호에 이 코드를 내면 번호를 훑어 남의 것이 있는지
-     * 알아낼 수 있다.
+     * 알아낼 수 있다. 원고 참조 입력에서는 쓸 수 없는 모든 번호에 이 응답을 써서 존재 여부를 구분하지 않는다.
      */
     ATTACHMENT_GONE(HttpStatus.GONE),
+    /** 원고의 현재 판이 요청과 다르다. */
+    CONTENT_DRAFT_CONFLICT(HttpStatus.CONFLICT),
+    /** 원고가 고정한 원본이나 관찰을 더 이상 쓸 수 없다. */
+    CONTENT_DRAFT_STALE(HttpStatus.CONFLICT),
+    /** 원고의 보관 기간이 끝났다. */
+    CONTENT_DRAFT_GONE(HttpStatus.GONE),
+    /** 일시 장애로 원고 본문을 사용할 수 없다. */
+    CONTENT_DRAFT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     /**
      * 대화 폴더에 그 파일이 없거나, 내주지 않는 확장자이거나, 실제 경로가 대화 폴더 밖이다.
      *
@@ -306,11 +314,14 @@ public enum ErrorCode {
     WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
+
     private final HttpStatus status;
+
 
     ErrorCode(HttpStatus status) {
         this.status = status;
     }
+
 
     public HttpStatus status() {
         return status;

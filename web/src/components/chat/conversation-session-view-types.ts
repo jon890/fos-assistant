@@ -56,6 +56,8 @@ export type Props = Pick<
     | "agents"
     | "agentCode"
     | "agentsLoading"
+    | "agentsError"
+    | "onRetryAgents"
     | "onAgentCodeChange"
   > &
   Pick<ConversationHistory, "assignConversationId"> &

@@ -123,7 +123,7 @@ profile 을 만드는 경로가 에이전트 만들기와 같아 MCP 등록과 �
 
 첫 로그인에 만드는 에이전트의 `cost_mode` 와 `credential_scope` 를 설정에서 읽는다. 키와 기본값은 `PeopleProperties` 가 갖는다.
 두 값이 사람마다 다르지 않은 근거는 [ADR-002](../../backend/docs/adr/ADR-002-profile은-나누고-ai-계정은-가족이-함께-쓴다.md) 에 있다.
-설정 이름은 `assistant.people.*` 그대로이고 `PeopleProperties` 는 `agent.application` 이 갖는다. `agent` 가 `people` 을 import 하지 않게 하려는 것이다(ADR-068).
+설정 이름은 `assistant.people.*` 그대로이고 `PeopleProperties` 는 `agent.config` 가 갖는다. `agent` 가 `people` 을 import 하지 않게 하려는 것이다(ADR-068).
 에이전트는 실행에 쓸 모델을 갖지 않으므로, 첫 로그인에 에이전트를 만들 때도 Hermes 에서 모델을 읽지 않는다.
 
 ### 첫 에이전트의 기본 도구

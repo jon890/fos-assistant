@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.AttachmentImages;
 import com.bifos.assistant.chat.application.AttachmentInspection;
 import com.bifos.assistant.chat.application.AttachmentService;
@@ -64,6 +65,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 요청 커밋과 파일 작업의 장벽을 H2와 실제 MySQL에서 같은 회귀로 확인한다. */
 @BackendIntegrationTest
 public class AttachmentDeletionBarrierTest {
+    @Autowired
+    ContentDraftCleaner drafts;
+
     private static final Instant NOW = Instant.parse("2026-10-10T01:00:00Z");
     private static final byte[] IMAGE = new byte[] {'G', 'I', 'F', '8', '9', 'a', 1, 2, 3};
 
@@ -135,12 +139,14 @@ public class AttachmentDeletionBarrierTest {
     private ChatAttachment photo;
     private final List<Path> fixtureDirectories = new ArrayList<>();
 
+
     @AfterEach
     protected void removeFiles() throws IOException {
         for (Path directory : fixtureDirectories) {
             clearDirectory(directory);
         }
     }
+
 
     @BeforeEach
     protected void setUp() {
@@ -151,47 +157,49 @@ public class AttachmentDeletionBarrierTest {
         photo = photo(owner, conversation);
     }
 
+
     @Test
     @DisplayName("삭제 요청 커밋과 파일 작업 전후에 접근을 막고 완료 기록 전 종료를 기동 정리로 복구한다")
     protected void retainsBarrierBeforeDuringAndAfterFileDeletion() {
         observationService.record(
-                owner,
-                conversation.id(),
-                photo.id(),
-                0,
-                UUID.randomUUID(),
-                ObservationFixture.input(),
-                ObservationFixture.model());
+            owner,
+            conversation.id(),
+            photo.id(),
+            0,
+            UUID.randomUUID(),
+            ObservationFixture.input(),
+            ObservationFixture.model());
         AttachmentStore interruptedStore = new AttachmentStore(properties) {
             @Override
             public synchronized void delete(ChatAttachment attachment) {
                 assertBlocked();
                 assertThat(observationRows.findFirstByAttachmentIdOrderByRevisionDesc(photo.id()))
-                        .isEmpty();
+                    .isEmpty();
                 assertThat(observationRequests.findAll())
-                        .noneMatch(row -> photo.id().equals(row.attachmentId()));
+                    .noneMatch(row -> photo.id().equals(row.attachmentId()));
                 assertThat(file(photo)).exists();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt())
-                        .isNull();
+                    .isNull();
                 super.delete(attachment);
                 assertBlocked();
                 assertThat(file(photo)).doesNotExist();
                 throw new IllegalStateException("synthetic stop before completion commit");
             }
         };
-        var interrupted = new AttachmentCleaner(attachments, interruptedStore, clock, mutations, observations);
+        var interrupted = new AttachmentCleaner(attachments, interruptedStore, clock, mutations, observations, drafts);
         assertThatThrownBy(() -> interrupted.delete(photo, NOW)).isInstanceOf(IllegalStateException.class);
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
-                .isEqualTo(NOW);
+            .isEqualTo(NOW);
         assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt()).isNull();
         clock.advance(Duration.ofSeconds(1));
-        var restarted = new AttachmentCleaner(attachments, store, clock, mutations, observations);
+        var restarted = new AttachmentCleaner(attachments, store, clock, mutations, observations, drafts);
         restarted.runScheduled();
         var completed = attachments.findById(photo.id()).orElseThrow();
         assertThat(completed.deletionRequestedAt()).isEqualTo(NOW);
         assertThat(completed.deletedAt()).isEqualTo(NOW.plusSeconds(1));
         assertBlocked();
     }
+
 
     @Test
     @DisplayName("파일 열기 중 삭제된 원본은 스트림을 닫고 응답 직전 SQL 검사에서 거절한다")
@@ -212,10 +220,11 @@ public class AttachmentDeletionBarrierTest {
             }
         };
         var reading = new AttachmentService(
-                access, attachments, deletingStore, properties, clock, images, inspection, cleaner, manager);
+            access, attachments, deletingStore, properties, clock, images, inspection, cleaner, manager);
         assertCode(() -> reading.read(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
         assertThat(closed).isTrue();
     }
+
 
     @Test
     @DisplayName("원본 inspect와 overview도 읽는 중 요청이 커밋되면 바이트를 반환하지 않는다")
@@ -231,21 +240,22 @@ public class AttachmentDeletionBarrierTest {
                 }
             };
             var reading = new AttachmentService(
-                    access, attachments, deletingStore, properties, clock, images, inspection, cleaner, manager);
+                access, attachments, deletingStore, properties, clock, images, inspection, cleaner, manager);
             int selected = mode;
             assertCode(
-                    () -> {
-                        if (selected == 0) {
-                            reading.inspect(owner, conversation.id(), photo.id(), null);
-                        } else if (selected == 1) {
-                            reading.inspect(owner, conversation.id(), photo.id(), null, () -> true);
-                        } else {
-                            reading.inspectOverview(owner, conversation.id(), photo.id());
-                        }
-                    },
-                    ErrorCode.ATTACHMENT_GONE);
+                () -> {
+                    if (selected == 0) {
+                        reading.inspect(owner, conversation.id(), photo.id(), null);
+                    } else if (selected == 1) {
+                        reading.inspect(owner, conversation.id(), photo.id(), null, () -> true);
+                    } else {
+                        reading.inspectOverview(owner, conversation.id(), photo.id());
+                    }
+                },
+                ErrorCode.ATTACHMENT_GONE);
         }
     }
+
 
     @Test
     @DisplayName("옛 트랜잭션의 첨부 엔티티가 보여도 다른 트랜잭션의 삭제 요청을 최신 SQL로 확인한다")
@@ -254,36 +264,35 @@ public class AttachmentDeletionBarrierTest {
             ChatAttachment cached = attachments.findById(photo.id()).orElseThrow();
             try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
                 pool.submit(() -> service.deleteByUser(owner, conversation.id(), photo.id()))
-                        .get(10, TimeUnit.SECONDS);
+                    .get(10, TimeUnit.SECONDS);
             } catch (Exception ex) {
                 throw new IllegalStateException(ex);
             }
             assertThat(cached.isVisible()).isTrue();
             assertCode(() -> service.read(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
             assertCode(
-                    () -> service.validateInspection(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
+                () -> service.validateInspection(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
         });
     }
+
 
     @Test
     @DisplayName("주인의 사용자 잠금에서 삭제가 대기하고 다른 사용자의 삭제는 독립적으로 끝난다")
     protected void serializesOwnerWithoutLockingOtherUsers() throws Exception {
-        Conversation waitingConversation =
-                conversations.save(Conversation.startedBy(owner.id(), "같은 주인의 다른 대화", null, NOW));
+        Conversation waitingConversation = conversations.save(Conversation.startedBy(owner.id(), "같은 주인의 다른 대화", null, NOW));
         ChatAttachment waitingPhoto = photo(owner, waitingConversation);
         CurrentUser otherOwner = user();
         Conversation other = conversations.save(Conversation.startedBy(otherOwner.id(), "독립 정리", null, NOW));
         ChatAttachment otherPhoto = photo(otherOwner, other);
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        boolean mysql = jdbc.execute((ConnectionCallback<Boolean>)
-                connection -> "MySQL".equals(connection.getMetaData().getDatabaseProductName()));
+        boolean mysql = jdbc.execute((ConnectionCallback<Boolean>)connection -> "MySQL".equals(connection.getMetaData().getDatabaseProductName()));
         var holdingSession = new AtomicReference<Long>();
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             // 사용자 행만 잠근다. 대화·첨부 잠금으로 사용자 잠금 누락을 가릴 수 없다.
             var holding = pool.submit(() -> new TransactionTemplate(manager).execute(status -> {
                 holdingSession.set(
-                        jdbc.queryForObject(mysql ? "select connection_id()" : "select session_id()", Long.class));
+                    jdbc.queryForObject(mysql ? "select connection_id()" : "select session_id()", Long.class));
                 users.findByIdForUpdate(owner.id()).orElseThrow();
                 entered.countDown();
                 await(release);
@@ -291,33 +300,33 @@ public class AttachmentDeletionBarrierTest {
             }));
             try {
                 assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-                var waiting =
-                        pool.submit(() -> service.deleteByUser(owner, waitingConversation.id(), waitingPhoto.id()));
+                var waiting = pool.submit(() -> service.deleteByUser(owner, waitingConversation.id(), waitingPhoto.id()));
                 assertUserLockWait(mysql, holdingSession.get(), waiting);
                 pool.submit(() -> service.deleteByUser(otherOwner, other.id(), otherPhoto.id()))
-                        .get(10, TimeUnit.SECONDS);
+                    .get(10, TimeUnit.SECONDS);
                 assertThat(attachments.findById(otherPhoto.id()).orElseThrow().deletedAt())
-                        .isEqualTo(NOW);
+                    .isEqualTo(NOW);
                 release.countDown();
                 waiting.get(10, TimeUnit.SECONDS);
                 holding.get(10, TimeUnit.SECONDS);
                 assertThat(attachments.findById(waitingPhoto.id()).orElseThrow().deletedAt())
-                        .isEqualTo(NOW);
+                    .isEqualTo(NOW);
             } finally {
                 release.countDown();
             }
         }
     }
 
+
     private void assertUserLockWait(boolean mysql, Long holdingSession, Future<?> waiting) throws InterruptedException {
         String sql = mysql
-                ? "select count(*) from performance_schema.data_lock_waits w"
-                        + " join performance_schema.data_locks l on l.engine_lock_id=w.requesting_engine_lock_id"
-                        + " join performance_schema.threads t on t.thread_id=w.blocking_thread_id"
-                        + " where l.object_schema=database() and l.object_name='app_user' and t.processlist_id=?"
-                : "select count(*) from information_schema.sessions where blocker_id=?"
-                        + " and lower(executing_statement) like '%app_user%'"
-                        + " and lower(executing_statement) like '%for update%'";
+            ? "select count(*) from performance_schema.data_lock_waits w"
+                + " join performance_schema.data_locks l on l.engine_lock_id=w.requesting_engine_lock_id"
+                + " join performance_schema.threads t on t.thread_id=w.blocking_thread_id"
+                + " where l.object_schema=database() and l.object_name='app_user' and t.processlist_id=?"
+            : "select count(*) from information_schema.sessions where blocker_id=?"
+                + " and lower(executing_statement) like '%app_user%'"
+                + " and lower(executing_statement) like '%for update%'";
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         boolean observed = false;
         while (System.nanoTime() < deadline) {
@@ -334,25 +343,26 @@ public class AttachmentDeletionBarrierTest {
         assertThat(waiting.isDone()).isFalse();
     }
 
+
     @Test
     @DisplayName("이미 열린 트랜잭션의 coordinator 진입과 writer 단독 호출을 거절한다")
     protected void rejectsSuffixOnlyTransactions() {
         assertThatThrownBy(() -> new TransactionTemplate(manager)
-                        .execute(status -> mutations.run(
-                                owner.id(),
-                                new ChatContentMutationTarget(conversation.id(), List.of(photo.id())),
-                                () -> true)))
-                .isInstanceOf(IllegalStateException.class);
+            .execute(status -> mutations.run(
+                owner.id(),
+                new ChatContentMutationTarget(conversation.id(), List.of(photo.id())),
+                () -> true)))
+                    .isInstanceOf(IllegalStateException.class);
         Object purgeWriter = context.getBean("conversationPurgeWriter");
         writer.deleteIfActive(conversation.id(), owner.id(), NOW);
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(purgeWriter, "purge", conversation.id(), NOW))
-                .isInstanceOf(RuntimeException.class);
+            .isInstanceOf(RuntimeException.class);
         assertThatThrownBy(() -> new TransactionTemplate(manager)
-                        .execute(status ->
-                                ReflectionTestUtils.invokeMethod(purgeWriter, "purge", conversation.id(), NOW)))
+            .execute(status -> ReflectionTestUtils.invokeMethod(purgeWriter, "purge", conversation.id(), NOW)))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(attachments.findById(photo.id())).isPresent();
     }
+
 
     @Test
     @DisplayName("만료 정리의 파일 작업 전에도 사용자 삭제와 같은 영속 장벽을 유지한다")
@@ -367,12 +377,13 @@ public class AttachmentDeletionBarrierTest {
                 super.delete(attachment);
             }
         };
-        var expiring = new AttachmentCleaner(attachments, validating, clock, mutations, observations);
+        var expiring = new AttachmentCleaner(attachments, validating, clock, mutations, observations, drafts);
         assertThat(expiring.cleanExpired(clock.instant())).isEqualTo(1);
         assertThat(checked).isTrue();
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
-                .isEqualTo(clock.instant());
+            .isEqualTo(clock.instant());
     }
+
 
     @Test
     @DisplayName("만료 정리가 파일 삭제를 기다리는 동안 사용자 삭제가 완료되어도 첫 요청과 접근 차단을 유지한다")
@@ -388,11 +399,11 @@ public class AttachmentDeletionBarrierTest {
                 assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
                 clock.advance(Duration.ofSeconds(1));
                 pool.submit(() -> service.deleteByUser(owner, conversation.id(), photo.id()))
-                        .get(10, TimeUnit.SECONDS);
+                    .get(10, TimeUnit.SECONDS);
                 assertBlocked();
                 assertThat(file(photo)).doesNotExist();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
-                        .isEqualTo(requestedAt);
+                    .isEqualTo(requestedAt);
             } finally {
                 release.countDown();
             }
@@ -400,6 +411,7 @@ public class AttachmentDeletionBarrierTest {
             assertBlocked();
         }
     }
+
 
     @Test
     @DisplayName("만료 정리가 파일 작업을 기다릴 때 대화 purge가 먼저 끝나도 파일과 행이 되살아나지 않는다")
@@ -415,9 +427,9 @@ public class AttachmentDeletionBarrierTest {
                 writer.deleteIfActive(conversation.id(), owner.id(), clock.instant());
                 pool.submit(() -> purger.purgeDue(clock.instant())).get(10, TimeUnit.SECONDS);
                 assertThat(conversations
-                                .findById(conversation.id())
-                                .orElseThrow()
-                                .purgedAt())
+                    .findById(conversation.id())
+                    .orElseThrow()
+                    .purgedAt())
                         .isEqualTo(clock.instant());
                 assertThat(attachments.findById(photo.id())).isEmpty();
             } finally {
@@ -429,6 +441,7 @@ public class AttachmentDeletionBarrierTest {
         }
     }
 
+
     private AttachmentCleaner pausedCleaner(CountDownLatch entered, CountDownLatch release) {
         AttachmentStore paused = new AttachmentStore(properties) {
             @Override
@@ -438,25 +451,27 @@ public class AttachmentDeletionBarrierTest {
                 super.delete(attachment);
             }
         };
-        return new AttachmentCleaner(attachments, paused, clock, mutations, observations);
+        return new AttachmentCleaner(attachments, paused, clock, mutations, observations, drafts);
     }
+
 
     private void assertBlocked() {
         assertCode(() -> service.read(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
         assertCode(() -> service.inspect(owner, conversation.id(), photo.id(), null), ErrorCode.ATTACHMENT_GONE);
         assertCode(
-                () -> service.inspect(owner, conversation.id(), photo.id(), null, () -> true),
-                ErrorCode.ATTACHMENT_GONE);
+            () -> service.inspect(owner, conversation.id(), photo.id(), null, () -> true),
+            ErrorCode.ATTACHMENT_GONE);
         assertCode(() -> service.inspectOverview(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
         assertCode(() -> service.validateInspection(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
         assertThat(service.agentInput(conversation.id(), List.of(photo), "본문", true)
-                        .images())
+            .images())
                 .isEmpty();
         assertThat(service.agentInput(conversation.id(), List.of(photo), "본문", true)
-                        .text())
+            .text())
                 .contains("사진은 모두 1장")
                 .doesNotContain("파일=" + photo.storedName());
     }
+
 
     private CurrentUser user() {
         AppUser row = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "주인", 1L, UserRole.MEMBER, NOW));
@@ -471,6 +486,7 @@ public class AttachmentDeletionBarrierTest {
         return new CurrentUser(row.id(), row.email(), row.displayName(), row.groupId(), row.role());
     }
 
+
     private static void clearDirectory(Path directory) throws IOException {
         if (Files.exists(directory)) {
             try (var paths = Files.walk(directory)) {
@@ -481,21 +497,24 @@ public class AttachmentDeletionBarrierTest {
         }
     }
 
+
     private ChatAttachment photo(CurrentUser user, Conversation target) {
         ChatAttachment row = service.upload(
-                user, target.id(), "a.gif", "image/gif", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
+            user, target.id(), "a.gif", "image/gif", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
         service.attach(100L, target.id(), List.of(row.id()));
         return attachments.findById(row.id()).orElseThrow();
     }
 
+
     private Path file(ChatAttachment attachment) {
         return Path.of(
-                properties.root(),
-                "users",
-                AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()),
-                attachment.conversationId().toString(),
-                attachment.storedName());
+            properties.root(),
+            "users",
+            AttachmentStore.userDirectoryKey(attachment.uploadedByUserId()),
+            attachment.conversationId().toString(),
+            attachment.storedName());
     }
+
 
     private static void await(CountDownLatch latch) {
         try {
@@ -508,9 +527,10 @@ public class AttachmentDeletionBarrierTest {
         }
     }
 
+
     private static void assertCode(Runnable work, ErrorCode expected) {
         assertThatThrownBy(work::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 }
