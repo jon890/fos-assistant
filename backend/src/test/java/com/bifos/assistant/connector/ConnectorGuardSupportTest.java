@@ -48,6 +48,8 @@ import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -215,7 +217,7 @@ class ConnectorGuardSupportTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"revoked", "pending", "revision", "deleted"})
+    @ValueSource(strings = {"revoked", "pending", "revision", "deleted", "bindingRevision", "restart", "owner", "profile"})
     @DisplayName("카탈로그 HTTP가 진행되는 동안 바뀐 DB 상태는 성공 응답으로 되살리지 않는다")
     void rejectsChangesDuringCatalogHttp(String defect) throws Exception {
         var f = fixture();
@@ -226,10 +228,26 @@ class ConnectorGuardSupportTest {
                 case "revision" -> jdbc.update("update connector_connection set updated_at = ? where id = ?",
                     Timestamp.from(NOW.plusSeconds(1)), f.connectionId());
                 case "deleted" -> bindings.deleteById(f.bindingId());
+                // 실제 DDL의 DATETIME(6)에 맞춰 UTC 마이크로초 값으로 바인딩 revision만 바꾼다.
+                // HTTP 전후 조회는 각각 새 EntityManager를 쓰므로 JDBC 변경을 다시 읽어야 한다.
+                case "bindingRevision" -> {
+                    Instant changed = NOW.plusNanos(1000);
+                    assertThat(jdbc.update("update agent_connector_binding set updated_at = ? where id = ?",
+                        OffsetDateTime.ofInstant(changed, ZoneOffset.UTC), f.bindingId())).isEqualTo(1);
+                    Instant reread = new TransactionTemplate(manager).execute(status ->
+                        bindings.findById(f.bindingId()).orElseThrow().updatedAt());
+                    assertThat(reread).isEqualTo(changed);
+                }
+                case "restart" -> assertThat(jdbc.update("update agent_connector_binding set restart_required = true where id = ?",
+                    f.bindingId())).isEqualTo(1);
+                case "owner" -> assertThat(jdbc.update("update agent set owner_user_id = null where id = ?", f.agentId())).isEqualTo(1);
+                case "profile" -> assertThat(jdbc.update("update agent set hermes_profile = ? where id = ?",
+                    "changed-" + f.profile(), f.agentId())).isEqualTo(1);
                 default -> throw new AssertionError(defect);
             }
         });
         assertThat(post(SUPPORT, request(f).toString(), properties.dashboardToken(), false).statusCode()).isEqualTo(409);
+        assertThat(catalogReads.get()).isEqualTo(1);
     }
 
 
