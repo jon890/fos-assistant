@@ -277,3 +277,7 @@ plugin 스킬은 `plugin:이름` 으로만 불려 겹치지 않는다.
 **여기 없는 것은 맞는 토큰으로도 열리지 않는다.**
 `GET /api/config` 와 이름을 바꾸는 `PATCH`, 스킬을 만들고 고치는 `POST /api/skills`, `PUT /api/skills/content` 가 여기 해당한다.
 `DELETE /api/env` 는 관리 profile 의 커넥터 칸 key 만 받는다.
+
+## 도구 상세 설명
+
+schema 2 `tools.<이름>.description`을 선택 평문으로 받는다. 설명은 정책 dict와 분리하여 `tool_descriptions`에 보관하고 카탈로그 응답에만 합친다. 불량 설명의 fallback과 전체 manifest SHA, 옛 엄격 reader와의 호환 순서는 [커넥터 도구 정책](../../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」를 따른다. 표시 계약은 [커넥터 연결](../../../docs/features/connector.md)의 「도구 상세 설명」이 갖는다.
