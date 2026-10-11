@@ -199,7 +199,8 @@ for (const toolState of ["켜짐", "숨김", "조회 실패"] as const) {
           ? { status: 500, json: {} }
           : {
               json: {
-                shellOrFileEnabled: true,
+                // 켜짐은 표시된 toolset, 숨김은 서버의 실제 활성 상태를 따로 검증한다.
+                shellOrFileEnabled: toolState === "숨김",
                 toolsets:
                   toolState === "숨김"
                     ? []
