@@ -6,14 +6,19 @@ import com.bifos.assistant.crypto.application.DataKeyRewrapper;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.crypto.domain.AesGcm;
 import com.bifos.assistant.crypto.domain.SealedText;
-import com.bifos.assistant.crypto.domain.UserDataKey;
+import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.FileKeyEncryptionKeys;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Table;
 import java.util.Arrays;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.ResolvableType;
+import org.springframework.data.repository.Repository;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import javax.crypto.spec.SecretKeySpec;
@@ -44,10 +49,58 @@ class DataKeyServiceTest {
     @Autowired
     DataEncryptionProperties properties;
 
+    @Autowired
+    EntityManager entityManager;
+
+    @Autowired
+    ApplicationContext context;
+
+
+    @Test
+    @DisplayName("crypto 엔티티의 JPA 이름과 실제 클래스 및 저장소 빈은 유일하다")
+    void preservesOwnedPersistenceContract() {
+        assertThat(entityManager.getMetamodel().getEntities())
+            .filteredOn(entity -> entity.getName().equals("UserDataKey"))
+            .singleElement().satisfies(entity -> assertThat(entity.getJavaType()).isEqualTo(UserDataKey.class));
+        assertThat(entityManager.getMetamodel().getEntities())
+            .filteredOn(entity -> entity.getJavaType().equals(UserDataKey.class))
+            .singleElement().satisfies(entity -> assertThat(entity.getName()).isEqualTo("UserDataKey"));
+        assertThat(entityManager.getMetamodel().entity(UserDataKey.class).getIdType().getJavaType())
+            .isEqualTo(Long.class);
+        assertThat(UserDataKey.class.getAnnotation(Table.class).name()).isEqualTo("user_data_key");
+        assertThat(ResolvableType.forClass(UserDataKeyRepository.class).as(Repository.class).getGeneric(0).resolve())
+            .isEqualTo(UserDataKey.class);
+        assertThat(context.getBeansOfType(UserDataKeyRepository.class))
+            .containsOnlyKeys("userDataKeyRepository").containsEntry("userDataKeyRepository", keys);
+        assertThat(context.getBeansOfType(Repository.class))
+            .containsEntry("userDataKeyRepository", keys);
+    }
+
+
+    @Test
+    @DisplayName("기존 factory 의 값과 생성 시각은 저장한 뒤 두 조회 경로에서 보존된다")
+    void preservesFactoryValuesThroughRepository() {
+        Long userId = anyUserId();
+        Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+        UserDataKey saved = keys.saveAndFlush(UserDataKey.wrapped(userId, "synthetic-kek", "synthetic-wrapped", createdAt));
+        entityManager.clear();
+        assertThat(saved.id()).isNotNull();
+        assertThat(keys.findById(saved.id())).get().satisfies(row -> {
+            assertThat(row.userId()).isEqualTo(userId);
+            assertThat(row.kekId()).isEqualTo("synthetic-kek");
+            assertThat(row.wrappedKey()).isEqualTo("synthetic-wrapped");
+            assertThat(row.createdAt()).isEqualTo(createdAt);
+            assertThat(row.rewrappedAt()).isNull();
+        });
+        assertThat(keys.findByUserId(userId)).get().satisfies(row -> assertThat(row.id()).isEqualTo(saved.id()));
+    }
+
+
     @AfterEach
     void tearDown() {
         cipher.forgetCachedKeys();
     }
+
 
     @Test
     @DisplayName("같은 사용자의 본문은 데이터 key 하나로 암호화되고 같은 AAD 로만 풀린다")
@@ -68,6 +121,7 @@ class DataKeyServiceTest {
         assertThat(cipher.open(first.keyId(), userId, "row:2", first.content())).isEmpty();
     }
 
+
     @Test
     @DisplayName("다른 사용자의 데이터 key 로 쓴 본문은 주인을 바꿔 불러도 풀리지 않는다")
     void refusesToOpenWithAnotherOwner() {
@@ -77,8 +131,9 @@ class DataKeyServiceTest {
         cipher.seal(stranger, "row:9", "다른 사람 글").orElseThrow();
 
         assertThat(cipher.open(sealed.keyId(), stranger, "row:9", sealed.content()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("데이터 key 줄을 지우면 메모리에서 비운 뒤로 그 본문을 풀지 못한다")
@@ -90,8 +145,9 @@ class DataKeyServiceTest {
         cipher.forgetCachedKeys();
 
         assertThat(cipher.open(sealed.keyId(), userId, "row:3", sealed.content()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("풀지 못한 데이터 key 의 경고는 1분 안에 한 번만 남긴다")
@@ -103,27 +159,28 @@ class DataKeyServiceTest {
 
         for (int i = 0; i < 5; i++) {
             assertThat(cipher.open(sealed.keyId(), userId, "row:5", sealed.content()))
-                    .isEmpty();
+                .isEmpty();
         }
 
         String marker = "데이터 key 를 풀지 못했다. 1분 동안 이 key 의 본문은 읽을 수 없는 것으로 본다 keyId=" + sealed.keyId() + " ";
         assertThat(output.getAll().split(Pattern.quote(marker), -1)).hasSize(2);
     }
 
+
     @Test
     @DisplayName("옛 KEK 로 감싼 데이터 key 는 기동 작업이 활성 KEK 로 다시 감싸고 본문은 그대로 풀린다")
     void rewrapsKeysWrappedWithOldKek() {
         Long userId = anyUserId();
         FileKeyEncryptionKeys oldKeks = new FileKeyEncryptionKeys(
-                new DataEncryptionProperties(properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10));
+            new DataEncryptionProperties(properties.kekFile(), "test-kek-0", true, properties.dekCacheTtl(), 10));
         byte[] dataKey = new byte[32];
-        Arrays.fill(dataKey, (byte) 3);
+        Arrays.fill(dataKey, (byte)3);
         UserDataKey row = keys.saveAndFlush(UserDataKey.wrapped(
-                userId, "test-kek-0", oldKeks.wrap(dataKey, UserDataKey.wrapBinding(userId)), Instant.now()));
+            userId, "test-kek-0", oldKeks.wrap(dataKey, UserDataKey.wrapBinding(userId)), Instant.now()));
         String sealed = AesGcm.seal(
-                new SecretKeySpec(dataKey, "AES"),
-                PLAIN.getBytes(StandardCharsets.UTF_8),
-                "row:4".getBytes(StandardCharsets.UTF_8));
+            new SecretKeySpec(dataKey, "AES"),
+            PLAIN.getBytes(StandardCharsets.UTF_8),
+            "row:4".getBytes(StandardCharsets.UTF_8));
 
         int rewrapped = rewrapper.rewrapAll();
 
@@ -134,6 +191,7 @@ class DataKeyServiceTest {
         assertThat(after.wrappedKey()).isNotEqualTo(row.wrappedKey());
         assertThat(cipher.open(row.id(), userId, "row:4", sealed)).contains(PLAIN);
     }
+
 
     private static Long anyUserId() {
         return ThreadLocalRandom.current().nextLong(1_000_000L, 9_000_000L);

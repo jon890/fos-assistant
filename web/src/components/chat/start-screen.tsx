@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { AgentView } from "@/lib/agent";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { cn } from "cn";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,8 @@ type HeaderProps = {
   displayName: string | null;
   agents: AgentView[];
   loading: boolean;
+  agentsError: boolean;
+  onRetryAgents(): void;
   selectedCode: string;
   onSelect(code: string): void;
   /** 사진을 먼저 올려 빈 대화가 생겼다. 그 대화의 에이전트는 이미 정해졌다 */
@@ -30,6 +33,8 @@ export function StartScreenHeader({
   displayName,
   agents,
   loading,
+  agentsError,
+  onRetryAgents,
   selectedCode,
   onSelect,
   locked,
@@ -50,6 +55,14 @@ export function StartScreenHeader({
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
           <Skeleton className={`${AGENT_CARD_HEIGHT} w-44 shrink-0`} />
+        </div>
+      ) : agentsError ? (
+        <div role="alert">
+          <EmptyState
+            title="에이전트 목록을 읽지 못했어요"
+            description="잠시 뒤 다시 읽어 주세요."
+            action={<Button onClick={onRetryAgents}>다시 읽기</Button>}
+          />
         </div>
       ) : agents.length === 0 ? (
         // 사용자는 자기 에이전트를 직접 만들 수 있다. 관리자에게 미루지 않고 만드는 길로 보낸다.
