@@ -156,27 +156,15 @@ POST 재전송은 별도 원고 생성이므로 MCP 설명도 자동 재시도�
 CAS 불일치는 원본 읽기와 새 암호화를 시작하기 전에 판정한다.
 오류는 원고·파일 경로·JSON 원문·예외 cause를 응답과 로그에 싣지 않는다.
 
-### MCP와 배치 (후속 PR B)
+MCP 연결은 후속 구현에서 제공한다. 현재 구현은 REST 저장·조회다.
 
-| 도구 | 인자 | 실행 범위 |
-| --- | --- | --- |
-| `content_draft_write` | `{draftId?,expectedRevision?,draft}` | 생성 때 두 옵션 모두 생략, 수정 때 둘 다 필수 |
-| `content_draft_read` | `{draftId,revision?}` | 생략하면 현재 revision, 있으면 지정 revision |
-
-`McpCallerResolver`가 서명을 확인한 origin 실행의 사용자와 대화를 사용한다. 실행 전후 requireCurrent guard로 현재 agent/profile/사용자 권한을 다시 검사한다.
-전용 typed conflict 예외의 currentRevision 필드를 쓰며 message는 고정 문구다. 예외 문자열을 파싱하거나 본문·revision을 로그 message에 넣지 않는다.
-fos-ctx REQUIRED_TOOLS와 README·서명 필수 목록 테스트도 두 도구를 함께 반영한다. McpController의 500줄 상한을 지키도록 handler는 한 줄 위임으로 두고 DTO나 도구 클래스에서 인자를 해석한다.
-모델 인자로 conversationId·사용자·profile을 받지 않는다. REST와 같은 서비스·판정을 호출한다.
-MCP 결과는 같은 안전한 원고 응답 또는 `{code,currentRevision?}`이며 JSON-RPC의 기존 도구 결과 형태로 감싼다.
-살펴보기의 기존 허용 도구 집합을 확대하지 않는다. 이 두 도구는 일반 대화에서만 사용한다.
-Hermes 실행 사건 수집에서 두 도구와 `__` 접두 도구의 start/complete/fail detail·text를 가려 본문 중복 저장을 막는다.
+### 원고 서비스 배치
 
 신규 엔티티는 `chat.domain.entity`의 ContentDraft, ContentDraftRevision, ContentDraftAsset에 둔다.
 기존 엔티티를 옮기거나 최상위 기능 패키지를 늘리지 않는다. `domain..`의 기존 층 규칙이 이 하위 패키지도 검사한다.
 상태 enum은 `chat.domain.type`, 공개 서비스 반환 타입은 `chat.application.model`, 저장소와 암호화는 `chat.infra`에 둔다.
 REST는 `chat.presentation.contentdraft.ContentDraftController`와 그 패키지의 유일한 `ContentDraftDtos`가 맡는다.
-기존 chat.presentation의 DTO 파일을 더 늘리지 않는다. MCP 인자는 기존 `mcp.presentation.McpDtos`에 모으고 처리와 정의는 `mcp.application.McpContentDraftTools`에 둔다.
-`McpToolCatalog`와 `McpController`가 도구를 연결하며 범용 `McpToolService`에 원고 저장 책임을 추가하지 않는다.
+기존 chat.presentation의 DTO 파일을 더 늘리지 않는다.
 
 ### 권한·원본·관찰 검사
 
