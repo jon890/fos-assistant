@@ -92,6 +92,9 @@ public class ConnectorBindingInstalls {
     /** 현재 시도에만 설치와 probe 결과를 적는다. 이 단계는 연결의 revision을 바꾸지 않는다. */
     void record(ConnectorBinding binding, ConnectorBindingAttempt attempt, ConnectorInstallResult result) {
         Instant now = binding.updatedAt().isAfter(attempt.startedAt()) ? binding.updatedAt() : attempt.startedAt();
+        if (attempt.legacy() && attempt.checkInstallation() && result.installNotSent()) {
+            binding.restoreInstallIntent(attempt.desiredEnabled());
+        }
         if (result.installed() != null) {
             if (attempt.legacy() && attempt.replaceValues()) {
                 binding.installed(result.envRestart() || result.installed().restartRequired()
@@ -140,15 +143,16 @@ public class ConnectorBindingInstalls {
             throw new IllegalStateException("installation HTTP requires no transaction");
         }
         if (attempt.waiting() != null) {
-            return new ConnectorInstallResult(null, false, attempt.waiting(), null);
+            return new ConnectorInstallResult(null, false, attempt.waiting(), null, true);
         }
         String step = STEP_INSTALL_STATE;
         InstallResult installed = null;
+        boolean installSent = false;
         try {
             if (attempt.checkInstallation() && attempt.legacy()
                 && (!attempt.desiredEnabled()
                     || !connector.readConnector(attempt.profile(), attempt.connectorId()).enabled())) {
-                return new ConnectorInstallResult(null, false, ResyncOutcome.NOT_INSTALLED, null);
+                return new ConnectorInstallResult(null, false, ResyncOutcome.NOT_INSTALLED, null, true);
             }
             boolean envRestart = false;
             if (attempt.legacy() && attempt.replaceValues()) {
@@ -161,6 +165,7 @@ public class ConnectorBindingInstalls {
                 }
             }
             step = STEP_INSTALL;
+            installSent = true;
             installed = sendAgain(attempt);
             boolean restart = attempt.legacy() ? installed.pluginUpdated()
                 : installed.restartRequired() || installed.pluginUpdated();
@@ -171,12 +176,12 @@ public class ConnectorBindingInstalls {
             ResyncOutcome outcome = restart ? ResyncOutcome.RESTART_PENDING
                 : scheduled ? ResyncOutcome.APPLY_SCHEDULED : ResyncOutcome.NOT_INSTALLED;
             if (!attempt.checkInstallation() || restart || scheduled) {
-                return new ConnectorInstallResult(installed, envRestart, outcome, null);
+                return new ConnectorInstallResult(installed, envRestart, outcome, null, false);
             }
             step = STEP_INSTALL_STATE;
             outcome = notInstalledReason(connector.readConnector(attempt.profile(), attempt.connectorId()), attempt.legacy());
             if (outcome != ResyncOutcome.READY) {
-                return new ConnectorInstallResult(installed, false, outcome, null);
+                return new ConnectorInstallResult(installed, false, outcome, null, false);
             }
             step = STEP_PROBE;
             ProbeResult probe = connector.probe(attempt.profile(), attempt.mcpServer());
@@ -189,16 +194,16 @@ public class ConnectorBindingInstalls {
                 .equals(Set.copyOf(toolsets.readEnabled(attempt.apiBaseUrl(), attempt.profile())))) {
                 outcome = ResyncOutcome.TOOLSETS_DIFFER;
             }
-            return new ConnectorInstallResult(installed, false, outcome, undeclared);
+            return new ConnectorInstallResult(installed, false, outcome, undeclared, false);
         } catch (ConnectorSandboxUnavailable | ConnectorInstallConflict | ConnectorProfileRejected ex) {
             if (!attempt.checkInstallation() && !attempt.replaceValues()) {
                 throw ex;
             }
             warn(step, attempt.connectorId(), ex);
-            return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null);
+            return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null, !installSent);
         } catch (RuntimeException ex) {
             warn(step, attempt.connectorId(), ex);
-            return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null);
+            return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null, !installSent);
         }
     }
 

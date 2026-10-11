@@ -134,6 +134,12 @@ public class ConnectorBinding {
     }
 
 
+    /** 설치를 보내기 전에 끝난 현재 시도만 시작 때의 의도를 되돌린다. PENDING은 유지한다. */
+    public void restoreInstallIntent(boolean desiredEnabled) {
+        this.desiredEnabled = desiredEnabled;
+    }
+
+
     /** 시작 트랜잭션이 새 시도를 적고 설치 중인 바인딩을 실행 대상에서 내린다. */
     public void beginInstall(UUID attemptId, Instant now) {
         this.desiredEnabled = false;
