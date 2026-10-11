@@ -368,6 +368,12 @@ node scripts/check-file-length.mjs --update
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
 
+`MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
+`MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
+writer는 facade의 트랜잭션 안에서 동작한다. 새 본문을 먼저 암호화한 뒤 이전 값을 판으로 저장하고,
+민감하게 고칠 때만 flush와 과거 평문 판의 봉인을 거쳐 현재 본문을 저장한다.
+외부 호출자는 기존 facade를 그대로 사용한다.
+
 ## 실행 공간 파일
 
 사용자가 「파일 공간」 화면에서 자기 실행 공간 `/workspace` 를 보는 길이다.

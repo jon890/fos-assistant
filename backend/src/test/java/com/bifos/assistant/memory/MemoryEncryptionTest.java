@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.context.ContextAssembler;
+import com.bifos.assistant.memory.application.MemoryContentCipher;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.domain.Memory;
@@ -41,6 +42,9 @@ class MemoryEncryptionTest {
 
     @Autowired
     MemoryService memories;
+
+    @Autowired
+    MemoryContentCipher cipher;
 
     @Autowired
     MemoryRepository repository;
@@ -147,6 +151,9 @@ class MemoryEncryptionTest {
         Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
         memories.update(ADMIN, memory.id(), SECOND, false);
         memories.update(ADMIN, memory.id(), THIRD, false);
+        List<Map<String, Object>> before = jdbc.queryForList(
+                "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? ORDER BY revision",
+                memory.id());
         Memory other = memories.create(ADMIN, MemoryScope.USER, "다른 항목", OTHER, false);
         memories.update(ADMIN, other.id(), "고친 글", false);
 
@@ -165,6 +172,12 @@ class MemoryEncryptionTest {
                         Long.class,
                         memory.id()))
                 .isZero();
+        assertThat(jdbc.queryForList(
+                "SELECT revision, changed_at, changed_by_user_id, sensitivity FROM memory_revision WHERE memory_id = ? AND revision < 3 ORDER BY revision",
+                memory.id())).isEqualTo(before);
+        assertThat(memories.revisionsOf(ADMIN, memory.id()))
+                .extracting(row -> cipher.open(row.content(), row.contentKeyId(), row.contentBinding()))
+                .containsExactly(FIRST, SECOND, THIRD);
         Map<String, Object> untouched = revisionRow(other.id(), 1);
         assertThat(untouched.get("CONTENT")).isEqualTo(OTHER);
         assertThat(untouched.get("CONTENT_KEY_ID")).isNull();
@@ -264,5 +277,41 @@ class MemoryEncryptionTest {
         String key =
                 jdbc.queryForObject("SELECT proposal_dedup_key FROM memory WHERE id = ?", String.class, proposed.id());
         assertThat(key).isNull();
+    }
+
+    @Test
+    @DisplayName("같은 본문을 고쳐도 판을 남기고 일반으로 되돌린 뒤 다시 민감하게 바꿔도 과거 판의 본문을 풀 수 있다")
+    void sealsPlainRevisionsAgainAfterReturningToNormal() {
+        Memory memory = sensitive(MemoryScope.USER, FIRST);
+        memories.update(ADMIN, memory.id(), FIRST, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+        memories.update(ADMIN, memory.id(), SECOND, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        memories.update(ADMIN, memory.id(), THIRD, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+
+        Memory current = repository.findById(memory.id()).orElseThrow();
+        assertThat(current.revision()).isEqualTo(4);
+        assertThat(memories.contentOf(current)).isEqualTo(THIRD);
+        assertThat(memories.revisionsOf(ADMIN, memory.id()))
+                .extracting(row -> cipher.open(row.content(), row.contentKeyId(), row.contentBinding()))
+                .containsExactly(FIRST, FIRST, SECOND);
+    }
+
+    @Test
+    @DisplayName("암호화 중 실패하면 현재 본문과 이전 판이 그대로 남는다")
+    void preservesCurrentAndEarlierRevisionWhenEncryptionFails() {
+        Memory memory = memories.create(ADMIN, MemoryScope.USER, "일반", FIRST, false);
+        memories.update(ADMIN, memory.id(), SECOND, false);
+
+        assertThatThrownBy(() -> memories.update(
+                ADMIN, memory.id(), null, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE))
+                .isInstanceOf(NullPointerException.class);
+
+        Memory current = repository.findById(memory.id()).orElseThrow();
+        assertThat(current.content()).isEqualTo(SECOND);
+        assertThat(current.revision()).isEqualTo(2);
+        assertThat(current.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
+        assertThat(memories.revisionsOf(ADMIN, memory.id())).singleElement().satisfies(row -> {
+            assertThat(row.content()).isEqualTo(FIRST);
+            assertThat(row.contentKeyId()).isNull();
+        });
     }
 }
