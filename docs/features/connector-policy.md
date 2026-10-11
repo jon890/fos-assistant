@@ -494,6 +494,9 @@ Control Plane의 `POST /internal/connector-executions/support`는 고정 서비�
 대조한다. 사용자 JWT, profile 토큰, ticket으로는 인증할 수 없다. 다른 메서드와 인접 경로는 열지 않는다.
 요청은 `v:1`, protocol, 문자열 bindingId·connectionId·connectionUpdatedAt·manifestSha256,
 UUID v4 nonce, profile, connectorId만 받는다. 중복·추가 키, 타입 보정, 비정규 값과 4096바이트 초과 본문은 거절한다.
+요청 형식 오류는 `400 VALIDATION_FAILED`, 서비스 인증 실패는 `401 UNAUTHENTICATED`로 응답한다.
+현재 상태나 카탈로그를 확인할 수 없으면 `409 CONNECTOR_ACTION_NOT_PENDING`으로 응답하며,
+철회·재설치·미지원 등 세부 사유는 응답에 싣지 않고 일반화한다.
 
 bindingId로 현재 바인딩·연결·에이전트를 읽어 소유자, 접근 허용, profile, READY 상태와 켜려는 의도,
 연결 revision을 확인한다. 매 요청 새 카탈로그의 원형 보호 선언과 manifest 전체 SHA를 대조하고
