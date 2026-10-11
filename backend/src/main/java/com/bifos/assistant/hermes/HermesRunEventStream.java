@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.List;
 import java.util.Map;
 import java.util.HashSet;
 import java.util.Set;
@@ -217,6 +218,12 @@ public class HermesRunEventStream {
             detail = null;
             text = null;
         }
+        if (!"USER".equalsIgnoreCase(type) && !"message.delta".equalsIgnoreCase(type) && !"message.interim".equalsIgnoreCase(type)
+            && (contentDraftTool(root) || contentDraftTool(payload))) {
+            // 원고 도구는 별칭 전체를 확인하고 사건 이름과 역할에 관계없이 두 출력 경로를 버린다.
+            detail = null;
+            text = null;
+        }
         if (memoryReadResult(type, toolName)) {
             // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
             detail = null;
@@ -346,6 +353,22 @@ public class HermesRunEventStream {
             }
             return connectorCalled;
         }
+    }
+
+
+    /** 사건의 별칭에서 원고 저장·읽기 도구 이름을 확인한다. */
+    private static boolean contentDraftTool(JsonNode node) {
+        for (String key : List.of("tool", "tool_name", "toolName", "name")) {
+            JsonNode value = node.get(key);
+            if (value != null && value.isString()) {
+                String name = value.stringValue();
+                if (name.equals("content_draft_write") || name.equals("content_draft_read")
+                    || name.endsWith("__content_draft_write") || name.endsWith("__content_draft_read")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
 

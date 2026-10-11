@@ -62,6 +62,33 @@ class HermesRunEventStreamTest {
     }
 
 
+    @Test
+    @DisplayName("원고 도구의 별칭 전체와 비표준 사건은 본문을 버리고 대화 사건은 보존한다")
+    void suppressesDraftAliasesWithoutReclassifyingMessages() {
+        var json = JsonMapper.builder().build();
+        for (String name : List.of("content_draft_write", "content_draft_read", "mcp__fos_assistant__content_draft_write", "mcp__fos_assistant__content_draft_read")) {
+            for (String type : List.of("tool.started", "tool.completed", "tool.failed", "tool.progress", "custom.event", "")) {
+                for (String alias : List.of("tool", "tool_name", "toolName", "name")) {
+                    for (boolean nested : new boolean[] {false, true}) {
+                        var root = json.createObjectNode().put("event", type).put("tool", "different_tool");
+                        var node = nested ? root.putObject("data") : root;
+                        node.put(alias, name).put("preview", "합성원고표식").put("delta", "합성원고표식").put("error", true);
+                        var event = HermesRunEventStream.toRunEvent(root);
+                        assertThat(event.detail()).isNull();
+                        assertThat(event.text()).isNull();
+                        assertThat(event.toString()).doesNotContain("합성원고표식");
+                    }
+                }
+            }
+        }
+        for (String type : List.of("USER", "message.delta", "message.interim")) {
+            var root = json.createObjectNode().put("event", type).put("tool_name", "content_draft_write").put("text", "대화본문");
+            assertThat(HermesRunEventStream.toRunEvent(root).text()).isEqualTo("대화본문");
+        }
+        assertThat(parse("{\"event\":\"tool.completed\",\"tool\":\"not_content_draft_write\",\"text\":\"다른본문\"}").text()).isEqualTo("다른본문");
+    }
+
+
     private final JsonMapper mapper = JsonMapper.builder().build();
 
 
