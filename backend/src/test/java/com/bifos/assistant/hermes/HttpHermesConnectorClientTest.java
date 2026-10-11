@@ -74,6 +74,7 @@ class HttpHermesConnectorClientTest {
         ReflectionTestUtils.setField(client, "prepareClient", builder.build());
     }
 
+
     @Test
     @DisplayName("실제 Python producer의 Gmail과 네이버 카탈로그 인자 이름을 읽는다")
     void readsArgumentLabelsFromPythonCatalog() throws Exception {
@@ -88,6 +89,7 @@ class HttpHermesConnectorClientTest {
             .findFirst().orElseThrow().argLabels()).containsEntry("title", "제목");
         server.verify();
     }
+
 
     @Test
     @DisplayName("잘못된 인자 표시 이름만 버리고 도구 정책과 카탈로그는 유지한다")

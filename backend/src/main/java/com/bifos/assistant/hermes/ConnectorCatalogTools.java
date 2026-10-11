@@ -111,6 +111,7 @@ final class ConnectorCatalogTools {
         return value != null && value.isString() && !value.asString().isBlank() ? value.asString() : null;
     }
 
+
     private static Map<String, String> argLabels(JsonNode policy) {
         JsonNode value = policy == null ? null : policy.get("arg_labels");
         if (value == null || !value.isObject() || value.size() > 64) {

@@ -29,6 +29,7 @@ class ConnectorArgumentLabelsPipelineTest {
     @TempDir
     Path attachments;
 
+
     @Test
     @DisplayName("실제 Python 카탈로그에서 Java 승인 응답까지 Gmail과 네이버 표시 이름을 전달한다")
     void carriesProducerLabelsThroughActionDto() throws Exception {

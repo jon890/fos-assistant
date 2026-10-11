@@ -20,10 +20,11 @@ class ConnectorArgumentLabelsTest {
             Map.of("a", "가".repeat(81)), Map.of("a", "겹침", "b", "겹침"), Map.of("a", "b", "b", "이름"))) {
             assertThat(ConnectorArgumentLabels.read(labels)).isEmpty();
         }
-        for (int code : new int[]{0, 9, 10, 31, 127, 159, 0x61c, 0x200e, 0x2028, 0x2029, 0x202e, 0x2066, 0xd800}) {
-            assertThat(ConnectorArgumentLabels.read(Map.of("a", "앞" + (char) code + "뒤"))).isEmpty();
+        for (int code : new int[] {0, 9, 10, 31, 127, 159, 0x61c, 0x200e, 0x2028, 0x2029, 0x202e, 0x2066, 0xd800}) {
+            assertThat(ConnectorArgumentLabels.read(Map.of("a", "앞" + (char)code + "뒤"))).isEmpty();
         }
     }
+
 
     @Test
     @DisplayName("Unicode 글자 수와 compact JSON의 UTF-8 바이트 및 항목 수 경계를 지킨다")

@@ -17,45 +17,48 @@ import java.util.UUID;
  * @param actionId 승인 요청 번호. 공개 식별자다
  * @param toolName 원래 도구 이름. 확인하지 못한 호출은 null
  * @param title 사람에게 보일 이름. 카탈로그의 선언에 이름이 없거나 카탈로그를 읽지 못했으면 고정 문구다. 도구의 원래
- *     이름은 내부 값이라 여기 싣지 않는다
+ * 이름은 내부 값이라 여기 싣지 않는다
  * @param argsJson 승인할 인자. 비밀처럼 보이는 값은 가린 글이다. 커넥터가 식별자로 선언한 칸은 길이로 가리지
- *     않는다(ADR-089). 실행은 저장한 원문으로 한다
+ * 않는다(ADR-089). 실행은 저장한 원문으로 한다
  * @param grantAllowed 승인하면서 상시 허락을 줄 수 있는 도구인가. 승인 줄에 저장하지 않고 줄을 읽을 때의 카탈로그로
- *     본다(ADR-065)
+ * 본다(ADR-065)
  * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
- *     승인할 수 없다(ADR-065)
+ * 승인할 수 없다(ADR-065)
  * @param argLabels 지금 카탈로그가 선언한 그 도구의 인자 표시 이름. 실행 인자와 가림에는 쓰지 않는다
  */
 public record ConnectorActionView(
-        UUID actionId,
-        String connectorId,
-        String toolName,
-        String title,
-        ToolRisk risk,
-        ActionStatus status,
-        String argsJson,
-        String resultText,
-        String errorCode,
-        Instant createdAt,
-        Instant expiresAt,
-        boolean grantAllowed,
-        boolean hiddenArgs,
-        Map<String, String> argLabels) {
+    UUID actionId,
+    String connectorId,
+    String toolName,
+    String title,
+    ToolRisk risk,
+    ActionStatus status,
+    String argsJson,
+    String resultText,
+    String errorCode,
+    Instant createdAt,
+    Instant expiresAt,
+    boolean grantAllowed,
+    boolean hiddenArgs,
+    Map<String, String> argLabels) {
 
     public ConnectorActionView {
         argLabels = argLabels == null ? Map.of() : Map.copyOf(argLabels);
     }
 
+
     /** 표시 이름이 없는 기존 호출과 호환한다. */
     public ConnectorActionView(UUID actionId, String connectorId, String toolName, String title, ToolRisk risk,
-            ActionStatus status, String argsJson, String resultText, String errorCode, Instant createdAt,
-            Instant expiresAt, boolean grantAllowed, boolean hiddenArgs) {
+        ActionStatus status, String argsJson, String resultText, String errorCode, Instant createdAt,
+        Instant expiresAt, boolean grantAllowed, boolean hiddenArgs) {
         this(actionId, connectorId, toolName, title, risk, status, argsJson, resultText, errorCode, createdAt,
-                expiresAt, grantAllowed, hiddenArgs, Map.of());
+            expiresAt, grantAllowed, hiddenArgs, Map.of());
     }
+
 
     /** 선언한 이름이 없는 도구를 사용자에게 부르는 말이다. */
     public static final String UNNAMED_TITLE = "이름 없는 동작";
+
 
     /**
      * @param declared 카탈로그가 선언한 그 도구의 정책. 선언이 없거나 카탈로그를 읽지 못했으면 빈 값
@@ -63,29 +66,31 @@ public record ConnectorActionView(
      * @param hiddenArgs 가려진 글이 있어 승인할 수 없는 줄인가
      */
     public static ConnectorActionView from(
-            ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
+        ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
         return from(action, declared, grantable, hiddenArgs, Map.of());
     }
 
+
     /** 표시 이름은 현재 카탈로그에서 받으며 정책과 가림에는 쓰지 않는다. */
     public static ConnectorActionView from(ConnectorAction action, Optional<ToolPolicy> declared,
-            boolean grantable, boolean hiddenArgs, Map<String, String> argLabels) {
+        boolean grantable, boolean hiddenArgs, Map<String, String> argLabels) {
         return new ConnectorActionView(
-                action.publicId(),
-                action.connectorId(),
-                action.toolName(),
-                titleOf(declared),
-                action.risk(),
-                action.status(),
-                ToolDetailRedactor.redactArguments(action.argsJson(), identifiersOf(declared)),
-                action.resultText(),
-                action.errorCode(),
-                action.createdAt(),
-                action.expiresAt(),
-                action.grantAllowed() && grantable,
-                hiddenArgs,
-                argLabels);
+            action.publicId(),
+            action.connectorId(),
+            action.toolName(),
+            titleOf(declared),
+            action.risk(),
+            action.status(),
+            ToolDetailRedactor.redactArguments(action.argsJson(), identifiersOf(declared)),
+            action.resultText(),
+            action.errorCode(),
+            action.createdAt(),
+            action.expiresAt(),
+            action.grantAllowed() && grantable,
+            hiddenArgs,
+            argLabels);
     }
+
 
     /**
      * 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 승인 줄의 가림과 승인할 수 있는지의 판정이 같은
@@ -97,6 +102,7 @@ public record ConnectorActionView(
         return declared.map(ToolPolicy::identifiers).orElse(Set.of());
     }
 
+
     /**
      * 사람에게 보일 도구 제목이다. 승인 카드와 알림이 같은 제목을 쓰도록 둘 다 이 규칙을 부른다.
      *
@@ -105,7 +111,7 @@ public record ConnectorActionView(
      */
     public static String titleOf(Optional<ToolPolicy> declared) {
         return declared.map(ToolPolicy::title)
-                .filter(declaredTitle -> !declaredTitle.isBlank())
-                .orElse(UNNAMED_TITLE);
+            .filter(declaredTitle -> !declaredTitle.isBlank())
+            .orElse(UNNAMED_TITLE);
     }
 }

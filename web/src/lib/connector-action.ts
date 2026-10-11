@@ -99,8 +99,10 @@ const HIDDEN_MARK = "[가림]";
 
 const LABEL_KEY = /^[A-Za-z_][A-Za-z0-9_]{0,30}$/;
 const LABEL_RESERVED = new Set(["__proto__", "constructor", "prototype"]);
-const LABEL_FORBIDDEN = /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
-const LABEL_EDGE_SPACE = /^[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]|[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]$/;
+const LABEL_FORBIDDEN =
+  /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
+const LABEL_EDGE_SPACE =
+  /^[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]|[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]$/;
 
 /** 불량 표시 이름만 버리고 승인 줄과 값은 유지한다. */
 export function approvalArgLabels(value: unknown): Record<string, string> {
@@ -110,25 +112,44 @@ export function approvalArgLabels(value: unknown): Record<string, string> {
   const names = new Set<string>();
   const labels: Record<string, string> = {};
   for (const [key, label] of entries) {
-    if (!LABEL_KEY.test(key) || LABEL_RESERVED.has(key) || typeof label !== "string"
-      || [...label].length < 1 || [...label].length > 80 || LABEL_EDGE_SPACE.test(label)
-      || LABEL_FORBIDDEN.test(label) || !label.isWellFormed() || names.has(label)
-      || (Object.hasOwn(value, label) && key !== label)) return {};
+    if (
+      !LABEL_KEY.test(key) ||
+      LABEL_RESERVED.has(key) ||
+      typeof label !== "string" ||
+      [...label].length < 1 ||
+      [...label].length > 80 ||
+      LABEL_EDGE_SPACE.test(label) ||
+      LABEL_FORBIDDEN.test(label) ||
+      !label.isWellFormed() ||
+      names.has(label) ||
+      (Object.hasOwn(value, label) && key !== label)
+    )
+      return {};
     names.add(label);
     labels[key] = label;
   }
-  return new TextEncoder().encode(JSON.stringify(labels)).length <= 16384 ? labels : {};
+  return new TextEncoder().encode(JSON.stringify(labels)).length <= 16384
+    ? labels
+    : {};
 }
 
 /** 표시만 바꾸고 원래 키와 가림 표시는 유지한다. 충돌한 줄에는 원래 키를 병기한다. */
 export function approvalArgLabel(
-  key: string, labels?: Readonly<Record<string, string>>, rawKeys?: readonly string[],
+  key: string,
+  labels?: Readonly<Record<string, string>>,
+  rawKeys?: readonly string[],
 ): string {
   const checked = approvalArgLabels(labels);
-  const nameOf = (raw: string) => Object.hasOwn(checked, raw) ? checked[raw] : raw;
+  const nameOf = (raw: string) =>
+    Object.hasOwn(checked, raw) ? checked[raw] : raw;
   const label = nameOf(key);
-  return rawKeys?.some((raw) => raw !== key && (nameOf(raw) === label || raw === label || nameOf(raw) === key))
-    ? `${label} (${key})` : label;
+  return rawKeys?.some(
+    (raw) =>
+      raw !== key &&
+      (nameOf(raw) === label || raw === label || nameOf(raw) === key),
+  )
+    ? `${label} (${key})`
+    : label;
 }
 
 /**

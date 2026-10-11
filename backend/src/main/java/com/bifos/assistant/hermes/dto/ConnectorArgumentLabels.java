@@ -19,6 +19,7 @@ public final class ConnectorArgumentLabels {
     private static final String SPACE = " \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000\ufeff";
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     /** 원문 키와 값은 바꾸지 않는다. 반환 map은 소유 사본이다. */
     public static Map<String, String> read(Map<?, ?> labels) {
         if (labels == null || labels.size() > 64) {
@@ -36,9 +37,10 @@ public final class ConnectorArgumentLabels {
             return Map.of();
         }
         @SuppressWarnings("unchecked")
-        Map<String, String> checked = (Map<String, String>) labels;
+        Map<String, String> checked = (Map<String, String>)labels;
         return Map.copyOf(checked);
     }
+
 
     private static boolean validValue(String value) {
         int length = value.codePointCount(0, value.length());

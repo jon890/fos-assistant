@@ -31,10 +31,18 @@ const GRANT_CHOICES: { period: GrantPeriod; label: string }[] = [
 
 type Sending = "approve" | "reject" | "grant" | null;
 
-function ArgRows({ rows, label }: { rows: { key: string; value: string }[]; label: (key: string) => string }) {
+function ArgRows({
+  rows,
+  label,
+}: {
+  rows: { key: string; value: string }[];
+  label: (key: string) => string;
+}) {
   return rows.map((row) => (
     <div key={row.key} className="min-w-0">
-      <dt className="break-all text-xs text-muted-foreground">{label(row.key)}</dt>
+      <dt className="break-all text-xs text-muted-foreground">
+        {label(row.key)}
+      </dt>
       <dd className="whitespace-pre-wrap break-all">{row.value}</dd>
     </div>
   ));
@@ -45,7 +53,9 @@ function ArgRows({ rows, label }: { rows: { key: string; value: string }[]; labe
  */
 function HiddenArgsNotice({ action }: { action: ConnectorAction }) {
   const rawKeys = readableArgs(action.argsJson)?.map((row) => row.key);
-  const keys = hiddenArgKeys(action.argsJson).map((key) => approvalArgLabel(key, action.argLabels, rawKeys));
+  const keys = hiddenArgKeys(action.argsJson).map((key) =>
+    approvalArgLabel(key, action.argLabels, rawKeys),
+  );
   return (
     <Notice variant="warning" role="status" data-testid="approval-hidden-args">
       <p data-testid="approval-hidden-args-reason" className="break-words">
@@ -91,7 +101,8 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
   }
   const shown = args.rows.filter((row) => !fold || row.core);
   const rawKeys = [...args.rows.map((row) => row.key), ...args.emptyKeys];
-  const label = (key: string) => approvalArgLabel(key, action.argLabels, rawKeys);
+  const label = (key: string) =>
+    approvalArgLabel(key, action.argLabels, rawKeys);
   const folded = fold ? args.rows.filter((row) => !row.core) : [];
   const emptyLine =
     args.emptyKeys.length > 0 ? (

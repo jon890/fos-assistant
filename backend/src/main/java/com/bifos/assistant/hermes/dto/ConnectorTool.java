@@ -27,6 +27,7 @@ public record ConnectorTool(
         argLabels = ConnectorArgumentLabels.read(argLabels);
     }
 
+
     /** 표시 이름이 없는 옛 카탈로그다. */
     public ConnectorTool(String name, String risk, String approval, String title, Boolean grant, List<String> identifiers,
         String description) {
