@@ -10,7 +10,9 @@ import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorField;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class ConnectorBindingInstalls {
+    private static final String STEP_ENV = "env";
     private static final String STEP_INSTALL = "install";
     private static final String STEP_INSTALL_STATE = "install-state";
     private static final String STEP_PROBE = "probe";
@@ -158,6 +161,44 @@ public class ConnectorBindingInstalls {
             return ResyncOutcome.CALL_FAILED;
         }
     }
+
+    /** 연결 값이 바뀐 바인딩에 설치를 다시 보낸다. 판정과 실패 처리는 기존 연결 등록 계약을 따른다. */
+    public boolean reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted, Instant now) {
+        Agent agent = binding.agent();
+        String profile = agent.hermesProfile();
+        binding.beginInstall(now);
+        String step = STEP_INSTALL;
+        try {
+            if (agent.connectorManaged()) {
+                step = STEP_ENV;
+                boolean restart = false;
+                for (ConnectorField field : manifest.fields()) {
+                    String value = accepted.get(field.key());
+                    // 비운 선택 칸은 앞선 등록이 남긴 값을 지운다.
+                    restart |= value == null
+                            ? connector.deleteEnv(profile, field.env())
+                            : connector.putEnv(profile, field.env(), value);
+                }
+                step = STEP_INSTALL;
+                InstallResult installed = connector.putConnector(profile, manifest.id(), true, agent.sandboxOwner());
+                binding.installed(restart || installed.restartRequired() || installed.pluginUpdated(), now);
+            } else {
+                String ownerBrowser = ownerBrowser(binding, manifest);
+                InstallResult installed = connector.bindConnector(
+                        profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner(), ownerBrowser);
+                record(binding, installed, false, now);
+            }
+            if (binding.mcpServer() == null) {
+                binding.recordServer(manifest.mcpServer());
+            }
+            return false;
+        } catch (RuntimeException ex) {
+            ConnectorBindingInstalls.warn(step, manifest.id(), ex);
+            binding.pending(now);
+            return true;
+        }
+    }
+
 
     /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
     static void warn(String step, String connectorId, RuntimeException ex) {

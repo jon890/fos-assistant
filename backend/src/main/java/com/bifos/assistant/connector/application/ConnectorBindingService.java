@@ -64,7 +64,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @Service
 public class ConnectorBindingService implements AgentConnectorDetacher {
-    private static final String STEP_ENV = "env";
     private static final String STEP_INSTALL = "install";
     private static final String STEP_DETACH = "detach";
     private static final String STEP_VAULT_IMPORT = "vault-import";
@@ -383,40 +382,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * @return 외부 호출이 실패했는가. 실패해도 예외로 알리지 않고 그 바인딩만 {@code PENDING} 으로 둔다
      */
     public boolean reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted) {
-        Instant now = now();
-        Agent agent = binding.agent();
-        String profile = agent.hermesProfile();
-        binding.beginInstall(now);
-        String step = STEP_INSTALL;
-        try {
-            if (agent.connectorManaged()) {
-                step = STEP_ENV;
-                boolean restart = false;
-                for (ConnectorField field : manifest.fields()) {
-                    String value = accepted.get(field.key());
-                    // 비운 선택 칸은 앞선 등록이 남긴 값을 지운다.
-                    restart |= value == null
-                            ? connector.deleteEnv(profile, field.env())
-                            : connector.putEnv(profile, field.env(), value);
-                }
-                step = STEP_INSTALL;
-                InstallResult installed = connector.putConnector(profile, manifest.id(), true, agent.sandboxOwner());
-                binding.installed(restart || installed.restartRequired() || installed.pluginUpdated(), now);
-            } else {
-                String ownerBrowser = installs.ownerBrowser(binding, manifest);
-                InstallResult installed = connector.bindConnector(
-                        profile, manifest.id(), binding.connection().vault(), agent.sandboxOwner(), ownerBrowser);
-                installs.record(binding, installed, false, now);
-            }
-            if (binding.mcpServer() == null) {
-                binding.recordServer(manifest.mcpServer());
-            }
-            return false;
-        } catch (RuntimeException ex) {
-            ConnectorBindingInstalls.warn(step, manifest.id(), ex);
-            binding.pending(now);
-            return true;
-        }
+        return installs.reinstall(binding, manifest, accepted, now());
     }
 
     /**
