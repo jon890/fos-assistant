@@ -108,6 +108,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 커넥터는 프로세스 공용 큐를 그룹별로 두어 같은 그룹의 요청을 한 번에 하나씩 보낸다. 요청이 끝난 뒤 다음 요청까지 표의 간격을 둔다. `ORDER_INFO`는 KST 09:00~09:10에 피크 한도를 적용한다. 공식 19그룹과 AUTH도 같은 큐 경계를 사용한다. 예산은 origin/client ID별로 공유하며 secret 변경으로 한도를 우회하지 못한다.
 `get_buying_power`의 두 조회와 서로 다른 호출의 같은 그룹 요청, 토큰 재발급 뒤 재송도 이 큐를 거친다. 다른 그룹은 서로의 큐를 기다리지 않는다. X-RateLimit의 낮은 한도와 Remaining/상대 Reset, Retry-After를 우선 적용한다. 큐 대기도 4초 호출 deadline 안에 포함한다.
 
+간격, 상대 헤더 대기, 호출 deadline과 토큰 TTL은 `performance.timeOrigin + performance.now()`의 소수 밀리초 시각을 함께 쓴다. 실행 중 벽시계가 보정되어도 경과 시간은 바뀌지 않는다. KST 피크 여부는 현재 벽시계로 판단한다. 타이머에 넘기는 남은 시간은 밀리초 단위로 올림하고, 깬 뒤 간격과 deadline을 다시 검사한다. `Date.now()`의 정수 눈금만 비교하면 실제로 1초가 지나기 전에 다음 요청을 보낼 수 있기 때문이다.
+
 GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 번만 다시 보낸다. `Retry-After`가 초 단위 수치로 더 긴 대기를 요구하면 그 시간도 지킨다. 재송도 429면 `TOSSINVEST_RATE_LIMITED`로 끝낸다. 다른 프로세스와는 큐를 공유하지 않으므로 그 사이의 충돌은 이 재시도로 대응한다.
 
 ### 오류
@@ -126,7 +128,7 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 
 ## 서버와 검사
 
-`src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
+`src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶는다. 생성 entry는 Git에서 추적하지 않고 테스트와 배포 묶음 생산 때 소스에서 빌드한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
 공식 JSON fixture의 41 operation과 실제 등록 12개 operation(인증 1개, 조회 11개)을 구분한다. MCP 도구는 10개다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 시세 네 도구를 production 서버와 bundle에 연결했으며 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
 대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 시험별로 필요한 `GET`과 `POST /oauth2/token`만 허용한다. 다른 GET이나 금융 POST·DELETE가 오면 시험이 실패한다. 공식 성공 예시 29개와 production SDK·stdio bundle의 실제 HTTP 도달을 검사한다.
 

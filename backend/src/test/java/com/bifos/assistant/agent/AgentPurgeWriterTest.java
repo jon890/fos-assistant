@@ -44,6 +44,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,22 +113,31 @@ class AgentPurgeWriterTest {
     AppUser owner;
     Agent agent;
 
+
+    /** 실패와 되돌림 검사에서 남긴 바인딩이 다음 검사의 에이전트 삭제를 막지 않게 한다. */
+    @AfterEach
+    void cleanBindings() {
+        bindings.deleteAll(bindings.findByAgentId(agent.id()));
+    }
+
+
     @BeforeEach
     void setUp() {
         String email = "agent-purge-" + UUID.randomUUID() + "@example.test";
         owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
         String code = "purge-" + UUID.randomUUID().toString().substring(0, 8);
         agent = agents.save(Agent.of(
-                code,
-                "정리할 에이전트",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            "정리할 에이전트",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW));
     }
+
 
     @Test
     @DisplayName("딸린 줄이 모두 있는 지운 에이전트를 지우고 대화와 실행은 남긴다")
@@ -146,19 +156,20 @@ class AgentPurgeWriterTest {
         assertThat(countOf("proactive_loop_setting", "agent_id")).isZero();
         assertThat(countOf("proactive_check", "agent_id")).isZero();
         assertThat(actions.findById(attached.actionId()))
-                .as("승인 이력은 남고 에이전트만 비운다")
-                .get()
-                .extracting(ConnectorAction::agentId)
-                .isNull();
+            .as("승인 이력은 남고 에이전트만 비운다")
+            .get()
+            .extracting(ConnectorAction::agentId)
+            .isNull();
         assertThat(connections.findById(attached.connectionId()))
-                .as("연결은 사용자의 것이라 남는다")
-                .isPresent();
+            .as("연결은 사용자의 것이라 남는다")
+            .isPresent();
         assertThat(connectionAgentId(attached.connectionId()))
-                .as("연결의 옛 에이전트 칸은 비운다")
-                .isNull();
+            .as("연결의 옛 에이전트 칸은 비운다")
+            .isNull();
         assertThat(conversations.findById(attached.conversationId())).isPresent();
         assertThat(executions.findById(attached.executionId())).isPresent();
     }
+
 
     @Test
     @DisplayName("cutoff 보다 늦게 지운 에이전트는 남긴다")
@@ -173,6 +184,7 @@ class AgentPurgeWriterTest {
         assertAttachedRowsRemain();
     }
 
+
     @Test
     @DisplayName("지우지 않은 에이전트는 건드리지 않는다")
     void leavesActiveAgentUntouched() {
@@ -182,11 +194,12 @@ class AgentPurgeWriterTest {
 
         assertThat(outcome).isEqualTo(AgentPurgeOutcome.GONE);
         assertThat(agents.findById(agent.id()))
-                .get()
-                .extracting(Agent::deletedAt)
-                .isNull();
+            .get()
+            .extracting(Agent::deletedAt)
+            .isNull();
         assertAttachedRowsRemain();
     }
+
 
     @Test
     @DisplayName("지웠지만 정리되지 않은 대화가 있으면 미루고, 대화가 정리되면 지운다")
@@ -201,9 +214,9 @@ class AgentPurgeWriterTest {
         assertThat(agents.findById(agent.id())).isPresent();
         assertAttachedRowsRemain();
         assertThat(actions.findById(attached.actionId()))
-                .get()
-                .extracting(ConnectorAction::agentId)
-                .isEqualTo(agent.id());
+            .get()
+            .extracting(ConnectorAction::agentId)
+            .isEqualTo(agent.id());
         assertThat(connectionAgentId(attached.connectionId())).isEqualTo(agent.id());
 
         transactions.executeWithoutResult(status -> conversations.markPurged(attached.conversationId(), NOW));
@@ -213,47 +226,47 @@ class AgentPurgeWriterTest {
         assertThat(agents.findById(agent.id())).isEmpty();
     }
 
+
     /** 에이전트를 가리키는 표마다 한 줄씩 만든다. 지우지 않은 대화 하나와 그 대화의 실행 하나도 만든다. */
     Attached attachEverything() {
         collections.saveAndFlush(AgentMemoryCollection.of(agent.id(), "core", false, NOW));
         collectionChanges.saveAndFlush(AgentMemoryCollectionChange.of(
-                agent.id(), "core", AgentMemoryCollectionChangeType.GRANTED, false, owner.id(), NOW));
+            agent.id(), "core", AgentMemoryCollectionChangeType.GRANTED, false, owner.id(), NOW));
         toolsetRequests.saveAndFlush(AgentToolsetRequest.of(1L, agent.id(), owner.id(), "image_gen", NOW));
 
-        ConnectorConnection connection =
-                connections.saveAndFlush(ConnectorConnection.pending(owner.id(), "demo-mail", NOW));
+        ConnectorConnection connection = connections.saveAndFlush(ConnectorConnection.pending(owner.id(), "demo-mail", NOW));
         jdbc.update("UPDATE connector_connection SET agent_id = ? WHERE id = ?", agent.id(), connection.id());
         bindings.saveAndFlush(ConnectorBinding.pending(agent, connection, "demo-mail", NOW));
 
-        Conversation conversation =
-                conversations.saveAndFlush(Conversation.startedBy(owner.id(), "남는 대화", agent.id(), NOW));
+        Conversation conversation = conversations.saveAndFlush(Conversation.startedBy(owner.id(), "남는 대화", agent.id(), NOW));
         AgentExecution execution = executions.saveAndFlush(AgentExecution.builder()
-                .userId(owner.id())
-                .agentId(agent.id())
-                .conversationId(conversation.id())
-                .profileName(agent.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(NOW)
-                .build());
+            .userId(owner.id())
+            .agentId(agent.id())
+            .conversationId(conversation.id())
+            .profileName(agent.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(NOW)
+            .build());
         ConnectorAction action = actions.saveAndFlush(ConnectorAction.decided(
-                connection,
-                agent.id(),
-                execution,
-                "mcp__mail__read",
-                "read",
-                new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE),
-                true,
-                "agent-purge-" + UUID.randomUUID(),
-                "synthetic-hash",
-                NOW));
+            connection,
+            agent.id(),
+            execution,
+            "mcp__mail__read",
+            "read",
+            new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.READ, ToolApproval.NONE),
+            true,
+            "agent-purge-" + UUID.randomUUID(),
+            "synthetic-hash",
+            NOW));
 
         loopSettings.saveAndFlush(ProactiveLoopSetting.of(owner.id(), agent.id(), true, null, NOW));
         ProactiveCheck check = checks.saveAndFlush(
-                ProactiveCheck.started(owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, NOW));
+            ProactiveCheck.started(owner.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, NOW));
 
         return new Attached(connection.id(), action.id(), conversation.id(), execution.id(), check.id());
     }
+
 
     /** 엔티티로 적어 읽는 쪽과 같은 UTC 로 저장한다. */
     void markAgentDeleted(Instant deletedAt) {
@@ -261,6 +274,7 @@ class AgentPurgeWriterTest {
         loaded.markDeleted(deletedAt);
         agents.saveAndFlush(loaded);
     }
+
 
     void assertAttachedRowsRemain() {
         assertThat(countOf("agent_memory_collection", "agent_id")).isEqualTo(1);
@@ -272,16 +286,20 @@ class AgentPurgeWriterTest {
         assertThat(countOf("connector_action", "agent_id")).isEqualTo(1);
     }
 
+
     /** 그 표에서 이 검사의 에이전트를 가리키는 줄 수다. 표와 칸 이름은 이 클래스가 정한 값만 넘긴다. */
     long countOf(String table, String column) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?", Long.class, agent.id());
+            "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?", Long.class, agent.id());
         return count == null ? 0 : count;
     }
+
 
     Long connectionAgentId(Long connectionId) {
         return jdbc.queryForObject("SELECT agent_id FROM connector_connection WHERE id = ?", Long.class, connectionId);
     }
 
-    record Attached(Long connectionId, Long actionId, Long conversationId, Long executionId, Long checkId) {}
+
+    record Attached(Long connectionId, Long actionId, Long conversationId, Long executionId, Long checkId) {
+    }
 }
