@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import com.bifos.assistant.memory.application.MemoryContentBackfill;
 import com.bifos.assistant.memory.application.MemoryContentSealer;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.MemoryRevisionId;
+import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -52,12 +52,14 @@ class MemoryContentBackfillTest {
     @Autowired
     MemoryContentSealer sealer;
 
+
     @BeforeEach
     void clean() {
         Mockito.reset(sealer);
         revisionRepository.deleteAll();
         repository.deleteAll();
     }
+
 
     private long insertMemory(String sensitivity, String content) {
         jdbc.update("""
@@ -69,6 +71,7 @@ class MemoryContentBackfillTest {
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);
     }
 
+
     private void insertRevision(long memoryId, int revision, String content, String contentKeyId) {
         jdbc.update("""
                 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, collection,
@@ -78,13 +81,15 @@ class MemoryContentBackfillTest {
                 """, memoryId, revision, content, contentKeyId);
     }
 
+
     /** 대상을 찾은 뒤 잠가 읽기 전에 다른 쪽이 먼저 암호화한 상황을 만든다. */
     private void sealBehindBack(long id) {
         jdbc.update(
-                "UPDATE memory SET content = ?, content_key_id = 'test-1', revision = 9 WHERE id = ?",
-                SEALED_FIRST,
-                id);
+            "UPDATE memory SET content = ?, content_key_id = 'test-1', revision = 9 WHERE id = ?",
+            SEALED_FIRST,
+            id);
     }
+
 
     @Test
     @DisplayName("평문으로 남은 민감 줄만 암호화하고 판 번호와 갱신 시각은 그대로다")
@@ -97,29 +102,28 @@ class MemoryContentBackfillTest {
                 VALUES (?, 1, 'UPDATED', 'USER', 1, 'identity', 'MEMORY', 'ACCEPTED', '옛 판', ?, 'SEARCH',
                     'SENSITIVE', CURRENT_TIMESTAMP(6))
                 """, sensitiveId, REVISION_MARK);
-        Map<String, Object> before =
-                jdbc.queryForMap("SELECT revision, updated_at FROM memory WHERE id = ?", sensitiveId);
+        Map<String, Object> before = jdbc.queryForMap("SELECT revision, updated_at FROM memory WHERE id = ?", sensitiveId);
 
         assertThat(backfill.sealPlaintext()).isEqualTo(2);
 
         Map<String, Object> sealed = jdbc.queryForMap(
-                "SELECT content, content_key_id, revision, updated_at FROM memory WHERE id = ?", sensitiveId);
-        assertThat((String) sealed.get("CONTENT")).doesNotContain(MEMORY_MARK);
+            "SELECT content, content_key_id, revision, updated_at FROM memory WHERE id = ?", sensitiveId);
+        assertThat((String)sealed.get("CONTENT")).doesNotContain(MEMORY_MARK);
         assertThat(sealed.get("CONTENT_KEY_ID")).isEqualTo("test-1");
         assertThat(sealed.get("REVISION")).isEqualTo(before.get("REVISION"));
         // 같은 시각이 다른 offset 으로 읽힐 수 있어 순간으로 비교한다
-        assertThat(((OffsetDateTime) sealed.get("UPDATED_AT")).toInstant())
-                .isEqualTo(((OffsetDateTime) before.get("UPDATED_AT")).toInstant());
+        assertThat(((OffsetDateTime)sealed.get("UPDATED_AT")).toInstant())
+            .isEqualTo(((OffsetDateTime)before.get("UPDATED_AT")).toInstant());
         Map<String, Object> revision = jdbc.queryForMap("SELECT content, content_key_id FROM memory_revision");
-        assertThat((String) revision.get("CONTENT")).doesNotContain(REVISION_MARK);
+        assertThat((String)revision.get("CONTENT")).doesNotContain(REVISION_MARK);
         assertThat(revision.get("CONTENT_KEY_ID")).isEqualTo("test-1");
-        Map<String, Object> normal =
-                jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", normalId);
+        Map<String, Object> normal = jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", normalId);
         assertThat(normal.get("CONTENT")).isEqualTo("일반 본문");
         assertThat(normal.get("CONTENT_KEY_ID")).isNull();
         assertThat(memories.contentOf(repository.findById(sensitiveId).orElseThrow()))
-                .isEqualTo(MEMORY_MARK);
+            .isEqualTo(MEMORY_MARK);
     }
+
 
     @Test
     @DisplayName("한 번 더 부르면 0 이고 암호문이 바뀌지 않는다")
@@ -131,8 +135,9 @@ class MemoryContentBackfillTest {
         assertThat(backfill.sealPlaintext()).isZero();
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, id))
-                .isEqualTo(first);
+            .isEqualTo(first);
     }
+
 
     @Test
     @DisplayName("이미 암호문인 민감 줄은 암호화하지 않고 본문을 그대로 둔다")
@@ -143,8 +148,9 @@ class MemoryContentBackfillTest {
         assertThat(sealer.sealMemory(id)).isFalse();
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, id))
-                .isEqualTo(SEALED_FIRST);
+            .isEqualTo(SEALED_FIRST);
     }
+
 
     @Test
     @DisplayName("일반 줄과 없는 번호는 암호화하지 않는다")
@@ -154,11 +160,11 @@ class MemoryContentBackfillTest {
         assertThat(sealer.sealMemory(normalId)).isFalse();
         assertThat(sealer.sealMemory(normalId + 1000)).isFalse();
 
-        Map<String, Object> normal =
-                jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", normalId);
+        Map<String, Object> normal = jdbc.queryForMap("SELECT content, content_key_id FROM memory WHERE id = ?", normalId);
         assertThat(normal.get("CONTENT")).isEqualTo("일반 본문");
         assertThat(normal.get("CONTENT_KEY_ID")).isNull();
     }
+
 
     @Test
     @DisplayName("이미 암호문인 판과 없는 판은 암호화하지 않는다")
@@ -170,48 +176,50 @@ class MemoryContentBackfillTest {
         assertThat(sealer.sealRevision(new MemoryRevisionId(id, 2))).isFalse();
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory_revision WHERE memory_id = ?", String.class, id))
-                .isEqualTo(SEALED_FIRST);
+            .isEqualTo(SEALED_FIRST);
     }
+
 
     @Test
     @DisplayName("대상을 찾은 뒤 다른 쪽이 먼저 암호화한 줄을 먼저 읽어 둔 옛 값으로 덮어쓰지 않는다")
     void doesNotOverwriteRowSealedAfterLookup() {
         long id = insertMemory("SENSITIVE", MEMORY_MARK);
         doAnswer(invocation -> {
-                    sealBehindBack(id);
-                    return invocation.callRealMethod();
-                })
-                .when(sealer)
-                .sealMemory(id);
+            sealBehindBack(id);
+            return invocation.callRealMethod();
+        })
+            .when(sealer)
+            .sealMemory(id);
 
         assertThat(backfill.sealPlaintext()).isZero();
 
         Map<String, Object> row = jdbc.queryForMap("SELECT content, revision FROM memory WHERE id = ?", id);
         assertThat(row.get("CONTENT")).isEqualTo(SEALED_FIRST);
-        assertThat(((Number) row.get("REVISION")).longValue()).isEqualTo(9L);
+        assertThat(((Number)row.get("REVISION")).longValue()).isEqualTo(9L);
     }
+
 
     @Test
     @DisplayName("대상을 찾은 뒤 사용자가 본문을 고치고 일반 항목으로 바꾼 줄은 덮어쓰지 않는다")
     void doesNotOverwriteRowChangedToNormalAfterLookup() {
         long id = insertMemory("SENSITIVE", MEMORY_MARK);
         doAnswer(invocation -> {
-                    jdbc.update(
-                            "UPDATE memory SET content = '고친 일반 본문', sensitivity = 'NORMAL', revision = 4 WHERE id = ?",
-                            id);
-                    return invocation.callRealMethod();
-                })
-                .when(sealer)
-                .sealMemory(id);
+            jdbc.update(
+                "UPDATE memory SET content = '고친 일반 본문', sensitivity = 'NORMAL', revision = 4 WHERE id = ?",
+                id);
+            return invocation.callRealMethod();
+        })
+            .when(sealer)
+            .sealMemory(id);
 
         assertThat(backfill.sealPlaintext()).isZero();
 
-        Map<String, Object> row =
-                jdbc.queryForMap("SELECT content, content_key_id, revision FROM memory WHERE id = ?", id);
+        Map<String, Object> row = jdbc.queryForMap("SELECT content, content_key_id, revision FROM memory WHERE id = ?", id);
         assertThat(row.get("CONTENT")).isEqualTo("고친 일반 본문");
         assertThat(row.get("CONTENT_KEY_ID")).isNull();
-        assertThat(((Number) row.get("REVISION")).longValue()).isEqualTo(4L);
+        assertThat(((Number)row.get("REVISION")).longValue()).isEqualTo(4L);
     }
+
 
     @Test
     @DisplayName("보정이 예외를 던져도 기동을 잇고 로그에는 예외 클래스 이름만 남긴다")

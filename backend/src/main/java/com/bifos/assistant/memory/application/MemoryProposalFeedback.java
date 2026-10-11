@@ -4,7 +4,7 @@ import com.bifos.assistant.feedback.application.model.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import lombok.AccessLevel;
@@ -20,7 +20,7 @@ final class MemoryProposalFeedback {
      */
     static FeedbackEntry of(CurrentUser user, Memory memory, FeedbackEventType type, FeedbackActor actor, Instant now) {
         return FeedbackEntry.of(user.id(), FeedbackSubjectType.MEMORY, memory.id(), type, actor, now)
-                .originExecution(memory.proposedByExecutionId())
-                .version(Integer.toString(memory.revision()));
+            .originExecution(memory.proposedByExecutionId())
+            .version(Integer.toString(memory.revision()));
     }
 }

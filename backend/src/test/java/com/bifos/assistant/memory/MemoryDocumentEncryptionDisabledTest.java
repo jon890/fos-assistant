@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -40,52 +40,56 @@ class MemoryDocumentEncryptionDisabledTest {
     @Autowired
     JdbcTemplate jdbc;
 
+
     @BeforeEach
     void clean() {
         revisionRepository.deleteAll();
         repository.deleteAll();
     }
 
+
     private long count(String table) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
     }
 
+
     private static void assertUnavailable(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE));
     }
+
 
     @Test
     @DisplayName("key 가 없으면 민감 문서를 만들지 못하고 아무것도 저장하지 않는다")
     void sensitiveDocumentIsNotCreated() {
         assertUnavailable(() -> memories.createDocument(
-                DAD, "identity", "application-profile", "t", MARK, MemorySensitivity.SENSITIVE));
+            DAD, "identity", "application-profile", "t", MARK, MemorySensitivity.SENSITIVE));
 
         assertThat(count("memory")).isZero();
     }
 
+
     @Test
     @DisplayName("key 가 없으면 일반 문서를 민감으로 고치지 못하고 평문과 판 번호가 그대로다")
     void documentCannotBecomeSensitive() {
-        Memory created =
-                memories.createDocument(DAD, "identity", "application-profile", "t", MARK, MemorySensitivity.NORMAL);
+        Memory created = memories.createDocument(DAD, "identity", "application-profile", "t", MARK, MemorySensitivity.NORMAL);
 
         assertUnavailable(() -> memories.reviseDocument(DAD, created.id(), "다른 글", MemorySensitivity.SENSITIVE, 1));
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, created.id()))
-                .isEqualTo(MARK);
+            .isEqualTo(MARK);
         assertThat(jdbc.queryForObject("SELECT revision FROM memory WHERE id = ?", Integer.class, created.id()))
-                .isEqualTo(1);
+            .isEqualTo(1);
         assertThat(count("memory_revision")).isZero();
     }
+
 
     @Test
     @DisplayName("key 가 없어도 일반 문서는 만들어진다")
     void normalDocumentIsCreated() {
-        Memory created =
-                memories.createDocument(DAD, "identity", "application-profile", "t", MARK, MemorySensitivity.NORMAL);
+        Memory created = memories.createDocument(DAD, "identity", "application-profile", "t", MARK, MemorySensitivity.NORMAL);
 
         assertThat(created.id()).isNotNull();
     }

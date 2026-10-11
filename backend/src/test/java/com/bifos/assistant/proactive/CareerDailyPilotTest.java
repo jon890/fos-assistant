@@ -29,7 +29,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
@@ -82,12 +82,12 @@ import org.springframework.data.domain.PageRequest;
  * <p>날마다의 흐름은 이렇다. 모든 글과 주소는 합성 값이다.
  *
  * <ol>
- *   <li>새 포지션을 찾아 답과 보고를 남긴다
- *   <li>보고를 열지 않아 모델 없이 건너뛴다. 사용자가 보고를 열고 「이런 공고는 관심 없어」 라고 답하고 Memory 제안이 생긴다
- *   <li>사용자 답이 변화 신호에 실린다. 모델이 같은 공고를 다시 내도 이미 알린 것이라 답과 보고 없이 침묵한다
- *   <li>사용자가 Memory 제안을 받아들인 뒤 Memory 문맥이 바뀌었다고 실린다. 새 근거가 없어 침묵한다
- *   <li>커리어 출처를 읽지 못해 장애를 무소식과 구분해 남긴다
- *   <li>사용자가 깨우기를 끄면 발화하지 않는다
+ * <li>새 포지션을 찾아 답과 보고를 남긴다
+ * <li>보고를 열지 않아 모델 없이 건너뛴다. 사용자가 보고를 열고 「이런 공고는 관심 없어」 라고 답하고 Memory 제안이 생긴다
+ * <li>사용자 답이 변화 신호에 실린다. 모델이 같은 공고를 다시 내도 이미 알린 것이라 답과 보고 없이 침묵한다
+ * <li>사용자가 Memory 제안을 받아들인 뒤 Memory 문맥이 바뀌었다고 실린다. 새 근거가 없어 침묵한다
+ * <li>커리어 출처를 읽지 못해 장애를 무소식과 구분해 남긴다
+ * <li>사용자가 깨우기를 끄면 발화하지 않는다
  * </ol>
  */
 @BackendIntegrationTest
@@ -172,9 +172,11 @@ class CareerDailyPilotTest {
     private Agent agent;
     private final List<Long> createdChecks = new ArrayList<>();
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -187,37 +189,38 @@ class CareerDailyPilotTest {
         doReturn(Set.of("career")).when(connectorBindings).connectorServers(any());
         doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user =
-                users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
+        AppUser user = users.save(AppUser.of("pilot-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "career-" + suffix;
         agent = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                ENABLED_AT));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            ENABLED_AT));
     }
+
 
     @AfterEach
     void tearDown() {
         createdChecks.addAll(checksOfAgent().stream().map(ProactiveCheck::id).toList());
         findings.deleteAll(findings.findAll().stream()
-                .filter(finding -> createdChecks.contains(finding.checkId()))
-                .toList());
+            .filter(finding -> createdChecks.contains(finding.checkId()))
+            .toList());
         cleanTasks();
     }
+
 
     @Test
     @DisplayName("매일 깨우기가 엿새 동안 발견, 건너뛰기, 피드백 뒤 되풀이 침묵, 정상 침묵, 출처 장애, 끄기를 차례로 지킨다")
     void runsCareerDailyCycleAcrossSixDays() {
         assertThat(schedules
-                        .update(owner, agent.code(), true, "08:30", SEOUL.getId())
-                        .nextRunAt())
+            .update(owner, agent.code(), true, "08:30", SEOUL.getId())
+            .nextRunAt())
                 .as("첫 발화 예정 시각")
                 .isEqualTo(FIRST_WAKE);
 
@@ -230,16 +233,16 @@ class CareerDailyPilotTest {
         HermesRunCommand firstCommand = stub().received().getLast();
         assertThat(firstCommand.input()).contains("- 지난 살펴보기: 처음").contains("최근에 알린 발견이 없다.");
         assertThat(firstCommand.instructions())
-                .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
-                .contains("- 연결한 서비스의 도구는 직접 부른다.")
-                .contains("- 이번 실행은 읽기만 한다.");
+            .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
+            .contains("- 연결한 서비스의 도구는 직접 부른다.")
+            .contains("- 이번 실행은 읽기만 한다.");
         ChatMessage discovery = lastMessage(first);
         assertThat(discovery.role()).isEqualTo(MessageRole.ASSISTANT);
         assertThat(discovery.content()).contains("**새로 알릴 것**").contains("](" + POSITION_URL + ")");
         assertThat(messagesOf(first))
-                .as("예약 실행은 시작 알림 줄을 남기지 않는다")
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.ASSISTANT);
+            .as("예약 실행은 시작 알림 줄을 남기지 않는다")
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.ASSISTANT);
         assertThat(runOf(1).status()).isEqualTo(TaskRunStatus.SUCCEEDED);
 
         // 2일: 보고를 열지 않았으므로 모델을 부르지 않는다.
@@ -254,8 +257,8 @@ class CareerDailyPilotTest {
         clock.set(clock.instant().plus(Duration.ofHours(10)));
         chat.history(owner, first.conversationId());
         assertThat(checks.findById(first.id()).orElseThrow().reportOpenedAt())
-                .as("점검 대화를 읽은 시각")
-                .isEqualTo(clock.instant());
+            .as("점검 대화를 읽은 시각")
+            .isEqualTo(clock.instant());
         messages.save(ChatMessage.fromUser(first.conversationId(), owner.id(), FEEDBACK, clock.instant()));
         Memory proposal = memories.proposeUser(owner, "커리어 선호", "백엔드 플랫폼 공고는 원하지 않는다", null);
 
@@ -264,12 +267,12 @@ class CareerDailyPilotTest {
         ProactiveCheck third = wake(3);
         HermesRunCommand thirdCommand = stub().received().getLast();
         assertThat(thirdCommand.input())
-                .as("건너뛴 2일이 아니라 1일 살펴보기를 기준으로 본 변화 신호")
-                .contains("- 지난 살펴보기: " + first.finishedAt())
-                .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개")
-                .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
-                .contains("[position] " + POSITION_KEY)
-                .contains("그 뒤 사용자 메시지 1개");
+            .as("건너뛴 2일이 아니라 1일 살펴보기를 기준으로 본 변화 신호")
+            .contains("- 지난 살펴보기: " + first.finishedAt())
+            .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 1개")
+            .contains("- Memory 문맥이 지난 살펴보기와 같은지: 같음")
+            .contains("[position] " + POSITION_KEY)
+            .contains("그 뒤 사용자 메시지 1개");
         assertThat(thirdCommand.sessionId()).as("같은 점검 대화 session").isEqualTo(firstCommand.sessionId());
         assertThat(third.newFindings()).isZero();
         assertThat(third.referenceFindings()).isEqualTo(1);
@@ -285,15 +288,14 @@ class CareerDailyPilotTest {
         ProactiveCheck fourth = wake(4);
         assertThat(fourth.skippedReason()).as("4일은 모델을 부른다").isNull();
         assertThat(stub().received().getLast().input())
-                .contains("- 지난 살펴보기: " + third.finishedAt())
-                .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 0개")
-                .contains("- Memory 문맥이 지난 살펴보기와 같은지: 바뀜");
+            .contains("- 지난 살펴보기: " + third.finishedAt())
+            .contains("- 그 뒤 사용자가 이 대화에 보낸 메시지: 0개")
+            .contains("- Memory 문맥이 지난 살펴보기와 같은지: 바뀜");
         assertThat(fourth.report()).isNull();
         assertThat(lastMessage(fourth).content()).isEqualTo(FEEDBACK);
 
         // 5일: 커리어 출처 장애는 무소식으로 숨기지 않는다.
-        answerWith(command ->
-                result("{\"version\":2,\"outcome\":\"NOTHING_NEW\",\"sourceFailures\":[\"" + SOURCE_FAILURE + "\"]}"));
+        answerWith(command -> result("{\"version\":2,\"outcome\":\"NOTHING_NEW\",\"sourceFailures\":[\"" + SOURCE_FAILURE + "\"]}"));
         ProactiveCheck fifth = wake(5);
         ChatMessage failure = lastMessage(fifth);
         assertThat(failure.role()).isEqualTo(MessageRole.ASSISTANT);
@@ -311,53 +313,53 @@ class CareerDailyPilotTest {
         List<ProactiveCheck> all = checksOfAgent();
         assertThat(runsOfAgent()).as("wake count").hasSize(5);
         assertThat(all.stream().filter(check -> check.skippedReason() == null))
-                .as("모델을 부른 깨우기")
-                .hasSize(4);
+            .as("모델을 부른 깨우기")
+            .hasSize(4);
         assertThat(all.stream().filter(check -> check.report() != null))
-                .as("message surfaced count")
-                .hasSize(2);
+            .as("message surfaced count")
+            .hasSize(2);
         assertThat(all.stream()
-                        .filter(check -> check.skippedReason() == null
-                                && check.status() == CheckStatus.SUCCEEDED
-                                && check.report() == null))
-                .as("silence count")
-                .hasSize(2);
+            .filter(check -> check.skippedReason() == null
+                && check.status() == CheckStatus.SUCCEEDED
+                && check.report() == null))
+                    .as("silence count")
+                    .hasSize(2);
         assertThat(all.stream().filter(check -> check.referenceFindings() > 0 && check.report() == null))
-                .as("되풀이를 억제한 깨우기")
-                .hasSize(1);
+            .as("되풀이를 억제한 깨우기")
+            .hasSize(1);
         assertThat(messagesOf(first).stream().filter(message -> message.role() == MessageRole.ASSISTANT))
-                .as("점검 대화의 답")
-                .hasSize(2);
+            .as("점검 대화의 답")
+            .hasSize(2);
         assertThat(notifications.findByUserIdOrderByCreatedAtDescIdDesc(owner.id(), PageRequest.of(0, 10)))
-                .as("깨우기는 실행 알림을 만들지 않는다")
-                .isEmpty();
+            .as("깨우기는 실행 알림을 만들지 않는다")
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("점검 대화를 읽거나 그 대화에 보내면 그 사용자의 그 대화 보고만 연 것으로 적는다")
     void marksOnlyReportsOfReadCheckConversationAsOpened() {
-        Conversation read =
-                conversations.save(Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
+        Conversation read = conversations.save(Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
         Agent otherAgent = agents.save(Agent.of(
-                agent.code() + "-b",
-                "공부",
-                agent.code() + "-b",
-                "http://agent-runtime.test/p/" + agent.code() + "-b",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                ENABLED_AT));
+            agent.code() + "-b",
+            "공부",
+            agent.code() + "-b",
+            "http://agent-runtime.test/p/" + agent.code() + "-b",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            ENABLED_AT));
         Conversation otherConversation = conversations.save(
-                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 공부", otherAgent.id(), ENABLED_AT));
+            Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 공부", otherAgent.id(), ENABLED_AT));
         AppUser otherUser = users.save(AppUser.of(
-                "pilot-other-" + UUID.randomUUID().toString().substring(0, 8) + "@example.com",
-                "사용자B",
-                1L,
-                UserRole.MEMBER,
-                ENABLED_AT));
+            "pilot-other-" + UUID.randomUUID().toString().substring(0, 8) + "@example.com",
+            "사용자B",
+            1L,
+            UserRole.MEMBER,
+            ENABLED_AT));
         Conversation otherUsers = conversations.save(
-                Conversation.startedForCheck(otherUser.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
+            Conversation.startedForCheck(otherUser.id(), "먼저 살펴보기 · 커리어", agent.id(), ENABLED_AT));
         ProactiveCheck mine = reported(owner.id(), agent.id(), read.id());
         ProactiveCheck mineEarlier = reported(owner.id(), agent.id(), read.id());
         ProactiveCheck otherConversationReport = reported(owner.id(), otherAgent.id(), otherConversation.id());
@@ -369,19 +371,19 @@ class CareerDailyPilotTest {
 
         assertThat(checks.findById(mine.id()).orElseThrow().reportOpenedAt()).isEqualTo(readAt);
         assertThat(checks.findById(mineEarlier.id()).orElseThrow().reportOpenedAt())
-                .isEqualTo(readAt);
+            .isEqualTo(readAt);
         assertThat(checks.findById(otherConversationReport.id()).orElseThrow().reportOpenedAt())
-                .as("같은 사용자의 다른 점검 대화")
-                .isNull();
+            .as("같은 사용자의 다른 점검 대화")
+            .isNull();
         assertThat(checks.findById(otherUserReport.id()).orElseThrow().reportOpenedAt())
-                .as("다른 사용자의 점검 대화")
-                .isNull();
+            .as("다른 사용자의 점검 대화")
+            .isNull();
 
         clock.set(readAt.plusSeconds(60));
         chat.history(owner, read.id());
         assertThat(checks.findById(mine.id()).orElseThrow().reportOpenedAt())
-                .as("다시 읽어도 첫 시각")
-                .isEqualTo(readAt);
+            .as("다시 읽어도 첫 시각")
+            .isEqualTo(readAt);
 
         ProactiveCheck later = reported(owner.id(), agent.id(), read.id());
         Instant sentAt = readAt.plus(Duration.ofHours(1));
@@ -389,32 +391,33 @@ class CareerDailyPilotTest {
         stub().willReturn(result("{\"version\":2,\"outcome\":\"NOTHING_NEW\"}"));
         chat.send(owner, read.id(), "이 공고는 관심 없어", null);
         assertThat(checks.findById(later.id()).orElseThrow().reportOpenedAt())
-                .as("점검 대화에 보낸 질문")
-                .isEqualTo(sentAt);
+            .as("점검 대화에 보낸 질문")
+            .isEqualTo(sentAt);
         assertThat(checks.findById(otherConversationReport.id()).orElseThrow().reportOpenedAt())
-                .as("보낸 뒤에도 다른 점검 대화")
-                .isNull();
+            .as("보낸 뒤에도 다른 점검 대화")
+            .isNull();
     }
+
 
     /** 끝난 살펴보기에 보고 하나를 붙여 저장한다. 정리 단계가 지운다. */
     private ProactiveCheck reported(Long userId, Long agentId, Long conversationId) {
-        ProactiveCheck check =
-                ProactiveCheck.started(userId, agentId, conversationId, CheckTrigger.SCHEDULED, false, ENABLED_AT);
+        ProactiveCheck check = ProactiveCheck.started(userId, agentId, conversationId, CheckTrigger.SCHEDULED, false, ENABLED_AT);
         check.succeed(
-                CheckOutcome.FINDINGS,
-                1,
-                0,
-                new CheckReport(List.of("새 포지션"), List.of(), List.of(POSITION_URL), List.of(), List.of()),
-                0,
-                0,
-                0,
-                0,
-                0,
-                ENABLED_AT.plusSeconds(60));
+            CheckOutcome.FINDINGS,
+            1,
+            0,
+            new CheckReport(List.of("새 포지션"), List.of(), List.of(POSITION_URL), List.of(), List.of()),
+            0,
+            0,
+            0,
+            0,
+            0,
+            ENABLED_AT.plusSeconds(60));
         ProactiveCheck saved = checks.save(check);
         createdChecks.add(saved.id());
         return saved;
     }
+
 
     /** 그날 예정 시각 30초 뒤에 깨우고, 살펴보기가 끝나면 1분 뒤 다시 돌려 발화 줄에 결과를 회복한다. */
     private ProactiveCheck wake(int day) {
@@ -426,10 +429,12 @@ class CareerDailyPilotTest {
         return checks.findById(check.id()).orElseThrow();
     }
 
+
     private void tickAt(Instant at) {
         clock.set(at);
         dispatcher.tick(at);
     }
+
 
     private ProactiveCheck awaitNewCheck(int before) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
@@ -454,71 +459,81 @@ class CareerDailyPilotTest {
         }
     }
 
+
     private void answerWith(Function<HermesRunCommand, HermesRunResult> answer) {
         stub().willAnswer(answer);
     }
 
+
     private TaskRun runOf(int day) {
         Instant scheduled = FIRST_WAKE.plus(Duration.ofDays(day - 1L));
         return runsOfAgent().stream()
-                .filter(run -> run.scheduledFor().equals(scheduled))
-                .findFirst()
-                .orElseThrow();
+            .filter(run -> run.scheduledFor().equals(scheduled))
+            .findFirst()
+            .orElseThrow();
     }
+
 
     private List<TaskRun> runsOfAgent() {
         return runs.findAll().stream()
-                .filter(run -> run.ownerUserId().equals(owner.id()))
-                .sorted(Comparator.comparing(TaskRun::id))
-                .toList();
+            .filter(run -> run.ownerUserId().equals(owner.id()))
+            .sorted(Comparator.comparing(TaskRun::id))
+            .toList();
     }
+
 
     private List<ProactiveCheck> checksOfAgent() {
         if (agent == null) {
             return List.of();
         }
         return checks.findAll().stream()
-                .filter(check -> check.agentId().equals(agent.id()))
-                .sorted(Comparator.comparing(ProactiveCheck::id))
-                .toList();
+            .filter(check -> check.agentId().equals(agent.id()))
+            .sorted(Comparator.comparing(ProactiveCheck::id))
+            .toList();
     }
+
 
     private List<ProactiveCheckFinding> findingsOf(ProactiveCheck check) {
         return findings.findAll().stream()
-                .filter(finding -> finding.checkId().equals(check.id()))
-                .toList();
+            .filter(finding -> finding.checkId().equals(check.id()))
+            .toList();
     }
+
 
     private List<ChatMessage> messagesOf(ProactiveCheck check) {
         return messages.findByConversationIdOrderByIdAsc(check.conversationId());
     }
 
+
     private ChatMessage lastMessage(ProactiveCheck check) {
         return messagesOf(check).getLast();
     }
+
 
     /** 확인 시각을 지금으로 둔 포지션 발견 하나와 v2 보고 초안이다. */
     private String positionFindings(String changeSinceLast) {
         String change = changeSinceLast == null ? "" : ",\"changeSinceLast\":\"" + changeSinceLast + "\"";
         return "{\"version\":2,\"outcome\":\"FINDINGS\",\"summary\":\"새 포지션을 찾았어요\",\"findings\":[{"
-                + "\"area\":\"position\",\"topicKey\":\"" + POSITION_KEY + "\",\"title\":\"예시 회사 백엔드 플랫폼\","
-                + "\"sourceUrl\":\"" + POSITION_URL + "\",\"checkedAt\":\"" + clock.instant() + "\","
-                + "\"freshness\":\"CURRENT\",\"whyItMatters\":\"선호한 플랫폼 역할과 맞아요\","
-                + "\"facts\":[\"공고가 열려 있다\"],\"next\":{\"type\":\"QUESTION\",\"text\":\"지원을 검토해 볼까요\"}"
-                + change + "}],\"report\":{\"changed\":[\"새 포지션 하나\"],\"done\":[\"공고 원문을 확인했다\"],"
-                + "\"next\":[\"지원 여부를 정한다\"]}}";
+            + "\"area\":\"position\",\"topicKey\":\"" + POSITION_KEY + "\",\"title\":\"예시 회사 백엔드 플랫폼\","
+            + "\"sourceUrl\":\"" + POSITION_URL + "\",\"checkedAt\":\"" + clock.instant() + "\","
+            + "\"freshness\":\"CURRENT\",\"whyItMatters\":\"선호한 플랫폼 역할과 맞아요\","
+            + "\"facts\":[\"공고가 열려 있다\"],\"next\":{\"type\":\"QUESTION\",\"text\":\"지원을 검토해 볼까요\"}"
+            + change + "}],\"report\":{\"changed\":[\"새 포지션 하나\"],\"done\":[\"공고 원문을 확인했다\"],"
+            + "\"next\":[\"지원 여부를 정한다\"]}}";
     }
+
 
     private static HermesRunResult result(String json) {
         return HermesRunResult.of(
-                "run-" + UUID.randomUUID(),
-                null,
-                "completed",
-                "블록 밖의 글\n<fos-check-result>\n" + json + "\n</fos-check-result>",
-                "model",
-                "provider",
-                TokenUsage.empty());
+            "run-" + UUID.randomUUID(),
+            null,
+            "completed",
+            "블록 밖의 글\n<fos-check-result>\n" + json + "\n</fos-check-result>",
+            "model",
+            "provider",
+            TokenUsage.empty());
     }
+
 
     private void cleanTasks() {
         runs.deleteAll();

@@ -11,7 +11,7 @@ import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.proactive.application.SurfacedProblems;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
@@ -38,9 +38,10 @@ public class SuggestionFeedback {
     private final ConnectorActionService actions;
     private final SurfacedProblems surfacedProblems;
 
+
     /** 제안이 아닌 항목이면 아무것도 하지 않는다. */
     public void controlled(
-            CurrentUser user, AttentionCandidate candidate, FeedbackEventType type, String reason, Instant now) {
+        CurrentUser user, AttentionCandidate candidate, FeedbackEventType type, String reason, Instant now) {
         FeedbackSubjectType subject = switch (candidate.trigger()) {
             case FOLLOW_UP_PROPOSED -> FeedbackSubjectType.FOLLOW_UP;
             case MEMORY_PROPOSED -> FeedbackSubjectType.MEMORY;
@@ -52,7 +53,7 @@ public class SuggestionFeedback {
             return;
         }
         FeedbackEntry base = FeedbackEntry.ofKey(user.id(), subject, candidate.itemKey(), type, FeedbackActor.USER, now)
-                .reason(reason);
+            .reason(reason);
         Optional<FeedbackEntry> entry;
         try {
             entry = withOrigin(user, subject, idOf(candidate.itemKey()), base);
@@ -63,33 +64,35 @@ public class SuggestionFeedback {
         entry.ifPresent(feedback::record);
     }
 
+
     /** 제안의 대화와 제안한 실행을 채운다. 판정이면 원천 점검 대화와 원천 살펴보기를 채운다. 원천을 모르면 지운 대화인지 가릴 수 없어 빈 값이다. */
     private Optional<FeedbackEntry> withOrigin(
-            CurrentUser user, FeedbackSubjectType subject, String id, FeedbackEntry base) {
+        CurrentUser user, FeedbackSubjectType subject, String id, FeedbackEntry base) {
         Optional<FeedbackEntry> filled = switch (subject) {
             case FOLLOW_UP ->
                 followUps.openAndProposedOf(user.id()).stream()
-                        .filter(followUp -> followUp.publicId().toString().equals(id))
-                        .findFirst()
-                        .map(FollowUpSnapshot::conversationId)
-                        .map(base::conversation);
+                    .filter(followUp -> followUp.publicId().toString().equals(id))
+                    .findFirst()
+                    .map(FollowUpSnapshot::conversationId)
+                    .map(base::conversation);
             case MEMORY ->
                 memories.proposalsOf(user).stream()
-                        .filter(memory -> memory.id().toString().equals(id))
-                        .findFirst()
-                        .map(Memory::proposedByExecutionId)
-                        .map(base::originExecution);
+                    .filter(memory -> memory.id().toString().equals(id))
+                    .findFirst()
+                    .map(Memory::proposedByExecutionId)
+                    .map(base::originExecution);
             case CONNECTOR_ACTION ->
                 actions.pendingApprovalsOf(user).stream()
-                        .filter(action -> action.actionId().equals(UUID.fromString(id)))
-                        .findFirst()
-                        .map(PendingApproval::conversationId)
-                        .map(base::conversation);
+                    .filter(action -> action.actionId().equals(UUID.fromString(id)))
+                    .findFirst()
+                    .map(PendingApproval::conversationId)
+                    .map(base::conversation);
             case AUTONOMY_DECISION -> surfacedProblems.withOrigin(user.id(), Long.valueOf(id), base);
             default -> Optional.empty();
         };
         return filled;
     }
+
 
     private static String idOf(String itemKey) {
         return itemKey.substring(itemKey.indexOf(':') + 1);
