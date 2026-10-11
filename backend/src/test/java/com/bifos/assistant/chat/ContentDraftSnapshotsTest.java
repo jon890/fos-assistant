@@ -90,6 +90,8 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     HermesConnectorClient catalog;
     @Autowired
     HttpContentDraftSnapshotClient compiler;
+    @Autowired
+    com.bifos.assistant.connector.application.ConnectorCatalogCache cache;
     ConnectorBinding binding;
     AgentExecution origin;
     AllowedPerson person;
@@ -179,7 +181,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(preview().snapshotId()).isEqualTo(first.snapshotId());
         assertThat(snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()).preview().title()).isEqualTo("비밀 원고 😀");
         assertThat(first.assetIds()).containsExactly(photo.id().toString());
-        assertThat(json.writeValueAsString(first)).doesNotContain("photo_dir", "fileName", "storedName", "payload", properties.agentRoot());
+        assertThat(json.writeValueAsString(first)).doesNotContain("photo_dir", "fileName", "storedName", "payload", "authorizationFingerprint", properties.agentRoot());
         assertThat(snapshotRows.count()).isEqualTo(1);
         assertThat(jobRows.count()).isZero();
         assertThat(revisionRows.findAll()).allSatisfy(row -> assertThat(row.body()).startsWith("v1.").doesNotContain("비밀"));
@@ -334,6 +336,118 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         clock.set(row.expiresAt());
         code(() -> snapshots.readCurrentSnapshot(owner, conversation.id(), row.snapshotId()), ErrorCode.CONTENT_DRAFT_GONE);
         assertThat(snapshotRows.count()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("유효 binding 판 변경은 옛 행을 보존하고 같은 revision에 새 preview를 만든다")
+    void recoversAfterBindingStampChange() {
+        recoversAfterChange(() -> jdbc.update("update agent_connector_binding set updated_at=? where id=?", NOW.plusSeconds(1), binding.id()),
+            ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
+    }
+
+
+    @Test
+    @DisplayName("유효 connection 판 변경은 옛 행을 보존하고 같은 revision에 새 preview를 만든다")
+    void recoversAfterConnectionStampChange() {
+        recoversAfterChange(() -> jdbc.update("update connector_connection set updated_at=? where id=?", NOW.plusSeconds(1), binding.connection().id()),
+            ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
+    }
+
+
+    @Test
+    @DisplayName("catalog 정책 변경 뒤 참가 호출자는 밖에서 준비한 stamp를 명시 대조한다")
+    void recoversAfterPolicyChangeAndRequiresCallerComparison() throws Exception {
+        var first = preview();
+        var prepared = bindingAccess.prepare(owner, binding.agent().id(), binding.id());
+        when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test", List.of(),
+            false, 1, List.of(), List.of(), null, false, false, null, null, null,
+            new ConnectorSnapshotDeclaration("content-snapshot-v1", "compile_changed", "start_snapshot", "status_snapshot",
+                Map.of("compile", true, "start", false, "status", false)))));
+        var field = cache.getClass().getDeclaredField("readAt");
+        field.setAccessible(true);
+        field.set(cache, null);
+        var fresh = bindingAccess.prepare(owner, binding.agent().id(), binding.id());
+        var input = mutations.run(owner.id(), new ChatContentMutationTarget(conversation.id(), List.of()),
+            () -> snapshots.requireCurrentSnapshotParticipant(owner, conversation.id(), first.snapshotId()));
+        assertThat(input.binding()).isEqualTo(prepared).isNotEqualTo(fresh);
+        assertThatThrownBy(() -> {
+            if (!fresh.equals(input.binding())) {
+                throw ContentDraftSnapshotInputs.stale();
+            }
+        }).isInstanceOf(com.bifos.assistant.chat.domain.ContentDraftException.class);
+        assertRecovered(first, ErrorCode.CONTENT_DRAFT_STALE);
+    }
+
+
+    @Test
+    @DisplayName("새 유효 origin은 새 UUID를 만들고 취소된 origin은 계속 거절한다")
+    void recoversWithNewOriginAfterCancellation() {
+        var first = preview();
+        var old = history(first.snapshotId());
+        var next = executions.save(AgentExecution.builder().userId(owner.id()).conversationId(conversation.id()).agentId(binding.agent().id())
+            .profileName(origin.profileName()).costMode(CostMode.SUBSCRIPTION).status(ExecutionStatus.RUNNING).startedAt(NOW.plusSeconds(1)).build());
+        try {
+            jdbc.update("update agent_execution set status='CANCELLED' where id=?", origin.id());
+            code(this::preview, ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
+            code(() -> snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()), ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
+            var second = snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), next.id());
+            assertThat(second.snapshotId()).isNotEqualTo(first.snapshotId());
+            assertThat(second.snapshotHash()).isEqualTo(first.snapshotHash());
+            assertThat(snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), next.id()).snapshotId()).isEqualTo(second.snapshotId());
+            assertThat(snapshots.readCurrentSnapshot(owner, conversation.id(), second.snapshotId())).isEqualTo(second);
+            assertThat(snapshotRows.count()).isEqualTo(2);
+            assertThat(history(first.snapshotId())).isEqualTo(old);
+        } finally {
+            executions.deleteById(next.id());
+        }
+    }
+
+
+    @Test
+    @DisplayName("저장된 권한 지문 변조는 실제 캡처 값 재계산에서 거절한다")
+    void rejectsTamperedAuthorizationFingerprint() {
+        var first = preview();
+        for (String field : List.of("origin_execution_id", "agent_id")) {
+            jdbc.update("update content_draft_snapshot set " + field + "=" + field + "+10000");
+            try {
+                code(this::preview, ErrorCode.CONTENT_DRAFT_STALE);
+            } finally {
+                jdbc.update("update content_draft_snapshot set " + field + "=" + field + "-10000");
+            }
+        }
+        jdbc.update("update content_draft_snapshot set authorization_fingerprint=?", "f".repeat(64));
+        code(() -> snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()), ErrorCode.CONTENT_DRAFT_STALE);
+        assertThat(snapshotRows.count()).isEqualTo(1);
+    }
+
+
+    private void recoversAfterChange(Runnable change, ErrorCode oldError) {
+        var first = preview();
+        change.run();
+        assertRecovered(first, oldError);
+    }
+
+
+    private void assertRecovered(ContentDraftSnapshotView first, ErrorCode oldError) {
+        var old = history(first.snapshotId());
+        code(() -> snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()), oldError);
+        var second = preview();
+        assertThat(second.snapshotId()).isNotEqualTo(first.snapshotId());
+        assertThat(second.snapshotHash()).isEqualTo(first.snapshotHash());
+        assertThat(preview().snapshotId()).isEqualTo(second.snapshotId());
+        assertThat(snapshots.readCurrentSnapshot(owner, conversation.id(), second.snapshotId())).isEqualTo(second);
+        assertThat(snapshotRows.count()).isEqualTo(2);
+        assertThat(history(first.snapshotId())).isEqualTo(old);
+        code(() -> snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()), oldError);
+    }
+
+
+    private Map<String, Object> history(UUID snapshotId) {
+        var id = snapshotRows.findByPublicIdAndOwnerUserIdAndConversationId(snapshotId, owner.id(), conversation.id()).orElseThrow().id();
+        var values = jdbc.queryForMap("select * from content_draft_snapshot where id=?", id);
+        values.replaceAll((key, value) -> value instanceof byte[] bytes ? java.util.HexFormat.of().formatHex(bytes) : value);
+        return values;
     }
 
 

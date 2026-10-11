@@ -15,11 +15,12 @@ CREATE TABLE content_draft_snapshot (
     compiler_version VARCHAR(32) NOT NULL,
     payload_fingerprint CHAR(64) NOT NULL,
     snapshot_hash CHAR(64) NOT NULL,
+    authorization_fingerprint CHAR(64) NOT NULL,
     created_at DATETIME(6) NOT NULL,
     expires_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_content_snapshot_public (public_id),
-    UNIQUE KEY uk_content_snapshot_revision_binding_hash (revision_id, binding_id, snapshot_hash),
+    UNIQUE KEY uk_content_snapshot_revision_binding_hash (revision_id, binding_id, snapshot_hash, authorization_fingerprint),
     KEY idx_content_draft_snapshot_owner_conversation (owner_user_id, conversation_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 

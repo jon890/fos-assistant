@@ -9,5 +9,5 @@ public interface ContentDraftSnapshotRepository extends JpaRepository<ContentDra
     Optional<ContentDraftSnapshot> findByPublicIdAndOwnerUserIdAndConversationId(UUID publicId, Long ownerUserId, Long conversationId);
 
 
-    Optional<ContentDraftSnapshot> findByRevisionIdAndBindingIdAndSnapshotHashAndOwnerUserIdAndConversationId(Long revisionId, Long bindingId, String snapshotHash, Long ownerUserId, Long conversationId);
+    Optional<ContentDraftSnapshot> findByRevisionIdAndBindingIdAndSnapshotHashAndAuthorizationFingerprintAndOwnerUserIdAndConversationId(Long revisionId, Long bindingId, String snapshotHash, String authorizationFingerprint, Long ownerUserId, Long conversationId);
 }

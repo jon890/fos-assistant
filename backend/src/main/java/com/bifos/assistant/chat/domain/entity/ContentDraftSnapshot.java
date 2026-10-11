@@ -18,7 +18,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "content_draft_snapshot", uniqueConstraints = {
     @UniqueConstraint(name = "uk_content_snapshot_public", columnNames = "public_id"),
-    @UniqueConstraint(name = "uk_content_snapshot_revision_binding_hash", columnNames = {"revision_id", "binding_id", "snapshot_hash"})
+    @UniqueConstraint(name = "uk_content_snapshot_revision_binding_hash", columnNames = {"revision_id", "binding_id", "snapshot_hash", "authorization_fingerprint"})
 })
 @Getter
 @Accessors(fluent = true)
@@ -73,6 +73,9 @@ public class ContentDraftSnapshot {
     @Column(name = "snapshot_hash", nullable = false, columnDefinition = "CHAR(64)")
     private String snapshotHash;
 
+    @Column(name = "authorization_fingerprint", nullable = false, columnDefinition = "CHAR(64)")
+    private String authorizationFingerprint;
+
     @Column(name = "created_at", nullable = false, columnDefinition = "DATETIME(6)")
     private Instant createdAt;
 
@@ -80,7 +83,7 @@ public class ContentDraftSnapshot {
     private Instant expiresAt;
 
 
-    public ContentDraftSnapshot(UUID publicId, Long revisionId, Long ownerUserId, Long conversationId, Long originExecutionId, Long agentId, Long connectionId, Long bindingId, Instant connectionUpdatedAt, Instant bindingUpdatedAt, String policyFingerprint, int schemaVersion, String compilerVersion, String payloadFingerprint, String snapshotHash, Instant createdAt, Instant expiresAt) {
+    public ContentDraftSnapshot(UUID publicId, Long revisionId, Long ownerUserId, Long conversationId, Long originExecutionId, Long agentId, Long connectionId, Long bindingId, Instant connectionUpdatedAt, Instant bindingUpdatedAt, String policyFingerprint, int schemaVersion, String compilerVersion, String payloadFingerprint, String snapshotHash, String authorizationFingerprint, Instant createdAt, Instant expiresAt) {
         this.publicId = publicId;
         this.revisionId = revisionId;
         this.ownerUserId = ownerUserId;
@@ -96,6 +99,7 @@ public class ContentDraftSnapshot {
         this.compilerVersion = compilerVersion;
         this.payloadFingerprint = payloadFingerprint;
         this.snapshotHash = snapshotHash;
+        this.authorizationFingerprint = authorizationFingerprint;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
     }

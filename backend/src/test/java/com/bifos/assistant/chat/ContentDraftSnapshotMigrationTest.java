@@ -93,17 +93,29 @@ class ContentDraftSnapshotMigrationTest {
         }
         execute(snapshot(1, 1, 1));
         execute(job(1, 1, 1));
-        for (String key : Set.of("public_id", "revision_id", "owner_user_id", "conversation_id", "origin_execution_id", "binding_id", "policy_fingerprint")) {
+        for (String key : Set.of("public_id", "revision_id", "owner_user_id", "conversation_id", "origin_execution_id", "binding_id", "policy_fingerprint", "authorization_fingerprint")) {
             assertThatThrownBy(() -> execute("update content_draft_snapshot set " + key + "=null where id=1")).isInstanceOf(SQLException.class);
         }
     }
 
 
+    @Test
+    @DisplayName("같은 revision binding hash의 새 권한 판만 별도 행으로 저장한다")
+    void includesAuthorizationInUniqueIdentity() throws Exception {
+        execute(snapshot(1, 1, 1));
+        var nextAuthorization = snapshot(2, 1, 1).replace("d".repeat(64), "e".repeat(64));
+        execute(nextAuthorization);
+        assertThatThrownBy(() -> execute(snapshot(3, 1, 1).replace("d".repeat(64), "e".repeat(64))))
+            .isInstanceOf(SQLException.class);
+        assertThat(count("content_draft_snapshot")).isEqualTo(2);
+    }
+
+
     private String snapshot(int id, int revisionId, int bindingId) {
-        return "insert into content_draft_snapshot(id,public_id,revision_id,owner_user_id,conversation_id,origin_execution_id,agent_id,connection_id,binding_id,connection_updated_at,binding_updated_at,policy_fingerprint,schema_version,compiler_version,payload_fingerprint,snapshot_hash,created_at,expires_at) values("
+        return "insert into content_draft_snapshot(id,public_id,revision_id,owner_user_id,conversation_id,origin_execution_id,agent_id,connection_id,binding_id,connection_updated_at,binding_updated_at,policy_fingerprint,schema_version,compiler_version,payload_fingerprint,snapshot_hash,authorization_fingerprint,created_at,expires_at) values("
             + id + ",X'" + String.format("%032x", id) + "'," + revisionId + ",1,1,1,1,1," + bindingId
             + ",CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'" + "a".repeat(64) + "',1,'content-compiler-v1','" + "b".repeat(64)
-            + "','" + "c".repeat(64) + "',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)";
+            + "','" + "c".repeat(64) + "','" + "d".repeat(64) + "',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)";
     }
 
 

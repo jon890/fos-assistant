@@ -71,8 +71,9 @@ public class ContentDraftSnapshots {
                 || !now.canonicalDraft().equals(before.canonicalDraft()) || !now.resolvedAssets().equals(before.resolvedAssets())) {
                 throw ContentDraftSnapshotInputs.stale();
             }
-            var row = snapshots.findByRevisionIdAndBindingIdAndSnapshotHashAndOwnerUserIdAndConversationId(
-                now.revisionId(), now.binding().bindingId(), result.path("snapshotHash").stringValue(), user.id(), conversationId).orElse(null);
+            var authorization = ContentDraftAuthorizationHash.fingerprint(user.id(), conversationId, now);
+            var row = snapshots.findByRevisionIdAndBindingIdAndSnapshotHashAndAuthorizationFingerprintAndOwnerUserIdAndConversationId(
+                now.revisionId(), now.binding().bindingId(), result.path("snapshotHash").stringValue(), authorization, user.id(), conversationId).orElse(null);
             if (row == null) {
                 if (!insert) {
                     throw ContentDraftSnapshotHash.unavailable();
@@ -81,9 +82,12 @@ public class ContentDraftSnapshots {
                 row = snapshots.saveAndFlush(new ContentDraftSnapshot(UUID.randomUUID(), now.revisionId(), user.id(), conversationId,
                     now.originExecutionId(), stamp.agentId(), stamp.connectionId(), stamp.bindingId(), stamp.connectionUpdatedAt(), stamp.bindingUpdatedAt(),
                     stamp.policyFingerprint(), 1, "content-compiler-v1", result.path("payloadFingerprint").stringValue(),
-                    result.path("snapshotHash").stringValue(), clock.instant().truncatedTo(ChronoUnit.MICROS), now.expiresAt()));
+                    result.path("snapshotHash").stringValue(), authorization, clock.instant().truncatedTo(ChronoUnit.MICROS), now.expiresAt()));
             }
             requireStamp(row, now.binding());
+            if (!row.originExecutionId().equals(now.originExecutionId()) || !row.expiresAt().equals(now.expiresAt())) {
+                throw ContentDraftSnapshotInputs.stale();
+            }
             inputs.agent(user, conversationId, row.originExecutionId());
             return view(row, now);
         });
@@ -102,6 +106,10 @@ public class ContentDraftSnapshots {
     }
 
 
+    /**
+     * DB 권한과 캡처 원본을 검사한다. 호출자는 트랜잭션 밖에서 준비한 정책 포함 stamp를 반환 binding과
+     * 명시적으로 대조한 뒤 사용해야 한다. 이 참가 함수는 현재 catalog를 조회하지 않는다.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public ContentDraftSnapshotInput requireCurrentSnapshotParticipant(CurrentUser user, Long conversationId, UUID snapshotId) {
         mutations.requireParticipant(conversationId);
@@ -116,7 +124,8 @@ public class ContentDraftSnapshots {
         var input = current(user, conversationId, UUID.fromString(draft.publicId()), revision.revision(), row.originExecutionId(), stamp);
         var result = ContentDraftSnapshotHash.compile(input.canonicalDraft(), input.resolvedAssets());
         if (!row.expiresAt().isAfter(clock.instant()) || !row.snapshotHash().equals(result.path("snapshotHash").stringValue())
-            || !row.payloadFingerprint().equals(result.path("payloadFingerprint").stringValue())) {
+            || !row.payloadFingerprint().equals(result.path("payloadFingerprint").stringValue())
+            || !row.authorizationFingerprint().equals(ContentDraftAuthorizationHash.fingerprint(user.id(), conversationId, input))) {
             throw ContentDraftSnapshotInputs.stale();
         }
         return new ContentDraftSnapshotInput(row.publicId(), input.revisionId(), input.originExecutionId(), stamp,
@@ -140,7 +149,8 @@ public class ContentDraftSnapshots {
 
 
     private static void requireStamp(ContentDraftSnapshot row, ContentDraftBindingStamp stamp) {
-        if (!row.connectionId().equals(stamp.connectionId()) || !row.bindingUpdatedAt().equals(stamp.bindingUpdatedAt())
+        if (!row.agentId().equals(stamp.agentId()) || !row.bindingId().equals(stamp.bindingId())
+            || !row.connectionId().equals(stamp.connectionId()) || !row.bindingUpdatedAt().equals(stamp.bindingUpdatedAt())
             || !row.connectionUpdatedAt().equals(stamp.connectionUpdatedAt()) || !row.policyFingerprint().equals(stamp.policyFingerprint())) {
             throw ContentDraftSnapshotInputs.stale();
         }
