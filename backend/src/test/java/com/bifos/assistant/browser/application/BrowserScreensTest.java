@@ -52,6 +52,7 @@ class BrowserScreensTest {
     private UserBrowserSweeper sweeper;
     private FakeBrowserRuntime runtime;
 
+
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM user_browser");
@@ -61,15 +62,16 @@ class BrowserScreensTest {
         screens = new BrowserScreens(cdp, cdp, usage, () -> Duration.ofMinutes(30), Duration.ofHours(1));
         runtime = new FakeBrowserRuntime();
         service = service(repository);
-        sweeper =
-                new UserBrowserSweeper(service, screens, repository, runtime, usage, userId -> true, Clock.systemUTC());
+        sweeper = new UserBrowserSweeper(service, screens, repository, runtime, usage, userId -> true, Clock.systemUTC());
     }
+
 
     @AfterEach
     void tearDown() {
         screens.close();
         jdbc.update("DELETE FROM user_browser");
     }
+
 
     @Test
     @DisplayName("같은 브라우저에 두 번째 화면을 열면 첫 화면에 replaced 를 보내고 닫는다")
@@ -87,6 +89,7 @@ class BrowserScreensTest {
         assertThat(usage.inUse(1L)).isTrue();
     }
 
+
     @Test
     @DisplayName("열린 화면이 없거나 남의 화면만 있으면 입력은 BROWSER_SCREEN_CLOSED 다")
     void rejectsInputWithoutOwnScreen() {
@@ -94,13 +97,14 @@ class BrowserScreensTest {
         BrowserScreenInput reload = new BrowserScreenInput(Kind.RELOAD, null, 0, 0, 0, null, null, null, null, 0, 0);
 
         assertThatThrownBy(() -> screens.input(202L, reload))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_SCREEN_CLOSED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_SCREEN_CLOSED));
         assertThat(cdp.sent("Page.reload")).isEmpty();
 
         screens.input(201L, reload);
         assertThat(cdp.sent("Page.reload")).hasSize(1);
     }
+
 
     @Test
     @DisplayName("탭에 붙지 못하면 BROWSER_START_FAILED 이고 사용 핸들을 남기지 않는다")
@@ -108,11 +112,12 @@ class BrowserScreensTest {
         cdp.failConnect = true;
 
         assertThatThrownBy(() -> screens.open(1L, 201L, CDP, null, new RecordingScreenSink()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_START_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.BROWSER_START_FAILED));
         assertThat(screens.isOpen(1L)).isFalse();
         assertThat(usage.inUse(1L)).isFalse();
     }
+
 
     @Test
     @DisplayName("화면을 열면 브라우저를 켜고, 끄면 화면에 stopped 를 보내고 닫는다")
@@ -132,6 +137,7 @@ class BrowserScreensTest {
         assertThat(usage.inUse(id)).isFalse();
     }
 
+
     @Test
     @DisplayName("화면이 열려 있으면 유휴 시간이 지나도 자동 중지하지 않고 화면이 닫히면 멈춘다")
     void keepsBrowserWhileScreenIsOpen() {
@@ -148,6 +154,7 @@ class BrowserScreensTest {
         assertThat(status(201L)).isEqualTo(UserBrowserStatus.STOPPED);
     }
 
+
     @Test
     @DisplayName("화면을 열 때 활동 기록이 실패하면 화면을 열지 않고 사용 핸들도 남기지 않는다")
     void opensNoScreenWhenTouchFails() {
@@ -156,15 +163,16 @@ class BrowserScreensTest {
         ageActivity(id, Duration.ofMinutes(2));
         UserBrowserRepository failing = mock(UserBrowserRepository.class, AdditionalAnswers.delegatesTo(repository));
         doThrow(new DataAccessResourceFailureException("database is down"))
-                .when(failing)
-                .save(any());
+            .when(failing)
+            .save(any());
 
         assertThatThrownBy(() -> service(failing).openScreen(201L, null, new RecordingScreenSink()))
-                .isInstanceOf(DataAccessResourceFailureException.class);
+            .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(screens.isOpen(id)).isFalse();
         assertThat(usage.inUse(id)).isFalse();
         assertThat(cdp.attached).isEmpty();
     }
+
 
     @Test
     @DisplayName("상태 맞추기가 컨테이너가 사라진 RUNNING 을 STOPPED 로 되돌리면 그 화면에 stopped 를 보내고 닫는다")
@@ -173,9 +181,9 @@ class BrowserScreensTest {
         RecordingScreenSink sink = new RecordingScreenSink();
         service.openScreen(201L, null, sink);
         jdbc.update(
-                "UPDATE user_browser SET updated_at = ? WHERE id = ?",
-                Timestamp.from(Instant.now().minus(Duration.ofMinutes(1))),
-                id);
+            "UPDATE user_browser SET updated_at = ? WHERE id = ?",
+            Timestamp.from(Instant.now().minus(Duration.ofMinutes(1))),
+            id);
         runtime.containers().clear();
 
         sweeper.reconcile();
@@ -186,49 +194,54 @@ class BrowserScreensTest {
         assertThat(usage.inUse(id)).isFalse();
     }
 
+
     private UserBrowserService service(UserBrowserRepository browsers) {
-        return new UserBrowserService(
-                browsers,
-                runtime,
-                profiles(),
-                address -> true,
-                LiveProperties.fixed(BrowserProperties.class, properties()),
-                Clock.systemUTC(),
-                screens);
+        return UserBrowserServiceTestFactory.create(
+            browsers,
+            runtime,
+            profiles(),
+            address -> true,
+            LiveProperties.fixed(BrowserProperties.class, properties()),
+            Clock.systemUTC(),
+            screens);
     }
+
 
     private UserBrowserStatus status(Long userId) {
         return repository.findByUserId(userId).orElseThrow().status();
     }
 
+
     private void ageActivity(Long id, Duration age) {
         jdbc.update(
-                "UPDATE user_browser SET last_active_at = ? WHERE id = ?",
-                Timestamp.from(Instant.now().minus(age)),
-                id);
+            "UPDATE user_browser SET last_active_at = ? WHERE id = ?",
+            Timestamp.from(Instant.now().minus(age)),
+            id);
     }
+
 
     private static BrowserProperties properties() {
         return new BrowserProperties(
-                true,
-                "https://browser-proxy.example.test",
-                "example/browser:test",
-                "example-browser",
-                9999,
-                "build/unused",
-                "/example/browser-profiles",
-                "/example/profile",
-                512,
-                1.0,
-                256,
-                128,
-                5,
-                Duration.ofMinutes(10),
-                Duration.ofMillis(100),
-                Duration.ofMinutes(30),
-                null,
-                null);
+            true,
+            "https://browser-proxy.example.test",
+            "example/browser:test",
+            "example-browser",
+            9999,
+            "build/unused",
+            "/example/browser-profiles",
+            "/example/profile",
+            512,
+            1.0,
+            256,
+            128,
+            5,
+            Duration.ofMinutes(10),
+            Duration.ofMillis(100),
+            Duration.ofMinutes(30),
+            null,
+            null);
     }
+
 
     private static BrowserProfileStore profiles() {
         return new BrowserProfileStore() {
@@ -236,6 +249,7 @@ class BrowserScreensTest {
             public void ensure(String profileKey) {
                 // 검사는 디렉터리를 만들지 않는다
             }
+
 
             @Override
             public void delete(String profileKey) {

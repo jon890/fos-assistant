@@ -510,7 +510,11 @@ HTTP 뒤 DB 상태를 다시 확인한다. 철회·재설치·카탈로그 변�
 바인딩 revision과 설치 시도 번호는 소비자 wire에 추가하지 않는다.
 
 이 응답은 현재 요청의 지원 확인이며 거래 권한이 아니다. READY나 verified만으로 금융 snapshot 없는
-승인 줄을 실행하지 않는다. guard를 실은 설치 호출은 아직 연결하지 않았으며 후속 구현이 맡는다.
+승인 줄을 실행하지 않는다. 설치 시작 트랜잭션이 검증한 protocol과 전체 SHA를 불변 입력에 캡처해
+기존 여섯 칸의 `bind.guard`에 전달한다. 선언이 없는 일반 설치는 기존 5인자 호출을 유지하고 잘못된 선언은 거절한다.
+PENDING 설치 callback의 `409/pending`은 실패나 READY의 필수 조건으로 바꾸지 않는다.
+설치·상태·probe 결과를 현재 시도의 CAS로 READY에 저장한 뒤 새 nonce로 verified를 확인한다.
+옛 backend의 401·403·404와 guard 누락, SHA·nonce 불일치 및 재시작 뒤 확인 실패는 이전 verified를 되살리지 못한다.
 금융 승인 hook과 주문 producer가 없으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
 DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
 

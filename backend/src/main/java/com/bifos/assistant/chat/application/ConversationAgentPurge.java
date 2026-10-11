@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.application;
 
-import com.bifos.assistant.agent.application.AgentPurgeParticipant;
+import com.bifos.assistant.agent.purge.application.AgentPurgeParticipant;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -20,10 +20,12 @@ class ConversationAgentPurge implements AgentPurgeParticipant {
 
     private final ConversationRepository conversations;
 
+
     @Override
     public boolean blocksPurge(Long agentId) {
         return conversations.existsByAgentIdAndDeletedAtIsNotNullAndPurgedAtIsNull(agentId);
     }
+
 
     @Override
     public void release(Long agentId) {
