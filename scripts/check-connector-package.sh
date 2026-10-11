@@ -9,6 +9,7 @@ work="$(mktemp -d "${TMPDIR:-/tmp}/connector-package.XXXXXX")"
 image="fos-connector-package-check:$(basename "$work" | tr '[:upper:]' '[:lower:]')"
 container=""
 connectors=()
+success=false
 cleanup() {
   if [ -n "$container" ]; then docker rm "$container" >/dev/null 2>&1 || true; fi
   docker image rm "$image" >/dev/null 2>&1 || true
@@ -16,7 +17,7 @@ cleanup() {
     local entry="hermes/connectors/$id/dist/$id-mcp.js"
     if [ -f "$work/original/$id" ]; then
       cp -p "$work/original/$id" "$entry"
-    else
+    elif [ "$success" = false ]; then
       rm -f "$entry"
     fi
   done
@@ -43,11 +44,15 @@ bun run hermes/connectors/package.ts verify "$work/bundle" "$sha"
 for id in "${connectors[@]}"; do
   mkdir -p "hermes/connectors/$id/dist"
   cp -p "$work/bundle/hermes/connectors/$id/dist/$id-mcp.js" "hermes/connectors/$id/dist/$id-mcp.js"
-  git diff --exit-code -- "hermes/connectors/$id/dist/$id-mcp.js"
 done
-# 기존 HTTP 대역과 check:bundle로 Docker와 runner의 바이트 동일성도 확인한다.
+# 소스에서 entry를 다시 빌드한 뒤 기존 HTTP 대역과 재현성을 검사한다.
 bash scripts/check-connectors.sh
+for id in "${connectors[@]}"; do
+  cmp "$work/bundle/hermes/connectors/$id/dist/$id-mcp.js" "hermes/connectors/$id/dist/$id-mcp.js"
+done
 bun run hermes/connectors/package.ts build "$work/runner" "$sha"
 bun run hermes/connectors/package.ts verify "$work/runner" "$sha"
 diff -r "$work/bundle" "$work/runner"
-echo "Docker와 runner의 전체 묶음, 추적 entry의 바이트가 일치했다"
+# 새 checkout의 후속 Hermes 검사가 실행할 entry를 남긴다. 실패 때는 원래 상태로 돌린다.
+success=true
+echo "Docker와 runner의 전체 묶음, 소스에서 재빌드한 entry의 바이트가 일치했다"

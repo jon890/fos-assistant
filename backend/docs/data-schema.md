@@ -537,6 +537,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 연결의 `status` 는 「값이 확인돼 쓸 수 있는가」 이고, 바인딩의 `status` 는 「그 에이전트의 profile 에 설치되고 반영됐는가」 다. 바인딩의 `desired_enabled` 가 참이어도 반영 확인 전에는 `PENDING` 이다.
 
 - `mcp_server` 는 붙일 때 manifest 가 선언한 MCP 서버 이름이다. 운영자가 카탈로그에서 커넥터를 빼도 그 profile 에 설치된 서버 이름을 잃지 않게 둔다. 마이그레이션이 만든 옛 바인딩은 비어 있고 연결 확인과 관리자 반영 완료가 채운다
+- `install_attempt_id`는 nullable `BINARY(16)` UUID다. 설치 시작을 커밋할 때 새 값으로 바꾸고 현재 시도의 결과만 한 번 적용한 뒤 비운다. 기존 행은 null로 유지하며 상태를 바꾸거나 값을 채우는 마이그레이션은 하지 않는다
 - `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치 시각이고, 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
 - 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 옛 커넥터 에이전트의 바인딩만 그 에이전트를 켜고 끈다
