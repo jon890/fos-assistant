@@ -1,4 +1,5 @@
 """실제 자식 프로세스의 timeout·권한 거절과 pipe·슬롯 회수를 확인한다."""
+import errno
 import importlib
 import io
 import json
@@ -134,7 +135,7 @@ class ImageSupervisorTest(unittest.TestCase):
         while time.monotonic() < deadline:
             try:
                 stat = proc.read_text()
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 return
             # comm에는 공백과 괄호가 들어갈 수 있어 마지막 닫는 괄호 뒤에서 상태를 읽는다.
             if stat.rsplit(")", 1)[1].split()[0] == "Z":
@@ -143,12 +144,12 @@ class ImageSupervisorTest(unittest.TestCase):
         self.fail("helper remained active after parent exit")
 
     def test_process_disappearing_at_stat_read_counts_as_stopped(self):
-        proc = Mock(spec=Path)
-        proc.exists.return_value = True
-        self.assertTrue(proc.exists())
-        proc.read_text.side_effect = FileNotFoundError("process exited before read")
-        self.assert_process_stopped(proc, time.monotonic() + 3)
-        proc.read_text.assert_called_once_with()
+        for error_number in (errno.ENOENT, errno.ESRCH):
+            with self.subTest(errno=error_number):
+                proc = Mock(spec=Path)
+                proc.read_text.side_effect = OSError(error_number, os.strerror(error_number))
+                self.assert_process_stopped(proc, time.monotonic() + 3)
+                proc.read_text.assert_called_once_with()
 
     def test_process_state_after_comm_with_spaces_and_parentheses_is_polled(self):
         proc = Mock(spec=Path)
@@ -168,7 +169,7 @@ class ImageSupervisorTest(unittest.TestCase):
         sleep.assert_called_once_with(.01)
 
     def test_process_stat_unexpected_read_errors_propagate(self):
-        for error in (PermissionError("denied"), OSError("unexpected I/O error")):
+        for error in (PermissionError(errno.EACCES, "denied"), OSError(errno.EIO, "unexpected I/O error")):
             with self.subTest(error=type(error).__name__):
                 proc = Mock(spec=Path)
                 proc.read_text.side_effect = error
