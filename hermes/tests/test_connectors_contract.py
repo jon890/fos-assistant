@@ -192,6 +192,16 @@ class ConnectorsContractTest(base.ConnectorGateCase):
             with self.subTest(connector=root.name):
                 self.assertEqual(check_connector(root, REPO, self.plugin._load_connector), [])
 
+    def test_bundled_readme_links_survive_manifest_loading(self):
+        for name in ("gmail", "naver-blog"):
+            root = CONNECTORS / name
+            with self.subTest(connector=name):
+                loaded = self.plugin._load_connector(name, {"root": root, "command": sys.executable, "env": {}})
+                self.assertEqual(loaded["readme_url"], "https://github.com/jon890/fos-assistant/blob/main/hermes/connectors/%s/README.md" % name)
+                self.assertTrue((root / "README.md").is_file())
+                self.assertEqual(loaded["link_kind"], "service")
+                self.assertEqual(loaded["link"], read_json(root / "connector.json")["link"])
+
     def test_connector_skills_do_not_request_secrets(self):
         """커넥터 스킬은 앞머리로 비밀값을 요청하지 않는다(ADR-086).
 
