@@ -124,8 +124,8 @@ public class ConnectorBindingApplier {
      */
     private ConnectorBindingAttempt applyDueLocked(DueBinding due, List<ConnectorManifest> catalog) {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
-        boolean target = users.findByIdForUpdate(due.userId()).isPresent()
-            && agents.findByIdForUpdate(due.agentId())
+        service.lockOwner(due.userId());
+        boolean target = agents.findByIdForUpdate(due.agentId())
                 .filter(candidate -> !candidate.isDeleted())
                 .filter(candidate -> Objects.equals(candidate.ownerUserId(), due.userId()))
                 .isPresent();
@@ -265,9 +265,8 @@ public class ConnectorBindingApplier {
      */
     private Drifted resyncDriftedLocked(ReadyBinding candidate, int streak, List<ConnectorManifest> catalog) {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
-        AppUser owner = users.findByIdForUpdate(candidate.userId()).orElse(null);
-        boolean target = owner != null
-            && agents.findByIdForUpdate(candidate.agentId())
+        AppUser owner = service.lockOwner(candidate.userId());
+        boolean target = agents.findByIdForUpdate(candidate.agentId())
                 .filter(found -> !found.isDeleted())
                 .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
                 .isPresent();

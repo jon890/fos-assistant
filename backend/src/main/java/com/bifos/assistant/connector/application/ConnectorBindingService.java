@@ -322,6 +322,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         if (owner == null || !owner.groupId().equals(admin.groupId())) {
             throw agentNotFound();
         }
+        attempts.lockOwner(ownerId);
         ConnectorConnection connection = connections
             .findByUserIdAndConnectorId(ownerId, connectorId)
             .orElseThrow(ConnectorBindingService::notBound);

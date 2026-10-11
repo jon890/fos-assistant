@@ -8,6 +8,9 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -514,6 +517,42 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         assertThat(attempts.execute(capture(target))).contains(ResyncOutcome.CALL_FAILED);
         assertThat(bindings.findById(target.bindingId()).orElseThrow().desiredEnabled()).isFalse();
         assertThat(bindings.findById(target.bindingId()).orElseThrow().status()).isEqualTo(BindingStatus.PENDING);
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"confirm", "scheduled", "drift"})
+    @DisplayName("철회된 주인의 관리자 확인과 예약과 드리프트는 설치 시작과 외부 설치를 보내지 않는다")
+    void refusesInstallStartForRevokedOwner(String entry) throws Exception {
+        Target target = readyTarget();
+        if (entry.equals("scheduled")) {
+            transactions.executeWithoutResult(status -> {
+                ConnectorBinding binding = bindings.findById(target.bindingId()).orElseThrow();
+                binding.pending(clock.instant());
+                binding.scheduleApply(clock.instant().minusSeconds(1));
+            });
+        }
+        Observed before = observe(target.bindingId());
+        transactions.executeWithoutResult(status -> {
+            users.findByIdForUpdate(target.owner().id()).orElseThrow();
+            AllowedPerson person = people.save(AllowedPerson.of(target.owner().email(), "검사", "revoked-" + target.owner().id(), clock.instant()));
+            person.disable();
+        });
+        clearInvocations(connector);
+        when(connector.readConnector(anyString(), anyString()))
+            .thenReturn(new ConnectorState("p", false, false, false, true, "bind"));
+        if (entry.equals("confirm")) {
+            assertThatThrownBy(() -> service.confirmApplied(user(UserRole.ADMIN, 1L), target.agent().code(), DEMO, null))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+        } else if (entry.equals("scheduled")) {
+            assertThat(applier.applyDue()).isZero();
+            assertThat(bindings.findById(target.bindingId()).orElseThrow().applyDueAt()).isNotNull();
+        } else {
+            assertThat(applier.resyncDrifted()).isZero();
+        }
+        verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
+        assertThat(observe(target.bindingId())).isEqualTo(before);
     }
 
 
