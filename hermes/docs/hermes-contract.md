@@ -2635,6 +2635,25 @@ nonce와 성공 원문을 저장하거나 자식에 서비스 비밀값을 전�
 승인 hook·주문 producer 구현 전에는 금융 호출이 계속 차단된다.
 지원 상태의 verified는 현재 응답의 검증 결과이며 금융 거래 허가를 뜻하지 않는다.
 
+### 원고 compile 전용 private 전달
+
+snapshot은 별도 `POST /api/connectors/{id}/snapshot` 서비스 경로다. <!-- ref-ignore: plugin middleware가 처리하는 서비스 경로다 -->
+handler도 서비스 Bearer를 직접 검사하여 쿠키만 있는 요청은 받지 않는다.
+manifest의 정확한 다섯 키는 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`다.
+protocol은 `content-snapshot-v1`, capabilities는 `{compile:true,start:false,status:false}`이며 추가 키·누락·boolean이 아닌 값은 거절한다.
+검증된 snapshot은 공개 tools와 분리해 catalog 응답에 싣고 같은 capabilities를 compile 성공 envelope에 넣는다.
+후속 Control Plane의 Java decoder도 이 선언을 소비해야 한다. start/status는 현재 자식 생성 전 409다.
+
+private 자식에만 `--content-snapshot-operation compile`을 붙인다. 공개 서버 목록은 그대로이며 env나 모델 args로 mode를 바꾸지 못한다.
+설치 manifest와 profile은 private flag와 세 `FOS_CONTENT_*` snapshot env를 선언하지 못한다.
+기존 설치 소유 기록·profile 표식과 주인 첨부·브라우저 선택 규칙을 쓰며 dashboard 자식의 UID를 바꾸지 않는다.
+MCP 실제 목록에 read-only compile 하나만 있어야 호출한다. Python mcp 2.0.0과 TypeScript SDK 1.28.0 stdio 왕복을 합성 입력으로 검사한다.
+compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다. 자식 stderr는 버리고 오류 원문·인자·결과를 로그에 넣지 않는다.
+입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#compile-전용-내부-transport)이 갖는다.
+
+본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
+최초 원고 MCP 생성·DB·승인·worker 시작·조회와 실제 네이버 접근은 이번 compile 경계의 범위 밖이다.
+
 ### 커넥터 정책이 기대는 계약
 
 Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지면 커넥터 도구의 판정이 비켜 갈 수 있다.
