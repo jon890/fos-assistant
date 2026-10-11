@@ -22,7 +22,7 @@ export function createToolRegistration(server: McpServer) {
       {
         description: (
           manifest.tools as Record<string, { description: string }>
-        )[name]!.description,
+        )[name]?.description,
         inputSchema: z.strictObject(schema),
         annotations,
       },

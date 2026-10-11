@@ -86,7 +86,7 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 시세·시장 7 opera
     expect(tools.map((t) => t.name).sort()).toEqual(
       Object.keys(manifest.tools).sort(),
     );
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(33);
     for (const [i, [, name, args]] of cases.entries()) {
       const definition = tools.find((t) => t.name === name)!;
       expect(definition.annotations?.readOnlyHint).toBe(true);

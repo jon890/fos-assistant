@@ -1,11 +1,11 @@
 ---
 name: tossinvest
-description: 토스증권 계좌와 시세, 섹터를 읽는다. 주문하지 않는다.
+description: 토스증권 계좌와 종목·시장·섹터 정보, 주문 내역을 조회한다. 주문하지 않는다.
 ---
 
 # 토스증권
 
-사용자의 토스증권 계좌와 시세, 섹터를 읽는다.
+사용자의 토스증권 계좌와 종목·시장·섹터 정보, 주문 내역을 조회한다.
 
 ## 주문하지 않는다
 
@@ -27,10 +27,21 @@ description: 토스증권 계좌와 시세, 섹터를 읽는다. 주문하지 �
 - `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각)로 기간을 정해 주문을 본다.
   OPEN은 전체를 읽고 CLOSED는 기본 20건·최대 100건의 한 페이지를 읽는다. `has_more`가 참이면 일부라고 말하고 `nextCursor`로 다음 페이지를 요청한다
 
+- `get_stocks`: 종목 코드나 티커 1~200개의 상세 참조 정보를 본다
+- `list_stocks`: 필수 market과 선택 status·securityType·commonShare로 시장 전체 목록을 읽는다. 페이지가 없으며 참조 정보는 화면·세션 진입 시 읽고 짧은 주기로 반복하지 않는다
+- `get_stock_warnings`: 단일 symbol의 유의사항을 본다. exchange는 상장 시장 market과 다른 거래소 코드다. 빈 배열은 정상이고 없는 종목은 입력 오류다
+- `get_sellable_quantity`: symbol 하나의 매도 가능 수량을 본다. decimal 문자열을 그대로 말한다
+- `get_order`: list_orders에서 받은 orderId로 주문 하나와 execution을 본다. 주문 상태와 부분 체결을 구분한다
+- `get_commissions`: 인자 없이 연결 계좌의 전체 시장 수수료를 읽는다. commissionRate는 소수 비율이고 marketCountry 필터는 없다
+- `get_orderbook`, `get_trades`, `get_price_limits`: 단일 symbol의 호가·최근 체결·가격제한을 읽는다. 미국 가격제한의 null과 체결이 없는 빈 배열을 보존한다
+- `get_candles`: symbol, interval(1m/1d), count 기본 100·최대 200으로 최신순 한 페이지를 읽는다. adjusted 기본 true이며 nextBefore를 다음 before에 그대로 넣는다
+- `get_exchange_rate`: 서로 다른 KRW/USD 통화와 선택 RFC 3339 dateTime으로 참고용 환율을 읽는다. 실제 주문 환율로 설명하지 않는다
+- `get_market_calendar`: market=KR/US와 선택 date로 전일·당일·익일 운영 일정을 읽는다. 미국 date는 미국 현지 날짜며 반환 시각은 KST 원문이다
+
 - `list_conditional_orders`: `status=OPEN/CLOSED`로 조건주문 한 페이지를 본다. 선택 `symbol`, `cursor`, `limit`를 받으며 기본 20건, 최대 100건이다. `hasNext`가 참이면 일부만 읽었다고 말하고 `nextCursor`로 다음 페이지를 요청한다
 - `get_conditional_order`: 목록에서 받은 `conditionalOrderId`로 상세를 본다. 계좌, token, URL을 인자로 넘기지 않는다
 
-조건주문의 SINGLE/OCO/OTO 유형과 STOP/PROFIT_RATE 조건을 받은 대로 설명한다. 최상위 상태와 각 leg의 상태를 구분하며 WATCHING을 체결 완료로 말하지 않는다. null과 없는 `expireDate`를 추측해서 채우지 않는다. 생성·수정·취소는 토스증권 앱이나 웹에서 직접 한다.
+조건주문의 SINGLE/OCO/OTO 유형과 STOP/PROFIT_RATE 조건을 받은 대로 설명한다. targetProfitRate="10.5"는 10.5%다. 최상위 상태와 각 leg의 상태를 구분하며 WATCHING을 체결 완료로 말하지 않는다. null과 없는 `expireDate`를 추측해서 채우지 않는다. 생성·수정·취소는 토스증권 앱이나 웹에서 직접 한다.
 
 - `list_sectors`: 인자 없이 전체 섹터 목록과 depth 0·1·2의 계층을 본다. 다른 섹터 도구에 넣을 `sectorId`는 이 목록에서 먼저 확인한다
 - `get_sector_rankings`: `type`에 `TOP_GAINERS`나 `MARKET_TRADING_AMOUNT`, `marketCountry`에 `KR`이나 `US`, `duration`에 `1d`·`1w`·`1mo`·`3mo`·`6mo`·`1y`를 넣는다. 대분류와 중분류(depth 0·1)의 상위 100건까지 보고, 데이터가 없으면 빈 배열을 받는다

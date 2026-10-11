@@ -67,8 +67,8 @@ for (const mode of ["source", "bundle"]) {
       expect(listed.map((item) => item.name).sort()).toEqual(
         Object.keys(manifest.tools).sort(),
       );
-      expect(listed).toHaveLength(8);
-      expect(CURRENT_OPERATIONS.size).toBe(10);
+      expect(listed).toHaveLength(33);
+      expect(CURRENT_OPERATIONS.size).toBe(35);
       for (const item of listed) {
         expect(item.description?.length).toBeGreaterThan(20);
         expect(item.description).not.toContain("undefined");
@@ -79,6 +79,8 @@ for (const mode of ["source", "bundle"]) {
         expect(manifest.tools[name]).toEqual({
           risk: "READ",
           approval: "none",
+          description: listed.find((entry) => entry.name === name)!
+            .description!,
         });
         for (const key of [
           "account",

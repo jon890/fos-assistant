@@ -47,7 +47,7 @@ const manifest = JSON.parse(
 
 async function checkProduction(client: Client, fake: FakeToss) {
   const listed = (await client.listTools()).tools;
-  expect(listed).toHaveLength(11);
+  expect(listed).toHaveLength(33);
   expect(new Set(listed.map(({ name }) => name))).toEqual(
     new Set(Object.keys(manifest.tools)),
   );
@@ -61,7 +61,11 @@ async function checkProduction(client: Client, fake: FakeToss) {
   for (const [, name, , detail] of cases) {
     const registered = listed.find((item) => item.name === name)!;
     expect(listed.filter((item) => item.name === name)).toHaveLength(1);
-    expect(manifest.tools[name]).toEqual({ risk: "READ", approval: "none" });
+    expect(manifest.tools[name]).toEqual({
+      risk: "READ",
+      approval: "none",
+      description: registered.description,
+    });
     expect(registered.description).toContain(detail);
     for (const term of [
       "KR",

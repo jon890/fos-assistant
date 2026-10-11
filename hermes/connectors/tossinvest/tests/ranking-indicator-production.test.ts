@@ -1,3 +1,4 @@
+import { readToolNames, readOperationIds } from "./read-union-cases.ts";
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -47,18 +48,8 @@ const calls = [
 ] as const;
 
 test("production stdio 도구 합집합의 설명·READ 정책과 신규 GET 4개 도달을 확인한다", async () => {
-  const original = [
-    "issueOAuth2Token",
-    "getAccounts",
-    "getPrices",
-    "getStocks",
-    "getHoldings",
-    "getBuyingPower",
-    "getSellableQuantity",
-    "getOrders",
-  ];
   expect(CURRENT_OPERATIONS).toEqual(
-    new Set([...original, ...calls.map(([, operation]) => operation)]),
+    new Set(["issueOAuth2Token", ...readOperationIds]),
   );
   const fake = new FakeToss(
     new Set(["issueOAuth2Token", ...calls.map(([, operation]) => operation)]),
@@ -99,22 +90,15 @@ test("production stdio 도구 합집합의 설명·READ 정책과 신규 GET 4�
       new Set(Object.keys(connector.tools)),
     );
     expect(new Set(listed.map((entry) => entry.name))).toEqual(
-      new Set([
-        "list_accounts",
-        "get_quotes",
-        "get_holdings",
-        "get_sellable_quantity",
-        "get_buying_power",
-        "list_orders",
-        ...calls.map(([name]) => name),
-      ]),
+      new Set(readToolNames),
     );
-    expect(listed).toHaveLength(10);
+    expect(listed).toHaveLength(33);
     for (const entry of listed) {
       expect(entry.description).toBeTruthy();
       expect(entry.description).not.toContain("undefined");
       expect(entry.annotations?.readOnlyHint).toBe(true);
-      expect(connector.tools[entry.name]).toEqual({ risk: "READ" });
+      expect(connector.tools[entry.name].risk).toBe("READ");
+      expect(entry.description).toBe(connector.tools[entry.name].description);
     }
     expect(
       listed.find((entry) => entry.name === "get_market_indicator_prices")!

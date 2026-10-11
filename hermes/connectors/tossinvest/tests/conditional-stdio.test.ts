@@ -91,14 +91,39 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
     expect(manifest.default_tool_policy).toBe("deny");
     expect(new Set(tools.map(({ name }) => name))).toEqual(
       new Set([
-        "list_accounts",
-        "get_quotes",
-        "get_holdings",
         "get_buying_power",
-        "list_orders",
-        "get_sellable_quantity",
-        "list_conditional_orders",
+        "get_candles",
+        "get_commissions",
         "get_conditional_order",
+        "get_exchange_rate",
+        "get_holdings",
+        "get_market_calendar",
+        "get_market_indicator_candles",
+        "get_market_indicator_investor_trading",
+        "get_market_indicator_prices",
+        "get_order",
+        "get_orderbook",
+        "get_price_limits",
+        "get_quotes",
+        "get_rankings",
+        "get_sector",
+        "get_sector_etfs",
+        "get_sector_rankings",
+        "get_sector_stocks",
+        "get_sellable_quantity",
+        "get_stock_credit_trades",
+        "get_stock_investor_trading",
+        "get_stock_program_trades",
+        "get_stock_securities_lending",
+        "get_stock_short_selling",
+        "get_stock_warnings",
+        "get_stocks",
+        "get_trades",
+        "list_accounts",
+        "list_conditional_orders",
+        "list_orders",
+        "list_sectors",
+        "list_stocks",
       ]),
     );
     expect(new Set(tools.map(({ name }) => name))).toEqual(
@@ -113,7 +138,11 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
       "list_conditional_orders",
       "get_conditional_order",
     ] as const) {
-      expect(manifest.tools[name]).toEqual({ risk: "READ", approval: "none" });
+      expect(manifest.tools[name]).toEqual({
+        risk: "READ",
+        approval: "none",
+        description: tools.find((entry) => entry.name === name)!.description!,
+      });
       const entry = tools.find((entry) => entry.name === name)!;
       expect(entry.description).toContain("연결한 계좌");
       expect(entry.inputSchema.additionalProperties).toBe(false);

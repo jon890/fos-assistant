@@ -1,3 +1,4 @@
+import { readUnionCases, readOperationIds } from "./read-union-cases.ts";
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -26,25 +27,8 @@ import {
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 export const canonical = JSON.parse(raw.toString());
 
-test("현재 16개 READ operation의 공식 성공 예시 40개를 그대로 읽는다", () => {
-  const reads = new Set([
-    "getAccounts",
-    "getPrices",
-    "getStocks",
-    "getHoldings",
-    "getBuyingPower",
-    "getSellableQuantity",
-    "getOrders",
-    "listStocks",
-    "getStockWarnings",
-    "getOrderbook",
-    "getTrades",
-    "getPriceLimit",
-    "getCandles",
-    "getExchangeRate",
-    "getKrMarketCalendar",
-    "getUsMarketCalendar",
-  ]);
+test("현재 34개 READ operation의 공식 성공 예시 78개를 그대로 읽는다", () => {
+  const reads = new Set(readOperationIds);
   let count = 0;
   for (const methods of Object.values(canonical.paths) as any[]) {
     const upstream = methods.get;
@@ -74,7 +58,7 @@ test("현재 16개 READ operation의 공식 성공 예시 40개를 그대로 읽
       count++;
     }
   }
-  expect(count).toBe(40);
+  expect(count).toBe(78);
 });
 
 test("ETF 영문명 누락 호환은 해당 분류와 필드에만 적용한다", () => {
@@ -180,10 +164,10 @@ test("공식 41 operation의 method/path/group과 SHA-256이 일치하고 미구
     41,
   );
   expect(new Set(OPERATIONS.map((op) => op.group)).size).toBe(19);
-  expect(CURRENT_OPERATIONS.size).toBe(17);
+  expect(CURRENT_OPERATIONS.size).toBe(35);
   expect(
     OPERATIONS.filter((op) => !CURRENT_OPERATIONS.has(op.id)),
-  ).toHaveLength(24);
+  ).toHaveLength(6);
 });
 
 test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => {
@@ -205,26 +189,8 @@ test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => 
   ).toBe(false);
 });
 
-test("production SDK의 15개 도구가 17 operation에 도달하고 GET body는 없다", async () => {
-  const allowed = new Set([
-    "issueOAuth2Token",
-    "getAccounts",
-    "getPrices",
-    "getStocks",
-    "getHoldings",
-    "getBuyingPower",
-    "getSellableQuantity",
-    "getOrders",
-    "listStocks",
-    "getStockWarnings",
-    "getOrderbook",
-    "getTrades",
-    "getPriceLimit",
-    "getCandles",
-    "getExchangeRate",
-    "getKrMarketCalendar",
-    "getUsMarketCalendar",
-  ]);
+test("production SDK의 33개 도구가 35 operation에 도달하고 GET body는 없다", async () => {
+  const allowed = new Set(["issueOAuth2Token", ...readOperationIds]);
   const fake = new FakeToss(allowed);
   for (const [path, result] of Object.entries({
     accounts: [],
@@ -266,6 +232,31 @@ test("production SDK의 15개 도구가 17 operation에 도달하고 GET body는
         ].examples as Record<string, { value: unknown }>,
       )[0]!.value,
     );
+  const additionalPaths: string[] = [];
+  for (const call of readUnionCases.slice(16)) {
+    for (const id of call.operations) {
+      const operation = OPERATIONS.find((operation) => operation.id === id)!;
+      const path = operation.path.replace(/\{(\w+)\}/g, (_, key) =>
+        encodeURIComponent(String(call.args[key])),
+      );
+      const content =
+        canonical.paths[operation.path].get.responses["200"].content[
+          "application/json"
+        ];
+      fake.on(
+        "GET",
+        path,
+        content.example ?? (Object.values(content.examples)[0] as any).value,
+      );
+      if (
+        !canonical.paths[operation.path].get.parameters?.some(
+          (parameter: any) =>
+            parameter.$ref === "#/components/parameters/AccountSeq",
+        )
+      )
+        additionalPaths.push(path);
+    }
+  }
   try {
     await withMcp(
       createTossinvestServer({
@@ -290,6 +281,9 @@ test("production SDK의 15개 도구가 17 operation에 도달하고 GET body는
           ["get_exchange_rate", { baseCurrency: "USD", quoteCurrency: "KRW" }],
           ["get_market_calendar", { market: "KR" }],
           ["get_market_calendar", { market: "US" }],
+          ...readUnionCases
+            .slice(16)
+            .map(({ name, args }) => [name, args] as const),
         ] as const)
           expect(
             (await tool(client, name, args)).result.isError,
@@ -306,13 +300,13 @@ test("production SDK의 15개 도구가 17 operation에 도달하고 GET body는
     );
     expect(received).toEqual(allowed);
     expect(CURRENT_OPERATIONS).toEqual(received);
-    expect(fake.seen("GET")).toHaveLength(18);
+    expect(fake.seen("GET")).toHaveLength(36);
     expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
     expect(
       fake.seen("POST").filter((request) => request.path !== "/oauth2/token"),
     ).toHaveLength(0);
     expect(fake.seen("DELETE")).toHaveLength(0);
-    expect(fake.requests).toHaveLength(19);
+    expect(fake.requests).toHaveLength(37);
     for (const request of fake.seen("GET")) {
       expect(request.body).toBe("");
       expect(request.headers.get("authorization")).toBe(
@@ -320,6 +314,7 @@ test("production SDK의 15개 도구가 17 operation에 도달하고 GET body는
       );
       expect(request.headers.get("x-tossinvest-account")).toBe(
         [
+          ...additionalPaths,
           "/api/v1/accounts",
           "/api/v1/prices",
           "/api/v1/stocks",
@@ -449,7 +444,7 @@ test("빌드한 production stdio bundle의 계좌·시세 도구가 실제 HTTP 
     );
     for (const entry of listed)
       expect(entry.description).toBe(manifest.tools[entry.name].description);
-    expect(listed).toHaveLength(15);
+    expect(listed).toHaveLength(33);
     for (const [name, args] of [
       ["get_stocks", { symbols: "AAPL" }],
       ["list_stocks", { market: "NASDAQ", commonShare: false }],
