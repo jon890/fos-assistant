@@ -354,6 +354,8 @@ test("잘못된 enum, symbol, 경로 주입, 없는 페이지 인자는 인증�
     ["list_stocks", { market: "KOSPI", limit: 20 }],
     ["get_stock_warnings", {}],
     ["get_stock_warnings", { symbol: "" }],
+    ["get_stock_warnings", { symbol: "." }],
+    ["get_stock_warnings", { symbol: ".." }],
     ["get_stock_warnings", { symbol: "005930,AAPL" }],
     ["get_stock_warnings", { symbol: " AAPL " }],
     ["get_stock_warnings", { symbol: "AAPL\n" }],

@@ -66,6 +66,7 @@ export function registerStockTools(register: RegisterTool, client: Tossinvest) {
       symbol: z
         .string()
         .regex(SYMBOL)
+        .refine((value) => value !== "." && value !== "..")
         .refine((value) => value.trim() === value),
     },
     { readOnlyHint: true },
