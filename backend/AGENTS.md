@@ -43,6 +43,16 @@ HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 
 누락·중복·빈 선택도 실패하며 기존 위반 기준 파일을 쓰지 않는다.
 공유 lifecycle과 기본 모델, endpoint probe와 영속 타입은 기존 위치를 유지한다.
 
+### 에이전트 지연 정리
+
+정리 실행과 writer 및 참여 port는 `agent.purge.application`에,
+정리 결과 enum은 그 아래 `application.model`에 둔다.
+참여 구현은 각 기능에 남기고 정리 실행이 구현 기능을 import하지 않는다.
+`AgentProperties`와 profile 회수 port는 기존 `agent.application`에 둔다.
+검사: `ArchitectureRules.AGENT_PURGE_CONTRACT_PLACEMENT`
+전체 운영 루트의 top-level 이름과 기대 FQN·각 대상 수 1을 검사하며 누락·중복·빈 선택도 실패한다.
+정리 하위 기능의 역할과 방향은 기존 기준 파일 없이 raw 검사한다.
+
 `application` 과 `domain` 은 타입 하나에 파일 하나다.
 
 예외는 **그 타입 밖에서 쓰이지 않는 값**이다.
