@@ -1,8 +1,7 @@
 package com.bifos.assistant.agent.application;
 
-import com.bifos.assistant.agent.config.AgentProperties;
-
 import com.bifos.assistant.agent.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.config.AgentProperties;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.shared.error.ApiException;
