@@ -15,7 +15,7 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `DELETE /api/profiles/<이름>` | 관리 표식이 있는 profile 을 지운다 | 없음 | 200 | 401 관리 표식이 없는 profile. 404 없는 profile. 두 번째 호출의 404 는 「이미 지움」 으로 읽는다 |
 | `PUT /api/env` | 그 profile 의 `.env` 에 정해 둔 key 한 줄을 쓴다 | `{profile, key, value}`. key 는 `API_SERVER_KEY`, `API_SERVER_MODEL_NAME`, `MCP_FOS_ASSISTANT_API_KEY` 와 카탈로그 커넥터의 `fields[].env` 뿐 | 200. 커넥터 key 는 `{profile, key, restart_required}` | 400 다른 key, `default`, 형식. 404 없는 profile |
 | `DELETE /api/env` | 관리 profile 의 커넥터 칸 key 만 지운다 | `{profile, key}` | `{profile, key, restart_required}` | |
-| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
+| `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 커넥터면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
 | `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. `mode` 는 `bind` 나 `isolated` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
@@ -68,7 +68,7 @@ API server 의 session 응답은 provider 를 주지 않는다. 그 값은 Herme
 `schema` 가 없는 응답은 `1` 로 읽는다. `operator_env` 의 이름과 값, `errors` 는 담지 않는다.
 `skills` 는 바인딩 설치가 profile 에 복사할 스킬의 이름 목록이고 이름 순이다. 이름은 `SKILL.md` 앞머리의 `name` 이고, 없으면 디렉터리 이름이다. 본문은 담지 않는다.
 `fields` 가 빈 목록인 커넥터도 받는다. 값을 받지 않는 일반 MCP 서버다.
-`icon` 은 `{media_type, data}` 이거나 null 이고 `link` 는 글이거나 null 이다. 검사 규칙은 [커넥터 연결](../../connectors/README.md) 의 「아이콘과 링크」 가 갖는다. 옛 대시보드 plugin 은 두 칸을 내지 않고, Control Plane 은 없는 칸을 null 로 읽는다.
+`icon`은 `{media_type, data}`이거나 null이다. `link`와 `readme_url`은 각각 500자 이하의 HTTPS·ASCII 주소나 null이다. 주소 하나가 틀려도 그 칸만 비우고 커넥터와 다른 칸은 유지한다. `link_kind`는 `project`거나 `service`이며 없거나 모르는 값은 `service`다. Control Plane은 옛 응답의 주소를 null로 읽고 웹에 `readmeUrl`, `linkKind`로 낸다. 두 링크의 검사와 화면 계약은 [커넥터 카드 ADR](../../../docs/adr/ADR-20261008-connector-card.md)의 「두 링크로 확장한 계약」이 갖는다.
 
 **`POST /api/profiles` 는 틀을 쓰지 못하면 만든 것을 지운다.**
 본문은 `name`, `no_skills`, `description` 만 받는다. `clone_from` 은 다른 profile 의 `.env` 를 끌어오므로 400 이다.
