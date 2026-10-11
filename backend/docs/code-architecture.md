@@ -170,6 +170,23 @@ domain과 infra는 admin을 import하지 않는다.
 현재 admin 범위의 Service·공개 application record·HTTP record·설정 선언의 역할과 의존도 검사하며,
 기존 위반 기준 파일로 얼리지 않는다. 목적별 하위 패키지도 기존 층·웹 의존 방향 검사의 대상이다.
 
+### 에이전트 지연 정리
+
+`agent.purge.application`에 `AgentPurger`, `AgentPurgeWriter`, `AgentPurgeParticipant`를 모은다.
+정리 결과 `AgentPurgeOutcome`는 그 아래 `application.model`에 둔다.
+설정 `AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application`에 둔다.
+참여 구현은 `chat`, `connector`, `proactive`가 소유하며 정리 실행은 구현 기능을 import하지 않는다.
+
+먼저 읽기 트랜잭션으로 대기 여부를 확인하고, 관리하는 profile을 회수한 뒤,
+쓰기 트랜잭션에서 에이전트 행을 잠그고 다시 확인한다.
+참여 표와 FK 참조를 해제한 뒤 에이전트 행을 지운다.
+`WAITING`, `GONE`, `PURGED`와 실패 시 행 보존·backoff, 주기와 설정 키는 기존 계약을 유지한다.
+
+검사: `ArchitectureRules.AGENT_PURGE_CONTRACT_PLACEMENT`
+전체 운영 루트의 top-level 이름으로 네 타입을 선택하고 기대 FQN과 각 대상 수 1을 강제한다.
+누락·중복·빈 선택과 옛 위치 복귀, purge 하위 기능의 잘못된 역할과 역방향 의존도 raw 검사로 실패한다.
+기존 층·웹 의존 규칙과 공용 fixture를 함께 쓰며 기존 위반 기준 파일을 추가하지 않는다.
+
 ### 최상위 패키지의 층 순서
 
 최상위 패키지의 순서는 `TopLevelPackageOrder.ORDER` 가 아래에서 위로 적어 갖는다.
@@ -203,7 +220,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
-`agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent` 에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
+`agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.purge.application`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 `workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. 어느 패키지도 `workspace` 를 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
