@@ -21,6 +21,7 @@ class ContentDraftSnapshotJpaMigrationTest {
     @Autowired
     private Flyway flyway;
 
+
     @DynamicPropertySource
     static void useMigratedH2(DynamicPropertyRegistry registry) {
         var url = "jdbc:h2:mem:content-preview-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -28,6 +29,7 @@ class ContentDraftSnapshotJpaMigrationTest {
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
+
 
     @Test
     @DisplayName("H2의 실제 Flyway 스키마로 snapshot과 job 엔티티를 검증한다")
