@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import pathlib
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 

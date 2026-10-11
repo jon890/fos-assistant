@@ -61,5 +61,3 @@ def _read_connector_json(root: pathlib.Path, relative: str):
     if path.resolve() != path or not path.is_file():
         raise ValueError("%s 가 없거나 링크다" % relative)
     return json.loads(path.read_text(encoding="utf-8"))
-
-
