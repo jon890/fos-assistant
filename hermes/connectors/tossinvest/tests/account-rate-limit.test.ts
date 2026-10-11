@@ -2,22 +2,40 @@ import { describe, expect, test } from "bun:test";
 import { groupLimit } from "../src/rate-limit.ts";
 import { Tossinvest } from "../src/client.ts";
 import { createTossinvestServer } from "../src/server.ts";
-import { FakeToss, emptyHoldings, apiError, credentials, json, tool, withMcp } from "./support.ts";
+import {
+  FakeToss,
+  emptyHoldings,
+  apiError,
+  credentials,
+  json,
+  tool,
+  withMcp,
+} from "./support.ts";
 
 const env = { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "7" };
 const accountBodies = {
   "/api/v1/accounts": { result: [] },
   "/api/v1/holdings": { result: emptyHoldings },
-  "/api/v1/buying-power": { result: { currency: "KRW", cashBuyingPower: "1000" } },
+  "/api/v1/buying-power": {
+    result: { currency: "KRW", cashBuyingPower: "1000" },
+  },
   "/api/v1/sellable-quantity": { result: { sellableQuantity: "2" } },
-  "/api/v1/orders": { result: { orders: [], nextCursor: null, hasNext: false } },
+  "/api/v1/orders": {
+    result: { orders: [], nextCursor: null, hasNext: false },
+  },
 };
 
 const groups = {
   "/api/v1/accounts": { name: "ACCOUNT", interval: 1_000 },
   "/api/v1/holdings": { name: "ASSET", interval: 200 },
-  "/api/v1/buying-power": { name: "ORDER_INFO", interval: Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())) },
-  "/api/v1/sellable-quantity": { name: "ORDER_INFO", interval: Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())) },
+  "/api/v1/buying-power": {
+    name: "ORDER_INFO",
+    interval: Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())),
+  },
+  "/api/v1/sellable-quantity": {
+    name: "ORDER_INFO",
+    interval: Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())),
+  },
   "/api/v1/orders": { name: "ORDER_HISTORY", interval: 200 },
 } as const;
 
@@ -32,7 +50,10 @@ function limitedAccountRoutes(fake: FakeToss) {
       const group = groups[path as keyof typeof groups];
       const now = performance.now();
       arrivals.push({ group: group.name, at: now, interval: group.interval });
-      if (active.has(group.name) || now - (last.get(group.name) ?? -Infinity) < group.interval) {
+      if (
+        active.has(group.name) ||
+        now - (last.get(group.name) ?? -Infinity) < group.interval
+      ) {
         rejected += 1;
         return apiError(429, "too-many-requests")();
       }
@@ -58,7 +79,9 @@ describe("계좌 조회 호출 간격", () => {
         fetch(`${fake.url}/api/v1/buying-power`),
         fetch(`${fake.url}/api/v1/sellable-quantity`),
       ]);
-      expect(responses.map((response) => response.status).sort()).toEqual([200, 429]);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 429,
+      ]);
       expect(limit.rejected()).toBe(1);
       await Promise.all(responses.map((response) => response.text()));
     } finally {
@@ -70,24 +93,41 @@ describe("계좌 조회 호출 간격", () => {
     const fake = new FakeToss();
     const limit = limitedAccountRoutes(fake);
     try {
-      await withMcp(createTossinvestServer({ apiBase: fake.url, env }), async (client) => {
-        const results = await Promise.all([
-          tool(client, "get_buying_power", { currency: "KRW", symbol: "005930" }),
-          tool(client, "get_holdings"),
-          tool(client, "list_orders", { status: "OPEN" }),
-          tool(client, "list_accounts"),
-        ]);
-        for (const result of results) expect(result.result.isError).toBeUndefined();
-        expect(results[0]!.body).toEqual({
-          currency: "KRW", cash_buying_power: "1000", sellable_quantity: "2",
-          result: { buyingPower: { currency: "KRW", cashBuyingPower: "1000" }, sellableQuantity: { sellableQuantity: "2" } }, metadata: { buyingPower: {}, sellableQuantity: {} },
-        });
-      });
+      await withMcp(
+        createTossinvestServer({ apiBase: fake.url, env }),
+        async (client) => {
+          const results = await Promise.all([
+            tool(client, "get_buying_power", {
+              currency: "KRW",
+              symbol: "005930",
+            }),
+            tool(client, "get_holdings"),
+            tool(client, "list_orders", { status: "OPEN" }),
+            tool(client, "list_accounts"),
+          ]);
+          for (const result of results)
+            expect(result.result.isError).toBeUndefined();
+          expect(results[0]!.body).toEqual({
+            currency: "KRW",
+            cash_buying_power: "1000",
+            sellable_quantity: "2",
+            result: {
+              buyingPower: { currency: "KRW", cashBuyingPower: "1000" },
+              sellableQuantity: { sellableQuantity: "2" },
+            },
+            metadata: { buyingPower: {}, sellableQuantity: {} },
+          });
+        },
+      );
       expect(limit.arrivals).toHaveLength(5);
       expect(limit.rejected()).toBe(0);
-      const orderInfo = limit.arrivals.filter((arrival) => arrival.group === "ORDER_INFO");
+      const orderInfo = limit.arrivals.filter(
+        (arrival) => arrival.group === "ORDER_INFO",
+      );
       expect(orderInfo).toHaveLength(2);
-      expect(orderInfo[1]!.at - orderInfo[0]!.at).toBeGreaterThanOrEqual(Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())));
+      expect(orderInfo[1]!.at - orderInfo[0]!.at).toBeGreaterThanOrEqual(
+        Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())),
+      );
     } finally {
       fake.stop();
     }
@@ -109,7 +149,9 @@ describe("계좌 조회 호출 간격", () => {
       expect(fake.seen("GET", "/api/v1/accounts").length).toBeLessThan(2);
       await Promise.all(pending);
       expect(limit.rejected()).toBe(0);
-      expect(limit.arrivals[1]!.at - limit.arrivals[0]!.at).toBeGreaterThanOrEqual(1_000);
+      expect(
+        limit.arrivals[1]!.at - limit.arrivals[0]!.at,
+      ).toBeGreaterThanOrEqual(1_000);
     } finally {
       fake.stop();
     }
@@ -119,8 +161,12 @@ describe("계좌 조회 호출 간격", () => {
     const fake = new FakeToss();
     let arrived!: () => void;
     let release!: () => void;
-    const started = new Promise<void>((resolve) => { arrived = resolve; });
-    const held = new Promise<void>((resolve) => { release = resolve; });
+    const started = new Promise<void>((resolve) => {
+      arrived = resolve;
+    });
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     fake.routes.set("GET /api/v1/accounts", async () => {
       arrived();
       await held;
@@ -131,9 +177,9 @@ describe("계좌 조회 호출 간격", () => {
     const pending = client.request("/api/v1/accounts");
     try {
       await started;
-      expect(await client.request("/api/v1/holdings", { account: true })).toEqual(
-        accountBodies["/api/v1/holdings"],
-      );
+      expect(
+        await client.request("/api/v1/holdings", { account: true }),
+      ).toEqual(accountBodies["/api/v1/holdings"]);
     } finally {
       release();
       await pending;
@@ -156,7 +202,11 @@ describe("계좌 조회 호출 간격", () => {
       expect(limit.rejected()).toBe(0);
       expect(limit.arrivals).toHaveLength(4);
       for (let index = 1; index < limit.arrivals.length; index++)
-        expect(limit.arrivals[index]!.at - limit.arrivals[index - 1]!.at).toBeGreaterThanOrEqual(Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())));
+        expect(
+          limit.arrivals[index]!.at - limit.arrivals[index - 1]!.at,
+        ).toBeGreaterThanOrEqual(
+          Math.ceil(1000 / groupLimit("ORDER_INFO", Date.now())),
+        );
     } finally {
       fake.stop();
     }
@@ -168,15 +218,20 @@ describe("계좌 조회 호출 간격", () => {
     fake.sequence("GET", "/api/v1/buying-power", [
       () => {
         arrivals.push(performance.now());
-        return json({ error: { code: "too-many-requests" } }, 429, { "retry-after": "1.2" });
+        return json({ error: { code: "too-many-requests" } }, 429, {
+          "retry-after": "1.2",
+        });
       },
-      () => { arrivals.push(performance.now()); return json(accountBodies["/api/v1/buying-power"]); },
+      () => {
+        arrivals.push(performance.now());
+        return json(accountBodies["/api/v1/buying-power"]);
+      },
     ]);
     try {
       const client = new Tossinvest({ apiBase: fake.url, env });
-      expect(await client.request("/api/v1/buying-power", { account: true })).toEqual(
-        accountBodies["/api/v1/buying-power"],
-      );
+      expect(
+        await client.request("/api/v1/buying-power", { account: true }),
+      ).toEqual(accountBodies["/api/v1/buying-power"]);
       expect(arrivals).toHaveLength(2);
       expect(arrivals[1]! - arrivals[0]!).toBeGreaterThanOrEqual(1_200);
     } finally {
@@ -188,8 +243,14 @@ describe("계좌 조회 호출 간격", () => {
     const fake = new FakeToss();
     const arrivals: number[] = [];
     fake.sequence("GET", "/api/v1/accounts", [
-      () => { arrivals.push(performance.now()); return apiError(429, "too-many-requests")(); },
-      () => { arrivals.push(performance.now()); return json({ result: [] }); },
+      () => {
+        arrivals.push(performance.now());
+        return apiError(429, "too-many-requests")();
+      },
+      () => {
+        arrivals.push(performance.now());
+        return json({ result: [] });
+      },
     ]);
     const client = new Tossinvest({ apiBase: fake.url, env });
     try {
@@ -217,10 +278,14 @@ describe("계좌 조회 호출 간격", () => {
       apiError(401, "token-revoked"),
       apiError(429, "too-many-requests"),
     ];
-    fake.sequence("GET", "/api/v1/accounts", responses.map((response) => () => {
-      arrivals.push(performance.now());
-      return response();
-    }));
+    fake.sequence(
+      "GET",
+      "/api/v1/accounts",
+      responses.map((response) => () => {
+        arrivals.push(performance.now());
+        return response();
+      }),
+    );
     try {
       const client = new Tossinvest({ apiBase: fake.url, env });
       await expect(client.request("/api/v1/accounts")).rejects.toMatchObject({
@@ -229,7 +294,9 @@ describe("계좌 조회 호출 간격", () => {
       expect(arrivals).toHaveLength(3);
       expect(fake.issued).toBe(2);
       for (let index = 1; index < arrivals.length; index++)
-        expect(arrivals[index]! - arrivals[index - 1]!).toBeGreaterThanOrEqual(1_000);
+        expect(arrivals[index]! - arrivals[index - 1]!).toBeGreaterThanOrEqual(
+          1_000,
+        );
     } finally {
       fake.stop();
     }

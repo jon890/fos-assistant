@@ -1,11 +1,11 @@
 import { z } from "zod";
-import {
-  NAME_MAX_CHARS,
-  ORDERS_MAX,
-  SYMBOL,
-} from "./constants.ts";
+import { NAME_MAX_CHARS, ORDERS_MAX, SYMBOL } from "./constants.ts";
 import { TossinvestError } from "./errors.ts";
-import { decimalValue as decimal, serviceValue as value, truncateCodePoints } from "./values.ts";
+import {
+  decimalValue as decimal,
+  serviceValue as value,
+  truncateCodePoints,
+} from "./values.ts";
 import type { Tossinvest } from "./client.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 import { envelopeMetadata } from "./api-contract.ts";
@@ -43,7 +43,11 @@ function parseSymbol(raw: string | undefined): string | null {
 /** `YYYY-MM-DD` 꼴의 실제 날짜를 UTC 자정의 ms 로 바꾼다. 없는 날짜(2월 30일 등)는 거절한다. */
 function parseDate(raw: string): number {
   if (!DATE.test(raw)) throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
-  const [year, month, day] = raw.split("-").map(Number) as [number, number, number];
+  const [year, month, day] = raw.split("-").map(Number) as [
+    number,
+    number,
+    number,
+  ];
   const time = Date.UTC(year, month - 1, day);
   const date = new Date(time);
   if (
@@ -84,7 +88,13 @@ export function orderQuery(input: OrderInput): URLSearchParams {
   if (symbol !== null) query.set("symbol", symbol);
   if (from !== null) query.set("from", from);
   if (to !== null) query.set("to", to);
-  if (input.limit !== undefined && (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > ORDERS_MAX)) throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
+  if (
+    input.limit !== undefined &&
+    (!Number.isInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > ORDERS_MAX)
+  )
+    throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
   if (status === "CLOSED") {
     query.set("limit", String(input.limit ?? 20));
     if (input.cursor !== undefined) query.set("cursor", input.cursor);
@@ -167,20 +177,49 @@ function holdingsItem(row: Record<string, any>) {
   };
 }
 
-export function registerAccountTools(register: RegisterTool, client: Tossinvest) {
-  register("get_holdings", { symbol: z.string().optional() }, { readOnlyHint: true }, async ({ symbol }) => {
-    const stock = parseSymbol(symbol);
-    const envelope = await client.request("/api/v1/holdings", { account: true, query: stock === null ? undefined : new URLSearchParams({ symbol: stock }) });
-    const data = result(envelope);
-    return { result: data, metadata: envelopeMetadata(envelope), total: holdingsTotal(data), items: objects(data.items).map(holdingsItem) };
-  });
+export function registerAccountTools(
+  register: RegisterTool,
+  client: Tossinvest,
+) {
+  register(
+    "get_holdings",
+    { symbol: z.string().optional() },
+    { readOnlyHint: true },
+    async ({ symbol }) => {
+      const stock = parseSymbol(symbol);
+      const envelope = await client.request("/api/v1/holdings", {
+        account: true,
+        query:
+          stock === null ? undefined : new URLSearchParams({ symbol: stock }),
+      });
+      const data = result(envelope);
+      return {
+        result: data,
+        metadata: envelopeMetadata(envelope),
+        total: holdingsTotal(data),
+        items: objects(data.items).map(holdingsItem),
+      };
+    },
+  );
 
-  register("get_sellable_quantity", { symbol: z.string() }, { readOnlyHint: true }, async ({ symbol }) => {
-    const stock = parseSymbol(symbol);
-    if (stock === null) throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
-    const envelope = await client.request("/api/v1/sellable-quantity", { account: true, query: new URLSearchParams({ symbol: stock }) });
-    return { result: envelope.result, metadata: envelopeMetadata(envelope), sellable_quantity: decimal(envelope.result.sellableQuantity) };
-  });
+  register(
+    "get_sellable_quantity",
+    { symbol: z.string() },
+    { readOnlyHint: true },
+    async ({ symbol }) => {
+      const stock = parseSymbol(symbol);
+      if (stock === null) throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
+      const envelope = await client.request("/api/v1/sellable-quantity", {
+        account: true,
+        query: new URLSearchParams({ symbol: stock }),
+      });
+      return {
+        result: envelope.result,
+        metadata: envelopeMetadata(envelope),
+        sellable_quantity: decimal(envelope.result.sellableQuantity),
+      };
+    },
+  );
 
   register(
     "get_buying_power",
@@ -207,8 +246,15 @@ export function registerAccountTools(register: RegisterTool, client: Tossinvest)
       const powerResult = result(power);
       const currencyValue = value(powerResult.currency);
       return {
-        result: { buyingPower: powerResult, sellableQuantity: sellable === null ? null : sellable.result },
-        metadata: { buyingPower: envelopeMetadata(power), sellableQuantity: sellable === null ? null : envelopeMetadata(sellable) },
+        result: {
+          buyingPower: powerResult,
+          sellableQuantity: sellable === null ? null : sellable.result,
+        },
+        metadata: {
+          buyingPower: envelopeMetadata(power),
+          sellableQuantity:
+            sellable === null ? null : envelopeMetadata(sellable),
+        },
         currency: typeof currencyValue === "string" ? currencyValue : code,
         cash_buying_power: decimal(powerResult.cashBuyingPower),
         sellable_quantity:
@@ -231,11 +277,15 @@ export function registerAccountTools(register: RegisterTool, client: Tossinvest)
     async (input) => {
       const query = orderQuery(input);
       const closed = query.get("status") === "CLOSED";
-      const envelope = await client.request("/api/v1/orders", { query, account: true });
+      const envelope = await client.request("/api/v1/orders", {
+        query,
+        account: true,
+      });
       const data = result(envelope);
       const orders = objects(data.orders);
       return {
-        result: data, metadata: envelopeMetadata(envelope),
+        result: data,
+        metadata: envelopeMetadata(envelope),
         orders: orders.map(orderRow),
         nextCursor: data.nextCursor,
         hasNext: data.hasNext,
