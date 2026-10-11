@@ -88,12 +88,15 @@ async function measure(
   const conversationsBefore = await conversationCount(context, context.tokens.aunt);
   context.hermes.resetRunConcurrency();
 
-  const auntRequests = Array.from({ length: sent }, (_, index) =>
-    send(context, context.tokens.aunt, `부하 측정 ${limit}-${index + 1}`, aunt.agentCode),
-  );
-  const kidRequest = send(context, context.tokens.kid, `부하 측정 ${limit}-kid`, kidAgentCode);
-  const results = await Promise.all(auntRequests);
-  const kid = await kidRequest;
+  // 다른 사용자 요청이 먼저 실패해도 러너의 catch와 finally로 전달한다.
+  const all = await Promise.all([
+    ...Array.from({ length: sent }, (_, index) =>
+      send(context, context.tokens.aunt, `부하 측정 ${limit}-${index + 1}`, aunt.agentCode),
+    ),
+    send(context, context.tokens.kid, `부하 측정 ${limit}-kid`, kidAgentCode),
+  ]);
+  const results = all.slice(0, sent);
+  const kid = all[sent]!;
 
   const accepted = results.filter((result) => result.status === 200);
   const rejected = results.filter((result) => result.status !== 200);
