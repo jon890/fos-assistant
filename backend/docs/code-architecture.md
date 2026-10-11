@@ -11,10 +11,10 @@ chat.application의 기존 저장 서비스를 유지하고 MediaObservationPage
 관찰 REST 요청·응답은 `chat.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
 일반 대화 DTO는 `ChatDtos`에 두고, 관찰 DTO는 파일 길이 상한 안에서 기존 필드 설명을 보존하도록 관심사별로 나눈다.
 mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
-McpToolCatalog는 기존 도구와 관찰 도구의 정의를 같은 순서로 모으며 호출 시점의 설정을 읽는다.
-McpToolService는 catalog를 호출하고 기존 실행 handler를 유지한다. McpController의 분기도 그대로 둔다.
+McpToolCatalog는 기존 도구와 관찰 도구의 순서를 유지하고 끝에 memory_search 정의를 더하며 호출 시점의 설정을 읽는다.
+McpToolService는 catalog를 호출하고 실행 handler를 유지한다. McpController는 검색과 관찰 도구를 같은 요청자 판정 뒤에 처리한다.
 HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수집 전에 null로 만든다.
-공용 시험 컨텍스트는 변경하지 않는다. Memory 검색이 추가되면 그 도구의 두 경로 가림과 SQL 관측 대역도 유지한다.
+공용 시험 컨텍스트는 변경하지 않는다. Memory 검색의 detail·text 가림과 본문·암호문·COUNT 비조회를 확인하는 SQL 관측 대역도 유지한다.
 JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
 MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원문·cause를 넘기지 않는다. 인증 실패는 기존 필터가 처리한다.
 
@@ -425,6 +425,15 @@ node scripts/check-file-length.mjs --update
 갱신한 기준 파일은 같은 커밋에 넣는다. 새 코드는 기준 목록에 추가하지 않고 나눈다.
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
+
+`MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
+`MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
+writer는 facade의 트랜잭션 안에서 동작한다. 새 본문을 먼저 암호화한 뒤 이전 값을 판으로 저장하고,
+민감하게 고칠 때만 flush와 과거 평문 판의 봉인을 거쳐 현재 본문을 저장한다.
+`MemoryTitleSearch`는 제목 검색의 입력 검사와 repository 조회를 맡는다. repository만 주입받고
+`MemoryService.searchFor`의 읽기 전용 `REQUIRES_NEW`, 2초 제한 트랜잭션 안에서 실행한다.
+MCP 호출은 공개 facade의 Spring proxy를 거치므로 바깥 트랜잭션의 제한을 물려받지 않는다.
+외부 호출자는 기존 facade를 그대로 사용한다.
 
 ## 실행 공간 파일
 
