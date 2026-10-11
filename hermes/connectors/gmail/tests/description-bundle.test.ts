@@ -3,7 +3,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { expect, test } from "bun:test";
 import manifest from "../connector.json";
 
-test("커밋한 stdio bundle의 SDK 목록은 manifest 정본 설명과 같다", async () => {
+test("빌드한 stdio bundle의 SDK 목록은 manifest 정본 설명과 같다", async () => {
   const client = new Client({ name: "description-contract", version: "1.0.0" });
   const transport = new StdioClientTransport({
     command: process.execPath,
