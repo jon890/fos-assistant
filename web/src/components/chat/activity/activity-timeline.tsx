@@ -6,11 +6,13 @@ import {
   CircleAlert,
   CircleHelp,
   LoaderCircle,
+  MessageCircle,
   Square,
 } from "lucide-react";
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
+import { Markdown } from "@/components/chat/markdown";
 import {
   activityLabel,
   type ActivityItem,
@@ -60,7 +62,7 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
           item.durationMs !== null && item.state !== "running"
             ? formatSeconds(item.durationMs)
             : null;
-        const spoken = SPOKEN[item.state];
+        const spoken = item.kind === "interim" ? null : SPOKEN[item.state];
         return (
           <li
             key={item.key}
@@ -77,10 +79,16 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
               aria-hidden="true"
               className={cn(
                 "flex h-5 w-4 shrink-0 items-center justify-center",
-                markColor(item.state),
+                item.kind === "interim"
+                  ? "text-muted-foreground"
+                  : markColor(item.state),
               )}
             >
-              {MARKS[item.state]}
+              {item.kind === "interim" ? (
+                <MessageCircle className={ICON_CLASS} />
+              ) : (
+                MARKS[item.state]
+              )}
             </span>
             {spoken ? <span className="sr-only">{spoken}</span> : null}
             <div className="min-w-0 flex-1">
@@ -88,9 +96,20 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
                 {item.kind === "subagent" ? (
                   <span className="shrink-0 text-muted-foreground">도우미</span>
                 ) : null}
-                <span className="min-w-0 break-words">
-                  {activityLabel(item)}
-                </span>
+                {item.kind === "interim" ? (
+                  <span className="shrink-0 text-muted-foreground">
+                    비서 안내
+                  </span>
+                ) : null}
+                {item.kind === "interim" ? (
+                  <div className="min-w-0 break-words">
+                    <Markdown>{item.name}</Markdown>
+                  </div>
+                ) : (
+                  <span className="min-w-0 break-words">
+                    {activityLabel(item)}
+                  </span>
+                )}
                 {item.state === "failed" ? (
                   <span className="shrink-0 text-destructive">실패</span>
                 ) : null}
