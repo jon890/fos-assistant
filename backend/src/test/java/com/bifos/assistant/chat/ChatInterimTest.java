@@ -226,6 +226,7 @@ class ChatInterimTest {
         }
     }
 
+
     private void assertStoredAnswer(ChatEvent done, String answer) {
         assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(user, done.conversationId())))
             .filteredOn(message -> message.role() == MessageRole.ASSISTANT)

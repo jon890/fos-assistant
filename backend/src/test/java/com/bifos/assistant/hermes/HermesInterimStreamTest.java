@@ -25,6 +25,7 @@ class HermesInterimStreamTest {
         assertThat(events.getLast().streamedPrefixLength()).isEqualTo(text.length());
     }
 
+
     @Test
     @DisplayName("pinned SSE는 종료까지 읽고 완전 delta와 일부 접두사를 중간 안내로 확인한다")
     void readsWireAndClassifiesFullAndPartialPrefixes() throws IOException {
