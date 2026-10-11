@@ -39,6 +39,19 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import java.time.Clock;
+import java.util.Arrays;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedBy;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.auditing.DateTimeProvider;
+import org.springframework.data.domain.Auditable;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.IdClass;
@@ -97,6 +110,108 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ArchitectureRules {
+
+    /**
+     * MemoryCollection.createdAt 하나만 auditing 을 쓰며 listener, provider 와 Clock 선언이 빠지지 않는다.
+     * 실제 callback 시각과 마이크로초 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
+     */
+    public static final ArchRule AUDITING_LISTENERS_AND_CLOCK = classes()
+        .should(new ArchCondition<JavaClass>("MemoryCollection.createdAt 의 auditing listener 와 Clock 선언을 지킨다") {
+            private int entities;
+            private int configs;
+            private int providers;
+
+
+            @Override
+            public void init(Collection<JavaClass> allClasses) {
+                entities = 0;
+                configs = 0;
+                providers = 0;
+            }
+
+
+            @Override
+            public void check(JavaClass type, ConditionEvents events) {
+                boolean collection = type.getSimpleName().equals("MemoryCollection")
+                    || (type.isAnnotatedWith(Table.class)
+                        && type.getAnnotationOfType(Table.class).name().equals("memory_collection"));
+                if (collection) {
+                    entities++;
+                    require(type, type.getName().equals("com.bifos.assistant.memory.domain.MemoryCollection")
+                        && type.isAnnotatedWith(Entity.class), "MemoryCollection 선택과 Entity 선언", events);
+                    require(type, type.isAnnotatedWith(EntityListeners.class)
+                        && Arrays.asList(type.getAnnotationOfType(EntityListeners.class).value())
+                            .equals(List.of(AuditingEntityListener.class)),
+                        "EntityListeners 선언", events);
+                    Optional<JavaField> created = type.tryGetField("createdAt");
+                    require(type, created.isPresent() && created.get().getRawType().isEquivalentTo(Instant.class)
+                        && created.get().isAnnotatedWith(CreatedDate.class), "createdAt Instant 와 CreatedDate", events);
+                }
+                if (!collection) {
+                    require(type, !type.isAnnotatedWith(EntityListeners.class)
+                        || Arrays.stream((JavaClass[])type.getAnnotationOfType(EntityListeners.class.getName())
+                            .getProperties().get("value"))
+                            .noneMatch(listener -> listener.isEquivalentTo(AuditingEntityListener.class)),
+                        "허용하지 않은 AuditingEntityListener 선언", events);
+                    require(type, !type.isAssignableTo(Auditable.class),
+                        "허용하지 않은 Auditable 구현 또는 상속", events);
+                }
+                for (JavaField field : type.getFields()) {
+                    boolean allowed = collection && field.getName().equals("createdAt");
+                    require(type, (!field.isAnnotatedWith(CreatedDate.class) || allowed)
+                        && !field.isAnnotatedWith(LastModifiedDate.class)
+                        && !field.isAnnotatedWith(CreatedBy.class)
+                        && !field.isAnnotatedWith(LastModifiedBy.class), "허용하지 않은 auditing field " + field.getFullName(), events);
+                }
+                for (JavaMethod method : type.getMethods()) {
+                    require(type, !method.isAnnotatedWith(CreatedDate.class)
+                        && !method.isAnnotatedWith(LastModifiedDate.class)
+                        && !method.isAnnotatedWith(CreatedBy.class)
+                        && !method.isAnnotatedWith(LastModifiedBy.class), "허용하지 않은 auditing getter " + method.getFullName(), events);
+                    if (method.isAnnotatedWith(Bean.class)) {
+                        Bean bean = method.getAnnotationOfType(Bean.class);
+                        boolean named = Arrays.asList(bean.value()).contains("auditingDateTimeProvider")
+                            || Arrays.asList(bean.name()).contains("auditingDateTimeProvider")
+                            || (bean.value().length == 0 && bean.name().length == 0
+                                && method.getName().equals("auditingDateTimeProvider"));
+                        if (named) {
+                            providers++;
+                            require(type, type.getSimpleName().equals("JpaAuditingConfig")
+                                && method.getRawReturnType().isEquivalentTo(DateTimeProvider.class)
+                                && method.getRawParameterTypes().size() == 1
+                                && method.getRawParameterTypes().getFirst().isEquivalentTo(Clock.class),
+                                "auditingDateTimeProvider Bean 반환과 Clock 인자", events);
+                        }
+                    }
+                }
+                if (type.getSimpleName().equals("JpaAuditingConfig") || type.isAnnotatedWith(EnableJpaAuditing.class)) {
+                    configs++;
+                    require(type, type.getName().equals("com.bifos.assistant.shared.config.JpaAuditingConfig")
+                        && type.isAnnotatedWith(Configuration.class)
+                        && type.isAnnotatedWith(EnableJpaAuditing.class)
+                        && type.getAnnotationOfType(EnableJpaAuditing.class).dateTimeProviderRef()
+                            .equals("auditingDateTimeProvider"),
+                        "JpaAuditingConfig providerRef 선언", events);
+                }
+            }
+
+
+            @Override
+            public void finish(ConditionEvents events) {
+                if (entities != 1 || configs != 1 || providers != 1) {
+                    events.add(SimpleConditionEvent.violated("auditing", "MemoryCollection / JpaAuditingConfig / auditingDateTimeProvider 선택 수는 각각 1: "
+                        + entities + " / " + configs + " / " + providers));
+                }
+            }
+        });
+
+
+    private static void require(JavaClass type, boolean valid, String detail, ConditionEvents events) {
+        if (!valid) {
+            events.add(SimpleConditionEvent.violated(type, type.getName() + ": " + detail));
+        }
+    }
+
 
     /** Spring 의 {@code Transactional} 을 import 하므로 Jakarta 쪽은 이 상수에서만 전체 이름으로 쓴다. */
     private static final Class<? extends Annotation> JAKARTA_TRANSACTIONAL = jakarta.transaction.Transactional.class; // 전체 이름 허용: Spring 과 Jakarta 의 Transactional 이름이 같다
@@ -378,13 +493,6 @@ public final class ArchitectureRules {
     }
 
 
-    private static void require(JavaClass item, boolean valid, String explanation, ConditionEvents events) {
-        if (!valid) {
-            events.add(SimpleConditionEvent.violated(item, item.getName() + ": " + explanation));
-        }
-    }
-
-
     /**
      * {@code orchestration} 은 {@code mcp} 에 의존하지 않는다.
      *
@@ -628,6 +736,14 @@ public final class ArchitectureRules {
         .should()
         .callMethod(Executors.class, "newVirtualThreadPerTaskExecutor")
         .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
+
+    /**
+     * 에이전트 설정 두 타입의 이름·prefix·개수와 config 역할을 raw 검사한다.
+     * 옛 package 복귀와 누락도 선택 범위에서 빠지지 않는다. 다른 기능의 배치는 검사하지 않는다.
+     */
+    public static final ArchRule FEATURE_CONFIG_PLACEMENT = classes()
+        .should(new AgentConfigPlacement())
+        .as("에이전트 설정은 agent.config에 유일하게 있고 config에는 설정만 둔다");
 
     /**
      * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.
