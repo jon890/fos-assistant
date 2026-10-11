@@ -64,6 +64,7 @@ class ContentDraftIdempotencyMysqlTest extends ContentDraftIdempotencyTest {
         Assertions.assertThat(draftRows.count()).isZero();
     }
 
+
     @DynamicPropertySource
     static void mysql(DynamicPropertyRegistry registry) {
         var database = MysqlTestDatabase.create();

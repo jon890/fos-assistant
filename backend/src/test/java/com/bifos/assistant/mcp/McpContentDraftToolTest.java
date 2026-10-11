@@ -105,6 +105,7 @@ class McpContentDraftToolTest {
     private String root;
     private String token;
 
+
     @BeforeEach
     void prepare() {
         clock.set(Instant.parse("2026-10-10T01:00:00Z"));
@@ -117,6 +118,7 @@ class McpContentDraftToolTest {
         origin = McpCallSigner.running(executions, agents, owner.id(), conversation.id(), PROFILE, root);
     }
 
+
     @AfterEach
     void cleanup() {
         calls.deleteAll();
@@ -128,6 +130,7 @@ class McpContentDraftToolTest {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         jdbc.update("update agent set enabled=true,deleted_at=null,hermes_profile=? where id=?", PROFILE, origin.agentId());
     }
+
 
     @Test
     @DisplayName("실제 commit 뒤 프록시 응답 단절과 두 재호출은 같은 원고이며 CAS 뒤 현재 판을 읽는다")
@@ -170,6 +173,7 @@ class McpContentDraftToolTest {
         assertThat(calls.count()).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("동시 HTTP 같은 서명 전송은 한 원고와 한 생성 및 전송 대응만 저장한다")
     void serializesTwoHttpRequestsAtDatabaseBoundary() throws Exception {
@@ -192,6 +196,7 @@ class McpContentDraftToolTest {
         assertThat(calls.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("최상위 null unknown requestId 교체와 revision coercion은 안전한 -32602이고 저장하지 않는다")
     void rejectsStrictArgumentShapesBeforeServiceWrites() throws Exception {
@@ -212,6 +217,7 @@ class McpContentDraftToolTest {
         assertThat(requests.count()).isZero();
     }
 
+
     @Test
     @DisplayName("완료 origin의 등록 child는 읽고 origin 취소와 현재 agent 철회는 본문과 번호를 차단한다")
     void preservesCompletedChildAndCancellationContract() throws Exception {
@@ -230,6 +236,7 @@ class McpContentDraftToolTest {
         assertContext(call(McpContentDraftTools.WRITE, args, child, "call_4"));
         assertThat(drafts.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("서비스 commit 직후 agent 권한을 잃으면 성공과 typed 오류의 본문과 번호를 차단한다")
@@ -258,6 +265,7 @@ class McpContentDraftToolTest {
         Mockito.verify(fake, Mockito.times(1)).createIdempotent(any(), any(), any(), any());
     }
 
+
     private ObjectNode body(String title) {
         var body = json.createObjectNode().put("title", title).put("category", "분류");
         body.putArray("tags");
@@ -265,15 +273,18 @@ class McpContentDraftToolTest {
         return body;
     }
 
+
     private ObjectNode creating() {
         var args = json.createObjectNode().put("requestId", UUID.randomUUID().toString());
         args.set("draft", body(MARKER));
         return args;
     }
 
+
     private JsonNode call(String tool, ObjectNode args, String session, String callId) throws Exception {
         return json.readTree(send(rpc(tool, args, session, callId).getBytes(StandardCharsets.UTF_8)).body());
     }
+
 
     private String rpc(String tool, ObjectNode args, String session, String callId) {
         var signed = args.deepCopy();
@@ -283,11 +294,13 @@ class McpContentDraftToolTest {
         return json.writeValueAsString(rpc);
     }
 
+
     private HttpResponse<String> send(byte[] body) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
             .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofByteArray(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
+
 
     private JsonNode data(JsonNode response) {
         assertThat(response.path("result").path("isError").booleanValue()).as(response.toString()).isFalse();
@@ -295,6 +308,7 @@ class McpContentDraftToolTest {
         String begin = "\n<external-data>\n";
         return json.readTree(text.substring(text.indexOf(begin) + begin.length(), text.lastIndexOf("</external-data>")));
     }
+
 
     private static void assertContext(JsonNode response) {
         assertThat(response.toString()).contains("호출 맥락을 확인할 수 없습니다").doesNotContain(MARKER, "currentRevision");

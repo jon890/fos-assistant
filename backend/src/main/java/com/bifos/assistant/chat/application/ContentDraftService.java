@@ -105,6 +105,7 @@ public class ContentDraftService {
         return result.view();
     }
 
+
     private ReadResult createIdempotentLocked(CurrentUser user, ContentDraftCreationContext context,
         UUID requestId, ContentDraftInput input, byte[] hash, boolean allowCreate) {
         requireWritable(user, context.conversationId());
@@ -157,10 +158,12 @@ public class ContentDraftService {
         return readLocked(user, context.conversationId(), draft, null);
     }
 
+
     private void saveCall(ContentDraftCreationContext context, ContentDraftCreationRequest request) {
         creationCalls.saveAndFlush(new ContentDraftCreationCall(context.callKey(), context.callIdentityKey(),
             request.id(), context.sessionId(), context.toolCallId()));
     }
+
 
     private ContentDraft createLocked(CurrentUser user, Long conversationId, UUID id, ContentDraftInput input) {
         var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
@@ -171,9 +174,11 @@ public class ContentDraftService {
         return draft;
     }
 
+
     private static ApiException invalidContext() {
         return new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
     }
+
 
     public ContentDraftView revise(CurrentUser user, Long conversationId, UUID id, long expectedRevision, ContentDraftInput input) {
         requireWritable(user, conversationId);
@@ -250,19 +255,20 @@ public class ContentDraftService {
 
 
     private ReadResult readLocked(CurrentUser user, Long conversationId, ContentDraft draft, Long revision) {
-    var conversation = access.requireOwn(user, conversationId);
-    var row = revisions.findByDraftIdAndRevision(draft.id(), revision == null ? draft.currentRevision() : revision)
-        .orElseThrow(ContentDraftService::notFound);
-    var error = check(draft, row);
-    if (error != null) {
-        return new ReadResult(null, error);
+        var conversation = access.requireOwn(user, conversationId);
+        var row = revisions.findByDraftIdAndRevision(draft.id(), revision == null ? draft.currentRevision() : revision)
+            .orElseThrow(ContentDraftService::notFound);
+        var error = check(draft, row);
+        if (error != null) {
+            return new ReadResult(null, error);
+        }
+        var input = open(draft, row);
+        var canonical = new CanonicalDraft(1, UUID.fromString(draft.publicId()), row.revision(), conversation.publicId(),
+            input.title(), input.category(), input.tags(), input.blocks());
+        error = check(draft, row);
+        return new ReadResult(error == null ? new ContentDraftView(canonical, "DRAFTING", draft.expiresAt()) : null, error);
     }
-    var input = open(draft, row);
-    var canonical = new CanonicalDraft(1, UUID.fromString(draft.publicId()), row.revision(), conversation.publicId(),
-        input.title(), input.category(), input.tags(), input.blocks());
-    error = check(draft, row);
-    return new ReadResult(error == null ? new ContentDraftView(canonical, "DRAFTING", draft.expiresAt()) : null, error);
-    }
+
 
     private ContentDraftException check(ContentDraft draft, ContentDraftRevision row) {
         if (!draft.expiresAt().isAfter(clock.instant()) || row.status() == ContentDraftRevisionStatus.EXPIRED) {
@@ -282,6 +288,7 @@ public class ContentDraftService {
         revisions.expire(draft.id());
         creationRequests.findByDraftPublicId(draft.publicId()).forEach(ContentDraftCreationRequest::markGone);
     }
+
 
     private ContentDraftInput open(ContentDraft draft, ContentDraftRevision row) {
         try {

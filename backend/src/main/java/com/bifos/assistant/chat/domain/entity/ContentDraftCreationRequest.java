@@ -70,6 +70,7 @@ public class ContentDraftCreationRequest {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     public ContentDraftCreationRequest(byte[] creationKey, byte[] identityKey, Long ownerUserId, Long conversationId, String profileName, Long originExecutionId, Long rootExecutionId, String rootSessionId, String requestId, byte[] requestHash, String draftPublicId, Instant createdAt) {
         this.creationKey = creationKey;
         this.identityKey = identityKey;
@@ -85,6 +86,7 @@ public class ContentDraftCreationRequest {
         this.createdAt = createdAt;
         this.status = ContentDraftCreationStatus.CREATED;
     }
+
 
     public void markGone() {
         status = ContentDraftCreationStatus.GONE;

@@ -88,6 +88,7 @@ class HermesRunEventStreamTest {
         assertThat(parse("{\"event\":\"tool.completed\",\"tool\":\"not_content_draft_write\",\"text\":\"다른본문\"}").text()).isEqualTo("다른본문");
     }
 
+
     private final JsonMapper mapper = JsonMapper.builder().build();
 
 

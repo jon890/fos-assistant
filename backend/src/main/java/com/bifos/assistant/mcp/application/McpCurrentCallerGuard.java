@@ -18,6 +18,7 @@ public class McpCurrentCallerGuard {
     private final SessionOwnerResolver sessions;
     private final TransactionTemplate permissions;
 
+
     public McpCurrentCallerGuard(UserAccessPolicy users, AgentService agents,
         SessionOwnerResolver sessions, PlatformTransactionManager manager) {
         this.users = users;
@@ -27,6 +28,7 @@ public class McpCurrentCallerGuard {
         permissions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         permissions.setReadOnly(true);
     }
+
 
     public void requireCurrent(McpCaller caller) {
         permissions.executeWithoutResult(status -> {
@@ -56,6 +58,5 @@ public class McpCurrentCallerGuard {
     private static ApiException invalidContext() {
         return new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
     }
-
 
 }

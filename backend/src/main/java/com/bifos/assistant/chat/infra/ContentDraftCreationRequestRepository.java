@@ -8,9 +8,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ContentDraftCreationRequestRepository extends JpaRepository<ContentDraftCreationRequest, Long> {
     Optional<ContentDraftCreationRequest> findByCreationKey(byte[] key);
 
+
     Optional<ContentDraftCreationRequest> findByIdentityKey(byte[] key);
 
+
     List<ContentDraftCreationRequest> findByConversationIdOrderByIdAsc(Long conversationId);
+
 
     List<ContentDraftCreationRequest> findByDraftPublicId(String draftPublicId);
 }

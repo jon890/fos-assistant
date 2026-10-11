@@ -29,6 +29,7 @@ public class McpContentDraftTools {
     private final McpCurrentCallerGuard guard;
     private final ObjectMapper json;
 
+
     public Map<String, Object> write(McpCaller caller, UUID requestId, UUID draftId, Long expectedRevision, JsonNode body) {
         return guarded(caller, () -> {
             var input = reader.read(body);
@@ -44,9 +45,11 @@ public class McpContentDraftTools {
         });
     }
 
+
     public Map<String, Object> read(McpCaller caller, UUID draftId, Long revision) {
         return guarded(caller, () -> drafts.read(caller.user(), caller.originExecution().conversationId(), draftId, revision));
     }
+
 
     private Map<String, Object> guarded(McpCaller caller, Supplier<ContentDraftView> work) {
         try {
@@ -84,9 +87,11 @@ public class McpContentDraftTools {
         }
     }
 
+
     private static Map<String, Object> invalidContext() {
         return McpToolService.result("호출 맥락을 확인할 수 없습니다. 새 대화에서 다시 시도해 주세요.", true);
     }
+
 
     public Map<String, Object> writeDefinition() {
         var fields = Map.<String, Object>of("requestId", uuid(), "draftId", uuid(), "expectedRevision", revision(true), "draft", draftSchema());
@@ -98,13 +103,16 @@ public class McpContentDraftTools {
         return Map.of("name", WRITE, "description",
             "현재 대화의 원고를 저장한다. 첫 생성은 requestId UUID를 한 번 정한다. 응답 유실 뒤 재시도는 같은 requestId와 최초 원고를 그대로 보낸다. "
                 + "별도 원고 의도일 때만 새 requestId와 새 도구 호출을 쓴다. 수정은 draftId와 expectedRevision을 함께 주고 requestId는 생략한다. "
-                + "사진은 다시 분석하지 않으며 충돌은 현재 revision을 읽고 판단한다.", "inputSchema", schema);
+                + "사진은 다시 분석하지 않으며 충돌은 현재 revision을 읽고 판단한다.",
+            "inputSchema", schema);
     }
+
 
     public Map<String, Object> readDefinition() {
         return Map.of("name", READ, "description", "현재 대화의 원고를 읽는다. revision을 생략하면 현재 판을 읽는다.",
             "inputSchema", object(Map.of("draftId", uuid(), "revision", revision(false)), List.of("draftId")));
     }
+
 
     private static Map<String, Object> draftSchema() {
         var observation = object(Map.of("id", assetId(), "revision", revision(false)), List.of("id", "revision"));
@@ -120,21 +128,26 @@ public class McpContentDraftTools {
             List.of("title", "category", "tags", "blocks"));
     }
 
+
     private static Map<String, Object> assetId() {
         return Map.of("type", "string", "pattern", "^[1-9][0-9]{0,18}$");
     }
+
 
     private static Map<String, Object> uuid() {
         return Map.of("type", "string", "format", "uuid", "pattern", "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
     }
 
+
     private static Map<String, Object> revision(boolean writing) {
         return Map.of("type", "integer", "minimum", 1, "maximum", ContentDraftInputReader.MAX_REVISION - (writing ? 1 : 0));
     }
 
+
     private static Map<String, Object> text(int min, int max) {
         return Map.of("type", "string", "minLength", min, "maxLength", max);
     }
+
 
     private static LinkedHashMap<String, Object> object(Map<String, Object> properties, List<String> required) {
         return new LinkedHashMap<>(Map.of("type", "object", "additionalProperties", false, "properties", properties, "required", required));

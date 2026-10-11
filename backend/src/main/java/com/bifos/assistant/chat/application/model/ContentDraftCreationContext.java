@@ -11,6 +11,8 @@ import tools.jackson.databind.json.JsonMapper;
 /** 서명과 현재 호출자 검사로 얻은 생성 범위다. 모델 인자로 받지 않는다. */
 public record ContentDraftCreationContext(Long ownerUserId, Long conversationId, String profileName,
     Long originExecutionId, Long rootExecutionId, String rootSessionId, String sessionId, String toolCallId) {
+
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String PURPOSE = "CONTENT_DRAFT_CREATE";
 
@@ -20,6 +22,7 @@ public record ContentDraftCreationContext(Long ownerUserId, Long conversationId,
         return hash(tuple);
     }
 
+
     public byte[] callKey() {
         var tuple = scope();
         tuple.add(sessionId);
@@ -27,19 +30,23 @@ public record ContentDraftCreationContext(Long ownerUserId, Long conversationId,
         return hash(tuple);
     }
 
+
     public byte[] creationIdentityKey(UUID requestId) {
         return hash(List.of(1, ownerUserId, conversationId, profileName, PURPOSE, requestId.toString()));
     }
 
+
     public byte[] callIdentityKey() {
         return hash(List.of(1, ownerUserId, conversationId, profileName, rootSessionId, PURPOSE, sessionId, toolCallId));
     }
+
 
     public boolean matches(ContentDraftCreationRequest row) {
         return ownerUserId.equals(row.ownerUserId()) && conversationId.equals(row.conversationId())
             && profileName.equals(row.profileName()) && originExecutionId.equals(row.originExecutionId())
             && rootExecutionId.equals(row.rootExecutionId()) && rootSessionId.equals(row.rootSessionId());
     }
+
 
     public static byte[] requestHash(ContentDraftInput input) {
         var tuples = new ArrayList<Object>();
@@ -60,14 +67,17 @@ public record ContentDraftCreationContext(Long ownerUserId, Long conversationId,
         return hash(List.of(1, PURPOSE, input.title(), input.category(), input.tags(), tuples));
     }
 
+
     private ArrayList<Object> scope() {
         return new ArrayList<>(List.of(1, ownerUserId, conversationId, profileName, originExecutionId,
             rootExecutionId, rootSessionId, PURPOSE));
     }
 
+
     private static byte[] hash(Object tuple) {
         return Sha256.newDigest().digest(JSON.writeValueAsBytes(tuple));
     }
+
 
     @Override
     public String toString() {

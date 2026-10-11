@@ -26,6 +26,7 @@ public final class McpDtos {
                 modifying ? draftUuid(node.get("draftId")) : null, revision, node.get("draft"));
         }
 
+
         @Override
         public String toString() {
             return "ContentDraftWriteArguments[body omitted]";
@@ -40,12 +41,14 @@ public final class McpDtos {
         }
     }
 
+
     private static UUID draftUuid(JsonNode node) {
         if (node == null || !node.isString()) {
             throw ContentDraftInputReader.invalid();
         }
         return ContentDraftInputReader.uuid(node.stringValue());
     }
+
 
     public record MediaObservationListArguments(String afterAssetId, int limit) {
         static MediaObservationListArguments from(JsonNode node) {

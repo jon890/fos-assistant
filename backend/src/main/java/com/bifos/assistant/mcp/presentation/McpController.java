@@ -84,26 +84,27 @@ public class McpController {
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
 
+
     /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
     private Map<String, ToolHandler> handlers() {
         return Map.ofEntries(
-        Map.entry(MEMORY_READ, this::readMemory),
-        Map.entry(MEMORY_SEARCH, this::searchMemory),
-        Map.entry(ARTIFACT_WRITE, this::writeArtifact),
-        Map.entry(AGENT_LIST, this::listAgents),
-        Map.entry(AGENT_STATUS, this::agentStatus),
-        Map.entry(AGENT_DELEGATE, this::agentDelegate),
-        Map.entry(AGENT_STOP, this::agentStop),
-        Map.entry(FOLLOW_UP_PROPOSE, this::proposeFollowUp),
-        Map.entry(MEMORY_REMEMBER, this::remember),
-        Map.entry(McpMediaObservationTools.LIST, (caller, id, args) -> validated(id, args,
-            MediaObservationListArguments::from, value -> this.mediaObservations.list(caller, value.afterAssetId(), value.limit()))),
-        Map.entry(McpMediaObservationTools.RECORD, (caller, id, args) -> validated(id, args,
-            MediaObservationRecordArguments::from, value -> this.mediaObservations.record(caller, value.assetId(), value.expectedRevision(), value.requestId(), value.observation()))),
-        Map.entry(McpContentDraftTools.WRITE, (caller, id, args) -> validated(id, args,
-            ContentDraftWriteArguments::from, value -> this.contentDrafts.write(caller, value.requestId(), value.draftId(), value.expectedRevision(), value.draft()))),
-        Map.entry(McpContentDraftTools.READ, (caller, id, args) -> validated(id, args,
-            ContentDraftReadArguments::from, value -> this.contentDrafts.read(caller, value.draftId(), value.revision()))));
+            Map.entry(MEMORY_READ, this::readMemory),
+            Map.entry(MEMORY_SEARCH, this::searchMemory),
+            Map.entry(ARTIFACT_WRITE, this::writeArtifact),
+            Map.entry(AGENT_LIST, this::listAgents),
+            Map.entry(AGENT_STATUS, this::agentStatus),
+            Map.entry(AGENT_DELEGATE, this::agentDelegate),
+            Map.entry(AGENT_STOP, this::agentStop),
+            Map.entry(FOLLOW_UP_PROPOSE, this::proposeFollowUp),
+            Map.entry(MEMORY_REMEMBER, this::remember),
+            Map.entry(McpMediaObservationTools.LIST, (caller, id, args) -> validated(id, args,
+                MediaObservationListArguments::from, value -> this.mediaObservations.list(caller, value.afterAssetId(), value.limit()))),
+            Map.entry(McpMediaObservationTools.RECORD, (caller, id, args) -> validated(id, args,
+                MediaObservationRecordArguments::from, value -> this.mediaObservations.record(caller, value.assetId(), value.expectedRevision(), value.requestId(), value.observation()))),
+            Map.entry(McpContentDraftTools.WRITE, (caller, id, args) -> validated(id, args,
+                ContentDraftWriteArguments::from, value -> this.contentDrafts.write(caller, value.requestId(), value.draftId(), value.expectedRevision(), value.draft()))),
+            Map.entry(McpContentDraftTools.READ, (caller, id, args) -> validated(id, args,
+                ContentDraftReadArguments::from, value -> this.contentDrafts.read(caller, value.draftId(), value.revision()))));
     }
 
 
@@ -236,6 +237,7 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
     }
+
 
     private Map<String, Object> readMemory(McpCaller caller, JsonNode id, JsonNode arguments) {
         JsonNode memoryId = arguments.get("id");

@@ -41,6 +41,7 @@ public class ContentDraftCreationCall {
     @Column(name = "tool_call_id", nullable = false, columnDefinition = "LONGTEXT")
     private String toolCallId;
 
+
     public ContentDraftCreationCall(byte[] callKey, byte[] identityKey, Long creationRequestId, String sessionId, String toolCallId) {
         this.callKey = callKey;
         this.identityKey = identityKey;

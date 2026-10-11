@@ -51,12 +51,14 @@ class McpCallerInvariantTest {
     private String unboundToken;
     private long unboundTokenId;
 
+
     @BeforeEach
     void setUp() {
         tokenRepository.deleteAll();
         unboundToken = "unbound-" + UUID.randomUUID();
         unboundTokenId = McpCallSigner.insertUnboundToken(jdbc, unboundToken, "unbound");
     }
+
 
     @Test
     @DisplayName("profile 이 빈 토큰은 목록과 모든 도구가 401 이고 사용 시각을 남기지 않는다")
@@ -73,13 +75,14 @@ class McpCallerInvariantTest {
         for (Map.Entry<String, String> request : requests.entrySet()) {
             HttpResponse<String> response = send(unboundToken, request.getValue());
             assertThat(response.statusCode())
-                    .as("%s 의 HTTP 상태, 본문: %s", request.getKey(), response.body())
-                    .isEqualTo(401);
+                .as("%s 의 HTTP 상태, 본문: %s", request.getKey(), response.body())
+                .isEqualTo(401);
         }
         assertThat(tokenRepository.findById(unboundTokenId).orElseThrow().lastUsedAt())
-                .as("profile 이 빈 토큰의 사용 시각")
-                .isNull();
+            .as("profile 이 빈 토큰의 사용 시각")
+            .isNull();
     }
+
 
     @Test
     @DisplayName("profile 이 빈 토큰은 하위 에이전트 session 을 등록하지 못한다")
@@ -88,25 +91,26 @@ class McpCallerInvariantTest {
         String child = "하위-" + UUID.randomUUID();
 
         HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(
-                                URI.create("http://localhost:" + port + "/internal/hermes/session-bindings/subagent"))
-                        .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + unboundToken)
-                        .POST(HttpRequest.BodyPublishers.ofString(
-                                McpCallSigner.subagentBody(unboundToken, root, root, child)
-                                        .toString()))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder(
+                URI.create("http://localhost:" + port + "/internal/hermes/session-bindings/subagent"))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + unboundToken)
+                .POST(HttpRequest.BodyPublishers.ofString(
+                    McpCallSigner.subagentBody(unboundToken, root, root, child)
+                        .toString()))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).as("등록 응답: %s", response.body()).isEqualTo(401);
         assertThat(jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM hermes_session_binding WHERE session_id = ?", Integer.class, child))
+            "SELECT COUNT(*) FROM hermes_session_binding WHERE session_id = ?", Integer.class, child))
                 .as("등록 줄 수")
                 .isZero();
         assertThat(tokenRepository.findById(unboundTokenId).orElseThrow().lastUsedAt())
-                .as("profile 이 빈 토큰의 사용 시각")
-                .isNull();
+            .as("profile 이 빈 토큰의 사용 시각")
+            .isNull();
     }
+
 
     @Test
     @DisplayName("profile 에 묶인 토큰도 fos ctx 가 없으면 모든 도구가 호출 맥락 오류다")
@@ -116,17 +120,18 @@ class McpCallerInvariantTest {
         for (Map.Entry<String, ObjectNode> tool : toolArguments().entrySet()) {
             HttpResponse<String> response = send(bound, toolCall(tool.getKey(), tool.getValue()));
             assertThat(response.statusCode())
-                    .as("%s 의 HTTP 상태, 본문: %s", tool.getKey(), response.body())
-                    .isEqualTo(200);
+                .as("%s 의 HTTP 상태, 본문: %s", tool.getKey(), response.body())
+                .isEqualTo(200);
             JsonNode result = json.readTree(response.body()).path("result");
             assertThat(result.path("isError").asBoolean())
-                    .as("%s 의 결과: %s", tool.getKey(), result)
-                    .isTrue();
+                .as("%s 의 결과: %s", tool.getKey(), result)
+                .isTrue();
             assertThat(result.path("content").get(0).path("text").asString())
-                    .as("%s 의 문구", tool.getKey())
-                    .isEqualTo(INVALID_CONTEXT);
+                .as("%s 의 문구", tool.getKey())
+                .isEqualTo(INVALID_CONTEXT);
         }
     }
+
 
     /** 요청자 판정이 인자 검사보다 먼저이므로 인자 모양과 무관하게 같은 결과여야 한다. */
     private Map<String, ObjectNode> toolArguments() {
@@ -135,8 +140,8 @@ class McpCallerInvariantTest {
         arguments.put("artifact_write", json.createObjectNode());
         arguments.put("agent_list", json.createObjectNode());
         arguments.put(
-                "agent_delegate",
-                json.createObjectNode().put("agent_code", "worker").put("task", "일"));
+            "agent_delegate",
+            json.createObjectNode().put("agent_code", "worker").put("task", "일"));
         arguments.put("agent_status", json.createObjectNode().put("execution_id", 1));
         arguments.put("agent_stop", json.createObjectNode().put("execution_id", 1));
         arguments.put("follow_up_propose", json.createObjectNode().put("title", "할 일 검사 7391"));
@@ -144,6 +149,7 @@ class McpCallerInvariantTest {
         arguments.put("content_draft_read", json.createObjectNode());
         return arguments;
     }
+
 
     private String toolCall(String name, JsonNode arguments) {
         ObjectNode params = json.createObjectNode();
@@ -157,13 +163,14 @@ class McpCallerInvariantTest {
         return json.writeValueAsString(request);
     }
 
+
     private HttpResponse<String> send(String token, String request) throws Exception {
         return client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
-                        .header("Authorization", "Bearer " + token)
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(request))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(request))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
     }
 }

@@ -371,6 +371,7 @@ public class HermesRunEventStream {
         return false;
     }
 
+
     private static boolean memoryReadResult(String type, String toolName) {
         return toolName != null
             && toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)

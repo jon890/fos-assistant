@@ -50,6 +50,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(creationCalls.count()).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("최초 본문 변조와 같은 전송의 요청 교체는 typed 충돌이고 새 turn 재생은 맥락 오류다")
     void rejectsChangedBodyRequestAndOriginWithoutNewDrafts() {
@@ -69,6 +70,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(revisionRows.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("같은 origin의 다른 session에 있는 같은 도구 번호는 독립된 전송이다")
     void separatesCallsInDifferentSessions() {
@@ -78,6 +80,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(second.draft().draftId()).isNotEqualTo(first.draft().draftId());
         assertThat(creationCalls.count()).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("만료 경계와 cleaner 재시작 뒤 tombstone은 hash와 참조 없이 재생성을 막는다")
@@ -98,6 +101,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(creationCalls.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("참조 STALE는 소비 키를 유지하고 기존 CAS로 회복하면 현재 판을 반환한다")
     void keepsStaleKeyUntilCasRepairsReferences() {
@@ -111,6 +115,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(drafts.createIdempotent(owner, scope("call_3"), id, input).draft().title()).isEqualTo("회복");
         assertThat(draftRows.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("별도 연결의 동시 같은 생성은 한 원고 한 revision 한 대응만 커밋한다")
@@ -134,6 +139,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(creationCalls.count()).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("암호화와 asset 대응 insert 및 commit 실패는 다섯 표 전체를 rollback하고 같은 키로 회복한다")
     void rollsBackEveryParticipantBeforeRetry() {
@@ -150,7 +156,8 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
                 case "asset" -> Mockito.doThrow(failureException).when(failedAssets).save(ArgumentMatchers.any());
                 case "request" -> Mockito.doThrow(failureException).when(failedRequests).saveAndFlush(ArgumentMatchers.any());
                 case "call" -> Mockito.doThrow(failureException).when(failedCalls).saveAndFlush(ArgumentMatchers.any());
-                default -> { }
+                default -> {
+                }
             }
             var localBodies = new ContentDraftBodies(cipher) {
                 @Override
@@ -190,6 +197,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         }
     }
 
+
     @Test
     @DisplayName("대화 purge는 두 대응을 tombstone으로 남기고 원고와 본문을 물리 삭제한다")
     void preservesConsumedIdentityAfterConversationPurge() {
@@ -207,6 +215,7 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThatThrownBy(() -> drafts.createIdempotent(owner, scope("call_2"), id, inputDraft("purge", false)))
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND));
     }
+
 
     @Test
     @DisplayName("동시 같은 키의 다른 본문은 성공 하나와 충돌 하나이고 최초 본문을 보존한다")
@@ -238,9 +247,11 @@ class ContentDraftIdempotencyTest extends ContentDraftFixture {
         assertThat(creationCalls.count()).isEqualTo(1);
     }
 
+
     private ContentDraftCreationContext scope(String call) {
         return new ContentDraftCreationContext(owner.id(), conversation.id(), "profile", 99L, 99L, "root", "root", call);
     }
+
 
     private static void assertGone(Runnable work) {
         assertThatThrownBy(work::run).isInstanceOfSatisfying(ContentDraftException.class, ex -> {

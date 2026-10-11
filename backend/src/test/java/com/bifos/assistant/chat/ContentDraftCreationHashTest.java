@@ -16,6 +16,7 @@ class ContentDraftCreationHashTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private final ContentDraftInputReader reader = new ContentDraftInputReader();
 
+
     @Test
     @DisplayName("독립 Python compact UTF8 배열 golden vector와 네 식별 키 및 본문 hash가 같다")
     void matchesIndependentUtf8GoldenVectors() {
@@ -39,6 +40,7 @@ class ContentDraftCreationHashTest {
         assertThat(HexFormat.of().formatHex(ContentDraftCreationContext.requestHash(input)))
             .isEqualTo("d95699aeef1aa82b4184f2c39890ad69c44e0b51009e1007794bfda16166d7eb");
     }
+
 
     @Test
     @DisplayName("객체 순서와 escape는 같고 Unicode 조합 배열 순서와 caption 생략은 다르다")

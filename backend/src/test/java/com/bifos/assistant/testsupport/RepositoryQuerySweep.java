@@ -42,10 +42,12 @@ public class RepositoryQuerySweep {
     private final ApplicationContext context;
     private final TransactionTemplate transaction;
 
+
     public RepositoryQuerySweep(ApplicationContext context, PlatformTransactionManager transactionManager) {
         this.context = context;
         this.transaction = new TransactionTemplate(transactionManager);
     }
+
 
     /**
      * @param repositories 찾은 저장소 인터페이스의 단순 이름. 선언 메서드가 없는 저장소도 담는다
@@ -55,14 +57,17 @@ public class RepositoryQuerySweep {
      * @param staleExclusions 제외 목록에 있는데 찾지 못한 이름
      */
     public record Result(
-            List<String> repositories,
-            List<String> executed,
-            List<Failure> failures,
-            List<String> unsupported,
-            Set<String> staleExclusions) {}
+        List<String> repositories,
+        List<String> executed,
+        List<Failure> failures,
+        List<String> unsupported,
+        Set<String> staleExclusions) {
+    }
 
     /** 메서드 이름은 {@code 인터페이스 단순 이름.메서드 이름} 이다. */
-    public record Failure(String method, Throwable cause) {}
+    public record Failure(String method, Throwable cause) {
+    }
+
 
     /**
      * 저장소 메서드를 모두 실행한 뒤 결과를 준다. 실패한 쿼리가 뒤의 메서드를 막지 않는다.
@@ -109,29 +114,31 @@ public class RepositoryQuerySweep {
         Set<String> staleExclusions = new TreeSet<>(excluded);
         staleExclusions.removeAll(targets.keySet());
         return new Result(
-                List.copyOf(repositories),
-                List.copyOf(executed),
-                List.copyOf(failures),
-                List.copyOf(unsupported),
-                staleExclusions);
+            List.copyOf(repositories),
+            List.copyOf(executed),
+            List.copyOf(failures),
+            List.copyOf(unsupported),
+            staleExclusions);
     }
+
 
     private List<Class<?>> repositoryInterfaces() {
         return context.getBeansOfType(RepositoryFactoryInformation.class).values().stream()
-                .<Class<?>>map(
-                        information -> information.getRepositoryInformation().getRepositoryInterface())
-                .filter(type -> type.getPackageName().startsWith(BASE_PACKAGE))
-                .sorted(Comparator.comparing(Class::getName))
-                .toList();
+            .<Class<?>>map(
+                information -> information.getRepositoryInformation().getRepositoryInterface())
+            .filter(type -> type.getPackageName().startsWith(BASE_PACKAGE))
+            .sorted(Comparator.comparing(Class::getName))
+            .toList();
     }
+
 
     private static List<Method> declaredQueryMethods(Class<?> repositoryInterface) {
         return Arrays.stream(repositoryInterface.getDeclaredMethods())
-                .filter(method ->
-                        !method.isDefault() && !method.isSynthetic() && !Modifier.isStatic(method.getModifiers()))
-                .sorted(Comparator.comparing(Method::getName))
-                .toList();
+            .filter(method -> !method.isDefault() && !method.isSynthetic() && !Modifier.isStatic(method.getModifiers()))
+            .sorted(Comparator.comparing(Method::getName))
+            .toList();
     }
+
 
     /** 예외 없이 끝나면 null 을, 아니면 그 예외를 준다. 쿼리가 실패해도 트랜잭션은 되돌린다. */
     private Throwable invoke(Target target, Object[] arguments) {
@@ -156,6 +163,7 @@ public class RepositoryQuerySweep {
         }
     }
 
+
     private static Object[] arguments(Method method) {
         Type[] types = method.getGenericParameterTypes();
         Object[] arguments = new Object[types.length];
@@ -164,6 +172,7 @@ public class RepositoryQuerySweep {
         }
         return arguments;
     }
+
 
     private static Object value(Type type) {
         if (type instanceof ParameterizedType parameterized && parameterized.getRawType() instanceof Class<?> raw) {
@@ -209,6 +218,7 @@ public class RepositoryQuerySweep {
         throw new UnsupportedTypeException(type.getTypeName());
     }
 
+
     private static Object record(Class<?> type) {
         RecordComponent[] components = type.getRecordComponents();
         Class<?>[] componentTypes = new Class<?>[components.length];
@@ -226,12 +236,15 @@ public class RepositoryQuerySweep {
         }
     }
 
-    private record Target(Object proxy, Method method) {}
+
+    private record Target(Object proxy, Method method) {
+    }
 
     /** 인자 값을 만드는 규칙에 없는 타입이다. 메시지는 그 타입의 이름이다. */
     private static final class UnsupportedTypeException extends RuntimeException {
 
         private static final long serialVersionUID = 1L;
+
 
         UnsupportedTypeException(String typeName) {
             super(typeName);
