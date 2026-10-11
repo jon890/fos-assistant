@@ -6,7 +6,7 @@ const fixture = readFileSync(
   new URL("../tests/fixtures/openapi-1.2.24.json", import.meta.url),
 );
 const canonical = JSON.parse(fixture.toString());
-const sourceFile = new URL("../src/api-contract.ts", import.meta.url);
+const sourceFile = new URL("../src/api-contract-generated.ts", import.meta.url);
 const before = readFileSync(sourceFile, "utf8");
 const keys = new Set([
   "$ref",
