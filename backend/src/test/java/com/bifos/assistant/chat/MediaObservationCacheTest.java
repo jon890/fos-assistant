@@ -50,6 +50,7 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
     @Autowired
     DataEncryptionProperties encryption;
 
+
     @Test
     @DisplayName("같은 조건의 다른 실행과 본문은 최초 관찰을 유지하고 재시작 alias를 복원한다")
     void preservesInitialObservationAndRestoresCacheAliasAfterRestart() {
@@ -68,16 +69,16 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         assertThat(requests.count()).isEqualTo(2);
         var restarted = local(store, bodies, observations, requests, attachments, access);
         assertThat(restarted.record(owner, conversation.id(), photo.id(), 1, alias, submitted, source))
-                .isEqualTo(first);
+            .isEqualTo(first);
         code(() -> record(1, alias, input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         code(() -> record(0, UUID.randomUUID(), submitted, source), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
     }
 
+
     @Test
     @DisplayName("미확인 모델의 별개 실행은 다른 본문을 새 revision에 저장하고 UUID 재시도는 보존한다")
     void storesSeparateUnknownExecutionsAndPreservesUuidRetry() {
-        for (var names :
-                List.of(List.of("UNKNOWN", "model"), List.of("provider", "UNKNOWN"), List.of("UNKNOWN", "UNKNOWN"))) {
+        for (var names : List.of(List.of("UNKNOWN", "model"), List.of("provider", "UNKNOWN"), List.of("UNKNOWN", "UNKNOWN"))) {
             photo = photo();
             UUID firstId = UUID.randomUUID();
             var initialSource = source(names.get(0), null, names.get(1), null, 123L);
@@ -90,9 +91,9 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
             assertThat(second.observation()).isEqualTo(submitted);
             assertThat(second.provenance().executionId()).isEqualTo(456L);
             assertThat(observations
-                            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
-                            .orElseThrow()
-                            .analysisKey())
+                .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                .orElseThrow()
+                .analysisKey())
                     .isNull();
             assertThat(record(0, firstId, initial, initialSource)).isEqualTo(first);
             code(() -> record(1, UUID.randomUUID(), submitted, laterSource), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
@@ -100,6 +101,7 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         assertThat(observations.count()).isEqualTo(6);
         assertThat(requests.count()).isEqualTo(6);
     }
+
 
     @Test
     @DisplayName("기존 미확인 행의 nonnull key도 후보로 쓰지 않고 과거 UUID는 읽는다")
@@ -111,21 +113,21 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
             var first = record(0, firstId, input(), initialSource);
             // 수정 전 직렬화로 만든 key가 남은 구행을 재현한다.
             String legacyKey = Sha256.hex(json.writer()
-                    .without(SerializationFeature.INDENT_OUTPUT)
-                    .writeValueAsString(Arrays.asList(
-                            first.sourceFingerprint(),
-                            1,
-                            "media-observation-v1",
-                            names.get(0),
-                            null,
-                            names.get(1),
-                            null,
-                            Arrays.asList("ORIGINAL", null, null))));
+                .without(SerializationFeature.INDENT_OUTPUT)
+                .writeValueAsString(Arrays.asList(
+                    first.sourceFingerprint(),
+                    1,
+                    "media-observation-v1",
+                    names.get(0),
+                    null,
+                    names.get(1),
+                    null,
+                    Arrays.asList("ORIGINAL", null, null))));
             jdbc.update("update media_observation set analysis_key=? where attachment_id=?", legacyKey, photo.id());
             assertThat(observations
-                            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
-                            .orElseThrow()
-                            .analysisKey())
+                .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                .orElseThrow()
+                .analysisKey())
                     .isEqualTo(legacyKey);
             var submitted = complete(ObservationStatus.SUCCEEDED, "새 미확인 결과", input().coverage(), "456");
             var second = record(1, UUID.randomUUID(), submitted, source(names.get(0), null, names.get(1), null, 456L));
@@ -137,18 +139,20 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         assertThat(requests.count()).isEqualTo(4);
     }
 
+
     @Test
     @DisplayName("알려진 provider와 model은 두 버전이 null이어도 다른 실행의 결과를 재사용한다")
     void reusesKnownIdentityWithNullVersions() {
         var first = record(0, UUID.randomUUID(), input(), source("provider", null, "model", null, 123L));
         var submitted = complete(ObservationStatus.SUCCEEDED, "다른 본문", input().coverage(), "456");
         assertThat(record(1, UUID.randomUUID(), submitted, source("provider", null, "model", null, 456L)))
-                .isEqualTo(first);
+            .isEqualTo(first);
         assertThat(observations.findAll())
-                .singleElement()
-                .satisfies(row -> assertThat(row.analysisKey()).isNotNull());
+            .singleElement()
+            .satisfies(row -> assertThat(row.analysisKey()).isNotNull());
         assertThat(requests.count()).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("완료 세 상태의 모든 후보와 제출 조합은 후보 상태를 보존한다")
@@ -158,73 +162,75 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
                 photo = photo();
                 var first = record(0, UUID.randomUUID(), complete(candidate, "처음", input().coverage(), "123"), model());
                 assertThat(record(1, UUID.randomUUID(), complete(submitted, "나중", input().coverage(), "123"), model()))
-                        .isEqualTo(first);
+                    .isEqualTo(first);
             }
         }
         assertThat(observations.count()).isEqualTo(9);
         assertThat(requests.count()).isEqualTo(18);
     }
 
+
     @Test
     @DisplayName("허용 조건의 변경은 새 revision이고 미지원 schema와 prompt는 거부한다")
     void createsNewRevisionsForChangedConditionsAndRejectsUnsupportedVersions() {
         var conditions = List.of(
-                source("Provider", "provider-v2", "model", "model-v3", 123L),
-                source("provider", null, "model", "model-v3", 123L),
-                source("provider", "", "model", "model-v3", 123L),
-                source("provider", "provider-v2", "another", "model-v3", 123L),
-                changedModel());
+            source("Provider", "provider-v2", "model", "model-v3", 123L),
+            source("provider", null, "model", "model-v3", 123L),
+            source("provider", "", "model", "model-v3", 123L),
+            source("provider", "provider-v2", "another", "model-v3", 123L),
+            changedModel());
         for (var source : conditions) {
             photo = photo();
             record(0, UUID.randomUUID(), input(), model());
             assertThat(record(1, UUID.randomUUID(), input(), source).revision()).isEqualTo(2);
         }
         for (var coverage : List.of(
-                new Coverage("OVERVIEW", null, null),
-                new Coverage("FIRST_FRAME", null, 0),
-                new Coverage("CROP", new Region(0, .25, .5, .5), null))) {
+            new Coverage("OVERVIEW", null, null),
+            new Coverage("FIRST_FRAME", null, 0),
+            new Coverage("CROP", new Region(0, .25, .5, .5), null))) {
             photo = photo();
             record(0, UUID.randomUUID(), input(), model());
             assertThat(record(
-                                    1,
-                                    UUID.randomUUID(),
-                                    complete(ObservationStatus.SUCCEEDED, "관찰", coverage, "123"),
-                                    model())
-                            .revision())
-                    .isEqualTo(2);
+                1,
+                UUID.randomUUID(),
+                complete(ObservationStatus.SUCCEEDED, "관찰", coverage, "123"),
+                model())
+                    .revision())
+                        .isEqualTo(2);
         }
         long count = observations.count();
         for (var invalid : List.of(
-                new ObservationProvenance(
-                        model().kind(), 123L, "provider", null, "model", null, 2, model().promptVersion(), null),
-                new ObservationProvenance(model().kind(), 123L, "provider", null, "model", null, 1, "v2", null))) {
+            new ObservationProvenance(
+                model().kind(), 123L, "provider", null, "model", null, 2, model().promptVersion(), null),
+            new ObservationProvenance(model().kind(), 123L, "provider", null, "model", null, 1, "v2", null))) {
             code(() -> record(2, UUID.randomUUID(), input(), invalid), ErrorCode.VALIDATION_FAILED);
         }
         assertThat(observations.count()).isEqualTo(count);
     }
 
+
     @Test
     @DisplayName("처리 실패 구행과 과거 완료는 현재 후보로 재사용하지 않는다")
     void excludesProcessingFailedLegacyAndHistoricalRows() {
         for (var initial : List.of(
-                new MediaObservationInput(
-                        ObservationStatus.PROCESSING, null, null, null, input().coverage(), null, null),
-                new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "MODEL_ERROR"))) {
+            new MediaObservationInput(
+                ObservationStatus.PROCESSING, null, null, null, input().coverage(), null, null),
+            new MediaObservationInput(ObservationStatus.FAILED, null, null, null, null, null, "MODEL_ERROR"))) {
             photo = photo();
             record(0, UUID.randomUUID(), initial, model());
             assertThat(observations
-                            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
-                            .orElseThrow()
-                            .analysisKey())
+                .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                .orElseThrow()
+                .analysisKey())
                     .isNull();
             assertThat(record(1, UUID.randomUUID(), input(), model()).revision())
-                    .isEqualTo(2);
+                .isEqualTo(2);
             assertThat(record(2, UUID.randomUUID(), initial, model()).revision())
-                    .isEqualTo(3);
+                .isEqualTo(3);
             assertThat(observations
-                            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
-                            .orElseThrow()
-                            .analysisKey())
+                .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                .orElseThrow()
+                .analysisKey())
                     .isNull();
         }
         photo = photo();
@@ -232,9 +238,10 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         jdbc.update("update media_observation set analysis_key=null where attachment_id=?", photo.id());
         assertThat(record(1, UUID.randomUUID(), input(), model()).revision()).isEqualTo(2);
         assertThat(record(2, UUID.randomUUID(), input(), changedModel()).revision())
-                .isEqualTo(3);
+            .isEqualTo(3);
         assertThat(record(3, UUID.randomUUID(), input(), model()).revision()).isEqualTo(4);
     }
+
 
     @Test
     @DisplayName("유효한 평문은 목록과 UUID에서 읽되 새 cache alias는 만들지 않는다")
@@ -246,11 +253,12 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         assertThat(record(0, initial, input(), model())).isEqualTo(first);
         assertThat(record(1, UUID.randomUUID(), input(), model()).revision()).isEqualTo(2);
         assertThat(observations
-                        .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
-                        .orElseThrow()
-                        .bodyKeyId())
+            .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+            .orElseThrow()
+            .bodyKeyId())
                 .isNotNull();
     }
+
 
     @Test
     @DisplayName("본문과 분석 key 손상은 새 암호화 revision으로 대체한다")
@@ -259,8 +267,8 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
             photo = photo();
             record(0, UUID.randomUUID(), input(), model());
             var row = observations
-                    .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
-                    .orElseThrow();
+                .findFirstByAttachmentIdOrderByRevisionDesc(photo.id())
+                .orElseThrow();
             if (mode == 0) {
                 jdbc.update("update media_observation set body=null where id=?", row.id());
             } else if (mode == 1) {
@@ -276,29 +284,30 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
                     case 6 -> json.writeValueAsString(input("x".repeat(2001)));
                     case 7 ->
                         json.writeValueAsString(
-                                complete(ObservationStatus.NEEDS_REVIEW, "본문", input().coverage(), "123"));
+                            complete(ObservationStatus.NEEDS_REVIEW, "본문", input().coverage(), "123"));
                     case 8 ->
                         json.writeValueAsString(complete(
-                                ObservationStatus.SUCCEEDED, "본문", new Coverage("OVERVIEW", null, null), "123"));
+                            ObservationStatus.SUCCEEDED, "본문", new Coverage("OVERVIEW", null, null), "123"));
                     default ->
                         json.writeValueAsString(complete(ObservationStatus.SUCCEEDED, "본문", input().coverage(), "456"));
                 };
                 String aad = "media_observation:" + (mode == 9 ? row.id() + 1 : row.id()) + ":conversation:"
-                        + row.conversationId() + ":user:" + row.ownerUserId();
+                    + row.conversationId() + ":user:" + row.ownerUserId();
                 var sealed = cipher.seal(owner.id(), aad, plain).orElseThrow();
                 jdbc.update(
-                        "update media_observation set body=?,body_key_id=? where id=?",
-                        sealed.content(),
-                        sealed.keyId(),
-                        row.id());
+                    "update media_observation set body=?,body_key_id=? where id=?",
+                    sealed.content(),
+                    sealed.keyId(),
+                    row.id());
             }
             assertThat(record(1, UUID.randomUUID(), input(), model()).revision())
-                    .as("손상 종류 %s", mode)
-                    .isEqualTo(2);
+                .as("손상 종류 %s", mode)
+                .isEqualTo(2);
         }
         assertThat(observations.count()).isEqualTo(22);
         assertThat(requests.count()).isEqualTo(22);
     }
+
 
     @Test
     @DisplayName("원본 파일만 없어져도 새 UUID와 과거 UUID는 거절하고 목록 본문을 차단한다")
@@ -309,10 +318,11 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         code(() -> record(1, UUID.randomUUID(), input(), model()), ErrorCode.ATTACHMENT_GONE);
         code(() -> record(0, first, input(), model()), ErrorCode.ATTACHMENT_GONE);
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst().observation())
-                .isNull();
+            .isNull();
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("암호화 쓰기를 꺼도 기존 cache는 읽고 miss의 새 쓰기는 롤백한다")
@@ -324,10 +334,12 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
                 return false;
             }
 
+
             @Override
             public Optional<SealedText> seal(Long owner, String aad, String plain) {
                 throw new AssertionError("새 암호화 금지");
             }
+
 
             @Override
             public Optional<String> open(Long key, Long owner, String aad, String sealed) {
@@ -336,31 +348,32 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         };
         var writing = local(store, new MediaObservationBodies(disabled), observations, requests, attachments, access);
         assertThat(writing.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input("다른 본문"), model()))
-                .isEqualTo(first);
+            .isEqualTo(first);
         jdbc.update("update media_observation set body=null");
         code(
-                () -> writing.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
-                ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
+            () -> writing.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
+            ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("cache 조회와 alias SQL 실패는 전파하며 alias 실패는 롤백한다")
     void propagatesCacheSqlFailuresAndRollsBackAliasFailure() {
         record(0, UUID.randomUUID(), input(), model());
-        var brokenRows =
-                fail(MediaObservationRepository.class, observations, "findFirstByAttachmentIdOrderByRevisionDesc", 1);
+        var brokenRows = fail(MediaObservationRepository.class, observations, "findFirstByAttachmentIdOrderByRevisionDesc", 1);
         assertThatThrownBy(() -> local(store, bodies, brokenRows, requests, attachments, access)
-                        .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
+            .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         var brokenAliases = fail(MediaObservationRequestRepository.class, requests, "saveAndFlush", 1);
         assertThatThrownBy(() -> local(store, bodies, observations, brokenAliases, attachments, access)
-                        .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
+            .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("cache 복호화의 실제 DEK SQL 실패는 miss로 바꾸지 않는다")
@@ -371,31 +384,33 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         var reading = local(store, new MediaObservationBodies(fresh), observations, requests, attachments, access);
         UUID alias = UUID.randomUUID();
         assertThatThrownBy(() -> reading.record(owner, conversation.id(), photo.id(), 1, alias, input(), model()))
-                .isInstanceOf(DataAccessResourceFailureException.class);
+            .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
         assertThat(reading.record(owner, conversation.id(), photo.id(), 1, alias, input(), model())
-                        .revision())
+            .revision())
                 .isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("cache 응답 마지막 SQL 실패 뒤 커밋 alias로 재시도한다")
     void preservesCacheAliasAfterFinalResponseSqlFailure() {
         var first = record(0, UUID.randomUUID(), input(), model());
         var broken = fail(
-                ChatAttachmentRepository.class,
-                attachments,
-                "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
-                3);
+            ChatAttachmentRepository.class,
+            attachments,
+            "existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter",
+            3);
         UUID alias = UUID.randomUUID();
         assertThatThrownBy(() -> local(store, bodies, observations, requests, broken, access)
-                        .record(owner, conversation.id(), photo.id(), 1, alias, input(), model()))
+            .record(owner, conversation.id(), photo.id(), 1, alias, input(), model()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(2);
         assertThat(record(1, alias, input(), model())).isEqualTo(first);
     }
+
 
     @Test
     @DisplayName("다른 사용자의 같은 원본은 별도 관찰과 alias를 갖는다")
@@ -409,37 +424,40 @@ class MediaObservationCacheTest extends MediaObservationRequestTest {
         assertThat(second.assetId()).isNotEqualTo(first.assetId());
         assertThat(observations.count()).isEqualTo(2);
         assertThat(requests.findAll())
-                .extracting(value -> value.observationId())
-                .doesNotHaveDuplicates();
+            .extracting(value -> value.observationId())
+            .doesNotHaveDuplicates();
     }
+
 
     private static List<ObservationStatus> completedStatuses() {
         return List.of(ObservationStatus.SUCCEEDED, ObservationStatus.PARTIAL, ObservationStatus.NEEDS_REVIEW);
     }
 
+
     private static MediaObservationInput complete(
-            ObservationStatus status, String summary, Coverage coverage, String execution) {
+        ObservationStatus status, String summary, Coverage coverage, String execution) {
         return new MediaObservationInput(
-                status,
-                summary,
-                List.of(),
-                status == ObservationStatus.PARTIAL ? List.of("불확실") : List.of(),
-                coverage,
-                new Evidence(ObservationProvenanceKind.MODEL_RESULT, execution),
-                null);
+            status,
+            summary,
+            List.of(),
+            status == ObservationStatus.PARTIAL ? List.of("불확실") : List.of(),
+            coverage,
+            new Evidence(ObservationProvenanceKind.MODEL_RESULT, execution),
+            null);
     }
 
+
     private static ObservationProvenance source(
-            String provider, String providerVersion, String model, String modelVersion, Long execution) {
+        String provider, String providerVersion, String model, String modelVersion, Long execution) {
         return new ObservationProvenance(
-                ObservationProvenanceKind.MODEL_RESULT,
-                execution,
-                provider,
-                providerVersion,
-                model,
-                modelVersion,
-                1,
-                "media-observation-v1",
-                null);
+            ObservationProvenanceKind.MODEL_RESULT,
+            execution,
+            provider,
+            providerVersion,
+            model,
+            modelVersion,
+            1,
+            "media-observation-v1",
+            null);
     }
 }

@@ -16,35 +16,37 @@ import tools.jackson.databind.SerializationFeature;
 public final class MediaObservationAnalysisKey {
 
     public static String compute(
-            ObjectMapper json, String fingerprint, ObservationProvenance source, Coverage coverage) {
+        ObjectMapper json, String fingerprint, ObservationProvenance source, Coverage coverage) {
         if (hasUnknownIdentity(source)) {
             return null;
         }
         var region = coverage.region();
         List<String> coordinates = region == null
-                ? null
-                : List.of(
-                        coordinate(region.x()),
-                        coordinate(region.y()),
-                        coordinate(region.width()),
-                        coordinate(region.height()));
+            ? null
+            : List.of(
+                coordinate(region.x()),
+                coordinate(region.y()),
+                coordinate(region.width()),
+                coordinate(region.height()));
         return Sha256.hex(json.writer()
-                .without(SerializationFeature.INDENT_OUTPUT)
-                .writeValueAsString(Arrays.asList(
-                        fingerprint,
-                        source.schemaVersion(),
-                        source.promptVersion(),
-                        source.provider(),
-                        source.providerVersion(),
-                        source.model(),
-                        source.modelVersion(),
-                        Arrays.asList(coverage.mode(), coordinates, coverage.frame()))));
+            .without(SerializationFeature.INDENT_OUTPUT)
+            .writeValueAsString(Arrays.asList(
+                fingerprint,
+                source.schemaVersion(),
+                source.promptVersion(),
+                source.provider(),
+                source.providerVersion(),
+                source.model(),
+                source.modelVersion(),
+                Arrays.asList(coverage.mode(), coordinates, coverage.frame()))));
     }
+
 
     public static boolean hasUnknownIdentity(ObservationProvenance source) {
         return ObservationProvenance.UNKNOWN_IDENTITY.equals(source.provider())
-                || ObservationProvenance.UNKNOWN_IDENTITY.equals(source.model());
+            || ObservationProvenance.UNKNOWN_IDENTITY.equals(source.model());
     }
+
 
     private static String coordinate(double value) {
         return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
