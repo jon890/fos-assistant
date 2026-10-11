@@ -166,6 +166,76 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 소유자는 서비스의 API 가 바뀌었을 때 고치고, 배포 뒤 실제 계정으로 확인한다.
 **대역 검사는 서비스의 API 가 바뀐 것을 알지 못한다.** 그 틈은 소유자의 확인으로 막는다.
 
+## 배포 묶음
+
+`Dockerfile`과 `package.ts`는 소스 checkout과 같은 SHA의 커넥터 설치 묶음을 만든다.
+운영 저장소는 이 빌드 정의를 재사용하고, Hermes runtime에는 검증한 파일만 설치한다.
+이 단계에서는 `dist` 추적을 유지한다. 소비 경로 구현과 실제 배포 확인을 마친 뒤 별도 PR에서 추적을 제거한다.
+
+| 항목 | 계약 |
+| --- | --- |
+| Docker context | `hermes/connectors/` |
+| 빌드 인자 | `SOURCE_COMMIT`: 40자 소문자 hex. 없거나 형식이 틀리면 실패 |
+| 빌드 도구 | Bun `1.3.14`, 커넥터마다 `bun install --frozen-lockfile`. 새 의존성 없음 |
+| 기본 이미지 | `oven/bun:1.3.14-alpine`, amd64와 arm64를 포함한 공식 이미지 index digest를 Dockerfile에 고정 |
+| 출력 | `/bundle/manifest.json`, `/bundle/hermes/connectors/<id>/` |
+| 실행 방식 | 최종 이미지는 `scratch`. `docker create`와 `docker cp`로 꺼내고 실행하지 않음. `/none`은 create를 위한 자리표시 명령 |
+| 재현성 | 같은 프로세스와 의존성에서 각 커넥터의 기존 `buildBundle(outdir)`로 출력 디렉터리만 나눠 두 번 빌드하고 entry 바이트가 같을 때만 출력 |
+| 파일 권한 | 소스 git mode `100644`는 `0644`, `100755`는 `0755`. git 없는 context는 실행 비트 유무로 같은 두 권한으로 정규화. 생성 entry는 추적 mode가 있으면 보존하고 없으면 `0644` |
+| 디렉터리 권한 | `0755`. symlink와 특수 파일, 추가 빈 디렉터리, setuid 등 다른 권한은 거절 |
+
+기본 이미지의 버전은 [Bun 설치 문서](https://bun.com/docs/installation)의 공식 `oven/bun` 이미지를 쓴다.
+[공식 이미지 목록](https://hub.docker.com/r/oven/bun/tags?name=1.3.14-alpine)과 registry에서 digest를 대조했다.
+태그만 바뀌어도 빌드 입력이 바뀌지 않도록 태그와 digest를 함께 고정한다.
+
+### 포함하는 파일
+
+`connector.json`이 있는 각 커넥터 디렉터리의 git 추적 파일 전체와 `.mcp.json`이 선언한 정확한 생성 entry를 포함한다.
+plugin manifest, `.mcp.json`, 아이콘, 스킬, 전체 source와 테스트도 설치 파일이다.
+커넥터 밖의 root `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`, `README.md`는 포함하지 않는다.
+`node_modules`는 설치 파일이 아니며 추적하면 실패한다.
+
+`.dockerignore`는 `node_modules`와 현재 세 커넥터의 생성 entry만 제외한다.
+`dist` 전체를 제외하지 않으므로 그 아래 다른 추적 파일도 보존한다.
+커넥터를 추가할 때 Dockerfile의 의존성 COPY와 `.dockerignore`의 정확한 entry를 함께 추가한다.
+context에 커넥터가 있는데 의존성 설치 층이 빠졌으면 묶음 생산이 실패한다.
+
+### manifest와 검증
+
+manifest의 모든 객체 키는 사전순으로 정렬하고 UTF-8 JSON과 마지막 줄바꿈으로 쓴다.
+`format`은 `1`, `source_commit`은 빌드 인자, `bun_version`은 `1.3.14`다.
+`connectors`의 키는 id이고, 값은 아래 세 칸을 갖는다.
+
+| 칸 | 값 |
+| --- | --- |
+| `entry` | `dist/<id>-mcp.js`. `.mcp.json`의 command는 `bun`, args는 `${CLAUDE_PLUGIN_ROOT}/`를 붙인 이 경로 하나 |
+| `files` | 커넥터 기준 상대 경로를 키로, 파일 바이트의 sha256 소문자 hex를 값으로 갖는 객체 |
+| `modes` | `files`와 같은 키를 갖고, 권한 문자열 `0644` 또는 `0755`를 값으로 갖는 객체 |
+
+`bun run hermes/connectors/package.ts build <출력 디렉터리> <SHA>`로 생산한다. 출력 디렉터리는 아직 없어야 한다.
+`bun run hermes/connectors/package.ts verify <묶음 디렉터리> <SHA>`는 git checkout에서 실행한다.
+검증기는 checkout HEAD와 SHA, index와 해당 SHA, 커넥터별 git inventory와 mode를 대조한다.
+묶음 전체의 파일과 디렉터리 목록, 해시, 권한, entry, 소스 바이트가 모두 맞아야 통과한다.
+entry를 추적하는 동안에는 entry 바이트도 해당 SHA의 git blob과 같아야 한다.
+경로 탈출과 symlink는 허용하지 않는다.
+
+**받는 쪽은 manifest의 SHA와 해시만 믿으면 안 된다.** Docker context에는 `.git`이 없어 producer는 context의 커넥터 파일을 복사한다.
+git checkout에서 생산할 때는 추적 파일만 선택해 테스트가 남긴 캐시를 포함하지 않는다.
+`SOURCE_COMMIT`은 소스의 정체를 증명하지 않는다. 받는 쪽이 신뢰하는 해당 SHA의 checkout과 정확히 대조해야 한다.
+각 선언 커넥터 prefix에 한정한 `git ls-files --stage` 목록에 정확한 생성 entry를 합친 것만 허용한다.
+생성 entry 이외 파일은 해당 SHA의 바이트와 같아야 하고, mode도 git mode와 같아야 한다.
+root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 제외하면 안 된다.
+추적하지 않는 entry의 재현성은 같은 SHA의 고정 빌드 정의와 CI로 검증한다.
+비공개 소비 검사기도 `modes`와 실제 파일 권한을 검사해야 한다.
+
+### CI에서 확인하는 범위
+
+`scripts/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
+이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓은 뒤 기존 HTTP 대역 검사와 `check:bundle`을 실행한다.
+runner에서 별도로 만든 전체 묶음과 Docker 출력의 manifest 및 모든 파일을 대조해 빌드 환경 차이도 확인한다.
+기존 stdio MCP 계약 검사와 Hermes 상류 계약 검사도 이어서 실행한다.
+CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않는다.
+
 ## 공통 검사
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 바로 아래 디렉터리를 모두 찾아 아래를 본다.
