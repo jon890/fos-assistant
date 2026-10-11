@@ -68,6 +68,7 @@ async function fixture() {
 
 test("두 독립 빌드의 전체 바이트, 설치 파일과 git 실행 권한을 보존한다", async () => {
   const f = await fixture();
+  expect(f.git("ls-files", "sample/dist/sample-mcp.js")).toBe("");
   await buildPackage(f.root, f.output, f.commit);
   const other = join(f.work, "other");
   await buildPackage(f.root, other, f.commit);
@@ -99,6 +100,25 @@ test("두 독립 빌드의 전체 바이트, 설치 파일과 git 실행 권한�
       .mode & 0o777,
   ).toBe(0o755);
   expect((await lstat(entry)).mode & 0o777).toBe(0o644);
+});
+
+test("추적하지 않는 오래된 entry를 무시하고 source와 index를 바꾸지 않는다", async () => {
+  const f = await fixture();
+  const entry = join(f.connector, "dist/sample-mcp.js");
+  await writeFile(entry, "stale generated entry\n");
+  const before = f.git("ls-files", "--stage");
+  await buildPackage(f.root, f.output, f.commit);
+  await verifyPackage(f.root, f.output, f.commit);
+  expect(await readFile(entry, "utf8")).toBe("stale generated entry\n");
+  expect(f.git("ls-files", "--stage")).toBe(before);
+  expect(f.git("diff", "--exit-code")).toBe("");
+  expect(
+    execFileSync(
+      process.execPath,
+      [join(f.output, "hermes/connectors/sample/dist/sample-mcp.js")],
+      { encoding: "utf8" },
+    ),
+  ).toBe("sample ready\n");
 });
 
 const badBundles: [

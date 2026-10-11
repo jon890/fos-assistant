@@ -9,6 +9,10 @@
 [ADR-066](ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md)의 Python 서버와 단일 scope 결정을 대체한다.
 휴지통과 메일 삭제를 서버가 막는 결정, 환경 변수로 자격 증명을 받는 계약, 보내기 승인과 읽은 글을 자료로 다루는 계약은 유지한다.
 
+### 부분 대체
+
+생성된 실행 파일을 커밋하는 결정과 커밋 파일을 재빌드 결과에 대조하는 검사는 [ADR-20261011 / connector-source-build](ADR-20261011-connector-source-build.md) 이 대체한다. TypeScript, Bun, scope 와 승인 정책은 유지한다.
+
 ### 권한과 승인
 
 | 대상 | 결정과 근거 |
