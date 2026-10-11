@@ -29,10 +29,12 @@ public class DataKeyWriter {
     private final KeyEncryptionKeys keks;
     private final Clock clock;
 
+
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<UserDataKey> find(Long userId) {
         return keys.findByUserId(userId);
     }
+
 
     /** 새 데이터 key 를 뽑아 활성 KEK 로 감싸 저장한다. 이미 있으면 유일 제약 위반이 난다 */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -42,6 +44,7 @@ public class DataKeyWriter {
         String wrapped = keks.wrap(dataKey, UserDataKey.wrapBinding(userId));
         return keys.saveAndFlush(UserDataKey.wrapped(userId, keks.activeKeyId(), wrapped, clock.instant()));
     }
+
 
     /**
      * 활성 KEK 가 아닌 KEK 로 감싼 줄 하나를 활성 KEK 로 다시 감싼다. 데이터 key 원문은 그대로라 본문은 다시 쓰지 않는다.

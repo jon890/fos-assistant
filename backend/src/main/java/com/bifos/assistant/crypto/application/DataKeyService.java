@@ -43,12 +43,13 @@ public class DataKeyService implements TextCipher {
      */
     private final KeyCache<Long, Boolean> unavailable;
 
+
     public DataKeyService(
-            KeyEncryptionKeys keks,
-            DataKeyWriter writer,
-            UserDataKeyRepository keys,
-            DataEncryptionProperties properties,
-            Clock clock) {
+        KeyEncryptionKeys keks,
+        DataKeyWriter writer,
+        UserDataKeyRepository keys,
+        DataEncryptionProperties properties,
+        Clock clock) {
         this.keks = keks;
         this.writer = writer;
         this.keys = keys;
@@ -57,10 +58,12 @@ public class DataKeyService implements TextCipher {
         this.unavailable = new KeyCache<>(UNAVAILABLE_TTL, properties.dekCacheMaxEntries(), clock);
     }
 
+
     @Override
     public boolean enabled() {
         return keks.available();
     }
+
 
     @Override
     public Optional<SealedText> seal(Long ownerUserId, String aad, String plain) {
@@ -71,6 +74,7 @@ public class DataKeyService implements TextCipher {
         String content = AesGcm.seal(key.secret(), plain.getBytes(StandardCharsets.UTF_8), bytes(aad));
         return Optional.of(new SealedText(content, key.id()));
     }
+
 
     @Override
     public Optional<String> open(Long keyId, Long ownerUserId, String aad, String sealed) {
@@ -97,12 +101,14 @@ public class DataKeyService implements TextCipher {
         }
     }
 
+
     /** 메모리에 둔 데이터 key 를 모두 버린다. 검사가 key 를 바꿀 때 쓴다 */
     public void forgetCachedKeys() {
         byId.clear();
         byUser.clear();
         unavailable.clear();
     }
+
 
     private DataKey forWriting(Long userId) {
         Optional<DataKey> cached = byUser.get(userId);
@@ -113,6 +119,7 @@ public class DataKeyService implements TextCipher {
         return remember(row);
     }
 
+
     private UserDataKey create(Long userId) {
         try {
             return writer.create(userId);
@@ -121,6 +128,7 @@ public class DataKeyService implements TextCipher {
             return writer.find(userId).orElseThrow(() -> e);
         }
     }
+
 
     private DataKey forReading(Long keyId) {
         Optional<DataKey> cached = byId.get(keyId);
@@ -131,6 +139,7 @@ public class DataKeyService implements TextCipher {
         return remember(row);
     }
 
+
     private DataKey remember(UserDataKey row) {
         byte[] secret = keks.unwrap(row.kekId(), row.wrappedKey(), UserDataKey.wrapBinding(row.userId()));
         DataKey key = new DataKey(row.id(), row.userId(), new SecretKeySpec(secret, "AES"));
@@ -138,6 +147,7 @@ public class DataKeyService implements TextCipher {
         byUser.put(row.userId(), key);
         return key;
     }
+
 
     private static byte[] bytes(String aad) {
         return aad.getBytes(StandardCharsets.UTF_8);

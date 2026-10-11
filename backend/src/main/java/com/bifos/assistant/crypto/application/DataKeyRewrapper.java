@@ -27,6 +27,7 @@ public class DataKeyRewrapper implements ApplicationRunner {
     private final KeyEncryptionKeys keks;
     private final DataKeyWriter writer;
 
+
     @Override
     public void run(ApplicationArguments args) {
         try {
@@ -35,6 +36,7 @@ public class DataKeyRewrapper implements ApplicationRunner {
             log.error("데이터 key 를 다시 감싸지 못했다 exception={}", e.getClass().getName());
         }
     }
+
 
     /** @return 다시 감싼 줄 수 */
     public int rewrapAll() {
