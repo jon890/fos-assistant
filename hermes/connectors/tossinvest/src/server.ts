@@ -9,6 +9,7 @@ import {
 import { createToolRegistration } from "./tool-registration.ts";
 import { registerReadTools } from "./read-tools.ts";
 import { registerAccountTools } from "./account-tools.ts";
+import { registerMarketInfoTools } from "./market-info-tools.ts";
 
 export { isSupportedBunVersion } from "./runtime.ts";
 export type { TossinvestOptions } from "./client.ts";
@@ -19,6 +20,7 @@ export function createTossinvestServer(options: TossinvestOptions = {}) {
   const register = createToolRegistration(server);
   registerReadTools(register, client);
   registerAccountTools(register, client);
+  registerMarketInfoTools(register, client);
   return server;
 }
 

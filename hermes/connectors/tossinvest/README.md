@@ -37,6 +37,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_sellable_quantity` | `GET /api/v1/sellable-quantity` | 종목 하나의 매도 가능 수량을 읽는다 |
 | `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
 | `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다 |
+| `get_exchange_rate` | `GET /api/v1/exchange-rate` | KRW와 USD 사이의 참고용 표시 환율을 읽는다 |
+| `get_market_calendar` | `GET /api/v1/market-calendar/KR`, `GET /api/v1/market-calendar/US` | 국내 또는 미국 시장의 전일·당일·익일 운영 일정을 읽는다 |
 
 계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
 
@@ -50,6 +52,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity}`. `sellable_quantity` 는 `symbol` 을 주지 않으면 null 이다 |
 | `get_sellable_quantity` | `symbol`: 필수 | `{result, metadata, sellable_quantity}` |
 | `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`, `cursor`, `limit`: 선택 | `{orders, has_more, nextCursor, hasNext}`. 아래 「주문 내역」 |
+| `get_exchange_rate` | `baseCurrency`, `quoteCurrency`: 서로 다른 `KRW` 또는 `USD`. `dateTime`: 선택, 시간대가 있는 ISO 시각 | `{result, metadata}`. 환율 한 건의 decimal 문자열과 `validFrom`, `validUntil`을 보존한다 |
+| `get_market_calendar` | `market`: `KR` 또는 `US`. `date`: 선택, `YYYY-MM-DD`(미국은 미국 현지 날짜) | `{result, metadata}`. `today`, `previousBusinessDay`, `nextBusinessDay`의 세션과 휴장 null을 보존한다 |
 
 모든 조회는 기존 표시 필드와 함께 공식 `result`와 `metadata`를 제공한다. 단일 조회의 metadata는 현재 `{}`다. `get_quotes`는 `{prices, stocks}`, `get_buying_power`는 `{buyingPower, sellableQuantity}`를 result에 담고 metadata도 같은 키를 쓴다. symbol 없는 buying power의 sellableQuantity와 그 metadata는 null이다.
 공식 result의 문자열, decimal, boolean, null, 배열과 unknown enum을 보존한다. Account.accountSeq는 원문 int64에서 정확한 문자열로 바꾸고 accountNo는 결과를 만들기 전에 마스킹한다. 필수 필드 누락과 잘못된 타입은 일부 성공으로 숨기지 않는다.
@@ -66,6 +70,15 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
 | `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
 | `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
+
+### 환율과 시장 일정
+
+환율은 1분 주기로 갱신되는 참고용 표시값이며 실제 주문에 적용될 거래 환율을 보장하지 않는다. `dateTime`을 생략하면 현재 유효 환율을 요청한다. 환전과 주문은 하지 않는다.
+시장 일정은 API가 반환한 3영업일 정보 그대로다. 모든 응답 시각은 KST(+09:00)이며 날짜를 계산하거나 세션을 합치지 않는다. 국내는 KRX+NXT 통합 세션이고 장전·장후 시간외종가는 제외된다. 미국은 `dayMarket`, `preMarket`, `regularMarket`, `afterMarket`을 각각 보존한다. 휴장과 부분 휴장의 null도 바꾸지 않는다.
+세 조회는 `MARKET_INFO` 그룹의 공용 큐를 사용하며 최소 간격은 334ms다. 두 도구의 metadata는 현재 빈 객체다. 인자 검증은 HTTP 전송 전에 끝나며 같은 통화 쌍, 실제로 없는 날짜, 시간대 없는 시각과 추가 인자를 거절한다.
+
+도구 설명은 MCP SDK의 `tools/list`에 등록한다. 현재 manifest reader는 도구별 `description`을 받지 않으므로 정책 선언에는 추가하지 않는다. manifest 설명 통합은 그 칸을 받는 reader가 배포된 뒤 진행한다.
+manifest 해시는 전체 선언 원문(`rawSource`)을 재귀 키 정렬·공백 없는 JSON으로 직렬화해 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 현재 보호 선언과 금융 승인 ticket을 제공하지 않는다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 두 도구는 `READ`로 추가하며 금융 쓰기 권한을 열지 않는다.
 
 ### 토큰
 
@@ -109,8 +122,8 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 ## 서버와 검사
 
 `src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
-공식 JSON fixture의 41 operation과 실제 등록 8개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
-대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 여섯 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
+공식 JSON fixture의 41 operation과 실제 등록 11개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 등록 집합은 기존 8개와 `getExchangeRate`, `getKrMarketCalendar`, `getUsMarketCalendar`다. 나머지 30개 operation은 아직 등록하지 않았다.
+대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 여덟 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다. 실제 SDK와 빌드한 stdio 서버에서 loopback HTTP로 환율·양 시장 일정을 왕복하고, JSON-RPC trace에서도 결과와 인자 검증을 확인한다.
 
 ## 보안
 
