@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.memory.domain.MemoryRevision;
+import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -31,6 +31,7 @@ public class MemoryContentBackfill implements ApplicationRunner {
     private final MemoryContentCipher cipher;
     private final MemoryContentSealer sealer;
 
+
     @Override
     public void run(ApplicationArguments args) {
         try {
@@ -41,11 +42,11 @@ public class MemoryContentBackfill implements ApplicationRunner {
         }
     }
 
+
     /** @return 실제로 암호화한 줄 수. key 가 없으면 0 이다 */
     public int sealPlaintext() {
         List<Long> memoryIds = memories.findIdsBySensitivityAndContentKeyIdIsNull(MemorySensitivity.SENSITIVE);
-        List<MemoryRevision> revisionRows =
-                revisions.findBySensitivityAndContentKeyIdIsNull(MemorySensitivity.SENSITIVE);
+        List<MemoryRevision> revisionRows = revisions.findBySensitivityAndContentKeyIdIsNull(MemorySensitivity.SENSITIVE);
         if (!cipher.enabled()) {
             if (!memoryIds.isEmpty() || !revisionRows.isEmpty()) {
                 log.warn("평문으로 남은 민감 줄이 있다 memory={} revision={}", memoryIds.size(), revisionRows.size());

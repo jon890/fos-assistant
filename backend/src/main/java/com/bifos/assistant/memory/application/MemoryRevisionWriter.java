@@ -1,8 +1,8 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.MemoryRevision;
+import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
