@@ -20,7 +20,7 @@ final class MemoryProposalFeedback {
      */
     static FeedbackEntry of(CurrentUser user, Memory memory, FeedbackEventType type, FeedbackActor actor, Instant now) {
         return FeedbackEntry.of(user.id(), FeedbackSubjectType.MEMORY, memory.id(), type, actor, now)
-                .originExecution(memory.proposedByExecutionId())
-                .version(Integer.toString(memory.revision()));
+            .originExecution(memory.proposedByExecutionId())
+            .version(Integer.toString(memory.revision()));
     }
 }

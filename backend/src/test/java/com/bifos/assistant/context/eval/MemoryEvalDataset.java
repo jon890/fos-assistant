@@ -29,12 +29,13 @@ import tools.jackson.databind.json.JsonMapper;
  */
 record MemoryEvalDataset(int version, String note, List<User> users, List<Agent> agents, List<Case> cases) {
 
+
     static final String RESOURCE = "/memory-eval/family-cases.json";
 
     private static final JsonMapper JSON = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-            .build();
+        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+        .build();
 
     /** 클래스패스의 시험 세트를 읽는다. */
     static MemoryEvalDataset load() {
@@ -47,6 +48,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
             throw new UncheckedIOException(ex);
         }
     }
+
 
     /**
      * JSON 글을 읽고 참조가 맞는지 검사한다.
@@ -64,22 +66,23 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         return dataset;
     }
 
+
     /** 사용자 key 로 찾는다. */
     User user(String key) {
         return users.stream().filter(each -> each.key().equals(key)).findFirst().orElseThrow();
     }
 
+
     private void validate() {
-        Set<String> userKeys =
-                requireUnique("사용자 key", users.stream().map(User::key).toList());
+        Set<String> userKeys = requireUnique("사용자 key", users.stream().map(User::key).toList());
         Set<String> groups = new HashSet<>(users.stream().map(User::group).toList());
-        Set<String> agentKeys =
-                requireUnique("에이전트 key", agents.stream().map(Agent::key).toList());
+        Set<String> agentKeys = requireUnique("에이전트 key", agents.stream().map(Agent::key).toList());
         requireUnique("사례 id", cases.stream().map(Case::id).toList());
         for (Case each : cases) {
             validateCase(each, userKeys, groups, agentKeys);
         }
     }
+
 
     private static void validateCase(Case each, Set<String> userKeys, Set<String> groups, Set<String> agentKeys) {
         String where = "사례 " + each.id() + ": ";
@@ -87,8 +90,8 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         require(userKeys.contains(each.asker()), where + "asker 가 users 에 없다: " + each.asker());
         require(agentKeys.contains(each.agent()), where + "agent 가 agents 에 없다: " + each.agent());
         Set<String> memoryKeys = requireUnique(
-                where + "Memory key",
-                each.memories().stream().map(MemorySeed::key).toList());
+            where + "Memory key",
+            each.memories().stream().map(MemorySeed::key).toList());
         for (MemorySeed memory : each.memories()) {
             validateMemory(where + "Memory " + memory.key() + ": ", memory, userKeys, groups);
         }
@@ -104,13 +107,14 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         for (Forbidden forbidden : each.forbidden()) {
             require(forbidden.kind() != null, where + "forbidden.kind 가 없다");
             require(
-                    memoryKeys.contains(forbidden.memory()),
-                    where + "forbidden 이 없는 Memory 를 가리킨다: " + forbidden.memory());
+                memoryKeys.contains(forbidden.memory()),
+                where + "forbidden 이 없는 Memory 를 가리킨다: " + forbidden.memory());
             require(
-                    seen.add(forbidden.memory()),
-                    where + "한 Memory 가 expect 와 forbidden 에 겹쳐 있거나 두 번 적혔다: " + forbidden.memory());
+                seen.add(forbidden.memory()),
+                where + "한 Memory 가 expect 와 forbidden 에 겹쳐 있거나 두 번 적혔다: " + forbidden.memory());
         }
     }
+
 
     private static void validateMemory(String where, MemorySeed memory, Set<String> userKeys, Set<String> groups) {
         if (memory.scope() == MemoryScope.USER) {
@@ -121,17 +125,18 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         require(memory.entryType() != MemoryEntryType.SOURCE, where + "entryType 은 MEMORY 나 DOCUMENT 만 쓴다");
         if (memory.entryType() == MemoryEntryType.DOCUMENT) {
             require(
-                    memory.documentKey() != null && !memory.documentKey().isBlank(),
-                    where + "DOCUMENT 에 documentKey 가 없다");
+                memory.documentKey() != null && !memory.documentKey().isBlank(),
+                where + "DOCUMENT 에 documentKey 가 없다");
             require(memory.scope() == MemoryScope.USER, where + "DOCUMENT 는 USER 항목이다");
             require(
-                    memory.status() == MemoryStatus.ACCEPTED && memory.retrieval() == MemoryRetrieval.SEARCH,
-                    where + "DOCUMENT 는 ACCEPTED 이고 SEARCH 로 고정이다");
+                memory.status() == MemoryStatus.ACCEPTED && memory.retrieval() == MemoryRetrieval.SEARCH,
+                where + "DOCUMENT 는 ACCEPTED 이고 SEARCH 로 고정이다");
         }
         if (memory.status() != MemoryStatus.ACCEPTED) {
             require(memory.scope() == MemoryScope.USER, where + "PROPOSED 와 REJECTED 는 USER 항목이다");
         }
     }
+
 
     private static Set<String> requireUnique(String what, List<String> values) {
         Set<String> seen = new HashSet<>();
@@ -141,18 +146,21 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         return seen;
     }
 
+
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new IllegalStateException(message);
         }
     }
 
+
     /**
      * @param key 사례에서 부르는 이름
      * @param role 역할
      * @param group 그룹 이름
      */
-    record User(String key, UserRole role, String group) {}
+    record User(String key, UserRole role, String group) {
+    }
 
     /**
      * @param key 사례에서 부르는 이름
@@ -165,7 +173,8 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
         }
     }
 
-    record Grant(String collection, boolean allowSensitive) {}
+    record Grant(String collection, boolean allowSensitive) {
+    }
 
     /**
      * @param id 사례 번호
@@ -175,15 +184,15 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param forbidden 실리면 안 되는 Memory
      */
     record Case(
-            String id,
-            Category category,
-            String asker,
-            String agent,
-            String question,
-            List<MemorySeed> memories,
-            Filler filler,
-            List<String> expect,
-            List<Forbidden> forbidden) {
+        String id,
+        Category category,
+        String asker,
+        String agent,
+        String question,
+        List<MemorySeed> memories,
+        Filler filler,
+        List<String> expect,
+        List<Forbidden> forbidden) {
 
         Case {
             memories = memories == null ? List.of() : List.copyOf(memories);
@@ -201,19 +210,19 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param updatedDaysAgo 시험 시계 기준 며칠 전에 고친 항목인가
      */
     record MemorySeed(
-            String key,
-            String owner,
-            MemoryScope scope,
-            String group,
-            String title,
-            String content,
-            String collection,
-            MemoryRetrieval retrieval,
-            MemoryStatus status,
-            MemorySensitivity sensitivity,
-            MemoryEntryType entryType,
-            String documentKey,
-            int updatedDaysAgo) {
+        String key,
+        String owner,
+        MemoryScope scope,
+        String group,
+        String title,
+        String content,
+        String collection,
+        MemoryRetrieval retrieval,
+        MemoryStatus status,
+        MemorySensitivity sensitivity,
+        MemoryEntryType entryType,
+        String documentKey,
+        int updatedDaysAgo) {
 
         MemorySeed {
             scope = scope == null ? MemoryScope.USER : scope;
@@ -232,13 +241,15 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
      * @param owner 주인 사용자 key
      * @param updatedDaysAgo 시험 시계 기준 며칠 전에 고친 항목인가
      */
-    record Filler(String owner, int count, int contentChars, int updatedDaysAgo) {}
+    record Filler(String owner, int count, int contentChars, int updatedDaysAgo) {
+    }
 
     /**
      * @param memory 실리면 안 되는 Memory 의 key
      * @param kind 실렸을 때의 뜻
      */
-    record Forbidden(String memory, ForbiddenKind kind) {}
+    record Forbidden(String memory, ForbiddenKind kind) {
+    }
 
     /** 실리면 안 되는 항목의 종류다. */
     enum ForbiddenKind {

@@ -19,18 +19,23 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
 
     Optional<Memory> findByProposalDedupKey(String proposalDedupKey);
 
+
     List<Memory> findByScopeAndOwnerUserIdAndEntryTypeOrderByCollectionAscDocumentKeyAsc(
-            MemoryScope scope, Long ownerUserId, MemoryEntryType entryType);
+        MemoryScope scope, Long ownerUserId, MemoryEntryType entryType);
+
 
     List<Memory> findByScopeAndOwnerUserIdAndStatusOrderByIdAsc(
-            MemoryScope scope, Long ownerUserId, MemoryStatus status);
+        MemoryScope scope, Long ownerUserId, MemoryStatus status);
+
 
     Optional<Memory> findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
-            MemoryScope scope, Long ownerUserId, String collection, String documentKey);
+        MemoryScope scope, Long ownerUserId, String collection, String documentKey);
+
 
     /** 암호화되지 않은 채 남은 줄의 번호를 찾는다. 잠그지 않고 읽으므로 쓰기 전에 잠가 다시 읽는다(ADR-055). */
     @Query("select m.id from Memory m where m.sensitivity = :sensitivity and m.contentKeyId is null")
     List<Long> findIdsBySensitivityAndContentKeyIdIsNull(@Param("sensitivity") MemorySensitivity sensitivity);
+
 
     /**
      * 항목 한 줄을 쓰기 잠금으로 읽는다.
@@ -42,6 +47,7 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     @Query("select m from Memory m where m.id = :id")
     Optional<Memory> findByIdForUpdate(@Param("id") Long id);
 
+
     /**
      * 한 사용자와 그 그룹의 실릴 수 있는 항목을 collection 과 민감도마다 센다.
      *
@@ -52,12 +58,12 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
      * @param groupId 셀 그룹이다
      */
     @Query("select new com.bifos.assistant.memory.domain.MemoryCollectionCount(m.collection, m.sensitivity, count(m))"
-            + " from Memory m"
-            + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
-            + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
-            + " and m.retrieval <> com.bifos.assistant.memory.domain.type.MemoryRetrieval.ARCHIVE"
-            + " and ((m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER and m.ownerUserId = :userId)"
-            + " or (m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP and m.groupId = :groupId))"
-            + " group by m.collection, m.sensitivity")
+        + " from Memory m"
+        + " where m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
+        + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
+        + " and m.retrieval <> com.bifos.assistant.memory.domain.type.MemoryRetrieval.ARCHIVE"
+        + " and ((m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER and m.ownerUserId = :userId)"
+        + " or (m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP and m.groupId = :groupId))"
+        + " group by m.collection, m.sensitivity")
     List<MemoryCollectionCount> countLoadableByCollection(@Param("userId") Long userId, @Param("groupId") Long groupId);
 }

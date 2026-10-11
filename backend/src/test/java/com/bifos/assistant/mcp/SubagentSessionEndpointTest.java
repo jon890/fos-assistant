@@ -90,6 +90,7 @@ class SubagentSessionEndpointTest {
     private String rootB;
     private AgentExecution dadRun;
 
+
     @BeforeEach
     void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE_A, PROFILE_B));
@@ -106,24 +107,25 @@ class SubagentSessionEndpointTest {
         McpCallSigner.running(executions, agents, kid.id(), 2L, PROFILE_B, rootB);
     }
 
+
     @Test
     @DisplayName("도는 실행 아래 최상위 자식을 등록하면 201 이다")
     void registeringTopLevelChildUnderRunningRunIs201() throws Exception {
         String child = newChild();
 
         HttpResponse<String> response = register(
-                tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
+            tokenA, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(201);
         assertThat(json.readTree(response.body())).isEqualTo(json.readTree("{\"result\":\"created\"}"));
         assertThat(rows(PROFILE_A, child)).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("원본 조회는 profile 토큰 인증만 받고 Origin과 사용자 JWT는 거절한다")
     void attachmentInspectionUsesProfileTokenFilterAndExcludesJwt() throws Exception {
-        for (String inspection :
-                new String[] {"/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate"}) {
+        for (String inspection : new String[] {"/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate"}) {
             assertThat(send(inspection, null, "{}", false).statusCode()).isEqualTo(401);
             assertThat(send(inspection, jwt(dad), "{}", false).statusCode()).isEqualTo(401);
             assertThat(send(inspection, tokenA, "{}", true).statusCode()).isEqualTo(403);
@@ -132,6 +134,7 @@ class SubagentSessionEndpointTest {
             assertThat(response.body()).contains("VALIDATION_FAILED");
         }
     }
+
 
     @Test // 9
     @DisplayName("같은 본문을 다시 보내면 200 이고 줄은 하나다")
@@ -147,6 +150,7 @@ class SubagentSessionEndpointTest {
         assertThat(rows(PROFILE_A, child)).isEqualTo(1);
     }
 
+
     @Test // 10
     @DisplayName("같은 자식을 다른 루트의 도는 실행 아래로 보내면 409 이고 origin 은 그대로다")
     void sendingSameChildUnderOtherRootsRunningRunIs409AndOriginUnchanged() throws Exception {
@@ -156,13 +160,14 @@ class SubagentSessionEndpointTest {
         McpCallSigner.running(executions, agents, kid.id(), 3L, PROFILE_A, otherRoot);
 
         HttpResponse<String> response = register(
-                tokenA,
-                McpCallSigner.subagentBody(tokenA, otherRoot, otherRoot, child).toString());
+            tokenA,
+            McpCallSigner.subagentBody(tokenA, otherRoot, otherRoot, child).toString());
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(409);
         assertThat(json.readTree(response.body()).path("code").asString()).isEqualTo("SESSION_BINDING_CONFLICT");
         assertThat(origin(PROFILE_A, child)).as("origin 실행").isEqualTo(dadRun.id());
     }
+
 
     @Test
     @DisplayName("서명이나 모양이 틀리거나 JSON 이 아니거나 비어 있으면 403 이다")
@@ -176,14 +181,15 @@ class SubagentSessionEndpointTest {
         for (String body : List.of(wrongSig.toString(), wrongShape.toString(), "not json", "[1]", "")) {
             HttpResponse<String> response = register(tokenA, body);
             assertThat(response.statusCode())
-                    .as("본문 %s 의 응답: %s", body, response.body())
-                    .isEqualTo(403);
+                .as("본문 %s 의 응답: %s", body, response.body())
+                .isEqualTo(403);
             assertThat(json.readTree(response.body()).path("code").asString())
-                    .as("본문 %s", body)
-                    .isEqualTo("SESSION_BINDING_REJECTED");
+                .as("본문 %s", body)
+                .isEqualTo("SESSION_BINDING_REJECTED");
         }
         assertThat(rows(PROFILE_A, child)).isZero();
     }
+
 
     @Test // 8
     @DisplayName("profile A 토큰으로 profile B 실행의 루트 아래 등록하면 403 이고 줄이 없다")
@@ -191,32 +197,33 @@ class SubagentSessionEndpointTest {
         String child = newChild();
 
         HttpResponse<String> response = register(
-                tokenA, McpCallSigner.subagentBody(tokenA, rootB, rootB, child).toString());
+            tokenA, McpCallSigner.subagentBody(tokenA, rootB, rootB, child).toString());
 
         assertThat(response.statusCode()).as("응답: %s", response.body()).isEqualTo(403);
         assertThat(json.readTree(response.body()).path("code").asString()).isEqualTo("SESSION_BINDING_REJECTED");
         assertThat(rows(PROFILE_A, child) + rows(PROFILE_B, child)).isZero();
     }
 
+
     @Test
     @DisplayName("토큰이 없거나 모르거나 폐기됐으면 401 이고 본문이 없다")
     void missingUnknownOrRevokedTokenIs401WithoutBody() throws Exception {
         String revoked = tokens.issue(PROFILE_A, "revoked").rawToken();
         tokens.revoke(tokenRepository
-                .findByTokenHash(AgentTokenService.hash(revoked))
-                .orElseThrow()
-                .id());
+            .findByTokenHash(AgentTokenService.hash(revoked))
+            .orElseThrow()
+            .id());
         String unknown = "unknown-" + UUID.randomUUID();
         String child = newChild();
 
         HttpResponse<String> none = register(
-                null, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
+            null, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
         HttpResponse<String> notIssued = register(
-                unknown,
-                McpCallSigner.subagentBody(unknown, rootA, rootA, child).toString());
+            unknown,
+            McpCallSigner.subagentBody(unknown, rootA, rootA, child).toString());
         HttpResponse<String> gone = register(
-                revoked,
-                McpCallSigner.subagentBody(revoked, rootA, rootA, child).toString());
+            revoked,
+            McpCallSigner.subagentBody(revoked, rootA, rootA, child).toString());
 
         for (HttpResponse<String> response : List.of(none, notIssued, gone)) {
             assertThat(response.statusCode()).isEqualTo(401);
@@ -225,6 +232,7 @@ class SubagentSessionEndpointTest {
         assertThat(rows(PROFILE_A, child)).isZero();
     }
 
+
     @Test
     @DisplayName("사용자 JWT 로 부르면 MCP 토큰 필터가 받아 401 이고 줄이 없다")
     void userJwtIs401ByMcpTokenFilterAndLeavesNoRow() throws Exception {
@@ -232,11 +240,12 @@ class SubagentSessionEndpointTest {
         String child = newChild();
 
         HttpResponse<String> response = register(
-                jwt, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
+            jwt, McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString());
 
         assertThat(response.statusCode()).isEqualTo(401);
         assertThat(rows(PROFILE_A, child)).isZero();
     }
+
 
     @Test
     @DisplayName("Origin 헤더가 있으면 403 이다")
@@ -244,14 +253,15 @@ class SubagentSessionEndpointTest {
         String child = newChild();
 
         HttpResponse<String> response = send(
-                PATH,
-                tokenA,
-                McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString(),
-                true);
+            PATH,
+            tokenA,
+            McpCallSigner.subagentBody(tokenA, rootA, rootA, child).toString(),
+            true);
 
         assertThat(response.statusCode()).isEqualTo(403);
         assertThat(rows(PROFILE_A, child)).isZero();
     }
+
 
     @Test // 1
     @DisplayName("등록한 자식은 부모 실행이 끝난 뒤에도 memory read 로 부모 사용자의 본문을 읽는다")
@@ -259,22 +269,22 @@ class SubagentSessionEndpointTest {
         Memory indexed = memories.create(current(dad), MemoryScope.USER, "색인", "아빠 본문", false);
         String child = newChild();
         assertThat(register(
-                                tokenA,
-                                McpCallSigner.subagentBody(tokenA, rootA, rootA, child)
-                                        .toString())
-                        .statusCode())
-                .isEqualTo(201);
+            tokenA,
+            McpCallSigner.subagentBody(tokenA, rootA, rootA, child)
+                .toString())
+                    .statusCode())
+                        .isEqualTo(201);
         jdbc.update(
-                "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
+            "UPDATE agent_execution SET status = ? WHERE id = ?", ExecutionStatus.SUCCEEDED.name(), dadRun.id());
         String fosCtx = McpCallSigner.context(tokenA, "memory_read", rootA, child, "call_" + UUID.randomUUID())
-                .toString();
+            .toString();
 
         HttpResponse<String> response = send(
-                "/mcp",
-                tokenA,
-                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
-                        + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}",
-                false);
+            "/mcp",
+            tokenA,
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"memory_read\",\"arguments\":{\"id\":"
+                + indexed.id() + ",\"_fos_ctx\":" + fosCtx + "}}}",
+            false);
 
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode result = json.readTree(response.body()).path("result");
@@ -282,11 +292,11 @@ class SubagentSessionEndpointTest {
         assertThat(result.path("content").get(0).path("text").asString()).isEqualTo("아빠 본문");
     }
 
+
     @Test
     @DisplayName("등록 경로는 도구 목록에 나오지 않는다")
     void registrationPathIsNotInToolList() throws Exception {
-        HttpResponse<String> response =
-                send("/mcp", tokenA, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", false);
+        HttpResponse<String> response = send("/mcp", tokenA, "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}", false);
 
         assertThat(response.statusCode()).isEqualTo(200);
         JsonNode listed = json.readTree(response.body()).path("result").path("tools");
@@ -297,14 +307,16 @@ class SubagentSessionEndpointTest {
         assertThat(response.body()).doesNotContain(PATH, "session-bindings");
     }
 
+
     private HttpResponse<String> register(String token, String body) throws Exception {
         return send(PATH, token, body, false);
     }
 
+
     private HttpResponse<String> send(String path, String token, String body, boolean origin) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body));
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(body));
         if (token != null) {
             builder.header("Authorization", "Bearer " + token);
         }
@@ -314,36 +326,41 @@ class SubagentSessionEndpointTest {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+
     private int rows(String profileName, String sessionId) {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
-                Integer.class,
-                profileName,
-                sessionId);
+            "SELECT COUNT(*) FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
+            Integer.class,
+            profileName,
+            sessionId);
     }
+
 
     private Long origin(String profileName, String sessionId) {
         return jdbc.queryForObject(
-                "SELECT origin_execution_id FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
-                Long.class,
-                profileName,
-                sessionId);
+            "SELECT origin_execution_id FROM hermes_session_binding WHERE profile_name = ? AND session_id = ?",
+            Long.class,
+            profileName,
+            sessionId);
     }
+
 
     private static String newChild() {
         return "하위-" + UUID.randomUUID();
     }
 
+
     private static String jwt(AppUser user) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(user.email())
-                .claim("name", user.displayName())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(600)))
-                .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
-                .compact();
+            .subject(user.email())
+            .claim("name", user.displayName())
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusSeconds(600)))
+            .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
     }
+
 
     private static CurrentUser current(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());

@@ -54,6 +54,7 @@ public class ServiceToken {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+
     private ServiceToken(Long userId, String tokenHash, String label, Instant expiresAt, Instant now) {
         this.userId = userId;
         this.tokenHash = tokenHash;
@@ -62,9 +63,11 @@ public class ServiceToken {
         this.createdAt = now;
     }
 
+
     public static ServiceToken issue(Long userId, String tokenHash, String label, Instant expiresAt, Instant now) {
         return new ServiceToken(userId, tokenHash, label, expiresAt, now);
     }
+
 
     /** 폐기되지 않았고 만료 시각이 아직 오지 않았는가. */
     public boolean usableAt(Instant now) {

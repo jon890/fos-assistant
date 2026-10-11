@@ -92,29 +92,31 @@ class MemoryUseControllerTest {
     private Memory memory;
     private AgentExecution run;
 
+
     @BeforeEach
     void setUp() {
         long suffix = Math.abs(UUID.randomUUID().getMostSignificantBits() % 1_000_000L) + 6_000_000L;
         dad = new CurrentUser(suffix, "dad-" + suffix + "@example.com", "아빠", 1L, UserRole.ADMIN);
         kid = new CurrentUser(suffix + 1, "kid-" + suffix + "@example.com", "아이", 1L, UserRole.MEMBER);
         mvc = MockMvcBuilders.standaloneSetup(new MemoryUseController(uses, access, currentUser))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
         conversation = conversations.save(Conversation.startedBy(dad.id(), "참고한 기억 경로", null, Instant.now()));
         memory = memoryService.create(
-                dad, MemoryScope.USER, "딸 이름", SECRET_BODY, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            dad, MemoryScope.USER, "딸 이름", SECRET_BODY, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
         run = McpCallSigner.running(
-                executions,
-                agents,
-                dad.id(),
-                conversation.id(),
-                "chat-memory-use-controller",
-                "fos-" + UUID.randomUUID());
+            executions,
+            agents,
+            dad.id(),
+            conversation.id(),
+            "chat-memory-use-controller",
+            "fos-" + UUID.randomUUID());
         messages.save(ChatMessage.fromAssistant(conversation.id(), "답", run.id(), Instant.now()));
         contextSources.save(ExecutionContextSource.of(
-                run.id(), 0, "MEMORY_FACTS", "memory:" + memory.id(), "INLINE", "FRESH", Instant.now()));
+            run.id(), 0, "MEMORY_FACTS", "memory:" + memory.id(), "INLINE", "FRESH", Instant.now()));
         when(currentUser.require()).thenReturn(dad);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -125,20 +127,22 @@ class MemoryUseControllerTest {
         memories.deleteById(memory.id());
     }
 
+
     @Test
     @DisplayName("대화의 주인은 200 과 항목 칸을 가진 JSON 배열을 받고 본문은 받지 않는다")
     void ownerGetsArrayWithoutBody() throws Exception {
         mvc.perform(get("/api/v1/chat/conversations/{id}/memory-uses", conversation.publicId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].executionId").value(run.id()))
-                .andExpect(jsonPath("$[0].memoryId").value(memory.id()))
-                .andExpect(jsonPath("$[0].title").value("딸 이름"))
-                .andExpect(jsonPath("$[0].scope").value("USER"))
-                .andExpect(jsonPath("$[0].via").value("FACTS"))
-                .andExpect(jsonPath("$[0].content").doesNotExist())
-                .andExpect(content().string(not(containsString(SECRET_BODY))));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].executionId").value(run.id()))
+            .andExpect(jsonPath("$[0].memoryId").value(memory.id()))
+            .andExpect(jsonPath("$[0].title").value("딸 이름"))
+            .andExpect(jsonPath("$[0].scope").value("USER"))
+            .andExpect(jsonPath("$[0].via").value("FACTS"))
+            .andExpect(jsonPath("$[0].content").doesNotExist())
+            .andExpect(content().string(not(containsString(SECRET_BODY))));
     }
+
 
     @Test
     @DisplayName("다른 사용자는 없는 대화와 같은 404 를 받고 항목은 새지 않는다")
@@ -146,16 +150,16 @@ class MemoryUseControllerTest {
         when(currentUser.require()).thenReturn(kid);
 
         String foreign = mvc.perform(get("/api/v1/chat/conversations/{id}/memory-uses", conversation.publicId()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()))
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.CONVERSATION_NOT_FOUND.name()))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
         String missing = mvc.perform(get("/api/v1/chat/conversations/{id}/memory-uses", UUID.randomUUID()))
-                .andExpect(status().isNotFound())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+            .andExpect(status().isNotFound())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
 
         assertThat(foreign).as("남의 대화 응답과 없는 대화 응답").isEqualTo(missing);
     }

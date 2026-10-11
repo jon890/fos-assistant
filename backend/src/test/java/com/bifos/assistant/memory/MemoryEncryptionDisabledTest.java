@@ -64,6 +64,7 @@ class MemoryEncryptionDisabledTest {
     @Autowired
     JdbcTemplate jdbc;
 
+
     @BeforeEach
     void clean() {
         // 설정이 다른 컨텍스트도 같은 메모리 데이터베이스를 쓴다. 비우지 않으면 줄 수 단언이 순서에 따라 흔들린다
@@ -71,16 +72,19 @@ class MemoryEncryptionDisabledTest {
         repository.deleteAll();
     }
 
+
     private static void assertUnavailable(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_ENCRYPTION_UNAVAILABLE));
     }
+
 
     private long count(String table) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
     }
+
 
     private long insertSensitiveRow(String content, String keyId) {
         jdbc.update("""
@@ -92,30 +96,33 @@ class MemoryEncryptionDisabledTest {
         return jdbc.queryForObject("SELECT MAX(id) FROM memory", Long.class);
     }
 
+
     @Test
     @DisplayName("key 가 없으면 민감 항목을 만들지 못하고 아무것도 저장하지 않는다")
     void createSensitiveIsRejected() {
         assertUnavailable(() -> memories.create(
-                ADMIN, MemoryScope.USER, "신원", PLAIN, "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
+            ADMIN, MemoryScope.USER, "신원", PLAIN, "identity", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
 
         assertThat(count("memory")).isZero();
         assertThat(count("memory_revision")).isZero();
     }
 
+
     @Test
     @DisplayName("key 가 없으면 그룹 범위의 민감 항목도 만들지 못한다")
     void createGroupSensitiveIsRejected() {
         assertUnavailable(() -> memories.create(
-                ADMIN,
-                MemoryScope.GROUP,
-                "신원",
-                PLAIN,
-                "identity",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.SENSITIVE));
+            ADMIN,
+            MemoryScope.GROUP,
+            "신원",
+            PLAIN,
+            "identity",
+            MemoryRetrieval.SEARCH,
+            MemorySensitivity.SENSITIVE));
 
         assertThat(count("memory")).isZero();
     }
+
 
     @Test
     @DisplayName("일반 항목을 민감으로 고치려 하면 거절되고 본문과 민감도와 판이 그대로다")
@@ -125,7 +132,7 @@ class MemoryEncryptionDisabledTest {
         memories.update(ADMIN, memory.id(), PLAIN, false);
 
         assertUnavailable(
-                () -> memories.update(ADMIN, memory.id(), PLAIN, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
+            () -> memories.update(ADMIN, memory.id(), PLAIN, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
 
         Memory current = repository.findById(memory.id()).orElseThrow();
         assertThat(current.content()).isEqualTo(PLAIN);
@@ -133,11 +140,12 @@ class MemoryEncryptionDisabledTest {
         assertThat(current.revision()).isEqualTo(2);
         assertThat(count("memory_revision")).isEqualTo(1);
         Map<String, Object> revision = jdbc.queryForMap(
-                "SELECT content, content_key_id FROM memory_revision WHERE memory_id = ? AND revision = 1",
-                memory.id());
+            "SELECT content, content_key_id FROM memory_revision WHERE memory_id = ? AND revision = 1",
+            memory.id());
         assertThat(revision.get("CONTENT")).isEqualTo("처음 글");
         assertThat(revision.get("CONTENT_KEY_ID")).isNull();
     }
+
 
     @Test
     @DisplayName("제안을 받아들여도 민감 항목이 되지 않고 민감으로 고치는 길은 거절된다")
@@ -148,10 +156,10 @@ class MemoryEncryptionDisabledTest {
 
         Memory accepted = repository.findById(proposed.id()).orElseThrow();
         assertThat(accepted.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
-        assertUnavailable(() ->
-                memories.update(ADMIN, proposed.id(), PLAIN, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
+        assertUnavailable(() -> memories.update(ADMIN, proposed.id(), PLAIN, MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
         assertThat(count("memory_revision")).isZero();
     }
+
 
     @Test
     @DisplayName("일반 항목은 key 가 없어도 만들고 고치고 지운다")
@@ -165,6 +173,7 @@ class MemoryEncryptionDisabledTest {
         assertThat(count("memory_revision")).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("목록에 없는 key 로 암호화된 줄은 contentOf 가 거절하고 목록은 실패하지 않는다")
     void sealedRowWithoutKey() {
@@ -172,9 +181,10 @@ class MemoryEncryptionDisabledTest {
 
         assertUnavailable(() -> memories.contentOf(repository.findById(id).orElseThrow()));
         assertThat(views())
-                .singleElement()
-                .satisfies(view -> assertThat(view.content()).isEmpty());
+            .singleElement()
+            .satisfies(view -> assertThat(view.content()).isEmpty());
     }
+
 
     @Test
     @DisplayName("평문으로 남은 민감 줄도 목록으로 나가지 않는다")
@@ -182,9 +192,10 @@ class MemoryEncryptionDisabledTest {
         insertSensitiveRow(PLAIN, null);
 
         assertThat(views())
-                .singleElement()
-                .satisfies(view -> assertThat(view.content()).isEmpty());
+            .singleElement()
+            .satisfies(view -> assertThat(view.content()).isEmpty());
     }
+
 
     @Test
     @DisplayName("key 가 없으면 평문으로 남은 민감 줄을 옮기지 않고 그대로 둔다")
@@ -194,8 +205,9 @@ class MemoryEncryptionDisabledTest {
         assertThat(backfill.sealPlaintext()).isZero();
 
         assertThat(jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, id))
-                .isEqualTo(PLAIN);
+            .isEqualTo(PLAIN);
     }
+
 
     private List<MemoryView> views() {
         CurrentUserProvider currentUser = Mockito.mock(CurrentUserProvider.class);

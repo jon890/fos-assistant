@@ -68,6 +68,7 @@ class MemoryDocumentTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private MemoryDocumentController controller;
 
+
     @BeforeEach
     void setUp() {
         revisionRepository.deleteAll();
@@ -76,36 +77,41 @@ class MemoryDocumentTest {
         as(DAD);
     }
 
+
     private void as(CurrentUser user) {
         when(currentUser.require()).thenReturn(user);
     }
+
 
     private DocumentView createSensitive() {
         return controller.create(new CreateDocumentRequest("identity", NAME, "지원서 공통 프로필", MARK, true));
     }
 
+
     private Map<String, Object> row(Long id) {
         return jdbc.queryForMap("SELECT * FROM memory WHERE id = ?", id);
     }
 
+
     private static void assertCode(Runnable action, ErrorCode code) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class, e -> assertThat(e.code()).isEqualTo(code));
+            .isInstanceOfSatisfying(
+                ApiException.class, e -> assertThat(e.code()).isEqualTo(code));
     }
+
 
     @Test
     @DisplayName("이관한 문서는 읽고 고쳐도 기존 출처가 남고 다른 사용자에게 보이지 않는다")
     void preservesMigratedDocumentProvenance() {
         Long id = controller
-                .create(new CreateDocumentRequest("core", "legacy-document", "이관 문서", "기존 본문", false))
-                .id();
+            .create(new CreateDocumentRequest("core", "legacy-document", "이관 문서", "기존 본문", false))
+            .id();
         jdbc.update(
-                "UPDATE memory SET source_type = ?, source_ref = ?, source_date = ? WHERE id = ?",
-                "brain",
-                "legacy/example.md",
-                Date.valueOf("2026-01-02"),
-                id);
+            "UPDATE memory SET source_type = ?, source_ref = ?, source_date = ? WHERE id = ?",
+            "brain",
+            "legacy/example.md",
+            Date.valueOf("2026-01-02"),
+            id);
 
         assertThat(controller.get(id).content()).isEqualTo("기존 본문");
         assertThat(controller.list()).extracting(DocumentSummaryView::id).contains(id);
@@ -121,6 +127,7 @@ class MemoryDocumentTest {
         assertThat(controller.list()).extracting(DocumentSummaryView::id).doesNotContain(id);
     }
 
+
     @Test
     @DisplayName("민감 문서를 만들면 곧 승인되고 본문은 암호문으로 저장된다")
     void createsAcceptedSensitiveDocument() {
@@ -134,8 +141,9 @@ class MemoryDocumentTest {
         assertThat(stored.get("STATUS")).isEqualTo("ACCEPTED");
         assertThat(stored.get("RETRIEVAL")).isEqualTo("SEARCH");
         assertThat(stored.get("SCOPE")).isEqualTo("USER");
-        assertThat((String) stored.get("CONTENT")).doesNotContain(MARK);
+        assertThat((String)stored.get("CONTENT")).doesNotContain(MARK);
     }
+
 
     @Test
     @DisplayName("같은 이름으로 한 번 더 만들면 거절하고 다른 주인은 같은 이름을 쓴다")
@@ -148,6 +156,7 @@ class MemoryDocumentTest {
         assertThat(createSensitive().id()).isNotNull();
     }
 
+
     @Test
     @DisplayName("남의 문서는 읽지도 고치지도 못한다")
     void hidesOthersDocument() {
@@ -157,6 +166,7 @@ class MemoryDocumentTest {
         assertCode(() -> controller.get(id), ErrorCode.MEMORY_NOT_FOUND);
         assertCode(() -> controller.update(id, new UpdateDocumentRequest("x", true, 1)), ErrorCode.MEMORY_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("문서 목록은 자기 문서만 내고 본문 칸이 없다")
@@ -171,9 +181,10 @@ class MemoryDocumentTest {
         assertThat(list).hasSize(1);
         assertThat(list.get(0).documentKey()).isEqualTo(NAME);
         assertThat(DocumentSummaryView.class.getRecordComponents())
-                .extracting(component -> component.getName())
-                .doesNotContain("content");
+            .extracting(component -> component.getName())
+            .doesNotContain("content");
     }
+
 
     @Test
     @DisplayName("판 번호를 견줘 고치고 낡은 판 번호는 거절한다")
@@ -185,29 +196,31 @@ class MemoryDocumentTest {
         assertThat(revised.revision()).isEqualTo(2);
         assertThat(controller.get(id).content()).isEqualTo("평문-표식-8802");
         assertThat(jdbc.queryForObject(
-                        "SELECT change_type FROM memory_revision WHERE memory_id = ? AND revision = 1",
-                        String.class,
-                        id))
+            "SELECT change_type FROM memory_revision WHERE memory_id = ? AND revision = 1",
+            String.class,
+            id))
                 .isEqualTo("UPDATED");
 
         long before = revisionRepository.count();
         assertCode(
-                () -> controller.update(id, new UpdateDocumentRequest("평문-표식-9913", true, 1)),
-                ErrorCode.MEMORY_REVISION_CONFLICT);
+            () -> controller.update(id, new UpdateDocumentRequest("평문-표식-9913", true, 1)),
+            ErrorCode.MEMORY_REVISION_CONFLICT);
         assertThat(revisionRepository.count()).isEqualTo(before);
         assertThat(controller.get(id).content()).isEqualTo("평문-표식-8802");
     }
+
 
     @Test
     @DisplayName("이름과 collection 의 모양이 틀리면 거절한다")
     void validatesNameAndCollection() {
         assertCode(
-                () -> controller.create(new CreateDocumentRequest("identity", "Application_Profile", "t", "c", false)),
-                ErrorCode.VALIDATION_FAILED);
+            () -> controller.create(new CreateDocumentRequest("identity", "Application_Profile", "t", "c", false)),
+            ErrorCode.VALIDATION_FAILED);
         assertCode(
-                () -> controller.create(new CreateDocumentRequest("no-such-area", NAME, "t", "c", false)),
-                ErrorCode.VALIDATION_FAILED);
+            () -> controller.create(new CreateDocumentRequest("no-such-area", NAME, "t", "c", false)),
+            ErrorCode.VALIDATION_FAILED);
     }
+
 
     @Test
     @DisplayName("만드는 요청에 민감 표시가 빠지면 검증이 실패한다")
@@ -215,11 +228,12 @@ class MemoryDocumentTest {
         Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
         assertThat(validator.validate(new CreateDocumentRequest("identity", NAME, "t", "c", null)))
-                .extracting(violation -> violation.getPropertyPath().toString())
-                .containsExactly("sensitive");
+            .extracting(violation -> violation.getPropertyPath().toString())
+            .containsExactly("sensitive");
         assertThat(validator.validate(new CreateDocumentRequest("identity", NAME, "t", "c", false)))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("문서는 Memory 목록에 나오지 않는다")
@@ -230,13 +244,14 @@ class MemoryDocumentTest {
         assertThat(memoryController.readable()).extracting(MemoryView::id).doesNotContain(id);
     }
 
+
     @Test
     @DisplayName("Memory 의 수정과 승인과 거절은 문서를 찾지 못한다")
     void memoryPathsDoNotTouchDocuments() {
         Long sensitiveId = createSensitive().id();
         Long plainId = controller
-                .create(new CreateDocumentRequest("career", "position-notes", "직무 메모", "일반 글", false))
-                .id();
+            .create(new CreateDocumentRequest("career", "position-notes", "직무 메모", "일반 글", false))
+            .id();
 
         for (Long id : List.of(sensitiveId, plainId)) {
             assertCode(() -> memories.update(DAD, id, "x", true), ErrorCode.MEMORY_NOT_FOUND);
@@ -248,6 +263,7 @@ class MemoryDocumentTest {
         }
     }
 
+
     @Test
     @DisplayName("문서를 지운 뒤 같은 이름으로 다시 만들 수 있고 지운 판의 본문은 암호문이다")
     void deleteThenRecreate() {
@@ -257,17 +273,19 @@ class MemoryDocumentTest {
 
         assertThat(createSensitive().id()).isNotEqualTo(id);
         String deleted = jdbc.queryForObject(
-                "SELECT content FROM memory_revision WHERE memory_id = ? AND change_type = 'DELETED'",
-                String.class,
-                id);
+            "SELECT content FROM memory_revision WHERE memory_id = ? AND change_type = 'DELETED'",
+            String.class,
+            id);
         assertThat(deleted).doesNotContain(MARK);
     }
+
 
     @Test
     @DisplayName("collection 목록에 identity 가 들어 있다")
     void collectionsIncludeIdentity() {
         assertThat(controller.collections()).extracting(CollectionView::key).contains("identity");
     }
+
 
     @Test
     @DisplayName("민감 문서의 꺼내는 방식은 요청으로 정하지 못하고 늘 SEARCH 다")

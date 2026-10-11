@@ -7,7 +7,8 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ServiceTokenCollectionRepository
-        extends JpaRepository<ServiceTokenCollection, ServiceTokenCollectionId> {
+    extends
+        JpaRepository<ServiceTokenCollection, ServiceTokenCollectionId> {
 
     List<ServiceTokenCollection> findByIdTokenIdIn(Collection<Long> tokenIds);
 }

@@ -71,6 +71,7 @@ class MemoryFreshnessTest {
     @Autowired
     ConversationRepository conversations;
 
+
     @BeforeEach
     void setUp() {
         contextSources.deleteAll();
@@ -78,6 +79,7 @@ class MemoryFreshnessTest {
         memoryRepository.deleteAll();
         clock.set(NOW);
     }
+
 
     @Test
     @DisplayName("오래된 항상 항목과 색인 항목은 STALE이고 경계와 새 항목은 FRESH다")
@@ -93,57 +95,59 @@ class MemoryFreshnessTest {
         clock.set(NOW);
 
         assertThat(assembler.assembleForOwner(USER).bundle().items())
-                .extracting(ContextItem::ref, ContextItem::freshness)
-                .containsExactlyInAnyOrder(
-                        tuple("memory:" + staleAlways.id(), ContextFreshness.STALE),
-                        tuple("memory:" + staleIndex.id(), ContextFreshness.STALE),
-                        tuple("memory:" + staleOmitted.id(), ContextFreshness.STALE),
-                        tuple("memory:" + boundary.id(), ContextFreshness.FRESH),
-                        tuple("memory:" + fresh.id(), ContextFreshness.FRESH));
+            .extracting(ContextItem::ref, ContextItem::freshness)
+            .containsExactlyInAnyOrder(
+                tuple("memory:" + staleAlways.id(), ContextFreshness.STALE),
+                tuple("memory:" + staleIndex.id(), ContextFreshness.STALE),
+                tuple("memory:" + staleOmitted.id(), ContextFreshness.STALE),
+                tuple("memory:" + boundary.id(), ContextFreshness.FRESH),
+                tuple("memory:" + fresh.id(), ContextFreshness.FRESH));
         assertThat(assembler.assembleForOwner(USER).bundle().items())
-                .filteredOn(item -> item.ref().equals("memory:" + staleOmitted.id()))
-                .singleElement()
-                .extracting(ContextItem::bodyMode)
-                .isEqualTo(ContextBodyMode.OMITTED);
+            .filteredOn(item -> item.ref().equals("memory:" + staleOmitted.id()))
+            .singleElement()
+            .extracting(ContextItem::bodyMode)
+            .isEqualTo(ContextBodyMode.OMITTED);
     }
+
 
     @Test
     @DisplayName("기본 기준이 0이어도 collection 기준은 따로 STALE과 FRESH를 판정한다")
     void usesCollectionStaleAfterWhenDefaultFreshnessIsDisabled() {
         clock.set(NOW.minus(Duration.ofDays(31)));
         Memory career = memories.create(
-                USER, MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
+            USER, MemoryScope.USER, "커리어", "커리어 본문", "career", MemoryRetrieval.ALWAYS, MemorySensitivity.NORMAL);
         Memory defaultDisabled = memories.create(
-                USER, MemoryScope.USER, "판정 끔", "본문", "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            USER, MemoryScope.USER, "판정 끔", "본문", "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
         clock.set(NOW.minus(Duration.ofDays(29)));
         Memory careerFresh = memories.create(
-                USER,
-                MemoryScope.USER,
-                "새 커리어",
-                "새 커리어 본문",
-                "career",
-                MemoryRetrieval.SEARCH,
-                MemorySensitivity.NORMAL);
+            USER,
+            MemoryScope.USER,
+            "새 커리어",
+            "새 커리어 본문",
+            "career",
+            MemoryRetrieval.SEARCH,
+            MemorySensitivity.NORMAL);
         clock.set(NOW);
         ContextAssembler configured = new ContextAssembler(
-                memories,
-                new ContextProperties(
-                        8_000,
-                        4,
-                        Duration.ofHours(6),
-                        Duration.ZERO,
-                        Map.of("career", Duration.ofDays(30)),
-                        null,
-                        null),
-                clock);
+            memories,
+            new ContextProperties(
+                8_000,
+                4,
+                Duration.ofHours(6),
+                Duration.ZERO,
+                Map.of("career", Duration.ofDays(30)),
+                null,
+                null),
+            clock);
 
         assertThat(configured.assembleForOwner(USER).bundle().items())
-                .extracting(ContextItem::ref, ContextItem::freshness)
-                .containsExactlyInAnyOrder(
-                        tuple("memory:" + career.id(), ContextFreshness.STALE),
-                        tuple("memory:" + defaultDisabled.id(), ContextFreshness.UNKNOWN),
-                        tuple("memory:" + careerFresh.id(), ContextFreshness.FRESH));
+            .extracting(ContextItem::ref, ContextItem::freshness)
+            .containsExactlyInAnyOrder(
+                tuple("memory:" + career.id(), ContextFreshness.STALE),
+                tuple("memory:" + defaultDisabled.id(), ContextFreshness.UNKNOWN),
+                tuple("memory:" + careerFresh.id(), ContextFreshness.FRESH));
     }
+
 
     @Test
     @DisplayName("수정 시각이 없는 대역 Memory는 UNKNOWN으로 판정한다")
@@ -159,15 +163,16 @@ class MemoryFreshnessTest {
         when(mockedMemories.alwaysInjectedFor(any(), any())).thenReturn(List.of(memory));
         when(mockedMemories.indexedFor(any(), any())).thenReturn(List.of());
         ContextAssembler mockedAssembler = new ContextAssembler(
-                mockedMemories,
-                new ContextProperties(8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of(), null, null),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+            mockedMemories,
+            new ContextProperties(8_000, 4, Duration.ofHours(6), Duration.ofDays(180), Map.of(), null, null),
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
         assertThat(mockedAssembler.assembleForOwner(USER).bundle().items())
-                .singleElement()
-                .extracting(ContextItem::freshness)
-                .isEqualTo(ContextFreshness.UNKNOWN);
+            .singleElement()
+            .extracting(ContextItem::freshness)
+            .isEqualTo(ContextFreshness.UNKNOWN);
     }
+
 
     @Test
     @DisplayName("실제 Memory에서 만든 STALE과 UNKNOWN 출처를 실행 기록에 함께 남긴다")
@@ -175,50 +180,51 @@ class MemoryFreshnessTest {
         clock.set(NOW.minus(Duration.ofDays(181)));
         Memory stale = memories.create(USER, MemoryScope.USER, "오래된 기억", "본문", true);
         Memory unknown = memories.create(
-                USER, MemoryScope.USER, "판정 없는 기억", "본문", "disabled", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+            USER, MemoryScope.USER, "판정 없는 기억", "본문", "disabled", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
         clock.set(NOW);
         ContextAssembler configured = new ContextAssembler(
-                memories,
-                new ContextProperties(
-                        8_000,
-                        4,
-                        Duration.ofHours(6),
-                        Duration.ofDays(180),
-                        Map.of("disabled", Duration.ZERO),
-                        null,
-                        null),
-                clock);
+            memories,
+            new ContextProperties(
+                8_000,
+                4,
+                Duration.ofHours(6),
+                Duration.ofDays(180),
+                Map.of("disabled", Duration.ZERO),
+                null,
+                null),
+            clock);
         AssembledContext context = configured.assembleForOwner(USER);
         Conversation conversation = conversations.save(Conversation.startedBy(USER.id(), "신선도", null, NOW));
         AgentExecution execution = recorder.start(
-                USER,
-                conversation.executionConversation(),
-                agent(),
+            USER,
+            conversation.executionConversation(),
+            agent(),
+            null,
+            null,
+            new ExecutionContextSnapshot(
+                context.chars(),
                 null,
-                null,
-                new ExecutionContextSnapshot(
-                        context.chars(),
-                        null,
-                        context.instructionsHash(),
-                        context.omittedItems(),
-                        ContextSourceRefs.of(context)));
+                context.instructionsHash(),
+                context.omittedItems(),
+                ContextSourceRefs.of(context)));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
-                .extracting(ExecutionContextSource::sourceRef, ExecutionContextSource::freshness)
-                .containsExactlyInAnyOrder(
-                        tuple("memory:" + stale.id(), "STALE"), tuple("memory:" + unknown.id(), "UNKNOWN"));
+            .extracting(ExecutionContextSource::sourceRef, ExecutionContextSource::freshness)
+            .containsExactlyInAnyOrder(
+                tuple("memory:" + stale.id(), "STALE"), tuple("memory:" + unknown.id(), "UNKNOWN"));
     }
+
 
     private static Agent agent() {
         return Agent.of(
-                "memory-freshness-agent",
-                "신선도 검사",
-                "memory-freshness-agent",
-                "http://runtime.test/p/memory-freshness",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                USER.id(),
-                NOW);
+            "memory-freshness-agent",
+            "신선도 검사",
+            "memory-freshness-agent",
+            "http://runtime.test/p/memory-freshness",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            USER.id(),
+            NOW);
     }
 }

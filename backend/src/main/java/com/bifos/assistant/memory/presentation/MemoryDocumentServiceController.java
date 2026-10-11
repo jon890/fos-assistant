@@ -27,30 +27,31 @@ public class MemoryDocumentServiceController {
 
     private final MemoryService memories;
 
+
     @GetMapping("/{collection}/{documentKey}")
     public ResponseEntity<ServiceDocumentView> read(
-            @RequestAttribute(ServiceTokenInterceptor.PRINCIPAL_ATTRIBUTE) ServicePrincipal principal,
-            @PathVariable String collection,
-            @PathVariable String documentKey) {
+        @RequestAttribute(ServiceTokenInterceptor.PRINCIPAL_ATTRIBUTE) ServicePrincipal principal,
+        @PathVariable String collection,
+        @PathVariable String documentKey) {
         Memory memory = memories.documentForService(principal.userId(), principal.access(), collection, documentKey);
         ServiceDocumentView body = new ServiceDocumentView(
-                memory.collection(),
-                memory.documentKey(),
-                memory.title(),
-                memories.contentOf(memory),
-                memory.revision(),
-                memory.updatedAt());
+            memory.collection(),
+            memory.documentKey(),
+            memory.title(),
+            memories.contentOf(memory),
+            memory.revision(),
+            memory.updatedAt());
         // 본문과 제목은 적지 않는다
         log.info(
-                "service document read userId={} tokenId={} collection={} documentKey={} revision={}",
-                principal.userId(),
-                principal.tokenId(),
-                memory.collection(),
-                memory.documentKey(),
-                memory.revision());
+            "service document read userId={} tokenId={} collection={} documentKey={} revision={}",
+            principal.userId(),
+            principal.tokenId(),
+            memory.collection(),
+            memory.documentKey(),
+            memory.revision());
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.noStore())
-                .header(EXPIRES_AT_HEADER, principal.expiresAt().toString())
-                .body(body);
+            .cacheControl(CacheControl.noStore())
+            .header(EXPIRES_AT_HEADER, principal.expiresAt().toString())
+            .body(body);
     }
 }

@@ -100,13 +100,14 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     @Transient
     private boolean persisted;
 
+
     /**
      * 항목의 지금 값을 판으로 옮긴다. 항목을 고치거나 지우기 직전에 부른다.
      *
      * @param reason 바꾼 까닭. 적지 않으면 null 이다
      */
     public static MemoryRevision of(
-            Memory memory, MemoryChangeType changeType, Long changedByUserId, String reason, Instant at) {
+        Memory memory, MemoryChangeType changeType, Long changedByUserId, String reason, Instant at) {
         MemoryRevision revision = new MemoryRevision();
         revision.id = new MemoryRevisionId(memory.id(), memory.revision());
         revision.changeType = changeType;
@@ -128,10 +129,12 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         return revision;
     }
 
+
     /** 암호문이 누구의 것인지 적은 글이다. {@link Memory#contentBinding()} 과 같은 규칙이다. */
     public String contentBinding() {
         return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
     }
+
 
     /**
      * 남긴 판의 뜻은 바뀌지 않는다. 평문으로 남은 민감 판의 저장 모양만 바꾼다(ADR-055).
@@ -146,11 +149,13 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
         this.contentKeyId = body.keyId();
     }
 
+
     /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@code id()} 와 같다. */
     @Override
     public MemoryRevisionId getId() {
         return id();
     }
+
 
     /**
      * 판은 늘 새 줄로 넣는다. 번호를 직접 정하므로 이것이 없으면 저장이 같은 번호의 줄을 조용히 덮어쓴다.
@@ -161,6 +166,7 @@ public class MemoryRevision implements Persistable<MemoryRevisionId> {
     public boolean isNew() {
         return !persisted;
     }
+
 
     @PostLoad
     @PostPersist

@@ -68,15 +68,16 @@ public class MemoryCapture {
     @Column(name = "undone_at")
     private Instant undoneAt;
 
+
     public static MemoryCapture of(
-            Long memoryId,
-            Long userId,
-            Long conversationId,
-            Long executionId,
-            MemoryCaptureKind kind,
-            Integer baseRevision,
-            MemoryStatus previousStatus,
-            Instant now) {
+        Long memoryId,
+        Long userId,
+        Long conversationId,
+        Long executionId,
+        MemoryCaptureKind kind,
+        Integer baseRevision,
+        MemoryStatus previousStatus,
+        Instant now) {
         MemoryCapture capture = new MemoryCapture();
         capture.memoryId = memoryId;
         capture.userId = userId;
@@ -89,10 +90,12 @@ public class MemoryCapture {
         return capture;
     }
 
+
     /** 사람이 되돌렸다. 대화에 다시 그리지 않는다. */
     public void undo(Instant at) {
         undoneAt = at;
     }
+
 
     public boolean undone() {
         return undoneAt != null;

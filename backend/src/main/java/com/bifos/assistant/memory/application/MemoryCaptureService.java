@@ -62,6 +62,7 @@ public class MemoryCaptureService {
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
+
     /**
      * 사실 하나를 바로 저장하거나 제안으로 남긴다.
      *
@@ -81,8 +82,8 @@ public class MemoryCaptureService {
         }
         MemorySensitivity sensitivity = request.sensitivity();
         boolean direct = request.direct()
-                && sensitivity == MemorySensitivity.NORMAL
-                && !MemorySensitiveHints.suspected(request.title(), request.content());
+            && sensitivity == MemorySensitivity.NORMAL
+            && !MemorySensitiveHints.suspected(request.title(), request.content());
         String dedupKey = MemoryService.proposalDedupKey(user.id(), request.title(), request.content());
         if (sensitivity == MemorySensitivity.NORMAL) {
             Optional<Memory> existing = memories.findByProposalDedupKey(dedupKey);
@@ -101,33 +102,34 @@ public class MemoryCaptureService {
             throw ex;
         }
         Memory saved = memories.save(
-                direct
-                        ? Memory.remembered(
-                                user.id(),
-                                request.title(),
-                                body,
-                                placement,
-                                request.executionId(),
-                                dedupKey,
-                                clock.instant())
-                        : Memory.proposed(
-                                user.id(),
-                                request.title(),
-                                body,
-                                placement,
-                                request.executionId(),
-                                dedupKey,
-                                clock.instant()));
+            direct
+                ? Memory.remembered(
+                    user.id(),
+                    request.title(),
+                    body,
+                    placement,
+                    request.executionId(),
+                    dedupKey,
+                    clock.instant())
+                : Memory.proposed(
+                    user.id(),
+                    request.title(),
+                    body,
+                    placement,
+                    request.executionId(),
+                    dedupKey,
+                    clock.instant()));
         MemoryCaptureKind kind = direct ? MemoryCaptureKind.CREATED : MemoryCaptureKind.PROPOSED;
         record(saved.id(), user, request, kind, direct ? saved.revision() : null);
         if (!direct) {
             // 바로 저장은 사용자 본인의 말이라 제안이 아니다. 제안만 판단 피드백의 SURFACED 로 남긴다.
             feedback.record(MemoryProposalFeedback.of(
-                    user, saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, clock.instant()));
+                user, saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, clock.instant()));
         }
         return new MemoryRememberResult(
-                direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED, saved.id());
+            direct ? MemoryRememberOutcome.REMEMBERED : MemoryRememberOutcome.PROPOSED, saved.id());
     }
+
 
     /**
      * 한 대화에서 요청자가 남긴 기록과 그 항목을 만든 순으로 낸다. 되돌린 기록과 항목이 없어진 기록은 뺀다.
@@ -135,31 +137,30 @@ public class MemoryCaptureService {
      * @param conversationId 요청자의 대화임을 부르는 쪽이 확인한 번호
      */
     public List<CapturedMemory> capturesOf(CurrentUser user, Long conversationId) {
-        List<MemoryCapture> rows =
-                captures.findByUserIdAndConversationIdAndUndoneAtIsNullOrderByIdAsc(user.id(), conversationId);
+        List<MemoryCapture> rows = captures.findByUserIdAndConversationIdAndUndoneAtIsNullOrderByIdAsc(user.id(), conversationId);
         if (rows.isEmpty()) {
             return List.of();
         }
-        Map<Long, Memory> byId =
-                memories
-                        .findAllById(rows.stream()
-                                .map(MemoryCapture::memoryId)
-                                .distinct()
-                                .toList())
-                        .stream()
-                        .filter(memory -> memory.isReadableBy(user.id(), user.groupId()))
-                        .collect(Collectors.toMap(Memory::id, Function.identity()));
+        Map<Long, Memory> byId = memories
+            .findAllById(rows.stream()
+                .map(MemoryCapture::memoryId)
+                .distinct()
+                .toList())
+            .stream()
+            .filter(memory -> memory.isReadableBy(user.id(), user.groupId()))
+            .collect(Collectors.toMap(Memory::id, Function.identity()));
         return rows.stream()
-                .filter(row -> byId.containsKey(row.memoryId()))
-                .map(row -> new CapturedMemory(row, byId.get(row.memoryId())))
-                .toList();
+            .filter(row -> byId.containsKey(row.memoryId()))
+            .map(row -> new CapturedMemory(row, byId.get(row.memoryId())))
+            .toList();
     }
+
 
     /**
      * 기록 하나를 되돌린다. 새 항목은 지우고, 기존 제안의 승인은 물리고, 고친 항목은 이전 판으로 돌린다. 이미 되돌렸으면 그대로 둔다.
      *
      * @throws ApiException 남의 기록이거나 없으면 MEMORY_NOT_FOUND, 제안이면 MEMORY_REVISION_CONFLICT, 고친 뒤에 다시 바뀐
-     *     항목이면 MEMORY_REVISION_CONFLICT
+     * 항목이면 MEMORY_REVISION_CONFLICT
      */
     @Transactional
     public void undo(CurrentUser user, Long captureId) {
@@ -179,6 +180,7 @@ public class MemoryCaptureService {
         captures.save(capture);
         log.info("memory capture undone userId={} captureId={} kind={}", user.id(), captureId, capture.kind());
     }
+
 
     /** 바로 저장을 되돌린다. 새 항목은 지우고 기존 제안은 복원한다. 그 뒤에 고쳤으면 막고, 이미 없으면 기록만 되돌린다. */
     private void removeCreated(CurrentUser user, MemoryCapture capture) {
@@ -201,12 +203,13 @@ public class MemoryCaptureService {
             Memory restored = memories.save(memory);
             // 받아들임을 무른 것이다. 첫 반응은 그대로 두고, 오래 가는 선호로 읽히지 않게 사용자의 마지막 결정을 남긴다.
             feedback.record(MemoryProposalFeedback.of(
-                            user, restored, FeedbackEventType.DISMISSED, FeedbackActor.USER, clock.instant())
-                    .reason(FeedbackLabeler.MEMORY_UNDO));
+                user, restored, FeedbackEventType.DISMISSED, FeedbackActor.USER, clock.instant())
+                .reason(FeedbackLabeler.MEMORY_UNDO));
         } else {
             memoryService.delete(user, capture.memoryId());
         }
     }
+
 
     private void restore(CurrentUser user, MemoryCapture capture) {
         Memory memory = memories.findByIdForUpdate(capture.memoryId()).orElseThrow(MemoryCaptureService::notFound);
@@ -217,8 +220,8 @@ public class MemoryCaptureService {
             throw conflict("the memory has changed after it was remembered");
         }
         MemoryRevision before = revisions
-                .findById(new MemoryRevisionId(memory.id(), capture.baseRevision()))
-                .orElseThrow(() -> conflict("the previous revision is missing"));
+            .findById(new MemoryRevisionId(memory.id(), capture.baseRevision()))
+            .orElseThrow(() -> conflict("the previous revision is missing"));
         String content = before.contentKeyId() == null ? before.content() : null;
         if (content == null) {
             throw conflict("a sealed revision is not restored here");
@@ -226,11 +229,12 @@ public class MemoryCaptureService {
         memoryService.revise(user, memory, content, before.retrieval(), before.sensitivity());
     }
 
+
     /** 고칠 항목은 요청자의 개인 MEMORY 항목이고 승인됐고 일반 민감도이며 이 에이전트가 받는 collection 에 있다. */
     private MemoryRememberResult update(CurrentUser user, MemoryAccess access, MemoryRememberRequest request) {
         if (!request.direct()
-                || request.sensitivity() != MemorySensitivity.NORMAL
-                || MemorySensitiveHints.suspected(request.title(), request.content())) {
+            || request.sensitivity() != MemorySensitivity.NORMAL
+            || MemorySensitiveHints.suspected(request.title(), request.content())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
         }
         Optional<Memory> found = memories.findByIdForUpdate(request.memoryId());
@@ -247,22 +251,24 @@ public class MemoryCaptureService {
         return new MemoryRememberResult(MemoryRememberOutcome.UPDATED, memory.id());
     }
 
+
     private static boolean updatable(CurrentUser user, MemoryAccess access, Memory memory) {
         return memory.scope() == MemoryScope.USER
-                && Objects.equals(memory.ownerUserId(), user.id())
-                && memory.entryType() == MemoryEntryType.MEMORY
-                && memory.status() == MemoryStatus.ACCEPTED
-                && memory.sensitivity() == MemorySensitivity.NORMAL
-                && !memory.sealed()
-                && access.allows(memory.collection(), MemorySensitivity.NORMAL);
+            && Objects.equals(memory.ownerUserId(), user.id())
+            && memory.entryType() == MemoryEntryType.MEMORY
+            && memory.status() == MemoryStatus.ACCEPTED
+            && memory.sensitivity() == MemorySensitivity.NORMAL
+            && !memory.sealed()
+            && access.allows(memory.collection(), MemorySensitivity.NORMAL);
     }
+
 
     /**
      * 같은 제목과 본문의 줄이 이미 있을 때다. 승인 전의 제안을 사용자가 지금 직접 말했으면 받아들인 것으로 본다. 거절한 줄은 다시
      * 만들지 않는다.
      */
     private MemoryRememberResult existingOutcome(
-            CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
+        CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
         return switch (existing.status()) {
             case ACCEPTED -> new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, existing.id());
             case REJECTED -> new MemoryRememberResult(MemoryRememberOutcome.REJECTED_BEFORE, existing.id());
@@ -277,38 +283,42 @@ public class MemoryCaptureService {
         };
     }
 
+
     private void record(
-            Long memoryId, CurrentUser user, MemoryRememberRequest request, MemoryCaptureKind kind, Integer base) {
+        Long memoryId, CurrentUser user, MemoryRememberRequest request, MemoryCaptureKind kind, Integer base) {
         record(memoryId, user, request, kind, base, null);
     }
 
+
     private void record(
-            Long memoryId,
-            CurrentUser user,
-            MemoryRememberRequest request,
-            MemoryCaptureKind kind,
-            Integer base,
-            MemoryStatus previousStatus) {
+        Long memoryId,
+        CurrentUser user,
+        MemoryRememberRequest request,
+        MemoryCaptureKind kind,
+        Integer base,
+        MemoryStatus previousStatus) {
         captures.save(MemoryCapture.of(
-                memoryId,
-                user.id(),
-                request.conversationId(),
-                request.executionId(),
-                kind,
-                base,
-                previousStatus,
-                clock.instant()));
+            memoryId,
+            user.id(),
+            request.conversationId(),
+            request.executionId(),
+            kind,
+            base,
+            previousStatus,
+            clock.instant()));
         log.info(
-                "memory captured userId={} memoryId={} executionId={} kind={}",
-                user.id(),
-                memoryId,
-                request.executionId(),
-                kind);
+            "memory captured userId={} memoryId={} executionId={} kind={}",
+            user.id(),
+            memoryId,
+            request.executionId(),
+            kind);
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.MEMORY_NOT_FOUND, "no such memory capture");
     }
+
 
     private static ApiException conflict(String message) {
         return new ApiException(ErrorCode.MEMORY_REVISION_CONFLICT, message);

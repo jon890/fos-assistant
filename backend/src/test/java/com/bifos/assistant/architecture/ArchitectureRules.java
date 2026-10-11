@@ -1001,8 +1001,7 @@ public final class ArchitectureRules {
 
 
     private static boolean isOwnedEntity(JavaClass item, String root, List<String> owners) {
-        return item.isAnnotatedWith(Entity.class) && owners.stream().anyMatch(feature ->
-            item.getPackageName().equals(root + "." + feature) || item.getPackageName().startsWith(root + "." + feature + "."));
+        return item.isAnnotatedWith(Entity.class) && owners.stream().anyMatch(feature -> item.getPackageName().equals(root + "." + feature) || item.getPackageName().startsWith(root + "." + feature + "."));
     }
 
 

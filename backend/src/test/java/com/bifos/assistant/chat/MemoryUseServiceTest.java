@@ -77,6 +77,7 @@ class MemoryUseServiceTest {
     private final List<Long> createdMemoryIds = new ArrayList<>();
     private final List<Long> conversationIds = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         long suffix = Math.abs(UUID.randomUUID().getMostSignificantBits() % 1_000_000L) + 5_000_000L;
@@ -85,13 +86,14 @@ class MemoryUseServiceTest {
         conversation = newConversation(dad);
     }
 
+
     @AfterEach
     void tearDown() {
         for (Long conversationId : conversationIds) {
             jdbc.update(
-                    "DELETE FROM execution_context_source WHERE execution_id IN"
-                            + " (SELECT id FROM agent_execution WHERE conversation_id = ?)",
-                    conversationId);
+                "DELETE FROM execution_context_source WHERE execution_id IN"
+                    + " (SELECT id FROM agent_execution WHERE conversation_id = ?)",
+                conversationId);
             jdbc.update("DELETE FROM chat_message WHERE conversation_id = ?", conversationId);
             jdbc.update("DELETE FROM agent_execution WHERE conversation_id = ?", conversationId);
             jdbc.update("DELETE FROM conversation WHERE id = ?", conversationId);
@@ -101,6 +103,7 @@ class MemoryUseServiceTest {
         }
         memories.deleteAllById(createdMemoryIds);
     }
+
 
     @Test
     @DisplayName("본문을 받은 개인 사실과 항상 층과 읽은 항목만 기록한 순서로 나오고 제목만 실은 줄과 빠진 줄은 나오지 않는다")
@@ -120,13 +123,14 @@ class MemoryUseServiceTest {
         List<MemoryUse> uses = service.usesOf(dad, conversation.id());
 
         assertThat(uses)
-                .extracting(
-                        MemoryUse::executionId, MemoryUse::memoryId, MemoryUse::title, MemoryUse::scope, MemoryUse::via)
-                .containsExactly(
-                        tuple(run.id(), fact.id(), "딸 이름", MemoryScope.USER, MemoryUseVia.FACTS),
-                        tuple(run.id(), always.id(), "우리 집 규칙", MemoryScope.GROUP, MemoryUseVia.ALWAYS),
-                        tuple(run.id(), read.id(), "경력 요약", MemoryScope.USER, MemoryUseVia.READ));
+            .extracting(
+                MemoryUse::executionId, MemoryUse::memoryId, MemoryUse::title, MemoryUse::scope, MemoryUse::via)
+            .containsExactly(
+                tuple(run.id(), fact.id(), "딸 이름", MemoryScope.USER, MemoryUseVia.FACTS),
+                tuple(run.id(), always.id(), "우리 집 규칙", MemoryScope.GROUP, MemoryUseVia.ALWAYS),
+                tuple(run.id(), read.id(), "경력 요약", MemoryScope.USER, MemoryUseVia.READ));
     }
+
 
     @Test
     @DisplayName("같은 항목이 실렸고 읽히기도 했으면 앞의 실린 것 하나만 나온다")
@@ -138,9 +142,10 @@ class MemoryUseServiceTest {
         source(run, 2, "MEMORY_READ", fact, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
-                .extracting(MemoryUse::memoryId, MemoryUse::via)
-                .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
+            .extracting(MemoryUse::memoryId, MemoryUse::via)
+            .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
     }
+
 
     @Test
     @DisplayName("답마다 따로 모으고 실행 번호 오름차순으로 낸다")
@@ -153,9 +158,10 @@ class MemoryUseServiceTest {
         source(earlier, 0, "MEMORY_FACTS", first, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
-                .extracting(MemoryUse::executionId, MemoryUse::memoryId)
-                .containsExactly(tuple(earlier.id(), first.id()), tuple(later.id(), second.id()));
+            .extracting(MemoryUse::executionId, MemoryUse::memoryId)
+            .containsExactly(tuple(earlier.id(), first.id()), tuple(later.id(), second.id()));
     }
+
 
     @Test
     @DisplayName("지운 항목과 다른 사용자의 개인 항목과 제안으로 돌아간 항목은 빠지고 제목은 지금 제목이다")
@@ -177,9 +183,10 @@ class MemoryUseServiceTest {
         jdbc.update("UPDATE memory SET title = ? WHERE id = ?", "새 제목", renamed.id());
 
         assertThat(service.usesOf(dad, conversation.id()))
-                .extracting(MemoryUse::memoryId, MemoryUse::title)
-                .containsExactly(tuple(renamed.id(), "새 제목"));
+            .extracting(MemoryUse::memoryId, MemoryUse::title)
+            .containsExactly(tuple(renamed.id(), "새 제목"));
     }
+
 
     @Test
     @DisplayName("MEMORY_READ 이지만 body_mode 가 INLINE 이 아닌 줄과 memory: 가 아닌 ref 는 건너뛴다")
@@ -196,9 +203,10 @@ class MemoryUseServiceTest {
         source(run, 5, "MEMORY_READ", read, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
-                .extracting(MemoryUse::memoryId, MemoryUse::via)
-                .containsExactly(tuple(read.id(), MemoryUseVia.READ));
+            .extracting(MemoryUse::memoryId, MemoryUse::via)
+            .containsExactly(tuple(read.id(), MemoryUseVia.READ));
     }
+
 
     @Test
     @DisplayName("답 메시지가 없는 대화는 빈 목록이고 답이 없는 실행과 다른 대화의 답은 넣지 않는다")
@@ -214,6 +222,7 @@ class MemoryUseServiceTest {
         assertThat(service.usesOf(dad, newConversation(dad).id())).isEmpty();
     }
 
+
     @Test
     @DisplayName("읽은 항목은 그 에이전트가 받지 않는 collection 과 허용 없는 민감 항목과 항상 싣는 항목이면 빠진다")
     void dropsReadItemsTheAgentCannotReadNow() {
@@ -228,9 +237,10 @@ class MemoryUseServiceTest {
         }
 
         assertThat(service.usesOf(dad, conversation.id()))
-                .extracting(MemoryUse::memoryId, MemoryUse::title)
-                .containsExactly(tuple(readable.id(), "읽힘"));
+            .extracting(MemoryUse::memoryId, MemoryUse::title)
+            .containsExactly(tuple(readable.id(), "읽힘"));
     }
+
 
     @Test
     @DisplayName("에이전트가 없는 실행은 읽은 항목을 내지 않고 실은 항목은 그대로 낸다")
@@ -242,9 +252,10 @@ class MemoryUseServiceTest {
         source(run, 1, "MEMORY_READ", read, "INLINE");
 
         assertThat(service.usesOf(dad, conversation.id()))
-                .extracting(MemoryUse::memoryId, MemoryUse::via)
-                .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
+            .extracting(MemoryUse::memoryId, MemoryUse::via)
+            .containsExactly(tuple(fact.id(), MemoryUseVia.FACTS));
     }
+
 
     private Conversation newConversation(CurrentUser owner) {
         Conversation saved = conversations.save(Conversation.startedBy(owner.id(), "참고한 기억 검사", null, Instant.now()));
@@ -252,55 +263,62 @@ class MemoryUseServiceTest {
         return saved;
     }
 
+
     private Memory memory(
-            CurrentUser owner, MemoryScope scope, String title, String content, MemoryRetrieval retrieval) {
+        CurrentUser owner, MemoryScope scope, String title, String content, MemoryRetrieval retrieval) {
         return memory(owner, scope, "core", title, content, retrieval, MemorySensitivity.NORMAL);
     }
 
+
     private Memory memory(
-            CurrentUser owner,
-            String collection,
-            MemorySensitivity sensitivity,
-            MemoryRetrieval retrieval,
-            String title) {
+        CurrentUser owner,
+        String collection,
+        MemorySensitivity sensitivity,
+        MemoryRetrieval retrieval,
+        String title) {
         return memory(owner, MemoryScope.USER, collection, title, title + " 본문", retrieval, sensitivity);
     }
 
+
     private Memory memory(
-            CurrentUser owner,
-            MemoryScope scope,
-            String collection,
-            String title,
-            String content,
-            MemoryRetrieval retrieval,
-            MemorySensitivity sensitivity) {
+        CurrentUser owner,
+        MemoryScope scope,
+        String collection,
+        String title,
+        String content,
+        MemoryRetrieval retrieval,
+        MemorySensitivity sensitivity) {
         Memory saved = memoryService.create(owner, scope, title, content, collection, retrieval, sensitivity);
         createdMemoryIds.add(saved.id());
         return saved;
     }
 
+
     private AgentExecution answeredRun(Conversation target, boolean answered) {
         return answeredRun(target, answered, true);
     }
+
 
     /** 그 대화에서 도는 실행을 만들고, 답 메시지를 남긴다. 에이전트가 없는 실행이면 {@code withAgent} 가 거짓이다. */
     private AgentExecution answeredRun(Conversation target, boolean answered, boolean withAgent) {
         String root = "fos-" + UUID.randomUUID();
         AgentExecution run = withAgent
-                ? McpCallSigner.running(executions, agents, target.userId(), target.id(), PROFILE, root)
-                : McpCallSigner.running(executions, target.userId(), target.id(), PROFILE, root);
+            ? McpCallSigner.running(executions, agents, target.userId(), target.id(), PROFILE, root)
+            : McpCallSigner.running(executions, target.userId(), target.id(), PROFILE, root);
         if (answered) {
             messages.save(ChatMessage.fromAssistant(target.id(), "답", run.id(), Instant.now()));
         }
         return run;
     }
 
+
     private void source(AgentExecution run, int position, String source, Memory memory, String bodyMode) {
         sourceRef(run, position, source, "memory:" + memory.id(), bodyMode);
     }
 
+
     private void sourceRef(AgentExecution run, int position, String source, String ref, String bodyMode) {
         contextSources.save(
-                ExecutionContextSource.of(run.id(), position, source, ref, bodyMode, "FRESH", Instant.now()));
+            ExecutionContextSource.of(run.id(), position, source, ref, bodyMode, "FRESH", Instant.now()));
     }
 }

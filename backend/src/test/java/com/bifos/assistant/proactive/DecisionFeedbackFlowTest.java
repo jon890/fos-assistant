@@ -136,6 +136,7 @@ class DecisionFeedbackFlowTest {
     private ProactiveCheck reported;
     private ProactiveCheck silent;
 
+
     @BeforeEach
     void setUp() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
@@ -143,37 +144,38 @@ class DecisionFeedbackFlowTest {
         other = member(now);
         String code = "feedback-" + UUID.randomUUID().toString().substring(0, 8);
         career = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                now));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            now));
         checkConversation = conversations.save(Conversation.startedForCheck(owner.id(), "커리어 살펴보기", career.id(), now));
         root = executions.save(execution(null, now));
         reported = ProactiveCheck.started(
-                owner.id(), career.id(), checkConversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(120));
+            owner.id(), career.id(), checkConversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(120));
         reported.attachRoot(root.id(), "session-fixture");
         reported.succeed(
-                CheckOutcome.FINDINGS,
-                1,
-                0,
-                new CheckReport(List.of("합성 변화"), List.of(), List.of(), List.of(), List.of("합성 다음")),
-                0,
-                0,
-                0,
-                0,
-                0,
-                now.minusSeconds(60));
+            CheckOutcome.FINDINGS,
+            1,
+            0,
+            new CheckReport(List.of("합성 변화"), List.of(), List.of(), List.of(), List.of("합성 다음")),
+            0,
+            0,
+            0,
+            0,
+            0,
+            now.minusSeconds(60));
         reported = checks.save(reported);
         silent = ProactiveCheck.started(
-                owner.id(), career.id(), checkConversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(30));
+            owner.id(), career.id(), checkConversation.id(), CheckTrigger.SCHEDULED, false, now.minusSeconds(30));
         silent.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, now.minusSeconds(20));
         silent = checks.save(silent);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -183,8 +185,8 @@ class DecisionFeedbackFlowTest {
             jdbc.update("DELETE FROM proactive_autonomy_decision WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM proactive_value_evaluation WHERE user_id = ?", userId);
             jdbc.update(
-                    "DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
-                    userId);
+                "DELETE FROM memory_revision WHERE memory_id IN (SELECT id FROM memory WHERE owner_user_id = ?)",
+                userId);
             jdbc.update("DELETE FROM memory WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
@@ -194,6 +196,7 @@ class DecisionFeedbackFlowTest {
         }
     }
 
+
     @Test
     @DisplayName("보고, 할 일 제안과 반응, 관심 범위 Memory 가 그 살펴보기의 결정 하나로 묶이고 침묵은 보고 없는 상황으로 남는다")
     void linksCareerPilotFlowToOneDecision() {
@@ -202,8 +205,7 @@ class DecisionFeedbackFlowTest {
         AgentExecution child = executions.save(execution(root.id(), Instant.now()));
         followUps.propose(owner, checkConversation.id(), child.id(), FIRST_TITLE, null, false);
         followUps.propose(owner, checkConversation.id(), root.id(), SECOND_TITLE, null, false);
-        Map<String, FollowUpSnapshot> byTitle =
-                followUps.list(owner).stream().collect(Collectors.toMap(FollowUpSnapshot::title, Function.identity()));
+        Map<String, FollowUpSnapshot> byTitle = followUps.list(owner).stream().collect(Collectors.toMap(FollowUpSnapshot::title, Function.identity()));
         FollowUpSnapshot first = byTitle.get(FIRST_TITLE);
         followUps.update(owner, first.publicId(), new FollowUpPatch(null, false, null, true));
         followUps.accept(owner, first.publicId());
@@ -217,20 +219,19 @@ class DecisionFeedbackFlowTest {
         assertThat(export.version()).as("읽기 모델의 모양 버전").isEqualTo(2);
         DecisionRecord decision = record(export, "check:" + reported.id());
         assertThat(decision.situation().reportSurfaced()).isTrue();
-        Map<String, Subject> subjects =
-                decision.subjects().stream().collect(Collectors.toMap(Subject::subjectKey, Function.identity()));
+        Map<String, Subject> subjects = decision.subjects().stream().collect(Collectors.toMap(Subject::subjectKey, Function.identity()));
         assertThat(subjects.get("proactive_check:" + reported.id()).label()).isEqualTo(FeedbackLabel.NO_RESPONSE);
         Subject accepted = subjects.get("follow_up:" + first.publicId());
         assertThat(accepted.label()).isEqualTo(FeedbackLabel.ACCEPTED);
         assertThat(accepted.edited()).isTrue();
         assertThat(accepted.outcome()).isEqualTo(FeedbackEventType.EXECUTION_SUCCEEDED);
         assertThat(accepted.events())
-                .extracting(DecisionFeedbackExport.Event::type)
-                .containsExactly(
-                        FeedbackEventType.SURFACED,
-                        FeedbackEventType.EDITED,
-                        FeedbackEventType.ACCEPTED,
-                        FeedbackEventType.EXECUTION_SUCCEEDED);
+            .extracting(DecisionFeedbackExport.Event::type)
+            .containsExactly(
+                FeedbackEventType.SURFACED,
+                FeedbackEventType.EDITED,
+                FeedbackEventType.ACCEPTED,
+                FeedbackEventType.EXECUTION_SUCCEEDED);
         assertThat(accepted.events().get(1).changedFields()).containsExactly("WAITING");
         Subject rejected = subjects.get("follow_up:" + byTitle.get(SECOND_TITLE).publicId());
         assertThat(rejected.label()).isEqualTo(FeedbackLabel.DECLINED);
@@ -249,27 +250,27 @@ class DecisionFeedbackFlowTest {
         assertThat(exporter.export(other, Duration.ofDays(30)).records()).isEmpty();
     }
 
+
     @Test
     @DisplayName("살펴보기 밖의 대화에서 나온 할 일 제안은 그 제안의 열쇠로 따로 묶이고 대화를 지우면 사건이 함께 지워진다")
     void forgetsEventsWhenConversationIsDeleted() {
-        Conversation plain =
-                conversations.save(Conversation.startedBy(owner.id(), "합성 대화", career.id(), Instant.now()));
+        Conversation plain = conversations.save(Conversation.startedBy(owner.id(), "합성 대화", career.id(), Instant.now()));
         AgentExecution turn = executions.save(AgentExecution.builder()
-                .userId(owner.id())
-                .conversationId(plain.id())
-                .agentId(career.id())
-                .profileName(career.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(owner.id())
+            .conversationId(plain.id())
+            .agentId(career.id())
+            .profileName(career.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         followUps.propose(owner, plain.id(), turn.id(), FIRST_TITLE, null, false);
         FollowUpSnapshot proposed = followUps.list(owner).getFirst();
         followUps.accept(owner, proposed.publicId());
         String key = FeedbackSubjectType.FOLLOW_UP.key(proposed.publicId());
 
         assertThat(record(exporter.export(owner, Duration.ofDays(30)), key).situation())
-                .isNull();
+            .isNull();
         assertThat(subjectEvents(key)).hasSize(2).allSatisfy(event -> {
             assertThat(event.conversationId()).isEqualTo(plain.id());
             assertThat(event.originExecutionId()).isEqualTo(turn.id());
@@ -279,9 +280,10 @@ class DecisionFeedbackFlowTest {
 
         assertThat(subjectEvents(key)).isEmpty();
         assertThat(exporter.export(owner, Duration.ofDays(30)).records())
-                .extracting(DecisionRecord::decisionKey)
-                .doesNotContain(key);
+            .extracting(DecisionRecord::decisionKey)
+            .doesNotContain(key);
     }
+
 
     @Test
     @DisplayName("대화를 지운 뒤 그 대화에서 나온 Memory 제안을 받아들여도 지운 대화에 사건을 남기지 않는다")
@@ -294,6 +296,7 @@ class DecisionFeedbackFlowTest {
         assertThat(subjectEvents("memory:" + proposed.id())).isEmpty();
     }
 
+
     @Test
     @DisplayName("점검 대화를 지우면 그 살펴보기의 상황과 제안이 replay 읽기 모델에서 빠진다")
     void hidesDeletedCheckConversation() {
@@ -304,9 +307,10 @@ class DecisionFeedbackFlowTest {
 
         assertThat(exporter.export(owner, Duration.ofDays(30)).records()).isEmpty();
         assertThat(jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ?", Long.class, owner.id()))
+            "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ?", Long.class, owner.id()))
                 .isZero();
     }
+
 
     @Test
     @DisplayName("자동 실행한 살펴보기의 결과는 그 실행을 허락한 판정의 원천 살펴보기 결정에 판단, 정책과 함께 묶인다")
@@ -314,31 +318,31 @@ class DecisionFeedbackFlowTest {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         DecisionState state = DecisionFixtures.state();
         ValueEvaluation evaluation = evaluations.save(ValueEvaluation.of(
-                reported.id(),
-                owner.id(),
-                null,
-                new DecisionEvidence(
-                        state,
-                        List.of(),
-                        new DecisionProviderInfo("fixture", "1", null, "fixture-model", null, null, null),
-                        DecisionFixtures.ordered(state)),
-                now));
+            reported.id(),
+            owner.id(),
+            null,
+            new DecisionEvidence(
+                state,
+                List.of(),
+                new DecisionProviderInfo("fixture", "1", null, "fixture-model", null, null, null),
+                DecisionFixtures.ordered(state)),
+            now));
         AgentExecution autonomousRoot = executions.save(execution(null, now));
         ProactiveCheck autonomous = ProactiveCheck.started(
-                owner.id(), career.id(), checkConversation.id(), CheckTrigger.AUTONOMY, false, now);
+            owner.id(), career.id(), checkConversation.id(), CheckTrigger.AUTONOMY, false, now);
         autonomous.attachRoot(autonomousRoot.id(), "session-autonomous");
         autonomous.succeed(CheckOutcome.NOTHING_NEW, 0, 0, null, 0, 0, 0, 0, 0, now);
         ProactiveCheck savedAutonomous = checks.save(autonomous);
         AutonomyDecision decision = AutonomyDecision.of(
-                owner.id(),
-                evaluation.id(),
-                11L,
-                reported.id(),
-                AutonomyLevel.EXECUTE,
-                List.of(AutonomyReason.READ_ONLY_SAFE),
-                AutonomyFixtures.safe().build(),
-                1,
-                now);
+            owner.id(),
+            evaluation.id(),
+            11L,
+            reported.id(),
+            AutonomyLevel.EXECUTE,
+            List.of(AutonomyReason.READ_ONLY_SAFE),
+            AutonomyFixtures.safe().build(),
+            1,
+            now);
         decision.started(savedAutonomous.id());
         decisions.save(decision);
 
@@ -347,16 +351,15 @@ class DecisionFeedbackFlowTest {
         DecisionFeedbackExport export = exporter.export(owner, Duration.ofDays(30));
 
         DecisionRecord source = record(export, "check:" + reported.id());
-        Map<String, Subject> subjects =
-                source.subjects().stream().collect(Collectors.toMap(Subject::subjectKey, Function.identity()));
+        Map<String, Subject> subjects = source.subjects().stream().collect(Collectors.toMap(Subject::subjectKey, Function.identity()));
         assertThat(subjects).hasSize(2);
         Subject outcome = subjects.get("proactive_check:" + savedAutonomous.id());
         assertThat(outcome.label()).isEqualTo(FeedbackLabel.NOT_SURFACED);
         assertThat(outcome.outcome()).isEqualTo(FeedbackEventType.EXECUTION_SUCCEEDED);
         assertThat(subjects.keySet()).anyMatch(key -> key.startsWith("follow_up:"));
         assertThat(record(export, "check:" + savedAutonomous.id()).subjects())
-                .as("자동 실행 트리의 제안은 원천 결정으로 옮겨 자동 실행의 상황에는 남지 않는다")
-                .isEmpty();
+            .as("자동 실행 트리의 제안은 원천 결정으로 옮겨 자동 실행의 상황에는 남지 않는다")
+            .isEmpty();
         assertThat(source.judgments()).singleElement().satisfies(judgment -> {
             assertThat(judgment.requestedModel()).isEqualTo("fixture-model");
             assertThat(judgment.orderedCandidateIds()).containsExactly(11L, 12L);
@@ -366,28 +369,30 @@ class DecisionFeedbackFlowTest {
             assertThat(policy.executionCheckId()).isEqualTo(savedAutonomous.id());
         });
         assertThat(record(export, "check:" + savedAutonomous.id()).situation().reportSurfaced())
-                .isFalse();
+            .isFalse();
         assertThat(export.toString()).doesNotContain("마감 전에 지원 의사를 확인할 가치가 크다", "관심 공고가 이틀 뒤");
     }
+
 
     @Test
     @DisplayName("부르는 쪽 트랜잭션이 되돌려지면 사건을 남기지 않는다")
     void dropsEventWhenCallerRollsBack() {
         transactions.executeWithoutResult(status -> {
             recorder.record(FeedbackEntry.of(
-                    owner.id(),
-                    FeedbackSubjectType.MEMORY,
-                    1L,
-                    FeedbackEventType.SURFACED,
-                    FeedbackActor.AGENT,
-                    Instant.now()));
+                owner.id(),
+                FeedbackSubjectType.MEMORY,
+                1L,
+                FeedbackEventType.SURFACED,
+                FeedbackActor.AGENT,
+                Instant.now()));
             status.setRollbackOnly();
         });
 
         assertThat(jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ?", Long.class, owner.id()))
+            "SELECT COUNT(*) FROM decision_feedback_event WHERE user_id = ?", Long.class, owner.id()))
                 .isZero();
     }
+
 
     @Test
     @DisplayName("보관 기간 정리는 마지막 사건이 기간 앞인 제안만 통째로 지우고 최근 사건이 있는 제안은 첫 사건까지 남긴다")
@@ -403,51 +408,56 @@ class DecisionFeedbackFlowTest {
 
         assertThat(subjectEvents("follow_up:expired")).isEmpty();
         assertThat(subjectEvents("follow_up:alive"))
-                .extracting(FeedbackEvent::eventType)
-                .containsExactly(FeedbackEventType.ACCEPTED, FeedbackEventType.DISMISSED);
+            .extracting(FeedbackEvent::eventType)
+            .containsExactly(FeedbackEventType.ACCEPTED, FeedbackEventType.DISMISSED);
     }
+
 
     private void saveEvent(String key, FeedbackEventType type, Instant at) {
         events.save(FeedbackEvent.of(
-                owner.id(),
-                FeedbackSubjectType.FOLLOW_UP,
-                key,
-                type,
-                FeedbackActor.USER,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(),
-                at));
+            owner.id(),
+            FeedbackSubjectType.FOLLOW_UP,
+            key,
+            type,
+            FeedbackActor.USER,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            at));
     }
+
 
     private List<FeedbackEvent> subjectEvents(String key) {
         return events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(owner.id(), List.of(key));
     }
 
+
     private static DecisionRecord record(DecisionFeedbackExport export, String decisionKey) {
         return export.records().stream()
-                .filter(each -> each.decisionKey().equals(decisionKey))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("no record " + decisionKey + " in " + export.records()));
+            .filter(each -> each.decisionKey().equals(decisionKey))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no record " + decisionKey + " in " + export.records()));
     }
+
 
     private AgentExecution execution(Long rootId, Instant now) {
         return AgentExecution.builder()
-                .userId(owner.id())
-                .conversationId(checkConversation.id())
-                .agentId(career.id())
-                .parentExecutionId(rootId)
-                .rootExecutionId(rootId)
-                .profileName(career.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(now)
-                .build();
+            .userId(owner.id())
+            .conversationId(checkConversation.id())
+            .agentId(career.id())
+            .parentExecutionId(rootId)
+            .rootExecutionId(rootId)
+            .profileName(career.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(now)
+            .build();
     }
+
 
     private CurrentUser member(Instant now) {
         String email = "decision-feedback-" + UUID.randomUUID() + "@example.com";

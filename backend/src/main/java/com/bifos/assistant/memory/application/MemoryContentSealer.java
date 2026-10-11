@@ -24,6 +24,7 @@ public class MemoryContentSealer {
     private final MemoryRevisionRepository revisions;
     private final MemoryContentCipher cipher;
 
+
     /** @return 이 호출이 암호화했으면 true. 줄이 없거나 민감 줄이 아니거나 이미 암호문이면 false 다 */
     @Transactional
     public boolean sealMemory(Long id) {
@@ -35,6 +36,7 @@ public class MemoryContentSealer {
         memories.save(row);
         return true;
     }
+
 
     /** @return 이 호출이 암호화했으면 true. 판이 없거나 민감 판이 아니거나 이미 암호문이면 false 다 */
     @Transactional

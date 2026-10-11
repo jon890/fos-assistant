@@ -28,10 +28,11 @@ public class MemorySources {
     private final ExecutionAgentQuery executions;
     private final AgentService agents;
 
+
     /** 기억 번호별 출처다. 에이전트가 남기지 않은 기억은 맵에 없다. */
     public Map<Long, MemorySource> of(CurrentUser user, Collection<Memory> memories) {
         Map<Long, Long> agentByExecution = executions.agentIdsOf(
-                memories.stream().map(Memory::proposedByExecutionId).toList());
+            memories.stream().map(Memory::proposedByExecutionId).toList());
         Map<Long, Agent> agentById = agents.byIds(agentByExecution.values());
         Map<Long, MemorySource> result = new HashMap<>();
         for (Memory memory : memories) {
@@ -49,6 +50,7 @@ public class MemorySources {
         }
         return result;
     }
+
 
     private static MemorySource describe(CurrentUser user, Agent agent) {
         if (agent == null) {
