@@ -72,18 +72,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ConnectorPolicyService {
     static final String CONTEXT_MESSAGE = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
 
-    private static final String POLICY_UNAVAILABLE_MESSAGE =
-            "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
+    private static final String POLICY_UNAVAILABLE_MESSAGE = "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
     private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
     /**
      * 연결은 쓸 수 있는데 이 에이전트에 붙인 것이 아직 반영되지 않았다. 대개 반영 예정 시각이 지나면 Control Plane 이 스스로
      * 확인해 풀린다(ADR-20261007 / connector-live-reload). 재시작이 필요한 바인딩은 관리자 반영 완료가 푼다.
      */
-    static final String BINDING_PENDING_MESSAGE =
-            "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
+    static final String BINDING_PENDING_MESSAGE = "이 에이전트에 붙인 연결이 아직 반영되지 않았다. 대개 몇 분 안에 저절로 반영되니 사용자에게 잠시 뒤 다시 시도하라고 알린다.";
     /** 재시작이 필요한 바인딩이다. 저절로 풀리지 않고 관리자 반영 완료가 있어야 풀린다. */
-    static final String BINDING_RESTART_MESSAGE =
-            "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
+    static final String BINDING_RESTART_MESSAGE = "이 에이전트에 붙인 연결은 관리자가 반영을 마쳐야 쓸 수 있다. 지금은 실행하지 않았으니 사용자에게 관리자의 반영을 기다리라고 알린다.";
 
     private static final String UNDECLARED_MESSAGE = "이 도구는 사용이 허락되지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
@@ -107,55 +104,57 @@ public class ConnectorPolicyService {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
     // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorPolicyService(
-            ConnectorActionRepository actions,
-            ConnectorBindingRepository bindings,
-            ConnectorToolGrantRepository grants,
-            SessionOwnerResolver owners,
-            ConnectorCatalogCache catalog,
-            LiveProperties<ConnectorPolicyProperties> properties,
-            ApplicationEventPublisher events,
-            NotificationService notifications,
-            ConversationNotices conversations,
-            ProactiveCheckGuard checkGuard,
-            CheckNotificationPolicy checkNotifications,
-            DecisionFeedbackRecorder feedback,
-            PlatformTransactionManager transactionManager) {
+        ConnectorActionRepository actions,
+        ConnectorBindingRepository bindings,
+        ConnectorToolGrantRepository grants,
+        SessionOwnerResolver owners,
+        ConnectorCatalogCache catalog,
+        LiveProperties<ConnectorPolicyProperties> properties,
+        ApplicationEventPublisher events,
+        NotificationService notifications,
+        ConversationNotices conversations,
+        ProactiveCheckGuard checkGuard,
+        CheckNotificationPolicy checkNotifications,
+        DecisionFeedbackRecorder feedback,
+        PlatformTransactionManager transactionManager) {
         this(
-                actions,
-                bindings,
-                grants,
-                owners,
-                catalog,
-                properties,
-                events,
-                notifications,
-                conversations,
-                checkGuard,
-                checkNotifications,
-                feedback,
-                transactionManager,
-                Clock.systemUTC());
+            actions,
+            bindings,
+            grants,
+            owners,
+            catalog,
+            properties,
+            events,
+            notifications,
+            conversations,
+            checkGuard,
+            checkNotifications,
+            feedback,
+            transactionManager,
+            Clock.systemUTC());
     }
 
+
     public ConnectorPolicyService(
-            ConnectorActionRepository actions,
-            ConnectorBindingRepository bindings,
-            ConnectorToolGrantRepository grants,
-            SessionOwnerResolver owners,
-            ConnectorCatalogCache catalog,
-            LiveProperties<ConnectorPolicyProperties> properties,
-            ApplicationEventPublisher events,
-            NotificationService notifications,
-            ConversationNotices conversations,
-            ProactiveCheckGuard checkGuard,
-            CheckNotificationPolicy checkNotifications,
-            DecisionFeedbackRecorder feedback,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        ConnectorActionRepository actions,
+        ConnectorBindingRepository bindings,
+        ConnectorToolGrantRepository grants,
+        SessionOwnerResolver owners,
+        ConnectorCatalogCache catalog,
+        LiveProperties<ConnectorPolicyProperties> properties,
+        ApplicationEventPublisher events,
+        NotificationService notifications,
+        ConversationNotices conversations,
+        ProactiveCheckGuard checkGuard,
+        CheckNotificationPolicy checkNotifications,
+        DecisionFeedbackRecorder feedback,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         this.actions = actions;
         this.bindings = bindings;
         this.grants = grants;
@@ -172,6 +171,7 @@ public class ConnectorPolicyService {
         this.clock = clock;
     }
 
+
     /**
      * @param profileName 토큰이 증명한 profile
      * @param rootSessionId 서명을 확인한 루트 session
@@ -182,15 +182,15 @@ public class ConnectorPolicyService {
      * @param argsJson 서명을 확인한 인자 글
      */
     public ConnectorPolicyAnswer decide(
-            String profileName,
-            String rootSessionId,
-            String sessionId,
-            String toolCallId,
-            String hermesTool,
-            String toolName,
-            String argsJson) {
+        String profileName,
+        String rootSessionId,
+        String sessionId,
+        String toolCallId,
+        String hermesTool,
+        String toolName,
+        String argsJson) {
         String dedupeKey = ConnectorActionKey.of(profileName, rootSessionId, sessionId, toolCallId)
-                .value();
+            .value();
         String argsSha256 = Sha256.hex(argsJson);
         Optional<ConnectorAction> recorded = actions.findByDedupeKey(dedupeKey);
         if (recorded.isPresent()) {
@@ -203,16 +203,14 @@ public class ConnectorPolicyService {
             // 까닭은 찾는 쪽이 이미 로그에 남겼다.
             return blockedWithoutRecord("origin 실행을 찾지 못했다");
         }
-        List<ConnectorBinding> attached =
-                origin.agentId() == null ? List.of() : bindings.findByAgentId(origin.agentId());
+        List<ConnectorBinding> attached = origin.agentId() == null ? List.of() : bindings.findByAgentId(origin.agentId());
         // 등록 이름의 서버 앞부분으로 그 호출의 연결을 고른다. 대시보드가 한 profile 에서 서버 이름이 겹치지 않게 막으므로
         // 맞는 바인딩은 하나다. 둘 이상이면 어느 연결의 정책으로 판정할지 정할 수 없어 막는다.
         ConnectorBinding binding = null;
         Optional<ConnectorManifest> manifest = Optional.empty();
         int matches = 0;
         for (ConnectorBinding candidate : attached) {
-            Optional<ConnectorManifest> declared =
-                    readManifest(candidate.connection().connectorId());
+            Optional<ConnectorManifest> declared = readManifest(candidate.connection().connectorId());
             if (servesTool(candidate, declared, hermesTool)) {
                 binding = candidate;
                 manifest = declared;
@@ -233,50 +231,48 @@ public class ConnectorPolicyService {
             return blockedWithoutRecord("바인딩의 에이전트 profile 이 토큰의 profile 과 다르다");
         }
         ConnectionStatus usable = usableStatus(connection, binding);
-        boolean bindingPending =
-                connection.status() == ConnectionStatus.READY && binding.status() != BindingStatus.READY;
+        boolean bindingPending = connection.status() == ConnectionStatus.READY && binding.status() != BindingStatus.READY;
 
         Instant now = Instant.now(clock);
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
-                .orElse(null);
+            .orElse(null);
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
         // 직접 부른 호출도 위임 자식의 호출도 같은 트리 루트로 경계가 정해진다. 살펴보기 turn 의 트리면 루트가 그 turn 이다
         // (ADR-080). 그 살펴보기가 쓰기 도구를 허용했으면 쓰기를 거절하지 않고 승인 줄로 보낸다(ADR-082).
         CheckBoundary boundary = checkBoundary(origin);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
-                        usable,
-                        ownServerTool(value, hermesTool),
-                        value.schema(),
-                        declared,
-                        granted(connection, confirmedTool, now),
-                        argsJson.getBytes(StandardCharsets.UTF_8).length,
-                        boundary))
-                .orElseGet(ToolPolicyDecision::policyUnavailable);
+            usable,
+            ownServerTool(value, hermesTool),
+            value.schema(),
+            declared,
+            granted(connection, confirmedTool, now),
+            argsJson.getBytes(StandardCharsets.UTF_8).length,
+            boundary))
+            .orElseGet(ToolPolicyDecision::policyUnavailable);
         // 허용만 통과시킨다. 승인이 필요한 호출을 통과시키면 사람의 확인 없이 쓰기가 나간다.
         boolean passed = decision.decision() == ActionDecision.ALLOWED;
         boolean needsApproval = decision.decision() == ActionDecision.NEEDS_APPROVAL;
         if (needsApproval) {
             // 같은 실행이 같은 도구를 같은 인자로 다시 불렀다. 새 줄을 만들지 않고 앞선 요청의 번호로 답한다.
-            Optional<ConnectorAction> waiting =
-                    actions.findFirstByOriginExecutionIdAndHermesToolAndArgsSha256AndStatusOrderByIdAsc(
-                            origin.id(), hermesTool, argsSha256, ActionStatus.PENDING);
+            Optional<ConnectorAction> waiting = actions.findFirstByOriginExecutionIdAndHermesToolAndArgsSha256AndStatusOrderByIdAsc(
+                origin.id(), hermesTool, argsSha256, ActionStatus.PENDING);
             if (waiting.isPresent()) {
                 return answer(waiting.get());
             }
         }
         ConnectorAction action = ConnectorAction.decided(
-                connection,
-                origin.agentId(),
-                origin,
-                hermesTool,
-                confirmedTool,
-                decision,
-                passed,
-                dedupeKey,
-                argsSha256,
-                now);
+            connection,
+            origin.agentId(),
+            origin,
+            hermesTool,
+            confirmedTool,
+            decision,
+            passed,
+            dedupeKey,
+            argsSha256,
+            now);
         if (needsApproval) {
             action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
         }
@@ -303,10 +299,11 @@ public class ConnectorPolicyService {
         } catch (DataIntegrityViolationException ex) {
             // 같은 호출이 동시에 와 유니크 제약에 걸렸다. 먼저 저장된 줄의 판정을 그대로 돌려준다.
             return actions.findByDedupeKey(dedupeKey)
-                    .map(first -> replayed(first, hermesTool, argsSha256))
-                    .orElseThrow(() -> ex);
+                .map(first -> replayed(first, hermesTool, argsSha256))
+                .orElseThrow(() -> ex);
         }
     }
+
 
     /** 승인 줄을 보인 판단 피드백 사건이다. 커밋한 뒤에 부르므로 바로 남는다. 살펴보기 트리의 승인 줄이면 그 살펴보기로 잇는다. */
     private void recordSurfaced(ConnectorAction saved, AgentExecution origin, Instant now) {
@@ -319,43 +316,47 @@ public class ConnectorPolicyService {
             checkId = null;
         }
         feedback.record(FeedbackEntry.of(
-                        saved.userId(),
-                        FeedbackSubjectType.CONNECTOR_ACTION,
-                        saved.publicId(),
-                        FeedbackEventType.SURFACED,
-                        FeedbackActor.AGENT,
-                        now)
-                .conversation(saved.conversationId())
-                .originExecution(saved.originExecutionId())
-                .sourceCheck(checkId)
-                .version(saved.argsSha256()));
+            saved.userId(),
+            FeedbackSubjectType.CONNECTOR_ACTION,
+            saved.publicId(),
+            FeedbackEventType.SURFACED,
+            FeedbackActor.AGENT,
+            now)
+            .conversation(saved.conversationId())
+            .originExecution(saved.originExecutionId())
+            .sourceCheck(checkId)
+            .version(saved.argsSha256()));
     }
+
 
     /** 살펴보기 줄을 한 번 읽어 경계를 정한다. 줄이 없으면 살펴보기 트리가 아니다. */
     private CheckBoundary checkBoundary(AgentExecution origin) {
         return checkGuard
-                .checkOf(origin)
-                .map(check -> check.writesAllowed() ? CheckBoundary.APPROVAL_ONLY : CheckBoundary.READ_ONLY)
-                .orElse(CheckBoundary.NOT_CHECK);
+            .checkOf(origin)
+            .map(check -> check.writesAllowed() ? CheckBoundary.APPROVAL_ONLY : CheckBoundary.READ_ONLY)
+            .orElse(CheckBoundary.NOT_CHECK);
     }
+
 
     /** 승인 줄의 주인에게 새 요청을 알린다. 대화가 지워졌거나 없으면 눌러도 갈 곳이 없어 남기지 않는다. */
     private void notifyApprovalRequested(ConnectorAction action, String toolTitle) {
         conversations
-                .publicIdOf(action.conversationId())
-                .ifPresent(conversationId -> notifications.notify(
-                        action.userId(),
-                        NotificationKind.APPROVAL_REQUESTED,
-                        APPROVAL_REQUESTED_TITLE,
-                        "「" + toolTitle + "」",
-                        new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
+            .publicIdOf(action.conversationId())
+            .ifPresent(conversationId -> notifications.notify(
+                action.userId(),
+                NotificationKind.APPROVAL_REQUESTED,
+                APPROVAL_REQUESTED_TITLE,
+                "「" + toolTitle + "」",
+                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
     }
+
 
     /** 그 사용자가 그 커넥터의 그 도구에 준 유효한 상시 허락이 있는가. 원래 이름을 확인하지 못한 호출은 없는 것이다. */
     private boolean granted(ConnectorConnection connection, String confirmedTool, Instant now) {
         return confirmedTool != null
-                && grants.existsActive(connection.userId(), connection.connectorId(), confirmedTool, now);
+            && grants.existsActive(connection.userId(), connection.connectorId(), confirmedTool, now);
     }
+
 
     /** 읽지 못했거나 카탈로그에 없으면 빈 값이다. 예외 종류만 남긴다. 예외 메시지에는 원격 응답이 섞일 수 있다. */
     private Optional<ConnectorManifest> readManifest(String connectorId) {
@@ -363,12 +364,13 @@ public class ConnectorPolicyService {
             return catalog.find(connectorId);
         } catch (RuntimeException ex) {
             log.warn(
-                    "connector {} policy catalog read failed: {}",
-                    connectorId,
-                    ex.getClass().getSimpleName());
+                "connector {} policy catalog read failed: {}",
+                connectorId,
+                ex.getClass().getSimpleName());
             return Optional.empty();
         }
     }
+
 
     /**
      * 같은 키로 이미 남긴 줄의 판정을 돌려준다. 그 줄의 등록 이름이나 인자 해시가 이번 요청과 다르면 돌려주지 않고 막는다.
@@ -394,11 +396,13 @@ public class ConnectorPolicyService {
         return answer(recorded);
     }
 
+
     private boolean stillReady(Long agentId, String connectorId) {
         return bindings.findByAgentId(agentId).stream()
-                .filter(binding -> binding.connection().connectorId().equals(connectorId))
-                .anyMatch(binding -> usableStatus(binding.connection(), binding) == ConnectionStatus.READY);
+            .filter(binding -> binding.connection().connectorId().equals(connectorId))
+            .anyMatch(binding -> usableStatus(binding.connection(), binding) == ConnectionStatus.READY);
     }
+
 
     /**
      * 판정에 넘길 연결 상태다. 연결이 {@code READY} 이고 그 에이전트에 붙인 바인딩도 {@code READY} 일 때만 {@code READY} 다.
@@ -408,9 +412,10 @@ public class ConnectorPolicyService {
      */
     static ConnectionStatus usableStatus(ConnectorConnection connection, ConnectorBinding binding) {
         return connection.status() == ConnectionStatus.READY && binding.status() == BindingStatus.READY
-                ? ConnectionStatus.READY
-                : ConnectionStatus.PENDING;
+            ? ConnectionStatus.READY
+            : ConnectionStatus.PENDING;
     }
+
 
     /**
      * 등록 이름이 그 바인딩의 MCP 서버가 낸 도구의 것인가.
@@ -419,17 +424,19 @@ public class ConnectorPolicyService {
      * 못한 줄로 남는다.
      */
     private static boolean servesTool(
-            ConnectorBinding binding, Optional<ConnectorManifest> manifest, String hermesTool) {
+        ConnectorBinding binding, Optional<ConnectorManifest> manifest, String hermesTool) {
         if (manifest.isPresent()) {
             return ownServerTool(manifest.get(), hermesTool);
         }
         return binding.mcpServer() != null && hermesTool.startsWith(HermesToolName.of(binding.mcpServer(), ""));
     }
 
+
     /** 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 서버 이름까지의 앞부분이 같은지로 본다. */
     static boolean ownServerTool(ConnectorManifest manifest, String hermesTool) {
         return hermesTool.startsWith(HermesToolName.of(manifest.mcpServer(), ""));
     }
+
 
     /**
      * hook 이 보낸 원래 이름으로 등록 이름을 다시 계산해 hook 이 받은 등록 이름과 다르면 이름이 없는 호출로 읽는다. 다른
@@ -437,16 +444,18 @@ public class ConnectorPolicyService {
      */
     private static String confirmedTool(ConnectorManifest manifest, String hermesTool, String toolName) {
         if (toolName == null
-                || !HermesToolName.of(manifest.mcpServer(), toolName).equals(hermesTool)) {
+            || !HermesToolName.of(manifest.mcpServer(), toolName).equals(hermesTool)) {
             return null;
         }
         return toolName;
     }
 
+
     private static ConnectorPolicyAnswer blockedWithoutRecord(String reason) {
         log.warn("커넥터 도구 호출을 줄 없이 막았다 reason={}", reason);
         return new ConnectorPolicyAnswer(false, CONTEXT_MESSAGE, null);
     }
+
 
     /** 승인 줄은 지금 상태와 상관없이 승인을 기다리라는 글과 그 번호로 답한다. 같은 호출이 다시 와도 답이 같다. */
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
@@ -458,6 +467,7 @@ public class ConnectorPolicyService {
         }
         return new ConnectorPolicyAnswer(false, message(action.denyReason()), null);
     }
+
 
     private static String message(ActionDenyReason reason) {
         if (reason == null) {
@@ -472,6 +482,7 @@ public class ConnectorPolicyService {
             case READ_ONLY_RUN -> READ_ONLY_RUN_MESSAGE;
         };
     }
+
 
     /** 재시작 대기는 관리자를, 반영 예정이 남았으면 잠시 뒤를 기다린다. 예정 없이 남은 바인딩은 저절로 풀리지 않아 연결 확인을 안내한다. */
     private static String bindingPendingMessage(ConnectorBinding binding) {
