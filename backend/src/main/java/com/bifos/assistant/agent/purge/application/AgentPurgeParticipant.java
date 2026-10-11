@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.purge.application;
 
 /**
  * 지운 에이전트를 정리할 때 그 에이전트를 가리키는 자기 표의 줄을 맡는다(ADR-20261009 / agent-purge).

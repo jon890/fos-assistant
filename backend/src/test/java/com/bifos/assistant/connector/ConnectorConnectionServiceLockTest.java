@@ -13,8 +13,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.application.AgentPurgeWriter;
-import com.bifos.assistant.agent.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.purge.application.AgentPurgeWriter;
+import com.bifos.assistant.agent.purge.application.model.AgentPurgeOutcome;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;

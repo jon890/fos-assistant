@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application.model;
+package com.bifos.assistant.agent.purge.application.model;
 
 /** 지운 에이전트 하나를 정리한 결과다(ADR-20261009 / agent-purge). */
 public enum AgentPurgeOutcome {
