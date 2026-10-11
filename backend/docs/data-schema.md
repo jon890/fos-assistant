@@ -43,6 +43,8 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 `content_draft_snapshot`은 기존 암호화 revision의 참조, 최초 내부 origin 실행, 에이전트와 연결·바인딩 판, 정책 지문과 compiler의 두 지문을 보존한다.
 본문·canonical 블록·compiled payload·관찰 설명·사진 byte는 저장하지 않는다. 기존 `content_draft_revision`의 암호화 본문 한 곳만 사용한다.
 칸과 제약은 `V20261011192647__content_draft_snapshot_job.sql`이 소유한다.
+두 표의 시각 칸은 MySQL에서 `DATETIME(6)`이며, 엔티티의 `Instant`는 기존 원고처럼 dialect의 기본 매핑을 사용한다.
+H2에서도 Flyway 스키마와 `ddl-auto: validate`로 실제 JPA 기동을 검사한다.
 snapshot의 모든 칸은 필수이며 공개 UUID와 `(revision_id,binding_id,snapshot_hash,authorization_fingerprint)`는 각각 유일하다.
 `authorization_fingerprint`는 서버가 캡처한 권한 맥락의 SHA-256 지문이다. compiler의 두 지문과 별개이며 서명이나 ACL을 대신하지 않는다.
 `policy_fingerprint`는 잠금 밖에서 준비한 compile 전용 선언과 도구 정책의 SHA-256이다. 연결·바인딩 수정 시각과 함께 현재 판을 대조한다.

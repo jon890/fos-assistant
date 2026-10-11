@@ -50,22 +50,22 @@ public class ContentDraftJob {
     @Column(name = "status", nullable = false, columnDefinition = "VARCHAR(32)")
     private ContentDraftJobStatus status;
 
-    @Column(name = "created_at", nullable = false, columnDefinition = "DATETIME(6)")
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "approved_by", nullable = true, columnDefinition = "BIGINT")
     private Long approvedBy;
 
-    @Column(name = "approved_at", nullable = true, columnDefinition = "DATETIME(6)")
+    @Column(name = "approved_at", nullable = true)
     private Instant approvedAt;
 
-    @Column(name = "last_checked_at", nullable = true, columnDefinition = "DATETIME(6)")
+    @Column(name = "last_checked_at", nullable = true)
     private Instant lastCheckedAt;
 
-    @Column(name = "start_claimed_at", nullable = true, columnDefinition = "DATETIME(6)")
+    @Column(name = "start_claimed_at", nullable = true)
     private Instant startClaimedAt;
 
-    @Column(name = "save_claimed_at", nullable = true, columnDefinition = "DATETIME(6)")
+    @Column(name = "save_claimed_at", nullable = true)
     private Instant saveClaimedAt;
 
     @Column(name = "stage", nullable = true, columnDefinition = "VARCHAR(32)")

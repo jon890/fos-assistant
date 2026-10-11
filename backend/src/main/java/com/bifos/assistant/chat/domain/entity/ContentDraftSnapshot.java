@@ -52,10 +52,10 @@ public class ContentDraftSnapshot {
     @Column(name = "binding_id", nullable = false, columnDefinition = "BIGINT")
     private Long bindingId;
 
-    @Column(name = "connection_updated_at", nullable = false, columnDefinition = "DATETIME(6)")
+    @Column(name = "connection_updated_at", nullable = false)
     private Instant connectionUpdatedAt;
 
-    @Column(name = "binding_updated_at", nullable = false, columnDefinition = "DATETIME(6)")
+    @Column(name = "binding_updated_at", nullable = false)
     private Instant bindingUpdatedAt;
 
     @Column(name = "policy_fingerprint", nullable = false, columnDefinition = "CHAR(64)")
@@ -76,10 +76,10 @@ public class ContentDraftSnapshot {
     @Column(name = "authorization_fingerprint", nullable = false, columnDefinition = "CHAR(64)")
     private String authorizationFingerprint;
 
-    @Column(name = "created_at", nullable = false, columnDefinition = "DATETIME(6)")
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "expires_at", nullable = false, columnDefinition = "DATETIME(6)")
+    @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
 
