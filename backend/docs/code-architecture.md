@@ -247,6 +247,40 @@ class UserExecutionLimitBackgroundTest { ... }
 
 기준 파일을 갱신하거나 규칙을 뺄 때 읽는 절차를 갖는다.
 
+### Eclipse JDT와 Spotless의 Java 포맷
+
+Java 포맷의 규칙 정본은 `config/spotless/eclipse-formatter.xml`이다.
+Spotless 8.10.3의 공식 `eclipse(version).configFile(...)` 통합을 쓰고 JDT 4.35를 version catalog로 고정한다.
+이 버전의 공식 lockfile은 JDT core와 ecj 3.41.0을 고정하며 Java 21 소스를 처리한다.
+제품 실행 의존에는 추가하지 않는다. Gradle이 포맷에 필요한 Maven 의존만 받으므로 IDE 설치와 별도 배치·설치 검증 코드가 필요하지 않다.
+
+사용자가 IntelliJ에서 정리한 표본의 규칙 목표를 JDT 설정으로 옮겼다.
+IntelliJ scheme XML을 JDT가 직접 읽는 것은 아니다. 아래 이름은 `org.eclipse.jdt.core.formatter.` 뒤의 설정 키다.
+
+| 목표 | JDT 설정과 차이 |
+| --- | --- |
+| 4칸 들여쓰기 | `tabulation.char=space`, `tabulation.size=4`, `indentation.size=4` |
+| continuation 4칸 | `continuation_indentation=1`. 값은 칸 수가 아니라 들여쓰기 단위다. 열에 맞추는 인자는 이 값보다 더 들어갈 수 있다. |
+| 메서드 사이 빈 줄 2개 | `blank_lines_before_method=2`, `blank_lines_before_abstract_method=2`. 첫 선언 앞은 `blank_lines_before_first_class_body_declaration=0`이다. |
+| 빈 줄 보존과 초기화 구역 | `number_of_empty_lines_to_preserve=1`, `blank_lines_before_new_chunk=2`. 새 멤버 묶음과 초기화 구역의 판단은 IntelliJ와 다르다. |
+| 여러 줄 인자와 체인 정렬 | 인자·매개변수·selector의 `alignment_for_*=20`은 필요할 때 compact wrap과 열 정렬을 적용한다. `join_wrapped_lines=false`로 기존 줄바꿈을 보존한다. 체인을 정렬하는 기준 열은 IntelliJ와 다를 수 있다. |
+| RIGHT_MARGIN 500 | `lineSplit=500`. 자동 줄바꿈 기준을 120열로 바꾸지 않는다. 긴 문자열이나 나눌 수 없는 토큰은 이 값보다 길 수 있다. |
+| SOFT_MARGINS 200 | IDE의 안내선이므로 JDT에는 대응하는 포맷 설정이 없다. 개발자가 IntelliJ의 시각 안내선으로 선택할 수 있다. |
+| Javadoc과 일반 주석 | `comment.line_length=500`, `join_lines_in_comments=false`, `comment.new_lines_at_javadoc_boundaries=true`. Javadoc은 정리하되 기존 문단 줄바꿈을 유지하고 일반·행 주석의 본문 재배치는 끈다. `<p>`와 태그 설명 배치는 IntelliJ와 다를 수 있다. |
+| 문자열과 text block | 문자열 내용을 바꾸는 단계를 쓰지 않는다. `text_block_indentation=3`은 기존 text block 들여쓰기를 보존한다. |
+| 명시 import | import 삭제·wildcard 확장·순서 정렬과 멤버 재정렬을 켜지 않는다. wildcard는 기존 Checkstyle이 금지한다. |
+
+[Spotless JDT 통합 문서](https://github.com/diffplug/spotless/blob/gradle/8.10.3/plugin-gradle/README.md#eclipse-jdt)와
+[JDT 4.35 설정 정의](https://github.com/eclipse-jdt/eclipse.jdt.core/blob/R4_35/org.eclipse.jdt.core/formatter/org/eclipse/jdt/core/formatter/DefaultCodeFormatterConstants.java)가 설정의 근거다.
+IntelliJ의 Reformat Code와 완전히 같은 결과는 보장하지 않는다. IDE에서도 저장소와 같은 결과가 필요하면
+Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같은 태스크를 실행한다. 전역 Code Style이나 plugin 설치를 변경할 필요는 없다.
+
+`spotlessCheck`는 원본을 바꾸지 않고 위반이 있으면 실패한다. 설정 파일과 고정 엔진은 Spotless의 태스크 입력에 포함된다.
+실제 Gradle 회귀 `test/spotless-jdt.test.py`가 들여쓰기·빈 줄·주석·Java 컴파일·check 원본 불변·설정 변경 감지·2회 멱등성·위반 실패를 검사한다. Linux CI도 이 회귀를 실행한다.
+기본 범위는 `origin/main`과의 공통 조상 뒤 바뀐 파일이다. `-PformatAll=true`로 main/test Java 전체를 확인하거나 적용한다.
+전체 통일 전에 파일 길이와 품질 기준도 충족해야 한다. 포맷만으로 기준을 넘으면 파일 분리는 별도 관심사로 진행한다.
+실행 명령과 커밋 분리는 `backend/AGENTS.md`의 「포맷」 절이 갖는다.
+
 ### 구조 규칙의 기준 파일
 
 `backend/config/archunit/store/` 의 기준 파일이 지금 있는 위반을 얼려 둔다. 기준의 뜻은 [ADR-042](../../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 가 갖는다.

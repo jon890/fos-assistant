@@ -10,7 +10,7 @@ archunit = "1.5.1"
 commons-compress = "1.28.0"
 checkstyle = "14.3.0"
 spotless = "8.10.3"
-palantir-java-format = "2.100.0"
+eclipse-jdt = "4.35"
 # 7.40.0 과 7.41.0 은 Maven Central 에 없는 rewrite-bom 8.91.0 을 가리켜 받지 못한다
 openrewrite-plugin = "7.39.0"
 openrewrite-recipe-bom = "3.37.0"
