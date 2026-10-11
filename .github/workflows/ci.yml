@@ -17,10 +17,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  backend:
-    name: backend
+  backend-tests:
+    name: backend-${{ matrix.suite }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [unit, mysql]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -44,12 +48,27 @@ jobs:
           bun install --cwd hermes/connectors/naver-blog --frozen-lockfile
           bun run --cwd hermes/connectors/naver-blog build
       - name: 백엔드 테스트
+        if: matrix.suite == 'unit'
         working-directory: backend
         run: ./gradlew test
       # H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다. 운영과 같은 판과 기본 정렬 규칙으로 띄워
       # 마이그레이션과 저장소 쿼리를 검사한다.
       - name: 실제 MySQL 검사
+        if: matrix.suite == 'mysql'
         run: scripts/check-mysql-migration.sh
+
+  backend:
+    name: backend
+    needs: backend-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      # 두 suite를 병렬 실행하되 어느 하나 실패·취소·생략이면 필수 검사도 실패한다.
+      - name: 백엔드 검사 결과 확인
+        env:
+          BACKEND_RESULT: ${{ needs.backend-tests.result }}
+        run: test "$BACKEND_RESULT" = success
 
   web:
     name: web
