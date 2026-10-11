@@ -17,6 +17,10 @@ import { registerSectorTools } from "./sector-tools.ts";
 
 import { registerConditionalReadTools } from "./conditional-read-tools.ts";
 
+import { registerRankingTools } from "./ranking-tools.ts";
+
+import { registerIndicatorTools } from "./indicator-tools.ts";
+
 export { isSupportedBunVersion } from "./runtime.ts";
 export type { TossinvestOptions } from "./client.ts";
 
@@ -31,6 +35,8 @@ export function createTossinvestServer(options: TossinvestOptions = {}) {
   registerMarketInfoTools(register, client);
   registerSectorTools(register, client);
   registerConditionalReadTools(register, client);
+  registerRankingTools(register, client);
+  registerIndicatorTools(register, client);
   return server;
 }
 

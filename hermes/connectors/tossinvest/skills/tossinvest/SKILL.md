@@ -61,3 +61,14 @@ description: 토스증권 계좌와 시세, 섹터를 읽는다. 주문하지 �
 - `TOSSINVEST_ACCOUNT_NOT_FOUND`: 연결한 계좌를 찾지 못했다. 연결 화면에서 계좌를 다시 골라 달라고 안내한다
 - `TOSSINVEST_INVALID_INPUT`: 종목 기호나 인자를 확인한다. 없는 섹터라면 `list_sectors`에서 `sectorId`를 다시 확인한다
 - `TOSSINVEST_RATE_LIMITED`, `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE`: 잠시 뒤 다시 시도한다
+
+## 랭킹과 시장 지표 조회
+
+- `get_rankings`: KR/US, 6종 type, 7종 duration, count=1..100 기본 100. TOP_GAINERS/TOP_LOSERS의 realtime은 거절한다. 시장 전체와 토스증권 체결 기준을 구분한다. 기간은 거래일 기준이고 rankedAt이 집계 시각이다. changeRate 0.0125는 1.25%다.
+- `get_market_indicator_prices`: KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y만 지원한다. symbols는 쉼표로 이은 최대 200개다. 지수는 point, 국채 금리는 percent이며 lastPrice 3.25는 3.25%다.
+- `get_market_indicator_candles`: 지수는 1m/1d, 국채는 1d만 지원한다. count=1..200 기본 100. nextBefore를 다음 before에 그대로 넣고 null이면 끝낸다.
+- `get_market_indicator_investor_trading`: KOSPI/KOSDAQ, 1d/1w/1mo/1y, count=1..100 기본 10. KRW 매매대금이며 당일 값은 잠정치, updatedAt은 갱신 시각이다. nextUntil을 다음 until에 넣고 null이면 끝낸다.
+
+before는 offset 포함 ISO 시각, until은 해당 날짜를 포함하는 YYYY-MM-DD 상한이며 생략하면 최신부터 읽는다. nextBefore/nextUntil은 선택 필드다. null은 마지막 페이지지만 필드 부재를 null로 바꾸거나 마지막으로 단정하지 않는다.
+
+네 도구는 READ이며 승인이 없다. 계좌·token·URL은 인자로 보내지 않는다. 주문이나 WebSocket 도구는 제공하지 않는다.
