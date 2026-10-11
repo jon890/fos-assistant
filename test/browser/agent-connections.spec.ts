@@ -25,10 +25,10 @@ const NAME = "연결 쓰는 비서";
 const TITLE = "검사용 메모";
 /** 셸과 파일 도구가 켜진 에이전트에 연결을 붙일 때 붙이기 확인 창이 더 알리는 글이다. */
 const SHELL_RISK_MESSAGE =
-  "격리를 적용하지 않은 에이전트는 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
+  "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
 /** 연결이 붙은 에이전트에서 셸과 파일 도구를 켤 때 도구 확인 창이 더 알리는 글이다. */
 const CONNECTION_RISK_MESSAGE =
-  "격리를 적용하지 않은 에이전트는 붙은 연결의 비밀값을 이 도구로 읽고, 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
+  "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
 function ownerOf(projectName: string) {
   return {
@@ -91,6 +91,10 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 반영 �
   await expect(row).toHaveCount(1);
   await expect(row).toContainText(TITLE);
   await expect(row).toContainText("도구 4개");
+  const order = await page.getByRole("region").evaluateAll((regions) =>
+    regions.map((region) => region.getAttribute("aria-label")),
+  );
+  expect(order.indexOf("이 에이전트가 쓰는 연결")).toBeLessThan(order.indexOf("도구"));
   await expect(row.getByTestId("agent-connection-state")).toHaveText(
     "붙지 않음",
   );
@@ -101,11 +105,12 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 반영 �
   });
   await expect(
     dialog.getByText(
-      "이 에이전트가 이 연결의 도구를 직접 써요. 운영에서 격리를 적용하지 않은 에이전트는 터미널이나 파일 도구로 연결의 비밀값에 닿을 수 있어요.",
+      "이 에이전트가 이 서비스의 도구를 직접 써요. 명령 실행이나 파일 도구를 함께 쓰면 연결 정보에 접근할 수 있어요. 읽은 내용이 다른 도구를 통해 인터넷으로 나갈 수도 있어요.",
     ),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "붙이기" }).click();
   await expect(dialog).toBeHidden();
+  await expect(row).toContainText("몇 분 안에 쓸 수 있어요.");
   await expect(row.getByTestId("agent-connection-state")).toHaveText(
     "반영 대기",
   );
@@ -126,6 +131,9 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 반영 �
   await expect(
     section(page).getByTestId("agent-connection-state"),
   ).toHaveText("붙지 않음");
+  await expect(section(page)).not.toContainText("몇 분 안에 쓸 수 있어요.");
+  await expect(section(page)).not.toContainText("바로 쓸 수 있어요.");
+  await expect(section(page)).not.toContainText("관리자가 반영을 확인하면 쓸 수 있어요.");
   await expect(
     section(page).getByRole("button", { name: "붙이기" }),
   ).toBeVisible();
@@ -189,6 +197,59 @@ test("붙이기가 실패해도 서버에 남은 바인딩을 다시 읽어 보�
     "반영 대기",
   );
   await expect(row.getByRole("button", { name: "떼기" })).toBeVisible();
+  await expect(row).toContainText("몇 분 안에 쓸 수 있어요.");
+});
+
+for (const restartRequired of [false, true]) {
+  test(`READY 바인딩의 사용 안내는 재시작 대기 ${restartRequired}를 먼저 따른다`, async ({ page }) => {
+    const code = await createAgent(page);
+    await page.route(`**/api/agents/${code}/connections/demo-notes`, async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fallback();
+        return;
+      }
+      const response = await route.fetch();
+      const view = await response.json();
+      await route.fulfill({ response, json: { ...view, status: "READY", restartRequired } });
+    });
+    await page.goto(`/agents/${code}`);
+    const row = section(page).getByTestId("agent-connection");
+    await row.getByRole("button", { name: "붙이기" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "붙이기" }).click();
+    await expect(row).toContainText(restartRequired ? "관리자가 반영을 확인하면 쓸 수 있어요." : "바로 쓸 수 있어요.");
+    await expect(row.getByTestId("agent-connection-state")).toHaveText(restartRequired ? "반영 대기" : "붙음");
+    await row.getByRole("button", { name: "떼기" }).focus();
+    await row.getByRole("button", { name: "떼기" }).press("Enter");
+    await expect(row.getByTestId("agent-connection-state")).toHaveText("붙지 않음");
+    await expect(row).not.toContainText("쓸 수 있어요.");
+  });
+}
+
+test("도구 조회 실패에는 붙이기 위험을 알리고 다시 읽어 꺼짐을 확인하면 경고를 거둔다", async ({
+  page,
+  hermes,
+}) => {
+  const code = await createAgent(page);
+  await hermes.setReadinessOutage("unavailable");
+  try {
+    await page.goto(`/agents/${code}`);
+    await expect(page.getByRole("region", { name: "도구" }).getByRole("alert")).toBeVisible();
+    const row = section(page).getByTestId("agent-connection");
+    const dialog = page.getByRole("alertdialog", { name: `${TITLE} 연결을 붙일까요?` });
+    await row.getByRole("button", { name: "붙이기" }).click();
+    await expect(dialog.getByText(SHELL_RISK_MESSAGE)).toBeVisible();
+    await dialog.getByRole("button", { name: "취소" }).click();
+
+    await hermes.setReadinessOutage(undefined);
+    await page.reload();
+    await expect(page.getByRole("region", { name: "도구" }).getByRole("alert")).toHaveCount(0);
+    await row.getByRole("button", { name: "붙이기" }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(SHELL_RISK_MESSAGE)).toHaveCount(0);
+    await dialog.getByRole("button", { name: "취소" }).click();
+  } finally {
+    await hermes.setReadinessOutage(undefined);
+  }
 });
 
 test("셸 도구와 연결을 함께 쓰면 붙일 때와 도구를 켤 때 그 위험을 알린다", async ({
