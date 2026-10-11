@@ -19,7 +19,13 @@
  * </ul>
  */
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ConversationSession } from "./chat/conversation-session";
 import {
@@ -40,6 +46,9 @@ export function ChatPanel({
   const requestedAgent = useRef(agentCodeParam(useSearchParams().get("agent")));
   const { newConversationVersion } = useConversations();
   const [agents, setAgents] = useState<AgentView[]>([]);
+  const [agentsError, setAgentsError] = useState(false);
+  const agentsRequest = useRef(0);
+  const agentsInFlight = useRef<number | null>(null);
   const [agentsLoading, setAgentsLoading] = useState(true);
   const [agentCode, setAgentCode] = useState<string>("");
   /** `generation` 은 `ConversationSession` 의 `key` 다. 올리면 대화별 상태가 모두 새로 만들어진다 */
@@ -54,21 +63,58 @@ export function ChatPanel({
   const [seenPathname, setSeenPathname] = useState(pathname);
   const [seenNewVersion, setSeenNewVersion] = useState(newConversationVersion);
 
-  useEffect(() => {
-    fetchChatAgents()
-      .then((response) => (response.ok ? response.json() : []))
-      .then((data: AgentView[]) => {
+  // 응답을 기다리는 동안 사진이나 메시지로 대화가 생겨도 그 에이전트를 유지한다.
+  const activeConversationId = useRef(conversationId);
+  useLayoutEffect(() => {
+    activeConversationId.current = conversationId;
+  }, [conversationId]);
+
+  const readAgents = useCallback(async (): Promise<void> => {
+    if (agentsInFlight.current !== null) return;
+    const request = ++agentsRequest.current;
+    agentsInFlight.current = request;
+    const valid = () => agentsRequest.current === request;
+    const fetching = Promise.resolve().then(fetchChatAgents);
+    // 외부 요청의 비동기 처리에서 읽기 상태와 결과를 반영한다.
+    return Promise.resolve()
+      .then(async () => {
+        if (valid()) {
+          setAgentsLoading(true);
+          setAgentsError(false);
+        }
+        const response = await fetching;
+        if (!response.ok) throw new Error("에이전트 목록 읽기 실패");
+        const data: AgentView[] = await response.json();
+        if (!valid()) return;
         setAgents(data);
-        const requested = data.find(
-          (agent) => agent.code === requestedAgent.current,
-        );
-        setAgentCode(
-          (current) => current || requested?.code || data[0]?.code || "",
-        );
+        if (activeConversationId.current === null) {
+          const requested = data.find(
+            (agent) => agent.code === requestedAgent.current,
+          );
+          setAgentCode((current) =>
+            data.length === 0 ? "" : current || requested?.code || data[0].code,
+          );
+        }
       })
-      .catch(() => setAgents([]))
-      .finally(() => setAgentsLoading(false));
+      .catch(() => {
+        if (valid()) setAgentsError(true);
+      })
+      .finally(() => {
+        if (valid()) {
+          agentsInFlight.current = null;
+          setAgentsLoading(false);
+        }
+      });
   }, []);
+
+  useEffect(() => {
+    void readAgents();
+    return () => {
+      // Strict Mode의 다음 setup과 화면 이동 뒤 응답을 이전 요청에서 분리한다.
+      ++agentsRequest.current;
+      agentsInFlight.current = null;
+    };
+  }, [readAgents]);
 
   const currentConversation = useConversation(conversationId);
   // 대화 줄이 바뀌면 그리는 중에 그 대화의 에이전트로 맞춘다. 처음 그릴 때 이미 줄이 있으면 그때도 맞춘다.
@@ -117,6 +163,8 @@ export function ChatPanel({
       onConversationIdChange={setConversationId}
       agents={agents}
       agentsLoading={agentsLoading}
+      agentsError={agentsError}
+      onRetryAgents={() => void readAgents()}
       agentCode={agentCode}
       onAgentCodeChange={setAgentCode}
       currentConversation={currentConversation}

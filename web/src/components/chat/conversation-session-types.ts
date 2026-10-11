@@ -78,6 +78,8 @@ export type ConversationSessionProps = {
   onConversationIdChange(id: string): void;
   agents: AgentView[];
   agentsLoading: boolean;
+  agentsError: boolean;
+  onRetryAgents(): void;
   agentCode: string;
   onAgentCodeChange(code: string): void;
   /** `useConversation(conversationId)` 의 결과다 */

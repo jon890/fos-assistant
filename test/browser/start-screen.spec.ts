@@ -151,12 +151,165 @@ test("쓸 수 있는 에이전트가 없으면 입력창을 잠그고 에이전�
 
   await expect(page.getByText("아직 쓸 수 있는 에이전트가 없어요. 에이전트를 만들면 바로 대화할 수 있어요.")).toBeVisible();
   await expect(composer(page)).toBeDisabled();
+  await expect(page.getByRole("button", { name: "다시 읽기" })).toHaveCount(0);
   await expect(page.getByRole("radiogroup", { name: "에이전트" })).toHaveCount(0);
 
   await page.unroute("**/api/agents");
   await page.getByRole("link", { name: "에이전트 만들기" }).click();
   await expect(page.getByRole("dialog", { name: "새 에이전트" })).toBeVisible();
   await expect(page).toHaveURL(/\/agents$/);
+});
+
+for (const failure of ["HTTP", "fetch", "JSON"] as const) {
+  test(`목록 ${failure} 실패에는 다시 읽기만 보이고 재시도 성공은 입력창을 유지한다`, async ({ page }) => {
+    await page.route("**/api/agents", async (route) => {
+      if (failure === "fetch") await route.abort("failed");
+      else if (failure === "JSON") await route.fulfill({ contentType: "application/json", body: "{" });
+      else await route.fulfill({ status: 500, json: {} });
+    });
+    await page.goto("/");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("에이전트 목록을 읽지 못했어요");
+    await expect(composer(page)).toBeDisabled();
+    await expect(page.getByRole("link", { name: "에이전트 만들기" })).toHaveCount(0);
+    await expectNoHorizontalScroll(page);
+    // DOM에 표시를 남겨 재시도가 입력창을 새로 만들지 않는지 함께 본다.
+    await composer(page).evaluate((node) => node.setAttribute("data-kept", "true"));
+    await page.unroute("**/api/agents");
+    const retry = page.getByRole("button", { name: "다시 읽기" });
+    await retry.focus();
+    await retry.press("Enter");
+    await expect(composer(page)).toBeEnabled();
+    await expect(composer(page)).toHaveAttribute("data-kept", "true");
+    await expect(page.getByRole("main").getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: PROMPT, exact: true })).toBeVisible({ timeout: 15_000 });
+  });
+}
+
+test("재시도 연속 누름은 한 요청이며 실패하면 다시 읽을 수 있다", async ({ page }) => {
+  let retryCalls = 0;
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/agents", (route) => route.fulfill({ status: 500, json: {} }));
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "다시 읽기" })).toBeVisible();
+  await page.unroute("**/api/agents");
+  await page.route("**/api/agents", async (route) => {
+    ++retryCalls;
+    await released;
+    await route.fulfill({ status: 500, json: {} });
+  });
+  // 같은 이벤트 턴의 두 호출은 다시 그리기 전에 진행 중 요청 가드를 거친다.
+  await page.getByRole("button", { name: "다시 읽기" }).evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
+  await expect(page.getByRole("status").filter({ hasText: "에이전트를 읽는 중" })).toBeVisible();
+  await expect.poll(() => retryCalls).toBe(1);
+  release();
+  await expect(page.getByRole("button", { name: "다시 읽기" })).toBeEnabled();
+  await expect(composer(page)).toBeDisabled();
+  await page.unroute("**/api/agents");
+  await page.getByRole("button", { name: "다시 읽기" }).click();
+  await expect(composer(page)).toBeEnabled();
+});
+
+for (const result of ["실패", "빈 목록", "다른 에이전트"] as const) {
+  test(`기존 빈 대화는 목록 ${result}에도 에이전트와 글을 유지한다`, async ({ page }) => {
+    const created = await page.request.post("/api/chat/conversations", { data: { agentCode: FLOW_AGENT_CODE } });
+    expect(created.ok()).toBeTruthy();
+    const { conversationId } = await created.json() as { conversationId: string };
+    await page.route("**/api/agents", (route) => route.fulfill(
+      result === "실패" ? { status: 500, json: {} } : { json: result === "빈 목록" ? [] : [agentRow("browser", "다른 비서")] },
+    ));
+    try {
+      await page.goto(`/chat/${conversationId}`);
+      await expect(composer(page)).toBeEnabled();
+      await composer(page).fill("남겨 둔 글");
+      await composer(page).evaluate((node) => node.setAttribute("data-kept", "true"));
+      // 이미 연 대화에는 첫 화면의 재시도 UI가 없다. 목록 결과가 전송할 에이전트를 바꾸지 않는지 본다.
+      await expect(page.getByRole("button", { name: "다시 읽기" })).toHaveCount(0);
+      await expect(composer(page)).toHaveValue("남겨 둔 글");
+      await expect(composer(page)).toHaveAttribute("data-kept", "true");
+      await expect(page).toHaveURL(new RegExp(`/chat/${conversationId}$`));
+      await page.getByRole("button", { name: "보내기" }).click();
+      await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
+      const conversations = await (await page.request.get("/api/chat/conversations")).json();
+      expect(conversations.items.find((item: { id: string }) => item.id === conversationId).agentCode).toBe(FLOW_AGENT_CODE);
+    } finally {
+      await page.request.delete(`/api/chat/conversations/${conversationId}`);
+    }
+  });
+}
+
+test("화면 이동 뒤 도착한 이전 목록은 새 대화의 선택을 덮어쓰지 않는다", async ({ page }, testInfo) => {
+  // 요청을 제거하면 Playwright가 이미 처리된 route를 해제하므로 fetch의 응답만 보류한다.
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    let hold = true;
+    const queued: Array<(response: Response) => void> = [];
+    Object.assign(window, {
+      agentReads: queued,
+      resumeAgentReads: () => { hold = false; },
+      releaseAgentReads: () => queued.forEach((resolve) => resolve(Response.json([{ code: "browser", name: "늦은 비서" }]))),
+    });
+    window.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (hold && new URL(url, location.href).pathname === "/api/agents") {
+        return new Promise<Response>((resolve) => queued.push(resolve));
+      }
+      return original(input, init);
+    };
+  });
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { agentReads: unknown[] }).agentReads.length)).toBeGreaterThan(0);
+  if (testInfo.project.name === "mobile") await page.getByRole("button", { name: "사이드바 열기" }).click();
+  await page.locator('a[href="/agents"]').first().click();
+  await expect(page).toHaveURL(/\/agents$/);
+  await page.evaluate(() => (window as unknown as { resumeAgentReads(): void }).resumeAgentReads());
+  await page.getByRole("link", { name: "검사용 비서 홈" }).click();
+  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await page.evaluate(async () => {
+    (window as unknown as { releaseAgentReads(): void }).releaseAgentReads();
+    await new Promise(requestAnimationFrame);
+  });
+  await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("늦은 비서", { exact: true })).toHaveCount(0);
+});
+
+test("Strict Mode의 이전 요청과 finally는 다음 요청의 읽는 중 상태를 풀지 않는다", async ({ page }) => {
+  test.skip(process.env.BROWSER_WEB_SERVER !== "dev", "Strict Mode의 effect 재실행은 개발 서버에서 확인한다");
+  await page.addInitScript(() => {
+    const original = window.fetch.bind(window);
+    const queued: Array<(response: Response) => void> = [];
+    Object.assign(window, { agentReads: queued });
+    window.fetch = (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (new URL(url, location.href).pathname === "/api/agents") {
+        return new Promise<Response>((resolve) => queued.push(resolve));
+      }
+      return original(input, init);
+    };
+  });
+  await page.goto("/");
+  const reads = () => page.evaluate(() => (window as unknown as { agentReads: unknown[] }).agentReads.length);
+  await expect.poll(reads).toBe(2);
+  // 이전 응답은 성공이어도 선택과 loading을 바꾸지 못한다.
+  await page.evaluate(() => {
+    (window as unknown as { agentReads: Array<(response: Response) => void> }).agentReads[0](Response.json([{ code: "old", name: "이전 비서" }]));
+  });
+  await expect(page.getByRole("status").filter({ hasText: "에이전트를 읽는 중" })).toBeVisible();
+  await expect(page.getByText("이전 비서")).toHaveCount(0);
+  await page.evaluate(() => {
+    (window as unknown as { agentReads: Array<(response: Response) => void> }).agentReads[1](new Response("{}", { status: 500 }));
+  });
+  await expect(page.getByRole("button", { name: "다시 읽기" })).toBeVisible();
+  await page.getByRole("button", { name: "다시 읽기" }).click();
+  await expect.poll(reads).toBe(3);
+  await page.evaluate(() => {
+    (window as unknown as { agentReads: Array<(response: Response) => void> }).agentReads[2](Response.json([{ code: "browser", name: "최신 비서", acceptsAttachments: true }]));
+  });
+  await expect(page.getByRole("main").getByText("최신 비서", { exact: true })).toBeVisible();
+  await expect(composer(page)).toBeEnabled();
 });
 
 test("에이전트가 하나면 카드 없이 그 이름과 추천 질문을 보인다", async ({ page }) => {
