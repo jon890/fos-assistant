@@ -21,13 +21,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -44,7 +41,6 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class UserBrowserService {
 
     /** 켜다가 proxy 호출이 실패했다. */
@@ -57,8 +53,6 @@ public class UserBrowserService {
     public static final String STOP_FAILED = "stop_failed";
 
     private static final Duration POLL_INTERVAL = Duration.ofMillis(500);
-    // 활동을 다시 기록하기까지의 간격이다. UserBrowser.touch 와 같다
-    private static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
     private static final List<UserBrowserStatus> COUNTED =
             List.of(UserBrowserStatus.STARTING, UserBrowserStatus.RUNNING);
 
@@ -70,10 +64,28 @@ public class UserBrowserService {
     private final Clock clock;
     private final BrowserScreens screens;
     private final ReentrantLock startLock = new ReentrantLock();
-    /** 사용자마다 마지막으로 활동을 기록한 시각이다. 간격 안의 입력은 DB 를 읽지 않고 거른다. */
-    private final Map<Long, Instant> touched = new ConcurrentHashMap<>();
+    private final BrowserActivityTracker activity;
     /** 중계가 다른 전이를 기다리는 동안 쉬는 함수다. 시험이 바꿔 끼워 그 사이에 줄을 바꾼다. */
     Consumer<Duration> sleeper = UserBrowserService::sleep;
+
+    /** 기존 주입 인자로 활동 기록기를 만든다. 공개 생성자와 실제 호출자의 인자는 유지한다. */
+    public UserBrowserService(
+            UserBrowserRepository browsers,
+            BrowserRuntime runtime,
+            BrowserProfileStore profiles,
+            CdpProbe cdp,
+            LiveProperties<BrowserProperties> properties,
+            Clock clock,
+            BrowserScreens screens) {
+        this.browsers = browsers;
+        this.runtime = runtime;
+        this.profiles = profiles;
+        this.cdp = cdp;
+        this.properties = properties;
+        this.clock = clock;
+        this.screens = screens;
+        this.activity = new BrowserActivityTracker(browsers, clock);
+    }
 
     /** 프로필 디렉터리 이름이다. 첨부 디렉터리 키와 같은 계산이지만 루트가 다르다. */
     public static String profileKey(Long userId) {
@@ -204,25 +216,7 @@ public class UserBrowserService {
      * <p>1분 안이면 DB 를 읽지 않는다. 다른 전이와 겹쳐 저장하지 못하면 이번 기록은 버린다. 다음 활동이 다시 쓴다.
      */
     public void touch(Long userId) {
-        Instant now = clock.instant();
-        Instant last = touched.get(userId);
-        if (last != null && !now.isBefore(last) && now.isBefore(last.plus(TOUCH_INTERVAL))) {
-            return;
-        }
-        browsers.findByUserId(userId)
-                .filter(browser -> browser.status() == UserBrowserStatus.RUNNING)
-                .ifPresent(browser -> {
-                    if (!browser.touch(now)) {
-                        touched.put(userId, browser.lastActiveAt());
-                        return;
-                    }
-                    try {
-                        browsers.save(browser);
-                        touched.put(userId, now);
-                    } catch (OptimisticLockingFailureException ex) {
-                        log.debug("user browser touch skipped id={}", browser.id());
-                    }
-                });
+        activity.touch(userId);
     }
 
     /** 로그인 화면을 열고 앞의 화면은 닫는다. 꺼져 있으면 켜고, 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. 활동은 열기 전에 기록한다. */
@@ -387,7 +381,7 @@ public class UserBrowserService {
         }
         // 화면이 먼저 닫혀야 멈춘 브라우저에 붙은 화면이 남지 않는다
         screens.close(browser.id());
-        touched.remove(browser.userId());
+        activity.clear(browser.userId());
         browser.beginStop(clock.instant());
         UserBrowser stopping = save(browser);
         try {

@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -21,6 +23,7 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.FakeBrowserRuntime;
+import com.bifos.assistant.testsupport.TestClock;
 import java.net.URI;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -44,6 +47,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.OptimisticLockingFailureException;
 
 /**
  * 켜기, 끄기, 지우기의 순서와 동시 수, 실패 처리를 실제 DB 와 대역 proxy 로 본다. 규칙은 {@code docs/features/user-browser.md} 의
@@ -449,6 +453,129 @@ class UserBrowserServiceTest {
     }
 
     @Test
+    @DisplayName("1분 전에는 저장하지 않고 정확히 1분이 되면 DB 활동 시각을 갱신한다")
+    void touchesAtExactMinuteBoundary() {
+        TestClock clock = new TestClock();
+        Instant started = Instant.parse("2026-10-11T00:00:00Z");
+        clock.set(started);
+        UserBrowserRepository counting = mock(UserBrowserRepository.class, delegatesTo(repository));
+        UserBrowserService service = service(true, 2, counting, clock);
+        service.create(101L);
+        service.start(101L);
+        clearInvocations(counting);
+
+        service.touch(101L);
+        clock.set(started.plusSeconds(59));
+        service.touch(101L);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(started);
+        verify(counting, times(1)).findByUserId(101L);
+        clock.set(started.plusSeconds(60));
+        service.touch(101L);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(clock.instant());
+        verify(counting, times(2)).findByUserId(101L);
+        verify(counting, times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("시계가 역행하면 DB를 다시 읽고 저장된 시각을 기억해 다음 1분 경계를 지킨다")
+    void rereadsAfterClockReversalAndKeepsStoredTimestamp() {
+        TestClock clock = new TestClock();
+        Instant started = Instant.parse("2026-10-11T00:00:00Z");
+        clock.set(started);
+        UserBrowserRepository counting = mock(UserBrowserRepository.class, delegatesTo(repository));
+        UserBrowserService service = service(true, 2, counting, clock);
+        service.create(101L);
+        service.start(101L);
+        clearInvocations(counting);
+        service.touch(101L);
+
+        clock.set(started.minusSeconds(120));
+        service.touch(101L);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(started);
+        verify(counting, times(2)).findByUserId(101L);
+        clock.set(started.plusSeconds(59));
+        service.touch(101L);
+        verify(counting, times(2)).findByUserId(101L);
+        clock.set(started.plusSeconds(60));
+        service.touch(101L);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(clock.instant());
+        verify(counting, times(3)).findByUserId(101L);
+    }
+
+    @Test
+    @DisplayName("같은 사용자를 끈 뒤 시계가 역행한 채 다시 켜도 이전 활동 캐시가 새 기록을 막지 않는다")
+    void clearsActivityCacheWhenStoppingBeforeRestart() {
+        TestClock clock = new TestClock();
+        Instant started = Instant.parse("2026-10-11T00:00:00Z");
+        clock.set(started);
+        UserBrowserService service = service(true, 2, repository, clock);
+        service.create(101L);
+        service.start(101L);
+        clock.set(started.plusSeconds(60));
+        service.touch(101L);
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(clock.instant());
+
+        clock.set(started.plusSeconds(10));
+        service.stop(101L);
+        service.start(101L);
+        clock.set(started.plusSeconds(70));
+        service.touch(101L);
+
+        var saved = repository.findByUserId(101L).orElseThrow();
+        assertThat(saved.status()).isEqualTo(UserBrowserStatus.RUNNING);
+        assertThat(saved.lastActiveAt()).isEqualTo(clock.instant());
+    }
+
+    @Test
+    @DisplayName("활동 저장이 낙관적 잠금으로 실패하면 캐시를 갱신하지 않아 같은 시각의 다음 활동이 재시도한다")
+    void retriesActivityAfterOptimisticFailure() {
+        TestClock clock = new TestClock();
+        Instant started = Instant.parse("2026-10-11T00:00:00Z");
+        clock.set(started);
+        UserBrowserRepository racing = mock(UserBrowserRepository.class, delegatesTo(repository));
+        AtomicBoolean failFirst = new AtomicBoolean(true);
+        doAnswer(call -> {
+                    if (failFirst.compareAndSet(true, false)) {
+                        throw new OptimisticLockingFailureException("concurrent activity");
+                    }
+                    return repository.save(call.getArgument(0));
+                })
+                .when(racing)
+                .save(any());
+        UserBrowserService service = service(true, 2, racing, clock);
+        service.create(101L);
+        service.start(101L);
+        clock.set(started.plusSeconds(60));
+
+        service.touch(101L);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(started);
+        service.touch(101L);
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(clock.instant());
+        verify(racing, times(2)).save(any());
+    }
+
+    @Test
+    @DisplayName("멈춰 있거나 존재하지 않는 브라우저의 활동은 저장하지 않는다")
+    void ignoresActivityForStoppedAndMissingBrowsers() {
+        UserBrowserRepository counting = mock(UserBrowserRepository.class, delegatesTo(repository));
+        UserBrowserService service = service(true, 2, counting);
+        service.create(101L);
+        var stored = repository.findByUserId(101L).orElseThrow().lastActiveAt();
+
+        service.touch(101L);
+        service.touch(102L);
+
+        assertThat(repository.findByUserId(101L).orElseThrow().lastActiveAt()).isEqualTo(stored);
+        assertThat(repository.findByUserId(102L)).isEmpty();
+        verify(counting, never()).save(any());
+    }
+
+    @Test
     @DisplayName("중계가 켜 둘 때 브라우저가 없으면 만들고 켠 뒤 그 번호와 CDP 주소를 준다")
     void ensureRunningCreatesAndStartsMissingBrowser() {
         UserBrowserService service = service(true, 2);
@@ -666,6 +793,10 @@ class UserBrowserServiceTest {
     }
 
     private UserBrowserService service(boolean enabled, int maxRunning, UserBrowserRepository browsers) {
+        return service(enabled, maxRunning, browsers, Clock.systemUTC());
+    }
+
+    private UserBrowserService service(boolean enabled, int maxRunning, UserBrowserRepository browsers, Clock clock) {
         BrowserProperties properties = new BrowserProperties(
                 enabled,
                 "https://browser-proxy.example.test",
@@ -705,7 +836,7 @@ class UserBrowserServiceTest {
                 profiles,
                 address -> cdpReady.get(),
                 LiveProperties.fixed(BrowserProperties.class, properties),
-                Clock.systemUTC(),
+                clock,
                 new BrowserScreens(
                         new FakeCdp(),
                         new FakeCdp(),
