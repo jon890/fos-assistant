@@ -13,6 +13,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 
 import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.application.AgentPurgeWriter;
+import com.bifos.assistant.agent.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.application.ConnectorActionService;
@@ -22,6 +25,7 @@ import com.bifos.assistant.connector.application.ConnectorProperties;
 import com.bifos.assistant.connector.application.ConnectorBindingInstalls;
 import com.bifos.assistant.connector.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.application.ConnectorInstallAttempts;
+import com.bifos.assistant.connector.application.ConnectorPolicyService;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
 import com.bifos.assistant.connector.application.model.ConnectorInstallResult;
@@ -42,6 +46,9 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.user.application.SignInRevocation;
+import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.type.ExecutionStatus;
+import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -54,6 +61,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -110,6 +118,17 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     @Autowired
     ConnectorBindingApplier applier;
 
+    @Autowired
+    AgentPurgeWriter purge;
+
+    @Autowired
+    ConnectorPolicyService policy;
+
+    @Autowired
+    AgentExecutionRepository executions;
+
+    private Long policyRunId;
+
     private ConnectorConnectionService requests;
 
 
@@ -124,6 +143,9 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     @AfterEach
     void cleanAccess() {
         people.deleteAll();
+        if (policyRunId != null) {
+            executions.deleteById(policyRunId);
+        }
     }
 
 
@@ -404,6 +426,69 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             release.countDown();
             first.get(10, TimeUnit.SECONDS);
             assertThat(bindings.findByAgentId(agent.id())).extracting(binding -> binding.id()).containsExactly(current);
+        } finally {
+            release.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("떼기와 에이전트 정리 뒤 늦은 설치 성공은 행을 되살리지 않고 남은 외부 설치의 정책 호출은 차단된다")
+    void blocksLateInstallAfterDetachOrAgentPurge(boolean purgeAgent) throws Exception {
+        CurrentUser owner = user(UserRole.MEMBER, 1L);
+        requests.register(owner, DEMO, VALUES);
+        Agent agent = agent(owner, AgentVisibility.PRIVATE);
+        String session = "fos-" + UUID.randomUUID();
+        policyRunId = executions.save(AgentExecution.builder().userId(owner.id()).agentId(agent.id())
+            .profileName(agent.hermesProfile()).hermesSessionId(session).costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING).startedAt(clock.instant()).build()).id();
+        List<String> events = new CopyOnWriteArrayList<>();
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            assertNoTransaction();
+            entered.countDown();
+            await(release);
+            events.add("bind-applied");
+            return INSTALLED;
+        }).when(connector).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+        doAnswer(invocation -> {
+            events.add("unbind");
+            return INSTALLED;
+        }).when(connector).unbindConnector(anyString(), anyString());
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> installing = pool.submit(() -> service.bind(owner, agent.code(), DEMO));
+            assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
+            pool.submit(() -> {
+                if (purgeAgent) {
+                    transactions.executeWithoutResult(status -> {
+                        users.findByIdForUpdate(owner.id()).orElseThrow();
+                        Agent current = agents.findByIdForUpdate(agent.id()).orElseThrow();
+                        service.detachAll(current);
+                        current.markDeleted(clock.instant());
+                    });
+                    assertThat(purge.purge(agent.id(), clock.instant())).isEqualTo(AgentPurgeOutcome.PURGED);
+                } else {
+                    service.unbind(owner, agent.code(), DEMO);
+                }
+            }).get(10, TimeUnit.SECONDS);
+            assertThat(bindings.findByAgentId(agent.id())).isEmpty();
+            assertThat(events).containsExactly("unbind");
+            release.countDown();
+            if (purgeAgent) {
+                assertThatThrownBy(() -> installing.get(10, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
+                    .cause().isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+                assertThat(agents.findById(agent.id())).isEmpty();
+            } else {
+                installing.get(10, TimeUnit.SECONDS);
+            }
+            assertThat(events).containsExactly("unbind", "bind-applied");
+            assertThat(bindings.findByAgentId(agent.id())).isEmpty();
+            assertThat(policy.decide(agent.hermesProfile(), session, session, "late-install", "mcp__demo__list_scopes", "list_scopes", "{}").allowed()).isFalse();
+            assertThat(actions.findAll()).isEmpty();
         } finally {
             release.countDown();
             pool.shutdownNow();
