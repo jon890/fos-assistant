@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { envelopeMetadata } from "./api-contract.ts";
+import { SCHEMAS, envelopeMetadata } from "./api-contract.ts";
 import type { Tossinvest } from "./client.ts";
 import { TossinvestError } from "./errors.ts";
+import { officialFields } from "./official-response.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
 export function registerRankingTools(
@@ -49,7 +50,10 @@ export function registerRankingTools(
         count: String(count),
       });
       const envelope = await client.request("/api/v1/rankings", { query });
-      return { result: envelope.result, metadata: envelopeMetadata(envelope) };
+      return {
+        result: officialFields(envelope.result, SCHEMAS.RankingResponse),
+        metadata: envelopeMetadata(envelope),
+      };
     },
   );
 }

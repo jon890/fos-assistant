@@ -117,7 +117,7 @@ for (const name of Object.keys(paths) as ToolName[]) {
   });
 }
 
-test("긴 decimal·null·boolean을 보존하고 잘못된 행·JSON·큰 본문은 전체 실패한다", async () => {
+test("긴 decimal·null을 보존하고 추가 키를 제거하며 잘못된 행·JSON·큰 본문은 전체 실패한다", async () => {
   const fake = new FakeToss(allowed);
   const rows = structuredClone(
     examples("get_market_indicator_prices")[0].result,
@@ -138,7 +138,9 @@ test("긴 decimal·null·boolean을 보존하고 잘못된 행·JSON·큰 본문
         "get_market_indicator_prices",
         inputs.get_market_indicator_prices,
       );
-      expect(body.result).toEqual(rows);
+      expect(body.result).toEqual(
+        rows.map(({ extra: _extra, ...official }: any) => official),
+      );
       for (let i = 0; i < 3; i++)
         await expectFailure(
           client,

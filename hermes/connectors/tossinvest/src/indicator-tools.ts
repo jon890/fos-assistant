@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { envelopeMetadata } from "./api-contract.ts";
+import { SCHEMAS, envelopeMetadata } from "./api-contract.ts";
 import type { Tossinvest } from "./client.ts";
 import { TossinvestError } from "./errors.ts";
+import { officialFields } from "./official-response.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
 const symbols = [
@@ -47,7 +48,13 @@ export function registerIndicatorTools(
         "/api/v1/market-indicators/prices",
         { query: new URLSearchParams({ symbols }) },
       );
-      return { result: envelope.result, metadata: envelopeMetadata(envelope) };
+      return {
+        result: officialFields(envelope.result, {
+          type: "array",
+          items: SCHEMAS.MarketIndicatorPriceResponse,
+        }),
+        metadata: envelopeMetadata(envelope),
+      };
     },
   );
   register(
@@ -76,7 +83,10 @@ export function registerIndicatorTools(
         { query },
       );
       return {
-        result: envelope.result,
+        result: officialFields(
+          envelope.result,
+          SCHEMAS.MarketIndicatorCandlePageResponse,
+        ),
         metadata: envelopeMetadata(envelope),
         nextBefore: envelope.result.nextBefore,
       };
@@ -108,7 +118,10 @@ export function registerIndicatorTools(
         { query },
       );
       return {
-        result: envelope.result,
+        result: officialFields(
+          envelope.result,
+          SCHEMAS.InvestorTradingResponse,
+        ),
         metadata: envelopeMetadata(envelope),
         nextUntil: envelope.result.nextUntil,
       };
