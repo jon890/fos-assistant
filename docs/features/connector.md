@@ -612,7 +612,14 @@ prepare는 계좌 끝 네 자리, 공식 StockInfo의 market·currency와 정정
 CREATE의 UUID는 여기서 한 번 생성한다. US 가격은 1달러 미만 소수 넷째 자리,
 1달러 이상 둘째 자리까지 받으며 값을 절삭하지 않는다. confirmHighValueOrder는 false만 받는다.
 공식 inline oneOf의 수량·금액 분기별로 본문을 고르고 금액 본문에서 timeInForce·price를 뺀다.
+quantity는 주 단위 수량, KR price는 원, US price와 orderAmount는 달러다.
+수량 주문은 quantity, US MARKET 금액 주문은 orderAmount를 사용하며 둘을 함께 넣지 않는다.
+공식 금액 주문과 소수 수량 매도는 정규장 시작부터 종료 1시간 전까지 접수할 수 있다.
+시간 조건은 서버가 최종 판정하며 준비 성공이 접수 가능 시간을 보장하지 않는다.
+금액 원주문을 LIMIT로 정정하는 것은 현재 prepare와 실행 양쪽에서 거절한다.
+이를 지원하려면 원주문 대조를 유지하면서 소비 계약과 새 표시 값을 함께 설계해야 한다.
 일반 취소는 POST와 `{}`이며 정정·취소 응답의 새 orderId를 보존한다.
+정정·취소의 2xx가 원주문과 같은 orderId를 반환하면 계약 위반으로 UNKNOWN이다.
 CREATE 응답 clientOrderId의 누락·null을 허용하고 값이 있으면 준비한 UUID와 대조한다.
 
 guard는 자식의 권한 env를 회수하고 실행 원문의 바이트 SHA와 SDK 인자의 모든 키·값·타입을 대조한다.
@@ -622,6 +629,11 @@ claim 응답의 v·allowed·ticketId·expiresAt을 검사하며 redirect나 재�
 금융 fetch를 시작하는 quota queue callback에서 계좌와 ticket 만료를 마지막으로 검사한다.
 POST·DELETE는 GET 재시도 루프를 공유하지 않는다. 전송 전 실패와 공식 명백한 거절은 FAILED,
 429·5xx·timeout·불량2xx와 불분명한 오류는 UNKNOWN이며 자동 재전송하지 않는다.
+MODIFY·CANCEL도 UNKNOWN이면 새 권한이나 UUID로 자동 재전송하지 않는다.
+공식 해당 operation의 명백한 거절 401은 FAILED, 미지·해석 불가 401은 UNKNOWN이다.
+두 경우 모두 토큰 재발급과 금융 재전송은 없다.
+client의 financial은 승인 검증을 제공하지 않는 저수준 내부 transport다.
+생산 금융 호출자는 trading-tools이며 claim과 본문 검증을 거친다. 타입만으로 보안 경계를 만들지 않는다.
 
 테스트 원본의 단일 생산자는 `tests/fixtures/trading-entry.ts --generate`다.
 운영 manifest·plugin·MCP 정의를 복사한 고유 임시 디렉터리의 사본에만 금융 선언과 실제 SDK bundle을 넣는다.

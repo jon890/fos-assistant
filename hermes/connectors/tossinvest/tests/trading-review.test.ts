@@ -109,6 +109,25 @@ for (const [amount, target] of [
         tool: "modify_order",
         args: model,
       });
+      for (const item of (await prepare.listTools()).tools.filter((item) =>
+        [
+          "prepare_trade",
+          "create_order",
+          "modify_order",
+          "cancel_order",
+        ].includes(item.name),
+      )) {
+        expect(item.description).toContain("quantity는 주");
+        expect(item.description).toContain("KR price는 원");
+        expect(item.description).toContain("US price와 orderAmount는 달러");
+        expect(item.description).toContain("둘을 함께 넣지");
+        if (["modify_order", "cancel_order"].includes(item.name))
+          expect(item.description).toContain(
+            "UNKNOWN이면 새 권한이나 UUID로 자동 재전송하지",
+          );
+        if (["prepare_trade", "modify_order"].includes(item.name))
+          expect(item.description).toContain("금액 원주문을 LIMIT로 정정");
+      }
       const unsupported = amount && target === "LIMIT";
       // 성공 결과는 실제 소비자까지 확인한다. 수정 전에는 LIMIT와 금액의 불일치가 드러난다.
       if (!prepared.result.isError) await consume(root, prepared.body, model);
