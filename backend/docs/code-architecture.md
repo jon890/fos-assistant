@@ -26,6 +26,8 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 운영 시계와 공용 검사 시계의 빈은 추가하지 않는다. 이 선언과 대상의 정확한 개수는 baseline 없는
 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`이 검사한다. 실제 callback과 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
 설정·provider 선언과 대상 엔티티는 각각 하나다. 다른 필드·getter의 auditing annotation과 `@LastModifiedDate`는 허용하지 않는다.
+다른 운영 타입의 `AuditingEntityListener` 선언과 Spring Data `Auditable` 구현·상속도 거절한다.
+`AbstractAuditable` 상속도 여기에 포함한다. 기존 JPA 업무 시각과 다른 listener는 그대로 허용한다.
 
 `defaultsFor(groupId)`가 만든 객체는 생성 시각이 null이다. 복합 ID로 `saveAll`이 merge할 때는 반환된 managed 객체를 사용한다.
 `PrePersist` 시각과 트랜잭션 commit 완료 시각은 다르다. rollback하면 시각이 채워졌어도 행은 남지 않는다.

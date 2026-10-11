@@ -481,11 +481,8 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 그룹이 쓰는 collection 하나가 한 줄이다. 화면의 탭과 에이전트 접근 설정이 고를 목록이고, 누가 읽는지는 이 표가 정하지 않는다.
 그룹마다 `MemoryCollection.DEFAULT_KEYS` 로 시작한다. 마이그레이션이 사용자가 있는 그룹에 넣고, 그 뒤에 생긴 그룹은 목록을 처음 읽을 때 넣는다.
 
-`created_at`은 JPA `PrePersist`에서 기록하는 생성 시각이다. commit 완료 시각이 아니다.
-`MemoryCollection.createdAt`만 auditing 대상이며 기존 `Clock`으로 읽은 시각을 마이크로초로 잘라 저장한다.
-기존 행을 읽어 merge하거나 변경 없이 flush해도 생성 시각은 유지한다. rollback한 새 줄은 남지 않는다.
-SQL bulk·native SQL과 마이그레이션은 auditing listener를 거치지 않으므로 SQL이 시각을 정한다.
-스키마와 HTTP 응답 모양은 바꾸지 않는다. 다른 엔티티와 업무 시각은 전달받은 값을 유지한다.
+`created_at`은 JPA `PrePersist`에서 기록하는 생성 시각이며 commit 완료 시각은 아니다.
+시계와 정밀도, 기존 행과 SQL의 처리 계약은 [`code-architecture.md`의 「JPA 생성 시각」](code-architecture.md#jpa-생성-시각)이 갖는다.
 
 ### agent_memory_collection
 
