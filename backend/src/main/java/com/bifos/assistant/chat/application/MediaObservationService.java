@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.domain.MediaObservation;
 import com.bifos.assistant.chat.domain.MediaObservationRequest;
 import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
 import com.bifos.assistant.chat.domain.type.ObservationStatus;
+import com.bifos.assistant.chat.infra.AttachmentFingerprint;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.MediaObservationBodies;
@@ -21,13 +22,11 @@ import com.bifos.assistant.shared.util.Sha256;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -389,21 +388,12 @@ public class MediaObservationService {
 
 
     private String fingerprint(ChatAttachment row) {
-        MessageDigest digest = Sha256.newDigest();
-        try (var input = store.open(row)) {
-            byte[] buffer = new byte[8192];
-            long size = 0;
-            for (int read; (read = input.read(buffer)) != -1;) {
-                size += read;
-                if (size > row.byteSize()) {
-                    throw gone();
-                }
-                digest.update(buffer, 0, read);
-            }
-            if (size == 0 || size != row.byteSize() || !row.expiresAt().isAfter(clock.instant())) {
+        try {
+            String fingerprint = AttachmentFingerprint.read(store, row);
+            if (fingerprint == null || !row.expiresAt().isAfter(clock.instant())) {
                 throw gone();
             }
-            return HexFormat.of().formatHex(digest.digest());
+            return fingerprint;
         } catch (IOException | UncheckedIOException ex) {
             throw gone();
         }
