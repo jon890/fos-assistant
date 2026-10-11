@@ -435,7 +435,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 10개 READ 도구가 내부 인증을 포함한 12개 operation의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 29개 operation의 producer는 아직 구현하지 않았다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
@@ -449,18 +449,18 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 12개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
 새 도구는 아래 공식 camelCase 입력 이름을 그대로 쓴다. 기존 `get_quotes(symbols)`, `get_buying_power(currency,symbol)`과 `list_orders(status,from,to,symbol)`은 유지하고 선택 입력을 더한다.
 `get_market_calendar`는 필수 `market: KR/US`로 고정된 두 주소 중 하나를 고른다.
 API의 account 헤더는 입력에 노출하지 않는다. 연결 env의 계좌만 사용하며 모델의 계좌, URL, 토큰과 clientOrderId 입력은 거절한다.
-읽기 도구는 공식 `result`와 필요한 envelope 메타데이터를 무손실로 제공한다. 기존 snake_case 표시 필드는 호환을 위해 유지하고 공식 `result`를 추가한다.
+읽기 도구는 공식 `result`와 `metadata`를 제공한다. 랭킹·시장 지표 네 도구는 검증 뒤 공식 schema의 알려진 result 필드만 재귀적으로 투영하고 추가 키는 전달하지 않는다. 기존 snake_case 표시 필드는 호환을 위해 유지하고 공식 `result`를 추가한다.
 `get_quotes`의 공식 결과는 `{prices,stocks}`이며 각각 공식 배열이다. `get_stocks`도 별도로 등록해 이름 이외의 참조 정보를 읽는다.
 `get_holdings`는 선택 `symbol`을 추가한다. `get_sellable_quantity`는 단독 호출도 가능하게 한다.
 get_buying_power의 result는 symbol 부재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: null}, symbol 존재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: SellableQuantityResponse}다. 각 값은 공식 result 전체이며 후자는 두 GET을 각각 한 번 호출한다.
-envelope 메타데이터는 result 밖의 metadata: {buyingPower: {...}, sellableQuantity: {...} | null}에 둔다. 각 객체는 해당 upstream envelope에서 result만 제외한 공식 필드를 보존하며 부재를 null로 발명하지 않는다. 현재 ApiResponse에는 result 이외 필드가 없어 {}다.
+envelope 메타데이터는 result 밖의 metadata: {buyingPower: {...}, sellableQuantity: {...} | null}에 둔다. 현재 각 envelope의 metadata는 항상 {}이며, 알 수 없는 upstream envelope 추가 키를 보존하지 않는다. 공식 계약에 메타데이터가 추가되면 wrapper와 producer를 함께 갱신한다.
 단독 get_sellable_quantity는 result: SellableQuantityResponse와 metadata: {}를 반환한다. get_quotes는 result: {prices,stocks}, metadata: {prices: {}, stocks: {}}로 같은 규칙을 쓴다. 한 호출 실패나 schema 위반을 부분 성공/null로 숨기지 않는다.
 기존 currency/cash_buying_power/sellable_quantity 표시와 선택지 accounts/account_seq/label을 유지한다. symbol 부재의 기존 sellable_quantity는 null이다.
 producer가 schema 검증 뒤 accountNo를 끝 네 자리로 마스킹한 복사본에서 표시·result·metadata·structuredContent·content를 함께 만든다. 선택지와 오류·로그에도 계좌 원문을 싣지 않으며 표시 helper에만 마스킹을 맡기지 않는다.
