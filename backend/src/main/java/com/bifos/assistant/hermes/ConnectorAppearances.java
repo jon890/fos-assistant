@@ -35,7 +35,7 @@ final class ConnectorAppearances {
     /** 상한 바이트를 base64 로 쓴 최대 글자 수다. 이보다 긴 글은 디코딩하지 않고 버린다. */
     private static final int ICON_MAX_BASE64_CHARS = (ICON_MAX_BYTES + 2) / 3 * 4;
 
-    private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    private static final byte[] PNG_SIGNATURE = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
     /**
      * 링크 모양이다. 대시보드가 같은 식을 {@code fullmatch} 로 쓰므로 여기서는 {@code matches()} 로 쓴다.
@@ -43,14 +43,15 @@ final class ConnectorAppearances {
      * <p>{@code java.net.URI} 같은 해석기는 언어마다 받는 범위가 달라 쓰지 않는다. 식을 바꾸면 대시보드의 식도 함께 바꾼다.
      */
     private static final Pattern LINK = Pattern.compile(
-            "^https://[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
-                    + "(?::[0-9]{1,5})?(?:[/?#](?:[A-Za-z0-9\\-._~!$&'()*+,;=:@/?#]|%[0-9A-Fa-f]{2})*)?$");
+        "^https://[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*"
+            + "(?::[0-9]{1,5})?(?:[/?#](?:[A-Za-z0-9\\-._~!$&'()*+,;=:@/?#]|%[0-9A-Fa-f]{2})*)?$");
 
     /** 대시보드와 같은 금지 목록이다. 일부만 걸려도 버리므로 {@code find()} 로 쓴다. 공백과 대소문자는 ASCII 기준이다. */
     private static final Pattern SVG_FORBIDDEN = Pattern.compile(
-            "<!doctype|<!entity|<script|<foreignobject|<iframe|<embed|<object|<set|<animate|@import|javascript:|&#|\\\\"
-                    + "|\\son[a-z]+\\s*=|href\\s*=(?![\\s\"']*#)|url\\((?![\\s\"']*#)",
-            Pattern.CASE_INSENSITIVE);
+        "<!doctype|<!entity|<script|<foreignobject|<iframe|<embed|<object|<set|<animate|@import|javascript:|&#|\\\\"
+            + "|\\son[a-z]+\\s*=|href\\s*=(?![\\s\"']*#)|url\\((?![\\s\"']*#)",
+        Pattern.CASE_INSENSITIVE);
+
 
     /** 카탈로그 항목 하나에서 아이콘과 링크를 읽는다. 없거나 틀린 칸은 null 이다. */
     static ConnectorAppearance read(JsonNode item) {
@@ -58,11 +59,12 @@ final class ConnectorAppearances {
         JsonNode link = item.get("link");
         JsonNode kind = item.get("link_kind");
         return new ConnectorAppearance(
-                field(item, "icon", icon),
-                field(item, "link", link),
-                field(item, "readme_url", item.get("readme_url")),
-                kind != null && kind.isString() ? kind.asString() : null);
+            field(item, "icon", icon),
+            field(item, "link", link),
+            field(item, "readme_url", item.get("readme_url")),
+            kind != null && kind.isString() ? kind.asString() : null);
     }
+
 
     private static String field(JsonNode item, String name, JsonNode declared) {
         if (absent(declared)) {
@@ -80,14 +82,17 @@ final class ConnectorAppearances {
         return value;
     }
 
+
     private static boolean absent(JsonNode node) {
         return node == null || node.isNull();
     }
+
 
     private static String id(JsonNode item) {
         JsonNode id = item.get("id");
         return id != null && id.isString() ? id.asString() : null;
     }
+
 
     private static String icon(JsonNode declared) {
         if (!declared.isObject()) {
@@ -115,6 +120,7 @@ final class ConnectorAppearances {
         return safe ? "data:" + type + ";base64," + Base64.getEncoder().encodeToString(bytes) : null;
     }
 
+
     private static boolean startsWithPngSignature(byte[] bytes) {
         if (bytes.length < PNG_SIGNATURE.length) {
             return false;
@@ -127,20 +133,22 @@ final class ConnectorAppearances {
         return true;
     }
 
+
     private static boolean svgIsSafe(byte[] bytes) {
         String text;
         try {
             text = StandardCharsets.UTF_8
-                    .newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes))
-                    .toString();
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
         } catch (CharacterCodingException ex) {
             return false;
         }
         return startsWithSvgRoot(text) && !SVG_FORBIDDEN.matcher(text).find();
     }
+
 
     /**
      * 앞의 BOM, 공백, XML 선언, 주석을 건너뛴 뒤 {@code <svg} 루트가 오는지 본다.
@@ -173,6 +181,7 @@ final class ConnectorAppearances {
         return isSvgTagAt(text, at);
     }
 
+
     /** 대소문자는 ASCII 로만 무시한다. {@code String.regionMatches} 는 유니코드 대소문자를 써 대시보드와 답이 갈린다. */
     private static boolean isSvgTagAt(String text, int at) {
         String tag = "<svg";
@@ -181,7 +190,7 @@ final class ConnectorAppearances {
         }
         for (int i = 0; i < tag.length(); i++) {
             char c = text.charAt(at + i);
-            char lower = c >= 'A' && c <= 'Z' ? (char) (c + ('a' - 'A')) : c;
+            char lower = c >= 'A' && c <= 'Z' ? (char)(c + ('a' - 'A')) : c;
             if (lower != tag.charAt(i)) {
                 return false;
             }
@@ -190,9 +199,11 @@ final class ConnectorAppearances {
         return isAsciiSpace(next) || next == '>' || next == '/';
     }
 
+
     private static boolean isAsciiSpace(char c) {
         return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f' || c == '\u000B';
     }
+
 
     private static String link(JsonNode declared) {
         if (!declared.isString()) {

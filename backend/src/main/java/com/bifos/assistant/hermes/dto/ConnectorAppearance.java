@@ -9,11 +9,14 @@ package com.bifos.assistant.hermes.dto;
  * @param linkKind 첫 링크의 종류. {@code service} 또는 {@code project}
  */
 public record ConnectorAppearance(String icon, String link, String readmeUrl, String linkKind) {
+
+
     public static final ConnectorAppearance NONE = new ConnectorAppearance(null, null);
 
     public ConnectorAppearance {
         linkKind = "project".equals(linkKind) ? "project" : "service";
     }
+
 
     /** README와 링크 종류가 없는 옛 카탈로그와 호출자를 받는다. */
     public ConnectorAppearance(String icon, String link) {
