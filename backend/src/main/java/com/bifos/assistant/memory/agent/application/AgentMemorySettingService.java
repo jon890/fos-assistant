@@ -1,14 +1,16 @@
-package com.bifos.assistant.memory.application;
+package com.bifos.assistant.memory.agent.application;
 
-import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
+import com.bifos.assistant.memory.application.MemoryCollectionService;
+
+import com.bifos.assistant.agent.memory.application.AgentMemoryCollectionService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
 import com.bifos.assistant.agent.domain.AgentMemoryCollectionChange;
-import com.bifos.assistant.memory.application.model.AgentMemoryCountScope;
-import com.bifos.assistant.memory.application.model.AgentMemoryGrantInput;
-import com.bifos.assistant.memory.application.model.AgentMemorySetting;
-import com.bifos.assistant.memory.application.model.AgentMemorySettingChange;
-import com.bifos.assistant.memory.application.model.AgentMemorySettingCollection;
+import com.bifos.assistant.memory.agent.application.model.AgentMemoryCountScope;
+import com.bifos.assistant.memory.agent.application.model.AgentMemoryGrantInput;
+import com.bifos.assistant.memory.agent.application.model.AgentMemorySetting;
+import com.bifos.assistant.memory.agent.application.model.AgentMemorySettingChange;
+import com.bifos.assistant.memory.agent.application.model.AgentMemorySettingCollection;
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryCollectionCount;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;

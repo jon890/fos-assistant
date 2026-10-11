@@ -1,4 +1,4 @@
-package com.bifos.assistant.memory.application.model;
+package com.bifos.assistant.memory.agent.application.model;
 
 import java.util.List;
 

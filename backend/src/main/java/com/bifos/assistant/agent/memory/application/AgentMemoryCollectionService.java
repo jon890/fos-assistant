@@ -1,4 +1,6 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.memory.application;
+
+import com.bifos.assistant.agent.memory.application.model.AgentMemoryGrants;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentCreated;

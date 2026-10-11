@@ -1,4 +1,4 @@
-package com.bifos.assistant.memory.application.model;
+package com.bifos.assistant.memory.agent.application.model;
 
 /**
  * 관리자 화면의 collection 한 줄이다.

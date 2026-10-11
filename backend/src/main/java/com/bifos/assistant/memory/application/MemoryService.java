@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
-import com.bifos.assistant.agent.application.AgentMemoryGrants;
+import com.bifos.assistant.agent.memory.application.AgentMemoryCollectionService;
+import com.bifos.assistant.agent.memory.application.model.AgentMemoryGrants;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;

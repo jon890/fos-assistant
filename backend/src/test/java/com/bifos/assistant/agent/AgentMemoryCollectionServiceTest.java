@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-import com.bifos.assistant.agent.application.AgentMemoryCollectionService;
-import com.bifos.assistant.agent.application.AgentMemoryGrants;
+import com.bifos.assistant.agent.memory.application.AgentMemoryCollectionService;
+import com.bifos.assistant.agent.memory.application.model.AgentMemoryGrants;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
 import com.bifos.assistant.agent.domain.AgentMemoryCollectionChange;

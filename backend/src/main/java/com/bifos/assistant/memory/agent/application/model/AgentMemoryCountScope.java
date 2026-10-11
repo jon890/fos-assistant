@@ -1,4 +1,4 @@
-package com.bifos.assistant.memory.application.model;
+package com.bifos.assistant.memory.agent.application.model;
 
 /** 관리자 화면의 항목 수를 누구의 항목으로 셌는지다. */
 public enum AgentMemoryCountScope {
