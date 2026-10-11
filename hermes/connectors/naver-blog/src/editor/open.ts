@@ -1,5 +1,9 @@
 import { fieldCandidates } from "./fields.ts";
-import { filterOpenDiagnostics, type OpenDiagnostics, type OpenReason } from "./open-diagnostics.ts";
+import {
+  filterOpenDiagnostics,
+  type OpenDiagnostics,
+  type OpenReason,
+} from "./open-diagnostics.ts";
 import {
   blockingPopup,
   clearProgress,
@@ -33,7 +37,8 @@ async function probe(page: EditorPage, attempts: number) {
     page_focused: document.hasFocus(), page_visible: document.visibilityState === "visible",
     candidates: nodes.length, prepared: prepared.length,
     sized: candidates.filter(c => c.sized).length, editable: candidates.filter(c => c.editable).length,
-    visible: candidates.filter(c => c.visible).length, frames: frames.length, frame_candidates: frameCandidates};
+    visible: candidates.filter(c => c.visible).length, frames: frames.length, frame_candidates: frameCandidates,
+    editors: editors.length, input_frames: inputFrames.length, buffer_ready: bufferReady};
 })()`);
   return filterOpenDiagnostics({ attempts, last })!;
 }
@@ -42,7 +47,11 @@ async function probe(page: EditorPage, attempts: number) {
 export async function open(page: EditorPage, { keepDraftNotice = false } = {}) {
   const interval = page.times.openSeconds / OPEN_TRIES;
   let diagnostics: OpenDiagnostics;
-  const fail = (code: "login_required" | "editor_failed", message: string, reason?: OpenReason) => {
+  const fail = (
+    code: "login_required" | "editor_failed",
+    message: string,
+    reason?: OpenReason,
+  ) => {
     if (reason) diagnostics.last.reason = reason;
     return page.fail(code, message, { open_diagnostics: diagnostics });
   };
@@ -55,10 +64,17 @@ export async function open(page: EditorPage, { keepDraftNotice = false } = {}) {
 
     // 제목이 없거나 숨겨져 있어도 읽기 경로의 복구 알림을 먼저 보존한다.
     let note = await blockingPopup(page);
-    if (note.includes("작성 중인 글이 있습니다") && note.includes("이어서 작성하시겠습니까")) {
+    if (
+      note.includes("작성 중인 글이 있습니다") &&
+      note.includes("이어서 작성하시겠습니까")
+    ) {
       if (keepDraftNotice) return "draft_notice";
       if (!(await dismissPopup(page, "취소")))
-        throw fail("editor_failed", "작성 중인 글 알림을 닫지 못했다", "draft_notice");
+        throw fail(
+          "editor_failed",
+          "작성 중인 글 알림을 닫지 못했다",
+          "draft_notice",
+        );
       note = await requireClearScreen(page);
     }
     if (note) throw fail("editor_failed", "알림이 떠 있어 멈춘다", "popup");
