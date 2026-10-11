@@ -133,7 +133,7 @@ public class ConnectorConnectionService {
                 ConnectorToolPolicies.summaries(manifest),
                 connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
                 true,
-                    connection == null ? List.of() : bindingService.boundAgents(connection),
+                connection == null ? List.of() : bindingService.boundAgents(connection),
                 manifest.ownerBrowserLoginUrl()));
         }
         mine.values().stream()
@@ -147,7 +147,7 @@ public class ConnectorConnectionService {
                 List.of(),
                 connection.status(),
                 false,
-                        bindingService.boundAgents(connection)))
+                bindingService.boundAgents(connection)))
             .forEach(result::add);
         return List.copyOf(result);
     }
