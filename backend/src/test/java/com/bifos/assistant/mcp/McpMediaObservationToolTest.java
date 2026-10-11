@@ -30,6 +30,7 @@ import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.mcp.application.AgentTokenService;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
+import com.bifos.assistant.mcp.presentation.McpController;
 import com.bifos.assistant.mcp.presentation.McpDtos.MediaObservationRecordArguments;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
@@ -56,6 +57,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -98,6 +100,9 @@ class McpMediaObservationToolTest {
 
     @Autowired
     AgentService agentService;
+
+    @Autowired
+    McpController controller;
 
     @Autowired
     AgentExecutionRepository executions;
@@ -226,7 +231,12 @@ class McpMediaObservationToolTest {
                 McpMediaObservationTools.LIST,
                 McpMediaObservationTools.RECORD,
                 "memory_remember");
+        var handlers = (Map<?, ?>)ReflectionTestUtils.getField(controller, "handlers");
+        assertThat(list).extracting(item -> item.path("name").asString())
+            .containsExactlyInAnyOrderElementsOf(handlers.keySet().stream().map(Object::toString).toList());
         for (JsonNode tool : list) {
+            assertThat(tool.path("inputSchema").path("type").asString()).isEqualTo("object");
+            assertThat(tool.path("inputSchema").path("properties").isObject()).isTrue();
             if (McpMediaObservationTools.RECORD.equals(tool.path("name").asString())) {
                 var schema = tool.path("inputSchema");
                 assertThat(schema.path("additionalProperties").asBoolean()).isFalse();

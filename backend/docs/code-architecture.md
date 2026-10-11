@@ -10,6 +10,8 @@ chat.application의 기존 저장 서비스를 유지하고 MediaObservationPage
 공개 페이지 타입은 chat.application.model.MediaObservationPage에 둔다.
 REST 요청·응답은 chat.presentation.ChatDtos, MCP 인자는 mcp.presentation.McpDtos에 모은다.
 mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
+McpToolCatalog는 기존 도구와 관찰 도구의 정의를 같은 순서로 모으며 호출 시점의 설정을 읽는다.
+McpToolService는 catalog를 호출하고 기존 실행 handler를 유지한다. McpController의 분기도 그대로 둔다.
 HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수집 전에 null로 만든다.
 공용 시험 컨텍스트는 변경하지 않는다. Memory 검색이 추가되면 그 도구의 두 경로 가림과 SQL 관측 대역도 유지한다.
 JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
