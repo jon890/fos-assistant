@@ -141,7 +141,8 @@ export function useConversationSend({
     ]);
     const restoreFailedMessage = () => {
       if (selectionVersion.current !== version) return;
-      if (replacementText === undefined) setDraft(text);
+      if (replacementText === undefined)
+        setDraft((current) => (current.length === 0 ? text : current));
       setTurns((previous) =>
         previous.filter(
           (turn) => turn.id !== pendingId && turn.id !== assistantPendingId,

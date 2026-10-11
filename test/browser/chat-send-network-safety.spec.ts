@@ -424,3 +424,87 @@ for (const lostAfterCreation of [false, true]) {
       });
   });
 }
+
+for (const boundary of ["creation", "recovery"] as const) {
+  test(`지연 ${boundary} 실패는 대기 중 새로 쓴 글을 보존한다`, async ({
+    page,
+    context,
+    isolatedMember,
+  }) => {
+    await setSession(context, isolatedMember);
+    await page.goto("/");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reached = false;
+    let creates = 0;
+    let streams = 0;
+    let fallback = 0;
+    page.on("request", (request) => {
+      if (request.method() !== "POST") return;
+      const pathname = new URL(request.url()).pathname;
+      if (pathname === "/api/chat/conversations") creates++;
+      if (pathname === "/api/chat/stream") streams++;
+      if (pathname === "/api/chat") fallback++;
+    });
+    if (boundary === "creation") {
+      await page.route("**/api/chat/conversations", async (route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        reached = true;
+        await gate;
+        await route.abort("failed");
+      });
+    } else {
+      await page.route("**/api/chat/stream", (route) => route.abort("failed"));
+      await page.route("**/api/chat/conversations/*/running", async (route) => {
+        reached = true;
+        await gate;
+        // 지연만 주입하고 running 판정은 실제 BFF와 Backend에 맡긴다.
+        await route.continue();
+      });
+    }
+    const input = page.getByRole("textbox", { name: "메시지" });
+    await input.fill("처음 보낸 질문");
+    await page
+      .getByTestId("composer-shell")
+      .getByRole("button", { name: "보내기" })
+      .click();
+    try {
+      await expect.poll(() => reached).toBe(true);
+      await expect(input).toHaveValue("");
+      await input.fill("대기 중 새로 쓴 글");
+    } finally {
+      release();
+    }
+    await expect(
+      page.getByText(
+        boundary === "creation"
+          ? /대화를 시작하지 못했어요/
+          : /응답 연결이 끊겼어요/,
+      ),
+    ).toBeVisible();
+    await expect(input).toHaveValue("대기 중 새로 쓴 글");
+    expect(creates).toBe(1);
+    expect(streams).toBe(boundary === "creation" ? 0 : 1);
+    expect(fallback).toBe(0);
+    await expect(page.getByTestId("user-message")).toHaveCount(0);
+    const response = await page.request.get("/api/chat/conversations");
+    expect(response.ok()).toBeTruthy();
+    const listing = (await response.json()) as { items: Array<{ id: string }> };
+    expect(listing.items).toHaveLength(boundary === "creation" ? 0 : 1);
+    for (const { id } of listing.items) {
+      expect(await stored(page, id)).toEqual({
+        questions: [],
+        executions: [],
+        answers: 0,
+        pending: 0,
+      });
+      const running = await page.request.get(
+        `/api/chat/conversations/${id}/running`,
+      );
+      expect(running.ok()).toBeTruthy();
+      expect((await running.json()).running).toBe(false);
+    }
+  });
+}
