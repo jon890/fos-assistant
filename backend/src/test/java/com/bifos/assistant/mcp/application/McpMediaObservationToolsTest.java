@@ -71,7 +71,7 @@ class McpMediaObservationToolsTest {
         when(users.allowed(7L)).thenReturn(true);
         when(sessions.resolve("profile", "root", "root")).thenReturn(origin);
         tools = new McpMediaObservationTools(
-            pages, service, new MediaObservationInputReader(json), users, agents, sessions, json, manager);
+            pages, service, new MediaObservationInputReader(json), new McpCurrentCallerGuard(users, agents, sessions, manager), json);
         caller = new McpCaller(
             new CurrentUser(7L, "user@example.test", "사용자", 1L, UserRole.MEMBER),
             origin,
