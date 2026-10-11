@@ -2676,7 +2676,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 
 서비스별 계약은 [커넥터 연결](../../docs/features/connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 커넥터의 기존 client와 범용 승인 plugin 경계를 사용한다.
-Bun client는 [공식 OpenAPI 1.2.24](../connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)의 41 operation 고정 계약과 19그룹 예산을 갖는다. 현재 도구가 사용하는 인증·조회 operation의 정본은 [api-contract.ts](../connectors/tossinvest/src/api-contract.ts)의 `CURRENT_OPERATIONS`이며, 여기에 선언한 operation이 이 큐를 사용한다. 나머지 operation의 producer는 아직 구현하지 않았다.
+Bun client는 [공식 OpenAPI 1.2.24](../connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)의 41 operation 고정 계약과 19그룹 예산을 갖는다. READ 도구 33개는 GET 34개와 내부 인증 1개를 사용한다. 인증·조회 operation의 정본은 [api-contract.ts](../connectors/tossinvest/src/api-contract.ts)의 `CURRENT_OPERATIONS`이며, 여기에 선언한 operation이 이 큐를 사용한다. 나머지 6개 금융 producer는 구현·등록하지 않았다. 새 조회 도구의 운영 반영은 배포 뒤 확인해야 한다.
 
 ### 그룹별 예산
 
