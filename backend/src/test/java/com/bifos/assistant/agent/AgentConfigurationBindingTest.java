@@ -26,19 +26,21 @@ class AgentConfigurationBindingTest {
         assertThat(properties.purgeAfter()).isEqualTo(Duration.ofHours(36));
     }
 
+
     @Test
     @DisplayName("첫 에이전트 비용 방식과 계정 범위와 도구를 바인딩한다")
     void bindsExplicitFirstAgentValues() {
         Binder binder = binder(Map.of(
-                "assistant.people.default-cost-mode", "API",
-                "assistant.people.default-credential-scope", "DEDICATED",
-                "assistant.people.default-toolsets[0]", "web",
-                "assistant.people.default-toolsets[1]", "terminal"));
+            "assistant.people.default-cost-mode", "API",
+            "assistant.people.default-credential-scope", "DEDICATED",
+            "assistant.people.default-toolsets[0]", "web",
+            "assistant.people.default-toolsets[1]", "terminal"));
         PeopleProperties properties = binder.bind("assistant.people", PeopleProperties.class).get();
         assertThat(properties.defaultCostMode()).isEqualTo(CostMode.API);
         assertThat(properties.defaultCredentialScope()).isEqualTo(CredentialScope.DEDICATED);
         assertThat(properties.defaultToolsets()).containsExactly("web", "terminal");
     }
+
 
     @Test
     @DisplayName("설정이 없으면 에이전트와 첫 에이전트의 기본값을 쓴다")
@@ -53,14 +55,16 @@ class AgentConfigurationBindingTest {
         assertThat(people.defaultToolsets()).isEmpty();
     }
 
+
     @Test
     @DisplayName("음수 기간과 허용하지 않은 기본 도구의 바인딩을 거절한다")
     void rejectsInvalidBoundValues() {
         assertThatThrownBy(() -> binder(Map.of("assistant.agents.purge-after", "-1s"))
-                .bind("assistant.agents", AgentProperties.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+            .bind("assistant.agents", AgentProperties.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> binder(Map.of("assistant.people.default-toolsets[0]", "memory"))
-                .bind("assistant.people", PeopleProperties.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
+            .bind("assistant.people", PeopleProperties.class)).hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
+
 
     private static Binder binder(Map<String, String> values) {
         return new Binder(new MapConfigurationPropertySource(values));

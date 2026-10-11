@@ -10,9 +10,9 @@ import org.springframework.validation.annotation.Validated;
  * <p>기본값을 코드에 둔다. 없다고 기동을 막을 값이 아니다.
  *
  * @param maxPerUser 사용자 한 사람이 가질 수 있는 지우지 않은 에이전트 수. 첫 로그인에 생긴 에이전트도
- *     센다. {@code ADMIN} 은 세지 않는다
+ * 센다. {@code ADMIN} 은 세지 않는다
  * @param purgeAfter 지운 뒤 행을 실제로 지우기까지 기다리는 기간. 0 보다 커야 한다. 지운 직후에도 늦게 끝난 실행과 지운
- *     대화의 정리가 그 에이전트의 행을 읽기 때문이다
+ * 대화의 정리가 그 에이전트의 행을 읽기 때문이다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.agents")

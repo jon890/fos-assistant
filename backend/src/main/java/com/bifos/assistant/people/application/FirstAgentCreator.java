@@ -39,11 +39,13 @@ public class FirstAgentCreator implements FirstSignInListener {
     private final BackgroundTasks backgroundTasks;
     private final Clock clock;
 
+
     /** 허용 목록에서 그 사람을 찾으면 에이전트를 만들고, 찾지 못하면 아무것도 만들지 않는다. */
     @Override
     public void onUserCreated(AppUser created, String email) {
         signInPolicy.admit(email).ifPresent(person -> createFirstAgent(created, person));
     }
+
 
     /**
      * 그 사람의 profile 을 가리키는 에이전트를 하나 만든다.
@@ -53,19 +55,20 @@ public class FirstAgentCreator implements FirstSignInListener {
      */
     private void createFirstAgent(AppUser owner, AllowedPerson person) {
         Agent saved = agents.save(Agent.of(
-                person.hermesProfile(),
-                person.displayName(),
-                person.hermesProfile(),
-                hermesProperties.profileBaseUrl(person.hermesProfile()),
-                peopleProperties.defaultCostMode(),
-                peopleProperties.defaultCredentialScope(),
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                clock.instant()));
+            person.hermesProfile(),
+            person.displayName(),
+            person.hermesProfile(),
+            hermesProperties.profileBaseUrl(person.hermesProfile()),
+            peopleProperties.defaultCostMode(),
+            peopleProperties.defaultCredentialScope(),
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            clock.instant()));
         afterCommit(() -> backgroundTasks.start(
-                "default-toolsets-" + saved.code(),
-                () -> defaultToolsets.apply(saved, peopleProperties.defaultToolsets())));
+            "default-toolsets-" + saved.code(),
+            () -> defaultToolsets.apply(saved, peopleProperties.defaultToolsets())));
     }
+
 
     /** 트랜잭션이 없으면 곧바로 돈다. 되돌려진 로그인의 profile 에는 도구를 켜지 않는다. */
     private static void afterCommit(Runnable action) {

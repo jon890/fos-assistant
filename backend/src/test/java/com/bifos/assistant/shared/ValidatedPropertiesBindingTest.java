@@ -30,23 +30,24 @@ import org.springframework.validation.annotation.Validated;
 class ValidatedPropertiesBindingTest {
 
     private static final List<Class<?>> PROPERTIES_TYPES = List.of(
-            AgentProperties.class,
-            StarterProperties.class,
-            ArtifactProperties.class,
-            ArtifactSourceProperties.class,
-            AttachmentProperties.class,
-            DelegationWakeProperties.class,
-            ContextProperties.class,
-            HermesProperties.class,
-            MemoryProposalProperties.class,
-            DelegationProperties.class,
-            PeopleProperties.class,
-            AuthProperties.class,
-            SkillProperties.class,
-            PricingProperties.class);
+        AgentProperties.class,
+        StarterProperties.class,
+        ArtifactProperties.class,
+        ArtifactSourceProperties.class,
+        AttachmentProperties.class,
+        DelegationWakeProperties.class,
+        ContextProperties.class,
+        HermesProperties.class,
+        MemoryProposalProperties.class,
+        DelegationProperties.class,
+        PeopleProperties.class,
+        AuthProperties.class,
+        SkillProperties.class,
+        PricingProperties.class);
 
     @Autowired
     private ApplicationContext context;
+
 
     @Test
     @DisplayName("설정 record 열넷은 빈으로 꺼낼 수 있고 프록시가 아닌 record 타입 그대로다")
@@ -58,13 +59,14 @@ class ValidatedPropertiesBindingTest {
         }
     }
 
+
     @Test
     @DisplayName("설정 record 열넷은 모두 Validated 를 단다")
     void everyPropertiesTypeIsValidated() {
         List<String> missing = PROPERTIES_TYPES.stream()
-                .filter(type -> !AnnotatedElementUtils.hasAnnotation(type, Validated.class))
-                .map(Class::getName)
-                .toList();
+            .filter(type -> !AnnotatedElementUtils.hasAnnotation(type, Validated.class))
+            .map(Class::getName)
+            .toList();
         assertThat(missing).as("Validated 가 없는 설정 타입").isEmpty();
     }
 }

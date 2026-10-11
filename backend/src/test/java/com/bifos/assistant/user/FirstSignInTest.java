@@ -56,6 +56,7 @@ class FirstSignInTest {
     @Autowired
     HermesModelClient hermesModels;
 
+
     @BeforeEach
     void setUp() {
         agents.deleteAll();
@@ -64,9 +65,11 @@ class FirstSignInTest {
         people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
     }
 
+
     private String expectedApiBaseUrl() {
         return hermesProperties.profileBaseUrl(PROFILE);
     }
+
 
     @Test
     @DisplayName("허용 목록에 있는 사람의 첫 요청에 사용자와 에이전트가 함께 생긴다")
@@ -75,10 +78,11 @@ class FirstSignInTest {
 
         assertThat(created.email()).isEqualTo(EMAIL);
         assertThat(agents.findByCode(PROFILE))
-                .get()
-                .extracting(Agent::name, Agent::hermesProfile, Agent::apiBaseUrl)
-                .containsExactly(NAME, PROFILE, expectedApiBaseUrl());
+            .get()
+            .extracting(Agent::name, Agent::hermesProfile, Agent::apiBaseUrl)
+            .containsExactly(NAME, PROFILE, expectedApiBaseUrl());
     }
+
 
     @Test
     @DisplayName("만들어진 에이전트는 주인이 그 사람이고 자기만 본다")
@@ -86,10 +90,11 @@ class FirstSignInTest {
         AppUser created = provisioning.resolve(EMAIL, NAME);
 
         assertThat(agents.findByCode(PROFILE))
-                .get()
-                .extracting(Agent::visibility, Agent::ownerUserId, Agent::enabled)
-                .containsExactly(AgentVisibility.PRIVATE, created.id(), true);
+            .get()
+            .extracting(Agent::visibility, Agent::ownerUserId, Agent::enabled)
+            .containsExactly(AgentVisibility.PRIVATE, created.id(), true);
     }
+
 
     @Test
     @DisplayName("만들어진 에이전트의 과금 설정은 설정의 기본값과 같다")
@@ -97,10 +102,11 @@ class FirstSignInTest {
         provisioning.resolve(EMAIL, NAME);
 
         assertThat(agents.findByCode(PROFILE))
-                .get()
-                .extracting(Agent::costMode, Agent::credentialScope)
-                .containsExactly(peopleProperties.defaultCostMode(), peopleProperties.defaultCredentialScope());
+            .get()
+            .extracting(Agent::costMode, Agent::credentialScope)
+            .containsExactly(peopleProperties.defaultCostMode(), peopleProperties.defaultCredentialScope());
     }
+
 
     @Test
     @DisplayName("같은 사람의 두 번째 요청에는 에이전트가 늘지 않는다")
@@ -113,6 +119,7 @@ class FirstSignInTest {
         assertThat(agents.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("허용 목록에 없는 주소는 사용자만 만들고 에이전트를 만들지 않는다")
     void addressNotInAllowlistCreatesOnlyUserAndNoAgent() {
@@ -121,6 +128,7 @@ class FirstSignInTest {
         assertThat(users.findByEmail("stranger@example.com")).isPresent();
         assertThat(agents.count()).isZero();
     }
+
 
     /**
      * Hermes 가 모델을 주지 않아도 에이전트가 만들어진다.
@@ -135,10 +143,11 @@ class FirstSignInTest {
 
         assertThat(created.id()).isNotNull();
         assertThat(agents.findByCode(PROFILE))
-                .as("Hermes 가 모델과 provider 를 주지 않아도 에이전트가 만들어져야 한다")
-                .isPresent();
+            .as("Hermes 가 모델과 provider 를 주지 않아도 에이전트가 만들어져야 한다")
+            .isPresent();
         verifyNoInteractions(hermesModels);
     }
+
 
     @Test
     @DisplayName("허용 목록에서 꺼진 사람은 에이전트를 만들지 않는다")

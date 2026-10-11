@@ -71,6 +71,7 @@ public class AgentLifecycleService {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     /**
      * 요청자의 에이전트를 만든다. 주인은 요청자다. {@code ADMIN} 이 만들어도 자기 것이 된다.
      *
@@ -85,11 +86,11 @@ public class AgentLifecycleService {
      * <p>두 가지를 알고 받아들인다.
      *
      * <ul>
-     *   <li>만들기 한 건이 DB 커넥션을 둘 쓴다. 잠금을 쥔 이 트랜잭션과, profile 을 만들며 토큰을 발급하거나
-     *       폐기하는 {@code REQUIRES_NEW} 트랜잭션이다. 서로 다른 사용자의 동시 만들기가 커넥션 풀 크기 이상이면
-     *       모두 둘째 커넥션을 기다리며 막힐 수 있다. 가족 규모에서는 그만큼 동시에 만들 일이 없다.
-     *   <li>{@code saveAndFlush} 가 성공한 뒤 커밋 단계에서 실패하면 행은 되돌려지고 profile 은 남는다.
-     *       커밋 실패는 드물어 여기서 거두지 않는다. 남은 profile 은 운영에서 지운다.
+     * <li>만들기 한 건이 DB 커넥션을 둘 쓴다. 잠금을 쥔 이 트랜잭션과, profile 을 만들며 토큰을 발급하거나
+     * 폐기하는 {@code REQUIRES_NEW} 트랜잭션이다. 서로 다른 사용자의 동시 만들기가 커넥션 풀 크기 이상이면
+     * 모두 둘째 커넥션을 기다리며 막힐 수 있다. 가족 규모에서는 그만큼 동시에 만들 일이 없다.
+     * <li>{@code saveAndFlush} 가 성공한 뒤 커밋 단계에서 실패하면 행은 되돌려지고 profile 은 남는다.
+     * 커밋 실패는 드물어 여기서 거두지 않는다. 남은 profile 은 운영에서 지운다.
      * </ul>
      *
      * @param visibility 비어 있으면 {@code PRIVATE}
@@ -102,6 +103,7 @@ public class AgentLifecycleService {
         return provisionAgent(user, name, visibility);
     }
 
+
     private Agent provisionAgent(CurrentUser user, String name, AgentVisibility visibility) {
         String agentName = requireName(name);
         AgentVisibility effectiveVisibility = visibility == null ? AgentVisibility.PRIVATE : visibility;
@@ -113,7 +115,7 @@ public class AgentLifecycleService {
             profileName = PROFILE_PREFIX + randomChars();
             if (isTaken(code, profileName)) {
                 throw new ApiException(
-                        ErrorCode.HERMES_PROVISION_FAILED, "could not pick a free agent code and profile name");
+                    ErrorCode.HERMES_PROVISION_FAILED, "could not pick a free agent code and profile name");
             }
         }
         String apiBaseUrl = hermesProperties.profileBaseUrl(profileName);
@@ -122,18 +124,18 @@ public class AgentLifecycleService {
         try {
             if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
                 throw new ApiException(
-                        ErrorCode.HERMES_PROVISION_FAILED, "the new profile did not get the safe default toolsets");
+                    ErrorCode.HERMES_PROVISION_FAILED, "the new profile did not get the safe default toolsets");
             }
             Agent agent = Agent.of(
-                    code,
-                    agentName,
-                    profileName,
-                    apiBaseUrl,
-                    peopleProperties.defaultCostMode(),
-                    CredentialScope.SHARED_HOUSEHOLD,
-                    effectiveVisibility,
-                    user.id(),
-                    clock.instant());
+                code,
+                agentName,
+                profileName,
+                apiBaseUrl,
+                peopleProperties.defaultCostMode(),
+                CredentialScope.SHARED_HOUSEHOLD,
+                effectiveVisibility,
+                user.id(),
+                clock.instant());
             agent.markManagedProfile();
             // 제약 위반이 커밋 때가 아니라 여기서 드러나야 profile 을 거둘 수 있다.
             return agents.saveAndFlush(agent);
@@ -142,6 +144,7 @@ public class AgentLifecycleService {
             throw failure;
         }
     }
+
 
     /**
      * 공개 범위를 바꾼다. 주인이 있으면 그대로 둔다(ADR-033).
@@ -164,15 +167,15 @@ public class AgentLifecycleService {
         return transactions.execute(status -> changeVisibilityLocked(user, agentId, visibility));
     }
 
+
     private Agent changeVisibilityLocked(CurrentUser user, Long agentId, AgentVisibility visibility) {
         Agent agent = requireManageable(user, lockById(agentId));
-        Long ownerId =
-                visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null ? user.id() : agent.ownerUserId();
+        Long ownerId = visibility == AgentVisibility.PRIVATE && agent.ownerUserId() == null ? user.id() : agent.ownerUserId();
         // 바인딩은 에이전트 행을 잠근 읽기를 마친 뒤에 읽는다. 앞으로 옮기면 붙이기가 커밋한 바인딩을 보지 못해 그룹 공개와
         // 바인딩이 함께 남는다.
         if (visibility == AgentVisibility.GROUP && connectorBindings.hasBindings(agent.id())) {
             throw new ApiException(
-                    ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "an agent with connections must stay private");
+                ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "an agent with connections must stay private");
         }
         // 꺼진 에이전트는 여기서 검사하지 않는다. 켤 때 관리자 경로의 수정이 같은 검사를 한다.
         if (agent.enabled() && visibility == AgentVisibility.GROUP) {
@@ -181,6 +184,7 @@ public class AgentLifecycleService {
         agent.changeAccess(agent.enabled(), visibility, ownerId);
         return agents.save(agent);
     }
+
 
     /**
      * 에이전트를 지운다. 행은 남기고 지운 시각을 적는다.
@@ -206,6 +210,7 @@ public class AgentLifecycleService {
         transactions.executeWithoutResult(status -> deleteLocked(user, found.id(), ownerId));
     }
 
+
     private void deleteLocked(CurrentUser user, Long agentId, Long ownerId) {
         if (ownerId != null) {
             users.findByIdForUpdate(ownerId);
@@ -224,6 +229,7 @@ public class AgentLifecycleService {
         agents.save(agent);
     }
 
+
     private void removeSkillDirectory(String profileName) {
         try {
             skillFiles.deleteAll(profileName);
@@ -231,6 +237,7 @@ public class AgentLifecycleService {
             log.warn("지운 에이전트의 스킬 디렉터리를 지우지 못했다. 쓰이지 않을 디렉터리가 남는다 profile={}", profileName, failure);
         }
     }
+
 
     /**
      * 그 profile 을 그룹에 공개해도 되는지 본다. 셸이나 파일 등급의 도구가 켜져 있으면 거절한다.
@@ -241,9 +248,10 @@ public class AgentLifecycleService {
     public void requireGroupSafe(String apiBaseUrl, String profileName) {
         if (AgentToolPolicy.hasPrivateOnlyToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
             throw new ApiException(
-                    ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
+                ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
     }
+
 
     /**
      * 그 profile 의 주인을 바꿔도 되는지 본다. 셸이나 파일 등급의 도구가 켜져 있으면 거절한다(ADR-086).
@@ -254,29 +262,32 @@ public class AgentLifecycleService {
     public void requireOwnerChangeSafe(String apiBaseUrl, String profileName) {
         if (AgentToolPolicy.hasSandboxToolset(hermesToolsets.readEnabled(apiBaseUrl, profileName))) {
             throw new ApiException(
-                    ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF,
-                    "turn off shell and file toolsets before changing the owner");
+                ErrorCode.AGENT_OWNER_CHANGE_REQUIRES_SHELL_OFF,
+                "turn off shell and file toolsets before changing the owner");
         }
     }
+
 
     private static String requireName(String name) {
         String stripped = name == null ? "" : name.strip();
         if (stripped.isEmpty() || stripped.length() > MAX_NAME_CHARS) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "an agent name must be 1 to " + MAX_NAME_CHARS + " characters");
+                ErrorCode.VALIDATION_FAILED, "an agent name must be 1 to " + MAX_NAME_CHARS + " characters");
         }
         return stripped;
     }
 
+
     /** 주인 행을 잠그고 센다. 잠금은 트랜잭션이 끝날 때까지 쥔다. */
     private void requireBelowLimit(CurrentUser user) {
         users.findByIdForUpdate(user.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
+            .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
         if (agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(user.id()) >= properties.maxPerUser()) {
             throw new ApiException(
-                    ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of " + properties.maxPerUser() + " was reached");
+                ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of " + properties.maxPerUser() + " was reached");
         }
     }
+
 
     /**
      * 번호나 profile 이름이 이미 쓰이는가.
@@ -286,9 +297,10 @@ public class AgentLifecycleService {
      */
     private boolean isTaken(String code, String profileName) {
         return agents.findByCode(code).isPresent()
-                || agents.existsByHermesProfile(profileName)
-                || reservedProfileNames.reservedByPerson(profileName);
+            || agents.existsByHermesProfile(profileName)
+            || reservedProfileNames.reservedByPerson(profileName);
     }
+
 
     /**
      * 에이전트 행을 잠그고 읽는다. 다른 요청이 잠금을 쥐고 있으면 풀릴 때까지 기다린다.
@@ -298,6 +310,7 @@ public class AgentLifecycleService {
     private Agent lockById(Long agentId) {
         return agents.findByIdForUpdate(agentId).orElseThrow(AgentLifecycleService::notFound);
     }
+
 
     /**
      * 고칠 에이전트인지 본다. 주인과 {@code ADMIN} 만 통과한다.
@@ -313,6 +326,7 @@ public class AgentLifecycleService {
         return agent;
     }
 
+
     /**
      * 지울 에이전트인지 본다. {@link #requireManageable} 과 같되 옛 커넥터 에이전트도 통과한다.
      *
@@ -327,15 +341,18 @@ public class AgentLifecycleService {
         return agent;
     }
 
+
     private static void requireVisible(CurrentUser user, Agent agent) {
         if (agent.isDeleted() || !(user.isAdmin() || agent.isReadableBy(user.id()))) {
             throw notFound();
         }
     }
 
+
     private static ApiException notFound() {
         return new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
     }
+
 
     /**
      * 만들다 실패한 profile 을 거둔다.
@@ -348,11 +365,12 @@ public class AgentLifecycleService {
             provisioner.deprovision(profileName);
         } catch (RuntimeException withdrawFailure) {
             log.error(
-                    "에이전트를 만들다 실패해 profile 을 거두려 했으나 그것도 실패했다. 쓰이지 않을 profile 이 남는다 profile={}",
-                    profileName,
-                    withdrawFailure);
+                "에이전트를 만들다 실패해 profile 을 거두려 했으나 그것도 실패했다. 쓰이지 않을 profile 이 남는다 profile={}",
+                profileName,
+                withdrawFailure);
         }
     }
+
 
     private static String randomChars() {
         StringBuilder chars = new StringBuilder(RANDOM_CHARS);

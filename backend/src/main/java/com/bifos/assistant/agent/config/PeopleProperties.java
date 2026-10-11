@@ -23,22 +23,21 @@ import org.springframework.validation.annotation.Validated;
  * @param defaultCostMode 그 에이전트의 비용 방식
  * @param defaultCredentialScope 그 에이전트가 쓰는 AI 계정의 범위
  * @param defaultToolsets 그 에이전트에 켜는 도구. 없으면 profile 틀의 도구만 남는다. 주인 등급이나 실행 공간 도구가 아니면
- *     기동하지 않는다. 셸 계열을 언제 빼는지는 {@link AgentDefaultToolsets} 가 정한다
+ * 기동하지 않는다. 셸 계열을 언제 빼는지는 {@link AgentDefaultToolsets} 가 정한다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.people")
 public record PeopleProperties(
-        CostMode defaultCostMode, CredentialScope defaultCredentialScope, List<String> defaultToolsets) {
+    CostMode defaultCostMode, CredentialScope defaultCredentialScope, List<String> defaultToolsets) {
 
     public PeopleProperties {
         defaultCostMode = defaultCostMode == null ? CostMode.SUBSCRIPTION : defaultCostMode;
-        defaultCredentialScope =
-                defaultCredentialScope == null ? CredentialScope.SHARED_HOUSEHOLD : defaultCredentialScope;
+        defaultCredentialScope = defaultCredentialScope == null ? CredentialScope.SHARED_HOUSEHOLD : defaultCredentialScope;
         defaultToolsets = defaultToolsets == null ? List.of() : List.copyOf(defaultToolsets);
         for (String name : defaultToolsets) {
             if (!AgentToolPolicy.allowedAsDefault(name)) {
                 throw new IllegalArgumentException(
-                        "assistant.people.default-toolsets allows only owner-tier and sandbox toolsets: " + name);
+                    "assistant.people.default-toolsets allows only owner-tier and sandbox toolsets: " + name);
             }
         }
     }

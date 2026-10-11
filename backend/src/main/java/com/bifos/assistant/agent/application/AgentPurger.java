@@ -24,11 +24,11 @@ import org.springframework.stereotype.Component;
  * <p>한 에이전트를 이 순서로 지운다.
  *
  * <ol>
- *   <li>지금 지울 수 있는지 읽기 트랜잭션으로 먼저 본다. 지웠지만 정리되지 않은 대화가 있으면 다음 차례로 미룬다. 기다리는
- *       에이전트마다 Hermes 를 부르지 않으려고 거두기보다 앞에 둔다.
- *   <li>Control Plane 이 만든 profile 이면 한 번 더 거두고 스킬 디렉터리를 지운다. 지울 때 이미 거뒀어도 다시 거두면 그대로
- *       끝난다. 운영에서 만든 profile 은 Hermes 를 부르지 않는다.
- *   <li>{@link AgentPurgeWriter} 가 행을 잠그고 기다릴지를 한 번 더 본 뒤, 딸린 줄과 행을 한 트랜잭션으로 지운다.
+ * <li>지금 지울 수 있는지 읽기 트랜잭션으로 먼저 본다. 지웠지만 정리되지 않은 대화가 있으면 다음 차례로 미룬다. 기다리는
+ * 에이전트마다 Hermes 를 부르지 않으려고 거두기보다 앞에 둔다.
+ * <li>Control Plane 이 만든 profile 이면 한 번 더 거두고 스킬 디렉터리를 지운다. 지울 때 이미 거뒀어도 다시 거두면 그대로
+ * 끝난다. 운영에서 만든 profile 은 Hermes 를 부르지 않는다.
+ * <li>{@link AgentPurgeWriter} 가 행을 잠그고 기다릴지를 한 번 더 본 뒤, 딸린 줄과 행을 한 트랜잭션으로 지운다.
  * </ol>
  *
  * <p>어느 단계든 실패하면 그 에이전트는 행이 남는다. 다음 차례에 처음부터 다시 한다. 실패가 이어지는 에이전트는 기다리는 간격을 한
@@ -65,11 +65,13 @@ public class AgentPurger {
     /** 실패한 에이전트를 다음에 다시 볼 시각과 그때 기다릴 간격, 잇단 실패 수다. */
     private final Map<Long, Backoff> backoffs = new ConcurrentHashMap<>();
 
+
     /** 운영은 매분 돈다. 검사에서는 {@code -} 로 끄고 {@link #purgeDue} 를 직접 부른다. */
     @Scheduled(cron = "${assistant.agents.purge-cron}")
     public void runScheduled() {
         purgeDue(clock.instant());
     }
+
 
     /**
      * 지운 지 정리 기한이 지난 에이전트를 지운다. 기다리는 간격 안의 에이전트는 후보에서 뺀다.
@@ -79,11 +81,11 @@ public class AgentPurger {
     public int purgeDue(Instant now) {
         Instant cutoff = now.minus(properties.purgeAfter());
         List<Long> waitingIds = backoffs.entrySet().stream()
-                .filter(entry -> now.isBefore(entry.getValue().retryAt()))
-                .map(Map.Entry::getKey)
-                .toList();
+            .filter(entry -> now.isBefore(entry.getValue().retryAt()))
+            .map(Map.Entry::getKey)
+            .toList();
         List<Long> candidates = agents.findPurgeCandidates(
-                cutoff, waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds, PageRequest.of(0, BATCH));
+            cutoff, waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds, PageRequest.of(0, BATCH));
         long started = System.nanoTime();
         int purged = 0;
         int waiting = 0;
@@ -114,6 +116,7 @@ public class AgentPurger {
         return purged;
     }
 
+
     /** 에이전트 하나를 지운다. 기다려야 하면 Hermes 를 부르지 않고 {@code WAITING} 을 돌려준다. */
     private AgentPurgeOutcome purgeOne(Long agentId, Instant cutoff) {
         if (!writer.ready(agentId, cutoff)) {
@@ -130,6 +133,7 @@ public class AgentPurger {
         return writer.purge(agentId, cutoff);
     }
 
+
     private void deleteSkillDirectory(Agent agent) {
         try {
             skillFiles.deleteAll(agent.hermesProfile());
@@ -139,34 +143,37 @@ public class AgentPurger {
         }
     }
 
+
     private void recordFailure(Long agentId, Instant now, RuntimeException ex) {
         Backoff previous = backoffs.get(agentId);
-        Duration next =
-                previous == null ? FIRST_BACKOFF : min(previous.interval().multipliedBy(2), MAX_BACKOFF);
+        Duration next = previous == null ? FIRST_BACKOFF : min(previous.interval().multipliedBy(2), MAX_BACKOFF);
         int attempts = previous == null ? 1 : previous.attempts() + 1;
         backoffs.put(agentId, new Backoff(now.plus(next), next, attempts));
         String code = ex instanceof ApiException api ? api.code().name() : "-";
         if (attempts == ALERT_ATTEMPTS) {
             log.error(
-                    "지운 에이전트를 정리하지 못했다 agentId={} attempts={} error={} code={}",
-                    agentId,
-                    attempts,
-                    ex.getClass().getSimpleName(),
-                    code);
+                "지운 에이전트를 정리하지 못했다 agentId={} attempts={} error={} code={}",
+                agentId,
+                attempts,
+                ex.getClass().getSimpleName(),
+                code);
         } else {
             log.warn(
-                    "지운 에이전트를 정리하지 못했다 agentId={} attempts={} error={} code={}",
-                    agentId,
-                    attempts,
-                    ex.getClass().getSimpleName(),
-                    code);
+                "지운 에이전트를 정리하지 못했다 agentId={} attempts={} error={} code={}",
+                agentId,
+                attempts,
+                ex.getClass().getSimpleName(),
+                code);
         }
     }
+
 
     private static Duration min(Duration left, Duration right) {
         return left.compareTo(right) <= 0 ? left : right;
     }
 
+
     /** 실패한 에이전트를 다시 볼 시각과 그때 쓴 간격, 잇단 실패 수다. */
-    private record Backoff(Instant retryAt, Duration interval, int attempts) {}
+    private record Backoff(Instant retryAt, Duration interval, int attempts) {
+    }
 }
