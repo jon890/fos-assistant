@@ -179,6 +179,18 @@ for (const existing of [false, true]) {
             answers: 0,
             pending: 0,
           });
+          if (!existing) {
+            // started를 받지 못해도 실제로 확보한 빈 대화는 목록에 남아야 한다.
+            const openSidebar = page.getByRole("button", {
+              name: "사이드바 열기",
+            });
+            if (await openSidebar.isVisible()) await openSidebar.click();
+            await expect(
+              page
+                .getByRole("navigation", { name: "대화 목록" })
+                .locator(`a[href="/chat/${id}"]`),
+            ).toBeVisible();
+          }
           return;
         }
         await hermes.waitForHeldRun();

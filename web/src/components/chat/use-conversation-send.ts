@@ -102,6 +102,8 @@ export function useConversationSend({
     )
       return false;
     const version = selectionVersion.current;
+    const creatingForSend = conversationIdRef.current === null;
+    let listRefreshed = false;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
     const savedBefore = savedIdsOf(turns);
@@ -209,6 +211,7 @@ export function useConversationSend({
         },
       );
       if (kind === "observing") handedOff = true;
+      if (kind === "answered") listRefreshed = true;
       return (
         kind === "observing" ||
         kind === "answered" ||
@@ -269,7 +272,7 @@ export function useConversationSend({
       // 송신 응답을 잃어도 실행 상태를 물을 주소가 있도록 먼저 대화를 확보한다.
       let targetConversationId: string | null;
       try {
-        targetConversationId = await ensureConversation();
+        targetConversationId = await ensureConversation(false);
       } catch {
         throw new Error(
           "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
@@ -311,6 +314,7 @@ export function useConversationSend({
                 `/chat/${event.conversationId}`,
               );
             assignConversationId(event.conversationId);
+            listRefreshed = true;
             void refresh();
           },
           onDelta: (textDelta) => {
@@ -343,6 +347,7 @@ export function useConversationSend({
           },
           onDone: async (event) => {
             assignConversationId(event.conversationId!);
+            listRefreshed = true;
             await Promise.all([
               refresh(),
               refreshMessages(event.conversationId!, version),
@@ -378,6 +383,14 @@ export function useConversationSend({
         );
       return false;
     } finally {
+      // started를 받지 못해도 확보한 빈 대화나 관찰 중인 실행은 목록에 보인다.
+      if (
+        creatingForSend &&
+        !listRefreshed &&
+        conversationIdRef.current !== null &&
+        selectionVersion.current === version
+      )
+        void refresh();
       if (selectionVersion.current === version && !handedOff) setSending(false);
       void finishSentTurn(pendingId);
     }
