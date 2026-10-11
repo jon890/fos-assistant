@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.dao.OptimisticLockingFailureException;
 
-/** ケ�진 브라우저의 활동 시각 저장과 사용자별 1분 제한 상태를 함께 갖는다. */
+/** 켜진 브라우저의 활동 시각 저장과 사용자별 1분 제한 상태를 함께 갖는다. */
 @Component
 @RequiredArgsConstructor
 @Slf4j(topic = "com.bifos.assistant.browser.application.UserBrowserService")
