@@ -20,10 +20,12 @@ class ConversationAgentPurge implements AgentPurgeParticipant {
 
     private final ConversationRepository conversations;
 
+
     @Override
     public boolean blocksPurge(Long agentId) {
         return conversations.existsByAgentIdAndDeletedAtIsNotNullAndPurgedAtIsNull(agentId);
     }
+
 
     @Override
     public void release(Long agentId) {

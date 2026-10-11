@@ -25,10 +25,12 @@ class ConnectorAgentPurge implements AgentPurgeParticipant {
     private final ConnectorConnectionRepository connections;
     private final ConnectorActionRepository actions;
 
+
     @Override
     public boolean blocksPurge(Long agentId) {
         return false;
     }
+
 
     @Override
     public void release(Long agentId) {

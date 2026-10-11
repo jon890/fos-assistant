@@ -23,10 +23,12 @@ class ProactiveAgentPurge implements AgentPurgeParticipant {
     private final ProactiveLoopSettingRepository settings;
     private final ProactiveCheckRepository checks;
 
+
     @Override
     public boolean blocksPurge(Long agentId) {
         return false;
     }
+
 
     @Override
     public void release(Long agentId) {

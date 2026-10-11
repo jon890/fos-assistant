@@ -62,11 +62,13 @@ class AgentPurgerTest {
 
     AppUser owner;
 
+
     @BeforeEach
     void setUp() {
         String email = "agent-purger-" + UUID.randomUUID() + "@example.test";
         owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
     }
+
 
     @Test
     @DisplayName("지운 지 7일이 지난 관리형 에이전트는 profile 을 거두고 행을 지운다")
@@ -80,6 +82,7 @@ class AgentPurgerTest {
         verify(dashboard).deleteProfile(agent.hermesProfile());
     }
 
+
     @Test
     @DisplayName("7일이 지나지 않은 에이전트는 남긴다")
     void keepsAgentDeletedWithinSevenDays() {
@@ -90,6 +93,7 @@ class AgentPurgerTest {
         assertThat(agents.findById(agent.id())).isPresent();
         verify(dashboard, never()).deleteProfile(agent.hermesProfile());
     }
+
 
     @Test
     @DisplayName("지우지 않은 에이전트는 건드리지 않는다")
@@ -102,6 +106,7 @@ class AgentPurgerTest {
         verify(dashboard, never()).deleteProfile(agent.hermesProfile());
     }
 
+
     @Test
     @DisplayName("관리형이 아닌 에이전트는 Hermes 를 부르지 않고 지운다")
     void purgesUnmanagedAgentWithoutCallingHermes() {
@@ -113,12 +118,12 @@ class AgentPurgerTest {
         verify(dashboard, never()).deleteProfile(agent.hermesProfile());
     }
 
+
     @Test
     @DisplayName("지웠지만 정리되지 않은 대화가 있으면 Hermes 를 부르지 않고 미룬다")
     void defersAgentWithUnpurgedConversationWithoutCallingHermes() {
         Agent agent = createAgent(true, NOW.minus(Duration.ofDays(8)));
-        Conversation conversation =
-                conversations.saveAndFlush(Conversation.startedBy(owner.id(), "남은 대화", agent.id(), NOW));
+        Conversation conversation = conversations.saveAndFlush(Conversation.startedBy(owner.id(), "남은 대화", agent.id(), NOW));
         conversationWriter.deleteIfActive(conversation.id(), owner.id(), NOW);
 
         purger.purgeDue(NOW);
@@ -127,13 +132,14 @@ class AgentPurgerTest {
         verify(dashboard, never()).deleteProfile(agent.hermesProfile());
     }
 
+
     @Test
     @DisplayName("profile 거두기가 실패하면 행을 남기고 간격이 지난 뒤 다시 지운다")
     void keepsAgentWhenDeprovisionFailsAndRetriesAfterBackoff() {
         Agent agent = createAgent(true, NOW.minus(Duration.ofDays(8)));
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
-                .when(dashboard)
-                .deleteProfile(agent.hermesProfile());
+            .when(dashboard)
+            .deleteProfile(agent.hermesProfile());
 
         purger.purgeDue(NOW);
 
@@ -151,19 +157,20 @@ class AgentPurgerTest {
         verify(dashboard, times(2)).deleteProfile(agent.hermesProfile());
     }
 
+
     /** profile 이름과 code 는 Hermes profile 이름 규칙에 맞게 소문자와 숫자로 만든다. deletedAt 이 null 이면 지우지 않는다. */
     Agent createAgent(boolean managed, Instant deletedAt) {
         String code = "purge-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = Agent.of(
-                code,
-                "정리할 에이전트",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW.minus(Duration.ofDays(30)));
+            code,
+            "정리할 에이전트",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW.minus(Duration.ofDays(30)));
         if (managed) {
             agent.markManagedProfile();
         }

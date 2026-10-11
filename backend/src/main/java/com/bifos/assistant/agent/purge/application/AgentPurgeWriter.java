@@ -28,6 +28,7 @@ public class AgentPurgeWriter {
     private final AgentToolsetRequestRepository toolsetRequests;
     private final List<AgentPurgeParticipant> participants;
 
+
     /** 그 에이전트를 지금 지울 수 있는가. 지운 지 cutoff 앞이고 기다리라는 참여자가 없어야 한다. 잠그지 않는다. */
     @Transactional(readOnly = true)
     public boolean ready(Long agentId, Instant cutoff) {
@@ -36,6 +37,7 @@ public class AgentPurgeWriter {
         }
         return participants.stream().noneMatch(participant -> participant.blocksPurge(agentId));
     }
+
 
     /** 지운 지 cutoff 앞인 에이전트 하나를 지운다. */
     @Transactional
@@ -53,6 +55,7 @@ public class AgentPurgeWriter {
         agents.deletePurged(agentId);
         return AgentPurgeOutcome.PURGED;
     }
+
 
     /** 행이 있고, 지운 에이전트이고, 지운 시각이 cutoff 뒤가 아니어야 지울 수 있다. */
     private static boolean purgeable(Agent agent, Instant cutoff) {
