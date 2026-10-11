@@ -1,4 +1,4 @@
-package com.bifos.assistant.crypto.domain;
+package com.bifos.assistant.crypto.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

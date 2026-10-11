@@ -3,7 +3,7 @@ package com.bifos.assistant.crypto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.crypto.domain.UserDataKey;
+import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.FileKeyEncryptionKeys;
 import java.io.IOException;

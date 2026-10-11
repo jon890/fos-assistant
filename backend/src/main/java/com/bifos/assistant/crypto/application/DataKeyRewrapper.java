@@ -1,7 +1,7 @@
 package com.bifos.assistant.crypto.application;
 
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
-import com.bifos.assistant.crypto.domain.UserDataKey;
+import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

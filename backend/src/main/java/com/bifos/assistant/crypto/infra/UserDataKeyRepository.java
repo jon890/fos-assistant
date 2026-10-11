@@ -1,6 +1,6 @@
 package com.bifos.assistant.crypto.infra;
 
-import com.bifos.assistant.crypto.domain.UserDataKey;
+import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -5,7 +5,7 @@ import com.bifos.assistant.crypto.domain.DataKey;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
-import com.bifos.assistant.crypto.domain.UserDataKey;
+import com.bifos.assistant.crypto.domain.entity.UserDataKey;
 import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import java.nio.charset.StandardCharsets;
