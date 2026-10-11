@@ -44,6 +44,7 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,6 +112,12 @@ class AgentPurgeWriterTest {
 
     AppUser owner;
     Agent agent;
+
+    /** 실패와 되돌림 검사에서 남긴 바인딩이 다음 검사의 에이전트 삭제를 막지 않게 한다. */
+    @AfterEach
+    void cleanBindings() {
+        bindings.deleteAll(bindings.findByAgentId(agent.id()));
+    }
 
     @BeforeEach
     void setUp() {
