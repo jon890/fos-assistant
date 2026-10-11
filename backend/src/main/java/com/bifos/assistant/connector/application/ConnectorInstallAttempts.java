@@ -4,6 +4,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.application.execution.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.application.model.ConnectorInstallResult;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
@@ -45,6 +46,7 @@ public class ConnectorInstallAttempts {
     private final ConnectorBindingInstalls installs;
     private final SignInRevocation access;
     private final TransactionTemplate transactions;
+    private final ConnectorExecutionGuard guards;
 
 
     /** 호출자가 잠금과 권한 검사를 마친 뒤 불변 입력만 반환하도록 시작 트랜잭션을 연다. 상위 트랜잭션은 허용하지 않는다. */
@@ -81,6 +83,15 @@ public class ConnectorInstallAttempts {
             throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while preparing installation");
         }
         ConnectorManifest declared = manifest.orElse(null);
+        String protocol = null;
+        String manifestSha = null;
+        if (declared != null && declared.executionGuard() != null && !declared.executionGuard().isNull()) {
+            protocol = guards.read(declared).protocol();
+            manifestSha = declared.executionGuardManifestSha256();
+            if (manifestSha == null || !manifestSha.matches("[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("invalid execution guard manifest hash");
+            }
+        }
         if (binding.mcpServer() == null && declared != null) {
             binding.recordServer(declared.mcpServer());
         }
@@ -106,7 +117,7 @@ public class ConnectorInstallAttempts {
             binding.id(), agent.id(), connection.userId(), connection.id(), connection.updatedAt(),
             connection.status(), connection.vaultStored(), attemptId, now,
             agent.hermesProfile(), agent.apiBaseUrl(), agent.credentialScope(), agent.sandboxOwner(),
-            connection.connectorId(), connection.vault(),
+            connection.connectorId(), protocol, manifestSha, connection.vault(),
             declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
             agent.connectorManaged(), desired, binding.restartRequired(), checkInstallation, replaceValues,
             declared != null && declared.attachments(), waiting,

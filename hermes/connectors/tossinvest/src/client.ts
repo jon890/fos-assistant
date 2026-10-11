@@ -14,6 +14,11 @@ import {
   TOKEN_MIN_TTL_MS,
 } from "./constants.ts";
 import { TossinvestError } from "./errors.ts";
+import {
+  financialOperation,
+  financialResult,
+  financialFailure,
+} from "./trading-body.ts";
 import { clearProxyEnvironment, type Env } from "./runtime.ts";
 import {
   operationFor,
@@ -150,6 +155,7 @@ export class Tossinvest {
     init: RequestInit,
     deadline: number,
     state: Identity,
+    beforeSend?: () => void,
   ): Promise<Exchange> {
     return queueRequest(
       this.budget(state),
@@ -157,6 +163,7 @@ export class Tossinvest {
       deadline,
       async () => {
         clearProxyEnvironment();
+        beforeSend?.();
         let response: Response;
         try {
           response = await fetch(`${this.apiBase}${path}`, {
@@ -281,6 +288,49 @@ export class Tossinvest {
     if (!validAccountSeq(seq))
       throw new TossinvestError("TOSSINVEST_ACCOUNT_NOT_FOUND");
     return seq;
+  }
+
+  /** 승인 검증을 제공하지 않는 저수준 내부 transport다. 호출자가 guard와 본문 검증을 맡는다.
+   * 금융 요청은 한 번만 전송하며 GET 재시도와 토큰 재발급 루프에 들어가지 않는다. */
+  async financial(
+    method: "POST" | "DELETE",
+    path: string,
+    body: unknown,
+    beforeSend: () => void,
+  ): Promise<any> {
+    const operation = financialOperation(method, path);
+    const account = this.accountSeq();
+    const state = this.acquire();
+    const deadline = clock.now() + this.timeoutMs;
+    let started = false;
+    try {
+      const token = await this.getToken(state, deadline);
+      const response = await this.exchange(
+        operation,
+        path,
+        {
+          method,
+          headers: {
+            authorization: `Bearer ${token}`,
+            accept: "application/json",
+            "content-type": "application/json",
+            "x-tossinvest-account": account,
+          },
+          body: method === "DELETE" ? undefined : JSON.stringify(body),
+        },
+        deadline,
+        state,
+        () => {
+          beforeSend();
+          started = true;
+        },
+      );
+      return financialResult(operation.id, response);
+    } catch (error) {
+      financialFailure(error, started);
+    } finally {
+      this.release(state);
+    }
   }
 
   /** GET의 429와 토큰 재발급을 각각 한 번만 허용해 전송은 최대 세 번이다. */

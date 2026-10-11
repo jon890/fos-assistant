@@ -3,7 +3,7 @@ package com.bifos.assistant.context;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.OmittedMemories;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;

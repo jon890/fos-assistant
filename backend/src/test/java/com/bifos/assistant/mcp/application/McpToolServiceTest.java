@@ -15,7 +15,7 @@ import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.chat.application.ArtifactWriteService;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
