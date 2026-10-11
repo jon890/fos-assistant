@@ -17,12 +17,42 @@ import tools.jackson.databind.JsonNode;
  * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
  * @param appearance 카드의 아이콘과 링크. 옛 대시보드 plugin 은 내지 않고, 없으면 {@link ConnectorAppearance#NONE}
  * @param singleBinding 참이면 사용자의 그 연결은 에이전트 하나에만 붙는다(ADR-20261008 / connector-binding-guards). 옛 대시보드
- *     plugin 은 내지 않고, 없으면 거짓
+ * plugin 은 내지 않고, 없으면 거짓
  * @param ownerBrowser 참이면 그 커넥터는 사용자 브라우저를 쓴다. 설치와 확인 호출이 중계 주소를 싣는다
- *     (ADR-20261008 / browser-gateway-token). 옛 대시보드 plugin 은 내지 않고, 없으면 거짓
+ * (ADR-20261008 / browser-gateway-token). 옛 대시보드 plugin 은 내지 않고, 없으면 거짓
  * @param ownerBrowserLoginUrl 사용자가 브라우저에서 먼저 로그인할 곳. 선언하지 않았으면 null
  */
 public record ConnectorManifest(
+    String id,
+    String title,
+    String description,
+    List<ConnectorField> fields,
+    String verifyTool,
+    String mcpServer,
+    List<String> toolsets,
+    boolean attachments,
+    int schema,
+    List<ConnectorTool> tools,
+    List<String> skills,
+    ConnectorAppearance appearance,
+    boolean singleBinding,
+    boolean ownerBrowser,
+    String ownerBrowserLoginUrl,
+    JsonNode executionGuard,
+    String executionGuardManifestSha256) {
+
+    public ConnectorManifest {
+        description = description == null ? "" : description;
+        fields = List.copyOf(fields);
+        toolsets = List.copyOf(toolsets);
+        tools = List.copyOf(tools);
+        skills = List.copyOf(skills);
+        appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+
+    /** 해시 칸을 모르는 기존 producer 소비 생성자다. */
+    public ConnectorManifest(
         String id,
         String title,
         String description,
@@ -39,124 +69,138 @@ public record ConnectorManifest(
         boolean ownerBrowser,
         String ownerBrowserLoginUrl,
         JsonNode executionGuard) {
-
-    public ConnectorManifest {
-        description = description == null ? "" : description;
-        fields = List.copyOf(fields);
-        toolsets = List.copyOf(toolsets);
-        tools = List.copyOf(tools);
-        skills = List.copyOf(skills);
-        appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+        this(
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            toolsets,
+            attachments,
+            schema,
+            tools,
+            skills,
+            appearance,
+            singleBinding,
+            ownerBrowser,
+            ownerBrowserLoginUrl,
+            executionGuard,
+            null);
     }
+
 
     /** 보호 선언을 모르는 기존 카탈로그 생성자다. 누락은 미지원이다. */
     public ConnectorManifest(
-            String id,
-            String title,
-            String description,
-            List<ConnectorField> fields,
-            String verifyTool,
-            String mcpServer,
-            List<String> toolsets,
-            boolean attachments,
-            int schema,
-            List<ConnectorTool> tools,
-            List<String> skills,
-            ConnectorAppearance appearance,
-            boolean singleBinding,
-            boolean ownerBrowser,
-            String ownerBrowserLoginUrl) {
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        List<String> toolsets,
+        boolean attachments,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills,
+        ConnectorAppearance appearance,
+        boolean singleBinding,
+        boolean ownerBrowser,
+        String ownerBrowserLoginUrl) {
         this(
-                id,
-                title,
-                description,
-                fields,
-                verifyTool,
-                mcpServer,
-                toolsets,
-                attachments,
-                schema,
-                tools,
-                skills,
-                appearance,
-                singleBinding,
-                ownerBrowser,
-                ownerBrowserLoginUrl,
-                null);
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            toolsets,
+            attachments,
+            schema,
+            tools,
+            skills,
+            appearance,
+            singleBinding,
+            ownerBrowser,
+            ownerBrowserLoginUrl,
+            null);
     }
+
 
     /** 연결을 에이전트 하나로 제한하지 않고 사용자 브라우저를 쓰지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
     public ConnectorManifest(
-            String id,
-            String title,
-            String description,
-            List<ConnectorField> fields,
-            String verifyTool,
-            String mcpServer,
-            List<String> toolsets,
-            boolean attachments,
-            int schema,
-            List<ConnectorTool> tools,
-            List<String> skills,
-            ConnectorAppearance appearance) {
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        List<String> toolsets,
+        boolean attachments,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills,
+        ConnectorAppearance appearance) {
         this(
-                id,
-                title,
-                description,
-                fields,
-                verifyTool,
-                mcpServer,
-                toolsets,
-                attachments,
-                schema,
-                tools,
-                skills,
-                appearance,
-                false,
-                false,
-                null);
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            toolsets,
+            attachments,
+            schema,
+            tools,
+            skills,
+            appearance,
+            false,
+            false,
+            null);
     }
+
 
     /** 아이콘과 링크를 내지 않는 선언이다. 새 칸을 모르는 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
     public ConnectorManifest(
-            String id,
-            String title,
-            String description,
-            List<ConnectorField> fields,
-            String verifyTool,
-            String mcpServer,
-            List<String> toolsets,
-            boolean attachments,
-            int schema,
-            List<ConnectorTool> tools,
-            List<String> skills) {
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        List<String> toolsets,
+        boolean attachments,
+        int schema,
+        List<ConnectorTool> tools,
+        List<String> skills) {
         this(
-                id,
-                title,
-                description,
-                fields,
-                verifyTool,
-                mcpServer,
-                toolsets,
-                attachments,
-                schema,
-                tools,
-                skills,
-                ConnectorAppearance.NONE);
+            id,
+            title,
+            description,
+            fields,
+            verifyTool,
+            mcpServer,
+            toolsets,
+            attachments,
+            schema,
+            tools,
+            skills,
+            ConnectorAppearance.NONE);
     }
+
 
     /** 스킬을 내지 않는 선언이다. 옛 대시보드 plugin 의 카탈로그와 검사가 쓴다. */
     public ConnectorManifest(
-            String id,
-            String title,
-            String description,
-            List<ConnectorField> fields,
-            String verifyTool,
-            String mcpServer,
-            List<String> toolsets,
-            boolean attachments,
-            int schema,
-            List<ConnectorTool> tools) {
+        String id,
+        String title,
+        String description,
+        List<ConnectorField> fields,
+        String verifyTool,
+        String mcpServer,
+        List<String> toolsets,
+        boolean attachments,
+        int schema,
+        List<ConnectorTool> tools) {
         this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, List.of());
     }
 }
