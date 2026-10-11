@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from .connector_guard import _guard_manifest
+from .connector_description import _tool_descriptions
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -253,6 +254,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset({verify["tool"]} | option_tools),
         "tools": tools,
+        "tool_descriptions": _tool_descriptions(declared),
         "server": definition,
     }
 
@@ -346,7 +348,8 @@ def _connector_catalog_response():
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
           **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
           # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
-          "tools": {name: {key: value for key, value in policy.items() if value is not None}
+          "tools": {name: {key: value for key, value in {**policy, "description": manifest["tool_descriptions"].get(name)}.items()
+                           if value is not None}
                     for name, policy in manifest["tools"].items()}}
          for manifest in _connector_catalog().values()],
         status_code=200,
