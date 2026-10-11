@@ -747,7 +747,6 @@ public final class ArchitectureRules {
         .should(notReadHermesTimeoutsFromInjectedProperties())
         .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
 
-
     /** crypto 의 엔티티는 domain.entity 에 두고 UserDataKey 또는 같은 표의 타입은 정확히 하나다. */
     public static final ArchRule ENTITIES_IN_OWNED_ENTITY_PACKAGE = entitiesInOwnedEntityPackage("com.bifos.assistant");
 
