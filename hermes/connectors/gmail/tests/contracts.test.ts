@@ -30,8 +30,11 @@ test("모든 MCP 도구는 사용자가 판단할 수 있는 설명을 제공한
   const server = createGmailServer({ env: {} });
   await withMcp(server, async (client) => {
     const tools = await client.listTools();
-    expect(tools.tools).toHaveLength(15);
+    expect(new Set(tools.tools.map((tool) => tool.name))).toEqual(
+      new Set(Object.keys(manifest.tools)),
+    );
     for (const tool of tools.tools) {
+      expect(tool.description).toBe(manifest.tools[tool.name].description);
       expect(tool.description?.trim().length).toBeGreaterThan(20);
     }
     const byName = new Map(
