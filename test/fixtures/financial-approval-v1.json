@@ -773,6 +773,644 @@
         "account": "000007",
         "client": "00000000-0000-4000-8000-000000000002"
       }
+    },
+    {
+      "name": "normalization-integrity-quantity-value-change",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"200\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"200\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"200\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "be05ccc06a8be460b00726ceee02194aa0f85deb5702e61e9ebe538fa7615a47",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "8f764e3a55d4f6096797222f58e850b6d715dd4c2b5516d7791540bf74eaa8c0",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-price-value-change",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"200\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"200\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"200\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "a40837626737824235a4b7e55e834bdcdde417c936566c4d58f0d7c5813ec6be",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "90036c652769e68640b50d8e1cede345831ea22f17c7294542f64ac91ccfbdeb",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-amount-value-change",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"001.00\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"200\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":null,\"orderAmount\":\"200\",\"price\":null,\"orderType\":\"MARKET\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"orderAmount\",\"before\":\"001.00\",\"after\":\"200\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "3baaab016ffde99ee4aff9e59f743ca50e46dcbf865899631a8b328d4949b708",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "4db960ca1267d6b4f58ab0efe0932e5dc14aa0a3ca46633e4432b4497fdd3872",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-other-symbol",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"MSFT\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"MSFT\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"MSFT\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "403200ef1e779495936701b1bb0f866b02432e16612f1502f6055099a5f3c88c",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "2f1c3ab42edd71b5fe805161cc9576228c1460973e8d31f4c9a08c9a7f55f062",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-symbol-lowercase-target",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"abc\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"symbol\",\"before\":\"ABC\",\"after\":\"abc\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "63b6bd247f502706cc50b03a8c441c0221034bdf8109cc791ee84345bfcc33e1",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "e15eacf58b34270eea41e9fd222efe22384ed9e0e484833b52e29a16954286cc",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-tif-change",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"CLS\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"CLS\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":\"DAY\",\"after\":\"CLS\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "310e3247b0a47f45c9a458246e047f78eb616b036e026effa8f36816f87c3a4e",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "0e16f150c4c11d457f5fb4d0c7347a0d381be5afade8c6b6fee077be13f881b5",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-tif-default-change",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"CLS\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"CLS\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"CLS\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "310e3247b0a47f45c9a458246e047f78eb616b036e026effa8f36816f87c3a4e",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "0e16f150c4c11d457f5fb4d0c7347a0d381be5afade8c6b6fee077be13f881b5",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-quantity-sign",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"-2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"-2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"-2\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "cd6755d004b0081815bbf30adc20d42ddc7ca892ded7728e61acb76478159557",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "ea1971585552dac526b7bc2e13f108ab801be1ccee62884eccfe69882bdad1a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-quantity-exponent",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2e0\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2e0\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2e0\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "d5d767b4915349e881c913923aa131b433ce95deccaf69db3fb05ff3f66829d9",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-quantity-noncanonical",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"0002.0\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"0002.0\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"0002.0\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "9ba1081c1d563ad018aa51811dbcfeac9ee1a37b5a70893ee0c94b29b051390d",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-quantity-zeros",
+      "valid": true,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"001.00\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"1\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"1\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"001.00\",\"after\":\"1\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "4bb132e61a4e33530042497be67db3af9e75acb698056dcdcc30e61560f1d4af",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "d06fb3c4fb840421fbf31a8cca5ce591b691f980ab3eb99863da83a27ac2e1c8",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-quantity-unchanged-zeros",
+      "valid": true,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"001.00\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"001.00\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"001.00\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "5c1285aafa849a8fbebe723ad131fca3e4a561b612909d6e7c0507d0954a3fd0",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "d06fb3c4fb840421fbf31a8cca5ce591b691f980ab3eb99863da83a27ac2e1c8",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-price-sign",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"002\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"-2\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"-2\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"price\",\"before\":\"002\",\"after\":\"-2\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "04162f9c9a1cd743629695f5a710ce94e0d8090d56e4f9e904af7f286a883e2b",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "8b8e9853693099f6210bb308c830ff4f92a461f33f602932f630a3cfc9361f90",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-price-exponent",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"002\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"2e0\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"2e0\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"price\",\"before\":\"002\",\"after\":\"2e0\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "22647b213ee45965404b610223de5e89195c92dda63430c91390c38edaa1f7c2",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "702ab9c731a65f2d6115cde95f138b557dd41fe1f4ed8e853c92af07f1c90be8",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-price-noncanonical",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"002\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"0002.0\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"0002.0\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"price\",\"before\":\"002\",\"after\":\"0002.0\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "04f2c31c90fb28869fdd29fc10241765bcc9aee95a35ab305493472034faebe9",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "702ab9c731a65f2d6115cde95f138b557dd41fe1f4ed8e853c92af07f1c90be8",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-price-zeros",
+      "valid": true,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"001.00\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"1\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"1\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"price\",\"before\":\"001.00\",\"after\":\"1\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "eb589ceea4752bfb074d7e6bdb9c99914aeec3efc417a9bbe1a758473f5306f5",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "3216139841e6a2ecd6f4a0aa89c8e7c88b0f414e2df089378640308e016cea8f",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-price-unchanged-zeros",
+      "valid": true,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"001.00\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"001.00\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"001.00\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "257ecc098e37120f181726df197eb352588733d2d1cd39ad749dde6728c084db",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "3216139841e6a2ecd6f4a0aa89c8e7c88b0f414e2df089378640308e016cea8f",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-orderAmount-sign",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"002\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"-2\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":null,\"orderAmount\":\"-2\",\"price\":null,\"orderType\":\"MARKET\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"orderAmount\",\"before\":\"002\",\"after\":\"-2\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "0a01ddd1333d79d0ca358c8501e9673f3411d44ae63add7c9b6e7602bdfc3a29",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "e46ecc1d3b97eece72febd36532003ac77a62e99e9c5ca4e6623f0823e6022da",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-orderAmount-exponent",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"002\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"2e0\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":null,\"orderAmount\":\"2e0\",\"price\":null,\"orderType\":\"MARKET\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"orderAmount\",\"before\":\"002\",\"after\":\"2e0\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "c4db618d68cd2c93c8492899819530491299430e7fe3580fd6ed9ea8b4a76c7e",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "cd1695a8345e09a0e08cea3839a53f3dbbfb66f04de8c71d57a22c033abc0157",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-orderAmount-noncanonical",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"002\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"0002.0\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":null,\"orderAmount\":\"0002.0\",\"price\":null,\"orderType\":\"MARKET\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"orderAmount\",\"before\":\"002\",\"after\":\"0002.0\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "ddaff8b6dcbf3a9b73143a97b5f427fa233b46343c9a77c6ef1443ad9511ec76",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "cd1695a8345e09a0e08cea3839a53f3dbbfb66f04de8c71d57a22c033abc0157",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-orderAmount-zeros",
+      "valid": true,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"001.00\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"1\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":null,\"orderAmount\":\"1\",\"price\":null,\"orderType\":\"MARKET\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"orderAmount\",\"before\":\"001.00\",\"after\":\"1\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "d3b65d253c471698a50053dbdf0d11dd54d72d5a3ccb66f34328aca8a26b8509",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "aa41d3258f1bcf6f58a25a5abb755bc7e50901f506e3d88ffa6b4d1dd7b7e440",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-orderAmount-unchanged-zeros",
+      "valid": true,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"001.00\",\"timeInForce\":\"DAY\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"MARKET\",\"orderAmount\":\"001.00\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":null,\"orderAmount\":\"001.00\",\"price\":null,\"orderType\":\"MARKET\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "e4fa5cb5ec24d7e35d589d4bd4da517f4d26c3b39d4eb3e9514c44289a0e982c",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "aa41d3258f1bcf6f58a25a5abb755bc7e50901f506e3d88ffa6b4d1dd7b7e440",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-missing",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-duplicate",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-extra",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-forbidden-field",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"2\"},{\"field\":\"side\",\"before\":\"BUY\",\"after\":\"SELL\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-wrong-before",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"2\",\"after\":\"2\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-wrong-after",
+      "valid": false,
+      "operation": "CREATE",
+      "tool": "place_order",
+      "modelArgsJson": "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}",
+      "executionArgsJson": "{\"symbol\":\"ABC\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"2\",\"price\":\"12.34\",\"timeInForce\":\"DAY\",\"clientOrderId\":\"00000000-0000-4000-8000-000000000001\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"2\",\"orderAmount\":null,\"price\":\"12.34\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"CREATE\",\"orderId\":null,\"original\":null,\"normalization\":[{\"field\":\"symbol\",\"before\":\"abc\",\"after\":\"ABC\"},{\"field\":\"price\",\"before\":\"0012.3400\",\"after\":\"12.34\"},{\"field\":\"timeInForce\",\"before\":null,\"after\":\"DAY\"},{\"field\":\"quantity\",\"before\":\"002\",\"after\":\"200\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "88a3576e69f15b8b44d1ee3eab65ef9319a1682cd68aa4cc4e616ae0de86e9eb",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "5f884151227193c02bd56182fd4b28bf056047c01b82c076cb58ee149407a4a6",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
+    },
+    {
+      "name": "normalization-integrity-added-quantity",
+      "valid": false,
+      "operation": "MODIFY",
+      "tool": "change_order",
+      "modelArgsJson": "{\"orderId\":\"order/α ?\",\"orderType\":\"LIMIT\",\"price\":\"13\"}",
+      "executionArgsJson": "{\"orderId\":\"order/α ?\",\"orderType\":\"LIMIT\",\"price\":\"13\",\"account_seq\":\"000007\",\"market\":\"NYSE\",\"currency\":\"USD\",\"expected_order\":{\"orderId\":\"order/α ?\",\"symbol\":\"ABC\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"10\",\"orderAmount\":null,\"price\":\"12\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"status\":\"PENDING\",\"execution\":{\"filledQuantity\":\"0\"}},\"quantity\":\"10\"}",
+      "summaryJson": "{\"account\":\"4321\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"10\",\"orderAmount\":null,\"price\":\"13\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"operation\":\"MODIFY\",\"orderId\":\"order/α ?\",\"original\":{\"orderId\":\"order/α ?\",\"symbol\":\"ABC\",\"market\":\"NYSE\",\"currency\":\"USD\",\"side\":\"BUY\",\"quantity\":\"10\",\"orderAmount\":null,\"price\":\"12\",\"orderType\":\"LIMIT\",\"timeInForce\":\"DAY\",\"status\":\"PENDING\",\"filledQuantity\":\"0\"},\"normalization\":[{\"field\":\"quantity\",\"before\":null,\"after\":\"10\"}]}",
+      "scopeJson": "{\"account_seq\":\"000007\"}",
+      "executionArgsSha256": "31a42fbd2147887a5be9337435cc0b74a6ebe92cad3c59c131ddd64e7012e4a6",
+      "scopeSha256": "187c67a4c8579a6ea26fd3d3e01a29fde0d14dce2f22bf867685bf89cf2bea6b",
+      "requestKey": "f705849c5203bdde69130b665831b627479d0a36f5ce9f282bde395f3100af54",
+      "scopeFields": [
+        {
+          "arg": "account_seq",
+          "field": "account"
+        }
+      ],
+      "publicFields": {
+        "account": "000007"
+      }
     }
   ]
 }
