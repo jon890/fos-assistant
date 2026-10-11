@@ -53,6 +53,7 @@ import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Calendar;
@@ -339,7 +340,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         transactions.executeWithoutResult(status -> {
             users.findByIdForUpdate(target.owner().id()).orElseThrow();
             jdbc.update("UPDATE connector_connection SET updated_at = ? WHERE id = ?",
-                java.sql.Timestamp.from(attempt.connectionRevision().plusSeconds(1)), attempt.connectionId());
+                Timestamp.from(attempt.connectionRevision().plusSeconds(1)), attempt.connectionId());
         });
         Observed changed = observe(target.bindingId());
         assertThat(changed.attempt()).isEqualTo(attempt.attemptId());
@@ -564,11 +565,11 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         allowCheck();
         AtomicInteger installsSent = new AtomicInteger();
         doAnswer(invocation -> {
-                assertNoTransaction();
-                assertThat(observe(target.bindingId()).desired()).isFalse();
-                installsSent.incrementAndGet();
-                return INSTALLED;
-            }).when(connector).putConnector(anyString(), anyString(), anyBoolean(), anyString());
+            assertNoTransaction();
+            assertThat(observe(target.bindingId()).desired()).isFalse();
+            installsSent.incrementAndGet();
+            return INSTALLED;
+        }).when(connector).putConnector(anyString(), anyString(), anyBoolean(), anyString());
         when(connector.readConnector(anyString(), anyString())).thenAnswer(invocation -> {
             assertNoTransaction();
             if (readFailure) {

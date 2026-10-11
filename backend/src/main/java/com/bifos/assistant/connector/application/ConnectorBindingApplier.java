@@ -126,9 +126,9 @@ public class ConnectorBindingApplier {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
         service.lockOwner(due.userId());
         boolean target = agents.findByIdForUpdate(due.agentId())
-                .filter(candidate -> !candidate.isDeleted())
-                .filter(candidate -> Objects.equals(candidate.ownerUserId(), due.userId()))
-                .isPresent();
+            .filter(candidate -> !candidate.isDeleted())
+            .filter(candidate -> Objects.equals(candidate.ownerUserId(), due.userId()))
+            .isPresent();
         ConnectorBinding binding = bindings.findById(due.bindingId()).orElse(null);
         Instant now = clock.instant();
         if (binding == null
@@ -267,9 +267,9 @@ public class ConnectorBindingApplier {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
         AppUser owner = service.lockOwner(candidate.userId());
         boolean target = agents.findByIdForUpdate(candidate.agentId())
-                .filter(found -> !found.isDeleted())
-                .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
-                .isPresent();
+            .filter(found -> !found.isDeleted())
+            .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
+            .isPresent();
         ConnectorBinding binding = bindings.findById(candidate.bindingId()).orElse(null);
         if (binding == null || binding.status() != BindingStatus.READY) {
             // 지워졌거나 다른 경로가 상태를 바꿨다. 이어지던 어긋남이 아니므로 횟수를 지운다.
