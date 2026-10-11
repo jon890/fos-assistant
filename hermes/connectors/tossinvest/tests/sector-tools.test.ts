@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Tossinvest } from "../src/client.ts";
 import { operationFor } from "../src/api-contract.ts";
 import { registerSectorTools } from "../src/sector-tools.ts";
+import { apiErrorCode } from "../src/transport.ts";
 import { createToolRegistration } from "../src/tool-registration.ts";
 import {
   FakeToss,
@@ -96,6 +97,27 @@ async function session(
 }
 
 describe("섹터 조회 모듈의 SDK와 HTTP", () => {
+  test("404 상태와 공식 원인 코드가 함께 맞을 때만 입력 오류로 분류한다", () => {
+    for (const [status, code, expected] of [
+      [404, "sector-not-found", "TOSSINVEST_INVALID_INPUT"],
+      [404, "stock-not-found", "TOSSINVEST_INVALID_INPUT"],
+      [404, "not-found", "TOSSINVEST_UNAVAILABLE"],
+      [500, "sector-not-found", "TOSSINVEST_UNAVAILABLE"],
+      [401, "sector-not-found", "TOSSINVEST_UNAUTHORIZED"],
+      [403, "sector-not-found", "TOSSINVEST_FORBIDDEN"],
+      [429, "sector-not-found", "TOSSINVEST_RATE_LIMITED"],
+    ] as const) {
+      expect(
+        apiErrorCode({
+          status,
+          data: { error: { code } },
+          ok: false,
+          empty: false,
+          retryAfterMs: 0,
+        }),
+      ).toBe(expected);
+    }
+  });
   test("공식 5개 operation에 도달하고 전체 결과와 읽기 권한을 보존한다", async () => {
     await session(async (fake, client) => {
       const listed = await client.listTools();
@@ -322,7 +344,9 @@ describe("섹터 조회 모듈의 SDK와 HTTP", () => {
 
   test("404와 5xx는 안전한 오류로 알리고 재송신하지 않는다", async () => {
     for (const [status, code, expected] of [
-      [404, "sector-not-found", "TOSSINVEST_UNAVAILABLE"],
+      [404, "sector-not-found", "TOSSINVEST_INVALID_INPUT"],
+      [404, "not-found", "TOSSINVEST_UNAVAILABLE"],
+      [500, "sector-not-found", "TOSSINVEST_UNAVAILABLE"],
       [500, "internal-error", "TOSSINVEST_UNAVAILABLE"],
       [503, "internal-error", "TOSSINVEST_UNAVAILABLE"],
     ] as const) {

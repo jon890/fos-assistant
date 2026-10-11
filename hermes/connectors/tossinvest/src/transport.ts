@@ -69,7 +69,7 @@ export function apiErrorCode(exchange: Exchange): string {
   if (status === 401) return "TOSSINVEST_UNAUTHORIZED";
   if (status === 403) return "TOSSINVEST_FORBIDDEN";
   if (status === 400) return "TOSSINVEST_INVALID_INPUT";
-  if (status === 404 && code === "stock-not-found")
+  if (status === 404 && ["stock-not-found", "sector-not-found"].includes(code))
     return "TOSSINVEST_INVALID_INPUT";
   if (status === 429) return "TOSSINVEST_RATE_LIMITED";
   return "TOSSINVEST_UNAVAILABLE";

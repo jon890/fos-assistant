@@ -37,6 +37,11 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_sellable_quantity` | `GET /api/v1/sellable-quantity` | 종목 하나의 매도 가능 수량을 읽는다 |
 | `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
 | `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다 |
+| `list_sectors` | `GET /api/v1/sectors` | 전체 섹터 목록과 계층을 읽는다 |
+| `get_sector_rankings` | `GET /api/v1/sectors/rankings` | 시장·기간·기준별 섹터 랭킹을 읽는다 |
+| `get_sector` | `GET /api/v1/sectors/{sectorId}` | 섹터 기본 정보와 기간별 등락률을 읽는다 |
+| `get_sector_stocks` | `GET /api/v1/sectors/{sectorId}/stocks` | 섹터와 하위 섹터에 속한 보통주 전체를 읽는다 |
+| `get_sector_etfs` | `GET /api/v1/sectors/{sectorId}/etfs` | 관련 ETF의 symbol과 name을 읽는다 |
 
 계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
 
@@ -66,6 +71,14 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
 | `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
 | `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
+
+### 섹터 조회
+
+섹터 도구 5개도 공식 `result` 전체와 `metadata`를 돌려준다. `list_sectors`는 인자가 없고, 나머지는 `marketCountry: KR/US`가 필수다. `get_sector_rankings`는 `type: TOP_GAINERS/MARKET_TRADING_AMOUNT`와 `duration: 1d/1w/1mo/3mo/6mo/1y`를 받는다. 상세·주식·ETF는 목록에서 확인한 `sectorId`를 받으며 영문·숫자·밑줄·하이픈 1~40자만 허용한다. 페이지와 추가 필터는 없다.
+
+depth 0/1/2와 parentSectorId를 보존하고 대분류의 parentSectorId와 상세 summary는 null일 수 있다. 상세 changeRates는 6개 기간이며 데이터가 없는 changeRate는 null이다. 주식의 volume·tradingAmount·marketCapitalization과 랭킹의 금액도 null일 수 있다. decimal 문자열은 숫자로 바꾸지 않으며 US 금액도 currency에 표시된 원화 환산값이다. ETF는 symbol·name만 제공하고 관련 항목이 없으면 빈 배열이다. 한 종목이 여러 섹터에 속할 수 있다.
+
+현재 서버는 READ 도구 11개를 등록하고 인증을 포함한 공식 REST operation 13개에 연결된다. 나머지 28개 operation과 금융 쓰기는 아직 지원하지 않는다. 도구 설명은 connector.json을 정본으로 SDK에도 같은 본문을 제공한다.
 
 ### 토큰
 
@@ -102,7 +115,7 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 | `TOSSINVEST_IP_NOT_ALLOWED` | `forbidden` | `reconnect` | API 의 `ip-not-allowed`, 토큰 발급의 403 `access_denied`. 허용 IP 가 바뀌었을 수 있다 |
 | `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
 | `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다. 상태와 관계없이 `account-not-found` 면 이 코드다 |
-| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목이다 |
+| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목이나 섹터다 |
 | `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | GET의 한 번 재시도 뒤에도 429 |
 | `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 시간이 지났다, 5xx 와 그 밖의 4xx, 다시 보낸 호출도 `token-revoked` 였다 |
 
@@ -111,8 +124,8 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 ## 서버와 검사
 
 `src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
-공식 JSON fixture의 41 operation과 실제 등록 8개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
-대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 여섯 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
+공식 JSON fixture의 41 operation과 실제 등록 13개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
+대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 11개 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
 
 ## 보안
 

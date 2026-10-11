@@ -435,7 +435,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 11개 READ 도구가 인증·조회 13개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 28개 operation의 producer는 아직 구현하지 않았다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
@@ -449,7 +449,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 13개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
@@ -511,11 +511,11 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getMarketIndicatorPrices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
 | `getMarketIndicatorCandles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | 미연결 | 랭킹·지표 |
 | `getMarketIndicatorInvestorTrading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
-| `listSectors` | `list_sectors` | READ/none; SECTOR | 미연결 | 섹터 |
-| `getSectorRankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | 미연결 | 섹터 |
-| `getSector` | `get_sector` | READ/none; SECTOR | 미연결 | 섹터 |
-| `getSectorStocks` | `get_sector_stocks` | READ/none; SECTOR | 미연결 | 섹터 |
-| `getSectorEtfs` | `get_sector_etfs` | READ/none; SECTOR | 미연결 | 섹터 |
+| `listSectors` | `list_sectors` | READ/none; SECTOR | 구현 | 섹터 |
+| `getSectorRankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | 구현 | 섹터 |
+| `getSector` | `get_sector` | READ/none; SECTOR | 구현 | 섹터 |
+| `getSectorStocks` | `get_sector_stocks` | READ/none; SECTOR | 구현 | 섹터 |
+| `getSectorEtfs` | `get_sector_etfs` | READ/none; SECTOR | 구현 | 섹터 |
 | `getAccounts` | `list_accounts` | READ/none; ACCOUNT | 기반 구현 | 기반 |
 | `getHoldings` | `get_holdings` | READ/none; ASSET | 기반 구현 | 기반 |
 | `getOrders` | `list_orders` | READ/none; ORDER_HISTORY | 기반 구현 | 기반 |
