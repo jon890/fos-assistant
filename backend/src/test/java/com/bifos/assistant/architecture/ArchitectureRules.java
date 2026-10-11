@@ -182,6 +182,173 @@ public final class ArchitectureRules {
             "com.bifos.assistant..presentation..")
         .as("domain 은 웹 계층에 의존하지 않는다");
 
+    /** 새 기능의 네 층 선택은 기존 선택을 모두 포함한다. */
+    public static final ArchRule FEATURE_LAYER_COVERAGE = featureLayerCoverage("com.bifos.assistant");
+
+    /** agent.memory 는 memory 와 memory.agent 를 읽지 않는다. */
+    public static final ArchRule AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY = agentMemoryDirection("com.bifos.assistant");
+
+    /** 두 Memory 경계의 서비스, 공개 값과 HTTP graph 는 맡은 층에 둔다. */
+    public static final ArchRule FEATURE_APPLICATION_ROLE = featureApplicationRole("com.bifos.assistant");
+
+    /** 옮긴 계약은 운영 루트 전체에서 이름으로 선택하고 FQN 과 단일 소유를 강제한다. */
+    public static final ArchRule MOVED_CONTRACT_OWNERSHIP = movedContractOwnership("com.bifos.assistant");
+
+    static ArchRule featureLayerCoverage(String root) {
+        return classes().that().resideInAPackage(root + "..")
+            .should(new ArchCondition<JavaClass>("기존 층 선택의 누락이 없다") {
+                @Override
+                public void check(JavaClass item, ConditionEvents events) {
+                    for (String layer : List.of("application", "domain", "infra", "presentation")) {
+                        boolean oldSelected = resideInAPackage(root + ".(*)." + layer + "..").test(item);
+                        require(item, !oldSelected || resideInAPackage(root + ".." + layer + "..").test(item),
+                            layer + " 층의 기존 선택을 포함한다", events);
+                    }
+                }
+            }).as("FEATURE_LAYER_COVERAGE: 네 층 선택에 기존 누락이 없다");
+    }
+
+    static ArchRule agentMemoryDirection(String root) {
+        return noClasses().that().resideInAPackage(root + ".agent..")
+            .should().dependOnClassesThat().resideInAPackage(root + ".memory..")
+            .as("AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY: agent 는 memory 를 읽지 않는다");
+    }
+
+    static Map<String, String> memoryContractOwners() {
+        Map<String, String> owners = new HashMap<>();
+        owners.put("AgentMemoryCollectionService", "agent.memory.application.AgentMemoryCollectionService");
+        owners.put("AgentMemoryGrants", "agent.memory.application.model.AgentMemoryGrants");
+        owners.put("AgentMemorySettingService", "memory.agent.application.AgentMemorySettingService");
+        owners.put("AgentMemorySettingController", "memory.agent.presentation.AgentMemorySettingController");
+        for (String name : List.of("AgentMemorySetting", "AgentMemorySettingCollection", "AgentMemorySettingChange",
+            "AgentMemoryGrantInput", "AgentMemoryCountScope")) {
+            owners.put(name, "memory.agent.application.model." + name);
+        }
+        owners.put("AgentMemoryDtos", "memory.agent.presentation.AgentMemoryDtos");
+        for (String name : List.of("AgentMemoryGrantBody", "ReplaceAgentMemoryRequest", "AgentMemorySettingView",
+            "AgentMemoryCollectionView", "AgentMemoryChangeView")) {
+            owners.put(name, "memory.agent.presentation.AgentMemoryDtos$" + name);
+        }
+        return Map.copyOf(owners);
+    }
+
+    static ArchRule movedContractOwnership(String root) {
+        return classes().that().resideInAPackage(root + "..")
+            .should(ownedTypes(root, memoryContractOwners()))
+            .as("MOVED_CONTRACT_OWNERSHIP: Memory 계약의 단일 소유와 최종 FQN 을 지킨다");
+    }
+
+    static ArchRule featureApplicationRole(String root) {
+        return classes().that().resideInAPackage(root + "..")
+            .should(new ArchCondition<JavaClass>("Memory 서비스와 공개 값 및 HTTP graph 의 역할을 지킨다") {
+                private final Set<JavaClass> http = new HashSet<>();
+                private final Set<JavaClass> serviceValues = new HashSet<>();
+
+                @Override
+                public void init(Collection<JavaClass> allObjectsToTest) {
+                    http.clear();
+                    serviceValues.clear();
+                    for (JavaClass type : allObjectsToTest) {
+                        if (memoryBoundary(root, type).isEmpty()) {
+                            continue;
+                        }
+                        for (JavaMethod method : type.getMethods()) {
+                            if (mapped(method)) {
+                                collectMemoryGraph(root, method, http);
+                            } else if ((type.isAnnotatedWith(Service.class) || type.isAnnotatedWith(Component.class))
+                                && method.getModifiers().contains(JavaModifier.PUBLIC)) {
+                                collectMemoryGraph(root, method, serviceValues);
+                            }
+                        }
+                    }
+                }
+
+                @Override
+                public void check(JavaClass item, ConditionEvents events) {
+                    Optional<String> owner = memoryBoundary(root, item);
+                    if (owner.isEmpty()) {
+                        return;
+                    }
+                    String boundary = owner.get();
+                    String packageName = item.getPackageName();
+                    if (item.isAnnotatedWith(Service.class) || item.isAnnotatedWith(Component.class)) {
+                        require(item, packageName.equals(boundary + ".application"),
+                            "Service 와 Component 는 소유 application 에 있다", events);
+                    }
+                    boolean stateHelper = !item.isRecord() && !item.isEnum()
+                        && !item.isAnnotatedWith(Entity.class) && !item.isAnnotatedWith(Embeddable.class)
+                        && !item.isAnnotatedWith(ConfigurationProperties.class)
+                        && !item.isAnnotatedWith(RestController.class)
+                        && !packageName.startsWith(boundary + ".domain")
+                        && !packageName.startsWith(boundary + ".infra")
+                        && !packageName.equals(boundary + ".presentation")
+                        && item.getFields().stream().anyMatch(field -> !field.getModifiers().contains(JavaModifier.STATIC));
+                    if (stateHelper && !serviceValues.contains(item)) {
+                        require(item, packageName.equals(boundary + ".application"), "상태 helper 는 application 에 있다", events);
+                    }
+                    if (item.isAnnotatedWith(ConfigurationProperties.class)) {
+                        require(item, packageName.equals(boundary + ".config"), "설정 선언은 config 에 있다", events);
+                    } else if (item.isAnnotatedWith(Entity.class) || item.isAnnotatedWith(Embeddable.class)) {
+                        require(item, packageName.equals(boundary + ".domain.entity"), "영속 타입은 domain.entity 에 있다", events);
+                    } else if (http.contains(item)) {
+                        require(item, packageName.equals(boundary + ".presentation")
+                            && item.getEnclosingClass().map(outer -> outer.getSimpleName().endsWith("Dtos")
+                                && outer.getPackageName().equals(packageName)).orElse(false),
+                            "HTTP graph 의 DTO 는 소유 presentation 의 Dtos 안에 있다", events);
+                    } else if ((item.isRecord() || item.isEnum() || serviceValues.contains(item))
+                        && item.getModifiers().contains(JavaModifier.PUBLIC)
+                        && !packageName.startsWith(boundary + ".domain")
+                        && !packageName.startsWith(boundary + ".infra")) {
+                        require(item, packageName.equals(boundary + ".application.model"),
+                            "공개 서비스 값은 application.model 에 있다", events);
+                    }
+                    for (JavaField field : item.getFields()) {
+                        if (field.isAnnotatedWith(Enumerated.class)) {
+                            require(item, field.getRawType().getPackageName().equals(boundary + ".domain.type"),
+                                "저장 enum 은 domain.type 에 있다", events);
+                        }
+                    }
+                    if (packageName.contains(".presentation") && item.isRecord()) {
+                        require(item, item.getEnclosingClass().map(outer -> outer.getSimpleName().endsWith("Dtos")).orElse(false),
+                            "HTTP record 는 Dtos 안에 있다", events);
+                    }
+                    if (item.getSimpleName().equals("AgentMemorySettingController")) {
+                        require(item, item.isAnnotatedWith(RestController.class), "Memory 창구는 RestController 다", events);
+                        require(item, item.tryGetAnnotationOfType(RequestMapping.class)
+                            .map(mapping -> List.of(mapping.value()).equals(List.of("/api/v1/admin/agents/{code}/memory-collections")))
+                            .orElse(false), "Memory HTTP 경로를 보존한다", events);
+                        for (JavaMethod method : item.getMethods().stream().filter(ArchitectureRules::mapped).toList()) {
+                            require(item, method.getMethodCallsFromSelf().stream().anyMatch(call ->
+                                call.getTargetOwner().getName().equals(root + ".shared.auth.CurrentUserProvider")
+                                    && call.getTarget().getName().equals("requireAdmin")),
+                                method.getName() + " 은 requireAdmin 을 부른다", events);
+                        }
+                    }
+                }
+            }).as("FEATURE_APPLICATION_ROLE: Memory 경계의 서비스·공개 값·HTTP 역할을 지킨다");
+    }
+
+    private static Optional<String> memoryBoundary(String root, JavaClass item) {
+        return List.of(root + ".agent.memory", root + ".memory.agent").stream()
+            .filter(boundary -> item.getPackageName().equals(boundary)
+                || item.getPackageName().startsWith(boundary + ".")).findFirst();
+    }
+
+    private static void collectMemoryGraph(String root, JavaMethod method, Set<JavaClass> selected) {
+        method.getReturnType().getAllInvolvedRawTypes().forEach(type -> collectMemoryValue(root, type, selected));
+        method.getParameterTypes().forEach(parameter -> parameter.getAllInvolvedRawTypes()
+            .forEach(type -> collectMemoryValue(root, type, selected)));
+    }
+
+    private static void collectMemoryValue(String root, JavaClass type, Set<JavaClass> selected) {
+        if (memoryBoundary(root, type).isEmpty() || !selected.add(type)) {
+            return;
+        }
+        for (JavaField field : type.getFields()) {
+            field.getType().getAllInvolvedRawTypes().forEach(value -> collectMemoryValue(root, value, selected));
+        }
+    }
+
     /** 관리자 서비스와 명령은 지정한 application 소유 경계에 각각 하나씩 있고 저장 타입을 갖지 않는다. */
     public static final ArchRule AGENT_ADMIN_APPLICATION_PLACEMENT = agentAdminApplicationPlacement("com.bifos.assistant");
 

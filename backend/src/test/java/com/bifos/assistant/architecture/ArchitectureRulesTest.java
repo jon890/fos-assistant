@@ -2,6 +2,7 @@ package com.bifos.assistant.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
@@ -15,7 +16,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.Map;
 import java.util.Set;
 import javax.tools.DiagnosticCollector;
@@ -24,6 +27,9 @@ import javax.tools.ToolProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -94,6 +100,72 @@ class ArchitectureRulesTest {
         return String.join(File.pathSeparator, entries);
     }
 
+
+    @Test
+    @DisplayName("두 Memory 하위 기능의 네 층을 모두 선택하고 기존 층의 누락도 없다")
+    void selectsEveryMemoryFeatureLayer() throws IOException {
+        Map<String, String> sources = new HashMap<>();
+        for (String feature : List.of("agent.memory", "memory.agent")) {
+            for (String layer : List.of("application", "domain", "infra", "presentation")) {
+                String name = "com.bifos.assistant." + feature + "." + layer + ".Sample";
+                sources.put(name, "package " + name.substring(0, name.lastIndexOf('.')) + "; public class Sample {}");
+            }
+        }
+        JavaClasses fixture = compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(sources.size());
+        for (String layer : List.of("application", "domain", "infra", "presentation")) {
+            var selector = JavaClass.Predicates.resideInAPackage(
+                "com.bifos.assistant.." + layer + "..");
+            assertThat(fixture.stream().filter(selector).map(type -> type.getName()).toList())
+                .containsExactlyInAnyOrder("com.bifos.assistant.agent.memory." + layer + ".Sample",
+                    "com.bifos.assistant.memory.agent." + layer + ".Sample");
+            var old = JavaClass.Predicates.resideInAPackage(
+                "com.bifos.assistant.(*)." + layer + "..");
+            assertThat(MAIN.stream().filter(old).filter(selector.negate()).toList()).isEmpty();
+        }
+        ArchitectureRules.FEATURE_LAYER_COVERAGE.check(MAIN);
+        ArchitectureRules.FEATURE_LAYER_COVERAGE.check(fixture);
+        ArchitectureRules.LAYER_DIRECTION.check(fixture);
+        String from = "com.bifos.assistant.agent.memory.application.Sample";
+        sources.put(from, "package com.bifos.assistant.agent.memory.application; public class Sample { "
+            + "com.bifos.assistant.agent.memory.infra.Sample store; "
+            + "com.bifos.assistant.agent.memory.domain.Sample policy; }");
+        JavaClasses application = compileFixture(temporary.resolve("application"), sources);
+        assertThat(application).hasSize(sources.size());
+        ArchitectureRules.LAYER_DIRECTION.check(application);
+        ArchitectureRules.AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY.check(application);
+    }
+
+    @ParameterizedTest
+    @MethodSource("memoryDirections")
+    @DisplayName("Memory 기능의 층 역방향과 웹 의존을 독립 fixture 로 거절한다")
+    void rejectsMemoryDirection(String origin, String target, boolean web, boolean upward) throws IOException {
+        String root = "com.bifos.assistant";
+        String from = root + "." + origin;
+        String to = target.startsWith("org.") || target.startsWith("jakarta.") ? target : root + "." + target;
+        Map<String, String> sources = new HashMap<>();
+        sources.put(from, "package " + from.substring(0, from.lastIndexOf('.'))
+            + "; public class Bad { " + to + " value; }");
+        if (to.startsWith(root)) {
+            sources.put(to, "package " + to.substring(0, to.lastIndexOf('.')) + "; public class Target {}");
+        }
+        JavaClasses fixture = compileFixture(temporary, sources);
+        assertThat(fixture.stream().filter(type -> type.getName().equals(from)).toList()).hasSize(1);
+        var rule = upward ? ArchitectureRules.AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY
+            : web ? ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB : ArchitectureRules.LAYER_DIRECTION;
+        AgentMemoryCollectionServicePlacementTest.assertViolation(rule, fixture, from, to);
+    }
+
+    static Stream<Arguments> memoryDirections() {
+        return Stream.of(
+            Arguments.of("agent.memory.infra.Bad", "agent.memory.application.Target", false, false),
+            Arguments.of("memory.agent.presentation.Bad", "memory.agent.infra.Target", false, false),
+            Arguments.of("agent.memory.domain.Bad", "agent.memory.presentation.Target", false, false),
+            Arguments.of("agent.memory.domain.Bad", "org.springframework.http.HttpStatus", true, false),
+            Arguments.of("agent.memory.domain.Bad", "jakarta.servlet.Servlet", true, false),
+            Arguments.of("agent.memory.application.Bad", "memory.application.Target", false, true),
+            Arguments.of("agent.application.Bad", "memory.agent.application.Target", false, true));
+    }
 
     @Test
     @DisplayName("기존 층 규칙은 기능별 하위 패키지의 정상 흐름도 허용한다")

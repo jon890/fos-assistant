@@ -40,6 +40,16 @@ record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모�
 `agent.presentation`은 `AgentDtos`를 쓰고,
 관리 등록·목록·수정은 `agent.admin.presentation`의 `AgentAdminDtos`를 쓴다.
 
+### 에이전트 Memory 접근 설정
+
+collection 서비스는 `agent.memory.application`, 공개 값은 그 아래 `application.model`에 둔다.
+관리자 설정 서비스와 공개 설정 값은 `memory.agent.application`과 그 아래 `application.model`에 둔다.
+HTTP 창구와 요청·응답은 `memory.agent.presentation`의 `AgentMemoryDtos`를 쓴다.
+agent는 memory를 읽지 않고 memory의 설정 서비스가 agent의 collection 서비스를 읽는다.
+검사: `ArchitectureRules.FEATURE_LAYER_COVERAGE`, `AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY`,
+`FEATURE_APPLICATION_ROLE`, `MOVED_CONTRACT_OWNERSHIP`.
+소유 타입의 누락·중복·빈 선택과 새 서비스·공개 값·HTTP 타입의 역할 위반도 raw 검사로 거절한다.
+
 ### 관리자 등록 업무
 
 수동 profile 등록과 변경은 `agent.admin.application.AgentAdminService`가 맡는다.

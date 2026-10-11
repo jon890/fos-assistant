@@ -92,6 +92,25 @@ HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는
 profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
 
+### 에이전트 Memory 접근 설정
+
+`agent.memory.application.AgentMemoryCollectionService`는 에이전트가 받는 collection과 민감 허용을 맡는다.
+공개 값 `AgentMemoryGrants`는 그 아래 `application.model`에 둔다.
+이 경계는 agent의 domain과 infra를 읽고 최상위 memory를 읽지 않는다.
+`memory.agent.application.AgentMemorySettingService`는 항목 수와 관리자 설정 흐름을 맡으며,
+Memory 목록과 저장소 및 agent의 collection 서비스를 읽는다. 공개 설정 값은 그 아래 `application.model`에 둔다.
+HTTP 창구와 다섯 요청·응답 record는 `memory.agent.presentation.AgentMemorySettingController`와 `AgentMemoryDtos`에 모은다.
+GET·PUT 경로와 `requireAdmin`, collection 변경의 첫 잠금 읽기와 트랜잭션 및 응답 재조회 시점은 유지한다.
+
+검사: `ArchitectureRules.FEATURE_LAYER_COVERAGE`, `AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY`,
+`FEATURE_APPLICATION_ROLE`, `MOVED_CONTRACT_OWNERSHIP`.
+층 선택은 기능 하위 패키지도 포함하고 기존 선택의 누락을 막는다.
+두 경계의 새 서비스와 상태 helper는 application, 공개 서비스 값은 application.model,
+HTTP 메서드가 쓰는 요청·응답 값은 같은 presentation의 Dtos 안에 둔다.
+설정 선언과 영속 타입은 각각 config와 domain.entity, 저장 enum은 domain.type에 둔다.
+옮긴 계약은 전체 운영 루트에서 이름으로 찾고 최종 FQN과 대상 수 1을 강제한다.
+누락·중복·빈 선택은 raw 검사에서 실패하며 기존 위반 기준 파일을 쓰지 않는다.
+
 ### 에이전트 관리자 등록
 
 수동 profile 등록과 변경은 `agent.admin.application.AgentAdminService`가 맡고,
