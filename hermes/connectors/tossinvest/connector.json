@@ -80,7 +80,7 @@
     },
     "get_sector": {
       "risk": "READ",
-      "description": "sectorId와 marketCountry로 섹터의 기본 정보와 기간별 등락률을 읽습니다. sectorId는 목록에서 확인한 영문·숫자·밑줄·하이픈 1~40자이며 marketCountry는 KR 또는 US입니다. result의 계층과 nullable summary, performance.changeRates의 6개 기간을 보존합니다. 데이터가 없는 기간의 changeRate는 null입니다. 등락률은 소수비율이며 0.01은 1%입니다."
+      "description": "sectorId와 marketCountry로 섹터의 기본 정보와 기간별 등락률을 읽습니다. sectorId는 목록에서 확인한 영문·숫자·밑줄·하이픈 1~40자이며 marketCountry는 KR 또는 US입니다. result의 계층과 nullable summary, performance.changeRates의 6개 기간을 보존합니다. 상세 조회에서 rankings 식별자는 랭킹 경로와 겹쳐 거절합니다. 데이터가 없는 기간의 changeRate는 null입니다. 등락률은 소수비율이며 0.01은 1%입니다."
     },
     "get_sector_stocks": {
       "risk": "READ",

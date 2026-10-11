@@ -33,7 +33,7 @@ description: 토스증권 계좌와 시세, 섹터를 읽는다. 주문하지 �
 - `get_sector_stocks`: `sectorId`와 `marketCountry`로 하위 섹터를 포함한 보통주 전체를 본다. 거래량과 금액은 데이터가 없으면 null이다
 - `get_sector_etfs`: `sectorId`와 `marketCountry`로 해당 섹터의 ETF 전체를 본다. 하위 섹터는 포함하지 않으며 symbol과 name만 제공한다
 
-섹터 조회의 `sectorId`는 영문·숫자·밑줄·하이픈 1~40자다. `marketCountry`는 `KR`이나 `US`이며 기본값은 없다. 페이지나 추가 필터는 없다.
+섹터 조회의 `sectorId`는 영문·숫자·밑줄·하이픈 1~40자다. `marketCountry`는 `KR`이나 `US`이며 기본값은 없다. 페이지나 추가 필터는 없다. `get_sector`는 랭킹 경로와 겹치는 `sectorId: rankings`를 거절한다.
 등락률 decimal은 소수비율이며 0.01은 1%다. US 거래대금과 시가총액도 원화 환산값이므로 결과의 currency를 확인한다.
 현재 도구는 모두 `READ`이며 조회만 가능하다. 금융 쓰기는 지원하지 않는다.
 

@@ -274,6 +274,31 @@ describe("섹터 조회 모듈의 SDK와 HTTP", () => {
     });
   });
 
+  test("상세의 rankings 충돌만 거절하고 주식과 ETF 경로는 허용한다", async () => {
+    await session(async (fake, client) => {
+      await expectFailure(client, "TOSSINVEST_INVALID_INPUT", "get_sector", {
+        sectorId: "rankings",
+        marketCountry: "KR",
+      });
+      expect(fake.requests).toHaveLength(0);
+      expect(fake.issued).toBe(0);
+      for (const item of cases.slice(3)) {
+        const path = item.path.replace("100", "rankings");
+        expect(operationFor("GET", path).id).toBe(item.id);
+        fake.on("GET", path, example(item.template, item.sample));
+        expect(
+          (
+            await tool(client, item.name, {
+              sectorId: "rankings",
+              marketCountry: "KR",
+            })
+          ).result.isError,
+        ).toBeUndefined();
+        expect(fake.seen("GET", path)).toHaveLength(1);
+      }
+    });
+  });
+
   test("잘못된 입력은 인증과 HTTP 전송 전에 거절한다", async () => {
     await session(async (fake, client) => {
       for (const item of cases.slice(2)) {

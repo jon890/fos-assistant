@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { envelopeMetadata } from "./api-contract.ts";
+import { TossinvestError } from "./errors.ts";
 import type { Tossinvest } from "./client.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
@@ -44,11 +45,14 @@ export function registerSectorTools(
       name,
       { sectorId, marketCountry },
       { readOnlyHint: true },
-      async ({ sectorId, marketCountry }) =>
-        read(
+      async ({ sectorId, marketCountry }) => {
+        if (name === "get_sector" && sectorId === "rankings")
+          throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
+        return read(
           `/api/v1/sectors/${encodeURIComponent(sectorId)}${suffix}`,
           new URLSearchParams({ marketCountry }),
-        ),
+        );
+      },
     );
   }
 }
