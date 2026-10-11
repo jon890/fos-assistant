@@ -37,6 +37,7 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SamplePriceCatalog;
+import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.ExecutionEvent;
@@ -50,6 +51,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -102,6 +104,9 @@ class RestartReconcilerTest {
 
     @Autowired
     RestartReconciler reconciler;
+
+    @Autowired
+    TrackingBackgroundTasks backgroundTasks;
 
     @Autowired
     RestartReconcileProperties properties;
@@ -401,26 +406,32 @@ class RestartReconcilerTest {
 
     @Test
     @DisplayName("같은 줄에 잡기와 묻기를 두 번 해도 한 번만 묻고 한 번만 적는다")
-    void claimingAndReconcilingTwiceAsksAndWritesOnce() {
+    void claimingAndReconcilingTwiceAsksAndWritesOnce() throws InterruptedException {
         AgentExecution turn = chatTurn(conversation, chief);
         AgentExecution child = delegated();
+        Instant startup = Instant.now();
         stub.willLookup(turn.hermesRunId(), finished(turn, "completed", "끝난 답"));
         stub.willLookup(child.hermesRunId(), finished(child, "completed", "조사 결과"));
         stub.willReturn(HermesRunResult.of("auto", "session", "completed", "정리한 답", "model", "provider", USAGE));
 
-        reconciler.claim();
-        reconciler.claim();
+        CompletableFuture.allOf(
+                        CompletableFuture.runAsync(() -> reconciler.claimStartedBy(startup)),
+                        CompletableFuture.runAsync(() -> reconciler.claimStartedBy(startup)))
+                .join();
         reconciler.reconcile(LONG_WAIT);
+        reconciler.claimStartedBy(startup);
         reconciler.reconcile(LONG_WAIT);
 
         AgentExecution first = awaitStatus(turn, ExecutionStatus.SUCCEEDED);
         awaitStatus(child, ExecutionStatus.SUCCEEDED);
         awaitUntil(() -> delivered(child), "위임 결과가 부모 대화에 전해지지 않았다");
+        backgroundTasks.awaitIdle(WAIT_LIMIT);
         awaitIdle(conversation.id());
         Instant deliveredAt = executions.findById(child.id()).orElseThrow().resultDeliveredAt();
 
-        reconciler.claim();
+        reconciler.claimStartedBy(startup);
         reconciler.reconcile(LONG_WAIT);
+        backgroundTasks.awaitIdle(WAIT_LIMIT);
         awaitIdle(conversation.id());
 
         assertThat(stub.lookups())
@@ -436,6 +447,51 @@ class RestartReconcilerTest {
         assertThat(again.finishedAt()).isEqualTo(first.finishedAt());
         assertThat(executions.findById(child.id()).orElseThrow().resultDeliveredAt())
                 .isEqualTo(deliveredAt);
+    }
+
+    @Test
+    @DisplayName("기동 시각으로 다시 잡으면 복구 결과를 전하는 새 자동 turn 은 건드리지 않는다")
+    void leavesNewAutoTurnRunningWhenReclaimingStartupRows() throws InterruptedException {
+        AgentExecution turn = chatTurn(conversation, chief);
+        AgentExecution child = delegated();
+        Instant startup = Instant.now();
+        stub.willLookup(turn.hermesRunId(), finished(turn, "completed", "끝난 답"));
+        stub.willLookup(child.hermesRunId(), finished(child, "completed", "조사 결과"));
+        stub.willReturn(HermesRunResult.of("auto", "session", "completed", "정리한 답", "model", "provider", USAGE));
+        CompletableFuture<Void> autoAwaiting = new CompletableFuture<>();
+        CompletableFuture<Void> releaseAuto = new CompletableFuture<>();
+        stub.beforeAwait(() -> {
+            autoAwaiting.complete(null);
+            releaseAuto.join();
+        });
+
+        try {
+            reconciler.start();
+            reconciler.resumeAfterStart();
+            awaitUntil(autoAwaiting::isDone, "자동 turn 이 결과를 기다리지 않았다");
+            AgentExecution auto = executions.findByStatus(ExecutionStatus.RUNNING).stream()
+                    .filter(row -> "auto".equals(row.hermesRunId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(auto.startedAt()).isAfter(startup);
+            assertThat(delivered(child)).isTrue();
+            assertThat(turns.markOf(conversation.id())).isEqualTo(new TurnMark(true, auto.id()));
+
+            // 기동 뒤 다시 잡아도 이 프로세스가 새로 연 자동 turn 은 대상이 아니다.
+            reconciler.resumeAfterStart();
+            reconciler.resumeAfterStart();
+        } finally {
+            releaseAuto.complete(null);
+            backgroundTasks.awaitIdle(WAIT_LIMIT);
+        }
+        assertThat(stub.lookups()).containsExactlyInAnyOrder(turn.hermesRunId(), child.hermesRunId());
+        assertThat(stub.received()).hasSize(1);
+        assertThat(executions.findByStatus(ExecutionStatus.RUNNING)).isEmpty();
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+                .filteredOn(message -> "정리한 답".equals(message.content()))
+                .hasSize(1);
+        assertThat(notices()).hasSize(1);
+        awaitIdle(conversation.id());
     }
 
     @Test

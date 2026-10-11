@@ -466,6 +466,7 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/doc
 
 `ApplicationReadyEvent` 에서 잡으면 그 사이 들어온 보내기가 같은 Hermes session 에 turn 을 하나 더 열므로, 잡기는 웹 서버를 여는 lifecycle 보다 앞선 phase 의 `SmartLifecycle` 에서 한다.
 잡기가 실패해도 기동은 이어 가고, 묻기 단계가 기동하기 전에 시작한 줄만 다시 잡는다. 웹 서버가 열린 뒤 새로 시작한 turn 의 줄을 건드리지 않기 위해서다.
+복구한 위임 결과를 전하려고 새로 열린 자동 turn 도 같은 기준으로 제외한다. 기동 뒤 잡기를 다시 해도 기동 시각을 유지한다.
 `assistant.restart-reconcile.enabled` 를 false 로 두면 잡지도 묻지도 않는다. 테스트 profile 이 이렇게 돌고, 운영에서 끄면 `RUNNING` 줄이 그대로 남는다.
 
 | 실행 | 판정 | 끝났을 때 적는 것 | 아직 돌 때 |
