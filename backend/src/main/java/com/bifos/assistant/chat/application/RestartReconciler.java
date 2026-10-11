@@ -89,7 +89,7 @@ public class RestartReconciler implements SmartLifecycle {
     private final Map<Long, Claimed> pending = new LinkedHashMap<>();
 
     /** 이 클래스가 잡은 turn 잠금이다. 대화 번호가 열쇠다. {@code this} 로 지킨다. */
-    private final Map<Long, ConversationLock> locks = new HashMap<>();
+    private final Map<Long, RecoveredConversationLock> locks = new HashMap<>();
 
     /**
      * 지금 정하고 있는 실행 번호와, 그 묻기가 시작할 때의 {@link #stopCount} 다. 같은 줄에 스레드를 둘 띄우지 않으려고 둔다.
@@ -277,11 +277,11 @@ public class RestartReconciler implements SmartLifecycle {
      * 잠금을 얻은 뒤에만 센다. 도중에 예외가 나면 이 줄에서 새로 잡은 잠금을 닫고 올린다. 그래서 잡기를 다시 불러도
      * 같은 줄로 두 번 세지 않는다.
      */
-    private ConversationLock lockFor(AgentExecution row) {
+    private RecoveredConversationLock lockFor(AgentExecution row) {
         if (!holdsConversation(row)) {
             return null;
         }
-        ConversationLock lock = locks.get(row.conversationId());
+        RecoveredConversationLock lock = locks.get(row.conversationId());
         boolean opened = lock == null;
         if (opened) {
             TurnHandle handle;
@@ -296,7 +296,7 @@ public class RestartReconciler implements SmartLifecycle {
                 return null;
             }
             // 흐름 turn 의 자식 줄이면 루트 실행 번호를 붙인다. 사용자의 중지와 running 경로가 루트 번호로 찾는다.
-            lock = new ConversationLock(row.conversationId(), row.treeRootId(), handle);
+            lock = new RecoveredConversationLock(row.conversationId(), row.treeRootId(), handle);
         }
         Long markedExecutionId = lock.executionId;
         try {
@@ -318,11 +318,7 @@ public class RestartReconciler implements SmartLifecycle {
         if (opened) {
             locks.put(row.conversationId(), lock);
         }
-        lock.remaining++;
-        lock.executionIds.add(row.id());
-        if (row.parentExecutionId() == null) {
-            lock.rootClaimed = true;
-        }
+        lock.claim(row);
         return lock;
     }
 
@@ -509,7 +505,7 @@ public class RestartReconciler implements SmartLifecycle {
      * <p>루트 줄이 이미 끝나고 자식만 돌던 흐름 turn 이면 여기서 화면에 끝났음을 알린다. 루트 줄을 함께 정했으면
      * {@link RecoveredRunRecorder} 가 이미 알렸으므로 내지 않는다.
      */
-    private void release(ConversationLock lock) {
+    private void release(RecoveredConversationLock lock) {
         if (lock == null) {
             return;
         }
@@ -553,7 +549,7 @@ public class RestartReconciler implements SmartLifecycle {
     }
 
     /** 화면이 「답을 만드는 중」 을 내리도록 알린다. 흐름은 이어 가지 못하므로 답 없이 끝난다. 지운 대화에는 내지 않는다. */
-    private void announceFlowEnded(ConversationLock lock, boolean stopped) {
+    private void announceFlowEnded(RecoveredConversationLock lock, boolean stopped) {
         Conversation conversation = conversations
                 .findById(lock.conversationId)
                 .filter(found -> found.deletedAt() == null)
@@ -574,7 +570,7 @@ public class RestartReconciler implements SmartLifecycle {
      * <p>프로세스가 내려가면 함께 사라지는 것들이다. 같은 프로세스에서 다시 시작할 때만 남아 있다.
      */
     private void discardLeftovers() {
-        List<ConversationLock> leftovers;
+        List<RecoveredConversationLock> leftovers;
         synchronized (this) {
             leftovers = new ArrayList<>(locks.values());
             locks.clear();
@@ -586,30 +582,5 @@ public class RestartReconciler implements SmartLifecycle {
     }
 
     /** 기억한 줄 하나와, 그 줄 때문에 잡은 잠금이다. 잡지 않았으면 null 이다. */
-    private record Claimed(AgentExecution row, ConversationLock lock) {}
-
-    /** 이 클래스가 잡은 대화 하나의 turn 잠금이다. 바뀌는 값은 바깥 객체로 지킨다. */
-    private static final class ConversationLock {
-        private final Long conversationId;
-
-        /** 중지 표시에 붙인 실행 번호다. 그 대화에서 먼저 잡은 줄의 루트 실행이다. */
-        private final Long executionId;
-
-        private final TurnHandle handle;
-
-        /** 이 잠금을 함께 쓰는 줄 가운데 아직 정해지지 않은 수다. */
-        private int remaining;
-
-        /** 이 잠금을 함께 쓰는 줄의 실행 번호다. 풀 때 취소로 끝난 줄이 있는지 본다. */
-        private final List<Long> executionIds = new ArrayList<>();
-
-        /** 루트 줄도 이 잠금으로 정한다. 거짓이면 루트가 이미 끝나고 자식만 돌던 흐름 turn 이다. */
-        private boolean rootClaimed;
-
-        private ConversationLock(Long conversationId, Long executionId, TurnHandle handle) {
-            this.conversationId = conversationId;
-            this.executionId = executionId;
-            this.handle = handle;
-        }
-    }
+    private record Claimed(AgentExecution row, RecoveredConversationLock lock) {}
 }
