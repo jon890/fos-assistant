@@ -1,4 +1,4 @@
-package com.bifos.assistant.memory.domain;
+package com.bifos.assistant.memory.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
@@ -24,14 +24,17 @@ public class ServiceTokenCollection {
     @Column(name = "allow_sensitive", nullable = false)
     private boolean allowSensitive;
 
+
     private ServiceTokenCollection(Long tokenId, String collection, boolean allowSensitive) {
         this.id = new ServiceTokenCollectionId(tokenId, collection);
         this.allowSensitive = allowSensitive;
     }
 
+
     public static ServiceTokenCollection of(Long tokenId, String collection, boolean allowSensitive) {
         return new ServiceTokenCollection(tokenId, collection, allowSensitive);
     }
+
 
     public String collection() {
         return id.collection();

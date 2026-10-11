@@ -7,7 +7,7 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.application.model.MemorySearchItem;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
