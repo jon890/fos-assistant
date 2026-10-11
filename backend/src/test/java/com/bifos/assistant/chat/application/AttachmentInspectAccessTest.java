@@ -51,15 +51,16 @@ class AttachmentInspectAccessTest {
     private final ChatAttachment photo = mock(ChatAttachment.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final AttachmentService service = new AttachmentService(
-            access,
-            attachments,
-            store,
-            null,
-            Clock.fixed(now, ZoneOffset.UTC),
-            null,
-            inspection,
-            mock(AttachmentCleaner.class),
-            transactions);
+        access,
+        attachments,
+        store,
+        null,
+        Clock.fixed(now, ZoneOffset.UTC),
+        null,
+        inspection,
+        mock(AttachmentCleaner.class),
+        transactions);
+
 
     @BeforeEach
     void setUp() {
@@ -72,10 +73,11 @@ class AttachmentInspectAccessTest {
         when(photo.isVisible()).thenReturn(true);
         when(photo.expiresAt()).thenReturn(now.plusSeconds(1));
         when(attachments
-                        .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
-                                7L, 2L, 1L, now))
-                .thenReturn(true);
+            .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                7L, 2L, 1L, now))
+                    .thenReturn(true);
     }
+
 
     @Test
     @DisplayName("GIF 원본의 20MiB 상한과 저장 크기 및 MIME magic을 확인하고 Java decode는 하지 않는다")
@@ -83,10 +85,10 @@ class AttachmentInspectAccessTest {
         when(photo.contentType()).thenReturn("image/gif");
         byte[] bytes = new byte[20 * 1024 * 1024];
         System.arraycopy(new byte[] {'G', 'I', 'F', '8', '9', 'a'}, 0, bytes, 0, 6);
-        when(photo.byteSize()).thenReturn((long) bytes.length);
+        when(photo.byteSize()).thenReturn((long)bytes.length);
         when(store.open(photo)).thenAnswer(invocation -> new ByteArrayInputStream(bytes));
         assertThat(service.inspect(user, 2L, 7L, null).bytes()).containsExactly(bytes);
-        when(photo.byteSize()).thenReturn((long) bytes.length + 1);
+        when(photo.byteSize()).thenReturn((long)bytes.length + 1);
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
         byte[] overflow = Arrays.copyOf(bytes, bytes.length + 1);
         when(store.open(photo)).thenReturn(new ByteArrayInputStream(overflow));
@@ -97,17 +99,19 @@ class AttachmentInspectAccessTest {
         verify(inspection, never()).read(any(), any(), any());
     }
 
+
     @Test
     @DisplayName("캐시의 첨부가 유효해도 SQL 상태가 바뀌면 재검증을 거절한다")
     void rejectsSqlRevocationEvenWhenCachedEntityIsVisible() {
         service.validateInspection(user, 2L, 7L);
         when(attachments
-                        .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
-                                7L, 2L, 1L, now))
-                .thenReturn(false);
+            .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                7L, 2L, 1L, now))
+                    .thenReturn(false);
         assertThatThrownBy(() -> service.validateInspection(user, 2L, 7L)).isInstanceOf(ApiException.class);
         verifyNoInteractions(inspection, store);
     }
+
 
     @Test
     @DisplayName("다른 대화와 업로더 및 미전송 삭제 만료 사진을 거절한다")
@@ -127,6 +131,7 @@ class AttachmentInspectAccessTest {
         verifyNoInteractions(inspection);
     }
 
+
     @Test
     @DisplayName("보낸 지난 사진을 허용하되 읽는 중 삭제되면 반환하지 않는다")
     void allowsSentPastPhotoButDeletionDuringReadDoesNotReturnPixels() {
@@ -140,6 +145,7 @@ class AttachmentInspectAccessTest {
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
     }
 
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @DisplayName("열기 뒤 SQL 검사에서 접근이 차단되면 스트림을 닫고 닫기 실패도 원래 거절을 가리지 않는다")
@@ -152,10 +158,11 @@ class AttachmentInspectAccessTest {
         assertThatThrownBy(() -> service.read(user, 2L, 7L)).isInstanceOfSatisfying(ApiException.class, ex -> {
             assertThat(ex.code()).isEqualTo(ErrorCode.ATTACHMENT_GONE);
             assertThat(ex.getSuppressed())
-                    .containsExactly(failClose ? new Throwable[] {closeFailure} : new Throwable[0]);
+                .containsExactly(failClose ? new Throwable[] {closeFailure} : new Throwable[0]);
         });
         assertThat(closed).isTrue();
     }
+
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -170,8 +177,9 @@ class AttachmentInspectAccessTest {
         assertThatThrownBy(() -> service.read(user, 2L, 7L)).isSameAs(sqlFailure);
         assertThat(closed).isTrue();
         assertThat(sqlFailure.getSuppressed())
-                .containsExactly(failClose ? new Throwable[] {closeFailure} : new Throwable[0]);
+            .containsExactly(failClose ? new Throwable[] {closeFailure} : new Throwable[0]);
     }
+
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -192,6 +200,7 @@ class AttachmentInspectAccessTest {
         assertThatThrownBy(() -> service.read(user, 2L, 7L)).isSameAs(failure);
         assertThat(closed).isTrue();
     }
+
 
     private static InputStream trackedStream(AtomicBoolean closed, IOException failure) {
         return new ByteArrayInputStream(new byte[] {1}) {
