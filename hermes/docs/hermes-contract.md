@@ -546,7 +546,7 @@ v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 운영 Hermes 에서 왕
 | session 기록 | 이미지 파트는 `[screenshot]` 글로 저장된다(`session_persistence.py` 의 `_durable_content`). 다음 실행의 기록에 이미지가 다시 실리지 않는다 |
 | 같은 턴의 도구 루프 | 모델을 다시 부를 때마다 사용자가 올린 이미지가 다시 실린다. 요청에서 빼는 정책은 도구 결과 이미지에만 적용된다 |
 | 압축이 그 턴에 돈다 | 원본 파트가 기록에 남을 수 있다. 압축은 가장 최근 이미지 메시지 앞의 이미지를 「[Attached image — stripped after compression]」 으로 바꾼다 |
-| API 오류 | 요청 전체를 `request_dump_*.json` 으로 남긴다. base64 가 들어간다 |
+| API 오류 | upstream 기본 writer는 요청 전체를 `request_dump_*.json`으로 남기며 base64도 들어간다. 관리 addon의 [본문 없는 요청 진단](#본문-없는-요청-진단)은 설치한 interpreter의 이 writer만 교체한다 |
 | `pre_llm_call`, `post_llm_call` hook | `user_message` 로 목록을 그대로 받는다. 우리 plugin 은 두 hook 을 쓰지 않는다 |
 | 사용량 | 이미지 토큰을 따로 나누지 않는다. provider 가 준 입력 토큰에 섞인다 |
 | `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다. openai-codex 의 클라이언트는 `low` 를 지원하지 않는다며 막는다 |
@@ -799,6 +799,143 @@ v2026.9.24 소스에서 확인했다. API server 가 `DELETE /api/sessions/{sess
 | 인증 | 그 profile 의 key 를 `Authorization: Bearer` 로 보낸다. 실행 경로와 같다 |
 
 Control Plane 은 지운 대화를 정리할 때 이 경로를 부른다. 근거는 [ADR-20261008 / conversation-purge](../../backend/docs/adr/ADR-20261008-conversation-purge.md) 에 있다.
+
+## 본문 없는 요청 진단
+
+고정 upstream의 `HERMES_DUMP_REQUESTS`는 preflight만 켜거나 끈다. 두 terminal 오류는 이 값과 무관하게
+`agent.agent_runtime_helpers.dump_api_request_debug`를 호출한다. `HERMES_DUMP_REQUEST_STDOUT`은
+파일 저장 뒤 stdout에도 같은 내용을 출력하는 옵션이며 전체 dump 금지가 아니다.
+`SessionPersistenceMixin`의 lazy forward는 매 호출에 module 속성을 읽으므로 consumer를 먼저 import해도
+첫 호출 전에 설치한 writer를 쓴다. [ADR-20261012 / bodyless-request-diagnostics](adr/ADR-20261012-bodyless-request-diagnostics.md)가 이 내부 교체를 제한한다.
+
+### 설치와 소유
+
+`hermes/runtime/`은 일반 runtime addon이며 PluginManager의 선택 등록으로 필수 설치를 보장하지 않는다.
+관리 bootstrap은 별도 관리 import 경로에서 `from runtime import install_bodyless_writer`를 불러
+`install_bodyless_writer(*, resolver, fingerprints)`로 첫 writer 호출 전에 설치한다.
+반환 writer의 인자는 `(agent, api_kwargs, *, reason, error=None)`이고 반환은 `Path | None`이다.
+같은 resolver 객체와 지문만 멱등이다. 지문·resolver·현재 helper identity 불일치는 고정
+`InstallationError("bodyless_installation_failed")`이며 원문 writer를 호출하지 않는다.
+
+`fingerprints`는 `hermes/tests/hermes_contract.py`의 `BODYLESS_REQUEST_FILES`에 선언한 다섯 상대 파일 이름과
+소문자 SHA-256 64자만 가진 dict다. 누락·추가·잘못된 타입과 형식을 거절한다.
+설치 시 전체 파일 hash, 정확한 위치·키워드 인자와 기본값, 현재 helper의 code를 고정 source와 대조한다.
+기대값은 private의 독립적으로 승인·봉인한 release manifest에서 전달한다.
+기동 때 관측한 자기 hash나 profile의 쓰기 가능한 설정으로 기대값을 다시 만들지 않는다.
+
+process-global 소유 module은 profile plugin의 register·reload·unload와 별개로 설치 identity를 유지한다.
+cleanup에 원문 복원 함수를 제공하지 않는다. runtime bundle 자체를 profile loader로 로드하지 않는다.
+core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바꾸지 않는다.
+설치 실패 때 관리 bootstrap은 고정 오류만 출력하고 main을 시작하지 않아야 한다.
+설치 실패와 진단 I/O 실패는 다르다. I/O 실패는 `None`이며 기존 오류 결과·session 저장·실패 실행 기록을 유지한다.
+이미 만들어진 부모 execution은 failed로 남길 수 있다. 범용 reservation·new run·provider 횟수 0을 요구하지 않는다.
+
+### 관리 bootstrap의 추가 내부 의존
+
+아래 계약은 private 관리 owner가 사용하는 일반 내부 경계다. 공개 writer 설치 API의 인자와
+`BODYLESS_REQUEST_FILES`의 다섯 파일 지문에는 추가하지 않는다.
+`hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 고정 공식 commit의 정확한
+위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
+`BODYLESS_MANAGED_MODULE_NODES`는 문맥 저장소와 `contextvars` import,
+cron module의 `sys` import·child 진입점을 선언한다.
+두 문맥 module의 `ContextVar`·`Token`과 선언된 저장소·함수 이름은 module scope에서 한 번만
+bind되는지 검사한다. 대입·삭제·import·정의 외에 exception target과 match capture도 센다.
+함수·class 안의 로컬 이름은 module binding으로 세지 않는다.
+명시 home의 직접 helper인 `load_env_file`도 함수 AST를 별도로 선언한다.
+AST 지문은 행 번호·공백·주석을 제외하며 함수 본문의 변경도 재검토 대상으로 삼는다.
+실제 source에서 선택한 get·set·reset을 실행해 복사 문맥의 격리와 token 복원을 확인한다.
+loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환 dict가 섞이지 않고,
+프로세스 환경을 읽어 대체하거나 변경하지 않는지 확인한다.
+이 분리 실행에 필요한 parser·cache·stat helper는 실행하되 전이 의존 전체의 지문을 선언하지 않는다.
+
+| 내부 경계 | 관리 owner가 기대는 동작 |
+| --- | --- |
+| `agent.agent_init.init_agent` | 실제 초기화 경계다. owner는 정확한 agent class와 객체 identity를 확인해 먼저 등록하고, 초기화 실패 때 해제한다 |
+| `run_agent.AIAgent.__init__`·`close` | constructor는 호출 안에서 initializer를 import한다. close wrapper는 원래 함수를 부르며 성공·실패 모두에서 등록을 해제한다 |
+| `tools.delegate_tool._build_child_agent` | 명시 `parent_agent`를 받아 같은 interpreter의 `AIAgent`를 만든다. owner는 등록된 부모 identity에서 자식 capability를 전달한다 |
+| `agent.secret_scope` | `build_profile_secret_scope`에 명시 home을 주고 `set_secret_scope`에 그 home을 함께 기록한다. `current_secret_scope_home`으로 확인하고 token을 `reset_secret_scope`로 복원한다 |
+| `hermes_constants` | home override의 get·set·reset은 context-local이다. set이 준 token으로 이전 문맥을 복원한다 |
+| `cron.scheduler` | parent는 module-global `sys.executable`로 child argv를 만들고 module 이름·payload·ack 인자를 전달한다. 환경을 정리해 spawn하고 ack와 조기 종료를 확인한다. child는 payload를 읽고 소유권 인수·ack 뒤 job을 실행하며 문맥 token을 복원한다 |
+
+`cron.scheduler.run_one_job`의 정확한 signature와 함수 AST도 별도로 선언한다.
+이 정의가 module의 같은 이름을 한 번만 bind하는지 확인해 후속 대입·삭제·재import·중복 정의와
+exception target·match capture를 거절한다. 조건문 안도 검사하며 함수·class 로컬 scope는 제외한다.
+이 검사는 명시된 source AST의 binding을 확인하며 동적인 `globals()` 변경까지 막는 보장은 아니다.
+전체 source hash와 실제 callable·code 검사는 별도의 private 보호다.
+worker는 호출 시점에 이 module binding을 조회한다. worker의 분리 실행은 검증한 payload 객체의
+`read_text(encoding="utf-8")`·`unlink(missing_ok=True)`를 소비하고 durable adoption과
+atomic ack 게시가 성공한 뒤 job을 호출하는지 확인한다. adoption·ack 실패 때 job을 호출하지 않고,
+ack 뒤 job이 `False`를 반환하면 ack를 보존하며 그 실패를 그대로 반환한다.
+저장소와 secret/profile 적재는 대역이며 실제 `run_one_job` 전체 실행이나 운영 저장을 검증하지 않는다.
+
+resolver는 약한 registry에 등록된 실제 agent identity만 읽는다. 등록되지 않은 부모와 다른 profile의
+capability, 현재 secret/home 문맥과 맞지 않는 capability는 생성 전에 거절한다.
+owner는 생성·close 실패와 순환 객체 수거 때 등록을 해제하고, profile plugin reload/unload와
+bootstrap 재import 뒤에도 같은 process owner identity를 유지해야 한다.
+thread로 문맥을 전달할 때는 명시적으로 복사하며 전역 home을 대체 값으로 쓰지 않는다.
+
+cron adapter는 scheduler module의 executable 조회만 proxy로 제한한다. 이 proxy는 공식 Hermes API가 아니다.
+프로세스 전체 `sys.executable`과 subprocess 전역을 교체하지 않는다.
+release 봉인과 런타임 callable·signature·code 대조, 관리 진입점 연결은 private owner의 책임이다.
+공개 source 계약 시험은 전체 `AIAgent`·실제 parent·provider 네트워크를 실행하지 않는다.
+private prototype의 합성 검증과 실제 image 시험·활성화 수락도 이 source 검사로 대체하지 않는다.
+공개 변경의 actual main 반영과 private 활성화는 아직 완료되지 않았다.
+
+### resolver와 파일 쓰기
+
+`resolver(agent) -> str | None`은 bootstrap이 검증한 agent 바인딩의 기존 절대 디렉터리를 반환한다.
+권한과 바인딩 수명, 같은 interpreter의 자식에게 올바른 바인딩을 전달하는 일은 private owner가 맡는다.
+요청 `api_kwargs`·agent의 사용자 입력 속성·cwd·전역 profile과 다른 profile의 기본 경로로 목적지를 정하지 않는다.
+resolver는 동시 호출에 안전해야 하며 profile마다 검증한 목적지를 독립적으로 반환해야 한다.
+공개 addon은 권한을 새로 만들거나 resolver가 고른 profile이 맞다고 인증하지 않는다.
+
+`None`, resolver 예외·잘못된 반환값, 읽기 전용·미지원 플랫폼·추출·쓰기 실패는 출력 없이 `None`이다.
+원문 writer나 agent logger·stdout 옵션으로 fallback하지 않는다. 부모 디렉터리를 만들거나 cwd로 넘어가지 않는다.
+각 부모를 POSIX `O_DIRECTORY | O_NOFOLLOW` dirfd로 열고 leaf를 `O_EXCL | O_NOFOLLOW`, 0600으로 생성한다.
+이름은 무작위이며 session·profile·본문을 넣지 않는다. 충돌은 덮어쓰지 않고 실패한다.
+불완전 쓰기는 생성한 leaf만 dirfd로 정리한다. 부모 경로 교체는 열린 FD의 쓰기 대상을 바꾸지 않는다.
+private owner는 목적지 디렉터리를 요청자가 바꾸거나 옮길 수 없게 유지한다.
+
+### 기록과 완전성
+
+JSON은 `reason`, `error`, `counts`만 갖는다. 본문·이미지·URL·token·경로·session 식별자·오류 문구·stack은 없다.
+`reason`은 세 callsite의 고정 값 또는 `unknown`이다. `error`는 정확한 built-in 예외 타입으로만 분류하며
+`none`, `timeout`, `connection`, `permission`, `value`, `type`, `io`, `other` 중 하나다.
+SDK 예외와 임의 하위 타입은 `other`이고 property·class 이름·str·repr을 읽지 않는다.
+
+| 수치 | 뜻 |
+| --- | --- |
+| `text_parts`, `image_parts`, `other_parts` | 알려진 content에서 관측한 text·image·미지원 파트 수 |
+| `text_chars`, `text_bytes` | Python code point 수와 검사한 유효 UTF-8 바이트 수 |
+| `image_encoded_chars`, `image_bytes` | base64 문자열의 길이와 검증한 decoded 크기 또는 직접 받은 bytes 길이 |
+| `completeness` | `complete`, `unknown`, `invalid`, `cycle`, `limit` 중 하나 |
+
+Chat Completions의 `messages.content`, Responses의 `input`·`function_call_output.output`, Anthropic의
+text·base64 image·tool_result, Gemini의 `contents.parts`·inlineData와 각 계열의 system/instructions를 읽는다.
+native tool 이미지도 같은 알려진 content 모양으로 센다. 원격 image URL·file id·Gemini fileData는 읽거나 다운로드하지 않는다.
+Gemini functionResponse의 parts는 읽되 임의 response 객체는 탐색하지 않아 `unknown`이다.
+모르는 파트와 추가 content 필드, tool call 인자와 미지원 응답은 `unknown`이며 전체 본문 크기로 추정하지 않는다.
+모델·tools schema·transport 설정·headers와 임의 root 필드는 이 content 집계의 대상이 아니다.
+
+`complete`는 지원하는 content의 집계가 끝났다는 뜻이며 이미지가 실제로 디코딩·판독된다는 뜻은 아니다.
+그 밖의 수치는 관측한 하한이다. 0을 확정된 전체 수치로 해석하지 않는다.
+여러 문제가 있으면 `limit > cycle > invalid > unknown` 우선순위로 기록한다.
+한 요청의 노드·파트·깊이·문자 검사량과 dict 필드 검사량은 `runtime/request_counts.py`의 상수로 제한한다.
+큰 문자열의 길이는 복사 없이 읽고 UTF-8/base64 검증만 제한한다. 본문 변경·deepcopy·전체 직렬화·이미지 decoding은 하지 않는다.
+
+### 검증과 수락 경계
+
+공식 고정 source에서 실제 helper code·lazy forward·세 callsite를 분리 실행하고,
+엄격한 provider·session 대역으로 입력 identity와 기존 실패 결과를 대조한다. source 바이트 불변도 확인한다.
+합성 fixture·POSIX writer·동시 profile과 consumer 선행 설치 검사는 전체 Hermes import·실 provider·관리 topology 검사를 대신하지 않는다.
+알려진 alias 검사는 지원 core와 이 저장소의 설치 plugin 범위다. 기존 direct callable alias와 설치 뒤 helper 변조는 우회 반례이며,
+재설치의 identity 검출을 임의 host와 악성 코드 전체의 불변으로 확대하지 않는다.
+
+실제 parent·s6·PM relaunch·gateway 정상 restart, 두 profile reload/unload와 새 interpreter 설치는 private 후속 수락 조건이다.
+immutable manifest는 image·실제 interpreter·core helper와 lazy forward/callsite·writer bundle·adapter를 독립적으로 봉인한다.
+SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 별도로 수락해야 한다.
+이 writer는 새 요청 진단과 자신의 출력만 제한한다. SDK·framework·session·trajectory 전체 가림이나 운영 보호 완료를 증명하지 않는다.
+운영 연결과 배포 뒤 실제 Hermes 왕복은 `fos-home-infra`가 맡는다.
 
 ## 동시 실행
 
@@ -2650,13 +2787,44 @@ private 자식에만 `--content-snapshot-operation compile`을 붙인다. 공개
 MCP 실제 목록에 read-only compile 하나만 있어야 호출한다. Python mcp 2.0.0과 TypeScript SDK 1.28.0 stdio 왕복을 합성 입력으로 검사한다.
 compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다.
 adapter 자체는 오류 원문·인자·결과를 로그에 넣지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
-Python MCP SDK는 잘못된 stdout을 `logger.exception`으로 기록하며 현재 그 본문은 가리지 않는다.
-SDK와 프레임워크 진단 전체의 본문 가림은 아직 구현·검증되지 않았다.
+compile의 Python MCP SDK 진단은 아래 source 계약에 따라 본문 없이 남긴다.
 입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#compile-전용-내부-transport)이 갖는다.
 
-본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
-후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
+본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
+운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
 최초 원고 MCP 생성·DB·승인·worker 시작·조회와 실제 네이버 접근은 이번 compile 경계의 범위 밖이다.
+
+### compile 전용 SDK 진단
+
+`connector_diagnostics.py`의 내부 API는 `ensure_snapshot_diagnostics()`와 `snapshot_diagnostics_scope()`다.
+Python mcp 정확히 2.0.0의 전체 Python source 122개를 `connector_diagnostics_source.json`과 대조한다.
+최초 설치에서 파일 목록과 bytes SHA-256, import한 실행 module의 파일과 logger 객체·이름을 검사한다.
+공식 [PyPI mcp 2.0.0](https://pypi.org/project/mcp/2.0.0/) wheel SHA-256은 `1cb4c75d2d2c7b8c1d756355e5d82a39f2822cc7f13e22a2051d7ca3592349d6`다.
+logger는 `mcp.client.stdio`, `client`, `mcp.shared.jsonrpc_dispatcher`다.
+SDK source 계약 자료는 plugin 묶음에도 포함한다.
+
+Filter와 그 ContextVar는 프로세스 수명 동안 logger 객체에 남기고 profile reload에서도 재사용한다.
+매 compile은 같은 정책과 첫 filter 부착 상태를 확인한 뒤 SDK task를 만든다.
+알 수 없는 앞선 filter, 다른 정책, 지원 source 불일치나 읽기 실패는 자식 생성 전 고정 unavailable 503으로 끝난다.
+profile 관리 API 전체를 닫거나 unload에서 Filter를 제거하지 않는다.
+source 검사는 최초 설치 때 수행하며 설치된 source는 프로세스 실행 중 바뀌지 않는다는 계약을 전제로 한다.
+
+scope는 stdio와 ClientSession context 전체 및 취소 뒤 정리를 감싼다.
+SDK child task는 ContextVar를 상속하며 호출 task는 정리 뒤 token을 reset한다.
+scope 안에서 msg, args, exc_info, exc_text, stack_info와 cached message를 제거한다.
+원문을 format하거나 예외의 str/repr를 호출하지 않고 `mcp diagnostic body omitted`만 기록한다.
+logger 이름, severity, record 수와 정상 RPC 결과는 유지한다.
+source logger Filter이므로 direct·ancestor handler에 모두 적용되며 다른 logger와 scope 밖 로그는 그대로다.
+부모 logger Filter만으로는 descendant record를 보호하지 못한다.
+
+지원 SDK를 올리는 변경의 구현자가 새 공식 wheel 배포 SHA와 설치 source 전체의 byte 일치를 먼저 검증한다.
+그 뒤 source manifest를 갱신하고 reachable logger와 custom extra 사용을 검토하며 실제 표식 시험을 다시 통과시킨다.
+단순 version 갱신이나 세 emission 파일만의 hash 갱신으로 지원 source를 바꾸지 않는다.
+필수 회귀는 `test_connector_diagnostics.py`와 `test_connector_diagnostics_transport.py`가 갖는다.
+
+이 보장은 compile SDK 진단에 한정된다.
+Filter 전에 본문을 저장하는 record factory, logging 자체의 실패를 출력하는 custom handler와 framework 예외는 별도 정책이 필요하다.
+이미 열린 gateway task, trajectory·session 저장과 공개 A1 request_dump writer도 보호 완료로 판정하지 않는다.
 
 ### 커넥터 정책이 기대는 계약
 
@@ -2676,7 +2844,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 
 서비스별 계약은 [커넥터 연결](../../docs/features/connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 커넥터의 기존 client와 범용 승인 plugin 경계를 사용한다.
-Bun client는 [공식 OpenAPI 1.2.24](../connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)의 41 operation 고정 계약과 19그룹 예산을 갖는다. 현재 도구가 사용하는 인증·조회 operation의 정본은 [api-contract.ts](../connectors/tossinvest/src/api-contract.ts)의 `CURRENT_OPERATIONS`이며, 여기에 선언한 operation이 이 큐를 사용한다. 나머지 operation의 producer는 아직 구현하지 않았다.
+Bun client는 [공식 OpenAPI 1.2.24](../connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)의 41 operation 고정 계약과 19그룹 예산을 갖는다. READ 도구 33개는 GET 34개와 내부 인증 1개를 사용한다. 인증·조회 operation의 정본은 [api-contract.ts](../connectors/tossinvest/src/api-contract.ts)의 `CURRENT_OPERATIONS`이며, 여기에 선언한 operation이 이 큐를 사용한다. 나머지 6개 금융 producer는 구현·등록하지 않았다. 새 조회 도구의 운영 반영은 배포 뒤 확인해야 한다.
 
 ### 그룹별 예산
 

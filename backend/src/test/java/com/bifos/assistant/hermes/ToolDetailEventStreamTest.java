@@ -33,7 +33,9 @@ class ToolDetailEventStreamTest {
                 "list_media_observations",
                 "record_media_observation",
                 "mcp__fos_assistant__list_media_observations",
-                "mcp__fos_assistant__record_media_observation")) {
+                "mcp__fos_assistant__record_media_observation",
+                "content_draft_write", "content_draft_read",
+                "mcp__fos_assistant__content_draft_write", "mcp__fos_assistant__content_draft_read")) {
                 for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
                     for (boolean nested : new boolean[] {false, true}) {
                         for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {

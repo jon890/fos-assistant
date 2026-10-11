@@ -1,9 +1,14 @@
 "use client";
 
+import { useRef } from "react";
 import { describeError } from "@/components/error-message";
 import { emptyActivity } from "./activity/activity-state";
 import type { Turn } from "./message-bubble";
-import { fetchConversationMessages, fetchRunningTurn } from "@/lib/chat-api";
+import {
+  createConversation,
+  fetchConversationMessages,
+  fetchRunningTurn,
+} from "@/lib/chat-api";
 import { foldVersions } from "@/lib/message-versions";
 import {
   RunningTurn,
@@ -40,7 +45,7 @@ type Context = Pick<
   | "turns"
   | "setSelectedVersions"
 > &
-  Pick<ConversationSessionProps, "onConversationIdChange">;
+  Pick<ConversationSessionProps, "onConversationIdChange" | "agentCode">;
 
 export function useConversationHistory({
   disposed,
@@ -63,11 +68,46 @@ export function useConversationHistory({
   turns,
   setSelectedVersions,
   onConversationIdChange,
+  agentCode,
 }: Context) {
+  const creatingConversation = useRef<Promise<string | null> | null>(null);
+
   function assignConversationId(id: string) {
     if (disposed.current) return;
     conversationIdRef.current = id;
     onConversationIdChange(id);
+  }
+
+  /** 사진·모델 선택과 송신이 같은 빈 대화를 확보한다. 실패한 생성 요청은 자동 재시도하지 않는다. */
+  async function ensureConversation(
+    refreshList = true,
+  ): Promise<string | null> {
+    if (conversationIdRef.current !== null) return conversationIdRef.current;
+    if (creatingConversation.current !== null)
+      return creatingConversation.current;
+    const version = selectionVersion.current;
+    const promise = (async () => {
+      const response = await createConversation(agentCode);
+      const payload = await readPayload<
+        ErrorPayload & { conversationId?: string }
+      >(response);
+      if (!response.ok || !payload.conversationId)
+        throw new Error(
+          "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+        );
+      if (disposed.current || selectionVersion.current !== version) return null;
+      window.history.replaceState(null, "", `/chat/${payload.conversationId}`);
+      assignConversationId(payload.conversationId);
+      // 첫 송신은 started가 목록을 읽는다. 사진·모델 선택은 빈 대화를 바로 목록에 보인다.
+      if (refreshList) void refresh();
+      return payload.conversationId;
+    })();
+    creatingConversation.current = promise;
+    try {
+      return await promise;
+    } finally {
+      creatingConversation.current = null;
+    }
   }
 
   /**
@@ -260,6 +300,7 @@ export function useConversationHistory({
     });
   }
   return {
+    ensureConversation,
     assignConversationId,
     beginObserving,
     handOffInterruptedStream,
