@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { guard } from "./errors.ts";
 import { z } from "zod";
+import manifest from "../connector.json";
 
 export type RegisterTool = (
   name: string,
@@ -10,38 +11,6 @@ export type RegisterTool = (
 ) => void;
 
 export function createToolRegistration(server: McpServer) {
-  const descriptions: Record<string, string> = {
-    list_accounts:
-      "연결한 토스증권 계좌의 순번과 유형, 계좌번호 끝 네 자리를 읽습니다. 입력 인자는 없습니다. accounts에 정확한 문자열 account_seq, account_type, 마스킹한 label을 돌려줍니다. 공식 result의 계좌번호도 마스킹하며 계좌를 만들거나 변경하지 않습니다.",
-    get_quotes:
-      "symbols에 쉼표로 구분한 종목 코드나 티커 1~200개를 넣어 현재가와 이름을 읽습니다. 예: 005930,AAPL. result는 prices와 stocks의 공식 전체 배열이며 quotes는 기존 표시 필드입니다. decimal 문자열과 null을 보존하며 종목 상세만 필요하면 get_stocks를 사용합니다.",
-    get_stocks:
-      "쉼표로 구분한 symbols 1~200개의 종목 상세를 읽습니다. 이름, market, securityType, status, currency, 상장·폐지일, 발행주식수, 레버리지와 국내 시장의 NXT 지원·거래정지 정보를 result 전체로 돌려줍니다. decimal 문자열과 중첩 boolean, null을 보존합니다.",
-    list_stocks:
-      "market(KOSPI, KOSDAQ, NYSE, NASDAQ, AMEX, KR_ETC, US_ETC)의 종목 전체 목록을 읽습니다. 선택 인자는 status(SCHEDULED, ACTIVE, DELISTED), securityType(STOCK, FOREIGN_STOCK, DEPOSITARY_RECEIPT, INFRASTRUCTURE_FUND, REIT, ETF, FOREIGN_ETF, ETN, STOCK_WARRANTS), commonShare이며 status 생략 시 ACTIVE입니다. commonShare=false도 필터로 보냅니다. 페이지나 cursor 없이 전량 반환하며 STOCK_ALL은 초당 1회입니다. 참조 정보는 화면·세션 진입 시 조회하고 짧은 주기로 반복 조회하지 않습니다.",
-    get_stock_warnings:
-      "단일 symbol의 매수 유의사항을 읽습니다. warningType, exchange, startDate, endDate를 보존합니다. exchange(KRX, NXT 등)는 상장 시장 market과 다른 거래소 코드이며 날짜와 exchange는 null일 수 있습니다. 빈 유의사항은 정상 결과이고 미존재 종목은 입력 오류입니다. symbol은 한 경로 segment로 인코딩합니다.",
-    get_holdings:
-      "연결한 계좌의 보유 종목, 평가 금액과 손익을 읽습니다. symbol은 선택 필터입니다. result 전체와 total, items를 반환하며 공제 전후 금액, 통화별 합계와 decimal 문자열을 보존합니다. 보유 종목이나 계좌를 변경하지 않습니다.",
-    get_sellable_quantity:
-      "symbol에 단일 종목 코드나 티커를 넣어 연결한 계좌의 매도 가능 수량을 읽습니다. result, metadata와 sellable_quantity를 반환하고 수량의 decimal 문자열을 보존합니다. 주문을 생성하거나 변경하지 않습니다.",
-    get_buying_power:
-      "currency(KRW 또는 USD)로 연결한 계좌의 주문 가능 현금을 읽습니다. symbol을 선택하면 해당 종목의 매도 가능 수량도 읽습니다. result는 buyingPower와 sellableQuantity이며 symbol 생략 시 후자는 null입니다. decimal 문자열을 보존하고 주문하지 않습니다.",
-    list_orders:
-      "status(OPEN 또는 CLOSED)로 연결한 계좌의 주문 내역을 읽습니다. from, to는 선택 날짜(YYYY-MM-DD, 한국 시각)이고 symbol도 선택입니다. CLOSED는 cursor와 limit(기본 20, 최대 100)으로 한 페이지를 읽으며 nextCursor, hasNext를 보존합니다. OPEN은 cursor와 limit 없이 전량을 반환합니다. 주문을 생성·정정·취소하지 않습니다.",
-    get_orderbook:
-      "symbol 한 종목의 매수·매도 호가와 잔량, 통화, 데이터 시각을 조회합니다. 국내 종목 코드(005930, 0101N0)나 미국 티커(AAPL, BRK.B)를 넣습니다. 가격과 수량은 decimal 문자열이며 데이터 시각은 null일 수 있습니다. 조회 시점의 REST 결과로 실시간 구독이나 주문 기능은 없습니다.",
-    get_trades:
-      "symbol 한 종목의 당일 최근 체결가·수량·시각·통화를 조회합니다. 국내 종목 코드나 미국 티커를 넣습니다. count는 기본 50, 1~50의 정수입니다. 가격과 수량은 decimal 문자열이며 체결이 없으면 빈 배열입니다. 조회 시점의 REST 결과로 실시간 구독이나 주문 기능은 없습니다.",
-    get_price_limits:
-      "symbol 한 종목의 당일 상한가·하한가와 통화, 데이터 시각을 조회합니다. 국내 종목 코드나 미국 티커를 넣습니다. 가격은 decimal 문자열이며 미국처럼 가격제한이 없는 시장에서는 null입니다. 조회 시점의 REST 결과로 실시간 구독이나 주문 기능은 없습니다.",
-    get_candles:
-      "symbol 한 종목의 OHLCV 캔들을 최신순으로 한 페이지 조회합니다. 국내 종목 코드나 미국 티커와 필수 interval(1m 분봉, 1d 일봉)을 넣습니다. count는 기본 100, 1~200의 정수이고 adjusted는 기본 true이며 false도 가능합니다. before는 타임존을 포함한 ISO 8601 시각이며 해당 시각을 포함해 이전 봉을 읽습니다. 예: 2026-03-25T09:00:00+09:00. nextBefore를 다음 호출의 before로 그대로 넣으며 마지막 페이지는 null입니다. 오프셋의 +는 커넥터가 인코딩합니다. 가격과 수량은 decimal 문자열입니다. 전체 페이지 자동 수집, 실시간 구독, 주문 기능은 없습니다.",
-    get_exchange_rate:
-      "KRW와 USD 사이의 참고용 표시 환율 한 건을 읽습니다. baseCurrency와 quoteCurrency는 서로 다른 KRW 또는 USD이고, 선택 dateTime은 초와 시간대가 있는 RFC 3339 시각입니다. 생략하면 현재 유효 환율입니다. result의 환율, 중간 환율, 변동과 validFrom/validUntil을 원문 그대로 반환하며 metadata는 빈 객체입니다. 1분 주기로 갱신되는 표시값으로 주문의 실제 거래 환율을 보장하지 않습니다. 주문하거나 환전하지 않습니다.",
-    get_market_calendar:
-      "market에 KR 또는 US를 넣어 국내 또는 미국 시장의 전일·당일·익일 3영업일 운영 일정을 읽습니다. 선택 date는 YYYY-MM-DD이며 미국 시장은 미국 현지 날짜입니다. 모든 응답 시각은 KST(+09:00) 원문입니다. 국내는 KRX+NXT 통합 세션이며 장전·장후 시간외종가는 제외됩니다. 미국은 dayMarket, preMarket, regularMarket, afterMarket 4세션입니다. result의 날짜·세션·휴장 null을 그대로 반환하며 metadata는 빈 객체입니다. 날짜를 계산하거나 세션을 합치지 않으며 주문하지 않습니다.",
-  };
   const register: RegisterTool = (
     name: string,
     schema: any,
@@ -51,7 +20,9 @@ export function createToolRegistration(server: McpServer) {
     server.registerTool(
       name,
       {
-        description: descriptions[name],
+        description: (
+          manifest.tools as Record<string, { description: string }>
+        )[name]!.description,
         inputSchema: z.strictObject(schema),
         annotations,
       },

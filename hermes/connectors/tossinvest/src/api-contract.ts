@@ -24,6 +24,11 @@ export const CURRENT_OPERATIONS = new Set([
   "getExchangeRate",
   "getKrMarketCalendar",
   "getUsMarketCalendar",
+  "listSectors",
+  "getSectorRankings",
+  "getSector",
+  "getSectorStocks",
+  "getSectorEtfs",
 ]);
 export function matchesOperation(
   operation: Operation,

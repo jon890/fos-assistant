@@ -71,7 +71,7 @@ export function apiErrorCode(exchange: Exchange): string {
   if (status === 400) return "TOSSINVEST_INVALID_INPUT";
   if (
     status === 404 &&
-    (code === "stock-not-found" || code === "exchange-rate-not-found")
+    ["stock-not-found", "exchange-rate-not-found", "sector-not-found"].includes(code)
   )
     return "TOSSINVEST_INVALID_INPUT";
   if (status === 429) return "TOSSINVEST_RATE_LIMITED";

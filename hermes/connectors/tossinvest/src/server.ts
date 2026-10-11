@@ -13,6 +13,8 @@ import { registerAccountTools } from "./account-tools.ts";
 import { registerMarketDataTools } from "./market-data-tools.ts";
 import { registerMarketInfoTools } from "./market-info-tools.ts";
 
+import { registerSectorTools } from "./sector-tools.ts";
+
 export { isSupportedBunVersion } from "./runtime.ts";
 export type { TossinvestOptions } from "./client.ts";
 
@@ -25,6 +27,7 @@ export function createTossinvestServer(options: TossinvestOptions = {}) {
   registerStockTools(register, client);
   registerMarketDataTools(register, client);
   registerMarketInfoTools(register, client);
+  registerSectorTools(register, client);
   return server;
 }
 
