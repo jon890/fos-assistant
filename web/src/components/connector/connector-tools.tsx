@@ -39,7 +39,10 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
             <Badge variant={policyVariant(tool)}>{toolPolicyLabel(tool)}</Badge>
           </span>
           {toolDescription(tool.description) && (
-            <p data-testid="connector-tool-description" className="w-full whitespace-pre-wrap break-words text-muted-foreground [overflow-wrap:anywhere]">
+            <p
+              data-testid="connector-tool-description"
+              className="w-full whitespace-pre-wrap break-words text-muted-foreground [overflow-wrap:anywhere]"
+            >
               {toolDescription(tool.description)}
             </p>
           )}

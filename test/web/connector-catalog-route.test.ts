@@ -220,13 +220,31 @@ test("두 링크는 독립적으로 정제하고 정책과 로그인 주소를 �
   ]);
 });
 
-
 test("실제 GET은 공통 설명 경계마다 정책을 보존하고 설명만 정제한다", async () => {
-  const vectors = JSON.parse(await readFile(new URL("../fixtures/connector-tool-descriptions.json", import.meta.url), "utf8"));
+  const vectors = JSON.parse(
+    await readFile(
+      new URL("../fixtures/connector-tool-descriptions.json", import.meta.url),
+      "utf8",
+    ),
+  );
   for (const vector of vectors) {
-    const tool = { name: "write_note", title: "메모 쓰기", risk: "WRITE", approval: "REQUIRED", grant: true };
-    const response = await getCatalog([summary({ tools: [{ ...tool, description: vector.value, secret: "제외" }] })]);
+    const tool = {
+      name: "write_note",
+      title: "메모 쓰기",
+      risk: "WRITE",
+      approval: "REQUIRED",
+      grant: true,
+    };
+    const response = await getCatalog([
+      summary({
+        tools: [{ ...tool, description: vector.value, secret: "제외" }],
+      }),
+    ]);
     const body = await response.json();
-    assert.deepEqual(body[0].tools, [{ ...tool, description: vector.expected }], vector.name);
+    assert.deepEqual(
+      body[0].tools,
+      [{ ...tool, description: vector.expected }],
+      vector.name,
+    );
   }
 });
