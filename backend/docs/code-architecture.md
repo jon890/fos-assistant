@@ -91,6 +91,12 @@ native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 �
 처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
+### 첨부 원본 조회
+
+`AttachmentService`는 대화 주인과 업로더, 전송·삭제·만료 상태를 확인하고 원본 읽기 전후의 SQL 재검증을 맡는다.
+`AttachmentInspection`은 표시 크기와 영역 디코딩, 개요·GIF/WebP용 원본 bytes의 크기와 MIME magic 검사를 맡는다.
+원본 읽기는 같은 패키지에서만 호출하며, 권한 판정과 Clock·트랜잭션 경계는 서비스가 유지한다.
+
 ### 첨부 관찰
 
 첨부 관찰의 권한·원본 검사와 CAS/USER 보호는 `MediaObservationService`가 맡는다.

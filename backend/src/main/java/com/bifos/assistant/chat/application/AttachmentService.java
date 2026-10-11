@@ -11,11 +11,9 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -67,7 +65,7 @@ public class AttachmentService {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
         InspectedImage result =
                 "image/gif".equals(attachment.contentType()) || "image/webp".equals(attachment.contentType())
-                        ? readRaw(attachment)
+                        ? inspection.readRaw(attachment)
                         : inspection.read(attachment, region, active);
         requireInspectable(user, conversationId, attachmentId);
         return result;
@@ -76,7 +74,7 @@ public class AttachmentService {
     /** 명시적으로 요청한 개요는 원본을 그대로 넘겨 Pillow에서 표시 방향으로 줄인다. */
     public InspectedImage inspectOverview(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
-        InspectedImage result = readRaw(attachment);
+        InspectedImage result = inspection.readRaw(attachment);
         requireInspectable(user, conversationId, attachmentId);
         return result;
     }
@@ -84,39 +82,6 @@ public class AttachmentService {
     /** 변환 진행 중에도 원본을 읽지 않고 SQL 상태만 다시 확인한다. */
     public void validateInspection(CurrentUser user, Long conversationId, Long attachmentId) {
         requireInspectable(user, conversationId, attachmentId);
-    }
-
-    private InspectedImage readRaw(ChatAttachment attachment) {
-        int limit = 20 * 1024 * 1024;
-        try (InputStream in = store.open(attachment)) {
-            byte[] raw = in.readNBytes(limit + 1);
-            boolean magic = switch (attachment.contentType()) {
-                case "image/gif" ->
-                    raw.length >= 6 && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
-                case "image/webp" ->
-                    raw.length >= 12
-                            && raw[0] == 'R'
-                            && raw[1] == 'I'
-                            && raw[2] == 'F'
-                            && raw[3] == 'F'
-                            && raw[8] == 'W'
-                            && raw[9] == 'E'
-                            && raw[10] == 'B'
-                            && raw[11] == 'P';
-                case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte) 0xff && raw[1] == (byte) 0xd8;
-                case "image/png" ->
-                    raw.length >= 8
-                            && Arrays.equals(
-                                    Arrays.copyOf(raw, 8), new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
-                default -> false;
-            };
-            if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {
-                throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "invalid original image");
-            }
-            return new InspectedImage(attachment.contentType(), raw);
-        } catch (IOException ex) {
-            throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "could not read original image", ex);
-        }
     }
 
     private ChatAttachment requireInspectable(CurrentUser user, Long conversationId, Long attachmentId) {

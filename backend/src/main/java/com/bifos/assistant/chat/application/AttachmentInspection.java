@@ -14,6 +14,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +56,40 @@ public class AttachmentInspection {
                     .orElse("확인 불가");
         } catch (IOException | RuntimeException ex) {
             return "확인 불가";
+        }
+    }
+
+    /** 디코딩 없이 원본을 읽고 크기와 MIME magic을 확인한다. 권한과 상태 재검증은 서비스가 맡는다. */
+    InspectedImage readRaw(ChatAttachment attachment) {
+        int limit = 20 * 1024 * 1024;
+        try (InputStream in = store.open(attachment)) {
+            byte[] raw = in.readNBytes(limit + 1);
+            boolean magic = switch (attachment.contentType()) {
+                case "image/gif" ->
+                    raw.length >= 6 && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
+                case "image/webp" ->
+                    raw.length >= 12
+                            && raw[0] == 'R'
+                            && raw[1] == 'I'
+                            && raw[2] == 'F'
+                            && raw[3] == 'F'
+                            && raw[8] == 'W'
+                            && raw[9] == 'E'
+                            && raw[10] == 'B'
+                            && raw[11] == 'P';
+                case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte) 0xff && raw[1] == (byte) 0xd8;
+                case "image/png" ->
+                    raw.length >= 8
+                            && Arrays.equals(
+                                    Arrays.copyOf(raw, 8), new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
+                default -> false;
+            };
+            if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {
+                throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "invalid original image");
+            }
+            return new InspectedImage(attachment.contentType(), raw);
+        } catch (IOException ex) {
+            throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "could not read original image", ex);
         }
     }
 

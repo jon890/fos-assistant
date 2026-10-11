@@ -5,7 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -42,7 +47,7 @@ class AttachmentInspectAccessTest {
     private final ConversationAccess access = mock(ConversationAccess.class);
     private final ChatAttachmentRepository attachments = mock(ChatAttachmentRepository.class);
     private final AttachmentStore store = mock(AttachmentStore.class);
-    private final AttachmentInspection inspection = mock(AttachmentInspection.class);
+    private final AttachmentInspection inspection = spy(new AttachmentInspection(store));
     private final ChatAttachment photo = mock(ChatAttachment.class);
     private final PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
     private final AttachmentService service = new AttachmentService(
@@ -89,7 +94,7 @@ class AttachmentInspectAccessTest {
         when(photo.contentType()).thenReturn("image/webp");
         when(store.open(photo)).thenReturn(new ByteArrayInputStream(bytes));
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
-        verifyNoInteractions(inspection);
+        verify(inspection, never()).read(any(), any(), any());
     }
 
     @Test
@@ -126,12 +131,12 @@ class AttachmentInspectAccessTest {
     @DisplayName("보낸 지난 사진을 허용하되 읽는 중 삭제되면 반환하지 않는다")
     void allowsSentPastPhotoButDeletionDuringReadDoesNotReturnPixels() {
         InspectedImage result = new InspectedImage("image/png", new byte[] {1});
-        when(inspection.read(eq(photo), eq(null), any())).thenReturn(result);
+        doReturn(result).when(inspection).read(eq(photo), eq(null), any());
         assertThat(service.inspect(user, 2L, 7L, null)).isEqualTo(result);
-        when(inspection.read(eq(photo), eq(null), any())).thenAnswer(invocation -> {
+        doAnswer(invocation -> {
             when(photo.isVisible()).thenReturn(false);
             return result;
-        });
+        }).when(inspection).read(eq(photo), eq(null), any());
         assertThatThrownBy(() -> service.inspect(user, 2L, 7L, null)).isInstanceOf(ApiException.class);
     }
 
