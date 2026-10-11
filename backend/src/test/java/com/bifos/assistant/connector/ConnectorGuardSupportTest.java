@@ -373,7 +373,8 @@ class ConnectorGuardSupportTest {
             binding.installed(false, NOW);
             binding.ready(NOW);
             bindings.saveAndFlush(binding);
-            return new Fixture(binding.id(), connection.id(), agent.id(), profile, user.email());
+            // 같은 시각의 상태 전이도 revision을 올리므로 저장한 연결의 현재 값을 요청에 쓴다.
+            return new Fixture(binding.id(), connection.id(), connection.updatedAt(), agent.id(), profile, user.email());
         });
     }
 
@@ -381,7 +382,7 @@ class ConnectorGuardSupportTest {
     private ObjectNode request(Fixture f) {
         return JSON.createObjectNode().put("v", 1).put("protocol", "approval-claim-v1")
             .put("bindingId", f.bindingId().toString()).put("connectionId", f.connectionId().toString())
-            .put("connectionUpdatedAt", NOW.toString()).put("manifestSha256", SHA)
+            .put("connectionUpdatedAt", f.connectionUpdatedAt().toString()).put("manifestSha256", SHA)
             .put("nonce", UUID.randomUUID().toString()).put("profile", f.profile()).put("connectorId", "demo-financial");
     }
 
@@ -400,6 +401,6 @@ class ConnectorGuardSupportTest {
     }
 
 
-    private record Fixture(Long bindingId, Long connectionId, Long agentId, String profile, String email) {
+    private record Fixture(Long bindingId, Long connectionId, Instant connectionUpdatedAt, Long agentId, String profile, String email) {
     }
 }
