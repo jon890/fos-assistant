@@ -122,6 +122,24 @@ NATIVE_ATTACHMENT_FUNCTIONS = {
 }
 NATIVE_TOOL_EVENT_FIELDS = ("gateway/platforms/api_server_runs.py", "_FIXED_EVENT_FIELDS")
 
+# 관리 bootstrap이 교체하는 내부 writer다. 공식 upstream 확장 API가 아니다.
+BODYLESS_REQUEST_WRITER = ("agent/agent_runtime_helpers.py", "dump_api_request_debug",
+                          Call(positional=2, keywords=("reason", "error"), exact=True))
+BODYLESS_REQUEST_FORWARD = ("agent/session_persistence.py", "SessionPersistenceMixin",
+                           "_dump_api_request_debug", "agent.agent_runtime_helpers", "dump_api_request_debug")
+BODYLESS_REQUEST_LAZY = ("agent/lazy_forward.py", ("lazy_attr", "forward"))
+BODYLESS_REQUEST_CALLS = {
+    "agent/turn_api_request.py": {"build_api_request": "preflight"},
+    "agent/turn_recovery.py": {
+        "nonretryable_client_error_result": "non_retryable_client_error",
+        "max_retries_exhausted_result": "max_retries_exhausted",
+    },
+}
+BODYLESS_REQUEST_FILES = (
+    BODYLESS_REQUEST_WRITER[0], BODYLESS_REQUEST_LAZY[0], BODYLESS_REQUEST_FORWARD[0],
+    *BODYLESS_REQUEST_CALLS,
+)
+
 # 대시보드가 요청마다 이 import 를 다시 해야 바꿔 끼운 함수가 쓰인다.
 # 모듈 머리에서 한 번만 import 하게 바뀌면 plugin 이 감싼 것이 쓰이지 않고 토큰 경로가 모두 닫힌다.
 # 이 import 를 하는 미들웨어는 `token_authenticated` 를 읽는 미들웨어보다 바깥(나중 등록)이어야 한다.

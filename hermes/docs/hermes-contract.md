@@ -546,7 +546,7 @@ v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 운영 Hermes 에서 왕
 | session 기록 | 이미지 파트는 `[screenshot]` 글로 저장된다(`session_persistence.py` 의 `_durable_content`). 다음 실행의 기록에 이미지가 다시 실리지 않는다 |
 | 같은 턴의 도구 루프 | 모델을 다시 부를 때마다 사용자가 올린 이미지가 다시 실린다. 요청에서 빼는 정책은 도구 결과 이미지에만 적용된다 |
 | 압축이 그 턴에 돈다 | 원본 파트가 기록에 남을 수 있다. 압축은 가장 최근 이미지 메시지 앞의 이미지를 「[Attached image — stripped after compression]」 으로 바꾼다 |
-| API 오류 | 요청 전체를 `request_dump_*.json` 으로 남긴다. base64 가 들어간다 |
+| API 오류 | upstream 기본 writer는 요청 전체를 `request_dump_*.json`으로 남기며 base64도 들어간다. 관리 addon의 [본문 없는 요청 진단](#본문-없는-요청-진단)은 설치한 interpreter의 이 writer만 교체한다 |
 | `pre_llm_call`, `post_llm_call` hook | `user_message` 로 목록을 그대로 받는다. 우리 plugin 은 두 hook 을 쓰지 않는다 |
 | 사용량 | 이미지 토큰을 따로 나누지 않는다. provider 가 준 입력 토큰에 섞인다 |
 | `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다. openai-codex 의 클라이언트는 `low` 를 지원하지 않는다며 막는다 |
@@ -799,6 +799,92 @@ v2026.9.24 소스에서 확인했다. API server 가 `DELETE /api/sessions/{sess
 | 인증 | 그 profile 의 key 를 `Authorization: Bearer` 로 보낸다. 실행 경로와 같다 |
 
 Control Plane 은 지운 대화를 정리할 때 이 경로를 부른다. 근거는 [ADR-20261008 / conversation-purge](../../backend/docs/adr/ADR-20261008-conversation-purge.md) 에 있다.
+
+## 본문 없는 요청 진단
+
+고정 upstream의 `HERMES_DUMP_REQUESTS`는 preflight만 켜거나 끈다. 두 terminal 오류는 이 값과 무관하게
+`agent.agent_runtime_helpers.dump_api_request_debug`를 호출한다. `HERMES_DUMP_REQUEST_STDOUT`은
+파일 저장 뒤 stdout에도 같은 내용을 출력하는 옵션이며 전체 dump 금지가 아니다.
+`SessionPersistenceMixin`의 lazy forward는 매 호출에 module 속성을 읽으므로 consumer를 먼저 import해도
+첫 호출 전에 설치한 writer를 쓴다. [ADR-20261012 / bodyless-request-diagnostics](adr/ADR-20261012-bodyless-request-diagnostics.md)가 이 내부 교체를 제한한다.
+
+### 설치와 소유
+
+`hermes/runtime/`은 일반 runtime addon이며 PluginManager의 선택 등록으로 필수 설치를 보장하지 않는다.
+관리 bootstrap은 별도 관리 import 경로에서 `from runtime import install_bodyless_writer`를 불러
+`install_bodyless_writer(*, resolver, fingerprints)`로 첫 writer 호출 전에 설치한다.
+반환 writer의 인자는 `(agent, api_kwargs, *, reason, error=None)`이고 반환은 `Path | None`이다.
+같은 resolver 객체와 지문만 멱등이다. 지문·resolver·현재 helper identity 불일치는 고정
+`InstallationError("bodyless_installation_failed")`이며 원문 writer를 호출하지 않는다.
+
+`fingerprints`는 `hermes/tests/hermes_contract.py`의 `BODYLESS_REQUEST_FILES`에 선언한 다섯 상대 파일 이름과
+소문자 SHA-256 64자만 가진 dict다. 누락·추가·잘못된 타입과 형식을 거절한다.
+설치 시 전체 파일 hash, 정확한 위치·키워드 인자와 기본값, 현재 helper의 code를 고정 source와 대조한다.
+기대값은 private의 독립적으로 승인·봉인한 release manifest에서 전달한다.
+기동 때 관측한 자기 hash나 profile의 쓰기 가능한 설정으로 기대값을 다시 만들지 않는다.
+
+process-global 소유 module은 profile plugin의 register·reload·unload와 별개로 설치 identity를 유지한다.
+cleanup에 원문 복원 함수를 제공하지 않는다. runtime bundle 자체를 profile loader로 로드하지 않는다.
+core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바꾸지 않는다.
+설치 실패 때 관리 bootstrap은 고정 오류만 출력하고 main을 시작하지 않아야 한다.
+설치 실패와 진단 I/O 실패는 다르다. I/O 실패는 `None`이며 기존 오류 결과·session 저장·실패 실행 기록을 유지한다.
+이미 만들어진 부모 execution은 failed로 남길 수 있다. 범용 reservation·new run·provider 횟수 0을 요구하지 않는다.
+
+### resolver와 파일 쓰기
+
+`resolver(agent) -> str | None`은 bootstrap이 검증한 agent 바인딩의 기존 절대 디렉터리를 반환한다.
+권한과 바인딩 수명, 같은 interpreter의 자식에게 올바른 바인딩을 전달하는 일은 private owner가 맡는다.
+요청 `api_kwargs`·agent의 사용자 입력 속성·cwd·전역 profile과 다른 profile의 기본 경로로 목적지를 정하지 않는다.
+resolver는 동시 호출에 안전해야 하며 profile마다 검증한 목적지를 독립적으로 반환해야 한다.
+공개 addon은 권한을 새로 만들거나 resolver가 고른 profile이 맞다고 인증하지 않는다.
+
+`None`, resolver 예외·잘못된 반환값, 읽기 전용·미지원 플랫폼·추출·쓰기 실패는 출력 없이 `None`이다.
+원문 writer나 agent logger·stdout 옵션으로 fallback하지 않는다. 부모 디렉터리를 만들거나 cwd로 넘어가지 않는다.
+각 부모를 POSIX `O_DIRECTORY | O_NOFOLLOW` dirfd로 열고 leaf를 `O_EXCL | O_NOFOLLOW`, 0600으로 생성한다.
+이름은 무작위이며 session·profile·본문을 넣지 않는다. 충돌은 덮어쓰지 않고 실패한다.
+불완전 쓰기는 생성한 leaf만 dirfd로 정리한다. 부모 경로 교체는 열린 FD의 쓰기 대상을 바꾸지 않는다.
+private owner는 목적지 디렉터리를 요청자가 바꾸거나 옮길 수 없게 유지한다.
+
+### 기록과 완전성
+
+JSON은 `reason`, `error`, `counts`만 갖는다. 본문·이미지·URL·token·경로·session 식별자·오류 문구·stack은 없다.
+`reason`은 세 callsite의 고정 값 또는 `unknown`이다. `error`는 정확한 built-in 예외 타입으로만 분류하며
+`none`, `timeout`, `connection`, `permission`, `value`, `type`, `io`, `other` 중 하나다.
+SDK 예외와 임의 하위 타입은 `other`이고 property·class 이름·str·repr을 읽지 않는다.
+
+| 수치 | 뜻 |
+| --- | --- |
+| `text_parts`, `image_parts`, `other_parts` | 알려진 content에서 관측한 text·image·미지원 파트 수 |
+| `text_chars`, `text_bytes` | Python code point 수와 검사한 유효 UTF-8 바이트 수 |
+| `image_encoded_chars`, `image_bytes` | base64 문자열의 길이와 검증한 decoded 크기 또는 직접 받은 bytes 길이 |
+| `completeness` | `complete`, `unknown`, `invalid`, `cycle`, `limit` 중 하나 |
+
+Chat Completions의 `messages.content`, Responses의 `input`·`function_call_output.output`, Anthropic의
+text·base64 image·tool_result, Gemini의 `contents.parts`·inlineData와 각 계열의 system/instructions를 읽는다.
+native tool 이미지도 같은 알려진 content 모양으로 센다. 원격 image URL·file id·Gemini fileData는 읽거나 다운로드하지 않는다.
+Gemini functionResponse의 parts는 읽되 임의 response 객체는 탐색하지 않아 `unknown`이다.
+모르는 파트와 추가 content 필드, tool call 인자와 미지원 응답은 `unknown`이며 전체 본문 크기로 추정하지 않는다.
+모델·tools schema·transport 설정·headers와 임의 root 필드는 이 content 집계의 대상이 아니다.
+
+`complete`는 지원하는 content의 집계가 끝났다는 뜻이며 이미지가 실제로 디코딩·판독된다는 뜻은 아니다.
+그 밖의 수치는 관측한 하한이다. 0을 확정된 전체 수치로 해석하지 않는다.
+여러 문제가 있으면 `limit > cycle > invalid > unknown` 우선순위로 기록한다.
+한 요청의 노드·파트·깊이·문자 검사량과 dict 필드 검사량은 `runtime/request_counts.py`의 상수로 제한한다.
+큰 문자열의 길이는 복사 없이 읽고 UTF-8/base64 검증만 제한한다. 본문 변경·deepcopy·전체 직렬화·이미지 decoding은 하지 않는다.
+
+### 검증과 수락 경계
+
+공식 고정 source에서 실제 helper code·lazy forward·세 callsite를 분리 실행하고,
+엄격한 provider·session 대역으로 입력 identity와 기존 실패 결과를 대조한다. source 바이트 불변도 확인한다.
+합성 fixture·POSIX writer·동시 profile과 consumer 선행 설치 검사는 전체 Hermes import·실 provider·관리 topology 검사를 대신하지 않는다.
+알려진 alias 검사는 지원 core와 이 저장소의 설치 plugin 범위다. 기존 direct callable alias와 설치 뒤 helper 변조는 우회 반례이며,
+재설치의 identity 검출을 임의 host와 악성 코드 전체의 불변으로 확대하지 않는다.
+
+실제 parent·s6·PM relaunch·gateway 정상 restart, 두 profile reload/unload와 새 interpreter 설치는 private 후속 수락 조건이다.
+immutable manifest는 image·실제 interpreter·core helper와 lazy forward/callsite·writer bundle·adapter를 독립적으로 봉인한다.
+SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 별도로 수락해야 한다.
+이 writer는 새 요청 진단과 자신의 출력만 제한한다. SDK·framework·session·trajectory 전체 가림이나 운영 보호 완료를 증명하지 않는다.
+운영 연결과 배포 뒤 실제 Hermes 왕복은 `fos-home-infra`가 맡는다.
 
 ## 동시 실행
 
