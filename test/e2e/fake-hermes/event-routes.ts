@@ -83,7 +83,7 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
                 response.on("close", resolve);
               });
             }
-            event(response, { event: "run.completed" });
+            event(response, { event: run.status === "cancelled" ? "run.cancelled" : "run.completed" });
             response.end();
             return;
           }

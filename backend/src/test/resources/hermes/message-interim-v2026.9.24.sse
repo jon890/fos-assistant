@@ -1,0 +1,24 @@
+: pinned gateway _run_event와 _interim_cb 모양의 합성 envelope다. 운영 본문은 없다.
+
+data: {"event":"message.interim","run_id":"fixture-run","timestamp":1791630000.1,"text":"자료를 먼저 확인할게요.","already_streamed":false}
+
+data: {"event":"message.interim","run_id":"fixture-run","timestamp":1791630000.1,"text":"자료를 먼저 확인할게요.","already_streamed":false}
+
+data: {"event":"reasoning.available","run_id":"fixture-run","timestamp":1791630000.2,"text":"SYNTHETIC_HIDDEN_REASONING"}
+
+data: {"event":"tool.started","run_id":"fixture-run","timestamp":1791630000.3,"tool":"web_search","preview":"자료 찾기"}
+
+data: {"event":"tool.completed","run_id":"fixture-run","timestamp":1791630000.4,"tool":"web_search","duration":0.1,"error":false}
+
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":1791630000.5,"delta":"두 번째  안내"}
+
+data: {"event":"message.interim","run_id":"fixture-run","timestamp":1791630000.6,"text":"두 번째 안내","already_streamed":true}
+
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":1791630000.7,"delta":"일부만 "}
+
+data: {"event":"message.interim","run_id":"fixture-run","timestamp":1791630000.8,"text":"일부만 흘린 안내도 전부 보여요.","already_streamed":true}
+
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":1791630000.9,"delta":"확인한 최종 답이에요."}
+
+data: {"event":"run.completed","run_id":"fixture-run","timestamp":1791630001.0}
+

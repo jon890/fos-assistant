@@ -19,6 +19,7 @@ import com.bifos.assistant.usage.domain.ExecutionEvent;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import java.util.Set;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -167,7 +168,7 @@ class ChatRunEvents {
     /** 스트림으로 온 사건을 화면으로 중계하면서 우리 이름으로도 옮겨 적는다. */
     void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
         append(pending, event);
-        String type = event.type() == null ? "" : event.type().toLowerCase();
+        String type = event.type() == null ? "" : event.type().toLowerCase(Locale.ROOT);
         CheckTurn check = pending.intent() instanceof TurnIntent.ProactiveCheck proactive ? proactive.check() : null;
         if ("message.delta".equals(type) && event.text() != null) {
             executions.markFirstDelta(pending.execution());
@@ -176,6 +177,20 @@ class ChatRunEvents {
                 // 살펴보기의 답은 결과 블록의 JSON 이 섞인 글이라 흘리지 않는다. 검사해 그린 글만 남긴다.
                 if (check == null) {
                     onEvent.accept(ChatEvent.delta(event.text()));
+                }
+            }
+        } else if ("message.interim".equals(type)) {
+            synchronized (pending) {
+                int length = Boolean.TRUE.equals(event.alreadyStreamed()) && event.streamedPrefixLength() != null
+                        ? event.streamedPrefixLength() : 0;
+                // 파서가 직전 구간의 출처를 확인한 경우만 중지 시 저장하는 답에서 뺀다.
+                if (length > 0 && length <= pending.streamed().length()) {
+                    pending.streamed().setLength(pending.streamed().length() - length);
+                } else {
+                    length = 0;
+                }
+                if (check == null && (length > 0 || (event.text() != null && !event.text().isBlank()))) {
+                    onEvent.accept(ChatEvent.interim(event.text(), event.alreadyStreamed(), length, event.interimId()));
                 }
             }
         } else if ("tool.started".equals(type)) {

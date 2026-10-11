@@ -11,6 +11,7 @@ import {
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
+import { Markdown } from "../markdown";
 import {
   activityLabel,
   type ActivityItem,
@@ -88,9 +89,15 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
                 {item.kind === "subagent" ? (
                   <span className="shrink-0 text-muted-foreground">도우미</span>
                 ) : null}
-                <span className="min-w-0 break-words">
-                  {activityLabel(item)}
-                </span>
+                {item.kind === "interim" ? (
+                  <div className="min-w-0 break-words">
+                    <Markdown>{item.name}</Markdown>
+                  </div>
+                ) : (
+                  <span className="min-w-0 break-words">
+                    {activityLabel(item)}
+                  </span>
+                )}
                 {item.state === "failed" ? (
                   <span className="shrink-0 text-destructive">실패</span>
                 ) : null}

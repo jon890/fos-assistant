@@ -5,8 +5,9 @@ import type {
 } from "@/components/execution/execution-tree";
 import { subagentLabel } from "../../../lib/format.ts";
 import { toolLabel } from "../../../lib/tool-label.ts";
+import { interimKey } from "../turn-stream-text.ts";
 
-export type ActivityItemKind = "tool" | "subagent" | "step";
+export type ActivityItemKind = "tool" | "subagent" | "step" | "interim";
 export type ActivityItemState =
   "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
 
@@ -86,7 +87,7 @@ export function failActivity(
   return {
     ...state,
     endedAt,
-    items: state.items.map((item) =>
+    items: state.items.filter((item) => item.kind !== "interim").map((item) =>
       item.state === "running"
         ? {
             ...item,
@@ -157,11 +158,23 @@ export function applyChatEvent(
     return {
       ...state,
       endedAt: Date.now(),
-      items: state.items.map((item) =>
+      items: state.items.filter((item) => item.kind !== "interim").map((item) =>
         item.state === "running" ? { ...item, state: "stopped" } : item,
       ),
     };
   const items = state.items;
+  if (event.type === "interim" && event.text?.trim() && state.endedAt === null) {
+    const pairKey = interimKey(event);
+    if (items.some((item) => item.kind === "interim" && item.pairKey === pairKey)) return state;
+    return {
+      ...state,
+      items: append(items, {
+        kind: "interim", name: event.text, detail: null, model: null,
+        inputTokens: null, outputTokens: null, durationMs: null,
+        state: "done", pairKey,
+      }),
+    };
+  }
   if (event.type === "tool") {
     const name = event.toolName ?? "도구";
     if (event.phase === "started")

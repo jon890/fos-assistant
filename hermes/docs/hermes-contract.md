@@ -2562,6 +2562,28 @@ config migration 처리기와 `SessionDB` 의 schema 초기화다.
 | stop | 활동 중이면 `stopping` 과 hard interrupt 요청. 최종 상태는 별도 조회 | 같은 비동기 중단 계약을 유지한다 |
 
 소비자는 v0.21.5 의 `interrupted` 도 종료 상태로 처리해야 한다.
+
+`message.interim`은 종료 사건이 아니다. v2026.9.24의 `_interim_cb`는
+`event`, `run_id`, `timestamp`, `text`, `already_streamed`를 보내고 실행을 이어 간다.
+Codex의 live commentary도 이 경로로 보내며 `already_streamed=false`다.
+`phase=analysis`는 commentary 추출 대상이 아니다.
+
+`already_streamed=true`의 판정은 think를 뺀 안내와 delta를 공백 정규화한 뒤
+`visible_content.startswith(streamed)`로 비교한다. 따라서 일부 접두사만 delta로 온 경우에도 참이다.
+Control Plane은 boolean만으로 안내를 버리지 않는다. 직전 구간의 출처를 확인한 길이만
+`streamedPrefixLength`로 기존 채팅 SSE에 싣고, 안내 전체를 `interim`으로 보낸다.
+가리기 전에 길이를 확인하고 원문을 별도 칸에 싣지 않는다.
+`already_streamed`가 누락되거나 boolean이 아니면 미확인으로 두고 본문을 재분류하지 않는다.
+timestamp를 `interimId`로 사용해 실행 안에서 재수신을 가려내고, timestamp가 없으면 안내의 정규화된 글로 구분한다.
+도구 시작·이전 안내가 경계이며, 확인할 구간이 65,536자를 넘으면 재분류하지 않는다.
+최종 상태의 `output`과 중지 결과의 `output`은 출처를 추정해 바꾸지 않는다.
+
+이 전달과 저장 계약은 합성 wire fixture로 실제 HTTP 파서·채팅 SSE·브라우저를 거쳐 검사한다.
+실제 운영 Hermes의 출력 순서와 재분류 범위는 배포 뒤 왕복 확인이 필요하다.
+근거는 [v2026.9.24 api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/gateway/platforms/api_server_runs.py)의
+`_interim_cb`와 [stream_delivery.py](https://github.com/NousResearch/hermes-agent/blob/v2026.9.24/agent/stream_delivery.py)의
+`_interim_content_was_streamed`, `_fire_streamed_codex_commentary`다.
+
 run 입력 토큰에 cache read·write 를 다시 더하면 중복 합산이 된다.
 우리 backend 는 `cache_read_tokens` 를 캐시 입력으로 읽고, 입력 단가는 `input_tokens` 에서 그것을 뺀 나머지에만 매긴다. v0.21.3 의 run usage 에는 캐시 칸이 없어 그 전 실행의 캐시 입력은 비어 있다.
 session 상세의 비캐시 입력 토큰과 혼동하지 않는다.

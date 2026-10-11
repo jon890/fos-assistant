@@ -20,6 +20,9 @@ import java.util.UUID;
  * @param model 하위 에이전트의 모델
  * @param inputTokens 하위 에이전트의 입력 토큰
  * @param outputTokens 하위 에이전트의 출력 토큰
+ * @param alreadyStreamed Hermes가 중간 안내의 일부를 delta로 전달했다고 알렸는가
+ * @param streamedPrefixLength 파서가 안내로 확인한 직전 delta 구간의 UTF-16 길이
+ * @param interimId 실행 안에서 중간 안내의 재수신을 가려낼 식별자
  */
 public record ChatEvent(
         String type,
@@ -40,7 +43,24 @@ public record ChatEvent(
         String goal,
         String model,
         Long inputTokens,
-        Long outputTokens) {
+        Long outputTokens,
+        Boolean alreadyStreamed,
+        Integer streamedPrefixLength,
+        String interimId) {
+
+    public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
+            Long messageId, Long executionId, String code, String message, String stepName, String stepState,
+            String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
+            Long inputTokens, Long outputTokens) {
+        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, stepName,
+                stepState, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null);
+    }
+
+    /** 저장하지 않는 중간 안내와 확인된 직전 delta 구간의 UTF-16 길이다. */
+    public static ChatEvent interim(String text, Boolean alreadyStreamed, int streamedPrefixLength, String interimId) {
+        return new ChatEvent("interim", text, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, alreadyStreamed, streamedPrefixLength, interimId);
+    }
 
     public static final String STARTED = "started";
     public static final String COMPLETED = "completed";
@@ -146,7 +166,10 @@ public record ChatEvent(
                 goal,
                 model,
                 inputTokens,
-                outputTokens);
+                outputTokens,
+                alreadyStreamed,
+                streamedPrefixLength,
+                interimId);
     }
 
     public static ChatEvent subagent(
