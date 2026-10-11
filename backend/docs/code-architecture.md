@@ -18,6 +18,26 @@ HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수�
 JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
 MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원문·cause를 넘기지 않는다. 인증 실패는 기존 필터가 처리한다.
 
+## JPA 생성 시각
+
+`memory.domain.MemoryCollection.createdAt` 하나에 `@CreatedDate`와 `@EntityListeners(AuditingEntityListener.class)`를 둔다.
+`shared.config.JpaAuditingConfig`는 `@EnableJpaAuditing(dateTimeProviderRef="auditingDateTimeProvider")`로 활성화한다.
+같은 이름의 `DateTimeProvider` 빈은 기존 `Clock`을 주입받고 `Instant`를 `ChronoUnit.MICROS`로 잘라 돌려준다.
+운영 시계와 공용 검사 시계의 빈은 추가하지 않는다. 이 선언과 대상의 정확한 개수는 baseline 없는
+`ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`이 검사한다. 실제 callback과 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
+설정·provider 선언과 대상 엔티티는 각각 하나다. 다른 필드·getter의 auditing annotation과 `@LastModifiedDate`는 허용하지 않는다.
+다른 운영 타입의 `AuditingEntityListener` 선언과 Spring Data `Auditable` 구현·상속도 거절한다.
+`AbstractAuditable` 상속도 여기에 포함한다. 기존 JPA 업무 시각과 다른 listener는 그대로 허용한다.
+
+`defaultsFor(groupId)`가 만든 객체는 생성 시각이 null이다. 복합 ID로 `saveAll`이 merge할 때는 반환된 managed 객체를 사용한다.
+`PrePersist` 시각과 트랜잭션 commit 완료 시각은 다르다. rollback하면 시각이 채워졌어도 행은 남지 않는다.
+서비스는 기존 목록이 있으면 새 기본 객체를 만들지 않는다. DB에서 읽은 기존 객체의 detach/merge와 no-op은 기존 생성 시각을 유지한다.
+생성 시각이 null인 기본 객체를 이미 존재하는 ID에 merge하는 경우는 서비스 계약에 포함하지 않는다.
+
+다른 엔티티 및 `MemoryRevision.changedAt`, `AgentMemoryCollectionChange.changedAt` 같은 업무 시각은 전달받은 값을 유지한다.
+native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 시각을 정한다. 기존 마이그레이션은 수정하지 않는다.
+[Spring Data auditing](https://docs.spring.io/spring-data/jpa/reference/auditing.html)의 엔티티별 listener와 provider 설정을 따른다.
+
 ## 패키지와 책임
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.

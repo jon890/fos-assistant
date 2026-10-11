@@ -149,6 +149,14 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 한 커밋에 섞으면 리뷰에서 기능 변경이 포맷 변경에 묻힌다.
 선택 까닭은 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 의 대안 기각 항목에 있다.
 
+## JPA auditing 범위
+
+계약은 [`code-architecture.md`의 「JPA 생성 시각」](docs/code-architecture.md#jpa-생성-시각)이 갖는다.
+검사: `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`, `MemoryCollectionAuditingPlacementTest`,
+`MemoryCollectionAuditingTest`, `MemoryCollectionAuditingMysqlTest`.
+실행: `./gradlew archTest`와 `./gradlew test --tests '*MemoryCollectionAuditingTest'`.
+MySQL 검사는 루트의 `scripts/check-mysql-migration.sh --tests '*MemoryCollectionAuditingMysqlTest'`로 돌린다.
+
 ## 엔티티와 마이그레이션은 따로 논다
 
 `./gradlew test` 는 엔티티로 스키마를 만들고 운영은 Flyway 가 만든 스키마를 검증한다.
