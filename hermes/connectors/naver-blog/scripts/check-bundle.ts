@@ -11,7 +11,7 @@ if (
     JSON.stringify(["naver-blog"]) ||
   server.command !== "bun" ||
   JSON.stringify(server.args) !==
-    JSON.stringify([`\${CLAUDE_PLUGIN_ROOT}/dist/${filename}`])
+    JSON.stringify(["--no-env-file", `\${CLAUDE_PLUGIN_ROOT}/dist/${filename}`])
 )
   throw new Error("INVALID_CONNECTOR_ENTRY");
 

@@ -70,6 +70,7 @@ from .connector_run import (
     _connector_call_request,
     _connector_execute_request,
 )
+from .connector_snapshot import _connector_snapshot_request
 
 from .connector_vault import (
     VAULT_ROUTES,
@@ -127,6 +128,7 @@ CATALOG_PATH = "/api/connectors/catalog"
 CALL_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/call$")
 EXECUTE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/execute$")
 PREPARE_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/prepare$")
+SNAPSHOT_ROUTE_RE = re.compile(r"^/api/connectors/([^/]+)/snapshot$")
 MODEL_DEFAULTS_RE = re.compile(r"^/api/profiles/([^/]+)/model-defaults$")
 DECISION_READINESS_RE = re.compile(r"^/api/profiles/([^/]+)/decision-readiness$")
 # native 하위 에이전트가 쓴 자식 session 의 provider 를 읽는 경로다(ADR-067).
@@ -298,6 +300,9 @@ def _install_gate() -> bool:
     async def token_auth_middleware(request, call_next):
         path = request.url.path
         method = request.method.upper()
+        snapshot = SNAPSHOT_ROUTE_RE.fullmatch(path) if method == "POST" else None
+        if snapshot is not None:
+            return await _connector_snapshot_request(request, snapshot.group(1))
 
         decision_match = DECISION_READINESS_RE.match(path) if method == "GET" else None
         if decision_match is not None:

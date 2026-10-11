@@ -301,6 +301,59 @@ cache 후보는 `body_key_id`가 null이 아닌 행으로 제한한다. 기존 �
 새 색인과 제약은 추가하지 않는다. 최신 revision 조회로 후보 하나만 비교한다.
 키의 입력과 null 의미는 [완료 결과 재사용 ADR](adr/ADR-20261011-media-observation-cache.md)이 갖는다.
 
+### content_draft・content_draft_revision・content_draft_asset
+
+V20261011060038 마이그레이션으로 생성하는 원고 revision 저장 모델이다.
+생성·조회·수정과 참조 검사, 오류 응답과 삭제 참가 지점은 [원고 저장 계약](../../docs/features/content-draft.md#원고-revision-저장-계약)이 갖는다.
+preview·approval·job 표는 이 저장 모델에 포함하지 않는다.
+
+| 표 | 칸과 타입 | 필수와 제약 |
+| --- | --- | --- |
+| `content_draft` | id BIGINT AUTO_INCREMENT, public_id CHAR(36), conversation_id BIGINT, owner_user_id BIGINT, current_revision BIGINT, created_at・expires_at DATETIME(6) | 모두 NOT NULL, id PK, public_id UNIQUE, current_revision 양수 |
+| `content_draft_revision` | id BIGINT AUTO_INCREMENT, draft_id BIGINT, revision BIGINT, status VARCHAR(32), schema_version INT, created_at DATETIME(6), body LONGTEXT, body_key_id BIGINT | body와 body_key_id만 NULL 허용, id PK, UNIQUE(draft_id, revision), revision 양수, schema_version=1 |
+| `content_draft_asset` | id BIGINT AUTO_INCREMENT, revision_id BIGINT, position INT, attachment_id BIGINT, source_fingerprint CHAR(64), observation_id BIGINT, observation_revision BIGINT | 관찰 두 칸만 NULL 허용, id PK, UNIQUE(revision_id, position), position 0..499, 관찰 쌍은 둘 다 NULL 또는 둘 다 비NULL |
+
+asset은 image 블록마다 한 줄이다. position은 전체 blocks 배열의 인덱스여서 사이가 비어도 되고 같은 attachment_id가 여러 번 나와도 된다.
+관찰을 지정했다면 observation_revision은 양수다. asset 지문은 서버가 읽은 원본의 SHA-256 소문자 64자리다.
+title・category・tags・blocks는 revision.body에만 넣는다. 평문 제목 칸이나 본문 복제는 만들지 않는다.
+
+| 연결과 색인 | 뜻 |
+| --- | --- |
+| draft.conversation_id → conversation.id FK | 자동 cascade 없음, 대화 purge가 원고를 명시적으로 삭제 |
+| revision.draft_id → draft.id FK ON DELETE CASCADE | 원고 물리 삭제 시 revision 제거 |
+| asset.revision_id → revision.id FK ON DELETE CASCADE | revision 물리 삭제 시 asset 제거 |
+| asset.attachment_id → chat_attachment.id FK | 자동 cascade 없음, tombstone 보존, purge에서 원고를 첨부보다 먼저 삭제 |
+| asset.observation_id에는 FK 없음 | 관찰 정리 후에도 tombstone 식별자 보존, 대응은 서비스가 잠금 안에서 검증 |
+| draft(conversation_id, created_at, id) | 생성 역순 목록 |
+| draft(expires_at, id) | 원고 만료 후보 |
+| asset(attachment_id, revision_id), asset(observation_id) | 첨부・관찰 참조의 무효화 후보 |
+
+owner_user_id는 저장 당시 주인으로 필수이며 현재 대화 주인과 매번 비교한다.
+body_key_id는 기존 본문 암호화와 같이 FK를 두지 않는다.
+관찰의 물리 삭제만으로 asset을 제거하지 않으며, 조회와 정리가 사라진 참조를 STALE로 만든다.
+본문을 지운 뒤에는 암호화한 blocks를 읽지 않아도 asset 행으로 참조 정리를 할 수 있다.
+
+status는 VALID・STALE・EXPIRED 세 값이고 CHECK로 다른 값을 거절한다.
+CHECK는 VALID이면 body・body_key_id 모두 비NULL, STALE 또는 EXPIRED이면 둘 다 NULL임을 강제한다.
+seal을 위해 NULL VALID 행을 먼저 INSERT하지 않는다. 신규 revision 번호와 공개 draft UUID로 AAD를 만든 뒤 암호화한 값을 채워 INSERT한다.
+AAD는 `content_draft_revision:<draft UUID>:revision:<번호>:conversation:<내부 대화 ID>:user:<주인 ID>`다.
+`TextCipher.enabled()`가 false이거나 seal/open이 실패하면 평문 호환으로 읽거나 쓰지 않는다.
+빈 암호문은 서비스가 거절한다. 무효화는 status와 본문/key를 같은 UPDATE로 바꾸며 rollback하면 셋이 함께 복구된다.
+
+draft.expires_at은 생성 시각+30일과 최초 참조 첨부 만료 중 최솟값이다. 사진이 없으면 생성+30일이다.
+수정할 때 새 참조 첨부의 만료로 더 짧아질 수 있고 원래 값보다 길어지지 않는다.
+원고 자체 만료에는 STALE을 포함한 모든 EXPIRED 아닌 revision을 EXPIRED로 바꾸고, 참조 무효화에는 그 참조를 쓰는 VALID revision만 STALE로 바꾼다. flushAutomatically=true로 진행 중인 삭제 요청도 먼저 반영하며 EXPIRED를 보존한다.
+current_revision은 유일하게 수락된 마지막 번호이며 무효화해도 감소시키지 않는다.
+사라진 첨부를 뺀 새 본문으로 수정할 수 있지만 해당 원고가 자체 만료됐다면 새 원고를 만든다.
+이전 STALE 본문을 조회하거나 복호화하여 복구하지 않는다.
+
+시간은 주입한 Clock의 Instant를 UTC microsecond로 잘라 DATETIME(6)에 저장한다.
+V20261011060038은 세 표의 DDL을 담고 ENGINE・CHARSET・COLLATE는 위 작성 규칙을 따른다.
+Flyway H2와 실제 MySQL 회귀가 엔티티 validate, CHECK 위반, FK・cascade・purge 순서와 본문/key 무효화를 검사한다.
+RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별도 MySQL 회귀가 검사한다.
+운영 조회 권한과 그 확인은 `fos-home-infra`가 관리하며 원고 본문은 조회 대상에서 제외한다.
+
+
 ### chat_artifact
 
 에이전트가 turn 안에 대화의 결과물 폴더에 만들거나 고친 HTML 파일 하나가 한 행이다([ADR-027](../../docs/adr/ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md)).
@@ -487,6 +540,9 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 그룹이 쓰는 collection 하나가 한 줄이다. 화면의 탭과 에이전트 접근 설정이 고를 목록이고, 누가 읽는지는 이 표가 정하지 않는다.
 그룹마다 `MemoryCollection.DEFAULT_KEYS` 로 시작한다. 마이그레이션이 사용자가 있는 그룹에 넣고, 그 뒤에 생긴 그룹은 목록을 처음 읽을 때 넣는다.
+
+`created_at`은 JPA `PrePersist`에서 기록하는 생성 시각이며 commit 완료 시각은 아니다.
+시계와 정밀도, 기존 행과 SQL의 처리 계약은 [`code-architecture.md`의 「JPA 생성 시각」](code-architecture.md#jpa-생성-시각)이 갖는다.
 
 ### agent_memory_collection
 

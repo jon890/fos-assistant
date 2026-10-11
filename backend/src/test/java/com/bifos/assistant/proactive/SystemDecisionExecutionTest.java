@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
@@ -25,6 +26,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -49,33 +52,67 @@ class SystemDecisionExecutionTest {
     @Autowired
     Clock clock;
 
+    @Autowired
+    StubHermesRunsClient hermes;
+
     private final List<Long> created = new ArrayList<>();
+
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("시스템의 실제 모델을 읽지 못하면 성공과 실패 모두 요청 모델로 대체하지 않는다")
+    void leavesUnknownSystemRuntimeEmpty(boolean failed) {
+        hermes.willReportSessionRuntime(null);
+        AgentExecution system = recorder.startSystem(
+            USER, "decision-test", CostMode.SUBSCRIPTION,
+            ModelChoice.of("requested-provider", "requested-model", null));
+        created.add(system.id());
+        HermesRunResult result = new HermesRunResult(
+            "unknown-system-run", "unknown-session", failed ? "failed" : "completed",
+            null, "requested-model", "requested-provider", null, new TokenUsage(10L, 0L, 4L, 14L));
+        if (failed) {
+            recorder.failSystem(system, result, "http://hermes.example.com", "FAILED");
+        } else {
+            recorder.completeSystem(system, result, "http://hermes.example.com");
+        }
+
+        assertThat(executions.findById(system.id()).orElseThrow()).satisfies(row -> {
+            assertThat(row.status()).isEqualTo(failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCEEDED);
+            assertThat(row.provider()).isNull();
+            assertThat(row.model()).isNull();
+            assertThat(row.totalTokens()).isEqualTo(14L);
+            assertThat(row.estimatedCostMicros()).isNull();
+            assertThat(row.pricingVersion()).isNull();
+        });
+    }
+
 
     @AfterEach
     void tearDown() {
         executions.deleteAllById(created);
     }
 
+
     @Test
     @DisplayName("시스템 판단도 요청자의 실행 기록과 합계에 남고 에이전트 없는 줄을 정렬할 수 있다")
     void recordsSystemExecutionWithoutCreatingAnAgent() {
         Instant now = clock.instant();
         AgentExecution system = recorder.startSystem(
-                USER,
-                "decision-test",
-                CostMode.SUBSCRIPTION,
-                ModelChoice.of("requested-provider", "requested-model", "high"));
+            USER,
+            "decision-test",
+            CostMode.SUBSCRIPTION,
+            ModelChoice.of("requested-provider", "requested-model", "high"));
         created.add(system.id());
         HermesRunResult result = new HermesRunResult(
-                "system-run",
-                "session-new",
-                "completed",
-                "not-stored",
-                "requested-model",
-                "requested-provider",
-                null,
-                TokenUsage.empty(),
-                new SessionRuntime("actual-model", "actual-provider"));
+            "system-run",
+            "session-new",
+            "completed",
+            "not-stored",
+            "requested-model",
+            "requested-provider",
+            null,
+            TokenUsage.empty(),
+            new SessionRuntime("actual-model", "actual-provider"));
         recorder.completeSystem(system, result, "http://hermes.example.com");
         assertThat(executions.findById(system.id()).orElseThrow()).satisfies(row -> {
             assertThat(row.agentId()).isNull();
@@ -86,16 +123,15 @@ class SystemDecisionExecutionTest {
             assertThat(row.outputText()).isNull();
         });
         AgentExecution other = executions.save(AgentExecution.builder()
-                .userId(USER.id())
-                .agentId(960_101L)
-                .profileName("source-test")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(now)
-                .build());
+            .userId(USER.id())
+            .agentId(960_101L)
+            .profileName("source-test")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(now)
+            .build());
         created.add(other.id());
-        var lines =
-                usage.byAgent(USER.id(), now.minusSeconds(1), clock.instant().plusSeconds(1));
+        var lines = usage.byAgent(USER.id(), now.minusSeconds(1), clock.instant().plusSeconds(1));
         assertThat(lines).hasSize(2);
         assertThat(lines.getLast().cost().agentId()).isNull();
         var previous = SecurityContextHolder.getContext();
@@ -106,33 +142,34 @@ class SystemDecisionExecutionTest {
             SecurityContextHolder.setContext(context);
             String month = YearMonth.from(now.atZone(ZoneId.of("Asia/Seoul"))).toString();
             assertThat(controller.breakdown("agent", month).rows())
-                    .filteredOn(row -> row.key().equals("system-decision"))
-                    .singleElement()
-                    .satisfies(row -> assertThat(row.label()).isEqualTo("시스템 판단"));
+                .filteredOn(row -> row.key().equals("system-decision"))
+                .singleElement()
+                .satisfies(row -> assertThat(row.label()).isEqualTo("시스템 판단"));
         } finally {
             SecurityContextHolder.setContext(previous);
         }
     }
 
+
     @Test
     @DisplayName("실패한 판단도 실제 모델과 토큰은 보존하고 오류 본문은 저장하지 않는다")
     void preservesUsageOfFailedSystemExecution() {
         AgentExecution system = recorder.startSystem(
-                USER,
-                "decision-test",
-                CostMode.SUBSCRIPTION,
-                ModelChoice.of("requested-provider", "requested-model", null));
+            USER,
+            "decision-test",
+            CostMode.SUBSCRIPTION,
+            ModelChoice.of("requested-provider", "requested-model", null));
         created.add(system.id());
         HermesRunResult result = new HermesRunResult(
-                "failed-run",
-                "session-new",
-                "failed",
-                null,
-                null,
-                null,
-                "private error",
-                new TokenUsage(10L, 0L, 4L, 14L),
-                new SessionRuntime("actual-model", "actual-provider"));
+            "failed-run",
+            "session-new",
+            "failed",
+            null,
+            null,
+            null,
+            "private error",
+            new TokenUsage(10L, 0L, 4L, 14L),
+            new SessionRuntime("actual-model", "actual-provider"));
         recorder.failSystem(system, result, "http://hermes.example.com", "DECISION_PROVIDER_FAILED");
         assertThat(executions.findById(system.id()).orElseThrow()).satisfies(row -> {
             assertThat(row.status()).isEqualTo(ExecutionStatus.FAILED);
