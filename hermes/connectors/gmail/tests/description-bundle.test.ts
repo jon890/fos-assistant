@@ -15,8 +15,11 @@ test("커밋한 stdio bundle의 SDK 목록은 manifest 정본 설명과 같다",
     await client.connect(transport);
     const tools = (await client.listTools()).tools;
     const declared: Record<string, { description: string }> = manifest.tools;
-    expect(new Set(tools.map((tool) => tool.name))).toEqual(new Set(Object.keys(declared)));
-    for (const tool of tools) expect(tool.description).toBe(declared[tool.name]!.description);
+    expect(new Set(tools.map((tool) => tool.name))).toEqual(
+      new Set(Object.keys(declared)),
+    );
+    for (const tool of tools)
+      expect(tool.description).toBe(declared[tool.name]!.description);
     expect(tools.filter((tool) => !tool.description?.trim())).toEqual([]);
   } finally {
     await client.close();

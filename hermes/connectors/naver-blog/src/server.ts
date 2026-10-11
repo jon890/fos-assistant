@@ -32,7 +32,11 @@ import {
   writeInput,
 } from "./jobs.ts";
 import { cardWouldMask } from "./card-mask.ts";
-import { CHANGES_MAX, overwriteContentShape, validateOverwrite } from "./overwrite-draft.ts";
+import {
+  CHANGES_MAX,
+  overwriteContentShape,
+  validateOverwrite,
+} from "./overwrite-draft.ts";
 import { renderDraft, renderShape, type RenderInput } from "./render.ts";
 import { readConnection, sessionStatus, type Env } from "./session.ts";
 import { runWorker } from "./worker.ts";
@@ -84,7 +88,13 @@ const DEFAULT_SERVER_DEPS: ServerDeps = {
  * 작업 프로세스가 사진을 읽을 때도 같은 첨부 디렉터리로 다시 검사하도록 그 env 를 함께 넘긴다.
  */
 function workerEnvironment(env: Env) {
-  const keys = ["PATH", "HOME", "NAVER_BLOG_BROWSER_URL", "NAVER_BLOG_ID", ATTACHMENT_DIR_ENV];
+  const keys = [
+    "PATH",
+    "HOME",
+    "NAVER_BLOG_BROWSER_URL",
+    "NAVER_BLOG_ID",
+    ATTACHMENT_DIR_ENV,
+  ];
   if (env.NAVER_BLOG_JOB_DIR) keys.push("NAVER_BLOG_JOB_DIR");
   const picked: Record<string, string> = {};
   for (const key of keys) {
@@ -99,7 +109,11 @@ function workerEnvironment(env: Env) {
  * 작업 프로세스는 새 세션으로 떠서 대시보드가 이 서버의 프로세스 묶음을 정리해도 남는다.
  * 띄우기 전에 실패하면 잠금과 작업 파일을 지운다.
  */
-async function startJob(env: Env, input: Record<string, unknown>, deps: ServerDeps) {
+async function startJob(
+  env: Env,
+  input: Record<string, unknown>,
+  deps: ServerDeps,
+) {
   const { blogId } = readConnection(env);
   // 중계가 꺼진 브라우저를 켜는 데 30초까지 걸려 확인 도구의 8초보다 길게 기다린다.
   await deps.checkSession(env, { timeoutMs: 45_000 });
@@ -121,11 +135,15 @@ async function startJob(env: Env, input: Record<string, unknown>, deps: ServerDe
       heartbeat_at: null,
     });
     await writeInput(dir, jobId, input);
-    const child = spawn(process.execPath, [deps.workerEntry, "--worker", path], {
-      detached: true,
-      stdio: "ignore",
-      env: workerEnvironment(env),
-    });
+    const child = spawn(
+      process.execPath,
+      [deps.workerEntry, "--worker", path],
+      {
+        detached: true,
+        stdio: "ignore",
+        env: workerEnvironment(env),
+      },
+    );
     // 띄운 뒤의 오류는 시작 확인이 시간 초과로 알린다.
     child.on("error", () => {});
     child.unref();
@@ -138,7 +156,10 @@ async function startJob(env: Env, input: Record<string, unknown>, deps: ServerDe
   const deadline = Date.now() + deps.startWaitMs;
   for (;;) {
     const state = await readState(dir, jobId);
-    if (state?.pid != null && (state.stage !== "queued" || state.status !== "running"))
+    if (
+      state?.pid != null &&
+      (state.stage !== "queued" || state.status !== "running")
+    )
       return { job_id: jobId, status: state.status };
     if (Date.now() >= deadline) throw new ToolError("NAVER_BLOG_START_UNKNOWN");
     await Bun.sleep(Math.min(100, Math.max(1, deadline - Date.now())));
@@ -147,7 +168,8 @@ async function startJob(env: Env, input: Record<string, unknown>, deps: ServerDe
 
 /** 초안과 사진을 검사한 뒤 새 글 저장 작업을 띄운다. 입력 파일에는 `kind` 를 두지 않는다. */
 async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
-  if (validateDraft(input).length) throw new ToolError("NAVER_BLOG_INVALID_INPUT");
+  if (validateDraft(input).length)
+    throw new ToolError("NAVER_BLOG_INVALID_INPUT");
   if ((await checkPhotoFiles(input, env[ATTACHMENT_DIR_ENV])).length)
     throw new ToolError("NAVER_BLOG_PHOTO_INVALID");
   return startJob(
@@ -164,13 +186,29 @@ async function saveDraft(env: Env, input: DraftInput, deps: ServerDeps) {
 }
 
 /** 고친 글의 모양을 검사한 뒤 `kind: "overwrite"` 입력 파일로 덮어쓰기 작업을 띄운다. */
-async function overwriteDraft(env: Env, input: OverwriteInput, deps: ServerDeps) {
+async function overwriteDraft(
+  env: Env,
+  input: OverwriteInput,
+  deps: ServerDeps,
+) {
   const { draft_id, revision, changes, title, category, tags, body } = input;
-  if (validateOverwrite({ title, category, tags, body }).length || cardWouldMask(changes))
+  if (
+    validateOverwrite({ title, category, tags, body }).length ||
+    cardWouldMask(changes)
+  )
     throw new ToolError("NAVER_BLOG_INVALID_INPUT");
   return startJob(
     env,
-    { kind: "overwrite", draft_id, revision, changes, title, category, tags, body },
+    {
+      kind: "overwrite",
+      draft_id,
+      revision,
+      changes,
+      title,
+      category,
+      tags,
+      body,
+    },
     deps,
   );
 }
@@ -185,17 +223,24 @@ async function draftJob(env: Env, jobId: string, waitSeconds: number) {
   for (;;) {
     let state = await readState(dir, jobId);
     if (!state) throw new ToolError("NAVER_BLOG_JOB_NOT_FOUND");
-    if (state.status === "running" && !jobAlive(state, Date.parse(state.started_at))) {
+    if (
+      state.status === "running" &&
+      !jobAlive(state, Date.parse(state.started_at))
+    ) {
       state = (await finishStale(dir, state)) ?? state;
       await releaseLock(dir, jobId);
     }
-    if (state.status !== "running" || Date.now() >= deadline) return publicState(state);
+    if (state.status !== "running" || Date.now() >= deadline)
+      return publicState(state);
     await Bun.sleep(Math.min(1_000, Math.max(1, deadline - Date.now())));
   }
 }
 
 /** 도구를 등록한 서버. 시험은 이 서버를 InMemoryTransport 로 부른다. */
-export function createServer(env: Env = process.env, overrides: Partial<ServerDeps> = {}) {
+export function createServer(
+  env: Env = process.env,
+  overrides: Partial<ServerDeps> = {},
+) {
   const deps = { ...DEFAULT_SERVER_DEPS, ...overrides };
   const server = new McpServer({ name: "fos-naver-blog", version: "1.0.0" });
   server.registerTool(
@@ -221,7 +266,10 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
     {
       description: manifest.tools.read_draft.description,
       inputSchema: {
-        draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("list_drafts 가 돌려준 draft_id"),
+        draft_id: z
+          .string()
+          .regex(DRAFT_ID_PATTERN)
+          .describe("list_drafts 가 돌려준 draft_id"),
       },
       annotations: { readOnlyHint: false },
     },
@@ -234,7 +282,8 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
       inputSchema: renderShape,
       annotations: { readOnlyHint: true },
     },
-    (input) => guard(() => renderDraft(input as RenderInput, env[ATTACHMENT_DIR_ENV])),
+    (input) =>
+      guard(() => renderDraft(input as RenderInput, env[ATTACHMENT_DIR_ENV])),
   );
   server.registerTool(
     "save_draft",
@@ -249,7 +298,10 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
     {
       description: manifest.tools.overwrite_draft.description,
       inputSchema: {
-        draft_id: z.string().regex(DRAFT_ID_PATTERN).describe("read_draft 로 읽은 글의 draft_id"),
+        draft_id: z
+          .string()
+          .regex(DRAFT_ID_PATTERN)
+          .describe("read_draft 로 읽은 글의 draft_id"),
         revision: z
           .string()
           .regex(/^[0-9a-f]{16}$/)
@@ -283,7 +335,8 @@ export function createServer(env: Env = process.env, overrides: Partial<ServerDe
       },
       annotations: { readOnlyHint: true },
     },
-    ({ job_id, wait_seconds }) => guard(() => draftJob(env, job_id, wait_seconds)),
+    ({ job_id, wait_seconds }) =>
+      guard(() => draftJob(env, job_id, wait_seconds)),
   );
   return server;
 }
