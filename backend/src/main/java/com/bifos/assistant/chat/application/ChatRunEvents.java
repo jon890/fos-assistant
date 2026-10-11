@@ -33,8 +33,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @RequiredArgsConstructor
 class ChatRunEvents {
-    private static final Set<String> TERMINAL_EVENTS =
-            Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
+    private static final Set<String> TERMINAL_EVENTS = Set.of("run.completed", "run.failed", "run.cancelled", "run.interrupted");
 
     private final AgentConnectorBindings connectorBindings;
     private final ExecutionConnectorCalls connectorCalls;
@@ -48,6 +47,7 @@ class ChatRunEvents {
     private final UserExecutionLimiter limiter;
     private final BackgroundTasks backgroundTasks;
 
+
     String submit(PendingTurn pending) {
         try {
             executions.markSubmitted(pending.execution());
@@ -56,10 +56,10 @@ class ChatRunEvents {
             executions.attachRunId(pending.execution(), runId);
             append(pending, ExecutionEventType.RUN_STARTED, null);
             turns.trackRun(
-                    pending.execution().id(),
-                    pending.command().apiBaseUrl(),
-                    pending.command().profileName(),
-                    runId);
+                pending.execution().id(),
+                pending.command().apiBaseUrl(),
+                pending.command().profileName(),
+                runId);
             return runId;
         } catch (ApiException ex) {
             executions.fail(pending.execution(), ex.code().name());
@@ -68,11 +68,12 @@ class ChatRunEvents {
         }
     }
 
+
     /**
      * Hermes 사건 스트림이 닫히거나 중지 유예가 끝날 때까지 읽는다.
      *
      * @param onEvent 사건을 화면으로 흘릴 곳. null 이면 한 번에 받는 경로라 실행 기록에만 남기고 답 조각 시각도 적지 않는다.
-     *     이 경로는 스트림을 기다리는 시간에도 {@code hermes.run-timeout} 상한을 두고, 넘으면 스트림을 닫은 채 결과 조회로 넘어간다
+     * 이 경로는 스트림을 기다리는 시간에도 {@code hermes.run-timeout} 상한을 두고, 넘으면 스트림을 닫은 채 결과 조회로 넘어간다
      */
     void relay(PendingTurn pending, String runId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         // 일부 HTTP 스트림은 다른 스레드의 close 중에도 readLine 을 놓지 않는다.
@@ -80,30 +81,30 @@ class ChatRunEvents {
         CompletableFuture<Void> streamDone = new CompletableFuture<>();
         AtomicBoolean terminalSeen = new AtomicBoolean();
         ToolDetailScope detailScope = toolDetailScope(pending.agent())
-                .withTreeHistory(
-                        at -> connectorCalls.calledBefore(pending.execution().treeRootId(), at));
+            .withTreeHistory(
+                at -> connectorCalls.calledBefore(pending.execution().treeRootId(), at));
         backgroundTasks.start("turn-event-stream-" + runId, () -> {
             try {
                 eventStream.open(
-                        pending.command().apiBaseUrl(),
-                        pending.command().profileName(),
-                        runId,
-                        event -> {
-                            synchronized (pending) {
-                                if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
-                                    if (TERMINAL_EVENTS.contains(event.type())) {
-                                        terminalSeen.set(true);
-                                    }
-                                    if (onEvent == null) {
-                                        append(pending, event);
-                                    } else {
-                                        forward(pending, event, onEvent);
-                                    }
+                    pending.command().apiBaseUrl(),
+                    pending.command().profileName(),
+                    runId,
+                    event -> {
+                        synchronized (pending) {
+                            if (!handle.cancelled().get() || !turns.isStopConfirmed(handle)) {
+                                if (TERMINAL_EVENTS.contains(event.type())) {
+                                    terminalSeen.set(true);
+                                }
+                                if (onEvent == null) {
+                                    append(pending, event);
+                                } else {
+                                    forward(pending, event, onEvent);
                                 }
                             }
-                        },
-                        stream -> turns.attachStream(handle, stream),
-                        detailScope);
+                        }
+                    },
+                    stream -> turns.attachStream(handle, stream),
+                    detailScope);
             } catch (ApiException ex) {
                 synchronized (pending) {
                     executions.finishEventObservation(pending.execution(), false);
@@ -125,7 +126,7 @@ class ChatRunEvents {
         });
         if (onEvent == null) {
             turns.awaitStreamOrGrace(
-                    handle, streamDone, hermesProperties.current().runTimeout());
+                handle, streamDone, hermesProperties.current().runTimeout());
         } else {
             turns.awaitStreamOrGrace(handle, streamDone);
         }
@@ -135,6 +136,7 @@ class ChatRunEvents {
             }
         }
     }
+
 
     /**
      * 실행 기록에서 내용을 통째로 가릴 도구다. 옛 커넥터 에이전트는 모두 가리고, 다른 에이전트는 붙은 커넥터 서버의 도구만
@@ -147,23 +149,25 @@ class ChatRunEvents {
         return ToolDetailScope.prefixes(connectorBindings.connectorToolPrefixes(agent.id()));
     }
 
+
     HermesRunResult awaitCompletion(PendingTurn pending, String runId) {
         try {
             return hermes.awaitCompletion(pending.command(), runId);
         } catch (ApiException ex) {
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(
-                    pending.user().id(),
-                    pending.execution().id(),
-                    pending.command().apiBaseUrl(),
-                    pending.command().profileName(),
-                    runId,
-                    false);
+                pending.user().id(),
+                pending.execution().id(),
+                pending.command().apiBaseUrl(),
+                pending.command().profileName(),
+                runId,
+                false);
             executions.fail(pending.execution(), ex.code().name());
             append(pending, ExecutionEventType.RUN_FAILED, ex.code().name());
             throw ex;
         }
     }
+
 
     /** 스트림으로 온 사건을 화면으로 중계하면서 우리 이름으로도 옮겨 적는다. */
     void forward(PendingTurn pending, RunEvent event, Consumer<ChatEvent> onEvent) {
@@ -182,7 +186,7 @@ class ChatRunEvents {
         } else if ("message.interim".equals(type)) {
             synchronized (pending) {
                 int length = Boolean.TRUE.equals(event.alreadyStreamed()) && event.streamedPrefixLength() != null
-                        ? event.streamedPrefixLength() : 0;
+                    ? event.streamedPrefixLength() : 0;
                 // 파서가 직전 구간의 출처를 확인한 경우만 중지 시 저장하는 답에서 뺀다.
                 if (length > 0 && length <= pending.streamed().length()) {
                     pending.streamed().setLength(pending.streamed().length() - length);
@@ -200,37 +204,40 @@ class ChatRunEvents {
             }
         } else if ("tool.completed".equals(type)) {
             onEvent.accept(ChatEvent.tool(
-                    event.toolName(), event.detail(), ChatEvent.COMPLETED, event.durationMs(), event.failed()));
+                event.toolName(), event.detail(), ChatEvent.COMPLETED, event.durationMs(), event.failed()));
         } else if ("subagent.start".equals(type)) {
             onEvent.accept(ChatEvent.subagent(
-                    event.subagentId(),
-                    event.goal() == null ? event.detail() : event.goal(),
-                    event.model(),
-                    ChatEvent.STARTED,
-                    null,
-                    null,
-                    null,
-                    null));
+                event.subagentId(),
+                event.goal() == null ? event.detail() : event.goal(),
+                event.model(),
+                ChatEvent.STARTED,
+                null,
+                null,
+                null,
+                null));
         } else if ("subagent.complete".equals(type)) {
             onEvent.accept(ChatEvent.subagent(
-                    event.subagentId(),
-                    event.goal() == null ? event.detail() : event.goal(),
-                    event.model(),
-                    ChatEvent.COMPLETED,
-                    event.inputTokens(),
-                    event.outputTokens(),
-                    event.durationMs(),
-                    event.failed()));
+                event.subagentId(),
+                event.goal() == null ? event.detail() : event.goal(),
+                event.model(),
+                ChatEvent.COMPLETED,
+                event.inputTokens(),
+                event.outputTokens(),
+                event.durationMs(),
+                event.failed()));
         }
     }
+
 
     void append(PendingTurn pending, ExecutionEventType type, String detail) {
         store(pending, sequence -> eventRecorder.record(pending.execution(), type, detail, sequence));
     }
 
+
     void append(PendingTurn pending, RunEvent event) {
         store(pending, sequence -> eventRecorder.record(pending.execution(), event, sequence));
     }
+
 
     /**
      * 사건 하나를 저장한다.
@@ -249,9 +256,9 @@ class ChatRunEvents {
             pending.counter().advance();
         } catch (RuntimeException ex) {
             log.warn(
-                    "could not record an execution event executionId={}",
-                    pending.execution().id(),
-                    ex);
+                "could not record an execution event executionId={}",
+                pending.execution().id(),
+                ex);
             executions.finishEventObservation(pending.execution(), false);
         }
     }

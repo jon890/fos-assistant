@@ -19,28 +19,30 @@ class HermesInterimStreamTest {
         List<RunEvent> events = new ArrayList<>();
         HermesInterimWire.read(HermesInterimWire.fixture(), ToolDetailScope.NONE, events::add);
         assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-                .extracting(RunEvent::streamedPrefixLength).containsExactly(0, 0, "두 번째  안내".length(), "일부만 ".length());
+            .extracting(RunEvent::streamedPrefixLength).containsExactly(0, 0, "두 번째  안내".length(), "일부만 ".length());
         assertThat(events.getLast().type()).isEqualTo("run.completed");
         assertThat(events).filteredOn(event -> "reasoning.available".equals(event.type()))
-                .allSatisfy(event -> assertThat(event.text()).isNull());
+            .allSatisfy(event -> assertThat(event.text()).isNull());
         assertThat(events.toString()).doesNotContain("SYNTHETIC_HIDDEN_REASONING");
     }
+
 
     @Test
     @DisplayName("누락되거나 잘못된 boolean과 맞지 않는 delta는 재분류하지 않는다")
     void preservesUnknownAndMismatchedPrefixes() throws IOException {
         for (String field : List.of("", ",\"already_streamed\":\"true\"", ",\"already_streamed\":1",
-                ",\"already_streamed\":null", ",\"already_streamed\":false", ",\"already_streamed\":true")) {
+            ",\"already_streamed\":null", ",\"already_streamed\":false", ",\"already_streamed\":true")) {
             List<RunEvent> events = new ArrayList<>();
             HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"답 조각\"}\n\n"
-                    + "data: {\"event\":\"message.interim\",\"text\":\"다른 안내\"" + field + "}\n\n",
-                    ToolDetailScope.NONE, events::add);
+                + "data: {\"event\":\"message.interim\",\"text\":\"다른 안내\"" + field + "}\n\n",
+                ToolDetailScope.NONE, events::add);
             assertThat(events.getLast().streamedPrefixLength()).isZero();
             if (!field.endsWith(":true") && !field.endsWith(":false")) {
                 assertThat(events.getLast().alreadyStreamed()).isNull();
             }
         }
     }
+
 
     @Test
     @DisplayName("도구 경계를 넘어 앞의 답을 지우거나 같은 안내를 재수신해 두 번 빼지 않는다")
@@ -61,8 +63,9 @@ class HermesInterimStreamTest {
 
                 """, ToolDetailScope.NONE, events::add);
         assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-                .extracting(RunEvent::streamedPrefixLength).containsExactly(0, 4, 0);
+            .extracting(RunEvent::streamedPrefixLength).containsExactly(0, 4, 0);
     }
+
 
     @Test
     @DisplayName("안내 뒤 같은 접두사의 최종 delta가 와도 재수신한 안내는 그 delta를 지우지 않는다")
@@ -71,12 +74,13 @@ class HermesInterimStreamTest {
             List<RunEvent> events = new ArrayList<>();
             String interim = "data: {\"event\":\"message.interim\",\"text\":\"새 안내\",\"already_streamed\":true" + identity + "}\n\n";
             HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"새 안내\"}\n\n"
-                    + interim + "data: {\"event\":\"message.delta\",\"delta\":\"새 안내\"}\n\n" + interim,
-                    ToolDetailScope.NONE, events::add);
+                + interim + "data: {\"event\":\"message.delta\",\"delta\":\"새 안내\"}\n\n" + interim,
+                ToolDetailScope.NONE, events::add);
             assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-                    .extracting(RunEvent::streamedPrefixLength).containsExactly(4, 0);
+                .extracting(RunEvent::streamedPrefixLength).containsExactly(4, 0);
         }
     }
+
 
     @Test
     @DisplayName("reset과 실행 시작은 앞 시도의 delta와 안내 중복 상태를 비운다")
@@ -85,14 +89,15 @@ class HermesInterimStreamTest {
             List<RunEvent> events = new ArrayList<>();
             String interim = "data: {\"event\":\"message.interim\",\"text\":\"안내\",\"already_streamed\":true}\n\n";
             HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"안내\"}\n\n" + interim
-                    + "data: {\"event\":\"message.delta\",\"delta\":\"앞 시도\"}\n\n"
-                    + "data: {\"event\":\"" + boundary + "\"}\n\n"
-                    + "data: {\"event\":\"message.delta\",\"delta\":\"안내\"}\n\n" + interim,
-                    ToolDetailScope.NONE, events::add);
+                + "data: {\"event\":\"message.delta\",\"delta\":\"앞 시도\"}\n\n"
+                + "data: {\"event\":\"" + boundary + "\"}\n\n"
+                + "data: {\"event\":\"message.delta\",\"delta\":\"안내\"}\n\n" + interim,
+                ToolDetailScope.NONE, events::add);
             assertThat(events).filteredOn(event -> "message.interim".equals(event.type()))
-                    .extracting(RunEvent::streamedPrefixLength).containsExactly(2, 2);
+                .extracting(RunEvent::streamedPrefixLength).containsExactly(2, 2);
         }
     }
+
 
     @Test
     @DisplayName("NBSP와 EM SPACE와 줄바꿈은 upstream과 같이 정규화하고 emoji의 UTF-16 길이를 전달한다")
@@ -101,12 +106,13 @@ class HermesInterimStreamTest {
         String prefix = "\u00a0\u2003확인😀\n중\u00a0";
         var delta = mapper.createObjectNode().put("event", "message.delta").put("delta", prefix);
         var interim = mapper.createObjectNode().put("event", "message.interim")
-                .put("text", "확인😀 중이에요.").put("already_streamed", true);
+            .put("text", "확인😀 중이에요.").put("already_streamed", true);
         List<RunEvent> events = new ArrayList<>();
         HermesInterimWire.read("data: " + mapper.writeValueAsString(delta) + "\n\n"
-                + "data: " + mapper.writeValueAsString(interim) + "\n\n", ToolDetailScope.NONE, events::add);
+            + "data: " + mapper.writeValueAsString(interim) + "\n\n", ToolDetailScope.NONE, events::add);
         assertThat(events.getLast().streamedPrefixLength()).isEqualTo(prefix.length());
     }
+
 
     @Test
     @DisplayName("중간 안내의 think와 비밀값은 숨기고 커넥터 호출 뒤와 트리 이력에도 같은 정책을 적용한다")

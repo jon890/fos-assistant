@@ -28,6 +28,7 @@ public final class HermesInterimWire {
         }
     }
 
+
     public static void read(String wire, ToolDetailScope scope, Consumer<RunEvent> consumer) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/runs/fixture-run/events", exchange -> {
@@ -43,10 +44,11 @@ public final class HermesInterimWire {
             var keys = mock(HermesProfileKeyStore.class);
             when(keys.resolve("fixture")).thenReturn("synthetic-profile-key");
             var properties = new HermesProperties(null, null, null, null, null,
-                    Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofSeconds(5));
+                Duration.ofSeconds(5), Duration.ofSeconds(5), Duration.ofSeconds(5));
             new HermesRunEventStream(keys, properties, JsonMapper.builder().build()).open(
-                    "http://127.0.0.1:" + server.getAddress().getPort(), "fixture", "fixture-run",
-                    consumer, stream -> {}, scope);
+                "http://127.0.0.1:" + server.getAddress().getPort(), "fixture", "fixture-run",
+                consumer, stream -> {
+                }, scope);
         } finally {
             server.stop(0);
         }

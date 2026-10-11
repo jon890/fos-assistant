@@ -273,6 +273,7 @@ public class HermesRunEventStream {
         private boolean segmentTooLong;
         private final Set<String> interimKeys = new HashSet<>();
 
+
         /** 직전 구간 전체가 안내의 접두사인 경우만 재분류한다. 부분 문자열이나 최종 답에서는 찾지 않는다. */
         Integer classify(String type, String text, Boolean alreadyStreamed, String interimId) {
             if ("message.delta".equalsIgnoreCase(type) && text != null) {
@@ -298,7 +299,7 @@ public class HermesRunEventStream {
                 return length;
             }
             if ("tool.started".equalsIgnoreCase(type) || "run.started".equalsIgnoreCase(type)
-                    || "reset".equalsIgnoreCase(type)) {
+                || "reset".equalsIgnoreCase(type)) {
                 deltaSegment.setLength(0);
                 segmentTooLong = false;
                 if (!"tool.started".equalsIgnoreCase(type)) {
@@ -307,6 +308,7 @@ public class HermesRunEventStream {
             }
             return null;
         }
+
 
         private static String normalize(String text) {
             return text.replaceAll("(?U)[\\s\\u001c-\\u001f]+", " ").strip();
@@ -408,6 +410,7 @@ public class HermesRunEventStream {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isBoolean() ? value : null;
     }
+
 
     private static Boolean firstBoolean(JsonNode root, JsonNode payload, String field) {
         JsonNode value = bool(root, field);

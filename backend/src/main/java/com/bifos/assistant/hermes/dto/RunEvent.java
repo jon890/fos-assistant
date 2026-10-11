@@ -17,38 +17,39 @@ package com.bifos.assistant.hermes.dto;
  * @param outputTokens 하위 에이전트의 출력 토큰
  * @param status 하위 에이전트의 종료 상태
  * @param skillName {@code skill_view} 도구의 시작 사건에서 모델이 읽은 스킬 이름. 가리기 전 미리보기에서 꺼내
- *     이름 규칙으로 검증한 값이다. 원문은 담지 않는다. 스킬 사용 기록만 쓰고 화면과 사건 저장에는 싣지
- *     않는다. 그 밖의 사건과 연결용 에이전트의 실행에서는 {@code null} 이다
+ * 이름 규칙으로 검증한 값이다. 원문은 담지 않는다. 스킬 사용 기록만 쓰고 화면과 사건 저장에는 싣지
+ * 않는다. 그 밖의 사건과 연결용 에이전트의 실행에서는 {@code null} 이다
  * @param alreadyStreamed 중간 안내의 일부가 delta로 전달됐는지. 누락되거나 boolean이 아니면 null
  * @param streamedPrefixLength 안내로 확인한 직전 delta 구간의 UTF-16 길이. 원문이 아니라 제거할 길이만 전달한다
  * @param interimId 실행 안에서 같은 안내의 재수신을 가려낼 식별자. Hermes의 timestamp가 없으면 null
  */
 public record RunEvent(
-        String type,
-        String text,
-        String toolName,
-        String detail,
-        Long durationMs,
-        Boolean failed,
-        String subagentId,
-        String goal,
-        String model,
-        String childSessionId,
-        Long inputTokens,
-        Long outputTokens,
-        String status,
-        String skillName,
-        Boolean alreadyStreamed,
-        Integer streamedPrefixLength,
-        String interimId) {
+    String type,
+    String text,
+    String toolName,
+    String detail,
+    Long durationMs,
+    Boolean failed,
+    String subagentId,
+    String goal,
+    String model,
+    String childSessionId,
+    Long inputTokens,
+    Long outputTokens,
+    String status,
+    String skillName,
+    Boolean alreadyStreamed,
+    Integer streamedPrefixLength,
+    String interimId) {
 
     /** 기존 소비자는 중간 안내의 재분류 정보를 모른다. */
     public RunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed,
-            String subagentId, String goal, String model, String childSessionId, Long inputTokens,
-            Long outputTokens, String status, String skillName) {
+        String subagentId, String goal, String model, String childSessionId, Long inputTokens,
+        Long outputTokens, String status, String skillName) {
         this(type, text, toolName, detail, durationMs, failed, subagentId, goal, model, childSessionId,
-                inputTokens, outputTokens, status, skillName, null, null, null);
+            inputTokens, outputTokens, status, skillName, null, null, null);
     }
+
 
     public RunEvent(String type, String text, String toolName, String detail, Long durationMs, Boolean failed) {
         this(type, text, toolName, detail, durationMs, failed, null, null, null, null, null, null, null, null);

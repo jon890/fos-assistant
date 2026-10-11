@@ -25,98 +25,104 @@ import java.util.UUID;
  * @param interimId 실행 안에서 중간 안내의 재수신을 가려낼 식별자
  */
 public record ChatEvent(
-        String type,
-        String text,
-        String toolName,
-        String detail,
-        UUID conversationId,
-        Long messageId,
-        Long executionId,
-        String code,
-        String message,
-        String stepName,
-        String stepState,
-        String phase,
-        Long durationMs,
-        Boolean failed,
-        String subagentId,
-        String goal,
-        String model,
-        Long inputTokens,
-        Long outputTokens,
-        Boolean alreadyStreamed,
-        Integer streamedPrefixLength,
-        String interimId) {
+    String type,
+    String text,
+    String toolName,
+    String detail,
+    UUID conversationId,
+    Long messageId,
+    Long executionId,
+    String code,
+    String message,
+    String stepName,
+    String stepState,
+    String phase,
+    Long durationMs,
+    Boolean failed,
+    String subagentId,
+    String goal,
+    String model,
+    Long inputTokens,
+    Long outputTokens,
+    Boolean alreadyStreamed,
+    Integer streamedPrefixLength,
+    String interimId) {
 
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
-            Long messageId, Long executionId, String code, String message, String stepName, String stepState,
-            String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
-            Long inputTokens, Long outputTokens) {
+        Long messageId, Long executionId, String code, String message, String stepName, String stepState,
+        String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
+        Long inputTokens, Long outputTokens) {
         this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, stepName,
-                stepState, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null);
+            stepState, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null);
     }
+
 
     /** 저장하지 않는 중간 안내와 확인된 직전 delta 구간의 UTF-16 길이다. */
     public static ChatEvent interim(String text, Boolean alreadyStreamed, int streamedPrefixLength, String interimId) {
         return new ChatEvent("interim", text, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, alreadyStreamed, streamedPrefixLength, interimId);
+            null, null, null, null, null, null, null, null, alreadyStreamed, streamedPrefixLength, interimId);
     }
+
 
     public static final String STARTED = "started";
     public static final String COMPLETED = "completed";
 
+
     public static ChatEvent delta(String text) {
         return new ChatEvent(
-                "delta", text, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null);
+            "delta", text, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null);
     }
+
 
     /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 루트 실행의 번호다. */
     public static ChatEvent started(UUID conversationId, Long executionId) {
         return new ChatEvent(
-                "started",
-                null,
-                null,
-                null,
-                conversationId,
-                null,
-                executionId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "started",
+            null,
+            null,
+            null,
+            conversationId,
+            null,
+            executionId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     public static ChatEvent tool(String toolName, String detail, String phase, Long durationMs, Boolean failed) {
         return new ChatEvent(
-                "tool",
-                null,
-                toolName,
-                detail,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                phase,
-                durationMs,
-                failed,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "tool",
+            null,
+            toolName,
+            detail,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            phase,
+            durationMs,
+            failed,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     /**
      * 이 사건을 보는 사람에게 맞춰 돌려준다.
@@ -145,70 +151,74 @@ public record ChatEvent(
         return Optional.of(this);
     }
 
+
     /** 보는 사람에 따라 빼는 칸만 바꾼 새 사건이다. 나머지 칸은 그대로 옮긴다. */
     private ChatEvent redacted(String detail, String model, Long inputTokens, Long outputTokens) {
         return new ChatEvent(
-                type,
-                text,
-                toolName,
-                detail,
-                conversationId,
-                messageId,
-                executionId,
-                code,
-                message,
-                stepName,
-                stepState,
-                phase,
-                durationMs,
-                failed,
-                subagentId,
-                goal,
-                model,
-                inputTokens,
-                outputTokens,
-                alreadyStreamed,
-                streamedPrefixLength,
-                interimId);
+            type,
+            text,
+            toolName,
+            detail,
+            conversationId,
+            messageId,
+            executionId,
+            code,
+            message,
+            stepName,
+            stepState,
+            phase,
+            durationMs,
+            failed,
+            subagentId,
+            goal,
+            model,
+            inputTokens,
+            outputTokens,
+            alreadyStreamed,
+            streamedPrefixLength,
+            interimId);
     }
 
+
     public static ChatEvent subagent(
-            String subagentId,
-            String goal,
-            String model,
-            String phase,
-            Long inputTokens,
-            Long outputTokens,
-            Long durationMs,
-            Boolean failed) {
+        String subagentId,
+        String goal,
+        String model,
+        String phase,
+        Long inputTokens,
+        Long outputTokens,
+        Long durationMs,
+        Boolean failed) {
         return new ChatEvent(
-                "subagent",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                phase,
-                durationMs,
-                failed,
-                subagentId,
-                goal,
-                model,
-                inputTokens,
-                outputTokens);
+            "subagent",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            phase,
+            durationMs,
+            failed,
+            subagentId,
+            goal,
+            model,
+            inputTokens,
+            outputTokens);
     }
+
 
     /** 흐름의 한 단계가 시작되거나 끝났다. */
     public static ChatEvent step(String stepName, String state) {
         return new ChatEvent(
-                "step", null, null, null, null, null, null, null, null, stepName, state, null, null, null, null, null,
-                null, null, null);
+            "step", null, null, null, null, null, null, null, null, stepName, state, null, null, null, null, null,
+            null, null, null);
     }
+
 
     /**
      * 앞 provider 가 막혀 다음 모델로 넘어갔다.
@@ -217,26 +227,27 @@ public record ChatEvent(
      */
     public static ChatEvent switched(String label) {
         return new ChatEvent(
-                "switched",
-                label,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "switched",
+            label,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     /**
      * 지금까지 흘린 답 조각을 화면에서 지우라고 알린다.
@@ -245,55 +256,58 @@ public record ChatEvent(
      */
     public static ChatEvent reset() {
         return new ChatEvent(
-                "reset", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null);
+            "reset", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            null, null);
     }
+
 
     public static ChatEvent done(UUID conversationId, Long messageId, Long executionId) {
         return new ChatEvent(
-                "done",
-                null,
-                null,
-                null,
-                conversationId,
-                messageId,
-                executionId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "done",
+            null,
+            null,
+            null,
+            conversationId,
+            messageId,
+            executionId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     public static ChatEvent stopped(UUID conversationId, Long messageId, Long executionId) {
         return new ChatEvent(
-                "stopped",
-                null,
-                null,
-                null,
-                conversationId,
-                messageId,
-                executionId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "stopped",
+            null,
+            null,
+            null,
+            conversationId,
+            messageId,
+            executionId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     /**
      * 대화에 알림 줄이 저장됐다. 위임 결과가 도착했거나 자동 turn 한도에 닿았을 때 낸다.
@@ -303,26 +317,27 @@ public record ChatEvent(
      */
     public static ChatEvent system(UUID conversationId, Long messageId, String content) {
         return new ChatEvent(
-                "system",
-                content,
-                null,
-                null,
-                conversationId,
-                messageId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "system",
+            content,
+            null,
+            null,
+            conversationId,
+            messageId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     /**
      * 그 대화의 승인 줄이 생겼거나 상태가 바뀌었다(ADR-050). 화면은 이 사건을 받으면 승인 줄을 다시 읽는다.
@@ -333,26 +348,27 @@ public record ChatEvent(
      */
     public static ChatEvent approval(UUID conversationId, UUID actionId) {
         return new ChatEvent(
-                "approval",
-                null,
-                null,
-                actionId.toString(),
-                conversationId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "approval",
+            null,
+            null,
+            actionId.toString(),
+            conversationId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     /**
      * 대기 메시지를 합쳐 사용자 메시지로 저장했다. 요청한 연결이 없는 turn 이라 화면이 이 사건으로 그 글을 그린다.
@@ -362,54 +378,56 @@ public record ChatEvent(
      */
     public static ChatEvent user(UUID conversationId, Long messageId, String content) {
         return new ChatEvent(
-                "user",
-                content,
-                null,
-                null,
-                conversationId,
-                messageId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "user",
+            content,
+            null,
+            null,
+            conversationId,
+            messageId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     /** 대기 줄이 바뀌었다. 화면이 대기 줄을 다시 읽는다. */
     public static ChatEvent pending(UUID conversationId) {
         return new ChatEvent(
-                "pending",
-                null,
-                null,
-                null,
-                conversationId,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
+            "pending",
+            null,
+            null,
+            null,
+            conversationId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
     }
+
 
     public static ChatEvent error(String code, String message) {
         return new ChatEvent(
-                "error", null, null, null, null, null, null, code, message, null, null, null, null, null, null, null,
-                null, null, null);
+            "error", null, null, null, null, null, null, code, message, null, null, null, null, null, null, null,
+            null, null, null);
     }
 }

@@ -112,7 +112,9 @@ export function ActivityBlock(props: Props) {
   const live = props.mode === "live";
   const running = props.mode === "live" && props.state.endedAt === null;
   const latest = running
-    ? props.state.items.findLast((item) => item.state === "running" || item.kind === "interim")
+    ? props.state.items.findLast(
+        (item) => item.state === "running" || item.kind === "interim",
+      )
     : null;
   // 끝난 블록의 한 줄은 수로 고르는 고정 문장이다. 수와 모델과 토큰은 대화에 그리지 않는다.
   const outcome: ActivityOutcome =

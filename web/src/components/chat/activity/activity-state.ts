@@ -87,14 +87,16 @@ export function failActivity(
   return {
     ...state,
     endedAt,
-    items: state.items.filter((item) => item.kind !== "interim").map((item) =>
-      item.state === "running"
-        ? {
-            ...item,
-            state: item.kind === "subagent" ? "result-missing" : "unfinished",
-          }
-        : item,
-    ),
+    items: state.items
+      .filter((item) => item.kind !== "interim")
+      .map((item) =>
+        item.state === "running"
+          ? {
+              ...item,
+              state: item.kind === "subagent" ? "result-missing" : "unfinished",
+            }
+          : item,
+      ),
   };
 }
 
@@ -158,20 +160,35 @@ export function applyChatEvent(
     return {
       ...state,
       endedAt: Date.now(),
-      items: state.items.filter((item) => item.kind !== "interim").map((item) =>
-        item.state === "running" ? { ...item, state: "stopped" } : item,
-      ),
+      items: state.items
+        .filter((item) => item.kind !== "interim")
+        .map((item) =>
+          item.state === "running" ? { ...item, state: "stopped" } : item,
+        ),
     };
   const items = state.items;
-  if (event.type === "interim" && event.text?.trim() && state.endedAt === null) {
+  if (
+    event.type === "interim" &&
+    event.text?.trim() &&
+    state.endedAt === null
+  ) {
     const pairKey = interimKey(event);
-    if (items.some((item) => item.kind === "interim" && item.pairKey === pairKey)) return state;
+    if (
+      items.some((item) => item.kind === "interim" && item.pairKey === pairKey)
+    )
+      return state;
     return {
       ...state,
       items: append(items, {
-        kind: "interim", name: event.text, detail: null, model: null,
-        inputTokens: null, outputTokens: null, durationMs: null,
-        state: "done", pairKey,
+        kind: "interim",
+        name: event.text,
+        detail: null,
+        model: null,
+        inputTokens: null,
+        outputTokens: null,
+        durationMs: null,
+        state: "done",
+        pairKey,
       }),
     };
   }
