@@ -115,6 +115,109 @@ test("본문에 그릴 줄이 없는 카드는 빈 본문을 그리지 않는다
   await expect(cards.nth(1).locator("[data-slot=card-content]")).toHaveCount(1);
 });
 
+test("사이트 로그인 안내는 쓸 수 있는 카드에서 연결 상태에 맞게 보인다", async ({
+  page,
+}) => {
+  const loginUrl = "https://example.com/login?return=%2Fhome&mode=personal";
+  await listConnectors(page, [
+    connector("site-new", { ownerBrowserLoginUrl: loginUrl }),
+    connector("site-pending", {
+      ownerBrowserLoginUrl: loginUrl,
+      myStatus: "PENDING",
+    }),
+    connector("site-ready", {
+      ownerBrowserLoginUrl: loginUrl,
+      myStatus: "READY",
+    }),
+    connector("site-removed", {
+      ownerBrowserLoginUrl: loginUrl,
+      available: false,
+    }),
+    connector("oauth-card", { ownerBrowserLoginUrl: null }),
+    connector("api-card"),
+    connector("unsafe-card", { ownerBrowserLoginUrl: "javascript:alert(1)" }),
+  ]);
+  await page.goto("/connections");
+  for (const [id, message] of [
+    ["site-new", "이 서비스는 내 브라우저에서 먼저 로그인해야 해요."],
+    ["site-pending", "이 서비스는 내 브라우저에 로그인한 계정을 써요."],
+    ["site-ready", "이 서비스는 내 브라우저에 로그인한 계정을 써요."],
+  ]) {
+    const card = page
+      .getByTestId("connector-card")
+      .filter({ hasText: `검사용 ${id}` });
+    await expect(card.getByTestId("connector-login-guidance")).toContainText(
+      message,
+    );
+    await expect(card.getByTestId("browser-login-link")).toHaveAttribute(
+      "href",
+      `/browser?url=${encodeURIComponent(loginUrl)}`,
+    );
+    await expect(card.locator("[data-slot=card-content]")).toBeVisible();
+  }
+  for (const id of ["site-removed", "oauth-card", "api-card", "unsafe-card"]) {
+    const card = page
+      .getByTestId("connector-card")
+      .filter({ hasText: `검사용 ${id}` });
+    await expect(card.getByTestId("connector-login-guidance")).toHaveCount(0);
+    await expect(card.getByTestId("browser-login-link")).toHaveCount(0);
+  }
+});
+
+test("로그인 링크는 카드 상세 링크와 별개로 클릭하고 키보드로 연다", async ({
+  page,
+}) => {
+  const loginUrl = "https://example.com/login?return=%2Fhome&mode=personal";
+  await listConnectors(page, [
+    connector("site-login", { ownerBrowserLoginUrl: loginUrl }),
+  ]);
+  // 목적지는 로컬 대역으로 받아 브라우저 기동과 실제 계정 접근을 하지 않는다.
+  await page.route("**/browser?**", (route) =>
+    route.fulfill({ body: "로그인 목적지" }),
+  );
+  await page.route("**/connections/site-login", (route) =>
+    route.fulfill({ body: "연결 상세 목적지" }),
+  );
+  await page.goto("/connections");
+  const card = page.getByTestId("connector-card");
+  const login = card.getByRole("link", {
+    name: "내 브라우저에서 로그인",
+    exact: true,
+  });
+  const cardBox = await card.boundingBox();
+  const loginBox = await login.boundingBox();
+  if (!cardBox || !loginBox)
+    throw new Error("카드나 로그인 링크의 상자를 찾지 못했어요");
+  expect(loginBox.x + loginBox.width).toBeLessThanOrEqual(
+    cardBox.x + cardBox.width,
+  );
+  expect(loginBox.y + loginBox.height).toBeLessThanOrEqual(
+    cardBox.y + cardBox.height,
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await login.click();
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === "/browser" && url.searchParams.get("url") === loginUrl,
+  );
+  await page.goto("/connections");
+  await card.locator("[data-slot=card-link]").focus();
+  await page.keyboard.press("Tab");
+  await expect(login).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(
+    (url) =>
+      url.pathname === "/browser" && url.searchParams.get("url") === loginUrl,
+  );
+  await page.goto("/connections");
+  await card.locator("[data-slot=card-link]").click();
+  await expect(page).toHaveURL(/\/connections\/site-login$/);
+});
+
 test("카드의 설명 글을 눌러도 상세 화면으로 간다", async ({ page }) => {
   await listConnectors(page, [rich]);
   await page.route("**/api/connections/rich-card", (route) =>
@@ -247,12 +350,20 @@ test("두 화면 폭에서 각 구역의 열 수와 카드 높이, 주 단추 �
       description: "공백없는긴설명".repeat(60),
       icon: SVG_ICON,
       myStatus: "READY",
+      ownerBrowserLoginUrl: "https://example.com/login",
     }),
     rich,
     connector("ready-grid", { myStatus: "READY" }),
-    connector("pending-grid", { myStatus: "PENDING", description: "" }),
+    connector("pending-grid", {
+      myStatus: "PENDING",
+      description: "",
+      ownerBrowserLoginUrl: "https://example.com/login",
+    }),
     connector("unavailable-grid", { available: false, myStatus: "READY" }),
-    connector("bare-grid", { description: "" }),
+    connector("bare-grid", {
+      description: "",
+      ownerBrowserLoginUrl: "https://example.com/login",
+    }),
     connector("extra-grid"),
   ]);
   await page.goto("/connections");
