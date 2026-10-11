@@ -47,12 +47,12 @@ public class WorkspaceService {
     private final UserExecutionLimiter limiter;
     private final WorkspaceDeleter deleter;
 
+
     public WorkspaceStatus status(CurrentUser user) {
         List<WorkspaceAgent> shared = agents.readableBy(user).stream()
-                .filter(agent -> user.id().equals(agent.ownerUserId()))
-                .map(agent ->
-                        new WorkspaceAgent(agent.code(), agent.name(), agent.visibility() == AgentVisibility.GROUP))
-                .toList();
+            .filter(agent -> user.id().equals(agent.ownerUserId()))
+            .map(agent -> new WorkspaceAgent(agent.code(), agent.name(), agent.visibility() == AgentVisibility.GROUP))
+            .toList();
         int running = limiter.used(user.id());
         WorkspaceProperties current = properties.current();
         Optional<Path> ownerDir = ownerDir(current, user);
@@ -60,18 +60,25 @@ public class WorkspaceService {
             return new WorkspaceStatus(false, false, false, running, shared);
         }
         return new WorkspaceStatus(
-                true, current.deletable(), WorkspaceTree.isDirectoryNoFollow(ownerDir.get()), running, shared);
+            true, current.deletable(), WorkspaceTree.isDirectoryNoFollow(ownerDir.get()), running, shared);
     }
 
+
     public WorkspaceListing list(CurrentUser user, String rawPath) {
+        return list(user, rawPath, null);
+    }
+
+
+    public WorkspaceListing list(CurrentUser user, String rawPath, String cursor) {
         Path ownerDir = requireOwnerDir(user);
         WorkspacePath path = WorkspacePath.parse(rawPath);
         try {
-            return WorkspaceTree.list(ownerDir, path, LIST_LIMIT).orElseThrow(WorkspaceService::notFound);
+            return WorkspaceTree.list(ownerDir, path, LIST_LIMIT, cursor).orElseThrow(WorkspaceService::notFound);
         } catch (IOException ex) {
             throw readFailed(user, ex);
         }
     }
+
 
     /**
      * 본문을 연다. 미리보기는 확장자로 형식을 정하고 크기 상한을 열기 전에 본다. 내려받기는 형식과 크기를 보지 않는다.
@@ -81,8 +88,8 @@ public class WorkspaceService {
     public WorkspaceFile open(CurrentUser user, String rawPathFromPathVariable, boolean download) {
         Path ownerDir = requireOwnerDir(user);
         String relative = rawPathFromPathVariable.startsWith("/")
-                ? rawPathFromPathVariable.substring(1)
-                : rawPathFromPathVariable;
+            ? rawPathFromPathVariable.substring(1)
+            : rawPathFromPathVariable;
         WorkspacePath path = WorkspacePath.ofSegments(List.of(relative.split("/", -1)));
         try {
             if (download) {
@@ -90,8 +97,8 @@ public class WorkspaceService {
                 return new WorkspaceFile(path.name(), DOWNLOAD_TYPE, opened.size(), false, true, opened.body());
             }
             WorkspacePreview preview = WorkspacePreviewPolicy.of(path.name())
-                    .orElseThrow(() -> new ApiException(
-                            ErrorCode.WORKSPACE_PREVIEW_UNSUPPORTED, "workspace preview is not supported"));
+                .orElseThrow(() -> new ApiException(
+                    ErrorCode.WORKSPACE_PREVIEW_UNSUPPORTED, "workspace preview is not supported"));
             Optional<Long> size = WorkspaceTree.stat(ownerDir, path).map(WorkspaceEntry::size);
             if (size.isPresent() && size.get() > preview.maxBytes()) {
                 throw tooLarge();
@@ -103,11 +110,12 @@ public class WorkspaceService {
                 throw tooLarge();
             }
             return new WorkspaceFile(
-                    path.name(), preview.contentType(), opened.size(), preview.html(), false, opened.body());
+                path.name(), preview.contentType(), opened.size(), preview.html(), false, opened.body());
         } catch (IOException ex) {
             throw readFailed(user, ex);
         }
     }
+
 
     /**
      * 경로 하나를 운영의 권한 도우미로 지운다. 읽기 마운트에서 없는 경로는 도우미를 부르지 않는다. 도우미도 같은 검사를 다시 한다.
@@ -138,15 +146,17 @@ public class WorkspaceService {
         }
     }
 
+
     private static void logDelete(CurrentUser user, WorkspacePath path, String kind, String entries, String result) {
         log.info(
-                "workspace delete user={} path={} kind={} entries={} result={}",
-                user.id(),
-                escapeForLog(path.value()),
-                kind,
-                entries,
-                result);
+            "workspace delete user={} path={} kind={} entries={} result={}",
+            user.id(),
+            escapeForLog(path.value()),
+            kind,
+            entries,
+            result);
     }
+
 
     /** 루트가 설정되었고 링크가 아닌 디렉터리일 때만 요청자의 디렉터리를 준다. */
     private static Optional<Path> ownerDir(WorkspaceProperties current, CurrentUser user) {
@@ -156,10 +166,12 @@ public class WorkspaceService {
         return Optional.of(current.rootPath().resolve(ownerKey(user)));
     }
 
+
     /** 실행 공간의 주인 키다. 요청자로만 만든다. */
     private static String ownerKey(CurrentUser user) {
         return "u" + user.id();
     }
+
 
     /**
      * 로그 줄을 끊거나 꾸밀 수 있는 문자를 역슬래시, {@code u}, 대문자 16진수 네 자리로 바꾼다. C0 제어 문자와 DEL, C1 제어 문자, 줄 구분자
@@ -170,7 +182,7 @@ public class WorkspaceService {
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
             if (c < 0x20 || (c >= 0x7f && c <= 0x9f) || c == 0x2028 || c == 0x2029) {
-                escaped.append(String.format("\\u%04X", (int) c));
+                escaped.append(String.format("\\u%04X", (int)c));
             } else {
                 escaped.append(c);
             }
@@ -178,22 +190,26 @@ public class WorkspaceService {
         return escaped.toString();
     }
 
+
     private Path requireOwnerDir(CurrentUser user) {
         return ownerDir(properties.current(), user)
-                .orElseThrow(() -> new ApiException(ErrorCode.WORKSPACE_UNAVAILABLE, "workspace is not configured"));
+            .orElseThrow(() -> new ApiException(ErrorCode.WORKSPACE_UNAVAILABLE, "workspace is not configured"));
     }
+
 
     private static ApiException readFailed(CurrentUser user, IOException ex) {
         log.warn(
-                "workspace read failed user={} error={}",
-                user.id(),
-                ex.getClass().getSimpleName());
+            "workspace read failed user={} error={}",
+            user.id(),
+            ex.getClass().getSimpleName());
         return new ApiException(ErrorCode.INTERNAL_ERROR, "workspace read failed");
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.WORKSPACE_ENTRY_NOT_FOUND, "workspace entry not found");
     }
+
 
     private static ApiException tooLarge() {
         return new ApiException(ErrorCode.WORKSPACE_PREVIEW_TOO_LARGE, "workspace preview is too large");

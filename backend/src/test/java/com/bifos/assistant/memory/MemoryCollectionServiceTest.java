@@ -7,6 +7,8 @@ import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.util.List;
+import java.time.Instant;
+import com.bifos.assistant.testsupport.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,24 +24,34 @@ class MemoryCollectionServiceTest {
     @Autowired
     MemoryCollectionRepository repository;
 
+    @Autowired
+    TestClock clock;
+
+
     @BeforeEach
     void setUp() {
         repository.deleteAll();
     }
 
+
     @Test
     @DisplayName("줄이 없는 그룹은 기본 collection 일곱 개를 순서대로 받고 다시 물어도 늘지 않는다")
     void groupsWithoutRowsGetSevenDefaultsOnce() {
+        clock.set(Instant.parse("2030-01-02T03:04:05.123456789Z"));
         List<MemoryCollection> first = service.collectionsOf(31L);
+        clock.set(Instant.EPOCH);
         List<MemoryCollection> second = service.collectionsOf(31L);
 
         assertThat(first)
-                .extracting(MemoryCollection::key)
-                .containsExactly("core", "career", "learning", "health", "finance", "home", "identity");
+            .extracting(MemoryCollection::key)
+            .containsExactly("core", "career", "learning", "health", "finance", "home", "identity");
         assertThat(first).extracting(MemoryCollection::displayName).doesNotContainNull();
         assertThat(second).extracting(MemoryCollection::key).containsExactlyElementsOf(MemoryCollection.DEFAULT_KEYS);
+        assertThat(second).extracting(MemoryCollection::createdAt)
+            .containsOnly(Instant.parse("2030-01-02T03:04:05.123456Z"));
         assertThat(repository.count()).isEqualTo(7);
     }
+
 
     @Test
     @DisplayName("그룹마다 목록이 따로다")

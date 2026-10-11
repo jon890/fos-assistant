@@ -8,6 +8,7 @@ import json
 import re
 
 from .connector_guard import HEX, PROTOCOL, _strict_json
+from .connector_normalization import preserves
 
 
 def _require(condition):
@@ -200,6 +201,7 @@ def _prepare_result(payload, original_args, manifest, tool, env):
         seen.add(field)
         _require(all(value is None or (isinstance(value, str) and 1 <= len(value) <= 32) for value in (change["before"], change["after"])))
         _require(change["before"] == original_args.get(field) and change["after"] == args.get(field))
+        _require(change["before"] != change["after"] and preserves(field, change["before"], change["after"]))
     _require(seen == {field for field in NORMALIZED if original_args.get(field) != args.get(field)})
     _require("confirmHighValueOrder" not in original_args or original_args["confirmHighValueOrder"] is False)
     for field in {"orderId", "side", "orderType"} & set(original_args):

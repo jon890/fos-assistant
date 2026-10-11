@@ -5,6 +5,12 @@ import dashboard_profile_api_support as support
 
 
 class ProfileApiRoutesTest(support.ProfileApiRouteTest):
+    def test_snapshot_requires_service_bearer_even_with_a_cookie(self):
+        """private 본문 경로는 쿠키만으로 열리지 않는다."""
+        for token in (None, "wrong"):
+            self.assertEqual(self.request("/api/connectors/demo-notes/snapshot", "POST", token=token,
+                                          cookie=True), 401)
+
     def test_soul_methods_accept_token_and_preserve_cookie(self):
         """SOUL 경로는 토큰 요청을 받아들이고 쿠키 요청의 기존 동작을 그대로 둔다."""
         for method in ("GET", "PUT"):

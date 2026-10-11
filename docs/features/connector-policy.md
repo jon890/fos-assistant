@@ -369,8 +369,13 @@ original은 이 execution을 펼치고 조회한 market을 더한 값이며 실�
 
 normalization.field는 symbol, quantity, orderAmount, price, timeInForce 중 하나이며 중복될 수 없다.
 각 항목에는 field, before, after만 있고 전후 값은 1자 이상 32자 이하 문자열 또는 누락을 뜻하는 null이다.
-기본값, 표기 변경과 가격 절삭의 모든 차이는 원래 args와 실행 args를 대조해 기록한다.
+기본값과 표기 변경의 모든 차이는 원래 args와 실행 args를 대조해 기록한다.
 변경이 없으면 빈 배열이며 기록한 전후 값이 실제 인자와 다르면 거절한다.
+기록의 일치와 별도로 Python prepare 소비자와 저장·읽기 소비자가 의미 보존을 검사한다.
+변경된 symbol은 원래 symbol의 대문자화만, quantity·orderAmount·price는 양의 decimal의 선행·후행 0 제거만 허용한다.
+숫자를 다른 값으로 바꾸거나 추가·제거하는 변환과 가격 절삭은 거절한다.
+timeInForce는 CREATE에서 생략한 값을 DAY로 보충하는 기존 기본값만 허용한다.
+변경되지 않은 값은 기존 strict 입력 계약을 적용하며 canonical 표기를 새로 강제하지 않는다.
 정규화 계산과 조회 값의 출처 확인은 커넥터가 맡는다.
 
 | 동작 | 실행 args의 정확한 키 |

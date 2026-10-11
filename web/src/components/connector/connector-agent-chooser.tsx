@@ -50,8 +50,11 @@ async function shellOrFileEnabled(code: string): Promise<boolean> {
     const response = await fetchAgentTools(code, false);
     if (!response.ok) return true;
     const tools = (await response.json()) as AgentToolsView;
-    return hasShellOrFileTool(
-      tools.toolsets.filter((tool) => tool.enabled).map((tool) => tool.name),
+    return (
+      tools.shellOrFileEnabled ||
+      hasShellOrFileTool(
+        tools.toolsets.filter((tool) => tool.enabled).map((tool) => tool.name),
+      )
     );
   } catch {
     return true;
