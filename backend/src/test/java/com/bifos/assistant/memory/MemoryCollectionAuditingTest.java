@@ -3,6 +3,10 @@ package com.bifos.assistant.memory;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.AgentMemoryCollectionChange;
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.domain.type.CostMode;
+import com.bifos.assistant.agent.domain.type.CredentialScope;
+import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.AgentMemoryCollectionChangeType;
 import com.bifos.assistant.memory.application.MemoryCollectionService;
 import com.bifos.assistant.memory.domain.Memory;
@@ -21,6 +25,8 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Calendar;
+import java.util.TimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -135,7 +141,10 @@ class MemoryCollectionAuditingTest {
                 MemoryPlacement.core(MemoryRetrieval.SEARCH), 1L, CREATED);
             entityManager.persist(memory);
             MemoryRevision revision = MemoryRevision.of(memory, MemoryChangeType.UPDATED, 1L, "변경", Instant.EPOCH);
-            AgentMemoryCollectionChange change = AgentMemoryCollectionChange.of(1L, "core",
+            Agent agent = Agent.of("auditing-business-time", "시각 검사", "auditing-business-time",
+                    "http://runtime.test", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.GROUP, null, CREATED);
+            entityManager.persist(agent);
+            AgentMemoryCollectionChange change = AgentMemoryCollectionChange.of(agent.id(), "core",
                 AgentMemoryCollectionChangeType.GRANTED, false, 1L, Instant.EPOCH);
             entityManager.persist(revision);
             entityManager.persist(change);
@@ -148,6 +157,7 @@ class MemoryCollectionAuditingTest {
             entityManager.remove(entityManager.find(MemoryRevision.class, revisionId));
             entityManager.remove(entityManager.find(AgentMemoryCollectionChange.class, changeId));
             entityManager.remove(entityManager.find(Memory.class, memory.id()));
+            entityManager.remove(entityManager.find(Agent.class, agent.id()));
         });
         assertPersisted(CREATED);
         assertThat(collections.findAll()).extracting(MemoryCollection::displayName).containsOnly("native");
@@ -178,7 +188,7 @@ class MemoryCollectionAuditingTest {
         assertThat(collections.findByIdGroupIdOrderBySortOrderAsc(GROUP_ID))
             .hasSize(7).extracting(MemoryCollection::createdAt).containsOnly(expected);
         List<Instant> timestamps = jdbc.query("select created_at from memory_collection where group_id = ?",
-            (row, index) -> row.getTimestamp(1).toInstant(), GROUP_ID);
+            (row, index) -> row.getTimestamp(1, Calendar.getInstance(TimeZone.getTimeZone("UTC"))).toInstant(), GROUP_ID);
         assertThat(timestamps).hasSize(7).containsOnly(expected);
     }
 }
