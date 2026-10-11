@@ -75,6 +75,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 `get_conditional_order`는 목록에서 받은 불투명 `conditionalOrderId`만 받는다. 점 경로, percent 인코딩, 경로 구분자와 URL 주입을 거절한다. 계좌, token, URL은 caller가 지정하지 못하며 현재 연결의 env 계좌만 사용한다.
 SINGLE/OCO/OTO, STOP/PROFIT_RATE와 최상위·leg 상태를 구분한다. HOLDING이나 CANCELED인 leg를 최상위 상태로 바꾸지 않는다. nullable 가격과 `second=null`, 없는 `expireDate`와 decimal 문자열을 보존한다. WATCHING은 체결 완료를 뜻하지 않는다. 조건주문 생성·수정·취소와 WebSocket은 지원하지 않는다.
 
+조건조회 결과는 공식 schema의 알려진 필드만 반환한다. 최상위와 leg, 중첩 배열의 확장 키는 제거하며 서비스가 추가한 정보는 누락될 수 있다. 공식 필드의 unknown enum 값은 보존한다. metadata는 현재 `{}`이며 upstream metadata를 그대로 노출하지 않는다. 계좌번호 표시는 기존 `list_accounts`의 끝 네 자리 마스킹을 따른다.
+
 ### 토큰
 
 - 토큰은 프로세스 메모리에만 둔다. `expires_in` 에서 60초 뺀 시각까지 쓴다. 60초 이하면 `expires_in` 의 절반과 5초 가운데 긴 동안 쓰되 `expires_in` 을 넘기지 않고, 값이 없거나 양의 정확한 수명이 아니면 발급 오류로 거절한다. 매 호출이 토큰을 새로 받아 서로를 무효로 만들지 않게 하기 위해서다.

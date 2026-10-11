@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   envelopeMetadata,
+  SCHEMAS,
   type ConditionalOrderDetailResponse,
   type PaginatedConditionalOrderResponse,
 } from "./api-contract.ts";
@@ -11,6 +12,30 @@ import type { RegisterTool } from "./tool-registration.ts";
 const invalidInput = (): never => {
   throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
 };
+
+/** 검증된 조건조회 응답에서 공식 필드만 남긴다. nullable·부재·문자열 값은 바꾸지 않는다. */
+function officialFields(value: any, schema: any): any {
+  if (value === null) return null;
+  if (schema.$ref)
+    return officialFields(value, SCHEMAS[schema.$ref.split("/").pop()]);
+  if (schema.allOf)
+    return schema.allOf.reduce(
+      (result: any, branch: any) => ({
+        ...result,
+        ...officialFields(value, branch),
+      }),
+      {},
+    );
+  if (Array.isArray(value))
+    return value.map((entry) => officialFields(entry, schema.items));
+  if (schema.properties)
+    return Object.fromEntries(
+      Object.entries(schema.properties)
+        .filter(([key]) => Object.hasOwn(value, key))
+        .map(([key, child]) => [key, officialFields(value[key], child)]),
+    );
+  return value;
+}
 
 /** 불투명 ID를 한 segment로만 보낸다. URL이 정규화하는 점 경로도 거절한다. */
 function orderSegment(id: string): string {
@@ -57,7 +82,10 @@ export function registerConditionalReadTools(
         account: true,
         query,
       });
-      const data = envelope.result as PaginatedConditionalOrderResponse;
+      const data = officialFields(
+        envelope.result,
+        SCHEMAS.PaginatedConditionalOrderResponse,
+      ) as PaginatedConditionalOrderResponse;
       return {
         result: data,
         metadata: envelopeMetadata(envelope),
@@ -79,7 +107,10 @@ export function registerConditionalReadTools(
         { account: true },
       );
       return {
-        result: envelope.result as ConditionalOrderDetailResponse,
+        result: officialFields(
+          envelope.result,
+          SCHEMAS.ConditionalOrderDetailResponse,
+        ) as ConditionalOrderDetailResponse,
         metadata: envelopeMetadata(envelope),
       };
     },

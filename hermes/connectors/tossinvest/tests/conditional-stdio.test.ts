@@ -29,8 +29,36 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
   const directory = await mkdtemp(join(tmpdir(), "conditional-stdio-"));
   const client = new Client({ name: "conditional-stdio-test", version: "1" });
   const id = detail.result.conditionalOrderId;
-  fake.on("GET", path, page);
-  fake.on("GET", `${path}/${encodeURIComponent(id)}`, detail);
+  const extension = {
+    accountNo,
+    token: credentials.TOSSINVEST_CLIENT_SECRET,
+    nested: [{ access_token: credentials.TOSSINVEST_CLIENT_ID }],
+  };
+  const extendedDetail = {
+    ...detail,
+    metadata: extension,
+    result: {
+      ...detail.result,
+      ...extension,
+      first: { ...detail.result.first, ...extension },
+    },
+  };
+  const extendedPage = {
+    ...page,
+    metadata: extension,
+    result: {
+      ...page.result,
+      ...extension,
+      conditionalOrders: page.result.conditionalOrders.map((row) => ({
+        ...row,
+        ...extension,
+        first: { ...row.first, ...extension },
+        ...(row.second ? { second: { ...row.second, ...extension } } : {}),
+      })),
+    },
+  };
+  fake.on("GET", path, extendedPage);
+  fake.on("GET", `${path}/${encodeURIComponent(id)}`, extendedDetail);
   fake.on("GET", "/api/v1/accounts", {
     result: [{ accountSeq: 7, accountType: "BROKERAGE", accountNo }],
   });
