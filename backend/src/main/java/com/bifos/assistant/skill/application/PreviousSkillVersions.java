@@ -15,6 +15,7 @@ class PreviousSkillVersions {
 
     private final PreviousSkillStore store;
 
+
     /** 게시가 끝난 뒤 바뀌기 전 스킬을 남긴다. 실패하면 기존 경고만 남긴다. */
     void write(String profile, SkillBundle replaced) {
         try {
@@ -24,6 +25,7 @@ class PreviousSkillVersions {
         }
     }
 
+
     /** 게시가 끝난 뒤 이전 버전을 지운다. 실패해도 저장과 지우기를 실패로 바꾸지 않는다. */
     void delete(String profile, String name) {
         try {
@@ -32,6 +34,7 @@ class PreviousSkillVersions {
             log.warn("스킬의 이전 버전을 지우지 못했다 profile={} skill={}", profile, name, ex);
         }
     }
+
 
     /** 남긴 시각 파일만 읽는다. 없거나 읽지 못하면 {@code null} 이고 읽기와 저장을 막지 않는다. */
     Instant savedAt(String profile, String name) {
