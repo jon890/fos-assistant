@@ -43,7 +43,6 @@ public final class ConnectorExecutionSnapshot {
                     .build())
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
-    private static final Set<String> NORMALIZED = Set.of("symbol", "quantity", "orderAmount", "price", "timeInForce");
     private static final Set<String> SUMMARY = Set.of(("account,symbol,market,currency,side,quantity,orderAmount,price,"
                     + "orderType,timeInForce,operation,orderId,original,normalization")
             .split(","));
@@ -105,7 +104,7 @@ public final class ConnectorExecutionSnapshot {
                 && summary.get("account").stringValue().matches("[0-9]{4}"));
         equal(summary.get("operation"), JSON.valueToTree(operation));
         validateArgs(input, args, summary, scope, operation);
-        normalizations(input, args, summary.get("normalization"));
+        ConnectorNormalization.validate(input, args, summary.get("normalization"), JSON.nullNode());
         return new ConnectorExecutionSnapshot(
                 executionArgsJson, summaryJson, scopeJson, Sha256.hex(executionArgsJson), Sha256.hex(scopeJson), args);
     }
@@ -392,35 +391,6 @@ public final class ConnectorExecutionSnapshot {
         }
     }
 
-    private static void normalizations(JsonNode input, JsonNode args, JsonNode changes) {
-        require(changes.isArray() && changes.size() <= 8);
-        Map<String, JsonNode> actual = new TreeMap<>();
-        for (JsonNode change : changes) {
-            keys(change, Set.of("field", "before", "after"));
-            String field = text(change.get("field"), 1, 32);
-            require(NORMALIZED.contains(field) && actual.put(field, change) == null);
-            for (String name : Set.of("before", "after")) {
-                if (!change.get(name).isNull()) {
-                    text(change.get(name), 1, 32);
-                }
-            }
-            equal(change.get("before"), input.has(field) ? input.get(field) : JSON.nullNode());
-            equal(change.get("after"), args.has(field) ? args.get(field) : JSON.nullNode());
-            require(!change.get("before").equals(change.get("after")));
-            require(ConnectorNormalization.preserves(field, change.get("before"), change.get("after")));
-        }
-        for (String field : NORMALIZED) {
-            JsonNode before = input.has(field) ? input.get(field) : JSON.nullNode();
-            JsonNode after = args.has(field) ? args.get(field) : JSON.nullNode();
-            require(before.equals(after) != actual.containsKey(field));
-        }
-        for (String field : Set.of("orderId", "side", "orderType")) {
-            if (input.has(field)) {
-                equal(input.get(field), args.get(field));
-            }
-        }
-    }
-
     private static String openColumn(
             ConnectorAction action, Long keyId, String column, String stored, TextCipher cipher) {
         if (keyId == null) {
@@ -459,11 +429,11 @@ public final class ConnectorExecutionSnapshot {
         }
     }
 
-    private static void keys(JsonNode node, Set<String> names) {
+    static void keys(JsonNode node, Set<String> names) {
         require(node != null && node.isObject() && node.propertyNames().equals(names));
     }
 
-    private static String text(JsonNode node, int minimum, int maximum) {
+    static String text(JsonNode node, int minimum, int maximum) {
         require(node != null && node.isString());
         String value = node.stringValue();
         require(value.length() >= minimum
@@ -482,11 +452,11 @@ public final class ConnectorExecutionSnapshot {
         return value.getBytes(StandardCharsets.UTF_8).length;
     }
 
-    private static void equal(JsonNode left, JsonNode right) {
+    static void equal(JsonNode left, JsonNode right) {
         require(left != null && right != null && left.equals(right));
     }
 
-    private static void require(boolean condition) {
+    static void require(boolean condition) {
         if (!condition) {
             throw invalid();
         }
