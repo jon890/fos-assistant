@@ -1,6 +1,7 @@
 import { CdpSession, httpJson, wsUrlFor } from "../cdp.ts";
 import { BLOG_ID_PATTERN } from "../session.ts";
 import { EditorError, type EditorErrorCode } from "./editor-error.ts";
+import { fieldCandidates } from "./fields.ts";
 
 export { EditorError, type EditorErrorCode } from "./editor-error.ts";
 export { focus, focusField } from "./focus.ts";
@@ -342,12 +343,11 @@ export function normalize(text: string) {
 
 /** 선택자에 걸리는 문단의 글을 차례대로 읽는다. 빈 칸의 안내 문구는 실제 글이 아니라 뺀다. */
 export async function paragraphs(page: EditorPage, selector: string): Promise<string[]> {
-  const raw = await page.js<string>(
-    `JSON.stringify([...document.querySelectorAll(${q(selector)})]` +
+  const raw = await page.js<string>(`(() => { ${selector === TITLE_SELECTOR ? fieldCandidates(selector, true) : ""}
+    return JSON.stringify((${selector === TITLE_SELECTOR ? "el ? [el] : []" : `[...document.querySelectorAll(${q(selector)})]`})` +
       ".map(e => { const c = e.cloneNode(true);" +
       " c.querySelectorAll('.se-placeholder').forEach(x => x.remove());" +
-      " return c.textContent; }))",
-  );
+      " return c.textContent; })); })()");
   return JSON.parse(raw || "[]");
 }
 

@@ -596,12 +596,18 @@ export class FakeEditor {
       };
       return new Function("sessionStorage", `return (${expression});`)(storage);
     }
-    if (expression.includes("location.hostname"))
-      return JSON.stringify({
-        title: this.docTitle,
-        host: this.host,
-        ready: this.host === "blog.naver.com",
-      });
+    if (expression.includes("const openProbe = true")) {
+      const page = this.docTitle.includes("NAVER 로그인") ? "login" :
+        this.docTitle.includes("네이버 블로그") ? "editor" : "other";
+      const host = this.host === "nid.naver.com" ? "login" :
+        this.host === "blog.naver.com" ? "blog" : "other";
+      const prepared = host === "blog" ? 1 : 0;
+      return { page, host, reason: page === "login" || host === "login" ? "login_required" :
+        page !== "editor" ? "page_loading" : prepared ? "ready" : "title_missing",
+        document_state: "complete", candidates: prepared, prepared,
+        sized: prepared, editable: prepared, visible: prepared,
+        frames: 0, frame_candidates: 0, page_visible: true, page_focused: true };
+    }
     if (expression.includes("const focusProbe = true")) {
       const selector = quoted(expression, "querySelectorAll(");
       const action = this.clickAction(`document.querySelector(${JSON.stringify(selector)})`);
@@ -615,8 +621,6 @@ export class FakeEditor {
           active: this.focused ?? "other", collapsed: true },
       };
     }
-    if (expression.includes("const nodes = document.querySelectorAll(") &&
-        expression.includes("el.isContentEditable")) return this.host === "blog.naver.com";
     if (expression.includes("JSON.stringify({x: r.left")) {
       const finder = /const el = ([\s\S]*?);\n {2}if \(!el\)/.exec(expression)?.[1] ?? "";
       const action = this.clickAction(finder);

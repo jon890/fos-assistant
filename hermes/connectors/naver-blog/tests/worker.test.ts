@@ -82,24 +82,29 @@ async function expectOnlyState(dir: string, jobId: string) {
   expect((await readdir(dir)).sort()).toEqual([`${jobId}.finished`, `${jobId}.json`]);
 }
 
-test("실제 Chrome의 제목 커서 진단이 worker와 작업 파일을 거쳐 draft_job까지 안전하게 전달된다", async () => {
+for (const stage of ["open", "fill"] as const)
+test(`실제 Chrome의 ${stage} 실패 진단이 worker와 작업 파일을 거쳐 draft_job까지 안전하게 전달된다`, async () => {
   const chrome = await localChrome();
   cleanups.push(() => chrome.stop());
   const { page } = await chrome.tab();
   await openEditor(page);
-  await page.js(`(() => {const cover=document.createElement('div');
+  await page.js(stage === "open" ? "document.getElementById('title').remove()" : `(() => {const cover=document.createElement('div');
     cover.textContent='private-dom-account-url-marker';
     cover.style.cssText='position:fixed;inset:0;background:white;z-index:100';document.body.append(cover)})()`);
   const { dir, jobId, run } = await queuedJob();
   await run(async (_env, blocks, input, onStage) => {
-    await onStage("fill"); page.stage = "fill";
-    await fill(page, input.title, blocks, "synthetic-hash");
+    await onStage(stage); page.stage = stage;
+    if (stage === "open") await openEditor(page);
+    else await fill(page, input.title, blocks, "synthetic-hash");
     throw new Error("제목 실패가 입력을 중단해야 한다");
   });
   const stored = await readState(dir, jobId);
-  expect(stored).toMatchObject({ status: "failed", save_clicked: false, stage: "fill" });
-  expect(stored?.error?.focus_diagnostics).toMatchObject({ attempts: 10 });
+  expect(stored).toMatchObject({ status: "failed", save_clicked: false, stage });
+  if (stage === "open") expect(stored?.error?.open_diagnostics).toMatchObject({ attempts: 40,
+    last: { reason: "title_missing" } });
+  else expect(stored?.error?.focus_diagnostics).toMatchObject({ attempts: 10 });
   expect(chrome.calls).not.toContain("Input.insertText");
+  expect(chrome.calls).not.toContain("Input.dispatchMouseEvent");
   const server = createServer({ NAVER_BLOG_JOB_DIR: dir });
   const client = new Client({ name: "focus-diagnostic-test", version: "1" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -120,6 +125,8 @@ test("커서 진단 직렬화는 허용 값만 복사하고 기존 사본 번호
   await run(async () => {
     throw new EditorError("editor_failed", "fill", "제목 자리에 커서를 두지 못했다", {
       backup_draft_id: "224000000002",
+      open_diagnostics: { attempts: 900, last: { reason: "private-text", host: "private-url",
+        candidates: 900, frames: Infinity, html: "private-dom" } },
       focus_diagnostics: { attempts: Infinity, url: "private-url", samples: Array(30).fill({
         elements: 10000, hit: "private-title", anchor: "title", active: "body", x: 40,
         text: "private-body", html: "private-dom", sized: true,
@@ -129,6 +136,8 @@ test("커서 진단 직렬화는 허용 값만 복사하고 기존 사본 번호
   const state = await readState(dir, jobId);
   const error = state?.error as Record<string, any>;
   expect(error.backup_draft_id).toBe("224000000002");
+  expect(error.open_diagnostics).toMatchObject({ attempts: 40,
+    last: { reason: "page_loading", host: "other", candidates: 100, frames: 0 } });
   expect(error.focus_diagnostics.attempts).toBe(0);
   expect(error.focus_diagnostics.samples).toHaveLength(10);
   expect(error.focus_diagnostics.samples[0]).toMatchObject({ elements: 100, hit: "other" });

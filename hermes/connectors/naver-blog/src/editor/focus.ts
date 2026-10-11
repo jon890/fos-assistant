@@ -1,4 +1,5 @@
 import type { EditorPage } from "./page.ts";
+import { fieldCandidates } from "./fields.ts";
 
 type Region = "title" | "body" | "other" | "none";
 export type FocusSample = {
@@ -45,8 +46,7 @@ export function filterFocusDiagnostics(value: unknown): FocusDiagnostics | undef
 async function probe(page: EditorPage, selector: string, scope: string) {
   const raw = await page.js<any>(`(() => {
   const focusProbe = true;
-  const nodes = document.querySelectorAll(${JSON.stringify(selector)});
-  const el = ${scope === ".se-documentTitle" ? "nodes.length === 1" : "nodes.length > 0"} ? nodes[0] : null;
+  ${fieldCandidates(selector, scope === ".se-documentTitle")}
   if (el) el.scrollIntoView({behavior: "instant", block: "center"});
   const r = el?.getBoundingClientRect();
   const sized = !!r && r.width > 0 && r.height > 0;
