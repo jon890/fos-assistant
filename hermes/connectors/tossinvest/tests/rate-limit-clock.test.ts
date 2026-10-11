@@ -16,8 +16,13 @@ test("실제 Clock은 정수 벽시계의 다음 눈금에서 1초 대기를 끝
     () => precise - performance.timeOrigin,
   );
   const sleep = spyOn(Bun, "sleep").mockImplementation(async (ms) => {
+    const before = clock.now();
     // 타이머가 정수 눈금으로 일찍 깨는 경우를 재현한다.
     precise = Math.floor(precise + Number(ms));
+    // 소수 대기를 버리면 같은 시각으로 깨어 큐가 영원히 다시 잠든다.
+    // 실제 타이머의 다음 기상까지 진행하지 못하는 fake는 즉시 실패시킨다.
+    if (clock.now() <= before)
+      throw new Error(`모의 sleep 뒤 큐 시각이 진전하지 않았다: ${ms}ms`);
   });
   const arrivals: number[] = [];
   try {
@@ -69,28 +74,63 @@ test("소수 Clock과 조기 기상에서도 남은 시간까지 다시 기다�
   }
 });
 
-test("1초와 같은 deadline과 늦은 기상은 HTTP 작업을 시작하지 않는다", async () => {
-  for (const extra of [0, 0.25]) {
-    let now = Date.now() + 10000.75;
-    const timer = {
-      now: () => now,
-      sleep: async (ms: number) => {
-        now += ms + 0.5;
-      },
-    };
-    let sent = 0;
-    const work = async () => {
-      sent++;
-    };
-    try {
-      await queueRequest("boundary", "ACCOUNT", now + 5000, work, timer);
-      await expect(
-        queueRequest("boundary", "ACCOUNT", now + 1000 + extra, work, timer),
-      ).rejects.toMatchObject({ code: "TOSSINVEST_NETWORK" });
-      expect(sent).toBe(1);
-    } finally {
-      clearRateLimits();
-    }
+test("1초와 같은 deadline은 sleep과 HTTP 없이 즉시 실패한다", async () => {
+  let now = Date.now() + 10000.75;
+  const waits: number[] = [];
+  const controlledClock = {
+    now: () => now,
+    sleep: async (ms: number) => {
+      waits.push(ms);
+      now += ms;
+    },
+  };
+  let sent = 0;
+  try {
+    await queueRequest(
+      "exact-boundary",
+      "ACCOUNT",
+      now + 5000,
+      async () => {},
+      controlledClock,
+    );
+    await expect(
+      queueRequest(
+        "exact-boundary",
+        "ACCOUNT",
+        now + 1000,
+        async () => {
+          sent++;
+        },
+        controlledClock,
+      ),
+    ).rejects.toMatchObject({ code: "TOSSINVEST_NETWORK" });
+    expect(waits).toEqual([]);
+    expect(sent).toBe(0);
+  } finally {
+    clearRateLimits();
+  }
+});
+
+test("deadline을 넘긴 늦은 기상은 HTTP 작업을 시작하지 않는다", async () => {
+  let now = Date.now() + 10000.75;
+  const timer = {
+    now: () => now,
+    sleep: async (ms: number) => {
+      now += ms + 0.5;
+    },
+  };
+  let sent = 0;
+  const work = async () => {
+    sent++;
+  };
+  try {
+    await queueRequest("boundary", "ACCOUNT", now + 5000, work, timer);
+    await expect(
+      queueRequest("boundary", "ACCOUNT", now + 1000.25, work, timer),
+    ).rejects.toMatchObject({ code: "TOSSINVEST_NETWORK" });
+    expect(sent).toBe(1);
+  } finally {
+    clearRateLimits();
   }
 });
 
@@ -171,7 +211,12 @@ test("실제 Clock의 경과 시간은 벽시계 보정에 흔들리지 않고 K
     () => now - performance.timeOrigin,
   );
   const sleep = spyOn(Bun, "sleep").mockImplementation(async (ms) => {
+    const before = clock.now();
     now += Number(ms);
+    // 벽시계는 고정돼 있다. 큐가 Date.now로 회귀하면 fake 경과 시간이
+    // 흘러도 큐 시각은 멈춰 있으므로 마이크로태스크 재대기를 허용하지 않는다.
+    if (clock.now() <= before)
+      throw new Error(`모의 sleep 뒤 큐 시각이 진전하지 않았다: ${ms}ms`);
   });
   try {
     const start = clock.now();
@@ -243,6 +288,8 @@ test("소수 Clock에서 토큰 TTL의 안전 정수 경계를 정확히 판정�
 });
 
 test("실제 Bun HTTP에서 401 다음 429도 처음 deadline을 공유한다", async () => {
+  // 실제 HTTP 호환 확인과 간격 실측이다. 정수 시계 결함의 결정적 회귀는
+  // 위의 제어 시계와 조기 기상 검사가 맡으며 이 검사는 변이에서도 통과할 수 있다.
   const fake = new FakeToss();
   const arrivals: number[] = [];
   fake.sequence(

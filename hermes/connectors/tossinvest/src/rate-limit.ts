@@ -23,11 +23,14 @@ export const GROUP_LIMITS: Readonly<Record<string, number>> = {
   ORDER_INFO: 6,
 };
 export interface Clock {
-  /** epoch 밀리초다. 같은 Clock 안의 경과 시간과 deadline을 비교한다. */
+  /** epoch 근사 밀리초다. 같은 Clock 안의 경과 시간과 deadline을 비교한다. */
   now(): number;
   sleep(ms: number): Promise<void>;
 }
-/** 벽시계 보정에 흔들리지 않는 소수 밀리초 시각이다. KST 판정만 현재 벽시계를 쓴다. */
+/** 벽시계 보정에 흔들리지 않는 epoch 근사 시각이다. KST 판정만 현재 벽시계를 쓴다.
+ * 시스템 suspend 중 경과 시계가 멈추는 환경에서는 토큰 TTL도 그만큼 늦게 끝날 수 있다.
+ * 실제 만료 토큰은 기존 expired-token 401의 한 번 재발급 경로로 복구한다.
+ */
 export const clock: Clock = {
   now: () => performance.timeOrigin + performance.now(),
   sleep: (ms) => Bun.sleep(ms),
