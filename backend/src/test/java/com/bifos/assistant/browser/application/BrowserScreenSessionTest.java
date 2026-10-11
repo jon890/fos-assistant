@@ -153,6 +153,24 @@ class BrowserScreenSessionTest {
     }
 
     @Test
+    @DisplayName("Space와 방향 키는 누름과 뗌을 차례로 보내고 알 수 없는 키는 무시한다")
+    void preservesSpecialKeyCommands() {
+        BrowserScreenSession session = open(Duration.ofMinutes(30), Duration.ofHours(1), null);
+
+        session.input(input(Kind.KEY, "Space", null, null));
+        session.input(input(Kind.KEY, "ArrowLeft", null, null));
+        session.input(input(Kind.KEY, "UNKNOWN", null, null));
+
+        assertThat(cdp.sent("Input.dispatchKeyEvent"))
+                .extracting(FakeCdp.Sent::params)
+                .containsExactly(
+                        Map.of("type", "keyDown", "key", " ", "code", "Space", "windowsVirtualKeyCode", 32, "text", " "),
+                        Map.of("type", "keyUp", "key", " ", "code", "Space", "windowsVirtualKeyCode", 32),
+                        Map.of("type", "rawKeyDown", "key", "ArrowLeft", "code", "ArrowLeft", "windowsVirtualKeyCode", 37),
+                        Map.of("type", "keyUp", "key", "ArrowLeft", "code", "ArrowLeft", "windowsVirtualKeyCode", 37));
+    }
+
+    @Test
     @DisplayName("새 탭이 생기면 screencast 를 그 탭으로 옮기고 탭 목록을 다시 알린다")
     void movesToNewTab() throws InterruptedException {
         open(Duration.ofMinutes(30), Duration.ofMillis(20), null);

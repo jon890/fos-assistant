@@ -13,7 +13,6 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -407,19 +406,7 @@ public class BrowserScreenSession {
             mouseDown = "down".equals(input.action()) || (mouseDown && !"up".equals(input.action()));
             pressed = mouseDown;
         }
-        String type = switch (input.action()) {
-            case "down" -> "mousePressed";
-            case "up" -> "mouseReleased";
-            default -> "mouseMoved";
-        };
-        boolean click = !"mouseMoved".equals(type);
-        params.put("type", type);
-        params.put("button", click || pressed ? "left" : "none");
-        params.put("buttons", pressed ? 1 : 0);
-        if (click) {
-            params.put("clickCount", 1);
-        }
-        command(current, "Input.dispatchMouseEvent", params);
+        command(current, "Input.dispatchMouseEvent", BrowserScreenInputParams.mouse(params, input.action(), pressed));
     }
 
     private void wheel(CdpConnection current, BrowserScreenInput input) {
@@ -436,28 +423,14 @@ public class BrowserScreenSession {
         if (size == null) {
             return null;
         }
-        Map<String, Object> params = new HashMap<>();
-        params.put("x", input.x() * size.width());
-        params.put("y", input.y() * size.height());
-        return params;
+        return BrowserScreenInputParams.point(input, size.width(), size.height());
     }
 
     /** 특수 키를 누르고 뗀다. 글자를 만드는 Enter 와 Space 는 {@code text} 를 싣는다. */
     private void key(CdpConnection current, String name) {
-        Integer keyCode = BrowserScreenInput.KEYS.get(name);
-        if (keyCode == null) {
-            return;
+        for (Map<String, Object> params : BrowserScreenInputParams.key(name)) {
+            command(current, "Input.dispatchKeyEvent", params);
         }
-        boolean space = "Space".equals(name);
-        Map<String, Object> up =
-                Map.of("type", "keyUp", "key", space ? " " : name, "code", name, "windowsVirtualKeyCode", keyCode);
-        Map<String, Object> down = new HashMap<>(up);
-        down.put("type", "Enter".equals(name) || space ? "keyDown" : "rawKeyDown");
-        if ("Enter".equals(name) || space) {
-            down.put("text", space ? " " : "\r");
-        }
-        command(current, "Input.dispatchKeyEvent", down);
-        command(current, "Input.dispatchKeyEvent", up);
     }
 
     private void back(CdpConnection current) {
