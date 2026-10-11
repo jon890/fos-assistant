@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import Link from "next/link";
 import { signIn } from "@/auth";
 import { appName } from "@/lib/app-name";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,11 @@ export default async function SignInPage() {
             Google 계정으로 로그인
           </Button>
         </form>
+        <Button asChild variant="link" className="mt-3 text-foreground">
+          <Link href="/privacy" prefetch={false}>
+            데이터 보관 안내
+          </Link>
+        </Button>
       </Card>
     </section>
   );
