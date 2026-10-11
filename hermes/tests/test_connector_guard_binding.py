@@ -82,7 +82,8 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
 
     def test_link_metadata_changes_hash_without_changing_policy_and_blocks_old_ticket(self):
         original = (self.connector_root / "connector.json").read_text()
-        for key, value in (("readme_url", "https://example.test/README.md"), ("link_kind", "project")):
+        for key, value in (("link", "https://example.test/service"),
+                           ("readme_url", "https://example.test/README.md"), ("link_kind", "project")):
             with self.subTest(field=key):
                 (self.connector_root / "connector.json").write_text(original)
                 self.rewrite("connector.json", lambda declared: declared.update({key: value}))
