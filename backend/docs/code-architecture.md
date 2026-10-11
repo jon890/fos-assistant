@@ -217,6 +217,14 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 3 에 어느 항목이 드는지는 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「에이전트의 실행에 보이는 항목」 이 갖는다.
 
+### 문맥 조립
+
+`ContextAssembler`는 요청자의 권한, 후보 항목, 층 순서와 신선도를 결정한다.
+매 조립 호출마다 package-private `ContextBudgetWriter`를 새로 만들어 예산에 맞춘 글과 누락 항목, 문맥 묶음을 함께 조립한다.
+writer는 머리 줄과 구분 줄을 포함한 길이를 계산한다. 항상 넣는 층과 색인 층에서는 상한을 넘는 항목 하나만 건너뛰고 묶음의 원래 자리에 `OMITTED`로 남긴다.
+개인 사실 구역의 `appendIfFits`는 남은 예산에 들어가지 않는 항목을 누락으로 기록하지 않고, `ContextAssembler`가 그 항목을 색인으로 돌린다.
+개인 사실 후보의 선택과 색인 예산 계산도 writer의 같은 렌더링 규칙을 쓴다.
+
 ## 가격표
 
 `usage/infra/ModelsDevPriceCatalog` 가 models.dev 카탈로그를 읽어 메모리에 둔다.
