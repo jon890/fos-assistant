@@ -20,7 +20,7 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 
 ## JPA 생성 시각
 
-`memory.domain.MemoryCollection.createdAt` 하나에 `@CreatedDate`와 `@EntityListeners(AuditingEntityListener.class)`를 둔다.
+`memory.domain.entity.MemoryCollection.createdAt` 하나에 `@CreatedDate`와 `@EntityListeners(AuditingEntityListener.class)`를 둔다.
 `shared.config.JpaAuditingConfig`는 `@EnableJpaAuditing(dateTimeProviderRef="auditingDateTimeProvider")`로 활성화한다.
 같은 이름의 `DateTimeProvider` 빈은 기존 `Clock`을 주입받고 `Instant`를 `ChronoUnit.MICROS`로 잘라 돌려준다.
 운영 시계와 공용 검사 시계의 빈은 추가하지 않는다. 이 선언과 대상의 정확한 개수는 baseline 없는
@@ -134,6 +134,16 @@ HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는
 profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
 
+### 브라우저 활동 시각
+
+`UserBrowserService`의 공개 호출은 그대로 두고,
+같은 패키지의 package-private Spring 컴포넌트 `BrowserActivityTracker`를 생성자로 주입한다.
+기록기는 같은 저장소와 시계로 활동을 저장하고 사용자별 1분 제한 캐시를 갖는다.
+`touch`, 화면 열기와 입력은 기존 시점에 기록기를 부르고, 중지는 화면을 닫은 뒤 캐시를 지우고 상태를 바꾼다.
+켜진 브라우저만 저장하며 시계 역행이나 엔티티의 기록 거절 때는 DB의 활동 시각을 기억한다.
+낙관적 잠금 실패 때는 캐시를 갱신하지 않아 다음 활동이 다시 시도한다.
+켜기 잠금과 컨테이너 수명, CDP 대기는 `UserBrowserService`에 둔다.
+
 ### 스킬
 
 `skill.application.SkillService`는 권한, 에이전트 행 잠금, 트랜잭션과 스킬 게시 순서, `SkillsChanged` 사건을 맡는다.
@@ -197,6 +207,14 @@ domain과 infra는 admin을 import하지 않는다.
 소유 엔티티와 같은 패키지에 둔다. 참조되지 않은 `@Embeddable`은 영속 ID로 허용하지 않는다.
 entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
 entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
+
+`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`,
+`ServiceToken`, `ServiceTokenCollection`과 복합 ID 세 타입을 소유한다.
+기존 타입은 운영 루트 전체에서 top-level 이름 또는 표 계약으로 선택하며 각 기대 수는 1이다.
+다른 기능 이동, 표를 유지한 이름 변경, 누락과 중복도 같은 두 규칙으로 거절한다.
+새 memory 엔티티와 실제 영속 ID에도 위 배치 규칙을 적용한다.
+`MemoryPlacement`, `StoredContent`, `MemoryCollectionCount`와 event는 `memory.domain`에,
+저장 enum은 `memory.domain.type`에 남는다. 표와 JPQL 엔티티 이름, 암호화 결합 값과 시각 계약은 유지한다.
 
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.

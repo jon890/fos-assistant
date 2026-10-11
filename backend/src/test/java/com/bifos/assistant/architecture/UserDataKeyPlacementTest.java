@@ -283,12 +283,12 @@ class UserDataKeyPlacementTest {
 
 
     private static ArchRule entities() {
-        return ArchitectureRules.entitiesInOwnedEntityPackage(ROOT);
+        return ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "crypto");
     }
 
 
     private static ArchRule ids() {
-        return ArchitectureRules.embeddedIdsWithEntities(ROOT);
+        return ArchitectureRules.embeddedIdsWithEntities(ROOT, "crypto");
     }
 
 

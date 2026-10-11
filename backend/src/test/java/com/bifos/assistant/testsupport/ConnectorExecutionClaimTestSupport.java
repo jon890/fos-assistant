@@ -39,13 +39,13 @@ import tools.jackson.databind.json.JsonMapper;
 @Import(IntegrationTestDoubles.class)
 @ExtendWith(IntegrationTestIsolation.class)
 @MockitoBean(
-        types = {
-            HermesRunEventStream.class,
-            HermesToolsetClient.class,
-            HermesSkillClient.class,
-            HermesModelClient.class,
-            HermesDashboardClient.class
-        })
+    types = {
+        HermesRunEventStream.class,
+        HermesToolsetClient.class,
+        HermesSkillClient.class,
+        HermesModelClient.class,
+        HermesDashboardClient.class
+    })
 @ResourceLock("connector-execution-catalog")
 public abstract class ConnectorExecutionClaimTestSupport {
     protected static final JsonMapper JSON = JsonMapper.builder().build();
@@ -60,7 +60,8 @@ public abstract class ConnectorExecutionClaimTestSupport {
                        "place_order":{"title":"주문","risk":"FINANCIAL","approval":"always"}},
               "execution_guard":{"protocol":"approval-claim-v1","prepare_tool":"prepare",
                 "scope_fields":[{"arg":"account_seq","field":"account"}],
-                "operations":{"place_order":"CREATE"}}}]
+                "operations":{"place_order":"CREATE"}},
+              "execution_guard_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]
             """;
     protected static final AtomicReference<String> CATALOG_BODY = new AtomicReference<>(CATALOG);
     protected static final AtomicReference<Barrier> BARRIER = new AtomicReference<>();
@@ -73,15 +74,17 @@ public abstract class ConnectorExecutionClaimTestSupport {
     @Autowired
     protected TestClock clock;
 
+
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry registry) {
         registry.add(
-                "hermes.dashboard-base-url",
-                () -> "http://127.0.0.1:" + REMOTE.getAddress().getPort());
+            "hermes.dashboard-base-url",
+            () -> "http://127.0.0.1:" + REMOTE.getAddress().getPort());
         registry.add("hermes.dashboard-token", () -> TOKEN);
         registry.add("hermes.read-timeout", () -> "5s");
         registry.add("assistant.attachment.root", () -> System.getProperty("java.io.tmpdir"));
     }
+
 
     @BeforeEach
     void setUpClaim() {
@@ -93,6 +96,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
         EXECUTE_REQUESTS.set(0);
     }
 
+
     @AfterEach
     void releaseBarrier() {
         Barrier active = BARRIER.getAndSet(null);
@@ -100,6 +104,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
             active.release.countDown();
         }
     }
+
 
     private static HttpServer server() {
         try {
@@ -112,6 +117,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
             throw new IllegalStateException(e);
         }
     }
+
 
     private static void respond(HttpExchange exchange) throws IOException {
         String uri = exchange.getRequestURI().getPath();
@@ -138,29 +144,29 @@ public abstract class ConnectorExecutionClaimTestSupport {
         } else if ("/api/connectors".equals(uri)) {
             if ("PUT".equals(exchange.getRequestMethod())) {
                 response = JSON.writeValueAsString(Map.of(
-                        "profile",
-                        body.get("profile").stringValue(),
-                        "plugin",
-                        "demo-financial",
-                        "enabled",
-                        body.get("enabled").booleanValue(),
-                        "restart_required",
-                        false));
+                    "profile",
+                    body.get("profile").stringValue(),
+                    "plugin",
+                    "demo-financial",
+                    "enabled",
+                    body.get("enabled").booleanValue(),
+                    "restart_required",
+                    false));
             } else {
                 String profile = URLDecoder.decode(
-                        exchange.getRequestURI().getQuery().substring("profile=".length()), StandardCharsets.UTF_8);
+                    exchange.getRequestURI().getQuery().substring("profile=".length()), StandardCharsets.UTF_8);
                 response = JSON.writeValueAsString(
-                        Map.of("profile", profile, "policy_hook", true, "connectors", new Object[] {
-                            Map.of(
-                                    "plugin",
-                                    "demo-financial",
-                                    "enabled",
-                                    true,
-                                    "configured",
-                                    CONFIGURED.get(),
-                                    "mode",
-                                    "bind")
-                        }));
+                    Map.of("profile", profile, "policy_hook", true, "connectors", new Object[] {
+                        Map.of(
+                            "plugin",
+                            "demo-financial",
+                            "enabled",
+                            true,
+                            "configured",
+                            CONFIGURED.get(),
+                            "mode",
+                            "bind")
+                    }));
             }
         } else if ("/api/connector-vault".equals(uri)) {
             response = "{\"ok\":true,\"changed\":true}";
@@ -181,6 +187,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
             stream.write(bytes);
         }
     }
+
 
     public static final class Barrier {
         public final CountDownLatch entered = new CountDownLatch(1);
