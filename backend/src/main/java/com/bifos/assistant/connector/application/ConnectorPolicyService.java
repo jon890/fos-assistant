@@ -90,11 +90,8 @@ public class ConnectorPolicyService {
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
     private static final String READ_ONLY_RUN_MESSAGE = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
     /**
-     * 승인을 기다리는 호출에 답하는 글이다. 모델이 읽는다.
-     *
-     * <p>약속은 실제 동작과 같아야 한다. 대화 화면에 승인 카드가 뜨고, 승인하면 저장한 인자로 한 번 실행한 결과가 그
-     * 대화의 다음 turn 으로 온다({@link ConnectorActionResultSource}). 번호는 줄을 가리키는 값이라 사용자에게 읽어 줄
-     * 것이 아니다.
+     * 모델이 읽는 승인 대기 안내다. 번호는 사용자에게 읽어 주지 않는다.
+     * 승인 카드에서 허락하면 저장한 인자로 한 번 실행하고 결과가 같은 대화의 다음 turn 으로 온다({@link ConnectorActionResultSource}).
      */
     private static final String APPROVAL_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. "
             + "대화 화면에 승인 카드가 떴으니 사용자에게 거기서 승인해 달라고 알린다. 번호는 사용자에게 말하지 않는다. "
@@ -386,14 +383,9 @@ public class ConnectorPolicyService {
     }
 
     /**
-     * 같은 키로 이미 남긴 줄의 판정을 돌려준다. 그 줄의 등록 이름이나 인자 해시가 이번 요청과 다르면 돌려주지 않고 막는다.
-     *
-     * <p>한 session 에서 같은 {@code tool_call_id} 가 되풀이되면 키가 같다. 줄의 판정을 그대로 주면 앞서 허용한
-     * 읽기 도구의 답이 다른 도구나 다른 인자의 호출에 나간다. 새 줄은 만들지 않는다. 키가 유니크라 만들 수 없다.
-     *
-     * <p>허용한 줄은 그 에이전트에 그 연결이 지금도 붙어 있고 연결과 바인딩이 모두 {@code READY} 일 때만 다시 허용한다.
-     * 연결을 해제하거나 떼어 낸 뒤에 같은 호출이 다시 와도 앞의 허용이 나가지 않게 한다. 막은 줄과 승인 줄은 연결 상태와
-     * 상관없이 처음 답을 돌려준다.
+     * 같은 session 의 {@code tool_call_id} 는 키가 같아 새 줄을 만들지 않는다. 등록 이름이나 인자 해시가 다르면 앞의 판정을 주지 않고 막는다.
+     * 허용한 줄은 연결이 여전히 그 에이전트에 붙어 있고 연결과 바인딩이 모두 {@code READY} 일 때만 다시 허용한다.
+     * 막은 줄과 승인 줄은 연결 상태와 상관없이 처음 답을 돌려준다.
      */
     private ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
         if (!recorded.hermesTool().equals(hermesTool)) {
@@ -416,10 +408,8 @@ public class ConnectorPolicyService {
     }
 
     /**
-     * 판정에 넘길 연결 상태다. 연결이 {@code READY} 이고 그 에이전트에 붙인 바인딩도 {@code READY} 일 때만 {@code READY} 다.
-     *
-     * <p>값이 확인됐어도 공유 gateway 가 아직 그 profile 의 MCP 서버를 보지 못했으면 쓸 수 없다. 승인한 호출의 실행도 같은
-     * 규칙으로 다시 판정한다.
+     * 연결과 바인딩이 모두 {@code READY} 일 때만 판정에 {@code READY} 를 넘긴다.
+     * 값 확인뿐 아니라 공유 gateway 의 MCP 서버 반영도 필요하며 승인한 호출의 실행에도 같은 규칙을 쓴다.
      */
     static ConnectionStatus usableStatus(ConnectorConnection connection, ConnectorBinding binding) {
         return connection.status() == ConnectionStatus.READY && binding.status() == BindingStatus.READY
