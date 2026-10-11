@@ -10,9 +10,12 @@ import org.springframework.test.context.TestContextManager;
 /** 실제 기동 검사가 기존 통합 검사 컨텍스트와 스키마를 닫지 않는지 확인한다. */
 class ContentDraftSnapshotContextIsolationTest {
     @BackendIntegrationTest
-    static class SharedContext {}
+    static class SharedContext {
+    }
 
-    static class ClaimContext extends ConnectorExecutionClaimTestSupport {}
+    static class ClaimContext extends ConnectorExecutionClaimTestSupport {
+    }
+
 
     @Test
     @DisplayName("Flyway 기동과 종료 뒤에도 공유 검사와 claim 검사의 스키마가 살아 있다")
