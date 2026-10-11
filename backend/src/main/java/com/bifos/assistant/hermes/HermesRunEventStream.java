@@ -14,7 +14,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -27,6 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class HermesRunEventStream {
+    private static final Pattern THINK_BLOCK = Pattern.compile("(?is)<think>.*?(?:</think>|$)");
 
     /** 모델이 스킬을 읽는 Hermes 도구의 이름이다. */
     private static final String SKILL_VIEW_TOOL = "skill_view";
@@ -185,7 +189,24 @@ public class HermesRunEventStream {
         String text = firstText(root, payload, "delta", "text", "output");
         boolean toolEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.");
         boolean subagentEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.");
-        boolean afterConnector = (toolEvent || subagentEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
+        boolean interimEvent = "message.interim".equalsIgnoreCase(type);
+        Boolean alreadyStreamed = interimEvent ? firstBoolean(root, payload, "already_streamed") : null;
+        JsonNode timestamp = number(root, "timestamp");
+        if (timestamp == null) {
+            timestamp = number(payload, "timestamp");
+        }
+        String interimId = interimEvent ? state.interimIdentity(timestamp, text) : null;
+        Integer streamedPrefixLength = state.classify(type, text, alreadyStreamed, interimId);
+        boolean afterConnector = (toolEvent || subagentEvent || interimEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
+        if (interimEvent) {
+            // 재분류 길이는 가리기 전에 계산한다. 중간 안내도 도구 설명과 같은 민감 출력 경계를 따른다.
+            text = text == null ? null : THINK_BLOCK.matcher(text).replaceAll("").strip();
+            text = ToolDetailRedactor.redact(text, null, scope, state.identifiers, afterConnector);
+            detail = null;
+        } else if (type != null && type.toLowerCase(Locale.ROOT).startsWith("reasoning.")) {
+            text = null;
+            detail = null;
+        }
         if (toolEvent
             && toolName != null
             && (toolName.equals("list_media_observations")
@@ -240,7 +261,10 @@ public class HermesRunEventStream {
             firstNumber(root, payload, "input_tokens"),
             firstNumber(root, payload, "output_tokens"),
             firstText(root, payload, "status"),
-            skillName);
+            skillName,
+            alreadyStreamed,
+            streamedPrefixLength,
+            interimId);
     }
 
 
@@ -249,6 +273,56 @@ public class HermesRunEventStream {
         private final Map<String, String> identifiers = new LinkedHashMap<>();
         private final Clock clock;
         private boolean connectorCalled;
+        private final StringBuilder deltaSegment = new StringBuilder();
+        private final Set<String> interimKeys = new HashSet<>();
+        private final Map<InterimIdentity, String> interimIds = new LinkedHashMap<>();
+
+
+        /** timestamp는 고유 번호가 아니다. 원문도 대조하되, 바깥에는 실행 안에서 부여한 번호만 보낸다. */
+        String interimIdentity(JsonNode timestamp, String text) {
+            var identity = new InterimIdentity(timestamp == null ? null : timestamp.asText(),
+                normalize(text == null ? "" : text));
+            return interimIds.computeIfAbsent(identity, ignored -> Integer.toString(interimIds.size() + 1));
+        }
+
+
+        private record InterimIdentity(String timestamp, String text) {
+        }
+
+
+        /** 직전 구간 전체가 안내의 접두사인 경우만 재분류한다. 부분 문자열이나 최종 답에서는 찾지 않는다. */
+        Integer classify(String type, String text, Boolean alreadyStreamed, String interimId) {
+            if ("message.delta".equalsIgnoreCase(type) && text != null) {
+                deltaSegment.append(text);
+                return null;
+            }
+            if ("message.interim".equalsIgnoreCase(type)) {
+                String key = interimId == null ? "text:" + normalize(text == null ? "" : text) : "id:" + interimId;
+                if (!interimKeys.add(key)) {
+                    // 안내 뒤의 최종 답이 같은 접두사여도 재수신이 그 답을 지우지 않는다.
+                    return 0;
+                }
+                String prefix = normalize(deltaSegment.toString());
+                int length = Boolean.TRUE.equals(alreadyStreamed) && !prefix.isEmpty()
+                    && text != null && normalize(text).startsWith(prefix) ? deltaSegment.length() : 0;
+                deltaSegment.setLength(0);
+                return length;
+            }
+            if ("tool.started".equalsIgnoreCase(type) || "run.started".equalsIgnoreCase(type)
+                || "reset".equalsIgnoreCase(type)) {
+                deltaSegment.setLength(0);
+                if (!"tool.started".equalsIgnoreCase(type)) {
+                    interimKeys.clear();
+                    interimIds.clear();
+                }
+            }
+            return null;
+        }
+
+
+        private static String normalize(String text) {
+            return text.replaceAll("(?U)[\\s\\u001c-\\u001f]+", " ").strip();
+        }
 
 
         private DetailState(Clock clock) {
@@ -345,6 +419,15 @@ public class HermesRunEventStream {
     private static JsonNode bool(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isBoolean() ? value : null;
+    }
+
+
+    private static Boolean firstBoolean(JsonNode root, JsonNode payload, String field) {
+        JsonNode value = bool(root, field);
+        if (value == null && !root.has(field)) {
+            value = bool(payload, field);
+        }
+        return value == null ? null : value.asBoolean();
     }
 
 
