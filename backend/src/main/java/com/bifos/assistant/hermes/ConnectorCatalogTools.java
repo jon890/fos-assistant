@@ -16,10 +16,11 @@ import tools.jackson.databind.json.JsonMapper;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorCatalogTools {
     private static final JsonMapper CATALOG = JsonMapper.builder(JsonFactory.builder()
-                    .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-                    .build())
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
+        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+        .build())
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build();
+
 
     /** tree 변환 전에 중복과 뒤따르는 JSON을 거절하며 원문과 cause를 오류 처리에 넘기지 않는다. */
     static JsonNode parseCatalog(String raw) {
@@ -34,9 +35,11 @@ final class ConnectorCatalogTools {
         }
     }
 
+
     static boolean readable(JsonNode declared) {
         return declared == null || declared.isNull() || declared.isObject();
     }
+
 
     /**
      * 도구 이름을 키로 하는 객체를 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다.
@@ -52,15 +55,17 @@ final class ConnectorCatalogTools {
         for (Map.Entry<String, JsonNode> entry : declared.properties()) {
             JsonNode policy = entry.getValue();
             tools.add(new ConnectorTool(
-                    entry.getKey(),
-                    text(policy, "risk"),
-                    text(policy, "approval"),
-                    text(policy, "title"),
-                    grant(policy),
-                    identifiers(policy)));
+                entry.getKey(),
+                text(policy, "risk"),
+                text(policy, "approval"),
+                text(policy, "title"),
+                grant(policy),
+                identifiers(policy),
+                text(policy, "description")));
         }
         return List.copyOf(tools);
     }
+
 
     /**
      * 상시 허락을 줄 수 있는지의 선언이다(ADR-065). 칸이 없으면 null 이고 받는 쪽이 승인 방식으로 정한다.
@@ -75,6 +80,7 @@ final class ConnectorCatalogTools {
         }
         return value.isBoolean() && value.asBoolean();
     }
+
 
     /**
      * 식별자 인자의 선언이다(ADR-089). 칸이 없으면 빈 목록이다.
@@ -96,6 +102,7 @@ final class ConnectorCatalogTools {
         }
         return List.copyOf(identifiers);
     }
+
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
