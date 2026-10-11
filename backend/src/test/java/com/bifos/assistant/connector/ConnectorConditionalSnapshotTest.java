@@ -63,19 +63,33 @@ class ConnectorConditionalSnapshotTest {
     private static final JsonNode BASE = VECTOR.get("cases").get(0);
     private static final Instant NOW = Instant.parse("2026-10-11T00:00:00Z");
     private static final String DECLARATION = "[{\"arg\":\"account_seq\",\"field\":\"account\"}]";
-    @Autowired ConnectorActionExecutionRepository contents;
-    @Autowired ConnectorActionRepository actions;
-    @Autowired ConnectorConnectionRepository connections;
-    @Autowired ConnectorBindingRepository bindings;
-    @Autowired AgentRepository agents;
-    @Autowired AgentExecutionRepository runs;
-    @Autowired AppUserRepository users;
-    @Autowired DataKeyService cipher;
-    @Autowired EntityManager em;
-    @Autowired JdbcTemplate jdbc;
+    @Autowired
+    ConnectorActionExecutionRepository contents;
+    @Autowired
+    ConnectorActionRepository actions;
+    @Autowired
+    ConnectorConnectionRepository connections;
+    @Autowired
+    ConnectorBindingRepository bindings;
+    @Autowired
+    AgentRepository agents;
+    @Autowired
+    AgentExecutionRepository runs;
+    @Autowired
+    AppUserRepository users;
+    @Autowired
+    DataKeyService cipher;
+    @Autowired
+    EntityManager em;
+    @Autowired
+    JdbcTemplate jdbc;
+
 
     @AfterEach
-    void clearCipherCache() { cipher.forgetCachedKeys(); }
+    void clearCipherCache() {
+        cipher.forgetCachedKeys();
+    }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("sharedCases")
@@ -101,6 +115,7 @@ class ConnectorConditionalSnapshotTest {
         assertThat(opened.scopeJson()).isEqualTo(value(sample, "scopeJson"));
     }
 
+
     @Test
     @DisplayName("AAD의 열·사용자·action과 key 식별자를 바꾸면 DB 읽기가 실패한다")
     void rejectsStoredCipherContextTampering() {
@@ -120,6 +135,7 @@ class ConnectorConditionalSnapshotTest {
             .isInstanceOf(IllegalStateException.class);
     }
 
+
     @Test
     @DisplayName("정상 암호문이어도 표시 내용이 달라지면 저장 후 읽기에서 거절한다")
     void rejectsStoredSemanticTampering() {
@@ -133,6 +149,7 @@ class ConnectorConditionalSnapshotTest {
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
             .isInstanceOf(IllegalArgumentException.class);
     }
+
 
     @Test
     @DisplayName("일반 주문에서 허용하는 account scope를 조건 DB 읽기에서는 거절한다")
@@ -152,10 +169,12 @@ class ConnectorConditionalSnapshotTest {
             .isInstanceOf(IllegalArgumentException.class);
     }
 
+
     private ConnectorActionExecution capture(ConnectorAction action, ConnectorBinding binding, JsonNode sample) {
         return ConnectorExecutionSnapshot.capture(action, binding, value(sample, "operation"), DECLARATION,
             value(sample, "executionArgsJson"), value(sample, "summaryJson"), value(sample, "scopeJson"), cipher, NOW);
     }
+
 
     private Fixture fixture() {
         AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, NOW));
@@ -220,13 +239,23 @@ class ConnectorConditionalSnapshotTest {
         return VECTOR.get("cases").valueStream().map(sample -> Arguments.of(value(sample, "name"), sample));
     }
 
+
     private static JsonNode vectors() {
-        try { return JSON.readTree(Files.readString(Path.of("../test/resources/conditional-snapshot-v1.json"))); }
-        catch (Exception e) { throw new IllegalStateException("공통 조건 vector를 읽지 못했다", e); }
+        try {
+            return JSON.readTree(Files.readString(Path.of("../test/resources/conditional-snapshot-v1.json")));
+        } catch (Exception e) {
+            throw new IllegalStateException("공통 조건 vector를 읽지 못했다", e);
+        }
     }
 
-    private static String value(JsonNode node, String name) { return node.get(name).stringValue(); }
-    private record Fixture(ConnectorAction action, ConnectorBinding binding) {}
+
+    private static String value(JsonNode node, String name) {
+        return node.get(name).stringValue();
+    }
+
+
+    private record Fixture(ConnectorAction action, ConnectorBinding binding) {
+    }
 }
 
 /** 같은 원문·암호화 DB 소비를 MySQL 스키마에서도 확인한다. */

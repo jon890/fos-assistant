@@ -33,6 +33,7 @@ final class ConnectorOrderSnapshot {
             .split(","));
     private static final Set<String> ORDER_VALUES = Set.of("symbol", "side", "quantity", "orderAmount", "price", "orderType", "timeInForce");
 
+
     /** 기존 일반 주문 검증을 이동하며 정규화 의미 보존도 함께 적용한다. */
     static void validate(JsonNode input, JsonNode args, JsonNode summary, JsonNode scope, String operation) {
         keys(summary, SUMMARY);
@@ -42,6 +43,7 @@ final class ConnectorOrderSnapshot {
         validateArgs(input, args, summary, scope, operation);
         ConnectorNormalization.validate(input, args, summary.get("normalization"), JSON.nullNode());
     }
+
 
     /** 기존 일반 주문 의도 키의 정렬과 길이 접두 표기를 유지한다. */
     static String requestKey(JsonNode execution, Long userId, Long connectionId, String tool) {
@@ -65,6 +67,7 @@ final class ConnectorOrderSnapshot {
         values.forEach((name, value) -> body.append(lengthPrefix(name)).append(lengthPrefix(value)));
         return Sha256.hex(body.toString());
     }
+
 
     private static void validateArgs(
         JsonNode input, JsonNode args, JsonNode summary, JsonNode scope, String operation) {
@@ -227,6 +230,7 @@ final class ConnectorOrderSnapshot {
     private static String lengthPrefix(String value) {
         return value.getBytes(StandardCharsets.UTF_8).length + ":" + value;
     }
+
 
     private static IllegalArgumentException invalid() {
         return new IllegalArgumentException("invalid financial execution snapshot");

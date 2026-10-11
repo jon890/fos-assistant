@@ -30,6 +30,7 @@ final class ConnectorConditionalSnapshot {
     private static final Set<String> STATUS = Set.of("WATCHING", "PAUSED", "ORDERING", "ORDERED", "COMPLETED", "EXPIRED");
     private static final List<String> NORMALIZED = List.of("symbol", "quantity", "first.triggerPrice", "first.orderPrice", "second.triggerPrice", "second.orderPrice");
 
+
     /** 정확한 키 집합과 의미 보존을 함께 판정한다. */
     static void validate(JsonNode input, JsonNode args, JsonNode summary, JsonNode scope, String operation) {
         keys(summary, SUMMARY);
@@ -83,6 +84,7 @@ final class ConnectorConditionalSnapshot {
         display(args, summary, operation);
     }
 
+
     private static void display(JsonNode args, JsonNode summary, String operation) {
         JsonNode shown = "CANCEL".equals(operation) ? summary.get("original") : args;
         for (String field : Set.of("type", "quantity", "orderType", "expireDate", "first", "second")) {
@@ -97,6 +99,7 @@ final class ConnectorConditionalSnapshot {
         equal(summary.get("symbol"), symbol);
     }
 
+
     private static String market(JsonNode args) {
         String value = text(args.get("market"), 1, 16);
         boolean kr = Set.of("KOSPI", "KOSDAQ", "KR_ETC").contains(value);
@@ -104,6 +107,7 @@ final class ConnectorConditionalSnapshot {
         require((kr ? "KRW" : "USD").equals(text(args.get("currency"), 3, 3)));
         return kr ? "KR" : "US";
     }
+
 
     private static void write(JsonNode node, String market) {
         String type = enumeration(node.get("type"), Set.of("SINGLE", "OCO", "OTO"));
@@ -136,6 +140,7 @@ final class ConnectorConditionalSnapshot {
         }
     }
 
+
     private static void detail(JsonNode node, String market) {
         optionalKeys(node, DETAIL, Set.of("expireDate", "second"));
         id(node.get("conditionalOrderId"));
@@ -164,6 +169,7 @@ final class ConnectorConditionalSnapshot {
         }
     }
 
+
     private static void detailLeg(JsonNode leg) {
         optionalKeys(leg, Set.of("type", "status", "orderSide"), Set.of("triggerPrice", "targetProfitRate", "orderPrice", "triggeredOrderId"));
         enumeration(leg.get("type"), Set.of("STOP", "PROFIT_RATE"));
@@ -184,6 +190,7 @@ final class ConnectorConditionalSnapshot {
             id(leg.get("triggeredOrderId"));
         }
     }
+
 
     private static void normalization(JsonNode input, JsonNode args, JsonNode changes) {
         require(changes.isArray());
@@ -214,6 +221,7 @@ final class ConnectorConditionalSnapshot {
         }
     }
 
+
     /** operation별 고정 경로를 UTF-8 길이 접두 표기로 인코딩한다. */
     static String requestKey(JsonNode args, Long userId, Long connectionId, String tool, String operation) {
         StringBuilder body = new StringBuilder(lp("fos-conditional-intent-v1"));
@@ -235,6 +243,7 @@ final class ConnectorConditionalSnapshot {
         return Sha256.hex(body.toString());
     }
 
+
     private static void append(StringBuilder body, String name, JsonNode args) {
         JsonNode value = path(args, name);
         body.append(lp(name));
@@ -249,6 +258,7 @@ final class ConnectorConditionalSnapshot {
         }
     }
 
+
     private static JsonNode path(JsonNode node, String name) {
         for (String part : name.split("\\.")) {
             if (node == null || !node.isObject()) {
@@ -259,9 +269,11 @@ final class ConnectorConditionalSnapshot {
         return node;
     }
 
+
     private static String lp(String value) {
         return value.getBytes(StandardCharsets.UTF_8).length + ":" + value;
     }
+
 
     private static void optionalKeys(JsonNode node, Set<String> required, Set<String> optional) {
         require(node != null && node.isObject() && node.propertyNames().containsAll(required));
@@ -270,11 +282,13 @@ final class ConnectorConditionalSnapshot {
         require(allowed.containsAll(node.propertyNames()));
     }
 
+
     private static String enumeration(JsonNode node, Set<String> values) {
         String value = text(node, 1, 32);
         require(values.contains(value));
         return value;
     }
+
 
     private static String decimal(JsonNode node) {
         String value = text(node, 1, 30);
@@ -282,15 +296,18 @@ final class ConnectorConditionalSnapshot {
         return ConnectorNormalization.canonicalDecimal(value);
     }
 
+
     private static void symbol(JsonNode node) {
         require(text(node, 1, 32).matches("[A-Za-z0-9.-]{1,32}"));
     }
+
 
     private static void id(JsonNode node) {
         String value = text(node, 1, 256);
         require(!Set.of(".", "..").contains(value) && value.codePoints().noneMatch(c -> Character.isWhitespace(c) || Character.isSpaceChar(c))
             && !value.contains("\uFEFF") && !value.matches(".*[/\\\\?#%:].*"));
     }
+
 
     private static void date(JsonNode node) {
         String value = text(node, 10, 10);
