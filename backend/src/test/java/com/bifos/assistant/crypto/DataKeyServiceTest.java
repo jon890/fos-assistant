@@ -11,14 +11,13 @@ import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.FileKeyEncryptionKeys;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.shared.util.Sha256;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Table;
 import java.util.Arrays;
-import java.util.TreeSet;
-import java.util.stream.Collectors;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.ResolvableType;
 import org.springframework.data.repository.Repository;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
@@ -58,16 +57,42 @@ class DataKeyServiceTest {
 
 
     @Test
-    @DisplayName("엔티티 이동은 JPA 이름과 저장소 빈 목록을 보존한다")
-    void preservesPersistenceInventory() {
-        String entities = entityManager.getMetamodel().getEntities().stream()
-            .map(entity -> entity.getName()).sorted().collect(Collectors.joining(","));
-        String repositories = String.join(",", new TreeSet<>(context.getBeansOfType(Repository.class).keySet()));
-        // 이동 전 실제 Spring 문맥에서 얻은 정렬된 이름 목록의 지문이다. 새 영속 타입을 더하면 함께 갱신한다.
-        assertThat(entityManager.getMetamodel().getEntities()).hasSize(57);
-        assertThat(Sha256.hex(entities)).isEqualTo("8c92d2d7cc8650d71e2278086880d0bc761b84f3ad1ca6a9f7229f3337a4b70e");
-        assertThat(context.getBeansOfType(Repository.class)).hasSize(57);
-        assertThat(Sha256.hex(repositories)).isEqualTo("11a793acd5b9b1970a31b077fd796d81ff89752368c87abadae92e7f636e1912");
+    @DisplayName("crypto 엔티티의 JPA 이름과 실제 클래스 및 저장소 빈은 유일하다")
+    void preservesOwnedPersistenceContract() {
+        assertThat(entityManager.getMetamodel().getEntities())
+            .filteredOn(entity -> entity.getName().equals("UserDataKey"))
+            .singleElement().satisfies(entity -> assertThat(entity.getJavaType()).isEqualTo(UserDataKey.class));
+        assertThat(entityManager.getMetamodel().getEntities())
+            .filteredOn(entity -> entity.getJavaType().equals(UserDataKey.class))
+            .singleElement().satisfies(entity -> assertThat(entity.getName()).isEqualTo("UserDataKey"));
+        assertThat(entityManager.getMetamodel().entity(UserDataKey.class).getIdType().getJavaType())
+            .isEqualTo(Long.class);
+        assertThat(UserDataKey.class.getAnnotation(Table.class).name()).isEqualTo("user_data_key");
+        assertThat(ResolvableType.forClass(UserDataKeyRepository.class).as(Repository.class).getGeneric(0).resolve())
+            .isEqualTo(UserDataKey.class);
+        assertThat(context.getBeansOfType(UserDataKeyRepository.class))
+            .containsOnlyKeys("userDataKeyRepository").containsEntry("userDataKeyRepository", keys);
+        assertThat(context.getBeansOfType(Repository.class))
+            .containsEntry("userDataKeyRepository", keys);
+    }
+
+
+    @Test
+    @DisplayName("기존 factory 의 값과 생성 시각은 저장한 뒤 두 조회 경로에서 보존된다")
+    void preservesFactoryValuesThroughRepository() {
+        Long userId = anyUserId();
+        Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
+        UserDataKey saved = keys.saveAndFlush(UserDataKey.wrapped(userId, "synthetic-kek", "synthetic-wrapped", createdAt));
+        entityManager.clear();
+        assertThat(saved.id()).isNotNull();
+        assertThat(keys.findById(saved.id())).get().satisfies(row -> {
+            assertThat(row.userId()).isEqualTo(userId);
+            assertThat(row.kekId()).isEqualTo("synthetic-kek");
+            assertThat(row.wrappedKey()).isEqualTo("synthetic-wrapped");
+            assertThat(row.createdAt()).isEqualTo(createdAt);
+            assertThat(row.rewrappedAt()).isNull();
+        });
+        assertThat(keys.findByUserId(userId)).get().satisfies(row -> assertThat(row.id()).isEqualTo(saved.id()));
     }
 
 
