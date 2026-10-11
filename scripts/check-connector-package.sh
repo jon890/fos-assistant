@@ -10,7 +10,7 @@ image="fos-connector-package-check:$(basename "$work" | tr '[:upper:]' '[:lower:
 container=""
 connectors=()
 cleanup() {
-  if [ -n "$container" ]; then docker rm "$container" >/dev/null; fi
+  if [ -n "$container" ]; then docker rm "$container" >/dev/null 2>&1 || true; fi
   docker image rm "$image" >/dev/null 2>&1 || true
   for id in "${connectors[@]}"; do
     local entry="hermes/connectors/$id/dist/$id-mcp.js"
