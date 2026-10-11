@@ -160,11 +160,13 @@ test("쓸 수 있는 에이전트가 없으면 입력창을 잠그고 에이전�
   await expect(page).toHaveURL(/\/agents$/);
 });
 
-for (const failure of ["HTTP", "fetch", "JSON"] as const) {
+for (const failure of ["HTTP", "fetch", "JSON", "객체 응답", "null 응답"] as const) {
   test(`목록 ${failure} 실패에는 다시 읽기만 보이고 재시도 성공은 입력창을 유지한다`, async ({ page }) => {
     await page.route("**/api/agents", async (route) => {
       if (failure === "fetch") await route.abort("failed");
       else if (failure === "JSON") await route.fulfill({ contentType: "application/json", body: "{" });
+      else if (failure === "객체 응답") await route.fulfill({ status: 200, json: {} });
+      else if (failure === "null 응답") await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
       else await route.fulfill({ status: 500, json: {} });
     });
     await page.goto("/");
@@ -213,13 +215,16 @@ test("재시도 연속 누름은 한 요청이며 실패하면 다시 읽을 수
   await expect(composer(page)).toBeEnabled();
 });
 
-for (const result of ["실패", "빈 목록", "다른 에이전트"] as const) {
+for (const result of ["실패", "빈 목록", "다른 에이전트", "객체 응답", "null 응답"] as const) {
   test(`기존 빈 대화는 목록 ${result}에도 에이전트와 글을 유지한다`, async ({ page }) => {
     const created = await page.request.post("/api/chat/conversations", { data: { agentCode: FLOW_AGENT_CODE } });
     expect(created.ok()).toBeTruthy();
     const { conversationId } = await created.json() as { conversationId: string };
     await page.route("**/api/agents", (route) => route.fulfill(
-      result === "실패" ? { status: 500, json: {} } : { json: result === "빈 목록" ? [] : [agentRow("browser", "다른 비서")] },
+      result === "실패" ? { status: 500, json: {} }
+        : result === "객체 응답" ? { status: 200, json: {} }
+          : result === "null 응답" ? { status: 200, contentType: "application/json", body: "null" }
+            : { json: result === "빈 목록" ? [] : [agentRow("browser", "다른 비서")] },
     ));
     try {
       await page.goto(`/chat/${conversationId}`);

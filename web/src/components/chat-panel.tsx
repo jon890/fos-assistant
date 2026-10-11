@@ -85,6 +85,7 @@ export function ChatPanel({
         const response = await fetching;
         if (!response.ok) throw new Error("에이전트 목록 읽기 실패");
         const data: AgentView[] = await response.json();
+        if (!Array.isArray(data)) throw new Error("에이전트 목록 형식 오류");
         if (!valid()) return;
         setAgents(data);
         if (activeConversationId.current === null) {
