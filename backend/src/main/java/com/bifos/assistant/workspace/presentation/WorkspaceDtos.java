@@ -16,15 +16,15 @@ import lombok.NoArgsConstructor;
 public final class WorkspaceDtos {
 
     public record StatusView(
-            boolean available, boolean deletable, boolean exists, int runningExecutions, List<AgentView> agents) {
+        boolean available, boolean deletable, boolean exists, int runningExecutions, List<AgentView> agents) {
 
         static StatusView of(WorkspaceStatus status) {
             return new StatusView(
-                    status.available(),
-                    status.deletable(),
-                    status.exists(),
-                    status.runningExecutions(),
-                    status.agents().stream().map(AgentView::of).toList());
+                status.available(),
+                status.deletable(),
+                status.exists(),
+                status.runningExecutions(),
+                status.agents().stream().map(AgentView::of).toList());
         }
     }
 
@@ -35,13 +35,14 @@ public final class WorkspaceDtos {
         }
     }
 
-    public record ListingView(String path, List<EntryView> entries, boolean truncated) {
+    public record ListingView(String path, List<EntryView> entries, boolean truncated, String nextCursor) {
 
         static ListingView of(WorkspaceListing listing) {
             return new ListingView(
-                    listing.path(),
-                    listing.entries().stream().map(EntryView::of).toList(),
-                    listing.truncated());
+                listing.path(),
+                listing.entries().stream().map(EntryView::of).toList(),
+                listing.truncated(),
+                listing.nextCursor());
         }
     }
 
@@ -52,16 +53,16 @@ public final class WorkspaceDtos {
      * @param modifiedAt ISO-8601 문자열
      */
     public record EntryView(
-            String name, String kind, Long size, String modifiedAt, boolean readable, boolean openable) {
+        String name, String kind, Long size, String modifiedAt, boolean readable, boolean openable) {
 
         static EntryView of(WorkspaceEntry entry) {
             return new EntryView(
-                    entry.name(),
-                    entry.kind().name(),
-                    entry.size(),
-                    entry.modifiedAt().toString(),
-                    entry.readable(),
-                    entry.openable());
+                entry.name(),
+                entry.kind().name(),
+                entry.size(),
+                entry.modifiedAt().toString(),
+                entry.readable(),
+                entry.openable());
         }
     }
 
@@ -83,8 +84,8 @@ public final class WorkspaceDtos {
 
         static AdminUsageView of(WorkspaceUsageReport report) {
             return new AdminUsageView(
-                    report.available(),
-                    report.spaces().stream().map(AdminSpaceView::of).toList());
+                report.available(),
+                report.spaces().stream().map(AdminSpaceView::of).toList());
         }
     }
 
@@ -99,7 +100,7 @@ public final class WorkspaceDtos {
 
         static AdminSpaceView of(WorkspaceSpaceUsage space) {
             return new AdminSpaceView(
-                    space.kind().name(), space.id(), space.name(), space.bytes(), space.entries(), space.partial());
+                space.kind().name(), space.id(), space.name(), space.bytes(), space.entries(), space.partial());
         }
     }
 }

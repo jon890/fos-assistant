@@ -26,7 +26,8 @@ READ_COMMITTED 새 트랜잭션에서 주인과 대상 상태를 다시 확인�
 ## 관찰 저장과 사용자 정정
 
 `MediaObservationService`는 보낸 첨부의 관찰을 저장하고 목록으로 읽는 동기 서비스다.
-REST 조회·사용자 정정과 서명된 MCP 조회·기록을 제공한다. 전용 UI, 실제 분석 호출과 완료 결과 캐시는 아직 제공하지 않는다.
+REST 조회·사용자 정정과 서명된 MCP 조회·기록, 저장 완료 결과의 재사용을 제공한다.
+전용 UI와 실제 분석 호출은 아직 제공하지 않는다.
 결정과 기각 근거는 [ADR-20261010 / media-observation-storage](../../backend/docs/adr/ADR-20261010-media-observation-storage.md)가 갖는다.
 
 쓰기 전에 현재 대화 주인과 업로더, 삭제·만료 상태를 확인하고 원본의 SHA-256과 크기를 직접 계산한다.
@@ -35,12 +36,12 @@ REST 조회·사용자 정정과 서명된 MCP 조회·기록을 제공한다. �
 
 | 제출과 조회 | 결과 |
 | --- | --- |
-| 새 UUID와 현재 revision | revision을 하나 늘린다. 같은 MODEL 완료 결과도 새 revision이다 |
+| 새 UUID와 현재 revision | 최신 MODEL 완료 결과와 분석 조건이 같고 후보의 암호화 본문 검증에 성공하면 alias만 추가한다. 그 밖에는 revision을 하나 늘린다 |
 | 같은 UUID와 같은 내용 | 최초 수락한 revision과 서버 관측 시각을 반환한다. 이후 revision은 바꾸지 않는다 |
 | 같은 UUID와 다른 내용, 새 UUID와 오래된 revision | 현재 revision만 담은 409다 |
 | 현재 USER 정정에 새 MODEL 제출 | revision이 맞아도 409다. 과거 UUID 재시도는 원래 revision만 읽는다 |
 | 같은 크기로 원본을 교체 | 신규·기존 UUID 쓰기는 409다. 목록은 현재 지문과 NEEDS_REVIEW/CONTENT_UNAVAILABLE를 내며 본문은 없다 |
-| 암호화할 수 없음 | 503으로 거절하고 관찰과 alias를 함께 되돌린다 |
+| 새 본문을 암호화할 수 없음 | 503으로 거절하고 관찰과 alias를 함께 되돌린다. 이미 복호화한 결과의 재사용은 허용한다 |
 | 본문 복호화·JSON 검증 실패 | 본문 없이 NEEDS_REVIEW/CONTENT_UNAVAILABLE다. USER 출처는 유지한다 |
 | PROCESSING이 15분 지남 | 목록에서 NEEDS_REVIEW/ANALYSIS_STALE로 해석한다. DB revision과 alias는 바꾸지 않는다 |
 | 관찰 없는 유효 첨부 | NOT_ANALYZED와 revision 0이다. 조회만으로 행을 만들지 않는다 |
@@ -51,18 +52,51 @@ REST 조회·사용자 정정과 서명된 MCP 조회·기록을 제공한다. �
 summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관찰 JSON은 UTF-8 32KiB로 제한한다.
 관찰과 alias는 원본 첨부보다 오래 보관하지 않는다.
 
+## 완료 결과 재사용
+
+재사용의 분석 조건과 수명은 [완료 결과 재사용 ADR](../../backend/docs/adr/ADR-20261011-media-observation-cache.md)이 갖는다.
+
+새 UUID의 MODEL 완료 제출은 현재 최신 MODEL 완료 행만 재사용할 수 있다.
+권한과 원본 검사, 기존 UUID 재시도, CAS와 USER 보호를 먼저 적용한다.
+같은 분석 조건이어도 현재 revision이 맞지 않으면 409다.
+구행의 null key, 평문 호환 행, PROCESSING, FAILED, USER와 과거 revision은 재사용하지 않는다.
+평문 호환 행은 목록과 기존 UUID 재시도에서 계속 읽을 수 있다.
+
+provider 또는 model을 확인하지 못한 제출은 대문자 예약 표식 `UNKNOWN`을 쓴다.
+둘 중 하나에 이 표식이 있으면 새 analysis key를 만들지 않으며, 저장된 후보의 key가 nonnull이어도 재사용하지 않는다.
+새 UUID는 제출한 본문으로 새 revision을 만들고 같은 UUID·같은 내용은 처음 수락한 revision을 반환한다.
+알려진 provider와 model의 두 version이 null인 재사용은 유지한다.
+이 표식만 검사하며 실제 provider·model 신원까지 검증하지 않는다.
+executionId를 가짜 provider/modelVersion이나 promptVersion에 넣거나 USER 출처로 바꾸어 미확인 정체성을 숨기지 않는다.
+
+| 제출 | 재사용 뒤 응답과 저장 |
+| --- | --- |
+| 같은 분석 조건, 새 UUID, 현재 revision | 기존 결과를 반환하고 새 alias만 추가한다 |
+| 같은 조건의 다른 summary나 다른 완료 상태 | 기존 본문·상태·출처·관측 시각을 반환한다 |
+| 재사용 alias의 같은 UUID와 같은 최초 제출 | 최초 연결한 결과를 반환한다 |
+| 재사용 alias의 UUID에 기존 결과 본문을 대신 제출 | 최초 제출 hash와 다르면 409다 |
+| 본문 복호화·JSON·상태·coverage 검증 실패 | 재사용하지 않고 제출한 새 암호화 revision을 저장한다 |
+| SQL 조회 또는 alias 저장 실패 | 요청 실패다. 성공이나 miss로 바꾸지 않는다 |
+
+서비스는 결과가 제출된 뒤 중복 revision을 막는다.
+실제 모델 호출을 생략하거나 새 분석을 실행하는 표면은 제공하지 않는다.
+응답 전에 접근을 확인하고 새 원본 스트림에서 SHA와 크기를 검사한 뒤 스트림을 닫는다.
+그 다음 최신 SQL로 소유·삭제·만료 상태를 다시 확인하고 현재 시계와 관찰 만료 시각을 확인한다.
+원본 읽기 중 커밋한 삭제 요청이나 소유 변경도 본문 응답을 막는다.
+마지막 검사 뒤에 발생하는 외부 파일 변경까지 원자적으로 막지는 않는다.
+재사용에도 별도 보관 기간이나 cache 전용 상태를 두지 않는다.
 
 ### 관찰 API와 MCP 연결
 
 REST 조회·사용자 정정, MCP 조회·기록과 페이지·제출 본문 검사는 구현되었다.
 `MediaObservationService.list/record`를 그대로 호출한다.
-완료 결과 캐시의 머지를 선행 조건으로 두지 않는다.
-저장 서비스, 암호화, DDL과 삭제 장벽은 변경하지 않는다.
+API는 기존 저장 서비스와 암호화, 삭제 장벽을 사용한다.
+완료 결과 재사용은 앞 절의 저장 계약을 따른다.
 
-record에는 캐시 재사용이 없어 새 MODEL UUID마다 새 revision과 본문을 저장한다.
-캐시가 추가된 기준에서는 provider/model 미확인 관찰의 analysisKey 생성과 결과 재사용을 저장 producer가 둘 다 꺼야 한다.
-캐시를 추가할 때는 같은 record 시그니처와 두 제외 조건을 유지하고, 다른 실행·UUID·본문을 새로 저장하는 회귀를 통과해야 한다.
-list와 USER 정정 REST는 이 캐시 제외 producer에 의존하지 않는다.
+MCP record의 provider/model은 UNKNOWN이며 응답의 sourceAssurance는 MODEL_UNVERIFIED다.
+저장 서비스는 이 미확인 출처의 analysisKey 생성과 후보 재사용을 모두 제외한다.
+다른 실행의 새 UUID는 제출한 새 본문과 revision을 저장하며 같은 UUID 재시도는 처음 수락한 결과를 반환한다.
+list와 USER 정정 REST는 기존 조회와 USER 보호 계약을 유지한다.
 
 사진 업로드·전송과 Hermes의 native 이미지 입력은 기존 경로를 유지한다.
 에이전트는 현재 대화의 관찰을 읽고 필요한 사진을 기존 `attachment_inspect`로 확인한 뒤 모델 관찰을 제출한다.

@@ -35,6 +35,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
     @Autowired
     DataEncryptionProperties cryptoProperties;
 
+
     @Test
     @DisplayName("실제 암호화 왕복과 행 대화 소유자 AAD를 각각 검증한다")
     void roundTripsRealCipherAndIndependentlyBindsRowConversationAndOwner() {
@@ -46,15 +47,16 @@ class MediaObservationBodiesTest extends ObservationFixture {
         assertThat(bodies.open(row, owner.id())).contains(plain);
         for (String field : new String[] {"id", "conversationId", "ownerUserId"}) {
             var copy = copied(row);
-            ReflectionTestUtils.setField(copy, field, ((Long) ReflectionTestUtils.getField(copy, field)) + 1);
+            ReflectionTestUtils.setField(copy, field, ((Long)ReflectionTestUtils.getField(copy, field)) + 1);
             String changedAad = "media_observation:" + copy.id() + ":conversation:" + copy.conversationId() + ":user:"
-                    + copy.ownerUserId();
+                + copy.ownerUserId();
             assertThat(cipher.open(row.bodyKeyId(), owner.id(), changedAad, row.body()))
-                    .as(field + "만 바꾸고 key와 복호화 사용자는 그대로 둔 독립 AAD 실패")
-                    .isEmpty();
+                .as(field + "만 바꾸고 key와 복호화 사용자는 그대로 둔 독립 AAD 실패")
+                .isEmpty();
         }
         assertThat(bodies.open(row, owner.id())).contains(plain);
     }
+
 
     @Test
     @DisplayName("활성 플래그 변경은 기존 암호문을 열고 새 캐시의 KEK 부재는 실패한다")
@@ -69,10 +71,12 @@ class MediaObservationBodiesTest extends ObservationFixture {
                 return false;
             }
 
+
             @Override
             public Optional<SealedText> seal(Long owner, String aad, String plain) {
                 return cipher.seal(owner, aad, plain);
             }
+
 
             @Override
             public Optional<String> open(Long keyId, Long owner, String aad, String sealed) {
@@ -82,16 +86,17 @@ class MediaObservationBodiesTest extends ObservationFixture {
         assertThat(new MediaObservationBodies(disabled).open(row, owner.id())).contains(expected);
         var missingProperties = new DataEncryptionProperties("", "", false, null, 100);
         var missing = new DataKeyService(
-                new FileKeyEncryptionKeys(missingProperties), keyWriter, keys, missingProperties, clock);
+            new FileKeyEncryptionKeys(missingProperties), keyWriter, keys, missingProperties, clock);
         missing.forgetCachedKeys();
         assertThat(new MediaObservationBodies(missing).open(row, owner.id())).isEmpty();
         code(
-                () -> local(store, new MediaObservationBodies(disabled), observations, requests, attachments, access)
-                        .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
-                ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
+            () -> local(store, new MediaObservationBodies(disabled), observations, requests, attachments, access)
+                .record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), changedModel()),
+            ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("빈 암호화 결과와 암호 오류는 전체 저장을 롤백한다")
@@ -103,6 +108,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
                     return true;
                 }
 
+
                 @Override
                 public Optional<SealedText> seal(Long owner, String aad, String plain) {
                     if (cryptoFailure) {
@@ -111,20 +117,22 @@ class MediaObservationBodiesTest extends ObservationFixture {
                     return Optional.empty();
                 }
 
+
                 @Override
                 public Optional<String> open(Long keyId, Long owner, String aad, String sealed) {
                     return cipher.open(keyId, owner, aad, sealed);
                 }
             };
             code(
-                    () -> local(store, new MediaObservationBodies(failing), observations, requests, attachments, access)
-                            .record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
-                    ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
+                () -> local(store, new MediaObservationBodies(failing), observations, requests, attachments, access)
+                    .record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
+                ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE);
             assertThat(observations.count()).isZero();
             assertThat(requests.count()).isZero();
         }
         record(0, UUID.randomUUID(), input(), model());
     }
+
 
     @Test
     @DisplayName("null 키의 평문 호환만 읽고 깨진 JSON과 빈 본문을 거부한다")
@@ -132,7 +140,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
         record(0, UUID.randomUUID(), input(), model());
         jdbc.update("update media_observation set body=?, body_key_id=null", json.writeValueAsString(input()));
         assertThat(service.list(owner, conversation.id(), null, 10).getFirst().observation())
-                .isEqualTo(input());
+            .isEqualTo(input());
         for (String body : new String[] {"{", "null", "{}", null}) {
             jdbc.update("update media_observation set body=?", body);
             var result = service.list(owner, conversation.id(), null, 10).getFirst();
@@ -140,6 +148,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
             assertThat(result.errorCode()).isEqualTo("CONTENT_UNAVAILABLE");
         }
     }
+
 
     @Test
     @DisplayName("실제 DEK SQL 실패를 전파하고 오류를 캐시하지 않아 복구한다")
@@ -154,6 +163,7 @@ class MediaObservationBodiesTest extends ObservationFixture {
         assertThat(reading.open(row, owner.id())).contains(json.writeValueAsString(input()));
     }
 
+
     @Test
     @DisplayName("암호화의 DEK SQL 실패는 revision과 alias를 롤백한다")
     void propagatesDekLookupSqlFailureDuringSealAndRollsBackRevisionAndAlias() {
@@ -163,31 +173,34 @@ class MediaObservationBodiesTest extends ObservationFixture {
         var fresh = new DataKeyService(keks, localWriter, failingKeys, cryptoProperties, clock);
         var writing = local(store, new MediaObservationBodies(fresh), observations, requests, attachments, access);
         UUID request = UUID.randomUUID();
-        assertThatThrownBy(() -> writing.record(owner, conversation.id(), photo.id(), 1, request, input(), model()))
+        assertThatThrownBy(
+            () -> writing.record(owner, conversation.id(), photo.id(), 1, request, input(), changedModel()))
                 .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
-        assertThat(writing.record(owner, conversation.id(), photo.id(), 1, request, input(), model())
-                        .revision())
+        assertThat(writing.record(owner, conversation.id(), photo.id(), 1, request, input(), changedModel())
+            .revision())
                 .isEqualTo(2);
         assertThat(requests.count()).isEqualTo(2);
     }
 
+
     private MediaObservation copied(MediaObservation source) {
         var result = new MediaObservation(
-                photo,
-                source.revision(),
-                source.sourceFingerprint(),
-                source.status(),
-                source.provenanceKind(),
-                source.schemaVersion(),
-                source.promptVersion(),
-                source.originExecutionId(),
-                source.provider(),
-                source.providerVersion(),
-                source.model(),
-                source.modelVersion(),
-                source.createdAt());
+            photo,
+            source.revision(),
+            source.sourceFingerprint(),
+            source.status(),
+            source.provenanceKind(),
+            source.schemaVersion(),
+            source.promptVersion(),
+            source.originExecutionId(),
+            source.provider(),
+            source.providerVersion(),
+            source.model(),
+            source.modelVersion(),
+            source.analysisKey(),
+            source.createdAt());
         ReflectionTestUtils.setField(result, "id", source.id());
         result.seal(source.body(), source.bodyKeyId());
         return result;
