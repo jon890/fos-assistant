@@ -471,7 +471,7 @@ producer가 schema 검증 뒤 accountNo를 끝 네 자리로 마스킹한 복사
 Bun 1.3.14의 native JSON.parse reviver 세 번째 인자 context.source를 사용한다. reviver에서 number primitive의 원문을 holder 객체/키별 WeakMap에 보관한 다음 operation/status의 응답 schema를 따라 객체·배열·$ref·allOf를 순회해 지정 위치만 변환한다. 같은 이름인 다른 필드나 문자열은 변환하지 않는다.
 schema 위치와 출력 변환은 api-contract.ts의 응답 descriptor가 소유한다. canonical 1.2.24의 int64 위치는 Account.accountSeq와 OAuth2TokenResponse.expires_in 두 곳이다. 원문 schema를 수정하지 않고 MCP 출력 descriptor에 변환을 선언한다.
 Account.accountSeq는 항상 정규 10진수 문자열이며 1..9223372036854775807이다. 다른 int64는 -9223372036854775808..9223372036854775807에서 schema의 추가 제약을 적용하고 안전 정수는 number, 그 밖은 정규 10진수 문자열로 반환한다. expires_in은 추가로 양수여야 한다.
-expires_in의 정확한 초→ms 계산은 BigInt로 하고 안전한 Date.now()/expiresAt 표현 범위를 넘으면 발급 오류로 거절한다. token을 모델 결과에 내보내지 않는다.
+expires_in의 정확한 초→ms 계산은 BigInt로 하고 안전한 `clock.now()`/expiresAt 표현 범위를 넘으면 발급 오류로 거절한다. `clock.now()`는 `performance.timeOrigin + performance.now()`의 소수 밀리초 시각이며 토큰 TTL, 호출 deadline과 상대 한도 대기에 함께 쓴다. KST 피크 여부만 현재 벽시계로 판단한다. token을 모델 결과에 내보내지 않는다.
 JSON integer 계약은 1.0, 1e3처럼 수학적으로 정수인 표기도 허용한다. source의 부호·계수·소수 자리·지수를 문자열로 분해해 정확한 정수성과 signed int64 범위를 검사한다. 1.5와 1e-1은 거절한다. 지수가 크면 1 MiB 본문 안에서도 자리수 비교로 조기 거절하고 큰 0 문자열을 할당하지 않는다.
 Number(value)나 반올림한 Number로 범위를 판정하지 않는다. primitive 문자열의 가짜 숫자는 그대로 두며 구문 오류는 native parser가 거절한다. context.source가 없으면 정확성을 가장하지 않고 실패한다. JSON 정규식 재작성과 새 의존성은 금지한다.
 raw fixture의 기대값은 손으로 적은 10진수 문자열/BigInt 상수에서 만든다. 2^53-1·2^53·2^53+1, 인접 큰 정수, int64 최대·초과·최소·미만, accountSeq의 0·음수, nested 배열, 같은 이름의 비schema 필드, 문자열 속 가짜 숫자, 정수 지수/소수와 비정수 표기·문법 오류를 검사한다.
