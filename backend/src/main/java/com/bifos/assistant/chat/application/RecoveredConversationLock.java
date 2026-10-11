@@ -22,11 +22,13 @@ final class RecoveredConversationLock {
     /** 루트 줄도 이 잠금으로 정한다. 거짓이면 루트가 이미 끝나고 자식만 돌던 흐름 turn 이다. */
     boolean rootClaimed;
 
+
     RecoveredConversationLock(Long conversationId, Long executionId, TurnHandle handle) {
         this.conversationId = conversationId;
         this.executionId = executionId;
         this.handle = handle;
     }
+
 
     /** 잡기를 마친 실행만 센다. 호출자는 RestartReconciler의 모니터를 쥔다. */
     void claim(AgentExecution row) {
