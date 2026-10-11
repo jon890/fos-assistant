@@ -20,12 +20,12 @@ description: 토스증권 계좌와 시세를 읽는다. 주문하지 않는다.
 ## 읽기
 
 - `list_accounts`: 연결한 계좌의 순번과 유형, 계좌번호 끝 네 자리를 본다. 계좌번호 원문은 나오지 않는다
-- `get_quotes`: 종목 코드나 티커를 쉼표로 이어 20개까지의 현재가와 이름을 본다. 예: `symbols` 에 `005930,AAPL`
+- `get_quotes`: 종목 코드나 티커를 쉼표로 이어 200개까지의 현재가와 이름을 본다. 예: `symbols` 에 `005930,AAPL`
 - `get_holdings`: 보유 종목과 평가 금액, 손익을 본다. `total` 의 금액은 원화(`krw`)와 달러(`usd`)로 나뉘고, `items` 의 금액은 그 종목의 거래 통화 기준이다.
   비용 공제 전 값과 공제 후 값(`..._after_cost`)이 함께 오므로 어느 쪽을 말하는지 밝힌다
 - `get_buying_power`: `currency` 에 `KRW` 나 `USD` 를 넣어 주문 가능 현금을 본다. `symbol` 을 주면 그 종목의 매도 가능 수량도 본다
-- `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각, 366일까지)로 기간을 정해 주문을 본다.
-  100건까지 오고 `has_more` 가 참이면 더 있다. 그때는 받은 것이 일부라고 말한다
+- `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각)로 기간을 정해 주문을 본다.
+  OPEN은 전체를 읽고 CLOSED는 기본 20건·최대 100건의 한 페이지를 읽는다. `has_more`가 참이면 일부라고 말하고 `nextCursor`로 다음 페이지를 요청한다
 
 - `list_conditional_orders`: `status=OPEN/CLOSED`로 조건주문 한 페이지를 본다. 선택 `symbol`, `cursor`, `limit`를 받으며 기본 20건, 최대 100건이다. `hasNext`가 참이면 일부만 읽었다고 말하고 `nextCursor`로 다음 페이지를 요청한다
 - `get_conditional_order`: 목록에서 받은 `conditionalOrderId`로 상세를 본다. 계좌, token, URL을 인자로 넘기지 않는다
