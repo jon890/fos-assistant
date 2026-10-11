@@ -61,7 +61,10 @@ for (const [path, name, args] of [
   for (const [exampleName, example] of Object.entries(examples(path))) {
     test(`공식 ${exampleName} ${path}를 SDK와 HTTP로 보존한다`, async () => {
       const fake = new FakeToss(allowed);
-      fake.on("GET", path, example.value);
+      fake.on("GET", path, {
+        ...example.value,
+        metadata: { upstream: "응답 확장 필드를 metadata로 노출하지 않는다" },
+      });
       try {
         await withMcp(moduleServer(fake), async (client) => {
           const listed = await client.listTools();
@@ -216,6 +219,8 @@ test("잘못된 날짜·시각·통화·시장과 추가 인자는 인증도 HTT
         ...[
           "2026-02-30T09:30:00+09:00",
           "2026-03-25T09:30:00",
+          "2026-03-25T09:30+09:00",
+          "2026-03-25T09:30Z",
           "2026-03-25T25:00:00Z",
           "",
         ].map((dateTime) => ({ ...currency, dateTime })),

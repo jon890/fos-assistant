@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createTossinvestServer } from "../src/server.ts";
+import { apiErrorCode } from "../src/transport.ts";
 import {
   FakeToss,
   credentials,
@@ -28,6 +29,27 @@ const allowed = new Set([
   "getUsMarketCalendar",
 ]);
 
+test("환율 없음은 404일 때만 입력 오류이며 기존 상태 분류를 유지한다", () => {
+  for (const [status, upstream, expected] of [
+    [404, "exchange-rate-not-found", "TOSSINVEST_INVALID_INPUT"],
+    [404, "stock-not-found", "TOSSINVEST_INVALID_INPUT"],
+    [404, "not-found", "TOSSINVEST_UNAVAILABLE"],
+    [401, "exchange-rate-not-found", "TOSSINVEST_UNAUTHORIZED"],
+    [429, "exchange-rate-not-found", "TOSSINVEST_RATE_LIMITED"],
+    [500, "exchange-rate-not-found", "TOSSINVEST_UNAVAILABLE"],
+    [503, "unknown", "TOSSINVEST_UNAVAILABLE"],
+  ] as const)
+    expect(
+      apiErrorCode({
+        status,
+        data: { error: { code: upstream } },
+        ok: false,
+        empty: false,
+        retryAfterMs: 0,
+      }),
+    ).toBe(expected);
+});
+
 for (const [path, name, args] of cases) {
   test(`${path} 404와 잘못된 429 본문을 안전한 오류로 바꾼다`, async () => {
     for (const status of [404, 429]) {
@@ -37,13 +59,17 @@ for (const [path, name, args] of cases) {
         path,
         status === 429
           ? { error: {} }
-          : {
-              error: {
-                requestId: "synthetic",
-                code: "exchange-rate-not-found",
-                message: "민감한 원문",
+          : path === "/api/v1/exchange-rate"
+            ? canonical.paths[path].get.responses["404"].content[
+                "application/json"
+              ].examples.exchangeRateNotFound.value
+            : {
+                error: {
+                  requestId: "synthetic",
+                  code: "not-found",
+                  message: "민감한 원문",
+                },
               },
-            },
         status,
       );
       try {
@@ -54,7 +80,9 @@ for (const [path, name, args] of cases) {
               client,
               status === 429
                 ? "TOSSINVEST_RATE_LIMITED"
-                : "TOSSINVEST_UNAVAILABLE",
+                : path === "/api/v1/exchange-rate"
+                  ? "TOSSINVEST_INVALID_INPUT"
+                  : "TOSSINVEST_UNAVAILABLE",
               name,
               args,
             ),
@@ -109,6 +137,8 @@ test("윤년의 실제 날짜와 UTC·음수 offset 시각을 그대로 HTTP que
         for (const dateTime of [
           "2024-02-29T23:59:59Z",
           "2024-02-29T23:59:59-05:00",
+          "2024-02-29T23:59:59.123Z",
+          "2024-02-29T23:59:59.123+09:00",
         ])
           expect(
             (
@@ -131,6 +161,8 @@ test("윤년의 실제 날짜와 UTC·음수 offset 시각을 그대로 HTTP que
     expect(fake.seen("GET").map((r) => Object.fromEntries(r.query))).toEqual([
       { ...cases[0][2], dateTime: "2024-02-29T23:59:59Z" },
       { ...cases[0][2], dateTime: "2024-02-29T23:59:59-05:00" },
+      { ...cases[0][2], dateTime: "2024-02-29T23:59:59.123Z" },
+      { ...cases[0][2], dateTime: "2024-02-29T23:59:59.123+09:00" },
       { date: "2024-02-29" },
     ]);
   } finally {

@@ -7,7 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { buildBundle } from "../scripts/build.ts";
 import { proxyFreeEnvironment } from "../src/runtime.ts";
-import { FakeToss, credentials, tool } from "./support.ts";
+import { FakeToss, credentials, expectFailure, json, tool } from "./support.ts";
 
 const canonical = JSON.parse(
   readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`, "utf8"),
@@ -45,7 +45,20 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
           .examples as Record<string, { value: any }>,
       )[0]!.value,
   );
-  for (const [i, [path]] of cases.entries()) fake.on("GET", path, responses[i]);
+  const missingRate =
+    canonical.paths[cases[0][0]].get.responses["404"].content[
+      "application/json"
+    ].examples.exchangeRateNotFound.value;
+  const historical = { ...cases[0][2], dateTime: "2020-01-01T00:00:00Z" };
+  for (const [i, [path]] of cases.entries())
+    fake.routes.set(`GET ${path}`, (request) =>
+      request.query.get("dateTime") === historical.dateTime
+        ? json(missingRate, 404)
+        : json({
+            ...responses[i],
+            metadata: { upstream: "노출하지 않을 확장 필드" },
+          }),
+    );
   try {
     await buildBundle(directory);
     // production origin은 유지하고 시험 프로세스에서만 HTTP 목적지를 바꾼다.
@@ -76,8 +89,23 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
       expect(body).toEqual({ result: responses[i].result, metadata: {} });
       expect(result.structuredContent).toEqual(body);
     }
+    await expectFailure(
+      client,
+      "TOSSINVEST_INVALID_INPUT",
+      "get_exchange_rate",
+      historical,
+    );
+    for (const dateTime of ["2026-03-25T09:30Z", "2026-03-25T09:30+09:00"])
+      expect(
+        (
+          await client.callTool({
+            name: "get_exchange_rate",
+            arguments: { ...cases[0][2], dateTime },
+          })
+        ).isError,
+      ).toBe(true);
     await client.close();
-    expect(fake.requests).toHaveLength(4);
+    expect(fake.requests).toHaveLength(5);
 
     // 한 프로세스의 줄 단위 trace를 직접 읽어 SDK가 감추는 stdout도 확인한다.
     const messages = [
@@ -108,6 +136,21 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
           arguments: { market: "KR", date: "2026-02-29" },
         },
       },
+      {
+        jsonrpc: "2.0",
+        id: 7,
+        method: "tools/call",
+        params: { name: "get_exchange_rate", arguments: historical },
+      },
+      ...["2026-03-25T09:30Z", "2026-03-25T09:30+09:00"].map((dateTime, i) => ({
+        jsonrpc: "2.0",
+        id: i + 8,
+        method: "tools/call",
+        params: {
+          name: "get_exchange_rate",
+          arguments: { ...cases[0][2], dateTime },
+        },
+      })),
     ];
     const child = Bun.spawn([process.execPath, "--preload", preload, bundle], {
       env: proxyFreeEnvironment({ ...process.env, ...credentials }),
@@ -121,7 +164,7 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
     const deadline = setTimeout(() => child.kill(), 10000);
     try {
       while (
-        ![1, 2, 3, 4, 5, 6].every((id) =>
+        ![1, 2, 3, 4, 5, 6, 7, 8, 9].every((id) =>
           trace
             .split("\n")
             .slice(0, -1)
@@ -154,15 +197,22 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 새 3 operation을 실
         });
       }
       expect(replies.find((r) => r.id === 6).result.isError).toBe(true);
+      const notFound = replies.find((r) => r.id === 7).result;
+      expect(notFound.isError).toBe(true);
+      expect(JSON.parse(notFound.content[0].text)).toEqual({
+        error: { code: "TOSSINVEST_INVALID_INPUT" },
+      });
+      for (const id of [8, 9])
+        expect(replies.find((r) => r.id === id).result.isError).toBe(true);
     } finally {
       clearTimeout(deadline);
       child.stdin.end();
       child.kill();
       await child.exited;
     }
-    expect(fake.requests).toHaveLength(8);
+    expect(fake.requests).toHaveLength(10);
     expect(fake.seen("GET").map((r) => r.path)).toEqual(
-      [...cases, ...cases].map(([path]) => path),
+      [...cases, cases[0], ...cases, cases[0]].map(([path]) => path),
     );
     for (const request of fake.seen("GET")) {
       expect(request.body).toBe("");

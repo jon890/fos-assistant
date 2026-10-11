@@ -14,7 +14,10 @@ export function registerMarketInfoTools(
     {
       baseCurrency: z.enum(["KRW", "USD"]),
       quoteCurrency: z.enum(["KRW", "USD"]),
-      dateTime: z.iso.datetime({ offset: true }).optional(),
+      dateTime: z.iso
+        .datetime({ offset: true })
+        .regex(/T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/)
+        .optional(),
     },
     { readOnlyHint: true },
     async ({ baseCurrency, quoteCurrency, dateTime }) => {
