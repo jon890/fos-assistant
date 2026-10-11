@@ -14,6 +14,7 @@ import com.bifos.assistant.hermes.SandboxAttachmentDirectory;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -108,7 +109,7 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
     }
 
 
-    private void support(HttpExchange exchange) throws java.io.IOException {
+    private void support(HttpExchange exchange) throws IOException {
         try {
             assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer " + token);
             JsonNode request = JSON.readTree(exchange.getRequestBody().readAllBytes());
@@ -131,12 +132,12 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
         } catch (Exception | AssertionError error) {
             callbackFailure.set(error);
             reply(exchange, 500, "{}");
-            throw new java.io.IOException(error);
+            throw new IOException(error);
         }
     }
 
 
-    private void plugin(HttpExchange exchange) throws java.io.IOException {
+    private void plugin(HttpExchange exchange) throws IOException {
         try {
             assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer " + token);
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -157,7 +158,7 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
             reply(exchange, signal != null && heldFailure.get() != 0 ? heldFailure.get() : response.statusCode(), response.body());
         } catch (Exception error) {
             reply(exchange, 500, "{}");
-            throw new java.io.IOException(error);
+            throw new IOException(error);
         }
     }
 
@@ -181,7 +182,7 @@ final class ConnectorBindingHttpFixture implements AutoCloseable {
     }
 
 
-    private static void reply(HttpExchange exchange, int status, String body) throws java.io.IOException {
+    private static void reply(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.sendResponseHeaders(status, bytes.length);
