@@ -52,6 +52,7 @@ class ValidatedPropertiesBindingTest {
     @DisplayName("설정 record 열넷은 빈으로 꺼낼 수 있고 프록시가 아닌 record 타입 그대로다")
     void beansAreBoundWithoutProxy() {
         for (Class<?> type : PROPERTIES_TYPES) {
+            assertThat(context.getBeansOfType(type)).hasSize(1);
             Object bean = context.getBean(type);
             assertThat(bean.getClass()).as("%s 의 빈 클래스", type.getSimpleName()).isEqualTo(type);
         }
