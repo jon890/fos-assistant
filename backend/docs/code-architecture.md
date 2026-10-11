@@ -61,6 +61,12 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 두 패키지가 서로를 import 하면 한쪽을 바꿀 때 다른 쪽의 타입을 함께 바꿔야 하기 때문이다.
 검사: `ArchitectureRules.ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP`, `ArchitectureRules.TOP_LEVEL_PACKAGES_FREE_OF_CYCLES`
 
+`AgentDelegationService`는 위임 권한과 깊이·한도 판정, 같은 호출의 재조회, 루트 잠금과 제출 마감 시각을 소유한다.
+같은 패키지의 package-private `DelegationRuns`가 실제 실행과 실행 중인 위임의 등록·조회·중지, 서버 전체 자리와 종료 사건 발행을 맡는다.
+공개 메서드와 생성자, 트랜잭션 경계는 서비스가 갖고, 서비스가 `BackgroundTasks`로 실행을 시작한다.
+실행 줄을 등록한 뒤 요청 스레드를 깨우며, 종료 때는 등록 해제, 루트 turn의 run 해제, 종료 표시, 자리 반환, 제출 대기 종료, 종료 사건 발행 순서를 지킨다.
+사용자 실행 한도 판정은 `DelegationRuns.isUserBusy` 하나를 서비스와 실행 경로가 함께 쓴다.
+
 **경로 변수와 요청 인자의 형식이 틀리면 어느 경로든 400 `VALIDATION_FAILED` 다.**
 처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
