@@ -27,6 +27,7 @@ class MemorySearchMysqlTest extends MemorySearchTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 
+
     @Test
     @DisplayName("검색 statement는 바깥 트랜잭션의 30초 제한과 분리해 2초에 지연을 중단하고 실패를 돌려준다")
     void cancelsDelayedSearchWithinItsOwnTimeout() {
@@ -37,13 +38,14 @@ class MemorySearchMysqlTest extends MemorySearchTest {
         outer.setTimeout(30);
         long started = System.nanoTime();
         assertThatThrownBy(() -> outer.execute(status -> memories.searchFor(USER, CORE, "합성", 10, null)))
-                .isInstanceOf(RuntimeException.class);
+            .isInstanceOf(RuntimeException.class);
         long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
         assertThat(elapsed).isBetween(800L, 4500L);
         assertProjectionAndTimeout();
         System.out.printf(
-                "memory-search timeoutMs=%d jdbcTimeoutSeconds=%d%n", elapsed, MemorySearchSqlProbe.timeout());
+            "memory-search timeoutMs=%d jdbcTimeoutSeconds=%d%n", elapsed, MemorySearchSqlProbe.timeout());
     }
+
 
     @Test
     @DisplayName("검색 SQL 오류를 빈 결과로 바꾸지 않는다")

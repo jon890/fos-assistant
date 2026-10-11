@@ -28,11 +28,13 @@ public final class MemoryQueries {
         return (root, query, builder) -> readable(root, builder, userId, groupId);
     }
 
+
     /** 목록 API 가 내는 항목이다. 볼 수 있는 항목 가운데 종류가 MEMORY 인 것이다. 문서는 문서 API 가 따로 낸다(ADR-057). */
     public static Specification<Memory> listedFor(Long userId, Long groupId) {
         return (root, query, builder) -> builder.and(
-                readable(root, builder, userId, groupId), builder.equal(root.get("entryType"), MemoryEntryType.MEMORY));
+            readable(root, builder, userId, groupId), builder.equal(root.get("entryType"), MemoryEntryType.MEMORY));
     }
+
 
     /**
      * 에이전트의 실행에 실을 수 있는 항목이다.
@@ -44,57 +46,60 @@ public final class MemoryQueries {
      * @param sensitiveCollections 그 가운데 민감 항목까지 받는 collection
      */
     public static Specification<Memory> injectable(
-            Long userId,
-            Long groupId,
-            MemoryRetrieval retrieval,
-            Set<String> collections,
-            Set<String> sensitiveCollections) {
+        Long userId,
+        Long groupId,
+        MemoryRetrieval retrieval,
+        Set<String> collections,
+        Set<String> sensitiveCollections) {
         return (root, query, builder) -> {
             Predicate selected = builder.and(
-                    readable(root, builder, userId, groupId),
-                    builder.equal(root.get("status"), MemoryStatus.ACCEPTED),
-                    builder.notEqual(root.get("entryType"), MemoryEntryType.SOURCE),
-                    builder.equal(root.get("retrieval"), retrieval));
+                readable(root, builder, userId, groupId),
+                builder.equal(root.get("status"), MemoryStatus.ACCEPTED),
+                builder.notEqual(root.get("entryType"), MemoryEntryType.SOURCE),
+                builder.equal(root.get("retrieval"), retrieval));
             if (collections == null) {
                 return selected;
             }
             Predicate normal = builder.equal(root.get("sensitivity"), MemorySensitivity.NORMAL);
             Predicate sensitivity = sensitiveCollections.isEmpty()
-                    ? normal
-                    : builder.or(normal, root.get("collection").in(sensitiveCollections));
+                ? normal
+                : builder.or(normal, root.get("collection").in(sensitiveCollections));
             return builder.and(selected, root.get("collection").in(collections), sensitivity);
         };
     }
 
+
     private static Predicate readable(Root<Memory> root, CriteriaBuilder builder, Long userId, Long groupId) {
         Predicate own = builder.and(
-                builder.equal(root.get("scope"), MemoryScope.USER), builder.equal(root.get("ownerUserId"), userId));
+            builder.equal(root.get("scope"), MemoryScope.USER), builder.equal(root.get("ownerUserId"), userId));
         if (groupId == null) {
             return own;
         }
         Predicate shared = builder.and(
-                builder.equal(root.get("scope"), MemoryScope.GROUP), builder.equal(root.get("groupId"), groupId));
+            builder.equal(root.get("scope"), MemoryScope.GROUP), builder.equal(root.get("groupId"), groupId));
         return builder.or(own, shared);
     }
 
+
     /** 현재 실행이 읽을 수 있는 SEARCH 항목의 제목만 찾는다. LIKE의 특수 문자는 글자로 다룬다. */
     public static Specification<Memory> searchFor(
-            Long userId,
-            Long groupId,
-            Set<String> collections,
-            Set<String> sensitiveCollections,
-            String text,
-            Long afterId) {
+        Long userId,
+        Long groupId,
+        Set<String> collections,
+        Set<String> sensitiveCollections,
+        String text,
+        Long afterId) {
         String pattern = "%"
-                + text.strip()
-                        .toLowerCase(Locale.ROOT)
-                        .replace("\\", "\\\\")
-                        .replace("%", "\\%")
-                        .replace("_", "\\_") + "%";
+            + text.strip()
+                .toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            + "%";
         Specification<Memory> title = (root, query, builder) -> builder.and(
-                builder.like(builder.lower(root.get("title")), pattern, '\\'),
-                afterId == null ? builder.conjunction() : builder.greaterThan(root.get("id"), afterId));
+            builder.like(builder.lower(root.get("title")), pattern, '\\'),
+            afterId == null ? builder.conjunction() : builder.greaterThan(root.get("id"), afterId));
         return injectable(userId, groupId, MemoryRetrieval.SEARCH, collections, sensitiveCollections)
-                .and(title);
+            .and(title);
     }
 }

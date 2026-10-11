@@ -106,46 +106,48 @@ class McpMemorySearchToolTest {
     private String root;
     private AgentExecution run;
 
+
     @BeforeEach
     void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         repository.deleteAll();
         AppUser owner = users.save(AppUser.of(
-                "search-" + UUID.randomUUID() + "@example.test", "검색 검사", 10L, UserRole.ADMIN, Instant.now()));
+            "search-" + UUID.randomUUID() + "@example.test", "검색 검사", 10L, UserRole.ADMIN, Instant.now()));
         user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         token = tokens.issue(PROFILE, "합성 검사").rawToken();
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, user.id(), 1L, PROFILE, root);
         grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
         mvc = MockMvcBuilders.webAppContextSetup(context)
-                .apply(springSecurity())
-                .build();
+            .apply(springSecurity())
+            .build();
     }
+
 
     @Test
     @DisplayName("작은 조립 예산으로 빠진 항목을 검색한 뒤 읽어야 MEMORY_READ 한 줄을 남긴다")
     void discoversActuallyOmittedItemAndRecordsOnlySuccessfulRead() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         ContextAssembler small = new ContextAssembler(
-                memories, new ContextProperties(32, 4, null, null, Map.of(), 0, 200), Clock.systemUTC());
+            memories, new ContextProperties(32, 4, null, null, Map.of(), 0, 200), Clock.systemUTC());
         AssembledContext assembled = small.assemble(user, run.agentId());
         assertThat(assembled.omittedMemoryIds()).containsExactly(memory.id());
         assertThat(assembled.bundle().items())
-                .filteredOn(item -> item.ref().equals("memory:" + memory.id()))
-                .extracting(item -> item.bodyMode())
-                .containsExactly(ContextBodyMode.OMITTED);
+            .filteredOn(item -> item.ref().equals("memory:" + memory.id()))
+            .extracting(item -> item.bodyMode())
+            .containsExactly(ContextBodyMode.OMITTED);
         assertThat(assembled.instructions()).isNull();
         sourceWriter.write(
-                run.id(),
-                assembled.bundle().items().stream()
-                        .map(item -> new ContextSourceRef(
-                                item.source().name(),
-                                item.ref(),
-                                item.bodyMode().name(),
-                                item.freshness().name()))
-                        .toList());
+            run.id(),
+            assembled.bundle().items().stream()
+                .map(item -> new ContextSourceRef(
+                    item.source().name(),
+                    item.ref(),
+                    item.bodyMode().name(),
+                    item.freshness().name()))
+                .toList());
 
-        Logger logger = (Logger) LoggerFactory.getLogger(McpToolService.class);
+        Logger logger = (Logger)LoggerFactory.getLogger(McpToolService.class);
         ListAppender<ILoggingEvent> logs = new ListAppender<>();
         logs.start();
         logger.addAppender(logs);
@@ -160,40 +162,40 @@ class McpMemorySearchToolTest {
             assertThat(data.path("nextAfterId").isNull()).isTrue();
             assertThat(response.toString()).doesNotContain(BODY, "ownerUserId", "contentKeyId");
             assertThat(sources.findByIdExecutionIdOrderByIdPositionAsc(run.id()))
-                    .extracting(ExecutionContextSource::source)
-                    .doesNotContain("MEMORY_READ");
-            JsonNode read =
-                    call("memory_read", arguments().put("id", item.path("id").asLong()));
+                .extracting(ExecutionContextSource::source)
+                .doesNotContain("MEMORY_READ");
+            JsonNode read = call("memory_read", arguments().put("id", item.path("id").asLong()));
             assertThat(text(read)).isEqualTo(BODY);
             assertThat(sources.findByIdExecutionIdOrderByIdPositionAsc(run.id()))
-                    .filteredOn(source -> "MEMORY_READ".equals(source.source()))
-                    .extracting(ExecutionContextSource::sourceRef)
-                    .containsExactly("memory:" + memory.id());
+                .filteredOn(source -> "MEMORY_READ".equals(source.source()))
+                .extracting(ExecutionContextSource::sourceRef)
+                .containsExactly("memory:" + memory.id());
             assertThat(logs.list)
-                    .extracting(ILoggingEvent::getFormattedMessage)
-                    .allSatisfy(message -> assertThat(message).doesNotContain(QUERY, TITLE, BODY));
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .allSatisfy(message -> assertThat(message).doesNotContain(QUERY, TITLE, BODY));
         } finally {
             logger.detachAppender(logs);
             logs.stop();
         }
     }
 
+
     @Test
     @DisplayName("검색 뒤에도 권한 철회 거절 삭제를 검사하고 판이 바뀌면 최신 본문을 읽는다")
     void rechecksReadPermissionsAndReturnsCurrentRevision() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
-                        .path("items"))
+            .path("items"))
                 .hasSize(1);
         memories.update(user, memory.id(), "바뀐 본문", false);
         JsonNode latest = searchData(call("memory_search", arguments().put("query", QUERY)));
         assertThat(latest.path("items").get(0).path("revision").asInt()).isEqualTo(2);
         assertThat(text(call("memory_read", arguments().put("id", memory.id()))))
-                .isEqualTo("바뀐 본문");
+            .isEqualTo("바뀐 본문");
         jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", run.agentId());
         assertUnavailable(memory.id());
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
-                        .path("items"))
+            .path("items"))
                 .isEmpty();
         grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
         jdbc.update("UPDATE memory SET status = 'REJECTED' WHERE id = ?", memory.id());
@@ -202,9 +204,10 @@ class McpMemorySearchToolTest {
         repository.deleteById(memory.id());
         assertUnavailable(memory.id());
         assertThat(sources.findByIdExecutionIdOrderByIdPositionAsc(run.id()))
-                .filteredOn(source -> "MEMORY_READ".equals(source.source()))
-                .hasSize(1);
+            .filteredOn(source -> "MEMORY_READ".equals(source.source()))
+            .hasSize(1);
     }
+
 
     @Test
     @DisplayName("등록한 native 자식은 origin의 권한을 쓰며 서명 오류 다른 profile 취소된 루트는 제목도 받지 못한다")
@@ -215,7 +218,7 @@ class McpMemorySearchToolTest {
         ObjectNode value = arguments().put("query", QUERY);
         value.set("_fos_ctx", McpCallSigner.context(token, "memory_search", root, child, "call_" + UUID.randomUUID()));
         assertThat(searchData(send("memory_search", value, token)).path("items"))
-                .hasSize(1);
+            .hasSize(1);
         ObjectNode invalid = arguments().put("query", QUERY);
         invalid.set("_fos_ctx", McpCallSigner.context(token, "memory_read", root));
         assertInvalid(send("memory_search", invalid, token));
@@ -226,49 +229,49 @@ class McpMemorySearchToolTest {
         assertInvalid(send("memory_search", mismatched, other));
         ObjectNode unregistered = arguments().put("query", QUERY);
         unregistered.set(
-                "_fos_ctx", McpCallSigner.context(token, "memory_search", root, "missing-child", "missing-call"));
+            "_fos_ctx", McpCallSigner.context(token, "memory_search", root, "missing-child", "missing-call"));
         assertInvalid(send("memory_search", unregistered, token));
         jdbc.update("UPDATE agent_execution SET status = 'CANCELLED' WHERE id = ?", run.id());
         assertInvalid(send("memory_search", value, token));
         assertInvalid(call("memory_search", arguments().put("query", QUERY)));
     }
 
+
     @Test
     @DisplayName("형식 길이 범위와 모르는 키는 MCP의 인자 오류이며 페이지 끝 번호는 null이다")
     void rejectsInvalidArgumentsAndSerializesLastPage() throws Exception {
         List<ObjectNode> invalid = List.of(
-                arguments(),
-                arguments().putNull("query"),
-                arguments().put("query", true),
-                arguments().put("query", "  "),
-                arguments().put("query", "가".repeat(201)),
-                arguments().put("query", QUERY).put("limit", 0),
-                arguments().put("query", QUERY).put("limit", 51),
-                arguments().put("query", QUERY).put("limit", 1.5),
-                arguments().put("query", QUERY).putNull("limit"),
-                arguments().put("query", QUERY).put("limit", "10"),
-                arguments().put("query", QUERY).put("after_id", 0),
-                arguments().put("query", QUERY).put("after_id", -1),
-                arguments().put("query", QUERY).put("after_id", 1.5),
-                arguments().put("query", QUERY).putNull("after_id"),
-                arguments().put("query", QUERY).put("user_id", user.id()),
-                arguments().put("query", QUERY).put("profile", PROFILE),
-                arguments().put("query", QUERY).put("collection", "career"));
+            arguments(),
+            arguments().putNull("query"),
+            arguments().put("query", true),
+            arguments().put("query", "  "),
+            arguments().put("query", "가".repeat(201)),
+            arguments().put("query", QUERY).put("limit", 0),
+            arguments().put("query", QUERY).put("limit", 51),
+            arguments().put("query", QUERY).put("limit", 1.5),
+            arguments().put("query", QUERY).putNull("limit"),
+            arguments().put("query", QUERY).put("limit", "10"),
+            arguments().put("query", QUERY).put("after_id", 0),
+            arguments().put("query", QUERY).put("after_id", -1),
+            arguments().put("query", QUERY).put("after_id", 1.5),
+            arguments().put("query", QUERY).putNull("after_id"),
+            arguments().put("query", QUERY).put("user_id", user.id()),
+            arguments().put("query", QUERY).put("profile", PROFILE),
+            arguments().put("query", QUERY).put("collection", "career"));
         for (ObjectNode value : invalid) {
             assertThat(call("memory_search", value).path("error").path("code").asInt())
-                    .isEqualTo(-32602);
+                .isEqualTo(-32602);
         }
         ObjectNode oversized = arguments().put("query", QUERY);
         oversized.set("after_id", json.readTree("9223372036854775808"));
         assertThat(call("memory_search", oversized).path("error").path("code").asInt())
-                .isEqualTo(-32602);
+            .isEqualTo(-32602);
         Memory first = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         Memory second = memories.create(user, MemoryScope.USER, TITLE + " 둘", BODY, false);
-        JsonNode page =
-                searchData(call("memory_search", arguments().put("query", QUERY).put("limit", 1)));
+        JsonNode page = searchData(call("memory_search", arguments().put("query", QUERY).put("limit", 1)));
         assertThat(page.path("nextAfterId").asLong()).isEqualTo(first.id());
         JsonNode last = searchData(call(
-                "memory_search", arguments().put("query", QUERY).put("limit", 1).put("after_id", first.id())));
+            "memory_search", arguments().put("query", QUERY).put("limit", 1).put("after_id", first.id())));
         assertThat(last.path("items").get(0).path("id").asLong()).isEqualTo(second.id());
         assertThat(last.path("nextAfterId").isNull()).isTrue();
         JsonNode empty = searchData(call("memory_search", arguments().put("query", "없는 제목")));
@@ -276,57 +279,64 @@ class McpMemorySearchToolTest {
         assertThat(empty.path("nextAfterId").isNull()).isTrue();
     }
 
+
     private void assertUnavailable(Long id) throws Exception {
         JsonNode response = call("memory_read", arguments().put("id", id));
         assertThat(response.path("result").path("isError").asBoolean()).isTrue();
         assertThat(text(response)).isEqualTo("Memory 항목을 읽을 수 없습니다.");
     }
 
+
     private void assertInvalid(JsonNode response) {
         assertThat(response.path("result")).isEqualTo(json.valueToTree(tools.invalidContext()));
         assertThat(response.toString()).doesNotContain(QUERY, TITLE, BODY);
     }
 
+
     private ObjectNode arguments() {
         return json.createObjectNode();
     }
+
 
     private JsonNode call(String name, ObjectNode arguments) throws Exception {
         arguments.set("_fos_ctx", McpCallSigner.context(token, name, root));
         return send(name, arguments, token);
     }
 
+
     private JsonNode send(String name, ObjectNode arguments, String rawToken) throws Exception {
         String request = json.writeValueAsString(Map.of(
-                "jsonrpc",
-                "2.0",
-                "id",
-                1,
-                "method",
-                "tools/call",
-                "params",
-                Map.of("name", name, "arguments", arguments)));
+            "jsonrpc",
+            "2.0",
+            "id",
+            1,
+            "method",
+            "tools/call",
+            "params",
+            Map.of("name", name, "arguments", arguments)));
         return json.readTree(mvc.perform(post("/mcp")
-                        .servletPath("/mcp")
-                        .header("Authorization", "Bearer " + rawToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(request))
-                .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString());
+            .servletPath("/mcp")
+            .header("Authorization", "Bearer " + rawToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(request))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString());
     }
+
 
     private static String text(JsonNode response) {
         return response.path("result").path("content").get(0).path("text").asString();
     }
+
 
     private JsonNode searchData(JsonNode response) {
         assertThat(response.path("result").path("isError").asBoolean()).isFalse();
         String text = text(response);
         assertThat(text).contains("<external-data>\n").endsWith("\n</external-data>");
         return json.readTree(text.substring(
-                text.indexOf("<external-data>\n") + "<external-data>\n".length(),
-                text.lastIndexOf("\n</external-data>")));
+            text.indexOf("<external-data>\n") + "<external-data>\n".length(),
+            text.lastIndexOf("\n</external-data>")));
     }
 }

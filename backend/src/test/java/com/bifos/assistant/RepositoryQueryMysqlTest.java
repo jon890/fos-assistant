@@ -66,6 +66,7 @@ class RepositoryQueryMysqlTest {
 
     private RepositoryQuerySweep.Result result;
 
+
     @DynamicPropertySource
     static void useMysql(DynamicPropertyRegistry registry) {
         MysqlTestDatabase database = MysqlTestDatabase.create();
@@ -77,80 +78,85 @@ class RepositoryQueryMysqlTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 
+
     @BeforeAll
     void runEveryRepositoryMethod() {
         result = new RepositoryQuerySweep(context, transactionManager).run(EXCLUDED);
     }
 
+
     @Test
     @DisplayName("모든 저장소 메서드가 실제 MySQL 에서 실행된다")
     void executesEveryRepositoryMethod() {
         List<String> failures = result.failures().stream()
-                .map(failure ->
-                        failure.method() + ": " + rootCause(failure.cause()).getMessage())
-                .toList();
+            .map(failure -> failure.method() + ": " + rootCause(failure.cause()).getMessage())
+            .toList();
 
         assertThat(failures).as("실제 MySQL 에서 실패한 저장소 메서드").isEmpty();
     }
+
 
     @Test
     @DisplayName("실행하지 못한 메서드가 없다")
     void leavesNoMethodUnexecuted() {
         assertThat(result.unsupported())
-                .as("인자를 만들지 못한 메서드. RepositoryQuerySweep 에 그 타입의 값을 더한다")
-                .isEmpty();
+            .as("인자를 만들지 못한 메서드. RepositoryQuerySweep 에 그 타입의 값을 더한다")
+            .isEmpty();
         assertThat(result.staleExclusions()).as("제외 목록에 있는데 저장소에 없는 메서드").isEmpty();
     }
+
 
     @Test
     @DisplayName("저장소를 빠뜨리지 않았다")
     void findsEveryRepository() {
         Set<String> expected = context.getBeansOfType(Repository.class).values().stream()
-                .flatMap(bean -> Arrays.stream(bean.getClass().getInterfaces()))
-                .filter(type -> Repository.class.isAssignableFrom(type)
-                        && type.getPackageName().startsWith(BASE_PACKAGE))
-                .map(Class::getSimpleName)
-                .collect(Collectors.toSet());
+            .flatMap(bean -> Arrays.stream(bean.getClass().getInterfaces()))
+            .filter(type -> Repository.class.isAssignableFrom(type)
+                && type.getPackageName().startsWith(BASE_PACKAGE))
+            .map(Class::getSimpleName)
+            .collect(Collectors.toSet());
 
         assertThat(expected).as("문맥에서 찾은 저장소 빈").isNotEmpty();
         assertThat(result.repositories()).containsExactlyInAnyOrderElementsOf(expected);
         assertThat(result.executed()).contains("ExecutionEventRepository.findUnscheduledChildren");
         assertThat(result.repositories()).contains("MediaObservationRepository", "MediaObservationRequestRepository");
         assertThat(result.executed())
-                .contains(
-                        "MediaObservationRepository.findFirstByAttachmentIdOrderByRevisionDesc",
-                        "MediaObservationRepository.deleteForAttachment",
-                        "MediaObservationRepository.deleteForConversation",
-                        "MediaObservationRepository.findCleanupCandidates",
-                        "MediaObservationRequestRepository.findByAttachmentIdAndRequestId");
+            .contains(
+                "MediaObservationRepository.findFirstByAttachmentIdOrderByRevisionDesc",
+                "MediaObservationRepository.deleteForAttachment",
+                "MediaObservationRepository.deleteForConversation",
+                "MediaObservationRepository.findCleanupCandidates",
+                "MediaObservationRequestRepository.findByAttachmentIdAndRequestId");
     }
+
 
     @Test
     @DisplayName("MemoryQueries 의 조건이 실제 MySQL 에서 실행된다")
     void executesMemorySpecifications() {
         MemoryRetrieval retrieval = MemoryRetrieval.values()[0];
         List<Specification<Memory>> specifications = List.of(
-                MemoryQueries.readableBy(1L, 1L),
-                MemoryQueries.readableBy(1L, null),
-                MemoryQueries.listedFor(1L, 1L),
-                MemoryQueries.injectable(1L, 1L, retrieval, null, Set.of()),
-                MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core"), Set.of()),
-                MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core"), Set.of("core")));
+            MemoryQueries.readableBy(1L, 1L),
+            MemoryQueries.readableBy(1L, null),
+            MemoryQueries.listedFor(1L, 1L),
+            MemoryQueries.injectable(1L, 1L, retrieval, null, Set.of()),
+            MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core"), Set.of()),
+            MemoryQueries.injectable(1L, 1L, retrieval, Set.of("core"), Set.of("core")));
 
         for (int i = 0; i < specifications.size(); i++) {
             Specification<Memory> specification = specifications.get(i);
             assertThatCode(() -> memoryRepository.findAll(specification))
-                    .as("%d번째 조건", i + 1)
-                    .doesNotThrowAnyException();
+                .as("%d번째 조건", i + 1)
+                .doesNotThrowAnyException();
         }
         assertThatCode(() -> memoryRepository.findBy(
-                        MemoryQueries.searchFor(1L, 1L, Set.of("core"), Set.of(), "%_\\", 1L),
-                        query -> query.as(MemorySearchItem.class)
-                                .sortBy(Sort.by("id"))
-                                .limit(11)
-                                .all()))
-                .doesNotThrowAnyException();
+            MemoryQueries.searchFor(1L, 1L, Set.of("core"), Set.of(), "%_\\", 1L),
+            query -> query.as(MemorySearchItem.class)
+                .sortBy(Sort.by("id"))
+                .limit(11)
+                .all()))
+                    .doesNotThrowAnyException();
     }
+
 
     private static Throwable rootCause(Throwable throwable) {
         Throwable current = throwable;
@@ -166,6 +172,7 @@ class RepositoryQueryMysqlTest {
 class AttachmentDeletionBarrierMysqlTest extends AttachmentDeletionBarrierTest {
     private static Path testFiles;
 
+
     @DynamicPropertySource
     static void useMysql(DynamicPropertyRegistry registry) throws IOException {
         testFiles = Files.createTempDirectory("attachment-deletion-barrier-");
@@ -178,6 +185,7 @@ class AttachmentDeletionBarrierMysqlTest extends AttachmentDeletionBarrierTest {
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
+
 
     @AfterAll
     static void removeRoot() throws IOException {

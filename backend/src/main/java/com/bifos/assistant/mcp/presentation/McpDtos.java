@@ -7,7 +7,8 @@ import tools.jackson.databind.JsonNode;
 /** MCP 도구가 받는 JSON 인자 모양과 하위 에이전트 session 등록의 응답 모양을 한곳에 둔다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpDtos {
-    public record MemoryReadArguments(Long id) {}
+    public record MemoryReadArguments(Long id) {
+    }
 
     /** 검색어를 로그에 남기지 않는 제목 검색 인자다. */
     public record MemorySearchArguments(String query, int limit, Long afterId) {
@@ -15,10 +16,11 @@ public final class McpDtos {
             JsonNode limit = arguments.get("limit");
             JsonNode after = arguments.get("after_id");
             return new MemorySearchArguments(
-                    arguments.get("query").asString().strip(),
-                    limit == null ? 10 : limit.intValue(),
-                    after == null ? null : after.longValue());
+                arguments.get("query").asString().strip(),
+                limit == null ? 10 : limit.intValue(),
+                after == null ? null : after.longValue());
         }
+
 
         @Override
         public String toString() {
@@ -30,11 +32,12 @@ public final class McpDtos {
         /** JSON의 snake_case 이름을 Java record의 이름으로 바꾼다. */
         static ArtifactWriteArguments from(JsonNode arguments) {
             return new ArtifactWriteArguments(
-                    arguments.get("conversation_id").asString(),
-                    arguments.get("path").asString(),
-                    optional(arguments, "content"),
-                    optional(arguments, "source_url"));
+                arguments.get("conversation_id").asString(),
+                arguments.get("path").asString(),
+                optional(arguments, "content"),
+                optional(arguments, "source_url"));
         }
+
 
         private static String optional(JsonNode arguments, String name) {
             JsonNode value = arguments.get(name);
@@ -54,10 +57,11 @@ public final class McpDtos {
             JsonNode dueAt = arguments.get("due_at");
             JsonNode waiting = arguments.get("waiting");
             return new FollowUpProposeArguments(
-                    arguments.get("title").asString(),
-                    dueAt == null || dueAt.isNull() ? null : dueAt.asString(),
-                    waiting == null || waiting.isNull() ? null : waiting.booleanValue());
+                arguments.get("title").asString(),
+                dueAt == null || dueAt.isNull() ? null : dueAt.asString(),
+                waiting == null || waiting.isNull() ? null : waiting.booleanValue());
         }
+
 
         /** 제목을 빼고 낸다. 제목을 로그에 남기지 않는다. */
         @Override
@@ -75,33 +79,36 @@ public final class McpDtos {
      * @param sensitive 민감한 내용인가. 없거나 {@code null} 이면 null
      */
     public record MemoryRememberArguments(
-            String title, String content, String evidence, Long memoryId, String collection, Boolean sensitive) {
+        String title, String content, String evidence, Long memoryId, String collection, Boolean sensitive) {
         /** JSON 의 snake_case 이름을 Java record 의 이름으로 바꾼다. {@code null} 값은 없는 것으로 본다. */
         static MemoryRememberArguments from(JsonNode arguments) {
             JsonNode memoryId = arguments.get("memory_id");
             JsonNode sensitive = arguments.get("sensitive");
             return new MemoryRememberArguments(
-                    arguments.get("title").asString(),
-                    arguments.get("content").asString(),
-                    optionalText(arguments, "evidence"),
-                    memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
-                    optionalText(arguments, "collection"),
-                    sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue());
+                arguments.get("title").asString(),
+                arguments.get("content").asString(),
+                optionalText(arguments, "evidence"),
+                memoryId == null || memoryId.isNull() ? null : memoryId.longValue(),
+                optionalText(arguments, "collection"),
+                sensitive == null || sensitive.isNull() ? null : sensitive.booleanValue());
         }
+
 
         private static String optionalText(JsonNode arguments, String name) {
             JsonNode value = arguments.get(name);
             return value == null || value.isNull() ? null : value.asString();
         }
 
+
         /** 제목, 본문, 근거를 빼고 낸다. 로그에 남기지 않는다. */
         @Override
         public String toString() {
             return "MemoryRememberArguments[memoryId=" + memoryId + ", collection=" + collection + ", sensitive="
-                    + sensitive + "]";
+                + sensitive + "]";
         }
     }
 
     /** 하위 에이전트 session 등록의 응답이다. {@code created} 나 {@code exists} 다. */
-    public record SubagentRegistrationResponse(String result) {}
+    public record SubagentRegistrationResponse(String result) {
+    }
 }

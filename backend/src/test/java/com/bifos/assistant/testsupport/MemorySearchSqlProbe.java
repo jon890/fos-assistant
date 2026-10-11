@@ -27,41 +27,51 @@ public class MemorySearchSqlProbe implements StatementInspector {
     private boolean delay;
     private boolean invalid;
 
+
     private static MemorySearchSqlProbe state() {
         return CURRENT.get();
     }
+
 
     public static void reset() {
         CURRENT.remove();
     }
 
+
     public static void capture() {
         state().capture = true;
     }
+
 
     public static void delay() {
         state().delay = true;
     }
 
+
     public static void invalidate() {
         state().invalid = true;
     }
+
 
     private static boolean enabled() {
         return state().capture;
     }
 
+
     public static List<String> selects() {
         return List.copyOf(state().selects);
     }
+
 
     public static int timeout() {
         return state().timeout;
     }
 
+
     public static boolean readOnly() {
         return state().readOnly;
     }
+
 
     @Override
     public String inspect(String sql) {
@@ -75,6 +85,7 @@ public class MemorySearchSqlProbe implements StatementInspector {
         }
         return state().invalid ? sql.replace(".title", ".nonexistent_search_column") : sql;
     }
+
 
     static BeanPostProcessor observeStatements() {
         return new BeanPostProcessor() {
@@ -90,6 +101,7 @@ public class MemorySearchSqlProbe implements StatementInspector {
                         return enabled() ? wrapConnection(connection) : connection;
                     }
 
+
                     @Override
                     public Connection getConnection(String username, String password) throws SQLException {
                         Connection connection = super.getConnection(username, password);
@@ -100,24 +112,26 @@ public class MemorySearchSqlProbe implements StatementInspector {
         };
     }
 
+
     private static Connection wrapConnection(Connection delegate) {
-        return (Connection) Proxy.newProxyInstance(
-                Connection.class.getClassLoader(), new Class<?>[] {Connection.class}, (proxy, method, args) -> {
-                    Object value = invoke(delegate, method, args);
-                    if (value instanceof PreparedStatement statement && "prepareStatement".equals(method.getName())) {
-                        return Proxy.newProxyInstance(
-                                PreparedStatement.class.getClassLoader(),
-                                new Class<?>[] {PreparedStatement.class},
-                                (statementProxy, statementMethod, statementArgs) -> {
-                                    if ("executeQuery".equals(statementMethod.getName()) && enabled()) {
-                                        state().timeout = statement.getQueryTimeout();
-                                    }
-                                    return invoke(statement, statementMethod, statementArgs);
-                                });
-                    }
-                    return value;
-                });
+        return (Connection)Proxy.newProxyInstance(
+            Connection.class.getClassLoader(), new Class<?>[] {Connection.class}, (proxy, method, args) -> {
+                Object value = invoke(delegate, method, args);
+                if (value instanceof PreparedStatement statement && "prepareStatement".equals(method.getName())) {
+                    return Proxy.newProxyInstance(
+                        PreparedStatement.class.getClassLoader(),
+                        new Class<?>[] {PreparedStatement.class},
+                        (statementProxy, statementMethod, statementArgs) -> {
+                            if ("executeQuery".equals(statementMethod.getName()) && enabled()) {
+                                state().timeout = statement.getQueryTimeout();
+                            }
+                            return invoke(statement, statementMethod, statementArgs);
+                        });
+                }
+                return value;
+            });
     }
+
 
     private static Object invoke(Object target, Method method, Object[] args) throws Throwable {
         try {

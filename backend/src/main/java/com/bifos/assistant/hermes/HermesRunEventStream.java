@@ -55,14 +55,16 @@ public class HermesRunEventStream {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+
     public HermesRunEventStream(
-            HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper) {
+        HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper) {
         this(keyStore, properties, objectMapper, Clock.systemUTC());
     }
 
+
     @Autowired
     public HermesRunEventStream(
-            HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper, Clock clock) {
+        HermesProfileKeyStore keyStore, HermesProperties properties, ObjectMapper objectMapper, Clock clock) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.runTimeout());
@@ -72,35 +74,39 @@ public class HermesRunEventStream {
         this.clock = clock;
     }
 
+
     public void open(String apiBaseUrl, String profileName, String runId, Consumer<RunEvent> onEvent) {
-        open(apiBaseUrl, profileName, runId, onEvent, stream -> {});
+        open(apiBaseUrl, profileName, runId, onEvent, stream -> {
+        });
     }
 
+
     public void open(
-            String apiBaseUrl,
-            String profileName,
-            String runId,
-            Consumer<RunEvent> onEvent,
-            Consumer<Closeable> onOpened) {
+        String apiBaseUrl,
+        String profileName,
+        String runId,
+        Consumer<RunEvent> onEvent,
+        Consumer<Closeable> onOpened) {
         open(apiBaseUrl, profileName, runId, onEvent, onOpened, ToolDetailScope.NONE);
     }
 
+
     /** @param scope 내용을 통째로 가릴 도구의 범위. 비밀값과 식별자는 범위와 관계없이 가린다 */
     public void open(
-            String apiBaseUrl,
-            String profileName,
-            String runId,
-            Consumer<RunEvent> onEvent,
-            Consumer<Closeable> onOpened,
-            ToolDetailScope scope) {
+        String apiBaseUrl,
+        String profileName,
+        String runId,
+        Consumer<RunEvent> onEvent,
+        Consumer<Closeable> onOpened,
+        ToolDetailScope scope) {
         String apiKey = keyStore.resolve(profileName);
         try (InputStream body = restClient
-                .get()
-                .uri(apiBaseUrl + "/v1/runs/{runId}/events", runId)
-                .header("Authorization", "Bearer " + apiKey)
-                .accept(MediaType.TEXT_EVENT_STREAM)
-                .retrieve()
-                .body(InputStream.class)) {
+            .get()
+            .uri(apiBaseUrl + "/v1/runs/{runId}/events", runId)
+            .header("Authorization", "Bearer " + apiKey)
+            .accept(MediaType.TEXT_EVENT_STREAM)
+            .retrieve()
+            .body(InputStream.class)) {
             if (body == null) {
                 throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an empty event stream");
             }
@@ -112,6 +118,7 @@ public class HermesRunEventStream {
             throw new ApiException(ErrorCode.HERMES_UNAVAILABLE, "could not read the Hermes event stream", ex);
         }
     }
+
 
     private void readEvents(InputStream body, Consumer<RunEvent> onEvent, ToolDetailScope scope) throws IOException {
         DetailState state = new DetailState(clock);
@@ -137,8 +144,9 @@ public class HermesRunEventStream {
         }
     }
 
+
     private void emit(StringBuilder data, Consumer<RunEvent> onEvent, ToolDetailScope scope, DetailState state)
-            throws IOException {
+        throws IOException {
         if (data.isEmpty()) {
             return;
         }
@@ -151,6 +159,7 @@ public class HermesRunEventStream {
         }
     }
 
+
     /**
      * 사건 하나의 JSON 을 {@link RunEvent} 로 옮긴다.
      *
@@ -161,9 +170,11 @@ public class HermesRunEventStream {
         return toRunEvent(root, ToolDetailScope.NONE);
     }
 
+
     static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope) {
         return toRunEvent(root, scope, new DetailState(Clock.systemUTC()));
     }
+
 
     private static RunEvent toRunEvent(JsonNode root, ToolDetailScope scope, DetailState state) {
         JsonNode payload = root.path("data");
@@ -173,16 +184,15 @@ public class HermesRunEventStream {
         boolean memorySearch = toolName != null && toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX);
         boolean toolEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("tool.");
         boolean subagentEvent = type != null && type.toLowerCase(Locale.ROOT).startsWith("subagent.");
-        boolean afterConnector =
-                (toolEvent || subagentEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
+        boolean afterConnector = (toolEvent || subagentEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
         if (memoryReadResult(type, toolName)) {
             // 결과에 Memory 본문이 실린다. 인자를 담은 tool.started 의 preview 만 실행 사건에 남긴다(ADR-071)
             detail = null;
         }
         if (toolName != null
-                && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)
-                        || toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX)
-                        || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX))) {
+            && (toolName.endsWith(FOLLOW_UP_PROPOSE_TOOL_SUFFIX)
+                || toolName.endsWith(MEMORY_SEARCH_TOOL_SUFFIX)
+                || toolName.endsWith(MEMORY_REMEMBER_TOOL_SUFFIX))) {
             // 시작의 preview 에 할 일 제목이나 기억할 사실이 실린다. 관리자가 실행 기록에서 남의 글을 읽지 못하게
             // 시작과 끝 모두 남기지 않는다
             detail = null;
@@ -191,9 +201,9 @@ public class HermesRunEventStream {
         if (toolEvent) {
             // 긴 스킬 이름은 token 으로 보여 가려진다. 스킬 사용 기록에 넘길 이름은 가리기 전에 꺼내 검증한다.
             if (!scope.hideAll()
-                    && !afterConnector
-                    && SKILL_VIEW_STARTED.equalsIgnoreCase(type)
-                    && SKILL_VIEW_TOOL.equals(toolName)) {
+                && !afterConnector
+                && SKILL_VIEW_STARTED.equalsIgnoreCase(type)
+                && SKILL_VIEW_TOOL.equals(toolName)) {
                 skillName = HermesSkillName.fromPreview(detail);
             }
             detail = ToolDetailRedactor.redact(detail, toolName, scope, state.identifiers, afterConnector);
@@ -206,21 +216,22 @@ public class HermesRunEventStream {
             detail = ToolDetailRedactor.redact(detail, null, scope, state.identifiers, afterConnector);
         }
         return new RunEvent(
-                type,
-                memorySearch ? null : firstText(root, payload, "delta", "text", "output"),
-                toolName,
-                detail,
-                durationMs(root, payload),
-                failed(root, payload),
-                firstText(root, payload, "subagent_id"),
-                goal,
-                firstText(root, payload, "model"),
-                firstText(root, payload, "child_session_id"),
-                firstNumber(root, payload, "input_tokens"),
-                firstNumber(root, payload, "output_tokens"),
-                firstText(root, payload, "status"),
-                skillName);
+            type,
+            memorySearch ? null : firstText(root, payload, "delta", "text", "output"),
+            toolName,
+            detail,
+            durationMs(root, payload),
+            failed(root, payload),
+            firstText(root, payload, "subagent_id"),
+            goal,
+            firstText(root, payload, "model"),
+            firstText(root, payload, "child_session_id"),
+            firstNumber(root, payload, "input_tokens"),
+            firstNumber(root, payload, "output_tokens"),
+            firstText(root, payload, "status"),
+            skillName);
     }
+
 
     /** 번호표와 커넥터 호출 여부는 스트림마다 따로 둔다. 다른 트리로 이어지지 않는다. */
     private static final class DetailState {
@@ -228,9 +239,11 @@ public class HermesRunEventStream {
         private final Clock clock;
         private boolean connectorCalled;
 
+
         private DetailState(Clock clock) {
             this.clock = clock;
         }
+
 
         boolean afterConnector(ToolDetailScope scope, String toolName, JsonNode root, JsonNode payload) {
             if (scope.hides(toolName)) {
@@ -242,20 +255,22 @@ public class HermesRunEventStream {
                     timestamp = number(payload, "timestamp");
                 }
                 Instant at = timestamp == null
-                        ? clock.instant()
-                        : Instant.ofEpochMilli((long) Math.ceil(timestamp.asDouble() * 1000));
+                    ? clock.instant()
+                    : Instant.ofEpochMilli((long)Math.ceil(timestamp.asDouble() * 1000));
                 connectorCalled = scope.connectorCalledInTree().test(at);
             }
             return connectorCalled;
         }
     }
 
+
     /** {@code memory_read} 도구의 사건 가운데 시작이 아닌 것이다. Hermes 가 뒤에 결과를 싣기 시작해도 본문을 남기지 않는다. */
     private static boolean memoryReadResult(String type, String toolName) {
         return toolName != null
-                && toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)
-                && !MEMORY_READ_STARTED.equalsIgnoreCase(type);
+            && toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)
+            && !MEMORY_READ_STARTED.equalsIgnoreCase(type);
     }
+
 
     private static String firstDetail(JsonNode root, JsonNode payload) {
         for (String name : new String[] {"preview", "detail", "result"}) {
@@ -269,6 +284,7 @@ public class HermesRunEventStream {
         }
         return null;
     }
+
 
     /** Hermes 는 걸린 시간을 초 단위 실수로 보낸다. 1000 을 곱해 밀리초 정수로 옮긴다. */
     private static Long durationMs(JsonNode root, JsonNode payload) {
@@ -285,6 +301,7 @@ public class HermesRunEventStream {
         return value == null ? null : Math.round(value.asDouble() * 1000);
     }
 
+
     /** {@code error} 를 보내지 않으면 실패인지 아닌지 모른다는 뜻으로 null 을 낸다. */
     private static Boolean failed(JsonNode root, JsonNode payload) {
         JsonNode value = bool(root, "error");
@@ -298,6 +315,7 @@ public class HermesRunEventStream {
         return status == null ? null : !"completed".equalsIgnoreCase(status);
     }
 
+
     private static Long firstNumber(JsonNode root, JsonNode payload, String field) {
         JsonNode value = number(root, field);
         if (value == null) {
@@ -306,15 +324,18 @@ public class HermesRunEventStream {
         return value == null ? null : value.asLong();
     }
 
+
     private static JsonNode number(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isNumber() ? value : null;
     }
 
+
     private static JsonNode bool(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isBoolean() ? value : null;
     }
+
 
     private static String firstText(JsonNode root, JsonNode payload, String... names) {
         for (String name : names) {
@@ -328,6 +349,7 @@ public class HermesRunEventStream {
         }
         return null;
     }
+
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
