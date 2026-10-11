@@ -118,6 +118,7 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
+`HttpHermesConnectorClient`는 카탈로그 HTTP 요청과 엄격한 JSON 파싱을 맡고, package-private `ConnectorCatalogDecoder`가 각 항목의 선언과 기본값을 읽는다. 보호 선언과 `execution_guard_manifest_sha256`은 같은 `ConnectorManifest`에 그대로 전달하며, 금융 준비와 승인 실행의 판정은 기존 client와 guard에 남는다.
 `connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
 `agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 셋으로 부른다. `connector` 가 `agent` 보다 위라서다.
 
