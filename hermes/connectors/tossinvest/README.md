@@ -5,6 +5,8 @@
 결정은 [ADR-20261008 / tossinvest-connector](../../docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
 커넥터 공통 계약은 [커넥터 연결](../../../docs/features/connector.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
 
+서비스는 [토스증권 공식 사이트](https://www.tossinvest.com/), 사용법은 [이 커넥터 README](https://github.com/jon890/fos-assistant/blob/main/hermes/connectors/tossinvest/README.md)에서 확인한다. API 설정 근거는 [토스증권 개발자 문서](https://developers.tossinvest.com/)다.
+
 **이 커넥터는 주문하지 않는다.** 주문, 정정, 취소 도구가 없다. 매수와 매도는 사용자가 토스증권 앱이나 웹에서 한다.
 
 ## 등록 칸
@@ -27,16 +29,43 @@
 
 ## 도구와 정책
 
-MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없이 돈다. 서버의 도구에도 `readOnlyHint` 를 참으로 둔다.
+MCP 서버 이름은 `tossinvest` 다. 도구 33개는 모두 `READ` 이고 승인 없이 돈다. SDK 설명은 connector.json의 본문을 그대로 쓴다. 서버의 도구에도 `readOnlyHint` 를 참으로 둔다.
 
 | 도구 | 부르는 API | 하는 일 |
 | --- | --- | --- |
 | `list_accounts` | `GET /api/v1/accounts` | 계좌 순번, 계좌 유형, 계좌번호 끝 네 자리를 읽는다 |
 | `get_quotes` | `GET /api/v1/prices`, `GET /api/v1/stocks` | 종목 200개까지의 현재가와 이름을 읽는다 |
+| `get_stocks` | `GET /api/v1/stocks` | 종목 200개까지의 상세 참조 정보를 읽는다 |
+| `list_stocks` | `GET /api/v1/stocks/all` | 시장별 종목 전체 목록을 읽는다 |
+| `get_stock_warnings` | `GET /api/v1/stocks/{symbol}/warnings` | 종목 하나의 유의사항을 읽는다 |
 | `get_holdings` | `GET /api/v1/holdings` | 보유 종목과 평가, 손익을 읽는다 |
 | `get_sellable_quantity` | `GET /api/v1/sellable-quantity` | 종목 하나의 매도 가능 수량을 읽는다 |
 | `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
 | `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다 |
+| `get_orderbook` | `GET /api/v1/orderbook` | 한 종목의 매수·매도 호가와 잔량을 읽는다 |
+| `get_trades` | `GET /api/v1/trades` | 한 종목의 당일 최근 체결 내역을 읽는다 |
+| `get_price_limits` | `GET /api/v1/price-limits` | 한 종목의 당일 상하한가를 읽는다 |
+| `get_candles` | `GET /api/v1/candles` | 한 종목의 분봉·일봉 캔들을 한 페이지 읽는다 |
+| `get_exchange_rate` | `GET /api/v1/exchange-rate` | KRW와 USD 사이의 참고용 표시 환율을 읽는다 |
+| `get_market_calendar` | `GET /api/v1/market-calendar/KR`, `GET /api/v1/market-calendar/US` | 국내 또는 미국 시장의 전일·당일·익일 운영 일정을 읽는다 |
+| `list_sectors` | `GET /api/v1/sectors` | 전체 섹터 목록과 계층을 읽는다 |
+| `get_sector_rankings` | `GET /api/v1/sectors/rankings` | 시장·기간·기준별 섹터 랭킹을 읽는다 |
+| `get_sector` | `GET /api/v1/sectors/{sectorId}` | 섹터 기본 정보와 기간별 등락률을 읽는다 |
+| `get_sector_stocks` | `GET /api/v1/sectors/{sectorId}/stocks` | 섹터와 하위 섹터에 속한 보통주 전체를 읽는다 |
+| `get_sector_etfs` | `GET /api/v1/sectors/{sectorId}/etfs` | 관련 ETF의 symbol과 name을 읽는다 |
+| `list_conditional_orders` | `GET /api/v1/conditional-orders` | 진행 중이나 종료된 조건주문을 한 페이지 읽는다 |
+| `get_conditional_order` | `GET /api/v1/conditional-orders/{conditionalOrderId}` | 조건주문 하나의 상세를 읽는다 |
+| `get_rankings` | `GET /api/v1/rankings` | KR/US 주식의 6종 랭킹을 7종 기간으로 읽는다. TOP의 realtime 4개 조합은 거절한다 |
+| `get_market_indicator_prices` | `GET /api/v1/market-indicators/prices` | 국내 지수 2종과 국채 금리 6종의 시세를 읽는다 |
+| `get_market_indicator_candles` | `GET /api/v1/market-indicators/{symbol}/candles` | 지수 분봉·일봉과 국채 일봉을 읽는다 |
+| `get_market_indicator_investor_trading` | `GET /api/v1/market-indicators/{symbol}/investor-trading` | 코스피·코스닥 투자자별 KRW 매매대금을 읽는다 |
+| `get_order` | `GET /api/v1/orders/{orderId}` | 주문 하나의 상세와 체결을 읽는다 |
+| `get_commissions` | `GET /api/v1/commissions` | 전체 시장의 수수료 비율과 적용 날짜를 읽는다 |
+| `get_stock_investor_trading` | `GET /api/v1/stocks/{symbol}/investor-trading` | 투자자별 매매와 외국인 보유, CFD를 읽는다 |
+| `get_stock_program_trades` | `GET /api/v1/stocks/{symbol}/program-trades` | KRX 프로그램 매매를 읽는다 |
+| `get_stock_short_selling` | `GET /api/v1/stocks/{symbol}/short-selling` | 공매도 수량과 금액, 비중을 읽는다 |
+| `get_stock_credit_trades` | `GET /api/v1/stocks/{symbol}/credit-trades` | 개인 신용거래를 읽는다 |
+| `get_stock_securities_lending` | `GET /api/v1/stocks/{symbol}/securities-lending` | 기관 대차거래를 읽는다 |
 
 계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
 
@@ -46,16 +75,36 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | --- | --- | --- |
 | `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다. 순번은 양의 int64 범위의 정확한 문자열이다. 잘못된 행은 전체 응답 오류로 알린다 |
 | `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~200개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
+| `get_stocks` | `symbols`: 쉼표로 이은 종목 1~200개 | `{result: StockInfo[], metadata}`. 국내 시장 상세와 decimal 문자열, boolean, null을 보존한다 |
+| `list_stocks` | `market`: 필수. `status`, `securityType`, `commonShare`: 선택 | `{result: StockSummary[], metadata}`. 페이지 없이 전량을 반환한다 |
+| `get_stock_warnings` | `symbol`: 필수, 단일 종목 | `{result: StockWarning[], metadata}`. 빈 배열은 정상이고 미존재는 입력 오류다 |
 | `get_holdings` | `symbol`: 선택 | `{total, items}`. 금액은 공제 전(`market_value`, `profit_loss`, `profit_loss_rate`)과 비용 공제 후(`..._after_cost`)를 함께 싣는다. `total` 의 금액은 `{krw, usd}` 이고, `items` 의 금액은 그 종목의 거래 통화 기준 글 하나다. 금액과 수량은 API 가 준 10진수 글 그대로다 |
 | `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity}`. `sellable_quantity` 는 `symbol` 을 주지 않으면 null 이다 |
 | `get_sellable_quantity` | `symbol`: 필수 | `{result, metadata, sellable_quantity}` |
 | `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`, `cursor`, `limit`: 선택 | `{orders, has_more, nextCursor, hasNext}`. 아래 「주문 내역」 |
+| `get_orderbook` | `symbol`: 필수 | `{result, metadata}`. 매수·매도 호가와 잔량, 통화, 데이터 시각 |
+| `get_trades` | `symbol`: 필수. `count`: 기본 50, 1~50의 정수 | `{result, metadata}`. 체결가·수량·시각·통화 배열, 체결이 없으면 빈 배열 |
+| `get_price_limits` | `symbol`: 필수 | `{result, metadata}`. 당일 상하한가와 통화, 시각. 미국처럼 가격제한이 없으면 가격은 null |
+| `get_candles` | `symbol`, `interval`: 필수. `interval`은 `1m` 또는 `1d`. `count`: 기본 100, 1~200의 정수. `before`, `adjusted`: 선택 | `{result, metadata}`. 최신순 캔들 배열과 `nextBefore` |
+| `get_exchange_rate` | `baseCurrency`, `quoteCurrency`: 서로 다른 `KRW` 또는 `USD`. `dateTime`: 선택, 초와 시간대가 있는 RFC 3339 시각 | `{result, metadata}`. 환율 한 건의 decimal 문자열과 `validFrom`, `validUntil`을 보존한다 |
+| `get_market_calendar` | `market`: `KR` 또는 `US`. `date`: 선택, `YYYY-MM-DD`(미국은 미국 현지 날짜) | `{result, metadata}`. `today`, `previousBusinessDay`, `nextBusinessDay`의 세션과 휴장 null을 보존한다 |
+| `get_order` | `orderId`: 필수 opaque 문자열 | `{result: Order, metadata: {}}`. 공식 13개 필드와 execution 7개 필드를 보존한다 |
+| `get_commissions` | 없음 | `{result: Commission[], metadata: {}}`. 시장별 4개 필드와 배열 순서, null과 부재를 보존한다 |
 
 모든 조회는 기존 표시 필드와 함께 공식 `result`와 `metadata`를 제공한다. 단일 조회의 metadata는 현재 `{}`다. `get_quotes`는 `{prices, stocks}`, `get_buying_power`는 `{buyingPower, sellableQuantity}`를 result에 담고 metadata도 같은 키를 쓴다. symbol 없는 buying power의 sellableQuantity와 그 metadata는 null이다.
 공식 result의 문자열, decimal, boolean, null, 배열과 unknown enum을 보존한다. Account.accountSeq는 원문 int64에서 정확한 문자열로 바꾸고 accountNo는 결과를 만들기 전에 마스킹한다. 필수 필드 누락과 잘못된 타입은 일부 성공으로 숨기지 않는다.
 종목 기호는 `^[A-Za-z0-9.-]+$`만 받는다. 조회 기간의 길이 제한은 없으며 실제 날짜와 from/to 순서를 검사한다. 이름 100자와 일반 문자열 64자 절단은 기존 표시 필드에만 적용한다. 공식 result, orderId, cursor와 decimal은 자르지 않는다.
 
+### 종목 참조 정보
+
+`get_stock_warnings`는 경로를 바꾸는 점 segment `.`과 `..`을 인증과 HTTP 요청 전에 거절한다.
+
+`list_stocks`의 market은 KOSPI, KOSDAQ, NYSE, NASDAQ, AMEX, KR_ETC, US_ETC다. status는 SCHEDULED, ACTIVE, DELISTED이고 생략하면 공식 API가 ACTIVE를 적용한다. securityType은 STOCK, FOREIGN_STOCK, DEPOSITARY_RECEIPT, INFRASTRUCTURE_FUND, REIT, ETF, FOREIGN_ETF, ETN, STOCK_WARRANTS다. commonShare=false도 전송한다.
+전체 목록은 페이지나 cursor를 만들지 않는다. 기존 1 MiB 상한을 넘으면 오류로 끝낸다. STOCK_ALL은 초당 1회이며 상세와 유의사항의 STOCK 큐와 독립적이다. 큐 대기도 기존 4초 deadline에 포함한다. 참조 정보는 화면·세션 진입 시 읽고 짧은 주기로 반복 조회하지 않는다. 유의사항의 exchange는 거래소 코드이며 상장 시장 market과 다르다. 날짜와 exchange의 null, 알 수 없는 코드를 보존한다.
+
 ### 주문 내역
+
+get_order는 list_orders의 페이지와 별개로 주문 하나를 반환한다. orderId는 길이를 자르지 않고 Unicode를 인코딩하며 경로 구분자, percent, 제어문자와 단독 surrogate를 거절한다. get_commissions에는 marketCountry query나 필터가 없다. commissionRate는 decimal 비율이며 0.00015를 퍼센트 숫자로 바꾸지 않는다. 날짜와 시각은 공식 KST 문자열을 유지한다. 두 도구는 검증된 응답을 공용 schema 투영으로 제한해 추가 민감키를 제거한다.
 
 끝난 주문(`CLOSED`)은 기본 20건, 최대 100건의 한 페이지를 읽고 `nextCursor`와 `hasNext`를 보존한다. 받은 cursor를 다음 호출에 그대로 넣는다. `has_more`는 CLOSED의 hasNext와 같다. 미체결(`OPEN`)은 cursor와 limit 없이 전량을 반환한다.
 금액과 수량은 API 가 준 10진수 글 그대로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다.
@@ -66,6 +115,63 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
 | `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
 | `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
+
+### 시세와 캔들
+
+네 시세 도구의 `symbol`은 국내 종목 코드(`005930`, `0101N0`)나 미국 티커(`AAPL`, `BRK.B`) 한 개다. 계좌 헤더를 보내지 않는다. 조회 시점의 REST 응답을 읽으며 실시간 구독이나 자동 폴링은 하지 않는다.
+호가와 잔량, 체결가와 수량, 캔들의 OHLCV는 공식 필드의 decimal 문자열 그대로다. 미국 가격제한의 null과 빈 배열, 데이터 미제공 시 호가 시각의 null도 보존한다. 필드 정본은 [공식 fixture](tests/fixtures/openapi-1.2.24.json)와 생성된 계약이다.
+
+캔들의 `adjusted`는 기본 true이고 false도 query로 전달한다. `before`는 타임존이 있는 ISO 8601 시각이며 그 시각과 같거나 이전인 봉을 읽는다. 예를 들어 `2026-03-25T09:00:00+09:00`을 인자로 넣으면 커넥터가 `+`를 인코딩한다.
+다음 페이지는 `result.nextBefore`를 다음 호출의 `before`로 그대로 넣는다. 마지막 페이지는 null이다. 한 호출에서 다음 페이지를 자동으로 모으지 않는다.
+
+### 환율과 시장 일정
+
+환율은 1분 주기로 갱신되는 참고용 표시값이며 실제 주문에 적용될 거래 환율을 보장하지 않는다. `dateTime`을 생략하면 현재 유효 환율을 요청한다. 환전과 주문은 하지 않는다.
+시장 일정은 API가 반환한 3영업일 정보 그대로다. 모든 응답 시각은 KST(+09:00)이며 날짜를 계산하거나 세션을 합치지 않는다. 국내는 KRX+NXT 통합 세션이고 장전·장후 시간외종가는 제외된다. 미국은 `dayMarket`, `preMarket`, `regularMarket`, `afterMarket`을 각각 보존한다. 휴장과 부분 휴장의 null도 바꾸지 않는다.
+세 조회는 `MARKET_INFO` 그룹의 공용 큐를 사용하며 최소 간격은 334ms다. 두 도구의 metadata는 현재 빈 객체다. 인자 검증은 HTTP 전송 전에 끝나며 같은 통화 쌍, 실제로 없는 날짜, 초를 생략하거나 시간대가 없는 시각과 추가 인자를 거절한다.
+
+`connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 현재 `execution_guard`가 없고 해시 값은 null이며 조회 도구 33개의 승인 정책은 `none`이다. 금융 승인 ticket도 없으므로 이번 변경으로 무효화되는 ticket은 없다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 조회 도구는 `READ`로 선언하며 금융 쓰기 권한을 열지 않는다.
+
+### 섹터 조회
+
+섹터 도구 5개도 공식 `result` 전체와 `metadata`를 돌려준다. `list_sectors`는 인자가 없고, 나머지는 `marketCountry: KR/US`가 필수다. `get_sector_rankings`는 `type: TOP_GAINERS/MARKET_TRADING_AMOUNT`와 `duration: 1d/1w/1mo/3mo/6mo/1y`를 받는다. 상세·주식·ETF는 목록에서 확인한 `sectorId`를 받으며 영문·숫자·밑줄·하이픈 1~40자만 허용한다. 페이지와 추가 필터는 없다. `get_sector`는 랭킹 경로와 겹치는 `sectorId: rankings`를 거절한다. 랭킹은 대분류·중분류(depth 0·1)의 상위 100건까지다.
+
+depth 0/1/2와 parentSectorId를 보존하고 대분류의 parentSectorId와 상세 summary는 null일 수 있다. 상세 changeRates는 6개 기간이며 데이터가 없는 changeRate는 null이다. 주식의 volume·tradingAmount·marketCapitalization과 랭킹의 금액도 null일 수 있다. 등락률 decimal은 소수비율이며 0.01은 1%다. decimal 문자열은 숫자로 바꾸지 않으며 US 금액도 currency에 표시된 원화 환산값이다. ETF는 하위 섹터를 포함하지 않으며 symbol·name만 제공하고 관련 항목이 없으면 빈 배열이다. 한 종목이 여러 섹터에 속할 수 있다.
+
+### 조건주문 조회
+
+`list_conditional_orders`는 `status=OPEN/CLOSED`와 선택 `symbol`, `cursor`, `limit`를 받는다. 두 상태 모두 기본 20건, 최대 100건의 한 페이지만 반환한다. `result.conditionalOrders`, `nextCursor`, `hasNext`를 보존하며 다음 페이지는 받은 cursor로 별도 호출한다.
+`get_conditional_order`는 목록에서 받은 불투명 `conditionalOrderId`만 받는다. C0·DEL·C1 제어문자, 점 경로, percent 인코딩, 경로 구분자와 URL 주입을 인증 HTTP 전에 거절한다. 계좌, token, URL은 caller가 지정하지 못하며 현재 연결의 env 계좌만 사용한다.
+SINGLE/OCO/OTO, STOP/PROFIT_RATE와 최상위·leg 상태를 구분한다. HOLDING이나 CANCELED인 leg를 최상위 상태로 바꾸지 않는다. nullable 가격과 `second=null`, 없는 `expireDate`와 decimal 문자열을 보존한다. `targetProfitRate="10.5"`는 10.5%다. WATCHING은 체결 완료를 뜻하지 않는다. 조건주문 생성·수정·취소와 WebSocket은 지원하지 않는다.
+
+조건조회 결과는 공식 schema의 알려진 필드만 반환한다. 최상위와 leg, 중첩 배열의 확장 키는 제거하며 서비스가 추가한 정보는 누락될 수 있다. 공식 필드의 unknown enum 값은 보존한다. 지원하지 않는 객체 schema는 원문을 반환하지 않고 전체 오류로 거절한다. metadata는 현재 `{}`이며 upstream metadata를 그대로 노출하지 않는다. 계좌번호 표시는 기존 `list_accounts`의 끝 네 자리 마스킹을 따른다.
+
+### 랭킹과 시장 지표
+
+랭킹 count는 1..100, 기본 100이고 excludeInvestmentCaution은 기본 false다. 시장 전체와 토스증권 체결 기준을 구분하며 TOP은 기간 시작값, 나머지는 전일 기준값을 쓴다. 허용 시장·기간 조합은 80개다. 기간은 거래일 기준이며 rankedAt이 집계 시각이다. changeRate는 소수비율이므로 0.0125는 1.25%다.
+지수 단위는 point, 국채 금리는 percent다. 3.25는 3.25%다. 캔들 count는 1..200 기본 100이며 nextBefore를 다음 before에 그대로 넣는다. 투자자 매매대금은 1d/1w/1mo/1y, count=1..100 기본 10이며 nextUntil을 다음 until에 넣는다. 각 도구의 nextBefore 또는 nextUntil이 null이면 마지막 페이지다. 선택 필드가 없다는 것만으로 마지막이라고 단정하지 않는다. before는 offset을 포함한 ISO 시각이고 until은 해당 날짜를 포함하는 YYYY-MM-DD 상한이다. 둘을 생략하면 최신부터 읽는다. 시세 symbols는 최대 200개다. 투자자 당일 값은 잠정치이며 updatedAt이 갱신 시각이다.
+이 네 도구는 계좌·token·URL 인자를 받지 않는다. 연결 env만 사용하고 시장 조회에는 계좌 헤더를 보내지 않는다.
+
+### 국내 종목 통계
+
+5개 통계 도구는 `symbol`을 필수로 받고 `count`는 기본 10, 최대 100이다.
+예를 들어 `get_stock_investor_trading`에 `{"symbol":"005930","count":100,"until":"2026-07-17"}`을 넣는다.
+`until`은 해당 날짜를 포함한다. 다음 페이지에는 `result.nextUntil`을 그대로 넣고 null이거나 없으면 끝낸다.
+응답은 `{result: {records, nextUntil?}, metadata: {}}`이며 한 페이지의 전체 행과 순서를 보존한다.
+symbol은 영문·숫자·점·하이픈을 받지만 통계는 KR 전용이다. 미국 종목의 `unsupported-market`는 `TOSSINVEST_INVALID_INPUT`으로 알린다.
+모델의 계좌, token, URL과 추가 인자는 인증 전에 거절한다. 통계 GET에는 연결 계좌 헤더도 보내지 않는다.
+공식 필드만 재귀적으로 반환하고 중첩 객체·배열의 비공식 확장키를 제거한다. decimal 문자열, null과 선택 필드의 부재는 그대로 둔다.
+
+| 통계 | 단위와 집계 범위 | 반영 시점과 해석 |
+| --- | --- | --- |
+| 투자자별 매매 | KRX·NXT 합계 수량(주), 기관 7개 분류·등록외국인·보유·CFD. 보유와 CFD 비중은 소수 비율 | 장중 잠정치에는 개인·기관 세부·기타법인·보유·CFD가 null일 수 있다. 당일 저녁 확정치, CFD 다음 영업일 새벽, 보유 다음 영업일 오전 재갱신을 구분한다. updatedAt은 기록 전체의 마지막 갱신이다 |
+| 프로그램 | KRX 거래량(주), 차익 arbitrage·비차익 nonArbitrage. NXT 제외 | 당일 값은 장 종료 전 바뀔 수 있다. 거래대금·updatedAt은 없다 |
+| 공매도 | 수량(주), 금액(KRW), 소수 비율 | 당일 저녁 확정치. 비중의 분모는 정규장 외 세션을 포함한 누적 값이며 부재는 null, 0은 문자열 0이다 |
+| 신용 | 자기신용·유통금융 합계 수량(주), balanceRate·tradingRate는 소수 비율 | marginLoan·stockLoan은 각각 nullable 객체다. 다음 영업일 새벽에 전 영업일 값이 반영된다. 개인 신용대주다 |
+| 대차 | 기관 대여·차입의 체결·상환·잔고 수량(주), 잔고 금액(KRW) | 당일 저녁 확정치. 개인 신용대주와 구분한다 |
+
+음수 순매수는 순매도다. 비율을 백분율로 바꾸거나 장중 값을 확정치로 말하지 않는다.
+5개는 `STOCK_TRADING_TREND` 그룹의 초당 10회 한도를 공유하며 최소 호출 간격은 100ms다. AUTH는 별도 초당 5회다.
 
 ### 토큰
 
@@ -83,8 +189,8 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | --- | --- | --- | --- |
 | `GET /api/v1/accounts` | `ACCOUNT` | 1회 | 1,000ms |
 | `GET /api/v1/holdings` | `ASSET` | 5회 | 200ms |
-| `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | `ORDER_INFO` | 6회, 09:00~09:10 KST에는 3회 | 평시 167ms, 피크 334ms |
-| `GET /api/v1/orders` | `ORDER_HISTORY` | 5회 | 200ms |
+| `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity`, `GET /api/v1/commissions` | `ORDER_INFO` | 6회, 09:00~09:10 KST에는 3회 | 평시 167ms, 피크 334ms |
+| `GET /api/v1/orders`, `GET /api/v1/orders/{orderId}` | `ORDER_HISTORY` | 5회 | 200ms |
 
 한도 수치는 공식 [연동 가이드의 Rate Limits](https://openapi.tossinvest.com/openapi-docs/overview.md#rate-limits)에서 확인했다. 공식 한도는 사전 공지 없이 바뀔 수 있다.
 커넥터는 프로세스 공용 큐를 그룹별로 두어 같은 그룹의 요청을 한 번에 하나씩 보낸다. 요청이 끝난 뒤 다음 요청까지 표의 간격을 둔다. `ORDER_INFO`는 KST 09:00~09:10에 피크 한도를 적용한다. 공식 19그룹과 AUTH도 같은 큐 경계를 사용한다. 예산은 origin/client ID별로 공유하며 secret 변경으로 한도를 우회하지 못한다.
@@ -102,7 +208,7 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 | `TOSSINVEST_IP_NOT_ALLOWED` | `forbidden` | `reconnect` | API 의 `ip-not-allowed`, 토큰 발급의 403 `access_denied`. 허용 IP 가 바뀌었을 수 있다 |
 | `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
 | `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다. 상태와 관계없이 `account-not-found` 면 이 코드다 |
-| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목이다 |
+| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목·섹터이거나 요청한 시점의 환율이 없다 |
 | `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | GET의 한 번 재시도 뒤에도 429 |
 | `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 시간이 지났다, 5xx 와 그 밖의 4xx, 다시 보낸 호출도 `token-revoked` 였다 |
 
@@ -111,8 +217,12 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 ## 서버와 검사
 
 `src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶는다. 생성 entry는 Git에서 추적하지 않고 테스트와 배포 묶음 생산 때 소스에서 빌드한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
-공식 JSON fixture의 41 operation과 실제 등록 8개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
-대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 여섯 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
+공식 JSON fixture의 41 operation 중 인증 1개와 조회 GET 34개를 연결한다. MCP 도구는 READ 33개다. `getStocks`를 사용하는 `get_quotes`와 `get_stocks`, `getSellableQuantity`를 공유하는 두 도구는 고유 operation으로 한 번만 센다. 나머지 6개 금융 쓰기 operation은 구현·등록하지 않았으며 주문을 실행할 수 없다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다.
+도구와 고유 operation은 다른 수치다. coverage 시험은 모든 도구와 한국·미국 시장 일정을 호출해 인증 1회와 조회 36회를 수신한다. `getStocks`와 `getSellableQuantity`는 여러 도구가 공유한다.
+
+SDK 설명과 manifest의 tools.description은 33개 모두 같은 평문이다. 설명은 표시 정보이며 READ/none 정책과 분리된다. 설명을 넣은 manifest의 운영 설치는 새 reader가 실제 plugin에 로드된 것을 확인한 뒤 진행한다.
+
+대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 시험별로 필요한 `GET`과 `POST /oauth2/token`만 허용한다. 다른 GET이나 금융 POST·DELETE가 오면 시험이 실패한다. 공식 성공 예시 78개와 production SDK·소스에서 빌드한 stdio bundle의 실제 HTTP 도달을 검사한다.
 
 ## 보안
 

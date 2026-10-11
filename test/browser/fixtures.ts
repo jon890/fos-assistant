@@ -42,6 +42,10 @@ const HERMES_CONTROL_PATH = join(
   tmpdir(),
   `fos-assistant-browser-hermes-${RUN_ID}.url`,
 );
+const WORKSPACE_CONTROL_PATH = join(
+  tmpdir(),
+  `fos-assistant-browser-workspace-${RUN_ID}.root`,
+);
 
 /** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
 export const FLOW_AGENT_CODE = "browserflow";
@@ -292,7 +296,11 @@ export async function disconnectDemoConnector(email: string): Promise<void> {
 export async function bindDemoConnector(
   email: string,
   agentCode: string,
-): Promise<{ bound: boolean; status: string | null; restartRequired: boolean }> {
+): Promise<{
+  bound: boolean;
+  status: string | null;
+  restartRequired: boolean;
+}> {
   const response = await callAs(
     email,
     "PUT",
@@ -315,7 +323,9 @@ export async function bindDemoConnector(
  * <p>연결 등록은 더는 이런 에이전트를 만들지 않으므로 검사에서만 뜨는 경로로 만든다. 그 사용자의 시험 커넥터 연결도
  * `READY` 가 된다. 검사가 끝나면 에이전트를 지우고 연결을 해제한다.
  */
-export async function createLegacyConnectorAgent(email: string): Promise<string> {
+export async function createLegacyConnectorAgent(
+  email: string,
+): Promise<string> {
   const response = await callAs(
     email,
     "POST",
@@ -444,7 +454,9 @@ async function writeProfileKeys(work: string): Promise<string> {
 
 async function seedAgents(hermesBaseUrl: string): Promise<void> {
   // 첫 요청이 관리자를 만들고 표시 이름은 그때 굳는다. README 화면을 찍는 설정만 이 이름을 바꾼다.
-  const token = await new SignJWT({ name: process.env.BROWSER_ADMIN_NAME ?? "브라우저 테스트" })
+  const token = await new SignJWT({
+    name: process.env.BROWSER_ADMIN_NAME ?? "브라우저 테스트",
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(TEST_EMAIL)
     .setIssuedAt()
@@ -602,6 +614,7 @@ function startControlPlane(
   attachmentRoot: string,
   artifactRoot: string,
   skillRoot: string,
+  workspaceRoot: string,
 ): ChildProcess {
   const log = createWriteStream(logPath);
   const app = spawn("./gradlew", ["--no-daemon", "--quiet", "smokeRun"], {
@@ -615,7 +628,8 @@ function startControlPlane(
       ASSISTANT_JWT_SECRET: JWT_SECRET,
       // 민감 Memory 문서를 만드는 검사가 쓴다. 운영 값이 아니라 글자 0123456789abcdef0123456789abcdef 의 base64 다.
       ASSISTANT_MEMORY_ENCRYPTION_ACTIVE_KEY_ID: "test-1",
-      ASSISTANT_MEMORY_ENCRYPTION_KEYS: "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+      ASSISTANT_MEMORY_ENCRYPTION_KEYS:
+        "test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
       // 검사는 같은 사용자로 짧은 시간에 커넥터를 여러 번 부른다. 기본값 10회에 걸리지 않게 올린다.
       ASSISTANT_CONNECTOR_CALLS_PER_MINUTE: "1000",
       HERMES_PROFILE_KEY_DIR: keyDir,
@@ -629,6 +643,8 @@ function startControlPlane(
       // 스킬 디렉터리도 두 루트에 같은 경로를 준다. 대역이 게시된 경로의 SKILL.md 를 같은 기계에서 읽는다.
       ASSISTANT_SKILL_ROOT: skillRoot,
       ASSISTANT_SKILL_AGENT_ROOT: skillRoot,
+      // 목록 페이지 검사는 실행마다 만든 합성 공간만 읽는다. 삭제 도우미는 연결하지 않는다.
+      ASSISTANT_SANDBOX_WORKSPACE_ROOT: workspaceRoot,
       // 첫 로그인의 기본 도구는 backend 시험이 확인한다. 화면 시험의 도구 초기 상태를 바꾸지 않게 비운다.
       ASSISTANT_PEOPLE_DEFAULTTOOLSETS: "",
       HERMES_DASHBOARD_BASE_URL: dashboardBaseUrl,
@@ -672,6 +688,9 @@ export default async function setupServices(): Promise<() => Promise<void>> {
 
   try {
     const skillRoot = await makeSkillRoot(work);
+    const workspaceRoot = join(work, "workspace");
+    await mkdir(workspaceRoot);
+    await writeFile(WORKSPACE_CONTROL_PATH, workspaceRoot);
     hermes = await startFakeHermes(PROFILE_KEYS, undefined, {}, skillRoot);
     await writeFile(HERMES_CONTROL_PATH, hermes.baseUrl);
     await seedBrowserToolsets(hermes.baseUrl);
@@ -682,6 +701,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
       await makeAttachmentRoot(work),
       await makeArtifactRoot(work),
       skillRoot,
+      workspaceRoot,
     );
     app = controlPlane;
     await waitForHealth(logPath, controlPlane);
@@ -690,6 +710,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
     await stopProcess(app);
     await hermes?.close();
     await rm(HERMES_CONTROL_PATH, { force: true });
+    await rm(WORKSPACE_CONTROL_PATH, { force: true });
     await rm(work, { recursive: true, force: true });
     throw error;
   }
@@ -698,6 +719,7 @@ export default async function setupServices(): Promise<() => Promise<void>> {
     await stopProcess(app);
     await hermes?.close();
     await rm(HERMES_CONTROL_PATH, { force: true });
+    await rm(WORKSPACE_CONTROL_PATH, { force: true });
     await rm(work, { recursive: true, force: true });
   };
 }
@@ -727,7 +749,9 @@ export function waitForStreamedContentAfterLoad(
     const response = await goto(...args);
     await streamedContentPlaced();
     if (waitForShellReady)
-      await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
+      await page
+        .locator('main[aria-busy="false"]')
+        .waitFor({ state: "attached" });
     return response;
   };
   const reload = page.reload.bind(page);
@@ -735,26 +759,52 @@ export function waitForStreamedContentAfterLoad(
     const response = await reload(...args);
     await streamedContentPlaced();
     if (waitForShellReady)
-      await page.locator('main[aria-busy="false"]').waitFor({ state: "attached" });
+      await page
+        .locator('main[aria-busy="false"]')
+        .waitFor({ state: "attached" });
     return response;
   };
 }
 
-export const test = base.extend<{ hermes: FakeHermesControl; isolatedMember: { email: string; name: string }; resetHermes: void; waitForShellReady: boolean }>({
+export const test = base.extend<{
+  hermes: FakeHermesControl;
+  isolatedMember: { email: string; name: string };
+  resetHermes: void;
+  waitForShellReady: boolean;
+  workspace: { ownerDir: string };
+}>({
   // 외부 스크립트를 막고 SSR 첫 그림을 검사할 때만 false로 둔다.
   waitForShellReady: [true, { option: true }],
   isolatedMember: async ({}, use, testInfo) => {
     await use(isolatedUser(testInfo, "member"));
   },
-  resetHermes: [async ({}, use) => {
-    const hermes = await fakeHermesControl();
-    await hermes.resetControls();
+  workspace: async ({ context, page }, use, testInfo) => {
+    await setSession(context, isolatedUser(testInfo, "workspace"));
+    const me = await page.request.get("/api/me");
+    if (!me.ok())
+      throw new Error(`합성 파일 공간 사용자를 만들지 못했다: ${me.status()}`);
+    const { id } = (await me.json()) as { id: number };
+    const workspaceRoot = await readFile(WORKSPACE_CONTROL_PATH, "utf-8");
+    const ownerDir = join(workspaceRoot, `u${id}`);
+    await mkdir(ownerDir);
     try {
-      await use();
+      await use({ ownerDir });
     } finally {
-      await hermes.resetControls();
+      await rm(ownerDir, { recursive: true, force: true });
     }
-  }, { auto: true }],
+  },
+  resetHermes: [
+    async ({}, use) => {
+      const hermes = await fakeHermesControl();
+      await hermes.resetControls();
+      try {
+        await use();
+      } finally {
+        await hermes.resetControls();
+      }
+    },
+    { auto: true },
+  ],
   hermes: async ({}, use) => {
     await use(await fakeHermesControl());
   },

@@ -1,3 +1,4 @@
+import { readUnionCases, readOperationIds } from "./read-union-cases.ts";
 import { expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -26,16 +27,8 @@ import {
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 export const canonical = JSON.parse(raw.toString());
 
-test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽는다", () => {
-  const reads = new Set([
-    "getAccounts",
-    "getPrices",
-    "getStocks",
-    "getHoldings",
-    "getBuyingPower",
-    "getSellableQuantity",
-    "getOrders",
-  ]);
+test("현재 34개 READ operation의 공식 성공 예시 78개를 그대로 읽는다", () => {
+  const reads = new Set(readOperationIds);
   let count = 0;
   for (const methods of Object.values(canonical.paths) as any[]) {
     const upstream = methods.get;
@@ -65,7 +58,7 @@ test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽�
       count++;
     }
   }
-  expect(count).toBe(20);
+  expect(count).toBe(78);
 });
 
 test("ETF 영문명 누락 호환은 해당 분류와 필드에만 적용한다", () => {
@@ -171,10 +164,10 @@ test("공식 41 operation의 method/path/group과 SHA-256이 일치하고 미구
     41,
   );
   expect(new Set(OPERATIONS.map((op) => op.group)).size).toBe(19);
-  expect(CURRENT_OPERATIONS.size).toBe(8);
+  expect(CURRENT_OPERATIONS.size).toBe(35);
   expect(
     OPERATIONS.filter((op) => !CURRENT_OPERATIONS.has(op.id)),
-  ).toHaveLength(33);
+  ).toHaveLength(6);
 });
 
 test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => {
@@ -196,17 +189,8 @@ test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => 
   ).toBe(false);
 });
 
-test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는 없다", async () => {
-  const allowed = new Set([
-    "issueOAuth2Token",
-    "getAccounts",
-    "getPrices",
-    "getStocks",
-    "getHoldings",
-    "getBuyingPower",
-    "getSellableQuantity",
-    "getOrders",
-  ]);
+test("production SDK의 33개 도구가 35 operation에 도달하고 GET body는 없다", async () => {
+  const allowed = new Set(["issueOAuth2Token", ...readOperationIds]);
   const fake = new FakeToss(allowed);
   for (const [path, result] of Object.entries({
     accounts: [],
@@ -216,8 +200,63 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
     "buying-power": { currency: "KRW", cashBuyingPower: "1" },
     "sellable-quantity": { sellableQuantity: "2" },
     orders: { orders: [], nextCursor: null, hasNext: false },
+    "stocks/all": [],
+    "stocks/AAPL/warnings": [],
   }))
     fake.on("GET", `/api/v1/${path}`, { result });
+  for (const [path, example] of [
+    ["orderbook", "krStock"],
+    ["trades", "usStock"],
+    ["price-limits", "usStock"],
+    ["candles", "lastPage"],
+  ]) {
+    const endpoint = `/api/v1/${path}`;
+    fake.on(
+      "GET",
+      endpoint,
+      canonical.paths[endpoint].get.responses["200"].content["application/json"]
+        .examples[example!].value,
+    );
+  }
+  for (const path of [
+    "exchange-rate",
+    "market-calendar/KR",
+    "market-calendar/US",
+  ])
+    fake.on(
+      "GET",
+      `/api/v1/${path}`,
+      Object.values(
+        canonical.paths[`/api/v1/${path}`].get.responses["200"].content[
+          "application/json"
+        ].examples as Record<string, { value: unknown }>,
+      )[0]!.value,
+    );
+  const additionalPaths: string[] = [];
+  for (const call of readUnionCases.slice(16)) {
+    for (const id of call.operations) {
+      const operation = OPERATIONS.find((operation) => operation.id === id)!;
+      const path = operation.path.replace(/\{(\w+)\}/g, (_, key) =>
+        encodeURIComponent(String(call.args[key])),
+      );
+      const content =
+        canonical.paths[operation.path].get.responses["200"].content[
+          "application/json"
+        ];
+      fake.on(
+        "GET",
+        path,
+        content.example ?? (Object.values(content.examples)[0] as any).value,
+      );
+      if (
+        !canonical.paths[operation.path].get.parameters?.some(
+          (parameter: any) =>
+            parameter.$ref === "#/components/parameters/AccountSeq",
+        )
+      )
+        additionalPaths.push(path);
+    }
+  }
   try {
     await withMcp(
       createTossinvestServer({
@@ -229,35 +268,66 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
           ["list_accounts", {}],
           ["get_quotes", { symbols: "AAPL" }],
           ["get_holdings", {}],
+          ["get_sellable_quantity", { symbol: "AAPL" }],
           ["get_buying_power", { currency: "KRW", symbol: "AAPL" }],
           ["list_orders", { status: "OPEN" }],
+          ["get_stocks", { symbols: "AAPL" }],
+          ["list_stocks", { market: "NASDAQ", commonShare: false }],
+          ["get_stock_warnings", { symbol: "AAPL" }],
+          ["get_orderbook", { symbol: "005930" }],
+          ["get_trades", { symbol: "AAPL" }],
+          ["get_price_limits", { symbol: "AAPL" }],
+          ["get_candles", { symbol: "005930", interval: "1d" }],
+          ["get_exchange_rate", { baseCurrency: "USD", quoteCurrency: "KRW" }],
+          ["get_market_calendar", { market: "KR" }],
+          ["get_market_calendar", { market: "US" }],
+          ...readUnionCases
+            .slice(16)
+            .map(({ name, args }) => [name, args] as const),
         ] as const)
           expect(
             (await tool(client, name, args)).result.isError,
           ).toBeUndefined();
       },
     );
-    expect(CURRENT_OPERATIONS).toEqual(allowed);
-    expect(
-      new Set(
-        fake.requests.map(
-          (request) =>
-            OPERATIONS.find((op) =>
-              matchesOperation(op, request.method, request.path),
-            )!.id,
-        ),
+    const received = new Set(
+      fake.requests.map(
+        (request) =>
+          OPERATIONS.find((op) =>
+            matchesOperation(op, request.method, request.path),
+          )!.id,
       ),
-    ).toEqual(allowed);
-    expect(fake.requests).toHaveLength(8);
+    );
+    expect(received).toEqual(allowed);
+    expect(CURRENT_OPERATIONS).toEqual(received);
+    expect(fake.seen("GET")).toHaveLength(36);
+    expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+    expect(
+      fake.seen("POST").filter((request) => request.path !== "/oauth2/token"),
+    ).toHaveLength(0);
+    expect(fake.seen("DELETE")).toHaveLength(0);
+    expect(fake.requests).toHaveLength(37);
     for (const request of fake.seen("GET")) {
       expect(request.body).toBe("");
       expect(request.headers.get("authorization")).toBe(
         "Bearer fake-access-token-1",
       );
       expect(request.headers.get("x-tossinvest-account")).toBe(
-        ["accounts", "prices", "stocks"].some((path) =>
-          request.path.endsWith(`/${path}`),
-        )
+        [
+          ...additionalPaths,
+          "/api/v1/accounts",
+          "/api/v1/prices",
+          "/api/v1/stocks",
+          "/api/v1/stocks/all",
+          "/api/v1/stocks/AAPL/warnings",
+          "/api/v1/orderbook",
+          "/api/v1/trades",
+          "/api/v1/price-limits",
+          "/api/v1/candles",
+          "/api/v1/exchange-rate",
+          "/api/v1/market-calendar/KR",
+          "/api/v1/market-calendar/US",
+        ].includes(request.path)
           ? null
           : "7",
       );
@@ -286,16 +356,63 @@ test("고정 fixture에서 생성한 계약은 재현 가능하다", async () =>
   expect(await new Response(child.stderr).text()).toBe("");
 });
 
-test("빌드한 stdio bundle의 새 도구는 실제 loopback HTTP 목적지에 한 번 도달한다", async () => {
+test("빌드한 production stdio bundle의 계좌·시세 도구가 실제 HTTP 목적지에 도달한다", async () => {
   const fake = new FakeToss(
-    new Set(["issueOAuth2Token", "getSellableQuantity"]),
+    new Set([
+      "issueOAuth2Token",
+      "getSellableQuantity",
+      "getStocks",
+      "listStocks",
+      "getStockWarnings",
+      "getOrderbook",
+      "getTrades",
+      "getPriceLimit",
+      "getCandles",
+    ]),
   );
+  fake.on("GET", "/api/v1/stocks", { result: [] });
+  fake.on("GET", "/api/v1/stocks/all", { result: [] });
+  fake.on("GET", "/api/v1/stocks/AAPL/warnings", { result: [] });
   const directory = await mkdtemp(join(tmpdir(), "toss-rest-bundle-"));
   const preload = join(directory, "loopback.ts");
   const client = new Client({ name: "bundle-test", version: "1.0" });
   fake.on("GET", "/api/v1/sellable-quantity", {
     result: { sellableQuantity: "9007199254740993.001" },
   });
+  const marketCalls = [
+    {
+      name: "get_orderbook",
+      path: "/api/v1/orderbook",
+      example: "krStock",
+      args: { symbol: "005930" },
+    },
+    {
+      name: "get_trades",
+      path: "/api/v1/trades",
+      example: "usStock",
+      args: { symbol: "AAPL" },
+    },
+    {
+      name: "get_price_limits",
+      path: "/api/v1/price-limits",
+      example: "usStock",
+      args: { symbol: "AAPL" },
+    },
+    {
+      name: "get_candles",
+      path: "/api/v1/candles",
+      example: "lastPage",
+      args: { symbol: "005930", interval: "1d", adjusted: false },
+    },
+  ];
+  for (const call of marketCalls)
+    fake.on(
+      "GET",
+      call.path,
+      canonical.paths[call.path].get.responses["200"].content[
+        "application/json"
+      ].examples[call.example].value,
+    );
   try {
     await buildBundle(directory);
     // production base는 그대로 두고 시험 프로세스의 fetch 전송만 loopback으로 돌린다.
@@ -321,7 +438,48 @@ test("빌드한 stdio bundle의 새 도구는 실제 loopback HTTP 목적지에 
       metadata: {},
       sellable_quantity: "9007199254740993.001",
     });
-    expect(fake.requests).toHaveLength(2);
+    const listed = (await client.listTools()).tools;
+    const manifest = JSON.parse(
+      readFileSync(`${import.meta.dir}/../connector.json`, "utf8"),
+    );
+    for (const entry of listed)
+      expect(entry.description).toBe(manifest.tools[entry.name].description);
+    expect(listed).toHaveLength(33);
+    for (const [name, args] of [
+      ["get_stocks", { symbols: "AAPL" }],
+      ["list_stocks", { market: "NASDAQ", commonShare: false }],
+      ["get_stock_warnings", { symbol: "AAPL" }],
+    ] as const) {
+      const entry = listed.find((item) => item.name === name)!;
+      expect(entry.annotations?.readOnlyHint).toBe(true);
+      expect(entry.description).not.toContain("undefined");
+      const response = await tool(client, name, args);
+      expect(response.result.isError).toBeUndefined();
+      expect(response.body).toEqual({ result: [], metadata: {} });
+    }
+    expect(new Set(listed.map((item) => item.name))).toEqual(
+      new Set(Object.keys(manifest.tools)),
+    );
+    for (const call of marketCalls) {
+      const response = await tool(client, call.name, call.args);
+      expect(response.result.isError).toBeUndefined();
+      expect(response.result.structuredContent).toEqual(response.body);
+      expect(response.body.result).toEqual(
+        canonical.paths[call.path].get.responses["200"].content[
+          "application/json"
+        ].examples[call.example].value.result,
+      );
+      const received = fake.seen("GET", call.path);
+      expect(received).toHaveLength(1);
+      expect(received[0]!.body).toBe("");
+      expect(received[0]!.headers.get("x-tossinvest-account")).toBeNull();
+    }
+    expect(fake.requests).toHaveLength(9);
+    expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+    expect(
+      fake.seen("POST").filter((request) => request.path !== "/oauth2/token"),
+    ).toHaveLength(0);
+    expect(fake.seen("DELETE")).toHaveLength(0);
     const request = fake.seen("GET")[0]!;
     expect(request.path).toBe("/api/v1/sellable-quantity");
     expect(request.query.get("symbol")).toBe("AAPL");
