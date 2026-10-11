@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createTossinvestServer } from "../src/server.ts";
 import {
   FakeToss,
+  stockInfo,
   accountNo,
   apiError,
   credentials,
@@ -21,20 +22,27 @@ const manifest = JSON.parse(
 const accountRows = {
   result: [
     { accountNo, accountSeq: 7, accountType: "BROKERAGE" },
-    { accountNo: "99900001234", accountSeq: "8", accountType: "FUTURE_TYPE" },
+    { accountNo: "99900001234", accountSeq: 8, accountType: "FUTURE_TYPE" },
   ],
 };
 const priceRows = {
   result: [
-    { symbol: "005930", timestamp: "2026-01-02T00:00:00Z", lastPrice: "70000", currency: "KRW" },
-    { symbol: "AAPL", timestamp: "2026-01-02T00:00:01Z", lastPrice: "190.5", currency: "USD" },
+    {
+      symbol: "005930",
+      timestamp: "2026-01-02T00:00:00Z",
+      lastPrice: "70000",
+      currency: "KRW",
+    },
+    {
+      symbol: "AAPL",
+      timestamp: "2026-01-02T00:00:01Z",
+      lastPrice: "190.5",
+      currency: "USD",
+    },
   ],
 };
 const stockRows = {
-  result: [
-    { symbol: "005930", name: "가상전자" },
-    { symbol: "AAPL", name: "Fake Apple" },
-  ],
+  result: [stockInfo("005930", "가상전자"), stockInfo("AAPL", "Fake Apple")],
 };
 
 function setup(options: Record<string, unknown> = {}) {
@@ -85,9 +93,30 @@ describe("list_accounts", () => {
     try {
       await withMcp(server, async (client) => {
         expect((await tool(client, "list_accounts")).body).toEqual({
+          result: [
+            {
+              accountNo: "****8901",
+              accountSeq: "7",
+              accountType: "BROKERAGE",
+            },
+            {
+              accountNo: "****1234",
+              accountSeq: "8",
+              accountType: "FUTURE_TYPE",
+            },
+          ],
+          metadata: {},
           accounts: [
-            { account_seq: "7", account_type: "BROKERAGE", label: "종합매매 ****8901" },
-            { account_seq: "8", account_type: "FUTURE_TYPE", label: "기타 ****1234" },
+            {
+              account_seq: "7",
+              account_type: "BROKERAGE",
+              label: "종합매매 ****8901",
+            },
+            {
+              account_seq: "8",
+              account_type: "FUTURE_TYPE",
+              label: "기타 ****1234",
+            },
           ],
         });
       });
@@ -111,7 +140,7 @@ describe("list_accounts", () => {
     }
   });
 
-  test("순번이 숫자 1자리에서 10자리가 아닌 계좌는 결과에서 뺀다", async () => {
+  test("잘못된 순번이 섞인 계좌 응답은 전체 오류다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/accounts", {
       result: [
@@ -122,36 +151,34 @@ describe("list_accounts", () => {
       ],
     });
     try {
-      await withMcp(server, async (client) => {
-        expect((await tool(client, "list_accounts")).body).toEqual({
-          accounts: [
-            { account_seq: "1234567890", account_type: "BROKERAGE", label: "종합매매 ****8901" },
-          ],
-        });
-      });
+      await withMcp(server, (client) =>
+        expectFailure(client, "TOSSINVEST_UNAVAILABLE", "list_accounts"),
+      );
     } finally {
       fake.stop();
     }
   });
 
-  test("accountType 이 글이 아니면 account_type 은 null 이고 이름표는 기타다", async () => {
+  test("accountType이 글이 아니면 전체 오류다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/accounts", {
-      result: [{ accountNo, accountSeq: 7, accountType: { kind: "BROKERAGE" } }],
+      result: [
+        { accountNo, accountSeq: 7, accountType: { kind: "BROKERAGE" } },
+      ],
     });
     try {
-      await withMcp(server, async (client) => {
-        expect((await tool(client, "list_accounts")).body).toEqual({
-          accounts: [{ account_seq: "7", account_type: null, label: "기타 ****8901" }],
-        });
-      });
+      await withMcp(server, (client) =>
+        expectFailure(client, "TOSSINVEST_UNAVAILABLE", "list_accounts"),
+      );
     } finally {
       fake.stop();
     }
   });
 
   test("client 값이 비어 있으면 요청 없이 거절한다", async () => {
-    const { fake, server } = setup({ env: { TOSSINVEST_CLIENT_ID: "only-id" } });
+    const { fake, server } = setup({
+      env: { TOSSINVEST_CLIENT_ID: "only-id" },
+    });
     try {
       await withMcp(server, (client) =>
         expectFailure(client, "TOSSINVEST_UNAUTHORIZED", "list_accounts"),
@@ -171,11 +198,26 @@ describe("get_quotes", () => {
     try {
       await withMcp(server, async (client) => {
         expect(
-          (await tool(client, "get_quotes", { symbols: " 005930 , AAPL,, " })).body,
+          (await tool(client, "get_quotes", { symbols: " 005930 , AAPL,, " }))
+            .body,
         ).toEqual({
+          result: { prices: priceRows.result, stocks: stockRows.result },
+          metadata: { prices: {}, stocks: {} },
           quotes: [
-            { symbol: "005930", name: "가상전자", last_price: "70000", currency: "KRW", timestamp: "2026-01-02T00:00:00Z" },
-            { symbol: "AAPL", name: "Fake Apple", last_price: "190.5", currency: "USD", timestamp: "2026-01-02T00:00:01Z" },
+            {
+              symbol: "005930",
+              name: "가상전자",
+              last_price: "70000",
+              currency: "KRW",
+              timestamp: "2026-01-02T00:00:00Z",
+            },
+            {
+              symbol: "AAPL",
+              name: "Fake Apple",
+              last_price: "190.5",
+              currency: "USD",
+              timestamp: "2026-01-02T00:00:01Z",
+            },
           ],
         });
       });
@@ -189,22 +231,25 @@ describe("get_quotes", () => {
     }
   });
 
-  test("객체나 배열인 값은 null 이고 64자를 넘는 글은 잘린다", async () => {
+  test("시세 값의 schema 위반은 전체 오류다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/prices", {
       result: [
-        { symbol: "AAA", lastPrice: { raw: 1 }, currency: ["KRW"], timestamp: "t".repeat(80) },
+        {
+          symbol: "AAA",
+          lastPrice: { raw: 1 },
+          currency: ["KRW"],
+          timestamp: "t".repeat(80),
+        },
       ],
     });
     fake.on("GET", "/api/v1/stocks", { result: [] });
     try {
-      await withMcp(server, async (client) => {
-        expect((await tool(client, "get_quotes", { symbols: "AAA" })).body).toEqual({
-          quotes: [
-            { symbol: "AAA", name: null, last_price: null, currency: null, timestamp: "t".repeat(64) },
-          ],
-        });
-      });
+      await withMcp(server, (client) =>
+        expectFailure(client, "TOSSINVEST_UNAVAILABLE", "get_quotes", {
+          symbols: "AAA",
+        }),
+      );
     } finally {
       fake.stop();
     }
@@ -215,15 +260,20 @@ describe("get_quotes", () => {
     const longName = "가".repeat(150);
     fake.on("GET", "/api/v1/prices", {
       result: [
-        { symbol: "AAA", lastPrice: 1, currency: "KRW", timestamp: "t" },
-        { symbol: "BBB", lastPrice: 2, currency: "KRW", timestamp: "t" },
+        { symbol: "AAA", lastPrice: "1", currency: "KRW", timestamp: "t" },
+        { symbol: "BBB", lastPrice: "2", currency: "KRW", timestamp: "t" },
       ],
     });
-    fake.on("GET", "/api/v1/stocks", { result: [{ symbol: "AAA", name: longName }] });
+    fake.on("GET", "/api/v1/stocks", { result: [stockInfo("AAA", longName)] });
     try {
       await withMcp(server, async (client) => {
-        const { body } = await tool(client, "get_quotes", { symbols: "AAA,BBB" });
-        const quotes = body.quotes as Array<{ symbol: string; name: string | null }>;
+        const { body } = await tool(client, "get_quotes", {
+          symbols: "AAA,BBB",
+        });
+        const quotes = body.quotes as Array<{
+          symbol: string;
+          name: string | null;
+        }>;
         expect(quotes[0]!.name).toBe("가".repeat(100));
         expect(quotes[1]!.name).toBeNull();
       });
@@ -236,30 +286,45 @@ describe("get_quotes", () => {
     ["", "빈 값"],
     [" , ", "쉼표만"],
     ["005930;AAPL", "허용하지 않는 글자"],
-    ["A".repeat(13), "13자"],
-    [Array.from({ length: 21 }, (_, index) => `S${index}`).join(","), "21개"],
-  ])("symbols %j(%s)는 요청 없이 TOSSINVEST_INVALID_INPUT 이다", async (symbols) => {
-    const { fake, server } = setup();
-    try {
-      await withMcp(server, (client) =>
-        expectFailure(client, "TOSSINVEST_INVALID_INPUT", "get_quotes", { symbols }),
-      );
-      expect(fake.requests).toHaveLength(0);
-    } finally {
-      fake.stop();
-    }
-  });
+    [
+      Array.from({ length: 2001 }, (_, index) => `S${index}`).join(","),
+      "201개",
+    ],
+  ])(
+    "symbols %j(%s)는 요청 없이 TOSSINVEST_INVALID_INPUT 이다",
+    async (symbols) => {
+      const { fake, server } = setup();
+      try {
+        await withMcp(server, (client) =>
+          expectFailure(client, "TOSSINVEST_INVALID_INPUT", "get_quotes", {
+            symbols,
+          }),
+        );
+        expect(fake.requests).toHaveLength(0);
+      } finally {
+        fake.stop();
+      }
+    },
+  );
 
-  test("20개는 받는다", async () => {
+  test("200개는 받는다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/prices", { result: [] });
     fake.on("GET", "/api/v1/stocks", { result: [] });
-    const symbols = Array.from({ length: 20 }, (_, index) => `S${index}`).join(",");
+    const symbols = Array.from({ length: 200 }, (_, index) => `S${index}`).join(
+      ",",
+    );
     try {
       await withMcp(server, async (client) => {
-        expect((await tool(client, "get_quotes", { symbols })).body).toEqual({ quotes: [] });
+        expect((await tool(client, "get_quotes", { symbols })).body).toEqual({
+          quotes: [],
+          result: { prices: [], stocks: [] },
+          metadata: { prices: {}, stocks: {} },
+        });
       });
-      expect(fake.seen("GET", "/api/v1/prices")[0]!.query.get("symbols")).toBe(symbols);
+      expect(fake.seen("GET", "/api/v1/prices")[0]!.query.get("symbols")).toBe(
+        symbols,
+      );
     } finally {
       fake.stop();
     }
@@ -298,7 +363,9 @@ describe("토큰", () => {
       });
       expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
       for (const request of fake.seen("GET"))
-        expect(request.headers.get("authorization")).toBe(`Bearer ${tokenPrefix}1`);
+        expect(request.headers.get("authorization")).toBe(
+          `Bearer ${tokenPrefix}1`,
+        );
     } finally {
       fake.stop();
     }
@@ -346,24 +413,46 @@ describe("토큰", () => {
     },
   );
 
-  test.each([
-    [{ expires_in: 30 }, "expires_in 이 여유 60초보다 짧다"],
-    [{}, "expires_in 이 없다"],
-  ])("토큰 응답 %j(%s)이어도 잇단 두 호출은 토큰을 한 번만 받는다", async (extra) => {
-    const { fake, server } = setup();
-    fake.routes.set("POST /oauth2/token", () => {
-      fake.issued += 1;
-      return json({ access_token: `${tokenPrefix}${fake.issued}`, token_type: "Bearer", ...extra });
-    });
-    fake.on("GET", "/api/v1/accounts", accountRows);
-    try {
-      await withMcp(server, async (client) => {
-        await tool(client, "list_accounts");
-        await tool(client, "list_accounts");
+  test.each([[{ expires_in: 30 }, "expires_in 이 여유 60초보다 짧다"]])(
+    "토큰 응답 %j(%s)이어도 잇단 두 호출은 토큰을 한 번만 받는다",
+    async (extra) => {
+      const { fake, server } = setup();
+      fake.routes.set("POST /oauth2/token", () => {
+        fake.issued += 1;
+        return json({
+          access_token: `${tokenPrefix}${fake.issued}`,
+          token_type: "Bearer",
+          ...extra,
+        });
       });
-      expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
-      for (const request of fake.seen("GET", "/api/v1/accounts"))
-        expect(request.headers.get("authorization")).toBe(`Bearer ${tokenPrefix}1`);
+      fake.on("GET", "/api/v1/accounts", accountRows);
+      try {
+        await withMcp(server, async (client) => {
+          await tool(client, "list_accounts");
+          await tool(client, "list_accounts");
+        });
+        expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+        for (const request of fake.seen("GET", "/api/v1/accounts"))
+          expect(request.headers.get("authorization")).toBe(
+            `Bearer ${tokenPrefix}1`,
+          );
+      } finally {
+        fake.stop();
+      }
+    },
+  );
+
+  test("expires_in이 없으면 발급 오류이며 API를 보내지 않는다", async () => {
+    const { fake, server } = setup();
+    fake.on("POST", "/oauth2/token", {
+      access_token: "fake",
+      token_type: "Bearer",
+    });
+    try {
+      await withMcp(server, (client) =>
+        expectFailure(client, "TOSSINVEST_UNAVAILABLE", "list_accounts"),
+      );
+      expect(fake.seen("GET")).toHaveLength(0);
     } finally {
       fake.stop();
     }
@@ -412,7 +501,9 @@ describe("토큰", () => {
       status,
     );
     try {
-      await withMcp(server, (client) => expectFailure(client, code, "list_accounts"));
+      await withMcp(server, (client) =>
+        expectFailure(client, code, "list_accounts"),
+      );
       expect(fake.seen("GET")).toHaveLength(0);
     } finally {
       fake.stop();
@@ -431,20 +522,28 @@ describe("API 오류", () => {
     [404, "not-found", "TOSSINVEST_UNAVAILABLE"],
     [429, "too-many-requests", "TOSSINVEST_RATE_LIMITED"],
     [500, "internal", "TOSSINVEST_UNAVAILABLE"],
-  ])("API %i %s 는 %s 이고 서비스의 message 를 싣지 않는다", async (status, code, expected) => {
-    const { fake, server } = setup();
-    fake.fail("GET", "/api/v1/accounts", status, code);
-    try {
-      await withMcp(server, (client) => expectFailure(client, expected, "list_accounts"));
-      expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
-    } finally {
-      fake.stop();
-    }
-  });
+  ])(
+    "API %i %s 는 %s 이고 서비스의 message 를 싣지 않는다",
+    async (status, code, expected) => {
+      const { fake, server } = setup();
+      fake.fail("GET", "/api/v1/accounts", status, code);
+      try {
+        await withMcp(server, (client) =>
+          expectFailure(client, expected, "list_accounts"),
+        );
+        expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+      } finally {
+        fake.stop();
+      }
+    },
+  );
 
   test("JSON 이 아닌 응답은 UNAVAILABLE 이다", async () => {
     const { fake, server } = setup();
-    fake.routes.set("GET /api/v1/accounts", new Response("<html>", { status: 200 }));
+    fake.routes.set(
+      "GET /api/v1/accounts",
+      new Response("<html>", { status: 200 }),
+    );
     try {
       await withMcp(server, (client) =>
         expectFailure(client, "TOSSINVEST_UNAVAILABLE", "list_accounts"),
@@ -456,9 +555,8 @@ describe("API 오류", () => {
 
   test("1MB 를 넘는 응답은 UNAVAILABLE 이다", async () => {
     const { fake, server } = setup();
-    fake.routes.set(
-      "GET /api/v1/accounts",
-      () => json({ result: [], padding: "x".repeat(1024 * 1024 + 1) }),
+    fake.routes.set("GET /api/v1/accounts", () =>
+      json({ result: [], padding: "x".repeat(1024 * 1024 + 1) }),
     );
     try {
       await withMcp(server, (client) =>
@@ -494,7 +592,10 @@ describe("API 오류", () => {
 
   test("응답하지 않는 서비스는 제한 시간 뒤 NETWORK 다", async () => {
     const { fake, server } = setup({ timeoutMs: 200 });
-    fake.routes.set("GET /api/v1/accounts", () => new Promise<Response>(() => {}));
+    fake.routes.set(
+      "GET /api/v1/accounts",
+      () => new Promise<Response>(() => {}),
+    );
     try {
       await withMcp(server, (client) =>
         expectFailure(client, "TOSSINVEST_NETWORK", "list_accounts"),
@@ -508,7 +609,11 @@ describe("API 오류", () => {
     const fake = new FakeToss();
     const unreachable = fake.url;
     fake.server.stop(true);
-    const server = createTossinvestServer({ apiBase: unreachable, env: credentials, timeoutMs: 500 });
+    const server = createTossinvestServer({
+      apiBase: unreachable,
+      env: credentials,
+      timeoutMs: 500,
+    });
     await withMcp(server, (client) =>
       expectFailure(client, "TOSSINVEST_NETWORK", "list_accounts"),
     );
