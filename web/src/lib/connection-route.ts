@@ -1,3 +1,4 @@
+import { toolDescription } from "@/lib/connector-tool-description";
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import type { ControlPlaneResult } from "@/lib/control-plane-result";
@@ -238,6 +239,7 @@ function safeTools(value: unknown): ConnectorTool[] {
         risk: item.risk as ToolRisk,
         approval: item.approval as ToolApproval,
         grant: item.grant === true,
+        description: toolDescription(item.description),
       },
     ];
   });
