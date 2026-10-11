@@ -9,6 +9,7 @@
 #     *.py, plugin.yaml         plugins/dashboard-profile-api/ 그대로
 #     default-config.yaml.template     profile-template/config.yaml.template 에 MCP 주소를 채운 것
 #     profile-plugins/<이름>/          틀의 plugins.enabled 가 켜는 plugin
+#     runtime/*.py                    관리 bootstrap이 별도로 import 하는 일반 addon
 #
 # 묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다. 근거는 ADR-041 이 갖는다.
 set -euo pipefail
@@ -91,6 +92,8 @@ mkdir -p -- "$OUT/profile-plugins"
 cp -- "$DASHBOARD_PLUGIN/"*.py "$DASHBOARD_PLUGIN/plugin.yaml" "$OUT/"
 cp -- "$DASHBOARD_PLUGIN/connector_diagnostics_source.json" "$OUT/"
 cp -- "$SCRIPT_DIR/decision-profile/config.yaml.template" "$OUT/decision-config.yaml.template"
+mkdir -- "$OUT/runtime"
+cp -- "$SCRIPT_DIR/runtime/"*.py "$OUT/runtime/"
 
 # 주소를 글자 그대로 넣는다. sed 의 구분자와 특수 글자를 피하려고 Python 으로 바꾼다.
 python3 - "$TEMPLATE" "$OUT/default-config.yaml.template" "$PLACEHOLDER" "$MCP_URL" <<'PY' \
