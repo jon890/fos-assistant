@@ -140,14 +140,19 @@ describe("주문 상세와 수수료 독립 조회", () => {
       );
       const path = `/api/v1/orders/${order.orderId}`;
       fake.on("GET", path, contaminated({ result: order }));
-      success(
-        await client.callTool({
-          name: "get_order",
-          arguments: { orderId: order.orderId },
-        }),
-        order,
-      );
+      const projected = await client.callTool({
+        name: "get_order",
+        arguments: { orderId: order.orderId },
+      });
+      success(projected, order);
       request(fake, path);
+      const body = projected.structuredContent as any;
+      expect(Object.keys(body.result)).toEqual(
+        Object.keys(fixture.components.schemas.Order.properties),
+      );
+      expect(Object.keys(body.result.execution)).toEqual(
+        Object.keys(fixture.components.schemas.OrderExecution.properties),
+      );
     }));
 
   test("optional 부재와 null·unknown 시장·모든 정상 행 유지", async () =>
@@ -200,6 +205,7 @@ describe("주문 상세와 수수료 독립 조회", () => {
     run(async (fake, client) => {
       for (const orderId of [
         "opaque.with-dot_+한글😀",
+        "opaque-" + "한글😀".repeat(128),
         "opaque-" + "x".repeat(4096),
       ]) {
         const order = sampleOrder(orderId);
@@ -230,6 +236,11 @@ describe("주문 상세와 수수료 독립 조회", () => {
         "a\n",
         "a\u007f",
         "a\u0085",
+        ...Array.from({ length: 32 }, (_, i) => `a${String.fromCharCode(i)}`),
+        ...Array.from(
+          { length: 33 },
+          (_, i) => `a${String.fromCharCode(127 + i)}`,
+        ),
         "\ud800",
         "\udfff",
       ]) {

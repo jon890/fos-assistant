@@ -1,45 +1,9 @@
 import { z } from "zod";
-import type { Commission, Order, OrderExecution } from "./api-contract.ts";
+import { SCHEMAS } from "./api-contract.ts";
 import type { Tossinvest } from "./client.ts";
 import { TossinvestError } from "./errors.ts";
 import type { RegisterTool } from "./tool-registration.ts";
-
-/** 공식 필드만 옮겨 계좌 응답의 확장키를 노출하지 않는다. null과 부재는 구별한다. */
-function pick<T extends object>(value: T, keys: readonly (keyof T)[]): T {
-  return Object.fromEntries(
-    keys
-      .filter((key) => Object.hasOwn(value, key))
-      .map((key) => [key, value[key]]),
-  ) as T;
-}
-
-function orderResult(order: Order): Order {
-  const result = pick(order, [
-    "orderId",
-    "symbol",
-    "side",
-    "orderType",
-    "timeInForce",
-    "status",
-    "price",
-    "quantity",
-    "orderAmount",
-    "currency",
-    "orderedAt",
-    "canceledAt",
-    "execution",
-  ]);
-  result.execution = pick<OrderExecution>(order.execution, [
-    "filledQuantity",
-    "averageFilledPrice",
-    "filledAmount",
-    "commission",
-    "tax",
-    "filledAt",
-    "settlementDate",
-  ]);
-  return result;
-}
+import { officialFields } from "./official-response.ts";
 
 /** opaque ID의 숫자 여부와 길이는 제한하지 않고 경로 주입만 막는다. */
 function orderPath(orderId: string): string {
@@ -65,7 +29,10 @@ export function registerOrderReadTools(
       const envelope = await client.request(orderPath(orderId), {
         account: true,
       });
-      return { result: orderResult(envelope.result), metadata: {} };
+      return {
+        result: officialFields(envelope.result, SCHEMAS.Order),
+        metadata: {},
+      };
     },
   );
 
@@ -75,9 +42,10 @@ export function registerOrderReadTools(
       account: true,
     });
     return {
-      result: envelope.result.map((row: Commission) =>
-        pick(row, ["marketCountry", "commissionRate", "startDate", "endDate"]),
-      ),
+      result: officialFields(envelope.result, {
+        type: "array",
+        items: SCHEMAS.Commission,
+      }),
       metadata: {},
     };
   });

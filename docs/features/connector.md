@@ -435,8 +435,8 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
-현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
+현재 8개 READ 도구가 인증·조회 10개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 31개 operation의 producer는 아직 구현하지 않았다.
+현재 금융 도구는 차단돼 있다. 아래 표는 등록한 도구와 앞으로 구현할 도구를 상태로 구분한다.
 
 ### 공식 기준과 완료 조건
 
@@ -449,7 +449,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 10개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
@@ -520,7 +520,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getHoldings` | `get_holdings` | READ/none; ASSET | 기반 구현 | 기반 |
 | `getOrders` | `list_orders` | READ/none; ORDER_HISTORY | 기반 구현 | 기반 |
 | `createOrder` | `create_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
-| `getOrder` | `get_order` | READ/none; ORDER_HISTORY | 미연결 | 일반주문 |
+| `getOrder` | `get_order` | READ/none; ORDER_HISTORY | 구현 | 주문 상세 조회 |
 | `modifyOrder` | `modify_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
 | `cancelOrder` | `cancel_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
 | `createConditionalOrder` | `create_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
@@ -530,7 +530,9 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `modifyConditionalOrder` | `modify_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
 | `getBuyingPower` | `get_buying_power` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
 | `getSellableQuantity` | `get_sellable_quantity` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
-| `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 미연결 | 일반주문 |
+| `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 구현 | 수수료 조회 |
+
+get_order는 필수 opaque orderId로 주문 하나를 읽고 getOrders의 목록 페이지와 구분한다. 제어문자(C0/DEL/C1)와 단독 surrogate, 경로 주입을 거절하며 정상 Unicode와 긴 ID는 보존한다. get_commissions는 입력 없이 전체 시장 배열을 반환한다. 두 조회는 금융 producer의 선행 조건 없이 등록한다. Order 13개와 OrderExecution 7개, Commission 4개 공식 필드를 공용 schema 투영으로 보존하고 확장 민감키를 제거한다. commissionRate는 decimal 비율이며 KST 날짜·시각과 null·부재, 배열 순서를 바꾸지 않는다.
 
 ### 필드 계약
 
@@ -540,7 +542,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
 이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
 일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
-현재 7개 READ operation의 공식 성공 예시 20개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
+현재 9개 READ operation의 공식 성공 예시 25개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
 
 ### 페이지와 시장별 조건
 

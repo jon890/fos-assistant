@@ -20,12 +20,15 @@ description: 토스증권 계좌와 시세를 읽는다. 주문하지 않는다.
 ## 읽기
 
 - `list_accounts`: 연결한 계좌의 순번과 유형, 계좌번호 끝 네 자리를 본다. 계좌번호 원문은 나오지 않는다
-- `get_quotes`: 종목 코드나 티커를 쉼표로 이어 20개까지의 현재가와 이름을 본다. 예: `symbols` 에 `005930,AAPL`
+- `get_quotes`: 종목 코드나 티커를 쉼표로 이어 200개까지의 현재가와 이름을 본다. 예: `symbols` 에 `005930,AAPL`
 - `get_holdings`: 보유 종목과 평가 금액, 손익을 본다. `total` 의 금액은 원화(`krw`)와 달러(`usd`)로 나뉘고, `items` 의 금액은 그 종목의 거래 통화 기준이다.
   비용 공제 전 값과 공제 후 값(`..._after_cost`)이 함께 오므로 어느 쪽을 말하는지 밝힌다
 - `get_buying_power`: `currency` 에 `KRW` 나 `USD` 를 넣어 주문 가능 현금을 본다. `symbol` 을 주면 그 종목의 매도 가능 수량도 본다
-- `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각, 366일까지)로 기간을 정해 주문을 본다.
-  100건까지 오고 `has_more` 가 참이면 더 있다. 그때는 받은 것이 일부라고 말한다
+- `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각)로 기간을 정해 주문을 본다.
+  CLOSED는 기본 20건, 최대 100건의 한 페이지다. `hasNext`가 참이면 받은 `nextCursor`로 다음 페이지를 읽는다. OPEN은 cursor와 limit 없이 전체를 반환한다
+- `get_sellable_quantity`: `symbol` 한 종목의 매도 가능 수량을 본다
+- `get_order`: 목록에서 받은 `orderId`로 주문 하나와 체결 상세를 본다. ID를 숫자로 바꾸거나 자르지 않는다
+- `get_commissions`: 인자 없이 전체 시장의 수수료와 적용 날짜를 본다. marketCountry 필터가 없다. `commissionRate`는 decimal 비율 그대로이며 퍼센트 숫자로 바꾸지 않는다
 
 금액과 수량은 10진수 글로 온다. 숫자로 어림하지 않고 받은 글 그대로 말한다.
 
