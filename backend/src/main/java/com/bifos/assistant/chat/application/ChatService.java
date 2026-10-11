@@ -107,10 +107,7 @@ public class ChatService {
                 return;
             }
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
-            onEvent.accept(
-                    turn.cancelled()
-                            ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                            : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
             turns.close(handle);
         }
@@ -189,10 +186,7 @@ public class ChatService {
         }
         ChatTurn turn = chatTurnRunner.runTurn(
                 owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
-        onEvent.accept(
-                turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+        onEvent.accept(ChatTurnCompletion.eventOf(turn));
         return turn;
     }
 
@@ -222,10 +216,7 @@ public class ChatService {
         }
         ChatTurn turn = chatTurnRunner.runTurn(
                 owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle);
-        onEvent.accept(
-                turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+        onEvent.accept(ChatTurnCompletion.eventOf(turn));
     }
 
     /**
@@ -258,10 +249,7 @@ public class ChatService {
             try {
                 ChatTurn turn =
                         chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
-                onEvent.accept(
-                        turn.cancelled()
-                                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+                onEvent.accept(ChatTurnCompletion.eventOf(turn));
                 return;
             } catch (PendingQueueChangedException ex) {
                 if (attempt >= PENDING_READ_ATTEMPTS) {
@@ -306,10 +294,7 @@ public class ChatService {
                 return;
             }
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, question.content(), intent, onEvent, true, handle);
-            onEvent.accept(
-                    turn.cancelled()
-                            ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                            : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
             turns.close(handle);
         }

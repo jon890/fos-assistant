@@ -55,6 +55,8 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 
@@ -191,6 +193,48 @@ class ChatStopTest {
                 .filteredOn(it -> it.conversationId().equals(conversationId))
                 .singleElement()
                 .satisfies(it -> assertThat(it.stopped()).isTrue());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("완료와 중지 사건은 저장한 답과 실행을 가리키고 잠금 닫기보다 먼저 전달된다")
+    void emitsPersistedTerminalEventBeforeClosingTurn(boolean cancelled) {
+        CurrentUser dad = member("dad@example.com", "dad");
+        stub().willReturn(HermesRunResult.of(
+                "run-terminal", "session", cancelled ? "cancelled" : "completed",
+                "남긴 답", "model", "provider", TokenUsage.empty()));
+        if (cancelled) {
+            stub().beforeAwait(() -> chat.stop(dad, latestExecution(dad).id()));
+        }
+        List<String> order = new CopyOnWriteArrayList<>();
+        List<ChatEvent> relayed = new ArrayList<>();
+        turns.addCloseListener(closed -> order.add("closed"));
+
+        chat.stream(dad, null, "질문", "dad", event -> {
+            relayed.add(event);
+            order.add(event.type());
+        });
+
+        String terminalType = cancelled ? "stopped" : "done";
+        assertThat(order).endsWith(terminalType, "closed");
+        assertThat(relayed).filteredOn(event -> List.of("done", "stopped").contains(event.type()))
+                .singleElement().isEqualTo(relayed.getLast());
+        ChatEvent terminal = relayed.getLast();
+        Long conversationId = access.requireOwnId(dad, terminal.conversationId());
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
+                .extracting(message -> message.role()).containsExactly(MessageRole.USER, MessageRole.ASSISTANT);
+        assertThat(messages.findById(terminal.messageId()).orElseThrow())
+                .satisfies(answer -> {
+                    assertThat(answer.conversationId()).isEqualTo(conversationId);
+                    assertThat(answer.executionId()).isEqualTo(terminal.executionId());
+                    assertThat(answer.content()).isEqualTo("남긴 답");
+                });
+        assertThat(executions.findById(terminal.executionId()).orElseThrow())
+                .satisfies(execution -> {
+                    assertThat(execution.conversationId()).isEqualTo(conversationId);
+                    assertThat(execution.status())
+                            .isEqualTo(cancelled ? ExecutionStatus.CANCELLED : ExecutionStatus.SUCCEEDED);
+                });
     }
 
     @Test
