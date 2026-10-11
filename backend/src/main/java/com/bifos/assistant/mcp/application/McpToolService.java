@@ -86,6 +86,7 @@ public class McpToolService {
         return catalog.tools();
     }
 
+
     /**
      * 요청자를 정하지 못한 호출의 도구 결과다.
      * <p>서명 오류, profile 불일치, 부모 없음, 부모 둘 이상, 사용자 없음을 모두 이 결과 하나로 답한다(ADR-032).

@@ -42,10 +42,12 @@ class McpToolCatalogTest {
         assertThat(description(catalog.tools())).endsWith("먼저 살펴보기에서는 wait_seconds 로 끝나기를 기다린다(최대 40초).");
     }
 
+
     private static String description(List<Map<String, Object>> definitions) {
         return definitions.stream().filter(tool -> "agent_status".equals(tool.get("name")))
             .map(tool -> (String)tool.get("description")).findFirst().orElseThrow();
     }
+
 
     private static DelegationProperties settings(int waitSeconds) {
         return new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 1000, Duration.ofSeconds(waitSeconds));
