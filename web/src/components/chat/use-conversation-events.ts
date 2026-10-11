@@ -22,6 +22,7 @@ import {
 } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationHistory } from "./use-conversation-history";
+import { applyStreamText } from "./turn-stream-text";
 
 type Context = Pick<
   ConversationSessionState,
@@ -101,6 +102,8 @@ export function useConversationEvents({
     state: TurnStreamState,
     callbacks: TurnStreamCallbacks,
   ) {
+    state.textState ??= { text: "", interimKeys: new Set() };
+    const reclassified = applyStreamText(state.textState, event);
     if (event.type === "system") {
       callbacks.onSystem?.(event);
     } else if (event.type === "started") {
@@ -112,6 +115,12 @@ export function useConversationEvents({
       callbacks.onDelta?.(event.text);
     } else if (event.type === "reset") {
       callbacks.onReset?.();
+      setActivity((previous) => previous && applyChatEvent(previous, event));
+    } else if (event.type === "interim") {
+      if (reclassified) {
+        callbacks.onReset?.();
+        if (state.textState.text) callbacks.onDelta?.(state.textState.text);
+      }
       setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (["tool", "subagent", "step"].includes(event.type)) {
       setActivity((previous) => previous && applyChatEvent(previous, event));
