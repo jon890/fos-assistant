@@ -51,10 +51,12 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 | 커넥터에 스킬이 있는데 `skills` 도구가 꺼져 있다 | 지침을 쓰려면 스킬 도구를 켜라는 안내. 붙이기는 `skills` 를 켜지 않는다([ADR-029](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)) |
 
 「붙이기」 는 확인 창을 거친다. 실패하면 창이 남아 까닭을 보인다.
-확인 창은 격리를 적용하지 않은 에이전트가 터미널이나 파일 도구로 연결의 비밀값에 닿을 수 있다고 늘 알린다.
-셸, 파일, 코드 실행 도구가 켜져 있으면 승인 없이 그 서비스를 부를 수 있고, 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있다는 경고를 더한다.
-화면은 그 profile 에 실행 공간 격리([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md))가 적용됐는지 모른다. 그래서 두 경우를 함께 알린다.
+확인 창은 「이 에이전트가 이 서비스의 도구를 직접 써요. 명령 실행이나 파일 도구를 함께 쓰면 연결 정보에 접근할 수 있어요. 읽은 내용이 다른 도구를 통해 인터넷으로 나갈 수도 있어요.」를 늘 알린다.
+셸, 파일, 코드 실행 도구가 켜져 있으면 「안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.」를 더한다.
 도구 절도 연결이 붙은 에이전트에서 그 도구를 켤 때 같은 경고를 더한다.
+화면은 실행 공간 격리([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md))가 적용됐는지 모르므로 두 경우를 함께 알린다.
+READ 데이터의 인터넷 전파 위험은 [커넥터 도구 정책](connector-policy.md#커넥터-read-데이터의-흐름)이 갖는다.
+
 「바인딩」 은 화면에 보이지 않는다. 「붙이기」, 「떼기」, 「이 에이전트가 쓰는 연결」, 「반영 대기」 라 쓴다.
 
 **「외부 서비스 연결」 화면**은 계정 연결을 맡는다. 떼기는 에이전트 화면에서 한다.
@@ -93,6 +95,29 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 - 「이 에이전트에서 쓰기」 는 그 에이전트의 도구를 먼저 읽는다. 셸, 파일, 코드 실행 도구가 켜졌거나 도구를 읽지 못했으면 에이전트 화면과 같은 확인 창을 거치고, 아니면 바로 붙인다
 - 붙이기가 실패해도 서버에 바인딩이 남았을 수 있어 붙인 에이전트 목록을 다시 읽는다
 - 붙이면 언제 쓸 수 있는지(바로, 몇 분 안에, 관리자가 반영을 확인하면)를 함께 보이고, 「대화하기」 가 `/?agent=<번호>` 로 그 에이전트를 고른 새 대화를 연다
+
+### 에이전트 사용 시작 안내
+
+에이전트 상세는 성격 뒤에 연결 절과 도구 절을 차례로 그린다. 읽지 못한 절도 같은 순서다.
+주인과 관리자의 권한, 옛 커넥터 에이전트에 숨기는 절은 그대로 유지한다.
+
+붙은 연결은 제목과 도구 수 아래에 `boundReadiness({status, restartRequired})`의 안내를 보인다.
+
+| 바인딩 상태 | 안내 |
+| --- | --- |
+| 재시작 대기. `READY`여도 이 조건을 먼저 본다 | 관리자가 반영을 확인하면 쓸 수 있어요. |
+| `READY`이고 재시작 대기가 아니다 | 바로 쓸 수 있어요. |
+| 나머지 | 몇 분 안에 쓸 수 있어요. |
+
+붙지 않은 연결에는 사용 시점 안내가 없다. 「몇 분」은 기존 추정 안내이며 완료 시각을 보장하지 않는다.
+붙이기가 실패해도 서버에 바인딩이 남을 수 있으므로 목록을 다시 읽어 상태와 도구 절의 연결 위험 안내를 맞춘다.
+
+셸·파일·코드 실행 도구를 켜는 확인 창은 다음 문구를 쓴다.
+「안전하게 분리되지 않은 에이전트는 다른 사용자의 파일과 서버 설정에 접근할 수 있어요. 분리된 에이전트도 허용된 파일과 서비스를 이용하고 파일이나 읽은 내용을 인터넷으로 보낼 수 있어요.」
+사용자별 실행 공간과 사진 첨부 설명은 도구 설명에 남긴다.
+연결 화면의 에이전트 고르기도 실제 `shellOrFileEnabled`를 확인하므로 도구를 목록에서 숨겨도 경고가 남는다.
+에이전트 상세와 연결 화면 모두 도구를 읽지 못하면 켜져 있다고 보고 붙이기 확인 창에서 경고한다.
+확인 창은 항상 승인받는다고 보장하지 않는다. READ·WRITE의 승인과 FINANCIAL·DESTRUCTIVE의 거절 정책은 바꾸지 않는다.
 
 ## 흐름
 
@@ -187,7 +212,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | 대시보드가 401 로 거절한다. 표식이 없는 profile 이다 | `CONNECTOR_PROFILE_NOT_READY` |
 | 그 밖의 외부 실패 | 바인딩을 `PENDING` 으로 남기고 `CONNECTOR_OPERATION_FAILED`. 대시보드가 반쯤 반영했을 수 있어 다음 연결 확인이 설치를 다시 보낸다 |
 
-대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았다. 트랜잭션이 되돌려져 바인딩 행도 남지 않는다.
+대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았다. 결과 트랜잭션이 같은 설치 시도의 새 바인딩 행만 지운다.
 붙인 바인딩은 늘 `PENDING` 이다. 답의 `restart_required` 나 `plugin_updated` 가 참이면 재시작 대기로 두고 그 시각을 적는다. 둘 다 거짓이고 `reload_pending` 이 참이면 `assistant.connector.binding.apply-delay` 뒤를 반영 예정 시각으로 적는다.
 그 시간을 정한 까닭은 `ConnectorBindingProperties` 의 주석과 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 가 갖는다.
 
@@ -286,12 +311,41 @@ manifest 가 바뀐 뒤 설치가 다시 보내지지 않은 바인딩을 Contro
 
 ### 동시 요청과 잠금
 
-- 같은 사용자의 등록, 확인, 해제, 붙이기, 떼기, 승인은 사용자 행 잠금으로 순서대로 처리한다. 그래서 승인이 본 바인딩은 커밋할 때까지 떼어지지 않는다
+- 같은 사용자의 등록, 확인, 해제, 붙이기, 떼기, 승인은 각 저장 단계에서 사용자 행 잠금으로 순서대로 처리한다. 그래서 승인이 본 바인딩은 커밋할 때까지 떼어지지 않는다
 - 붙이기, 떼기, 관리자 반영 완료, 반영 예정 확인, 지우기는 사용자 행을 먼저, 에이전트 행을 다음에 잠근다. 공개 범위 변경과 관리자 수정도 같은 에이전트 행을 잠그므로, 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다
 - 바인딩의 `desired_enabled` 는 이번 설치가 끝까지 성공해 활성화 후보가 되었는지를 뜻한다. 설치를 보내기 전에 거짓으로 두고 성공한 뒤에만 참으로 둔다
 - 외부 호출이 실패하면 `PENDING` 을 커밋한다. 이전 값으로 실행할 수 있는 상태로 되돌리지 않는다
 - DB 커밋 자체가 실패하면 이미 반영한 보관 파일이나 설치는 되돌리지 못한다. 다시 등록하거나 연결 확인을 눌러 상태를 맞춘다
 - 지우기가 profile 에서 뗀 뒤 행 삭제가 실패해 되돌려지면 행은 남고 profile 에서는 떼어진 상태다. 다음 연결 확인이 설치가 configured 가 아닌 것을 보고 그 바인딩을 `PENDING` 으로 둔다
+
+### 설치 호출의 커밋 경계
+
+등록, 연결 확인, 붙이기, 관리자 반영 완료와 예약·드리프트 확인은 같은 설치 경계를 쓴다.
+`ConnectorInstallAttempts`가 트랜잭션 경계를 맡고 `ConnectorBindingInstalls`가 불변 입력으로 외부 호출을 실행한다.
+
+1. 시작 트랜잭션은 소유 사용자, 에이전트 순서로 잠근 뒤 바인딩을 다시 읽는다. 관리자 확인과 예약·드리프트도 소유자의 접근 철회를 확인한다. 바인딩마다 새 `install_attempt_id`와 `PENDING`을 적고 설치 입력을 반환한다. 설치를 보낼 때는 `desired_enabled=false`로 내리고, 재시작·반영 예정만 기다리는 확인은 기존 의도를 유지한다.
+2. 시작을 커밋한 뒤 DB 트랜잭션 밖에서 설치, 상태 조회와 probe를 실행한다. 입력에는 커밋된 연결 revision과 profile, credential, 보관 파일과 manifest의 선언만 담는다. JPA 엔티티와 lazy 참조는 넘기지 않는다.
+3. 결과 트랜잭션은 같은 잠금 순서로 현재 바인딩을 다시 읽는다. 접근 권한·소유자·profile·credential·연결 상태와 revision·시도 UUID가 모두 맞을 때만 결과를 적고 UUID를 비운다.
+
+늦은 성공과 실패, 중복 결과는 새 시도를 덮거나 지운 바인딩을 다시 만들지 못한다.
+새 붙이기의 명시적 거절도 현재 시도만 지우며, 외부 설치를 뒤늦게 떼는 정리 호출은 하지 않는다.
+연결 revision은 시작 단계에서 DB의 마이크로초 정밀도로 단조 증가하며 결과 단계에서는 바꾸지 않는다.
+verify를 보내기 전에 본 revision이 달라졌으면 이전 계정의 성공과 실패를 버리고 지금 연결을 돌려준다.
+응답을 잃거나 결과 저장이 실패하면 커밋된 `PENDING`을 남기고 기존 연결 확인으로 복구한다.
+옛 바인딩의 설치 전 상태 조회가 실패하거나 꺼진 설치를 보면, 결과 CAS를 통과한 시도만 기존 활성화 의도를 복원한다.
+설치 요청을 보낸 뒤 실패했으면 의도를 복원하지 않는다. 어느 경우든 반영 확인 전에는 `PENDING`이라 도구를 허용하지 않는다.
+드리프트 처리 횟수는 결과 커밋 뒤에만 증가한다.
+
+callback이 없는 vault 저장·가져오기·삭제와 detach 자체는 기존 잠금과 부분 해제 계약을 유지한다.
+진행 중인 설치 HTTP는 떼기나 에이전트 삭제·정리를 기다리게 하지 않는다.
+떼기가 외부 설치와 바인딩 행을 지운 뒤 앞선 설치가 늦게 성공하면 profile에 행 없는 설치가 남을 수 있다.
+에이전트 정리로 행이 사라진 경우도 결과는 버리지만 외부 설치를 자동으로 지우지는 않는다.
+정책 hook은 실행의 에이전트에 붙은 바인딩을 찾지 못하면 차단하며, 남은 설치만으로 도구 권한이 생기지는 않는다.
+앞선 성공 뒤 무조건 detach를 보내면 다시 붙인 새 설치까지 지울 수 있어 정리 호출을 추가하지 않는다.
+외부 설치까지 원자적으로 정리하려면 Hermes가 설치의 식별자를 대조하는 조건부 설치·삭제 계약을 제공해야 한다.
+현재 시도 UUID는 DB 안에서만 쓰므로, 지금 계약은 DB 권한 차단까지 보장하고 남은 외부 상태의 자동 정리는 보장하지 않는다.
+READ·WRITE의 설치, 재시작 대기와 반영 예정 계약은 그대로이며 FINANCIAL·DESTRUCTIVE는 계속 `RISK_NOT_OPEN`이다.
+guard를 실은 설치와 지원 확인은 후속 구현이며 이번 변경으로 금융 도구를 노출하지 않는다.
 
 ### 재시작
 
@@ -432,10 +486,40 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 - 에이전트의 연결 목록은 그 에이전트의 주인만 읽는다. 해제한 연결은 빠지고, 붙일 수 없는 까닭은 `blockedReason` 이 `AgentConnectionsView` 의 값으로 준다
 - 바인딩마다 재시작 대기가 있다. 연결 상태 응답의 `bindings[]` 와 관리자 목록이 바인딩 상태와 재시작 대기를 함께 낸다
 
+## 네이버 read_draft 사진 메타데이터
+
+`read_draft`는 임시저장 글을 편집기에 불러와 기존 `draft_id`, `revision`, `title`, `category`, `tags`, `body`에 사진 메타데이터를 더한다.
+기존 본문의 `[기존 사진 1]` 같은 줄과 덮어쓰기용 구성요소 대응은 그대로다.
+불러오기 중 네이버 자동저장이 발생할 수 있으므로 기존 WRITE 정책을 유지한다.
+
+`photos`는 `document.components`에 직접 놓인 `@ctype=image`만 현재 배열 차례로 읽는다.
+중첩 이미지와 이미지 그룹은 분석하지 않으므로 전체 사진 검증 완료를 뜻하지 않는다.
+
+| 사진 항목의 칸 | 의미 |
+| --- | --- |
+| `position` | 직접 이미지 중 1부터 센 현재 순서 |
+| `componentIndex` | 원래 components 배열에서 0부터 센 위치 |
+| `componentId` | 편집기 구성요소의 식별자. 영문, 숫자, 밑줄과 하이픈으로 된 1자 이상 200자 이하 문자열이며 그 밖은 null |
+| `fileName` | 실제 이미지 필드의 파일명. 누락되거나 잘못된 값은 null이며 URL에서 추정하지 않는다 |
+
+파일명은 UTF-16 코드 단위로 1개 이상 255개 이하만 허용한다.
+경로 구분자, 콜론, URL query·fragment 기호, 제어 문자, 보이지 않는 형식 문자, 줄 구분자, 잘못된 surrogate, 앞뒤 공백과 점 경로는 거절한다.
+값을 자르거나 고쳐서 유효한 파일명으로 만들지 않으며, 잘못된 메타데이터 때문에 기존 본문 읽기를 실패시키지 않는다.
+사진 항목에는 src, domain, path, 좌표, origin, caption, 원시 객체와 본문을 넣지 않는다.
+
+사진 항목은 최대 50개다. `photo_count`는 직접 이미지의 실제 관측 수이며 `photos_truncated`는 상한 때문에 응답에서 빠진 항목이 있는지 알린다.
+사진이 없으면 빈 배열, 0, false를 반환한다. 51개라면 앞의 50개와 관측 수 51, 잘림 여부 true를 반환하며 본문의 기존 사진 줄은 모두 유지한다.
+중복 파일명도 현재 순서대로 각각 반환한다.
+
+`revision`은 제목, 카테고리, 태그와 본문 네 칸의 기존 지문이며 사진 메타데이터를 포함하지 않는다.
+사진 수와 본문 줄이 같은 상태에서 사진 식별자나 파일명만 바뀌어도 이 지문은 그대로일 수 있다.
+파일명과 component id는 첨부 번호나 권한, 사진 hash가 아니다. 업로드 바이트나 픽셀의 동일성, 승인 시점 사진의 불변성을 증명하지 않는다.
+사용자와 첨부의 신뢰할 수 있는 대응과 접근 권한은 후속 Control Plane이 확인해야 하며 모델이 반환 파일명을 권한 근거로 사용할 수 없다.
+
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 10개 READ 도구가 인증·조회 12개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 29개 operation의 producer는 아직 구현하지 않았다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
@@ -449,7 +533,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 12개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
@@ -470,7 +554,7 @@ producer가 schema 검증 뒤 accountNo를 끝 네 자리로 마스킹한 복사
 Bun 1.3.14의 native JSON.parse reviver 세 번째 인자 context.source를 사용한다. reviver에서 number primitive의 원문을 holder 객체/키별 WeakMap에 보관한 다음 operation/status의 응답 schema를 따라 객체·배열·$ref·allOf를 순회해 지정 위치만 변환한다. 같은 이름인 다른 필드나 문자열은 변환하지 않는다.
 schema 위치와 출력 변환은 api-contract.ts의 응답 descriptor가 소유한다. canonical 1.2.24의 int64 위치는 Account.accountSeq와 OAuth2TokenResponse.expires_in 두 곳이다. 원문 schema를 수정하지 않고 MCP 출력 descriptor에 변환을 선언한다.
 Account.accountSeq는 항상 정규 10진수 문자열이며 1..9223372036854775807이다. 다른 int64는 -9223372036854775808..9223372036854775807에서 schema의 추가 제약을 적용하고 안전 정수는 number, 그 밖은 정규 10진수 문자열로 반환한다. expires_in은 추가로 양수여야 한다.
-expires_in의 정확한 초→ms 계산은 BigInt로 하고 안전한 Date.now()/expiresAt 표현 범위를 넘으면 발급 오류로 거절한다. token을 모델 결과에 내보내지 않는다.
+expires_in의 정확한 초→ms 계산은 BigInt로 하고 안전한 `clock.now()`/expiresAt 표현 범위를 넘으면 발급 오류로 거절한다. `clock.now()`는 `performance.timeOrigin + performance.now()`의 소수 밀리초 시각이며 토큰 TTL, 호출 deadline과 상대 한도 대기에 함께 쓴다. KST 피크 여부만 현재 벽시계로 판단한다. token을 모델 결과에 내보내지 않는다.
 JSON integer 계약은 1.0, 1e3처럼 수학적으로 정수인 표기도 허용한다. source의 부호·계수·소수 자리·지수를 문자열로 분해해 정확한 정수성과 signed int64 범위를 검사한다. 1.5와 1e-1은 거절한다. 지수가 크면 1 MiB 본문 안에서도 자리수 비교로 조기 거절하고 큰 0 문자열을 할당하지 않는다.
 Number(value)나 반올림한 Number로 범위를 판정하지 않는다. primitive 문자열의 가짜 숫자는 그대로 두며 구문 오류는 native parser가 거절한다. context.source가 없으면 정확성을 가장하지 않고 실패한다. JSON 정규식 재작성과 새 의존성은 금지한다.
 raw fixture의 기대값은 손으로 적은 10진수 문자열/BigInt 상수에서 만든다. 2^53-1·2^53·2^53+1, 인접 큰 정수, int64 최대·초과·최소·미만, accountSeq의 0·음수, nested 배열, 같은 이름의 비schema 필드, 문자열 속 가짜 숫자, 정수 지수/소수와 비정수 표기·문법 오류를 검사한다.
@@ -491,11 +575,11 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | 공식 operationId | 도구 또는 인증 | 권한과 한도 그룹 | 현재 상태 | 단계 |
 | --- | --- | --- | --- | --- |
 | `issueOAuth2Token` | `내부 Tossinvest.token/issue` | 내부 인증; AUTH | 기반 구현 | 기반 |
-| `getOrderbook` | `get_orderbook` | READ/none; MARKET_DATA | 미연결 | 시세 |
+| `getOrderbook` | `get_orderbook` | READ/none; MARKET_DATA | 구현 | 시세 |
 | `getPrices` | `get_quotes` | READ/none; MARKET_DATA | 기반 구현 | 기반 |
-| `getTrades` | `get_trades` | READ/none; MARKET_DATA | 미연결 | 시세 |
-| `getPriceLimit` | `get_price_limits` | READ/none; MARKET_DATA | 미연결 | 시세 |
-| `getCandles` | `get_candles` | READ/none; MARKET_DATA_CHART | 미연결 | 시세 |
+| `getTrades` | `get_trades` | READ/none; MARKET_DATA | 구현 | 시세 |
+| `getPriceLimit` | `get_price_limits` | READ/none; MARKET_DATA | 구현 | 시세 |
+| `getCandles` | `get_candles` | READ/none; MARKET_DATA_CHART | 구현 | 시세 |
 | `getStocks` | `get_stocks` | READ/none; STOCK | get_quotes 구현; get_stocks 미등록 | 종목 |
 | `listStocks` | `list_stocks` | READ/none; STOCK_ALL | 미연결 | 종목 |
 | `getStockWarnings` | `get_stock_warnings` | READ/none; STOCK | 미연결 | 종목 |
@@ -540,7 +624,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
 이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
 일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
-현재 7개 READ operation의 공식 성공 예시 20개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
+현재 11개 READ operation의 공식 성공 예시 29개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다. production SDK가 10개 도구를 호출해 인증·조회 12개 operation에 도달하는지 HTTP 수신 기록으로 확인하며 stdio bundle에서도 시세 네 도구의 도달을 검사한다.
 
 ### 페이지와 시장별 조건
 

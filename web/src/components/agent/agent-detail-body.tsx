@@ -174,26 +174,6 @@ export function AgentDetailBody({
           )}
         </>
       )}
-      {connectorManaged || tools === null ? null : tools.ok ? (
-        <AgentToolsSection
-          code={code}
-          initialTools={tools.data.initialTools}
-          admin={tools.data.admin}
-          visibility={visibility}
-          hasConnections={hasConnections}
-          onToolsChange={setToolState}
-        />
-      ) : (
-        <section
-          aria-label="도구"
-          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
-        >
-          <h2 className="font-semibold">도구</h2>
-          <Notice variant="error" role="alert" className="mt-3">
-            {tools.message}
-          </Notice>
-        </section>
-      )}
       {connectorManaged || connections === null ? null : connections.ok ? (
         <AgentConnectionsSection
           code={code}
@@ -211,6 +191,26 @@ export function AgentDetailBody({
           <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
           <Notice variant="error" role="alert" className="mt-3">
             {connections.message}
+          </Notice>
+        </section>
+      )}
+      {connectorManaged || tools === null ? null : tools.ok ? (
+        <AgentToolsSection
+          code={code}
+          initialTools={tools.data.initialTools}
+          admin={tools.data.admin}
+          visibility={visibility}
+          hasConnections={hasConnections}
+          onToolsChange={setToolState}
+        />
+      ) : (
+        <section
+          aria-label="도구"
+          className="mx-auto mt-8 w-full max-w-2xl rounded-md border border-border p-4"
+        >
+          <h2 className="font-semibold">도구</h2>
+          <Notice variant="error" role="alert" className="mt-3">
+            {tools.message}
           </Notice>
         </section>
       )}

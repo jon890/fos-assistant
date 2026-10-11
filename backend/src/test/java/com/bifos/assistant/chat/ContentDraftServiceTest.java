@@ -295,6 +295,8 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     @Test
     @DisplayName("업로더 변경과 대화 purge는 잠금 안에서 본문과 자식을 정리한다")
     void cleansOwnerMismatchAndPurgesDraftChildrenBeforeAttachments() {
+        // 공유 컨텍스트의 앞 검사에서 남은 정리 후보를 처리한 뒤 이번 대화만 검증한다.
+        purger.purgeDue(NOW);
         drafts.create(owner, conversation.id(), inputDraft("본문", true));
         var other = user();
         jdbc.update("update chat_attachment set uploaded_by_user_id=? where id=?", other.id(), photo.id());
