@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.bifos.assistant.chat.AttachmentDeletionBarrierTest;
 import com.bifos.assistant.memory.application.model.MemorySearchItem;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.infra.MemoryQueries;
 import com.bifos.assistant.memory.infra.MemoryRepository;

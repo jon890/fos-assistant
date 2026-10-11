@@ -3,7 +3,7 @@ package com.bifos.assistant.memory;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.memory.application.MemoryCollectionService;
-import com.bifos.assistant.memory.domain.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.util.List;

@@ -1,5 +1,7 @@
-package com.bifos.assistant.memory.domain;
+package com.bifos.assistant.memory.domain.entity;
 
+import com.bifos.assistant.memory.domain.MemoryPlacement;
+import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -120,16 +122,17 @@ public class Memory {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     private Memory(
-            MemoryScope scope,
-            Long ownerUserId,
-            Long groupId,
-            String title,
-            StoredContent body,
-            MemoryPlacement placement,
-            MemoryStatus status,
-            Long proposedByExecutionId,
-            Instant now) {
+        MemoryScope scope,
+        Long ownerUserId,
+        Long groupId,
+        String title,
+        StoredContent body,
+        MemoryPlacement placement,
+        MemoryStatus status,
+        Long proposedByExecutionId,
+        Instant now) {
         this.scope = scope;
         this.ownerUserId = ownerUserId;
         this.groupId = groupId;
@@ -147,107 +150,111 @@ public class Memory {
         this.updatedAt = now;
     }
 
+
     public static Memory accepted(
-            MemoryScope scope,
-            Long ownerUserId,
-            Long groupId,
-            String title,
-            StoredContent body,
-            MemoryPlacement placement,
-            Long acceptedByUserId,
-            Instant now) {
-        Memory memory =
-                new Memory(scope, ownerUserId, groupId, title, body, placement, MemoryStatus.ACCEPTED, null, now);
+        MemoryScope scope,
+        Long ownerUserId,
+        Long groupId,
+        String title,
+        StoredContent body,
+        MemoryPlacement placement,
+        Long acceptedByUserId,
+        Instant now) {
+        Memory memory = new Memory(scope, ownerUserId, groupId, title, body, placement, MemoryStatus.ACCEPTED, null, now);
         memory.acceptedByUserId = acceptedByUserId;
         memory.acceptedAt = now;
         return memory;
     }
+
 
     /**
      * 사용자가 직접 쓴 문서다. 곧 ACCEPTED 이고 꺼내는 방식은 SEARCH 로 고정한다. 민감 문서가 항상 층으로 올라갈 길을
      * 만들지 않는다(ADR-057).
      */
     public static Memory document(
-            Long ownerUserId,
-            String collection,
-            String documentKey,
-            String title,
-            StoredContent body,
-            MemorySensitivity sensitivity,
-            Instant now) {
+        Long ownerUserId,
+        String collection,
+        String documentKey,
+        String title,
+        StoredContent body,
+        MemorySensitivity sensitivity,
+        Instant now) {
         Memory memory = accepted(
-                MemoryScope.USER,
-                ownerUserId,
-                null,
-                title,
-                body,
-                new MemoryPlacement(collection, MemoryRetrieval.SEARCH, sensitivity),
-                ownerUserId,
-                now);
+            MemoryScope.USER,
+            ownerUserId,
+            null,
+            title,
+            body,
+            new MemoryPlacement(collection, MemoryRetrieval.SEARCH, sensitivity),
+            ownerUserId,
+            now);
         memory.entryType = MemoryEntryType.DOCUMENT;
         memory.documentKey = documentKey;
         return memory;
     }
 
+
     public static Memory proposedUser(
-            Long ownerUserId,
-            String title,
-            String content,
-            Long proposedByExecutionId,
-            String proposalDedupKey,
-            Instant now) {
+        Long ownerUserId,
+        String title,
+        String content,
+        Long proposedByExecutionId,
+        String proposalDedupKey,
+        Instant now) {
         Memory memory = new Memory(
-                MemoryScope.USER,
-                ownerUserId,
-                null,
-                title,
-                StoredContent.plain(content),
-                MemoryPlacement.core(MemoryRetrieval.SEARCH),
-                MemoryStatus.PROPOSED,
-                proposedByExecutionId,
-                now);
+            MemoryScope.USER,
+            ownerUserId,
+            null,
+            title,
+            StoredContent.plain(content),
+            MemoryPlacement.core(MemoryRetrieval.SEARCH),
+            MemoryStatus.PROPOSED,
+            proposedByExecutionId,
+            now);
         memory.proposalDedupKey = proposalDedupKey;
         return memory;
     }
+
 
     /**
      * 에이전트가 {@code memory_remember} 로 제안한 개인 항목이다(ADR-20261007 / memory-remember). 민감 항목이면 중복 키를 비운다. 키가 본문의 해시라
      * 평문 칸에 지문이 남기 때문이다.
      */
     public static Memory proposed(
-            Long ownerUserId,
-            String title,
-            StoredContent body,
-            MemoryPlacement placement,
-            Long proposedByExecutionId,
-            String proposalDedupKey,
-            Instant now) {
+        Long ownerUserId,
+        String title,
+        StoredContent body,
+        MemoryPlacement placement,
+        Long proposedByExecutionId,
+        String proposalDedupKey,
+        Instant now) {
         Memory memory = new Memory(
-                MemoryScope.USER,
-                ownerUserId,
-                null,
-                title,
-                body,
-                placement,
-                MemoryStatus.PROPOSED,
-                proposedByExecutionId,
-                now);
+            MemoryScope.USER,
+            ownerUserId,
+            null,
+            title,
+            body,
+            placement,
+            MemoryStatus.PROPOSED,
+            proposedByExecutionId,
+            now);
         memory.proposalDedupKey = placement.sensitivity() == MemorySensitivity.SENSITIVE ? null : proposalDedupKey;
         return memory;
     }
+
 
     /**
      * 사용자가 대화에서 직접 말해 바로 저장한 개인 항목이다(ADR-20261007 / memory-remember). 그 말을 승인으로 보아 곧 ACCEPTED 이고 승인한 사람은
      * 주인이다. 민감 항목은 이 길로 오지 않는다.
      */
     public static Memory remembered(
-            Long ownerUserId,
-            String title,
-            StoredContent body,
-            MemoryPlacement placement,
-            Long proposedByExecutionId,
-            String proposalDedupKey,
-            Instant now) {
+        Long ownerUserId,
+        String title,
+        StoredContent body,
+        MemoryPlacement placement,
+        Long proposedByExecutionId,
+        String proposalDedupKey,
+        Instant now) {
         if (placement.sensitivity() == MemorySensitivity.SENSITIVE) {
             throw new IllegalArgumentException("a sensitive memory cannot be remembered without review");
         }
@@ -257,6 +264,7 @@ public class Memory {
         return memory;
     }
 
+
     /** 사람이 받아들인다. 이때부터 주입 대상이 된다. */
     public void accept(Long userId, Instant at) {
         status = MemoryStatus.ACCEPTED;
@@ -265,11 +273,13 @@ public class Memory {
         updatedAt = at;
     }
 
+
     /** 사람이 물린다. 주입되지 않는다. */
     public void reject(Instant at) {
         status = MemoryStatus.REJECTED;
         updatedAt = at;
     }
+
 
     /** 기존 제안을 받아들인 기록을 되돌린다. 승인 정보도 지워 다시 주입되지 않게 한다. */
     public void restoreProposal(Instant at) {
@@ -279,6 +289,7 @@ public class Memory {
         updatedAt = at;
     }
 
+
     /**
      * 본문과 꺼내는 방식과 민감도를 고치고 판을 하나 올린다.
      *
@@ -287,11 +298,11 @@ public class Memory {
      * @throws IllegalArgumentException 민감 항목을 항상 싣게 하려 할 때. {@link MemoryPlacement#allows} 로 먼저 본다
      */
     public void revise(
-            StoredContent body,
-            MemoryRetrieval retrieval,
-            MemorySensitivity sensitivity,
-            String updatedProposalDedupKey,
-            Instant at) {
+        StoredContent body,
+        MemoryRetrieval retrieval,
+        MemorySensitivity sensitivity,
+        String updatedProposalDedupKey,
+        Instant at) {
         if (!MemoryPlacement.allows(retrieval, sensitivity)) {
             throw new IllegalArgumentException("a sensitive memory cannot always be injected");
         }
@@ -306,15 +317,18 @@ public class Memory {
         this.updatedAt = at;
     }
 
+
     /** 본문이 암호문으로 저장돼 있는가. */
     public boolean sealed() {
         return contentKeyId != null;
     }
 
+
     /** 암호문이 누구의 것인지 적은 글이다. 암호화와 풀기가 같은 값을 써야 한다(ADR-055). */
     public String contentBinding() {
         return scope == MemoryScope.USER ? "USER:" + ownerUserId : "GROUP:" + groupId;
     }
+
 
     /**
      * 평문으로 남은 본문의 저장 모양만 암호문으로 바꾼다. 판 번호와 갱신 시각은 건드리지 않는다.
@@ -329,12 +343,14 @@ public class Memory {
         this.contentKeyId = body.keyId();
     }
 
+
     /** USER 는 주인만, GROUP 은 같은 그룹의 사용자가 본다. 그룹이 없는 사용자는 GROUP 항목을 보지 못한다. */
     public boolean isReadableBy(Long userId, Long groupId) {
         return scope == MemoryScope.USER
-                ? userId != null && Objects.equals(ownerUserId, userId)
-                : groupId != null && Objects.equals(this.groupId, groupId);
+            ? userId != null && Objects.equals(ownerUserId, userId)
+            : groupId != null && Objects.equals(this.groupId, groupId);
     }
+
 
     /** 꺼내는 방식을 적고 옛 칸을 같은 뜻으로 맞춘다. */
     private void place(MemoryRetrieval retrieval) {
