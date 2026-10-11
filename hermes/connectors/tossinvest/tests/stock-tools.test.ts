@@ -523,11 +523,17 @@ test("production factory가 기존 도구와 종목 도구를 함께 등록한�
       const listed = (await sdk.listTools()).tools.map((entry) => entry.name);
       expect(listed.sort()).toEqual([
         "get_buying_power",
+        "get_candles",
+        "get_exchange_rate",
         "get_holdings",
+        "get_market_calendar",
+        "get_orderbook",
+        "get_price_limits",
         "get_quotes",
         "get_sellable_quantity",
         "get_stock_warnings",
         "get_stocks",
+        "get_trades",
         "list_accounts",
         "list_orders",
         "list_stocks",
