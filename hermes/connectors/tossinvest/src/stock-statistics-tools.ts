@@ -1,35 +1,9 @@
 import { z } from "zod";
-import { envelopeMetadata, operationFor, SCHEMAS } from "./api-contract.ts";
+import { envelopeMetadata, operationFor } from "./api-contract.ts";
 import type { Tossinvest } from "./client.ts";
 import { SYMBOL } from "./constants.ts";
 import type { RegisterTool } from "./tool-registration.ts";
-
-/** 검증된 응답의 공식 필드만 복사한다. 중첩된 비공식 확장키는 모델에게 전달하지 않는다. */
-function officialFields(value: any, schema: any): any {
-  if (value === null) return null;
-  if (schema.$ref)
-    return officialFields(value, SCHEMAS[schema.$ref.split("/").at(-1)]);
-  if (schema.allOf)
-    return Object.assign(
-      {},
-      ...schema.allOf.map((part: any) => officialFields(value, part)),
-    );
-  const union = schema.oneOf ?? schema.anyOf;
-  if (union)
-    return officialFields(
-      value,
-      union.find((part: any) => part.type !== "null"),
-    );
-  if (Array.isArray(value))
-    return value.map((item) => officialFields(item, schema.items));
-  if (typeof value === "object")
-    return Object.fromEntries(
-      Object.entries(schema.properties ?? {})
-        .filter(([key]) => Object.hasOwn(value, key))
-        .map(([key, part]) => [key, officialFields(value[key], part)]),
-    );
-  return value;
-}
+import { officialFields } from "./official-response.ts";
 
 /** 국내 여부는 API가 판정한다. 공식 pattern을 유지하되 URL이 정규화하는 점 segment는 막는다. */
 export function registerStockStatisticsTools(
