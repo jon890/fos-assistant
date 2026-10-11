@@ -855,6 +855,14 @@ loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환
 | `hermes_constants` | home override의 get·set·reset은 context-local이다. set이 준 token으로 이전 문맥을 복원한다 |
 | `cron.scheduler` | parent는 module-global `sys.executable`로 child argv를 만들고 module 이름·payload·ack 인자를 전달한다. 환경을 정리해 spawn하고 ack와 조기 종료를 확인한다. child는 payload를 읽고 소유권 인수·ack 뒤 job을 실행하며 문맥 token을 복원한다 |
 
+`cron.scheduler.run_one_job`의 정확한 signature와 함수 AST도 별도로 선언한다.
+이 정의가 module의 같은 이름을 한 번만 bind하는지 확인해 후속 대입·재import·중복 정의를 거절한다.
+worker는 호출 시점에 이 module binding을 조회한다. worker의 분리 실행은 검증한 payload 객체의
+`read_text(encoding="utf-8")`·`unlink(missing_ok=True)`를 소비하고 durable adoption과
+atomic ack 게시가 성공한 뒤 job을 호출하는지 확인한다. adoption·ack 실패 때 job을 호출하지 않고,
+ack 뒤 job이 `False`를 반환하면 ack를 보존하며 그 실패를 그대로 반환한다.
+저장소와 secret/profile 적재는 대역이며 실제 `run_one_job` 전체 실행이나 운영 저장을 검증하지 않는다.
+
 resolver는 약한 registry에 등록된 실제 agent identity만 읽는다. 등록되지 않은 부모와 다른 profile의
 capability, 현재 secret/home 문맥과 맞지 않는 capability는 생성 전에 거절한다.
 owner는 생성·close 실패와 순환 객체 수거 때 등록을 해제하고, profile plugin reload/unload와

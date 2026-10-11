@@ -267,6 +267,11 @@ BODYLESS_MANAGED_FUNCTIONS = {
             'cf9bfcd238776707dda832877e43e06204b016ad44143361e87f9f832731549b'),
     },
     'cron/scheduler.py': {
+        'run_one_job': (
+            ('job: dict, *, adapters=None, loop=None, verbose: bool=False, '
+             'extra_prompt: Optional[str]=None, cancel_event: Optional[_CancelEventLike]=None'),
+            'bool',
+            'd2910271e855c4ea97bd2fc96aa6acf160442313e58f0b7cf3d29bea0839a63d'),
         '_launch_external_cron_worker': (
             ('job: dict'),
             'bool',
