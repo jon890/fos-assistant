@@ -51,7 +51,7 @@ class CollationMixQueryMysqlTest {
 
     /** V57 스키마에서 정렬 규칙이 다른 두 표의 문자열 칸을 비교하는 저장소 메서드다. */
     private static final List<String> COLLATION_MIXED_METHODS = List.of(
-            "ExecutionEventRepository.findUnscheduledChildren", "ExecutionEventRepository.countUnscheduledChildren");
+        "ExecutionEventRepository.findUnscheduledChildren", "ExecutionEventRepository.countUnscheduledChildren");
 
     @Autowired
     private ApplicationContext context;
@@ -85,6 +85,7 @@ class CollationMixQueryMysqlTest {
     @MockitoBean
     private ContentDraftCleaner contentDraftCleaner;
 
+
     @DynamicPropertySource
     static void useMysqlBeforeUnify(DynamicPropertyRegistry registry) {
         MysqlTestDatabase database = MysqlTestDatabase.create();
@@ -97,6 +98,7 @@ class CollationMixQueryMysqlTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
     }
 
+
     @Test
     @DisplayName("통일하기 전 스키마까지만 올라갔다")
     void stopsBeforeCollationUnify() {
@@ -105,30 +107,33 @@ class CollationMixQueryMysqlTest {
         assertThat(tableCollation("agent_execution")).isEqualTo(NEW_COLLATION);
     }
 
+
     @Test
     @DisplayName("저장소 쿼리 검사가 정렬 규칙이 섞인 쿼리를 잡는다")
     void catchesCollationMix() {
         List<RepositoryQuerySweep.Failure> failures = new RepositoryQuerySweep(context, transactionManager)
-                .run(Set.of())
-                .failures();
+            .run(Set.of())
+            .failures();
 
         assertThat(failures)
-                .extracting(RepositoryQuerySweep.Failure::method)
-                .contains(COLLATION_MIXED_METHODS.toArray(String[]::new));
+            .extracting(RepositoryQuerySweep.Failure::method)
+            .contains(COLLATION_MIXED_METHODS.toArray(String[]::new));
         // V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패하므로 정렬 규칙이 섞인 두 메서드의 실패만 오류 코드를 본다.
         assertThat(failures)
-                .filteredOn(failure -> COLLATION_MIXED_METHODS.contains(failure.method()))
-                .allSatisfy(failure -> assertThat(sqlErrorCode(failure.cause()))
-                        .as("%s 의 SQL 오류 코드. 원인: %s", failure.method(), failure.cause())
-                        .isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
+            .filteredOn(failure -> COLLATION_MIXED_METHODS.contains(failure.method()))
+            .allSatisfy(failure -> assertThat(sqlErrorCode(failure.cause()))
+                .as("%s 의 SQL 오류 코드. 원인: %s", failure.method(), failure.cause())
+                .isEqualTo(ILLEGAL_MIX_OF_COLLATIONS));
     }
+
 
     private String tableCollation(String table) {
         return jdbc.queryForObject(
-                "SELECT table_collation FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
-                String.class,
-                table);
+            "SELECT table_collation FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
+            String.class,
+            table);
     }
+
 
     /** 원인 사슬에서 처음 만나는 {@link SQLException} 의 오류 코드다. 없으면 null 이다. */
     private static Integer sqlErrorCode(Throwable throwable) {
