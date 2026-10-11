@@ -29,6 +29,8 @@ import {
   type AgentConnectionView,
 } from "@/lib/agent-connection";
 
+import { boundReadiness } from "@/lib/connector-onboarding";
+
 type Props = {
   code: string;
   initialConnections: AgentConnectionView[];
@@ -48,10 +50,10 @@ const BLOCKED_MESSAGES: Record<AgentConnectionBlock, string> = {
 };
 
 const RISK_MESSAGE =
-  "이 에이전트가 이 연결의 도구를 직접 써요. 운영에서 격리를 적용하지 않은 에이전트는 터미널이나 파일 도구로 연결의 비밀값에 닿을 수 있어요.";
+  "이 에이전트가 이 서비스의 도구를 직접 써요. 명령 실행이나 파일 도구를 함께 쓰면 연결 정보에 접근할 수 있어요. 읽은 내용이 다른 도구를 통해 인터넷으로 나갈 수도 있어요.";
 
 const SHELL_RISK_MESSAGE =
-  "격리를 적용하지 않은 에이전트는 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
+  "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
 /** 붙이기 확인 창이다. 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. 연결 화면의 에이전트 고르기도 쓴다. */
 export function BindConfirm({
@@ -144,9 +146,14 @@ function ConnectionRow({
         <p className="mt-1 text-xs text-muted-foreground">
           도구 {view.toolCount}개
         </p>
+        {view.bound ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {boundReadiness(view)}
+          </p>
+        ) : null}
         {!view.bound && !ready && !blocked ? (
           <p className="mt-1 text-xs text-muted-foreground">
-            서비스 연결에서 연결을 확인해 주세요.
+            외부 서비스 연결에서 연결을 확인해 주세요.
           </p>
         ) : null}
         {view.skills.length > 0 && skillsOff ? (
@@ -192,7 +199,7 @@ function ConnectionRow({
  * 「이 에이전트가 쓰는 연결」 이다. 주인이 자기 연결을 이 에이전트에 붙이고 뗀다.
  *
  * <p>붙이기는 확인 창을 거친다. 붙인 연결의 도구를 이 에이전트가 직접 쓰므로, 셸과 파일 도구가 켜져 있으면 그 위험까지 알린다.
- * 실행 공간 격리를 적용하지 않은 profile 은 그 도구로 비밀값을 읽고 승인 없이 그 서비스를 부를 수 있고, 격리한 profile 도 읽은
+ * 안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있고, 분리된 에이전트도 읽은
  * 내용을 인터넷으로 보낼 수 있다(ADR-086). 화면은 격리 적용 여부를 모르므로 두 경우를 함께 알린다. 계정 연결은 연결 화면이 한다.
  */
 export function AgentConnectionsSection({
@@ -217,7 +224,8 @@ export function AgentConnectionsSection({
       : visibility === GROUP_VISIBILITY
         ? "AGENT_NOT_PRIVATE"
         : null;
-  const shellOrFile = toolState?.shellOrFileEnabled === true;
+  // 도구 조회가 실패하면 활성 상태를 모르므로 연결 고르기와 같은 위험 안내를 보인다.
+  const shellOrFile = toolState === null || toolState.shellOrFileEnabled;
   const skillsOff = toolState !== null && !toolState.skillsEnabled;
 
   function replace(next: AgentConnectionView) {
