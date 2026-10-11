@@ -123,7 +123,7 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 
 ## 서버와 검사
 
-`src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
+`src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶는다. 생성 entry는 Git에서 추적하지 않고 테스트와 배포 묶음 생산 때 소스에서 빌드한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
 공식 JSON fixture의 41 operation과 실제 등록 10개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
 도구 9개와 고유 operation 10개는 다른 수치다. 모든 도구를 한 번씩 부르는 coverage 시험은 인증 1회와 조회 11회를 수신하고 금융 POST/DELETE는 0회다. `getStocks`와 `getSellableQuantity`는 여러 도구가 공유한다.
 
