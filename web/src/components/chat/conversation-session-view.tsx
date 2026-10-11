@@ -59,6 +59,8 @@ export function ConversationSessionView({
   agents,
   agentCode,
   agentsLoading,
+  agentsError,
+  onRetryAgents,
   onAgentCodeChange,
   assignConversationId,
   submit,
@@ -238,6 +240,8 @@ export function ConversationSessionView({
               displayName={displayName}
               agents={agents}
               loading={agentsLoading}
+              agentsError={agentsError}
+              onRetryAgents={onRetryAgents}
               selectedCode={agentCode}
               onSelect={onAgentCodeChange}
               locked={agentLocked}

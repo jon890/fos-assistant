@@ -14,6 +14,7 @@ import com.bifos.assistant.mcp.presentation.McpDtos.MediaObservationListArgument
 import com.bifos.assistant.mcp.presentation.McpDtos.MediaObservationRecordArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryReadArguments;
 import com.bifos.assistant.mcp.presentation.McpDtos.MemoryRememberArguments;
+import com.bifos.assistant.mcp.presentation.McpDtos.MemorySearchArguments;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.shared.error.ApiException;
@@ -47,6 +48,7 @@ public class McpController {
     private static final Pattern UUID_TEXT = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
     private static final String INVALID_ARGUMENTS = "인자 형식이 올바르지 않습니다.";
     private static final String MEMORY_READ = "memory_read";
+    private static final String MEMORY_SEARCH = "memory_search";
     private static final String ARTIFACT_WRITE = "artifact_write";
     private static final String AGENT_LIST = "agent_list";
     private static final String AGENT_STATUS = "agent_status";
@@ -60,6 +62,7 @@ public class McpController {
     /** 먼저 살펴보기에서 읽기, 위임과 사람이 받아들여야 하는 할 일 제안을 받는다. */
     private static final Set<String> CHECK_TREE_TOOLS = Set.of(
         MEMORY_READ,
+        MEMORY_SEARCH,
         AGENT_LIST,
         AGENT_DELEGATE,
         AGENT_STATUS,
@@ -77,6 +80,7 @@ public class McpController {
     /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
     private final Map<String, ToolHandler> handlers = Map.ofEntries(
         Map.entry(MEMORY_READ, this::readMemory),
+        Map.entry(MEMORY_SEARCH, this::searchMemory),
         Map.entry(ARTIFACT_WRITE, this::writeArtifact),
         Map.entry(AGENT_LIST, this::listAgents),
         Map.entry(AGENT_STATUS, this::agentStatus),
@@ -246,6 +250,29 @@ public class McpController {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
         return response(id, tools.readMemory(caller, new MemoryReadArguments(memoryId.longValue()).id()));
+    }
+
+
+    /** 검색 범위는 origin 실행에서만 정한다. null과 모르는 키는 인자 오류다. */
+    private Map<String, Object> searchMemory(McpCaller caller, JsonNode id, JsonNode arguments) {
+        JsonNode limit = arguments.get("limit");
+        JsonNode after = arguments.get("after_id");
+        if (!Set.of("query", "limit", "after_id").containsAll(arguments.propertyNames())
+            || !text(arguments, "query")
+            || (limit != null
+                && (!limit.isIntegralNumber()
+                    || !limit.canConvertToInt()
+                    || limit.intValue() < 1
+                    || limit.intValue() > 50))
+            || (after != null
+                && (!after.isIntegralNumber() || !after.canConvertToLong() || after.longValue() <= 0))) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        MemorySearchArguments value = MemorySearchArguments.from(arguments);
+        if (value.query().isEmpty() || value.query().codePointCount(0, value.query().length()) > 200) {
+            return invalidParams(id, INVALID_ARGUMENTS);
+        }
+        return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.afterId()));
     }
 
 
