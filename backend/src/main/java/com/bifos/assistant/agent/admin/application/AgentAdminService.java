@@ -1,5 +1,11 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.admin.application;
 
+import com.bifos.assistant.agent.admin.application.model.AgentCreateCommand;
+import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
+import com.bifos.assistant.agent.application.AgentConnectorBindings;
+import com.bifos.assistant.agent.application.AgentEndpointProbe;
+import com.bifos.assistant.agent.application.AgentLifecycleService;
+import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -29,6 +35,7 @@ public class AgentAdminService {
     private final AgentConnectorBindings connectorBindings;
     private final Clock clock;
 
+
     @Transactional
     public Agent create(AgentCreateCommand command) {
         if (agents.findByCode(command.code()).isPresent()) {
@@ -41,23 +48,25 @@ public class AgentAdminService {
             lifecycle.requireGroupSafe(command.apiBaseUrl(), command.hermesProfile());
         }
         Agent agent = Agent.of(
-                command.code(),
-                command.name(),
-                command.hermesProfile(),
-                command.apiBaseUrl(),
-                command.costMode(),
-                command.credentialScope(),
-                command.visibility(),
-                ownerId,
-                clock.instant());
+            command.code(),
+            command.name(),
+            command.hermesProfile(),
+            command.apiBaseUrl(),
+            command.costMode(),
+            command.credentialScope(),
+            command.visibility(),
+            ownerId,
+            clock.instant());
         agent.assignFlow(requireKnownFlow(command.flow()));
         return agents.save(agent);
     }
+
 
     /** 관리 목록에 보일 에이전트다. 지운 에이전트는 되살리지 못하므로 두지 않는다. */
     public List<Agent> list() {
         return agents.findAll().stream().filter(agent -> !agent.isDeleted()).toList();
     }
+
 
     /**
      * 관리자가 에이전트의 사용 여부와 공개 범위, 주인, 주소를 고친다.
@@ -75,20 +84,20 @@ public class AgentAdminService {
         }
         // 주인은 공개 범위와 별개다(ADR-033). 새 주인을 주지 않으면 그룹으로 바꿔도 지금 주인이 남는다.
         Long ownerId = command.ownerEmail() == null || command.ownerEmail().isBlank()
-                ? agent.ownerUserId()
-                : ownerId(command.visibility(), command.ownerEmail());
+            ? agent.ownerUserId()
+            : ownerId(command.visibility(), command.ownerEmail());
         if (command.visibility() == AgentVisibility.PRIVATE && ownerId == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a private agent needs an owner");
         }
         boolean ownerChanges = !Objects.equals(ownerId, agent.ownerUserId());
         if ((ownerChanges || command.visibility() == AgentVisibility.GROUP)
-                && connectorBindings.hasBindings(agent.id())) {
+            && connectorBindings.hasBindings(agent.id())) {
             if (ownerChanges) {
                 throw new ApiException(
-                        ErrorCode.AGENT_HAS_CONNECTIONS, "detach the connections before changing the owner");
+                    ErrorCode.AGENT_HAS_CONNECTIONS, "detach the connections before changing the owner");
             }
             throw new ApiException(
-                    ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "an agent with connections must stay private");
+                ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "an agent with connections must stay private");
         }
         String apiBaseUrl = effectiveApiBaseUrl(agent, command.apiBaseUrl());
         if (command.enabled() && command.visibility() == AgentVisibility.GROUP) {
@@ -109,6 +118,7 @@ public class AgentAdminService {
         return agents.save(agent);
     }
 
+
     /**
      * 모르는 흐름 이름을 저장하지 못하게 막는다.
      *
@@ -121,6 +131,7 @@ public class AgentAdminService {
         }
         throw new ApiException(ErrorCode.VALIDATION_FAILED, "no such flow");
     }
+
 
     /**
      * 주소를 바꾸는 요청이면 닿는지 본 뒤에 바꾼다.
@@ -140,9 +151,11 @@ public class AgentAdminService {
         return next;
     }
 
+
     private static String stripTrailingSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
     }
+
 
     /**
      * 고칠 에이전트를 잠그고 읽는다. 지운 에이전트는 없는 에이전트와 같다.
@@ -152,12 +165,13 @@ public class AgentAdminService {
      */
     private Agent requireAgentForUpdate(String code) {
         Agent agent = agents.findByCodeForUpdate(code)
-                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+            .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
         }
         return agent;
     }
+
 
     /**
      * 받은 메일 주소의 사용자를 주인으로 고른다.
@@ -173,7 +187,7 @@ public class AgentAdminService {
             return null;
         }
         return users.findByEmail(ownerEmail)
-                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "no such user"))
-                .id();
+            .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "no such user"))
+            .id();
     }
 }
