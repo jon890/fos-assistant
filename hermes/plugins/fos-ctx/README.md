@@ -89,7 +89,7 @@ Control Plane 의 `agent_*` 도구는 이 값으로 부모 실행을 찾고, 서
 
 | 도구 | 서명하지 못할 때 |
 | --- | --- |
-| `agent_*`, `memory_read`, `memory_search`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation` | 막는다. 모델에게 막은 이유가 간다 |
+| `agent_*`, `memory_read`, `memory_search`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read` | 막는다. 모델에게 막은 이유가 간다 |
 | 그 밖의 Control Plane MCP 도구 | 막지 않고 원래 인자 그대로 보낸다 |
 | Control Plane MCP 가 아닌 도구 | 건드리지 않는다. `skill_manage` 만 아래처럼 막는다 |
 
@@ -247,7 +247,7 @@ v0.21.5(`v2026.9.24`) 격리 환경에서 측정했다. 결정은 [ADR-031](../.
 
 **플러그인은 profile 마다 둔다.** profile 디렉터리의 `plugins/` 에 두고 그 profile 설정에서 켜야 그 profile 의 호출에 붙는다. plugin 원본은 이 저장소의 [`hermes/plugins/fos-ctx/`](.) 에 있고, 대시보드 plugin 이 새 profile 을 만들 때 그 profile 로 복사한다.
 
-**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation`, `agent_*` 가 모두 그렇다([ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
+**hook 이 끼우지 못한 호출도 서버에 도착한다.** 플러그인이 빠졌거나 hook 이 값을 돌려주지 않으면 원래 인자 그대로 간다. 그래서 서버는 서명이 없거나 틀린 호출을 거절한다. `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `agent_*` 가 모두 그렇다([ADR-032](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 
 ##### `_fos_ctx` 계약
 
@@ -288,7 +288,7 @@ hook 은 Control Plane MCP 의 모든 도구 인자에 `_fos_ctx` 를 덮어쓴�
 
 서버는 모든 도구에서 `_fos_ctx` 로 요청자를 정한다. 서명을 확인한 뒤 보는 순서는 [`docs/features/mcp.md`](../../../docs/features/mcp.md#mcp-호출의-요청자를-정할-때) 의 「MCP 호출의 요청자를 정할 때」 가 갖는다.
 도구 인자 검사에 넘기기 전에 `_fos_ctx` 는 떼어 낸다. 도구 규격이 그 키를 모르기 때문이다.
-플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고 `hermes/tests/test_fos_ctx.py` 가 그 동작을 검사한다. 다만 profile 에 실제로 설치되어 켜졌는지는 이 저장소가 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
+플러그인에 요구하는 동작이다. 서명할 수 없으면 `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `agent_*` 를 모두 Hermes 쪽에서 막는다. 플러그인은 이 저장소의 `hermes/plugins/fos-ctx/` 가 갖고 `hermes/tests/test_fos_ctx.py` 가 그 동작을 검사한다. 다만 profile 에 실제로 설치되어 켜졌는지는 이 저장소가 확인하지 못한다. 그래서 서버도 서명이 없는 호출을 거절한다. 플러그인이 막지 못해도 서버에서 같은 조건으로 막힌다.
 
 ##### 호출은 profile 마다 하나씩 나간다
 
@@ -303,6 +303,9 @@ Hermes 는 401 이면 다시 연결해 같은 인자로 한 번 더 보낸다. s
 hook 이 넣은 `tool_call_id` 는 인자에 들어 있어 다시 보낼 때도 같다. 그래서 **profile, 루트 session, 그 호출의 session, `tool_call_id`** 로 같은 위임을 두 번 만들지 않는 키를 계산한다.
 `tool_call_id` 가 루트 아래 모든 session 에서 유일하다는 보장은 없다. 하위 에이전트마다 session 이 달라, session 을 빼면 다른 하위 에이전트의 같은 번호가 같은 위임으로 잘못 합쳐진다. 정의는 [ADR-032 의 「`delegation_key`」](../../../backend/docs/adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md#delegation_key) 에 있다.
 JSON-RPC 의 `id` 는 연결마다 새로 매겨져 이 용도로 쓰지 않는다.
+원고 생성은 모델의 새 호출에도 같은 의도를 알아볼 수 있도록 명시적 requestId를 함께 받는다.
+plugin은 requestId를 만들거나 교체하지 않으며 같은 전송 재시도에서는 주어진 tool_call_id를 보존한다.
+원고 본문과 requestId는 서명 v1 범위에 들어가지 않는다. 서버가 영속 대응과 최초 본문 지문을 따로 검사한다.
 
 ##### 공유 profile 에서 두 사용자의 호출을 실제로 확인하는 절차
 

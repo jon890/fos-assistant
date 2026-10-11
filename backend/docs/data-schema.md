@@ -845,3 +845,19 @@ action을 지우면 실행 내용도 지운다.
 | `docs/backend/schema/task.md` | 이 파일 「예약 작업 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
 | `docs/backend/schema/users-agents.md` | 이 파일 「사용자와 에이전트 표」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
 | `docs/backend/user-browser.md` | [`docs/features/user-browser.md`](../../docs/features/user-browser.md) 「사용자 브라우저」 | <!-- ref-ignore: 적용된 마이그레이션 주석이 가리키는 옛 경로다 -->
+
+## 원고 생성 재시도 대응
+
+`content_draft_creation_request`와 `content_draft_creation_call`은 응답 캐시가 아니라 소비한 생성 식별자의 대응이다.
+생성 키와 전송 키, 각 식별 고정 키는 각각 BINARY(32) UNIQUE다.
+범위 배열과 최초 입력 지문의 정의는 [첫 MCP 생성의 재시도 식별](../../docs/features/content-draft.md#첫-mcp-생성의-재시도-식별)이 갖는다.
+해시로 조회한 뒤 저장한 owner·대화·profile·origin·루트와 session·호출 번호를 Java 값으로 정확히 비교한다.
+본문과 암호화 key, 토큰과 서명은 두 표에 복사하지 않는다.
+
+생성 요청의 CREATED는 최초 requestHash와 공개 draft UUID가 모두 있고 GONE은 둘 다 없다.
+새 마이그레이션의 CHECK가 이 관계를 확인한다.
+전송 대응은 생성 요청 행에 FK로 붙으며 cascade로 지우지 않는다.
+사용자·대화·실행과 원고에는 삭제 cascade FK를 두지 않는다.
+purge와 자체 만료는 기존 콘텐츠 잠금 안에서 GONE으로 바꾸고 본문을 지워도 두 대응을 보존한다.
+STALE은 기존 원고와 최초 지문을 유지하므로 CAS 회복 뒤 같은 요청으로 현재 판을 읽을 수 있다.
+완료된 origin에 등록된 child가 계속 호출할 수 있어 두 대응에는 원고의 30일 보관 기간을 적용하지 않는다.

@@ -4,6 +4,9 @@ import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.McpCallContext;
 import com.bifos.assistant.mcp.application.McpCaller;
+import com.bifos.assistant.mcp.application.McpContentDraftTools;
+import com.bifos.assistant.mcp.presentation.McpDtos.ContentDraftWriteArguments;
+import com.bifos.assistant.mcp.presentation.McpDtos.ContentDraftReadArguments;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpPrincipal;
@@ -26,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.info.BuildProperties;
@@ -75,21 +79,33 @@ public class McpController {
     private final McpToolService tools;
     private final McpCallerResolver callers;
     private final McpMediaObservationTools mediaObservations;
+    private final McpContentDraftTools contentDrafts;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
+    private final Map<String, ToolHandler> handlers = handlers();
+
+
     /** 받아들이는 도구 이름과 그 처리. 이름 검사와 분기가 이 한 곳에서 정해진다. */
-    private final Map<String, ToolHandler> handlers = Map.ofEntries(
-        Map.entry(MEMORY_READ, this::readMemory),
-        Map.entry(MEMORY_SEARCH, this::searchMemory),
-        Map.entry(ARTIFACT_WRITE, this::writeArtifact),
-        Map.entry(AGENT_LIST, this::listAgents),
-        Map.entry(AGENT_STATUS, this::agentStatus),
-        Map.entry(AGENT_DELEGATE, this::agentDelegate),
-        Map.entry(AGENT_STOP, this::agentStop),
-        Map.entry(FOLLOW_UP_PROPOSE, this::proposeFollowUp),
-        Map.entry(MEMORY_REMEMBER, this::remember),
-        Map.entry(McpMediaObservationTools.LIST, this::listMediaObservations),
-        Map.entry(McpMediaObservationTools.RECORD, this::recordMediaObservation));
+    private Map<String, ToolHandler> handlers() {
+        return Map.ofEntries(
+            Map.entry(MEMORY_READ, this::readMemory),
+            Map.entry(MEMORY_SEARCH, this::searchMemory),
+            Map.entry(ARTIFACT_WRITE, this::writeArtifact),
+            Map.entry(AGENT_LIST, this::listAgents),
+            Map.entry(AGENT_STATUS, this::agentStatus),
+            Map.entry(AGENT_DELEGATE, this::agentDelegate),
+            Map.entry(AGENT_STOP, this::agentStop),
+            Map.entry(FOLLOW_UP_PROPOSE, this::proposeFollowUp),
+            Map.entry(MEMORY_REMEMBER, this::remember),
+            Map.entry(McpMediaObservationTools.LIST, (caller, id, args) -> validated(id, args,
+                MediaObservationListArguments::from, value -> this.mediaObservations.list(caller, value.afterAssetId(), value.limit()))),
+            Map.entry(McpMediaObservationTools.RECORD, (caller, id, args) -> validated(id, args,
+                MediaObservationRecordArguments::from, value -> this.mediaObservations.record(caller, value.assetId(), value.expectedRevision(), value.requestId(), value.observation()))),
+            Map.entry(McpContentDraftTools.WRITE, (caller, id, args) -> validated(id, args,
+                ContentDraftWriteArguments::from, value -> this.contentDrafts.write(caller, value.requestId(), value.draftId(), value.expectedRevision(), value.draft()))),
+            Map.entry(McpContentDraftTools.READ, (caller, id, args) -> validated(id, args,
+                ContentDraftReadArguments::from, value -> this.contentDrafts.read(caller, value.draftId(), value.revision()))));
+    }
 
 
     /** 요청자가 정해진 뒤 {@code _fos_ctx} 를 뗀 인자로 도구 하나를 처리한다. */
@@ -136,17 +152,9 @@ public class McpController {
 
 
     /**
-     * 도구 호출을 다섯 단계로 판정한다. 모든 도구가 같은 순서를 지난다.
-     *
-     * <ol>
-     * <li>{@code params.name} 이 문자열이고 {@code params.arguments} 가 객체인지 본다. 아니면 {@code -32602}
-     * <li>이름으로 처리를 고른다. 모르는 도구면 {@code -32601}
-     * <li>원래 인자의 {@code _fos_ctx} 로 요청자를 정한다(ADR-032). 정하지 못하면 {@link McpToolService#invalidContext()}
-     * <li>요청자의 origin 실행이 먼저 살펴보기 트리이고 {@link #CHECK_TREE_TOOLS} 밖의 도구면
-     * {@link McpToolService#notAllowedInCheck()}. 쓰기 도구를 허용한 살펴보기는 {@link #CHECK_TREE_WRITE_TOOLS} 를 그
-     * 점검 대화에 한해 받는다
-     * <li>{@code _fos_ctx} 를 뗀 인자로 도구별 검사를 하고 그 요청자로 도구를 돌린다
-     * </ol>
+     * 이름과 인자 모양을 확인한 뒤 서명으로 origin을 정하고 살펴보기 권한을 검사한다.
+     * {@code _fos_ctx}는 도구 인자에서 떼며, 도구마다 같은 판정 순서를 유지한다(ADR-032).
+     * 살펴보기의 추가 쓰기는 {@link #CHECK_TREE_WRITE_TOOLS}와 해당 점검 대화에만 허용한다.
      */
     private Map<String, Object> call(McpPrincipal principal, JsonNode id, JsonNode params) {
         JsonNode name = params.get("name");
@@ -221,23 +229,10 @@ public class McpController {
     }
 
 
-    private Map<String, Object> listMediaObservations(McpCaller caller, JsonNode id, JsonNode arguments) {
+    private <T> Map<String, Object> validated(JsonNode id, JsonNode arguments,
+        Function<JsonNode, T> parse, Function<T, Map<String, Object>> action) {
         try {
-            var value = MediaObservationListArguments.from(arguments);
-            return response(id, mediaObservations.list(caller, value.afterAssetId(), value.limit()));
-        } catch (ApiException ex) {
-            return invalidParams(id, INVALID_ARGUMENTS);
-        }
-    }
-
-
-    private Map<String, Object> recordMediaObservation(McpCaller caller, JsonNode id, JsonNode arguments) {
-        try {
-            var value = MediaObservationRecordArguments.from(arguments);
-            return response(
-                id,
-                mediaObservations.record(
-                    caller, value.assetId(), value.expectedRevision(), value.requestId(), value.observation()));
+            return response(id, action.apply(parse.apply(arguments)));
         } catch (ApiException ex) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
