@@ -3,6 +3,21 @@
 Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 규칙을 갖는다.
 방향 규칙은 `ArchitectureRules.java` 가 강제하고, 이 파일은 규칙마다 그 검사의 이름을 적는다.
 
+## 관찰 연결의 모듈 배치
+
+REST·MCP와 chat.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결)을 따른다.
+chat.application의 기존 저장 서비스를 유지하고 MediaObservationPages와 MediaObservationInputReader를 새 소비자로 둔다.
+공개 페이지 타입은 chat.application.model.MediaObservationPage에 둔다.
+관찰 REST 요청·응답은 `chat.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
+일반 대화 DTO는 `ChatDtos`에 두고, 관찰 DTO는 파일 길이 상한 안에서 기존 필드 설명을 보존하도록 관심사별로 나눈다.
+mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
+McpToolCatalog는 기존 도구와 관찰 도구의 정의를 같은 순서로 모으며 호출 시점의 설정을 읽는다.
+McpToolService는 catalog를 호출하고 기존 실행 handler를 유지한다. McpController의 분기도 그대로 둔다.
+HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수집 전에 null로 만든다.
+공용 시험 컨텍스트는 변경하지 않는다. Memory 검색이 추가되면 그 도구의 두 경로 가림과 SQL 관측 대역도 유지한다.
+JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
+MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원문·cause를 넘기지 않는다. 인증 실패는 기존 필터가 처리한다.
+
 ## 패키지와 책임
 
 도메인별로 나누고 각 도메인 안은 `presentation` 에서 `application` 을 거쳐 `infra` 와 `domain` 으로 흐른다.
@@ -110,6 +125,7 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 연결을 에이전트에 붙이고 떼는 바인딩(`agent_connector_binding`)과 관리자 반영 완료도 이 패키지가 갖는다. `ConnectorConnectionService` 가 연결을, `ConnectorBindingService` 가 바인딩을 맡는다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 특정 서비스의 이름, 주소, env 이름, 토큰 형식을 코드에 두지 않는다. 모두 대시보드 plugin 이 내는 manifest 에서 온다([ADR-043](adr/ADR-043-커넥터는-plugin-의-connector-json-으로-선언하고-control-plane-은-범용-흐름만-갖는다.md)).
 카탈로그, 도구 호출, 설치, env, MCP probe 는 `hermes`의 `HermesConnectorClient` 가 HTTP로 호출한다.
+`HttpHermesConnectorClient`는 카탈로그 HTTP 요청과 엄격한 JSON 파싱을 맡고, package-private `ConnectorCatalogDecoder`가 각 항목의 선언과 기본값을 읽는다. 보호 선언과 `execution_guard_manifest_sha256`은 같은 `ConnectorManifest`에 그대로 전달하며, 금융 준비와 승인 실행의 판정은 기존 client와 guard에 남는다.
 `connector.application` 의 `ConnectorCallLimiter` 가 선택지 조회, 등록, 연결 확인을 사용자별로 제한한다. 한도는 `ConnectorProperties`(`assistant.connector`)가 갖고 상태는 JVM 메모리에 둔다. Control Plane 이 한 대라는 전제다.
 `agent` 가 바인딩을 알아야 하는 자리는 `agent.application` 에 둔 port 셋으로 부른다. `connector` 가 `agent` 보다 위라서다.
 
