@@ -21,6 +21,7 @@ import com.bifos.assistant.usage.infra.SubagentUsageJobRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,6 +123,7 @@ public class SubagentUsageReconciler {
     @Scheduled(cron = "${assistant.usage.reconcile-cron:*/5 * * * * *}")
     public void reconcile() {
         Instant now = clock.instant();
+        Instant tick = now.truncatedTo(ChronoUnit.MICROS);
         discover(now);
         List<AgentExecution> unknownDefaults =
                 executions.findUnknownReasoningDefaults(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20));
@@ -129,8 +131,8 @@ public class SubagentUsageReconciler {
             launch("profile:defaults", () -> supplementDefaults(unknownDefaults));
         }
         for (SubagentUsageJob job :
-                jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc("WAITING", now)) {
-            launch("child:" + job.id(), () -> poll(job.id()));
+                jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc("WAITING", tick)) {
+            launch("child:" + job.id(), () -> poll(job.id(), tick));
         }
     }
 
@@ -181,17 +183,24 @@ public class SubagentUsageReconciler {
     }
 
     void poll(Long jobId) {
+        poll(jobId, null);
+    }
+
+    private void poll(Long jobId, Instant tick) {
         SubagentUsageJob job = jobs.findById(jobId).orElse(null);
         if (job == null || !"WAITING".equals(job.status())) {
             return;
         }
-        Instant now = clock.instant();
-        SubagentSessionUsage read = job.expired(now)
+        Instant startedAt = clock.instant();
+        SubagentSessionUsage read = job.expired(startedAt)
                 ? null
                 : hermes.readSubagentUsage(job.apiBaseUrl(), job.profileName(), job.childSessionId());
         // 대시보드 조회도 Hermes 조회처럼 트랜잭션 밖에서 한다.
-        ProviderResolution resolution = resolveProvider(job, read, now);
+        ProviderResolution resolution = resolveProvider(job, read);
         SubagentSessionUsage usage = resolution.usage();
+        Instant now = clock.instant();
+        // cron 은 초 단위다. 짧은 지연은 다음 틱을 건너뛰지 않고, 느린 조회 뒤에는 완료한 초부터 기다린다.
+        Instant retryBase = tick == null ? startedAt : laterSecond(tick, now);
         transaction.executeWithoutResult(status -> {
             AgentExecution parent = executions.lockById(job.executionId()).orElse(null);
             SubagentUsageJob current = jobs.findById(jobId).orElse(null);
@@ -200,7 +209,11 @@ public class SubagentUsageReconciler {
             }
             if (isFinalChild(current, usage) && resolution.waitForProvider()) {
                 // 줄은 한 번만 적으므로, 대시보드가 돌아올 때까지 줄도 완료 사건도 남기지 않는다.
-                current.retry(now);
+                if (current.expired(now)) {
+                    current.expire();
+                } else {
+                    current.retry(now, retryBase);
+                }
             } else if (isFinalChild(current, usage)) {
                 // 완료 사건은 표시용이다. 부모 스트림으로 이미 왔으면 다시 만들지 않는다.
                 if (!events.existsByExecutionIdAndHermesSessionIdAndEventType(
@@ -225,10 +238,15 @@ public class SubagentUsageReconciler {
             } else if (current.expired(now)) {
                 current.expire();
             } else {
-                current.retry(now);
+                current.retry(now, retryBase);
             }
             jobs.save(current);
         });
+    }
+
+    /** 시계가 역행해도 예약 기준을 받은 틱보다 앞당기지 않는다. 사건 시각에는 쓰지 않는다. */
+    private static Instant laterSecond(Instant tick, Instant completedAt) {
+        return (tick.isAfter(completedAt) ? tick : completedAt).truncatedTo(ChronoUnit.SECONDS);
     }
 
     /** 대시보드 조회를 반영한 자식 사용량과, 대시보드를 더 기다릴지다. */
@@ -241,7 +259,7 @@ public class SubagentUsageReconciler {
      * 읽은 것이라 채우지 않는다. 대시보드에 닿지 못했으면 자식이 끝난 뒤 {@link #PROVIDER_RETRY_WINDOW}
      * 동안만 기다린다.
      */
-    private ProviderResolution resolveProvider(SubagentUsageJob job, SubagentSessionUsage usage, Instant now) {
+    private ProviderResolution resolveProvider(SubagentUsageJob job, SubagentSessionUsage usage) {
         if (!isFinalChild(job, usage)
                 || (usage.provider() != null && !usage.provider().isBlank())) {
             return new ProviderResolution(usage, false);
@@ -251,7 +269,8 @@ public class SubagentUsageReconciler {
             return new ProviderResolution(usage, false);
         }
         if (lookup.unavailable()) {
-            boolean withinWindow = usage.endedAt() + PROVIDER_RETRY_WINDOW.toSeconds() > now.getEpochSecond();
+            boolean withinWindow = usage.endedAt() + PROVIDER_RETRY_WINDOW.toSeconds()
+                    > clock.instant().getEpochSecond();
             return new ProviderResolution(usage, withinWindow);
         }
         boolean hasProvider = lookup.provider() != null && !lookup.provider().isBlank();

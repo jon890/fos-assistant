@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -118,7 +119,8 @@ public class SubagentUsageJob {
         job.apiBaseUrl = apiBaseUrl;
         job.status = "WAITING";
         job.createdAt = now;
-        job.nextAttemptAt = now;
+        // DATETIME(6) 반올림으로 발견한 틱보다 미래에 저장되지 않게 한다.
+        job.nextAttemptAt = now.truncatedTo(ChronoUnit.MICROS);
         job.expiresAt = parent.finishedAt().plus(Duration.ofHours(24));
         return job;
     }
@@ -169,12 +171,17 @@ public class SubagentUsageJob {
     }
 
     public void retry(Instant now) {
+        retry(now, now);
+    }
+
+    /** 실제 경과 시각으로 backoff 를 정하고, 별도로 받은 예약 기준에 간격을 더한다. */
+    public void retry(Instant now, Instant schedulingBase) {
         attempts++;
         long seconds = 5;
         if (!now.isBefore(createdAt.plusSeconds(120))) {
             backoffAttempts = Math.min(backoffAttempts + 1, 6);
             seconds = Math.min(300, 5L << backoffAttempts);
         }
-        nextAttemptAt = now.plusSeconds(seconds);
+        nextAttemptAt = schedulingBase.plusSeconds(seconds);
     }
 }
