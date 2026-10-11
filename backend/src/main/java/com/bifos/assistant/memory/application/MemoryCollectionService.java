@@ -14,6 +14,7 @@ public class MemoryCollectionService {
 
     private final MemoryCollectionRepository collections;
 
+
     /**
      * 그룹의 collection 을 화면 순서로 낸다.
      *

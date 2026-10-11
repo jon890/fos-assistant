@@ -27,10 +27,12 @@ class MemoryCollectionServiceTest {
     @Autowired
     TestClock clock;
 
+
     @BeforeEach
     void setUp() {
         repository.deleteAll();
     }
+
 
     @Test
     @DisplayName("줄이 없는 그룹은 기본 collection 일곱 개를 순서대로 받고 다시 물어도 늘지 않는다")
@@ -41,14 +43,15 @@ class MemoryCollectionServiceTest {
         List<MemoryCollection> second = service.collectionsOf(31L);
 
         assertThat(first)
-                .extracting(MemoryCollection::key)
-                .containsExactly("core", "career", "learning", "health", "finance", "home", "identity");
+            .extracting(MemoryCollection::key)
+            .containsExactly("core", "career", "learning", "health", "finance", "home", "identity");
         assertThat(first).extracting(MemoryCollection::displayName).doesNotContainNull();
         assertThat(second).extracting(MemoryCollection::key).containsExactlyElementsOf(MemoryCollection.DEFAULT_KEYS);
         assertThat(second).extracting(MemoryCollection::createdAt)
-                .containsOnly(Instant.parse("2030-01-02T03:04:05.123456Z"));
+            .containsOnly(Instant.parse("2030-01-02T03:04:05.123456Z"));
         assertThat(repository.count()).isEqualTo(7);
     }
+
 
     @Test
     @DisplayName("그룹마다 목록이 따로다")

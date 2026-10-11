@@ -10,6 +10,7 @@ import org.springframework.test.context.DynamicPropertySource;
 class MemoryCollectionAuditingMysqlTest extends MemoryCollectionAuditingTest {
     private static final MysqlTestDatabase DATABASE = MysqlTestDatabase.create();
 
+
     @DynamicPropertySource
     static void configureMysql(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", DATABASE::url);

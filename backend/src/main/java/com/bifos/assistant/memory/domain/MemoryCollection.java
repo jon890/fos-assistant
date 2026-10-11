@@ -29,8 +29,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 public class MemoryCollection {
 
     /** 그룹마다 처음부터 두는 collection 의 key 다. 순서가 화면 순서다. */
-    public static final List<String> DEFAULT_KEYS =
-            List.of("core", "career", "learning", "health", "finance", "home", "identity");
+    public static final List<String> DEFAULT_KEYS = List.of("core", "career", "learning", "health", "finance", "home", "identity");
 
     private static final List<String> DEFAULT_NAMES = List.of("기본", "커리어", "학습", "건강", "재무", "집", "신원");
 
@@ -47,21 +46,24 @@ public class MemoryCollection {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     private MemoryCollection(Long groupId, String key, String displayName, int sortOrder) {
         this.id = new MemoryCollectionId(groupId, key);
         this.displayName = displayName;
         this.sortOrder = sortOrder;
     }
 
+
     /** 한 그룹의 기본 collection 줄들이다. */
     public static List<MemoryCollection> defaultsFor(Long groupId) {
         return DEFAULT_KEYS.stream()
-                .map(key -> {
-                    int index = DEFAULT_KEYS.indexOf(key);
-                    return new MemoryCollection(groupId, key, DEFAULT_NAMES.get(index), index + 1);
-                })
-                .toList();
+            .map(key -> {
+                int index = DEFAULT_KEYS.indexOf(key);
+                return new MemoryCollection(groupId, key, DEFAULT_NAMES.get(index), index + 1);
+            })
+            .toList();
     }
+
 
     public String key() {
         return id.key();

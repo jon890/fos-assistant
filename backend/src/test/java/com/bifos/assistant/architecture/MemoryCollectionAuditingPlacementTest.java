@@ -50,12 +50,14 @@ class MemoryCollectionAuditingPlacementTest {
     @TempDir
     Path temporary;
 
+
     @Test
     @DisplayName("현재 domain 위치의 생성 시각과 정상 provider 선언을 허용한다")
     void acceptsActualAnnotations() throws IOException {
         ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK.check(
-                ArchitectureRulesTest.compileFixture(temporary, Map.of(ENTITY, ENTITY_SOURCE, CONFIG, CONFIG_SOURCE)));
+            ArchitectureRulesTest.compileFixture(temporary, Map.of(ENTITY, ENTITY_SOURCE, CONFIG, CONFIG_SOURCE)));
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -80,9 +82,9 @@ class MemoryCollectionAuditingPlacementTest {
             case "reference" -> config = config.replace("dateTimeProviderRef=\"auditingDateTimeProvider\"", "dateTimeProviderRef=\"wrong\"");
             case "bean" -> config = config.replace("@Bean(\"auditingDateTimeProvider\")", "@Bean(\"wrong\")");
             case "return" -> config = config.replace("DateTimeProvider provider", "java.time.Instant provider")
-                    .replace("return () -> Optional.of(clock.instant().truncatedTo(ChronoUnit.MICROS));", "return clock.instant();");
+                .replace("return () -> Optional.of(clock.instant().truncatedTo(ChronoUnit.MICROS));", "return clock.instant();");
             case "clock" -> config = config.replace("provider(Clock clock)", "provider()")
-                    .replace("clock.instant()", "java.time.Instant.EPOCH");
+                .replace("clock.instant()", "java.time.Instant.EPOCH");
             case "missingEntity" -> entity = null;
             case "duplicateEntity" -> sources.put("fixture.MemoryCollection", ENTITY_SOURCE.replace("com.bifos.assistant.memory.domain", "fixture"));
             case "missingConfig" -> config = null;
@@ -97,7 +99,7 @@ class MemoryCollectionAuditingPlacementTest {
             sources.put(CONFIG, config);
         }
         var result = ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK.evaluate(
-                ArchitectureRulesTest.compileFixture(temporary, sources));
+            ArchitectureRulesTest.compileFixture(temporary, sources));
         assertThat(result.hasViolation()).as(change).isTrue();
         assertThat(result.getFailureReport().toString()).contains("auditing", "MemoryCollection");
     }
