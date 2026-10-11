@@ -45,12 +45,16 @@ import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.persistence.EntityManager;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
@@ -153,7 +157,7 @@ class ConnectorActionExecutionTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("collisionCases")
-    @DisplayName("side 변경 우회와 clientOrderId scope 충돌을 저장 전과 DB 읽기에서 거절한다")
+    @DisplayName("scope 충돌과 정규화 의미 변경을 저장 전과 DB 읽기에서 거절한다")
     void rejectsSharedScopeCollisionsBeforeCaptureAndAfterReload(String name, JsonNode sample) {
         Fixture fixture = fixture();
         ConnectorBinding binding = fixture.binding();
@@ -177,6 +181,15 @@ class ConnectorActionExecutionTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("invalid financial execution snapshot");
         assertThat(contents.existsById(action.id())).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("collisionCases")
+    @DisplayName("과거 저장된 정규화 의미 변경도 실제 open에서 거절한다")
+    void rejectsSharedIntegrityChangesAfterReload(String name, JsonNode sample) {
+        Fixture fixture = fixture();
+        ConnectorBinding binding = fixture.binding();
+        ConnectorAction action = action(binding, value(sample, "modelArgsJson"));
 
         // 과거 저장 내용을 재현해 원문 해시가 맞아도 strict 검증에서 거절하는지 확인한다.
         contents.saveAndFlush(ConnectorActionExecution.stored(
@@ -191,7 +204,9 @@ class ConnectorActionExecutionTest {
                 null,
                 Sha256.hex(value(sample, "executionArgsJson")),
                 Sha256.hex(value(sample, "scopeJson")),
-                "0".repeat(64),
+                value(sample, "name").startsWith("normalization-integrity-")
+                        ? historicalRequestKey(sample, action, binding)
+                        : "0".repeat(64),
                 ConnectorExecutionSnapshot.PROTOCOL,
                 NOW));
         em.clear();
@@ -800,10 +815,34 @@ class ConnectorActionExecutionTest {
                 value(sample, "operation"));
     }
 
+    private static String historicalRequestKey(JsonNode sample, ConnectorAction action, ConnectorBinding binding) {
+        Map<String, String> values = new TreeMap<>();
+        JsonNode args = JSON.readTree(value(sample, "executionArgsJson"));
+        for (var entry : args.properties()) {
+            if (!Set.of("clientOrderId", "expected_order").contains(entry.getKey())) {
+                String value = entry.getValue().stringValue();
+                if (Set.of("quantity", "orderAmount", "price").contains(entry.getKey())) {
+                    value = new BigDecimal(value).stripTrailingZeros().toPlainString();
+                }
+                values.put(entry.getKey(), value);
+            }
+        }
+        values.put("userId", action.userId().toString());
+        values.put("connectionId", binding.connection().id().toString());
+        values.put("tool", action.toolName());
+        StringBuilder body = new StringBuilder("23:fos-financial-intent-v1");
+        values.forEach((key, value) -> body.append(key.getBytes(StandardCharsets.UTF_8).length)
+                .append(':').append(key).append(value.getBytes(StandardCharsets.UTF_8).length)
+                .append(':').append(value));
+        return Sha256.hex(body.toString());
+    }
+
     private static Stream<Arguments> collisionCases() {
         return VECTOR.get("cases")
                 .valueStream()
-                .filter(sample -> value(sample, "name").startsWith("scope-collision-"))
+                .filter(sample -> value(sample, "name").startsWith("scope-collision-")
+                        || (value(sample, "name").startsWith("normalization-integrity-")
+                                && !sample.get("valid").booleanValue()))
                 .map(sample -> Arguments.of(value(sample, "name"), sample));
     }
 

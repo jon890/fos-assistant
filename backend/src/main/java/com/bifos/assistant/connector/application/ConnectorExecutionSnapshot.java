@@ -210,7 +210,7 @@ public final class ConnectorExecutionSnapshot {
             require(entry.getValue().isString());
             String value = entry.getValue().stringValue();
             if (Set.of("quantity", "orderAmount", "price").contains(entry.getKey())) {
-                value = new BigDecimal(value).stripTrailingZeros().toPlainString();
+                value = ConnectorNormalization.canonicalDecimal(value);
             }
             values.put(entry.getKey(), value);
         }
@@ -407,6 +407,7 @@ public final class ConnectorExecutionSnapshot {
             equal(change.get("before"), input.has(field) ? input.get(field) : JSON.nullNode());
             equal(change.get("after"), args.has(field) ? args.get(field) : JSON.nullNode());
             require(!change.get("before").equals(change.get("after")));
+            require(ConnectorNormalization.preserves(field, change.get("before"), change.get("after")));
         }
         for (String field : NORMALIZED) {
             JsonNode before = input.has(field) ? input.get(field) : JSON.nullNode();
