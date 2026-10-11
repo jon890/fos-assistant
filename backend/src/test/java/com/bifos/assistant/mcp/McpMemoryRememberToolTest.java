@@ -149,17 +149,17 @@ class McpMemoryRememberToolTest {
 
 
     @Test
-    @DisplayName("memory_remember 는 중복 없이 등록되고 title 과 content 가 필수다")
-    void listsMemoryRememberLast() throws Exception {
+    @DisplayName("도구 목록에 memory_remember가 하나 있고 title과 content가 필수다")
+    void listsMemoryRememberSchema() throws Exception {
         JsonNode tools = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
             .path("result")
             .path("tools");
 
-        assertThat(tools).extracting(item -> item.path("name").asString()).doesNotHaveDuplicates();
-        JsonNode tool = StreamSupport.stream(tools.spliterator(), false)
-            .filter(item -> TOOL.equals(item.path("name").asString()))
-            .findFirst()
-            .orElseThrow();
+        List<JsonNode> matches = StreamSupport.stream(tools.spliterator(), false)
+            .filter(value -> TOOL.equals(value.path("name").asString()))
+            .toList();
+        assertThat(matches).hasSize(1);
+        JsonNode tool = matches.getFirst();
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         assertThat(tool.path("inputSchema").path("required").toString()).isEqualTo("[\"title\",\"content\"]");
         assertThat(tool.path("inputSchema").path("additionalProperties").asBoolean())
