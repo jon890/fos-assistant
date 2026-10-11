@@ -43,7 +43,7 @@ export function useConversationQueue({
     text: string,
     fromDraft: boolean,
   ): Promise<boolean> {
-    // 새 대화의 첫 turn 은 `started` 가 대화 식별자를 실어 올 때까지 대기 메시지를 받을 대화가 없다.
+    // 첫 송신 전에 빈 대화 식별자를 확보한다. 아직 확보하지 못했으면 대기 메시지를 받지 않는다.
     if (
       text.length === 0 ||
       conversationIdRef.current === null ||

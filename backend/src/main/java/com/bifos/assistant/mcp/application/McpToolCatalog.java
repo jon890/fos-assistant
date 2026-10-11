@@ -15,6 +15,7 @@ public class McpToolCatalog {
     private final LiveProperties<DelegationProperties> delegationProperties;
     private final McpMemoryRemember memoryRemember;
     private final McpMediaObservationTools mediaObservations;
+    private final McpContentDraftTools contentDrafts;
 
 
     public List<Map<String, Object>> tools() {
@@ -146,6 +147,8 @@ public class McpToolCatalog {
                     List.of("title"))),
             mediaObservations.listDefinition(),
             mediaObservations.recordDefinition(),
+            contentDrafts.writeDefinition(),
+            contentDrafts.readDefinition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",

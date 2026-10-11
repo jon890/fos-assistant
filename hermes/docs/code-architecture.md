@@ -37,6 +37,12 @@ Control Plane 이 기대는 Hermes 쪽 코드다. Hermes 에 설치하는 plugin
 설치 묶음은 대시보드 plugin 과 profile plugin 의 모든 Python 모듈을 함께 담는다.
 커넥터 설치와 `policy_hook` 조회도 `fos-ctx` 의 하위 모듈까지 묶음과 비교한다.
 
+`runtime/`은 관리 bootstrap이 명시 import하는 일반 addon이다. `bodyless_install.py`는 process-global
+writer 소유와 설치 검사를, `bodyless_requests.py`는 profile별 안전한 파일 쓰기를,
+`request_counts.py`는 본문을 보존하는 제한된 집계를 맡는다. profile plugin의 reload·unload에 설치 수명을 묶지 않는다.
+일반 동작 계약은 [본문 없는 요청 진단](hermes-contract.md#본문-없는-요청-진단)이 갖고,
+명시 기동과 고정 manifest·새 interpreter 연결은 `fos-home-infra`가 맡는다.
+
 ## 범용 커넥터
 
 `connector_guard.py`는 보호 선언과 바인딩 지원 응답을 검증하고,
@@ -70,6 +76,7 @@ hermes/
     fos-ctx/                 profile plugin. Control Plane MCP 호출에 _fos_ctx 서명을 붙이고, 바인딩 profile 과 옛 설치 profile 의 커넥터 도구 호출을 Control Plane 에 물어 막는다
   connectors/
     <커넥터 이름>/            범용 커넥터 하나. connector.json, .mcp.json, MCP 서버, 스킬 (ADR-064)
+  runtime/                   관리 bootstrap이 설치하는 일반 addon. plugin 등록과 별개
   profile-template/
     config.yaml.template     새 profile 의 설정 틀. 안전한 도구 목록, Control Plane MCP 등록, fos-ctx 켜기
   bundle.sh                  설치 묶음을 만든다

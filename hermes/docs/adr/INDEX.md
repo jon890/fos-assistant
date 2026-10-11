@@ -17,3 +17,5 @@ Hermes 에 설치하는 plugin 과 profile 틀, 커넥터(`hermes/`) 한 층의 
 | [ADR-20261009 / naver-blog-overwrite](ADR-20261009-naver-blog-overwrite.md) | 네이버 블로그 임시저장 글 덮어쓰기는 원본 사본을 먼저 남기고, 승인 카드의 지문과 바뀌는 내용을 작업이 다시 대조한다 | Accepted. ADR-20261009 / naver-blog-primitives 의 읽기 도구 위에 쓰기 도구를 더한다 |
 | [ADR-20261009 / naver-blog-primitives](ADR-20261009-naver-blog-primitives.md) | 네이버 블로그 커넥터는 임시저장 글을 읽는 기본 도구를 갖고, 글을 어떻게 쓸지는 모델과 Memory 가 정한다 | Accepted. [ADR-20261007 / naver-blog-connector](../../../docs/adr/ADR-20261007-naver-blog-connector.md) 에 읽기 도구를 더하고, 문체를 비공개 스킬로 둔다는 부분을 Memory 로 바꾼다 |
 | [ADR-20261011 / connector-source-build](ADR-20261011-connector-source-build.md) | 커넥터 실행 파일은 소스로 빌드하고 Git 으로 추적하지 않는다 | Accepted. ADR-084 의 실행 파일 커밋과 대조 검사를 부분 대체한다 |
+| [ADR-20261011 / content-snapshot-compiler](ADR-20261011-content-snapshot-compiler.md) | 원고 compiler는 별도 private process로 호출한다 | Accepted |
+| [ADR-20261012 / bodyless-request-diagnostics](ADR-20261012-bodyless-request-diagnostics.md) | 관리 bootstrap이 요청 진단 writer를 본문 없는 writer로 교체한다 | Accepted. ADR-001의 관리 entrypoint 내부 교체 예외와 일반 writer 계약을 정한다 |
