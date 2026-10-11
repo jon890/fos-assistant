@@ -40,6 +40,7 @@ import {
 import { renderDraft, renderShape, type RenderInput } from "./render.ts";
 import { readConnection, sessionStatus, type Env } from "./session.ts";
 import { runWorker } from "./worker.ts";
+import { connectSnapshotServer } from "./content-snapshot.ts";
 
 const MINIMUM_BUN_VERSION = [1, 3, 14] as const;
 
@@ -372,6 +373,7 @@ export async function runServer() {
     }
     return;
   }
+  if (await connectSnapshotServer(process.argv, process.env)) return;
   const jobFile = workerArgument(process.argv);
   if (jobFile !== null) {
     await runWorker(jobFile);

@@ -137,10 +137,12 @@ async function connectors(root: string) {
     sameKeys(mcp.mcpServers, [name]);
     const server = mcp.mcpServers[name];
     const entry = `dist/${name}-mcp.js`;
+    const args = JSON.stringify(server.args);
+    const bundle = `\${CLAUDE_PLUGIN_ROOT}/${entry}`;
     requireValue(
       server.command === "bun" &&
-        JSON.stringify(server.args) ===
-          JSON.stringify([`\${CLAUDE_PLUGIN_ROOT}/${entry}`]),
+        (args === JSON.stringify([bundle]) ||
+          args === JSON.stringify(["--no-env-file", bundle])),
       "INVALID_CONNECTOR_ENTRY",
     );
     result[name] = entry;
