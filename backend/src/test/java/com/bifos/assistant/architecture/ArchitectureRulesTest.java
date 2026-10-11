@@ -489,5 +489,4 @@ class ArchitectureRulesTest {
             .check(TESTS);
     }
 
-
 }
