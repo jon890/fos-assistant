@@ -1,6 +1,14 @@
 import { afterEach, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { OverwriteResult, runOverwrite } from "../src/editor/overwrite.ts";
@@ -26,7 +34,10 @@ import { fill } from "../src/editor/text.ts";
 import { localChrome } from "./local-chrome.ts";
 
 const BLOG_ID = "example-blog";
-const ENV = { NAVER_BLOG_BROWSER_URL: `http://127.0.0.1:9${GATEWAY_PATH}`, NAVER_BLOG_ID: BLOG_ID };
+const ENV = {
+  NAVER_BLOG_BROWSER_URL: `http://127.0.0.1:9${GATEWAY_PATH}`,
+  NAVER_BLOG_ID: BLOG_ID,
+};
 const INPUT = {
   title: "가상국수 다녀온 날",
   category: "가상국수로그",
@@ -52,7 +63,10 @@ afterEach(async () => {
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 
 /** 잠금과 대기 중인 상태 파일, 입력 파일을 준비한 작업 하나. */
-async function queuedJob(input: Record<string, unknown> = INPUT, env: Env = ENV) {
+async function queuedJob(
+  input: Record<string, unknown> = INPUT,
+  env: Env = ENV,
+) {
   const dir = await mkdtemp(join(tmpdir(), "naver-blog-worker-"));
   cleanups.push(() => rm(dir, { recursive: true, force: true }));
   const jobId = randomUUID();
@@ -79,59 +93,126 @@ async function queuedJob(input: Record<string, unknown> = INPUT, env: Env = ENV)
 
 /** 작업이 끝나면 입력 파일과 잠금이 없고 상태 파일과 끝냄 표시만 남는다. */
 async function expectOnlyState(dir: string, jobId: string) {
-  expect((await readdir(dir)).sort()).toEqual([`${jobId}.finished`, `${jobId}.json`]);
+  expect((await readdir(dir)).sort()).toEqual([
+    `${jobId}.finished`,
+    `${jobId}.json`,
+  ]);
 }
 
-test("실제 Chrome의 제목 커서 진단이 worker와 작업 파일을 거쳐 draft_job까지 안전하게 전달된다", async () => {
-  const chrome = await localChrome();
-  cleanups.push(() => chrome.stop());
-  const { page } = await chrome.tab();
-  await openEditor(page);
-  await page.js(`(() => {const cover=document.createElement('div');
+for (const stage of ["open", "fill"] as const)
+  test(`실제 Chrome의 ${stage} 실패 진단이 worker와 작업 파일을 거쳐 draft_job까지 안전하게 전달된다`, async () => {
+    const chrome = await localChrome();
+    cleanups.push(() => chrome.stop());
+    const { page } = await chrome.tab();
+    await openEditor(page);
+    await page.js(
+      stage === "open"
+        ? "document.getElementById('title').remove()"
+        : `(() => {const cover=document.createElement('div');
     cover.textContent='private-dom-account-url-marker';
-    cover.style.cssText='position:fixed;inset:0;background:white;z-index:100';document.body.append(cover)})()`);
-  const { dir, jobId, run } = await queuedJob();
-  await run(async (_env, blocks, input, onStage) => {
-    await onStage("fill"); page.stage = "fill";
-    await fill(page, input.title, blocks, "synthetic-hash");
-    throw new Error("제목 실패가 입력을 중단해야 한다");
-  });
-  const stored = await readState(dir, jobId);
-  expect(stored).toMatchObject({ status: "failed", save_clicked: false, stage: "fill" });
-  expect(stored?.error?.focus_diagnostics).toMatchObject({ attempts: 10 });
-  expect(chrome.calls).not.toContain("Input.insertText");
-  const server = createServer({ NAVER_BLOG_JOB_DIR: dir });
-  const client = new Client({ name: "focus-diagnostic-test", version: "1" });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  try {
-    await server.connect(serverTransport); await client.connect(clientTransport);
-    const result = await client.callTool({ name: "draft_job", arguments: { job_id: jobId, wait_seconds: 0 } });
-    const content = result.content as Array<{ text: string }>;
-    const payload = JSON.parse(content[0]!.text);
-    expect(payload.error).toEqual(stored?.error);
-    expect(payload.save_clicked).toBe(false);
-    for (const sensitive of [INPUT.title, INPUT.body, "private-dom", chrome.url, ENV.NAVER_BLOG_BROWSER_URL])
-      expect(JSON.stringify(payload)).not.toContain(sensitive);
-  } finally { await client.close(); await server.close(); }
-}, 15_000);
+    cover.style.cssText='position:fixed;inset:0;background:white;z-index:100';document.body.append(cover)})()`,
+    );
+    const { dir, jobId, run } = await queuedJob();
+    await run(async (_env, blocks, input, onStage) => {
+      await onStage(stage);
+      page.stage = stage;
+      if (stage === "open") await openEditor(page);
+      else await fill(page, input.title, blocks, "synthetic-hash");
+      throw new Error("제목 실패가 입력을 중단해야 한다");
+    });
+    const stored = await readState(dir, jobId);
+    expect(stored).toMatchObject({
+      status: "failed",
+      save_clicked: false,
+      stage,
+    });
+    if (stage === "open")
+      expect(stored?.error?.open_diagnostics).toMatchObject({
+        attempts: 40,
+        last: { reason: "title_missing" },
+      });
+    else
+      expect(stored?.error?.focus_diagnostics).toMatchObject({ attempts: 10 });
+    expect(chrome.calls).not.toContain("Input.insertText");
+    expect(chrome.calls).not.toContain("Input.dispatchMouseEvent");
+    const server = createServer({ NAVER_BLOG_JOB_DIR: dir });
+    const client = new Client({ name: "focus-diagnostic-test", version: "1" });
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    try {
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      const result = await client.callTool({
+        name: "draft_job",
+        arguments: { job_id: jobId, wait_seconds: 0 },
+      });
+      const content = result.content as Array<{ text: string }>;
+      const payload = JSON.parse(content[0]!.text);
+      expect(payload.error).toEqual(stored?.error);
+      expect(payload.save_clicked).toBe(false);
+      for (const sensitive of [
+        INPUT.title,
+        INPUT.body,
+        "private-dom",
+        chrome.url,
+        ENV.NAVER_BLOG_BROWSER_URL,
+      ])
+        expect(JSON.stringify(payload)).not.toContain(sensitive);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  }, 15_000);
 
 test("커서 진단 직렬화는 허용 값만 복사하고 기존 사본 번호를 보존한다", async () => {
   const { dir, jobId, run } = await queuedJob();
   await run(async () => {
-    throw new EditorError("editor_failed", "fill", "제목 자리에 커서를 두지 못했다", {
-      backup_draft_id: "224000000002",
-      focus_diagnostics: { attempts: Infinity, url: "private-url", samples: Array(30).fill({
-        elements: 10000, hit: "private-title", anchor: "title", active: "body", x: 40,
-        text: "private-body", html: "private-dom", sized: true,
-      }) },
-    });
+    throw new EditorError(
+      "editor_failed",
+      "fill",
+      "제목 자리에 커서를 두지 못했다",
+      {
+        backup_draft_id: "224000000002",
+        open_diagnostics: {
+          attempts: 900,
+          last: {
+            reason: "private-text",
+            host: "private-url",
+            candidates: 900,
+            frames: Infinity,
+            html: "private-dom",
+          },
+        },
+        focus_diagnostics: {
+          attempts: Infinity,
+          url: "private-url",
+          samples: Array(30).fill({
+            elements: 10000,
+            hit: "private-title",
+            anchor: "title",
+            active: "body",
+            x: 40,
+            text: "private-body",
+            html: "private-dom",
+            sized: true,
+          }),
+        },
+      },
+    );
   });
   const state = await readState(dir, jobId);
   const error = state?.error as Record<string, any>;
   expect(error.backup_draft_id).toBe("224000000002");
+  expect(error.open_diagnostics).toMatchObject({
+    attempts: 40,
+    last: { reason: "page_loading", host: "other", candidates: 100, frames: 0 },
+  });
   expect(error.focus_diagnostics.attempts).toBe(0);
   expect(error.focus_diagnostics.samples).toHaveLength(10);
-  expect(error.focus_diagnostics.samples[0]).toMatchObject({ elements: 100, hit: "other" });
+  expect(error.focus_diagnostics.samples[0]).toMatchObject({
+    elements: 100,
+    hit: "other",
+  });
   expect(JSON.stringify(error)).not.toContain("private");
 });
 
@@ -141,14 +222,32 @@ test("실제 Chrome의 제목 대기 중 작업 시간 상한은 timeout과 저�
   const env = { ...ENV, NAVER_BLOG_BROWSER_URL: chrome.url };
   const { dir, jobId, run } = await queuedJob(INPUT, env);
   const stages: string[] = [];
-  await run(async (actualEnv, blocks, input, onStage, signal) =>
-    runDraft(actualEnv, blocks, input, async (stage) => {
-      stages.push(stage); await onStage(stage);
-      if (stage === "fill") await (await chrome.latest()).js("document.getElementById('title').style.display='none'");
-    }, signal, { stepSeconds: 3, openSeconds: 0.5 }), 500);
+  await run(
+    async (actualEnv, blocks, input, onStage, signal) =>
+      runDraft(
+        actualEnv,
+        blocks,
+        input,
+        async (stage) => {
+          stages.push(stage);
+          await onStage(stage);
+          if (stage === "fill")
+            await (
+              await chrome.latest()
+            ).js("document.getElementById('title').style.display='none'");
+        },
+        signal,
+        { stepSeconds: 3, openSeconds: 0.5 },
+      ),
+    500,
+  );
   const state = await readState(dir, jobId);
   expect(stages).toEqual(["open", "fill"]);
-  expect(state).toMatchObject({ status: "failed", save_clicked: false, error: { code: "timeout", stage: "fill" } });
+  expect(state).toMatchObject({
+    status: "failed",
+    save_clicked: false,
+    error: { code: "timeout", stage: "fill" },
+  });
   expect(chrome.calls).not.toContain("Input.insertText");
   expect(chrome.calls).not.toContain("Page.setInterceptFileChooserDialog");
   expect(chrome.closed).toHaveLength(1);
@@ -187,13 +286,20 @@ test("저장 확인이 save_unconfirmed 로 끝나면 unknown 이다", async () 
 
   await run(async (_env, _blocks, _input, onStage) => {
     await onStage("save_clicking");
-    throw new EditorError("save_unconfirmed", "save", "임시저장 수가 늘지 않았다");
+    throw new EditorError(
+      "save_unconfirmed",
+      "save",
+      "임시저장 수가 늘지 않았다",
+    );
   });
 
   const state = await readState(dir, jobId);
   expect(state?.status).toBe("unknown");
   expect(state?.save_clicked).toBe(true);
-  expect(state?.error).toMatchObject({ code: "save_unconfirmed", stage: "save" });
+  expect(state?.error).toMatchObject({
+    code: "save_unconfirmed",
+    stage: "save",
+  });
   await expectOnlyState(dir, jobId);
 });
 
@@ -216,9 +322,14 @@ test("저장 전의 category_not_found 는 failed 와 있는 카테고리 이름
 
   await run(async (_env, _blocks, _input, onStage) => {
     await onStage("settings");
-    throw new EditorError("category_not_found", "settings", "카테고리를 찾지 못했다", {
-      categories: ["일상", "여행"],
-    });
+    throw new EditorError(
+      "category_not_found",
+      "settings",
+      "카테고리를 찾지 못했다",
+      {
+        categories: ["일상", "여행"],
+      },
+    );
   });
 
   const state = await readState(dir, jobId);
@@ -260,7 +371,10 @@ test("정리가 먼저 작업을 끝냈으면 save_clicking 이 실패해 저장
   let clicked = false;
 
   await run(async (_env, _blocks, _input, onStage) => {
-    await finishState(dir, jobId, { status: "failed", error: { code: "timeout" } });
+    await finishState(dir, jobId, {
+      status: "failed",
+      error: { code: "timeout" },
+    });
     await onStage("save_clicking");
     clicked = true;
     return { state: null, savedBefore: 3, savedAfter: 4 };
@@ -289,14 +403,20 @@ test("작업 디렉터리 확인이 실패하면 상태를 쓰지 않고 입력�
   expect(called).toBe(false);
   expect(await readState(dir, jobId)).toEqual(before);
   expect((await readdir(dir)).sort()).toEqual(
-    [`${jobId}.input.json`, `${jobId}.json`, lockFile(dir, BLOG_ID).slice(dir.length + 1)].sort(),
+    [
+      `${jobId}.input.json`,
+      `${jobId}.json`,
+      lockFile(dir, BLOG_ID).slice(dir.length + 1),
+    ].sort(),
   );
 });
 
 /** 주인의 첨부 디렉터리 아래에 사진 한 장을 둔 사진 디렉터리. */
 async function ownerPhotos() {
   // 링크가 없도록 실제 경로를 쓴다. 커넥터가 링크를 거절한다.
-  const attachmentDir = await realpath(await mkdtemp(join(tmpdir(), "naver-blog-worker-photos-")));
+  const attachmentDir = await realpath(
+    await mkdtemp(join(tmpdir(), "naver-blog-worker-photos-")),
+  );
   cleanups.push(() => rm(attachmentDir, { recursive: true, force: true }));
   const photoDir = join(attachmentDir, "conversation");
   await mkdir(photoDir);
@@ -307,7 +427,10 @@ async function ownerPhotos() {
 
 test("작업 프로세스는 자기 env 의 첨부 디렉터리 아래 사진을 다시 검사해 읽는다", async () => {
   const { attachmentDir, input } = await ownerPhotos();
-  const { dir, jobId, run } = await queuedJob(input, { ...ENV, NAVER_BLOG_ATTACHMENT_DIR: attachmentDir });
+  const { dir, jobId, run } = await queuedJob(input, {
+    ...ENV,
+    NAVER_BLOG_ATTACHMENT_DIR: attachmentDir,
+  });
 
   await run(fakeRunDraft);
 
@@ -357,7 +480,9 @@ function draftSpy() {
 }
 
 /** 받은 인자를 남기고 정한 결과를 돌려주는 덮어쓰기 대역. */
-function overwriteSpy(body: typeof runOverwrite = async () => OVERWRITE_RESULT) {
+function overwriteSpy(
+  body: typeof runOverwrite = async () => OVERWRITE_RESULT,
+) {
   const calls: unknown[] = [];
   const fake: typeof runOverwrite = async (env, input, onStage, signal) => {
     calls.push({ env, input });
@@ -367,7 +492,10 @@ function overwriteSpy(body: typeof runOverwrite = async () => OVERWRITE_RESULT) 
 }
 
 test("kind 가 overwrite 인 입력 파일이면 runOverwrite 만 부르고 그 결과를 그대로 남긴다", async () => {
-  const { dir, jobId, runWith } = await queuedJob({ kind: "overwrite", ...OVERWRITE_INPUT });
+  const { dir, jobId, runWith } = await queuedJob({
+    kind: "overwrite",
+    ...OVERWRITE_INPUT,
+  });
   const draft = draftSpy();
   const overwrite = overwriteSpy(async (_env, _input, onStage) => {
     await onStage("open");
@@ -406,7 +534,10 @@ test("kind 가 없는 옛 입력 파일은 새 글 저장으로 읽어 runDraft 
 
 test("덮어쓰기 입력 파일에 칸이 빠졌으면 어느 흐름도 부르지 않고 editor_failed 다", async () => {
   const { changes: _changes, ...missing } = OVERWRITE_INPUT;
-  const { dir, jobId, runWith } = await queuedJob({ kind: "overwrite", ...missing });
+  const { dir, jobId, runWith } = await queuedJob({
+    kind: "overwrite",
+    ...missing,
+  });
   const draft = draftSpy();
   const overwrite = overwriteSpy();
 
@@ -422,13 +553,21 @@ test("덮어쓰기 입력 파일에 칸이 빠졌으면 어느 흐름도 부르�
 });
 
 test("runOverwrite 가 save_clicking 뒤 사본 번호를 실은 EditorError 를 던지면 unknown 이고 오류에 사본 번호가 실린다", async () => {
-  const { dir, jobId, runWith } = await queuedJob({ kind: "overwrite", ...OVERWRITE_INPUT });
+  const { dir, jobId, runWith } = await queuedJob({
+    kind: "overwrite",
+    ...OVERWRITE_INPUT,
+  });
   const overwrite = overwriteSpy(async (_env, _input, onStage) => {
     await onStage("save");
     await onStage("save_clicking");
-    throw new EditorError("save_unconfirmed", "save", "저장을 확인하지 못했다", {
-      backup_draft_id: "224000000002",
-    });
+    throw new EditorError(
+      "save_unconfirmed",
+      "save",
+      "저장을 확인하지 못했다",
+      {
+        backup_draft_id: "224000000002",
+      },
+    );
   });
 
   await runWith({ runDraft: draftSpy().fake, runOverwrite: overwrite.fake });
@@ -446,7 +585,10 @@ test("runOverwrite 가 save_clicking 뒤 사본 번호를 실은 EditorError 를
 });
 
 test("덮어쓰기가 시간 상한에 걸려 EditorError 로 끝나면 timeout 오류에 사본 번호만 더한다", async () => {
-  const { dir, jobId, runWith } = await queuedJob({ kind: "overwrite", ...OVERWRITE_INPUT });
+  const { dir, jobId, runWith } = await queuedJob({
+    kind: "overwrite",
+    ...OVERWRITE_INPUT,
+  });
   const overwrite = overwriteSpy(async (_env, _input, onStage, signal) => {
     await onStage("apply");
     return new Promise<OverwriteResult>((_, reject) =>
@@ -461,10 +603,17 @@ test("덮어쓰기가 시간 상한에 걸려 EditorError 로 끝나면 timeout 
     );
   });
 
-  await runWith({ runDraft: draftSpy().fake, runOverwrite: overwrite.fake }, 100);
+  await runWith(
+    { runDraft: draftSpy().fake, runOverwrite: overwrite.fake },
+    100,
+  );
 
   const state = await readState(dir, jobId);
   expect(state?.status).toBe("failed");
-  expect(state?.error).toEqual({ code: "timeout", stage: "apply", backup_draft_id: "224000000002" });
+  expect(state?.error).toEqual({
+    code: "timeout",
+    stage: "apply",
+    backup_draft_id: "224000000002",
+  });
   await expectOnlyState(dir, jobId);
 });
