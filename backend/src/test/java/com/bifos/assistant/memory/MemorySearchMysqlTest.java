@@ -2,9 +2,12 @@ package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.bifos.assistant.testsupport.MemorySearchSqlProbe;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
+import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -37,13 +40,22 @@ class MemorySearchMysqlTest extends MemorySearchTest {
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
         outer.setTimeout(30);
         long started = System.nanoTime();
-        assertThatThrownBy(() -> outer.execute(status -> memories.searchFor(USER, CORE, "합성", 10, null)))
-            .isInstanceOf(RuntimeException.class);
+        Throwable failure = catchThrowable(() -> outer.execute(status -> memories.searchFor(USER, CORE, "합성", 10, null)));
         long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+        SQLException sqlFailure = sqlFailure(failure);
+        System.out.printf(
+            "memory-search timeoutMs=%d jdbcTimeoutSeconds=%d selectCount=%d readOnly=%b sqlState=%s errorCode=%d sqlTimeout=%b%n",
+            elapsed,
+            MemorySearchSqlProbe.timeout(),
+            MemorySearchSqlProbe.selects().size(),
+            MemorySearchSqlProbe.readOnly(),
+            sqlFailure == null ? null : sqlFailure.getSQLState(),
+            sqlFailure == null ? 0 : sqlFailure.getErrorCode(),
+            sqlFailure instanceof SQLTimeoutException);
+        assertThat(failure).isInstanceOf(RuntimeException.class);
+        assertThat((Throwable)sqlFailure).isInstanceOf(SQLTimeoutException.class);
         assertThat(elapsed).isBetween(800L, 4500L);
         assertProjectionAndTimeout();
-        System.out.printf(
-            "memory-search timeoutMs=%d jdbcTimeoutSeconds=%d%n", elapsed, MemorySearchSqlProbe.timeout());
     }
 
 
@@ -55,5 +67,15 @@ class MemorySearchMysqlTest extends MemorySearchTest {
         MemorySearchSqlProbe.invalidate();
         assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, null)).isInstanceOf(RuntimeException.class);
         assertProjectionAndTimeout();
+    }
+
+
+    private static SQLException sqlFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql) {
+                return sql;
+            }
+        }
+        return null;
     }
 }
