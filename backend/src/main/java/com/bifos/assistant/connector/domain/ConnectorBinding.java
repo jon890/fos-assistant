@@ -15,6 +15,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Objects;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -88,6 +91,10 @@ public class ConnectorBinding {
     @Column(name = "apply_due_at")
     private Instant applyDueAt;
 
+    /** 커밋한 설치 시도다. 결과를 한 번 적용한 뒤 비우며, 시각이 같아도 새 시도와 옛 응답을 구분한다. */
+    @Column(name = "install_attempt_id", columnDefinition = "BINARY(16)")
+    private UUID installAttemptId;
+
     @Column(name = "desired_enabled", nullable = false)
     private boolean desiredEnabled;
 
@@ -120,8 +127,25 @@ public class ConnectorBinding {
 
     /** 설치를 보내기 전이다. 설치가 끝날 때까지 켜려는 의도를 내린다. */
     public void beginInstall(Instant now) {
+        beginInstall(UUID.randomUUID(), now);
+    }
+
+    /** 시작 트랜잭션이 새 시도를 적고 설치 중인 바인딩을 실행 대상에서 내린다. */
+    public void beginInstall(UUID attemptId, Instant now) {
+        this.installAttemptId = Objects.requireNonNull(attemptId);
         this.desiredEnabled = false;
-        pending(now);
+        // 실행 승인의 바인딩 revision도 같은 시계 값에서 새 설치를 구분해야 한다.
+        Instant revision = now.truncatedTo(ChronoUnit.MICROS);
+        pending(revision.isAfter(updatedAt) ? revision : updatedAt.plus(1, ChronoUnit.MICROS));
+    }
+
+    /** 현재 시도만 한 번 소비한다. 옛 응답과 중복 응답은 상태를 바꾸지 못한다. */
+    public boolean consumeInstall(UUID attemptId) {
+        if (attemptId == null || !attemptId.equals(installAttemptId)) {
+            return false;
+        }
+        this.installAttemptId = null;
+        return true;
     }
 
     /**

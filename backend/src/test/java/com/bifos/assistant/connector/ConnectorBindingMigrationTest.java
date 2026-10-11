@@ -119,7 +119,7 @@ class ConnectorBindingMigrationTest {
                 .isEqualTo(1);
     }
 
-    private void migrate(String version) {
+    protected void migrate(String version) {
         Flyway.configure()
                 .dataSource(database.url(), database.username(), database.password())
                 .locations("classpath:db/migration")
@@ -157,7 +157,7 @@ class ConnectorBindingMigrationTest {
                 + ", TIMESTAMP '2026-09-01 00:00:00', TIMESTAMP '2026-09-03 00:00:00')";
     }
 
-    private Connection connect() throws SQLException {
+    protected Connection connect() throws SQLException {
         return DriverManager.getConnection(database.url(), database.username(), database.password());
     }
 

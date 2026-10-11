@@ -5,6 +5,7 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.model.AgentConnectionView;
+import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
 import com.bifos.assistant.connector.application.model.AgentConnectionsView;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
@@ -18,7 +19,6 @@ import com.bifos.assistant.hermes.ConnectorInstallConflict;
 import com.bifos.assistant.hermes.ConnectorProfileRejected;
 import com.bifos.assistant.hermes.ConnectorSandboxUnavailable;
 import com.bifos.assistant.hermes.HermesConnectorClient;
-import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
@@ -37,13 +37,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 연결을 에이전트에 붙이고 떼고, 붙인 바인딩을 그 profile 의 설치와 맞춘다(ADR-083).
@@ -55,8 +54,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 잠그므로 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다.
  *
  * <p>옛 커넥터 에이전트({@code Agent.connectorManaged()})의 바인딩은 그 에이전트가 지워질 때까지 옛 방식으로 다룬다. 값은
- * 그 profile 의 {@code .env} 에 직접 쓰고 설치는 바인딩 칸 없이 보내며 사진 받기와 내장 도구 선언도 그대로 본다. 외부 호출은
- * 트랜잭션 안에서 한다. 순서와 실패 처리는 {@code docs/features/connector.md} 가 갖는다.
+ * 그 profile 의 {@code .env} 에 직접 쓰고 설치는 바인딩 칸 없이 보내며 사진 받기와 내장 도구 선언도 그대로 본다. 설치 외부 호출은
+ * 시작 상태를 커밋한 뒤 트랜잭션 밖에서 한다. 순서와 실패 처리는 {@code docs/features/connector.md} 가 갖는다.
  *
  * <p>{@link #reinstall}, {@link #detach}, {@link #resync} 는 연결 서비스가 자기 트랜잭션 안에서 부르는 단계다. 프록시를
  * 거쳐 부르므로 public 으로 둔다.
@@ -64,7 +63,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @Service
 public class ConnectorBindingService implements AgentConnectorDetacher {
-    private static final String STEP_INSTALL = "install";
     private static final String STEP_DETACH = "detach";
     private static final String STEP_VAULT_IMPORT = "vault-import";
 
@@ -75,18 +73,21 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private final HermesConnectorClient connector;
     private final SkillPublisher skills;
     private final ConnectorActionService approvals;
-    private final TransactionTemplate transactions;
-    private final ConnectorBindingInstalls installs;
+    private final ConnectorInstallAttempts attempts;
     private final Clock clock;
 
     /**
      * 반영 완료의 트랜잭션이 본 결과다. 확인하지 못한 상태도 커밋한 뒤에 실패를 알리려고 값으로 돌려준다.
      *
-     * @param view 반영을 확인한 바인딩의 모습. 확인하지 못했으면 null
+     * @param attempt 결과 트랜잭션에서 대조할 설치 입력
+     * @param manifest 응답 화면을 만드는 선언. 카탈로그에서 빠졌으면 null
      */
-    private record Confirmed(AgentConnectionView view, ResyncOutcome outcome) {}
+    private record Confirmed(ConnectorBindingAttempt attempt, ConnectorManifest manifest) {}
 
-    // TransactionTemplate 은 transaction manager 로 여기서 만들고, 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
+    /** 이미 붙은 바인딩이면 view만 있고, 새 붙이기면 커밋한 설치 입력이 있다. */
+    private record Bound(AgentConnectionView view, ConnectorBindingAttempt attempt) {}
+
+    // 설치 경계와 시계는 협력 객체와 주입된 Clock이 갖는다.
     @Autowired
     public ConnectorBindingService(
             ConnectorBindingRepository bindings,
@@ -96,31 +97,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             HermesConnectorClient connector,
             SkillPublisher skills,
             ConnectorActionService approvals,
-            PlatformTransactionManager transactionManager,
-            ConnectorBindingInstalls installs) {
-        this(
-                bindings,
-                connections,
-                agents,
-                users,
-                connector,
-                skills,
-                approvals,
-                transactionManager,
-                installs,
-                Clock.systemUTC());
-    }
-
-    public ConnectorBindingService(
-            ConnectorBindingRepository bindings,
-            ConnectorConnectionRepository connections,
-            AgentRepository agents,
-            AppUserRepository users,
-            HermesConnectorClient connector,
-            SkillPublisher skills,
-            ConnectorActionService approvals,
-            PlatformTransactionManager transactionManager,
-            ConnectorBindingInstalls installs,
+            ConnectorInstallAttempts attempts,
             Clock clock) {
         this.bindings = bindings;
         this.connections = connections;
@@ -129,8 +106,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         this.connector = connector;
         this.skills = skills;
         this.approvals = approvals;
-        this.transactions = new TransactionTemplate(transactionManager);
-        this.installs = installs;
+        this.attempts = attempts;
         this.clock = clock;
     }
 
@@ -164,15 +140,54 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * {@code skills} toolset 은 켜지 않는다. 도구 선택은 주인이 화면에서 정하고 (ADR-029) 붙이기가 다른 도구를 몰래 켜지
      * 않는다.
      *
-     * <p>대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았고, 이 트랜잭션이 되돌려져 바인딩 행도 남지 않는다.
+     * <p>대시보드가 409 나 401 로 거절하면 대시보드는 아무것도 바꾸지 않았고, 결과 트랜잭션이 현재 시도의 바인딩 행만 지운다.
      * 그 밖의 외부 실패는 바인딩을 {@code PENDING} 으로 남기고 연결 실패로 끝낸다. 대시보드가 반쯤 반영했을 수 있어 다음 연결
      * 확인이 그 바인딩의 설치를 다시 보낸다.
      *
      * <p>커넥터가 {@code single_binding} 을 선언했고 그 연결이 이미 다른 에이전트에 붙어 있으면 설치 전에 거절한다.
      * 대시보드가 409 {@code sandbox_unavailable} 로 거절하면 실행 공간이 없다는 다른 오류로 옮긴다.
      */
-    @Transactional(noRollbackFor = ConnectorOperationFailure.class)
     public AgentConnectionView bind(CurrentUser user, String agentCode, String connectorId) {
+        Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
+        Agent found = requireOwned(user, agentCode, false);
+        String profile = found.hermesProfile();
+        Set<String> taken = manifest.filter(declared -> !declared.skills().isEmpty())
+                .map(declared -> skills.list(profile).stream().map(HermesSkill::name).collect(Collectors.toSet()))
+                .orElse(Set.of());
+        Bound started = attempts.start(() -> bindLocked(user, agentCode, connectorId, manifest, profile, taken));
+        if (started.attempt() == null) {
+            return started.view();
+        }
+        ConnectorBindingAttempt attempt = started.attempt();
+        Optional<ResyncOutcome> outcome;
+        try {
+            outcome = attempts.execute(attempt);
+        } catch (ConnectorSandboxUnavailable ex) {
+            if (attempts.reject(attempt)) {
+                throw new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE,
+                        "the agent profile has no isolated workspace for this connector");
+            }
+            outcome = Optional.empty();
+        } catch (ConnectorInstallConflict ex) {
+            if (attempts.reject(attempt)) {
+                throw new ApiException(ErrorCode.CONNECTOR_BIND_CONFLICT, "the agent profile conflicts with this connector");
+            }
+            outcome = Optional.empty();
+        } catch (ConnectorProfileRejected ex) {
+            if (attempts.reject(attempt)) {
+                throw new ApiException(ErrorCode.CONNECTOR_PROFILE_NOT_READY, "the agent profile does not accept connectors yet");
+            }
+            outcome = Optional.empty();
+        }
+        if (outcome.orElse(null) == ResyncOutcome.CALL_FAILED) {
+            throw new ConnectorOperationFailure();
+        }
+        return currentView(user.id(), attempt.agentId(), connectorId, manifest.orElse(null));
+    }
+
+    /** 소유자와 에이전트를 잠근 뒤 새 바인딩과 설치 입력을 함께 커밋한다. */
+    private Bound bindLocked(CurrentUser user, String agentCode, String connectorId,
+            Optional<ConnectorManifest> manifest, String profile, Set<String> taken) {
         lockUser(user.id());
         Agent agent = requireOwned(user, agentCode, true);
         if (agent.connectorManaged()) {
@@ -187,43 +202,25 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 .findByUserIdAndConnectorId(user.id(), connectorId)
                 .filter(found -> found.status() == ConnectionStatus.READY && found.vaultStored())
                 .orElseThrow(() -> new ApiException(ErrorCode.CONNECTOR_NOT_CONNECTED, "connect this connector first"));
-        Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
         Optional<ConnectorBinding> existing = bindings.findByAgentIdAndConnectionId(agent.id(), connection.id());
         if (existing.isPresent()) {
-            return view(connection, existing.get(), manifest.orElse(null));
+            return new Bound(view(connection, existing.get(), manifest.orElse(null)), null);
         }
         ConnectorManifest declared = manifest.orElseThrow(ConnectorErrors::notFound);
         if (declared.singleBinding()
                 && !bindings.findByConnectionId(connection.id()).isEmpty()) {
             throw new ApiException(ErrorCode.CONNECTOR_SINGLE_BINDING, "this connection is attached to another agent");
         }
-        requireSkillNamesFree(agent, declared);
+        if (!Objects.equals(agent.hermesProfile(), profile)) {
+            throw new ApiException(ErrorCode.AGENT_BUSY, "the agent profile changed while preparing");
+        }
+        if (declared.skills().stream().anyMatch(taken::contains)) {
+            throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "the agent already has a skill named like a skill of this connector");
+        }
         Instant now = now();
         ConnectorBinding binding =
                 bindings.save(ConnectorBinding.pending(agent, connection, declared.mcpServer(), now));
-        binding.beginInstall(now);
-        try {
-            String ownerBrowser = installs.ownerBrowser(binding, declared);
-            InstallResult installed = connector.bindConnector(
-                    agent.hermesProfile(), connectorId, connection.vault(), agent.sandboxOwner(), ownerBrowser);
-            installs.record(binding, installed, false, now);
-        } catch (ConnectorSandboxUnavailable ex) {
-            throw new ApiException(
-                    ErrorCode.AGENT_SANDBOX_UNAVAILABLE,
-                    "the agent profile has no isolated workspace for this connector");
-        } catch (ConnectorInstallConflict ex) {
-            throw new ApiException(
-                    ErrorCode.CONNECTOR_BIND_CONFLICT, "the agent profile conflicts with this connector");
-        } catch (ConnectorProfileRejected ex) {
-            throw new ApiException(
-                    ErrorCode.CONNECTOR_PROFILE_NOT_READY, "the agent profile does not accept connectors yet");
-        } catch (RuntimeException ex) {
-            ConnectorBindingInstalls.warn(STEP_INSTALL, connectorId, ex);
-            binding.pending(now);
-            bindings.save(binding);
-            throw new ConnectorOperationFailure();
-        }
-        return view(connection, bindings.save(binding), declared);
+        return new Bound(null, attempts.begin(binding, manifest, Map.of(), false, false, false, now));
     }
 
     /**
@@ -284,24 +281,26 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             // 주인 없는 에이전트에는 바인딩이 없다. 다른 그룹 관리자에게 그 에이전트가 있는지 드러내지 않게 같은 404 로 답한다.
             throw agentNotFound();
         }
-        Confirmed confirmed =
-                transactions.execute(status -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince));
+        Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
+        Confirmed confirmed = attempts.start(() -> confirmLocked(admin, agentId, ownerId, connectorId, shownSince, manifest));
         if (confirmed == null) {
             throw new ConnectorOperationFailure();
         }
-        if (confirmed.view() == null) {
-            throw ConnectorErrors.notApplied(confirmed.outcome());
+        Optional<ResyncOutcome> outcome = attempts.execute(confirmed.attempt());
+        AgentConnectionView view = currentView(ownerId, agentId, connectorId, confirmed.manifest());
+        if (outcome.isPresent() && (outcome.get() != ResyncOutcome.READY || view.status() != BindingStatus.READY)) {
+            throw ConnectorErrors.notApplied(outcome.get());
         }
-        return confirmed.view();
+        return view;
     }
 
     /**
      * 반영 완료의 트랜잭션이다. 트랜잭션 안에서만 부른다.
      *
-     * @return 반영을 확인했으면 그 바인딩의 모습. 확인하지 못했으면 view 가 null 이고 까닭을 함께 담으며, 바인딩의 상태는 커밋된다
+     * @return 결과 트랜잭션에서 대조할 설치 입력과 manifest
      */
     private Confirmed confirmLocked(
-            CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince) {
+            CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince, Optional<ConnectorManifest> manifest) {
         AppUser owner = users.findByIdForUpdate(ownerId).orElse(null);
         Agent agent = agents.findByIdForUpdate(agentId)
                 .filter(candidate -> !candidate.isDeleted())
@@ -325,13 +324,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(
                     ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
         }
-        Optional<ConnectorManifest> manifest = ConnectorManifests.find(connector, connectorId);
-        ResyncOutcome outcome = resync(binding, manifest, true);
-        bindings.save(binding);
-        if (outcome != ResyncOutcome.READY || binding.status() != BindingStatus.READY) {
-            return new Confirmed(null, outcome);
-        }
-        return new Confirmed(view(connection, binding, manifest.orElse(null)), outcome);
+        return new Confirmed(attempts.begin(binding, manifest, Map.of(), true, true, false, now()), manifest.orElse(null));
     }
 
     /**
@@ -379,10 +372,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * <p>일반 바인딩은 대시보드가 보관 파일에서 값을 다시 복사한다. 옛 바인딩은 받은 값을 지금처럼 그 profile 의 {@code .env}
      * 에 쓴다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있으므로 재시작 필요를 누적하고 {@code PENDING} 으로 둔다.
      *
-     * @return 외부 호출이 실패했는가. 실패해도 예외로 알리지 않고 그 바인딩만 {@code PENDING} 으로 둔다
+     * @return 시작 트랜잭션이 커밋할 불변 설치 입력
      */
-    public boolean reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted) {
-        return installs.reinstall(binding, manifest, accepted, now());
+    public ConnectorBindingAttempt reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted) {
+        return attempts.begin(binding, Optional.of(manifest), accepted, false, false, true, now());
     }
 
     /**
@@ -425,54 +418,41 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * 답하므로 그 값은 쓰지 않고 hook plugin 파일이 바뀌었을 때만 재시작 대기로 둔다. 켜진 내장 도구가 manifest 의 선언과 같아야
      * 하고, 쓸 수 있을 때만 선언한 사진 받기를 옮긴다.
      *
-     * @return 반영 맞추기가 끝난 까닭. 외부 호출이 실패해도({@code CALL_FAILED}) 예외로 알리지 않고 그 바인딩만 {@code PENDING} 으로
-     *     둔다. {@code READY} 가 아닌 까닭은 커넥터 번호와 까닭 이름만 로그 한 줄로 남긴다
+     * @return 시작 트랜잭션이 커밋할 불변 설치 입력. 외부 호출과 결과 대조는 {@link #execute}가 한다
      */
-    public ResyncOutcome resync(ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
-        ResyncOutcome outcome = resyncReason(binding, manifest, afterRestart);
-        if (outcome != ResyncOutcome.READY && outcome != ResyncOutcome.CALL_FAILED) {
-            log.info("connector {} not applied: {}", binding.connection().connectorId(), outcome);
-        }
-        return outcome;
+    public ConnectorBindingAttempt resync(ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
+        return attempts.begin(binding, manifest, Map.of(), true, afterRestart, false, now());
     }
 
-    private ResyncOutcome resyncReason(
-            ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
-        Instant now = now();
-        // 재시작 대기로 일찍 돌아가도 서버 이름은 채운다. 관리자 반영 완료의 probe 가 그 이름을 쓴다.
-        if (binding.mcpServer() == null && manifest.isPresent()) {
-            binding.recordServer(manifest.get().mcpServer());
-        }
-        // 관리자 반영 완료는 재시작 대기만 넘는다. 반영 예정 시각 전에는 gateway 가 아직 서버를 연결하지 않았을 수 있다.
-        // probe 는 gateway 와 별개의 연결이라 그 전에 통과해 READY 가 되면 실제 실행에는 도구가 없다.
-        boolean dueLater = binding.applyDueAt() != null && binding.applyDueAt().isAfter(now);
-        if (manifest.isEmpty()) {
-            binding.pending(now);
-            return ResyncOutcome.CATALOG_MISSING;
-        }
-        if (!afterRestart && binding.restartRequired()) {
-            binding.pending(now);
-            return ResyncOutcome.RESTART_PENDING;
-        }
-        if (dueLater) {
-            binding.pending(now);
-            return ResyncOutcome.APPLY_SCHEDULED;
-        }
-        return installs.resync(binding, manifest.get(), now);
+    /** 커밋된 설치 입력을 트랜잭션 밖에서 실행하고 현재 시도에 적용한 결과만 돌려준다. */
+    public Optional<ResyncOutcome> execute(ConnectorBindingAttempt attempt) {
+        return attempts.execute(attempt);
     }
 
-    /** 스킬 이름이 그 profile 에 이미 있으면 붙이지 않는다. 올린 스킬과 Hermes 스킬을 함께 본다. */
-    private void requireSkillNamesFree(Agent agent, ConnectorManifest manifest) {
-        if (manifest.skills().isEmpty()) {
-            return;
-        }
-        Set<String> taken = skills.list(agent.hermesProfile()).stream()
-                .map(HermesSkill::name)
-                .collect(Collectors.toSet());
-        if (manifest.skills().stream().anyMatch(taken::contains)) {
-            throw new ApiException(
-                    ErrorCode.SKILL_NAME_TAKEN, "the agent already has a skill named like a skill of this connector");
-        }
+    /** 연결 등록과 확인도 동일한 시작 트랜잭션을 쓰고, 외부 설치를 부르기 전에 커밋한다. */
+    public <T> T start(Supplier<T> preparation) {
+        return attempts.start(preparation);
+    }
+
+    /** 연결과 설치 시작에서 소유자 잠금과 접근 철회 검사를 공유한다. */
+    public AppUser lockOwner(Long ownerId) {
+        return attempts.lockOwner(ownerId);
+    }
+
+    /** 결과가 버려졌거나 그 사이 떼어진 바인딩도 지금 상태로 응답한다. */
+    private AgentConnectionView currentView(Long ownerId, Long agentId, String connectorId, ConnectorManifest manifest) {
+        return attempts.start(() -> {
+            lockUser(ownerId);
+            Agent agent = agents.findByIdForUpdate(agentId).filter(candidate -> !candidate.isDeleted())
+                    .orElseThrow(ConnectorBindingService::agentNotFound);
+            if (!Objects.equals(agent.ownerUserId(), ownerId)) {
+                throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while installing");
+            }
+            ConnectorConnection connection = connections.findByUserIdAndConnectorId(ownerId, connectorId)
+                    .orElseThrow(ConnectorBindingService::notBound);
+            ConnectorBinding binding = bindings.findByAgentIdAndConnectionId(agentId, connection.id()).orElse(null);
+            return view(connection, binding, manifest);
+        });
     }
 
     /**
@@ -496,7 +476,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     }
 
     private void lockUser(Long userId) {
-        users.findByIdForUpdate(userId).orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
+        attempts.lockOwner(userId);
     }
 
     private static String blockedReason(Agent agent) {

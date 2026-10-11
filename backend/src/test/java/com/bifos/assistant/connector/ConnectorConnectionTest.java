@@ -118,4 +118,18 @@ class ConnectorConnectionTest {
         agent.markConnectorManaged();
         return agent;
     }
+
+    @Test
+    @DisplayName("고정 시계와 되돌아간 시계에서도 연결 revision이 마이크로초마다 증가한다")
+    void advancesRevisionAtDatabasePrecision() {
+        ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
+        connection.connected(FIELDS, CREATED);
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(1_000));
+        connection.ready(CREATED);
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(2_000));
+        connection.pending(CREATED.minusSeconds(1));
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(3_000));
+        connection.disconnected(CREATED);
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(4_000));
+    }
 }

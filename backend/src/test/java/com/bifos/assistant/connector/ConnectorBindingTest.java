@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
 import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -157,6 +158,24 @@ class ConnectorBindingTest {
             agent.markConnectorManaged();
         }
         return agent;
+    }
+
+    @Test
+    @DisplayName("같은 시각에도 새 시도만 한 번 소비하고 이전 시도와 중복 결과는 버린다")
+    void consumesCurrentInstallAttemptOnce() {
+        ConnectorBinding binding = ConnectorBinding.pending(agent(false), connection(), "demo", CREATED);
+        UUID first = UUID.randomUUID();
+        UUID second = UUID.randomUUID();
+        binding.beginInstall(first, LATER);
+        binding.beginInstall(second, LATER);
+        assertThat(binding.status()).isEqualTo(BindingStatus.PENDING);
+        assertThat(binding.desiredEnabled()).isFalse();
+        assertThat(binding.consumeInstall(first)).isFalse();
+        assertThat(binding.installAttemptId()).isEqualTo(second);
+        assertThat(binding.consumeInstall(second)).isTrue();
+        assertThat(binding.consumeInstall(second)).isFalse();
+        assertThat(binding.consumeInstall(null)).isFalse();
+        assertThat(binding.installAttemptId()).isNull();
     }
 
     private static ConnectorConnection connection() {

@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -110,6 +111,7 @@ public class ConnectorConnection {
      * <p>세어 둔 선언 밖 도구 수는 값이 바뀌었으므로 비운다. 다음 연결 확인이 다시 센다.
      */
     public void connected(ConnectionFields fields, Instant now) {
+        now = nextRevision(now);
         this.fields = fields;
         this.vaultStored = true;
         this.undeclaredTools = 0;
@@ -120,12 +122,14 @@ public class ConnectorConnection {
 
     /** 확인 도구가 통과했다. */
     public void ready(Instant now) {
+        now = nextRevision(now);
         this.status = ConnectionStatus.READY;
         this.checkedAt = now;
         this.updatedAt = now;
     }
 
     public void pending(Instant now) {
+        now = nextRevision(now);
         this.status = ConnectionStatus.PENDING;
         this.updatedAt = now;
     }
@@ -144,11 +148,19 @@ public class ConnectorConnection {
      * <p>재시작 대기는 바인딩이 갖고, 뗀 바인딩은 행이 지워지므로 여기 남길 대기가 없다.
      */
     public void disconnected(Instant now) {
+        now = nextRevision(now);
         this.status = ConnectionStatus.DISCONNECTED;
         this.fields = ConnectionFields.empty();
         this.vaultStored = false;
         this.undeclaredTools = 0;
         this.checkedAt = now;
         this.updatedAt = now;
+    }
+
+    /** DB의 마이크로초 정밀도에서 고정 시계와 되돌아간 시계도 이전 revision을 재사용하지 않는다. */
+    private Instant nextRevision(Instant now) {
+        Instant candidate = now.truncatedTo(ChronoUnit.MICROS);
+        Instant previous = updatedAt.truncatedTo(ChronoUnit.MICROS);
+        return candidate.isAfter(previous) ? candidate : previous.plus(1, ChronoUnit.MICROS);
     }
 }
