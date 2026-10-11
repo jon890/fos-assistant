@@ -35,9 +35,9 @@ import org.springframework.stereotype.Component;
  * <p>한 대화를 이 순서로 지운다. 도는 실행이나 읽는 중인 자식 사용량이 있으면 다음 차례로 미룬다.
  *
  * <ol>
- *   <li>Hermes 에서 그 대화의 session 을 지운다. 위임한 자식 session 은 Hermes 가 함께 지운다.
- *   <li>첨부 파일과 결과물 폴더를 지운다.
- *   <li>메시지, 대기 메시지, 첨부와 결과물의 줄, 실행의 본문을 한 트랜잭션으로 지우고 지운 시각을 적는다.
+ * <li>Hermes 에서 그 대화의 session 을 지운다. 위임한 자식 session 은 Hermes 가 함께 지운다.
+ * <li>첨부 파일과 결과물 폴더를 지운다.
+ * <li>메시지, 대기 메시지, 첨부와 결과물의 줄, 실행의 본문을 한 트랜잭션으로 지우고 지운 시각을 적는다.
  * </ol>
  *
  * <p>어느 단계든 실패하면 그 대화는 지운 시각을 적지 않고 남는다. 다음 차례에 처음부터 다시 한다. 이미 지운 session 과 파일은
@@ -75,15 +75,18 @@ public class ConversationPurger {
     private final Clock clock;
     private final ChatContentMutationCoordinator mutations;
     private final MediaObservationCleaner observations;
+    private final ContentDraftCleaner drafts;
 
     /** 실패한 대화를 다음에 다시 볼 시각과 그때 기다릴 간격, 잇단 실패 수다. */
     private final Map<Long, Backoff> backoffs = new ConcurrentHashMap<>();
+
 
     /** 운영은 매분 돈다. 검사에서는 {@code -} 로 끄고 {@link #purgeDue} 를 직접 부른다. */
     @Scheduled(cron = "${assistant.chat.purge-cron}")
     public void runScheduled() {
         purgeDue(clock.instant());
     }
+
 
     /**
      * 지웠지만 본문이 남은 대화를 지운다. 기다리는 간격 안의 대화는 후보에서 뺀다.
@@ -92,11 +95,11 @@ public class ConversationPurger {
      */
     public int purgeDue(Instant now) {
         List<Long> waitingIds = backoffs.entrySet().stream()
-                .filter(entry -> now.isBefore(entry.getValue().retryAt()))
-                .map(Map.Entry::getKey)
-                .toList();
+            .filter(entry -> now.isBefore(entry.getValue().retryAt()))
+            .map(Map.Entry::getKey)
+            .toList();
         List<Long> candidates = conversations.findPurgeCandidates(
-                waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds, PageRequest.of(0, BATCH));
+            waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds, PageRequest.of(0, BATCH));
         long started = System.nanoTime();
         int purged = 0;
         int waiting = 0;
@@ -123,29 +126,30 @@ public class ConversationPurger {
         return purged;
     }
 
+
     private void recordFailure(Long conversationId, Instant now, RuntimeException ex) {
         Backoff previous = backoffs.get(conversationId);
-        Duration next =
-                previous == null ? FIRST_BACKOFF : min(previous.interval().multipliedBy(2), MAX_BACKOFF);
+        Duration next = previous == null ? FIRST_BACKOFF : min(previous.interval().multipliedBy(2), MAX_BACKOFF);
         int attempts = previous == null ? 1 : previous.attempts() + 1;
         backoffs.put(conversationId, new Backoff(now.plus(next), next, attempts));
         String code = ex instanceof ApiException api ? api.code().name() : "-";
         if (attempts == ALERT_ATTEMPTS) {
             log.error(
-                    "지운 대화의 본문을 잇달아 지우지 못했다 conversationId={} attempts={} error={} code={}",
-                    conversationId,
-                    attempts,
-                    ex.getClass().getSimpleName(),
-                    code);
+                "지운 대화의 본문을 잇달아 지우지 못했다 conversationId={} attempts={} error={} code={}",
+                conversationId,
+                attempts,
+                ex.getClass().getSimpleName(),
+                code);
         } else {
             log.warn(
-                    "지운 대화의 본문을 지우지 못했다 conversationId={} attempts={} error={} code={}",
-                    conversationId,
-                    attempts,
-                    ex.getClass().getSimpleName(),
-                    code);
+                "지운 대화의 본문을 지우지 못했다 conversationId={} attempts={} error={} code={}",
+                conversationId,
+                attempts,
+                ex.getClass().getSimpleName(),
+                code);
         }
     }
+
 
     /**
      * 대화 하나를 지운다.
@@ -169,6 +173,7 @@ public class ConversationPurger {
             for (ChatAttachment attachment : attachments.findByConversationIdOrderByIdAsc(conversationId)) {
                 attachment.requestDeletion(now);
             }
+            drafts.invalidateForConversation(conversationId);
             observations.deleteForConversation(conversationId);
             return current;
         });
@@ -180,6 +185,7 @@ public class ConversationPurger {
         return mutations.run(prepared.userId(), target, () -> writer.purge(conversationId, now));
     }
 
+
     private void deleteHermesSessions(Conversation conversation) {
         List<ExecutionSessionRef> refs = new ArrayList<>(executions.sessions(conversation.id()));
         Agent conversationAgent = agents.findById(conversation.agentId()).orElse(null);
@@ -190,14 +196,14 @@ public class ConversationPurger {
             for (String sessionId : new String[] {conversation.hermesSessionId(), conversation.hermesRootSessionId()}) {
                 if (sessionId != null && !sessionId.isBlank()) {
                     refs.add(new ExecutionSessionRef(
-                            conversationAgent.id(), conversationAgent.hermesProfile(), sessionId));
+                        conversationAgent.id(), conversationAgent.hermesProfile(), sessionId));
                 }
             }
         }
         Map<Long, Agent> byId = agents.byIds(refs.stream()
-                .map(ExecutionSessionRef::agentId)
-                .filter(Objects::nonNull)
-                .toList());
+            .map(ExecutionSessionRef::agentId)
+            .filter(Objects::nonNull)
+            .toList());
         Map<String, ExecutionSessionRef> unique = new LinkedHashMap<>();
         refs.forEach(ref -> unique.putIfAbsent(ref.profileName() + "\n" + ref.sessionId(), ref));
         for (ExecutionSessionRef ref : unique.values()) {
@@ -205,14 +211,15 @@ public class ConversationPurger {
             if (agent == null) {
                 // 주소를 알 길이 없다. 지운 에이전트는 7일 뒤 행이 사라진다. 관리형 profile 의 session 은 profile 과 함께 이미 지워졌다.
                 log.warn(
-                        "주소를 몰라 Hermes session 을 지우지 못했다 conversationId={} profile={}",
-                        conversation.id(),
-                        ref.profileName());
+                    "주소를 몰라 Hermes session 을 지우지 못했다 conversationId={} profile={}",
+                    conversation.id(),
+                    ref.profileName());
                 continue;
             }
             deleteSession(agent, ref);
         }
     }
+
 
     private void deleteSession(Agent agent, ExecutionSessionRef ref) {
         try {
@@ -226,6 +233,7 @@ public class ConversationPurger {
         }
     }
 
+
     private void deleteFiles(Long conversationId) {
         for (ChatAttachment attachment : attachments.findByConversationIdOrderByIdAsc(conversationId)) {
             if (attachment.deletedAt() == null) {
@@ -235,10 +243,13 @@ public class ConversationPurger {
         artifactStore.deleteFolder(conversationId);
     }
 
+
     private static Duration min(Duration left, Duration right) {
         return left.compareTo(right) <= 0 ? left : right;
     }
 
+
     /** 실패한 대화를 다시 볼 시각과 그때 쓴 간격, 잇단 실패 수다. */
-    private record Backoff(Instant retryAt, Duration interval, int attempts) {}
+    private record Backoff(Instant retryAt, Duration interval, int attempts) {
+    }
 }
