@@ -29,6 +29,7 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
     @Autowired
     AuthProperties auth;
 
+
     @Test
     @DisplayName("전체 필터를 통과한 ticket claim은 200, 같은 권한의 재사용은 409다")
     void authenticatesTicketAcrossEntireFilterChain() throws Exception {
@@ -43,19 +44,21 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
         assertThat(post(CLAIM, request, null, false).statusCode()).isEqualTo(409);
     }
 
+
     @Test
     @DisplayName("유효 JWT와 profile Bearer만으로 본문 ticket을 대신 인증할 수 없다")
     void rejectsJwtAndProfileBearerWithoutTicket() throws Exception {
         Fixture f = fixture();
         String jwt = Jwts.builder()
-                .subject(f.user().email())
-                .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8)))
-                .compact();
+            .subject(f.user().email())
+            .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8)))
+            .compact();
         for (String token : new String[] {jwt, "test-profile-bearer"}) {
             assertThat(post(CLAIM, "{\"tool\":\"place_order\"}", token, false).statusCode())
-                    .isEqualTo(401);
+                .isEqualTo(401);
         }
     }
+
 
     @Test
     @DisplayName("중복 키와 chunked 초과 본문은 400이며 소비가 일어나지 않는다")
@@ -63,12 +66,13 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
         Fixture f = fixture();
         String request = JSON.writeValueAsString(input(tickets.issue(f.action())));
         assertThat(post(CLAIM, request.replace("\"tool\":", "\"tool\":\"place_order\",\"tool\":"), null, false)
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(400);
         assertThat(post(CLAIM, " ".repeat(8192) + request, null, true).statusCode())
-                .isEqualTo(400);
+            .isEqualTo(400);
         assertThat(row(f).consumedAt()).isNull();
     }
+
 
     @Test
     @DisplayName("claim의 하위나 비슷한 내부 경로는 익명으로 열리지 않는다")
@@ -78,6 +82,7 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
         }
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"})
     @DisplayName("ticket 없는 비 POST claim은 실제 HTTP 필터의 인증 경계에서 거절된다")
@@ -86,27 +91,27 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
         tickets.issue(f.action());
         var before = row(f);
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + CLAIM))
-                .timeout(Duration.ofSeconds(10))
-                .method(method, HttpRequest.BodyPublishers.noBody())
-                .build();
+            .timeout(Duration.ofSeconds(10))
+            .method(method, HttpRequest.BodyPublishers.noBody())
+            .build();
         try (var client = HttpClient.newHttpClient()) {
             assertThat(client.send(request, HttpResponse.BodyHandlers.ofString())
-                            .statusCode())
+                .statusCode())
                     .isIn(401, 403);
             String jwt = Jwts.builder()
-                    .subject(f.user().email())
-                    .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8)))
-                    .compact();
+                .subject(f.user().email())
+                .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8)))
+                .compact();
             jdbc.update(
-                    "update allowed_person set enabled = false where email = ?",
-                    f.user().email());
+                "update allowed_person set enabled = false where email = ?",
+                f.user().email());
             var revoked = HttpRequest.newBuilder(request.uri())
-                    .timeout(Duration.ofSeconds(10))
-                    .header("Authorization", "Bearer " + jwt)
-                    .method(method, HttpRequest.BodyPublishers.noBody())
-                    .build();
+                .timeout(Duration.ofSeconds(10))
+                .header("Authorization", "Bearer " + jwt)
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .build();
             assertThat(client.send(revoked, HttpResponse.BodyHandlers.ofString())
-                            .statusCode())
+                .statusCode())
                     .isEqualTo(401);
         }
         assertThat(row(f).ticketId()).isEqualTo(before.ticketId());
@@ -114,15 +119,16 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
         assertThat(row(f).consumedAt()).isNull();
     }
 
+
     private HttpResponse<String> post(String uri, String body, String token, boolean chunked) throws Exception {
         var publisher = chunked
-                ? HttpRequest.BodyPublishers.ofInputStream(
-                        () -> new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
-                : HttpRequest.BodyPublishers.ofString(body);
+            ? HttpRequest.BodyPublishers.ofInputStream(
+                () -> new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+            : HttpRequest.BodyPublishers.ofString(body);
         var builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + uri))
-                .timeout(Duration.ofSeconds(10))
-                .header("Content-Type", "application/json")
-                .POST(publisher);
+            .timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "application/json")
+            .POST(publisher);
         if (token != null) {
             builder.header("Authorization", "Bearer " + token);
         }

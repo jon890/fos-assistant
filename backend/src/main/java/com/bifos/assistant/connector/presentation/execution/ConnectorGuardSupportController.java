@@ -17,13 +17,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConnectorGuardSupportController {
     private final ConnectorGuardSupport support;
 
+
     @PostMapping(value = "/internal/connector-executions/support", produces = MediaType.APPLICATION_JSON_VALUE)
     public SupportResponse support(HttpServletRequest request) throws IOException {
         support.authenticate(request.getHeader("Authorization"));
         var input = SupportRequest.decode(request.getInputStream().readNBytes(SupportRequest.REQUEST_LIMIT + 1));
         support.verify(Long.valueOf(input.bindingId()), Long.valueOf(input.connectionId()),
-                Instant.parse(input.connectionUpdatedAt()), input.profile(), input.connectorId(),
-                input.protocol(), input.manifestSha256());
+            Instant.parse(input.connectionUpdatedAt()), input.profile(), input.connectorId(),
+            input.protocol(), input.manifestSha256());
         return SupportResponse.from(input);
     }
 }
