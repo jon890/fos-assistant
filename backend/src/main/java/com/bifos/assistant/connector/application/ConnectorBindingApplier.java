@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
+import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.DueBinding;
 import com.bifos.assistant.connector.domain.ReadyBinding;
@@ -73,11 +74,13 @@ public class ConnectorBindingApplier {
      */
     private final Map<Long, Integer> driftStreak = new HashMap<>();
 
+
     /** 30초마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
     @Scheduled(cron = "${assistant.connector.binding.apply-cron}")
     public void runScheduled() {
         applyDue();
     }
+
 
     /**
      * 반영 예정 시각이 지난 바인딩마다 반영 맞추기를 한 번 돌린다.
@@ -96,78 +99,80 @@ public class ConnectorBindingApplier {
      */
     public int applyDue() {
         int applied = 0;
+        List<ConnectorManifest> catalog = readCatalog();
         for (DueBinding due : bindings.findApplyDue(clock.instant())) {
             try {
-                if (Boolean.TRUE.equals(transactions.execute(status -> applyDueLocked(due)))) {
+                ConnectorBindingAttempt attempt = transactions.execute(status -> applyDueLocked(due, catalog));
+                if (attempt != null && service.execute(attempt).isPresent()) {
                     applied++;
                 }
             } catch (RuntimeException ex) {
                 log.warn(
-                        "connector binding {} failed at apply-due: {}",
-                        due.bindingId(),
-                        ex.getClass().getSimpleName());
+                    "connector binding {} failed at apply-due: {}",
+                    due.bindingId(),
+                    ex.getClass().getSimpleName());
             }
         }
         return applied;
     }
 
+
     /**
      * 예약 확인 하나의 트랜잭션이다. 트랜잭션 안에서만 부른다.
      *
-     * @return 반영 맞추기를 돌렸는가. 건너뛰었으면 거짓이다
+     * @return 커밋한 설치 입력. 건너뛰었으면 null이다
      */
-    private boolean applyDueLocked(DueBinding due) {
+    private ConnectorBindingAttempt applyDueLocked(DueBinding due, List<ConnectorManifest> catalog) {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
-        boolean target = users.findByIdForUpdate(due.userId()).isPresent()
-                && agents.findByIdForUpdate(due.agentId())
-                        .filter(candidate -> !candidate.isDeleted())
-                        .filter(candidate -> Objects.equals(candidate.ownerUserId(), due.userId()))
-                        .isPresent();
+        service.lockOwner(due.userId());
+        boolean target = agents.findByIdForUpdate(due.agentId())
+            .filter(candidate -> !candidate.isDeleted())
+            .filter(candidate -> Objects.equals(candidate.ownerUserId(), due.userId()))
+            .isPresent();
         ConnectorBinding binding = bindings.findById(due.bindingId()).orElse(null);
         Instant now = clock.instant();
         if (binding == null
-                || binding.restartRequired()
-                || binding.applyDueAt() == null
-                || binding.applyDueAt().isAfter(now)) {
-            return false;
+            || binding.restartRequired()
+            || binding.applyDueAt() == null
+            || binding.applyDueAt().isAfter(now)) {
+            return null;
         }
         binding.clearApplyDue();
         if (!target) {
             bindings.save(binding);
-            return false;
+            return null;
         }
-        return resyncWithCatalog(binding, now) != null;
-    }
-
-    /**
-     * 카탈로그에서 manifest 를 찾아 반영 맞추기를 돌리고 바인딩을 저장한다. 트랜잭션 안에서만 부른다.
-     *
-     * <p>카탈로그를 읽지 못하면 바인딩을 {@code PENDING} 으로 두고 저장한다. 예외를 밖으로 던지면 트랜잭션이 되돌려져 비운 반영 예정이
-     * 살아나 매 주기 다시 집거나, 어긋난 바인딩이 {@code READY} 로 남는다. 사용자의 연결 확인이나 관리자 반영 완료가 다시 맞추게 둔다.
-     *
-     * @return 반영 맞추기의 결과. 카탈로그를 읽지 못해 돌리지 않았으면 null 이다
-     */
-    private ResyncOutcome resyncWithCatalog(ConnectorBinding binding, Instant now) {
-        String connectorId = binding.connection().connectorId();
-        Optional<ConnectorManifest> manifest;
-        try {
-            manifest = ConnectorManifests.find(connector, connectorId);
-        } catch (RuntimeException ex) {
-            ConnectorBindingInstalls.warn("catalog", connectorId, ex);
+        if (catalog == null) {
             binding.pending(now);
             bindings.save(binding);
             return null;
         }
-        ResyncOutcome outcome = service.resync(binding, manifest, false);
-        bindings.save(binding);
-        return outcome;
+        return service.resync(binding, manifest(catalog, binding.connection().connectorId()), false);
     }
+
+
+    /** 카탈로그 HTTP는 사용자와 에이전트 잠금을 잡기 전에 실행한다. 실패는 대상별 시작 트랜잭션에서 PENDING으로 적는다. */
+    private List<ConnectorManifest> readCatalog() {
+        try {
+            return ConnectorManifests.read(connector);
+        } catch (RuntimeException ex) {
+            ConnectorBindingInstalls.warn("catalog", "catalog", ex);
+            return null;
+        }
+    }
+
+
+    private static Optional<ConnectorManifest> manifest(List<ConnectorManifest> catalog, String connectorId) {
+        return catalog.stream().filter(declared -> declared.id().equals(connectorId)).findFirst();
+    }
+
 
     /** 10분마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
     @Scheduled(cron = "${assistant.connector.binding.drift-cron}")
     public void runDriftScheduled() {
         resyncDrifted();
     }
+
 
     /**
      * 설치 상태가 어긋난 {@code READY} 바인딩의 반영 맞추기를 한 번 돌린다.
@@ -198,7 +203,7 @@ public class ConnectorBindingApplier {
             ResyncOutcome reason;
             try {
                 reason = ConnectorBindingInstalls.notInstalledReason(
-                        connector.readConnector(candidate.profile(), candidate.connectorId()), candidate.legacy());
+                    connector.readConnector(candidate.profile(), candidate.connectorId()), candidate.legacy());
             } catch (RuntimeException ex) {
                 ConnectorBindingInstalls.warn("drift-check", candidate.connectorId(), ex);
                 continue;
@@ -211,9 +216,21 @@ public class ConnectorBindingApplier {
             // 이번에 처리하면 몇 번째 연속 어긋남인가. 커밋된 처리만 센다.
             int streak = driftStreak.getOrDefault(candidate.bindingId(), 0) + 1;
             try {
-                Drifted drifted = transactions.execute(status -> resyncDriftedLocked(candidate, streak));
+                List<ConnectorManifest> catalog = readCatalog();
+                Drifted drifted = transactions.execute(status -> resyncDriftedLocked(candidate, streak, catalog));
                 if (drifted == null) {
+                    driftStreak.remove(candidate.bindingId());
                     continue;
+                }
+                if (drifted.attempt() != null) {
+                    Optional<ResyncOutcome> outcome = service.execute(drifted.attempt());
+                    if (outcome.isEmpty()) {
+                        continue;
+                    }
+                    drifted = transactions.execute(status -> summarize(candidate, outcome.get()));
+                    if (drifted == null) {
+                        continue;
+                    }
                 }
                 if (drifted.counted()) {
                     if (streak >= DRIFT_STREAK_LIMIT) {
@@ -231,36 +248,35 @@ public class ConnectorBindingApplier {
                 }
             } catch (RuntimeException ex) {
                 log.warn(
-                        "connector binding {} failed at drift: {}",
-                        candidate.bindingId(),
-                        ex.getClass().getSimpleName());
+                    "connector binding {} failed at drift: {}",
+                    candidate.bindingId(),
+                    ex.getClass().getSimpleName());
             }
         }
         todos.forEach(this::notifyAdmins);
         return resynced;
     }
 
+
     /**
      * 어긋난 바인딩 하나의 트랜잭션이다. 트랜잭션 안에서만 부른다.
      *
      * @return 그 바인딩에 한 일. 건너뛰었으면 null 이다
      */
-    private Drifted resyncDriftedLocked(ReadyBinding candidate, int streak) {
+    private Drifted resyncDriftedLocked(ReadyBinding candidate, int streak, List<ConnectorManifest> catalog) {
         // 잠금 순서는 연결 사용자 행 다음에 에이전트 행이다. 사용자가 없으면 에이전트를 잠그지 않는다.
-        AppUser owner = users.findByIdForUpdate(candidate.userId()).orElse(null);
-        boolean target = owner != null
-                && agents.findByIdForUpdate(candidate.agentId())
-                        .filter(found -> !found.isDeleted())
-                        .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
-                        .isPresent();
+        AppUser owner = service.lockOwner(candidate.userId());
+        boolean target = agents.findByIdForUpdate(candidate.agentId())
+            .filter(found -> !found.isDeleted())
+            .filter(found -> Objects.equals(found.ownerUserId(), candidate.userId()))
+            .isPresent();
         ConnectorBinding binding = bindings.findById(candidate.bindingId()).orElse(null);
         if (binding == null || binding.status() != BindingStatus.READY) {
             // 지워졌거나 다른 경로가 상태를 바꿨다. 이어지던 어긋남이 아니므로 횟수를 지운다.
-            driftStreak.remove(candidate.bindingId());
             return null;
         }
         if (!target) {
-            return null;
+            return new Drifted(null, false, false, false, false, null);
         }
         Instant now = clock.instant();
         if (streak >= DRIFT_STREAK_LIMIT) {
@@ -268,39 +284,54 @@ public class ConnectorBindingApplier {
             bindings.save(binding);
             return Drifted.pending(owner.groupId(), binding, true);
         }
-        ResyncOutcome outcome = resyncWithCatalog(binding, now);
-        if (outcome == null) {
+        if (catalog == null) {
+            binding.pending(now);
+            bindings.save(binding);
             return Drifted.pending(owner.groupId(), binding, false);
         }
-        boolean adminTodo = outcome != ResyncOutcome.READY && outcome != ResyncOutcome.APPLY_SCHEDULED;
-        return new Drifted(owner.groupId(), true, adminTodo, binding.restartRequired(), true);
+        ConnectorBindingAttempt attempt = service.resync(binding, manifest(catalog, candidate.connectorId()), false);
+        return new Drifted(owner.groupId(), false, false, binding.restartRequired(), false, attempt);
     }
+
+
+    /** 설치 결과가 커밋된 뒤 관리자 알림에 필요한 현재 상태만 읽는다. */
+    private Drifted summarize(ReadyBinding candidate, ResyncOutcome outcome) {
+        ConnectorBinding binding = bindings.findById(candidate.bindingId()).orElse(null);
+        AppUser owner = users.findById(candidate.userId()).orElse(null);
+        if (binding == null || owner == null) {
+            return null;
+        }
+        boolean adminTodo = outcome != ResyncOutcome.READY && outcome != ResyncOutcome.APPLY_SCHEDULED;
+        return new Drifted(owner.groupId(), true, adminTodo, binding.restartRequired(), true, null);
+    }
+
 
     /** 한 그룹의 차단되지 않은 관리자마다 알림 한 건을 남긴다. 그룹마다 트랜잭션을 따로 연다. */
     private void notifyAdmins(Long groupId, AdminTodo todo) {
         String body = todo.restartRequired()
-                ? "커넥터 정의가 바뀌어 연결 " + todo.count() + "개를 다시 설치했어요. 공유 gateway 를 재시작한 뒤 「연결 반영 확인」에서 반영 완료를 눌러 주세요."
-                : "커넥터 정의가 바뀐 연결 " + todo.count() + "개의 반영을 확인하지 못했어요. 「연결 반영 확인」에서 반영 완료를 눌러 다시 확인해 주세요.";
+            ? "커넥터 정의가 바뀌어 연결 " + todo.count() + "개를 다시 설치했어요. 공유 gateway 를 재시작한 뒤 「연결 반영 확인」에서 반영 완료를 눌러 주세요."
+            : "커넥터 정의가 바뀐 연결 " + todo.count() + "개의 반영을 확인하지 못했어요. 「연결 반영 확인」에서 반영 완료를 눌러 다시 확인해 주세요.";
         try {
             transactions.executeWithoutResult(status -> {
                 for (AppUser admin : users.findByGroupIdAndRole(groupId, UserRole.ADMIN)) {
                     if (!access.revoked(admin.email())) {
                         notifications.notify(
-                                admin.id(),
-                                NotificationKind.CONNECTOR_REINSTALLED,
-                                REINSTALLED_TITLE,
-                                body,
-                                new NotificationTarget(NotificationTargetType.ADMIN_CONNECTIONS, null));
+                            admin.id(),
+                            NotificationKind.CONNECTOR_REINSTALLED,
+                            REINSTALLED_TITLE,
+                            body,
+                            new NotificationTarget(NotificationTargetType.ADMIN_CONNECTIONS, null));
                     }
                 }
             });
         } catch (RuntimeException ex) {
             log.warn(
-                    "connector drift notification failed for group {}: {}",
-                    groupId,
-                    ex.getClass().getSimpleName());
+                "connector drift notification failed for group {}: {}",
+                groupId,
+                ex.getClass().getSimpleName());
         }
     }
+
 
     /**
      * 어긋난 바인딩 하나에 한 일이다.
@@ -309,14 +340,15 @@ public class ConnectorBindingApplier {
      * @param resynced 반영 맞추기를 돌렸는가
      * @param adminTodo 관리자가 할 일이 남았는가. 재시작 대기나 {@code PENDING} 으로 남았다
      * @param restartRequired 재시작 대기인가
+     * @param attempt 커밋한 설치 입력. 설치를 보내지 않는 처리면 null
      * @param counted 연속 어긋남 횟수를 바꾸는가. 반영 맞추기를 돌렸으면 올리고, 연속 상한이라 {@code PENDING} 으로만 뒀으면 지운다
      */
     private record Drifted(
-            Long groupId, boolean resynced, boolean adminTodo, boolean restartRequired, boolean counted) {
+        Long groupId, boolean resynced, boolean adminTodo, boolean restartRequired, boolean counted, ConnectorBindingAttempt attempt) {
 
         /** 반영 맞추기를 돌리지 않고 {@code PENDING} 으로만 둔 바인딩이다. */
         static Drifted pending(Long groupId, ConnectorBinding binding, boolean counted) {
-            return new Drifted(groupId, false, true, binding.restartRequired(), counted);
+            return new Drifted(groupId, false, true, binding.restartRequired(), counted, null);
         }
     }
 

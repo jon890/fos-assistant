@@ -45,6 +45,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 붙이기와 공개 범위 변경이 같은 에이전트에 함께 올 때 에이전트 행 잠금으로 줄을 서는지 본다(ADR-083).
@@ -62,16 +63,16 @@ class AgentVisibilityLockTest {
 
     /** MCP 서버 이름이 {@code demo} 인 커넥터다. */
     private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(),
+        "list_scopes",
+        "demo",
+        List.of(),
+        false,
+        2,
+        List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
 
     @Autowired
     AgentLifecycleService lifecycle;
@@ -106,10 +107,12 @@ class AgentVisibilityLockTest {
     /** 이 테스트가 실제 key 디렉터리에 남긴 파일을 지우려고 적어 둔다. */
     private final List<String> createdProfiles = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(SAFE_TOOLSETS);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -119,14 +122,15 @@ class AgentVisibilityLockTest {
         connections.deleteAll();
     }
 
+
     /**
-     * 붙이기가 에이전트 행 잠금을 쥔 동안 공개 범위 변경은 기다리고, 붙이기가 커밋한 바인딩을 보고 거절된다.
+     * 설치 HTTP가 멈춰도 공개 범위 변경은 시작 트랜잭션이 커밋한 바인딩을 보고 거절된다.
      *
-     * <p>붙이기가 대시보드에 설치를 보내는 자리에서 멈춘다. 그때 붙이기는 사용자 행과 에이전트 행을 이미 잠갔고 바인딩 줄도 넣었다.
+     * <p>붙이기가 대시보드에 설치를 보내는 자리에서 멈춘다. 그때 사용자와 에이전트 잠금은 풀렸지만 바인딩은 이미 저장됐다.
      */
     @Test
-    @DisplayName("붙이기가 에이전트 행을 잠근 동안 공개 범위 변경은 기다렸다가 커밋된 바인딩을 보고 거절된다")
-    void visibilityChangeWaitsForBindAndSeesCommittedBinding() throws Exception {
+    @DisplayName("설치 응답을 기다리는 동안에도 공개 범위 변경은 커밋된 바인딩을 보고 바로 거절된다")
+    void visibilityChangeSeesCommittedBindingWhileInstallWaits() throws Exception {
         CurrentUser kid = member();
         Agent created = create(kid, "숙제 도우미", null);
         readyConnection(kid);
@@ -134,31 +138,27 @@ class AgentVisibilityLockTest {
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> {
-                    locked.countDown();
-                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-                    return new InstallResult(true, false);
-                });
+            .thenAnswer(invocation -> {
+                assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+                locked.countDown();
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+                return new InstallResult(true, false);
+            });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<AgentConnectionView> binding = pool.submit(() -> bindingService.bind(kid, created.code(), DEMO));
-            assertThat(locked.await(10, TimeUnit.SECONDS)).as("붙이기가 잠금을 쥐었다").isTrue();
-            Future<Agent> changing =
-                    pool.submit(() -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP));
-            Thread.sleep(300);
-            assertThat(changing.isDone()).as("공개 범위 변경이 에이전트 행 잠금을 기다린다").isFalse();
-
-            release.countDown();
-
-            assertThat(binding.get(10, TimeUnit.SECONDS).bound()).isTrue();
+            assertThat(locked.await(10, TimeUnit.SECONDS)).as("붙이기가 설치 응답을 기다린다").isTrue();
+            Future<Agent> changing = pool.submit(() -> lifecycle.changeVisibility(kid, created.code(), AgentVisibility.GROUP));
             assertThatThrownBy(() -> changing.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE));
+                .isInstanceOf(ExecutionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                    ApiException.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE));
+            release.countDown();
+            assertThat(binding.get(10, TimeUnit.SECONDS).bound()).isTrue();
             assertThat(agents.findByCode(created.code()).orElseThrow().visibility())
-                    .isEqualTo(AgentVisibility.PRIVATE);
+                .isEqualTo(AgentVisibility.PRIVATE);
             assertThat(bindingRows.existsByAgentId(created.id())).isTrue();
         } finally {
             release.countDown();
@@ -166,11 +166,13 @@ class AgentVisibilityLockTest {
         }
     }
 
+
     private Agent create(CurrentUser user, String name, AgentVisibility visibility) {
         Agent created = lifecycle.create(user, name, visibility);
         createdProfiles.add(created.hermesProfile());
         return created;
     }
+
 
     /** 값을 보관 파일에 둔 그 사용자의 READY 연결이다. */
     private ConnectorConnection readyConnection(CurrentUser owner) {
@@ -178,6 +180,7 @@ class AgentVisibilityLockTest {
         connection.connected(ConnectionFields.empty(), Instant.now());
         return connections.save(connection);
     }
+
 
     private CurrentUser member() {
         String email = "visibility-lock-" + UUID.randomUUID() + "@example.com";
