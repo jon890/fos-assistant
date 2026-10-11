@@ -17,3 +17,11 @@ for connector in "${ROOT}"/hermes/connectors/*; do
   bun run --cwd "${connector}" test
   bun run --cwd "${connector}" check:bundle
 done
+
+# 루트의 묶음 생산 코드도 커넥터에 고정한 기존 TypeScript 의존성으로 검사한다.
+bun "${ROOT}/hermes/connectors/gmail/node_modules/typescript/bin/tsc" \
+  --noEmit --strict --skipLibCheck --target ESNext --module ESNext \
+  --moduleResolution bundler --allowImportingTsExtensions \
+  --typeRoots "${ROOT}/hermes/connectors/gmail/node_modules/@types" \
+  "${ROOT}/hermes/connectors/package.ts" "${ROOT}/hermes/connectors/package.test.ts"
+bun test "${ROOT}/hermes/connectors/package.test.ts"
