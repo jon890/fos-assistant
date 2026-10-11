@@ -1,10 +1,19 @@
 import { CdpSession, httpJson, wsUrlFor } from "../cdp.ts";
 import { BLOG_ID_PATTERN } from "../session.ts";
 import { EditorError, type EditorErrorCode } from "./editor-error.ts";
-import { fieldCandidates } from "./fields.ts";
 
 export { EditorError, type EditorErrorCode } from "./editor-error.ts";
 export { focus, focusField } from "./focus.ts";
+export {
+  clearField,
+  emojiSplit,
+  normalize,
+  paragraphs,
+  typeLine,
+  newParagraph,
+  focusPlaceholder,
+  componentCount,
+} from "./text-fields.ts";
 
 /**
  * 기다리는 시간의 상한(초). 기본값은 원본이 실측으로 정한 값이다.
@@ -64,9 +73,15 @@ export class EditorPage {
   static async attach(wsUrl: string, options: EditorOptions = {}) {
     const { signal, ...times } = options;
     const session = await CdpSession.connect(wsUrl);
-    const page = new EditorPage(session, { ...DEFAULT_TIMES, ...times }, signal);
+    const page = new EditorPage(
+      session,
+      { ...DEFAULT_TIMES, ...times },
+      signal,
+    );
     session.onEvent("Page.javascriptDialogOpening", () => {
-      session.send("Page.handleJavaScriptDialog", { accept: true }).catch(() => {});
+      session
+        .send("Page.handleJavaScriptDialog", { accept: true })
+        .catch(() => {});
     });
     try {
       await page.call("Page.enable");
@@ -93,7 +108,11 @@ export class EditorPage {
     return (seconds * this.times.photoSeconds) / DEFAULT_TIMES.photoSeconds;
   }
 
-  fail(code: EditorErrorCode, message: string, extra?: Record<string, unknown>) {
+  fail(
+    code: EditorErrorCode,
+    message: string,
+    extra?: Record<string, unknown>,
+  ) {
     return new EditorError(code, this.stage, message, extra);
   }
 
@@ -120,7 +139,10 @@ export class EditorPage {
   }
 
   /** CDP 명령 하나. 브라우저의 오류 원문은 버리고 메서드 이름만 남긴다. */
-  async call<T = any>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+  async call<T = any>(
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<T> {
     this.throwIfAborted();
     try {
       return await this.untilAborted(this.session.send<T>(method, params));
@@ -218,7 +240,9 @@ export class EditorPage {
 
   sleep(seconds: number) {
     return this.untilAborted(
-      new Promise<void>((resolve) => setTimeout(resolve, Math.max(0, seconds * 1000))),
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, Math.max(0, seconds * 1000)),
+      ),
     );
   }
 
@@ -253,19 +277,31 @@ export async function openWriteTab(
   options: EditorOptions = {},
 ) {
   if (!BLOG_ID_PATTERN.test(blogId))
-    throw new EditorError("editor_failed", "open", "블로그 아이디의 모양이 맞지 않아 탭을 열지 않았다");
+    throw new EditorError(
+      "editor_failed",
+      "open",
+      "블로그 아이디의 모양이 맞지 않아 탭을 열지 않았다",
+    );
   const target = (await httpJson(
     cdpUrl,
     `/json/new?${encodeURIComponent(writeUrl(blogId))}`,
     { method: "PUT" },
   )) as { id?: unknown; webSocketDebuggerUrl?: unknown } | null;
   const targetId = typeof target?.id === "string" ? target.id : "";
-  if (!targetId) throw new EditorError("editor_failed", "open", "새 탭을 열지 못했다");
+  if (!targetId)
+    throw new EditorError("editor_failed", "open", "새 탭을 열지 못했다");
   try {
     const debuggerUrl = target?.webSocketDebuggerUrl;
     if (typeof debuggerUrl !== "string")
-      throw new EditorError("editor_failed", "open", "새 탭에 붙을 주소가 없다");
-    const page = await EditorPage.attach(wsUrlFor(cdpUrl, debuggerUrl), options);
+      throw new EditorError(
+        "editor_failed",
+        "open",
+        "새 탭에 붙을 주소가 없다",
+      );
+    const page = await EditorPage.attach(
+      wsUrlFor(cdpUrl, debuggerUrl),
+      options,
+    );
     return { targetId, page };
   } catch (error) {
     await closeTab(cdpUrl, targetId).catch(() => {});
@@ -292,12 +328,6 @@ export function clickButton(page: EditorPage, text: string) {
   return page.mouseClick(buttonFinder("button", text));
 }
 
-/** 지금 초점이 있는 곳의 글자를 지운다. 전체 선택은 Linux Chrome 의 Control+A 다. */
-export async function clearField(page: EditorPage) {
-  await page.press("a", "KeyA", 65, 2);
-  await page.press("Delete", "Delete", 46);
-}
-
 /** 화면을 덮고 있는 알림의 글. 없으면 빈 문자열이다. */
 export async function blockingPopup(page: EditorPage) {
   return (
@@ -316,7 +346,9 @@ export async function blockingPopup(page: EditorPage) {
 
 /** 알림의 단추 하나를 마우스로 누른다. */
 export function dismissPopup(page: EditorPage, button: string) {
-  return page.mouseClick(buttonFinder(".se-popup button, [role=dialog] button", button));
+  return page.mouseClick(
+    buttonFinder(".se-popup button, [role=dialog] button", button),
+  );
 }
 
 /** 화면을 덮은 알림이 잠깐 뒤에도 남아 있으면 그 글을 돌려준다. 없으면 빈 문자열이다. */
@@ -328,125 +360,13 @@ export async function requireClearScreen(page: EditorPage) {
   return blockingPopup(page);
 }
 
-// 이모지와 그것을 잇는 변형 선택자, 피부색, ZWJ 를 한 덩어리로 잡는다.
-const EMOJI_RUN = /([\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]+)/u;
-
-/** 글자와 이모지를 나눠 넣을 조각. 한 번에 넣으면 앞 글자가 사라진다. */
-export function emojiSplit(text: string) {
-  return text.split(EMOJI_RUN).filter(Boolean);
-}
-
-/** 편집기가 바꿔 넣는 공백 문자를 되돌려 초안과 견줄 수 있게 한다. */
-export function normalize(text: string) {
-  return text.replace(/\u00a0/g, " ").replace(/[\u200b\ufeff]/g, "").trim();
-}
-
-/** 선택자에 걸리는 문단의 글을 차례대로 읽는다. 빈 칸의 안내 문구는 실제 글이 아니라 뺀다. */
-export async function paragraphs(page: EditorPage, selector: string): Promise<string[]> {
-  const raw = await page.js<string>(`(() => { ${selector === TITLE_SELECTOR ? fieldCandidates(selector, true) : ""}
-    return JSON.stringify((${selector === TITLE_SELECTOR ? "el ? [el] : []" : `[...document.querySelectorAll(${q(selector)})]`})` +
-      ".map(e => { const c = e.cloneNode(true);" +
-      " c.querySelectorAll('.se-placeholder').forEach(x => x.remove());" +
-      " return c.textContent; })); })()");
-  return JSON.parse(raw || "[]");
-}
-
-/**
- * 커서가 있는 마지막 문단에 한 줄을 넣고 반영될 때까지 기다린다.
- * 글자와 이모지를 나눠 넣고 조각마다 화면에 들어왔는지 확인한 뒤 잠깐 둔다.
- */
-export async function typeLine(page: EditorPage, selector: string, text: string) {
-  let typed = "";
-  for (const part of emojiSplit(text)) {
-    await page.insertText(part);
-    typed += part;
-    const want = normalize(typed);
-    await page.waitUntil(async () => {
-      const lines = await paragraphs(page, selector);
-      return normalize(lines[lines.length - 1] ?? "") === want;
-    });
-    await page.sleep(page.step(SETTLE_SECONDS));
-  }
-}
-
-/** Enter 를 누르고 문단이 하나 늘어날 때까지 기다린다. */
-export async function newParagraph(page: EditorPage, selector: string) {
-  const count = (await paragraphs(page, selector)).length;
-  await page.enter();
-  await page.waitUntil(async () => (await paragraphs(page, selector)).length > count);
-}
-
-/** 본문에서 자리표시 문단을 찾아 초점을 두고 글자를 지운다. */
-export async function focusPlaceholder(page: EditorPage, text: string) {
-  const finder =
-    `[...document.querySelectorAll(${q(BODY_SELECTOR)})]` +
-    `.filter(e => { const value = e.textContent.trim();` +
-    ` return value === ${q(text)} ||` +
-    ` (${q(text)}.startsWith(value) && value.length >= ${text.length - 10}); })`;
-  const matches = JSON.parse(
-    (await page.js<string>(
-      `JSON.stringify(${finder}.map(e => ({id:e.id, text:e.textContent.trim()})))`,
-    )) || "[]",
-  ) as Array<{ id: string; text: string }>;
-  if (matches.length !== 1 || !matches[0]!.id) return false;
-  const elementId = matches[0]!.id;
-  const remaining = matches[0]!.text;
-  const element = `document.getElementById(${q(elementId)})`;
-  const currentText = async () => (await page.js<string>(`${element}?.textContent`)) || "";
-
-  // 문단 끝 글자의 오른쪽을 눌러 커서를 문단 끝에 둔다.
-  const clickEnd = async () => {
-    const spot = await page.js<string | null>(`(() => {
-  const el = ${element};
-  if (!el) return null;
-  el.scrollIntoView({behavior: "instant", block: "center"});
-  const range = document.createRange();
-  range.selectNodeContents(el);
-  const rects = range.getClientRects();
-  const rect = rects[rects.length - 1];
-  if (!rect) return null;
-  return JSON.stringify({x: rect.right + 4, y: rect.top + rect.height / 2});
-})()`);
-    if (!spot) return false;
-    const point = JSON.parse(spot) as { x: number; y: number };
-    await page.mouseAt(point.x, point.y);
-    return Boolean(
-      await page.js(
-        "(() => { const s = getSelection(); const n = s.anchorNode;" +
-          ` return n?.nodeType === 3 && n.parentElement.closest(${q(BODY_SELECTOR)})?.id === ${q(elementId)}` +
-          " && s.anchorOffset === n.textContent.length; })()",
-      ),
-    );
-  };
-
-  if (!(await clickEnd())) return false;
-  // JS Range 로 선택해 지우면 편집기 내부 커서와 어긋날 수 있다.
-  // 실제 키 입력으로 끝에서 지우고, 매번 줄이 짧아졌는지 확인한다.
-  for (let i = 0; i < remaining.length * 2; i++) {
-    const current = await currentText();
-    if (!current) return true;
-    if (current.length > remaining.length || !remaining.startsWith(current)) return false;
-    if (!(await clickEnd())) return false;
-    await page.press("Backspace", "Backspace", 8);
-    if (!(await page.waitUntil(async () => (await currentText()).length < current.length)))
-      return false;
-    await page.sleep(page.step(SETTLE_SECONDS));
-  }
-  return false;
-}
-
-/** 본문의 SmartEditor 구성요소 수. */
-export async function componentCount(page: EditorPage, kind: string) {
-  return (
-    (await page.js<number>(`document.querySelectorAll(".se-component.se-${kind}").length`)) || 0
-  );
-}
-
 type Progress = { draftHash?: string; passed?: string[] };
 
 /** 이 탭의 sessionStorage 에 둔 단계 결과. */
 export async function progress(page: EditorPage): Promise<Progress> {
-  const raw = await page.js<string | null>(`sessionStorage.getItem(${q(PROGRESS_KEY)})`);
+  const raw = await page.js<string | null>(
+    `sessionStorage.getItem(${q(PROGRESS_KEY)})`,
+  );
   try {
     return raw ? (JSON.parse(raw) as Progress) : {};
   } catch {
@@ -465,7 +385,8 @@ export async function setStage(
   if (current.draftHash !== draftHash) current = { draftHash, passed: [] };
   const done = new Set(current.passed ?? []);
   if (passed) done.add(stage);
-  else for (const later of STAGES.slice(STAGES.indexOf(stage))) done.delete(later);
+  else
+    for (const later of STAGES.slice(STAGES.indexOf(stage))) done.delete(later);
   current.passed = STAGES.filter((item) => done.has(item));
   await page.js(`sessionStorage.setItem(${q(PROGRESS_KEY)}, ${q(q(current))})`);
 }
