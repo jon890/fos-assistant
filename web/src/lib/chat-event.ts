@@ -12,6 +12,7 @@ export type ChatEvent = {
   type:
     | "started"
     | "delta"
+    | "interim"
     | "tool"
     | "subagent"
     | "step"
@@ -25,6 +26,9 @@ export type ChatEvent = {
     | "pending"
     | "approval";
   text?: string | null;
+  alreadyStreamed?: boolean | null;
+  streamedPrefixLength?: number | null;
+  interimId?: string | null;
   toolName?: string | null;
   detail?: string | null;
   conversationId?: string | null;
