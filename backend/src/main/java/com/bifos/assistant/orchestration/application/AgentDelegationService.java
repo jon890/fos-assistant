@@ -72,19 +72,20 @@ public class AgentDelegationService {
 
     private final DelegationRuns runs;
 
+
     public AgentDelegationService(
-            AgentService agents,
-            AgentExecutionRepository executions,
-            ExecutionDeliveryWriter deliveryWriter,
-            ChildExecutionRunner children,
-            ConversationRepository conversations,
-            LiveProperties<DelegationProperties> properties,
-            TurnCancellation turns,
-            HermesRunsClient hermes,
-            ApplicationEventPublisher events,
-            ProactiveCheckGuard checkGuard,
-            Clock clock,
-            BackgroundTasks backgroundTasks) {
+        AgentService agents,
+        AgentExecutionRepository executions,
+        ExecutionDeliveryWriter deliveryWriter,
+        ChildExecutionRunner children,
+        ConversationRepository conversations,
+        LiveProperties<DelegationProperties> properties,
+        TurnCancellation turns,
+        HermesRunsClient hermes,
+        ApplicationEventPublisher events,
+        ProactiveCheckGuard checkGuard,
+        Clock clock,
+        BackgroundTasks backgroundTasks) {
         this.agents = agents;
         this.executions = executions;
         this.deliveryWriter = deliveryWriter;
@@ -101,11 +102,13 @@ public class AgentDelegationService {
         }
     }
 
+
     /** 요청자가 쓸 수 있고 켜진 에이전트다. 같은 profile 을 여럿이 써도 요청자마다 다르다. */
     @Transactional(readOnly = true)
     public List<Agent> list(CurrentUser user) {
         return agents.readableBy(user);
     }
+
 
     /**
      * 요청자가 물을 수 있는 위임 실행 하나를 읽는다.
@@ -117,6 +120,7 @@ public class AgentDelegationService {
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId) {
         return executions.findById(executionId).filter(execution -> canQuery(user, origin, execution));
     }
+
 
     /**
      * {@link #status(CurrentUser, AgentExecution, Long)} 와 같이 읽되, 그 실행이 이 서버에서 돌고 있으면 끝나기를 기다린 뒤 다시 읽는다.
@@ -132,10 +136,10 @@ public class AgentDelegationService {
     public Optional<AgentExecution> status(CurrentUser user, AgentExecution origin, Long executionId, Duration wait) {
         Optional<AgentExecution> found = status(user, origin, executionId);
         if (found.isEmpty()
-                || found.get().status() != ExecutionStatus.RUNNING
-                || wait.isZero()
-                || wait.isNegative()
-                || !checkGuard.isCheckTree(origin)) {
+            || found.get().status() != ExecutionStatus.RUNNING
+            || wait.isZero()
+            || wait.isNegative()
+            || !checkGuard.isCheckTree(origin)) {
             return found;
         }
         RunningDelegation delegation = runs.find(executionId);
@@ -146,6 +150,7 @@ public class AgentDelegationService {
         delegation.awaitEnded(wait.compareTo(waitMax) < 0 ? wait : waitMax);
         return executions.findById(executionId);
     }
+
 
     /**
      * 요청자가 물을 수 있는 위임 실행 하나를 멈추고 그 뒤의 상태를 돌려준다. 그 실행이 다시 맡긴 실행은 멈추지 않는다.
@@ -180,6 +185,7 @@ public class AgentDelegationService {
         // 중지 표시는 켜졌다. Hermes 에 보내지 못했어도 실행이 끝날 때 CANCELLED 로 적힌다.
         return executions.findById(executionId).map(reread -> new DelegationStop(reread, true));
     }
+
 
     /**
      * 끝난 먼저 살펴보기 트리의 위임 결과를 전했다고 적고, 그 트리에서 도는 위임 자식을 멈춘다(ADR-080).
@@ -220,6 +226,7 @@ public class AgentDelegationService {
         }
     }
 
+
     /**
      * 다른 에이전트의 실행을 origin 실행의 자식으로 시작하고, Hermes 제출까지만 기다린다(ADR-017 「{@code agent_delegate} 는
      * 기다리지 않는다」).
@@ -246,7 +253,7 @@ public class AgentDelegationService {
      * @param task 그 에이전트에게 줄 지시. 부르는 쪽이 길이와 빈 값을 검사했다
      */
     public DelegationResult delegate(
-            CurrentUser user, AgentExecution origin, DelegationKey delegationKey, String agentCode, String task) {
+        CurrentUser user, AgentExecution origin, DelegationKey delegationKey, String agentCode, String task) {
         DelegationProperties settings = properties.current();
         Optional<Conversation> conversation = conversationOf(user, origin);
         if (conversation.isEmpty()) {
@@ -292,8 +299,7 @@ public class AgentDelegationService {
             if (checkTree && !withinCheckLimit(origin, rootId)) {
                 return rejected(Failure.CHECK_LIMIT, origin, "살펴보기가 끝났거나 위임 상한에 닿았다");
             }
-            if (executions.countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(rootId, ExecutionStatus.RUNNING)
-                    >= settings.maxConcurrentChildren()) {
+            if (executions.countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(rootId, ExecutionStatus.RUNNING) >= settings.maxConcurrentChildren()) {
                 return rejected(Failure.TOO_MANY_CHILDREN, origin, "루트당 동시 위임 한도에 닿았다");
             }
             // 남은 시간이 없으면 실행 스레드를 띄우지 않는다. 띄우면 곧바로 포기하게 되고 CANCELLED 줄만 남는다.
@@ -307,8 +313,8 @@ public class AgentDelegationService {
             Handoff started = handoff;
             try {
                 backgroundTasks.start(
-                        "agent-delegate-" + rootId,
-                        () -> runs.run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
+                    "agent-delegate-" + rootId,
+                    () -> runs.run(user, conversation.get(), origin, agent, task, delegationKey, checkTree, started));
             } catch (RuntimeException | Error ex) {
                 runs.release();
                 log.warn("위임 실행 스레드를 띄우지 못했다 originExecutionId={}", origin.id(), ex);
@@ -333,9 +339,9 @@ public class AgentDelegationService {
             if (handoff.failure() instanceof DataIntegrityViolationException) {
                 // 같은 키를 다른 요청이 먼저 저장했다. 트랜잭션 밖에서 그 줄을 다시 읽는다.
                 return executions
-                        .findByDelegationKey(delegationKey.value())
-                        .map(raced -> sameCall(user, origin, raced))
-                        .orElseGet(() -> rejected(Failure.SUBMIT_FAILED, origin, "저장에 실패했고 다시 읽은 줄도 없다"));
+                    .findByDelegationKey(delegationKey.value())
+                    .map(raced -> sameCall(user, origin, raced))
+                    .orElseGet(() -> rejected(Failure.SUBMIT_FAILED, origin, "저장에 실패했고 다시 읽은 줄도 없다"));
             }
             return rejected(Failure.SUBMIT_FAILED, origin, "실행 줄을 만들지 못했다");
         }
@@ -350,6 +356,7 @@ public class AgentDelegationService {
         return DelegationResult.started(execution.id(), ExecutionStatus.RUNNING);
     }
 
+
     /**
      * 살펴보기 트리에서 하나 더 맡길 수 있는가. 루트 잠금 안에서 부른다.
      *
@@ -359,8 +366,9 @@ public class AgentDelegationService {
      */
     private boolean withinCheckLimit(AgentExecution origin, Long rootId) {
         return runs.checkRunning(origin)
-                && executions.countByRootExecutionIdAndDelegationKeyIsNotNull(rootId) < checkGuard.maxDelegations();
+            && executions.countByRootExecutionIdAndDelegationKeyIsNotNull(rootId) < checkGuard.maxDelegations();
     }
+
 
     /**
      * 이 프로세스에 중지 표시가 없는 실행의 run 에 중지만 보낸다. 보냈으면 참이다.
@@ -371,9 +379,9 @@ public class AgentDelegationService {
         Optional<Agent> found = agents.findById(execution.agentId());
         if (found.isEmpty()) {
             log.warn(
-                    "에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
-                    execution.id(),
-                    execution.agentId());
+                "에이전트 행이 없어 끊긴 위임 실행의 Hermes run 을 멈추지 못했다 executionId={} agentId={}",
+                execution.id(),
+                execution.agentId());
             return false;
         }
         try {
@@ -384,6 +392,7 @@ public class AgentDelegationService {
             return false;
         }
     }
+
 
     /**
      * 같은 키로 이미 있는 실행을 돌려준다.
@@ -397,6 +406,7 @@ public class AgentDelegationService {
         return DelegationResult.started(existing.id(), existing.status());
     }
 
+
     /**
      * origin 실행의 대화다. 자식 실행이 그 대화의 모델 선택을 쓴다.
      *
@@ -409,6 +419,7 @@ public class AgentDelegationService {
         return conversations.findByIdAndUserIdAndDeletedAtIsNull(origin.conversationId(), user.id());
     }
 
+
     /**
      * 새 자식의 깊이다. origin 에서 {@code parent_execution_id} 를 따라 올라가 센다. 사용자가 부른 실행이 0 이다.
      *
@@ -420,16 +431,18 @@ public class AgentDelegationService {
         while (parentId != null && depth <= maxDepth) {
             depth++;
             parentId = executions
-                    .findById(parentId)
-                    .map(AgentExecution::parentExecutionId)
-                    .orElse(null);
+                .findById(parentId)
+                .map(AgentExecution::parentExecutionId)
+                .orElse(null);
         }
         return depth;
     }
 
+
     private ReentrantLock lockOf(Long rootId) {
         return rootLocks[Math.floorMod(rootId.hashCode(), ROOT_LOCK_STRIPES)];
     }
+
 
     /** 마감 시각까지 잠금을 기다린다. 끊기면 잡지 못한 것과 같게 보고 끊긴 표시는 되살린다. */
     private static boolean tryLock(ReentrantLock lock, long deadline) {
@@ -441,11 +454,13 @@ public class AgentDelegationService {
         }
     }
 
+
     /** 이유는 로그에만 남긴다. 밖으로는 실패 코드만 나간다. */
     private static DelegationResult rejected(Failure failure, AgentExecution origin, String reason) {
         log.warn("위임을 시작하지 않았다 originExecutionId={} failure={} reason={}", origin.id(), failure, reason);
         return DelegationResult.rejected(failure);
     }
+
 
     /**
      * 부르는 쪽이 이 실행을 물을 수 있는지 판정한다(ADR-017 「도구 넷과 한도」).

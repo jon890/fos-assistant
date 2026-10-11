@@ -80,13 +80,14 @@ class AgentDelegationServiceRaceTest {
 
     private AgentDelegationService delegations;
 
+
     @BeforeEach
     void setUp() {
         when(origin.id()).thenReturn(ROOT_ID);
         when(origin.treeRootId()).thenReturn(ROOT_ID);
         when(origin.conversationId()).thenReturn(CONVERSATION_ID);
         when(conversations.findByIdAndUserIdAndDeletedAtIsNull(CONVERSATION_ID, user.id()))
-                .thenReturn(Optional.of(mock(Conversation.class)));
+            .thenReturn(Optional.of(mock(Conversation.class)));
         Agent agent = mock(Agent.class);
         when(agent.apiBaseUrl()).thenReturn("http://agent-runtime.test/p/" + WORKER);
         when(agent.hermesProfile()).thenReturn(WORKER);
@@ -96,32 +97,35 @@ class AgentDelegationServiceRaceTest {
         delegations = service(new VirtualThreadBackgroundTasks());
     }
 
+
     /** 서버 전체 한도를 1 로 둬, 거절한 요청이 자리를 돌려주지 않고 남기면 다음 요청이 BUSY 가 된다. */
     private AgentDelegationService service(BackgroundTasks backgroundTasks) {
         return new AgentDelegationService(
-                mock(AgentService.class),
-                executions,
-                mock(ExecutionDeliveryWriter.class),
-                children,
-                conversations,
-                new LiveProperties<>() {
-                    @Override
-                    public DelegationProperties current() {
-                        return settings.get();
-                    }
+            mock(AgentService.class),
+            executions,
+            mock(ExecutionDeliveryWriter.class),
+            children,
+            conversations,
+            new LiveProperties<>() {
+                @Override
+                public DelegationProperties current() {
+                    return settings.get();
+                }
 
-                    @Override
-                    public Class<DelegationProperties> type() {
-                        return DelegationProperties.class;
-                    }
-                },
-                mock(TurnCancellation.class),
-                mock(HermesRunsClient.class),
-                events,
-                checkGuard,
-                Clock.systemUTC(),
-                backgroundTasks);
+
+                @Override
+                public Class<DelegationProperties> type() {
+                    return DelegationProperties.class;
+                }
+            },
+            mock(TurnCancellation.class),
+            mock(HermesRunsClient.class),
+            events,
+            checkGuard,
+            Clock.systemUTC(),
+            backgroundTasks);
     }
+
 
     @Test
     @DisplayName("루트 잠금을 제한 시간 안에 잡지 못하면 실행을 시작하지 않고 SUBMIT FAILED 다")
@@ -140,11 +144,10 @@ class AgentDelegationServiceRaceTest {
         DelegationResult holdingResult;
         DelegationResult waitingResult;
         try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
-            Future<DelegationResult> first =
-                    pool.submit(() -> delegations.delegate(user, origin, holding, WORKER, "앞 요청"));
+            Future<DelegationResult> first = pool.submit(() -> delegations.delegate(user, origin, holding, WORKER, "앞 요청"));
             assertThat(holdingEntered.await(10, TimeUnit.SECONDS))
-                    .as("앞 요청이 잠금을 쥐었다")
-                    .isTrue();
+                .as("앞 요청이 잠금을 쥐었다")
+                .isTrue();
 
             waitingResult = delegations.delegate(user, origin, waiting, WORKER, "잠금을 기다리는 요청");
 
@@ -153,20 +156,21 @@ class AgentDelegationServiceRaceTest {
         }
 
         assertThat(waitingResult.failure())
-                .as("잠금을 못 잡은 요청: %s", waitingResult)
-                .isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
+            .as("잠금을 못 잡은 요청: %s", waitingResult)
+            .isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
         assertThat(holdingResult.failure())
-                .as("잠금 안에서 제한 시간이 지난 요청: %s", holdingResult)
-                .isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
+            .as("잠금 안에서 제한 시간이 지난 요청: %s", holdingResult)
+            .isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
         verify(children, never()).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
 
         startsWithRow(77L);
         DelegationResult retried = delegations.delegate(user, origin, waiting, WORKER, "같은 키로 다시 부른다");
         assertThat(retried.executionId())
-                .as("거절한 요청이 줄과 자리를 남기지 않아 같은 키로 새로 시작한다: %s", retried)
-                .isEqualTo(77L);
+            .as("거절한 요청이 줄과 자리를 남기지 않아 같은 키로 새로 시작한다: %s", retried)
+            .isEqualTo(77L);
         assertThat(retried.status()).isEqualTo(ExecutionStatus.RUNNING);
     }
+
 
     @Test
     @DisplayName("실행 스레드를 띄우지 못하면 SUBMIT FAILED 로 끝나고 동시 위임 자리를 돌려준다")
@@ -183,6 +187,7 @@ class AgentDelegationServiceRaceTest {
                 return real.start(name, task);
             }
 
+
             @Override
             public Thread unstarted(String name, Runnable task) {
                 return real.unstarted(name, task);
@@ -198,19 +203,20 @@ class AgentDelegationServiceRaceTest {
         startsWithRow(78L);
         DelegationResult next = delegations.delegate(user, origin, key("call_after_failure"), WORKER, "다음 요청");
         assertThat(next.failure())
-                .as("서버 한도가 1 이라 자리를 돌려주지 않았으면 BUSY 다: %s", next)
-                .isNull();
+            .as("서버 한도가 1 이라 자리를 돌려주지 않았으면 BUSY 다: %s", next)
+            .isNull();
         assertThat(next.executionId()).as("다음 요청: %s", next).isEqualTo(78L);
         assertThat(next.status()).isEqualTo(ExecutionStatus.RUNNING);
     }
+
 
     @Test
     @DisplayName("사용자 실행 한도는 BUSY 로, 다른 시작 실패는 SUBMIT FAILED 로 답하고 모두 자리를 돌려준다")
     void distinguishesUserBusyFromSubmitFailureAndReturnsSlot() {
         delegations = service(completingTasks());
         when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenThrow(new ApiException(ErrorCode.USER_BUSY, "사용자 한도"))
-                .thenThrow(new IllegalStateException("실행 줄 저장 실패"));
+            .thenThrow(new ApiException(ErrorCode.USER_BUSY, "사용자 한도"))
+            .thenThrow(new IllegalStateException("실행 줄 저장 실패"));
 
         DelegationResult busy = delegations.delegate(user, origin, key("call_user_busy"), WORKER, "사용자 한도");
         DelegationResult failed = delegations.delegate(user, origin, key("call_row_failed"), WORKER, "줄 저장 실패");
@@ -221,8 +227,9 @@ class AgentDelegationServiceRaceTest {
         assertThat(failed.executionId()).isNull();
         startsWithRow(79L);
         assertThat(delegations.delegate(user, origin, key("call_after_row_failure"), WORKER, "다음 요청").executionId())
-                .isEqualTo(79L);
+            .isEqualTo(79L);
     }
+
 
     @Test
     @DisplayName("종료 사건 발행이 실패해도 실행 자리를 돌려주고 다음 위임을 받는다")
@@ -240,6 +247,7 @@ class AgentDelegationServiceRaceTest {
         assertThat(next.failure()).isNull();
     }
 
+
     /** 실행 종료와 다음 요청 사이의 순서를 고정한다. 실제 스레드 경합은 다른 검사에서 본다. */
     private BackgroundTasks completingTasks() {
         BackgroundTasks tasks = mock(BackgroundTasks.class);
@@ -251,6 +259,7 @@ class AgentDelegationServiceRaceTest {
         return tasks;
     }
 
+
     @Test
     @DisplayName("실행 줄 저장이 유일 제약에 걸리면 먼저 저장된 같은 키의 줄을 다시 읽어 그 번호를 준다")
     void rereadsRowOfSameKeySavedFirstAndReturnsItsIdOnUniqueConflict() {
@@ -261,10 +270,10 @@ class AgentDelegationServiceRaceTest {
         when(saved.status()).thenReturn(ExecutionStatus.RUNNING);
         // 잠금 안에서는 아직 없고, 저장이 걸린 뒤 다시 읽으면 다른 요청이 저장한 줄이 있다.
         when(executions.findByDelegationKey(raced.value()))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(saved));
+            .thenReturn(Optional.empty())
+            .thenReturn(Optional.of(saved));
         when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenThrow(new DataIntegrityViolationException("같은 delegation_key"));
+            .thenThrow(new DataIntegrityViolationException("같은 delegation_key"));
 
         DelegationResult result = delegations.delegate(user, origin, raced, WORKER, "같은 호출");
 
@@ -272,6 +281,7 @@ class AgentDelegationServiceRaceTest {
         assertThat(result.executionId()).isEqualTo(55L);
         assertThat(result.status()).isEqualTo(ExecutionStatus.RUNNING);
     }
+
 
     @Test
     @DisplayName("다시 읽은 같은 키의 줄이 다른 사용자의 것이면 번호를 알리지 않는다")
@@ -282,16 +292,17 @@ class AgentDelegationServiceRaceTest {
         when(saved.userId()).thenReturn(user.id() + 1);
         when(saved.status()).thenReturn(ExecutionStatus.RUNNING);
         when(executions.findByDelegationKey(raced.value()))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(saved));
+            .thenReturn(Optional.empty())
+            .thenReturn(Optional.of(saved));
         when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenThrow(new DataIntegrityViolationException("같은 delegation_key"));
+            .thenThrow(new DataIntegrityViolationException("같은 delegation_key"));
 
         DelegationResult result = delegations.delegate(user, origin, raced, WORKER, "같은 호출");
 
         assertThat(result.failure()).as("결과: %s", result).isEqualTo(DelegationResult.Failure.SUBMIT_FAILED);
         assertThat(result.executionId()).isNull();
     }
+
 
     @Test
     @DisplayName("살펴보기 트리에서 RUNNING 으로 읽은 실행이 도는 표시를 찾기 전에 끝났으면 한 번 다시 읽어 끝난 상태를 준다")
@@ -307,6 +318,7 @@ class AgentDelegationServiceRaceTest {
         assertThat(read).as("다시 읽은 줄").containsSame(endedRow);
     }
 
+
     @Test
     @DisplayName("서버 전체 동시 위임 한도는 위임마다 지금 설정을 읽고 끝난 실행이 돌려준 자리는 다시 얻는다")
     void serverWideLimitReadsCurrentSettingsAndReusesReturnedSlot() throws Exception {
@@ -321,6 +333,7 @@ class AgentDelegationServiceRaceTest {
                 return thread;
             }
 
+
             @Override
             public Thread unstarted(String name, Runnable task) {
                 return real.unstarted(name, task);
@@ -331,17 +344,17 @@ class AgentDelegationServiceRaceTest {
         AtomicLong nextId = new AtomicLong(100L);
         // 실행이 줄을 만들고 제출한 뒤 finish 까지 돌아, 그동안 자리를 쥔다.
         when(children.delegate(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenAnswer(invocation -> {
-                    long id = nextId.incrementAndGet();
-                    AgentExecution row = mock(AgentExecution.class);
-                    when(row.id()).thenReturn(id);
-                    Consumer<AgentExecution> onStarted = invocation.getArgument(6);
-                    BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
-                    onStarted.accept(row);
-                    onSubmitted.accept(row, "run-" + id);
-                    finish.await(10, TimeUnit.SECONDS);
-                    return ChildResult.succeeded(id, "답");
-                });
+            .thenAnswer(invocation -> {
+                long id = nextId.incrementAndGet();
+                AgentExecution row = mock(AgentExecution.class);
+                when(row.id()).thenReturn(id);
+                Consumer<AgentExecution> onStarted = invocation.getArgument(6);
+                BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
+                onStarted.accept(row);
+                onSubmitted.accept(row, "run-" + id);
+                finish.await(10, TimeUnit.SECONDS);
+                return ChildResult.succeeded(id, "답");
+            });
 
         DelegationResult first = delegations.delegate(user, origin, key("call_limit_first"), WORKER, "첫 요청");
         DelegationResult refused = delegations.delegate(user, origin, key("call_limit_second"), WORKER, "한도 1 의 둘째");
@@ -352,8 +365,8 @@ class AgentDelegationServiceRaceTest {
         finish.countDown();
         for (Thread thread : started) {
             assertThat(thread.join(Duration.ofSeconds(10)))
-                    .as("실행 스레드 %s 가 끝났다", thread.getName())
-                    .isTrue();
+                .as("실행 스레드 %s 가 끝났다", thread.getName())
+                .isTrue();
         }
         settings.set(withMaxActive(1));
         DelegationResult afterReturn = delegations.delegate(user, origin, key("call_limit_after"), WORKER, "돌려준 뒤");
@@ -362,14 +375,16 @@ class AgentDelegationServiceRaceTest {
         assertThat(refused.failure()).as("한도 1 에서 자리를 쥔 동안의 둘째: %s", refused).isEqualTo(DelegationResult.Failure.BUSY);
         assertThat(second.failure()).as("한도를 2 로 올린 뒤의 둘째: %s", second).isNull();
         assertThat(afterReturn.failure())
-                .as("두 실행이 자리를 돌려준 뒤 한도 1 의 요청: %s", afterReturn)
-                .isNull();
+            .as("두 실행이 자리를 돌려준 뒤 한도 1 의 요청: %s", afterReturn)
+            .isNull();
     }
+
 
     /** 서버 전체 한도만 다른 위임 설정이다. 나머지는 {@link #service} 의 기본값과 같다. */
     private static DelegationProperties withMaxActive(int maxActive) {
         return new DelegationProperties(2, 4, maxActive, SUBMIT_TIMEOUT, 100, Duration.ofSeconds(20));
     }
+
 
     /** 이 대화에서 요청자가 맡긴 위임 실행 줄이다. */
     private AgentExecution delegatedRow(Long id, ExecutionStatus status) {
@@ -382,18 +397,20 @@ class AgentDelegationServiceRaceTest {
         return row;
     }
 
+
     /** 다음 실행이 줄을 만들고 곧바로 제출하게 한다. */
     private void startsWithRow(Long executionId) {
         AgentExecution row = mock(AgentExecution.class);
         when(row.id()).thenReturn(executionId);
         doAnswer(invocation -> {
-                    Consumer<AgentExecution> onStarted = invocation.getArgument(6);
-                    BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
-                    onStarted.accept(row);
-                    onSubmitted.accept(row, "run-" + executionId);
-                    return ChildResult.succeeded(executionId, "답");
-                }).when(children).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
+            Consumer<AgentExecution> onStarted = invocation.getArgument(6);
+            BiConsumer<AgentExecution, String> onSubmitted = invocation.getArgument(7);
+            onStarted.accept(row);
+            onSubmitted.accept(row, "run-" + executionId);
+            return ChildResult.succeeded(executionId, "답");
+        }).when(children).delegate(any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
+
 
     private static DelegationKey key(String toolCallId) {
         return DelegationKey.of("race-chief", "fos-root", "fos-root", toolCallId);

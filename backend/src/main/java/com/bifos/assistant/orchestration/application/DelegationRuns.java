@@ -37,12 +37,13 @@ final class DelegationRuns {
     /** 실행을 끝까지 돈 가상 스레드가 돌려주는 서버 전체 위임 자리다. */
     private final DelegationSlots activeDelegations = new DelegationSlots();
 
+
     DelegationRuns(
-            ChildExecutionRunner children,
-            TurnCancellation turns,
-            HermesRunsClient hermes,
-            ApplicationEventPublisher events,
-            ProactiveCheckGuard checkGuard) {
+        ChildExecutionRunner children,
+        TurnCancellation turns,
+        HermesRunsClient hermes,
+        ApplicationEventPublisher events,
+        ProactiveCheckGuard checkGuard) {
         this.children = children;
         this.turns = turns;
         this.hermes = hermes;
@@ -50,25 +51,30 @@ final class DelegationRuns {
         this.checkGuard = checkGuard;
     }
 
+
     boolean tryAcquire(int maxActive) {
         return activeDelegations.tryAcquire(maxActive);
     }
+
 
     void release() {
         activeDelegations.release();
     }
 
+
     RunningDelegation find(Long executionId) {
         return running.get(executionId);
     }
 
+
     /** origin 이 속한 살펴보기가 아직 {@code RUNNING} 인가. 살펴보기 트리가 아니면 거짓이다. */
     boolean checkRunning(AgentExecution origin) {
         return checkGuard
-                .checkOf(origin)
-                .map(check -> check.status() == CheckStatus.RUNNING)
-                .orElse(false);
+            .checkOf(origin)
+            .map(check -> check.status() == CheckStatus.RUNNING)
+            .orElse(false);
     }
+
 
     /**
      * 가상 스레드에서 실행 하나를 끝까지 돌린다.
@@ -85,14 +91,14 @@ final class DelegationRuns {
      * @param checkTree origin 이 먼저 살펴보기 트리 안에 있다
      */
     void run(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution origin,
-            Agent agent,
-            String task,
-            DelegationKey delegationKey,
-            boolean checkTree,
-            Handoff handoff) {
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution origin,
+        Agent agent,
+        String task,
+        DelegationKey delegationKey,
+        boolean checkTree,
+        Handoff handoff) {
         Long rootId = origin.treeRootId();
         RunningDelegation delegation = new RunningDelegation(agent.apiBaseUrl(), agent.hermesProfile());
         RuntimeException failure = null;
@@ -102,26 +108,26 @@ final class DelegationRuns {
                 return;
             }
             children.delegate(
-                    user,
-                    conversation,
-                    origin,
-                    agent,
-                    task,
-                    delegationKey,
-                    execution -> {
-                        // 번호를 돌려받은 쪽이 곧바로 멈출 수 있게, 요청 스레드를 깨우기 전에 중지 표시를 등록한다.
-                        delegation.bindExecution(execution.id());
-                        running.put(execution.id(), delegation);
-                        handoff.onRowCreated(execution);
-                    },
-                    (execution, runId) -> {
-                        handoff.markSubmitted();
-                        if (delegation.attachRun(runId)) {
-                            sendStop(delegation, runId);
-                        }
-                        turns.trackRun(rootId, agent.apiBaseUrl(), agent.hermesProfile(), runId);
-                    },
-                    () -> handoff.abandoned() || delegation.stopRequested() || rootTurnStopped(rootId));
+                user,
+                conversation,
+                origin,
+                agent,
+                task,
+                delegationKey,
+                execution -> {
+                    // 번호를 돌려받은 쪽이 곧바로 멈출 수 있게, 요청 스레드를 깨우기 전에 중지 표시를 등록한다.
+                    delegation.bindExecution(execution.id());
+                    running.put(execution.id(), delegation);
+                    handoff.onRowCreated(execution);
+                },
+                (execution, runId) -> {
+                    handoff.markSubmitted();
+                    if (delegation.attachRun(runId)) {
+                        sendStop(delegation, runId);
+                    }
+                    turns.trackRun(rootId, agent.apiBaseUrl(), agent.hermesProfile(), runId);
+                },
+                () -> handoff.abandoned() || delegation.stopRequested() || rootTurnStopped(rootId));
         } catch (DataIntegrityViolationException ex) {
             failure = ex;
             log.info("같은 위임 키의 실행 줄이 먼저 저장됐다 originExecutionId={}", origin.id());
@@ -151,6 +157,7 @@ final class DelegationRuns {
         }
     }
 
+
     /**
      * 위임 실행이 끝났다고 알린다. 받는 쪽이 부모 대화에 전할지 정한다.
      *
@@ -165,6 +172,7 @@ final class DelegationRuns {
         }
     }
 
+
     /** 중지를 보낸다. 보내지 못해도 중지 표시는 켜진 채라, 실행이 끝날 때 CANCELLED 로 적힌다. */
     void sendStop(RunningDelegation delegation, String runId) {
         try {
@@ -173,6 +181,7 @@ final class DelegationRuns {
             log.warn("위임 실행의 Hermes run 을 멈추지 못했다 executionId={} runId={}", delegation.executionId(), runId, ex);
         }
     }
+
 
     /**
      * 사용자가 루트 turn 을 멈췄는지 본다. 흐름의 하위 실행과 같은 판정이다.
@@ -184,6 +193,7 @@ final class DelegationRuns {
     private boolean rootTurnStopped(Long rootId) {
         return turns.isStopConfirmed(rootId) || turns.shouldStopBeforeSubmit(rootId);
     }
+
 
     static boolean isUserBusy(RuntimeException failure) {
         return failure instanceof ApiException api && api.code() == ErrorCode.USER_BUSY;
