@@ -46,32 +46,35 @@ public class ConnectorInstallAttempts {
     private final SignInRevocation access;
     private final TransactionTemplate transactions;
 
+
     /** 호출자가 잠금과 권한 검사를 마친 뒤 불변 입력만 반환하도록 시작 트랜잭션을 연다. 상위 트랜잭션은 허용하지 않는다. */
     public <T> T start(Supplier<T> preparation) {
         requireOutsideTransaction();
         return transactions.execute(status -> preparation.get());
     }
 
+
     /** 소유자 행을 첫 읽기로 잠그고 현재 로그인 접근 권한을 확인한다. */
     public AppUser lockOwner(Long ownerId) {
         AppUser owner = users.findByIdForUpdate(ownerId)
-                .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
+            .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
         if (access.revoked(owner.email())) {
             throw new ApiException(ErrorCode.FORBIDDEN, "sign-in access was revoked");
         }
         return owner;
     }
 
+
     /** 시작 트랜잭션 안에서 바인딩의 새 시도와 HTTP에 필요한 값을 함께 캡처한다. */
     public ConnectorBindingAttempt begin(
-            ConnectorBinding binding, Optional<ConnectorManifest> manifest, Map<String, String> values,
-            boolean checkInstallation, boolean afterRestart, boolean replaceValues, Instant now) {
+        ConnectorBinding binding, Optional<ConnectorManifest> manifest, Map<String, String> values,
+        boolean checkInstallation, boolean afterRestart, boolean replaceValues, Instant now) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("installation preparation requires a transaction");
         }
         Agent agent = agents.findByIdForUpdate(binding.agent().id())
-                .filter(candidate -> !candidate.isDeleted())
-                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+            .filter(candidate -> !candidate.isDeleted())
+            .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
         binding = bindings.findById(binding.id()).orElseThrow();
         ConnectorConnection connection = binding.connection();
         if (!Objects.equals(agent.ownerUserId(), connection.userId())) {
@@ -96,17 +99,18 @@ public class ConnectorInstallAttempts {
         binding.beginInstall(attemptId, now);
         bindings.save(binding);
         return new ConnectorBindingAttempt(
-                binding.id(), agent.id(), connection.userId(), connection.id(), connection.updatedAt(),
-                connection.status(), connection.vaultStored(), attemptId, now,
-                agent.hermesProfile(), agent.apiBaseUrl(), agent.credentialScope(), agent.sandboxOwner(),
-                connection.connectorId(), connection.vault(),
-                declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
-                agent.connectorManaged(), desired, binding.restartRequired(), checkInstallation, replaceValues,
-                declared != null && declared.attachments(), waiting,
-                declared == null ? List.of() : declared.fields(),
-                declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList(),
-                declared == null ? List.of() : declared.toolsets(), values);
+            binding.id(), agent.id(), connection.userId(), connection.id(), connection.updatedAt(),
+            connection.status(), connection.vaultStored(), attemptId, now,
+            agent.hermesProfile(), agent.apiBaseUrl(), agent.credentialScope(), agent.sandboxOwner(),
+            connection.connectorId(), connection.vault(),
+            declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
+            agent.connectorManaged(), desired, binding.restartRequired(), checkInstallation, replaceValues,
+            declared != null && declared.attachments(), waiting,
+            declared == null ? List.of() : declared.fields(),
+            declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList(),
+            declared == null ? List.of() : declared.toolsets(), values);
     }
+
 
     /** 커밋된 입력으로 HTTP를 보내고, 적용된 결과만 돌려준다. 버린 응답은 오류와 횟수에 넣지 않는다. */
     public Optional<ResyncOutcome> execute(ConnectorBindingAttempt attempt) {
@@ -114,10 +118,11 @@ public class ConnectorInstallAttempts {
         ConnectorInstallResult result = installs.execute(attempt);
         Optional<ResyncOutcome> applied = complete(attempt, result);
         applied.filter(outcome -> attempt.checkInstallation()
-                        && outcome != ResyncOutcome.READY && outcome != ResyncOutcome.CALL_FAILED)
-                .ifPresent(outcome -> log.info("connector {} not applied: {}", attempt.connectorId(), outcome));
+            && outcome != ResyncOutcome.READY && outcome != ResyncOutcome.CALL_FAILED)
+            .ifPresent(outcome -> log.info("connector {} not applied: {}", attempt.connectorId(), outcome));
         return applied;
     }
+
 
     /** 결과 트랜잭션에서 현재 설치 맥락과 UUID를 대조하고 한 번만 적용한다. 연결 revision은 변경하지 않는다. */
     public Optional<ResyncOutcome> complete(ConnectorBindingAttempt attempt, ConnectorInstallResult result) {
@@ -133,6 +138,7 @@ public class ConnectorInstallAttempts {
         });
     }
 
+
     /** 새 붙이기가 아무것도 설치하지 않고 거절됐을 때 그 시도의 행만 지운다. 새 시도와 다른 바인딩은 건드리지 않는다. */
     public boolean reject(ConnectorBindingAttempt attempt) {
         requireOutsideTransaction();
@@ -146,6 +152,7 @@ public class ConnectorInstallAttempts {
         }));
     }
 
+
     /** 첫 DB 읽기는 소유자 잠금이다. MySQL에서 잠금을 기다린 뒤의 값을 읽도록 엔티티를 먼저 찾지 않는다. */
     private ConnectorBinding current(ConnectorBindingAttempt attempt) {
         AppUser owner = users.findByIdForUpdate(attempt.ownerId()).orElse(null);
@@ -157,13 +164,13 @@ public class ConnectorInstallAttempts {
         }
         Agent agent = agents.findByIdForUpdate(attempt.agentId()).orElse(null);
         if (agent == null || agent.isDeleted()
-                || !Objects.equals(agent.ownerUserId(), attempt.ownerId())
-                || !Objects.equals(agent.hermesProfile(), attempt.profile())
-                || !Objects.equals(agent.apiBaseUrl(), attempt.apiBaseUrl())
-                || !Objects.equals(agent.sandboxOwner(), attempt.sandboxOwner())
-                || agent.credentialScope() != attempt.credentialScope()
-                || agent.connectorManaged() != attempt.legacy()
-                || (!attempt.legacy() && agent.visibility() != AgentVisibility.PRIVATE)) {
+            || !Objects.equals(agent.ownerUserId(), attempt.ownerId())
+            || !Objects.equals(agent.hermesProfile(), attempt.profile())
+            || !Objects.equals(agent.apiBaseUrl(), attempt.apiBaseUrl())
+            || !Objects.equals(agent.sandboxOwner(), attempt.sandboxOwner())
+            || agent.credentialScope() != attempt.credentialScope()
+            || agent.connectorManaged() != attempt.legacy()
+            || (!attempt.legacy() && agent.visibility() != AgentVisibility.PRIVATE)) {
             return null;
         }
         ConnectorBinding binding = bindings.findById(attempt.bindingId()).orElse(null);
@@ -172,13 +179,14 @@ public class ConnectorInstallAttempts {
         }
         ConnectorConnection connection = binding.connection();
         return Objects.equals(connection.id(), attempt.connectionId())
-                        && Objects.equals(connection.userId(), attempt.ownerId())
-                        && Objects.equals(connection.updatedAt(), attempt.connectionRevision())
-                        && connection.status() == attempt.connectionStatus()
-                        && connection.vaultStored() == attempt.vaultStored()
-                        && Objects.equals(binding.installAttemptId(), attempt.attemptId())
+            && Objects.equals(connection.userId(), attempt.ownerId())
+            && Objects.equals(connection.updatedAt(), attempt.connectionRevision())
+            && connection.status() == attempt.connectionStatus()
+            && connection.vaultStored() == attempt.vaultStored()
+            && Objects.equals(binding.installAttemptId(), attempt.attemptId())
                 ? binding : null;
     }
+
 
     private static void requireOutsideTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {

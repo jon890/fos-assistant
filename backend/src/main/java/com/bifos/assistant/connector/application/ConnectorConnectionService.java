@@ -71,29 +71,33 @@ public class ConnectorConnectionService {
     private final BrowserGatewayTokens tokens;
     private final Clock clock;
 
+
     /**
      * 연결 확인의 앞 트랜잭션이 본 것이다. 확인 도구를 부를지 정한다.
      *
      * @param vault 확인 도구가 값을 읽을 보관 파일. 값이 보관 파일에 없거나 해제된 연결이면 null
      */
-    private record Prepared(String vault, Instant revision) {}
+    private record Prepared(String vault, Instant revision) {
+    }
 
     /** 커밋한 설치 입력과, 커밋한 뒤에 알릴 실패를 담은 연결 확인의 결과다. */
-    private record Checked(List<ConnectorBindingAttempt> attempts, ApiException failure) {}
+    private record Checked(List<ConnectorBindingAttempt> attempts, ApiException failure) {
+    }
+
 
     // TransactionTemplate은 주입된 transaction manager로 만들고 시각은 주입된 Clock으로 정한다.
     @Autowired
     public ConnectorConnectionService(
-            ConnectorConnectionRepository connections,
-            ConnectorBindingRepository bindings,
-            AppUserRepository users,
-            ConnectorBindingService bindingService,
-            HermesConnectorClient connector,
-            PlatformTransactionManager transactionManager,
-            ConnectorCallLimiter limiter,
-            ConnectorActionService approvals,
-            BrowserGatewayTokens tokens,
-            Clock clock) {
+        ConnectorConnectionRepository connections,
+        ConnectorBindingRepository bindings,
+        AppUserRepository users,
+        ConnectorBindingService bindingService,
+        HermesConnectorClient connector,
+        PlatformTransactionManager transactionManager,
+        ConnectorCallLimiter limiter,
+        ConnectorActionService approvals,
+        BrowserGatewayTokens tokens,
+        Clock clock) {
         this.connections = connections;
         this.bindings = bindings;
         this.users = users;
@@ -106,6 +110,7 @@ public class ConnectorConnectionService {
         this.clock = clock;
     }
 
+
     /**
      * 카탈로그의 커넥터와 그것에 대한 내 상태다. env 이름과 도구 이름은 여기서 빠진다.
      *
@@ -116,37 +121,38 @@ public class ConnectorConnectionService {
     public List<ConnectorSummary> catalog(CurrentUser user) {
         List<ConnectorManifest> manifests = ConnectorManifests.read(connector);
         Map<String, ConnectorConnection> mine = connections.findByUserId(user.id()).stream()
-                .collect(Collectors.toMap(ConnectorConnection::connectorId, connection -> connection));
+            .collect(Collectors.toMap(ConnectorConnection::connectorId, connection -> connection));
         List<ConnectorSummary> result = new ArrayList<>();
         for (ConnectorManifest manifest : manifests) {
             ConnectorConnection connection = mine.remove(manifest.id());
             result.add(new ConnectorSummary(
-                    manifest.id(),
-                    manifest.title(),
-                    manifest.description(),
-                    manifest.appearance(),
-                    manifest.fields().stream().map(ConnectorFieldSummary::from).toList(),
-                    ConnectorToolPolicies.summaries(manifest),
-                    connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
-                    true,
-                    connection == null ? List.of() : boundAgents(connection),
-                    manifest.ownerBrowserLoginUrl()));
+                manifest.id(),
+                manifest.title(),
+                manifest.description(),
+                manifest.appearance(),
+                manifest.fields().stream().map(ConnectorFieldSummary::from).toList(),
+                ConnectorToolPolicies.summaries(manifest),
+                connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
+                true,
+                connection == null ? List.of() : boundAgents(connection),
+                manifest.ownerBrowserLoginUrl()));
         }
         mine.values().stream()
-                .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
-                .map(connection -> new ConnectorSummary(
-                        connection.connectorId(),
-                        connection.connectorId(),
-                        "",
-                        ConnectorAppearance.NONE,
-                        List.of(),
-                        List.of(),
-                        connection.status(),
-                        false,
-                        boundAgents(connection)))
-                .forEach(result::add);
+            .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
+            .map(connection -> new ConnectorSummary(
+                connection.connectorId(),
+                connection.connectorId(),
+                "",
+                ConnectorAppearance.NONE,
+                List.of(),
+                List.of(),
+                connection.status(),
+                false,
+                boundAgents(connection)))
+            .forEach(result::add);
         return List.copyOf(result);
     }
+
 
     /** 이미 연결 행이 있으면 카탈로그에서 빠진 커넥터도 읽는다. */
     @Transactional(readOnly = true)
@@ -157,25 +163,26 @@ public class ConnectorConnectionService {
         }
         requireManifest(connectorId);
         return new ConnectionSnapshot(
-                connectorId, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), null, List.of(), 0);
+            connectorId, ConnectionStatus.DISCONNECTED, Map.of(), Map.of(), null, List.of(), 0);
     }
+
 
     /** 작성 중인 값으로 선택지 도구를 부른다. 아무것도 저장하지 않으므로 사용자 행을 잠그지 않는다. */
     public List<ConnectorOption> options(
-            CurrentUser user, String connectorId, String fieldKey, Map<String, String> values) {
+        CurrentUser user, String connectorId, String fieldKey, Map<String, String> values) {
         return limiter.call(user.id(), () -> {
             ConnectorManifest manifest = requireManifest(connectorId);
             ConnectorFieldOptions options = manifest.fields().stream()
-                    .filter(field -> field.key().equals(fieldKey) && field.options() != null)
-                    .map(ConnectorField::options)
-                    .findFirst()
-                    .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
+                .filter(field -> field.key().equals(fieldKey) && field.options() != null)
+                .map(ConnectorField::options)
+                .findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "this field has no options"));
             // 고르는 중이라 필수 칸이 아직 비어 있을 수 있다. 채운 칸의 형식만 본다.
-            JsonNode result =
-                    call(user.id(), manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
+            JsonNode result = call(user.id(), manifest, options.tool(), ConnectorValues.validated(manifest, values, false));
             return ConnectorOption.listFrom(result, options).orElseThrow(ConnectorErrors::unavailable);
         });
     }
+
 
     /**
      * 값을 등록하거나 교체한다. 입력 칸이 없는 커넥터는 빈 값을 받는다.
@@ -202,6 +209,7 @@ public class ConnectorConnectionService {
         });
     }
 
+
     /**
      * 잠금 안에서 보관 파일과 붙은 바인딩을 반영하고 저장한다. 트랜잭션 안에서만 부른다.
      *
@@ -211,8 +219,8 @@ public class ConnectorConnectionService {
         AppUser owner = lock(user.id());
         Instant now = now();
         ConnectorConnection connection = connections
-                .findByUserIdAndConnectorId(owner.id(), manifest.id())
-                .orElseGet(() -> connections.save(ConnectorConnection.pending(owner.id(), manifest.id(), now)));
+            .findByUserIdAndConnectorId(owner.id(), manifest.id())
+            .orElseGet(() -> connections.save(ConnectorConnection.pending(owner.id(), manifest.id(), now)));
         // 다른 계정의 값으로 바꿀 수 있다. 앞선 값에 한 승인 요청과 상시 허락을 남기지 않는다(ADR-050).
         approvals.rejectPendingFor(connection, now);
         try {
@@ -226,8 +234,9 @@ public class ConnectorConnectionService {
         connection.connected(ConnectorValues.stored(manifest, accepted), now);
         connections.save(connection);
         return bindings.findByConnectionId(connection.id()).stream()
-                .map(binding -> bindingService.reinstall(binding, manifest, accepted)).toList();
+            .map(binding -> bindingService.reinstall(binding, manifest, accepted)).toList();
     }
+
 
     /**
      * 연결을 해제한다. 붙은 바인딩을 모두 뗀 뒤 보관 파일을 지운다.
@@ -259,6 +268,7 @@ public class ConnectorConnectionService {
         connection.disconnected(now);
         return ConnectionSnapshot.from(connections.save(connection), List.of());
     }
+
 
     /**
      * 보관 파일의 값으로 확인 도구를 부르고, 붙은 바인딩마다 설치와 반영을 맞춘다.
@@ -306,6 +316,7 @@ public class ConnectorConnectionService {
         });
     }
 
+
     /** 연결 확인의 앞 트랜잭션이다. 옛 연결이면 그 커넥터 에이전트의 profile 에 있던 값을 보관 파일로 옮긴다. */
     private Prepared prepare(CurrentUser user, String connectorId, boolean known) {
         lock(user.id());
@@ -315,14 +326,14 @@ public class ConnectorConnectionService {
         }
         if (!connection.vaultStored()) {
             Optional<ConnectorBinding> legacy = bindings.findByConnectionId(connection.id()).stream()
-                    .filter(binding -> binding.agent().connectorManaged())
-                    .findFirst();
+                .filter(binding -> binding.agent().connectorManaged())
+                .findFirst();
             if (legacy.isPresent()) {
                 try {
                     connector.importVault(
-                            connection.vault(),
-                            connectorId,
-                            legacy.get().agent().hermesProfile());
+                        connection.vault(),
+                        connectorId,
+                        legacy.get().agent().hermesProfile());
                     connection.markVaultStored();
                     connections.save(connection);
                 } catch (RuntimeException ex) {
@@ -333,18 +344,20 @@ public class ConnectorConnectionService {
         return new Prepared(connection.vaultStored() ? connection.vault() : null, connection.updatedAt());
     }
 
+
     /** 보관 파일의 값으로 확인 도구를 부른다. 실패는 공통 어휘의 오류로 돌려준다. */
     private ApiException verify(long userId, ConnectorManifest manifest, String vault) {
         final CallResult result;
         try {
             result = connector.callWithVault(
-                    manifest.id(), manifest.verifyTool(), vault, ownerBrowser(userId, manifest));
+                manifest.id(), manifest.verifyTool(), vault, ownerBrowser(userId, manifest));
         } catch (RuntimeException ex) {
             warn(STEP_TOOL_CALL, manifest.id(), ex);
             return ConnectorErrors.unavailable();
         }
         return result.ok() ? null : ConnectorErrors.of(result.error());
     }
+
 
     /**
      * 연결 확인의 뒤 트랜잭션이다. 다시 잠그고 확인 결과를 적은 뒤 바인딩마다 설치를 맞춘다.
@@ -354,12 +367,12 @@ public class ConnectorConnectionService {
      * 확인할 수도 다시 등록할 수도 없어 보관 파일이 없어도 오류 없이 {@code PENDING} 이다.
      */
     private Checked recordCheck(
-            CurrentUser user,
-            String connectorId,
-            Optional<ConnectorManifest> manifest,
-            Instant revision,
-            boolean verified,
-            ApiException verifyFailure) {
+        CurrentUser user,
+        String connectorId,
+        Optional<ConnectorManifest> manifest,
+        Instant revision,
+        boolean verified,
+        ApiException verifyFailure) {
         lock(user.id());
         ConnectorConnection connection = requireConnection(user.id(), connectorId, manifest.isPresent());
         if (connection.status() == ConnectionStatus.DISCONNECTED || !connection.updatedAt().equals(revision)) {
@@ -372,15 +385,15 @@ public class ConnectorConnectionService {
         }
         List<ConnectorBinding> bound = bindings.findByConnectionId(connection.id());
         if (manifest.isPresent()
-                && !connection.vaultStored()
-                && bound.stream().noneMatch(binding -> binding.agent().connectorManaged())) {
+            && !connection.vaultStored()
+            && bound.stream().noneMatch(binding -> binding.agent().connectorManaged())) {
             // 값이 보관 파일에도 옛 에이전트의 profile 에도 없다. 확인할 값이 없으니 다시 등록해야 쓸 수 있다.
             // 카탈로그에서 빠진 커넥터는 다시 등록할 수도 없어 아래의 PENDING 으로 오류 없이 끝낸다.
             connection.pending(now);
             return new Checked(
-                    List.of(),
-                    new ApiException(
-                            ErrorCode.CONNECTOR_NOT_CONNECTED, "register the values of this connection again"));
+                List.of(),
+                new ApiException(
+                    ErrorCode.CONNECTOR_NOT_CONNECTED, "register the values of this connection again"));
         }
         if (verified) {
             connection.ready(now);
@@ -389,22 +402,24 @@ public class ConnectorConnectionService {
         }
         connections.save(connection);
         List<ConnectorBindingAttempt> started = bound.stream()
-                .map(binding -> bindingService.resync(binding, manifest, false)).toList();
+            .map(binding -> bindingService.resync(binding, manifest, false)).toList();
         return new Checked(started, null);
     }
+
 
     /** 관리자가 보는 같은 그룹 사용자의 바인딩들이다. 반영 완료는 바인딩마다 누른다. */
     @Transactional(readOnly = true)
     public List<AdminConnectionSnapshot> listForAdmin(CurrentUser admin) {
         requireAdmin(admin);
         Map<Long, String> names = users.findAll().stream()
-                .filter(user -> user.groupId().equals(admin.groupId()))
-                .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
+            .filter(user -> user.groupId().equals(admin.groupId()))
+            .collect(Collectors.toMap(AppUser::id, AppUser::displayName));
         return bindings.findByConnectionUserIdIn(List.copyOf(names.keySet())).stream()
-                .map(binding -> AdminConnectionSnapshot.from(
-                        binding, names.get(binding.connection().userId())))
-                .toList();
+            .map(binding -> AdminConnectionSnapshot.from(
+                binding, names.get(binding.connection().userId())))
+            .toList();
     }
+
 
     /** 도구를 부르고 성공 결과를 돌려준다. 실패는 공통 어휘에 맞는 오류 코드로 끝낸다. */
     private JsonNode call(long userId, ConnectorManifest manifest, String tool, Map<String, String> values) {
@@ -421,6 +436,7 @@ public class ConnectorConnectionService {
         return result.result();
     }
 
+
     /**
      * 확인 도구와 선택지 호출에 실을 브라우저 중계 주소다. 사용자 브라우저를 쓰지 않는 커넥터는 null 이라 본문에 키가 없다.
      *
@@ -430,36 +446,43 @@ public class ConnectorConnectionService {
         return manifest.ownerBrowser() ? tokens.callAddress(userId).orElse("") : null;
     }
 
+
     private ConnectionSnapshot snapshot(ConnectorConnection connection) {
         return ConnectionSnapshot.from(connection, bindings.findByConnectionId(connection.id()));
     }
 
+
     private List<BoundAgentSummary> boundAgents(ConnectorConnection connection) {
         return bindings.findByConnectionId(connection.id()).stream()
-                .map(BoundAgentSummary::from)
-                .toList();
+            .map(BoundAgentSummary::from)
+            .toList();
     }
+
 
     private Optional<ConnectorManifest> findManifest(String connectorId) {
         return ConnectorManifests.find(connector, connectorId);
     }
 
+
     private ConnectorManifest requireManifest(String connectorId) {
         return findManifest(connectorId).orElseThrow(ConnectorErrors::notFound);
     }
 
+
     /** 연결 행이 없을 때, 아는 커넥터면 입력 오류이고 모르는 커넥터면 없는 커넥터다. */
     private ConnectorConnection requireConnection(Long userId, String connectorId, boolean known) {
         return connections
-                .findByUserIdAndConnectorId(userId, connectorId)
-                .orElseThrow(() -> known
-                        ? new ApiException(ErrorCode.VALIDATION_FAILED, "no connection for this connector")
-                        : ConnectorErrors.notFound());
+            .findByUserIdAndConnectorId(userId, connectorId)
+            .orElseThrow(() -> known
+                ? new ApiException(ErrorCode.VALIDATION_FAILED, "no connection for this connector")
+                : ConnectorErrors.notFound());
     }
+
 
     private AppUser lock(Long userId) {
         return bindingService.lockOwner(userId);
     }
+
 
     private static void requireAdmin(CurrentUser admin) {
         if (!admin.isAdmin()) {
@@ -467,11 +490,13 @@ public class ConnectorConnectionService {
         }
     }
 
+
     /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
     private static void warn(String step, String connectorId, RuntimeException ex) {
         String kind = ex.getClass().getSimpleName();
         log.warn("connector {} failed at {}: {}", connectorId, step, kind);
     }
+
 
     private Instant now() {
         return Instant.now(clock);

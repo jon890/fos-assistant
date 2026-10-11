@@ -19,6 +19,7 @@ class ConnectorBindingTest {
     private static final Instant LATER = Instant.parse("2026-01-02T00:00:00Z");
     private static final Instant LATEST = Instant.parse("2026-01-03T00:00:00Z");
 
+
     @Test
     @DisplayName("옛 커넥터 에이전트의 바인딩은 ready 가 에이전트를 켜고 pending 이 끄며 사진 받기를 내린다")
     void legacyConnectorAgentFollowsBindingState() {
@@ -40,6 +41,7 @@ class ConnectorBindingTest {
         assertThat(agent.enabled()).as("pending 뒤 옛 에이전트").isFalse();
         assertThat(agent.connectorAttachments()).as("pending 뒤 사진 받기").isFalse();
     }
+
 
     @Test
     @DisplayName("일반 에이전트의 바인딩은 상태가 바뀌어도 에이전트의 enabled 를 바꾸지 않는다")
@@ -64,6 +66,7 @@ class ConnectorBindingTest {
         assertThat(disabledAgent.enabled()).as("READY 바인딩의 꺼진 일반 에이전트").isFalse();
     }
 
+
     @Test
     @DisplayName("installed 는 재시작 대기를 누적하고 재시작이 필요한 설치의 시각만 대기 시작으로 적는다")
     void installedAccumulatesRestartRequired() {
@@ -85,16 +88,17 @@ class ConnectorBindingTest {
         binding.installed(false, LATEST);
 
         assertThat(binding.restartRequired())
-                .as("재시작이 필요 없는 설치가 앞선 대기를 지우지 않는다")
-                .isTrue();
+            .as("재시작이 필요 없는 설치가 앞선 대기를 지우지 않는다")
+            .isTrue();
         assertThat(binding.restartRequiredSince())
-                .as("재시작이 필요 없는 설치는 대기 시작 시각을 옮기지 않는다")
-                .isEqualTo(LATER);
+            .as("재시작이 필요 없는 설치는 대기 시작 시각을 옮기지 않는다")
+            .isEqualTo(LATER);
 
         binding.ready(LATEST);
 
         assertThat(binding.restartRequired()).as("반영되면 대기가 풀린다").isFalse();
     }
+
 
     @Test
     @DisplayName("재시작 대기 표시는 거짓이 와도 앞선 참을 지우지 않는다")
@@ -106,6 +110,7 @@ class ConnectorBindingTest {
 
         assertThat(binding.restartRequired()).isTrue();
     }
+
 
     @Test
     @DisplayName("반영 예정 시각은 더 늦은 값을 지키고 clearApplyDue 와 ready 가 비운다")
@@ -132,6 +137,7 @@ class ConnectorBindingTest {
         assertThat(binding.status()).isEqualTo(BindingStatus.READY);
     }
 
+
     @Test
     @DisplayName("서버 이름이 빈 옛 바인딩에 서버 이름을 적는다")
     void recordServerFillsServerName() {
@@ -143,22 +149,24 @@ class ConnectorBindingTest {
         assertThat(binding.mcpServer()).isEqualTo("demo");
     }
 
+
     private static Agent agent(boolean connectorManaged) {
         Agent agent = Agent.of(
-                "demo",
-                "검사용 메모",
-                "demo-profile",
-                "http://localhost",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                1L,
-                CREATED);
+            "demo",
+            "검사용 메모",
+            "demo-profile",
+            "http://localhost",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            1L,
+            CREATED);
         if (connectorManaged) {
             agent.markConnectorManaged();
         }
         return agent;
     }
+
 
     @Test
     @DisplayName("같은 시각에도 새 시도만 한 번 소비하고 이전 시도와 중복 결과는 버린다")
@@ -177,6 +185,7 @@ class ConnectorBindingTest {
         assertThat(binding.consumeInstall(null)).isFalse();
         assertThat(binding.installAttemptId()).isNull();
     }
+
 
     private static ConnectorConnection connection() {
         return ConnectorConnection.pending(1L, "demo-notes", CREATED);

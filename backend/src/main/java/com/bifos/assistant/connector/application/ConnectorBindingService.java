@@ -76,29 +76,33 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private final ConnectorInstallAttempts attempts;
     private final Clock clock;
 
+
     /**
      * 반영 완료의 트랜잭션이 본 결과다. 확인하지 못한 상태도 커밋한 뒤에 실패를 알리려고 값으로 돌려준다.
      *
      * @param attempt 결과 트랜잭션에서 대조할 설치 입력
      * @param manifest 응답 화면을 만드는 선언. 카탈로그에서 빠졌으면 null
      */
-    private record Confirmed(ConnectorBindingAttempt attempt, ConnectorManifest manifest) {}
+    private record Confirmed(ConnectorBindingAttempt attempt, ConnectorManifest manifest) {
+    }
 
     /** 이미 붙은 바인딩이면 view만 있고, 새 붙이기면 커밋한 설치 입력이 있다. */
-    private record Bound(AgentConnectionView view, ConnectorBindingAttempt attempt) {}
+    private record Bound(AgentConnectionView view, ConnectorBindingAttempt attempt) {
+    }
+
 
     // 설치 경계와 시계는 협력 객체와 주입된 Clock이 갖는다.
     @Autowired
     public ConnectorBindingService(
-            ConnectorBindingRepository bindings,
-            ConnectorConnectionRepository connections,
-            AgentRepository agents,
-            AppUserRepository users,
-            HermesConnectorClient connector,
-            SkillPublisher skills,
-            ConnectorActionService approvals,
-            ConnectorInstallAttempts attempts,
-            Clock clock) {
+        ConnectorBindingRepository bindings,
+        ConnectorConnectionRepository connections,
+        AgentRepository agents,
+        AppUserRepository users,
+        HermesConnectorClient connector,
+        SkillPublisher skills,
+        ConnectorActionService approvals,
+        ConnectorInstallAttempts attempts,
+        Clock clock) {
         this.bindings = bindings;
         this.connections = connections;
         this.agents = agents;
@@ -110,6 +114,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         this.clock = clock;
     }
 
+
     /**
      * 그 에이전트에서 본 내 연결들이다. 해제한 연결은 빠진다. 주인만 읽는다.
      *
@@ -119,17 +124,17 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     public AgentConnectionsView listForAgent(CurrentUser user, String agentCode) {
         Agent agent = requireOwned(user, agentCode, false);
         Map<String, ConnectorManifest> manifests = ConnectorManifests.read(connector).stream()
-                .collect(Collectors.toMap(ConnectorManifest::id, Function.identity()));
+            .collect(Collectors.toMap(ConnectorManifest::id, Function.identity()));
         Map<Long, ConnectorBinding> bound = bindings.findByAgentId(agent.id()).stream()
-                .collect(Collectors.toMap(binding -> binding.connection().id(), Function.identity()));
+            .collect(Collectors.toMap(binding -> binding.connection().id(), Function.identity()));
         List<AgentConnectionView> views = connections.findByUserId(user.id()).stream()
-                .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
-                .sorted(Comparator.comparing(ConnectorConnection::connectorId))
-                .map(connection ->
-                        view(connection, bound.get(connection.id()), manifests.get(connection.connectorId())))
-                .toList();
+            .filter(connection -> connection.status() != ConnectionStatus.DISCONNECTED)
+            .sorted(Comparator.comparing(ConnectorConnection::connectorId))
+            .map(connection -> view(connection, bound.get(connection.id()), manifests.get(connection.connectorId())))
+            .toList();
         return new AgentConnectionsView(views, blockedReason(agent));
     }
+
 
     /**
      * 내 연결을 내 에이전트에 붙인다. 이미 붙어 있으면 지금 상태를 돌려준다.
@@ -152,8 +157,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         Agent found = requireOwned(user, agentCode, false);
         String profile = found.hermesProfile();
         Set<String> taken = manifest.filter(declared -> !declared.skills().isEmpty())
-                .map(declared -> skills.list(profile).stream().map(HermesSkill::name).collect(Collectors.toSet()))
-                .orElse(Set.of());
+            .map(declared -> skills.list(profile).stream().map(HermesSkill::name).collect(Collectors.toSet()))
+            .orElse(Set.of());
         Bound started = attempts.start(() -> bindLocked(user, agentCode, connectorId, manifest, profile, taken));
         if (started.attempt() == null) {
             return started.view();
@@ -165,7 +170,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         } catch (ConnectorSandboxUnavailable ex) {
             if (attempts.reject(attempt)) {
                 throw new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE,
-                        "the agent profile has no isolated workspace for this connector");
+                    "the agent profile has no isolated workspace for this connector");
             }
             outcome = Optional.empty();
         } catch (ConnectorInstallConflict ex) {
@@ -185,30 +190,31 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         return currentView(user.id(), attempt.agentId(), connectorId, manifest.orElse(null));
     }
 
+
     /** 소유자와 에이전트를 잠근 뒤 새 바인딩과 설치 입력을 함께 커밋한다. */
     private Bound bindLocked(CurrentUser user, String agentCode, String connectorId,
-            Optional<ConnectorManifest> manifest, String profile, Set<String> taken) {
+        Optional<ConnectorManifest> manifest, String profile, Set<String> taken) {
         lockUser(user.id());
         Agent agent = requireOwned(user, agentCode, true);
         if (agent.connectorManaged()) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a legacy connection agent cannot take other connections");
+                ErrorCode.VALIDATION_FAILED, "a legacy connection agent cannot take other connections");
         }
         if (agent.visibility() != AgentVisibility.PRIVATE) {
             throw new ApiException(
-                    ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "connections can be attached to a private agent only");
+                ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "connections can be attached to a private agent only");
         }
         ConnectorConnection connection = connections
-                .findByUserIdAndConnectorId(user.id(), connectorId)
-                .filter(found -> found.status() == ConnectionStatus.READY && found.vaultStored())
-                .orElseThrow(() -> new ApiException(ErrorCode.CONNECTOR_NOT_CONNECTED, "connect this connector first"));
+            .findByUserIdAndConnectorId(user.id(), connectorId)
+            .filter(found -> found.status() == ConnectionStatus.READY && found.vaultStored())
+            .orElseThrow(() -> new ApiException(ErrorCode.CONNECTOR_NOT_CONNECTED, "connect this connector first"));
         Optional<ConnectorBinding> existing = bindings.findByAgentIdAndConnectionId(agent.id(), connection.id());
         if (existing.isPresent()) {
             return new Bound(view(connection, existing.get(), manifest.orElse(null)), null);
         }
         ConnectorManifest declared = manifest.orElseThrow(ConnectorErrors::notFound);
         if (declared.singleBinding()
-                && !bindings.findByConnectionId(connection.id()).isEmpty()) {
+            && !bindings.findByConnectionId(connection.id()).isEmpty()) {
             throw new ApiException(ErrorCode.CONNECTOR_SINGLE_BINDING, "this connection is attached to another agent");
         }
         if (!Objects.equals(agent.hermesProfile(), profile)) {
@@ -218,10 +224,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(ErrorCode.SKILL_NAME_TAKEN, "the agent already has a skill named like a skill of this connector");
         }
         Instant now = now();
-        ConnectorBinding binding =
-                bindings.save(ConnectorBinding.pending(agent, connection, declared.mcpServer(), now));
+        ConnectorBinding binding = bindings.save(ConnectorBinding.pending(agent, connection, declared.mcpServer(), now));
         return new Bound(null, attempts.begin(binding, manifest, Map.of(), false, false, false, now));
     }
+
 
     /**
      * 내 에이전트에서 연결을 뗀다. 붙어 있지 않으면 아무것도 하지 않는다.
@@ -235,11 +241,10 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         Agent agent = requireOwned(user, agentCode, true);
         if (agent.connectorManaged()) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "delete the legacy connection agent instead of detaching it");
+                ErrorCode.VALIDATION_FAILED, "delete the legacy connection agent instead of detaching it");
         }
         Optional<ConnectorConnection> connection = connections.findByUserIdAndConnectorId(user.id(), connectorId);
-        Optional<ConnectorBinding> binding =
-                connection.flatMap(found -> bindings.findByAgentIdAndConnectionId(agent.id(), found.id()));
+        Optional<ConnectorBinding> binding = connection.flatMap(found -> bindings.findByAgentIdAndConnectionId(agent.id(), found.id()));
         if (binding.isEmpty()) {
             return;
         }
@@ -251,6 +256,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ConnectorOperationFailure();
         }
     }
+
 
     /**
      * 관리자가 공유 gateway 를 재시작한 뒤 누르는 반영 완료다. 그 에이전트의 주인이 같은 그룹이어야 한다.
@@ -268,13 +274,13 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * 바뀌었으면 {@code AGENT_BUSY} 다. 그다음 지금 주인의 그룹이 관리자와 다르면 {@code AGENT_NOT_FOUND} 다.
      */
     public AgentConnectionView confirmApplied(
-            CurrentUser admin, String agentCode, String connectorId, Instant shownSince) {
+        CurrentUser admin, String agentCode, String connectorId, Instant shownSince) {
         if (!admin.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "administrator access is required");
         }
         Agent found = agents.findByCode(agentCode)
-                .filter(agent -> !agent.isDeleted())
-                .orElseThrow(ConnectorBindingService::agentNotFound);
+            .filter(agent -> !agent.isDeleted())
+            .orElseThrow(ConnectorBindingService::agentNotFound);
         Long agentId = found.id();
         Long ownerId = found.ownerUserId();
         if (ownerId == null) {
@@ -294,17 +300,18 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         return view;
     }
 
+
     /**
      * 반영 완료의 트랜잭션이다. 트랜잭션 안에서만 부른다.
      *
      * @return 결과 트랜잭션에서 대조할 설치 입력과 manifest
      */
     private Confirmed confirmLocked(
-            CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince, Optional<ConnectorManifest> manifest) {
+        CurrentUser admin, Long agentId, Long ownerId, String connectorId, Instant shownSince, Optional<ConnectorManifest> manifest) {
         AppUser owner = users.findByIdForUpdate(ownerId).orElse(null);
         Agent agent = agents.findByIdForUpdate(agentId)
-                .filter(candidate -> !candidate.isDeleted())
-                .orElseThrow(ConnectorBindingService::agentNotFound);
+            .filter(candidate -> !candidate.isDeleted())
+            .orElseThrow(ConnectorBindingService::agentNotFound);
         if (!Objects.equals(agent.ownerUserId(), ownerId)) {
             // 주인을 읽은 뒤 바뀌었다. 잠근 사용자 행이 지금 주인의 것이 아니다.
             throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while confirming");
@@ -315,17 +322,18 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw agentNotFound();
         }
         ConnectorConnection connection = connections
-                .findByUserIdAndConnectorId(ownerId, connectorId)
-                .orElseThrow(ConnectorBindingService::notBound);
+            .findByUserIdAndConnectorId(ownerId, connectorId)
+            .orElseThrow(ConnectorBindingService::notBound);
         ConnectorBinding binding = bindings.findByAgentIdAndConnectionId(agent.id(), connection.id())
-                .orElseThrow(ConnectorBindingService::notBound);
+            .orElseThrow(ConnectorBindingService::notBound);
         Instant since = binding.restartRequiredSince();
         if (since != null && (shownSince == null || since.isAfter(shownSince))) {
             throw new ApiException(
-                    ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
+                ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
         }
         return new Confirmed(attempts.begin(binding, manifest, Map.of(), true, true, false, now()), manifest.orElse(null));
     }
+
 
     /**
      * 그 에이전트의 바인딩을 모두 뗀다.
@@ -346,7 +354,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
                 if (!connection.vaultStored()) {
                     try {
                         connector.importVault(
-                                connection.vault(), connectorId, binding.agent().hermesProfile());
+                            connection.vault(), connectorId, binding.agent().hermesProfile());
                     } catch (RuntimeException ex) {
                         ConnectorBindingInstalls.warn(STEP_VAULT_IMPORT, connectorId, ex);
                         throw new ConnectorOperationFailure();
@@ -366,6 +374,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         }
     }
 
+
     /**
      * 값을 바꾼 연결의 바인딩에 설치를 다시 보낸다. 연결 등록의 트랜잭션 안에서 부른다.
      *
@@ -377,6 +386,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     public ConnectorBindingAttempt reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted) {
         return attempts.begin(binding, Optional.of(manifest), accepted, false, false, true, now());
     }
+
 
     /**
      * 바인딩을 profile 에서 떼고 행을 지운다. 외부 호출이 실패하면 예외를 그대로 던지고 행은 남는다.
@@ -401,6 +411,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         bindings.delete(binding);
     }
 
+
     /**
      * 설치를 한 번 다시 보내고 그 profile 에 반영됐는지 본다. 쓸 수 있으면 {@code READY}, 아니면 {@code PENDING} 이다.
      *
@@ -424,36 +435,41 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         return attempts.begin(binding, manifest, Map.of(), true, afterRestart, false, now());
     }
 
+
     /** 커밋된 설치 입력을 트랜잭션 밖에서 실행하고 현재 시도에 적용한 결과만 돌려준다. */
     public Optional<ResyncOutcome> execute(ConnectorBindingAttempt attempt) {
         return attempts.execute(attempt);
     }
+
 
     /** 연결 등록과 확인도 동일한 시작 트랜잭션을 쓰고, 외부 설치를 부르기 전에 커밋한다. */
     public <T> T start(Supplier<T> preparation) {
         return attempts.start(preparation);
     }
 
+
     /** 연결과 설치 시작에서 소유자 잠금과 접근 철회 검사를 공유한다. */
     public AppUser lockOwner(Long ownerId) {
         return attempts.lockOwner(ownerId);
     }
+
 
     /** 결과가 버려졌거나 그 사이 떼어진 바인딩도 지금 상태로 응답한다. */
     private AgentConnectionView currentView(Long ownerId, Long agentId, String connectorId, ConnectorManifest manifest) {
         return attempts.start(() -> {
             lockUser(ownerId);
             Agent agent = agents.findByIdForUpdate(agentId).filter(candidate -> !candidate.isDeleted())
-                    .orElseThrow(ConnectorBindingService::agentNotFound);
+                .orElseThrow(ConnectorBindingService::agentNotFound);
             if (!Objects.equals(agent.ownerUserId(), ownerId)) {
                 throw new ApiException(ErrorCode.AGENT_BUSY, "the agent owner changed while installing");
             }
             ConnectorConnection connection = connections.findByUserIdAndConnectorId(ownerId, connectorId)
-                    .orElseThrow(ConnectorBindingService::notBound);
+                .orElseThrow(ConnectorBindingService::notBound);
             ConnectorBinding binding = bindings.findByAgentIdAndConnectionId(agentId, connection.id()).orElse(null);
             return view(connection, binding, manifest);
         });
     }
+
 
     /**
      * 요청자가 주인인 에이전트를 읽는다. {@code AgentLifecycleService} 의 관리 규칙과 같다.
@@ -464,20 +480,21 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     private Agent requireOwned(CurrentUser user, String code, boolean forUpdate) {
         // 잠금은 기다린다. 공개 범위 변경이나 주인 변경이 잠금을 쥐고 있으면 그 커밋을 보고 판정한다. 엔티티를 먼저 읽지
         // 않고 id 로 잠그며 처음 읽어야 기다린 뒤의 값을 본다.
-        Optional<Agent> found =
-                forUpdate ? agents.findIdByCode(code).flatMap(agents::findByIdForUpdate) : agents.findByCode(code);
+        Optional<Agent> found = forUpdate ? agents.findIdByCode(code).flatMap(agents::findByIdForUpdate) : agents.findByCode(code);
         Agent agent = found.filter(candidate -> !candidate.isDeleted())
-                .filter(candidate -> user.isAdmin() || candidate.isReadableBy(user.id()))
-                .orElseThrow(ConnectorBindingService::agentNotFound);
+            .filter(candidate -> user.isAdmin() || candidate.isReadableBy(user.id()))
+            .orElseThrow(ConnectorBindingService::agentNotFound);
         if (!Objects.equals(agent.ownerUserId(), user.id())) {
             throw new ApiException(ErrorCode.FORBIDDEN, "only the owner can manage connections of this agent");
         }
         return agent;
     }
 
+
     private void lockUser(Long userId) {
         attempts.lockOwner(userId);
     }
+
 
     private static String blockedReason(Agent agent) {
         if (agent.connectorManaged()) {
@@ -486,27 +503,31 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         return agent.visibility() == AgentVisibility.PRIVATE ? null : AgentConnectionsView.AGENT_NOT_PRIVATE;
     }
 
+
     /** 카탈로그에서 빠진 커넥터는 이름 대신 번호를 쓰고 도구와 스킬을 모른다. */
     private static AgentConnectionView view(
-            ConnectorConnection connection, ConnectorBinding binding, ConnectorManifest manifest) {
+        ConnectorConnection connection, ConnectorBinding binding, ConnectorManifest manifest) {
         return new AgentConnectionView(
-                connection.connectorId(),
-                manifest == null ? connection.connectorId() : manifest.title(),
-                connection.status(),
-                binding != null,
-                binding == null ? null : binding.status(),
-                binding != null && binding.restartRequired(),
-                manifest == null ? 0 : manifest.tools().size(),
-                manifest == null ? List.of() : manifest.skills());
+            connection.connectorId(),
+            manifest == null ? connection.connectorId() : manifest.title(),
+            connection.status(),
+            binding != null,
+            binding == null ? null : binding.status(),
+            binding != null && binding.restartRequired(),
+            manifest == null ? 0 : manifest.tools().size(),
+            manifest == null ? List.of() : manifest.skills());
     }
+
 
     private static ApiException agentNotFound() {
         return new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
     }
 
+
     private static ApiException notBound() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "this agent has no such connection");
     }
+
 
     private Instant now() {
         return Instant.now(clock);

@@ -10,6 +10,7 @@ import org.springframework.test.context.DynamicPropertySource;
 class ConnectorConnectionServiceMysqlLockTest extends ConnectorConnectionServiceLockTest {
     private static MysqlTestDatabase database;
 
+
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         database = MysqlTestDatabase.create();

@@ -23,12 +23,14 @@ class ConnectorBindingInstallAttemptMigrationTest extends ConnectorBindingMigrat
         List<String> before = states();
         migrate("20261011040236");
         assertThat(states()).isEqualTo(before);
-        try (Connection connection = connect(); Statement query = connection.createStatement();
-                ResultSet row = query.executeQuery("SELECT COUNT(*) FROM agent_connector_binding WHERE install_attempt_id IS NOT NULL")) {
+        try (Connection connection = connect();
+            Statement query = connection.createStatement();
+            ResultSet row = query.executeQuery("SELECT COUNT(*) FROM agent_connector_binding WHERE install_attempt_id IS NOT NULL")) {
             assertThat(row.next()).isTrue();
             assertThat(row.getInt(1)).isZero();
         }
     }
+
 
     @Test
     @DisplayName("새 UUID를 16바이트로 저장하고 소비한 뒤 null로 비울 수 있다")
@@ -37,11 +39,11 @@ class ConnectorBindingInstallAttemptMigrationTest extends ConnectorBindingMigrat
         UUID id = UUID.randomUUID();
         byte[] bytes = ByteBuffer.allocate(16).putLong(id.getMostSignificantBits()).putLong(id.getLeastSignificantBits()).array();
         try (Connection connection = connect();
-                PreparedStatement update = connection.prepareStatement("UPDATE agent_connector_binding SET install_attempt_id = ?")) {
+            PreparedStatement update = connection.prepareStatement("UPDATE agent_connector_binding SET install_attempt_id = ?")) {
             update.setBytes(1, bytes);
             assertThat(update.executeUpdate()).isEqualTo(2);
             try (Statement query = connection.createStatement();
-                    ResultSet rows = query.executeQuery("SELECT install_attempt_id FROM agent_connector_binding")) {
+                ResultSet rows = query.executeQuery("SELECT install_attempt_id FROM agent_connector_binding")) {
                 while (rows.next()) {
                     assertThat(rows.getBytes(1)).isEqualTo(bytes);
                 }
@@ -51,10 +53,12 @@ class ConnectorBindingInstallAttemptMigrationTest extends ConnectorBindingMigrat
         }
     }
 
+
     private List<String> states() throws SQLException {
         List<String> values = new ArrayList<>();
-        try (Connection connection = connect(); Statement query = connection.createStatement();
-                ResultSet rows = query.executeQuery("SELECT id, status, desired_enabled, restart_required FROM agent_connector_binding ORDER BY id")) {
+        try (Connection connection = connect();
+            Statement query = connection.createStatement();
+            ResultSet rows = query.executeQuery("SELECT id, status, desired_enabled, restart_required FROM agent_connector_binding ORDER BY id")) {
             while (rows.next()) {
                 values.add(rows.getLong(1) + ":" + rows.getString(2) + ":" + rows.getBoolean(3) + ":" + rows.getBoolean(4));
             }

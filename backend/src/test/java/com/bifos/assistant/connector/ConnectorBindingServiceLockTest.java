@@ -74,17 +74,17 @@ class ConnectorBindingServiceLockTest {
     protected static final String DEMO = "demo-notes";
     protected static final Map<String, String> VALUES = Map.of("token", "demo_ok_0123456789");
     protected static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
-            List.of());
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
+        "list_scopes",
+        "demo",
+        List.of(),
+        false,
+        2,
+        List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
+        List.of());
     /** 이 시각 뒤의 설치는 모두 관리자가 본 뒤의 설치다. */
     private static final Instant LONG_AGO = Instant.parse("2020-01-01T00:00:00Z");
 
@@ -124,20 +124,22 @@ class ConnectorBindingServiceLockTest {
     @Autowired
     HermesToolsetClient toolsets;
 
+
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false));
+            .thenReturn(new InstallResult(true, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
         when(skills.list(anyString())).thenReturn(List.of());
     }
+
 
     @AfterEach
     void tearDown() {
@@ -147,6 +149,7 @@ class ConnectorBindingServiceLockTest {
         agents.deleteAll();
         users.deleteAll();
     }
+
 
     /**
      * 다른 트랜잭션이 주인의 사용자 행을 잠근 동안 반영 완료는 기다리고, 커밋된 새 재시작 대기 시각을 보고 거절한다.
@@ -168,24 +171,22 @@ class ConnectorBindingServiceLockTest {
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> registering =
-                    pool.submit(() -> transactions.executeWithoutResult(status -> {
-                        users.findByIdForUpdate(owner.id()).orElseThrow();
-                        jdbc.update("UPDATE agent_connector_binding SET restart_required_since = ?", Timestamp.from(Instant.now()));
-                        locked.countDown();
-                        await(release);
-                    }));
+            Future<?> registering = pool.submit(() -> transactions.executeWithoutResult(status -> {
+                users.findByIdForUpdate(owner.id()).orElseThrow();
+                jdbc.update("UPDATE agent_connector_binding SET restart_required_since = ?", Timestamp.from(Instant.now()));
+                locked.countDown();
+                await(release);
+            }));
             assertThat(locked.await(10, TimeUnit.SECONDS))
-                    .as("다른 트랜잭션이 사용자 행 잠금을 쥐었다")
-                    .isTrue();
+                .as("다른 트랜잭션이 사용자 행 잠금을 쥐었다")
+                .isTrue();
             CountDownLatch waiting = new CountDownLatch(1);
             doAnswer(invocation -> {
                 waiting.countDown();
                 jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", Long.class, owner.id());
                 return users.findById(owner.id());
             }).when(users).findByIdForUpdate(owner.id());
-            Future<AgentConnectionView> confirming =
-                    pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, shown));
+            Future<AgentConnectionView> confirming = pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, shown));
             assertThat(waiting.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(confirming.isDone()).as("반영 완료가 사용자 행 잠금을 기다린다").isFalse();
 
@@ -193,11 +194,11 @@ class ConnectorBindingServiceLockTest {
 
             registering.get(10, TimeUnit.SECONDS);
             assertThatThrownBy(() -> confirming.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RESTART_AGAIN));
+                .isInstanceOf(ExecutionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                    ApiException.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RESTART_AGAIN));
             ConnectorBinding stored = onlyBinding();
             assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
             assertThat(stored.restartRequired()).isTrue();
@@ -207,6 +208,7 @@ class ConnectorBindingServiceLockTest {
             pool.shutdownNow();
         }
     }
+
 
     /** 반영 완료가 트랜잭션 밖에서 주인을 읽은 뒤 주인이 바뀌면, 잠근 사용자 행이 지금 주인의 것이 아니라 대기를 풀지 않는다. */
     @Test
@@ -222,23 +224,21 @@ class ConnectorBindingServiceLockTest {
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> registering =
-                    pool.submit(() -> transactions.executeWithoutResult(status -> {
-                        users.findByIdForUpdate(owner.id()).orElseThrow();
-                        locked.countDown();
-                        await(release);
-                    }));
+            Future<?> registering = pool.submit(() -> transactions.executeWithoutResult(status -> {
+                users.findByIdForUpdate(owner.id()).orElseThrow();
+                locked.countDown();
+                await(release);
+            }));
             assertThat(locked.await(10, TimeUnit.SECONDS))
-                    .as("다른 트랜잭션이 사용자 행 잠금을 쥐었다")
-                    .isTrue();
+                .as("다른 트랜잭션이 사용자 행 잠금을 쥐었다")
+                .isTrue();
             CountDownLatch waiting = new CountDownLatch(1);
             doAnswer(invocation -> {
                 waiting.countDown();
                 jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", Long.class, owner.id());
                 return users.findById(owner.id());
             }).when(users).findByIdForUpdate(owner.id());
-            Future<AgentConnectionView> confirming =
-                    pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, null));
+            Future<AgentConnectionView> confirming = pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, null));
             assertThat(waiting.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(confirming.isDone()).as("반영 완료가 사용자 행 잠금을 기다린다").isFalse();
             jdbc.update("UPDATE agent SET owner_user_id = ? WHERE id = ?", next.id(), agent.id());
@@ -247,10 +247,10 @@ class ConnectorBindingServiceLockTest {
 
             registering.get(10, TimeUnit.SECONDS);
             assertThatThrownBy(() -> confirming.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_BUSY));
+                .isInstanceOf(ExecutionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_BUSY));
             assertThat(onlyBinding().restartRequired()).as("재시작 대기가 풀리지 않았다").isTrue();
             verify(connector, never()).probe(anyString(), anyString());
         } finally {
@@ -258,6 +258,7 @@ class ConnectorBindingServiceLockTest {
             pool.shutdownNow();
         }
     }
+
 
     /** 관리자 목록이 보인 그 바인딩의 재시작 대기 시작 시각이다. */
     private static void await(CountDownLatch latch) {
@@ -269,15 +270,18 @@ class ConnectorBindingServiceLockTest {
         }
     }
 
+
     private Instant shownTo(CurrentUser admin) {
         List<AdminConnectionSnapshot> listed = connectionService.listForAdmin(admin);
         assertThat(listed).hasSize(1);
         return listed.get(0).restartRequiredSince();
     }
 
+
     private void connect(CurrentUser owner, String connectorId, Map<String, String> values) {
         connectionService.register(owner, connectorId, values);
     }
+
 
     private ConnectorBinding onlyBinding() {
         List<ConnectorBinding> all = bindings.findAll();
@@ -285,19 +289,21 @@ class ConnectorBindingServiceLockTest {
         return all.get(0);
     }
 
+
     protected Agent agent(CurrentUser owner, AgentVisibility visibility) {
         String code = "lock-" + UUID.randomUUID().toString().substring(0, 13);
         return agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                owner.id(),
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            owner.id(),
+            Instant.now()));
     }
+
 
     protected CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();

@@ -30,11 +30,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "connector_connection",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_connector_connection_user_connector",
-                        columnNames = {"user_id", "connector_id"}))
+    name = "connector_connection",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_connector_connection_user_connector",
+        columnNames = {"user_id", "connector_id"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -82,6 +81,7 @@ public class ConnectorConnection {
     @Column(name = "agent_id", insertable = false, updatable = false)
     private Long legacyAgentId;
 
+
     private ConnectorConnection(Long userId, String connectorId, Instant now) {
         this.userId = userId;
         this.connectorId = connectorId;
@@ -91,10 +91,12 @@ public class ConnectorConnection {
         this.updatedAt = now;
     }
 
+
     /** 에이전트 없는 연결이다. 값은 보관 파일에 두고 에이전트에는 바인딩으로 붙인다(ADR-083). */
     public static ConnectorConnection pending(Long userId, String connectorId, Instant now) {
         return new ConnectorConnection(userId, connectorId, now);
     }
+
 
     /**
      * 보관 파일의 이름이다. 연결 번호 앞에 {@code c} 를 붙인다. 저장한 뒤에만 부른다.
@@ -104,6 +106,7 @@ public class ConnectorConnection {
     public String vault() {
         return "c" + id;
     }
+
 
     /**
      * 확인 도구가 통과한 값을 보관 파일에 썼다. 비밀이 아닌 칸 값과 비밀 앞부분을 적고 쓸 수 있는 연결로 둔다.
@@ -120,6 +123,7 @@ public class ConnectorConnection {
         this.updatedAt = now;
     }
 
+
     /** 확인 도구가 통과했다. */
     public void ready(Instant now) {
         now = nextRevision(now);
@@ -128,19 +132,23 @@ public class ConnectorConnection {
         this.updatedAt = now;
     }
 
+
     public void pending(Instant now) {
         now = nextRevision(now);
         this.status = ConnectionStatus.PENDING;
         this.updatedAt = now;
     }
 
+
     public void markVaultStored() {
         this.vaultStored = true;
     }
 
+
     public void recordUndeclaredTools(int count) {
         this.undeclaredTools = count;
     }
+
 
     /**
      * 바인딩을 모두 떼고 보관 파일을 지웠다. 행은 이력을 위해 남기고 칸 값과 비밀 앞부분을 비운다.
@@ -156,6 +164,7 @@ public class ConnectorConnection {
         this.checkedAt = now;
         this.updatedAt = now;
     }
+
 
     /** DB의 마이크로초 정밀도에서 고정 시계와 되돌아간 시계도 이전 revision을 재사용하지 않는다. */
     private Instant nextRevision(Instant now) {

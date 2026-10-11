@@ -42,14 +42,16 @@ public class ConnectorBindingInstalls {
     private final ConnectorBindingProperties properties;
     private final BrowserGatewayTokens tokens;
 
+
     /** 설치를 그 방식대로 한 번 보내고 대시보드의 답을 돌려준다. 엔티티를 외부 호출로 넘기지 않는다. */
     private InstallResult sendAgain(ConnectorBindingAttempt attempt) {
         if (attempt.legacy()) {
             return connector.putConnector(attempt.profile(), attempt.connectorId(), true, attempt.sandboxOwner());
         }
         return connector.bindConnector(attempt.profile(), attempt.connectorId(), attempt.vault(),
-                attempt.sandboxOwner(), attempt.ownerBrowser());
+            attempt.sandboxOwner(), attempt.ownerBrowser());
     }
+
 
     /**
      * 바인딩 설치에 실을 브라우저 중계 주소다. 사용자 브라우저를 쓰지 않는 커넥터는 null 이라 본문에 키가 없다.
@@ -60,6 +62,7 @@ public class ConnectorBindingInstalls {
     String ownerBrowser(ConnectorBinding binding, ConnectorManifest manifest) {
         return manifest.ownerBrowser() ? tokens.bindingAddress(binding.id()).orElse("") : null;
     }
+
 
     /**
      * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다.
@@ -85,13 +88,14 @@ public class ConnectorBindingInstalls {
         return restart || scheduled;
     }
 
+
     /** 현재 시도에만 설치와 probe 결과를 적는다. 이 단계는 연결의 revision을 바꾸지 않는다. */
     void record(ConnectorBinding binding, ConnectorBindingAttempt attempt, ConnectorInstallResult result) {
         Instant now = binding.updatedAt().isAfter(attempt.startedAt()) ? binding.updatedAt() : attempt.startedAt();
         if (result.installed() != null) {
             if (attempt.legacy() && attempt.replaceValues()) {
                 binding.installed(result.envRestart() || result.installed().restartRequired()
-                        || result.installed().pluginUpdated(), now);
+                    || result.installed().pluginUpdated(), now);
             } else {
                 record(binding, result.installed(), attempt.legacy(), now);
             }
@@ -109,6 +113,7 @@ public class ConnectorBindingInstalls {
         }
     }
 
+
     /**
      * 다시 보낸 뒤 읽은 설치가 그 방식대로 반영됐는가. 일반 바인딩은 바인딩 방식으로 켜져 있어야 한다.
      *
@@ -116,12 +121,13 @@ public class ConnectorBindingInstalls {
      */
     static ResyncOutcome notInstalledReason(ConnectorState state, boolean legacy) {
         boolean installed = state.configured()
-                && (legacy || (state.enabled() && HermesConnectorClient.MODE_BIND.equals(state.mode())));
+            && (legacy || (state.enabled() && HermesConnectorClient.MODE_BIND.equals(state.mode())));
         if (!installed) {
             return ResyncOutcome.NOT_INSTALLED;
         }
         return state.policyHook() ? ResyncOutcome.READY : ResyncOutcome.POLICY_HOOK_OFF;
     }
+
 
     /**
      * 설치와 반영 확인을 실행한다. 일반 바인딩의 도구 선택과 옛 설치의 내장 toolset 판정은 기존 계약을 따른다.
@@ -140,8 +146,8 @@ public class ConnectorBindingInstalls {
         InstallResult installed = null;
         try {
             if (attempt.checkInstallation() && attempt.legacy()
-                    && (!attempt.desiredEnabled()
-                            || !connector.readConnector(attempt.profile(), attempt.connectorId()).enabled())) {
+                && (!attempt.desiredEnabled()
+                    || !connector.readConnector(attempt.profile(), attempt.connectorId()).enabled())) {
                 return new ConnectorInstallResult(null, false, ResyncOutcome.NOT_INSTALLED, null);
             }
             boolean envRestart = false;
@@ -151,19 +157,19 @@ public class ConnectorBindingInstalls {
                     String value = attempt.values().get(field.key());
                     // 비운 선택 칸은 앞선 등록이 남긴 값을 지운다.
                     envRestart |= value == null ? connector.deleteEnv(attempt.profile(), field.env())
-                            : connector.putEnv(attempt.profile(), field.env(), value);
+                        : connector.putEnv(attempt.profile(), field.env(), value);
                 }
             }
             step = STEP_INSTALL;
             installed = sendAgain(attempt);
             boolean restart = attempt.legacy() ? installed.pluginUpdated()
-                    : installed.restartRequired() || installed.pluginUpdated();
+                : installed.restartRequired() || installed.pluginUpdated();
             if (attempt.legacy() && attempt.replaceValues()) {
                 restart |= envRestart || installed.restartRequired();
             }
             boolean scheduled = !attempt.legacy() && !restart && !attempt.restartRequired() && installed.reloadPending();
             ResyncOutcome outcome = restart ? ResyncOutcome.RESTART_PENDING
-                    : scheduled ? ResyncOutcome.APPLY_SCHEDULED : ResyncOutcome.NOT_INSTALLED;
+                : scheduled ? ResyncOutcome.APPLY_SCHEDULED : ResyncOutcome.NOT_INSTALLED;
             if (!attempt.checkInstallation() || restart || scheduled) {
                 return new ConnectorInstallResult(installed, envRestart, outcome, null);
             }
@@ -174,13 +180,13 @@ public class ConnectorBindingInstalls {
             }
             step = STEP_PROBE;
             ProbeResult probe = connector.probe(attempt.profile(), attempt.mcpServer());
-            int undeclared = (int) probe.tools().stream().filter(name -> !attempt.declaredTools().contains(name)).count();
+            int undeclared = (int)probe.tools().stream().filter(name -> !attempt.declaredTools().contains(name)).count();
             if (!probe.ok()) {
                 outcome = ResyncOutcome.PROBE_FAILED;
             } else if (probe.tools().isEmpty()) {
                 outcome = ResyncOutcome.NO_TOOLS;
             } else if (attempt.legacy() && !Set.copyOf(attempt.toolsets())
-                    .equals(Set.copyOf(toolsets.readEnabled(attempt.apiBaseUrl(), attempt.profile())))) {
+                .equals(Set.copyOf(toolsets.readEnabled(attempt.apiBaseUrl(), attempt.profile())))) {
                 outcome = ResyncOutcome.TOOLSETS_DIFFER;
             }
             return new ConnectorInstallResult(installed, false, outcome, undeclared);
@@ -195,6 +201,7 @@ public class ConnectorBindingInstalls {
             return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null);
         }
     }
+
 
     /** 실패한 단계와 커넥터 번호와 예외 종류만 남긴다. 예외 메시지와 원격 응답에는 칸 값이 섞일 수 있어 적지 않는다. */
     static void warn(String step, String connectorId, RuntimeException ex) {

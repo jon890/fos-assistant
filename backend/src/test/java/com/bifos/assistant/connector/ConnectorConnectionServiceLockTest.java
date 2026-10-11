@@ -104,17 +104,20 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
 
     private ConnectorConnectionService requests;
 
+
     /** 공용 컨텍스트를 나누지 않고 기존 서비스 생성자에 동시 호출 두 자리를 주어 실제 DB 경쟁을 만든다. */
     @BeforeEach
     void configureConcurrentRequests() {
         requests = new ConnectorConnectionService(connections, bindings, users, service, connector,
-                transactionManager, new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
+            transactionManager, new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
     }
+
 
     @AfterEach
     void cleanAccess() {
         people.deleteAll();
     }
+
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -127,30 +130,30 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         CountDownLatch release = new CountDownLatch(1);
         AtomicInteger calls = new AtomicInteger();
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> {
-                    assertNoTransaction();
-                    Observed started = observe(target.bindingId());
-                    assertThat(started.revision()).isAfter(before.revision());
-                    assertThat(started.attempt()).isNotNull();
-                    assertThat(started.status()).isEqualTo("PENDING");
-                    assertThat(started.desired()).isFalse();
-                    if (calls.incrementAndGet() == 1) {
-                        entered.countDown();
-                        await(release);
-                        if (lateFailure) {
-                            throw new IllegalStateException("lost response");
-                        }
-                        return new InstallResult(true, false);
+            .thenAnswer(invocation -> {
+                assertNoTransaction();
+                Observed started = observe(target.bindingId());
+                assertThat(started.revision()).isAfter(before.revision());
+                assertThat(started.attempt()).isNotNull();
+                assertThat(started.status()).isEqualTo("PENDING");
+                assertThat(started.desired()).isFalse();
+                if (calls.incrementAndGet() == 1) {
+                    entered.countDown();
+                    await(release);
+                    if (lateFailure) {
+                        throw new IllegalStateException("lost response");
                     }
-                    return new InstallResult(false, false, true);
-                });
+                    return new InstallResult(true, false);
+                }
+                return new InstallResult(false, false, true);
+            });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<?> first = pool.submit(() -> requests.register(target.owner(), DEMO, VALUES));
             assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
             UUID firstId = observe(target.bindingId()).attempt();
             pool.submit(() -> requests.register(target.owner(), DEMO, Map.of("token", "demo_next_0123456789")))
-                    .get(10, TimeUnit.SECONDS);
+                .get(10, TimeUnit.SECONDS);
             Observed current = observe(target.bindingId());
             assertThat(current.attempt()).isNull();
             assertThat(firstId).isNotNull();
@@ -166,6 +169,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         }
     }
 
+
     @Test
     @DisplayName("check의 probe가 멈춘 동안 해제가 완료되고 늦은 성공이 삭제한 바인딩을 되살리지 않는다")
     void completesDisconnectWhileProbeWaits() throws Exception {
@@ -173,9 +177,12 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(CallResult.success(JsonMapper.builder().build().readTree("{}")));
+            .thenReturn(CallResult.success(JsonMapper.builder().build().readTree("{}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> { assertNoTransaction(); return INSTALLED; });
+            .thenAnswer(invocation -> {
+                assertNoTransaction();
+                return INSTALLED;
+            });
         when(connector.readConnector(anyString(), anyString())).thenAnswer(invocation -> {
             assertNoTransaction();
             return new ConnectorState("p", true, true, false, true, "bind");
@@ -196,12 +203,13 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             checking.get(10, TimeUnit.SECONDS);
             assertThat(bindings.findById(target.bindingId())).isEmpty();
             assertThat(connections.findByUserIdAndConnectorId(target.owner().id(), DEMO).orElseThrow().status())
-                    .isEqualTo(ConnectionStatus.DISCONNECTED);
+                .isEqualTo(ConnectionStatus.DISCONNECTED);
         } finally {
             release.countDown();
             pool.shutdownNow();
         }
     }
+
 
     @Test
     @DisplayName("verify 중 바뀐 계정의 PENDING을 이전 계정의 성공으로 READY로 올리지 않는다")
@@ -231,13 +239,14 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             release.countDown();
             checking.get(10, TimeUnit.SECONDS);
             assertThat(connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow().status())
-                    .isEqualTo(ConnectionStatus.PENDING);
+                .isEqualTo(ConnectionStatus.PENDING);
             assertThat(connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow().updatedAt()).isEqualTo(revision);
         } finally {
             release.countDown();
             pool.shutdownNow();
         }
     }
+
 
     @Test
     @DisplayName("설치 응답을 기다리는 동안 접근 철회가 완료되고 결과는 FORBIDDEN이며 PENDING이 남는다")
@@ -246,12 +255,12 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> {
-                    assertNoTransaction();
-                    entered.countDown();
-                    await(release);
-                    return INSTALLED;
-                });
+            .thenAnswer(invocation -> {
+                assertNoTransaction();
+                entered.countDown();
+                await(release);
+                return INSTALLED;
+            });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             Future<?> registering = pool.submit(() -> requests.register(target.owner(), DEMO, VALUES));
@@ -263,7 +272,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             })).get(10, TimeUnit.SECONDS);
             release.countDown();
             assertThatThrownBy(() -> registering.get(10, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class)
-                    .cause().isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+                .cause().isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
             assertThat(observe(target.bindingId()).status()).isEqualTo("PENDING");
             assertThat(observe(target.bindingId()).attempt()).isNotNull();
         } finally {
@@ -271,6 +280,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             pool.shutdownNow();
         }
     }
+
 
     @Test
     @DisplayName("서비스를 다시 만든 뒤에도 같은 시각의 새 시도만 적용하고 중복 결과를 버리며 연결 revision은 유지한다")
@@ -289,6 +299,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         assertThat(bindings.findById(target.bindingId()).orElseThrow().status()).isEqualTo(BindingStatus.READY);
         assertThat(observe(target.bindingId()).attempt()).isNull();
     }
+
 
     @Test
     @DisplayName("결과 저장 트랜잭션이 실패하면 시작의 PENDING과 시도가 남고 다음 연결 확인이 복구한다")
@@ -314,6 +325,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         assertThat(observe(target.bindingId()).status()).isEqualTo("READY");
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"hermes_profile", "credential_scope", "owner_user_id"})
     @DisplayName("결과의 profile과 credential과 소유자가 현재 값과 다르면 READY로 올리지 않는다")
@@ -331,6 +343,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         assertThat(attempts.complete(attempt, READY)).isEmpty();
         assertThat(observe(target.bindingId()).status()).isEqualTo("PENDING");
     }
+
 
     @Test
     @DisplayName("새 붙이기를 해제하고 다시 붙인 뒤 이전 거절이 새 바인딩을 지우지 않는다")
@@ -370,6 +383,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         }
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"confirm", "scheduled", "drift"})
     @DisplayName("관리자 확인과 예약 반영과 어긋남 재설치의 HTTP도 트랜잭션 밖에서 커밋된 시도를 본다")
@@ -380,14 +394,14 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             return List.of(DEMO_MANIFEST);
         });
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> {
-                    assertNoTransaction();
-                    Observed observed = observe(target.bindingId());
-                    assertThat(observed.attempt()).isNotNull();
-                    assertThat(observed.status()).isEqualTo("PENDING");
-                    assertThat(observed.desired()).isFalse();
-                    return INSTALLED;
-                });
+            .thenAnswer(invocation -> {
+                assertNoTransaction();
+                Observed observed = observe(target.bindingId());
+                assertThat(observed.attempt()).isNotNull();
+                assertThat(observed.status()).isEqualTo("PENDING");
+                assertThat(observed.desired()).isFalse();
+                return INSTALLED;
+            });
         AtomicInteger reads = new AtomicInteger();
         when(connector.readConnector(anyString(), anyString())).thenAnswer(invocation -> {
             assertNoTransaction();
@@ -402,7 +416,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             service.confirmApplied(user(UserRole.ADMIN, 1L), target.agent().code(), DEMO, null);
         } else if (entry.equals("scheduled")) {
             jdbc.update("UPDATE agent_connector_binding SET status = 'PENDING', apply_due_at = ? WHERE id = ?",
-                    Timestamp.from(clock.instant().minusSeconds(1)), target.bindingId());
+                Timestamp.from(clock.instant().minusSeconds(1)), target.bindingId());
             assertThat(applier.applyDue()).isEqualTo(1);
         } else {
             assertThat(applier.resyncDrifted()).isEqualTo(1);
@@ -411,6 +425,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         assertThat(applied.status()).isEqualTo("READY");
         assertThat(applied.attempt()).isNull();
     }
+
 
     private Target readyTarget() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
@@ -422,6 +437,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         return new Target(owner, agent, bindingId);
     }
 
+
     private ConnectorBindingAttempt capture(Target target) {
         return attempts.start(() -> {
             attempts.lockOwner(target.owner().id());
@@ -430,16 +446,18 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         });
     }
 
+
     private void allowCheck() {
         when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(CallResult.success(JsonMapper.builder().build().readTree("{}")));
+            .thenReturn(CallResult.success(JsonMapper.builder().build().readTree("{}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class))).thenReturn(INSTALLED);
     }
+
 
     /** 호출 스레드와 별도 DB 연결로 커밋된 시도와 revision을 직접 읽는다. */
     private Observed observe(Long bindingId) throws Exception {
         try (Connection connection = dataSource.getConnection();
-                PreparedStatement query = connection.prepareStatement("SELECT c.updated_at, b.install_attempt_id, b.status, b.desired_enabled FROM agent_connector_binding b JOIN connector_connection c ON c.id = b.connection_id WHERE b.id = ?")) {
+            PreparedStatement query = connection.prepareStatement("SELECT c.updated_at, b.install_attempt_id, b.status, b.desired_enabled FROM agent_connector_binding b JOIN connector_connection c ON c.id = b.connection_id WHERE b.id = ?")) {
             query.setLong(1, bindingId);
             try (ResultSet row = query.executeQuery()) {
                 assertThat(row.next()).isTrue();
@@ -451,16 +469,21 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         }
     }
 
+
     private static void assertNoTransaction() {
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
         assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isFalse();
     }
 
+
     private static void await(CountDownLatch latch) throws InterruptedException {
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
     }
 
-    private record Target(CurrentUser owner, Agent agent, Long bindingId) {}
 
-    private record Observed(Instant revision, UUID attempt, String status, boolean desired) {}
+    private record Target(CurrentUser owner, Agent agent, Long bindingId) {
+    }
+
+    private record Observed(Instant revision, UUID attempt, String status, boolean desired) {
+    }
 }
