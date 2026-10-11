@@ -7,8 +7,8 @@ import com.bifos.assistant.memory.application.model.AgentMemorySettingCollection
 import com.bifos.assistant.memory.application.model.MemorySource;
 import com.bifos.assistant.memory.application.model.ServiceTokenGrant;
 import com.bifos.assistant.memory.application.model.ServiceTokenSnapshot;
-import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.validation.Valid;

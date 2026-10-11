@@ -6,7 +6,7 @@ import com.bifos.assistant.attention.application.model.AttentionSourceRef;
 import com.bifos.assistant.attention.domain.type.AttentionTrigger;
 import com.bifos.assistant.attention.domain.type.CardKey;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;
 import java.util.List;

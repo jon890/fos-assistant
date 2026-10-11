@@ -23,7 +23,7 @@ import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemState;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;

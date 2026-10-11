@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.infra;
 
-import com.bifos.assistant.memory.domain.MemoryCapture;
+import com.bifos.assistant.memory.domain.entity.MemoryCapture;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;

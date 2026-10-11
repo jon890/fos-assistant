@@ -137,7 +137,7 @@ public final class ArchitectureRules {
                         && type.getAnnotationOfType(Table.class).name().equals("memory_collection"));
                 if (collection) {
                     entities++;
-                    require(type, type.getName().equals("com.bifos.assistant.memory.domain.MemoryCollection")
+                    require(type, type.getName().equals("com.bifos.assistant.memory.domain.entity.MemoryCollection")
                         && type.isAnnotatedWith(Entity.class), "MemoryCollection 선택과 Entity 선언", events);
                     require(type, type.isAnnotatedWith(EntityListeners.class)
                         && Arrays.asList(type.getAnnotationOfType(EntityListeners.class).value())

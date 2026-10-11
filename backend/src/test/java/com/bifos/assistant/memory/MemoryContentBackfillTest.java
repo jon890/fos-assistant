@@ -8,7 +8,7 @@ import static org.mockito.Mockito.doThrow;
 import com.bifos.assistant.memory.application.MemoryContentBackfill;
 import com.bifos.assistant.memory.application.MemoryContentSealer;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.MemoryRevisionId;
+import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;

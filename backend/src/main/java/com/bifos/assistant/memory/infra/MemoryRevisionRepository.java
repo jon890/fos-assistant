@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.infra;
 
-import com.bifos.assistant.memory.domain.MemoryRevision;
-import com.bifos.assistant.memory.domain.MemoryRevisionId;
+import com.bifos.assistant.memory.domain.entity.MemoryRevision;
+import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import jakarta.persistence.LockModeType;
 import java.util.List;

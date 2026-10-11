@@ -11,7 +11,7 @@ import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.proactive.application.SurfacedProblems;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import java.time.Instant;

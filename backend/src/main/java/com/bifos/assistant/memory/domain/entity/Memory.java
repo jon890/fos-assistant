@@ -1,5 +1,7 @@
-package com.bifos.assistant.memory.domain;
+package com.bifos.assistant.memory.domain.entity;
 
+import com.bifos.assistant.memory.domain.MemoryPlacement;
+import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;

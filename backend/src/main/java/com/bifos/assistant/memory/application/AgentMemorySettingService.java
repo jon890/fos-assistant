@@ -9,7 +9,7 @@ import com.bifos.assistant.memory.application.model.AgentMemoryGrantInput;
 import com.bifos.assistant.memory.application.model.AgentMemorySetting;
 import com.bifos.assistant.memory.application.model.AgentMemorySettingChange;
 import com.bifos.assistant.memory.application.model.AgentMemorySettingCollection;
-import com.bifos.assistant.memory.domain.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryCollectionCount;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;

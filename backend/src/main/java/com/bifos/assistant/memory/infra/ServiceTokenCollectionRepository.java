@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.infra;
 
-import com.bifos.assistant.memory.domain.ServiceTokenCollection;
-import com.bifos.assistant.memory.domain.ServiceTokenCollectionId;
+import com.bifos.assistant.memory.domain.entity.ServiceTokenCollection;
+import com.bifos.assistant.memory.domain.entity.ServiceTokenCollectionId;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;

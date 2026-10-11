@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.memory.domain.MemoryRevision;
+import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;

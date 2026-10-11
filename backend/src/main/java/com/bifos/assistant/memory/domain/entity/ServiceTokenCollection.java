@@ -1,4 +1,4 @@
-package com.bifos.assistant.memory.domain;
+package com.bifos.assistant.memory.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;

@@ -29,7 +29,7 @@ import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.notification.infra.NotificationRepository;
 import com.bifos.assistant.proactive.domain.CheckReport;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;

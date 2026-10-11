@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.memory.application.AcceptedMemoryLookup;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ExecutionMemoryRef;
 import com.bifos.assistant.usage.application.ExecutionMemoryRefs;

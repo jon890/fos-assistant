@@ -3,7 +3,7 @@ package com.bifos.assistant.memory.application;
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.memory.application.model.MemorySource;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ExecutionAgentQuery;
 import java.util.Collection;

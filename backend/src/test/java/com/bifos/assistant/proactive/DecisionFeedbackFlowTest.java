@@ -23,7 +23,7 @@ import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpPatch;
 import com.bifos.assistant.followup.application.model.FollowUpSnapshot;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.proactive.application.CheckFeedback;
 import com.bifos.assistant.proactive.application.DecisionFeedbackExporter;
 import com.bifos.assistant.proactive.application.model.DecisionFeedbackExport;

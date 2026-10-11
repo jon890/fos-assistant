@@ -1,4 +1,4 @@
-package com.bifos.assistant.memory.domain;
+package com.bifos.assistant.memory.domain.entity;
 
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;

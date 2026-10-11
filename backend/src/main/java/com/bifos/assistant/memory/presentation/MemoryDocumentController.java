@@ -1,7 +1,7 @@
 package com.bifos.assistant.memory.presentation;
 
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CollectionView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateDocumentRequest;

@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.infra;
 
-import com.bifos.assistant.memory.domain.ServiceToken;
+import com.bifos.assistant.memory.domain.entity.ServiceToken;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

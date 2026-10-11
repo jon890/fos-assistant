@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import com.bifos.assistant.memory.application.ServiceTokenService;
 import com.bifos.assistant.memory.application.model.IssuedServiceToken;
 import com.bifos.assistant.memory.application.model.ServiceTokenGrant;
-import com.bifos.assistant.memory.domain.ServiceToken;
+import com.bifos.assistant.memory.domain.entity.ServiceToken;
 import com.bifos.assistant.memory.infra.ServiceTokenCollectionRepository;
 import com.bifos.assistant.memory.infra.ServiceTokenRepository;
 import com.bifos.assistant.memory.presentation.MemoryDtos.IssueServiceTokenRequest;
