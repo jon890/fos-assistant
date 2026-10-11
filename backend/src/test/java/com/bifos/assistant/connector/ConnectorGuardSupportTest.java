@@ -234,8 +234,7 @@ class ConnectorGuardSupportTest {
                     Instant changed = NOW.plusNanos(1000);
                     assertThat(jdbc.update("update agent_connector_binding set updated_at = ? where id = ?",
                         OffsetDateTime.ofInstant(changed, ZoneOffset.UTC), f.bindingId())).isEqualTo(1);
-                    Instant reread = new TransactionTemplate(manager).execute(status ->
-                        bindings.findById(f.bindingId()).orElseThrow().updatedAt());
+                    Instant reread = new TransactionTemplate(manager).execute(status -> bindings.findById(f.bindingId()).orElseThrow().updatedAt());
                     assertThat(reread).isEqualTo(changed);
                 }
                 case "restart" -> assertThat(jdbc.update("update agent_connector_binding set restart_required = true where id = ?",
