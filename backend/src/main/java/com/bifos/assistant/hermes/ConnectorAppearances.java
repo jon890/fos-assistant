@@ -56,10 +56,12 @@ final class ConnectorAppearances {
     static ConnectorAppearance read(JsonNode item) {
         JsonNode icon = item.get("icon");
         JsonNode link = item.get("link");
-        if (absent(icon) && absent(link)) {
-            return ConnectorAppearance.NONE;
-        }
-        return new ConnectorAppearance(field(item, "icon", icon), field(item, "link", link));
+        JsonNode kind = item.get("link_kind");
+        return new ConnectorAppearance(
+                field(item, "icon", icon),
+                field(item, "link", link),
+                field(item, "readme_url", item.get("readme_url")),
+                kind != null && kind.isString() ? kind.asString() : null);
     }
 
     private static String field(JsonNode item, String name, JsonNode declared) {

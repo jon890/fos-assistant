@@ -89,7 +89,7 @@ class ConnectorConnectionControllerTest {
                         DEMO,
                         "검사용 메모",
                         "검사에서만 쓰는 커넥터입니다.",
-                        new ConnectorAppearance(ICON, LINK),
+                        new ConnectorAppearance(ICON, LINK, "https://example.com/README.md", "project"),
                         List.of(
                                 new ConnectorFieldSummary("token", "토큰", "", true, true, "^demo_.+$", false, false),
                                 new ConnectorFieldSummary("scope", "범위", "", false, false, null, true, true)),
@@ -105,6 +105,9 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].title").value("검사용 메모"))
                 .andExpect(jsonPath("$[0].icon").value(ICON))
                 .andExpect(jsonPath("$[0].link").value(LINK))
+                .andExpect(jsonPath("$[0].readmeUrl").value("https://example.com/README.md"))
+                .andExpect(jsonPath("$[0].linkKind").value("project"))
+                .andExpect(jsonPath("$[0].readme_url").doesNotExist())
                 .andExpect(jsonPath("$[0].myStatus").value("PENDING"))
                 .andExpect(jsonPath("$[0].available").value(true))
                 .andExpect(jsonPath("$[0].fields[0].key").value("token"))
@@ -153,7 +156,7 @@ class ConnectorConnectionControllerTest {
                 .andExpect(jsonPath("$[0].tools").isEmpty())
                 .andReturn();
         // 응답은 null 칸을 빼지 않는다. 화면이 칸이 있는 null 을 받는지 본다.
-        assertThat(result.getResponse().getContentAsString()).contains("\"icon\":null", "\"link\":null");
+        assertThat(result.getResponse().getContentAsString()).contains("\"icon\":null", "\"link\":null", "\"readmeUrl\":null", "\"linkKind\":\"service\"");
     }
 
     @Test

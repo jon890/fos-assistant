@@ -204,6 +204,25 @@ class ConnectorAppearancesTest {
         }
     }
 
+    @DisplayName("README와 서비스 링크는 같은 규칙으로 독립 검증하고 구버전 종류는 service다")
+    @Test
+    void readsIndependentReadmeAndProjectKind() {
+        for (String accepted : ACCEPTED_LINKS) {
+            ObjectNode node = item(null, LINK).put("readme_url", accepted).put("link_kind", "project");
+            assertThat(ConnectorAppearances.read(node))
+                    .isEqualTo(new ConnectorAppearance(null, LINK, accepted, "project"));
+        }
+        for (String rejected : REJECTED_LINKS) {
+            ObjectNode node = item(null, LINK).put("readme_url", rejected).put("link_kind", "unknown");
+            assertThat(ConnectorAppearances.read(node))
+                    .isEqualTo(new ConnectorAppearance(null, LINK, null, "service"));
+            node.put("link", rejected).put("readme_url", LINK);
+            assertThat(ConnectorAppearances.read(node))
+                    .isEqualTo(new ConnectorAppearance(null, null, LINK, "service"));
+        }
+        assertThat(new ConnectorAppearance(null, LINK).linkKind()).isEqualTo("service");
+    }
+
     @DisplayName("칸이 없거나 JSON null 이면 둘 다 null 이다")
     @Test
     void readsMissingOrNullFieldsAsNone() {

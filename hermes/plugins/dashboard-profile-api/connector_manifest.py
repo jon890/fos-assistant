@@ -117,6 +117,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("title 과 description 은 문자열이다")
     icon = _appearance_or_none(connector_id, "icon", lambda: _connector_icon(root, declared.get("icon")))
     link = _appearance_or_none(connector_id, "link", lambda: _connector_link(declared.get("link")))
+    readme_url = _appearance_or_none(connector_id, "readme_url", lambda: _connector_link(declared.get("readme_url")))
+    link_kind = "project" if declared.get("link_kind") == "project" else "service"
     fields = _connector_fields(declared.get("fields"))
     verify = declared.get("verify")
     if (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)
@@ -230,6 +232,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "description": declared.get("description", ""),
         "icon": icon,
         "link": link,
+        "readme_url": readme_url,
+        "link_kind": link_kind,
         "fields": fields,
         "verify": {"tool": verify["tool"]},
         "mcp_server": mcp_server,
@@ -335,6 +339,7 @@ def _connector_catalog_response():
     return JSONResponse(
         [{"id": manifest["id"], "schema": manifest["schema"], "title": manifest["title"],
           "description": manifest["description"], "icon": manifest["icon"], "link": manifest["link"],
+          "readme_url": manifest["readme_url"], "link_kind": manifest["link_kind"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
           "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
           "owner_browser": manifest["owner_browser_env"] is not None,

@@ -97,7 +97,9 @@ public final class ConnectionDtos {
             String myStatus,
             boolean available,
             List<BoundAgentView> bindings,
-            String ownerBrowserLoginUrl) {
+            String ownerBrowserLoginUrl,
+            String readmeUrl,
+            String linkKind) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
                     value.id(),
@@ -110,7 +112,9 @@ public final class ConnectionDtos {
                     value.myStatus().name(),
                     value.available(),
                     value.bindings().stream().map(BoundAgentView::from).toList(),
-                    value.ownerBrowserLoginUrl());
+                    value.ownerBrowserLoginUrl(),
+                    value.appearance().readmeUrl(),
+                    value.appearance().linkKind());
         }
     }
 

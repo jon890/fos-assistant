@@ -190,6 +190,24 @@ class HttpHermesConnectorClientTest {
         server.verify();
     }
 
+    @DisplayName("HTTP 카탈로그의 두 링크를 독립 검증하고 기존 정책과 구버전 응답을 유지한다")
+    @Test
+    void readsReadmeAndProjectFromHttpCatalog() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String metadata = ",\"link\":\"http://invalid.example.test/\",\"readme_url\":\"https://example.com/README.md\",\"link_kind\":\"project\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(CATALOG.replace(tail, tail + metadata), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        ConnectorManifest read = client.readCatalog().get(0);
+        ConnectorManifest legacy = client.readCatalog().get(0);
+        assertThat(read.appearance()).isEqualTo(new ConnectorAppearance(null, null, "https://example.com/README.md", "project"));
+        assertThat(read.tools()).isEqualTo(legacy.tools());
+        assertThat(read.fields()).isEqualTo(legacy.fields());
+        assertThat(legacy.appearance()).isEqualTo(ConnectorAppearance.NONE);
+        server.verify();
+    }
+
     @DisplayName("카탈로그의 toolsets 와 attachments 를 읽고, 모양이 틀리면 거절한다")
     @Test
     void readsDeclaredToolsetsAndAttachments() {
