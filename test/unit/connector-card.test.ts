@@ -4,6 +4,7 @@ import {
   type ConnectorTool,
   connectorIconSrc,
   connectorLinkHref,
+  connectorAppearanceLinkHref,
   toolRiskCounts,
 } from "../../web/src/lib/connection.ts";
 
@@ -82,4 +83,36 @@ test("도구 요약은 위험도 순서를 지키고 0개인 위험도를 뺀다
 
 test("도구가 없으면 요약도 비어 있다", () => {
   assert.deepEqual(toolRiskCounts([]), []);
+});
+
+test("표시 링크는 HTTPS ASCII 모양과 500자 상한을 두 주소에 적용한다", () => {
+  const max =
+    "https://example.com/" + "a".repeat(500 - "https://example.com/".length);
+  for (const url of [
+    "https://mail.google.com/",
+    "https://blog.naver.com/",
+    "https://github.com/example/project/blob/main/README.md",
+    "https://example.com:8443/a?b=1&c=%20#x",
+    "https://xn--9n2bp8q.com/",
+    max,
+  ]) {
+    assert.equal(connectorAppearanceLinkHref(url), url);
+  }
+  for (const bad of [
+    null,
+    undefined,
+    "",
+    "https://example.com/%zz",
+    "https://example.com/a\\b",
+    "https://example.com/\n",
+    "https://example.com/a b",
+    "https://예시.com/",
+    "//example.com/",
+    "http://example.com/",
+    "HTTPS://example.com/",
+    "https://user:password@example.com/",
+    max + "a",
+  ]) {
+    assert.equal(connectorAppearanceLinkHref(bad), null, String(bad));
+  }
 });

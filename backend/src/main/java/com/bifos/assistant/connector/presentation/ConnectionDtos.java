@@ -30,24 +30,24 @@ public final class ConnectionDtos {
     }
 
     public record ConnectorFieldView(
-            String key,
-            String label,
-            String description,
-            boolean secret,
-            boolean required,
-            String pattern,
-            boolean hasOptions,
-            boolean autoSelectSingle) {
+        String key,
+        String label,
+        String description,
+        boolean secret,
+        boolean required,
+        String pattern,
+        boolean hasOptions,
+        boolean autoSelectSingle) {
         static ConnectorFieldView from(ConnectorFieldSummary value) {
             return new ConnectorFieldView(
-                    value.key(),
-                    value.label(),
-                    value.description(),
-                    value.secret(),
-                    value.required(),
-                    value.pattern(),
-                    value.hasOptions(),
-                    value.autoSelectSingle());
+                value.key(),
+                value.label(),
+                value.description(),
+                value.secret(),
+                value.required(),
+                value.pattern(),
+                value.hasOptions(),
+                value.autoSelectSingle());
         }
     }
 
@@ -59,11 +59,11 @@ public final class ConnectionDtos {
     public record ConnectorToolView(String name, String title, String risk, String approval, boolean grant) {
         static ConnectorToolView from(ConnectorToolSummary value) {
             return new ConnectorToolView(
-                    value.name(),
-                    value.title(),
-                    value.risk().name(),
-                    value.approval().name(),
-                    value.grant());
+                value.name(),
+                value.title(),
+                value.risk().name(),
+                value.approval().name(),
+                value.grant());
         }
     }
 
@@ -75,7 +75,7 @@ public final class ConnectionDtos {
     public record BoundAgentView(String agentCode, String agentName, String status, boolean restartRequired) {
         static BoundAgentView from(BoundAgentSummary value) {
             return new BoundAgentView(
-                    value.agentCode(), value.agentName(), value.status().name(), value.restartRequired());
+                value.agentCode(), value.agentName(), value.status().name(), value.restartRequired());
         }
     }
 
@@ -87,30 +87,34 @@ public final class ConnectionDtos {
      * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 {@code https://} 주소. 선언하지 않았으면 null
      */
     public record ConnectorView(
-            String id,
-            String title,
-            String description,
-            String icon,
-            String link,
-            List<ConnectorFieldView> fields,
-            List<ConnectorToolView> tools,
-            String myStatus,
-            boolean available,
-            List<BoundAgentView> bindings,
-            String ownerBrowserLoginUrl) {
+        String id,
+        String title,
+        String description,
+        String icon,
+        String link,
+        List<ConnectorFieldView> fields,
+        List<ConnectorToolView> tools,
+        String myStatus,
+        boolean available,
+        List<BoundAgentView> bindings,
+        String ownerBrowserLoginUrl,
+        String readmeUrl,
+        String linkKind) {
         static ConnectorView from(ConnectorSummary value) {
             return new ConnectorView(
-                    value.id(),
-                    value.title(),
-                    value.description(),
-                    value.appearance().icon(),
-                    value.appearance().link(),
-                    value.fields().stream().map(ConnectorFieldView::from).toList(),
-                    value.tools().stream().map(ConnectorToolView::from).toList(),
-                    value.myStatus().name(),
-                    value.available(),
-                    value.bindings().stream().map(BoundAgentView::from).toList(),
-                    value.ownerBrowserLoginUrl());
+                value.id(),
+                value.title(),
+                value.description(),
+                value.appearance().icon(),
+                value.appearance().link(),
+                value.fields().stream().map(ConnectorFieldView::from).toList(),
+                value.tools().stream().map(ConnectorToolView::from).toList(),
+                value.myStatus().name(),
+                value.available(),
+                value.bindings().stream().map(BoundAgentView::from).toList(),
+                value.ownerBrowserLoginUrl(),
+                value.appearance().readmeUrl(),
+                value.appearance().linkKind());
         }
     }
 
@@ -122,22 +126,22 @@ public final class ConnectionDtos {
 
     /** 재시작 대기는 연결이 아니라 붙은 에이전트마다 {@code bindings} 에 있다. */
     public record ConnectionView(
-            String connectorId,
-            String status,
-            Map<String, String> secretPrefixes,
-            Map<String, String> values,
-            Instant checkedAt,
-            List<BoundAgentView> bindings,
-            int undeclaredTools) {
+        String connectorId,
+        String status,
+        Map<String, String> secretPrefixes,
+        Map<String, String> values,
+        Instant checkedAt,
+        List<BoundAgentView> bindings,
+        int undeclaredTools) {
         static ConnectionView from(ConnectionSnapshot value) {
             return new ConnectionView(
-                    value.connectorId(),
-                    value.status().name(),
-                    value.secretPrefixes(),
-                    value.values(),
-                    value.checkedAt(),
-                    value.bindings().stream().map(BoundAgentView::from).toList(),
-                    value.undeclaredTools());
+                value.connectorId(),
+                value.status().name(),
+                value.secretPrefixes(),
+                value.values(),
+                value.checkedAt(),
+                value.bindings().stream().map(BoundAgentView::from).toList(),
+                value.undeclaredTools());
         }
     }
 
@@ -149,14 +153,14 @@ public final class ConnectionDtos {
      * @param actionId 승인 요청 번호. 승인 요청을 만들지 않았으면 null
      */
     public record ConnectorPolicyResponse(
-            String decision,
-            String message,
-            @JsonProperty("action_id") String actionId) {
+        String decision,
+        String message,
+        @JsonProperty("action_id") String actionId) {
         static ConnectorPolicyResponse from(ConnectorPolicyAnswer value) {
             return new ConnectorPolicyResponse(
-                    value.allowed() ? "allow" : "block",
-                    value.message(),
-                    value.actionId() == null ? null : value.actionId().toString());
+                value.allowed() ? "allow" : "block",
+                value.message(),
+                value.actionId() == null ? null : value.actionId().toString());
         }
     }
 
@@ -166,24 +170,24 @@ public final class ConnectionDtos {
      * @param restartRequiredSince 반영 완료 요청이 그대로 돌려보낼 재시작 대기 시작 시각
      */
     public record AdminConnectionView(
-            String connectorId,
-            Long userId,
-            String displayName,
-            String agentCode,
-            String status,
-            boolean restartRequired,
-            Instant restartRequiredSince,
-            int undeclaredTools) {
+        String connectorId,
+        Long userId,
+        String displayName,
+        String agentCode,
+        String status,
+        boolean restartRequired,
+        Instant restartRequiredSince,
+        int undeclaredTools) {
         static AdminConnectionView from(AdminConnectionSnapshot value) {
             return new AdminConnectionView(
-                    value.connectorId(),
-                    value.userId(),
-                    value.displayName(),
-                    value.agentCode(),
-                    value.status().name(),
-                    value.restartRequired(),
-                    value.restartRequiredSince(),
-                    value.undeclaredTools());
+                value.connectorId(),
+                value.userId(),
+                value.displayName(),
+                value.agentCode(),
+                value.status().name(),
+                value.restartRequired(),
+                value.restartRequiredSince(),
+                value.undeclaredTools());
         }
     }
 
@@ -192,7 +196,8 @@ public final class ConnectionDtos {
      *
      * @param restartRequiredSince 관리자 목록에서 본 그 바인딩의 재시작 대기 시작 시각. 대기가 없었으면 null
      */
-    public record ConfirmRequest(Instant restartRequiredSince) {}
+    public record ConfirmRequest(Instant restartRequiredSince) {
+    }
 
     /**
      * 에이전트 하나에서 본 연결 하나다. 상태는 enum 이름 그대로 내고, 붙어 있지 않으면 {@code status} 가 null 이다.
@@ -201,24 +206,24 @@ public final class ConnectionDtos {
      * @param skills 붙이면 그 profile 에 설치되는 커넥터 스킬 이름
      */
     public record AgentConnectionResponse(
-            String connectorId,
-            String title,
-            String connectionStatus,
-            boolean bound,
-            String status,
-            boolean restartRequired,
-            int toolCount,
-            List<String> skills) {
+        String connectorId,
+        String title,
+        String connectionStatus,
+        boolean bound,
+        String status,
+        boolean restartRequired,
+        int toolCount,
+        List<String> skills) {
         static AgentConnectionResponse from(AgentConnectionView value) {
             return new AgentConnectionResponse(
-                    value.connectorId(),
-                    value.title(),
-                    value.connectionStatus().name(),
-                    value.bound(),
-                    value.status() == null ? null : value.status().name(),
-                    value.restartRequired(),
-                    value.toolCount(),
-                    value.skills());
+                value.connectorId(),
+                value.title(),
+                value.connectionStatus().name(),
+                value.bound(),
+                value.status() == null ? null : value.status().name(),
+                value.restartRequired(),
+                value.toolCount(),
+                value.skills());
         }
     }
 
@@ -230,10 +235,10 @@ public final class ConnectionDtos {
     public record AgentConnectionsResponse(List<AgentConnectionResponse> connections, String blockedReason) {
         static AgentConnectionsResponse from(AgentConnectionsView value) {
             return new AgentConnectionsResponse(
-                    value.connections().stream()
-                            .map(AgentConnectionResponse::from)
-                            .toList(),
-                    value.blockedReason());
+                value.connections().stream()
+                    .map(AgentConnectionResponse::from)
+                    .toList(),
+                value.blockedReason());
         }
     }
 }
