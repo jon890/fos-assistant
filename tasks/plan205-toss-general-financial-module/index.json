@@ -1,0 +1,9 @@
+{
+  "name": "plan205-toss-general-financial-module",
+  "description": "일반 금융 prepare·단일전송·실행 guard를 실제 모듈로 구현하고 테스트에서만 등록한다",
+  "status": "pending",
+  "created_at": "2026-10-11",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [{"number": 1, "file": "phase-01.md", "execution_profile": "deep"}]
+}

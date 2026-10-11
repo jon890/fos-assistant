@@ -1,0 +1,14 @@
+{
+  "status": "pending",
+  "observedMainSha": "105b510bab2224500157011dc83b1570388849b3",
+  "observedInstallPr": 437,
+  "observedInstallHeadSha": "72b3ed32cc8e60bdd3720751f32dbdf9172c1f28",
+  "installMergedObserved": false,
+  "execution": [
+    {"plan": "plan204-financial-guard-install", "gate": "437 실제 main 통합, 신규 설치 식별자 확인, 기본 검사 0, 독립 계획 검토 승인"},
+    {"plan": "plan205-toss-general-financial-module", "gate": "437 실제 main 통합, 기본 검사 0, 독립 계획 검토 승인; guard 계획과 파일 소유권이 겹치지 않으면 병렬 가능"},
+    {"plan": "plan206-financial-snapshot-producer", "gate": "앞 두 구현의 실제 main 통합, producer 검사 0, 독립 계획 검토 승인"}
+  ],
+  "runtime": {"financialPolicy": "RISK_NOT_OPEN", "financialToolsHidden": true, "publicApprovalConnected": false},
+  "completion": "각 관심사의 설계·구현·회귀를 함께 검토하고 CI 뒤 PR로 머지; 계획만으로 push나 PR 금지"
+}

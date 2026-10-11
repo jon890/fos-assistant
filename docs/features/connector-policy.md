@@ -509,6 +509,27 @@ HTTP 뒤 DB 상태를 다시 확인한다. 철회·재설치·카탈로그 변�
 금융 승인 hook과 주문 producer가 없으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
 DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
 
+### 금융 producer의 구현 경계 보완안
+
+아래는 구현 전 보완안이다. 금융 snapshot·승인·ticket·실행을 잇는 application 규칙은 한 구현으로 두되,
+현재 공개 hook과 approve의 `RISK_NOT_OPEN`, plugin 금융 숨김은 유지한다. 새 featureflag·검증용 HTTP API나
+금융 허용을 흉내 내는 별도 정책을 만들지 않는다. 실제 application의 호출부만 테스트 내부에서 연결한다.
+이 검증은 mock 목적지까지의 application 통합이며 공개 승인 E2E나 운영 활성화 완료가 아니다.
+
+준비 HTTP는 DB 트랜잭션 밖에서 한 번 실행한다. 저장 단계는 소유 사용자 잠금 아래 현재 바인딩·profile·
+소유권·READY·공개 scope·manifest SHA와 두 revision을 재검증하고, PENDING action과 암호화한 snapshot을 함께 저장한다.
+승인은 같은 내용을 다시 검증하고 EXECUTING을 커밋한 뒤 기존 ticket 발급과 executeApproved를 한 번 호출한다.
+실행 원문을 승인 뒤 다시 만들지 않는다. claim의 일회 소비·철회·만료 검사를 그대로 사용한다.
+
+FINANCIAL은 매번 승인하고 grant를 만들거나 사용하지 않는다. DESTRUCTIVE는 차단한다.
+동일 request_key의 PENDING·EXECUTING·UNKNOWN은 사용자 잠금 아래 차단하며 UUID 교체로 UNKNOWN을 우회하지 않는다.
+UNKNOWN 자동 재전송과 명시적 새 요청 경로는 열지 않는다. ticket은 60초와 승인 만료 중 빠른 쪽까지며,
+75초는 execute의 HTTP 읽기 제한이다. support verified와 fresh nonce는 거래 권한이 아니다.
+
+SDK 입력과 저장 실행 원문의 키·값·타입 대조는 coercion·strip·default 전에 끝낸다.
+외부 본문에는 공식 필드만 담고 scope·메타데이터는 제거한다. 구현하지 않은 공개 연결은 계속 미연결로 표시한다.
+공개 연결과 승인 카드 표시·일괄 승인 제외는 실거래 금지 경계를 확보한 별도 결정 및 보안 리뷰 전까지 보류한다.
+
 ## 커넥터 READ 데이터의 흐름
 
 연결을 붙인 에이전트가 커넥터에서 읽은 글이 모델, 셸, 웹, 다른 커넥터, Memory, 결과물, 기록으로 가는 길을 갖는다.
