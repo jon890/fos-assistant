@@ -4,6 +4,18 @@ Hermes 가 Control Plane MCP 를 부를 때 토큰으로 profile 을 증명하�
 
 covers: `backend/src/main/java/com/bifos/assistant/mcp/`, `hermes/plugins/fos-ctx/`
 
+## 관찰 도구 연결
+
+list_media_observations와 record_media_observation은 같은 Control Plane MCP 서버에 등록되어 있다.
+입력·응답·출처와 예산은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결)이 갖는다.
+fos-ctx REQUIRED_TOOLS에 두 도구를 추가해 서명을 만들지 못하면 막는다.
+새 정의는 memory_remember 앞에 넣고 작업 기준의 기존 도구 전체와 상대 등록 순서를 보존한다.
+memory_search가 합쳐진 기준에서는 그 정의·서명·살펴보기 허용과 이름·schema 기반 검사를 유지한다.
+도구 개수나 마지막 도구를 과거 값으로 고정하지 않는다.
+서명 규격과 native 자식 등록, Memory 도구의 인자·권한·본문 반환 규격은 바꾸지 않는다.
+McpController 한정 JSON 파싱 실패는 다른 도구에도 -32700/id=null을 반환하되 기존 인증 필터의 401/403은 유지한다.
+파싱 실패와 유효 JSON의 인자 오류 -32602를 구분하고 입력 원문·예외 cause를 로그에 남기지 않는다.
+
 ## 요구
 
 - Control Plane 이 Hermes 에 여는 도구는 MCP 서버 하나(`fos-assistant`)에 모은다.
@@ -102,7 +114,7 @@ Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` 가 모두 이 길을 지난다.
+`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation` 가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.

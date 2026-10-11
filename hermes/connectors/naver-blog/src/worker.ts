@@ -1,9 +1,14 @@
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname } from "node:path";
 import { type DraftInput, parseBody } from "./draft.ts";
-import { type OverwriteInput, type OverwriteStage, runOverwrite } from "./editor/overwrite.ts";
+import {
+  type OverwriteInput,
+  type OverwriteStage,
+  runOverwrite,
+} from "./editor/overwrite.ts";
 import { EditorError, runDraft, type RunStage } from "./editor/run.ts";
 import { filterFocusDiagnostics } from "./editor/focus.ts";
+import { filterOpenDiagnostics } from "./editor/open-diagnostics.ts";
 import {
   checkJobDir,
   finishClaimed,
@@ -26,10 +31,17 @@ export type WorkerDeps = {
   env: Env;
 };
 
-const DEFAULT_DEPS: WorkerDeps = { runDraft, runOverwrite, limitMs: 600_000, env: process.env };
+const DEFAULT_DEPS: WorkerDeps = {
+  runDraft,
+  runOverwrite,
+  limitMs: 600_000,
+  env: process.env,
+};
 
 /** 입력 파일이 담은 작업. */
-type JobInput = { kind: "save"; draft: DraftInput } | { kind: "overwrite"; input: OverwriteInput };
+type JobInput =
+  | { kind: "save"; draft: DraftInput }
+  | { kind: "overwrite"; input: OverwriteInput };
 
 /** 입력 파일의 다섯 칸만 꺼낸다. 모양이 틀리면 `null`. */
 function draftFrom(raw: unknown): DraftInput | null {
@@ -101,10 +113,17 @@ async function takeInput(dir: string, jobId: string) {
 /** `EditorError` 를 작업 상태의 `error` 로 옮긴다. 그 밖의 예외는 원문을 싣지 않는다. */
 function errorOf(error: unknown, stage: string): Record<string, unknown> {
   if (error instanceof EditorError) {
-    const { focus_diagnostics, ...extra } = error.extra;
+    const { focus_diagnostics, open_diagnostics, ...extra } = error.extra;
     const safe = filterFocusDiagnostics(focus_diagnostics);
-    return { code: error.code, stage: error.stage, message: error.message, ...extra,
-      ...(safe ? { focus_diagnostics: safe } : {}) };
+    const opening = filterOpenDiagnostics(open_diagnostics);
+    return {
+      code: error.code,
+      stage: error.stage,
+      message: error.message,
+      ...extra,
+      ...(safe ? { focus_diagnostics: safe } : {}),
+      ...(opening ? { open_diagnostics: opening } : {}),
+    };
   }
   return { code: "editor_failed", stage };
 }
@@ -114,8 +133,13 @@ function errorOf(error: unknown, stage: string): Record<string, unknown> {
  * 사용자가 남은 원본 사본을 찾을 수 있게 하려는 것이고, 다른 `extra` 칸은 싣지 않는다.
  */
 function timeoutOf(error: unknown, stage: string): Record<string, unknown> {
-  const backup = error instanceof EditorError ? error.extra.backup_draft_id : undefined;
-  return { code: "timeout", stage, ...(backup === undefined ? {} : { backup_draft_id: backup }) };
+  const backup =
+    error instanceof EditorError ? error.extra.backup_draft_id : undefined;
+  return {
+    code: "timeout",
+    stage,
+    ...(backup === undefined ? {} : { backup_draft_id: backup }),
+  };
 }
 
 /**
@@ -127,11 +151,15 @@ function timeoutOf(error: unknown, stage: string): Record<string, unknown> {
  * 상태 쓰기처럼 편집기 흐름 밖에서 난 예외도 `editor_failed` 로 끝내고 잠금을 푼다.
  * 작업 디렉터리 확인이 실패하면 그 디렉터리를 믿을 수 없으므로 아무것도 쓰거나 지우지 않고 끝낸다.
  */
-export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> = {}) {
+export async function runWorker(
+  jobFile: string,
+  overrides: Partial<WorkerDeps> = {},
+) {
   const deps = { ...DEFAULT_DEPS, ...overrides };
   const dir = dirname(jobFile);
   const jobId = basename(jobFile).replace(/\.json$/, "");
-  if (!JOB_ID_PATTERN.test(jobId) || basename(jobFile) !== `${jobId}.json`) return;
+  if (!JOB_ID_PATTERN.test(jobId) || basename(jobFile) !== `${jobId}.json`)
+    return;
   try {
     await checkJobDir(dir);
   } catch {
@@ -153,7 +181,8 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
   }
 
   async function work() {
-    const heartbeat = () => updateState(dir, jobId, { heartbeat_at: new Date().toISOString() });
+    const heartbeat = () =>
+      updateState(dir, jobId, { heartbeat_at: new Date().toISOString() });
     const started = await updateState(dir, jobId, {
       pid: process.pid,
       heartbeat_at: new Date().toISOString(),
@@ -162,7 +191,10 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
       await unlink(inputFile(dir, jobId)).catch(() => {});
       return;
     }
-    const timer = setInterval(() => void heartbeat().catch(() => {}), HEARTBEAT_MS);
+    const timer = setInterval(
+      () => void heartbeat().catch(() => {}),
+      HEARTBEAT_MS,
+    );
     const controller = new AbortController();
     const limit = setTimeout(() => controller.abort(), deps.limitMs);
     stage = started.stage;
@@ -174,7 +206,10 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
       } else {
         const onStage = async (next: RunStage | OverwriteStage) => {
           if (next === "save_clicking") {
-            const written = await updateState(dir, jobId, { save_clicked: true, stage: "save" });
+            const written = await updateState(dir, jobId, {
+              save_clicked: true,
+              stage: "save",
+            });
             // 쓴 뒤 다시 읽는다. 정리가 이미 이 작업을 끝냈거나 끝내기로 했으면 저장 단추를 누르지 않는다.
             const current = await readState(dir, jobId);
             if (
@@ -193,7 +228,12 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
         };
         try {
           if (job.kind === "overwrite") {
-            const result = await deps.runOverwrite(deps.env, job.input, onStage, controller.signal);
+            const result = await deps.runOverwrite(
+              deps.env,
+              job.input,
+              onStage,
+              controller.signal,
+            );
             outcome = { status: "succeeded", result };
           } else {
             const { state, savedBefore, savedAfter } = await deps.runDraft(
@@ -205,16 +245,21 @@ export async function runWorker(jobFile: string, overrides: Partial<WorkerDeps> 
             );
             outcome = {
               status: "succeeded",
-              result: { state, saved_before: savedBefore, saved_after: savedAfter },
+              result: {
+                state,
+                saved_before: savedBefore,
+                saved_after: savedAfter,
+              },
             };
           }
         } catch (error) {
           if (clicked) {
             outcome = {
               status: "unknown",
-              error: controller.signal.aborted && !(error instanceof EditorError)
-                ? { code: "timeout", stage }
-                : errorOf(error, stage),
+              error:
+                controller.signal.aborted && !(error instanceof EditorError)
+                  ? { code: "timeout", stage }
+                  : errorOf(error, stage),
             };
           } else if (controller.signal.aborted) {
             outcome = { status: "failed", error: timeoutOf(error, stage) };

@@ -61,8 +61,8 @@ MCP 서버 이름은 `naver-blog` 다.
 | `render_draft` | 아래 「초안」 의 다섯 칸, `base`(덮어쓸 때 `read_draft` 가 준 `title`, `category`, `tags`, `body`, 선택), `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `index.html` 이나 `<폴더>/index.html`, 폴더는 세 단계까지), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다. `base` 를 주면 `changes` 와 `base_revision` 이 더 온다(아래 「임시저장 글 덮어쓰기」) |
 | `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}]}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
 | `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body}`. 아래 「임시저장 글 읽기」 를 본다 |
-| `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status: "running"}`. `job_id` 는 UUID 다 |
-| `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status: "running"}`. 아래 「임시저장 글 덮어쓰기」 를 본다 |
+| `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status}`. `job_id` 는 UUID 고, `status` 는 시작 확인 때 읽은 `running`, `succeeded`, `failed`, `unknown` 중 하나다 |
+| `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status}`. 상태는 `save_draft` 와 같다. 아래 「임시저장 글 덮어쓰기」 를 본다 |
 | `draft_job` | `job_id`, `wait_seconds`(0~50, 기본 45) | 아래 「작업」 의 상태 |
 
 ## 임시저장 글 읽기
@@ -226,21 +226,33 @@ MCP 서버 이름은 `naver-blog` 다.
 
 ### 입력 준비와 커서 실패 진단
 
-글쓰기 화면은 제목 문단이 하나이고, 보이는 크기와 편집 가능한 상태를 갖출 때 준비된 것으로 본다.
+글쓰기 화면은 제목 후보 중 보이는 크기와 표시 조건을 갖춘 준비 문단이 유일할 때 준비된 것으로 본다.
+직접 편집 가능한 문단 또는 단일 SmartEditor와 유일한 `input_buffer` 프레임이 준비된 모델 문단을 받는다.
+입력 프레임은 같은 출처의 편집 가능한 BODY를 가져야 한다. 다른 프레임이나 화면 밖의 별도 DIV는 대신 쓰지 않는다.
+숨은 복제 문단은 준비 판정과 제목 입력·판독에서 제외하며, 준비된 후보가 여럿이면 입력하지 않는다.
 제목과 본문의 표시 판정은 조상의 투명도와 표시 전환도 확인한다.
 작성 중인 글 알림의 유지·취소 정책을 먼저 적용한다.
 준비 직후 문단이 교체되거나 잠깐 숨겨지면 입력 단계는 기존 10회, 기본 대기 합계 3초 안에서 다시 찾는다.
 제목 가운데를 다른 요소가 가리면 그 요소를 누르거나 우회하지 않는다.
 클릭 뒤 선택 영역 양 끝이 현재 문단 안에 있고 접혀 있으며 실제 입력 초점이 같은 편집 영역에 있을 때만 글자를 넣는다.
+별도 입력 프레임에서는 그 프레임이 활성 요소이며 내부 BODY에 입력 초점과 접힌 선택 영역이 함께 있어야 한다.
 JS Range로 커서를 강제로 옮기지 않으며, 입력 뒤 제목과 본문을 초안과 대조한다.
 
 커서를 두지 못하면 `editor_failed`의 `error.focus_diagnostics`에 시도 수와 시도별 구조화된 상태만 남긴다.
 각 상태는 요소 수(100까지), 크기·편집 가능·페이지 초점·페이지 표시·접힌 선택 영역 여부와 hit test, selection 양 끝, activeElement의 분류다.
+입력 프레임의 초점과 내부 선택 영역이 함께 확인됐는지는 `input_frame`으로 남긴다.
 분류는 `title`, `body`, `other`, `none`만 허용하고 시도와 상태는 10개까지다.
 좌표, DOM 원문, 태그·클래스·id, 제목·본문·사진·URL·계정·환경값은 읽어 진단에 넣지 않는다.
 브라우저 결과와 예외 직렬화 경계에서 허용 필드만 복사한다.
 CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전체 시간 초과는 기존 `timeout` 계약을 따른다.
 이 진단은 실패 시점의 상태이며 과거 실패 원인을 확정하는 자료가 아니다.
+
+준비 실패의 `error.open_diagnostics`는 시도 수(40까지)와 마지막 관측만 담는다.
+관측은 페이지 제목·호스트·문서 로딩 상태의 분류, 페이지 초점·표시 여부,
+제목 후보·준비 후보·프레임·프레임 안 제목·editor·입력 프레임 수(각 100까지)와 실패 사유다.
+로그인, 페이지 대기, 제목 없음·준비 안 됨·복수 준비, 프레임 안 제목, 복구 알림과 다른 알림을 구분한다.
+프레임으로 실행 대상을 바꾸지 않는다. 준비 실패는 제목·사진 입력과 저장 전에 끝나며 `save_clicked`는 거짓이다.
+기본 40초·40회 대기와 저장 이후 `unknown` 처리는 유지한다.
 
 승인한 `save_draft` 는 아래를 확인한 뒤 분리된 작업 프로세스를 띄우고 작업 번호를 돌려준다. 확인 하나라도 실패하면 작업을 만들지 않는다.
 
@@ -261,6 +273,12 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `state` | 저장을 확인한 뒤 편집기에 실제로 들어간 제목, 사진, 스티커, 지도, 카테고리, 태그를 읽는다. 이 단계가 실패해도 작업은 실패가 아니다 |
 
 작업 상태는 `{job_id, status, stage, save_clicked, started_at, finished_at, result, error}` 다. `save_clicked` 는 저장 단추를 누르기 직전에 참이 된다.
+
+저장 시작 응답은 `{job_id, status}` 다. 시작을 확인하는 동안 작업이 끝났으면 그 종료 상태를 그대로 돌려준다.
+시작 응답이 `succeeded`, `failed`, `unknown` 이어도 받은 `job_id` 로 `draft_job` 을 바로 조회해 상세 결과와 오류를 확인한다.
+`running` 이면 계속 조회하고, 완료 안내는 `draft_job` 이 확인한 저장 결과에 근거한다.
+승인 엔진의 도구 호출 성공은 작업 접수를 뜻하며 실제 저장 성공과는 다르다.
+`NAVER_BLOG_START_UNKNOWN` 은 작업이 시작됐는지 확인하지 못했다는 뜻이다. 자동으로 다시 저장하지 않고 사용자에게 임시저장 목록 확인을 부탁한다.
 
 | `status` | 뜻 | 에이전트가 할 일 |
 | --- | --- | --- |

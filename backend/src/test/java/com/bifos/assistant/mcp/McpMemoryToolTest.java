@@ -175,8 +175,28 @@ class McpMemoryToolTest {
                 "agent_status",
                 "agent_stop",
                 "follow_up_propose",
+                "list_media_observations",
+                "record_media_observation",
                 "memory_remember",
                 "memory_search");
+        JsonNode search = StreamSupport.stream(listed.path("result").path("tools").spliterator(), false)
+            .filter(tool -> "memory_search".equals(tool.path("name").asString()))
+            .findFirst().orElseThrow();
+        JsonNode schema = search.path("inputSchema");
+        assertThat(schema.path("type").asString()).isEqualTo("object");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("required")).extracting(JsonNode::asString).containsExactly("query");
+        JsonNode fields = schema.path("properties");
+        assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "after_id");
+        assertThat(fields.path("query").path("type").asString()).isEqualTo("string");
+        assertThat(fields.path("query").path("minLength").asInt()).isEqualTo(1);
+        assertThat(fields.path("query").path("maxLength").asInt()).isEqualTo(200);
+        assertThat(fields.path("limit").path("type").asString()).isEqualTo("integer");
+        assertThat(fields.path("limit").path("minimum").asInt()).isEqualTo(1);
+        assertThat(fields.path("limit").path("maximum").asInt()).isEqualTo(50);
+        assertThat(fields.path("limit").path("default").asInt()).isEqualTo(10);
+        assertThat(fields.path("after_id").path("type").asString()).isEqualTo("integer");
+        assertThat(fields.path("after_id").path("minimum").asInt()).isEqualTo(1);
         HttpResponse<String> notification = mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);
         assertThat(notification.body()).isEmpty();
