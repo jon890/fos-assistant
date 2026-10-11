@@ -74,9 +74,9 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 
 ### 섹터 조회
 
-섹터 도구 5개도 공식 `result` 전체와 `metadata`를 돌려준다. `list_sectors`는 인자가 없고, 나머지는 `marketCountry: KR/US`가 필수다. `get_sector_rankings`는 `type: TOP_GAINERS/MARKET_TRADING_AMOUNT`와 `duration: 1d/1w/1mo/3mo/6mo/1y`를 받는다. 상세·주식·ETF는 목록에서 확인한 `sectorId`를 받으며 영문·숫자·밑줄·하이픈 1~40자만 허용한다. 페이지와 추가 필터는 없다.
+섹터 도구 5개도 공식 `result` 전체와 `metadata`를 돌려준다. `list_sectors`는 인자가 없고, 나머지는 `marketCountry: KR/US`가 필수다. `get_sector_rankings`는 `type: TOP_GAINERS/MARKET_TRADING_AMOUNT`와 `duration: 1d/1w/1mo/3mo/6mo/1y`를 받는다. 상세·주식·ETF는 목록에서 확인한 `sectorId`를 받으며 영문·숫자·밑줄·하이픈 1~40자만 허용한다. 페이지와 추가 필터는 없다. 랭킹은 대분류·중분류(depth 0·1)의 상위 100건까지다.
 
-depth 0/1/2와 parentSectorId를 보존하고 대분류의 parentSectorId와 상세 summary는 null일 수 있다. 상세 changeRates는 6개 기간이며 데이터가 없는 changeRate는 null이다. 주식의 volume·tradingAmount·marketCapitalization과 랭킹의 금액도 null일 수 있다. 등락률 decimal은 소수비율이며 0.01은 1%다. decimal 문자열은 숫자로 바꾸지 않으며 US 금액도 currency에 표시된 원화 환산값이다. ETF는 symbol·name만 제공하고 관련 항목이 없으면 빈 배열이다. 한 종목이 여러 섹터에 속할 수 있다.
+depth 0/1/2와 parentSectorId를 보존하고 대분류의 parentSectorId와 상세 summary는 null일 수 있다. 상세 changeRates는 6개 기간이며 데이터가 없는 changeRate는 null이다. 주식의 volume·tradingAmount·marketCapitalization과 랭킹의 금액도 null일 수 있다. 등락률 decimal은 소수비율이며 0.01은 1%다. decimal 문자열은 숫자로 바꾸지 않으며 US 금액도 currency에 표시된 원화 환산값이다. ETF는 하위 섹터를 포함하지 않으며 symbol·name만 제공하고 관련 항목이 없으면 빈 배열이다. 한 종목이 여러 섹터에 속할 수 있다.
 
 현재 서버는 READ 도구 11개를 등록하고 인증을 포함한 공식 REST operation 13개에 연결된다. 나머지 28개 operation과 금융 쓰기는 아직 지원하지 않는다. 도구 설명은 connector.json을 정본으로 SDK에도 같은 본문을 제공한다.
 

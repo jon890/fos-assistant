@@ -76,7 +76,7 @@
     },
     "get_sector_rankings": {
       "risk": "READ",
-      "description": "type, marketCountry, duration으로 섹터 랭킹을 읽습니다. type은 TOP_GAINERS 또는 MARKET_TRADING_AMOUNT, marketCountry는 KR 또는 US, duration은 1d·1w·1mo·3mo·6mo·1y입니다. result.rankings의 등락률, 거래대금, 시가총액과 통화를 보존합니다. 등락률은 소수비율이며 0.01은 1%입니다. US 금액도 원화 환산값이며 데이터가 없으면 빈 배열입니다."
+      "description": "type, marketCountry, duration으로 대분류·중분류(depth 0·1)의 섹터 랭킹을 최대 100건 읽습니다. type은 TOP_GAINERS 또는 MARKET_TRADING_AMOUNT, marketCountry는 KR 또는 US, duration은 1d·1w·1mo·3mo·6mo·1y입니다. result.rankings의 등락률, 거래대금, 시가총액과 통화를 보존합니다. 등락률은 소수비율이며 0.01은 1%입니다. US 금액도 원화 환산값이며 데이터가 없으면 빈 배열입니다."
     },
     "get_sector": {
       "risk": "READ",
@@ -88,7 +88,7 @@
     },
     "get_sector_etfs": {
       "risk": "READ",
-      "description": "sectorId와 marketCountry로 섹터와 관련된 ETF를 읽습니다. sectorId는 영문·숫자·밑줄·하이픈 1~40자이며 marketCountry는 KR 또는 US입니다. result.etfs에 symbol과 name을 보존합니다. 관련 ETF가 없으면 빈 배열이며 이 도구는 가격이나 수익률을 제공하지 않습니다."
+      "description": "sectorId와 marketCountry로 해당 섹터의 ETF 전체를 읽습니다. 하위 섹터는 포함하지 않습니다. sectorId는 영문·숫자·밑줄·하이픈 1~40자이며 marketCountry는 KR 또는 US입니다. result.etfs에 symbol과 name을 보존합니다. 관련 ETF가 없으면 빈 배열이며 이 도구는 가격이나 수익률을 제공하지 않습니다."
     }
   },
   "errors": {
