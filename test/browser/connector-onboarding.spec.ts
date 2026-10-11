@@ -25,7 +25,7 @@ const GROUP_NAME = "모두의 비서";
 const GROUP_REASON =
   "그룹에 공개한 에이전트라 붙일 수 없어요. 나만 쓰는 에이전트로 바꾸면 붙일 수 있어요.";
 const SHELL_RISK_MESSAGE =
-  "격리를 적용하지 않은 에이전트는 연결 도구의 승인 없이 그 서비스를 부를 수 있어요. 격리한 에이전트도 연결 도구로 읽은 내용을 인터넷으로 보낼 수 있어요.";
+  "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
 function ownerOf(testInfo: TestInfo) {
   return isolatedUser(testInfo, "onboarding");
@@ -187,50 +187,66 @@ test("에이전트 화면에서 외부 서비스 연결하기로 가면 연결 �
   ).toBeVisible();
 });
 
-test("셸이나 파일 도구가 켜진 에이전트를 고르면 확인 창이 그 위험을 알린 뒤 붙인다", async ({
-  page,
-}) => {
-  const code = await createAgent(page, PRIVATE_NAME);
-  // 명령 실행 도구는 관리자만 켠다. 켜진 에이전트의 도구 목록을 정해 준다.
-  await page.route(`**/api/agents/${code}/tools`, (route) =>
-    route.fulfill({
-      json: {
-        toolsets: [
-          {
-            name: "terminal",
-            label: "명령 실행",
-            description: "",
-            tier: "ADMIN",
-            enabled: true,
-            editable: false,
-            requiresPrivate: false,
-          },
-        ],
-        unclassifiedEnabled: [],
-      },
-    }),
-  );
-
-  await page.goto("/connections/demo-notes");
-  await connect(page);
-  await choice(page, PRIVATE_NAME)
-    .getByRole("button", { name: "이 에이전트에서 쓰기" })
-    .click();
-  const dialog = page.getByRole("alertdialog", {
-    name: `${TITLE} 연결을 붙일까요?`,
-  });
-  await expect(dialog.getByText(SHELL_RISK_MESSAGE)).toBeVisible();
-  await clickAndWaitForResponse(
+for (const toolState of ["켜짐", "숨김", "조회 실패"] as const) {
+  test(`셸 도구 ${toolState} 상태에서도 확인 창이 위험을 알린 뒤 붙인다`, async ({
     page,
-    dialog.getByRole("button", { name: "붙이기" }),
-    "PUT",
-    new RegExp(`^/api/agents/${code}/connections/demo-notes$`),
-  );
-  await expect(dialog).toBeHidden();
-  await expect(
-    page.getByRole("heading", { name: `「${PRIVATE_NAME}」에 붙였어요` }),
-  ).toBeVisible();
-});
+  }) => {
+    const code = await createAgent(page, PRIVATE_NAME);
+    // 명령 실행 도구는 관리자만 켠다. 켜진 에이전트의 도구 목록을 정해 준다.
+    await page.route(`**/api/agents/${code}/tools`, (route) =>
+      route.fulfill(
+        toolState === "조회 실패"
+          ? { status: 500, json: {} }
+          : {
+              json: {
+                // 켜짐은 표시된 toolset, 숨김은 서버의 실제 활성 상태를 따로 검증한다.
+                shellOrFileEnabled: toolState === "숨김",
+                toolsets:
+                  toolState === "숨김"
+                    ? []
+                    : [
+                        {
+                          name: "terminal",
+                          label: "명령 실행",
+                          description: "",
+                          tier: "ADMIN",
+                          enabled: true,
+                          editable: false,
+                          requiresPrivate: false,
+                        },
+                      ],
+                unclassifiedEnabled: [],
+              },
+            },
+      ),
+    );
+
+    await page.goto("/connections/demo-notes");
+    await connect(page);
+    await choice(page, PRIVATE_NAME)
+      .getByRole("button", { name: "이 에이전트에서 쓰기" })
+      .click();
+    const dialog = page.getByRole("alertdialog", {
+      name: `${TITLE} 연결을 붙일까요?`,
+    });
+    await expect(
+      dialog.getByText(
+        "이 에이전트가 이 서비스의 도구를 직접 써요. 명령 실행이나 파일 도구를 함께 쓰면 연결 정보에 접근할 수 있어요. 읽은 내용이 다른 도구를 통해 인터넷으로 나갈 수도 있어요.",
+      ),
+    ).toBeVisible();
+    await expect(dialog.getByText(SHELL_RISK_MESSAGE)).toBeVisible();
+    await clickAndWaitForResponse(
+      page,
+      dialog.getByRole("button", { name: "붙이기" }),
+      "PUT",
+      new RegExp(`^/api/agents/${code}/connections/demo-notes$`),
+    );
+    await expect(dialog).toBeHidden();
+    await expect(
+      page.getByRole("heading", { name: `「${PRIVATE_NAME}」에 붙였어요` }),
+    ).toBeVisible();
+  });
+}
 
 test("붙일 수 있는 에이전트가 없으면 연결된 카드와 고르기 영역이 에이전트를 만드는 길로 안내한다", async ({
   page,

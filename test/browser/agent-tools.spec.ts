@@ -97,7 +97,7 @@ test("관리자가 terminal 도구를 켤 때 확인 창을 거친다", async ({
   await expect(dialog).toBeVisible();
   await expect(
     dialog.getByText(
-      "운영에서 격리를 적용한 에이전트는 사용자별 실행 공간에서 셸과 파일을 다뤄요. 적용하지 않은 에이전트는 서버에서 실행돼 다른 사용자의 파일과 설정에 닿을 수 있어요. 격리한 공간도 허용된 비밀 파일과 연결된 서비스, 사진 첨부를 읽거나 인터넷에 나갈 수 있어요.",
+      "안전하게 분리되지 않은 에이전트는 다른 사용자의 파일과 서버 설정에 접근할 수 있어요. 분리된 에이전트도 허용된 파일과 서비스를 이용하고 파일이나 읽은 내용을 인터넷으로 보낼 수 있어요.",
     ),
   ).toBeVisible();
   await dialog.getByRole("button", { name: "켜기" }).click();
