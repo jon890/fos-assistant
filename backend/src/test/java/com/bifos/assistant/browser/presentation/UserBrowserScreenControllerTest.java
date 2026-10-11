@@ -11,6 +11,7 @@ import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
 import com.bifos.assistant.browser.application.FakeCdp;
 import com.bifos.assistant.browser.application.UserBrowserService;
+import com.bifos.assistant.browser.application.UserBrowserServiceTestFactory;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.CdpTarget;
@@ -63,6 +64,7 @@ class UserBrowserScreenControllerTest {
     private FakeCdp cdp;
     private BrowserScreens screens;
 
+
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM user_browser");
@@ -70,6 +72,7 @@ class UserBrowserScreenControllerTest {
         cdp.pages.add(new CdpTarget("T1", "첫 탭", "https://example.com/"));
         signIn(OWNER);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -80,6 +83,7 @@ class UserBrowserScreenControllerTest {
         SecurityContextHolder.clearContext();
     }
 
+
     @Test
     @DisplayName("화면을 열면 SSE 로 탭 목록을 먼저 보내고 입력을 받으면 204 다")
     void opensScreenAndAcceptsInput() throws Exception {
@@ -87,18 +91,19 @@ class UserBrowserScreenControllerTest {
         mvc.perform(post("/api/v1/browser")).andExpect(status().isOk());
 
         MvcResult opened = mvc.perform(get("/api/v1/browser/screen").param("url", "https://example.com/login"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
+            .andExpect(request().asyncStarted())
+            .andReturn();
         input(mvc, "{\"type\":\"text\",\"text\":\"안녕\"}").andExpect(status().isNoContent());
         input(mvc, "{\"type\":\"scroll\",\"action\":\"bottom\",\"text\":\"alert('secret-value')\"}")
-                .andExpect(status().isNoContent());
+            .andExpect(status().isNoContent());
 
         assertThat(opened.getResponse().getContentAsString()).contains("event:tabs");
         assertThat(cdp.sent("Page.navigate").get(0).params()).containsEntry("url", "https://example.com/login");
         assertThat(cdp.sent("Input.insertText").get(0).params()).containsEntry("text", "안녕");
         assertThat(cdp.sent("Runtime.evaluate").get(0).params())
-                .containsEntry("expression", "window.scrollTo(0, document.documentElement.scrollHeight)");
+            .containsEntry("expression", "window.scrollTo(0, document.documentElement.scrollHeight)");
     }
+
 
     @Test
     @DisplayName("모양이 틀린 입력은 값을 싣지 않은 400 이다")
@@ -125,14 +130,15 @@ class UserBrowserScreenControllerTest {
         };
         for (String body : bodies) {
             MvcResult result = input(mvc, body)
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                    .andReturn();
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andReturn();
             assertThat(result.getResponse().getContentAsString())
-                    .doesNotContain("secret-value")
-                    .doesNotContain(longText);
+                .doesNotContain("secret-value")
+                .doesNotContain(longText);
         }
     }
+
 
     @Test
     @DisplayName("시작 주소가 http 나 https 가 아니면 SSE 를 열지 않고 400 이다")
@@ -141,10 +147,11 @@ class UserBrowserScreenControllerTest {
         mvc.perform(post("/api/v1/browser")).andExpect(status().isOk());
 
         mvc.perform(get("/api/v1/browser/screen").param("url", "file:///etc/passwd"))
-                .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest());
 
         assertThat(cdp.attached).isEmpty();
     }
+
 
     @Test
     @DisplayName("본문이 8KB 를 넘으면 값을 싣지 않은 400 이다")
@@ -152,37 +159,40 @@ class UserBrowserScreenControllerTest {
         String body = "{\"type\":\"text\",\"text\":\"secret-value\"" + " ".repeat(8 * 1024) + "}";
 
         MvcResult result = input(mvc(true), body)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andReturn();
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+            .andReturn();
 
         assertThat(result.getResponse().getContentAsString()).doesNotContain("secret-value");
     }
+
 
     @Test
     @DisplayName("SSE 만 받는 요청도 기능 꺼짐과 틀린 시작 주소는 JSON 본문의 code 로 받는다")
     void returnsJsonErrorsToEventStreamRequests() throws Exception {
         mvc(false)
-                .perform(get("/api/v1/browser/screen").accept(MediaType.TEXT_EVENT_STREAM))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("BROWSER_DISABLED"));
+            .perform(get("/api/v1/browser/screen").accept(MediaType.TEXT_EVENT_STREAM))
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.code").value("BROWSER_DISABLED"));
         screens.close();
 
         mvc(true)
-                .perform(get("/api/v1/browser/screen")
-                        .param("url", "file:///etc/passwd")
-                        .accept(MediaType.TEXT_EVENT_STREAM))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+            .perform(get("/api/v1/browser/screen")
+                .param("url", "file:///etc/passwd")
+                .accept(MediaType.TEXT_EVENT_STREAM))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
+
 
     @Test
     @DisplayName("열린 화면이 없으면 입력은 409 BROWSER_SCREEN_CLOSED 다")
     void rejectsInputWithoutScreen() throws Exception {
         input(mvc(true), "{\"type\":\"reload\"}")
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("BROWSER_SCREEN_CLOSED"));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("BROWSER_SCREEN_CLOSED"));
     }
+
 
     @Test
     @DisplayName("기능이 꺼져 있으면 화면 열기와 입력 모두 503 이다")
@@ -191,9 +201,10 @@ class UserBrowserScreenControllerTest {
 
         mvc.perform(get("/api/v1/browser/screen")).andExpect(status().isServiceUnavailable());
         input(mvc, "{\"type\":\"reload\"}")
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("BROWSER_DISABLED"));
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.code").value("BROWSER_DISABLED"));
     }
+
 
     @Test
     @DisplayName("입력은 요청자의 화면에만 닿고 남의 화면에는 닿지 않는다")
@@ -204,38 +215,42 @@ class UserBrowserScreenControllerTest {
 
         signIn(OTHER);
         input(mvc, "{\"type\":\"reload\"}")
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("BROWSER_SCREEN_CLOSED"));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("BROWSER_SCREEN_CLOSED"));
 
         assertThat(cdp.sent("Page.reload")).isEmpty();
     }
 
+
     private ResultActions input(MockMvc mvc, String body) throws Exception {
         return mvc.perform(post("/api/v1/browser/screen/input")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
     }
+
 
     private MockMvc mvc(boolean enabled) {
         screens = new BrowserScreens(
-                cdp, cdp, new BrowserUsage(), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
-        UserBrowserService service = new UserBrowserService(
-                repository,
-                runtime(),
-                profiles(),
-                address -> true,
-                LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
-                Clock.systemUTC(),
-                screens);
+            cdp, cdp, new BrowserUsage(), LiveProperties.fixed(BrowserProperties.class, properties(enabled)));
+        UserBrowserService service = UserBrowserServiceTestFactory.create(
+            repository,
+            runtime(),
+            profiles(),
+            address -> true,
+            LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
+            Clock.systemUTC(),
+            screens);
         return MockMvcBuilders.standaloneSetup(new UserBrowserController(service, new CurrentUserProvider()))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
+
 
     private static void signIn(CurrentUser user) {
         SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+            .setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
     }
+
 
     /** 컨테이너를 늘 켜진 것으로 보는 대역 proxy 다. */
     private static BrowserRuntime runtime() {
@@ -245,30 +260,36 @@ class UserBrowserScreenControllerTest {
                 return "c1";
             }
 
+
             @Override
             public void start(String containerId) {
                 // 대역은 켜진 것으로 본다
             }
+
 
             @Override
             public void stop(String containerId) {
                 // 대역은 멈춘 것으로 본다
             }
 
+
             @Override
             public void remove(String containerId) {
                 // 대역은 지운 것으로 본다
             }
+
 
             @Override
             public Optional<URI> cdpAddress(String containerId) {
                 return Optional.of(URI.create("http://192.0.2.10:9999"));
             }
 
+
             @Override
             public OptionalInt exitCode(String containerId) {
                 return OptionalInt.empty();
             }
+
 
             @Override
             public List<RuntimeContainer> list() {
@@ -277,12 +298,14 @@ class UserBrowserScreenControllerTest {
         };
     }
 
+
     private static BrowserProfileStore profiles() {
         return new BrowserProfileStore() {
             @Override
             public void ensure(String profileKey) {
                 // 검사는 디렉터리를 만들지 않는다
             }
+
 
             @Override
             public void delete(String profileKey) {
@@ -291,25 +314,26 @@ class UserBrowserScreenControllerTest {
         };
     }
 
+
     private static BrowserProperties properties(boolean enabled) {
         return new BrowserProperties(
-                enabled,
-                "https://browser-proxy.example.test",
-                "example/browser:test",
-                "example-browser",
-                9999,
-                "build/unused",
-                "/example/browser-profiles",
-                "/example/profile",
-                512,
-                1.0,
-                256,
-                128,
-                2,
-                Duration.ofMinutes(10),
-                Duration.ofMillis(100),
-                Duration.ofMinutes(30),
-                null,
-                null);
+            enabled,
+            "https://browser-proxy.example.test",
+            "example/browser:test",
+            "example-browser",
+            9999,
+            "build/unused",
+            "/example/browser-profiles",
+            "/example/profile",
+            512,
+            1.0,
+            256,
+            128,
+            2,
+            Duration.ofMinutes(10),
+            Duration.ofMillis(100),
+            Duration.ofMinutes(30),
+            null,
+            null);
     }
 }
