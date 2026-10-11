@@ -14,6 +14,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
+import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
@@ -49,6 +50,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -303,6 +306,47 @@ class ConnectorPolicyEndpointTest {
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
         assertThat(row.get("PASSED")).isEqualTo(false);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ActionStatus.class, names = "PENDING", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("승인 줄이 실행 중이거나 종료됐어도 재호출은 처음의 차단 응답을 그대로 돌려준다")
+    void replaysApprovalAnswerAfterStatusChanged(ActionStatus status) throws Exception {
+        connect(true);
+        String body = body(token, "mcp__demo__write_note", "write_note", root, newCall(), ARGS);
+        HttpResponse<String> first = send(token, body);
+        assertApprovalRequested(first);
+        jdbc.update("UPDATE connector_action SET status = ?", status.name());
+        jdbc.update("UPDATE connector_connection SET status = 'PENDING' WHERE user_id = ?", owner.id());
+
+        HttpResponse<String> repeated = send(token, body);
+
+        assertThat(json.readTree(repeated.body())).isEqualTo(json.readTree(first.body()));
+        assertThat(onlyRow().get("STATUS")).isEqualTo(status.name());
+        assertThat(onlyRow().get("PASSED")).isEqualTo(false);
+    }
+
+    @Test
+    @DisplayName("대화가 없는 승인 요청과 재호출은 승인 화면을 약속하지 않고 같은 번호로 차단한다")
+    void blocksApprovalWithoutConversationAndReplaysSameAnswer() throws Exception {
+        connect(true);
+        jdbc.update("UPDATE agent_execution SET conversation_id = NULL WHERE id = ?", run.id());
+        String body = body(token, "mcp__demo__write_note", "write_note", root, newCall(), ARGS);
+
+        HttpResponse<String> first = send(token, body);
+        HttpResponse<String> repeated = send(token, body);
+
+        assertThat(first.statusCode()).isEqualTo(200);
+        JsonNode reply = json.readTree(first.body());
+        String actionId = reply.path("action_id").asString();
+        assertThat(UUID.fromString(actionId)).isNotNull();
+        assertThat(reply.path("decision").asString()).isEqualTo("block");
+        assertThat(reply.path("message").asString()).isEqualTo("이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 "
+                + actionId + " 다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.");
+        assertThat(json.readTree(repeated.body())).isEqualTo(reply);
+        assertThat(onlyRow().get("STATUS")).isEqualTo("PENDING");
+        assertThat(onlyRow().get("ARGS_JSON")).isEqualTo(ARGS);
+        assertThat(notifications.count()).isZero();
     }
 
     @Test
