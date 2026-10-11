@@ -3,8 +3,8 @@ package com.bifos.assistant.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentProperties;
-import com.bifos.assistant.agent.application.PeopleProperties;
+import com.bifos.assistant.agent.config.AgentProperties;
+import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import java.time.Duration;

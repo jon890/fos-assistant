@@ -3,7 +3,7 @@ package com.bifos.assistant.agent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.application.AgentProperties;
+import com.bifos.assistant.agent.config.AgentProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

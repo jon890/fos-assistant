@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.config;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;

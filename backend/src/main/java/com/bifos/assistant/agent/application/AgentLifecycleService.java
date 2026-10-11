@@ -1,5 +1,8 @@
 package com.bifos.assistant.agent.application;
 
+import com.bifos.assistant.agent.config.AgentProperties;
+import com.bifos.assistant.agent.config.PeopleProperties;
+
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;

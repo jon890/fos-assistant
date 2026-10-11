@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.config;
 
 import com.bifos.assistant.agent.application.toolset.AgentDefaultToolsets;
 import com.bifos.assistant.agent.domain.AgentToolPolicy;
