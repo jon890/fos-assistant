@@ -210,6 +210,7 @@ public class AgentExecution {
     @Column(name = "result_delivered_at", updatable = false)
     private Instant resultDeliveredAt;
 
+
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
         this.conversationId = builder.conversationId;
@@ -249,9 +250,11 @@ public class AgentExecution {
         this.firstDeltaAt = builder.firstDeltaAt;
     }
 
+
     public static Builder builder() {
         return new Builder();
     }
+
 
     /**
      * 이 실행이 속한 실행 트리의 루트 번호다.
@@ -263,15 +266,18 @@ public class AgentExecution {
         return rootExecutionId == null ? id : rootExecutionId;
     }
 
+
     private void closeInterruptedObservation() {
         if (eventObservation == EventObservation.OBSERVING) {
             eventObservation = EventObservation.INCOMPLETE;
         }
     }
 
+
     public void beginEventObservation() {
         eventObservation = EventObservation.OBSERVING;
     }
+
 
     /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
     public boolean finishEventObservation(boolean complete) {
@@ -286,6 +292,7 @@ public class AgentExecution {
         return true;
     }
 
+
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
     public void attachRunId(String hermesRunId) {
         this.hermesRunId = hermesRunId;
@@ -293,6 +300,7 @@ public class AgentExecution {
             eventObservation = EventObservation.INCOMPLETE;
         }
     }
+
 
     /** Hermes 에 제출하기 직전 시각은 한 번만 적는다. */
     public void markSubmitted(Instant at) {
@@ -302,12 +310,14 @@ public class AgentExecution {
         }
     }
 
+
     /** Flow 루트가 먼저 받은 원래 요청 시각을 보존하려고 더 이른 시각만 적는다. */
     public void markRequestReceived(Instant at) {
         if (at != null && (requestReceivedAt == null || at.isBefore(requestReceivedAt))) {
             requestReceivedAt = at;
         }
     }
+
 
     /** 첫 assistant delta를 받은 시각만 보존한다. 본문은 실행 기록에 두지 않는다. */
     public boolean markFirstDelta(Instant at) {
@@ -317,6 +327,7 @@ public class AgentExecution {
         }
         return false;
     }
+
 
     /** profile 설정에서 읽은 기본값으로 요청 effort의 출처를 보완한다. */
     public void recordProfileReasoningDefault(String effort) {
@@ -329,6 +340,7 @@ public class AgentExecution {
         }
     }
 
+
     /** profile 기본 모델 설정의 정상 응답을 확인했음을 적어 빈 effort를 다시 조회하지 않는다. */
     public void markReasoningDefaultsChecked(Instant at) {
         if (reasoningDefaultsCheckedAt == null) {
@@ -336,10 +348,12 @@ public class AgentExecution {
         }
     }
 
+
     /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
     public void recordOutput(String outputText) {
         this.outputText = outputText;
     }
+
 
     /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
     public void markSucceeded(String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
@@ -352,6 +366,7 @@ public class AgentExecution {
         closeInterruptedObservation();
         this.status = ExecutionStatus.SUCCEEDED;
     }
+
 
     /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
     public void markSucceeded(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
@@ -366,9 +381,10 @@ public class AgentExecution {
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
+
     /** 실패 응답에 포함된 모델과 토큰과 금액을 보존하고 FAILED 로 옮긴다. */
     public void markFailed(
-            String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
+        String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
         recordUsage(provider, model, usage);
         this.estimatedCostMicros = cost.estimatedMicros();
         this.actualCostMicros = cost.actualMicros();
@@ -376,6 +392,7 @@ public class AgentExecution {
         this.pricingVersion = cost.pricingVersion();
         markFailed(errorCode, finishedAt);
     }
+
 
     /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
     public void markFailed(String errorCode, Instant finishedAt) {
@@ -386,6 +403,7 @@ public class AgentExecution {
         this.status = ExecutionStatus.FAILED;
     }
 
+
     /** 끝난 시각과 토큰과 금액을 채우고 CANCELLED 로 옮긴다. */
     public void markCancelled(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
         recordUsage(provider, model, usage);
@@ -395,6 +413,7 @@ public class AgentExecution {
         this.pricingVersion = cost.pricingVersion();
         markCancelled(finishedAt);
     }
+
 
     /** 이미 토큰을 적은 실행의 상태만 CANCELLED 로 옮긴다. */
     public void markCancelled(Instant finishedAt) {
@@ -408,6 +427,7 @@ public class AgentExecution {
         this.status = ExecutionStatus.CANCELLED;
     }
 
+
     private void recordUsage(String provider, String model, TokenUsage usage) {
         this.provider = provider;
         this.model = model;
@@ -416,6 +436,7 @@ public class AgentExecution {
         this.outputTokens = usage.outputTokens();
         this.totalTokens = usage.totalTokens();
     }
+
 
     public static final class Builder {
         private Long userId;
@@ -455,100 +476,120 @@ public class AgentExecution {
         private Instant submittedAt;
         private Instant firstDeltaAt;
 
+
         public Builder userId(Long userId) {
             this.userId = userId;
             return this;
         }
+
 
         public Builder conversationId(Long conversationId) {
             this.conversationId = conversationId;
             return this;
         }
 
+
         public Builder agentId(Long agentId) {
             this.agentId = agentId;
             return this;
         }
+
 
         public Builder parentExecutionId(Long parentExecutionId) {
             this.parentExecutionId = parentExecutionId;
             return this;
         }
 
+
         public Builder rootExecutionId(Long rootExecutionId) {
             this.rootExecutionId = rootExecutionId;
             return this;
         }
+
 
         public Builder retryOfExecutionId(Long retryOfExecutionId) {
             this.retryOfExecutionId = retryOfExecutionId;
             return this;
         }
 
+
         public Builder profileName(String profileName) {
             this.profileName = profileName;
             return this;
         }
+
 
         public Builder hermesRunId(String hermesRunId) {
             this.hermesRunId = hermesRunId;
             return this;
         }
 
+
         public Builder hermesSessionId(String hermesSessionId) {
             this.hermesSessionId = hermesSessionId;
             return this;
         }
+
 
         public Builder delegationKey(String delegationKey) {
             this.delegationKey = delegationKey;
             return this;
         }
 
+
         public Builder provider(String provider) {
             this.provider = provider;
             return this;
         }
+
 
         public Builder model(String model) {
             this.model = model;
             return this;
         }
 
+
         public Builder reasoningEffort(String reasoningEffort) {
             this.reasoningEffort = reasoningEffort;
             return this;
         }
+
 
         public Builder reasoningEffortSource(ReasoningEffortSource reasoningEffortSource) {
             this.reasoningEffortSource = reasoningEffortSource;
             return this;
         }
 
+
         public Builder modelTier(ModelTier modelTier) {
             this.modelTier = modelTier;
             return this;
         }
+
 
         public Builder requestReceivedAt(Instant requestReceivedAt) {
             this.requestReceivedAt = requestReceivedAt;
             return this;
         }
 
+
         public Builder costMode(CostMode costMode) {
             this.costMode = costMode;
             return this;
         }
+
 
         public Builder status(ExecutionStatus status) {
             this.status = status;
             return this;
         }
 
+
         public Builder errorCode(String errorCode) {
             this.errorCode = errorCode;
             return this;
         }
+
 
         public Builder tokens(Long input, Long cachedInput, Long output, Long total) {
             this.inputTokens = input;
@@ -558,6 +599,7 @@ public class AgentExecution {
             return this;
         }
 
+
         /** 비용을 모르면 금액 칸을 모두 null 로 둔다. 어느 것도 공짜로 읽히지 않게 하기 위해서다. */
         public Builder cost(EstimatedCost cost) {
             this.estimatedCostMicros = cost.micros();
@@ -565,6 +607,7 @@ public class AgentExecution {
             this.pricingVersion = cost.pricingVersion();
             return this;
         }
+
 
         /** 환산액과 실제 청구액을 함께 채운다. 구독 경로는 실제 청구액이 null 로 남는다. */
         public Builder cost(ExecutionCost cost) {
@@ -575,6 +618,7 @@ public class AgentExecution {
             return this;
         }
 
+
         public Builder timing(Instant startedAt, Instant finishedAt) {
             this.startedAt = startedAt;
             this.finishedAt = finishedAt;
@@ -582,30 +626,36 @@ public class AgentExecution {
             return this;
         }
 
+
         public Builder contextChars(Long contextChars) {
             this.contextChars = contextChars;
             return this;
         }
+
 
         public Builder contextOmittedItems(Integer contextOmittedItems) {
             this.contextOmittedItems = contextOmittedItems;
             return this;
         }
 
+
         public Builder runtimeFingerprint(String runtimeFingerprint) {
             this.runtimeFingerprint = runtimeFingerprint;
             return this;
         }
+
 
         public Builder instructionsHash(String instructionsHash) {
             this.instructionsHash = instructionsHash;
             return this;
         }
 
+
         public Builder startedAt(Instant startedAt) {
             this.startedAt = startedAt;
             return this;
         }
+
 
         public AgentExecution build() {
             return new AgentExecution(this);
