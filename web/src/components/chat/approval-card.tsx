@@ -100,7 +100,7 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
     ) : null;
   }
   const shown = args.rows.filter((row) => !fold || row.core);
-  const rawKeys = [...args.rows.map((row) => row.key), ...args.emptyKeys];
+  const rawKeys = readableArgs(action.argsJson)?.map((row) => row.key);
   const label = (key: string) =>
     approvalArgLabel(key, action.argLabels, rawKeys);
   const folded = fold ? args.rows.filter((row) => !row.core) : [];

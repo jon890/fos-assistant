@@ -12,6 +12,21 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ConnectorArgumentLabelsTest {
     @Test
+    @DisplayName("응답 인자에서 보이는 키만 남기되 전체 metadata를 먼저 검증한다")
+    void filtersVisibleKeysAfterValidatingMetadata() {
+        Map<String, String> labels = Map.of("scope", "범위", "absent", "없는 칸");
+        assertThat(ConnectorArgumentLabels.visible(labels, "{\"scope\":\"[가림]\"}"))
+            .containsExactlyEntriesOf(Map.of("scope", "범위"));
+        for (String args : List.of("null", "[]", "1", "손상", "{")) {
+            assertThat(ConnectorArgumentLabels.visible(labels, args)).isEmpty();
+        }
+        assertThat(ConnectorArgumentLabels.visible(labels, null)).isEmpty();
+        assertThat(ConnectorArgumentLabels.visible(Map.of("scope", "범위", "absent", "불량\n이름"),
+            "{\"scope\":\"값\"}")).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("인자 표시 이름은 잘못된 키와 타입 및 충돌과 제어문자를 거절한다")
     void rejectsMalformedMetadata() {
         for (Map<?, ?> labels : List.of(Map.of("a", 1), Map.of("a", List.of()), Map.of("a", ""),

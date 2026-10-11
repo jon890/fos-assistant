@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
+import com.bifos.assistant.hermes.dto.ConnectorArgumentLabels;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Map;
@@ -24,7 +25,7 @@ import java.util.UUID;
  * 본다(ADR-065)
  * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
  * 승인할 수 없다(ADR-065)
- * @param argLabels 지금 카탈로그가 선언한 그 도구의 인자 표시 이름. 실행 인자와 가림에는 쓰지 않는다
+ * @param argLabels 지금 카탈로그가 선언한 표시 이름 중 가린 인자에 그대로 남은 원래 키의 이름. 실행 인자와 가림에는 쓰지 않는다
  */
 public record ConnectorActionView(
     UUID actionId,
@@ -43,7 +44,7 @@ public record ConnectorActionView(
     Map<String, String> argLabels) {
 
     public ConnectorActionView {
-        argLabels = argLabels == null ? Map.of() : Map.copyOf(argLabels);
+        argLabels = ConnectorArgumentLabels.visible(argLabels, argsJson);
     }
 
 

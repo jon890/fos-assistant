@@ -2,12 +2,15 @@ package com.bifos.assistant.hermes.dto;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 
 /** 도구별 인자 표시 이름만 검증한다. 불량 메타데이터는 정책과 카탈로그를 거절하지 않는다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -39,6 +42,30 @@ public final class ConnectorArgumentLabels {
         @SuppressWarnings("unchecked")
         Map<String, String> checked = (Map<String, String>)labels;
         return Map.copyOf(checked);
+    }
+
+
+    /** 가린 응답 객체에 그대로 남은 키의 표시 이름만 내보낸다. 원문과 파싱 오류는 기록하지 않는다. */
+    public static Map<String, String> visible(Map<?, ?> labels, String redactedArgs) {
+        Map<String, String> checked = read(labels);
+        if (checked.isEmpty() || redactedArgs == null) {
+            return Map.of();
+        }
+        try {
+            JsonNode args = JSON.readTree(redactedArgs);
+            if (args == null || !args.isObject()) {
+                return Map.of();
+            }
+            Map<String, String> visible = new HashMap<>();
+            checked.forEach((key, label) -> {
+                if (args.has(key)) {
+                    visible.put(key, label);
+                }
+            });
+            return Map.copyOf(visible);
+        } catch (JacksonException ex) {
+            return Map.of();
+        }
     }
 
 

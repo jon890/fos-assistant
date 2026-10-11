@@ -13,6 +13,15 @@ const PRODUCED_CATALOG = JSON.parse(
     "utf8",
   ),
 );
+const MASKED_DTO = JSON.parse(
+  readFileSync(
+    new URL(
+      "../resources/connector-argument-masked-action.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 type Action = Record<string, unknown> & { status: string };
 
@@ -98,6 +107,8 @@ test("실제 Python 카탈로그의 메일 인자 이름과 선언 밖 충돌 �
       argsJson: JSON.stringify({
         to: "friend@example.com",
         "받는 사람": "모델이 보낸 키",
+        "받는 사람 (to)": "병기한 이름과 같은 키",
+        "받는 사람 (to) [1]": "",
         subject: "합성 제목",
         cc: "",
       }),
@@ -105,17 +116,19 @@ test("실제 Python 카탈로그의 메일 인자 이름과 선언 밖 충돌 �
   );
   const card = page.getByTestId("approval-card");
   await expect(card.locator("dt")).toHaveText([
-    "받는 사람 (to)",
+    "받는 사람 (to) [2]",
     "받는 사람 (받는 사람)",
+    "받는 사람 (to) [3]",
     "제목",
   ]);
   await expect(card.locator("dd")).toHaveText([
     "friend@example.com",
     "모델이 보낸 키",
+    "병기한 이름과 같은 키",
     "합성 제목",
   ]);
   await expect(card.getByTestId("approval-args-empty")).toHaveText(
-    "비어 있는 항목: 참조",
+    "비어 있는 항목: 받는 사람 (to) [1], 참조",
   );
   let submitted: unknown;
   await page.route(`**/api/connector-actions/${ACTION_ID}/approve`, (route) => {
@@ -168,6 +181,50 @@ test("인자 표시 이름의 HTML은 요소를 만들지 않고 글자로 보�
   const card = page.getByTestId("approval-card");
   await expect(card.locator("dt")).toHaveText(["<b>제목</b>", "count"]);
   await expect(card.locator("dt b")).toHaveCount(0);
+});
+
+test("실제 Java 가림 DTO는 원래 키 없이 카드와 승인 금지를 유지한다", async ({
+  page,
+}) => {
+  await openWith(page, "가린 키 metadata", MASKED_DTO);
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["범위", "[가림]"]);
+  await expect(card.getByTestId("approval-hidden-args-reason")).toContainText(
+    "가려진 칸([가림])",
+  );
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-grant")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toBeVisible();
+});
+
+test("병기 뒤 충돌한 제목은 가림 안내와 빈 항목에도 같은 최종 이름을 쓴다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "최종 제목 충돌",
+    action({
+      argLabels: PRODUCED_CATALOG[0].tools.send_message.arg_labels,
+      grantAllowed: false,
+      hiddenArgs: true,
+      argsJson: JSON.stringify({
+        to: "[가림]",
+        "받는 사람": "값",
+        "받는 사람 (to)": "",
+      }),
+    }),
+  );
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText([
+    "받는 사람 (to) [1]",
+    "받는 사람 (받는 사람)",
+  ]);
+  await expect(card.getByTestId("approval-hidden-args-reason")).toContainText(
+    "가려진 칸(받는 사람 (to) [1])",
+  );
+  await expect(card.getByTestId("approval-args-empty")).toHaveText(
+    "비어 있는 항목: 받는 사람 (to) [2]",
+  );
 });
 
 test("승인 줄이 없는 대화에는 카드 자리가 없다", async ({ page }) => {

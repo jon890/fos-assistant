@@ -119,7 +119,10 @@ test("Python producer의 표시 이름은 조회·승인·거절 응답에 남�
       assert.equal(response.status, 200);
       const body = await response.json();
       const safe = kind === "list" ? body[0] : body;
-      assert.deepEqual(safe.argLabels, labels);
+      assert.deepEqual(
+        safe.argLabels,
+        action.visibleApprovalArgLabels(labels, source.argsJson),
+      );
       assert.equal(safe.argsJson, source.argsJson);
       assert.equal(safe.hiddenArgs, false);
       assert.equal(safe.grantAllowed, false);
@@ -136,6 +139,46 @@ test("Python producer의 표시 이름은 조회·승인·거절 응답에 남�
           JSON.stringify(calls[0].init),
           '{"method":"POST","body":{"grant":null}}',
         );
+    }
+  }
+});
+
+test("실제 Java DTO와 가림 전 producer metadata 모두에서 숨긴 원래 키를 응답에 싣지 않는다", async () => {
+  const dto = JSON.parse(
+    await readFile(
+      new URL(
+        "../resources/connector-argument-masked-action.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  const catalog = JSON.parse(
+    await readFile(
+      new URL(
+        "../resources/connector-argument-masked-catalog.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  );
+  const originalLabels = catalog[0].tools.write_note.arg_labels;
+  const maskedKey = Object.keys(originalLabels).find((key) => key !== "scope")!;
+  for (const metadata of [dto.argLabels, originalLabels]) {
+    for (const kind of ["list", "approve", "reject"] as const) {
+      const source = { ...dto, argLabels: metadata };
+      const { response } = await callRoute(
+        kind,
+        kind === "list" ? [source] : source,
+      );
+      assert.equal(response.status, 200);
+      const body = await response.json();
+      const safe = kind === "list" ? body[0] : body;
+      assert.equal(JSON.stringify(safe).includes(maskedKey), false);
+      assert.deepEqual(safe.argLabels, { scope: "범위" });
+      assert.equal(safe.hiddenArgs, true);
+      assert.equal(safe.grantAllowed, false);
+      assert.equal(safe.argsJson, dto.argsJson);
     }
   }
 });

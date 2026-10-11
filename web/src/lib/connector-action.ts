@@ -133,6 +133,20 @@ export function approvalArgLabels(value: unknown): Record<string, string> {
     : {};
 }
 
+/** 가린 응답 인자에 남아 있는 원래 키의 이름만 브라우저로 옮긴다. 전체 map을 먼저 검증한다. */
+export function visibleApprovalArgLabels(
+  value: unknown,
+  argsJson: string | null,
+): Record<string, string> {
+  const checked = approvalArgLabels(value);
+  const args = argsObject(argsJson);
+  return args === null
+    ? {}
+    : Object.fromEntries(
+        Object.entries(checked).filter(([key]) => Object.hasOwn(args, key)),
+      );
+}
+
 /** 표시만 바꾸고 원래 키와 가림 표시는 유지한다. 충돌한 줄에는 원래 키를 병기한다. */
 export function approvalArgLabel(
   key: string,
@@ -142,14 +156,31 @@ export function approvalArgLabel(
   const checked = approvalArgLabels(labels);
   const nameOf = (raw: string) =>
     Object.hasOwn(checked, raw) ? checked[raw] : raw;
-  const label = nameOf(key);
-  return rawKeys?.some(
-    (raw) =>
-      raw !== key &&
-      (nameOf(raw) === label || raw === label || nameOf(raw) === key),
-  )
-    ? `${label} (${key})`
-    : label;
+  if (!rawKeys) return nameOf(key);
+  const keys = [...new Set(rawKeys)];
+  const names = keys.map((raw) => {
+    const label = nameOf(raw);
+    return keys.some(
+      (other) =>
+        other !== raw &&
+        (nameOf(other) === label || other === label || nameOf(other) === raw),
+    )
+      ? `${label} (${raw})`
+      : label;
+  });
+  // 병기한 문구도 원래 키와 겹칠 수 있다. 모든 최종 이름을 예약한 뒤 겹친 줄에만 번호를 붙인다.
+  const occupied = new Set(names);
+  const counts = new Map<string, number>();
+  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  const unique = names.map((name) => {
+    if (counts.get(name) === 1) return name;
+    let number = 1;
+    while (occupied.has(`${name} [${number}]`)) number++;
+    const final = `${name} [${number}]`;
+    occupied.add(final);
+    return final;
+  });
+  return unique[keys.indexOf(key)] ?? nameOf(key);
 }
 
 /**

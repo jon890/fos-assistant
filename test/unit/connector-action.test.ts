@@ -4,6 +4,7 @@ import {
   approvalArgs,
   approvalArgLabel,
   approvalArgLabels,
+  visibleApprovalArgLabels,
   bulkApprovable,
   type ConnectorAction,
   hiddenArgKeys,
@@ -73,6 +74,35 @@ test("표시 이름의 Unicode와 UTF-8 및 항목 수 경계는 실제 compact 
       {},
     );
   }
+});
+
+test("원래 키 병기 뒤 다시 겹친 제목도 모든 최종 문구와 구분한다", () => {
+  const keys = ["to", "받는 사람", "받는 사람 (to)", "받는 사람 (to) [1]"];
+  const names = keys.map((key) =>
+    approvalArgLabel(key, { to: "받는 사람" }, keys),
+  );
+  assert.equal(new Set(names).size, keys.length);
+  assert.ok(names[0].includes("받는 사람 (to)"));
+  assert.ok(names[2].includes("받는 사람 (to)"));
+});
+
+test("응답의 보이는 키만 남기되 없는 키의 불량 metadata도 먼저 거절한다", () => {
+  assert.deepEqual(
+    visibleApprovalArgLabels(
+      { scope: "범위", absent: "없는 칸" },
+      '{"scope":"[가림]"}',
+    ),
+    { scope: "범위" },
+  );
+  assert.deepEqual(
+    visibleApprovalArgLabels(
+      { scope: "범위", absent: "불량\n이름" },
+      '{"scope":"값"}',
+    ),
+    {},
+  );
+  for (const args of [null, "null", "[]", "1", "손상", "{"])
+    assert.deepEqual(visibleApprovalArgLabels({ scope: "범위" }, args), {});
 });
 
 test("JSON 객체는 최상위 키마다 한 줄로 바뀐다", () => {
