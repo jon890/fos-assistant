@@ -2574,7 +2574,8 @@ Control Plane은 boolean만으로 안내를 버리지 않는다. 직전 구간�
 `streamedPrefixLength`로 기존 채팅 SSE에 싣고, 안내 전체를 `interim`으로 보낸다.
 가리기 전에 길이를 확인하고 원문을 별도 칸에 싣지 않는다.
 `already_streamed`가 누락되거나 boolean이 아니면 미확인으로 두고 본문을 재분류하지 않는다.
-timestamp를 `interimId`로 사용해 실행 안에서 재수신을 가려내고, timestamp가 없으면 안내의 정규화된 글로 구분한다.
+timestamp는 고유 사건 번호가 아니다. timestamp와 정규화된 원문을 함께 대조해 실행 안에서 `interimId`를 부여한다.
+밖으로 보내는 번호에는 원문과 timestamp를 싣지 않는다. timestamp가 없으면 정규화된 원문으로 재수신을 구분한다.
 도구 시작·이전 안내가 경계이며, 확인할 구간이 65,536자를 넘으면 재분류하지 않는다.
 최종 상태의 `output`과 중지 결과의 `output`은 출처를 추정해 바꾸지 않는다.
 

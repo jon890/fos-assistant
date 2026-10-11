@@ -192,7 +192,7 @@ public class HermesRunEventStream {
         if (timestamp == null) {
             timestamp = number(payload, "timestamp");
         }
-        String interimId = interimEvent && timestamp != null ? timestamp.asText() : null;
+        String interimId = interimEvent ? state.interimIdentity(timestamp, text) : null;
         Integer streamedPrefixLength = state.classify(type, text, alreadyStreamed, interimId);
         boolean afterConnector = (toolEvent || subagentEvent || interimEvent) && state.afterConnector(scope, toolEvent ? toolName : null, root, payload);
         if (interimEvent) {
@@ -272,6 +272,18 @@ public class HermesRunEventStream {
         private final StringBuilder deltaSegment = new StringBuilder();
         private boolean segmentTooLong;
         private final Set<String> interimKeys = new HashSet<>();
+        private final Map<InterimIdentity, String> interimIds = new LinkedHashMap<>();
+
+
+        /** timestamp는 고유 번호가 아니다. 원문도 대조하되, 바깥에는 실행 안에서 부여한 번호만 보낸다. */
+        String interimIdentity(JsonNode timestamp, String text) {
+            var identity = new InterimIdentity(timestamp == null ? null : timestamp.asText(),
+                normalize(text == null ? "" : text));
+            return interimIds.computeIfAbsent(identity, ignored -> Integer.toString(interimIds.size() + 1));
+        }
+
+
+        private record InterimIdentity(String timestamp, String text) {}
 
 
         /** 직전 구간 전체가 안내의 접두사인 경우만 재분류한다. 부분 문자열이나 최종 답에서는 찾지 않는다. */
@@ -304,6 +316,7 @@ public class HermesRunEventStream {
                 segmentTooLong = false;
                 if (!"tool.started".equalsIgnoreCase(type)) {
                     interimKeys.clear();
+                    interimIds.clear();
                 }
             }
             return null;

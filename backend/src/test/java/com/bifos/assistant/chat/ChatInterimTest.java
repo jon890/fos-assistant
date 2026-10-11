@@ -181,6 +181,30 @@ class ChatInterimTest {
         assertStoredAnswer(retry.getLast(), "재시도 답");
     }
 
+    @Test
+    @DisplayName("같은 timestamp의 다른 안내를 각각 재분류하고 가린 본문이 같아도 번호와 부분 답은 보존한다")
+    void reclassifiesDifferentInterimsAtSameTimestamp() {
+        var events = stream("""
+                data: {"event":"message.delta","delta":"token=secret-one"}
+
+                data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-one","already_streamed":true}
+
+                data: {"event":"message.delta","delta":"token=secret-two"}
+
+                data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-two","already_streamed":true}
+
+                data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-one","already_streamed":true}
+
+                data: {"event":"message.delta","delta":"안전한 부분 답"}
+
+                """, "cancelled", "");
+        assertThat(events).filteredOn(event -> "interim".equals(event.type()))
+            .extracting(ChatEvent::interimId).containsExactly("1", "2", "1");
+        assertThat(events).filteredOn(event -> "interim".equals(event.type()))
+            .extracting(ChatEvent::text).containsOnly("token=[가림]");
+        assertStoredAnswer(events.getLast(), "안전한 부분 답");
+    }
+
 
     private void assertStoredAnswer(ChatEvent done, String answer) {
         assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(user, done.conversationId())))

@@ -185,7 +185,7 @@ export function ActivityBlock(props: Props) {
               className="size-2 shrink-0 rounded-full bg-signal ring-2 ring-pill"
             />
             <span className="min-w-0 flex-1 truncate">
-              {latest ? activityLabel(latest) : "준비하고 있어요"}
+              {latest ? `${latest.kind === "interim" ? "비서 안내: " : ""}${activityLabel(latest)}` : "준비하고 있어요"}
             </span>
             <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
               {formatElapsed(now - props.state.startedAt)}

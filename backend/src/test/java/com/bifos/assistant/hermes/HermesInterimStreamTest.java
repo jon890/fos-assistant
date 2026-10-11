@@ -113,6 +113,23 @@ class HermesInterimStreamTest {
         assertThat(events.getLast().streamedPrefixLength()).isEqualTo(prefix.length());
     }
 
+    @Test
+    @DisplayName("같은 timestamp의 다른 원문은 가린 글이 같아도 다른 안내이고 정확히 재수신한 사건만 같은 번호다")
+    void distinguishesDifferentTextsAtSameTimestampBeforeRedaction() throws IOException {
+        List<RunEvent> events = new ArrayList<>();
+        HermesInterimWire.read("""
+                data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-one"}
+
+                data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-two"}
+
+                data: {"event":"message.interim","timestamp":1.1,"text":"token=secret-one"}
+
+                """, ToolDetailScope.NONE, events::add);
+        assertThat(events).extracting(RunEvent::text).containsExactly("token=[가림]", "token=[가림]", "token=[가림]");
+        assertThat(events).extracting(RunEvent::interimId).containsExactly("1", "2", "1");
+        assertThat(events.toString()).doesNotContain("secret-one", "secret-two", "1.1");
+    }
+
 
     @Test
     @DisplayName("중간 안내의 think와 비밀값은 숨기고 커넥터 호출 뒤와 트리 이력에도 같은 정책을 적용한다")

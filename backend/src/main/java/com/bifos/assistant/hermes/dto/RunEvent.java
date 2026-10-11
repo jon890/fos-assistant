@@ -21,7 +21,7 @@ package com.bifos.assistant.hermes.dto;
  * 않는다. 그 밖의 사건과 연결용 에이전트의 실행에서는 {@code null} 이다
  * @param alreadyStreamed 중간 안내의 일부가 delta로 전달됐는지. 누락되거나 boolean이 아니면 null
  * @param streamedPrefixLength 안내로 확인한 직전 delta 구간의 UTF-16 길이. 원문이 아니라 제거할 길이만 전달한다
- * @param interimId 실행 안에서 같은 안내의 재수신을 가려낼 식별자. Hermes의 timestamp가 없으면 null
+ * @param interimId 실행 안에서 같은 안내의 재수신을 가려낼 불투명한 번호. 원문과 timestamp를 노출하지 않는다
  */
 public record RunEvent(
     String type,

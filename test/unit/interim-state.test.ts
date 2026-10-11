@@ -53,10 +53,10 @@ test("미확인과 잘못된 길이는 본문을 보존한다", () => {
   assert.equal(state.text, "답");
 });
 
-test("가려진 본문이 같아도 timestamp가 다른 안내는 각각 보인다", () => {
+test("가려진 본문이 같아도 원문을 대조해 부여한 번호가 다른 안내는 각각 보인다", () => {
   let activity = emptyActivity(0);
   const state: TurnStreamText = { text: "", interimKeys: new Set() };
-  for (const interimId of ["1.1", "1.2"]) {
+  for (const interimId of ["1", "2"]) {
     applyStreamText(state, { type: "delta", text: "가려질 안내" });
     const event = { type: "interim" as const, text: "[가림]", interimId, alreadyStreamed: true, streamedPrefixLength: 6 };
     activity = applyChatEvent(activity, event);
