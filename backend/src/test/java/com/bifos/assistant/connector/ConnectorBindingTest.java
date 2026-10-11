@@ -49,7 +49,7 @@ class ConnectorBindingTest {
         Agent enabledAgent = agent(false);
         ConnectorBinding binding = ConnectorBinding.pending(enabledAgent, connection(), "demo", CREATED);
 
-        binding.beginInstall(LATER);
+        binding.beginInstall(UUID.randomUUID(), LATER);
         binding.installed(true, LATER);
         binding.pending(LATER);
 
@@ -75,7 +75,7 @@ class ConnectorBindingTest {
         assertThat(binding.restartRequiredSince()).isNull();
         assertThat(binding.desiredEnabled()).isFalse();
 
-        binding.beginInstall(LATER);
+        binding.beginInstall(UUID.randomUUID(), LATER);
         binding.installed(true, LATER);
 
         assertThat(binding.status()).isEqualTo(BindingStatus.PENDING);
@@ -83,7 +83,7 @@ class ConnectorBindingTest {
         assertThat(binding.restartRequired()).isTrue();
         assertThat(binding.restartRequiredSince()).isEqualTo(LATER);
 
-        binding.beginInstall(LATEST);
+        binding.beginInstall(UUID.randomUUID(), LATEST);
         assertThat(binding.desiredEnabled()).as("설치를 시작하면 켜려는 의도를 내린다").isFalse();
         binding.installed(false, LATEST);
 

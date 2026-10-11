@@ -128,12 +128,6 @@ public class ConnectorBinding {
     }
 
 
-    /** 설치를 보내기 전이다. 설치가 끝날 때까지 켜려는 의도를 내린다. */
-    public void beginInstall(Instant now) {
-        beginInstall(UUID.randomUUID(), now);
-    }
-
-
     /** 설치를 보내기 전에 끝난 현재 시도만 시작 때의 의도를 되돌린다. PENDING은 유지한다. */
     public void restoreInstallIntent(boolean desiredEnabled) {
         this.desiredEnabled = desiredEnabled;
