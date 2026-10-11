@@ -38,6 +38,28 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 기존 보관 기간은 늘리지 않는다.
 원본 조회와 삭제 잠금의 흐름은 [사진 첨부](../../docs/features/attachment.md#삭제-요청과-접근-차단)가 갖는다.
 
+## 원고 snapshot과 저장 링크
+
+`content_draft_snapshot`은 기존 암호화 revision의 참조, 최초 내부 origin 실행, 에이전트와 연결·바인딩 판, 정책 지문과 compiler의 두 지문을 보존한다.
+본문·canonical 블록·compiled payload·관찰 설명·사진 byte는 저장하지 않는다. 기존 `content_draft_revision`의 암호화 본문 한 곳만 사용한다.
+칸과 제약은 `V20261011192647__content_draft_snapshot_job.sql`이 소유한다.
+snapshot의 모든 칸은 필수이며 공개 UUID와 `(revision_id,binding_id,snapshot_hash)`는 각각 유일하다.
+`policy_fingerprint`는 잠금 밖에서 준비한 compile 전용 선언과 도구 정책의 SHA-256이다. 연결·바인딩 수정 시각과 함께 현재 판을 대조한다.
+기한은 원고와 참조 첨부 중 가장 이른 기한이다.
+
+`content_draft_job`은 후속 승인 요청을 위한 최소 이력 표다. preview는 job 행을 만들지 않는다.
+snapshot과 action 참조는 각각 유일하고 필수다. owner·conversation은 후속 목록을 같은 범위로 조회하기 위한 필수 칸이다.
+job ID는 예약 전 NULL이며 값이 있으면 유일하다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code도 처음에는 NULL이다.
+status·생성 시각·save_clicked는 필수이고 save_clicked 기본값은 false다.
+저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다. 승인·claim·worker 실행은 아직 구현하지 않았다.
+
+두 표 모두 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
+삭제 가능한 원고·첨부·binding·connection·대화·origin과 이력용 action·snapshot에는 물리 FK와 삭제 cascade를 두지 않는다.
+원고 만료·삭제·purge 뒤에도 참조와 terminal 이력은 남고, 본문을 복구하거나 권한을 우회하는 데 쓰지 않는다.
+같은 snapshot의 UNIQUE 경합은 실패 트랜잭션이 끝난 뒤 새 트랜잭션에서 owner·conversation 범위의 기존 행을 읽는다.
+없는 기존 행이나 공개 UUID만 충돌한 경우는 안전한 실패로 끝내며 실패한 트랜잭션을 다시 쓰지 않는다.
+흐름과 현재 권한 검사는 [원고 기능](../../docs/features/content-draft.md#불변-preview-snapshot)에 있다.
+
 ## 본문 칸과 운영 조회
 
 사용자가 쓴 글이나 모델이 만든 글을 담는 칸이다. 저장 시 암호화의 대상이고, 운영 조회 계정이 읽지 않는 칸이다.

@@ -657,3 +657,13 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 줄은 `bytes` 가 큰 순서다.
 
 루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
+
+### 원고 snapshot의 참가 경계
+
+chat의 `ContentDraftSnapshots`가 preview 저장과 현재 원본 재검사를 소유한다.
+`ContentDraftSnapshotInputs`는 기존 원고·revision·asset 저장소와 복호화·reader를 사용하며 기존 `ContentDraftService`의 helper를 넓히지 않는다.
+`ContentDraftBindingAccess`는 DB 권한 검사와 잠금 밖의 선언 준비를 나누고 connector의 `ConnectorContentDraftBindings`가 구현한다.
+`ContentDraftBindingStamp`에는 식별자·수정 시각·profile·connector ID·정책 지문만 담는다. catalog 전체와 비밀값은 넘기지 않는다.
+`HttpContentDraftSnapshotClient`는 제한된 서비스 HTTP만 맡고, chat의 hash 검증은 요청과 응답 전체를 대조한다.
+독립 조회는 coordinator에 한 번 진입한다. 참가 API는 MANDATORY와 `requireParticipant`를 모두 확인한다.
+compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메인·port를 이유로 패키지 순서나 기존 구조 규칙을 바꾸지 않는다.

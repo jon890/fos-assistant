@@ -16,6 +16,7 @@ import com.bifos.assistant.chat.infra.ResultDeliveryAttemptRepository;
 import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.feedback.application.FeedbackConversations;
 import com.bifos.assistant.hermes.HermesConnectorClient;
+import com.bifos.assistant.hermes.HttpContentDraftSnapshotClient;
 import com.bifos.assistant.hermes.HermesDashboardClient;
 import com.bifos.assistant.hermes.HermesModelClient;
 import com.bifos.assistant.hermes.HermesRunEventStream;
@@ -84,6 +85,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
             HermesRunEventStream.class,
             HermesToolsetClient.class,
             HermesConnectorClient.class,
+            HttpContentDraftSnapshotClient.class,
             HermesSkillClient.class,
             HermesModelClient.class,
             HermesDashboardClient.class

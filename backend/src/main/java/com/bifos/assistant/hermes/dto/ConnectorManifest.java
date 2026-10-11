@@ -39,7 +39,8 @@ public record ConnectorManifest(
     boolean ownerBrowser,
     String ownerBrowserLoginUrl,
     JsonNode executionGuard,
-    String executionGuardManifestSha256) {
+    String executionGuardManifestSha256,
+    ConnectorSnapshotDeclaration snapshot) {
 
     public ConnectorManifest {
         description = description == null ? "" : description;
@@ -48,6 +49,16 @@ public record ConnectorManifest(
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+
+    /** snapshot 선언을 모르는 기존 생성자다. 누락은 미지원이다. */
+    public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
+        String verifyTool, String mcpServer, List<String> toolsets, boolean attachments, int schema,
+        List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
+        boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256) {
+        this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, skills,
+            appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, null);
     }
 
 
