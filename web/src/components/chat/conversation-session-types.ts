@@ -3,6 +3,7 @@ import type { Turn } from "./message-bubble";
 import { type useConversation } from "@/components/shell/conversations-provider";
 import type { ChatEvent } from "@/lib/chat-event";
 import type { AgentView } from "@/lib/agent";
+import type { TurnStreamText } from "./turn-stream-text";
 
 export type ErrorPayload = { code: string; message: string };
 
@@ -44,6 +45,7 @@ export type InterruptedHandlers = {
   onMissing(history: Turn[] | null): Promise<void>;
 };
 export type TurnStreamState = {
+  textState?: TurnStreamText;
   started: boolean;
   done: boolean;
   reportedError: boolean;
