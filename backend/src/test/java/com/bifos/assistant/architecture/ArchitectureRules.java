@@ -40,6 +40,11 @@ import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Table;
+import java.util.HashSet;
 import java.lang.annotation.Annotation;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -625,6 +630,14 @@ public final class ArchitectureRules {
         .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
 
     /**
+     * 에이전트 설정 두 타입의 이름·prefix·개수와 config 역할을 raw 검사한다.
+     * 옛 package 복귀와 누락도 선택 범위에서 빠지지 않는다. 다른 기능의 배치는 검사하지 않는다.
+     */
+    public static final ArchRule FEATURE_CONFIG_PLACEMENT = classes()
+        .should(new AgentConfigPlacement())
+        .as("에이전트 설정은 agent.config에 유일하게 있고 config에는 설정만 둔다");
+
+    /**
      * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.
      *
      * <p>근거: 잘못된 설정은 기동에서 멈춘다.
@@ -741,6 +754,159 @@ public final class ArchitectureRules {
         .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
         .should(notReadHermesTimeoutsFromInjectedProperties())
         .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
+
+    /** crypto 의 엔티티는 domain.entity 에 두고 UserDataKey 또는 같은 표의 타입은 정확히 하나다. */
+    public static final ArchRule ENTITIES_IN_OWNED_ENTITY_PACKAGE = entitiesInOwnedEntityPackage("com.bifos.assistant");
+
+    /** crypto 의 영속 ID 는 소유 엔티티와 같은 패키지에 두고 정책과 projection 은 entity 에 두지 않는다. */
+    public static final ArchRule EMBEDDED_IDS_WITH_ENTITIES = embeddedIdsWithEntities("com.bifos.assistant");
+
+
+    /** fixture 도 운영 규칙의 선택 조건을 그대로 쓰며 루트만 바꾼다. */
+    static ArchRule entitiesInOwnedEntityPackage(String root) {
+        String entityPackage = root + ".crypto.domain.entity";
+        return classes().that().resideInAPackage(root + "..")
+            .should(new ArchCondition<JavaClass>("소유 엔티티를 정확히 하나의 domain.entity 에 둔다") {
+                private int ownedCount;
+                private int tableCount;
+
+
+                @Override
+                public void init(Collection<JavaClass> all) {
+                    ownedCount = 0;
+                    tableCount = 0;
+                }
+
+
+                @Override
+                public void check(JavaClass item, ConditionEvents events) {
+                    boolean ownsTable = item.tryGetAnnotationOfType(Table.class)
+                        .map(table -> table.name().equals("user_data_key")).orElse(false);
+                    boolean existing = (item.getEnclosingClass().isEmpty()
+                        && item.getSimpleName().equals("UserDataKey")) || ownsTable;
+                    if (ownsTable) {
+                        tableCount++;
+                    }
+                    if (existing) {
+                        ownedCount++;
+                    }
+                    boolean cryptoEntity = isCryptoEntity(item, root);
+                    if ((existing || cryptoEntity)
+                        && (!item.getPackageName().equals(entityPackage) || !item.isAnnotatedWith(Entity.class))) {
+                        events.add(SimpleConditionEvent.violated(item,
+                            item.getName() + " 엔티티의 위치는 " + entityPackage + " 이다"));
+                    }
+                }
+
+
+                @Override
+                public void finish(ConditionEvents events) {
+                    if (tableCount != 1) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + ".user_data_key Table 기대 수 1, 실제 " + tableCount));
+                    }
+                    if (ownedCount != 1) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + ".UserDataKey/user_data_key 기대 수 1, 실제 " + ownedCount));
+                    }
+                }
+            }).as("ENTITIES_IN_OWNED_ENTITY_PACKAGE: crypto 엔티티는 domain.entity 에 정확히 하나씩 둔다");
+    }
+
+
+    /** 아직 이동하지 않은 기능을 제한하지 않고 crypto 의 ID 연결과 entity 패키지 역할만 검사한다. */
+    static ArchRule embeddedIdsWithEntities(String root) {
+        String entityPackage = root + ".crypto.domain.entity";
+        return classes().that().resideInAPackage(root + "..")
+            .should(new ArchCondition<JavaClass>("영속 ID 를 소유 엔티티와 같은 패키지에 둔다") {
+                private final Set<JavaClass> idClasses = new HashSet<>();
+                private int entityCount;
+
+
+                @Override
+                public void init(Collection<JavaClass> all) {
+                    idClasses.clear();
+                    entityCount = 0;
+                    for (JavaClass item : all) {
+                        if (isCryptoEntity(item, root)) {
+                            entityCount++;
+                            idClasses.addAll(persistentIdsOf(item));
+                        }
+                    }
+                }
+
+
+                @Override
+                public void check(JavaClass item, ConditionEvents events) {
+                    if (isCryptoEntity(item, root)) {
+                        persistentIdsOf(item).forEach(id -> checkIdPackage(item, id, events));
+                    }
+                    boolean inEntityPackage = item.getPackageName().equals(entityPackage);
+                    boolean inSubpackage = item.getPackageName().startsWith(entityPackage + ".");
+                    boolean persistent = item.isAnnotatedWith(Entity.class) || idClasses.contains(item);
+                    boolean privateNested = item.getEnclosingClass().isPresent()
+                        && item.getModifiers().contains(JavaModifier.PRIVATE);
+                    boolean privateValue = privateNested && !persistent
+                        && !item.isAnnotatedWith(Embeddable.class) && !item.isAnnotatedWith(MappedSuperclass.class);
+                    if (inSubpackage || (inEntityPackage && !privateValue && (!persistent || privateNested))) {
+                        events.add(SimpleConditionEvent.violated(item,
+                            item.getName() + " 은 " + entityPackage
+                                + " 의 엔티티나 실제 영속 ID 또는 private 비영속 구현 값이어야 한다"));
+                    }
+                }
+
+
+                @Override
+                public void finish(ConditionEvents events) {
+                    if (entityCount == 0) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + " 의 crypto 엔티티 검사 대상이 0개다"));
+                    }
+                }
+            }).as("EMBEDDED_IDS_WITH_ENTITIES: crypto 영속 ID 는 엔티티와 같은 패키지에 둔다");
+    }
+
+
+    private static boolean isCryptoEntity(JavaClass item, String root) {
+        return (item.getPackageName().equals(root + ".crypto")
+            || item.getPackageName().startsWith(root + ".crypto.")) && item.isAnnotatedWith(Entity.class);
+    }
+
+
+    /** 필드·getter 와 영속 상속 선언을 함께 읽어 실제 엔티티에 적용되는 ID 타입만 모은다. */
+    private static Set<JavaClass> persistentIdsOf(JavaClass entity) {
+        Set<JavaClass> ids = new HashSet<>();
+        boolean foundIdClass = false;
+        for (JavaClass declaration : entity.getClassHierarchy()) {
+            if (!declaration.equals(entity) && !declaration.isAnnotatedWith(MappedSuperclass.class)
+                && !declaration.isAnnotatedWith(Entity.class)) {
+                continue;
+            }
+            declaration.getFields().stream().filter(field -> field.isAnnotatedWith(EmbeddedId.class))
+                .forEach(field -> ids.add(field.getRawType()));
+            declaration.getMethods().stream().filter(method -> method.isAnnotatedWith(EmbeddedId.class))
+                .forEach(method -> ids.add(method.getRawReturnType()));
+            // 더 가까운 영속 선언의 IdClass 가 상속 선언보다 우선한다.
+            if (!foundIdClass && declaration.isAnnotatedWith(IdClass.class)) {
+                ids.add(idClassOf(declaration));
+                foundIdClass = true;
+            }
+        }
+        return ids;
+    }
+
+
+    private static JavaClass idClassOf(JavaClass item) {
+        return (JavaClass)item.getAnnotationOfType(IdClass.class.getName()).get("value").orElseThrow();
+    }
+
+
+    private static void checkIdPackage(JavaClass entity, JavaClass id, ConditionEvents events) {
+        if (!entity.getPackageName().equals(id.getPackageName())) {
+            events.add(SimpleConditionEvent.violated(entity,
+                entity.getName() + " 의 영속 ID " + id.getName() + " 는 소유 엔티티와 같은 패키지여야 한다"));
+        }
+    }
 
 
     private static DescribedPredicate<JavaClass> enclosedByServiceOrInfra() {
