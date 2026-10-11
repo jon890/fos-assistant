@@ -6,6 +6,7 @@ import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.model.AgentConnectionView;
 import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
+import com.bifos.assistant.connector.application.model.BoundAgentSummary;
 import com.bifos.assistant.connector.application.model.AgentConnectionsView;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
@@ -385,6 +386,13 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      */
     public ConnectorBindingAttempt reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted) {
         return attempts.begin(binding, Optional.of(manifest), accepted, false, false, true, now());
+    }
+
+
+    List<BoundAgentSummary> boundAgents(ConnectorConnection connection) {
+        return bindings.findByConnectionId(connection.id()).stream()
+            .map(BoundAgentSummary::from)
+            .toList();
     }
 
 

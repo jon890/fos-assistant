@@ -3,7 +3,6 @@ package com.bifos.assistant.connector.application;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
 import com.bifos.assistant.connector.application.model.AdminConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
-import com.bifos.assistant.connector.application.model.BoundAgentSummary;
 import com.bifos.assistant.connector.application.model.ConnectionSnapshot;
 import com.bifos.assistant.connector.application.model.ConnectorFieldSummary;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
@@ -134,7 +133,7 @@ public class ConnectorConnectionService {
                 ConnectorToolPolicies.summaries(manifest),
                 connection == null ? ConnectionStatus.DISCONNECTED : connection.status(),
                 true,
-                connection == null ? List.of() : boundAgents(connection),
+                    connection == null ? List.of() : bindingService.boundAgents(connection),
                 manifest.ownerBrowserLoginUrl()));
         }
         mine.values().stream()
@@ -148,7 +147,7 @@ public class ConnectorConnectionService {
                 List.of(),
                 connection.status(),
                 false,
-                boundAgents(connection)))
+                        bindingService.boundAgents(connection)))
             .forEach(result::add);
         return List.copyOf(result);
     }
@@ -449,13 +448,6 @@ public class ConnectorConnectionService {
 
     private ConnectionSnapshot snapshot(ConnectorConnection connection) {
         return ConnectionSnapshot.from(connection, bindings.findByConnectionId(connection.id()));
-    }
-
-
-    private List<BoundAgentSummary> boundAgents(ConnectorConnection connection) {
-        return bindings.findByConnectionId(connection.id()).stream()
-            .map(BoundAgentSummary::from)
-            .toList();
     }
 
 
