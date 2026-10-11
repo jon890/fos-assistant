@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.application;
 
 import java.time.Instant;
-import java.nio.charset.StandardCharsets.UTF;
+import java.nio.charset.StandardCharsets;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.application.model.MediaObservationInput;
 import com.bifos.assistant.chat.application.model.ObservationProvenance;
@@ -109,7 +109,7 @@ public class ContentDraftReferences {
         if (open) {
             String plain = bodies.open(row, draft.ownerUserId()).orElseThrow(ContentDraftBodies::unavailable);
             try {
-                if (plain.getBytes(UTF_8).length > MediaObservationInput.MAX_BODY_BYTES) {
+                if (plain.getBytes(StandardCharsets.UTF_8).length > MediaObservationInput.MAX_BODY_BYTES) {
                     return false;
                 }
                 var body = json.readValue(plain, MediaObservationInput.class);
