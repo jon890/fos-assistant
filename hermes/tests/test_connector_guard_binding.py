@@ -82,7 +82,8 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
 
     def test_link_metadata_changes_hash_without_changing_policy_and_blocks_old_ticket(self):
         original = (self.connector_root / "connector.json").read_text()
-        for key, value in (("readme_url", "https://example.test/README.md"), ("link_kind", "project")):
+        for key, value in (("link", "https://example.test/service"),
+                           ("readme_url", "https://example.test/README.md"), ("link_kind", "project")):
             with self.subTest(field=key):
                 (self.connector_root / "connector.json").write_text(original)
                 self.rewrite("connector.json", lambda declared: declared.update({key: value}))
@@ -95,6 +96,27 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
                 self.assertEqual(self.guard_module._guard_support(PROFILE, changed, self.entry)["state"], "pending")
                 self.assertEqual(self.request(EXECUTE, "POST", self.body(execution=True))[0], 409)
                 self.assertEqual(changed["server"]["tools"]["exclude"], ["place_order"])
+        self.assertEqual(self.supports + self.claims + self.trades, [])
+
+    def test_tool_description_changes_whole_hash_and_blocks_old_ticket(self):
+        original = (self.connector_root / "connector.json").read_text()
+        for value in ("새 설명", "", 42, "설명\u202e"):
+            with self.subTest(description=value):
+                (self.connector_root / "connector.json").write_text(original)
+                self.rewrite("connector.json", lambda declared: declared["tools"]["place_order"].update(description=value))
+                changed = self.plugin._connector_manifest(base.DEMO)
+                self.assertEqual(changed["tools"], self.manifest["tools"])
+                self.assertEqual(changed["execution_guard"], self.manifest["execution_guard"])
+                self.assertNotEqual(changed["execution_guard_manifest_sha256"], self.guard["manifestSha256"])
+                self.assertEqual(self.guard_module._guard_support(PROFILE, changed, self.entry)["state"], "pending")
+                self.assertEqual(self.request(EXECUTE, "POST", self.body(execution=True))[0], 409)
+                self.assertEqual(changed["server"]["tools"]["exclude"], ["place_order"])
+        self.assertEqual(self.supports + self.claims + self.trades, [])
+
+    def test_unserializable_description_does_not_rescue_financial_manifest(self):
+        self.rewrite("connector.json", lambda declared: declared["tools"]["place_order"].update(description="\ud800"))
+        self.assertIsNone(self.plugin._connector_manifest(base.DEMO))
+        self.assertEqual(self.request(EXECUTE, "POST", self.body(execution=True))[0], 404)
         self.assertEqual(self.supports + self.claims + self.trades, [])
 
     def test_revocation_during_callback_blocks_prepare_and_execution(self):
