@@ -225,6 +225,33 @@ for (const restartRequired of [false, true]) {
   });
 }
 
+test("도구 조회 실패에는 붙이기 위험을 알리고 다시 읽어 꺼짐을 확인하면 경고를 거둔다", async ({
+  page,
+  hermes,
+}) => {
+  const code = await createAgent(page);
+  await hermes.setReadinessOutage("unavailable");
+  try {
+    await page.goto(`/agents/${code}`);
+    await expect(page.getByRole("region", { name: "도구" }).getByRole("alert")).toBeVisible();
+    const row = section(page).getByTestId("agent-connection");
+    const dialog = page.getByRole("alertdialog", { name: `${TITLE} 연결을 붙일까요?` });
+    await row.getByRole("button", { name: "붙이기" }).click();
+    await expect(dialog.getByText(SHELL_RISK_MESSAGE)).toBeVisible();
+    await dialog.getByRole("button", { name: "취소" }).click();
+
+    await hermes.setReadinessOutage(undefined);
+    await page.reload();
+    await expect(page.getByRole("region", { name: "도구" }).getByRole("alert")).toHaveCount(0);
+    await row.getByRole("button", { name: "붙이기" }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(SHELL_RISK_MESSAGE)).toHaveCount(0);
+    await dialog.getByRole("button", { name: "취소" }).click();
+  } finally {
+    await hermes.setReadinessOutage(undefined);
+  }
+});
+
 test("셸 도구와 연결을 함께 쓰면 붙일 때와 도구를 켤 때 그 위험을 알린다", async ({
   context,
   page,

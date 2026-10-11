@@ -224,7 +224,8 @@ export function AgentConnectionsSection({
       : visibility === GROUP_VISIBILITY
         ? "AGENT_NOT_PRIVATE"
         : null;
-  const shellOrFile = toolState?.shellOrFileEnabled === true;
+  // 도구 조회가 실패하면 활성 상태를 모르므로 연결 고르기와 같은 위험 안내를 보인다.
+  const shellOrFile = toolState === null || toolState.shellOrFileEnabled;
   const skillsOff = toolState !== null && !toolState.skillsEnabled;
 
   function replace(next: AgentConnectionView) {
