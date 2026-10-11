@@ -853,6 +853,52 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             "write_note": {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False, "identifiers": []},
         })
 
+    def test_toss_stock_tools_are_read_without_approval_or_grant(self):
+        """실제 종목 참조 선언을 카탈로그 reader로 읽어 READ/none을 확인한다."""
+        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        names = {"get_stocks", "list_stocks", "get_stock_warnings"}
+        tools = {"list_scopes": {"risk": "READ"}, **{name: declared["tools"][name] for name in names}}
+        self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
+        policies = self.catalog()[0]["tools"]
+        self.assertEqual(set(policies), names | {"list_scopes"})
+        for policy in policies.values():
+            self.assertEqual(policy["risk"], "READ")
+            self.assertEqual(policy["approval"], "none")
+            self.assertFalse(policy["grant"])
+
+    def test_toss_read_union_preserves_descriptions_and_read_policy(self):
+        """조회 합집합 33개를 실제 reader로 읽고 금융 권한 없이 설명을 보존한다."""
+        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        names = {
+            "list_accounts", "get_quotes", "get_holdings", "get_buying_power", "list_orders",
+            "get_sellable_quantity", "get_stocks", "list_stocks", "get_stock_warnings",
+            "get_orderbook", "get_trades", "get_price_limits", "get_candles", "get_exchange_rate",
+            "get_market_calendar", "list_sectors", "get_sector_rankings", "get_sector",
+            "get_sector_stocks", "get_sector_etfs", "list_conditional_orders", "get_conditional_order",
+            "get_rankings", "get_market_indicator_prices", "get_market_indicator_candles",
+            "get_market_indicator_investor_trading", "get_order", "get_commissions",
+            "get_stock_investor_trading", "get_stock_program_trades", "get_stock_short_selling",
+            "get_stock_credit_trades", "get_stock_securities_lending",
+        }
+        self.assertEqual(set(declared["tools"]), names)
+        self.assertTrue(declared["single_binding"])
+        self.assertTrue(declared["sandbox_required"])
+        self.assertEqual(declared["default_tool_policy"], "deny")
+        tools = {"list_scopes": {"risk": "READ"}, **declared["tools"]}
+        self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
+        policies = self.catalog()[0]["tools"]
+        self.assertEqual(set(policies), names | {"list_scopes"})
+        for name in names:
+            policy = policies[name]
+            self.assertEqual(policy["risk"], "READ")
+            self.assertEqual(policy["approval"], "none")
+            self.assertFalse(policy["grant"])
+            self.assertFalse(policy["outbound"])
+            self.assertEqual(policy["description"], declared["tools"][name]["description"])
+            self.assertNotIn("undefined", policy["description"])
+        self.rewrite("connector.json", lambda value: value["tools"]["get_order"].update(risk="UNKNOWN"))
+        self.assertEqual(self.catalog(), [])
+
     def test_default_approval_of_every_risk(self):
         """위험도 다섯의 기본 `approval` 은 계약의 표와 같다."""
         expected = {"READ": "none", "SENSITIVE": "required", "WRITE": "required",
