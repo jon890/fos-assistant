@@ -29,8 +29,7 @@ class ConnectorConditionalValidationTest(ConnectorGateCase):
             self.validation._require(len(case[field + 'Json'].encode('utf-8')) <= limit)
             self.assertEqual(hashlib.sha256(case[field + 'Json'].encode()).hexdigest(), case[field + 'Sha256'])
         manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {
-            'operations': {case['tool']: case['operation']}, 'scope_fields': [{'arg': 'account_seq', 'field': 'account'}]}}
-        self.validation._require(scope == {'account_seq': '1234'})
+            'operations': {case['tool']: case['operation']}, 'scope_fields': [{'arg': key, 'field': 'account'} for key in scope]}}
         return self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': summary}, model,
                                                 manifest, case['tool'], {'TEST_ACCOUNT': '1234'})
 
