@@ -4,6 +4,14 @@
 
 covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
 
+## 도구 상세 설명
+
+상세 화면은 각 도구의 이름과 위험도·승인 배지 아래에 기능, 중요한 입력, 결과의 제한과 부작용을 평문으로 보인다. 설명은 접거나 줄 수로 자르지 않고 개행을 유지한다. 목록 카드는 기존 도구 요약을 유지한다. 설명이 없는 옛 응답이나 불량 설명은 이름과 정책 배지만 보인다.
+
+정본은 schema 2의 `tools.<이름>.description`이다. Gmail과 네이버 블로그는 이 JSON을 정적으로 import하여 SDK 등록에도 같은 설명을 쓴다. 카탈로그를 읽을 때 MCP 서버를 실행하거나 서비스 API에 설명을 묻지 않는다. Hermes의 `tool_descriptions`는 정책과 분리하며, 카탈로그의 `tools`에 합친 설명을 Control Plane의 `ConnectorTool` → `ConnectorToolSummary` → `ConnectorToolView`와 웹 응답 정제를 거쳐 표시한다.
+
+설명은 앞뒤 공백을 자른 뒤 1자부터 2,000 Unicode code point까지, UTF-8 8,192바이트 이하이다. 탭·CR·LF는 허용하고 그 밖의 C0, DEL, C1, 방향 제어문자와 잘못된 surrogate는 금지한다. HTML이나 Markdown도 React 텍스트로 그린다. 문자와 공백 경계는 Python·Java·웹이 공통 fixture로 검사한다.
+
 ## 요구
 
 **커넥터는 에이전트에게 도구를 쥐어 주는 것이고, 에이전트의 역할을 넓혀 주는 것이다.**
