@@ -60,7 +60,8 @@ public abstract class ConnectorExecutionClaimTestSupport {
                        "place_order":{"title":"주문","risk":"FINANCIAL","approval":"always"}},
               "execution_guard":{"protocol":"approval-claim-v1","prepare_tool":"prepare",
                 "scope_fields":[{"arg":"account_seq","field":"account"}],
-                "operations":{"place_order":"CREATE"}}}]
+                "operations":{"place_order":"CREATE"}},
+              "execution_guard_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]
             """;
     protected static final AtomicReference<String> CATALOG_BODY = new AtomicReference<>(CATALOG);
     protected static final AtomicReference<Barrier> BARRIER = new AtomicReference<>();

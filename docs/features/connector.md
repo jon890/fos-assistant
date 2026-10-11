@@ -320,7 +320,29 @@ callback이 없는 vault 저장·가져오기·삭제와 detach 자체는 기존
 외부 설치까지 원자적으로 정리하려면 Hermes가 설치의 식별자를 대조하는 조건부 설치·삭제 계약을 제공해야 한다.
 현재 시도 UUID는 DB 안에서만 쓰므로, 지금 계약은 DB 권한 차단까지 보장하고 남은 외부 상태의 자동 정리는 보장하지 않는다.
 READ·WRITE의 설치, 재시작 대기와 반영 예정 계약은 그대로이며 FINANCIAL·DESTRUCTIVE는 계속 `RISK_NOT_OPEN`이다.
-guard를 실은 설치와 지원 확인은 후속 구현이며 이번 변경으로 금융 도구를 노출하지 않는다.
+
+### guard 설치와 지원 확인
+
+시작 트랜잭션은 카탈로그의 `execution_guard`를 기존 선언 검사기로 검증하고 protocol과 전체 manifest SHA를
+불변 설치 입력에 캡처한다. 선언이 없으면 기존 5인자 설치를 쓴다. 선언이나 SHA가 잘못됐으면 설치를 보내지 않는다.
+설치 입력에는 엔티티와 가변 JSON을 보관하지 않으며, 일반 바인딩의 유효한 선언만 6인자 `bindConnector`에 연결한다.
+
+`bind.guard`는 `v`, `protocol`, `bindingId`, `connectionId`, `connectionUpdatedAt`, `manifestSha256`만 갖는다.
+번호는 문자열이고 연결 revision은 시작 트랜잭션이 커밋한 값이다. 시도 UUID와 바인딩 revision, nonce는 설치 wire에 넣지 않는다.
+manifest가 바뀌면 새 설치 시도가 새 SHA를 캡처하며 과거 verified를 재사용하지 않는다.
+
+| 순서 | 관측하는 상태 |
+| --- | --- |
+| 시작 커밋 | 새 시도와 `PENDING`, 커밋된 연결 revision |
+| Python 설치 callback | 실제 support가 `409`로 거절하고 plugin은 `pending`을 반환 |
+| 설치·상태·probe와 결과 CAS | 재시작·반영 예정 계약에 따라 현재 시도만 `READY`로 전이 |
+| READY 뒤 상태 조회 | 새 nonce로 실제 support를 확인하고 일치하면 `verified` |
+
+READY 이전의 verified를 설치 완료 조건으로 요구하지 않는다. 지원 확인 실패는 금융 차단 상태이며 일반 설치의
+configured·enabled·mode·policy hook과 probe 판정을 대신하지 않는다. verified도 거래 권한이 아니므로
+금융 도구의 exclude와 상시 허락 없음, `RISK_NOT_OPEN`을 유지한다.
+실제 Spring MVC·DB와 Python 설치·상태·support 소비자의 왕복은 H2와 새 Flyway MySQL DB에서 같은 시험으로 확인한다.
+운영 배포와 실제 실행 왕복의 확인 절차는 `fos-home-infra`가 소유한다.
 
 ### 재시작
 

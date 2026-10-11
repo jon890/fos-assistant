@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * 불변 설치 입력으로 대시보드를 부르고 답과 설치 상태를 그 바인딩의 방식대로 판정한다(ADR-083).
@@ -32,6 +33,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Component
 @RequiredArgsConstructor
 public class ConnectorBindingInstalls {
+    private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String STEP_ENV = "env";
     private static final String STEP_INSTALL = "install";
     private static final String STEP_INSTALL_STATE = "install-state";
@@ -47,6 +49,14 @@ public class ConnectorBindingInstalls {
     private InstallResult sendAgain(ConnectorBindingAttempt attempt) {
         if (attempt.legacy()) {
             return connector.putConnector(attempt.profile(), attempt.connectorId(), true, attempt.sandboxOwner());
+        }
+        if (attempt.guardProtocol() != null) {
+            var guard = JSON.createObjectNode().put("v", 1).put("protocol", attempt.guardProtocol())
+                .put("bindingId", attempt.bindingId().toString()).put("connectionId", attempt.connectionId().toString())
+                .put("connectionUpdatedAt", attempt.connectionRevision().toString())
+                .put("manifestSha256", attempt.guardManifestSha256());
+            return connector.bindConnector(attempt.profile(), attempt.connectorId(), attempt.vault(),
+                attempt.sandboxOwner(), attempt.ownerBrowser(), guard);
         }
         return connector.bindConnector(attempt.profile(), attempt.connectorId(), attempt.vault(),
             attempt.sandboxOwner(), attempt.ownerBrowser());
