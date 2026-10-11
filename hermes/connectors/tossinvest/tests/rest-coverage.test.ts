@@ -26,7 +26,7 @@ import {
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 export const canonical = JSON.parse(raw.toString());
 
-test("현재 11개 READ operation의 공식 성공 예시 29개를 그대로 읽는다", () => {
+test("현재 14개 READ operation의 공식 성공 예시 36개를 그대로 읽는다", () => {
   const reads = new Set([
     "getAccounts",
     "getPrices",
@@ -39,6 +39,9 @@ test("현재 11개 READ operation의 공식 성공 예시 29개를 그대로 읽
     "getTrades",
     "getPriceLimit",
     "getCandles",
+    "getExchangeRate",
+    "getKrMarketCalendar",
+    "getUsMarketCalendar",
   ]);
   let count = 0;
   for (const methods of Object.values(canonical.paths) as any[]) {
@@ -69,7 +72,7 @@ test("현재 11개 READ operation의 공식 성공 예시 29개를 그대로 읽
       count++;
     }
   }
-  expect(count).toBe(29);
+  expect(count).toBe(36);
 });
 
 test("ETF 영문명 누락 호환은 해당 분류와 필드에만 적용한다", () => {
@@ -175,10 +178,10 @@ test("공식 41 operation의 method/path/group과 SHA-256이 일치하고 미구
     41,
   );
   expect(new Set(OPERATIONS.map((op) => op.group)).size).toBe(19);
-  expect(CURRENT_OPERATIONS.size).toBe(12);
+  expect(CURRENT_OPERATIONS.size).toBe(15);
   expect(
     OPERATIONS.filter((op) => !CURRENT_OPERATIONS.has(op.id)),
-  ).toHaveLength(29);
+  ).toHaveLength(26);
 });
 
 test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => {
@@ -200,7 +203,7 @@ test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => 
   ).toBe(false);
 });
 
-test("production SDK의 10개 도구가 12 operation에 도달하고 GET body는 없다", async () => {
+test("production SDK의 12개 도구가 15 operation에 도달하고 GET body는 없다", async () => {
   const allowed = new Set([
     "issueOAuth2Token",
     "getAccounts",
@@ -214,6 +217,9 @@ test("production SDK의 10개 도구가 12 operation에 도달하고 GET body는
     "getTrades",
     "getPriceLimit",
     "getCandles",
+    "getExchangeRate",
+    "getKrMarketCalendar",
+    "getUsMarketCalendar",
   ]);
   const fake = new FakeToss(allowed);
   for (const [path, result] of Object.entries({
@@ -240,6 +246,20 @@ test("production SDK의 10개 도구가 12 operation에 도달하고 GET body는
         .examples[example!].value,
     );
   }
+  for (const path of [
+    "exchange-rate",
+    "market-calendar/KR",
+    "market-calendar/US",
+  ])
+    fake.on(
+      "GET",
+      `/api/v1/${path}`,
+      Object.values(
+        canonical.paths[`/api/v1/${path}`].get.responses["200"].content[
+          "application/json"
+        ].examples as Record<string, { value: unknown }>,
+      )[0]!.value,
+    );
   try {
     await withMcp(
       createTossinvestServer({
@@ -258,6 +278,9 @@ test("production SDK의 10개 도구가 12 operation에 도달하고 GET body는
           ["get_trades", { symbol: "AAPL" }],
           ["get_price_limits", { symbol: "AAPL" }],
           ["get_candles", { symbol: "005930", interval: "1d" }],
+          ["get_exchange_rate", { baseCurrency: "USD", quoteCurrency: "KRW" }],
+          ["get_market_calendar", { market: "KR" }],
+          ["get_market_calendar", { market: "US" }],
         ] as const)
           expect(
             (await tool(client, name, args)).result.isError,
@@ -274,13 +297,13 @@ test("production SDK의 10개 도구가 12 operation에 도달하고 GET body는
     );
     expect(received).toEqual(allowed);
     expect(CURRENT_OPERATIONS).toEqual(received);
-    expect(fake.seen("GET")).toHaveLength(11);
+    expect(fake.seen("GET")).toHaveLength(14);
     expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
     expect(
       fake.seen("POST").filter((request) => request.path !== "/oauth2/token"),
     ).toHaveLength(0);
     expect(fake.seen("DELETE")).toHaveLength(0);
-    expect(fake.requests).toHaveLength(12);
+    expect(fake.requests).toHaveLength(15);
     for (const request of fake.seen("GET")) {
       expect(request.body).toBe("");
       expect(request.headers.get("authorization")).toBe(
@@ -295,6 +318,9 @@ test("production SDK의 10개 도구가 12 operation에 도달하고 GET body는
           "trades",
           "price-limits",
           "candles",
+          "exchange-rate",
+          "market-calendar/KR",
+          "market-calendar/US",
         ].some((path) => request.path.endsWith(`/${path}`))
           ? null
           : "7",

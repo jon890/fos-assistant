@@ -19,6 +19,9 @@ export const CURRENT_OPERATIONS = new Set([
   "getTrades",
   "getPriceLimit",
   "getCandles",
+  "getExchangeRate",
+  "getKrMarketCalendar",
+  "getUsMarketCalendar",
 ]);
 export function matchesOperation(
   operation: Operation,
