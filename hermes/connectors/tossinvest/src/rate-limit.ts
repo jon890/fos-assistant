@@ -23,10 +23,18 @@ export const GROUP_LIMITS: Readonly<Record<string, number>> = {
   ORDER_INFO: 6,
 };
 export interface Clock {
+  /** epoch 근사 밀리초다. 같은 Clock 안의 경과 시간과 deadline을 비교한다. */
   now(): number;
   sleep(ms: number): Promise<void>;
 }
-const clock: Clock = { now: Date.now, sleep: (ms) => Bun.sleep(ms) };
+/** 벽시계 보정에 흔들리지 않는 epoch 근사 시각이다. KST 판정만 현재 벽시계를 쓴다.
+ * 시스템 suspend 중 경과 시계가 멈추는 환경에서는 토큰 TTL도 그만큼 늦게 끝날 수 있다.
+ * 실제 만료 토큰은 기존 expired-token 401의 한 번 재발급 경로로 복구한다.
+ */
+export const clock: Clock = {
+  now: () => performance.timeOrigin + performance.now(),
+  sleep: (ms) => Bun.sleep(ms),
+};
 type Queue = {
   tail: Promise<void>;
   pending: number;
@@ -89,7 +97,7 @@ export async function queueRequest<T>(
       while (true) {
         const current = timer.now();
         const limit = Math.min(
-          groupLimit(group, current),
+          groupLimit(group, timer === clock ? Date.now() : current),
           current < state.limitUntil ? state.limit : Infinity,
         );
         const wait =
@@ -100,7 +108,8 @@ export async function queueRequest<T>(
         if (current >= deadline || current + Math.max(0, wait) >= deadline)
           throw new TossinvestError("TOSSINVEST_NETWORK");
         if (wait <= 0) break;
-        await timer.sleep(wait);
+        // 정수 밀리초 타이머가 남은 소수 시간을 버리지 않게 올리고, 깬 뒤 다시 검사한다.
+        await timer.sleep(Math.ceil(wait));
       }
       try {
         return await work();
@@ -116,7 +125,7 @@ export async function queueRequest<T>(
     () => {},
   );
   // 기다리다가 deadline이 끝난 호출도 즉시 반환하며 큐 안의 작업은 HTTP를 시작하지 않는다.
-  return withDeadline(pending, deadline);
+  return withDeadline(pending, deadline, timer);
 }
 
 export function observeRateLimit(
@@ -124,6 +133,7 @@ export function observeRateLimit(
   group: string,
   status: number,
   headers: Headers,
+  timer: Clock = clock,
 ) {
   const q = queues.get(`${identity}\n${group}`);
   if (!q) return;
@@ -134,7 +144,7 @@ export function observeRateLimit(
       ? Math.min(n * 1000, Number.MAX_SAFE_INTEGER)
       : 0;
   };
-  const now = Date.now();
+  const now = timer.now();
   const reset = seconds("x-ratelimit-reset");
   const limit = Number(headers.get("x-ratelimit-limit"));
   if (Number.isFinite(limit) && limit > 0) {
@@ -153,16 +163,19 @@ export function observeRateLimit(
 export async function withDeadline<T>(
   work: Promise<T>,
   deadline: number,
+  source: Clock = clock,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       work,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new TossinvestError("TOSSINVEST_NETWORK")),
-          Math.max(0, deadline - Date.now()),
-        );
+        const check = () => {
+          const remaining = deadline - source.now();
+          if (remaining <= 0) reject(new TossinvestError("TOSSINVEST_NETWORK"));
+          else timer = setTimeout(check, Math.ceil(remaining));
+        };
+        check();
       }),
     ]);
   } finally {
