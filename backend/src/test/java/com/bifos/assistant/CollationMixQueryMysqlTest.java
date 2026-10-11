@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.chat.application.MediaObservationCleaner;
+import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
@@ -79,6 +80,10 @@ class CollationMixQueryMysqlTest {
     /** V57에는 관찰 표가 없으므로 관찰 정리의 기동 읽기는 실행하지 않는다. */
     @MockitoBean
     private MediaObservationCleaner mediaObservationCleaner;
+
+    /** V57에는 원고 표가 없으므로 원고 정리의 기동 읽기도 실행하지 않는다. */
+    @MockitoBean
+    private ContentDraftCleaner contentDraftCleaner;
 
     @DynamicPropertySource
     static void useMysqlBeforeUnify(DynamicPropertyRegistry registry) {

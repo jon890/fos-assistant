@@ -64,7 +64,7 @@ public class ContentDraftService {
             save(draft, 1, accepted, prepared);
             return null;
         });
-        return read(user, conversationId, id, null);
+        return read(user, conversationId, id, 1L);
     }
 
 
@@ -95,7 +95,7 @@ public class ContentDraftService {
         if (error != null) {
             throw error;
         }
-        return read(user, conversationId, id, null);
+        return read(user, conversationId, id, expectedRevision + 1);
     }
 
 

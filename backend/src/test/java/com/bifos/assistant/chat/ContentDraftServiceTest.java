@@ -13,6 +13,8 @@ import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftReferences;
 import com.bifos.assistant.chat.application.ContentDraftService;
 import com.bifos.assistant.chat.application.model.ContentDraftInput;
+import com.bifos.assistant.chat.application.model.ContentDraftView;
+import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ContentDraftRevisionStatus;
@@ -40,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class ContentDraftServiceTest extends ContentDraftFixture {
     @Test
@@ -206,7 +209,8 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         jdbc.update("update conversation set task_id=7 where id=?", task.id());
         code(() -> drafts.create(owner, check.id(), inputDraft("새", false)), ErrorCode.CONVERSATION_NOT_FOUND);
         code(() -> drafts.create(owner, task.id(), inputDraft("새", false)), ErrorCode.CONVERSATION_NOT_FOUND);
-        conversations.deleteById(task.id());
+        Integer deleted = new TransactionTemplate(manager).execute(status -> conversations.discardEmptyTaskConversation(task.id()));
+        assertThat(deleted).isEqualTo(1);
         assertThat(draftRows.count()).isZero();
     }
 
@@ -308,6 +312,29 @@ class ContentDraftServiceTest extends ContentDraftFixture {
             code(() -> drafts.create(owner, conversation.id(), reader.read(node)), ErrorCode.ATTACHMENT_GONE);
         }
         assertThat(draftRows.count()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("커밋 뒤 경쟁 수정이 끝나도 생성과 수정은 이번 수락 판을 응답한다")
+    void returnsAcceptedRevisionWhenAnotherCasCommitsBeforeResponseRead() {
+        var racing = new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows,
+            new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock) {
+            @Override
+            public ContentDraftView read(CurrentUser user, Long conversationId, UUID id, Long revision) {
+                long current = draftRows.findByPublicIdAndConversationIdAndOwnerUserId(id.toString(), conversationId, user.id())
+                    .orElseThrow().currentRevision();
+                drafts.revise(user, conversationId, id, current, inputDraft("경쟁 수정", false));
+                return super.read(user, conversationId, id, revision);
+            }
+        };
+        var created = racing.create(owner, conversation.id(), inputDraft("수락 생성", false));
+        assertThat(created.draft().revision()).isEqualTo(1);
+        assertThat(created.draft().title()).isEqualTo("수락 생성");
+        var revised = racing.revise(owner, conversation.id(), created.draft().draftId(), 2, inputDraft("수락 수정", false));
+        assertThat(revised.draft().revision()).isEqualTo(3);
+        assertThat(revised.draft().title()).isEqualTo("수락 수정");
+        assertThat(drafts.read(owner, conversation.id(), created.draft().draftId(), null).draft().revision()).isEqualTo(4);
     }
 
 }
