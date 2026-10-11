@@ -2,10 +2,7 @@ package com.bifos.assistant.usage.application;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
-import com.bifos.assistant.hermes.dto.SessionRuntime;
-import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -27,7 +24,7 @@ import org.springframework.stereotype.Service;
 /**
  * 에이전트 turn 하나를 한 줄로 남긴다. 그래야 사용량을 사용자, 모델, provider 로 되짚을 수 있다.
  *
- * <p>비용은 실행이 끝나는 이 자리에서 환산하고 쓴 가격표와 함께 저장한다. 조회할 때 다시 계산하면
+ * <p>완료 기록 서비스는 실행이 끝날 때 비용을 환산하고 쓴 가격표와 함께 저장한다. 조회할 때 다시 계산하면
  * 가격이 바뀔 때 지난달 합계가 따라 움직인다.
  */
 @Service
@@ -37,10 +34,9 @@ public class ExecutionRecorder {
     private final Clock clock;
 
     private final AgentExecutionRepository executions;
-    private final CostEstimator costs;
-    private final HermesRunsClient hermes;
     private final UserExecutionLimiter limiter;
     private final ExecutionContextSourceWriter contextSources;
+    private final ExecutionCompletionRecorder completion;
 
     /**
      * 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다.
@@ -347,32 +343,13 @@ public class ExecutionRecorder {
 
     /** 시스템 판단 실행의 실제 모델과 토큰을 남긴다. 실제 모델을 모르면 요청 모델로 대신하지 않는다. */
     public AgentExecution completeSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl) {
-        return recordSystem(execution, result, apiBaseUrl, null);
+        return completion.completeSystem(execution, result, apiBaseUrl);
     }
 
     /** 실패한 시스템 판단도 실제 모델과 사용량을 보존한다. 실패 응답 본문은 남기지 않는다. */
     public AgentExecution failSystem(
             AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
-        return recordSystem(execution, result, apiBaseUrl, errorCode);
-    }
-
-    private AgentExecution recordSystem(
-            AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
-        SessionRuntime actual = result.runtime();
-        if (actual == null || isBlank(actual.provider()) || isBlank(actual.model())) {
-            actual = hermes.readSessionRuntime(apiBaseUrl, execution.profileName(), result.sessionId());
-        }
-        String provider = actual == null ? null : actual.provider();
-        String model = actual == null ? null : actual.model();
-        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        execution.attachRunId(result.runId());
-        var cost = costs.estimate(provider, model, usage, execution.costMode());
-        if (errorCode == null) {
-            execution.markSucceeded(provider, model, usage, cost, clock.instant());
-        } else {
-            execution.markFailed(provider, model, usage, cost, errorCode, clock.instant());
-        }
-        return executions.save(execution);
+        return completion.failSystem(execution, result, apiBaseUrl, errorCode);
     }
 
     /** 제출 직후 run 번호를 붙인다. */
@@ -425,7 +402,7 @@ public class ExecutionRecorder {
     /**
      * 끝난 실행을 SUCCEEDED 로 갱신한다.
      *
-     * <p>기록할 provider 와 모델은 {@link #served} 가 고른다. v0.21.5 의 실행 {@code runtime} 이 짝을 주면 그것을,
+     * <p>기록할 provider 와 모델은 완료 기록 서비스가 고른다. v0.21.5 의 실행 {@code runtime} 이 짝을 주면 그것을,
      * 아니면 세션 조회와 대화가 고른 값으로 채운다. 모두 읽지 못해도 실행은 성공으로 남긴다. 모델 이름을 모르는
      * 것이 답을 버릴 이유가 되지 않는다.
      *
@@ -433,7 +410,7 @@ public class ExecutionRecorder {
      */
     public AgentExecution complete(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
-        return complete(execution, agent, result, requested, null);
+        return completion.complete(execution, agent, result, requested);
     }
 
     /**
@@ -446,17 +423,7 @@ public class ExecutionRecorder {
      */
     public AgentExecution complete(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
-        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime served = served(agent, result, requested);
-        String provider = served.provider();
-        String model = served.model();
-        execution.attachRunId(result.runId());
-        execution.markSucceeded(
-                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), clock.instant());
-        if (outputText != null) {
-            execution.recordOutput(outputText);
-        }
-        return executions.save(execution);
+        return completion.complete(execution, agent, result, requested, outputText);
     }
 
     /**
@@ -471,34 +438,18 @@ public class ExecutionRecorder {
 
     /** 최종 결과를 받지 못한 실행을 FAILED 로 갱신한다. 이미 적힌 사용량은 보존한다. */
     public AgentExecution fail(AgentExecution execution, String errorCode) {
-        execution.markFailed(errorCode, clock.instant());
-        return executions.save(execution);
+        return completion.fail(execution, errorCode);
     }
 
     /** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
     public AgentExecution fail(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
-        if (result == null) {
-            return fail(execution, errorCode);
-        }
-        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime served = served(agent, result, requested);
-        String provider = served.provider();
-        String model = served.model();
-        execution.attachRunId(result.runId());
-        execution.markFailed(
-                provider,
-                model,
-                usage,
-                costs.estimate(provider, model, usage, agent.costMode()),
-                errorCode,
-                clock.instant());
-        return executions.save(execution);
+        return completion.fail(execution, agent, result, requested, errorCode);
     }
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
-        return cancel(execution, agent, result, requested, null);
+        return completion.cancel(execution, agent, result, requested);
     }
 
     /**
@@ -511,62 +462,12 @@ public class ExecutionRecorder {
      */
     public AgentExecution cancel(
             AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
-        if (result == null) {
-            return cancel(execution);
-        }
-        TokenUsage usage = result.usage() == null ? TokenUsage.empty() : result.usage();
-        SessionRuntime served = served(agent, result, requested);
-        String provider = served.provider();
-        String model = served.model();
-        execution.attachRunId(result.runId());
-        execution.markCancelled(
-                provider, model, usage, costs.estimate(provider, model, usage, agent.costMode()), clock.instant());
-        if (outputText != null) {
-            execution.recordOutput(outputText);
-        }
-        return executions.save(execution);
+        return completion.cancel(execution, agent, result, requested, outputText);
     }
 
     /** 이미 적은 토큰을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(AgentExecution execution) {
-        execution.markCancelled(clock.instant());
-        return executions.save(execution);
-    }
-
-    /**
-     * 기록할 provider 와 모델의 짝을 고른다.
-     *
-     * <p>v0.21.5 실행 조회의 {@code runtime} 에 둘 다 있으면 그 짝을 통째로 쓴다. 출처가 다른 두 값을 한 짝으로
-     * 적으면 금액도 틀린 짝으로 계산된다. 없으면 세션 조회, {@code runtime}, 대화가 고른 값 순서로 칸마다 채운다.
-     */
-    private SessionRuntime served(Agent agent, HermesRunResult result, ModelChoice requested) {
-        SessionRuntime runtime = result.runtime();
-        if (runtime != null && !isBlank(runtime.provider()) && !isBlank(runtime.model())) {
-            return runtime;
-        }
-        SessionRuntime actual = readActualRuntime(agent, result);
-        String provider = firstNonBlank(
-                actual == null ? null : actual.provider(),
-                firstNonBlank(
-                        runtime == null ? null : runtime.provider(), requested == null ? null : requested.provider()));
-        String model = firstNonBlank(
-                actual == null ? null : actual.model(),
-                firstNonBlank(runtime == null ? null : runtime.model(), requested == null ? null : requested.model()));
-        return new SessionRuntime(model, provider);
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private SessionRuntime readActualRuntime(Agent agent, HermesRunResult result) {
-        SessionRuntime actual =
-                hermes.readSessionRuntime(agent.apiBaseUrl(), agent.hermesProfile(), result.sessionId());
-        if (actual == null) {
-            log.info(
-                    "실제로 돈 모델을 읽지 못해 대화가 고른 값을 적는다 profile={} sessionId={}", agent.hermesProfile(), result.sessionId());
-        }
-        return actual;
+        return completion.cancel(execution);
     }
 
     private AgentExecution.Builder base(CurrentUser user, ExecutionConversation conversation, Agent agent) {
@@ -579,7 +480,4 @@ public class ExecutionRecorder {
                 .startedAt(clock.instant());
     }
 
-    private static String firstNonBlank(String preferred, String fallback) {
-        return preferred == null || preferred.isBlank() ? fallback : preferred;
-    }
 }

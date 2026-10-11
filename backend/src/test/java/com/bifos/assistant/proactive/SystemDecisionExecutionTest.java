@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
@@ -25,6 +26,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -49,7 +52,38 @@ class SystemDecisionExecutionTest {
     @Autowired
     Clock clock;
 
+    @Autowired
+    StubHermesRunsClient hermes;
+
     private final List<Long> created = new ArrayList<>();
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("시스템의 실제 모델을 읽지 못하면 성공과 실패 모두 요청 모델로 대체하지 않는다")
+    void leavesUnknownSystemRuntimeEmpty(boolean failed) {
+        hermes.willReportSessionRuntime(null);
+        AgentExecution system = recorder.startSystem(
+                USER, "decision-test", CostMode.SUBSCRIPTION,
+                ModelChoice.of("requested-provider", "requested-model", null));
+        created.add(system.id());
+        HermesRunResult result = new HermesRunResult(
+                "unknown-system-run", "unknown-session", failed ? "failed" : "completed",
+                null, "requested-model", "requested-provider", null, new TokenUsage(10L, 0L, 4L, 14L));
+        if (failed) {
+            recorder.failSystem(system, result, "http://hermes.example.com", "FAILED");
+        } else {
+            recorder.completeSystem(system, result, "http://hermes.example.com");
+        }
+
+        assertThat(executions.findById(system.id()).orElseThrow()).satisfies(row -> {
+            assertThat(row.status()).isEqualTo(failed ? ExecutionStatus.FAILED : ExecutionStatus.SUCCEEDED);
+            assertThat(row.provider()).isNull();
+            assertThat(row.model()).isNull();
+            assertThat(row.totalTokens()).isEqualTo(14L);
+            assertThat(row.estimatedCostMicros()).isNull();
+            assertThat(row.pricingVersion()).isNull();
+        });
+    }
 
     @AfterEach
     void tearDown() {

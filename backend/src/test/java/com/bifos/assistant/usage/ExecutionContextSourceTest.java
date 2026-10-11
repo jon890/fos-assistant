@@ -13,12 +13,11 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
-import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ContextSourceRef;
-import com.bifos.assistant.usage.application.CostEstimator;
+import com.bifos.assistant.usage.application.ExecutionCompletionRecorder;
 import com.bifos.assistant.usage.application.ExecutionContextSnapshot;
 import com.bifos.assistant.usage.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
@@ -71,17 +70,13 @@ class ExecutionContextSourceTest {
     Clock clock;
 
     @Autowired
-    CostEstimator costs;
+    ExecutionCompletionRecorder completion;
 
     @Autowired
     UserExecutionLimiter limiter;
 
     @Autowired
     PlatformTransactionManager transactionManager;
-
-    /** 실제로 돈 모델을 읽는 세션 조회는 대역이 받는다. 기록 규칙만 보는 검사다. */
-    @Autowired
-    HermesRunsClient hermes;
 
     private Conversation conversation;
 
@@ -134,10 +129,9 @@ class ExecutionContextSourceTest {
         ExecutionRecorder swapped = new ExecutionRecorder(
                 clock,
                 executions,
-                costs,
-                hermes,
                 limiter,
-                new ExecutionContextSourceWriter(failing, transactionManager, clock));
+                new ExecutionContextSourceWriter(failing, transactionManager, clock),
+                completion);
 
         AgentExecution execution = start(swapped, adminUser());
 

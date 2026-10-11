@@ -10,6 +10,8 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.hermes.StubHermesRunsClient;
+import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -28,6 +30,9 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** 실행 시작과 종료가 하나의 기록을 상태 전이하는지 확인한다. */
@@ -52,6 +57,9 @@ class ExecutionLifecycleTest {
 
     @Autowired
     ConversationRepository conversations;
+
+    @Autowired
+    StubHermesRunsClient hermes;
 
     private Conversation conversation;
 
@@ -109,6 +117,93 @@ class ExecutionLifecycleTest {
             assertThat(saved.hermesRunId()).isEqualTo("run-1");
             assertThat(saved.status()).isEqualTo(ExecutionStatus.FAILED);
             assertThat(saved.errorCode()).isEqualTo("HERMES_UNAVAILABLE");
+        });
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "run-provider, run-model, session-provider, session-model, run-provider, run-model",
+        "run-provider, , session-provider, session-model, session-provider, session-model",
+        "run-provider, , , session-model, run-provider, session-model",
+        " , run-model, , , anthropic, run-model",
+        " , , , , anthropic, example-model-large"
+    })
+    @DisplayName("완전한 실행 runtime 짝을 우선하고 부족한 칸은 세션과 요청 순서로 채운다")
+    void preservesRuntimePairAndFallbackOrder(
+            String runProvider, String runModel, String sessionProvider, String sessionModel,
+            String expectedProvider, String expectedModel) {
+        hermes.willReportSessionRuntime(new SessionRuntime(sessionModel, sessionProvider));
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
+        HermesRunResult result = new HermesRunResult(
+                "runtime-run", "runtime-session", "completed", "답", null, null, null,
+                new TokenUsage(120L, 80L, 40L, 160L), new SessionRuntime(runModel, runProvider));
+
+        recorder.complete(execution, agent(), result, requested());
+
+        assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
+            assertThat(saved.provider()).isEqualTo(expectedProvider);
+            assertThat(saved.model()).isEqualTo(expectedModel);
+            assertThat(saved.totalTokens()).isEqualTo(160L);
+            assertThat(saved.estimatedCostMicros()).isNull();
+            assertThat(saved.pricingVersion()).isNull();
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionStatus.class, names = {"SUCCEEDED", "CANCELLED"})
+    @DisplayName("완료와 취소는 종료 상태와 답을 같은 실행 줄에 저장한다")
+    void storesTerminalStatusAndOutputOnSameRow(ExecutionStatus status) {
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
+        if (status == ExecutionStatus.SUCCEEDED) {
+            recorder.complete(execution, agent(), result(), requested(), "저장할 답");
+        } else {
+            recorder.cancel(execution, agent(), result(), requested(), "저장할 답");
+        }
+
+        assertThat(executions.count()).isOne();
+        assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
+            assertThat(saved.status()).isEqualTo(status);
+            assertThat(saved.outputText()).isEqualTo("저장할 답");
+            assertThat(saved.hermesRunId()).isEqualTo("run-1");
+            assertThat(saved.totalTokens()).isEqualTo(160L);
+            assertThat(saved.finishedAt()).isNotNull();
+        });
+    }
+
+    @Test
+    @DisplayName("취소한 실행의 후속 사용량 저장은 기존 종료 시각을 보존한다")
+    void preservesCancellationTimeWhenUsageArrivesLater() {
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
+        Instant cancelledAt = Instant.parse("2026-10-01T00:00:00Z");
+        execution.markCancelled(cancelledAt);
+        executions.save(execution);
+
+        recorder.cancel(execution, agent(), result(), requested(), "멈춘 답");
+
+        assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
+            assertThat(saved.finishedAt()).isEqualTo(cancelledAt);
+            assertThat(saved.status()).isEqualTo(ExecutionStatus.CANCELLED);
+            assertThat(saved.totalTokens()).isEqualTo(160L);
+            assertThat(saved.outputText()).isEqualTo("멈춘 답");
+        });
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ExecutionStatus.class, names = {"FAILED", "CANCELLED"})
+    @DisplayName("최종 결과가 없는 실패와 취소는 기존 사용량과 답을 보존한다")
+    void preservesRecordedUsageWhenFinalResultIsMissing(ExecutionStatus status) {
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
+        recorder.complete(execution, agent(), result(), requested(), "기존 답");
+        if (status == ExecutionStatus.FAILED) {
+            recorder.fail(execution, agent(), null, requested(), "FAILED");
+        } else {
+            recorder.cancel(execution, agent(), null, requested(), "새 답");
+        }
+
+        assertThat(executions.findById(execution.id()).orElseThrow()).satisfies(saved -> {
+            assertThat(saved.status()).isEqualTo(status);
+            assertThat(saved.totalTokens()).isEqualTo(160L);
+            assertThat(saved.outputText()).isEqualTo("기존 답");
         });
     }
 

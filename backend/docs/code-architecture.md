@@ -158,7 +158,12 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 6. `HttpHermesRunsClient` 가 실행을 제출하고 받은 `run_id` 를 그 자리에서 실행 줄에 적는다. 싣는 모델과 effort 는 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「모델 선택」 이 정한다.
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다. 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다([ADR-004](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
-9. `ExecutionRecorder` 가 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「합계와 완전성」 이 갖는다.
+9. `ExecutionRecorder` 가 완료 기록 서비스에 위임해 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「합계와 완전성」 이 갖는다.
+
+실행 기록의 공개 메서드는 `ExecutionRecorder`에 둔다. 시작과 실행 한도, 문맥 출처, 관측 상태와 시각 표시는 이 서비스가 맡는다.
+`ExecutionCompletionRecorder`는 완료·실패·취소 때 실제 provider와 모델, 사용량, 당시 가격과 버전, 종료 상태와 답을 같은 실행 줄에 저장한다.
+완전한 실행 runtime 짝을 우선하고, 부족한 칸은 세션 조회·실행 runtime·요청값 순서로 채운다. 시스템 판단은 실제 모델을 모르면 요청값으로 대체하지 않는다.
+최종 결과 없는 실패·취소는 이미 저장한 사용량을 보존하고, 취소의 후속 저장은 기존 종료 시각을 보존한다. 두 서비스 사이에 새 트랜잭션을 두지 않는다.
 
 `instructions` 를 조립하는 순서는 아래와 같다.
 
