@@ -44,9 +44,9 @@ export function createToolRegistration(server: McpServer) {
     server.registerTool(
       name,
       {
-        description: (
-          manifest.tools as Record<string, { description: string }>
-        )[name]?.description ?? descriptions[name],
+        description:
+          (manifest.tools as Record<string, { description: string }>)[name]
+            ?.description ?? descriptions[name],
         inputSchema: z.strictObject(schema),
         annotations,
       },
