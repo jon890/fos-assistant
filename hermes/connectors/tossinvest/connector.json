@@ -30,6 +30,7 @@
     "get_sellable_quantity": { "risk": "READ" }
   },
   "errors": {
+    "TOSSINVEST_OUTCOME_UNKNOWN": "outcome_unknown",
     "TOSSINVEST_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },
     "TOSSINVEST_IP_NOT_ALLOWED": { "category": "forbidden", "recovery": "reconnect" },
     "TOSSINVEST_FORBIDDEN": "forbidden",
