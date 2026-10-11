@@ -75,6 +75,7 @@ public class ConversationPurger {
     private final Clock clock;
     private final ChatContentMutationCoordinator mutations;
     private final MediaObservationCleaner observations;
+    private final ContentDraftCleaner drafts;
 
     /** 실패한 대화를 다음에 다시 볼 시각과 그때 기다릴 간격, 잇단 실패 수다. */
     private final Map<Long, Backoff> backoffs = new ConcurrentHashMap<>();
@@ -169,6 +170,7 @@ public class ConversationPurger {
             for (ChatAttachment attachment : attachments.findByConversationIdOrderByIdAsc(conversationId)) {
                 attachment.requestDeletion(now);
             }
+            drafts.invalidateForConversation(conversationId);
             observations.deleteForConversation(conversationId);
             return current;
         });

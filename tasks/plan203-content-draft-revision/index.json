@@ -1,0 +1,11 @@
+{
+  "name": "plan203-content-draft-revision",
+  "description": "main의 원고 revision REST에 서명 origin MCP와 사건 가림·fos-ctx 필수 목록을 연결한다",
+  "status": "pending",
+  "created_at": "2026-10-11",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" }
+  ]
+}

@@ -1,0 +1,14 @@
+package com.bifos.assistant.chat.presentation.contentdraft;
+
+import java.util.List;
+import lombok.NoArgsConstructor;
+import lombok.AccessLevel;
+import com.bifos.assistant.chat.application.model.ContentDraftSummary;
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class ContentDraftDtos {
+
+    public record ListResponse(List<ContentDraftSummary> items) {}
+
+    public record DraftError(String code, String message, Long currentRevision) {}
+}

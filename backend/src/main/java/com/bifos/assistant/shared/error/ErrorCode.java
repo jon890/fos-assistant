@@ -142,6 +142,14 @@ public enum ErrorCode {
      * 알아낼 수 있다.
      */
     ATTACHMENT_GONE(HttpStatus.GONE),
+    /** 원고의 현재 판이 요청과 다르다. */
+    CONTENT_DRAFT_CONFLICT(HttpStatus.CONFLICT),
+    /** 원고가 고정한 원본이나 관찰을 더 이상 쓸 수 없다. */
+    CONTENT_DRAFT_STALE(HttpStatus.CONFLICT),
+    /** 원고의 보관 기간이 끝났다. */
+    CONTENT_DRAFT_GONE(HttpStatus.GONE),
+    /** 일시 장애로 원고 본문을 사용할 수 없다. */
+    CONTENT_DRAFT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     /**
      * 대화 폴더에 그 파일이 없거나, 내주지 않는 확장자이거나, 실제 경로가 대화 폴더 밖이다.
      *

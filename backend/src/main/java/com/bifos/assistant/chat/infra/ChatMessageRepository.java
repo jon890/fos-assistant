@@ -44,6 +44,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
     /** 그 실행이 남긴 메시지가 이미 있는지 본다. */
     boolean existsByExecutionId(Long executionId);
 
+    boolean existsByConversationId(Long conversationId);
+
     /**
      * 기간 안에 요청을 받은 사용자 turn 의 루트 실행에서 첫 반응 시간 집계가 쓰는 칸만 읽는다.
      *

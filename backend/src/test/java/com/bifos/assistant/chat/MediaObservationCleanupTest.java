@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.ConversationPurger;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -19,6 +20,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class MediaObservationCleanupTest extends ObservationFixture {
+    @Autowired
+    ContentDraftCleaner drafts;
+
     @Autowired
     ConversationWriter writer;
 
@@ -40,7 +44,7 @@ class MediaObservationCleanupTest extends ObservationFixture {
                 throw new IllegalStateException("synthetic file deletion failure");
             }
         };
-        var cleaner = new AttachmentCleaner(attachments, failing, clock, mutations, observationCleaner);
+        var cleaner = new AttachmentCleaner(attachments, failing, clock, mutations, observationCleaner, drafts);
         assertThatThrownBy(() -> cleaner.delete(photo, NOW)).isInstanceOf(IllegalStateException.class);
         assertThat(observations.count()).isZero();
         assertThat(requests.count()).isZero();

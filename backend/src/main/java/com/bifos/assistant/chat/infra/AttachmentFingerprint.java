@@ -4,10 +4,12 @@ import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.shared.util.Sha256;
 import java.io.IOException;
 import java.util.HexFormat;
+import lombok.NoArgsConstructor;
+import lombok.AccessLevel;
 
 /** 원본 전체의 크기를 확인하고 관찰과 원고가 같은 SHA-256 계산을 쓴다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class AttachmentFingerprint {
-    private AttachmentFingerprint() {}
 
     public static String read(AttachmentStore store, ChatAttachment row) throws IOException {
         var digest = Sha256.newDigest();

@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.ChatContentMutationCoordinator;
 import com.bifos.assistant.chat.application.MediaObservationCleaner;
 import com.bifos.assistant.chat.domain.ChatAttachment;
@@ -32,6 +33,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /** 일정이 부르는 {@code runScheduled} 가 주입받은 시계의 시각을 기준으로 첨부를 지우는지 확인한다. */
 @BackendIntegrationTest
 class AttachmentCleanerClockTest {
+    @Autowired
+    ContentDraftCleaner drafts;
+
 
     private static final Instant NOW = Instant.parse("2026-03-01T04:00:00Z");
 
@@ -77,7 +81,7 @@ class AttachmentCleanerClockTest {
         ChatAttachment expired = stored(NOW.minus(Duration.ofDays(1)));
         ChatAttachment live = stored(NOW.plus(Duration.ofDays(1)));
         AttachmentCleaner cleaner =
-                new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations, observations);
+                new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations, observations, drafts);
 
         cleaner.runScheduled();
 
@@ -98,7 +102,7 @@ class AttachmentCleanerClockTest {
                 progressingClock.advance(Duration.ofSeconds(60));
             }
         };
-        var cleaner = new AttachmentCleaner(attachments, progressingStore, progressingClock, mutations, observations);
+        var cleaner = new AttachmentCleaner(attachments, progressingStore, progressingClock, mutations, observations, drafts);
 
         assertThat(cleaner.delete(attachment, progressingClock.instant())).isTrue();
         var completed = attachments.findById(attachment.id()).orElseThrow();

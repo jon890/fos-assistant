@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.AttachmentImages;
 import com.bifos.assistant.chat.application.AttachmentInspection;
 import com.bifos.assistant.chat.application.AttachmentService;
@@ -64,6 +65,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** 요청 커밋과 파일 작업의 장벽을 H2와 실제 MySQL에서 같은 회귀로 확인한다. */
 @BackendIntegrationTest
 public class AttachmentDeletionBarrierTest {
+    @Autowired
+    ContentDraftCleaner drafts;
+
     private static final Instant NOW = Instant.parse("2026-10-10T01:00:00Z");
     private static final byte[] IMAGE = new byte[] {'G', 'I', 'F', '8', '9', 'a', 1, 2, 3};
 
@@ -179,13 +183,13 @@ public class AttachmentDeletionBarrierTest {
                 throw new IllegalStateException("synthetic stop before completion commit");
             }
         };
-        var interrupted = new AttachmentCleaner(attachments, interruptedStore, clock, mutations, observations);
+        var interrupted = new AttachmentCleaner(attachments, interruptedStore, clock, mutations, observations, drafts);
         assertThatThrownBy(() -> interrupted.delete(photo, NOW)).isInstanceOf(IllegalStateException.class);
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
                 .isEqualTo(NOW);
         assertThat(attachments.findById(photo.id()).orElseThrow().deletedAt()).isNull();
         clock.advance(Duration.ofSeconds(1));
-        var restarted = new AttachmentCleaner(attachments, store, clock, mutations, observations);
+        var restarted = new AttachmentCleaner(attachments, store, clock, mutations, observations, drafts);
         restarted.runScheduled();
         var completed = attachments.findById(photo.id()).orElseThrow();
         assertThat(completed.deletionRequestedAt()).isEqualTo(NOW);
@@ -367,7 +371,7 @@ public class AttachmentDeletionBarrierTest {
                 super.delete(attachment);
             }
         };
-        var expiring = new AttachmentCleaner(attachments, validating, clock, mutations, observations);
+        var expiring = new AttachmentCleaner(attachments, validating, clock, mutations, observations, drafts);
         assertThat(expiring.cleanExpired(clock.instant())).isEqualTo(1);
         assertThat(checked).isTrue();
         assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
@@ -438,7 +442,7 @@ public class AttachmentDeletionBarrierTest {
                 super.delete(attachment);
             }
         };
-        return new AttachmentCleaner(attachments, paused, clock, mutations, observations);
+        return new AttachmentCleaner(attachments, paused, clock, mutations, observations, drafts);
     }
 
     private void assertBlocked() {

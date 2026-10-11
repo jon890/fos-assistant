@@ -32,6 +32,7 @@ public class AttachmentCleaner {
     private final Clock clock;
     private final ChatContentMutationCoordinator mutations;
     private final MediaObservationCleaner observations;
+    private final ContentDraftCleaner drafts;
 
     /** 하루에 한 번 돈다. 시각은 Control Plane 의 시간대를 따르고, 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
@@ -89,6 +90,7 @@ public class AttachmentCleaner {
                 return null;
             }
             row.requestDeletion(now);
+            drafts.invalidateForAttachment(row.conversationId(), row.id());
             observations.deleteForAttachment(row.conversationId(), row.id());
             return row;
         });

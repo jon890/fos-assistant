@@ -47,7 +47,7 @@ public class ChatContentMutationCoordinator {
             for (Long id : ids) {
                 attachments
                         .findForMutation(id, target.conversationId())
-                        .filter(it -> ownerUserId.equals(it.uploadedByUserId()))
+                        .filter(it -> target.attachmentIds().isEmpty() || ownerUserId.equals(it.uploadedByUserId()))
                         .orElseThrow(ChatContentMutationCoordinator::notFound);
             }
             entered.set(target);

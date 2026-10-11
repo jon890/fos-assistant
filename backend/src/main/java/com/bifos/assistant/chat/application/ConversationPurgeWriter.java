@@ -2,6 +2,9 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatArtifactRepository;
+import com.bifos.assistant.chat.infra.ContentDraftRepository;
+import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
+import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
@@ -32,6 +35,9 @@ class ConversationPurgeWriter {
     private final ExecutionQuestionRepository questions;
     private final ConversationExecutionPurge executions;
     private final ChatContentMutationCoordinator mutations;
+    private final ContentDraftRepository drafts;
+    private final ContentDraftRevisionRepository revisions;
+    private final ContentDraftAssetRepository assets;
 
     /**
      * 그 대화의 본문을 지우고 지운 시각을 적는다.
@@ -47,6 +53,9 @@ class ConversationPurgeWriter {
             return false;
         }
         pendingMessages.deleteAllOf(conversationId);
+        assets.deleteForConversation(conversationId);
+        revisions.deleteForConversation(conversationId);
+        drafts.deleteForConversation(conversationId);
         attachments.deleteAllOf(conversationId);
         artifacts.deleteAllOf(conversationId);
         questions.deleteAllOf(conversationId);
