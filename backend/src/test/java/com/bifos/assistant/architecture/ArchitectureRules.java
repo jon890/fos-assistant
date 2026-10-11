@@ -31,20 +31,31 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.Table;
+import java.util.HashSet;
 import java.lang.annotation.Annotation;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
@@ -75,6 +86,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBeans;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * backend 의 구조 규칙이다. 문서는 규칙을 이 클래스의 상수 이름으로 가리킨다.
@@ -86,8 +99,7 @@ import org.springframework.validation.annotation.Validated;
 public final class ArchitectureRules {
 
     /** Spring 의 {@code Transactional} 을 import 하므로 Jakarta 쪽은 이 상수에서만 전체 이름으로 쓴다. */
-    private static final Class<? extends Annotation> JAKARTA_TRANSACTIONAL =
-            jakarta.transaction.Transactional.class; // 전체 이름 허용: Spring 과 Jakarta 의 Transactional 이름이 같다
+    private static final Class<? extends Annotation> JAKARTA_TRANSACTIONAL = jakarta.transaction.Transactional.class; // 전체 이름 허용: Spring 과 Jakarta 의 Transactional 이름이 같다
 
     /**
      * 최상위 패키지 사이의 간선이 순환에 속하지 않는다. {@code shared} 는 그래프에서 뺀다.
@@ -95,10 +107,10 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」 의 {@code mcp} 와 {@code orchestration} 문단.
      */
     public static final ArchRule TOP_LEVEL_PACKAGES_FREE_OF_CYCLES = classes()
-            .that()
-            .resideInAPackage("com.bifos.assistant..")
-            .should(new TopLevelPackageCycles())
-            .as("최상위 패키지 사이의 간선은 순환에 속하지 않는다");
+        .that()
+        .resideInAPackage("com.bifos.assistant..")
+        .should(new TopLevelPackageCycles())
+        .as("최상위 패키지 사이의 간선은 순환에 속하지 않는다");
 
     /**
      * 최상위 패키지는 층 순서에서 자기보다 아래에 있는 패키지만 쓴다. 순서에 없는 최상위 패키지도 위반이다.
@@ -107,10 +119,10 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/docs/code-architecture.md} 「최상위 패키지의 층 순서」, ADR-068.
      */
     public static final ArchRule TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER = classes()
-            .that()
-            .resideInAPackage("com.bifos.assistant..")
-            .should(new TopLevelPackageOrder())
-            .as("최상위 패키지는 층 순서의 아래쪽만 쓴다");
+        .that()
+        .resideInAPackage("com.bifos.assistant..")
+        .should(new TopLevelPackageOrder())
+        .as("최상위 패키지는 층 순서의 아래쪽만 쓴다");
 
     /**
      * {@code shared} 는 다른 최상위 패키지에 의존하지 않는다.
@@ -118,12 +130,12 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」 의 {@code shared/auth}, {@code shared/error} 책임.
      */
     public static final ArchRule SHARED_DOES_NOT_DEPEND_ON_DOMAINS = noClasses()
-            .that()
-            .resideInAPackage("com.bifos.assistant.shared..")
-            .should()
-            .dependOnClassesThat(resideInAPackage("com.bifos.assistant.(*)..")
-                    .and(resideOutsideOfPackage("com.bifos.assistant.shared..")))
-            .as("shared 는 다른 최상위 패키지에 의존하지 않는다");
+        .that()
+        .resideInAPackage("com.bifos.assistant.shared..")
+        .should()
+        .dependOnClassesThat(resideInAPackage("com.bifos.assistant.(*)..")
+            .and(resideOutsideOfPackage("com.bifos.assistant.shared..")))
+        .as("shared 는 다른 최상위 패키지에 의존하지 않는다");
 
     /**
      * 도메인 안은 {@code presentation} 에서 {@code application} 을 거쳐 {@code infra} 와 {@code domain} 으로 흐른다.
@@ -133,24 +145,24 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」.
      */
     public static final ArchRule LAYER_DIRECTION = layeredArchitecture()
-            .consideringOnlyDependenciesInLayers()
-            .layer("presentation")
-            .definedBy("com.bifos.assistant.*.presentation..")
-            .layer("application")
-            .definedBy("com.bifos.assistant.*.application..")
-            .layer("infra")
-            .definedBy("com.bifos.assistant.*.infra..")
-            .layer("domain")
-            .definedBy("com.bifos.assistant.*.domain..")
-            .whereLayer("presentation")
-            .mayNotBeAccessedByAnyLayer()
-            .whereLayer("application")
-            .mayOnlyBeAccessedByLayers("presentation")
-            .whereLayer("infra")
-            .mayOnlyBeAccessedByLayers("application")
-            .whereLayer("domain")
-            .mayOnlyBeAccessedByLayers("presentation", "application", "infra")
-            .as("층은 presentation 에서 application 을 거쳐 infra 와 domain 으로 흐른다");
+        .consideringOnlyDependenciesInLayers()
+        .layer("presentation")
+        .definedBy("com.bifos.assistant..presentation..")
+        .layer("application")
+        .definedBy("com.bifos.assistant..application..")
+        .layer("infra")
+        .definedBy("com.bifos.assistant..infra..")
+        .layer("domain")
+        .definedBy("com.bifos.assistant..domain..")
+        .whereLayer("presentation")
+        .mayNotBeAccessedByAnyLayer()
+        .whereLayer("application")
+        .mayOnlyBeAccessedByLayers("presentation")
+        .whereLayer("infra")
+        .mayOnlyBeAccessedByLayers("application")
+        .whereLayer("domain")
+        .mayOnlyBeAccessedByLayers("presentation", "application", "infra")
+        .as("층은 presentation 에서 application 을 거쳐 infra 와 domain 으로 흐른다");
 
     /**
      * {@code domain} 은 웹 계층의 타입에 의존하지 않는다.
@@ -159,16 +171,219 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」.
      */
     public static final ArchRule DOMAIN_DOES_NOT_DEPEND_ON_WEB = noClasses()
+        .that()
+        .resideInAPackage("com.bifos.assistant..domain..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "org.springframework.web..",
+            "org.springframework.http..",
+            "jakarta.servlet..",
+            "com.bifos.assistant..presentation..")
+        .as("domain 은 웹 계층에 의존하지 않는다");
+
+    /** 관리자 서비스와 명령은 지정한 application 소유 경계에 각각 하나씩 있고 저장 타입을 갖지 않는다. */
+    public static final ArchRule AGENT_ADMIN_APPLICATION_PLACEMENT = agentAdminApplicationPlacement("com.bifos.assistant");
+
+    /** 관리자 HTTP 계약은 지정한 presentation 에 각각 하나씩 있고 모든 mapped 메서드가 requireAdmin 을 부른다. */
+    public static final ArchRule AGENT_ADMIN_HTTP_CONTRACT = agentAdminHttpContract("com.bifos.assistant");
+
+
+    /** 정상·위반 fixture 도 운영 규칙과 같은 조건을 쓰며 바뀌는 것은 루트뿐이다. */
+    static ArchRule agentAdminApplicationPlacement(String root) {
+        Map<String, String> owners = Map.of(
+            "AgentAdminService", "agent.admin.application.AgentAdminService",
+            "AgentCreateCommand", "agent.admin.application.model.AgentCreateCommand",
+            "AgentUpdateCommand", "agent.admin.application.model.AgentUpdateCommand");
+        return classes()
             .that()
-            .resideInAPackage("com.bifos.assistant.*.domain..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage(
-                    "org.springframework.web..",
-                    "org.springframework.http..",
-                    "jakarta.servlet..",
-                    "com.bifos.assistant.*.presentation..")
-            .as("domain 은 웹 계층에 의존하지 않는다");
+            .resideInAPackage(root + "..")
+            .should(ownedTypes(root, owners))
+            .andShould(adminApplicationRoles(root))
+            .as("AGENT_ADMIN_APPLICATION_PLACEMENT: 관리자 서비스와 명령의 소유 경계를 지킨다");
+    }
+
+
+    /** HTTP 타입을 기존 package 로 되돌리거나 중복·누락해도 전체 루트에서 찾는다. */
+    static ArchRule agentAdminHttpContract(String root) {
+        Map<String, String> owners = Map.of(
+            "AgentAdminController", "agent.admin.presentation.AgentAdminController",
+            "AgentAdminDtos", "agent.admin.presentation.AgentAdminDtos",
+            "CreateAgentRequest", "agent.admin.presentation.AgentAdminDtos$CreateAgentRequest",
+            "UpdateAgentRequest", "agent.admin.presentation.AgentAdminDtos$UpdateAgentRequest",
+            "AdminAgentView", "agent.admin.presentation.AgentAdminDtos$AdminAgentView");
+        return classes()
+            .that()
+            .resideInAPackage(root + "..")
+            .should(ownedTypes(root, owners))
+            .andShould(adminHttpRoles(root))
+            .as("AGENT_ADMIN_HTTP_CONTRACT: 관리자 HTTP 배치와 requireAdmin 호출을 지킨다");
+    }
+
+
+    /** 이름으로 전체 루트를 골라 누락과 중복을 막고, 위치는 FQN 으로 따로 판정한다. */
+    static ArchCondition<JavaClass> ownedTypes(String root, Map<String, String> owners) {
+        return new ArchCondition<>("소유 타입이 기대한 FQN 에 각각 하나씩 있다") {
+            private final Map<String, Integer> counts = new HashMap<>();
+
+
+            @Override
+            public void init(Collection<JavaClass> allObjectsToTest) {
+                counts.clear();
+            }
+
+
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                String key = item.getSimpleName();
+                if (!owners.containsKey(key)) {
+                    return;
+                }
+                counts.merge(key, 1, Integer::sum);
+                String expected = root + "." + owners.get(key);
+                require(item, item.getName().equals(expected), expected + " 에 있어야 한다", events);
+            }
+
+
+            @Override
+            public void finish(ConditionEvents events) {
+                owners.forEach((key, expected) -> {
+                    int count = counts.getOrDefault(key, 0);
+                    if (count != 1) {
+                        String name = root + "." + expected;
+                        events.add(SimpleConditionEvent.violated(name, name + " 의 대상 수가 " + count + " 이다. 기대값은 1이다"));
+                    }
+                });
+            }
+        };
+    }
+
+
+    private static ArchCondition<JavaClass> adminApplicationRoles(String root) {
+        return new ArchCondition<>("admin 은 application 업무만 소유하고 domain 과 infra 가 admin 을 쓰지 않는다") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                String boundary = root + ".agent.admin.";
+                if (item.getPackageName().startsWith(boundary)) {
+                    require(
+                        item,
+                        !item.isAnnotatedWith(Entity.class)
+                            && !item.isAnnotatedWith(Embeddable.class)
+                            && !item.isAnnotatedWith(Repository.class)
+                            && !item.getSimpleName().endsWith("Repository"),
+                        "Entity, Embeddable, Repository 는 admin 밖에 있다",
+                        events);
+                    if (item.isAnnotatedWith(Service.class)) {
+                        require(
+                            item,
+                            item.getPackageName().equals(boundary + "application"),
+                            "Service 는 admin.application 에 있다",
+                            events);
+                    }
+                    if (item.isRecord()
+                        && item.getModifiers().contains(JavaModifier.PUBLIC)
+                        && item.getPackageName().contains(".application")) {
+                        require(
+                            item,
+                            item.getPackageName().equals(boundary + "application.model"),
+                            "공개 application record 는 application.model 에 있다",
+                            events);
+                    }
+                    if (item.isAnnotatedWith(ConfigurationProperties.class)) {
+                        require(item, item.getPackageName().equals(boundary + "config"), "설정 선언은 config 에 있다", events);
+                    }
+                }
+                if (item.getName().equals(boundary + "application.AgentAdminService")) {
+                    require(item, item.isAnnotatedWith(Service.class), "AgentAdminService 는 Service 다", events);
+                }
+                if (Set.of("AgentCreateCommand", "AgentUpdateCommand").contains(item.getSimpleName())) {
+                    require(
+                        item,
+                        item.isRecord() && item.getModifiers().contains(JavaModifier.PUBLIC),
+                        "관리 명령은 공개 record 다",
+                        events);
+                }
+                if (item.getPackageName().contains(".domain.")
+                    || item.getPackageName().endsWith(".domain")
+                    || item.getPackageName().contains(".infra.")
+                    || item.getPackageName().endsWith(".infra")) {
+                    item.getDirectDependenciesFromSelf().stream()
+                        .filter(dependency -> dependency.getTargetClass().getName().startsWith(boundary))
+                        .forEach(dependency -> events.add(SimpleConditionEvent.violated(
+                            item, dependency.getDescription() + ": domain 과 infra 는 admin 을 쓰지 않는다")));
+                }
+            }
+        };
+    }
+
+
+    private static ArchCondition<JavaClass> adminHttpRoles(String root) {
+        return new ArchCondition<>("관리 HTTP record 와 컨트롤러가 presentation 에 있고 mapped 메서드가 requireAdmin 을 부른다") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                String presentation = root + ".agent.admin.presentation";
+                if (item.getPackageName().startsWith(root + ".agent.admin.")
+                    && item.isRecord()
+                    && !item.isAnnotatedWith(ConfigurationProperties.class)
+                    && !item.getPackageName().contains(".application.")) {
+                    require(
+                        item,
+                        item.getPackageName().equals(presentation)
+                            && item.getEnclosingClass()
+                                .map(outer -> outer.getName().equals(presentation + ".AgentAdminDtos"))
+                                .orElse(false),
+                        "HTTP record 는 admin.presentation.AgentAdminDtos 안에 있다",
+                        events);
+                }
+                if (!item.getSimpleName().equals("AgentAdminController")) {
+                    return;
+                }
+                require(item, item.isAnnotatedWith(RestController.class), "관리 창구는 RestController 다", events);
+                require(
+                    item,
+                    item.tryGetAnnotationOfType(RequestMapping.class)
+                        .map(mapping -> List.of(mapping.value()).equals(List.of("/api/v1/admin/agents")))
+                        .orElse(false),
+                    "관리 HTTP 경로는 /api/v1/admin/agents 다",
+                    events);
+                List<JavaMethod> mapped = item.getMethods().stream()
+                    .filter(ArchitectureRules::mapped)
+                    .toList();
+                require(
+                    item,
+                    mapped.size() == 3
+                        && mapped.stream()
+                            .map(JavaMethod::getName)
+                            .collect(Collectors.toSet())
+                            .equals(Set.of("create", "list", "update")),
+                    "관리 mapped 메서드는 등록·목록·수정 3개다",
+                    events);
+                for (JavaMethod method : mapped) {
+                    boolean authorized = method.getMethodCallsFromSelf().stream()
+                        .anyMatch(call -> call.getTargetOwner().getName().equals(root + ".shared.auth.CurrentUserProvider")
+                            && call.getName().equals("requireAdmin"));
+                    require(
+                        item,
+                        authorized,
+                        method.getFullName() + " 에서 CurrentUserProvider.requireAdmin 을 호출한다",
+                        events);
+                }
+            }
+        };
+    }
+
+
+    private static boolean mapped(JavaMethod method) {
+        return method.isAnnotatedWith(RequestMapping.class) || method.isMetaAnnotatedWith(RequestMapping.class);
+    }
+
+
+    private static void require(JavaClass item, boolean valid, String explanation, ConditionEvents events) {
+        if (!valid) {
+            events.add(SimpleConditionEvent.violated(item, item.getName() + ": " + explanation));
+        }
+    }
+
 
     /**
      * {@code orchestration} 은 {@code mcp} 에 의존하지 않는다.
@@ -177,12 +392,12 @@ public final class ArchitectureRules {
      * 「{@code mcp} 는 {@code orchestration} 을 부르고, {@code orchestration} 은 {@code mcp} 를 import 하지 않는다」.
      */
     public static final ArchRule ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP = noClasses()
-            .that()
-            .resideInAPackage("com.bifos.assistant.orchestration..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("com.bifos.assistant.mcp..")
-            .as("orchestration 은 mcp 에 의존하지 않는다");
+        .that()
+        .resideInAPackage("com.bifos.assistant.orchestration..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("com.bifos.assistant.mcp..")
+        .as("orchestration 은 mcp 에 의존하지 않는다");
 
     /**
      * {@code mcp} 는 Hermes 를 부르는 타입에 의존하지 않는다.
@@ -192,14 +407,14 @@ public final class ArchitectureRules {
      * <p>근거: {@code docs/features/agent-skill.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
      */
     public static final ArchRule MCP_DOES_NOT_CALL_HERMES = noClasses()
-            .that()
-            .resideInAPackage("com.bifos.assistant.mcp..")
-            .should()
-            .dependOnClassesThat(resideInAPackage("com.bifos.assistant.hermes..")
-                    .and(simpleNameEndingWith("Client")
-                            .or(simpleName("HermesRunEventStream"))
-                            .or(simpleName("HermesProfileKeyStore"))))
-            .as("mcp 는 Hermes 를 부르는 타입에 의존하지 않는다");
+        .that()
+        .resideInAPackage("com.bifos.assistant.mcp..")
+        .should()
+        .dependOnClassesThat(resideInAPackage("com.bifos.assistant.hermes..")
+            .and(simpleNameEndingWith("Client")
+                .or(simpleName("HermesRunEventStream"))
+                .or(simpleName("HermesProfileKeyStore"))))
+        .as("mcp 는 Hermes 를 부르는 타입에 의존하지 않는다");
 
     /**
      * {@code orchestration} 은 {@code ChatService} 에 의존하지 않는다.
@@ -207,12 +422,12 @@ public final class ArchitectureRules {
      * <p>근거: {@code docs/features/chat.md} 「중지」 의 「{@code ChatService} 와 흐름이 서로를 부르지 않게」.
      */
     public static final ArchRule ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE = noClasses()
-            .that()
-            .resideInAPackage("com.bifos.assistant.orchestration..")
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("com.bifos.assistant.chat.application.ChatService")
-            .as("orchestration 은 ChatService 에 의존하지 않는다");
+        .that()
+        .resideInAPackage("com.bifos.assistant.orchestration..")
+        .should()
+        .dependOnClassesThat()
+        .haveFullyQualifiedName("com.bifos.assistant.chat.application.ChatService")
+        .as("orchestration 은 ChatService 에 의존하지 않는다");
 
     /**
      * {@code hermes} 는 {@code people} 에 의존하지 않는다.
@@ -221,12 +436,12 @@ public final class ArchitectureRules {
      * 「{@code hermes} 는 부르는 방법만 알고 순서를 모른다」.
      */
     public static final ArchRule HERMES_DOES_NOT_DEPEND_ON_PEOPLE = noClasses()
-            .that()
-            .resideInAPackage("com.bifos.assistant.hermes..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("com.bifos.assistant.people..")
-            .as("hermes 는 people 에 의존하지 않는다");
+        .that()
+        .resideInAPackage("com.bifos.assistant.hermes..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAPackage("com.bifos.assistant.people..")
+        .as("hermes 는 people 에 의존하지 않는다");
 
     /**
      * Jackson 2 의 {@code core} 와 {@code databind} 를 쓰지 않는다.
@@ -235,10 +450,10 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/AGENTS.md} 「기술 주의점」 의 「Spring Boot 4 는 Jackson 3 을 쓴다」.
      */
     public static final ArchRule NO_JACKSON_2_DATABIND = noClasses()
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("com.fasterxml.jackson.core..", "com.fasterxml.jackson.databind..")
-            .as("Jackson 2 의 core 와 databind 에 의존하지 않는다");
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("com.fasterxml.jackson.core..", "com.fasterxml.jackson.databind..")
+        .as("Jackson 2 의 core 와 databind 에 의존하지 않는다");
 
     /**
      * 컨트롤러 안에 record 를 두지 않는다.
@@ -246,13 +461,13 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/AGENTS.md} 「데이터 클래스는 컨트롤러 안에 두지 않는다」.
      */
     public static final ArchRule CONTROLLERS_HAVE_NO_NESTED_RECORDS = classes()
-            .that()
-            .areRecords()
-            .and()
-            .areNestedClasses()
-            .should(notEnclosedByController())
-            .allowEmptyShould(true)
-            .as("컨트롤러 안에 record 를 두지 않는다");
+        .that()
+        .areRecords()
+        .and()
+        .areNestedClasses()
+        .should(notEnclosedByController())
+        .allowEmptyShould(true)
+        .as("컨트롤러 안에 record 를 두지 않는다");
 
     /**
      * {@code @Test} 와 {@code @ParameterizedTest} 메서드에는 {@code @DisplayName} 이 붙는다.
@@ -262,13 +477,13 @@ public final class ArchitectureRules {
      * <p>근거: {@code backend/AGENTS.md} 「테스트」 의 「테스트 이름」.
      */
     public static final ArchRule TEST_METHODS_HAVE_DISPLAY_NAME = methods()
-            .that()
-            .areAnnotatedWith(Test.class)
-            .or()
-            .areAnnotatedWith(ParameterizedTest.class)
-            .should()
-            .beAnnotatedWith(DisplayName.class)
-            .as("테스트 메서드에는 DisplayName 이 붙는다");
+        .that()
+        .areAnnotatedWith(Test.class)
+        .or()
+        .areAnnotatedWith(ParameterizedTest.class)
+        .should()
+        .beAnnotatedWith(DisplayName.class)
+        .as("테스트 메서드에는 DisplayName 이 붙는다");
 
     /**
      * 검사 클래스나 그 중첩 클래스에 붙으면 Spring 이 컨텍스트를 따로 띄우는 주석의 전체 이름이다.
@@ -277,36 +492,34 @@ public final class ArchitectureRules {
      * 클래스를 import 할 수 없어 이름 문자열로 적는다. ArchUnit 은 읽은 바이트코드의 주석 이름으로 견주므로 클래스가 없어도 찾는다.
      */
     private static final List<String> CONTEXT_SPLITTING_CLASS_ANNOTATIONS = List.of(
-            MockitoBean.class.getName(),
-            MockitoBeans.class.getName(),
-            MockitoSpyBean.class.getName(),
-            MockitoSpyBeans.class.getName(),
-            Import.class.getName(),
-            ImportAutoConfiguration.class.getName(),
-            TestPropertySource.class.getName(),
-            TestPropertySources.class.getName(),
-            SpringBootTest.class.getName(),
-            ContextConfiguration.class.getName(),
-            ActiveProfiles.class.getName(),
-            DirtiesContext.class.getName(),
-            TestConfiguration.class.getName(),
-            TestExecutionListeners.class.getName(),
-            BootstrapWith.class.getName(),
-            JsonTest.class.getName(),
-            "org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest",
-            "org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc",
-            "org.springframework.boot.webflux.test.autoconfigure.WebFluxTest",
-            "org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest",
-            "org.springframework.boot.jdbc.test.autoconfigure.JdbcTest",
-            "org.springframework.boot.restclient.test.autoconfigure.RestClientTest");
+        MockitoBean.class.getName(),
+        MockitoBeans.class.getName(),
+        MockitoSpyBean.class.getName(),
+        MockitoSpyBeans.class.getName(),
+        Import.class.getName(),
+        ImportAutoConfiguration.class.getName(),
+        TestPropertySource.class.getName(),
+        TestPropertySources.class.getName(),
+        SpringBootTest.class.getName(),
+        ContextConfiguration.class.getName(),
+        ActiveProfiles.class.getName(),
+        DirtiesContext.class.getName(),
+        TestConfiguration.class.getName(),
+        TestExecutionListeners.class.getName(),
+        BootstrapWith.class.getName(),
+        JsonTest.class.getName(),
+        "org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest",
+        "org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc",
+        "org.springframework.boot.webflux.test.autoconfigure.WebFluxTest",
+        "org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest",
+        "org.springframework.boot.jdbc.test.autoconfigure.JdbcTest",
+        "org.springframework.boot.restclient.test.autoconfigure.RestClientTest");
 
     /** 필드에 붙으면 컨텍스트를 나누는 주석의 전체 이름이다. */
-    private static final List<String> CONTEXT_SPLITTING_FIELD_ANNOTATIONS =
-            List.of(MockitoBean.class.getName(), MockitoSpyBean.class.getName(), TestBean.class.getName());
+    private static final List<String> CONTEXT_SPLITTING_FIELD_ANNOTATIONS = List.of(MockitoBean.class.getName(), MockitoSpyBean.class.getName(), TestBean.class.getName());
 
     /** 메서드에 붙으면 컨텍스트를 나누거나 닫는 주석의 전체 이름이다. */
-    private static final List<String> CONTEXT_SPLITTING_METHOD_ANNOTATIONS =
-            List.of(DynamicPropertySource.class.getName(), DirtiesContext.class.getName());
+    private static final List<String> CONTEXT_SPLITTING_METHOD_ANNOTATIONS = List.of(DynamicPropertySource.class.getName(), DirtiesContext.class.getName());
 
     /**
      * {@code testsupport} 밖의 검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다. 대상 주석은 클래스와 중첩 클래스는
@@ -318,11 +531,11 @@ public final class ArchitectureRules {
      * <p>근거: ADR-20261007 / test-context-base. 검사 클래스마다 선언이 다르면 컨텍스트가 늘고, 닫힌 컨텍스트가 힙을 붙잡는다.
      */
     public static final ArchRule TESTS_DO_NOT_SPLIT_CONTEXT = classes()
-            .that(resideOutsideOfPackage("com.bifos.assistant.testsupport.."))
-            .and(notMysqlTest())
-            .should(notDeclareContextSplitting())
-            .allowEmptyShould(true)
-            .as("검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다");
+        .that(resideOutsideOfPackage("com.bifos.assistant.testsupport.."))
+        .and(notMysqlTest())
+        .should(notDeclareContextSplitting())
+        .allowEmptyShould(true)
+        .as("검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다");
 
     /**
      * {@code application} 밖의 클래스와 메서드에는 {@code @Transactional} 을 붙이지 않는다.
@@ -331,28 +544,28 @@ public final class ArchitectureRules {
      * <p>근거: 트랜잭션 경계는 유스케이스를 아는 층이 정한다. 컨트롤러와 저장소에 두면 경계가 둘로 갈린다.
      */
     public static final ArchRule TRANSACTIONAL_ONLY_IN_APPLICATION = CompositeArchRule.of(noClasses()
-                    .that()
-                    .resideOutsideOfPackage("..application..")
-                    .should()
-                    .beAnnotatedWith(Transactional.class))
-            .and(noClasses()
-                    .that()
-                    .resideOutsideOfPackage("..application..")
-                    .should()
-                    .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
-            .and(noMethods()
-                    .that()
-                    .areDeclaredInClassesThat()
-                    .resideOutsideOfPackage("..application..")
-                    .should()
-                    .beAnnotatedWith(Transactional.class))
-            .and(noMethods()
-                    .that()
-                    .areDeclaredInClassesThat()
-                    .resideOutsideOfPackage("..application..")
-                    .should()
-                    .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
-            .as("Transactional 은 application 안에서만 쓴다");
+        .that()
+        .resideOutsideOfPackage("..application..")
+        .should()
+        .beAnnotatedWith(Transactional.class))
+        .and(noClasses()
+            .that()
+            .resideOutsideOfPackage("..application..")
+            .should()
+            .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
+        .and(noMethods()
+            .that()
+            .areDeclaredInClassesThat()
+            .resideOutsideOfPackage("..application..")
+            .should()
+            .beAnnotatedWith(Transactional.class))
+        .and(noMethods()
+            .that()
+            .areDeclaredInClassesThat()
+            .resideOutsideOfPackage("..application..")
+            .should()
+            .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
+        .as("Transactional 은 application 안에서만 쓴다");
 
     /**
      * {@code Instant.now()} 를 직접 부르지 않는다.
@@ -360,8 +573,7 @@ public final class ArchitectureRules {
      *
      * <p>근거: 시각을 주입받아야 테스트가 시각을 고정한다.
      */
-    public static final ArchRule NO_DIRECT_INSTANT_NOW =
-            noClasses().should().callMethod(Instant.class, "now").as("Instant.now() 를 직접 부르지 않는다");
+    public static final ArchRule NO_DIRECT_INSTANT_NOW = noClasses().should().callMethod(Instant.class, "now").as("Instant.now() 를 직접 부르지 않는다");
 
     /**
      * {@code MessageDigest.getInstance} 는 {@code shared.util.Sha256} 만 부른다.
@@ -369,11 +581,11 @@ public final class ArchitectureRules {
      * <p>근거: 해시 구현을 한 곳에 둔다.
      */
     public static final ArchRule MESSAGE_DIGEST_ONLY_IN_SHA256 = noClasses()
-            .that()
-            .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.util.Sha256")
-            .should()
-            .callMethod(MessageDigest.class, "getInstance", String.class)
-            .as("MessageDigest.getInstance 는 Sha256 만 부른다");
+        .that()
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.util.Sha256")
+        .should()
+        .callMethod(MessageDigest.class, "getInstance", String.class)
+        .as("MessageDigest.getInstance 는 Sha256 만 부른다");
 
     /**
      * 가상 스레드를 직접 띄우는 {@code Thread.ofVirtual()} 과 {@code Thread.startVirtualThread} 는
@@ -383,26 +595,26 @@ public final class ArchitectureRules {
      * <p>근거: ADR-20261007 / background-tasks. 직접 띄운 스레드는 검사가 끝날 때 기다리지 못한다.
      */
     public static final ArchRule VIRTUAL_THREADS_ONLY_THROUGH_BACKGROUND_TASKS = CompositeArchRule.of(noClasses()
-                    .that()
-                    .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
-                    .and()
-                    .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
-                    .and()
-                    .doNotHaveFullyQualifiedName(
-                            "com.bifos.assistant.notification.presentation.NotificationEventStreams")
-                    .should()
-                    .callMethod(Thread.class, "ofVirtual"))
-            .and(noClasses()
-                    .that()
-                    .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
-                    .and()
-                    .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
-                    .and()
-                    .doNotHaveFullyQualifiedName(
-                            "com.bifos.assistant.notification.presentation.NotificationEventStreams")
-                    .should()
-                    .callMethod(Thread.class, "startVirtualThread", Runnable.class))
-            .as("가상 스레드는 BackgroundTasks 와 SSE 연결만 직접 띄운다");
+        .that()
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
+        .and()
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
+        .and()
+        .doNotHaveFullyQualifiedName(
+            "com.bifos.assistant.notification.presentation.NotificationEventStreams")
+        .should()
+        .callMethod(Thread.class, "ofVirtual"))
+        .and(noClasses()
+            .that()
+            .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
+            .and()
+            .doNotHaveFullyQualifiedName("com.bifos.assistant.chat.presentation.ChatEventStreams")
+            .and()
+            .doNotHaveFullyQualifiedName(
+                "com.bifos.assistant.notification.presentation.NotificationEventStreams")
+            .should()
+            .callMethod(Thread.class, "startVirtualThread", Runnable.class))
+        .as("가상 스레드는 BackgroundTasks 와 SSE 연결만 직접 띄운다");
 
     /**
      * {@code Executors.newVirtualThreadPerTaskExecutor()} 는 {@code ResearchAndBuildFlow} 만 부른다.
@@ -411,11 +623,19 @@ public final class ArchitectureRules {
      * <p>근거: ADR-20261007 / background-tasks. 블록 밖으로 살아 남는 실행기는 검사가 끝날 때 기다리지 못한다.
      */
     public static final ArchRule VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW = noClasses()
-            .that()
-            .doNotHaveFullyQualifiedName("com.bifos.assistant.orchestration.application.ResearchAndBuildFlow")
-            .should()
-            .callMethod(Executors.class, "newVirtualThreadPerTaskExecutor")
-            .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
+        .that()
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.orchestration.application.ResearchAndBuildFlow")
+        .should()
+        .callMethod(Executors.class, "newVirtualThreadPerTaskExecutor")
+        .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
+
+    /**
+     * 에이전트 설정 두 타입의 이름·prefix·개수와 config 역할을 raw 검사한다.
+     * 옛 package 복귀와 누락도 선택 범위에서 빠지지 않는다. 다른 기능의 배치는 검사하지 않는다.
+     */
+    public static final ArchRule FEATURE_CONFIG_PLACEMENT = classes()
+        .should(new AgentConfigPlacement())
+        .as("에이전트 설정은 agent.config에 유일하게 있고 config에는 설정만 둔다");
 
     /**
      * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.
@@ -423,12 +643,12 @@ public final class ArchitectureRules {
      * <p>근거: 잘못된 설정은 기동에서 멈춘다.
      */
     public static final ArchRule CONFIGURATION_PROPERTIES_ARE_VALIDATED = classes()
-            .that()
-            .areAnnotatedWith(ConfigurationProperties.class)
-            .should()
-            .beAnnotatedWith(Validated.class)
-            .allowEmptyShould(true)
-            .as("ConfigurationProperties 클래스에는 Validated 가 붙는다");
+        .that()
+        .areAnnotatedWith(ConfigurationProperties.class)
+        .should()
+        .beAnnotatedWith(Validated.class)
+        .allowEmptyShould(true)
+        .as("ConfigurationProperties 클래스에는 Validated 가 붙는다");
 
     /**
      * 서비스({@code @Service}, {@code @Component}, {@code @Repository})와 {@code infra} 안의 중첩 타입은
@@ -438,13 +658,13 @@ public final class ArchitectureRules {
      * <p>근거: 서비스가 돌려주는 모델을 서비스 안에 두면 그 모델을 쓰는 쪽이 서비스를 import 하게 된다.
      */
     public static final ArchRule SERVICES_DO_NOT_EXPOSE_NESTED_TYPES = classes()
-            .that()
-            .areMemberClasses()
-            .and(enclosedByServiceOrInfra())
-            .should()
-            .bePrivate()
-            .allowEmptyShould(true)
-            .as("서비스와 infra 안의 중첩 타입은 private 이다");
+        .that()
+        .areMemberClasses()
+        .and(enclosedByServiceOrInfra())
+        .should()
+        .bePrivate()
+        .allowEmptyShould(true)
+        .as("서비스와 infra 안의 중첩 타입은 private 이다");
 
     /**
      * 엔티티의 {@code @Enumerated} 필드 타입은 {@code ..domain.type..} 에 둔다.
@@ -454,14 +674,14 @@ public final class ArchitectureRules {
      * <p>근거: 저장되는 값은 바꾸면 마이그레이션을 판단해야 하므로 한곳에 모아 보이게 한다.
      */
     public static final ArchRule ENUMERATED_FIELDS_USE_DOMAIN_TYPE = fields().that()
-            .areAnnotatedWith(Enumerated.class)
-            .and()
-            .areDeclaredInClassesThat()
-            .areAnnotatedWith(Entity.class)
-            .should()
-            .haveRawType(resideInAPackage("..domain.type.."))
-            .allowEmptyShould(true)
-            .as("Enumerated 필드의 타입은 domain.type 에 있다");
+        .areAnnotatedWith(Enumerated.class)
+        .and()
+        .areDeclaredInClassesThat()
+        .areAnnotatedWith(Entity.class)
+        .should()
+        .haveRawType(resideInAPackage("..domain.type.."))
+        .allowEmptyShould(true)
+        .as("Enumerated 필드의 타입은 domain.type 에 있다");
 
     /**
      * {@code ..domain.type..} 의 클래스는 {@code application}, {@code infra}, {@code presentation} 에 의존하지 않는다.
@@ -469,37 +689,36 @@ public final class ArchitectureRules {
      * <p>근거: 저장되는 enum 은 가장 아래 층이다.
      */
     public static final ArchRule DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE = noClasses()
-            .that()
-            .resideInAPackage("..domain.type..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("..application..", "..infra..", "..presentation..")
-            .allowEmptyShould(true)
-            .as("domain.type 은 위 층에 의존하지 않는다");
+        .that()
+        .resideInAPackage("..domain.type..")
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage("..application..", "..infra..", "..presentation..")
+        .allowEmptyShould(true)
+        .as("domain.type 은 위 층에 의존하지 않는다");
 
     /** {@code LivePropertiesConfig} 의 전체 이름이다. 패키지 루트에 있어 구조 규칙이 이름으로 가리킨다. */
     private static final String LIVE_PROPERTIES_CONFIG = "com.bifos.assistant.LivePropertiesConfig";
 
     /** 기동 때 살펴보기 {@code max-duration} 과 {@code hermes.run-timeout} 을 견주는 설정 클래스다. */
-    private static final String RUN_TIMEOUT_CHECK =
-            "com.bifos.assistant.proactive.application.ProactiveCheckProperties$RunTimeoutCheck";
+    private static final String RUN_TIMEOUT_CHECK = "com.bifos.assistant.proactive.application.ProactiveCheckProperties$RunTimeoutCheck";
 
     /** 실행 중에 쓰는 설정 record 다. {@code HermesProperties} 는 두 칸만 해당하므로 따로 본다. */
     private static final List<Class<?>> LIVE_SETTINGS = List.of(
-            DelegationWakeProperties.class,
-            UserExecutionProperties.class,
-            ProactiveCheckProperties.class,
-            StarterProperties.class,
-            DelegationProperties.class,
-            AutonomyProperties.class,
-            ProactiveLoopProperties.class,
-            PricingProperties.class,
-            MemoryEncryptionProperties.class,
-            ModelTierProperties.class,
-            ConnectorPolicyProperties.class,
-            MemoryProposalProperties.class,
-            BrowserProperties.class,
-            WorkspaceProperties.class);
+        DelegationWakeProperties.class,
+        UserExecutionProperties.class,
+        ProactiveCheckProperties.class,
+        StarterProperties.class,
+        DelegationProperties.class,
+        AutonomyProperties.class,
+        ProactiveLoopProperties.class,
+        PricingProperties.class,
+        MemoryEncryptionProperties.class,
+        ModelTierProperties.class,
+        ConnectorPolicyProperties.class,
+        MemoryProposalProperties.class,
+        BrowserProperties.class,
+        WorkspaceProperties.class);
 
     /** {@code HermesProperties} 가운데 {@code LiveProperties} 로 읽는 칸이다. */
     private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "pollInterval");
@@ -512,12 +731,12 @@ public final class ArchitectureRules {
      * <p>근거: ADR-20261007 / live-properties. record 를 필드로 쥐면 검사가 바꾼 값을 보지 못한다.
      */
     public static final ArchRule LIVE_SETTINGS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
-            .that()
-            .doNotHaveFullyQualifiedName(LIVE_PROPERTIES_CONFIG)
-            .and()
-            .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
-            .should(notHoldAny(LIVE_SETTINGS))
-            .as("실행 중에 쓰는 설정 record 는 LivePropertiesConfig 만 주입받는다");
+        .that()
+        .doNotHaveFullyQualifiedName(LIVE_PROPERTIES_CONFIG)
+        .and()
+        .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
+        .should(notHoldAny(LIVE_SETTINGS))
+        .as("실행 중에 쓰는 설정 record 는 LivePropertiesConfig 만 주입받는다");
 
     /**
      * {@code HermesProperties} 를 생성자 인자나 필드로 갖고 {@code runTimeout()} 이나 {@code pollInterval()} 을 부르는 운영 클래스는
@@ -527,28 +746,183 @@ public final class ArchitectureRules {
      * <p>근거: ADR-20261007 / live-properties. 두 클라이언트는 HTTP 클라이언트를 만들 때 한 번 읽고, 통합 검사가 대역으로 바꾼다.
      */
     public static final ArchRule HERMES_TIMEOUTS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
-            .that()
-            .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HermesRunEventStream")
-            .and()
-            .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HttpHermesRunsClient")
-            .and()
-            .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
-            .should(notReadHermesTimeoutsFromInjectedProperties())
-            .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
+        .that()
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HermesRunEventStream")
+        .and()
+        .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HttpHermesRunsClient")
+        .and()
+        .doNotHaveFullyQualifiedName(RUN_TIMEOUT_CHECK)
+        .should(notReadHermesTimeoutsFromInjectedProperties())
+        .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
+
+    /** crypto 의 엔티티는 domain.entity 에 두고 UserDataKey 또는 같은 표의 타입은 정확히 하나다. */
+    public static final ArchRule ENTITIES_IN_OWNED_ENTITY_PACKAGE = entitiesInOwnedEntityPackage("com.bifos.assistant");
+
+    /** crypto 의 영속 ID 는 소유 엔티티와 같은 패키지에 두고 정책과 projection 은 entity 에 두지 않는다. */
+    public static final ArchRule EMBEDDED_IDS_WITH_ENTITIES = embeddedIdsWithEntities("com.bifos.assistant");
+
+
+    /** fixture 도 운영 규칙의 선택 조건을 그대로 쓰며 루트만 바꾼다. */
+    static ArchRule entitiesInOwnedEntityPackage(String root) {
+        String entityPackage = root + ".crypto.domain.entity";
+        return classes().that().resideInAPackage(root + "..")
+            .should(new ArchCondition<JavaClass>("소유 엔티티를 정확히 하나의 domain.entity 에 둔다") {
+                private int ownedCount;
+                private int tableCount;
+
+
+                @Override
+                public void init(Collection<JavaClass> all) {
+                    ownedCount = 0;
+                    tableCount = 0;
+                }
+
+
+                @Override
+                public void check(JavaClass item, ConditionEvents events) {
+                    boolean ownsTable = item.tryGetAnnotationOfType(Table.class)
+                        .map(table -> table.name().equals("user_data_key")).orElse(false);
+                    boolean existing = (item.getEnclosingClass().isEmpty()
+                        && item.getSimpleName().equals("UserDataKey")) || ownsTable;
+                    if (ownsTable) {
+                        tableCount++;
+                    }
+                    if (existing) {
+                        ownedCount++;
+                    }
+                    boolean cryptoEntity = isCryptoEntity(item, root);
+                    if ((existing || cryptoEntity)
+                        && (!item.getPackageName().equals(entityPackage) || !item.isAnnotatedWith(Entity.class))) {
+                        events.add(SimpleConditionEvent.violated(item,
+                            item.getName() + " 엔티티의 위치는 " + entityPackage + " 이다"));
+                    }
+                }
+
+
+                @Override
+                public void finish(ConditionEvents events) {
+                    if (tableCount != 1) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + ".user_data_key Table 기대 수 1, 실제 " + tableCount));
+                    }
+                    if (ownedCount != 1) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + ".UserDataKey/user_data_key 기대 수 1, 실제 " + ownedCount));
+                    }
+                }
+            }).as("ENTITIES_IN_OWNED_ENTITY_PACKAGE: crypto 엔티티는 domain.entity 에 정확히 하나씩 둔다");
+    }
+
+
+    /** 아직 이동하지 않은 기능을 제한하지 않고 crypto 의 ID 연결과 entity 패키지 역할만 검사한다. */
+    static ArchRule embeddedIdsWithEntities(String root) {
+        String entityPackage = root + ".crypto.domain.entity";
+        return classes().that().resideInAPackage(root + "..")
+            .should(new ArchCondition<JavaClass>("영속 ID 를 소유 엔티티와 같은 패키지에 둔다") {
+                private final Set<JavaClass> idClasses = new HashSet<>();
+                private int entityCount;
+
+
+                @Override
+                public void init(Collection<JavaClass> all) {
+                    idClasses.clear();
+                    entityCount = 0;
+                    for (JavaClass item : all) {
+                        if (isCryptoEntity(item, root)) {
+                            entityCount++;
+                            idClasses.addAll(persistentIdsOf(item));
+                        }
+                    }
+                }
+
+
+                @Override
+                public void check(JavaClass item, ConditionEvents events) {
+                    if (isCryptoEntity(item, root)) {
+                        persistentIdsOf(item).forEach(id -> checkIdPackage(item, id, events));
+                    }
+                    boolean inEntityPackage = item.getPackageName().equals(entityPackage);
+                    boolean inSubpackage = item.getPackageName().startsWith(entityPackage + ".");
+                    boolean persistent = item.isAnnotatedWith(Entity.class) || idClasses.contains(item);
+                    boolean privateNested = item.getEnclosingClass().isPresent()
+                        && item.getModifiers().contains(JavaModifier.PRIVATE);
+                    boolean privateValue = privateNested && !persistent
+                        && !item.isAnnotatedWith(Embeddable.class) && !item.isAnnotatedWith(MappedSuperclass.class);
+                    if (inSubpackage || (inEntityPackage && !privateValue && (!persistent || privateNested))) {
+                        events.add(SimpleConditionEvent.violated(item,
+                            item.getName() + " 은 " + entityPackage
+                                + " 의 엔티티나 실제 영속 ID 또는 private 비영속 구현 값이어야 한다"));
+                    }
+                }
+
+
+                @Override
+                public void finish(ConditionEvents events) {
+                    if (entityCount == 0) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + " 의 crypto 엔티티 검사 대상이 0개다"));
+                    }
+                }
+            }).as("EMBEDDED_IDS_WITH_ENTITIES: crypto 영속 ID 는 엔티티와 같은 패키지에 둔다");
+    }
+
+
+    private static boolean isCryptoEntity(JavaClass item, String root) {
+        return (item.getPackageName().equals(root + ".crypto")
+            || item.getPackageName().startsWith(root + ".crypto.")) && item.isAnnotatedWith(Entity.class);
+    }
+
+
+    /** 필드·getter 와 영속 상속 선언을 함께 읽어 실제 엔티티에 적용되는 ID 타입만 모은다. */
+    private static Set<JavaClass> persistentIdsOf(JavaClass entity) {
+        Set<JavaClass> ids = new HashSet<>();
+        boolean foundIdClass = false;
+        for (JavaClass declaration : entity.getClassHierarchy()) {
+            if (!declaration.equals(entity) && !declaration.isAnnotatedWith(MappedSuperclass.class)
+                && !declaration.isAnnotatedWith(Entity.class)) {
+                continue;
+            }
+            declaration.getFields().stream().filter(field -> field.isAnnotatedWith(EmbeddedId.class))
+                .forEach(field -> ids.add(field.getRawType()));
+            declaration.getMethods().stream().filter(method -> method.isAnnotatedWith(EmbeddedId.class))
+                .forEach(method -> ids.add(method.getRawReturnType()));
+            // 더 가까운 영속 선언의 IdClass 가 상속 선언보다 우선한다.
+            if (!foundIdClass && declaration.isAnnotatedWith(IdClass.class)) {
+                ids.add(idClassOf(declaration));
+                foundIdClass = true;
+            }
+        }
+        return ids;
+    }
+
+
+    private static JavaClass idClassOf(JavaClass item) {
+        return (JavaClass)item.getAnnotationOfType(IdClass.class.getName()).get("value").orElseThrow();
+    }
+
+
+    private static void checkIdPackage(JavaClass entity, JavaClass id, ConditionEvents events) {
+        if (!entity.getPackageName().equals(id.getPackageName())) {
+            events.add(SimpleConditionEvent.violated(entity,
+                entity.getName() + " 의 영속 ID " + id.getName() + " 는 소유 엔티티와 같은 패키지여야 한다"));
+        }
+    }
+
 
     private static DescribedPredicate<JavaClass> enclosedByServiceOrInfra() {
         return new DescribedPredicate<>("바깥 클래스가 서비스이거나 infra 안에 있다") {
             @Override
             public boolean test(JavaClass item) {
                 return item.getEnclosingClass()
-                        .map(outer -> outer.isAnnotatedWith(Service.class)
-                                || outer.isAnnotatedWith(Component.class)
-                                || outer.isAnnotatedWith(Repository.class)
-                                || resideInAPackage("..infra..").test(outer))
-                        .orElse(false);
+                    .map(outer -> outer.isAnnotatedWith(Service.class)
+                        || outer.isAnnotatedWith(Component.class)
+                        || outer.isAnnotatedWith(Repository.class)
+                        || resideInAPackage("..infra..").test(outer))
+                    .orElse(false);
             }
         };
     }
+
 
     /** 생성자 인자나 필드의 타입이 {@code types} 가운데 하나면 위반이다. */
     private static ArchCondition<JavaClass> notHoldAny(List<Class<?>> types) {
@@ -558,12 +932,13 @@ public final class ArchitectureRules {
                 for (Class<?> type : types) {
                     if (holds(item, type)) {
                         events.add(SimpleConditionEvent.violated(
-                                item, item.getName() + " 가 " + type.getSimpleName() + " 을 생성자 인자나 필드로 갖는다"));
+                            item, item.getName() + " 가 " + type.getSimpleName() + " 을 생성자 인자나 필드로 갖는다"));
                     }
                 }
             }
         };
     }
+
 
     /** {@code HermesProperties} 를 쥐고 {@code runTimeout()} 이나 {@code pollInterval()} 을 부르면 위반이다. */
     private static ArchCondition<JavaClass> notReadHermesTimeoutsFromInjectedProperties() {
@@ -571,15 +946,16 @@ public final class ArchitectureRules {
             @Override
             public void check(JavaClass item, ConditionEvents events) {
                 boolean reads = item.getMethodCallsFromSelf().stream()
-                        .anyMatch(call -> call.getTargetOwner().isEquivalentTo(HermesProperties.class)
-                                && HERMES_LIVE_ACCESSORS.contains(call.getName()));
+                    .anyMatch(call -> call.getTargetOwner().isEquivalentTo(HermesProperties.class)
+                        && HERMES_LIVE_ACCESSORS.contains(call.getName()));
                 if (reads && holds(item, HermesProperties.class)) {
                     events.add(SimpleConditionEvent.violated(
-                            item, item.getName() + " 가 HermesProperties 를 쥐고 runTimeout 이나 pollInterval 을 부른다"));
+                        item, item.getName() + " 가 HermesProperties 를 쥐고 runTimeout 이나 pollInterval 을 부른다"));
                 }
             }
         };
     }
+
 
     /** 그 클래스가 {@code type} 을 필드로 갖거나 생성자 인자로 받는지 본다. */
     private static boolean holds(JavaClass item, Class<?> type) {
@@ -596,6 +972,7 @@ public final class ArchitectureRules {
         return false;
     }
 
+
     /** 그 클래스와 바깥 클래스, 그들의 상위 클래스 어디에도 {@code @Tag("mysql")} 이 없다. JUnit 의 {@code Tag} 는 상속된다. */
     private static DescribedPredicate<JavaClass> notMysqlTest() {
         return new DescribedPredicate<>("MySQL 검사가 아니다") {
@@ -605,7 +982,7 @@ public final class ArchitectureRules {
                 while (current.isPresent()) {
                     JavaClass each = current.get();
                     if (taggedMysql(each)
-                            || each.getAllRawSuperclasses().stream().anyMatch(ArchitectureRules::taggedMysql)) {
+                        || each.getAllRawSuperclasses().stream().anyMatch(ArchitectureRules::taggedMysql)) {
                         return false;
                     }
                     current = each.getEnclosingClass();
@@ -615,11 +992,13 @@ public final class ArchitectureRules {
         };
     }
 
+
     private static boolean taggedMysql(JavaClass item) {
         return item.tryGetAnnotationOfType(Tag.class)
-                .map(tag -> "mysql".equals(tag.value()))
-                .orElse(false);
+            .map(tag -> "mysql".equals(tag.value()))
+            .orElse(false);
     }
+
 
     private static ArchCondition<JavaClass> notDeclareContextSplitting() {
         return new ArchCondition<>("컨텍스트를 나누는 주석을 클래스, 필드, 메서드에 두지 않는다") {
@@ -628,14 +1007,14 @@ public final class ArchitectureRules {
                 for (String type : CONTEXT_SPLITTING_CLASS_ANNOTATIONS) {
                     if (item.isAnnotatedWith(type)) {
                         events.add(SimpleConditionEvent.violated(
-                                item, item.getName() + " 에 @" + simpleNameOf(type) + " 이 붙었다"));
+                            item, item.getName() + " 에 @" + simpleNameOf(type) + " 이 붙었다"));
                     }
                 }
                 for (JavaField field : item.getFields()) {
                     for (String type : CONTEXT_SPLITTING_FIELD_ANNOTATIONS) {
                         if (field.isAnnotatedWith(type)) {
                             events.add(SimpleConditionEvent.violated(
-                                    field, field.getFullName() + " 에 @" + simpleNameOf(type) + " 이 붙었다"));
+                                field, field.getFullName() + " 에 @" + simpleNameOf(type) + " 이 붙었다"));
                         }
                     }
                 }
@@ -643,7 +1022,7 @@ public final class ArchitectureRules {
                     for (String type : CONTEXT_SPLITTING_METHOD_ANNOTATIONS) {
                         if (method.isAnnotatedWith(type)) {
                             events.add(SimpleConditionEvent.violated(
-                                    method, method.getFullName() + " 에 @" + simpleNameOf(type) + " 이 붙었다"));
+                                method, method.getFullName() + " 에 @" + simpleNameOf(type) + " 이 붙었다"));
                         }
                     }
                 }
@@ -651,9 +1030,11 @@ public final class ArchitectureRules {
         };
     }
 
+
     private static String simpleNameOf(String annotationName) {
         return annotationName.substring(annotationName.lastIndexOf('.') + 1);
     }
+
 
     private static ArchCondition<JavaClass> notEnclosedByController() {
         return new ArchCondition<>("바깥 클래스의 단순 이름이 Controller 로 끝나지 않는다") {
@@ -663,8 +1044,8 @@ public final class ArchitectureRules {
                 while (enclosing.isPresent()) {
                     if (enclosing.get().getSimpleName().endsWith("Controller")) {
                         events.add(SimpleConditionEvent.violated(
-                                item,
-                                item.getName() + " 가 컨트롤러 " + enclosing.get().getName() + " 안에 있다"));
+                            item,
+                            item.getName() + " 가 컨트롤러 " + enclosing.get().getName() + " 안에 있다"));
                         return;
                     }
                     enclosing = enclosing.get().getEnclosingClass();

@@ -10,6 +10,7 @@ import com.bifos.assistant.followup.application.FollowUpDueAt;
 import com.bifos.assistant.followup.application.FollowUpService;
 import com.bifos.assistant.followup.application.model.FollowUpProposalOutcome;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.domain.Memory;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationResult;
@@ -119,6 +120,21 @@ public class McpToolService {
             }
             throw ex;
         }
+    }
+
+
+    /** 제목만 반환한다. 본문 사용 기록은 뒤이은 성공한 memory_read가 남긴다. */
+    public Map<String, Object> searchMemory(McpCaller caller, String query, int limit, Long afterId) {
+        MemorySearchPage page = memories.searchFor(
+            caller.user(), memories.accessOf(caller.originExecution().agentId()), query, limit, afterId);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("items", page.items());
+        data.put("nextAfterId", page.nextAfterId());
+        log.info(
+            "memory search executionId={} resultCount={}",
+            caller.executionId(),
+            page.items().size());
+        return result(ExternalData.wrap(JSON.writeValueAsString(data)), false);
     }
 
 

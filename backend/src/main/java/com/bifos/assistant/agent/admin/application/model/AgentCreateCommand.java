@@ -1,4 +1,4 @@
-package com.bifos.assistant.agent.application;
+package com.bifos.assistant.agent.admin.application.model;
 
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -13,12 +13,13 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
  * @param flow 흐름 이름. 비어 있으면 흐름을 두지 않는다
  */
 public record AgentCreateCommand(
-        String code,
-        String name,
-        String hermesProfile,
-        String apiBaseUrl,
-        CostMode costMode,
-        CredentialScope credentialScope,
-        AgentVisibility visibility,
-        String ownerEmail,
-        String flow) {}
+    String code,
+    String name,
+    String hermesProfile,
+    String apiBaseUrl,
+    CostMode costMode,
+    CredentialScope credentialScope,
+    AgentVisibility visibility,
+    String ownerEmail,
+    String flow) {
+}

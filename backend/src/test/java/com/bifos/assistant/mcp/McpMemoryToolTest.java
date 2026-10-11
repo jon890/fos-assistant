@@ -161,30 +161,42 @@ class McpMemoryToolTest {
             .isEqualTo(buildProperties.getVersion());
         JsonNode listed = body(mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"id\":18,\"method\":\"tools/list\"}"));
         assertThat(listed.path("id").asInt()).isEqualTo(18);
-        assertThat(listed.path("result").path("tools"))
-            .extracting(item -> item.path("name").asString())
+        List<String> names = StreamSupport.stream(
+            listed.path("result").path("tools").spliterator(), false)
+            .map(tool -> tool.path("name").asString())
+            .toList();
+        assertThat(names)
             .doesNotHaveDuplicates()
-            .contains(
+            .containsExactly(
                 "memory_read",
                 "artifact_write",
+                "agent_list",
+                "agent_delegate",
+                "agent_status",
+                "agent_stop",
                 "follow_up_propose",
-                "memory_remember",
                 "list_media_observations",
-                "record_media_observation");
-        assertThat(listed.path("result").path("tools").get(0).path("name").asString())
-            .isEqualTo("memory_read");
-        assertThat(listed.path("result").path("tools").get(1).path("name").asString())
-            .isEqualTo("artifact_write");
-        assertThat(listed.path("result").path("tools").get(2).path("name").asString())
-            .isEqualTo("agent_list");
-        assertThat(listed.path("result").path("tools").get(3).path("name").asString())
-            .isEqualTo("agent_delegate");
-        assertThat(listed.path("result").path("tools").get(4).path("name").asString())
-            .isEqualTo("agent_status");
-        assertThat(listed.path("result").path("tools").get(5).path("name").asString())
-            .isEqualTo("agent_stop");
-        assertThat(listed.path("result").path("tools").get(6).path("name").asString())
-            .isEqualTo("follow_up_propose");
+                "record_media_observation",
+                "memory_remember",
+                "memory_search");
+        JsonNode search = StreamSupport.stream(listed.path("result").path("tools").spliterator(), false)
+            .filter(tool -> "memory_search".equals(tool.path("name").asString()))
+            .findFirst().orElseThrow();
+        JsonNode schema = search.path("inputSchema");
+        assertThat(schema.path("type").asString()).isEqualTo("object");
+        assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(schema.path("required")).extracting(JsonNode::asString).containsExactly("query");
+        JsonNode fields = schema.path("properties");
+        assertThat(fields.propertyNames()).containsExactlyInAnyOrder("query", "limit", "after_id");
+        assertThat(fields.path("query").path("type").asString()).isEqualTo("string");
+        assertThat(fields.path("query").path("minLength").asInt()).isEqualTo(1);
+        assertThat(fields.path("query").path("maxLength").asInt()).isEqualTo(200);
+        assertThat(fields.path("limit").path("type").asString()).isEqualTo("integer");
+        assertThat(fields.path("limit").path("minimum").asInt()).isEqualTo(1);
+        assertThat(fields.path("limit").path("maximum").asInt()).isEqualTo(50);
+        assertThat(fields.path("limit").path("default").asInt()).isEqualTo(10);
+        assertThat(fields.path("after_id").path("type").asString()).isEqualTo("integer");
+        assertThat(fields.path("after_id").path("minimum").asInt()).isEqualTo(1);
         HttpResponse<String> notification = mcp(dadToken, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         assertThat(notification.statusCode()).isEqualTo(202);
         assertThat(notification.body()).isEmpty();
