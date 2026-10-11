@@ -68,7 +68,7 @@ function installCoverageRoutes(fake: FakeToss) {
     stocks: [],
     holdings: emptyHoldings,
     "buying-power": { currency: "KRW", cashBuyingPower: "1" },
-    "sellable-quantity": { sellableQuantity: "2" },
+    "sellable-quantity": { sellableQuantity: "9007199254740993.001" },
     orders: { orders: [], nextCursor: null, hasNext: false },
   }))
     fake.on("GET", `/api/v1/${path}`, { result });
@@ -88,7 +88,7 @@ function installCoverageRoutes(fake: FakeToss) {
     );
 }
 
-function expectCoverageRequests(fake: FakeToss) {
+function expectCoverageRequests(fake: FakeToss, accountSeq = "7") {
   const reached = new Set(
     fake.requests.map(
       (request) =>
@@ -119,7 +119,7 @@ function expectCoverageRequests(fake: FakeToss) {
           (path) => request.path === `/api/v1/${path}`,
         )
         ? null
-        : "7",
+        : accountSeq,
     );
     if (request.path.startsWith("/api/v1/sectors")) {
       expect(Object.fromEntries(request.query)).toEqual(
@@ -435,7 +435,7 @@ test("독립 stdio bundle의 11개 도구 설명과 13개 operation을 실제 HT
       new StdioClientTransport({
         command: process.execPath,
         args: ["--preload", preload, join(directory, "tossinvest-mcp.js")],
-        env: { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "7" },
+        env: { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "9223372036854775807" },
         stderr: "pipe",
       }),
     );
@@ -444,6 +444,12 @@ test("독립 stdio bundle의 11개 도구 설명과 13개 operation을 실제 HT
       const { result, body } = await tool(client, name, args);
       expect(result.isError).toBeUndefined();
       expect(result.structuredContent).toEqual(body);
+      if (name === "get_sellable_quantity") {
+        expect(body.result).toEqual({
+          sellableQuantity: "9007199254740993.001",
+        });
+        expect(body.sellable_quantity).toBe("9007199254740993.001");
+      }
       if (name.startsWith("get_sector") || name === "list_sectors") {
         const path =
           name === "list_sectors"
@@ -458,7 +464,7 @@ test("독립 stdio bundle의 11개 도구 설명과 13개 operation을 실제 HT
         });
       }
     }
-    expectCoverageRequests(fake);
+    expectCoverageRequests(fake, "9223372036854775807");
   } finally {
     await client.close();
     fake.stop();
