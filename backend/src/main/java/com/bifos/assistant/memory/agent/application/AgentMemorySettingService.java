@@ -52,6 +52,7 @@ public class AgentMemorySettingService {
     private final MemoryRepository memories;
     private final AppUserRepository users;
 
+
     /**
      * 에이전트가 받는 collection 과 민감 허용, 셈 대상의 collection 마다 항목 수, 최근 변경 기록을 낸다.
      *
@@ -72,15 +73,15 @@ public class AgentMemorySettingService {
         Long userId = owner.map(AppUser::id).orElse(null);
 
         Map<String, AgentMemoryCollection> rows = agentCollections.rowsOf(agent.id()).stream()
-                .collect(Collectors.toMap(AgentMemoryCollection::collection, Function.identity()));
+            .collect(Collectors.toMap(AgentMemoryCollection::collection, Function.identity()));
         List<MemoryCollectionCount> counts = memories.countLoadableByCollection(userId, groupId);
         Map<String, Long> entries = counts.stream()
-                .collect(Collectors.groupingBy(
-                        MemoryCollectionCount::collection, Collectors.summingLong(MemoryCollectionCount::entries)));
+            .collect(Collectors.groupingBy(
+                MemoryCollectionCount::collection, Collectors.summingLong(MemoryCollectionCount::entries)));
         Map<String, Long> sensitiveEntries = counts.stream()
-                .filter(count -> count.sensitivity() == MemorySensitivity.SENSITIVE)
-                .collect(Collectors.groupingBy(
-                        MemoryCollectionCount::collection, Collectors.summingLong(MemoryCollectionCount::entries)));
+            .filter(count -> count.sensitivity() == MemorySensitivity.SENSITIVE)
+            .collect(Collectors.groupingBy(
+                MemoryCollectionCount::collection, Collectors.summingLong(MemoryCollectionCount::entries)));
 
         List<AgentMemorySettingCollection> view = new ArrayList<>();
         Set<String> unlisted = new TreeSet<>(rows.keySet());
@@ -93,11 +94,12 @@ public class AgentMemorySettingService {
         }
 
         return new AgentMemorySetting(
-                owner.isPresent() ? AgentMemoryCountScope.OWNER : AgentMemoryCountScope.GROUP,
-                owner.map(AppUser::displayName).orElse(null),
-                view,
-                changesOf(agent.id()));
+            owner.isPresent() ? AgentMemoryCountScope.OWNER : AgentMemoryCountScope.GROUP,
+            owner.map(AppUser::displayName).orElse(null),
+            view,
+            changesOf(agent.id()));
     }
+
 
     /**
      * 에이전트가 받는 collection 을 관리자가 고른 목록으로 바꾸고 바뀐 설정을 낸다.
@@ -109,7 +111,7 @@ public class AgentMemorySettingService {
      *
      * @param next 받을 collection 전체다. 비어 있으면 모두 뗀다
      * @throws ApiException 같은 collection 이 둘이거나 64개를 넘거나 목록에 없는 collection 이 있으면
-     *     {@code VALIDATION_FAILED}, 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 커넥터 에이전트면 {@code FORBIDDEN}
+     * {@code VALIDATION_FAILED}, 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 커넥터 에이전트면 {@code FORBIDDEN}
      */
     public AgentMemorySetting replace(CurrentUser admin, String code, List<AgentMemoryGrantInput> next) {
         if (next.size() > MAX_COLLECTIONS) {
@@ -125,48 +127,51 @@ public class AgentMemorySettingService {
         Agent agent = agentCollections.requireEditableAgent(code);
         Long groupId = ownerOf(agent).map(AppUser::groupId).orElse(admin.groupId());
         Set<String> listed = collections.collectionsOf(groupId).stream()
-                .map(MemoryCollection::key)
-                .collect(Collectors.toSet());
+            .map(MemoryCollection::key)
+            .collect(Collectors.toSet());
         agentCollections.replace(agent.id(), grants, listed, admin.id());
         return settingOf(admin, code);
     }
+
 
     private Optional<AppUser> ownerOf(Agent agent) {
         return agent.ownerUserId() == null ? Optional.empty() : users.findById(agent.ownerUserId());
     }
 
+
     private List<AgentMemorySettingChange> changesOf(Long agentId) {
         List<AgentMemoryCollectionChange> changes = agentCollections.recentChangesOf(agentId);
         Set<Long> userIds = changes.stream()
-                .map(AgentMemoryCollectionChange::changedByUserId)
-                .collect(Collectors.toSet());
+            .map(AgentMemoryCollectionChange::changedByUserId)
+            .collect(Collectors.toSet());
         Map<Long, String> names = new HashMap<>();
         users.findAllById(userIds).forEach(user -> names.put(user.id(), user.displayName()));
         return changes.stream()
-                .map(change -> new AgentMemorySettingChange(
-                        change.collection(),
-                        change.changeType().name(),
-                        change.allowSensitive(),
-                        names.get(change.changedByUserId()),
-                        change.changedAt()))
-                .toList();
+            .map(change -> new AgentMemorySettingChange(
+                change.collection(),
+                change.changeType().name(),
+                change.allowSensitive(),
+                names.get(change.changedByUserId()),
+                change.changedAt()))
+            .toList();
     }
 
+
     private static AgentMemorySettingCollection collectionView(
-            String key,
-            String displayName,
-            boolean listed,
-            Map<String, AgentMemoryCollection> rows,
-            Map<String, Long> entries,
-            Map<String, Long> sensitiveEntries) {
+        String key,
+        String displayName,
+        boolean listed,
+        Map<String, AgentMemoryCollection> rows,
+        Map<String, Long> entries,
+        Map<String, Long> sensitiveEntries) {
         AgentMemoryCollection row = rows.get(key);
         return new AgentMemorySettingCollection(
-                key,
-                displayName,
-                listed,
-                row != null,
-                row != null && row.allowSensitive(),
-                entries.getOrDefault(key, 0L),
-                sensitiveEntries.getOrDefault(key, 0L));
+            key,
+            displayName,
+            listed,
+            row != null,
+            row != null && row.allowSensitive(),
+            entries.getOrDefault(key, 0L),
+            sensitiveEntries.getOrDefault(key, 0L));
     }
 }

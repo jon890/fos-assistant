@@ -25,6 +25,7 @@ class AgentMemorySettingServicePlacementTest {
     @TempDir
     Path temporary;
 
+
     @Test
     @DisplayName("새 서비스와 공개 결과 및 HTTP 중첩 DTO 의 정상 배치를 허용한다")
     void acceptsRoles() throws IOException {
@@ -32,6 +33,7 @@ class AgentMemorySettingServicePlacementTest {
         assertThat(fixture).hasSize(5);
         ArchitectureRules.featureApplicationRole(ROOT).check(fixture);
     }
+
 
     @ParameterizedTest
     @MethodSource("invalidRoles")
@@ -44,6 +46,7 @@ class AgentMemorySettingServicePlacementTest {
         assertThat(fixture.stream().filter(type -> type.getName().equals(name)).toList()).hasSize(1);
         assertViolation(ArchitectureRules.featureApplicationRole(ROOT), fixture, name, detail);
     }
+
 
     static Stream<Arguments> invalidRoles() {
         return Stream.of(
@@ -59,6 +62,7 @@ class AgentMemorySettingServicePlacementTest {
             Arguments.of("agent.memory.application.BadEntity", "@jakarta.persistence.Entity public class BadEntity {}", "domain.entity"));
     }
 
+
     @Test
     @DisplayName("HTTP mapped graph 의 DTO 를 model 로 옮겨도 HTTP 역할 위반을 찾는다")
     void rejectsHttpDtoInModel() throws IOException {
@@ -73,6 +77,7 @@ class AgentMemorySettingServicePlacementTest {
         assertViolation(ArchitectureRules.featureApplicationRole(ROOT), fixture, wrong, "HTTP graph");
     }
 
+
     @Test
     @DisplayName("같은 presentation 의 다른 outer 로 빠진 확정 HTTP record 도 거절한다")
     void rejectsDetachedOwnedHttpDto() throws IOException {
@@ -85,6 +90,7 @@ class AgentMemorySettingServicePlacementTest {
         assertThat(fixture.stream().filter(type -> type.getSimpleName().equals("AgentMemoryGrantBody")).toList()).hasSize(1);
         assertViolation(ArchitectureRules.movedContractOwnership(ROOT), fixture, detached + "$AgentMemoryGrantBody", "AgentMemoryDtos");
     }
+
 
     @Test
     @DisplayName("서비스 입출력 graph 는 record 가 아닌 공개 결과도 model 배치를 검사한다")
@@ -99,6 +105,7 @@ class AgentMemorySettingServicePlacementTest {
         assertThat(fixture.stream().filter(type -> type.getName().equals(wrong)).toList()).hasSize(1);
         assertViolation(ArchitectureRules.featureApplicationRole(ROOT), fixture, wrong, "application.model");
     }
+
 
     @Test
     @DisplayName("domain 정책과 infra projection 및 올바른 설정과 영속 타입을 공개 결과로 올리지 않는다")
@@ -115,6 +122,7 @@ class AgentMemorySettingServicePlacementTest {
         assertThat(fixture).hasSize(5 + declarations.size());
         ArchitectureRules.featureApplicationRole(ROOT).check(fixture);
     }
+
 
     private static Map<String, String> roleSources() {
         Map<String, String> sources = new HashMap<>();

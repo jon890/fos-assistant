@@ -136,6 +136,7 @@ class ArchitectureRulesTest {
         ArchitectureRules.AGENT_MEMORY_HAS_NO_UPWARD_MEMORY_DEPENDENCY.check(application);
     }
 
+
     @ParameterizedTest
     @MethodSource("memoryDirections")
     @DisplayName("Memory 기능의 층 역방향과 웹 의존을 독립 fixture 로 거절한다")
@@ -156,6 +157,7 @@ class ArchitectureRulesTest {
         AgentMemoryCollectionServicePlacementTest.assertViolation(rule, fixture, from, to);
     }
 
+
     static Stream<Arguments> memoryDirections() {
         return Stream.of(
             Arguments.of("agent.memory.infra.Bad", "agent.memory.application.Target", false, false),
@@ -166,6 +168,7 @@ class ArchitectureRulesTest {
             Arguments.of("agent.memory.application.Bad", "memory.application.Target", false, true),
             Arguments.of("agent.application.Bad", "memory.agent.application.Target", false, true));
     }
+
 
     @Test
     @DisplayName("기존 층 규칙은 기능별 하위 패키지의 정상 흐름도 허용한다")

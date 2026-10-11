@@ -10,7 +10,8 @@ import java.util.List;
  * @param changes 최근 변경 기록 10줄이다. 새것부터다
  */
 public record AgentMemorySetting(
-        AgentMemoryCountScope countedFor,
-        String ownerName,
-        List<AgentMemorySettingCollection> collections,
-        List<AgentMemorySettingChange> changes) {}
+    AgentMemoryCountScope countedFor,
+    String ownerName,
+    List<AgentMemorySettingCollection> collections,
+    List<AgentMemorySettingChange> changes) {
+}

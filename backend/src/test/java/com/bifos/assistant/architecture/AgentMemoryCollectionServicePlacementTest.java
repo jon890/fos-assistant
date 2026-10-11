@@ -26,6 +26,7 @@ class AgentMemoryCollectionServicePlacementTest {
     @TempDir
     Path temporary;
 
+
     @Test
     @DisplayName("운영 Memory 계약은 각각 하나이고 raw 소유·역할·방향 검사를 통과한다")
     void checksProductionContracts() {
@@ -39,6 +40,7 @@ class AgentMemoryCollectionServicePlacementTest {
         ArchitectureRules.FEATURE_LAYER_COVERAGE.check(ArchitectureRulesTest.MAIN);
     }
 
+
     @Test
     @DisplayName("정상 Memory 소유 fixture 는 전체 계약을 선택하고 허용한다")
     void acceptsOwnedFixture() throws IOException {
@@ -49,6 +51,7 @@ class AgentMemoryCollectionServicePlacementTest {
         ArchitectureRules.movedContractOwnership(ROOT).check(fixture);
     }
 
+
     @ParameterizedTest
     @MethodSource("ownedNames")
     @DisplayName("소유 계약 하나가 누락되면 raw 검사가 실패한다")
@@ -56,8 +59,7 @@ class AgentMemoryCollectionServicePlacementTest {
         Map<String, String> sources = sources();
         String location = ROOT + "." + ArchitectureRules.memoryContractOwners().get(name);
         if (location.contains("$")) {
-            sources.compute(location.substring(0, location.indexOf('$')), (key, body) ->
-                body.replace("public record " + name + "() {}", ""));
+            sources.compute(location.substring(0, location.indexOf('$')), (key, body) -> body.replace("public record " + name + "() {}", ""));
         } else {
             sources.remove(location);
         }
@@ -65,6 +67,7 @@ class AgentMemoryCollectionServicePlacementTest {
         assertThat(fixture.stream().filter(type -> type.getSimpleName().equals(name)).toList()).isEmpty();
         assertViolation(ArchitectureRules.movedContractOwnership(ROOT), fixture, name, "대상 수가 0");
     }
+
 
     @ParameterizedTest
     @MethodSource("ownedNames")
@@ -77,6 +80,7 @@ class AgentMemoryCollectionServicePlacementTest {
         assertThat(fixture.stream().filter(type -> type.getSimpleName().equals(name)).toList()).hasSize(2);
         assertViolation(ArchitectureRules.movedContractOwnership(ROOT), fixture, duplicate, "대상 수가 2");
     }
+
 
     @ParameterizedTest
     @MethodSource("wrongPlacements")
@@ -92,6 +96,7 @@ class AgentMemoryCollectionServicePlacementTest {
         assertViolation(ArchitectureRules.movedContractOwnership(ROOT), fixture, moved, "에 있어야 한다");
     }
 
+
     static Stream<Arguments> wrongPlacements() {
         return Stream.of(
             Arguments.of("AgentMemoryCollectionService", "agent.application"),
@@ -103,6 +108,7 @@ class AgentMemoryCollectionServicePlacementTest {
             Arguments.of("AgentMemorySetting", "other.application.model"),
             Arguments.of("AgentMemoryDtos", "memory.presentation"));
     }
+
 
     @Test
     @DisplayName("소유 타입 전체가 없거나 운영 루트 선택이 비어도 실패한다")
@@ -116,9 +122,11 @@ class AgentMemoryCollectionServicePlacementTest {
             .isInstanceOf(AssertionError.class);
     }
 
+
     static Stream<String> ownedNames() {
         return ArchitectureRules.memoryContractOwners().keySet().stream().sorted();
     }
+
 
     static Map<String, String> sources() {
         Map<String, String> sources = new HashMap<>();
@@ -137,9 +145,11 @@ class AgentMemoryCollectionServicePlacementTest {
         return sources;
     }
 
+
     static String source(String name, String declaration) {
         return "package " + name.substring(0, name.lastIndexOf('.')) + ";\n" + declaration;
     }
+
 
     static void assertViolation(ArchRule rule, JavaClasses fixture, String... details) {
         var result = rule.evaluate(fixture);

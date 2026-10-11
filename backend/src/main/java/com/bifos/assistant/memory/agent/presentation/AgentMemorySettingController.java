@@ -23,19 +23,21 @@ public class AgentMemorySettingController {
     private final AgentMemorySettingService settings;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public AgentMemorySettingView get(@PathVariable String code) {
         return AgentMemorySettingView.from(settings.settingOf(currentUser.requireAdmin(), code));
     }
 
+
     @PutMapping
     public AgentMemorySettingView replace(
-            @PathVariable String code, @Valid @RequestBody ReplaceAgentMemoryRequest request) {
+        @PathVariable String code, @Valid @RequestBody ReplaceAgentMemoryRequest request) {
         return AgentMemorySettingView.from(settings.replace(
-                currentUser.requireAdmin(),
-                code,
-                request.collections().stream()
-                        .map(AgentMemoryGrantBody::toInput)
-                        .toList()));
+            currentUser.requireAdmin(),
+            code,
+            request.collections().stream()
+                .map(AgentMemoryGrantBody::toInput)
+                .toList()));
     }
 }
