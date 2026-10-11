@@ -3,7 +3,6 @@ package com.bifos.assistant.chat.presentation;
 import com.bifos.assistant.chat.application.ActivitySummary;
 import com.bifos.assistant.chat.application.AgentModelSettings;
 import com.bifos.assistant.chat.application.HiddenModels;
-import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.MemoryUse;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.PendingQueue;
@@ -13,17 +12,11 @@ import com.bifos.assistant.chat.application.StarterSuggestions;
 import com.bifos.assistant.chat.application.model.LatencyRow;
 import com.bifos.assistant.chat.application.model.LatencyStat;
 import com.bifos.assistant.chat.application.model.LatencySummary;
-import com.bifos.assistant.chat.application.model.MediaObservationInput;
-import com.bifos.assistant.chat.application.model.MediaObservationPage;
-import com.bifos.assistant.chat.application.model.MediaObservationView;
-import com.bifos.assistant.chat.application.model.ObservationProvenance;
 import com.bifos.assistant.chat.domain.ChatArtifact;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.ChatPendingMessage;
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
-import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
-import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.hermes.dto.HermesModelCatalog;
 import com.bifos.assistant.hermes.dto.ReasoningCapability;
 import com.bifos.assistant.memory.application.model.CapturedMemory;
@@ -40,74 +33,12 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import tools.jackson.databind.JsonNode;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ChatDtos {
-    public record MediaObservationCorrectionRequest(long expectedRevision, UUID requestId, JsonNode observation) {
-        public static MediaObservationCorrectionRequest from(JsonNode node) {
-            MediaObservationInputReader.fields(node, Set.of("expectedRevision", "requestId", "observation"));
-            return new MediaObservationCorrectionRequest(
-                MediaObservationInputReader.revision(node.get("expectedRevision")),
-                MediaObservationInputReader.requestId(node.get("requestId")),
-                node.get("observation"));
-        }
-
-
-        @Override
-        public String toString() {
-            return "MediaObservationCorrectionRequest[body omitted]";
-        }
-    }
-
-    public record MediaObservationPageResponse(List<MediaObservationResponse> items, String nextAfterAssetId) {
-        public static MediaObservationPageResponse from(MediaObservationPage page) {
-            return new MediaObservationPageResponse(
-                page.items().stream().map(MediaObservationResponse::from).toList(), page.nextAfterAssetId());
-        }
-    }
-
-    public record MediaObservationResponse(
-        String assetId,
-        int ordinal,
-        String sourceFingerprint,
-        Long revision,
-        ObservationStatus status,
-        MediaObservationInput observation,
-        ObservationProvenance provenance,
-        Instant expiresAt,
-        String errorCode,
-        String sourceAssurance) {
-        public static MediaObservationResponse from(MediaObservationView view) {
-            String assurance = view.observation() == null || view.provenance() == null
-                ? null
-                : view.provenance().kind() == ObservationProvenanceKind.USER_CORRECTION
-                    ? "USER_CORRECTION"
-                    : "MODEL_UNVERIFIED";
-            return new MediaObservationResponse(
-                view.assetId(),
-                view.ordinal(),
-                view.sourceFingerprint(),
-                view.revision(),
-                view.status(),
-                view.observation(),
-                view.provenance(),
-                view.expiresAt(),
-                view.errorCode(),
-                assurance);
-        }
-
-
-        @Override
-        public String toString() {
-            return "MediaObservationResponse[body omitted]";
-        }
-    }
-
     /**
      * @param conversationId 이어 쓸 대화의 공개 식별자. 없으면 새 대화를 만든다
      * @param attachmentIds 이 메시지와 함께 보낼 첨부 번호들. 화면이 비워 보내든 빼고 보내든 같게 다루려고
@@ -321,7 +252,11 @@ public final class ChatDtos {
         }
     }
 
-    /** model이 null이면 provider 전체인 숨김 항목이다. */
+    /**
+     * 숨긴 provider 또는 모델 하나다.
+     *
+     * @param model null 이면 그 provider 전체다
+     */
     public record HiddenModelEntry(@NotNull String provider, String model) {
     }
 
@@ -413,7 +348,12 @@ public final class ChatDtos {
         }
     }
 
-    /** 관리자 사용량 화면에 LatencySummary의 기간과 날짜·단계 순서를 그대로 낸다. */
+    /**
+     * 관리자 사용량 화면의 첫 반응 시간 절이 받는 집계다.
+     *
+     * @param days 집계한 기간의 일수
+     * @param rows 날짜 오름차순이고 같은 날짜 안에서는 단계 순서다
+     */
     public record LatencySummaryView(int days, List<LatencyRowView> rows) {
         static LatencySummaryView from(LatencySummary summary) {
             return new LatencySummaryView(
@@ -422,7 +362,14 @@ public final class ChatDtos {
         }
     }
 
-    /** 날짜와 단계, 각 시간의 의미는 LatencyRow를 따른다. */
+    /**
+     * @param date {@code Asia/Seoul} 의 날짜
+     * @param modelTier 모델 단계. 단계를 고르지 않은 실행은 null
+     * @param turns 답 메시지가 있는 사용자 turn 수
+     * @param firstResponse 요청을 받은 때부터 첫 조각까지
+     * @param toSubmit 요청을 받은 때부터 제출까지
+     * @param toFirstDelta 제출한 때부터 첫 조각까지
+     */
     public record LatencyRowView(
         LocalDate date,
         ModelTier modelTier,
@@ -441,7 +388,12 @@ public final class ChatDtos {
         }
     }
 
-    /** LatencyStat의 밀리초 단위와 건수 0·백분위 null인 결측값을 그대로 낸다. */
+    /**
+     * 지표 하나의 건수와 백분위다. 값이 없는 지표는 {@code count} 가 0 이고 두 백분위가 null 이다.
+     *
+     * @param p50Ms 중앙값. 밀리초
+     * @param p90Ms 90번째 백분위. 밀리초
+     */
     public record LatencyStatView(long count, Long p50Ms, Long p90Ms) {
         static LatencyStatView from(LatencyStat stat) {
             return new LatencyStatView(stat.count(), stat.p50Ms(), stat.p90Ms());

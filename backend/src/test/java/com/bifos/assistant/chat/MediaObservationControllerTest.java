@@ -10,7 +10,7 @@ import com.bifos.assistant.chat.application.model.MediaObservationInput;
 import com.bifos.assistant.chat.application.model.ObservationProvenance;
 import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
 import com.bifos.assistant.chat.domain.type.ObservationStatus;
-import com.bifos.assistant.chat.presentation.ChatDtos.MediaObservationCorrectionRequest;
+import com.bifos.assistant.chat.presentation.MediaObservationDtos.MediaObservationCorrectionRequest;
 import com.bifos.assistant.crypto.domain.KeyEncryptionKeys;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import io.jsonwebtoken.Jwts;

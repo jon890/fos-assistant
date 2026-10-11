@@ -8,7 +8,8 @@ Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 �
 REST·MCP와 chat.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)을 따른다.
 chat.application의 기존 저장 서비스를 유지하고 MediaObservationPages와 MediaObservationInputReader를 새 소비자로 둔다.
 공개 페이지 타입은 chat.application.model.MediaObservationPage에 둔다.
-REST 요청·응답은 chat.presentation.ChatDtos, MCP 인자는 mcp.presentation.McpDtos에 모은다.
+관찰 REST 요청·응답은 `chat.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
+일반 대화 DTO는 `ChatDtos`에 두고, 관찰 DTO는 파일 길이 상한 안에서 기존 필드 설명을 보존하도록 관심사별로 나눈다.
 mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
 McpToolCatalog는 기존 도구와 관찰 도구의 정의를 같은 순서로 모으며 호출 시점의 설정을 읽는다.
 McpToolService는 catalog를 호출하고 기존 실행 handler를 유지한다. McpController의 분기도 그대로 둔다.
