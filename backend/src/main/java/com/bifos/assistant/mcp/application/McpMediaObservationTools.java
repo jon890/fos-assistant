@@ -1,14 +1,11 @@
 package com.bifos.assistant.mcp.application;
 
-import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.MediaObservationPages;
 import com.bifos.assistant.chat.application.MediaObservationService;
 import com.bifos.assistant.chat.application.model.MediaObservationView;
 import com.bifos.assistant.chat.application.model.ObservationProvenance;
 import com.bifos.assistant.chat.domain.type.ObservationProvenanceKind;
-import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
-import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -18,9 +15,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -34,32 +28,21 @@ public class McpMediaObservationTools {
     private final MediaObservationPages pages;
     private final MediaObservationService observations;
     private final MediaObservationInputReader reader;
-    private final UserAccessPolicy users;
-    private final AgentService agents;
-    private final SessionOwnerResolver sessions;
+    private final McpCurrentCallerGuard guard;
     private final ObjectMapper json;
-    private final TransactionTemplate permissions;
 
 
     public McpMediaObservationTools(
         MediaObservationPages pages,
         MediaObservationService observations,
         MediaObservationInputReader reader,
-        UserAccessPolicy users,
-        AgentService agents,
-        SessionOwnerResolver sessions,
-        ObjectMapper json,
-        PlatformTransactionManager manager) {
+        McpCurrentCallerGuard guard,
+        ObjectMapper json) {
         this.pages = pages;
         this.observations = observations;
         this.reader = reader;
-        this.users = users;
-        this.agents = agents;
-        this.sessions = sessions;
+        this.guard = guard;
         this.json = json;
-        this.permissions = new TransactionTemplate(manager);
-        permissions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        permissions.setReadOnly(true);
     }
 
 
@@ -104,9 +87,9 @@ public class McpMediaObservationTools {
     /** 권한 조회는 짧은 별도 트랜잭션이다. 저장은 기존 서비스의 독립 commit 경계를 유지한다. */
     private Map<String, Object> guarded(McpCaller caller, Supplier<JsonNode> action) {
         try {
-            requireCurrent(caller);
+            guard.requireCurrent(caller);
             JsonNode result = action.get();
-            requireCurrent(caller);
+            guard.requireCurrent(caller);
             return McpToolService.result(ExternalData.wrap(json.writeValueAsString(result)), false);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
@@ -131,31 +114,6 @@ public class McpMediaObservationTools {
     }
 
 
-    private void requireCurrent(McpCaller caller) {
-        permissions.executeWithoutResult(status -> {
-            var original = caller.originExecution();
-            var context = caller.context();
-            var origin = sessions.resolve(original.profileName(), context.rootSessionId(), context.sessionId());
-            if (!original.id().equals(origin.id())
-                || !caller.user().id().equals(origin.userId())
-                || origin.conversationId() == null
-                || !origin.conversationId().equals(original.conversationId())
-                || !original.profileName().equals(origin.profileName())
-                || !users.allowed(origin.userId())) {
-                throw invalidContext();
-            }
-            var agent = agents.findById(origin.agentId()).orElseThrow(McpMediaObservationTools::invalidContext);
-            if (agent.isDeleted()
-                || !agent.enabled()
-                || agent.connectorManaged()
-                || !agent.isReadableBy(origin.userId())
-                || !origin.profileName().equals(agent.hermesProfile())) {
-                throw invalidContext();
-            }
-        });
-    }
-
-
     private ObjectNode response(MediaObservationView view) {
         ObjectNode result = json.valueToTree(view);
         String assurance = view.observation() == null || view.provenance() == null
@@ -174,11 +132,6 @@ public class McpMediaObservationTools {
             result.put("currentRevision", revision);
         }
         return McpToolService.result(json.writeValueAsString(result), true);
-    }
-
-
-    private static ApiException invalidContext() {
-        return new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
     }
 
 

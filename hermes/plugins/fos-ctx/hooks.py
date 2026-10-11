@@ -26,7 +26,7 @@ TOOL_PREFIX = "mcp__fos_assistant__"
 # 서명이 없으면 막는 도구다.
 REQUIRED_PREFIX = "agent_"
 REQUIRED_TOOLS = frozenset({"memory_read", "memory_search", "artifact_write", "follow_up_propose", "memory_remember",
-                            "list_media_observations", "record_media_observation"})
+                            "list_media_observations", "record_media_observation", "content_draft_write", "content_draft_read"})
 
 # 모델이 스킬을 만들고 고치는 도구다. Hermes `tools/skill_manager_tool.py` 가 이 이름으로 등록한다.
 SKILL_MANAGE_TOOL = "skill_manage"

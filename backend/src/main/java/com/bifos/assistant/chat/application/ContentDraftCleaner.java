@@ -4,6 +4,8 @@ import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import com.bifos.assistant.chat.domain.type.ContentDraftRevisionStatus;
 import com.bifos.assistant.chat.infra.ContentDraftAssetRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;
+import com.bifos.assistant.chat.infra.ContentDraftCreationRequestRepository;
+import com.bifos.assistant.chat.domain.entity.ContentDraftCreationRequest;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ConversationRepository;
 import java.time.Clock;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class ContentDraftCleaner {
     private final ContentDraftRepository drafts;
+    private final ContentDraftCreationRequestRepository creationRequests;
     private final ContentDraftRevisionRepository revisions;
     private final ContentDraftAssetRepository assets;
     private final ContentDraftReferences references;
@@ -64,6 +67,7 @@ public class ContentDraftCleaner {
                     for (var draft : drafts.findByConversationIdOrderByIdAsc(conversationId)) {
                         if (!draft.expiresAt().isAfter(now)) {
                             count += revisions.expire(draft.id());
+                            creationRequests.findByDraftPublicId(draft.publicId()).forEach(ContentDraftCreationRequest::markGone);
                             continue;
                         }
                         if (conversation.deletedAt() != null || !draft.ownerUserId().equals(conversation.userId())) {
