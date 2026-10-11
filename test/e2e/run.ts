@@ -371,6 +371,8 @@ async function main(): Promise<void> {
   const logPath = join(work, "app.log");
   let hermes: FakeHermes | undefined;
   let app: ChildProcess | undefined;
+  let scenarioName = "기동";
+  let scenarioStartedAt = performance.now();
 
   try {
     const skillRoot = await makeSkillRoot(work);
@@ -441,25 +443,32 @@ async function main(): Promise<void> {
     };
 
     for (const scenario of SCENARIOS) {
+      scenarioName = scenario.name;
+      scenarioStartedAt = performance.now();
       console.log(`== ${scenario.name}`);
       await scenario.run(context);
     }
 
     console.log("\n모두 통과했다");
-  } catch (error) {
-    console.error(`\n실패: ${error instanceof ScenarioFailure ? error.message : String(error)}`);
+  } catch {
+    // 예외에는 요청과 응답 본문이 섞일 수 있어 고정 필드만 남긴다.
+    console.error("\n실패:", JSON.stringify({
+      status: "FAILED",
+      scenario: scenarioName,
+      elapsedMs: Math.round(performance.now() - scenarioStartedAt),
+    }));
     await printAppLog(logPath, [JWT_SECRET, PROFILE_KEY, FAKE_DASHBOARD_TOKEN, ...TOOL_DETAIL_SECRETS]);
     process.exitCode = 1;
   } finally {
-    if (app?.pid !== undefined) {
+    try {
+      if (app !== undefined) await killControlPlane(app);
+    } finally {
       try {
-        process.kill(-app.pid, "SIGTERM");
-      } catch {
-        // 이미 내려갔다
+        await hermes?.close();
+      } finally {
+        await rm(work, { recursive: true, force: true });
       }
     }
-    await hermes?.close();
-    await rm(work, { recursive: true, force: true });
   }
 }
 
