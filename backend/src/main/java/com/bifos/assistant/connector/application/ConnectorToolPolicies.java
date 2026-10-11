@@ -28,6 +28,7 @@ public final class ConnectorToolPolicies {
 
     private static final int LEGACY_SCHEMA = 1;
 
+
     /** 이 manifest 의 도구 정책으로 판정해도 되는가. 거짓이면 그 커넥터를 없는 것으로 다룬다. */
     public static boolean valid(ConnectorManifest manifest) {
         if (manifest.schema() != LEGACY_SCHEMA && manifest.schema() != DECLARING_SCHEMA) {
@@ -46,12 +47,13 @@ public final class ConnectorToolPolicies {
         }
         for (ConnectorField field : manifest.fields()) {
             if (field.options() != null
-                    && !readWithoutApproval(manifest, field.options().tool())) {
+                && !readWithoutApproval(manifest, field.options().tool())) {
                 return false;
             }
         }
         return true;
     }
+
 
     /** 이름이 같은 도구의 선언이다. 선언이 없거나 읽을 수 없거나 이름이 null 이면 빈 값이다. */
     public static Optional<ToolPolicy> find(ConnectorManifest manifest, String toolName) {
@@ -59,10 +61,11 @@ public final class ConnectorToolPolicies {
             return Optional.empty();
         }
         return manifest.tools().stream()
-                .filter(tool -> toolName.equals(tool.name()))
-                .findFirst()
-                .flatMap(ConnectorToolPolicies::policy);
+            .filter(tool -> toolName.equals(tool.name()))
+            .findFirst()
+            .flatMap(ConnectorToolPolicies::policy);
     }
+
 
     /** 화면에 낼 도구 선언이다. 도구를 선언하지 않는 판은 대시보드가 부르는 도구만 담고 있어 내지 않는다. */
     static List<ConnectorToolSummary> summaries(ConnectorManifest manifest) {
@@ -72,29 +75,31 @@ public final class ConnectorToolPolicies {
         List<ConnectorToolSummary> summaries = new ArrayList<>();
         for (ConnectorTool tool : manifest.tools()) {
             policy(tool)
-                    .map(policy -> new ConnectorToolSummary(
-                            tool.name(), policy.title(), policy.risk(), policy.approval(), policy.grantable(), tool.description()))
-                    .ifPresent(summaries::add);
+                .map(policy -> new ConnectorToolSummary(
+                    tool.name(), policy.title(), policy.risk(), policy.approval(), policy.grantable(), tool.description()))
+                .ifPresent(summaries::add);
         }
         return List.copyOf(summaries);
     }
+
 
     /** MCP 서버가 낸 도구 이름 가운데 manifest 가 선언하지 않은 수다. 도구를 선언하지 않는 판은 세지 않는다. */
     static int undeclared(ConnectorManifest manifest, List<String> toolNames) {
         if (manifest.schema() != DECLARING_SCHEMA) {
             return 0;
         }
-        Set<String> declared =
-                manifest.tools().stream().map(ConnectorTool::name).collect(Collectors.toSet());
-        return (int) toolNames.stream().filter(name -> !declared.contains(name)).count();
+        Set<String> declared = manifest.tools().stream().map(ConnectorTool::name).collect(Collectors.toSet());
+        return (int)toolNames.stream().filter(name -> !declared.contains(name)).count();
     }
+
 
     /** 대시보드가 승인 없이 부르는 확인 도구와 선택지 도구는 읽기 전용이고 승인이 없어야 한다. */
     private static boolean readWithoutApproval(ConnectorManifest manifest, String toolName) {
         return find(manifest, toolName)
-                .filter(policy -> policy.risk() == ToolRisk.READ && policy.approval() == ToolApproval.NONE)
-                .isPresent();
+            .filter(policy -> policy.risk() == ToolRisk.READ && policy.approval() == ToolApproval.NONE)
+            .isPresent();
     }
+
 
     /**
      * 글자로 받은 선언을 읽는다. 모르는 위험도나 승인 방식, 하한보다 느슨한 선언은 빈 값이다.
@@ -111,13 +116,13 @@ public final class ConnectorToolPolicies {
         for (ToolRisk risk : ToolRisk.values()) {
             if (risk.name().equals(tool.risk())) {
                 return approval.looserThan(risk.floor())
-                        ? Optional.empty()
-                        : Optional.of(new ToolPolicy(
-                                risk,
-                                approval,
-                                tool.title(),
-                                approval == ToolApproval.REQUIRED && !Boolean.FALSE.equals(tool.grant()),
-                                approval == ToolApproval.REQUIRED ? Set.copyOf(tool.identifiers()) : Set.of()));
+                    ? Optional.empty()
+                    : Optional.of(new ToolPolicy(
+                        risk,
+                        approval,
+                        tool.title(),
+                        approval == ToolApproval.REQUIRED && !Boolean.FALSE.equals(tool.grant()),
+                        approval == ToolApproval.REQUIRED ? Set.copyOf(tool.identifiers()) : Set.of()));
             }
         }
         return Optional.empty();

@@ -61,6 +61,8 @@ public final class ConnectionDtos {
         public ConnectorToolView(String name, String title, String risk, String approval, boolean grant) {
             this(name, title, risk, approval, grant, null);
         }
+
+
         static ConnectorToolView from(ConnectorToolSummary value) {
             return new ConnectorToolView(
                 value.name(),

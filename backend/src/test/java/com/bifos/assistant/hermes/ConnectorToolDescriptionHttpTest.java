@@ -26,24 +26,25 @@ class ConnectorToolDescriptionHttpTest {
             var builder = RestClient.builder();
             var server = MockRestServiceServer.bindTo(builder).build();
             var client = new HttpHermesConnectorClient(
-                    new HermesProperties("unused", "https://example.test", "token", "https://example.test", null, null, null, null),
-                    new SandboxAttachmentDirectory("unused"));
+                new HermesProperties("unused", "https://example.test", "token", "https://example.test", null, null, null, null),
+                new SandboxAttachmentDirectory("unused"));
             ReflectionTestUtils.setField(client, "client", builder.build());
             String raw = "[{\"id\":\"demo-notes\",\"schema\":2,\"title\":\"검사\",\"description\":\"검사\","
-                    + "\"fields\":[],\"verify\":{\"tool\":\"read_note\"},\"mcp_server\":\"demo\","
-                    + "\"tools\":{\"read_note\":{\"risk\":\"READ\",\"approval\":\"none\",\"title\":\"읽기\",\"description\":"
-                    + asciiJson(mapper.writeValueAsString(vector.get("value"))) + "}}}]";
+                + "\"fields\":[],\"verify\":{\"tool\":\"read_note\"},\"mcp_server\":\"demo\","
+                + "\"tools\":{\"read_note\":{\"risk\":\"READ\",\"approval\":\"none\",\"title\":\"읽기\",\"description\":"
+                + asciiJson(mapper.writeValueAsString(vector.get("value"))) + "}}}]";
             server.expect(requestTo("https://example.test/api/connectors/catalog"))
-                    .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
             var tool = client.readCatalog().getFirst().tools().getFirst();
             assertThat(tool.risk()).isEqualTo("READ");
             assertThat(tool.approval()).isEqualTo("none");
             assertThat(tool.title()).isEqualTo("읽기");
             assertThat(tool.description()).as(vector.get("name").asString())
-                    .isEqualTo(vector.get("expected").isNull() ? null : vector.get("expected").asString());
+                .isEqualTo(vector.get("expected").isNull() ? null : vector.get("expected").asString());
             server.verify();
         }
     }
+
 
     @Test
     @DisplayName("옛 생성자는 상세 설명 없이 식별자와 상시 허락을 유지한다")
@@ -57,12 +58,14 @@ class ConnectorToolDescriptionHttpTest {
         assertThat(oldest.identifiers()).isEmpty();
         assertThat(oldest.grant()).isFalse();
     }
+
+
     /** HTTP의 UTF-8 인코더가 잘못된 surrogate를 ?로 바꾸기 전에 JSON escape로 보존한다. */
     private static String asciiJson(String value) {
         StringBuilder result = new StringBuilder();
         for (char character : value.toCharArray()) {
             if (character > 127) {
-                result.append(String.format("\\u%04x", (int) character));
+                result.append(String.format("\\u%04x", (int)character));
             } else {
                 result.append(character);
             }
