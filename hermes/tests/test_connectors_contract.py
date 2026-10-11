@@ -136,7 +136,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
         if server.get("command") != "bun":
             problems.append(".mcp.json 의 command 가 bun 이 아니다: %r" % server.get("command"))
         if server.get("args") != ["${CLAUDE_PLUGIN_ROOT}/dist/%s-mcp.js" % name]:
-            problems.append(".mcp.json 이 커밋한 묶음 파일 하나를 실행하지 않는다")
+            problems.append(".mcp.json 이 빌드한 묶음 파일 하나를 실행하지 않는다")
         if not (root / "src/server.ts").is_file():
             problems.append("TypeScript 서버 소스가 없다")
         if (root / "server.py").exists():

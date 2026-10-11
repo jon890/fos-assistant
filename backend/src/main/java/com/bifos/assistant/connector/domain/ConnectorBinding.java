@@ -15,6 +15,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Objects;
+import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,11 +36,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "agent_connector_binding",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_agent_connector_binding",
-                        columnNames = {"agent_id", "connection_id"}))
+    name = "agent_connector_binding",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_agent_connector_binding",
+        columnNames = {"agent_id", "connection_id"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -88,6 +90,10 @@ public class ConnectorBinding {
     @Column(name = "apply_due_at")
     private Instant applyDueAt;
 
+    /** 커밋한 설치 시도다. 결과를 한 번 적용한 뒤 비우며, 시각이 같아도 새 시도와 옛 응답을 구분한다. */
+    @Column(name = "install_attempt_id", columnDefinition = "BINARY(16)")
+    private UUID installAttemptId;
+
     @Column(name = "desired_enabled", nullable = false)
     private boolean desiredEnabled;
 
@@ -100,6 +106,7 @@ public class ConnectorBinding {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     private ConnectorBinding(Agent agent, ConnectorConnection connection, String mcpServer, Instant now) {
         this.agent = agent;
         this.connection = connection;
@@ -109,20 +116,49 @@ public class ConnectorBinding {
         this.updatedAt = now;
     }
 
+
     public static ConnectorBinding pending(Agent agent, ConnectorConnection connection, String mcpServer, Instant now) {
         return new ConnectorBinding(agent, connection, mcpServer, now);
     }
+
 
     /** 설치에 쓴 서버 이름을 적는다. 옛 바인딩은 확인할 때 여기로 채운다. */
     public void recordServer(String mcpServer) {
         this.mcpServer = mcpServer;
     }
 
-    /** 설치를 보내기 전이다. 설치가 끝날 때까지 켜려는 의도를 내린다. */
-    public void beginInstall(Instant now) {
-        this.desiredEnabled = false;
-        pending(now);
+
+    /** 설치를 보내기 전에 끝난 현재 시도만 시작 때의 의도를 되돌린다. PENDING은 유지한다. */
+    public void restoreInstallIntent(boolean desiredEnabled) {
+        this.desiredEnabled = desiredEnabled;
     }
+
+
+    /** 시작 트랜잭션이 새 시도를 적고 설치 중인 바인딩을 실행 대상에서 내린다. */
+    public void beginInstall(UUID attemptId, Instant now) {
+        this.desiredEnabled = false;
+        recordInstallAttempt(attemptId, now);
+    }
+
+
+    /** 설치를 보내지 않는 대기 확인은 켜려는 의도를 보존하고 새 결과 대조 시도만 적는다. */
+    public void recordInstallAttempt(UUID attemptId, Instant now) {
+        this.installAttemptId = Objects.requireNonNull(attemptId);
+        // 실행 승인의 바인딩 revision도 같은 시계 값에서 새 설치를 구분해야 한다.
+        Instant revision = now.truncatedTo(ChronoUnit.MICROS);
+        pending(revision.isAfter(updatedAt) ? revision : updatedAt.plus(1, ChronoUnit.MICROS));
+    }
+
+
+    /** 현재 시도만 한 번 소비한다. 옛 응답과 중복 응답은 상태를 바꾸지 못한다. */
+    public boolean consumeInstall(UUID attemptId) {
+        if (attemptId == null || !attemptId.equals(installAttemptId)) {
+            return false;
+        }
+        this.installAttemptId = null;
+        return true;
+    }
+
 
     /**
      * 설치가 성공했다. 켜려는 의도가 돌아오지만 반영 확인 전이라 상태는 {@code PENDING} 이다.
@@ -139,6 +175,7 @@ public class ConnectorBinding {
         pending(now);
     }
 
+
     /** 반영을 확인했다. 재시작 대기와 반영 예정을 함께 푼다. */
     public void ready(Instant now) {
         this.status = BindingStatus.READY;
@@ -151,6 +188,7 @@ public class ConnectorBinding {
         }
     }
 
+
     public void pending(Instant now) {
         this.status = BindingStatus.PENDING;
         this.updatedAt = now;
@@ -159,6 +197,7 @@ public class ConnectorBinding {
         }
     }
 
+
     /** 반영 예정 시각을 적는다. 이미 더 늦은 예정이 있으면 그 값을 둔다. 앞선 설치가 아직 반영되지 않았을 수 있기 때문이다. */
     public void scheduleApply(Instant dueAt) {
         if (this.applyDueAt == null || this.applyDueAt.isBefore(dueAt)) {
@@ -166,15 +205,18 @@ public class ConnectorBinding {
         }
     }
 
+
     /** 예정한 확인을 시작하기 전에 비운다. 확인은 한 번만 시도한다. */
     public void clearApplyDue() {
         this.applyDueAt = null;
     }
 
+
     /** 앞선 대기 값을 지우지 않고 논리 OR 로 누적한다. */
     public void markRestartRequired(boolean restartRequired) {
         this.restartRequired = this.restartRequired || restartRequired;
     }
+
 
     /**
      * 옛 커넥터 에이전트를 끄고 사진도 받지 않는 것으로 둔다.
