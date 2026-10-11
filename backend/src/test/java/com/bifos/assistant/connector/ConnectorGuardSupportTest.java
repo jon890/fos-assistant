@@ -23,10 +23,13 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HttpHermesConnectorClient;
 import com.bifos.assistant.hermes.SandboxAttachmentDirectory;
+import com.bifos.assistant.mcp.domain.AgentToken;
+import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.AuthProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -111,6 +114,8 @@ class ConnectorGuardSupportTest {
     PlatformTransactionManager manager;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    AgentTokenRepository profileTokens;
 
 
     @BeforeEach
@@ -146,6 +151,7 @@ class ConnectorGuardSupportTest {
     @AfterEach
     void tearDown() {
         remote.stop(0);
+        profileTokens.deleteAll();
         bindings.deleteAll();
         connections.deleteAll();
         agents.deleteAll();
@@ -157,6 +163,7 @@ class ConnectorGuardSupportTest {
     @Test
     @DisplayName("서비스 Bearer로 현재 바인딩을 확인하고 요청마다 nonce와 guard 타입을 그대로 응답한다")
     void echoesOnlyCurrentNonceAndGuardFields() throws Exception {
+        Long executionsBefore = jdbc.queryForObject("select count(*) from connector_action_execution", Long.class);
         var request = request(fixture());
         for (int i = 0; i < 2; i++) {
             request.put("nonce", UUID.randomUUID().toString());
@@ -167,7 +174,7 @@ class ConnectorGuardSupportTest {
             assertThat(JSON.readTree(response.body())).isEqualTo(expected);
         }
         assertThat(catalogReads.get()).isEqualTo(2);
-        assertThat(jdbc.queryForObject("select count(*) from connector_action_execution", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from connector_action_execution", Long.class)).isEqualTo(executionsBefore);
         for (ToolRisk risk : new ToolRisk[] {ToolRisk.FINANCIAL, ToolRisk.DESTRUCTIVE}) {
             assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2,
                 Optional.of(new ToolPolicy(risk, ToolApproval.ALWAYS, null, false)), true, 0,
@@ -180,6 +187,9 @@ class ConnectorGuardSupportTest {
     @DisplayName("JWT와 profile 토큰과 서명된 ticket은 서비스 인증을 대신하지 못한다")
     void rejectsEveryOtherAuthenticationSource() throws Exception {
         Fixture f = fixture();
+        Long usersBefore = jdbc.queryForObject("select count(*) from app_user", Long.class);
+        var profileToken = profileTokens.saveAndFlush(AgentToken.issueFor(
+            f.profile(), Sha256.hex("test-profile-bearer"), "support 인증 검사", NOW));
         String jwt = Jwts.builder().subject(f.email())
             .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8))).compact();
         var vector = JSON.readTree(Files.readString(Path.of("../test/resources/financial-ticket-v1.json")));
@@ -188,7 +198,8 @@ class ConnectorGuardSupportTest {
             assertThat(post(SUPPORT, request(f).toString(), token, false).statusCode()).isEqualTo(401);
         }
         assertThat(catalogReads.get()).isZero();
-        assertThat(jdbc.queryForObject("select count(*) from app_user", Long.class)).isEqualTo(1);
+        assertThat(profileTokens.findById(profileToken.id()).orElseThrow().lastUsedAt()).isNull();
+        assertThat(jdbc.queryForObject("select count(*) from app_user", Long.class)).isEqualTo(usersBefore);
     }
 
 
