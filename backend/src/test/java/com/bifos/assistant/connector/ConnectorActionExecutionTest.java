@@ -132,10 +132,12 @@ class ConnectorActionExecutionTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+
     @AfterEach
     void clearCipherCache() {
         cipher.forgetCachedKeys();
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("sharedCases")
@@ -149,11 +151,12 @@ class ConnectorActionExecutionTest {
             assertThat(snapshot.requestKey(901L, 701L, value(sample, "tool"))).isEqualTo(value(sample, "requestKey"));
         } else {
             assertThatThrownBy(() -> validate(sample))
-                    .as(name)
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("invalid financial execution snapshot");
+                .as(name)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("invalid financial execution snapshot");
         }
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("collisionCases")
@@ -168,20 +171,21 @@ class ConnectorActionExecutionTest {
         binding.connection().connected(new ConnectionFields(publicFields, Map.of()), NOW);
         ConnectorAction action = action(binding, value(sample, "modelArgsJson"));
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.capture(
-                        action,
-                        binding,
-                        value(sample, "operation"),
-                        sample.get("scopeFields").toString(),
-                        value(sample, "executionArgsJson"),
-                        value(sample, "summaryJson"),
-                        value(sample, "scopeJson"),
-                        cipher,
-                        NOW))
+            action,
+            binding,
+            value(sample, "operation"),
+            sample.get("scopeFields").toString(),
+            value(sample, "executionArgsJson"),
+            value(sample, "summaryJson"),
+            value(sample, "scopeJson"),
+            cipher,
+            NOW))
                 .as(name)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("invalid financial execution snapshot");
         assertThat(contents.existsById(action.id())).isFalse();
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("collisionCases")
@@ -193,93 +197,94 @@ class ConnectorActionExecutionTest {
 
         // 과거 저장 내용을 재현해 원문 해시가 맞아도 strict 검증에서 거절하는지 확인한다.
         contents.saveAndFlush(ConnectorActionExecution.stored(
-                action,
-                binding.connection().id(),
-                binding.id(),
-                binding.connection().updatedAt(),
-                binding.updatedAt(),
-                value(sample, "executionArgsJson"),
-                value(sample, "summaryJson"),
-                value(sample, "scopeJson"),
-                null,
-                Sha256.hex(value(sample, "executionArgsJson")),
-                Sha256.hex(value(sample, "scopeJson")),
-                value(sample, "name").startsWith("normalization-integrity-")
-                        ? historicalRequestKey(sample, action, binding)
-                        : "0".repeat(64),
-                ConnectorExecutionSnapshot.PROTOCOL,
-                NOW));
+            action,
+            binding.connection().id(),
+            binding.id(),
+            binding.connection().updatedAt(),
+            binding.updatedAt(),
+            value(sample, "executionArgsJson"),
+            value(sample, "summaryJson"),
+            value(sample, "scopeJson"),
+            null,
+            Sha256.hex(value(sample, "executionArgsJson")),
+            Sha256.hex(value(sample, "scopeJson")),
+            value(sample, "name").startsWith("normalization-integrity-")
+                ? historicalRequestKey(sample, action, binding)
+                : "0".repeat(64),
+            ConnectorExecutionSnapshot.PROTOCOL,
+            NOW));
         em.clear();
         ConnectorAction reloaded = actions.findById(action.id()).orElseThrow();
         ConnectorActionExecution row = contents.findById(action.id()).orElseThrow();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("invalid financial execution snapshot")
-                .satisfies(error -> assertThat(error.getStackTrace())
-                        .extracting(StackTraceElement::getMethodName)
-                        .contains("validate"));
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("invalid financial execution snapshot")
+            .satisfies(error -> assertThat(error.getStackTrace())
+                .extracting(StackTraceElement::getMethodName)
+                .contains("validate"));
     }
+
 
     @ParameterizedTest(name = "{0}")
     @ValueSource(
-            strings = {
-                "orderId",
-                "symbol",
-                "market",
-                "currency",
-                "side",
-                "quantity",
-                "orderAmount",
-                "price",
-                "orderType",
-                "timeInForce",
-                "status",
-                "filledQuantity",
-                "execution",
-                "clientOrderId",
-                "expected_order",
-                "confirmHighValueOrder",
-                "userId",
-                "connectionId",
-                "tool"
-            })
+        strings = {
+            "orderId",
+            "symbol",
+            "market",
+            "currency",
+            "side",
+            "quantity",
+            "orderAmount",
+            "price",
+            "orderType",
+            "timeInForce",
+            "status",
+            "filledQuantity",
+            "execution",
+            "clientOrderId",
+            "expected_order",
+            "confirmHighValueOrder",
+            "userId",
+            "connectionId",
+            "tool"
+        })
     @DisplayName("주문 필드 전체와 내부 메타데이터의 이름은 scope로 쓸 수 없다")
     void rejectsEveryReservedScopeName(String name) {
-        ObjectNode args = (ObjectNode) JSON.readTree(value(BASE, "executionArgsJson"));
+        ObjectNode args = (ObjectNode)JSON.readTree(value(BASE, "executionArgsJson"));
         JsonNode existing = args.get(name);
         String scopeValue = existing != null && existing.isString() ? existing.stringValue() : "reserved";
         args.put(name, scopeValue);
         ObjectNode scope = JSON.createObjectNode().put("account_seq", "000007").put(name, scopeValue);
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.validate(
-                        value(BASE, "modelArgsJson"),
-                        args.toString(),
-                        value(BASE, "summaryJson"),
-                        scope.toString(),
-                        "CREATE"))
+            value(BASE, "modelArgsJson"),
+            args.toString(),
+            value(BASE, "summaryJson"),
+            scope.toString(),
+            "CREATE"))
                 .isInstanceOf(IllegalArgumentException.class);
         Fixture fixture = fixture();
         fixture.binding()
-                .connection()
-                .connected(new ConnectionFields(Map.of("account", "000007", "reserved", scopeValue), Map.of()), NOW);
-        String declaration =
-                "[{\"arg\":\"account_seq\",\"field\":\"account\"},{\"arg\":\"" + name + "\",\"field\":\"reserved\"}]";
+            .connection()
+            .connected(new ConnectionFields(Map.of("account", "000007", "reserved", scopeValue), Map.of()), NOW);
+        String declaration = "[{\"arg\":\"account_seq\",\"field\":\"account\"},{\"arg\":\"" + name + "\",\"field\":\"reserved\"}]";
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.capture(
-                        fixture.action(),
-                        fixture.binding(),
-                        "CREATE",
-                        declaration,
-                        args.toString(),
-                        value(BASE, "summaryJson"),
-                        scope.toString(),
-                        cipher,
-                        NOW))
+            fixture.action(),
+            fixture.binding(),
+            "CREATE",
+            declaration,
+            args.toString(),
+            value(BASE, "summaryJson"),
+            scope.toString(),
+            cipher,
+            NOW))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(contents.existsById(fixture.action().id())).isFalse();
     }
 
+
     @ParameterizedTest(name = "{0}")
     @ValueSource(
-            strings = {"account", "tenant", "user", "connection", "side_scope", "clientOrderId_scope", "tool_scope"})
+        strings = {"account", "tenant", "user", "connection", "side_scope", "clientOrderId_scope", "tool_scope"})
     @DisplayName("예약 이름과 다른 정상 scope 및 주문 이름의 공개 연결 칸을 유지한다")
     void preservesNonReservedScopeNamesAndPublicFieldNames(String name) {
         Fixture fixture = fixture();
@@ -288,24 +293,25 @@ class ConnectorActionExecutionTest {
         String scope = value(BASE, "scopeJson").replace("account_seq", name);
         String declaration = "[{\"arg\":\"" + name + "\",\"field\":\"side\"}]";
         ConnectorActionExecution row = contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
-                fixture.action(),
-                fixture.binding(),
-                "CREATE",
-                declaration,
-                args,
-                value(BASE, "summaryJson"),
-                scope,
-                cipher,
-                NOW));
+            fixture.action(),
+            fixture.binding(),
+            "CREATE",
+            declaration,
+            args,
+            value(BASE, "summaryJson"),
+            scope,
+            cipher,
+            NOW));
         em.clear();
         ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(
-                actions.findById(row.actionId()).orElseThrow(),
-                contents.findById(row.actionId()).orElseThrow(),
-                cipher);
+            actions.findById(row.actionId()).orElseThrow(),
+            contents.findById(row.actionId()).orElseThrow(),
+            cipher);
         assertThat(opened.executionArgsJson()).isEqualTo(args);
         assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
         assertThat(opened.scopeJson()).isEqualTo(scope);
     }
+
 
     @Test
     @DisplayName("암호화한 세 본문을 같은 key로 저장하고 두 revision 및 원래 인자를 보존한다")
@@ -320,10 +326,10 @@ class ConnectorActionExecutionTest {
         assertThat(row.consumedAt()).isNull();
         assertThat(row.supersedesUnknownActionId()).isNull();
         assertThat(row.connectionUpdatedAt())
-                .isEqualTo(fixture.binding().connection().updatedAt());
+            .isEqualTo(fixture.binding().connection().updatedAt());
         assertThat(row.bindingUpdatedAt())
-                .isEqualTo(fixture.binding().updatedAt())
-                .isNotEqualTo(row.connectionUpdatedAt());
+            .isEqualTo(fixture.binding().updatedAt())
+            .isNotEqualTo(row.connectionUpdatedAt());
         em.clear();
         ConnectorAction action = actions.findById(fixture.action().id()).orElseThrow();
         ConnectorActionExecution stored = contents.findById(action.id()).orElseThrow();
@@ -336,6 +342,7 @@ class ConnectorActionExecutionTest {
         assertThat(action.grantAllowed()).isFalse();
     }
 
+
     @Test
     @DisplayName("같은 의도는 여러 행에 저장할 수 있고 clientOrderId만 달라도 같은 키다")
     void intentIsNotUniqueAndClientIdDoesNotChangeIt() {
@@ -344,23 +351,24 @@ class ConnectorActionExecutionTest {
         ConnectorAction secondAction = action(fixture.binding(), value(BASE, "modelArgsJson"));
         JsonNode sample = VECTOR.get("cases").get(1);
         ConnectorActionExecution second = contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
-                secondAction,
-                fixture.binding(),
-                "CREATE",
-                DECLARATION,
-                value(sample, "executionArgsJson"),
-                value(sample, "summaryJson"),
-                value(sample, "scopeJson"),
-                cipher,
-                NOW));
+            secondAction,
+            fixture.binding(),
+            "CREATE",
+            DECLARATION,
+            value(sample, "executionArgsJson"),
+            value(sample, "summaryJson"),
+            value(sample, "scopeJson"),
+            cipher,
+            NOW));
         assertThat(second.requestKey()).isEqualTo(first.requestKey());
         assertThat(second.executionArgsSha256()).isNotEqualTo(first.executionArgsSha256());
         assertThat(contents.findByRequestKeyOrderByActionIdAsc(first.requestKey()))
-                .hasSize(2);
+            .hasSize(2);
         assertThat(validate(BASE).requestKey(902L, 701L, "place_order")).isNotEqualTo(value(BASE, "requestKey"));
         assertThat(validate(BASE).requestKey(901L, 702L, "place_order")).isNotEqualTo(value(BASE, "requestKey"));
         assertThat(validate(BASE).requestKey(901L, 701L, "other_tool")).isNotEqualTo(value(BASE, "requestKey"));
     }
+
 
     @Test
     @DisplayName("같은 승인 번호를 쓰는 두 새 객체의 저장은 기존 내용을 덮어쓰지 않고 거절한다")
@@ -371,18 +379,19 @@ class ConnectorActionExecutionTest {
         em.clear();
         ConnectorAction reloaded = actions.findById(first.actionId()).orElseThrow();
         ConnectorActionExecution second = ConnectorExecutionSnapshot.capture(
-                reloaded,
-                fixture.binding(),
-                "CREATE",
-                DECLARATION,
-                value(BASE, "executionArgsJson"),
-                value(BASE, "summaryJson"),
-                value(BASE, "scopeJson"),
-                cipher,
-                NOW);
+            reloaded,
+            fixture.binding(),
+            "CREATE",
+            DECLARATION,
+            value(BASE, "executionArgsJson"),
+            value(BASE, "summaryJson"),
+            value(BASE, "scopeJson"),
+            cipher,
+            NOW);
         assertThat(second.isNew()).isTrue();
         assertThatThrownBy(() -> contents.saveAndFlush(second)).isInstanceOf(DataIntegrityViolationException.class);
     }
+
 
     @Test
     @DisplayName("NULL keyId는 설정과 무관하게 평문을 읽으며 해시 변조를 거절한다")
@@ -392,20 +401,21 @@ class ConnectorActionExecutionTest {
         ConnectorActionExecution row = save(fixture, disabled);
         assertThat(row.contentKeyId()).isNull();
         assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, cipher)
-                        .executionArgsJson())
+            .executionArgsJson())
                 .isEqualTo(value(BASE, "executionArgsJson"));
         assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, disabled)
-                        .executionArgsJson())
+            .executionArgsJson())
                 .isEqualTo(value(BASE, "executionArgsJson"));
         jdbc.update(
-                "UPDATE connector_action_execution SET execution_args_json = ? WHERE action_id = ?",
-                value(BASE, "executionArgsJson") + " ",
-                row.actionId());
+            "UPDATE connector_action_execution SET execution_args_json = ? WHERE action_id = ?",
+            value(BASE, "executionArgsJson") + " ",
+            row.actionId());
         em.clear();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-                        fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
 
     @Test
     @DisplayName("비NULL keyId는 현재 enabled가 거짓이어도 실제 복호화를 거친다")
@@ -413,16 +423,16 @@ class ConnectorActionExecutionTest {
         Fixture fixture = fixture();
         ConnectorActionExecution row = save(fixture, cipher);
         assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, new ForcedCipher(cipher, false))
-                        .scopeJson())
+            .scopeJson())
                 .isEqualTo(value(BASE, "scopeJson"));
         DataEncryptionProperties disabled = new DataEncryptionProperties("", "", false, Duration.ofMinutes(1), 20);
-        DataKeyService withoutKek =
-                new DataKeyService(new FileKeyEncryptionKeys(disabled), writer, keys, disabled, Clock.systemUTC());
+        DataKeyService withoutKek = new DataKeyService(new FileKeyEncryptionKeys(disabled), writer, keys, disabled, Clock.systemUTC());
         assertThat(withoutKek.enabled()).isFalse();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, withoutKek))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("financial snapshot decryption failed");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("financial snapshot decryption failed");
     }
+
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -431,12 +441,11 @@ class ConnectorActionExecutionTest {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         withCommittedFixture(fixture -> {
             Long keyId = transactions.execute(status -> {
-                ConnectorActionExecution row =
-                        contents.findById(fixture.action().id()).orElseThrow();
+                ConnectorActionExecution row = contents.findById(fixture.action().id()).orElseThrow();
                 assertThat(keys.existsById(row.contentKeyId())).isTrue();
                 cipher.forgetCachedKeys();
                 assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, cipher)
-                                .executionArgsJson())
+                    .executionArgsJson())
                         .isEqualTo(value(BASE, "executionArgsJson"));
                 return row.contentKeyId();
             });
@@ -448,14 +457,14 @@ class ConnectorActionExecutionTest {
             cipher.forgetCachedKeys();
             transactions.executeWithoutResult(status -> {
                 assertThat(keys.existsById(keyId)).isFalse();
-                ConnectorActionExecution row =
-                        contents.findById(fixture.action().id()).orElseThrow();
+                ConnectorActionExecution row = contents.findById(fixture.action().id()).orElseThrow();
                 assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, cipher))
-                        .isInstanceOf(IllegalStateException.class)
-                        .hasMessage("financial snapshot decryption failed");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("financial snapshot decryption failed");
             });
         });
     }
+
 
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -463,19 +472,19 @@ class ConnectorActionExecutionTest {
     void freshCipherReadsPersistedContentWithoutOldCaches() {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         withCommittedFixture(fixture -> transactions.executeWithoutResult(status -> {
-            ConnectorActionExecution row =
-                    contents.findById(fixture.action().id()).orElseThrow();
+            ConnectorActionExecution row = contents.findById(fixture.action().id()).orElseThrow();
             assertThat(row.isNew()).isFalse();
             assertThat(keys.existsById(row.contentKeyId())).isTrue();
             DataKeyService fresh = new DataKeyService(
-                    new FileKeyEncryptionKeys(properties), writer, keys, properties, Clock.systemUTC());
+                new FileKeyEncryptionKeys(properties), writer, keys, properties, Clock.systemUTC());
             ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(
-                    actions.findById(row.actionId()).orElseThrow(), row, fresh);
+                actions.findById(row.actionId()).orElseThrow(), row, fresh);
             assertThat(opened.executionArgsJson()).isEqualTo(value(BASE, "executionArgsJson"));
             assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
             assertThat(opened.scopeJson()).isEqualTo(value(BASE, "scopeJson"));
         }));
     }
+
 
     @ParameterizedTest(name = "{0}: {1}")
     @MethodSource("aadCases")
@@ -486,14 +495,14 @@ class ConnectorActionExecutionTest {
         withCommittedFixture(source -> {
             boolean anotherOwner = boundary.startsWith("owner");
             Fixture target = "column".equals(boundary)
-                    ? source
-                    : transactions.execute(status -> {
-                        Fixture created = anotherOwner
-                                ? fixture()
-                                : new Fixture(action(source.binding(), value(BASE, "modelArgsJson")), source.binding());
-                        save(created, cipher);
-                        return created;
-                    });
+                ? source
+                : transactions.execute(status -> {
+                    Fixture created = anotherOwner
+                        ? fixture()
+                        : new Fixture(action(source.binding(), value(BASE, "modelArgsJson")), source.binding());
+                    save(created, cipher);
+                    return created;
+                });
             try {
                 // REQUIRES_NEW로 만든 key도 보이는 새 트랜잭션에서 정상 읽기를 먼저 확인한다.
                 cipher.forgetCachedKeys();
@@ -503,13 +512,11 @@ class ConnectorActionExecutionTest {
                     if (target != source) {
                         assertPersistedBodies(target);
                     }
-                    ConnectorActionExecution sourceRow =
-                            contents.findById(source.action().id()).orElseThrow();
-                    ConnectorActionExecution targetRow =
-                            contents.findById(target.action().id()).orElseThrow();
+                    ConnectorActionExecution sourceRow = contents.findById(source.action().id()).orElseThrow();
+                    ConnectorActionExecution targetRow = contents.findById(target.action().id()).orElseThrow();
                     if (anotherOwner) {
                         assertThat(source.action().userId())
-                                .isNotEqualTo(target.action().userId());
+                            .isNotEqualTo(target.action().userId());
                         assertThat(sourceRow.contentKeyId()).isNotEqualTo(targetRow.contentKeyId());
                     } else {
                         assertThat(sourceRow.contentKeyId()).isEqualTo(targetRow.contentKeyId());
@@ -517,39 +524,34 @@ class ConnectorActionExecutionTest {
                 });
                 transactions.executeWithoutResult(status -> {
                     em.clear();
-                    ConnectorActionExecution sourceRow =
-                            contents.findById(source.action().id()).orElseThrow();
-                    ConnectorActionExecution targetRow =
-                            contents.findById(target.action().id()).orElseThrow();
+                    ConnectorActionExecution sourceRow = contents.findById(source.action().id()).orElseThrow();
+                    ConnectorActionExecution targetRow = contents.findById(target.action().id()).orElseThrow();
                     String fromColumn = "column".equals(boundary)
-                            ? ("scope_json".equals(column) ? "summary_json" : "scope_json")
-                            : column;
+                        ? ("scope_json".equals(column) ? "summary_json" : "scope_json")
+                        : column;
                     String sealed = jdbc.queryForObject(
-                            "SELECT " + fromColumn + " FROM connector_action_execution WHERE action_id = ?",
-                            String.class,
-                            sourceRow.actionId());
-                    Long movedKey =
-                            "owner-source-key".equals(boundary) ? sourceRow.contentKeyId() : targetRow.contentKeyId();
+                        "SELECT " + fromColumn + " FROM connector_action_execution WHERE action_id = ?",
+                        String.class,
+                        sourceRow.actionId());
+                    Long movedKey = "owner-source-key".equals(boundary) ? sourceRow.contentKeyId() : targetRow.contentKeyId();
                     assertThat(jdbc.update(
-                                    "UPDATE connector_action_execution SET " + column
-                                            + " = ?, content_key_id = ? WHERE action_id = ?",
-                                    sealed,
-                                    movedKey,
-                                    targetRow.actionId()))
+                        "UPDATE connector_action_execution SET " + column
+                            + " = ?, content_key_id = ? WHERE action_id = ?",
+                        sealed,
+                        movedKey,
+                        targetRow.actionId()))
                             .isEqualTo(1);
                     em.clear();
                 });
                 cipher.forgetCachedKeys();
                 transactions.executeWithoutResult(status -> {
                     em.clear();
-                    ConnectorAction reloaded =
-                            actions.findById(target.action().id()).orElseThrow();
-                    ConnectorActionExecution row =
-                            contents.findById(reloaded.id()).orElseThrow();
+                    ConnectorAction reloaded = actions.findById(target.action().id()).orElseThrow();
+                    ConnectorActionExecution row = contents.findById(reloaded.id()).orElseThrow();
                     assertThat(keys.existsById(row.contentKeyId())).isTrue();
                     assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher))
-                            .isInstanceOf(IllegalStateException.class)
-                            .hasMessage("financial snapshot decryption failed");
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessage("financial snapshot decryption failed");
                 });
             } finally {
                 if (target != source) {
@@ -558,17 +560,18 @@ class ConnectorActionExecutionTest {
                             deleteFixture(target);
                         } else {
                             jdbc.update(
-                                    "DELETE FROM connector_action WHERE id = ?",
-                                    target.action().id());
+                                "DELETE FROM connector_action WHERE id = ?",
+                                target.action().id());
                             jdbc.update(
-                                    "DELETE FROM agent_execution WHERE id = ?",
-                                    target.action().originExecutionId());
+                                "DELETE FROM agent_execution WHERE id = ?",
+                                target.action().originExecutionId());
                         }
                     });
                 }
             }
         });
     }
+
 
     private void assertPersistedBodies(Fixture fixture) {
         ConnectorAction action = actions.findById(fixture.action().id()).orElseThrow();
@@ -580,37 +583,39 @@ class ConnectorActionExecutionTest {
         assertThat(opened.scopeJson()).isEqualTo(value(BASE, "scopeJson"));
     }
 
+
     private static Stream<Arguments> aadCases() {
         return Stream.of("row", "column", "owner-source-key", "owner-target-key")
-                .flatMap(boundary -> Stream.of("execution_args_json", "summary_json", "scope_json")
-                        .map(column -> Arguments.of(boundary, column)));
+            .flatMap(boundary -> Stream.of("execution_args_json", "summary_json", "scope_json")
+                .map(column -> Arguments.of(boundary, column)));
     }
+
 
     @Test
     @DisplayName("실제 암호문 변조와 저장한 scope 해시 변조를 거절한다")
     void rejectsCiphertextAndScopeHashTampering() {
         Fixture fixture = fixture();
         ConnectorActionExecution row = save(fixture, cipher);
-        String broken =
-                row.executionArgsJson().substring(0, row.executionArgsJson().length() - 8) + "AAAAAAAA";
+        String broken = row.executionArgsJson().substring(0, row.executionArgsJson().length() - 8) + "AAAAAAAA";
         jdbc.update(
-                "UPDATE connector_action_execution SET execution_args_json = ? WHERE action_id = ?",
-                broken,
-                row.actionId());
+            "UPDATE connector_action_execution SET execution_args_json = ? WHERE action_id = ?",
+            broken,
+            row.actionId());
         em.clear();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-                        fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
                 .isInstanceOf(IllegalStateException.class);
         jdbc.update(
-                "UPDATE connector_action_execution SET execution_args_json = ?, scope_sha256 = ? WHERE action_id = ?",
-                row.executionArgsJson(),
-                "0".repeat(64),
-                row.actionId());
+            "UPDATE connector_action_execution SET execution_args_json = ?, scope_sha256 = ? WHERE action_id = ?",
+            row.executionArgsJson(),
+            "0".repeat(64),
+            row.actionId());
         em.clear();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-                        fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
 
     @Test
     @DisplayName("세 seal의 keyId가 다르거나 enabled 상태에서 빈 seal이면 행을 저장하지 않는다")
@@ -619,8 +624,8 @@ class ConnectorActionExecutionTest {
         TextCipher mismatched = mock(TextCipher.class);
         when(mismatched.enabled()).thenReturn(true);
         when(mismatched.seal(anyLong(), anyString(), anyString()))
-                .thenReturn(Optional.of(new SealedText("fake-a", 1L)))
-                .thenReturn(Optional.of(new SealedText("fake-b", 2L)));
+            .thenReturn(Optional.of(new SealedText("fake-a", 1L)))
+            .thenReturn(Optional.of(new SealedText("fake-b", 2L)));
         assertThatThrownBy(() -> save(fixture, mismatched)).isInstanceOf(IllegalArgumentException.class);
         TextCipher empty = mock(TextCipher.class);
         when(empty.enabled()).thenReturn(true);
@@ -628,6 +633,7 @@ class ConnectorActionExecutionTest {
         assertThatThrownBy(() -> save(fixture, empty)).isInstanceOf(IllegalStateException.class);
         assertThat(contents.existsById(fixture.action().id())).isFalse();
     }
+
 
     @Test
     @DisplayName("enabled 상태의 빈 open을 평문이나 빈 성공으로 바꾸지 않는다")
@@ -638,9 +644,10 @@ class ConnectorActionExecutionTest {
         when(empty.enabled()).thenReturn(true);
         when(empty.open(anyLong(), anyLong(), anyString(), anyString())).thenReturn(Optional.empty());
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, empty))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("financial snapshot decryption failed");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("financial snapshot decryption failed");
     }
+
 
     @Test
     @DisplayName("scope 선언은 공개 연결 칸만 허용하고 누락·추가·중복·타입 오류를 거절한다")
@@ -656,15 +663,15 @@ class ConnectorActionExecutionTest {
             "[{\"arg\":\"account_seq\",\"arg\":\"other\",\"field\":\"account\"}]"
         }) {
             assertThatThrownBy(() -> ConnectorExecutionSnapshot.capture(
-                            fixture.action(),
-                            fixture.binding(),
-                            "CREATE",
-                            bad,
-                            value(BASE, "executionArgsJson"),
-                            value(BASE, "summaryJson"),
-                            value(BASE, "scopeJson"),
-                            cipher,
-                            NOW))
+                fixture.action(),
+                fixture.binding(),
+                "CREATE",
+                bad,
+                value(BASE, "executionArgsJson"),
+                value(BASE, "summaryJson"),
+                value(BASE, "scopeJson"),
+                cipher,
+                NOW))
                     .isInstanceOf(IllegalArgumentException.class);
         }
         fixture.binding().connection().connected(new ConnectionFields(Map.of("account", "8"), Map.of()), NOW);
@@ -672,15 +679,17 @@ class ConnectorActionExecutionTest {
         assertThat(contents.existsById(fixture.action().id())).isFalse();
     }
 
+
     @Test
     @DisplayName("저장 함수는 다른 소유자의 바인딩을 사용하지 않는다")
     void cannotUseAnotherOwnersBinding() {
         Fixture fixture = fixture();
         ReflectionTestUtils.setField(
-                fixture.action(), "userId", fixture.action().userId() + 1000);
+            fixture.action(), "userId", fixture.action().userId() + 1000);
         assertThatThrownBy(() -> save(fixture, cipher)).isInstanceOf(IllegalArgumentException.class);
         assertThat(contents.existsById(fixture.action().id())).isFalse();
     }
+
 
     @Test
     @DisplayName("승인 줄을 지우면 실행 내용도 지우고 연결이나 바인딩 삭제는 이력을 남긴다")
@@ -688,15 +697,16 @@ class ConnectorActionExecutionTest {
         Fixture fixture = fixture();
         ConnectorActionExecution row = save(fixture, cipher);
         jdbc.update(
-                "DELETE FROM agent_connector_binding WHERE id = ?",
-                fixture.binding().id());
+            "DELETE FROM agent_connector_binding WHERE id = ?",
+            fixture.binding().id());
         jdbc.update(
-                "DELETE FROM connector_connection WHERE id = ?",
-                fixture.binding().connection().id());
+            "DELETE FROM connector_connection WHERE id = ?",
+            fixture.binding().connection().id());
         assertThat(contents.existsById(row.actionId())).isTrue();
         jdbc.update("DELETE FROM connector_action WHERE id = ?", row.actionId());
         assertThat(contents.existsById(row.actionId())).isFalse();
     }
+
 
     @Test
     @DisplayName("불변 본문은 관리 엔티티를 바꿔도 다시 저장되지 않는다")
@@ -708,21 +718,23 @@ class ConnectorActionExecutionTest {
         contents.flush();
         em.clear();
         assertThat(contents.findById(row.actionId()).orElseThrow().executionArgsJson())
-                .isEqualTo(sealed);
+            .isEqualTo(sealed);
     }
+
 
     private ConnectorActionExecution save(Fixture fixture, TextCipher selected) {
         return contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
-                fixture.action(),
-                fixture.binding(),
-                "CREATE",
-                DECLARATION,
-                value(BASE, "executionArgsJson"),
-                value(BASE, "summaryJson"),
-                value(BASE, "scopeJson"),
-                selected,
-                NOW));
+            fixture.action(),
+            fixture.binding(),
+            "CREATE",
+            DECLARATION,
+            value(BASE, "executionArgsJson"),
+            value(BASE, "summaryJson"),
+            value(BASE, "scopeJson"),
+            selected,
+            NOW));
     }
+
 
     /** 쓰기를 커밋한 뒤 별도 읽기 경계를 검사하고 이 fixture의 정확한 번호만 정리한다. */
     private void withCommittedFixture(Consumer<Fixture> assertion) {
@@ -739,38 +751,39 @@ class ConnectorActionExecutionTest {
         }
     }
 
+
     private void deleteFixture(Fixture fixture) {
         jdbc.update(
-                "DELETE FROM connector_action WHERE id = ?", fixture.action().id());
+            "DELETE FROM connector_action WHERE id = ?", fixture.action().id());
         jdbc.update("DELETE FROM agent_execution WHERE id = ?", fixture.action().originExecutionId());
         jdbc.update(
-                "DELETE FROM agent_connector_binding WHERE id = ?",
-                fixture.binding().id());
+            "DELETE FROM agent_connector_binding WHERE id = ?",
+            fixture.binding().id());
         jdbc.update(
-                "DELETE FROM connector_connection WHERE id = ?",
-                fixture.binding().connection().id());
+            "DELETE FROM connector_connection WHERE id = ?",
+            fixture.binding().connection().id());
         jdbc.update(
-                "DELETE FROM agent_memory_collection WHERE agent_id = ?",
-                fixture.binding().agent().id());
+            "DELETE FROM agent_memory_collection WHERE agent_id = ?",
+            fixture.binding().agent().id());
         jdbc.update("DELETE FROM agent WHERE id = ?", fixture.binding().agent().id());
         jdbc.update(
-                "DELETE FROM user_data_key WHERE user_id = ?", fixture.action().userId());
+            "DELETE FROM user_data_key WHERE user_id = ?", fixture.action().userId());
         jdbc.update("DELETE FROM app_user WHERE id = ?", fixture.action().userId());
     }
 
+
     private Fixture fixture() {
-        AppUser user =
-                users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, NOW));
         Agent agent = agents.saveAndFlush(Agent.of(
-                "execution-" + UUID.randomUUID(),
-                "검사용 에이전트",
-                "execution-test-" + UUID.randomUUID(),
-                "http://localhost",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                NOW));
+            "execution-" + UUID.randomUUID(),
+            "검사용 에이전트",
+            "execution-test-" + UUID.randomUUID(),
+            "http://localhost",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            NOW));
         ConnectorConnection connection = ConnectorConnection.pending(user.id(), "demo-financial", NOW);
         connection.connected(new ConnectionFields(Map.of("account", "000007"), Map.of("secret", "fake")), NOW);
         connection.ready(NOW);
@@ -781,39 +794,42 @@ class ConnectorActionExecutionTest {
         return new Fixture(action(binding, value(BASE, "modelArgsJson")), binding);
     }
 
+
     private ConnectorAction action(ConnectorBinding binding, String raw) {
         AgentExecution run = runs.saveAndFlush(AgentExecution.builder()
-                .userId(binding.connection().userId())
-                .agentId(binding.agent().id())
-                .profileName(binding.agent().hermesProfile())
-                .hermesSessionId("fos-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(NOW)
-                .build());
+            .userId(binding.connection().userId())
+            .agentId(binding.agent().id())
+            .profileName(binding.agent().hermesProfile())
+            .hermesSessionId("fos-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(NOW)
+            .build());
         ConnectorAction action = ConnectorAction.decided(
-                binding.connection(),
-                binding.agent().id(),
-                run,
-                "mcp__demo__place_order",
-                "place_order",
-                new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
-                false,
-                Sha256.hex(UUID.randomUUID().toString()),
-                Sha256.hex(raw),
-                NOW);
+            binding.connection(),
+            binding.agent().id(),
+            run,
+            "mcp__demo__place_order",
+            "place_order",
+            new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
+            false,
+            Sha256.hex(UUID.randomUUID().toString()),
+            Sha256.hex(raw),
+            NOW);
         action.awaitApproval(raw, NOW.plusSeconds(300));
         return actions.saveAndFlush(action);
     }
 
+
     private static ConnectorExecutionSnapshot validate(JsonNode sample) {
         return ConnectorExecutionSnapshot.validate(
-                value(sample, "modelArgsJson"),
-                value(sample, "executionArgsJson"),
-                value(sample, "summaryJson"),
-                value(sample, "scopeJson"),
-                value(sample, "operation"));
+            value(sample, "modelArgsJson"),
+            value(sample, "executionArgsJson"),
+            value(sample, "summaryJson"),
+            value(sample, "scopeJson"),
+            value(sample, "operation"));
     }
+
 
     private static String historicalRequestKey(JsonNode sample, ConnectorAction action, ConnectorBinding binding) {
         Map<String, String> values = new TreeMap<>();
@@ -832,23 +848,26 @@ class ConnectorActionExecutionTest {
         values.put("tool", action.toolName());
         StringBuilder body = new StringBuilder("23:fos-financial-intent-v1");
         values.forEach((key, value) -> body.append(key.getBytes(StandardCharsets.UTF_8).length)
-                .append(':').append(key).append(value.getBytes(StandardCharsets.UTF_8).length)
-                .append(':').append(value));
+            .append(':').append(key).append(value.getBytes(StandardCharsets.UTF_8).length)
+            .append(':').append(value));
         return Sha256.hex(body.toString());
     }
 
+
     private static Stream<Arguments> collisionCases() {
         return VECTOR.get("cases")
-                .valueStream()
-                .filter(sample -> value(sample, "name").startsWith("scope-collision-")
-                        || (value(sample, "name").startsWith("normalization-integrity-")
-                                && !sample.get("valid").booleanValue()))
-                .map(sample -> Arguments.of(value(sample, "name"), sample));
+            .valueStream()
+            .filter(sample -> value(sample, "name").startsWith("scope-collision-")
+                || (value(sample, "name").startsWith("normalization-integrity-")
+                    && !sample.get("valid").booleanValue()))
+            .map(sample -> Arguments.of(value(sample, "name"), sample));
     }
+
 
     private static Stream<Arguments> sharedCases() {
         return VECTOR.get("cases").valueStream().map(sample -> Arguments.of(value(sample, "name"), sample));
     }
+
 
     private static JsonNode vectors() {
         try {
@@ -858,17 +877,21 @@ class ConnectorActionExecutionTest {
         }
     }
 
+
     private static String value(JsonNode node, String name) {
         return node.get(name).stringValue();
     }
 
-    private record Fixture(ConnectorAction action, ConnectorBinding binding) {}
+
+    private record Fixture(ConnectorAction action, ConnectorBinding binding) {
+    }
 
     private record ForcedCipher(TextCipher delegate, boolean enabled) implements TextCipher {
         @Override
         public Optional<SealedText> seal(Long ownerUserId, String aad, String plain) {
             return delegate.seal(ownerUserId, aad, plain);
         }
+
 
         @Override
         public Optional<String> open(Long keyId, Long ownerUserId, String aad, String sealed) {

@@ -50,6 +50,7 @@ final class ConnectorNormalization {
         }
     }
 
+
     /** 이미 타입과 표기를 검증한 변경 칸에 허용된 변환만 적용한다. */
     static boolean preserves(String field, JsonNode before, JsonNode after) {
         if (!after.isString()) {
@@ -68,6 +69,7 @@ final class ConnectorNormalization {
             default -> false;
         };
     }
+
 
     /** 앞선 decimal 타입 검사 뒤에 사용하며 부동소수점 변환 없이 0 표기만 제거한다. */
     static String canonicalDecimal(String value) {
