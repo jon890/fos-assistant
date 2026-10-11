@@ -2,16 +2,31 @@ package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryCapture;
+import com.bifos.assistant.memory.domain.entity.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.MemoryCollectionId;
+import com.bifos.assistant.memory.domain.entity.MemoryRevision;
+import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
+import com.bifos.assistant.memory.domain.entity.ServiceToken;
+import com.bifos.assistant.memory.domain.entity.ServiceTokenCollection;
+import com.bifos.assistant.memory.domain.entity.ServiceTokenCollectionId;
+import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
+import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
+import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
+import com.bifos.assistant.memory.infra.ServiceTokenCollectionRepository;
+import com.bifos.assistant.memory.infra.ServiceTokenRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import jakarta.persistence.EntityManager;
-import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.support.Repositories;
 
-/** 위치 이동 전후 JPA 이름과 스캔 대상 수가 유지되는지 실제 문맥에서 확인한다. */
+/** 옮긴 소유 타입의 JPA 탐색과 저장소 연결을 실제 문맥에서 확인한다. */
 @BackendIntegrationTest
 class MemoryPersistencePlacementTest {
     @Autowired
@@ -22,22 +37,30 @@ class MemoryPersistencePlacementTest {
 
 
     @Test
-    @DisplayName("엔티티 이름과 전체 엔티티 수 및 memory 저장소 빈이 위치 이동 전과 같다")
+    @DisplayName("기존 memory 엔티티와 ID를 JPA가 탐색하고 각 저장소에 연결한다")
     void preservesPersistenceDiscovery() {
-        var entities = entityManager.getMetamodel().getEntities();
-        assertThat(entities).hasSize(60);
-        assertThat(entities.stream()
-            .filter(entity -> entity.getJavaType().getPackageName().startsWith("com.bifos.assistant.memory."))
-            .map(entity -> entity.getName()))
-                .containsExactlyInAnyOrder("Memory", "MemoryCapture", "MemoryCollection", "MemoryRevision",
-                    "ServiceToken", "ServiceTokenCollection");
-        var repositories = context.getBeansOfType(Repository.class);
-        assertThat(repositories).hasSize(60);
-        assertThat(repositories.values().stream()
-            .flatMap(bean -> Arrays.stream(bean.getClass().getInterfaces()))
-            .filter(type -> type.getPackageName().equals("com.bifos.assistant.memory.infra"))
-            .map(Class::getSimpleName))
-                .containsExactlyInAnyOrder("MemoryRepository", "MemoryCaptureRepository", "MemoryCollectionRepository",
-                    "MemoryRevisionRepository", "ServiceTokenRepository", "ServiceTokenCollectionRepository");
+        Repositories repositories = new Repositories(context);
+        assertPersistence(repositories, Memory.class, Long.class, MemoryRepository.class);
+        assertPersistence(repositories, MemoryCapture.class, Long.class, MemoryCaptureRepository.class);
+        assertPersistence(repositories, MemoryCollection.class, MemoryCollectionId.class, MemoryCollectionRepository.class);
+        assertPersistence(repositories, MemoryRevision.class, MemoryRevisionId.class, MemoryRevisionRepository.class);
+        assertPersistence(repositories, ServiceToken.class, Long.class, ServiceTokenRepository.class);
+        assertPersistence(repositories, ServiceTokenCollection.class, ServiceTokenCollectionId.class, ServiceTokenCollectionRepository.class);
+        for (Class<?> idType : new Class<?>[] {MemoryCollectionId.class, MemoryRevisionId.class, ServiceTokenCollectionId.class}) {
+            assertThat(entityManager.getMetamodel().embeddable(idType).getJavaType()).isEqualTo(idType);
+        }
+    }
+
+
+    private void assertPersistence(Repositories repositories, Class<?> entityType, Class<?> idType, Class<? extends Repository<?, ?>> repositoryType) {
+        var entity = entityManager.getMetamodel().entity(entityType);
+        assertThat(entity.getJavaType()).isEqualTo(entityType);
+        assertThat(entity.getName()).isEqualTo(entityType.getSimpleName());
+        assertThat(entity.getIdType().getJavaType()).isEqualTo(idType);
+        var information = repositories.getRepositoryInformationFor(entityType).orElseThrow();
+        assertThat(information.getRepositoryInterface()).isEqualTo(repositoryType);
+        assertThat(information.getDomainType()).isEqualTo(entityType);
+        assertThat(information.getIdType()).isEqualTo(idType);
+        assertThat(repositories.getRepositoryFor(entityType)).contains(context.getBean(repositoryType));
     }
 }

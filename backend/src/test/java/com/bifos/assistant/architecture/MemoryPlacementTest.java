@@ -34,8 +34,6 @@ class MemoryPlacementTest {
     @Test
     @DisplayName("운영 아홉 저장 타입과 실제 ID 연결을 기준 파일 없이 검사한다")
     void checksProductionPlacement() {
-        assertThat(ArchitectureRulesTest.MAIN.stream()
-            .filter(item -> item.getPackageName().equals("com.bifos.assistant.memory.domain.entity"))).hasSize(9);
         ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE.check(ArchitectureRulesTest.MAIN);
         ArchitectureRules.EMBEDDED_IDS_WITH_ENTITIES.check(ArchitectureRulesTest.MAIN);
     }
@@ -162,6 +160,19 @@ class MemoryPlacementTest {
         JavaClasses fixture = compile("nested", sources, 11);
         assertThat(ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").evaluate(fixture).getFailureReport().toString())
             .contains(ROOT + ".other.Outer$Copy", "memory Table 기대 수 1, 실제 2");
+    }
+
+
+    @Test
+    @DisplayName("새 memory 엔티티와 실제 ID 및 private 중첩 값은 정상 확장으로 허용한다")
+    void acceptsNewPersistentTypesAndPrivateValue() throws IOException {
+        Map<String, String> sources = owners();
+        sources.put(ENTITY + ".Extra", entity(ENTITY, "Extra", "extra",
+            "@jakarta.persistence.EmbeddedId ExtraId id; private static class Value {}"));
+        sources.put(ENTITY + ".ExtraId", "package " + ENTITY + "; @jakarta.persistence.Embeddable public class ExtraId {}");
+        JavaClasses fixture = compile("extension", sources, 12);
+        ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").check(fixture);
+        ArchitectureRules.embeddedIdsWithEntities(ROOT, "memory").check(fixture);
     }
 
 
