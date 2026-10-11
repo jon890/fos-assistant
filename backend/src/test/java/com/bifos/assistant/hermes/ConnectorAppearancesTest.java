@@ -25,37 +25,38 @@ class ConnectorAppearancesTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String LINK = "https://notes.example.test/about";
     private static final int ICON_MAX_BYTES = 32 * 1024;
-    private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+    private static final byte[] PNG_SIGNATURE = {(byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
     /** 링크 모양의 시험 벡터다. 대시보드의 {@code test_connector_manifest.py} 가 같은 목록을 단언한다. 한쪽을 바꾸면 다른 쪽도 바꾼다. */
     private static final List<String> ACCEPTED_LINKS = List.of(
-            "https://mail.google.com/",
-            "https://blog.naver.com/",
-            "https://example.com",
-            "https://example.com:8443/a?b=1&c=%20#x",
-            "https://xn--9n2bp8q.com/",
-            "https://example.com/" + "a".repeat(500 - "https://example.com/".length()));
+        "https://mail.google.com/",
+        "https://blog.naver.com/",
+        "https://example.com",
+        "https://example.com:8443/a?b=1&c=%20#x",
+        "https://xn--9n2bp8q.com/",
+        "https://example.com/" + "a".repeat(500 - "https://example.com/".length()));
 
     private static final List<String> REJECTED_LINKS = List.of(
-            "https://example.com/a|b",
-            "https://example.com/a\"b",
-            "https://example.com/<x>",
-            "https://example.com/{x}",
-            "https://example.com/a^b",
-            "https://example.com/%zz",
-            "https://my_host.example.com/",
-            "https://example.com:abc/",
-            "https://예시.com/한글",
-            "https://a..b/",
-            "https://-bad-.com/",
-            "http://example.com/",
-            "HTTPS://example.com/",
-            "https://user@example.com/",
-            "https://example.com/a b",
-            "https://example.com/a\\b",
-            "https://[::1]/",
-            "https://example.com/?a[]=1",
-            "https://example.com/" + "a".repeat(501 - "https://example.com/".length()));
+        "https://example.com/a|b",
+        "https://example.com/a\"b",
+        "https://example.com/<x>",
+        "https://example.com/{x}",
+        "https://example.com/a^b",
+        "https://example.com/%zz",
+        "https://my_host.example.com/",
+        "https://example.com:abc/",
+        "https://예시.com/한글",
+        "https://a..b/",
+        "https://-bad-.com/",
+        "http://example.com/",
+        "HTTPS://example.com/",
+        "https://user@example.com/",
+        "https://example.com/a b",
+        "https://example.com/a\\b",
+        "https://[::1]/",
+        "https://example.com/?a[]=1",
+        "https://example.com/" + "a".repeat(501 - "https://example.com/".length()));
+
 
     @DisplayName("배포하는 서비스 아이콘이 Control Plane 검증을 통과한다")
     @ParameterizedTest
@@ -73,6 +74,7 @@ class ConnectorAppearancesTest {
         assertThat(read).isEqualTo(new ConnectorAppearance("data:image/svg+xml;base64," + data, link));
     }
 
+
     @DisplayName("SVG 와 PNG 아이콘은 data URL 로, https 링크는 그대로 담는다")
     @Test
     void readsSvgAndPngAsDataUrlAndKeepsLink() {
@@ -87,16 +89,17 @@ class ConnectorAppearancesTest {
         assertThat(fromPng).isEqualTo(new ConnectorAppearance("data:image/png;base64," + pngData, null));
     }
 
+
     @DisplayName("문서 안을 가리키는 href 와 url() 참조는 받는다")
     @ParameterizedTest
     @ValueSource(
-            strings = {
-                "<a href=\"#a\"/>",
-                "<use xlink:href='#a'/>",
-                "<rect fill=\"url(#g)\"/>",
-                "<rect fill=\"url('#g')\"/>",
-                "<rect fill=\"url( #g)\"/>"
-            })
+        strings = {
+            "<a href=\"#a\"/>",
+            "<use xlink:href='#a'/>",
+            "<rect fill=\"url(#g)\"/>",
+            "<rect fill=\"url('#g')\"/>",
+            "<rect fill=\"url( #g)\"/>"
+        })
     void acceptsInDocumentReferences(String body) {
         String data = base64("<svg xmlns=\"http://www.w3.org/2000/svg\">" + body + "</svg>");
 
@@ -104,6 +107,7 @@ class ConnectorAppearancesTest {
 
         assertThat(read.icon()).isEqualTo("data:image/svg+xml;base64," + data);
     }
+
 
     @DisplayName("32 KiB 정확히인 아이콘은 받는다")
     @Test
@@ -115,29 +119,31 @@ class ConnectorAppearancesTest {
         assertThat(read.icon()).isEqualTo("data:image/svg+xml;base64," + data);
     }
 
+
     @DisplayName("금지 요소나 외부 참조가 있거나 svg 로 시작하지 않는 SVG 는 아이콘만 버리고 링크는 둔다")
     @ParameterizedTest
     @ValueSource(
-            strings = {
-                "<svg><script>alert(1)</script></svg>",
-                "<svg onload=\"alert(1)\"/>",
-                "<svg><foreignObject/></svg>",
-                "<!DOCTYPE svg><svg/>",
-                "<svg><set attributeName=\"x\" to=\"1\"/></svg>",
-                "<svg><animate attributeName=\"x\"/></svg>",
-                "<svg><text>&#106;</text></svg>",
-                "<svg><style>a{b:\\61}</style></svg>",
-                "<svg><a xlink:href=\"https://evil.example.test/\"/></svg>",
-                "<svg><rect fill=\"url(http://evil.example.test/a)\"/></svg>",
-                "<rect/>",
-                "<svgx/>",
-                "<svg"
-            })
+        strings = {
+            "<svg><script>alert(1)</script></svg>",
+            "<svg onload=\"alert(1)\"/>",
+            "<svg><foreignObject/></svg>",
+            "<!DOCTYPE svg><svg/>",
+            "<svg><set attributeName=\"x\" to=\"1\"/></svg>",
+            "<svg><animate attributeName=\"x\"/></svg>",
+            "<svg><text>&#106;</text></svg>",
+            "<svg><style>a{b:\\61}</style></svg>",
+            "<svg><a xlink:href=\"https://evil.example.test/\"/></svg>",
+            "<svg><rect fill=\"url(http://evil.example.test/a)\"/></svg>",
+            "<rect/>",
+            "<svgx/>",
+            "<svg"
+        })
     void dropsUnsafeSvgButKeepsLink(String svg) {
         ConnectorAppearance read = ConnectorAppearances.read(item(icon("image/svg+xml", base64(svg)), LINK));
 
         assertThat(read).isEqualTo(new ConnectorAppearance(null, LINK));
     }
+
 
     @DisplayName("패딩 없는 base64 아이콘은 디코딩한 바이트를 표준 base64 로 다시 인코딩해 담는다")
     @Test
@@ -150,6 +156,7 @@ class ConnectorAppearancesTest {
         assertThat(unpadded).isNotEqualTo(padded);
         assertThat(read.icon()).isEqualTo("data:image/svg+xml;base64," + padded);
     }
+
 
     @DisplayName("UTF-8 이 아닌 바이트, 틀린 base64, 빈 내용, 상한 초과, 서명 없는 PNG, 모르는 형식, 객체가 아닌 아이콘은 아이콘만 버린다")
     @Test
@@ -169,20 +176,22 @@ class ConnectorAppearancesTest {
 
         for (JsonNode declared : icons) {
             assertThat(ConnectorAppearances.read(item(declared, LINK)))
-                    .as("icon=%s", declared)
-                    .isEqualTo(new ConnectorAppearance(null, LINK));
+                .as("icon=%s", declared)
+                .isEqualTo(new ConnectorAppearance(null, LINK));
         }
     }
+
 
     @DisplayName("링크 모양에 맞는 링크는 그대로 담는다. 500자 링크도 받는다")
     @Test
     void acceptsLinksOfTheLinkShape() {
         for (String link : ACCEPTED_LINKS) {
             assertThat(ConnectorAppearances.read(item(null, link)).link())
-                    .as("link=%s", link)
-                    .isEqualTo(link);
+                .as("link=%s", link)
+                .isEqualTo(link);
         }
     }
+
 
     @DisplayName("링크 모양을 벗어난 링크, 빈 글, 글이 아닌 링크는 링크만 버리고 아이콘은 둔다")
     @Test
@@ -199,21 +208,42 @@ class ConnectorAppearancesTest {
             ObjectNode item = item(icon("image/svg+xml", data), null);
             item.set("link", declared);
             assertThat(ConnectorAppearances.read(item))
-                    .as("link=%s", declared)
-                    .isEqualTo(new ConnectorAppearance("data:image/svg+xml;base64," + data, null));
+                .as("link=%s", declared)
+                .isEqualTo(new ConnectorAppearance("data:image/svg+xml;base64," + data, null));
         }
     }
+
+
+    @DisplayName("README와 서비스 링크는 같은 규칙으로 독립 검증하고 구버전 종류는 service다")
+    @Test
+    void readsIndependentReadmeAndProjectKind() {
+        for (String accepted : ACCEPTED_LINKS) {
+            ObjectNode node = item(null, LINK).put("readme_url", accepted).put("link_kind", "project");
+            assertThat(ConnectorAppearances.read(node))
+                .isEqualTo(new ConnectorAppearance(null, LINK, accepted, "project"));
+        }
+        for (String rejected : REJECTED_LINKS) {
+            ObjectNode node = item(null, LINK).put("readme_url", rejected).put("link_kind", "unknown");
+            assertThat(ConnectorAppearances.read(node))
+                .isEqualTo(new ConnectorAppearance(null, LINK, null, "service"));
+            node.put("link", rejected).put("readme_url", LINK);
+            assertThat(ConnectorAppearances.read(node))
+                .isEqualTo(new ConnectorAppearance(null, null, LINK, "service"));
+        }
+        assertThat(new ConnectorAppearance(null, LINK).linkKind()).isEqualTo("service");
+    }
+
 
     @DisplayName("칸이 없거나 JSON null 이면 둘 다 null 이다")
     @Test
     void readsMissingOrNullFieldsAsNone() {
         ObjectNode missing = JSON.createObjectNode().put("id", "demo-notes");
-        ObjectNode nulls =
-                JSON.createObjectNode().put("id", "demo-notes").putNull("icon").putNull("link");
+        ObjectNode nulls = JSON.createObjectNode().put("id", "demo-notes").putNull("icon").putNull("link");
 
         assertThat(ConnectorAppearances.read(missing)).isEqualTo(ConnectorAppearance.NONE);
         assertThat(ConnectorAppearances.read(nulls)).isEqualTo(ConnectorAppearance.NONE);
     }
+
 
     @DisplayName("주석 2000개 뒤의 svg 루트는 받고 다른 글은 버리며, 둘 다 예외 없이 1초 안에 끝난다")
     @Test
@@ -223,13 +253,14 @@ class ConnectorAppearancesTest {
         String other = base64(comments + "X");
 
         ConnectorAppearance accepted = assertTimeoutPreemptively(
-                Duration.ofSeconds(1), () -> ConnectorAppearances.read(item(icon("image/svg+xml", root), null)));
+            Duration.ofSeconds(1), () -> ConnectorAppearances.read(item(icon("image/svg+xml", root), null)));
         ConnectorAppearance rejected = assertTimeoutPreemptively(
-                Duration.ofSeconds(1), () -> ConnectorAppearances.read(item(icon("image/svg+xml", other), null)));
+            Duration.ofSeconds(1), () -> ConnectorAppearances.read(item(icon("image/svg+xml", other), null)));
 
         assertThat(accepted.icon()).isEqualTo("data:image/svg+xml;base64," + root);
         assertThat(rejected).isEqualTo(ConnectorAppearance.NONE);
     }
+
 
     private static ObjectNode item(JsonNode icon, String link) {
         ObjectNode item = JSON.createObjectNode().put("id", "demo-notes");
@@ -242,17 +273,21 @@ class ConnectorAppearancesTest {
         return item;
     }
 
+
     private static ObjectNode icon(String mediaType, String data) {
         return JSON.createObjectNode().put("media_type", mediaType).put("data", data);
     }
+
 
     private static JsonNode text(String value) {
         return JSON.getNodeFactory().stringNode(value);
     }
 
+
     private static String base64(String text) {
         return Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
     }
+
 
     /** 앞뒤 태그 사이를 공백으로 채워 UTF-8 로 정확히 {@code bytes} 바이트인 SVG 를 만든다. */
     private static String paddedSvg(int bytes) {

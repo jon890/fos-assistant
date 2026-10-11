@@ -80,6 +80,23 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
         self.assertNotIn("nonce", json.dumps(self.entry))
         self.assertEqual(self.claims + self.trades, [])
 
+    def test_link_metadata_changes_hash_without_changing_policy_and_blocks_old_ticket(self):
+        original = (self.connector_root / "connector.json").read_text()
+        for key, value in (("readme_url", "https://example.test/README.md"), ("link_kind", "project")):
+            with self.subTest(field=key):
+                (self.connector_root / "connector.json").write_text(original)
+                self.rewrite("connector.json", lambda declared: declared.update({key: value}))
+                changed = self.plugin._connector_manifest(base.DEMO)
+                self.assertEqual(changed[key], value)
+                self.assertEqual(changed["tools"], self.manifest["tools"])
+                self.assertEqual(changed["fields"], self.manifest["fields"])
+                self.assertEqual(changed["execution_guard"], self.manifest["execution_guard"])
+                self.assertNotEqual(changed["execution_guard_manifest_sha256"], self.guard["manifestSha256"])
+                self.assertEqual(self.guard_module._guard_support(PROFILE, changed, self.entry)["state"], "pending")
+                self.assertEqual(self.request(EXECUTE, "POST", self.body(execution=True))[0], 409)
+                self.assertEqual(changed["server"]["tools"]["exclude"], ["place_order"])
+        self.assertEqual(self.supports + self.claims + self.trades, [])
+
     def test_revocation_during_callback_blocks_prepare_and_execution(self):
         for route, body in ((PREPARE, self.body()), (EXECUTE, self.body(execution=True))):
             self.write_state()
