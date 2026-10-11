@@ -1,6 +1,6 @@
 # 사진 참조를 고정한 원고와 단계별 검증
 
-covers: `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`, `test/support/media-pipeline-evidence.ts`, `test/unit/media-pipeline-evidence.test.ts`
+covers: `backend/src/main/java/com/bifos/assistant/chat/**/ContentDraft*`, `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`, `test/support/media-pipeline-evidence.ts`, `test/unit/media-pipeline-evidence.test.ts`
 
 typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으로 변환한다.
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.
@@ -121,6 +121,8 @@ UTF-8 compact JSON 본문은 기존 합의인 64KiB 이하다.
 REST 기본 경로는 `/api/v1/chat/conversations/{conversationId}/content-drafts`다.
 conversationId와 draftId는 소문자 정규형 공개 UUID다. revision은 1부터 JavaScript safe integer 상한 9,007,199,254,740,991까지의 정수다.
 JSON 중복 키·unknown·명시적 null과 문자열·실수 expectedRevision coercion은 거절한다.
+모든 문자열 입력에서 짝 없는 UTF-16 high/low surrogate는 `VALIDATION_FAILED`로 거절한다.
+유효한 surrogate pair와 비BMP 문자는 자동 치환 없이 보존하고 길이는 Unicode code point로 센다.
 
 | 경로 | 요청 | 성공 응답 |
 | --- | --- | --- |

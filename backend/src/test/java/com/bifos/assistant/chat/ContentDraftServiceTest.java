@@ -14,6 +14,9 @@ import com.bifos.assistant.chat.application.ContentDraftReferences;
 import com.bifos.assistant.chat.application.ContentDraftService;
 import com.bifos.assistant.chat.application.model.ContentDraftInput;
 import com.bifos.assistant.chat.application.model.ContentDraftView;
+import com.bifos.assistant.chat.application.model.MediaObservationInput;
+import com.bifos.assistant.chat.application.model.MediaObservationInput.Coverage;
+import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
@@ -198,6 +201,46 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         observations.deleteAll();
         code(() -> drafts.read(owner, conversation.id(), id, null), ErrorCode.CONTENT_DRAFT_STALE);
         assertErased(ContentDraftRevisionStatus.STALE);
+    }
+
+
+    @Test
+    @DisplayName("PROCESSING 관찰 참조는 STALE로 거절하고 원고 행을 남기지 않는다")
+    void rejectsProcessingObservationRefWithoutWrites() {
+        var processing = new MediaObservationInput(ObservationStatus.PROCESSING, null, List.of(), List.of(),
+            new Coverage("ORIGINAL", null, null), null, null);
+        record(0, UUID.randomUUID(), processing, model());
+        var observation = observations.findAll().getFirst();
+        var node = json.valueToTree(inputDraft("관찰 참조", true));
+        ((ObjectNode)node.get("blocks").get(0)).set("observationRef",
+            json.createObjectNode().put("id", observation.id().toString()).put("revision", 1));
+        code(() -> drafts.create(owner, conversation.id(), reader.read(node)), ErrorCode.CONTENT_DRAFT_STALE);
+        assertThat(draftRows.count()).isZero();
+        assertThat(revisionRows.count()).isZero();
+        assertThat(assetRows.count()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("purge 파일 단계가 실패해도 앞서 커밋한 원고 본문 무효화와 삭제 요청은 남는다")
+    void purgeErasesBodiesBeforeFileStageFails() throws IOException {
+        drafts.create(owner, conversation.id(), inputDraft("purge 본문", true));
+        var blocked = file(photo);
+        Files.delete(blocked);
+        Files.createDirectories(blocked);
+        Files.write(blocked.resolve("block"), new byte[] {1});
+        jdbc.update("update conversation set deleted_at=? where id=?", NOW, conversation.id());
+        try {
+            assertThat(purger.purgeDue(NOW)).isZero();
+            assertThat(draftRows.count()).isEqualTo(1);
+            assertErased(ContentDraftRevisionStatus.STALE);
+            assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt()).isEqualTo(NOW);
+            assertThat(conversations.findById(conversation.id()).orElseThrow().purgedAt()).isNull();
+        } finally {
+            Files.delete(blocked.resolve("block"));
+            Files.delete(blocked);
+            jdbc.update("update conversation set deleted_at=null where id=?", conversation.id());
+        }
     }
 
 

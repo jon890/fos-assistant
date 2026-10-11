@@ -341,11 +341,10 @@ current_revision은 유일하게 수락된 마지막 번호이며 무효화해�
 이전 STALE 본문을 조회하거나 복호화하여 복구하지 않는다.
 
 시간은 주입한 Clock의 Instant를 UTC microsecond로 잘라 DATETIME(6)에 저장한다.
-새 SQL의 버전은 구현 착수 시 UTC 작성 시각으로 정하며 기존 마이그레이션은 고치지 않는다.
-세 표를 만드는 DDL만 새 파일에 두고 ENGINE・CHARSET・COLLATE는 위 작성 규칙을 따른다.
-Flyway H2와 실제 MySQL에서 엔티티 validate, CHECK 위반, FK・cascade・purge 순서와 본문/key 무효화를 확인한다.
-RepositoryQueryMysqlTest의 자동 실행은 새 저장소 SQL의 실행 여부만 증명하며 값과 경쟁은 별도 MySQL 회귀가 증명한다.
-새 표의 운영 조회 권한은 본문을 제외하여 `fos-home-infra`에서 반영한다. 이 작업의 완료 없이 운영 검증을 완료로 표시하지 않는다.
+V20261011060038은 세 표의 DDL을 담고 ENGINE・CHARSET・COLLATE는 위 작성 규칙을 따른다.
+Flyway H2와 실제 MySQL 회귀가 엔티티 validate, CHECK 위반, FK・cascade・purge 순서와 본문/key 무효화를 검사한다.
+RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별도 MySQL 회귀가 검사한다.
+운영 조회 권한과 그 확인은 `fos-home-infra`가 관리하며 원고 본문은 조회 대상에서 제외한다.
 
 ### chat_artifact
 

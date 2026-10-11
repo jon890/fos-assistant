@@ -157,6 +157,17 @@ public class ContentDraftInputReader {
             throw invalid();
         }
         String value = node.stringValue();
+        for (int index = 0; index < value.length(); index++) {
+            char current = value.charAt(index);
+            if (Character.isHighSurrogate(current)) {
+                if (index + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(index + 1))) {
+                    throw invalid();
+                }
+                index++;
+            } else if (Character.isLowSurrogate(current)) {
+                throw invalid();
+            }
+        }
         int count = value.codePointCount(0, value.length());
         if (count < min || count > max) {
             throw invalid();
