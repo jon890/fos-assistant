@@ -5,7 +5,7 @@ WORKDIR /src
 COPY gmail/package.json gmail/bun.lock gmail/
 COPY naver-blog/package.json naver-blog/bun.lock naver-blog/
 COPY tossinvest/package.json tossinvest/bun.lock tossinvest/
-RUN for connector in */; do bun install --cwd "$connector" --frozen-lockfile --network-concurrency=1; done
+RUN set -e; for connector in */; do bun install --cwd "$connector" --frozen-lockfile --network-concurrency=1; done
 COPY . .
 RUN bun run package.ts build /bundle "$SOURCE_COMMIT"
 
