@@ -105,7 +105,7 @@ def ensure_snapshot_diagnostics():
 
 @contextmanager
 def snapshot_diagnostics_scope():
-    """SDK contextとその子taskの終了まで保護し、呼出元の状態を戻す。"""
+    """SDK context와 그 자식 task가 끝날 때까지 보호하고 호출자의 상태를 되돌린다."""
     state = ensure_snapshot_diagnostics()
     token = state.active.set(True)
     try:
