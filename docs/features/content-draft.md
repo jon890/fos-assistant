@@ -120,7 +120,9 @@ UTF-8 compact JSON 본문은 기존 합의인 64KiB 이하다.
 
 REST 기본 경로는 `/api/v1/chat/conversations/{conversationId}/content-drafts`다.
 conversationId와 draftId는 소문자 정규형 공개 UUID다. revision은 1부터 JavaScript safe integer 상한 9,007,199,254,740,991까지의 정수다.
-JSON 중복 키·unknown·명시적 null과 문자열·실수 expectedRevision coercion은 거절한다.
+REST는 STRICT_DUPLICATE_DETECTION으로 JSON 중복 키를 거절한다.
+unknown·명시적 null과 문자열·실수 expectedRevision coercion도 거절한다.
+MCP는 기존 JsonNode 파싱 뒤의 값을 검증하므로 중복 키 거절을 보장하지 않는다. 전역 MCP parser는 이 기능에서 바꾸지 않는다.
 모든 문자열 입력에서 짝 없는 UTF-16 high/low surrogate는 `VALIDATION_FAILED`로 거절한다.
 유효한 surrogate pair와 비BMP 문자는 자동 치환 없이 보존하고 길이는 Unicode code point로 센다.
 
@@ -138,7 +140,7 @@ STALE·EXPIRED 항목은 목록에 남기되 title은 null, status는 해당 값
 유효한 행의 복호화 실패는 목록에서도 안전한 503으로 처리한다.
 이전 유효 revision은 읽기 전용이며 되돌리기는 그 본문을 현재 expectedRevision과 함께 PUT하여 새 revision을 만든다.
 PUT에는 멱등 requestId를 새로 도입하지 않는다. 응답을 잃으면 다시 조회하며 같은 expectedRevision의 재전송은 충돌한다.
-POST 재전송은 별도 원고 생성이므로 MCP 설명도 자동 재시도를 권하지 않는다.
+REST POST 재전송은 별도 원고 생성이다. 첫 MCP 저장의 중복 생성 방지는 아래 후속 설계에서 결정 대기로 둔다.
 
 | 경우 | 응답 |
 | --- | --- |
@@ -163,20 +165,73 @@ CAS 불일치는 원본 읽기와 새 암호화를 시작하기 전에 판정한
 | `content_draft_write` | `{draftId?,expectedRevision?,draft}` | 생성 때 두 옵션 모두 생략, 수정 때 둘 다 필수 |
 | `content_draft_read` | `{draftId,revision?}` | 생략하면 현재 revision, 있으면 지정 revision |
 
-`McpCallerResolver`가 서명을 확인한 origin 실행의 사용자와 대화를 사용한다. 실행 전후 requireCurrent guard로 현재 agent/profile/사용자 권한을 다시 검사한다.
-전용 typed conflict 예외의 currentRevision 필드를 쓰며 message는 고정 문구다. 예외 문자열을 파싱하거나 본문·revision을 로그 message에 넣지 않는다.
-fos-ctx REQUIRED_TOOLS와 README·서명 필수 목록 테스트도 두 도구를 함께 반영한다. McpController의 500줄 상한을 지키도록 handler는 한 줄 위임으로 두고 DTO나 도구 클래스에서 인자를 해석한다.
-모델 인자로 conversationId·사용자·profile을 받지 않는다. REST와 같은 서비스·판정을 호출한다.
-MCP 결과는 같은 안전한 원고 응답 또는 `{code,currentRevision?}`이며 JSON-RPC의 기존 도구 결과 형태로 감싼다.
-살펴보기의 기존 허용 도구 집합을 확대하지 않는다. 이 두 도구는 일반 대화에서만 사용한다.
-Hermes 실행 사건 수집에서 두 도구와 `__` 접두 도구의 start/complete/fail detail·text를 가려 본문 중복 저장을 막는다.
+이 절은 후속 구현 설계이며 두 도구는 아직 등록되지 않았다.
+PR443에는 REST 설계와 구현만 남기고 이 상세와 실행 계획은 후속 브랜치가 보존한다.
+후속 PR에는 해당 단계의 설계와 구현을 함께 담는다.
+
+새 두 도구는 최상위 선택 필드도 명시적 null을 거절한다. 기존 도구의 null 처리는 유지한다.
+write는 draftId와 expectedRevision 중 하나만 지정하면 거절한다.
+read revision은 1부터 9,007,199,254,740,991까지이고 수정 expectedRevision은 다음 번호를 만들 수 있는 1부터 9,007,199,254,740,990까지다.
+모르는 키, 사용자·conversationId·profile·실행 식별자는 받지 않으며 `_fos_ctx`는 기존 handler 진입 전에 뗀다.
+draft의 필드·상한은 ContentDraftInputReader와 일치시킨다.
+제목 100자, 분류 50자, 태그 30개와 각 30자, 블록 500개, 사진 50개, 스티커·지도 각각 30개가 상한이다.
+문단과 caption은 각각 0부터 20,000자까지와 0부터 300자까지다.
+지도 name·address는 각각 1부터 200자까지이고 sticker code는 1부터 64자까지다.
+문자열은 Unicode code point로 세며 UTF-8 compact JSON 64KiB, 예약 줄, 짝 없는 surrogate 검사도 재사용한다.
+REST strict 파싱과 MCP JsonNode의 중복 키 경계는 「입력과 응답」의 구분을 따른다.
+
+`McpCallerResolver`가 서명을 확인한 origin의 사용자와 대화만 사용한다.
+raw HMAC은 v1, 도구 이름, root_session_id, session_id, tool_call_id를 서명한다.
+args, time과 nonce는 서명하지 않으며 현재 tool_call_id 중복 검사도 없다.
+등록된 child는 origin이 COMPLETED여도 같은 origin을 사용하고 origin·루트 CANCELLED는 차단하는 기존 계약을 유지한다.
+살펴보기 허용 집합은 확대하지 않는다. 쓰기 허용 살펴보기에서도 두 도구를 차단한다.
+
+기존 관찰 도구의 requireCurrent와 invalidContext만 최소 공용 guard로 옮긴다.
+관찰 오류 변환과 conflict 문자열 파싱은 이동 대상이 아니다.
+실행 전후 별도 REQUIRES_NEW 읽기 트랜잭션에서 현재 origin·session 등록·사용자 권한·agent 활성·삭제·profile 일치를 재검사한다.
+사전 검사 실패는 서비스 호출·신규 revision·외부 호출 0회다.
+사후 검사 실패는 이미 커밋된 행을 되돌리지 않으며 응답의 본문과 revision만 차단한다.
+저장과 취소·권한 철회를 원자적으로 처리하거나 실패 뒤 재시도가 안전하다고 설명하지 않는다.
+
+첫 MCP 저장에 중복 생성 방지를 포함할지는 사용자 답변 대기다.
+포함하면 호출 식별 범위·보존 기간·본문 동일성·재전송을 설계하고 서비스·schema 변경 범위와 동시 생성·응답 유실 시험을 확정해야 한다.
+제외하면 기존 생성 계약을 유지하며 실패 뒤 자동으로 다시 만들지 않고 read나 기존 원고 목록으로 확인하도록 설명한다.
+제외 선택의 시험은 사후 검사 실패 뒤 행 보존과 재전송 시 별도 생성 가능성을 확인한다.
+어느 선택도 확정하지 않으며 그 선택에 의존하는 구현은 시작하지 않는다.
+
+| MCP 결과 | 응답 형태 |
+| --- | --- |
+| 성공 | 안전한 ContentDraftView JSON을 ExternalData.wrap으로 감싼 기존 도구 result, isError=false |
+| 인자 모양·본문·예약 줄·크기의 VALIDATION_FAILED | HTTP 200의 JSON-RPC -32602와 기존 고정 INVALID_ARGUMENTS |
+| CONTENT_DRAFT_CONFLICT·CONTENT_DRAFT_STALE | isError=true, text JSON의 code와 typed currentRevision 정수 |
+| CONTENT_DRAFT_GONE·CONTENT_DRAFT_UNAVAILABLE와 다른 domain 오류 | isError=true, text JSON의 code만 전달 |
+| 서명·현재 맥락 오류 | 기존 MCP_CALL_CONTEXT_INVALID 고정 결과, 본문·revision 없음 |
+
+예외 message와 cause를 결과로 보내거나 파싱하지 않으며 본문·revision을 로그 message에 넣지 않는다.
+catalog 등록 순서는 record_media_observation 뒤, memory_remember 앞에 write, read다.
+McpController는 두 위임 항목과 최소 공용 인자 오류 helper로 500줄 상한을 지킨다.
+인자 record와 파싱은 기존 McpDtos에 둔다.
+정의와 처리는 mcp.application.McpContentDraftTools가 맡고 범용 McpToolService에 원고 저장 책임을 추가하지 않는다.
+fos-ctx REQUIRED_TOOLS, README의 계약·필수 목록, __init__.py 설명과 서명 실패 차단 시험을 함께 반영한다.
+catalog 생성자·순서, caller 불변 목록과 MCP 기능 문서의 전체 목록도 갱신한다.
+
+Hermes 사건 가림은 state.classify와 interim 접두사 길이 계산 뒤, 기존 관찰 가림 옆에서 수행한다.
+정확한 두 도구 이름 또는 `__content_draft_write`·`__content_draft_read` suffix만 대상이다.
+표시용 이름 선택은 유지하되 가림은 root/data의 tool·tool_name·toolName·name 별칭을 모두 검사한다.
+앞 별칭이 다른 도구를 가리켜도 뒤의 원고 이름을 놓치지 않는다.
+가림은 tool. 사건 이름에만 의존하지 않는다. 실제 tool.started, tool.completed의 error=true/false와 비표준·이름 없는 도구 사건도 대상으로 한다.
+preview·detail·result와 delta·text·output의 root/data 값을 통해 선택된 detail과 text를 null로 만들어 수집·실행 저장·대화 사건·화면 경로에 본문을 남기지 않는다.
+합성 tool.failed는 경계 시험이며 실제 Hermes 실패 사건 계약으로 가정하지 않는다.
+일반 USER와 final(message.delta), interim(message.interim)을 임의로 가리지 않으며 기존 분류·interim·reasoning 정책을 유지한다.
+subagent goal의 본문 보호 확대는 이 작업의 범위 밖이다.
+
+### 원고 서비스 배치
 
 신규 엔티티는 `chat.domain.entity`의 ContentDraft, ContentDraftRevision, ContentDraftAsset에 둔다.
 기존 엔티티를 옮기거나 최상위 기능 패키지를 늘리지 않는다. `domain..`의 기존 층 규칙이 이 하위 패키지도 검사한다.
 상태 enum은 `chat.domain.type`, 공개 서비스 반환 타입은 `chat.application.model`, 저장소와 암호화는 `chat.infra`에 둔다.
 REST는 `chat.presentation.contentdraft.ContentDraftController`와 그 패키지의 유일한 `ContentDraftDtos`가 맡는다.
-기존 chat.presentation의 DTO 파일을 더 늘리지 않는다. MCP 인자는 기존 `mcp.presentation.McpDtos`에 모으고 처리와 정의는 `mcp.application.McpContentDraftTools`에 둔다.
-`McpToolCatalog`와 `McpController`가 도구를 연결하며 범용 `McpToolService`에 원고 저장 책임을 추가하지 않는다.
+기존 chat.presentation의 DTO 파일을 더 늘리지 않는다.
 
 ### 권한·원본·관찰 검사
 
