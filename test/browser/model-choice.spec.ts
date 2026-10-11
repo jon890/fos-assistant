@@ -1083,14 +1083,30 @@ test("대화 목록이 오기 전에는 이미 있는 대화의 모델 단추를
       await route.fallback();
     },
   );
+  const agentsRead = page.waitForResponse("**/api/agents");
   await page.goto(`/chat/${conversationId}`);
+  const agentsResponse = await agentsRead;
+  expect(agentsResponse.ok()).toBeTruthy();
+  await agentsResponse.finished();
+  expect(await agentsResponse.json()).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ code: "browser", acceptsAttachments: true }),
+    ]),
+  );
 
-  // 에이전트 목록이 오기 전에는 다른 까닭으로도 막혀 있다. 사진 단추가 보이면 에이전트가 정해진 뒤다.
-  await expect(page.getByTestId("attachment-input")).toBeAttached();
+  // 에이전트 목록이 와도 기존 대화의 에이전트는 아직 모른다. 첫 에이전트의 사진 도구를 대신 주지 않는다.
+  await composer(page).fill("목록을 기다리며 쓴 글");
+  await composer(page).evaluate((node) =>
+    node.setAttribute("data-kept", "true"),
+  );
+  await expect(page.getByTestId("attachment-input")).toHaveCount(0);
   // 적힌 값을 모르는 채 고르면 「기본」 으로 보고 저장해 적힌 모델을 지운다.
   await expect(tierSettings(page)).toBeDisabled();
   release();
   await expect(tierSettings(page)).toBeEnabled();
+  await expect(page.getByTestId("attachment-input")).toBeAttached();
+  await expect(composer(page)).toHaveValue("목록을 기다리며 쓴 글");
+  await expect(composer(page)).toHaveAttribute("data-kept", "true");
   await openSettings(page);
   await expect(picker(page)).toHaveText("example-model · high");
 });
