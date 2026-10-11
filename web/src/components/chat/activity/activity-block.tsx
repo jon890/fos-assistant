@@ -112,7 +112,9 @@ export function ActivityBlock(props: Props) {
   const live = props.mode === "live";
   const running = props.mode === "live" && props.state.endedAt === null;
   const latest = running
-    ? props.state.items.findLast((item) => item.state === "running")
+    ? props.state.items.findLast(
+        (item) => item.state === "running" || item.kind === "interim",
+      )
     : null;
   // 끝난 블록의 한 줄은 수로 고르는 고정 문장이다. 수와 모델과 토큰은 대화에 그리지 않는다.
   const outcome: ActivityOutcome =
@@ -183,7 +185,9 @@ export function ActivityBlock(props: Props) {
               className="size-2 shrink-0 rounded-full bg-signal ring-2 ring-pill"
             />
             <span className="min-w-0 flex-1 truncate">
-              {latest ? activityLabel(latest) : "준비하고 있어요"}
+              {latest
+                ? `${latest.kind === "interim" ? "비서 안내: " : ""}${activityLabel(latest)}`
+                : "준비하고 있어요"}
             </span>
             <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
               {formatElapsed(now - props.state.startedAt)}
