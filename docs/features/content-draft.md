@@ -5,7 +5,7 @@ covers: `backend/src/main/java/com/bifos/assistant/chat/**/ContentDraft*`, `herm
 typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으로 변환한다.
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.
 관찰 저장과 REST·MCP 연결은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결)에 따라 구현되었다.
-순수 compiler와 합성 판정, Control Plane의 원고 revision 저장 REST가 구현되어 있다. MCP 도구·실행 사건 가림·fos-ctx 서명 필수 목록은 후속 구현이다.
+순수 compiler와 합성 판정, Control Plane의 원고 revision 저장 REST가 구현되어 있다. MCP 도구·실행 사건 가림·fos-ctx 서명 필수 목록도 구현되어 있다.
 원고 revision의 불변 preview snapshot 서비스와 최소 참조 표가 구현되어 있다. 공개 preview API·승인·job 실행·화면 연동은 후속 범위다.
 
 ## 정적 canonical 계약
@@ -120,7 +120,7 @@ compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다
 ## 불변 preview snapshot
 
 `ContentDraftSnapshots.preview`는 기존 REST 원고의 ID·revision·binding ID와 인증 내부 맥락의 origin 실행 ID를 받는다.
-최초 MCP 생성 idempotency와 독립적이며 미머지 MCP 타입이나 handler를 사용하지 않는다.
+최초 MCP 생성 idempotency와 독립적이며 MCP 생성 타입이나 handler를 재사용하지 않는다.
 사용자 입력에서 owner·profile·origin 실행·파일명·경로를 받지 않는다. 현재 profile과 connector ID는 요청자의 실제 바인딩에서 정한다.
 chat은 `ContentDraftBindingAccess`의 불변 stamp만 사용하고 connector 엔티티와 `McpCaller`를 import하지 않는다.
 
@@ -205,7 +205,9 @@ UTF-8 compact JSON 본문은 기존 합의인 64KiB 이하다.
 
 REST 기본 경로는 `/api/v1/chat/conversations/{conversationId}/content-drafts`다.
 conversationId와 draftId는 소문자 정규형 공개 UUID다. revision은 1부터 JavaScript safe integer 상한 9,007,199,254,740,991까지의 정수다.
-JSON 중복 키·unknown·명시적 null과 문자열·실수 expectedRevision coercion은 거절한다.
+REST는 STRICT_DUPLICATE_DETECTION으로 JSON 중복 키를 거절한다.
+unknown·명시적 null과 문자열·실수 expectedRevision coercion도 거절한다.
+MCP는 기존 JsonNode 파싱 뒤의 값을 검증하므로 중복 키 거절을 보장하지 않는다. 전역 MCP parser는 이 기능에서 바꾸지 않는다.
 모든 문자열 입력에서 짝 없는 UTF-16 high/low surrogate는 `VALIDATION_FAILED`로 거절한다.
 유효한 surrogate pair와 비BMP 문자는 자동 치환 없이 보존하고 길이는 Unicode code point로 센다.
 
@@ -223,7 +225,7 @@ STALE·EXPIRED 항목은 목록에 남기되 title은 null, status는 해당 값
 유효한 행의 복호화 실패는 목록에서도 안전한 503으로 처리한다.
 이전 유효 revision은 읽기 전용이며 되돌리기는 그 본문을 현재 expectedRevision과 함께 PUT하여 새 revision을 만든다.
 PUT에는 멱등 requestId를 새로 도입하지 않는다. 응답을 잃으면 다시 조회하며 같은 expectedRevision의 재전송은 충돌한다.
-POST 재전송은 별도 원고 생성이므로 MCP 설명도 자동 재시도를 권하지 않는다.
+REST POST 재전송은 별도 원고 생성이다. 첫 MCP 생성은 아래 영속 중복 생성 방지를 적용한다.
 
 | 경우 | 응답 |
 | --- | --- |
@@ -241,7 +243,167 @@ POST 재전송은 별도 원고 생성이므로 MCP 설명도 자동 재시도�
 CAS 불일치는 원본 읽기와 새 암호화를 시작하기 전에 판정한다.
 오류는 원고·파일 경로·JSON 원문·예외 cause를 응답과 로그에 싣지 않는다.
 
-MCP 연결은 후속 구현에서 제공한다. 현재 구현은 REST 저장·조회다.
+### MCP와 배치
+
+| 도구 | 인자 | 실행 범위 |
+| --- | --- | --- |
+| `content_draft_write` | `{requestId?,draftId?,expectedRevision?,draft}` | 생성 때 requestId 필수, 나머지 두 옵션 생략. 수정 때 requestId 금지, 나머지 둘 필수 |
+| `content_draft_read` | `{draftId,revision?}` | 생략하면 현재 revision, 있으면 지정 revision |
+
+두 도구는 기존 Control Plane MCP 서버에 등록되어 있다.
+
+새 두 도구는 최상위 선택 필드도 명시적 null을 거절한다. 기존 도구의 null 처리는 유지한다.
+write는 draftId와 expectedRevision 중 하나만 지정하면 거절한다.
+생성 requestId는 소문자 정규형 공개 UUID이며 누락·명시적 null을 거절한다. 수정에는 requestId를 받지 않는다.
+read revision은 1부터 9,007,199,254,740,991까지이고 수정 expectedRevision은 다음 번호를 만들 수 있는 1부터 9,007,199,254,740,990까지다.
+모르는 키, 사용자·conversationId·profile·실행 식별자는 받지 않으며 `_fos_ctx`는 기존 handler 진입 전에 뗀다.
+draft의 필드·상한은 ContentDraftInputReader와 일치시킨다.
+제목 100자, 분류 50자, 태그 30개와 각 30자, 블록 500개, 사진 50개, 스티커·지도 각각 30개가 상한이다.
+문단과 caption은 각각 0부터 20,000자까지와 0부터 300자까지다.
+지도 name·address는 각각 1부터 200자까지이고 sticker code는 1부터 64자까지다.
+문자열은 Unicode code point로 세며 UTF-8 compact JSON 64KiB, 예약 줄, 짝 없는 surrogate 검사도 재사용한다.
+REST strict 파싱과 MCP JsonNode의 중복 키 경계는 「입력과 응답」의 구분을 따른다.
+
+`McpCallerResolver`가 서명을 확인한 origin의 사용자와 대화만 사용한다.
+raw HMAC은 v1, 도구 이름, root_session_id, session_id, tool_call_id를 서명한다.
+args, time과 nonce는 서명하지 않으며 현재 tool_call_id 중복 검사도 없다.
+등록된 child는 origin이 SUCCEEDED·FAILED여도 같은 origin을 사용하고 origin·루트 CANCELLED는 차단하는 기존 계약을 유지한다.
+살펴보기 허용 집합은 확대하지 않는다. 쓰기 허용 살펴보기에서도 두 도구를 차단한다.
+
+기존 관찰 도구의 requireCurrent와 invalidContext만 최소 공용 guard로 옮긴다.
+관찰 오류 변환과 conflict 문자열 파싱은 이동 대상이 아니다.
+실행 전후 별도 REQUIRES_NEW 읽기 트랜잭션에서 현재 origin·session 등록·사용자 권한·agent 활성·삭제·profile 일치를 재검사한다.
+성공과 typed domain 오류 모두 사후 검사 뒤 응답한다. 오류의 currentRevision도 현재 권한을 잃었으면 차단한다. 기존 관찰 도구의 오류 변환은 바꾸지 않는다.
+사전 검사 실패는 서비스 호출·신규 revision·외부 호출 0회다.
+사후 검사 실패는 이미 커밋된 행을 되돌리지 않으며 응답의 본문과 revision만 차단한다.
+저장과 취소·권한 철회를 원자적으로 처리한다고 설명하지 않는다.
+첫 MCP 생성의 중복 방지는 확정한 사용자 정책이며 권한 확인을 통과한 같은 생성 요청은 커밋 뒤 응답이 끊겨도 같은 원고로 연결한다.
+현재 사용자 답변 대기는 없다. 재시도의 응답과 보존 기간은 다음 절을 따른다.
+
+| MCP 결과 | 응답 형태 |
+| --- | --- |
+| 성공 | 안전한 ContentDraftView JSON을 ExternalData.wrap으로 감싼 기존 도구 result, isError=false |
+| 인자 모양·본문·예약 줄·크기의 VALIDATION_FAILED | HTTP 200의 JSON-RPC -32602와 기존 고정 INVALID_ARGUMENTS |
+| CONTENT_DRAFT_CONFLICT·CONTENT_DRAFT_STALE | isError=true, text JSON의 code와 typed currentRevision 정수 |
+| CONTENT_DRAFT_GONE·CONTENT_DRAFT_UNAVAILABLE와 다른 domain 오류 | isError=true, text JSON의 code만 전달 |
+| 서명·현재 맥락 오류 | 기존 MCP_CALL_CONTEXT_INVALID 고정 결과, 본문·revision 없음 |
+
+예외 message와 cause를 결과로 보내거나 파싱하지 않으며 본문·revision을 로그 message에 넣지 않는다.
+catalog 등록 순서는 record_media_observation 뒤, memory_remember 앞에 write, read다.
+McpController는 두 위임 항목과 최소 공용 인자 오류 helper로 500줄 상한을 지킨다.
+인자 record와 파싱은 기존 McpDtos에 둔다.
+정의와 처리는 mcp.application.McpContentDraftTools가 맡고 범용 McpToolService에 원고 저장 책임을 추가하지 않는다.
+fos-ctx REQUIRED_TOOLS, README의 계약·필수 목록, __init__.py 설명과 서명 실패 차단 시험을 함께 반영한다.
+catalog 생성자·순서, caller 불변 목록과 MCP 기능 문서의 전체 목록도 갱신한다.
+
+Hermes 사건 가림은 state.classify와 interim 접두사 길이 계산 뒤, 기존 관찰 가림 옆에서 수행한다.
+정확한 두 도구 이름 또는 `__content_draft_write`·`__content_draft_read` suffix만 대상이다.
+표시용 이름 선택은 유지하되 가림은 root/data의 tool·tool_name·toolName·name 별칭을 모두 검사한다.
+앞 별칭이 다른 도구를 가리켜도 뒤의 원고 이름을 놓치지 않는다.
+가림은 tool. 사건 이름에만 의존하지 않는다. 실제 tool.started, tool.completed의 error=true/false와 비표준·이름 없는 도구 사건도 대상으로 한다.
+preview·detail·result와 delta·text·output의 root/data 값을 통해 선택된 detail과 text를 null로 만들어 수집·실행 저장·대화 사건·화면 경로에 본문을 남기지 않는다.
+합성 tool.failed는 경계 시험이며 실제 Hermes 실패 사건 계약으로 가정하지 않는다.
+일반 USER와 final(message.delta), interim(message.interim)을 임의로 가리지 않으며 기존 분류·interim·reasoning 정책을 유지한다.
+subagent goal의 본문 보호 확대는 이 작업의 범위 밖이다.
+
+### 첫 MCP 생성의 재시도 식별
+
+REST POST와 PUT, 원고 revision CAS는 기존 계약을 유지한다.
+`McpCallContext`와 fos-ctx README의 「재시도와 tool_call_id」는 Hermes가 같은 전송을 재시도할 때 ID를 유지한다고 명시한다.
+`pre_tool_call`은 이미 정해진 tool_call_id를 받는다. 모델이 다시 도구를 선택한 새 호출의 ID까지 같다는 계약은 없다.
+실제 transport는 401 재연결 때 같은 인자를 한 번 더 보내며 session 만료 뒤 쓰기는 outcome_uncertain으로 끝낸다. 이 설계는 Hermes core의 자동 재시도 정책을 바꾸지 않고 같은 인자의 서버 재호출을 멱등하게 만든다.
+JSON-RPC id, turn_id, api_request_id, task_id도 생성 의도를 영속 식별하는 값으로 쓰지 않는다.
+`record_media_observation`의 기존 requestId 인자와 같은 방식으로 원고 생성에 requestId를 추가하되, 아래 범위와 본문 동일성은 원고가 별도로 정의한다.
+
+모델은 새 원고 생성 의도를 처음 제출할 때 requestId 하나를 정하고 그 인자와 원고 입력을 유지한다.
+응답 단절·일시 장애 뒤 새 도구 호출로 같은 생성을 재시도할 때도 requestId와 최초 원고 입력을 그대로 보낸다.
+동일 내용의 별도 원고를 의도하여 만들 때만 새 requestId와 새 tool_call_id를 사용한다.
+서버나 hook은 누락된 requestId를 매번 UUID로 채우지 않는다. 단순히 새 UUID를 보내거나 저장 뒤 목록을 조회하는 것은 같은 요청의 재시도가 아니다.
+도구 설명에 이 규칙을 싣고 실제 인자 재사용을 E2E로 검증한다. 추가 LLM 호출이나 지침만으로 중복 방지를 완료했다고 판단하지 않는다.
+
+#### 호출자와 키 범위
+
+현재 `McpCallerResolver`는 profile 토큰과 HMAC 검증 뒤 `SessionOwnerResolver`가 반환한 origin 실행에서 사용자·대화를 읽는다.
+native 자식 session 등록은 부모 등록의 origin을 잇는다. FOS 자식 실행은 그 실행 자체가 origin이다.
+등록된 자식은 origin이 SUCCEEDED·FAILED여도 사용할 수 있고 origin·루트 CANCELLED는 거절한다. 등록이 없는 최상위 session은 정확히 하나의 RUNNING 실행만 사용한다.
+`root_session_id`는 Hermes의 parent_session_id 사슬에서 얻는 값이다. FOS 실행 트리의 루트 실행 번호와 같은 값으로 간주하지 않는다.
+루트 실행 번호는 origin의 rootExecutionId가 있으면 그 값, 없으면 origin.id다. 원고에서 별도의 최신 실행·native origin 추정 규칙을 만들지 않는다.
+
+| 식별 | 고정하는 범위 |
+| --- | --- |
+| 생성 키 | `[1,ownerUserId,conversationId,profileName,originExecutionId,rootExecutionId,rootSessionId,"CONTENT_DRAFT_CREATE",requestId]` |
+| 전송 키 | 생성 키에서 requestId를 빼고 `[sessionId,toolCallId]`를 붙인 배열 |
+| 생성 식별 고정 키 | `[1,ownerUserId,conversationId,profileName,"CONTENT_DRAFT_CREATE",requestId]`. 같은 요청을 다른 origin·루트로 재해석하지 못하게 하는 UNIQUE |
+| 전송 식별 고정 키 | `[1,ownerUserId,conversationId,profileName,rootSessionId,"CONTENT_DRAFT_CREATE",sessionId,toolCallId]`. 같은 전송을 다음 turn의 origin으로 옮기지 못하게 하는 UNIQUE |
+| 본문 동일성 | 최초 검증한 원고 입력의 아래 requestHash. 생성 키와 전송 키는 본문을 포함하지 않음 |
+
+각 키는 UTF-8 compact JSON 배열의 SHA-256을 BINARY(32)로 저장한다. 문자열은 원문 그대로이며 session ID를 잘라 저장하거나 대소문자 무시 정렬로 비교하지 않는다.
+배열의 ID 번호는 십진 JSON 정수, UUID는 정규형 문자열이다. 키 해시가 같으면 저장한 범위도 Java 문자열·정수로 정확히 대조하며 범위 불일치는 본문 없는 맥락 오류다.
+같은 origin·루트에 등록된 다른 session에서 requestId를 재사용하면 같은 원고다. session은 전송 키에만 들어가 자식의 같은 tool_call_id끼리 충돌하지 않는다.
+다른 사용자·대화·profile의 같은 requestId는 독립된 범위이며 이전 원고를 반환하거나 그 존재를 알리지 않는다. 생성하려면 그 범위의 현재 권한과 모든 검사를 통과해야 한다.
+같은 사용자·대화·profile에서 requestId를 다른 정식 origin·루트에 재사용하면 생성 식별 고정 키의 범위 대조가 실패하여 MCP_CALL_CONTEXT_INVALID다.
+같은 서명 전송을 같은 session의 다음 turn에서 재생해도 전송 식별 고정 키의 origin 대조로 차단한다. 범위가 달라졌다는 이유로 없는 키로 보고 새 원고를 만들지 않는다.
+새 turn이나 새 루트에서 새 원고를 의도할 때는 새 requestId와 새 tool_call_id가 필요하다.
+
+HMAC은 도구 이름·root/session·tool_call_id의 권한 맥락 증명이다. args·requestId·본문은 서명하지 않으므로 동일성 검사가 별도로 필요하다.
+현재 `_fos_ctx`에는 REQUEST nonce나 purpose 필드가 없다. 커넥터 지원 확인의 SupportRequest nonce는 요청과 응답 대응용이며 원고 키가 아니다.
+REQUEST nonce/signature 같은 권한 증명을 후속 계약에서 만나도 생성 재시도 식별자로 대체하지 않는다. 일반 JSON-RPC와 서명 v1을 재설계하지 않는다.
+
+#### 최초 본문 지문과 충돌
+
+검증한 `ContentDraftInput`의 requestHash는 아래 배열을 UTF-8 compact JSON으로 직렬화한 SHA-256이다.
+`[1,"CONTENT_DRAFT_CREATE",title,category,tags,blockTuples]`를 쓰며 draftId·revision·Clock·expiresAt·requestId·서명·nonce·원본 지문은 넣지 않는다.
+blockTuples는 「정적 canonical 계약」의 paragraph·image·sticker·map 배열을 사용한다. observationRef의 ID는 정규 십진 문자열이며 revision은 정수다.
+caption·observationRef 생략은 tuple의 null로 표현한다. 입력의 명시적 null은 그 전에 거절한다.
+객체 키 순서와 JSON escape 표기 차이는 같은 입력이다. 배열 순서, 공백·줄바꿈, Unicode 조합, caption 생략과 빈 문자열은 서로 다른 입력이다.
+trim·Unicode normalize·태그 정렬을 하지 않는다. 짝 없는 surrogate와 unknown 필드는 해시 전에 거절한다.
+requestHash는 snapshotHash·payloadFingerprint와 다른 값이며 compiler나 snapshot을 호출하지 않는다.
+같은 생성 키의 다른 requestHash 또는 같은 전송 키의 다른 requestId·requestHash는 `CONTENT_DRAFT_CONFLICT`다.
+권한을 확인한 뒤 현재 원고가 유효하면 typed currentRevision을 주고, 본문·최초 hash·기존 요청 인자는 내보내지 않는다.
+만료·STALE·purge 판정은 아래 재시도 응답 순서가 먼저이며, 사용할 수 없는 본문을 충돌 응답에 붙이지 않는다.
+
+#### 영속 대응과 트랜잭션
+
+새 `content_draft_creation_request`는 생성 키·생성 식별 고정 키 각각 UNIQUE, 검증된 범위·requestId·최초 requestHash·draft 공개 UUID·CREATED/GONE 상태·생성 시각을 저장한다.
+새 `content_draft_creation_call`은 전송 키·전송 식별 고정 키 각각 UNIQUE와 검증된 session/tool_call_id의 정확한 대응, 생성 요청 행 참조를 저장한다.
+본문·title·revision 본문·암호화 key·서명·토큰은 두 표에 복사하지 않는다. 세부 FK와 CHECK는 새 Flyway 파일로 추가하고 기존 적용 migration은 고치지 않는다.
+생성 요청의 draft 참조는 삭제 cascade를 걸지 않는다. purge 뒤에도 tombstone을 남길 수 있도록 nullable 참조나 공개 UUID를 사용한다.
+사용자·대화·실행 식별자는 대응 확인용이며 삭제 cascade로 tombstone을 지우지 않는다. 두 표는 원고 전용이고 일반 chat 표를 변경하지 않는다.
+
+기존 `ContentDraftService.create`를 호출한 뒤 대응 행을 저장하면 원고 commit 뒤 장애로 중복이 생긴다.
+MCP용 `createIdempotent`와 검증된 호출 범위 타입을 추가하고 기존 create의 저장 부분만 같은 서비스 안에서 재사용한다.
+트랜잭션 밖의 guard·입력 검증 뒤 `ChatContentMutationCoordinator.run`으로 들어간다.
+사용자→대화→첨부 ID 오름차순 잠금 뒤 생성 요청→전송 대응 순서로 조회·저장한다. 같은 사용자의 생성·CAS·삭제·expire·purge는 기존 잠금으로 직렬화한다.
+잠금 안에서 requireWritable을 다시 확인하고 두 식별 고정 키와 생성·전송 키를 조회한다. 고정 키의 origin·루트 불일치는 본문 없이 먼저 거절한다.
+권한과 범위가 맞는 대응의 본문 충돌을 판정하기 전에 현재 원고의 접근·만료·참조 상태도 확인한다.
+대응이 없을 때만 서버 UUID·revision 1을 만들고 원본·관찰 검사와 암호화를 수행한다.
+원고·revision·asset·생성 요청·전송 대응은 한 TX로 커밋한다. save 실패·unique 위반·암호화 실패는 모두 rollback하여 원고만 남거나 키만 소비되지 않는다.
+DB UNIQUE는 여러 프로세스에서도 최종 장벽이다. unique 예외를 삼켜 rollback-only TX 안에서 성공 결과를 읽지 않는다.
+경합 패자는 TX 종료 뒤 새 coordinator TX에서 현재 권한과 대응을 다시 검사한다. 최대 한 번 재조회하고 미확정이면 UNAVAILABLE로 응답하며 새 원고를 만들지 않는다.
+대응이 있으면 원본 재분석·새 암호화·신규 revision 없이 그 draft의 현재 revision을 읽는다. 새 tool_call_id의 전송 대응도 같은 잠금·TX에서 추가한다.
+응답 직전 read의 권한·참조·Clock 검사와 MCP 사후 guard를 수행한다. 응답 캐시로 최초 본문을 재전달하지 않는다.
+
+#### 재시도 응답과 삭제 장벽
+
+| 현재 상태 | 같은 생성 요청의 결과 |
+| --- | --- |
+| 현재 권한 있고 원고 유효 | 같은 draftId와 현재 revision의 ContentDraftView. revision 1 저장 뒤 CAS로 2가 됐으면 2 반환 |
+| 같은 요청의 본문·전송 대응 충돌 | CONTENT_DRAFT_CONFLICT와 유효한 현재 currentRevision. 신규 원고·revision 0개 |
+| 참조 삭제·변경·만료 | CONTENT_DRAFT_STALE와 currentRevision, 본문 없음. 대응을 유지하여 같은 요청으로 재생성 금지 |
+| 원고 expiresAt 도달 또는 GONE tombstone | CONTENT_DRAFT_GONE, 본문·currentRevision 없음. UUID·만료 연장·재생성 없음 |
+| 삭제 대화·purge·다른 주인 | 기존 CONVERSATION_NOT_FOUND. tombstone보다 권한 판정이 먼저이며 본문·revision 없음 |
+| 취소·권한 철회·agent/profile 변경·session 불일치 | 기존 MCP_CALL_CONTEXT_INVALID 또는 토큰 인증의 401. 대응 행이 있어도 우회하지 않음 |
+| 일시 key·복호화 장애 | CONTENT_DRAFT_UNAVAILABLE. 대응과 기존 본문 보존, 같은 키로 다시 조회 가능 |
+
+사후 guard 실패는 커밋된 행과 대응을 되돌리지 않는다. 현재 권한이 다시 유효해져 같은 범위의 요청이 들어오면 같은 원고를 읽는다.
+등록이 없는 끝난 최상위 실행을 대응 행만으로 복원하거나 다른 turn의 RUNNING 실행에 옮기지 않는다.
+수정은 기존 expectedRevision CAS다. 생성 재시도의 최초 입력은 현재 수정 본문과 달라도 최초 requestHash와 비교하며 수정 내용을 덮어쓰지 않는다.
+무효화·자체 만료·purge와 대응 정리는 같은 coordinator 잠금에 참가한다. expiresAt을 새로 늘리지 않는다.
+자체 만료나 draft 물리 삭제는 GONE tombstone으로 바꾸고 requestHash·draft 참조를 지워도 생성 키·전송 대응은 남긴다. 대화 purge도 본문과 FK 자식보다 앞서 이 상태를 커밋한다.
+STALE은 기존 원고 식별과 최초 requestHash를 유지한다. 기존 CAS로 유효한 새 revision을 만들면 같은 생성 요청은 그 현재 revision을 반환할 수 있다.
+원고의 30일 보관 기간이나 임의 재시도 보관 기간으로 대응 행을 삭제하지 않는다. 완료된 origin의 등록된 child가 계속 호출할 수 있기 때문이다.
+tombstone은 두 식별 고정 키와 정확한 범위 대응을 포함한 본문 없는 최소 식별 정보로 기한 없이 보존한다. 보존 기간 단축은 모든 관련 session·origin 권한의 영구 종료와 식별자 재사용 금지를 증명한 별도 변경에서 다룬다.
+로그·사건·오류·진단에는 본문과 requestHash·키·session 식별자·서명을 싣지 않는다. 중복 원고 0개와 본문 없는 오류 종류·크기·파트 수만 관측한다.
 
 ### 원고 서비스 배치
 
@@ -306,9 +468,9 @@ Alpine 위험 수용, 원본 파일 순서 실증의 미완료 상태, 실제 �
 | 같은 expectedRevision의 두 요청 | 성공 1회, 충돌 1회, currentRevision 일치 |
 | 다른 사용자·대화·미전송 첨부·교차 관찰 | 본문 없이 거절, 신규 revision 0개 |
 | 삭제 사전 커밋 뒤 파일 삭제 장벽·실패·재시작 | 생성·CAS·현재/이전 본문 차단, body/key 모두 null |
-| 만료·purge·암호화 실패 | 만료 즉시 차단, purge 자식 0개, 실패 시 쓰기 전체 rollback |
+| 만료·purge·암호화 실패 | 만료 즉시 차단, purge 원고·revision·asset 0개와 생성 tombstone 유지, 실패 시 쓰기 전체 rollback |
 | 실제 REST | 내부 경로·storedName·원문 오류 미노출, typed currentRevision |
-| 후속 MCP·실행 사건 | origin 실행 재검사, 도구 사건 본문 없음 |
+| MCP·실행 사건 | origin 실행 재검사, 도구 사건 본문 없음 |
 | H2·Flyway MySQL 8.4 | CHECK와 FK 유효, CAS 경쟁·삭제 실제 갱신·새 저장소 SQL 실행 |
 
 운영 계정의 새 표 권한과 배포 뒤 실제 MCP 왕복은 `fos-home-infra`에서 확인한다.

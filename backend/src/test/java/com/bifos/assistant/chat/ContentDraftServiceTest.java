@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat;
 
+import com.bifos.assistant.chat.infra.ContentDraftCreationCallRepository;
+import com.bifos.assistant.chat.infra.ContentDraftCreationRequestRepository;
 import tools.jackson.databind.node.ObjectNode;
 import com.bifos.assistant.chat.application.ConversationPurger;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -318,7 +320,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         var id = drafts.create(owner, conversation.id(), inputDraft("첫", false)).draft().draftId();
         var broken = fail(ContentDraftRevisionRepository.class, revisionRows, "saveAndFlush", 1);
         var failing = new ContentDraftService(access, messages, mutations, draftRows, broken, assetRows,
-            new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock);
+            new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock, creationRequests, creationCalls);
         assertThatThrownBy(() -> failing.revise(owner, conversation.id(), id, 1, inputDraft("새", false)))
             .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(draftRows.findAll().getFirst().currentRevision()).isEqualTo(1);
@@ -364,7 +366,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
     @DisplayName("커밋 뒤 경쟁 수정이 끝나도 생성과 수정은 이번 수락 판을 응답한다")
     void returnsAcceptedRevisionWhenAnotherCasCommitsBeforeResponseRead() {
         var racing = new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows,
-            new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock) {
+            new ContentDraftReferences(attachments, store, observations, bodies, clock, json), draftBodies, reader, json, clock, creationRequests, creationCalls) {
             @Override
             public ContentDraftView read(CurrentUser user, Long conversationId, UUID id, Long revision) {
                 long current = draftRows.findByPublicIdAndConversationIdAndOwnerUserId(id.toString(), conversationId, user.id())
@@ -389,6 +391,10 @@ abstract class ContentDraftFixture extends ObservationFixture {
     @Autowired
     ContentDraftService drafts;
     @Autowired
+    ContentDraftCreationRequestRepository creationRequests;
+    @Autowired
+    ContentDraftCreationCallRepository creationCalls;
+    @Autowired
     ContentDraftRepository draftRows;
     @Autowired
     ContentDraftRevisionRepository revisionRows;
@@ -408,6 +414,8 @@ abstract class ContentDraftFixture extends ObservationFixture {
 
     @AfterEach
     void removeDrafts() {
+        creationCalls.deleteAll();
+        creationRequests.deleteAll();
         assetRows.deleteAll();
         revisionRows.deleteAll();
         draftRows.deleteAll();
@@ -415,7 +423,7 @@ abstract class ContentDraftFixture extends ObservationFixture {
 
 
     ContentDraftService localDrafts(ContentDraftReferences refs, ContentDraftBodies localBodies) {
-        return new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows, refs, localBodies, reader, json, clock);
+        return new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows, refs, localBodies, reader, json, clock, creationRequests, creationCalls);
     }
 
 
