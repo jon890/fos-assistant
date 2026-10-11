@@ -1,4 +1,4 @@
-package com.bifos.assistant.crypto.domain;
+package com.bifos.assistant.crypto.domain.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,7 +44,9 @@ public class UserDataKey {
     @Column(name = "rewrapped_at")
     private Instant rewrappedAt;
 
+
     protected UserDataKey() {}
+
 
     private UserDataKey(Long userId, String kekId, String wrappedKey, Instant now) {
         this.userId = userId;
@@ -53,14 +55,17 @@ public class UserDataKey {
         this.createdAt = now;
     }
 
+
     public static UserDataKey wrapped(Long userId, String kekId, String wrappedKey, Instant now) {
         return new UserDataKey(userId, kekId, wrappedKey, now);
     }
+
 
     /** 감싸기 AAD. 감싼 key 를 다른 사용자의 줄로 옮기면 풀리지 않는다 */
     public static byte[] wrapBinding(Long userId) {
         return ("user_data_key:user:" + userId).getBytes(StandardCharsets.UTF_8);
     }
+
 
     public void rewrap(String kekId, String wrappedKey, Instant now) {
         this.kekId = kekId;

@@ -5,8 +5,8 @@
   "scripts": {
     "build": "bun run scripts/build.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test ./src ./tests ./scripts",
-    "check:bundle": "bun run scripts/check-bundle.ts"
+    "test": "bun run build && bun test ./src ./tests ./scripts",
+    "check:bundle": "bun run build && bun run scripts/check-bundle.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.28.0",
