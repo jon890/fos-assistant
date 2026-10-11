@@ -16,7 +16,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** H2で見た検索の意味とSQL投影をFlywayの実際のMySQLスキーマでも確認する。 */
+/** H2에서 확인한 검색 동작과 SQL 투영을 Flyway로 만든 실제 MySQL 스키마에서도 확인한다. */
 @Tag("mysql")
 class MemorySearchMysqlTest extends MemorySearchTest {
     @DynamicPropertySource
