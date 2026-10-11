@@ -454,9 +454,12 @@ for (const [, name, segment] of cases) {
     const fake = new FakeToss(allowed);
     try {
       const wire = example(segment);
-      wire.result.records = Array.from({ length: 100 }, () =>
-        structuredClone(wire.result.records.at(-1)),
-      );
+      wire.result.records = Array.from({ length: 100 }, (_, index) => ({
+        ...structuredClone(wire.result.records.at(-1)),
+        date: new Date(Date.UTC(2026, 6, 17 - index))
+          .toISOString()
+          .slice(0, 10),
+      }));
       const expected = structuredClone(wire.result);
       // 공식 필드 사이의 비공식 키와 그 안의 객체·배열에 합성 민감값을 끼운다.
       const inject = (value: any) => {

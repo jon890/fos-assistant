@@ -37,6 +37,11 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_sellable_quantity` | `GET /api/v1/sellable-quantity` | 종목 하나의 매도 가능 수량을 읽는다 |
 | `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
 | `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다 |
+| `get_stock_investor_trading` | `GET /api/v1/stocks/{symbol}/investor-trading` | 투자자별 매매와 외국인 보유, CFD를 읽는다 |
+| `get_stock_program_trades` | `GET /api/v1/stocks/{symbol}/program-trades` | KRX 프로그램 매매를 읽는다 |
+| `get_stock_short_selling` | `GET /api/v1/stocks/{symbol}/short-selling` | 공매도 수량과 금액, 비중을 읽는다 |
+| `get_stock_credit_trades` | `GET /api/v1/stocks/{symbol}/credit-trades` | 개인 신용거래를 읽는다 |
+| `get_stock_securities_lending` | `GET /api/v1/stocks/{symbol}/securities-lending` | 기관 대차거래를 읽는다 |
 
 계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
 
@@ -66,6 +71,27 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
 | `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
 | `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
+
+### 국내 종목 통계
+
+5개 통계 도구는 `symbol`을 필수로 받고 `count`는 기본 10, 최대 100이다.
+예를 들어 `get_stock_investor_trading`에 `{"symbol":"005930","count":100,"until":"2026-07-17"}`을 넣는다.
+`until`은 해당 날짜를 포함한다. 다음 페이지에는 `result.nextUntil`을 그대로 넣고 null이거나 없으면 끝낸다.
+응답은 `{result: {records, nextUntil?}, metadata: {}}`이며 한 페이지의 전체 행과 순서를 보존한다.
+symbol은 영문·숫자·점·하이픈을 받지만 통계는 KR 전용이다. 미국 종목의 `unsupported-market`는 `TOSSINVEST_INVALID_INPUT`으로 알린다.
+모델의 계좌, token, URL과 추가 인자는 인증 전에 거절한다. 통계 GET에는 연결 계좌 헤더도 보내지 않는다.
+공식 필드만 재귀적으로 반환하고 중첩 객체·배열의 비공식 확장키를 제거한다. decimal 문자열, null과 선택 필드의 부재는 그대로 둔다.
+
+| 통계 | 단위와 집계 범위 | 반영 시점과 해석 |
+| --- | --- | --- |
+| 투자자별 매매 | KRX·NXT 합계 수량(주), 기관 7개 분류·등록외국인·보유·CFD. 보유와 CFD 비중은 소수 비율 | 장중 잠정치에는 개인·기관 세부·기타법인·보유·CFD가 null일 수 있다. 당일 저녁 확정치, CFD 다음 영업일 새벽, 보유 다음 영업일 오전 재갱신을 구분한다. updatedAt은 기록 전체의 마지막 갱신이다 |
+| 프로그램 | KRX 거래량(주), 차익 arbitrage·비차익 nonArbitrage. NXT 제외 | 당일 값은 장 종료 전 바뀔 수 있다. 거래대금·updatedAt은 없다 |
+| 공매도 | 수량(주), 금액(KRW), 소수 비율 | 당일 저녁 확정치. 비중의 분모는 정규장 외 세션을 포함한 누적 값이며 부재는 null, 0은 문자열 0이다 |
+| 신용 | 자기신용·유통금융 합계 수량(주), balanceRate·tradingRate는 소수 비율 | marginLoan·stockLoan은 각각 nullable 객체다. 다음 영업일 새벽에 전 영업일 값이 반영된다. 개인 신용대주다 |
+| 대차 | 기관 대여·차입의 체결·상환·잔고 수량(주), 잔고 금액(KRW) | 당일 저녁 확정치. 개인 신용대주와 구분한다 |
+
+음수 순매수는 순매도다. 비율을 백분율로 바꾸거나 장중 값을 확정치로 말하지 않는다.
+5개는 `STOCK_TRADING_TREND` 그룹의 초당 10회 한도를 공유하며 최소 호출 간격은 100ms다. AUTH는 별도 초당 5회다.
 
 ### 토큰
 
@@ -111,8 +137,8 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 ## 서버와 검사
 
 `src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
-공식 JSON fixture의 41 operation과 실제 등록 8개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
-대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 여섯 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
+공식 JSON fixture의 41 operation과 실제 등록 13개 operation(인증 1개·조회 12개)을 구분한다. 미구현은 28개다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 통계 연결은 독립 리뷰와 CI 판정 대기다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
+대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 11개 도구가 부르는 `GET`과 `POST /oauth2/token`뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
 
 ## 보안
 

@@ -435,7 +435,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 source에 연결한 11개 READ 도구가 인증·조회 13개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 28개 operation의 producer는 아직 구현하지 않았다. 통계 5개의 연결은 독립 리뷰와 CI 판정 대기다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
@@ -449,7 +449,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 13개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
@@ -499,11 +499,11 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getStocks` | `get_stocks` | READ/none; STOCK | get_quotes 구현; get_stocks 미등록 | 종목 |
 | `listStocks` | `list_stocks` | READ/none; STOCK_ALL | 미연결 | 종목 |
 | `getStockWarnings` | `get_stock_warnings` | READ/none; STOCK | 미연결 | 종목 |
-| `getStockInvestorTrading` | `get_stock_investor_trading` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockProgramTrades` | `get_stock_program_trades` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockShortSelling` | `get_stock_short_selling` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockCreditTrades` | `get_stock_credit_trades` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockSecuritiesLending` | `get_stock_securities_lending` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
+| `getStockInvestorTrading` | `get_stock_investor_trading` | READ/none; STOCK_TRADING_TREND | 연결·검토 대기 | 종목 |
+| `getStockProgramTrades` | `get_stock_program_trades` | READ/none; STOCK_TRADING_TREND | 연결·검토 대기 | 종목 |
+| `getStockShortSelling` | `get_stock_short_selling` | READ/none; STOCK_TRADING_TREND | 연결·검토 대기 | 종목 |
+| `getStockCreditTrades` | `get_stock_credit_trades` | READ/none; STOCK_TRADING_TREND | 연결·검토 대기 | 종목 |
+| `getStockSecuritiesLending` | `get_stock_securities_lending` | READ/none; STOCK_TRADING_TREND | 연결·검토 대기 | 종목 |
 | `getExchangeRate` | `get_exchange_rate` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
 | `getKrMarketCalendar` | `get_market_calendar(market=KR)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
 | `getUsMarketCalendar` | `get_market_calendar(market=US)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
@@ -531,6 +531,29 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getBuyingPower` | `get_buying_power` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
 | `getSellableQuantity` | `get_sellable_quantity` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
 | `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 미연결 | 일반주문 |
+
+### 국내 종목 통계 계약
+
+통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.
+모두 schema 2의 READ/none이고 금융 승인 정책은 바꾸지 않는다. 연결 계좌 헤더도 통계 GET에 보내지 않는다.
+`symbol`은 공식 영문·숫자·점·하이픈 pattern을 유지하되 `.`과 `..` 및 URL segment 주입은 인증 전에 거절한다.
+caller의 계좌, token, URL과 추가 인자도 HTTP 0회로 거절한다. 통계는 KR 전용이며 미국 종목의 unsupported-market는 `TOSSINVEST_INVALID_INPUT`이다.
+`count`는 기본 10, 1~100의 정수이며 `until`은 실제 날짜(YYYY-MM-DD)다. until은 해당 날짜를 포함한다.
+응답 `{result: {records, nextUntil?}, metadata: {}}`의 모든 행과 배열 순서를 보존한다. 다음 페이지에는 nextUntil을 그대로 넣고 null이거나 없으면 끝낸다.
+검증된 응답을 공용 `officialFields`로 투영해 공식 필드만 재귀적으로 남긴다. 중첩 객체·배열의 민감 확장키를 제거하고 decimal 문자열, null과 선택 필드의 부재를 보존한다.
+잘못된 행은 일부 성공으로 삭제하지 않고 전체 응답 오류로 끝낸다. 자동 페이지 합치기나 수치 변환은 없다.
+
+| 통계 | 집계·단위 | 값의 시점 |
+| --- | --- | --- |
+| 투자자별 매매 | KRX·NXT 거래량(주), 기관 7개 분류·등록외국인·외국인 보유·CFD. 보유·CFD 비중은 소수 비율 | 장중 잠정치의 개인·기관 세부·기타법인·보유·CFD는 null일 수 있다. 당일 저녁 확정치, CFD 다음 영업일 새벽, 보유 다음 영업일 오전 재갱신을 구분한다. updatedAt은 기록 전체의 마지막 갱신이다 |
+| 프로그램 | KRX 거래량(주), 차익 arbitrage·비차익 nonArbitrage. NXT 제외 | 당일 값은 장 종료 전 바뀔 수 있다. 거래대금·updatedAt은 없다 |
+| 공매도 | 수량(주), 거래대금(KRW), 소수 비율 | 당일 저녁 확정치. 정규장 외 세션을 포함한 누적 분모의 부재는 null, 0은 문자열 0이다 |
+| 신용 | 자기신용·유통금융 합계 수량(주), balanceRate·tradingRate는 소수 비율. marginLoan·stockLoan은 nullable 객체 | 다음 영업일 새벽에 전 영업일 값이 반영된다. 개인 신용대주다 |
+| 대차 | 기관 대여·차입의 체결·상환·잔고 수량(주), 잔고 금액(KRW) | 당일 저녁 확정치. 개인 신용대주와 구분한다 |
+
+음수 순매수는 순매도이며 비율을 백분율로 바꾸지 않는다. 장중 확정치나 모든 시장 지원을 보장하지 않는다.
+5개 operation은 STOCK_TRADING_TREND 초당 10회와 최소 100ms 간격을 공유한다. AUTH 초당 5회는 별도다.
+모듈 시험과 production SDK·standalone stdio 시험은 loopback에서 GET 목적지, 빈 body, 인증 POST와 금융 POST·DELETE 0회를 각각 확인한다. 실제 credentials·계좌·거래와 배포는 이 검사의 범위 밖이다.
 
 ### 필드 계약
 

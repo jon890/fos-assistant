@@ -171,10 +171,10 @@ test("공식 41 operation의 method/path/group과 SHA-256이 일치하고 미구
     41,
   );
   expect(new Set(OPERATIONS.map((op) => op.group)).size).toBe(19);
-  expect(CURRENT_OPERATIONS.size).toBe(8);
+  expect(CURRENT_OPERATIONS.size).toBe(13);
   expect(
     OPERATIONS.filter((op) => !CURRENT_OPERATIONS.has(op.id)),
-  ).toHaveLength(33);
+  ).toHaveLength(28);
 });
 
 test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => {
@@ -196,7 +196,7 @@ test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => 
   ).toBe(false);
 });
 
-test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는 없다", async () => {
+test("실제 SDK 도구 호출로 현재 13 operation에 도달하고 GET body는 없다", async () => {
   const allowed = new Set([
     "issueOAuth2Token",
     "getAccounts",
@@ -206,8 +206,23 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
     "getBuyingPower",
     "getSellableQuantity",
     "getOrders",
+    "getStockInvestorTrading",
+    "getStockProgramTrades",
+    "getStockShortSelling",
+    "getStockCreditTrades",
+    "getStockSecuritiesLending",
   ]);
   const fake = new FakeToss(allowed);
+  for (const segment of [
+    "investor-trading",
+    "program-trades",
+    "short-selling",
+    "credit-trades",
+    "securities-lending",
+  ])
+    fake.on("GET", `/api/v1/stocks/005930/${segment}`, {
+      result: { records: [], nextUntil: null },
+    });
   for (const [path, result] of Object.entries({
     accounts: [],
     prices: [],
@@ -231,6 +246,11 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
           ["get_holdings", {}],
           ["get_buying_power", { currency: "KRW", symbol: "AAPL" }],
           ["list_orders", { status: "OPEN" }],
+          ["get_stock_investor_trading", { symbol: "005930" }],
+          ["get_stock_program_trades", { symbol: "005930" }],
+          ["get_stock_short_selling", { symbol: "005930" }],
+          ["get_stock_credit_trades", { symbol: "005930" }],
+          ["get_stock_securities_lending", { symbol: "005930" }],
         ] as const)
           expect(
             (await tool(client, name, args)).result.isError,
@@ -248,16 +268,17 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
         ),
       ),
     ).toEqual(allowed);
-    expect(fake.requests).toHaveLength(8);
+    expect(fake.requests).toHaveLength(13);
     for (const request of fake.seen("GET")) {
       expect(request.body).toBe("");
       expect(request.headers.get("authorization")).toBe(
         "Bearer fake-access-token-1",
       );
       expect(request.headers.get("x-tossinvest-account")).toBe(
-        ["accounts", "prices", "stocks"].some((path) =>
-          request.path.endsWith(`/${path}`),
-        )
+        request.path.startsWith("/api/v1/stocks/") ||
+          ["accounts", "prices", "stocks"].some((path) =>
+            request.path.endsWith(`/${path}`),
+          )
           ? null
           : "7",
       );
