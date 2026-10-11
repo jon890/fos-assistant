@@ -130,7 +130,6 @@ get_order는 list_orders의 페이지와 별개로 주문 하나를 반환한다
 시장 일정은 API가 반환한 3영업일 정보 그대로다. 모든 응답 시각은 KST(+09:00)이며 날짜를 계산하거나 세션을 합치지 않는다. 국내는 KRX+NXT 통합 세션이고 장전·장후 시간외종가는 제외된다. 미국은 `dayMarket`, `preMarket`, `regularMarket`, `afterMarket`을 각각 보존한다. 휴장과 부분 휴장의 null도 바꾸지 않는다.
 세 조회는 `MARKET_INFO` 그룹의 공용 큐를 사용하며 최소 간격은 334ms다. 두 도구의 metadata는 현재 빈 객체다. 인자 검증은 HTTP 전송 전에 끝나며 같은 통화 쌍, 실제로 없는 날짜, 초를 생략하거나 시간대가 없는 시각과 추가 인자를 거절한다.
 
-도구 설명은 MCP SDK의 `tools/list`에 등록한다. 이번 통합에서는 manifest에 시세와 시장 정보 도구를 함께 등록하며 도구별 `description`은 추가하지 않는다. manifest 설명 통합은 운영 reader 배포를 확인한 뒤 별도 변경으로 진행한다.
 `connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 현재 `execution_guard`가 없고 해시 값은 null이며 조회 도구 33개의 승인 정책은 `none`이다. 금융 승인 ticket도 없으므로 이번 변경으로 무효화되는 ticket은 없다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 조회 도구는 `READ`로 선언하며 금융 쓰기 권한을 열지 않는다.
 
 ### 섹터 조회
