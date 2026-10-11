@@ -552,7 +552,12 @@ for (const viewport of [
           { ...tool("write_one", "WRITE"), description },
           { ...tool("old_one", "READ"), approval: "NONE", grant: false },
           { ...tool("bad_one", "WRITE"), description: "글\u202e" },
-          { ...tool("empty_one", "READ"), approval: "NONE", grant: false, description: " " },
+          {
+            ...tool("empty_one", "READ"),
+            approval: "NONE",
+            grant: false,
+            description: " ",
+          },
         ],
       }),
     ]);
