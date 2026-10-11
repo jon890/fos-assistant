@@ -310,6 +310,25 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
 
 
     @Test
+    @DisplayName("시도 UUID와 연결 상태가 같아도 연결 revision만 달라지면 결과를 버린다")
+    void discardsResultWhenOnlyConnectionRevisionChanges() throws Exception {
+        Target target = readyTarget();
+        ConnectorBindingAttempt attempt = capture(target);
+        transactions.executeWithoutResult(status -> {
+            users.findByIdForUpdate(target.owner().id()).orElseThrow();
+            jdbc.update("UPDATE connector_connection SET updated_at = ? WHERE id = ?",
+                java.sql.Timestamp.from(attempt.connectionRevision().plusSeconds(1)), attempt.connectionId());
+        });
+        Observed changed = observe(target.bindingId());
+        assertThat(changed.attempt()).isEqualTo(attempt.attemptId());
+        assertThat(changed.revision()).isAfter(attempt.connectionRevision());
+        assertThat(connections.findById(attempt.connectionId()).orElseThrow().status()).isEqualTo(attempt.connectionStatus());
+        assertThat(attempts.complete(attempt, READY)).isEmpty();
+        assertThat(observe(target.bindingId())).isEqualTo(changed);
+    }
+
+
+    @Test
     @DisplayName("결과 저장 트랜잭션이 실패하면 시작의 PENDING과 시도가 남고 다음 연결 확인이 복구한다")
     void preservesPendingAfterResultCommitFails() throws Exception {
         Target target = readyTarget();
