@@ -23,6 +23,8 @@ import { registerIndicatorTools } from "./indicator-tools.ts";
 
 import { registerOrderReadTools } from "./order-read-tools.ts";
 
+import { registerStockStatisticsTools } from "./stock-statistics-tools.ts";
+
 export { isSupportedBunVersion } from "./runtime.ts";
 export type { TossinvestOptions } from "./client.ts";
 
@@ -40,6 +42,7 @@ export function createTossinvestServer(options: TossinvestOptions = {}) {
   registerRankingTools(register, client);
   registerIndicatorTools(register, client);
   registerOrderReadTools(register, client);
+  registerStockStatisticsTools(register, client);
   return server;
 }
 

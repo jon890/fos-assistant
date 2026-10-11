@@ -64,7 +64,12 @@
     "get_market_indicator_candles": {"risk": "READ"},
     "get_market_indicator_investor_trading": {"risk": "READ"},
     "get_order": {"risk": "READ", "approval": "none"},
-    "get_commissions": {"risk": "READ", "approval": "none"}
+    "get_commissions": {"risk": "READ", "approval": "none"},
+    "get_stock_investor_trading": {"risk": "READ", "approval": "none"},
+    "get_stock_program_trades": {"risk": "READ", "approval": "none"},
+    "get_stock_short_selling": {"risk": "READ", "approval": "none"},
+    "get_stock_credit_trades": {"risk": "READ", "approval": "none"},
+    "get_stock_securities_lending": {"risk": "READ", "approval": "none"}
   },
   "errors": {
     "TOSSINVEST_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },

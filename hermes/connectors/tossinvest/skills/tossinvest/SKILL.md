@@ -72,3 +72,22 @@ description: 토스증권 계좌와 시세, 섹터를 읽는다. 주문하지 �
 before는 offset 포함 ISO 시각, until은 해당 날짜를 포함하는 YYYY-MM-DD 상한이며 생략하면 최신부터 읽는다. nextBefore/nextUntil은 선택 필드다. null은 마지막 페이지지만 필드 부재를 null로 바꾸거나 마지막으로 단정하지 않는다.
 
 네 도구는 READ이며 승인이 없다. 계좌·token·URL은 인자로 보내지 않는다. 주문이나 WebSocket 도구는 제공하지 않는다.
+
+## 국내 종목 통계
+
+아래 5개 도구는 KR 전용이다. `symbol`은 영문·숫자·점·하이픈을 받으며 코드 모양으로 시장을 추측하지 않는다.
+`count`는 기본 10, 최대 100이다. `until`(YYYY-MM-DD)은 그 날짜를 포함한다.
+예: `get_stock_short_selling`에 `{"symbol":"005930","count":10,"until":"2026-07-17"}`을 넣는다.
+한 페이지의 `result.records` 전체를 읽고 다음 페이지에는 `result.nextUntil`을 그대로 넣는다. null이거나 없으면 끝이다.
+계좌, token, URL과 추가 인자는 넣지 않는다. 미국 종목의 unsupported-market는 `TOSSINVEST_INVALID_INPUT`이다.
+
+- `get_stock_investor_trading`: KRX·NXT 합계 거래량(주), 기관 7개 분류·등록외국인·외국인 보유·CFD를 읽는다. 보유와 CFD 비중은 소수 비율이다.
+  장중 잠정치의 개인·기관 세부·기타법인·보유·CFD는 null일 수 있다. 당일 저녁 확정치와 CFD 다음 영업일 새벽, 보유 다음 영업일 오전 재갱신을 구분한다. updatedAt은 기록 전체의 마지막 갱신이다
+- `get_stock_program_trades`: KRX 거래량(주)만 읽는다. NXT는 제외한다. 차익 arbitrage·비차익 nonArbitrage를 구분한다. 당일 값은 장 종료 전 바뀔 수 있고 거래대금·updatedAt은 없다
+- `get_stock_short_selling`: 거래량(주), 거래대금(KRW), 소수 비율을 읽는다. 정규장 외 세션을 포함한 누적 분모가 없으면 비중은 null, 분모가 0이면 문자열 0이다. 당일 저녁 확정치다
+- `get_stock_credit_trades`: 자기신용·유통금융 합계의 개인 신용거래다. marginLoan·stockLoan은 각각 null일 수 있다. 수량은 주, balanceRate·tradingRate는 소수 비율이다. 다음 영업일 새벽에 전 영업일 값이 반영된다
+- `get_stock_securities_lending`: 기관 대여·차입의 체결·상환·잔고 수량(주), 잔고 금액(KRW)을 읽는다. 개인 신용대주와 구분한다. 당일 저녁 확정치다
+
+음수 순매수는 순매도다. decimal 문자열과 null, 선택 필드의 부재를 바꾸지 않고 장중 값을 확정치로 말하지 않는다.
+5개 통계는 초당 10회와 최소 100ms 간격을 공유한다. 인증은 별도 초당 5회다.
+
