@@ -152,6 +152,7 @@ class MemoryCollectionAuditingPlacementTest {
             .containsExactlyInAnyOrderElementsOf(expectedDetails(change));
     }
 
+
     private static List<String> expectedDetails(String change) {
         String counts = "MemoryCollection / JpaAuditingConfig / auditingDateTimeProvider 선택 수는 각각 1: ";
         return switch (change) {

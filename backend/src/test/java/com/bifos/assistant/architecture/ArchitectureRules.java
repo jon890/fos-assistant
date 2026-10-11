@@ -138,7 +138,7 @@ public final class ArchitectureRules {
                 }
                 if (!collection) {
                     require(type, !type.isAnnotatedWith(EntityListeners.class)
-                        || Arrays.stream((JavaClass[]) type.getAnnotationOfType(EntityListeners.class.getName())
+                        || Arrays.stream((JavaClass[])type.getAnnotationOfType(EntityListeners.class.getName())
                             .getProperties().get("value"))
                             .noneMatch(listener -> listener.isEquivalentTo(AuditingEntityListener.class)),
                         "허용하지 않은 AuditingEntityListener 선언", events);
