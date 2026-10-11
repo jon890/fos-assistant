@@ -177,16 +177,24 @@ test.describe("스킬을 올린 에이전트", () => {
   });
 });
 
-test("스트림 없이 보내도 없는 이름을 같은 문구로 입력창 아래에 알린다", async ({ page }) => {
-  // 스트림 경로가 없는 것처럼 404 를 돌려 `/api/chat` 으로 되돌아가게 한다. 거절은 실제 Control Plane 이 한다.
+test("스트림 경로 거절은 비스트림으로 다시 보내지 않고 글을 남긴다", async ({ page }) => {
+  let fallbackPosts = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/chat" && request.method() === "POST") fallbackPosts++;
+  });
+  // 상태 번호만으로 수락 전 실패를 증명하지 못하므로 별도 송신을 하지 않는다.
   await page.route("**/api/chat/stream", (route) =>
-    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ code: "NOT_FOUND", message: "" }) }));
+    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ code: "NOT_FOUND", message: "응답 연결을 열지 못했어요." }) }));
   await page.goto("/");
   const input = composer(page);
   await input.fill("/nope 해 줘");
   await input.press("Enter");
-  await expect(page.getByTestId("skill-command-notice")).toHaveText("/nope 스킬이 이 에이전트에 없어요");
+  await expect(page.getByText("응답 연결을 열지 못했어요.")).toBeVisible();
+  await expect(page.getByTestId("skill-command-notice")).toHaveCount(0);
   await expect(input).toHaveValue("/nope 해 줘");
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+  await expect(page.getByTestId("assistant-message")).toHaveCount(0);
+  expect(fallbackPosts).toBe(0);
 });
 
 test("스트림이 HTTP 오류로 거절해도 없는 이름을 같은 문구로 입력창 아래에 알린다", async ({ page }) => {

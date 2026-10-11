@@ -39,8 +39,6 @@ export type Props = Pick<
   | "outgoing"
   | "setOutgoing"
   | "setDraft"
-  | "conversationIdRef"
-  | "refresh"
   | "executionId"
   | "stopRequested"
   | "setComposerBlocking"
@@ -60,7 +58,7 @@ export type Props = Pick<
     | "onRetryAgents"
     | "onAgentCodeChange"
   > &
-  Pick<ConversationHistory, "assignConversationId"> &
+  Pick<ConversationHistory, "ensureConversation"> &
   Pick<
     ConversationQueue,
     "submit" | "cancelPendingMessage" | "releasePendingMessages"

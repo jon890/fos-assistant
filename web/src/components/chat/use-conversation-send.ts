@@ -3,7 +3,7 @@
 import { describeError } from "@/components/error-message";
 import { parseSkillCommand } from "./skill-command";
 import { emptyActivity, failActivity } from "./activity/activity-state";
-import { sendChatMessage, startChatStream } from "@/lib/chat-api";
+import { startChatStream } from "@/lib/chat-api";
 import {
   TurnStreamState,
   ErrorPayload,
@@ -47,7 +47,10 @@ type Context = Pick<
   Pick<ConversationSessionProps, "conversationId" | "agentCode"> &
   Pick<
     ConversationHistory,
-    "refreshMessages" | "settleInterruptedStream" | "assignConversationId"
+    | "refreshMessages"
+    | "settleInterruptedStream"
+    | "assignConversationId"
+    | "ensureConversation"
   > &
   Pick<ConversationQueue, "queueMessage"> &
   Pick<ConversationEvents, "consumeTurnStream" | "finishSentTurn">;
@@ -80,6 +83,7 @@ export function useConversationSend({
   settleInterruptedStream,
   queueMessage,
   assignConversationId,
+  ensureConversation,
   consumeTurnStream,
   finishSentTurn,
 }: Context) {
@@ -93,6 +97,7 @@ export function useConversationSend({
     if (
       text.length === 0 ||
       sending ||
+      sentTurnToken.current !== null ||
       (conversationId === null && agentCode.length === 0)
     )
       return false;
@@ -170,7 +175,9 @@ export function useConversationSend({
         : `${message} 대화 이력을 다시 읽지 못했어요. 아래에서 다시 시도하거나 대화를 새로고침해 주세요.`;
 
     /** 끝 사건 없이 끊긴 스트림을 마무리한다. 돌고 있거나 답이 저장됐으면 오류로 끝내지 않는다. */
-    const finishInterrupted = async (): Promise<boolean> => {
+    const finishInterrupted = async (
+      failure?: ErrorPayload,
+    ): Promise<boolean> => {
       // 질문이 이미 저장돼 글을 되돌리지 않았으면 전송이 끝난 것으로 알린다. 입력창이 첨부 미리보기를 남기지 않게 한다.
       let questionKept = false;
       const kind = await settleInterruptedStream(
@@ -181,8 +188,8 @@ export function useConversationSend({
           onMissing: async (history) => {
             finishFailedActivity();
             const message = describeError(
-              "STREAM_INTERRUPTED",
-              "응답 연결이 끊겼어요.",
+              failure?.code ?? "STREAM_INTERRUPTED",
+              failure?.message ?? "응답 연결이 끊겼어요.",
             );
             const questionSaved =
               stream.started ||
@@ -211,7 +218,7 @@ export function useConversationSend({
 
     /**
      * `started` 전에 거절된 보내기를 알린다. 없는 스킬 커맨드는 입력창 위 오류 대신 입력창 아래에 이름으로 알린다.
-     * 스트림 사건, 스트림의 HTTP 오류, 스트림 없이 보낸 응답 셋이 모두 이 길로 온다.
+     * 스트림 사건과 스트림의 HTTP 오류가 이 길로 온다.
      */
     const reportRejected = (code: string, message: string) => {
       const command =
@@ -257,54 +264,38 @@ export function useConversationSend({
       reportRejected(code, message);
       return false;
     };
-    const requestBody = {
-      conversationId,
-      text,
-      agentCode,
-      attachmentIds,
-    };
-    const sendWithoutStream = async () => {
-      const response = await sendChatMessage(requestBody);
-      const payload = await readPayload<
-        ErrorPayload & { conversationId: string; assistantText: string }
-      >(response);
-      if (!response.ok) return rejectBeforeStart(payload.code, payload.message);
-      if (selectionVersion.current !== version) return true;
-      if (conversationIdRef.current === null) {
-        window.history.replaceState(
-          null,
-          "",
-          `/chat/${payload.conversationId}`,
+    try {
+      // 송신 응답을 잃어도 실행 상태를 물을 주소가 있도록 먼저 대화를 확보한다.
+      let targetConversationId: string | null;
+      try {
+        targetConversationId = await ensureConversation();
+      } catch {
+        throw new Error(
+          "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
         );
       }
-      assignConversationId(payload.conversationId);
-      setTurns((previous) => [
-        ...previous,
-        {
-          id: `assistant-${Date.now()}`,
-          role: "ASSISTANT",
-          content: payload.assistantText,
-          senderName: null,
-        },
-      ]);
-      await Promise.all([
-        refresh(),
-        refreshMessages(payload.conversationId, version),
-      ]);
-      return true;
-    };
-    try {
+      if (targetConversationId === null || selectionVersion.current !== version)
+        return false;
       let response: Response;
       try {
-        response = await startChatStream(requestBody);
+        response = await startChatStream({
+          conversationId: targetConversationId,
+          text,
+          agentCode,
+          attachmentIds,
+        });
       } catch {
-        return await sendWithoutStream();
+        // fetch 예외로는 수락 전 실패와 수락 뒤 응답 유실을 구분하지 못한다. 별도 POST를 보내지 않는다.
+        return await finishInterrupted();
       }
+      if (selectionVersion.current !== version) return false;
       if (!response.ok) {
-        if ([404, 405, 415, 501].includes(response.status)) {
-          return await sendWithoutStream();
-        }
-        const payload = await readPayload<ErrorPayload>(response);
+        const payload = await readPayload<ErrorPayload>(response).catch(
+          () => null,
+        );
+        // 중계나 서버의 5xx는 오류 코드가 있어도 수락 전 거절이라는 증거가 아니다.
+        if (response.status >= 500 || !payload?.code)
+          return await finishInterrupted(payload ?? undefined);
         return await rejectBeforeStart(payload.code, payload.message);
       }
 
@@ -380,9 +371,10 @@ export function useConversationSend({
     } catch (reason) {
       finishFailedActivity();
       restoreFailedMessage();
-      setError(
-        reason instanceof Error ? reason.message : "요청을 보내지 못했어요.",
-      );
+      if (selectionVersion.current === version)
+        setError(
+          reason instanceof Error ? reason.message : "요청을 보내지 못했어요.",
+        );
       return false;
     } finally {
       if (selectionVersion.current === version && !handedOff) setSending(false);
