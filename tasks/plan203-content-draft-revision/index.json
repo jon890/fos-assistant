@@ -1,6 +1,6 @@
 {
   "name": "plan203-content-draft-revision",
-  "description": "main의 원고 revision REST에 서명 origin MCP와 사건 가림·fos-ctx 필수 목록을 연결한다",
+  "description": "main의 원고 revision REST에 생성 중복 방지·서명 origin MCP·사건 가림과 fos-ctx 필수 목록을 연결한다",
   "status": "pending",
   "created_at": "2026-10-11",
   "total_phases": 1,
