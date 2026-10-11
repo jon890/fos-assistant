@@ -444,7 +444,7 @@ class ConnectorActionDeliveryTest {
         assertThat(history())
                 .extracting(ChatMessage::content)
                 .containsExactly(
-                        "「이름 없는 동작」 요청을 지금은 실행할 수 없어 취소했어요. 연결 화면에서 연결을 확인해 주세요",
+                        "「이름 없는 동작」 요청을 지금은 실행할 수 없어 취소했어요. 외부 서비스 연결에서 연결을 확인해 주세요",
                         "연결이 바뀌어 「이름 없는 동작」 요청을 취소했어요",
                         "「이름 없는 동작」 요청에 화면에 가려지는 내용이 있어 취소했어요. 에이전트에게 그 부분을 빼거나 다시 쓰게 해 주세요");
         assertThat(stub().received()).isEmpty();
