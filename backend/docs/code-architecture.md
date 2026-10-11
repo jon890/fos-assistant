@@ -75,6 +75,20 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 
 ### 에이전트 도구
 
+`agent.config`는 에이전트 생성 한도와 삭제 유예 기간의 `AgentProperties`,
+첫 에이전트의 비용 방식·계정 범위·기본 도구 정책인 `PeopleProperties`를 갖는다.
+`PeopleProperties`의 prefix는 `assistant.people`이지만 소유는 에이전트다.
+`AgentLifecycleService`, `AgentPurger`, `FirstAgentCreator`는 이 설정을 타입으로 주입받는다.
+기본값과 검증, Duration 단위, 도구 정책과 루트 설정 스캔은 유지한다.
+
+`FEATURE_CONFIG_PLACEMENT`는 전체 운영 타입에서 두 top-level 이름과 prefix를 확인해
+정확한 config 소유·선언 수 1·public record·`@Validated` 계약을 검사한다.
+옛 위치 복귀, 누락·중복, prefix를 다른 이름으로 선언하는 경우도 실패한다.
+새 `agent.config`에는 설정 선언만 허용하고 서비스·저장소·컨트롤러·영속 타입·일반 값과 enum을 거절한다.
+이 검사는 `AgentPropertiesPlacementTest`에서 기준 파일 없이 실행하며 `test`와 `archTest`,
+CI backend와 quality 검사에 함께 포함된다. 다른 관심사의 배치는 아직 검사하지 않는다.
+공개 서비스 값과 HTTP DTO, 저장 enum의 배치 원칙은 기존 규칙을 따른다.
+
 `agent.application.toolset`은 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
 이 서비스들의 공개 반환값은 `agent.application.model`에 둔다.
 HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.

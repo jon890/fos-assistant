@@ -19,6 +19,12 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 에이전트 도구 서비스는 `agent.application.toolset`에 두고,
 외부에서 쓰는 공개 반환 타입은 `agent.application.model`에 둔다.
 
+`agent.config`는 `AgentProperties`와 첫 에이전트 생성 정책인 `PeopleProperties`를 소유한다.
+설정 prefix는 각각 `assistant.agents`, `assistant.people`로 유지한다.
+서비스는 `application`, 공개 서비스 값은 `application.model`, HTTP 요청·응답은 `presentation`에 둔다.
+설정 package에는 서비스·저장소·컨트롤러·영속 타입·일반 DTO와 enum을 두지 않는다.
+검사: `ArchitectureRules.FEATURE_CONFIG_PLACEMENT`가 현재 두 설정과 `agent.config`만 기준 파일 없이 검사한다.
+
 ### 데이터 클래스는 컨트롤러 안에 두지 않는다
 
 **`presentation` 의 요청과 응답 모양은 그 패키지의 `*Dtos.java` 하나에 모은다.**

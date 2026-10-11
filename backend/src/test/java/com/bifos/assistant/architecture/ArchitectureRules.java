@@ -418,6 +418,14 @@ public final class ArchitectureRules {
             .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
 
     /**
+     * 에이전트 설정 두 타입의 이름·prefix·개수와 config 역할을 raw 검사한다.
+     * 옛 package 복귀와 누락도 선택 범위에서 빠지지 않는다. 다른 기능의 배치는 검사하지 않는다.
+     */
+    public static final ArchRule FEATURE_CONFIG_PLACEMENT = classes()
+        .should(new AgentConfigPlacement())
+        .as("에이전트 설정은 agent.config에 유일하게 있고 config에는 설정만 둔다");
+
+    /**
      * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.
      *
      * <p>근거: 잘못된 설정은 기동에서 멈춘다.
