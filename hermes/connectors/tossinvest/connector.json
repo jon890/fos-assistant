@@ -62,7 +62,9 @@
     "get_rankings": {"risk": "READ"},
     "get_market_indicator_prices": {"risk": "READ"},
     "get_market_indicator_candles": {"risk": "READ"},
-    "get_market_indicator_investor_trading": {"risk": "READ"}
+    "get_market_indicator_investor_trading": {"risk": "READ"},
+    "get_order": {"risk": "READ", "approval": "none"},
+    "get_commissions": {"risk": "READ", "approval": "none"}
   },
   "errors": {
     "TOSSINVEST_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },

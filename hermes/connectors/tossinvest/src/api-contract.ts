@@ -35,6 +35,8 @@ export const CURRENT_OPERATIONS = new Set([
   "getMarketIndicatorPrices",
   "getMarketIndicatorCandles",
   "getMarketIndicatorInvestorTrading",
+  "getOrder",
+  "getCommissions",
 ]);
 export function matchesOperation(
   operation: Operation,
