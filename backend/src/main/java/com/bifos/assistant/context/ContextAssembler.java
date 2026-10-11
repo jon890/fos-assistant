@@ -86,10 +86,12 @@ public class ContextAssembler implements OmittedMemories {
     private final ContextProperties properties;
     private final Clock clock;
 
+
     /** Memory 예산과 관계없이 모든 에이전트 실행에 공통 답변과 도구 호출 지침을 넣는다. */
     public AssembledContext withResponseInstructions(AssembledContext context) {
         return withResponseInstructions(context, false);
     }
+
 
     /**
      * 공통 답변과 도구 호출 지침을 넣는다. {@code memory_remember} 를 받는 실행이면 기억 지침을 그 뒤에 더한다(ADR-20261007 / memory-remember).
@@ -106,6 +108,7 @@ public class ContextAssembler implements OmittedMemories {
         }
         return new AssembledContext(instructions, instructions.length(), context.omittedMemoryIds(), context.bundle());
     }
+
 
     /**
      * 고르는 자리를 여기 하나로 모은다. 항목이 많아지면 이 클래스에서 검색으로 바꾼다.
@@ -124,6 +127,7 @@ public class ContextAssembler implements OmittedMemories {
         return assemble(user, memories.accessOf(agentId));
     }
 
+
     /**
      * 사용자가 자기 Memory 목록을 볼 때의 조립이다. collection 과 민감도를 거르지 않는다.
      *
@@ -133,10 +137,12 @@ public class ContextAssembler implements OmittedMemories {
         return assemble(user, MemoryAccess.owner());
     }
 
+
     @Override
     public Set<Long> omittedFor(CurrentUser user) {
         return Set.copyOf(assembleForOwner(user).omittedMemoryIds());
     }
+
 
     private AssembledContext assemble(CurrentUser user, MemoryAccess access) {
         Instant now = clock.instant();
@@ -145,20 +151,19 @@ public class ContextAssembler implements OmittedMemories {
         long maxChars = properties.maxChars();
         // 개인 사실 후보를 빼기 전의 색인 전체로 몫을 정한다. 색인 전체가 몫(상한의 1/4) 안에 들 때는 구역에 실린 항목이
         // 색인에서 빠지므로 색인은 떼어 둔 자리보다 길어지지 않는다
-        long indexBudget =
-                Math.min(indexLength(indexed, sameNameDocuments(indexed)), maxChars / properties.indexBudgetRatio());
+        long indexBudget = Math.min(indexLength(indexed, sameNameDocuments(indexed)), maxChars / properties.indexBudgetRatio());
 
         ContextBudgetWriter builder = new ContextBudgetWriter(maxChars);
         builder.limit(maxChars - indexBudget);
         appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP, now);
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
         Set<Long> facts = appendFacts(builder, indexed, now);
-        List<Memory> rest =
-                indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
+        List<Memory> rest = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
         builder.limit(maxChars);
         appendIndex(builder, rest, sameNameDocuments(rest), now);
         return builder.build();
     }
+
 
     /**
      * 개인 사실 구역을 담고 실은 항목의 번호를 돌려준다.
@@ -172,18 +177,17 @@ public class ContextAssembler implements OmittedMemories {
         if (budget <= 0) {
             return Set.of();
         }
-        List<Memory> chosen =
-                chooseFacts(indexed.stream().filter(this::factCandidate).toList(), budget, builder.isEmpty());
+        List<Memory> chosen = chooseFacts(indexed.stream().filter(this::factCandidate).toList(), budget, builder.isEmpty());
         Set<Long> placed = new HashSet<>();
         chosen.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
             ContextItem item = memoryItem(
-                    memory,
-                    ContextSource.MEMORY_FACTS,
-                    ContextBodyMode.INLINE,
-                    List.of(),
-                    memory.title(),
-                    memory.content(),
-                    memoryFreshness(memory, now));
+                memory,
+                ContextSource.MEMORY_FACTS,
+                ContextBodyMode.INLINE,
+                List.of(),
+                memory.title(),
+                memory.content(),
+                memoryFreshness(memory, now));
             if (builder.appendIfFits(FACTS_HEADER, factLine(memory), item)) {
                 placed.add(memory.id());
             } else {
@@ -193,14 +197,16 @@ public class ContextAssembler implements OmittedMemories {
         return placed;
     }
 
+
     /** 색인에 오를 항목 가운데 본문이 짧은 개인 평문 항목만 개인 사실 구역의 후보다. */
     private boolean factCandidate(Memory memory) {
         return memory.scope() == MemoryScope.USER
-                && memory.entryType() == MemoryEntryType.MEMORY
-                && memory.sensitivity() == MemorySensitivity.NORMAL
-                && !memory.sealed()
-                && memory.content().length() <= properties.factsItemMaxChars();
+            && memory.entryType() == MemoryEntryType.MEMORY
+            && memory.sensitivity() == MemorySensitivity.NORMAL
+            && !memory.sealed()
+            && memory.content().length() <= properties.factsItemMaxChars();
     }
+
 
     /**
      * 최근에 고친 것부터, 같으면 번호가 큰 것부터 보며 머리와 구분 줄을 포함한 구역 글이 예산 안이면 담고 아니면 건너뛴다.
@@ -209,15 +215,15 @@ public class ContextAssembler implements OmittedMemories {
      */
     private static List<Memory> chooseFacts(List<Memory> candidates, long budget, boolean startsEmpty) {
         Comparator<Memory> recentFirst = Comparator.comparing(
-                        Memory::updatedAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
-                .thenComparing(Memory::id)
-                .reversed();
+            Memory::updatedAt, Comparator.nullsFirst(Comparator.<Instant>naturalOrder()))
+            .thenComparing(Memory::id)
+            .reversed();
         List<Memory> chosen = new ArrayList<>();
         long used = 0;
         for (Memory memory : candidates.stream().sorted(recentFirst).toList()) {
             boolean first = chosen.isEmpty();
             long cost = ContextBudgetWriter.next(startsEmpty && first, !first, FACTS_HEADER, factLine(memory))
-                    .length();
+                .length();
             if (used + cost <= budget) {
                 chosen.add(memory);
                 used += cost;
@@ -226,88 +232,96 @@ public class ContextAssembler implements OmittedMemories {
         return chosen;
     }
 
+
     /** 개인 사실 한 줄이다. 제목과 본문의 줄바꿈은 공백 하나로 바꾸고 자르지 않는다. */
     private static String factLine(Memory memory) {
         return "- [" + memory.id() + "] " + oneLine(memory.title()) + ": " + oneLine(memory.content());
     }
+
 
     /** 줄바꿈을 공백 하나로 바꾼다. 모델이 정한 제목이나 본문이 지시문에 머리 줄을 끼우지 못하게 한다. */
     private static String oneLine(String text) {
         return LINE_BREAK.matcher(text).replaceAll(" ");
     }
 
+
     private void appendAlways(
-            ContextBudgetWriter builder, String header, List<Memory> memories, MemoryScope scope, Instant now) {
+        ContextBudgetWriter builder, String header, List<Memory> memories, MemoryScope scope, Instant now) {
         memories.stream()
-                .filter(memory -> memory.scope() == scope)
-                .filter(ContextAssembler::plainOrSkipped)
-                .sorted(Comparator.comparing(Memory::id))
-                .forEach(memory -> {
-                    ContextItem item = alwaysItem(memory, now);
-                    builder.append(memory.id(), header, "- " + item.body(), item);
-                });
+            .filter(memory -> memory.scope() == scope)
+            .filter(ContextAssembler::plainOrSkipped)
+            .sorted(Comparator.comparing(Memory::id))
+            .forEach(memory -> {
+                ContextItem item = alwaysItem(memory, now);
+                builder.append(memory.id(), header, "- " + item.body(), item);
+            });
     }
+
 
     /** 항상 층의 줄은 본문까지 싣는다. */
     private ContextItem alwaysItem(Memory memory, Instant now) {
         return memoryItem(
-                memory,
-                ContextSource.MEMORY_ALWAYS,
-                ContextBodyMode.INLINE,
-                List.of(),
-                null,
-                memory.content(),
-                memoryFreshness(memory, now));
+            memory,
+            ContextSource.MEMORY_ALWAYS,
+            ContextBodyMode.INLINE,
+            List.of(),
+            null,
+            memory.content(),
+            memoryFreshness(memory, now));
     }
+
 
     /** 색인 층의 줄은 제목만 싣는다. 본문은 {@code memory_read} 로만 읽는다. */
     private ContextItem indexItem(Memory memory, List<Memory> sameNames, Instant now) {
         List<String> conflictsWith = sameNames.stream()
-                .map(other -> ContextItem.memoryRef(other.id()))
-                .toList();
+            .map(other -> ContextItem.memoryRef(other.id()))
+            .toList();
         return memoryItem(
-                memory,
-                ContextSource.MEMORY_INDEX,
-                ContextBodyMode.TITLE_ONLY,
-                conflictsWith,
-                memory.title(),
-                null,
-                memoryFreshness(memory, now));
+            memory,
+            ContextSource.MEMORY_INDEX,
+            ContextBodyMode.TITLE_ONLY,
+            conflictsWith,
+            memory.title(),
+            null,
+            memoryFreshness(memory, now));
     }
 
+
     private static ContextItem memoryItem(
-            Memory memory,
-            ContextSource source,
-            ContextBodyMode bodyMode,
-            List<String> conflictsWith,
-            String title,
-            String body,
-            ContextFreshness freshness) {
+        Memory memory,
+        ContextSource source,
+        ContextBodyMode bodyMode,
+        List<String> conflictsWith,
+        String title,
+        String body,
+        ContextFreshness freshness) {
         return new ContextItem(
-                source,
-                ContextItem.memoryRef(memory.id()),
-                memory.scope(),
-                memory.ownerUserId(),
-                memory.sensitivity(),
-                ContextTrust.USER_APPROVED,
-                memory.updatedAt(),
-                freshness,
-                bodyMode,
-                conflictsWith,
-                title,
-                body);
+            source,
+            ContextItem.memoryRef(memory.id()),
+            memory.scope(),
+            memory.ownerUserId(),
+            memory.sensitivity(),
+            ContextTrust.USER_APPROVED,
+            memory.updatedAt(),
+            freshness,
+            bodyMode,
+            conflictsWith,
+            title,
+            body);
     }
+
 
     /** collection 별 기준을 먼저 보고, 0 이하 기준은 신선도 판정을 끈다. */
     private ContextFreshness memoryFreshness(Memory memory, Instant now) {
         Duration staleAfter = properties
-                .memoryCollectionStaleAfter()
-                .getOrDefault(memory.collection(), properties.memoryStaleAfter());
+            .memoryCollectionStaleAfter()
+            .getOrDefault(memory.collection(), properties.memoryStaleAfter());
         if (staleAfter == null || staleAfter.isZero() || staleAfter.isNegative()) {
             return ContextFreshness.UNKNOWN;
         }
         return ResultHeader.freshnessOf(memory.updatedAt(), now, staleAfter);
     }
+
 
     /**
      * 본문을 풀지 않는다. 암호문인 줄은 싣지 않는다(ADR-055).
@@ -322,8 +336,9 @@ public class ContextAssembler implements OmittedMemories {
         return true;
     }
 
+
     private void appendIndex(
-            ContextBudgetWriter builder, List<Memory> memories, Map<Long, List<Memory>> sameNames, Instant now) {
+        ContextBudgetWriter builder, List<Memory> memories, Map<Long, List<Memory>> sameNames, Instant now) {
         memories.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
             ContextItem item = indexItem(memory, others, now);
@@ -331,19 +346,21 @@ public class ContextAssembler implements OmittedMemories {
         });
     }
 
+
     /** 색인 한 줄이다. 제목의 줄바꿈은 공백 하나로 바꾼다. 같은 이름의 문서가 다른 범위에 있으면 그 번호를 줄 끝에 적는다. */
     private static String indexLine(Long memoryId, String title, List<Memory> sameNames) {
         StringBuilder line = new StringBuilder("- [" + memoryId + "] " + oneLine(title));
         for (Memory other : sameNames) {
             String kind = other.scope() == MemoryScope.GROUP ? "그룹" : "개인";
             line.append(" (같은 이름의 ")
-                    .append(kind)
-                    .append(" 문서 [")
-                    .append(other.id())
-                    .append("] 가 있다)");
+                .append(kind)
+                .append(" 문서 [")
+                .append(other.id())
+                .append("] 가 있다)");
         }
         return line.toString();
     }
+
 
     /**
      * 색인에 함께 오른 개인 문서와 그룹 문서 가운데 collection 과 document_key 가 같은 것을 서로 짝짓는다(ADR-071).
@@ -354,21 +371,22 @@ public class ContextAssembler implements OmittedMemories {
      */
     private static Map<Long, List<Memory>> sameNameDocuments(List<Memory> indexed) {
         Map<List<String>, List<Memory>> byName = indexed.stream()
-                .filter(memory -> memory.entryType() == MemoryEntryType.DOCUMENT && memory.documentKey() != null)
-                .collect(Collectors.groupingBy(memory -> List.of(memory.collection(), memory.documentKey())));
+            .filter(memory -> memory.entryType() == MemoryEntryType.DOCUMENT && memory.documentKey() != null)
+            .collect(Collectors.groupingBy(memory -> List.of(memory.collection(), memory.documentKey())));
         Map<Long, List<Memory>> sameNames = new HashMap<>();
         byName.values()
-                .forEach(documents -> documents.forEach(document -> {
-                    List<Memory> others = documents.stream()
-                            .filter(other -> other.scope() != document.scope())
-                            .sorted(Comparator.comparing(Memory::id))
-                            .toList();
-                    if (!others.isEmpty()) {
-                        sameNames.put(document.id(), others);
-                    }
-                }));
+            .forEach(documents -> documents.forEach(document -> {
+                List<Memory> others = documents.stream()
+                    .filter(other -> other.scope() != document.scope())
+                    .sorted(Comparator.comparing(Memory::id))
+                    .toList();
+                if (!others.isEmpty()) {
+                    sameNames.put(document.id(), others);
+                }
+            }));
         return sameNames;
     }
+
 
     /**
      * 색인 층을 통째로 실을 때 늘어나는 글자 수다.

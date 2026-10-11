@@ -23,23 +23,28 @@ final class ContextBudgetWriter {
     /** 지금 담는 층이 쓸 수 있는 자리다. 층을 옮길 때마다 바꾼다. */
     private long limit;
 
+
     ContextBudgetWriter(long maxChars) {
         this.maxChars = maxChars;
         this.limit = maxChars;
     }
 
+
     void limit(long limit) {
         this.limit = Math.max(0, Math.min(limit, maxChars));
     }
+
 
     /** 지금 층에 남은 자리다. */
     long room() {
         return Math.max(0, limit - selected.length());
     }
 
+
     boolean isEmpty() {
         return selected.isEmpty();
     }
+
 
     /**
      * 남은 자리에 들어가면 담고 참을 돌려준다. 들어가지 않으면 아무것도 남기지 않고 거짓을 돌려준다.
@@ -56,6 +61,7 @@ final class ContextBudgetWriter {
         items.add(item);
         return true;
     }
+
 
     /**
      * 항목 하나를 담는다.
@@ -78,9 +84,11 @@ final class ContextBudgetWriter {
         items.add(item);
     }
 
+
     private static String next(StringBuilder value, Set<String> headers, String header, String item) {
         return next(value.isEmpty(), headers.contains(header), header, item);
     }
+
 
     /** 앞 글이 비었는지와 머리가 이미 있는지로 다음에 붙을 글을 만든다. 담기와 고르기가 같은 규칙을 쓴다. */
     static String next(boolean empty, boolean headed, String header, String item) {
@@ -88,10 +96,12 @@ final class ContextBudgetWriter {
         return prefix + (headed ? item : header + SEPARATOR + item);
     }
 
+
     static void appendTo(StringBuilder value, Set<String> headers, String header, String item) {
         value.append(next(value, headers, header, item));
         headers.add(header);
     }
+
 
     AssembledContext build() {
         if (!omitted.isEmpty()) {
@@ -99,7 +109,7 @@ final class ContextBudgetWriter {
         }
         ContextBundle bundle = new ContextBundle(items);
         return selected.isEmpty()
-                ? new AssembledContext(null, 0, omitted, bundle)
-                : new AssembledContext(selected.toString(), selected.length(), omitted, bundle);
+            ? new AssembledContext(null, 0, omitted, bundle)
+            : new AssembledContext(selected.toString(), selected.length(), omitted, bundle);
     }
 }
