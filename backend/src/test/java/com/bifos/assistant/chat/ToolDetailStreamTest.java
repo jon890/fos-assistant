@@ -92,7 +92,9 @@ class ToolDetailStreamTest {
                 "list_media_observations",
                 "record_media_observation",
                 "mcp__fos_assistant__list_media_observations",
-                "mcp__fos_assistant__record_media_observation")) {
+                "mcp__fos_assistant__record_media_observation",
+                "content_draft_write", "content_draft_read",
+                "mcp__fos_assistant__content_draft_write", "mcp__fos_assistant__content_draft_read")) {
                 for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
                     for (boolean nested : new boolean[] {false, true}) {
                         for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
@@ -134,7 +136,7 @@ class ToolDetailStreamTest {
                     },
                     ToolDetailScope.prefixes(Set.of("mcp__demo__")));
                 var observationEvents = parsed.stream()
-                    .filter(event -> event.toolName() != null && event.toolName().contains("media_observation"))
+                    .filter(event -> event.toolName() != null && (event.toolName().contains("media_observation") || event.toolName().contains("content_draft")))
                     .toList();
                 assertThat(observationEvents).isNotEmpty().allSatisfy(event -> {
                     assertThat(event.detail()).isNull();
@@ -151,7 +153,7 @@ class ToolDetailStreamTest {
                     .findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(executionId))
                     .stream()
                     .filter(event -> event.toolName() != null
-                        && event.toolName().contains("media_observation"))
+                        && (event.toolName().contains("media_observation") || event.toolName().contains("content_draft")))
                     .toList();
                 long persistable = observationEvents.stream()
                     .filter(event -> !"tool.failed".equals(event.type()))
