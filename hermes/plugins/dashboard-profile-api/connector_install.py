@@ -1,6 +1,7 @@
 """커넥터 조회, 설치, 떼기와 MCP 서버 probe 요청을 검사한다."""
 
 from __future__ import annotations
+from .connector_guard import _binding_guard, _guard_support, _guard_hide_financial
 
 import asyncio
 import json
@@ -128,9 +129,14 @@ async def _connector_request(request):
                 or not isinstance(body["plugin"], str) or not CONNECTOR_ID_RE.match(body["plugin"])
                 or not isinstance(body["enabled"], bool)
                 or (body["enabled"] and body["plugin"] not in roots)
-                or ("bind" in body and (not isinstance(bind, dict) or set(bind) != {"vault"}
+                or ("bind" in body and (not isinstance(bind, dict) or set(bind) - {"guard"} != {"vault"}
                                         or not isinstance(bind["vault"], str) or not VAULT_ID_RE.match(bind["vault"])))):
             return _rejected("profile, 알려진 plugin, enabled 와 바인딩이면 bind.vault, 그리고 sandbox_owner, owner_browser 만 받는다")
+        if isinstance(bind, dict) and "guard" in bind:
+            try:
+                _binding_guard(bind["guard"])
+            except (ValueError, TypeError):
+                return _rejected("bind.guard 형식이 올바르지 않다")
         owner = body.get("sandbox_owner")
         if owner is not None and not (isinstance(owner, str) and SANDBOX_OWNER_RE.match(owner)):
             return _rejected("sandbox_owner 형식이 올바르지 않다")
@@ -165,6 +171,8 @@ async def _connector_request(request):
             state_path = profile_dir / CONNECTOR_STATE
             # 바인딩 항목은 모양만 보고, manifest 와 맞는지는 아래에서 항목마다 따로 판정한다.
             state = _connector_state(json.loads(state_path.read_text(encoding="utf-8"))) if state_path.exists() else {}
+            await asyncio.to_thread(_guard_hide_financial, profile_dir, state)
+            config = yaml.safe_load((profile_dir / "config.yaml").read_text(encoding="utf-8")) or {}
             servers = config.get("mcp_servers") or {}
             try:
                 expected = _connector_allowlist(state, servers)
@@ -202,8 +210,12 @@ async def _connector_request(request):
                                       and tools_current)
                     else:
                         configured = isolated and tools_current
+                support = await asyncio.to_thread(_guard_support, profile, manifest, entry)
+                if support["state"] == "verified" and (not configured or _policy_hook_failure(profile_dir, config, state, drift) is not None):
+                    support["state"] = "pending"
                 connectors.append({"plugin": plugin, "enabled": entry is not None, "configured": configured,
-                                   "mode": mode})
+                                   "mode": mode, **({"execution_guard": support} if manifest is not None
+                                   and manifest.get("execution_guard") is not None else {})})
             # 운영 목록에서 빠진 커넥터의 기록은 설치를 끌 수 있게 보이되 쓸 수 있다고 답하지 않는다.
             connectors.extend({"plugin": plugin, "enabled": True, "configured": False, "mode": _entry_mode(entry)}
                               for plugin, entry in state.items() if plugin not in roots)
@@ -268,7 +280,13 @@ async def _connector_request(request):
             stage = "bind"
             result = await asyncio.to_thread(_connector_bind_config, profile_dir, body["plugin"], True,
                                              body["bind"]["vault"], values, owner_attachments, owner_output,
-                                             body.get("owner_browser"))
+                                             body.get("owner_browser"), body["bind"].get("guard"))
+            if manifest.get("execution_guard") is not None:
+                installed = _connector_state(json.loads((profile_dir / CONNECTOR_STATE).read_text(encoding="utf-8")))
+                support = await asyncio.to_thread(_guard_support, profile, manifest, installed.get(body["plugin"]))
+                if support["state"] == "verified":
+                    support["state"] = "pending"
+                result["execution_guard"] = support
             return JSONResponse({**response, **result}, status_code=200)
         if unbind:
             stage = "bind"
