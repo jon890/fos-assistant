@@ -71,22 +71,23 @@ class SubagentUsageSchedulingTest {
     private AgentExecution parent;
     private Duration launchDelay;
 
+
     @BeforeEach
     void setUp() {
         jobs.deleteAll();
         events.deleteAll();
         executions.deleteAll();
         Agent agent = agents.findByCode("scheduling-test").orElseGet(() -> agents.save(Agent.of(
-                "scheduling-test", "시각 검사", "scheduling-test", "http://runtime", CostMode.API,
-                CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 4501L, TICK)));
+            "scheduling-test", "시각 검사", "scheduling-test", "http://runtime", CostMode.API,
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 4501L, TICK)));
         Instant finished = TICK.minusSeconds(5).plusMillis(13);
         parent = executions.save(AgentExecution.builder()
-                .userId(4501L).agentId(agent.id()).profileName(agent.hermesProfile())
-                .hermesSessionId("parent").costMode(CostMode.API).status(ExecutionStatus.SUCCEEDED)
-                .timing(finished.minusSeconds(5), finished).build());
+            .userId(4501L).agentId(agent.id()).profileName(agent.hermesProfile())
+            .hermesSessionId("parent").costMode(CostMode.API).status(ExecutionStatus.SUCCEEDED)
+            .timing(finished.minusSeconds(5), finished).build());
         events.save(ExecutionEvent.builder().executionId(parent.id()).sequence(1)
-                .eventType(ExecutionEventType.SUBAGENT_STARTED).hermesSessionId("child")
-                .occurredAt(finished.minusSeconds(1)).build());
+            .eventType(ExecutionEventType.SUBAGENT_STARTED).hermesSessionId("child")
+            .occurredAt(finished.minusSeconds(1)).build());
         hermes = mock(HermesRunsClient.class);
         providers = mock(SubagentProviderClient.class);
         BackgroundTasks background = mock(BackgroundTasks.class);
@@ -97,9 +98,10 @@ class SubagentUsageSchedulingTest {
             return null;
         }).when(background).start(any(), any());
         reconciler = new SubagentUsageReconciler(executions, events, jobs, agentService, hermes,
-                mock(ProfileModelDefaultsClient.class), providers, estimator, manager, clock, background);
+            mock(ProfileModelDefaultsClient.class), providers, estimator, manager, clock, background);
         when(hermes.readSubagentUsage(any(), any(), any())).thenReturn(usage(null, "anthropic"));
     }
+
 
     @ParameterizedTest
     @ValueSource(longs = {300, 700})
@@ -122,6 +124,7 @@ class SubagentUsageSchedulingTest {
         assertThat(job().recordedAt()).isAfter(TICK.plusSeconds(5));
     }
 
+
     @Test
     @DisplayName("틱 지연이 15ms에서 7ms로 줄어도 다음 5초 틱을 건너뛰지 않는다")
     void toleratesDecreasingTickJitter() {
@@ -130,6 +133,7 @@ class SubagentUsageSchedulingTest {
         verify(hermes, times(2)).readSubagentUsage(any(), any(), any());
         assertThat(job().nextAttemptAt()).isEqualTo(TICK.plusSeconds(10));
     }
+
 
     @Test
     @DisplayName("5초 넘게 걸린 GET 뒤에는 완료한 초에서 기다리고 실제 기록 시각을 쓴다")
@@ -148,6 +152,7 @@ class SubagentUsageSchedulingTest {
         assertThat(completions()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("백그라운드 시작이 밀리면 실제 완료한 초를 재시도 기준으로 쓴다")
     void waitsAfterDelayedLaunch() {
@@ -160,6 +165,7 @@ class SubagentUsageSchedulingTest {
         tick(TICK.plusSeconds(15));
         verify(hermes, times(2)).readSubagentUsage(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("조회 중 시계가 역행해도 예약은 틱보다 앞서지 않고 완료 사건은 실제 시각이다")
@@ -178,17 +184,18 @@ class SubagentUsageSchedulingTest {
         assertThat(completions().getFirst().occurredAt()).isEqualTo(TICK.plusSeconds(4));
     }
 
+
     @Test
     @DisplayName("provider 미확인도 다음 틱에서 다시 읽고 확인한 뒤 한 번만 기록한다")
     void retriesProviderWithoutDuplicatingCompletion() {
         when(hermes.readSubagentUsage(any(), any(), any()))
-                .thenReturn(usage((double) TICK.getEpochSecond(), null));
+            .thenReturn(usage((double)TICK.getEpochSecond(), null));
         when(providers.read(any(), any())).thenReturn(SubagentProviderLookup.unreachable());
         tick(TICK.plusNanos(700));
         assertThat(job().recordedAt()).isNull();
         assertThat(completions()).isEmpty();
         when(providers.read(any(), any()))
-                .thenReturn(SubagentProviderLookup.found("anthropic", "example-model-large"));
+            .thenReturn(SubagentProviderLookup.found("anthropic", "example-model-large"));
         tick(TICK.plusSeconds(5).plusMillis(7));
         tick(TICK.plusSeconds(10));
         assertThat(job().provider()).isEqualTo("anthropic");
@@ -196,6 +203,7 @@ class SubagentUsageSchedulingTest {
         assertThat(completions()).hasSize(1);
         verify(hermes, times(2)).readSubagentUsage(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("직접 조회는 실제 시각에 간격을 더하고 재기동 뒤 다음 가능한 틱에서 이어 간다")
@@ -210,6 +218,7 @@ class SubagentUsageSchedulingTest {
         assertThat(job().expiresAt()).isEqualTo(parent.finishedAt().plus(Duration.ofHours(24)));
     }
 
+
     @Test
     @DisplayName("초 단위 예약과 달라도 backoff 진입은 실제 경과 2분으로 판단한다")
     void usesActualTimeForBackoff() {
@@ -221,6 +230,7 @@ class SubagentUsageSchedulingTest {
         assertThat(job().backoffAttempts()).isOne();
         assertThat(job().nextAttemptAt()).isEqualTo(TICK.plusSeconds(135));
     }
+
 
     @Test
     @DisplayName("1초 cron 도 예약 전에 반복하지 않고 긴 cron 은 다음 가능한 틱에서 조회한다")
@@ -234,6 +244,7 @@ class SubagentUsageSchedulingTest {
         tick(TICK.plusSeconds(15));
         verify(hermes, times(3)).readSubagentUsage(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("느린 GET 중 기한을 넘기면 실제 종료 시각에서 만료시키고 기한을 늘리지 않는다")
@@ -251,6 +262,7 @@ class SubagentUsageSchedulingTest {
         assertThat(completions()).isEmpty();
     }
 
+
     @Test
     @DisplayName("백그라운드 대기 중 기한을 넘기면 session 을 조회하지 않는다")
     void expiresBeforeDelayedReadStarts() {
@@ -261,6 +273,7 @@ class SubagentUsageSchedulingTest {
         assertThat(job().status()).isEqualTo("EXPIRED");
         verify(hermes, never()).readSubagentUsage(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("느린 provider 조회가 10분 창을 넘기면 실제 종료 시각으로 포기하고 한 번 기록한다")
@@ -279,13 +292,14 @@ class SubagentUsageSchedulingTest {
         assertThat(completions()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("provider 를 기다리는 중에도 실제 작업 기한이 지나면 만료된다")
     void expiresProviderWaitAtActualDeadline() {
         reconciler.discover(TICK);
         Instant deadline = job().expiresAt();
         when(hermes.readSubagentUsage(any(), any(), any()))
-                .thenReturn(usage((double) deadline.minusSeconds(1).getEpochSecond(), null));
+            .thenReturn(usage((double)deadline.minusSeconds(1).getEpochSecond(), null));
         when(providers.read(any(), any())).thenAnswer(invocation -> {
             clock.set(deadline.plusMillis(1));
             return SubagentProviderLookup.unreachable();
@@ -296,23 +310,27 @@ class SubagentUsageSchedulingTest {
         assertThat(completions()).isEmpty();
     }
 
+
     private void tick(Instant now) {
         clock.set(now);
         reconciler.reconcile();
     }
+
 
     private SubagentUsageJob job() {
         assertThat(jobs.findAll()).hasSize(1);
         return jobs.findAll().getFirst();
     }
 
+
     private List<ExecutionEvent> completions() {
         return events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id())).stream()
-                .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED).toList();
+            .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED).toList();
     }
+
 
     private static SubagentSessionUsage usage(Double endedAt, String provider) {
         return new SubagentSessionUsage("child", "subagent", "parent", "example-model-large", provider,
-                1.0, endedAt, 10L, 4L, 0L, 0L);
+            1.0, endedAt, 10L, 4L, 0L, 0L);
     }
 }

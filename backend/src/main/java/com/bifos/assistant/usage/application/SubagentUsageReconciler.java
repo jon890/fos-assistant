@@ -69,44 +69,46 @@ public class SubagentUsageReconciler {
     private final Semaphore slots = new Semaphore(4);
     private final Set<String> active = ConcurrentHashMap.newKeySet();
 
+
     @Autowired
     public SubagentUsageReconciler(
-            AgentExecutionRepository executions,
-            ExecutionEventRepository events,
-            SubagentUsageJobRepository jobs,
-            AgentService agents,
-            HermesRunsClient hermes,
-            ProfileModelDefaultsClient defaults,
-            SubagentProviderClient providers,
-            CostEstimator estimator,
-            PlatformTransactionManager manager,
-            BackgroundTasks backgroundTasks) {
+        AgentExecutionRepository executions,
+        ExecutionEventRepository events,
+        SubagentUsageJobRepository jobs,
+        AgentService agents,
+        HermesRunsClient hermes,
+        ProfileModelDefaultsClient defaults,
+        SubagentProviderClient providers,
+        CostEstimator estimator,
+        PlatformTransactionManager manager,
+        BackgroundTasks backgroundTasks) {
         this(
-                executions,
-                events,
-                jobs,
-                agents,
-                hermes,
-                defaults,
-                providers,
-                estimator,
-                manager,
-                Clock.systemUTC(),
-                backgroundTasks);
+            executions,
+            events,
+            jobs,
+            agents,
+            hermes,
+            defaults,
+            providers,
+            estimator,
+            manager,
+            Clock.systemUTC(),
+            backgroundTasks);
     }
 
+
     SubagentUsageReconciler(
-            AgentExecutionRepository executions,
-            ExecutionEventRepository events,
-            SubagentUsageJobRepository jobs,
-            AgentService agents,
-            HermesRunsClient hermes,
-            ProfileModelDefaultsClient defaults,
-            SubagentProviderClient providers,
-            CostEstimator estimator,
-            PlatformTransactionManager manager,
-            Clock clock,
-            BackgroundTasks backgroundTasks) {
+        AgentExecutionRepository executions,
+        ExecutionEventRepository events,
+        SubagentUsageJobRepository jobs,
+        AgentService agents,
+        HermesRunsClient hermes,
+        ProfileModelDefaultsClient defaults,
+        SubagentProviderClient providers,
+        CostEstimator estimator,
+        PlatformTransactionManager manager,
+        Clock clock,
+        BackgroundTasks backgroundTasks) {
         this.executions = executions;
         this.events = events;
         this.jobs = jobs;
@@ -120,26 +122,25 @@ public class SubagentUsageReconciler {
         this.backgroundTasks = backgroundTasks;
     }
 
+
     @Scheduled(cron = "${assistant.usage.reconcile-cron:*/5 * * * * *}")
     public void reconcile() {
         Instant now = clock.instant();
         Instant tick = now.truncatedTo(ChronoUnit.MICROS);
         discover(now);
-        List<AgentExecution> unknownDefaults =
-                executions.findUnknownReasoningDefaults(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20));
+        List<AgentExecution> unknownDefaults = executions.findUnknownReasoningDefaults(now.minus(Duration.ofHours(24)), PageRequest.of(0, 20));
         if (!unknownDefaults.isEmpty()) {
             launch("profile:defaults", () -> supplementDefaults(unknownDefaults));
         }
-        for (SubagentUsageJob job :
-                jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc("WAITING", tick)) {
+        for (SubagentUsageJob job : jobs.findTop20ByStatusAndNextAttemptAtLessThanEqualOrderByNextAttemptAtAsc("WAITING", tick)) {
             launch("child:" + job.id(), () -> poll(job.id(), tick));
         }
     }
 
+
     /** 종료 직후 재기동된 경우에도 시작 사건을 다시 훑어 누락 작업을 만든다. */
     void discover(Instant now) {
-        for (ExecutionEvent start :
-                events.findUnscheduledChildren(now.minus(DISCOVERY_WINDOW), PageRequest.of(0, 20))) {
+        for (ExecutionEvent start : events.findUnscheduledChildren(now.minus(DISCOVERY_WINDOW), PageRequest.of(0, 20))) {
             transaction.executeWithoutResult(status -> {
                 AgentExecution parent = executions.lockById(start.executionId()).orElse(null);
                 if (parent == null || parent.finishedAt() == null) {
@@ -149,8 +150,7 @@ public class SubagentUsageReconciler {
                     return;
                 }
                 Agent agent = agents.findById(parent.agentId()).orElse(null);
-                SubagentUsageJob job =
-                        SubagentUsageJob.create(parent, start, agent == null ? "" : agent.apiBaseUrl(), now);
+                SubagentUsageJob job = SubagentUsageJob.create(parent, start, agent == null ? "" : agent.apiBaseUrl(), now);
                 if (agent == null || agent.isDeleted()) {
                     job.expire("AGENT_MISSING");
                 } else if (!parent.profileName().equals(agent.hermesProfile())) {
@@ -161,6 +161,7 @@ public class SubagentUsageReconciler {
             });
         }
     }
+
 
     private void launch(String key, Runnable action) {
         if (!active.add(key)) {
@@ -182,9 +183,11 @@ public class SubagentUsageReconciler {
         });
     }
 
+
     void poll(Long jobId) {
         poll(jobId, null);
     }
+
 
     private void poll(Long jobId, Instant tick) {
         SubagentUsageJob job = jobs.findById(jobId).orElse(null);
@@ -193,8 +196,8 @@ public class SubagentUsageReconciler {
         }
         Instant startedAt = clock.instant();
         SubagentSessionUsage read = job.expired(startedAt)
-                ? null
-                : hermes.readSubagentUsage(job.apiBaseUrl(), job.profileName(), job.childSessionId());
+            ? null
+            : hermes.readSubagentUsage(job.apiBaseUrl(), job.profileName(), job.childSessionId());
         // 대시보드 조회도 Hermes 조회처럼 트랜잭션 밖에서 한다.
         ProviderResolution resolution = resolveProvider(job, read);
         SubagentSessionUsage usage = resolution.usage();
@@ -217,18 +220,18 @@ public class SubagentUsageReconciler {
             } else if (isFinalChild(current, usage)) {
                 // 완료 사건은 표시용이다. 부모 스트림으로 이미 왔으면 다시 만들지 않는다.
                 if (!events.existsByExecutionIdAndHermesSessionIdAndEventType(
-                        parent.id(), current.childSessionId(), ExecutionEventType.SUBAGENT_COMPLETED)) {
+                    parent.id(), current.childSessionId(), ExecutionEventType.SUBAGENT_COMPLETED)) {
                     saveCompletion(parent, current, usage, now);
                 }
                 String reason = unpricedReason(usage);
                 ExecutionCost cost = ExecutionCost.unknown();
                 if (reason == null) {
                     cost = estimator.estimate(
-                            usage.provider(),
-                            usage.model(),
-                            new TokenUsage(
-                                    usage.inclusiveInputTokens(), usage.cacheReadTokens(), usage.outputTokens(), null),
-                            parent.costMode());
+                        usage.provider(),
+                        usage.model(),
+                        new TokenUsage(
+                            usage.inclusiveInputTokens(), usage.cacheReadTokens(), usage.outputTokens(), null),
+                        parent.costMode());
                     if (!cost.isKnown()) {
                         cost = ExecutionCost.unknown();
                         reason = "PRICE_UNKNOWN";
@@ -244,13 +247,17 @@ public class SubagentUsageReconciler {
         });
     }
 
+
     /** 시계가 역행해도 예약 기준을 받은 틱보다 앞당기지 않는다. 사건 시각에는 쓰지 않는다. */
     private static Instant laterSecond(Instant tick, Instant completedAt) {
         return (tick.isAfter(completedAt) ? tick : completedAt).truncatedTo(ChronoUnit.SECONDS);
     }
 
+
     /** 대시보드 조회를 반영한 자식 사용량과, 대시보드를 더 기다릴지다. */
-    private record ProviderResolution(SubagentSessionUsage usage, boolean waitForProvider) {}
+    private record ProviderResolution(SubagentSessionUsage usage, boolean waitForProvider) {
+    }
+
 
     /**
      * session 응답에 provider 가 없는 종료 자식의 provider 를 대시보드에서 읽는다.
@@ -261,7 +268,7 @@ public class SubagentUsageReconciler {
      */
     private ProviderResolution resolveProvider(SubagentUsageJob job, SubagentSessionUsage usage) {
         if (!isFinalChild(job, usage)
-                || (usage.provider() != null && !usage.provider().isBlank())) {
+            || (usage.provider() != null && !usage.provider().isBlank())) {
             return new ProviderResolution(usage, false);
         }
         SubagentProviderLookup lookup = providers.read(job.profileName(), job.childSessionId());
@@ -269,8 +276,7 @@ public class SubagentUsageReconciler {
             return new ProviderResolution(usage, false);
         }
         if (lookup.unavailable()) {
-            boolean withinWindow = usage.endedAt() + PROVIDER_RETRY_WINDOW.toSeconds()
-                    > clock.instant().getEpochSecond();
+            boolean withinWindow = usage.endedAt() + PROVIDER_RETRY_WINDOW.toSeconds() > clock.instant().getEpochSecond();
             return new ProviderResolution(usage, withinWindow);
         }
         boolean hasProvider = lookup.provider() != null && !lookup.provider().isBlank();
@@ -279,33 +285,36 @@ public class SubagentUsageReconciler {
         return new ProviderResolution(hasProvider && sameModel ? usage.withProvider(lookup.provider()) : usage, false);
     }
 
+
     private void saveCompletion(AgentExecution parent, SubagentUsageJob job, SubagentSessionUsage usage, Instant now) {
         List<ExecutionEvent> starts = events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id()));
         ExecutionEvent start = starts.stream()
-                .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED
-                        && job.childSessionId().equals(event.hermesSessionId()))
-                .findFirst()
-                .orElse(null);
+            .filter(event -> event.eventType() == ExecutionEventType.SUBAGENT_STARTED
+                && job.childSessionId().equals(event.hermesSessionId()))
+            .findFirst()
+            .orElse(null);
         events.save(ExecutionEvent.builder()
-                .executionId(parent.id())
-                .sequence(events.lastSequence(parent.id()) + 1)
-                .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
-                .subagentName(start == null ? null : start.subagentName())
-                .hermesSessionId(job.childSessionId())
-                .model(eventModel(usage.model()))
-                .inputTokens(usage.inclusiveInputTokens())
-                .outputTokens(usage.outputTokens())
-                .durationMs(usage.durationMs())
-                .failed(null)
-                .detail(start == null ? null : start.detail())
-                .occurredAt(now)
-                .build());
+            .executionId(parent.id())
+            .sequence(events.lastSequence(parent.id()) + 1)
+            .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
+            .subagentName(start == null ? null : start.subagentName())
+            .hermesSessionId(job.childSessionId())
+            .model(eventModel(usage.model()))
+            .inputTokens(usage.inclusiveInputTokens())
+            .outputTokens(usage.outputTokens())
+            .durationMs(usage.durationMs())
+            .failed(null)
+            .detail(start == null ? null : start.detail())
+            .occurredAt(now)
+            .build());
     }
+
 
     /** 사건의 모델 칸 길이를 넘는 이름은 잘라 넣는다. 넘는 값은 저장이 실패해 작업 줄까지 되돌린다. */
     private static String eventModel(String model) {
         return model == null || model.length() <= EVENT_MODEL_LIMIT ? model : model.substring(0, EVENT_MODEL_LIMIT);
     }
+
 
     /** 환산을 시도하기 전에 알 수 있는 금액 미확인 까닭이다. 환산할 수 있으면 null 이다. */
     private static String unpricedReason(SubagentSessionUsage usage) {
@@ -318,12 +327,14 @@ public class SubagentUsageReconciler {
         return null;
     }
 
+
     static boolean isFinalChild(SubagentUsageJob job, SubagentSessionUsage usage) {
         return usage != null
-                && "subagent".equals(usage.source())
-                && job.childSessionId().equals(usage.id())
-                && usage.endedAt() != null;
+            && "subagent".equals(usage.source())
+            && job.childSessionId().equals(usage.id())
+            && usage.endedAt() != null;
     }
+
 
     /** 읽을 수 없는 최신 profile이 다음 실행의 기본 강도 보완까지 막지 않게 page 안에서 차례로 읽는다. */
     void supplementDefaults(List<AgentExecution> executions) {
@@ -334,6 +345,7 @@ public class SubagentUsageReconciler {
         }
     }
 
+
     boolean supplementDefault(Long executionId, String profile) {
         ProfileModelDefaults value = defaults.read(profile);
         if (value == null) {
@@ -342,8 +354,8 @@ public class SubagentUsageReconciler {
         return Boolean.TRUE.equals(transaction.execute(status -> {
             AgentExecution execution = executions.lockById(executionId).orElse(null);
             if (execution != null
-                    && execution.reasoningEffort() == null
-                    && execution.reasoningDefaultsCheckedAt() == null) {
+                && execution.reasoningEffort() == null
+                && execution.reasoningDefaultsCheckedAt() == null) {
                 if (value.reasoningEffort() != null && !value.reasoningEffort().isBlank()) {
                     execution.recordProfileReasoningDefault(value.reasoningEffort());
                 }

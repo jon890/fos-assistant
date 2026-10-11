@@ -23,12 +23,12 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "subagent_usage_job",
-        uniqueConstraints = {
-            @UniqueConstraint(
-                    name = "uk_subagent_usage_child",
-                    columnNames = {"execution_id", "child_session_id"})
-        })
+    name = "subagent_usage_job",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_subagent_usage_child",
+            columnNames = {"execution_id", "child_session_id"})
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -110,6 +110,7 @@ public class SubagentUsageJob {
     @Column(name = "recorded_at")
     private Instant recordedAt;
 
+
     public static SubagentUsageJob create(AgentExecution parent, ExecutionEvent start, String apiBaseUrl, Instant now) {
         SubagentUsageJob job = new SubagentUsageJob();
         job.executionId = parent.id();
@@ -125,9 +126,11 @@ public class SubagentUsageJob {
         return job;
     }
 
+
     public boolean expired(Instant now) {
         return !now.isBefore(expiresAt);
     }
+
 
     /**
      * 종료를 확인한 자식의 사용량과 금액을 적고 줄을 끝낸다.
@@ -135,8 +138,7 @@ public class SubagentUsageJob {
      * <p>금액을 내지 못했으면 {@code cost} 는 비어 있고 {@code reason} 에 그 까닭이 온다.
      */
     public void record(SubagentSessionUsage usage, ExecutionCost cost, String reason, Instant now) {
-        provider =
-                usage.provider() == null || usage.provider().isBlank() ? null : cut(usage.provider(), PROVIDER_LIMIT);
+        provider = usage.provider() == null || usage.provider().isBlank() ? null : cut(usage.provider(), PROVIDER_LIMIT);
         model = cut(usage.model(), MODEL_LIMIT);
         inputTokens = usage.inputTokens();
         cacheReadTokens = usage.cacheReadTokens();
@@ -151,6 +153,7 @@ public class SubagentUsageJob {
         unconfirmedReason = reason;
     }
 
+
     /**
      * 칸 길이를 넘는 값을 잘라 적는다.
      *
@@ -161,18 +164,22 @@ public class SubagentUsageJob {
         return value == null || value.length() <= limit ? value : value.substring(0, limit);
     }
 
+
     public void expire() {
         expire("DEADLINE");
     }
+
 
     public void expire(String reason) {
         status = "EXPIRED";
         unconfirmedReason = reason;
     }
 
+
     public void retry(Instant now) {
         retry(now, now);
     }
+
 
     /** 실제 경과 시각으로 backoff 를 정하고, 별도로 받은 예약 기준에 간격을 더한다. */
     public void retry(Instant now, Instant schedulingBase) {
