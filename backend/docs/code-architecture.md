@@ -329,6 +329,10 @@ MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
 **검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@Tag("mysql")` 검사는 예외다.
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
+
+`ContentDraftSnapshotJpaMigrationTest`는 공유 컨텍스트를 그대로 쓰며, 실제 Flyway·JPA 기동은 별도 H2 DB의 애플리케이션을 직접 띄워 검사 안에서 닫는다.
+기동용 컨텍스트를 Spring 검사 캐시에 넣으면 캐시에서 밀려난 `create-drop` 컨텍스트가 다른 검사의 공유 스키마를 지울 수 있다.
+`ContentDraftSnapshotContextIsolationTest`는 공유 검사와 claim 검사 컨텍스트가 이미 떠 있을 때도 기동과 종료 뒤 두 스키마를 읽을 수 있는지 확인한다.
 - 기반에 있는 타입은 `@Autowired` 로 받는다.
 - 설정 값을 바꿔야 하면 아래 「설정 바꾸기」 를 쓴다.
 - mock 이 필요하던 빈은 기반의 spy 로 올리고 `doReturn(...).when(spy)` 로 바꾼다. 정하지 않은 메서드는 실제로 돈다.
