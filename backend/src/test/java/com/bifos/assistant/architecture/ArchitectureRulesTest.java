@@ -495,4 +495,5 @@ class ArchitectureRulesTest {
         FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME)
             .check(TESTS);
     }
+
 }
