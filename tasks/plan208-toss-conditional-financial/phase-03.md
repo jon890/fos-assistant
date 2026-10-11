@@ -11,9 +11,9 @@
 ## 컨텍스트
 
 **근거 문서**: `docs/features/connector.md`의 「조건주문 REST 쓰기의 구현 보완안」과 `docs/features/connector-policy.md`의 「금융 실행 내용의 저장과 검증」이다.
-현재 actual main에는 ConnectorFinancialProducer/ConnectorFinancialApproval/ConnectorFinancialConflicts가 없다.
+대조한 local main71ab1c685712c1a88478b90c576cff380c59a35f와 origin/main3f0f3c4c185ea3e74f5954ef890d78a945b3bfff에는 ConnectorFinancialProducer/ConnectorFinancialApproval/ConnectorFinancialConflicts가 없다. 현재 PHASE_BLOCKED다.
 canonical source 2a3a41cc88246e3b14ce6812f2cb267db5e4ad3a의 실제 producer 설계는 package-private request와 approve를 테스트 내부에서 호출하며 공개 정책을 열지 않는다.
-이 phase는 그 실제 업무 구현을 재사용한다. 조건 snapshot의 검증 분기는 이미 구현되어 있어 generic JSON producer나 별도 테스트 금융 policy를 추가하지 않는다.
+이 phase는 그 실제 업무 구현을 재사용한다. 착수 시 선행 통합된 조건 snapshot의 검증 분기를 사용하므로 generic JSON producer나 별도 테스트 금융 policy를 추가하지 않는다.
 sourceContext라는 현재 없는 DTO를 가정하지 않는다. 준비 전 실제 producer가 복사한 owner/profile/connection/binding/revision/manifest 맥락을 직접 관측한다.
 
 ## Blocked 조건
@@ -27,7 +27,7 @@ sourceContext라는 현재 없는 DTO를 가정하지 않는다. 준비 전 실�
 ## 의도 메모
 
 - 외부 금융 목적지만 loopback이며 승인 caller만 테스트에서 연결한다. 실제 공개 승인 API를 통과하는 E2E라고 보고하지 않는다.
-- 예상 추가 운영 코드는0줄이다. producer가 기존 API로 조건을 수용하지 못하면 오류를 보고하고 별도 검토에서 수정 파일·예산을 확정한다.
+- 예상 추가 운영 코드는0줄이며 아직 검증되지 않은 예산 가정이다. producer가 기존 API로 조건을 수용하지 못하면 오류를 보고하고 별도 검토에서 수정 파일·예산을 확정한다.
 - 이 관심사도 운영1500줄과 파일 상한을 지킨다. 새 migration과 baseline 증가는 없다.
 
 ## 작업 항목
@@ -45,17 +45,18 @@ sourceContext라는 현재 없는 DTO를 가정하지 않는다. 준비 전 실�
 실제 Python loader SHA를 fresh Spring catalog/bind.guard/support에 같이 전달한다. manifest/SHA를 Java·Python에서 다시 만들지 않는다.
 기존 공용 HermesConnectorClient mock은 내부에서 만든 실제 HTTP client로 위임한다. 새 Spring context·TestBean·가짜 검증 endpoint를 만들지 않는다.
 실제 request의 TX 밖 prepare1회, 사용자 잠금 아래 현재 맥락 재검증과 PENDING+암호화 snapshot+notification의 같은 TX 커밋을 관측한다.
+CASE-PREPARE-BUDGET은 실제 Spring prepareClient의 read timeout2초를 사용한다. cold auth/429로 prepare 응답을 지연시키거나1 MiB 초과 응답을 주입하고 저장 action/snapshot/notification0·금융0을 확인한다. 늦은 prepare 결과도 저장하지 않는다.
 원래 모델 인자를 유지하고 실행 원문·summary·scope·두 revision을 불변으로 저장한다. 저장 summary의 모든 leg·단위를 실제 open 결과와 대조한다.
 approve가 저장 원문을 쓰고 EXECUTING 커밋 뒤 ticket1회·executeApproved1회를 호출하는지 확인한다. 승인 때 prepare·UUID 생성은0회다.
 실제 Spring claim HTTP의 서명 인증과 consumeTicket 커밋 뒤에만 SDK가 금융 요청을 보내게 연결한다. 실제 인증·DB 소비는 이 시험의 책임이다.
-clientOrderId가 달라도 동일 의도 PENDING/EXECUTING/UNKNOWN이 차단되는지 실제 conflicts 구현으로 확인한다. supersedes_unknown_action_id는 NULL이다.
+DB-INTENT는 clientOrderId만 변경하거나 expected_conditional_order만 변경해도 동일 의도 PENDING/EXECUTING/UNKNOWN이 차단되는지 실제 conflicts 구현으로 확인한다. CREATE AAPL/MSFT는 서로 다른 키여서 차단하지 않고 MODIFY/CANCEL의 다른 대상 ID도 구분한다. 사용자 잠금과 실제 H2/MySQL DB를 쓰며 가짜 conflicts 결과를 주입하지 않는다. supersedes_unknown_action_id는 NULL이다.
 
 ### 3. 수신·실패 주입·MySQL 회귀
 
 정상 CREATE/MODIFY 금융 POST1, CANCEL DELETE1, replay 추가 전송0회를 목적지에서 센다. auth·GET·claim counter는 구분한다.
 MODIFY 새 ID, CREATE optional/null clientOrderId, CANCEL 빈204를 실제 결과 DB 상태와 대조한다.
 원문/summary 변조·추가 키·숫자 decimal·scope/env·owner/profile/revision/manifest 변경·철회·ticket 만료·claim replay는 금융0회다.
-현재 원주문의 leg 상태·targetProfitRate·triggeredOrderId·expireDate 부재가 바뀌면 금융0회다.
+현재 원주문의 leg 상태·targetProfitRate·triggeredOrderId·expireDate 부재가 바뀌면 금융0회다. OTO first 완료/second 감시 CANCEL과 PROFIT_RATE→STOP MODIFY, KR decimal 수량은 새 prepare 당시의 지원 vector로 왕복한다.
 429/5xx/끊김/timeout/불량2xx는 DB UNKNOWN, 공식 명백 거절은 FAILED, 정상은 SUCCEEDED다. UNKNOWN 뒤 ticket/UUID 교체와 추가 전송0회를 확인한다.
 동일 의도 경쟁, claim 직전 철회, 금융 성공 뒤 결과 저장 실패와 기동 정리 경쟁을 bounded latch로 주입한다.
 늦은 결과가 정산된 줄을 바꾸지 않고 프로세스 재기동이 재실행하지 않는지 확인한다.
@@ -75,13 +76,13 @@ node scripts/check-file-length.mjs
 
 H2/MySQL에서 신설 시험이 실행되고 실제 DB producer→Python→SDK→목적지와 replay0회가 확인되어야 완료다. 합성 claim 증거와 구분해 보고한다.
 scripts/check-mysql-migration.sh는 set -Eeuo pipefail로 실패를 전달하며 모든 인자를 mysqlMigrationTest에 넘긴다. backend/build.gradle.kts의 이 task는 mysql 태그를 포함한다. 신규 MySQL 클래스에는 같은 태그를 붙이며 필터와 실제 실행 건수를 함께 확인한다.
-테스트가 기본 업무 API로 통과하면 운영 변경 없이 이 관심사를 끝낸다. 운영 허가와 실제 거래는 완료 조건이 아니다.
+테스트가 기본 업무 API로 통과하면 운영 변경 없이 이 관심사를 끝낸다. 표의 신규 시험은 Java500/Python400줄 이하로 배분하고, 실제 선행 코드가 조건을 거절하면 운영0줄 가정을 폐기해 실패 파일·수정 예산을 별도 검토한다. 없는 producer를 이 phase에서 fake로 채우지 않는다. 운영 허가와 실제 거래는 완료 조건이 아니다.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 | --- | --- |
-| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerRoundTripTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerMysqlRoundTripTest.java` | 신규 |
-| `test/e2e/financial/conditional_plugin_http.py` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerRoundTripTest.java` | 신규 (480줄 이내) |
+| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConditionalProducerMysqlRoundTripTest.java` | 신규 (80줄 이내) |
+| `test/e2e/financial/conditional_plugin_http.py` | 신규 (360줄 이내) |
 | `docs/features/connector.md` | 수정 |
