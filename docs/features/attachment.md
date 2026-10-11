@@ -276,7 +276,8 @@ WebP는 바이트와 픽셀을 만들지 않는 metadata 사례이며 실제 관
 
 테스트의 [픽셀 대응 검증기](../../test/support/media-pipeline-mapping.ts)는 합성 이미지 30장의 방향이 반영된 JPEG에서 픽셀 ID를 회수하고 첨부 ID, 순서, 원본 SHA와 준비 JPEG SHA를 따로 비교한다.
 8방향 회전 JPEG는 독립 좌표 벡터로 확인하며 누락, 중복, 순서 변경과 디코딩 실패는 대응 검증 실패다.
-이 unit 검사는 테스트 준비기와 대역 수신 계약만 확인한다. 실제 Control Plane 업로드와 저장, 다음 turn 재사용은 별도 통합 검사가 필요하고 모델 의미 판독과 실제 provider 전달은 미측정이다.
+unit 검사는 독립 준비기와 대역 수신 계약을 확인한다. MCP 통합 검사는 실제 Control Plane에 JPEG/PNG/GIF 30장을 올려 역순으로 보내고, HTTP로 받은 FakeHermes의 JPEG 픽셀을 첨부·순서·원본 SHA와 대조한다. 서명된 MCP로 관찰을 저장한 뒤 사진 없는 새 turn에서 30개 본문과 revision을 재조회하며 추가 저장은 하지 않는다.
+관찰은 `NEEDS_REVIEW`, `MODEL_UNVERIFIED`이고 JPEG/PNG는 `OVERVIEW`, GIF는 `FIRST_FRAME`의 frame 0으로 기록한다. 실제 DB 검사는 소유권·다른 대화·삭제·만료·UUID 재시도·USER 정정 보호와 암호화 본문을 확인한다. 실제 provider 전달, 사진 의미와 OCR 정확도는 미측정이다.
 기존 원본 픽셀 evidence V1과 `actuallyObserved` 판정에는 수신 JPEG 결과를 넣지 않는다.
 
 ## 요구

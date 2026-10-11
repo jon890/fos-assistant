@@ -43,6 +43,20 @@ export type MediaFixture = {
 
 const GENERATOR = join(import.meta.dirname, "MediaFixtureGenerator.java");
 
+/** 서로 다른 압축 파일의 길이는 같을 수 있다. 각 원본의 실제 길이만 대조한다. */
+export function requireSourceByteLength(
+  bytes: Uint8Array,
+  declared: unknown,
+): void {
+  if (
+    typeof declared !== "number" ||
+    !Number.isSafeInteger(declared) ||
+    declared <= 0 ||
+    declared !== bytes.byteLength
+  )
+    throw new Error("SOURCE_BYTE_LENGTH_INVALID");
+}
+
 export type PreparedPixelMeasurement = {
   recoveredId: number | null;
   width: number | null;
@@ -113,6 +127,7 @@ export function createMediaFixture(
   return generated.map(({ ordinal, format, orientation, measurement }) => {
     const fileName = `asset-${ordinal}.${format.toLowerCase()}`;
     const bytes = readFileSync(join(tempDir, fileName));
+    requireSourceByteLength(bytes, measurement.byteLength);
     const bytesSha256 = createHash("sha256").update(bytes).digest("hex");
     const signature =
       format === "JPEG"
