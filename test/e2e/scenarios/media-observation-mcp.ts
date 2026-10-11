@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { call, expect, expectStatus, fail, step, upload, type Scenario } from "../harness.ts";
 import { callTool, contextFor, openStream, within, type ToolResult } from "../delegation-support.ts";
 import { signedCallContext, signedSubagentRegistration } from "../mcp-context.ts";
+import { NEW_PERSON } from "./people.ts";
 
 export const MEDIA_OBSERVATION_PROFILE = "media-observation-mcp";
 const AGENT = "media-observation-mcp";
@@ -21,10 +22,13 @@ function data<T>(result: ToolResult): T {
 export const mediaObservationMcpScenario: Scenario = {
   name: "사진 관찰 REST와 서명된 MCP",
   async run(context) {
+    // 앞 사람 추가 시나리오에서 실제 허용 목록에 등록한 사용자의 권한을 쓴다.
+    const ownerToken = context.tokens.aunt;
+    const ownerContext = { ...context, tokens: { ...context.tokens, dad: ownerToken } };
     expectStatus(await call(context, "/admin/agents", { method: "POST", token: context.tokens.dad, body: {
       code: AGENT, name: "사진 관찰 검사", hermesProfile: MEDIA_OBSERVATION_PROFILE,
       apiBaseUrl: `${context.hermesBaseUrl}/p/${MEDIA_OBSERVATION_PROFILE}`, costMode: "SUBSCRIPTION",
-      credentialScope: "DEDICATED", visibility: "PRIVATE", ownerEmail: "dad@example.com",
+      credentialScope: "DEDICATED", visibility: "PRIVATE", ownerEmail: NEW_PERSON.email,
     } }), 200, "관찰 에이전트 등록");
     let issued: { id: number; token: string } | undefined;
     let conversationId: string | undefined;
@@ -34,18 +38,18 @@ export const mediaObservationMcpScenario: Scenario = {
       issued = expectStatus(await call(context, "/admin/agent-tokens", { method: "POST", token: context.tokens.dad,
         body: { profileName: MEDIA_OBSERVATION_PROFILE, label: "observation-e2e" } }), 200, "관찰 토큰 발급").json();
       const token = issued!.token;
-      conversationId = expectStatus(await call(context, "/chat/conversations", { method: "POST", token: context.tokens.dad,
+      conversationId = expectStatus(await call(context, "/chat/conversations", { method: "POST", token: ownerToken,
         body: { agentCode: AGENT } }), 200, "관찰 대화 시작").json<{ conversationId: string }>().conversationId;
       const ids: number[] = [];
       for (let index = 0; index < 6; index++) {
         ids.push(expectStatus(await upload(context, `/chat/conversations/${conversationId}/attachments`, {
-          token: context.tokens.dad, field: "file", fileName: `합성-${index}.gif`, contentType: "image/gif",
+          token: ownerToken, field: "file", fileName: `합성-${index}.gif`, contentType: "image/gif",
           bytes: Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64"),
         }), 200, "합성 사진 업로드").json<{ id: number }>().id);
       }
       step("실제 메시지에 사진을 붙이고 실행을 유지해 현재 session으로 관찰을 저장한다");
       context.hermes.holdNextRun();
-      const firstTurn = call(context, "/chat/messages", { method: "POST", token: context.tokens.dad,
+      const firstTurn = call(context, "/chat/messages", { method: "POST", token: ownerToken,
         body: { conversationId, text: "합성 사진 관찰 검사", agentCode: AGENT, attachmentIds: ids } });
       firstTurn.catch(() => undefined);
       completed = firstTurn;
@@ -95,7 +99,7 @@ export const mediaObservationMcpScenario: Scenario = {
 
       step("뒤 turn에서 관찰을 다시 읽고 REST USER 정정은 MODEL이 덮어쓰지 못한다");
       context.hermes.holdNextRun();
-      const turn = await openStream(context, "관찰을 다시 읽어 줘", AGENT, conversationId);
+      const turn = await openStream(ownerContext, "관찰을 다시 읽어 줘", AGENT, conversationId);
       completed = turn.completed;
       await within(context.hermes.waitForHeldRun(), 5_000, "둘째 관찰 실행을 받지 못했다");
       const nextSession = context.hermes.heldRun()?.sessionId;
@@ -104,7 +108,7 @@ export const mediaObservationMcpScenario: Scenario = {
       expect(reread.items[0]?.revision === 1, "뒤 turn의 관찰이 사라졌다");
       const assetId = ids[0]!;
       expectStatus(await call(context, `/chat/conversations/${conversationId}/media-observations/${assetId}`, {
-        method: "PUT", token: context.tokens.dad, body: { expectedRevision: 1, requestId: randomUUID(), observation: {
+        method: "PUT", token: ownerToken, body: { expectedRevision: 1, requestId: randomUUID(), observation: {
           status: "SUCCEEDED", summary: "사용자 정정", coverage: { mode: "ORIGINAL" },
         } },
       }), 200, "사용자 정정");
@@ -122,7 +126,7 @@ export const mediaObservationMcpScenario: Scenario = {
         body: JSON.stringify(signedSubagentRegistration(token, nextSession, nextSession, child)),
       })).status === 201, "중지할 native 자식 등록 실패");
       const executionId = await turn.executionId;
-      expectStatus(await call(context, `/chat/executions/${executionId}/stop`, { method: "POST", token: context.tokens.dad }), 202, "관찰 실행 중지");
+      expectStatus(await call(context, `/chat/executions/${executionId}/stop`, { method: "POST", token: ownerToken }), 202, "관찰 실행 중지");
       context.hermes.releaseHeldRun();
       await turn.completed;
       const cancelled = await callTool(context, token, LIST, {}, signedCallContext(token, LIST, nextSession, child, `call_${randomUUID()}`));
@@ -140,10 +144,10 @@ export const mediaObservationMcpScenario: Scenario = {
       const cleanup: Promise<unknown>[] = [];
       if (issued !== undefined) cleanup.push(call(context, `/admin/agent-tokens/${issued.id}`, { method: "DELETE", token: context.tokens.dad })
         .then((response) => expectStatus(response, 200, "관찰 토큰 정리")));
-      if (conversationId !== undefined) cleanup.push(call(context, `/chat/conversations/${conversationId}`, { method: "DELETE", token: context.tokens.dad })
+      if (conversationId !== undefined) cleanup.push(call(context, `/chat/conversations/${conversationId}`, { method: "DELETE", token: ownerToken })
         .then((response) => expectStatus(response, 204, "관찰 대화 정리")));
       cleanup.push(call(context, `/admin/agents/${AGENT}`, { method: "PATCH", token: context.tokens.dad,
-        body: { enabled: false, visibility: "PRIVATE", ownerEmail: "dad@example.com" } })
+        body: { enabled: false, visibility: "PRIVATE", ownerEmail: NEW_PERSON.email } })
         .then((response) => expectStatus(response, 200, "관찰 에이전트 정리")));
       const results = await Promise.allSettled(cleanup);
       if (!failed) {
