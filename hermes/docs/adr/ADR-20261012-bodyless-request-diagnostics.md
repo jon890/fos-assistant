@@ -55,6 +55,10 @@ cron module의 executable 조회만 제한하는 private proxy도 공식 Hermes 
 공식 source의 helper code와 lazy forward, 세 호출부를 분리 실행해 입력과 실패 분류·session 저장 결과를 대조한다.
 함수 분리 실행은 전체 Hermes import나 실제 provider 실행을 대신하지 않는다.
 추가 관리 의존은 정확한 signature·함수 AST·context-local 저장소·cron module 진입점의 source 검사다.
+문맥 저장소의 `contextvars` import와 선언 이름의 module binding도 검사한다.
+명시 home을 읽는 직접 helper인 `load_env_file`의 함수 AST를 추가로 선언한다.
+선택한 실제 문맥 함수의 복사 문맥 격리·token 복원과 loader의 임시 home·합성 env 격리는
+분리 실행으로 확인한다. 전이 의존 전체의 지문이나 builder 전체 실행을 뜻하지 않는다.
 initializer의 전역 alias 전환, 부모 인자 삭제, 전역 home fallback, 프로세스 전역 interpreter 교체와
 ack 게시 제거의 반례를 거절한다. 전체 agent와 실제 parent·provider 네트워크는 이 검사에서 실행하지 않는다.
 

@@ -836,8 +836,15 @@ core·venv 파일, 프로세스 전체의 `sys.executable`과 subprocess를 바�
 `BODYLESS_REQUEST_FILES`의 다섯 파일 지문에는 추가하지 않는다.
 `hermes/tests/hermes_contract.py`의 `BODYLESS_MANAGED_FUNCTIONS`가 고정 공식 commit의 정확한
 위치·키워드 전용 인자, 기본값·annotation과 함수 AST를 선언한다.
-`BODYLESS_MANAGED_MODULE_NODES`는 문맥 저장소와 cron module의 `sys` import·child 진입점을 선언한다.
+`BODYLESS_MANAGED_MODULE_NODES`는 문맥 저장소와 `contextvars` import,
+cron module의 `sys` import·child 진입점을 선언한다.
+두 문맥 module의 `ContextVar`·`Token`과 선언된 저장소·함수 이름은 module scope에서 한 번만
+bind되는지 검사한다. 명시 home의 직접 helper인 `load_env_file`도 함수 AST를 별도로 선언한다.
 AST 지문은 행 번호·공백·주석을 제외하며 함수 본문의 변경도 재검토 대상으로 삼는다.
+실제 source에서 선택한 get·set·reset을 실행해 복사 문맥의 격리와 token 복원을 확인한다.
+loader도 분리 실행해 서로 다른 임시 home의 합성 env 값과 반환 dict가 섞이지 않고,
+프로세스 환경을 읽어 대체하거나 변경하지 않는지 확인한다.
+이 분리 실행에 필요한 parser·cache·stat helper는 실행하되 전이 의존 전체의 지문을 선언하지 않는다.
 
 | 내부 경계 | 관리 owner가 기대는 동작 |
 | --- | --- |

@@ -43,7 +43,7 @@ class Call:
     keywords: tuple = ()
     is_async: bool = False
     # plugin 이 돌려받은 값의 모양에 기대면 반환 annotation 을 적는다. 바뀌면 plugin 의 쓰는 곳을 다시 본다.
-    returns: str = None
+    returns: str | None = None
     # plugin 이 이 함수를 바꿔 끼우면 Hermes 정의의 인자가 정확히 이 모양이어야 한다.
     exact: bool = False
 
@@ -231,6 +231,10 @@ BODYLESS_MANAGED_FUNCTIONS = {
             'b32c188da5f322e03285711ffa18520d65278f0edb636bb69aada9571ebf9ae5'),
     },
     'agent/secret_scope.py': {
+        'load_env_file': (
+            ('env_path: Path'),
+            'Dict[str, str]',
+            'b3512b6c0ddf893b8b895bcc518efb8bf7e0a85f326e0a6702a83b61c5988bec'),
         'current_secret_scope_home': (
             (''),
             'Optional[str]',
@@ -277,10 +281,12 @@ BODYLESS_MANAGED_FUNCTIONS = {
 # context-local 저장소와 cron의 module-global sys 조회, child 진입점도 함수 밖 계약이다.
 BODYLESS_MANAGED_MODULE_NODES = {
     'agent/secret_scope.py': {
+        'from contextvars': '4d0b69a21e07c09772f472c6b0411bc712725d65289d6dbe78af988bf4f22819',
         '_SECRET_SCOPE': 'e1d8ad0021ac4a95106cc9ca4eebf23585a9ed588e615423ecc9d03eb47924e8',
         '_BoundScope': '77f0d9930ea6754d082810686e2be8e15c76712533f7767d07ca758f18c4d910',
     },
     'hermes_constants.py': {
+        'from contextvars': '4d0b69a21e07c09772f472c6b0411bc712725d65289d6dbe78af988bf4f22819',
         '_HERMES_HOME_OVERRIDE': '98eaa1371fae960a502aed95e91d5d64b69e64a1d94702c00db8b5fcc309fd7c',
         '_UNSET': '6eaf8669f559cd824f5088f162c8ea4f1edab6686f51f7fcea9fbaa6ad635ccb',
     },
