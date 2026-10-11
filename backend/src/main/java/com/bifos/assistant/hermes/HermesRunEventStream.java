@@ -356,7 +356,7 @@ public class HermesRunEventStream {
     }
 
 
-    /** {@code memory_read} 도구의 사건 가운데 시작이 아닌 것이다. Hermes 가 뒤에 결과를 싣기 시작해도 본문을 남기지 않는다. */
+    /** 사건의 별칭에서 원고 저장·읽기 도구 이름을 확인한다. */
     private static boolean contentDraftTool(JsonNode node) {
         for (String key : List.of("tool", "tool_name", "toolName", "name")) {
             JsonNode value = node.get(key);
@@ -372,6 +372,7 @@ public class HermesRunEventStream {
     }
 
 
+    /** {@code memory_read} 도구의 사건 가운데 시작이 아닌 것이다. Hermes 가 뒤에 결과를 싣기 시작해도 본문을 남기지 않는다. */
     private static boolean memoryReadResult(String type, String toolName) {
         return toolName != null
             && toolName.endsWith(MEMORY_READ_TOOL_SUFFIX)
