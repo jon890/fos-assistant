@@ -117,6 +117,40 @@ class ConnectorConditionalSnapshotTest {
 
 
     @Test
+    @DisplayName("조건 의도 키는 잘못된 surrogate를 거절하고 한글과 정상 비 BMP 해시를 보존한다")
+    void rejectsMalformedToolEncodingAndPreservesUtf8Hash() {
+        ConnectorExecutionSnapshot snapshot = validate(BASE);
+        // primitive 호출만 검사한다. 두 tool 모두 manifest의 ASCII 등록 경계에서는 허용되지 않는다.
+        assertThat(snapshot.requestKey(1L, 2L, "tool?")).hasSize(64);
+        for (String tool : new String[] {"tool\uD800", "tool\uDC00", "tool\uD800?"}) {
+            assertThatThrownBy(() -> snapshot.requestKey(1L, 2L, tool)).isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThat(snapshot.requestKey(1L, 2L, "도구😀"))
+            .isEqualTo("0b37ca3b111348cc0319f633d016e521d3ff675b75cef78e4cbc98a4eee04650");
+        assertThat(snapshot.requestKey(1L, 2L, value(BASE, "tool"))).isEqualTo(value(BASE, "requestKey"));
+    }
+
+
+    @Test
+    @DisplayName("Spring 원문 경계의 공통 기대는 수용 47개와 거절 132개다")
+    void verifiesActualRawConsumerCounts() {
+        int accepted = 0;
+        int rejected = 0;
+        for (JsonNode sample : VECTOR.get("cases")) {
+            if (sample.get("valid").booleanValue()) {
+                validate(sample);
+                accepted++;
+            } else {
+                assertThatThrownBy(() -> validate(sample)).as(value(sample, "name")).isInstanceOf(IllegalArgumentException.class);
+                rejected++;
+            }
+        }
+        assertThat(accepted).isEqualTo(47);
+        assertThat(rejected).isEqualTo(132);
+    }
+
+
+    @Test
     @DisplayName("AAD의 열·사용자·action과 key 식별자를 바꾸면 DB 읽기가 실패한다")
     void rejectsStoredCipherContextTampering() {
         Fixture fixture = fixture();

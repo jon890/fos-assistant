@@ -7,6 +7,9 @@ import static com.bifos.assistant.connector.application.ConnectorExecutionSnapsh
 
 import com.bifos.assistant.shared.util.Sha256;
 import java.math.BigDecimal;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.LocalDate;
@@ -271,7 +274,15 @@ final class ConnectorConditionalSnapshot {
 
 
     private static String lp(String value) {
-        return value.getBytes(StandardCharsets.UTF_8).length + ":" + value;
+        try {
+            int length = StandardCharsets.UTF_8.newEncoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .encode(CharBuffer.wrap(value)).remaining();
+            return length + ":" + value;
+        } catch (CharacterCodingException ignored) {
+            throw new IllegalArgumentException("conditional intent requires valid UTF-8");
+        }
     }
 
 
