@@ -132,6 +132,36 @@ class ConnectorGateCase(unittest.TestCase):
 
 
 class ConnectorCatalogTest(ConnectorGateCase):
+    def test_private_snapshot_activation_is_not_an_install_manifest_parameter(self):
+        """snapshot 선언이 없어도 private 인자와 예약 env는 공개 설치에서 거절한다."""
+        reader = sys.modules[self.plugin.__name__ + ".connector_snapshot_manifest"]
+        for name in reader.SNAPSHOT_ENV:
+            with self.assertRaises(ValueError):
+                reader._snapshot_manifest({}, {"args": [], "env": {name: ""}}, {}, {name})
+        for flag in ("--content-snapshot-operation", "--content-snapshot-operation=compile"):
+            with self.assertRaises(ValueError):
+                reader._snapshot_manifest({}, {"args": [flag], "env": {}}, {}, set())
+
+    def test_snapshot_declaration_has_exact_capabilities_and_no_public_tools(self):
+        """snapshot은 별도 카탈로그 칸이고 이름·키·boolean 계약이 틀리면 선언 전체를 거절한다."""
+        declaration = {"protocol": "content-snapshot-v1", "compile_tool": "compile_snapshot",
+                       "start_tool": "start_snapshot", "status_tool": "snapshot_status",
+                       "capabilities": {"compile": True, "start": False, "status": False}}
+        self.rewrite("connector.json", lambda value: value.update(snapshot=declaration))
+        self.assertEqual(self.catalog()[0]["snapshot"], declaration)
+        self.assertNotIn("compile_snapshot", self.catalog()[0]["tools"])
+        for changed in [{"extra": True}, {"protocol": "content-snapshot-v2"}, {"start_tool": "compile_snapshot"},
+                        {"compile_tool": "list_scopes"}, {"compile_tool": "../tool"},
+                        {"capabilities": {"compile": 1, "start": False, "status": False}},
+                        {"capabilities": {"compile": True, "start": True, "status": False}},
+                        {"capabilities": {"compile": True, "start": False}},
+                        {"capabilities": {"compile": True, "start": False, "status": False, "extra": False}}]:
+            self.rewrite("connector.json", lambda value: value.update(snapshot={**declaration, **changed}))
+            self.assertEqual(self.catalog(), [])
+        self.rewrite("connector.json", lambda value: value.update(snapshot={k: v for k, v in declaration.items()
+                                                                          if k != "capabilities"}))
+        self.assertEqual(self.catalog(), [])
+
     def test_catalog_lists_the_validated_connector_without_operator_values(self):
         """시험 커넥터가 카탈로그에 나오고, 칸의 env 와 확인 도구가 있고, 운영자 env 의 이름과 값이 없다."""
         body = self.catalog()
