@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.ContentDraftCleaner;
-import com.bifos.assistant.chat.application.ContentDraftException;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftReferences;
 import com.bifos.assistant.chat.application.ContentDraftService;
@@ -25,12 +25,11 @@ import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -106,13 +105,22 @@ class ContentDraftServiceTest extends ContentDraftFixture {
             ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
         assertThat(localDrafts(refs, draftBodies).read(owner, conversation.id(), id, null).draft().title()).isEqualTo("비밀");
         TextCipher failed = new TextCipher() {
-            public boolean enabled() { return true; }
+            @Override
+            public boolean enabled() {
+                return true;
+            }
 
 
-            public Optional<SealedText> seal(Long user, String aad, String plain) { throw new IllegalStateException("synthetic"); }
+            @Override
+            public Optional<SealedText> seal(Long user, String aad, String plain) {
+                throw new IllegalStateException("synthetic");
+            }
 
 
-            public Optional<String> open(Long key, Long user, String aad, String value) { return Optional.empty(); }
+            @Override
+            public Optional<String> open(Long key, Long user, String aad, String value) {
+                return Optional.empty();
+            }
         };
         var unavailable = localDrafts(refs, new ContentDraftBodies(failed));
         code(() -> unavailable.read(owner, conversation.id(), id, null), ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
@@ -134,7 +142,9 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         drafts.revise(owner, conversation.id(), id, 1, inputDraft("둘", true));
         var failingStore = new AttachmentStore(properties) {
             @Override
-            public void delete(ChatAttachment row) { throw new IllegalStateException("synthetic"); }
+            public void delete(ChatAttachment row) {
+                throw new IllegalStateException("synthetic");
+            }
         };
         var interrupted = new AttachmentCleaner(attachments, failingStore, clock, mutations, observationCleaner, cleaner);
         assertThatThrownBy(() -> interrupted.delete(photo, NOW)).isInstanceOf(IllegalStateException.class);
@@ -264,6 +274,40 @@ class ContentDraftServiceTest extends ContentDraftFixture {
             .isInstanceOf(DataAccessResourceFailureException.class);
         assertThat(draftRows.findAll().getFirst().currentRevision()).isEqualTo(1);
         assertThat(revisionRows.count()).isEqualTo(1);
+    }
+
+
+    @Test
+    @DisplayName("같은 사용자라도 다른 원고·revision의 암호문은 AAD가 달라 열리지 않는다")
+    void rejectsCiphertextMovedAcrossDraftsAndRevisions() {
+        var first = drafts.create(owner, conversation.id(), inputDraft("첫", false)).draft().draftId();
+        var second = drafts.create(owner, conversation.id(), inputDraft("둘", false)).draft().draftId();
+        var rows = revisionRows.findAll();
+        jdbc.update("update content_draft_revision set body=?,body_key_id=? where id=?", rows.get(0).body(), rows.get(0).bodyKeyId(), rows.get(1).id());
+        code(() -> drafts.read(owner, conversation.id(), second, null), ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
+        assertThat(revisionRows.findById(rows.get(1).id()).orElseThrow().status()).isEqualTo(ContentDraftRevisionStatus.VALID);
+        drafts.revise(owner, conversation.id(), first, 1, inputDraft("셋", false));
+        var current = revisionRows.findAll().getLast();
+        jdbc.update("update content_draft_revision set body=?,body_key_id=? where id=?", rows.get(0).body(), rows.get(0).bodyKeyId(), current.id());
+        code(() -> drafts.read(owner, conversation.id(), first, null), ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
+        assertThat(drafts.read(owner, conversation.id(), first, 1L).draft().title()).isEqualTo("첫");
+    }
+
+
+    @Test
+    @DisplayName("없는 타대화 미전송 첨부는 같은 410으로 응답한다")
+    void rejectsUnavailableAssetsWithTheSameGoneCode() {
+        var other = user();
+        var another = conversations.save(Conversation.startedBy(other.id(), "타 대화", null, NOW));
+        var foreign = photo(other, another);
+        var pending = attachmentService.upload(owner, conversation.id(), "a.gif", "image/gif", IMAGE.length,
+            () -> new ByteArrayInputStream(IMAGE));
+        for (Long id : List.of(Long.MAX_VALUE, foreign.id(), pending.id())) {
+            var node = json.valueToTree(inputDraft("본문", true));
+            ((ObjectNode)node.get("blocks").get(0)).put("assetId", id.toString());
+            code(() -> drafts.create(owner, conversation.id(), reader.read(node)), ErrorCode.ATTACHMENT_GONE);
+        }
+        assertThat(draftRows.count()).isZero();
     }
 
 }

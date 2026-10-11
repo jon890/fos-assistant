@@ -5,6 +5,7 @@ import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import com.bifos.assistant.chat.application.model.ContentDraftInput;
 import com.bifos.assistant.chat.application.model.ContentDraftSummary;
 import com.bifos.assistant.chat.application.model.ContentDraftView;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.domain.entity.ContentDraft;
 import com.bifos.assistant.chat.domain.entity.ContentDraftAsset;
 import com.bifos.assistant.chat.domain.entity.ContentDraftRevision;

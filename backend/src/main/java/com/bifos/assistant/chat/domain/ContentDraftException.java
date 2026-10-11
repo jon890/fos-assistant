@@ -1,4 +1,4 @@
-package com.bifos.assistant.chat.application;
+package com.bifos.assistant.chat.domain;
 
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;

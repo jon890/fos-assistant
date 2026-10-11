@@ -1,6 +1,6 @@
 package com.bifos.assistant.chat.infra;
 
-import com.bifos.assistant.chat.application.ContentDraftException;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.domain.entity.ContentDraft;
 import com.bifos.assistant.chat.domain.entity.ContentDraftRevision;
 import com.bifos.assistant.crypto.domain.SealedText;

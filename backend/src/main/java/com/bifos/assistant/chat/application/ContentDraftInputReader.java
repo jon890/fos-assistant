@@ -31,14 +31,7 @@ public class ContentDraftInputReader {
         String title = text(node.get("title"), 1, 100);
         String category = text(node.get("category"), 1, 50);
         var tags = node.get("tags");
-        array(tags, 30);
-        Set<String> unique = new HashSet<>();
-        for (var tag : tags) {
-            String value = text(tag, 1, 30);
-            if (value.contains("#") || value.contains(",") || !unique.add(TRIM.matcher(value).replaceAll("").toLowerCase(Locale.ROOT))) {
-                throw invalid();
-            }
-        }
+        validateTags(tags);
         var blocks = node.get("blocks");
         array(blocks, 500);
         int images = 0;
@@ -88,6 +81,18 @@ public class ContentDraftInputReader {
             throw invalid();
         }
         return new ContentDraftInput(title, category, tags.deepCopy(), blocks.deepCopy());
+    }
+
+
+    private static void validateTags(JsonNode tags) {
+        array(tags, 30);
+        Set<String> unique = new HashSet<>();
+        for (var tag : tags) {
+            String value = text(tag, 1, 30);
+            if (value.contains("#") || value.contains(",") || !unique.add(TRIM.matcher(value).replaceAll("").toLowerCase(Locale.ROOT))) {
+                throw invalid();
+            }
+        }
     }
 
 

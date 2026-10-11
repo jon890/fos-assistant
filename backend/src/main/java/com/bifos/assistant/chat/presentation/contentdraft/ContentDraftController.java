@@ -1,7 +1,7 @@
 package com.bifos.assistant.chat.presentation.contentdraft;
 
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import com.bifos.assistant.chat.application.ContentDraftException;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftService;
 import com.bifos.assistant.chat.application.ConversationAccess;

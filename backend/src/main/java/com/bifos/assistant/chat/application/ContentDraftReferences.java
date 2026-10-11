@@ -2,6 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import java.time.Instant;
 import java.nio.charset.StandardCharsets;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.application.model.MediaObservationInput;
 import com.bifos.assistant.chat.application.model.ObservationProvenance;
