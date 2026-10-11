@@ -14,6 +14,18 @@ import tools.jackson.databind.json.JsonMapper;
 
 class HermesInterimStreamTest {
     @Test
+    @DisplayName("64KiB보다 긴 안내도 확인된 delta 전체를 재분류한다")
+    void classifiesLargeConfirmedInterim() throws IOException {
+        String text = "긴 안내 ".repeat(15_000);
+        List<RunEvent> events = new ArrayList<>();
+        HermesInterimWire.read("data: {\"event\":\"message.delta\",\"delta\":\"" + text + "\"}\n\n"
+            + "data: {\"event\":\"message.interim\",\"text\":\"" + text + "\",\"already_streamed\":true}\n\n",
+            ToolDetailScope.NONE, events::add);
+        assertThat(text.length()).isGreaterThan(65_536);
+        assertThat(events.getLast().streamedPrefixLength()).isEqualTo(text.length());
+    }
+
+    @Test
     @DisplayName("pinned SSE는 종료까지 읽고 완전 delta와 일부 접두사를 중간 안내로 확인한다")
     void readsWireAndClassifiesFullAndPartialPrefixes() throws IOException {
         List<RunEvent> events = new ArrayList<>();

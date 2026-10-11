@@ -207,6 +207,25 @@ class ChatInterimTest {
     }
 
 
+    @Test
+    @DisplayName("64KiB보다 긴 확인된 안내는 중지 fallback에서 빼고 남은 답 조각만 저장한다")
+    void excludesLargeConfirmedInterimFromStoppedFallback() {
+        String text = "긴 안내 ".repeat(15_000);
+        for (String partial : List.of("", "안전한 부분 답")) {
+            var events = stream("data: {\"event\":\"message.delta\",\"delta\":\"" + text + "\"}\n\n"
+                + "data: {\"event\":\"message.interim\",\"text\":\"" + text + "\",\"already_streamed\":true}\n\n"
+                + "data: {\"event\":\"message.delta\",\"delta\":\"" + partial + "\"}\n\n", "cancelled", "");
+            var stopped = events.getLast();
+            if (partial.isEmpty()) {
+                assertThat(stopped.messageId()).isNull();
+                assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(user, stopped.conversationId())))
+                    .noneMatch(message -> message.role() == MessageRole.ASSISTANT);
+            } else {
+                assertStoredAnswer(stopped, partial);
+            }
+        }
+    }
+
     private void assertStoredAnswer(ChatEvent done, String answer) {
         assertThat(messages.findByConversationIdOrderByIdAsc(access.requireOwnId(user, done.conversationId())))
             .filteredOn(message -> message.role() == MessageRole.ASSISTANT)

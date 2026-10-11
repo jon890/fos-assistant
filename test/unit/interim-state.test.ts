@@ -3,6 +3,17 @@ import test from "node:test";
 import { applyChatEvent, emptyActivity, failActivity } from "../../web/src/components/chat/activity/activity-state.ts";
 import { applyStreamText, type TurnStreamText } from "../../web/src/components/chat/turn-stream-text.ts";
 
+test("64KiB보다 긴 확인된 안내도 답에서 빼고 나중에 온 답은 보존한다", () => {
+  const prefix = "긴 안내 ".repeat(15_000);
+  const state: TurnStreamText = { text: "앞 답" + prefix, interimKeys: new Set() };
+  const event = { type: "interim" as const, text: "긴 안내", interimId: "1", alreadyStreamed: true, streamedPrefixLength: prefix.length };
+  assert.equal(applyStreamText(state, event), true);
+  assert.equal(state.text, "앞 답");
+  applyStreamText(state, { type: "delta", text: "나중 답" });
+  assert.equal(applyStreamText(state, event), false);
+  assert.equal(state.text, "앞 답나중 답");
+});
+
 test("다른 안내의 순서를 보존하고 공백만 다른 재수신은 한 번 표시한다", () => {
   let state = emptyActivity(0);
   for (const text of ["먼저 확인해요", "다음 안내예요", "먼저  확인해요"]) {

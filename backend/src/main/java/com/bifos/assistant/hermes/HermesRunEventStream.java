@@ -270,7 +270,6 @@ public class HermesRunEventStream {
         private final Clock clock;
         private boolean connectorCalled;
         private final StringBuilder deltaSegment = new StringBuilder();
-        private boolean segmentTooLong;
         private final Set<String> interimKeys = new HashSet<>();
         private final Map<InterimIdentity, String> interimIds = new LinkedHashMap<>();
 
@@ -290,12 +289,7 @@ public class HermesRunEventStream {
         /** 직전 구간 전체가 안내의 접두사인 경우만 재분류한다. 부분 문자열이나 최종 답에서는 찾지 않는다. */
         Integer classify(String type, String text, Boolean alreadyStreamed, String interimId) {
             if ("message.delta".equalsIgnoreCase(type) && text != null) {
-                if (deltaSegment.length() + text.length() > 65_536) {
-                    segmentTooLong = true;
-                    deltaSegment.setLength(0);
-                } else if (!segmentTooLong) {
-                    deltaSegment.append(text);
-                }
+                deltaSegment.append(text);
                 return null;
             }
             if ("message.interim".equalsIgnoreCase(type)) {
@@ -305,16 +299,14 @@ public class HermesRunEventStream {
                     return 0;
                 }
                 String prefix = normalize(deltaSegment.toString());
-                int length = Boolean.TRUE.equals(alreadyStreamed) && !segmentTooLong && !prefix.isEmpty()
+                int length = Boolean.TRUE.equals(alreadyStreamed) && !prefix.isEmpty()
                     && text != null && normalize(text).startsWith(prefix) ? deltaSegment.length() : 0;
                 deltaSegment.setLength(0);
-                segmentTooLong = false;
                 return length;
             }
             if ("tool.started".equalsIgnoreCase(type) || "run.started".equalsIgnoreCase(type)
                 || "reset".equalsIgnoreCase(type)) {
                 deltaSegment.setLength(0);
-                segmentTooLong = false;
                 if (!"tool.started".equalsIgnoreCase(type)) {
                     interimKeys.clear();
                     interimIds.clear();
