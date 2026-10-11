@@ -12,10 +12,15 @@ hermes/bundle.sh --out <디렉터리> --mcp-url <Control Plane MCP 주소>
 
 `--out` 은 없거나 비어 있는 디렉터리여야 하고, `--mcp-url` 은 `http://` 나 `https://` 로 시작해야 한다.
 묶음은 Hermes 의 `plugins/dashboard-profile-api/` 자리에 그대로 들어갈 모양이다.
-plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/` 이다.
+plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `default-config.yaml.template`, 틀의 `plugins.enabled` 가 켜는 profile plugin 을 담은 `profile-plugins/<이름>/`, 관리 bootstrap용 `runtime/*.py`를 담는다.
 틀의 MCP 주소 자리는 `__FOS_ASSISTANT_MCP_URL__` 이다. 주소를 주지 않거나 자리가 남으면 묶음을 만들지 않고 실패한다.
 묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
 디렉터리 배치와 배포 순서는 [`hermes/docs/code-architecture.md`](docs/code-architecture.md) 의 「디렉터리 배치와 배포 순서」 가 갖는다.
+
+`runtime/`은 PluginManager가 선택 등록하는 plugin이 아니다. 운영은 이 묶음을 별도 관리 import 경로에 두고,
+검증한 bootstrap에서 `from runtime import install_bodyless_writer`로 명시 설치한다.
+묶음에 들어 있다는 사실만으로 보호가 설치되지는 않는다. API와 resolver·release manifest 계약은
+[본문 없는 요청 진단](docs/hermes-contract.md#본문-없는-요청-진단)이 갖는다.
 
 ## 운영 값
 
