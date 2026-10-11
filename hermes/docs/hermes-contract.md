@@ -14,7 +14,8 @@ fos-ctx는 기존 pre_tool_call로 두 관찰 도구의 _fos_ctx를 덮어쓰고
 새 도구는 모델 선언을 저장하며 실제 provider·model이나 이미지 판독 품질을 증명하지 않는다.
 Control Plane은 두 도구의 bare/prefixed 이름에 대해 start/complete/fail detail과 text를 수집 전에 null로 만든다.
 root/data에 담긴 preview/detail/result와 delta/text/output도 가리며 ADMIN/MEMBER와 커넥터 호출 전후에 같은 규칙을 적용한다.
-기존 Memory 검색의 가림·REQUIRED_TOOLS 등록과 native 이미지·coverage의 선언 의미를 유지한다.
+Memory 검색이 추가된 기준에서는 그 가림과 REQUIRED_TOOLS 등록도 유지한다.
+native 이미지·coverage의 선언 의미는 바꾸지 않는다.
 
 ## 확장 지점
 
