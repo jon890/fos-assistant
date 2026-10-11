@@ -7,35 +7,12 @@ import {
 } from "./api-contract.ts";
 import type { Tossinvest } from "./client.ts";
 import { TossinvestError } from "./errors.ts";
+import { officialFields } from "./official-response.ts";
 import type { RegisterTool } from "./tool-registration.ts";
 
 const invalidInput = (): never => {
   throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
 };
-
-/** 검증된 조건조회 응답에서 공식 필드만 남긴다. nullable·부재·문자열 값은 바꾸지 않는다. */
-function officialFields(value: any, schema: any): any {
-  if (value === null) return null;
-  if (schema.$ref)
-    return officialFields(value, SCHEMAS[schema.$ref.split("/").pop()]);
-  if (schema.allOf)
-    return schema.allOf.reduce(
-      (result: any, branch: any) => ({
-        ...result,
-        ...officialFields(value, branch),
-      }),
-      {},
-    );
-  if (Array.isArray(value))
-    return value.map((entry) => officialFields(entry, schema.items));
-  if (schema.properties)
-    return Object.fromEntries(
-      Object.entries(schema.properties)
-        .filter(([key]) => Object.hasOwn(value, key))
-        .map(([key, child]) => [key, officialFields(value[key], child)]),
-    );
-  return value;
-}
 
 /** 불투명 ID를 한 segment로만 보낸다. URL이 정규화하는 점 경로도 거절한다. */
 function orderSegment(id: string): string {
@@ -43,7 +20,7 @@ function orderSegment(id: string): string {
     !id ||
     id === "." ||
     id === ".." ||
-    /[\s/\\?#%:\u0000-\u001f\u007f]/u.test(id)
+    /[\s/\\?#%:\u0000-\u001f\u007f-\u009f]/u.test(id)
   )
     return invalidInput();
   try {
@@ -60,10 +37,13 @@ export function registerConditionalReadTools(
   register(
     "list_conditional_orders",
     {
-      status: z.string().default(""),
+      status: z
+        .string()
+        .default("")
+        .describe("필수. OPEN 또는 CLOSED를 넘긴다."),
       symbol: z.string().optional(),
       cursor: z.string().optional(),
-      limit: z.number().optional(),
+      limit: z.number().optional().describe("정수 1..100. 생략하면 기본 20건."),
     },
     { readOnlyHint: true },
     async ({ status, symbol, cursor, limit }) => {
@@ -98,7 +78,12 @@ export function registerConditionalReadTools(
 
   register(
     "get_conditional_order",
-    { conditionalOrderId: z.string().default("") },
+    {
+      conditionalOrderId: z
+        .string()
+        .default("")
+        .describe("필수. 조회할 조건주문의 불투명 ID를 넘긴다."),
+    },
     { readOnlyHint: true },
     async ({ conditionalOrderId }) => {
       const segment = orderSegment(conditionalOrderId);

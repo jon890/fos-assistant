@@ -72,10 +72,10 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 ### 조건주문 조회
 
 `list_conditional_orders`는 `status=OPEN/CLOSED`와 선택 `symbol`, `cursor`, `limit`를 받는다. 두 상태 모두 기본 20건, 최대 100건의 한 페이지만 반환한다. `result.conditionalOrders`, `nextCursor`, `hasNext`를 보존하며 다음 페이지는 받은 cursor로 별도 호출한다.
-`get_conditional_order`는 목록에서 받은 불투명 `conditionalOrderId`만 받는다. 점 경로, percent 인코딩, 경로 구분자와 URL 주입을 거절한다. 계좌, token, URL은 caller가 지정하지 못하며 현재 연결의 env 계좌만 사용한다.
-SINGLE/OCO/OTO, STOP/PROFIT_RATE와 최상위·leg 상태를 구분한다. HOLDING이나 CANCELED인 leg를 최상위 상태로 바꾸지 않는다. nullable 가격과 `second=null`, 없는 `expireDate`와 decimal 문자열을 보존한다. WATCHING은 체결 완료를 뜻하지 않는다. 조건주문 생성·수정·취소와 WebSocket은 지원하지 않는다.
+`get_conditional_order`는 목록에서 받은 불투명 `conditionalOrderId`만 받는다. C0·DEL·C1 제어문자, 점 경로, percent 인코딩, 경로 구분자와 URL 주입을 인증 HTTP 전에 거절한다. 계좌, token, URL은 caller가 지정하지 못하며 현재 연결의 env 계좌만 사용한다.
+SINGLE/OCO/OTO, STOP/PROFIT_RATE와 최상위·leg 상태를 구분한다. HOLDING이나 CANCELED인 leg를 최상위 상태로 바꾸지 않는다. nullable 가격과 `second=null`, 없는 `expireDate`와 decimal 문자열을 보존한다. `targetProfitRate="10.5"`는 10.5%다. WATCHING은 체결 완료를 뜻하지 않는다. 조건주문 생성·수정·취소와 WebSocket은 지원하지 않는다.
 
-조건조회 결과는 공식 schema의 알려진 필드만 반환한다. 최상위와 leg, 중첩 배열의 확장 키는 제거하며 서비스가 추가한 정보는 누락될 수 있다. 공식 필드의 unknown enum 값은 보존한다. metadata는 현재 `{}`이며 upstream metadata를 그대로 노출하지 않는다. 계좌번호 표시는 기존 `list_accounts`의 끝 네 자리 마스킹을 따른다.
+조건조회 결과는 공식 schema의 알려진 필드만 반환한다. 최상위와 leg, 중첩 배열의 확장 키는 제거하며 서비스가 추가한 정보는 누락될 수 있다. 공식 필드의 unknown enum 값은 보존한다. 지원하지 않는 객체 schema는 원문을 반환하지 않고 전체 오류로 거절한다. metadata는 현재 `{}`이며 upstream metadata를 그대로 노출하지 않는다. 계좌번호 표시는 기존 `list_accounts`의 끝 네 자리 마스킹을 따른다.
 
 ### 토큰
 

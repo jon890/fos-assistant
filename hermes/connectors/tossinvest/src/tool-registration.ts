@@ -24,7 +24,7 @@ export function createToolRegistration(server: McpServer) {
     list_conditional_orders:
       "연결한 계좌의 진행 중(OPEN)이나 종료(CLOSED) 조건주문을 한 페이지 읽습니다. 기본 20건, 최대 100건이며 nextCursor와 hasNext로 다음 페이지를 확인합니다.",
     get_conditional_order:
-      "연결한 계좌의 조건주문 ID로 상세를 읽습니다. OCO·OTO와 STOP·PROFIT_RATE 조건, 최상위 상태와 각 leg 상태를 그대로 구분합니다. 생성하거나 취소하지 않습니다.",
+      "연결한 계좌의 조건주문 ID로 상세를 읽습니다. OCO·OTO와 STOP·PROFIT_RATE 조건, 최상위 상태와 각 leg 상태를 그대로 구분합니다. targetProfitRate 문자열 10.5는 10.5%입니다. 생성하거나 취소하지 않습니다.",
   };
   const register: RegisterTool = (
     name: string,

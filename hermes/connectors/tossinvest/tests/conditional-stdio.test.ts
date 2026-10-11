@@ -4,6 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  boundaryCases,
+  withExtensions,
+  sensitiveExtension,
+  sensitiveMarker,
+} from "./conditional-boundary-fixture.ts";
 import { buildBundle } from "../scripts/build.ts";
 import manifest from "../connector.json";
 import canonical from "./fixtures/openapi-1.2.24.json";
@@ -120,6 +126,28 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
     expect(
       tools.find(({ name }) => name === "get_conditional_order")!.description,
     ).toContain("최상위 상태와 각 leg 상태");
+    const listSchema = tools.find(
+      ({ name }) => name === "list_conditional_orders",
+    )!.inputSchema;
+    const detailSchema = tools.find(
+      ({ name }) => name === "get_conditional_order",
+    )!.inputSchema;
+    expect(listSchema.properties?.status).toMatchObject({
+      description: "필수. OPEN 또는 CLOSED를 넘긴다.",
+      default: "",
+    });
+    expect(listSchema.properties?.limit).toMatchObject({
+      description: "정수 1..100. 생략하면 기본 20건.",
+    });
+    expect(detailSchema.properties?.conditionalOrderId).toMatchObject({
+      description: "필수. 조회할 조건주문의 불투명 ID를 넘긴다.",
+      default: "",
+    });
+    expect(listSchema.required ?? []).not.toContain("status");
+    expect(detailSchema.required ?? []).not.toContain("conditionalOrderId");
+    expect(
+      tools.find(({ name }) => name === "get_conditional_order")!.description,
+    ).toContain("targetProfitRate 문자열 10.5는 10.5%");
     // caller가 계좌나 credential, 목적지와 ID 경로를 바꿔도 인증부터 보내지 않는다.
     for (const [name, args] of [
       ["list_conditional_orders", { status: "OPEN", account: "8" }],
@@ -136,6 +164,31 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
       expect((await client.callTool({ name, arguments: args })).isError).toBe(
         true,
       );
+    for (const code of [
+      ...Array.from({ length: 32 }, (_, index) => index),
+      ...Array.from({ length: 33 }, (_, index) => 127 + index),
+    ]) {
+      const rejected = await tool(client, "get_conditional_order", {
+        conditionalOrderId: `a${String.fromCharCode(code)}b`,
+      });
+      expect(rejected.result.isError).toBe(true);
+      expect(rejected.body).toEqual({
+        error: { code: "TOSSINVEST_INVALID_INPUT" },
+      });
+      expect(fake.requests).toHaveLength(0);
+    }
+    for (const [name, args] of [
+      ["list_conditional_orders", {}],
+      ["get_conditional_order", {}],
+      ["list_conditional_orders", { status: "OPEN", limit: 1.5 }],
+    ] as Array<[string, Record<string, unknown>]>) {
+      const rejected = await tool(client, name, args);
+      expect(rejected.result.isError).toBe(true);
+      expect(rejected.body).toEqual({
+        error: { code: "TOSSINVEST_INVALID_INPUT" },
+      });
+      expect(fake.requests).toHaveLength(0);
+    }
     expect(fake.requests).toHaveLength(0);
     for (const status of ["OPEN", "CLOSED"]) {
       const listing = await tool(client, "list_conditional_orders", { status });
@@ -176,6 +229,70 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
       expect(request.body).toBe("");
     }
     expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+    expect(
+      fake.requests.filter(
+        (request) =>
+          request.method === "DELETE" ||
+          (request.method === "POST" && request.path !== "/oauth2/token"),
+      ),
+    ).toHaveLength(0);
+    const longId = `opaque-9223372036854775808-${"x".repeat(4096)}-가😀`;
+    fake.on("GET", `${path}/${encodeURIComponent(longId)}`, extendedDetail);
+    const long = await tool(client, "get_conditional_order", {
+      conditionalOrderId: longId,
+    });
+    expect(long.result.isError).toBeUndefined();
+    expect(long.body).toEqual({ result: detail.result, metadata: {} });
+    expect(fake.seen("GET").at(-1)!.path).toBe(
+      `${path}/${encodeURIComponent(longId)}`,
+    );
+    for (const expected of boundaryCases()) {
+      const upstream = withExtensions(expected);
+      fake.on("GET", `${path}/${encodeURIComponent(id)}`, {
+        result: upstream,
+        metadata: sensitiveExtension,
+        ...sensitiveExtension,
+      });
+      const next = {
+        ...expected,
+        conditionalOrderId: "next-opaque-9223372036854775808",
+      };
+      const expectedPage = {
+        conditionalOrders: [expected, next],
+        nextCursor: null,
+        hasNext: false,
+      };
+      fake.on("GET", path, {
+        result: {
+          ...expectedPage,
+          ...sensitiveExtension,
+          conditionalOrders: [upstream, withExtensions(next)],
+        },
+        metadata: sensitiveExtension,
+        ...sensitiveExtension,
+      });
+      const singleVariant = await tool(client, "get_conditional_order", {
+        conditionalOrderId: id,
+      });
+      const pageVariant = await tool(client, "list_conditional_orders", {
+        status: "CLOSED",
+      });
+      expect(singleVariant.result.isError).toBeUndefined();
+      expect(singleVariant.body).toEqual({ result: expected, metadata: {} });
+      expect(pageVariant.result.isError).toBeUndefined();
+      expect(pageVariant.body).toEqual({
+        result: expectedPage,
+        metadata: {},
+        ...expectedPage,
+      });
+      for (const response of [singleVariant, pageVariant]) {
+        expect(response.result.structuredContent).toEqual(response.body);
+        expect(JSON.stringify(response.result)).not.toContain(sensitiveMarker);
+        expect(JSON.stringify(response.result)).not.toContain("access_token");
+      }
+    }
+    expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+    expect(fake.seen("GET")).toHaveLength(13);
     expect(
       fake.requests.filter(
         (request) =>

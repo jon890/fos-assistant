@@ -1,4 +1,10 @@
 import { expect, test } from "bun:test";
+import {
+  boundaryCases,
+  withExtensions,
+  sensitiveExtension,
+  sensitiveMarker,
+} from "./conditional-boundary-fixture.ts";
 import canonical from "./fixtures/openapi-1.2.24.json";
 import { createTossinvestServer } from "../src/server.ts";
 import { FakeToss, accountNo, credentials, tool, withMcp } from "./support.ts";
@@ -97,6 +103,86 @@ test("실제 SDK 조건조회는 모든 공식 필드와 부재를 보존하고 
     expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
     expect(fake.seen("GET")).toHaveLength(4);
     expect(fake.seen("DELETE")).toHaveLength(0);
+  } finally {
+    fake.stop();
+  }
+});
+
+test("source SDK의 공식 전체 필드·배열 순서·null·부재·unknown enum·큰 ID는 유지한다", async () => {
+  const fake = new FakeToss(
+    new Set([
+      "issueOAuth2Token",
+      "getConditionalOrders",
+      "getConditionalOrder",
+    ]),
+  );
+  try {
+    await withMcp(
+      createTossinvestServer({
+        apiBase: fake.url,
+        env: { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "9223372036854775807" },
+      }),
+      async (client) => {
+        for (const expected of boundaryCases()) {
+          const next = {
+            ...expected,
+            conditionalOrderId: "next-opaque-9223372036854775808",
+          };
+          const expectedPage = {
+            conditionalOrders: [expected, next],
+            hasNext: false,
+          };
+          fake.on(
+            "GET",
+            `/api/v1/conditional-orders/${encodeURIComponent(expected.conditionalOrderId)}`,
+            {
+              result: withExtensions(expected),
+              metadata: sensitiveExtension,
+              ...sensitiveExtension,
+            },
+          );
+          fake.on("GET", "/api/v1/conditional-orders", {
+            result: {
+              ...expectedPage,
+              ...sensitiveExtension,
+              conditionalOrders: [
+                withExtensions(expected),
+                withExtensions(next),
+              ],
+            },
+            metadata: sensitiveExtension,
+            ...sensitiveExtension,
+          });
+          const single = await tool(client, "get_conditional_order", {
+            conditionalOrderId: expected.conditionalOrderId,
+          });
+          const listing = await tool(client, "list_conditional_orders", {
+            status: "OPEN",
+          });
+          expect(single.result.isError).toBeUndefined();
+          expect(single.body).toEqual({ result: expected, metadata: {} });
+          expect(listing.result.isError).toBeUndefined();
+          expect(listing.body).toEqual({
+            result: expectedPage,
+            metadata: {},
+            ...expectedPage,
+          });
+          for (const response of [single, listing]) {
+            expect(response.result.structuredContent).toEqual(response.body);
+            expect(JSON.stringify(response.result)).not.toContain(
+              sensitiveMarker,
+            );
+            expect(JSON.stringify(response.result)).not.toContain(
+              "access_token",
+            );
+          }
+        }
+      },
+    );
+    expect(fake.seen("POST", "/oauth2/token")).toHaveLength(1);
+    expect(fake.seen("GET")).toHaveLength(8);
+    expect(fake.seen("DELETE")).toHaveLength(0);
+    expect(fake.requests).toHaveLength(9);
   } finally {
     fake.stop();
   }

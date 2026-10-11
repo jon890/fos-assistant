@@ -254,6 +254,33 @@ test.each([
   expect(context.fake.requests).toHaveLength(0);
 });
 
+test("C0·DEL·C1 전체는 인증을 포함해 HTTP 전에 입력 오류로 거절한다", async () => {
+  const context = setup();
+  await run(context, async (client) => {
+    for (const code of [
+      ...Array.from({ length: 32 }, (_, index) => index),
+      ...Array.from({ length: 33 }, (_, index) => 127 + index),
+    ]) {
+      await expectFailure(
+        client,
+        "TOSSINVEST_INVALID_INPUT",
+        "get_conditional_order",
+        {
+          conditionalOrderId: `a${String.fromCharCode(code)}b`,
+        },
+      );
+      expect(context.fake.requests).toHaveLength(0);
+    }
+    await expectFailure(
+      client,
+      "TOSSINVEST_INVALID_INPUT",
+      "get_conditional_order",
+      {},
+    );
+    expect(context.fake.requests).toHaveLength(0);
+  });
+});
+
 test.each([
   "",
   ".",
