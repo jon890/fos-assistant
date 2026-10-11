@@ -180,7 +180,7 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 | 기본 이미지 | `oven/bun:1.3.14-alpine`, amd64와 arm64를 포함한 공식 이미지 index digest를 Dockerfile에 고정 |
 | 출력 | `/bundle/manifest.json`, `/bundle/hermes/connectors/<id>/` |
 | 실행 방식 | 최종 이미지는 `scratch`. `docker create`와 `docker cp`로 꺼내고 실행하지 않음. `/none`은 create를 위한 자리표시 명령 |
-| 재현성 | 각 커넥터의 기존 `buildBundle(outdir)`로 두 독립 디렉터리에 빌드하고 entry 바이트가 같을 때만 출력 |
+| 재현성 | 같은 프로세스와 의존성에서 각 커넥터의 기존 `buildBundle(outdir)`로 출력 디렉터리만 나눠 두 번 빌드하고 entry 바이트가 같을 때만 출력 |
 | 파일 권한 | 소스 git mode `100644`는 `0644`, `100755`는 `0755`. git 없는 context는 실행 비트 유무로 같은 두 권한으로 정규화. 생성 entry는 추적 mode가 있으면 보존하고 없으면 `0644` |
 | 디렉터리 권한 | `0755`. symlink와 특수 파일, 추가 빈 디렉터리, setuid 등 다른 권한은 거절 |
 
@@ -232,7 +232,7 @@ root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 �
 
 `scripts/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
 이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓은 뒤 기존 HTTP 대역 검사와 `check:bundle`을 실행한다.
-runner의 독립 전체 묶음과 Docker 출력의 manifest 및 모든 파일이 같아야 한다.
+runner에서 별도로 만든 전체 묶음과 Docker 출력의 manifest 및 모든 파일을 대조해 빌드 환경 차이도 확인한다.
 기존 stdio MCP 계약 검사와 Hermes 상류 계약 검사도 이어서 실행한다.
 CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않는다.
 
