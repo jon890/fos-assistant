@@ -76,6 +76,8 @@ hermes/
   tests/                     Python unittest. Hermes 모듈은 가짜로 끼운다
 ```
 
+`connectors/` 루트의 `Dockerfile`, `.dockerignore`, `package.ts`, `package.test.ts`는 [커넥터 만들기의 배포 묶음 계약](../connectors/README.md#배포-묶음)을 따른다.
+
 **서비스 이름은 `hermes/connectors/` 와 그 검사와 문서에만 둔다.** `backend/src/main`, `web/src`, `hermes/plugins` 는 어느 서비스도 모른다. `test/unit/connector-neutral.test.ts` 가 본다.
 
 **운영 값은 코드에 두지 않는다.** 설치 묶음을 만들 때와 프로세스의 환경 변수로 받는다.
