@@ -17,6 +17,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
 
     List<ChatMessage> findByConversationIdOrderByIdAsc(Long conversationId);
 
+
     /**
      * 대화의 답 메시지가 가리키는 실행 번호를 번호 순으로 읽는다. 메시지 본문은 읽지 않는다.
      *
@@ -31,20 +32,26 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
             """)
     List<Long> findAssistantExecutionIds(@Param("conversationId") Long conversationId);
 
+
     /** 대화에서 그 역할이 처음 남긴 메시지를 읽는다. */
     Optional<ChatMessage> findFirstByConversationIdAndRoleOrderByIdAsc(Long conversationId, MessageRole role);
 
+
     /** 그 시각까지 그 대화에 저장된 메시지 가운데 그 역할이 아닌 가장 최근 메시지를 읽는다. */
     Optional<ChatMessage> findTopByConversationIdAndRoleNotAndCreatedAtLessThanEqualOrderByIdDesc(
-            Long conversationId, MessageRole role, Instant createdAt);
+        Long conversationId, MessageRole role, Instant createdAt);
+
 
     /** 대화에서 그 역할이 그 시각 뒤에 남긴 메시지 수. 먼저 살펴보기가 지난 살펴보기 뒤 사용자가 보낸 메시지를 센다. */
     long countByConversationIdAndRoleAndCreatedAtAfter(Long conversationId, MessageRole role, Instant after);
 
+
     /** 그 실행이 남긴 메시지가 이미 있는지 본다. */
     boolean existsByExecutionId(Long executionId);
 
+
     boolean existsByConversationId(Long conversationId);
+
 
     /**
      * 기간 안에 요청을 받은 사용자 turn 의 루트 실행에서 첫 반응 시간 집계가 쓰는 칸만 읽는다.
@@ -71,7 +78,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
                     = com.bifos.assistant.chat.domain.type.MessageRole.USER
             """)
     List<TurnTiming> findUserTurnTimings(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /**
      * 그 대화의 메시지가 앞선 판을 가리키는 칸을 비운다. 같은 대화의 메시지를 지우기 전에 부른다.
@@ -83,10 +91,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
     @Query("update ChatMessage m set m.replacesMessageId = null where m.conversationId = :conversationId")
     int clearReplacesOf(@Param("conversationId") Long conversationId);
 
+
     /** 그 대화의 메시지를 모두 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from ChatMessage m where m.conversationId = :conversationId")
     int deleteAllOf(@Param("conversationId") Long conversationId);
+
 
     @Query("""
             select new com.bifos.assistant.chat.domain.UserLastMessage(message.senderUserId, max(message.createdAt))

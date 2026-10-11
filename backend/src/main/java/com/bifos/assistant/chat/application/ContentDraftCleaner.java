@@ -31,11 +31,13 @@ public class ContentDraftCleaner {
     private final ChatContentMutationCoordinator mutations;
     private final Clock clock;
 
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void invalidateForAttachment(Long conversationId, Long attachmentId) {
         mutations.requireParticipant(conversationId);
         revisions.invalidateAttachment(attachmentId);
     }
+
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void invalidateForConversation(Long conversationId) {
@@ -43,18 +45,20 @@ public class ContentDraftCleaner {
         revisions.invalidateConversation(conversationId);
     }
 
+
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
     @EventListener(ApplicationReadyEvent.class)
     public void runScheduled() {
         cleanExpired(clock.instant());
     }
 
+
     public int cleanExpired(Instant now) {
         int changed = 0;
         for (var candidate : revisions.findCleanupCandidates(now)) {
-            Long conversationId = (Long) candidate[0];
+            Long conversationId = (Long)candidate[0];
             try {
-                changed += mutations.run((Long) candidate[1], new ChatContentMutationTarget(conversationId, List.of()), () -> {
+                changed += mutations.run((Long)candidate[1], new ChatContentMutationTarget(conversationId, List.of()), () -> {
                     var conversation = conversations.findById(conversationId).orElseThrow();
                     int count = 0;
                     for (var draft : drafts.findByConversationIdOrderByIdAsc(conversationId)) {

@@ -39,6 +39,7 @@ class ConversationPurgeWriter {
     private final ContentDraftRevisionRepository revisions;
     private final ContentDraftAssetRepository assets;
 
+
     /**
      * 그 대화의 본문을 지우고 지운 시각을 적는다.
      *
@@ -47,8 +48,7 @@ class ConversationPurgeWriter {
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean purge(Long conversationId, Instant now) {
         mutations.requireParticipant(conversationId);
-        Conversation conversation =
-                conversations.findByIdForMessageWrite(conversationId).orElse(null);
+        Conversation conversation = conversations.findByIdForMessageWrite(conversationId).orElse(null);
         if (conversation == null || conversation.deletedAt() == null || conversation.purgedAt() != null) {
             return false;
         }

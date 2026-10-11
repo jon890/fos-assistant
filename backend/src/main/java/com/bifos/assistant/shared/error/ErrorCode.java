@@ -314,11 +314,14 @@ public enum ErrorCode {
     WORKSPACE_DELETE_FAILED(HttpStatus.BAD_GATEWAY),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
+
     private final HttpStatus status;
+
 
     ErrorCode(HttpStatus status) {
         this.status = status;
     }
+
 
     public HttpStatus status() {
         return status;

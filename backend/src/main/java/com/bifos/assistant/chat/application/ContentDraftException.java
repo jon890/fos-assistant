@@ -7,10 +7,12 @@ import com.bifos.assistant.shared.error.ErrorCode;
 public class ContentDraftException extends ApiException {
     private final Long currentRevision;
 
+
     public ContentDraftException(ErrorCode code, Long currentRevision) {
         super(code, "원고를 사용할 수 없습니다.");
         this.currentRevision = currentRevision;
     }
+
 
     public Long currentRevision() {
         return currentRevision;

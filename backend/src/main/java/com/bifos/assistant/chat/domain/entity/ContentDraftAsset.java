@@ -40,6 +40,7 @@ public class ContentDraftAsset {
     @Column(name = "observation_revision")
     private Long observationRevision;
 
+
     public ContentDraftAsset(Long revisionId, int position, Long attachmentId, String fingerprint, Long observationId, Long observationRevision) {
         this.revisionId = revisionId;
         this.position = position;

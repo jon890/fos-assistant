@@ -8,7 +8,9 @@ import com.bifos.assistant.chat.application.model.ContentDraftSummary;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ContentDraftDtos {
 
-    public record ListResponse(List<ContentDraftSummary> items) {}
+    public record ListResponse(List<ContentDraftSummary> items) {
+    }
 
-    public record DraftError(String code, String message, Long currentRevision) {}
+    public record DraftError(String code, String message, Long currentRevision) {
+    }
 }

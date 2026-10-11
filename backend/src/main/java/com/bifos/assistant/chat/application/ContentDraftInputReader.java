@@ -25,6 +25,7 @@ public class ContentDraftInputReader {
         Pattern.compile("^\\[지도: ([^|\\]]+?) \\| ([^\\]]+)\\]$"),
         Pattern.compile("^\\[기존 (사진|스티커|지도|구성요소) ([1-9][0-9]*)(?:: [A-Za-z0-9_-]{1,40})?\\]$"));
 
+
     public ContentDraftInput read(JsonNode node) {
         fields(node, Set.of("title", "category", "tags", "blocks"), Set.of());
         String title = text(node.get("title"), 1, 100);
@@ -89,6 +90,7 @@ public class ContentDraftInputReader {
         return new ContentDraftInput(title, category, tags.deepCopy(), blocks.deepCopy());
     }
 
+
     public static void fields(JsonNode node, Set<String> required, Set<String> optional) {
         if (node == null || !node.isObject()) {
             throw invalid();
@@ -106,6 +108,7 @@ public class ContentDraftInputReader {
         }
     }
 
+
     public static long revision(JsonNode node) {
         if (node == null || !node.isIntegralNumber() || !node.canConvertToLong()) {
             throw invalid();
@@ -116,6 +119,7 @@ public class ContentDraftInputReader {
         }
         return value;
     }
+
 
     public static Long id(JsonNode node) {
         String value = text(node, 1, 19);
@@ -129,6 +133,7 @@ public class ContentDraftInputReader {
         }
     }
 
+
     public static UUID uuid(String value) {
         try {
             UUID id = UUID.fromString(value);
@@ -140,6 +145,7 @@ public class ContentDraftInputReader {
             throw invalid();
         }
     }
+
 
     private static String text(JsonNode node, int min, int max) {
         if (node == null || !node.isString()) {
@@ -153,6 +159,7 @@ public class ContentDraftInputReader {
         return value;
     }
 
+
     private static void line(JsonNode node, int max) {
         String value = text(node, 0, max);
         if (value.contains("\r") || value.contains("\n")
@@ -161,11 +168,13 @@ public class ContentDraftInputReader {
         }
     }
 
+
     private static void array(JsonNode node, int max) {
         if (node == null || !node.isArray() || node.size() > max) {
             throw invalid();
         }
     }
+
 
     public static ApiException invalid() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "원고 입력 형식이 올바르지 않습니다.");

@@ -24,6 +24,7 @@ public class ChatContentMutationCoordinator {
     private final PlatformTransactionManager transactions;
     private final ThreadLocal<ChatContentMutationTarget> entered = new ThreadLocal<>();
 
+
     public <T> T run(Long ownerUserId, ChatContentMutationTarget target, Supplier<T> work) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("content mutation must start outside a transaction");
@@ -34,21 +35,21 @@ public class ChatContentMutationCoordinator {
         return transaction.execute(status -> {
             users.findByIdForUpdate(ownerUserId).orElseThrow(ChatContentMutationCoordinator::notFound);
             var conversation = conversations
-                    .findByIdForMessageWrite(target.conversationId())
-                    .orElseThrow(ChatContentMutationCoordinator::notFound);
+                .findByIdForMessageWrite(target.conversationId())
+                .orElseThrow(ChatContentMutationCoordinator::notFound);
             if (!ownerUserId.equals(conversation.userId())) {
                 throw notFound();
             }
             var ids = target.attachmentIds().isEmpty()
-                    ? attachments.findByConversationIdOrderByIdAsc(target.conversationId()).stream()
-                            .map(it -> it.id())
-                            .toList()
-                    : target.attachmentIds();
+                ? attachments.findByConversationIdOrderByIdAsc(target.conversationId()).stream()
+                    .map(it -> it.id())
+                    .toList()
+                : target.attachmentIds();
             for (Long id : ids) {
                 attachments
-                        .findForMutation(id, target.conversationId())
-                        .filter(it -> target.attachmentIds().isEmpty() || ownerUserId.equals(it.uploadedByUserId()))
-                        .orElseThrow(ChatContentMutationCoordinator::notFound);
+                    .findForMutation(id, target.conversationId())
+                    .filter(it -> target.attachmentIds().isEmpty() || ownerUserId.equals(it.uploadedByUserId()))
+                    .orElseThrow(ChatContentMutationCoordinator::notFound);
             }
             entered.set(target);
             try {
@@ -59,11 +60,13 @@ public class ChatContentMutationCoordinator {
         });
     }
 
+
     public void requireParticipant(Long conversationId) {
         if (entered.get() == null || !conversationId.equals(entered.get().conversationId())) {
             throw new IllegalStateException("content writer requires the mutation coordinator");
         }
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");

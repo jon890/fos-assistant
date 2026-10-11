@@ -8,8 +8,9 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface ContentDraftAssetRepository extends JpaRepository<ContentDraftAsset, Long> {
     List<ContentDraftAsset> findByRevisionIdOrderByPositionAsc(Long revisionId);
+
+
     @Modifying(flushAutomatically = true)
     @Query("delete from ContentDraftAsset a where a.revisionId in (select r.id from ContentDraftRevision r where r.draftId in (select d.id from ContentDraft d where d.conversationId = :conversationId))")
     int deleteForConversation(Long conversationId);
 }
-

@@ -36,7 +36,6 @@ class AttachmentCleanerClockTest {
     @Autowired
     ContentDraftCleaner drafts;
 
-
     private static final Instant NOW = Instant.parse("2026-03-01T04:00:00Z");
 
     @Autowired
@@ -62,32 +61,34 @@ class AttachmentCleanerClockTest {
 
     private Long conversationId;
 
+
     @BeforeEach
     void setUp() throws IOException {
         if (jdbc.queryForObject("select count(*) from app_user where id=9202", Long.class) == 0) {
             jdbc.update("insert into app_user(id,email,display_name,group_id,role,created_at)"
-                    + " values (9202,'clock@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");
+                + " values (9202,'clock@example.test','주인',1,'MEMBER',CURRENT_TIMESTAMP)");
         }
         attachments.deleteAll();
         deleteTree(Path.of(properties.root()).toAbsolutePath());
         conversationId = conversations
-                .save(Conversation.startedBy(9202L, "시계 대화", null, Instant.now()))
-                .id();
+            .save(Conversation.startedBy(9202L, "시계 대화", null, Instant.now()))
+            .id();
     }
+
 
     @Test
     @DisplayName("고정한 시각보다 앞서 만료된 첨부만 지우고 그 뒤에 만료되는 첨부는 남긴다")
     void runScheduledDeletesOnlyAttachmentsExpiredBeforeClockInstant() {
         ChatAttachment expired = stored(NOW.minus(Duration.ofDays(1)));
         ChatAttachment live = stored(NOW.plus(Duration.ofDays(1)));
-        AttachmentCleaner cleaner =
-                new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations, observations, drafts);
+        AttachmentCleaner cleaner = new AttachmentCleaner(attachments, store, Clock.fixed(NOW, ZoneOffset.UTC), mutations, observations, drafts);
 
         cleaner.runScheduled();
 
         assertThat(attachments.findById(expired.id()).orElseThrow().deletedAt()).isEqualTo(NOW);
         assertThat(attachments.findById(live.id()).orElseThrow().deletedAt()).isNull();
     }
+
 
     @Test
     @DisplayName("파일 작업 중 진행한 시각을 완료 트랜잭션에 기록하고 반복 삭제에도 최초 시각을 유지한다")
@@ -115,14 +116,16 @@ class AttachmentCleanerClockTest {
         assertThat(repeated.deletedAt()).isEqualTo(NOW.plusSeconds(60));
     }
 
+
     private ChatAttachment stored(Instant expiresAt) {
         ChatAttachment attachment = attachments.save(
-                ChatAttachment.of(conversationId, 9202L, "photo.png", "image/png", 3, expiresAt, Instant.now()));
+            ChatAttachment.of(conversationId, 9202L, "photo.png", "image/png", 3, expiresAt, Instant.now()));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), "png"));
         attachments.save(attachment);
         store.save(attachment, new ByteArrayInputStream(new byte[] {1, 2, 3}));
         return attachment;
     }
+
 
     private static void deleteTree(Path root) throws IOException {
         if (!Files.exists(root)) {

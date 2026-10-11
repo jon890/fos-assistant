@@ -39,6 +39,7 @@ public class ContentDraftController {
     private final ContentDraftInputReader reader;
     private final ContentDraftService drafts;
 
+
     @PostMapping
     public ResponseEntity<ContentDraftView> create(@PathVariable String conversationId, @RequestBody String body) {
         var user = currentUser.require();
@@ -46,16 +47,19 @@ public class ContentDraftController {
         return ResponseEntity.status(201).body(drafts.create(user, id, reader.read(parse(body))));
     }
 
+
     @GetMapping
     public ListResponse list(@PathVariable String conversationId) {
         var user = currentUser.require();
         return new ListResponse(drafts.list(user, access.requireOwnId(user, ContentDraftInputReader.uuid(conversationId))));
     }
 
+
     @GetMapping("/{draftId}")
     public ContentDraftView read(@PathVariable String conversationId, @PathVariable String draftId) {
         return readRevision(conversationId, draftId, null);
     }
+
 
     @GetMapping("/{draftId}/revisions/{revision}")
     public ContentDraftView readRevision(@PathVariable String conversationId, @PathVariable String draftId, @PathVariable String revision) {
@@ -64,6 +68,7 @@ public class ContentDraftController {
         Long number = revision == null ? null : ContentDraftInputReader.revision(parse(revision));
         return drafts.read(user, id, ContentDraftInputReader.uuid(draftId), number);
     }
+
 
     @PutMapping("/{draftId}")
     public ContentDraftView revise(@PathVariable String conversationId, @PathVariable String draftId, @RequestBody String body) {
@@ -75,16 +80,19 @@ public class ContentDraftController {
             ContentDraftInputReader.revision(node.get("expectedRevision")), reader.read(node.get("draft")));
     }
 
+
     @ExceptionHandler(ContentDraftException.class)
     public ResponseEntity<DraftError> rejected(ContentDraftException ex) {
         return ResponseEntity.status(ex.code().status()).body(new DraftError(ex.code().name(), ex.getMessage(), ex.currentRevision()));
     }
+
 
     /** 파서 예외 원문과 cause를 응답이나 로그로 보내지 않는다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> malformed() {
         return ResponseEntity.badRequest().body(new ErrorResponse("VALIDATION_FAILED", "원고 입력 형식이 올바르지 않습니다."));
     }
+
 
     private static JsonNode parse(String value) {
         try {

@@ -61,6 +61,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(drafts.list(owner, conversation.id()).getFirst().status()).isEqualTo("DRAFTING");
     }
 
+
     @Test
     @DisplayName("실제 트랜잭션의 동시 CAS는 한 판만 수락한다")
     void acceptsExactlyOneConcurrentCas() throws Exception {
@@ -88,6 +89,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(revisionRows.count()).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("쓰기 IO와 본문 key 장애는 기존 암호문과 번호를 보존한다")
     void preservesBodyKeysAndRevisionOnTransientIoAndCryptoFailure() {
@@ -105,7 +107,11 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(localDrafts(refs, draftBodies).read(owner, conversation.id(), id, null).draft().title()).isEqualTo("비밀");
         TextCipher failed = new TextCipher() {
             public boolean enabled() { return true; }
+
+
             public Optional<SealedText> seal(Long user, String aad, String plain) { throw new IllegalStateException("synthetic"); }
+
+
             public Optional<String> open(Long key, Long user, String aad, String value) { return Optional.empty(); }
         };
         var unavailable = localDrafts(refs, new ContentDraftBodies(failed));
@@ -119,6 +125,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(stored.bodyKeyId()).isEqualTo(previous.bodyKeyId());
         assertThat(stored.status()).isEqualTo(ContentDraftRevisionStatus.VALID);
     }
+
 
     @Test
     @DisplayName("삭제 사전 커밋은 파일 실패와 재시작 뒤에도 모든 이전 본문을 차단한다")
@@ -141,6 +148,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(drafts.revise(owner, conversation.id(), id, 2, inputDraft("사진 제거", false)).draft().revision()).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("STALE도 보관 만료 뒤 EXPIRED가 되고 본문은 복구되지 않는다")
     void expiresStaleAndValidRevisionsAtRetentionBoundary() {
@@ -155,13 +163,14 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(drafts.list(owner, conversation.id()).getFirst().status()).isEqualTo("EXPIRED");
     }
 
+
     @Test
     @DisplayName("타첨부 관찰과 지문 변경은 STALE이며 일시 복호화 장애는 보존한다")
     void distinguishesObservationMismatchFromTransientDecryption() throws IOException {
         record(0, UUID.randomUUID(), input(), model());
         var observation = observations.findAll().getFirst();
         var node = json.valueToTree(inputDraft("관찰 참조", true));
-        var image = (ObjectNode) node.get("blocks").get(0);
+        var image = (ObjectNode)node.get("blocks").get(0);
         image.set("observationRef", json.createObjectNode().put("id", observation.id().toString()).put("revision", 1));
         var accepted = reader.read(node);
         var id = drafts.create(owner, conversation.id(), accepted).draft().draftId();
@@ -178,6 +187,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertErased(ContentDraftRevisionStatus.STALE);
     }
 
+
     @Test
     @DisplayName("살펴보기와 메시지 없는 자동 대화는 원고 없이 기존 삭제 경로를 유지한다")
     void blocksCheckAndEmptyTaskConversationsWithoutLeavingForeignKeys() {
@@ -189,6 +199,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         conversations.deleteById(task.id());
         assertThat(draftRows.count()).isZero();
     }
+
 
     @Test
     @DisplayName("파일 삭제를 멈춘 동안 새 쓰기와 이전 판이 모두 삭제 장벽을 본다")
@@ -223,6 +234,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         }
     }
 
+
     @Test
     @DisplayName("업로더 변경과 대화 purge는 잠금 안에서 본문과 자식을 정리한다")
     void cleansOwnerMismatchAndPurgesDraftChildrenBeforeAttachments() {
@@ -239,6 +251,7 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         assertThat(draftRows.count()).isZero();
         assertThat(attachments.findById(photo.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("저장 SQL 실패는 CAS 번호와 새 revision을 함께 되돌린다")
@@ -276,6 +289,7 @@ abstract class ContentDraftFixture extends ObservationFixture {
     @Autowired
     ConversationPurger purger;
 
+
     @AfterEach
     void removeDrafts() {
         assetRows.deleteAll();
@@ -283,9 +297,11 @@ abstract class ContentDraftFixture extends ObservationFixture {
         draftRows.deleteAll();
     }
 
+
     ContentDraftService localDrafts(ContentDraftReferences refs, ContentDraftBodies localBodies) {
         return new ContentDraftService(access, messages, mutations, draftRows, revisionRows, assetRows, refs, localBodies, reader, json, clock);
     }
+
 
     ContentDraftInput inputDraft(String title, boolean image) {
         var node = json.createObjectNode().put("title", title).put("category", "분류");
@@ -298,6 +314,7 @@ abstract class ContentDraftFixture extends ObservationFixture {
         node.set("blocks", blocks);
         return reader.read(node);
     }
+
 
     void assertErased(ContentDraftRevisionStatus status) {
         assertThat(revisionRows.findAll()).isNotEmpty().allSatisfy(row -> {

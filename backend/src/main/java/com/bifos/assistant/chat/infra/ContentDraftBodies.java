@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class ContentDraftBodies {
     private final TextCipher cipher;
 
+
     public SealedText seal(ContentDraft draft, long revision, String plain) {
         try {
             if (!cipher.enabled()) {
@@ -30,6 +31,7 @@ public class ContentDraftBodies {
         }
     }
 
+
     public String open(ContentDraft draft, ContentDraftRevision row) {
         try {
             if (row.body() == null || row.bodyKeyId() == null) {
@@ -42,10 +44,12 @@ public class ContentDraftBodies {
         }
     }
 
+
     private static String aad(ContentDraft draft, long revision) {
         return "content_draft_revision:" + draft.publicId() + ":revision:" + revision
             + ":conversation:" + draft.conversationId() + ":user:" + draft.ownerUserId();
     }
+
 
     public static ContentDraftException unavailable() {
         return new ContentDraftException(ErrorCode.CONTENT_DRAFT_UNAVAILABLE, null);

@@ -17,6 +17,7 @@ class ContentDraftInputReaderTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private final ContentDraftInputReader reader = new ContentDraftInputReader();
 
+
     @Test
     @DisplayName("canonical 블록과 코드포인트 경계를 그대로 수용한다")
     void acceptsAllCanonicalBlocksAndCodePointBoundary() {
@@ -27,11 +28,12 @@ class ContentDraftInputReaderTest {
               {"type":"sticker","code":"hello_1"},
               {"type":"map","name":"이름","address":"주소|상세"}]}
             """);
-        ((ObjectNode) node).put("title", "😀".repeat(100));
+        ((ObjectNode)node).put("title", "😀".repeat(100));
         assertThat(reader.read(node).title()).isEqualTo("😀".repeat(100));
-        ((ObjectNode) node).put("title", "😀".repeat(101));
+        ((ObjectNode)node).put("title", "😀".repeat(101));
         assertThatThrownBy(() -> reader.read(node)).isInstanceOf(ApiException.class);
     }
+
 
     @Test
     @DisplayName("정규 ID와 정수 revision만 받고 문자열과 실수 변환을 거절한다")
@@ -47,6 +49,7 @@ class ContentDraftInputReaderTest {
         assertThatThrownBy(() -> ContentDraftInputReader.uuid("1-1-1-1-1")).isInstanceOf(ApiException.class);
     }
 
+
     @Test
     @DisplayName("unknown null 중복 태그 예약 줄과 UTF-8 한도 위반을 거절한다")
     void rejectsUnknownNullDuplicateTagsReservedLinesAndOversizedUtf8() {
@@ -58,7 +61,7 @@ class ContentDraftInputReaderTest {
         }
         for (String line : List.of("[사진 1: a.jpg]", "[스티커: hello]", "[지도: 이름 | 주소]", "[기존 구성요소 1]", "a\nb", "😀".repeat(20_000))) {
             var node = json.readTree("{\"title\":\"제목\",\"category\":\"분류\",\"tags\":[],\"blocks\":[]}");
-            ((ArrayNode) node.get("blocks")).add(json.createObjectNode().put("type", "paragraph").put("text", line));
+            ((ArrayNode)node.get("blocks")).add(json.createObjectNode().put("type", "paragraph").put("text", line));
             assertThatThrownBy(() -> reader.read(node)).isInstanceOf(ApiException.class);
         }
     }

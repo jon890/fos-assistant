@@ -42,6 +42,7 @@ public class ContentDraftReferences {
     private final Clock clock;
     private final ObjectMapper json;
 
+
     public List<ContentDraftAsset> prepare(ContentDraft draft, JsonNode blocks) {
         var result = new ArrayList<ContentDraftAsset>();
         var fingerprints = new HashMap<Long, String>();
@@ -68,6 +69,7 @@ public class ContentDraftReferences {
         return result;
     }
 
+
     public boolean valid(ContentDraft draft, List<ContentDraftAsset> assets, boolean openObservation) {
         for (var asset : assets) {
             var attachment = attachments.findById(asset.attachmentId()).orElse(null);
@@ -77,6 +79,7 @@ public class ContentDraftReferences {
         }
         return true;
     }
+
 
     public Instant expiry(List<ContentDraftAsset> assets, Instant initial) {
         var result = initial;
@@ -89,11 +92,13 @@ public class ContentDraftReferences {
         return result;
     }
 
+
     private boolean usable(ContentDraft draft, ChatAttachment row) {
         return draft.conversationId().equals(row.conversationId()) && draft.ownerUserId().equals(row.uploadedByUserId())
             && row.messageId() != null && row.deletionRequestedAt() == null && row.deletedAt() == null
             && row.expiresAt().isAfter(clock.instant());
     }
+
 
     private boolean validObservation(ContentDraft draft, ContentDraftAsset asset, boolean open) {
         if (asset.observationId() == null) {
@@ -125,6 +130,7 @@ public class ContentDraftReferences {
         return true;
     }
 
+
     private String fingerprint(ChatAttachment row) {
         try {
             String fingerprint = AttachmentFingerprint.read(store, row);
@@ -136,6 +142,7 @@ public class ContentDraftReferences {
             throw ContentDraftBodies.unavailable();
         }
     }
+
 
     private static ApiException gone() {
         return new ApiException(ErrorCode.ATTACHMENT_GONE, "첨부를 사용할 수 없습니다.");

@@ -48,6 +48,7 @@ public class ContentDraftService {
     private final ObjectMapper json;
     private final Clock clock;
 
+
     public ContentDraftView create(CurrentUser user, Long conversationId, ContentDraftInput input) {
         requireWritable(user, conversationId);
         var accepted = reader.read(json.valueToTree(input));
@@ -64,6 +65,7 @@ public class ContentDraftService {
         });
         return read(user, conversationId, id, null);
     }
+
 
     public ContentDraftView revise(CurrentUser user, Long conversationId, UUID id, long expectedRevision, ContentDraftInput input) {
         requireWritable(user, conversationId);
@@ -95,6 +97,7 @@ public class ContentDraftService {
         return read(user, conversationId, id, null);
     }
 
+
     public ContentDraftView read(CurrentUser user, Long conversationId, UUID id, Long revision) {
         access.requireOwn(user, conversationId);
         if (revision != null && (revision < 1 || revision > ContentDraftInputReader.MAX_REVISION)) {
@@ -125,6 +128,7 @@ public class ContentDraftService {
         return result.view();
     }
 
+
     public List<ContentDraftSummary> list(CurrentUser user, Long conversationId) {
         access.requireOwn(user, conversationId);
         var result = mutations.run(user.id(), target(conversationId), () -> {
@@ -147,6 +151,7 @@ public class ContentDraftService {
             ? new ContentDraftSummary(item.draftId(), item.revision(), null, "EXPIRED", item.expiresAt()) : item).toList();
     }
 
+
     private ContentDraftException check(ContentDraft draft, ContentDraftRevision row) {
         if (!draft.expiresAt().isAfter(clock.instant()) || row.status() == ContentDraftRevisionStatus.EXPIRED) {
             revisions.expire(draft.id());
@@ -160,6 +165,7 @@ public class ContentDraftService {
         return null;
     }
 
+
     private ContentDraftInput open(ContentDraft draft, ContentDraftRevision row) {
         try {
             return reader.read(json.readTree(bodies.open(draft, row)));
@@ -167,6 +173,7 @@ public class ContentDraftService {
             throw ContentDraftBodies.unavailable();
         }
     }
+
 
     private void save(ContentDraft draft, long revision, ContentDraftInput input, List<ContentDraftAsset> prepared) {
         var sealed = bodies.seal(draft, revision, json.writeValueAsString(input));
@@ -184,11 +191,13 @@ public class ContentDraftService {
         }
     }
 
+
     private ContentDraft requireDraft(CurrentUser user, Long conversationId, UUID id) {
         access.requireOwn(user, conversationId);
         return drafts.findByPublicIdAndConversationIdAndOwnerUserId(id.toString(), conversationId, user.id())
             .orElseThrow(ContentDraftService::notFound);
     }
+
 
     private void requireWritable(CurrentUser user, Long conversationId) {
         var conversation = access.requireOwn(user, conversationId);
@@ -198,13 +207,17 @@ public class ContentDraftService {
         }
     }
 
+
     private static ChatContentMutationTarget target(Long conversationId) {
         return new ChatContentMutationTarget(conversationId, List.of());
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist");
     }
 
-    private record ReadResult(ContentDraftView view, ContentDraftException error) {}
+
+    private record ReadResult(ContentDraftView view, ContentDraftException error) {
+    }
 }

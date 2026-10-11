@@ -21,6 +21,7 @@ class ContentDraftControllerTest extends ContentDraftFixture {
     @LocalServerPort
     int port;
 
+
     @Test
     @DisplayName("HTTP 생성 이전 조회 목록과 typed 충돌을 반환하고 본문은 숨긴다")
     void servesRestRevisionsAndTypedConflictWithoutBody() throws Exception {
@@ -39,6 +40,7 @@ class ContentDraftControllerTest extends ContentDraftFixture {
         assertThat(send(user(), "/" + id, "GET", "").statusCode()).isEqualTo(404);
     }
 
+
     @Test
     @DisplayName("중복 JSON 키 malformed null unknown과 revision coercion을 저장 없이 거절한다")
     void rejectsMalformedDuplicateKeysAndCoercionWithoutWrites() throws Exception {
@@ -55,6 +57,7 @@ class ContentDraftControllerTest extends ContentDraftFixture {
         assertThat(revisionRows.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("HTTP STALE와 만료에는 본문 없이 현재 번호와 안전한 코드만 준다")
     void returnsStaleRevisionAndExpiryWithoutContent() throws Exception {
@@ -67,6 +70,7 @@ class ContentDraftControllerTest extends ContentDraftFixture {
         clock.set(draftRows.findAll().getFirst().expiresAt());
         assertThat(send(owner, "/" + id, "GET", "").statusCode()).isEqualTo(410);
     }
+
 
     private HttpResponse<String> send(CurrentUser user, String suffix, String method, String body) throws Exception {
         Instant now = Instant.now();

@@ -15,9 +15,11 @@ import org.junit.jupiter.api.Test;
 class ContentDraftMigrationTest {
     private String[] database;
 
+
     String[] createDatabase() {
         return new String[] {"jdbc:h2:mem:draft-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""};
     }
+
 
     @BeforeEach
     void migrate() throws SQLException {
@@ -28,6 +30,7 @@ class ContentDraftMigrationTest {
         execute("insert into content_draft(id,public_id,conversation_id,owner_user_id,current_revision,created_at,expires_at) values(1,'00000000-0000-0000-0000-000000000002',1,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
         execute("insert into content_draft_revision(id,draft_id,revision,status,schema_version,created_at,body,body_key_id) values(1,1,1,'VALID',1,CURRENT_TIMESTAMP,'sealed',1)");
     }
+
 
     @Test
     @DisplayName("본문과 key CHECK revision UNIQUE 관찰 쌍과 position을 강제한다")
@@ -47,6 +50,7 @@ class ContentDraftMigrationTest {
         execute("update content_draft_revision set status='EXPIRED' where id=1");
     }
 
+
     @Test
     @DisplayName("첨부와 대화 FK는 tombstone을 보존하고 원고 먼저 purge하면 자식도 지운다")
     void restrictsAttachmentDeletionAndCascadesDraftPurge() throws SQLException {
@@ -54,7 +58,8 @@ class ContentDraftMigrationTest {
         assertThatThrownBy(() -> execute("delete from chat_attachment where id=1")).isInstanceOf(SQLException.class);
         assertThatThrownBy(() -> execute("delete from conversation where id=1")).isInstanceOf(SQLException.class);
         execute("delete from content_draft where id=1");
-        try (var connection = DriverManager.getConnection(database[0], database[1], database[2]); var statement = connection.createStatement();
+        try (var connection = DriverManager.getConnection(database[0], database[1], database[2]);
+            var statement = connection.createStatement();
             var rows = statement.executeQuery("select (select count(*) from content_draft_asset)+(select count(*) from content_draft_revision)")) {
             assertThat(rows.next()).isTrue();
             assertThat(rows.getInt(1)).isZero();
@@ -62,6 +67,7 @@ class ContentDraftMigrationTest {
         execute("delete from chat_attachment where id=1");
         execute("delete from conversation where id=1");
     }
+
 
     private void execute(String sql) throws SQLException {
         try (var connection = DriverManager.getConnection(database[0], database[1], database[2]); var statement = connection.createStatement()) {

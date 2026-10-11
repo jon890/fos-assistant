@@ -41,6 +41,7 @@ public class ContentDraft {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+
     public ContentDraft(String publicId, Long conversationId, Long ownerUserId, Instant now, Instant expiresAt) {
         this.publicId = publicId;
         this.conversationId = conversationId;

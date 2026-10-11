@@ -48,6 +48,7 @@ public class ContentDraftRevision {
     @Column(name = "body_key_id")
     private Long bodyKeyId;
 
+
     public ContentDraftRevision(Long draftId, long revision, Instant now, String body, Long keyId) {
         this.draftId = draftId;
         this.revision = revision;
