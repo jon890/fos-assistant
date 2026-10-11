@@ -507,10 +507,10 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getExchangeRate` | `get_exchange_rate` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
 | `getKrMarketCalendar` | `get_market_calendar(market=KR)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
 | `getUsMarketCalendar` | `get_market_calendar(market=US)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
-| `getRankings` | `get_rankings` | READ/none; RANKING | 미연결 | 랭킹·지표 |
-| `getMarketIndicatorPrices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
-| `getMarketIndicatorCandles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | 미연결 | 랭킹·지표 |
-| `getMarketIndicatorInvestorTrading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
+| `getRankings` | `get_rankings` | READ/none; RANKING | 구현 | 랭킹·지표 |
+| `getMarketIndicatorPrices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | 구현 | 랭킹·지표 |
+| `getMarketIndicatorCandles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | 구현 | 랭킹·지표 |
+| `getMarketIndicatorInvestorTrading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | 구현 | 랭킹·지표 |
 | `listSectors` | `list_sectors` | READ/none; SECTOR | 미연결 | 섹터 |
 | `getSectorRankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | 미연결 | 섹터 |
 | `getSector` | `get_sector` | READ/none; SECTOR | 미연결 | 섹터 |
@@ -540,7 +540,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
 이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
 일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
-현재 7개 READ operation의 공식 성공 예시 20개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
+현재 11개 READ operation의 공식 성공 예시 30개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
 
 ### 페이지와 시장별 조건
 
@@ -553,7 +553,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | exchange-rate | baseCurrency/quoteCurrency와 선택 dateTime을 지원한다. 참고용 표시 환율을 주문 체결 환율로 설명하지 않는다 |
 | KR/US calendar | 시장별 영업일, KRX/NXT와 미국 세션, 시간대·서머타임을 원문대로 전달한다. 날짜 미지정은 공식 현재일 기준이며 UTC 날짜로 임의 치환하지 않는다 |
 | rankings | 6종 type, KR/US, 7종 duration, excludeInvestmentCaution, count를 모두 제공한다. TOP_GAINERS/TOP_LOSERS에는 realtime 금지다. 시장 전체와 토스 체결 기준, 기간 시작값과 전일 기준값을 구분한다. 빈 rankings와 rankedAt=null도 정상이다 |
-| market indicators | KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y만 시세·일봉을 지원한다. 분봉은 지수만, investor-trading은 KOSPI/KOSDAQ와 1d/1w/1mo/1y만 지원한다 |
+| market indicators | KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y만 시세·일봉을 지원한다. 지수는 point, 국채 금리는 percent다. 캔들은 count=1..200 기본 100, before/nextBefore를 보존한다. 분봉은 지수만, investor-trading은 KOSPI/KOSDAQ와 1d/1w/1mo/1y, count=1..100 기본 10, until/nextUntil을 지원한다 |
 | sectors | 목록·랭킹·상세·주식·ETF의 5개 조회다. 계층 0/1/2와 여러 섹터 소속, KR/US 차이와 빈 목록을 보존한다 |
 | orders OPEN | 공식 전량을 보존하고 100건으로 자르지 않는다. limit/cursor는 upstream이 무시하며 from/to는 KST orderedAt 날짜 필터다 |
 | orders CLOSED | limit=1..100, 기본 20과 opaque cursor를 노출한다. nextCursor/hasNext를 보존하고 마지막 페이지에서 커서를 만들지 않는다. 임의 366일 제한은 제거한다 |

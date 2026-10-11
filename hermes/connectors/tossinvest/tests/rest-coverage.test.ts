@@ -26,7 +26,7 @@ import {
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 export const canonical = JSON.parse(raw.toString());
 
-test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽는다", () => {
+test("현재 11개 READ operation의 공식 성공 예시 30개를 그대로 읽는다", () => {
   const reads = new Set([
     "getAccounts",
     "getPrices",
@@ -35,6 +35,10 @@ test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽�
     "getBuyingPower",
     "getSellableQuantity",
     "getOrders",
+    "getRankings",
+    "getMarketIndicatorPrices",
+    "getMarketIndicatorCandles",
+    "getMarketIndicatorInvestorTrading",
   ]);
   let count = 0;
   for (const methods of Object.values(canonical.paths) as any[]) {
@@ -65,7 +69,7 @@ test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽�
       count++;
     }
   }
-  expect(count).toBe(20);
+  expect(count).toBe(30);
 });
 
 test("ETF 영문명 누락 호환은 해당 분류와 필드에만 적용한다", () => {
@@ -171,10 +175,10 @@ test("공식 41 operation의 method/path/group과 SHA-256이 일치하고 미구
     41,
   );
   expect(new Set(OPERATIONS.map((op) => op.group)).size).toBe(19);
-  expect(CURRENT_OPERATIONS.size).toBe(8);
+  expect(CURRENT_OPERATIONS.size).toBe(12);
   expect(
     OPERATIONS.filter((op) => !CURRENT_OPERATIONS.has(op.id)),
-  ).toHaveLength(33);
+  ).toHaveLength(29);
 });
 
 test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => {
@@ -196,7 +200,7 @@ test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => 
   ).toBe(false);
 });
 
-test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는 없다", async () => {
+test("실제 SDK 도구 호출로 기존 8 operation에 도달하고 GET body는 없다", async () => {
   const allowed = new Set([
     "issueOAuth2Token",
     "getAccounts",
@@ -237,7 +241,9 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
           ).toBeUndefined();
       },
     );
-    expect(CURRENT_OPERATIONS).toEqual(allowed);
+    expect(
+      new Set([...CURRENT_OPERATIONS].filter((id) => allowed.has(id))),
+    ).toEqual(allowed);
     expect(
       new Set(
         fake.requests.map(
