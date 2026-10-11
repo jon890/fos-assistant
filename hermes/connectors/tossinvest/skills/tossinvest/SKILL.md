@@ -27,6 +27,11 @@ description: 토스증권 계좌와 시세를 읽는다. 주문하지 않는다.
 - `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각, 366일까지)로 기간을 정해 주문을 본다.
   100건까지 오고 `has_more` 가 참이면 더 있다. 그때는 받은 것이 일부라고 말한다
 
+- `list_conditional_orders`: `status=OPEN/CLOSED`로 조건주문 한 페이지를 본다. 선택 `symbol`, `cursor`, `limit`를 받으며 기본 20건, 최대 100건이다. `hasNext`가 참이면 일부만 읽었다고 말하고 `nextCursor`로 다음 페이지를 요청한다
+- `get_conditional_order`: 목록에서 받은 `conditionalOrderId`로 상세를 본다. 계좌, token, URL을 인자로 넘기지 않는다
+
+조건주문의 SINGLE/OCO/OTO 유형과 STOP/PROFIT_RATE 조건을 받은 대로 설명한다. 최상위 상태와 각 leg의 상태를 구분하며 WATCHING을 체결 완료로 말하지 않는다. null과 없는 `expireDate`를 추측해서 채우지 않는다. 생성·수정·취소는 토스증권 앱이나 웹에서 직접 한다.
+
 금액과 수량은 10진수 글로 온다. 숫자로 어림하지 않고 받은 글 그대로 말한다.
 
 시세와 계좌 값은 조회한 시각과 함께 말한다. 결과의 `timestamp` 가 시세의 시각이다.

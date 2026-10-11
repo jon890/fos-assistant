@@ -524,8 +524,8 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `modifyOrder` | `modify_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
 | `cancelOrder` | `cancel_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
 | `createConditionalOrder` | `create_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
-| `getConditionalOrders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | 미연결 | 조건 조회 |
-| `getConditionalOrder` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | 미연결 | 조건 조회 |
+| `getConditionalOrders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | 구현 | 조건 조회 |
+| `getConditionalOrder` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | 구현 | 조건 조회 |
 | `cancelConditionalOrder` | `cancel_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
 | `modifyConditionalOrder` | `modify_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
 | `getBuyingPower` | `get_buying_power` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
@@ -540,7 +540,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
 이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
 일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
-현재 7개 READ operation의 공식 성공 예시 20개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
+현재 9개 READ operation의 공식 성공 예시 22개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
 
 ### 페이지와 시장별 조건
 
@@ -557,7 +557,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | sectors | 목록·랭킹·상세·주식·ETF의 5개 조회다. 계층 0/1/2와 여러 섹터 소속, KR/US 차이와 빈 목록을 보존한다 |
 | orders OPEN | 공식 전량을 보존하고 100건으로 자르지 않는다. limit/cursor는 upstream이 무시하며 from/to는 KST orderedAt 날짜 필터다 |
 | orders CLOSED | limit=1..100, 기본 20과 opaque cursor를 노출한다. nextCursor/hasNext를 보존하고 마지막 페이지에서 커서를 만들지 않는다. 임의 366일 제한은 제거한다 |
-| conditional-orders | OPEN/CLOSED 모두 cursor/limit 페이지를 지원한다. 다른 채널의 주문도 조회한다. 응답 PROFIT_RATE는 읽되 ConditionRequest에 없는 생성 필드를 발명하지 않는다 |
+| conditional-orders | OPEN/CLOSED 모두 한 페이지씩, 기본 20건·최대 100건과 nextCursor/hasNext를 보존한다. 다른 채널의 주문도 조회한다. SINGLE/OCO/OTO와 STOP/PROFIT_RATE, 최상위·leg 상태, null과 expireDate 부재를 보존한다. 불투명 ID의 percent·점 경로 주입은 거절한다 |
 | 큰 응답 | 1 MiB 상한과 4초 HTTP timeout을 유지한다. 공식 페이지가 있으면 사용자가 다음 페이지를 읽는다. 페이지가 없는 큰 응답은 명확한 크기 초과 오류로 끝내며 몰래 일부 행을 남기지 않는다 |
 
 ### 요청 경계와 시험

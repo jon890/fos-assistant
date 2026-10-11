@@ -26,7 +26,7 @@ import {
 const raw = readFileSync(`${import.meta.dir}/fixtures/openapi-1.2.24.json`);
 export const canonical = JSON.parse(raw.toString());
 
-test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽는다", () => {
+test("현재 9개 READ operation의 공식 성공 예시 22개를 그대로 읽는다", () => {
   const reads = new Set([
     "getAccounts",
     "getPrices",
@@ -35,6 +35,8 @@ test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽�
     "getBuyingPower",
     "getSellableQuantity",
     "getOrders",
+    "getConditionalOrders",
+    "getConditionalOrder",
   ]);
   let count = 0;
   for (const methods of Object.values(canonical.paths) as any[]) {
@@ -65,7 +67,7 @@ test("현재 7개 READ operation의 공식 성공 예시 20개를 그대로 읽�
       count++;
     }
   }
-  expect(count).toBe(20);
+  expect(count).toBe(22);
 });
 
 test("ETF 영문명 누락 호환은 해당 분류와 필드에만 적용한다", () => {
@@ -171,10 +173,10 @@ test("공식 41 operation의 method/path/group과 SHA-256이 일치하고 미구
     41,
   );
   expect(new Set(OPERATIONS.map((op) => op.group)).size).toBe(19);
-  expect(CURRENT_OPERATIONS.size).toBe(8);
+  expect(CURRENT_OPERATIONS.size).toBe(10);
   expect(
     OPERATIONS.filter((op) => !CURRENT_OPERATIONS.has(op.id)),
-  ).toHaveLength(33);
+  ).toHaveLength(31);
 });
 
 test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => {
@@ -196,7 +198,7 @@ test("READ 허용 집합은 금융 POST와 DELETE를 거절한다", async () => 
   ).toBe(false);
 });
 
-test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는 없다", async () => {
+test("실제 SDK 도구 호출로 현재 10 operation에 도달하고 GET body는 없다", async () => {
   const allowed = new Set([
     "issueOAuth2Token",
     "getAccounts",
@@ -206,6 +208,8 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
     "getBuyingPower",
     "getSellableQuantity",
     "getOrders",
+    "getConditionalOrders",
+    "getConditionalOrder",
   ]);
   const fake = new FakeToss(allowed);
   for (const [path, result] of Object.entries({
@@ -218,6 +222,17 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
     orders: { orders: [], nextCursor: null, hasNext: false },
   }))
     fake.on("GET", `/api/v1/${path}`, { result });
+  const conditional =
+    canonical.paths["/api/v1/conditional-orders/{conditionalOrderId}"].get
+      .responses["200"].content["application/json"].example;
+  fake.on("GET", "/api/v1/conditional-orders", {
+    result: { conditionalOrders: [], hasNext: false, nextCursor: null },
+  });
+  fake.on(
+    "GET",
+    `/api/v1/conditional-orders/${conditional.result.conditionalOrderId}`,
+    conditional,
+  );
   try {
     await withMcp(
       createTossinvestServer({
@@ -231,6 +246,11 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
           ["get_holdings", {}],
           ["get_buying_power", { currency: "KRW", symbol: "AAPL" }],
           ["list_orders", { status: "OPEN" }],
+          ["list_conditional_orders", { status: "OPEN" }],
+          [
+            "get_conditional_order",
+            { conditionalOrderId: conditional.result.conditionalOrderId },
+          ],
         ] as const)
           expect(
             (await tool(client, name, args)).result.isError,
@@ -248,7 +268,7 @@ test("실제 SDK 도구 호출로 현재 8 operation에 도달하고 GET body는
         ),
       ),
     ).toEqual(allowed);
-    expect(fake.requests).toHaveLength(8);
+    expect(fake.requests).toHaveLength(10);
     for (const request of fake.seen("GET")) {
       expect(request.body).toBe("");
       expect(request.headers.get("authorization")).toBe(

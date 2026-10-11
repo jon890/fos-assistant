@@ -27,7 +27,9 @@
     "get_holdings": { "risk": "READ" },
     "get_buying_power": { "risk": "READ" },
     "list_orders": { "risk": "READ" },
-    "get_sellable_quantity": { "risk": "READ" }
+    "get_sellable_quantity": { "risk": "READ" },
+    "list_conditional_orders": { "risk": "READ", "approval": "none" },
+    "get_conditional_order": { "risk": "READ", "approval": "none" }
   },
   "errors": {
     "TOSSINVEST_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },
