@@ -552,20 +552,25 @@ public final class ArchitectureRules {
         return classes().that().resideInAPackage(root + "..")
             .should(new ArchCondition<JavaClass>("소유 엔티티를 정확히 하나의 domain.entity 에 둔다") {
                 private int ownedCount;
+                private int tableCount;
 
 
                 @Override
                 public void init(Collection<JavaClass> all) {
                     ownedCount = 0;
+                    tableCount = 0;
                 }
 
 
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
+                    boolean ownsTable = item.tryGetAnnotationOfType(Table.class)
+                        .map(table -> table.name().equals("user_data_key")).orElse(false);
                     boolean existing = (item.getEnclosingClass().isEmpty()
-                        && item.getSimpleName().equals("UserDataKey"))
-                        || item.tryGetAnnotationOfType(Table.class)
-                            .map(table -> table.name().equals("user_data_key")).orElse(false);
+                        && item.getSimpleName().equals("UserDataKey")) || ownsTable;
+                    if (ownsTable) {
+                        tableCount++;
+                    }
                     if (existing) {
                         ownedCount++;
                     }
@@ -580,6 +585,10 @@ public final class ArchitectureRules {
 
                 @Override
                 public void finish(ConditionEvents events) {
+                    if (tableCount != 1) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + ".user_data_key Table 기대 수 1, 실제 " + tableCount));
+                    }
                     if (ownedCount != 1) {
                         events.add(SimpleConditionEvent.violated(root,
                             root + ".UserDataKey/user_data_key 기대 수 1, 실제 " + ownedCount));

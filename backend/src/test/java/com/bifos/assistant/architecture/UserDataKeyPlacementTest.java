@@ -267,6 +267,16 @@ class UserDataKeyPlacementTest {
     }
 
 
+    @Test
+    @DisplayName("UserDataKey 이름만 남기고 Table 계약을 없애면 거절한다")
+    void rejectsOwnerWithoutTableContract() throws IOException {
+        JavaClasses fixture = compile(Map.of(ENTITY + ".UserDataKey", entitySource(ENTITY, "UserDataKey", "")));
+        assertThat(fixture).hasSize(1);
+        assertThat(entities().evaluate(fixture).getFailureReport().toString())
+            .contains("user_data_key Table 기대 수 1, 실제 0");
+    }
+
+
     private JavaClasses compile(Map<String, String> sources) throws IOException {
         return ArchitectureRulesTest.compileFixture(temporary, sources);
     }
