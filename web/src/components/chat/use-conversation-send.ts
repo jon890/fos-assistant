@@ -102,8 +102,7 @@ export function useConversationSend({
     )
       return false;
     const version = selectionVersion.current;
-    const creatingForSend = conversationIdRef.current === null;
-    let listRefreshed = false;
+    let needsCreationRefresh = conversationIdRef.current === null;
     const pendingId = `pending-${Date.now()}`;
     const assistantPendingId = `assistant-${Date.now()}`;
     const savedBefore = savedIdsOf(turns);
@@ -211,7 +210,7 @@ export function useConversationSend({
         },
       );
       if (kind === "observing") handedOff = true;
-      if (kind === "answered") listRefreshed = true;
+      if (kind === "answered") needsCreationRefresh = false;
       return (
         kind === "observing" ||
         kind === "answered" ||
@@ -220,10 +219,7 @@ export function useConversationSend({
       );
     };
 
-    /**
-     * `started` 전에 거절된 보내기를 알린다. 없는 스킬 커맨드는 입력창 위 오류 대신 입력창 아래에 이름으로 알린다.
-     * 스트림 사건과 스트림의 HTTP 오류가 이 길로 온다.
-     */
+    /** 스트림 사건·HTTP 오류의 수락 전 거절을 알린다. 없는 스킬은 입력창 아래에 이름으로 알린다. */
     const reportRejected = (code: string, message: string) => {
       const command =
         code === "SKILL_COMMAND_UNKNOWN" ? parseSkillCommand(text) : null;
@@ -238,7 +234,6 @@ export function useConversationSend({
     let queuedInstead = false;
     /**
      * `started` 전에 거절된 보내기를 마무리한다.
-     *
      * <p>`CONVERSATION_BUSY` 는 자동 turn 이 막 열린 순간에 보낸 경우다. 화면은 아직 그 turn 을 모른다. 글을
      * 입력창에 되돌리지 않고 대기 메시지로 넣는다. 사진을 실었으면 대기 메시지가 글만 받으므로 되돌린다.
      */
@@ -314,7 +309,7 @@ export function useConversationSend({
                 `/chat/${event.conversationId}`,
               );
             assignConversationId(event.conversationId);
-            listRefreshed = true;
+            needsCreationRefresh = false;
             void refresh();
           },
           onDelta: (textDelta) => {
@@ -347,7 +342,7 @@ export function useConversationSend({
           },
           onDone: async (event) => {
             assignConversationId(event.conversationId!);
-            listRefreshed = true;
+            needsCreationRefresh = false;
             await Promise.all([
               refresh(),
               refreshMessages(event.conversationId!, version),
@@ -385,8 +380,7 @@ export function useConversationSend({
     } finally {
       // started를 받지 못해도 확보한 빈 대화나 관찰 중인 실행은 목록에 보인다.
       if (
-        creatingForSend &&
-        !listRefreshed &&
+        needsCreationRefresh &&
         conversationIdRef.current !== null &&
         selectionVersion.current === version
       )

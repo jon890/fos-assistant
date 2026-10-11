@@ -79,7 +79,9 @@ export function useConversationHistory({
   }
 
   /** 사진·모델 선택과 송신이 같은 빈 대화를 확보한다. 실패한 생성 요청은 자동 재시도하지 않는다. */
-  async function ensureConversation(refreshList = true): Promise<string | null> {
+  async function ensureConversation(
+    refreshList = true,
+  ): Promise<string | null> {
     if (conversationIdRef.current !== null) return conversationIdRef.current;
     if (creatingConversation.current !== null)
       return creatingConversation.current;
