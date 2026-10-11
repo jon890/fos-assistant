@@ -1,8 +1,8 @@
 package com.bifos.assistant.agent.purge.application;
 
-import com.bifos.assistant.agent.application.AgentProperties;
 import com.bifos.assistant.agent.application.ProfileProvisioning;
 import com.bifos.assistant.agent.application.ProfileSkillFiles;
+import com.bifos.assistant.agent.config.AgentProperties;
 import com.bifos.assistant.agent.purge.application.model.AgentPurgeOutcome;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.infra.AgentRepository;

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from .connector_guard import _guard_manifest
 from .connector_description import _tool_descriptions
+from .connector_snapshot_manifest import _snapshot_manifest
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -221,6 +222,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
     env.update({name: "" for name in owner_env})
     option_tools = {field["options"]["tool"] for field in fields if "options" in field}
     tools = _connector_tools(declared, verify["tool"], option_tools, mcp_server)
+    snapshot = _snapshot_manifest(declared, server, tools, set(server["env"]) | set(entry["env"]))
     definition = {"command": command, "args": args, "env": env, "enabled": True}
     # 늘 승인이 필요한 도구는 모델에 등록하지 않는다. 도구 이름에는 glob 글자가 없어 그 이름만 빠진다.
     excluded = sorted(name for name, policy in tools.items() if policy["approval"] == "always")
@@ -254,6 +256,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset({verify["tool"]} | option_tools),
         "tools": tools,
+        "snapshot": snapshot,
         "tool_descriptions": _tool_descriptions(declared),
         "server": definition,
     }
@@ -346,6 +349,7 @@ def _connector_catalog_response():
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
+          **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
           **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
           # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
           "tools": {name: {key: value for key, value in {**policy, "description": manifest["tool_descriptions"].get(name)}.items()

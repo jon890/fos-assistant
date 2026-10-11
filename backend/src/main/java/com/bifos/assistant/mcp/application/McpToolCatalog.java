@@ -23,7 +23,7 @@ public class McpToolCatalog {
                 "name",
                 "memory_read",
                 "description",
-                "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인에 있다.",
+                "지금 묻는 사람의 Memory 항목 본문을 번호로 읽는다. 번호는 지시문의 개인 사실 구역이나 색인, memory_search 결과에 있다.",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -146,7 +146,27 @@ public class McpToolCatalog {
                     List.of("title"))),
             mediaObservations.listDefinition(),
             mediaObservations.recordDefinition(),
-            memoryRemember.definition());
+            memoryRemember.definition(),
+            Map.of(
+                "name", "memory_search",
+                "description",
+                "색인에 없는 기억도 현재 실행의 권한으로 제목에서 찾는다. query는 제목의 일부이며 본문은 검색하지 않는다. 결과의 id로 memory_read를 불러 본문을 읽는다. nextAfterId가 있으면 after_id에 넣어 다음 페이지를 읽는다.",
+                "inputSchema",
+                Map.of(
+                    "type",
+                    "object",
+                    "additionalProperties",
+                    false,
+                    "properties",
+                    Map.of(
+                        "query", Map.of("type", "string", "minLength", 1, "maxLength", 200),
+                        "limit",
+                        Map.of(
+                            "type", "integer", "minimum", 1, "maximum", 50,
+                            "default", 10),
+                        "after_id", Map.of("type", "integer", "minimum", 1)),
+                    "required",
+                    List.of("query"))));
     }
 
 }
