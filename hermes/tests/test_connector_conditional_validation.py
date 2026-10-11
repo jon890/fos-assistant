@@ -11,6 +11,8 @@ import types
 from test_connector_manifest import ConnectorGateCase
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
+RAW_LIMITS = {'modelArgs': 16384, 'executionArgs': 16384, 'summary': 8192, 'scope': 2048}
+RAW_ONLY = {'RAW-' + field + '-BYTES' for field in RAW_LIMITS}
 
 
 class ConnectorConditionalValidationTest(ConnectorGateCase):
@@ -25,22 +27,41 @@ class ConnectorConditionalValidationTest(ConnectorGateCase):
     def consume(self, case):
         model, args, summary, scope = [self.guard._strict_json(case[field + 'Json'])
                                        for field in ('modelArgs', 'executionArgs', 'summary', 'scope')]
-        for field, limit in [('modelArgs', 16384), ('executionArgs', 16384), ('summary', 8192), ('scope', 2048)]:
-            self.validation._require(len(case[field + 'Json'].encode('utf-8')) <= limit)
-            self.assertEqual(hashlib.sha256(case[field + 'Json'].encode()).hexdigest(), case[field + 'Sha256'])
         manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {
             'operations': {case['tool']: case['operation']}, 'scope_fields': [{'arg': key, 'field': 'account'} for key in scope]}}
         return self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': summary}, model,
                                                 manifest, case['tool'], {'TEST_ACCOUNT': '1234'})
 
-    def test_shared_raw_consumers(self):
+    def test_actual_object_consumers(self):
+        accepted = rejected = 0
         for case in self.cases:
             with self.subTest(case=case['name']):
-                if case['valid']:
+                # 네 공백 원문은 Spring에서 거절하지만 객체 변환 뒤에는 허용된다.
+                if case['valid'] or case['name'] in RAW_ONLY:
                     self.consume(case)
+                    accepted += 1
                 else:
                     with self.assertRaises((ValueError, UnicodeError)):
                         self.consume(case)
+                    rejected += 1
+        self.assertEqual((accepted, rejected), (51, 128))
+        self.assertEqual(sum(case['name'] not in RAW_ONLY for case in self.cases), 175)
+
+    def test_spring_raw_boundary_expectations(self):
+        raw_only = [case for case in self.cases if case['name'] in RAW_ONLY]
+        self.assertEqual({case['name'] for case in raw_only}, RAW_ONLY)
+        for case in self.cases:
+            for field in RAW_LIMITS:
+                self.assertEqual(hashlib.sha256(case[field + 'Json'].encode()).hexdigest(), case[field + 'Sha256'])
+        for case in raw_only:
+            with self.subTest(case=case['name']):
+                field = case['name'][4:-6]
+                self.assertGreater(len(case[field + 'Json'].encode('utf-8')), RAW_LIMITS[field])
+                self.assertFalse(case['valid'])
+                self.consume(case)
+        # valid는 Spring 원문 경계의 기대이며 위 길이 단언은 production 거절이 아니다.
+        self.assertEqual((len(self.cases), sum(case['valid'] for case in self.cases)), (179, 47))
+        self.assertEqual(sum(not case['valid'] for case in self.cases), 132)
 
     def test_reserved_scope_and_env(self):
         fixture = json.loads((REPO / 'test/resources/conditional-snapshot-v1.json').read_text())
