@@ -38,26 +38,28 @@ public class ExecutionRecorder {
     private final ExecutionContextSourceWriter contextSources;
     private final ExecutionCompletionRecorder completion;
 
+
     /**
      * 실행을 RUNNING 으로 만들어 돌려준다. 부모가 없으면 parent 와 root 는 null 이다.
      *
      * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      */
     public AgentExecution start(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            Long contextChars) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        Long contextChars) {
         return start(
-                user,
-                conversation,
-                agent,
-                parentExecutionId,
-                rootExecutionId,
-                ExecutionContextSnapshot.ofChars(contextChars));
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            ExecutionContextSnapshot.ofChars(contextChars));
     }
+
 
     /**
      * 실행 당시의 상태를 함께 적으며 RUNNING 으로 만들어 돌려준다.
@@ -65,14 +67,15 @@ public class ExecutionRecorder {
      * <p>사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      */
     public AgentExecution start(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            ExecutionContextSnapshot context) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context) {
         return start(user, conversation, agent, parentExecutionId, rootExecutionId, context, null, null, null);
     }
+
 
     /**
      * 대화가 고른 모델과 effort 까지 적으며 RUNNING 으로 만들어 돌려준다.
@@ -85,32 +88,33 @@ public class ExecutionRecorder {
      *
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      * @param retryOfExecutionId 지금은 늘 null 이다. provider 가 막히면 다른 모델로 넘기던 때 채우던 칸이고,
-     *     넘김이 없어진 뒤로는 채우지 않는다. 그 전에 남은 실행 기록을 읽으려고 칸과 인자를 남겨 둔다
+     * 넘김이 없어진 뒤로는 채우지 않는다. 그 전에 남은 실행 기록을 읽으려고 칸과 인자를 남겨 둔다
      * @param hermesSessionId 이 실행 줄에 적을 Hermes session. 제출하기 전에 적힌다. 대화 turn 은 그 대화의
-     *     루트 session 이라 Hermes 에 보내는 값과 다를 수 있다(ADR-031). 없으면 null 이다
+     * 루트 session 이라 Hermes 에 보내는 값과 다를 수 있다(ADR-031). 없으면 null 이다
      */
     public AgentExecution start(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            ExecutionContextSnapshot context,
-            ModelChoice requested,
-            Long retryOfExecutionId,
-            String hermesSessionId) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId) {
         return start(
-                user,
-                conversation,
-                agent,
-                parentExecutionId,
-                rootExecutionId,
-                context,
-                requested,
-                retryOfExecutionId,
-                hermesSessionId,
-                null);
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            context,
+            requested,
+            retryOfExecutionId,
+            hermesSessionId,
+            null);
     }
+
 
     /**
      * 다른 에이전트에게 맡긴 실행을 {@code delegation_key} 와 함께 RUNNING 으로 만들어 돌려준다.
@@ -124,30 +128,31 @@ public class ExecutionRecorder {
      * @param delegationKey 위임이 아니면 null 이다
      */
     public AgentExecution start(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            ExecutionContextSnapshot context,
-            ModelChoice requested,
-            Long retryOfExecutionId,
-            String hermesSessionId,
-            DelegationKey delegationKey) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId,
+        DelegationKey delegationKey) {
         return start(
-                user,
-                conversation,
-                agent,
-                parentExecutionId,
-                rootExecutionId,
-                context,
-                requested,
-                retryOfExecutionId,
-                hermesSessionId,
-                delegationKey,
-                null,
-                null);
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            context,
+            requested,
+            retryOfExecutionId,
+            hermesSessionId,
+            delegationKey,
+            null,
+            null);
     }
+
 
     /**
      * 보낸 effort 를 누가 정했는지다.
@@ -156,15 +161,16 @@ public class ExecutionRecorder {
      * 단계를 거친 실행은 그 단계의 mapping 이 비어 에이전트 기본값으로 돌았어도 {@code REQUESTED} 로 적는다.
      */
     private static ReasoningEffortSource effortSource(
-            ExecutionConversation conversation, ModelChoice requested, ModelTier modelTier) {
+        ExecutionConversation conversation, ModelChoice requested, ModelTier modelTier) {
         if (requested == null || requested.reasoningEffort() == null) {
             return ReasoningEffortSource.UNKNOWN;
         }
         boolean chosenByConversation = conversation != null && conversation.reasoningEffort() != null;
         return modelTier == null && !chosenByConversation
-                ? ReasoningEffortSource.AGENT_DEFAULT
-                : ReasoningEffortSource.REQUESTED;
+            ? ReasoningEffortSource.AGENT_DEFAULT
+            : ReasoningEffortSource.REQUESTED;
     }
+
 
     /**
      * 요청을 받은 시각과 대화가 고른 단계를 실행 줄에 복사한다.
@@ -173,34 +179,35 @@ public class ExecutionRecorder {
      * 사용자 실행 한도를 본다(ADR-069). 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
      */
     public AgentExecution start(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            ExecutionContextSnapshot context,
-            ModelChoice requested,
-            Long retryOfExecutionId,
-            String hermesSessionId,
-            DelegationKey delegationKey,
-            ModelTier modelTier,
-            Instant requestReceivedAt) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId,
+        DelegationKey delegationKey,
+        ModelTier modelTier,
+        Instant requestReceivedAt) {
         return record(
-                user,
-                conversation,
-                agent,
-                parentExecutionId,
-                rootExecutionId,
-                context,
-                requested,
-                retryOfExecutionId,
-                hermesSessionId,
-                delegationKey,
-                modelTier,
-                requestReceivedAt,
-                effortSource(conversation, requested, modelTier),
-                admissionOf(conversation, parentExecutionId, rootExecutionId));
+            user,
+            conversation,
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            context,
+            requested,
+            retryOfExecutionId,
+            hermesSessionId,
+            delegationKey,
+            modelTier,
+            requestReceivedAt,
+            effortSource(conversation, requested, modelTier),
+            admissionOf(conversation, parentExecutionId, rootExecutionId));
     }
+
 
     /**
      * 원래 실행에서 이어지는 실행을 RUNNING 으로 만들어 돌려준다. Memory 제안처럼 같은 대화에서 원래 실행의
@@ -216,11 +223,11 @@ public class ExecutionRecorder {
      * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution startInheriting(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            AgentExecution parent,
-            ModelChoice requested) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        AgentExecution parent,
+        ModelChoice requested) {
         ModelChoice sent = requested == null ? ModelChoice.defaults() : requested;
         ReasoningEffortSource source;
         if (sent.reasoningEffort() == null) {
@@ -231,31 +238,32 @@ public class ExecutionRecorder {
             source = ReasoningEffortSource.REQUESTED;
         }
         return record(
-                user,
-                conversation,
-                agent,
-                parent.id(),
-                parent.id(),
-                ExecutionContextSnapshot.ofChars(0L),
-                sent,
-                null,
-                null,
-                null,
-                parent.modelTier(),
-                null,
-                source,
-                ExecutionAdmission.BACKGROUND);
+            user,
+            conversation,
+            agent,
+            parent.id(),
+            parent.id(),
+            ExecutionContextSnapshot.ofChars(0L),
+            sent,
+            null,
+            null,
+            null,
+            parent.modelTier(),
+            null,
+            source,
+            ExecutionAdmission.BACKGROUND);
     }
+
 
     /** 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. */
     private ExecutionAdmission admissionOf(
-            ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
+        ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
         if (parentExecutionId != null) {
             Long rootId = rootExecutionId == null ? parentExecutionId : rootExecutionId;
             Long rootConversationId = executions
-                    .findById(rootId)
-                    .map(AgentExecution::conversationId)
-                    .orElse(null);
+                .findById(rootId)
+                .map(AgentExecution::conversationId)
+                .orElse(null);
             if (limiter.isBackgroundConversation(rootConversationId)) {
                 return ExecutionAdmission.BACKGROUND_CHILD;
             }
@@ -264,45 +272,47 @@ public class ExecutionRecorder {
         return conversation != null ? ExecutionAdmission.TURN_ROOT : ExecutionAdmission.BACKGROUND;
     }
 
+
     private AgentExecution record(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            ExecutionContextSnapshot context,
-            ModelChoice requested,
-            Long retryOfExecutionId,
-            String hermesSessionId,
-            DelegationKey delegationKey,
-            ModelTier modelTier,
-            Instant requestReceivedAt,
-            ReasoningEffortSource effortSource,
-            ExecutionAdmission admission) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        ExecutionContextSnapshot context,
+        ModelChoice requested,
+        Long retryOfExecutionId,
+        String hermesSessionId,
+        DelegationKey delegationKey,
+        ModelTier modelTier,
+        Instant requestReceivedAt,
+        ReasoningEffortSource effortSource,
+        ExecutionAdmission admission) {
         AgentExecution execution = limiter.admit(
-                user.id(),
-                admission,
-                () -> executions.save(base(user, conversation, agent)
-                        .hermesSessionId(hermesSessionId)
-                        .delegationKey(delegationKey == null ? null : delegationKey.value())
-                        .parentExecutionId(parentExecutionId)
-                        .rootExecutionId(rootExecutionId)
-                        .retryOfExecutionId(retryOfExecutionId)
-                        .provider(requested == null ? null : requested.provider())
-                        .model(requested == null ? null : requested.model())
-                        .reasoningEffort(requested == null ? null : requested.reasoningEffort())
-                        .reasoningEffortSource(effortSource)
-                        .modelTier(modelTier)
-                        .requestReceivedAt(requestReceivedAt)
-                        .contextChars(context.contextChars())
-                        .contextOmittedItems(context.contextOmittedItems())
-                        .runtimeFingerprint(context.runtimeFingerprint())
-                        .instructionsHash(context.instructionsHash())
-                        .status(ExecutionStatus.RUNNING)
-                        .build()));
+            user.id(),
+            admission,
+            () -> executions.save(base(user, conversation, agent)
+                .hermesSessionId(hermesSessionId)
+                .delegationKey(delegationKey == null ? null : delegationKey.value())
+                .parentExecutionId(parentExecutionId)
+                .rootExecutionId(rootExecutionId)
+                .retryOfExecutionId(retryOfExecutionId)
+                .provider(requested == null ? null : requested.provider())
+                .model(requested == null ? null : requested.model())
+                .reasoningEffort(requested == null ? null : requested.reasoningEffort())
+                .reasoningEffortSource(effortSource)
+                .modelTier(modelTier)
+                .requestReceivedAt(requestReceivedAt)
+                .contextChars(context.contextChars())
+                .contextOmittedItems(context.contextOmittedItems())
+                .runtimeFingerprint(context.runtimeFingerprint())
+                .instructionsHash(context.instructionsHash())
+                .status(ExecutionStatus.RUNNING)
+                .build()));
         contextSources.write(execution.id(), context.sources());
         return execution;
     }
+
 
     /**
      * 속한 대화 없이 도는 실행을 RUNNING 으로 만들어 돌려준다.
@@ -319,38 +329,42 @@ public class ExecutionRecorder {
         return start(user, null, agent, null, null, ExecutionContextSnapshot.ofChars(0L), requested, null, null);
     }
 
+
     /** 설치 설정의 시스템 profile 로 판단만 한다. 사용자 에이전트 줄을 만들지 않으며 요청자의 백그라운드 한도로 센다. */
     public AgentExecution startSystem(CurrentUser user, String profileName, CostMode costMode, ModelChoice requested) {
         return limiter.admit(
-                user.id(),
-                ExecutionAdmission.BACKGROUND,
-                () -> executions.save(AgentExecution.builder()
-                        .userId(user.id())
-                        .profileName(profileName)
-                        .costMode(costMode)
-                        .provider(requested.provider())
-                        .model(requested.model())
-                        .reasoningEffort(requested.reasoningEffort())
-                        .reasoningEffortSource(
-                                requested.reasoningEffort() == null
-                                        ? ReasoningEffortSource.UNKNOWN
-                                        : ReasoningEffortSource.REQUESTED)
-                        .contextChars(0L)
-                        .status(ExecutionStatus.RUNNING)
-                        .startedAt(clock.instant())
-                        .build()));
+            user.id(),
+            ExecutionAdmission.BACKGROUND,
+            () -> executions.save(AgentExecution.builder()
+                .userId(user.id())
+                .profileName(profileName)
+                .costMode(costMode)
+                .provider(requested.provider())
+                .model(requested.model())
+                .reasoningEffort(requested.reasoningEffort())
+                .reasoningEffortSource(
+                    requested.reasoningEffort() == null
+                        ? ReasoningEffortSource.UNKNOWN
+                        : ReasoningEffortSource.REQUESTED)
+                .contextChars(0L)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(clock.instant())
+                .build()));
     }
+
 
     /** 시스템 판단 실행의 실제 모델과 토큰을 남긴다. 실제 모델을 모르면 요청 모델로 대신하지 않는다. */
     public AgentExecution completeSystem(AgentExecution execution, HermesRunResult result, String apiBaseUrl) {
         return completion.completeSystem(execution, result, apiBaseUrl);
     }
 
+
     /** 실패한 시스템 판단도 실제 모델과 사용량을 보존한다. 실패 응답 본문은 남기지 않는다. */
     public AgentExecution failSystem(
-            AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
+        AgentExecution execution, HermesRunResult result, String apiBaseUrl, String errorCode) {
         return completion.failSystem(execution, result, apiBaseUrl, errorCode);
     }
+
 
     /** 제출 직후 run 번호를 붙인다. */
     public void attachRunId(AgentExecution execution, String hermesRunId) {
@@ -358,11 +372,13 @@ public class ExecutionRecorder {
         executions.save(execution);
     }
 
+
     /** Hermes 제출 직전 시각을 실행 줄에 남긴다. */
     public void markSubmitted(AgentExecution execution) {
         execution.markSubmitted(clock.instant());
         executions.save(execution);
     }
+
 
     /** 사건 수집을 시작하기 전에 저장한다. 재기동 중 끊기면 수집 완료로 오인하지 않는다. */
     public void beginEventObservation(AgentExecution execution) {
@@ -370,12 +386,14 @@ public class ExecutionRecorder {
         saveEventObservation(execution);
     }
 
+
     /** 관측 실패가 답과 확인한 사용량의 저장을 막지 않는다. */
     public void finishEventObservation(AgentExecution execution, boolean complete) {
         if (execution.finishEventObservation(complete)) {
             saveEventObservation(execution);
         }
     }
+
 
     private void saveEventObservation(AgentExecution execution) {
         try {
@@ -386,11 +404,13 @@ public class ExecutionRecorder {
         }
     }
 
+
     /** Flow 루트에는 실행기 진입보다 앞선 원래 요청 수신 시각을 남긴다. */
     public void markRequestReceived(AgentExecution execution, Instant at) {
         execution.markRequestReceived(at);
         executions.save(execution);
     }
+
 
     /** 최초 assistant delta 수신 시각만 남긴다. */
     public void markFirstDelta(AgentExecution execution) {
@@ -398,6 +418,7 @@ public class ExecutionRecorder {
             executions.save(execution);
         }
     }
+
 
     /**
      * 끝난 실행을 SUCCEEDED 로 갱신한다.
@@ -409,9 +430,10 @@ public class ExecutionRecorder {
      * @param requested 대화가 고른 provider, 모델, effort. null 이면 기본값으로 본다
      */
     public AgentExecution complete(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         return completion.complete(execution, agent, result, requested);
     }
+
 
     /**
      * 끝난 실행을 SUCCEEDED 로 갱신하며 답을 같은 저장에서 적는다.
@@ -422,9 +444,10 @@ public class ExecutionRecorder {
      * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
      */
     public AgentExecution complete(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
         return completion.complete(execution, agent, result, requested, outputText);
     }
+
 
     /**
      * 이 번호들 중 자식을 가진 것만 낸다.
@@ -436,21 +459,25 @@ public class ExecutionRecorder {
         return executions.findParentIdsHavingChildren(executionIds);
     }
 
+
     /** 최종 결과를 받지 못한 실행을 FAILED 로 갱신한다. 이미 적힌 사용량은 보존한다. */
     public AgentExecution fail(AgentExecution execution, String errorCode) {
         return completion.fail(execution, errorCode);
     }
 
+
     /** 최종 실패 결과의 사용량과 실제 모델을 보존하며 FAILED 와 오류 코드를 함께 남긴다. */
     public AgentExecution fail(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String errorCode) {
         return completion.fail(execution, agent, result, requested, errorCode);
     }
+
 
     /** Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested) {
         return completion.cancel(execution, agent, result, requested);
     }
+
 
     /**
      * Hermes 가 돌려준 사용량을 보존하며 실행을 취소로 남기고, 멈춘 자리까지의 답을 같은 저장에서 적는다.
@@ -461,23 +488,25 @@ public class ExecutionRecorder {
      * @param outputText 실행 줄의 {@code output_text} 에 적을 답. null 이면 적지 않는다
      */
     public AgentExecution cancel(
-            AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
+        AgentExecution execution, Agent agent, HermesRunResult result, ModelChoice requested, String outputText) {
         return completion.cancel(execution, agent, result, requested, outputText);
     }
+
 
     /** 이미 적은 토큰을 보존하며 실행을 취소로 남긴다. */
     public AgentExecution cancel(AgentExecution execution) {
         return completion.cancel(execution);
     }
 
+
     private AgentExecution.Builder base(CurrentUser user, ExecutionConversation conversation, Agent agent) {
         return AgentExecution.builder()
-                .userId(user.id())
-                .conversationId(conversation == null ? null : conversation.id())
-                .agentId(agent.id())
-                .profileName(agent.hermesProfile())
-                .costMode(agent.costMode())
-                .startedAt(clock.instant());
+            .userId(user.id())
+            .conversationId(conversation == null ? null : conversation.id())
+            .agentId(agent.id())
+            .profileName(agent.hermesProfile())
+            .costMode(agent.costMode())
+            .startedAt(clock.instant());
     }
 
 }

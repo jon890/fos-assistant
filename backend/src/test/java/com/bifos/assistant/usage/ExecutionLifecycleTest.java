@@ -63,11 +63,13 @@ class ExecutionLifecycleTest {
 
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         executions.deleteAll();
         conversation = conversations.save(Conversation.startedBy(USER_ID, "실행", null, Instant.now()));
     }
+
 
     @Test
     @DisplayName("시작한 실행은 종료 정보 없이 RUNNING이고 부모와 루트를 저장한다")
@@ -81,11 +83,11 @@ class ExecutionLifecycleTest {
         assertThat(execution.rootExecutionId()).isEqualTo(3L);
     }
 
+
     @Test
     @DisplayName("완료는 같은 줄에 토큰과 금액을 갱신한다")
     void completionUpdatesTokensAndAmountOnSameRow() {
-        AgentExecution execution =
-                recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         Long id = execution.id();
 
         AgentExecution completed = recorder.complete(execution, agent(), result(), requested());
@@ -101,11 +103,11 @@ class ExecutionLifecycleTest {
         });
     }
 
+
     @Test
     @DisplayName("실패와 run 번호 연결은 같은 줄을 갱신한다")
     void failureAndRunIdLinkUpdateSameRow() {
-        AgentExecution execution =
-                recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
+        AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         Long id = execution.id();
 
         recorder.attachRunId(execution, "run-1");
@@ -120,6 +122,7 @@ class ExecutionLifecycleTest {
         });
     }
 
+
     @ParameterizedTest
     @CsvSource({
         "run-provider, run-model, session-provider, session-model, run-provider, run-model",
@@ -130,13 +133,13 @@ class ExecutionLifecycleTest {
     })
     @DisplayName("완전한 실행 runtime 짝을 우선하고 부족한 칸은 세션과 요청 순서로 채운다")
     void preservesRuntimePairAndFallbackOrder(
-            String runProvider, String runModel, String sessionProvider, String sessionModel,
-            String expectedProvider, String expectedModel) {
+        String runProvider, String runModel, String sessionProvider, String sessionModel,
+        String expectedProvider, String expectedModel) {
         hermes.willReportSessionRuntime(new SessionRuntime(sessionModel, sessionProvider));
         AgentExecution execution = recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
         HermesRunResult result = new HermesRunResult(
-                "runtime-run", "runtime-session", "completed", "답", null, null, null,
-                new TokenUsage(120L, 80L, 40L, 160L), new SessionRuntime(runModel, runProvider));
+            "runtime-run", "runtime-session", "completed", "답", null, null, null,
+            new TokenUsage(120L, 80L, 40L, 160L), new SessionRuntime(runModel, runProvider));
 
         recorder.complete(execution, agent(), result, requested());
 
@@ -148,6 +151,7 @@ class ExecutionLifecycleTest {
             assertThat(saved.pricingVersion()).isNull();
         });
     }
+
 
     @ParameterizedTest
     @EnumSource(value = ExecutionStatus.class, names = {"SUCCEEDED", "CANCELLED"})
@@ -170,6 +174,7 @@ class ExecutionLifecycleTest {
         });
     }
 
+
     @Test
     @DisplayName("취소한 실행의 후속 사용량 저장은 기존 종료 시각을 보존한다")
     void preservesCancellationTimeWhenUsageArrivesLater() {
@@ -187,6 +192,7 @@ class ExecutionLifecycleTest {
             assertThat(saved.outputText()).isEqualTo("멈춘 답");
         });
     }
+
 
     @ParameterizedTest
     @EnumSource(value = ExecutionStatus.class, names = {"FAILED", "CANCELLED"})
@@ -207,18 +213,19 @@ class ExecutionLifecycleTest {
         });
     }
 
+
     @Test
     @DisplayName("Flow가 늦게 시작돼도 더 이른 원래 요청 수신 시각을 보존한다")
     void keepsEarlierOriginalRequestReceivedAt() {
         Instant first = Instant.parse("2026-10-01T00:00:00Z");
         AgentExecution execution = AgentExecution.builder()
-                .userId(USER_ID)
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(first.plusSeconds(10))
-                .requestReceivedAt(first.plusSeconds(5))
-                .build();
+            .userId(USER_ID)
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(first.plusSeconds(10))
+            .requestReceivedAt(first.plusSeconds(5))
+            .build();
 
         execution.markRequestReceived(first);
         execution.markRequestReceived(first.plusSeconds(20));
@@ -226,26 +233,28 @@ class ExecutionLifecycleTest {
         assertThat(execution.requestReceivedAt()).isEqualTo(first);
     }
 
+
     @Test
     @DisplayName("같은 instructions 는 같은 해시로 적히고 본문은 어디에도 저장되지 않는다")
     void sameInstructionsGiveSameHashAndBodyIsStoredNowhere() {
         AssembledContext context = contextOf(SECRET_MEMORY);
 
         AgentExecution execution = recorder.start(
-                user(),
-                conversation.executionConversation(),
-                agent(),
-                null,
-                null,
-                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
+            user(),
+            conversation.executionConversation(),
+            agent(),
+            null,
+            null,
+            new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
 
         AgentExecution saved = executions.findById(execution.id()).orElseThrow();
         assertThat(saved.instructionsHash())
-                .isEqualTo(contextOf(SECRET_MEMORY).instructionsHash())
-                .hasSize(32);
+            .isEqualTo(contextOf(SECRET_MEMORY).instructionsHash())
+            .hasSize(32);
         assertThat(stringColumnsOf(saved))
-                .noneSatisfy(value -> assertThat(value).contains(SECRET_MEMORY));
+            .noneSatisfy(value -> assertThat(value).contains(SECRET_MEMORY));
     }
+
 
     @Test
     @DisplayName("다른 instructions 는 다른 해시로 적힌다")
@@ -256,6 +265,7 @@ class ExecutionLifecycleTest {
         assertThat(one.instructionsHash()).isNotEqualTo(other.instructionsHash());
     }
 
+
     @Test
     @DisplayName("문맥이 없으면 해시 칸도 비운다")
     void leavesHashColumnEmptyWhenNoContext() {
@@ -263,16 +273,17 @@ class ExecutionLifecycleTest {
         assertThat(new AssembledContext("", 0).instructionsHash()).isNull();
 
         AgentExecution execution = recorder.start(
-                user(),
-                conversation.executionConversation(),
-                agent(),
-                null,
-                null,
-                new ExecutionContextSnapshot(0L, null, AssembledContext.empty().instructionsHash()));
+            user(),
+            conversation.executionConversation(),
+            agent(),
+            null,
+            null,
+            new ExecutionContextSnapshot(0L, null, AssembledContext.empty().instructionsHash()));
 
         assertThat(executions.findById(execution.id()).orElseThrow().instructionsHash())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("설정 지문은 읽는 경로가 없어 비어 있다")
@@ -280,16 +291,17 @@ class ExecutionLifecycleTest {
         AssembledContext context = contextOf(SECRET_MEMORY);
 
         AgentExecution execution = recorder.start(
-                user(),
-                conversation.executionConversation(),
-                agent(),
-                null,
-                null,
-                new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
+            user(),
+            conversation.executionConversation(),
+            agent(),
+            null,
+            null,
+            new ExecutionContextSnapshot(context.chars(), null, context.instructionsHash()));
 
         assertThat(executions.findById(execution.id()).orElseThrow().runtimeFingerprint())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("실행 중인 줄은 가격 미확인 실행으로 세지 않는다")
@@ -297,17 +309,19 @@ class ExecutionLifecycleTest {
         recorder.start(user(), conversation.executionConversation(), agent(), null, null, 0L);
 
         MonthlyCost cost = executions.sumCostBetween(
-                USER_ID, Instant.now().minusSeconds(60), Instant.now().plusSeconds(60));
+            USER_ID, Instant.now().minusSeconds(60), Instant.now().plusSeconds(60));
 
         assertThat(cost.totalMicros()).isZero();
         assertThat(cost.pricedExecutions()).isZero();
         assertThat(cost.unpricedExecutions()).isZero();
     }
 
+
     private static AssembledContext contextOf(String memoryContent) {
         String instructions = "# 지금 묻는 사람에 대해 아는 것\n\n- " + memoryContent;
         return new AssembledContext(instructions, instructions.length());
     }
+
 
     /**
      * 저장된 실행 줄의 문자열 칸을 모두 모은다. 어느 칸에도 본문이 남지 않은 것을 확인하기 위해서다.
@@ -317,51 +331,55 @@ class ExecutionLifecycleTest {
      */
     private static List<String> stringColumnsOf(AgentExecution execution) {
         return Stream.of(
-                        execution.profileName(),
-                        execution.hermesRunId(),
-                        execution.provider(),
-                        execution.model(),
-                        execution.costMode().name(),
-                        execution.status().name(),
-                        execution.errorCode(),
-                        execution.runtimeFingerprint(),
-                        execution.instructionsHash(),
-                        execution.costCurrency(),
-                        execution.pricingVersion())
-                .filter(Objects::nonNull)
-                .toList();
+            execution.profileName(),
+            execution.hermesRunId(),
+            execution.provider(),
+            execution.model(),
+            execution.costMode().name(),
+            execution.status().name(),
+            execution.errorCode(),
+            execution.runtimeFingerprint(),
+            execution.instructionsHash(),
+            execution.costCurrency(),
+            execution.pricingVersion())
+            .filter(Objects::nonNull)
+            .toList();
     }
+
 
     private static CurrentUser user() {
         return new CurrentUser(USER_ID, "dad@example.com", "dad", 1L, UserRole.ADMIN);
     }
 
+
     private static Agent agent() {
         return Agent.of(
-                "dad",
-                "Dad",
-                "dad",
-                "http://127.0.0.1:1/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                USER_ID,
-                Instant.now());
+            "dad",
+            "Dad",
+            "dad",
+            "http://127.0.0.1:1/p/dad",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            USER_ID,
+            Instant.now());
     }
+
 
     /** 요청에 실어 보낸 provider 와 모델. 세션 조회가 답하지 않으면 이 값이 기록된다. */
     private static ModelChoice requested() {
         return new ModelChoice(REQUESTED_PROVIDER, REQUESTED_MODEL, null);
     }
 
+
     private static HermesRunResult result() {
         return HermesRunResult.of(
-                "run-1",
-                "session-1",
-                "completed",
-                "끝",
-                "example-model-large",
-                "anthropic",
-                new TokenUsage(120L, 80L, 40L, 160L));
+            "run-1",
+            "session-1",
+            "completed",
+            "끝",
+            "example-model-large",
+            "anthropic",
+            new TokenUsage(120L, 80L, 40L, 160L));
     }
 }
