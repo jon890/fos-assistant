@@ -33,6 +33,9 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | --- | --- | --- |
 | `list_accounts` | `GET /api/v1/accounts` | 계좌 순번, 계좌 유형, 계좌번호 끝 네 자리를 읽는다 |
 | `get_quotes` | `GET /api/v1/prices`, `GET /api/v1/stocks` | 종목 200개까지의 현재가와 이름을 읽는다 |
+| `get_stocks` | `GET /api/v1/stocks` | 종목 200개까지의 상세 참조 정보를 읽는다 |
+| `list_stocks` | `GET /api/v1/stocks/all` | 시장별 종목 전체 목록을 읽는다 |
+| `get_stock_warnings` | `GET /api/v1/stocks/{symbol}/warnings` | 종목 하나의 유의사항을 읽는다 |
 | `get_holdings` | `GET /api/v1/holdings` | 보유 종목과 평가, 손익을 읽는다 |
 | `get_sellable_quantity` | `GET /api/v1/sellable-quantity` | 종목 하나의 매도 가능 수량을 읽는다 |
 | `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
@@ -46,6 +49,9 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | --- | --- | --- |
 | `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다. 순번은 양의 int64 범위의 정확한 문자열이다. 잘못된 행은 전체 응답 오류로 알린다 |
 | `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~200개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
+| `get_stocks` | `symbols`: 쉼표로 이은 종목 1~200개 | `{result: StockInfo[], metadata}`. 국내 시장 상세와 decimal 문자열, boolean, null을 보존한다 |
+| `list_stocks` | `market`: 필수. `status`, `securityType`, `commonShare`: 선택 | `{result: StockSummary[], metadata}`. 페이지 없이 전량을 반환한다 |
+| `get_stock_warnings` | `symbol`: 필수, 단일 종목 | `{result: StockWarning[], metadata}`. 빈 배열은 정상이고 미존재는 입력 오류다 |
 | `get_holdings` | `symbol`: 선택 | `{total, items}`. 금액은 공제 전(`market_value`, `profit_loss`, `profit_loss_rate`)과 비용 공제 후(`..._after_cost`)를 함께 싣는다. `total` 의 금액은 `{krw, usd}` 이고, `items` 의 금액은 그 종목의 거래 통화 기준 글 하나다. 금액과 수량은 API 가 준 10진수 글 그대로다 |
 | `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity}`. `sellable_quantity` 는 `symbol` 을 주지 않으면 null 이다 |
 | `get_sellable_quantity` | `symbol`: 필수 | `{result, metadata, sellable_quantity}` |
@@ -54,6 +60,11 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 모든 조회는 기존 표시 필드와 함께 공식 `result`와 `metadata`를 제공한다. 단일 조회의 metadata는 현재 `{}`다. `get_quotes`는 `{prices, stocks}`, `get_buying_power`는 `{buyingPower, sellableQuantity}`를 result에 담고 metadata도 같은 키를 쓴다. symbol 없는 buying power의 sellableQuantity와 그 metadata는 null이다.
 공식 result의 문자열, decimal, boolean, null, 배열과 unknown enum을 보존한다. Account.accountSeq는 원문 int64에서 정확한 문자열로 바꾸고 accountNo는 결과를 만들기 전에 마스킹한다. 필수 필드 누락과 잘못된 타입은 일부 성공으로 숨기지 않는다.
 종목 기호는 `^[A-Za-z0-9.-]+$`만 받는다. 조회 기간의 길이 제한은 없으며 실제 날짜와 from/to 순서를 검사한다. 이름 100자와 일반 문자열 64자 절단은 기존 표시 필드에만 적용한다. 공식 result, orderId, cursor와 decimal은 자르지 않는다.
+
+### 종목 참조 정보
+
+`list_stocks`의 market은 KOSPI, KOSDAQ, NYSE, NASDAQ, AMEX, KR_ETC, US_ETC다. status는 SCHEDULED, ACTIVE, DELISTED이고 생략하면 공식 API가 ACTIVE를 적용한다. securityType은 STOCK, FOREIGN_STOCK, DEPOSITARY_RECEIPT, INFRASTRUCTURE_FUND, REIT, ETF, FOREIGN_ETF, ETN, STOCK_WARRANTS다. commonShare=false도 전송한다.
+전체 목록은 페이지나 cursor를 만들지 않는다. 기존 1 MiB 상한을 넘으면 오류로 끝낸다. STOCK_ALL은 초당 1회이며 상세와 유의사항의 STOCK 큐와 독립적이다. 큐 대기도 기존 4초 deadline에 포함한다. 참조 정보는 화면·세션 진입 시 읽고 짧은 주기로 반복 조회하지 않는다. 유의사항의 exchange는 거래소 코드이며 상장 시장 market과 다르다. 날짜와 exchange의 null, 알 수 없는 코드를 보존한다.
 
 ### 주문 내역
 
@@ -109,8 +120,12 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 ## 서버와 검사
 
 `src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶어 커밋한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
-공식 JSON fixture의 41 operation과 실제 등록 8개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
-대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 여섯 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
+공식 JSON fixture의 41 operation과 실제 등록 10개 operation을 구분한다. `scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다. 새 시장정보·일반주문·조건주문 producer는 아직 등록하지 않았다.
+도구 9개와 고유 operation 10개는 다른 수치다. 모든 도구를 한 번씩 부르는 coverage 시험은 인증 1회와 조회 11회를 수신하고 금융 POST/DELETE는 0회다. `getStocks`와 `getSellableQuantity`는 여러 도구가 공유한다.
+
+SDK 설명과 manifest의 tools.description은 9개 모두 같은 평문이다. 설명은 표시 정보이며 READ/none 정책과 분리된다. 설명을 넣은 manifest의 운영 설치는 새 reader가 실제 plugin에 로드된 것을 확인한 뒤 진행한다.
+
+대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 목록은 현재 아홉 도구가 부르는 `GET` 과 `POST /oauth2/token` 뿐이다. `POST /api/v1/orders` 같은 다른 경로가 오면 시험이 실패한다.
 
 ## 보안
 

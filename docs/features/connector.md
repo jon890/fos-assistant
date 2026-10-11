@@ -435,7 +435,8 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 9개 READ 도구가 인증·조회 10개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 31개 operation의 producer는 아직 구현하지 않았다.
+종목 참조 도구 `get_stocks`, `list_stocks`, `get_stock_warnings`는 production 서버에 등록되어 있다. `getStocks`는 기존 `get_quotes`와 공유하므로 고유 operation 증가분은 `listStocks`, `getStockWarnings` 두 개다. 전체 목록은 7개 시장과 선택 필터를 지원하며 페이지 없이 전량을 반환한다. 유의사항의 exchange는 상장 시장 market과 구분하고 빈 배열과 미존재 오류를 구분한다. 이 세 도구도 READ/none이며 SDK의 readOnlyHint는 참이다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
@@ -449,7 +450,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 10개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 

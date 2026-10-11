@@ -823,6 +823,19 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             "write_note": {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False, "identifiers": []},
         })
 
+    def test_toss_stock_tools_are_read_without_approval_or_grant(self):
+        """실제 종목 참조 선언을 카탈로그 reader로 읽어 READ/none을 확인한다."""
+        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        names = {"get_stocks", "list_stocks", "get_stock_warnings"}
+        tools = {"list_scopes": {"risk": "READ"}, **{name: declared["tools"][name] for name in names}}
+        self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
+        policies = self.catalog()[0]["tools"]
+        self.assertEqual(set(policies), names | {"list_scopes"})
+        for policy in policies.values():
+            self.assertEqual(policy["risk"], "READ")
+            self.assertEqual(policy["approval"], "none")
+            self.assertFalse(policy["grant"])
+
     def test_default_approval_of_every_risk(self):
         """위험도 다섯의 기본 `approval` 은 계약의 표와 같다."""
         expected = {"READ": "none", "SENSITIVE": "required", "WRITE": "required",
