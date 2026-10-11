@@ -2,7 +2,6 @@ package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.memory.domain.MemoryCollection;
 import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
-import java.time.Clock;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MemoryCollectionService {
 
     private final MemoryCollectionRepository collections;
-    private final Clock clock;
+
 
     /**
      * 그룹의 collection 을 화면 순서로 낸다.
@@ -28,6 +27,6 @@ public class MemoryCollectionService {
         if (!existing.isEmpty()) {
             return existing;
         }
-        return collections.saveAll(MemoryCollection.defaultsFor(groupId, clock.instant()));
+        return collections.saveAll(MemoryCollection.defaultsFor(groupId));
     }
 }

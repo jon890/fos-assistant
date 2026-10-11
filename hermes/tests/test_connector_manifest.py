@@ -132,6 +132,36 @@ class ConnectorGateCase(unittest.TestCase):
 
 
 class ConnectorCatalogTest(ConnectorGateCase):
+    def test_private_snapshot_activation_is_not_an_install_manifest_parameter(self):
+        """snapshot 선언이 없어도 private 인자와 예약 env는 공개 설치에서 거절한다."""
+        reader = sys.modules[self.plugin.__name__ + ".connector_snapshot_manifest"]
+        for name in reader.SNAPSHOT_ENV:
+            with self.assertRaises(ValueError):
+                reader._snapshot_manifest({}, {"args": [], "env": {name: ""}}, {}, {name})
+        for flag in ("--content-snapshot-operation", "--content-snapshot-operation=compile"):
+            with self.assertRaises(ValueError):
+                reader._snapshot_manifest({}, {"args": [flag], "env": {}}, {}, set())
+
+    def test_snapshot_declaration_has_exact_capabilities_and_no_public_tools(self):
+        """snapshot은 별도 카탈로그 칸이고 이름·키·boolean 계약이 틀리면 선언 전체를 거절한다."""
+        declaration = {"protocol": "content-snapshot-v1", "compile_tool": "compile_snapshot",
+                       "start_tool": "start_snapshot", "status_tool": "snapshot_status",
+                       "capabilities": {"compile": True, "start": False, "status": False}}
+        self.rewrite("connector.json", lambda value: value.update(snapshot=declaration))
+        self.assertEqual(self.catalog()[0]["snapshot"], declaration)
+        self.assertNotIn("compile_snapshot", self.catalog()[0]["tools"])
+        for changed in [{"extra": True}, {"protocol": "content-snapshot-v2"}, {"start_tool": "compile_snapshot"},
+                        {"compile_tool": "list_scopes"}, {"compile_tool": "../tool"},
+                        {"capabilities": {"compile": 1, "start": False, "status": False}},
+                        {"capabilities": {"compile": True, "start": True, "status": False}},
+                        {"capabilities": {"compile": True, "start": False}},
+                        {"capabilities": {"compile": True, "start": False, "status": False, "extra": False}}]:
+            self.rewrite("connector.json", lambda value: value.update(snapshot={**declaration, **changed}))
+            self.assertEqual(self.catalog(), [])
+        self.rewrite("connector.json", lambda value: value.update(snapshot={k: v for k, v in declaration.items()
+                                                                          if k != "capabilities"}))
+        self.assertEqual(self.catalog(), [])
+
     def test_catalog_lists_the_validated_connector_without_operator_values(self):
         """시험 커넥터가 카탈로그에 나오고, 칸의 env 와 확인 도구가 있고, 운영자 env 의 이름과 값이 없다."""
         body = self.catalog()
@@ -822,6 +852,52 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             "env_view": {"risk": "READ", "approval": "none", "grant": False, "outbound": False, "identifiers": []},
             "write_note": {"risk": "WRITE", "approval": "required", "grant": True, "outbound": False, "identifiers": []},
         })
+
+    def test_toss_stock_tools_are_read_without_approval_or_grant(self):
+        """실제 종목 참조 선언을 카탈로그 reader로 읽어 READ/none을 확인한다."""
+        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        names = {"get_stocks", "list_stocks", "get_stock_warnings"}
+        tools = {"list_scopes": {"risk": "READ"}, **{name: declared["tools"][name] for name in names}}
+        self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
+        policies = self.catalog()[0]["tools"]
+        self.assertEqual(set(policies), names | {"list_scopes"})
+        for policy in policies.values():
+            self.assertEqual(policy["risk"], "READ")
+            self.assertEqual(policy["approval"], "none")
+            self.assertFalse(policy["grant"])
+
+    def test_toss_read_union_preserves_descriptions_and_read_policy(self):
+        """조회 합집합 33개를 실제 reader로 읽고 금융 권한 없이 설명을 보존한다."""
+        declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        names = {
+            "list_accounts", "get_quotes", "get_holdings", "get_buying_power", "list_orders",
+            "get_sellable_quantity", "get_stocks", "list_stocks", "get_stock_warnings",
+            "get_orderbook", "get_trades", "get_price_limits", "get_candles", "get_exchange_rate",
+            "get_market_calendar", "list_sectors", "get_sector_rankings", "get_sector",
+            "get_sector_stocks", "get_sector_etfs", "list_conditional_orders", "get_conditional_order",
+            "get_rankings", "get_market_indicator_prices", "get_market_indicator_candles",
+            "get_market_indicator_investor_trading", "get_order", "get_commissions",
+            "get_stock_investor_trading", "get_stock_program_trades", "get_stock_short_selling",
+            "get_stock_credit_trades", "get_stock_securities_lending",
+        }
+        self.assertEqual(set(declared["tools"]), names)
+        self.assertTrue(declared["single_binding"])
+        self.assertTrue(declared["sandbox_required"])
+        self.assertEqual(declared["default_tool_policy"], "deny")
+        tools = {"list_scopes": {"risk": "READ"}, **declared["tools"]}
+        self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
+        policies = self.catalog()[0]["tools"]
+        self.assertEqual(set(policies), names | {"list_scopes"})
+        for name in names:
+            policy = policies[name]
+            self.assertEqual(policy["risk"], "READ")
+            self.assertEqual(policy["approval"], "none")
+            self.assertFalse(policy["grant"])
+            self.assertFalse(policy["outbound"])
+            self.assertEqual(policy["description"], declared["tools"][name]["description"])
+            self.assertNotIn("undefined", policy["description"])
+        self.rewrite("connector.json", lambda value: value["tools"]["get_order"].update(risk="UNKNOWN"))
+        self.assertEqual(self.catalog(), [])
 
     def test_default_approval_of_every_risk(self):
         """위험도 다섯의 기본 `approval` 은 계약의 표와 같다."""

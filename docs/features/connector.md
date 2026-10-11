@@ -486,15 +486,46 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 - 에이전트의 연결 목록은 그 에이전트의 주인만 읽는다. 해제한 연결은 빠지고, 붙일 수 없는 까닭은 `blockedReason` 이 `AgentConnectionsView` 의 값으로 준다
 - 바인딩마다 재시작 대기가 있다. 연결 상태 응답의 `bindings[]` 와 관리자 목록이 바인딩 상태와 재시작 대기를 함께 낸다
 
+## 네이버 read_draft 사진 메타데이터
+
+`read_draft`는 임시저장 글을 편집기에 불러와 기존 `draft_id`, `revision`, `title`, `category`, `tags`, `body`에 사진 메타데이터를 더한다.
+기존 본문의 `[기존 사진 1]` 같은 줄과 덮어쓰기용 구성요소 대응은 그대로다.
+불러오기 중 네이버 자동저장이 발생할 수 있으므로 기존 WRITE 정책을 유지한다.
+
+`photos`는 `document.components`에 직접 놓인 `@ctype=image`만 현재 배열 차례로 읽는다.
+중첩 이미지와 이미지 그룹은 분석하지 않으므로 전체 사진 검증 완료를 뜻하지 않는다.
+
+| 사진 항목의 칸 | 의미 |
+| --- | --- |
+| `position` | 직접 이미지 중 1부터 센 현재 순서 |
+| `componentIndex` | 원래 components 배열에서 0부터 센 위치 |
+| `componentId` | 편집기 구성요소의 식별자. 영문, 숫자, 밑줄과 하이픈으로 된 1자 이상 200자 이하 문자열이며 그 밖은 null |
+| `fileName` | 실제 이미지 필드의 파일명. 누락되거나 잘못된 값은 null이며 URL에서 추정하지 않는다 |
+
+파일명은 UTF-16 코드 단위로 1개 이상 255개 이하만 허용한다.
+경로 구분자, 콜론, URL query·fragment 기호, 제어 문자, 보이지 않는 형식 문자, 줄 구분자, 잘못된 surrogate, 앞뒤 공백과 점 경로는 거절한다.
+값을 자르거나 고쳐서 유효한 파일명으로 만들지 않으며, 잘못된 메타데이터 때문에 기존 본문 읽기를 실패시키지 않는다.
+사진 항목에는 src, domain, path, 좌표, origin, caption, 원시 객체와 본문을 넣지 않는다.
+
+사진 항목은 최대 50개다. `photo_count`는 직접 이미지의 실제 관측 수이며 `photos_truncated`는 상한 때문에 응답에서 빠진 항목이 있는지 알린다.
+사진이 없으면 빈 배열, 0, false를 반환한다. 51개라면 앞의 50개와 관측 수 51, 잘림 여부 true를 반환하며 본문의 기존 사진 줄은 모두 유지한다.
+중복 파일명도 현재 순서대로 각각 반환한다.
+
+`revision`은 제목, 카테고리, 태그와 본문 네 칸의 기존 지문이며 사진 메타데이터를 포함하지 않는다.
+사진 수와 본문 줄이 같은 상태에서 사진 식별자나 파일명만 바뀌어도 이 지문은 그대로일 수 있다.
+파일명과 component id는 첨부 번호나 권한, 사진 hash가 아니다. 업로드 바이트나 픽셀의 동일성, 승인 시점 사진의 불변성을 증명하지 않는다.
+사용자와 첨부의 신뢰할 수 있는 대응과 접근 권한은 후속 Control Plane이 확인해야 하며 모델이 반환 파일명을 권한 근거로 사용할 수 없다.
+
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 10개 READ 도구가 인증·조회 12개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 29개 operation의 producer는 아직 구현하지 않았다.
+현재 READ 도구 33개가 조회 GET 34개와 내부 인증 1개의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었으며 나머지 6개 금융 쓰기 operation은 구현·등록하지 않았다. READ 조회 추가가 금융 실행 허용을 뜻하지 않는다.
+종목 참조 도구 `get_stocks`, `list_stocks`, `get_stock_warnings`는 production 서버에 등록되어 있다. `getStocks`는 기존 `get_quotes`와 공유하므로 고유 operation 증가분은 `listStocks`, `getStockWarnings` 두 개다. 전체 목록은 7개 시장과 선택 필터를 지원하며 페이지 없이 전량을 반환한다. 유의사항의 exchange는 상장 시장 market과 구분하고 빈 배열과 미존재 오류를 구분한다. 이 세 도구도 READ/none이며 SDK의 readOnlyHint는 참이다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
 
-2026-10-11에 [공식 OpenAPI JSON](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)의 1.2.24, OpenAPI 3.1.0, 41 operation을 확인했다.
+2026-10-12에 [공식 OpenAPI JSON](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)의 1.2.24, OpenAPI 3.1.0, 41 operation을 확인했다.
 원문 SHA-256은 `7e753c21dc4b938d8f9610ce3efd6542783018977cb030e39db5a006f5b59d40`이다.
 [공식 개요](https://openapi.tossinvest.com/openapi-docs/overview.md)는 호출 한도와 오류의 근거다.
 구현을 시작할 때 버전, method/path 집합, 참조 schema, 설명의 조건과 오류를 다시 대조한다.
@@ -503,7 +534,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 12개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 35개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
@@ -514,7 +545,7 @@ API의 account 헤더는 입력에 노출하지 않는다. 연결 env의 계좌�
 `get_quotes`의 공식 결과는 `{prices,stocks}`이며 각각 공식 배열이다. `get_stocks`도 별도로 등록해 이름 이외의 참조 정보를 읽는다.
 `get_holdings`는 선택 `symbol`을 추가한다. `get_sellable_quantity`는 단독 호출도 가능하게 한다.
 get_buying_power의 result는 symbol 부재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: null}, symbol 존재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: SellableQuantityResponse}다. 각 값은 공식 result 전체이며 후자는 두 GET을 각각 한 번 호출한다.
-envelope 메타데이터는 result 밖의 metadata: {buyingPower: {...}, sellableQuantity: {...} | null}에 둔다. 각 객체는 해당 upstream envelope에서 result만 제외한 공식 필드를 보존하며 부재를 null로 발명하지 않는다. 현재 ApiResponse에는 result 이외 필드가 없어 {}다.
+envelope 메타데이터는 result 밖의 metadata: {buyingPower: {...}, sellableQuantity: {...} | null}에 둔다. 각 객체의 metadata는 현재 항상 {}이며 알 수 없는 envelope 추가 키는 전달하지 않는다. symbol 없는 sellableQuantity의 metadata만 null이다.
 단독 get_sellable_quantity는 result: SellableQuantityResponse와 metadata: {}를 반환한다. get_quotes는 result: {prices,stocks}, metadata: {prices: {}, stocks: {}}로 같은 규칙을 쓴다. 한 호출 실패나 schema 위반을 부분 성공/null로 숨기지 않는다.
 기존 currency/cash_buying_power/sellable_quantity 표시와 선택지 accounts/account_seq/label을 유지한다. symbol 부재의 기존 sellable_quantity는 null이다.
 producer가 schema 검증 뒤 accountNo를 끝 네 자리로 마스킹한 복사본에서 표시·result·metadata·structuredContent·content를 함께 만든다. 선택지와 오류·로그에도 계좌 원문을 싣지 않으며 표시 helper에만 마스킹을 맡기지 않는다.
@@ -550,41 +581,41 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getTrades` | `get_trades` | READ/none; MARKET_DATA | 구현 | 시세 |
 | `getPriceLimit` | `get_price_limits` | READ/none; MARKET_DATA | 구현 | 시세 |
 | `getCandles` | `get_candles` | READ/none; MARKET_DATA_CHART | 구현 | 시세 |
-| `getStocks` | `get_stocks` | READ/none; STOCK | get_quotes 구현; get_stocks 미등록 | 종목 |
-| `listStocks` | `list_stocks` | READ/none; STOCK_ALL | 미연결 | 종목 |
-| `getStockWarnings` | `get_stock_warnings` | READ/none; STOCK | 미연결 | 종목 |
-| `getStockInvestorTrading` | `get_stock_investor_trading` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockProgramTrades` | `get_stock_program_trades` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockShortSelling` | `get_stock_short_selling` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockCreditTrades` | `get_stock_credit_trades` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getStockSecuritiesLending` | `get_stock_securities_lending` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
-| `getExchangeRate` | `get_exchange_rate` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
-| `getKrMarketCalendar` | `get_market_calendar(market=KR)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
-| `getUsMarketCalendar` | `get_market_calendar(market=US)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
-| `getRankings` | `get_rankings` | READ/none; RANKING | 미연결 | 랭킹·지표 |
-| `getMarketIndicatorPrices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
-| `getMarketIndicatorCandles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | 미연결 | 랭킹·지표 |
-| `getMarketIndicatorInvestorTrading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
-| `listSectors` | `list_sectors` | READ/none; SECTOR | 미연결 | 섹터 |
-| `getSectorRankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | 미연결 | 섹터 |
-| `getSector` | `get_sector` | READ/none; SECTOR | 미연결 | 섹터 |
-| `getSectorStocks` | `get_sector_stocks` | READ/none; SECTOR | 미연결 | 섹터 |
-| `getSectorEtfs` | `get_sector_etfs` | READ/none; SECTOR | 미연결 | 섹터 |
+| `getStocks` | `get_stocks`, `get_quotes` | READ/none; STOCK | 구현 | 종목 |
+| `listStocks` | `list_stocks` | READ/none; STOCK_ALL | 구현 | 종목 |
+| `getStockWarnings` | `get_stock_warnings` | READ/none; STOCK | 구현 | 종목 |
+| `getStockInvestorTrading` | `get_stock_investor_trading` | READ/none; STOCK_TRADING_TREND | 구현 | 종목 |
+| `getStockProgramTrades` | `get_stock_program_trades` | READ/none; STOCK_TRADING_TREND | 구현 | 종목 |
+| `getStockShortSelling` | `get_stock_short_selling` | READ/none; STOCK_TRADING_TREND | 구현 | 종목 |
+| `getStockCreditTrades` | `get_stock_credit_trades` | READ/none; STOCK_TRADING_TREND | 구현 | 종목 |
+| `getStockSecuritiesLending` | `get_stock_securities_lending` | READ/none; STOCK_TRADING_TREND | 구현 | 종목 |
+| `getExchangeRate` | `get_exchange_rate` | READ/none; MARKET_INFO | 구현 | 시장 일정 |
+| `getKrMarketCalendar` | `get_market_calendar(market=KR)` | READ/none; MARKET_INFO | 구현 | 시장 일정 |
+| `getUsMarketCalendar` | `get_market_calendar(market=US)` | READ/none; MARKET_INFO | 구현 | 시장 일정 |
+| `getRankings` | `get_rankings` | READ/none; RANKING | 구현 | 랭킹·지표 |
+| `getMarketIndicatorPrices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | 구현 | 랭킹·지표 |
+| `getMarketIndicatorCandles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | 구현 | 랭킹·지표 |
+| `getMarketIndicatorInvestorTrading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | 구현 | 랭킹·지표 |
+| `listSectors` | `list_sectors` | READ/none; SECTOR | 구현 | 섹터 |
+| `getSectorRankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | 구현 | 섹터 |
+| `getSector` | `get_sector` | READ/none; SECTOR | 구현 | 섹터 |
+| `getSectorStocks` | `get_sector_stocks` | READ/none; SECTOR | 구현 | 섹터 |
+| `getSectorEtfs` | `get_sector_etfs` | READ/none; SECTOR | 구현 | 섹터 |
 | `getAccounts` | `list_accounts` | READ/none; ACCOUNT | 기반 구현 | 기반 |
 | `getHoldings` | `get_holdings` | READ/none; ASSET | 기반 구현 | 기반 |
 | `getOrders` | `list_orders` | READ/none; ORDER_HISTORY | 기반 구현 | 기반 |
 | `createOrder` | `create_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
-| `getOrder` | `get_order` | READ/none; ORDER_HISTORY | 미연결 | 일반주문 |
+| `getOrder` | `get_order` | READ/none; ORDER_HISTORY | 구현 | 일반주문 |
 | `modifyOrder` | `modify_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
 | `cancelOrder` | `cancel_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
 | `createConditionalOrder` | `create_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
-| `getConditionalOrders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | 미연결 | 조건 조회 |
-| `getConditionalOrder` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | 미연결 | 조건 조회 |
+| `getConditionalOrders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | 구현 | 조건 조회 |
+| `getConditionalOrder` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | 구현 | 조건 조회 |
 | `cancelConditionalOrder` | `cancel_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
 | `modifyConditionalOrder` | `modify_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
 | `getBuyingPower` | `get_buying_power` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
 | `getSellableQuantity` | `get_sellable_quantity` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
-| `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 미연결 | 일반주문 |
+| `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 구현 | 일반주문 |
 
 ### 필드 계약
 
@@ -594,7 +625,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
 이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
 일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
-현재 11개 READ operation의 공식 성공 예시 29개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다. production SDK가 10개 도구를 호출해 인증·조회 12개 operation에 도달하는지 HTTP 수신 기록으로 확인하며 stdio bundle에서도 시세 네 도구의 도달을 검사한다.
+현재 34개 READ operation의 공식 성공 예시 78개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다. production SDK와 소스·빌드한 stdio가 각각 33개 도구를 호출해 인증·조회 35개 operation에 도달하는지 HTTP 수신 기록으로 확인하며 stdio bundle에서도 종목 참조·시세·시장 도구의 도달을 검사한다.
 
 ### 페이지와 시장별 조건
 
@@ -623,3 +654,44 @@ API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`�
 잘못된 입력은 HTTP 0회이고 429, 5xx, timeout, credential/IP/revoke, malformed, 응답 크기 초과를 각 도구 그룹에서 검사한다.
 소스 AST와 자체 복제 schema의 일치만으로 통과시키지 않는다. 빌드한 bundle의 SDK 호출이 로컬 HTTP 목적지에 도달해야 한다.
 CI의 `hermes` job과 `scripts/check-connectors.sh`가 새 시험을 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
+
+### 국내 종목 통계 계약
+
+통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.
+모두 schema 2의 READ/none이고 금융 승인 정책은 바꾸지 않는다. 연결 계좌 헤더도 통계 GET에 보내지 않는다.
+`symbol`은 공식 영문·숫자·점·하이픈 pattern을 유지하되 `.`과 `..` 및 URL segment 주입은 인증 전에 거절한다.
+caller의 계좌, token, URL과 추가 인자도 HTTP 0회로 거절한다. 통계는 KR 전용이며 미국 종목의 unsupported-market는 `TOSSINVEST_INVALID_INPUT`이다.
+`count`는 기본 10, 1~100의 정수이며 `until`은 실제 날짜(YYYY-MM-DD)다. until은 해당 날짜를 포함한다.
+응답 `{result: {records, nextUntil?}, metadata: {}}`의 모든 행과 배열 순서를 보존한다. 다음 페이지에는 nextUntil을 그대로 넣고 null이거나 없으면 끝낸다.
+검증된 응답을 공용 `officialFields`로 투영해 공식 필드만 재귀적으로 남긴다. 중첩 객체·배열의 민감 확장키를 제거하고 decimal 문자열, null과 선택 필드의 부재를 보존한다.
+잘못된 행은 일부 성공으로 삭제하지 않고 전체 응답 오류로 끝낸다. 자동 페이지 합치기나 수치 변환은 없다.
+
+| 통계 | 집계·단위 | 값의 시점 |
+| --- | --- | --- |
+| 투자자별 매매 | KRX·NXT 거래량(주), 기관 7개 분류·등록외국인·외국인 보유·CFD. 보유·CFD 비중은 소수 비율 | 장중 잠정치의 개인·기관 세부·기타법인·보유·CFD는 null일 수 있다. 당일 저녁 확정치, CFD 다음 영업일 새벽, 보유 다음 영업일 오전 재갱신을 구분한다. updatedAt은 기록 전체의 마지막 갱신이다 |
+| 프로그램 | KRX 거래량(주), 차익 arbitrage·비차익 nonArbitrage. NXT 제외 | 당일 값은 장 종료 전 바뀔 수 있다. 거래대금·updatedAt은 없다 |
+| 공매도 | 수량(주), 거래대금(KRW), 소수 비율 | 당일 저녁 확정치. 정규장 외 세션을 포함한 누적 분모의 부재는 null, 0은 문자열 0이다 |
+| 신용 | 자기신용·유통금융 합계 수량(주), balanceRate·tradingRate는 소수 비율. marginLoan·stockLoan은 nullable 객체 | 다음 영업일 새벽에 전 영업일 값이 반영된다. 개인 신용대주다 |
+| 대차 | 기관 대여·차입의 체결·상환·잔고 수량(주), 잔고 금액(KRW) | 당일 저녁 확정치. 개인 신용대주와 구분한다 |
+
+음수 순매수는 순매도이며 비율을 백분율로 바꾸지 않는다. 장중 확정치나 모든 시장 지원을 보장하지 않는다.
+5개 operation은 STOCK_TRADING_TREND 초당 10회와 최소 100ms 간격을 공유한다. AUTH 초당 5회는 별도다.
+모듈 시험과 production SDK·standalone stdio 시험은 loopback에서 GET 목적지, 빈 body, 인증 POST와 금융 POST·DELETE 0회를 각각 확인한다. 실제 credentials·계좌·거래와 배포는 이 검사의 범위 밖이다.
+
+### 조회 합집합과 공식 필드 투영
+
+종목 참조·섹터·조건주문 조회·랭킹과 지표·주문 상세와 수수료·국내 수급 통계를 같은 production 서버에 등록한다.
+기존 시세와 시장 조회, 계좌 조회의 입력·페이지·오류 계약을 유지한다. `getStocks`와 `getSellableQuantity`의 공유 호출은 중복 operation으로 세지 않는다.
+조회 GET 34개는 공식 REST의 모든 GET이며 나머지 6개 POST·DELETE 금융 producer는 별도 구현 대상이다.
+
+조건조회, 랭킹·시장 지표, 주문 상세·수수료와 통계는 검증 뒤 공용 `officialFields(value, schema)`로 공식 알려진 필드를 투영한다.
+조건조회의 nullable·ref·allOf와 통계의 설명 전용 result 구체화, 정확한 ref/null 두 분기 계약을 함께 사용한다.
+decimal 문자열, unknown enum, null과 선택 필드 부재, 배열 전체와 순서를 보존하고 중첩 객체·배열의 비공식 민감 추가 키를 제거한다.
+미지원 union·anyOf·map·미정의 ref와 properties 없는 객체는 원문을 반환하지 않고 전체 오류로 막는다.
+helper는 검증된 현재 고정 schema에 쓰는 제한된 투영 함수다. 겹치는 중첩 allOf의 범용 무손실 병합이나 알려진 문자열 안의 민감값 탐지는 지원한다고 주장하지 않는다.
+기존 종목·시세·계좌·섹터 producer의 모든 확장키까지 일괄 제거하는 계약으로 확대하지 않는다.
+
+합집합 회귀는 SDK와 소스·빌드한 stdio 각각에서 도구 33개·고유 REST 35개를 검사한다.
+시장 일정의 KR·US를 각각 호출하고 get_quotes와 get_buying_power의 두 요청을 포함하면 각 경로의 전송은 GET 36회와 인증 POST 1회다.
+각 도구의 caller 계좌·token·URL 추가 인자는 stdio에서 인증을 포함해 HTTP 0회로 거절한다.
+금융 POST·DELETE는 0회이며 READ/none, 기본 deny, single_binding과 sandbox_required를 유지한다.
