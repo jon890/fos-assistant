@@ -35,7 +35,7 @@ MCP 서버 이름은 `tossinvest` 다. 도구는 모두 `READ` 이고 승인 없
 | `get_quotes` | `GET /api/v1/prices`, `GET /api/v1/stocks` | 종목 200개까지의 현재가와 이름을 읽는다 |
 | `get_holdings` | `GET /api/v1/holdings` | 보유 종목과 평가, 손익을 읽는다 |
 | `get_sellable_quantity` | `GET /api/v1/sellable-quantity` | 종목 하나의 매도 가능 수량을 읽는다 |
-| `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity`, `GET /api/v1/commissions` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
+| `get_buying_power` | `GET /api/v1/buying-power`, `GET /api/v1/sellable-quantity` | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
 | `get_order` | `GET /api/v1/orders/{orderId}` | 주문 하나의 상세와 체결을 읽는다 |
 | `get_commissions` | `GET /api/v1/commissions` | 전체 시장의 수수료 비율과 적용 날짜를 읽는다 |
 | `list_orders` | `GET /api/v1/orders` | 미체결이나 끝난 주문을 기간으로 읽는다 |
