@@ -71,6 +71,52 @@ compiler 회귀와 공유 golden vector는 `hermes/connectors/naver-blog/tests/c
 테스트는 고정 ResolvedAsset mock과 임시 디렉터리의 합성 사진만 사용한다.
 다른 구현의 신규 파일이나 실제 provider 호출에 의존하지 않는다.
 
+### compile 전용 내부 transport
+
+`POST /api/connectors/{id}/snapshot`은 Control Plane 서비스 Bearer로만 호출한다. <!-- ref-ignore: plugin이 middleware에서 처리하는 서비스 경로다 -->
+대시보드 쿠키만 있는 요청은 거절한다. 요청의 정확한 키는 `profile`, `operation`, `args`이며 이번 구현은 `operation:"compile"`만 받는다.
+args는 서버가 검증한 `canonicalDraft`와 `resolvedAssets`다. 모델 공개 도구에는 내부 경로와 private 도구를 등록하지 않는다.
+
+connector.json의 snapshot은 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`의 다섯 키만 받는다.
+protocol은 `content-snapshot-v1`, 도구 이름은 서로 다르고 공개 도구와 겹치지 않는다.
+capabilities는 `compile`, `start`, `status` 세 boolean이며 이번 구현은 `{compile:true,start:false,status:false}`만 선언한다.
+카탈로그의 별도 snapshot 칸과 성공 HTTP 응답은 같은 검증된 선언을 사용한다.
+후속 Java catalog decoder도 이 다섯 키 계약을 따라야 한다. decoder와 DB, 승인, worker 시작·조회는 아직 구현하지 않았다.
+
+dashboard는 기존 설치 소유 기록과 profile 표식, 주인 첨부·브라우저 환경 선택 규칙을 확인한 뒤 별도 stdio 자식을 띄운다.
+실행 UID는 기존 dashboard 자식과 같고 권한을 올리지 않는다.
+private process는 dashboard가 붙인 `--content-snapshot-operation compile` 인자로만 열린다.
+공개 설치 args의 private flag와 manifest·profile의 `FOS_CONTENT_SNAPSHOT_OPERATION`, `FOS_CONTENT_SAVE_TICKET`, `FOS_CONTENT_SAVE_AUTHORIZE_URL` 선언은 거절한다.
+부모 env 전체를 복사하지 않으며 별도 private env를 일반 MCP 설치에 남기지 않는다.
+Naver 실행 선언의 `--no-env-file`로 Bun이 dashboard의 작업 디렉터리에서 `.env`를 자동으로 읽는 것도 차단한다.
+실제 private 도구 목록이 선언한 compile 하나와 다르면 호출하지 않는다.
+start·status와 미지원 operation은 자식 실행 전 409로 끝나며 일반 execute로 우회하지 않는다.
+
+성공 응답은 `{ok:true,result,capabilities}`이고 result는 기존 `CompiledSnapshotV1`이다.
+오류는 본문·경로·cause·stderr 없는 `{ok:false,error}`이며 compile timeout은 504다.
+전체 MCP 왕복은 5초로 제한하고 기존 call·execute와 동시 호출 4개 한도를 공유한다. 자동 재전송은 없다.
+adapter 자체는 원고와 인자·결과를 파일이나 로그에 남기지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
+Python MCP SDK는 잘못된 stdout을 `logger.exception`으로 기록하며 현재 그 본문은 가리지 않는다.
+SDK와 프레임워크 진단 전체의 본문 가림은 아직 구현·검증되지 않았다.
+renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거나 반환하지 않는다.
+
+| UTF-8 compact JSON 상한 | 검사 경계 |
+| --- | --- |
+| canonical 원고 65,536 bytes | Python 요청과 private compiler |
+| 요청·응답 envelope 각각 524,288 bytes | 요청 스트림은 JSON 변환 전, MCP 결과와 HTTP 응답은 전달 전 |
+| compiled JSON 262,144 bytes | payload·tuple·notes·manifest를 포함한 전체 직렬화 |
+| 이미지 자리·manifest·resolvedAssets 각각 50개 | 같은 asset 반복은 자리마다 세고 asset 정의 중복은 거절 |
+| photoDir 4,096 bytes·fileName 255 bytes | 내부 원본 참조 스키마와 Python 입력 |
+| asset ID 양수 Long, 최대 19자리 | 정규형 십진 문자열이며 앞자리 0은 거절 |
+
+기존 본문 20,000 code point 상한과 golden의 두 해시, caption·notes·반복 사진·미사용 asset 허용은 보존한다.
+사진의 권한과 지문 대응은 호출자가 검증한다. compile의 파일 검사만으로 실제 provider의 사진 identity를 증명하지 않는다.
+합성 stdio·HTTP 검사는 Python mcp 2.0.0과 TypeScript SDK 1.28.0으로 수행한다.
+
+**본문 없는 진단 정책의 실제 구현과 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
+후속 진단 정책의 운영 수락 검사는 잘못된 stdout의 SDK 로그 본문 노출 재현과 SDK validation 오류를 포함해야 한다.
+이번 구현은 로컬 compile 경계이며 원고 최초 MCP 생성, snapshot 영속화, 승인과 실제 네이버 저장을 열지 않는다.
+
 ## 단계별 합성 판정
 
 사진 전달과 내용 판독은 별도 증거로 판정한다.
