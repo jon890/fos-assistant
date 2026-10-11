@@ -80,9 +80,6 @@ public class ContextAssembler implements OmittedMemories {
             아래는 제목만 적은 것이다. 필요하면 memory_read 도구로 본문을 읽는다.
             """.stripTrailing();
 
-    /** 제목과 항목, 항목과 항목 사이에 넣는 구분 줄이다. */
-    private static final String SEPARATOR = "\n\n";
-
     private static final Pattern LINE_BREAK = Pattern.compile("\\r\\n|\\n|\\r");
 
     private final MemoryService memories;
@@ -100,12 +97,12 @@ public class ContextAssembler implements OmittedMemories {
      * @param remembers Control Plane MCP 도구를 받고 먼저 살펴보기가 아닌 실행이다. 옛 커넥터 에이전트는 거짓이다
      */
     public AssembledContext withResponseInstructions(AssembledContext context, boolean remembers) {
-        String instructions = RESPONSE_INSTRUCTIONS + SEPARATOR + TOOL_CALL_INSTRUCTIONS;
+        String instructions = RESPONSE_INSTRUCTIONS + ContextBudgetWriter.SEPARATOR + TOOL_CALL_INSTRUCTIONS;
         if (remembers) {
-            instructions += SEPARATOR + MEMORY_INSTRUCTIONS;
+            instructions += ContextBudgetWriter.SEPARATOR + MEMORY_INSTRUCTIONS;
         }
         if (context.instructions() != null && !context.instructions().isBlank()) {
-            instructions += SEPARATOR + context.instructions();
+            instructions += ContextBudgetWriter.SEPARATOR + context.instructions();
         }
         return new AssembledContext(instructions, instructions.length(), context.omittedMemoryIds(), context.bundle());
     }
@@ -151,7 +148,7 @@ public class ContextAssembler implements OmittedMemories {
         long indexBudget =
                 Math.min(indexLength(indexed, sameNameDocuments(indexed)), maxChars / properties.indexBudgetRatio());
 
-        ContextBuilder builder = new ContextBuilder(maxChars);
+        ContextBudgetWriter builder = new ContextBudgetWriter(maxChars);
         builder.limit(maxChars - indexBudget);
         appendAlways(builder, GROUP_HEADER, always, MemoryScope.GROUP, now);
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
@@ -170,7 +167,7 @@ public class ContextAssembler implements OmittedMemories {
      * 담는다. 고르기와 담기가 같은 길이 계산을 쓰므로 고른 항목은 모두 들어간다. 그래도 들어가지 않는 항목은 빠진 항목으로 세지 않고
      * 색인으로 돌린다.
      */
-    private Set<Long> appendFacts(ContextBuilder builder, List<Memory> indexed, Instant now) {
+    private Set<Long> appendFacts(ContextBudgetWriter builder, List<Memory> indexed, Instant now) {
         long budget = Math.min(builder.room(), properties.factsMaxChars());
         if (budget <= 0) {
             return Set.of();
@@ -219,7 +216,7 @@ public class ContextAssembler implements OmittedMemories {
         long used = 0;
         for (Memory memory : candidates.stream().sorted(recentFirst).toList()) {
             boolean first = chosen.isEmpty();
-            long cost = ContextBuilder.next(startsEmpty && first, !first, FACTS_HEADER, factLine(memory))
+            long cost = ContextBudgetWriter.next(startsEmpty && first, !first, FACTS_HEADER, factLine(memory))
                     .length();
             if (used + cost <= budget) {
                 chosen.add(memory);
@@ -240,7 +237,7 @@ public class ContextAssembler implements OmittedMemories {
     }
 
     private void appendAlways(
-            ContextBuilder builder, String header, List<Memory> memories, MemoryScope scope, Instant now) {
+            ContextBudgetWriter builder, String header, List<Memory> memories, MemoryScope scope, Instant now) {
         memories.stream()
                 .filter(memory -> memory.scope() == scope)
                 .filter(ContextAssembler::plainOrSkipped)
@@ -326,7 +323,7 @@ public class ContextAssembler implements OmittedMemories {
     }
 
     private void appendIndex(
-            ContextBuilder builder, List<Memory> memories, Map<Long, List<Memory>> sameNames, Instant now) {
+            ContextBudgetWriter builder, List<Memory> memories, Map<Long, List<Memory>> sameNames, Instant now) {
         memories.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
             ContextItem item = indexItem(memory, others, now);
@@ -388,101 +385,9 @@ public class ContextAssembler implements OmittedMemories {
         memories.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
             List<Memory> others = sameNames.getOrDefault(memory.id(), List.of());
             String line = indexLine(memory.id(), memory.title(), others);
-            ContextBuilder.appendTo(rendered, headers, INDEX_HEADER, line);
+            ContextBudgetWriter.appendTo(rendered, headers, INDEX_HEADER, line);
         });
-        return rendered.length() + SEPARATOR.length();
+        return rendered.length() + ContextBudgetWriter.SEPARATOR.length();
     }
 
-    private static final class ContextBuilder {
-        private final long maxChars;
-        private final StringBuilder full = new StringBuilder();
-        private final StringBuilder selected = new StringBuilder();
-        private final Set<String> fullHeaders = new HashSet<>();
-        private final Set<String> selectedHeaders = new HashSet<>();
-        private final List<Long> omitted = new ArrayList<>();
-        private final List<ContextItem> items = new ArrayList<>();
-
-        /** 지금 담는 층이 쓸 수 있는 자리다. 층을 옮길 때마다 바꾼다. */
-        private long limit;
-
-        private ContextBuilder(long maxChars) {
-            this.maxChars = maxChars;
-            this.limit = maxChars;
-        }
-
-        private void limit(long limit) {
-            this.limit = Math.max(0, Math.min(limit, maxChars));
-        }
-
-        /** 지금 층에 남은 자리다. */
-        private long room() {
-            return Math.max(0, limit - selected.length());
-        }
-
-        private boolean isEmpty() {
-            return selected.isEmpty();
-        }
-
-        /**
-         * 남은 자리에 들어가면 담고 참을 돌려준다. 들어가지 않으면 아무것도 남기지 않고 거짓을 돌려준다.
-         *
-         * <p>{@link #append} 와 달리 빠진 항목으로 세지 않는다. 그 항목은 부르는 쪽이 다른 층으로 돌린다.
-         */
-        private boolean appendIfFits(String header, String line, ContextItem item) {
-            String added = next(selected, selectedHeaders, header, line);
-            if (selected.length() + added.length() > limit) {
-                return false;
-            }
-            appendTo(full, fullHeaders, header, line);
-            appendTo(selected, selectedHeaders, header, line);
-            items.add(item);
-            return true;
-        }
-
-        /**
-         * 항목 하나를 담는다.
-         *
-         * <p>그 항목이 남은 자리에 들어가지 않으면 <b>그 항목만</b> 빼고 다음 항목을 계속 본다. 한 번
-         * 넘쳤다고 뒤를 모두 멈추면 본문이 긴 항목 하나가 나머지와 색인까지 밀어낸다.
-         *
-         * <p>넘친 항목을 잘라서 싣지도 않는다. 잘린 사실은 틀린 사실이 될 수 있다. 뺀 항목은 묶음의 원래 자리에
-         * {@link ContextBodyMode#OMITTED} 로 남긴다.
-         */
-        private void append(Long memoryId, String header, String line, ContextItem item) {
-            appendTo(full, fullHeaders, header, line);
-            String lineWithHeader = next(selected, selectedHeaders, header, line);
-            if (selected.length() + lineWithHeader.length() > limit) {
-                omitted.add(memoryId);
-                items.add(item.withBodyMode(ContextBodyMode.OMITTED));
-                return;
-            }
-            appendTo(selected, selectedHeaders, header, line);
-            items.add(item);
-        }
-
-        private static String next(StringBuilder value, Set<String> headers, String header, String item) {
-            return next(value.isEmpty(), headers.contains(header), header, item);
-        }
-
-        /** 앞 글이 비었는지와 머리가 이미 있는지로 다음에 붙을 글을 만든다. 담기와 고르기가 같은 규칙을 쓴다. */
-        private static String next(boolean empty, boolean headed, String header, String item) {
-            String prefix = empty ? "" : SEPARATOR;
-            return prefix + (headed ? item : header + SEPARATOR + item);
-        }
-
-        private static void appendTo(StringBuilder value, Set<String> headers, String header, String item) {
-            value.append(next(value, headers, header, item));
-            headers.add(header);
-        }
-
-        private AssembledContext build() {
-            if (!omitted.isEmpty()) {
-                log.warn("memory context omitted items={} chars={}", omitted.size(), full.length() - selected.length());
-            }
-            ContextBundle bundle = new ContextBundle(items);
-            return selected.isEmpty()
-                    ? new AssembledContext(null, 0, omitted, bundle)
-                    : new AssembledContext(selected.toString(), selected.length(), omitted, bundle);
-        }
-    }
 }

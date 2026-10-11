@@ -756,6 +756,35 @@ class ContextAssemblerTest {
         assertThat(result.bundle().items()).extracting(ContextItem::ref).doesNotContain("memory:" + career.id());
     }
 
+    @Test
+    @DisplayName("같은 조립기를 다시 불러도 앞 호출의 머리와 누락과 항목이 섞이지 않는다")
+    void resetsHeadersOmittedAndItemsBetweenAssemblies() {
+        Memory omitted = memories.create(ADMIN, MemoryScope.GROUP, "넘친 항목", "가".repeat(9_000), true);
+        memories.create(ADMIN, MemoryScope.GROUP, "첫 항목", "첫 호출 본문", true);
+        AssembledContext first = assembler.assemble(ADMIN, agentId);
+        assertThat(first.omittedMemoryIds()).containsExactly(omitted.id());
+
+        repository.deleteAll();
+        repository.flush();
+        AssembledContext empty = assembler.assemble(ADMIN, agentId);
+        assertThat(empty.instructions()).isNull();
+        assertThat(empty.chars()).isZero();
+        assertThat(empty.omittedMemoryIds()).isEmpty();
+        assertThat(empty.bundle().items()).isEmpty();
+
+        Memory secondMemory = memories.create(ADMIN, MemoryScope.GROUP, "다음 항목", "다음 호출 본문", true);
+        AssembledContext second = assembler.assemble(ADMIN, agentId);
+        String expected = "# 우리 그룹이 함께 아는 것\n\n- 다음 호출 본문";
+        assertThat(second.instructions()).isEqualTo(expected);
+        assertThat(second.chars()).isEqualTo(expected.length());
+        assertThat(second.instructionsHash()).isEqualTo(Sha256.hex16(expected));
+        assertThat(second.omittedMemoryIds()).isEmpty();
+        assertThat(second.bundle().items()).extracting(ContextItem::ref)
+                .containsExactly("memory:" + secondMemory.id());
+        assertThat(first.omittedMemoryIds()).containsExactly(omitted.id());
+        assertThat(first.instructions()).contains("첫 호출 본문").doesNotContain("다음 호출 본문");
+    }
+
     /** 개인 사실 구역 예산만 바꾼 조립기다. 나머지 설정은 운영 바인딩 값을 쓴다. */
     private ContextAssembler assemblerWithFactsBudget(int factsMaxChars) {
         return new ContextAssembler(
