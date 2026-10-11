@@ -45,6 +45,7 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -121,6 +122,7 @@ class McpMemoryRememberToolTest {
     private Conversation conversation;
     private AgentExecution dadRun;
 
+
     @BeforeEach
     void setUp() {
         clear();
@@ -133,6 +135,7 @@ class McpMemoryRememberToolTest {
         dadRun = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, dadRoot);
     }
 
+
     @AfterEach
     void tearDown() {
         jdbc.update("DELETE FROM decision_feedback_event WHERE user_id = ?", dad.id());
@@ -144,20 +147,26 @@ class McpMemoryRememberToolTest {
         clear();
     }
 
+
     @Test
-    @DisplayName("도구 목록의 마지막이 memory_remember 이고 title 과 content 가 필수다")
+    @DisplayName("memory_remember 는 중복 없이 등록되고 title 과 content 가 필수다")
     void listsMemoryRememberLast() throws Exception {
         JsonNode tools = body(send("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}"))
-                .path("result")
-                .path("tools");
+            .path("result")
+            .path("tools");
 
-        JsonNode tool = tools.get(tools.size() - 1);
+        assertThat(tools).extracting(item -> item.path("name").asString()).doesNotHaveDuplicates();
+        JsonNode tool = StreamSupport.stream(tools.spliterator(), false)
+            .filter(item -> TOOL.equals(item.path("name").asString()))
+            .findFirst()
+            .orElseThrow();
         assertThat(tool.path("name").asString()).isEqualTo(TOOL);
         assertThat(tool.path("inputSchema").path("required").toString()).isEqualTo("[\"title\",\"content\"]");
         assertThat(tool.path("inputSchema").path("additionalProperties").asBoolean())
-                .isFalse();
+            .isFalse();
         assertThat(tool.path("description").asString()).contains("작업 기록").contains("부정은 content 에 그대로 살린다");
     }
+
 
     @Test
     @DisplayName("사람이 보낸 turn 에서 부정이 뒤집히지 않은 본문은 바로 ACCEPTED 로 저장하고 기록을 남긴다")
@@ -180,6 +189,7 @@ class McpMemoryRememberToolTest {
         assertThat(feedbackEvents()).as("바로 저장은 제안이 아니라 판단 피드백을 남기지 않는다").isEmpty();
     }
 
+
     @Test
     @DisplayName("근거가 없거나 질문에 없어도 다듬은 본문은 바로 저장한다")
     void remembersRefinedContentRegardlessOfEvidence() throws Exception {
@@ -189,13 +199,14 @@ class McpMemoryRememberToolTest {
         assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).isEqualTo(REMEMBERED);
 
         assertThat(memoriesOfDad())
-                .extracting(Memory::status)
-                .containsExactly(MemoryStatus.ACCEPTED, MemoryStatus.ACCEPTED);
+            .extracting(Memory::status)
+            .containsExactly(MemoryStatus.ACCEPTED, MemoryStatus.ACCEPTED);
         assertThat(capturesOfDad())
-                .extracting(MemoryCapture::kind)
-                .containsExactly(MemoryCaptureKind.CREATED, MemoryCaptureKind.CREATED);
+            .extracting(MemoryCapture::kind)
+            .containsExactly(MemoryCaptureKind.CREATED, MemoryCaptureKind.CREATED);
         assertThat(feedbackEvents()).as("바로 저장은 판단 피드백을 남기지 않는다").isEmpty();
     }
+
 
     @Test
     @DisplayName("질문의 부정이 본문에서 사라지면 제안으로 내린다")
@@ -207,6 +218,7 @@ class McpMemoryRememberToolTest {
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
     }
 
+
     @Test
     @DisplayName("질문에 없던 부정이 본문에 생기면 제안으로 내린다")
     void proposesWhenContentAddsNegation() throws Exception {
@@ -217,6 +229,7 @@ class McpMemoryRememberToolTest {
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.PROPOSED);
     }
 
+
     @Test
     @DisplayName("질문의 부정이 다른 표지로라도 본문에 살아 있으면 바로 저장한다")
     void remembersWhenNegationKept() throws Exception {
@@ -226,6 +239,7 @@ class McpMemoryRememberToolTest {
 
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
+
 
     @Test
     @DisplayName("모델이 sensitive 를 주지 않아도 본문이 민감해 보이면 일반 민감도의 제안으로 내린다")
@@ -238,6 +252,7 @@ class McpMemoryRememberToolTest {
         assertThat(memory.status()).isEqualTo(MemoryStatus.PROPOSED);
         assertThat(memory.sensitivity()).isEqualTo(MemorySensitivity.NORMAL);
     }
+
 
     @Test
     @DisplayName("바로 저장한 항목을 민감해 보이는 본문으로 고치려 하면 고치지 않고 확인하라고 답한다")
@@ -255,6 +270,7 @@ class McpMemoryRememberToolTest {
         assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 홍길동이다");
     }
 
+
     @Test
     @DisplayName("질문에만 민감한 낱말이 있으면 제목과 본문만 보므로 바로 저장한다")
     void remembersWhenOnlyQuestionLooksSensitive() throws Exception {
@@ -265,15 +281,17 @@ class McpMemoryRememberToolTest {
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
 
+
     /** 판단 피드백을 {@code 종류|주체} 로 남긴 순서대로 읽는다. */
     private List<String> feedbackEvents() {
         return jdbc
-                .queryForList(
-                        "SELECT event_type, actor FROM decision_feedback_event WHERE user_id = ? ORDER BY id", dad.id())
-                .stream()
-                .map(row -> row.get("EVENT_TYPE") + "|" + row.get("ACTOR"))
-                .toList();
+            .queryForList(
+                "SELECT event_type, actor FROM decision_feedback_event WHERE user_id = ? ORDER BY id", dad.id())
+            .stream()
+            .map(row -> row.get("EVENT_TYPE") + "|" + row.get("ACTOR"))
+            .toList();
     }
+
 
     @Test
     @DisplayName("사람이 보낸 질문이 이어지지 않은 실행은 본문이 맞아도 제안이다")
@@ -281,8 +299,9 @@ class McpMemoryRememberToolTest {
         messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("바깥 도구를 시작한 실행은 제안이고 Control Plane 읽기 도구만 부른 실행은 바로 저장한다")
@@ -291,11 +310,12 @@ class McpMemoryRememberToolTest {
         toolStarted("mcp__fos_assistant__memory_read");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(REMEMBERED);
+            .isEqualTo(REMEMBERED);
 
         toolStarted("web_search");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("붙은 커넥터의 READ 도구를 시작한 대화의 기억은 근거가 질문에 있어도 제안이다")
@@ -305,8 +325,9 @@ class McpMemoryRememberToolTest {
         toolStarted("mcp__gmail__get_message");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("Hermes 도구 정의 검색과 설명을 읽어도 바로 저장하고 중계 실행은 제안이다")
@@ -316,27 +337,29 @@ class McpMemoryRememberToolTest {
         toolStarted("tool_describe");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(REMEMBERED);
+            .isEqualTo(REMEMBERED);
 
         toolStarted("tool_call");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("같은 대화의 앞 실행이 바깥 도구를 썼으면 지금 실행이 쓰지 않았어도 제안이다")
     void proposesWhenEarlierRunReadOutsideText() throws Exception {
         AgentExecution earlier = otherRootRun("run-earlier");
         questions.save(ExecutionQuestion.of(
-                earlier.id(),
-                messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "메일 읽어 줘", Instant.now()))
-                        .id(),
-                Instant.now()));
+            earlier.id(),
+            messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), "메일 읽어 줘", Instant.now()))
+                .id(),
+            Instant.now()));
         toolStarted(earlier.id(), ExecutionEventType.TOOL_STARTED, "mcp__gmail__read_message");
         askedInThisTurn();
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("하위 에이전트를 시작한 실행은 제안이다")
@@ -345,8 +368,9 @@ class McpMemoryRememberToolTest {
         toolStarted(dadRun.id(), ExecutionEventType.SUBAGENT_STARTED, null);
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("이름이 없는 도구 시작 사건도 바깥 도구로 본다")
@@ -355,8 +379,9 @@ class McpMemoryRememberToolTest {
         toolStarted(dadRun.id(), ExecutionEventType.TOOL_STARTED, null);
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("같은 대화에 사람의 질문 없이 보낸 루트 실행(맡긴 일의 결과 turn)이 있으면 제안이다")
@@ -365,8 +390,9 @@ class McpMemoryRememberToolTest {
         otherRootRun("run-delivery");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("기능 도입 전의 질문 없는 루트 실행이 대화에 있으면 그 뒤의 질문 turn 도 제안이다")
@@ -377,6 +403,7 @@ class McpMemoryRememberToolTest {
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).isEqualTo(PROPOSED);
     }
 
+
     @Test
     @DisplayName("질문 없는 루트 실행이 없으면 새 root 의 질문 turn 은 바로 저장한다")
     void remembersInNewRootRunWithoutLegacyRun() throws Exception {
@@ -385,16 +412,17 @@ class McpMemoryRememberToolTest {
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).isEqualTo(REMEMBERED);
     }
 
+
     @Test
     @DisplayName("질문 줄이 다른 사람의 메시지를 가리키면 없는 줄로 보고 제안이다")
     void proposesWhenQuestionIsOthers() throws Exception {
-        ChatMessage foreign =
-                messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
+        ChatMessage foreign = messages.save(ChatMessage.fromUser(conversation.id(), dad.id() + 100_000, QUESTION, Instant.now()));
         questions.save(ExecutionQuestion.of(dadRun.id(), foreign.id(), Instant.now()));
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-                .isEqualTo(PROPOSED);
+            .isEqualTo(PROPOSED);
     }
+
 
     @Test
     @DisplayName("바로 저장한 항목을 사람이 고친 뒤에는 되돌리지 않는다")
@@ -405,10 +433,11 @@ class McpMemoryRememberToolTest {
         memoryService.update(currentDad(), capture.memoryId(), "다른 사람은 홍길동이고 열 살이다", false);
 
         assertThatThrownBy(() -> captureService.undo(currentDad(), capture.id()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
         assertThat(memories.findById(capture.memoryId())).isPresent();
     }
+
 
     @Test
     @DisplayName("민감한 내용은 바로 저장 조건이어도 제안이고 본문은 암호문이며 중복 키를 남기지 않는다")
@@ -426,6 +455,7 @@ class McpMemoryRememberToolTest {
         assertThat(memory.proposalDedupKey()).isNull();
     }
 
+
     @Test
     @DisplayName("그 에이전트가 받지 않는 collection 은 저장하지 않고 오류로 답한다")
     void rejectsCollectionOutsideAgentGrants() throws Exception {
@@ -439,6 +469,7 @@ class McpMemoryRememberToolTest {
         assertThat(memoriesOfDad()).isEmpty();
     }
 
+
     @Test
     @DisplayName("기존 제안을 바로 저장한 기록을 되돌리면 항목을 보존하고 승인 전 상태로 돌아간다")
     void restoresProposalWhenUndoingAcceptance() throws Exception {
@@ -447,9 +478,9 @@ class McpMemoryRememberToolTest {
         askedInThisTurn();
         call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
         MemoryCapture accepted = capturesOfDad().stream()
-                .filter(capture -> capture.kind() == MemoryCaptureKind.CREATED)
-                .findFirst()
-                .orElseThrow();
+            .filter(capture -> capture.kind() == MemoryCaptureKind.CREATED)
+            .findFirst()
+            .orElseThrow();
         assertThat(accepted.previousStatus()).isEqualTo(MemoryStatus.PROPOSED);
 
         captureService.undo(currentDad(), accepted.id());
@@ -462,9 +493,10 @@ class McpMemoryRememberToolTest {
         assertThat(restored.acceptedAt()).isNull();
         assertThat(captures.findById(accepted.id()).orElseThrow().undone()).isTrue();
         assertThat(feedbackEvents())
-                .as("받아들임을 무른 것을 사용자의 마지막 결정으로 한 번만 남긴다")
-                .containsExactly("SURFACED|AGENT", "ACCEPTED|USER", "DISMISSED|USER");
+            .as("받아들임을 무른 것을 사용자의 마지막 결정으로 한 번만 남긴다")
+            .containsExactly("SURFACED|AGENT", "ACCEPTED|USER", "DISMISSED|USER");
     }
+
 
     @Test
     @DisplayName("같은 제목과 본문은 한 줄만 남기고 이미 기억하고 있다고 답한다")
@@ -479,6 +511,7 @@ class McpMemoryRememberToolTest {
         assertThat(memoriesOfDad()).hasSize(1);
         assertThat(capturesOfDad()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("바로 저장 조건이면 memory_id 의 본문을 고치고 판을 올리며 되돌리면 이전 본문으로 돌아간다")
@@ -497,15 +530,16 @@ class McpMemoryRememberToolTest {
         assertThat(updated.revision()).isEqualTo(2);
 
         MemoryCapture update = capturesOfDad().stream()
-                .filter(capture -> capture.kind() == MemoryCaptureKind.UPDATED)
-                .findFirst()
-                .orElseThrow();
+            .filter(capture -> capture.kind() == MemoryCaptureKind.UPDATED)
+            .findFirst()
+            .orElseThrow();
         captureService.undo(currentDad(), update.id());
 
         Memory restored = memories.findById(memoryId).orElseThrow();
         assertThat(restored.content()).isEqualTo("다른 사람은 김철수다");
         assertThat(restored.revision()).isEqualTo(3);
     }
+
 
     @Test
     @DisplayName("바로 저장 조건이 아니면 기존 항목을 고치지 않고 사용자에게 확인하라고 답한다")
@@ -524,6 +558,7 @@ class McpMemoryRememberToolTest {
         assertThat(memories.findById(memoryId).orElseThrow().content()).isEqualTo("다른 사람은 김철수다");
     }
 
+
     @Test
     @DisplayName("한 실행에서 셋을 남기면 넷째는 저장하지 않는다")
     void limitsCapturesPerExecution() throws Exception {
@@ -538,6 +573,7 @@ class McpMemoryRememberToolTest {
         assertThat(memoriesOfDad()).hasSize(3);
     }
 
+
     @Test
     @DisplayName("대화의 기록 목록은 되돌린 기록을 빼고, 새로 만든 항목을 되돌리면 그 항목을 지운다")
     void listsAndUndoesCreatedCapture() throws Exception {
@@ -547,23 +583,22 @@ class McpMemoryRememberToolTest {
 
         List<CapturedMemory> listed = captureService.capturesOf(currentDad(), conversation.id());
         assertThat(listed)
-                .extracting(captured -> captured.capture().kind())
-                .containsExactly(MemoryCaptureKind.CREATED, MemoryCaptureKind.PROPOSED);
+            .extracting(captured -> captured.capture().kind())
+            .containsExactly(MemoryCaptureKind.CREATED, MemoryCaptureKind.PROPOSED);
 
         CapturedMemory created = listed.getFirst();
         captureService.undo(currentDad(), created.capture().id());
 
         assertThat(memories.findById(created.memory().id())).isEmpty();
         assertThat(captureService.capturesOf(currentDad(), conversation.id()))
-                .extracting(captured -> captured.capture().kind())
-                .containsExactly(MemoryCaptureKind.PROPOSED);
-        CapturedMemory proposal =
-                captureService.capturesOf(currentDad(), conversation.id()).getFirst();
-        assertThatThrownBy(() ->
-                        captureService.undo(currentDad(), proposal.capture().id()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
+            .extracting(captured -> captured.capture().kind())
+            .containsExactly(MemoryCaptureKind.PROPOSED);
+        CapturedMemory proposal = captureService.capturesOf(currentDad(), conversation.id()).getFirst();
+        assertThatThrownBy(() -> captureService.undo(currentDad(), proposal.capture().id()))
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_REVISION_CONFLICT));
     }
+
 
     @Test
     @DisplayName("남의 기록은 되돌리지 못하고 없는 기록과 같은 응답이다")
@@ -574,9 +609,10 @@ class McpMemoryRememberToolTest {
         CurrentUser other = new CurrentUser(dad.id() + 100_000, "other@example.com", "남", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> captureService.undo(other, capture.id()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
     }
+
 
     @Test
     @DisplayName("모르는 키나 사용자를 바꾸려는 키는 인자 오류다")
@@ -590,67 +626,75 @@ class McpMemoryRememberToolTest {
         assertThat(memoriesOfDad()).isEmpty();
     }
 
+
     private void askedInThisTurn() {
         askedInThisTurn(QUESTION);
     }
+
 
     private void askedInThisTurn(String text) {
         ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), text, Instant.now()));
         questions.save(ExecutionQuestion.of(dadRun.id(), question.id(), Instant.now()));
     }
 
+
     /** 새 root 의 실행을 만들고 사람의 질문을 잇는다. 그 root 를 돌려준다. */
     private String askedInNewRootRun() {
         String root = McpCallSigner.newRoot();
         AgentExecution run = McpCallSigner.running(executions, agents, dad.id(), conversation.id(), PROFILE, root);
-        ChatMessage question =
-                messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
+        ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), dad.id(), QUESTION, Instant.now()));
         questions.save(ExecutionQuestion.of(run.id(), question.id(), Instant.now()));
         return root;
     }
+
 
     private void toolStarted(String toolName) {
         toolStarted(dadRun.id(), ExecutionEventType.TOOL_STARTED, toolName);
     }
 
+
     private void toolStarted(Long executionId, ExecutionEventType type, String toolName) {
         events.save(ExecutionEvent.builder()
-                .executionId(executionId)
-                .sequence((int) events.count() + 1000)
-                .eventType(type)
-                .toolName(toolName)
-                .occurredAt(Instant.now())
-                .build());
+            .executionId(executionId)
+            .sequence((int)events.count() + 1000)
+            .eventType(type)
+            .toolName(toolName)
+            .occurredAt(Instant.now())
+            .build());
     }
+
 
     /** 같은 대화에서 Hermes 로 보낸 다른 루트 실행이다. 질문 줄은 잇지 않는다. */
     private AgentExecution otherRootRun(String runId) {
         return executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .agentId(dadRun.agentId())
-                .conversationId(conversation.id())
-                .profileName(PROFILE)
-                .hermesSessionId(McpCallSigner.newRoot())
-                .hermesRunId(runId)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .agentId(dadRun.agentId())
+            .conversationId(conversation.id())
+            .profileName(PROFILE)
+            .hermesSessionId(McpCallSigner.newRoot())
+            .hermesRunId(runId)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
     }
+
 
     private void clear() {
         jdbc.update(
-                "DELETE FROM execution_question WHERE execution_id IN (SELECT id FROM agent_execution WHERE profile_name = ?)",
-                PROFILE);
+            "DELETE FROM execution_question WHERE execution_id IN (SELECT id FROM agent_execution WHERE profile_name = ?)",
+            PROFILE);
         jdbc.update(
-                "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE profile_name = ?)",
-                PROFILE);
+            "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE profile_name = ?)",
+            PROFILE);
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
     }
+
 
     private CurrentUser currentDad() {
         return new CurrentUser(dad.id(), dad.email(), "아빠", 1L, UserRole.ADMIN);
     }
+
 
     private ObjectNode remember(String title, String content, String evidence) {
         ObjectNode arguments = json.createObjectNode().put("title", title).put("content", content);
@@ -660,17 +704,20 @@ class McpMemoryRememberToolTest {
         return arguments;
     }
 
+
     private List<Memory> memoriesOfDad() {
         return memories.findAll().stream()
-                .filter(memory -> dad.id().equals(memory.ownerUserId()))
-                .toList();
+            .filter(memory -> dad.id().equals(memory.ownerUserId()))
+            .toList();
     }
+
 
     private List<MemoryCapture> capturesOfDad() {
         return captures.findAll().stream()
-                .filter(capture -> dad.id().equals(capture.userId()))
-                .toList();
+            .filter(capture -> dad.id().equals(capture.userId()))
+            .toList();
     }
+
 
     private Memory onlyMemory() {
         List<Memory> rows = memoriesOfDad();
@@ -678,27 +725,33 @@ class McpMemoryRememberToolTest {
         return rows.getFirst();
     }
 
+
     private MemoryCapture onlyCapture() {
         List<MemoryCapture> rows = capturesOfDad();
         assertThat(rows).hasSize(1);
         return rows.getFirst();
     }
 
+
     private JsonNode call(ObjectNode arguments) throws Exception {
         return call(arguments, dadRoot);
     }
+
 
     private JsonNode call(ObjectNode arguments, String root) throws Exception {
         return body(send(signed(arguments, root))).path("result");
     }
 
+
     private String signed(ObjectNode arguments) {
         return signed(arguments, dadRoot);
     }
 
+
     private String signed(ObjectNode arguments, String root) {
         return McpCallSigner.withContext(json.writeValueAsString(toolCall(arguments)), dadToken, root);
     }
+
 
     private ObjectNode toolCall(JsonNode arguments) {
         ObjectNode request = json.createObjectNode();
@@ -711,20 +764,23 @@ class McpMemoryRememberToolTest {
         return request;
     }
 
+
     private HttpResponse<String> send(String request) throws Exception {
         return client.send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
-                        .header("Content-Type", "application/json")
-                        .header("Authorization", "Bearer " + dadToken)
-                        .POST(HttpRequest.BodyPublishers.ofString(request))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/mcp"))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + dadToken)
+                .POST(HttpRequest.BodyPublishers.ofString(request))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
     }
+
 
     private JsonNode body(HttpResponse<String> response) {
         assertThat(response.statusCode()).as("본문: %s", response.body()).isEqualTo(200);
         return json.readTree(response.body());
     }
+
 
     private static String text(JsonNode result) {
         return result.path("content").get(0).path("text").asString();
