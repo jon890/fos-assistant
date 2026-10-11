@@ -110,28 +110,36 @@ class UserDataKeyPlacementTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"embedded", "idclass"})
+    @ValueSource(strings = {"embedded", "getter", "inheritedField", "inheritedGetter", "idclass", "inheritedIdClass"})
     @DisplayName("EmbeddedId 와 IdClass 는 엔티티와 같은 패키지면 허용하고 다른 패키지면 거절한다")
     void checksPersistentIdPackage(String kind) throws IOException {
         for (boolean samePackage : new boolean[] {true, false}) {
             String idPackage = samePackage ? ENTITY : ROOT + ".crypto.domain";
             String idName = idPackage + ".KeyId";
-            String declaration = kind.equals("embedded")
-                ? "@jakarta.persistence.EmbeddedId " + idName + " id;"
-                : "@jakarta.persistence.Id long id;";
+            boolean idClass = kind.endsWith("IdClass") || kind.equals("idclass");
+            String declaration = idClass ? "@jakarta.persistence.Id long id;"
+                : kind.equals("getter") || kind.equals("inheritedGetter")
+                    ? "@jakarta.persistence.EmbeddedId public " + idName + " getId() { return null; }"
+                    : "@jakarta.persistence.EmbeddedId " + idName + " id;";
+            String annotation = idClass ? "@jakarta.persistence.IdClass(" + idName + ".class) " : "";
             Map<String, String> sources = owner(ENTITY, "UserDataKey");
-            String entity = entitySource(ENTITY, "Extra", declaration);
-            if (kind.equals("idclass")) {
-                entity = entity.replace("@jakarta.persistence.Entity",
-                    "@jakarta.persistence.IdClass(" + idName + ".class) @jakarta.persistence.Entity");
+            boolean inherited = kind.startsWith("inherited");
+            if (inherited) {
+                String basePackage = ROOT + ".crypto.domain";
+                sources.put(basePackage + ".Base", "package " + basePackage + "; " + annotation
+                    + "@jakarta.persistence.MappedSuperclass public class Base { " + declaration + " }");
+                sources.put(ENTITY + ".Extra", entitySource(ENTITY, "Extra", "")
+                    .replace("class Extra", "class Extra extends " + basePackage + ".Base"));
+            } else {
+                sources.put(ENTITY + ".Extra", entitySource(ENTITY, "Extra", declaration)
+                    .replace("@jakarta.persistence.Entity", annotation + "@jakarta.persistence.Entity"));
             }
-            sources.put(ENTITY + ".Extra", entity);
             sources.put(idName, "package " + idPackage + "; "
-                + (kind.equals("embedded") ? "@jakarta.persistence.Embeddable " : "")
+                + (!idClass ? "@jakarta.persistence.Embeddable " : "")
                 + "public class KeyId implements java.io.Serializable { public long id; }");
             JavaClasses fixture = ArchitectureRulesTest.compileFixture(
                 temporary.resolve(kind + samePackage), sources);
-            assertThat(fixture).hasSize(3);
+            assertThat(fixture).hasSize(inherited ? 4 : 3);
             entities().check(fixture);
             if (samePackage) {
                 ids().check(fixture);
@@ -167,6 +175,95 @@ class UserDataKeyPlacementTest {
         assertThat(fixture).hasSize(3);
         entities().check(fixture);
         ids().check(fixture);
+    }
+
+
+    @Test
+    @DisplayName("정상 소유자를 남겨도 다른 기능의 중첩 Table 중복을 거절한다")
+    void rejectsNestedDuplicateTableOwner() throws IOException {
+        for (boolean duplicate : new boolean[] {false, true}) {
+            Map<String, String> sources = owner(ENTITY, "UserDataKey");
+            String other = ROOT + ".other.domain";
+            sources.put(other + ".Container", source(other, "Container",
+                "@jakarta.persistence.Entity @jakarta.persistence.Table(name=\""
+                    + (duplicate ? "user_data_key" : "other_table") + "\") public static class Duplicate {}"));
+            JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary.resolve("nested" + duplicate), sources);
+            assertThat(fixture).hasSize(3);
+            if (duplicate) {
+                assertThat(entities().evaluate(fixture).getFailureReport().toString())
+                    .contains("실제 2", other + ".Container$Duplicate");
+            } else {
+                entities().check(fixture);
+            }
+        }
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Dto", "Model", "Kind", "Config", "Policy"})
+    @DisplayName("공개 중첩 DTO 와 model 과 enum 과 config 와 policy 를 거절한다")
+    void rejectsPublicNestedRoles(String name) throws IOException {
+        Map<String, String> sources = owner(ENTITY, "UserDataKey");
+        String nested = name.equals("Kind") ? "public enum Kind { ONE }"
+            : name.equals("Dto") || name.equals("Model") ? "public record " + name + "() {}"
+                : "public static class " + name + " {}";
+        sources.put(ENTITY + ".Extra", entitySource(ENTITY, "Extra", nested));
+        JavaClasses fixture = compile(sources);
+        assertThat(fixture).hasSize(3);
+        entities().check(fixture);
+        assertThat(ids().evaluate(fixture).getFailureReport().toString()).contains(ENTITY + ".Extra$" + name);
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"policy", "entity", "id"})
+    @DisplayName("entity 하위 패키지는 일반 값과 엔티티와 실제 ID 모두 거절한다")
+    void rejectsEntitySubpackages(String kind) throws IOException {
+        Map<String, String> sources = owner(ENTITY, "UserDataKey");
+        String child = ENTITY + ".child";
+        sources.put(child + ".Value", kind.equals("entity") ? entitySource(child, "Value", "")
+            : source(child, "Value", ""));
+        if (kind.equals("id")) {
+            sources.put(ENTITY + ".Extra", entitySource(ENTITY, "Extra",
+                "@jakarta.persistence.EmbeddedId " + child + ".Value id;"));
+        }
+        JavaClasses fixture = compile(sources);
+        assertThat(fixture).hasSize(kind.equals("id") ? 3 : 2);
+        assertThat(ids().evaluate(fixture).getFailureReport().toString()).contains(child + ".Value");
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"orphan", "privateEmbeddable", "privateEntity", "packageNested"})
+    @DisplayName("참조되지 않은 Embeddable 과 private 영속 타입과 비공개 구현이 아닌 중첩 값을 거절한다")
+    void rejectsValuesDisguisedAsPersistentIds(String kind) throws IOException {
+        Map<String, String> sources = owner(ENTITY, "UserDataKey");
+        String annotation = kind.equals("privateEntity") ? "@jakarta.persistence.Entity "
+            : "@jakarta.persistence.Embeddable ";
+        String target;
+        if (kind.equals("orphan")) {
+            sources.put(ENTITY + ".Policy", "package " + ENTITY + "; " + annotation + "public class Policy {}");
+            target = ENTITY + ".Policy";
+        } else {
+            String body = kind.equals("packageNested") ? "static class Value {}"
+                : annotation + "private static class Value {}";
+            sources.put(ENTITY + ".Extra", entitySource(ENTITY, "Extra", body));
+            target = ENTITY + ".Extra$Value";
+        }
+        JavaClasses fixture = compile(sources);
+        assertThat(fixture).hasSize(kind.equals("orphan") ? 2 : 3);
+        assertThat(ids().evaluate(fixture).getFailureReport().toString()).contains(target);
+    }
+
+
+    @Test
+    @DisplayName("다른 기능만 import 하면 ID 단독 규칙도 실질 대상 0개를 거절한다")
+    void rejectsMissingCryptoEntitiesInIdRule() throws IOException {
+        JavaClasses fixture = compile(Map.of(ROOT + ".other.domain.Other",
+            entitySource(ROOT + ".other.domain", "Other", "")));
+        assertThat(fixture).hasSize(1);
+        assertThat(ids().evaluate(fixture).getFailureReport().toString())
+            .contains("EMBEDDED_IDS_WITH_ENTITIES", "crypto 엔티티 검사 대상이 0개");
     }
 
 

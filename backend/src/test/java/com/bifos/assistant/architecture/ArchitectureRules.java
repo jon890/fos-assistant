@@ -31,6 +31,7 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaConstructor;
 import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.CompositeArchRule;
@@ -40,6 +41,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.IdClass;
+import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Table;
 import jakarta.persistence.Enumerated;
 import java.lang.annotation.Annotation;
@@ -560,10 +562,10 @@ public final class ArchitectureRules {
 
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
-                    boolean existing = item.getEnclosingClass().isEmpty()
-                        && (item.getSimpleName().equals("UserDataKey")
-                            || item.tryGetAnnotationOfType(Table.class)
-                                .map(table -> table.name().equals("user_data_key")).orElse(false));
+                    boolean existing = (item.getEnclosingClass().isEmpty()
+                        && item.getSimpleName().equals("UserDataKey"))
+                        || item.tryGetAnnotationOfType(Table.class)
+                            .map(table -> table.name().equals("user_data_key")).orElse(false);
                     if (existing) {
                         ownedCount++;
                     }
@@ -593,34 +595,47 @@ public final class ArchitectureRules {
         return classes().that().resideInAPackage(root + "..")
             .should(new ArchCondition<JavaClass>("영속 ID 를 소유 엔티티와 같은 패키지에 둔다") {
                 private final Set<JavaClass> idClasses = new HashSet<>();
+                private int entityCount;
 
 
                 @Override
                 public void init(Collection<JavaClass> all) {
                     idClasses.clear();
-                    all.stream().filter(item -> isCryptoEntity(item, root))
-                        .filter(item -> item.isAnnotatedWith(IdClass.class))
-                        .forEach(item -> idClasses.add(idClassOf(item)));
+                    entityCount = 0;
+                    for (JavaClass item : all) {
+                        if (isCryptoEntity(item, root)) {
+                            entityCount++;
+                            idClasses.addAll(persistentIdsOf(item));
+                        }
+                    }
                 }
 
 
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
                     if (isCryptoEntity(item, root)) {
-                        for (JavaField field : item.getFields()) {
-                            if (field.isAnnotatedWith(EmbeddedId.class)) {
-                                checkIdPackage(item, field.getRawType(), events);
-                            }
-                        }
-                        if (item.isAnnotatedWith(IdClass.class)) {
-                            checkIdPackage(item, idClassOf(item), events);
-                        }
+                        persistentIdsOf(item).forEach(id -> checkIdPackage(item, id, events));
                     }
-                    if (item.getPackageName().equals(entityPackage) && item.getEnclosingClass().isEmpty()
-                        && !item.isAnnotatedWith(Entity.class) && !item.isAnnotatedWith(Embeddable.class)
-                        && !idClasses.contains(item)) {
+                    boolean inEntityPackage = item.getPackageName().equals(entityPackage);
+                    boolean inSubpackage = item.getPackageName().startsWith(entityPackage + ".");
+                    boolean persistent = item.isAnnotatedWith(Entity.class) || idClasses.contains(item);
+                    boolean privateNested = item.getEnclosingClass().isPresent()
+                        && item.getModifiers().contains(JavaModifier.PRIVATE);
+                    boolean privateValue = privateNested && !persistent
+                        && !item.isAnnotatedWith(Embeddable.class) && !item.isAnnotatedWith(MappedSuperclass.class);
+                    if (inSubpackage || (inEntityPackage && !privateValue && (!persistent || privateNested))) {
                         events.add(SimpleConditionEvent.violated(item,
-                            item.getName() + " 은 엔티티나 영속 ID 가 아니므로 " + entityPackage + " 에 둘 수 없다"));
+                            item.getName() + " 은 " + entityPackage
+                                + " 의 엔티티나 실제 영속 ID 또는 private 비영속 구현 값이어야 한다"));
+                    }
+                }
+
+
+                @Override
+                public void finish(ConditionEvents events) {
+                    if (entityCount == 0) {
+                        events.add(SimpleConditionEvent.violated(root,
+                            root + " 의 crypto 엔티티 검사 대상이 0개다"));
                     }
                 }
             }).as("EMBEDDED_IDS_WITH_ENTITIES: crypto 영속 ID 는 엔티티와 같은 패키지에 둔다");
@@ -630,6 +645,29 @@ public final class ArchitectureRules {
     private static boolean isCryptoEntity(JavaClass item, String root) {
         return (item.getPackageName().equals(root + ".crypto")
             || item.getPackageName().startsWith(root + ".crypto.")) && item.isAnnotatedWith(Entity.class);
+    }
+
+
+    /** 필드·getter 와 영속 상속 선언을 함께 읽어 실제 엔티티에 적용되는 ID 타입만 모은다. */
+    private static Set<JavaClass> persistentIdsOf(JavaClass entity) {
+        Set<JavaClass> ids = new HashSet<>();
+        boolean foundIdClass = false;
+        for (JavaClass declaration : entity.getClassHierarchy()) {
+            if (!declaration.equals(entity) && !declaration.isAnnotatedWith(MappedSuperclass.class)
+                && !declaration.isAnnotatedWith(Entity.class)) {
+                continue;
+            }
+            declaration.getFields().stream().filter(field -> field.isAnnotatedWith(EmbeddedId.class))
+                .forEach(field -> ids.add(field.getRawType()));
+            declaration.getMethods().stream().filter(method -> method.isAnnotatedWith(EmbeddedId.class))
+                .forEach(method -> ids.add(method.getRawReturnType()));
+            // 더 가까운 영속 선언의 IdClass 가 상속 선언보다 우선한다.
+            if (!foundIdClass && declaration.isAnnotatedWith(IdClass.class)) {
+                ids.add(idClassOf(declaration));
+                foundIdClass = true;
+            }
+        }
+        return ids;
     }
 
 

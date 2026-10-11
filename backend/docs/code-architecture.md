@@ -100,10 +100,13 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 `crypto.domain.entity`는 `UserDataKey`와 이후 추가하는 crypto 엔티티, 그 엔티티의 영속 ID를 둔다.
 암호화 정책과 port는 `crypto.domain`에 남긴다. `UserDataKey`의 단순 이름 또는
 `user_data_key` 표 계약으로 전체 운영 패키지에서 하나를 찾고 정확한 목적 패키지를 검사한다.
+표 계약은 중첩 타입도 포함하므로 다른 기능의 중첩 엔티티가 같은 표를 선언해도 중복이다.
 검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`와 `EMBEDDED_IDS_WITH_ENTITIES`.
 두 규칙은 기준 파일 없이 검사하며 다른 기능의 아직 이동하지 않은 엔티티는 제한하지 않는다.
-`@EmbeddedId`와 `@IdClass`의 타입은 소유 엔티티와 같은 패키지에 두고,
-정책과 projection, event, enum은 entity 패키지에 두지 않는다.
+`@EmbeddedId` 필드·getter와 영속 상속 선언에 적용되는 `@IdClass`의 실제 타입은
+소유 엔티티와 같은 패키지에 둔다. 참조되지 않은 `@Embeddable`은 영속 ID로 허용하지 않는다.
+entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
+entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
 
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.

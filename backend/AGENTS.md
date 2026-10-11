@@ -22,8 +22,10 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 ### crypto의 영속 타입
 
 `UserDataKey`와 새 crypto 엔티티는 `crypto.domain.entity`에 둔다.
-`@EmbeddedId`와 `@IdClass`의 타입도 소유 엔티티와 같은 패키지에 둔다.
+`@EmbeddedId`의 필드·getter와 영속 상속 선언에 적용되는 `@IdClass`의 실제 타입도 소유 엔티티와 같은 패키지에 둔다.
 정책과 port는 `crypto.domain`에 남기고 projection과 enum은 entity에 두지 않는다.
+entity 하위 패키지와 공개 중첩 DTO·model·enum·config·policy도 금지한다.
+예외는 private 비영속 구현 값뿐이며 참조되지 않은 `@Embeddable`은 영속 ID가 아니다.
 검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`.
 
 ### 데이터 클래스는 컨트롤러 안에 두지 않는다
