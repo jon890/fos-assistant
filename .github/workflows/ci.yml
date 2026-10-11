@@ -265,7 +265,8 @@ jobs:
         run: |
           test -x /usr/bin/google-chrome || { echo '합성 DOM 회귀에 실제 Chrome 설치가 필요합니다.' >&2; exit 1; }
           /usr/bin/google-chrome --version
-      - run: bash scripts/check-connectors.sh
+      - name: 커넥터 배포 묶음과 기존 HTTP 대역 검사
+        run: bash scripts/check-connector-package.sh
       - run: python -m unittest discover -s hermes/tests -v
       # dashboard-profile-api 가 기대는 Hermes 내부 지점을 계약의 판 소스에서 확인한다(ADR-088).
       - run: bash scripts/check-hermes-contract.sh
