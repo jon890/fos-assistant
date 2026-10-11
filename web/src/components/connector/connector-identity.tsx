@@ -2,7 +2,7 @@ import { ExternalLink, Plug } from "lucide-react";
 import { CardDescription, CardTitle } from "@/components/ui/card";
 import {
   connectorIconSrc,
-  connectorLinkHref,
+  connectorAppearanceLinkHref,
   type ConnectorSummary,
 } from "@/lib/connection";
 import { cn } from "cn";
@@ -46,29 +46,67 @@ export function ConnectorIcon({
 export function ConnectorLink({
   link,
   title,
+  label = "공식 사이트",
+  readme = false,
   className,
 }: {
   link: string | null | undefined;
   title: string;
+  label?: string;
+  readme?: boolean;
   className?: string;
 }) {
-  const href = connectorLinkHref(link);
+  const href = connectorAppearanceLinkHref(link);
   if (!href) return null;
   return (
     <a
-      data-testid="connector-link"
+      data-testid={readme ? "connector-readme-link" : "connector-link"}
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "inline-flex items-center gap-1 text-sm underline underline-offset-2",
+        "inline-flex min-w-0 items-center gap-1 rounded-sm text-sm underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring",
         className,
       )}
     >
-      사이트 열기
-      <ExternalLink aria-hidden className="size-3.5" />
+      {label}
+      <ExternalLink aria-hidden className="size-3.5 shrink-0" />
       <span className="sr-only">({title}, 새 탭)</span>
     </a>
+  );
+}
+
+/** 공식 서비스나 프로젝트와 커넥터 설명서를 서로 다른 이름으로 연다. */
+export function ConnectorLinks({
+  connector,
+  title,
+  className,
+}: {
+  connector: ConnectorSummary | null | undefined;
+  title: string;
+  className?: string;
+}) {
+  if (
+    !connectorAppearanceLinkHref(connector?.link) &&
+    !connectorAppearanceLinkHref(connector?.readmeUrl)
+  )
+    return null;
+  return (
+    <div className={cn("flex min-w-0 flex-wrap gap-x-3 gap-y-1", className)}>
+      <ConnectorLink
+        link={connector?.link}
+        title={title}
+        label={
+          connector?.linkKind === "project" ? "프로젝트 GitHub" : "공식 사이트"
+        }
+      />
+      <ConnectorLink
+        link={connector?.readmeUrl}
+        title={title}
+        label="커넥터 README"
+        readme
+      />
+    </div>
   );
 }
 
@@ -88,7 +126,7 @@ export function ConnectorHeading({
         {connector?.description ? (
           <CardDescription>{connector.description}</CardDescription>
         ) : null}
-        <ConnectorLink link={connector?.link} title={title} />
+        <ConnectorLinks connector={connector} title={title} />
       </div>
     </div>
   );

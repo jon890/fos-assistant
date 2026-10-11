@@ -16,10 +16,10 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   ConnectorIcon,
-  ConnectorLink,
+  ConnectorLinks,
 } from "@/components/connector/connector-identity";
 import {
-  connectorLinkHref,
+  connectorAppearanceLinkHref,
   readConnectors,
   toolRiskCounts,
   type ConnectorSummary,
@@ -31,7 +31,8 @@ function hasCardContent(connector: ConnectorSummary): boolean {
     !connector.available ||
     connector.tools.length > 0 ||
     connector.myStatus !== "DISCONNECTED" ||
-    connectorLinkHref(connector.link) !== null
+    connectorAppearanceLinkHref(connector.link) !== null ||
+    connectorAppearanceLinkHref(connector.readmeUrl) !== null
   );
 }
 
@@ -124,8 +125,8 @@ function ConnectorCard({
               아직 쓰는 에이전트가 없어요. 눌러서 쓸 에이전트를 골라 주세요.
             </p>
           ) : null}
-          <ConnectorLink
-            link={connector.link}
+          <ConnectorLinks
+            connector={connector}
             title={connector.title}
             className="relative z-10"
           />
