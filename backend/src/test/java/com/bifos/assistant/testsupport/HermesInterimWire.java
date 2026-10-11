@@ -14,11 +14,13 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.function.Consumer;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import tools.jackson.databind.json.JsonMapper;
 
 /** pinned Hermes 모양의 합성 SSE를 실제 HTTP 파서로 읽는다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HermesInterimWire {
-    private HermesInterimWire() {}
 
     public static String fixture() throws IOException {
         try (var input = HermesInterimWire.class.getResourceAsStream("/hermes/message-interim-v2026.9.24.sse")) {
