@@ -1,12 +1,9 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { Tossinvest } from "../src/client.ts";
+import { createTossinvestServer } from "../src/server.ts";
 import { OPERATIONS, matchesOperation } from "../src/api-contract.ts";
 import { RESPONSE_MAX_BYTES } from "../src/constants.ts";
-import { registerMarketDataTools } from "../src/market-data-tools.ts";
-import { createToolRegistration } from "../src/tool-registration.ts";
 import {
   FakeToss,
   credentials,
@@ -39,21 +36,17 @@ const args = (name: string) =>
     : { symbol: "005930" };
 const allowed = (...ids: string[]) => new Set(["issueOAuth2Token", ...ids]);
 
-/** production 등록은 integrator가 맡는다. 실제 공용 등록 함수를 독립 McpServer에 설치한다. */
+/** production 서버를 SDK로 호출하고 받은 HTTP 요청의 경계를 함께 검사한다. */
 async function withMarket(
   fake: FakeToss,
   work: (client: Client) => Promise<void>,
   timeoutMs?: number,
 ) {
-  const server = new McpServer({ name: "market-module-test", version: "1" });
-  registerMarketDataTools(
-    createToolRegistration(server),
-    new Tossinvest({
-      apiBase: fake.url,
-      env: { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "7" },
-      timeoutMs,
-    }),
-  );
+  const server = createTossinvestServer({
+    apiBase: fake.url,
+    env: { ...credentials, TOSSINVEST_ACCOUNT_SEQ: "7" },
+    timeoutMs,
+  });
   try {
     await withMcp(server, work);
   } finally {
@@ -106,15 +99,19 @@ for (const spec of tools) {
   }
 }
 
-test("등록된 네 도구가 실제 수신 operation 네 개와 인증에 도달한다", async () => {
+test("production에 등록한 네 시세 도구가 실제 수신 operation 네 개와 인증에 도달한다", async () => {
   const fake = new FakeToss(allowed(...tools.map((spec) => spec.id)));
   for (const spec of tools)
     fake.on("GET", spec.path, Object.values(examples(spec.path))[0]!.value);
   await withMarket(fake, async (client) => {
     const listed = (await client.listTools()).tools;
-    expect(new Set(listed.map((item) => item.name))).toEqual(
-      new Set(tools.map((spec) => spec.name)),
-    );
+    expect(
+      new Set(
+        listed
+          .filter((item) => tools.some((spec) => spec.name === item.name))
+          .map((item) => item.name),
+      ),
+    ).toEqual(new Set(tools.map((spec) => spec.name)));
     for (const item of listed)
       expect(item.annotations?.readOnlyHint).toBe(true);
     for (const spec of tools)
