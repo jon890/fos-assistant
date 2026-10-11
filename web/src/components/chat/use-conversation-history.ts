@@ -73,7 +73,7 @@ export function useConversationHistory({
   /**
    * 도는 turn 을 보기 시작한다. 보낸 창과 같은 상태를 채워 기다리는 표시와 중지가 같이 동작한다.
    *
-   * <p>스트림이 끊겨 넘어온 창은 이미 받은 작업 과정을 그대로 두고, 다음 트리 조회가 그것을 덮는다.
+   * <p>스트림이 끊겨 넘어온 창은 저장 가능한 작업 과정만 두고, 다음 트리 조회가 그것을 덮는다.
    */
   function beginObserving(
     id: string,
@@ -90,7 +90,7 @@ export function useConversationHistory({
     setExecutionId(running.executionId);
     setActivity((previous) => ({
       ...emptyActivity(startedAt),
-      items: previous?.items ?? [],
+      items: previous?.items.filter((item) => item.kind !== "interim") ?? [],
     }));
     observedTurnFilter.current = {
       watchedId: running.executionId,
