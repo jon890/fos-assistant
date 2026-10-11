@@ -22,17 +22,18 @@ class MemoryCollectionAuditingPlacementTest {
             package com.bifos.assistant.memory.domain;
             import jakarta.persistence.*;
             import java.time.Instant;
-            import org.springframework.data.annotation.*;
+            import org.springframework.data.annotation.CreatedDate;
             import org.springframework.data.jpa.domain.support.AuditingEntityListener;
             @Entity @Table(name="memory_collection") @EntityListeners(AuditingEntityListener.class)
             public class MemoryCollection {
-                @jakarta.persistence.Id Long id;
+                @Id Long id;
                 @CreatedDate Instant createdAt;
             }
             """;
     private static final String CONFIG_SOURCE = """
             package com.bifos.assistant.shared.config;
             import java.time.Clock;
+            import java.time.Instant;
             import java.time.temporal.ChronoUnit;
             import java.util.Optional;
             import org.springframework.context.annotation.*;
@@ -61,7 +62,7 @@ class MemoryCollectionAuditingPlacementTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "created", "listener", "business", "other", "getter", "reference", "bean", "return", "clock",
+        "created", "type", "configuration", "enable", "beanMissing", "listener", "business", "other", "getter", "reference", "bean", "return", "clock",
         "missingEntity", "duplicateEntity", "missingConfig", "duplicateConfig", "duplicateProvider"
     })
     @DisplayName("annotation 과 listener 와 provider 선언 누락 및 중복은 운영 규칙으로 실패한다")
@@ -71,20 +72,25 @@ class MemoryCollectionAuditingPlacementTest {
         String config = CONFIG_SOURCE;
         switch (change) {
             case "created" -> entity = entity.replace("@CreatedDate Instant", "Instant");
+            case "type" -> entity = entity.replace("Instant createdAt", "String createdAt");
+            case "configuration" -> config = config.replace("@Configuration ", "");
+            case "enable" -> config = config.replace("@EnableJpaAuditing(dateTimeProviderRef=\"auditingDateTimeProvider\")", "");
+            case "beanMissing" -> config = config.replace("@Bean(\"auditingDateTimeProvider\")", "");
             case "listener" -> entity = entity.replace("@EntityListeners(AuditingEntityListener.class)", "");
-            case "business" -> entity = entity.replace("@jakarta.persistence.Id Long id;", "@jakarta.persistence.Id Long id; @CreatedDate Instant expiresAt;");
+            case "business" -> entity = entity.replace("@Id Long id;", "@Id Long id; @CreatedDate Instant expiresAt;");
             case "other" -> sources.put("fixture.Other", """
                     package fixture;
                     import org.springframework.data.annotation.LastModifiedDate;
-                    public class Other { @LastModifiedDate java.time.Instant changedAt; }
+                    import java.time.Instant;
+                    public class Other { @LastModifiedDate Instant changedAt; }
                     """);
-            case "getter" -> entity = entity.replace("@jakarta.persistence.Id Long id;", "@jakarta.persistence.Id Long id; @CreatedDate Instant getCreatedAt() { return createdAt; }");
+            case "getter" -> entity = entity.replace("@Id Long id;", "@Id Long id; @CreatedDate Instant getCreatedAt() { return createdAt; }");
             case "reference" -> config = config.replace("dateTimeProviderRef=\"auditingDateTimeProvider\"", "dateTimeProviderRef=\"wrong\"");
             case "bean" -> config = config.replace("@Bean(\"auditingDateTimeProvider\")", "@Bean(\"wrong\")");
-            case "return" -> config = config.replace("DateTimeProvider provider", "java.time.Instant provider")
+            case "return" -> config = config.replace("DateTimeProvider provider", "Instant provider")
                 .replace("return () -> Optional.of(clock.instant().truncatedTo(ChronoUnit.MICROS));", "return clock.instant();");
             case "clock" -> config = config.replace("provider(Clock clock)", "provider()")
-                .replace("clock.instant()", "java.time.Instant.EPOCH");
+                .replace("clock.instant()", "Instant.EPOCH");
             case "missingEntity" -> entity = null;
             case "duplicateEntity" -> sources.put("fixture.MemoryCollection", ENTITY_SOURCE.replace("com.bifos.assistant.memory.domain", "fixture"));
             case "missingConfig" -> config = null;

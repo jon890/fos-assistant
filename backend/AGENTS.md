@@ -124,7 +124,7 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 
 현재 auditing 대상은 `memory.domain.MemoryCollection.createdAt` 하나다.
 `@CreatedDate`와 `AuditingEntityListener`를 함께 쓰고 `shared.config.JpaAuditingConfig`가 기존 `Clock` 빈을 받는다.
-`DateTimeProvider`는 시각을 마이크로초로 버린 뒤 기록한다. 생성 시각은 `PrePersist` 시점이며 commit 완료 시각이 아니다.
+`DateTimeProvider`는 마이크로초 미만을 버린 뒤 기록한다. 생성 시각은 `PrePersist` 시점이며 commit 완료 시각이 아니다.
 다른 엔티티와 업무 시각, 수정 시각은 자동으로 전환하지 않는다. SQL bulk와 native SQL은 listener를 거치지 않는다.
 검사: `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`, `MemoryCollectionAuditingTest`, `MemoryCollectionAuditingMysqlTest`.
 
