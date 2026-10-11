@@ -489,7 +489,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 10개 READ 도구가 인증·조회 12개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 29개 operation의 producer는 아직 구현하지 않았다.
 현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
@@ -503,7 +503,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 
 완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
 HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
-구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 12개를 같은 수치로 표시하지 않는다.
 
 ### 도구 입력과 결과
 
@@ -545,11 +545,11 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | 공식 operationId | 도구 또는 인증 | 권한과 한도 그룹 | 현재 상태 | 단계 |
 | --- | --- | --- | --- | --- |
 | `issueOAuth2Token` | `내부 Tossinvest.token/issue` | 내부 인증; AUTH | 기반 구현 | 기반 |
-| `getOrderbook` | `get_orderbook` | READ/none; MARKET_DATA | 미연결 | 시세 |
+| `getOrderbook` | `get_orderbook` | READ/none; MARKET_DATA | 구현 | 시세 |
 | `getPrices` | `get_quotes` | READ/none; MARKET_DATA | 기반 구현 | 기반 |
-| `getTrades` | `get_trades` | READ/none; MARKET_DATA | 미연결 | 시세 |
-| `getPriceLimit` | `get_price_limits` | READ/none; MARKET_DATA | 미연결 | 시세 |
-| `getCandles` | `get_candles` | READ/none; MARKET_DATA_CHART | 미연결 | 시세 |
+| `getTrades` | `get_trades` | READ/none; MARKET_DATA | 구현 | 시세 |
+| `getPriceLimit` | `get_price_limits` | READ/none; MARKET_DATA | 구현 | 시세 |
+| `getCandles` | `get_candles` | READ/none; MARKET_DATA_CHART | 구현 | 시세 |
 | `getStocks` | `get_stocks` | READ/none; STOCK | get_quotes 구현; get_stocks 미등록 | 종목 |
 | `listStocks` | `list_stocks` | READ/none; STOCK_ALL | 미연결 | 종목 |
 | `getStockWarnings` | `get_stock_warnings` | READ/none; STOCK | 미연결 | 종목 |
@@ -594,7 +594,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
 이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
 일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
-현재 7개 READ operation의 공식 성공 예시 20개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
+현재 11개 READ operation의 공식 성공 예시 29개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다. production SDK가 10개 도구를 호출해 인증·조회 12개 operation에 도달하는지 HTTP 수신 기록으로 확인하며 stdio bundle에서도 시세 네 도구의 도달을 검사한다.
 
 ### 페이지와 시장별 조건
 
