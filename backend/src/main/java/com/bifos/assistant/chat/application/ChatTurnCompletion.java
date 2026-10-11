@@ -4,9 +4,10 @@ package com.bifos.assistant.chat.application;
 final class ChatTurnCompletion {
     private ChatTurnCompletion() {}
 
+
     static ChatEvent eventOf(ChatTurn turn) {
         return turn.cancelled()
-                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId());
+            ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+            : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId());
     }
 }
