@@ -40,6 +40,8 @@ export type ConnectorTool = {
   risk: ToolRisk;
   approval: ToolApproval;
   grant: boolean;
+  /** 옛 응답은 상세 설명이 없을 수 있다. */
+  description?: string | null;
 };
 
 /** 연결 목록의 카드 한 장이다. `available` 이 거짓이면 운영 목록에서 빠진 커넥터다. */
