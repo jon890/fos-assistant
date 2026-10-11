@@ -119,7 +119,7 @@ export function inspectSubmittedMediaBatch(
   }
 }
 
-/** CP一覧と受信ピクセルを独立に照合するテスト契約。モデルの意味検証ではない。 */
+/** CP 목록과 수신 픽셀을 독립적으로 대조하는 테스트 계약이다. 모델의 의미 판독은 검증하지 않는다. */
 export function validateMediaMapping(
   expected: readonly ExpectedMediaMapping[],
   listed: readonly ListedMediaMapping[],
