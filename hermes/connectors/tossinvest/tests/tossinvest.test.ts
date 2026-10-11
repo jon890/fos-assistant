@@ -66,7 +66,10 @@ describe("토스증권 커넥터 계약", () => {
         expect(item.annotations?.readOnlyHint).toBe(true);
         expect(item.description?.trim().length).toBeGreaterThan(20);
         expect(item.description).not.toContain("undefined");
-        expect(manifest.tools[item.name].risk).toBe("READ");
+        expect(item.description).toBe(manifest.tools[item.name].description);
+        expect(
+          manifest.tools[item.name as keyof typeof manifest.tools].risk,
+        ).toBe("READ");
       }
     });
   });
