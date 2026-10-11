@@ -11,9 +11,15 @@ import com.bifos.assistant.crypto.infra.DataEncryptionProperties;
 import com.bifos.assistant.crypto.infra.FileKeyEncryptionKeys;
 import com.bifos.assistant.crypto.infra.UserDataKeyRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.shared.util.Sha256;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import jakarta.persistence.EntityManager;
 import java.util.Arrays;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import org.springframework.context.ApplicationContext;
+import org.springframework.data.repository.Repository;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 import javax.crypto.spec.SecretKeySpec;
@@ -43,6 +49,25 @@ class DataKeyServiceTest {
 
     @Autowired
     DataEncryptionProperties properties;
+
+    @Autowired
+    EntityManager entityManager;
+
+    @Autowired
+    ApplicationContext context;
+
+    @Test
+    @DisplayName("엔티티 이동은 JPA 이름과 저장소 빈 목록을 보존한다")
+    void preservesPersistenceInventory() {
+        String entities = entityManager.getMetamodel().getEntities().stream()
+                .map(entity -> entity.getName()).sorted().collect(Collectors.joining(","));
+        String repositories = String.join(",", new TreeSet<>(context.getBeansOfType(Repository.class).keySet()));
+        // 이동 전 실제 Spring 문맥에서 얻은 정렬된 이름 목록의 지문이다. 새 영속 타입을 더하면 함께 갱신한다.
+        assertThat(entityManager.getMetamodel().getEntities()).hasSize(57);
+        assertThat(Sha256.hex(entities)).isEqualTo("8c92d2d7cc8650d71e2278086880d0bc761b84f3ad1ca6a9f7229f3337a4b70e");
+        assertThat(context.getBeansOfType(Repository.class)).hasSize(57);
+        assertThat(Sha256.hex(repositories)).isEqualTo("11a793acd5b9b1970a31b077fd796d81ff89752368c87abadae92e7f636e1912");
+    }
 
     @AfterEach
     void tearDown() {
