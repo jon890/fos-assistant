@@ -68,6 +68,7 @@ import org.springframework.boot.test.autoconfigure.json.JsonTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
@@ -100,6 +101,19 @@ public final class ArchitectureRules {
 
     /** Spring 의 {@code Transactional} 을 import 하므로 Jakarta 쪽은 이 상수에서만 전체 이름으로 쓴다. */
     private static final Class<? extends Annotation> JAKARTA_TRANSACTIONAL = jakarta.transaction.Transactional.class; // 전체 이름 허용: Spring 과 Jakarta 의 Transactional 이름이 같다
+
+    private static final Map<String, DescribedPredicate<JavaClass>> LAYER_SELECTORS = Map.of(
+        "presentation", resideInAPackage("com.bifos.assistant..presentation.."),
+        "application", resideInAPackage("com.bifos.assistant..application.."),
+        "infra", resideInAPackage("com.bifos.assistant..infra.."),
+        "domain", resideInAPackage("com.bifos.assistant..domain.."));
+
+
+    /** 실제 층 규칙과 누락 검사가 같은 선택자를 쓴다. */
+    static DescribedPredicate<JavaClass> layerSelector(String layer) {
+        return LAYER_SELECTORS.get(layer);
+    }
+
 
     /**
      * 최상위 패키지 사이의 간선이 순환에 속하지 않는다. {@code shared} 는 그래프에서 뺀다.
@@ -147,13 +161,13 @@ public final class ArchitectureRules {
     public static final ArchRule LAYER_DIRECTION = layeredArchitecture()
         .consideringOnlyDependenciesInLayers()
         .layer("presentation")
-        .definedBy("com.bifos.assistant..presentation..")
+        .definedBy(layerSelector("presentation"))
         .layer("application")
-        .definedBy("com.bifos.assistant..application..")
+        .definedBy(layerSelector("application"))
         .layer("infra")
-        .definedBy("com.bifos.assistant..infra..")
+        .definedBy(layerSelector("infra"))
         .layer("domain")
-        .definedBy("com.bifos.assistant..domain..")
+        .definedBy(layerSelector("domain"))
         .whereLayer("presentation")
         .mayNotBeAccessedByAnyLayer()
         .whereLayer("application")
@@ -202,7 +216,9 @@ public final class ArchitectureRules {
                 public void check(JavaClass item, ConditionEvents events) {
                     for (String layer : List.of("application", "domain", "infra", "presentation")) {
                         boolean oldSelected = resideInAPackage(root + ".(*)." + layer + "..").test(item);
-                        require(item, !oldSelected || resideInAPackage(root + ".." + layer + "..").test(item),
+                        boolean featureSelected = List.of("agent.memory", "memory.agent").stream()
+                            .anyMatch(feature -> resideInAPackage(root + "." + feature + "." + layer + "..").test(item));
+                        require(item, !(oldSelected || featureSelected) || layerSelector(layer).test(item),
                             layer + " 층의 기존 선택을 포함한다", events);
                     }
                 }
@@ -248,15 +264,21 @@ public final class ArchitectureRules {
             .should(new ArchCondition<JavaClass>("Memory 서비스와 공개 값 및 HTTP graph 의 역할을 지킨다") {
                 private final Set<JavaClass> http = new HashSet<>();
                 private final Set<JavaClass> serviceValues = new HashSet<>();
+                private final Set<JavaClass> configurationValues = new HashSet<>();
 
 
                 @Override
                 public void init(Collection<JavaClass> allObjectsToTest) {
                     http.clear();
                     serviceValues.clear();
+                    configurationValues.clear();
                     for (JavaClass type : allObjectsToTest) {
                         if (memoryBoundary(root, type).isEmpty()) {
                             continue;
+                        }
+                        if (type.isAnnotatedWith(ConfigurationProperties.class)
+                            || enclosingConfigurationProperties(type)) {
+                            collectMemoryValue(root, type, configurationValues);
                         }
                         for (JavaMethod method : type.getMethods()) {
                             if (mapped(method)) {
@@ -278,13 +300,19 @@ public final class ArchitectureRules {
                     }
                     String boundary = owner.get();
                     String packageName = item.getPackageName();
-                    if (item.isAnnotatedWith(Service.class) || item.isAnnotatedWith(Component.class)) {
+                    boolean service = item.isAnnotatedWith(Service.class) || item.isAnnotatedWith(Component.class);
+                    boolean persistent = item.isAnnotatedWith(Entity.class) || item.isAnnotatedWith(Embeddable.class)
+                        || item.isAnnotatedWith(MappedSuperclass.class);
+                    boolean configuration = item.isAnnotatedWith(Configuration.class)
+                        || item.isAnnotatedWith(ConfigurationProperties.class)
+                        || (configurationValues.contains(item) && !service && !persistent);
+                    if (service) {
                         require(item, packageName.equals(boundary + ".application"),
                             "Service 와 Component 는 소유 application 에 있다", events);
                     }
                     boolean stateHelper = !item.isRecord() && !item.isEnum()
-                        && !item.isAnnotatedWith(Entity.class) && !item.isAnnotatedWith(Embeddable.class)
-                        && !item.isAnnotatedWith(ConfigurationProperties.class)
+                        && !persistent && !configuration
+                        && !privateMemoryImplementation(item, http, serviceValues)
                         && !item.isAnnotatedWith(RestController.class)
                         && !packageName.startsWith(boundary + ".domain")
                         && !packageName.startsWith(boundary + ".infra")
@@ -293,25 +321,32 @@ public final class ArchitectureRules {
                     if (stateHelper && !serviceValues.contains(item)) {
                         require(item, packageName.equals(boundary + ".application"), "상태 helper 는 application 에 있다", events);
                     }
-                    if (item.isAnnotatedWith(ConfigurationProperties.class)) {
+                    if (configuration) {
                         require(item, packageName.equals(boundary + ".config"), "설정 선언은 config 에 있다", events);
-                    } else if (item.isAnnotatedWith(Entity.class) || item.isAnnotatedWith(Embeddable.class)) {
+                    }
+                    if (persistent) {
                         require(item, packageName.equals(boundary + ".domain.entity"), "영속 타입은 domain.entity 에 있다", events);
                     } else if (http.contains(item)) {
                         require(item, packageName.equals(boundary + ".presentation")
                             && item.getEnclosingClass().map(outer -> outer.getSimpleName().endsWith("Dtos")
                                 && outer.getPackageName().equals(packageName)).orElse(false),
                             "HTTP graph 의 DTO 는 소유 presentation 의 Dtos 안에 있다", events);
-                    } else if ((item.isRecord() || item.isEnum() || serviceValues.contains(item))
+                    } else if (!configuration && (item.isRecord() || item.isEnum() || serviceValues.contains(item))
                         && item.getModifiers().contains(JavaModifier.PUBLIC)
                         && !packageName.startsWith(boundary + ".domain")
                         && !packageName.startsWith(boundary + ".infra")) {
                         require(item, packageName.equals(boundary + ".application.model"),
                             "공개 서비스 값은 application.model 에 있다", events);
                     }
-                    for (JavaField field : item.getFields()) {
+                    for (JavaField field : item.getAllFields()) {
                         if (field.isAnnotatedWith(Enumerated.class)) {
                             require(item, field.getRawType().getPackageName().equals(boundary + ".domain.type"),
+                                "저장 enum 은 domain.type 에 있다", events);
+                        }
+                    }
+                    for (JavaMethod method : item.getAllMethods()) {
+                        if (method.isAnnotatedWith(Enumerated.class)) {
+                            require(item, method.getRawReturnType().getPackageName().equals(boundary + ".domain.type"),
                                 "저장 enum 은 domain.type 에 있다", events);
                         }
                     }
@@ -340,6 +375,32 @@ public final class ArchitectureRules {
             .filter(boundary -> item.getPackageName().equals(boundary)
                 || item.getPackageName().startsWith(boundary + "."))
             .findFirst();
+    }
+
+
+    private static boolean enclosingConfigurationProperties(JavaClass item) {
+        return item.getEnclosingClass().map(outer -> outer.isAnnotatedWith(ConfigurationProperties.class)
+            || enclosingConfigurationProperties(outer)).orElse(false);
+    }
+
+
+    private static boolean privateMemoryImplementation(JavaClass item, Set<JavaClass> http, Set<JavaClass> serviceValues) {
+        if (!item.getModifiers().contains(JavaModifier.PRIVATE) || item.getEnclosingClass().isEmpty()
+            || http.contains(item) || serviceValues.contains(item)) {
+            return false;
+        }
+        JavaClass outer = item.getEnclosingClass().orElseThrow();
+        boolean exposed = outer.getAllMethods().stream()
+            .filter(method -> method.getModifiers().contains(JavaModifier.PUBLIC)
+                || method.getModifiers().contains(JavaModifier.PROTECTED))
+            .anyMatch(method -> method.getReturnType().getAllInvolvedRawTypes().contains(item)
+                || method.getParameterTypes().stream().anyMatch(parameter -> parameter.getAllInvolvedRawTypes().contains(item)))
+            || outer.getAllFields().stream()
+                .filter(field -> !field.getModifiers().contains(JavaModifier.PRIVATE))
+                .anyMatch(field -> field.getType().getAllInvolvedRawTypes().contains(item));
+        return !exposed && item.getDirectDependenciesToSelf().stream()
+            .allMatch(dependency -> dependency.getOriginClass().equals(item)
+                || dependency.getOriginClass().equals(outer));
     }
 
 

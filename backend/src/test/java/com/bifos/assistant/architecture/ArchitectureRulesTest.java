@@ -114,8 +114,7 @@ class ArchitectureRulesTest {
         JavaClasses fixture = compileFixture(temporary, sources);
         assertThat(fixture).hasSize(sources.size());
         for (String layer : List.of("application", "domain", "infra", "presentation")) {
-            var selector = JavaClass.Predicates.resideInAPackage(
-                "com.bifos.assistant.." + layer + "..");
+            var selector = ArchitectureRules.layerSelector(layer);
             assertThat(fixture.stream().filter(selector).map(type -> type.getName()).toList())
                 .containsExactlyInAnyOrder("com.bifos.assistant.agent.memory." + layer + ".Sample",
                     "com.bifos.assistant.memory.agent." + layer + ".Sample");
@@ -176,6 +175,37 @@ class ArchitectureRulesTest {
             Arguments.of("agent.memory.domain.Bad", "jakarta.servlet.Servlet", true, false),
             Arguments.of("agent.memory.application.Bad", "memory.application.Target", false, true),
             Arguments.of("agent.application.Bad", "memory.agent.application.Target", false, true));
+    }
+
+
+    @ParameterizedTest
+    @MethodSource("memoryLayerSelections")
+    @DisplayName("두 Memory 기능의 각 층에서 실제 층 규칙의 금지 의존이 실패한다")
+    void rejectsForbiddenDependencyInEveryMemoryLayer(String feature, String layer, String targetLayer) throws IOException {
+        String boundary = "com.bifos.assistant." + feature;
+        String from = boundary + "." + layer + ".Bad";
+        String to = boundary + "." + targetLayer + ".Target";
+        Map<String, String> sources = new HashMap<>();
+        sources.put(from, "package " + boundary + "." + layer + "; public class Bad { " + to + " value; }");
+        sources.put(to, "package " + boundary + "." + targetLayer + "; public class Target {}");
+        for (String other : List.of("presentation", "application", "infra", "domain")) {
+            String name = boundary + "." + other + ".Selected";
+            sources.put(name, "package " + boundary + "." + other + "; public class Selected {}");
+        }
+        JavaClasses fixture = compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(6);
+        assertThat(ArchitectureRules.layerSelector(layer).test(fixture.get(from))).isTrue();
+        ArchitectureRules.FEATURE_LAYER_COVERAGE.check(fixture);
+        AgentMemoryCollectionServicePlacementTest.assertViolation(ArchitectureRules.LAYER_DIRECTION, fixture, from, to);
+    }
+
+
+    static Stream<Arguments> memoryLayerSelections() {
+        return Stream.of("agent.memory", "memory.agent").flatMap(feature -> Stream.of(
+            Arguments.of(feature, "presentation", "infra"),
+            Arguments.of(feature, "application", "presentation"),
+            Arguments.of(feature, "infra", "application"),
+            Arguments.of(feature, "domain", "infra")));
     }
 
 
