@@ -88,6 +88,14 @@ class ConnectorEnvironmentTest(unittest.TestCase):
                 self.environment(**{ROOTS_ENV: raw})
                 self.assertEqual(self.plugin._connector_roots(), {})
 
+    def test_roots_rejects_duplicate_keys_and_non_json_numbers(self):
+        for raw in ('{"x":"/abs/a","x":"/abs/b"}',
+                    '{"x":{"root":"/abs/a","env":{"DEMO_BASE":"a","DEMO_BASE":"b"}}}',
+                    '{"x":{"root":"/abs/a","extra":NaN}}'):
+            with self.subTest(raw=raw):
+                self.environment(**{ROOTS_ENV: raw})
+                self.assertEqual(self.plugin._connector_roots(), {})
+
     def test_roots_drops_only_relative_entries(self):
         """상대 경로 항목은 버리고 절대 경로 항목은 남긴다."""
         self.environment(**{ROOTS_ENV: json.dumps({"x": "relative"})})

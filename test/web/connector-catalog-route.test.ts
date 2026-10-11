@@ -24,6 +24,8 @@ function summary(change: Record<string, unknown> = {}) {
     available: true,
     bindings: [],
     ownerBrowserLoginUrl: null,
+    readmeUrl: null,
+    linkKind: "service",
     ...change,
   };
 }
@@ -131,6 +133,8 @@ test("로그인 안내 주소가 없거나 틀려도 카탈로그 행을 유지�
 test("아이콘과 링크, 로그인 안내 주소가 없는 옛 카탈로그도 세 칸을 null로 내려준다", async () => {
   const legacy = summary();
   Reflect.deleteProperty(legacy, "ownerBrowserLoginUrl");
+  Reflect.deleteProperty(legacy, "readmeUrl");
+  Reflect.deleteProperty(legacy, "linkKind");
   const response = await getCatalog([legacy]);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), [
@@ -152,5 +156,62 @@ test("장식 칸이 틀려도 커넥터는 유지하고 해당 칸만 비운다"
     summary({ icon: null, link: null }),
     summary({ icon: null, link: null }),
     summary({ icon: PNG, link: null }),
+  ]);
+});
+
+test("두 링크는 독립적으로 정제하고 정책과 로그인 주소를 유지한다", async () => {
+  const readmeUrl = "https://github.com/example/project/blob/main/README.md";
+  const tools = [
+    {
+      name: "write",
+      title: null,
+      risk: "WRITE",
+      approval: "REQUIRED",
+      grant: true,
+    },
+  ];
+  const ownerBrowserLoginUrl = "https://example.com/login?return=%2Fhome";
+  const change = { tools, ownerBrowserLoginUrl };
+  const invalid = [
+    "http://example.com/",
+    "https://user:pw@example.com/",
+    "https://example.com/%zz",
+    "https://example.com/a\\b",
+    "https://example.com/\n",
+    "https://example.com/" + "a".repeat(501 - "https://example.com/".length),
+    7,
+    {},
+  ];
+  const items = invalid.flatMap((bad) => [
+    summary({ ...change, link: bad, readmeUrl, linkKind: "project" }),
+    summary({ ...change, link: LINK, readmeUrl: bad, linkKind: "unknown" }),
+  ]);
+  const response = await getCatalog(items);
+  assert.deepEqual(
+    await response.json(),
+    invalid.flatMap(() => [
+      summary({
+        ...change,
+        icon: null,
+        link: null,
+        readmeUrl,
+        linkKind: "project",
+      }),
+      summary({
+        ...change,
+        icon: null,
+        link: LINK,
+        readmeUrl: null,
+        linkKind: "service",
+      }),
+    ]),
+  );
+  const max =
+    "https://example.com/" + "a".repeat(500 - "https://example.com/".length);
+  const accepted = await getCatalog([
+    summary({ link: max, readmeUrl: max, linkKind: "project" }),
+  ]);
+  assert.deepEqual(await accepted.json(), [
+    summary({ icon: null, link: max, readmeUrl: max, linkKind: "project" }),
   ]);
 });
