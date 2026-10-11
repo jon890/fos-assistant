@@ -153,6 +153,9 @@ export function tradingBody(tool: TradeTool, args: Args): Args {
   if ((args.orderType === "LIMIT") !== Object.hasOwn(args, "price")) reject();
   if (args.price !== undefined) priceCheck(args.price, region);
   if (tool === "modify_order") {
+    // 금액 원주문의 LIMIT 전환은 현재 표시 값·소비 계약으로 표현할 수 없다.
+    if (args.expected_order.orderAmount !== null && args.orderType === "LIMIT")
+      reject();
     if (
       !(
         region === "KR"

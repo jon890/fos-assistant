@@ -56,6 +56,12 @@ export function registerTradingTools(
         }
         beforeSend();
         const response = await client.financial("POST", path, body, beforeSend);
+        // 정정·취소는 새 ID를 요구한다. 계약 위반 2xx도 재전송 없이 UNKNOWN이다.
+        if (
+          tool !== "create_order" &&
+          response.result.orderId === input.orderId
+        )
+          throw new TossinvestError(UNKNOWN);
         const returned = response.result.clientOrderId;
         if (
           tool === "create_order" &&

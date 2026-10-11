@@ -290,7 +290,8 @@ export class Tossinvest {
     return seq;
   }
 
-  /** 금융 요청은 한 번만 전송한다. GET 재시도와 토큰 재발급 루프에 들어가지 않는다. */
+  /** 승인 검증을 제공하지 않는 저수준 내부 transport다. 호출자가 guard와 본문 검증을 맡는다.
+   * 금융 요청은 한 번만 전송하며 GET 재시도와 토큰 재발급 루프에 들어가지 않는다. */
   async financial(
     method: "POST" | "DELETE",
     path: string,
