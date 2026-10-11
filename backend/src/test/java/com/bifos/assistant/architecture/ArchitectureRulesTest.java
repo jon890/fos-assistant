@@ -96,18 +96,18 @@ class ArchitectureRulesTest {
 
 
     @Test
-    @DisplayName("기존 층 규칙은 현재 패키지의 정상 흐름도 허용한다")
+    @DisplayName("기존 층 규칙은 목적별 하위 패키지의 정상 흐름도 허용한다")
     void acceptsLayerFixture() throws IOException {
         JavaClasses fixture = compileFixture(
             temporary,
             Map.of(
-                "com.bifos.assistant.fixture.presentation.Controller", """
-                        package com.bifos.assistant.fixture.presentation;
-                        import com.bifos.assistant.fixture.application.UseCase;
+                "com.bifos.assistant.fixture.admin.presentation.Controller", """
+                        package com.bifos.assistant.fixture.admin.presentation;
+                        import com.bifos.assistant.fixture.admin.application.UseCase;
                         public class Controller { UseCase service; }
                         """,
-                "com.bifos.assistant.fixture.application.UseCase", """
-                        package com.bifos.assistant.fixture.application;
+                "com.bifos.assistant.fixture.admin.application.UseCase", """
+                        package com.bifos.assistant.fixture.admin.application;
                         import com.bifos.assistant.fixture.infra.Store;
                         public class UseCase { Store store; }
                         """,
@@ -127,13 +127,13 @@ class ArchitectureRulesTest {
 
 
     @Test
-    @DisplayName("기존 층 규칙은 컨트롤러에서 infra 로 바로 가는 의존을 거절한다")
+    @DisplayName("기존 층 규칙은 목적별 컨트롤러에서 infra 로 바로 가는 의존을 거절한다")
     void rejectsControllerInfraFixture() throws IOException {
         JavaClasses fixture = compileFixture(
             temporary,
             Map.of(
-                "com.bifos.assistant.fixture.presentation.Controller", """
-                        package com.bifos.assistant.fixture.presentation;
+                "com.bifos.assistant.fixture.admin.presentation.Controller", """
+                        package com.bifos.assistant.fixture.admin.presentation;
                         import com.bifos.assistant.fixture.infra.Store;
                         public class Controller { Store store; }
                         """,
@@ -146,7 +146,7 @@ class ArchitectureRulesTest {
             .evaluate(fixture)
             .getFailureReport()
             .toString())
-                .contains("fixture.presentation.Controller", "fixture.infra.Store", "층은 presentation");
+                .contains("fixture.admin.presentation.Controller", "fixture.infra.Store", "층은 presentation");
     }
 
 
@@ -156,17 +156,17 @@ class ArchitectureRulesTest {
         JavaClasses fixture = compileFixture(
             temporary,
             Map.of(
-                "com.bifos.assistant.fixture.domain.Policy", """
-                        package com.bifos.assistant.fixture.domain;
-                        import com.bifos.assistant.fixture.presentation.Controller;
+                "com.bifos.assistant.fixture.admin.domain.Policy", """
+                        package com.bifos.assistant.fixture.admin.domain;
+                        import com.bifos.assistant.fixture.admin.presentation.Controller;
                         import org.springframework.http.HttpStatus;
                         public class Policy {
                             Controller controller;
                             HttpStatus status;
                         }
                         """,
-                "com.bifos.assistant.fixture.presentation.Controller", """
-                        package com.bifos.assistant.fixture.presentation;
+                "com.bifos.assistant.fixture.admin.presentation.Controller", """
+                        package com.bifos.assistant.fixture.admin.presentation;
                         public class Controller {}
                         """));
         assertThat(fixture).hasSize(2);
@@ -175,8 +175,8 @@ class ArchitectureRulesTest {
             .getFailureReport()
             .toString())
                 .contains(
-                    "fixture.domain.Policy",
-                    "fixture.presentation.Controller",
+                    "fixture.admin.domain.Policy",
+                    "fixture.admin.presentation.Controller",
                     "HttpStatus",
                     "domain 은 웹 계층");
         assertThat(ArchitectureRules.LAYER_DIRECTION.evaluate(fixture).hasViolation())
@@ -367,4 +367,94 @@ class ArchitectureRulesTest {
         FreezingArchRule.freeze(ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME)
             .check(TESTS);
     }
+
+
+    @Test
+    @DisplayName("기존 층 규칙은 현재 패키지의 정상 흐름도 허용한다")
+    void acceptsLayerFixtureForFeature() throws IOException {
+        JavaClasses fixture = compileFixture(
+            temporary,
+            Map.of(
+                "com.bifos.assistant.fixture.presentation.Controller", """
+                        package com.bifos.assistant.fixture.presentation;
+                        import com.bifos.assistant.fixture.application.UseCase;
+                        public class Controller { UseCase service; }
+                        """,
+                "com.bifos.assistant.fixture.application.UseCase", """
+                        package com.bifos.assistant.fixture.application;
+                        import com.bifos.assistant.fixture.infra.Store;
+                        public class UseCase { Store store; }
+                        """,
+                "com.bifos.assistant.fixture.infra.Store", """
+                        package com.bifos.assistant.fixture.infra;
+                        import com.bifos.assistant.fixture.domain.Policy;
+                        public class Store { Policy policy; }
+                        """,
+                "com.bifos.assistant.fixture.domain.Policy", """
+                        package com.bifos.assistant.fixture.domain;
+                        public class Policy {}
+                        """));
+        assertThat(fixture).hasSize(4);
+        ArchitectureRules.LAYER_DIRECTION.check(fixture);
+        ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB.check(fixture);
+    }
+
+
+    @Test
+    @DisplayName("기존 층 규칙은 컨트롤러에서 infra 로 바로 가는 의존을 거절한다")
+    void rejectsControllerInfraFixtureForFeature() throws IOException {
+        JavaClasses fixture = compileFixture(
+            temporary,
+            Map.of(
+                "com.bifos.assistant.fixture.presentation.Controller", """
+                        package com.bifos.assistant.fixture.presentation;
+                        import com.bifos.assistant.fixture.infra.Store;
+                        public class Controller { Store store; }
+                        """,
+                "com.bifos.assistant.fixture.infra.Store", """
+                        package com.bifos.assistant.fixture.infra;
+                        public class Store {}
+                        """));
+        assertThat(fixture).hasSize(2);
+        assertThat(ArchitectureRules.LAYER_DIRECTION
+            .evaluate(fixture)
+            .getFailureReport()
+            .toString())
+                .contains("fixture.presentation.Controller", "fixture.infra.Store", "층은 presentation");
+    }
+
+
+    @Test
+    @DisplayName("기존 domain 규칙은 presentation 과 Spring Web 의존을 거절한다")
+    void rejectsDomainWebFixtureForFeature() throws IOException {
+        JavaClasses fixture = compileFixture(
+            temporary,
+            Map.of(
+                "com.bifos.assistant.fixture.domain.Policy", """
+                        package com.bifos.assistant.fixture.domain;
+                        import com.bifos.assistant.fixture.presentation.Controller;
+                        import org.springframework.http.HttpStatus;
+                        public class Policy {
+                            Controller controller;
+                            HttpStatus status;
+                        }
+                        """,
+                "com.bifos.assistant.fixture.presentation.Controller", """
+                        package com.bifos.assistant.fixture.presentation;
+                        public class Controller {}
+                        """));
+        assertThat(fixture).hasSize(2);
+        assertThat(ArchitectureRules.DOMAIN_DOES_NOT_DEPEND_ON_WEB
+            .evaluate(fixture)
+            .getFailureReport()
+            .toString())
+                .contains(
+                    "fixture.domain.Policy",
+                    "fixture.presentation.Controller",
+                    "HttpStatus",
+                    "domain 은 웹 계층");
+        assertThat(ArchitectureRules.LAYER_DIRECTION.evaluate(fixture).hasViolation())
+            .isTrue();
+    }
+
 }
