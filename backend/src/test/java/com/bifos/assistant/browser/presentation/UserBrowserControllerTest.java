@@ -12,6 +12,7 @@ import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
 import com.bifos.assistant.browser.application.FakeCdp;
 import com.bifos.assistant.browser.application.UserBrowserService;
+import com.bifos.assistant.browser.application.UserBrowserServiceTestFactory;
 import com.bifos.assistant.browser.domain.BrowserProfileStore;
 import com.bifos.assistant.browser.domain.BrowserRuntime;
 import com.bifos.assistant.browser.domain.RuntimeContainer;
@@ -63,6 +64,7 @@ class UserBrowserControllerTest {
 
     private final List<String> containers = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         jdbc.update("DELETE FROM user_browser");
@@ -70,11 +72,13 @@ class UserBrowserControllerTest {
         signIn(MEMBER);
     }
 
+
     @AfterEach
     void tearDown() {
         jdbc.update("DELETE FROM user_browser");
         SecurityContextHolder.clearContext();
     }
+
 
     @Test
     @DisplayName("만들고 켜고 끄고 지우는 동안 상태와 유휴 시간을 돌려준다")
@@ -82,35 +86,36 @@ class UserBrowserControllerTest {
         MockMvc mvc = mvc(true);
 
         mvc.perform(get("/api/v1/browser"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.enabled").value(true))
-                .andExpect(jsonPath("$.exists").value(false))
-                .andExpect(jsonPath("$.idleTimeoutSeconds").value(600));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(true))
+            .andExpect(jsonPath("$.exists").value(false))
+            .andExpect(jsonPath("$.idleTimeoutSeconds").value(600));
         mvc.perform(post("/api/v1/browser"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.exists").value(true))
-                .andExpect(jsonPath("$.status").value("STOPPED"))
-                .andExpect(jsonPath("$.lastError").isEmpty());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.exists").value(true))
+            .andExpect(jsonPath("$.status").value("STOPPED"))
+            .andExpect(jsonPath("$.lastError").isEmpty());
         mvc.perform(post("/api/v1/browser"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_EXISTS.name()));
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_EXISTS.name()));
         mvc.perform(post("/api/v1/browser/start"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RUNNING"))
-                .andExpect(jsonPath("$.startedAt").isNotEmpty())
-                .andExpect(jsonPath("$.lastActiveAt").isNotEmpty());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("RUNNING"))
+            .andExpect(jsonPath("$.startedAt").isNotEmpty())
+            .andExpect(jsonPath("$.lastActiveAt").isNotEmpty());
         mvc.perform(get("/api/v1/browser"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("RUNNING"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("RUNNING"));
         mvc.perform(post("/api/v1/browser/stop"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("STOPPED"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("STOPPED"));
         mvc.perform(delete("/api/v1/browser")).andExpect(status().isNoContent());
         mvc.perform(get("/api/v1/browser")).andExpect(jsonPath("$.exists").value(false));
         mvc.perform(post("/api/v1/browser/start"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_NOT_FOUND.name()));
     }
+
 
     @Test
     @DisplayName("기능이 꺼져 있으면 GET 은 200 으로 enabled 만 주고 쓰기는 503 이다")
@@ -118,15 +123,16 @@ class UserBrowserControllerTest {
         MockMvc mvc = mvc(false);
 
         mvc.perform(get("/api/v1/browser"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.enabled").value(false))
-                .andExpect(jsonPath("$.exists").doesNotExist())
-                .andExpect(jsonPath("$.status").doesNotExist());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.enabled").value(false))
+            .andExpect(jsonPath("$.exists").doesNotExist())
+            .andExpect(jsonPath("$.status").doesNotExist());
         mvc.perform(post("/api/v1/browser"))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_DISABLED.name()));
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.code").value(ErrorCode.BROWSER_DISABLED.name()));
         mvc.perform(post("/api/v1/browser/start")).andExpect(status().isServiceUnavailable());
     }
+
 
     @Test
     @DisplayName("일반 사용자는 관리자 경로에서 403 이다")
@@ -134,11 +140,12 @@ class UserBrowserControllerTest {
         MockMvc mvc = mvc(true);
 
         mvc.perform(get("/api/v1/admin/browsers"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value(ErrorCode.FORBIDDEN.name()));
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value(ErrorCode.FORBIDDEN.name()));
         mvc.perform(post("/api/v1/admin/browsers/1/stop")).andExpect(status().isForbidden());
         mvc.perform(delete("/api/v1/admin/browsers/1")).andExpect(status().isForbidden());
     }
+
 
     @Test
     @DisplayName("관리자는 모든 브라우저를 사용자 이름과 함께 보고 번호로 끄고 지운다")
@@ -150,49 +157,52 @@ class UserBrowserControllerTest {
         signIn(ADMIN);
 
         mvc.perform(get("/api/v1/admin/browsers"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value(id))
-                .andExpect(jsonPath("$[0].userId").value(MEMBER.id()))
-                .andExpect(jsonPath("$[0].userName").value("아이"))
-                .andExpect(jsonPath("$[0].status").value("RUNNING"))
-                .andExpect(jsonPath("$[0].containerId").doesNotExist())
-                .andExpect(jsonPath("$[0].profileKey").doesNotExist());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(1))
+            .andExpect(jsonPath("$[0].id").value(id))
+            .andExpect(jsonPath("$[0].userId").value(MEMBER.id()))
+            .andExpect(jsonPath("$[0].userName").value("아이"))
+            .andExpect(jsonPath("$[0].status").value("RUNNING"))
+            .andExpect(jsonPath("$[0].containerId").doesNotExist())
+            .andExpect(jsonPath("$[0].profileKey").doesNotExist());
         mvc.perform(post("/api/v1/admin/browsers/" + id + "/stop"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("STOPPED"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("STOPPED"));
         mvc.perform(delete("/api/v1/admin/browsers/" + id)).andExpect(status().isNoContent());
         mvc.perform(get("/api/v1/admin/browsers"))
-                .andExpect(jsonPath("$.length()").value(0));
+            .andExpect(jsonPath("$.length()").value(0));
     }
 
+
     private MockMvc mvc(boolean enabled) {
-        UserBrowserService service = new UserBrowserService(
-                repository,
-                runtime(),
-                profiles(),
-                address -> true,
-                LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
-                Clock.systemUTC(),
-                new BrowserScreens(
-                        new FakeCdp(),
-                        new FakeCdp(),
-                        new BrowserUsage(),
-                        LiveProperties.fixed(BrowserProperties.class, properties(enabled))));
+        UserBrowserService service = UserBrowserServiceTestFactory.create(
+            repository,
+            runtime(),
+            profiles(),
+            address -> true,
+            LiveProperties.fixed(BrowserProperties.class, properties(enabled)),
+            Clock.systemUTC(),
+            new BrowserScreens(
+                new FakeCdp(),
+                new FakeCdp(),
+                new BrowserUsage(),
+                LiveProperties.fixed(BrowserProperties.class, properties(enabled))));
         CurrentUserProvider currentUser = new CurrentUserProvider();
         UserDisplayNameService names = mock(UserDisplayNameService.class);
         when(names.find(MEMBER.id())).thenReturn("아이");
         return MockMvcBuilders.standaloneSetup(
-                        new UserBrowserController(service, currentUser),
-                        new UserBrowserAdminController(service, names, currentUser))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            new UserBrowserController(service, currentUser),
+            new UserBrowserAdminController(service, names, currentUser))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
+
 
     private static void signIn(CurrentUser user) {
         SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+            .setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
     }
+
 
     /** 만든 컨테이너 번호만 기억하는 대역 proxy 다. 켜기와 끄기의 순서는 서비스 검사가 본다. */
     private BrowserRuntime runtime() {
@@ -203,30 +213,36 @@ class UserBrowserControllerTest {
                 return containers.get(containers.size() - 1);
             }
 
+
             @Override
             public void start(String containerId) {
                 // 대역은 켜진 것으로 본다
             }
+
 
             @Override
             public void stop(String containerId) {
                 // 대역은 멈춘 것으로 본다
             }
 
+
             @Override
             public void remove(String containerId) {
                 containers.remove(containerId);
             }
+
 
             @Override
             public Optional<URI> cdpAddress(String containerId) {
                 return Optional.of(URI.create("http://192.0.2.10:9999"));
             }
 
+
             @Override
             public OptionalInt exitCode(String containerId) {
                 return OptionalInt.empty();
             }
+
 
             @Override
             public List<RuntimeContainer> list() {
@@ -235,12 +251,14 @@ class UserBrowserControllerTest {
         };
     }
 
+
     private static BrowserProfileStore profiles() {
         return new BrowserProfileStore() {
             @Override
             public void ensure(String profileKey) {
                 // 검사는 디렉터리를 만들지 않는다
             }
+
 
             @Override
             public void delete(String profileKey) {
@@ -249,25 +267,26 @@ class UserBrowserControllerTest {
         };
     }
 
+
     private static BrowserProperties properties(boolean enabled) {
         return new BrowserProperties(
-                enabled,
-                "https://browser-proxy.example.test",
-                "example/browser:test",
-                "example-browser",
-                9999,
-                "build/unused",
-                "/example/browser-profiles",
-                "/example/profile",
-                512,
-                1.0,
-                256,
-                128,
-                2,
-                Duration.ofMinutes(10),
-                Duration.ofMillis(100),
-                Duration.ofMinutes(30),
-                null,
-                null);
+            enabled,
+            "https://browser-proxy.example.test",
+            "example/browser:test",
+            "example-browser",
+            9999,
+            "build/unused",
+            "/example/browser-profiles",
+            "/example/profile",
+            512,
+            1.0,
+            256,
+            128,
+            2,
+            Duration.ofMinutes(10),
+            Duration.ofMillis(100),
+            Duration.ofMinutes(30),
+            null,
+            null);
     }
 }
