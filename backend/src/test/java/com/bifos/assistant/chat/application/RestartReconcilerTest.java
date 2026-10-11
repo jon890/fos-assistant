@@ -161,6 +161,7 @@ class RestartReconcilerTest {
     private Agent worker;
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         awaitAllIdle();
@@ -181,12 +182,14 @@ class RestartReconcilerTest {
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
     }
 
+
     @AfterEach
     void tearDown() {
         // 남은 잠금이 있으면 여기서 실패한다.
         awaitAllIdle();
         stub.reset();
     }
+
 
     @Test
     @DisplayName("Hermes 에서 성공으로 끝난 대화 turn 은 사용량과 답을 적고 잠금을 푼다")
@@ -206,9 +209,10 @@ class RestartReconcilerTest {
         assertThat(saved.estimatedCostMicros()).as("가격표가 아는 모델이라 금액을 적는다").isNotNull();
         awaitIdle(conversation.id());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(tuple(MessageRole.ASSISTANT, "끝난 답"));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(tuple(MessageRole.ASSISTANT, "끝난 답"));
     }
+
 
     @Test
     @DisplayName("아직 도는 대화 turn 에는 다시 붙어 잠금을 쥐고, 끝나면 답을 적고 잠금을 푼다")
@@ -223,18 +227,19 @@ class RestartReconcilerTest {
         assertThat(statusOf(row)).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(turns.markOf(conversation.id())).isEqualTo(new TurnMark(true, row.id()));
         assertThatThrownBy(() -> chat.send(dad, conversation.id(), "그 사이 보낸 글", "dad"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
 
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
 
         awaitStatus(row, ExecutionStatus.SUCCEEDED);
         awaitIdle(conversation.id());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(tuple(MessageRole.ASSISTANT, "끝난 답"));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(tuple(MessageRole.ASSISTANT, "끝난 답"));
         assertThat(stub.stopped()).as("다시 붙은 대화 turn 은 멈추지 않는다").isEmpty();
     }
+
 
     @Test
     @DisplayName("Hermes 에서 실패로 끝난 대화 turn 은 받은 사용량을 남기고 메시지 없이 FAILED 로 적는다")
@@ -252,6 +257,7 @@ class RestartReconcilerTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
     }
 
+
     @Test
     @DisplayName("Hermes 가 모르는 run 은 한 번만 묻고 REMOTE_RUN_LOST 로 적는다")
     void unknownRunIsAskedOnceAndRecordedAsLost() {
@@ -264,11 +270,12 @@ class RestartReconcilerTest {
         assertThat(saved.errorCode()).isEqualTo("REMOTE_RUN_LOST");
         awaitIdle(conversation.id());
         assertThat(executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(row.id())))
-                .as("묻고 실패로 적은 줄의 끝 사건")
-                .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
-                .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "REMOTE_RUN_LOST"));
+            .as("묻고 실패로 적은 줄의 끝 사건")
+            .extracting(ExecutionEvent::eventType, ExecutionEvent::detail)
+            .containsExactly(tuple(ExecutionEventType.RUN_FAILED, "REMOTE_RUN_LOST"));
         assertThat(stub.lookups()).containsExactly(row.hermesRunId());
     }
+
 
     @Test
     @DisplayName("Hermes 에 닿지 못하는 동안에는 RUNNING 과 잠금을 두고, 닿으면 그 답을 적는다")
@@ -291,6 +298,7 @@ class RestartReconcilerTest {
         awaitIdle(conversation.id());
     }
 
+
     @Test
     @DisplayName("run 번호가 없는 줄은 묻지 않고 ORPHANED 로 적는다")
     void rowWithoutRunIdIsRecordedAsOrphanedWithoutAsking() {
@@ -298,14 +306,15 @@ class RestartReconcilerTest {
 
         reconciler.claim();
         assertThat(turns.markOf(conversation.id()).running())
-                .as("run 번호가 없는 줄은 잠금을 잡지 않는다")
-                .isFalse();
+            .as("run 번호가 없는 줄은 잠금을 잡지 않는다")
+            .isFalse();
         reconciler.reconcile(LONG_WAIT);
 
         AgentExecution saved = awaitStatus(row, ExecutionStatus.FAILED);
         assertThat(saved.errorCode()).isEqualTo("ORPHANED");
         assertThat(stub.lookups()).isEmpty();
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없는 줄은 묻지 않고 ORPHANED 로 적고 잡은 잠금을 푼다")
@@ -323,6 +332,7 @@ class RestartReconcilerTest {
         assertThat(stub.lookups()).isEmpty();
     }
 
+
     @Test
     @DisplayName("상한까지 계속 돌면 중지를 보내고 RECONCILE_TIMEOUT 으로 적는다")
     void stopsAndRecordsTimeoutWhenStillRunningAtLimit() {
@@ -339,12 +349,13 @@ class RestartReconcilerTest {
         releaseRemoteEndHold(row);
     }
 
+
     @Test
     @DisplayName("상한까지 한 번도 닿지 못하면 RECONCILE_UNREACHABLE 로 적는다")
     void recordsUnreachableWhenNeverReachedUntilLimit() {
         AgentExecution row = chatTurn(conversation, chief);
         stub.willFailLookup(
-                row.hermesRunId(), new ApiException(ErrorCode.HERMES_UNAVAILABLE, "hermes is down"), Integer.MAX_VALUE);
+            row.hermesRunId(), new ApiException(ErrorCode.HERMES_UNAVAILABLE, "hermes is down"), Integer.MAX_VALUE);
 
         reconciler.claim();
         reconciler.reconcile(SHORT_WAIT);
@@ -354,6 +365,7 @@ class RestartReconcilerTest {
         awaitIdle(conversation.id());
         releaseRemoteEndHold(row);
     }
+
 
     @Test
     @DisplayName("상한을 넘겨 FAILED 로 적은 줄의 사용자 자리는 Hermes 가 그 run 을 모른다고 답할 때까지 남고, 중지는 한 번만 간다")
@@ -378,6 +390,7 @@ class RestartReconcilerTest {
         assertThat(stub.stopped()).as("기동 정리가 보낸 중지 하나뿐이다").containsExactly(row.hermesRunId());
     }
 
+
     @Test
     @DisplayName("아직 도는 위임 실행에는 부모 대화를 잠그지 않고 다시 붙고, 끝난 결과를 부모 대화에 한 번 전한다")
     void reattachesToRunningDelegationWithoutLockAndDeliversResultOnce() {
@@ -391,8 +404,8 @@ class RestartReconcilerTest {
 
         assertThat(statusOf(row)).isEqualTo(ExecutionStatus.RUNNING);
         assertThat(turns.markOf(conversation.id()).running())
-                .as("위임 실행은 부모 대화의 잠금을 잡지 않는다")
-                .isFalse();
+            .as("위임 실행은 부모 대화의 잠금을 잡지 않는다")
+            .isFalse();
 
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "조사 결과"));
 
@@ -403,6 +416,7 @@ class RestartReconcilerTest {
         assertThat(notices()).as("부모 대화의 알림 줄").hasSize(1);
         assertThat(stub.stopped()).isEmpty();
     }
+
 
     @Test
     @DisplayName("같은 줄에 잡기와 묻기를 두 번 해도 한 번만 묻고 한 번만 적는다")
@@ -415,9 +429,9 @@ class RestartReconcilerTest {
         stub.willReturn(HermesRunResult.of("auto", "session", "completed", "정리한 답", "model", "provider", USAGE));
 
         CompletableFuture.allOf(
-                        CompletableFuture.runAsync(() -> reconciler.claimStartedBy(startup)),
-                        CompletableFuture.runAsync(() -> reconciler.claimStartedBy(startup)))
-                .join();
+            CompletableFuture.runAsync(() -> reconciler.claimStartedBy(startup)),
+            CompletableFuture.runAsync(() -> reconciler.claimStartedBy(startup)))
+            .join();
         reconciler.reconcile(LONG_WAIT);
         reconciler.claimStartedBy(startup);
         reconciler.reconcile(LONG_WAIT);
@@ -435,19 +449,20 @@ class RestartReconcilerTest {
         awaitIdle(conversation.id());
 
         assertThat(stub.lookups())
-                .as("끝난 줄은 다시 묻지 않는다")
-                .containsExactlyInAnyOrder(turn.hermesRunId(), child.hermesRunId());
+            .as("끝난 줄은 다시 묻지 않는다")
+            .containsExactlyInAnyOrder(turn.hermesRunId(), child.hermesRunId());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .filteredOn(message -> turn.id().equals(message.executionId()))
-                .as("그 실행의 답")
-                .hasSize(1);
+            .filteredOn(message -> turn.id().equals(message.executionId()))
+            .as("그 실행의 답")
+            .hasSize(1);
         assertThat(notices()).as("부모 대화의 알림 줄").hasSize(1);
         AgentExecution again = executions.findById(turn.id()).orElseThrow();
         assertThat(again.totalTokens()).isEqualTo(first.totalTokens());
         assertThat(again.finishedAt()).isEqualTo(first.finishedAt());
         assertThat(executions.findById(child.id()).orElseThrow().resultDeliveredAt())
-                .isEqualTo(deliveredAt);
+            .isEqualTo(deliveredAt);
     }
+
 
     @Test
     @DisplayName("기동 시각으로 다시 잡으면 복구 결과를 전하는 새 자동 turn 은 건드리지 않는다")
@@ -470,9 +485,9 @@ class RestartReconcilerTest {
             reconciler.resumeAfterStart();
             awaitUntil(autoAwaiting::isDone, "자동 turn 이 결과를 기다리지 않았다");
             AgentExecution auto = executions.findByStatus(ExecutionStatus.RUNNING).stream()
-                    .filter(row -> "auto".equals(row.hermesRunId()))
-                    .findFirst()
-                    .orElseThrow();
+                .filter(row -> "auto".equals(row.hermesRunId()))
+                .findFirst()
+                .orElseThrow();
             assertThat(auto.startedAt()).isAfter(startup);
             assertThat(delivered(child)).isTrue();
             assertThat(turns.markOf(conversation.id())).isEqualTo(new TurnMark(true, auto.id()));
@@ -488,11 +503,12 @@ class RestartReconcilerTest {
         assertThat(stub.received()).hasSize(1);
         assertThat(executions.findByStatus(ExecutionStatus.RUNNING)).isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .filteredOn(message -> "정리한 답".equals(message.content()))
-                .hasSize(1);
+            .filteredOn(message -> "정리한 답".equals(message.content()))
+            .hasSize(1);
         assertThat(notices()).hasSize(1);
         awaitIdle(conversation.id());
     }
+
 
     @Test
     @DisplayName("아직 도는 흐름 turn 의 루트 줄에는 중지를 보내고 취소로 끝난 상태를 적는다")
@@ -500,8 +516,7 @@ class RestartReconcilerTest {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation =
-                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
+        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution row = chatTurn(flowConversation, flowed);
         stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
         stub.onStop(runId -> stub.willLookup(runId, finished(row, "cancelled", "")));
@@ -514,8 +529,9 @@ class RestartReconcilerTest {
         awaitIdle(flowConversation.id());
         assertThat(stub.stopped()).containsExactly(row.hermesRunId());
         assertThat(messages.findByConversationIdOrderByIdAsc(flowConversation.id()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("다시 붙은 대화 turn 을 사용자가 멈추면 중지를 보내고 CANCELLED 로 적은 뒤 대기 줄을 멈춘다")
@@ -535,10 +551,11 @@ class RestartReconcilerTest {
         awaitStatus(row, ExecutionStatus.CANCELLED);
         awaitIdle(conversation.id());
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
-                .containsExactly(tuple("기다리는 글", true));
+            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+            .containsExactly(tuple("기다리는 글", true));
         assertThat(stub.received()).as("멈춘 대기 줄은 보내지 않는다").isEmpty();
     }
+
 
     @Test
     @DisplayName("중지를 요청만 하고 확정하기 전에 취소 결과가 적혀도 대기 줄을 멈춘다")
@@ -560,10 +577,11 @@ class RestartReconcilerTest {
         awaitStatus(row, ExecutionStatus.CANCELLED);
         awaitIdle(conversation.id());
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
-                .containsExactly(tuple("기다리는 글", true));
+            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+            .containsExactly(tuple("기다리는 글", true));
         assertThat(stub.received()).as("멈춘 대기 줄은 보내지 않는다").isEmpty();
     }
+
 
     @Test
     @DisplayName("정하는 동안 쌓인 대기 메시지는 남아 있다가 잠금이 풀린 뒤 새 turn 으로 간다")
@@ -578,28 +596,28 @@ class RestartReconcilerTest {
         awaitLookups(row, 2);
 
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatPendingMessage::content)
-                .containsExactly("쌓인 글");
+            .extracting(ChatPendingMessage::content)
+            .containsExactly("쌓인 글");
         assertThat(stub.received()).as("잠금이 잡힌 동안에는 보내지 않는다").isEmpty();
 
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
 
         awaitUntil(
-                () -> messages.findByConversationIdOrderByIdAsc(conversation.id())
-                                .size()
-                        == 3,
-                "쌓인 글의 turn 이 끝나지 않았다");
+            () -> messages.findByConversationIdOrderByIdAsc(conversation.id())
+                .size() == 3,
+            "쌓인 글의 turn 이 끝나지 않았다");
         awaitIdle(conversation.id());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role, ChatMessage::content)
-                .containsExactly(
-                        tuple(MessageRole.ASSISTANT, "끝난 답"),
-                        tuple(MessageRole.USER, "쌓인 글"),
-                        tuple(MessageRole.ASSISTANT, "다음 답"));
+            .extracting(ChatMessage::role, ChatMessage::content)
+            .containsExactly(
+                tuple(MessageRole.ASSISTANT, "끝난 답"),
+                tuple(MessageRole.USER, "쌓인 글"),
+                tuple(MessageRole.ASSISTANT, "다음 답"));
         assertThat(stub.received()).as("새 실행이 한 번 제출됐다").hasSize(1);
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("내려가기 시작한 뒤에는 줄을 적지 않고 중지도 보내지 않는다")
@@ -620,7 +638,7 @@ class RestartReconcilerTest {
             assertThat(statusOf(row)).as("다음 기동이 다시 정하도록 남긴다").isEqualTo(ExecutionStatus.RUNNING);
             assertThat(stub.stopped()).isEmpty();
             assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                    .isEmpty();
+                .isEmpty();
         } finally {
             // 이 빈은 캐시된 문맥이 함께 쓴다. 내려가는 중 표시를 지워 뒤 검사가 정상으로 돌게 한다.
             reconciler.start();
@@ -628,15 +646,16 @@ class RestartReconcilerTest {
         assertThat(reconciler.isRunning()).isTrue();
     }
 
+
     @Test
     @DisplayName("적다가 한 번 실패하면 실패로 적지 않고 다시 물어 그 답을 적는다")
     void asksAgainWhenWritingFailsOnce() {
         AgentExecution row = chatTurn(conversation, chief);
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
         doThrow(new IllegalStateException("일시적인 DB 오류"))
-                .doCallRealMethod()
-                .when(recorder)
-                .settle(any(), any());
+            .doCallRealMethod()
+            .when(recorder)
+            .settle(any(), any());
 
         reconciler.claim();
         reconciler.reconcile(LONG_WAIT);
@@ -646,9 +665,10 @@ class RestartReconcilerTest {
         awaitIdle(conversation.id());
         assertThat(stub.lookups()).as("실패한 뒤 한 번 더 물었다").hasSize(2);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly("끝난 답");
+            .extracting(ChatMessage::content)
+            .containsExactly("끝난 답");
     }
+
 
     @Test
     @DisplayName("끝난 답을 계속 적지 못해 상한을 넘기면 중지를 보내지 않고 RECONCILE_TIMEOUT 으로 적는다")
@@ -666,20 +686,21 @@ class RestartReconcilerTest {
         assertThat(stub.stopped()).as("이미 끝난 run 에는 중지를 보내지 않는다").isEmpty();
     }
 
+
     @Test
     @DisplayName("잡다가 에이전트 조회가 실패한 줄의 대화는 잠긴 채 남지 않고, 다시 잡으면 한 번만 센다")
     void conversationIsNotLeftLockedWhenClaimFailsAndRetryCountsOnce() {
         AgentExecution row = chatTurn(conversation, chief);
         stub.willLookup(row.hermesRunId(), finished(row, "completed", "끝난 답"));
         doThrow(new IllegalStateException("일시적인 DB 오류"))
-                .doCallRealMethod()
-                .when(agentService)
-                .findById(chief.id());
+            .doCallRealMethod()
+            .when(agentService)
+            .findById(chief.id());
 
         assertThatThrownBy(() -> reconciler.claim()).isInstanceOf(IllegalStateException.class);
         assertThat(turns.markOf(conversation.id()).running())
-                .as("잡다가 실패한 줄의 잠금")
-                .isFalse();
+            .as("잡다가 실패한 줄의 잠금")
+            .isFalse();
 
         reconciler.claim();
         assertThat(turns.markOf(conversation.id())).isEqualTo(new TurnMark(true, row.id()));
@@ -690,49 +711,49 @@ class RestartReconcilerTest {
         awaitIdle(conversation.id());
     }
 
+
     @Test
     @DisplayName("루트 줄이 끝나고 자식만 도는 흐름 turn 도 대화를 잠그고, 자식을 멈춘 뒤에 푼다")
     void locksConversationForRunningFlowChildUntilItIsStopped() {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);
         flowed = agents.save(flowed);
-        Conversation flowConversation =
-                conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
+        Conversation flowConversation = conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
         AgentExecution root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(flowConversation.id())
-                .agentId(flowed.id())
-                .profileName(flowed.hermesProfile())
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .timing(
-                        Instant.now().minus(Duration.ofMinutes(2)),
-                        Instant.now().minus(Duration.ofMinutes(1)))
-                .build());
+            .userId(dad.id())
+            .conversationId(flowConversation.id())
+            .agentId(flowed.id())
+            .profileName(flowed.hermesProfile())
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .timing(
+                Instant.now().minus(Duration.ofMinutes(2)),
+                Instant.now().minus(Duration.ofMinutes(1)))
+            .build());
         AgentExecution child = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(flowConversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.treeRootId())
-                .profileName("worker")
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
-                .build());
+            .userId(dad.id())
+            .conversationId(flowConversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.treeRootId())
+            .profileName("worker")
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
+            .build());
         stub.willLookup(child.hermesRunId(), HermesRunLookup.running());
         stub.onStop(runId -> stub.willLookup(runId, finished(child, "cancelled", "")));
 
         reconciler.claim();
 
         assertThat(turns.markOf(flowConversation.id()))
-                .as("표시에는 루트 실행 번호가 붙는다")
-                .isEqualTo(new TurnMark(true, root.id()));
+            .as("표시에는 루트 실행 번호가 붙는다")
+            .isEqualTo(new TurnMark(true, root.id()));
         assertThatThrownBy(() -> chat.send(dad, flowConversation.id(), "그 사이 보낸 글", "flowed"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
 
         reconciler.reconcile(LONG_WAIT);
 
@@ -742,6 +763,7 @@ class RestartReconcilerTest {
         assertThat(statusOf(root)).as("끝난 루트 줄은 그대로다").isEqualTo(ExecutionStatus.SUCCEEDED);
     }
 
+
     @Test
     @DisplayName("자식만 돌던 흐름 turn 을 사용자가 멈췄으면 풀 때 stopped 를 내고 대기 줄을 멈춘다")
     void publishesStoppedAndHoldsPendingWhenUserStoppedChildOnlyFlowTurn() {
@@ -749,7 +771,7 @@ class RestartReconcilerTest {
         AgentExecution child = runningFlowChild(flowConversation);
         stub.willLookup(child.hermesRunId(), finished(child, "cancelled", ""));
         pendingMessages.save(
-                ChatPendingMessage.queued(flowConversation.id(), dad.id(), "기다리는 글", false, Instant.now()));
+            ChatPendingMessage.queued(flowConversation.id(), dad.id(), "기다리는 글", false, Instant.now()));
         List<ChatEvent> events = new CopyOnWriteArrayList<>();
         Runnable stopListening = hub.subscribe(flowConversation.id(), events::add);
 
@@ -764,14 +786,15 @@ class RestartReconcilerTest {
         }
 
         assertThat(events)
-                .filteredOn(event -> !"pending".equals(event.type()))
-                .extracting(ChatEvent::type, ChatEvent::messageId, ChatEvent::executionId)
-                .containsExactly(tuple("stopped", null, child.treeRootId()));
+            .filteredOn(event -> !"pending".equals(event.type()))
+            .extracting(ChatEvent::type, ChatEvent::messageId, ChatEvent::executionId)
+            .containsExactly(tuple("stopped", null, child.treeRootId()));
         assertThat(pendingMessages.findByConversationIdOrderByIdAsc(flowConversation.id()))
-                .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
-                .containsExactly(tuple("기다리는 글", true));
+            .extracting(ChatPendingMessage::content, ChatPendingMessage::held)
+            .containsExactly(tuple("기다리는 글", true));
         assertThat(stub.received()).as("멈춘 대기 줄은 보내지 않는다").isEmpty();
     }
+
 
     @Test
     @DisplayName("자식만 돌던 흐름 turn 이 사용자의 중지 없이 끝나면 풀 때 error 를 한 번 낸다")
@@ -793,9 +816,10 @@ class RestartReconcilerTest {
         }
 
         assertThat(events)
-                .extracting(ChatEvent::type, ChatEvent::code)
-                .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
+            .extracting(ChatEvent::type, ChatEvent::code)
+            .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
     }
+
 
     @Test
     @DisplayName("기동 때의 잡기와 다시 잡기가 모두 도중에 실패해도 이미 잡은 줄은 묻고 잠금을 푼다")
@@ -820,22 +844,25 @@ class RestartReconcilerTest {
         assertThat(stub.lookups()).containsExactly(claimedRow.hermesRunId());
     }
 
+
     @Test
     @DisplayName("웹 서버를 여는 lifecycle 보다 먼저 시작한다")
     void startsBeforeWebServerLifecycle() {
         assertThat(reconciler.getPhase()).isLessThan(WebServerApplicationContext.START_STOP_LIFECYCLE_PHASE);
     }
 
+
     @Test
     @DisplayName("상한 설정은 비우면 null 이고 0 이하이면 설정 이름을 넣어 거절한다")
     void maxWaitIsNullWhenBlankAndRejectedWhenNotPositive() {
         assertThat(properties.maxWait()).as("비워 둔 기본 설정").isNull();
         assertThat(new RestartReconcileProperties(true, Duration.ofMillis(1)).maxWait())
-                .isEqualTo(Duration.ofMillis(1));
+            .isEqualTo(Duration.ofMillis(1));
         assertThatThrownBy(() -> new RestartReconcileProperties(true, Duration.ZERO))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("assistant.restart-reconcile.max-wait");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("assistant.restart-reconcile.max-wait");
     }
+
 
     private Conversation flowConversation() {
         Agent flowed = agent("flowed", "흐름");
@@ -844,108 +871,118 @@ class RestartReconcilerTest {
         return conversations.save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()));
     }
 
+
     /** 루트 줄은 이미 성공으로 끝났고 자식만 아직 도는 흐름 turn 의 자식 줄이다. */
     private AgentExecution runningFlowChild(Conversation flowConversation) {
         AgentExecution root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(flowConversation.id())
-                .agentId(flowConversation.agentId())
-                .profileName("flowed")
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .timing(
-                        Instant.now().minus(Duration.ofMinutes(2)),
-                        Instant.now().minus(Duration.ofMinutes(1)))
-                .build());
+            .userId(dad.id())
+            .conversationId(flowConversation.id())
+            .agentId(flowConversation.agentId())
+            .profileName("flowed")
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .timing(
+                Instant.now().minus(Duration.ofMinutes(2)),
+                Instant.now().minus(Duration.ofMinutes(1)))
+            .build());
         return executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(flowConversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.treeRootId())
-                .profileName("worker")
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
-                .build());
+            .userId(dad.id())
+            .conversationId(flowConversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.treeRootId())
+            .profileName("worker")
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.now().minus(Duration.ofMinutes(1)))
+            .build());
     }
+
 
     /** 이전 프로세스가 돌리던 대화 turn 의 루트 줄이다. */
     private AgentExecution chatTurn(Conversation owner, Agent agent) {
         return executions.save(
-                running(owner, agent).hermesRunId("run-" + UUID.randomUUID()).build());
+            running(owner, agent).hermesRunId("run-" + UUID.randomUUID()).build());
     }
+
 
     private AgentExecution.Builder running(Conversation owner, Agent agent) {
         return AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(owner.id())
-                .agentId(agent.id())
-                .profileName(agent.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.now().minus(Duration.ofMinutes(1)));
+            .userId(dad.id())
+            .conversationId(owner.id())
+            .agentId(agent.id())
+            .profileName(agent.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.now().minus(Duration.ofMinutes(1)));
     }
+
 
     /** 끝난 대화 turn 아래에서 다른 에이전트에게 맡겨 아직 도는 실행이다. */
     private AgentExecution delegated() {
         AgentExecution root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         return executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.treeRootId())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName("worker")
-                .hermesRunId("run-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.treeRootId())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName("worker")
+            .hermesRunId("run-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.now())
+            .build());
     }
+
 
     private Agent agent(String code, String name) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                dad.id(),
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            dad.id(),
+            Instant.now());
     }
+
 
     private static HermesRunLookup finished(AgentExecution row, String status, String output) {
         return HermesRunLookup.finished(new HermesRunResult(
-                row.hermesRunId(), "sess-1", status, output, null, null, null, USAGE, PRICED_RUNTIME));
+            row.hermesRunId(), "sess-1", status, output, null, null, null, USAGE, PRICED_RUNTIME));
     }
+
 
     private ExecutionStatus statusOf(AgentExecution row) {
         return executions.findById(row.id()).orElseThrow().status();
     }
 
+
     private boolean delivered(AgentExecution row) {
         return executions.findById(row.id()).orElseThrow().resultDeliveredAt() != null;
     }
 
+
     private List<ChatMessage> notices() {
         return messages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                .filter(message -> message.role() == MessageRole.SYSTEM)
-                .toList();
+            .filter(message -> message.role() == MessageRole.SYSTEM)
+            .toList();
     }
+
 
     /**
      * 상한을 넘겨 FAILED 로 적은 줄의 원격 종료 확인 자리를 돌려받는다.
@@ -959,16 +996,19 @@ class RestartReconcilerTest {
         awaitUntil(() -> limiter.used(dad.id()) == 0, "run " + row.hermesRunId() + " 의 원격 종료 확인 자리가 돌아오지 않았다");
     }
 
+
     private long lookupsOf(AgentExecution row) {
         return stub.lookups().stream().filter(row.hermesRunId()::equals).count();
     }
 
+
     /** 그 run 을 적어도 {@code count} 번 물을 때까지 기다린다. 되풀이해 묻고 있다는 것을 본 뒤에 단언하려고 쓴다. */
     private void awaitLookups(AgentExecution row, int count) {
         awaitUntil(
-                () -> stub.lookups().stream().filter(row.hermesRunId()::equals).count() >= count,
-                "run " + row.hermesRunId() + " 을 " + count + "번 묻지 않았다");
+            () -> stub.lookups().stream().filter(row.hermesRunId()::equals).count() >= count,
+            "run " + row.hermesRunId() + " 을 " + count + "번 묻지 않았다");
     }
+
 
     /** 그 줄이 기대한 상태가 될 때까지 기다린 뒤 다시 읽어 돌려준다. */
     private AgentExecution awaitStatus(AgentExecution row, ExecutionStatus expected) {
@@ -980,21 +1020,24 @@ class RestartReconcilerTest {
             }
             if (System.nanoTime() > deadline) {
                 fail(
-                        "실행 %d 이 %s 안에 %s 가 되지 않았다. 지금은 %s(%s) 다",
-                        row.id(), WAIT_LIMIT, expected, saved.status(), saved.errorCode());
+                    "실행 %d 이 %s 안에 %s 가 되지 않았다. 지금은 %s(%s) 다",
+                    row.id(), WAIT_LIMIT, expected, saved.status(), saved.errorCode());
             }
             pause();
         }
     }
 
+
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {
         awaitUntil(() -> !turns.markOf(conversationId).running(), "대화 " + conversationId + " 의 turn 잠금이 풀리지 않았다");
     }
+
 
     private void awaitUntil(BooleanSupplier condition, String failure) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
@@ -1005,6 +1048,7 @@ class RestartReconcilerTest {
             pause();
         }
     }
+
 
     private static void pause() {
         try {
