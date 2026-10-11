@@ -42,7 +42,9 @@ export class FakeCdp {
   readonly prefix = GATEWAY_PATH;
   readonly server: ReturnType<typeof Bun.serve<SocketData, never>>;
 
-  constructor({ allowed = ["Storage.getCookies"] }: { allowed?: string[] } = {}) {
+  constructor({
+    allowed = ["Storage.getCookies"],
+  }: { allowed?: string[] } = {}) {
     this.allowed = new Set(allowed);
     this.server = Bun.serve<SocketData, never>({
       hostname: "127.0.0.1",
@@ -101,11 +103,18 @@ export class FakeCdp {
     }
     const pathname = url.pathname.slice(this.prefix.length);
     this.httpRequests.push(`${request.method} ${pathname}`);
-    const socketPath = /^\/devtools\/(browser|page)\/([A-Za-z0-9-]+)$/.exec(pathname);
+    const socketPath = /^\/devtools\/(browser|page)\/([A-Za-z0-9-]+)$/.exec(
+      pathname,
+    );
     if (socketPath) {
       this.origins.push(request.headers.get("origin") ?? "");
-      if (request.headers.has("origin")) return new Response(null, { status: 403 });
-      if (server.upgrade(request, { data: { target: `${socketPath[1]}/${socketPath[2]}` } }))
+      if (request.headers.has("origin"))
+        return new Response(null, { status: 403 });
+      if (
+        server.upgrade(request, {
+          data: { target: `${socketPath[1]}/${socketPath[2]}` },
+        })
+      )
         return undefined;
       return new Response("upgrade failed", { status: 400 });
     }
@@ -148,9 +157,17 @@ export class FakeCdp {
   }
 
   private command(socket: ServerWebSocket<SocketData>, raw: string) {
-    const message = JSON.parse(raw) as { id: number; method: string; params?: any };
+    const message = JSON.parse(raw) as {
+      id: number;
+      method: string;
+      params?: any;
+    };
     const target = socket.data.target;
-    this.calls.push({ target, method: message.method, params: message.params ?? {} });
+    this.calls.push({
+      target,
+      method: message.method,
+      params: message.params ?? {},
+    });
     const reply = (body: Record<string, unknown>) =>
       socket.send(JSON.stringify({ id: message.id, ...body }));
     if (!this.allowed.has(message.method)) {
@@ -173,7 +190,11 @@ export class FakeCdp {
 
 /** 이미 닫힌 포트의 중계 주소. 띄웠다 닫아 운영체제가 고른 포트를 쓴다. */
 export function closedPortUrl() {
-  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("") });
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    fetch: () => new Response(""),
+  });
   const url = `http://${server.hostname}:${server.port}${GATEWAY_PATH}`;
   server.stop(true);
   return url;
@@ -208,25 +229,37 @@ export type FakeDraft = {
 };
 
 /** 편집기 문서. `getDocumentData()` 와 `setDocumentData()` 가 주고받는 모양이다. */
-type FakeDocument = { documentId?: unknown; document?: { components?: unknown[] } };
+type FakeDocument = {
+  documentId?: unknown;
+  document?: { components?: unknown[] };
+};
 
 const TITLE_SELECTOR = JSON.stringify(".se-documentTitle .se-text-paragraph");
-const BODY_SELECTOR = JSON.stringify(".se-component.se-text .se-text-paragraph");
+const BODY_SELECTOR = JSON.stringify(
+  ".se-component.se-text .se-text-paragraph",
+);
 
 /** 식 안에서 처음 나오는 JSON 문자열 하나를 꺼낸다. */
 function quoted(expression: string, after: string) {
   const start = expression.indexOf(after);
-  const match = /"(?:[^"\\]|\\.)*"/.exec(expression.slice(start + after.length));
+  const match = /"(?:[^"\\]|\\.)*"/.exec(
+    expression.slice(start + after.length),
+  );
   return match ? (JSON.parse(match[0]) as string) : "";
 }
 
 /** 편집기 문서의 제목 구성요소 글. */
 function titleOf(components: unknown[]) {
   const title = components.find(
-    (component) => (component as { "@ctype"?: unknown })?.["@ctype"] === "documentTitle",
+    (component) =>
+      (component as { "@ctype"?: unknown })?.["@ctype"] === "documentTitle",
   ) as { title?: Array<{ nodes?: Array<{ value?: unknown }> }> } | undefined;
   return (title?.title ?? [])
-    .map((paragraph) => (paragraph.nodes ?? []).map((node) => (typeof node.value === "string" ? node.value : "")).join(""))
+    .map((paragraph) =>
+      (paragraph.nodes ?? [])
+        .map((node) => (typeof node.value === "string" ? node.value : ""))
+        .join(""),
+    )
     .join("");
 }
 
@@ -276,7 +309,11 @@ export class FakeEditor {
   /** 끝이 있는 애니메이션이 돈다고 이만큼 답한다. */
   animatingPolls = 0;
   /** 발행 단추 진단 식의 답. */
-  publishDiagnosis = { publish_button: "shown", covered_by: null as string | null, layers: [] as string[] };
+  publishDiagnosis = {
+    publish_button: "shown",
+    covered_by: null as string | null,
+    layers: [] as string[],
+  };
   /** 발행 단추를 누른 수. */
   publishClicks = 0;
   /** 임시저장 목록 API 가 돌려줄 글. 목록 화면도 이 차례로 놓인다. */
@@ -323,7 +360,10 @@ export class FakeEditor {
   install(cdp: FakeCdp) {
     cdp.on("Page.enable", (_, target) => {
       if (this.alertOnEnable)
-        cdp.emit(target, "Page.javascriptDialogOpening", { message: "확인", type: "alert" });
+        cdp.emit(target, "Page.javascriptDialogOpening", {
+          message: "확인",
+          type: "alert",
+        });
       return {};
     });
     cdp.on("Page.handleJavaScriptDialog", () => ({}));
@@ -345,16 +385,20 @@ export class FakeEditor {
     cdp.on("Runtime.evaluate", (params) => {
       const expression = String(params.expression);
       this.scripts.push(expression);
-      if (this.hangList && expression.includes("TempPostList.naver")) return NO_REPLY;
+      if (this.hangList && expression.includes("TempPostList.naver"))
+        return NO_REPLY;
       const value = this.evaluate(expression);
-      return { result: value === undefined ? { type: "undefined" } : { value } };
+      return {
+        result: value === undefined ? { type: "undefined" } : { value },
+      };
     });
     cdp.on("Input.insertText", (params) => {
       this.type(String(params.text));
       return {};
     });
     cdp.on("Input.dispatchKeyEvent", (params) => {
-      if (params.type === "rawKeyDown") this.key(params.key, params.modifiers ?? 0);
+      if (params.type === "rawKeyDown")
+        this.key(params.key, params.modifiers ?? 0);
       return {};
     });
     cdp.on("Input.dispatchMouseEvent", (params, target) => {
@@ -449,7 +493,8 @@ export class FakeEditor {
         this.documentId = "";
       };
     }
-    if (finder.includes("button.se-image-toolbar-button")) return this.photoAction;
+    if (finder.includes("button.se-image-toolbar-button"))
+      return this.photoAction;
     if (finder.includes(".se-module-image")) {
       const index = indexIn(finder, ".se-image')]");
       if (!this.images[index]) return null;
@@ -466,7 +511,8 @@ export class FakeEditor {
       if (!this.stickerPanel || !this.stickerCodes.includes(code)) return null;
       return () => this.stickers.push(code);
     }
-    if (finder.includes("button.se-map-toolbar-button")) return () => (this.mapOpen = true);
+    if (finder.includes("button.se-map-toolbar-button"))
+      return () => (this.mapOpen = true);
     if (finder.includes("장소명을 입력하세요.")) {
       if (!this.mapOpen) return null;
       return () => (this.focused = "search");
@@ -490,35 +536,46 @@ export class FakeEditor {
         this.results = [];
       };
     }
-    if (finder.includes("임시저장된 글 보기")) return () => (this.listOpen = true);
+    if (finder.includes("임시저장된 글 보기"))
+      return () => (this.listOpen = true);
     if (finder.includes("tpb*s.close")) return () => (this.listOpen = false);
     if (finder.includes("tpb*s.tlist")) {
       const draft = this.drafts[indexIn(finder, "tpb*s.tlist")];
       if (!this.listOpen || !draft) return null;
       return () => {
         this.loaded = this.loadInstead ?? draft;
-        this.document = { document: { components: structuredClone(this.loaded.components) } };
+        this.document = {
+          document: { components: structuredClone(this.loaded.components) },
+        };
         this.documentId = String(this.loaded.logNo);
         this.listOpen = false;
         this.category = draft.category;
         this.tags = [...draft.tags];
       };
     }
-    if (finder.includes('data-click-area=\\"tpb.publish\\"')) return this.publishAction;
+    if (finder.includes('data-click-area=\\"tpb.publish\\"'))
+      return this.publishAction;
     if (finder.includes("label[for]")) {
       const name = quoted(finder, "===");
-      if (!this.categoryListOpen || !this.categories.includes(name)) return null;
+      if (!this.categoryListOpen || !this.categories.includes(name))
+        return null;
       return () => {
         this.category = name;
         this.categoryListOpen = false;
       };
     }
-    if (finder.includes("tag-item-") && finder.endsWith("?.querySelector('button')")) {
+    if (
+      finder.includes("tag-item-") &&
+      finder.endsWith("?.querySelector('button')")
+    ) {
       const tag = quoted(finder, "===");
       if (!this.settingsOpen || !this.tags.includes(tag)) return null;
       return () => (this.tags = this.tags.filter((item) => item !== tag));
     }
-    if (finder.includes('document.querySelectorAll("button")') && quoted(finder, "===") === "저장")
+    if (
+      finder.includes('document.querySelectorAll("button")') &&
+      quoted(finder, "===") === "저장"
+    )
       return () => this.save();
     return null;
   }
@@ -533,23 +590,38 @@ export class FakeEditor {
       this.saved += 1;
       return;
     }
-    const components = structuredClone(this.document.document?.components ?? []);
-    const content = { components, title: titleOf(components), category: this.category, tags: [...this.tags] };
-    const target = this.drafts.find((draft) => String(draft.logNo) === this.documentId);
+    const components = structuredClone(
+      this.document.document?.components ?? [],
+    );
+    const content = {
+      components,
+      title: titleOf(components),
+      category: this.category,
+      tags: [...this.tags],
+    };
+    const target = this.drafts.find(
+      (draft) => String(draft.logNo) === this.documentId,
+    );
     if (target) {
       if (this.ignoreUpdate) return;
       Object.assign(target, content, {
-        modiDate: this.loseModiDateOnUpdate ? Number.NaN : target.modiDate + 1000,
+        modiDate: this.loseModiDateOnUpdate
+          ? Number.NaN
+          : target.modiDate + 1000,
       });
       return;
     }
     if (this.documentId) return;
     if (this.backupUpdatesLoaded && this.loaded) {
-      Object.assign(this.loaded, content, { modiDate: this.loaded.modiDate + 1000 });
+      Object.assign(this.loaded, content, {
+        modiDate: this.loaded.modiDate + 1000,
+      });
       return;
     }
-    const logNo = Math.max(224000000000, ...this.drafts.map((draft) => draft.logNo)) + 1;
-    const modiDate = Math.max(0, ...this.drafts.map((draft) => draft.modiDate)) + 1000;
+    const logNo =
+      Math.max(224000000000, ...this.drafts.map((draft) => draft.logNo)) + 1;
+    const modiDate =
+      Math.max(0, ...this.drafts.map((draft) => draft.modiDate)) + 1000;
     this.drafts.unshift({ logNo, modiDate, ...content });
     this.saved += 1;
   }
@@ -557,7 +629,9 @@ export class FakeEditor {
   /** 식 하나에 화면 상태로 답한다. */
   private evaluate(expression: string): unknown {
     if (expression.includes("editor.setDocumentData(")) {
-      const doc = JSON.parse(quoted(expression, "const doc = ")) as FakeDocument;
+      const doc = JSON.parse(
+        quoted(expression, "const doc = "),
+      ) as FakeDocument;
       this.document = doc;
       this.documentId = String(doc.documentId ?? "");
       return true;
@@ -570,55 +644,110 @@ export class FakeEditor {
         modiDate,
         editorVersion: 4,
       }));
-      const body = { isSuccess: true, result: { totalCount: tempPostList.length, tempPostList } };
-      const text = this.listStatus === 200 ? `\n${JSON.stringify(body)}` : upstreamText;
+      const body = {
+        isSuccess: true,
+        result: { totalCount: tempPostList.length, tempPostList },
+      };
+      const text =
+        this.listStatus === 200 ? `\n${JSON.stringify(body)}` : upstreamText;
       return JSON.stringify({ status: this.listStatus, text });
     }
-    if (expression.includes("getDocumentData") && this.document)
+    if (expression.includes("getDocumentData()") && this.document)
       return JSON.stringify({ ...this.document, documentId: this.documentId });
-    if (expression.includes("getDocumentData"))
+    if (expression.includes("getDocumentData()"))
       return JSON.stringify(
         this.loaded
-          ? { document: { components: this.loaded.components }, documentId: String(this.loaded.logNo) }
+          ? {
+              document: { components: this.loaded.components },
+              documentId: String(this.loaded.logNo),
+            }
           : { document: { components: [] }, documentId: "" },
       );
-    if (expression.includes("tpb*s.tlist") && !expression.includes("JSON.stringify({x: r.left")) {
+    if (
+      expression.includes("tpb*s.tlist") &&
+      !expression.includes("JSON.stringify({x: r.left")
+    ) {
       const index = indexIn(expression, "tpb*s.tlist");
-      const title = (this.listTitles ?? this.drafts.map((draft) => draft.title))[index];
-      if (expression.includes('querySelector("strong")')) return this.listOpen ? (title ?? "") : "";
+      const title = (this.listTitles ??
+        this.drafts.map((draft) => draft.title))[index];
+      if (expression.includes('querySelector("strong")'))
+        return this.listOpen ? (title ?? "") : "";
       return this.listOpen && title !== undefined;
     }
     if (expression.includes("sessionStorage")) {
       const storage = {
         getItem: (key: string) => this.storage.get(key) ?? null,
-        setItem: (key: string, value: string) => void this.storage.set(key, value),
+        setItem: (key: string, value: string) =>
+          void this.storage.set(key, value),
         removeItem: (key: string) => void this.storage.delete(key),
       };
       return new Function("sessionStorage", `return (${expression});`)(storage);
     }
-    if (expression.includes("location.hostname"))
-      return JSON.stringify({
-        title: this.docTitle,
-        host: this.host,
-        ready: this.host === "blog.naver.com",
-      });
+    if (expression.includes("const openProbe = true")) {
+      const page = this.docTitle.includes("NAVER 로그인")
+        ? "login"
+        : this.docTitle.includes("네이버 블로그")
+          ? "editor"
+          : "other";
+      const host =
+        this.host === "nid.naver.com"
+          ? "login"
+          : this.host === "blog.naver.com"
+            ? "blog"
+            : "other";
+      const prepared = host === "blog" ? 1 : 0;
+      return {
+        page,
+        host,
+        reason:
+          page === "login" || host === "login"
+            ? "login_required"
+            : page !== "editor"
+              ? "page_loading"
+              : prepared
+                ? "ready"
+                : "title_missing",
+        document_state: "complete",
+        candidates: prepared,
+        prepared,
+        sized: prepared,
+        editable: prepared,
+        visible: prepared,
+        frames: 0,
+        frame_candidates: 0,
+        page_visible: true,
+        page_focused: true,
+      };
+    }
     if (expression.includes("const focusProbe = true")) {
-      const selector = quoted(expression, "querySelectorAll(");
-      const action = this.clickAction(`document.querySelector(${JSON.stringify(selector)})`);
+      const selector = quoted(
+        expression,
+        "const nodes = document.querySelectorAll(",
+      );
+      const action = this.clickAction(
+        `document.querySelector(${JSON.stringify(selector)})`,
+      );
       const area = selector.includes("documentTitle") ? "title" : "body";
       return {
         focused: this.focused === area,
         spot: action ? { x: this.spot(action), y: 1 } : null,
-        sample: { elements: 1, sized: true, editable: true,
-          page_focused: true, page_visible: true, hit: area,
-          anchor: this.focused ?? "none", end: this.focused ?? "none",
-          active: this.focused ?? "other", collapsed: true },
+        sample: {
+          elements: 1,
+          sized: true,
+          editable: true,
+          page_focused: true,
+          page_visible: true,
+          hit: area,
+          anchor: this.focused ?? "none",
+          end: this.focused ?? "none",
+          active: this.focused ?? "other",
+          collapsed: true,
+        },
       };
     }
-    if (expression.includes("const nodes = document.querySelectorAll(") &&
-        expression.includes("el.isContentEditable")) return this.host === "blog.naver.com";
     if (expression.includes("JSON.stringify({x: r.left")) {
-      const finder = /const el = ([\s\S]*?);\n {2}if \(!el\)/.exec(expression)?.[1] ?? "";
+      const finder =
+        /const el = ([\s\S]*?);\n {2}if \(!el\)/.exec(expression)?.[1] ?? "";
       const action = this.clickAction(finder);
       return action ? JSON.stringify({ x: this.spot(action), y: 1 }) : null;
     }
@@ -634,7 +763,8 @@ export class FakeEditor {
         y: 1,
       });
     }
-    if (expression.includes("publish_button:")) return JSON.stringify(this.publishDiagnosis);
+    if (expression.includes("publish_button:"))
+      return JSON.stringify(this.publishDiagnosis);
     if (expression.includes("getAnimations()")) {
       if (this.animatingPolls <= 0) return false;
       this.animatingPolls -= 1;
@@ -646,9 +776,15 @@ export class FakeEditor {
       if (selector.includes("tpb.publish")) action = this.publishAction;
       if (selector.includes("tpb*i.category") && this.settingsOpen)
         action = () => (this.categoryListOpen = true);
-      if (selector === "#tag-input" && this.settingsOpen) action = () => (this.focused = "tag");
+      if (selector === "#tag-input" && this.settingsOpen)
+        action = () => (this.focused = "tag");
       if (!action) return null;
-      return JSON.stringify({ top: 10, x: this.spot(action), y: 1, uncovered: true });
+      return JSON.stringify({
+        top: 10,
+        x: this.spot(action),
+        y: 1,
+        uncovered: true,
+      });
     }
     if (expression.includes("popup-dim")) return this.popup;
     if (expression.includes("s.anchorOffset")) {
@@ -668,22 +804,28 @@ export class FakeEditor {
           .map((line, index) => ({ id: `p-${index}`, text: line.trim() }))
           .filter(
             ({ text: value }) =>
-              value === text || (text.startsWith(value) && value.length >= text.length - 10),
+              value === text ||
+              (text.startsWith(value) && value.length >= text.length - 10),
           ),
       );
     }
-    if (expression.includes("getElementById(") && expression.endsWith("?.textContent")) {
+    if (
+      expression.includes("getElementById(") &&
+      expression.endsWith("?.textContent")
+    ) {
       const id = quoted(expression, "getElementById(");
       return this.body[Number(id.replace("p-", ""))];
     }
     if (expression.includes("cloneNode")) {
-      if (expression.includes(TITLE_SELECTOR)) return JSON.stringify([this.title]);
+      if (expression.includes(TITLE_SELECTOR))
+        return JSON.stringify([this.title]);
       if (expression.includes(BODY_SELECTOR)) return JSON.stringify(this.body);
       return "[]";
     }
-    const count = /^document\.querySelectorAll\("\.se-component\.se-(\w+)"\)\.length$/.exec(
-      expression,
-    );
+    const count =
+      /^document\.querySelectorAll\("\.se-component\.se-(\w+)"\)\.length$/.exec(
+        expression,
+      );
     if (count) {
       if (count[1] === "image") return this.images.length;
       if (count[1] === "sticker") return this.stickers.length;
@@ -696,26 +838,39 @@ export class FakeEditor {
       return Boolean(this.images[indexIn(expression, ".se-image')]")]);
     if (expression.includes("image.scrollIntoView"))
       return Boolean(this.images[indexIn(expression, ".se-image')]")]);
-    if (expression.includes("querySelector('.se-component-content-fit') !== null"))
+    if (
+      expression.includes("querySelector('.se-component-content-fit') !== null")
+    )
       return this.images[indexIn(expression, ".se-image')]")]?.fitted === true;
     if (expression.includes("se-object-arrangement-fit-toolbar-button"))
       return this.selectedImage >= 0;
     if (expression.includes("#image-type-list")) return false;
-    if (expression.includes(".se-sidebar-container-sticker")) return this.stickerPanel;
+    if (expression.includes(".se-sidebar-container-sticker"))
+      return this.stickerPanel;
     if (expression.includes("button.se-sidebar-element-sticker"))
-      return this.stickerPanel && this.stickerCodes.includes(quoted(expression, "==="));
+      return (
+        this.stickerPanel &&
+        this.stickerCodes.includes(quoted(expression, "==="))
+      );
     if (expression.includes("sticker.querySelector('img')?.alt"))
       return this.stickers[indexIn(expression, ".se-sticker')]")] ?? "";
     if (expression.includes(".se-component.se-placesMap')]"))
-      return JSON.stringify(this.maps.map((place) => `${place.name}\n${place.address}`));
+      return JSON.stringify(
+        this.maps.map((place) => `${place.name}\n${place.address}`),
+      );
     if (expression.includes(".se-popup-label-select-button"))
       return this.mapOpen ? "국내" : undefined;
     if (expression.includes("장소명을 입력하세요.")) return this.mapOpen;
     if (expression.includes("(link, index)"))
       return JSON.stringify(
-        this.results.map((place, index) => ({ index, name: place.name, address: place.address })),
+        this.results.map((place, index) => ({
+          index,
+          name: place.name,
+          address: place.address,
+        })),
       );
-    if (expression.includes(".se-place-add-button")) return this.selectedResult >= 0;
+    if (expression.includes(".se-place-add-button"))
+      return this.selectedResult >= 0;
     if (expression.includes(".se-popup-button-confirm")) return this.addClicked;
     if (expression.includes("layer_publish")) return this.settingsOpen;
     if (expression.includes("tag-item-"))
@@ -724,7 +879,10 @@ export class FakeEditor {
         tags: this.settingsOpen ? this.tags : [],
       });
     if (expression.includes("label[for]"))
-      return this.categoryListOpen && this.categories.includes(quoted(expression, "==="));
+      return (
+        this.categoryListOpen &&
+        this.categories.includes(quoted(expression, "==="))
+      );
     if (expression.includes("categoryItemText_"))
       return JSON.stringify(this.categoryListOpen ? this.categories : []);
     if (expression.includes("#tag-input")) return this.tagInput;

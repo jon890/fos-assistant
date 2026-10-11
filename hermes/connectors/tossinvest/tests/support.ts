@@ -2,6 +2,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { expect } from "bun:test";
+import {
+  CURRENT_OPERATIONS,
+  OPERATIONS,
+  matchesOperation,
+} from "../src/api-contract.ts";
+import { clearClientState } from "../src/client.ts";
 
 /** 모두 지어낸 값이다. 실제 계정이나 사람과 관계가 없다. */
 export const credentials = {
@@ -12,6 +18,61 @@ export const accountNo = "12345678901";
 export const tokenPrefix = "fake-access-token-";
 export const upstreamText = "upstream-error-text-for-tests";
 
+/** 공식 필수 필드를 명시한 합성 응답이다. schema를 순회해 성공 fixture를 발명하지 않는다. */
+export const emptyHoldings = {
+  totalPurchaseAmount: { krw: "0", usd: null },
+  marketValue: {
+    amount: { krw: "0", usd: null },
+    amountAfterCost: { krw: "0", usd: null },
+  },
+  profitLoss: {
+    amount: { krw: "0", usd: null },
+    amountAfterCost: { krw: "0", usd: null },
+    rate: "0",
+    rateAfterCost: "0",
+  },
+  dailyProfitLoss: { amount: { krw: "0", usd: null }, rate: "0" },
+  items: [],
+};
+export const stockInfo = (symbol: string, name: string) => ({
+  symbol,
+  name,
+  englishName: "Synthetic",
+  isinCode: "FAKE00000000",
+  market: "NASDAQ",
+  securityType: "STOCK",
+  isCommonShare: false,
+  status: "ACTIVE",
+  currency: "USD",
+  sharesOutstanding: "100",
+  listDate: null,
+  delistDate: null,
+  leverageFactor: null,
+  koreanMarketDetail: null,
+});
+export const sampleOrder = (id = "synthetic-order") => ({
+  orderId: id,
+  symbol: "AAPL",
+  side: "BUY",
+  orderType: "LIMIT",
+  timeInForce: "DAY",
+  status: "PENDING",
+  quantity: "0.9876543210987654321098765432",
+  price: "-0.000000000000000000000000001",
+  currency: "USD",
+  orderedAt: "2026-01-01T00:00:00Z",
+  canceledAt: null,
+  execution: {
+    filledQuantity: "0",
+    averageFilledPrice: null,
+    filledAmount: null,
+    commission: null,
+    tax: null,
+    filledAt: null,
+    settlementDate: null,
+  },
+});
+
 export type RecordedRequest = {
   method: string;
   path: string;
@@ -21,8 +82,7 @@ export type RecordedRequest = {
 };
 
 export type Route =
-  | Response
-  | ((request: RecordedRequest) => Response | Promise<Response>);
+  Response | ((request: RecordedRequest) => Response | Promise<Response>);
 
 /** 실제 토스증권 대신 도구가 만든 HTTP 요청만 받는 짧게 사는 대역이다. */
 export class FakeToss {
@@ -33,7 +93,7 @@ export class FakeToss {
   issued = 0;
   private allowed = true;
 
-  constructor() {
+  constructor(allowedOperations: ReadonlySet<string> = CURRENT_OPERATIONS) {
     this.server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
@@ -47,11 +107,24 @@ export class FakeToss {
           body: await request.text(),
         };
         this.requests.push(recorded);
-        if (!isAllowed(recorded.method, recorded.path)) this.allowed = false;
+        if (
+          !OPERATIONS.some(
+            (operation) =>
+              allowedOperations.has(operation.id) &&
+              matchesOperation(operation, recorded.method, recorded.path),
+          )
+        )
+          this.allowed = false;
         const route = this.routes.get(`${recorded.method} ${recorded.path}`);
         if (!route)
           return json(
-            { error: { requestId: "r", code: "not-found", message: upstreamText } },
+            {
+              error: {
+                requestId: "r",
+                code: "not-found",
+                message: upstreamText,
+              },
+            },
             404,
           );
         return route instanceof Response ? route.clone() : route(recorded);
@@ -105,22 +178,9 @@ export class FakeToss {
 
   stop() {
     this.server.stop(true);
+    clearClientState(this.url);
     expect(this.allowed).toBe(true);
   }
-}
-
-/** 도구가 계약 밖의 경로(주문 등)를 부르면 모든 시험이 실패한다. */
-function isAllowed(method: string, path: string) {
-  return new Set([
-    "POST /oauth2/token",
-    "GET /api/v1/accounts",
-    "GET /api/v1/prices",
-    "GET /api/v1/stocks",
-    "GET /api/v1/holdings",
-    "GET /api/v1/buying-power",
-    "GET /api/v1/sellable-quantity",
-    "GET /api/v1/orders",
-  ]).has(`${method} ${path}`);
 }
 
 export function json(body: unknown, status = 200, headers?: HeadersInit) {
