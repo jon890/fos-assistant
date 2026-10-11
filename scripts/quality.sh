@@ -38,7 +38,7 @@ describe() {
 }
 
 run_check() {
-  local backend=0 lint=0 format=0 file_length=0
+  local backend=0 lint=0 format=0 connector_format=0 file_length=0
 
   node "${ROOT}/scripts/check-file-length.mjs" || file_length=$?
 
@@ -50,16 +50,18 @@ run_check() {
   # --output-file 을 주면 ESLint 는 표준 출력에 내지 않는다. 실패한 위반은 quality-report.mjs 가 같은 JSON 에서 뽑는다.
   (cd "${ROOT}/web" && pnpm lint --format json --output-file build/eslint-report.json) || lint=$?
   (cd "${ROOT}/web" && pnpm format:check) || format=$?
+  node "${ROOT}/scripts/format-connectors.mjs" check || connector_format=$?
 
   echo ""
   describe "파일 길이" "${file_length}"
   describe "backend (qualityCheck)" "${backend}"
   describe "web (lint)" "${lint}"
   describe "web (format:check)" "${format}"
+  describe "커넥터 TypeScript (Prettier)" "${connector_format}"
   echo ""
   node "${ROOT}/scripts/quality-report.mjs"
 
-  if [ "${file_length}" -ne 0 ] || [ "${backend}" -ne 0 ] || [ "${lint}" -ne 0 ] || [ "${format}" -ne 0 ]; then
+  if [ "${file_length}" -ne 0 ] || [ "${backend}" -ne 0 ] || [ "${lint}" -ne 0 ] || [ "${format}" -ne 0 ] || [ "${connector_format}" -ne 0 ]; then
     return 1
   fi
   return 0
@@ -71,18 +73,20 @@ if [ "${mode}" = "check" ]; then
 fi
 
 # fix: 앞 단계가 실패해도 다음 단계로 가고, 끝에 check 로 남은 위반을 본다.
-rewrite=0 spotless=0 eslint_fix=0 prettier=0
+rewrite=0 spotless=0 eslint_fix=0 prettier=0 connector_prettier=0
 (cd "${ROOT}/backend" && ./gradlew rewriteChanged) || rewrite=$?
 # archTest 는 고친 위반을 기준에서 빼기만 한다. 새 위반은 그대로 실패한다.
 (cd "${ROOT}/backend" && ./gradlew spotlessApply archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true) || spotless=$?
 (cd "${ROOT}/web" && pnpm exec eslint --fix --prune-suppressions) || eslint_fix=$?
 (cd "${ROOT}/web" && pnpm format:changed) || prettier=$?
+node "${ROOT}/scripts/format-connectors.mjs" fix || connector_prettier=$?
 
 echo ""
 describe "OpenRewrite (rewriteChanged)" "${rewrite}"
 describe "Spotless 와 ArchUnit 기준 줄이기" "${spotless}"
 describe "eslint --fix --prune-suppressions" "${eslint_fix}"
 describe "Prettier (format:changed)" "${prettier}"
+describe "커넥터 TypeScript (Prettier)" "${connector_prettier}"
 echo ""
 echo "남은 위반을 확인하려고 check 를 돌린다."
 check_status=0

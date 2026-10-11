@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createTossinvestServer } from "../src/server.ts";
 import {
   FakeToss,
+  emptyHoldings,
   credentials,
   expectFailure,
   json,
@@ -15,7 +16,10 @@ const env = { ...credentials, TOSSINVEST_ACCOUNT_SEQ: accountSeq };
 
 function setup(environment: Record<string, string | undefined> = env) {
   const fake = new FakeToss();
-  const server = createTossinvestServer({ apiBase: fake.url, env: environment });
+  const server = createTossinvestServer({
+    apiBase: fake.url,
+    env: environment,
+  });
   return { fake, server };
 }
 
@@ -55,8 +59,17 @@ const holdings = {
         quantity: "1.234567",
         lastPrice: "190.50",
         averagePurchasePrice: "150.25",
-        marketValue: { purchaseAmount: "185.49", amount: "235.18", amountAfterCost: "234.90" },
-        profitLoss: { amount: "49.69", amountAfterCost: "49.41", rate: "26.79", rateAfterCost: "26.64" },
+        marketValue: {
+          purchaseAmount: "185.49",
+          amount: "235.18",
+          amountAfterCost: "234.90",
+        },
+        profitLoss: {
+          amount: "49.69",
+          amountAfterCost: "49.41",
+          rate: "26.79",
+          rateAfterCost: "26.64",
+        },
         dailyProfitLoss: { amount: "1.11", rate: "0.47" },
         cost: { commission: "0.12", tax: null },
       },
@@ -70,6 +83,8 @@ describe("get_holdings", () => {
     fake.on("GET", "/api/v1/holdings", holdings);
     await run(fake, server, async (client) => {
       expect((await tool(client, "get_holdings")).body).toEqual({
+        result: holdings.result,
+        metadata: {},
         total: {
           purchase_amount: { krw: "1000000", usd: null },
           market_value: { krw: "1200000", usd: null },
@@ -109,7 +124,7 @@ describe("get_holdings", () => {
     expect(request.headers.get("x-tossinvest-account")).toBe(accountSeq);
   });
 
-  test("객체나 배열인 값은 null 이고 64자를 넘는 글은 잘린다", async () => {
+  test("필수 필드와 값의 schema 위반은 전체 응답 오류다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/holdings", {
       result: {
@@ -124,20 +139,12 @@ describe("get_holdings", () => {
         ],
       },
     });
-    await run(fake, server, async (client) => {
-      const { body } = await tool(client, "get_holdings");
-      expect((body.total as { profit_loss_rate: unknown }).profit_loss_rate).toBeNull();
-      const items = body.items as Array<Record<string, unknown>>;
-      expect(items[0]).toMatchObject({
-        symbol: "005930",
-        quantity: null,
-        last_price: null,
-        currency: "x".repeat(64),
-      });
-    });
+    await run(fake, server, (client) =>
+      expectFailure(client, "TOSSINVEST_UNAVAILABLE", "get_holdings"),
+    );
   });
 
-  test("10진수 칸은 자르지 않고, 64자를 넘거나 10진수 꼴이 아니면 null 이다", async () => {
+  test("decimal의 공식 길이와 문자열 타입 위반은 전체 응답 오류다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/holdings", {
       result: {
@@ -152,23 +159,24 @@ describe("get_holdings", () => {
         ],
       },
     });
-    await run(fake, server, async (client) => {
-      const { body } = await tool(client, "get_holdings");
-      const items = body.items as Array<Record<string, unknown>>;
-      expect(items[0]).toMatchObject({
-        quantity: null,
-        last_price: "9".repeat(64),
-        average_purchase_price: null,
-        commission: "-0.5",
-        tax: 3,
-      });
-    });
+    await run(fake, server, (client) =>
+      expectFailure(client, "TOSSINVEST_UNAVAILABLE", "get_holdings"),
+    );
   });
 
   test("100자를 넘는 종목 이름은 자른다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/holdings", {
-      result: { items: [{ symbol: "005930", name: "가".repeat(150) }] },
+      result: {
+        ...holdings.result,
+        items: [
+          {
+            ...holdings.result.items[0],
+            symbol: "005930",
+            name: "가".repeat(150),
+          },
+        ],
+      },
     });
     await run(fake, server, async (client) => {
       const { body } = await tool(client, "get_holdings");
@@ -183,20 +191,34 @@ describe("계좌 순번", () => {
     ["없음", undefined],
     ["빈 값", ""],
     ["숫자가 아님", "seq-7"],
-    ["11자리", "99999999999"],
-  ])("env 가 %s 이면 요청 없이 TOSSINVEST_ACCOUNT_NOT_FOUND 다", async (_label, seq) => {
-    const { fake, server } = setup({ ...credentials, TOSSINVEST_ACCOUNT_SEQ: seq });
-    await run(fake, server, (client) =>
-      expectFailure(client, "TOSSINVEST_ACCOUNT_NOT_FOUND", "get_holdings"),
-    );
-    expect(fake.requests).toHaveLength(0);
-  });
+    ["int64 초과", "9223372036854775808"],
+    ["0", "0"],
+    ["음수", "-1"],
+    ["끝 줄바꿈", "1\n"],
+  ])(
+    "env 가 %s 이면 요청 없이 TOSSINVEST_ACCOUNT_NOT_FOUND 다",
+    async (_label, seq) => {
+      const { fake, server } = setup({
+        ...credentials,
+        TOSSINVEST_ACCOUNT_SEQ: seq,
+      });
+      await run(fake, server, (client) =>
+        expectFailure(client, "TOSSINVEST_ACCOUNT_NOT_FOUND", "get_holdings"),
+      );
+      expect(fake.requests).toHaveLength(0);
+    },
+  );
 
   test("10자리 순번은 받는다", async () => {
-    const { fake, server } = setup({ ...credentials, TOSSINVEST_ACCOUNT_SEQ: "1234567890" });
-    fake.on("GET", "/api/v1/holdings", { result: { items: [] } });
+    const { fake, server } = setup({
+      ...credentials,
+      TOSSINVEST_ACCOUNT_SEQ: "1234567890",
+    });
+    fake.on("GET", "/api/v1/holdings", { result: emptyHoldings });
     await run(fake, server, async (client) => {
-      expect((await tool(client, "get_holdings")).result.isError).toBeUndefined();
+      expect(
+        (await tool(client, "get_holdings")).result.isError,
+      ).toBeUndefined();
     });
     const request = fake.seen("GET", "/api/v1/holdings")[0]!;
     expect(request.headers.get("x-tossinvest-account")).toBe("1234567890");
@@ -212,13 +234,20 @@ describe("계좌 순번", () => {
 
   test("/sellable-quantity 의 400 account-not-found 는 TOSSINVEST_ACCOUNT_NOT_FOUND 다", async () => {
     const { fake, server } = setup();
-    fake.on("GET", "/api/v1/buying-power", { result: { currency: "KRW", cashBuyingPower: "1000" } });
+    fake.on("GET", "/api/v1/buying-power", {
+      result: { currency: "KRW", cashBuyingPower: "1000" },
+    });
     fake.fail("GET", "/api/v1/sellable-quantity", 400, "account-not-found");
     await run(fake, server, (client) =>
-      expectFailure(client, "TOSSINVEST_ACCOUNT_NOT_FOUND", "get_buying_power", {
-        currency: "KRW",
-        symbol: "005930",
-      }),
+      expectFailure(
+        client,
+        "TOSSINVEST_ACCOUNT_NOT_FOUND",
+        "get_buying_power",
+        {
+          currency: "KRW",
+          symbol: "005930",
+        },
+      ),
     );
   });
 });
@@ -226,9 +255,18 @@ describe("계좌 순번", () => {
 describe("get_buying_power", () => {
   test("symbol 이 없으면 /buying-power 만 부르고 sellable_quantity 는 null 이다", async () => {
     const { fake, server } = setup();
-    fake.on("GET", "/api/v1/buying-power", { result: { currency: "USD", cashBuyingPower: "1234.56" } });
+    fake.on("GET", "/api/v1/buying-power", {
+      result: { currency: "USD", cashBuyingPower: "1234.56" },
+    });
     await run(fake, server, async (client) => {
-      expect((await tool(client, "get_buying_power", { currency: "USD" })).body).toEqual({
+      expect(
+        (await tool(client, "get_buying_power", { currency: "USD" })).body,
+      ).toEqual({
+        result: {
+          buyingPower: { currency: "USD", cashBuyingPower: "1234.56" },
+          sellableQuantity: null,
+        },
+        metadata: { buyingPower: {}, sellableQuantity: null },
         currency: "USD",
         cash_buying_power: "1234.56",
         sellable_quantity: null,
@@ -243,11 +281,27 @@ describe("get_buying_power", () => {
 
   test("symbol 을 주면 /sellable-quantity 를 한 번 불러 매도 가능 수량을 싣는다", async () => {
     const { fake, server } = setup();
-    fake.on("GET", "/api/v1/buying-power", { result: { currency: "KRW", cashBuyingPower: "500000" } });
-    fake.on("GET", "/api/v1/sellable-quantity", { result: { sellableQuantity: "12" } });
+    fake.on("GET", "/api/v1/buying-power", {
+      result: { currency: "KRW", cashBuyingPower: "500000" },
+    });
+    fake.on("GET", "/api/v1/sellable-quantity", {
+      result: { sellableQuantity: "12" },
+    });
     await run(fake, server, async (client) => {
-      const { body } = await tool(client, "get_buying_power", { currency: "KRW", symbol: "005930" });
-      expect(body).toEqual({ currency: "KRW", cash_buying_power: "500000", sellable_quantity: "12" });
+      const { body } = await tool(client, "get_buying_power", {
+        currency: "KRW",
+        symbol: "005930",
+      });
+      expect(body).toEqual({
+        currency: "KRW",
+        cash_buying_power: "500000",
+        sellable_quantity: "12",
+        result: {
+          buyingPower: { currency: "KRW", cashBuyingPower: "500000" },
+          sellableQuantity: { sellableQuantity: "12" },
+        },
+        metadata: { buyingPower: {}, sellableQuantity: {} },
+      });
     });
     const sellable = fake.seen("GET", "/api/v1/sellable-quantity");
     expect(sellable).toHaveLength(1);
@@ -256,17 +310,26 @@ describe("get_buying_power", () => {
     expect(fake.seen("GET", "/api/v1/buying-power")).toHaveLength(1);
   });
 
-  test("64자를 넘는 currency 는 잘리고 글이 아니면 요청한 통화로 돌아간다", async () => {
+  test("표시 currency는 자르고 공식 result는 보존하며 잘못된 타입은 오류다", async () => {
     const { fake, server } = setup();
     fake.sequence("GET", "/api/v1/buying-power", [
-      () => json({ result: { currency: "x".repeat(80), cashBuyingPower: "1" } }),
-      () => json({ result: { currency: { code: "USD" }, cashBuyingPower: "2" } }),
+      () =>
+        json({ result: { currency: "x".repeat(80), cashBuyingPower: "1" } }),
+      () =>
+        json({ result: { currency: { code: "USD" }, cashBuyingPower: "2" } }),
     ]);
     await run(fake, server, async (client) => {
       const first = await tool(client, "get_buying_power", { currency: "KRW" });
       expect(first.body.currency).toBe("x".repeat(64));
-      const second = await tool(client, "get_buying_power", { currency: "USD" });
-      expect(second.body.currency).toBe("USD");
+      expect((first.body.result as any).buyingPower.currency).toBe(
+        "x".repeat(80),
+      );
+      await expectFailure(
+        client,
+        "TOSSINVEST_UNAVAILABLE",
+        "get_buying_power",
+        { currency: "USD" },
+      );
     });
   });
 
@@ -277,7 +340,12 @@ describe("get_buying_power", () => {
   ])("%j(%s)는 요청 없이 TOSSINVEST_INVALID_INPUT 이다", async (input) => {
     const { fake, server } = setup();
     await run(fake, server, (client) =>
-      expectFailure(client, "TOSSINVEST_INVALID_INPUT", "get_buying_power", input),
+      expectFailure(
+        client,
+        "TOSSINVEST_INVALID_INPUT",
+        "get_buying_power",
+        input,
+      ),
     );
     expect(fake.requests).toHaveLength(0);
   });
@@ -308,7 +376,7 @@ const order = (index: number) => ({
 });
 
 describe("list_orders", () => {
-  test("CLOSED 는 limit=100 으로 한 쪽만 읽고 hasNext 를 has_more 로 옮긴다", async () => {
+  test("CLOSED 는 기본 limit=20 으로 한 쪽만 읽고 hasNext 를 has_more 로 옮긴다", async () => {
     const { fake, server } = setup();
     fake.on("GET", "/api/v1/orders", {
       result: { orders: [order(1)], nextCursor: "fake-cursor", hasNext: true },
@@ -321,12 +389,21 @@ describe("list_orders", () => {
         symbol: "AAPL",
       });
       expect(body).toEqual({
+        result: {
+          orders: [order(1)],
+          nextCursor: "fake-cursor",
+          hasNext: true,
+        },
+        metadata: {},
+        nextCursor: "fake-cursor",
+        hasNext: true,
         orders: [
           {
             order_id: "fake-order-1",
             symbol: "AAPL",
             side: "BUY",
             order_type: "LIMIT",
+            time_in_force: "DAY",
             status: "FILLED",
             price: "190.50",
             quantity: "0.5",
@@ -352,16 +429,24 @@ describe("list_orders", () => {
       symbol: "AAPL",
       from: "2026-03-01",
       to: "2026-03-31",
-      limit: "100",
+      limit: "20",
     });
     expect(request.headers.get("x-tossinvest-account")).toBe(accountSeq);
   });
 
   test("CLOSED 의 hasNext 가 거짓이면 has_more 도 거짓이다", async () => {
     const { fake, server } = setup();
-    fake.on("GET", "/api/v1/orders", { result: { orders: [], nextCursor: null, hasNext: false } });
+    fake.on("GET", "/api/v1/orders", {
+      result: { orders: [], nextCursor: null, hasNext: false },
+    });
     await run(fake, server, async (client) => {
-      expect((await tool(client, "list_orders", { status: "CLOSED" })).body).toEqual({
+      expect(
+        (await tool(client, "list_orders", { status: "CLOSED" })).body,
+      ).toEqual({
+        result: { orders: [], nextCursor: null, hasNext: false },
+        metadata: {},
+        nextCursor: null,
+        hasNext: false,
         orders: [],
         has_more: false,
       });
@@ -370,30 +455,38 @@ describe("list_orders", () => {
 
   test.each([
     [100, 100, false],
-    [101, 100, true],
-  ])("OPEN 은 limit 과 cursor 없이 읽고, %i건을 받으면 %i건과 has_more %p 다", async (given, kept, more) => {
-    const { fake, server } = setup();
-    fake.on("GET", "/api/v1/orders", {
-      result: {
-        orders: Array.from({ length: given }, (_, index) => ({ ...order(index), status: "PENDING" })),
-        nextCursor: null,
-        hasNext: false,
-      },
-    });
-    await run(fake, server, async (client) => {
-      const { body } = await tool(client, "list_orders", { status: "OPEN" });
-      const orders = body.orders as Array<{ order_id: string }>;
-      expect(orders).toHaveLength(kept);
-      expect(orders.at(-1)!.order_id).toBe(`fake-order-${kept - 1}`);
-      expect(body.has_more).toBe(more);
-    });
-    const request = fake.seen("GET", "/api/v1/orders")[0]!;
-    expect(Object.fromEntries(request.query)).toEqual({ status: "OPEN" });
-  });
+    [101, 101, false],
+  ])(
+    "OPEN 은 limit 과 cursor 없이 읽고, %i건을 받으면 %i건과 has_more %p 다",
+    async (given, kept, more) => {
+      const { fake, server } = setup();
+      fake.on("GET", "/api/v1/orders", {
+        result: {
+          orders: Array.from({ length: given }, (_, index) => ({
+            ...order(index),
+            status: "PENDING",
+          })),
+          nextCursor: null,
+          hasNext: false,
+        },
+      });
+      await run(fake, server, async (client) => {
+        const { body } = await tool(client, "list_orders", { status: "OPEN" });
+        const orders = body.orders as Array<{ order_id: string }>;
+        expect(orders).toHaveLength(kept);
+        expect(orders.at(-1)!.order_id).toBe(`fake-order-${kept - 1}`);
+        expect(body.has_more).toBe(more);
+      });
+      const request = fake.seen("GET", "/api/v1/orders")[0]!;
+      expect(Object.fromEntries(request.query)).toEqual({ status: "OPEN" });
+    },
+  );
 
   test("from 과 to 를 포함해 366일인 기간은 받는다", async () => {
     const { fake, server } = setup();
-    fake.on("GET", "/api/v1/orders", { result: { orders: [], hasNext: false } });
+    fake.on("GET", "/api/v1/orders", {
+      result: { orders: [], nextCursor: null, hasNext: false },
+    });
     await run(fake, server, async (client) => {
       const { result } = await tool(client, "list_orders", {
         status: "CLOSED",
@@ -406,13 +499,15 @@ describe("list_orders", () => {
   });
 
   test.each([
-    [{ status: "CLOSED", from: "2026-03-02", to: "2026-03-01" }, "from 이 to 보다 늦다"],
-    [{ status: "CLOSED", from: "2025-01-01", to: "2026-01-02" }, "367일"],
+    [
+      { status: "CLOSED", from: "2026-03-02", to: "2026-03-01" },
+      "from 이 to 보다 늦다",
+    ],
     [{ status: "CLOSED", from: "2026-02-30" }, "없는 날짜"],
     [{ status: "CLOSED", to: "2026/03/01" }, "형식이 틀린 날짜"],
     [{ status: "DONE" }, "모르는 status"],
     [{}, "status 없음"],
-    [{ status: "OPEN", symbol: "A".repeat(13) }, "13자 종목 기호"],
+    [{ status: "OPEN", symbol: "A,B" }, "comma 단일 종목"],
   ])("%j(%s)는 요청 없이 TOSSINVEST_INVALID_INPUT 이다", async (input) => {
     const { fake, server } = setup();
     await run(fake, server, (client) =>

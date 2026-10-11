@@ -422,3 +422,141 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 - 선택지 조회, 등록, 연결 확인은 사용자별 호출 제한을 먼저 지난다. [커넥터 도구 정책](connector-policy.md) 의 「사용자별 호출 제한」 이 갖는다
 - 에이전트의 연결 목록은 그 에이전트의 주인만 읽는다. 해제한 연결은 빠지고, 붙일 수 없는 까닭은 `blockedReason` 이 `AgentConnectionsView` 의 값으로 준다
 - 바인딩마다 재시작 대기가 있다. 연결 상태 응답의 `bindings[]` 와 관리자 목록이 바인딩 상태와 재시작 대기를 함께 낸다
+
+## 토스증권 REST 전체 지원
+
+목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
+현재 6개 READ 도구가 인증·조회 8개 method/path의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었지만 나머지 33개 operation의 producer는 아직 구현하지 않았다.
+현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
+
+### 공식 기준과 완료 조건
+
+2026-10-11에 [공식 OpenAPI JSON](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)의 1.2.24, OpenAPI 3.1.0, 41 operation을 확인했다.
+원문 SHA-256은 `7e753c21dc4b938d8f9610ce3efd6542783018977cb030e39db5a006f5b59d40`이다.
+[공식 개요](https://openapi.tossinvest.com/openapi-docs/overview.md)는 호출 한도와 오류의 근거다.
+구현을 시작할 때 버전, method/path 집합, 참조 schema, 설명의 조건과 오류를 다시 대조한다.
+차이가 있으면 변경점을 기능 문서와 fixture에 반영하고 범위를 재검토한 뒤 구현한다. 과거 검색 색인을 쓰지 않는다.
+[공식 llms 안내](https://developers.tossinvest.com/llms.txt)의 JWKS 소개는 canonical paths에 없으므로 42번째 완료 조건으로 세지 않는다.
+
+완료는 41개 method/path가 아래 도구 또는 내부 인증에 연결되고 입력, 응답, 페이지, 시장 조건과 오류를 실제 HTTP 시험으로 확인한 상태다.
+HTTP 함수만 만들거나 목록에 이름만 등록한 상태는 완료가 아니다.
+구현된 operation만 fixture의 상태를 올린다. 목표 41개와 현재 연결 8개를 같은 수치로 표시하지 않는다.
+
+### 도구 입력과 결과
+
+새 도구는 아래 공식 camelCase 입력 이름을 그대로 쓴다. 기존 `get_quotes(symbols)`, `get_buying_power(currency,symbol)`과 `list_orders(status,from,to,symbol)`은 유지하고 선택 입력을 더한다.
+`get_market_calendar`는 필수 `market: KR/US`로 고정된 두 주소 중 하나를 고른다.
+API의 account 헤더는 입력에 노출하지 않는다. 연결 env의 계좌만 사용하며 모델의 계좌, URL, 토큰과 clientOrderId 입력은 거절한다.
+읽기 도구는 공식 `result`와 필요한 envelope 메타데이터를 무손실로 제공한다. 기존 snake_case 표시 필드는 호환을 위해 유지하고 공식 `result`를 추가한다.
+`get_quotes`의 공식 결과는 `{prices,stocks}`이며 각각 공식 배열이다. `get_stocks`도 별도로 등록해 이름 이외의 참조 정보를 읽는다.
+`get_holdings`는 선택 `symbol`을 추가한다. `get_sellable_quantity`는 단독 호출도 가능하게 한다.
+get_buying_power의 result는 symbol 부재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: null}, symbol 존재 시 {buyingPower: BuyingPowerResponse, sellableQuantity: SellableQuantityResponse}다. 각 값은 공식 result 전체이며 후자는 두 GET을 각각 한 번 호출한다.
+envelope 메타데이터는 result 밖의 metadata: {buyingPower: {...}, sellableQuantity: {...} | null}에 둔다. 각 객체는 해당 upstream envelope에서 result만 제외한 공식 필드를 보존하며 부재를 null로 발명하지 않는다. 현재 ApiResponse에는 result 이외 필드가 없어 {}다.
+단독 get_sellable_quantity는 result: SellableQuantityResponse와 metadata: {}를 반환한다. get_quotes는 result: {prices,stocks}, metadata: {prices: {}, stocks: {}}로 같은 규칙을 쓴다. 한 호출 실패나 schema 위반을 부분 성공/null로 숨기지 않는다.
+기존 currency/cash_buying_power/sellable_quantity 표시와 선택지 accounts/account_seq/label을 유지한다. symbol 부재의 기존 sellable_quantity는 null이다.
+producer가 schema 검증 뒤 accountNo를 끝 네 자리로 마스킹한 복사본에서 표시·result·metadata·structuredContent·content를 함께 만든다. 선택지와 오류·로그에도 계좌 원문을 싣지 않으며 표시 helper에만 마스킹을 맡기지 않는다.
+계좌번호 원문은 예외다. `list_accounts`는 `accountNo`를 끝 네 자리로 마스킹하고 `accountSeq`와 `accountType`을 보존한다. 이 제한을 설명과 결과 schema에 명시한다.
+계좌 순번의 현재 10자리 제한과 목록 행 삭제는 제거한다. 공식 int64 범위의 양의 식별자를 원문에서 정확한 10진수 문자열로 읽어 연결 env와 헤더에 사용한다.
+무손실 파싱 경계는 client.ts의 exchange → api-contract.ts의 parseApiResponse(rawText, operation, status)다. bounded 1 MiB 본문을 UTF-8로 읽은 직후 호출하며 일반 JSON.parse의 손실한 값을 producer에 먼저 돌려주지 않는다.
+Bun 1.3.14의 native JSON.parse reviver 세 번째 인자 context.source를 사용한다. reviver에서 number primitive의 원문을 holder 객체/키별 WeakMap에 보관한 다음 operation/status의 응답 schema를 따라 객체·배열·$ref·allOf를 순회해 지정 위치만 변환한다. 같은 이름인 다른 필드나 문자열은 변환하지 않는다.
+schema 위치와 출력 변환은 api-contract.ts의 응답 descriptor가 소유한다. canonical 1.2.24의 int64 위치는 Account.accountSeq와 OAuth2TokenResponse.expires_in 두 곳이다. 원문 schema를 수정하지 않고 MCP 출력 descriptor에 변환을 선언한다.
+Account.accountSeq는 항상 정규 10진수 문자열이며 1..9223372036854775807이다. 다른 int64는 -9223372036854775808..9223372036854775807에서 schema의 추가 제약을 적용하고 안전 정수는 number, 그 밖은 정규 10진수 문자열로 반환한다. expires_in은 추가로 양수여야 한다.
+expires_in의 정확한 초→ms 계산은 BigInt로 하고 안전한 Date.now()/expiresAt 표현 범위를 넘으면 발급 오류로 거절한다. token을 모델 결과에 내보내지 않는다.
+JSON integer 계약은 1.0, 1e3처럼 수학적으로 정수인 표기도 허용한다. source의 부호·계수·소수 자리·지수를 문자열로 분해해 정확한 정수성과 signed int64 범위를 검사한다. 1.5와 1e-1은 거절한다. 지수가 크면 1 MiB 본문 안에서도 자리수 비교로 조기 거절하고 큰 0 문자열을 할당하지 않는다.
+Number(value)나 반올림한 Number로 범위를 판정하지 않는다. primitive 문자열의 가짜 숫자는 그대로 두며 구문 오류는 native parser가 거절한다. context.source가 없으면 정확성을 가장하지 않고 실패한다. JSON 정규식 재작성과 새 의존성은 금지한다.
+raw fixture의 기대값은 손으로 적은 10진수 문자열/BigInt 상수에서 만든다. 2^53-1·2^53·2^53+1, 인접 큰 정수, int64 최대·초과·최소·미만, accountSeq의 0·음수, nested 배열, 같은 이름의 비schema 필드, 문자열 속 가짜 숫자, 정수 지수/소수와 비정수 표기·문법 오류를 검사한다.
+실제 tools/call의 structuredContent와 content JSON, list_accounts 선택지와 env 헤더, 표시 호환과 raw result 모두 정확한 값을 단언한다. parser 단위 시험만으로 완료하지 않는다.
+형식이 잘못된 계좌 행은 전체 응답 오류로 알리고 정상 행처럼 누락시키지 않는다. 모델이 계좌를 지정하는 입력은 계속 받지 않는다.
+기존의 이름 100자, 일반 문자열 64자 절단은 표시 필드에만 적용한다. 공식 `result`, orderId, cursor와 decimal을 자르지 않는다.
+decimal은 string 그대로 유지하고 산술이 필요하면 정확한 문자열 연산을 쓴다. 응답의 null, boolean, 배열, 음수와 unknown enum을 버리지 않는다.
+요청 enum은 공식 지원값만 허용한다. 읽기 결과의 새 enum은 그대로 전달하되 금융 준비에서는 지원을 확인하지 못한 값으로 실행하지 않는다.
+schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 일부 행을 삭제하지 않는다.
+
+### 공식 operation과 producer
+
+입력 parameter, 성공·오류 응답과 필드 제약의 정본은 [공식 OpenAPI JSON](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)이다.
+확인한 원문은 [1.2.24 fixture](../../hermes/connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)에 그대로 보존한다.
+[생성된 계약](../../hermes/connectors/tossinvest/src/api-contract.ts)은 이 fixture의 method/path, 입력, 응답과 schema를 사용한다.
+아래 표는 operationId와 MCP 도구, 권한·호출 한도 그룹, 현재 구현 상태만 연결한다. 단계는 구현 관심사의 구분이며 PR 개수가 아니다.
+
+| 공식 operationId | 도구 또는 인증 | 권한과 한도 그룹 | 현재 상태 | 단계 |
+| --- | --- | --- | --- | --- |
+| `issueOAuth2Token` | `내부 Tossinvest.token/issue` | 내부 인증; AUTH | 기반 구현 | 기반 |
+| `getOrderbook` | `get_orderbook` | READ/none; MARKET_DATA | 미연결 | 시세 |
+| `getPrices` | `get_quotes` | READ/none; MARKET_DATA | 기반 구현 | 기반 |
+| `getTrades` | `get_trades` | READ/none; MARKET_DATA | 미연결 | 시세 |
+| `getPriceLimit` | `get_price_limits` | READ/none; MARKET_DATA | 미연결 | 시세 |
+| `getCandles` | `get_candles` | READ/none; MARKET_DATA_CHART | 미연결 | 시세 |
+| `getStocks` | `get_stocks` | READ/none; STOCK | get_quotes 구현; get_stocks 미등록 | 종목 |
+| `listStocks` | `list_stocks` | READ/none; STOCK_ALL | 미연결 | 종목 |
+| `getStockWarnings` | `get_stock_warnings` | READ/none; STOCK | 미연결 | 종목 |
+| `getStockInvestorTrading` | `get_stock_investor_trading` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
+| `getStockProgramTrades` | `get_stock_program_trades` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
+| `getStockShortSelling` | `get_stock_short_selling` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
+| `getStockCreditTrades` | `get_stock_credit_trades` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
+| `getStockSecuritiesLending` | `get_stock_securities_lending` | READ/none; STOCK_TRADING_TREND | 미연결 | 종목 |
+| `getExchangeRate` | `get_exchange_rate` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
+| `getKrMarketCalendar` | `get_market_calendar(market=KR)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
+| `getUsMarketCalendar` | `get_market_calendar(market=US)` | READ/none; MARKET_INFO | 미연결 | 시장 일정 |
+| `getRankings` | `get_rankings` | READ/none; RANKING | 미연결 | 랭킹·지표 |
+| `getMarketIndicatorPrices` | `get_market_indicator_prices` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
+| `getMarketIndicatorCandles` | `get_market_indicator_candles` | READ/none; MARKET_INDICATOR_CHART | 미연결 | 랭킹·지표 |
+| `getMarketIndicatorInvestorTrading` | `get_market_indicator_investor_trading` | READ/none; MARKET_INDICATOR | 미연결 | 랭킹·지표 |
+| `listSectors` | `list_sectors` | READ/none; SECTOR | 미연결 | 섹터 |
+| `getSectorRankings` | `get_sector_rankings` | READ/none; SECTOR_RANKING | 미연결 | 섹터 |
+| `getSector` | `get_sector` | READ/none; SECTOR | 미연결 | 섹터 |
+| `getSectorStocks` | `get_sector_stocks` | READ/none; SECTOR | 미연결 | 섹터 |
+| `getSectorEtfs` | `get_sector_etfs` | READ/none; SECTOR | 미연결 | 섹터 |
+| `getAccounts` | `list_accounts` | READ/none; ACCOUNT | 기반 구현 | 기반 |
+| `getHoldings` | `get_holdings` | READ/none; ASSET | 기반 구현 | 기반 |
+| `getOrders` | `list_orders` | READ/none; ORDER_HISTORY | 기반 구현 | 기반 |
+| `createOrder` | `create_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
+| `getOrder` | `get_order` | READ/none; ORDER_HISTORY | 미연결 | 일반주문 |
+| `modifyOrder` | `modify_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
+| `cancelOrder` | `cancel_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
+| `createConditionalOrder` | `create_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
+| `getConditionalOrders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | 미연결 | 조건 조회 |
+| `getConditionalOrder` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | 미연결 | 조건 조회 |
+| `cancelConditionalOrder` | `cancel_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
+| `modifyConditionalOrder` | `modify_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
+| `getBuyingPower` | `get_buying_power` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
+| `getSellableQuantity` | `get_sellable_quantity` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
+| `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 미연결 | 일반주문 |
+
+### 필드 계약
+
+공식 schema와 예시는 위 fixture와 생성된 계약에서 확인한다. 이 문서는 필드 표를 따로 복제하지 않는다.
+오류 code는 공식 예시의 값이며 폐쇄된 enum이 아니다. 공통 인증·IP·maintenance 오류는 [공식 개요](https://openapi.tossinvest.com/openapi-docs/overview.md)도 함께 확인한다.
+
+1.2.24의 StockInfo schema는 englishName을 필수로 선언하지만 같은 원문의 getStocks ETF 성공 예시는 이를 생략하고 securityType을 ETF로 제공한다.
+이 불일치에 한해 StockInfo의 securityType이 ETF일 때 englishName 부재를 허용한다. 누락 값을 채우지 않으며 존재하는 englishName의 타입은 그대로 검증한다.
+일반 주식·다른 분류와 다른 필수 필드에는 이 호환 처리를 적용하지 않는다. 실제 API 응답 형태는 이번 loopback 검증의 범위 밖이다.
+현재 7개 READ operation의 공식 성공 예시 20개와 공식 ETF·일반 종목의 실제 MCP SDK 호출을 회귀로 검사한다.
+
+### 페이지와 시장별 조건
+
+| 대상 | 지원 계약 |
+| --- | --- |
+| prices, stocks | 공식 최대 200종목을 허용한다. 단일 symbol에는 쉼표를 허용하지 않고 공식 pattern을 적용하며 임의 12자 제한은 제거한다. 금융 저장의 32자 제한은 별도 보호 계약으로 명시한다 |
+| candles | `interval=1m/1d`, `count=1..200`, `before`, `adjusted`를 지원한다. nextBefore를 다음 before에 그대로 전달하고 마지막 null을 보존한다. 시간대의 +는 URLSearchParams로 인코딩한다 |
+| stocks/all | 공식 market/status/securityType/commonShare 필터를 모두 지원한다. 공식 페이징이 없는 전량 응답을 임의 cursor로 바꾸지 않는다 |
+| 종목 수급 5개 | 국내 종목만 지원한다. count=1..100, until은 실제 날짜로 검사하며 응답의 잠정·확정 값과 null을 보존한다. nextUntil을 다음 until에 그대로 전달하고 null이면 종료한다 |
+| exchange-rate | baseCurrency/quoteCurrency와 선택 dateTime을 지원한다. 참고용 표시 환율을 주문 체결 환율로 설명하지 않는다 |
+| KR/US calendar | 시장별 영업일, KRX/NXT와 미국 세션, 시간대·서머타임을 원문대로 전달한다. 날짜 미지정은 공식 현재일 기준이며 UTC 날짜로 임의 치환하지 않는다 |
+| rankings | 6종 type, KR/US, 7종 duration, excludeInvestmentCaution, count를 모두 제공한다. TOP_GAINERS/TOP_LOSERS에는 realtime 금지다. 시장 전체와 토스 체결 기준, 기간 시작값과 전일 기준값을 구분한다. 빈 rankings와 rankedAt=null도 정상이다 |
+| market indicators | KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y만 시세·일봉을 지원한다. 분봉은 지수만, investor-trading은 KOSPI/KOSDAQ와 1d/1w/1mo/1y만 지원한다 |
+| sectors | 목록·랭킹·상세·주식·ETF의 5개 조회다. 계층 0/1/2와 여러 섹터 소속, KR/US 차이와 빈 목록을 보존한다 |
+| orders OPEN | 공식 전량을 보존하고 100건으로 자르지 않는다. limit/cursor는 upstream이 무시하며 from/to는 KST orderedAt 날짜 필터다 |
+| orders CLOSED | limit=1..100, 기본 20과 opaque cursor를 노출한다. nextCursor/hasNext를 보존하고 마지막 페이지에서 커서를 만들지 않는다. 임의 366일 제한은 제거한다 |
+| conditional-orders | OPEN/CLOSED 모두 cursor/limit 페이지를 지원한다. 다른 채널의 주문도 조회한다. 응답 PROFIT_RATE는 읽되 ConditionRequest에 없는 생성 필드를 발명하지 않는다 |
+| 큰 응답 | 1 MiB 상한과 4초 HTTP timeout을 유지한다. 공식 페이지가 있으면 사용자가 다음 페이지를 읽는다. 페이지가 없는 큰 응답은 명확한 크기 초과 오류로 끝내며 몰래 일부 행을 남기지 않는다 |
+
+### 요청 경계와 시험
+
+API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`하고 query는 URLSearchParams로 만든다.
+조회는 GET과 body 없음, 공식 계좌 대상만 env의 계좌 헤더를 사용한다. redirect와 프록시 경유를 허용하지 않는다.
+기존 Bun `FakeToss`와 실제 MCP 등록을 사용해 method, URL, query, header와 body를 검증한다.
+공식 예시의 모든 필드, nullable, 긴 decimal과 cursor, 빈 결과와 여러 페이지를 검사한다.
+잘못된 입력은 HTTP 0회이고 429, 5xx, timeout, credential/IP/revoke, malformed, 응답 크기 초과를 각 도구 그룹에서 검사한다.
+소스 AST와 자체 복제 schema의 일치만으로 통과시키지 않는다. 빌드한 bundle의 SDK 호출이 로컬 HTTP 목적지에 도달해야 한다.
+CI의 `hermes` job과 `scripts/check-connectors.sh`가 새 시험을 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
