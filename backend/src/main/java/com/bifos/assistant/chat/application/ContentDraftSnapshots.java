@@ -42,6 +42,7 @@ public class ContentDraftSnapshots {
     private final Clock clock;
     private final ChatAttachmentRepository attachments;
 
+
     public ContentDraftSnapshotView preview(CurrentUser user, Long conversationId, UUID draftId, long revision,
         Long bindingId, Long originExecutionId) {
         access.requireOwn(user, conversationId);
@@ -60,6 +61,7 @@ public class ContentDraftSnapshots {
             return accept(user, conversationId, draftId, revision, before, result, false);
         }
     }
+
 
     private ContentDraftSnapshotView accept(CurrentUser user, Long conversationId, UUID draftId, long revision,
         ContentDraftSnapshotInput before, JsonNode result, boolean insert) {
@@ -87,6 +89,7 @@ public class ContentDraftSnapshots {
         });
     }
 
+
     public ContentDraftSnapshotView readCurrentSnapshot(CurrentUser user, Long conversationId, UUID snapshotId) {
         access.requireOwn(user, conversationId);
         var row = requireOwned(user, conversationId, snapshotId);
@@ -97,6 +100,7 @@ public class ContentDraftSnapshots {
             return view(requireOwned(user, conversationId, snapshotId), input);
         });
     }
+
 
     @Transactional(propagation = Propagation.MANDATORY)
     public ContentDraftSnapshotInput requireCurrentSnapshotParticipant(CurrentUser user, Long conversationId, UUID snapshotId) {
@@ -119,6 +123,7 @@ public class ContentDraftSnapshots {
             input.canonicalDraft(), input.resolvedAssets(), row.expiresAt());
     }
 
+
     private ContentDraftSnapshotInput current(CurrentUser user, Long conversationId, UUID draftId, long revision,
         Long originId, ContentDraftBindingStamp stamp) {
         bindings.requireUnchanged(user, stamp);
@@ -127,10 +132,12 @@ public class ContentDraftSnapshots {
         return input;
     }
 
+
     private ContentDraftSnapshot requireOwned(CurrentUser user, Long conversationId, UUID snapshotId) {
         return snapshots.findByPublicIdAndOwnerUserIdAndConversationId(snapshotId, user.id(), conversationId)
             .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다."));
     }
+
 
     private static void requireStamp(ContentDraftSnapshot row, ContentDraftBindingStamp stamp) {
         if (!row.connectionId().equals(stamp.connectionId()) || !row.bindingUpdatedAt().equals(stamp.bindingUpdatedAt())
@@ -138,6 +145,7 @@ public class ContentDraftSnapshots {
             throw ContentDraftSnapshotInputs.stale();
         }
     }
+
 
     private ContentDraftSnapshotView view(ContentDraftSnapshot row, ContentDraftSnapshotInput input) {
         var canonical = json.treeToValue(input.canonicalDraft(), CanonicalDraft.class);
@@ -149,6 +157,7 @@ public class ContentDraftSnapshots {
         return new ContentDraftSnapshotView(row.publicId(), canonical.draftId(), canonical.revision(), row.snapshotHash(), canonical,
             assetIds, omitted, row.expiresAt());
     }
+
 
     private static ChatContentMutationTarget target(Long conversationId) {
         return new ChatContentMutationTarget(conversationId, List.of());

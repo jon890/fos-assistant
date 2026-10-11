@@ -16,6 +16,7 @@ public record ConnectorSnapshotDeclaration(String protocol, String compileTool, 
         }
     }
 
+
     public static ConnectorSnapshotDeclaration read(JsonNode node, List<ConnectorTool> publicTools) {
         if (node == null) {
             return null;
@@ -33,6 +34,7 @@ public record ConnectorSnapshotDeclaration(String protocol, String compileTool, 
             Map.of("compile", true, "start", false, "status", false));
     }
 
+
     public static void requireCompileOnly(JsonNode caps) {
         if (!caps.isObject() || !caps.propertyNames().equals(Set.of("compile", "start", "status"))
             || !caps.path("compile").isBoolean() || !caps.path("compile").booleanValue()
@@ -41,6 +43,7 @@ public record ConnectorSnapshotDeclaration(String protocol, String compileTool, 
             throw new IllegalStateException("snapshot capability를 확인하지 못했습니다.");
         }
     }
+
 
     private static String text(JsonNode node, String key) {
         var value = node.path(key);

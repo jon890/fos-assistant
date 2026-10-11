@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.sql.Connection;
 import java.util.Locale;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.sql.DriverManager;
@@ -22,9 +21,11 @@ import org.junit.jupiter.api.Test;
 class ContentDraftSnapshotMigrationTest {
     private String[] database;
 
+
     String[] createDatabase() {
         return new String[] {"jdbc:h2:mem:snapshot-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""};
     }
+
 
     @BeforeEach
     void migrate() throws SQLException {
@@ -38,6 +39,7 @@ class ContentDraftSnapshotMigrationTest {
             .outOfOrder(true).load().migrate();
         assertThat(count("content_draft_revision")).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("두 표의 NULL 유일 제약 논리 참조와 terminal 이력을 보존한다")
@@ -61,6 +63,7 @@ class ContentDraftSnapshotMigrationTest {
         assertThat(count("content_draft_snapshot")).isEqualTo(2);
         assertThat(count("content_draft_job")).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("snapshot 칸에는 본문이 없고 job 승인 칸은 nullable이며 owner 대화 색인이 있다")
@@ -95,6 +98,7 @@ class ContentDraftSnapshotMigrationTest {
         }
     }
 
+
     private String snapshot(int id, int revisionId, int bindingId) {
         return "insert into content_draft_snapshot(id,public_id,revision_id,owner_user_id,conversation_id,origin_execution_id,agent_id,connection_id,binding_id,connection_updated_at,binding_updated_at,policy_fingerprint,schema_version,compiler_version,payload_fingerprint,snapshot_hash,created_at,expires_at) values("
             + id + ",X'" + String.format("%032x", id) + "'," + revisionId + ",1,1,1,1,1," + bindingId
@@ -102,22 +106,27 @@ class ContentDraftSnapshotMigrationTest {
             + "','" + "c".repeat(64) + "',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)";
     }
 
+
     private String job(int id, int snapshotId, int actionId) {
         return "insert into content_draft_job(id,snapshot_id,action_id,owner_user_id,conversation_id,status,created_at) values("
             + id + "," + snapshotId + "," + actionId + ",1,1,'PREVIEW_READY',CURRENT_TIMESTAMP)";
     }
 
+
     private int count(String table) throws SQLException {
         try (var connection = DriverManager.getConnection(database[0], database[1], database[2]);
-            var statement = connection.createStatement(); var rows = statement.executeQuery("select count(*) from " + table)) {
+            var statement = connection.createStatement();
+            var rows = statement.executeQuery("select count(*) from " + table)) {
             rows.next();
             return rows.getInt(1);
         }
     }
 
+
     private static String tableName(Connection connection, String table) throws SQLException {
         return connection.getMetaData().storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
     }
+
 
     private void execute(String sql) throws SQLException {
         try (var connection = DriverManager.getConnection(database[0], database[1], database[2]); var statement = connection.createStatement()) {

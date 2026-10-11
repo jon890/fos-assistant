@@ -3,7 +3,6 @@ package com.bifos.assistant.chat;
 import java.util.HexFormat;
 import tools.jackson.databind.node.ObjectNode;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
@@ -14,6 +13,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ContentDraftSnapshotHashTest {
     private final JsonMapper json = JsonMapper.builder().build();
+
 
     @Test
     @DisplayName("공유 golden의 비BMP slash null tuple과 두 해시가 일치한다")

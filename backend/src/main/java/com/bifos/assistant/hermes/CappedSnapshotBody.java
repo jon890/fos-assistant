@@ -14,16 +14,19 @@ final class CappedSnapshotBody implements BodySubscriber<byte[]> {
     private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
     private Flow.Subscription subscription;
 
+
     @Override
     public CompletionStage<byte[]> getBody() {
         return body;
     }
+
 
     @Override
     public void onSubscribe(Flow.Subscription value) {
         subscription = value;
         value.request(1);
     }
+
 
     @Override
     public void onNext(List<ByteBuffer> chunks) {
@@ -40,10 +43,12 @@ final class CappedSnapshotBody implements BodySubscriber<byte[]> {
         subscription.request(1);
     }
 
+
     @Override
     public void onError(Throwable ignored) {
         body.completeExceptionally(new IllegalStateException("snapshot 응답 중단"));
     }
+
 
     @Override
     public void onComplete() {

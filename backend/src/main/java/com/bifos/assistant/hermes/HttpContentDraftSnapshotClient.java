@@ -26,6 +26,7 @@ public class HttpContentDraftSnapshotClient {
     private final HermesProperties properties;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
+
     public JsonNode compile(String profile, String connectorId, JsonNode canonicalDraft, JsonNode resolvedAssets) {
         if (TransactionSynchronizationManager.isActualTransactionActive() || !SLOTS.tryAcquire()) {
             throw unavailable();
@@ -87,9 +88,11 @@ public class HttpContentDraftSnapshotClient {
         }
     }
 
+
     private static ApiException unavailable() {
         return new ApiException(ErrorCode.CONTENT_DRAFT_UNAVAILABLE, "원고를 사용할 수 없습니다.");
     }
+
 
     private static boolean hash(JsonNode value) {
         return value.isString() && value.stringValue().matches("[0-9a-f]{64}");

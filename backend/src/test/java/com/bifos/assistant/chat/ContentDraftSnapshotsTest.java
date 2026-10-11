@@ -7,14 +7,12 @@ import java.lang.reflect.InvocationTargetException;
 import tools.jackson.databind.node.ObjectNode;
 import tools.jackson.databind.node.ArrayNode;
 
-
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.application.model.ContentDraftSnapshotView;
 import com.bifos.assistant.chat.application.model.ChatContentMutationTarget;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import org.springframework.transaction.IllegalTransactionStateException;
-
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -66,23 +64,37 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 class ContentDraftSnapshotsTest extends ContentDraftFixture {
-    @Autowired ContentDraftSnapshots snapshots;
-    @Autowired ContentDraftSnapshotInputs snapshotInputs;
-    @Autowired ContentDraftBindingAccess bindingAccess;
-    @Autowired ContentDraftSnapshotRepository snapshotRows;
-    @Autowired ContentDraftJobRepository jobRows;
-    @Autowired AgentRepository agents;
-    @Autowired AgentExecutionRepository executions;
-    @Autowired AllowedPersonRepository people;
-    @Autowired PersonAccessService personAccess;
-    @Autowired ConnectorConnectionRepository connections;
-    @Autowired ConnectorBindingRepository bindings;
-    @Autowired HermesConnectorClient catalog;
-    @Autowired HttpContentDraftSnapshotClient compiler;
+    @Autowired
+    ContentDraftSnapshots snapshots;
+    @Autowired
+    ContentDraftSnapshotInputs snapshotInputs;
+    @Autowired
+    ContentDraftBindingAccess bindingAccess;
+    @Autowired
+    ContentDraftSnapshotRepository snapshotRows;
+    @Autowired
+    ContentDraftJobRepository jobRows;
+    @Autowired
+    AgentRepository agents;
+    @Autowired
+    AgentExecutionRepository executions;
+    @Autowired
+    AllowedPersonRepository people;
+    @Autowired
+    PersonAccessService personAccess;
+    @Autowired
+    ConnectorConnectionRepository connections;
+    @Autowired
+    ConnectorBindingRepository bindings;
+    @Autowired
+    HermesConnectorClient catalog;
+    @Autowired
+    HttpContentDraftSnapshotClient compiler;
     ConnectorBinding binding;
     AgentExecution origin;
     AllowedPerson person;
     UUID draftId;
+
 
     @BeforeEach
     void prepareSnapshot() {
@@ -115,6 +127,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         draftId = drafts.create(owner, conversation.id(), inputDraft("비밀 원고 😀", true)).draft().draftId();
     }
 
+
     @AfterEach
     void removeSnapshots() {
         jobRows.deleteAll();
@@ -126,6 +139,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         agents.deleteById(binding.agent().id());
         people.deleteById(person.id());
     }
+
 
     @Test
     @DisplayName("REST long revision과 HTTP 정수 응답은 실제 Spring 저장 경로에서 같은 tuple이다")
@@ -157,6 +171,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         }
     }
 
+
     @Test
     @DisplayName("REST 원고의 반복 preview는 같은 snapshot과 암호화 본문 한 곳을 보존한다")
     void reusesSnapshotAndKeepsOnlyEncryptedRevisionBody() {
@@ -170,17 +185,20 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(revisionRows.findAll()).allSatisfy(row -> assertThat(row.body()).startsWith("v1.").doesNotContain("비밀"));
     }
 
+
     @Test
     @DisplayName("compiler를 기다리는 동안 실제 revision 수정이 커밋되면 snapshot을 남기지 않는다")
     void rejectsRevisionCommittedDuringCompiler() throws Exception {
         race(() -> drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", false)), ErrorCode.CONTENT_DRAFT_STALE);
     }
 
+
     @Test
     @DisplayName("compiler를 기다리는 동안 실제 허용 목록 철회가 커밋되면 snapshot을 남기지 않는다")
     void rejectsPermissionRevokedDuringCompiler() throws Exception {
         race(() -> personAccess.setEnabled(person.id(), false), ErrorCode.CONTENT_DRAFT_UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("compiler를 기다리는 동안 원본 byte를 교체하면 snapshot을 남기지 않는다")
@@ -195,6 +213,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
             }
         }, ErrorCode.CONTENT_DRAFT_STALE);
     }
+
 
     @Test
     @DisplayName("두 동시 preview가 같은 owner snapshot을 반환한다")
@@ -213,6 +232,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(snapshotRows.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("owner와 대화 ACL을 UUID와 해시보다 먼저 검사한다")
     void checksOwnerAndConversationBeforeSnapshot() {
@@ -223,6 +243,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         code(() -> snapshots.readCurrentSnapshot(owner, another.id(), row.snapshotId()), ErrorCode.CONVERSATION_NOT_FOUND);
         assertThat(snapshotRows.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("삭제 요청 만료 미전송 타대화와 참조 누락은 snapshot을 거절한다")
@@ -241,6 +262,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         code(this::preview, ErrorCode.CONTENT_DRAFT_STALE);
         assertThat(snapshotRows.count()).isZero();
     }
+
 
     @Test
     @DisplayName("실제 UNIQUE 실패 트랜잭션 뒤 새 owner 범위 읽기로 동일 snapshot을 찾는다")
@@ -264,6 +286,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(preview().snapshotId()).isEqualTo(first.snapshotId());
     }
 
+
     @Test
     @DisplayName("고정 관찰 대응을 다시 검증하고 중복 첨부 입력과 변조 compiler tuple을 거절한다")
     void revalidatesObservationAndRejectsCompilerDuplicateAssets() {
@@ -286,6 +309,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(snapshotRows.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("독립 진입과 MANDATORY 참가를 혼용하면 실패한다")
     void enforcesParticipantAndSingleCoordinatorEntry() {
@@ -299,6 +323,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(input.toString()).isEqualTo("ContentDraftSnapshotInput[redacted]");
     }
 
+
     @Test
     @DisplayName("binding 해제와 만료 뒤에도 기존 snapshot 이력은 남는다")
     void keepsHistoryAfterBindingRemovalAndExpiry() {
@@ -311,9 +336,11 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         assertThat(snapshotRows.count()).isEqualTo(1);
     }
 
+
     private ContentDraftSnapshotView preview() {
         return snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), origin.id());
     }
+
 
     private void race(Runnable change, ErrorCode expected) throws Exception {
         var entered = new CountDownLatch(1);

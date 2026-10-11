@@ -12,15 +12,18 @@ public record ContentDraftSnapshotInput(UUID snapshotId, Long revisionId, Long o
         resolvedAssets = resolvedAssets.deepCopy();
     }
 
+
     @Override
     public JsonNode canonicalDraft() {
         return canonicalDraft.deepCopy();
     }
 
+
     @Override
     public JsonNode resolvedAssets() {
         return resolvedAssets.deepCopy();
     }
+
 
     @Override
     public String toString() {

@@ -25,6 +25,7 @@ public class ConnectorContentDraftBindings implements ContentDraftBindingAccess 
     private final ConnectorCatalogCache catalog;
     private final UserAccessPolicy users;
 
+
     @Override
     public ContentDraftBindingStamp prepare(CurrentUser user, Long agentId, Long bindingId) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -32,21 +33,22 @@ public class ConnectorContentDraftBindings implements ContentDraftBindingAccess 
         }
         var stamp = requireCurrent(user, agentId, bindingId);
         try {
-        var manifest = catalog.find(stamp.connectorId()).orElseThrow(ContentDraftSnapshotHash::unavailable);
-        var declaration = manifest.snapshot();
-        if (declaration == null) {
-            throw ContentDraftSnapshotHash.unavailable();
-        }
-        var tuple = JSON.createArrayNode().add(declaration.protocol()).add(declaration.compileTool())
-            .add(declaration.startTool()).add(declaration.statusTool()).add(true).add(false).add(false);
-        tuple.add(JSON.valueToTree(manifest.tools().stream().sorted(Comparator.comparing(tool -> tool.name())).toList()));
-        return new ContentDraftBindingStamp(stamp.agentId(), stamp.connectionId(), stamp.bindingId(),
-            stamp.connectionUpdatedAt(), stamp.bindingUpdatedAt(), stamp.profile(), stamp.connectorId(),
-            ContentDraftSnapshotHash.hash(ContentDraftSnapshotHash.bytes(tuple)));
+            var manifest = catalog.find(stamp.connectorId()).orElseThrow(ContentDraftSnapshotHash::unavailable);
+            var declaration = manifest.snapshot();
+            if (declaration == null) {
+                throw ContentDraftSnapshotHash.unavailable();
+            }
+            var tuple = JSON.createArrayNode().add(declaration.protocol()).add(declaration.compileTool())
+                .add(declaration.startTool()).add(declaration.statusTool()).add(true).add(false).add(false);
+            tuple.add(JSON.valueToTree(manifest.tools().stream().sorted(Comparator.comparing(tool -> tool.name())).toList()));
+            return new ContentDraftBindingStamp(stamp.agentId(), stamp.connectionId(), stamp.bindingId(),
+                stamp.connectionUpdatedAt(), stamp.bindingUpdatedAt(), stamp.profile(), stamp.connectorId(),
+                ContentDraftSnapshotHash.hash(ContentDraftSnapshotHash.bytes(tuple)));
         } catch (RuntimeException ignored) {
             throw ContentDraftSnapshotHash.unavailable();
         }
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -63,6 +65,7 @@ public class ConnectorContentDraftBindings implements ContentDraftBindingAccess 
         return new ContentDraftBindingStamp(agent.id(), connection.id(), binding.id(), connection.updatedAt(),
             binding.updatedAt(), agent.hermesProfile(), connection.connectorId(), null);
     }
+
 
     @Override
     public void requireUnchanged(CurrentUser user, ContentDraftBindingStamp stamp) {

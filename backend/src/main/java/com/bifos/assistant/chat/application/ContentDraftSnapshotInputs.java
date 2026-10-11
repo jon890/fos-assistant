@@ -6,7 +6,6 @@ import java.util.List;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-
 import com.bifos.assistant.chat.application.model.CanonicalDraft;
 import com.bifos.assistant.chat.application.model.ContentDraftInput;
 import com.bifos.assistant.chat.domain.entity.ContentDraftAsset;
@@ -61,6 +60,7 @@ public class ContentDraftSnapshotInputs {
     private final ObjectMapper json;
     private final Clock clock;
 
+
     public Long agent(CurrentUser user, Long conversationId, Long originId) {
         access.requireOwn(user, conversationId);
         if (originId == null || !users.allowed(user.id())) {
@@ -75,6 +75,7 @@ public class ContentDraftSnapshotInputs {
         }
         return origin.agentId();
     }
+
 
     public ContentDraftSnapshotInput read(CurrentUser user, Long conversationId, UUID draftId, long revision,
         Long originId, ContentDraftBindingStamp binding) {
@@ -118,69 +119,72 @@ public class ContentDraftSnapshotInputs {
         }
     }
 
+
     private JsonNode resolve(CurrentUser user, Long conversationId, List<ContentDraftAsset> links,
         ContentDraftInput input) throws IOException {
-            var resolved = new HashMap<Long, ObjectNode>();
-            var order = new HashMap<Long, Integer>();
-            attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId).stream()
-                .filter(it -> it.messageId() != null).forEach(it -> order.put(it.id(), order.size() + 1));
-            for (var link : links) {
-                var value = resolveAsset(user, conversationId, link, input, order);
-                var previous = resolved.putIfAbsent(link.attachmentId(), value);
-                if (previous != null && value.has("observationNote")) {
-                    if (previous.has("observationNote") && !previous.get("observationNote").equals(value.get("observationNote"))) {
-                        throw stale();
-                    }
-                    previous.set("observationNote", value.get("observationNote"));
+        var resolved = new HashMap<Long, ObjectNode>();
+        var order = new HashMap<Long, Integer>();
+        attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId).stream()
+            .filter(it -> it.messageId() != null).forEach(it -> order.put(it.id(), order.size() + 1));
+        for (var link : links) {
+            var value = resolveAsset(user, conversationId, link, input, order);
+            var previous = resolved.putIfAbsent(link.attachmentId(), value);
+            if (previous != null && value.has("observationNote")) {
+                if (previous.has("observationNote") && !previous.get("observationNote").equals(value.get("observationNote"))) {
+                    throw stale();
                 }
+                previous.set("observationNote", value.get("observationNote"));
             }
-            if (links.size() != input.blocks().valueStream().filter(it -> "image".equals(it.path("type").stringValue())).count()) {
-                throw stale();
-            }
-            var resolvedAssets = json.createArrayNode();
-            resolved.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(it -> resolvedAssets.add(it.getValue()));
+        }
+        if (links.size() != input.blocks().valueStream().filter(it -> "image".equals(it.path("type").stringValue())).count()) {
+            throw stale();
+        }
+        var resolvedAssets = json.createArrayNode();
+        resolved.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(it -> resolvedAssets.add(it.getValue()));
         return resolvedAssets;
     }
 
+
     private ObjectNode resolveAsset(CurrentUser user, Long conversationId, ContentDraftAsset link,
         ContentDraftInput input, Map<Long, Integer> order) throws IOException {
-                var block = input.blocks().get(link.position());
-                if (block == null || !"image".equals(block.path("type").stringValue())
-                    || !link.attachmentId().toString().equals(block.path("assetId").stringValue())) {
-                    throw stale();
-                }
-                var ref = block.get("observationRef");
-                if (ref == null ? link.observationId() != null : !ref.path("id").stringValue().equals(String.valueOf(link.observationId()))
-                    || ref.path("revision").longValue() != link.observationRevision()) {
-                    throw stale();
-                }
-                var attachment = attachments.findById(link.attachmentId()).orElseThrow(ContentDraftSnapshotInputs::stale);
-                if (!link.sourceFingerprint().equals(AttachmentFingerprint.read(store, attachment))) {
-                    throw stale();
-                }
-                var value = json.createObjectNode().put("assetId", link.attachmentId().toString())
-                    .put("sourceFingerprint", link.sourceFingerprint()).put("fileName", attachment.storedName())
-                    .put("photoDir", properties.agentRoot().replaceAll("/+$", "") + "/users/"
-                        + AttachmentStore.userDirectoryKey(user.id()) + "/" + conversationId)
-                    .put("ordinal", order.get(link.attachmentId()));
-                if (link.observationId() != null) {
-                    var observation = observations.findById(link.observationId()).orElseThrow(ContentDraftSnapshotInputs::stale);
-                    var summary = json.readTree(observationBodies.open(observation, user.id()).orElseThrow(ContentDraftSnapshotHash::unavailable)).get("summary");
-                    if (summary != null && summary.isString()) {
-                        String note = summary.stringValue();
-                        value.put("observationNote", note.substring(0, note.offsetByCodePoints(0, Math.min(300, note.codePointCount(0, note.length())))));
-                    }
-                }
-                String name = attachment.storedName();
-                String directory = value.path("photoDir").stringValue();
-                if (!name.matches("(?i)[A-Za-z0-9._-]+\\.(jpg|jpeg|png|webp|gif|heic)") || name.contains("..")
-                    || name.toLowerCase(Locale.ROOT).endsWith(".small.jpg") || name.getBytes(StandardCharsets.UTF_8).length > 255
-                    || !directory.startsWith("/") || directory.indexOf(0) >= 0 || List.of(directory.split("/")).contains("..")
-                    || directory.getBytes(StandardCharsets.UTF_8).length > 4096) {
-                    throw ContentDraftSnapshotHash.unavailable();
-                }
+        var block = input.blocks().get(link.position());
+        if (block == null || !"image".equals(block.path("type").stringValue())
+            || !link.attachmentId().toString().equals(block.path("assetId").stringValue())) {
+            throw stale();
+        }
+        var ref = block.get("observationRef");
+        if (ref == null ? link.observationId() != null : !ref.path("id").stringValue().equals(String.valueOf(link.observationId()))
+            || ref.path("revision").longValue() != link.observationRevision()) {
+            throw stale();
+        }
+        var attachment = attachments.findById(link.attachmentId()).orElseThrow(ContentDraftSnapshotInputs::stale);
+        if (!link.sourceFingerprint().equals(AttachmentFingerprint.read(store, attachment))) {
+            throw stale();
+        }
+        var value = json.createObjectNode().put("assetId", link.attachmentId().toString())
+            .put("sourceFingerprint", link.sourceFingerprint()).put("fileName", attachment.storedName())
+            .put("photoDir", properties.agentRoot().replaceAll("/+$", "") + "/users/"
+                + AttachmentStore.userDirectoryKey(user.id()) + "/" + conversationId)
+            .put("ordinal", order.get(link.attachmentId()));
+        if (link.observationId() != null) {
+            var observation = observations.findById(link.observationId()).orElseThrow(ContentDraftSnapshotInputs::stale);
+            var summary = json.readTree(observationBodies.open(observation, user.id()).orElseThrow(ContentDraftSnapshotHash::unavailable)).get("summary");
+            if (summary != null && summary.isString()) {
+                String note = summary.stringValue();
+                value.put("observationNote", note.substring(0, note.offsetByCodePoints(0, Math.min(300, note.codePointCount(0, note.length())))));
+            }
+        }
+        String name = attachment.storedName();
+        String directory = value.path("photoDir").stringValue();
+        if (!name.matches("(?i)[A-Za-z0-9._-]+\\.(jpg|jpeg|png|webp|gif|heic)") || name.contains("..")
+            || name.toLowerCase(Locale.ROOT).endsWith(".small.jpg") || name.getBytes(StandardCharsets.UTF_8).length > 255
+            || !directory.startsWith("/") || directory.indexOf(0) >= 0 || List.of(directory.split("/")).contains("..")
+            || directory.getBytes(StandardCharsets.UTF_8).length > 4096) {
+            throw ContentDraftSnapshotHash.unavailable();
+        }
         return value;
     }
+
 
     public static ContentDraftException stale() {
         return new ContentDraftException(ErrorCode.CONTENT_DRAFT_STALE, null);

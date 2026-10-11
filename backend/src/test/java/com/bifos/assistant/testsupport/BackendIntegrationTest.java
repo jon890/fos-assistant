@@ -57,14 +57,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * 차지하고, 보관한 컨텍스트가 검사 JVM 힙을 채운다. 이 주석을 단 검사는 아래를 함께 쓴다.
  *
  * <ul>
- *   <li>웹 환경은 {@code RANDOM_PORT} 다. 실제 HTTP 로 부르는 검사와 아닌 검사가 같은 컨텍스트를 쓴다
- *   <li>Hermes 실행은 {@link IntegrationTestDoubles} 의 {@code StubHermesRunsClient} 가 받는다
- *   <li>시계는 {@link TestClock} 이다. 검사가 정하지 않으면 실제 시각을 준다
- *   <li>Hermes 의 사건 스트림, toolset, 커넥터, 스킬, 모델, 대시보드 클라이언트는 Mockito mock 이다. 검사는 {@code @Autowired}
- *       로 받아 동작을 정한다. mock 은 검사마다 초기화된다
- *   <li>검사가 동작을 바꾸거나 호출을 확인하는 운영 빈 몇 개는 Mockito spy 다. 정하지 않으면 실제 동작 그대로다
- *   <li>요청 밖 작업은 {@link TrackingBackgroundTasks} 가 띄운다. {@link IntegrationTestIsolation} 이 검사가 끝날 때 그 작업이
- *       모두 끝나기를 기다리고 대역과 시계를 되돌린다
+ * <li>웹 환경은 {@code RANDOM_PORT} 다. 실제 HTTP 로 부르는 검사와 아닌 검사가 같은 컨텍스트를 쓴다
+ * <li>Hermes 실행은 {@link IntegrationTestDoubles} 의 {@code StubHermesRunsClient} 가 받는다
+ * <li>시계는 {@link TestClock} 이다. 검사가 정하지 않으면 실제 시각을 준다
+ * <li>Hermes 의 사건 스트림, toolset, 커넥터, 스킬, 모델, 대시보드 클라이언트는 Mockito mock 이다. 검사는 {@code @Autowired}
+ * 로 받아 동작을 정한다. mock 은 검사마다 초기화된다
+ * <li>검사가 동작을 바꾸거나 호출을 확인하는 운영 빈 몇 개는 Mockito spy 다. 정하지 않으면 실제 동작 그대로다
+ * <li>요청 밖 작업은 {@link TrackingBackgroundTasks} 가 띄운다. {@link IntegrationTestIsolation} 이 검사가 끝날 때 그 작업이
+ * 모두 끝나기를 기다리고 대역과 시계를 되돌린다
  * </ul>
  *
  * <p>설정을 바꾸는 검사는 {@link OverrideProperties} 를 더한다. {@link IntegrationTestIsolation} 이 검사마다 적용하고 되돌리므로
@@ -81,47 +81,48 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 @ActiveProfiles("test")
 @Import(IntegrationTestDoubles.class)
 @MockitoBean(
-        types = {
-            HermesRunEventStream.class,
-            HermesToolsetClient.class,
-            HermesConnectorClient.class,
-            HttpContentDraftSnapshotClient.class,
-            HermesSkillClient.class,
-            HermesModelClient.class,
-            HermesDashboardClient.class
-        })
+    types = {
+        HermesRunEventStream.class,
+        HermesToolsetClient.class,
+        HermesConnectorClient.class,
+        HttpContentDraftSnapshotClient.class,
+        HermesSkillClient.class,
+        HermesModelClient.class,
+        HermesDashboardClient.class
+    })
 @MockitoSpyBean(
-        types = {
-            AgentConnectorBindings.class,
-            AgentDelegationService.class,
-            AgentEndpointProbe.class,
-            AgentRepository.class,
-            AgentService.class,
-            AppUserRepository.class,
-            AttachmentService.class,
-            AutonomyDecisionRepository.class,
-            ChatMessageRepository.class,
-            ChatPendingMessageRepository.class,
-            ChatService.class,
-            CheckNotificationPolicy.class,
-            ContextAssembler.class,
-            ConversationEventHub.class,
-            ExecutionEventRepository.class,
-            ExecutionSkillUseRepository.class,
-            FeedbackConversations.class,
-            HermesProfileProvisioner.class,
-            MemoryContentSealer.class,
-            PriceCatalog.class,
-            ProactiveCheckGuard.class,
-            ProactiveCheckService.class,
-            RecoveredRunRecorder.class,
-            ResultDeliveryAttemptRepository.class,
-            ResultDeliveryRecorder.class,
-            SkillCommandCatalog.class,
-            SkillService.class,
-            SkillStore.class,
-            TurnCancellation.class,
-            UserExecutionLimiter.class
-        })
+    types = {
+        AgentConnectorBindings.class,
+        AgentDelegationService.class,
+        AgentEndpointProbe.class,
+        AgentRepository.class,
+        AgentService.class,
+        AppUserRepository.class,
+        AttachmentService.class,
+        AutonomyDecisionRepository.class,
+        ChatMessageRepository.class,
+        ChatPendingMessageRepository.class,
+        ChatService.class,
+        CheckNotificationPolicy.class,
+        ContextAssembler.class,
+        ConversationEventHub.class,
+        ExecutionEventRepository.class,
+        ExecutionSkillUseRepository.class,
+        FeedbackConversations.class,
+        HermesProfileProvisioner.class,
+        MemoryContentSealer.class,
+        PriceCatalog.class,
+        ProactiveCheckGuard.class,
+        ProactiveCheckService.class,
+        RecoveredRunRecorder.class,
+        ResultDeliveryAttemptRepository.class,
+        ResultDeliveryRecorder.class,
+        SkillCommandCatalog.class,
+        SkillService.class,
+        SkillStore.class,
+        TurnCancellation.class,
+        UserExecutionLimiter.class
+    })
 @ExtendWith(IntegrationTestIsolation.class)
-public @interface BackendIntegrationTest {}
+public @interface BackendIntegrationTest {
+}

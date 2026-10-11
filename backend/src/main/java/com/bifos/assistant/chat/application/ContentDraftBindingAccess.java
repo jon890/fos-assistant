@@ -7,7 +7,9 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 public interface ContentDraftBindingAccess {
     ContentDraftBindingStamp prepare(CurrentUser user, Long agentId, Long bindingId);
 
+
     ContentDraftBindingStamp requireCurrent(CurrentUser user, Long agentId, Long bindingId);
+
 
     void requireUnchanged(CurrentUser user, ContentDraftBindingStamp stamp);
 }

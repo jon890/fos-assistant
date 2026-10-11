@@ -3,7 +3,6 @@ package com.bifos.assistant.hermes;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.IntStream;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
@@ -47,6 +46,7 @@ class HttpContentDraftSnapshotClientTest {
     private final CountDownLatch slotsArrived = new CountDownLatch(4);
     private final CountDownLatch release = new CountDownLatch(1);
 
+
     @BeforeEach
     void setUp() throws Exception {
         logs.start();
@@ -84,6 +84,7 @@ class HttpContentDraftSnapshotClientTest {
             "synthetic-token", null, null, null, null, null));
     }
 
+
     @AfterEach
     void tearDown() {
         release.countDown();
@@ -93,6 +94,7 @@ class HttpContentDraftSnapshotClientTest {
         assertThat(logs.list).allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain("BODY_MARKER", "/private/token", "rawHTTPargs"));
         logs.stop();
     }
+
 
     @Test
     @DisplayName("현재 Python catalog producer와 실제 TS compiler golden을 HTTP로 decode한다")
@@ -124,6 +126,7 @@ class HttpContentDraftSnapshotClientTest {
         }
     }
 
+
     @Test
     @DisplayName("실제 HTTP는 POST Bearer와 원고 원본 tuple만 전달한다")
     void sendsExactOriginalRequestTuple() {
@@ -135,6 +138,7 @@ class HttpContentDraftSnapshotClientTest {
         assertThat(seen.get().path("args").path("resolvedAssets")).isEqualTo(golden.get("assets"));
         ContentDraftSnapshotHash.verify(golden.get("draft"), golden.get("assets"), compile());
     }
+
 
     @Test
     @DisplayName("틀린 capability envelope schema와 revision을 안전한 오류로 거절한다")
@@ -157,6 +161,7 @@ class HttpContentDraftSnapshotClientTest {
         reject(answer);
     }
 
+
     @Test
     @DisplayName("chunked 512KiB와 compiled 256KiB 응답을 JSON tree 전에 제한한다")
     void capsChunkedAndCompiledResponses() {
@@ -166,6 +171,7 @@ class HttpContentDraftSnapshotClientTest {
         ((ObjectNode)answer.path("result").path("payload")).put("body", "x".repeat(262144));
         reject(answer);
     }
+
 
     @Test
     @DisplayName("canonical 64KiB와 원본 50개 상한은 HTTP 전에 거절한다")
@@ -183,6 +189,7 @@ class HttpContentDraftSnapshotClientTest {
         assertThat(seen.get()).isNull();
     }
 
+
     @Test
     @DisplayName("오류 body와 잘린 HTTP 응답의 원문 cause를 내보내지 않는다")
     void hidesRawErrorsAndRejectsLostResponse() {
@@ -196,6 +203,7 @@ class HttpContentDraftSnapshotClientTest {
         truncate = true;
         unavailable();
     }
+
 
     @Test
     @DisplayName("5초 전체 응답 한도와 호출 중단은 slot을 반환한다")
@@ -219,6 +227,7 @@ class HttpContentDraftSnapshotClientTest {
         assertThat(compile()).isEqualTo(golden.get("snapshot"));
     }
 
+
     @Test
     @DisplayName("네 slot이 사용 중이면 다섯 번째 호출을 HTTP 없이 거절한다")
     void sharesFourCompilerSlots() throws Exception {
@@ -235,20 +244,24 @@ class HttpContentDraftSnapshotClientTest {
         }
     }
 
+
     private ObjectNode answer() {
         var node = json.createObjectNode().put("ok", true).set("result", golden.get("snapshot").deepCopy());
         node.set("capabilities", json.createObjectNode().put("compile", true).put("start", false).put("status", false));
         return node;
     }
 
+
     private JsonNode compile() {
         return client.compile("synthetic-profile", "snapshot-test", golden.get("draft"), golden.get("assets"));
     }
+
 
     private void reject(JsonNode answer) {
         response.set(json.writeValueAsBytes(answer));
         unavailable();
     }
+
 
     private void unavailable() {
         assertThatThrownBy(this::compile).isInstanceOfSatisfying(ApiException.class, ex -> {
