@@ -104,6 +104,7 @@ class AgentPropertiesPlacementTest {
     @ValueSource(strings = {
         "jakarta.persistence.Entity", "jakarta.persistence.Embeddable",
         "org.springframework.stereotype.Service", "org.springframework.stereotype.Repository",
+        "org.springframework.stereotype.Controller",
         "org.springframework.web.bind.annotation.RestController"
     })
     @DisplayName("config에 영속 타입이나 서비스와 저장소와 컨트롤러를 두면 실패한다")
@@ -141,12 +142,79 @@ class AgentPropertiesPlacementTest {
     }
 
 
-    @Test
-    @DisplayName("다른 이름이 기존 에이전트 prefix를 선언하면 실패한다")
-    void rejectsPrefixAlias() throws IOException {
+    @ParameterizedTest
+    @ValueSource(strings = {"prefix=\"assistant.people\"", "value=\"assistant.people\"", "\"assistant.people\""})
+    @DisplayName("다른 이름과 package가 prefix 또는 value 별칭을 선언하면 실패한다")
+    void rejectsPrefixAlias(String declaration) throws IOException {
         Map<String, String> sources = validSources();
-        sources.put(OWNER + ".Alias", properties(OWNER, "Alias", "assistant.people"));
-        assertViolation(compile(sources), OWNER + ".Alias", "지정한 두 설정");
+        sources.put(OWNER + ".Alias", properties(OWNER, "Alias", "assistant.people")
+            .replace("prefix=\"assistant.people\"", declaration));
+        String other = "com.bifos.assistant.chat.application";
+        sources.put(other + ".Alias", properties(other, "Alias", "assistant.people")
+            .replace("prefix=\"assistant.people\"", declaration));
+        JavaClasses fixture = compile(sources);
+        assertViolation(fixture, OWNER + ".Alias", "지정한 두 설정");
+        assertViolation(fixture, other + ".Alias", "지정한 두 설정");
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"value=", ""})
+    @DisplayName("소유 설정 두 타입은 value 별칭으로 선언해도 통과한다")
+    void acceptsOwnedValueAlias(String attribute) throws IOException {
+        Map<String, String> sources = validSources();
+        sources.replaceAll((name, source) -> source.replace("prefix=", attribute));
+        ArchitectureRules.FEATURE_CONFIG_PLACEMENT.check(compile(sources));
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"AgentProperties", "Alias"})
+    @DisplayName("prefix와 value가 서로 다르면 소유 타입과 별칭 모두 실패한다")
+    void rejectsConflictingAliases(String name) throws IOException {
+        Map<String, String> sources = validSources();
+        sources.put(OWNER + "." + name, properties(OWNER, name, "assistant.agents")
+            .replace("prefix=\"assistant.agents\"", "prefix=\"assistant.agents\", value=\"changed\""));
+        assertViolation(compile(sources), OWNER + "." + name, "충돌하지 않음");
+    }
+
+
+    @Test
+    @DisplayName("소유 설정 record의 중첩 값 record는 통과한다")
+    void acceptsOwnedNestedRecords() throws IOException {
+        Map<String, String> sources = validSources();
+        sources.replaceAll((name, source) -> source.replace("{}",
+            "{ public record Nested(String value) { public record Deep(String value) {} } }"));
+        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(6);
+        ArchitectureRules.FEATURE_CONFIG_PLACEMENT.check(fixture);
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"jakarta.persistence.Entity", "org.springframework.stereotype.Service",
+        "org.springframework.stereotype.Repository", "org.springframework.stereotype.Controller"})
+    @DisplayName("소유 설정 안의 중첩 record라도 서비스 역할은 실패한다")
+    void rejectsNestedAnnotatedRole(String annotation) throws IOException {
+        Map<String, String> sources = validSources();
+        sources.put(AGENTS, sources.get(AGENTS).replace("{}",
+            "{ @" + annotation + " public record Nested(String value) {} }"));
+        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(3);
+        assertViolation(fixture, AGENTS + "$Nested", "배치하지 않음");
+    }
+
+
+    @Test
+    @DisplayName("일반 Configuration의 중첩 DTO는 설정 소유 값으로 허용하지 않는다")
+    void rejectsNestedConfigurationDto() throws IOException {
+        Map<String, String> sources = validSources();
+        sources.put(OWNER + ".Other", "package " + OWNER
+            + "; @org.springframework.context.annotation.Configuration public class Other {"
+            + " public record Nested(String value) {} }");
+        JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
+        assertThat(fixture).hasSize(4);
+        assertViolation(fixture, OWNER + ".Other$Nested", "ConfigurationProperties 또는 Configuration");
     }
 
 
