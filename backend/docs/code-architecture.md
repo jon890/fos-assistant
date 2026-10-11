@@ -11,12 +11,32 @@ chat.application의 기존 저장 서비스를 유지하고 MediaObservationPage
 관찰 REST 요청·응답은 `chat.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
 일반 대화 DTO는 `ChatDtos`에 두고, 관찰 DTO는 파일 길이 상한 안에서 기존 필드 설명을 보존하도록 관심사별로 나눈다.
 mcp.application.McpMediaObservationTools가 origin의 대화로 chat을 호출한다. chat은 MCP를 알지 않는다.
-McpToolCatalog는 기존 도구와 관찰 도구의 정의를 같은 순서로 모으며 호출 시점의 설정을 읽는다.
-McpToolService는 catalog를 호출하고 기존 실행 handler를 유지한다. McpController의 분기도 그대로 둔다.
+McpToolCatalog는 기존 도구와 관찰 도구의 순서를 유지하고 끝에 memory_search 정의를 더하며 호출 시점의 설정을 읽는다.
+McpToolService는 catalog를 호출하고 실행 handler를 유지한다. McpController는 검색과 관찰 도구를 같은 요청자 판정 뒤에 처리한다.
 HermesRunEventStream이 새 도구의 start/complete/fail detail과 text를 수집 전에 null로 만든다.
-공용 시험 컨텍스트는 변경하지 않는다. Memory 검색이 추가되면 그 도구의 두 경로 가림과 SQL 관측 대역도 유지한다.
+공용 시험 컨텍스트는 변경하지 않는다. Memory 검색의 detail·text 가림과 본문·암호문·COUNT 비조회를 확인하는 SQL 관측 대역도 유지한다.
 JSON 역직렬화 실패는 chat의 새 controller와 McpController 각각의 한정 예외 처리에서 안전한 응답으로 바꾼다.
 MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원문·cause를 넘기지 않는다. 인증 실패는 기존 필터가 처리한다.
+
+## JPA 생성 시각
+
+`memory.domain.MemoryCollection.createdAt` 하나에 `@CreatedDate`와 `@EntityListeners(AuditingEntityListener.class)`를 둔다.
+`shared.config.JpaAuditingConfig`는 `@EnableJpaAuditing(dateTimeProviderRef="auditingDateTimeProvider")`로 활성화한다.
+같은 이름의 `DateTimeProvider` 빈은 기존 `Clock`을 주입받고 `Instant`를 `ChronoUnit.MICROS`로 잘라 돌려준다.
+운영 시계와 공용 검사 시계의 빈은 추가하지 않는다. 이 선언과 대상의 정확한 개수는 baseline 없는
+`ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`이 검사한다. 실제 callback과 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
+설정·provider 선언과 대상 엔티티는 각각 하나다. 다른 필드·getter의 auditing annotation과 `@LastModifiedDate`는 허용하지 않는다.
+다른 운영 타입의 `AuditingEntityListener` 선언과 Spring Data `Auditable` 구현·상속도 거절한다.
+`AbstractAuditable` 상속도 여기에 포함한다. 기존 JPA 업무 시각과 다른 listener는 그대로 허용한다.
+
+`defaultsFor(groupId)`가 만든 객체는 생성 시각이 null이다. 복합 ID로 `saveAll`이 merge할 때는 반환된 managed 객체를 사용한다.
+`PrePersist` 시각과 트랜잭션 commit 완료 시각은 다르다. rollback하면 시각이 채워졌어도 행은 남지 않는다.
+서비스는 기존 목록이 있으면 새 기본 객체를 만들지 않는다. DB에서 읽은 기존 객체의 detach/merge와 no-op은 기존 생성 시각을 유지한다.
+생성 시각이 null인 기본 객체를 이미 존재하는 ID에 merge하는 경우는 서비스 계약에 포함하지 않는다.
+
+다른 엔티티 및 `MemoryRevision.changedAt`, `AgentMemoryCollectionChange.changedAt` 같은 업무 시각은 전달받은 값을 유지한다.
+native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 시각을 정한다. 기존 마이그레이션은 수정하지 않는다.
+[Spring Data auditing](https://docs.spring.io/spring-data/jpa/reference/auditing.html)의 엔티티별 listener와 provider 설정을 따른다.
 
 ## 패키지와 책임
 
@@ -79,6 +99,33 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 `MediaObservationCleaner`의 참가 메서드는 MANDATORY이며 첨부·대화 삭제의 사전 callback에서 호출한다.
 만료 정리는 대상마다 별도 coordinator 트랜잭션을 연다. [관찰 저장](../../docs/features/attachment.md#관찰-저장과-사용자-정정)이 서비스 범위를 갖는다.
 
+`chat.application.MediaObservationAnalysisKey`는 고정 배열을 직렬화해 분석 key를 계산한다.
+재사용 판단과 alias 저장은 기존 `MediaObservationService.record`가 맡으며 별도 cache 서비스는 두지 않는다.
+복호화·파싱·검증은 서비스의 조회와 재사용이 같은 함수로 수행한다.
+재사용의 조건과 수명은 [완료 결과 재사용 ADR](adr/ADR-20261011-media-observation-cache.md)이 갖는다.
+
+### 에이전트 설정
+
+`agent.config`는 에이전트 생성 한도와 삭제 유예 기간의 `AgentProperties`,
+첫 에이전트의 비용 방식, 계정 범위, 기본 도구 정책인 `PeopleProperties`를 갖는다.
+`PeopleProperties`의 prefix는 `assistant.people`이지만 소유는 에이전트다.
+`AgentLifecycleService`, `AgentPurger`, `FirstAgentCreator`는 이 설정을 타입으로 주입받는다.
+기본값과 검증, Duration 단위, 도구 정책과 루트 설정 스캔은 유지한다.
+
+`FEATURE_CONFIG_PLACEMENT`는 전체 운영 타입에서 두 top-level 이름과 prefix를 확인해
+정확한 config 소유, 선언 수 1, public record, `@Validated` 계약을 검사한다.
+옛 위치 복귀, 누락과 중복, 정확히 같은 prefix를 다른 이름이나 package에서 선언하는 경우도 실패한다.
+`ConfigurationProperties`의 `prefix`와 `value` 별칭을 함께 읽고, 두 값이 다르면 거절한다.
+새 `agent.config`에는 `ConfigurationProperties`와 `Configuration` 선언,
+두 소유 설정 record 안의 중첩 값 record만 허용한다.
+서비스, 저장소, 컨트롤러, 영속 타입, 일반 값과 enum은 중첩 타입에서도 거절한다.
+`Configuration`의 정상 Component 메타 주석은 허용한다.
+이 검사는 `AgentPropertiesPlacementTest`에서 기준 파일 없이 실행하며 `test`와 `archTest`,
+CI backend와 quality 검사에 함께 포함된다. 다른 관심사의 배치는 아직 검사하지 않는다.
+공개 서비스 값과 HTTP DTO, 저장 enum의 배치 원칙은 기존 규칙을 따른다.
+검사는 타입과 클래스에 직접 붙은 주석을 대상으로 한다.
+하위 prefix와 `@Bean` 메서드의 `ConfigurationProperties` 선언은 이 규칙의 검사 범위 밖이다.
+
 ### 에이전트 도구
 
 `agent.application.toolset`은 기본 도구 설정, 도구 조회와 저장, 카탈로그, 숨김과 사용 요청 승인을 맡는다.
@@ -86,6 +133,13 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 HTTP 요청과 응답의 변환은 `agent.presentation`의 `AgentDtos`가 맡는다.
 profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.application`에,
 도구 등급과 공개 범위를 판정하는 정책과 저장 값은 `agent.domain`에 둔다.
+
+### 스킬
+
+`skill.application.SkillService`는 권한, 에이전트 행 잠금, 트랜잭션과 스킬 게시 순서, `SkillsChanged` 사건을 맡는다.
+같은 패키지 안의 `PreviousSkillVersions`는 기존 `PreviousSkillStore`를 사용해 게시 뒤 이전 버전을 쓰고 지우며 보관 시각을 읽는다.
+이 세 작업의 실패는 기존 경고를 남기고 저장·삭제·원문 읽기를 계속한다. 시각이 없거나 읽지 못하면 `previousSavedAt`은 `null`이다.
+되돌리기의 엄격한 이전 본문 읽기는 `SkillService`에 남는다. 이전 버전이 없으면 `SKILL_NOT_FOUND`이며 읽기 실패를 무시하지 않는다.
 
 ### 에이전트 관리자 등록
 
@@ -211,6 +265,14 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 묻는 형식은 `web/src/lib/ask.ts` 가 카드로 읽는다. 둘이 같은 형식을 말해야 한다.
 
 3 에 어느 항목이 드는지는 [`docs/features/memory.md`](../../docs/features/memory.md) 의 「에이전트의 실행에 보이는 항목」 이 갖는다.
+
+### 문맥 조립
+
+`ContextAssembler`는 요청자의 권한, 후보 항목, 층 순서와 신선도를 결정한다.
+매 조립 호출마다 package-private `ContextBudgetWriter`를 새로 만들어 예산에 맞춘 글과 누락 항목, 문맥 묶음을 함께 조립한다.
+writer는 머리 줄과 구분 줄을 포함한 길이를 계산한다. 항상 넣는 층과 색인 층에서는 상한을 넘는 항목 하나만 건너뛰고 묶음의 원래 자리에 `OMITTED`로 남긴다.
+개인 사실 구역의 `appendIfFits`는 남은 예산에 들어가지 않는 항목을 누락으로 기록하지 않고, `ContextAssembler`가 그 항목을 색인으로 돌린다.
+개인 사실 후보의 선택과 색인 예산 계산도 writer의 같은 렌더링 규칙을 쓴다.
 
 ## 가격표
 
@@ -421,6 +483,15 @@ node scripts/check-file-length.mjs --update
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
 
+`MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
+`MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
+writer는 facade의 트랜잭션 안에서 동작한다. 새 본문을 먼저 암호화한 뒤 이전 값을 판으로 저장하고,
+민감하게 고칠 때만 flush와 과거 평문 판의 봉인을 거쳐 현재 본문을 저장한다.
+`MemoryTitleSearch`는 제목 검색의 입력 검사와 repository 조회를 맡는다. repository만 주입받고
+`MemoryService.searchFor`의 읽기 전용 `REQUIRES_NEW`, 2초 제한 트랜잭션 안에서 실행한다.
+MCP 호출은 공개 facade의 Spring proxy를 거치므로 바깥 트랜잭션의 제한을 물려받지 않는다.
+외부 호출자는 기존 facade를 그대로 사용한다.
+
 ## 실행 공간 파일
 
 사용자가 「파일 공간」 화면에서 자기 실행 공간 `/workspace` 를 보는 길이다.
@@ -476,7 +547,7 @@ Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한�
 | 경로 | 하는 일 | 응답 |
 | --- | --- | --- |
 | `GET /api/v1/workspace` | 공간의 상태 | `{available, deletable, exists, runningExecutions, agents: [{code, name, shared}]}`. `exists` 는 사용자 디렉터리가 있는지다. `agents` 는 요청자가 주인이고 켜져 있으며 지우지 않은 에이전트이고, `shared` 는 그룹에 공개했는지다. `runningExecutions` 는 사용자 실행 한도가 세는 지금 쥔 자리 수다 |
-| `GET /api/v1/workspace/entries?path=` | 디렉터리 하나의 목록 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated}`. 디렉터리를 읽는 순서로 1,001개까지 읽고, 그 가운데 1,000개를 디렉터리 먼저, 이름 순서로 준다. 1,001번째가 있으면 `truncated` 가 참이고, 그때는 순서상 앞선 항목도 빠질 수 있다. `size` 는 `FILE` 만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다 |
+| `GET /api/v1/workspace/entries?path=&cursor=` | 디렉터리 한 페이지. 두 인자는 선택이다 | `{path, entries: [{name, kind, size, modifiedAt, readable, openable}], truncated, nextCursor}`. 전체 스트림에서 cursor 뒤의 가장 작은 1,001건을 유지하고 디렉터리 먼저, Java 이름 순서로 1,000건을 준다. `truncated`는 다음 페이지가 있다는 뜻이며 `nextCursor`는 표시한 마지막 키다. 끝이면 null이다. `size`는 `FILE`만 채운다. 사용자 디렉터리가 아직 없으면 빈 목록이다. cursor 검사와 2초 순회 예산, 동시 변경의 한계는 [`파일 공간`](../../docs/features/workspace.md)의 「목록 페이지」가 갖는다 |
 | `GET /api/v1/workspace/files/{경로}` | 미리보기 본문 | 아래 「본문 머리글」. 경로의 조각마다 URL 인코딩한다 |
 | `GET /api/v1/workspace/files/{경로}?download=1` | 내려받기 | 크기 상한 없이 스트림으로 준다 |
 | `DELETE /api/v1/workspace/entries?path=` | 지우기 | 아래 「지우기」 |

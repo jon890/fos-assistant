@@ -33,22 +33,27 @@ public class WorkspaceController {
     private final WorkspaceService workspace;
     private final CurrentUserProvider currentUser;
 
+
     /** 루트가 설정되지 않아도 200 이다. 화면이 「쓸 수 없음」 을 그릴 수 있게 한다. */
     @GetMapping
     public StatusView status() {
         return StatusView.of(workspace.status(currentUser.require()));
     }
 
+
     @GetMapping("/entries")
-    public ListingView entries(@RequestParam(required = false) String path) {
-        return ListingView.of(workspace.list(currentUser.require(), path));
+    public ListingView entries(
+        @RequestParam(required = false) String path, @RequestParam(required = false) String cursor) {
+        return ListingView.of(workspace.list(currentUser.require(), path, cursor));
     }
+
 
     /** 경로 하나를 지운다. 이름에 주소 조각으로 쓸 수 없는 문자가 있어도 인자로 받으므로 지울 수 있다. */
     @DeleteMapping("/entries")
     public DeletionView delete(@RequestParam(required = false) String path) {
         return DeletionView.of(workspace.delete(currentUser.require(), path));
     }
+
 
     /**
      * 미리보기나 내려받기 본문이다. {@code {*path}} 는 디코딩한 상대 경로를 앞의 {@code /} 와 함께 준다.
@@ -57,22 +62,22 @@ public class WorkspaceController {
      */
     @GetMapping("/files/{*path}")
     public ResponseEntity<InputStreamResource> file(
-            @PathVariable("path") String path, @RequestParam(required = false) String download) {
+        @PathVariable("path") String path, @RequestParam(required = false) String download) {
         WorkspaceFile file = workspace.open(currentUser.require(), path, "1".equals(download));
         ContentDisposition disposition = (file.download()
-                        ? ContentDisposition.attachment()
-                        : ContentDisposition.inline())
+            ? ContentDisposition.attachment()
+            : ContentDisposition.inline())
                 .filename(file.name(), StandardCharsets.UTF_8)
                 .build();
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(file.contentType()))
-                .contentLength(file.size())
-                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-                .header(
-                        "Content-Security-Policy",
-                        file.html() ? SandboxedContentPolicy.HTML : SandboxedContentPolicy.NONE)
-                .header("X-Content-Type-Options", "nosniff")
-                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
-                .body(new InputStreamResource(file.body()));
+            .contentType(MediaType.parseMediaType(file.contentType()))
+            .contentLength(file.size())
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .header(
+                "Content-Security-Policy",
+                file.html() ? SandboxedContentPolicy.HTML : SandboxedContentPolicy.NONE)
+            .header("X-Content-Type-Options", "nosniff")
+            .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+            .body(new InputStreamResource(file.body()));
     }
 }
