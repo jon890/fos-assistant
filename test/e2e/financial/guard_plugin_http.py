@@ -15,6 +15,10 @@ REPO = pathlib.Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "hermes/tests"))
 from dashboard_profile_api_support import ProfileApiRouteTest, DEMO
 
+AUTH_PATH = "/oauth/token"
+FINANCIAL_PATH = "/financial/orders"
+SUPPORT_PATH = "/internal/connector-executions/support"
+
 
 class Fixture(ProfileApiRouteTest):
     """Hermes 환경 준비만 재사용한다. guard와 설치 처리기는 원본 plugin이다."""
@@ -41,26 +45,34 @@ class Fixture(ProfileApiRouteTest):
         self.nonces = []
         self.support_codes = []
         self.financial_posts = self.financial_deletes = self.auth_posts = 0
-        # 원본 소비자가 만든 HTTP 요청을 관측하고 실제 Spring에 보낸다. 외부 주소는 거절한다.
+        # 이 프로세스의 urllib 시도만 센다. MCP 자식과 다른 HTTP 라이브러리는 관측하지 않는다.
+        # loopback 대역의 목적지 경로를 구분하며 support는 실제 Spring에 보낸다.
         original_open = urllib.request.OpenerDirector.open
+        self.addCleanup(setattr, urllib.request.OpenerDirector, "open", original_open)
 
         def observed(opener, request, *args, **kwargs):
             url = request.full_url if isinstance(request, urllib.request.Request) else request
             parsed = urllib.parse.urlsplit(url)
             if parsed.hostname != "127.0.0.1":
                 raise AssertionError("loopback 밖의 HTTP 요청이다")
-            if parsed.path.endswith("/support"):
+            method = request.get_method() if isinstance(request, urllib.request.Request) else "GET"
+            support = parsed.path == SUPPORT_PATH and method == "POST"
+            if support:
                 self.nonces.append(json.loads(request.data)["nonce"])
-            elif request.get_method() == "POST":
+            elif parsed.path == AUTH_PATH and method == "POST":
+                self.auth_posts += 1
+            elif parsed.path == FINANCIAL_PATH and method == "POST":
                 self.financial_posts += 1
-            elif request.get_method() == "DELETE":
+            elif parsed.path == FINANCIAL_PATH and method == "DELETE":
                 self.financial_deletes += 1
             try:
                 answer = original_open(opener, request, *args, **kwargs)
-                self.support_codes.append(answer.status)
+                if support:
+                    self.support_codes.append(answer.status)
                 return answer
             except urllib.error.HTTPError as error:
-                self.support_codes.append(error.code)
+                if support:
+                    self.support_codes.append(error.code)
                 raise
 
         urllib.request.OpenerDirector.open = observed

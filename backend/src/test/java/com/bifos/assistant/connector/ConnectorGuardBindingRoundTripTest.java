@@ -409,6 +409,7 @@ class ConnectorGuardBindingRoundTripTest {
         }
         assertThat(observed.path("executionEnv").booleanValue()).isFalse();
         assertThat(observed.path("entry").toString()).doesNotContain("nonce", "ticket", "FOS_APPROVAL_");
+        // fixture 프로세스의 urllib에서 지정한 loopback 인증·금융 경로의 시도만 관측한다.
         assertThat(observed.path("financialPosts").intValue()).isZero();
         assertThat(observed.path("financialDeletes").intValue()).isZero();
         assertThat(observed.path("authPosts").intValue()).isZero();

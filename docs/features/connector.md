@@ -342,6 +342,10 @@ READY 이전의 verified를 설치 완료 조건으로 요구하지 않는다. �
 configured·enabled·mode·policy hook과 probe 판정을 대신하지 않는다. verified도 거래 권한이 아니므로
 금융 도구의 exclude와 상시 허락 없음, `RISK_NOT_OPEN`을 유지한다.
 실제 Spring MVC·DB와 Python 설치·상태·support 소비자의 왕복은 H2와 새 Flyway MySQL DB에서 같은 시험으로 확인한다.
+왕복 fixture의 전송 계수는 그 Python 프로세스의 urllib 요청 시도만 관측한다.
+loopback 대역의 인증 경로(`/oauth/token`) POST와 금융 경로(`/financial/orders`) POST·DELETE를 따로 센다.
+support POST와 다른 경로는 금융 계수에 넣지 않으며, 독립 loopback 수신 회귀가 각 1회 요청의 증가를 확인한다.
+연결 실패도 시도로 세지만 MCP 자식과 다른 HTTP 라이브러리의 전송은 관측하지 않는다.
 운영 배포와 실제 실행 왕복의 확인 절차는 `fos-home-infra`가 소유한다.
 
 ### 재시작
