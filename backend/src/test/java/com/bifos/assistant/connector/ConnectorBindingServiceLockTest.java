@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,6 +59,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -69,20 +71,20 @@ import tools.jackson.databind.json.JsonMapper;
 @BackendIntegrationTest
 class ConnectorBindingServiceLockTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
-    private static final String DEMO = "demo-notes";
-    private static final Map<String, String> VALUES = Map.of("token", "demo_ok_0123456789");
-    private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
-            List.of());
+    protected static final String DEMO = "demo-notes";
+    protected static final Map<String, String> VALUES = Map.of("token", "demo_ok_0123456789");
+    protected static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
+        "list_scopes",
+        "demo",
+        List.of(),
+        false,
+        2,
+        List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
+        List.of());
     /** 이 시각 뒤의 설치는 모두 관리자가 본 뒤의 설치다. */
     private static final Instant LONG_AGO = Instant.parse("2020-01-01T00:00:00Z");
 
@@ -111,6 +113,9 @@ class ConnectorBindingServiceLockTest {
     JdbcTemplate jdbc;
 
     @Autowired
+    TransactionTemplate transactions;
+
+    @Autowired
     HermesConnectorClient connector;
 
     @Autowired
@@ -119,20 +124,22 @@ class ConnectorBindingServiceLockTest {
     @Autowired
     HermesToolsetClient toolsets;
 
+
     @BeforeEach
     void setUp() {
         when(connector.readCatalog()).thenReturn(List.of(DEMO_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false));
+            .thenReturn(new InstallResult(true, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
         when(skills.list(anyString())).thenReturn(List.of());
     }
+
 
     @AfterEach
     void tearDown() {
@@ -143,14 +150,15 @@ class ConnectorBindingServiceLockTest {
         users.deleteAll();
     }
 
+
     /**
-     * 등록이 주인의 사용자 행을 잠근 동안 반영 완료는 기다리고, 그 등록이 커밋한 새 재시작 대기 시각을 보고 거절한다.
+     * 다른 트랜잭션이 주인의 사용자 행을 잠근 동안 반영 완료는 기다리고, 커밋된 새 재시작 대기 시각을 보고 거절한다.
      *
      * <p>반영 완료의 트랜잭션이 잠금 없는 읽기로 시작하면 MySQL 의 REPEATABLE READ 에서는 그때 읽기 시점이 정해져, 잠금을
-     * 기다린 뒤에도 바인딩의 옛 시각을 읽고 대기를 풀어 버린다. 등록은 바인딩에 설치를 다시 보내는 자리에서 멈춘다.
+     * 기다린 뒤에도 바인딩의 옛 시각을 읽고 대기를 풀어 버린다. 앞선 트랜잭션은 새 재시작 시각을 적고 잠금을 쥔 자리에서 멈춘다.
      */
     @Test
-    @DisplayName("등록이 사용자 행을 잠근 동안 반영 완료는 기다렸다가 등록이 커밋한 새 재시작 대기를 보고 CONNECTOR_RESTART_AGAIN 이다")
+    @DisplayName("사용자 행 잠금을 기다린 반영 완료는 커밋된 새 재시작 대기를 보고 CONNECTOR_RESTART_AGAIN 이다")
     void confirmAppliedWaitsForRegistrationAndSeesNewRestartWait() throws Exception {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
@@ -161,33 +169,36 @@ class ConnectorBindingServiceLockTest {
         Instant shown = shownTo(admin);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> {
-                    locked.countDown();
-                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-                    return new InstallResult(true, false);
-                });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> registering =
-                    pool.submit(() -> connectionService.register(owner, DEMO, Map.of("token", "demo_zz_0123456789")));
+            Future<?> registering = pool.submit(() -> transactions.executeWithoutResult(status -> {
+                users.findByIdForUpdate(owner.id()).orElseThrow();
+                jdbc.update("UPDATE agent_connector_binding SET restart_required_since = ?", Timestamp.from(Instant.now()));
+                locked.countDown();
+                await(release);
+            }));
             assertThat(locked.await(10, TimeUnit.SECONDS))
-                    .as("등록이 사용자 행 잠금을 쥐었다")
-                    .isTrue();
-            Future<AgentConnectionView> confirming =
-                    pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, shown));
-            Thread.sleep(300);
+                .as("다른 트랜잭션이 사용자 행 잠금을 쥐었다")
+                .isTrue();
+            CountDownLatch waiting = new CountDownLatch(1);
+            doAnswer(invocation -> {
+                waiting.countDown();
+                jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", Long.class, owner.id());
+                return users.findById(owner.id());
+            }).when(users).findByIdForUpdate(owner.id());
+            Future<AgentConnectionView> confirming = pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, shown));
+            assertThat(waiting.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(confirming.isDone()).as("반영 완료가 사용자 행 잠금을 기다린다").isFalse();
 
             release.countDown();
 
             registering.get(10, TimeUnit.SECONDS);
             assertThatThrownBy(() -> confirming.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RESTART_AGAIN));
+                .isInstanceOf(ExecutionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                    ApiException.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RESTART_AGAIN));
             ConnectorBinding stored = onlyBinding();
             assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
             assertThat(stored.restartRequired()).isTrue();
@@ -197,6 +208,7 @@ class ConnectorBindingServiceLockTest {
             pool.shutdownNow();
         }
     }
+
 
     /** 반영 완료가 트랜잭션 밖에서 주인을 읽은 뒤 주인이 바뀌면, 잠근 사용자 행이 지금 주인의 것이 아니라 대기를 풀지 않는다. */
     @Test
@@ -210,22 +222,24 @@ class ConnectorBindingServiceLockTest {
         service.bind(owner, agent.code(), DEMO);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenAnswer(invocation -> {
-                    locked.countDown();
-                    assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-                    return new InstallResult(false, false);
-                });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> registering =
-                    pool.submit(() -> connectionService.register(owner, DEMO, Map.of("token", "demo_zz_0123456789")));
+            Future<?> registering = pool.submit(() -> transactions.executeWithoutResult(status -> {
+                users.findByIdForUpdate(owner.id()).orElseThrow();
+                locked.countDown();
+                await(release);
+            }));
             assertThat(locked.await(10, TimeUnit.SECONDS))
-                    .as("등록이 사용자 행 잠금을 쥐었다")
-                    .isTrue();
-            Future<AgentConnectionView> confirming =
-                    pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, null));
-            Thread.sleep(300);
+                .as("다른 트랜잭션이 사용자 행 잠금을 쥐었다")
+                .isTrue();
+            CountDownLatch waiting = new CountDownLatch(1);
+            doAnswer(invocation -> {
+                waiting.countDown();
+                jdbc.queryForObject("SELECT id FROM app_user WHERE id = ? FOR UPDATE", Long.class, owner.id());
+                return users.findById(owner.id());
+            }).when(users).findByIdForUpdate(owner.id());
+            Future<AgentConnectionView> confirming = pool.submit(() -> service.confirmApplied(admin, agent.code(), DEMO, null));
+            assertThat(waiting.await(10, TimeUnit.SECONDS)).isTrue();
             assertThat(confirming.isDone()).as("반영 완료가 사용자 행 잠금을 기다린다").isFalse();
             jdbc.update("UPDATE agent SET owner_user_id = ? WHERE id = ?", next.id(), agent.id());
 
@@ -233,10 +247,10 @@ class ConnectorBindingServiceLockTest {
 
             registering.get(10, TimeUnit.SECONDS);
             assertThatThrownBy(() -> confirming.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_BUSY));
+                .isInstanceOf(ExecutionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_BUSY));
             assertThat(onlyBinding().restartRequired()).as("재시작 대기가 풀리지 않았다").isTrue();
             verify(connector, never()).probe(anyString(), anyString());
         } finally {
@@ -245,16 +259,29 @@ class ConnectorBindingServiceLockTest {
         }
     }
 
+
     /** 관리자 목록이 보인 그 바인딩의 재시작 대기 시작 시각이다. */
+    private static void await(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ex);
+        }
+    }
+
+
     private Instant shownTo(CurrentUser admin) {
         List<AdminConnectionSnapshot> listed = connectionService.listForAdmin(admin);
         assertThat(listed).hasSize(1);
         return listed.get(0).restartRequiredSince();
     }
 
+
     private void connect(CurrentUser owner, String connectorId, Map<String, String> values) {
         connectionService.register(owner, connectorId, values);
     }
+
 
     private ConnectorBinding onlyBinding() {
         List<ConnectorBinding> all = bindings.findAll();
@@ -262,21 +289,23 @@ class ConnectorBindingServiceLockTest {
         return all.get(0);
     }
 
-    private Agent agent(CurrentUser owner, AgentVisibility visibility) {
+
+    protected Agent agent(CurrentUser owner, AgentVisibility visibility) {
         String code = "lock-" + UUID.randomUUID().toString().substring(0, 13);
         return agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                owner.id(),
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            owner.id(),
+            Instant.now()));
     }
 
-    private CurrentUser user(UserRole role, long groupId) {
+
+    protected CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
         AppUser saved = users.save(AppUser.of("lock-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());

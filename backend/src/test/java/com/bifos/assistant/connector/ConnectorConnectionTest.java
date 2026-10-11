@@ -19,8 +19,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ConnectorConnectionTest {
     private static final Instant CREATED = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant LATER = Instant.parse("2026-01-02T00:00:00Z");
-    private static final ConnectionFields FIELDS =
-            new ConnectionFields(Map.of("scope", "a"), Map.of("token", "demo_ok_"));
+    private static final ConnectionFields FIELDS = new ConnectionFields(Map.of("scope", "a"), Map.of("token", "demo_ok_"));
+
 
     @Test
     @DisplayName("새 연결은 PENDING 으로 만들고 보관 파일 이름은 연결 번호 앞에 c 를 붙인다")
@@ -32,6 +32,7 @@ class ConnectorConnectionTest {
         assertThat(connection.vaultStored()).isFalse();
         assertThat(connection.vault()).isEqualTo("c42");
     }
+
 
     @Test
     @DisplayName("값을 보관 파일에 쓴 연결은 READY 이고 칸 값을 적으며 세어 둔 선언 밖 도구 수를 비운다")
@@ -50,6 +51,7 @@ class ConnectorConnectionTest {
         assertThat(connection.createdAt()).isEqualTo(CREATED);
     }
 
+
     @Test
     @DisplayName("해제하면 칸 값과 비밀 앞부분과 보관 파일 표시를 비운다")
     void disconnectClearsFieldsAndVault() {
@@ -63,6 +65,7 @@ class ConnectorConnectionTest {
         assertThat(connection.vaultStored()).isFalse();
         assertThat(connection.checkedAt()).isEqualTo(LATER);
     }
+
 
     @Test
     @DisplayName("연결의 메서드는 바인딩으로 붙은 옛 커넥터 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
@@ -89,6 +92,7 @@ class ConnectorConnectionTest {
         assertThat(disabled.enabled()).as("READY 뒤 꺼진 에이전트").isFalse();
     }
 
+
     @Test
     @DisplayName("상태 전이는 인자로 받은 시각을 적는다")
     void transitionsRecordTheGivenInstant() {
@@ -104,18 +108,34 @@ class ConnectorConnectionTest {
         assertThat(connection.createdAt()).isEqualTo(CREATED);
     }
 
+
     private static Agent agent() {
         Agent agent = Agent.of(
-                "demo",
-                "검사용 메모",
-                "demo-profile",
-                "http://localhost",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                1L,
-                Instant.now());
+            "demo",
+            "검사용 메모",
+            "demo-profile",
+            "http://localhost",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            1L,
+            Instant.now());
         agent.markConnectorManaged();
         return agent;
+    }
+
+
+    @Test
+    @DisplayName("고정 시계와 되돌아간 시계에서도 연결 revision이 마이크로초마다 증가한다")
+    void advancesRevisionAtDatabasePrecision() {
+        ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
+        connection.connected(FIELDS, CREATED);
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(1_000));
+        connection.ready(CREATED);
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(2_000));
+        connection.pending(CREATED.minusSeconds(1));
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(3_000));
+        connection.disconnected(CREATED);
+        assertThat(connection.updatedAt()).isEqualTo(CREATED.plusNanos(4_000));
     }
 }
