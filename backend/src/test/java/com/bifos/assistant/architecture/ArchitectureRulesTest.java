@@ -127,9 +127,18 @@ class ArchitectureRulesTest {
         ArchitectureRules.FEATURE_LAYER_COVERAGE.check(fixture);
         ArchitectureRules.LAYER_DIRECTION.check(fixture);
         String from = "com.bifos.assistant.agent.memory.application.Sample";
+        sources.put("com.bifos.assistant.agent.domain.Policy",
+            "package com.bifos.assistant.agent.domain; public class Policy {}");
+        sources.put("com.bifos.assistant.agent.infra.Store",
+            "package com.bifos.assistant.agent.infra; public class Store {}");
         sources.put(from, "package com.bifos.assistant.agent.memory.application; public class Sample { "
             + "com.bifos.assistant.agent.memory.infra.Sample store; "
-            + "com.bifos.assistant.agent.memory.domain.Sample policy; }");
+            + "com.bifos.assistant.agent.memory.domain.Sample policy; "
+            + "com.bifos.assistant.agent.domain.Policy agentPolicy; "
+            + "com.bifos.assistant.agent.infra.Store agentStore; }");
+        sources.put("com.bifos.assistant.memory.agent.application.Sample",
+            "package com.bifos.assistant.memory.agent.application; public class Sample { "
+                + "com.bifos.assistant.agent.memory.application.Sample service; }");
         JavaClasses application = compileFixture(temporary.resolve("application"), sources);
         assertThat(application).hasSize(sources.size());
         ArchitectureRules.LAYER_DIRECTION.check(application);
