@@ -18,6 +18,57 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 class ToolDetailEventStreamTest {
+    @Test
+    @DisplayName("실제 SSE의 관찰 본문은 scope와 커넥터 호출 전후에 관계없이 두 필드 모두 비운다")
+    void suppressesObservationBodiesInRealSseAcrossScopesAndConnectorHistory() throws IOException {
+        var mapper = JsonMapper.builder().build();
+        String marker = "SYNTHETIC_OCR_PRIVATE_3264";
+        StringBuilder raw = new StringBuilder();
+        for (boolean afterConnector : new boolean[] {false, true}) {
+            if (afterConnector) {
+                raw.append(
+                    "data: {\"event\":\"tool.started\",\"tool\":\"mcp__demo__read\",\"preview\":\"connector\"}\n\n");
+            }
+            for (String tool : List.of(
+                "list_media_observations",
+                "record_media_observation",
+                "mcp__fos_assistant__list_media_observations",
+                "mcp__fos_assistant__record_media_observation")) {
+                for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
+                    for (boolean nested : new boolean[] {false, true}) {
+                        for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
+                            var root = mapper.createObjectNode();
+                            var payload = nested ? root.putObject("data") : root;
+                            payload.put("event", event).put("tool", tool).put(field, marker);
+                            raw.append("data: ")
+                                .append(mapper.writeValueAsString(root))
+                                .append("\n\n");
+                        }
+                    }
+                }
+            }
+        }
+        HttpServer server = startServer(raw.toString());
+        try {
+            for (ToolDetailScope scope : List.of(
+                ToolDetailScope.NONE, ToolDetailScope.ALL, ToolDetailScope.prefixes(Set.of("mcp__demo__")))) {
+                List<RunEvent> events = read(server, scope);
+                assertThat(events).isNotEmpty();
+                for (RunEvent event : events) {
+                    if (!"mcp__demo__read".equals(event.toolName())) {
+                        assertThat(event.detail()).isNull();
+                        assertThat(event.text()).isNull();
+                    }
+                    assertThat(event.toString()).doesNotContain(marker);
+                    assertThat(mapper.writeValueAsString(event)).doesNotContain(marker);
+                }
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
+
+
     private static final String RAW = """
             data: {"event":"tool.started","preview":"12345678-1234-5678-9012-123456789abc abcdef01-1234-5678-9012-123456789abc"}
 
@@ -73,6 +124,7 @@ class ToolDetailEventStreamTest {
 
             """;
 
+
     @Test
     @DisplayName("같은 스트림의 도구 시작과 완료에서 UUID 번호표를 유지하고 비밀값은 가린다")
     void preservesUuidLabelsAcrossStartedAndCompletedEvents() throws IOException {
@@ -86,18 +138,20 @@ class ToolDetailEventStreamTest {
         }
     }
 
+
     @Test
     @DisplayName("옛 커넥터 에이전트의 스트림은 두 사건 모두 원문 전체를 가린다")
     void hidesAllDetailsForConnectorStream() throws IOException {
         HttpServer server = startServer(RAW);
         try {
             assertThat(read(server, ToolDetailScope.ALL))
-                    .extracting(RunEvent::detail)
-                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]");
+                .extracting(RunEvent::detail)
+                .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]");
         } finally {
             server.stop(0);
         }
     }
+
 
     @Test
     @DisplayName("붙은 커넥터 호출 전에는 비밀값만 가리고 호출 뒤 일반 도구는 길이만 남긴다")
@@ -107,21 +161,22 @@ class ToolDetailEventStreamTest {
             List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
 
             assertThat(events)
-                    .extracting(RunEvent::detail)
-                    .containsExactly(
-                            "호출-전-1180 [가림]", "[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 10자]", "[도구 내용 가림: 10자]");
+                .extracting(RunEvent::detail)
+                .containsExactly(
+                    "호출-전-1180 [가림]", "[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 10자]", "[도구 내용 가림: 10자]");
             assertThat(events)
-                    .extracting(RunEvent::toolName)
-                    .containsExactly(
-                            "web_search",
-                            "mcp__demo__list_notes",
-                            "mcp__demo__list_notes",
-                            "web_search",
-                            "mcp__demoother__list");
+                .extracting(RunEvent::toolName)
+                .containsExactly(
+                    "web_search",
+                    "mcp__demo__list_notes",
+                    "mcp__demo__list_notes",
+                    "web_search",
+                    "mcp__demoother__list");
         } finally {
             server.stop(0);
         }
     }
+
 
     @Test
     @DisplayName("붙은 커넥터 서버의 도구가 실제 모양으로 오면 이름과 시간과 실패는 남기고 내용만 가린다")
@@ -131,14 +186,14 @@ class ToolDetailEventStreamTest {
             List<RunEvent> events = read(server, ToolDetailScope.prefixes(Set.of("mcp__demo__")));
 
             assertThat(events)
-                    .extracting(RunEvent::type)
-                    .containsExactly("tool.started", "tool.completed", "tool.started", "tool.completed");
+                .extracting(RunEvent::type)
+                .containsExactly("tool.started", "tool.completed", "tool.started", "tool.completed");
             assertThat(events)
-                    .extracting(RunEvent::toolName)
-                    .containsExactly("mcp__demo__list_notes", "mcp__demo__list_notes", "terminal", "terminal");
+                .extracting(RunEvent::toolName)
+                .containsExactly("mcp__demo__list_notes", "mcp__demo__list_notes", "terminal", "terminal");
             assertThat(events)
-                    .extracting(RunEvent::detail)
-                    .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 2자]", "[도구 내용 가림: 2자]");
+                .extracting(RunEvent::detail)
+                .containsExactly("[연결 도구 내용 가림]", "[연결 도구 내용 가림]", "[도구 내용 가림: 2자]", "[도구 내용 가림: 2자]");
             assertThat(events).extracting(RunEvent::durationMs).containsExactly(null, 50L, null, 100L);
             assertThat(events).extracting(RunEvent::failed).containsExactly(null, false, null, true);
         } finally {
@@ -146,21 +201,23 @@ class ToolDetailEventStreamTest {
         }
     }
 
+
     @Test
     @DisplayName("연결 없는 실행은 일반 도구 내용에 기존 비밀값 가림과 500자 상한을 쓴다")
     void keepsExistingRuleWithoutBindings() throws IOException {
         String raw = "data: {\"event\":\"tool.started\",\"tool\":\"terminal\",\"preview\":\"Bearer tiny "
-                + "가".repeat(600) + "\"}\n\n";
+            + "가".repeat(600) + "\"}\n\n";
         HttpServer server = startServer(raw);
         try {
             assertThat(read(server, ToolDetailScope.NONE).getFirst().detail())
-                    .startsWith("[가림] ")
-                    .hasSize(500)
-                    .endsWith("…");
+                .startsWith("[가림] ")
+                .hasSize(500)
+                .endsWith("…");
         } finally {
             server.stop(0);
         }
     }
+
 
     @Test
     @DisplayName("자식이나 형제의 커넥터 호출 뒤에는 연결 없는 부모도 목표와 일반 도구를 가린다")
@@ -175,18 +232,18 @@ class ToolDetailEventStreamTest {
                 """;
         HttpServer server = startServer(raw);
         try {
-            ToolDetailScope scope =
-                    ToolDetailScope.NONE.withTreeHistory(at -> !at.isBefore(Instant.ofEpochSecond(1001)));
+            ToolDetailScope scope = ToolDetailScope.NONE.withTreeHistory(at -> !at.isBefore(Instant.ofEpochSecond(1001)));
             List<RunEvent> events = read(server, scope);
             assertThat(events).extracting(RunEvent::detail).containsExactly("호출 전", null, "[도구 내용 가림: 8자]");
             assertThat(events.get(1).goal()).isEqualTo("[도구 내용 가림: 8자]");
             assertThat(read(server, ToolDetailScope.NONE))
-                    .extracting(RunEvent::detail)
-                    .containsExactly("호출 전", null, "메일 본문 반환");
+                .extracting(RunEvent::detail)
+                .containsExactly("호출 전", null, "메일 본문 반환");
         } finally {
             server.stop(0);
         }
     }
+
 
     @Test
     @DisplayName("옛 커넥터 에이전트의 스트림은 커넥터 도구가 아닌 것도 모두 가린다")
@@ -194,12 +251,13 @@ class ToolDetailEventStreamTest {
         HttpServer server = startServer(MIXED_RAW);
         try {
             assertThat(read(server, ToolDetailScope.ALL))
-                    .extracting(RunEvent::detail)
-                    .containsOnly("[연결 도구 내용 가림]");
+                .extracting(RunEvent::detail)
+                .containsOnly("[연결 도구 내용 가림]");
         } finally {
             server.stop(0);
         }
     }
+
 
     @Test
     @DisplayName("memory_read 사건은 시작의 인자만 남기고 완료의 결과는 남기지 않는다")
@@ -216,6 +274,7 @@ class ToolDetailEventStreamTest {
         }
     }
 
+
     @Test
     @DisplayName("follow_up_propose 사건은 시작과 완료 모두 내용을 남기지 않는다")
     void keepsNoDetailOfFollowUpProposeEvents() throws IOException {
@@ -230,18 +289,20 @@ class ToolDetailEventStreamTest {
         }
     }
 
+
     @Test
     @DisplayName("다른 도구의 완료 사건은 결과를 가려 남긴다")
     void keepsRedactedResultOfOtherToolCompletedEvent() throws IOException {
         HttpServer server = startServer(OTHER_TOOL_RAW);
         try {
             assertThat(read(server, ToolDetailScope.NONE))
-                    .extracting(RunEvent::detail)
-                    .containsExactly("[가림] 검색 결과");
+                .extracting(RunEvent::detail)
+                .containsExactly("[가림] 검색 결과");
         } finally {
             server.stop(0);
         }
     }
+
 
     private static HttpServer startServer(String raw) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -257,20 +318,21 @@ class ToolDetailEventStreamTest {
         return server;
     }
 
+
     private static List<RunEvent> read(HttpServer server, ToolDetailScope scope) {
         HermesProfileKeyStore keys = mock(HermesProfileKeyStore.class);
         when(keys.resolve("test-profile")).thenReturn("test-key");
         HermesProperties properties = new HermesProperties(null, null, null, null, null, null, null, null);
-        HermesRunEventStream stream =
-                new HermesRunEventStream(keys, properties, JsonMapper.builder().build());
+        HermesRunEventStream stream = new HermesRunEventStream(keys, properties, JsonMapper.builder().build());
         List<RunEvent> events = new ArrayList<>();
         stream.open(
-                "http://127.0.0.1:" + server.getAddress().getPort(),
-                "test-profile",
-                "run-one",
-                events::add,
-                opened -> {},
-                scope);
+            "http://127.0.0.1:" + server.getAddress().getPort(),
+            "test-profile",
+            "run-one",
+            events::add,
+            opened -> {
+            },
+            scope);
         return events;
     }
 }
