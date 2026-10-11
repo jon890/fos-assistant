@@ -49,6 +49,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.auditing.DateTimeProvider;
+import org.springframework.data.domain.Auditable;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import jakarta.persistence.Enumerated;
@@ -134,6 +135,15 @@ public final class ArchitectureRules {
                     Optional<JavaField> created = type.tryGetField("createdAt");
                     require(type, created.isPresent() && created.get().getRawType().isEquivalentTo(Instant.class)
                         && created.get().isAnnotatedWith(CreatedDate.class), "createdAt Instant 와 CreatedDate", events);
+                }
+                if (!collection) {
+                    require(type, !type.isAnnotatedWith(EntityListeners.class)
+                        || Arrays.stream((JavaClass[]) type.getAnnotationOfType(EntityListeners.class.getName())
+                            .getProperties().get("value"))
+                            .noneMatch(listener -> listener.isEquivalentTo(AuditingEntityListener.class)),
+                        "허용하지 않은 AuditingEntityListener 선언", events);
+                    require(type, !type.isAssignableTo(Auditable.class),
+                        "허용하지 않은 Auditable 구현 또는 상속", events);
                 }
                 for (JavaField field : type.getFields()) {
                     boolean allowed = collection && field.getName().equals("createdAt");

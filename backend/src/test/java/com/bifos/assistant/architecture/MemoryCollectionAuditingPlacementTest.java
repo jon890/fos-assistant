@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -56,14 +57,27 @@ class MemoryCollectionAuditingPlacementTest {
     @DisplayName("현재 domain 위치의 생성 시각과 정상 provider 선언을 허용한다")
     void acceptsActualAnnotations() throws IOException {
         ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK.check(
-            ArchitectureRulesTest.compileFixture(temporary, Map.of(ENTITY, ENTITY_SOURCE, CONFIG, CONFIG_SOURCE)));
+            ArchitectureRulesTest.compileFixture(temporary, Map.of(ENTITY, ENTITY_SOURCE, CONFIG, CONFIG_SOURCE, "fixture.Other", """
+                package fixture;
+                import jakarta.persistence.*;
+                import java.time.Instant;
+                @Entity @EntityListeners(Other.Listener.class)
+                public class Other {
+                    @Id Long id;
+                    Instant changedAt;
+                    public static class Listener {
+                        @PrePersist public void stamp(Other entity) { entity.changedAt = Instant.EPOCH; }
+                    }
+                }
+                """)));
     }
 
 
     @ParameterizedTest
     @ValueSource(strings = {
         "created", "type", "configuration", "enable", "beanMissing", "listener", "business", "other", "getter", "reference", "bean", "return", "clock",
-        "missingEntity", "duplicateEntity", "missingConfig", "duplicateConfig", "duplicateProvider"
+        "missingEntity", "duplicateEntity", "missingConfig", "duplicateConfig", "duplicateProvider",
+        "otherListener", "auditable", "abstractAuditable", "inheritedAuditable"
     })
     @DisplayName("annotation 과 listener 와 provider 선언 누락 및 중복은 운영 규칙으로 실패한다")
     void rejectsInvalidDeclarations(String change) throws IOException {
@@ -96,6 +110,33 @@ class MemoryCollectionAuditingPlacementTest {
             case "missingConfig" -> config = null;
             case "duplicateConfig" -> sources.put("fixture.JpaAuditingConfig", CONFIG_SOURCE.replace("com.bifos.assistant.shared.config", "fixture"));
             case "duplicateProvider" -> config = config.replace("public class JpaAuditingConfig {", "public class JpaAuditingConfig { @Bean(\"auditingDateTimeProvider\") DateTimeProvider duplicate(Clock clock) { return () -> Optional.of(clock.instant()); }");
+            case "otherListener" -> sources.put("fixture.Other", """
+                    package fixture;
+                    import jakarta.persistence.*;
+                    import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+                    @Entity @EntityListeners(AuditingEntityListener.class)
+                    public class Other { @Id Long id; }
+                    """);
+            case "auditable" -> sources.put("fixture.Other", """
+                    package fixture;
+                    import java.time.Instant;
+                    import org.springframework.data.domain.Auditable;
+                    public abstract class Other implements Auditable<String, Long, Instant> {}
+                    """);
+            case "abstractAuditable" -> sources.put("fixture.Other", """
+                    package fixture;
+                    import org.springframework.data.jpa.domain.AbstractAuditable;
+                    public class Other extends AbstractAuditable<String, Long> {}
+                    """);
+            case "inheritedAuditable" -> {
+                sources.put("fixture.Base", """
+                        package fixture;
+                        import java.time.Instant;
+                        import org.springframework.data.domain.Auditable;
+                        public abstract class Base implements Auditable<String, Long, Instant> {}
+                        """);
+                sources.put("fixture.Other", "package fixture; public abstract class Other extends Base {}");
+            }
             default -> throw new IllegalArgumentException(change);
         }
         if (entity != null) {
@@ -107,6 +148,33 @@ class MemoryCollectionAuditingPlacementTest {
         var result = ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK.evaluate(
             ArchitectureRulesTest.compileFixture(temporary, sources));
         assertThat(result.hasViolation()).as(change).isTrue();
-        assertThat(result.getFailureReport().toString()).contains("auditing", "MemoryCollection");
+        assertThat(result.getFailureReport().getDetails()).as(change)
+            .containsExactlyInAnyOrderElementsOf(expectedDetails(change));
     }
+
+    private static List<String> expectedDetails(String change) {
+        String counts = "MemoryCollection / JpaAuditingConfig / auditingDateTimeProvider 선택 수는 각각 1: ";
+        return switch (change) {
+            case "created", "type" -> List.of(ENTITY + ": createdAt Instant 와 CreatedDate");
+            case "configuration", "enable", "reference" -> List.of(CONFIG + ": JpaAuditingConfig providerRef 선언");
+            case "listener" -> List.of(ENTITY + ": EntityListeners 선언");
+            case "business" -> List.of(ENTITY + ": 허용하지 않은 auditing field " + ENTITY + ".expiresAt");
+            case "other" -> List.of("fixture.Other: 허용하지 않은 auditing field fixture.Other.changedAt");
+            case "getter" -> List.of(ENTITY + ": 허용하지 않은 auditing getter " + ENTITY + ".getCreatedAt()");
+            case "beanMissing", "bean" -> List.of(counts + "1 / 1 / 0");
+            case "return", "clock" -> List.of(CONFIG + ": auditingDateTimeProvider Bean 반환과 Clock 인자");
+            case "missingEntity" -> List.of(counts + "0 / 1 / 1");
+            case "duplicateEntity" -> List.of("fixture.MemoryCollection: MemoryCollection 선택과 Entity 선언", counts + "2 / 1 / 1");
+            case "missingConfig" -> List.of(counts + "1 / 0 / 0");
+            case "duplicateConfig" -> List.of("fixture.JpaAuditingConfig: JpaAuditingConfig providerRef 선언",
+                counts + "1 / 2 / 2");
+            case "duplicateProvider" -> List.of(counts + "1 / 1 / 2");
+            case "otherListener" -> List.of("fixture.Other: 허용하지 않은 AuditingEntityListener 선언");
+            case "auditable", "abstractAuditable" -> List.of("fixture.Other: 허용하지 않은 Auditable 구현 또는 상속");
+            case "inheritedAuditable" -> List.of("fixture.Base: 허용하지 않은 Auditable 구현 또는 상속",
+                "fixture.Other: 허용하지 않은 Auditable 구현 또는 상속");
+            default -> throw new IllegalArgumentException(change);
+        };
+    }
+
 }
