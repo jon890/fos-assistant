@@ -28,6 +28,8 @@ public record ConnectorBindingAttempt(
     CredentialScope credentialScope,
     String sandboxOwner,
     String connectorId,
+    String guardProtocol,
+    String guardManifestSha256,
     String vault,
     String ownerBrowser,
     String mcpServer,
