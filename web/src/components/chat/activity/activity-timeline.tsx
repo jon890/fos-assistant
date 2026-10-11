@@ -12,7 +12,7 @@ import {
 import { cn } from "cn";
 import { formatSeconds } from "@/lib/format";
 import { isReadableDetail } from "@/lib/tool-label";
-import { Markdown } from "../markdown";
+import { Markdown } from "@/components/chat/markdown";
 import {
   activityLabel,
   type ActivityItem,
@@ -79,10 +79,16 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
               aria-hidden="true"
               className={cn(
                 "flex h-5 w-4 shrink-0 items-center justify-center",
-                item.kind === "interim" ? "text-muted-foreground" : markColor(item.state),
+                item.kind === "interim"
+                  ? "text-muted-foreground"
+                  : markColor(item.state),
               )}
             >
-              {item.kind === "interim" ? <MessageCircle className={ICON_CLASS} /> : MARKS[item.state]}
+              {item.kind === "interim" ? (
+                <MessageCircle className={ICON_CLASS} />
+              ) : (
+                MARKS[item.state]
+              )}
             </span>
             {spoken ? <span className="sr-only">{spoken}</span> : null}
             <div className="min-w-0 flex-1">
@@ -91,7 +97,9 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
                   <span className="shrink-0 text-muted-foreground">도우미</span>
                 ) : null}
                 {item.kind === "interim" ? (
-                  <span className="shrink-0 text-muted-foreground">비서 안내</span>
+                  <span className="shrink-0 text-muted-foreground">
+                    비서 안내
+                  </span>
                 ) : null}
                 {item.kind === "interim" ? (
                   <div className="min-w-0 break-words">

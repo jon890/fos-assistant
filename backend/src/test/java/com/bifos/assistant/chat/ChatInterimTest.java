@@ -181,6 +181,7 @@ class ChatInterimTest {
         assertStoredAnswer(retry.getLast(), "재시도 답");
     }
 
+
     @Test
     @DisplayName("같은 timestamp의 다른 안내를 각각 재분류하고 가린 본문이 같아도 번호와 부분 답은 보존한다")
     void reclassifiesDifferentInterimsAtSameTimestamp() {

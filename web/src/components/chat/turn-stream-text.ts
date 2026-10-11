@@ -1,11 +1,10 @@
-import type { ChatEvent } from "../../lib/chat-event.ts";
+import type { ChatEvent } from "@/lib/chat-event";
 
 /** 실행 동안만 두는 답 조각과 중간 안내 중복 상태다. 이력이나 저장 API에 넘기지 않는다. */
 export type TurnStreamText = { text: string; interimKeys: Set<string> };
 
 export function interimKey(event: ChatEvent): string {
   // Python의 \s는 Unicode White_Space 외에 이 네 구분 문자도 공백으로 본다.
-  // eslint-disable-next-line no-control-regex
   return event.interimId
     ? `id:${event.interimId}`
     : `text:${(event.text ?? "").replace(/[\p{White_Space}\u001c-\u001f]+/gu, " ").trim()}`;

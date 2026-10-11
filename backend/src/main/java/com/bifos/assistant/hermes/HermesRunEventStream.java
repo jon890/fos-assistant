@@ -283,7 +283,8 @@ public class HermesRunEventStream {
         }
 
 
-        private record InterimIdentity(String timestamp, String text) {}
+        private record InterimIdentity(String timestamp, String text) {
+        }
 
 
         /** 직전 구간 전체가 안내의 접두사인 경우만 재분류한다. 부분 문자열이나 최종 답에서는 찾지 않는다. */

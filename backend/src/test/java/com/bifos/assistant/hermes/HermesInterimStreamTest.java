@@ -113,6 +113,7 @@ class HermesInterimStreamTest {
         assertThat(events.getLast().streamedPrefixLength()).isEqualTo(prefix.length());
     }
 
+
     @Test
     @DisplayName("같은 timestamp의 다른 원문은 가린 글이 같아도 다른 안내이고 정확히 재수신한 사건만 같은 번호다")
     void distinguishesDifferentTextsAtSameTimestampBeforeRedaction() throws IOException {
