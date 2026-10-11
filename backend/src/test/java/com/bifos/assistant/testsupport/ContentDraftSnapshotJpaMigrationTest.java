@@ -1,8 +1,7 @@
-package com.bifos.assistant.chat;
+package com.bifos.assistant.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
