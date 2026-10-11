@@ -241,7 +241,8 @@ for (const result of ["실패", "빈 목록", "다른 에이전트"] as const) {
   });
 }
 
-test("화면 이동 뒤 도착한 이전 목록은 새 대화의 선택을 덮어쓰지 않는다", async ({ page }, testInfo) => {
+test("unmount 뒤 도착한 목록 응답은 새 화면의 선택을 덮어쓰지 않는다", async ({ page }, testInfo) => {
+  // 이전 ChatPanel의 unmount 격리를 본다. 요청 번호 가드는 아래 Strict Mode 검사로 검증한다.
   // 요청을 제거하면 Playwright가 이미 처리된 route를 해제하므로 fetch의 응답만 보류한다.
   await page.addInitScript(() => {
     const original = window.fetch.bind(window);
