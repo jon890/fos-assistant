@@ -29,30 +29,31 @@ class AgentAdminServicePlacementTest {
     private static final String CONTROLLER = ROOT + ".agent.admin.presentation.AgentAdminController";
     private static final String DTOS = ROOT + ".agent.admin.presentation.AgentAdminDtos";
     private static final Set<String> OWNED_NAMES = Set.of(
-            "AgentAdminService",
-            "AgentCreateCommand",
-            "AgentUpdateCommand",
-            "AgentAdminController",
-            "AgentAdminDtos",
-            "CreateAgentRequest",
-            "UpdateAgentRequest",
-            "AdminAgentView");
+        "AgentAdminService",
+        "AgentCreateCommand",
+        "AgentUpdateCommand",
+        "AgentAdminController",
+        "AgentAdminDtos",
+        "CreateAgentRequest",
+        "UpdateAgentRequest",
+        "AdminAgentView");
 
     @TempDir
     Path temporary;
+
 
     @Test
     @DisplayName("실제 운영 소스의 관리자 타입 8개가 각각 하나이고 raw 배치 검사를 통과한다")
     void checksProductionOwnership() {
         JavaClasses production = ArchitectureRulesTest.MAIN;
         assertThat(production.stream()
-                        .filter(type -> OWNED_NAMES.contains(type.getSimpleName()))
-                        .toList())
+            .filter(type -> OWNED_NAMES.contains(type.getSimpleName()))
+            .toList())
                 .hasSize(8);
         for (String name : OWNED_NAMES) {
             assertThat(production.stream()
-                            .filter(type -> type.getSimpleName().equals(name))
-                            .toList())
+                .filter(type -> type.getSimpleName().equals(name))
+                .toList())
                     .as("운영 타입 %s 의 선택 수", name)
                     .hasSize(1);
         }
@@ -60,18 +61,20 @@ class AgentAdminServicePlacementTest {
         ArchitectureRules.AGENT_ADMIN_HTTP_CONTRACT.check(production);
     }
 
+
     @Test
     @DisplayName("정상 fixture 의 소유 타입 8개와 공유 lifecycle 호출을 선택하고 허용한다")
     void acceptsOwnedFixture() throws IOException {
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources());
         assertThat(fixture).hasSize(10);
         assertThat(fixture.stream()
-                        .filter(type -> OWNED_NAMES.contains(type.getSimpleName()))
-                        .toList())
+            .filter(type -> OWNED_NAMES.contains(type.getSimpleName()))
+            .toList())
                 .hasSize(8);
         ArchitectureRules.agentAdminApplicationPlacement(ROOT).check(fixture);
         ArchitectureRules.agentAdminHttpContract(ROOT).check(fixture);
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("wrongPlacements")
@@ -81,29 +84,31 @@ class AgentAdminServicePlacementTest {
         move(sources, original, destination);
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture.stream()
-                        .filter(type -> type.getSimpleName().equals(name))
-                        .toList())
+            .filter(type -> type.getSimpleName().equals(name))
+            .toList())
                 .hasSize(1);
         assertViolation(rule(http), fixture, destination, "에 있어야 한다");
     }
 
+
     static Stream<Arguments> wrongPlacements() {
         return Stream.of(
-                Arguments.of("AgentAdminService", SERVICE, ROOT + ".agent.application.AgentAdminService", false),
-                Arguments.of(
-                        "AgentCreateCommand",
-                        ROOT + ".agent.admin.application.model.AgentCreateCommand",
-                        ROOT + ".agent.application.AgentCreateCommand",
-                        false),
-                Arguments.of(
-                        "AgentUpdateCommand",
-                        ROOT + ".agent.admin.application.model.AgentUpdateCommand",
-                        ROOT + ".agent.application.AgentUpdateCommand",
-                        false),
-                Arguments.of(
-                        "AgentAdminController", CONTROLLER, ROOT + ".agent.presentation.AgentAdminController", true),
-                Arguments.of("AgentAdminDtos", DTOS, ROOT + ".agent.presentation.AgentAdminDtos", true));
+            Arguments.of("AgentAdminService", SERVICE, ROOT + ".agent.application.AgentAdminService", false),
+            Arguments.of(
+                "AgentCreateCommand",
+                ROOT + ".agent.admin.application.model.AgentCreateCommand",
+                ROOT + ".agent.application.AgentCreateCommand",
+                false),
+            Arguments.of(
+                "AgentUpdateCommand",
+                ROOT + ".agent.admin.application.model.AgentUpdateCommand",
+                ROOT + ".agent.application.AgentUpdateCommand",
+                false),
+            Arguments.of(
+                "AgentAdminController", CONTROLLER, ROOT + ".agent.presentation.AgentAdminController", true),
+            Arguments.of("AgentAdminDtos", DTOS, ROOT + ".agent.presentation.AgentAdminDtos", true));
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidRoles")
@@ -117,39 +122,41 @@ class AgentAdminServicePlacementTest {
         assertViolation(rule(false), fixture, name, detail);
     }
 
+
     static Stream<Arguments> invalidRoles() {
         return Stream.of(
-                Arguments.of(
-                        "agent.admin.application.BadEntity",
-                        "@jakarta.persistence.Entity public class BadEntity {}",
-                        "Entity"),
-                Arguments.of(
-                        "agent.admin.application.BadEmbeddable",
-                        "@jakarta.persistence.Embeddable public class BadEmbeddable {}",
-                        "Embeddable"),
-                Arguments.of(
-                        "agent.admin.application.BadRepository", "public interface BadRepository {}", "Repository"),
-                Arguments.of(
-                        "agent.admin.presentation.BadService",
-                        "@org.springframework.stereotype.Service public class BadService {}",
-                        "Service"),
-                Arguments.of(
-                        "agent.admin.application.BadValue",
-                        "public record BadValue(String value) {}",
-                        "application.model"),
-                Arguments.of(
-                        "agent.admin.application.BadProperties",
-                        "@org.springframework.boot.context.properties.ConfigurationProperties(\"fixture\") public record BadProperties(String value) {}",
-                        "config"),
-                Arguments.of(
-                        "agent.domain.BadPolicy",
-                        "public class BadPolicy { " + SERVICE + " service; }",
-                        "domain 과 infra"),
-                Arguments.of(
-                        "agent.infra.BadAdapter",
-                        "public class BadAdapter { " + SERVICE + " service; }",
-                        "domain 과 infra"));
+            Arguments.of(
+                "agent.admin.application.BadEntity",
+                "@jakarta.persistence.Entity public class BadEntity {}",
+                "Entity"),
+            Arguments.of(
+                "agent.admin.application.BadEmbeddable",
+                "@jakarta.persistence.Embeddable public class BadEmbeddable {}",
+                "Embeddable"),
+            Arguments.of(
+                "agent.admin.application.BadRepository", "public interface BadRepository {}", "Repository"),
+            Arguments.of(
+                "agent.admin.presentation.BadService",
+                "@org.springframework.stereotype.Service public class BadService {}",
+                "Service"),
+            Arguments.of(
+                "agent.admin.application.BadValue",
+                "public record BadValue(String value) {}",
+                "application.model"),
+            Arguments.of(
+                "agent.admin.application.BadProperties",
+                "@org.springframework.boot.context.properties.ConfigurationProperties(\"fixture\") public record BadProperties(String value) {}",
+                "config"),
+            Arguments.of(
+                "agent.domain.BadPolicy",
+                "public class BadPolicy { " + SERVICE + " service; }",
+                "domain 과 infra"),
+            Arguments.of(
+                "agent.infra.BadAdapter",
+                "public class BadAdapter { " + SERVICE + " service; }",
+                "domain 과 infra"));
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("mappedMethods")
@@ -157,17 +164,19 @@ class AgentAdminServicePlacementTest {
     void rejectsMissingAuthorization(String method) throws IOException {
         Map<String, String> sources = sources();
         sources.compute(
-                CONTROLLER,
-                (name, source) -> source.replace(
-                        "void " + method + "() { currentUser.requireAdmin();", "void " + method + "() {"));
+            CONTROLLER,
+            (name, source) -> source.replace(
+                "void " + method + "() { currentUser.requireAdmin();", "void " + method + "() {"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture).hasSize(10);
         assertViolation(rule(true), fixture, CONTROLLER, method + "()", "requireAdmin");
     }
 
+
     static Stream<String> mappedMethods() {
         return Stream.of("create", "list", "update");
     }
+
 
     @Test
     @DisplayName("HTTP record 를 Dtos 밖으로 옮기면 거절한다")
@@ -181,6 +190,7 @@ class AgentAdminServicePlacementTest {
         assertViolation(rule(true), fixture, name, "AgentAdminDtos");
     }
 
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("ownedNames")
     @DisplayName("각 소유 타입을 빼면 대상 수 0으로 거절한다")
@@ -192,18 +202,18 @@ class AgentAdminServicePlacementTest {
             sources.entrySet().removeIf(entry -> entry.getKey().endsWith("." + name));
             if (name.equals("AgentAdminService")) {
                 sources.compute(
-                        CONTROLLER,
-                        (key, source) ->
-                                source.replace(SERVICE + " service;", "").replace("service.execute();", ""));
+                    CONTROLLER,
+                    (key, source) -> source.replace(SERVICE + " service;", "").replace("service.execute();", ""));
             }
         }
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture.stream()
-                        .filter(type -> type.getSimpleName().equals(name))
-                        .toList())
+            .filter(type -> type.getSimpleName().equals(name))
+            .toList())
                 .isEmpty();
         assertViolation(rule(isHttp(name)), fixture, name, "대상 수가 0");
     }
+
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("ownedNames")
@@ -214,51 +224,57 @@ class AgentAdminServicePlacementTest {
         sources.put(duplicate, source(duplicate, "public class " + name + " {}"));
         JavaClasses fixture = ArchitectureRulesTest.compileFixture(temporary, sources);
         assertThat(fixture.stream()
-                        .filter(type -> type.getSimpleName().equals(name))
-                        .toList())
+            .filter(type -> type.getSimpleName().equals(name))
+            .toList())
                 .hasSize(2);
         assertViolation(rule(isHttp(name)), fixture, duplicate, "대상 수가 2");
     }
 
+
     static Stream<String> ownedNames() {
         return OWNED_NAMES.stream().sorted();
     }
+
 
     @Test
     @DisplayName("소유 타입이 하나도 없거나 전체 루트가 비어도 raw 검사가 실패한다")
     void rejectsEmptySelection() throws IOException {
         String name = ROOT + ".Unrelated";
         JavaClasses unrelated = ArchitectureRulesTest.compileFixture(
-                temporary.resolve("unrelated"), Map.of(name, source(name, "public class Unrelated {}")));
+            temporary.resolve("unrelated"), Map.of(name, source(name, "public class Unrelated {}")));
         assertThat(unrelated).hasSize(1);
         assertViolation(rule(false), unrelated, "AgentAdminService", "대상 수가 0");
         assertViolation(rule(true), unrelated, "AgentAdminController", "대상 수가 0");
         JavaClasses empty = ArchitectureRulesTest.compileFixture(
-                temporary.resolve("outside"),
-                Map.of("outside.Unrelated", "package outside; public class Unrelated {}"));
+            temporary.resolve("outside"),
+            Map.of("outside.Unrelated", "package outside; public class Unrelated {}"));
         assertThatThrownBy(() -> rule(false).check(empty)).isInstanceOf(AssertionError.class);
         assertThatThrownBy(() -> rule(true).check(empty)).isInstanceOf(AssertionError.class);
     }
 
+
     private static boolean isHttp(String name) {
         return !Set.of("AgentAdminService", "AgentCreateCommand", "AgentUpdateCommand")
-                .contains(name);
+            .contains(name);
     }
+
 
     private static ArchRule rule(boolean http) {
         return http
-                ? ArchitectureRules.agentAdminHttpContract(ROOT)
-                : ArchitectureRules.agentAdminApplicationPlacement(ROOT);
+            ? ArchitectureRules.agentAdminHttpContract(ROOT)
+            : ArchitectureRules.agentAdminApplicationPlacement(ROOT);
     }
+
 
     private static void assertViolation(ArchRule rule, JavaClasses fixture, String... details) {
         var result = rule.evaluate(fixture);
         assertThat(result.hasViolation()).isTrue();
         assertThat(result.getFailureReport().toString())
-                .contains(rule.getDescription())
-                .contains(details);
+            .contains(rule.getDescription())
+            .contains(details);
         assertThatThrownBy(() -> rule.check(fixture)).isInstanceOf(AssertionError.class);
     }
+
 
     private static Map<String, String> sources() {
         Map<String, String> sources = new HashMap<>();
@@ -307,17 +323,19 @@ class AgentAdminServicePlacementTest {
         return sources;
     }
 
+
     private static String source(String name, String declaration) {
         return "package " + name.substring(0, name.lastIndexOf('.')) + ";\n" + declaration;
     }
 
+
     private static void move(Map<String, String> sources, String original, String destination) {
         String source = sources.remove(original);
         sources.put(
-                destination,
-                source.replace(
-                        original.substring(0, original.lastIndexOf('.')),
-                        destination.substring(0, destination.lastIndexOf('.'))));
+            destination,
+            source.replace(
+                original.substring(0, original.lastIndexOf('.')),
+                destination.substring(0, destination.lastIndexOf('.'))));
         sources.replaceAll((name, body) -> body.replace(original, destination));
     }
 }

@@ -97,19 +97,22 @@ class AgentLifecycleFlagsTest {
     private CurrentUser otherMember;
     private CurrentUser administrator;
 
+
     @BeforeEach
     void reset() {
         doNothing().when(endpointProbe).requireReachable(any(), any());
-        ((StubHermesRunsClient) hermes).reset();
+        ((StubHermesRunsClient)hermes).reset();
         owner = user(UserRole.MEMBER);
         otherMember = user(UserRole.MEMBER);
         administrator = user(UserRole.ADMIN);
     }
 
+
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
     }
+
 
     @Test
     @DisplayName("지운 에이전트는 목록과 시작과 쓰기에서 없는 에이전트이고 번호로는 읽힌다")
@@ -122,13 +125,14 @@ class AgentLifecycleFlagsTest {
         assertThat(agentService.readableBy(owner)).extracting(Agent::code).doesNotContain(helper);
         assertNotFound(() -> agentService.requireStartable(owner, helper));
         assertNotFound(() -> new TransactionTemplate(transactionManager)
-                .execute(status -> agentService.requireReadableForUpdate(owner, helper)));
+            .execute(status -> agentService.requireReadableForUpdate(owner, helper)));
 
         Agent byId = agentService.requireById(agent.id());
         assertThat(byId.isDeleted()).isTrue();
         assertThat(byId.enabled()).as("지우면 꺼진다").isFalse();
         assertThat(byId.deletedAt()).isEqualTo(DELETED_AT);
     }
+
 
     @Test
     @DisplayName("지운 에이전트의 기존 대화에 보내면 없는 에이전트이고 Hermes 를 부르지 않는다")
@@ -141,8 +145,9 @@ class AgentLifecycleFlagsTest {
         agents.save(agent);
 
         assertNotFound(() -> chat.send(owner, conversation.id(), "아직 있니?", null));
-        assertThat(((StubHermesRunsClient) hermes).received()).isEmpty();
+        assertThat(((StubHermesRunsClient)hermes).received()).isEmpty();
     }
+
 
     /** 다시 만들기는 새 질문 없이 기존 대화의 에이전트로 곧바로 간다. 그 길도 지운 에이전트를 막는다. */
     @Test
@@ -156,9 +161,11 @@ class AgentLifecycleFlagsTest {
         agent.markDeleted(DELETED_AT);
         agents.save(agent);
 
-        assertNotFound(() -> chat.regenerate(owner, conversation.id(), event -> {}));
-        assertThat(((StubHermesRunsClient) hermes).received()).isEmpty();
+        assertNotFound(() -> chat.regenerate(owner, conversation.id(), event -> {
+        }));
+        assertThat(((StubHermesRunsClient)hermes).received()).isEmpty();
     }
+
 
     @Test
     @DisplayName("관리자도 지운 에이전트를 켜지 못하고 관리 목록에서 보지 못한다")
@@ -172,10 +179,11 @@ class AgentLifecycleFlagsTest {
         signIn(administrator);
 
         assertNotFound(
-                () -> admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null, null)));
+            () -> admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.PRIVATE, null, null, null)));
         assertThat(agents.findByCode(helper).orElseThrow().enabled()).isFalse();
         assertThat(admin.list()).extracting(AdminAgentView::code).contains(kept).doesNotContain(helper);
     }
+
 
     @Test
     @DisplayName("관리자도 지운 에이전트의 도구를 읽거나 바꾸지 못한다")
@@ -191,6 +199,7 @@ class AgentLifecycleFlagsTest {
         verifyNoInteractions(hermesToolsets);
     }
 
+
     @Test
     @DisplayName("그룹으로 공개해도 주인이 남고 주인만 고친다")
     void keepsOwnerWhenPublishedToGroupAndOnlyOwnerEdits() {
@@ -198,8 +207,7 @@ class AgentLifecycleFlagsTest {
         agents.save(privateAgentOf(helper, owner));
         signIn(administrator);
 
-        AdminAgentView view =
-                admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null, null));
+        AdminAgentView view = admin.update(helper, new UpdateAgentRequest(true, AgentVisibility.GROUP, null, null, null));
 
         assertThat(view.visibility()).isEqualTo("GROUP");
         assertThat(view.ownerUserId()).isEqualTo(owner.id());
@@ -209,6 +217,7 @@ class AgentLifecycleFlagsTest {
         assertThat(agentService.isEditableBy(otherMember, saved)).isFalse();
         assertThat(agentService.isEditableBy(administrator, saved)).isTrue();
     }
+
 
     @Test
     @DisplayName("관리자가 그룹 에이전트를 만들 때 준 사용자가 주인이 되고 없는 사용자는 거절한다")
@@ -223,31 +232,34 @@ class AgentLifecycleFlagsTest {
         assertThat(owned.ownerUserId()).isEqualTo(owner.id());
         assertThat(ownerless.ownerUserId()).isNull();
         assertThatThrownBy(() -> admin.create(groupRequest(ghost, randomEmail())))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThat(agents.findByCode(ghost)).isEmpty();
     }
 
+
     private static CreateAgentRequest groupRequest(String code, String ownerEmail) {
         return new CreateAgentRequest(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                ownerEmail,
-                null);
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            ownerEmail,
+            null);
     }
+
 
     private void assertNotFound(Runnable call) {
         assertThatThrownBy(call::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.AGENT_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.AGENT_NOT_FOUND);
     }
+
 
     private CurrentUser user(UserRole role) {
         String email = randomEmail();
@@ -255,27 +267,31 @@ class AgentLifecycleFlagsTest {
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
+
     /** 에이전트 번호 규칙에 맞는 소문자와 숫자, {@code -} 로 만든다. */
     private static String randomCode(String prefix) {
         return prefix + "-" + UUID.randomUUID().toString().substring(0, 13);
     }
 
+
     private static String randomEmail() {
         return "flags-" + UUID.randomUUID() + "@example.com";
     }
 
+
     private static Agent privateAgentOf(String code, CurrentUser owner) {
         return Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now());
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            Instant.now());
     }
+
 
     private static void signIn(CurrentUser user) {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(user, null));
