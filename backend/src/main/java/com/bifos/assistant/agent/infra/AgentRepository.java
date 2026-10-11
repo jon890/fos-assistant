@@ -3,10 +3,12 @@ package com.bifos.assistant.agent.infra;
 import com.bifos.assistant.agent.domain.Agent;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
+
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -18,9 +20,12 @@ import org.springframework.data.repository.query.Param;
 public interface AgentRepository extends JpaRepository<Agent, Long> {
     Optional<Agent> findByCode(String code);
 
+
     List<Agent> findByEnabledTrueOrderByCodeAsc();
 
+
     List<Agent> findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc();
+
 
     /**
      * 에이전트 한 줄을 쓰기 잠금으로 읽는다.
@@ -32,6 +37,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Query("select a from Agent a where a.id = :id")
     Optional<Agent> findByIdForUpdate(@Param("id") Long id);
 
+
     /**
      * 번호로 에이전트의 id 만 읽는다. 행을 영속성 문맥에 올리지 않는다.
      *
@@ -41,11 +47,15 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     @Query("select a.id from Agent a where a.code = :code")
     Optional<Long> findIdByCode(@Param("code") String code);
 
-    /** 도구와 기본 모델 변경, 관리자의 에이전트 수정은 경합하면 {@code AGENT_BUSY} 로 곧바로 거절해 오래 기다리지 않는다. */
+
+    /**
+     * 도구와 기본 모델 변경, 관리자의 에이전트 수정은 경합하면 {@code AGENT_BUSY} 로 곧바로 거절해 오래 기다리지 않는다.
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "0"))
     @Query("select a from Agent a where a.code = :code")
     Optional<Agent> findByCodeForUpdate(@Param("code") String code);
+
 
     /**
      * 그 profile 을 이미 가리키는 에이전트가 있는가.
@@ -55,8 +65,12 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
      */
     boolean existsByHermesProfile(String hermesProfile);
 
-    /** 그 사용자가 주인인 지우지 않은 에이전트 수다. 사용자당 상한을 이 수로 센다. 커넥터 연결용 에이전트는 세지 않는다. */
+
+    /**
+     * 그 사용자가 주인인 지우지 않은 에이전트 수다. 사용자당 상한을 이 수로 센다. 커넥터 연결용 에이전트는 세지 않는다.
+     */
     long countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(Long ownerUserId);
+
 
     /**
      * cutoff 이전에 지운 에이전트의 번호를 먼저 지운 것부터 읽는다(ADR-20261009 / agent-purge).
@@ -64,12 +78,13 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
      * <p>{@code skipped} 는 기다리는 간격 안의 번호다. 비면 질의가 깨지므로 부르는 쪽이 없는 번호 하나를 넘긴다.
      */
     @Query("""
-            select a.id from Agent a
-             where a.deletedAt is not null and a.deletedAt <= :cutoff and a.id not in :skipped
-             order by a.deletedAt asc, a.id asc
-            """)
+        select a.id from Agent a
+         where a.deletedAt is not null and a.deletedAt <= :cutoff and a.id not in :skipped
+         order by a.deletedAt asc, a.id asc
+        """)
     List<Long> findPurgeCandidates(
-            @Param("cutoff") Instant cutoff, @Param("skipped") Collection<Long> skipped, Pageable page);
+        @Param("cutoff") Instant cutoff, @Param("skipped") Collection<Long> skipped, Pageable page);
+
 
     /**
      * 정리 기한이 지난 지운 에이전트의 행을 지운다(ADR-20261009 / agent-purge). 지운 행 수를 돌려준다.

@@ -9,7 +9,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
 import java.time.Instant;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -42,24 +44,29 @@ public class AgentMemoryCollectionChange {
     @Column(name = "change_type", nullable = false, length = 20)
     private AgentMemoryCollectionChangeType changeType;
 
-    /** 붙임과 민감 허용 바꿈은 바꾼 뒤의 값, 뗌은 떼기 전의 값이다. */
+    /**
+     * 붙임과 민감 허용 바꿈은 바꾼 뒤의 값, 뗌은 떼기 전의 값이다.
+     */
     @Column(name = "allow_sensitive", nullable = false)
     private boolean allowSensitive;
 
-    /** 바꾼 관리자다. 사용자를 지워도 기록은 남으므로 외래 키를 걸지 않는다. */
+    /**
+     * 바꾼 관리자다. 사용자를 지워도 기록은 남으므로 외래 키를 걸지 않는다.
+     */
     @Column(name = "changed_by_user_id", nullable = false)
     private Long changedByUserId;
 
     @Column(name = "changed_at", nullable = false)
     private Instant changedAt;
 
+
     public static AgentMemoryCollectionChange of(
-            Long agentId,
-            String collection,
-            AgentMemoryCollectionChangeType type,
-            boolean allowSensitive,
-            Long changedByUserId,
-            Instant now) {
+        Long agentId,
+        String collection,
+        AgentMemoryCollectionChangeType type,
+        boolean allowSensitive,
+        Long changedByUserId,
+        Instant now) {
         AgentMemoryCollectionChange change = new AgentMemoryCollectionChange();
         change.agentId = agentId;
         change.collection = collection;
