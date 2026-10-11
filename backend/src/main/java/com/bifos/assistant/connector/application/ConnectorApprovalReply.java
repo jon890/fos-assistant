@@ -23,7 +23,6 @@ final class ConnectorApprovalReply {
     private static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. " + "이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.";
 
 
-
     static ConnectorPolicyAnswer of(ConnectorAction action) {
         String message = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE : APPROVAL_MESSAGE;
         return new ConnectorPolicyAnswer(false, String.format(message, action.publicId()), action.publicId());
