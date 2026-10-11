@@ -1,9 +1,15 @@
 {
   "name": "plan206-financial-snapshot-producer",
-  "description": "운영 금융 차단을 유지하며 실제 snapshot·승인·ticket·실행 application을 테스트에서 연결한다",
+  "description": "204·205 실제 main 통합 뒤 snapshot producer와 실제 Spring claim·Python·SDK·mock 왕복을 검증한다",
   "status": "pending",
   "created_at": "2026-10-11",
   "total_phases": 1,
   "current_phase": 1,
-  "phases": [{"number": 1, "file": "phase-01.md", "execution_profile": "deep"}]
+  "phases": [
+    {
+      "number": 1,
+      "file": "phase-01.md",
+      "execution_profile": "deep"
+    }
+  ]
 }

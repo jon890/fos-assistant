@@ -516,6 +516,16 @@ DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 �
 금융 허용을 흉내 내는 별도 정책을 만들지 않는다. 실제 application의 호출부만 테스트 내부에서 연결한다.
 이 검증은 mock 목적지까지의 application 통합이며 공개 승인 E2E나 운영 활성화 완료가 아니다.
 
+일반 금융 모듈의 SDK·claim loopback 대역 시험은 실제 claim 소비자 통합의 증거가 아니다.
+snapshot producer 구현은 설치와 일반 금융 모듈이 실제 main에 통합된 뒤 시작한다. 현재 소비자의 파일 존재를
+확인한 기본 계획 검사 0만으로 착수 조건을 충족했다고 보지 않는다. 실제 DB snapshot/ticket 발급과
+Spring claim→Python→SDK→mock 금융 POST 1회, replay 추가 POST 0회를 필수 완료 증거로 남긴다.
+
+테스트용 connector 원본은 금융 SDK entry의 생성 명령이 /tmp 아래에 만들고 Python fixture는 그 명령만 호출한다.
+운영 manifest 사본에만 READ prepare·FINANCIAL/always·guard·scope_fields·SDK entry를 선언한다.
+Python의 실제 manifest loader가 계산한 execution_guard_manifest_sha256을 Spring catalog·bind.guard·support에 동일하게 연결한다.
+자체 SHA 상수나 별도 manifest 복제로 이 연결을 대신하지 않는다. 운영 금융 등록과 hook·approve 노출 차단은 유지한다.
+
 준비 HTTP는 DB 트랜잭션 밖에서 한 번 실행한다. 저장 단계는 소유 사용자 잠금 아래 현재 바인딩·profile·
 소유권·READY·공개 scope·manifest SHA와 두 revision을 재검증하고, PENDING action과 암호화한 snapshot을 함께 저장한다.
 승인은 같은 내용을 다시 검증하고 EXECUTING을 커밋한 뒤 기존 ticket 발급과 executeApproved를 한 번 호출한다.
@@ -529,6 +539,18 @@ UNKNOWN 자동 재전송과 명시적 새 요청 경로는 열지 않는다. tic
 SDK 입력과 저장 실행 원문의 키·값·타입 대조는 coercion·strip·default 전에 끝낸다.
 외부 본문에는 공식 필드만 담고 scope·메타데이터는 제거한다. 구현하지 않은 공개 연결은 계속 미연결로 표시한다.
 공개 연결과 승인 카드 표시·일괄 승인 제외는 실거래 금지 경계를 확보한 별도 결정 및 보안 리뷰 전까지 보류한다.
+
+| 책임 | 통합에서 남길 관측값 |
+| --- | --- |
+| 준비 | 실제 loader SHA의 catalog·bind·support 일치와 TX 밖 prepare 1회 |
+| 저장 | PENDING과 암호화 snapshot의 원자성, rollback과 동일 의도 차단 |
+| 승인 | 실제 규칙에 따른 EXECUTING 커밋 뒤 ticket·executeApproved 각 1회 |
+| claim | 실제 DB 소비와 Spring→Python→SDK→mock POST 1회, replay 추가 POST 0회 |
+| 전송 | SUCCEEDED·FAILED·UNKNOWN DB 결과와 금융 재전송 0회; auth는 별도 counter |
+
+snapshot producer 구현자는 이 producer 절만 소유하고 설치·지원 확인 절을 보존한다. 메인 코디네이터가
+최종 문서를 통합한다. 독립 checkout에서 구현하며 먼저 머지한 PR 뒤에는 일반 merge로 새 main을 포함한다.
+rebase와 force push는 하지 않는다. 공용 문서 통합 뒤 문서 구조·한국어·길이·공개 정보 검사를 다시 실행한다.
 
 ## 커넥터 READ 데이터의 흐름
 

@@ -1,14 +1,37 @@
 {
   "status": "pending",
-  "observedMainSha": "105b510bab2224500157011dc83b1570388849b3",
+  "observedMainSha": "3399ecc1ff882a6cc1b27b03ac82f6423835c606",
   "observedInstallPr": 437,
-  "observedInstallHeadSha": "72b3ed32cc8e60bdd3720751f32dbdf9172c1f28",
+  "observedInstallHeadSha": "421cbb1605c00fca011590de4904a26b9873d32f",
   "installMergedObserved": false,
   "execution": [
-    {"plan": "plan204-financial-guard-install", "gate": "437 실제 main 통합, 신규 설치 식별자 확인, 기본 검사 0, 독립 계획 검토 승인"},
-    {"plan": "plan205-toss-general-financial-module", "gate": "437 실제 main 통합, 기본 검사 0, 독립 계획 검토 승인; guard 계획과 파일 소유권이 겹치지 않으면 병렬 가능"},
-    {"plan": "plan206-financial-snapshot-producer", "gate": "앞 두 구현의 실제 main 통합, producer 검사 0, 독립 계획 검토 승인"}
+    {
+      "plan": "plan204-financial-guard-install",
+      "gate": "437 실제 main 통합, 신규 설치 식별자 확인, 기본 검사 0, 독립 계획 검토 승인"
+    },
+    {
+      "plan": "plan205-toss-general-financial-module",
+      "gate": "actual main 기본 검사 0, 독립 계획 검토 지적 반영, client/manifest 독점 소유권 확인 뒤 별도 dispatch로 즉시 착수 가능; 437 선행 조건 없음",
+      "evidence": "실제 SDK + claim loopback 대역 + mock 금융 단일전송; 대역 vector는 actual main claim 성공·실패 계약과 직접 대조"
+    },
+    {
+      "plan": "plan206-financial-snapshot-producer",
+      "gate": "204·205 구현의 실제 main 통합, 기본 검사 0, 독립 계획 검토 지적 반영",
+      "evidence": "실제 DB/Spring claim→Python→SDK→mock POST 1회와 replay 추가 POST 0회 필수"
+    }
   ],
-  "runtime": {"financialPolicy": "RISK_NOT_OPEN", "financialToolsHidden": true, "publicApprovalConnected": false},
-  "completion": "각 관심사의 설계·구현·회귀를 함께 검토하고 CI 뒤 PR로 머지; 계획만으로 push나 PR 금지"
+  "runtime": {
+    "financialPolicy": "RISK_NOT_OPEN",
+    "financialToolsHidden": true,
+    "publicApprovalConnected": false
+  },
+  "completion": "각 관심사의 설계·구현·회귀를 함께 검토하고 CI 뒤 PR로 머지; 계획만으로 push나 PR 금지",
+  "sharedDocumentOwnership": {
+    "204": "설치·지원 확인 절",
+    "205": "일반 금융 모듈 절",
+    "206": "snapshot producer 절",
+    "integrator": "메인 코디네이터"
+  },
+  "integration": "독립 checkout에서 구현; 먼저 머지한 PR 뒤 다른 PR은 일반 merge로 새 main 포함; 상대 문서 절 보존과 문서 검사 반복; rebase·force push 금지",
+  "bundleOwnership": "205 소유: 444 실제 main 미통합 동안 client 변경 시 운영 bundle 재생성·검사; 통합 뒤 새 산출물 추적 없이 소스 build/check"
 }
