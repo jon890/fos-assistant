@@ -58,13 +58,15 @@ for (const file of files) {
       throw new Error(`생성 계약 구간 표시가 올바르지 않다: ${file}`);
     }
   }
-  const source = generated ? before.replace(generated, marker) : before;
+  const source = generated ? before.replace(generated, () => marker) : before;
   const options = await prettier.resolveConfig(absolute);
   const formatted = await prettier.format(source, {
     ...options,
     filepath: absolute,
   });
-  const after = generated ? formatted.replace(marker, generated) : formatted;
+  const after = generated
+    ? formatted.replace(marker, () => generated)
+    : formatted;
   if (before === after) continue;
   if (mode === "fix") {
     await writeFile(absolute, after);

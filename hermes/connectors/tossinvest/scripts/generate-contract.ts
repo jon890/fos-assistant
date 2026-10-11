@@ -8,6 +8,17 @@ const fixture = readFileSync(
 const canonical = JSON.parse(fixture.toString());
 const sourceFile = new URL("../src/api-contract-generated.ts", import.meta.url);
 const before = readFileSync(sourceFile, "utf8");
+const start = "// CONTRACT-GENERATED:START";
+const end = "// CONTRACT-GENERATED:END";
+const generatedRegion =
+  /\/\/ CONTRACT-GENERATED:START[\s\S]*?\/\/ CONTRACT-GENERATED:END/;
+if (
+  before.split(start).length !== 2 ||
+  before.split(end).length !== 2 ||
+  !generatedRegion.test(before)
+) {
+  throw new Error("TOSSINVEST_CONTRACT_MARKERS_INVALID");
+}
 const keys = new Set([
   "$ref",
   "type",
@@ -145,10 +156,7 @@ for (const [name, schema] of Object.entries(canonical.components.schemas)) {
 }
 lines.push("// CONTRACT-GENERATED:END");
 const generated = lines.join("\n");
-const after = before.replace(
-  /\/\/ CONTRACT-GENERATED:START[\s\S]*?\/\/ CONTRACT-GENERATED:END/,
-  generated,
-);
+const after = before.replace(generatedRegion, () => generated);
 if (process.argv.includes("--check")) {
   if (before !== after) throw new Error("TOSSINVEST_CONTRACT_OUTDATED");
 } else writeFileSync(sourceFile, after);
