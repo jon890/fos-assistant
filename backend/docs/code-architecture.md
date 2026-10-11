@@ -137,6 +137,18 @@ domain과 infra는 admin을 import하지 않는다.
 새 최상위 패키지를 만들면 이 순서의 자리를 정하고 `TopLevelPackageOrder.ORDER` 에 넣는다.
 `shared` 는 순서 밖이고 어느 패키지도 쓰지 않는다.
 `crypto` 는 맨 아래다. 사용자별 데이터 key 와 KEK 를 갖고, 본문을 저장하는 패키지가 `crypto.domain` 의 `TextCipher` 로 암호화한다. 메시지 저장은 `infra` 에서 일어나 port 를 `application` 이 아니라 `domain` 에 둔다([ADR-20261008 / data-encryption](adr/ADR-20261008-data-encryption.md)).
+
+`crypto.domain.entity`는 `UserDataKey`와 이후 추가하는 crypto 엔티티, 그 엔티티의 영속 ID를 둔다.
+암호화 정책과 port는 `crypto.domain`에 남긴다. `UserDataKey`의 단순 이름 또는
+`user_data_key` 표 계약으로 전체 운영 패키지에서 하나를 찾고 정확한 목적 패키지를 검사한다.
+표 계약은 중첩 타입도 포함하므로 다른 기능의 중첩 엔티티가 같은 표를 선언해도 중복이다.
+검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`와 `EMBEDDED_IDS_WITH_ENTITIES`.
+두 규칙은 기준 파일 없이 검사하며 다른 기능의 아직 이동하지 않은 엔티티는 제한하지 않는다.
+`@EmbeddedId` 필드·getter와 영속 상속 선언에 적용되는 `@IdClass`의 실제 타입은
+소유 엔티티와 같은 패키지에 둔다. 참조되지 않은 `@Embeddable`은 영속 ID로 허용하지 않는다.
+entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
+entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
+
 `task` 는 `attention` 바로 아래다. 예약 turn 을 열려고 `chat` 을, 에이전트와 주인을 다시 확인하려고 `agent` 와 `user` 를, 결과를 알리려고 `notification` 을 쓴다. 대화 목록이 작업 이름을 보이려고 `chat` 에 port(`ConversationTaskLabels`)를 두고 `task` 가 구현한다.
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
