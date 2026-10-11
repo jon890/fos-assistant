@@ -45,8 +45,6 @@ export function ConversationSessionView({
   outgoing,
   setOutgoing,
   setDraft,
-  conversationIdRef,
-  refresh,
   executionId,
   stopRequested,
   setComposerBlocking,
@@ -62,7 +60,7 @@ export function ConversationSessionView({
   agentsError,
   onRetryAgents,
   onAgentCodeChange,
-  assignConversationId,
+  ensureConversation,
   submit,
   cancelPendingMessage,
   releasePendingMessages,
@@ -293,15 +291,9 @@ export function ConversationSessionView({
             conversationId={conversationId}
             agentCode={agentMissing ? "" : agentCode}
             acceptsAttachments={currentAgent?.acceptsAttachments ?? false}
-            onConversationCreated={(id) => {
-              if (conversationIdRef.current === null) {
-                window.history.replaceState(null, "", `/chat/${id}`);
-              }
-              assignConversationId(id);
-              void refresh();
-            }}
+            ensureConversation={ensureConversation}
             running={sending}
-            // 새 대화의 첫 turn 은 `started` 가 대화 식별자를 실어 온 뒤부터 대기 메시지를 받는다.
+            // 첫 송신 전에 빈 대화 식별자를 확보한다. 답이 도는 동안에는 대기 메시지를 받는다.
             canQueue={conversationId !== null}
             canStop={executionId !== null && !stopRequested}
             onStop={() => {

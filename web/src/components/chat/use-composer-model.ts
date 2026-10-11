@@ -7,7 +7,7 @@ import {
 } from "./model-picker";
 import type { Conversation } from "@/components/shell/conversations-provider";
 import { saveConversationTier, type ModelTierCode } from "@/lib/model-tiers";
-import { createConversation, saveConversationModel } from "@/lib/chat-api";
+import { saveConversationModel } from "@/lib/chat-api";
 import { Props } from "./composer-types";
 import type { ComposerState } from "./use-composer-state";
 
@@ -19,13 +19,7 @@ type Context = Pick<
   | "mountedRef"
   | "setSavingModel"
 > &
-  Pick<
-    Props,
-    | "conversationId"
-    | "agentCode"
-    | "onConversationCreated"
-    | "onModelChoiceSaved"
-  >;
+  Pick<Props, "conversationId" | "ensureConversation" | "onModelChoiceSaved">;
 
 export function useComposerModel({
   creatingConversationRef,
@@ -34,8 +28,7 @@ export function useComposerModel({
   mountedRef,
   setSavingModel,
   conversationId,
-  agentCode,
-  onConversationCreated,
+  ensureConversation,
   onModelChoiceSaved,
 }: Context) {
   async function ensureConversationId(): Promise<string | null> {
@@ -45,22 +38,10 @@ export function useComposerModel({
     const promise = (async () => {
       setCreatingConversation(true);
       try {
-        const response = await createConversation(agentCode);
-        const payload = (await response.json()) as {
-          conversationId?: string;
-          code?: string;
-          message?: string;
-        };
-        if (!response.ok || !payload.conversationId) {
-          setPickNotice(
-            "대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
-          );
-          return null;
-        }
+        const id = await ensureConversation();
         // 요청 도중 대화를 바꿨으면 부모는 이미 다른 대화를 보고 있다. 그 선택을 덮지 않는다.
         if (!mountedRef.current) return null;
-        onConversationCreated(payload.conversationId);
-        return payload.conversationId;
+        return id;
       } catch {
         setPickNotice("대화를 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
         return null;
