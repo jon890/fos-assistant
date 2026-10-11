@@ -26,6 +26,7 @@ final class BrowserActivityTracker {
     /** 사용자마다 마지막으로 활동을 기록한 시각이다. 간격 안의 입력은 DB 를 읽지 않고 거른다. */
     private final Map<Long, Instant> touched = new ConcurrentHashMap<>();
 
+
     void touch(Long userId) {
         Instant now = clock.instant();
         Instant last = touched.get(userId);
@@ -33,20 +34,21 @@ final class BrowserActivityTracker {
             return;
         }
         browsers.findByUserId(userId)
-                .filter(browser -> browser.status() == UserBrowserStatus.RUNNING)
-                .ifPresent(browser -> {
-                    if (!browser.touch(now)) {
-                        touched.put(userId, browser.lastActiveAt());
-                        return;
-                    }
-                    try {
-                        browsers.save(browser);
-                        touched.put(userId, now);
-                    } catch (OptimisticLockingFailureException ex) {
-                        log.debug("user browser touch skipped id={}", browser.id());
-                    }
-                });
+            .filter(browser -> browser.status() == UserBrowserStatus.RUNNING)
+            .ifPresent(browser -> {
+                if (!browser.touch(now)) {
+                    touched.put(userId, browser.lastActiveAt());
+                    return;
+                }
+                try {
+                    browsers.save(browser);
+                    touched.put(userId, now);
+                } catch (OptimisticLockingFailureException ex) {
+                    log.debug("user browser touch skipped id={}", browser.id());
+                }
+            });
     }
+
 
     void clear(Long userId) {
         touched.remove(userId);

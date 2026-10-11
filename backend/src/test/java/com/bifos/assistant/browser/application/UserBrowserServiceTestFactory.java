@@ -15,14 +15,14 @@ import lombok.NoArgsConstructor;
 public final class UserBrowserServiceTestFactory {
 
     public static UserBrowserService create(
-            UserBrowserRepository browsers,
-            BrowserRuntime runtime,
-            BrowserProfileStore profiles,
-            CdpProbe cdp,
-            LiveProperties<BrowserProperties> properties,
-            Clock clock,
-            BrowserScreens screens) {
+        UserBrowserRepository browsers,
+        BrowserRuntime runtime,
+        BrowserProfileStore profiles,
+        CdpProbe cdp,
+        LiveProperties<BrowserProperties> properties,
+        Clock clock,
+        BrowserScreens screens) {
         return new UserBrowserService(
-                browsers, runtime, profiles, cdp, properties, clock, screens, new BrowserActivityTracker(browsers, clock));
+            browsers, runtime, profiles, cdp, properties, clock, screens, new BrowserActivityTracker(browsers, clock));
     }
 }
