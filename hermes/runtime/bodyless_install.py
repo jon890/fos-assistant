@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import threading
 import types
+from typing import Callable, cast
 
 from .bodyless_requests import DestinationResolver, make_writer
 
@@ -17,10 +18,19 @@ FINGERPRINT_FILES = (
     "agent/turn_api_request.py", "agent/turn_recovery.py",
 )
 _OWNER_MODULE = "_fos_bodyless_requests_owner_v1"
-_candidate = types.ModuleType(_OWNER_MODULE)
+
+
+class _Owner(types.ModuleType):
+    """reload 뒤에도 유지하는 프로세스 상태의 실제 속성을 선언한다."""
+
+    lock: threading.Lock
+    installation: tuple[types.ModuleType, DestinationResolver, tuple[str, ...], Callable[..., Path | None]] | None
+
+
+_candidate = _Owner(_OWNER_MODULE)
 _candidate.lock = threading.Lock()
 _candidate.installation = None
-_owner = sys.modules.setdefault(_OWNER_MODULE, _candidate)
+_owner = cast(_Owner, sys.modules.setdefault(_OWNER_MODULE, _candidate))
 
 
 class InstallationError(RuntimeError):

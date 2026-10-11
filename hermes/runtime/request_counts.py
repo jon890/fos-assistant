@@ -1,6 +1,6 @@
 """알려진 provider 본문에서 원문을 복사하지 않고 제한된 수치만 센다."""
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from itertools import islice
 from typing import Literal, TypedDict
 
@@ -154,23 +154,26 @@ class _Counter:
             self.active.remove(identity)
 
     def part(self, fields, depth):
-        known = {"type", "text", "image_url", "source", "inlineData", "inline_data", "fileData", "file_data",
-                 "content", "parts", "output", "functionResponse", "function_response", "role", "id", "name",
-                 "tool_call_id", "call_id", "status", "cache_control", "detail"}
-        if fields.keys() - known:
-            self.issue("unknown")
+        # 공통 metadata와 이번 분기가 실제 읽는 content를 구분한다.
+        known = {"role", "id", "name", "tool_call_id", "call_id", "status", "cache_control"}
         kind = fields.get("type", _MISSING)
         if type(kind) is str and kind in ("text", "input_text", "output_text"):
+            known.update(("type", "text"))
             self.text(fields.get("text"))
         elif type(kind) is str and kind in ("image_url", "input_image"):
+            known.update(("type", "image_url", "detail"))
             image = fields.get("image_url")
             if type(image) is dict:
-                image = self.fields(image).get("url")
+                image_fields = self.fields(image)
+                self.check_fields(image_fields, {"url", "detail"})
+                image = image_fields.get("url")
             self.image(image, data_url=True)
         elif type(kind) is str and kind == "image":
+            known.update(("type", "source"))
             source = self.fields(fields.get("source"))
             source_kind = source.get("type")
             if type(source_kind) is str and source_kind == "base64":
+                self.check_fields(source, {"type", "media_type", "data"})
                 self.image(source.get("data"))
             elif type(source_kind) is str and source_kind == "url":
                 self.counts.image_parts += 1
@@ -179,14 +182,20 @@ class _Counter:
                 self.counts.image_parts += 1
                 self.issue("invalid")
         elif "inlineData" in fields or "inline_data" in fields:
-            inline = self.fields(fields.get("inlineData", fields.get("inline_data")))
-            mime = inline.get("mimeType", inline.get("mime_type"))
+            key = "inlineData" if "inlineData" in fields else "inline_data"
+            known.add(key)
+            inline = self.fields(fields[key])
+            mime_key = "mimeType" if "mimeType" in inline else "mime_type"
+            self.check_fields(inline, {mime_key, "data"})
+            mime = inline.get(mime_key)
             if type(mime) is str and mime.startswith("image/"):
                 self.image(inline.get("data"))
             else:
                 self.other()
         elif "fileData" in fields or "file_data" in fields:
-            file = self.fields(fields.get("fileData", fields.get("file_data")))
+            key = "fileData" if "fileData" in fields else "file_data"
+            known.add(key)
+            file = self.fields(fields[key])
             mime = file.get("mimeType", file.get("mime_type"))
             if type(mime) is str and mime.startswith("image/"):
                 self.counts.image_parts += 1
@@ -194,21 +203,29 @@ class _Counter:
             else:
                 self.other()
         elif "text" in fields and kind is _MISSING:
+            known.add("text")
             self.text(fields["text"])
         elif (kind is _MISSING or type(kind) is str and kind in ("message", "tool_result", "function_call_output")) and (
                 "content" in fields or "parts" in fields or "output" in fields):
+            known.add("type")
             for key in ("content", "parts", "output"):
                 if key in fields:
+                    known.add(key)
                     self.walk(fields[key], depth + 1)
-            if "tool_calls" in fields:
-                self.issue("unknown")
         elif "functionResponse" in fields or "function_response" in fields:
-            response = self.fields(fields.get("functionResponse", fields.get("function_response")))
+            key = "functionResponse" if "functionResponse" in fields else "function_response"
+            known.add(key)
+            response = self.fields(fields[key])
             if "parts" in response:
                 self.walk(response["parts"], depth + 1)
             self.issue("unknown")  # 임의 response 객체는 탐색하지 않는다.
         else:
             self.other()
+        self.check_fields(fields, known)
+
+    def check_fields(self, fields, known):
+        if fields.keys() - known:
+            self.issue("unknown")
 
     def other(self):
         self.counts.other_parts += 1
@@ -226,4 +243,10 @@ def count_request(api_kwargs) -> CountData:
             counter.walk(root[key])
     if not found:
         counter.issue("unknown")
-    return asdict(counter.counts)
+    counts = counter.counts
+    return {
+        "text_parts": counts.text_parts, "image_parts": counts.image_parts, "other_parts": counts.other_parts,
+        "text_chars": counts.text_chars, "text_bytes": counts.text_bytes,
+        "image_encoded_chars": counts.image_encoded_chars, "image_bytes": counts.image_bytes,
+        "completeness": counts.completeness,
+    }

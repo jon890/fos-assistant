@@ -24,8 +24,10 @@ def _error_kind(error) -> ErrorKind:
     if error is None:
         return "none"
     # SDK 예외의 property와 원문을 읽지 않는다. 임의 하위 타입은 other다.
-    for exception_type, category in ((TimeoutError, "timeout"), (ConnectionError, "connection"),
-            (PermissionError, "permission"), (ValueError, "value"), (TypeError, "type"), (OSError, "io")):
+    categories: tuple[tuple[type[Exception], ErrorKind], ...] = (
+        (TimeoutError, "timeout"), (ConnectionError, "connection"), (PermissionError, "permission"),
+        (ValueError, "value"), (TypeError, "type"), (OSError, "io"))
+    for exception_type, category in categories:
         if type(error) is exception_type:
             return category
     return "other"
@@ -57,13 +59,17 @@ def _write(directory, diagnostic) -> Path:
     # 직렬화 대상은 새로 만든 고정 enum과 숫자뿐이다.
     encoded = json.dumps(diagnostic, ensure_ascii=True, separators=(",", ":")).encode("ascii")
     parent = _open_directory(directory)
-    leaf = "request_diagnostic_" + secrets.token_hex(16) + ".json"
+    leaf = ""
     created = False
+    fd = None
     try:
+        leaf = "request_diagnostic_" + secrets.token_hex(16) + ".json"
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
         fd = os.open(leaf, flags, 0o600, dir_fd=parent)
         created = True
-        with os.fdopen(fd, "wb") as stream:
+        stream = os.fdopen(fd, "wb")
+        fd = None  # 성공한 fdopen이 stream에 FD 소유를 넘긴다.
+        with stream:
             os.fchmod(stream.fileno(), 0o600)
             stream.write(encoded)
             stream.flush()
@@ -77,7 +83,11 @@ def _write(directory, diagnostic) -> Path:
                 pass
         raise
     finally:
-        os.close(parent)
+        try:
+            if fd is not None:
+                os.close(fd)
+        finally:
+            os.close(parent)
 
 
 def make_writer(resolver: DestinationResolver):
