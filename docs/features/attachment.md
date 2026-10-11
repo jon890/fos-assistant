@@ -52,7 +52,7 @@ summary와 claim·uncertainty의 글자 수는 Unicode code point로 세고 관�
 관찰과 alias는 원본 첨부보다 오래 보관하지 않는다.
 
 
-### 관찰 API와 MCP 연결 설계
+### 관찰 API와 MCP 연결
 
 REST 조회·사용자 정정, MCP 조회·기록과 페이지·제출 본문 검사는 구현되었다.
 `MediaObservationService.list/record`를 그대로 호출한다.

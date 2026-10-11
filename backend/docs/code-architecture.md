@@ -3,9 +3,9 @@
 Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 규칙을 갖는다.
 방향 규칙은 `ArchitectureRules.java` 가 강제하고, 이 파일은 규칙마다 그 검사의 이름을 적는다.
 
-## 관찰 연결의 모듈 배치 설계
+## 관찰 연결의 모듈 배치
 
-REST·MCP와 chat.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결-설계)을 따른다.
+REST·MCP와 chat.application의 페이지·본문 검사는 구현되었다. 연결의 배치는 [사진 첨부 계약](../../docs/features/attachment.md#관찰-api와-mcp-연결)을 따른다.
 chat.application의 기존 저장 서비스를 유지하고 MediaObservationPages와 MediaObservationInputReader를 새 소비자로 둔다.
 공개 페이지 타입은 chat.application.model.MediaObservationPage에 둔다.
 관찰 REST 요청·응답은 `chat.presentation.MediaObservationDtos`, MCP 인자는 `mcp.presentation.McpDtos`에 모은다.
