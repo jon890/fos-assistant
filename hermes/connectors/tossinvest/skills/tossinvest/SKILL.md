@@ -24,8 +24,13 @@ description: 토스증권 계좌와 시세, 섹터를 읽는다. 주문하지 �
 - `get_holdings`: 보유 종목과 평가 금액, 손익을 본다. `total` 의 금액은 원화(`krw`)와 달러(`usd`)로 나뉘고, `items` 의 금액은 그 종목의 거래 통화 기준이다.
   비용 공제 전 값과 공제 후 값(`..._after_cost`)이 함께 오므로 어느 쪽을 말하는지 밝힌다
 - `get_buying_power`: `currency` 에 `KRW` 나 `USD` 를 넣어 주문 가능 현금을 본다. `symbol` 을 주면 그 종목의 매도 가능 수량도 본다
-- `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각, 366일까지)로 기간을 정해 주문을 본다.
-  100건까지 오고 `has_more` 가 참이면 더 있다. 그때는 받은 것이 일부라고 말한다
+- `list_orders`: `status` 에 미체결 `OPEN` 이나 끝난 `CLOSED` 를 넣고, `from` 과 `to`(`YYYY-MM-DD`, 한국 시각)로 기간을 정해 주문을 본다.
+  OPEN은 전체를 읽고 CLOSED는 기본 20건·최대 100건의 한 페이지를 읽는다. `has_more`가 참이면 일부라고 말하고 `nextCursor`로 다음 페이지를 요청한다
+
+- `list_conditional_orders`: `status=OPEN/CLOSED`로 조건주문 한 페이지를 본다. 선택 `symbol`, `cursor`, `limit`를 받으며 기본 20건, 최대 100건이다. `hasNext`가 참이면 일부만 읽었다고 말하고 `nextCursor`로 다음 페이지를 요청한다
+- `get_conditional_order`: 목록에서 받은 `conditionalOrderId`로 상세를 본다. 계좌, token, URL을 인자로 넘기지 않는다
+
+조건주문의 SINGLE/OCO/OTO 유형과 STOP/PROFIT_RATE 조건을 받은 대로 설명한다. 최상위 상태와 각 leg의 상태를 구분하며 WATCHING을 체결 완료로 말하지 않는다. null과 없는 `expireDate`를 추측해서 채우지 않는다. 생성·수정·취소는 토스증권 앱이나 웹에서 직접 한다.
 
 - `list_sectors`: 인자 없이 전체 섹터 목록과 depth 0·1·2의 계층을 본다. 다른 섹터 도구에 넣을 `sectorId`는 이 목록에서 먼저 확인한다
 - `get_sector_rankings`: `type`에 `TOP_GAINERS`나 `MARKET_TRADING_AMOUNT`, `marketCountry`에 `KR`이나 `US`, `duration`에 `1d`·`1w`·`1mo`·`3mo`·`6mo`·`1y`를 넣는다. 대분류와 중분류(depth 0·1)의 상위 100건까지 보고, 데이터가 없으면 빈 배열을 받는다

@@ -29,6 +29,8 @@ export const CURRENT_OPERATIONS = new Set([
   "getSector",
   "getSectorStocks",
   "getSectorEtfs",
+  "getConditionalOrders",
+  "getConditionalOrder",
 ]);
 export function matchesOperation(
   operation: Operation,
