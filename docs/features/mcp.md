@@ -114,7 +114,7 @@ Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose` 가 모두 이 길을 지난다.
+`memory_read`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation` 가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
