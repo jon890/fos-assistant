@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import os
-import pathlib
-from .connector_guard import _guard_manifest, _strict_json
+from .connector_guard import _guard_manifest
 
 # 옛 기능 모듈의 import 계약을 유지하려고 이동한 이름도 다시 내보낸다.
 
@@ -27,6 +26,8 @@ from .connector_policy import (
     _hermes_tool_name,
     _tool_identifiers,
 )
+
+from .connector_manifest_io import _connector_roots, _connector_command, _read_connector_json
 
 from .connector_schema import (
     BIND_MODE,
@@ -78,59 +79,6 @@ from .connector_skills import (
 )
 
 
-def _connector_roots() -> dict[str, dict]:
-    """운영 목록을 읽는다. `{"<커넥터 이름>": {"root", "command", "env"}}` 다. 없거나 틀리면 빈 dict 다.
-
-    환경 변수의 값은 이름마다 문자열(plugin 디렉터리)이나
-    `{"root": "<plugin 디렉터리>", "command": "<실행 파일>", "env": {"<이름>": "<값>"}}` 다.
-    문자열은 `{"root": 그 값}` 으로 읽는다.
-    """
-    raw = os.environ.get(CONNECTOR_ROOTS_ENV, "").strip()
-    if not raw:
-        return {}
-    try:
-        value = _strict_json(raw)
-    except ValueError:
-        value = None
-    if not isinstance(value, dict) or any(not isinstance(entry, (str, dict)) for entry in value.values()):
-        # 값에는 운영 경로가 들어 있어 로그에 싣지 않는다.
-        logger.warning("dashboard-profile-api: %s 가 문자열이나 object 값의 JSON object 가 아니다", CONNECTOR_ROOTS_ENV)
-        return {}
-    roots = {}
-    for name, entry in value.items():
-        if isinstance(entry, str):
-            entry = {"root": entry}
-        root, command, env = entry.get("root"), entry.get("command"), entry.get("env", {})
-        if (set(entry) - {"root", "command", "env"} or not isinstance(root, str)
-                or not (command is None or isinstance(command, str)) or not isinstance(env, dict)
-                or any(not isinstance(key, str) or not isinstance(item, str) for key, item in env.items())):
-            logger.warning("dashboard-profile-api: %s 의 %s 항목 모양이 올바르지 않아 버렸다", CONNECTOR_ROOTS_ENV, name)
-            continue
-        if not os.path.isabs(root) or (command is not None and not os.path.isabs(command)):
-            logger.warning("dashboard-profile-api: %s 의 %s 경로가 절대 경로가 아니라 버렸다", CONNECTOR_ROOTS_ENV, name)
-            continue
-        roots[name] = {"root": pathlib.Path(root), "command": command, "env": dict(env)}
-    return roots
-
-
-def _connector_command() -> str | None:
-    """커넥터 MCP 서버를 실행할 파일의 기본 절대 경로다. 없거나 절대 경로가 아니면 None 이다."""
-    command = os.environ.get(CONNECTOR_COMMAND_ENV, "").strip()
-    if not command:
-        return None
-    if not os.path.isabs(command):
-        logger.warning("dashboard-profile-api: %s 가 절대 경로가 아니다", CONNECTOR_COMMAND_ENV)
-        return None
-    return command
-
-
-def _read_connector_json(root: pathlib.Path, relative: str):
-    path = root / relative
-    if path.resolve() != path or not path.is_file():
-        raise ValueError("%s 가 없거나 링크다" % relative)
-    return _strict_json(path.read_text(encoding="utf-8"))
-
-
 def _appearance_or_none(connector_id: str, name: str, read):
     """카드 칸 하나를 읽는다. 틀리면 그 칸만 None 으로 두고 경고를 남긴다(ADR-20261008 connector-card).
 
@@ -169,6 +117,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         raise ValueError("title 과 description 은 문자열이다")
     icon = _appearance_or_none(connector_id, "icon", lambda: _connector_icon(root, declared.get("icon")))
     link = _appearance_or_none(connector_id, "link", lambda: _connector_link(declared.get("link")))
+    readme_url = _appearance_or_none(connector_id, "readme_url", lambda: _connector_link(declared.get("readme_url")))
+    link_kind = "project" if declared.get("link_kind") == "project" else "service"
     fields = _connector_fields(declared.get("fields"))
     verify = declared.get("verify")
     if (not isinstance(verify, dict) or not isinstance(verify.get("tool"), str)
@@ -282,6 +232,8 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "description": declared.get("description", ""),
         "icon": icon,
         "link": link,
+        "readme_url": readme_url,
+        "link_kind": link_kind,
         "fields": fields,
         "verify": {"tool": verify["tool"]},
         "mcp_server": mcp_server,
@@ -386,6 +338,7 @@ def _connector_catalog_response():
     return JSONResponse(
         [{"id": manifest["id"], "schema": manifest["schema"], "title": manifest["title"],
           "description": manifest["description"], "icon": manifest["icon"], "link": manifest["link"],
+          "readme_url": manifest["readme_url"], "link_kind": manifest["link_kind"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
           "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
           "owner_browser": manifest["owner_browser_env"] is not None,

@@ -26,6 +26,7 @@ function connector(id: string, change: Record<string, unknown> = {}) {
 const rich = connector("rich-card", {
   icon: SVG_ICON,
   link: "https://example.com/rich",
+  readmeUrl: "https://example.com/rich/README.md",
   tools: [
     tool("read_one", "READ"),
     tool("write_one", "WRITE"),
@@ -58,8 +59,20 @@ test("아이콘과 링크가 있는 카드가 도구 요약과 함께 보인다"
   await expect(link).toHaveAttribute("rel", "noopener noreferrer");
   await expect(
     card.getByRole("link", { name: /검사용 rich-card/ }),
-  ).toHaveCount(3);
-  await expect(link).toHaveAccessibleName(/검사용 rich-card/);
+  ).toHaveCount(4);
+  await expect(link).toHaveAccessibleName(
+    /공식 사이트.*검사용 rich-card.*새 탭/,
+  );
+  const readme = card.getByTestId("connector-readme-link");
+  await expect(readme).toHaveAttribute(
+    "href",
+    "https://example.com/rich/README.md",
+  );
+  await expect(readme).toHaveAttribute("target", "_blank");
+  await expect(readme).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(readme).toHaveAccessibleName(
+    /커넥터 README.*검사용 rich-card.*새 탭/,
+  );
   await expect(card.getByTestId("connector-tool-summary")).toHaveText(
     "도구 3개 · 조회 1 · 쓰기 1 · 되돌리기 어려운 쓰기 1",
   );
@@ -167,6 +180,10 @@ test("상세 화면 머리에 아이콘과 링크가 보인다", async ({ page }
   await expect(page.getByTestId("connector-link")).toHaveAttribute(
     "href",
     "https://example.com/rich",
+  );
+  await expect(page.getByTestId("connector-readme-link")).toHaveAttribute(
+    "href",
+    "https://example.com/rich/README.md",
   );
 });
 
@@ -359,6 +376,48 @@ test("중간 폭에서는 두 열로 보인다", async ({ page }) => {
         (node) => getComputedStyle(node).gridTemplateColumns.split(" ").length,
       ),
   ).toBe(2);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("README만 있는 카드와 프로젝트 링크는 키보드로 새 탭을 연다", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const longUrl =
+    "https://example.com/" + "a".repeat(500 - "https://example.com/".length);
+  await listConnectors(page, [
+    connector("readme-only", { readmeUrl: longUrl }),
+    connector("project", {
+      link: "https://example.com/project",
+      linkKind: "project",
+      readmeUrl: longUrl,
+    }),
+  ]);
+  await page
+    .context()
+    .route("https://example.com/**", (route) => route.fulfill({ body: "ok" }));
+  await page.goto("/connections");
+  const cards = page.getByTestId("connector-card");
+  await expect(cards.nth(0).getByTestId("connector-link")).toHaveCount(0);
+  await expect(cards.nth(0).getByTestId("connector-readme-link")).toBeVisible();
+  await expect(cards.nth(1).getByTestId("connector-link")).toHaveAccessibleName(
+    /프로젝트 GitHub.*project.*새 탭/,
+  );
+  const readme = cards.nth(0).getByTestId("connector-readme-link");
+  await readme.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(readme).toBeFocused();
+  const popup = page.waitForEvent("popup");
+  await page.keyboard.press("Enter");
+  const opened = await popup;
+  await opened.waitForLoadState();
+  expect(opened.url()).toBe(longUrl);
+  await opened.close();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

@@ -18,6 +18,8 @@ for (const theme of ["light", "dark"] as const) {
           description: manifest.description,
           icon: `data:image/svg+xml;base64,${icon.toString("base64")}`,
           link: manifest.link,
+          readmeUrl: manifest.readme_url,
+          linkKind: manifest.link_kind ?? "service",
           myStatus: "DISCONNECTED",
           available: true,
           bindings: [],
@@ -40,6 +42,20 @@ for (const theme of ["light", "dark"] as const) {
     const icons = page.getByTestId("connector-icon");
     await expect(icons).toHaveCount(connectors.length);
     for (const [index, connector] of connectors.entries()) {
+      const card = page.getByTestId("connector-card").nth(index);
+      await expect(card.getByTestId("connector-link")).toHaveAttribute(
+        "href",
+        connector.link,
+      );
+      await expect(card.getByTestId("connector-readme-link")).toHaveAttribute(
+        "href",
+        connector.readmeUrl,
+      );
+      await expect(
+        card.getByTestId("connector-readme-link"),
+      ).toHaveAccessibleName(
+        new RegExp(`커넥터 README.*${connector.title}.*새 탭`),
+      );
       const icon = icons.nth(index);
       await expect(icon).toBeVisible();
       await expect(icon).toHaveAttribute("src", connector.icon);
