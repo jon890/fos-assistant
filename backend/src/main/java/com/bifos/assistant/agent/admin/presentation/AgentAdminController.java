@@ -1,11 +1,11 @@
-package com.bifos.assistant.agent.presentation;
+package com.bifos.assistant.agent.admin.presentation;
 
-import com.bifos.assistant.agent.application.AgentAdminService;
-import com.bifos.assistant.agent.application.AgentCreateCommand;
-import com.bifos.assistant.agent.application.AgentUpdateCommand;
-import com.bifos.assistant.agent.presentation.AgentDtos.AdminAgentView;
-import com.bifos.assistant.agent.presentation.AgentDtos.CreateAgentRequest;
-import com.bifos.assistant.agent.presentation.AgentDtos.UpdateAgentRequest;
+import com.bifos.assistant.agent.admin.application.AgentAdminService;
+import com.bifos.assistant.agent.admin.application.model.AgentCreateCommand;
+import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.AdminAgentView;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.CreateAgentRequest;
+import com.bifos.assistant.agent.admin.presentation.AgentAdminDtos.UpdateAgentRequest;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -25,20 +25,22 @@ public class AgentAdminController {
     private final AgentAdminService adminAgents;
     private final CurrentUserProvider currentUser;
 
+
     @PostMapping
     public AdminAgentView create(@Valid @RequestBody CreateAgentRequest request) {
         currentUser.requireAdmin();
         return AdminAgentView.from(adminAgents.create(new AgentCreateCommand(
-                request.code(),
-                request.name(),
-                request.hermesProfile(),
-                request.apiBaseUrl(),
-                request.costMode(),
-                request.credentialScope(),
-                request.visibility(),
-                request.ownerEmail(),
-                request.flow())));
+            request.code(),
+            request.name(),
+            request.hermesProfile(),
+            request.apiBaseUrl(),
+            request.costMode(),
+            request.credentialScope(),
+            request.visibility(),
+            request.ownerEmail(),
+            request.flow())));
     }
+
 
     @GetMapping
     public List<AdminAgentView> list() {
@@ -46,16 +48,17 @@ public class AgentAdminController {
         return adminAgents.list().stream().map(AdminAgentView::from).toList();
     }
 
+
     @PatchMapping("/{code}")
     public AdminAgentView update(@PathVariable String code, @Valid @RequestBody UpdateAgentRequest request) {
         currentUser.requireAdmin();
         return AdminAgentView.from(adminAgents.update(
-                code,
-                new AgentUpdateCommand(
-                        request.enabled(),
-                        request.visibility(),
-                        request.ownerEmail(),
-                        request.apiBaseUrl(),
-                        request.proactiveCheckWritesAllowed())));
+            code,
+            new AgentUpdateCommand(
+                request.enabled(),
+                request.visibility(),
+                request.ownerEmail(),
+                request.apiBaseUrl(),
+                request.proactiveCheckWritesAllowed())));
     }
 }
