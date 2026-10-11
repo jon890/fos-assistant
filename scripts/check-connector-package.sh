@@ -43,11 +43,13 @@ bun run hermes/connectors/package.ts verify "$work/bundle" "$sha"
 for id in "${connectors[@]}"; do
   mkdir -p "hermes/connectors/$id/dist"
   cp -p "$work/bundle/hermes/connectors/$id/dist/$id-mcp.js" "hermes/connectors/$id/dist/$id-mcp.js"
-  git diff --exit-code -- "hermes/connectors/$id/dist/$id-mcp.js"
 done
-# 기존 HTTP 대역과 check:bundle로 Docker와 runner의 바이트 동일성도 확인한다.
+# 소스에서 entry를 다시 빌드한 뒤 기존 HTTP 대역과 재현성을 검사한다.
 bash scripts/check-connectors.sh
+for id in "${connectors[@]}"; do
+  cmp "$work/bundle/hermes/connectors/$id/dist/$id-mcp.js" "hermes/connectors/$id/dist/$id-mcp.js"
+done
 bun run hermes/connectors/package.ts build "$work/runner" "$sha"
 bun run hermes/connectors/package.ts verify "$work/runner" "$sha"
 diff -r "$work/bundle" "$work/runner"
-echo "Docker와 runner의 전체 묶음, 추적 entry의 바이트가 일치했다"
+echo "Docker와 runner의 전체 묶음, 소스에서 재빌드한 entry의 바이트가 일치했다"

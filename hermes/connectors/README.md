@@ -27,11 +27,11 @@ hermes/connectors/<id>/
   .mcp.json                MCP 서버 하나의 정의
   .claude-plugin/plugin.json
   src/server.ts            TypeScript stdio MCP 서버
-  dist/<id>-mcp.js          의존성까지 묶어 커밋한 실행 파일
+  dist/<id>-mcp.js          의존성까지 묶은 생성 실행 파일. Git 추적 제외
   package.json, bun.lock    빌드와 시험의 의존성
   tsconfig.json             타입 검사 설정
   scripts/build.ts          묶음 파일 빌드
-  scripts/check-bundle.ts   커밋한 묶음 파일과 재빌드 결과 비교
+  scripts/check-bundle.ts   독립 빌드 두 번과 로컬 entry의 바이트 비교
   tests/<id>.test.ts        로컬 HTTP 대역으로 도는 검사
   skills/<이름>/SKILL.md    붙인 에이전트에 스킬로 설치된다
   README.md                 도구와 정책, 보안, 설정 안내, 실제 계정 확인
@@ -120,9 +120,9 @@ hermes/connectors/<id>/
 
 ### MCP 서버
 
-- TypeScript 로 쓰고 `@modelcontextprotocol/sdk` 와 `zod` 를 포함해 의존성을 한 JavaScript 파일로 묶어 커밋한다. 실행할 때 패키지를 내려받지 않는다
+- TypeScript 로 쓰고 `@modelcontextprotocol/sdk` 와 `zod` 를 포함해 의존성을 한 JavaScript 파일로 묶는다. 생성 entry는 Git에 커밋하지 않는다. 실행할 때 패키지를 내려받지 않는다
 - `.mcp.json` 의 `command` 는 `bun`, 인자는 `${CLAUDE_PLUGIN_ROOT}/dist/<id>-mcp.js` 하나다. 실제 실행 파일은 운영 목록이 정한다. Python MCP 서버는 허용하지 않는다
-- 빌드는 Bun `1.3.14` 와 lockfile 로 고정한다. 런타임은 검증한 최소 버전 이상을 허용한다. `hermes/connectors/<id>/scripts/build.ts` 는 `target: "bun"` 을 쓰고 `hermes/connectors/<id>/scripts/check-bundle.ts` 는 임시 디렉터리에 다시 빌드해 커밋된 파일과 바이트를 비교한 뒤 임시 파일을 지운다
+- 빌드는 Bun `1.3.14` 와 lockfile 로 고정한다. 런타임은 검증한 최소 버전 이상을 허용한다. `hermes/connectors/<id>/scripts/build.ts` 는 `target: "bun"` 을 쓰고 `hermes/connectors/<id>/scripts/check-bundle.ts` 는 임시 디렉터리 두 곳에 빌드해 정확한 단일 출력 목록과 entry 선언, 전체 바이트 재현성을 검사하고 로컬 빌드 entry와 비교한 뒤 임시 파일을 지운다
 - 변경된 TypeScript 는 `scripts/quality.sh check` 와 `fix` 가 web 에 설치한 Prettier 로 검사하고 고친다. 토스증권의 생성 구간은 [생성기](tossinvest/scripts/generate-contract.ts)의 `--check` 로 재현성을 검사한다. 원문 fixture 와 minify 한 묶음 파일은 소스 포맷 대상이 아니다
 - 사용자 컴퓨터에서 한 번 돌리는 자격 증명 발급 스크립트는 Python 표준 라이브러리를 써도 된다. 서버 실행 의존성에는 포함하지 않는다
 - 외부 호출에는 제한 시간을 둔다. 대시보드가 확인 도구를 기다리는 시간은 10초, 승인한 호출을 기다리는 시간은 60초다
@@ -170,7 +170,9 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 `Dockerfile`과 `package.ts`는 소스 checkout과 같은 SHA의 커넥터 설치 묶음을 만든다.
 운영 저장소는 이 빌드 정의를 재사용하고, Hermes runtime에는 검증한 파일만 설치한다.
-이 단계에서는 `dist` 추적을 유지한다. 소비 경로 구현과 실제 배포 확인을 마친 뒤 별도 PR에서 추적을 제거한다.
+생성 entry 세 개는 Git 추적에서 제외하고 루트 `.gitignore`에 정확한 경로를 적는다. 설치 경로와 manifest 계약은 유지한다. 토스증권의 생성 API 계약 소스와 공식 fixture는 빌드 산출물이 아니므로 계속 추적한다.
+
+소스 변경 뒤 생성 entry를 수정한 다른 브랜치와 병합할 때 생기는 modify/delete 충돌은 생성 파일의 삭제를 유지해 해결한다. 병합한 소스에서 다시 빌드하며 생성 entry를 Git에 다시 넣지 않는다.
 
 | 항목 | 계약 |
 | --- | --- |
@@ -231,7 +233,7 @@ root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 �
 ### CI에서 확인하는 범위
 
 `scripts/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
-이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓은 뒤 기존 HTTP 대역 검사와 `check:bundle`을 실행한다.
+이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓는다. 각 패키지의 `test`와 `check:bundle`은 먼저 소스로 entry를 빌드한다. 네이버의 macOS 합성 시험도 Docker 안에서 entry를 빌드한다. 기존 HTTP 대역과 실제 entry의 SDK stdio 검사, `check:bundle`을 실행한 뒤 Docker entry와 로컬 entry를 바이트로 대조한다.
 runner에서 별도로 만든 전체 묶음과 Docker 출력의 manifest 및 모든 파일을 대조해 빌드 환경 차이도 확인한다.
 기존 stdio MCP 계약 검사와 Hermes 상류 계약 검사도 이어서 실행한다.
 CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않는다.
@@ -240,7 +242,7 @@ CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않�
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 바로 아래 디렉터리를 모두 찾아 아래를 본다.
 CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
-`scripts/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 묶음 파일 일치를 확인한다.
+`scripts/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
 전용 시험은 각 커넥터의 `tests/` 에 모으고, 여러 커넥터에 걸친 계약 검사만 `hermes/tests/` 에 둔다.
 
 | 보는 것 | 어긋나면 |
@@ -276,7 +278,7 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 
 저장소에 있는 커넥터는 운영자가 대시보드의 커넥터 목록에 올려야 카탈로그에 나온다.
 목록의 모양은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
-그 항목의 `command` 는 Bun 실행 파일이어야 한다. 의존성은 커밋한 묶음 파일에 들어 있다.
+그 항목의 `command` 는 Bun 실행 파일이어야 한다. 의존성은 빌드한 묶음 파일에 들어 있다.
 
 ## connector.json
 
