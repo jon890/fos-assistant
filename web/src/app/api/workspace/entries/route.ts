@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { errorResponse } from "@/lib/api-response";
 
-/** 디렉터리 하나의 목록이다. `path` 인자만 옮긴다. 없으면 Control Plane 이 사용자 디렉터리 자체를 읽는다. */
+/** 디렉터리 한 페이지다. `path`와 `cursor`만 옮긴다. 주인은 Control Plane이 인증 사용자로 정한다. */
 export async function GET(request: Request) {
-  const path = new URL(request.url).searchParams.get("path");
-  const query = path === null ? "" : `?path=${encodeURIComponent(path)}`;
+  const params = new URL(request.url).searchParams;
+  const forwarded = new URLSearchParams();
+  for (const key of ["path", "cursor"]) {
+    const value = params.get(key);
+    if (value !== null) forwarded.set(key, value);
+  }
+  const query = forwarded.size === 0 ? "" : `?${forwarded}`;
   const result = await callControlPlane(`/api/v1/workspace/entries${query}`);
   if (!result.ok)
     return errorResponse(result.code, result.message, result.status);

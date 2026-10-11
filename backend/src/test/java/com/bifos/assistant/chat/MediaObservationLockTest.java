@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.model.MediaObservationView;
 import com.bifos.assistant.chat.domain.ChatAttachment;
+import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.chat.infra.ChatAttachmentRepository;
 import com.bifos.assistant.shared.error.ApiException;
@@ -11,9 +12,12 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
+import java.nio.file.Files;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -29,7 +33,7 @@ import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** MySQL도 이 회귀와 요청 재시도/USER 회귀를 그대로 실행한다. */
-class MediaObservationLockTest extends MediaObservationRequestTest {
+class MediaObservationLockTest extends MediaObservationCacheTest {
     @Test
     @DisplayName("같은 CAS로 경쟁하는 새 요청은 revision 하나만 만든다")
     void createsOneRevisionForRacingNewRequestsWithSameCas() throws Exception {
@@ -42,20 +46,21 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
             start.countDown();
             var results = List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
             assertThat(results)
-                    .filteredOn(value -> value instanceof MediaObservationView)
-                    .hasSize(1);
+                .filteredOn(value -> value instanceof MediaObservationView)
+                .hasSize(1);
             assertThat(results)
-                    .filteredOn(value -> value == ErrorCode.MEDIA_OBSERVATION_CONFLICT)
-                    .hasSize(1);
+                .filteredOn(value -> value == ErrorCode.MEDIA_OBSERVATION_CONFLICT)
+                .hasSize(1);
             assertThat(observations.count()).isEqualTo(1);
             assertThat(requests.count()).isEqualTo(1);
             assertThat(observations.findAll().getFirst().bodyKeyId()).isNotNull();
             assertThat(service.list(owner, conversation.id(), null, 10)
-                            .getFirst()
-                            .observation())
+                .getFirst()
+                .observation())
                     .isEqualTo(input());
         }
     }
+
 
     @Test
     @DisplayName("동일 UUID 경쟁은 alias 하나를 돌려준다")
@@ -74,6 +79,7 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
         }
     }
 
+
     private Object race(CountDownLatch ready, CountDownLatch start, UUID id) {
         ready.countDown();
         await(start);
@@ -84,19 +90,229 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
         }
     }
 
+
+    @Test
+    @DisplayName("현재 완료 revision의 cache 경합은 두 성공이고 새 조건 경합은 한 승자다")
+    void allowsBothCacheAliasesButOnlyOneNewConditionRevision() throws Exception {
+        for (boolean hit : new boolean[] {true, false}) {
+            photo = photo();
+            record(0, UUID.randomUUID(), input(), model());
+            CountDownLatch ready = new CountDownLatch(2);
+            CountDownLatch start = new CountDownLatch(1);
+            try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+                var attempts = new ArrayList<Future<Object>>();
+                for (int index = 0; index < 2; index++) {
+                    attempts.add(pool.submit(() -> {
+                        ready.countDown();
+                        await(start);
+                        try {
+                            return record(1, UUID.randomUUID(), input(), hit ? model() : changedModel());
+                        } catch (ApiException ex) {
+                            return ex.code();
+                        }
+                    }));
+                }
+                assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+                start.countDown();
+                var results = List.of(
+                    attempts.get(0).get(10, TimeUnit.SECONDS),
+                    attempts.get(1).get(10, TimeUnit.SECONDS));
+                assertThat(results)
+                    .filteredOn(value -> value instanceof MediaObservationView)
+                    .hasSize(hit ? 2 : 1);
+                assertThat(results)
+                    .filteredOn(value -> value == ErrorCode.MEDIA_OBSERVATION_CONFLICT)
+                    .hasSize(hit ? 0 : 1);
+                assertThat(observations.findAll().stream()
+                    .filter(row -> row.attachmentId().equals(photo.id()))
+                    .toList())
+                        .hasSize(hit ? 1 : 2);
+                assertThat(requests.findAll().stream()
+                    .filter(row -> row.attachmentId().equals(photo.id()))
+                    .toList())
+                        .hasSize(hit ? 3 : 2);
+            }
+        }
+    }
+
+
+    @Test
+    @DisplayName("응답용 두 번째 스트림 읽기 중 커밋한 삭제와 두 소유 변경을 모든 경로에서 차단한다")
+    void blocksCommittedAccessChangesDuringSecondStreamForAllResponsePaths() throws Exception {
+        for (int route = 0; route < 4; route++) {
+            for (int change = 0; change < 3; change++) {
+                photo = photo();
+                UUID first = UUID.randomUUID();
+                record(0, first, input(), model());
+                if (route == 1) {
+                    record(1, UUID.randomUUID(), input(), changedModel());
+                }
+                runReadBarrier(route, change, first);
+            }
+        }
+    }
+
+
+    private void runReadBarrier(int route, int change, UUID first) throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger opens = new AtomicInteger();
+        AtomicBoolean closed = new AtomicBoolean();
+        var paused = new AttachmentStore(properties) {
+            @Override
+            public InputStream open(ChatAttachment attachment) {
+                InputStream stream = super.open(attachment);
+                if (opens.incrementAndGet() != 2) {
+                    return stream;
+                }
+                return new FilterInputStream(stream) {
+                    private boolean waiting = true;
+
+
+                    @Override
+                    public int read(byte[] buffer, int offset, int length) throws IOException {
+                        if (waiting) {
+                            waiting = false;
+                            entered.countDown();
+                            await(release);
+                        }
+                        return super.read(buffer, offset, length);
+                    }
+
+
+                    @Override
+                    public void close() throws IOException {
+                        closed.set(true);
+                        super.close();
+                    }
+                };
+            }
+        };
+        var reading = local(paused, bodies, observations, requests, attachments, access);
+        var other = user();
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var pending = pool.submit(() -> {
+                try {
+                    return route == 3
+                        ? reading.list(owner, conversation.id(), null, 100)
+                        : reading.record(
+                            owner,
+                            conversation.id(),
+                            photo.id(),
+                            route == 1 ? 0 : 1,
+                            route == 1 ? first : UUID.randomUUID(),
+                            input(),
+                            route == 2 ? changedModel() : model());
+                } catch (ApiException ex) {
+                    return ex.code();
+                }
+            });
+            try {
+                assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+                if (change == 0) {
+                    jdbc.update("update chat_attachment set deletion_requested_at=? where id=?", NOW, photo.id());
+                } else if (change == 1) {
+                    jdbc.update("update conversation set user_id=? where id=?", other.id(), conversation.id());
+                } else {
+                    jdbc.update("update chat_attachment set uploaded_by_user_id=? where id=?", other.id(), photo.id());
+                }
+                release.countDown();
+                var result = pending.get(10, TimeUnit.SECONDS);
+                if (route == 3 && change != 1) {
+                    assertThat((List<?>)result).allSatisfy(value -> {
+                        if (((MediaObservationView)value)
+                            .assetId()
+                            .equals(photo.id().toString())) {
+                            assertThat(((MediaObservationView)value).observation())
+                                .isNull();
+                            assertThat(((MediaObservationView)value).sourceFingerprint())
+                                .isNull();
+                        }
+                    });
+                } else {
+                    assertThat(result)
+                        .isEqualTo(change == 0 ? ErrorCode.ATTACHMENT_GONE : ErrorCode.CONVERSATION_NOT_FOUND);
+                }
+                assertThat(closed).isTrue();
+            } finally {
+                release.countDown();
+                if (change == 1) {
+                    jdbc.update("update conversation set user_id=? where id=?", owner.id(), conversation.id());
+                }
+                jdbc.update(
+                    "update chat_attachment set deletion_requested_at=?,uploaded_by_user_id=? where id=?",
+                    null,
+                    owner.id(),
+                    photo.id());
+                requests.deleteAll();
+                observations.deleteAll();
+                attachments.deleteAll();
+            }
+        }
+    }
+
+
+    @Test
+    @DisplayName("응답 원본 읽기 중 교체와 만료를 차단하고 이미 커밋한 alias는 보존한다")
+    void blocksSourceChangesAndExpiryDuringResponseButKeepsCommittedAlias() {
+        for (int change = 0; change < 6; change++) {
+            requests.deleteAll();
+            observations.deleteAll();
+            attachments.deleteAll();
+            clock.set(NOW);
+            photo = photo();
+            record(0, UUID.randomUUID(), input(), model());
+            AtomicInteger opens = new AtomicInteger();
+            int currentChange = change % 3;
+            var changed = new AttachmentStore(properties) {
+                @Override
+                public InputStream open(ChatAttachment attachment) {
+                    if (opens.incrementAndGet() == 2) {
+                        if (currentChange == 2) {
+                            clock.advance(Duration.ofDays(30));
+                        } else {
+                            byte[] bytes = IMAGE.clone();
+                            bytes[bytes.length - 1]++;
+                            try {
+                                Files.write(file(attachment), currentChange == 0 ? bytes : new byte[1]);
+                            } catch (IOException ex) {
+                                throw new UncheckedIOException(ex);
+                            }
+                        }
+                    }
+                    return super.open(attachment);
+                }
+            };
+            UUID alias = UUID.randomUUID();
+            var reading = local(changed, bodies, observations, requests, attachments, access);
+            if (change < 3) {
+                code(
+                    () -> reading.record(owner, conversation.id(), photo.id(), 1, alias, input(), model()),
+                    currentChange == 0 ? ErrorCode.MEDIA_OBSERVATION_CONFLICT : ErrorCode.ATTACHMENT_GONE);
+                assertThat(requests.findByAttachmentIdAndRequestId(photo.id(), alias.toString()))
+                    .isPresent();
+            } else {
+                var listed = reading.list(owner, conversation.id(), null, 10).getFirst();
+                assertThat(listed.observation()).isNull();
+                assertThat(listed.status())
+                    .isEqualTo(currentChange == 0 ? ObservationStatus.NEEDS_REVIEW : ObservationStatus.UNAVAILABLE);
+            }
+        }
+    }
+
+
     @Test
     @DisplayName("저장 중 원본 해시는 실제 사용자 행 잠금으로 삭제를 기다리게 한다")
     void makesDeletionWaitOnRealUserRowWhileRecordHashesSource() throws Exception {
         CountDownLatch entered = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         AtomicReference<Long> holdingSession = new AtomicReference<>();
-        boolean mysql = jdbc.execute((ConnectionCallback<Boolean>)
-                connection -> "MySQL".equals(connection.getMetaData().getDatabaseProductName()));
+        boolean mysql = jdbc.execute((ConnectionCallback<Boolean>)connection -> "MySQL".equals(connection.getMetaData().getDatabaseProductName()));
         AttachmentStore paused = new AttachmentStore(properties) {
             @Override
             public InputStream open(ChatAttachment attachment) {
                 holdingSession.set(
-                        jdbc.queryForObject(mysql ? "select connection_id()" : "select session_id()", Long.class));
+                    jdbc.queryForObject(mysql ? "select connection_id()" : "select session_id()", Long.class));
                 InputStream stream = super.open(attachment);
                 entered.countDown();
                 await(release);
@@ -123,12 +339,13 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
                 assertThat(observations.count()).isZero();
                 assertThat(requests.count()).isZero();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
-                        .isNotNull();
+                    .isNotNull();
             } finally {
                 release.countDown();
             }
         }
     }
+
 
     @Test
     @DisplayName("조회 중 삭제는 완료되고 반환 전에 본문을 차단한다")
@@ -154,15 +371,15 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
         };
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var reading = pool.submit(() -> local(paused, bodies, observations, requests, attachments, access)
-                    .list(owner, conversation.id(), null, 10));
+                .list(owner, conversation.id(), null, 10));
             try {
                 assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
                 pool.submit(() -> attachmentService.deleteByUser(owner, conversation.id(), photo.id()))
-                        .get(10, TimeUnit.SECONDS);
+                    .get(10, TimeUnit.SECONDS);
                 assertThat(observations.count()).isZero();
                 assertThat(requests.count()).isZero();
                 assertThat(attachments.findById(photo.id()).orElseThrow().deletionRequestedAt())
-                        .isNotNull();
+                    .isNotNull();
                 release.countDown();
                 var result = reading.get(10, TimeUnit.SECONDS).getFirst();
                 assertThat(result.observation()).isNull();
@@ -175,6 +392,7 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
         }
     }
 
+
     @Test
     @DisplayName("저장 커밋 뒤 삭제와 현재 시각을 다시 확인한다")
     void rechecksDeletionAndClockAfterCommitBeforeReturningRecord() throws Exception {
@@ -185,25 +403,25 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
             CountDownLatch release = new CountDownLatch(1);
             AtomicInteger count = new AtomicInteger();
             var guarded = ChatAttachmentRepository.class.cast(Proxy.newProxyInstance(
-                    ChatAttachmentRepository.class.getClassLoader(),
-                    new Class<?>[] {ChatAttachmentRepository.class},
-                    (proxy, method, args) -> {
-                        if (method.getName().startsWith("existsByIdAndConversationIdAndUploaded")
-                                && count.incrementAndGet() == 2) {
-                            entered.countDown();
-                            await(release);
-                        }
-                        try {
-                            return method.invoke(attachments, args);
-                        } catch (InvocationTargetException ex) {
-                            throw ex.getCause();
-                        }
-                    }));
+                ChatAttachmentRepository.class.getClassLoader(),
+                new Class<?>[] {ChatAttachmentRepository.class},
+                (proxy, method, args) -> {
+                    if (method.getName().startsWith("existsByIdAndConversationIdAndUploaded")
+                        && count.incrementAndGet() == 2) {
+                        entered.countDown();
+                        await(release);
+                    }
+                    try {
+                        return method.invoke(attachments, args);
+                    } catch (InvocationTargetException ex) {
+                        throw ex.getCause();
+                    }
+                }));
             try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
                 var pending = pool.submit(() -> code(
-                        () -> local(store, bodies, observations, requests, guarded, access)
-                                .record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
-                        ErrorCode.ATTACHMENT_GONE));
+                    () -> local(store, bodies, observations, requests, guarded, access)
+                        .record(owner, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
+                    ErrorCode.ATTACHMENT_GONE));
                 try {
                     assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
                     assertThat(requests.count()).isEqualTo(1);
@@ -226,14 +444,15 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
         }
     }
 
+
     private void assertUserLockWait(boolean mysql, Long holdingSession, Future<?> pending) throws InterruptedException {
         String sql = mysql
-                ? "select count(*) from performance_schema.data_lock_waits w"
-                        + " join performance_schema.data_locks l on l.engine_lock_id=w.requesting_engine_lock_id"
-                        + " join performance_schema.threads t on t.thread_id=w.blocking_thread_id"
-                        + " where l.object_schema=database() and l.object_name='app_user' and t.processlist_id=?"
-                : "select count(*) from information_schema.sessions where blocker_id=?"
-                        + " and lower(executing_statement) like '%app_user%' and lower(executing_statement) like '%for update%'";
+            ? "select count(*) from performance_schema.data_lock_waits w"
+                + " join performance_schema.data_locks l on l.engine_lock_id=w.requesting_engine_lock_id"
+                + " join performance_schema.threads t on t.thread_id=w.blocking_thread_id"
+                + " where l.object_schema=database() and l.object_name='app_user' and t.processlist_id=?"
+            : "select count(*) from information_schema.sessions where blocker_id=?"
+                + " and lower(executing_statement) like '%app_user%' and lower(executing_statement) like '%for update%'";
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         boolean observed = false;
         while (System.nanoTime() < deadline) {
@@ -250,6 +469,7 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
         assertThat(pending.isDone()).isFalse();
     }
 
+
     @Test
     @DisplayName("호출자의 트랜잭션을 중단하여 삭제 전 스냅샷으로 본문을 반환하지 않는다")
     void suspendsCallerTransactionAndIgnoresItsSnapshotAfterDeletionCommit() {
@@ -259,7 +479,7 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
             assertThat(observations.findAll()).hasSize(1);
             try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
                 pool.submit(() -> attachmentService.deleteByUser(owner, conversation.id(), photo.id()))
-                        .get(10, TimeUnit.SECONDS);
+                    .get(10, TimeUnit.SECONDS);
             } catch (Exception ex) {
                 throw new IllegalStateException(ex);
             }
@@ -268,10 +488,14 @@ class MediaObservationLockTest extends MediaObservationRequestTest {
             assertThat(result.observation()).isNull();
             assertThat(result.sourceFingerprint()).isNull();
             assertThat(result.revision()).isNull();
+            code(
+                () -> service.record(owner, conversation.id(), photo.id(), 1, UUID.randomUUID(), input(), model()),
+                ErrorCode.ATTACHMENT_GONE);
         });
         assertThat(observations.count()).isZero();
         assertThat(requests.count()).isZero();
     }
+
 
     private static void await(CountDownLatch latch) {
         try {
