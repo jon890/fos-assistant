@@ -52,6 +52,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     private final String token;
     private final SandboxAttachmentDirectory attachmentDirectory;
 
+
     public HttpHermesConnectorClient(HermesProperties properties, SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
@@ -68,13 +69,14 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         this.attachmentDirectory = attachmentDirectory;
     }
 
+
     @Override
     public List<ConnectorManifest> readCatalog() {
         JsonNode body = request(() -> ConnectorCatalogTools.parseCatalog(client.get()
-                .uri(baseUrl + "/api/connectors/catalog")
-                .header(AUTHORIZATION, bearer())
-                .retrieve()
-                .body(String.class)));
+            .uri(baseUrl + "/api/connectors/catalog")
+            .header(AUTHORIZATION, bearer())
+            .retrieve()
+            .body(String.class)));
         List<ConnectorManifest> manifests = new ArrayList<>();
         for (JsonNode item : body) {
             manifests.add(ConnectorCatalogDecoder.read(item));
@@ -82,26 +84,30 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return List.copyOf(manifests);
     }
 
+
     @Override
     public CallResult call(String connectorId, String tool, Map<String, String> values, String ownerBrowser) {
         return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, "values", values), ownerBrowser));
     }
+
 
     @Override
     public CallResult callWithVault(String connectorId, String tool, String vault, String ownerBrowser) {
         return postCall(connectorId, withOwnerBrowser(Map.of(TOOL, tool, VAULT, vault), ownerBrowser));
     }
 
+
     private CallResult postCall(String connectorId, Map<String, Object> request) {
         JsonNode body = request(() -> client.post()
-                .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(request)
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + "/api/connectors/{id}/call", connectorId)
+            .header(AUTHORIZATION, bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(request)
+            .retrieve()
+            .body(JsonNode.class));
         return callResult(body);
     }
+
 
     /** 중계 주소가 null 이면 키를 싣지 않는다. 사용자 브라우저를 쓰지 않는 커넥터의 요청 본문은 그대로다. */
     private static Map<String, Object> withOwnerBrowser(Map<String, Object> request, String ownerBrowser) {
@@ -113,6 +119,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return body;
     }
 
+
     private static CallResult callResult(JsonNode body) {
         if (requiredBoolean(body, "ok")) {
             JsonNode result = body.get("result");
@@ -122,48 +129,52 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             return CallResult.success(result);
         }
         return CallResult.failure(
-                ConnectorCallError.fromWord(text(body, "error")).orElseThrow(IllegalStateException::new));
+            ConnectorCallError.fromWord(text(body, "error")).orElseThrow(IllegalStateException::new));
     }
+
 
     @Override
     public void putVault(String vault, String connectorId, Map<String, String> values) {
         JsonNode body = request(() -> client.put()
-                .uri(baseUrl + VAULT_PATH)
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(VAULT, vault, CONNECTOR, connectorId, "values", values))
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + VAULT_PATH)
+            .header(AUTHORIZATION, bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(VAULT, vault, CONNECTOR, connectorId, "values", values))
+            .retrieve()
+            .body(JsonNode.class));
         if (!requiredBoolean(body, "ok")) {
             throw new IllegalStateException();
         }
     }
+
 
     @Override
     public boolean deleteVault(String vault) {
         JsonNode body = request(() -> client.method(HttpMethod.DELETE)
-                .uri(baseUrl + VAULT_PATH)
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(VAULT, vault))
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + VAULT_PATH)
+            .header(AUTHORIZATION, bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(VAULT, vault))
+            .retrieve()
+            .body(JsonNode.class));
         return requiredBoolean(body, "changed");
     }
+
 
     @Override
     public void importVault(String vault, String connectorId, String profile) {
         JsonNode body = request(() -> client.post()
-                .uri(baseUrl + VAULT_PATH + "/import")
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(VAULT, vault, CONNECTOR, connectorId, PROFILE, profile))
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + VAULT_PATH + "/import")
+            .header(AUTHORIZATION, bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(VAULT, vault, CONNECTOR, connectorId, PROFILE, profile))
+            .retrieve()
+            .body(JsonNode.class));
         if (!requiredBoolean(body, "ok")) {
             throw new IllegalStateException();
         }
     }
+
 
     /**
      * 성공 응답만 결과로 읽는다. 시간 초과, 끊긴 연결, 서버 오류, 읽을 수 없는 본문은 실행됐는지 알 수 없는 것이다.
@@ -184,26 +195,29 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return HttpHermesConnectorGuard.execute(executeClient, baseUrl, token, connectorId, body);
     }
 
+
     @Override
     public CallResult prepare(String profile, String connectorId, String hermesTool, String argsJson) {
         return HttpHermesConnectorGuard.prepare(
-                prepareClient,
-                baseUrl,
-                token,
-                connectorId,
-                HttpHermesConnectorGuard.body(profile, hermesTool, argsJson));
+            prepareClient,
+            baseUrl,
+            token,
+            connectorId,
+            HttpHermesConnectorGuard.body(profile, hermesTool, argsJson));
     }
+
 
     @Override
     public CallResult executeApproved(
-            String profile, String connectorId, String hermesTool, ConnectorApprovedExecution execution) {
+        String profile, String connectorId, String hermesTool, ConnectorApprovedExecution execution) {
         return HttpHermesConnectorGuard.execute(
-                executeClient,
-                baseUrl,
-                token,
-                connectorId,
-                HttpHermesConnectorGuard.approved(profile, hermesTool, execution));
+            executeClient,
+            baseUrl,
+            token,
+            connectorId,
+            HttpHermesConnectorGuard.approved(profile, hermesTool, execution));
     }
+
 
     /** 승인 줄에 저장한 인자 글을 JSON object 로 읽는다. object 로 읽을 수 없으면 null 이다. */
     private static JsonNode arguments(String argsJson) {
@@ -215,6 +229,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
     }
 
+
     @Override
     public InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner) {
         // 끄는 요청은 실행 공간을 열지 않으므로 첨부 디렉터리 문제로 막지 않는다.
@@ -222,29 +237,31 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             attachmentDirectory.ensure(sandboxOwner);
         }
         JsonNode body = request(() -> client.put()
-                .uri(baseUrl + "/api/connectors")
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled, "sandbox_owner", sandboxOwner))
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + "/api/connectors")
+            .header(AUTHORIZATION, bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled, "sandbox_owner", sandboxOwner))
+            .retrieve()
+            .body(JsonNode.class));
         return installResult(body, profile, connectorId, enabled);
     }
 
-    @Override
-    public InstallResult bindConnector(
-            String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser) {
-        return bindConnector(profile, connectorId, vault, sandboxOwner, ownerBrowser, null);
-    }
 
     @Override
     public InstallResult bindConnector(
-            String profile,
-            String connectorId,
-            String vault,
-            String sandboxOwner,
-            String ownerBrowser,
-            JsonNode guard) {
+        String profile, String connectorId, String vault, String sandboxOwner, String ownerBrowser) {
+        return bindConnector(profile, connectorId, vault, sandboxOwner, ownerBrowser, null);
+    }
+
+
+    @Override
+    public InstallResult bindConnector(
+        String profile,
+        String connectorId,
+        String vault,
+        String sandboxOwner,
+        String ownerBrowser,
+        JsonNode guard) {
         // 대시보드는 주인의 첨부 디렉터리를 만들지 않고 링크 없이 있는지만 본다(ADR-091, ADR-20261007 connector-owner-attachments).
         // 만들기는 최선 노력이다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 멈추지 않게 하고, 선언한 커넥터는
         // 대시보드가 디렉터리를 확인하지 못해 409 로 거절하므로 경계는 그대로다.
@@ -254,28 +271,30 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             log.warn("커넥터 주인의 첨부 디렉터리를 만들지 못해 확인을 대시보드에 맡긴다 profile={} connector={}", profile, connectorId);
         }
         return refusable(
-                withOwnerBrowser(
-                        Map.of(
-                                PROFILE,
-                                profile,
-                                PLUGIN,
-                                connectorId,
-                                ENABLED,
-                                true,
-                                "bind",
-                                guard == null ? Map.of(VAULT, vault) : Map.of(VAULT, vault, "guard", guard),
-                                "sandbox_owner",
-                                sandboxOwner),
-                        ownerBrowser),
-                profile,
-                connectorId,
-                true);
+            withOwnerBrowser(
+                Map.of(
+                    PROFILE,
+                    profile,
+                    PLUGIN,
+                    connectorId,
+                    ENABLED,
+                    true,
+                    "bind",
+                    guard == null ? Map.of(VAULT, vault) : Map.of(VAULT, vault, "guard", guard),
+                    "sandbox_owner",
+                    sandboxOwner),
+                ownerBrowser),
+            profile,
+            connectorId,
+            true);
     }
+
 
     @Override
     public InstallResult unbindConnector(String profile, String connectorId) {
         return refusable(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, false), profile, connectorId, false);
     }
+
 
     /**
      * 설치 요청을 보내고 거절을 안내가 다른 예외로 나눈다. 409 는 본문의 {@code code} 칸만 읽어
@@ -286,12 +305,12 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         final JsonNode body;
         try {
             body = client.put()
-                    .uri(baseUrl + "/api/connectors")
-                    .header(AUTHORIZATION, bearer())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(request)
-                    .retrieve()
-                    .body(JsonNode.class);
+                .uri(baseUrl + "/api/connectors")
+                .header(AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .body(JsonNode.class);
         } catch (HttpClientErrorException ex) {
             int status = ex.getStatusCode().value();
             if (status == HTTP_CONFLICT) {
@@ -310,6 +329,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return installResult(body, profile, connectorId, enabled);
     }
 
+
     private static InstallResult installResult(JsonNode body, String profile, String connectorId, boolean enabled) {
         requireText(body, PROFILE, profile);
         requireText(body, PLUGIN, connectorId);
@@ -317,18 +337,19 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
             throw new IllegalStateException();
         }
         return new InstallResult(
-                requiredBoolean(body, RESTART_REQUIRED),
-                optionalBoolean(body, "plugin_updated", false),
-                optionalBoolean(body, "reload_pending", false));
+            requiredBoolean(body, RESTART_REQUIRED),
+            optionalBoolean(body, "plugin_updated", false),
+            optionalBoolean(body, "reload_pending", false));
     }
+
 
     @Override
     public ConnectorState readConnector(String profile, String connectorId) {
         JsonNode response = request(() -> client.get()
-                .uri(baseUrl + "/api/connectors?profile={profile}", profile)
-                .header(AUTHORIZATION, bearer())
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + "/api/connectors?profile={profile}", profile)
+            .header(AUTHORIZATION, bearer())
+            .retrieve()
+            .body(JsonNode.class));
         JsonNode connectors = response.get("connectors");
         requireText(response, PROFILE, profile);
         if (connectors == null || !connectors.isArray()) {
@@ -342,13 +363,13 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
                 // 옛 대시보드 plugin 은 방식을 내지 않는다. 그때는 옛 설치뿐이었다.
                 String mode = text(item, "mode");
                 return new ConnectorState(
-                        profile,
-                        requiredBoolean(item, ENABLED),
-                        requiredBoolean(item, "configured"),
-                        false,
-                        policyHook,
-                        mode == null ? MODE_ISOLATED : mode,
-                        HttpHermesConnectorGuard.supportState(item.get("execution_guard")));
+                    profile,
+                    requiredBoolean(item, ENABLED),
+                    requiredBoolean(item, "configured"),
+                    false,
+                    policyHook,
+                    mode == null ? MODE_ISOLATED : mode,
+                    HttpHermesConnectorGuard.supportState(item.get("execution_guard")));
             }
         }
         // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.
@@ -356,13 +377,14 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return new ConnectorState(profile, false, false, false, policyHook, MODE_ISOLATED);
     }
 
+
     @Override
     public ProbeResult probe(String profile, String mcpServer) {
         JsonNode response = request(() -> client.post()
-                .uri(baseUrl + "/api/mcp/servers/{server}/test?profile={profile}", mcpServer, profile)
-                .header(AUTHORIZATION, bearer())
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + "/api/mcp/servers/{server}/test?profile={profile}", mcpServer, profile)
+            .header(AUTHORIZATION, bearer())
+            .retrieve()
+            .body(JsonNode.class));
         JsonNode tools = response.get("tools");
         if (tools == null || !tools.isArray()) {
             throw new IllegalStateException();
@@ -374,31 +396,34 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return new ProbeResult(requiredBoolean(response, "ok"), List.copyOf(names));
     }
 
+
     @Override
     public boolean putEnv(String profile, String key, String value) {
         JsonNode body = request(() -> client.put()
-                .uri(baseUrl + "/api/env")
-                .header(AUTHORIZATION, bearer())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(PROFILE, profile, "key", key, "value", value))
-                .retrieve()
-                .body(JsonNode.class));
+            .uri(baseUrl + "/api/env")
+            .header(AUTHORIZATION, bearer())
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(Map.of(PROFILE, profile, "key", key, "value", value))
+            .retrieve()
+            .body(JsonNode.class));
         requireText(body, PROFILE, profile);
         requireText(body, "key", key);
         return requiredBoolean(body, RESTART_REQUIRED);
     }
 
+
     @Override
     public boolean deleteEnv(String profile, String key) {
         try {
             ResponseEntity<String> response = client.method(HttpMethod.DELETE)
-                    .uri(baseUrl + "/api/env")
-                    .header(AUTHORIZATION, bearer())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(PROFILE, profile, "key", key))
-                    .retrieve()
-                    .onStatus(status -> status.value() == 404, (request, ignored) -> {})
-                    .toEntity(String.class);
+                .uri(baseUrl + "/api/env")
+                .header(AUTHORIZATION, bearer())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(PROFILE, profile, "key", key))
+                .retrieve()
+                .onStatus(status -> status.value() == 404, (request, ignored) -> {
+                })
+                .toEntity(String.class);
             if (response.getStatusCode().value() == 404) {
                 return false;
             }
@@ -414,9 +439,11 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
     }
 
+
     private String bearer() {
         return "Bearer " + token;
     }
+
 
     private static JsonNode request(Supplier<JsonNode> call) {
         try {
@@ -430,6 +457,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
     }
 
+
     private static boolean requiredBoolean(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         if (value == null || !value.isBoolean()) {
@@ -438,17 +466,20 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         return value.asBoolean();
     }
 
+
     private static boolean optionalBoolean(JsonNode node, String field, boolean fallback) {
         JsonNode value = node.get(field);
         // 칸이 있으면 필수 칸과 같게 읽는다. 불리언이 아니면 실패다.
         return value == null || value.isNull() ? fallback : requiredBoolean(node, field);
     }
 
+
     private static void requireText(JsonNode node, String field, String expected) {
         if (!expected.equals(text(node, field))) {
             throw new IllegalStateException();
         }
     }
+
 
     private static String requiredText(JsonNode node, String field) {
         String value = text(node, field);
@@ -457,6 +488,7 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         }
         return value;
     }
+
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
