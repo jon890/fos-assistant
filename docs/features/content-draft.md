@@ -362,7 +362,7 @@ bindingId는 선택 정수이고 소유자·profile·실행·파일 경로 인�
 | `/content-draft-jobs?beforeSnapshotId=` | `list`의 20개와 `nextBeforeSnapshotId` |
 
 남의 것, 다른 원고 ID, job이 없는 snapshot은 같은 404다. 오류 본문은 code만 싣는다.
-대화의 승인 줄 목록은 job 링크가 있는 줄에 `contentDraft` 요약(snapshotId, draftId, revision, 원래 conversationId, 상태·단계·저장 클릭·오류 code)을 붙이고 일반 줄은 null이다. 승인자·바인딩 판·경로는 싣지 않는다.
+대화의 승인 줄 목록과 그 줄의 승인·거절 응답은 job 링크가 있는 줄에 `contentDraft` 요약(snapshotId, draftId, revision, 원래 conversationId, 상태·단계·저장 클릭·오류 code)을 붙이고 일반 줄은 null이다. 승인자·바인딩 판·경로는 싣지 않는다.
 
 화면은 `contentDraft`가 있는 승인 줄을 원고 카드로 그린다.
 
