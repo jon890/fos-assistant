@@ -65,7 +65,15 @@
       "identifiers": [
         "reply_to_message_id"
       ],
-      "description": "to, subject, body로 Gmail 초안을 만들고 draft_id, message_id, thread_id를 돌려줍니다. to는 쉼표로 구분한 이메일 주소이며 cc와 bcc도 선택할 수 있습니다. 제목과 본문은 비어 있으면 안 됩니다. reply_to_message_id를 넣으면 원래 메일의 스레드에 답장 초안을 만듭니다. 본문은 평문이며 첨부 입력은 지원하지 않습니다. 초안만 저장하고 발송하지 않습니다."
+      "description": "to, subject, body로 Gmail 초안을 만들고 draft_id, message_id, thread_id를 돌려줍니다. to는 쉼표로 구분한 이메일 주소이며 cc와 bcc도 선택할 수 있습니다. 제목과 본문은 비어 있으면 안 됩니다. reply_to_message_id를 넣으면 원래 메일의 스레드에 답장 초안을 만듭니다. 본문은 평문이며 첨부 입력은 지원하지 않습니다. 초안만 저장하고 발송하지 않습니다.",
+      "arg_labels": {
+        "to": "받는 사람",
+        "subject": "제목",
+        "body": "본문",
+        "cc": "참조",
+        "bcc": "숨은 참조",
+        "reply_to_message_id": "답장할 메일 ID"
+      }
     },
     "modify_labels": {
       "risk": "WRITE",
@@ -75,14 +83,26 @@
       "identifiers": [
         "message_id"
       ],
-      "description": "message_id가 가리키는 메일 한 통에 라벨을 붙이거나 뗍니다. add_labels와 remove_labels는 쉼표로 구분한 라벨 ID 또는 이름이며 둘 중 하나는 필요합니다. 예를 들어 remove_labels에 INBOX를 넣으면 받은편지함에서 보관합니다. TRASH와 SPAM 라벨은 추가와 제거 모두 허용하지 않습니다. 변경한 메일 ID와 라벨 목록을 돌려줍니다."
+      "description": "message_id가 가리키는 메일 한 통에 라벨을 붙이거나 뗍니다. add_labels와 remove_labels는 쉼표로 구분한 라벨 ID 또는 이름이며 둘 중 하나는 필요합니다. 예를 들어 remove_labels에 INBOX를 넣으면 받은편지함에서 보관합니다. TRASH와 SPAM 라벨은 추가와 제거 모두 허용하지 않습니다. 변경한 메일 ID와 라벨 목록을 돌려줍니다.",
+      "arg_labels": {
+        "message_id": "메일 ID",
+        "add_labels": "붙일 라벨",
+        "remove_labels": "뗄 라벨"
+      }
     },
     "send_message": {
       "risk": "WRITE",
       "title": "메일 보내기",
       "grant": false,
       "outbound": true,
-      "description": "to, subject, body로 새 메일을 실제 발송합니다. cc와 bcc는 선택 사항이며 수신자는 쉼표로 구분한 이메일 주소를 받습니다. 제목과 본문은 필수이고 본문은 평문입니다. 첨부 입력은 지원하지 않습니다. 발송 응답의 id와 thread_id를 돌려주며 결과를 확인할 수 없으면 보낸편지함을 확인한 뒤 처리해야 합니다. 확인 없이 다시 보내면 중복 발송될 수 있습니다."
+      "description": "to, subject, body로 새 메일을 실제 발송합니다. cc와 bcc는 선택 사항이며 수신자는 쉼표로 구분한 이메일 주소를 받습니다. 제목과 본문은 필수이고 본문은 평문입니다. 첨부 입력은 지원하지 않습니다. 발송 응답의 id와 thread_id를 돌려주며 결과를 확인할 수 없으면 보낸편지함을 확인한 뒤 처리해야 합니다. 확인 없이 다시 보내면 중복 발송될 수 있습니다.",
+      "arg_labels": {
+        "to": "받는 사람",
+        "subject": "제목",
+        "body": "본문",
+        "cc": "참조",
+        "bcc": "숨은 참조"
+      }
     },
     "reply_to_message": {
       "risk": "WRITE",
@@ -92,13 +112,27 @@
       "identifiers": [
         "message_id"
       ],
-      "description": "message_id로 원래 메일의 스레드를 확인한 뒤 to, subject, body로 답장을 실제 발송합니다. 받는 사람과 제목은 직접 지정해야 하며 cc를 추가할 수 있습니다. bcc와 첨부 입력은 지원하지 않습니다. 발송한 메일의 id와 thread_id를 돌려줍니다. 결과가 불명확하면 보낸편지함에서 확인하고 같은 답장을 바로 다시 보내지 않습니다."
+      "description": "message_id로 원래 메일의 스레드를 확인한 뒤 to, subject, body로 답장을 실제 발송합니다. 받는 사람과 제목은 직접 지정해야 하며 cc를 추가할 수 있습니다. bcc와 첨부 입력은 지원하지 않습니다. 발송한 메일의 id와 thread_id를 돌려줍니다. 결과가 불명확하면 보낸편지함에서 확인하고 같은 답장을 바로 다시 보내지 않습니다.",
+      "arg_labels": {
+        "message_id": "메일 ID",
+        "to": "받는 사람",
+        "subject": "제목",
+        "body": "본문",
+        "cc": "참조"
+      }
     },
     "create_label": {
       "risk": "WRITE",
       "title": "라벨 만들기",
       "outbound": false,
-      "description": "name으로 사용자 라벨을 만들고 Gmail의 라벨 정보를 돌려줍니다. 이름은 비어 있지 않은 최대 225자이며 시스템 라벨 이름은 사용할 수 없습니다. 색을 지정하려면 text_color와 background_color를 함께 넣고 Gmail 허용 색상을 사용합니다. label_list_visibility는 labelShow, labelShowIfUnread, labelHide 중 하나이며 message_list_visibility는 show 또는 hide입니다. 기존 메일에 라벨을 붙이지는 않습니다."
+      "description": "name으로 사용자 라벨을 만들고 Gmail의 라벨 정보를 돌려줍니다. 이름은 비어 있지 않은 최대 225자이며 시스템 라벨 이름은 사용할 수 없습니다. 색을 지정하려면 text_color와 background_color를 함께 넣고 Gmail 허용 색상을 사용합니다. label_list_visibility는 labelShow, labelShowIfUnread, labelHide 중 하나이며 message_list_visibility는 show 또는 hide입니다. 기존 메일에 라벨을 붙이지는 않습니다.",
+      "arg_labels": {
+        "name": "라벨 이름",
+        "text_color": "글자 색",
+        "background_color": "배경 색",
+        "label_list_visibility": "라벨 목록 표시",
+        "message_list_visibility": "메일 목록 표시"
+      }
     },
     "update_label": {
       "risk": "WRITE",
@@ -107,7 +141,13 @@
       "identifiers": [
         "label"
       ],
-      "description": "label에 사용자 라벨 ID 또는 이름을 넣어 이름이나 색을 바꿉니다. name 또는 색 변경이 하나 이상 필요하며 색 변경에는 text_color와 background_color를 함께 넣습니다. 새 이름은 최대 225자이고 시스템 라벨은 수정할 수 없습니다. 바뀐 라벨 정보를 돌려주며 기존 메일의 본문은 바꾸지 않습니다."
+      "description": "label에 사용자 라벨 ID 또는 이름을 넣어 이름이나 색을 바꿉니다. name 또는 색 변경이 하나 이상 필요하며 색 변경에는 text_color와 background_color를 함께 넣습니다. 새 이름은 최대 225자이고 시스템 라벨은 수정할 수 없습니다. 바뀐 라벨 정보를 돌려주며 기존 메일의 본문은 바꾸지 않습니다.",
+      "arg_labels": {
+        "label": "바꿀 라벨",
+        "name": "라벨 이름",
+        "text_color": "글자 색",
+        "background_color": "배경 색"
+      }
     },
     "list_filters": {
       "risk": "READ",
@@ -118,7 +158,20 @@
       "title": "필터 만들기",
       "grant": false,
       "outbound": false,
-      "description": "앞으로 도착하는 메일에 적용할 필터를 만듭니다. from, to, subject, query, negated_query, has_attachment, size 중 검색 조건이 하나 이상 필요하고 add_labels 또는 remove_labels로 라벨 동작도 지정해야 합니다. has_attachment는 문자열 true 또는 false, size는 숫자 문자열이며 size_comparison의 larger 또는 smaller와 함께 넣습니다. 라벨은 쉼표로 구분한 ID나 이름을 받습니다. forward를 통한 전달과 TRASH, SPAM 라벨 변경은 허용하지 않습니다. 만든 필터를 돌려주며 기존 메일은 일괄 변경하지 않습니다."
+      "description": "앞으로 도착하는 메일에 적용할 필터를 만듭니다. from, to, subject, query, negated_query, has_attachment, size 중 검색 조건이 하나 이상 필요하고 add_labels 또는 remove_labels로 라벨 동작도 지정해야 합니다. has_attachment는 문자열 true 또는 false, size는 숫자 문자열이며 size_comparison의 larger 또는 smaller와 함께 넣습니다. 라벨은 쉼표로 구분한 ID나 이름을 받습니다. forward를 통한 전달과 TRASH, SPAM 라벨 변경은 허용하지 않습니다. 만든 필터를 돌려주며 기존 메일은 일괄 변경하지 않습니다.",
+      "arg_labels": {
+        "from": "보낸 사람",
+        "to": "받는 사람",
+        "subject": "제목",
+        "query": "검색 조건",
+        "negated_query": "제외할 검색 조건",
+        "has_attachment": "첨부 파일 조건",
+        "size": "메일 크기",
+        "size_comparison": "크기 비교 조건",
+        "add_labels": "붙일 라벨",
+        "remove_labels": "뗄 라벨",
+        "forward": "전달 주소"
+      }
     },
     "delete_filter": {
       "risk": "WRITE",
@@ -128,14 +181,23 @@
       "identifiers": [
         "filter_id"
       ],
-      "description": "filter_id로 저장된 Gmail 필터 한 개를 삭제하고 deleted와 filter_id를 돌려줍니다. 이후 도착하는 메일에는 이 규칙이 적용되지 않지만 기존 메일에 이미 붙은 라벨은 되돌리지 않습니다."
+      "description": "filter_id로 저장된 Gmail 필터 한 개를 삭제하고 deleted와 filter_id를 돌려줍니다. 이후 도착하는 메일에는 이 규칙이 적용되지 않지만 기존 메일에 이미 붙은 라벨은 되돌리지 않습니다.",
+      "arg_labels": {
+        "filter_id": "필터 ID"
+      }
     },
     "apply_labels_to_query": {
       "risk": "WRITE",
       "title": "검색한 메일의 라벨 바꾸기",
       "grant": false,
       "outbound": false,
-      "description": "query에 맞는 기존 메일의 라벨을 일괄 변경합니다. add_labels와 remove_labels는 쉼표로 구분한 라벨 ID 또는 이름이며 TRASH와 SPAM은 허용하지 않습니다. expected_count에는 사용자가 확인한 정확한 대상 수를 숫자 문자열로 넣습니다. 최대 500통까지 처리하며 검색 결과 수가 다르면 변경하지 않습니다. 변경 건수와 적용한 라벨 ID를 돌려주며 새 메일에 적용할 필터는 만들지 않습니다."
+      "description": "query에 맞는 기존 메일의 라벨을 일괄 변경합니다. add_labels와 remove_labels는 쉼표로 구분한 라벨 ID 또는 이름이며 TRASH와 SPAM은 허용하지 않습니다. expected_count에는 사용자가 확인한 정확한 대상 수를 숫자 문자열로 넣습니다. 최대 500통까지 처리하며 검색 결과 수가 다르면 변경하지 않습니다. 변경 건수와 적용한 라벨 ID를 돌려주며 새 메일에 적용할 필터는 만들지 않습니다.",
+      "arg_labels": {
+        "query": "검색 조건",
+        "add_labels": "붙일 라벨",
+        "remove_labels": "뗄 라벨",
+        "expected_count": "예상 메일 수"
+      }
     }
   },
   "errors": {

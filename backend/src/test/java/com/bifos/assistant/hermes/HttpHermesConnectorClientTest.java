@@ -76,6 +76,41 @@ class HttpHermesConnectorClientTest {
 
 
     @Test
+    @DisplayName("실제 Python producer의 Gmail과 네이버 카탈로그 인자 이름을 읽는다")
+    void readsArgumentLabelsFromPythonCatalog() throws Exception {
+        String raw = Files.readString(Path.of("../test/resources/connector-argument-catalog.json"));
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
+        List<ConnectorManifest> catalog = client.readCatalog();
+        assertThat(catalog).hasSize(2);
+        assertThat(catalog.getFirst().tools().stream().filter(tool -> tool.name().equals("send_message"))
+            .findFirst().orElseThrow().argLabels()).containsEntry("to", "받는 사람");
+        assertThat(catalog.getLast().tools().stream().filter(tool -> tool.name().equals("save_draft"))
+            .findFirst().orElseThrow().argLabels()).containsEntry("title", "제목");
+        server.verify();
+    }
+
+
+    @Test
+    @DisplayName("잘못된 인자 표시 이름만 버리고 도구 정책과 카탈로그는 유지한다")
+    void dropsMalformedArgumentLabelsWithoutDroppingCatalog() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String policies = ",\"schema\":2,\"tools\":{"
+            + "\"valid\":{\"risk\":\"WRITE\",\"arg_labels\":{\"to\":\"받는 사람\"}},"
+            + "\"nested\":{\"risk\":\"WRITE\",\"arg_labels\":{\"to\":{}}},"
+            + "\"array\":{\"risk\":\"WRITE\",\"arg_labels\":[]},"
+            + "\"old\":{\"risk\":\"WRITE\"}}";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(CATALOG.replace(tail, tail + policies), MediaType.APPLICATION_JSON));
+        List<ConnectorTool> tools = client.readCatalog().getFirst().tools();
+        assertThat(tools).extracting(ConnectorTool::argLabels)
+            .containsExactly(Map.of("to", "받는 사람"), Map.of(), Map.of(), Map.of());
+        assertThat(tools).extracting(ConnectorTool::risk).containsOnly("WRITE");
+        server.verify();
+    }
+
+
+    @Test
     @DisplayName("snapshot 다섯 필드와 compile 전용 capability를 읽고 옛 생성자를 보존한다")
     void readsCompileOnlySnapshotDeclaration() {
         String declaration = "\"snapshot\":{\"protocol\":\"content-snapshot-v1\",\"compile_tool\":\"compile_snapshot\","
