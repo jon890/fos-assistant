@@ -55,7 +55,6 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private final Map<String, SubagentSessionUsage> subagentUsages = new ConcurrentHashMap<>();
 
     private final Map<String, Deque<HermesRunLookup>> lookupAnswers = new ConcurrentHashMap<>();
-    private final Map<String, HermesRunLookup> lastLookupAnswers = new ConcurrentHashMap<>();
     private final Map<String, ApiException> lookupFailures = new ConcurrentHashMap<>();
     private final Map<String, AtomicInteger> lookupFailuresLeft = new ConcurrentHashMap<>();
     private final List<String> lookups = new CopyOnWriteArrayList<>();
@@ -117,7 +116,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
     public void willLookup(String runId, HermesRunLookup... answers) {
         Deque<HermesRunLookup> queue = new ArrayDeque<>();
         Collections.addAll(queue, answers);
-        lastLookupAnswers.remove(runId);
+        // 마지막 응답도 큐 안에 남겨, 조회가 교체 전후 어느 큐를 잡아도 등록된 run 을 잃지 않게 한다.
         lookupAnswers.put(runId, queue);
     }
 
@@ -192,7 +191,6 @@ public class StubHermesRunsClient implements HermesRunsClient {
         stopped.clear();
         onStop = runId -> {};
         lookupAnswers.clear();
-        lastLookupAnswers.clear();
         lookupFailures.clear();
         lookupFailuresLeft.clear();
         lookups.clear();
@@ -242,13 +240,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
             return HermesRunLookup.notFound();
         }
         synchronized (queue) {
-            HermesRunLookup next = queue.pollFirst();
-            if (next != null) {
-                lastLookupAnswers.put(runId, next);
-                return next;
+            if (queue.size() > 1) {
+                return queue.pollFirst();
             }
+            HermesRunLookup last = queue.peekFirst();
+            return last == null ? HermesRunLookup.notFound() : last;
         }
-        return lastLookupAnswers.getOrDefault(runId, HermesRunLookup.notFound());
     }
 
     @Override
