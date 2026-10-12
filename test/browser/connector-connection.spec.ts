@@ -14,7 +14,8 @@ const demoConnector = {
   tools: [
     {
       name: "list_scopes",
-      title: null,
+      title: "범위 목록 보기",
+      summary: "메모를 둘 범위를 읽어요.",
       risk: "READ",
       approval: "NONE",
       grant: false,
@@ -22,6 +23,9 @@ const demoConnector = {
     {
       name: "write_note",
       title: "메모 쓰기",
+      summary: "메모를 한 건 남겨요.",
+      // 옛 Control Plane 이 함께 보내던 모델용 설명이다. 화면은 그리지 않는다.
+      description: "note 인자로 메모 한 건을 저장합니다.",
       risk: "WRITE",
       approval: "REQUIRED",
       grant: true,
@@ -640,7 +644,7 @@ test("연결 화면이 도구마다 사람 말 이름과 요약, 위험도와 �
     "write_note",
     "purge_notes",
     "delete_note",
-    "메모 한 건을 저장합니다",
+    "note 인자로 메모 한 건을 저장합니다.",
   ])
     expect(text).not.toContain(hidden);
 });
