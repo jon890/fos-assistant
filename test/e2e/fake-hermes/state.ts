@@ -109,6 +109,7 @@ export function createFakeHermesState(
   let proactiveGate: Promise<void> | undefined;
   let openProactiveGate: (() => void) | undefined;
   const proactiveInputs: { profile: string; input: string }[] = [];
+  const contentSnapshot = createContentSnapshotState();
   return {
     who,
     keys: keys as Record<string, string>,
@@ -172,6 +173,46 @@ export function createFakeHermesState(
     proactiveGate: proactiveGate as Promise<void> | undefined,
     openProactiveGate: openProactiveGate as (() => void) | undefined,
     proactiveInputs: proactiveInputs as { profile: string; input: string }[],
+    contentSnapshot,
+  };
+}
+
+/** 시작 결과로 돌려줄 worker 상태다. `not_found` 는 상태 대신 고정 오류를 준다. */
+export type SnapshotJobOutcome = "running" | "succeeded" | "failed" | "unknown" | "not_found";
+
+/** private snapshot 경로가 받은 요청 한 줄이다. 원고 본문과 ticket 은 적지 않는다. */
+export type SnapshotRequest = {
+  operation: string;
+  connectorId: string;
+  /** 응답한 HTTP 상태다. 연결을 끊었으면 0 이다. */
+  status: number;
+  jobId: string | null;
+  bindingId: string | null;
+  bearer: boolean;
+  cookie: boolean;
+};
+
+/**
+ * private snapshot 경로의 대역 상태다.
+ *
+ * <p>job 은 jobId 마다 한 번만 만든다. 이미 있는 jobId 의 start 는 stamp 가 같을 때 그 상태만 돌려주고 새로 시작하지 않는다.
+ * `starts` 는 jobId 마다 받은 start 요청 수다. 시나리오가 같은 job 을 두 번 시작하지 않았는지 이것으로 본다.
+ */
+function createContentSnapshotState() {
+  return {
+    /** 참이면 카탈로그에 snapshot 커넥터를 낸다. */
+    on: false,
+    requests: [] as SnapshotRequest[],
+    starts: new Map<string, number>(),
+    jobs: new Map<string, { stamp: Record<string, unknown>; status: "running" | "failed"; errorCode: string | null }>(),
+    /** jobId 마다 status 조회가 돌려줄 결과다. 없으면 `running` 이다. */
+    outcomes: new Map<string, SnapshotJobOutcome>(),
+    /** 다음 start 하나를 접수한 뒤 응답을 잃게 한다. `disconnect` 는 연결을 끊고 `error` 는 500 으로 답한다. */
+    loseNextStart: undefined as "disconnect" | "error" | undefined,
+    /** 다음 start 하나를 이 code 로 시작 전에 거절한다. 그 job 은 failed 로 남는다. */
+    rejectNextStart: undefined as string | undefined,
+    /** 대역이 보낸 오류 응답 본문과 고정 오류 결과다. 본문이 새지 않았는지 시나리오가 본다. */
+    errorBodies: [] as string[],
   };
 }
 export type FakeHermesState = ReturnType<typeof createFakeHermesState>;
@@ -394,4 +435,18 @@ export type FakeHermes = {
   releaseProactiveEvents(): void;
   /** 받은 살펴보기 실행의 profile 과 입력 원문을 받은 순서대로 돌려준다. */
   proactiveInputs(): readonly { profile: string; input: string }[];
+  /** snapshot 커넥터를 카탈로그에 내거나 뺀다. Control Plane 은 카탈로그를 잠시 메모리에 두므로 기동 전에 켜 두는 것이 안전하다. */
+  setSnapshotConnector(on: boolean): void;
+  /** private snapshot 경로가 받은 요청을 받은 순서대로 복사해 돌려준다. */
+  snapshotRequests(): readonly SnapshotRequest[];
+  /** jobId 마다 받은 start 요청 수다. */
+  snapshotStarts(): Record<string, number>;
+  /** 다음 start 하나를 접수한 뒤 응답을 잃게 한다. */
+  loseNextSnapshotStart(mode: "disconnect" | "error"): void;
+  /** 다음 start 하나를 그 code 로 시작 전에 거절한다. */
+  rejectNextSnapshotStart(code: string): void;
+  /** 그 job 의 status 조회 결과를 정한다. */
+  setSnapshotJobOutcome(jobId: string, outcome: SnapshotJobOutcome): void;
+  /** 대역이 snapshot 경로에서 보낸 오류 본문들이다. */
+  snapshotErrorBodies(): readonly string[];
 };

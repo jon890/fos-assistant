@@ -51,6 +51,9 @@ public class HermesRunEventStream {
      * 서버 이름을 앞에 붙여 보낸다.
      */
     private static final String MEMORY_READ_TOOL_SUFFIX = "memory_read";
+    /** 결과나 인자에 원고 본문이 실릴 수 있는 도구다. 정확한 이름과 {@code __} 뒤 이름만 가린다. */
+    private static final List<String> CONTENT_DRAFT_TOOLS = List.of(
+        "content_draft_write", "content_draft_read", "content_draft_preview", "content_draft_save");
     /** 검색어와 제목도 시작과 끝의 실행 사건에서 가린다. */
     private static final String MEMORY_SEARCH_TOOL_SUFFIX = "memory_search";
 
@@ -371,15 +374,16 @@ public class HermesRunEventStream {
     }
 
 
-    /** 사건의 별칭에서 원고 저장·읽기 도구 이름을 확인한다. */
+    /** 사건의 별칭에서 원고 저장·읽기·preview·저장 요청 도구 이름을 확인한다. */
     private static boolean contentDraftTool(JsonNode node) {
         for (String key : List.of("tool", "tool_name", "toolName", "name")) {
             JsonNode value = node.get(key);
             if (value != null && value.isString()) {
                 String name = value.stringValue();
-                if (name.equals("content_draft_write") || name.equals("content_draft_read")
-                    || name.endsWith("__content_draft_write") || name.endsWith("__content_draft_read")) {
-                    return true;
+                for (String tool : CONTENT_DRAFT_TOOLS) {
+                    if (name.equals(tool) || name.endsWith("__" + tool)) {
+                        return true;
+                    }
                 }
             }
         }

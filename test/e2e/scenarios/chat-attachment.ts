@@ -124,7 +124,7 @@ function userMessage(messages: Message[], content: string): Message {
 }
 
 /** 1x1 PNG 를 만든다. 저장소에 이미지 파일을 두지 않으려고 검사 안에서 바이트를 짓는다. */
-function onePixelPng(): Uint8Array {
+export function onePixelPng(): Uint8Array {
   const chunk = (type: string, data: Buffer): Buffer => {
     const length = Buffer.alloc(4);
     length.writeUInt32BE(data.length);

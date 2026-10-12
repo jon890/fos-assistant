@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftService;
 import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
-import com.bifos.assistant.chat.application.model.ContentDraftView;
+import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
 import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -51,10 +51,11 @@ public class McpContentDraftTools {
     }
 
 
-    private Map<String, Object> guarded(McpCaller caller, Supplier<ContentDraftView> work) {
+    /** 원고 snapshot 도구도 같은 사전·사후 검사와 오류 변환을 쓴다. */
+    <T> Map<String, Object> guarded(McpCaller caller, Supplier<T> work) {
         try {
             guard.requireCurrent(caller);
-            ContentDraftView result = null;
+            T result = null;
             ApiException error = null;
             try {
                 result = work.get();
@@ -65,6 +66,10 @@ public class McpContentDraftTools {
             guard.requireCurrent(caller);
             if (error == null) {
                 return McpToolService.result(ExternalData.wrap(json.writeValueAsString(result)), false);
+            }
+            if (error instanceof ContentDraftBindingChoiceException choice) {
+                // 바인딩을 정하지 못한 까닭은 모델이 다음 호출을 고치도록 고정 문구로 싣는다.
+                return McpToolService.result(json.writeValueAsString(Map.of("code", error.code().name(), "message", choice.getMessage())), true);
             }
             if (error.code() == ErrorCode.VALIDATION_FAILED) {
                 throw ContentDraftInputReader.invalid();

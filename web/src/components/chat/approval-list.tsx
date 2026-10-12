@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ApprovalCard } from "@/components/chat/approval-card";
 import { ApprovalGroup } from "@/components/chat/approval-group";
+import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card";
+import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import {
   approveConnectorAction,
@@ -10,8 +12,13 @@ import {
   readConnectorActions,
   type ConnectorAction,
 } from "@/lib/connector-action";
+import { useContentDraftJobs } from "@/components/chat/use-content-draft-jobs";
+import {
+  isContentDraftTerminal,
+  type ContentDraftJobStatus,
+} from "@/lib/content-draft-snapshot";
 
-/** 카드로 보이는 상태다. 끝난 줄의 결과는 알림 줄과 답으로 이미 대화에 있다. */
+/** 카드로 보이는 상태다. 끝난 줄의 결과는 알림 줄과 답으로 이미 대화에 있다. 원고 저장 줄은 끝나도 보이되 처음부터 끝나 있던 줄은 접어 둔다. */
 const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN"];
 
 /** 「모두 승인」 이 다음 건으로 넘어가는 결과다. 그 밖의 결과(실패, 모름, 실행하지 않음)를 만나면 멈춘다. */
@@ -21,7 +28,7 @@ type Loaded = { conversationId: string; actions: ConnectorAction[] };
 
 /**
  * 기다리는 줄은 같은 커넥터의 같은 도구끼리 묶는다. 묶음의 자리는 그 도구가 처음 나온 자리다.
- * 실행 중이거나 결과를 모르는 줄과 도구 이름이 없는 줄은 한 장씩 둔다. 이름 없는 줄을 제목으로 묶으면 다른 도구가
+ * 실행 중이거나 결과를 모르는 줄과 도구 이름이 없는 줄, 원고 저장 줄은 한 장씩 둔다. 이름 없는 줄을 제목으로 묶으면 다른 도구가
  * 한 묶음에 섞일 수 있다.
  */
 function grouped(
@@ -30,7 +37,11 @@ function grouped(
   const groups = new Map<string, ConnectorAction[]>();
   const order: { key: string; actions: ConnectorAction[] }[] = [];
   for (const action of actions) {
-    if (action.status !== "PENDING" || action.toolName === null) {
+    if (
+      action.status !== "PENDING" ||
+      action.toolName === null ||
+      action.contentDraft
+    ) {
       order.push({ key: action.actionId, actions: [action] });
       continue;
     }
@@ -119,6 +130,11 @@ export function ApprovalList({
   const [expanded, setExpanded] = useState<string[]>([]);
   /** 카드가 혼자 승인이나 거절을 보내는 중인 줄이다. 그 줄이 든 묶음의 「모두 승인」 을 막는다 */
   const [sending, setSending] = useState<string[]>([]);
+  /** 이 화면에서 끝나지 않은 상태로 본 원고 줄이다. 그 줄은 끝나도 결과를 보이게 펼쳐 둔다 */
+  const [live, setLive] = useState<string[]>([]);
+  /** 처음부터 끝나 있던 원고 카드를 펼친 대화다. 대화를 열 때마다 지난 저장 카드가 쌓이지 않게 접어 둔다 */
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
+  const jobs = useContentDraftJobs(conversationId, refreshKey + reloads);
   const bulk = useBulkApproval(replace, () => setReloads((count) => count + 1));
 
   useEffect(() => {
@@ -158,6 +174,26 @@ export function ApprovalList({
     else setReloads((count) => count + 1);
   }
 
+  // 진행 중으로 본 원고 줄을 그리는 동안 더한다. 받은 목록에서 바로 정해지는 값이라 effect 를 거치지 않는다.
+  const running = [
+    ...(loaded?.actions ?? []).flatMap((action) =>
+      action.contentDraft && !isContentDraftTerminal(action.contentDraft.status)
+        ? [action.actionId]
+        : [],
+    ),
+    ...jobs.items.flatMap((job) =>
+      isContentDraftTerminal(job.status) ? [] : [job.actionId],
+    ),
+  ];
+  if (running.some((id) => !live.includes(id)))
+    setLive([...new Set([...live, ...running])]);
+  const finishedOpen = openedFor === conversationId;
+
+  /** 처음 본 때부터 끝나 있던 원고 줄이다. 펼치기 전에는 그리지 않는다. */
+  function finished(actionId: string, status: ContentDraftJobStatus) {
+    return isContentDraftTerminal(status) && !live.includes(actionId);
+  }
+
   function dismiss(actionId: string) {
     setDismissed((current) => [...current, actionId]);
   }
@@ -175,11 +211,38 @@ export function ApprovalList({
     loaded !== null && loaded.conversationId === conversationId
       ? loaded.actions.filter(
           (action) =>
-            SHOWN.includes(action.status) &&
+            (SHOWN.includes(action.status) || action.contentDraft) &&
             !dismissed.includes(action.actionId),
         )
       : [];
-  if (actions.length === 0) return null;
+  const finishedActions = actions.filter(
+    (action) =>
+      action.contentDraft &&
+      finished(action.actionId, action.contentDraft.status),
+  );
+  // 승인 줄 목록에 없는 원고 job 만 카드로 더한다. 같은 actionId 는 한 장만 그린다.
+  const seen = new Set([
+    ...dismissed,
+    ...(loaded?.conversationId === conversationId
+      ? loaded.actions.map((action) => action.actionId)
+      : []),
+  ]);
+  const jobOnly = jobs.items.filter(
+    (job) => !seen.has(job.actionId) && (seen.add(job.actionId), true),
+  );
+  const finishedJobs = jobOnly.filter((job) =>
+    finished(job.actionId, job.status),
+  );
+  const hiddenCount = finishedActions.length + finishedJobs.length;
+  const shownActions = finishedOpen
+    ? actions
+    : actions.filter((action) => !finishedActions.includes(action));
+  const shownJobs = finishedOpen
+    ? jobOnly
+    : jobOnly.filter((job) => !finishedJobs.includes(job));
+  if (conversationId === null) return null;
+  if (actions.length === 0 && jobOnly.length === 0 && jobs.next === null)
+    return null;
 
   return (
     <div
@@ -194,7 +257,7 @@ export function ApprovalList({
           {bulk.error}
         </Notice>
       ) : null}
-      {grouped(actions).map(({ key, actions: group }) =>
+      {grouped(shownActions).map(({ key, actions: group }) =>
         group.length === 1 ? (
           <ApprovalCard
             key={group[0].actionId}
@@ -230,6 +293,42 @@ export function ApprovalList({
           />
         ),
       )}
+      {shownJobs.map((job) => (
+        <ContentDraftSaveCard
+          key={job.actionId}
+          action={{ actionId: job.actionId, status: "PENDING" }}
+          draft={{ ...job, conversationId, errorCode: null }}
+          onChanged={() => changed(null)}
+          onDismiss={() => dismiss(job.actionId)}
+        />
+      ))}
+      {!finishedOpen && (hiddenCount > 0 || jobs.next !== null) ? (
+        <div>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="content-draft-finished"
+            onClick={() => setOpenedFor(conversationId)}
+          >
+            {hiddenCount > 0
+              ? `끝난 저장 ${hiddenCount}건 보기`
+              : "이전 저장 보기"}
+          </Button>
+        </div>
+      ) : null}
+      {finishedOpen && jobs.next !== null ? (
+        <div>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="content-draft-more"
+            loading={jobs.loadingMore}
+            onClick={() => void jobs.loadMore()}
+          >
+            이전 저장 더 보기
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

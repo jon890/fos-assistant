@@ -210,6 +210,21 @@ export function startFakeHermes(
         },
         releaseProactiveEvents: () => state.openProactiveGate?.(),
         proactiveInputs: () => state.proactiveInputs.map((entry) => ({ ...entry })),
+        setSnapshotConnector: (on: boolean) => {
+          state.contentSnapshot.on = on;
+        },
+        snapshotRequests: () => state.contentSnapshot.requests.map((entry) => ({ ...entry })),
+        snapshotStarts: () => Object.fromEntries(state.contentSnapshot.starts),
+        loseNextSnapshotStart: (mode) => {
+          state.contentSnapshot.loseNextStart = mode;
+        },
+        rejectNextSnapshotStart: (code: string) => {
+          state.contentSnapshot.rejectNextStart = code;
+        },
+        setSnapshotJobOutcome: (jobId, outcome) => {
+          state.contentSnapshot.outcomes.set(jobId, outcome);
+        },
+        snapshotErrorBodies: () => [...state.contentSnapshot.errorBodies],
         close: () =>
           new Promise<void>((done) => {
             state.holdNextRun = false;
@@ -227,6 +242,6 @@ export function startFakeHermes(
 }
 
 export { TOOL_DETAIL_SECRETS, TOOL_DETAIL_SAMPLE, ASK_GUIDE_HEADER, ARTIFACT_PROBE, ARTIFACT_SAME_NAME_PROBE, ARTIFACT_WRITE_PROBE, MEMORY_READ_PROBE, FOLLOW_UP_PROPOSE_PROBE, SUBAGENT_MEMORY_PROBE, SUBAGENT_PROVIDER_PROBE, CONNECTOR_TOOL_PROBE, NO_TOOL_CALL_PROBE, CONNECTOR_RESULT_SAMPLE, CONNECTOR_ARGUMENT_SAMPLE, LONG_ACTIVITY_PROBE, PROACTIVE_DEFAULT_FINDING, proactiveOutput, ASK_CARD_PROBE, FAKE_STARTER_PROMPTS } from "./fake-hermes/scenario-fixtures.ts";
-export { DEMO_CONNECTOR, DEMO_TOKEN_OK, DEMO_TOKEN_BAD, AGENDA_CONNECTOR } from "./fake-hermes/connectors.ts";
+export { DEMO_CONNECTOR, DEMO_TOKEN_OK, DEMO_TOKEN_BAD, AGENDA_CONNECTOR, SNAPSHOT_CONNECTOR } from "./fake-hermes/connectors.ts";
 export { FAKE_DASHBOARD_TOKEN, FAKE_USAGE } from "./fake-hermes/runtime-fixtures.ts";
-export { type DemoScript, type ConnectorToolCall, type ProactiveScript, type FakeHermes } from "./fake-hermes/state.ts";
+export { type DemoScript, type ConnectorToolCall, type ProactiveScript, type FakeHermes, type SnapshotJobOutcome } from "./fake-hermes/state.ts";

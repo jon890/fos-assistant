@@ -230,7 +230,7 @@ class McpMediaObservationToolTest {
                 "follow_up_propose",
                 McpMediaObservationTools.LIST,
                 McpMediaObservationTools.RECORD,
-                "content_draft_write", "content_draft_read",
+                "content_draft_write", "content_draft_read", "content_draft_preview", "content_draft_save",
                 "memory_remember");
         var handlers = (Map<?, ?>)ReflectionTestUtils.getField(controller, "handlers");
         assertThat(list).extracting(item -> item.path("name").asString())

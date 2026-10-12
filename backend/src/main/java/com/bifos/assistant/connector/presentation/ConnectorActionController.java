@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConnectorActionController {
     private final ConnectorActionService actions;
     private final ContentDraftSaveApproval contentDrafts;
+    private final ContentDraftJobs contentDraftJobs;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
@@ -47,9 +49,11 @@ public class ConnectorActionController {
     @GetMapping("/chat/conversations/{conversationId}/connector-actions")
     public List<ActionView> list(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
-        return actions.listForConversation(user, conversations.requireOwnId(user, conversationId)).stream()
-            .map(ActionView::from)
-            .toList();
+        Long id = conversations.requireOwnId(user, conversationId);
+        var views = actions.listForConversation(user, id);
+        // 원고 저장 줄은 job 링크로 찾은 요약을 붙인다. 화면은 이 요약이 있는 줄만 원고 카드로 그린다.
+        var summaries = contentDraftJobs.summaries(user, id, conversationId, views.stream().map(view -> view.actionId()).toList());
+        return views.stream().map(view -> ActionView.from(view, summaries.get(view.actionId()))).toList();
     }
 
 
@@ -61,7 +65,9 @@ public class ConnectorActionController {
         boolean conversationGrant = request != null && Boolean.TRUE.equals(request.conversationGrant());
         // 원고 snapshot 에 연결된 줄은 job 링크로 골라 원고 저장 승인으로 넘긴다. 인자 글이나 도구 이름으로 고르지 않는다.
         if (contentDrafts.select(user, actionId).isPresent()) {
-            return ActionView.from(contentDrafts.approve(user, actionId, grant, conversationGrant));
+            var approved = contentDrafts.approve(user, actionId, grant, conversationGrant);
+            // 화면이 응답으로 자기 줄을 바꾸므로 원고 줄은 목록과 같은 요약을 붙여 돌려준다.
+            return ActionView.from(approved, contentDraftJobs.summaryOf(user, actionId).orElse(null));
         }
         return ActionView.from(actions.approve(user, actionId, grant, conversationGrant));
     }
@@ -87,7 +93,9 @@ public class ConnectorActionController {
 
     @PostMapping("/connector-actions/{actionId}/reject")
     public ActionView reject(@PathVariable UUID actionId) {
-        return ActionView.from(actions.reject(currentUser.require(), actionId));
+        CurrentUser user = currentUser.require();
+        var rejected = actions.reject(user, actionId);
+        return ActionView.from(rejected, contentDraftJobs.summaryOf(user, actionId).orElse(null));
     }
 
 

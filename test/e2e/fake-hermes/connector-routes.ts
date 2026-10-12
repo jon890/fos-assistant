@@ -1,5 +1,6 @@
 import { type FakeHermesState } from "./state.ts";
-import { createBindings, FAKE_CONNECTORS, fakeConnector, verifyAnswer, DEMO_CONNECTOR, SERVER_TOOLS } from "./connectors.ts";
+import { createBindings, catalogOf, fakeConnector, verifyAnswer, DEMO_CONNECTOR, SERVER_TOOLS } from "./connectors.ts";
+import { createContentSnapshotRoutes } from "./content-snapshot-routes.ts";
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import {
   CONNECTOR_CATALOG_PATH,
@@ -15,11 +16,14 @@ import { send, readBody } from "./lifecycle.ts";
 import { join } from "node:path";
 /** 커넥터 카탈로그, 도구 호출, 설치와 보관 파일 경로를 처리한다. */
 export function createConnectorRoutes(state: FakeHermesState, { bindingInstall, vaultValuesValid }: ReturnType<typeof createBindings>) {
+  const snapshotRoutes = createContentSnapshotRoutes(state);
   return async (request: IncomingMessage, response: ServerResponse, path: string, queryProfile: string | null): Promise<boolean> => {
     if (request.method === "GET" && path === CONNECTOR_CATALOG_PATH) {
-      send(response, 200, FAKE_CONNECTORS);
+      send(response, 200, catalogOf(state));
       return true;
     }
+
+    if (await snapshotRoutes(request, response, path)) return true;
 
     const callMatch = CONNECTOR_CALL_PATH.exec(path);
     if (request.method === "POST" && callMatch !== null) {
@@ -85,7 +89,7 @@ export function createConnectorRoutes(state: FakeHermesState, { bindingInstall, 
       const env = state.profiles.get(queryProfile) ?? state.hostEnv.get(queryProfile) ?? {};
       const installed = state.installedConnectors.get(queryProfile) ?? new Set<string>();
       const toolsets = state.apiServerToolsets.get(queryProfile) ?? [];
-      const states = FAKE_CONNECTORS.map((connector) => {
+      const states = catalogOf(state).map((connector) => {
         const bound = state.boundConnectors.get(queryProfile)?.has(connector.id) === true;
         const filled = connector.fields.every((field) => !field.required || env[field.env] !== undefined);
         // 옛 설치는 도구 목록이 설치가 쓰는 목록과 같을 때만 configured 다. 다른 내장 도구나 Control Plane MCP 가 남으면 아니다.
@@ -244,7 +248,7 @@ export function createConnectorRoutes(state: FakeHermesState, { bindingInstall, 
     const probeMatch = MCP_SERVER_TEST_PATH.exec(path);
     if (request.method === "POST" && probeMatch !== null) {
       // 그 profile 에 설치하거나 붙인 커넥터의 서버만 시험한다.
-      const connector = FAKE_CONNECTORS.find((candidate) => candidate.mcp_server === probeMatch[1]);
+      const connector = catalogOf(state).find((candidate) => candidate.mcp_server === probeMatch[1]);
       if (connector === undefined || queryProfile === null
           || (!state.installedConnectors.get(queryProfile)?.has(connector.id)
             && !state.boundConnectors.get(queryProfile)?.has(connector.id))) {

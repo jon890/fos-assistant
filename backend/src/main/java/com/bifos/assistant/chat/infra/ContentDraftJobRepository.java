@@ -25,6 +25,10 @@ public interface ContentDraftJobRepository extends JpaRepository<ContentDraftJob
     Optional<ContentDraftJob> findByJobId(String jobId);
 
 
+    /** 승인 카드에 원고 요약을 붙일 때 그 줄들의 job 을 한 번에 읽는다. */
+    List<ContentDraftJob> findByActionIdIn(Collection<Long> actionIds);
+
+
     /** 이 시각보다 먼저 승인했는데 아직 그 상태인 job 이다. 기한 정리가 쓴다. */
     List<ContentDraftJob> findByStatusInAndApprovedAtBefore(Collection<ContentDraftJobStatus> statuses, Instant before);
 

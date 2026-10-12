@@ -12,4 +12,13 @@ public interface ContentDraftBindingAccess {
 
 
     void requireUnchanged(CurrentUser user, ContentDraftBindingStamp stamp);
+
+
+    /**
+     * 요청자 에이전트에 붙은 요청자 연결 가운데 snapshot 을 선언한 커넥터의 바인딩이 정확히 하나면 그 번호다.
+     * 트랜잭션 밖에서 부른다.
+     *
+     * @throws com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException 0개이거나 2개 이상일 때
+     */
+    Long soleSnapshotBinding(CurrentUser user, Long agentId);
 }
