@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { EXIT, NON_REQUIRED, checkRequired, collect, decide, remergeReasons } from "../../scripts/pr/merge-ready.mjs";
+import { EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, remergeReasons } from "../../scripts/pr/merge-ready.mjs";
 
 const REQUIRED = ["unit", "backend"];
 const ok = (name: string) => ({ name, state: "SUCCESS", startedAt: "2026-10-12T01:00:00Z" });
@@ -115,6 +115,18 @@ test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어�
   }
 });
 
+test("비슷하지만 위험 경로가 아닌 파일은 직전 CI 를 쓴다", () => {
+  const negatives = ["test/unit-foo/a.ts", "web/src/package.json.ts", "web/src/Dockerfile.md", "backend/src/main/resources/db/seed.sql", "scripts/ci-notes.md", "test/fixtures-old/a.json"];
+  for (const file of negatives) {
+    assert.deepEqual(remergeReasons(["web/src/a.ts"], [file]), [], file);
+  }
+});
+
+test("겹치는 파일이 넷 이상이면 앞의 셋과 나머지 개수를 적는다", () => {
+  const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"];
+  assert.match(remergeReasons(files, files)[0], /\(a\.ts, b\.ts, c\.ts 외 2개\)/);
+});
+
 // gh 와 git 호출을 흉내 낸다. 키는 명령과 인자를 공백으로 이은 앞부분이고 가장 긴 키가 이긴다.
 function fakeRun(overrides: Record<string, { status?: number; stdout?: string }> = {}) {
   const table: Record<string, { status?: number; stdout?: string }> = {
@@ -191,8 +203,50 @@ test("필수 검사 조회가 실패하거나 0개면 판정하지 않는다", (
   assert.throws(() => collect("7", fakeRun({ "gh api repos/o/r/branches": { stdout: "" } })), /0개/);
 });
 
-test("PR 번호가 없으면 종료 코드 2 로 끝난다", () => {
+test("gh pr checks 가 출력 없이 끝나거나 시작 시각이 없으면 판정하지 않는다", () => {
+  assert.throws(() => collect("7", fakeRun({ "gh pr checks": { status: 2, stdout: "" } })), /check run 조회 실패/);
+  const noStart = { "git merge-base --is-ancestor": { status: 1 }, "gh api repos/o/r/actions": { stdout: "" } };
+  const zeroStart = JSON.stringify([ok("unit"), ok("backend")].map((r) => ({ ...r, startedAt: "0001-01-01T00:00:00Z" })));
+  assert.throws(() => collect("7", fakeRun({ ...noStart, "gh pr checks": { status: 8, stdout: zeroStart } })), /시작 시각/);
+});
+
+test("필수 검사 조회 밖의 조회 실패도 판정하지 않는다", () => {
+  assert.throws(() => collect("7", fakeRun({ "gh pr view": { status: 1 } })), /PR 조회 실패/);
+  assert.throws(() => collect("7", fakeRun({ "gh api graphql": { status: 1 } })), /리뷰 스레드 조회 실패/);
+  assert.throws(() => collect("7", fakeRun({ "git fetch": { status: 1 } })), /git fetch 조회 실패/);
+});
+
+test("리뷰 스레드가 여러 페이지면 모두 센다", () => {
+  const page = (nodes: { isResolved: boolean }[], next: string | null) => JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: next !== null, endCursor: next }, nodes } } } } });
+  const pages = [page([{ isResolved: false }], "c1"), page([{ isResolved: false }, { isResolved: true }], null)];
+  const inner = fakeRun();
+  let call = 0;
+  const run = (command: string, args: string[]) => (command === "gh" && args[1] === "graphql" ? { status: 0, stdout: pages[call++], stderr: "" } : inner(command, args));
+  assert.equal(collect("7", run).unresolvedThreads, 2);
+  assert.equal(call, 2);
+});
+
+test("execute 는 판정 줄과 종료 코드를 낸다", () => {
+  const out: string[] = [];
+  const io = { log: (line: string) => out.push(line), error: (line: string) => out.push(line) };
+  const ready = { ...collect("7", fakeRun({ "gh api graphql": { stdout: JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [] } } } } }) } })) };
+  assert.equal(execute(["7"], { ...io, collectFacts: () => ready }), EXIT.READY);
+  assert.equal(out[0], "head: abc");
+  assert.equal(out.at(-1), "머지 가능");
+  out.length = 0;
+  assert.equal(execute(["7"], { ...io, collectFacts: () => collect("7", fakeRun()) }), EXIT.BLOCKED);
+  assert.match(out.at(-1) ?? "", /^막힘\(미해결 리뷰 스레드 1개\)/);
+  out.length = 0;
+  assert.equal(execute(["7"], { ...io, collectFacts: () => collect("7", fakeRun({ "gh api repos/o/r/branches": { stdout: "" } })) }), EXIT.LOOKUP);
+  assert.match(out[0], /0개/);
+});
+
+test("PR 번호가 없거나 숫자가 아니면 종료 코드 2 로 끝난다", () => {
+  const out: string[] = [];
+  const io = { log: () => {}, error: (line: string) => out.push(line) };
+  assert.equal(execute([], io), EXIT.LOOKUP);
+  assert.equal(execute(["abc"], io), EXIT.LOOKUP);
+  assert.match(out[0], /사용법/);
   const result = spawnSync("node", ["scripts/pr/merge-ready.mjs"], { encoding: "utf8" });
   assert.equal(result.status, EXIT.LOOKUP);
-  assert.match(result.stderr, /사용법/);
 });

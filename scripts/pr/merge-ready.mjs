@@ -128,7 +128,7 @@ export function realRun(command, args) {
   return { status: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
 }
 
-class LookupError extends Error {}
+export class LookupError extends Error {}
 
 function must(run, command, args, what) {
   const result = run(command, args);
@@ -185,29 +185,30 @@ export function collect(pr, run = realRun) {
   return { ...view, required, runs, unresolvedThreads, containsMain, remergeReasons: reasons, headRecheck };
 }
 
-function main() {
-  const pr = process.argv[2];
+/** 인자를 받아 판정을 출력하고 종료 코드를 돌려준다. 조회와 출력은 주입해 단위 테스트가 종료 코드를 확인한다. */
+export function execute(argv, { collectFacts = collect, log = console.log, error = console.error } = {}) {
+  const pr = argv[0];
   if (!pr || !/^\d+$/.test(pr)) {
-    console.error("사용법: scripts/pr/merge-ready.sh <PR 번호>");
-    process.exit(EXIT.LOOKUP);
+    error("사용법: scripts/pr/merge-ready.sh <PR 번호>");
+    return EXIT.LOOKUP;
   }
   let facts;
   try {
-    facts = collect(pr);
-  } catch (error) {
-    if (!(error instanceof LookupError)) throw error;
-    console.error(error.message);
-    process.exit(EXIT.LOOKUP);
+    facts = collectFacts(pr);
+  } catch (caught) {
+    if (!(caught instanceof LookupError)) throw caught;
+    error(caught.message);
+    return EXIT.LOOKUP;
   }
   const { pending, failed } = checkRequired(facts.required, facts.runs);
-  console.log(`head: ${facts.headRefOid}`);
-  console.log(`필수 검사 ${facts.required.length}개: 통과 ${facts.required.length - pending.length - failed.length}, 도는 중 ${pending.length}, 실패 ${failed.length}`);
-  console.log(`Draft: ${facts.isDraft ? "예" : "아니오"}, mergeable: ${facts.mergeable}, mergeStateStatus: ${facts.mergeStateStatus}`);
-  console.log(`미해결 리뷰 스레드: ${facts.unresolvedThreads}개`);
-  console.log(`head 가 origin/${facts.baseRefName} 를 포함: ${facts.containsMain ? "예" : "아니오"}`);
+  log(`head: ${facts.headRefOid}`);
+  log(`필수 검사 ${facts.required.length}개: 통과 ${facts.required.length - pending.length - failed.length}, 도는 중 ${pending.length}, 실패 ${failed.length}`);
+  log(`Draft: ${facts.isDraft ? "예" : "아니오"}, mergeable: ${facts.mergeable}, mergeStateStatus: ${facts.mergeStateStatus}`);
+  log(`미해결 리뷰 스레드: ${facts.unresolvedThreads}개`);
+  log(`head 가 origin/${facts.baseRefName} 를 포함: ${facts.containsMain ? "예" : "아니오"}`);
   const { verdict, code } = decide(facts);
-  console.log(verdict);
-  process.exit(code);
+  log(verdict);
+  return code;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) process.exit(execute(process.argv.slice(2)));
