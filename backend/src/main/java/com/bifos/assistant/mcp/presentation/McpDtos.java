@@ -41,7 +41,6 @@ public final class McpDtos {
         }
     }
 
-
     /** 원고 ID·revision·바인딩 번호만 받는다. 소유자·profile·경로는 받지 않는다. */
     public record ContentDraftPreviewArguments(UUID draftId, long revision, long bindingId) {
         static ContentDraftPreviewArguments from(JsonNode node) {
