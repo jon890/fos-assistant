@@ -141,7 +141,7 @@ plugin 전달과 Control Plane 호출은 아직 연결하지 않았다. 아래�
 | start 결과 | `{job_id, status, stamp, error_code}`. 시작 확인 전에 끝났으면 그 종료 상태다. 시작 전 거절 code를 같은 응답으로 읽으며 status와 같은 허용 규칙을 쓴다 |
 | status 입력 | `{stamp}`만 받는다 |
 | status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다 |
-| 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}` |
+| 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}`. 커넥터는 isError 결과의 text 하나로 보내고, plugin은 이 모양만 `ok:true` 결과로 넘기며 다른 isError는 503이다 |
 
 private 서버는 profile을 모르므로 profileHash를 다시 계산하지 않는다. 상태 파일의 stamp와 모든 칸이 같은지만 본다.
 요청 profile의 SHA-256과 stamp.profileHash는 plugin이 자식 실행 전에 대조한다. authorize 주소는 dashboard의 기존 `FOS_CONNECTOR_EXECUTIONS_BASE_URL` 접두사에 고정 내부 경로를 붙인다. 요청·manifest·profile이 다른 주소를 지정하지 못한다.
@@ -331,6 +331,8 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 `ContentDraftJobs.refresh`는 주인·원래 대화·원고 ID를 먼저 확인한다. 현재 binding·connection 버전과 정책이 snapshot과 같고 status capability가 켜져 있을 때만 같은 예약 ID를 조회한다. 연결이 없거나 바뀌면 마지막 CP 상태만 읽는다.
 원격 호출 동안 DB 잠금을 유지하지 않는다. 응답 뒤 coordinator에서 현재 ACL·binding을 다시 확인하고 승인 줄 → snapshot → job 순서로 잠근다. stamp와 jobId가 정확한 결과만 기록한다.
 `ContentDraftWorkerStatusDecoder`는 소문자 worker 상태를 CP enum으로 명시적으로 옮기며 단계·boolean·수치·종료 시각의 타입을 검사한다. 조회 오류는 `CONTENT_DRAFT_JOB_UNAVAILABLE`이고 기존 상태를 FAILED로 바꾸지 않는다.
+worker의 `not_found`는 timeout·전송 실패와 다르다. HTTP client가 `ContentDraftJobNotFound`로 따로 알리고, refresh는 start claim이 없으면 FAILED, 있으면 UNKNOWN과 `CONTENT_DRAFT_JOB_NOT_FOUND`로 닫는다. worker는 브라우저를 열기 전에 반드시 start claim을 받으므로 claim이 없으면 저장 클릭도 없고, 늦게 온 worker는 FAILED에서 claim을 받지 못한다.
+시작 전송이 아직 worker에 닿지 않았을 수 있는 승인 뒤 2분 동안의 DISPATCHED job은 `not_found`를 일시 장애로 본다. CP가 닫은 UNKNOWN은 다시 조회하지 않는다.
 늦은 terminal은 UNKNOWN job을 해소할 수 있다. 확정한 SUCCEEDED·FAILED는 덮지 않고 UNKNOWN을 running 응답으로 되돌리지 않는다. save claim 또는 save_clicked 뒤의 실패는 UNKNOWN이다. ConnectorAction은 EXECUTING일 때만 terminal로 바꾸고 기존 UNKNOWN 승인 줄은 유지한다. 일반 실행 정리가 원고 승인 줄을 바꾸지 않으므로 UNKNOWN 승인 줄은 시작 응답을 잃었을 때만 생긴다.
 FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장이 없었다는 증거가 아니다. save claim 뒤의 실패는 UNKNOWN으로 둔다.
 

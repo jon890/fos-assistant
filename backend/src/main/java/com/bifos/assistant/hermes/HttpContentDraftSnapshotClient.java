@@ -26,6 +26,7 @@ import tools.jackson.core.StreamReadFeature;
 public class HttpContentDraftSnapshotClient {
     private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Semaphore SLOTS = new Semaphore(4);
+    private static final Set<String> WORKER_ERRORS = Set.of("invalid_input", "not_found", "start_unknown", "unavailable");
     private final HermesProperties properties;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
@@ -45,9 +46,17 @@ public class HttpContentDraftSnapshotClient {
     }
 
 
+    /** @throws ContentDraftJobNotFound worker 가 그 stamp 의 job 을 모른다고 답했을 때. 전송 실패와 timeout 은 {@code CONTENT_DRAFT_JOB_UNAVAILABLE} 이다 */
     public JsonNode status(String profile, String connectorId, ContentDraftWorkerStamp stamp) {
         var args = JSON.createObjectNode().set("stamp", JSON.valueToTree(stamp));
-        return jobRequest(profile, connectorId, "status", args, stamp, 5);
+        var result = jobRequest(profile, connectorId, "status", args, stamp, 5);
+        if (result.has("error")) {
+            if ("not_found".equals(result.path("error").stringValue())) {
+                throw new ContentDraftJobNotFound();
+            }
+            throw jobUnavailable();
+        }
+        return result;
     }
 
 
@@ -86,6 +95,11 @@ public class HttpContentDraftSnapshotClient {
                     throw jobUnavailable();
                 }
                 var result = answer.path("result");
+                // worker 의 고정 오류 code 는 stamp 없이 이 모양으로만 온다. 무엇으로 읽을지는 operation 별 호출자가 정한다.
+                if (result.isObject() && result.propertyNames().equals(Set.of("error")) && result.path("error").isString()
+                    && WORKER_ERRORS.contains(result.path("error").stringValue())) {
+                    return result;
+                }
                 if (!result.isObject() || JSON.writeValueAsBytes(result).length > 262144
                     || !result.path("stamp").equals(JSON.valueToTree(stamp))
                     || !result.path("job_id").isString() || !stamp.jobId().toString().equals(result.path("job_id").stringValue())) {

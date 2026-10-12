@@ -17,7 +17,7 @@ from .connector_run import (_installed_server_env, _installed_owner_attachments,
                             _installed_owner_browser)
 from .connector_schema import BIND_MODE, CONNECTOR_ID_RE, CONNECTOR_STATE
 from .connector_snapshot_manifest import SNAPSHOT_ENV, SNAPSHOT_FLAG
-from .connector_snapshot_job import _job_args, _job_result, _authorize_url
+from .connector_snapshot_job import JOB_ERRORS, _job_args, _job_result, _authorize_url
 from .connector_state import _connector_state
 
 ENVELOPE_CAP = 524288
@@ -113,14 +113,21 @@ async def _run_connector_snapshot(manifest, args, env, operation="compile"):
                         or listed.tools[0].annotations.read_only_hint is not (operation != "start")):
                     raise ValueError("snapshot 선언 불일치")
                 result = await session.call_tool(tool, args)
-                payload = _snapshot_tool_result(result)
-                return payload if operation == "compile" else _job_result(operation, args, payload)
+                if operation == "compile":
+                    return _snapshot_tool_result(result)
+                return _job_result(operation, args, _snapshot_tool_result(result, job=True))
 
 
-def _snapshot_tool_result(result):
-    if len(result.model_dump_json(by_alias=True).encode("utf-8")) > ENVELOPE_CAP or result.is_error:
+def _snapshot_tool_result(result, job=False):
+    if len(result.model_dump_json(by_alias=True).encode("utf-8")) > ENVELOPE_CAP or result.is_error and not job:
         raise ValueError("snapshot 결과 거절")
     texts = [_strict_json(item.text) for item in result.content if item.type == "text"]
+    if result.is_error:
+        # start·status 의 고정 오류 code 는 isError 결과의 text 하나로만 온다. 그 밖의 오류는 원문을 버린다.
+        if (result.structured_content is not None or len(result.content) != 1 or len(texts) != 1
+                or not isinstance(texts[0], dict) or set(texts[0]) != {"error"} or texts[0]["error"] not in JOB_ERRORS):
+            raise ValueError("snapshot 결과 거절")
+        return texts[0]
     payload = result.structured_content
     if payload is None:
         if len(texts) != 1:

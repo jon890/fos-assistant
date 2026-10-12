@@ -2,12 +2,17 @@ package com.bifos.assistant.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.chat.application.model.ContentDraftJobView;
 import com.bifos.assistant.chat.domain.entity.ContentDraftJob;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.hermes.ContentDraftJobNotFound;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Duration;
@@ -84,6 +89,71 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.FAILED);
         assertThat(actionRows.findByPublicId(actionId).orElseThrow().status()).isEqualTo(ActionStatus.FAILED);
         assertThat(starter.started()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("worker가 not_found로 답하면 start claim 없는 job은 FAILED로 닫고 승인 줄도 FAILED다")
+    void failsMissingJobWithoutStartClaim() {
+        var actionId = accepted();
+        when(compiler.status(any(), any(), any())).thenThrow(new ContentDraftJobNotFound());
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.FAILED);
+        assertThat(jobRows.findAll().getFirst().errorCode()).isEqualTo(ContentDraftJob.NOT_FOUND);
+        assertThat(actionRows.findByPublicId(actionId).orElseThrow().status()).isEqualTo(ActionStatus.FAILED);
+        forbidden(() -> authorizer.authorize(starter.started().getLast().ticket(), "start", null));
+    }
+
+
+    @Test
+    @DisplayName("start claim 뒤 not_found는 UNKNOWN으로 확정하고 다시 조회하지 않는다")
+    void settlesClaimedMissingJobAsUnknownWithoutRequery() {
+        var actionId = accepted();
+        authorizer.authorize(starter.started().getLast().ticket(), "start", null);
+        when(compiler.status(any(), any(), any())).thenThrow(new ContentDraftJobNotFound());
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
+        assertThat(actionRows.findByPublicId(actionId).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
+        verify(compiler, times(1)).status(any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("시작 응답을 잃은 job에 worker가 not_found로 답하면 시작하지 않은 것이므로 FAILED다")
+    void failsLostStartThatWorkerNeverReceived() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.UNKNOWN);
+        when(compiler.status(any(), any(), any())).thenThrow(new ContentDraftJobNotFound());
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.FAILED);
+        assertThat(actionRows.findByPublicId(request.actionId()).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
+    }
+
+
+    @Test
+    @DisplayName("시작 전송 직후의 DISPATCHED job은 not_found를 일시 장애로 보고 닫지 않는다")
+    void keepsFreshDispatchedJobOnNotFound() {
+        accepted();
+        jdbc.update("update content_draft_job set status = 'DISPATCHED', approved_at = ?", java.sql.Timestamp.from(clock.instant()));
+        when(compiler.status(any(), any(), any())).thenThrow(new ContentDraftJobNotFound());
+        code(this::refresh, ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.DISPATCHED);
+        clock.advance(Duration.ofMinutes(3));
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.FAILED);
+    }
+
+
+    private ContentDraftJobView refresh() {
+        var job = jobRows.findAll().getFirst();
+        var snapshot = snapshotRows.findById(job.snapshotId()).orElseThrow();
+        return jobQueries.refresh(owner, conversation.id(), draftId, snapshot.publicId());
+    }
+
+
+    private static void forbidden(Runnable action) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
     }
 
 

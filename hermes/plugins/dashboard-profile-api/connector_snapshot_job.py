@@ -10,6 +10,7 @@ STAMP_KEYS = {"protocol", "snapshotId", "jobId", "snapshotHash", "bindingId", "c
               "bindingUpdatedAt", "connectionUpdatedAt", "profileHash"}
 STAGES = {"queued", "open", "fill", "photos", "components", "settings", "save", "state"}
 STATUSES = {"running", "succeeded", "failed", "unknown"}
+JOB_ERRORS = {"invalid_input", "not_found", "start_unknown", "unavailable"}
 
 
 def _matches(value, pattern):
@@ -57,7 +58,7 @@ def _authorize_url():
 
 
 def _job_result(operation, args, result):
-    if set(result) == {"error"} and result["error"] in {"invalid_input", "not_found", "start_unknown", "unavailable"}:
+    if set(result) == {"error"} and result["error"] in JOB_ERRORS:
         return result
     keys = {"job_id", "status", "stamp", "error_code"}
     if operation == "status":

@@ -29,6 +29,8 @@ import jakarta.persistence.EnumType;
 public class ContentDraftJob {
     /** ticket 기한과 worker 실행 상한이 지나도록 끝나지 않아 Control Plane 이 닫았다. */
     public static final String EXPIRED = "CONTENT_DRAFT_JOB_EXPIRED";
+    /** worker 가 그 stamp 의 job 을 모른다. 상태 파일이 없거나 정리됐다. */
+    public static final String NOT_FOUND = "CONTENT_DRAFT_JOB_NOT_FOUND";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -144,6 +146,12 @@ public class ContentDraftJob {
         this.status = startClaimedAt == null ? ContentDraftJobStatus.FAILED : ContentDraftJobStatus.UNKNOWN;
         this.errorCode = errorCode;
         this.lastCheckedAt = at;
+    }
+
+
+    /** worker 의 답을 더 기다릴 job 이다. Control Plane 이 닫은 UNKNOWN 은 다시 조회하지 않는다. */
+    public boolean awaitingResult() {
+        return running() || status == ContentDraftJobStatus.UNKNOWN && !EXPIRED.equals(errorCode) && !NOT_FOUND.equals(errorCode);
     }
 
 

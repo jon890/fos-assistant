@@ -24,7 +24,9 @@ import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
+import com.bifos.assistant.hermes.ContentDraftJobNotFound;
 import com.bifos.assistant.hermes.HttpContentDraftSnapshotClient;
+import com.bifos.assistant.connector.application.model.ContentDraftWorkerStatus;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
@@ -37,6 +39,7 @@ import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
@@ -69,6 +72,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private static final String DEDUPE_PREFIX = "v1-content-save";
     /** MCP 서버의 등록 이름이 아니므로 일반 승인 경로는 이 줄을 선언 없는 도구로 보고 실행 없이 거절한다. */
     static final String HERMES_TOOL = "fos_content_draft_save";
+    /** 시작 전송의 응답 한도(60초)보다 넉넉히 길다. 그 안의 DISPATCHED job 은 worker 가 아직 모를 수 있다. */
+    private static final Duration START_WINDOW = Duration.ofMinutes(2);
     private static final Set<ContentDraftJobStatus> RUNNING = EnumSet.of(ContentDraftJobStatus.DISPATCHED, ContentDraftJobStatus.SAVING);
 
     private final ContentDraftSnapshots snapshots;
@@ -157,7 +162,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
 
     private ContentDraftJobView refreshJob(CurrentUser user, ContentDraftSnapshot snapshot, ContentDraftJob job, ContentDraftJobView view) {
         Long conversationId = snapshot.conversationId();
-        if (job.jobId() == null || !job.running() && job.status() != ContentDraftJobStatus.UNKNOWN) {
+        if (job.jobId() == null || !job.awaitingResult()) {
             return view;
         }
         ContentDraftBindingStamp binding;
@@ -178,7 +183,17 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             view.actionId(), user.id(), conversationId, snapshot.bindingId(), snapshot.connectionId(),
             snapshot.bindingUpdatedAt(), snapshot.connectionUpdatedAt(), null, null);
         var stamp = ContentDraftWorkerStatusDecoder.stamp(binding.profile(), ticketFields);
-        var observed = ContentDraftWorkerStatusDecoder.decode(worker.status(binding.profile(), binding.connectorId(), stamp), stamp, false);
+        ContentDraftWorkerStatus observed;
+        try {
+            observed = ContentDraftWorkerStatusDecoder.decode(worker.status(binding.profile(), binding.connectorId(), stamp), stamp, false);
+        } catch (ContentDraftJobNotFound missing) {
+            // 시작 전송이 아직 worker 에 닿지 않았을 수 있는 동안은 일시 장애와 같게 둔다.
+            if (job.status() == ContentDraftJobStatus.DISPATCHED && job.approvedAt().isAfter(clock.instant().minus(START_WINDOW))) {
+                throw ContentDraftWorkerStatusDecoder.unavailable();
+            }
+            observed = null;
+        }
+        var answer = observed;
         return mutations.run(user.id(), new ChatContentMutationTarget(conversationId, List.of()), () -> {
             access.requireOwn(user, conversationId);
             try {
@@ -193,7 +208,12 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             if (!sameBinding(currentSnapshot, binding) || !currentJob.jobId().equals(stamp.jobId().toString())) {
                 throw ContentDraftWorkerStatusDecoder.unavailable();
             }
-            currentJob.observed(observed.status(), observed.stage(), observed.saveClicked(), observed.errorCode(), clock.instant());
+            if (answer != null) {
+                currentJob.observed(answer.status(), answer.stage(), answer.saveClicked(), answer.errorCode(), clock.instant());
+            } else if (currentJob.awaitingResult()) {
+                // worker 는 브라우저를 열기 전에 반드시 start claim 을 받는다. claim 이 없으면 저장 클릭도 없다.
+                currentJob.close(ContentDraftJob.NOT_FOUND, clock.instant());
+            }
             finishAction(action, currentJob);
             return views(List.of(currentJob)).getFirst();
         });

@@ -19,6 +19,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -282,6 +283,26 @@ class HttpContentDraftSnapshotClientTest {
         assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
         assertThat(requests.get()).isEqualTo(3);
+    }
+
+
+    @Test
+    @DisplayName("status의 not_found는 전용 예외이고 다른 worker 오류 code와 모르는 code는 일시 장애다")
+    void separatesStatusNotFoundFromTransientErrors() {
+        var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
+        response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", "not_found"))));
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp)).isInstanceOf(ContentDraftJobNotFound.class);
+        for (var code : List.of("unavailable", "invalid_input", "other_code")) {
+            response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", code))));
+            assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
+        }
+        response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", "not_found").put("extra", 1))));
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
+        status = 503;
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
     }
 
 

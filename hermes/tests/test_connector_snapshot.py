@@ -381,6 +381,33 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
             with self.assertRaises(ValueError):
                 self.module._snapshot_tool_result(result)
 
+    def test_job_error_code_passes_only_from_single_error_text(self):
+        # 실제 커넥터는 start·status 의 고정 code 를 isError 결과의 text 하나로 보낸다. 일시 장애와 not_found 를 CP 가 가른다.
+        def error(text, **extra):
+            return CallToolResult(content=[TextContent(type="text", text=text)], isError=True, **extra)
+        self.assertEqual(self.module._snapshot_tool_result(error('{"error":"not_found"}'), job=True), {"error": "not_found"})
+        for result in [error('{"error":"secret-stderr"}'), error('{"error":"not_found","body":"BODY_MARKER"}'),
+                       error('{"error":"not_found"}', structuredContent={"error": "not_found"}),
+                       CallToolResult(content=[TextContent(type="text", text='{"error":"not_found"}')] * 2, isError=True),
+                       error("not json")]:
+            with self.assertRaises(ValueError):
+                self.module._snapshot_tool_result(result, job=True)
+        with self.assertRaises(ValueError):
+            self.module._snapshot_tool_result(error('{"error":"not_found"}'))
+
+    def test_actual_sdk_status_not_found_reaches_control_plane_as_error_code(self):
+        self.enable_jobs()
+        (self.connector_root / "snapshot.js").write_text(
+            'import {McpServer} from ' + json.dumps(str(CONNECTOR / "node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js")) + ';\n'
+            'import {StdioServerTransport} from ' + json.dumps(str(CONNECTOR / "node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js")) + ';\n'
+            'import {z} from ' + json.dumps(str(CONNECTOR / "node_modules/zod/index.js")) + ';\n'
+            'const server = new McpServer({name:"fixture",version:"1"});\n'
+            'server.registerTool("content_snapshot_status", {inputSchema:{stamp:z.any()},annotations:{readOnlyHint:true}}, '
+            'async () => ({isError:true,content:[{type:"text",text:JSON.stringify({error:"not_found"})}]}));\n'
+            'await server.connect(new StdioServerTransport());\n')
+        status, result = self.call(self.job_body())
+        self.assertEqual((status, result["result"]), (200, {"error": "not_found"}), result)
+
     def test_actual_sdk_timeout_discards_stderr_and_reaps_the_synthetic_child(self):
         # protocol에 답하지 않는 합성 자식이다. 실제 provider나 개인 데이터는 사용하지 않는다.
         (self.connector_root / "snapshot.js").write_text(
