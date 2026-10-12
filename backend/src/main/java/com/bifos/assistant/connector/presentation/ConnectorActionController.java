@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ApproveRequest;
+import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ConversationGrantView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.GrantView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -52,16 +53,35 @@ public class ConnectorActionController {
     }
 
 
-    /** 본문이 없으면 상시 허락을 주지 않는 승인이다. */
+    /** 본문이 없으면 상시 허락도 대화 허락도 주지 않는 승인이다. */
     @PostMapping("/connector-actions/{actionId}/approve")
     public ActionView approve(@PathVariable UUID actionId, @RequestBody(required = false) ApproveRequest request) {
         CurrentUser user = currentUser.require();
         GrantPeriod grant = request == null ? null : request.grant();
+        boolean conversationGrant = request != null && Boolean.TRUE.equals(request.conversationGrant());
         // 원고 snapshot 에 연결된 줄은 job 링크로 골라 원고 저장 승인으로 넘긴다. 인자 글이나 도구 이름으로 고르지 않는다.
         if (contentDrafts.select(user, actionId).isPresent()) {
-            return ActionView.from(contentDrafts.approve(user, actionId, grant));
+            return ActionView.from(contentDrafts.approve(user, actionId, grant, conversationGrant));
         }
-        return ActionView.from(actions.approve(user, actionId, grant));
+        return ActionView.from(actions.approve(user, actionId, grant, conversationGrant));
+    }
+
+
+    /** 그 대화에서 계속 허용 중인 도구다. 주인의 대화가 아니면 다른 대화 경로와 같은 응답이다. */
+    @GetMapping("/chat/conversations/{conversationId}/connector-conversation-grants")
+    public List<ConversationGrantView> conversationGrants(@PathVariable UUID conversationId) {
+        CurrentUser user = currentUser.require();
+        return actions.conversationGrants(user, conversations.requireOwnId(user, conversationId)).stream()
+            .map(ConversationGrantView::from)
+            .toList();
+    }
+
+
+    @DeleteMapping("/chat/conversations/{conversationId}/connector-conversation-grants/{grantId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeConversationGrant(@PathVariable UUID conversationId, @PathVariable Long grantId) {
+        CurrentUser user = currentUser.require();
+        actions.revokeConversationGrant(user, conversations.requireOwnId(user, conversationId), grantId);
     }
 
 

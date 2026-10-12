@@ -24,8 +24,8 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
         # 늘 승인이 필요한 도구가 없으면 서버 정의에 `tools` 를 넣지 않는다.
         self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
 
-        self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "env_view": {"risk": "SENSITIVE"},
-                                  "write_note": {"risk": "WRITE"}})
+        self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "env_view": {"risk": "SENSITIVE", "outbound": False},
+                                  "write_note": {"risk": "WRITE", "outbound": False}})
         # manifest 가 바뀌면 다시 설치하기 전까지 대응의 그 서버 `tools` 가 옛것이다. 서버 목록과 접두사는 같으므로
         # hook 은 접두사로 서버를 잡아 묻는다. 그 커넥터 항목만 설치가 덜 된 것이고 `policy_hook` 은 참이다.
         status = self.connector_status()
@@ -187,7 +187,7 @@ class ProfileApiConnectorInstallPluginTest(support.ProfileApiRouteTest):
     def test_tools_that_always_need_approval_are_excluded_from_the_server_definition(self):
         """`approval: always` 인 도구는 서버 정의의 `tools.exclude` 에 이름 순으로 들어가고 소유 기록도 같다."""
         root = self.connector_fixture()
-        self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE"}})
+        self.declare_tools(root, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE", "outbound": False}})
         self.assertEqual(self.connector().status_code, 200)
         self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])
         self.assertIs(self.policy_hook(), True)
