@@ -74,6 +74,8 @@ public class ConnectorContentDraftBindings implements ContentDraftBindingAccess 
     public Long soleSnapshotBinding(CurrentUser user, Long agentId) {
         var ids = bindings.findByAgentId(agentId).stream()
             .filter(row -> user.id().equals(row.connection().userId()))
+            // 준비되지 않은 바인딩은 preview 가 어차피 거절하므로 세지 않는다. 세면 쓸 수 있는 하나가 MANY 로 막힌다.
+            .filter(row -> row.status() == BindingStatus.READY && row.connection().status() == ConnectionStatus.READY)
             .filter(row -> catalog.find(row.connection().connectorId()).map(manifest -> manifest.snapshot() != null).orElse(false))
             .map(ConnectorBinding::id).toList();
         if (ids.size() != 1) {

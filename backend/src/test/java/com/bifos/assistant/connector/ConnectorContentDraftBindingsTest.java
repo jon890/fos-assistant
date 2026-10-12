@@ -10,6 +10,8 @@ import com.bifos.assistant.connector.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.application.ConnectorContentDraftBindings;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.domain.type.BindingStatus;
+import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorSnapshotDeclaration;
@@ -55,6 +57,18 @@ class ConnectorContentDraftBindingsTest {
     }
 
 
+    @Test
+    @DisplayName("준비되지 않은 snapshot 바인딩은 세지 않아 준비된 하나를 고른다")
+    void ignoresBindingsThatAreNotReady() {
+        snapshotConnector("naver", true);
+        snapshotConnector("blog-b", true);
+        var rows = List.of(binding(1L, 7L, "naver"), binding(4L, 7L, "blog-b", BindingStatus.PENDING));
+        when(bindings.findByAgentId(5L)).thenReturn(rows);
+
+        assertThat(access.soleSnapshotBinding(OWNER, 5L)).isEqualTo(1L);
+    }
+
+
     private void snapshotConnector(String id, boolean declared) {
         var manifest = mock(ConnectorManifest.class);
         when(manifest.snapshot()).thenReturn(declared ? mock(ConnectorSnapshotDeclaration.class) : null);
@@ -63,12 +77,19 @@ class ConnectorContentDraftBindingsTest {
 
 
     private static ConnectorBinding binding(Long id, Long userId, String connectorId) {
+        return binding(id, userId, connectorId, BindingStatus.READY);
+    }
+
+
+    private static ConnectorBinding binding(Long id, Long userId, String connectorId, BindingStatus status) {
         var connection = mock(ConnectorConnection.class);
         when(connection.userId()).thenReturn(userId);
         when(connection.connectorId()).thenReturn(connectorId);
+        when(connection.status()).thenReturn(ConnectionStatus.READY);
         var binding = mock(ConnectorBinding.class);
         when(binding.id()).thenReturn(id);
         when(binding.connection()).thenReturn(connection);
+        when(binding.status()).thenReturn(status);
         return binding;
     }
 }
