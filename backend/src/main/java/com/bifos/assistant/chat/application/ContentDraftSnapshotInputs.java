@@ -97,6 +97,8 @@ public class ContentDraftSnapshotInputs {
         }
         try {
             var input = reader.read(json.readTree(bodies.open(draft, row)));
+            // 규칙 전에 저장한 판의 반복 사진은 일시 장애가 아니라 고쳐 저장할 원고다. 커넥터를 부르기 전에 같은 코드로 멈춘다.
+            ContentDraftInputReader.requireUniquePhotos(input);
             var canonical = json.valueToTree(new CanonicalDraft(1, draftId, revision, conversation.publicId(),
                 input.title(), input.category(), input.tags(), input.blocks()));
             var resolvedAssets = resolve(user, conversationId, links, input);
@@ -114,6 +116,9 @@ public class ContentDraftSnapshotInputs {
         } catch (IOException | RuntimeException ex) {
             if (ex instanceof ContentDraftException draftError) {
                 throw draftError;
+            }
+            if (ex instanceof ApiException duplicate && duplicate.code() == ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO) {
+                throw duplicate;
             }
             throw ContentDraftSnapshotHash.unavailable();
         }
