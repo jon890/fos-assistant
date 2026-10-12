@@ -144,6 +144,12 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 낙관적 잠금 실패 때는 캐시를 갱신하지 않아 다음 활동이 다시 시도한다.
 켜기 잠금과 컨테이너 수명, CDP 대기는 `UserBrowserService`에 둔다.
 
+### 로그인 화면 입력
+
+로그인 화면의 연결, 잠금과 입력 상태는 `BrowserScreenSession`이 소유한다.
+같은 `application`의 package-private `BrowserScreenInputParams`는 좌표와 키 입력의 CDP 인자만 만든다.
+명령 전송과 실패 처리, 탭 전환과 종료는 세션에 남겨 연결 수명과 입력 변환을 함께 바꾸지 않도록 한다.
+
 ### 스킬
 
 `skill.application.SkillService`는 권한, 에이전트 행 잠금, 트랜잭션과 스킬 게시 순서, `SkillsChanged` 사건을 맡는다.
