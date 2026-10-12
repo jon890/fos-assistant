@@ -2,12 +2,18 @@ import Link from "next/link";
 import { Notice } from "@/components/ui/notice";
 import { browserLoginHref, type ConnectionFailure } from "@/lib/connection";
 
-function LoginLink({ href }: { href: string }) {
+export function LoginLink({
+  href,
+  className = "",
+}: {
+  href: string;
+  className?: string;
+}) {
   return (
     <Link
       prefetch={false}
       href={href}
-      className="shrink-0 text-foreground underline underline-offset-4"
+      className={`shrink-0 text-foreground underline underline-offset-4 ${className}`}
       data-testid="browser-login-link"
     >
       내 브라우저에서 로그인
