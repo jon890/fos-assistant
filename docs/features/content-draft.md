@@ -106,7 +106,7 @@ Python MCP SDK의 compile·start·status 진단은 `connector_diagnostics.py`가
 scope 안에서는 msg, args, 예외, stack과 formatter의 cached message를 제거해 고정 문자열만 남긴다.
 logger 이름, ERROR/WARNING 등급과 record 수, 정상 RPC 결과는 유지하며 scope 밖 로그는 바꾸지 않는다.
 지원 source와 필터 상태를 확인하지 못하면 자식 생성 전 고정 unavailable 503으로 끝난다.
-정확한 SDK source 계약과 갱신 절차는 [Hermes 계약](../../hermes/docs/hermes-contract.md#compile-전용-sdk-진단)이 갖는다.
+정확한 SDK source 계약과 갱신 절차는 [Hermes 계약](../../hermes/docs/hermes-contract.md#private-snapshot-sdk-진단)이 갖는다.
 framework, 기존 gateway task, trajectory와 session 저장, 공개 A1 request_dump writer는 이 보호의 범위 밖이다.
 renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거나 반환하지 않는다.
 

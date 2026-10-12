@@ -2772,29 +2772,34 @@ nonce와 성공 원문을 저장하거나 자식에 서비스 비밀값을 전�
 승인 hook·주문 producer 구현 전에는 금융 호출이 계속 차단된다.
 지원 상태의 verified는 현재 응답의 검증 결과이며 금융 거래 허가를 뜻하지 않는다.
 
-### 원고 compile 전용 private 전달
+### 원고 private snapshot 전달
 
 snapshot은 별도 `POST /api/connectors/{id}/snapshot` 서비스 경로다. <!-- ref-ignore: plugin middleware가 처리하는 서비스 경로다 -->
 handler도 서비스 Bearer를 직접 검사하여 쿠키만 있는 요청은 받지 않는다.
 manifest의 정확한 다섯 키는 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`다.
-protocol은 `content-snapshot-v1`, capabilities는 `{compile:true,start:false,status:false}`이며 추가 키·누락·boolean이 아닌 값은 거절한다.
-검증된 snapshot은 공개 tools와 분리해 catalog 응답에 싣고 같은 capabilities를 compile 성공 envelope에 넣는다.
-후속 Control Plane의 Java decoder도 이 선언을 소비해야 한다. start/status는 현재 자식 생성 전 409다.
+protocol은 `content-snapshot-v1`이고 capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 추가 키·누락·boolean이 아닌 값은 거절한다.
+운영 선언은 `{compile:true,start:false,status:false}`를 유지한다.
+검증된 snapshot은 공개 tools와 분리해 catalog 응답에 싣고 같은 capabilities를 성공 envelope에 넣는다. Control Plane의 Java decoder도 이 선언을 소비한다.
+요청 operation은 `compile`, `start`, `status` 가운데 하나이며 선언이 false인 operation은 자식 생성 전 409다.
 
-private 자식에만 `--content-snapshot-operation compile`을 붙인다. 공개 서버 목록은 그대로이며 env나 모델 args로 mode를 바꾸지 못한다.
+private 자식에만 `--content-snapshot-operation <operation>`을 붙인다. 공개 서버 목록은 그대로이며 env나 모델 args로 mode를 바꾸지 못한다.
 설치 manifest와 profile은 private flag와 세 `FOS_CONTENT_*` snapshot env를 선언하지 못한다.
 기존 설치 소유 기록·profile 표식과 주인 첨부·브라우저 선택 규칙을 쓰며 dashboard 자식의 UID를 바꾸지 않는다.
-MCP 실제 목록에 read-only compile 하나만 있어야 호출한다. Python mcp 2.0.0과 TypeScript SDK 1.28.0 stdio 왕복을 합성 입력으로 검사한다.
-compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다.
-adapter 자체는 오류 원문·인자·결과를 로그에 넣지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
-compile의 Python MCP SDK 진단은 아래 source 계약에 따라 본문 없이 남긴다.
-입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#private-snapshot-내부-transport)이 갖는다.
+MCP 실제 목록에 그 operation의 도구 하나만 있고 `readOnlyHint`가 맞아야 호출한다. compile과 status는 true, start는 false다.
+Python mcp 2.0.0과 TypeScript SDK 1.28.0 stdio 왕복을 합성 입력으로 검사한다.
+세 operation은 기존 call·execute의 동시 실행 한도를 공유한다. 전체 왕복은 compile과 status가 5초, start가 60초다.
+start 자식에만 authorize 주소 `FOS_CONTENT_SAVE_AUTHORIZE_URL`을 넣는다. 기존 `FOS_CONNECTOR_EXECUTIONS_BASE_URL` 접두사에 고정 내부 경로를 붙인 값이며 요청·manifest·profile이 주소를 정하지 못한다.
+start·status 입력은 strict stamp와 profileHash를 자식 생성 전에 대조한다. 결과는 같은 stamp와 jobId를 돌려준 정해진 칸만 넘긴다.
+worker의 고정 오류 code(`invalid_input`, `not_found`, `start_unknown`, `unavailable`)는 isError 결과의 text 하나로 오며, plugin은 이 모양만 `ok:true` 결과의 `{"error": code}`로 넘긴다. 그 밖의 isError와 깨진 결과는 본문 없는 503이다.
+adapter 자체는 오류 원문·인자·결과·ticket을 로그에 넣지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
+세 operation의 Python MCP SDK 진단은 아래 source 계약에 따라 본문 없이 남긴다.
+입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약, stamp 칸과 job 결과 칸은 [원고 기능](../../docs/features/content-draft.md#private-snapshot-내부-transport)이 갖는다.
 
 본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
 운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
-최초 원고 MCP 생성·DB·승인·worker 시작·조회와 실제 네이버 접근은 이번 compile 경계의 범위 밖이다.
+최초 원고 MCP 생성과 실제 네이버 접근은 이 전달 경계의 범위 밖이다.
 
-### compile 전용 SDK 진단
+### private snapshot SDK 진단
 
 `connector_diagnostics.py`의 내부 API는 `ensure_snapshot_diagnostics()`와 `snapshot_diagnostics_scope()`다.
 Python mcp 정확히 2.0.0의 전체 Python source 122개를 `connector_diagnostics_source.json`과 대조한다.
@@ -2804,7 +2809,7 @@ logger는 `mcp.client.stdio`, `client`, `mcp.shared.jsonrpc_dispatcher`다.
 SDK source 계약 자료는 plugin 묶음에도 포함한다.
 
 Filter와 그 ContextVar는 프로세스 수명 동안 logger 객체에 남기고 profile reload에서도 재사용한다.
-매 compile은 같은 정책과 첫 filter 부착 상태를 확인한 뒤 SDK task를 만든다.
+매 호출은 같은 정책과 첫 filter 부착 상태를 확인한 뒤 SDK task를 만든다.
 알 수 없는 앞선 filter, 다른 정책, 지원 source 불일치나 읽기 실패는 자식 생성 전 고정 unavailable 503으로 끝난다.
 profile 관리 API 전체를 닫거나 unload에서 Filter를 제거하지 않는다.
 source 검사는 최초 설치 때 수행하며 설치된 source는 프로세스 실행 중 바뀌지 않는다는 계약을 전제로 한다.
