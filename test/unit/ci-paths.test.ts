@@ -213,9 +213,9 @@ test("PR 은 느린 검사를 기본으로 건너뛰고 전체 검사 라벨이 
   assert.equal(judged.browser.run, true);
 });
 
-test("workflow 는 전체 검사 라벨을 판정에 넘기고 라벨을 붙이면 다시 돈다", () => {
+test("workflow 는 전체 검사 라벨을 판정에 넘기고, 다른 라벨이 CI 를 다시 돌리지 않게 labeled 를 받지 않는다", () => {
   const text = readFileSync(".github/workflows/ci.yml", "utf8");
-  assert.match(text, /types: \[opened, synchronize, reopened, labeled\]/);
+  assert.match(text, /types: \[opened, synchronize, reopened\]/);
   assert.ok(text.includes(`FULL_LABEL: \${{ contains(github.event.pull_request.labels.*.name, '${FULL_LABEL}') }}`));
 });
 

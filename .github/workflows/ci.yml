@@ -2,8 +2,9 @@ name: CI
 
 on:
   pull_request:
-    # labeled: 「검사:전체」 라벨을 붙이면 브라우저와 E2E 까지 다시 돈다.
-    types: [opened, synchronize, reopened, labeled]
+    # labeled 는 넣지 않는다. pr-size 가 PR 마다 라벨을 붙여, 넣으면 진행 중인 CI 가 취소되고 다시 돈다.
+    # 「검사:전체」 라벨은 붙인 뒤의 다음 push 부터 적용된다.
+    types: [opened, synchronize, reopened]
   # main push 는 공개 정보, unit, quality(웹 빌드 포함)만 돈다. 전체 검사는 정기 실행과 수동 실행이 돈다.
   push:
     branches: [main]

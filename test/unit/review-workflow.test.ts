@@ -134,8 +134,7 @@ test("Draft 는 자동 리뷰를 건너뛰고 Ready 와 일반 PR, 권한 있는
   assert.equal(eligible("issue_comment", comment("/review-other")), false);
 
   const ci = readFileSync(".github/workflows/ci.yml", "utf8");
-  // 전체 검사 라벨(labeled)로는 다시 돌지만 Ready 전환으로는 돌지 않는다.
-  assert.match(ci, /types: \[opened, synchronize, reopened, labeled\]/);
+  assert.match(ci, /types: \[opened, synchronize, reopened\]/);
   assert.doesNotMatch(ci, /ready_for_review|pull_request\.draft/);
 });
 

@@ -29,7 +29,7 @@ description: |
 push 전에 빠른 로컬 검사만 돌리고 Draft 로 연다.
 backend 테스트와 MySQL, 브라우저처럼 무거운 검사는 로컬에서 기다리지 않고 Draft CI 에 맡긴다.
 Draft 에서는 바뀐 경로에 해당하는 무거운 검사만 돌고, 건너뛴 필수 검사는 판정 job 이 통과로 보고한다.
-브라우저 shard 와 E2E 는 PR 에서 돌지 않고 하루 한 번 정기 실행에서 돈다. 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙여 PR 에서도 돌린다.
+브라우저 shard 와 E2E 는 PR 에서 돌지 않고 하루 한 번 정기 실행에서 돈다. 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이고 다음 push 부터 PR 에서도 돌린다. 확인이 끝나면 라벨을 뗀다.
 경로 기준은 [ADR-20261012 / ci-path-filter](../../../docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다. GitHub 의 Claude 리뷰는 Draft 에서 돌지 않는다.
 
 ```bash
