@@ -169,7 +169,7 @@ def main() -> int:
         say("이미 동의한 계정이면 Google 계정의 「서드 파티 앱 및 서비스」 에서 이 앱의 접근을 지우고 다시 하세요.")
         return 1
     say("")
-    say("refresh token 입니다. 연결 화면에 붙여 넣은 뒤 터미널 기록에서 지우세요.")
+    say("refresh token 입니다. 외부 서비스 연결에 붙여 넣은 뒤 터미널 기록에서 지우세요.")
     print(refresh_token)
     return 0
 
