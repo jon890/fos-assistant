@@ -63,7 +63,7 @@ test("head 가 main 을 포함하지 않아도 까닭이 없으면 머지 가능
 });
 
 test("겹치지 않고 위험 경로도 없으면 직전 CI 를 쓴다", () => {
-  assert.deepEqual(remergeReasons(["web/src/a.ts"], ["backend/src/main/java/A.java", "docs/a.md"]), []);
+  assert.deepEqual(remergeReasons(["web/src/a.ts"], ["backend/src/main/java/A.java", "web/src/c.ts"]), []);
 });
 
 test("같은 파일을 고쳤으면 다시 합친다", () => {
@@ -88,7 +88,7 @@ test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어�
     const fromMain = remergeReasons(["web/src/a.ts"], [file]);
     assert.equal(fromMain.length, 1, file);
     assert.match(fromMain[0], new RegExp(`^main 이 .*${label}`), file);
-    const fromPr = remergeReasons([file], ["docs/x.md"]);
+    const fromPr = remergeReasons([file], ["web/src/x.ts"]);
     assert.match(fromPr[0], new RegExp(`^PR 이 .*${label}`), file);
   }
 });
