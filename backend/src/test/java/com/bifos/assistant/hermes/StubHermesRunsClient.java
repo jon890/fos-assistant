@@ -336,7 +336,6 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private record LookupFailure(ApiException failure, AtomicInteger remaining) {
     }
 
-
     /** session 을 물은 한 번이다. 어느 Hermes 의 어느 profile 에 물었는지 함께 담는다. */
     public record SessionLookup(String apiBaseUrl, String profileName, String sessionId) {
     }
