@@ -4,6 +4,7 @@ import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
 import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
+import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
@@ -84,6 +85,11 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<ConnectorPolicyProperties> connectorPolicyPropertiesLive(ConnectorPolicyProperties value) {
         return LiveProperties.fixed(ConnectorPolicyProperties.class, value);
+    }
+
+    @Bean
+    public LiveProperties<ConnectorFinancialProperties> connectorFinancialPropertiesLive(ConnectorFinancialProperties value) {
+        return LiveProperties.fixed(ConnectorFinancialProperties.class, value);
     }
 
     @Bean

@@ -13,6 +13,8 @@ import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.application.ConnectorFinancialConflicts;
+import com.bifos.assistant.connector.application.ConnectorFinancialGate;
+import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaimCodec;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaims;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionCurrent;
@@ -41,10 +43,13 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.testsupport.FinancialExecutionOpen;
+import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import com.bifos.assistant.testsupport.ConnectorExecutionClaimTestSupport;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
@@ -63,6 +68,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
@@ -90,6 +96,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 
 /** 실제 HTTP와 별도 DB 연결로 인증, 소비, HTTP 중 철회를 관측한다. */
+@FinancialExecutionOpen
 class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
     static final JsonNode VECTOR = vectors();
 
@@ -104,6 +111,12 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
     @Autowired
     ConnectorFinancialConflicts conflicts;
+
+    @Autowired
+    LiveProperties<ConnectorFinancialProperties> gate;
+
+    @Autowired
+    ConnectorFinancialGate financialGate;
 
     @Autowired
     HermesProperties properties;
@@ -155,6 +168,27 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
     @Autowired
     JdbcTemplate jdbc;
+
+
+    @Test
+    @DisplayName("발급 뒤 kill switch 를 끄거나 계좌를 목록에서 빼면 ticket 을 소비하지 않는다")
+    void closedGateKeepsTicketUnconsumed() {
+        Fixture f = fixture();
+        String raw = tickets.issue(f.action());
+        var open = gate.current();
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(false, open.allowedAccounts(),
+            open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
+            open.maxDailyAmountUsd()));
+        assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
+        assertThat(row(f).consumedAt()).isNull();
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(true, List.of("000009"),
+            open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
+            open.maxDailyAmountUsd()));
+        assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
+        assertThat(row(f).consumedAt()).isNull();
+        OverridableLiveProperties.during(gate, open);
+        assertThat(claims.claim(input(raw)).allowed()).isTrue();
+    }
 
 
     @Test
@@ -254,7 +288,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             }
         };
         var issuing = new ConnectorExecutionTicket(current, codec, actions, contents, users, expiring, clock, properties);
-        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, expiring, clock);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, financialGate, expiring, clock);
         assertThatThrownBy(() -> {
             if (consume) {
                 consuming.claim(input(raw));
@@ -593,7 +627,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             }
         };
         var issuing = new ConnectorExecutionTicket(current, codec, actions, contents, users, failing, clock, properties);
-        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, failing, clock);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, financialGate, failing, clock);
         assertThatThrownBy(() -> {
             if (consume) {
                 consuming.claim(input(raw));
@@ -671,7 +705,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var freshCodec = new ConnectorExecutionClaimCodec();
         var freshTickets = new ConnectorExecutionTicket(current, freshCodec, actions, contents, users, manager, clock, properties);
         var freshClaims = new ConnectorExecutionClaims(
-            freshTickets, freshCodec, current, users, actions, contents, conflicts, manager, clock);
+            freshTickets, freshCodec, current, users, actions, contents, conflicts, financialGate, manager, clock);
         assertThatThrownBy(() -> freshTickets.issue(f.action())).isInstanceOf(ApiException.class);
         assertThat(freshClaims.claim(input(raw)).allowed()).isTrue();
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);

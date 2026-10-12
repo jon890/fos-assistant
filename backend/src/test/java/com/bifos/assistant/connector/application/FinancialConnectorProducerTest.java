@@ -37,6 +37,8 @@ import com.bifos.assistant.people.domain.AllowedPerson;
 import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.testsupport.FinancialExecutionOpen;
+import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.usage.domain.AgentExecution;
@@ -45,6 +47,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.io.BufferedReader;
+import java.math.BigDecimal;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -53,6 +56,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -68,6 +72,7 @@ import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
 import com.bifos.assistant.proactive.domain.type.CheckTrigger;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -81,6 +86,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** 테스트의 호출부만 실제 내부 업무 규칙에 연결한다. 공개 금융 승인을 열지 않는다. */
 @BackendIntegrationTest
+@FinancialExecutionOpen
 class FinancialConnectorProducerTest {
     static final JsonMapper JSON = JsonMapper.builder().build();
     Instant now;
@@ -91,6 +97,8 @@ class FinancialConnectorProducerTest {
     ProactiveCheckRepository checks;
     @Autowired
     ConnectorFinancialApproval approval;
+    @Autowired
+    LiveProperties<ConnectorFinancialProperties> gate;
     @Autowired
     ConnectorActionRepository actions;
     @Autowired
@@ -295,6 +303,60 @@ class FinancialConnectorProducerTest {
         assertThat(action(first).status()).isEqualTo(ActionStatus.PENDING);
         assertThat(counters().path("prepare").intValue()).isEqualTo(2);
         assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("kill switch 가 꺼져 있으면 prepare 전에 거절하고 아무것도 저장하지 않는다")
+    void closedSwitchRejectsBeforePrepare() {
+        long count = actions.count();
+        OverridableLiveProperties.during(gate, financial(false, List.of("7"), "1000000"));
+        assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(counters().path("prepare").intValue()).isZero();
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("허용 목록 밖의 계좌는 prepare 전에 거절한다")
+    void accountOutsideAllowListRejectsBeforePrepare() {
+        long count = actions.count();
+        OverridableLiveProperties.during(gate, financial(true, List.of("9"), "1000000"));
+        assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(counters().path("prepare").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("한 건 금액 상한을 넘는 주문은 승인 줄과 snapshot 을 남기지 않는다")
+    void orderOverLimitStoresNothing() {
+        long count = actions.count();
+        long snapshots = contents.count();
+        OverridableLiveProperties.during(gate, financial(true, List.of("7"), "1"));
+        assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(contents.count()).isEqualTo(snapshots);
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("승인 전에 kill switch 를 끄면 승인을 거절하고 PENDING 으로 남긴다")
+    void approvalAfterSwitchClosedKeepsPending() {
+        var requested = request();
+        OverridableLiveProperties.during(gate, financial(false, List.of("7"), "1000000"));
+        assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
+        assertThat(action(requested).status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    static ConnectorFinancialProperties financial(boolean enabled, List<String> accounts, String maxOrder) {
+        BigDecimal order = new BigDecimal(maxOrder);
+        return new ConnectorFinancialProperties(enabled, accounts, order, order, new BigDecimal("1000"),
+            new BigDecimal("10000000"), new BigDecimal("100000"));
     }
 
 

@@ -179,6 +179,16 @@ public final class ConnectorExecutionSnapshot {
     }
 
 
+    /** 하루 상한 합계가 쓰는 실행 원문만 푼다. 저장한 원문 해시와 다시 대조한다. */
+    static JsonNode openExecutionArgs(ConnectorAction action, ConnectorActionExecution row, TextCipher cipher) {
+        require(action != null && row != null && Objects.equals(action.id(), row.actionId()));
+        require(PROTOCOL.equals(row.protocol()));
+        String args = openColumn(action, row.contentKeyId(), "execution_args_json", row.executionArgsJson(), cipher);
+        require(Sha256.hex(args).equals(row.executionArgsSha256()));
+        return object(args, 16 * 1024);
+    }
+
+
     /** 중복 의도 키를 한 함수에서 계산한다. decimal은 정확한 문자열로 정규화한다. */
     public String requestKey(Long userId, Long connectionId, String tool) {
         require(userId != null

@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.application.execution;
 import static com.bifos.assistant.connector.application.execution.ConnectorExecutionCurrent.require;
 
 import com.bifos.assistant.connector.application.ConnectorFinancialConflicts;
+import com.bifos.assistant.connector.application.ConnectorFinancialGate;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionClaimInput;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionClaimResult;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionReadContext;
@@ -28,6 +29,7 @@ public class ConnectorExecutionClaims {
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
     private final ConnectorFinancialConflicts conflicts;
+    private final ConnectorFinancialGate gate;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 
@@ -58,6 +60,9 @@ public class ConnectorExecutionClaims {
                     && payload.scopeSha256().equals(snapshot.scopeSha256())
                     && codec.readScope(snapshot.scopeJson()).equals(input.scope()));
                 conflicts.requireAvailable(row.requestKey(), action.id());
+                // 승인 뒤 kill switch 를 껐거나 계좌를 목록에서 뺐으면 ticket 을 소비하지 않는다.
+                gate.requireOpen();
+                gate.requireScope(snapshot.scopeJson());
                 row.consumeTicket(payload.ticketId(), now.truncatedTo(ChronoUnit.MICROS));
                 tickets.beforeCommit(action, payload);
                 return new ConnectorExecutionClaimResult(1, true, payload.ticketId(), payload.expiresAt());

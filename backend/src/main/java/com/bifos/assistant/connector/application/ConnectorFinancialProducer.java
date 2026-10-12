@@ -69,6 +69,7 @@ class ConnectorFinancialProducer {
     private final ProactiveCheckGuard proactive;
     private final ConnectorExecutionGuard guard;
     private final ConnectorFinancialConflicts conflicts;
+    private final ConnectorFinancialGate gate;
     private final TextCipher cipher;
     private final ConnectorActionBodies bodies;
     private final HermesConnectorClient hermes;
@@ -87,6 +88,7 @@ class ConnectorFinancialProducer {
         require(!TransactionSynchronizationManager.isActualTransactionActive());
         // 금융 snapshot은 평문으로 저장하지 않는다. 데이터 key가 꺼져 있으면 준비 HTTP 전에 거절한다.
         require(cipher.enabled());
+        gate.requireOpen();
         String key = ConnectorActionKey.of(profileName, rootSessionId, sessionId, toolCallId).value();
         String hash = Sha256.hex(argsJson);
         var recorded = actions.findByDedupeKey(key);
@@ -103,6 +105,10 @@ class ConnectorFinancialProducer {
             && HermesToolName.of(manifest.mcpServer(), toolName).equals(hermesTool)
             && contract.operations().containsKey(toolName));
         verified(hermes, manifest, before.profile(), before.binding(), before.connection(), before.connectionRevision());
+        Map<String, String> scope = new LinkedHashMap<>();
+        contract.scopeFields().forEach(field -> scope.put(field.arg(), before.fields().get(field.field())));
+        // 허용 목록 밖의 계좌는 토스 읽기도 보내지 않는다.
+        gate.requireAccounts(scope.values());
         // prepare는 재호출하지 않는다. DB 잠금과 연결을 놓은 뒤 읽기 전용 HTTP를 한 번 보낸다.
         var prepared = hermes.prepare(profileName, before.connector(), hermesTool, argsJson);
         require(prepared != null && prepared.ok());
@@ -113,8 +119,6 @@ class ConnectorFinancialProducer {
         var fresh = manifest(before.connector());
         require(Objects.equals(manifest.executionGuardManifestSha256(), fresh.executionGuardManifestSha256()));
         verified(hermes, fresh, before.profile(), before.binding(), before.connection(), before.connectionRevision());
-        Map<String, String> scope = new LinkedHashMap<>();
-        contract.scopeFields().forEach(field -> scope.put(field.arg(), before.fields().get(field.field())));
         String executionArgs = JSON.writeValueAsString(result.get("executionArgs"));
         String summary = JSON.writeValueAsString(result.get("summary"));
         String scopeJson = JSON.writeValueAsString(scope);
@@ -130,6 +134,8 @@ class ConnectorFinancialProducer {
                 return duplicate.get();
             }
             conflicts.requireAvailable(snapshot.requestKey(before.user(), before.connection(), toolName), null);
+            gate.requireOpen();
+            gate.requireWithinLimits(before.user(), null, executionArgs, clock.instant());
             var binding = bindings.findById(before.binding()).orElseThrow(ConnectorFinancialProducer::rejected);
             var origin = owners.resolve(profileName, rootSessionId, sessionId);
             Instant now = clock.instant();
