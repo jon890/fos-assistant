@@ -74,6 +74,7 @@
     "get_stock_securities_lending": {"risk": "READ", "approval": "none", "description": "기관 투자자 사이의 주식 대여·차입을 읽습니다. 체결·상환·잔고 수량은 주, 잔고 금액은 KRW입니다. 개인 신용대주와 구분합니다. 일별 확정치는 해당 일자 저녁에 반영됩니다. 국내(KR) 종목의 일별 통계 한 페이지입니다. symbol은 영문·숫자·점·하이픈을 허용하며 미국 종목은 unsupported-market 오류입니다. count는 1~100의 정수이며 기본 10입니다. until(YYYY-MM-DD)은 해당 날짜를 포함하며 다음 페이지에는 nextUntil을 그대로 넣습니다. decimal 문자열과 null을 그대로 반환합니다. 필요한 인자와 결과를 확인한 뒤 사용합니다."}
   },
   "errors": {
+    "TOSSINVEST_OUTCOME_UNKNOWN": "outcome_unknown",
     "TOSSINVEST_UNAUTHORIZED": { "category": "credential_rejected", "recovery": "reconnect" },
     "TOSSINVEST_IP_NOT_ALLOWED": { "category": "forbidden", "recovery": "reconnect" },
     "TOSSINVEST_FORBIDDEN": "forbidden",

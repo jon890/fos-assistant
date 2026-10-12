@@ -9,7 +9,7 @@ import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.application.model.MemorySource;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.application.ExecutionAgentQuery;
@@ -28,6 +28,7 @@ class MemorySourcesTest {
     private final AgentService agents = mock(AgentService.class);
     private final MemorySources sources = new MemorySources(executions, agents);
 
+
     @Test
     @DisplayName("볼 수 있는 에이전트는 이름을, 볼 수 없거나 모르는 에이전트는 이름 없이, 지운 에이전트와 행이 사라진 에이전트는 지웠다고 싣는다")
     void describesSourceByVisibility() {
@@ -44,8 +45,7 @@ class MemorySourcesTest {
         byId.put(400L, agent("옛 비서", true, true));
         when(agents.byIds(any())).thenReturn(byId);
 
-        Map<Long, MemorySource> result =
-                sources.of(USER, List.of(direct, visible, hidden, deleted, unknownExecution, purged));
+        Map<Long, MemorySource> result = sources.of(USER, List.of(direct, visible, hidden, deleted, unknownExecution, purged));
 
         assertThat(result).doesNotContainKey(1L);
         assertThat(result.get(2L)).isEqualTo(new MemorySource("집안일 도우미", false));
@@ -55,12 +55,14 @@ class MemorySourcesTest {
         assertThat(result.get(6L)).as("에이전트 번호는 있는데 행이 없으면 지운 에이전트다").isEqualTo(new MemorySource(null, true));
     }
 
+
     private static Memory memory(Long id, Long executionId) {
         Memory memory = mock(Memory.class);
         when(memory.id()).thenReturn(id);
         when(memory.proposedByExecutionId()).thenReturn(executionId);
         return memory;
     }
+
 
     private static Agent agent(String name, boolean readable, boolean deleted) {
         Agent agent = mock(Agent.class);

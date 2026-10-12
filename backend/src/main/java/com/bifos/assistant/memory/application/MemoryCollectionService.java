@@ -1,6 +1,6 @@
 package com.bifos.assistant.memory.application;
 
-import com.bifos.assistant.memory.domain.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

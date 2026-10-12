@@ -1,6 +1,6 @@
 package com.bifos.assistant.proactive.application;
 
-import com.bifos.assistant.agent.application.AgentPurgeParticipant;
+import com.bifos.assistant.agent.purge.application.AgentPurgeParticipant;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ProactiveLoopSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +23,12 @@ class ProactiveAgentPurge implements AgentPurgeParticipant {
     private final ProactiveLoopSettingRepository settings;
     private final ProactiveCheckRepository checks;
 
+
     @Override
     public boolean blocksPurge(Long agentId) {
         return false;
     }
+
 
     @Override
     public void release(Long agentId) {

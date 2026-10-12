@@ -351,7 +351,33 @@ callback이 없는 vault 저장·가져오기·삭제와 detach 자체는 기존
 외부 설치까지 원자적으로 정리하려면 Hermes가 설치의 식별자를 대조하는 조건부 설치·삭제 계약을 제공해야 한다.
 현재 시도 UUID는 DB 안에서만 쓰므로, 지금 계약은 DB 권한 차단까지 보장하고 남은 외부 상태의 자동 정리는 보장하지 않는다.
 READ·WRITE의 설치, 재시작 대기와 반영 예정 계약은 그대로이며 FINANCIAL·DESTRUCTIVE는 계속 `RISK_NOT_OPEN`이다.
-guard를 실은 설치와 지원 확인은 후속 구현이며 이번 변경으로 금융 도구를 노출하지 않는다.
+
+### guard 설치와 지원 확인
+
+시작 트랜잭션은 카탈로그의 `execution_guard`를 기존 선언 검사기로 검증하고 protocol과 전체 manifest SHA를
+불변 설치 입력에 캡처한다. 선언이 없으면 기존 5인자 설치를 쓴다. 선언이나 SHA가 잘못됐으면 설치를 보내지 않는다.
+설치 입력에는 엔티티와 가변 JSON을 보관하지 않으며, 일반 바인딩의 유효한 선언만 6인자 `bindConnector`에 연결한다.
+
+`bind.guard`는 `v`, `protocol`, `bindingId`, `connectionId`, `connectionUpdatedAt`, `manifestSha256`만 갖는다.
+번호는 문자열이고 연결 revision은 시작 트랜잭션이 커밋한 값이다. 시도 UUID와 바인딩 revision, nonce는 설치 wire에 넣지 않는다.
+manifest가 바뀌면 새 설치 시도가 새 SHA를 캡처하며 과거 verified를 재사용하지 않는다.
+
+| 순서 | 관측하는 상태 |
+| --- | --- |
+| 시작 커밋 | 새 시도와 `PENDING`, 커밋된 연결 revision |
+| Python 설치 callback | 실제 support가 `409`로 거절하고 plugin은 `pending`을 반환 |
+| 설치·상태·probe와 결과 CAS | 재시작·반영 예정 계약에 따라 현재 시도만 `READY`로 전이 |
+| READY 뒤 상태 조회 | 새 nonce로 실제 support를 확인하고 일치하면 `verified` |
+
+READY 이전의 verified를 설치 완료 조건으로 요구하지 않는다. 지원 확인 실패는 금융 차단 상태이며 일반 설치의
+configured·enabled·mode·policy hook과 probe 판정을 대신하지 않는다. verified도 거래 권한이 아니므로
+금융 도구의 exclude와 상시 허락 없음, `RISK_NOT_OPEN`을 유지한다.
+실제 Spring MVC·DB와 Python 설치·상태·support 소비자의 왕복은 H2와 새 Flyway MySQL DB에서 같은 시험으로 확인한다.
+왕복 fixture의 전송 계수는 그 Python 프로세스의 urllib 요청 시도만 관측한다.
+loopback 대역의 인증 경로(`/oauth/token`) POST와 금융 경로(`/financial/orders`) POST·DELETE를 따로 센다.
+support POST와 다른 경로는 금융 계수에 넣지 않으며, 독립 loopback 수신 회귀가 각 1회 요청의 증가를 확인한다.
+연결 실패도 시도로 세지만 MCP 자식과 다른 HTTP 라이브러리의 전송은 관측하지 않는다.
+운영 배포와 실제 실행 왕복의 확인 절차는 `fos-home-infra`가 소유한다.
 
 ### 재시작
 
@@ -661,6 +687,53 @@ API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`�
 소스 AST와 자체 복제 schema의 일치만으로 통과시키지 않는다. 빌드한 bundle의 SDK 호출이 로컬 HTTP 목적지에 도달해야 한다.
 CI의 `hermes` job과 `scripts/check-connectors.sh`가 새 시험을 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
 
+### 일반 금융 모듈
+
+`prepare-trade.ts`와 `trading-tools.ts`는 일반 주문 CREATE·MODIFY·CANCEL을 구현한다.
+운영 `server.ts`는 이 등록 함수를 호출하지 않는다. 운영 manifest는 READ 목록을 유지하고
+FINANCIAL 도구와 execution_guard를 선언하지 않는다. 공개 hook·approve의 RISK_NOT_OPEN과
+plugin의 금융 숨김, 상시 허락 차단, DESTRUCTIVE 차단도 유지한다.
+
+prepare는 계좌 끝 네 자리, 공식 StockInfo의 market·currency와 정정·취소의 원주문을 조회한다.
+실행 args와 summary는 [금융 저장 계약](connector-policy.md#표시-값과-실행-인자)을 따른다.
+모델 예약 키를 거절하고 문자열 decimal 표기와 기본 DAY의 변경을 normalization에 기록한다.
+CREATE의 UUID는 여기서 한 번 생성한다. US 가격은 1달러 미만 소수 넷째 자리,
+1달러 이상 둘째 자리까지 받으며 값을 절삭하지 않는다. confirmHighValueOrder는 false만 받는다.
+공식 inline oneOf의 수량·금액 분기별로 본문을 고르고 금액 본문에서 timeInForce·price를 뺀다.
+quantity는 주 단위 수량, KR price는 원, US price와 orderAmount는 달러다.
+수량 주문은 quantity, US MARKET 금액 주문은 orderAmount를 사용하며 둘을 함께 넣지 않는다.
+공식 금액 주문과 소수 수량 매도는 정규장 시작부터 종료 1시간 전까지 접수할 수 있다.
+시간 조건은 서버가 최종 판정하며 준비 성공이 접수 가능 시간을 보장하지 않는다.
+금액 원주문을 LIMIT로 정정하는 것은 현재 prepare와 실행 양쪽에서 거절한다.
+이를 지원하려면 원주문 대조를 유지하면서 소비 계약과 새 표시 값을 함께 설계해야 한다.
+일반 취소는 POST와 `{}`이며 정정·취소 응답의 새 orderId를 보존한다.
+정정·취소의 2xx가 원주문과 같은 orderId를 반환하면 계약 위반으로 UNKNOWN이다.
+CREATE 응답 clientOrderId의 누락·null을 허용하고 값이 있으면 준비한 UUID와 대조한다.
+
+guard는 자식의 권한 env를 회수하고 실행 원문의 바이트 SHA와 SDK 인자의 모든 키·값·타입을 대조한다.
+env 계좌를 문자열 그대로 대조한 뒤 ticket·tool·argsSha256·scope로 claim을 한 번 호출한다.
+claim 응답의 v·allowed·ticketId·expiresAt을 검사하며 redirect나 재시도를 하지 않는다.
+정정·취소는 claim 뒤 원주문을 다시 읽어 expected_order와 filledQuantity까지 대조한다.
+금융 fetch를 시작하는 quota queue callback에서 계좌와 ticket 만료를 마지막으로 검사한다.
+POST·DELETE는 GET 재시도 루프를 공유하지 않는다. 전송 전 실패와 공식 명백한 거절은 FAILED,
+429·5xx·timeout·불량2xx와 불분명한 오류는 UNKNOWN이며 자동 재전송하지 않는다.
+MODIFY·CANCEL도 UNKNOWN이면 새 권한이나 UUID로 자동 재전송하지 않는다.
+공식 해당 operation의 명백한 거절 401은 FAILED, 미지·해석 불가 401은 UNKNOWN이다.
+두 경우 모두 토큰 재발급과 금융 재전송은 없다.
+client의 financial은 승인 검증을 제공하지 않는 저수준 내부 transport다.
+생산 금융 호출자는 trading-tools이며 claim과 본문 검증을 거친다. 타입만으로 보안 경계를 만들지 않는다.
+
+테스트 원본의 단일 생산자는 `tests/fixtures/trading-entry.ts --generate`다.
+운영 manifest·plugin·MCP 정의를 복사한 고유 임시 디렉터리의 사본에만 금융 선언과 실제 SDK bundle을 넣는다.
+Python은 이 원본을 실제 `_load_connector`와 `_guard_manifest`로 읽고 준비 결과 소비자로 검증한다.
+이 소비자가 계산한 manifest SHA를 후속 catalog·bind·support 연결에도 사용해야 한다.
+각 일반 주문의 금융 POST 1회와 replay·변조·GET/auth/quota 만료의 금융 POST 0회를 수신 counter로 검증한다.
+auth POST, 준비 GET, claim HTTP와 금융 POST·DELETE는 별도로 센다. 목적지와 claim은 loopback만 허용한다.
+
+이 증거는 실제 SDK·claim 대역·mock 금융 목적지의 왕복이다. 대역의 protocol vector는 main의
+ClaimResponse·codec·claims·MVC 시험과 직접 대조하지만 실제 서명 인증·DB 일회 소비는 검증하지 않는다.
+실제 DB/Spring claim→Python→SDK→mock 목적지 왕복은 후속 snapshot producer 통합의 필수 조건이다.
+일반 주문 DELETE는 0회다. DELETE transport의 합성 204 검사는 조건주문 등록의 근거가 아니다.
 ### 국내 종목 통계 계약
 
 통계 5개는 `registerStockStatisticsTools` 한 곳에서 등록한다. 기존 stock-trend 후보와 동시에 등록하지 않는다.

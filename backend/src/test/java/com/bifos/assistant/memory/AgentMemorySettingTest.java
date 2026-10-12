@@ -14,8 +14,8 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.memory.application.AgentMemorySettingService;
-import com.bifos.assistant.memory.domain.Memory;
-import com.bifos.assistant.memory.domain.MemoryCollection;
+import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
@@ -92,6 +92,7 @@ class AgentMemorySettingTest {
     private AppUser owner;
     private AppUser other;
 
+
     @BeforeEach
     void setUp() {
         controller = new AgentMemorySettingController(service, currentUser);
@@ -101,6 +102,7 @@ class AgentMemorySettingTest {
         other = user("사용자B", UserRole.MEMBER);
         as(admin);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -114,33 +116,34 @@ class AgentMemorySettingTest {
         users.deleteAllById(userIds);
     }
 
+
     @Test
     @DisplayName("주인의 항목과 그룹 항목을 collection 마다 세고 받지 않는 collection 도 낸다")
     void countsOwnerAndGroupItemsPerCollectionIncludingUngrantedOnes() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
         save(Memory.document(
-                owner.id(), "career", key(), "이력", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
+            owner.id(), "career", key(), "이력", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
         save(Memory.document(
-                owner.id(), "career", key(), "연봉", StoredContent.plain("본문"), MemorySensitivity.SENSITIVE, NOW));
+            owner.id(), "career", key(), "연봉", StoredContent.plain("본문"), MemorySensitivity.SENSITIVE, NOW));
         save(Memory.accepted(
-                MemoryScope.USER,
-                owner.id(),
-                null,
-                "보관한 항목",
-                StoredContent.plain("본문"),
-                new MemoryPlacement("career", MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL),
-                owner.id(),
-                NOW));
+            MemoryScope.USER,
+            owner.id(),
+            null,
+            "보관한 항목",
+            StoredContent.plain("본문"),
+            new MemoryPlacement("career", MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL),
+            owner.id(),
+            NOW));
         save(Memory.proposed(
-                owner.id(),
-                "제안만 된 항목",
-                StoredContent.plain("본문"),
-                new MemoryPlacement("career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
-                null,
-                null,
-                NOW));
+            owner.id(),
+            "제안만 된 항목",
+            StoredContent.plain("본문"),
+            new MemoryPlacement("career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            null,
+            null,
+            NOW));
         save(Memory.document(
-                other.id(), "career", key(), "남의 이력", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
+            other.id(), "career", key(), "남의 이력", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
         save(groupItem("core"));
 
         AgentMemorySettingView view = controller.get(agent.code());
@@ -148,57 +151,58 @@ class AgentMemorySettingTest {
         assertThat(view.countedFor()).isEqualTo("OWNER");
         assertThat(view.ownerName()).isEqualTo("사용자A");
         assertThat(view.collections())
-                .extracting(AgentMemoryCollectionView::key)
-                .as("그룹의 collection 목록 순서로 받지 않는 collection 까지 낸다")
-                .containsExactlyElementsOf(MemoryCollection.DEFAULT_KEYS);
+            .extracting(AgentMemoryCollectionView::key)
+            .as("그룹의 collection 목록 순서로 받지 않는 collection 까지 낸다")
+            .containsExactlyElementsOf(MemoryCollection.DEFAULT_KEYS);
         assertThat(collection(view, "career"))
-                .extracting(
-                        AgentMemoryCollectionView::displayName,
-                        AgentMemoryCollectionView::listed,
-                        AgentMemoryCollectionView::granted,
-                        AgentMemoryCollectionView::entryCount,
-                        AgentMemoryCollectionView::sensitiveEntryCount)
-                .as("ARCHIVE, PROPOSED, 다른 사용자의 항목은 세지 않는다")
-                .containsExactly("커리어", true, false, 2L, 1L);
+            .extracting(
+                AgentMemoryCollectionView::displayName,
+                AgentMemoryCollectionView::listed,
+                AgentMemoryCollectionView::granted,
+                AgentMemoryCollectionView::entryCount,
+                AgentMemoryCollectionView::sensitiveEntryCount)
+            .as("ARCHIVE, PROPOSED, 다른 사용자의 항목은 세지 않는다")
+            .containsExactly("커리어", true, false, 2L, 1L);
         assertThat(collection(view, "core"))
-                .extracting(
-                        AgentMemoryCollectionView::granted,
-                        AgentMemoryCollectionView::allowSensitive,
-                        AgentMemoryCollectionView::entryCount)
-                .containsExactly(true, false, 1L);
+            .extracting(
+                AgentMemoryCollectionView::granted,
+                AgentMemoryCollectionView::allowSensitive,
+                AgentMemoryCollectionView::entryCount)
+            .containsExactly(true, false, 1L);
         assertThat(collection(view, "health").entryCount()).isZero();
         assertThat(view.changes()).isEmpty();
     }
+
 
     @Test
     @DisplayName("바꾸면 응답이 바뀐 값과 기록을 낸다")
     void returnsChangedValuesAndRecordsAfterReplacing() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
 
-        AgentMemorySettingView view =
-                controller.replace(agent.code(), request(new AgentMemoryGrantBody("career", true)));
+        AgentMemorySettingView view = controller.replace(agent.code(), request(new AgentMemoryGrantBody("career", true)));
 
         assertThat(collection(view, "career"))
-                .extracting(AgentMemoryCollectionView::granted, AgentMemoryCollectionView::allowSensitive)
-                .containsExactly(true, true);
+            .extracting(AgentMemoryCollectionView::granted, AgentMemoryCollectionView::allowSensitive)
+            .containsExactly(true, true);
         assertThat(collection(view, "core").granted()).isFalse();
         assertThat(view.changes())
-                .extracting(
-                        AgentMemoryChangeView::collection,
-                        AgentMemoryChangeView::changeType,
-                        AgentMemoryChangeView::allowSensitive,
-                        AgentMemoryChangeView::changedByName)
-                .containsExactlyInAnyOrder(
-                        tuple("career", "GRANTED", true, "관리자A"), tuple("core", "REVOKED", false, "관리자A"));
+            .extracting(
+                AgentMemoryChangeView::collection,
+                AgentMemoryChangeView::changeType,
+                AgentMemoryChangeView::allowSensitive,
+                AgentMemoryChangeView::changedByName)
+            .containsExactlyInAnyOrder(
+                tuple("career", "GRANTED", true, "관리자A"), tuple("core", "REVOKED", false, "관리자A"));
         assertThat(view.changes().get(0).changedByName()).isEqualTo("관리자A");
         assertThat(grants.findByIdAgentId(agent.id()))
-                .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
-                .containsExactly(tuple("career", true));
+            .extracting(AgentMemoryCollection::collection, AgentMemoryCollection::allowSensitive)
+            .containsExactly(tuple("career", true));
 
         AgentMemorySettingView emptied = controller.replace(agent.code(), request());
         assertThat(emptied.collections()).noneMatch(AgentMemoryCollectionView::granted);
         assertThat(grants.findByIdAgentId(agent.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("목록에 없는 받는 collection 은 key 이름으로 뒤에 붙이고 그대로 둘 수 있다")
@@ -207,18 +211,19 @@ class AgentMemorySettingTest {
         grants.save(AgentMemoryCollection.of(agent.id(), "legacy-notes", false, NOW));
 
         AgentMemorySettingView view = controller.replace(
-                agent.code(),
-                request(new AgentMemoryGrantBody("core", false), new AgentMemoryGrantBody("legacy-notes", true)));
+            agent.code(),
+            request(new AgentMemoryGrantBody("core", false), new AgentMemoryGrantBody("legacy-notes", true)));
 
         assertThat(view.collections().get(view.collections().size() - 1))
-                .extracting(
-                        AgentMemoryCollectionView::key,
-                        AgentMemoryCollectionView::displayName,
-                        AgentMemoryCollectionView::listed,
-                        AgentMemoryCollectionView::granted,
-                        AgentMemoryCollectionView::allowSensitive)
-                .containsExactly("legacy-notes", "legacy-notes", false, true, true);
+            .extracting(
+                AgentMemoryCollectionView::key,
+                AgentMemoryCollectionView::displayName,
+                AgentMemoryCollectionView::listed,
+                AgentMemoryCollectionView::granted,
+                AgentMemoryCollectionView::allowSensitive)
+            .containsExactly("legacy-notes", "legacy-notes", false, true, true);
     }
+
 
     @Test
     @DisplayName("그룹 목록에 없는 collection 과 겹치는 collection 과 64개 넘는 목록은 거절한다")
@@ -226,25 +231,26 @@ class AgentMemorySettingTest {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
 
         assertCode(
-                () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("no-such", false))),
-                ErrorCode.VALIDATION_FAILED);
+            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("no-such", false))),
+            ErrorCode.VALIDATION_FAILED);
         assertCode(
-                () -> controller.replace(
-                        agent.code(),
-                        request(new AgentMemoryGrantBody("career", false), new AgentMemoryGrantBody("career", true))),
-                ErrorCode.VALIDATION_FAILED);
+            () -> controller.replace(
+                agent.code(),
+                request(new AgentMemoryGrantBody("career", false), new AgentMemoryGrantBody("career", true))),
+            ErrorCode.VALIDATION_FAILED);
         AgentMemoryGrantBody[] tooMany = IntStream.range(0, 65)
-                .mapToObj(i -> new AgentMemoryGrantBody("c" + i, false))
-                .toArray(AgentMemoryGrantBody[]::new);
+            .mapToObj(i -> new AgentMemoryGrantBody("c" + i, false))
+            .toArray(AgentMemoryGrantBody[]::new);
         assertCode(() -> controller.replace(agent.code(), request(tooMany)), ErrorCode.VALIDATION_FAILED);
         assertCode(() -> controller.get("no-such-agent-" + key()), ErrorCode.AGENT_NOT_FOUND);
 
         assertThat(grants.findByIdAgentId(agent.id()))
-                .extracting(AgentMemoryCollection::collection)
-                .as("거절한 요청은 받는 줄을 바꾸지 않는다")
-                .containsExactly("core");
+            .extracting(AgentMemoryCollection::collection)
+            .as("거절한 요청은 받는 줄을 바꾸지 않는다")
+            .containsExactly("core");
         assertThat(controller.get(agent.code()).changes()).isEmpty();
     }
+
 
     @Test
     @DisplayName("ADMIN 이 아니면 읽지도 바꾸지도 못한다")
@@ -254,12 +260,13 @@ class AgentMemorySettingTest {
 
         assertCode(() -> controller.get(agent.code()), ErrorCode.FORBIDDEN);
         assertCode(
-                () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("career", true))),
-                ErrorCode.FORBIDDEN);
+            () -> controller.replace(agent.code(), request(new AgentMemoryGrantBody("career", true))),
+            ErrorCode.FORBIDDEN);
         assertThat(grants.findByIdAgentId(agent.id()))
-                .extracting(AgentMemoryCollection::collection)
-                .containsExactly("core");
+            .extracting(AgentMemoryCollection::collection)
+            .containsExactly("core");
     }
+
 
     @Test
     @DisplayName("주인이 없는 그룹 에이전트는 그룹 항목만 센다")
@@ -267,16 +274,17 @@ class AgentMemorySettingTest {
         Agent agent = agent(AgentVisibility.GROUP, null);
         save(groupItem("core"));
         save(Memory.document(
-                admin.id(), "core", key(), "관리자 개인 문서", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
+            admin.id(), "core", key(), "관리자 개인 문서", StoredContent.plain("본문"), MemorySensitivity.NORMAL, NOW));
 
         AgentMemorySettingView view = controller.get(agent.code());
 
         assertThat(view.countedFor()).isEqualTo("GROUP");
         assertThat(view.ownerName()).isNull();
         assertThat(collection(view, "core").entryCount())
-                .as("관리자의 USER 항목은 세지 않는다")
-                .isEqualTo(1L);
+            .as("관리자의 USER 항목은 세지 않는다")
+            .isEqualTo(1L);
     }
+
 
     private void as(AppUser user) {
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
@@ -284,67 +292,74 @@ class AgentMemorySettingTest {
             when(currentUser.requireAdmin()).thenReturn(current);
         } else {
             when(currentUser.requireAdmin())
-                    .thenThrow(new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin"));
+                .thenThrow(new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin"));
         }
     }
 
+
     private AppUser user(String displayName, UserRole role) {
-        AppUser saved =
-                users.save(AppUser.of("user-" + UUID.randomUUID() + "@example.com", displayName, groupId, role, NOW));
+        AppUser saved = users.save(AppUser.of("user-" + UUID.randomUUID() + "@example.com", displayName, groupId, role, NOW));
         userIds.add(saved.id());
         return saved;
     }
 
+
     private Agent agent(AgentVisibility visibility, Long ownerUserId) {
         String code = "memory-setting-" + key();
         Agent saved = agents.save(Agent.of(
-                code,
-                "설정 검사",
-                code,
-                "http://runtime.test/p/" + code,
-                CostMode.API,
-                CredentialScope.DEDICATED,
-                visibility,
-                ownerUserId,
-                NOW));
+            code,
+            "설정 검사",
+            code,
+            "http://runtime.test/p/" + code,
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            visibility,
+            ownerUserId,
+            NOW));
         agentIds.add(saved.id());
         return saved;
     }
+
 
     private void save(Memory memory) {
         memoryIds.add(memories.save(memory).id());
     }
 
+
     private Memory groupItem(String collection) {
         return Memory.accepted(
-                MemoryScope.GROUP,
-                null,
-                groupId,
-                "그룹 항목",
-                StoredContent.plain("본문"),
-                new MemoryPlacement(collection, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
-                admin.id(),
-                NOW);
+            MemoryScope.GROUP,
+            null,
+            groupId,
+            "그룹 항목",
+            StoredContent.plain("본문"),
+            new MemoryPlacement(collection, MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            admin.id(),
+            NOW);
     }
+
 
     private static ReplaceAgentMemoryRequest request(AgentMemoryGrantBody... bodies) {
         return new ReplaceAgentMemoryRequest(List.of(bodies));
     }
 
+
     private static AgentMemoryCollectionView collection(AgentMemorySettingView view, String key) {
         return view.collections().stream()
-                .filter(collection -> collection.key().equals(key))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("collection " + key + " is missing from " + view.collections()));
+            .filter(collection -> collection.key().equals(key))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("collection " + key + " is missing from " + view.collections()));
     }
+
 
     private static String key() {
         return UUID.randomUUID().toString().substring(0, 12);
     }
 
+
     private static void assertCode(Runnable action, ErrorCode code) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class, e -> assertThat(e.code()).isEqualTo(code));
+            .isInstanceOfSatisfying(
+                ApiException.class, e -> assertThat(e.code()).isEqualTo(code));
     }
 }

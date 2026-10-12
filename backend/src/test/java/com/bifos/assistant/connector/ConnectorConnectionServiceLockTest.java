@@ -13,8 +13,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.application.AgentPurgeWriter;
-import com.bifos.assistant.agent.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.purge.application.AgentPurgeWriter;
+import com.bifos.assistant.agent.purge.application.model.AgentPurgeOutcome;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.browser.application.BrowserGatewayTokens;
@@ -25,6 +25,7 @@ import com.bifos.assistant.connector.application.ConnectorProperties;
 import com.bifos.assistant.connector.application.ConnectorBindingInstalls;
 import com.bifos.assistant.connector.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.application.ConnectorInstallAttempts;
+import com.bifos.assistant.connector.application.execution.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
 import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
@@ -322,7 +323,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         ConnectorBindingAttempt second = capture(target);
         assertThat(first.attemptId()).isNotEqualTo(second.attemptId());
         assertThat(first.startedAt()).isEqualTo(second.startedAt());
-        ConnectorInstallAttempts recreated = new ConnectorInstallAttempts(bindings, agents, users, installs, access, transactions);
+        ConnectorInstallAttempts recreated = new ConnectorInstallAttempts(bindings, agents, users, installs, access, transactions, new ConnectorExecutionGuard());
         assertThat(recreated.complete(first, READY)).isEmpty();
         assertThat(recreated.complete(second, READY)).contains(ResyncOutcome.READY);
         assertThat(recreated.complete(second, READY)).isEmpty();
@@ -365,7 +366,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
                 });
             }
         };
-        ConnectorInstallAttempts failed = new ConnectorInstallAttempts(bindings, agents, users, installs, access, failing);
+        ConnectorInstallAttempts failed = new ConnectorInstallAttempts(bindings, agents, users, installs, access, failing, new ConnectorExecutionGuard());
         assertThatThrownBy(() -> failed.complete(attempt, READY)).isInstanceOf(IllegalStateException.class);
         assertThat(observe(target.bindingId()).attempt()).isEqualTo(attempt.attemptId());
         assertThat(observe(target.bindingId()).status()).isEqualTo("PENDING");
