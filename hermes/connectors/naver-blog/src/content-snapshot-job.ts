@@ -20,6 +20,7 @@ import {
   releaseLock,
   stateFile,
   type JobState,
+  updateState,
   writeInput,
 } from "./jobs.ts";
 import { spawnWorker, workerEnvironment } from "./worker-spawn.ts";
@@ -192,6 +193,15 @@ export async function startSnapshotJob(
     await acquireLock(dir, blogId, jobId);
   } catch (error) {
     return refuse(refusalCode(error));
+  }
+  // 세션 확인이 길었어도 pid 없는 시작 대기 10초를 지금부터 센다. 그 사이 조회가 끝냈으면 띄우지 않는다.
+  const fresh = await updateState(dir, jobId, {
+    started_at: new Date().toISOString(),
+  });
+  if (!fresh || fresh.status !== "running") {
+    await releaseLock(dir, jobId);
+    if (!fresh) throw new SnapshotJobError("unavailable");
+    return accepted(fresh, stamp);
   }
   try {
     await writeInput(dir, jobId, { kind: "content_snapshot", snapshot });

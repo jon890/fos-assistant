@@ -145,13 +145,14 @@ authorize 주소는 private 자식 env `FOS_CONTENT_SAVE_AUTHORIZE_URL`에서만
 start는 같은 jobId의 상태 파일을 `O_EXCL`로 먼저 만들어 예약 ID를 고정한다. 이미 있으면 stamp가 모두 같을 때 그 상태만 돌려주고 worker를 띄우지 않는다.
 그 뒤의 세션 확인·잠금·입력 쓰기·spawn 실패는 상태를 지우지 않고 failed로 끝낸다. 잠금이 바쁘면 code는 `busy`다.
 worker가 시작 확인 시간 안에 pid를 적지 않으면 `start_unknown`이고 예약 ID는 그대로 남는다. 다시 보내도 새 worker는 없다.
-ticket은 입력 파일과 상태 파일에 쓰지 않는다. 기존 env whitelist에 ticket과 authorize 주소만 더해 그 worker에 넘기고, worker는 무엇을 하기 전에 env에서 지운다.
+상태 파일은 끝난 뒤 24시간에 지워지므로 그 뒤의 재전송은 커넥터가 막지 못한다. 같은 job의 두 번째 실행은 Control Plane의 authorize(start) 단일 claim이 거절해야 한다.
+ticket은 입력 파일과 상태 파일에 쓰지 않는다. 기존 env whitelist에 ticket과 authorize 주소만 더해 그 worker에 넘긴다. worker는 무엇을 하기 전에 런타임 env에서 지워 이후 코드와 자식 프로세스에 넘기지 않는다. 커널이 보여 주는 최초 environ까지 지우지는 못한다.
 
 worker는 snapshot의 canonical tuple·manifest·notes로 원고를 다시 compile해 결과 전체와 두 지문이 같은지 본다. 상태 파일 stamp의 jobId·snapshotHash와도 맞춘다.
 어긋나면 브라우저를 열지 않고 `snapshot_invalid`로 끝난다. 통과하면 authorize(start) 뒤 기존 runDraft를 부른다.
 사진 i번째(0부터)는 manifest i번째와 대조한다. 읽은 바이트의 SHA-256이 sourceFingerprint와 같고 그 canonical position의 authorize(photo)를 통과해야 바로 그 바이트를 넣는다.
 검사하지 않은 기존 사진이 편집기에 있거나 manifest의 수·파일 이름이 다르면 `photo_mismatch`로 업로드 전에 멈춘다.
-save_clicking에서는 authorize(save)를 먼저 받고 기존 save_clicked 기록·재읽기·finishClaimed 검사를 그대로 한다. 거절이면 클릭 0회와 `authorize_denied`다.
+save_clicking에서는 authorize(save)를 먼저 받고 기존 save_clicked 기록·재읽기·finishClaimed 검사를 그대로 한다. 거절이면 클릭 0회와 `authorize_denied`다. save 허가 뒤 save_clicked 기록이 실패해도 클릭 0회의 failed이므로, Control Plane은 save 허가를 저장 완료로 다루지 않는다.
 authorize는 HTTP 200의 정확한 `{"allowed":true}`만 허가로 보고 10초 뒤 끊으며 다시 보내지 않는다.
 clicked=false 실패, clicked=true 뒤 unknown, 600초 timeout과 30초 heartbeat·11분 stale 규칙은 기존 DSL job과 같다.
 

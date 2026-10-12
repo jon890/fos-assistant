@@ -232,6 +232,27 @@ test("예약 ID로 worker 를 한 번 띄우고 start·photo·save authorize 뒤
   expect((await counts(stamp.jobId)).clicks).toBe(1);
 });
 
+test("같은 예약 ID 의 동시 start 는 worker 하나만 띄우고, 뒤이은 다른 stamp 는 결과 없이 거절한다", async () => {
+  const { call, cp, counts, finished, snapshot } = await setup({ photos: 1 });
+  const stamp = stampFor(snapshot);
+  const results = await Promise.all(
+    [0, 1, 2].map(() => call("start", startArgs(snapshot, stamp))),
+  );
+  for (const result of results) {
+    expect(result.isError).toBe(false);
+    expect(result.body.job_id).toBe(stamp.jobId);
+  }
+  expect(await finished(stamp)).toMatchObject({ status: "succeeded" });
+  const other = { ...stamp, bindingId: "99" };
+  expect(await call("start", startArgs(snapshot, other))).toEqual({
+    isError: true,
+    body: { error: "not_found" },
+  });
+  await Bun.sleep(300);
+  expect(cp.calls.filter((entry) => entry.stage === "start")).toHaveLength(1);
+  expect((await counts(stamp.jobId)).clicks).toBe(1);
+}, 20_000);
+
 for (const [name, deniedAt, uploads] of [
   ["start", (call: AuthorizeCall) => call.stage === "start", 0],
   [
