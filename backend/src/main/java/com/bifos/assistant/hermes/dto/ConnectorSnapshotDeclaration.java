@@ -10,7 +10,8 @@ public record ConnectorSnapshotDeclaration(String protocol, String compileTool, 
     String statusTool, Map<String, Boolean> capabilities) {
     public ConnectorSnapshotDeclaration {
         capabilities = Map.copyOf(capabilities);
-        if (!"content-snapshot-v1".equals(protocol) || !capabilities.equals(Map.of("compile", true, "start", false, "status", false))
+        // catalog 응답은 read 가 compile 전용만 받는다. 생성자는 세 capability 칸의 모양만 본다.
+        if (!"content-snapshot-v1".equals(protocol) || !capabilities.keySet().equals(Set.of("compile", "start", "status"))
             || Set.copyOf(List.of(compileTool, startTool, statusTool)).size() != 3) {
             throw new IllegalStateException("snapshot 선언을 확인하지 못했습니다.");
         }

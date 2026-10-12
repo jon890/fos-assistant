@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const BASELINE = "scripts/file-length-baseline.json";
+const BASELINE = "scripts/checks/file-length-baseline.json";
 const SKIP_DIRS = new Set([
   "test", "tests", "dist", "build", "bundle", "bundles", "node_modules",
   ".git", ".next", ".venv", "venv", "__pycache__",
@@ -87,7 +87,7 @@ export function checkFileLengths(root, { update = false } = {}) {
   for (const [file, previous] of Object.entries(baseline.files)) {
     const actual = counts.get(file);
     if (actual !== undefined && actual >= previous) continue;
-    notices.push(`${file}: ${previous}줄 → ${actual ?? "삭제"}. 기준값을 낮추라: node scripts/check-file-length.mjs --update`);
+    notices.push(`${file}: ${previous}줄 → ${actual ?? "삭제"}. 기준값을 낮추라: node scripts/checks/check-file-length.mjs --update`);
     if (update) {
       if (actual === undefined || actual <= limitFor(file)) delete baseline.files[file];
       else baseline.files[file] = actual;
@@ -104,9 +104,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const args = process.argv.slice(2);
     if (args.length > 1 || (args.length === 1 && args[0] !== "--update")) {
-      throw new Error("사용법: node scripts/check-file-length.mjs [--update]");
+      throw new Error("사용법: node scripts/checks/check-file-length.mjs [--update]");
     }
-    const result = checkFileLengths(resolve(dirname(fileURLToPath(import.meta.url)), ".."), { update: args.includes("--update") });
+    const result = checkFileLengths(resolve(dirname(fileURLToPath(import.meta.url)), "../.."), { update: args.includes("--update") });
     for (const notice of result.notices) console.log(`알림: ${notice}`);
     for (const error of result.errors) console.error(error);
     console.log(`파일 길이: ${result.checked}개 검사, ${result.errors.length}개 위반`);

@@ -33,7 +33,7 @@ jobs:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
-        run: node scripts/pr-size.mjs "$PR_BASE" "$PR_HEAD"
+        run: node scripts/pr/pr-size.mjs "$PR_BASE" "$PR_HEAD"
 
   size-label:
     # 쓰기 토큰을 가진 작업은 PR 코드를 체크아웃하거나 실행하지 않는다.
