@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -96,7 +97,7 @@ class MediaFixtureGenerator {
         entries.add(writeSpecial(dir, "landscape", "JPEG", landscape, 41, 4, false));
         // 같은 사진 두 장: 두 번째 파일은 첫 파일의 바이트 복사본이다.
         entries.add(writeSpecial(dir, "identical-a", "PNG", image(42, false), 42, 1, true));
-        Files.copy(dir.resolve("identical-a.png"), dir.resolve("identical-b.png"));
+        Files.copy(dir.resolve("identical-a.png"), dir.resolve("identical-b.png"), StandardCopyOption.REPLACE_EXISTING);
         entries.add(specialEntry(dir.resolve("identical-b.png"), "identical-b", "PNG", 42, 1, true));
         // 거의 같은 사진 두 장: 표식과 글씨 밖의 2x2 화소만 다르다.
         entries.add(writeSpecial(dir, "near-a", "PNG", image(44, false), 44, 1, true));

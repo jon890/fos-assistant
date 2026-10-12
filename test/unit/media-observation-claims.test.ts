@@ -55,6 +55,10 @@ test("특수 합성 사례를 다시 생성해도 바이트와 측정 결과가 
   assert.deepEqual(createSpecialMediaCases(join(dir, "repeat")), cases);
 });
 
+test("같은 디렉터리에 특수 합성 사례를 다시 생성해도 바이트와 측정 결과가 같다", () => {
+  assert.deepEqual(createSpecialMediaCases(dir), cases);
+});
+
 test("고해상도 간판은 표식과 제목이 사본에 남고 1px 메뉴 글씨는 원본에서만 읽힌다", () => {
   const sign = byKey("sign-hires");
   assert.deepEqual(
