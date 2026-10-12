@@ -252,6 +252,7 @@ class ConnectorActionServiceTest {
         }
     }
 
+
     @Test
     @DisplayName("인자 암호화 직전 INSERT는 본문이 비어 있고 암호화 실패는 승인 줄도 롤백한다")
     void rollsBackEmptyInsertWhenArgumentEncryptionFails() {
@@ -357,6 +358,7 @@ class ConnectorActionServiceTest {
             ReflectionTestUtils.setField(bodies, "cipher", previous);
         }
     }
+
 
     @Test
     @DisplayName("읽을 수 없는 결과는 암호문을 노출하지 않고 안내 글로 표시한다")

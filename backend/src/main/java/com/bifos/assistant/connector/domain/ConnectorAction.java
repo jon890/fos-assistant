@@ -327,6 +327,7 @@ public class ConnectorAction {
         return Optional.of(plain);
     }
 
+
     public String resultText() {
         if (resultKeyId == null) {
             return storedResultText;

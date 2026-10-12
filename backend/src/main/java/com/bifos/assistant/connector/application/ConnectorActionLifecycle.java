@@ -49,7 +49,7 @@ class ConnectorActionLifecycle {
         ConnectorActionDetails details,
         ConnectorActionSignals signals,
         TransactionTemplate transactions,
-            ConnectorActionBodies bodies,
+        ConnectorActionBodies bodies,
         Clock clock) {
         this.actions = actions;
         this.contents = contents;
@@ -216,7 +216,7 @@ class ConnectorActionLifecycle {
                                 action,
                                 contents.findByActionIdForUpdate(action.id()).orElse(null),
                                 null,
-                                    bodies,
+                                bodies,
                                 now);
                             return actions.save(action);
                         });

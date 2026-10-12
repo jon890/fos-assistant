@@ -126,7 +126,7 @@ class ConnectorActionApproval {
         CallResult result = null;
         try {
             result = connector.execute(
-                    approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.executableArgs().orElseThrow());
+                approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.executableArgs().orElseThrow());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
         } catch (RuntimeException ex) {
@@ -233,7 +233,7 @@ class ConnectorActionApproval {
             manifest.schema(),
             ConnectorToolPolicies.find(manifest, action.toolName()),
             false,
-                action.executableArgs().orElseThrow().getBytes(StandardCharsets.UTF_8).length,
+            action.executableArgs().orElseThrow().getBytes(StandardCharsets.UTF_8).length,
             CheckBoundary.NOT_CHECK);
     }
 
@@ -259,7 +259,7 @@ class ConnectorActionApproval {
         } else {
             // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
             bodies.fail(
-                    action,
+                action,
                 result.error().word(),
                 result.detail() == null ? null : result.detail().toStored(),
                 now);
