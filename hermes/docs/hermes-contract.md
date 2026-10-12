@@ -2682,6 +2682,7 @@ module 진입점의 `finish_worker_boot`와 worker env 표식도 새 계약에 �
 이 검사가 운영 저장소의 private bootstrap 호환을 증명하지는 않는다.
 이미지 갱신 전에 그쪽의 constructor·cron wrapper와 writer 파일 지문을 함께 확인해야 한다.
 
+이미지를 갱신하기 전에 모든 profile 의 설정과 session 저장소를 백업하고, 되돌릴 때 그 백업을 쓴다. 절차와 위치는 `fos-home-infra` 가 갖는다.
 배포 뒤에는 profile 관리·설정 저장, 연결 도구 호출과 승인, 실행 시작부터 SSE 답·도구·중간 안내·종료,
 캐시 사용량과 실제 provider/model, 원본 사진의 native 결과, cron의 관리 writer 적재를 왕복 확인한다.
 도구를 여러 번 부르는 긴 답 하나를 넣어, 사건 관측이 완료로 남는지도 확인한다.
