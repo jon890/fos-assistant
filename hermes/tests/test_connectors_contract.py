@@ -8,6 +8,7 @@ import ast
 import asyncio
 import json
 import pathlib
+import re
 import shutil
 import sys
 import tempfile
@@ -72,12 +73,35 @@ def imported_roots(source: str) -> set[str]:
     return names
 
 
+def user_copy_problems(tools: dict, loaded: dict | None, readme: str, arg_names: set[str]) -> list[str]:
+    """화면용 `title` 과 `summary` 의 위반이다. 화면은 실제 도구 이름과 인자 이름을 보이지 않는다."""
+    problems = []
+    hidden = set(tools) | arg_names
+    for tool, spec in tools.items():
+        if not str(spec.get("title", "")).strip():
+            problems.append("화면에 보일 title 이 없다: %s" % tool)
+        summary = spec.get("summary")
+        normalized = loaded.get("tool_summaries", {}).get(tool) if loaded is not None else None
+        if not isinstance(summary, str) or summary != normalized or len(summary) > TOOL_SUMMARY_MAX_CHARS:
+            problems.append("화면에 보일 summary 가 없거나 %d자 안의 평문이 아니다: %s" % (TOOL_SUMMARY_MAX_CHARS, tool))
+            continue
+        # 영문 낱말 단위로 견준다. 「Gmail」 같은 서비스 이름은 도구나 인자 이름이 아니라 통과한다.
+        words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", "%s %s" % (spec.get("title", ""), summary)))
+        if words & hidden:
+            problems.append("title 이나 summary 에 도구나 인자 이름이 있다: %s %s" % (tool, sorted(words & hidden)))
+        # 사용자 README 의 도구 표는 화면과 같은 말을 쓴다. 손으로 고친 표가 선언과 어긋나지 않게 한다.
+        elif "| %s | %s |" % (spec.get("title"), summary) not in readme:
+            problems.append("README 의 도구 표에 title 과 summary 줄이 없다: %s" % tool)
+    return problems
+
+
 def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> list[str]:
     """커넥터 하나의 위반 글 목록을 돌려준다. 비면 통과다. `load_connector` 는 plugin 의 `_load_connector` 다."""
     name = root.name
     problems: list[str] = []
 
     loaded = None
+    served_args: set[str] = set()
     try:
         loaded = load_connector(name, {"root": root, "command": sys.executable, "env": {}})
     except Exception as error:
@@ -112,24 +136,11 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
             problems.append("아이콘 SVG 가 %s 를 선언하지 않았다: %s" % (SVG_NAMESPACE, name))
 
     tools = declared.get("tools", {})
-    readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").is_file() else ""
     for tool, spec in tools.items():
         if spec.get("risk") in CLOSED_RISKS:
             problems.append("닫힌 위험도 %s 선언: %s" % (spec["risk"], tool))
         if spec.get("risk") != "READ" and not str(spec.get("title", "")).strip():
             problems.append("READ 가 아닌 도구에 title 이 없다: %s" % tool)
-        if name not in PENDING_USER_COPY:
-            if not str(spec.get("title", "")).strip():
-                problems.append("화면에 보일 title 이 없다: %s" % tool)
-            summary = spec.get("summary")
-            normalized = loaded.get("tool_summaries", {}).get(tool) if loaded is not None else None
-            if not isinstance(summary, str) or summary != normalized or len(summary) > TOOL_SUMMARY_MAX_CHARS:
-                problems.append("화면에 보일 summary 가 없거나 %d자 안의 평문이 아니다: %s" % (TOOL_SUMMARY_MAX_CHARS, tool))
-            elif any(tool in str(text) for text in (spec.get("title", ""), summary)):
-                problems.append("title 이나 summary 에 도구 이름이 있다: %s" % tool)
-            # 사용자 README 의 도구 표는 화면과 같은 말을 쓴다. 손으로 고친 표가 선언과 어긋나지 않게 한다.
-            elif "| %s | %s |" % (spec.get("title"), summary) not in readme:
-                problems.append("README 의 도구 표에 title 과 summary 줄이 없다: %s" % tool)
         if spec.get("risk") != "READ":
             if type(spec.get("outbound")) is not bool:
                 problems.append("READ 가 아닌 도구가 outbound 를 boolean 으로 선언하지 않았다: %s" % tool)
@@ -165,6 +176,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
             problems.append("Python MCP 서버는 허용하지 않는다")
         try:
             served = server_tools(server, root)
+            served_args = set().union(*(args for _, args in served.values()))
         except Exception as error:
             problems.append("서버를 띄워 도구를 읽지 못한다: %r" % error)
         else:
@@ -208,6 +220,10 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     lines = owners.read_text(encoding="utf-8").splitlines() if owners.is_file() else []
     if not any(len(parts) >= 2 and parts[0].startswith(prefix) for parts in (line.split() for line in lines)):
         problems.append("CODEOWNERS 에 %s 소유자 줄이 없다" % prefix)
+    if name not in PENDING_USER_COPY:
+        readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").is_file() else ""
+        problems.extend(user_copy_problems(tools, loaded, readme, served_args))
+
     return problems
 
 
@@ -363,7 +379,13 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
         self.assert_reported(problems, "summary")
         problems = self.broken_copy(self.edit_declaration(
             lambda v: v["tools"]["get_profile"].update(summary="get_profile 로 계정을 읽어요.")))
-        self.assert_reported(problems, "도구 이름")
+        self.assert_reported(problems, "도구나 인자 이름")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="search_messages 와 함께 써요.")))
+        self.assert_reported(problems, "search_messages")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="query 로 찾아요.")))
+        self.assert_reported(problems, "query")
         problems = self.broken_copy(self.edit_declaration(
             lambda v: v["tools"]["get_profile"].update(summary="README 에 없는 요약이에요.")))
         self.assert_reported(problems, "README")
