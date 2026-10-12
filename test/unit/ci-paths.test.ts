@@ -201,7 +201,6 @@ function workflowJobs(): Map<string, string> {
 // 무거운 검사 job 과 그 결과를 필수 검사 이름으로 판정하는 job 이다.
 const GATED = [
   { flag: "backend", work: "backend-tests", gate: "backend" },
-  { flag: "web", work: "web-build", gate: "web" },
   { flag: "browser", work: "browser", gate: "browser-required" },
   { flag: "e2e", work: "e2e-tests", gate: "e2e" },
   { flag: "hermes", work: "hermes-tests", gate: "hermes" },
@@ -227,28 +226,79 @@ test("무거운 job 은 자기 판정 값으로만 돌고, 필수 검사 job 은
 test("quality 는 판정 job 이 실패해도 생략되지 않고, 무거운 단계만 판정 값으로 건너뛴다", () => {
   const body = workflowJobs().get("quality") ?? assert.fail("quality job 이 없다");
   assert.match(body, /^ {4}needs: changes\n {4}if: always\(\)\n/m);
-  assert.match(body, /run: test "\$CHANGES_RESULT" = success/);
+  assert.match(body, /test "\$CHANGES_RESULT" = success/);
   assert.match(body, /SHOULD_RUN: \$\{\{ needs\.changes\.outputs\.quality \}\}/);
   assert.match(body, /test "\$SHOULD_RUN" = true \|\| test "\$SHOULD_RUN" = false/);
   const steps = body.split(/^ {6}- /m).slice(1);
-  const always = steps.filter((step) => !step.includes("if: needs.changes.outputs.quality == 'true'"));
+  const always = steps.filter((step) => !step.includes("if: needs.changes.outputs."));
   // 언제나 도는 단계는 판정 확인, checkout, 파일 길이 검사뿐이다.
   assert.equal(always.length, 3, always.join("\n---\n"));
   assert.ok(always.some((step) => step.includes("check-file-length.mjs")));
 });
 
-test("unit 과 public-safe 는 경로 판정과 무관하게 항상 돈다", () => {
-  for (const job of ["unit", "public-safe"]) {
+test("unit 과 경로 판정에 합친 public-safe 는 경로와 무관하게 항상 돈다", () => {
+  for (const job of ["unit", "changes"]) {
     const body = workflowJobs().get(job) ?? assert.fail(`${job} job 이 없다`);
     assert.doesNotMatch(body, /^ {4}(needs|if):/m, job);
   }
+  const changes = workflowJobs().get("changes")!;
+  assert.match(changes, /^ {4}name: public-safe$/m);
+  assert.match(changes, /run: node scripts\/ci\/ci-paths.mjs changes/);
+  assert.match(changes, /PUBLIC_REPO_DENYLIST.*scripts\/checks\/check-public-safe\.sh/);
+  assert.equal(changes.match(/uses: actions\/checkout@/g)?.length, 1);
 });
 
 test("브라우저 필수 검사는 shard 를 돌린 경우에만 폭별 실제 결과를 조회한다", () => {
   const body = workflowJobs().get("browser-required") ?? assert.fail("browser-required job 이 없다");
   assert.match(body, /matrix:\n {8}project: \[mobile, desktop\]/);
   assert.match(body, /if: needs.changes.outputs.browser == 'true'\n {8}env:/);
-  assert.match(body, /run: node scripts\/ci\/browser-ci.mjs check \$\{\{ matrix.project \}\} 4/);
+  assert.match(body, /run: node scripts\/ci\/browser-ci.mjs check \$\{\{ matrix.project \}\} 3/);
+  const work = workflowJobs().get("browser")!;
+  assert.match(work, /shard: \[1, 2, 3\]/);
+  assert.equal(work.match(/--shard=\$\{\{ matrix.shard \}\}\/3/g)?.length, 2);
+});
+
+test("웹 검사는 quality와 설치를 공유하되 변경 여부와 실제 단계 결과로 판정한다", () => {
+  const jobs = workflowJobs();
+  const quality = jobs.get("quality")!;
+  assert.equal(jobs.has("web-build"), false);
+  assert.match(quality, /web-result: \$\{\{ steps\.web-tests\.outcome \}\}/);
+  const webStep = quality.split("        id: web-tests\n")[1];
+  assert.match(webStep, /^ {8}if: needs.changes.outputs.web == 'true'\n/);
+  for (const command of ["pnpm test:node", "pnpm typecheck", "pnpm build"]) assert.ok(webStep.includes(command));
+  const shared = quality.split(/^ {6}- /m).filter((step) => /uses: (pnpm\/action-setup|actions\/setup-node)|run: cd web && pnpm install/.test(step));
+  assert.equal(shared.length, 3);
+  for (const step of shared) assert.match(step, /if: needs.changes.outputs.quality == 'true' \|\| needs.changes.outputs.web == 'true'/);
+  const web = jobs.get("web")!;
+  assert.match(web, /needs: \[changes, quality\]\n {4}if: always\(\)/);
+  assert.match(web, /JOB_RESULT: \$\{\{ needs\.quality\.outputs\.web-result \}\}/);
+  assert.match(web, /SHOULD_RUN: \$\{\{ needs\.changes\.outputs\.web \}\}/);
+  const expression = /CHANGES_RESULT: \$\{\{ (.*) \}\}/.exec(web)![1];
+  const evaluate = new Function("needs", `return ${expression};`);
+  for (const changes of ["success", "failure", "cancelled", "skipped"]) {
+    for (const quality of ["success", "failure", "cancelled", "skipped"]) {
+      for (const run of ["true", "false"]) {
+        for (const result of ["success", "failure", "cancelled", "skipped", ""]) {
+          const actual = gate({ changes: evaluate({ changes: { result: changes }, quality: { result: quality } }), run, result });
+          assert.equal(actual.pass, changes === "success" && quality === "success" && ((run === "true" && result === "success") || (run === "false" && result === "skipped")));
+        }
+      }
+    }
+  }
+});
+
+test("통합 뒤에도 필수 검사 이름 9개와 전체 검사 job 19개를 유지한다", () => {
+  const jobs = workflowJobs();
+  const names = [...jobs.values()].flatMap((body) => {
+    const name = /^ {4}name: (.+)$/m.exec(body)?.[1];
+    if (name === "browser-${{ matrix.project }}") return ["browser-mobile", "browser-desktop"];
+    return name ? [name] : [];
+  });
+  for (const name of ["backend", "web", "e2e", "unit", "hermes", "quality", "public-safe", "browser-mobile", "browser-desktop"]) {
+    assert.equal(names.filter((candidate) => candidate === name).length, 1, name);
+  }
+  // browser-failures는 성공한 PR에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
+  assert.equal(jobs.size - 1 + (2 - 1) + (6 - 1) + (2 - 1), 19);
 });
 
 test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다", () => {
