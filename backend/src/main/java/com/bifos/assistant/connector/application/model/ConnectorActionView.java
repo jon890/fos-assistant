@@ -26,6 +26,8 @@ import java.util.UUID;
  * @param hiddenArgs 답을 기다리는 줄이고, 상시 허락을 닫은 도구이며, {@code argsJson} 에 가려진 글이 있는가. 참이면
  * 승인할 수 없다(ADR-065)
  * @param argLabels 지금 카탈로그가 선언한 표시 이름 중 가린 인자에 그대로 남은 원래 키의 이름. 실행 인자와 가림에는 쓰지 않는다
+ * @param conversationGrantAllowed 승인하면서 이 대화에서 계속 허용할 수 있는 도구인가. 줄을 읽을 때의 카탈로그로
+ * 본다(ADR-20261012 / conversation-grant)
  */
 public record ConnectorActionView(
     UUID actionId,
@@ -41,10 +43,20 @@ public record ConnectorActionView(
     Instant expiresAt,
     boolean grantAllowed,
     boolean hiddenArgs,
-    Map<String, String> argLabels) {
+    Map<String, String> argLabels,
+    boolean conversationGrantAllowed) {
 
     public ConnectorActionView {
         argLabels = ConnectorArgumentLabels.visible(argLabels, argsJson);
+    }
+
+
+    /** 대화 허락을 모르는 기존 호출과 호환한다. */
+    public ConnectorActionView(UUID actionId, String connectorId, String toolName, String title, ToolRisk risk,
+        ActionStatus status, String argsJson, String resultText, String errorCode, Instant createdAt,
+        Instant expiresAt, boolean grantAllowed, boolean hiddenArgs, Map<String, String> argLabels) {
+        this(actionId, connectorId, toolName, title, risk, status, argsJson, resultText, errorCode, createdAt,
+            expiresAt, grantAllowed, hiddenArgs, argLabels, false);
     }
 
 
@@ -68,13 +80,17 @@ public record ConnectorActionView(
      */
     public static ConnectorActionView from(
         ConnectorAction action, Optional<ToolPolicy> declared, boolean grantable, boolean hiddenArgs) {
-        return from(action, declared, grantable, hiddenArgs, Map.of());
+        return from(action, declared, grantable, hiddenArgs, Map.of(), false);
     }
 
 
-    /** 표시 이름은 현재 카탈로그에서 받으며 정책과 가림에는 쓰지 않는다. */
+    /**
+     * 표시 이름은 현재 카탈로그에서 받으며 정책과 가림에는 쓰지 않는다.
+     *
+     * @param conversationGrantable 지금 카탈로그로 볼 때 그 도구를 한 대화에서 계속 허용할 수 있는가
+     */
     public static ConnectorActionView from(ConnectorAction action, Optional<ToolPolicy> declared,
-        boolean grantable, boolean hiddenArgs, Map<String, String> argLabels) {
+        boolean grantable, boolean hiddenArgs, Map<String, String> argLabels, boolean conversationGrantable) {
         return new ConnectorActionView(
             action.publicId(),
             action.connectorId(),
@@ -89,7 +105,8 @@ public record ConnectorActionView(
             action.expiresAt(),
             action.grantAllowed() && grantable,
             hiddenArgs,
-            argLabels);
+            argLabels,
+            action.conversationGrantAllowed() && conversationGrantable);
     }
 
 

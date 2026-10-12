@@ -9,12 +9,14 @@ import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,12 +46,20 @@ class ConnectorActionDetails {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
 
     private final ConnectorActionRepository actions;
+    private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorCatalogCache catalog;
+    private final Clock clock;
 
 
-    ConnectorActionDetails(ConnectorActionRepository actions, ConnectorCatalogCache catalog) {
+    ConnectorActionDetails(
+        ConnectorActionRepository actions,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConnectorCatalogCache catalog,
+        Clock clock) {
         this.actions = actions;
+        this.conversationGrants = conversationGrants;
         this.catalog = catalog;
+        this.clock = clock;
     }
 
 
@@ -189,7 +199,8 @@ class ConnectorActionDetails {
             action.errorCode(),
             action.resultText(),
             action.userId(),
-            action.executedAt());
+            action.executedAt(),
+            action.status() == null ? null : conversationGrants.findActiveExpiresAtByActionId(action.id(), Instant.now(clock)));
     }
 
 
@@ -208,7 +219,24 @@ class ConnectorActionDetails {
             hiddenArgs(manifest, action),
             manifest.flatMap(found -> found.tools().stream()
                 .filter(tool -> Objects.equals(tool.name(), action.toolName()))
-                .findFirst()).map(ConnectorTool::argLabels).orElse(Map.of()));
+                .findFirst()).map(ConnectorTool::argLabels).orElse(Map.of()),
+            conversationGrantable(manifest, action));
+    }
+
+
+    /**
+     * 지금 카탈로그로 볼 때 그 줄의 도구를 한 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 선언이 연
+     * 도구만 줄 수 있다. 카탈로그를 읽지 못했거나 도구 선언이 없으면 줄 수 없다. 도구를 선언하지 않는 schema 1 도 여는 선언이 없어 줄 수 없다.
+     *
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     */
+    static boolean conversationGrantable(Optional<ConnectorManifest> manifest, ConnectorAction action) {
+        if (manifest.isEmpty()) {
+            return false;
+        }
+        return ConnectorToolPolicies.find(manifest.get(), action.toolName())
+            .map(ToolPolicy::conversationGrantable)
+            .orElse(false);
     }
 
 
