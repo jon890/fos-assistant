@@ -44,6 +44,17 @@ test("필수가 아닌 claude-review 만 실패한 UNSTABLE 은 머지할 수 �
   assert.equal(decide({ ...base, mergeStateStatus: "UNSTABLE" }).code, EXIT.BLOCKED);
 });
 
+test("UNSTABLE 에서 필수가 아닌 검사가 도는 중이면 대기, mergeable 계산 중이면 UNSTABLE 이어도 대기다", () => {
+  const running = { ...base, mergeStateStatus: "UNSTABLE", runs: [...base.runs, { name: NON_REQUIRED, state: "IN_PROGRESS" }] };
+  assert.equal(decide(running).code, EXIT.WAIT);
+  const unknown = { ...base, mergeable: "UNKNOWN", mergeStateStatus: "UNSTABLE", runs: [...base.runs, { name: NON_REQUIRED, state: "FAILURE" }] };
+  assert.equal(decide(unknown).code, EXIT.WAIT);
+});
+
+test("허용 목록에 없는 mergeStateStatus 는 막힘이다", () => {
+  for (const status of ["BEHIND", "HAS_HOOKS", "DRAFT"]) assert.equal(decide({ ...base, mergeStateStatus: status }).code, EXIT.BLOCKED, status);
+});
+
 test("도는 중이거나 없는 필수 검사는 대기, 실패는 막힘이다", () => {
   assert.equal(decide({ ...base, runs: [ok("unit")] }).code, EXIT.WAIT);
   assert.equal(decide({ ...base, runs: [ok("unit"), { name: "backend", state: "FAILURE" }] }).code, EXIT.BLOCKED);

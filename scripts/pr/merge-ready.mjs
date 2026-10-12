@@ -6,7 +6,8 @@
 //   1. 브랜치 보호의 필수 검사 이름을 읽고 현재 head 의 check run 과 이름으로 대조한다.
 //      조회가 실패하거나 필수 검사가 0개면 통과와 구분되지 않아 판정하지 않는다(종료 코드 2).
 //   2. 미해결 리뷰 스레드, Draft, mergeStateStatus 를 본다.
-//      필수가 아닌 claude-review 만 실패해 UNSTABLE 이면 CLEAN 과 같이 본다.
+//      필수가 아닌 claude-review 만 실패해 UNSTABLE 이면 CLEAN 과 같이 본다. 필수가 아닌 검사가 도는 중이면 기다린다.
+//      CLEAN 과 그 UNSTABLE 이 아닌 mergeStateStatus 는 모두 막힘이다.
 //   3. head 가 origin/main 을 포함하지 않으면 다시 합쳐야 하는지 가른다.
 //      CI 뒤 main 에 들어온 커밋이 아래 조건에 하나도 걸리지 않으면 직전 CI 결과를 쓴다.
 //      main 이 바뀔 때마다 전체 CI 를 다시 돌리면 여러 PR 이 함께 돌 때 머지가 끝없이 밀린다.
@@ -79,6 +80,12 @@ export function failedOthers(required, runs) {
   return [...new Set(runs.filter((run) => !names.has(run.name) && !PENDING_STATES.has(run.state) && !["SUCCESS", "SKIPPED", "NEUTRAL"].includes(run.state)).map((run) => run.name))];
 }
 
+/** 필수가 아닌 검사 중 도는 중인 것의 이름. */
+export function pendingOthers(required, runs) {
+  const names = new Set(required);
+  return [...new Set(runs.filter((run) => !names.has(run.name) && PENDING_STATES.has(run.state)).map((run) => run.name))];
+}
+
 /**
  * 모은 사실로 판정 하나를 낸다. 순서가 곧 우선순위다.
  * input: { required, runs, isDraft, mergeable, mergeStateStatus, unresolvedThreads, containsMain, remergeReasons, headRefOid, headRecheck }
@@ -93,15 +100,19 @@ export function decide(input) {
   if (failed.length) return blocked(`필수 검사 실패: ${failed.join(", ")}`);
   if (pending.length) return { verdict: `${VERDICT.WAIT}(도는 중이거나 아직 없는 필수 검사: ${pending.join(", ")})`, code: EXIT.WAIT };
   if (unresolvedThreads > 0) return blocked(`미해결 리뷰 스레드 ${unresolvedThreads}개`);
-  if (mergeStateStatus === "UNSTABLE") {
-    const others = failedOthers(required, runs);
-    if (!(others.length > 0 && others.every((name) => name === NON_REQUIRED))) {
-      return blocked(`UNSTABLE 이고 실패한 검사가 ${NON_REQUIRED} 만이 아니다(${others.join(", ") || "실패한 검사를 찾지 못함"})`);
-    }
-  } else if (mergeStateStatus === "BLOCKED") {
-    return blocked("mergeStateStatus 가 BLOCKED 다(승인 요구나 브랜치 보호 규칙을 확인한다)");
-  } else if (mergeStateStatus === "UNKNOWN" || mergeable === "UNKNOWN") {
+  // 허용하는 상태만 통과시킨다. 목록에 없는 mergeStateStatus 는 막힘이다.
+  if (mergeStateStatus === "UNKNOWN" || mergeable === "UNKNOWN") {
     return { verdict: `${VERDICT.WAIT}(GitHub 가 mergeable 을 아직 계산하지 못했다)`, code: EXIT.WAIT };
+  }
+  if (mergeStateStatus === "UNSTABLE") {
+    const failed = failedOthers(required, runs);
+    if (failed.some((name) => name !== NON_REQUIRED)) return blocked(`UNSTABLE 이고 ${NON_REQUIRED} 밖의 검사가 실패했다(${failed.join(", ")})`);
+    // 필수가 아닌 검사가 도는 중이면 UNSTABLE 의 까닭이 아직 정해지지 않았다. 기다린다.
+    const running = pendingOthers(required, runs);
+    if (running.length) return { verdict: `${VERDICT.WAIT}(필수가 아닌 검사가 도는 중: ${running.join(", ")})`, code: EXIT.WAIT };
+    if (failed.length === 0) return blocked("UNSTABLE 인데 실패한 검사를 찾지 못했다");
+  } else if (mergeStateStatus !== "CLEAN") {
+    return blocked(`mergeStateStatus 가 ${mergeStateStatus} 다(승인 요구나 브랜치 보호 규칙을 확인한다)`);
   }
   if (!containsMain) {
     const reasons = input.remergeReasons;
