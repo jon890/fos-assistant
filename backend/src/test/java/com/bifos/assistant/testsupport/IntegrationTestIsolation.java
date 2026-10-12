@@ -1,5 +1,6 @@
 package com.bifos.assistant.testsupport;
 
+import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -57,15 +58,16 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
      * 넣지 않는다.
      */
     private static final Map<Class<?>, Set<ConfigurationPropertyName>> PARTIAL = Map.of(
-            HermesProperties.class,
-            Set.of(
-                    ConfigurationPropertyName.of("hermes.run-timeout"),
-                    ConfigurationPropertyName.of("hermes.poll-interval")),
-            ConnectorPolicyProperties.class,
-            Set.of(
-                    ConfigurationPropertyName.of("assistant.connector.policy.catalog-ttl"),
-                    ConfigurationPropertyName.of("assistant.connector.policy.catalog-failure-ttl"),
-                    ConfigurationPropertyName.of("assistant.connector.policy.approval-ttl")));
+        HermesProperties.class,
+        Set.of(
+            ConfigurationPropertyName.of("hermes.run-timeout"),
+            ConfigurationPropertyName.of("hermes.poll-interval")),
+        ConnectorPolicyProperties.class,
+        Set.of(
+            ConfigurationPropertyName.of("assistant.connector.policy.catalog-ttl"),
+            ConfigurationPropertyName.of("assistant.connector.policy.catalog-failure-ttl"),
+            ConfigurationPropertyName.of("assistant.connector.policy.approval-ttl")));
+
 
     @Override
     public void beforeEach(ExtensionContext context) {
@@ -74,10 +76,12 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         apply(applicationContext, overridesOf(context.getRequiredTestClass()));
     }
 
+
     @Override
     public void afterEach(ExtensionContext context) throws InterruptedException {
         afterTest(SpringExtension.getApplicationContext(context), IDLE_LIMIT);
     }
+
 
     /**
      * 띄운 작업이 모두 끝나기를 기다린 뒤 대역과 시계, 설정을 되돌린다. 기다리다 실패해도 되돌린다.
@@ -92,14 +96,16 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         }
     }
 
+
     /**
      * 검사 클래스와 그 상위 클래스, 메타 주석에 단 {@link OverrideProperties} 값을 모은다. 검사 클래스에 가까운 값이 앞에 온다.
      */
     static List<String> overridesOf(Class<?> testClass) {
         return MergedAnnotations.from(testClass, SearchStrategy.TYPE_HIERARCHY).stream(OverrideProperties.class)
-                .flatMap(annotation -> Arrays.stream(annotation.getStringArray("value")))
-                .toList();
+            .flatMap(annotation -> Arrays.stream(annotation.getStringArray("value")))
+            .toList();
     }
+
 
     /**
      * {@code "<키>=<값>"} 들을 설정 record 로 바인딩해 해당 {@link OverridableLiveProperties} 에 넣는다. 바꾼 record 는 운영과 같은
@@ -122,15 +128,14 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
             String value = override.substring(separator + 1);
             ConfigurationPropertyName name = ConfigurationPropertyName.of(key);
             List<OverridableLiveProperties<?>> owners = lives.stream()
-                    .filter(live -> prefixOf(live.type()).isAncestorOf(name))
-                    .toList();
+                .filter(live -> prefixOf(live.type()).isAncestorOf(name))
+                .toList();
             if (owners.isEmpty()) {
                 throw new IllegalArgumentException("LiveProperties 로 읽지 않는 설정이다: " + key);
             }
             for (OverridableLiveProperties<?> owner : owners) {
                 Set<ConfigurationPropertyName> allowed = PARTIAL.get(owner.type());
-                boolean field =
-                        namesField(owner.type(), name, prefixOf(owner.type()).getNumberOfElements());
+                boolean field = namesField(owner.type(), name, prefixOf(owner.type()).getNumberOfElements());
                 if (!field || (allowed != null && !allowed.contains(name))) {
                     throw new IllegalArgumentException("LiveProperties 로 읽지 않는 설정이다: " + key);
                 }
@@ -138,12 +143,13 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
             }
         }
 
-        ConfigurableEnvironment environment = (ConfigurableEnvironment) context.getEnvironment();
+        ConfigurableEnvironment environment = (ConfigurableEnvironment)context.getEnvironment();
         Map<OverridableLiveProperties<?>, Object> bound = new LinkedHashMap<>();
         grouped.forEach((live, values) -> bound.put(live, bind(environment, live.type(), values)));
         requireRunTimeoutOrder(lives, bound);
         bound.forEach(OverridableLiveProperties::override);
     }
+
 
     /**
      * 설정을 먼저 되돌리고 대역을 하나씩 되돌린다. 한 항목이 던져도 나머지는 되돌린다. 남은 대역과 설정은 원인과 먼 다음 검사를 흔든다.
@@ -155,6 +161,8 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> overridables(context).forEach(OverridableLiveProperties::reset));
         attempt(failures, () -> context.getBean(StubHermesRunsClient.class).reset());
         attempt(failures, () -> context.getBean(TestClock.class).reset());
+        // H2는 지운 사용자와 데이터 key의 번호를 다시 쓸 수 있다. 앞 검사의 key 캐시가 새 사용자에게 남지 않게 비운다.
+        attempt(failures, () -> context.getBean(DataKeyService.class).forgetCachedKeys());
         attempt(failures, () -> context.getBean(CapturingTaskScheduler.class).reset());
         attempt(failures, () -> context.getBean(WakeRetryThreads.class).reset());
         attempt(failures, () -> context.getBean(ConnectorChangeRecorder.class).reset());
@@ -163,13 +171,13 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(FakeBrowserRuntime.class).reset());
         attempt(failures, () -> context.getBean(EchoCdpRelayConnector.class).reset());
         attempt(
-                failures,
-                () -> context.getBean(AttentionTestCandidates.FailingCandidates.class)
-                        .reset());
+            failures,
+            () -> context.getBean(AttentionTestCandidates.FailingCandidates.class)
+                .reset());
         attempt(
-                failures,
-                () -> context.getBean(AttentionTestCandidates.ReadCountingCandidates.class)
-                        .reset());
+            failures,
+            () -> context.getBean(AttentionTestCandidates.ReadCountingCandidates.class)
+                .reset());
         if (failures.isEmpty()) {
             return;
         }
@@ -178,8 +186,9 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         if (first instanceof RuntimeException runtime) {
             throw runtime;
         }
-        throw (Error) first;
+        throw (Error)first;
     }
+
 
     /** 되돌리기 하나를 돌리고, 던지면 모아 둔다. 단언 실패 같은 {@link Error} 도 모아 뒤 항목을 막지 않는다. */
     private static void attempt(List<Throwable> failures, Runnable step) {
@@ -189,6 +198,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
             failures.add(ex);
         }
     }
+
 
     /**
      * {@code name} 의 {@code from} 번째 요소부터가 record {@code type} 의 칸을 가리키는가. 칸 이름은 record component 이름을
@@ -205,15 +215,15 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         String element = name.getElement(from, ConfigurationPropertyName.Form.UNIFORM);
         for (RecordComponent component : type.getRecordComponents()) {
             String field = ConfigurationPropertyName.of(kebab(component.getName()))
-                    .getElement(0, ConfigurationPropertyName.Form.UNIFORM);
+                .getElement(0, ConfigurationPropertyName.Form.UNIFORM);
             if (!field.equals(element)) {
                 continue;
             }
             Class<?> fieldType = component.getType();
             boolean last = from + 1 == name.getNumberOfElements();
             if (Map.class.isAssignableFrom(fieldType)
-                    || Collection.class.isAssignableFrom(fieldType)
-                    || fieldType.isArray()) {
+                || Collection.class.isAssignableFrom(fieldType)
+                || fieldType.isArray()) {
                 return true;
             }
             if (fieldType.isRecord() && !last) {
@@ -224,9 +234,11 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         return false;
     }
 
+
     private static String kebab(String camel) {
         return camel.replaceAll("([a-z0-9])([A-Z])", "$1-$2").toLowerCase(Locale.ROOT);
     }
+
 
     private static List<OverridableLiveProperties<?>> overridables(ApplicationContext context) {
         List<OverridableLiveProperties<?>> lives = new ArrayList<>();
@@ -238,11 +250,12 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         return lives;
     }
 
+
     private static ConfigurationPropertyName prefixOf(Class<?> type) {
-        String prefix =
-                MergedAnnotations.from(type).get(ConfigurationProperties.class).getString("prefix");
+        String prefix = MergedAnnotations.from(type).get(ConfigurationProperties.class).getString("prefix");
         return ConfigurationPropertyName.of(prefix);
     }
+
 
     /** 바꿀 값을 앞에, 컨텍스트의 설정을 뒤에 두어 그 record 의 prefix 로 바인딩한다. */
     private static Object bind(ConfigurableEnvironment environment, Class<?> type, Map<String, String> values) {
@@ -250,18 +263,19 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         sources.add(new MapConfigurationPropertySource(values));
         ConfigurationPropertySources.get(environment).forEach(sources::add);
         Binder binder = new Binder(
-                sources,
-                new PropertySourcesPlaceholdersResolver(environment),
-                ApplicationConversionService.getSharedInstance());
+            sources,
+            new PropertySourcesPlaceholdersResolver(environment),
+            ApplicationConversionService.getSharedInstance());
         return binder.bindOrCreate(prefixOf(type).toString(), Bindable.of(type));
     }
 
+
     /** 운영 기동 검사({@link ProactiveCheckProperties.RunTimeoutCheck})와 같은 조건을 바꾼 값으로 다시 확인한다. */
     private static void requireRunTimeoutOrder(
-            List<OverridableLiveProperties<?>> lives, Map<OverridableLiveProperties<?>, Object> bound) {
+        List<OverridableLiveProperties<?>> lives, Map<OverridableLiveProperties<?>, Object> bound) {
         boolean touched = bound.keySet().stream()
-                .anyMatch(
-                        live -> live.type() == ProactiveCheckProperties.class || live.type() == HermesProperties.class);
+            .anyMatch(
+                live -> live.type() == ProactiveCheckProperties.class || live.type() == HermesProperties.class);
         if (!touched) {
             return;
         }
@@ -270,12 +284,13 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         proactive.requireShorterThan(hermes.runTimeout());
     }
 
+
     private static <T> T valueAfter(
-            List<OverridableLiveProperties<?>> lives, Map<OverridableLiveProperties<?>, Object> bound, Class<T> type) {
+        List<OverridableLiveProperties<?>> lives, Map<OverridableLiveProperties<?>, Object> bound, Class<T> type) {
         OverridableLiveProperties<?> live = lives.stream()
-                .filter(candidate -> candidate.type() == type)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("LiveProperties 빈이 없다: " + type.getName()));
+            .filter(candidate -> candidate.type() == type)
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("LiveProperties 빈이 없다: " + type.getName()));
         return type.cast(bound.getOrDefault(live, live.current()));
     }
 }
