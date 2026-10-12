@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ConnectionBadge } from "@/components/connector/connection-badge";
+import { LoginLink } from "@/components/connector/browser-login";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import {
@@ -19,6 +20,7 @@ import {
   ConnectorLinks,
 } from "@/components/connector/connector-identity";
 import {
+  browserLoginHref,
   connectorAppearanceLinkHref,
   readConnectors,
   toolRiskCounts,
@@ -26,13 +28,17 @@ import {
 } from "@/lib/connection";
 
 /** 카드 본문에 그릴 줄이 하나라도 있는지 본다. 없으면 빈 본문이 카드 아래 여백만 남기므로 본문을 그리지 않는다. */
-function hasCardContent(connector: ConnectorSummary): boolean {
+function hasCardContent(
+  connector: ConnectorSummary,
+  loginHref: string | null,
+): boolean {
   return (
     !connector.available ||
     connector.tools.length > 0 ||
     connector.myStatus !== "DISCONNECTED" ||
     connectorAppearanceLinkHref(connector.link) !== null ||
-    connectorAppearanceLinkHref(connector.readmeUrl) !== null
+    connectorAppearanceLinkHref(connector.readmeUrl) !== null ||
+    loginHref !== null
   );
 }
 
@@ -67,6 +73,9 @@ function ConnectorCard({
   connector: ConnectorSummary;
   preferredAgent: string | null;
 }) {
+  const loginHref = connector.available
+    ? browserLoginHref(connector.ownerBrowserLoginUrl)
+    : null;
   return (
     <Card
       data-testid="connector-card"
@@ -96,7 +105,7 @@ function ConnectorCard({
         </div>
         <ConnectionBadge className="mt-3" status={connector.myStatus} />
       </CardHeader>
-      {hasCardContent(connector) ? (
+      {hasCardContent(connector, loginHref) ? (
         <CardContent className="min-w-0 space-y-1">
           {connector.available ? (
             connector.tools.length > 0 ? (
@@ -130,6 +139,19 @@ function ConnectorCard({
             title={connector.title}
             className="relative z-10"
           />
+          {loginHref ? (
+            <div
+              className="space-y-1 text-sm"
+              data-testid="connector-login-guidance"
+            >
+              <p className="text-muted-foreground">
+                {connector.myStatus === "DISCONNECTED"
+                  ? "이 서비스는 내 브라우저에서 먼저 로그인해야 해요."
+                  : "이 서비스는 내 브라우저에 로그인한 계정을 써요."}
+              </p>
+              <LoginLink href={loginHref} className="relative z-10" />
+            </div>
+          ) : null}
         </CardContent>
       ) : null}
       <CardFooter className="mt-auto">
