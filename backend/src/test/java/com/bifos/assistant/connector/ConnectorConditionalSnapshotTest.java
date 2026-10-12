@@ -135,6 +135,20 @@ class ConnectorConditionalSnapshotTest {
 
 
     @Test
+    @DisplayName("검증 분기는 manifest 가 도구에 선언한 종류가 정하고 summary 종류와 다르면 거절한다")
+    void rejectsSummaryKindOtherThanToolKind() throws Exception {
+        assertThat(validate(BASE).kind()).isEqualTo(ConnectorExecutionSnapshot.CONDITIONAL);
+        assertThat(validate(BASE, ConnectorExecutionSnapshot.CONDITIONAL).summaryJson()).isEqualTo(value(BASE, "summaryJson"));
+        assertThatThrownBy(() -> validate(BASE, ConnectorExecutionSnapshot.ORDER)).isInstanceOf(IllegalArgumentException.class);
+        JsonNode general = JSON.readTree(Files.readString(Path.of("../test/fixtures/financial-approval-v1.json")))
+            .get("cases").get(0);
+        assertThat(validate(general, ConnectorExecutionSnapshot.ORDER).kind()).isEqualTo(ConnectorExecutionSnapshot.ORDER);
+        assertThatThrownBy(() -> validate(general, ConnectorExecutionSnapshot.CONDITIONAL))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+
+    @Test
     @DisplayName("Spring 원문 경계의 공통 기대는 수용 47개와 거절 132개다")
     void verifiesActualRawConsumerCounts() {
         int accepted = 0;
@@ -271,6 +285,17 @@ class ConnectorConditionalSnapshotTest {
             value(sample, "summaryJson"),
             value(sample, "scopeJson"),
             value(sample, "operation"));
+    }
+
+
+    private static ConnectorExecutionSnapshot validate(JsonNode sample, String kind) {
+        return ConnectorExecutionSnapshot.validate(
+            value(sample, "modelArgsJson"),
+            value(sample, "executionArgsJson"),
+            value(sample, "summaryJson"),
+            value(sample, "scopeJson"),
+            value(sample, "operation"),
+            kind);
     }
 
 

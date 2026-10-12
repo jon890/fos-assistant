@@ -72,6 +72,7 @@ CASE-DEADLINE은 claim 뒤 GET/auth/quota/queue에서 경과를 주입한다. �
 
 신규 tests/fixtures/conditional-entry.ts만 테스트 connector 원본과 SDK bundle을 생성한다. 기존 trading-entry의 생성 원본을 기반으로 조건 등록을 추가한 테스트 사본을 만든다.
 이 한 생성 명령을 Bun 테스트와 Python fixture가 같이 호출한다. plugin.json/.mcp.json·READ prepare·FINANCIAL/always·guard·scope_fields 선언은 테스트 임시 원본에만 있다.
+guard 의 `kinds` 에 세 조건 도구를 `CONDITIONAL` 로 선언한다. 선언이 없으면 일반 주문으로 보고 조건 summary 를 거절한다.
 `hermes/tests/fixtures/toss-conditional-contract.py`는 실제 connector_manifest._load_connector와 _prepare_result를 호출하며 자체 manifest/SHA/검증기를 만들지 않는다.
 `hermes/tests/test_connector_conditional_sdk.py`는 실제 _run_connector_prepare/_prepare_answer 및 실행 처리기로 SDK stdio를 왕복한다. 성공 결과만 JSON 파일로 넘겨 검증한 것을 실제 실행 소비 증거로 대신하지 않는다.
 support 응답과 claim만 loopback 대역이다. ClaimResponse(v/allowed/ticketId/expiresAt), codec 요청8KiB·ticket4096자·scope 규칙과 MVC 성공200/replay409·실패 응답에 protocol vector를 직접 대조한다.

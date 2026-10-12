@@ -33,6 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Accessors(fluent = true)
 public final class ConnectorExecutionSnapshot {
     public static final String PROTOCOL = "approval-claim-v1";
+    public static final String ORDER = "ORDER";
+    public static final String CONDITIONAL = "CONDITIONAL";
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .streamReadConstraints(
@@ -91,6 +93,26 @@ public final class ConnectorExecutionSnapshot {
         }
         return new ConnectorExecutionSnapshot(
             executionArgsJson, summaryJson, scopeJson, Sha256.hex(executionArgsJson), Sha256.hex(scopeJson), args);
+    }
+
+
+    /** manifest 가 도구에 선언한 종류와 summary 종류가 같아야 한다. 조건 summary 로 일반 도구를 부르지 못한다. */
+    public static ConnectorExecutionSnapshot validate(
+        String modelArgsJson,
+        String executionArgsJson,
+        String summaryJson,
+        String scopeJson,
+        String operation,
+        String kind) {
+        ConnectorExecutionSnapshot snapshot = validate(modelArgsJson, executionArgsJson, summaryJson, scopeJson, operation);
+        require(snapshot.kind().equals(kind));
+        return snapshot;
+    }
+
+
+    /** summary 가 보이는 종류다. 호출자가 manifest 의 도구 종류와 대조한다. */
+    public String kind() {
+        return conditional(object(summaryJson, 8 * 1024)) ? CONDITIONAL : ORDER;
     }
 
 
@@ -241,7 +263,7 @@ public final class ConnectorExecutionSnapshot {
 
 
     private static boolean conditional(JsonNode summary) {
-        return summary.has("orderKind") && "CONDITIONAL".equals(summary.get("orderKind").stringValue());
+        return summary.has("orderKind") && CONDITIONAL.equals(summary.get("orderKind").stringValue());
     }
 
 
