@@ -68,16 +68,85 @@ const SNAPSHOT = "content-drafts/[draftId]/snapshots/[snapshotId]/route.ts";
 const JOB = "content-drafts/[draftId]/snapshots/[snapshotId]/job/route.ts";
 const JOBS = "content-draft-jobs/route.ts";
 
-test("snapshot 과 job 은 세 UUID 경로로만 Control Plane 을 부른다", async () => {
+const SNAPSHOT_BODY = {
+  snapshotId: ID,
+  draftId: OTHER,
+  revision: 3,
+  snapshotHash: "a".repeat(64),
+  expiresAt: "2026-10-13T00:00:00Z",
+  preview: {
+    schemaVersion: 1,
+    draftId: OTHER,
+    title: "제목",
+    category: "분류",
+    tags: ["태그"],
+    blocks: [
+      { type: "paragraph", text: "문단" },
+      {
+        type: "image",
+        assetId: "11",
+        observationRef: { id: "5", revision: 1 },
+      },
+    ],
+  },
+  assetIds: ["11"],
+  omittedAssetIds: ["12"],
+  addedLater: "x",
+};
+const JOB_BODY = {
+  snapshotId: ID,
+  draftId: OTHER,
+  revision: 3,
+  actionId: ID,
+  jobId: OTHER,
+  status: "SAVING",
+  stage: "uploading",
+  saveClicked: false,
+  lastCheckedAt: "2026-10-12T00:00:00Z",
+  errorCode: "busy",
+};
+
+test("snapshot 과 job 은 세 UUID 경로로만 Control Plane 을 부르고 화면이 쓰는 칸만 넘긴다", async () => {
   const params = { conversationId: ID, draftId: OTHER, snapshotId: ID };
-  const ok = { ok: true, status: 200, data: { revision: 3 } };
-  for (const [relative, suffix] of [
-    [SNAPSHOT, ""],
-    [JOB, "/job"],
-  ]) {
+  for (const [relative, suffix, body, expected] of [
+    [
+      SNAPSHOT,
+      "",
+      SNAPSHOT_BODY,
+      {
+        revision: 3,
+        preview: {
+          title: "제목",
+          category: "분류",
+          tags: ["태그"],
+          blocks: [
+            { type: "paragraph", text: "문단" },
+            { type: "image", assetId: "11", caption: null },
+          ],
+        },
+        assetIds: ["11"],
+        omittedAssetIds: ["12"],
+      },
+    ],
+    [
+      JOB,
+      "/job",
+      JOB_BODY,
+      {
+        snapshotId: ID,
+        draftId: OTHER,
+        revision: 3,
+        actionId: ID,
+        status: "SAVING",
+        stage: "uploading",
+        saveClicked: false,
+      },
+    ],
+  ] as const) {
+    const ok = { ok: true, status: 200, data: body };
     const { response, calls } = await callRoute(relative, params, ok);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { revision: 3 });
+    assert.deepEqual(await response.json(), expected);
     assert.deepEqual(calls, [
       `/api/v1/chat/conversations/${ID}/content-drafts/${OTHER}/snapshots/${ID}${suffix}`,
     ]);
@@ -113,9 +182,14 @@ test("job 목록은 beforeSnapshotId 만 UUID 로 검사해 넘긴다", async ()
   const ok = {
     ok: true,
     status: 200,
-    data: { items: [], nextBeforeSnapshotId: null },
+    data: { items: [JOB_BODY], nextBeforeSnapshotId: null },
   };
   const first = await callRoute(JOBS, { conversationId: ID }, ok);
+  const page = await first.response.json();
+  assert.equal(page.items.length, 1);
+  assert.equal(page.items[0].jobId, undefined);
+  assert.equal(page.items[0].errorCode, undefined);
+  assert.equal(page.nextBeforeSnapshotId, null);
   assert.deepEqual(first.calls, [
     `/api/v1/chat/conversations/${ID}/content-draft-jobs`,
   ]);

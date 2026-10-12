@@ -1,4 +1,4 @@
-import { contentDraftGet } from "@/lib/content-draft-route";
+import { contentDraftGet, pickSnapshot } from "@/lib/content-draft-route";
 
 type Context = {
   params: Promise<{
@@ -14,5 +14,6 @@ export async function GET(_: Request, { params }: Context) {
   return contentDraftGet(
     `/api/v1/chat/conversations/${conversationId}/content-drafts/${draftId}/snapshots/${snapshotId}`,
     [conversationId, draftId, snapshotId],
+    pickSnapshot,
   );
 }

@@ -1,4 +1,4 @@
-import { contentDraftGet } from "@/lib/content-draft-route";
+import { contentDraftGet, pickJobPage } from "@/lib/content-draft-route";
 
 type Context = { params: Promise<{ conversationId: string }> };
 
@@ -11,5 +11,6 @@ export async function GET(request: Request, { params }: Context) {
       before === null ? "" : `?beforeSnapshotId=${before}`
     }`,
     before === null ? [conversationId] : [conversationId, before],
+    pickJobPage,
   );
 }
