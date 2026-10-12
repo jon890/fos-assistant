@@ -164,6 +164,36 @@ class ContentDraftJobsTest extends ContentDraftFixture {
 
 
     @Test
+    @DisplayName("다른 사용자의 저장 요청·승인·조회는 404이고 기존 행과 시작 횟수는 바뀌지 않는다")
+    void rejectsForeignAccessWithoutChangingRows() throws Exception {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        var other = user();
+        code(() -> saves.requestSave(other, origin.id(), snapshotId), ErrorCode.CONVERSATION_NOT_FOUND);
+        code(() -> contentApproval.approve(other, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
+        code(() -> approvals.approve(other, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
+        code(() -> jobQueries.refresh(other, conversation.id(), draftId, snapshotId), ErrorCode.CONVERSATION_NOT_FOUND);
+        code(() -> jobQueries.list(other, conversation.id(), null, 20), ErrorCode.CONVERSATION_NOT_FOUND);
+        code(() -> jobQueries.list(other, conversation.id(), snapshotId, 20), ErrorCode.CONVERSATION_NOT_FOUND);
+        Instant now = Instant.now();
+        String token = io.jsonwebtoken.Jwts.builder().subject(other.email()).issuedAt(java.util.Date.from(now))
+            .expiration(java.util.Date.from(now.plusSeconds(600)))
+            .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret"
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8))).compact();
+        var http = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+            + "/api/v1/connector-actions/" + request.actionId() + "/approve"))
+            .header("Authorization", "Bearer " + token).POST(HttpRequest.BodyPublishers.noBody()).build();
+        assertThat(HttpClient.newHttpClient().send(http, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(404);
+        assertThat(actionRows.count()).isEqualTo(1);
+        assertThat(actionRows.findAll().getFirst().status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(jobRows.count()).isEqualTo(1);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.PREVIEW_READY);
+        assertThat(jobRows.findAll().getFirst().jobId()).isNull();
+        assertThat(starter.started()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("같은 snapshot의 반복·동시 저장 요청은 상시 허락 없는 승인 줄 하나와 job 하나만 만든다")
     void createsOneApprovalLinePerSnapshotForRepeatedAndConcurrentRequests() throws Exception {
         UUID snapshotId = preview();
