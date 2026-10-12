@@ -93,7 +93,7 @@ class Fixture(ConnectorExecuteTest):
 
 
 Fixture.setUpClass()
-logging.disable(logging.NOTSET)
+logging.disable(logging.CRITICAL)
 fixture = Fixture()
 fixture.setUp()
 

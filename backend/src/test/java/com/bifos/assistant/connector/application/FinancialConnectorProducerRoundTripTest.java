@@ -10,7 +10,11 @@ import com.bifos.assistant.connector.application.execution.ConnectorExecutionTic
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.user.domain.AppUser;
+import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -205,6 +209,114 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         } finally {
             dropCheck("connector_action", "producer_result_failure");
         }
+    }
+
+
+    @Test
+    @DisplayName("다른 사용자의 승인은 금융 줄을 찾지 못하고 실행하지 않는다")
+    void otherUserCannotApproveFinancialAction() {
+        var requested = request();
+        var other = tx().execute(status -> users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "다른 사람", 1L,
+            UserRole.MEMBER, now)));
+        var stranger = new CurrentUser(other.id(), other.email(), "다른 사람", 1L, UserRole.MEMBER);
+        assertThatThrownBy(() -> approval.approve(stranger, requested.actionId())).isInstanceOf(ApiException.class);
+        assertRejectedBeforeTransmission(requested.actionId());
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("요청 뒤 바뀐 권한 맥락은 승인 전에 거부된다")
+    @ValueSource(strings = {"desired-disabled", "disconnected", "profile", "owner"})
+    void changedAuthorityAfterRequestIsRejectedBeforeTransmission(String change) {
+        var requested = request();
+        switch (change) {
+            case "desired-disabled" -> jdbc.update("update agent_connector_binding set desired_enabled = false where id = ?", bindingId);
+            case "disconnected" -> tx().executeWithoutResult(status ->
+                connections.findById(connectionId).orElseThrow().disconnected(now.plusSeconds(1)));
+            case "profile" -> jdbc.update("update agent set hermes_profile = ? where id = (select agent_id from agent_connector_binding where id = ?)",
+                profile + "-moved", bindingId);
+            default -> {
+                var other = tx().execute(status -> users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "새 주인", 1L,
+                    UserRole.MEMBER, now)));
+                jdbc.update("update agent set owner_user_id = ? where id = (select agent_id from agent_connector_binding where id = ?)",
+                    other.id(), bindingId);
+            }
+        }
+        // 옮긴 profile은 Hermes 상태 조회에서, 나머지는 잠금 아래 재검증에서 거부된다.
+        assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(RuntimeException.class);
+        assertRejectedBeforeTransmission(requested.actionId());
+    }
+
+
+    @Test
+    @DisplayName("snapshot 없는 금융 줄은 승인해도 실행하지 않는다")
+    void financialActionWithoutSnapshotIsNotExecuted() {
+        var requested = request();
+        jdbc.update("delete from connector_action_execution where action_id = ?", action(requested).id());
+        assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
+        assertRejectedBeforeTransmission(requested.actionId());
+    }
+
+
+    @Test
+    @DisplayName("암호화하지 않은 snapshot은 승인해도 실행하지 않는다")
+    void plaintextSnapshotIsNotExecuted() {
+        var requested = request();
+        jdbc.update("update connector_action_execution set content_key_id = null where action_id = ?", action(requested).id());
+        assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
+        assertRejectedBeforeTransmission(requested.actionId());
+    }
+
+
+    @Test
+    @DisplayName("같은 의도의 동시 준비는 PENDING 한 줄만 남긴다")
+    void concurrentSameIntentRequestsLeaveOnePending() throws Exception {
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            Callable<Boolean> call = () -> {
+                try {
+                    request();
+                    return true;
+                } catch (ApiException ignored) {
+                    return false;
+                }
+            };
+            var first = executor.submit(call);
+            var second = executor.submit(call);
+            assertThat(first.get(20, TimeUnit.SECONDS) ^ second.get(20, TimeUnit.SECONDS)).isTrue();
+        }
+        assertThat(jdbc.queryForObject("select count(*) from connector_action where user_id = ? and status = 'PENDING'",
+            Long.class, user.id())).isEqualTo(1);
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("claim 직전에 생긴 같은 의도의 UNKNOWN은 ticket 소비와 금융 전송을 막는다")
+    void claimRejectsSameIntentUnknownCreatedAfterApproval() {
+        var earlier = request();
+        // REJECTED 같은 의도는 새 준비를 막지 않는다.
+        Long earlierId = action(earlier).id();
+        jdbc.update("update connector_action set status = 'REJECTED' where id = ?", earlierId);
+        var requested = request();
+        doAnswer(invocation -> {
+            sent = invocation.getArgument(3);
+            jdbc.update("update connector_action set status = 'UNKNOWN' where id = ?", earlierId);
+            return client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", sent);
+        }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
+        assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(contents.findById(action(requested).id()).orElseThrow().consumedAt()).isNull();
+        assertThat(counters().path("financial").intValue()).isZero();
+        assertThat(counters().path("deletes").intValue()).isZero();
+    }
+
+
+    private void assertRejectedBeforeTransmission(UUID actionId) {
+        var action = actions.findByPublicId(actionId).orElseThrow();
+        assertThat(action.status()).isEqualTo(ActionStatus.PENDING);
+        contents.findById(action.id()).ifPresent(row -> assertThat(row.ticketId()).isNull());
+        assertThat(counters().path("execute").intValue()).isZero();
+        assertThat(counters().path("financial").intValue()).isZero();
+        assertThat(counters().path("deletes").intValue()).isZero();
     }
 
 
