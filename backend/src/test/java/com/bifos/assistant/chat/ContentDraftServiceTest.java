@@ -220,7 +220,12 @@ class ContentDraftServiceTest extends ContentDraftFixture {
             assertThat(ref.get("revision").asLong()).isEqualTo(1);
         }
         assertThat(drafts.read(owner, conversation.id(), id, null).draft().title()).isEqualTo("원고3");
-        // 원고 수정은 관찰을 다시 쓰지 않는다. 행과 alias 수, 목록의 최초 관찰이 그대로다.
+        // 네 판 모두 저장된 참조 행이 같은 관찰 revision에 묶였다. 입력 JSON의 왕복만으로 판정하지 않는다.
+        assertThat(assetRows.findAll()).filteredOn(asset -> asset.position() == 0).hasSize(4).allSatisfy(asset -> {
+            assertThat(asset.observationId()).isEqualTo(observation.id());
+            assertThat(asset.observationRevision()).isEqualTo(observation.revision());
+        });
+        // 원고 경로는 관찰을 읽기만 한다. 앞으로 관찰 쓰기가 생기는 회귀를 막는다.
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
         assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(saved);
