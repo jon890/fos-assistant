@@ -214,7 +214,7 @@ export async function photos(
 
   let inserted = await imageCount(page);
   if (guard && inserted !== 0) throw new SnapshotGuardError("photo_mismatch");
-  // 기존 `inserted + offset + 1` 은 inserted 도 늘어 1·3·5 가 된다. manifest 자리는 고정한 시작값으로 찾는다.
+  // 루프 안에서 inserted 가 늘어나므로 사진 번호와 manifest 자리는 고정한 시작값으로 센다.
   const initial = inserted;
   if (inserted > images.length)
     throw page.fail(
@@ -241,7 +241,7 @@ export async function photos(
   }
 
   for (const [offset, block] of images.slice(inserted).entries()) {
-    const number = inserted + offset + 1;
+    const number = initial + offset + 1;
     let photo;
     try {
       photo = await readPhoto(input, block.file, attachmentDir);
