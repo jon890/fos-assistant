@@ -24,7 +24,9 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
    - 어느 규칙에도 맞지 않는 파일은 모든 job 을 돌린다. 새 디렉터리와 루트 설정 파일이 여기 든다.
      브라우저와 무관한 새 스크립트는 브라우저 shard 를 제외한 검사를 돌린다. 브라우저 입력 스크립트를 더하면 규칙에도 더한다.
    - `ci.yml` 과 `ci-paths.mjs` 를 바꾸면 모든 job 을 돌린다.
-   - 모듈 디렉터리 안의 파일은 설정과 의존 목록, Dockerfile 까지 그 모듈 코드로 본다. Markdown 은 건너뛰되, Hermes 계약 문서와 실행에 주입하는 스킬 본문은 관련 검사를 돌린다.
+   - 모듈 디렉터리 안의 파일은 설정과 의존 목록, Dockerfile 까지 그 모듈 코드로 본다.
+     문서 디렉터리와 README·AGENTS 등 정해진 설명 문서만 건너뛴다. 낯선 Markdown 입력도 전체 검사를 돌린다.
+     Hermes 계약 문서와 커넥터 README 존재 여부는 hermes 검사를, 실행에 주입하는 스킬 본문은 관련 검사를 돌린다.
    - 여러 job 이 함께 읽는 `test/support`, `test/fixtures`, `test/resources` 는 모든 job 을 돌린다.
      예외로 커넥터 인자 catalog 는 backend 와 hermes 계약 검사의 입력이므로 그 두 검사만 돌린다.
    - 바뀐 파일을 하나도 찾지 못하면 모든 job 을 돌린다.

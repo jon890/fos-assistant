@@ -23,16 +23,15 @@ export const RULES = [
   [/^scripts\/ci\/ci-paths\.mjs$/, ALL],
   // 스킬 본문은 실행에 주입하므로 설명 문서와 달리 Hermes 관련 검사를 돌린다.
   [/^hermes\/.*\/skills\/.*\.md$/, ["backend", "e2e", "hermes", "quality"]],
-  // Hermes 계약 문서는 hermes 테스트의 입력이다. 나머지 Markdown 은 무거운 검사를 켜지 않는다.
+  // Hermes 계약 문서와 커넥터 README 존재 여부는 hermes 테스트의 입력이다.
   [/^hermes\/docs\/hermes-contract\.md$/, ["hermes"]],
-  [/\.md$/, NONE],
+  [/^hermes\/connectors\/[^/]+\/README\.md$/, ["hermes"]],
 
   // 어느 job 의 입력도 아닌 문서다. 문서를 읽는 테스트는 언제나 도는 unit 에 있다.
   [/^(docs|tasks|\.claude)\//, NONE],
-  [/^[^/]+\.md$/, NONE],
+  [/(^|\/)(README(?:\.[^/.]+)?|AGENTS|CLAUDE|ICON-SOURCE)\.md$/, NONE],
   [/^(LICENSE|\.gitignore|\.github\/CODEOWNERS)$/, NONE],
-  [/^(backend|web)\/docs\//, NONE],
-  [/^(backend|web)\/[^/]+\.md$/, NONE],
+  [/^(backend|web|hermes)\/docs\//, NONE],
   // 다른 workflow 와 리뷰 지시문은 CI job 이 읽지 않는다. 이것을 검사하는 테스트는 unit 에 있다.
   [/^\.github\/workflows\/(claude-code-review|claude-architecture-audit|pr-size)\.yml$/, NONE],
   [/^\.github\/workflows\/[^/]+\.txt$/, NONE],

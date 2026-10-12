@@ -14,9 +14,13 @@ test("문서와 계획서만 바꾸면 무거운 job 을 모두 건너뛴다", (
     "docs/adr/INDEX.md", "docs/features/connector.md", "tasks/plan1/phase-01.md", ".claude/skills/pr-merge/SKILL.md",
     "AGENTS.md", "README.ko.md", "backend/docs/data-schema.md", "backend/AGENTS.md", "web/docs/code-architecture.md",
     "web/AGENTS.md", ".github/workflows/code-review-prompt.txt", ".github/workflows/pr-size.yml", "scripts/pr/pr-size.mjs",
-    "scripts/dev/check-local.sh", "test/unit/doc-files.test.ts", "hermes/connectors/naver-blog/README.md",
+    "scripts/dev/check-local.sh", "test/unit/doc-files.test.ts",
   ];
   assert.deepEqual(running(docs), []);
+});
+
+test("커넥터 README 는 존재 여부를 확인하는 hermes 검사만 돌린다", () => {
+  assert.deepEqual(running(["hermes/connectors/naver-blog/README.md"]), ["hermes"]);
 });
 
 test("모듈 코드는 그 모듈과 그것을 띄우는 job 을 돌린다", () => {
@@ -61,7 +65,7 @@ test("판정 규칙과 workflow 를 바꾸거나 규칙에 없는 파일이면 �
   for (const file of [
     ".github/workflows/ci.yml", "scripts/ci/ci-paths.mjs", ".github/actions/setup/action.yml",
     "test/support/pick-port.ts", "test/fixtures/a.json", "test/resources/a.json",
-    "test/package.json", "package.json", "new-dir/a.ts",
+    "test/package.json", "package.json", "new-dir/a.ts", "new-input.md", "new-dir/runtime.md",
   ]) {
     assert.deepEqual(running([file]), JOBS, file);
   }
