@@ -2658,6 +2658,8 @@ tag가 가리키는 commit은 `hermes_contract.py`의 `HERMES_COMMIT`으로 고�
 
 Control Plane은 `id:`, `seq`와 `replay.truncated`를 무시하고 기존 사건을 읽는다.
 이번 변경에 `Last-Event-ID` 재연결이나 누락 사건 복구를 더하지 않는다.
+느린 구독자로 닫히면 `: stream closed` 와 종료 사건 없이 스트림이 끝난다. Control Plane 은 이를 정상 EOF 로 읽고 결과 조회로 최종 답만 받는다.
+끊긴 뒤의 답 조각, 도구, 중간 안내 사건은 화면과 실행 기록에 남지 않으며, 다른 실패와 구분할 단서는 사건 관측이 완료되지 못했다는 플래그 하나뿐이다.
 v0.21.6 합성 fixture와 단일 사건 봉투 함수가 transport 차이를 갖고, 이전 버전 fixture도 남긴다.
 공식 SSE handler를 분리 실행해 `events.sse` 의 `id/seq` 를 대조하고, 첫 연결의 누락 안내는 같은 handler 가 만든 것을 손으로 쓴 사건과 따로 대조한다.
 `events.sse` 에는 누락 안내가 없고, 파서가 안내를 건너뛰는지는 `unknown.sse` 가 본다.
@@ -2682,6 +2684,7 @@ module 진입점의 `finish_worker_boot`와 worker env 표식도 새 계약에 �
 
 배포 뒤에는 profile 관리·설정 저장, 연결 도구 호출과 승인, 실행 시작부터 SSE 답·도구·중간 안내·종료,
 캐시 사용량과 실제 provider/model, 원본 사진의 native 결과, cron의 관리 writer 적재를 왕복 확인한다.
+도구를 여러 번 부르는 긴 답 하나를 넣어, 사건 관측이 완료로 남는지도 확인한다.
 운영 값과 실행 절차는 `fos-home-infra`가 갖는다.
 
 #### v0.21.3에서 v0.21.5까지
