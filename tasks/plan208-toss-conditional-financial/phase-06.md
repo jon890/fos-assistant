@@ -51,6 +51,9 @@ approve가 저장 원문을 쓰고 EXECUTING 커밋 뒤 ticket1회·executeAppro
 실제 Spring claim HTTP의 서명 인증과 consumeTicket 커밋 뒤에만 SDK가 금융 요청을 보내게 연결한다. 실제 인증·DB 소비는 이 테스트의 책임이다.
 DB-INTENT는 clientOrderId만 변경하거나 expected_conditional_order만 변경해도 동일 의도 PENDING/EXECUTING/UNKNOWN이 차단되는지 실제 conflicts 구현으로 확인한다. CREATE AAPL/MSFT는 서로 다른 키여서 차단하지 않고 MODIFY/CANCEL의 다른 대상 ID도 구분한다. 사용자 잠금과 실제 H2/MySQL DB를 쓰며 가짜 conflicts 결과를 주입하지 않는다. supersedes_unknown_action_id는 NULL이다.
 
+조건주문 금액 규칙을 phase-02 gate 에 더한다. leg 마다 `quantity × max(orderPrice, triggerPrice)` 를 한 건 금액으로 보고 OTO 는 두 leg 중 큰 값을 쓴다. MARKET 조건주문은 주문가가 없어 계속 거절한다.
+하루 합계에는 생성만 그 금액으로 넣고 정정은 바뀐 뒤 금액으로 바꿔 센다. 이 규칙이 들어오기 전까지 gate 는 조건 생성과 정정을 닫는다.
+
 ### 3. 수신·실패 주입·MySQL 회귀
 
 정상 CREATE/MODIFY 금융 POST1, CANCEL DELETE1, replay 추가 전송0회를 목적지에서 센다. auth·GET·claim counter는 구분한다.

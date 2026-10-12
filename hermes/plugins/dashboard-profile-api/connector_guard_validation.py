@@ -135,7 +135,10 @@ def _prepare_result(payload, original_args, manifest, tool, env):
         value = args.get(field["arg"])
         _require(isinstance(value, str) and 1 <= len(value.encode("utf-8")) <= 128
                  and value == env.get(fields[field["field"]]["env"]))
-    if summary.get("orderKind") == "CONDITIONAL":
+    # 검증 분기는 prepare 가 낸 summary 가 아니라 manifest 가 도구에 선언한 종류가 정한다
+    kind = manifest["execution_guard"].get("kinds", {}).get(tool, "ORDER")
+    _require((summary.get("orderKind") == "CONDITIONAL") == (kind == "CONDITIONAL"))
+    if kind == "CONDITIONAL":
         from .connector_conditional_validation import validate_conditional_prepare
         _require(scopes == [{"arg": "account_seq", "field": "account"}])
         return validate_conditional_prepare(payload, original_args, operation, {key: args[key] for key in scope_keys})

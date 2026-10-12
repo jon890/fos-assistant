@@ -1,0 +1,252 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import test from "node:test";
+import { EXIT, NON_REQUIRED, checkRequired, collect, decide, execute, remergeReasons } from "../../scripts/pr/merge-ready.mjs";
+
+const REQUIRED = ["unit", "backend"];
+const ok = (name: string) => ({ name, state: "SUCCESS", startedAt: "2026-10-12T01:00:00Z" });
+const base = {
+  required: REQUIRED,
+  runs: [ok("unit"), ok("backend")],
+  isDraft: false,
+  mergeable: "MERGEABLE",
+  mergeStateStatus: "CLEAN",
+  unresolvedThreads: 0,
+  containsMain: true,
+  remergeReasons: [],
+  headRefOid: "abc",
+  headRecheck: "abc",
+};
+
+test("필수 검사를 이름으로 대조하고 아직 없는 검사는 도는 중으로 본다", () => {
+  assert.deepEqual(checkRequired(REQUIRED, [ok("unit")]), { pending: ["backend"], failed: [] });
+  assert.deepEqual(checkRequired(REQUIRED, [ok("unit"), { name: "backend", state: "IN_PROGRESS" }]), { pending: ["backend"], failed: [] });
+  assert.deepEqual(checkRequired(REQUIRED, [ok("unit"), { name: "backend", state: "FAILURE" }]), { pending: [], failed: ["backend(FAILURE)"] });
+  assert.deepEqual(checkRequired(REQUIRED, [ok("unit"), { name: "backend", state: "SKIPPED" }]), { pending: [], failed: ["backend(SKIPPED)"] });
+});
+
+test("같은 이름의 검사가 여러 번 있으면 성공 하나가 실패를 가리지 않는다", () => {
+  const runs = [ok("unit"), ok("backend"), { name: "backend", state: "FAILURE" }];
+  assert.deepEqual(checkRequired(REQUIRED, runs).failed, ["backend(FAILURE)"]);
+});
+
+test("모든 조건이 맞으면 머지 가능이다", () => {
+  assert.deepEqual(decide(base), { verdict: "머지 가능", code: EXIT.READY });
+});
+
+test("필수가 아닌 claude-review 만 실패한 UNSTABLE 은 머지할 수 있다", () => {
+  const unstable = { ...base, mergeStateStatus: "UNSTABLE", runs: [...base.runs, { name: NON_REQUIRED, state: "FAILURE" }] };
+  assert.equal(decide(unstable).code, EXIT.READY);
+  const other = { ...unstable, runs: [...base.runs, { name: NON_REQUIRED, state: "FAILURE" }, { name: "lint", state: "FAILURE" }] };
+  assert.equal(decide(other).code, EXIT.BLOCKED);
+  assert.match(decide(other).verdict, /lint/);
+  // 실패한 검사를 하나도 찾지 못한 UNSTABLE 은 원인을 모르므로 통과시키지 않는다.
+  assert.equal(decide({ ...base, mergeStateStatus: "UNSTABLE" }).code, EXIT.BLOCKED);
+});
+
+test("UNSTABLE 에서 필수가 아닌 검사가 도는 중이면 대기, mergeable 계산 중이면 UNSTABLE 이어도 대기다", () => {
+  const running = { ...base, mergeStateStatus: "UNSTABLE", runs: [...base.runs, { name: NON_REQUIRED, state: "IN_PROGRESS" }] };
+  assert.equal(decide(running).code, EXIT.WAIT);
+  const unknown = { ...base, mergeable: "UNKNOWN", mergeStateStatus: "UNSTABLE", runs: [...base.runs, { name: NON_REQUIRED, state: "FAILURE" }] };
+  assert.equal(decide(unknown).code, EXIT.WAIT);
+});
+
+test("허용 목록에 없는 mergeStateStatus 는 막힘이다", () => {
+  for (const status of ["BEHIND", "HAS_HOOKS", "DRAFT"]) assert.equal(decide({ ...base, mergeStateStatus: status }).code, EXIT.BLOCKED, status);
+});
+
+test("도는 중이거나 없는 필수 검사는 대기, 실패는 막힘이다", () => {
+  assert.equal(decide({ ...base, runs: [ok("unit")] }).code, EXIT.WAIT);
+  assert.equal(decide({ ...base, runs: [ok("unit"), { name: "backend", state: "FAILURE" }] }).code, EXIT.BLOCKED);
+  assert.equal(decide({ ...base, mergeStateStatus: "UNKNOWN", mergeable: "UNKNOWN" }).code, EXIT.WAIT);
+});
+
+test("Draft, 충돌, 미해결 스레드, BLOCKED 는 막힘이다", () => {
+  assert.match(decide({ ...base, isDraft: true }).verdict, /^막힘\(Draft/);
+  assert.equal(decide({ ...base, mergeable: "CONFLICTING", mergeStateStatus: "DIRTY" }).code, EXIT.BLOCKED);
+  assert.match(decide({ ...base, unresolvedThreads: 2 }).verdict, /미해결 리뷰 스레드 2개/);
+  assert.equal(decide({ ...base, mergeStateStatus: "BLOCKED" }).code, EXIT.BLOCKED);
+});
+
+test("head 가 main 을 포함하지 않아도 까닭이 없으면 머지 가능, 있으면 다시 합치기다", () => {
+  assert.equal(decide({ ...base, containsMain: false }).code, EXIT.READY);
+  const stale = decide({ ...base, containsMain: false, remergeReasons: ["PR 과 main 이 같은 파일을 고쳤다(a.ts)"] });
+  assert.equal(stale.code, EXIT.REMERGE);
+  assert.match(stale.verdict, /^main 다시 합치기 필요\(PR 과 main 이 같은 파일/);
+});
+
+test("겹치지 않고 위험 경로도 없으면 직전 CI 를 쓴다", () => {
+  assert.deepEqual(remergeReasons(["web/src/a.ts"], ["backend/src/main/java/A.java", "web/src/c.ts"]), []);
+});
+
+test("같은 파일을 고쳤으면 다시 합친다", () => {
+  const reasons = remergeReasons(["web/src/a.ts", "web/src/b.ts"], ["web/src/b.ts"]);
+  assert.equal(reasons.length, 1);
+  assert.match(reasons[0], /같은 파일.*web\/src\/b\.ts/);
+});
+
+test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어느 쪽이 건드려도 다시 합친다", () => {
+  const cases: [string, string][] = [
+    ["backend/src/main/resources/db/migration/V20261012000000__a.sql", "마이그레이션"],
+    ["backend/build.gradle.kts", "빌드와 의존성"],
+    ["web/pnpm-lock.yaml", "빌드와 의존성"],
+    ["backend/gradle/libs.versions.toml", "빌드와 의존성"],
+    ["backend/gradle/wrapper/gradle-wrapper.properties", "빌드와 의존성"],
+    ["hermes/connectors/naver-blog/scripts/test.Dockerfile", "빌드와 의존성"],
+    ["hermes/connectors/gmail/package.json", "빌드와 의존성"],
+    ["test/unit/doc-files.test.ts", "test/unit"],
+    ["hermes/docs/hermes-contract.md", "공유 계약"],
+    ["hermes/connectors/gmail/tests/contracts.test.ts", "공유 계약"],
+    ["test/resources/connector-argument-catalog.json", "공유 계약"],
+    ["test/fixtures/connector-tool-descriptions.json", "공유 계약"],
+    ["test/support/pick-port.ts", "공유 계약"],
+    ["test/e2e/fake-hermes/run-routes.ts", "공유 계약"],
+    ["hermes/tests/fixtures/toss-trading-contract.py", "공유 계약"],
+    ["scripts/ci/ci-paths.mjs", "공유 계약"],
+    ["scripts/dev/check-local.sh", "공유 계약"],
+    [".github/workflows/ci.yml", "공유 계약"],
+  ];
+  for (const [file, label] of cases) {
+    const fromMain = remergeReasons(["web/src/a.ts"], [file]);
+    assert.equal(fromMain.length, 1, file);
+    assert.match(fromMain[0], new RegExp(`^main 이 .*${label}`), file);
+    const fromPr = remergeReasons([file], ["web/src/x.ts"]);
+    assert.match(fromPr[0], new RegExp(`^PR 이 .*${label}`), file);
+  }
+});
+
+test("비슷하지만 위험 경로가 아닌 파일은 직전 CI 를 쓴다", () => {
+  const negatives = ["test/unit-foo/a.ts", "web/src/package.json.ts", "web/src/Dockerfile.md", "backend/src/main/resources/db/seed.sql", "scripts/ci-notes.md", "test/fixtures-old/a.json"];
+  for (const file of negatives) {
+    assert.deepEqual(remergeReasons(["web/src/a.ts"], [file]), [], file);
+  }
+});
+
+test("겹치는 파일이 넷 이상이면 앞의 셋과 나머지 개수를 적는다", () => {
+  const files = ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"];
+  assert.match(remergeReasons(files, files)[0], /\(a\.ts, b\.ts, c\.ts 외 2개\)/);
+});
+
+// gh 와 git 호출을 흉내 낸다. 키는 명령과 인자를 공백으로 이은 앞부분이고 가장 긴 키가 이긴다.
+function fakeRun(overrides: Record<string, { status?: number; stdout?: string }> = {}) {
+  const table: Record<string, { status?: number; stdout?: string }> = {
+    "gh pr view": { stdout: JSON.stringify({ isDraft: false, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", headRefOid: "abc", baseRefName: "main" }) },
+    "gh repo view": { stdout: JSON.stringify({ owner: { login: "o" }, name: "r" }) },
+    "gh api repos/o/r/branches": { stdout: "unit\nbackend\n" },
+    "gh api repos/o/r/actions": { stdout: "2026-10-12T00:59:00Z\n" },
+    "gh pr checks": { status: 8, stdout: JSON.stringify([ok("unit"), ok("backend")]) },
+    "gh api graphql": { stdout: JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [{ isResolved: true }, { isResolved: false }] } } } } }) },
+    "git fetch": {},
+    "git merge-base --is-ancestor": {},
+    "git merge-base origin/main": { stdout: "mb111\n" },
+    ...overrides,
+  };
+  return (command: string, args: string[]) => {
+    const key = [command, ...args].join(" ");
+    const hit = Object.entries(table)
+      .filter(([prefix]) => key.startsWith(prefix))
+      .sort((a, b) => b[0].length - a[0].length)[0];
+    if (!hit) return { status: 1, stdout: "", stderr: `대역에 없는 호출: ${key}` };
+    return { status: hit[1].status ?? 0, stdout: hit[1].stdout ?? "", stderr: "" };
+  };
+}
+
+test("조회한 사실을 모아 판정 입력으로 만든다", () => {
+  const facts = collect("7", fakeRun());
+  assert.deepEqual(facts.required, ["unit", "backend"]);
+  assert.equal(facts.unresolvedThreads, 1);
+  assert.equal(facts.containsMain, true);
+  assert.equal(decide(facts).code, EXIT.BLOCKED);
+});
+
+test("head 가 main 을 포함하지 않으면 CI 시작 시각의 main 과 PR 파일을 비교한다", () => {
+  const run = fakeRun({
+    "git merge-base --is-ancestor": { status: 1 },
+    "git rev-list": { stdout: "deadbeef\n" },
+    "git diff --name-only --no-renames deadbeef": { stdout: "backend/build.gradle.kts\n" },
+    "git diff --name-only --no-renames mb111": { stdout: "web/src/a.ts\n" },
+  });
+  const facts = collect("7", run);
+  assert.equal(facts.containsMain, false);
+  assert.match(facts.remergeReasons.join(), /main 이 빌드와 의존성/);
+});
+
+test("조회하는 동안 head 가 바뀌었으면 대기다", () => {
+  const moved = decide({ ...base, headRecheck: "def" });
+  assert.equal(moved.code, EXIT.WAIT);
+  assert.match(moved.verdict, /abc.*def/);
+});
+
+test("CI 기준 main 은 workflow run 생성과 검사 시작 중 이른 시각으로 정한다", () => {
+  const calls: string[][] = [];
+  const inner = fakeRun({ "git merge-base --is-ancestor": { status: 1 }, "git rev-list": { stdout: "deadbeef\n" }, "git diff": { stdout: "" } });
+  collect("7", (command: string, args: string[]) => {
+    calls.push([command, ...args]);
+    return inner(command, args);
+  });
+  const revList = calls.find((call) => call[1] === "rev-list");
+  assert.ok(revList?.includes("--before=2026-10-12T00:59:00Z"));
+});
+
+test("PR 쪽 변경 파일도 옛 경로까지 구해 main 의 수정과 겹침을 잡는다", () => {
+  const run = fakeRun({
+    "git merge-base --is-ancestor": { status: 1 },
+    "git rev-list": { stdout: "deadbeef\n" },
+    "git diff --name-only --no-renames deadbeef": { stdout: "web/src/old.ts\n" },
+    "git diff --name-only --no-renames mb111": { stdout: "web/src/old.ts\nweb/src/new.ts\n" },
+  });
+  assert.match(collect("7", run).remergeReasons.join(), /같은 파일.*web\/src\/old\.ts/);
+});
+
+test("필수 검사 조회가 실패하거나 0개면 판정하지 않는다", () => {
+  assert.throws(() => collect("7", fakeRun({ "gh api repos/o/r/branches": { status: 1 } })), /브랜치 보호 필수 검사 조회 실패/);
+  assert.throws(() => collect("7", fakeRun({ "gh api repos/o/r/branches": { stdout: "" } })), /0개/);
+});
+
+test("gh pr checks 가 출력 없이 끝나거나 시작 시각이 없으면 판정하지 않는다", () => {
+  assert.throws(() => collect("7", fakeRun({ "gh pr checks": { status: 2, stdout: "" } })), /check run 조회 실패/);
+  const noStart = { "git merge-base --is-ancestor": { status: 1 }, "gh api repos/o/r/actions": { stdout: "" } };
+  const zeroStart = JSON.stringify([ok("unit"), ok("backend")].map((r) => ({ ...r, startedAt: "0001-01-01T00:00:00Z" })));
+  assert.throws(() => collect("7", fakeRun({ ...noStart, "gh pr checks": { status: 8, stdout: zeroStart } })), /시작 시각/);
+});
+
+test("필수 검사 조회 밖의 조회 실패도 판정하지 않는다", () => {
+  assert.throws(() => collect("7", fakeRun({ "gh pr view": { status: 1 } })), /PR 조회 실패/);
+  assert.throws(() => collect("7", fakeRun({ "gh api graphql": { status: 1 } })), /리뷰 스레드 조회 실패/);
+  assert.throws(() => collect("7", fakeRun({ "git fetch": { status: 1 } })), /git fetch 조회 실패/);
+});
+
+test("리뷰 스레드가 여러 페이지면 모두 센다", () => {
+  const page = (nodes: { isResolved: boolean }[], next: string | null) => JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: next !== null, endCursor: next }, nodes } } } } });
+  const pages = [page([{ isResolved: false }], "c1"), page([{ isResolved: false }, { isResolved: true }], null)];
+  const inner = fakeRun();
+  let call = 0;
+  const run = (command: string, args: string[]) => (command === "gh" && args[1] === "graphql" ? { status: 0, stdout: pages[call++], stderr: "" } : inner(command, args));
+  assert.equal(collect("7", run).unresolvedThreads, 2);
+  assert.equal(call, 2);
+});
+
+test("execute 는 판정 줄과 종료 코드를 낸다", () => {
+  const out: string[] = [];
+  const io = { log: (line: string) => out.push(line), error: (line: string) => out.push(line) };
+  const ready = { ...collect("7", fakeRun({ "gh api graphql": { stdout: JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [] } } } } }) } })) };
+  assert.equal(execute(["7"], { ...io, collectFacts: () => ready }), EXIT.READY);
+  assert.equal(out[0], "head: abc");
+  assert.equal(out.at(-1), "머지 가능");
+  out.length = 0;
+  assert.equal(execute(["7"], { ...io, collectFacts: () => collect("7", fakeRun()) }), EXIT.BLOCKED);
+  assert.match(out.at(-1) ?? "", /^막힘\(미해결 리뷰 스레드 1개\)/);
+  out.length = 0;
+  assert.equal(execute(["7"], { ...io, collectFacts: () => collect("7", fakeRun({ "gh api repos/o/r/branches": { stdout: "" } })) }), EXIT.LOOKUP);
+  assert.match(out[0], /0개/);
+});
+
+test("PR 번호가 없거나 숫자가 아니면 종료 코드 2 로 끝난다", () => {
+  const out: string[] = [];
+  const io = { log: () => {}, error: (line: string) => out.push(line) };
+  assert.equal(execute([], io), EXIT.LOOKUP);
+  assert.equal(execute(["abc"], io), EXIT.LOOKUP);
+  assert.match(out[0], /사용법/);
+  const result = spawnSync("node", ["scripts/pr/merge-ready.mjs"], { encoding: "utf8" });
+  assert.equal(result.status, EXIT.LOOKUP);
+});

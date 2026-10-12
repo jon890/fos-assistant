@@ -489,9 +489,10 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 발급 함수를 운영 승인이나 controller에서 호출하지 않으며 금융 위험도 판정을 바꾸지 않는다.
 
 카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
-정확한 키는 `protocol,prepare_tool,scope_fields,operations`이며 protocol은 `approval-claim-v1`이다.
+정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v1`이다.
 prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
+kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
 scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다.
 카탈로그 원문에서 중복 키와 뒤따르는 JSON을 먼저 거절하고, 보호 선언의 타입이나 키를 보충하지 않는다.
 이 읽기 계약은 plugin producer나 설치 지원 확인, 금융 노출의 근거가 아니다.

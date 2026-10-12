@@ -274,7 +274,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 | 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 없음 (#507 후속) |
 | 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 없음 (#507 후속) |
 | 공개 진입점 연결 | 정책 판정과 승인 API 가 FINANCIAL 을 producer 와 금융 승인으로 보낸다. 토스 서버와 manifest 가 두 도구를 등록한다 | 없음. producer 와 금융 승인은 package-private 이다 |
-| 승인 카드 표시 | 승인 카드가 저장한 summary(계좌 끝 네 자리, 종목, 방향, 수량, 가격, 정규화)를 보인다. 모델 인자만 보이고 승인하지 않는다 | 없음 |
+| 승인 카드 표시 | 승인 카드가 저장한 summary(종목, 방향, 수량, 가격, 정규화)를 보인다. 계좌는 summary 가 아니라 Control Plane 이 실제 전송 scope(`account_seq`)와 연결의 공개 칸, 허용 목록에서 만들어 보인다. 모델 인자만 보이고 승인하지 않는다 | 없음 |
 
 계획은 `tasks/plan208-toss-conditional-financial/` 이 갖는다.
 
@@ -287,7 +287,9 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 2. 계좌 허용 목록에 쓸 계좌 하나만 있고, 주문 상한이 아래 주문을 겨우 담을 만큼 작은지 확인한다
 3. kill switch 를 켠다. 켜는 것은 소유자가 그 자리에서 승인한다
 4. 대화에서 국내 종목 하나를 1주, 당일 하한가에 가까워 체결되지 않을 지정가로 매수하라고 요청한다. 가격은 `get_price_limits` 와 `get_orderbook` 으로 먼저 읽는다
-5. 승인 카드의 계좌 끝 네 자리, 종목, 방향, 수량, 가격이 요청과 같은지 보고 승인한다
+   주문은 국내 정규장 안에서 넣고, 장 시작과 마감의 동시호가 시간과 마감 직전은 피한다. 정규장 밖에서 넣으면 토스가 예약 주문으로 받거나 거절해 미체결 주문 하나와 취소를 확인하지 못할 수 있다.
+   그 종목이 하한가로 내려가면 이 주문은 체결된다. 그때의 최대 손실은 1주 가격이다
+5. 승인 카드의 계좌가 허용 목록에 적은 그 계좌인지, 종목, 방향, 수량, 가격이 요청과 같은지 보고 승인한다. 카드의 계좌는 Control Plane 이 실제 전송 계좌에서 만든 값이다. summary 의 끝 네 자리는 커넥터가 낸 값이라 계좌 확인의 근거로 쓰지 않는다
 6. `list_orders` 로 미체결 주문이 하나만 생겼는지 본다. 토스증권 앱에서도 같은 주문 하나를 확인한다
 7. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
 8. kill switch 를 끈다
@@ -505,7 +507,7 @@ CANCEL의 symbol 등 원주문 표시 값은 실행 입력에 복제하지 않�
 현재 Python connector_guard_validation._prepare_result는 일반 주문 SUMMARY와 orderId/side/timeInForce를 요구하므로 조건주문을 거절한다.
 Spring ConnectorExecutionSnapshot도 일반 주문의 SUMMARY/ORIGINAL/EXPECTED만 허용하며 requestKey는 expected_order/clientOrderId 이외의 값을 문자열로 요구한다. leg 객체를 그대로 넣으면 실패한다.
 Python에 별도 connector_conditional_validation.py, Spring에 ConnectorConditionalSnapshot을 두고 조건 summary와 실행 입력의 정확한 키·타입·공식 분기·정규화 전후를 검증한다.
-기존 외피 `{v:1,executionArgs,summary}`와 approval-claim-v1, 바이트·깊이 상한은 유지한다. orderKind로 검증 분기를 고르되 금융 권한은 기존 guard·현재 바인딩·서명·DB 소비가 정한다.
+기존 외피 `{v:1,executionArgs,summary}`와 approval-claim-v1, 바이트·깊이 상한은 유지한다. 검증 분기는 manifest `execution_guard.kinds` 가 도구에 선언한 종류가 고르고, summary 의 orderKind 는 그 종류와 같아야 한다. 금융 권한은 기존 guard·현재 바인딩·서명·DB 소비가 정한다.
 일반 주문 분기를 수정해 임의 JSON을 허용하지 않는다. 조건 분기는 신규 summary 키가 정확히 일치할 때만 선택하고 모델 인자·실행 인자·표시 값을 함께 검증한다.
 Python RESERVED와 Spring RESERVED_SCOPE_NAMES는 다음 전체 집합으로 같게 한다.
 `orderId symbol market currency side quantity orderAmount price orderType timeInForce status filledQuantity execution clientOrderId expected_order confirmHighValueOrder userId connectionId tool orderKind account operation original normalization conditionalOrderId type expireDate first second expected_conditional_order orderSide triggerPrice targetProfitRate orderPrice triggeredOrderId createdAt`.
@@ -606,7 +608,10 @@ UNKNOWN은 자동 재실행·ticket 재발급·UUID 교체를 하지 않는다. 
 ### 조건주문 snapshot 소비 계약
 
 Python의 `connector_conditional_validation`과 Spring의 `ConnectorConditionalSnapshot`은 조건주문 prepare 결과를 검증한다.
-`summary.orderKind=CONDITIONAL`인 경우에만 이 분기를 고른다. 일반 주문은 기존 정규화 의미 보존 규칙을 유지하며 `ConnectorOrderSnapshot`이 검증한다.
+manifest `execution_guard.kinds` 가 도구를 `CONDITIONAL` 로 선언한 경우에만 이 분기를 고르고, 그 도구의 summary 는 `orderKind=CONDITIONAL` 이어야 한다.
+선언하지 않은 도구는 일반 주문(`ORDER`)이며 조건 summary 를 내면 거절한다. prepare 가 낸 summary 가 분기를 정하면 사람은 조건주문 카드를 승인하는데 일반 도구가 불리는 일이 생긴다.
+Spring 은 producer 와 승인·claim 재검증(`ConnectorExecutionCurrent`) 두 곳에서, Python 은 `_prepare_result` 에서 같은 대조를 한다.
+일반 주문은 기존 정규화 의미 보존 규칙을 유지하며 `ConnectorOrderSnapshot`이 검증한다.
 이 구현은 금융 권한을 발급하지 않는다. 금융 도구의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
 실제 producer, SDK 금융 전송, claim 뒤 원주문 조회, 등록과 운영 개방은 아직 연결하지 않았다.
 
