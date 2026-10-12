@@ -208,7 +208,6 @@ class ContentDraftJobLoopbackTest extends ContentDraftJobFixture {
         }
     }
 
-
     private final class FixtureProcess implements AutoCloseable {
         private final Process process;
         private final BufferedReader reader;

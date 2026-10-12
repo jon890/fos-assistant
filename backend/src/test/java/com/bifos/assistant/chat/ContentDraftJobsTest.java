@@ -47,7 +47,9 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
     @Test
     @DisplayName("늦은 terminal 조회는 UNKNOWN job을 해소하고 UNKNOWN 승인 줄과 시작 횟수는 보존한다")
     void resolvesUnknownJobWithoutRestartingUnknownAction() {
-        starter.answer(call -> { throw new IllegalStateException("응답 유실"); });
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
         contentApproval.approve(owner, request.actionId(), null);
@@ -487,12 +489,6 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
             return claim.get(10, TimeUnit.SECONDS);
         }
     }
-
-
-
-
-
-
 
 
     private HttpResponse<String> post(String body) throws Exception {

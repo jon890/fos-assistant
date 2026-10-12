@@ -194,6 +194,7 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
         return snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), origin.id()).snapshotId();
     }
 
+
     protected void catalog(boolean start) {
         var declaration = new ConnectorSnapshotDeclaration("content-snapshot-v1", "compile_snapshot", "start_snapshot", "status_snapshot",
             Map.of("compile", true, "start", start, "status", start));

@@ -186,7 +186,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                     case SUCCEEDED -> action.succeed(null, clock.instant());
                     case FAILED -> action.fail("unavailable", null, clock.instant());
                     case UNKNOWN -> action.unknown(clock.instant());
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
             return views(List.of(currentJob)).getFirst();
