@@ -63,6 +63,7 @@ gh pr checks "$PR" --watch
 gh pr ready "$PR"
 ```
 
+main push 는 가벼운 검사만 돌고 전체 검사는 매일 정기 실행이 돌린다. 그래서 main 에 들어가는 head 의 PR CI 가 마지막 전체 검사다.
 main 에 새 커밋이 없으면 합칠 것이 없다. 같은 head 의 CI 결과를 쓰고, Ready 전환만으로 CI 를 다시 돌리지 않는다.
 
 **Draft CI 뒤에 들어온 main 커밋이 5단계의 예외 조건을 모두 만족하면 합치지 않고 그대로 Ready 로 바꾼다.**

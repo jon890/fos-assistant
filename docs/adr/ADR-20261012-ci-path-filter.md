@@ -35,7 +35,8 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
      backend 테스트 소스만 바꾸면 건너뛰되, 브라우저가 쓰는 `testsupport` 와 테스트 리소스는 브라우저도 돌린다.
      Hermes 코드만 바꾸면 브라우저는 건너뛰되, 커넥터 카드 검사가 읽는 manifest 와 아이콘은 브라우저도 돌린다.
      workflow 와 경로 판정 자체를 바꾸면 전체 검사를 돌린다.
-4. push 와 정기 실행은 언제나 모든 job 을 돌린다. 규칙이 놓친 의존은 main 에서 드러난다.
+4. 정기 실행과 수동 실행(`workflow_dispatch`)은 언제나 모든 job 을 돌린다. 규칙이 놓친 의존은 정기 실행에서 드러난다.
+   main push 는 가벼운 검사만 돈다(아래 「main push 는 가벼운 검사만 돈다」).
 5. `backend`, `web`, `e2e`, `hermes`와 폭별 브라우저 필수 검사 job은 결과를 판정한다.
    `web`은 quality에 합친 웹 단계의 결과를 받고, quality job 자체도 성공했는지 확인한다.
    규칙은 `ci-paths.mjs gate`가 갖는다.
@@ -66,7 +67,7 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
 
 ### 감수할 것
 
-- 규칙이 실제 의존보다 좁으면 PR 에서 깨진 것을 main push 에서야 본다. 새 job 입력을 만들면 `RULES` 를 함께 고친다.
+- 규칙이 실제 의존보다 좁으면 PR 에서 깨진 것을 다음 정기 실행에서야 본다. 새 job 입력을 만들면 `RULES` 를 함께 고친다.
 - 브라우저 서버는 `smokeRun` 의 테스트 classpath 로 기동한다. 테스트 지원 API 와 리소스도 브라우저 입력으로 관리한다.
 - 커넥터 카드 검사가 읽는 manifest 와 아이콘은 Hermes 안에 있어도 브라우저 입력으로 관리한다.
 - PR CI 가 판정한 바뀐 파일은 그 CI 를 돌린 시점의 main 기준이다. 뒤에 main 이 움직여도 PR 이 바꾼 파일은 같으므로 판정은 그대로 쓴다.
@@ -166,3 +167,26 @@ workflow 회귀 검사는 필수 이름과 job 수, 경로별 설치, 웹 단계
 job 수가 23개에서 19개로 줄어든 것은 확인했지만, 이 표본의 전체 시간은 앞의 표본보다 길었다.
 동시 PR과 main CI의 실행량, 캐시와 코드가 달라 전체 시간 단축이나 대기 감소를 이 결과로 입증할 수 없다.
 짧은 최종 판정도 runner를 기다렸으므로, 실행 시간과 대기 시간을 나눠 계속 판단한다.
+
+### main push 는 가벼운 검사만 돈다
+
+GitHub Free 의 동시 job 20개를 PR CI 와 main push CI 가 나눠 쓴다.
+머지마다 도는 main push 의 전체 검사가 job 약 20개를 차지해, 이어진 PR CI 가 줄을 섰다. main push run 하나가 34분 대기한 것을 실측했다.
+
+main 에 들어오는 커밋은 최신 main 을 포함한 head 로 PR CI 를 통과했거나 `pr-merge` 스킬 5단계의 예외를 만족한 것이다.
+같은 검사를 push 에서 다시 돌리는 가치가 낮아 다음과 같이 나눈다.
+
+| 실행 | 도는 것 | 실제 job 수 |
+| --- | --- | ---: |
+| main push | `public-safe`, `unit`, `quality`(웹 테스트·typecheck·빌드 포함)와 판정 job 6개 | 9 |
+| 정기 실행, 수동 실행 | 모든 검사 | 전체 검사 PR 과 같다 |
+
+- 판정 job 은 `backend`, `e2e`, `hermes`, `browser-*` 가 생략되면 통과로 보고하는 짧은 job 이다. push 의 실제 job 은 전체 검사 때의 19개에서 9개로 줄고, 그중 오래 도는 것은 quality 하나다.
+- 정기 실행은 하루 한 번(한국 시간 04:23)으로 둔다. 전체 검사가 한 번 도는 데 30분 안팎이 걸리고, 이 시간대는 PR 이 거의 없어 PR CI 와 한도를 다투지 않는다.
+  push 에서 뺀 검사가 깨지면 늦어도 하루 안에 드러난다. 더 자주 돌릴 이유는 아직 없다.
+- 필수 검사 이름 9개는 PR 에서 그대로 결과를 낸다. main push 는 필수 검사 대상이 아니므로 브랜치 보호는 바꾸지 않는다.
+- 정기 실행이 실패하면 실패한 run 이 Actions 에 남고, 브라우저 실패는 기존 `browser-failures` job 이 이슈로 모은다.
+  백엔드, e2e, Hermes 실패에 이슈를 따로 열지는 않는다. 새 외부 연동을 만들지 않는다는 제약을 지키고, 이슈 자동화는 같은 실패가 반복된 것을 본 뒤에 더한다.
+  이 job 은 정기 실행과 수동 실행의 main 실패만 모은다. push 는 browser 를 돌리지 않으므로 대상에서 뺐다.
+
+되돌릴 때는 `scripts/ci/ci-paths.mjs` 의 `PUSH_JOBS` 와 `ci.yml` 의 `browser-failures` 조건을 함께 고친다.
