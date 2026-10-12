@@ -345,12 +345,14 @@ FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장
 
 | 도구 | 인자 | 결과 |
 | --- | --- | --- |
-| `content_draft_preview` | `{draftId, revision, bindingId}` | `ContentDraftSnapshotView`. canonical preview와 포함·빠진 사진 ID이며 파일명·경로·compiled payload는 없다 |
+| `content_draft_preview` | `{draftId, revision, bindingId?}` | `ContentDraftSnapshotView`. canonical preview와 포함·빠진 사진 ID이며 파일명·경로·compiled payload는 없다 |
 | `content_draft_save` | `{snapshotId}` | `ContentDraftSaveRequestView`. 같은 snapshot의 재호출은 앞의 승인 줄과 job을 그대로 돌려준다 |
 
 정의와 처리는 `mcp.application.McpContentDraftSnapshots`가 맡고 등록 순서는 `content_draft_read` 뒤, `memory_remember` 앞이다.
 인자 검사와 오류 변환, 실행 전후 별도 읽기 트랜잭션의 현재 caller 검사는 「MCP와 배치」의 원고 도구와 같다. 사후 검사 실패는 이미 만든 snapshot·승인 줄을 되돌리지 않고 결과만 차단한다.
-bindingId는 정수이고 소유자·profile·실행·파일 경로 인자는 받지 않는다. 실행할 profile과 커넥터는 그 바인딩에서 정한다.
+bindingId는 선택 정수이고 소유자·profile·실행·파일 경로 인자는 받지 않는다. 실행할 profile과 커넥터는 그 바인딩에서 정한다.
+모델은 바인딩 번호를 알 경로가 없으므로 bindingId를 생략할 수 있다. 생략하면 서명된 origin의 에이전트에 붙은 요청자 연결 가운데 catalog가 snapshot을 선언한 커넥터의 바인딩이 정확히 하나일 때만 그것을 쓴다.
+0개나 2개 이상이면 `VALIDATION_FAILED`와 고정 까닭 `message`를 isError 결과로 돌려주며 snapshot을 만들지 않는다. 지정한 bindingId도 같은 에이전트·요청자 범위인지 preview가 검사한다.
 살펴보기 허용 집합은 넓히지 않는다. fos-ctx 서명 필수 목록과 실행 사건 가림에도 두 도구를 넣는다.
 
 | REST GET (`/api/v1/chat/conversations/{conversationId}` 아래) | 응답 |
@@ -700,4 +702,21 @@ Alpine 위험 수용, 원본 파일 순서 실증의 미완료 상태, 실제 �
 | H2·Flyway MySQL 8.4 | CHECK와 FK 유효, CAS 경쟁·삭제 실제 갱신·새 저장소 SQL 실행 |
 
 운영 계정의 새 표 권한과 배포 뒤 실제 MCP 왕복은 `fos-home-infra`에서 확인한다.
+
+### 배포 뒤 원격 확인
+
+로컬 구현 검증에서는 운영 브라우저·실계정·승인·저장·글 조회를 실행하지 않는다.
+모든 구현 단계를 배포하고 본문 없는 진단 정책의 구현·가림 검증을 마친 뒤, 새로 승인한 지정 테스트 글로만 확인한다. 기존 승인 영수증을 재사용하지 않는다.
+
+| 선행 조건 | 확인 항목 | 기대값 |
+| --- | --- | --- |
+| 배포와 진단 정책 수락 | 실제 Hermes MCP·dashboard HTTP·CP·worker 왕복 | 승인 revision·hash·binding·jobId가 일치하고 start는 1회 |
+| 같은 저장 작업을 시작한 뒤 | 대화 끊김·재접속·조회 timeout·gateway와 CP 재시작 | 같은 job만 조회하고 추가 저장·승인·start는 0회 |
+| 새로 승인한 실패 주입 | 클릭 직전·직후 중단과 원고 수정·삭제·실제 사용자와 에이전트 철회·CANCELLED 커밋 | save claim 전은 클릭 차단, claim 뒤 불확실성은 UNKNOWN, 자동 재시도 없음 |
+| 전체 연결 구현 완료 | 합성 표식 30장과 manifest·실제 전송 bytes·포함과 빠진 ID | 입력 대응을 위치·ID·지문으로 판정하고 내용 판독은 따로 판정 |
+| 실제 component 형태 관측과 새 저장·읽기 승인 | 업로드 alias와 저장 뒤 다시 읽은 실제 component 대응 | 관측 근거가 있는 사진만 원본 대응 성공, 누락·중복·이름 변경은 미확인 |
+
+EXECUTING 바인딩 해제·계정 변경은 실제 API의 기존 거절을 확인한다. 해제 성공으로 claim 차단을 증명하지 않으며 stop 응답만으로 취소 커밋을 대신하지 않는다.
+실제 사진 component와 alias 보존은 아직 확인하지 않았다. projection 번호·CDN basename·사진 수로 성공을 대신하지 않는다.
+운영 값과 실행 방법은 `fos-home-infra`가 갖고 이 문서에는 확인 결과만 남긴다.
 운영 값이나 실행 명령은 이 문서에 두지 않는다.
