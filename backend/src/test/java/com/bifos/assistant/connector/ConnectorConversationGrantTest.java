@@ -388,6 +388,37 @@ class ConnectorConversationGrantTest {
 
 
     @Test
+    @DisplayName("선언이 대화 허락을 닫으면 정리가 유효한 허락을 거두고, 다시 열어도 앞선 허락은 돌아오지 않는다")
+    void closedDeclarationRevokesConversationGrant() {
+        service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);
+        ConnectorManifest closed = new ConnectorManifest(
+            DECLARING.id(),
+            DECLARING.title(),
+            DECLARING.description(),
+            DECLARING.fields(),
+            DECLARING.verifyTool(),
+            DECLARING.mcpServer(),
+            DECLARING.toolsets(),
+            DECLARING.attachments(),
+            DECLARING.schema(),
+            DECLARING.tools().stream()
+                .map(tool -> WRITE.equals(tool.name())
+                    ? new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", true, List.of(), null, Map.of(), false)
+                    : tool)
+                .toList());
+        when(connector.readCatalog()).thenReturn(List.of(closed));
+        ConnectorCatalogTimes.expire();
+
+        assertThat(service.revokeClosedConversationGrants(Instant.now())).isEqualTo(1);
+        assertThat(service.revokeClosedConversationGrants(Instant.now())).as("거둔 줄은 다시 세지 않는다").isZero();
+
+        when(connector.readCatalog()).thenReturn(List.of(DECLARING));
+        ConnectorCatalogTimes.expire();
+        assertThat(ask(root, WRITE, "{\"text\":\"다시 연 뒤\"}").allowed()).isFalse();
+    }
+
+
+    @Test
     @DisplayName("기다리던 카드 둘을 모두 대화 허락과 함께 승인해도 유효한 허락은 한 줄이고, 다시 묻기 한 번으로 모두 거둔다")
     void sameToolKeepsOneActiveConversationGrant() {
         UUID first = ask(root, WRITE, ARGS).actionId();

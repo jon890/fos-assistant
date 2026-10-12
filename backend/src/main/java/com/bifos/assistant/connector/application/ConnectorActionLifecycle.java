@@ -110,6 +110,31 @@ class ConnectorActionLifecycle {
     }
 
 
+    /**
+     * 지금 선언이 대화 허락을 닫은 도구의 유효한 대화 허락 줄을 거둔다(ADR-20261012 / conversation-grant).
+     *
+     * <p>까닭과 건드리지 않는 줄은 {@link #revokeClosedGrants} 와 같다. 선언이 닫혔다 다시 열려도 앞선 허락이 되살아나지 않는다.
+     *
+     * @return 거둔 건수
+     */
+    int revokeClosedConversationGrants(Instant now) {
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        List<Long> closed = conversationGrants.findActive(now).stream()
+            .filter(grant -> manifests
+                .computeIfAbsent(grant.connectorId(), details::readManifest)
+                .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
+                .filter(declared -> !declared.conversationGrantable())
+                .isPresent())
+            .map(ConnectorConversationGrant::id)
+            .toList();
+        if (closed.isEmpty()) {
+            return 0;
+        }
+        Integer revoked = transactions.execute(status -> conversationGrants.revokeAll(closed, now));
+        return revoked == null ? 0 : revoked;
+    }
+
+
     /** 허락을 거둔다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다. */
     void revokeGrant(CurrentUser user, Long grantId) {
         ConnectorToolGrant grant = grants.findById(grantId)

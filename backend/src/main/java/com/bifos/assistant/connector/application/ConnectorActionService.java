@@ -280,6 +280,17 @@ public class ConnectorActionService {
 
 
     /**
+     * 지금 선언이 대화 허락을 닫은 도구의 유효한 대화 허락 줄을 거둔다(ADR-20261012 / conversation-grant). 규칙은
+     * {@link #revokeClosedGrants} 와 같다.
+     *
+     * @return 거둔 건수
+     */
+    public int revokeClosedConversationGrants(Instant now) {
+        return lifecycle.revokeClosedConversationGrants(now);
+    }
+
+
+    /**
      * 그 대화에서 계속 허용 중인 도구다. 지금 선언이 대화 허락을 닫은 도구는 내지 않는다.
      *
      * @param conversationId 주인인 것을 이미 확인한 대화의 번호

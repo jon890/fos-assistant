@@ -27,5 +27,6 @@ public class ConnectorActionExpirer {
         actions.expire(now);
         actions.markStale(now.minus(STALE_EXECUTION), now);
         actions.revokeClosedGrants(now);
+        actions.revokeClosedConversationGrants(now);
     }
 }

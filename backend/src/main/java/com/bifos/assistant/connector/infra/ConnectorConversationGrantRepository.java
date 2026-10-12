@@ -38,6 +38,25 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
         @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("now") Instant now);
 
 
+    /** 선언이 대화 허락을 닫은 도구의 줄을 찾으려고 모든 사용자의 유효한 대화 허락을 읽는다. */
+    @Query("""
+            select g from ConnectorConversationGrant g
+            where g.revokedAt is null and g.expiresAt > :now
+            order by g.id
+            """)
+    List<ConnectorConversationGrant> findActive(@Param("now") Instant now);
+
+
+    /**
+     * 번호의 대화 허락을 거둔다. 그 사이 사용자가 먼저 거둔 줄은 처음 거둔 시각을 그대로 둔다.
+     *
+     * @return 거둔 건수
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("update ConnectorConversationGrant g set g.revokedAt = :now where g.id in :ids and g.revokedAt is null")
+    int revokeAll(@Param("ids") List<Long> ids, @Param("now") Instant now);
+
+
     /**
      * 그 승인 줄과 함께 준 허락이 아직 유효한가. 결과의 알림 줄이 허락을 함께 알릴지 정한다. 다시 전할 때 이미 거두었거나 기간이
      * 지난 허락을 「다시 묻지 않고 실행해요」 로 알리지 않는다.
