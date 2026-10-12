@@ -1,7 +1,6 @@
 import manifest from "../connector.json";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import { z } from "zod";
@@ -31,6 +30,7 @@ import {
   stateFile,
   writeInput,
 } from "./jobs.ts";
+import { spawnWorker, workerEnvironment } from "./worker-spawn.ts";
 import { cardWouldMask } from "./card-mask.ts";
 import {
   CHANGES_MAX,
@@ -85,27 +85,6 @@ const DEFAULT_SERVER_DEPS: ServerDeps = {
 };
 
 /**
- * 작업 프로세스에 넘기는 env. 연결 칸 값은 파일에 쓰지 않고 env 로만 넘긴다.
- * 작업 프로세스가 사진을 읽을 때도 같은 첨부 디렉터리로 다시 검사하도록 그 env 를 함께 넘긴다.
- */
-function workerEnvironment(env: Env) {
-  const keys = [
-    "PATH",
-    "HOME",
-    "NAVER_BLOG_BROWSER_URL",
-    "NAVER_BLOG_ID",
-    ATTACHMENT_DIR_ENV,
-  ];
-  if (env.NAVER_BLOG_JOB_DIR) keys.push("NAVER_BLOG_JOB_DIR");
-  const picked: Record<string, string> = {};
-  for (const key of keys) {
-    const value = env[key];
-    if (value !== undefined) picked[key] = value;
-  }
-  return picked;
-}
-
-/**
  * 브라우저와 로그인을 확인한 뒤 잠금을 잡고 입력 파일을 써서 분리된 작업 프로세스를 띄운다.
  * 작업 프로세스는 새 세션으로 떠서 대시보드가 이 서버의 프로세스 묶음을 정리해도 남는다.
  * 띄우기 전에 실패하면 잠금과 작업 파일을 지운다.
@@ -136,18 +115,7 @@ async function startJob(
       heartbeat_at: null,
     });
     await writeInput(dir, jobId, input);
-    const child = spawn(
-      process.execPath,
-      [deps.workerEntry, "--worker", path],
-      {
-        detached: true,
-        stdio: "ignore",
-        env: workerEnvironment(env),
-      },
-    );
-    // 띄운 뒤의 오류는 시작 확인이 시간 초과로 알린다.
-    child.on("error", () => {});
-    child.unref();
+    spawnWorker(deps.workerEntry, path, workerEnvironment(env));
   } catch {
     await releaseLock(dir, jobId);
     await rm(path, { force: true });
@@ -217,13 +185,16 @@ async function overwriteDraft(
 /**
  * 작업 상태를 읽고, 돌고 있으면 1초마다 다시 읽어 끝나거나 `waitSeconds` 가 차면 돌려준다.
  * 돌고 있다는 작업의 프로세스가 사라졌거나 멈췄으면 묵은 작업으로 끝내고 잠금을 푼다.
+ * 원고 snapshot job 은 private 조회만 읽으므로 여기서는 없는 작업이다.
  */
 async function draftJob(env: Env, jobId: string, waitSeconds: number) {
   const dir = await openJobDir(env);
   const deadline = Date.now() + waitSeconds * 1_000;
   for (;;) {
     let state = await readState(dir, jobId);
-    if (!state) throw new ToolError("NAVER_BLOG_JOB_NOT_FOUND");
+    // 원고 snapshot job 은 stamp 값이 깨졌어도 공개 조회로 읽거나 묵은 작업으로 끝내지 않는다.
+    if (!state || Object.hasOwn(state, "snapshot_stamp"))
+      throw new ToolError("NAVER_BLOG_JOB_NOT_FOUND");
     if (
       state.status === "running" &&
       !jobAlive(state, Date.parse(state.started_at))

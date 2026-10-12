@@ -9,7 +9,7 @@
     { "number": 1, "status": "done", "note": "PR #463에서 머지했다" },
     { "number": 2, "status": "done", "note": "PR #469에서 머지했다" },
     { "number": 3, "status": "done", "note": "승인 요청·jobId 예약·worker 허가를 구현했다" },
-    { "number": 4, "file": "phase-04.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "status": "in_progress", "note": "PR #480은 커넥터 구현만 완료한다. Python plugin·backend start/status·JVM loopback은 phase-04의 남은 범위다", "execution_profile": "deep" },
     { "number": 5, "file": "phase-05.md", "execution_profile": "standard" }
   ]
 }

@@ -1,3 +1,8 @@
+import {
+  fingerprintOf,
+  type SnapshotGuard,
+  SnapshotGuardError,
+} from "../content-snapshot-guard.ts";
 import { type Block, type DraftInput, readPhoto } from "../draft.ts";
 import {
   ABORTED,
@@ -40,7 +45,9 @@ const SET_FILE = `function (data, name, mime) {
 /** 본문에 들어간 사진 블록 수. */
 export async function imageCount(page: EditorPage) {
   return (
-    (await page.js<number>('document.querySelectorAll(".se-component.se-image").length')) || 0
+    (await page.js<number>(
+      'document.querySelectorAll(".se-component.se-image").length',
+    )) || 0
   );
 }
 
@@ -69,7 +76,12 @@ async function imageUploadedVisible(page: EditorPage, index: number) {
 export async function incompleteImages(page: EditorPage, count: number) {
   const missing = new Set<number>();
   for (let index = 0; index < count; index++) {
-    if (!(await page.waitUntil(() => imageUploadedVisible(page, index), page.photoWait(15))))
+    if (
+      !(await page.waitUntil(
+        () => imageUploadedVisible(page, index),
+        page.photoWait(15),
+      ))
+    )
       missing.add(index);
   }
   // 뒤쪽 사진으로 스크롤하는 동안 앞쪽 사진이 다시 바뀌었는지도 확인한다.
@@ -81,7 +93,8 @@ export async function incompleteImages(page: EditorPage, count: number) {
 /** index 번째 사진을 골라 `문서 너비` 를 적용하고 결과 클래스를 확인한다. */
 async function fitImage(page: EditorPage, index: number) {
   const image = `${IMAGES}[${index}].querySelector('.se-module-image')`;
-  if (!(await page.waitUntil(() => page.mouseClick(image), page.step(10)))) return false;
+  if (!(await page.waitUntil(() => page.mouseClick(image), page.step(10))))
+    return false;
   const fitted = `${IMAGES}[${index}]?.querySelector('.se-component-content-fit') !== null`;
   if (await page.js(fitted)) return true;
   const toolbarShown = async () =>
@@ -94,7 +107,10 @@ async function fitImage(page: EditorPage, index: number) {
     );
   if (!(await page.waitUntil(toolbarShown, page.step(10)))) return false;
   if (!(await click(page, FIT_TOOLBAR))) return false;
-  return page.waitUntil(async () => Boolean(await page.js(fitted)), page.step(10));
+  return page.waitUntil(
+    async () => Boolean(await page.js(fitted)),
+    page.step(10),
+  );
 }
 
 /** 「사진 첨부 방식」 창이 보이면 개별사진을 고른다. */
@@ -129,9 +145,12 @@ async function attachPhoto(
     const opened = await chooser;
     if (!opened) return "파일 선택 창을 가로채지 못했다";
     if (!opened.backendNodeId) return "파일 선택 창에 backendNodeId 가 없다";
-    const resolved = await page.call<{ object?: { objectId?: string } }>("DOM.resolveNode", {
-      backendNodeId: opened.backendNodeId,
-    });
+    const resolved = await page.call<{ object?: { objectId?: string } }>(
+      "DOM.resolveNode",
+      {
+        backendNodeId: opened.backendNodeId,
+      },
+    );
     const objectId = resolved?.object?.objectId;
     if (!objectId) return "파일 input 을 찾지 못했다";
     const result = await page.call("Runtime.callFunctionOn", {
@@ -155,6 +174,8 @@ async function attachPhoto(
  * 사진 자리마다 자리표시 글을 지우고 사진 바이트를 넣는다.
  * 전송이 끝나면 `문서 너비` 를 적용한다. 실패하면 `photo_upload_failed` 와 몇 번째 사진 자리인지다.
  * 사진 파일은 바인딩 주인의 첨부 디렉터리(`attachmentDir`) 아래에서만 읽는다.
+ * `guard` 가 있으면 사진 i 번째(0부터)를 manifest i 번째와 대조한다. 읽은 바이트의 지문과
+ * 그 자리의 authorize 를 통과한 뒤 바로 그 바이트를 넣고, 검사하지 않은 기존 사진이 있으면 시작하지 않는다.
  */
 export async function photos(
   page: EditorPage,
@@ -162,11 +183,21 @@ export async function photos(
   blocks: Block[],
   draftHash: string,
   attachmentDir: string | undefined,
+  guard?: SnapshotGuard,
 ) {
   await setStage(page, draftHash, "photos", false);
   const images = blocks.filter(
-    (block): block is Extract<Block, { type: "image" }> => block.type === "image",
+    (block): block is Extract<Block, { type: "image" }> =>
+      block.type === "image",
   );
+  if (
+    guard &&
+    (guard.manifest.length !== images.length ||
+      images.some(
+        (block, index) => block.file !== guard.manifest[index]!.fileName,
+      ))
+  )
+    throw new SnapshotGuardError("photo_mismatch");
   if (images.length === 0) {
     await setStage(page, draftHash, "photos", true);
     return;
@@ -175,34 +206,53 @@ export async function photos(
     page.fail("photo_upload_failed", message, { photo });
 
   const note = await requireClearScreen(page);
-  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 사진을 넣지 못한다");
+  if (note)
+    throw page.fail(
+      "editor_failed",
+      "화면을 덮은 알림이 있어 사진을 넣지 못한다",
+    );
 
   let inserted = await imageCount(page);
+  if (guard && inserted !== 0) throw new SnapshotGuardError("photo_mismatch");
+  // 루프 안에서 inserted 가 늘어나므로 사진 번호와 manifest 자리는 고정한 시작값으로 센다.
+  const initial = inserted;
   if (inserted > images.length)
-    throw page.fail("editor_failed", `사진이 초안보다 많다: 화면 ${inserted}개, 초안 ${images.length}개`);
+    throw page.fail(
+      "editor_failed",
+      `사진이 초안보다 많다: 화면 ${inserted}개, 초안 ${images.length}개`,
+    );
   const fitted = (await page.js<number>(FITTED_COUNT)) || 0;
   if (fitted !== inserted)
     throw page.fail("editor_failed", "기존 사진 중 문서 너비가 아닌 것이 있다");
   const pending = await incompleteImages(page, inserted);
-  if (pending.length) throw failed(pending[0]! + 1, "기존 사진 중 전송이 끝나지 않은 것이 있다");
+  if (pending.length)
+    throw failed(pending[0]! + 1, "기존 사진 중 전송이 끝나지 않은 것이 있다");
   const visible = await paragraphs(page, BODY_SELECTOR);
   for (const [index, block] of images.slice(0, inserted).entries()) {
     const marker = imagePlaceholder(block);
     if (
       visible.some(
-        (line) => marker === line || (marker.startsWith(line) && line.length >= marker.length - 10),
+        (line) =>
+          marker === line ||
+          (marker.startsWith(line) && line.length >= marker.length - 10),
       )
     )
       throw failed(index + 1, "사진과 자리표시가 함께 남아 있다");
   }
 
   for (const [offset, block] of images.slice(inserted).entries()) {
-    const number = inserted + offset + 1;
+    const number = initial + offset + 1;
     let photo;
     try {
       photo = await readPhoto(input, block.file, attachmentDir);
     } catch {
       throw failed(number, "사진 파일을 읽지 못했다");
+    }
+    if (guard) {
+      const entry = guard.manifest[initial + offset]!;
+      if (fingerprintOf(photo.bytes) !== entry.sourceFingerprint)
+        throw new SnapshotGuardError("photo_mismatch");
+      await guard.authorizePhoto(entry.position);
     }
     if (!(await focusPlaceholder(page, imagePlaceholder(block))))
       throw failed(number, "사진 자리를 찾지 못했다");
@@ -211,7 +261,8 @@ export async function photos(
     try {
       problem = await attachPhoto(page, { ...photo, name: block.file });
     } catch (error) {
-      if (error instanceof EditorError && error.message === ABORTED) throw error;
+      if (error instanceof EditorError && error.message === ABORTED)
+        throw error;
       throw failed(number, "파일 선택 창에 사진을 넣지 못했다");
     }
     if (problem) throw failed(number, problem);
@@ -222,7 +273,8 @@ export async function photos(
     if (!landed) throw failed(number, "사진이 본문에 들어가지 않았다");
     const settled = await page.waitUntil(
       async () =>
-        (await imageUploadedVisible(page, before)) || Boolean(await blockingPopup(page)),
+        (await imageUploadedVisible(page, before)) ||
+        Boolean(await blockingPopup(page)),
       page.photoWait(90),
     );
     if (!settled) throw failed(number, "사진 전송이 끝나지 않았다");
@@ -233,12 +285,16 @@ export async function photos(
     inserted += 1;
     const incomplete = await incompleteImages(page, inserted);
     if (incomplete.length)
-      throw failed(incomplete[0]! + 1, "사진을 배치한 뒤 네이버 주소로 읽지 못한 사진이 있다");
+      throw failed(
+        incomplete[0]! + 1,
+        "사진을 배치한 뒤 네이버 주소로 읽지 못한 사진이 있다",
+      );
   }
 
   if ((await imageCount(page)) !== images.length)
     throw failed(images.length, "사진 개수가 초안과 다르다");
   const incomplete = await incompleteImages(page, images.length);
-  if (incomplete.length) throw failed(incomplete[0]! + 1, "사진 전송이 끝나지 않은 것이 있다");
+  if (incomplete.length)
+    throw failed(incomplete[0]! + 1, "사진 전송이 끝나지 않은 것이 있다");
   await setStage(page, draftHash, "photos", true);
 }

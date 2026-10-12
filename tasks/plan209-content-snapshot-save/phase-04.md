@@ -8,6 +8,18 @@
 
 **범위 외**: UI, 원고 최초 생성, overwrite 변경, 실제 계정·provider 사진 대응, 자동 저장 재시도.
 
+## 진행 상태와 남은 범위
+
+PR #480은 이 단계의 커넥터 구현만 끝낸다. private start·status, 예약 ID 유지, worker 재compile, 사진 바이트 지문, 단계별 authorize, 공개 조회 차단과 대역 검증을 구현했다.
+PR #483의 실제 authorize controller·ticket·시작 port와 대조했다. ticket은 마이크로초로 절삭한 `Instant.toString()`이며 커넥터는 해석하지 않고 그대로 전달한다. stamp는 UTC 소수 여섯 자리 고정이며 별도 decoder로 받는다.
+PR #486의 중복 사진 거절을 반영했다. compiler가 조기에 거절하고, compiler를 거치지 않은 반복 snapshot은 worker 재compile이 거절한다.
+아래 항목이 남으므로 phase-04 전체는 진행 중이다. 커넥터 대역 검증을 JVM loopback이나 실제 저장 왕복 완료로 다루지 않는다.
+
+- Python plugin의 start·status 전달, capability 검사, authorize 고정 주소 조립과 profileHash 대조.
+- backend의 `ContentDraftJobs.refresh`, `HttpContentDraftSnapshotClient` start·status, `ContentDraftWorkerStamp`, `ContentDraftWorkerStatusDecoder`, `CONTENT_DRAFT_JOB_UNAVAILABLE`과 대상 테스트.
+- 실제 CP HTTP와 Bun worker·fake CDP를 연결하는 JVM loopback 테스트 및 macOS Docker 합성 runner.
+- 진단·본문·ticket 가림 검증과 이후 운영 활성화. 그때까지 start·status capability는 false다.
+
 ## 컨텍스트
 
 **근거 문서**: `docs/features/content-draft.md`의 「내부 compiler와 worker 전달」와 「job 상태와 재접속」.
@@ -72,13 +84,13 @@ UNKNOWN 뒤 같은 job의 terminal을 검증하면 job 상태를 해소한다. C
 신규 `hermes/connectors/naver-blog/tests/content-snapshot-loopback-entry.ts`가 실제 runWorker와 fake-cdp를 연결하고 테스트 JVM이 이 자식을 시작·종료한다. Bun이 없으면 skip 대신 실패한다.
 start 응답 유실·CP restart·조회 timeout·권한 철회·사진 교체·클릭 직전/직후 중단에서 실제 start·클릭 횟수를 센다.
 `hermes/connectors/naver-blog/tests/worker.test.ts`와 `hermes/connectors/naver-blog/tests/jobs.test.ts`, `hermes/connectors/naver-blog/tests/save-draft.test.ts`는 terminal·stale·finish claim 경합과 legacy save/overwrite를 유지한다.
-`hermes/connectors/naver-blog/tests/editor-photos.test.ts`는 30장 서로 다른 합성 바이트의 manifest 순서, 중복 위치, 누락, same bytes 업로드를 검사한다. provider 대응 성공으로 이름 붙이지 않는다.
+`hermes/connectors/naver-blog/tests/editor-photos.test.ts`는 30장 서로 다른 합성 바이트의 manifest 순서, 누락, same bytes 업로드를 검사한다. 중복 사진의 compile 조기 거절과 compiler를 거치지 않은 snapshot의 worker 거절은 `content-snapshot-worker.test.ts`가 검사한다. provider 대응 성공으로 이름 붙이지 않는다.
 
 ContentDraftWorkerStatusDecoder는 소문자 worker status를 CP 대문자 enum으로 명시적으로 옮기고 stage·save_clicked의 타입과 whitelist를 검사한다. 잘못된 stamp·단계·대소문자·boolean coercion은 수용하지 않는다.
-photo guard는 기존 inserted+offset+1을 쓰지 않는다. initial inserted 고정값과 이미지 배열 인덱스로 assetManifest.position을 얻고 반복 asset도 자리별로 검사한다.
+photo guard는 기존 inserted+offset+1을 쓰지 않는다. initial inserted 고정값과 이미지 배열 인덱스로 assetManifest.position을 얻는다. 반복 asset은 compile에서 거절한다.
 runWorker loopback은 CP RANDOM_PORT HTTP 요청, 실제 worker 시작, 실제 fake CDP 파일 바이트 업로드, save 단추 클릭을 독립 카운터로 센다. `{saved:true}`나 예정 manifest를 클릭/업로드 증거로 세지 않는다.
 macOS Java fixture도 scripts/test.ts의 Linux 합성 Chrome 환경에서 entry를 시작하도록 Docker 전용 합성 runner를 둔다. CP loopback 접근 주소는 런타임으로 전달하고 start/stop/timeout/cleanup을 JVM try/finally로 관리한다. 실제 계정 env를 복사하지 않으며 Bun/Docker 부재는 실패다.
-50자리·반복 asset·30장 바이트·50/51고유 asset, readPhoto 뒤 파일 교체에서도 같은 Uint8Array hash/upload인지 검사한다. 입력 증거와 실제 provider component 대응은 별도 결과다.
+50장·30장 바이트·50/51고유 asset, readPhoto 뒤 파일 교체에서도 같은 Uint8Array hash/upload인지 검사한다. 반복 asset은 업로드 전에 거절하는지 검사한다. 입력 증거와 실제 provider component 대응은 별도 결과다.
 
 ## 검증
 
