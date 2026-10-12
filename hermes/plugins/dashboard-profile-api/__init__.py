@@ -65,7 +65,10 @@ import os
 try:
     import yaml
 except ModuleNotFoundError as exc:
-    raise RuntimeError("dashboard-profile-api에는 PyYAML==6.0.3이 필요하다") from exc
+    raise RuntimeError(
+        "dashboard-profile-api에는 PyYAML==6.0.3이 필요하다. "
+        "상류 경고가 안내하는 `hermes pm repair`에 기대지 말고 이미지 빌드에 PyYAML을 넣는다"
+    ) from exc
 
 # 시험과 기존 호출부가 쓰는 이름을 진입점에서 다시 내보낸다.
 from .common import (
