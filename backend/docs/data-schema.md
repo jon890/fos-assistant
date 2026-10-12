@@ -12,7 +12,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
-| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant` |
+| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -693,6 +693,15 @@ action을 지우면 실행 내용도 지운다.
 `revoked_at` 은 사용자가 거두었거나, 연결을 해제했거나, 선언이 상시 허락을 닫아 정리가 거둔 시각이다.
 상시 허락을 닫은 도구에는 만들지 않고, 판정할 때도 허락을 보지 않는다. 그 도구에 남은 줄은 주기 정리가 거둔다([ADR-065](../../docs/adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)).
 같은 도구에 허락을 다시 주면 새 줄을 만든다. 유일 제약은 없다.
+
+### connector_conversation_grant
+
+사용자가 한 대화에서 도구 하나를 계속 허용한 것이다. 승인하면서 「이 대화에서 계속 허용」 을 골라 준다([ADR-20261012 / conversation-grant](../../docs/adr/ADR-20261012-conversation-grant.md)).
+`conversation_id`, `agent_id`, `connector_id`, `tool_name` 이 모두 맞는 호출에만 통한다. `agent_id` 는 그 승인 줄을 판정한 실행의 에이전트다.
+`action_id` 는 허락을 함께 준 `connector_action` 의 번호다. 그 결과의 알림 줄이 이 칸으로 허락을 함께 알린다.
+`revoked_at` 이 비고 `expires_at` 이 지금보다 뒤이고 대화의 `deleted_at` 이 빈 줄만 유효하다. `expires_at` 은 만든 때부터 24시간 뒤다.
+`revoked_at` 은 사용자가 거두었거나, 그 에이전트에서 연결을 뗐거나, 연결을 해제하거나 다시 등록한 시각이다.
+외래 키는 사용자와 대화에 둔다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
 
 ## 사용자 브라우저 표
 
