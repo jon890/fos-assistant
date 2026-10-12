@@ -297,7 +297,7 @@ for (const [status, text] of [
   });
 }
 
-test("승인 응답이 실패로 끝나면 저장할 수 없다는 안내로 끝나고 다른 저장을 보내지 않는다", async ({
+test("시작 지원이 없어 실행 없이 거절되면 저장할 수 없다는 안내로 끝나고 다른 저장을 보내지 않는다", async ({
   page,
 }) => {
   const conversationId = await createConversation(page, "원고 미지원");
@@ -305,14 +305,18 @@ test("승인 응답이 실패로 끝나면 저장할 수 없다는 안내로 끝
     actions: [draftAction(conversationId, "PENDING", "PREVIEW_READY")],
   };
   const counts = await routeDraft(page, conversationId, state);
+  // ContentDraftSnapshotControllerTest 가 실제 HTTP 로 확인한 응답 모양이다.
   await page.route(
     `**/api/connector-actions/${ACTION_ID}/approve`,
     (route: Route) => {
       state.actions = [
         action({
-          status: "FAILED",
+          status: "REJECTED",
           errorCode: "not_executable",
-          contentDraft: summary(conversationId),
+          contentDraft: summary(conversationId, {
+            status: "STALE",
+            errorCode: "not_executable",
+          }),
         }),
       ];
       return route.fulfill({ json: state.actions[0] });
