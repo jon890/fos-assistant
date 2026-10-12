@@ -18,6 +18,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
@@ -103,6 +104,7 @@ public class ConnectorPolicyService {
     private final DecisionFeedbackRecorder feedback;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final ConnectorActionBodies bodies;
 
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -121,6 +123,7 @@ public class ConnectorPolicyService {
         ProactiveCheckGuard checkGuard,
         CheckNotificationPolicy checkNotifications,
         DecisionFeedbackRecorder feedback,
+        ConnectorActionBodies bodies,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
@@ -135,6 +138,7 @@ public class ConnectorPolicyService {
             checkGuard,
             checkNotifications,
             feedback,
+            bodies,
             transactionManager,
             Clock.systemUTC());
     }
@@ -153,6 +157,7 @@ public class ConnectorPolicyService {
         ProactiveCheckGuard checkGuard,
         CheckNotificationPolicy checkNotifications,
         DecisionFeedbackRecorder feedback,
+        ConnectorActionBodies bodies,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.actions = actions;
@@ -167,6 +172,7 @@ public class ConnectorPolicyService {
         this.checkGuard = checkGuard;
         this.checkNotifications = checkNotifications;
         this.feedback = feedback;
+        this.bodies = bodies;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -274,11 +280,14 @@ public class ConnectorPolicyService {
             argsSha256,
             now);
         if (needsApproval) {
-            action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
+            action.awaitApproval(now.plus(properties.current().approvalTtl()));
         }
         try {
             ConnectorAction saved = transactions.execute(status -> {
                 ConnectorAction stored = actions.saveAndFlush(action);
+                if (needsApproval) {
+                    bodies.sealArgs(stored, argsJson);
+                }
                 // 알림은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
                 if (needsApproval && stored.conversationId() != null && checkNotifications.allows(origin, now)) {
                     notifyApprovalRequested(stored, ConnectorActionView.titleOf(declared));

@@ -14,6 +14,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
@@ -31,6 +32,7 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -65,6 +67,7 @@ class ConnectorActionApproval {
     private final ConnectorActionSignals signals;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final ConnectorActionBodies bodies;
 
     ConnectorActionApproval(
             ConnectorActionRepository actions,
@@ -78,6 +81,7 @@ class ConnectorActionApproval {
             ConnectorActionDetails details,
             ConnectorActionSignals signals,
             TransactionTemplate transactions,
+            ConnectorActionBodies bodies,
             Clock clock) {
         this.actions = actions;
         this.grants = grants;
@@ -91,6 +95,7 @@ class ConnectorActionApproval {
         this.signals = signals;
         this.transactions = transactions;
         this.clock = clock;
+        this.bodies = bodies;
     }
 
     /**
@@ -168,6 +173,11 @@ class ConnectorActionApproval {
             return Approval.refused(saved);
         }
         Optional<ConnectorManifest> manifest = details.readManifest(action.connectorId());
+        String plain = action.argsJson();
+        if (plain == null || ConnectorAction.UNREADABLE_ARGS.equals(plain) || !Sha256.hex(plain).equals(action.argsSha256())) {
+            action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
+            return Approval.refused(actions.save(action));
+        }
         // 승인 줄이 `hiddenArgs` 로 낸 것과 같은 조건이다. 사람이 다 읽지 못한 인자로는 실행하지 않는다. 기간을 실은
         // 승인도 같으므로 허락을 볼 것보다 먼저 본다.
         if (hiddenArgs(manifest, action)) {
@@ -253,6 +263,7 @@ class ConnectorActionApproval {
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM)
                     .reason(action.errorCode()));
         }
+        bodies.sealResult(action);
         return actions.save(action);
     }
 

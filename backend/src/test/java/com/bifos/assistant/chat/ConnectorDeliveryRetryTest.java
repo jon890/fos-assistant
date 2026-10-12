@@ -45,6 +45,7 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.DelegationWakeEnabled;
@@ -317,7 +318,7 @@ class ConnectorDeliveryRetryTest {
                     approval_mode, decision, passed, status, origin_execution_id, conversation_id, dedupe_key,
                     args_json, args_sha256, expires_at, result_text, error_code, created_at)
                 VALUES (?, ?, ?, ?, ?, 'mcp__demo__write_note', 'WRITE', 'REQUIRED', 'NEEDS_APPROVAL',
-                    FALSE, ?, ?, ?, ?, '{"text":"안녕"}', 'sha', ?, ?, NULL, CURRENT_TIMESTAMP(6))
+                    FALSE, ?, ?, ?, ?, '{"text":"안녕"}', ?, ?, ?, NULL, CURRENT_TIMESTAMP(6))
                 """,
                 bytes(actionId),
                 userId,
@@ -328,6 +329,7 @@ class ConnectorDeliveryRetryTest {
                 root.id(),
                 conversation.id(),
                 UUID.randomUUID().toString(),
+                Sha256.hex("{\"text\":\"안녕\"}"),
                 Timestamp.from(Instant.now().plus(Duration.ofHours(24))),
                 resultText);
         return actionId;

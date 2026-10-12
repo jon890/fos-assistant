@@ -196,7 +196,7 @@ class ConnectorActionLifecycle {
             try {
                 Optional<ConnectorAction> settled = transactions.execute(status -> {
                     // claim 과 발급이 잡는 순서(사용자, 승인 줄, 실행 줄)를 지킨다.
-                    users.findByIdForUpdate(candidate.userId());
+                    users.findByIdForUpdate(candidate.userId()).orElseThrow(ConnectorActionDetails::notFound);
                     return actions.findByPublicIdForUpdate(candidate.publicId())
                             .filter(action -> action.status() == ActionStatus.EXECUTING)
                             .map(action -> {

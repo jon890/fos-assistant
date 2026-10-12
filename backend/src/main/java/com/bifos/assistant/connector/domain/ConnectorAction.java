@@ -14,6 +14,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
@@ -51,6 +52,9 @@ public class ConnectorAction {
 
     /** 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이 있어 실행하지 않고 끝낸 줄의 {@code errorCode} 다(ADR-065). */
     public static final String HIDDEN_ARGS = "hidden_args";
+
+    public static final String UNREADABLE_ARGS = "읽을 수 없는 인자입니다.";
+    public static final String UNREADABLE_RESULT = "읽을 수 없는 결과입니다.";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -126,7 +130,10 @@ public class ConnectorAction {
 
     /** 승인 줄만 채운다. hook 이 보낸 글자 그대로다. */
     @Column(name = "args_json", columnDefinition = "MEDIUMTEXT")
-    private String argsJson;
+    private String storedArgsJson;
+
+    @Column(name = "args_key_id")
+    private Long argsKeyId;
 
     /** 인자 글의 SHA-256 이다. 원문을 두지 않는 줄에서도 무엇을 불렀는지 맞춰 볼 수 있다. */
     @Column(name = "args_sha256", nullable = false, length = 64)
@@ -142,7 +149,22 @@ public class ConnectorAction {
     private Instant executedAt;
 
     @Column(name = "result_text", columnDefinition = "MEDIUMTEXT")
-    private String resultText;
+    private String storedResultText;
+
+    @Column(name = "result_key_id")
+    private Long resultKeyId;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private ConnectorActionBodyOpener opener;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private String plainArgs;
+
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private String plainResult;
 
     @Column(name = "error_code", length = 64)
     private String errorCode;
@@ -193,14 +215,13 @@ public class ConnectorAction {
     /**
      * 판정 줄을 승인 줄로 만든다. 저장하기 전에만 부른다.
      *
-     * @param argsJson hook 이 보낸 인자 글 그대로. 승인하면 이 값으로 실행한다
+     * <p>인자는 번호를 받은 뒤 같은 트랜잭션에서 암호화해 적는다. INSERT에는 인자 원문을 싣지 않는다.
      */
-    public void awaitApproval(String argsJson, Instant expiresAt) {
+    public void awaitApproval(Instant expiresAt) {
         if (decision != ActionDecision.NEEDS_APPROVAL || passed || status != null) {
             throw new IllegalStateException("only a blocked NEEDS_APPROVAL action can await approval");
         }
         this.status = ActionStatus.PENDING;
-        this.argsJson = argsJson;
         this.expiresAt = expiresAt;
     }
 
@@ -214,7 +235,9 @@ public class ConnectorAction {
     public void succeed(String resultText, Instant now) {
         require(ActionStatus.EXECUTING);
         this.status = ActionStatus.SUCCEEDED;
-        this.resultText = resultText;
+        this.storedResultText = resultText;
+        this.resultKeyId = null;
+        this.plainResult = null;
         this.executedAt = now;
     }
 
@@ -226,7 +249,9 @@ public class ConnectorAction {
         require(ActionStatus.EXECUTING);
         this.status = ActionStatus.FAILED;
         this.errorCode = errorCode;
-        this.resultText = resultText;
+        this.storedResultText = resultText;
+        this.resultKeyId = null;
+        this.plainResult = null;
         this.executedAt = now;
     }
 
@@ -267,6 +292,46 @@ public class ConnectorAction {
     /** 이 도구에 상시 허락을 줄 수 있는가. 늘 승인을 받는 도구와 원래 이름을 모르는 호출에는 주지 못한다. */
     public boolean grantAllowed() {
         return approvalMode == ToolApproval.REQUIRED && toolName != null;
+    }
+
+    /** 본문 접근은 모두 이 두 접근자를 거친다. 암호문은 처음 꺼낼 때만 푼다. */
+    public String argsJson() {
+        if (argsKeyId == null) {
+            return storedArgsJson;
+        }
+        if (plainArgs == null) {
+            String opened = opener == null ? null : opener.open(this, "args_json", argsKeyId, storedArgsJson);
+            plainArgs = opened == null ? UNREADABLE_ARGS : opened;
+        }
+        return plainArgs;
+    }
+
+    public String resultText() {
+        if (resultKeyId == null) {
+            return storedResultText;
+        }
+        if (plainResult == null) {
+            String opened = opener == null ? null : opener.open(this, "result_text", resultKeyId, storedResultText);
+            plainResult = opened == null ? UNREADABLE_RESULT : opened;
+        }
+        return plainResult;
+    }
+
+    public void attachOpener(ConnectorActionBodyOpener opener) {
+        this.opener = opener;
+    }
+
+    /** keyがnullなら移行前または暗号化を使わない保存だ。キャッシュは保存ごとに捨てる。 */
+    public void sealArgs(String stored, Long keyId) {
+        this.storedArgsJson = stored;
+        this.argsKeyId = keyId;
+        this.plainArgs = null;
+    }
+
+    public void sealResult(String stored, Long keyId) {
+        this.storedResultText = stored;
+        this.resultKeyId = keyId;
+        this.plainResult = null;
     }
 
     private void require(ActionStatus expected) {

@@ -14,6 +14,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -24,6 +26,7 @@ import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorCheckReportApprovals;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
+import com.bifos.assistant.connector.application.ConnectorActionBodyBackfill;
 import com.bifos.assistant.connector.application.ConnectorToolPolicies;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
@@ -41,6 +44,8 @@ import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
+import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
@@ -108,6 +113,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -154,6 +160,15 @@ class ConnectorActionServiceTest {
 
     @Autowired
     ConnectorActionRepository actions;
+
+    @Autowired
+    ConnectorActionBodies bodies;
+
+    @Autowired
+    ConnectorActionBodyBackfill bodyBackfill;
+
+    @Autowired
+    TextCipher cipher;
 
     @Autowired
     ConnectorToolGrantRepository grants;
@@ -209,6 +224,115 @@ class ConnectorActionServiceTest {
     private AgentExecution run;
     private String root;
 
+
+    @Test
+    @DisplayName("인자 암호화 직전 INSERT는 본문이 비어 있고 암호화 실패는 승인 줄도 롤백한다")
+    void rollsBackEmptyInsertWhenArgumentEncryptionFails() {
+        long before = actions.count();
+        var failing = mock(TextCipher.class);
+        when(failing.enabled()).thenReturn(true);
+        doAnswer(invocation -> {
+            assertThat(jdbc.queryForObject("select args_json from connector_action where user_id = ?", String.class, owner.id())).isNull();
+            throw new IllegalStateException("test encryption failure");
+        }).when(failing).seal(anyLong(), anyString(), anyString());
+        Object previous = ReflectionTestUtils.getField(bodies, "cipher");
+        ReflectionTestUtils.setField(bodies, "cipher", failing);
+        try {
+            assertThatThrownBy(() -> ask(WRITE, ARGS)).isInstanceOf(IllegalStateException.class);
+            assertThat(actions.count()).isEqualTo(before);
+            verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+        } finally {
+            ReflectionTestUtils.setField(bodies, "cipher", previous);
+        }
+    }
+
+    @Test
+    @DisplayName("승인 인자와 결과를 암호문으로 저장하고 주인의 조회와 실행에서만 푼다")
+    void storesEncryptedBodiesAndExecutesOriginalArguments() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        var before = actions.findByPublicId(actionId).orElseThrow();
+        assertThat(before.argsKeyId()).isNotNull();
+        assertThat(before.storedArgsJson()).startsWith("v1.").doesNotContain("안녕");
+        assertThat(JSON.readTree(service.listForConversation(me, CONVERSATION).getFirst().argsJson())).isEqualTo(JSON.readTree(ARGS));
+        assertThat(service.approve(me, actionId, null).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        verify(connector).execute(PROFILE, DEMO, "mcp__demo__write_note", ARGS);
+        var after = actions.findByPublicId(actionId).orElseThrow();
+        assertThat(after.resultKeyId()).isNotNull();
+        assertThat(after.storedResultText()).startsWith("v1.").doesNotContain("saved");
+        assertThat(after.resultText()).isEqualTo("{\"saved\":true}");
+        assertThat(cipher.open(after.argsKeyId(), owner.id() + 1,
+            "connector_action:" + after.id() + ":column:args_json:user:" + (owner.id() + 1), after.storedArgsJson())).isEmpty();
+        var admin = new CurrentUser(owner.id() + 1, "admin@example.test", "관리자", 1L, UserRole.ADMIN);
+        assertThatThrownBy(() -> service.approve(admin, actionId, null)).isInstanceOf(ApiException.class);
+    }
+
+    @Test
+    @DisplayName("같은 사용자의 승인 암호문을 맞바꿔도 인자를 실행하지 못한다")
+    void rejectsArgumentsMovedBetweenActions() {
+        var first = actions.findByPublicId(ask(WRITE, ARGS).actionId()).orElseThrow();
+        var second = actions.findByPublicId(ask(WRITE, "{\"text\":\"둘째 글\"}").actionId()).orElseThrow();
+        jdbc.update("update connector_action set args_json = ? where id = ?", second.storedArgsJson(), first.id());
+        jdbc.update("update connector_action set args_json = ? where id = ?", first.storedArgsJson(), second.id());
+        for (var row : List.of(first, second)) {
+            assertThat(service.approve(me, row.publicId(), null).status()).isEqualTo(ActionStatus.REJECTED);
+            assertThat(actions.findById(row.id()).orElseThrow().errorCode()).isEqualTo(ConnectorAction.NOT_EXECUTABLE);
+        }
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("평문 이관은 상태와 원문을 유지하고 두 번 실행해도 암호문을 다시 쓰지 않는다")
+    void backfillsPlainBodiesIdempotentlyAndPreservesApproval() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        var action = actions.findByPublicId(actionId).orElseThrow();
+        jdbc.update("update connector_action set args_json = ?, args_key_id = null where id = ?", ARGS, action.id());
+        bodyBackfill.backfill();
+        var sealed = actions.findById(action.id()).orElseThrow();
+        assertThat(sealed.storedArgsJson()).startsWith("v1.");
+        assertThat(sealed.argsJson()).isEqualTo(ARGS);
+        assertThat(sealed.status()).isEqualTo(ActionStatus.PENDING);
+        bodyBackfill.backfill();
+        assertThat(actions.findById(action.id()).orElseThrow().storedArgsJson()).isEqualTo(sealed.storedArgsJson());
+        service.approve(me, actionId, null);
+        jdbc.update("update connector_action set result_text = ?, result_key_id = null where id = ?", "이전 결과", action.id());
+        bodyBackfill.backfill();
+        var done = actions.findById(action.id()).orElseThrow();
+        assertThat(done.resultKeyId()).isNotNull();
+        assertThat(done.storedResultText()).startsWith("v1.");
+        assertThat(done.resultText()).isEqualTo("이전 결과");
+        verify(connector).execute(PROFILE, DEMO, "mcp__demo__write_note", ARGS);
+    }
+
+    @Test
+    @DisplayName("읽을 수 없는 결과는 암호문을 노출하지 않고 안내 글로 표시한다")
+    void displaysUnreadableResultWithoutLeakingStoredCiphertext() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        service.approve(me, actionId, null);
+        var action = actions.findByPublicId(actionId).orElseThrow();
+        jdbc.update("update connector_action set result_text = args_json where id = ?", action.id());
+        assertThat(actions.findById(action.id()).orElseThrow().resultText()).isEqualTo(ConnectorAction.UNREADABLE_RESULT);
+        assertThat(service.listForConversation(me, CONVERSATION).getFirst().resultText()).isEqualTo(ConnectorAction.UNREADABLE_RESULT);
+    }
+
+    @Test
+    @DisplayName("암호화가 꺼져 있으면 일반 쓰기는 평문 호환으로 저장하고 이관하지 않는다")
+    void preservesNonfinancialPlainCompatibilityWhenEncryptionDisabled() {
+        var disabled = mock(TextCipher.class);
+        Object previous = ReflectionTestUtils.getField(bodies, "cipher");
+        ReflectionTestUtils.setField(bodies, "cipher", disabled);
+        try {
+            UUID actionId = ask(WRITE, ARGS).actionId();
+            var action = actions.findByPublicId(actionId).orElseThrow();
+            assertThat(action.storedArgsJson()).isEqualTo(ARGS);
+            assertThat(action.argsKeyId()).isNull();
+            bodyBackfill.backfill();
+            assertThat(actions.findById(action.id()).orElseThrow().argsKeyId()).isNull();
+            service.approve(me, actionId, null);
+            assertThat(actions.findById(action.id()).orElseThrow().resultKeyId()).isNull();
+        } finally {
+            ReflectionTestUtils.setField(bodies, "cipher", previous);
+        }
+    }
 
     @BeforeEach
     void setUp() {

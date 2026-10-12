@@ -198,10 +198,23 @@ class FinancialConnectorProducerTest {
 
     @AfterEach
     void stopPlugin() throws Exception {
-        if (plugin != null) {
-            plugin.destroy();
-            assertThat(plugin.waitFor(15, TimeUnit.SECONDS)).isTrue();
-            assertThat(plugin.exitValue()).isZero();
+        try {
+            if (plugin != null) {
+                plugin.destroy();
+                assertThat(plugin.waitFor(15, TimeUnit.SECONDS)).isTrue();
+                assertThat(plugin.exitValue()).isZero();
+            }
+        } finally {
+            // 다음 대화 테스트가 사용자를 지울 수 있도록 이 fixture의 연결과 FK를 먼저 정리한다.
+            if (user != null) {
+                jdbc.update("delete from connector_action where user_id = ?", user.id());
+            }
+            if (bindingId != null) {
+                bindings.deleteById(bindingId);
+            }
+            if (connectionId != null) {
+                connections.deleteById(connectionId);
+            }
         }
     }
 

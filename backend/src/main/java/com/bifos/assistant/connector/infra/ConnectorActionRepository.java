@@ -17,6 +17,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface ConnectorActionRepository extends JpaRepository<ConnectorAction, Long> {
 
+    /** 이관 대상의 번호만 읽는다. 사용자·승인 줄 순서로 잠근 뒤 조건을 다시 확인한다. */
+    @Query("""
+        select a.id from ConnectorAction a
+        where (a.storedArgsJson is not null and a.argsKeyId is null)
+           or (a.storedResultText is not null and a.resultKeyId is null)
+        order by a.id
+        """)
+    List<Long> findPlainBodyIds();
+
     Optional<ConnectorAction> findByDedupeKey(String dedupeKey);
 
     Optional<ConnectorAction> findByPublicId(UUID publicId);

@@ -6,6 +6,8 @@ import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.chat.application.MediaObservationCleaner;
 import com.bifos.assistant.chat.application.ContentDraftCleaner;
+import com.bifos.assistant.connector.application.ConnectorActionSweeper;
+import com.bifos.assistant.connector.application.ConnectorActionBodyBackfill;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
@@ -84,6 +86,13 @@ class CollationMixQueryMysqlTest {
     /** V57에는 원고 표가 없으므로 원고 정리의 기동 읽기도 실행하지 않는다. */
     @MockitoBean
     private ContentDraftCleaner contentDraftCleaner;
+
+    /** V57에는 승인 본문 key 칸이 없으므로 승인 기동 정리와 본문 이관은 실행하지 않는다. */
+    @MockitoBean
+    private ConnectorActionSweeper connectorActionSweeper;
+
+    @MockitoBean
+    private ConnectorActionBodyBackfill connectorActionBodyBackfill;
 
 
     @DynamicPropertySource

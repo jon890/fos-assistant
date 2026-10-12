@@ -16,6 +16,7 @@ import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
@@ -69,6 +70,7 @@ class ConnectorFinancialProducer {
     private final ConnectorExecutionGuard guard;
     private final ConnectorFinancialConflicts conflicts;
     private final TextCipher cipher;
+    private final ConnectorActionBodies bodies;
     private final HermesConnectorClient hermes;
     private final LiveProperties<ConnectorPolicyProperties> properties;
     private final NotificationService notifications;
@@ -134,8 +136,9 @@ class ConnectorFinancialProducer {
             var action = ConnectorAction.decided(binding.connection(), before.agent(), origin, hermesTool, toolName,
                 new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
                 false, key, hash, now);
-            action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
+            action.awaitApproval(now.plus(properties.current().approvalTtl()));
             actions.saveAndFlush(action);
+            bodies.sealArgs(action, argsJson);
             var row = ConnectorExecutionSnapshot.capture(action, binding, operation,
                 JSON.writeValueAsString(contract.scopeFields()), executionArgs, summary, scopeJson, cipher, now);
             require(row.contentKeyId() != null);
