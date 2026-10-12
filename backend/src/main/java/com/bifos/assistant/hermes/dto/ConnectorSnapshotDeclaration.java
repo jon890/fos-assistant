@@ -5,12 +5,12 @@ import java.util.Map;
 import java.util.Set;
 import tools.jackson.databind.JsonNode;
 
-/** 검증한 compile 전용 선언이다. 원문 JSON과 분리한 불변 값만 전달한다. */
+/** 검증한 private snapshot 선언이다. 원문 JSON과 분리한 불변 값만 전달한다. */
 public record ConnectorSnapshotDeclaration(String protocol, String compileTool, String startTool,
     String statusTool, Map<String, Boolean> capabilities) {
     public ConnectorSnapshotDeclaration {
         capabilities = Map.copyOf(capabilities);
-        // catalog 응답은 read 가 compile 전용만 받는다. 생성자는 세 capability 칸의 모양만 본다.
+        // 운영 선언의 활성화와 transport 구현은 별개다.
         if (!"content-snapshot-v1".equals(protocol) || !capabilities.keySet().equals(Set.of("compile", "start", "status"))
             || Set.copyOf(List.of(compileTool, startTool, statusTool)).size() != 3) {
             throw new IllegalStateException("snapshot 선언을 확인하지 못했습니다.");
@@ -30,17 +30,18 @@ public record ConnectorSnapshotDeclaration(String protocol, String compileTool, 
         if (Set.copyOf(names).size() != 3 || publicTools.stream().anyMatch(tool -> names.contains(tool.name()))) {
             throw new IllegalStateException("snapshot 선언을 확인하지 못했습니다.");
         }
-        requireCompileOnly(node.path("capabilities"));
+        requireCapabilities(node.path("capabilities"));
         return new ConnectorSnapshotDeclaration("content-snapshot-v1", names.get(0), names.get(1), names.get(2),
-            Map.of("compile", true, "start", false, "status", false));
+            Map.of("compile", true, "start", node.path("capabilities").path("start").booleanValue(),
+                "status", node.path("capabilities").path("status").booleanValue()));
     }
 
 
-    public static void requireCompileOnly(JsonNode caps) {
+    public static void requireCapabilities(JsonNode caps) {
         if (!caps.isObject() || !caps.propertyNames().equals(Set.of("compile", "start", "status"))
             || !caps.path("compile").isBoolean() || !caps.path("compile").booleanValue()
-            || !caps.path("start").isBoolean() || caps.path("start").booleanValue()
-            || !caps.path("status").isBoolean() || caps.path("status").booleanValue()) {
+            || !caps.path("start").isBoolean() || !caps.path("status").isBoolean()
+            || caps.path("start").booleanValue() != caps.path("status").booleanValue()) {
             throw new IllegalStateException("snapshot capability를 확인하지 못했습니다.");
         }
     }

@@ -27,6 +27,13 @@ import jakarta.persistence.EnumType;
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ContentDraftJob {
+    /** ticket 기한과 worker 실행 상한이 지나도록 끝나지 않아 Control Plane 이 닫았다. */
+    public static final String EXPIRED = "CONTENT_DRAFT_JOB_EXPIRED";
+    /** worker 가 그 stamp 의 job 을 모른다. 상태 파일이 없거나 정리됐다. */
+    public static final String NOT_FOUND = "CONTENT_DRAFT_JOB_NOT_FOUND";
+    /** 연결이나 바인딩 버전이 바뀌어 옛 stamp 로 결과를 확인하지 못했다. */
+    public static final String BINDING_CHANGED = "CONTENT_DRAFT_BINDING_CHANGED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -132,8 +139,44 @@ public class ContentDraftJob {
     }
 
 
+    /**
+     * Control Plane 이 더 기다리지 않고 job 을 닫는다. start claim 이 없으면 worker 가 브라우저를 열지 않았으므로 FAILED, 있으면
+     * 결과를 모르는 UNKNOWN 이다. 늦게 온 worker 는 claimStart 의 허용 상태에 FAILED 가 없어 시작하지 못한다.
+     */
+    public void close(String errorCode, Instant at) {
+        require(running() || status == ContentDraftJobStatus.UNKNOWN);
+        this.status = startClaimedAt == null ? ContentDraftJobStatus.FAILED : ContentDraftJobStatus.UNKNOWN;
+        this.errorCode = errorCode;
+        this.lastCheckedAt = at;
+    }
+
+
+    /** worker 의 답을 더 기다릴 job 이다. Control Plane 이 닫은 UNKNOWN 은 다시 조회하지 않는다. */
+    public boolean awaitingResult() {
+        return running() || status == ContentDraftJobStatus.UNKNOWN && !EXPIRED.equals(errorCode) && !NOT_FOUND.equals(errorCode)
+            && !BINDING_CHANGED.equals(errorCode);
+    }
+
+
     public boolean running() {
         return status == ContentDraftJobStatus.DISPATCHED || status == ContentDraftJobStatus.SAVING;
+    }
+
+
+    /** 같은 job의 늦은 terminal로 UNKNOWN을 해소하되 확정한 terminal은 덮지 않는다. */
+    public void observed(ContentDraftJobStatus observed, String stage, boolean clicked, String code, Instant at) {
+        if (!running() && status != ContentDraftJobStatus.UNKNOWN) {
+            return;
+        }
+        this.stage = stage;
+        this.saveClicked = saveClicked || clicked;
+        this.lastCheckedAt = at;
+        this.errorCode = code;
+        if (observed == ContentDraftJobStatus.FAILED && (saveClicked || saveClaimedAt != null)) {
+            this.status = ContentDraftJobStatus.UNKNOWN;
+        } else if (status != ContentDraftJobStatus.UNKNOWN || observed != ContentDraftJobStatus.SAVING) {
+            this.status = observed;
+        }
     }
 
 

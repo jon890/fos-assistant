@@ -57,6 +57,7 @@ public class IntegrationTestDoubles {
 
     /** catalog 가 시작을 선언한 원고 저장 검사만 닿는다. */
     @Bean
+    @Primary
     RecordingContentDraftJobStarter recordingContentDraftJobStarter() {
         return new RecordingContentDraftJobStarter();
     }

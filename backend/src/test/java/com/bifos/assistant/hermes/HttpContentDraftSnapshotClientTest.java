@@ -1,5 +1,11 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.connector.application.ContentDraftWorkerStatusDecoder;
+import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import java.util.concurrent.ExecutorService;
 import java.util.stream.IntStream;
 
@@ -13,6 +19,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -38,6 +45,7 @@ class HttpContentDraftSnapshotClientTest {
     private JsonNode golden;
     private final AtomicReference<byte[]> response = new AtomicReference<>();
     private final AtomicReference<JsonNode> seen = new AtomicReference<>();
+    private final AtomicInteger requests = new AtomicInteger();
     private int status = 200;
     private volatile boolean stall;
     private volatile boolean truncate;
@@ -57,6 +65,7 @@ class HttpContentDraftSnapshotClientTest {
         executor = Executors.newVirtualThreadPerTaskExecutor();
         server.setExecutor(executor);
         server.createContext("/api/connectors/snapshot-test/snapshot", exchange -> {
+            requests.incrementAndGet();
             assertThat(exchange.getRequestMethod()).isEqualTo("POST");
             assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer synthetic-token");
             seen.set(json.readTree(exchange.getRequestBody().readAllBytes()));
@@ -249,6 +258,80 @@ class HttpContentDraftSnapshotClientTest {
         var node = json.createObjectNode().put("ok", true).set("result", golden.get("snapshot").deepCopy());
         node.set("capabilities", json.createObjectNode().put("compile", true).put("start", false).put("status", false));
         return node;
+    }
+
+
+    @Test
+    @DisplayName("실제 start·status HTTP body는 예약 ID·stamp와 ticket을 분리하고 자동 재전송하지 않는다")
+    void sendsReservedStartAndStatusBodiesWithoutRetry() {
+        var job = job();
+        var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job);
+        var result = json.createObjectNode().put("job_id", job.jobId().toString()).set("stamp", json.valueToTree(stamp))
+            .put("status", "running").putNull("error_code");
+        response.set(json.writeValueAsBytes(jobAnswer(result)));
+        assertThat(client.start("synthetic-profile", "snapshot-test", golden.path("snapshot"), stamp, "TICKET_MARKER")).isEqualTo(result);
+        assertThat(seen.get().path("operation").stringValue()).isEqualTo("start");
+        assertThat(seen.get().path("args").propertyNames()).isEqualTo(Set.of("snapshot", "jobId", "ticket", "stamp"));
+        assertThat(seen.get().path("args").path("ticket").stringValue()).isEqualTo("TICKET_MARKER");
+        client.status("synthetic-profile", "snapshot-test", stamp);
+        assertThat(seen.get().path("operation").stringValue()).isEqualTo("status");
+        assertThat(seen.get().path("args").propertyNames()).isEqualTo(Set.of("stamp"));
+        assertThat(seen.get().toString()).doesNotContain("TICKET_MARKER", "payload");
+        assertThat(requests.get()).isEqualTo(2);
+        ((ObjectNode)result.path("stamp")).put("profileHash", "b".repeat(64));
+        response.set(json.writeValueAsBytes(jobAnswer(result)));
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
+        assertThat(requests.get()).isEqualTo(3);
+    }
+
+
+    @Test
+    @DisplayName("status의 not_found는 전용 예외이고 다른 worker 오류 code와 모르는 code는 일시 장애다")
+    void separatesStatusNotFoundFromTransientErrors() {
+        var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
+        response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", "not_found"))));
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp)).isInstanceOf(ContentDraftJobNotFound.class);
+        for (var code : List.of("unavailable", "invalid_input", "other_code")) {
+            response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", code))));
+            assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+                .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
+        }
+        response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", "not_found").put("extra", 1))));
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
+        status = 503;
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp))
+            .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE));
+    }
+
+
+    @Test
+    @DisplayName("status 응답 timeout은 재전송 없이 취소하고 본문·ticket·원문 cause를 내보내지 않는다")
+    void cancelsStatusTimeoutWithoutRetryOrDiagnosticsBody() {
+        stall = true;
+        delayBody = true;
+        var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
+        var started = System.nanoTime();
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp)).isInstanceOfSatisfying(ApiException.class, ex -> {
+            assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
+            assertThat(ex.getCause()).isNull();
+        });
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isBetween(Duration.ofSeconds(4), Duration.ofSeconds(7));
+        assertThat(requests.get()).isEqualTo(1);
+    }
+
+
+    private ContentDraftSaveTicketPayload job() {
+        return new ContentDraftSaveTicketPayload(UUID.randomUUID(),
+            UUID.randomUUID(), golden.path("snapshot").path("snapshotHash").stringValue(), UUID.randomUUID(),
+            1L, 2L, 3L, 4L, Instant.parse("2026-10-11T00:00:00Z"), Instant.parse("2026-10-11T00:00:00.123400Z"), null, null);
+    }
+
+
+    private ObjectNode jobAnswer(JsonNode result) {
+        return json.createObjectNode().put("ok", true).set("result", result)
+            .set("capabilities", json.createObjectNode().put("compile", true).put("start", true).put("status", true));
     }
 
 

@@ -1,8 +1,11 @@
 package com.bifos.assistant.hermes;
 
+import com.bifos.assistant.shared.util.Sha256;
+
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.hermes.dto.ConnectorSnapshotDeclaration;
+import com.bifos.assistant.hermes.dto.ContentDraftWorkerStamp;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -23,8 +26,103 @@ import tools.jackson.core.StreamReadFeature;
 public class HttpContentDraftSnapshotClient {
     private static final JsonMapper JSON = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build();
     private static final Semaphore SLOTS = new Semaphore(4);
+    private static final Set<String> WORKER_ERRORS = Set.of("invalid_input", "not_found", "start_unknown", "unavailable");
     private final HermesProperties properties;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+
+
+    public JsonNode start(String profile, String connectorId, JsonNode snapshot, ContentDraftWorkerStamp stamp, String ticket) {
+        try {
+            if (!snapshot.path("snapshotHash").asString().equals(stamp.snapshotHash())
+                || JSON.writeValueAsBytes(snapshot).length > 262144 || ticket == null || !ticket.matches("[\\x21-\\x7e]{1,4096}")) {
+                throw jobUnavailable();
+            }
+            var args = JSON.createObjectNode().set("snapshot", snapshot).put("jobId", stamp.jobId().toString())
+                .put("ticket", ticket).set("stamp", JSON.valueToTree(stamp));
+            return jobRequest(profile, connectorId, "start", args, stamp, 60);
+        } catch (RuntimeException ignored) {
+            throw jobUnavailable();
+        }
+    }
+
+
+    /** @throws ContentDraftJobNotFound worker 가 그 stamp 의 job 을 모른다고 답했을 때. 전송 실패와 timeout 은 {@code CONTENT_DRAFT_JOB_UNAVAILABLE} 이다 */
+    public JsonNode status(String profile, String connectorId, ContentDraftWorkerStamp stamp) {
+        var args = JSON.createObjectNode().set("stamp", JSON.valueToTree(stamp));
+        var result = jobRequest(profile, connectorId, "status", args, stamp, 5);
+        if (result.has("error")) {
+            if ("not_found".equals(result.path("error").stringValue())) {
+                throw new ContentDraftJobNotFound();
+            }
+            throw jobUnavailable();
+        }
+        return result;
+    }
+
+
+    private JsonNode jobRequest(String profile, String connectorId, String operation, JsonNode args, ContentDraftWorkerStamp stamp, int seconds) {
+        if (TransactionSynchronizationManager.isActualTransactionActive() || !SLOTS.tryAcquire()) {
+            throw jobUnavailable();
+        }
+        try {
+            if (profile == null || "default".equals(profile) || !profile.matches("[a-z0-9][a-z0-9_-]{0,63}")
+                || connectorId == null || !connectorId.matches("[a-z0-9][a-z0-9-]{0,63}")
+                || !Sha256.hex(profile).equals(stamp.profileHash())) {
+                throw jobUnavailable();
+            }
+            var body = JSON.createObjectNode().put("profile", profile).put("operation", operation).set("args", args);
+            byte[] raw = JSON.writeValueAsBytes(body);
+            if (raw.length > 524288) {
+                throw jobUnavailable();
+            }
+            var request = HttpRequest.newBuilder(URI.create(properties.dashboardBaseUrl() + "/api/connectors/" + connectorId + "/snapshot"))
+                .timeout(Duration.ofSeconds(seconds)).header("Authorization", "Bearer " + properties.dashboardToken())
+                .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(raw)).build();
+            var pending = http.sendAsync(request, ignored -> new CappedSnapshotBody());
+            try {
+                var response = pending.get(seconds, TimeUnit.SECONDS);
+                if (response.statusCode() != 200) {
+                    throw jobUnavailable();
+                }
+                var answer = JSON.readTree(response.body());
+                if (!answer.isObject() || !answer.propertyNames().equals(Set.of("ok", "result", "capabilities"))
+                    || !answer.path("ok").isBoolean() || !answer.path("ok").booleanValue()) {
+                    throw jobUnavailable();
+                }
+                var caps = answer.path("capabilities");
+                ConnectorSnapshotDeclaration.requireCapabilities(caps);
+                if (!caps.path(operation).booleanValue()) {
+                    throw jobUnavailable();
+                }
+                var result = answer.path("result");
+                // worker 의 고정 오류 code 는 stamp 없이 이 모양으로만 온다. 무엇으로 읽을지는 operation 별 호출자가 정한다.
+                if (result.isObject() && result.propertyNames().equals(Set.of("error")) && result.path("error").isString()
+                    && WORKER_ERRORS.contains(result.path("error").stringValue())) {
+                    return result;
+                }
+                if (!result.isObject() || JSON.writeValueAsBytes(result).length > 262144
+                    || !result.path("stamp").equals(JSON.valueToTree(stamp))
+                    || !result.path("job_id").isString() || !stamp.jobId().toString().equals(result.path("job_id").stringValue())) {
+                    throw jobUnavailable();
+                }
+                return result;
+            } finally {
+                pending.cancel(true);
+            }
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+            throw jobUnavailable();
+        } catch (Exception ignored) {
+            throw jobUnavailable();
+        } finally {
+            SLOTS.release();
+        }
+    }
+
+
+    private static ApiException jobUnavailable() {
+        return new ApiException(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE, "원고 저장 상태를 확인할 수 없습니다.");
+    }
 
 
     public JsonNode compile(String profile, String connectorId, JsonNode canonicalDraft, JsonNode resolvedAssets) {
@@ -60,7 +158,7 @@ public class HttpContentDraftSnapshotClient {
                     || JSON.writeValueAsBytes(answer.path("result")).length > 262144) {
                     throw unavailable();
                 }
-                ConnectorSnapshotDeclaration.requireCompileOnly(answer.path("capabilities"));
+                ConnectorSnapshotDeclaration.requireCapabilities(answer.path("capabilities"));
                 var result = answer.path("result");
                 if (!result.isObject() || !result.propertyNames().equals(Set.of("schemaVersion", "compilerVersion", "draftId", "revision",
                     "canonicalBlocks", "payload", "photoNotes", "assetManifest", "payloadFingerprint", "snapshotHash"))
