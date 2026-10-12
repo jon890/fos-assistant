@@ -62,7 +62,7 @@ clicked=false 실패와 clicked=true UNKNOWN, 600초 timeout·30초 heartbeat st
 ### 3. CP 상태 조회와 같은 phase의 테스트
 
 ContentDraftJobs.refresh(CurrentUser user, Long conversationId, UUID draftId, UUID snapshotId)는 owner·원래 대화·현재 binding 버전을 확인한 뒤 동일 예약 ID만 조회한다.
-HttpContentDraftSnapshotClient의 추가 시그니처는 `JsonNode start(String profile, String connectorId, JsonNode snapshot, UUID jobId, String ticket)`과 `JsonNode status(String profile, String connectorId, ContentDraftWorkerStamp stamp)`다.
+HttpContentDraftSnapshotClient의 추가 시그니처는 `JsonNode start(String profile, String connectorId, JsonNode snapshot, ContentDraftSaveTicketPayload job, String ticket)`과 `JsonNode status(String profile, String connectorId, ContentDraftWorkerStamp stamp)`다.
 body·결과 envelope와 timeout은 기능 문서를 따른다. 자동 HTTP retry는 추가하지 않는다.
 CONTENT_DRAFT_JOB_UNAVAILABLE을 ErrorCode에 추가한다. HttpContentDraftSnapshotClientTest에서 start·status의 실제 HTTP body와 timeout·job/hash/binding stamp 거절·재전송 0회를 확인한다.
 원격 호출 뒤 다시 ACL을 확인하고 stamp와 jobId가 맞는 상태만 기록한다. 조회 오류는 terminal을 FAILED로 바꾸지 않는다.
