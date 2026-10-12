@@ -3,7 +3,7 @@
 // - 경고 목록: 실패시키지 않는 규칙(파일 길이, 메서드 길이 등)이 넘은 곳이다. 쪼갤 후보로 쓴다.
 // Checkstyle 의 error 는 Gradle 출력에 보이므로 여기서 다루지 않는다.
 //
-// 사용법: node scripts/quality-report.mjs [--checkstyle <XML>]... [--eslint <JSON>] [--root <저장소 root>]
+// 사용법: node scripts/checks/quality-report.mjs [--checkstyle <XML>]... [--eslint <JSON>] [--root <저장소 root>]
 // 인자를 주지 않으면 기본 보고서 경로를 읽는다. 환경 변수 QUALITY_CHECKSTYLE_REPORTS(쉼표로 구분)와 QUALITY_ESLINT_REPORT 로도 바꾼다.
 // 입력이 없으면 「보고서 없음」 으로 한 줄 내고, 이 스크립트는 늘 0 으로 끝난다. Node 내장 모듈만 쓴다.
 import { existsSync, readFileSync } from "node:fs";
@@ -31,7 +31,7 @@ function parseArgs(argv) {
 
 const options = parseArgs(process.argv.slice(2));
 const root = resolve(
-  options.root ?? join(dirname(fileURLToPath(import.meta.url)), ".."),
+  options.root ?? join(dirname(fileURLToPath(import.meta.url)), "../.."),
 );
 const checkstyleReports = options.checkstyle.length
   ? options.checkstyle

@@ -96,7 +96,7 @@ HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 
 ## 품질 검사
 
 구조 규칙, 코드 규칙, 포맷은 `./gradlew qualityCheck` 하나가 묶어 검사한다. 파일을 바꾸지 않는다.
-`scripts/quality.sh check` 끝의 「경고 목록(실패 아님)」 은 실패시키지 않지만 모두 고칠 후보다.
+`scripts/checks/quality.sh check` 끝의 「경고 목록(실패 아님)」 은 실패시키지 않지만 모두 고칠 후보다.
 
 기준 파일을 갱신하거나 규칙을 뺄 때는 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 를 읽는다.
 
@@ -173,13 +173,13 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 검사: `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`, `MemoryCollectionAuditingPlacementTest`,
 `MemoryCollectionAuditingTest`, `MemoryCollectionAuditingMysqlTest`.
 실행: `./gradlew archTest`와 `./gradlew test --tests '*MemoryCollectionAuditingTest'`.
-MySQL 검사는 루트의 `scripts/check-mysql-migration.sh --tests '*MemoryCollectionAuditingMysqlTest'`로 돌린다.
+MySQL 검사는 루트의 `scripts/checks/check-mysql-migration.sh --tests '*MemoryCollectionAuditingMysqlTest'`로 돌린다.
 
 ## 엔티티와 마이그레이션은 따로 논다
 
 `./gradlew test` 는 엔티티로 스키마를 만들고 운영은 Flyway 가 만든 스키마를 검증한다.
 **그래서 둘이 어긋나도 `./gradlew test` 는 통과한다.**
-그 어긋남은 `scripts/check-mysql-migration.sh` 의 `MysqlMigrationTest` 가 Flyway 로 만든 스키마를 `ddl-auto: validate` 로 확인한다.
+그 어긋남은 `scripts/checks/check-mysql-migration.sh` 의 `MysqlMigrationTest` 가 Flyway 로 만든 스키마를 `ddl-auto: validate` 로 확인한다.
 
 엔티티를 바꾸면 마이그레이션도 함께 바꾼다. 둘이 어긋나면 운영 기동이 실패한다.
 `@Lob` 문자열은 `columnDefinition` 으로 길이를 정한다.

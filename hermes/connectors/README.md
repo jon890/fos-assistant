@@ -133,7 +133,7 @@ Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `ove
 - TypeScript 로 쓰고 `@modelcontextprotocol/sdk` 와 `zod` 를 포함해 의존성을 한 JavaScript 파일로 묶는다. 생성 entry는 Git에 커밋하지 않는다. 실행할 때 패키지를 내려받지 않는다
 - `.mcp.json` 의 `command` 는 `bun`, 인자는 `${CLAUDE_PLUGIN_ROOT}/dist/<id>-mcp.js` 하나다. 실제 실행 파일은 운영 목록이 정한다. Python MCP 서버는 허용하지 않는다
 - 빌드는 Bun `1.3.14` 와 lockfile 로 고정한다. 런타임은 검증한 최소 버전 이상을 허용한다. `hermes/connectors/<id>/scripts/build.ts` 는 `target: "bun"` 을 쓰고 `hermes/connectors/<id>/scripts/check-bundle.ts` 는 임시 디렉터리 두 곳에 빌드해 정확한 단일 출력 목록과 entry 선언, 전체 바이트 재현성을 검사하고 로컬 빌드 entry와 비교한 뒤 임시 파일을 지운다
-- 변경된 TypeScript 는 `scripts/quality.sh check` 와 `fix` 가 web 에 설치한 Prettier 로 검사하고 고친다. 토스증권의 생성 구간은 [생성기](tossinvest/scripts/generate-contract.ts)의 `--check` 로 재현성을 검사한다. 원문 fixture 와 minify 한 묶음 파일은 소스 포맷 대상이 아니다
+- 변경된 TypeScript 는 `scripts/checks/quality.sh check` 와 `fix` 가 web 에 설치한 Prettier 로 검사하고 고친다. 토스증권의 생성 구간은 [생성기](tossinvest/scripts/generate-contract.ts)의 `--check` 로 재현성을 검사한다. 원문 fixture 와 minify 한 묶음 파일은 소스 포맷 대상이 아니다
 - 사용자 컴퓨터에서 한 번 돌리는 자격 증명 발급 스크립트는 Python 표준 라이브러리를 써도 된다. 서버 실행 의존성에는 포함하지 않는다
 - 외부 호출에는 제한 시간을 둔다. 대시보드가 확인 도구를 기다리는 시간은 10초, 승인한 호출을 기다리는 시간은 60초다
 - 외부에서 온 글을 결과에 담을 때 길이를 자른다
@@ -242,7 +242,7 @@ root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 �
 
 ### CI에서 확인하는 범위
 
-`scripts/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
+`scripts/ci/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
 이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓는다. 각 패키지의 `test`와 `check:bundle`은 먼저 소스로 entry를 빌드한다. 네이버의 macOS 합성 시험도 Docker 안에서 entry를 빌드한다. 기존 HTTP 대역과 실제 entry의 SDK stdio 검사, `check:bundle`을 실행한 뒤 Docker entry와 로컬 entry를 바이트로 대조한다.
 runner에서 별도로 만든 전체 묶음과 Docker 출력의 manifest 및 모든 파일을 대조해 빌드 환경 차이도 확인한다.
 검사가 성공하면 새 checkout에 빌드한 entry를 남겨 후속 Hermes 검사에서 실행한다. 원래 있던 entry는 보존하고, 실패하면 원래 파일 상태로 돌린다. Git index는 바꾸지 않는다.
@@ -252,8 +252,8 @@ CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않�
 ## 공통 검사
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 바로 아래 디렉터리를 모두 찾아 아래를 본다.
-CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
-`scripts/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
+CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
+`scripts/checks/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
 전용 시험은 각 커넥터의 `tests/` 에 모으고, 여러 커넥터에 걸친 계약 검사만 `hermes/tests/` 에 둔다.
 
 | 보는 것 | 어긋나면 |

@@ -4,9 +4,9 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { coveredBy, coversProblems, parseCovers, staleFeatures } from "../../scripts/check-feature-covers.mjs";
+import { coveredBy, coversProblems, parseCovers, staleFeatures } from "../../scripts/ci/check-feature-covers.mjs";
 
-const script = resolve(import.meta.dirname, "../../scripts/check-feature-covers.mjs");
+const script = resolve(import.meta.dirname, "../../scripts/ci/check-feature-covers.mjs");
 
 test("parseCovers 는 제목과 첫 절 사이의 covers 줄에서 경로를 순서대로 낸다", () => {
   const markdown = [
