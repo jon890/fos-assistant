@@ -66,7 +66,9 @@ class HermesRunEventStreamTest {
     @DisplayName("원고 도구의 별칭 전체와 비표준 사건은 본문을 버리고 대화 사건은 보존한다")
     void suppressesDraftAliasesWithoutReclassifyingMessages() {
         var json = JsonMapper.builder().build();
-        for (String name : List.of("content_draft_write", "content_draft_read", "mcp__fos_assistant__content_draft_write", "mcp__fos_assistant__content_draft_read")) {
+        for (String name : List.of("content_draft_write", "content_draft_read", "content_draft_preview", "content_draft_save",
+            "mcp__fos_assistant__content_draft_write", "mcp__fos_assistant__content_draft_read",
+            "mcp__fos_assistant__content_draft_preview", "mcp__fos_assistant__content_draft_save")) {
             for (String type : List.of("tool.started", "tool.completed", "tool.failed", "tool.progress", "custom.event", "")) {
                 for (String alias : List.of("tool", "tool_name", "toolName", "name")) {
                     for (boolean nested : new boolean[] {false, true}) {
