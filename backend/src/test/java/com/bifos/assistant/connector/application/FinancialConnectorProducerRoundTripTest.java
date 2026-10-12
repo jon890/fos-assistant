@@ -164,11 +164,14 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
                 default -> {
                 }
             }
-            post(pluginUrl + "/api/connectors/tossinvest/execute", Map.of("profile", profile,
+            var answer = post(pluginUrl + "/api/connectors/tossinvest/execute", Map.of("profile", profile,
                 "hermes_tool", "mcp__tossinvest__create_order", "args", args, "execution", Map.of("v", 1,
                     "protocol", "approval-claim-v1", "ticket", sent.ticket(), "argsJson", sent.argsJson(),
                     "argsSha256", "sha".equals(change) ? "0".repeat(64) : sent.argsSha256())),
                 properties.dashboardToken());
+            // 손상된 wire는 Python 처리기가 실패로 답해야 한다. 승인 상태는 그 거절을 받은 것으로 정산한다.
+            assertThat(answer.path("ok").asBoolean(false)).as("plugin 응답=%s", answer).isFalse();
+            assertThat(answer.path("detail").isString()).as("plugin 응답=%s", answer).isTrue();
             return CallResult.failure(ConnectorCallError.INVALID_INPUT);
         }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
         assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.FAILED);

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -58,6 +59,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.bifos.assistant.crypto.domain.TextCipher;
+import com.bifos.assistant.proactive.domain.ProactiveCheck;
+import com.bifos.assistant.proactive.domain.type.CheckTrigger;
+import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
+import com.bifos.assistant.shared.error.ApiException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -76,6 +85,8 @@ class FinancialConnectorProducerTest {
     static final String ARGS = "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}";
     @Autowired
     ConnectorFinancialProducer producer;
+    @Autowired
+    ProactiveCheckRepository checks;
     @Autowired
     ConnectorFinancialApproval approval;
     @Autowired
@@ -276,6 +287,59 @@ class FinancialConnectorProducerTest {
         assertThatThrownBy(this::request).isInstanceOf(RuntimeException.class);
         assertThat(actions.count()).isEqualTo(count);
         assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("권한과 선언이 맞지 않으면 prepare 전에 거부하고 아무것도 저장하지 않는다")
+    @ValueSource(strings = {"cipher-disabled", "user-not-allowed", "read-only-check", "agent-disabled", "agent-owner",
+        "connection-owner", "undeclared-tool"})
+    void rejectsBeforePreparationWhenAuthorityOrDeclarationDiffers(String change) {
+        long count = actions.count();
+        long snapshots = contents.count();
+        String toolName = "create_order";
+        Object original = ReflectionTestUtils.getField(producer, "cipher");
+        try {
+            switch (change) {
+                case "cipher-disabled" -> ReflectionTestUtils.setField(producer, "cipher", mock(TextCipher.class));
+                case "user-not-allowed" -> jdbc.update("delete from allowed_person where email = ?", user.email());
+                case "read-only-check" -> readOnlyCheck();
+                case "agent-disabled" -> jdbc.update("update agent set enabled = false where id = " + agentSql(), bindingId);
+                case "agent-owner" -> jdbc.update("update agent set owner_user_id = ? where id = " + agentSql(), otherUser(), bindingId);
+                case "connection-owner" -> jdbc.update("update connector_connection set user_id = ? where id = ?", otherUser(), connectionId);
+                default -> toolName = "get_orders";
+            }
+            String name = toolName;
+            assertThatThrownBy(() -> producer.request(profile, session, session, UUID.randomUUID().toString(),
+                "mcp__tossinvest__" + name, name, ARGS)).isInstanceOf(ApiException.class);
+        } finally {
+            ReflectionTestUtils.setField(producer, "cipher", original);
+        }
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(contents.count()).isEqualTo(snapshots);
+        assertThat(counters().path("prepare").intValue()).isZero();
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    private static String agentSql() {
+        return "(select agent_id from agent_connector_binding where id = ?)";
+    }
+
+
+    private Long otherUser() {
+        return tx().execute(status -> users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "다른 사람", 1L,
+            UserRole.MEMBER, now))).id();
+    }
+
+
+    private void readOnlyCheck() {
+        tx().executeWithoutResult(status -> {
+            var run = runs.findAll().stream().filter(row -> session.equals(row.hermesSessionId())).findFirst().orElseThrow();
+            var check = ProactiveCheck.started(user.id(), run.agentId(), run.conversationId(), CheckTrigger.MANUAL, false, now);
+            check.attachRoot(run.id(), session);
+            checks.saveAndFlush(check);
+        });
     }
 
 
