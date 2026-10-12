@@ -4,9 +4,9 @@ import { mkdtempSync, writeFileSync, renameSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded } from "../../scripts/pr-size.mjs";
+import { LARGE_THRESHOLD, MAX_LINES, category, classify, compare, countChanges, excluded } from "../../scripts/pr/pr-size.mjs";
 
-const SCRIPT = new URL("../../scripts/pr-size.mjs", import.meta.url).pathname;
+const SCRIPT = new URL("../../scripts/pr/pr-size.mjs", import.meta.url).pathname;
 // 시험 자식이 CI 작업의 출력과 요약을 바꾸거나 예외 라벨을 물려받지 않게 한다.
 const CLI_ENV = { ...process.env };
 for (const key of ["GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "PR_LABELS"]) delete CLI_ENV[key];

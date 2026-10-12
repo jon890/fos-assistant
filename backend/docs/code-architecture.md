@@ -278,6 +278,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
 | `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
 | `connector.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
+| `connector.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
 | `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
@@ -474,7 +475,7 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 
 | 언제 | 어떻게 |
 | --- | --- |
-| 기준에 든 위반을 고쳤다 | 평소 테스트가 `StoreUpdateFailedException: Updating frozen violations is disabled` 로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. `scripts/quality.sh fix` 도 같은 명령으로 기준을 줄인다 |
+| 기준에 든 위반을 고쳤다 | 평소 테스트가 `StoreUpdateFailedException: Updating frozen violations is disabled` 로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. `scripts/checks/quality.sh fix` 도 같은 명령으로 기준을 줄인다 |
 | 기준에 든 클래스의 이름만 바꿨다 | 같은 예외로 실패한다. 아래 「새 위반을 받아들이거나 다시 얼린다」 를 따른다 |
 | 규칙을 새로 더했다 | `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 그 규칙의 기준 파일을 만든다. `allowStoreCreation` 은 `stored.rules` 가 없을 때만 쓴다 |
 | 새 위반을 받아들이거나 다시 얼린다 | `./gradlew archTest --rerun --tests '*ArchitectureRulesTest.<메서드>' -Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true`. 까닭을 커밋 메시지와 PR 본문에 적는다 |
@@ -523,12 +524,12 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 
 ### 파일 길이 기준 목록
 
-`scripts/check-file-length.mjs`가 언어 공통 파일 길이 규칙을 소유한다.
+`scripts/checks/check-file-length.mjs`가 언어 공통 파일 길이 규칙을 소유한다.
 빈 줄과 주석을 포함한 전체 줄 수를 세며 마지막 개행은 빈 줄로 더하지 않는다.
-`scripts/quality.sh check`, `scripts/check-local.sh`, CI의 `quality` 단계에서 검사한다.
+`scripts/checks/quality.sh check`, `scripts/dev/check-local.sh`, CI의 `quality` 단계에서 검사한다.
 
-상한과 검사 범위, 제외하는 시험 경로와 생성물은 `scripts/check-file-length.mjs` 가 갖는다.
-데이터 표는 `scripts/file-length-baseline.json`의 `exclusions`에 경로와 까닭을 명시한다.
+상한과 검사 범위, 제외하는 시험 경로와 생성물은 `scripts/checks/check-file-length.mjs` 가 갖는다.
+데이터 표는 `scripts/checks/file-length-baseline.json`의 `exclusions`에 경로와 까닭을 명시한다.
 
 기존 긴 파일은 같은 파일의 `files`에 현재 줄 수를 기준값으로 둔다.
 기준 목록에 없는 파일이 상한을 넘거나, 목록에 든 파일이 기준값보다 커지면 실패한다.
@@ -537,8 +538,8 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 
 ```bash
 # cwd: 저장소 root
-node scripts/check-file-length.mjs
-node scripts/check-file-length.mjs --update
+node scripts/checks/check-file-length.mjs
+node scripts/checks/check-file-length.mjs --update
 ```
 
 `--update`는 기준값을 실제 줄 수로 낮춘다. 상한 이하가 됐거나 삭제된 파일은 목록에서 뺀다.

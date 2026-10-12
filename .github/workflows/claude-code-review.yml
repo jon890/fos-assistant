@@ -67,6 +67,7 @@ jobs:
 
       # 리뷰 뒤 확인에 쓰는 스크립트는 PR 이 아니라 기본 브랜치의 것을 쓴다.
       # PR 브랜치에는 아직 없을 수 있고, 비밀값을 가진 실행에서 PR 이 고친 스크립트를 돌리지 않기 위해서다.
+      # 경로 이동 전 브랜치들이 새 main 을 모두 합친 뒤 옛 경로 fallback 을 제거한다.
       - name: 리뷰 확인 도구를 기본 브랜치에서 가져오기
         if: github.event_name != 'issue_comment' || steps.fork_guard.outputs.review == 'true'
         uses: actions/checkout@v6
@@ -75,6 +76,8 @@ jobs:
           path: .review-tools
           fetch-depth: 1
           sparse-checkout: |
+            scripts/pr/review-execution-summary.mjs
+            scripts/pr/submitted-claude-reviews.jq
             scripts/review-execution-summary.mjs
             scripts/submitted-claude-reviews.jq
           sparse-checkout-cone-mode: false
@@ -162,7 +165,7 @@ jobs:
               fi
             done
 
-      # 바뀐 경로로 위험 라벨을 단다. 판정은 main 의 scripts/pr-risk-labels.sh 가 갖는다.
+      # 바뀐 경로로 위험 라벨을 단다. 판정은 main 의 scripts/pr/pr-risk-labels.sh 가 갖는다.
       # 처음 2주는 라벨만 단다. 머지 규칙은 바꾸지 않고, 리뷰가 그 관점을 더 보게만 한다.
       - name: 경로로 위험 라벨 달기
         id: risk
@@ -173,7 +176,9 @@ jobs:
           git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
           RISK_SCRIPT=$(mktemp "$RUNNER_TEMP/pr-risk-labels.XXXXXX")
           trap 'rm -f "$RISK_SCRIPT"' EXIT
-          git show origin/main:scripts/pr-risk-labels.sh > "$RISK_SCRIPT"
+          if ! git show origin/main:scripts/pr/pr-risk-labels.sh > "$RISK_SCRIPT" 2>/dev/null; then
+            git show origin/main:scripts/pr-risk-labels.sh > "$RISK_SCRIPT"
+          fi
           LABELS=$(gh pr diff "${{ env.PR_NUMBER }}" --repo "${{ github.repository }}" --name-only \
             | bash "$RISK_SCRIPT")
           for label in $LABELS; do
@@ -248,7 +253,12 @@ jobs:
         if: always() && (github.event_name != 'issue_comment' || steps.fork_guard.outputs.review == 'true')
         env:
           EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
-        run: node .review-tools/scripts/review-execution-summary.mjs
+        run: |
+          SUMMARY_SCRIPT=.review-tools/scripts/pr/review-execution-summary.mjs
+          if [ ! -f "$SUMMARY_SCRIPT" ]; then
+            SUMMARY_SCRIPT=.review-tools/scripts/review-execution-summary.mjs
+          fi
+          node "$SUMMARY_SCRIPT"
 
       # 게시된 인라인 댓글 중 dummy / 길이 미달 / 마커 부재 entry 를 자동 정리
       # — Claude action 이 자연어 sanity check 를 무시하고 "test body" / "test2"
@@ -299,10 +309,14 @@ jobs:
             echo "::error::리뷰 도중 PR 커밋이 변경되었습니다. 새 커밋을 다시 리뷰해야 합니다."
             exit 1
           fi
+          REVIEW_FILTER=.review-tools/scripts/pr/submitted-claude-reviews.jq
+          if [ ! -f "$REVIEW_FILTER" ]; then
+            REVIEW_FILTER=.review-tools/scripts/submitted-claude-reviews.jq
+          fi
           COUNT=$(gh api --paginate --slurp \
             "repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}/reviews?per_page=100" \
             | jq --arg sha "$REVIEW_HEAD" --argjson last "$LAST_REVIEW_ID" \
-              -f .review-tools/scripts/submitted-claude-reviews.jq)
+              -f "$REVIEW_FILTER")
           if [ "$COUNT" -eq 0 ]; then
             echo "::error::리뷰 미제출: 이번 실행에서 현재 커밋에 제출한 Claude 리뷰가 없습니다."
             exit 1
