@@ -1239,6 +1239,7 @@ class ConnectorPolicyEndpointTest {
         assertThat(actions.findById(((Number)row.get("ID")).longValue()).orElseThrow().argsJson()).isEqualTo(ARGS);
     }
 
+
     private Map<String, Object> onlyRow() {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM connector_action");
         assertThat(rows).as("connector_action 의 줄").hasSize(1);
