@@ -558,7 +558,7 @@ HTTP 뒤 DB 상태를 다시 확인한다. 철회·재설치·카탈로그 변�
 PENDING 설치 callback의 `409/pending`은 실패나 READY의 필수 조건으로 바꾸지 않는다.
 설치·상태·probe 결과를 현재 시도의 CAS로 READY에 저장한 뒤 새 nonce로 verified를 확인한다.
 옛 backend의 401·403·404와 guard 누락, SHA·nonce 불일치 및 재시작 뒤 확인 실패는 이전 verified를 되살리지 못한다.
-금융 승인 hook과 주문 producer가 없으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
+금융 승인 hook이 없고 아래 producer도 공개 경로에 연결하지 않으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
 DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
 
 ### 운영 비활성 금융 snapshot producer
