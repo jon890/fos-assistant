@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { forwardControlPlane } from "@/lib/control-plane";
 import { readControlPlaneResult } from "@/lib/control-plane-result";
 import { errorResponse } from "@/lib/api-response";
+import { rejectCrossOrigin } from "@/lib/same-origin";
 
 /** Control Plane 과 같은 본문 바이트 상한이다. */
 const MAX_BODY = 8 * 1024;
@@ -30,10 +31,13 @@ async function readLimited(request: Request): Promise<Uint8Array[] | null> {
 }
 
 /**
- * 열린 로그인 화면에 입력 하나를 보낸다. 세션을 먼저 보고, 본문은 크기만 확인해 받은 바이트 그대로 넘긴다.
+ * 열린 로그인 화면에 입력 하나를 보낸다. 출처와 세션을 먼저 보고, 본문은 크기만 확인해 받은 바이트 그대로 넘긴다.
  * 성공하면 본문 없이 204 다.
  */
 export async function POST(request: Request) {
+  // 입력에 비밀번호가 실릴 수 있어 다른 출처의 요청은 본문을 읽기 전에 막는다.
+  const rejected = rejectCrossOrigin(request);
+  if (rejected) return rejected;
   const session = await auth();
   if (!session?.user?.email) {
     return errorResponse("UNAUTHENTICATED", "로그인이 필요해요.", 401);
