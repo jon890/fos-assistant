@@ -64,7 +64,9 @@ final class ConnectorCatalogTools {
                 identifiers(policy),
                 text(policy, "description"),
                 argLabels(policy),
-                text(policy, "summary")));
+                text(policy, "summary"),
+                outbound(policy),
+                conversationGrant(policy)));
         }
         return List.copyOf(tools);
     }
@@ -78,6 +80,35 @@ final class ConnectorCatalogTools {
      */
     private static Boolean grant(JsonNode policy) {
         JsonNode value = policy == null ? null : policy.get("grant");
+        if (value == null) {
+            return null;
+        }
+        return value.isBoolean() && value.asBoolean();
+    }
+
+
+    /**
+     * 밖으로 나가는 도구인지의 선언이다(ADR-065). 칸이 없으면 null 이다.
+     *
+     * <p>boolean 이 아닌 값은 거절하지 않고 참으로 읽는다. 읽을 수 없는 선언이 대화 허락을 여는 쪽으로 읽히지 않게 한다.
+     */
+    private static Boolean outbound(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("outbound");
+        if (value == null) {
+            return null;
+        }
+        return !value.isBoolean() || value.asBoolean();
+    }
+
+
+    /**
+     * 한 대화에서 계속 허용할 수 있다는 선언이다(ADR-20261012 / conversation-grant). 칸이 없으면 null 이고 받는 쪽이 닫힌 것으로
+     * 읽는다.
+     *
+     * <p>boolean 이 아닌 값은 거절하지 않고 거짓으로 읽는다. 읽을 수 없는 선언이 대화 허락을 여는 쪽으로 읽히지 않게 한다.
+     */
+    private static Boolean conversationGrant(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("conversation_grant");
         if (value == null) {
             return null;
         }

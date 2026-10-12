@@ -3,9 +3,10 @@ package com.bifos.assistant;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
+import com.bifos.assistant.chat.application.ContentDraftCleaner;
 import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.chat.application.MediaObservationCleaner;
-import com.bifos.assistant.chat.application.ContentDraftCleaner;
+import com.bifos.assistant.connector.application.ConnectorActionSweeper;
 import com.bifos.assistant.proactive.application.ValueEvaluationRecovery;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
@@ -84,6 +85,10 @@ class CollationMixQueryMysqlTest {
     /** V57에는 원고 표가 없으므로 원고 정리의 기동 읽기도 실행하지 않는다. */
     @MockitoBean
     private ContentDraftCleaner contentDraftCleaner;
+
+    /** V57의 승인 줄 표에는 살펴보기 트리 칸이 없으므로 승인 줄의 기동 정리는 실행하지 않는다. */
+    @MockitoBean
+    private ConnectorActionSweeper connectorActionSweeper;
 
 
     @DynamicPropertySource
