@@ -580,6 +580,7 @@ test("새 탭의 편집기에 사진만 남아 있어도 불러오지 않고 NAV
 
 test.each([
   {},
+  { document: { components: [{ "@ctype": "unknown-placeholder" }] } },
   { document: {} },
   { document: { components: [{ "@ctype": "text", value: "쓰던 글" }] } },
   { document: { components: [{ "@ctype": "text", value: [{}] }] } },

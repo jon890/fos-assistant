@@ -131,8 +131,10 @@ export async function editorDocument(
   }
 }
 
-/** 새 편집기에 놓일 수 있는 구성요소 종류. 그 밖의 종류가 있으면 쓰던 글로 본다. */
+/** 새 편집기에 놓일 수 있는 구성요소 종류. */
 const EMPTY_KINDS = new Set(["documentTitle", "text"]);
+/** 이미 읽기에서 다루는 비글 구성요소. 모르는 종류는 작성 중인 글로 진단하지 않는다. */
+const CONTENT_KINDS = new Set(["image", "sticker", "placesMap"]);
 
 /** 문단 배열에 공백 밖의 글자가 있는지 본다. 모르는 모양은 빈 글로 간주하지 않는다. */
 function hasText(page: EditorPage, paragraphs: unknown) {
@@ -161,6 +163,11 @@ export async function assertEmptyEditor(page: EditorPage, listed: TempDraft[]) {
   const components = doc.document?.components;
   if (!Array.isArray(components))
     throw page.fail("editor_failed", "편집기 구성요소의 모양이 다르다");
+  for (const component of components) {
+    const kind = String(component?.["@ctype"] ?? "");
+    if (!EMPTY_KINDS.has(kind) && !CONTENT_KINDS.has(kind))
+      throw page.fail("editor_failed", "편집기 구성요소의 종류를 알지 못한다");
+  }
   const written = components.some(
     (component) =>
       !EMPTY_KINDS.has(String(component?.["@ctype"] ?? "")) ||
