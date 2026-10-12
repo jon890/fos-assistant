@@ -25,6 +25,10 @@ public interface ContentDraftJobRepository extends JpaRepository<ContentDraftJob
     Optional<ContentDraftJob> findByJobId(String jobId);
 
 
+    /** 이 시각보다 먼저 승인했는데 아직 그 상태인 job 이다. 기한 정리가 쓴다. */
+    List<ContentDraftJob> findByStatusInAndApprovedAtBefore(Collection<ContentDraftJobStatus> statuses, Instant before);
+
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select j from ContentDraftJob j where j.id = :id")
     Optional<ContentDraftJob> lockById(@Param("id") Long id);

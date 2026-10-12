@@ -1,8 +1,6 @@
 package com.bifos.assistant.chat;
 
-import com.bifos.assistant.hermes.dto.ContentDraftWorkerStamp;
 import org.mockito.Mockito;
-import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -92,13 +90,6 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
         });
         assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SAVING);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.SAVING);
-    }
-
-
-    private ObjectNode statusAnswer(ContentDraftWorkerStamp stamp, String status, boolean clicked) {
-        return json.createObjectNode().put("job_id", stamp.jobId().toString()).set("stamp", json.valueToTree(stamp))
-            .put("status", status).put("stage", "state").put("save_clicked", clicked)
-            .putNull("finished_at").putNull("saved_before").putNull("saved_after").putNull("error_code");
     }
 
 

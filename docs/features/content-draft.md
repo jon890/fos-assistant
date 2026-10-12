@@ -270,7 +270,10 @@ private 상태 도구 이름은 manifest의 `content_snapshot_status`다.
 | 예외·timeout·응답 유실 | UNKNOWN | DISPATCHED였으면 UNKNOWN |
 
 같은 snapshot의 재승인·재전송·outbox는 없다. 기존 ConnectorAction의 SUCCEEDED는 원고 경로에서 쓰지 않는다.
-오래된 EXECUTING 정리는 5분 뒤 승인 줄을 UNKNOWN으로 바꾸지만 job과 worker 허가는 그대로 둔다.
+원고 승인 줄은 job이 수명을 소유한다. `ConnectorActionExpirer`의 5분 정리와 `ConnectorActionSweeper`의 기동 정리는 job 링크가 있는 줄을 UNKNOWN으로 바꾸지 않는다.
+`ContentDraftJobExpirer`가 승인 뒤 15분이 지나도록 DISPATCHED·SAVING인 job을 한 번 조회한다. 끝난 결과를 읽으면 그대로 기록하고, 아니면 start claim이 없으면 FAILED, 있으면 UNKNOWN과 `CONTENT_DRAFT_JOB_EXPIRED`로 닫는다. EXECUTING 승인 줄도 같은 결과로 끝낸다.
+15분은 ticket 최대 수명 660초와 worker 실행 상한 600초보다 길다. 그 뒤에는 worker가 claim을 받지 못해 저장 클릭이 새로 생기지 않는다. 예약을 커밋한 뒤 시작을 보내기 전에 CP가 내려가 DISPATCHED로 남은 job도 이 정리가 닫는다.
+정리 전까지 그 연결의 해제와 재등록은 기존처럼 `CONNECTOR_ACTION_EXECUTING`으로 거절된다.
 
 ### 저장 ticket과 authorize
 
@@ -293,7 +296,7 @@ worker는 authorize 요청을 10초 timeout으로 한 번만 보내고 재시도
 매 호출은 ticket의 job·snapshot·hash·승인 줄·owner·대화·바인딩 판이 DB와 같은지 보고, 잠금 안에서 승인 사실, 사용자 허용, 에이전트, origin·루트 실행, 현재 원고·원본·바인딩을 다시 확인한다.
 start는 `start_claimed_at`, save는 `save_claimed_at`을 NULL에서 시각으로 바꾸는 조건부 갱신 결과 1일 때만 허가하고 그 트랜잭션을 커밋한 뒤 응답한다.
 start 전의 photo·save, 두 번째 start, 두 번째 save, save 뒤의 photo는 403이다. 응답을 잃어도 같은 claim을 다시 주거나 ticket을 다시 발급하지 않는다.
-시작 응답을 잃어 UNKNOWN인 job도 claim 한 번은 쓸 수 있다. 승인 줄은 EXECUTING이나 정리된 UNKNOWN이어야 한다.
+시작 응답을 잃어 UNKNOWN인 job도 claim 한 번은 쓸 수 있다. 승인 줄은 EXECUTING이거나 시작 응답을 잃은 UNKNOWN이어야 한다.
 
 ### 잠금 순서와 철회의 선형화
 
@@ -323,11 +326,12 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 | 시작 접수·start claim | SAVING | 같은 job만 조회 |
 | 시작 전 거절 | FAILED | 같은 snapshot 재시도 없음 |
 | 시작 결과 모름 | UNKNOWN | 예약 jobId로만 조회, 재승인으로 재실행하지 않음 |
+| 승인 뒤 15분 동안 끝나지 않음 | start claim 없으면 FAILED, 있으면 UNKNOWN | 기한 정리가 마지막으로 한 번 조회한 뒤 닫음 |
 
 `ContentDraftJobs.refresh`는 주인·원래 대화·원고 ID를 먼저 확인한다. 현재 binding·connection 버전과 정책이 snapshot과 같고 status capability가 켜져 있을 때만 같은 예약 ID를 조회한다. 연결이 없거나 바뀌면 마지막 CP 상태만 읽는다.
 원격 호출 동안 DB 잠금을 유지하지 않는다. 응답 뒤 coordinator에서 현재 ACL·binding을 다시 확인하고 승인 줄 → snapshot → job 순서로 잠근다. stamp와 jobId가 정확한 결과만 기록한다.
 `ContentDraftWorkerStatusDecoder`는 소문자 worker 상태를 CP enum으로 명시적으로 옮기며 단계·boolean·수치·종료 시각의 타입을 검사한다. 조회 오류는 `CONTENT_DRAFT_JOB_UNAVAILABLE`이고 기존 상태를 FAILED로 바꾸지 않는다.
-늦은 terminal은 UNKNOWN job을 해소할 수 있다. 확정한 SUCCEEDED·FAILED는 덮지 않고 UNKNOWN을 running 응답으로 되돌리지 않는다. save claim 또는 save_clicked 뒤의 실패는 UNKNOWN이다. ConnectorAction은 EXECUTING일 때만 terminal로 바꾸고 기존 UNKNOWN 승인 줄은 유지한다.
+늦은 terminal은 UNKNOWN job을 해소할 수 있다. 확정한 SUCCEEDED·FAILED는 덮지 않고 UNKNOWN을 running 응답으로 되돌리지 않는다. save claim 또는 save_clicked 뒤의 실패는 UNKNOWN이다. ConnectorAction은 EXECUTING일 때만 terminal로 바꾸고 기존 UNKNOWN 승인 줄은 유지한다. 일반 실행 정리가 원고 승인 줄을 바꾸지 않으므로 UNKNOWN 승인 줄은 시작 응답을 잃었을 때만 생긴다.
 FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장이 없었다는 증거가 아니다. save claim 뒤의 실패는 UNKNOWN으로 둔다.
 
 ### 승인과 허가 검증

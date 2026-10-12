@@ -155,11 +155,13 @@ class ConnectorActionLifecycle {
     /**
      * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
      *
+     * <p>원고 job 링크가 있는 줄은 job 이 수명을 소유한다. {@link ContentDraftJobExpirer} 가 job 과 함께 끝낸다.
+     *
      * @return 바꾼 건수
      */
     int markInterrupted(Instant now) {
         List<ConnectorAction> interrupted = transactions.execute(status -> {
-            List<ConnectorAction> executing = actions.findByStatus(ActionStatus.EXECUTING);
+            List<ConnectorAction> executing = actions.findExecutingWithoutContentJob();
             executing.forEach(action -> action.unknown(now));
             return actions.saveAll(executing);
         });
@@ -178,7 +180,7 @@ class ConnectorActionLifecycle {
      */
     int markStale(Instant before, Instant now) {
         int changed = 0;
-        for (ConnectorAction stale : actions.findByStatusAndDecidedAtBefore(ActionStatus.EXECUTING, before)) {
+        for (ConnectorAction stale : actions.findExecutingWithoutContentJobDecidedBefore(before)) {
             try {
                 Optional<ConnectorAction> unknown =
                         transactions.execute(status -> actions.findByPublicIdForUpdate(stale.publicId())

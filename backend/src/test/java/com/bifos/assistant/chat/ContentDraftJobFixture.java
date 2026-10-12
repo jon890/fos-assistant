@@ -6,6 +6,7 @@ import java.util.Base64;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
+import com.bifos.assistant.hermes.dto.ContentDraftWorkerStamp;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -192,6 +193,14 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
 
     protected UUID preview() {
         return snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), origin.id()).snapshotId();
+    }
+
+
+    /** 같은 stamp 를 되돌려 주는 worker 상태 응답이다. */
+    protected ObjectNode statusAnswer(ContentDraftWorkerStamp stamp, String status, boolean clicked) {
+        return json.createObjectNode().put("job_id", stamp.jobId().toString()).set("stamp", json.valueToTree(stamp))
+            .put("status", status).put("stage", "state").put("save_clicked", clicked)
+            .putNull("finished_at").putNull("saved_before").putNull("saved_after").putNull("error_code");
     }
 
 

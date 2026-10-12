@@ -27,6 +27,9 @@ import jakarta.persistence.EnumType;
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ContentDraftJob {
+    /** ticket 기한과 worker 실행 상한이 지나도록 끝나지 않아 Control Plane 이 닫았다. */
+    public static final String EXPIRED = "CONTENT_DRAFT_JOB_EXPIRED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -128,6 +131,18 @@ public class ContentDraftJob {
     public void unknown(Instant at) {
         requireRunning();
         this.status = ContentDraftJobStatus.UNKNOWN;
+        this.lastCheckedAt = at;
+    }
+
+
+    /**
+     * Control Plane 이 더 기다리지 않고 job 을 닫는다. start claim 이 없으면 worker 가 브라우저를 열지 않았으므로 FAILED, 있으면
+     * 결과를 모르는 UNKNOWN 이다. 늦게 온 worker 는 claimStart 의 허용 상태에 FAILED 가 없어 시작하지 못한다.
+     */
+    public void close(String errorCode, Instant at) {
+        require(running() || status == ContentDraftJobStatus.UNKNOWN);
+        this.status = startClaimedAt == null ? ContentDraftJobStatus.FAILED : ContentDraftJobStatus.UNKNOWN;
+        this.errorCode = errorCode;
         this.lastCheckedAt = at;
     }
 

@@ -35,16 +35,20 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>저장 요청은 기존 승인 줄 하나와 job 링크 하나를 같은 트랜잭션에서 만든다. 같은 snapshot 의 두 번째 요청은 앞의 줄을 그대로
  * 돌려준다. 현재 연결이 같은 조회만 예약한 private job을 읽고 시작은 재전송하지 않는다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJobQueries {
@@ -64,6 +69,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private static final String DEDUPE_PREFIX = "v1-content-save";
     /** MCP 서버의 등록 이름이 아니므로 일반 승인 경로는 이 줄을 선언 없는 도구로 보고 실행 없이 거절한다. */
     static final String HERMES_TOOL = "fos_content_draft_save";
+    private static final Set<ContentDraftJobStatus> RUNNING = EnumSet.of(ContentDraftJobStatus.DISPATCHED, ContentDraftJobStatus.SAVING);
 
     private final ContentDraftSnapshots snapshots;
     private final ContentDraftSnapshotInputs inputs;
@@ -82,6 +88,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final HttpContentDraftSnapshotClient worker;
+    private final AppUserRepository owners;
 
 
     @Override
@@ -144,6 +151,12 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         if (!draftId.equals(view.draftId())) {
             throw notFound();
         }
+        return refreshJob(user, snapshot, job, view);
+    }
+
+
+    private ContentDraftJobView refreshJob(CurrentUser user, ContentDraftSnapshot snapshot, ContentDraftJob job, ContentDraftJobView view) {
+        Long conversationId = snapshot.conversationId();
         if (job.jobId() == null || !job.running() && job.status() != ContentDraftJobStatus.UNKNOWN) {
             return view;
         }
@@ -161,7 +174,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         if (declaration == null || !Boolean.TRUE.equals(declaration.capabilities().get("status"))) {
             return view;
         }
-        var ticketFields = new ContentDraftSaveTicketPayload(UUID.fromString(job.jobId()), snapshotId, snapshot.snapshotHash(),
+        var ticketFields = new ContentDraftSaveTicketPayload(UUID.fromString(job.jobId()), snapshot.publicId(), snapshot.snapshotHash(),
             view.actionId(), user.id(), conversationId, snapshot.bindingId(), snapshot.connectionId(),
             snapshot.bindingUpdatedAt(), snapshot.connectionUpdatedAt(), null, null);
         var stamp = ContentDraftWorkerStatusDecoder.stamp(binding.profile(), ticketFields);
@@ -181,17 +194,76 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 throw ContentDraftWorkerStatusDecoder.unavailable();
             }
             currentJob.observed(observed.status(), observed.stage(), observed.saveClicked(), observed.errorCode(), clock.instant());
-            if (action.status() == ActionStatus.EXECUTING) {
-                switch (currentJob.status()) {
-                    case SUCCEEDED -> action.succeed(null, clock.instant());
-                    case FAILED -> action.fail("unavailable", null, clock.instant());
-                    case UNKNOWN -> action.unknown(clock.instant());
-                    default -> {
-                    }
-                }
-            }
+            finishAction(action, currentJob);
             return views(List.of(currentJob)).getFirst();
         });
+    }
+
+
+    /**
+     * 승인한 지 {@code before} 가 지나도록 진행 중인 job 을 한 번 조회하고, 그래도 끝나지 않았으면 닫는다. 아직 EXECUTING 인 승인 줄도
+     * 같은 결과로 끝낸다. 원고 승인 줄은 일반 실행 정리 대상이 아니므로 이 정리가 그 줄의 수명을 끝낸다.
+     *
+     * @param before 이 시각보다 먼저 승인한 job 만 본다. ticket 기한과 worker 실행 상한보다 넉넉히 앞선 시각을 준다
+     * @return 닫은 job 수
+     */
+    public int closeOverdue(Instant before) {
+        int closed = 0;
+        for (var due : jobs.findByStatusInAndApprovedAtBefore(RUNNING, before)) {
+            try {
+                if (closeOverdue(due)) {
+                    closed++;
+                }
+            } catch (RuntimeException ex) {
+                log.warn("기한이 지난 원고 저장 job 을 닫지 못했다 jobId={} kind={}", due.jobId(), ex.getClass().getSimpleName());
+            }
+        }
+        return closed;
+    }
+
+
+    private boolean closeOverdue(ContentDraftJob due) {
+        var snapshot = snapshotRows.findById(due.snapshotId()).orElseThrow(ContentDraftJobs::notFound);
+        var owner = owners.findById(due.ownerUserId()).orElse(null);
+        if (owner != null) {
+            try {
+                var user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+                refreshJob(user, snapshot, due, views(List.of(due)).getFirst());
+            } catch (RuntimeException ignored) {
+                // 마지막 조회에 실패해도 닫는다. 결과는 start claim 유무로 정한다.
+            }
+        }
+        var actionId = actions.findById(due.actionId()).orElseThrow(ContentDraftJobs::notFound).publicId();
+        var closed = mutations.run(due.ownerUserId(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), () -> {
+            var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ContentDraftJobs::notFound);
+            snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
+            var job = jobs.lockById(due.id()).orElseThrow(ContentDraftJobs::notFound);
+            if (!job.running()) {
+                return false;
+            }
+            job.close(ContentDraftJob.EXPIRED, clock.instant());
+            finishAction(action, job);
+            return true;
+        });
+        if (closed) {
+            events.publishEvent(new ConnectorActionChanged(snapshot.conversationId(), actionId));
+        }
+        return closed;
+    }
+
+
+    /** 승인 줄은 EXECUTING 일 때만 job 의 terminal 로 옮긴다. 이미 끝난 줄은 덮지 않는다. */
+    private void finishAction(ConnectorAction action, ContentDraftJob job) {
+        if (action.status() != ActionStatus.EXECUTING) {
+            return;
+        }
+        switch (job.status()) {
+            case SUCCEEDED -> action.succeed(null, clock.instant());
+            case FAILED -> action.fail("unavailable", null, clock.instant());
+            case UNKNOWN -> action.unknown(clock.instant());
+            default -> {
+            }
+        }
     }
 
 

@@ -80,9 +80,22 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
             """)
     List<UUID> findPublicIdsForTree(@Param("rootId") Long rootId, @Param("status") ActionStatus status);
 
-    List<ConnectorAction> findByStatus(ActionStatus status);
+    /** 일반 정리 대상인 실행 줄이다. 원고 job 링크가 있는 줄은 job 정리가 끝내므로 뺀다. */
+    @Query("""
+            select a from ConnectorAction a
+            where a.status = com.bifos.assistant.connector.domain.type.ActionStatus.EXECUTING
+              and not exists (select j.id from ContentDraftJob j where j.actionId = a.id)
+            """)
+    List<ConnectorAction> findExecutingWithoutContentJob();
 
-    List<ConnectorAction> findByStatusAndDecidedAtBefore(ActionStatus status, Instant before);
+    /** {@link #findExecutingWithoutContentJob()} 가운데 이 시각보다 먼저 승인한 줄이다. */
+    @Query("""
+            select a from ConnectorAction a
+            where a.status = com.bifos.assistant.connector.domain.type.ActionStatus.EXECUTING
+              and a.decidedAt < :before
+              and not exists (select j.id from ContentDraftJob j where j.actionId = a.id)
+            """)
+    List<ConnectorAction> findExecutingWithoutContentJobDecidedBefore(@Param("before") Instant before);
 
     /** 그 대화에서 아직 전하지 않은 끝난 승인 줄이다. 만든 순이다. */
     List<ConnectorAction> findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(
