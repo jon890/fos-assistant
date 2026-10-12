@@ -14,6 +14,8 @@ import { Notice } from "@/components/ui/notice";
 import { toolRiskLabel } from "@/lib/connection";
 import {
   approvalArgs,
+  approvalArgLabel,
+  readableArgs,
   approveConnectorAction,
   hiddenArgKeys,
   rejectConnectorAction,
@@ -29,10 +31,18 @@ const GRANT_CHOICES: { period: GrantPeriod; label: string }[] = [
 
 type Sending = "approve" | "reject" | "grant" | null;
 
-function ArgRows({ rows }: { rows: { key: string; value: string }[] }) {
+function ArgRows({
+  rows,
+  label,
+}: {
+  rows: { key: string; value: string }[];
+  label: (key: string) => string;
+}) {
   return rows.map((row) => (
     <div key={row.key} className="min-w-0">
-      <dt className="break-all text-xs text-muted-foreground">{row.key}</dt>
+      <dt className="break-all text-xs text-muted-foreground">
+        {label(row.key)}
+      </dt>
       <dd className="whitespace-pre-wrap break-all">{row.value}</dd>
     </div>
   ));
@@ -41,8 +51,11 @@ function ArgRows({ rows }: { rows: { key: string; value: string }[] }) {
 /**
  * 가려진 인자가 있어 승인할 수 없는 줄의 안내다. 왜 막혔는지와 사용자가 할 일을 카드에서 바로 읽게 한다(ADR-089).
  */
-function HiddenArgsNotice({ argsJson }: { argsJson: string | null }) {
-  const keys = hiddenArgKeys(argsJson);
+function HiddenArgsNotice({ action }: { action: ConnectorAction }) {
+  const rawKeys = readableArgs(action.argsJson)?.map((row) => row.key);
+  const keys = hiddenArgKeys(action.argsJson).map((key) =>
+    approvalArgLabel(key, action.argLabels, rawKeys),
+  );
   return (
     <Notice variant="warning" role="status" data-testid="approval-hidden-args">
       <p data-testid="approval-hidden-args-reason" className="break-words">
@@ -87,6 +100,9 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
     ) : null;
   }
   const shown = args.rows.filter((row) => !fold || row.core);
+  const rawKeys = readableArgs(action.argsJson)?.map((row) => row.key);
+  const label = (key: string) =>
+    approvalArgLabel(key, action.argLabels, rawKeys);
   const folded = fold ? args.rows.filter((row) => !row.core) : [];
   const emptyLine =
     args.emptyKeys.length > 0 ? (
@@ -94,7 +110,7 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
         data-testid="approval-args-empty"
         className="break-all text-xs text-muted-foreground"
       >
-        비어 있는 항목: {args.emptyKeys.join(", ")}
+        비어 있는 항목: {args.emptyKeys.map(label).join(", ")}
       </p>
     ) : null;
   const more = folded.length + args.emptyKeys.length;
@@ -110,7 +126,7 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
             folded.length > 0 ? "sm:grid-cols-2" : argsHeight,
           )}
         >
-          <ArgRows rows={shown} />
+          <ArgRows rows={shown} label={label} />
         </dl>
       ) : null}
       {fold && more > 0 ? (
@@ -127,7 +143,7 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
                   argsHeight,
                 )}
               >
-                <ArgRows rows={folded} />
+                <ArgRows rows={folded} label={label} />
               </dl>
             ) : null}
             {emptyLine}
@@ -255,7 +271,7 @@ export function ApprovalCard({
         </>
       )}
       <ApprovalArgsView action={action} />
-      {blocked ? <HiddenArgsNotice argsJson={action.argsJson} /> : null}
+      {blocked ? <HiddenArgsNotice action={action} /> : null}
       {action.status === "PENDING" ? (
         <div className="flex flex-wrap items-center gap-2">
           {blocked ? null : (

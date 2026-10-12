@@ -115,6 +115,11 @@ TOOL_RISK_DEFAULTS = {"READ": ("none", "none"), "SENSITIVE": ("required", "requi
 
 TOOL_TITLE_MAX_CHARS = 80
 
+# 승인 인자 표시 이름의 공통 상한이다. 정책과 실행 인자에는 쓰지 않는다.
+TOOL_ARG_LABELS_MAX = 64
+TOOL_ARG_LABEL_MAX_CHARS = 80
+TOOL_ARG_LABELS_MAX_BYTES = 16384
+
 
 # `tools.<이름>.identifiers` 가 가리키는 인자 이름이다(ADR-089). 도구 인자 객체의 맨 위 칸만 가리킨다.
 # 31자까지다. 32자 이상인 이름은 Control Plane 이 키 이름 자체를 긴 덩어리로 보고 가린다.

@@ -119,6 +119,18 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
         self.assertEqual(self.request(EXECUTE, "POST", self.body(execution=True))[0], 404)
         self.assertEqual(self.supports + self.claims + self.trades, [])
 
+    def test_argument_labels_change_whole_hash_and_block_old_ticket(self):
+        self.rewrite("connector.json", lambda declared: declared["tools"]["list_scopes"].update(
+            arg_labels={"scope": "범위"}))
+        changed = self.plugin._connector_manifest(base.DEMO)
+        self.assertEqual(changed["tools"], self.manifest["tools"])
+        self.assertEqual(changed["server"], self.manifest["server"])
+        self.assertEqual(changed["execution_guard"], self.manifest["execution_guard"])
+        self.assertNotEqual(changed["execution_guard_manifest_sha256"], self.guard["manifestSha256"])
+        self.assertEqual(self.guard_module._guard_support(PROFILE, changed, self.entry)["state"], "pending")
+        self.assertEqual(self.request(EXECUTE, "POST", self.body(execution=True))[0], 409)
+        self.assertEqual(self.supports + self.claims + self.trades, [])
+
     def test_revocation_during_callback_blocks_prepare_and_execution(self):
         for route, body in ((PREPARE, self.body()), (EXECUTE, self.body(execution=True))):
             self.write_state()

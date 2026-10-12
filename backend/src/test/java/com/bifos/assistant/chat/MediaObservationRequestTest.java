@@ -24,6 +24,27 @@ import org.springframework.dao.DataAccessResourceFailureException;
 
 class MediaObservationRequestTest extends ObservationFixture {
     @Test
+    @DisplayName("같은 UUID 재시도는 revision을 보존하고 다른 본문은 거부하며 UUID는 첨부별로 격리한다")
+    void scopesDuplicateUuidToAttachmentAndPreservesEncryptedBody() {
+        UUID request = UUID.randomUUID();
+        var first = record(0, request, input("첫 픽셀"), model());
+        assertThat(record(0, request, input("첫 픽셀"), model())).isEqualTo(first);
+        code(() -> record(0, request, input("다른 본문"), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
+        var otherPhoto = photo(owner, conversation, MediaObservationPixelFixture.gif(2));
+        var second = service.record(owner, conversation.id(), otherPhoto.id(), 0, request, input("둘째 픽셀"), model());
+        assertThat(second.revision()).isEqualTo(1);
+        assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(first, second);
+        assertThat(observations.count()).isEqualTo(2);
+        assertThat(requests.count()).isEqualTo(2);
+        for (var row : observations.findAll()) {
+            assertThat(row.bodyKeyId()).isNotNull();
+            assertThat(row.body()).doesNotContain("픽셀");
+            assertThat(bodies.open(row, owner.id())).isPresent();
+        }
+    }
+
+
+    @Test
     @DisplayName("서비스 재생성 뒤 모든 수락 UUID의 alias를 복원한다")
     void restoresEveryAcceptedAliasAfterServiceRestart() {
         UUID a = UUID.randomUUID();
@@ -147,7 +168,12 @@ class MediaObservationRequestTest extends ObservationFixture {
             input().coverage(),
             new MediaObservationInput.Evidence(ObservationProvenanceKind.USER_CORRECTION, "USER_CORRECTION"),
             null);
-        record(1, UUID.randomUUID(), correction, user);
+        var corrected = record(1, UUID.randomUUID(), correction, user);
+        code(() -> record(2, UUID.randomUUID(), input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
+        assertThat(service.list(owner, conversation.id(), null, 10).getFirst()).isEqualTo(corrected);
+        assertThat(corrected.observation().summary()).isEqualTo("사용자 정정");
+        assertThat(observations.count()).isEqualTo(2);
+        assertThat(requests.count()).isEqualTo(2);
         jdbc.update("update media_observation set body='broken' where revision=2");
         code(() -> record(2, UUID.randomUUID(), input(), model()), ErrorCode.MEDIA_OBSERVATION_CONFLICT);
         assertThat(record(0, old, input(), model())).isEqualTo(first);
