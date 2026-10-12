@@ -269,6 +269,14 @@ public class ConnectorAction {
         return approvalMode == ToolApproval.REQUIRED && toolName != null;
     }
 
+    /**
+     * 이 도구를 이 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 상시 허락과 같은 조건에 더해, 허락이 묶일
+     * 대화와 에이전트가 있어야 한다.
+     */
+    public boolean conversationGrantAllowed() {
+        return grantAllowed() && conversationId != null && agentId != null;
+    }
+
     private void require(ActionStatus expected) {
         if (status != expected) {
             throw new IllegalStateException("connector action must be " + expected + " but is " + status);

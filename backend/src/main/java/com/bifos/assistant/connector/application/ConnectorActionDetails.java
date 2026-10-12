@@ -9,6 +9,7 @@ import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
@@ -44,11 +45,16 @@ class ConnectorActionDetails {
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
 
     private final ConnectorActionRepository actions;
+    private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorCatalogCache catalog;
 
 
-    ConnectorActionDetails(ConnectorActionRepository actions, ConnectorCatalogCache catalog) {
+    ConnectorActionDetails(
+        ConnectorActionRepository actions,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConnectorCatalogCache catalog) {
         this.actions = actions;
+        this.conversationGrants = conversationGrants;
         this.catalog = catalog;
     }
 
@@ -189,7 +195,8 @@ class ConnectorActionDetails {
             action.errorCode(),
             action.resultText(),
             action.userId(),
-            action.executedAt());
+            action.executedAt(),
+            action.status() != null && conversationGrants.existsByActionId(action.id()));
     }
 
 
@@ -208,7 +215,24 @@ class ConnectorActionDetails {
             hiddenArgs(manifest, action),
             manifest.flatMap(found -> found.tools().stream()
                 .filter(tool -> Objects.equals(tool.name(), action.toolName()))
-                .findFirst()).map(ConnectorTool::argLabels).orElse(Map.of()));
+                .findFirst()).map(ConnectorTool::argLabels).orElse(Map.of()),
+            conversationGrantable(manifest, action));
+    }
+
+
+    /**
+     * 지금 카탈로그로 볼 때 그 줄의 도구를 한 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 밖으로 나가는
+     * 도구는 줄 수 없다. 그 밖의 규칙은 {@link #grantable} 과 같다.
+     *
+     * @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값
+     */
+    static boolean conversationGrantable(Optional<ConnectorManifest> manifest, ConnectorAction action) {
+        if (manifest.isEmpty()) {
+            return false;
+        }
+        return ConnectorToolPolicies.find(manifest.get(), action.toolName())
+            .map(ToolPolicy::conversationGrantable)
+            .orElse(manifest.get().schema() == SCHEMA_WITHOUT_TOOLS);
     }
 
 

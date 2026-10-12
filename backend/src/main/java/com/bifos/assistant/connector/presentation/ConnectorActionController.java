@@ -4,6 +4,7 @@ import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ApproveRequest;
+import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ConversationGrantView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.GrantView;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.CurrentUserProvider;
@@ -47,11 +48,30 @@ public class ConnectorActionController {
                 .toList();
     }
 
-    /** 본문이 없으면 상시 허락을 주지 않는 승인이다. */
+    /** 본문이 없으면 상시 허락도 대화 허락도 주지 않는 승인이다. */
     @PostMapping("/connector-actions/{actionId}/approve")
     public ActionView approve(@PathVariable UUID actionId, @RequestBody(required = false) ApproveRequest request) {
-        return ActionView.from(
-                actions.approve(currentUser.require(), actionId, request == null ? null : request.grant()));
+        return ActionView.from(actions.approve(
+                currentUser.require(),
+                actionId,
+                request == null ? null : request.grant(),
+                request != null && Boolean.TRUE.equals(request.conversationGrant())));
+    }
+
+    /** 그 대화에서 계속 허용 중인 도구다. 주인의 대화가 아니면 다른 대화 경로와 같은 응답이다. */
+    @GetMapping("/chat/conversations/{conversationId}/connector-conversation-grants")
+    public List<ConversationGrantView> conversationGrants(@PathVariable UUID conversationId) {
+        CurrentUser user = currentUser.require();
+        return actions.conversationGrants(user, conversations.requireOwnId(user, conversationId)).stream()
+                .map(ConversationGrantView::from)
+                .toList();
+    }
+
+    @DeleteMapping("/chat/conversations/{conversationId}/connector-conversation-grants/{grantId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeConversationGrant(@PathVariable UUID conversationId, @PathVariable Long grantId) {
+        CurrentUser user = currentUser.require();
+        actions.revokeConversationGrant(user, conversations.requireOwnId(user, conversationId), grantId);
     }
 
     @PostMapping("/connector-actions/{actionId}/reject")

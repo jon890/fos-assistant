@@ -486,6 +486,38 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("도구의 outbound 는 칸이 없으면 null, boolean 이면 그 값이고 그 밖의 모양은 참으로 읽는다")
+    @Test
+    void readsOutboundOfToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String required = "{\"risk\":\"WRITE\",\"approval\":\"required\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(
+                CATALOG.replace(
+                    tail,
+                    tail + ",\"schema\":2,\"tools\":{"
+                        + "\"absent\":" + required + "},"
+                        + "\"inside\":" + required + ",\"outbound\":false},"
+                        + "\"outside\":" + required + ",\"outbound\":true},"
+                        + "\"word\":" + required + ",\"outbound\":\"false\"},"
+                        + "\"empty\":" + required + ",\"outbound\":null}}"),
+                MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.tools())
+            .extracting(ConnectorTool::name, ConnectorTool::outbound)
+            .containsExactly(
+                tuple("absent", null),
+                tuple("inside", false),
+                tuple("outside", true),
+                // 읽을 수 없는 선언은 대화 허락을 여는 쪽으로 읽지 않는다.
+                tuple("word", true),
+                tuple("empty", true));
+        server.verify();
+    }
+
+
     @DisplayName("도구의 identifiers 는 문자열 배열이면 그 순서대로 읽고, 칸이 없거나 그 밖의 모양이면 빈 목록으로 읽는다")
     @Test
     void readsIdentifiersOfToolPolicies() {

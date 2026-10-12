@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -16,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
+import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
@@ -82,7 +84,7 @@ class ConnectorActionControllerTest {
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].length()").value(14))
+            .andExpect(jsonPath("$[0].length()").value(15))
             .andExpect(jsonPath("$[0].actionId").value(ACTION.toString()))
             .andExpect(jsonPath("$[0].connectorId").value("demo-notes"))
             .andExpect(jsonPath("$[0].toolName").value("write_note"))
@@ -96,7 +98,8 @@ class ConnectorActionControllerTest {
             .andExpect(jsonPath("$[0].expiresAt").exists())
             .andExpect(jsonPath("$[0].grantAllowed").value(true))
             .andExpect(jsonPath("$[0].hiddenArgs").value(true))
-            .andExpect(jsonPath("$[0].argLabels.text").value("내용"));
+            .andExpect(jsonPath("$[0].argLabels.text").value("내용"))
+            .andExpect(jsonPath("$[0].conversationGrantAllowed").value(false));
     }
 
 
@@ -117,7 +120,7 @@ class ConnectorActionControllerTest {
     @Test
     @DisplayName("승인은 grant 를 기간으로 읽어 넘기고 승인한 줄을 돌려준다")
     void approvePassesGrantPeriod() throws Exception {
-        when(service.approve(MEMBER, ACTION, GrantPeriod.TODAY)).thenReturn(PENDING);
+        when(service.approve(MEMBER, ACTION, GrantPeriod.TODAY, false)).thenReturn(PENDING);
 
         mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)
             .contentType(MediaType.APPLICATION_JSON)
@@ -131,7 +134,7 @@ class ConnectorActionControllerTest {
     @Test
     @DisplayName("grant 가 null 이거나 본문이 없으면 허락 없는 승인이다")
     void approveWithoutGrantPassesNull() throws Exception {
-        when(service.approve(MEMBER, ACTION, null)).thenReturn(PENDING);
+        when(service.approve(MEMBER, ACTION, null, false)).thenReturn(PENDING);
 
         mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)
             .contentType(MediaType.APPLICATION_JSON)
@@ -151,14 +154,14 @@ class ConnectorActionControllerTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
-        verify(service, never()).approve(any(), any(), any());
+        verify(service, never()).approve(any(), any(), any(), anyBoolean());
     }
 
 
     @Test
     @DisplayName("PENDING 이 아닌 줄의 승인은 409 CONNECTOR_ACTION_NOT_PENDING 이다")
     void approveOfFinishedActionIsConflict() throws Exception {
-        when(service.approve(MEMBER, ACTION, null))
+        when(service.approve(MEMBER, ACTION, null, false))
             .thenThrow(new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, "not pending"));
 
         mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION))
@@ -218,5 +221,56 @@ class ConnectorActionControllerTest {
             .andExpect(jsonPath("$.code").value("CONNECTOR_ACTION_NOT_FOUND"));
 
         verify(service).revokeGrant(MEMBER, 5L);
+    }
+
+
+    @Test
+    @DisplayName("conversationGrant 가 참이면 대화 허락을 함께 주는 승인으로 넘긴다")
+    void approvePassesConversationGrant() throws Exception {
+        when(service.approve(MEMBER, ACTION, null, true)).thenReturn(PENDING);
+
+        mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"grant\":null,\"conversationGrant\":true}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.actionId").value(ACTION.toString()));
+
+        verify(service).approve(MEMBER, ACTION, null, true);
+    }
+
+
+    @Test
+    @DisplayName("대화 허락 목록은 주인의 대화 번호로 읽고 grantId, title, expiresAt 만 낸다")
+    void conversationGrantsReturnContractFields() throws Exception {
+        when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
+        when(service.conversationGrants(MEMBER, 42L))
+            .thenReturn(List.of(new ConnectorConversationGrantView(
+                7L, "메모 쓰기", Instant.parse("2026-10-13T00:00:00Z"))));
+
+        mvc.perform(get("/api/v1/chat/conversations/{id}/connector-conversation-grants", CONVERSATION))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].length()").value(3))
+            .andExpect(jsonPath("$[0].grantId").value(7))
+            .andExpect(jsonPath("$[0].title").value("메모 쓰기"))
+            .andExpect(jsonPath("$[0].expiresAt").exists());
+    }
+
+
+    @Test
+    @DisplayName("대화 허락을 거두면 204 이고, 남의 대화면 CONVERSATION_NOT_FOUND 로 거두지 않는다")
+    void revokeConversationGrantChecksConversationOwner() throws Exception {
+        UUID foreign = UUID.fromString("019a0000-0000-7000-8000-000000000009");
+        when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
+        when(conversations.requireOwnId(MEMBER, foreign))
+            .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
+
+        mvc.perform(delete("/api/v1/chat/conversations/{id}/connector-conversation-grants/{grantId}", CONVERSATION, 7L))
+            .andExpect(status().isNoContent());
+        mvc.perform(delete("/api/v1/chat/conversations/{id}/connector-conversation-grants/{grantId}", foreign, 7L))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("CONVERSATION_NOT_FOUND"));
+
+        verify(service).revokeConversationGrant(MEMBER, 42L, 7L);
+        verify(service, never()).revokeConversationGrant(MEMBER, null, 7L);
     }
 }

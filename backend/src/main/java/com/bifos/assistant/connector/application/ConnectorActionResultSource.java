@@ -42,6 +42,12 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
 
     static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";
 
+    /** 대화 허락을 함께 준 결과의 알림 줄에 더하는 문장이다. */
+    static final String CONVERSATION_GRANT_NOTICE = "이 대화에서는 같은 동작을 다시 묻지 않고 실행해요. 다른 대화에서는 다시 물어요";
+
+    /** 대화 허락을 함께 준 결과의 모델 입력에 더하는 줄이다. 같은 동작을 다시 승인받으라고 사용자에게 말하지 않게 한다. */
+    static final String CONVERSATION_GRANT_INPUT = "사용자가 이 동작을 이 대화에서 계속 허용했다. 이 대화에서는 같은 동작이 승인 없이 실행된다.";
+
     /** 전달 묶음의 항목에 적는 출처 이름이다. 결과 이름은 승인 줄의 {@code public_id} UUID 글이다. */
     static final String SOURCE = "CONNECTOR_ACTION";
 
@@ -129,7 +135,16 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
         }
     }
 
-    private static String notice(ConnectorActionResult result) {
+    /** 대화 허락을 함께 준 결과는 그 사실을 한 문장 더한다. 다른 대화에서는 다시 묻는다는 것도 알린다. */
+    static String notice(ConnectorActionResult result) {
+        String status = statusNotice(result);
+        if (!result.conversationGranted()) {
+            return status;
+        }
+        return status + ". " + CONVERSATION_GRANT_NOTICE;
+    }
+
+    private static String statusNotice(ConnectorActionResult result) {
         return switch (result.status()) {
             case SUCCEEDED -> "승인한 「" + result.title() + "」 실행이 끝났어요";
             case FAILED -> "승인한 「" + result.title() + "」 실행이 실패했어요";
@@ -165,6 +180,9 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
         });
         StringBuilder input = new StringBuilder("승인한 동작의 결과가 도착했다.\n")
                 .append(ResultHeader.render("승인한 동작", fields, result.executedAt(), freshness, staleAfter));
+        if (result.conversationGranted()) {
+            input.append('\n').append(CONVERSATION_GRANT_INPUT);
+        }
         if (result.status() == ActionStatus.UNKNOWN) {
             return input.append('\n').append(UNKNOWN_INPUT).toString();
         }

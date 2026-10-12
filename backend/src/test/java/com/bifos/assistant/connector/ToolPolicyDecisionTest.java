@@ -13,6 +13,7 @@ import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -264,5 +265,44 @@ class ToolPolicyDecisionTest {
                         .denyReason())
                 .as("승인 줄에 원문으로 둘 수 없는 인자")
                 .isEqualTo(ActionDenyReason.ARGS_TOO_LARGE);
+    }
+
+    @Test
+    @DisplayName("대화 허락은 밖으로 나가지 않는 required 도구만 허용하고, 상시 허락을 닫은 도구도 대화 허락으로는 허용한다")
+    void conversationGrantAllowsOnlyToolsThatStayInside() {
+        Optional<ToolPolicy> inside = Optional.of(
+                new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false, Set.of(), true));
+        Optional<ToolPolicy> outbound = Optional.of(
+                new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false, Set.of(), false));
+        ToolPolicyDecision allowed =
+                new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
+        ToolPolicyDecision needsApproval =
+                new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
+
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, inside, false, true, 2, NOT_CHECK))
+                .isEqualTo(allowed);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, inside, true, false, 2, NOT_CHECK))
+                .as("상시 허락을 닫은 도구의 남은 상시 허락")
+                .isEqualTo(needsApproval);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, outbound, false, true, 2, NOT_CHECK))
+                .as("밖으로 나가는 도구")
+                .isEqualTo(needsApproval);
+    }
+
+    @Test
+    @DisplayName("대화 허락이 있어도 금융과 되돌리기 어려운 도구는 거절이고 살펴보기 트리는 경계대로 판정한다")
+    void conversationGrantDoesNotOpenClosedRisksOrCheckRuns() {
+        Optional<ToolPolicy> financial =
+                Optional.of(new ToolPolicy(ToolRisk.FINANCIAL, ToolApproval.ALWAYS, null, false));
+
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, financial, false, true, 2, NOT_CHECK))
+                .isEqualTo(new ToolPolicyDecision(
+                        ActionDecision.DENIED, ActionDenyReason.RISK_NOT_OPEN, ToolRisk.FINANCIAL, ToolApproval.ALWAYS));
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, WRITE, false, true, 2, READ_ONLY))
+                .isEqualTo(new ToolPolicyDecision(
+                        ActionDecision.DENIED, ActionDenyReason.READ_ONLY_RUN, ToolRisk.WRITE, ToolApproval.REQUIRED));
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, WRITE, false, true, 2, APPROVAL_ONLY))
+                .isEqualTo(new ToolPolicyDecision(
+                        ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED));
     }
 }

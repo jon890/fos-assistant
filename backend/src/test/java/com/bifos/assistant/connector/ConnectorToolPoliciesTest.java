@@ -11,6 +11,7 @@ import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -132,6 +133,25 @@ class ConnectorToolPoliciesTest {
     }
 
     @Test
+    @DisplayName("대화 허락은 required 이고 밖으로 나가지 않는 도구에만 열고, outbound 를 모르는 옛 카탈로그면 상시 허락을 따른다")
+    void readsConversationGrantFromOutbound() {
+        ConnectorManifest manifest = manifest(
+                2,
+                VERIFY,
+                OPTIONS,
+                tool("inside_closed", Boolean.FALSE, Boolean.FALSE),
+                tool("outbound", Boolean.FALSE, Boolean.TRUE),
+                tool("old_open", null, null),
+                tool("old_closed", Boolean.FALSE, null));
+
+        assertThat(ConnectorToolPolicies.find(manifest, "inside_closed").orElseThrow().conversationGrantable()).isTrue();
+        assertThat(ConnectorToolPolicies.find(manifest, "outbound").orElseThrow().conversationGrantable()).isFalse();
+        assertThat(ConnectorToolPolicies.find(manifest, "old_open").orElseThrow().conversationGrantable()).isTrue();
+        assertThat(ConnectorToolPolicies.find(manifest, "old_closed").orElseThrow().conversationGrantable()).isFalse();
+        assertThat(ConnectorToolPolicies.find(manifest, VERIFY.name()).orElseThrow().conversationGrantable()).isFalse();
+    }
+
+    @Test
     @DisplayName("none 이나 always 인 도구는 grant 가 참이어도 상시 허락을 줄 수 없다")
     void toolWithoutRequiredApprovalIsNeverGrantable() {
         ConnectorManifest manifest = manifest(
@@ -187,6 +207,10 @@ class ConnectorToolPoliciesTest {
     }
 
     /** 확인 도구가 {@code check} 이고 선택지 도구가 {@code list_scopes} 인 커넥터다. */
+    private static ConnectorTool tool(String name, Boolean grant, Boolean outbound) {
+        return new ConnectorTool(name, "WRITE", "required", null, grant, List.of(), null, Map.of(), outbound);
+    }
+
     private static ConnectorManifest manifest(int schema, ConnectorTool... tools) {
         return new ConnectorManifest(
                 "demo-notes",

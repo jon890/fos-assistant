@@ -14,6 +14,7 @@ import java.util.UUID;
  * @param resultText 실행 결과 본문. 모델 입력에만 넣고 알림 줄에는 싣지 않는다
  * @param userId 승인 줄의 주인
  * @param executedAt 실행이 끝난 시각. 결과 머리줄의 끝난 시각과 신선도에 쓴다(ADR-071). 모르면 null
+ * @param conversationGranted 승인하면서 그 도구를 그 대화에서 계속 허용했는가. 알림 줄과 모델 입력이 함께 알린다
  */
 public record ConnectorActionResult(
         UUID actionId,
@@ -23,4 +24,19 @@ public record ConnectorActionResult(
         String errorCode,
         String resultText,
         Long userId,
-        Instant executedAt) {}
+        Instant executedAt,
+        boolean conversationGranted) {
+
+    /** 대화 허락을 모르는 호출이다. */
+    public ConnectorActionResult(
+            UUID actionId,
+            String title,
+            String tool,
+            ActionStatus status,
+            String errorCode,
+            String resultText,
+            Long userId,
+            Instant executedAt) {
+        this(actionId, title, tool, status, errorCode, resultText, userId, executedAt, false);
+    }
+}

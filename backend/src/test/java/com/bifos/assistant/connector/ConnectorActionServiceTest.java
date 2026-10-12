@@ -1717,6 +1717,7 @@ class ConnectorActionServiceTest {
         jdbc.update("DELETE FROM decision_feedback_event");
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
+        jdbc.update("DELETE FROM connector_conversation_grant");
         bindings.deleteAll();
         connections.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));

@@ -43,11 +43,24 @@ public record ToolPolicyDecision(
         return denied(ActionDenyReason.POLICY_UNAVAILABLE, null);
     }
 
+    /** 대화 허락이 없는 호출이다. 뜻은 {@link #decide(ConnectionStatus, boolean, int, Optional, boolean, boolean, int, CheckBoundary)} 와 같다. */
+    public static ToolPolicyDecision decide(
+            ConnectionStatus connectionStatus,
+            boolean ownServerTool,
+            int schema,
+            Optional<ToolPolicy> declared,
+            boolean granted,
+            int argsBytes,
+            CheckBoundary boundary) {
+        return decide(connectionStatus, ownServerTool, schema, declared, granted, false, argsBytes, boundary);
+    }
+
     /**
      * @param ownServerTool 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 아니면 판과 상관없이 선언 없는 도구다
      * @param schema manifest 의 판
      * @param declared 그 도구의 선언. manifest 에 없으면 빈 값
      * @param granted 그 도구에 유효한 상시 허락이 있는가
+     * @param conversationGranted 그 대화의 그 에이전트 실행에 그 도구의 유효한 대화 허락이 있는가
      * @param argsBytes 인자 글의 UTF-8 바이트 수
      * @param boundary 먼저 살펴보기 트리 안의 호출인지와 그 살펴보기의 경계. 뜻은 {@link CheckBoundary} 가 갖는다
      */
@@ -57,6 +70,7 @@ public record ToolPolicyDecision(
             int schema,
             Optional<ToolPolicy> declared,
             boolean granted,
+            boolean conversationGranted,
             int argsBytes,
             CheckBoundary boundary) {
         if (connectionStatus != ConnectionStatus.READY) {
@@ -67,7 +81,7 @@ public record ToolPolicyDecision(
             return denied(ActionDenyReason.UNDECLARED, null);
         }
         // 도구를 선언하지 않는 판의 선언 없는 도구는 쓰기로 읽는다. 무엇을 하는지 모르므로 읽기로 풀어 주지 않는다.
-        // 그 판은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다.
+        // 그 판은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다. 대화 허락도 같다.
         ToolPolicy policy = declared.orElseGet(() -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
@@ -86,9 +100,12 @@ public record ToolPolicyDecision(
         if (boundary == CheckBoundary.APPROVAL_ONLY && !readWithoutApproval) {
             return new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, policy.risk(), policy.approval());
         }
-        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065).
+        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065). 밖으로 나가는 도구는 대화 허락도 보지 않는다
+        // (ADR-20261012 / conversation-grant).
+        boolean allowedByGrant = (granted && policy.grantable())
+                || (conversationGranted && policy.conversationGrantable());
         if (policy.approval() == ToolApproval.NONE
-                || (policy.approval() == ToolApproval.REQUIRED && granted && policy.grantable())) {
+                || (policy.approval() == ToolApproval.REQUIRED && allowedByGrant)) {
             return new ToolPolicyDecision(ActionDecision.ALLOWED, null, policy.risk(), policy.approval());
         }
         return new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, policy.risk(), policy.approval());

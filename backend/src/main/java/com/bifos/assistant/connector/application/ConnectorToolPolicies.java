@@ -107,6 +107,9 @@ public final class ConnectorToolPolicies {
      * <p>상시 허락은 승인을 받아 실행하는 도구에만 줄 수 있고, 선언이 닫았으면 줄 수 없다(ADR-065). 옛 대시보드
      * plugin 은 그 칸을 내지 않으므로 없는 것은 닫지 않은 것으로 읽는다. 식별자 인자도 승인 카드가 있는 도구에만
      * 둔다(ADR-089).
+     *
+     * <p>대화 허락은 승인을 받아 실행하고 밖으로 나가지 않는다고 선언한 도구에만 줄 수 있다(ADR-20261012 /
+     * conversation-grant). 밖으로 나가는지를 내지 않는 옛 대시보드 plugin 이면 모르는 것이라, 상시 허락이 열린 도구에만 연다.
      */
     private static Optional<ToolPolicy> policy(ConnectorTool tool) {
         ToolApproval approval = ToolApproval.fromWord(tool.approval());
@@ -117,14 +120,23 @@ public final class ConnectorToolPolicies {
             if (risk.name().equals(tool.risk())) {
                 return approval.looserThan(risk.floor())
                     ? Optional.empty()
-                    : Optional.of(new ToolPolicy(
-                        risk,
-                        approval,
-                        tool.title(),
-                        approval == ToolApproval.REQUIRED && !Boolean.FALSE.equals(tool.grant()),
-                        approval == ToolApproval.REQUIRED ? Set.copyOf(tool.identifiers()) : Set.of()));
+                    : Optional.of(policy(tool, risk, approval));
             }
         }
         return Optional.empty();
+    }
+
+
+    private static ToolPolicy policy(ConnectorTool tool, ToolRisk risk, ToolApproval approval) {
+        boolean required = approval == ToolApproval.REQUIRED;
+        boolean grantable = required && !Boolean.FALSE.equals(tool.grant());
+        boolean stayInside = tool.outbound() == null ? grantable : !tool.outbound();
+        return new ToolPolicy(
+            risk,
+            approval,
+            tool.title(),
+            grantable,
+            required ? Set.copyOf(tool.identifiers()) : Set.of(),
+            required && stayInside);
     }
 }

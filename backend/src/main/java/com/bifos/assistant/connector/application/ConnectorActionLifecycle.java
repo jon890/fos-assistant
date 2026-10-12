@@ -1,12 +1,15 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
+import com.bifos.assistant.connector.domain.ConnectorConversationGrant;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -29,6 +32,7 @@ class ConnectorActionLifecycle {
 
     private final ConnectorActionRepository actions;
     private final ConnectorToolGrantRepository grants;
+    private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorActionDetails details;
     private final ConnectorActionSignals signals;
     private final TransactionTemplate transactions;
@@ -37,12 +41,14 @@ class ConnectorActionLifecycle {
     ConnectorActionLifecycle(
             ConnectorActionRepository actions,
             ConnectorToolGrantRepository grants,
+            ConnectorConversationGrantRepository conversationGrants,
             ConnectorActionDetails details,
             ConnectorActionSignals signals,
             TransactionTemplate transactions,
             Clock clock) {
         this.actions = actions;
         this.grants = grants;
+        this.conversationGrants = conversationGrants;
         this.details = details;
         this.signals = signals;
         this.transactions = transactions;
@@ -107,6 +113,36 @@ class ConnectorActionLifecycle {
                 .orElseThrow(ConnectorActionDetails::notFound);
         grant.revoke(now());
         grants.save(grant);
+    }
+
+    /**
+     * 그 대화에서 계속 허용 중인 도구다(ADR-20261012 / conversation-grant). 지금 선언이 대화 허락을 닫은 도구는 판정이 보지 않아
+     * 효력이 없으므로 내지 않는다. 카탈로그를 읽지 못했으면 낸다.
+     *
+     * @param conversationId 주인인 것을 이미 확인한 대화의 번호
+     */
+    List<ConnectorConversationGrantView> conversationGrants(CurrentUser user, Long conversationId) {
+        Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
+        List<ConnectorConversationGrantView> views = new ArrayList<>();
+        for (ConnectorConversationGrant grant : conversationGrants.findActiveInConversation(user.id(), conversationId, now())) {
+            Optional<ToolPolicy> declared = manifests
+                    .computeIfAbsent(grant.connectorId(), details::readManifest)
+                    .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
+            if (declared.isPresent() && !declared.get().conversationGrantable()) {
+                continue;
+            }
+            views.add(ConnectorConversationGrantView.from(grant, declared.map(ToolPolicy::title).orElse(null)));
+        }
+        return views;
+    }
+
+    /** 대화 허락을 거둔다. 남의 허락과 다른 대화의 허락은 없는 것과 같은 응답이다. */
+    void revokeConversationGrant(CurrentUser user, Long conversationId, Long grantId) {
+        ConnectorConversationGrant grant = conversationGrants.findById(grantId)
+                .filter(found -> found.userId().equals(user.id()) && found.conversationId().equals(conversationId))
+                .orElseThrow(ConnectorActionDetails::notFound);
+        grant.revoke(now());
+        conversationGrants.save(grant);
     }
 
     /**
@@ -225,13 +261,15 @@ class ConnectorActionLifecycle {
                 grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
         active.forEach(grant -> grant.revoke(now));
         grants.saveAll(active);
+        conversationGrants.revokeAllOfConnector(connection.userId(), connection.connectorId(), now);
         signals.publishAfterCommit(rejected);
     }
 
     /**
      * 그 에이전트에서 연결을 뗄 때 그 에이전트의 실행이 판정한 줄만 거절한다. 트랜잭션 안에서 부른다.
      *
-     * <p>상시 허락은 건드리지 않는다. 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸린다.
+     * <p>상시 허락은 건드리지 않는다. 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸린다. 대화 허락은
+     * 에이전트에 묶이므로 그 에이전트의 것만 거둔다. 다시 붙여도 돌아오지 않는다.
      * {@code EXECUTING} 이 남은 줄이 있으면 {@code CONNECTOR_ACTION_EXECUTING} 으로 거절한다. 실행이 그 profile 의 값으로
      * 돌고 있어 그 사이 떼면 결과를 알 수 없다. 부르는 쪽이 사용자 행을 잠근 채 부르고 승인도 같은 행을 먼저 잠그므로
      * 줄을 따로 잠그지 않는다.
@@ -245,6 +283,7 @@ class ConnectorActionLifecycle {
         List<ConnectorAction> pending = actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
                 connection.userId(), connection.connectorId(), agentId, ActionStatus.PENDING);
         pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
+        conversationGrants.revokeAllOfAgent(connection.userId(), connection.connectorId(), agentId, now);
         signals.publishAfterCommit(actions.saveAll(pending));
     }
 

@@ -63,7 +63,8 @@ final class ConnectorCatalogTools {
                 grant(policy),
                 identifiers(policy),
                 text(policy, "description"),
-                argLabels(policy)));
+                argLabels(policy),
+                outbound(policy)));
         }
         return List.copyOf(tools);
     }
@@ -81,6 +82,20 @@ final class ConnectorCatalogTools {
             return null;
         }
         return value.isBoolean() && value.asBoolean();
+    }
+
+
+    /**
+     * 밖으로 나가는 도구인지의 선언이다(ADR-065). 칸이 없으면 null 이고 받는 쪽이 상시 허락의 선언으로 정한다.
+     *
+     * <p>boolean 이 아닌 값은 거절하지 않고 참으로 읽는다. 읽을 수 없는 선언이 대화 허락을 여는 쪽으로 읽히지 않게 한다.
+     */
+    private static Boolean outbound(JsonNode policy) {
+        JsonNode value = policy == null ? null : policy.get("outbound");
+        if (value == null) {
+            return null;
+        }
+        return !value.isBoolean() || value.asBoolean();
     }
 
 
