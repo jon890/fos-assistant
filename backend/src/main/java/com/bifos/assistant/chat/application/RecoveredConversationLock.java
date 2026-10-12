@@ -4,7 +4,7 @@ import com.bifos.assistant.usage.domain.AgentExecution;
 import java.util.ArrayList;
 import java.util.List;
 
-/** {@link RestartReconciler}가 잡은 대화 하나의 turn 잠금이다. 바뀌는 값은 그 객체의 모니터로 지킨다. */
+/** {@link RestartReconciler}가 잡은 대화 하나의 turn 잠금이다. 바뀌는 값은 {@link RestartReconciler}의 모니터로 지킨다. */
 final class RecoveredConversationLock {
     final Long conversationId;
 
