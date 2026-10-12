@@ -25,7 +25,7 @@ execute 의 오류 상세 없는 `unavailable` 실패(대시보드의 `400`, `40
 - 판정 함수는 하나다. `connector.application` 에 package-private `ConnectorFinancialOutcome`(가칭)을 두고, 이미 잠근 승인 줄과 실행 줄, 결과(`CallResult` 또는 null)를 받아 상태를 고친다. 세 자리가 모두 이것을 부른다
 - 금융 줄인지는 실행 줄(`connector_action_execution`)이 있는지로 안다. 없으면 지금처럼 `unknown` 이다
 - 잠금 순서는 사용자, 승인 줄, 실행 줄이다. 기동 정리도 줄마다 새 트랜잭션에서 이 순서로 잡는다. 줄 하나가 실패해도 나머지를 계속하고, 실패한 줄은 다음 기동이나 `markStale` 이 다시 본다
-- `FAILED` 의 `error_code` 는 `unavailable` 이고 `result_text` 는 null 이다. 보내지 않은 것이므로 판단 피드백은 `EXECUTION_FAILED` 로 남긴다
+- `FAILED` 의 `error_code` 는 `unavailable` 이고 `result_text` 는 null 이다. 금융 승인의 결과 기록은 `EXECUTION_FAILED` 판단 피드백을 남기고, 두 정리는 지금처럼 피드백을 남기지 않는다
 - 성공을 받았는데 `consumed_at` 이 비어 있으면 `SUCCEEDED` 로 적고 action 번호만 담아 경고한다. 성공을 실패로 바꾸지 않는다
 - 승인 결과 트랜잭션은 지금 사용자와 승인 줄만 잠근다. 실행 줄 잠금을 더한다
 
