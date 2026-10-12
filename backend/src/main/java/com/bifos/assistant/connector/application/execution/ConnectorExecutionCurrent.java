@@ -52,6 +52,7 @@ public class ConnectorExecutionCurrent {
     private final ConnectorExecutionGuard guard;
     private final PlatformTransactionManager transactionManager;
 
+
     public ConnectorExecutionReadContext readContext(UUID publicId) {
         requireNoTransaction();
         var read = new TransactionTemplate(transactionManager);
@@ -67,114 +68,120 @@ public class ConnectorExecutionCurrent {
         }
     }
 
+
     public ConnectorExecutionCatalog readCatalog(ConnectorExecutionReadContext context) {
         requireNoTransaction();
         try {
             var manifest = ConnectorManifests.find(hermes, context.connectorId())
-                    .orElseThrow(ConnectorExecutionCurrent::rejected);
+                .orElseThrow(ConnectorExecutionCurrent::rejected);
             var policies = new LinkedHashMap<String, ToolPolicy>();
             manifest.tools()
-                    .forEach(t -> policies.put(
-                            t.name(),
-                            ConnectorToolPolicies.find(manifest, t.name())
-                                    .orElseThrow(ConnectorExecutionCurrent::rejected)));
+                .forEach(t -> policies.put(
+                    t.name(),
+                    ConnectorToolPolicies.find(manifest, t.name())
+                        .orElseThrow(ConnectorExecutionCurrent::rejected)));
             return new ConnectorExecutionCatalog(
-                    manifest.id(),
-                    manifest.mcpServer(),
-                    guard.read(manifest),
-                    policies,
-                    manifest.fields().stream()
-                            .filter(f -> !f.secret())
-                            .map(f -> f.key())
-                            .collect(Collectors.toSet()));
+                manifest.id(),
+                manifest.mcpServer(),
+                guard.read(manifest),
+                policies,
+                manifest.fields().stream()
+                    .filter(f -> !f.secret())
+                    .map(f -> f.key())
+                    .collect(Collectors.toSet()));
         } catch (RuntimeException ignored) {
             throw rejected();
         }
     }
 
+
     public ConnectorExecutionSnapshot validateLocked(
-            ConnectorExecutionReadContext expected,
-            ConnectorExecutionCatalog catalog,
-            ConnectorAction action,
-            ConnectorActionExecution row) {
+        ConnectorExecutionReadContext expected,
+        ConnectorExecutionCatalog catalog,
+        ConnectorAction action,
+        ConnectorActionExecution row) {
         require(TransactionSynchronizationManager.isActualTransactionActive());
         try {
             var latest = context(action, row);
             require(expected.equals(latest));
             require(catalog.connectorId().equals(latest.connectorId())
-                    && catalog.mcpServer().equals(latest.mcpServer())
-                    && catalog.guard().protocol().equals(row.protocol())
-                    && HermesToolName.of(catalog.mcpServer(), action.toolName()).equals(action.hermesTool()));
+                && catalog.mcpServer().equals(latest.mcpServer())
+                && catalog.guard().protocol().equals(row.protocol())
+                && HermesToolName.of(catalog.mcpServer(), action.toolName()).equals(action.hermesTool()));
             ToolPolicy policy = catalog.toolPolicies().get(action.toolName());
             require(policy != null
-                    && policy.risk() == ToolRisk.FINANCIAL
-                    && policy.approval() == ToolApproval.ALWAYS
-                    && action.risk() == ToolRisk.FINANCIAL
-                    && action.approvalMode() == ToolApproval.ALWAYS);
+                && policy.risk() == ToolRisk.FINANCIAL
+                && policy.approval() == ToolApproval.ALWAYS
+                && action.risk() == ToolRisk.FINANCIAL
+                && action.approvalMode() == ToolApproval.ALWAYS);
             var snapshot = ConnectorExecutionSnapshot.open(action, row, cipher);
             String operation = catalog.guard().operations().get(action.toolName());
             require(operation != null
-                    && operation.equals(JSON.readTree(snapshot.summaryJson())
-                            .get("operation")
-                            .stringValue()));
+                && operation.equals(JSON.readTree(snapshot.summaryJson())
+                    .get("operation")
+                    .stringValue()));
             require(catalog.guard().scopeFields().stream()
-                    .allMatch(f -> catalog.publicFieldNames().contains(f.field())));
+                .allMatch(f -> catalog.publicFieldNames().contains(f.field())));
             snapshot.validateDeclaredScope(
-                    JSON.writeValueAsString(catalog.guard().scopeFields()), latest.publicFields());
+                JSON.writeValueAsString(catalog.guard().scopeFields()), latest.publicFields());
             return snapshot;
         } catch (RuntimeException ignored) {
             throw rejected();
         }
     }
 
+
     private ConnectorExecutionReadContext context(ConnectorAction action, ConnectorActionExecution row) {
         var connection = connections.findById(row.connectionId()).orElseThrow(ConnectorExecutionCurrent::rejected);
         var binding = bindings.findById(row.bindingId()).orElseThrow(ConnectorExecutionCurrent::rejected);
         var agent = binding.agent();
         require(access.allowed(action.userId())
-                && agent.enabled()
-                && connection.status() == ConnectionStatus.READY
-                && binding.status() == BindingStatus.READY
-                && binding.desiredEnabled());
+            && agent.enabled()
+            && connection.status() == ConnectionStatus.READY
+            && binding.status() == BindingStatus.READY
+            && binding.desiredEnabled());
         require(Objects.equals(action.id(), row.actionId())
-                && Objects.equals(action.userId(), connection.userId())
-                && Objects.equals(action.agentId(), agent.id())
-                && Objects.equals(agent.ownerUserId(), action.userId())
-                && Objects.equals(binding.connection().id(), connection.id())
-                && Objects.equals(action.connectorId(), connection.connectorId())
-                && Objects.equals(connection.updatedAt(), row.connectionUpdatedAt())
-                && Objects.equals(binding.updatedAt(), row.bindingUpdatedAt()));
+            && Objects.equals(action.userId(), connection.userId())
+            && Objects.equals(action.agentId(), agent.id())
+            && Objects.equals(agent.ownerUserId(), action.userId())
+            && Objects.equals(binding.connection().id(), connection.id())
+            && Objects.equals(action.connectorId(), connection.connectorId())
+            && Objects.equals(connection.updatedAt(), row.connectionUpdatedAt())
+            && Objects.equals(binding.updatedAt(), row.bindingUpdatedAt()));
         var origin = executions.findById(action.originExecutionId()).orElseThrow(ConnectorExecutionCurrent::rejected);
         require(Objects.equals(origin.userId(), action.userId()) && Objects.equals(origin.agentId(), action.agentId()));
         require(proactive.checkOf(origin).map(check -> check.writesAllowed()).orElse(true));
         return new ConnectorExecutionReadContext(
-                action.publicId(),
-                action.id(),
-                action.userId(),
-                action.agentId(),
-                action.originExecutionId(),
-                connection.id(),
-                binding.id(),
-                agent.hermesProfile(),
-                action.connectorId(),
-                action.toolName(),
-                action.hermesTool(),
-                binding.mcpServer(),
-                row.protocol(),
-                connection.updatedAt(),
-                binding.updatedAt(),
-                connection.fields().values());
+            action.publicId(),
+            action.id(),
+            action.userId(),
+            action.agentId(),
+            action.originExecutionId(),
+            connection.id(),
+            binding.id(),
+            agent.hermesProfile(),
+            action.connectorId(),
+            action.toolName(),
+            action.hermesTool(),
+            binding.mcpServer(),
+            row.protocol(),
+            connection.updatedAt(),
+            binding.updatedAt(),
+            connection.fields().values());
     }
+
 
     static void requireNoTransaction() {
         require(!TransactionSynchronizationManager.isActualTransactionActive());
     }
+
 
     static void require(boolean condition) {
         if (!condition) {
             throw rejected();
         }
     }
+
 
     static ApiException rejected() {
         return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, "financial execution unavailable");
