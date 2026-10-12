@@ -130,7 +130,7 @@ backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `herme
 
 ### 로컬 검사와 PR
 
-push 전에 `scripts/check-local.sh --fast` 로 빠른 검사만 돌리고 Draft PR 을 연다.
+push 전에 `scripts/dev/check-local.sh --fast` 로 빠른 검사만 돌리고 Draft PR 을 연다.
 무거운 검사는 Draft CI 가 돌리므로 로컬에서 기다리지 않는다.
 공개 정보 검사는 `--fast` 에도 들어 있다. push 하면 되돌릴 수 없어서다.
 그 검사는 추적 파일의 지금 내용만 보므로, 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
@@ -138,7 +138,7 @@ push 전에 `scripts/check-local.sh --fast` 로 빠른 검사만 돌리고 Draft
 
 ```bash
 # cwd: 저장소 root
-scripts/check-local.sh --fast
+scripts/dev/check-local.sh --fast
 ```
 
 **PR 을 열거나 Ready 로 바꾸거나 머지할 때는 [`.claude/skills/pr-merge/SKILL.md`](.claude/skills/pr-merge/SKILL.md) 를 읽는다.**
@@ -149,7 +149,7 @@ Draft CI, main 합치기, 리뷰 반영, 머지 판정의 순서를 그 파일�
 ## 머지는 PR 로 한다
 
 한 PR은 관심사 하나만 담는다. 리팩터링은 이동만 하는 커밋과 동작을 바꾸는 커밋을 나눈다.
-운영 코드의 변경 줄 상한은 `scripts/pr-size.mjs` 가 정한다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다.
+운영 코드의 변경 줄 상한은 `scripts/pr/pr-size.mjs` 가 정한다. 넘으면 설계와 구현을 함께 담은 단계별 PR로 나눈다.
 `규모:예외` 라벨은 사람이나 코디네이터만 붙인다. 구현 워커는 스스로 붙이지 않는다.
 
 Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는다.
@@ -159,7 +159,7 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 **Claude 리뷰는 한 번 반영하고 머지한다. 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.**
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가, 등급마다 무엇을 할지는 `pr-merge` 스킬의 「4. 리뷰 반영」 이 갖는다.
 
-`scripts/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
+`scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
 그 뒤 라벨이 실제 위험과 맞았는지 보고, 라벨이 붙은 PR 의 머지 전에 사람 확인을 받을지 정한다.
 
 ## 커밋

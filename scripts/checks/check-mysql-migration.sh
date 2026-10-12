@@ -10,7 +10,7 @@
 # utf8mb4_unicode_ci 가 되고 MysqlMigrationTest 가 잡는다. 까닭과 규칙은 backend/docs/data-schema.md 의 「마이그레이션 작성 규칙」 에 있다.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IMAGE="mysql:8.4"
 NAME="mysql-migration-check-$$"
 # 일회용 컨테이너에만 쓰는 값이다. 컨테이너는 이 머신의 loopback 에만 열린다.

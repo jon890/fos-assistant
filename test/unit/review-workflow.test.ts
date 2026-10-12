@@ -5,7 +5,7 @@ import test from "node:test";
 import {
   readExecution,
   summarizeExecution,
-} from "../../scripts/review-execution-summary.mjs";
+} from "../../scripts/pr/review-execution-summary.mjs";
 
 test("Draft 는 자동 리뷰를 건너뛰고 Ready 와 일반 PR, 권한 있는 댓글은 리뷰한다", () => {
   const workflow = readFileSync(
@@ -130,7 +130,7 @@ test("현재 커밋에 새로 제출한 Claude 리뷰만 성공으로 센다", (
         "last",
         "10",
         "-f",
-        "scripts/submitted-claude-reviews.jq",
+        "scripts/pr/submitted-claude-reviews.jq",
       ],
       { input: JSON.stringify(reviews), encoding: "utf8" },
     );

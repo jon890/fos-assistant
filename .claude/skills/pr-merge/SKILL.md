@@ -15,7 +15,7 @@ description: |
 
 | 단계 | 이름 | 통과 조건 | reference |
 | --- | --- | --- | --- |
-| 1 | Draft PR 열기 | `scripts/check-local.sh --fast` 가 0 으로 끝났고 `gh pr create --draft` 가 PR 주소를 냈다 | |
+| 1 | Draft PR 열기 | `scripts/dev/check-local.sh --fast` 가 0 으로 끝났고 `gh pr create --draft` 가 PR 주소를 냈다 | |
 | 2 | Draft CI | `gh pr checks` 의 모든 검사가 통과다 | |
 | 3 | main 합치고 Ready | 최신 main 을 합친 커밋의 CI 가 모두 통과했고 `gh pr ready` 가 끝났다 | |
 | 4 | 리뷰 반영 | 남은 🔴 P1 과 🟠 P2 를 한 번 고쳐 push 했거나 P2 를 고치지 않는 까닭을 PR 에 남겼다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
@@ -31,7 +31,7 @@ Draft 에서는 브라우저 전체 shard 를 포함한 CI 가 돌고 Claude 리
 
 ```bash
 # cwd: 저장소 root
-scripts/check-local.sh --fast
+scripts/dev/check-local.sh --fast
 git push -u origin HEAD
 gh pr create --draft --title "$TITLE" --body-file "$BODY_FILE"
 ```
@@ -55,7 +55,7 @@ rebase 와 force push 로 이력을 바꾸지 않는다.
 # cwd: 저장소 root
 git fetch origin
 git merge origin/main
-scripts/check-local.sh --fast
+scripts/dev/check-local.sh --fast
 git push
 gh pr checks "$PR" --watch
 gh pr ready "$PR"
@@ -92,4 +92,4 @@ gh pr checks "$PR" --required
 gh pr merge "$PR" --merge
 ```
 
-GitHub Actions 장애 등으로 CI 가 돌지 못하면 머지 전에 로컬에서 인자 없이 `scripts/check-local.sh` 를 돌려 전체 통과를 확인한다.
+GitHub Actions 장애 등으로 CI 가 돌지 못하면 머지 전에 로컬에서 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.

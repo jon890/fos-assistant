@@ -3,15 +3,15 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { checkFileLengths, limitFor, lineCount } from "../../scripts/check-file-length.mjs";
+import { checkFileLengths, limitFor, lineCount } from "../../scripts/checks/check-file-length.mjs";
 
 function fixture(t: test.TestContext, files: Record<string, number> = {}, exclusions: Record<string, string> = {}) {
   const root = mkdtempSync(join(tmpdir(), "file-length-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const directory of ["backend/src/main", "web/src", "hermes", "scripts"]) {
+  for (const directory of ["backend/src/main", "web/src", "hermes", "scripts/checks"]) {
     mkdirSync(join(root, directory), { recursive: true });
   }
-  const baseline = join(root, "scripts/file-length-baseline.json");
+  const baseline = join(root, "scripts/checks/file-length-baseline.json");
   writeFileSync(baseline, JSON.stringify({ version: 1, exclusions, files }));
   return {
     root, baseline,

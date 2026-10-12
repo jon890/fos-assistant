@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 
-const script = resolve(import.meta.dirname, "../../scripts/check-migration-versions.mjs");
+const script = resolve(import.meta.dirname, "../../scripts/checks/check-migration-versions.mjs");
 const directory = "backend/src/main/resources/db/migration";
 
 function check(added: string[], existing = ["V80__old.sql"]) {
