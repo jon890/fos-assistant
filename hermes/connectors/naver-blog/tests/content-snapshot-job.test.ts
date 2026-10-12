@@ -238,6 +238,7 @@ test("예약 ID로 worker 를 한 번 띄우고 start·photo·save authorize 뒤
       job_id: stamp.jobId,
       status: expect.stringMatching(/^(running|succeeded)$/),
       stamp,
+      error_code: null,
     },
   });
   const status = await finished(stamp);
@@ -291,6 +292,7 @@ test("예약 ID로 worker 를 한 번 띄우고 start·photo·save authorize 뒤
     job_id: stamp.jobId,
     status: "succeeded",
     stamp,
+    error_code: null,
   });
   await Bun.sleep(300);
   expect(cp.calls.filter((entry) => entry.stage === "start")).toHaveLength(1);
@@ -419,7 +421,12 @@ test("잠금이 바쁘면 예약 ID 를 failed 로 남기고 다시 보내도 �
   });
   const stamp = stampFor(snapshot);
   const first = await call("start", startArgs(snapshot, stamp));
-  expect(first.body).toEqual({ job_id: stamp.jobId, status: "failed", stamp });
+  expect(first.body).toEqual({
+    job_id: stamp.jobId,
+    status: "failed",
+    stamp,
+    error_code: "busy",
+  });
   expect((await call("status", { stamp })).body).toMatchObject({
     status: "failed",
     error_code: "busy",
@@ -454,7 +461,12 @@ test("worker 가 접수를 알리지 않으면 start_unknown 이고 예약 ID �
   const again = await call("start", startArgs(snapshot, stamp), {
     workerEntry: ENTRY,
   });
-  expect(again.body).toEqual({ job_id: stamp.jobId, status: "running", stamp });
+  expect(again.body).toEqual({
+    job_id: stamp.jobId,
+    status: "running",
+    stamp,
+    error_code: null,
+  });
   await Bun.sleep(300);
   expect(await readState(jobDir, stamp.jobId)).toMatchObject({
     pid: null,
@@ -500,6 +512,32 @@ test("start 입력은 strict 하다: jobId·hash 불일치, ticket 형식, 알 �
       body: { error: "invalid_input" },
     });
   expect(await readState(jobDir, stamp.jobId)).toBeNull();
+});
+
+test("start 재조회는 status 와 같은 규칙으로 안전한 code 만 싣는다", async () => {
+  const { jobDir, snapshot, call } = await setup({ photos: 1 });
+  for (const code of ["busy", "bad-code", "UPPER", "a".repeat(65)]) {
+    const stamp = stampFor(snapshot);
+    await createState(
+      jobDir,
+      runningState(stamp.jobId, {
+        status: "failed",
+        snapshot_stamp: stamp,
+        error: { code, message: BODY_MARKER },
+      }),
+    );
+    const result = (await call("start", startArgs(snapshot, stamp))).body;
+    expect(result.error_code).toBe(code === "busy" ? "busy" : null);
+    expect(result.error_code).toBe(
+      (await call("status", { stamp })).body.error_code,
+    );
+    expect(Object.keys(result).sort()).toEqual([
+      "error_code",
+      "job_id",
+      "stamp",
+      "status",
+    ]);
+  }
 });
 
 const runningState = (

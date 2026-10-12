@@ -138,7 +138,7 @@ plugin 전달과 Control Plane 호출은 아직 연결하지 않았다. 아래�
 | --- | --- |
 | stamp | `protocol, snapshotId, jobId, snapshotHash, bindingId, connectionId, bindingUpdatedAt, connectionUpdatedAt, profileHash`의 strict 객체. ID는 소문자 UUID, 두 binding ID는 정규형 십진 문자열, 두 시각은 UTC 소수 여섯 자리, hash는 소문자 64자리 16진수 |
 | start 입력 | `{snapshot, jobId, ticket, stamp}`. snapshot은 CompiledSnapshotV1, `stamp.jobId`와 `stamp.snapshotHash`는 jobId·snapshot과 같아야 한다. ticket은 공백 없는 ASCII 1~4,096자 |
-| start 결과 | `{job_id, status, stamp}`. 시작 확인 전에 끝났으면 그 종료 상태다 |
+| start 결과 | `{job_id, status, stamp, error_code}`. 시작 확인 전에 끝났으면 그 종료 상태다. 시작 전 거절 code를 같은 응답으로 읽으며 status와 같은 허용 규칙을 쓴다 |
 | status 입력 | `{stamp}`만 받는다 |
 | status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다 |
 | 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}` |

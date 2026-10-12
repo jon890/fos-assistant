@@ -122,10 +122,14 @@ async function reserved(dir: string, stamp: SnapshotStamp) {
   return state;
 }
 
+const safeErrorCode = (code: unknown) =>
+  typeof code === "string" && /^[a-z][a-z_]{0,63}$/.test(code) ? code : null;
+
 const accepted = (state: JobState, stamp: SnapshotStamp) => ({
   job_id: state.job_id,
   status: state.status,
   stamp,
+  error_code: safeErrorCode(state.error?.code),
 });
 
 /** 시작 전 거절의 안전한 code. 세션 확인과 잠금의 도구 오류만 이름을 옮긴다. */
@@ -236,7 +240,6 @@ export function projectStatus(state: JobState, stamp: SnapshotStamp) {
     (value as number) >= 0
       ? (value as number)
       : null;
-  const code = state.error?.code;
   return {
     job_id: state.job_id,
     stamp,
@@ -247,10 +250,7 @@ export function projectStatus(state: JobState, stamp: SnapshotStamp) {
       typeof state.finished_at === "string" ? state.finished_at : null,
     saved_before: count(result.saved_before),
     saved_after: count(result.saved_after),
-    error_code:
-      typeof code === "string" && /^[a-z][a-z_]{0,63}$/.test(code)
-        ? code
-        : null,
+    error_code: safeErrorCode(state.error?.code),
   };
 }
 
