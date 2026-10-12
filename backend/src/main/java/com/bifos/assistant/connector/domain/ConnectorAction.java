@@ -347,7 +347,7 @@ public class ConnectorAction {
     }
 
 
-    /** keyがnullなら移行前または暗号化を使わない保存だ。キャッシュは保存ごとに捨てる。 */
+    /** key가 null이면 이관 전이거나 암호화를 쓰지 않은 저장이다. 푼 글은 저장할 때마다 버린다. */
     public void sealArgs(String stored, Long keyId) {
         this.storedArgsJson = stored;
         this.argsKeyId = keyId;
