@@ -17,6 +17,8 @@
 금융 실행은 세 지점을 지난다: `ConnectorFinancialProducer.request`(준비와 저장), `ConnectorFinancialApproval.approve`(승인과 ticket), `ConnectorExecutionClaims`(claim 소비). 셋 다 같은 검사를 거쳐야 한다.
 주문 금액과 수량은 저장된 summary 와 실행 원문에 있다. `ConnectorOrderSnapshot.validate` 가 그 모양을 검증한다.
 한 건 금액은 지정가면 `quantity × price`, 시장가면 `orderAmount` 다. 시장가 수량 주문은 금액을 알 수 없으므로 상한이 있으면 거절한다.
+**금액을 계산하지 못하는 모양은 모두 거절한다.** 위 두 일반 주문 모양만 허용 목록으로 연다.
+조건주문 생성과 정정(`first` 가 있는 실행 원문)은 `price` 와 `orderAmount` 가 없고 금액이 leg 에 나뉘며 MARKET 은 주문가가 없다. 금액 규칙이 정해질 때까지 상한 검사에서 닫는다. 없는 칸을 0 으로 읽으면 상한을 지나간다.
 
 ## 의도 메모
 
@@ -31,7 +33,7 @@
 
 `ConnectorFinancialGateTest` 를 connector.application 패키지에 두고 실제 producer, approval, claim 을 부른다.
 꺼짐 기본값에서 준비 0건 저장, 승인 거절, claim 거절과 금융 전송 0회를 확인한다.
-허용 목록에 없는 계좌, 한 건 금액 초과, 수량 초과, 하루 합계 초과, 금액을 알 수 없는 시장가 수량 주문이 준비에서 거절되는지 확인한다.
+허용 목록에 없는 계좌, 한 건 금액 초과, 수량 초과, 하루 합계 초과, 금액을 알 수 없는 시장가 수량 주문, 조건주문 생성과 정정이 준비에서 거절되는지 확인한다.
 켬과 허용 계좌, 상한 안의 주문만 기존 왕복 테스트와 같이 통과하는지 확인한다.
 
 ### 2. 설정과 검사
