@@ -207,6 +207,32 @@ class ContentDraftServiceTest extends ContentDraftFixture {
 
 
     @Test
+    @DisplayName("관찰을 참조한 원고를 세 번 고쳐도 관찰 revision과 요청 alias를 새로 만들지 않는다")
+    void revisesObservedDraftThreeTimesWithoutNewObservation() {
+        var saved = record(0, UUID.randomUUID(), input(), model());
+        var observation = observations.findAll().getFirst();
+        var id = drafts.create(owner, conversation.id(), observedDraft("첫 원고", observation.id())).draft().draftId();
+        for (int revision = 1; revision < 4; revision++) {
+            var revised = drafts.revise(owner, conversation.id(), id, revision, observedDraft("원고" + revision, observation.id()));
+            assertThat(revised.draft().revision()).isEqualTo(revision + 1);
+            var ref = revised.draft().blocks().get(0).get("observationRef");
+            assertThat(ref.get("id").asString()).isEqualTo(observation.id().toString());
+            assertThat(ref.get("revision").asLong()).isEqualTo(1);
+        }
+        assertThat(drafts.read(owner, conversation.id(), id, null).draft().title()).isEqualTo("원고3");
+        // 네 판 모두 저장된 참조 행이 같은 관찰 revision에 묶였다. 입력 JSON의 왕복만으로 판정하지 않는다.
+        assertThat(assetRows.findAll()).filteredOn(asset -> asset.position() == 0).hasSize(4).allSatisfy(asset -> {
+            assertThat(asset.observationId()).isEqualTo(observation.id());
+            assertThat(asset.observationRevision()).isEqualTo(observation.revision());
+        });
+        // 원고 경로는 관찰을 읽기만 한다. 앞으로 관찰 쓰기가 생기는 회귀를 막는다.
+        assertThat(observations.count()).isEqualTo(1);
+        assertThat(requests.count()).isEqualTo(1);
+        assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(saved);
+    }
+
+
+    @Test
     @DisplayName("PROCESSING 관찰 참조는 STALE로 거절하고 원고 행을 남기지 않는다")
     void rejectsProcessingObservationRefWithoutWrites() {
         var processing = new MediaObservationInput(ObservationStatus.PROCESSING, null, List.of(), List.of(),
@@ -436,6 +462,14 @@ abstract class ContentDraftFixture extends ObservationFixture {
             blocks.add(json.createObjectNode().put("type", "image").put("assetId", photo.id().toString()));
         }
         node.set("blocks", blocks);
+        return reader.read(node);
+    }
+
+
+    ContentDraftInput observedDraft(String title, Long observationId) {
+        var node = json.valueToTree(inputDraft(title, true));
+        ((ObjectNode)node.get("blocks").get(0)).set("observationRef",
+            json.createObjectNode().put("id", observationId.toString()).put("revision", 1));
         return reader.read(node);
     }
 
