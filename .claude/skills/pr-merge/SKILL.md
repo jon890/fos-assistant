@@ -107,11 +107,17 @@ Ready 로 바꾸면 GitHub 의 Claude 리뷰도 돈다. 그 리뷰도 같은 방
 2. main 브랜치 보호가 정한 필수 검사의 통과를 **이름으로** 직접 확인한다. 브랜치 보호의 `strict` 는 켜지 않는다.
    `gh pr checks --required` 는 아직 생기지 않은 필수 검사를 빼고 성공으로 끝날 수 있다. 아래 명령의 출력이 비어 있어야 한다.
 
+   조회가 실패하거나 필수 검사가 0개로 나오면 `comm` 의 왼쪽이 비어 통과와 구분되지 않는다. 그래서 조회를 먼저 하고 실패하면 멈춘다.
+
    ```bash
-   # cwd: 저장소 root. 통과하지 않은 필수 검사 이름을 낸다.
-   comm -23 <(gh api repos/jon890/fos-assistant/branches/main/protection/required_status_checks --jq '.contexts[]' | sort) \
-     <(gh pr checks "$PR" --json name,state --jq '.[] | select(.state=="SUCCESS") | .name' | sort)
+   # cwd: 저장소 root. 통과하지 않은 필수 검사 이름을 낸다. 조회가 실패하면 출력 없이 1 로 끝난다.
+   REQUIRED="$(gh api repos/jon890/fos-assistant/branches/main/protection/required_status_checks --jq '.contexts[]')" \
+     && [ -n "$REQUIRED" ] \
+     && comm -23 <(printf '%s\n' "$REQUIRED" | sort) \
+       <(gh pr checks "$PR" --json name,state --jq '.[] | select(.state=="SUCCESS") | .name' | sort)
    ```
+
+   종료 코드가 0 이고 출력이 비어 있어야 통과다. 1 이면 조회가 실패한 것이므로 통과로 읽지 않는다.
 3. 4단계를 충족하면 머지한다. 이력을 한 줄로 합치지 않는다.
 
 ```bash
