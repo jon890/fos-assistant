@@ -106,10 +106,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -285,16 +288,19 @@ class ConnectorActionServiceTest {
 
     @Test
     @DisplayName("평문 이관은 상태와 원문을 유지하고 두 번 실행해도 암호문을 다시 쓰지 않는다")
-    void backfillsPlainBodiesIdempotentlyAndPreservesApproval() {
+    @ExtendWith(OutputCaptureExtension.class)
+    void backfillsPlainBodiesIdempotentlyAndPreservesApproval(CapturedOutput output) {
         UUID actionId = ask(WRITE, ARGS).actionId();
         var action = actions.findByPublicId(actionId).orElseThrow();
         jdbc.update("update connector_action set args_json = ?, args_key_id = null where id = ?", ARGS, action.id());
         bodyBackfill.backfill();
+        assertThat(output.getOut()).contains("승인 본문 이관 sealed=1 failed=0 remaining=0");
         var sealed = actions.findById(action.id()).orElseThrow();
         assertThat(sealed.storedArgsJson()).startsWith("v1.");
         assertThat(sealed.argsJson()).isEqualTo(ARGS);
         assertThat(sealed.status()).isEqualTo(ActionStatus.PENDING);
         bodyBackfill.backfill();
+        assertThat(output.getOut()).contains("승인 본문 이관 sealed=0 failed=0 remaining=0");
         assertThat(actions.findById(action.id()).orElseThrow().storedArgsJson()).isEqualTo(sealed.storedArgsJson());
         service.approve(me, actionId, null);
         jdbc.update("update connector_action set result_text = ?, result_key_id = null where id = ?", "이전 결과", action.id());
@@ -306,6 +312,27 @@ class ConnectorActionServiceTest {
         verify(connector).execute(PROFILE, DEMO, "mcp__demo__write_note", ARGS);
     }
 
+
+    @Test
+    @DisplayName("이관 실패는 평문을 보존하고 실패 건수와 남은 건수를 로그에 남긴다")
+    @ExtendWith(OutputCaptureExtension.class)
+    void reportsFailedAndRemainingBodyBackfills(CapturedOutput output) {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        var action = actions.findByPublicId(actionId).orElseThrow();
+        jdbc.update("update connector_action set args_json = ?, args_key_id = null where id = ?", ARGS, action.id());
+        var failing = mock(TextCipher.class);
+        when(failing.enabled()).thenReturn(true);
+        Object previous = ReflectionTestUtils.getField(bodies, "cipher");
+        ReflectionTestUtils.setField(bodies, "cipher", failing);
+        try {
+            bodyBackfill.backfill();
+            assertThat(actions.findById(action.id()).orElseThrow().argsKeyId()).isNull();
+            assertThat(actions.findById(action.id()).orElseThrow().storedArgsJson()).isEqualTo(ARGS);
+            assertThat(output.getOut()).contains("승인 본문 이관 sealed=0 failed=1 remaining=1");
+        } finally {
+            ReflectionTestUtils.setField(bodies, "cipher", previous);
+        }
+    }
 
     @Test
     @DisplayName("읽을 수 없는 결과는 암호문을 노출하지 않고 안내 글로 표시한다")

@@ -34,23 +34,33 @@ public class ConnectorActionBodyBackfill {
             return;
         }
         var tx = new TransactionTemplate(transactionManager);
+        int sealed = 0;
+        int failed = 0;
         for (Long id : candidates) {
             try {
                 var before = actions.findById(id).orElse(null);
                 if (before == null) {
                     continue;
                 }
-                tx.executeWithoutResult(status -> {
+                Boolean changed = tx.execute(status -> {
                     users.findByIdForUpdate(before.userId()).orElseThrow();
                     var action = actions.findByPublicIdForUpdate(before.publicId()).orElseThrow();
+                    boolean pending = (action.argsKeyId() == null && action.storedArgsJson() != null)
+                        || (action.resultKeyId() == null && action.storedResultText() != null);
                     if (action.argsKeyId() == null && action.storedArgsJson() != null) {
                         bodies.sealArgs(action, action.storedArgsJson());
                     }
                     bodies.sealResult(action);
+                    return pending;
                 });
+                if (Boolean.TRUE.equals(changed)) {
+                    sealed++;
+                }
             } catch (RuntimeException ex) {
+                failed++;
                 log.warn("승인 본문 이관 실패 actionId={} kind={}", id, ex.getClass().getSimpleName());
             }
         }
+        log.info("승인 본문 이관 sealed={} failed={} remaining={}", sealed, failed, actions.findPlainBodyIds().size());
     }
 }
