@@ -356,6 +356,13 @@ class HermesSourceTest(unittest.TestCase):
         for call in responded:
             self.assertTrue({keyword.arg for keyword in call.keywords if keyword.arg}
                             <= samples["approval.responded"].keys())
+        steered = [call for call in calls if call.func.id == "_mark_run_event"
+                   and any(isinstance(arg, ast.Constant) and arg.value == "run.steered"
+                           for arg in call.args)]
+        self.assertTrue(steered)
+        for call in steered:
+            self.assertTrue({keyword.arg for keyword in call.keywords if keyword.arg}
+                            <= samples["run.steered"].keys())
         approval = self.tree(self.root / "tools/approval.py")
         dictionaries = [{key.value for key in node.keys if isinstance(key, ast.Constant)}
                         for node in ast.walk(approval) if isinstance(node, ast.Dict)]

@@ -27,6 +27,7 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
     "tool.started": ["preview"], "tool.completed": ["duration", "error", "preview"],
     "message.interim": ["already_streamed"],
     "run.completed": ["completed", "partial", "interrupted"], "run.interrupted": ["error"],
+    "run.steered": ["accepted"],
   };
   const defaults = Object.fromEntries((fixedFields[String(fields.event)] ?? []).map((name) => [name, template[name]]));
   const required = fields.event === "message.delta" ? "delta"

@@ -25,3 +25,5 @@ data: {"event":"run.failed","run_id":"fixture-run","timestamp":2.1,"error":"í•©ì
 data: {"event":"run.cancelled","run_id":"fixture-run","timestamp":2.2}
 
 data: {"event":"run.interrupted","run_id":"fixture-run","timestamp":2.3,"error":"Gateway shutdown interrupted the run."}
+
+data: {"event":"run.steered","run_id":"fixture-run","timestamp":2.4,"accepted":true}

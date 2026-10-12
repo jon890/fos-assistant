@@ -8,7 +8,7 @@ test("기준 판은 Python 계약에서 읽고 공유 wire의 모든 사건에 �
   const contract = readFileSync(new URL("../../hermes/tests/hermes_contract.py", import.meta.url), "utf8");
   assert.equal(HERMES_VERSION, /^HERMES_VERSION = "([^"]+)"$/m.exec(contract)?.[1]);
   const samples = wireEvents(wireFixture("events"));
-  assert.equal(samples.length, 13);
+  assert.equal(samples.length, 14);
   for (const sample of samples) {
     const event = eventEnvelope({ run_id: "submitted-run", output: "완료 답", usage: FAKE_USAGE }, sample);
     assert.equal(event.run_id, "submitted-run");
@@ -31,6 +31,7 @@ test("기준 판은 Python 계약에서 읽고 공유 wire의 모든 사건에 �
     event: "tool.completed", run_id: "r", timestamp: 1, duration: 0, error: false, preview: "",
     tool: "test",
   });
+  assert.equal(eventEnvelope(run, { event: "run.steered" }).accepted, true);
 });
 
 test("대역 HTTP 사건에는 제출한 실행 번호와 timestamp 및 완료 결과가 실린다", async () => {

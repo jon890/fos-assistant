@@ -27,7 +27,7 @@ class HermesWireCompatibilityTest {
         var events = new ArrayList<RunEvent>();
         HermesInterimWire.read(HermesWire.fixture("events"), ToolDetailScope.NONE, events::add);
 
-        assertThat(events).hasSize(13);
+        assertThat(events).hasSize(14);
         assertThat(events.get(3).toolName()).isEqualTo("web_search");
         assertThat(events.get(3).durationMs()).isZero();
         assertThat(events.get(3).failed()).isFalse();
@@ -35,5 +35,6 @@ class HermesWireCompatibilityTest {
         assertThat(events.get(6).text()).isNull();
         assertThat(events.get(9).text()).isEqualTo("합성 답");
         assertThat(events.get(12).type()).isEqualTo("run.interrupted");
+        assertThat(events.get(13).type()).isEqualTo("run.steered");
     }
 }
