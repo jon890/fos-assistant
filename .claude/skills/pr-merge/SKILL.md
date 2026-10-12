@@ -20,7 +20,7 @@ description: |
 | 3 | main 합치고 Ready | 최신 main 을 합친 커밋의 CI 가 모두 통과했고 `gh pr ready` 가 끝났다 | |
 | 4 | 리뷰 반영 | 남은 🔴 P1 과 🟠 P2 를 한 번 고쳐 push 했거나 P2 를 고치지 않는 까닭을 PR 에 남겼다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
 | 5 | 머지 판정 | 지금 main 과 합친 상태에서 돈 CI 가 필수 검사를 모두 통과했다 | |
-| 6 | 정리 | `scripts/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 | |
+| 6 | 정리 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 | |
 
 아래 명령의 `$PR` 은 PR 번호다.
 
@@ -115,7 +115,7 @@ GitHub Actions 장애 등으로 CI 가 돌지 못하면 머지 전에 로컬에�
 ```bash
 # cwd: 저장소 root
 BRANCH="$(gh pr view "$PR" --json headRefName -q .headRefName)"
-scripts/finish-task.sh "$BRANCH"
+scripts/dev/finish-task.sh "$BRANCH"
 ```
 
 작업을 에이전트에 맡겼으면 그 회신을 받은 뒤 세션을 끝낸다. 스크립트는 세션을 끝내지 못한다.
