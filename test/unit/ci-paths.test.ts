@@ -65,12 +65,12 @@ test("job 이 부르는 스크립트는 그 job 을 돌린다", () => {
   assert.deepEqual(jobsFor("scripts/ci/check-connector-package.sh"), ["hermes"]);
   assert.deepEqual(jobsFor("scripts/checks/quality.sh"), ["quality"]);
   assert.deepEqual(jobsFor("scripts/ci/browser-ci.mjs"), ["browser"]);
-  assert.deepEqual(jobsFor("scripts/checks/new-check.sh"), ["backend", "web", "e2e", "hermes", "quality"]);
+  assert.deepEqual(jobsFor("scripts/checks/new-check.sh"), JOBS);
 });
 
 test("판정 규칙과 workflow 를 바꾸거나 규칙에 없는 파일이면 모두 돌린다", () => {
   for (const file of [
-    ".github/workflows/ci.yml", "scripts/ci/ci-paths.mjs", ".github/actions/setup/action.yml",
+    ".github/workflows/ci.yml", "scripts/ci/ci-paths.mjs", ".github/actions/setup/action.yml", "scripts/new-script.sh",
     "test/support/pick-port.ts", "test/fixtures/a.json", "test/resources/a.json",
     "test/package.json", "package.json", "new-dir/a.ts", "new-input.md", "new-dir/runtime.md",
   ]) {

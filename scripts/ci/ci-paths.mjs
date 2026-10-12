@@ -70,8 +70,7 @@ export const RULES = [
   [/^scripts\/ci\/check-feature-covers\.mjs$/, NONE],
   [/^scripts\/(dev|pr)\//, NONE],
   [/^scripts\/README\.md$/, NONE],
-  // 브라우저가 쓰는 스크립트는 위에서 따로 고른다. 그 밖의 새 스크립트도 브라우저 shard 는 켜지 않는다.
-  [/^scripts\//, ["backend", "web", "e2e", "hermes", "quality"]],
+  // 알 수 없는 스크립트도 기본값 ALL 을 쓴다. 다른 스크립트에서 간접 호출해도 검사를 놓치지 않는다.
 ];
 
 /** 파일 하나가 돌려야 하는 job 목록. 맞는 규칙이 없으면 모두 돌린다. */
