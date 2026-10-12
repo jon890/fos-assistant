@@ -309,7 +309,7 @@ export function ApprovalCard({
               loading={sending === "conversation"}
               onClick={() => void send("conversation", null)}
             >
-              이 대화에서 계속 허용
+              이 대화에서 계속 허용 (24시간)
             </Button>
           ) : null}
           {action.grantAllowed && !blocked ? (

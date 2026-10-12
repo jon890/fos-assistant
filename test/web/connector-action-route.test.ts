@@ -255,7 +255,7 @@ test("승인 줄의 conversationGrantAllowed 는 참일 때만 참으로 옮긴�
   }
 });
 
-test("대화 허락 목록은 번호와 이름과 끝나는 시각만 옮기고, 거두기는 그 대화의 경로로 보낸다", async () => {
+test("대화 허락 목록은 번호와 이름과 끝나는 시각, 에이전트 이름만 옮기고, 거두기는 그 대화의 경로로 보낸다", async () => {
   const listed = await callRoute("conversationGrants", [
     {
       grantId: 7,
@@ -264,10 +264,27 @@ test("대화 허락 목록은 번호와 이름과 끝나는 시각만 옮기고,
       toolName: "write_note",
       connectorId: "demo-notes",
     },
+    {
+      grantId: 8,
+      title: "글 불러오기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      agentName: "글 다듬기",
+    },
   ]);
   assert.equal(listed.response.status, 200);
   assert.deepEqual(await listed.response.json(), [
-    { grantId: 7, title: "메모 쓰기", expiresAt: "2026-10-13T00:00:00Z" },
+    {
+      grantId: 7,
+      title: "메모 쓰기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      agentName: null,
+    },
+    {
+      grantId: 8,
+      title: "글 불러오기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      agentName: "글 다듬기",
+    },
   ]);
   assert.equal(
     listed.calls[0].path,

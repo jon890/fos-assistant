@@ -54,6 +54,8 @@ export type ConversationGrant = {
   grantId: number;
   title: string;
   expiresAt: string;
+  /** 대화의 에이전트와 다른 에이전트에만 통하는 허락이면 그 이름이다. 아니면 null 이다. */
+  agentName: string | null;
 };
 
 /** 묻지 않고 실행하게 허락한 도구 한 개다. 화면에는 `title` 을 보인다. */

@@ -11,10 +11,19 @@ import {
 
 type Loaded = { conversationId: string; grants: ConversationGrant[] };
 
+function formatUntil(value: string) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Seoul",
+  }).format(new Date(value));
+}
+
 /**
  * 이 대화에서 계속 허용 중인 동작을 입력창 위에 한 줄씩 보이고, 「다시 묻기」 로 거두게 한다.
  *
- * <p>허락은 이 대화에서만 통하고 다른 대화에서는 다시 묻는다. 승인 카드에서 허락을 주면 서버가 `approval` 사건을 내므로
+ * <p>허락은 이 대화에서 끝나는 시각까지만 통하고 다른 대화에서는 다시 묻는다. 위임한 다른 에이전트에 준 허락이면 그 이름을
+ * 함께 보인다. 허락은 그 에이전트에만 통한다. 승인 카드에서 허락을 주면 서버가 `approval` 사건을 내므로
  * `refreshKey` 가 바뀌어 다시 읽는다. 허락이 없거나 읽지 못하면 아무것도 그리지 않는다.
  */
 export function ConversationGrantList({
@@ -79,7 +88,9 @@ export function ConversationGrantList({
           className="flex min-w-0 flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-1.5"
         >
           <p className="min-w-0 flex-1 break-words text-muted-foreground">
-            이 대화에서 묻지 않고 실행해요: 「{grant.title}」
+            {formatUntil(grant.expiresAt)}까지 이 대화에서 묻지 않고 실행해요:
+            「{grant.title}」
+            {grant.agentName ? ` · ${grant.agentName} 에이전트만` : null}
           </p>
           <Button
             size="sm"

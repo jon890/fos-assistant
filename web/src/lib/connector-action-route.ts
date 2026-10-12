@@ -152,13 +152,17 @@ function grantId(value: unknown): number {
   return value as number;
 }
 
-/** 대화 허락은 이름과 끝나는 시각만 옮긴다. 커넥터와 도구의 원래 이름은 화면이 쓰지 않는다. */
+/**
+ * 대화 허락은 이름과 끝나는 시각, 다른 에이전트에 준 허락이면 그 에이전트 이름만 옮긴다. 커넥터와 도구의 원래 이름은 화면이
+ * 쓰지 않는다.
+ */
 function safeConversationGrant(value: unknown): ConversationGrant {
   const item = record(value);
   return {
     grantId: grantId(item.grantId),
     title: text(item.title),
     expiresAt: text(item.expiresAt),
+    agentName: typeof item.agentName === "string" ? item.agentName : null,
   };
 }
 

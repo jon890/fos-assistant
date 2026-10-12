@@ -7,7 +7,12 @@ import type {
 const ACTION_ID = "1f0e0d0c-0b0a-4908-8706-050403020100";
 
 type Action = Record<string, unknown> & { status: string };
-type Grant = { grantId: number; title: string; expiresAt: string };
+type Grant = {
+  grantId: number;
+  title: string;
+  expiresAt: string;
+  agentName: string | null;
+};
 
 function action(overrides: Record<string, unknown> = {}): Action {
   return {
@@ -107,10 +112,29 @@ test("이 대화에서 계속 허용 중인 동작을 보이고 다시 묻기를
     page,
     "대화 허락 거두기",
     [],
-    [{ grantId: 7, title: "메모 쓰기", expiresAt: "2026-10-13T00:00:00Z" }],
+    [
+      {
+        grantId: 7,
+        title: "메모 쓰기",
+        expiresAt: "2026-10-13T00:00:00Z",
+        agentName: null,
+      },
+      {
+        grantId: 8,
+        title: "글 불러오기",
+        expiresAt: "2026-10-13T05:30:00Z",
+        agentName: "글 다듬기",
+      },
+    ],
   );
-  await expect(page.getByTestId("conversation-grant")).toHaveText(
-    /이 대화에서 묻지 않고 실행해요: 「메모 쓰기」/,
+  const rows = page.getByTestId("conversation-grant");
+  // 끝나는 시각은 가족이 사는 곳의 시각으로 보인다.
+  await expect(rows.nth(0)).toHaveText(
+    /2026\. 10\. 13\. 오전 9:00까지 이 대화에서 묻지 않고 실행해요:\s*「메모 쓰기」/,
+  );
+  await expect(rows.nth(0)).not.toContainText("에이전트만");
+  await expect(rows.nth(1)).toHaveText(
+    /오후 2:30까지 이 대화에서 묻지 않고 실행해요:\s*「글 불러오기」 · 글 다듬기 에이전트만/,
   );
   let method: string | null = null;
   await page.route(
@@ -122,7 +146,7 @@ test("이 대화에서 계속 허용 중인 동작을 보이고 다시 묻기를
     },
   );
 
-  await page.getByTestId("conversation-grant-revoke").click();
+  await page.getByTestId("conversation-grant-revoke").first().click();
 
   await expect(page.getByTestId("conversation-grant-list")).toHaveCount(0);
   expect(method).toBe("DELETE");
