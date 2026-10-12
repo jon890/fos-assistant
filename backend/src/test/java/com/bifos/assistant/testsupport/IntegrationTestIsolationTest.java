@@ -3,8 +3,17 @@ package com.bifos.assistant.testsupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 
+import com.bifos.assistant.chat.domain.ChatMessage;
+import com.bifos.assistant.chat.infra.ChatMessageContents;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
+import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
@@ -12,6 +21,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +37,9 @@ class IntegrationTestIsolationTest {
     private final TrackingBackgroundTasks tasks = new TrackingBackgroundTasks();
     private final StubHermesRunsClient stub = new StubHermesRunsClient();
     private final TestClock clock = new TestClock();
+    private final DataKeyService dataKeys = mock(DataKeyService.class);
+    private final ConversationRepository conversations = mock(ConversationRepository.class);
+    private final ChatMessageContents messageContents = new ChatMessageContents(dataKeys, conversations, clock);
     private final FailingAccessRevoker revoker = new FailingAccessRevoker();
     private final ConnectorChangeRecorder recorder = new ConnectorChangeRecorder();
     private final FakeBrowserRuntime browsers = new FakeBrowserRuntime();
@@ -38,6 +51,8 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("tasks", tasks);
         context.getBeanFactory().registerSingleton("stub", stub);
         context.getBeanFactory().registerSingleton("clock", clock);
+        context.getBeanFactory().registerSingleton("dataKeys", dataKeys);
+        context.getBeanFactory().registerSingleton("messageContents", messageContents);
         context.getBeanFactory().registerSingleton("scheduler", new CapturingTaskScheduler());
         context.getBeanFactory().registerSingleton("retryThreads", new WakeRetryThreads());
         context.getBeanFactory().registerSingleton("recorder", recorder);
@@ -77,6 +92,7 @@ class IntegrationTestIsolationTest {
             .as("대역에 넣어 둔 세션 응답이 비워져야 한다")
             .isNull();
         assertThat(clock.instant()).as("시계가 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+        verify(dataKeys).forgetCachedKeys();
         assertThatCode(() -> revoker.on(new UserAccessRevoked(1L)))
             .as("켜 둔 폐기 실패 대역이 꺼져야 한다")
             .doesNotThrowAnyException();
@@ -102,6 +118,7 @@ class IntegrationTestIsolationTest {
                 .as("실패해도 대역에 넣어 둔 세션 응답이 비워져야 한다")
                 .isNull();
             assertThat(clock.instant()).as("실패해도 시계가 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+            verify(dataKeys).forgetCachedKeys();
         } finally {
             hold.countDown();
             held.join();
@@ -125,6 +142,8 @@ class IntegrationTestIsolationTest {
                 }
             });
             broken.getBeanFactory().registerSingleton("clock", clock);
+            broken.getBeanFactory().registerSingleton("dataKeys", dataKeys);
+            broken.getBeanFactory().registerSingleton("messageContents", messageContents);
             broken.getBeanFactory().registerSingleton("scheduler", new CapturingTaskScheduler());
             broken.getBeanFactory().registerSingleton("retryThreads", new WakeRetryThreads() {
                 @Override
@@ -152,6 +171,7 @@ class IntegrationTestIsolationTest {
 
             assertThat(setting.current()).as("바꾼 설정이 기동 값으로 돌아와야 한다").isEqualTo("startup");
             assertThat(clock.instant()).as("던진 대역 뒤의 시계도 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+            verify(dataKeys).forgetCachedKeys();
             assertThatCode(() -> revoker.on(new UserAccessRevoked(1L)))
                 .as("던진 대역 뒤의 폐기 실패 대역도 꺼져야 한다")
                 .doesNotThrowAnyException();
@@ -160,6 +180,26 @@ class IntegrationTestIsolationTest {
         } finally {
             broken.close();
         }
+    }
+
+
+    @Test
+    @DisplayName("앞 검사가 시계를 미래로 옮겨도 다음 검사는 재사용된 대화 번호의 새 주인으로 본문을 푼다")
+    void reloadsConversationOwnerAfterTestClockMovesBack() throws InterruptedException {
+        var message = mock(ChatMessage.class);
+        when(message.id()).thenReturn(1L);
+        when(message.conversationId()).thenReturn(2L);
+        when(message.contentKeyId()).thenReturn(3L);
+        when(message.storedContent()).thenReturn("sealed");
+        when(conversations.findOwnerId(2L)).thenReturn(Optional.of(11L)).thenReturn(Optional.of(22L));
+        when(dataKeys.open(any(), any(), anyString(), anyString()))
+            .thenAnswer(invocation -> Optional.of("owner=" + invocation.getArgument(1)));
+        clock.set(Instant.parse("2100-01-01T00:00:00Z"));
+        assertThat(messageContents.open(message)).isEqualTo("owner=11");
+
+        IntegrationTestIsolation.afterTest(context, Duration.ofSeconds(5));
+
+        assertThat(messageContents.open(message)).isEqualTo("owner=22");
     }
 
 
