@@ -14,6 +14,12 @@ import {
   type ConnectorGrant,
   type ConversationGrant,
 } from "@/lib/connector-action";
+import {
+  CONTENT_DRAFT_JOB_STATUSES,
+  type ContentDraftJobStatus,
+  type ContentDraftSummary,
+} from "@/lib/content-draft-snapshot";
+import { isPublicId } from "@/lib/conversation-id";
 
 /** 브라우저에 그대로 넘기는 오류 코드다. 그 밖의 코드는 `INTERNAL_ERROR` 로 바꾼다. */
 const PASSED_CODES = new Set([
@@ -144,6 +150,32 @@ function safeAction(value: unknown): ConnectorAction {
       nullableText(item.argsJson),
     ),
     conversationGrantAllowed: item.conversationGrantAllowed === true,
+    contentDraft:
+      item.contentDraft == null ? null : safeContentDraft(item.contentDraft),
+  };
+}
+
+function publicId(value: unknown): string {
+  const id = text(value);
+  if (!isPublicId(id)) throw new Error();
+  return id;
+}
+
+/** 원고 저장 요약은 계약의 칸만 옮긴다. 승인자와 바인딩 판 같은 칸이 더해져도 브라우저로 옮기지 않는다. */
+function safeContentDraft(value: unknown): ContentDraftSummary {
+  const item = record(value);
+  const status = text(item.status) as ContentDraftJobStatus;
+  if (!CONTENT_DRAFT_JOB_STATUSES.includes(status)) throw new Error();
+  if (!Number.isSafeInteger(item.revision)) throw new Error();
+  return {
+    snapshotId: publicId(item.snapshotId),
+    draftId: publicId(item.draftId),
+    revision: item.revision as number,
+    conversationId: publicId(item.conversationId),
+    status,
+    stage: nullableText(item.stage),
+    saveClicked: item.saveClicked === true,
+    errorCode: nullableText(item.errorCode),
   };
 }
 

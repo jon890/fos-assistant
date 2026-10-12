@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Notice } from "@/components/ui/notice";
+import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card";
 import { toolRiskLabel } from "@/lib/connection";
 import {
   approvalArgs,
@@ -202,7 +203,7 @@ function GrantMenu({
  *
  * <p>`onChanged` 에 바뀐 줄을 넘긴다. 이미 처리된 요청이면 `null` 을 넘겨 목록을 다시 읽게 한다. `grouped` 면 묶음
  * 안의 한 건이라 제목과 안내를 묶음 머리에 맡기고 테두리 없이 그린다. `locked` 면 그 줄이 든 묶음의 「모두
- * 승인」 을 보내는 중이라 단추를 막는다.
+ * 승인」 을 보내는 중이라 단추를 막는다. 원고 저장 요약이 붙은 줄은 `ContentDraftSaveCard` 가 그린다.
  */
 export function ApprovalCard({
   action,
@@ -223,6 +224,15 @@ export function ApprovalCard({
   const [sending, setSending] = useState<Sending>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = sending !== null || locked;
+  if (action.contentDraft)
+    return (
+      <ContentDraftSaveCard
+        action={action}
+        draft={action.contentDraft}
+        onChanged={onChanged}
+        onDismiss={onDismiss}
+      />
+    );
 
   async function send(kind: Exclude<Sending, null>, grant: GrantPeriod | null) {
     if (busy) return;

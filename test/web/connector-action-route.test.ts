@@ -59,7 +59,10 @@ async function callRoute(
     },
     "@/lib/connector-action": action,
     "@/lib/connection": connection,
-    "@/lib/conversation-id": { isConversationId: () => true },
+    "@/lib/conversation-id": {
+      isConversationId: () => true,
+      isPublicId: (value: string) => /^[0-9a-f-]{36}$/.test(value),
+    },
     "@/lib/json-body": {
       readJsonBody: async (request: Request) => ({
         ok: true,
@@ -88,6 +91,9 @@ async function callRoute(
     });
     return module.exports;
   }
+  dependencies["@/lib/content-draft-snapshot"] = await load(
+    "../../web/src/lib/content-draft-snapshot.ts",
+  );
   dependencies["@/lib/connector-action-route"] = await load(
     "../../web/src/lib/connector-action-route.ts",
   );
@@ -252,6 +258,38 @@ test("승인 줄의 conversationGrantAllowed 는 참일 때만 참으로 옮긴�
       conversationGrantAllowed: value,
     });
     assert.equal((await response.json()).conversationGrantAllowed, expected);
+  }
+});
+
+test("원고 저장 요약은 계약의 칸만 옮기고 일반 줄은 null 이며 모양이 틀리면 고정 오류로 돌린다", async () => {
+  const contentDraft = {
+    snapshotId: ID,
+    draftId: ID,
+    revision: 3,
+    conversationId: ID,
+    status: "SAVING",
+    stage: "editor",
+    saveClicked: false,
+    errorCode: null,
+    approvedBy: "버릴 칸",
+  };
+  const { response } = await callRoute("list", [
+    { ...item({}), contentDraft },
+    item({}),
+  ]);
+  const [draft, plain] = await response.json();
+  const { approvedBy: _dropped, ...expected } = contentDraft;
+  assert.deepEqual(draft.contentDraft, expected);
+  assert.equal(plain.contentDraft, null);
+  for (const broken of [
+    { ...contentDraft, status: "DONE" },
+    { ...contentDraft, snapshotId: "../x" },
+    { ...contentDraft, revision: "3" },
+  ]) {
+    const failed = await callRoute("list", [
+      { ...item({}), contentDraft: broken },
+    ]);
+    assert.equal(failed.response.status, 502);
   }
 });
 

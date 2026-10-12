@@ -1,4 +1,5 @@
 import type { ToolRisk } from "@/lib/connection";
+import type { ContentDraftSummary } from "@/lib/content-draft-snapshot";
 
 export type ConnectorActionStatus =
   | "PENDING"
@@ -47,6 +48,8 @@ export type ConnectorAction = {
   argLabels?: Record<string, string>;
   /** 승인하면서 이 대화에서 계속 허용할 수 있는 줄인가. 밖으로 나가는 도구는 거짓이다. */
   conversationGrantAllowed: boolean;
+  /** 원고 저장 job 이 붙은 줄의 요약이다. 일반 줄은 null 이다. */
+  contentDraft: ContentDraftSummary | null;
 };
 
 /** 이 대화에서 계속 허용 중인 도구 한 개다. 화면에는 `title` 을 보인다. */
@@ -336,6 +339,9 @@ async function call<T>(
     return { ok: false, code: "", message: connectorActionErrorMessage("") };
   }
 }
+
+/** 서버 라우트를 부르고 오류 본문의 `code` 만 꺼낸다. 원고 저장 카드도 같이 쓴다. */
+export { call as callConnectorApi };
 
 export const readConnectorActions = (conversationId: string) =>
   call<ConnectorAction[]>(
