@@ -29,6 +29,7 @@ import {
   lockFile,
   readState,
   stateFile,
+  updateState,
 } from "../src/jobs.ts";
 import { createServer } from "../src/server.ts";
 import type { Env } from "../src/session.ts";
@@ -148,6 +149,70 @@ const startArgs = (snapshot: CompiledSnapshotV1, stamp: SnapshotStamp) => ({
   jobId: stamp.jobId,
   ticket: TICKET,
   stamp,
+});
+
+test("세션 확인 중 10초 지난 예약의 status 는 running 이고, 확인 뒤 같은 job 을 한 번 시작한다", async () => {
+  const { jobDir, cp, snapshot, call, counts, finished } = await setup({
+    photos: 1,
+  });
+  const stamp = stampFor(snapshot);
+  let entered!: () => void;
+  const checking = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const start = call("start", startArgs(snapshot, stamp), {
+    checkSession: async (_env, options) => {
+      expect(options?.timeoutMs).toBe(45_000);
+      entered();
+      await gate;
+      return {} as never;
+    },
+  });
+  await checking;
+  try {
+    // 실제 시간을 기다리지 않고 예약이 11초 전에 생긴 상태를 만든다.
+    await updateState(jobDir, stamp.jobId, {
+      started_at: new Date(Date.now() - 11_000).toISOString(),
+    });
+    expect((await call("status", { stamp })).body).toMatchObject({
+      status: "running",
+      error_code: null,
+    });
+    expect(cp.calls).toEqual([]);
+  } finally {
+    release();
+  }
+  expect((await start).isError).toBe(false);
+  expect(await finished(stamp)).toMatchObject({ status: "succeeded" });
+  expect(cp.calls.filter((entry) => entry.stage === "start")).toHaveLength(1);
+  expect((await counts(stamp.jobId)).clicks).toBe(1);
+});
+
+test("세션 확인 상한과 spawn 여유가 지난 pid 없는 예약은 timeout 으로 끝낸다", async () => {
+  const { jobDir, cp, snapshot, call, counts } = await setup({ photos: 1 });
+  const stamp = stampFor(snapshot);
+  await createState(
+    jobDir,
+    runningState(stamp.jobId, {
+      pid: null,
+      stage: "queued",
+      snapshot_stamp: stamp,
+      started_at: new Date(Date.now() - 56_000).toISOString(),
+    }),
+  );
+  expect((await call("status", { stamp })).body).toMatchObject({
+    status: "failed",
+    error_code: "timeout",
+  });
+  expect((await call("start", startArgs(snapshot, stamp))).body.status).toBe(
+    "failed",
+  );
+  expect(cp.calls).toEqual([]);
+  expect((await counts(stamp.jobId)).clicks).toBe(0);
 });
 
 async function filesContain(dir: string, needle: string) {

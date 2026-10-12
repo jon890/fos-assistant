@@ -163,6 +163,7 @@ clicked=false 실패, clicked=true 뒤 unknown, 600초 timeout과 30초 heartbea
 
 공개 `draft_job`은 상태 파일에 `snapshot_stamp` 키가 있으면 값이 null이거나 깨졌어도 `NAVER_BLOG_JOB_NOT_FOUND`다. 묵은 작업 정리 전에 막아 공개 조회가 private 상태를 바꾸지 못한다.
 private status만 stamp를 strict decode해 대조하고, 묵은 job은 공개 조회와 같은 규칙으로 끝낸다. 상태 파일이 없거나 정리됐으면 `not_found`이며 worker를 새로 띄우지 않는다.
+pid가 없는 queued 예약은 세션 확인 상한 45초와 spawn 여유 10초를 합친 55초까지 기다린다. 세션 확인 중 status가 예약을 먼저 timeout으로 끝내지 않는다.
 Control Plane과 compiler가 중복 사진을 미리 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 거절한다. compiler를 거치지 않은 반복 snapshot도 worker가 재compile할 때 `snapshot_invalid`로 막아 authorize 호출과 브라우저 실행을 하지 않는다.
 
 검증은 실제 TS MCP Client와 InMemoryTransport, 분리한 worker 프로세스, loopback 대역 authorize 서버로 한다. 업로드와 저장 클릭은 대역 runDraft가 남긴 독립 기록으로 센다.

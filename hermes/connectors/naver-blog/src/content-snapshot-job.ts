@@ -36,6 +36,9 @@ const micros = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/);
 const uuid = z.string().regex(JOB_ID_PATTERN);
+const SESSION_TIMEOUT_MS = 45_000;
+// worker 가 pid 를 적기 전에는 세션 확인 45초와 spawn 대기 10초를 모두 기다린다.
+const RESERVATION_WAIT_MS = SESSION_TIMEOUT_MS + 10_000;
 
 export const snapshotStampSchema = z.strictObject({
   protocol: z.literal("content-snapshot-v1"),
@@ -189,7 +192,7 @@ export async function startSnapshotJob(
   };
   try {
     const { blogId } = readConnection(env);
-    await deps.checkSession(env, { timeoutMs: 45_000 });
+    await deps.checkSession(env, { timeoutMs: SESSION_TIMEOUT_MS });
     await acquireLock(dir, blogId, jobId);
   } catch (error) {
     return refuse(refusalCode(error));
@@ -263,8 +266,13 @@ export async function snapshotJobStatus(env: Env, raw: unknown) {
   let state = await readState(dir, stamp.jobId);
   if (!state || !sameStamp(state, stamp))
     throw new SnapshotJobError("not_found");
+  const waitingForSession =
+    state.pid == null &&
+    state.stage === "queued" &&
+    Date.now() - Date.parse(state.started_at) < RESERVATION_WAIT_MS;
   if (
     state.status === "running" &&
+    !waitingForSession &&
     !jobAlive(state, Date.parse(state.started_at))
   ) {
     state = (await finishStale(dir, state)) ?? state;
