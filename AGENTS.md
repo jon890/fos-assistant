@@ -133,6 +133,7 @@ backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `herme
 push 전에 `scripts/check-local.sh --fast` 로 빠른 검사만 돌리고 Draft PR 을 연다.
 무거운 검사는 Draft CI 가 돌리므로 로컬에서 기다리지 않는다.
 공개 정보 검사는 `--fast` 에도 들어 있다. push 하면 되돌릴 수 없어서다.
+그 검사는 추적 파일의 지금 내용만 보므로, 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
 어느 단계를 돌리고 무엇을 CI 에 넘기는지는 그 스크립트의 머리말이 갖는다.
 
 ```bash
