@@ -130,12 +130,14 @@ backend 는 `backend/docs/adr/`, 화면은 `web/docs/adr/`, `hermes/` 는 `herme
 
 ### 로컬 검사와 PR
 
-push 전에 `scripts/check-local.sh` 로 로컬 검사를 돌린다.
-고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 인자로 준다. 인자의 뜻과 돌리는 명령은 그 스크립트의 머리말이 갖는다.
+push 전에 `scripts/check-local.sh --fast` 로 빠른 검사만 돌리고 Draft PR 을 연다.
+무거운 검사는 Draft CI 가 돌리므로 로컬에서 기다리지 않는다.
+공개 정보 검사는 `--fast` 에도 들어 있다. push 하면 되돌릴 수 없어서다.
+어느 단계를 돌리고 무엇을 CI 에 넘기는지는 그 스크립트의 머리말이 갖는다.
 
 ```bash
 # cwd: 저장소 root
-scripts/check-local.sh usage-breakdown memory-document
+scripts/check-local.sh --fast
 ```
 
 **PR 을 열거나 Ready 로 바꾸거나 머지할 때는 [`.claude/skills/pr-merge/SKILL.md`](.claude/skills/pr-merge/SKILL.md) 를 읽는다.**
