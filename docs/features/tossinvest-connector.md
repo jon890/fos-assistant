@@ -4,7 +4,7 @@
 
 covers: `hermes/connectors/tossinvest/`
 
-사용자의 토스증권 계좌를 읽는 범용 커넥터다. 코드는 [`hermes/connectors/tossinvest/`](../../hermes/connectors/tossinvest) 에 있다.
+코드는 [`hermes/connectors/tossinvest/`](../../hermes/connectors/tossinvest) 에 있다.
 이 문서는 도구와 정책, 보안, 연결 유지, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [토스증권 커넥터 README](../../hermes/connectors/tossinvest/README.md) 가 갖는다.
 결정은 [ADR-20261008 / tossinvest-connector](../../hermes/docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
 커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
