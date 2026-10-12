@@ -86,17 +86,6 @@ public class ConnectorPolicyService {
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
     private static final String READ_ONLY_RUN_MESSAGE = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
-    /**
-     * 모델이 읽는 승인 대기 안내다. 번호는 사용자에게 읽어 주지 않는다.
-     * 승인 카드에서 허락하면 저장한 인자로 한 번 실행하고 결과가 같은 대화의 다음 turn 으로 온다({@link ConnectorActionResultSource}).
-     */
-    private static final String APPROVAL_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. "
-        + "대화 화면에 승인 카드가 떴으니 사용자에게 거기서 승인해 달라고 알린다. 번호는 사용자에게 말하지 않는다. "
-        + "같은 도구를 다시 부르지 않는다. 승인하면 저장한 인자 그대로 한 번 실행되고 결과가 이 대화로 온다.";
-
-    /** 대화 없이 돈 실행은 승인 카드가 뜰 화면이 없다. 승인받을 수 있다고 약속하지 않는다. */
-    private static final String APPROVAL_WITHOUT_CONVERSATION_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. " + "이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.";
-
     /** 새 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
     static final String APPROVAL_REQUESTED_TITLE = "승인을 기다리는 요청이 있어요";
 
@@ -464,8 +453,7 @@ public class ConnectorPolicyService {
     /** 승인 줄은 지금 상태와 상관없이 승인을 기다리라는 글과 그 번호로 답한다. 같은 호출이 다시 와도 답이 같다. */
     private static ConnectorPolicyAnswer answer(ConnectorAction action) {
         if (action.status() != null) {
-            String message = action.conversationId() == null ? APPROVAL_WITHOUT_CONVERSATION_MESSAGE : APPROVAL_MESSAGE;
-            return new ConnectorPolicyAnswer(false, String.format(message, action.publicId()), action.publicId());
+            return ConnectorApprovalReply.of(action);
         }
         if (action.passed()) {
             return new ConnectorPolicyAnswer(true, "", null);
