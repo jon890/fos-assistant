@@ -51,6 +51,10 @@ const observation = (
 const all = (keys: readonly string[], route: VisionRoute) =>
   new Map(keys.map((key) => [key, route] as const));
 
+test("특수 합성 사례를 다시 생성해도 바이트와 측정 결과가 같다", () => {
+  assert.deepEqual(createSpecialMediaCases(join(dir, "repeat")), cases);
+});
+
 test("고해상도 간판은 표식과 제목이 사본에 남고 1px 메뉴 글씨는 원본에서만 읽힌다", () => {
   const sign = byKey("sign-hires");
   assert.deepEqual(
@@ -193,6 +197,20 @@ test("이미지를 뗀 재시도는 실패이고 읽었다는 관찰을 거절�
     embedded.map((key) => ({ assetKey: key, status: "FAILED", coverage: null, claims: [] })),
   );
   assert.equal(failed.delivery, "FAILED");
+  for (const route of ["STRIPPED", "NOT_EMBEDDED"] as const) {
+    for (const extra of [
+      { coverage: "OVERVIEW" as const, claims: [] },
+      { coverage: null, claims: [{ kind: "VISUAL" as const, confidence: "UNCERTAIN" as const }] },
+      { coverage: null, claims: [{ kind: "OCR" as const, confidence: "CONFIRMED" as const }] },
+    ]) {
+      assert.throws(
+        () => judgeObservationClaims(traits, all(embedded, route), [
+          observation(embedded[0]!, { status: "FAILED", ...extra }),
+        ]),
+        /OVERCLAIM_NOT_RECEIVED/,
+      );
+    }
+  }
 });
 
 test("일부를 싣지 못하면 provider 가 vision 을 지원하지 않아도 fallback 이 아니라 부분 실패다", () => {

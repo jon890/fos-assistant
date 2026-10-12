@@ -80,7 +80,13 @@ export function judgeObservationClaims(
     if (!route) throw new Error("ROUTE_MISSING");
     const observation = recorded.get(trait.assetKey);
     if (observation) {
-      if (!RECEIVED.includes(route) && route !== "UNKNOWN" && observation.status !== "FAILED")
+      if (
+        !RECEIVED.includes(route) &&
+        route !== "UNKNOWN" &&
+        (observation.status !== "FAILED" ||
+          observation.coverage !== null ||
+          observation.claims.some((claim) => claim.kind !== "USER"))
+      )
         throw new Error("OVERCLAIM_NOT_RECEIVED");
       if (
         route === "AUX_DESCRIPTION" &&
