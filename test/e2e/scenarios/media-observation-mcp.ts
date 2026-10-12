@@ -32,6 +32,7 @@ import {
   signedCallContext,
   signedSubagentRegistration,
 } from "../mcp-context.ts";
+import { checkPipelineEvidence } from "./media-pipeline-draft.ts";
 import { NEW_PERSON } from "./people.ts";
 
 export const MEDIA_OBSERVATION_PROFILE = "media-observation-mcp";
@@ -342,6 +343,7 @@ export const mediaObservationMcpScenario: Scenario = {
         recordRequestsAfterSave === mapping.rows.length,
         "record 요청 카운터가 저장 요청을 세지 못했다",
       );
+      await checkPipelineEvidence(context, token, session, fixtures, sent, sentIds);
       const native = `native-${randomUUID()}`;
       const registered = await fetch(
         `${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/session-bindings/subagent`,

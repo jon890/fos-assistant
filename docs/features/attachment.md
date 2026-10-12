@@ -2,7 +2,7 @@
 
 대화에 사진을 올려 에이전트에게 보내고, 에이전트가 만든 HTML 결과물을 보관하고 보이는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaObservation*`, `backend/src/main/java/com/bifos/assistant/chat/**/Observation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
+covers: `backend/src/main/java/com/bifos/assistant/chat/**/Artifact*`, `backend/src/main/java/com/bifos/assistant/chat/**/*Attachment*`, `backend/src/main/java/com/bifos/assistant/chat/**/ChatContentMutation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaObservation*`, `backend/src/main/java/com/bifos/assistant/chat/**/MediaPipeline*`, `backend/src/main/java/com/bifos/assistant/chat/**/Observation*`, `web/src/components/chat/artifact/`, `web/src/components/chat/use-composer-attachments.ts`, `web/src/components/chat/composer-attachment-utils.ts`, `web/src/lib/artifact-name.ts`, `web/src/app/files/`
 
 ## 삭제 요청과 접근 차단
 
@@ -286,6 +286,53 @@ MCP 통합 검사는 실제 Control Plane에 JPEG/PNG/GIF 30장을 올려 역순
 실제 DB 검사는 소유권·다른 대화·삭제·만료·UUID 재시도·USER 정정 보호와 암호화 본문을 확인한다.
 실제 provider 전달, 사진 의미와 OCR 정확도는 미측정이다.
 기존 원본 픽셀 evidence V1과 `actuallyObserved` 판정에는 수신 JPEG 결과를 넣지 않는다.
+
+특수 사례는 같은 생성기의 `special` 명령이 만든다. 모두 크기에 맞춰 키운 같은 표식을 갖는다.
+
+| 사례 | 확인하는 것 |
+| --- | --- |
+| 4032x3024 간판 | 표식과 24배 제목은 긴 변 1600px 사본에서도 읽히고, 1px 획의 메뉴 글씨는 원본에서만 읽힌다 |
+| 1920x1080 풍경 | 표식 밖에 글씨 화소가 없다 |
+| 같은 사진 두 장 | 바이트와 표식이 같아 픽셀로는 자리를 가릴 수 없고 첨부 번호로만 가린다 |
+| 거의 같은 사진 두 장 | 2x2 화소만 달라 표식은 같고 바이트로만 가린다 |
+
+[관찰 주장 판정기](../../test/support/media-observation-claims.ts)는 모델이 받은 입력보다 많이 읽었다고 기록했는지 본다.
+사본만 본 관찰이 작은 메뉴 글씨를 확인했다고 하거나 풍경의 글씨를 확인했다고 하면 거절한다.
+메뉴 글씨는 테스트가 별도로 확인한 원본(`ORIGINAL`)이나 영역(`CROP`) 조회 증거와 관찰의 범위가 일치해야 확인으로 받는다.
+모델이 적은 `coverage` 만으로는 조회 증거가 되지 않으며, 증거가 없으면 사본만 받은 것으로 본다.
+
+Control Plane 은 provider 의 vision 지원을 판정하지 않는다([ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md)).
+vision 을 지원하지 않는 모델에는 Hermes 가 보조 모델의 설명 글을 보내고, 상류가 이미지를 거절하면 이미지를 뗀 채 다시 시도한다.
+어느 쪽도 Control Plane 응답에 드러나지 않으므로 실제 흐름의 경로는 `UNKNOWN` 이고 판정은 `UNMEASURED` 다.
+단위 테스트는 provider 경로와 `embedded` 로그 줄을 직접 만들어 판정 규칙을 확인한다.
+가짜 Hermes 나 provider 가 vision 을 거절하거나 이미지를 뗀 채 다시 시도하는 흐름을 실행하는 검사는 아니다.
+이 검사가 보장하는 것은 주어진 경로에 따른 전달 상태와 과장된 관찰 주장의 거절이다.
+
+| 단위 테스트에 주어진 경로 | 판정 | 거절하는 주장 |
+| --- | --- | --- |
+| 모두 이미지로 받음 | `NATIVE` | |
+| vision 미지원으로 설명 글만 받음 | `FALLBACK` | `SUCCEEDED`, `ORIGINAL`·`CROP` 범위, 확인(`CONFIRMED`)한 시각·글씨 주장 |
+| 이미지를 뗀 재시도 | `FAILED` | `FAILED` 가 아닌 관찰 |
+| 일부를 싣지 못함(`embedded` 사건의 `missing`) | `PARTIAL_FAILURE`. provider 가 vision 을 지원하지 않아도 fallback 으로 바꾸지 않는다 | 싣지 못한 사진의 `FAILED` 가 아닌 관찰 |
+
+### 본문 없는 단계 사건
+
+Control Plane 은 사진이 지난 단계를 `media-pipeline {...}` 로그 한 줄로 남긴다. [`MediaPipelineEvents`](../../backend/src/main/java/com/bifos/assistant/chat/application/MediaPipelineEvents.java) 가 모양을 갖는다.
+사건에는 첨부 번호, 자리, 장수, 원고 ID 와 판만 싣는다. 사진 바이트, 캡션, 원고 글, 파일 이름은 싣지 않는다.
+
+| 단계 | 남기는 곳 | 뜻 |
+| --- | --- | --- |
+| `embedded` | 실행 입력을 만들 때 | 이번 메시지의 사진 가운데 이미지로 실은 것의 순서와 싣지 못한 첨부 번호다. Hermes 나 provider 가 받았다는 뜻이 아니다 |
+| `draftReferenced` | 원고 revision 커밋 뒤 | 그 판의 블록이 참조한 첨부 번호와 블록 자리다. 롤백한 저장은 남기지 않는다 |
+
+MCP 통합 검사는 30장 흐름에서 이 사건을 로그에서 모아 [단계별 증거](content-draft.md#단계별-증거)의 판정기에 넣는다.
+허용 목록 밖의 칸이 섞인 사건은 [로그 판독기](../../test/support/media-pipeline-log.ts)가 거절한다.
+30장을 참조한 첫 판은 포함 30, 가운데 한 장을 뺀 둘째 판은 포함 29와 빠진 1로 판정한다. 두 사건만으로 판독 성공을 만들지 않는다.
+
+`validatedOriginals`, `editorUploaded`, `saved` 는 아직 남기지 않는다.
+원고 snapshot 미리보기는 공개 경로가 없고, 네이버 저장 worker 가 snapshot 자리마다 사진을 넣는 경로는 아직 main 에 없다.
+main 의 저장 job 은 사진을 첨부 번호가 아니라 파일로 받아 자리와 첨부를 이을 수 없다.
+그 경로가 들어오면 snapshot 확정에서 `validatedOriginals` 를, worker 의 사진 자리 업로드와 저장 확인에서 `editorUploaded` 와 `saved` 를 같은 모양으로 더한다.
 
 ## 요구
 

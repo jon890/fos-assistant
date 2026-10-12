@@ -435,6 +435,7 @@ async function main(): Promise<void> {
       hermesBaseUrl: hermes.baseUrl,
       hermesProfileKey: PROFILE_KEY,
       hermes,
+      readBackendLog: () => readFile(logPath, "utf-8").catch(() => ""),
       restartControlPlane: async () => {
         if (app !== undefined) await killControlPlane(app);
         app = launch();
