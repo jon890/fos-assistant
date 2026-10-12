@@ -19,7 +19,6 @@ import com.bifos.assistant.connector.domain.type.BindingStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
-import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.application.model.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
@@ -91,7 +90,7 @@ public class ConnectorPolicyService {
 
     private final ConnectorActionRepository actions;
     private final ConnectorBindingRepository bindings;
-    private final ConnectorToolGrantRepository grants;
+    private final ConnectorGrantLookup grants;
     private final SessionOwnerResolver owners;
     private final ConnectorCatalogCache catalog;
     private final LiveProperties<ConnectorPolicyProperties> properties;
@@ -111,7 +110,7 @@ public class ConnectorPolicyService {
     public ConnectorPolicyService(
         ConnectorActionRepository actions,
         ConnectorBindingRepository bindings,
-        ConnectorToolGrantRepository grants,
+        ConnectorGrantLookup grants,
         SessionOwnerResolver owners,
         ConnectorCatalogCache catalog,
         LiveProperties<ConnectorPolicyProperties> properties,
@@ -143,7 +142,7 @@ public class ConnectorPolicyService {
     public ConnectorPolicyService(
         ConnectorActionRepository actions,
         ConnectorBindingRepository bindings,
-        ConnectorToolGrantRepository grants,
+        ConnectorGrantLookup grants,
         SessionOwnerResolver owners,
         ConnectorCatalogCache catalog,
         LiveProperties<ConnectorPolicyProperties> properties,
@@ -247,7 +246,8 @@ public class ConnectorPolicyService {
             ownServerTool(value, hermesTool),
             value.schema(),
             declared,
-            granted(connection, confirmedTool, now),
+            grants.standing(connection, confirmedTool, now),
+            grants.inConversation(origin, connection, confirmedTool, now),
             argsJson.getBytes(StandardCharsets.UTF_8).length,
             boundary))
             .orElseGet(ToolPolicyDecision::policyUnavailable);
@@ -273,6 +273,9 @@ public class ConnectorPolicyService {
             dedupeKey,
             argsSha256,
             now);
+        if (boundary != CheckBoundary.NOT_CHECK) {
+            action.markCheckTree();
+        }
         if (needsApproval) {
             action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
         }
@@ -348,13 +351,6 @@ public class ConnectorPolicyService {
                 APPROVAL_REQUESTED_TITLE,
                 "「" + toolTitle + "」",
                 new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
-    }
-
-
-    /** 그 사용자가 그 커넥터의 그 도구에 준 유효한 상시 허락이 있는가. 원래 이름을 확인하지 못한 호출은 없는 것이다. */
-    private boolean granted(ConnectorConnection connection, String confirmedTool, Instant now) {
-        return confirmedTool != null
-            && grants.existsActive(connection.userId(), connection.connectorId(), confirmedTool, now);
     }
 
 

@@ -20,6 +20,7 @@ public class ConnectorActionExpirer {
 
     private final Clock clock = Clock.systemUTC();
 
+
     /** 1분마다 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
     @Scheduled(cron = "${assistant.connector.policy.expire-cron}")
     public void runScheduled() {
@@ -27,5 +28,6 @@ public class ConnectorActionExpirer {
         actions.expire(now);
         actions.markStale(now.minus(STALE_EXECUTION), now);
         actions.revokeClosedGrants(now);
+        actions.revokeClosedConversationGrants(now);
     }
 }
