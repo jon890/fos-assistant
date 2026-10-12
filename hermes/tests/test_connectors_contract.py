@@ -23,6 +23,10 @@ CLOSED_RISKS = {"DESTRUCTIVE", "FINANCIAL"}
 SERVER_TIMEOUT_SECONDS = 30
 # `<img>` 로 그리는 SVG 는 이 이름공간 선언이 없으면 아무것도 그리지 않는다.
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
+# 화면은 도구 이름 대신 `title` 과 `summary` 를 보인다. 요약은 한두 문장이다.
+TOOL_SUMMARY_MAX_CHARS = 200
+# 화면용 `title` 과 `summary` 를 아직 채우지 않은 커넥터다. 채우는 PR 에서 이 목록과 함께 지운다.
+PENDING_USER_COPY = {"naver-blog"}
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
@@ -108,11 +112,24 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
             problems.append("아이콘 SVG 가 %s 를 선언하지 않았다: %s" % (SVG_NAMESPACE, name))
 
     tools = declared.get("tools", {})
+    readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").is_file() else ""
     for tool, spec in tools.items():
         if spec.get("risk") in CLOSED_RISKS:
             problems.append("닫힌 위험도 %s 선언: %s" % (spec["risk"], tool))
         if spec.get("risk") != "READ" and not str(spec.get("title", "")).strip():
             problems.append("READ 가 아닌 도구에 title 이 없다: %s" % tool)
+        if name not in PENDING_USER_COPY:
+            if not str(spec.get("title", "")).strip():
+                problems.append("화면에 보일 title 이 없다: %s" % tool)
+            summary = spec.get("summary")
+            normalized = loaded.get("tool_summaries", {}).get(tool) if loaded is not None else None
+            if not isinstance(summary, str) or summary != normalized or len(summary) > TOOL_SUMMARY_MAX_CHARS:
+                problems.append("화면에 보일 summary 가 없거나 %d자 안의 평문이 아니다: %s" % (TOOL_SUMMARY_MAX_CHARS, tool))
+            elif any(tool in str(text) for text in (spec.get("title", ""), summary)):
+                problems.append("title 이나 summary 에 도구 이름이 있다: %s" % tool)
+            # 사용자 README 의 도구 표는 화면과 같은 말을 쓴다. 손으로 고친 표가 선언과 어긋나지 않게 한다.
+            elif "| %s | %s |" % (spec.get("title"), summary) not in readme:
+                problems.append("README 의 도구 표에 title 과 summary 줄이 없다: %s" % tool)
         if spec.get("risk") != "READ":
             if type(spec.get("outbound")) is not bool:
                 problems.append("READ 가 아닌 도구가 outbound 를 boolean 으로 선언하지 않았다: %s" % tool)
@@ -338,6 +355,18 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
     def test_write_tool_without_title_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["create_draft"].pop("title")))
         self.assert_reported(problems, "title")
+
+    def test_tool_without_user_copy_is_reported(self):
+        problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["get_profile"].pop("title")))
+        self.assert_reported(problems, "title 이 없다")
+        problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["get_profile"].pop("summary")))
+        self.assert_reported(problems, "summary")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="get_profile 로 계정을 읽어요.")))
+        self.assert_reported(problems, "도구 이름")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="README 에 없는 요약이에요.")))
+        self.assert_reported(problems, "README")
 
     def test_connector_without_icon_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v.pop("icon")))
