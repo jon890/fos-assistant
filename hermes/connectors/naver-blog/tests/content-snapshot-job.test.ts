@@ -162,7 +162,7 @@ async function filesContain(dir: string, needle: string) {
 test("예약 ID로 worker 를 한 번 띄우고 start·photo·save authorize 뒤 같은 job 만 조회한다", async () => {
   const { jobDir, cp, snapshot, call, counts, finished } = await setup({
     photos: 3,
-    order: [1, 2, 1, 3],
+    order: [2, 1, 3],
   });
   const stamp = stampFor(snapshot);
   const started = await call("start", startArgs(snapshot, stamp));
@@ -187,7 +187,7 @@ test("예약 ID로 worker 를 한 번 띄우고 start·photo·save authorize 뒤
     saved_after: 4,
     error_code: null,
   });
-  // 반복 asset 도 자리마다 검사한다. position 은 canonical block 의 0부터 위치다.
+  // 사진 순서가 asset 번호와 달라도 position 은 canonical block 의 0부터 위치다.
   expect(cp.calls).toEqual([
     { ticket: TICKET, stage: "start" },
     ...snapshot.assetManifest.map((entry) => ({
@@ -198,7 +198,7 @@ test("예약 ID로 worker 를 한 번 띄우고 start·photo·save authorize 뒤
     { ticket: TICKET, stage: "save" },
   ]);
   expect(snapshot.assetManifest.map((entry) => entry.position)).toEqual([
-    1, 2, 3, 4,
+    1, 2, 3,
   ]);
   const recorded = await counts(stamp.jobId);
   expect(recorded.uploads).toEqual(

@@ -4,6 +4,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CompiledSnapshotV1 } from "../src/content-draft.ts";
+import { compiledSnapshotV1Schema } from "../src/content-draft.ts";
 import { type Fetcher, verifySnapshot } from "../src/content-snapshot-guard.ts";
 import type { runDraft } from "../src/editor/run.ts";
 import {
@@ -20,7 +21,11 @@ import type {
 } from "../src/content-snapshot-job.ts";
 import type { Env } from "../src/session.ts";
 import { runWorker } from "../src/worker.ts";
-import { stampFor, syntheticSnapshot } from "./content-snapshot-fixture.ts";
+import {
+  sha256,
+  stampFor,
+  syntheticSnapshot,
+} from "./content-snapshot-fixture.ts";
 
 const URL = "http://127.0.0.1:9/base/internal/content-draft-jobs/authorize";
 const cleanups: Array<() => unknown> = [];
@@ -38,7 +43,7 @@ async function photoRoot() {
 
 test("verifySnapshot 은 다시 compile 한 결과와 정확히 같은 snapshot 만 받는다", async () => {
   const root = await photoRoot();
-  const snapshot = await syntheticSnapshot(join(root, "p"), 2, [1, 2, 1]);
+  const snapshot = await syntheticSnapshot(join(root, "p"), 3, [2, 1, 3]);
   const empty = await syntheticSnapshot(join(root, "q"), 1, []);
   expect(verifySnapshot(snapshot)).toEqual(snapshot);
   expect(verifySnapshot(empty)).toEqual(empty);
@@ -71,6 +76,69 @@ test("verifySnapshot 은 다시 compile 한 결과와 정확히 같은 snapshot 
     null,
   ];
   for (const value of tampered) expect(verifySnapshot(value)).toBeNull();
+});
+
+test("compiler 는 반복 사진을 CONTENT_DRAFT_DUPLICATE_PHOTO 로 조기에 거절한다", async () => {
+  await expect(
+    syntheticSnapshot(join(await photoRoot(), "p"), 2, [1, 2, 1]),
+  ).rejects.toMatchObject({ code: "CONTENT_DRAFT_DUPLICATE_PHOTO" });
+});
+
+test("compiler 를 거치지 않은 반복 snapshot 은 지문이 맞아도 worker 재검증에서 거절한다", async () => {
+  const original = await syntheticSnapshot(join(await photoRoot(), "p"), 2);
+  const snapshot = structuredClone(original);
+  snapshot.canonicalBlocks.push(snapshot.canonicalBlocks[1]!);
+  snapshot.assetManifest.push({ ...snapshot.assetManifest[0]!, position: 3 });
+  snapshot.payload.body += "\n[사진 3: 1.jpg]";
+  const payload = snapshot.payload;
+  snapshot.payloadFingerprint = sha256(
+    JSON.stringify([
+      payload.title,
+      payload.category,
+      payload.tags,
+      payload.body,
+      payload.photo_dir ?? null,
+    ]),
+  );
+  snapshot.snapshotHash = sha256(
+    JSON.stringify([
+      1,
+      snapshot.compilerVersion,
+      snapshot.draftId,
+      snapshot.revision,
+      snapshot.canonicalBlocks,
+      snapshot.assetManifest.map((entry) => [
+        entry.position,
+        entry.assetId,
+        entry.sourceFingerprint,
+        entry.fileName,
+      ]),
+      snapshot.payloadFingerprint,
+      [],
+    ]),
+  );
+  // 옛 compiler 와 같은 지문을 갖췄으므로 형식 오류나 hash 불일치만으로는 거절할 수 없다.
+  expect(compiledSnapshotV1Schema.safeParse(snapshot).success).toBe(true);
+  expect(verifySnapshot(snapshot)).toBeNull();
+  const { dir, jobId } = await snapshotJob(snapshot, stampFor(snapshot));
+  const { events, fetcher } = recorder();
+  let opened = false;
+  await runWorker(stateFile(dir, jobId), {
+    env: workerEnv(),
+    fetch: fetcher,
+    runDraft: async () => {
+      opened = true;
+      throw new Error("열면 안 된다");
+    },
+    limitMs: 5_000,
+  });
+  expect(await readState(dir, jobId)).toMatchObject({
+    status: "failed",
+    save_clicked: false,
+    error: { code: "snapshot_invalid" },
+  });
+  expect(events).toEqual([]);
+  expect(opened).toBe(false);
 });
 
 /** 예약 stamp 가 있는 상태와 snapshot 입력을 준비한 worker 하나. */

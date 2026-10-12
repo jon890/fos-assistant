@@ -190,24 +190,6 @@ test("30장 서로 다른 합성 바이트를 manifest 순서와 자리별 autho
   expect(new Set(uploaded()).size).toBe(30);
 }, 30_000);
 
-test("같은 asset 의 반복 자리는 자리마다 검사하지만 기존 자리표시 규칙이 같은 이름 두 줄을 구별하지 못해 업로드 전에 멈춘다", async () => {
-  // 기존 DSL 의 자리표시는 파일 이름만 담아 반복 사진 두 줄이 같다. 이 한계는 snapshot guard 가 바꾸지 않는다.
-  const { page, input, blocks, attachmentDir, guard, authorized, uploaded } =
-    await guarded(2, [2, 1, 2]);
-  const failure = await photos(
-    page,
-    input,
-    blocks,
-    "draft-hash",
-    attachmentDir,
-    guard,
-  ).catch((error) => error);
-  expect(failure.code).toBe("photo_upload_failed");
-  expect(failure.message).toBe("사진 자리를 찾지 못했다");
-  expect(authorized).toEqual([1]);
-  expect(uploaded()).toEqual([]);
-});
-
 test("authorize 가 자리 하나를 거절하면 그 사진부터 업로드하지 않는다", async () => {
   const { page, input, blocks, attachmentDir, guard, uploaded } = await guarded(
     3,

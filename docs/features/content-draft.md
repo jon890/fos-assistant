@@ -163,7 +163,7 @@ clicked=false 실패, clicked=true 뒤 unknown, 600초 timeout과 30초 heartbea
 
 공개 `draft_job`은 상태 파일에 `snapshot_stamp` 키가 있으면 값이 null이거나 깨졌어도 `NAVER_BLOG_JOB_NOT_FOUND`다. 묵은 작업 정리 전에 막아 공개 조회가 private 상태를 바꾸지 못한다.
 private status만 stamp를 strict decode해 대조하고, 묵은 job은 공개 조회와 같은 규칙으로 끝낸다. 상태 파일이 없거나 정리됐으면 `not_found`이며 worker를 새로 띄우지 않는다.
-기존 DSL 자리표시는 파일 이름만 담으므로 같은 asset을 두 자리에 둔 원고는 첫 사진 자리를 찾지 못해 업로드 전에 멈춘다. guard는 이 한계를 바꾸지 않는다.
+Control Plane과 compiler가 중복 사진을 미리 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 거절한다. compiler를 거치지 않은 반복 snapshot도 worker가 재compile할 때 `snapshot_invalid`로 막아 authorize 호출과 브라우저 실행을 하지 않는다.
 
 검증은 실제 TS MCP Client와 InMemoryTransport, 분리한 worker 프로세스, loopback 대역 authorize 서버로 한다. 업로드와 저장 클릭은 대역 runDraft가 남긴 독립 기록으로 센다.
 30장 서로 다른 합성 바이트의 순서와 업로드 바이트는 대역 편집기로 확인한다. 실제 네이버 편집기·provider 사진 대응·운영 Hermes 왕복은 확인하지 않았다.
