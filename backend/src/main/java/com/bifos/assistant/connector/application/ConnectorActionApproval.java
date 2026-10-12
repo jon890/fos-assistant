@@ -254,18 +254,18 @@ class ConnectorActionApproval {
             // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.
             action.unknown(now);
         } else if (result.ok()) {
-            action.succeed(clip(result.result().toString()), now);
+            bodies.succeed(action, clip(result.result().toString()), now);
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
         } else {
             // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
-            action.fail(
+            bodies.fail(
+                    action,
                 result.error().word(),
                 result.detail() == null ? null : result.detail().toStored(),
                 now);
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM)
                 .reason(action.errorCode()));
         }
-        bodies.sealResult(action);
         return actions.save(action);
     }
 

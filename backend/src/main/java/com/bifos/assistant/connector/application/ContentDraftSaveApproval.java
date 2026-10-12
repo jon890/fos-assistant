@@ -275,7 +275,7 @@ public class ContentDraftSaveApproval {
         } else if (job.running() && job.startClaimedAt() == null) {
             job.fail(outcome.errorCode(), now);
             if (action.status() == ActionStatus.EXECUTING) {
-                action.fail("unavailable", null, now);
+                action.fail("unavailable", null, null, now);
             }
         }
         jobs.save(job);

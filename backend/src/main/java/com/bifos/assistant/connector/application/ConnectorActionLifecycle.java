@@ -8,6 +8,7 @@ import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -37,6 +38,7 @@ class ConnectorActionLifecycle {
     private final ConnectorActionSignals signals;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final ConnectorActionBodies bodies;
 
 
     ConnectorActionLifecycle(
@@ -47,6 +49,7 @@ class ConnectorActionLifecycle {
         ConnectorActionDetails details,
         ConnectorActionSignals signals,
         TransactionTemplate transactions,
+            ConnectorActionBodies bodies,
         Clock clock) {
         this.actions = actions;
         this.contents = contents;
@@ -56,6 +59,7 @@ class ConnectorActionLifecycle {
         this.signals = signals;
         this.transactions = transactions;
         this.clock = clock;
+        this.bodies = bodies;
     }
 
 
@@ -212,6 +216,7 @@ class ConnectorActionLifecycle {
                                 action,
                                 contents.findByActionIdForUpdate(action.id()).orElse(null),
                                 null,
+                                    bodies,
                                 now);
                             return actions.save(action);
                         });

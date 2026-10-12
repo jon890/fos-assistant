@@ -126,7 +126,7 @@ public class ConnectorActionService {
             transactions,
             bodies,
             clock);
-        this.lifecycle = new ConnectorActionLifecycle(actions, contents, users, grants, details, signals, transactions, clock);
+        this.lifecycle = new ConnectorActionLifecycle(actions, contents, users, grants, details, signals, transactions, bodies, clock);
     }
 
 

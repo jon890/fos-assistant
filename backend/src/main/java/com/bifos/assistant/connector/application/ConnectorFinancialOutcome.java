@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.domain.ConnectorActionExecution;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -23,7 +24,7 @@ final class ConnectorFinancialOutcome {
      * @param row 잠근 금융 실행 줄. 금융이 아닌 줄이면 null
      * @param result 실패 결과. 응답을 잃었으면 null. 성공 결과는 받지 않는다
      */
-    static void settle(ConnectorAction action, ConnectorActionExecution row, CallResult result, Instant now) {
+    static void settle(ConnectorAction action, ConnectorActionExecution row, CallResult result, ConnectorActionBodies bodies, Instant now) {
         if (action.status() != ActionStatus.EXECUTING) {
             throw new IllegalStateException("connector action must be EXECUTING but is " + action.status());
         }
@@ -35,7 +36,7 @@ final class ConnectorFinancialOutcome {
             if (row == null || consumed) {
                 action.unknown(now);
             } else {
-                action.fail(ConnectorCallError.UNAVAILABLE.word(), null, now);
+                bodies.fail(action, ConnectorCallError.UNAVAILABLE.word(), null, now);
             }
             return;
         }
@@ -44,6 +45,6 @@ final class ConnectorFinancialOutcome {
             action.unknown(now);
             return;
         }
-        action.fail(result.error().word(), result.detail() == null ? null : result.detail().toStored(), now);
+        bodies.fail(action, result.error().word(), result.detail() == null ? null : result.detail().toStored(), now);
     }
 }

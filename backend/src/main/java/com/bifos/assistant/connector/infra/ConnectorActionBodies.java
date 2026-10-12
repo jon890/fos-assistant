@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.domain.ConnectorActionBodyOpener;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,19 @@ public class ConnectorActionBodies implements ConnectorActionBodyOpener {
         }
         var sealed = seal(action, "result_text", action.storedResultText());
         action.sealResult(sealed.content(), sealed.keyId());
+        action.attachOpener(this);
+    }
+
+    /** 상태를 바꾸기 전에 봉인을 끝내 매핑된 칸에 결과 평문이 들어가지 않게 한다. */
+    public void succeed(ConnectorAction action, String plain, Instant now) {
+        var sealed = seal(action, "result_text", plain);
+        action.succeed(sealed.content(), sealed.keyId(), now);
+        action.attachOpener(this);
+    }
+
+    public void fail(ConnectorAction action, String errorCode, String plain, Instant now) {
+        var sealed = plain == null ? new SealedText(null, null) : seal(action, "result_text", plain);
+        action.fail(errorCode, sealed.content(), sealed.keyId(), now);
         action.attachOpener(this);
     }
 

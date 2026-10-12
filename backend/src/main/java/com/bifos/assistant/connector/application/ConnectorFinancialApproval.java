@@ -116,15 +116,14 @@ class ConnectorFinancialApproval {
                     if (row.consumedAt() == null) {
                         log.warn("claim 없이 금융 성공을 받았다 actionId={}", actionId);
                     }
-                    action.succeed(clip(executed.result().toString()), clock.instant());
+                    bodies.succeed(action, clip(executed.result().toString()), clock.instant());
                     feedback.record(entry(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
                 } else {
-                    ConnectorFinancialOutcome.settle(action, row, executed, clock.instant());
+                    ConnectorFinancialOutcome.settle(action, row, executed, bodies, clock.instant());
                     if (action.status() == ActionStatus.FAILED) {
                         feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
                     }
                 }
-                bodies.sealResult(action);
                 new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
             }
             return action;

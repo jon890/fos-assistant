@@ -16,6 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -227,6 +228,29 @@ class ConnectorActionServiceTest {
     private AgentExecution run;
     private String root;
 
+
+    @Test
+    @DisplayName("결과 봉인 중 강제로 flush해도 DB에 평문 결과를 쓰지 않는다")
+    void keepsResultPlaintextOutOfMappedColumnsBeforeSealing() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        var action = actions.findByPublicId(actionId).orElseThrow();
+        var probing = mock(TextCipher.class, delegatesTo(cipher));
+        doAnswer(invocation -> {
+            actions.flush();
+            assertThat(jdbc.queryForObject("select result_text from connector_action where id = ?", String.class, action.id())).isNull();
+            return cipher.seal(invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
+        }).when(probing).seal(anyLong(), anyString(), anyString());
+        Object previous = ReflectionTestUtils.getField(bodies, "cipher");
+        ReflectionTestUtils.setField(bodies, "cipher", probing);
+        try {
+            assertThat(service.approve(me, actionId, null).status()).isEqualTo(ActionStatus.SUCCEEDED);
+            var saved = actions.findById(action.id()).orElseThrow();
+            assertThat(saved.storedResultText()).startsWith("v1.");
+            assertThat(saved.resultText()).isEqualTo("{\"saved\":true}");
+        } finally {
+            ReflectionTestUtils.setField(bodies, "cipher", previous);
+        }
+    }
 
     @Test
     @DisplayName("인자 암호화 직전 INSERT는 본문이 비어 있고 암호화 실패는 승인 줄도 롤백한다")
