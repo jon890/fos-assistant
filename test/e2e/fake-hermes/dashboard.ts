@@ -2,6 +2,7 @@ import { type FakeHermesState } from "./state.ts";
 import { createBindings } from "./connectors.ts";
 import { createLifecycle, send, readBody } from "./lifecycle.ts";
 import { createConnectorRoutes } from "./connector-routes.ts";
+import { CONNECTOR_SNAPSHOT_PATH } from "./content-snapshot-routes.ts";
 import { type IncomingMessage, type ServerResponse } from "node:http";
 import {
   SOUL_PATH,
@@ -49,10 +50,12 @@ export function createDashboard(state: FakeHermesState, bindings: ReturnType<typ
       || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null
       || path === CONNECTORS_PATH || path === CONNECTOR_CATALOG_PATH
       || path === CONNECTOR_VAULT_PATH || path === CONNECTOR_VAULT_IMPORT_PATH
-      || CONNECTOR_CALL_PATH.test(path) || CONNECTOR_EXECUTE_PATH.test(path) || MCP_SERVER_TEST_PATH.test(path);
+      || CONNECTOR_CALL_PATH.test(path) || CONNECTOR_EXECUTE_PATH.test(path) || MCP_SERVER_TEST_PATH.test(path)
+      || CONNECTOR_SNAPSHOT_PATH.test(path);
     if (!isDashboardPath) return false;
 
-    if (!dashboardAuthorized(request)) {
+    // snapshot 경로는 쿠키와 Bearer 를 직접 가려 기록한다.
+    if (!dashboardAuthorized(request) && !CONNECTOR_SNAPSHOT_PATH.test(path)) {
       send(response, 401, { reason: "no_token" });
       return true;
     }

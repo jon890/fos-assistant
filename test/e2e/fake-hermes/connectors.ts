@@ -76,22 +76,59 @@ export const AGENDA_CONNECTOR = {
   },
 };
 
+/**
+ * private snapshot 선언을 가진 합성 커넥터다. 시나리오가 `setSnapshotConnector(true)` 로 켤 때만 카탈로그에 보인다.
+ *
+ * <p>원고 저장 승인 줄은 `save_draft` 의 정책을 빌려 판정하므로 그 이름의 도구를 선언한다. 선언 모양은 `docs/features/content-draft.md`
+ * 의 「private snapshot 내부 transport」 를 따르며, 운영 선언과 달리 시작과 상태 조회를 켠다. 실제 서비스 이름과 겹치지 않는다.
+ */
+export const SNAPSHOT_CONNECTOR = {
+  id: "demo-snapshot",
+  schema: 2,
+  title: "검사용 원고 저장",
+  description: "검사에서만 쓰는 원고 저장 커넥터입니다.",
+  fields: [] as FakeConnectorField[],
+  verify: { tool: "list_drafts" },
+  mcp_server: "snapshot",
+  toolsets: [] as string[],
+  attachments: false,
+  tools: {
+    list_drafts: { risk: "READ", approval: "none", grant: false, outbound: false },
+    save_draft: { risk: "WRITE", approval: "required", title: "검사용 임시저장", grant: false, outbound: false },
+  },
+  snapshot: {
+    protocol: "content-snapshot-v1",
+    compile_tool: "compile_content_snapshot",
+    start_tool: "start_content_snapshot",
+    status_tool: "content_snapshot_status",
+    capabilities: { compile: true, start: true, status: true },
+  },
+};
+
 /** 카탈로그에 내는 커넥터들이다. 옛 설치(`isolated`)와 보관 파일 가져오기는 첫째 커넥터만 흉내 낸다. */
 export const FAKE_CONNECTORS: readonly FakeConnector[] = [DEMO_CONNECTOR, AGENDA_CONNECTOR];
+
+/** 지금 카탈로그에 보이는 커넥터들이다. snapshot 커넥터는 켠 동안만 더한다. */
+export function catalogOf(state: FakeHermesState): readonly FakeConnector[] {
+  return state.contentSnapshot.on ? [...FAKE_CONNECTORS, SNAPSHOT_CONNECTOR] : FAKE_CONNECTORS;
+}
 
 /** MCP 서버가 실제로 내는 도구다. `hidden_tool` 은 manifest 가 선언하지 않은 도구다. */
 export const SERVER_TOOLS: Record<string, string[]> = {
   [DEMO_CONNECTOR.mcp_server]: ["list_scopes", "write_note", "purge_notes", "hidden_tool"],
   [AGENDA_CONNECTOR.mcp_server]: ["list_events", "add_event"],
+  [SNAPSHOT_CONNECTOR.mcp_server]: ["list_drafts", "save_draft"],
 };
 
+/** 꺼진 snapshot 커넥터도 찾는다. 카탈로그에 없을 때는 그 id 로 들어오는 요청이 없다. */
 export function fakeConnector(id: string | undefined): FakeConnector | undefined {
-  return FAKE_CONNECTORS.find((connector) => connector.id === id);
+  return [...FAKE_CONNECTORS, SNAPSHOT_CONNECTOR].find((connector) => connector.id === id);
 }
 
-/** 확인 도구의 답이다. 첫째 커넥터는 토큰을 보고, 칸이 없는 둘째 커넥터는 늘 통과한다. */
+/** 확인 도구의 답이다. 첫째 커넥터는 토큰을 보고, 칸이 없는 나머지 커넥터는 늘 통과한다. */
 export function verifyAnswer(connector: FakeConnector, values: Record<string, string> | undefined): unknown {
   if (connector.id === AGENDA_CONNECTOR.id) return { ok: true, result: { events: [] } };
+  if (connector.id === SNAPSHOT_CONNECTOR.id) return { ok: true, result: { drafts: [] } };
   return values?.token === DEMO_TOKEN_OK
     ? { ok: true, result: { scopes: [{ id: "a", name: "A" }] } }
     : { ok: false, error: "credential_rejected" };

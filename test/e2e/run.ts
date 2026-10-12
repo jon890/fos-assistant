@@ -66,6 +66,7 @@ import { DELEGATION_PROFILE, delegationScenario } from "./scenarios/delegation.t
 import { connectorScenario } from "./scenarios/connector.ts";
 import { connectorBindingScenario } from "./scenarios/connector-binding.ts";
 import { connectorPolicyScenario } from "./scenarios/connector-policy.ts";
+import { contentSnapshotSaveScenario } from "./scenarios/content-snapshot-save.ts";
 import { notificationsScenario } from "./scenarios/notifications.ts";
 import { deliveryRetryScenario } from "./scenarios/delivery-retry.ts";
 import { scheduledTaskScenario } from "./scenarios/scheduled-task.ts";
@@ -156,6 +157,8 @@ const SCENARIOS: readonly Scenario[] = [
   busyScenario,
   // 실패한 turn 을 하나 더 남기므로 사용량 합계를 세는 시나리오 뒤에 둔다.
   attentionScenario,
+  // snapshot 커넥터를 붙인 에이전트를 만들고 지우며 끝에 Control Plane 을 다시 띄운다. turn 을 돌리므로 막힌 provider 보다 앞에 둔다.
+  contentSnapshotSaveScenario,
   // 막힌 provider 를 만들어 두고 끝나므로 turn 을 돌리는 시나리오 가운데 마지막에 둔다. 앞 시나리오가 그 막힘에 걸리지 않게 한다.
   modelSelectionScenario,
   // Control Plane 을 다시 띄우므로 맨 끝에 둔다. 막힌 provider 를 먼저 푼다.
@@ -403,6 +406,8 @@ async function main(): Promise<void> {
       [CHAT_QUEUE_PROFILE]: ["fos-assistant"],
     }, skillRoot);
     console.log(`   ${hermes.baseUrl}`);
+    // Control Plane 은 카탈로그를 잠시 메모리에 둔다. 도중에 켜면 그 시간만큼 못 볼 수 있어 기동 전에 켠다.
+    hermes.setSnapshotConnector(true);
 
     console.log("== Control Plane 기동");
     const keyDir = await writeProfileKeys(work);
