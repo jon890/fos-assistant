@@ -44,6 +44,8 @@ class StubHermesRunsClientTest {
         stub.willLookup(runId, HermesRunLookup.running());
         // 마지막 응답을 되풀이하는 상태에서 응답 교체와 조회를 겹친다.
         stub.lookupRun("unused", "profile", runId);
+        // 시작만 맞추므로 수정 전 경합의 재현은 확률적이다.
+        // 수정 후에는 교체 전후 어느 응답을 읽어도 등록된 run 이 사라지지 않아야 한다.
         CyclicBarrier start = new CyclicBarrier(2);
         CyclicBarrier end = new CyclicBarrier(2);
         CompletableFuture<Void> replacing = CompletableFuture.runAsync(() -> {
