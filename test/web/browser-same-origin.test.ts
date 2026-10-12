@@ -9,6 +9,10 @@ const HOST = "assistant.example.test";
 const INPUT_URL = `https://${HOST}/api/browser/screen/input`;
 
 type Handler = (request: Request) => Promise<Response>;
+type AdminHandler = (
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) => Promise<Response>;
 
 /** 실제 라우트와 출처 판정을 실행한다. 세션과 Control Plane 호출만 바꾸고 불린 경로를 모은다. */
 async function loadRoutes() {
@@ -76,6 +80,12 @@ async function loadRoutes() {
     stop: await load(`${base}stop/route.ts`),
     screen: await load(`${base}screen/route.ts`),
     input: await load(`${base}screen/input/route.ts`),
+    adminDelete: await load(
+      "../../web/src/app/api/admin/browsers/[id]/route.ts",
+    ),
+    adminStop: await load(
+      "../../web/src/app/api/admin/browsers/[id]/stop/route.ts",
+    ),
   };
 }
 
@@ -123,7 +133,7 @@ test("Origin 이 없으면 넘기되 Sec-Fetch-Site 가 다른 사이트를 알�
   assert.equal(routes.calls.length, 2);
 });
 
-test("프록시가 넘긴 x-forwarded-host 를 Host 보다 먼저 본다", async () => {
+test("Origin 은 x-forwarded-host 나 Host 중 하나와 맞으면 된다", async () => {
   const { sameOrigin } = await loadRoutes();
   const request = (headers: Record<string, string>) =>
     new Request("http://internal/api/browser/start", {
@@ -155,6 +165,17 @@ test("프록시가 넘긴 x-forwarded-host 를 Host 보다 먼저 본다", async
         origin: `https://${HOST}`,
       }),
     ),
+    true,
+    "Next.js 의 Server Action 처럼 Host 가 맞아도 통과한다",
+  );
+  assert.equal(
+    sameOrigin.isSameOrigin(
+      request({
+        host: "internal",
+        "x-forwarded-host": "other.example.test",
+        origin: `https://${HOST}`,
+      }),
+    ),
     false,
   );
 });
@@ -166,7 +187,25 @@ test("상태를 바꾸는 브라우저 라우트는 모두 다른 출처를 막�
       method,
       headers: { host: HOST, origin: "https://evil.example.test" },
     });
+  const params = { params: Promise.resolve({ id: "1" }) };
+  const adminUrl = `https://${HOST}/api/admin/browsers/1`;
   const handlers: [Handler, Request][] = [
+    [
+      (request) =>
+        (routes.adminDelete.DELETE as unknown as AdminHandler)(request, params),
+      cross("DELETE", adminUrl),
+    ],
+    [
+      (request) =>
+        (routes.adminStop.POST as unknown as AdminHandler)(request, params),
+      cross("POST", `${adminUrl}/stop`),
+    ],
+    [
+      routes.screen.GET,
+      new Request(`https://${HOST}/api/browser/screen`, {
+        headers: { host: HOST, origin: "https://evil.example.test" },
+      }),
+    ],
     [routes.browser.POST, cross("POST", `https://${HOST}/api/browser`)],
     [routes.browser.DELETE, cross("DELETE", `https://${HOST}/api/browser`)],
     [routes.start.POST, cross("POST", `https://${HOST}/api/browser/start`)],
@@ -191,4 +230,15 @@ test("상태를 바꾸는 브라우저 라우트는 모두 다른 출처를 막�
   );
   assert.equal(same.status, 204);
   assert.deepEqual(routes.calls, ["/api/v1/browser/start"]);
+});
+
+test("같은 출처에서 연 화면 GET 은 Origin 없이도 Control Plane 으로 간다", async () => {
+  const routes = await loadRoutes();
+  const response = await routes.screen.GET(
+    new Request(`https://${HOST}/api/browser/screen`, {
+      headers: { host: HOST, "sec-fetch-site": "same-origin" },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(routes.calls, ["/api/v1/browser/screen"]);
 });
