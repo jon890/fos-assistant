@@ -30,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ConnectorFinancialGateTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final String KEY = "src/test/resources/financial/test-digest.key";
     // KST 2026-10-13 10:00 이다. 하루의 시작은 UTC 2026-10-12T15:00 이다.
     private static final Instant NOW = Instant.parse("2026-10-13T01:00:00Z");
     private static final String LIMIT_BUY = "{\"symbol\":\"A\",\"market\":\"KOSPI\",\"currency\":\"KRW\",\"side\":\"BUY\",\"quantity\":\"2\",\"price\":\"1000\","
@@ -43,7 +44,7 @@ class ConnectorFinancialGateTest {
     @DisplayName("설정 기본값은 kill switch 꺼짐, 빈 허용 목록, 상한 0 이다")
     void defaultsAreClosed() {
         var closed = new ConnectorFinancialProperties(false, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            BigDecimal.ZERO, BigDecimal.ZERO);
+            BigDecimal.ZERO, BigDecimal.ZERO, "");
         var gate = gate(closed);
         assertThatThrownBy(gate::requireOpen).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> gate.requireAccounts(List.of("7"))).isInstanceOf(ApiException.class);
@@ -53,12 +54,23 @@ class ConnectorFinancialGateTest {
 
 
     @Test
+    @DisplayName("keyed hash key 가 없으면 kill switch 를 켜도 닫는다")
+    void closesWithoutDigestKey() {
+        var noKey = open("1", "1", "1");
+        noKey = new ConnectorFinancialProperties(true, noKey.allowedAccounts(), noKey.maxOrderAmountKrw(),
+            noKey.maxOrderAmountUsd(), noKey.maxOrderQuantity(), noKey.maxDailyAmountKrw(), noKey.maxDailyAmountUsd(), "");
+        assertThatThrownBy(gate(noKey)::requireOpen).isInstanceOf(ApiException.class);
+        assertThatCode(gate(open("1", "1", "1"))::requireOpen).doesNotThrowAnyException();
+    }
+
+
+    @Test
     @DisplayName("음수 상한과 빈 계좌 식별자는 기동을 멈춘다")
     void rejectsInvalidSettings() {
         assertThatThrownBy(() -> new ConnectorFinancialProperties(true, List.of("7"), new BigDecimal("-1"), BigDecimal.ONE,
-            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE)).isInstanceOf(IllegalStateException.class);
+            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, KEY)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> new ConnectorFinancialProperties(true, List.of(" "), BigDecimal.ONE, BigDecimal.ONE,
-            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE)).isInstanceOf(IllegalStateException.class);
+            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, KEY)).isInstanceOf(IllegalStateException.class);
     }
 
 
@@ -141,13 +153,13 @@ class ConnectorFinancialGateTest {
     private ConnectorFinancialGate gate(ConnectorFinancialProperties properties) {
         when(actions.findByUserIdAndRiskAndDecidedAtGreaterThanEqual(eq(9L), eq(ToolRisk.FINANCIAL),
             eq(Instant.parse("2026-10-12T15:00:00Z")))).thenReturn(today);
-        return new ConnectorFinancialGate(LiveProperties.fixed(ConnectorFinancialProperties.class, properties), actions,
-            contents, mock(TextCipher.class));
+        var live = LiveProperties.fixed(ConnectorFinancialProperties.class, properties);
+        return new ConnectorFinancialGate(live, actions, contents, mock(TextCipher.class), new FinancialDigest(live));
     }
 
 
     private static ConnectorFinancialProperties open(String maxOrder, String maxQuantity, String maxDaily) {
         return new ConnectorFinancialProperties(true, List.of("7"), new BigDecimal(maxOrder), new BigDecimal(maxOrder),
-            new BigDecimal(maxQuantity), new BigDecimal(maxDaily), new BigDecimal(maxDaily));
+            new BigDecimal(maxQuantity), new BigDecimal(maxDaily), new BigDecimal(maxDaily), KEY);
     }
 }

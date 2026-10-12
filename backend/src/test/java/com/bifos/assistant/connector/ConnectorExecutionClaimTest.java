@@ -178,12 +178,12 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var open = gate.current();
         OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(false, open.allowedAccounts(),
             open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
-            open.maxDailyAmountUsd()));
+            open.maxDailyAmountUsd(), open.digestKeyFile()));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isNull();
         OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(true, List.of("000009"),
             open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
-            open.maxDailyAmountUsd()));
+            open.maxDailyAmountUsd(), open.digestKeyFile()));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isNull();
         OverridableLiveProperties.during(gate, open);

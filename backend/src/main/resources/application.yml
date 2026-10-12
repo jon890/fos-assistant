@@ -151,6 +151,8 @@ assistant:
       # 한 사용자가 KST 하루에 승인한 금액 합의 상한. 결과를 모르는 주문도 센다
       max-daily-amount-krw: ${ASSISTANT_FINANCIAL_MAX_DAILY_AMOUNT_KRW:0}
       max-daily-amount-usd: ${ASSISTANT_FINANCIAL_MAX_DAILY_AMOUNT_USD:0}
+      # 금융 줄의 DB 해시 칸을 keyed hash 하는 key 파일. 32바이트 이상을 base64 한 줄로 둔다. 없으면 금융 관문이 닫힌다
+      digest-key-file: ${ASSISTANT_FINANCIAL_DIGEST_KEY_FILE:}
     binding:
       # 재시작 없이 반영될 바인딩 설치를 보낸 뒤 반영 맞추기를 스스로 돌리기까지 기다리는 시간.
       # 공유 gateway 의 MCP 설정 맞추기 주기 둘과 연결 시간이다(ADR-20261007 / connector-live-reload)

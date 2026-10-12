@@ -40,10 +40,12 @@ public class ConnectorFinancialGate {
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
     private final TextCipher cipher;
+    private final FinancialDigest digest;
 
 
+    /** kill switch 와 함께 keyed hash key 를 본다. key 를 쓰는 단계 없이 켜면 열리지 않는다. */
     public void requireOpen() {
-        require(properties.current().enabled());
+        require(properties.current().enabled() && digest.available());
     }
 
 
