@@ -36,28 +36,22 @@ public class AgentExecution {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Getter
     private Long id;
 
     @Column(name = "user_id", nullable = false)
-    @Getter
     private Long userId;
 
     /** 이 실행이 속한 대화. 추천 질문을 만드는 실행처럼 대화 없이 돈 실행은 비어 있다. */
     @Column(name = "conversation_id")
-    @Getter
     private Long conversationId;
 
     @Column(name = "agent_id")
-    @Getter
     private Long agentId;
 
     @Column(name = "parent_execution_id")
-    @Getter
     private Long parentExecutionId;
 
     @Column(name = "root_execution_id")
-    @Getter
     private Long rootExecutionId;
 
     /**
@@ -67,15 +61,12 @@ public class AgentExecution {
      * 시도는 비어 있다.
      */
     @Column(name = "retry_of_execution_id")
-    @Getter
     private Long retryOfExecutionId;
 
     @Column(name = "profile_name", nullable = false, length = 64)
-    @Getter
     private String profileName;
 
     @Column(name = "hermes_run_id", length = 128)
-    @Getter
     private String hermesRunId;
 
     /**
@@ -87,50 +78,40 @@ public class AgentExecution {
      * {@code fos-<uuid>} 이고, Memory 제안은 비어 있다.
      */
     @Column(name = "hermes_session_id", length = 128)
-    @Getter
     private String hermesSessionId;
 
     /** 다른 에이전트에게 맡겨 만든 실행만 채운다. 같은 호출이 다시 와도 실행을 하나만 만든다. */
     @Column(name = "delegation_key", unique = true, length = 64)
-    @Getter
     private String delegationKey;
 
     /** 다른 에이전트에게 맡겨 만든 실행이 끝났을 때의 답. 대화 turn 의 답은 {@code chat_message} 가 갖는다. */
     @Column(name = "output_text", columnDefinition = "MEDIUMTEXT")
-    @Getter
     private String outputText;
 
     @Column(name = "provider", length = 64)
-    @Getter
     private String provider;
 
     @Column(name = "model", length = 128)
-    @Getter
     private String model;
 
     /** 이 실행에 요청한 reasoning effort. 기본값으로 보냈으면 비어 있다. */
     @Column(name = "reasoning_effort", length = 16)
-    @Getter
     private String reasoningEffort;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "reasoning_effort_source", length = 20)
-    @Getter
     private ReasoningEffortSource reasoningEffortSource;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "model_tier", length = 16)
-    @Getter
     private ModelTier modelTier;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "cost_mode", nullable = false, length = 20)
-    @Getter
     private CostMode costMode;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    @Getter
     private ExecutionStatus status;
 
     /** 과거 실행은 UNKNOWN 이다. 새 제출은 비수집을 먼저 표시하고 수집 경로가 OBSERVING 으로 바꾼다. */
@@ -139,31 +120,24 @@ public class AgentExecution {
     private EventObservation eventObservation = EventObservation.UNKNOWN;
 
     @Column(name = "error_code", length = 64)
-    @Getter
     private String errorCode;
 
     @Column(name = "input_tokens")
-    @Getter
     private Long inputTokens;
 
     @Column(name = "cached_input_tokens")
-    @Getter
     private Long cachedInputTokens;
 
     @Column(name = "output_tokens")
-    @Getter
     private Long outputTokens;
 
     @Column(name = "total_tokens")
-    @Getter
     private Long totalTokens;
 
     @Column(name = "latency_ms")
-    @Getter
     private Long latencyMs;
 
     @Column(name = "context_chars")
-    @Getter
     private Long contextChars;
 
     /**
@@ -173,7 +147,6 @@ public class AgentExecution {
      * 기록과 문맥을 조립하지 않은 실행은 비어 있다.
      */
     @Column(name = "context_omitted_items")
-    @Getter
     private Integer contextOmittedItems;
 
     /**
@@ -183,7 +156,6 @@ public class AgentExecution {
      * 않도록 미리 둔다.
      */
     @Column(name = "runtime_fingerprint", length = 64)
-    @Getter
     private String runtimeFingerprint;
 
     /**
@@ -193,50 +165,39 @@ public class AgentExecution {
      * 들어 있어 본문 자체는 어디에도 저장하지 않는다. 넣은 문맥이 없으면 비운다.
      */
     @Column(name = "instructions_hash", length = 64)
-    @Getter
     private String instructionsHash;
 
     /** 통화 단위의 100만분의 1로 적은 환산 금액. 가격을 찾지 못했으면 null 이다. */
     @Column(name = "estimated_cost_micros")
-    @Getter
     private Long estimatedCostMicros;
 
     @Column(name = "actual_cost_micros")
-    @Getter
     private Long actualCostMicros;
 
     @Column(name = "cost_currency", length = 3, columnDefinition = "CHAR(3)")
-    @Getter
     private String costCurrency;
 
     /** 계산에 쓴 가격표를 적는다. 나중에 가격이 바뀌어도 지난 기록이 다시 쓰이지 않게 한다. */
     @Column(name = "pricing_version", length = 32)
-    @Getter
     private String pricingVersion;
 
     @Column(name = "started_at", nullable = false)
-    @Getter
     private Instant startedAt;
 
     @Column(name = "finished_at")
-    @Getter
     private Instant finishedAt;
 
     @Column(name = "request_received_at")
-    @Getter
     private Instant requestReceivedAt;
 
     @Column(name = "submitted_at")
-    @Getter
     private Instant submittedAt;
 
     @Column(name = "first_delta_at")
-    @Getter
     private Instant firstDeltaAt;
 
     /** profile 기본 모델 설정을 정상으로 읽어 이 실행의 기본 강도를 확인한 시각이다. */
     @Column(name = "reasoning_defaults_checked_at")
-    @Getter
     private Instant reasoningDefaultsCheckedAt;
 
     /**
@@ -247,8 +208,8 @@ public class AgentExecution {
      */
     // 엔티티 저장이 이 칸을 메모리의 옛 값으로 덮지 않게 한다. 도는 위임 자식에 적은 표시가 그 자식이 끝날 때 지워지면 안 된다.
     @Column(name = "result_delivered_at", updatable = false)
-    @Getter
     private Instant resultDeliveredAt;
+
 
     private AgentExecution(Builder builder) {
         this.userId = builder.userId;
@@ -289,9 +250,11 @@ public class AgentExecution {
         this.firstDeltaAt = builder.firstDeltaAt;
     }
 
+
     public static Builder builder() {
         return new Builder();
     }
+
 
     /**
      * 이 실행이 속한 실행 트리의 루트 번호다.
@@ -303,15 +266,18 @@ public class AgentExecution {
         return rootExecutionId == null ? id : rootExecutionId;
     }
 
+
     private void closeInterruptedObservation() {
         if (eventObservation == EventObservation.OBSERVING) {
             eventObservation = EventObservation.INCOMPLETE;
         }
     }
 
+
     public void beginEventObservation() {
         eventObservation = EventObservation.OBSERVING;
     }
+
 
     /** 실패 표시는 뒤늦은 정상 스트림 종료로 지우지 않는다. */
     public boolean finishEventObservation(boolean complete) {
@@ -326,6 +292,7 @@ public class AgentExecution {
         return true;
     }
 
+
     /** 실행을 제출한 직후 Hermes 가 준 run 번호를 적는다. */
     public void attachRunId(String hermesRunId) {
         this.hermesRunId = hermesRunId;
@@ -333,6 +300,7 @@ public class AgentExecution {
             eventObservation = EventObservation.INCOMPLETE;
         }
     }
+
 
     /** Hermes 에 제출하기 직전 시각은 한 번만 적는다. */
     public void markSubmitted(Instant at) {
@@ -342,12 +310,14 @@ public class AgentExecution {
         }
     }
 
+
     /** Flow 루트가 먼저 받은 원래 요청 시각을 보존하려고 더 이른 시각만 적는다. */
     public void markRequestReceived(Instant at) {
         if (at != null && (requestReceivedAt == null || at.isBefore(requestReceivedAt))) {
             requestReceivedAt = at;
         }
     }
+
 
     /** 첫 assistant delta를 받은 시각만 보존한다. 본문은 실행 기록에 두지 않는다. */
     public boolean markFirstDelta(Instant at) {
@@ -357,6 +327,7 @@ public class AgentExecution {
         }
         return false;
     }
+
 
     /** profile 설정에서 읽은 기본값으로 요청 effort의 출처를 보완한다. */
     public void recordProfileReasoningDefault(String effort) {
@@ -369,6 +340,7 @@ public class AgentExecution {
         }
     }
 
+
     /** profile 기본 모델 설정의 정상 응답을 확인했음을 적어 빈 effort를 다시 조회하지 않는다. */
     public void markReasoningDefaultsChecked(Instant at) {
         if (reasoningDefaultsCheckedAt == null) {
@@ -376,19 +348,16 @@ public class AgentExecution {
         }
     }
 
+
     /** 끝난 답을 적는다. 다른 에이전트에게 맡겨 만든 실행만 쓴다. */
     public void recordOutput(String outputText) {
         this.outputText = outputText;
     }
 
+
     /** 끝난 시각과 토큰과 금액을 채우고 SUCCEEDED 로 옮긴다. */
     public void markSucceeded(String provider, String model, TokenUsage usage, EstimatedCost cost, Instant finishedAt) {
-        this.provider = provider;
-        this.model = model;
-        this.inputTokens = usage.inputTokens();
-        this.cachedInputTokens = usage.cachedInputTokens();
-        this.outputTokens = usage.outputTokens();
-        this.totalTokens = usage.totalTokens();
+        recordUsage(provider, model, usage);
         this.estimatedCostMicros = cost.micros();
         this.costCurrency = cost.currency();
         this.pricingVersion = cost.pricingVersion();
@@ -398,14 +367,10 @@ public class AgentExecution {
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
+
     /** 끝난 시각과 토큰과 환산액과 실제 청구액을 채우고 SUCCEEDED 로 옮긴다. */
     public void markSucceeded(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
-        this.provider = provider;
-        this.model = model;
-        this.inputTokens = usage.inputTokens();
-        this.cachedInputTokens = usage.cachedInputTokens();
-        this.outputTokens = usage.outputTokens();
-        this.totalTokens = usage.totalTokens();
+        recordUsage(provider, model, usage);
         this.estimatedCostMicros = cost.estimatedMicros();
         this.actualCostMicros = cost.actualMicros();
         this.costCurrency = cost.currency();
@@ -416,21 +381,18 @@ public class AgentExecution {
         this.status = ExecutionStatus.SUCCEEDED;
     }
 
+
     /** 실패 응답에 포함된 모델과 토큰과 금액을 보존하고 FAILED 로 옮긴다. */
     public void markFailed(
-            String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
-        this.provider = provider;
-        this.model = model;
-        this.inputTokens = usage.inputTokens();
-        this.cachedInputTokens = usage.cachedInputTokens();
-        this.outputTokens = usage.outputTokens();
-        this.totalTokens = usage.totalTokens();
+        String provider, String model, TokenUsage usage, ExecutionCost cost, String errorCode, Instant finishedAt) {
+        recordUsage(provider, model, usage);
         this.estimatedCostMicros = cost.estimatedMicros();
         this.actualCostMicros = cost.actualMicros();
         this.costCurrency = cost.currency();
         this.pricingVersion = cost.pricingVersion();
         markFailed(errorCode, finishedAt);
     }
+
 
     /** 끝난 시각과 오류 코드를 채우고 FAILED 로 옮긴다. */
     public void markFailed(String errorCode, Instant finishedAt) {
@@ -441,20 +403,17 @@ public class AgentExecution {
         this.status = ExecutionStatus.FAILED;
     }
 
+
     /** 끝난 시각과 토큰과 금액을 채우고 CANCELLED 로 옮긴다. */
     public void markCancelled(String provider, String model, TokenUsage usage, ExecutionCost cost, Instant finishedAt) {
-        this.provider = provider;
-        this.model = model;
-        this.inputTokens = usage.inputTokens();
-        this.cachedInputTokens = usage.cachedInputTokens();
-        this.outputTokens = usage.outputTokens();
-        this.totalTokens = usage.totalTokens();
+        recordUsage(provider, model, usage);
         this.estimatedCostMicros = cost.estimatedMicros();
         this.actualCostMicros = cost.actualMicros();
         this.costCurrency = cost.currency();
         this.pricingVersion = cost.pricingVersion();
         markCancelled(finishedAt);
     }
+
 
     /** 이미 토큰을 적은 실행의 상태만 CANCELLED 로 옮긴다. */
     public void markCancelled(Instant finishedAt) {
@@ -467,6 +426,17 @@ public class AgentExecution {
         closeInterruptedObservation();
         this.status = ExecutionStatus.CANCELLED;
     }
+
+
+    private void recordUsage(String provider, String model, TokenUsage usage) {
+        this.provider = provider;
+        this.model = model;
+        this.inputTokens = usage.inputTokens();
+        this.cachedInputTokens = usage.cachedInputTokens();
+        this.outputTokens = usage.outputTokens();
+        this.totalTokens = usage.totalTokens();
+    }
+
 
     public static final class Builder {
         private Long userId;
@@ -506,100 +476,120 @@ public class AgentExecution {
         private Instant submittedAt;
         private Instant firstDeltaAt;
 
+
         public Builder userId(Long userId) {
             this.userId = userId;
             return this;
         }
+
 
         public Builder conversationId(Long conversationId) {
             this.conversationId = conversationId;
             return this;
         }
 
+
         public Builder agentId(Long agentId) {
             this.agentId = agentId;
             return this;
         }
+
 
         public Builder parentExecutionId(Long parentExecutionId) {
             this.parentExecutionId = parentExecutionId;
             return this;
         }
 
+
         public Builder rootExecutionId(Long rootExecutionId) {
             this.rootExecutionId = rootExecutionId;
             return this;
         }
+
 
         public Builder retryOfExecutionId(Long retryOfExecutionId) {
             this.retryOfExecutionId = retryOfExecutionId;
             return this;
         }
 
+
         public Builder profileName(String profileName) {
             this.profileName = profileName;
             return this;
         }
+
 
         public Builder hermesRunId(String hermesRunId) {
             this.hermesRunId = hermesRunId;
             return this;
         }
 
+
         public Builder hermesSessionId(String hermesSessionId) {
             this.hermesSessionId = hermesSessionId;
             return this;
         }
+
 
         public Builder delegationKey(String delegationKey) {
             this.delegationKey = delegationKey;
             return this;
         }
 
+
         public Builder provider(String provider) {
             this.provider = provider;
             return this;
         }
+
 
         public Builder model(String model) {
             this.model = model;
             return this;
         }
 
+
         public Builder reasoningEffort(String reasoningEffort) {
             this.reasoningEffort = reasoningEffort;
             return this;
         }
+
 
         public Builder reasoningEffortSource(ReasoningEffortSource reasoningEffortSource) {
             this.reasoningEffortSource = reasoningEffortSource;
             return this;
         }
 
+
         public Builder modelTier(ModelTier modelTier) {
             this.modelTier = modelTier;
             return this;
         }
+
 
         public Builder requestReceivedAt(Instant requestReceivedAt) {
             this.requestReceivedAt = requestReceivedAt;
             return this;
         }
 
+
         public Builder costMode(CostMode costMode) {
             this.costMode = costMode;
             return this;
         }
+
 
         public Builder status(ExecutionStatus status) {
             this.status = status;
             return this;
         }
 
+
         public Builder errorCode(String errorCode) {
             this.errorCode = errorCode;
             return this;
         }
+
 
         public Builder tokens(Long input, Long cachedInput, Long output, Long total) {
             this.inputTokens = input;
@@ -609,6 +599,7 @@ public class AgentExecution {
             return this;
         }
 
+
         /** 비용을 모르면 금액 칸을 모두 null 로 둔다. 어느 것도 공짜로 읽히지 않게 하기 위해서다. */
         public Builder cost(EstimatedCost cost) {
             this.estimatedCostMicros = cost.micros();
@@ -616,6 +607,7 @@ public class AgentExecution {
             this.pricingVersion = cost.pricingVersion();
             return this;
         }
+
 
         /** 환산액과 실제 청구액을 함께 채운다. 구독 경로는 실제 청구액이 null 로 남는다. */
         public Builder cost(ExecutionCost cost) {
@@ -626,6 +618,7 @@ public class AgentExecution {
             return this;
         }
 
+
         public Builder timing(Instant startedAt, Instant finishedAt) {
             this.startedAt = startedAt;
             this.finishedAt = finishedAt;
@@ -633,30 +626,36 @@ public class AgentExecution {
             return this;
         }
 
+
         public Builder contextChars(Long contextChars) {
             this.contextChars = contextChars;
             return this;
         }
+
 
         public Builder contextOmittedItems(Integer contextOmittedItems) {
             this.contextOmittedItems = contextOmittedItems;
             return this;
         }
 
+
         public Builder runtimeFingerprint(String runtimeFingerprint) {
             this.runtimeFingerprint = runtimeFingerprint;
             return this;
         }
+
 
         public Builder instructionsHash(String instructionsHash) {
             this.instructionsHash = instructionsHash;
             return this;
         }
 
+
         public Builder startedAt(Instant startedAt) {
             this.startedAt = startedAt;
             return this;
         }
+
 
         public AgentExecution build() {
             return new AgentExecution(this);

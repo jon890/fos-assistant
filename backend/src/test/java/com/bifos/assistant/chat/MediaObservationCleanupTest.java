@@ -9,6 +9,7 @@ import com.bifos.assistant.chat.application.ConversationPurger;
 import com.bifos.assistant.chat.application.ConversationWriter;
 import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.domain.type.ObservationStatus;
 import com.bifos.assistant.chat.infra.AttachmentStore;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.sql.Timestamp;
@@ -20,6 +21,33 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class MediaObservationCleanupTest extends ObservationFixture {
+    @Test
+    @DisplayName("관찰 만료와 첨부 만료를 테스트 시계로 나누어 본문 차단과 실제 정리를 확인한다")
+    void separatesObservationExpiryFromAttachmentExpiryUsingTestClock() {
+        record(0, UUID.randomUUID(), input(), model());
+        jdbc.update("update media_observation set expires_at=?", Timestamp.from(NOW.plusSeconds(1)));
+        clock.advance(Duration.ofSeconds(2));
+        var expiredObservation = service.list(owner, conversation.id(), null, 10).getFirst();
+        assertThat(expiredObservation.observation()).isNull();
+        assertThat(observationCleaner.cleanExpired(clock.instant())).isEqualTo(1);
+        assertThat(file(photo)).exists();
+        assertThat(observations.count()).isZero();
+        assertThat(requests.count()).isZero();
+        record(0, UUID.randomUUID(), input(), model());
+        clock.set(photo.expiresAt().plusSeconds(1));
+        var expiredAttachment = service.list(owner, conversation.id(), null, 10).getFirst();
+        assertThat(expiredAttachment.status()).isEqualTo(ObservationStatus.UNAVAILABLE);
+        assertThat(expiredAttachment.observation()).isNull();
+        assertThat(expiredAttachment.sourceFingerprint()).isNull();
+        assertThat(expiredAttachment.revision()).isNull();
+        code(() -> record(0, UUID.randomUUID(), input(), model()), ErrorCode.ATTACHMENT_GONE);
+        attachmentCleaner.runScheduled();
+        assertThat(observations.count()).isZero();
+        assertThat(requests.count()).isZero();
+        assertThat(file(photo)).doesNotExist();
+    }
+
+
     @Autowired
     ContentDraftCleaner drafts;
 
