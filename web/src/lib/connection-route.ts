@@ -235,7 +235,7 @@ function safeTools(value: unknown): ConnectorTool[] {
     return [
       {
         name: item.name,
-        title: typeof item.title === "string" ? item.title : null,
+        title: toolText(item.title),
         risk: item.risk as ToolRisk,
         approval: item.approval as ToolApproval,
         grant: item.grant === true,

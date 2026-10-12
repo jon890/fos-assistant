@@ -220,6 +220,35 @@ test("두 링크는 독립적으로 정제하고 정책과 로그인 주소를 �
   ]);
 });
 
+test("실제 GET은 도구 제목도 요약과 같은 규칙으로 정제한다", async () => {
+  const response = await getCatalog([
+    summary({
+      tools: [
+        {
+          name: "a",
+          title: "  쓰기  ",
+          risk: "WRITE",
+          approval: "REQUIRED",
+          grant: true,
+        },
+        {
+          name: "b",
+          title: "글\u202e",
+          risk: "WRITE",
+          approval: "REQUIRED",
+          grant: true,
+        },
+        { name: "c", title: " ", risk: "READ", approval: "NONE", grant: false },
+      ],
+    }),
+  ]);
+  const body = await response.json();
+  assert.deepEqual(
+    body[0].tools.map((tool: { title: string | null }) => tool.title),
+    ["쓰기", null, null],
+  );
+});
+
 test("실제 GET은 공통 경계마다 정책을 보존하고 요약만 정제하며 모델용 설명은 버린다", async () => {
   const vectors = JSON.parse(
     await readFile(
