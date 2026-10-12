@@ -3,8 +3,11 @@ package com.bifos.assistant.testsupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
+import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.SessionRuntime;
 import com.bifos.assistant.shared.auth.UserAccessRevoked;
@@ -27,6 +30,7 @@ class IntegrationTestIsolationTest {
     private final TrackingBackgroundTasks tasks = new TrackingBackgroundTasks();
     private final StubHermesRunsClient stub = new StubHermesRunsClient();
     private final TestClock clock = new TestClock();
+    private final DataKeyService dataKeys = mock(DataKeyService.class);
     private final FailingAccessRevoker revoker = new FailingAccessRevoker();
     private final ConnectorChangeRecorder recorder = new ConnectorChangeRecorder();
     private final FakeBrowserRuntime browsers = new FakeBrowserRuntime();
@@ -37,6 +41,7 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("tasks", tasks);
         context.getBeanFactory().registerSingleton("stub", stub);
         context.getBeanFactory().registerSingleton("clock", clock);
+        context.getBeanFactory().registerSingleton("dataKeys", dataKeys);
         context.getBeanFactory().registerSingleton("scheduler", new CapturingTaskScheduler());
         context.getBeanFactory().registerSingleton("retryThreads", new WakeRetryThreads());
         context.getBeanFactory().registerSingleton("recorder", recorder);
@@ -73,6 +78,7 @@ class IntegrationTestIsolationTest {
                 .as("대역에 넣어 둔 세션 응답이 비워져야 한다")
                 .isNull();
         assertThat(clock.instant()).as("시계가 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+        verify(dataKeys).forgetCachedKeys();
         assertThatCode(() -> revoker.on(new UserAccessRevoked(1L)))
                 .as("켜 둔 폐기 실패 대역이 꺼져야 한다")
                 .doesNotThrowAnyException();
@@ -97,6 +103,7 @@ class IntegrationTestIsolationTest {
                     .as("실패해도 대역에 넣어 둔 세션 응답이 비워져야 한다")
                     .isNull();
             assertThat(clock.instant()).as("실패해도 시계가 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+            verify(dataKeys).forgetCachedKeys();
         } finally {
             hold.countDown();
             held.join();
@@ -120,6 +127,7 @@ class IntegrationTestIsolationTest {
                 }
             });
             broken.getBeanFactory().registerSingleton("clock", clock);
+            broken.getBeanFactory().registerSingleton("dataKeys", dataKeys);
             broken.getBeanFactory().registerSingleton("scheduler", new CapturingTaskScheduler());
             broken.getBeanFactory().registerSingleton("retryThreads", new WakeRetryThreads() {
                 @Override
@@ -146,6 +154,7 @@ class IntegrationTestIsolationTest {
 
             assertThat(setting.current()).as("바꾼 설정이 기동 값으로 돌아와야 한다").isEqualTo("startup");
             assertThat(clock.instant()).as("던진 대역 뒤의 시계도 고정 시각에서 풀려야 한다").isNotEqualTo(FIXED);
+            verify(dataKeys).forgetCachedKeys();
             assertThatCode(() -> revoker.on(new UserAccessRevoked(1L)))
                     .as("던진 대역 뒤의 폐기 실패 대역도 꺼져야 한다")
                     .doesNotThrowAnyException();
