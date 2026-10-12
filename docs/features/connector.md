@@ -738,7 +738,7 @@ auth POST, 준비 GET, claim HTTP와 금융 POST·DELETE는 별도로 센다. �
 
 이 증거는 실제 SDK·claim 대역·mock 금융 목적지의 왕복이다. 대역의 protocol vector는 main의
 ClaimResponse·codec·claims·MVC 시험과 직접 대조하지만 실제 서명 인증·DB 일회 소비는 검증하지 않는다.
-실제 DB/Spring claim→Python→SDK→mock 목적지 왕복은 후속 snapshot producer 통합의 필수 조건이다.
+실제 DB/Spring claim→Python→SDK→mock 목적지 왕복은 [운영 비활성 금융 snapshot producer](connector-policy.md#운영-비활성-금융-snapshot-producer)가 검증한다.
 일반 주문 DELETE는 0회다. DELETE transport의 합성 204 검사는 조건주문 등록의 근거가 아니다.
 ### 국내 종목 통계 계약
 
