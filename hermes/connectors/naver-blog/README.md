@@ -59,8 +59,8 @@ MCP 서버 이름은 `naver-blog` 다.
 | --- | --- | --- |
 | `session_status` | 없음 | `{browser: "connected", logged_in: true, blog_id}`. 로그인 쿠키가 없으면 `NAVER_BLOG_LOGIN_REQUIRED` 로 실패한다 |
 | `render_draft` | 아래 「초안」 의 다섯 칸, `base`(덮어쓸 때 `read_draft` 가 준 `title`, `category`, `tags`, `body`, 선택), `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `index.html` 이나 `<폴더>/index.html`, 폴더는 세 단계까지), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다. `base` 를 주면 `changes` 와 `base_revision` 이 더 온다(아래 「임시저장 글 덮어쓰기」) |
-| `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}]}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
-| `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body}`. 아래 「임시저장 글 읽기」 를 본다 |
+| `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}], autosave_requests}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
+| `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body, photos, photo_count, photos_truncated, autosave_check, autosave_requests}`. 아래 「임시저장 글 읽기」 를 본다 |
 | `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status}`. `job_id` 는 UUID 고, `status` 는 시작 확인 때 읽은 `running`, `succeeded`, `failed`, `unknown` 중 하나다 |
 | `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status}`. 상태는 `save_draft` 와 같다. 아래 「임시저장 글 덮어쓰기」 를 본다 |
 | `draft_job` | `job_id`, `wait_seconds`(0~50, 기본 45) | 아래 「작업」 의 상태 |
@@ -71,6 +71,7 @@ MCP 서버 이름은 `naver-blog` 다.
 한 번의 읽기는 2분이 지나면 멈춘다. 근거와 실측한 편집기 동작은 [ADR-20261009 / naver-blog-primitives](../../docs/adr/ADR-20261009-naver-blog-primitives.md) 가 갖는다.
 
 「작성 중인 글이 있습니다」 알림은 닫지 않는다. `list_drafts` 는 그 알림이 있어도 읽고, `read_draft` 는 글을 불러오지 않고 `NAVER_BLOG_EDITOR_IN_USE` 로 멈춘다.
+알림이 없어도 새 탭의 편집기 제목이나 글 문단에 글자가 있거나, 사진처럼 글이 아닌 구성요소가 있거나, 문서 번호가 목록에 있는 글 번호이면 같은 코드로 멈춘다. 모르는 구성요소 종류는 편집기 모양 오류로 처리한다.
 
 `list_drafts` 는 편집기가 임시저장 목록을 열 때 부르는 목록 응답(`TempPostList.naver`)을 그 탭에서 같은 출처로 받는다. 편집기에 글을 불러오지 않는다.
 
@@ -78,10 +79,29 @@ MCP 서버 이름은 `naver-blog` 다.
 
 `read_draft` 는 차례대로 한다.
 
-1. 목록 응답에서 그 `draft_id` 의 차례를 찾는다. 없으면 `NAVER_BLOG_DRAFT_NOT_FOUND` 다
-2. 「임시저장된 글 보기」 단추로 목록 레이어를 열고, 응답의 제목이 그 차례의 글 단추 제목으로 시작하는지 본 뒤 누른다(화면은 긴 제목을 `…` 로 줄인다). 다르면 누르지 않고 실패한다
-3. 편집기 문서(`getDocumentData()`)의 문서 번호가 그 `draft_id` 가 될 때까지 기다린다
-4. 편집기 문서에서 제목과 본문을, 발행 설정에서 카테고리와 태그를 읽는다. 저장 단추는 누르지 않는다
+1. 목록 응답에서 그 `draft_id` 의 차례를 찾는다. 없으면 `NAVER_BLOG_DRAFT_NOT_FOUND` 다. 이 응답의 전체 수와 그 글의 고친 시각을 읽기 전 값으로 둔다
+2. 편집기 문서(`getDocumentData()`)를 읽어 편집기가 비었는지 본다. 편집기 객체를 읽지 못하거나 구성요소·문단·글 조각의 모양이 달라지면 글을 누르기 전에 멈춘다. 코드는 아래 까닭을 구분하지 못한 실패의 규칙을 따른다. 불러온 뒤에야 모양이 바뀐 것을 알면 그 사이 자동저장이 돌 수 있어서다
+3. 「임시저장된 글 보기」 단추로 목록 레이어를 열고, 응답의 제목이 그 차례의 글 단추 제목으로 시작하는지 본 뒤 누른다(화면은 긴 제목을 `…` 로 줄인다). 다르면 누르지 않고 실패한다
+4. 편집기 문서의 문서 번호가 그 `draft_id` 가 될 때까지 기다린다. 그 사이 탭이 로그인 화면으로 넘어가면 `NAVER_BLOG_LOGIN_REQUIRED` 다
+5. 편집기 문서에서 제목과 본문을, 발행 설정에서 카테고리와 태그를 읽는다. 저장 단추는 누르지 않는다
+6. 목록 응답을 다시 받아 `autosave_check` 를 만든다
+
+까닭을 구분하지 못한 실패 뒤에는 브라우저의 네이버 로그인 쿠키를 한 번 더 본다. 쿠키가 없으면 `NAVER_BLOG_UNAVAILABLE` 대신 `NAVER_BLOG_LOGIN_REQUIRED` 다. 읽는 도중 세션이 끝나면 목록 응답이 로그인 화면으로 넘어가 모양 오류로만 보이기 때문이다.
+쿠키는 남았는데 서버 쪽 세션만 끝난 경우는 구분하지 못하고 `NAVER_BLOG_UNAVAILABLE` 이다.
+
+`autosave_check` 는 읽기 앞뒤 목록을 견준 관측값이다. 뒤 목록을 읽지 못하면 `null` 이다.
+
+| 칸 | 뜻 |
+| --- | --- |
+| `count_before`, `count_after` | 읽기 앞뒤 임시저장 글의 전체 수 |
+| `saved_at_before`, `saved_at_after` | 읽기 앞뒤 그 글의 고친 시각. 읽지 못했거나 뒤 목록에 그 글이 없으면 `null` 이다 |
+| `changed` | 수나 고친 시각이 다르거나 뒤 목록에 그 글이 없으면 참이다. 수가 같고 앞뒤 고친 시각이 모두 `null` 이면 판정 불가인 `null` 이다 |
+
+`changed` 가 거짓이어도 부작용이 없다는 증명이 아니다. 탭을 닫은 뒤의 자동저장과 목록에 드러나지 않는 편집기 상태는 담지 못한다.
+
+실계정 확인 전까지 `read_draft` 는 `WRITE` 와 매번 승인을 유지한다. 확인 결과는 ADR 의 「감당할 것」 에 날짜와 함께 남기고, 그 기록과 커넥터 도구 정책을 근거로 승인 경계를 바꿀지 따로 결정한다.
+
+`read_draft` 와 `list_drafts` 의 `autosave_requests` 는 읽기 탭에서 CDP `Network.enable` 뒤 관측한 `RabbitAutoSaveWrite.naver` 요청 수다. 관측 시작 전과 탭을 닫은 뒤의 요청, 다른 탭의 요청은 담지 못한다. `changed` 가 거짓이어도 자동저장이 없었다는 뜻은 아니다.
 
 본문은 새 글 초안과 같이 한 줄이 한 문단이다. 글 구성요소의 문단마다 한 줄이고, 문단 안의 줄바꿈은 공백이 된다.
 글이 아닌 구성요소는 1부터 센 번호를 단 줄 하나다. 번호는 사진, 스티커, 지도, 구성요소 넷마다 따로 세고, 「구성요소」 는 편집기 종류가 달라도 한 번호를 함께 센다.
@@ -313,12 +333,14 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `NAVER_BLOG_PHOTO_INVALID` | `invalid_input` | 사진 디렉터리가 바인딩 주인의 첨부 디렉터리 밖이거나, 사진 파일이 없거나, 링크이거나, 크기를 넘거나, 이미지 서명이 맞지 않는다. 문장은 원인을 나누지 않는다 |
 | `NAVER_BLOG_JOB_NOT_FOUND` | `invalid_input` | 그 번호의 작업이 없거나 지워졌다 |
 | `NAVER_BLOG_DRAFT_NOT_FOUND` | `invalid_input` | 그 `draft_id` 의 글이 임시저장 목록에 없다 |
-| `NAVER_BLOG_EDITOR_IN_USE` | `unavailable` | 글쓰기 화면에 「작성 중인 글이 있습니다」 알림이 떠 있어 글을 불러오지 않았다 |
-| `NAVER_BLOG_LOGIN_REQUIRED` | `credential_rejected` | 브라우저에 네이버 로그인 쿠키가 없다 |
+| `NAVER_BLOG_EDITOR_IN_USE` | `unavailable` | 글쓰기 화면에 「작성 중인 글이 있습니다」 알림이 떠 있거나 새 탭의 편집기에 쓰던 글이 남아 있어 글을 불러오지 않았다 |
+| `NAVER_BLOG_LOGIN_REQUIRED` | `credential_rejected` | 브라우저에 네이버 로그인 쿠키가 없다. 읽기 도구가 로그인 화면을 만났거나, 까닭을 모르게 실패한 뒤 쿠키가 없을 때도 이 코드다 |
 | `NAVER_BLOG_BUSY` | `unavailable` | 그 블로그에 돌고 있는 작업이 있다. 새 글 저장, 덮어쓰기, 읽기 도구 모두 이 코드로 거절한다 |
 | `NAVER_BLOG_BROWSER_UNREACHABLE` | `unavailable` | 중계에 닿지 않거나, 브라우저를 켜지 못했다(동시 수가 찼다). 중계가 404, 502, 503 을 주거나 중계 주소가 비었을 때도 이 코드다 |
 | `NAVER_BLOG_START_UNKNOWN` | `outcome_unknown` | 작업 프로세스를 띄웠는데 5초 안에 시작을 알리지 않았다. 늦게 시작할 수 있어 다시 부르지 않는다 |
 | `NAVER_BLOG_UNAVAILABLE` | `unavailable` | 그 밖의 실패 |
+
+`NAVER_BLOG_LOGIN_REQUIRED`, `NAVER_BLOG_BUSY`, `NAVER_BLOG_DRAFT_NOT_FOUND`, `NAVER_BLOG_UNAVAILABLE` 는 `connector.json` 에 복구 어휘(`reconnect`, `retry_later`, `recheck`, `retry_later`)를 함께 선언한다. `BUSY` 의 `retry_later` 는 읽기뿐 아니라 새 글 저장과 덮어쓰기에도 쓰인다. 승인한 호출이 이 코드로 실패하면 복구 안내가 에이전트까지 간다. `EDITOR_IN_USE` 는 자동 재시도 대신 스킬의 글 정리 안내를 따른다.
 
 꺼진 브라우저를 켜는 데 30초까지 걸린다. 연결 확인은 10초 제한이라 처음 한 번 `NAVER_BLOG_BROWSER_UNREACHABLE` 로 실패할 수 있다. 잠시 뒤 다시 누르면 된다.
 `save_draft` 와 `overwrite_draft` 는 브라우저를 확인할 때 45초까지 기다린다.
@@ -427,3 +449,31 @@ Chrome 부재, 이미지 생성·패키지 설치 실패와 회귀 실패는 비
 9. 제목에 `&` 와 `<` 가 든 글로 7, 8 을 한 번 더 한다. 사본이 `backup_failed` 없이 생긴다
 10. 원래 글을 열어 고친 줄과 태그가 들어갔고 사진 두 장, 스티커, 지도와 바뀌지 않은 문단의 꾸밈이 그대로인지 본다. 사본을 열어 고치기 전 글인지 본다
 11. 원래 글과 사본을 지운다
+
+### 읽기 부작용 확인
+
+`read_draft` 가 사용자의 다른 글과 자동저장본을 바꾸는지 확인하는 절차다. [ADR-20261009 / naver-blog-primitives](../../docs/adr/ADR-20261009-naver-blog-primitives.md) 의 위험도 판단이 이 결과를 근거로 삼는다.
+소유자가 승인한 자기 계정에서만 하고, 발행하지 않는다. 로그인과 캡차는 사람이 하고 우회하지 않는다. 결과에는 계정, 주소, 글 원문을 적지 않고 아래 관측값만 적는다.
+
+준비:
+
+- 가상 제목과 짧은 가상 본문으로 테스트 글 A 와 B 를 네이버에서 직접 임시저장한다. 실제 개인 글은 열지 않는다
+- 매 단계 앞뒤로 네이버 임시저장 목록의 전체 수, A 와 B 의 고친 시각, `read_draft` 응답의 `revision` 과 `autosave_check` 를 적는다
+- `read_draft` 와 `list_drafts` 응답의 `autosave_requests` 를 자동저장 요청 수로 기록한다. 관측 시작 전과 탭을 닫은 뒤, 다른 탭의 요청은 포함하지 않는다
+
+| 단계 | 할 일 | 적을 것 |
+| --- | --- | --- |
+| 1. 처음 읽기 | 먼저 「내 브라우저」 에서 새 글쓰기 화면을 열어 빈 편집기의 구성요소 종류, 글 조각의 칸과 `documentId` 형태만 확인하고 닫는다. 값과 글 원문은 기록하지 않는다. 다른 글쓰기 탭이 없는 상태에서 A 를 `read_draft` 로 읽는다 | 빈 편집기 모양, 성공 여부, 자동저장 요청 수, 목록 수와 A 의 고친 시각 변화, `autosave_check`. 불러오기 직후 A 의 `modiDate` 가 갱신되는지도 확인한다. 여기서 `NAVER_BLOG_EDITOR_IN_USE` 로 멈추면 새 편집기를 빈 편집기로 보는 판정이 틀린 것이다 |
+| 2. 다시 글쓰기 화면 | 1 직후 네이버 글쓰기 화면을 사람이 직접 연다 | 「작성 중인 글이 있습니다」 알림이 뜨는지. 뜨면 「취소」 로 닫지 말고 그대로 둔다 |
+| 3. 연속 읽기 | 2 의 알림을 둔 채 A 를 다시 읽고, 「확인」 을 눌러 이어 쓰기로 연 글을 확인하고 직접 임시저장한 뒤 탭을 닫고 세 번 더 연달아 읽는다 | 알림이 있을 때 `NAVER_BLOG_EDITOR_IN_USE` 인지, 직접 임시저장한 뒤 매번의 `revision` 이 같은지, 회차마다 자동저장 요청과 목록 변화 |
+| 4. 다른 탭의 미저장 글 | 사람이 「내 브라우저」 화면에서 B 를 다른 탭으로 열어 가상 문장 한 줄을 더하고 저장하지 않은 채 둔 뒤 A 를 읽는다 | 읽기가 성공했는지 멈췄는지, 읽은 뒤 B 탭의 미저장 문장이 남았는지, 그 탭을 새로 고치거나 닫은 뒤 B 의 내용과 고친 시각, 다음 글쓰기 화면의 알림 |
+| 5. 자동저장 경쟁 | 「내 브라우저」 화면의 B 탭에서 문장을 계속 고치는 동안(자동저장이 도는 동안) A 를 읽는다 | 4 와 같은 것, 그리고 A 와 B 가운데 내용이 바뀐 글이 있는지 |
+| 6. 목록만 읽기 | 다른 글쓰기 탭이 없는 상태에서 `list_drafts` 를 두 번 부른다 | 자동저장 요청 수, 목록 수 변화, 다음 글쓰기 화면의 알림 |
+| 7. 로그인 만료 | 사람이 네이버에서 로그아웃한 뒤 A 를 읽는다 | `NAVER_BLOG_LOGIN_REQUIRED` 인지, 목록 수와 A, B 가 그대로인지 |
+| 8. 정리 | A 와 B 와 그 사이 생긴 글을 지운다 | 지운 글 수 |
+
+판정:
+
+- 1 과 3 에서 목록 수와 A 의 내용이 그대로이고, 4 와 5 에서 B 의 미저장 문장과 저장본이 그대로이면 「자동저장은 돌지만 사용자 글을 바꾸지 않는다」 로 적는다. 승인 경계를 낮출지는 그 기록을 근거로 따로 정한다
+- 어느 단계에서든 A 나 B 의 내용, 미저장 문장, 다른 글의 자동저장본이 바뀌면 그 단계를 적고 승인 경계를 유지한다. 읽기를 막을 조건을 커넥터에 더할지 정한다
+- 2 의 알림이 매번 뜨면 연속 읽기는 사용자가 알림을 정리해야만 된다. 그 안내를 스킬에 둘지 정한다
