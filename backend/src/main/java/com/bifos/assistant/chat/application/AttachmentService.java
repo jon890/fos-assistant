@@ -325,6 +325,7 @@ public class AttachmentService {
                         ? prepared.get(attachment.id())
                         : new AgentPhoto(attachment.id(), order.get(attachment.id()), null, null))
                 .toList();
+        MediaPipelineEvents.embedded(conversationId, embedImages ? photos : List.of());
         String files = sent.stream()
                 .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id()
                         + (inspectable(it)

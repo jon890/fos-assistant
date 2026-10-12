@@ -313,6 +313,7 @@ public class ContentDraftService {
         if (!draft.expiresAt().isAfter(clock.instant()) || !references.valid(draft, prepared, true)) {
             throw ContentDraftBodies.unavailable();
         }
+        MediaPipelineEvents.draftReferenced(draft.conversationId(), draft.publicId(), revision, prepared);
     }
 
 
