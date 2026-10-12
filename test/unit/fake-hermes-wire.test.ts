@@ -84,6 +84,19 @@ test("대본도 공유 표본의 희귀 사건과 중간 안내 식별 시각을
     assert.deepEqual(terminal.map((event) => event.event), ["run.interrupted"]);
     const status = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${interrupted.run_id}`, { headers })).json();
     assert.equal(status.status, "interrupted");
+    assert.equal(status.error, terminal[0]?.error);
+    const failure = "합성 대본 실패 사유";
+    await fetch(`${hermes.baseUrl}/__test/script`, {
+      method: "POST", body: JSON.stringify({ input: "실행 실패 검사", events: [{ event: "run.failed", error: failure }] }),
+    });
+    const failed = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs`, {
+      method: "POST", headers, body: JSON.stringify({ input: "실행 실패 검사" }),
+    })).json();
+    const failedEvents = wireEvents(await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${failed.run_id}/events`, { headers })).text());
+    assert.deepEqual(failedEvents.map((event) => event.event), ["run.failed"]);
+    const failedStatus = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${failed.run_id}`, { headers })).json();
+    assert.equal(failedStatus.status, "failed");
+    assert.equal(failedStatus.error, failure);
   } finally {
     await hermes.close();
   }

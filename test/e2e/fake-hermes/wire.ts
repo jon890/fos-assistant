@@ -49,7 +49,9 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
 }
 
 export function runEventWriter(response: ServerResponse, run: Pick<Run, "run_id" | "output" | "usage" | "runtime">) {
-  return (fields: Record<string, unknown>): void => {
-    response.write(`data: ${JSON.stringify(eventEnvelope(run, fields))}\n\n`);
+  return (fields: Record<string, unknown>): Record<string, unknown> => {
+    const payload = eventEnvelope(run, fields);
+    response.write(`data: ${JSON.stringify(payload)}\n\n`);
+    return payload;
   };
 }

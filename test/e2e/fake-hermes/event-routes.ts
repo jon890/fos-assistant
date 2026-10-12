@@ -77,9 +77,10 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
               if (scripted.event === "subagent.start" && typeof scripted.child_session_id === "string") {
                 state.childUsages.set(scripted.child_session_id, { profile: profile!, parent: run.session_id, reads: 0, delayed: false });
               }
-              event(scripted);
+              const emitted = event(scripted);
               if (["run.completed", "run.failed", "run.cancelled", "run.interrupted"].includes(String(scripted.event))) {
                 run.status = String(scripted.event).slice(4);
+                run.error = typeof emitted.error === "string" ? emitted.error : undefined;
                 response.end();
                 return;
               }
