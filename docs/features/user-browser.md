@@ -97,6 +97,12 @@ Docker proxy 는 chunked 요청을 거절한다. 그래서 Control Plane 은 작
 경로는 `UserBrowserController` 와 `UserBrowserAdminController` 가, 응답 칸은 `UserBrowserDtos` 가, 오류 코드는 `ErrorCode` 의 `BROWSER_*` 가 갖는다.
 응답에는 컨테이너 번호와 프로필 키를 싣지 않는다.
 
+웹의 `/api/browser` 아래에서 상태를 바꾸는 라우트(만들기, 지우기, 켜기, 끄기, 화면 열기, 입력)는 Control Plane 을 부르기 전에 출처를 본다.
+세션 쿠키의 SameSite 기본값에만 기대지 않으려는 것이고, 판정은 `web/src/lib/same-origin.ts` 가 갖는다.
+`Origin` 이 있으면 그 host 가 요청 host(`x-forwarded-host`, 없으면 `Host`)와 같아야 하고, 다르면 403 `FORBIDDEN` 이다.
+`Origin` 이 없으면 Next.js 의 Server Action 처럼 넘기되, `Sec-Fetch-Site` 가 `cross-site` 나 `same-site` 면 막는다.
+화면 열기는 GET 이라 같은 출처에서도 `Origin` 이 없으므로 이 값으로 가린다. `test/web/browser-same-origin.test.ts` 가 확인한다.
+
 ### 로그인 유지
 
 끌 때 컨테이너를 지우므로 로그인은 프로필 디렉터리에 남은 것만 다음 기동으로 이어진다.
@@ -135,7 +141,7 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 - 휴대폰의 탭과 끌기는 `mouse` 와 `wheel` 로 바꿔 보낸다. 그래서 서버는 `touch` 를 받지 않는다.
 - 한글은 입력기가 조합을 끝낸 글자를 `text` 로 보내고, 입력은 순서가 바뀌지 않게 한 줄로 보낸다.
 - 시작 주소(`/browser?url=`)는 그 페이지에서 처음 연 화면에만 쓴다. 「다시 열기」 는 지금 탭을 그대로 본다.
-- 입력의 서버 라우트는 세션을 먼저 보고, 본문이 상한을 넘으면 더 읽지 않고 400 이다.
+- 입력의 서버 라우트는 출처와 세션을 먼저 보고, 본문이 상한을 넘으면 더 읽지 않고 400 이다.
 
 입력 변환은 `test/unit/browser-screen-input.test.ts` 가, 말없이 끊긴 SSE 를 다시 여는 것은 `test/browser/user-browser-screen.spec.ts` 가 확인한다.
 
