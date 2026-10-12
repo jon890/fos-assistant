@@ -40,7 +40,7 @@ export type WorkerDeps = {
   limitMs: number;
   /** 연결 칸 값을 읽는 env. 작업 프로세스는 자기 env 를 쓴다. */
   env: Env;
-  /** 원고 snapshot job 의 CP authorize 호출. 시험은 대역 CP 로 바꾼다. */
+  /** 원고 snapshot job 의 CP authorize 호출. 테스트는 대역 CP 로 바꾼다. */
   fetch: Fetcher;
 };
 
