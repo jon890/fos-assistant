@@ -51,6 +51,7 @@
         "title": "합성 인자 확인",
         "grant": false,
         "outbound": false,
+        "conversation_grant": false,
         "identifiers": [],
         "arg_labels": {
           "scope": "범위",
@@ -62,6 +63,7 @@
         "approval": "none",
         "grant": false,
         "outbound": false,
+        "conversation_grant": false,
         "identifiers": [],
         "arg_labels": {}
       },
@@ -70,6 +72,7 @@
         "approval": "none",
         "grant": false,
         "outbound": false,
+        "conversation_grant": false,
         "identifiers": [],
         "arg_labels": {}
       }

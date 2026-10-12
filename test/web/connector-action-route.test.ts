@@ -36,7 +36,16 @@ function item(argLabels: unknown) {
 }
 
 /** 실제 조회·승인·거절 라우트를 실행한다. 인증이 필요한 Control Plane 호출만 대역한다. */
-async function callRoute(kind: "list" | "approve" | "reject", value: unknown) {
+async function callRoute(
+  kind:
+    | "list"
+    | "approve"
+    | "reject"
+    | "conversationGrants"
+    | "revokeConversationGrant",
+  value: unknown,
+  approveBody: unknown = { grant: null, argLabels: { to: "요청의 가짜 이름" } },
+) {
   const webRequire = createRequire(
     new URL("../../web/package.json", import.meta.url),
   );
@@ -57,7 +66,10 @@ async function callRoute(kind: "list" | "approve" | "reject", value: unknown) {
         body: await request.json(),
       }),
     },
-    "@/lib/api-response": {},
+    "@/lib/api-response": {
+      errorResponse: (code: string, message: string, status: number) =>
+        Response.json({ code, message }, { status }),
+    },
   };
   async function load(relative: string) {
     const source = await readFile(new URL(relative, import.meta.url), "utf8");
@@ -79,28 +91,35 @@ async function callRoute(kind: "list" | "approve" | "reject", value: unknown) {
   dependencies["@/lib/connector-action-route"] = await load(
     "../../web/src/lib/connector-action-route.ts",
   );
+  const conversationRoutes =
+    "../../web/src/app/api/chat/conversations/[conversationId]";
   const relative =
     kind === "list"
-      ? "../../web/src/app/api/chat/conversations/[conversationId]/connector-actions/route.ts"
-      : `../../web/src/app/api/connector-actions/[actionId]/${kind}/route.ts`;
+      ? `${conversationRoutes}/connector-actions/route.ts`
+      : kind === "conversationGrants"
+        ? `${conversationRoutes}/connector-conversation-grants/route.ts`
+        : kind === "revokeConversationGrant"
+          ? `${conversationRoutes}/connector-conversation-grants/[grantId]/route.ts`
+          : `../../web/src/app/api/connector-actions/[actionId]/${kind}/route.ts`;
   const route = (await load(relative)) as {
     GET: (request: Request, context: unknown) => Promise<Response>;
     POST: (request: Request, context: unknown) => Promise<Response>;
+    DELETE: (request: Request, context: unknown) => Promise<Response>;
   };
   const request = new Request(
     "https://example.test/action",
     kind === "approve"
-      ? {
-          method: "POST",
-          body: JSON.stringify({
-            grant: null,
-            argLabels: { to: "요청의 가짜 이름" },
-          }),
-        }
+      ? { method: "POST", body: JSON.stringify(approveBody) }
       : undefined,
   );
-  const response = await (kind === "list" ? route.GET : route.POST)(request, {
-    params: Promise.resolve({ actionId: ID, conversationId: ID }),
+  const handler =
+    kind === "list" || kind === "conversationGrants"
+      ? route.GET
+      : kind === "revokeConversationGrant"
+        ? route.DELETE
+        : route.POST;
+  const response = await handler(request, {
+    params: Promise.resolve({ actionId: ID, conversationId: ID, grantId: "7" }),
   });
   return { response, calls };
 }
@@ -200,4 +219,82 @@ test("옛 응답과 잘못된 표시 이름도 승인 줄을 유지한다", asyn
     assert.equal(response.status, 200);
     assert.deepEqual((await response.json())[0].argLabels, {});
   }
+});
+
+test("대화 허락을 고른 승인만 conversationGrant 를 싣고, 기간과 함께 오거나 boolean 이 아니면 Control Plane 을 부르지 않는다", async () => {
+  const granted = await callRoute("approve", item({}), {
+    grant: null,
+    conversationGrant: true,
+  });
+  assert.equal(granted.response.status, 200);
+  assert.equal(
+    JSON.stringify(granted.calls[0].init),
+    '{"method":"POST","body":{"grant":null,"conversationGrant":true}}',
+  );
+  for (const body of [
+    { grant: "HOUR", conversationGrant: true },
+    { grant: null, conversationGrant: "true" },
+  ]) {
+    const refused = await callRoute("approve", item({}), body);
+    assert.equal(refused.response.status, 400);
+    assert.equal(refused.calls.length, 0);
+  }
+});
+
+test("승인 줄의 conversationGrantAllowed 는 참일 때만 참으로 옮긴다", async () => {
+  for (const [value, expected] of [
+    [true, true],
+    ["true", false],
+    [undefined, false],
+  ] as const) {
+    const { response } = await callRoute("approve", {
+      ...item({}),
+      conversationGrantAllowed: value,
+    });
+    assert.equal((await response.json()).conversationGrantAllowed, expected);
+  }
+});
+
+test("대화 허락 목록은 번호와 이름과 끝나는 시각, 에이전트 이름만 옮기고, 거두기는 그 대화의 경로로 보낸다", async () => {
+  const listed = await callRoute("conversationGrants", [
+    {
+      grantId: 7,
+      title: "메모 쓰기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      toolName: "write_note",
+      connectorId: "demo-notes",
+    },
+    {
+      grantId: 8,
+      title: "글 불러오기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      agentName: "글 다듬기",
+    },
+  ]);
+  assert.equal(listed.response.status, 200);
+  assert.deepEqual(await listed.response.json(), [
+    {
+      grantId: 7,
+      title: "메모 쓰기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      agentName: null,
+    },
+    {
+      grantId: 8,
+      title: "글 불러오기",
+      expiresAt: "2026-10-13T00:00:00Z",
+      agentName: "글 다듬기",
+    },
+  ]);
+  assert.equal(
+    listed.calls[0].path,
+    `/api/v1/chat/conversations/${ID}/connector-conversation-grants`,
+  );
+
+  const revoked = await callRoute("revokeConversationGrant", null);
+  assert.equal(
+    revoked.calls[0].path,
+    `/api/v1/chat/conversations/${ID}/connector-conversation-grants/7`,
+  );
+  assert.equal(JSON.stringify(revoked.calls[0].init), '{"method":"DELETE"}');
 });

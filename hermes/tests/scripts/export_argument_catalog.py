@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as temporary:
     shutil.copytree(REPO / "hermes/tests/fixtures/demo-connector", root)
     declared = json.loads((root / "connector.json").read_text())
     declared.update(schema=2, verify={"tool": "verify"}, tools={
-        "write_note": {"risk": "WRITE", "approval": "required", "grant": False,
+        "write_note": {"risk": "WRITE", "approval": "required", "grant": False, "outbound": False,
                         "title": "합성 인자 확인", "arg_labels": {
                             "scope": "범위", "ghp_synthetic_review_key": "합성 칸"}},
         "list_scopes": {"risk": "READ"}, "verify": {"risk": "READ"}})
