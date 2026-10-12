@@ -265,7 +265,8 @@ test("실제 JPEG 8방향과 30장 역순 매핑을 검증하고 잘못된 대�
       { file: join(dir, "ambiguous.png"), orientation: 1 },
       { file: join(dir, "received-25.jpeg"), orientation: 1 },
     ]);
-    assert.notEqual(failed[0].recoveredId, 6);
+    assert.equal(failed[0].recoveredId, null);
+    assert.equal(failed[0].errorCode, "MARKER_UNREADABLE");
     assert.equal(failed[1].errorCode, "DECODE_FAILED");
     assert.equal(failed[2].errorCode, "MARKER_UNREADABLE");
     assert.equal(failed[3].errorCode, "NOT_JPEG");
