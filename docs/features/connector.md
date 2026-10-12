@@ -4,13 +4,24 @@
 
 covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/connector/`, `web/src/app/connections/`, `web/src/app/admin/connections/`, `hermes/connectors/`, `hermes/plugins/dashboard-profile-api/`
 
-## 도구 상세 설명
+## 도구 이름과 요약
 
-상세 화면은 각 도구의 이름과 위험도·승인 배지 아래에 기능, 중요한 입력, 결과의 제한과 부작용을 평문으로 보인다. 설명은 접거나 줄 수로 자르지 않고 개행을 유지한다. 목록 카드는 기존 도구 요약을 유지한다. 설명이 없는 옛 응답이나 불량 설명은 이름과 정책 배지만 보인다.
+상세 화면은 도구마다 사람 말 이름(`title`)과 한두 문장의 요약(`summary`)을 위험도·승인 배지와 함께 보인다.
+**실제 도구 이름(`search_messages` 같은 것)과 모델이 읽는 설명은 화면에 보이지 않는다.**
+이름이 없거나 공백이면 「이름 없는 도구」 를 보이고, 요약이 없거나 불량이면 요약 줄을 그리지 않는다. 요약은 접거나 줄 수로 자르지 않고 개행을 유지한다. 목록 카드는 기존 도구 요약(도구 수)을 유지한다.
 
-정본은 schema 2의 `tools.<이름>.description`이다. Gmail과 네이버 블로그는 이 JSON을 정적으로 import하여 SDK 등록에도 같은 설명을 쓴다. 카탈로그를 읽을 때 MCP 서버를 실행하거나 서비스 API에 설명을 묻지 않는다. Hermes의 `tool_descriptions`는 정책과 분리하며, 카탈로그의 `tools`에 합친 설명을 Control Plane의 `ConnectorTool` → `ConnectorToolSummary` → `ConnectorToolView`와 웹 응답 정제를 거쳐 표시한다.
+| 칸 | 읽는 쪽 | 쓰는 법 |
+| --- | --- | --- |
+| `tools.<이름>.title` | 화면, 승인 카드, 알림 | 한글 도구 이름. 1자에서 80자. 승인 카드는 같은 칸을 제목으로 쓰고, 없으면 「이름 없는 동작」 이다 |
+| `tools.<이름>.summary` | 화면, 커넥터 README | 「~해요」체 한두 문장, 200자 안. 무엇을 하는지와 사용자가 알아야 할 한 가지(본문을 열지 않는다, 보내지 않는다, 승인을 받는다)만 적는다. 인자 이름, 반환 칸, ID, scope 같은 내부 말을 쓰지 않는다 |
+| `tools.<이름>.description` | 모델 | 기능, 중요한 입력, 결과의 제한과 부작용. Gmail 과 네이버 블로그는 이 JSON 을 정적으로 import 하여 SDK 등록에도 같은 설명을 쓴다. 화면에 닿지 않는다 |
 
-설명은 앞뒤 공백을 자른 뒤 1자부터 2,000 Unicode code point까지, UTF-8 8,192바이트 이하이다. 탭·CR·LF는 허용하고 그 밖의 C0, DEL, C1, 방향 제어문자와 잘못된 surrogate는 금지한다. HTML이나 Markdown도 React 텍스트로 그린다. 문자와 공백 경계는 Python·Java·웹이 공통 fixture로 검사한다.
+정본은 schema 2 의 `connector.json` 이다. 카탈로그를 읽을 때 MCP 서버를 실행하거나 서비스 API 에 묻지 않는다.
+Hermes 의 `tool_descriptions` 와 `tool_summaries` 는 정책과 분리하고 카탈로그의 `tools` 에만 합친다.
+요약은 Control Plane 의 `ConnectorTool` → `ConnectorToolSummary` → `ConnectorToolView` 와 웹 응답 정제를 거쳐 표시한다. 모델용 설명은 `ConnectorTool` 까지만 읽고 `ConnectorToolSummary` 에 싣지 않는다.
+
+요약과 설명은 같은 문자 규칙으로 정제한다. 앞뒤 공백을 자른 뒤 1자부터 2,000 Unicode code point 까지, UTF-8 8,192바이트 이하이다. 탭·CR·LF 는 허용하고 그 밖의 C0, DEL, C1, 방향 제어문자와 잘못된 surrogate 는 금지한다. HTML 이나 Markdown 도 React 텍스트로 그린다. 문자와 공백 경계는 Python·Java·웹이 공통 fixture 로 검사한다.
+200자 상한과 필수 여부, 도구 이름이 문구에 들지 않았는지, 커넥터 README 의 도구 표가 같은 문구인지는 `hermes/tests/test_connectors_contract.py` 가 커넥터마다 본다. 아직 채우지 않은 커넥터는 그 파일의 `PENDING_USER_COPY` 에 있다.
 
 ## 요구
 
@@ -552,6 +563,493 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 사진 수와 본문 줄이 같은 상태에서 사진 식별자나 파일명만 바뀌어도 이 지문은 그대로일 수 있다.
 파일명과 component id는 첨부 번호나 권한, 사진 hash가 아니다. 업로드 바이트나 픽셀의 동일성, 승인 시점 사진의 불변성을 증명하지 않는다.
 사용자와 첨부의 신뢰할 수 있는 대응과 접근 권한은 후속 Control Plane이 확인해야 하며 모델이 반환 파일명을 권한 근거로 사용할 수 없다.
+
+## Gmail 커넥터
+
+사용자의 Gmail 계정에 붙는 범용 커넥터다. 코드는 [`hermes/connectors/gmail/`](../../hermes/connectors/gmail) 에 있다.
+이 절은 도구와 정책, 보안, 연결 값의 수명, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [Gmail 커넥터 README](../../hermes/connectors/gmail/README.md) 가 갖는다.
+초기 결정은 [ADR-066](../../hermes/docs/adr/ADR-066-gmail-커넥터는-직접-만든-mcp-서버와-gmail-modify-scope-하나로-돌고-휴지통은-서버가-막는다.md), TypeScript 전환과 필터 권한은 [ADR-084](../../hermes/docs/adr/ADR-084-gmail-typescript-filters.md) 에 있다.
+커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
+
+### Gmail 등록 칸
+
+| 칸 | env | 비밀 | 무엇 |
+| --- | --- | --- | --- |
+| `client_id` | `GMAIL_OAUTH_CLIENT_ID` | 아니다 | 사용자가 만든 OAuth client 의 ID. `.apps.googleusercontent.com` 으로 끝나는 값만 받는다 |
+| `client_secret` | `GMAIL_OAUTH_CLIENT_SECRET` | 그렇다 | 그 client 의 secret |
+| `refresh_token` | `GMAIL_OAUTH_REFRESH_TOKEN` | 그렇다 | 그 client 로 받은 자기 계정의 refresh token |
+
+셋 다 필수다. 운영자가 주는 값(`operator_env`)은 없다.
+확인 도구는 `get_profile` 이다. 등록할 때 세 값으로 계정 주소를 읽어 보고, 읽히면 저장한다.
+
+### Gmail 도구와 정책
+
+MCP 서버 이름은 `gmail` 이다. 인자는 `search_messages` 의 `max_results`(정수)를 빼고 모두 글자다. 승인 카드가 인자를 키와 값으로 그대로 보이기 때문이다.
+
+| 도구 | 위험도 | 승인 | 상시 허락 | 카드 제목 | 하는 일 |
+| --- | --- | --- | --- | --- | --- |
+| `get_profile` | `READ` | 없음 | | | 계정 주소와 메일 수를 읽는다 |
+| `list_labels` | `READ` | 없음 | | | 라벨의 이름과 종류를 읽는다 |
+| `list_filters` | `READ` | 없음 | | | 저장된 자동 분류 필터를 읽는다 |
+| `search_messages` | `READ` | 없음 | | | Gmail 검색 문법으로 메일을 찾는다 |
+| `get_message` | `READ` | 없음 | | | 메일 하나의 머리와 본문을 읽는다 |
+| `get_thread` | `READ` | 없음 | | | 스레드의 메일을 차례로 읽는다 |
+| `create_draft` | `WRITE` | 필요 | 줄 수 있다 | 초안 만들기 | 초안함에 초안을 만든다. 보내지 않는다 |
+| `modify_labels` | `WRITE` | 필요 | 닫았다 | 라벨 바꾸기 | 메일 하나에 라벨을 더하고 뗀다. 보관과 읽음 처리가 여기 든다 |
+| `create_label` | `WRITE` | 필요 | 줄 수 있다 | 라벨 만들기 | 사용자 라벨을 만든다 |
+| `update_label` | `WRITE` | 필요 | 줄 수 있다 | 라벨 설정 바꾸기 | 사용자 라벨의 이름과 색만 바꾼다 |
+| `create_filter` | `WRITE` | 필요 | 닫았다 | 필터 만들기 | 앞으로 오는 메일의 자동 분류를 저장한다 |
+| `delete_filter` | `WRITE` | 필요 | 닫았다 | 필터 지우기 | 자동 분류 설정 하나를 지운다 |
+| `apply_labels_to_query` | `WRITE` | 필요 | 닫았다 | 검색한 메일의 라벨 바꾸기 | 기존 메일 최대 500통에 라벨을 더하고 뗀다 |
+| `send_message` | `WRITE` | 필요 | 닫았다 | 메일 보내기 | 새 메일을 보낸다 |
+| `reply_to_message` | `WRITE` | 필요 | 닫았다 | 답장 보내기 | 받은 메일의 스레드에 답장을 보낸다 |
+
+분류의 까닭이다.
+
+- 읽기 여섯은 계정의 상태를 바꾸지 않는다. 메일 본문은 민감하지만 이 커넥터를 연결한 뜻이 메일을 읽는 것이라 호출마다 묻지 않는다. 읽은 글은 그 사용자의 대화에만 간다.
+- 초안은 계정 안에서 되돌릴 수 있는 쓰기다. 밖으로 나가지 않으므로 상시 허락을 줄 수 있다.
+- 라벨 바꾸기도 계정 안의 쓰기지만 상시 허락을 닫았다. 속은 모델이 보안 알림 메일을 보관하거나 읽음 처리해 주인의 눈에서 숨길 수 있기 때문이다.
+- 라벨 만들기와 설정 변경은 메일을 숨기거나 밖으로 보내지 않아 상시 허락을 줄 수 있다. 시스템 라벨 변경과 라벨 삭제는 열지 않는다.
+- 필터 만들기와 지우기, 기존 메일 일괄 적용은 매번 승인한다. 자동 분류는 앞으로 올 보안 알림도 숨길 수 있고, 일괄 적용은 여러 메일의 표시를 바꾼다. 필터 삭제는 다시 만들 수 있는 설정 변경이다.
+- 밖으로 나간다는 선언(`"outbound": true`)은 보내기와 답장 둘이다.
+- 보내기와 답장은 계정 밖의 사람에게 나간다. `"grant": false` 로 상시 허락을 닫아 호출마다 사람이 받는 사람과 제목과 본문을 본다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)).
+- 휴지통과 영구 삭제는 도구가 없다. 선언에 없는 도구는 거절된다.
+- 쓰는 도구가 받는 메일, 라벨, 필터의 id 는 `identifiers` 로 선언했다. 필터 id 처럼 긴 영숫자라도 승인 카드에 그대로 보이고 승인할 수 있다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)). `create_draft` 의 `reply_to_message_id`, `modify_labels` 와 `reply_to_message` 의 `message_id`, `update_label` 의 `label`, `delete_filter` 의 `filter_id` 다. 라벨 이름을 쉼표로 이어 받는 `add_labels` 와 `remove_labels` 는 식별자 모양이 아니라 선언하지 않았다.
+
+#### Gmail 도구의 인자와 결과
+
+| 도구 | 인자 | 결과 |
+| --- | --- | --- |
+| `get_profile` | 없음 | `{email, messages_total, threads_total}` |
+| `list_labels` | 없음 | `{labels: [{id, name, type}]}`. `type` 은 `system` 이나 `user` |
+| `search_messages` | `query`(Gmail 검색 문법, 비우면 최근 메일), `max_results`(1~25, 기본 10), `page_token` | `{messages: [{id, thread_id, from, to, subject, date, snippet, labels}], next_page_token}` |
+| `get_message` | `message_id` | `{id, thread_id, from, to, cc, subject, date, labels, body, body_truncated, attachments: [{filename, mime_type, size}]}` |
+| `get_thread` | `thread_id` | `{id, messages: [get_message 와 같은 모양], messages_truncated}` |
+| `create_draft` | `to`, `subject`, `body`, `cc`, `bcc`, `reply_to_message_id` | `{draft_id, message_id, thread_id}` |
+| `modify_labels` | `message_id`, `add_labels`, `remove_labels` | `{id, labels}` |
+| `create_label` | `name`, `text_color`, `background_color`, `label_list_visibility`, `message_list_visibility` | 만든 라벨 |
+| `update_label` | `label`(번호나 이름), `name`, `text_color`, `background_color` | 바뀐 라벨 |
+| `list_filters` | 없음 | `{filters: [...]}` |
+| `create_filter` | `from`, `to`, `subject`, `query`, `negated_query`, `has_attachment`, `size`, `size_comparison`, `add_labels`, `remove_labels`, `forward` | 저장한 필터 |
+| `delete_filter` | `filter_id` | `{deleted, filter_id}` |
+| `apply_labels_to_query` | `query`, `add_labels`, `remove_labels`, `expected_count` | `{count, query, add_label_ids, remove_label_ids}` |
+| `send_message` | `to`, `subject`, `body`, `cc`, `bcc` | `{id, thread_id}` |
+| `reply_to_message` | `message_id`, `to`, `subject`, `body`, `cc` | `{id, thread_id}` |
+
+- **받는 사람(`to`, `cc`, `bcc`)은 쉼표로 나눈 주소만 받는다. 표시 이름을 받지 않는다.** `a@example.com, b@example.net` 모양이다. 카드에 보이는 글과 실제 받는 주소가 다르게 읽힐 길을 없앤다. 주소 하나는 ASCII 영문자, 숫자, `.!#$%&'*+/=?^_{|}~-` 로 된 이름과 `@` 와 점으로 이은 도메인이다. 그 밖의 모양은 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다. `이름 <주소>`, 따옴표, 괄호 주석, 꺾쇠, `:` 와 `;` 가 든 그룹 문법, ASCII 밖 글자, 인코딩된 낱말(`=?utf-8?b?...?=`)이 모두 여기 든다
+- 서버는 조립한 메일을 다시 읽어 `To`, `Cc`, `Bcc` 의 주소 목록이 인자의 주소 목록과 같은지 확인한다. 다르면 보내지 않고 `GMAIL_INVALID_INPUT` 이다
+- 제목에 줄바꿈 같은 제어 문자, 화면에 보이지 않거나 글의 방향을 바꾸는 문자(Unicode 범주 Cf), 앞 글자에 붙어 그 자체로는 아무것도 그리지 않는 결합 문자(범주 Mn 가운데 U+034F, 크메르 U+17B4 와 U+17B5, 변이 선택자 U+FE00 부터 U+FE0F, U+E0100 부터 U+E01EF, 몽골어 선택자 U+180B 부터 U+180D 와 U+180F), 인코딩된 낱말(`=?...?=`)이 있으면 거절한다. 태국어 모음이나 분해한 `é` 처럼 눈에 보이게 그려지는 결합 문자는 받는다. 이모지에 붙는 U+FE0F 는 글자가 아닌 글자(기호, 구두점, 숫자) 바로 뒤의 하나만 받는다. 본문도 Cf 문자를 거절하되 그림 글자를 잇는 U+200C 와 U+200D 는 받는다. 한글 채움 문자(U+3164)처럼 빈칸으로 보이는 글자도 제목과 본문에서 거절한다
+- 답장의 `In-Reply-To` 와 `References` 에는 원래 메일의 `<...>` 모양 번호만 옮긴다. 다른 글이 섞인 머리는 버리고 스레드 번호만으로 답장한다
+- 승인 카드는 받는 사람을 인자의 글 그대로 보인다. 주소만 받으므로 카드의 글이 곧 받는 주소다
+- `to`, `subject`, `body` 는 비울 수 없다
+- `add_labels` 와 `remove_labels` 는 쉼표로 나눈 라벨 이름이다. 시스템 라벨은 `INBOX`, `UNREAD`, `STARRED`, `IMPORTANT` 처럼 그 이름을 쓰고 사용자 라벨은 화면에 보이는 이름을 쓴다. 서버가 이름을 라벨 번호로 바꾼다. 모르는 이름은 `GMAIL_INVALID_INPUT` 이다. 보관은 `remove_labels: "INBOX"` 다
+- **`add_labels` 나 `remove_labels` 에 `TRASH` 나 `SPAM` 이 있으면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 으로 거절한다.** 휴지통과 스팸에 넣는 것도 꺼내는 것도 하지 않는다. 대소문자를 구분하지 않고, 이름이 그 라벨 번호로 바뀐 경우도 거절한다
+- `reply_to_message` 는 받는 사람과 제목을 원래 메일에서 채우지 않는다. 인자로 받은 그대로 보낸다. 승인한 것과 보낸 것이 같아야 하기 때문이다. 서버는 원래 메일의 스레드와 `Message-ID` 를 읽어 `In-Reply-To` 와 `References` 머리만 채운다
+- `create_draft` 의 `reply_to_message_id` 를 주면 그 메일의 스레드에 답장 초안을 만든다
+- 본문은 글(`text/plain`)로만 보낸다. 첨부를 붙이는 인자는 없다
+- `get_message` 의 `body` 는 `text/plain` 부분을 먼저 쓰고, 없으면 `text/html` 에서 태그를 뗀 글을 쓴다. 20,000자에서 자르고 잘랐으면 `body_truncated` 가 참이다. HTML 의 `script`, `style`, `head`, `title`, `template`, `noscript` 안의 글은 버린다. `</head>` 를 닫지 않은 메일은 `<body>` 에서 본문이 시작한다고 읽되, 다른 숨김 태그 안의 `<body>` 는 숨김을 풀지 않는다. 머리 값은 1,000자, 첨부 목록은 50개, 첨부 이름은 255자에서 자른다. Gmail 의 응답이 10MB 를 넘으면 `GMAIL_UNAVAILABLE` 이다. `get_thread` 는 메일마다 5,000자, 메일 20개까지다
+- 첨부는 이름, 종류, 크기만 낸다. 내용을 읽는 도구는 없다
+- 읽기 도구 셋(`search_messages`, `get_message`, `get_thread`)의 결과에는 `notice` 칸이 더 붙는다. 아래 「Gmail 보안」 이 갖는다
+- 결과의 `labels` 는 Gmail 의 라벨 번호다. 시스템 라벨은 번호가 이름과 같고, 사용자 라벨의 이름은 `list_labels` 로 찾는다
+- `message_id`, `thread_id`, `reply_to_message_id` 는 영문자, 숫자, `_`, `-` 로 된 64자까지의 글만 받는다. 아니면 Gmail 을 부르지 않고 `GMAIL_INVALID_INPUT` 이다
+- 도구는 프로세스 안의 상태에 기대지 않는다. access token 은 그 프로세스가 필요할 때 refresh token 으로 받는다
+
+#### Gmail 오류
+
+| 서버가 내는 코드 | 공통 어휘 | 복구 어휘 | 언제 |
+| --- | --- | --- | --- |
+| `GMAIL_UNAUTHORIZED` | `credential_rejected` | `reconnect` | 토큰 endpoint 가 `invalid_grant` 나 `invalid_client` 로 답했다. Gmail API 가 401 로 답했다. 세 값 가운데 하나가 비었다 |
+| `GMAIL_FORBIDDEN` | `forbidden` | | Gmail API 가 403 으로 답했다. scope 가 모자라거나 프로젝트에서 Gmail API 를 켜지 않았다 |
+| `GMAIL_FILTER_SCOPE_REQUIRED` | `forbidden` | `reconnect` | 필터 API 가 403 으로 답했다. 두 scope 로 토큰을 다시 받아 연결 값을 바꾼다 |
+| `GMAIL_TARGET_COUNT_CHANGED` | `invalid_input` | `recheck`, 세부 `actual_count` | 승인한 수와 검색한 수가 다르다. 변경하지 않고 `actual_count` 를 알린다 |
+| `GMAIL_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 비었거나 모양이 틀리다. 막은 라벨을 더하려 했다. Gmail API 가 400 이나 404 로 답했다 |
+| `GMAIL_SEND_UNKNOWN` | `outcome_unknown` | | 보내기나 답장의 보내는 요청(`messages/send`)을 보낸 뒤 시간 안에 답이 없거나, 연결이 끊겼거나, 응답을 읽지 못했거나, Gmail API 가 5xx 로 답했다. 메일이 나갔는지 모른다. 승인 줄은 실패가 아니라 `UNKNOWN` 으로 남는다 |
+| `GMAIL_UNAVAILABLE` | `unavailable` | `retry_later` | 연결하지 못했다. 시간 안에 답이 없다. Gmail API 가 3xx, 429, 5xx 나 위에 없는 4xx 로 답했다. 응답을 읽지 못했다. 토큰 endpoint 가 `invalid_grant` 와 `invalid_client` 밖의 오류로 답했다 |
+
+오류 결과는 코드만 담는다. 대상 수 변경에는 서버가 센 `actual_count` 도 담는다.
+승인 실행이 실패하면 공통 어휘와 함께 서버의 코드, 복구 어휘, `actual_count` 가 에이전트에 닿는다([커넥터 연결](../../hermes/connectors/README.md) 의 「오류 복구 계약」). 일반 403 인 `GMAIL_FORBIDDEN` 은 코드만 닿고 Google 의 오류 글은 닿지 않는다.
+Google 이 준 오류 글과 요청한 주소는 결과와 로그에 싣지 않는다.
+도구 인자는 모두 문자열이다. 숫자나 객체를 보내면 MCP SDK 가 서버 처리 전에 타입 오류로 거절한다. 이 오류는 JSON 결과가 아니어서 현재 공통 승인 경로에서 `unavailable` 로 보일 수 있다. 이 경우 연결 재시도보다 인자 타입을 먼저 확인한다.
+외부 호출의 제한 시간은 호출마다 15초다. 대시보드가 확인 도구를 기다리는 시간은 10초라, Google 이 느리게 답하면 등록과 연결 확인이 서버의 제한 시간보다 먼저 `unavailable` 로 끝난다. 어느 호출도 다시 부르지 않는다. 보내기가 시간 안에 답하지 않았을 때 다시 부르면 메일이 두 번 나갈 수 있다.
+
+### scope 와 휴지통
+
+요청하는 scope 는 `https://www.googleapis.com/auth/gmail.modify` 와 `https://www.googleapis.com/auth/gmail.settings.basic` 둘이다.
+라벨과 메일은 `gmail.modify`, [필터](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.settings.filters/create)는 `gmail.settings.basic` 을 쓴다.
+`gmail.settings.sharing` 은 요청하지 않는다. 전달 주소와 계정 밖으로 나가는 설정을 관리하지 않기 때문이다.
+
+| 하려는 것 | 이 scope 로 | 막는 곳 |
+| --- | --- | --- |
+| 읽기, 검색, 초안, 보내기, 라벨 바꾸기 | 된다 | |
+| 휴지통으로 옮기기 | **된다** | 서버 코드. 휴지통 endpoint 를 부르지 않고 라벨 바꾸기에서 `TRASH` 와 `SPAM` 을 더하는 것도 떼는 것도 거절한다 |
+| 영구 삭제 | 안 된다 | scope. `https://mail.google.com/` 을 받아야 한다 |
+
+보관(`INBOX` 라벨 떼기)에 `gmail.modify` 가 필요해 더 작은 scope 를 고를 수 없다.
+[`커넥터 테스트`](../../hermes/connectors/gmail/tests)가 `TRASH` 와 `SPAM` 의 거절을 보고, 대역이 받은 요청이 허용 목록 안에만 있는지 본다.
+필터 설정의 조회·생성·삭제와 라벨 생성·변경, 메일의 `batchModify` 는 허용한다. 메일의 휴지통·삭제와 첨부, 전달 주소 설정은 허용하지 않는다.
+
+**더 넓은 scope 로 받은 토큰을 넣지 않는다.** `https://mail.google.com/` 으로 받은 토큰도 등록은 되지만, 그 토큰이 새면 메일을 영구히 지울 수 있다.
+
+### 라벨과 자동 분류
+
+라벨 이름은 1부터 225자까지다. 시스템 라벨 이름은 만들거나 바꾸지 못한다.
+색은 `text_color` 와 `background_color` 를 함께 주고, [Gmail 이 허용하는 색](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.labels)만 받는다.
+목록 표시 값은 `labelShow`, `labelShowIfUnread`, `labelHide`, 메시지 표시 값은 `show`, `hide` 다. 생략하면 Gmail 기본값을 쓴다.
+
+필터는 중첩 JSON 대신 도구 표의 글자 인자로 조건과 동작을 받는다.
+`has_attachment` 는 빈 글이나 `true`, `false`, `size` 는 바이트 수를 적은 십진수, `size_comparison` 은 `larger`, `smaller` 다.
+크기를 주면 비교 방식도 준다. 조건과 라벨 동작이 각각 하나 이상 있어야 한다.
+라벨은 쉼표로 나눈 번호나 이름으로 받고, 번호로 바꾼 뒤에도 `TRASH` 와 `SPAM` 을 거절한다.
+`forward` 를 주면 쓰기 전에 거절한다. 필터를 수정하는 API 는 없으므로 조회한 필터를 승인 뒤 지우고 새 조건으로 다시 만든다.
+
+1. `list_labels` 로 필요한 라벨을 보고, 없으면 `create_label` 로 만든다.
+2. `create_filter` 로 앞으로 오는 메일의 분류를 저장한다.
+3. 기존 메일도 정리하려면 `search_messages` 의 모든 쪽에서 번호를 모아 대상 수를 센다.
+4. `apply_labels_to_query` 에 같은 검색어와 라벨, 센 수를 글자로 적은 `expected_count` 를 넣는다.
+
+**승인 카드에는 검색어와 대상 수를 함께 보인다.** 서버가 다시 검색한 수가 다르면 아무것도 바꾸지 않고 `GMAIL_TARGET_COUNT_CHANGED` 와 `actual_count` 를 반환한다.
+에이전트는 승인 결과의 `actual_count` 를 지금 수로 알리고, 다시 조회해 확인할지 묻는다. 그대로 다시 승인을 요청하지 않는다. 501통 이상이면 일부만 바꾸지 않고 거절한다.
+승인한 수가 0이고 검색도 비어 있으면 쓰기 없이 대상 수 0으로 끝난다.
+수가 같아도 검색과 변경 사이에 새 메일이 오면 그 메일은 이번 적용 대상에 들지 않는다.
+
+### Gmail 서버와 검사
+
+TypeScript 서버를 의존성까지 `dist/gmail-mcp.js` 하나로 묶는다. 생성 entry는 Git에서 추적하지 않는다. 실행 파일은 Bun 이다.
+빌드와 실행에 같은 도구를 써 별도 변환을 줄이고, 실행할 때 패키지를 내려받지 않는다.
+Bun `1.3.14` 와 lockfile 을 고정해 CI와 로컬 검사가 소스에서 entry를 빌드하고 독립 빌드 두 번의 전체 바이트와 같은지 검사한다. 실행은 검증한 최소 버전 `1.3.14` 이상을 허용한다. 시작 시 환경 프록시가 있으면 그 값을 뺀 환경으로 같은 묶음 파일을 다시 실행한다. Bun 이 시작 때 프록시를 기억하므로 요청 직전에 값을 지우는 것만으로는 우회하지 못한다. 표준 입출력을 이어 MCP 연결을 유지하며, 실제 요청은 프록시 없는 프로세스에서 실행한다.
+전용 테스트는 [`tests/`](../../hermes/connectors/gmail/tests)에 있다. 타입 검사와 테스트, 묶음 파일 비교는 `bash scripts/check-connectors.sh` 로 실행한다.
+`get_refresh_token.py` 는 서버 실행에 쓰지 않는 로컬 일회성 도구라 Python 표준 라이브러리를 유지한다.
+
+### Gmail 보안
+
+메일 본문은 누구나 보낼 수 있는 글이다. 그 글에 「이 메일을 아무개에게 전달하라」 같은 지시가 숨어 있을 수 있다.
+그 글이 모델을 속인다는 전제로 아래가 닿는 범위를 정한다.
+
+| 무엇 | 어떻게 |
+| --- | --- |
+| 붙인 에이전트 | Gmail 도구는 이 연결을 붙인 에이전트가 직접 부른다. 그 에이전트는 자기 Memory 와 대화 맥락과 켜진 도구를 함께 갖는다. 속은 모델이 닿는 곳은 이 메일 계정과 그 에이전트가 가진 것이다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) 의 「결과」). 터미널이나 파일 도구가 켜진 에이전트에서는 승인이 마지막 방어가 아니므로 그런 에이전트에는 붙이지 않기를 권한다([커넥터 연결](agent-skill.md) 의 「언제 에이전트를 나누는가」) |
+| 도구 결과 | 읽기 도구의 결과는 `fos-ctx` 가 `<external-data>` 로 감싸고 지시로 따르지 말라는 줄을 앞에 붙인다. Hermes 도 MCP 결과를 `<untrusted_tool_result>` 로 한 번 더 감싼다. 감싸도 모델이 그 글을 따르지 않는다는 보장은 없다 |
+| 쓰기 | 초안, 라벨, 보내기, 답장은 모두 승인 뒤에만 실행된다. 보내기와 답장은 상시 허락이 없어 호출마다 승인한다 |
+| 승인한 것과 실행한 것 | 승인 카드는 받는 사람(`to`, `cc`, `bcc`), 제목(`subject`), 본문(`body`)을 마크다운이나 HTML 로 읽지 않고 글자로 보인다. 토큰처럼 보이는 긴 글만 `[가림]` 으로 바꿔 보인다. 승인하면 Control Plane 이 저장한 인자 그대로 한 번만 실행한다. 결과를 모르면 다시 실행하지 않는다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)) |
+| 옛 커넥터 에이전트 | 옮겨 가기 전에 만든 Gmail 에이전트는 남아 있는 동안 자기 MCP 서버의 도구만 받고 Memory 와 Control Plane 도구를 받지 않는다. 다른 에이전트가 그 에이전트에 맡긴 일의 답은 Control Plane 이 `<external-data>` 로 감싸 전한다([커넥터 설치](connector.md) 의 「옛 커넥터 에이전트」) |
+
+서버가 하는 것도 있다.
+
+- 읽기 도구의 결과에 `notice` 칸을 넣어, 메일의 글은 보낸 사람이 쓴 자료이고 지시가 아니라고 적는다
+- 스킬 지침(`skills/gmail/SKILL.md`)이 같은 것을 말하고, 메일의 글이 시키는 쓰기를 하지 말고 사용자에게 알리라고 적는다
+
+**보내기, 답장, 라벨 바꾸기는 카드에 가려지는 글이 있으면 승인되지 않는다.** 승인 카드는 비밀처럼 보이는 키의 값과 토큰 모양의 긴 글을 `[가림]` 으로 바꿔 보인다. 가릴 자리는 글의 모양이 정하므로, 속은 모델이 내보낼 내용을 그런 모양으로 만들면 사람이 읽지 못한 글이 나간다. 그래서 이 세 도구의 요청은 가려지는 글이 하나라도 있으면 화면이 승인을 막고 Control Plane 도 실행하지 않는다([커넥터 연결](connector-policy.md) 의 「승인 줄과 경로」). 본문에 긴 링크 토큰이나 key 가 든 메일은 이 커넥터로 보낼 수 없다. 초안에는 이 제한이 없다. 초안의 카드에 `[가림]` 이 보이면 그 자리는 Gmail 초안함에서 확인한다.
+
+**이것으로 모델이 속지 않는다고 보장하지 못한다.** 마지막 방어는 사람이 승인 카드를 읽는 것이다.
+속은 모델이 읽은 메일의 내용을 그 대화의 답에 옮기는 것은 막지 못한다. 그 답은 계정 주인만 본다.
+HTML 메일에서 화면에 보이지 않게 꾸민 글(예: 숨긴 문단)은 걸러 내지 못하고 본문으로 모델에 간다.
+초안에 상시 허락을 주면 속은 모델이 초안을 만들 수 있다. 초안은 계정 밖으로 나가지 않고 지울 수 있다.
+
+### 연결 값의 수명
+
+자격 증명을 만들고 넣는 단계는 README 의 「연결하는 방법」 이 갖는다.
+
+#### 기존 토큰에 필터 권한 더하기
+
+`gmail.modify` 만 받은 옛 토큰도 연결 확인과 라벨·메일 도구는 계속 쓸 수 있다.
+필터 쓰기가 `GMAIL_FILTER_SCOPE_REQUIRED` 로 끝나면 다음 순서로 바꾼다. 같은 `forbidden` 이라도 코드가 `GMAIL_FORBIDDEN` 이면 필터 scope 문제로 단정하지 않는다.
+
+1. Google Cloud 동의 화면의 데이터 액세스에 `gmail.settings.basic` 을 더한다.
+2. README 의 토큰 발급 스크립트를 다시 실행해 두 scope 를 함께 허용한다.
+3. 외부 서비스 연결 화면에 새 refresh token 을 등록하고 연결 확인을 누른다.
+4. 값을 바꿨으므로 관리자가 공유 gateway 를 재시작하고 반영 완료를 누른 뒤 `list_filters` 가 읽히는지 확인한다.
+
+#### 토큰이 만료되거나 철회됐을 때
+
+| 까닭 | 일어나는 일 | 할 일 |
+| --- | --- | --- |
+| 동의 화면이 「테스트」 상태다 | refresh token 이 7일 뒤 만료된다 | 게시 상태를 「프로덕션」 으로 바꾸고 토큰을 다시 받는다 |
+| Google 계정의 비밀번호를 바꿨다 | Gmail 권한이 든 토큰이 모두 무효가 된다 | 토큰을 다시 받는다 |
+| 6개월 동안 쓰지 않았다 | 만료된다 | 토큰을 다시 받는다 |
+| 같은 client 로 토큰을 여러 번 받았다 | 한도를 넘으면 오래된 것부터 무효가 된다 | 쓰는 토큰을 다시 받는다 |
+| 사용자가 접근을 철회했다 | 바로 무효가 된다 | 다시 쓰려면 토큰을 다시 받는다 |
+
+토큰이 죽으면 도구 호출이 자격 증명 거절로 끝나고 에이전트가 메일을 읽지 못했다고 답한다. 「연결 확인」 도 실패한다.
+README 의 「2. refresh token 받기」 를 다시 하고 외부 서비스 연결 화면에서 새 값으로 다시 등록한다.
+
+**접근을 끊으려면** Google 계정의 「보안」 에서 「서드 파티 앱 및 서비스」 연결 목록을 열어 자기가 만든 앱을 지운다. 그 순간부터 토큰이 거절된다.
+외부 서비스 연결 화면의 해제는 이 비서 쪽의 값을 지운다. Google 쪽의 권한은 위 방법으로 따로 지운다.
+
+### Gmail 실제 계정으로 확인하기
+
+검사는 대역으로만 돈다. 실제 Gmail 로 도는지는 소유자가 배포한 뒤, 그리고 Gmail API 의 변경 공지가 있을 때 손으로 확인한다.
+운영자가 커넥터를 목록에 올리는 방법은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+
+| 순서 | 하는 일 | 기대하는 것 |
+| --- | --- | --- |
+| 1 | README 의 「연결하는 방법」 대로 등록하고 에이전트에 붙인 뒤 반영될 때까지 기다린다. 「반영 대기」 로 보이면 관리자가 재시작하고 반영 완료를 누른다 | 연결 상태가 준비됨이고 그 에이전트의 연결 줄이 「붙음」 이다. 외부 서비스 연결 화면의 도구 목록에 15개가 보이고 선언하지 않은 도구가 0 이다 |
+| 2 | 「최근 받은 메일 세 개를 알려 줘」 | 승인 없이 제목과 보낸 사람이 나온다 |
+| 3 | 그 가운데 하나를 읽어 달라고 한다 | 본문이 나온다. 한글 메일이 깨지지 않는다 |
+| 4 | 자기 주소로 보낼 초안을 만들어 달라고 한다 | 승인 카드에 받는 사람, 제목, 본문이 보인다. 승인하면 Gmail 초안함에 있다 |
+| 5 | 자기 주소로 메일을 보내 달라고 한다 | 카드에 「승인하고 묻지 않기」 가 없다. 승인하면 한 통만 도착한다 |
+| 6 | 받은 메일에 답장을 보내 달라고 한다 | 승인한 뒤 Gmail 에서 같은 스레드에 붙어 있다 |
+| 7 | 메일 하나를 보관해 달라고 한다 | 승인한 뒤 받은편지함에서 빠지고 전체보관함에 남는다 |
+| 8 | 메일 하나를 지워 달라고 한다 | 지우지 못한다고 답한다. Gmail 휴지통에 그 메일이 없다 |
+| 9 | Google 계정에서 앱 접근을 철회하고 메일을 물어본다 | 읽지 못했다고 답한다. 연결 확인이 실패한다 |
+
+라벨을 만들고 필터를 저장한 뒤 새 메일의 분류와 기존 메일 적용을 각각 승인해 확인한다.
+필터를 바꿀 때는 지우기와 다시 만들기에 각각 승인 카드가 뜨는지 본다.
+운영 실행 파일 목록을 바꾸는 방법과 실제 실행 확인은 `fos-home-infra` 가 갖는다.
+
+## 토스증권 커넥터
+
+사용자의 토스증권 계좌를 읽는 범용 커넥터다. 코드는 [`hermes/connectors/tossinvest/`](../../hermes/connectors/tossinvest) 에 있다.
+이 절은 도구와 정책, 보안, 연결 유지, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [토스증권 커넥터 README](../../hermes/connectors/tossinvest/README.md) 가 갖는다.
+결정은 [ADR-20261008 / tossinvest-connector](../../hermes/docs/adr/ADR-20261008-tossinvest-connector.md) 에 있다.
+커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
+
+서비스는 [토스증권 공식 사이트](https://www.tossinvest.com/) 에 있다. API 설정 근거는 [토스증권 개발자 문서](https://developers.tossinvest.com/)다.
+
+**이 커넥터는 주문하지 않는다.** 주문, 정정, 취소 도구가 없다. 매수와 매도는 사용자가 토스증권 앱이나 웹에서 한다.
+
+### 토스증권 등록 칸
+
+| 칸 | env | 비밀 | 무엇 |
+| --- | --- | --- | --- |
+| `client_id` | `TOSSINVEST_CLIENT_ID` | 아니다 | 토스증권 WTS 의 설정 > Open API 에서 받은 client ID |
+| `client_secret` | `TOSSINVEST_CLIENT_SECRET` | 그렇다 | 그 client 의 secret |
+| `account` | `TOSSINVEST_ACCOUNT_SEQ` | 아니다 | 읽을 계좌. 선택지 도구 `list_accounts` 가 계좌 순번과 끝 네 자리를 보이고, 계좌가 하나면 화면이 고른다 |
+
+셋 다 필수다. 운영자가 주는 값(`operator_env`)은 없다.
+확인 도구는 `list_accounts` 다. 등록할 때 두 값으로 토큰을 받고 계좌 목록을 읽어 보고, 읽히면 저장한다.
+
+| 선언 | 값 | 까닭 |
+| --- | --- | --- |
+| `single_binding` | 참 | 토스증권은 client 마다 유효한 토큰이 하나다. 두 에이전트에 붙이면 서로의 토큰을 무효로 만든다 |
+| `sandbox_required` | 참 | 키에 권한 범위가 없어 조회용 키로도 주문할 수 있다. 셸이 `.env` 를 읽는 profile 에 붙이지 않는다 |
+
+규칙은 [ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md) 가 갖는다.
+
+### 토스증권 도구와 정책
+
+MCP 서버 이름은 `tossinvest` 다. 도구 33개는 모두 `READ` 이고 승인 없이 돈다. SDK 설명은 connector.json의 본문을 그대로 쓴다. 서버의 도구에도 `readOnlyHint` 를 참으로 둔다.
+
+| 도구 | 부르는 API | 하는 일 |
+| --- | --- | --- |
+| `list_accounts` | GET /api/v1/accounts | 계좌 순번, 계좌 유형, 계좌번호 끝 네 자리를 읽는다 |
+| `get_quotes` | GET /api/v1/prices, GET /api/v1/stocks | 종목 200개까지의 현재가와 이름을 읽는다 |
+| `get_stocks` | GET /api/v1/stocks | 종목 200개까지의 상세 참조 정보를 읽는다 |
+| `list_stocks` | GET /api/v1/stocks/all | 시장별 종목 전체 목록을 읽는다 |
+| `get_stock_warnings` | GET /api/v1/stocks/{symbol}/warnings | 종목 하나의 유의사항을 읽는다 |
+| `get_holdings` | GET /api/v1/holdings | 보유 종목과 평가, 손익을 읽는다 |
+| `get_sellable_quantity` | GET /api/v1/sellable-quantity | 종목 하나의 매도 가능 수량을 읽는다 |
+| `get_buying_power` | GET /api/v1/buying-power, GET /api/v1/sellable-quantity | 통화별 주문 가능 현금과, 종목을 주면 그 종목의 매도 가능 수량을 읽는다 |
+| `list_orders` | GET /api/v1/orders | 미체결이나 끝난 주문을 기간으로 읽는다 |
+| `get_orderbook` | GET /api/v1/orderbook | 한 종목의 매수·매도 호가와 잔량을 읽는다 |
+| `get_trades` | GET /api/v1/trades | 한 종목의 당일 최근 체결 내역을 읽는다 |
+| `get_price_limits` | GET /api/v1/price-limits | 한 종목의 당일 상하한가를 읽는다 |
+| `get_candles` | GET /api/v1/candles | 한 종목의 분봉·일봉 캔들을 한 페이지 읽는다 |
+| `get_exchange_rate` | GET /api/v1/exchange-rate | KRW와 USD 사이의 참고용 표시 환율을 읽는다 |
+| `get_market_calendar` | GET /api/v1/market-calendar/KR, GET /api/v1/market-calendar/US | 국내 또는 미국 시장의 전일·당일·익일 운영 일정을 읽는다 |
+| `list_sectors` | GET /api/v1/sectors | 전체 섹터 목록과 계층을 읽는다 |
+| `get_sector_rankings` | GET /api/v1/sectors/rankings | 시장·기간·기준별 섹터 랭킹을 읽는다 |
+| `get_sector` | GET /api/v1/sectors/{sectorId} | 섹터 기본 정보와 기간별 등락률을 읽는다 |
+| `get_sector_stocks` | GET /api/v1/sectors/{sectorId}/stocks | 섹터와 하위 섹터에 속한 보통주 전체를 읽는다 |
+| `get_sector_etfs` | GET /api/v1/sectors/{sectorId}/etfs | 관련 ETF의 symbol과 name을 읽는다 |
+| `list_conditional_orders` | GET /api/v1/conditional-orders | 진행 중이나 종료된 조건주문을 한 페이지 읽는다 |
+| `get_conditional_order` | GET /api/v1/conditional-orders/{conditionalOrderId} | 조건주문 하나의 상세를 읽는다 |
+| `get_rankings` | GET /api/v1/rankings | KR/US 주식의 6종 랭킹을 7종 기간으로 읽는다. TOP의 realtime 4개 조합은 거절한다 |
+| `get_market_indicator_prices` | GET /api/v1/market-indicators/prices | 국내 지수 2종과 국채 금리 6종의 시세를 읽는다 |
+| `get_market_indicator_candles` | GET /api/v1/market-indicators/{symbol}/candles | 지수 분봉·일봉과 국채 일봉을 읽는다 |
+| `get_market_indicator_investor_trading` | GET /api/v1/market-indicators/{symbol}/investor-trading | 코스피·코스닥 투자자별 KRW 매매대금을 읽는다 |
+| `get_order` | GET /api/v1/orders/{orderId} | 주문 하나의 상세와 체결을 읽는다 |
+| `get_commissions` | GET /api/v1/commissions | 전체 시장의 수수료 비율과 적용 날짜를 읽는다 |
+| `get_stock_investor_trading` | GET /api/v1/stocks/{symbol}/investor-trading | 투자자별 매매와 외국인 보유, CFD를 읽는다 |
+| `get_stock_program_trades` | GET /api/v1/stocks/{symbol}/program-trades | KRX 프로그램 매매를 읽는다 |
+| `get_stock_short_selling` | GET /api/v1/stocks/{symbol}/short-selling | 공매도 수량과 금액, 비중을 읽는다 |
+| `get_stock_credit_trades` | GET /api/v1/stocks/{symbol}/credit-trades | 개인 신용거래를 읽는다 |
+| `get_stock_securities_lending` | GET /api/v1/stocks/{symbol}/securities-lending | 기관 대차거래를 읽는다 |
+
+계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
+
+#### 토스증권 도구의 인자와 결과
+
+| 도구 | 인자 | 결과 |
+| --- | --- | --- |
+| `list_accounts` | 없음 | `{accounts: [{account_seq, account_type, label}]}`. `label` 은 `종합매매 ****1234` 꼴이다. 계좌번호 원문은 싣지 않는다. 순번은 양의 int64 범위의 정확한 문자열이다. 잘못된 행은 전체 응답 오류로 알린다 |
+| `get_quotes` | `symbols`: 쉼표로 이은 종목 코드나 티커 1~200개 | `{quotes: [{symbol, name, last_price, currency, timestamp}]}` |
+| `get_stocks` | `symbols`: 쉼표로 이은 종목 1~200개 | `{result: StockInfo[], metadata}`. 국내 시장 상세와 decimal 문자열, boolean, null을 보존한다 |
+| `list_stocks` | `market`: 필수. `status`, `securityType`, `commonShare`: 선택 | `{result: StockSummary[], metadata}`. 페이지 없이 전량을 반환한다 |
+| `get_stock_warnings` | `symbol`: 필수, 단일 종목 | `{result: StockWarning[], metadata}`. 빈 배열은 정상이고 미존재는 입력 오류다 |
+| `get_holdings` | `symbol`: 선택 | `{total, items}`. 금액은 공제 전(`market_value`, `profit_loss`, `profit_loss_rate`)과 비용 공제 후(`..._after_cost`)를 함께 싣는다. `total` 의 금액은 `{krw, usd}` 이고, `items` 의 금액은 그 종목의 거래 통화 기준 글 하나다. 금액과 수량은 API 가 준 10진수 글 그대로다 |
+| `get_buying_power` | `currency`: `KRW` 나 `USD`. `symbol`: 선택 | `{currency, cash_buying_power, sellable_quantity}`. `sellable_quantity` 는 `symbol` 을 주지 않으면 null 이다 |
+| `get_sellable_quantity` | `symbol`: 필수 | `{result, metadata, sellable_quantity}` |
+| `list_orders` | `status`: `OPEN` 이나 `CLOSED`. `from`, `to`: 선택, `YYYY-MM-DD`(한국 시각). `symbol`, `cursor`, `limit`: 선택 | `{orders, has_more, nextCursor, hasNext}`. 아래 「주문 내역」 |
+| `get_orderbook` | `symbol`: 필수 | `{result, metadata}`. 매수·매도 호가와 잔량, 통화, 데이터 시각 |
+| `get_trades` | `symbol`: 필수. `count`: 기본 50, 1~50의 정수 | `{result, metadata}`. 체결가·수량·시각·통화 배열, 체결이 없으면 빈 배열 |
+| `get_price_limits` | `symbol`: 필수 | `{result, metadata}`. 당일 상하한가와 통화, 시각. 미국처럼 가격제한이 없으면 가격은 null |
+| `get_candles` | `symbol`, `interval`: 필수. `interval`은 `1m` 또는 `1d`. `count`: 기본 100, 1~200의 정수. `before`, `adjusted`: 선택 | `{result, metadata}`. 최신순 캔들 배열과 `nextBefore` |
+| `get_exchange_rate` | `baseCurrency`, `quoteCurrency`: 서로 다른 `KRW` 또는 `USD`. `dateTime`: 선택, 초와 시간대가 있는 RFC 3339 시각 | `{result, metadata}`. 환율 한 건의 decimal 문자열과 `validFrom`, `validUntil`을 보존한다 |
+| `get_market_calendar` | `market`: `KR` 또는 `US`. `date`: 선택, `YYYY-MM-DD`(미국은 미국 현지 날짜) | `{result, metadata}`. `today`, `previousBusinessDay`, `nextBusinessDay`의 세션과 휴장 null을 보존한다 |
+| `get_order` | `orderId`: 필수 opaque 문자열 | `{result: Order, metadata: {}}`. 공식 13개 필드와 execution 7개 필드를 보존한다 |
+| `get_commissions` | 없음 | `{result: Commission[], metadata: {}}`. 시장별 4개 필드와 배열 순서, null과 부재를 보존한다 |
+
+모든 조회는 기존 표시 필드와 함께 공식 `result`와 `metadata`를 제공한다. 단일 조회의 metadata는 현재 `{}`다. `get_quotes`는 `{prices, stocks}`, `get_buying_power`는 `{buyingPower, sellableQuantity}`를 result에 담고 metadata도 같은 키를 쓴다. symbol 없는 buying power의 sellableQuantity와 그 metadata는 null이다.
+공식 result의 문자열, decimal, boolean, null, 배열과 unknown enum을 보존한다. Account.accountSeq는 원문 int64에서 정확한 문자열로 바꾸고 accountNo는 결과를 만들기 전에 마스킹한다. 필수 필드 누락과 잘못된 타입은 일부 성공으로 숨기지 않는다.
+종목 기호는 `^[A-Za-z0-9.-]+$`만 받는다. 조회 기간의 길이 제한은 없으며 실제 날짜와 from/to 순서를 검사한다. 이름 100자와 일반 문자열 64자 절단은 기존 표시 필드에만 적용한다. 공식 result, orderId, cursor와 decimal은 자르지 않는다.
+
+#### 종목 참조 정보
+
+`get_stock_warnings`는 경로를 바꾸는 점 segment `.`과 `..`을 인증과 HTTP 요청 전에 거절한다.
+
+`list_stocks`의 market은 KOSPI, KOSDAQ, NYSE, NASDAQ, AMEX, KR_ETC, US_ETC다. status는 SCHEDULED, ACTIVE, DELISTED이고 생략하면 공식 API가 ACTIVE를 적용한다. securityType은 STOCK, FOREIGN_STOCK, DEPOSITARY_RECEIPT, INFRASTRUCTURE_FUND, REIT, ETF, FOREIGN_ETF, ETN, STOCK_WARRANTS다. commonShare=false도 전송한다.
+전체 목록은 페이지나 cursor를 만들지 않는다. 기존 1 MiB 상한을 넘으면 오류로 끝낸다. STOCK_ALL은 초당 1회이며 상세와 유의사항의 STOCK 큐와 독립적이다. 큐 대기도 기존 4초 deadline에 포함한다. 참조 정보는 화면·세션 진입 시 읽고 짧은 주기로 반복 조회하지 않는다. 유의사항의 exchange는 거래소 코드이며 상장 시장 market과 다르다. 날짜와 exchange의 null, 알 수 없는 코드를 보존한다.
+
+#### 주문 내역
+
+get_order는 list_orders의 페이지와 별개로 주문 하나를 반환한다. orderId는 길이를 자르지 않고 Unicode를 인코딩하며 경로 구분자, percent, 제어문자와 단독 surrogate를 거절한다. get_commissions에는 marketCountry query나 필터가 없다. commissionRate는 decimal 비율이며 0.00015를 퍼센트 숫자로 바꾸지 않는다. 날짜와 시각은 공식 KST 문자열을 유지한다. 두 도구는 검증된 응답을 공용 schema 투영으로 제한해 추가 민감키를 제거한다.
+
+끝난 주문(`CLOSED`)은 기본 20건, 최대 100건의 한 페이지를 읽고 `nextCursor`와 `hasNext`를 보존한다. 받은 cursor를 다음 호출에 그대로 넣는다. `has_more`는 CLOSED의 hasNext와 같다. 미체결(`OPEN`)은 cursor와 limit 없이 전량을 반환한다.
+금액과 수량은 API 가 준 10진수 글 그대로 둔다. 미국 주식의 달러 금액과 소수점 수량이 있어 정수로 바꾸면 값이 바뀐다.
+
+| `orders[]` 의 칸 | 뜻 |
+| --- | --- |
+| `order_id`, `symbol`, `side`, `order_type`, `time_in_force`, `status`, `currency` | API 값 그대로 |
+| `price`, `quantity`, `order_amount` | API 가 준 10진수 글. 없으면 null |
+| `filled_quantity`, `average_filled_price`, `filled_amount`, `commission`, `tax` | `execution` 의 값. 10진수 글이거나 null |
+| `ordered_at`, `filled_at`, `canceled_at`, `settlement_date` | API 값 그대로 |
+
+#### 시세와 캔들
+
+네 시세 도구의 `symbol`은 국내 종목 코드(`005930`, `0101N0`)나 미국 티커(`AAPL`, `BRK.B`) 한 개다. 계좌 헤더를 보내지 않는다. 조회 시점의 REST 응답을 읽으며 실시간 구독이나 자동 폴링은 하지 않는다.
+호가와 잔량, 체결가와 수량, 캔들의 OHLCV는 공식 필드의 decimal 문자열 그대로다. 미국 가격제한의 null과 빈 배열, 데이터 미제공 시 호가 시각의 null도 보존한다. 필드 정본은 [공식 fixture](../../hermes/connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)와 생성된 계약이다.
+
+캔들의 `adjusted`는 기본 true이고 false도 query로 전달한다. `before`는 타임존이 있는 ISO 8601 시각이며 그 시각과 같거나 이전인 봉을 읽는다. 예를 들어 `2026-03-25T09:00:00+09:00`을 인자로 넣으면 커넥터가 `+`를 인코딩한다.
+다음 페이지는 `result.nextBefore`를 다음 호출의 `before`로 그대로 넣는다. 마지막 페이지는 null이다. 한 호출에서 다음 페이지를 자동으로 모으지 않는다.
+
+#### 환율과 시장 일정
+
+환율은 1분 주기로 갱신되는 참고용 표시값이며 실제 주문에 적용될 거래 환율을 보장하지 않는다. `dateTime`을 생략하면 현재 유효 환율을 요청한다. 환전과 주문은 하지 않는다.
+시장 일정은 API가 반환한 3영업일 정보 그대로다. 모든 응답 시각은 KST(+09:00)이며 날짜를 계산하거나 세션을 합치지 않는다. 국내는 KRX+NXT 통합 세션이고 장전·장후 시간외종가는 제외된다. 미국은 `dayMarket`, `preMarket`, `regularMarket`, `afterMarket`을 각각 보존한다. 휴장과 부분 휴장의 null도 바꾸지 않는다.
+세 조회는 `MARKET_INFO` 그룹의 공용 큐를 사용하며 최소 간격은 334ms다. 두 도구의 metadata는 현재 빈 객체다. 인자 검증은 HTTP 전송 전에 끝나며 같은 통화 쌍, 실제로 없는 날짜, 초를 생략하거나 시간대가 없는 시각과 추가 인자를 거절한다.
+
+`connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 현재 `execution_guard`가 없고 해시 값은 null이며 조회 도구 33개의 승인 정책은 `none`이다. 금융 승인 ticket도 없으므로 이번 변경으로 무효화되는 ticket은 없다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 조회 도구는 `READ`로 선언하며 금융 쓰기 권한을 열지 않는다.
+
+#### 섹터 조회
+
+섹터 도구 5개도 공식 `result` 전체와 `metadata`를 돌려준다. `list_sectors`는 인자가 없고, 나머지는 `marketCountry: KR/US`가 필수다. `get_sector_rankings`는 `type: TOP_GAINERS/MARKET_TRADING_AMOUNT`와 `duration: 1d/1w/1mo/3mo/6mo/1y`를 받는다. 상세·주식·ETF는 목록에서 확인한 `sectorId`를 받으며 영문·숫자·밑줄·하이픈 1~40자만 허용한다. 페이지와 추가 필터는 없다. `get_sector`는 랭킹 경로와 겹치는 `sectorId: rankings`를 거절한다. 랭킹은 대분류·중분류(depth 0·1)의 상위 100건까지다.
+
+depth 0/1/2와 parentSectorId를 보존하고 대분류의 parentSectorId와 상세 summary는 null일 수 있다. 상세 changeRates는 6개 기간이며 데이터가 없는 changeRate는 null이다. 주식의 volume·tradingAmount·marketCapitalization과 랭킹의 금액도 null일 수 있다. 등락률 decimal은 소수비율이며 0.01은 1%다. decimal 문자열은 숫자로 바꾸지 않으며 US 금액도 currency에 표시된 원화 환산값이다. ETF는 하위 섹터를 포함하지 않으며 symbol·name만 제공하고 관련 항목이 없으면 빈 배열이다. 한 종목이 여러 섹터에 속할 수 있다.
+
+#### 조건주문 조회
+
+`list_conditional_orders`는 `status=OPEN/CLOSED`와 선택 `symbol`, `cursor`, `limit`를 받는다. 두 상태 모두 기본 20건, 최대 100건의 한 페이지만 반환한다. `result.conditionalOrders`, `nextCursor`, `hasNext`를 보존하며 다음 페이지는 받은 cursor로 별도 호출한다.
+`get_conditional_order`는 목록에서 받은 불투명 `conditionalOrderId`만 받는다. C0·DEL·C1 제어문자, 점 경로, percent 인코딩, 경로 구분자와 URL 주입을 인증 HTTP 전에 거절한다. 계좌, token, URL은 caller가 지정하지 못하며 현재 연결의 env 계좌만 사용한다.
+SINGLE/OCO/OTO, STOP/PROFIT_RATE와 최상위·leg 상태를 구분한다. HOLDING이나 CANCELED인 leg를 최상위 상태로 바꾸지 않는다. nullable 가격과 `second=null`, 없는 `expireDate`와 decimal 문자열을 보존한다. `targetProfitRate="10.5"`는 10.5%다. WATCHING은 체결 완료를 뜻하지 않는다. 조건주문 생성·수정·취소와 WebSocket은 지원하지 않는다.
+
+조건조회 결과는 공식 schema의 알려진 필드만 반환한다. 최상위와 leg, 중첩 배열의 확장 키는 제거하며 서비스가 추가한 정보는 누락될 수 있다. 공식 필드의 unknown enum 값은 보존한다. 지원하지 않는 객체 schema는 원문을 반환하지 않고 전체 오류로 거절한다. metadata는 현재 `{}`이며 upstream metadata를 그대로 노출하지 않는다. 계좌번호 표시는 기존 `list_accounts`의 끝 네 자리 마스킹을 따른다.
+
+#### 랭킹과 시장 지표
+
+랭킹 count는 1..100, 기본 100이고 excludeInvestmentCaution은 기본 false다. 시장 전체와 토스증권 체결 기준을 구분하며 TOP은 기간 시작값, 나머지는 전일 기준값을 쓴다. 허용 시장·기간 조합은 80개다. 기간은 거래일 기준이며 rankedAt이 집계 시각이다. changeRate는 소수비율이므로 0.0125는 1.25%다.
+지수 단위는 point, 국채 금리는 percent다. 3.25는 3.25%다. 캔들 count는 1..200 기본 100이며 nextBefore를 다음 before에 그대로 넣는다. 투자자 매매대금은 1d/1w/1mo/1y, count=1..100 기본 10이며 nextUntil을 다음 until에 넣는다. 각 도구의 nextBefore 또는 nextUntil이 null이면 마지막 페이지다. 선택 필드가 없다는 것만으로 마지막이라고 단정하지 않는다. before는 offset을 포함한 ISO 시각이고 until은 해당 날짜를 포함하는 YYYY-MM-DD 상한이다. 둘을 생략하면 최신부터 읽는다. 시세 symbols는 알려진 8종을 쉼표로 이은 1~200개다. 각 항목 양끝의 공백을 제거하므로 `KOSPI, KOSDAQ`는 `KOSPI,KOSDAQ`로 전송하며 순서와 중복은 유지한다. 빈 항목과 기호 내부 공백, 알 수 없는 기호는 요청 전에 거절한다. 투자자 당일 값은 잠정치이며 updatedAt이 갱신 시각이다.
+이 네 도구는 계좌·token·URL 인자를 받지 않는다. 연결 env만 사용하고 시장 조회에는 계좌 헤더를 보내지 않는다.
+
+#### 국내 종목 통계
+
+5개 통계 도구는 `symbol`을 필수로 받고 `count`는 기본 10, 최대 100이다.
+예를 들어 `get_stock_investor_trading`에 `{"symbol":"005930","count":100,"until":"2026-07-17"}`을 넣는다.
+`until`은 해당 날짜를 포함한다. 다음 페이지에는 `result.nextUntil`을 그대로 넣고 null이거나 없으면 끝낸다.
+응답은 `{result: {records, nextUntil?}, metadata: {}}`이며 한 페이지의 전체 행과 순서를 보존한다.
+symbol은 영문·숫자·점·하이픈을 받지만 통계는 KR 전용이다. 미국 종목의 `unsupported-market`는 `TOSSINVEST_INVALID_INPUT`으로 알린다.
+모델의 계좌, token, URL과 추가 인자는 인증 전에 거절한다. 통계 GET에는 연결 계좌 헤더도 보내지 않는다.
+공식 필드만 재귀적으로 반환하고 중첩 객체·배열의 비공식 확장키를 제거한다. decimal 문자열, null과 선택 필드의 부재는 그대로 둔다.
+
+| 통계 | 단위와 집계 범위 | 반영 시점과 해석 |
+| --- | --- | --- |
+| 투자자별 매매 | KRX·NXT 합계 수량(주), 기관 7개 분류·등록외국인·보유·CFD. 보유와 CFD 비중은 소수 비율 | 장중 잠정치에는 개인·기관 세부·기타법인·보유·CFD가 null일 수 있다. 당일 저녁 확정치, CFD 다음 영업일 새벽, 보유 다음 영업일 오전 재갱신을 구분한다. updatedAt은 기록 전체의 마지막 갱신이다 |
+| 프로그램 | KRX 거래량(주), 차익 arbitrage·비차익 nonArbitrage. NXT 제외 | 당일 값은 장 종료 전 바뀔 수 있다. 거래대금·updatedAt은 없다 |
+| 공매도 | 수량(주), 금액(KRW), 소수 비율 | 당일 저녁 확정치. 비중의 분모는 정규장 외 세션을 포함한 누적 값이며 부재는 null, 0은 문자열 0이다 |
+| 신용 | 자기신용·유통금융 합계 수량(주), balanceRate·tradingRate는 소수 비율 | marginLoan·stockLoan은 각각 nullable 객체다. 다음 영업일 새벽에 전 영업일 값이 반영된다. 개인 신용대주다 |
+| 대차 | 기관 대여·차입의 체결·상환·잔고 수량(주), 잔고 금액(KRW) | 당일 저녁 확정치. 개인 신용대주와 구분한다 |
+
+음수 순매수는 순매도다. 비율을 백분율로 바꾸거나 장중 값을 확정치로 말하지 않는다.
+5개는 `STOCK_TRADING_TREND` 그룹의 초당 10회 한도를 공유하며 최소 호출 간격은 100ms다. AUTH는 별도 초당 5회다.
+
+#### 토큰
+
+- 토큰은 프로세스 메모리에만 둔다. `expires_in` 에서 60초 뺀 시각까지 쓴다. 60초 이하면 `expires_in` 의 절반과 5초 가운데 긴 동안 쓰되 `expires_in` 을 넘기지 않고, 값이 없거나 양의 정확한 수명이 아니면 발급 오류로 거절한다. 매 호출이 토큰을 새로 받아 서로를 무효로 만들지 않게 하기 위해서다.
+- `401 token-revoked` 나 `expired-token` 을 받으면 토큰을 한 번 새로 받고 그 호출을 한 번만 다시 보낸다. 정규화한 origin, client ID, 메모리 credential identity별 발급은 한 번에 하나다.
+- 다시 보낸 호출도 `token-revoked` 면 다른 프로세스와 토큰을 다툰 것이라 `TOSSINVEST_UNAVAILABLE`(잠시 뒤 다시)로 끝낸다. 자격 증명이 틀린 것이 아니다.
+- `invalid-token` 과 `invalid_client` 는 다시 받지 않는다.
+- 확인 도구와 선택지 호출은 새 프로세스라 토큰을 새로 받는다. 그때 Hermes 쪽 프로세스의 토큰이 무효가 되고 다음 호출이 한 번 다시 받는다.
+
+#### 계좌 조회 호출 간격
+
+공식 [OpenAPI 스펙](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)은 계좌 관련 조회를 아래 API 그룹으로 나눈다.
+
+| 엔드포인트 | 공식 호출 한도 그룹 | 공식 초당 한도 | 커넥터의 최소 간격 |
+| --- | --- | --- | --- |
+| GET /api/v1/accounts | `ACCOUNT` | 1회 | 1,000ms |
+| GET /api/v1/holdings | `ASSET` | 5회 | 200ms |
+| GET /api/v1/buying-power, GET /api/v1/sellable-quantity, GET /api/v1/commissions | `ORDER_INFO` | 6회, 09:00~09:10 KST에는 3회 | 평시 167ms, 피크 334ms |
+| GET /api/v1/orders, GET /api/v1/orders/{orderId} | `ORDER_HISTORY` | 5회 | 200ms |
+
+한도 수치는 공식 [연동 가이드의 Rate Limits](https://openapi.tossinvest.com/openapi-docs/overview.md#rate-limits)에서 확인했다. 공식 한도는 사전 공지 없이 바뀔 수 있다.
+커넥터는 프로세스 공용 큐를 그룹별로 두어 같은 그룹의 요청을 한 번에 하나씩 보낸다. 요청이 끝난 뒤 다음 요청까지 표의 간격을 둔다. `ORDER_INFO`는 KST 09:00~09:10에 피크 한도를 적용한다. 공식 19그룹과 AUTH도 같은 큐 경계를 사용한다. 예산은 origin/client ID별로 공유하며 secret 변경으로 한도를 우회하지 못한다.
+`get_buying_power`의 두 조회와 서로 다른 호출의 같은 그룹 요청, 토큰 재발급 뒤 재송도 이 큐를 거친다. 다른 그룹은 서로의 큐를 기다리지 않는다. X-RateLimit의 낮은 한도와 Remaining/상대 Reset, Retry-After를 우선 적용한다. 큐 대기도 4초 호출 deadline 안에 포함한다.
+
+간격, 상대 헤더 대기, 호출 deadline과 토큰 TTL은 `performance.timeOrigin + performance.now()`의 소수 밀리초 시각을 함께 쓴다. 실행 중 벽시계가 보정되어도 경과 시간은 바뀌지 않는다. KST 피크 여부는 현재 벽시계로 판단한다. 타이머에 넘기는 남은 시간은 밀리초 단위로 올림하고, 깬 뒤 간격과 deadline을 다시 검사한다. `Date.now()`의 정수 눈금만 비교하면 실제로 1초가 지나기 전에 다음 요청을 보낼 수 있기 때문이다.
+
+GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 번만 다시 보낸다. `Retry-After`가 초 단위 수치로 더 긴 대기를 요구하면 그 시간도 지킨다. 재송도 429면 `TOSSINVEST_RATE_LIMITED`로 끝낸다. 다른 프로세스와는 큐를 공유하지 않으므로 그 사이의 충돌은 이 재시도로 대응한다.
+
+#### 토스증권 오류
+
+| 코드 | 공통 어휘 | 복구 | 언제 |
+| --- | --- | --- | --- |
+| `TOSSINVEST_UNAUTHORIZED` | `credential_rejected` | `reconnect` | 토큰 발급이 400, 401, `access_denied` 아닌 403 으로 거절됐다(client ID 나 secret 이 틀렸거나 형식이 맞지 않는다), API 가 `token-revoked` 와 `expired-token` 밖의 401 로 답했다 |
+| `TOSSINVEST_IP_NOT_ALLOWED` | `forbidden` | `reconnect` | API 의 `ip-not-allowed`, 토큰 발급의 403 `access_denied`. 허용 IP 가 바뀌었을 수 있다 |
+| `TOSSINVEST_FORBIDDEN` | `forbidden` | | 그 밖의 403 |
+| `TOSSINVEST_ACCOUNT_NOT_FOUND` | `invalid_input` | `reconnect` | 고른 계좌 순번이 없다. 상태와 관계없이 `account-not-found` 면 이 코드다 |
+| `TOSSINVEST_INVALID_INPUT` | `invalid_input` | `fix_input` | 인자가 형식에 맞지 않는다, 없는 종목·섹터이거나 요청한 시점의 환율이 없다 |
+| `TOSSINVEST_RATE_LIMITED` | `unavailable` | `retry_later` | GET의 한 번 재시도 뒤에도 429 |
+| `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE` | `unavailable` | `retry_later` | 닿지 못했거나 시간이 지났다, 5xx 와 그 밖의 4xx, 다시 보낸 호출도 `token-revoked` 였다 |
+
+결과와 오류에 토큰, secret, 계좌번호 원문, 서비스가 준 오류 원문을 싣지 않는다.
+
+### 토스증권 서버와 검사
+
+`src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶는다. 생성 entry는 Git에서 추적하지 않고 테스트와 배포 묶음 생산 때 소스에서 빌드한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
+공식 JSON fixture의 41 operation 중 인증 1개와 조회 GET 34개를 연결한다. MCP 도구는 READ 33개다. `getStocks`를 사용하는 `get_quotes`와 `get_stocks`, `getSellableQuantity`를 공유하는 두 도구는 고유 operation으로 한 번만 센다. 나머지 6개 금융 쓰기 operation은 구현·등록하지 않았으며 주문을 실행할 수 없다. `hermes/connectors/tossinvest/scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다.
+도구와 고유 operation은 다른 수치다. coverage 테스트는 모든 도구와 한국·미국 시장 일정을 호출해 인증 1회와 조회 36회를 수신한다. `getStocks`와 `getSellableQuantity`는 여러 도구가 공유한다.
+
+SDK 설명과 manifest의 tools.description은 33개 모두 같은 평문이다. 설명은 표시 정보이며 READ/none 정책과 분리된다. 설명을 넣은 manifest의 운영 설치는 새 reader가 실제 plugin에 로드된 것을 확인한 뒤 진행한다.
+
+대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 테스트별로 필요한 `GET`과 `POST /oauth2/token`만 허용한다. 다른 GET이나 금융 POST·DELETE가 오면 테스트가 실패한다. 공식 성공 예시 78개와 production SDK·소스에서 빌드한 stdio bundle의 실제 HTTP 도달을 검사한다.
+
+### 토스증권 보안
+
+- **돈이 움직이는 도구가 없다.** 그러나 키 자체는 주문할 수 있다. 키가 새면 허용 IP 에서 주문할 수 있다. 실행 공간도 같은 공인 IP 로 나가므로 허용 IP 는 셸에 샌 키를 막지 못한다. 그래서 `sandbox_required` 다.
+- 외부 글이 모델을 속였을 때 닿는 범위: 이 커넥터에는 쓰는 도구가 없다. 속은 모델이 할 수 있는 것은 읽은 계좌 데이터를 다른 도구(셸, 웹)로 내보내는 것이다. 그 길은 [READ 데이터 흐름](connector-policy.md) 의 RF-08, RF-09 와 같다.
+- 보유와 잔고가 모델 공급자에게 간다(RF-20). 사용자가 받아들였다.
+- 토스증권 이용 약관은 시세의 제3자 제공을 금지한다. 모델 공급자 전송이 여기 드는지는 확인하지 못했다.
+
+### 연결 유지
+
+#### 허용 IP 가 바뀌었을 때
+
+가정 회선은 공인 IP 가 바뀔 수 있다. 바뀌면 모든 호출이 `TOSSINVEST_IP_NOT_ALLOWED` 로 실패하고, 에이전트가 허용 IP 를 확인하라고 안내한다.
+WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 확인을 누른다. IP 가 바뀌었다는 알림은 운영이 한다.
+연결 상태는 저절로 바뀌지 않는다. 연결 확인이 같은 오류로 실패해야 연결이 `PENDING` 이 된다.
+
+#### 끊기
+
+연결을 해제하면 보관 파일과 붙은 profile 의 값이 지워진다. 토스증권 WTS 에서 그 client 도 지운다.
+
+### 토스증권 실제 계정으로 확인하기
+
+배포 뒤 소유자가 자기 계정으로 한 번 확인한다. 계좌번호, 금액, 종목은 어디에도 적지 않는다.
+
+1. 외부 서비스 연결 화면에서 등록하고, 계좌가 끝 네 자리로 보이는지 본다
+2. 실행 공간이 없는 에이전트에 붙이면 거절되는지, 있는 에이전트에 붙는지 본다
+3. 같은 연결을 두 번째 에이전트에 붙이면 거절되는지 본다
+4. 대화에서 보유 종목, 현재가, 주문 가능 현금, 이번 달 끝난 주문을 묻는다. 보유 종목의 손익과 비율 칸이 null 이 아닌지 본다. 서비스가 공식 decimal 형식이 아닌 값을 주면 응답 오류로 끝난다
+5. 연결 확인을 누른 직후 대화에서 다시 보유 종목을 물어, 토큰을 한 번 다시 받고 성공하는지 본다
 
 ## 토스증권 REST 전체 지원
 
