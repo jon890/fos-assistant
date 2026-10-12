@@ -60,6 +60,9 @@ public class SecurityConfig {
                 // support는 controller에서 서비스 Bearer만 인증한다.
                 .requestMatchers(HttpMethod.POST, "/internal/connector-executions/support")
                 .permitAll()
+                // 원고 저장 worker 의 범위 ticket 은 authorize controller 가 직접 인증한다.
+                .requestMatchers(HttpMethod.POST, "/internal/content-draft-jobs/authorize")
+                .permitAll()
                 .requestMatchers(
                     "/internal/hermes/attachment-inspect", "/internal/hermes/attachment-inspect/validate")
                 .hasRole("MCP")
