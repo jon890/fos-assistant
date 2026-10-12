@@ -105,6 +105,8 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 
 | [ADR-20261010 / attachment-inspect](ADR-20261010-attachment-inspect.md) | 현재 실행이 같은 대화의 원본 사진을 native 도구 결과로 다시 읽는다 | backend, hermes | Accepted |
 | [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) | 금융 실행 내용은 승인 이력에 묶어 불변으로 저장한다 | backend, hermes | Accepted |
+| [ADR-20261011 / content-snapshot-job](ADR-20261011-content-snapshot-job.md) | 승인한 원고는 불변 참조와 예약 job으로 한 번만 저장한다 | backend, hermes | Accepted |
+| [ADR-20261012 / ci-path-filter](ADR-20261012-ci-path-filter.md) | PR CI 는 바뀐 파일이 입력인 job 만 돌리고, 필수 검사는 건너뛴 까닭까지 판정한다 | 공통 | Accepted |
 | [ADR-20261012 / financial-unsent-proof](ADR-20261012-financial-unsent-proof.md) | 소비하지 않은 금융 ticket 은 미전송의 증거로 보고 결과 불명 대신 실패로 끝낸다 | backend, hermes | Accepted. ADR-20261010 / financial-execution-guard 의 claim 위에 선다 |
 
 ## 보관

@@ -58,7 +58,7 @@ export function compare(base, head, cwd) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [base, head = "HEAD"] = process.argv.slice(2);
-  if (!base) throw new Error("사용법: node scripts/pr-size.mjs <base> [head]");
+  if (!base) throw new Error("사용법: node scripts/pr/pr-size.mjs <base> [head]");
   const result = compare(base, head);
   const verdict = classify(result.production, JSON.parse(process.env.PR_LABELS || "[]"));
   const summary = `PR 변경: 운영 코드 ${result.production}줄, 시험 ${result.tests}줄, 문서 ${result.docs}줄 (생성 파일 제외 ${result.ignored}줄), 운영 코드 상한 ${MAX_LINES}줄, ${verdict.pass ? "통과" : "실패"}`;

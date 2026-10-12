@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { selectSpecs } from "../../scripts/browser-stability.mjs";
+import { selectSpecs } from "../../scripts/ci/browser-stability.mjs";
 
 test("새 spec과 고친 spec은 경로가 정확히 맞는 것만 반복한다", () => {
   assert.deepEqual(

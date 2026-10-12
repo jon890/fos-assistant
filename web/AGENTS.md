@@ -89,7 +89,7 @@
 
 | 언제 | 어떻게 |
 | --- | --- |
-| 기준에 든 위반을 고쳤다 | `pnpm lint` 가 「쓰지 않는 기준이 남았다」 며 2 로 끝난다. `pnpm exec eslint --prune-suppressions` 로 그 줄을 빼고 같은 커밋에 넣는다. `scripts/quality.sh fix` 도 이 명령을 돌린다 |
+| 기준에 든 위반을 고쳤다 | `pnpm lint` 가 「쓰지 않는 기준이 남았다」 며 2 로 끝난다. `pnpm exec eslint --prune-suppressions` 로 그 줄을 빼고 같은 커밋에 넣는다. `scripts/checks/quality.sh fix` 도 이 명령을 돌린다 |
 | 새 위반이 생겼다 | 고친다 |
 | 꼭 받아들여야 한다 | `pnpm exec eslint --suppress-rule <규칙> <파일>` 로 더한다. 까닭을 커밋 메시지와 PR 본문에 적는다 |
 | 규칙을 새로 더했다 | `pnpm exec eslint --suppress-all` 로 기존 위반을 기준에 둔다. 그 규칙의 위반 수를 커밋 메시지에 적는다 |

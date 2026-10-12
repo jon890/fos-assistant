@@ -67,9 +67,11 @@ public class ChatService {
     private final ChatConversationQueries chatConversationQueries;
     private final ChatConversationManagement chatConversationManagement;
 
+
     public ChatTurn send(CurrentUser user, Long conversationId, String text, String agentCode) {
         return send(user, conversationId, text, agentCode, List.of());
     }
+
 
     /**
      * 메시지 하나를 보낸다. 첨부 번호가 있으면 그 메시지에 묶고 사진이 놓인 자리를 Hermes 입력에 알린다.
@@ -77,26 +79,30 @@ public class ChatService {
      * <p>첨부가 하나라도 거절되면 메시지를 저장하지 않고 대화도 새로 만들지 않는다.
      */
     public ChatTurn send(
-            CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
+        CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
         Routed routed = chatTurnRouting.route(user, conversationId, text, agentCode, attachmentIds);
         if (routed.flow() != null) {
-            return chatTurnRunner.runFlow(user, routed, text, new TurnIntent.Fresh(), event -> {}, false, null);
+            return chatTurnRunner.runFlow(user, routed, text, new TurnIntent.Fresh(), event -> {
+            }, false, null);
         }
-        return chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), event -> {}, false, null);
+        return chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), event -> {
+        }, false, null);
     }
 
+
     public void stream(
-            CurrentUser user, Long conversationId, String text, String agentCode, Consumer<ChatEvent> onEvent) {
+        CurrentUser user, Long conversationId, String text, String agentCode, Consumer<ChatEvent> onEvent) {
         stream(user, conversationId, text, agentCode, List.of(), onEvent);
     }
 
+
     public void stream(
-            CurrentUser user,
-            Long conversationId,
-            String text,
-            String agentCode,
-            List<Long> attachmentIds,
-            Consumer<ChatEvent> onEvent) {
+        CurrentUser user,
+        Long conversationId,
+        String text,
+        String agentCode,
+        List<Long> attachmentIds,
+        Consumer<ChatEvent> onEvent) {
         Routed routed = chatTurnRouting.route(user, conversationId, text, agentCode, attachmentIds);
         // 잠금을 닫으면 닫기 리스너가 맡긴 일의 결과로 자동 turn 을 연다. 이 turn 의 done 이나 stopped 를 보낸 뒤에
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
@@ -107,14 +113,12 @@ public class ChatService {
                 return;
             }
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
-            onEvent.accept(
-                    turn.cancelled()
-                            ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                            : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
             turns.close(handle);
         }
     }
+
 
     /**
      * 아직 전하지 않은 끝난 위임 결과와 승인한 동작의 결과를 모아 사용자의 질문 없이 turn 하나를 돌린다(ADR-040,
@@ -131,9 +135,10 @@ public class ChatService {
      * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      */
     public void runDelegationResults(
-            CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
+        CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
         chatDeliveryTurns.runDelegationResults(owner, conversationId, handle, onEvent);
     }
+
 
     /**
      * 저장된 결과만 다시 읽어 전달 묶음 하나를 부모에 다시 넘긴다(ADR-075). 자식 실행과 커넥터 호출은 다시 하지 않는다.
@@ -146,12 +151,13 @@ public class ChatService {
      *
      * @param onEvent 알림 줄, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      * @throws ApiException {@code CONVERSATION_NOT_FOUND}, {@code DELIVERY_NOT_FOUND}, {@code DELIVERY_NOT_RETRYABLE},
-     *     {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_BUSY}, {@code USER_BUSY}. 이 예외들은 묶음을
-     *     바꾸지 않는다
+     * {@code AGENT_NOT_FOUND}, {@code AGENT_DISABLED}, {@code CONVERSATION_BUSY}, {@code USER_BUSY}. 이 예외들은 묶음을
+     * 바꾸지 않는다
      */
     public void retryDelivery(CurrentUser user, Long conversationId, Long deliveryId, Consumer<ChatEvent> onEvent) {
         chatDeliveryTurns.retryDelivery(user, conversationId, deliveryId, onEvent);
     }
+
 
     /**
      * 그 대화의 알림 줄 번호마다 그 줄이 마지막 시도의 마지막 알림 줄인 묶음의 번호와 상태다. 이력 API 가 쓴다.
@@ -161,6 +167,7 @@ public class ChatService {
     public Map<Long, DeliveryState> deliveryStates(Long conversationId) {
         return chatDeliveryTurns.deliveryStates(conversationId);
     }
+
 
     /**
      * 예약 작업의 지시로 사용자의 질문 없이 turn 하나를 돌린다(ADR-076).
@@ -176,25 +183,23 @@ public class ChatService {
      * @throws ApiException 대화의 에이전트에 흐름이 붙었으면 {@code TASK_AGENT_NOT_SUPPORTED}
      */
     public ChatTurn runScheduledTurn(
-            CurrentUser owner,
-            Long conversationId,
-            TurnHandle handle,
-            String notice,
-            String instruction,
-            Consumer<ChatEvent> onEvent) {
+        CurrentUser owner,
+        Long conversationId,
+        TurnHandle handle,
+        String notice,
+        String instruction,
+        Consumer<ChatEvent> onEvent) {
         Routed routed = chatTurnRouting.route(owner, conversationId, instruction, null, List.of());
         if (routed.flow() != null) {
             // 흐름은 지시를 흐름 안에서 저장해 알림 줄과 한 트랜잭션으로 묶을 수 없다. 작업을 만들 때 이미 거른다.
             throw new ApiException(ErrorCode.TASK_AGENT_NOT_SUPPORTED, "an agent with a flow cannot run a task");
         }
         ChatTurn turn = chatTurnRunner.runTurn(
-                owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
-        onEvent.accept(
-                turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
+        onEvent.accept(ChatTurnCompletion.eventOf(turn));
         return turn;
     }
+
 
     /**
      * 먼저 살펴보기 turn 하나를 돌린다(ADR-080). 살펴보기만의 일은 {@code check} 가 맡는다.
@@ -210,23 +215,21 @@ public class ChatService {
      * @param onEvent 알림 줄, {@code started}, 도구와 하위 에이전트 사건, {@code done} 이나 {@code stopped} 를 받는다
      */
     public void runProactiveCheck(
-            CurrentUser owner, Long conversationId, TurnHandle handle, CheckTurn check, Consumer<ChatEvent> onEvent) {
+        CurrentUser owner, Long conversationId, TurnHandle handle, CheckTurn check, Consumer<ChatEvent> onEvent) {
         String input = check.input();
         Routed routed = chatTurnRouting.route(owner, conversationId, input, null, List.of());
         if (routed.flow() != null) {
             throw new ApiException(
-                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "an agent with a flow does not run a proactive check");
+                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "an agent with a flow does not run a proactive check");
         }
         if (check.renewSession()) {
             sessions.renew(routed.conversation());
         }
         ChatTurn turn = chatTurnRunner.runTurn(
-                owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle);
-        onEvent.accept(
-                turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            owner, routed, input, new TurnIntent.ProactiveCheck(check), onEvent, true, handle);
+        onEvent.accept(ChatTurnCompletion.eventOf(turn));
     }
+
 
     /**
      * 쌓인 대기 메시지를 합쳐 사용자 메시지 하나로 turn 을 돌린다(ADR-048).
@@ -241,8 +244,8 @@ public class ChatService {
      * @param onEvent {@code user}, {@code pending}, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
      */
     public void runPendingMessages(
-            CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
-        for (int attempt = 1; ; attempt++) {
+        CurrentUser owner, Long conversationId, TurnHandle handle, Consumer<ChatEvent> onEvent) {
+        for (int attempt = 1;; attempt++) {
             List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
             if (rows.isEmpty() || rows.stream().anyMatch(ChatPendingMessage::held)) {
                 return;
@@ -256,27 +259,25 @@ public class ChatService {
             }
             List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
             try {
-                ChatTurn turn =
-                        chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
-                onEvent.accept(
-                        turn.cancelled()
-                                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+                ChatTurn turn = chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
+                onEvent.accept(ChatTurnCompletion.eventOf(turn));
                 return;
             } catch (PendingQueueChangedException ex) {
                 if (attempt >= PENDING_READ_ATTEMPTS) {
                     throw new ApiException(
-                            ErrorCode.CONVERSATION_BUSY, "the queued messages kept changing while sending");
+                        ErrorCode.CONVERSATION_BUSY, "the queued messages kept changing while sending");
                 }
             }
         }
     }
+
 
     /** 예약 작업 발화가 미리 만들었다가 쓰지 않은 대화만 부른다. 메시지가 있으면 지우지 않는다. */
     @Transactional
     public boolean discardEmptyTaskConversation(Long conversationId) {
         return chatConversationManagement.discardEmptyTaskConversation(conversationId);
     }
+
 
     /** 마지막 답을 새 실행으로 다시 만든다. */
     public void regenerate(CurrentUser user, Long conversationId, Consumer<ChatEvent> onEvent) {
@@ -290,34 +291,31 @@ public class ChatService {
             }
             ChatMessage last = active.getLast();
             ChatMessage previousAnswer = last.role() == MessageRole.ASSISTANT ? last : null;
-            ChatMessage question =
-                    previousAnswer == null ? last : ChatTurnRouting.previousQuestion(active, previousAnswer);
+            ChatMessage question = previousAnswer == null ? last : ChatTurnRouting.previousQuestion(active, previousAnswer);
             if (question == null || question.role() != MessageRole.USER) {
                 throw new ApiException(ErrorCode.MESSAGE_NOT_LATEST, "the latest message is not a question");
             }
             List<ChatAttachment> attached = attachments.allOf(conversation.id()).stream()
-                    .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
-                    .toList();
-            Routed routed =
-                    chatTurnRouting.routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
+                .filter(attachment -> question.id().equals(attachment.messageId()) && attachment.isVisible())
+                .toList();
+            Routed routed = chatTurnRouting.routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
             if (routed.flow() != null) {
                 chatTurnRunner.runFlow(user, routed, question.content(), intent, onEvent, true, handle);
                 return;
             }
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, question.content(), intent, onEvent, true, handle);
-            onEvent.accept(
-                    turn.cancelled()
-                            ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                            : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+            onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
             turns.close(handle);
         }
     }
 
+
     public void stop(CurrentUser user, Long executionId) {
         chatTurnStopper.stop(user, executionId);
     }
+
 
     /**
      * 이 실행들 중 자식을 가진 것을 낸다.
@@ -330,10 +328,12 @@ public class ChatService {
         return chatConversationQueries.executionIdsHavingChildren(history);
     }
 
+
     /** 답 메시지의 실행 상태를 한 번에 읽는다. */
     public Map<Long, ExecutionStatus> statuses(List<ChatMessage> history) {
         return chatConversationQueries.statuses(history);
     }
+
 
     /**
      * 이 답들 중 막혀서 넘어간 것에 넘어간 곳의 provider 와 모델을 붙인다.
@@ -347,10 +347,12 @@ public class ChatService {
         return chatConversationQueries.switchedLabels(viewer, history);
     }
 
+
     /** 답마다 도구와 하위 에이전트 사건을 한 번에 읽어 작업 과정 요약을 만든다. */
     public Map<Long, ActivitySummary> activitySummaries(List<ChatMessage> history) {
         return chatConversationQueries.activitySummaries(history);
     }
+
 
     /**
      * 이 대화의 첨부를 메시지 번호로 나눈다. 아직 메시지에 묶이지 않은 것은 뺀다.
@@ -362,6 +364,7 @@ public class ChatService {
         return chatConversationQueries.attachmentsByMessage(user, conversationId);
     }
 
+
     /**
      * 답 메시지마다 그 turn 이 만든 결과물을 한 번에 읽는다. 사용자 메시지는 결과물이 없어 묻지 않는다.
      *
@@ -371,10 +374,12 @@ public class ChatService {
         return chatConversationQueries.artifactsByMessage(history);
     }
 
+
     /** 주인을 확인하고 메시지를 읽는다. 점검 대화면 그 대화의 열지 않은 보고를 연 것으로 적는다. */
     public List<ChatMessage> history(CurrentUser user, Long conversationId) {
         return chatConversationQueries.history(user, conversationId);
     }
+
 
     /**
      * 대화에 지금 도는 turn 을 알려 준다.
@@ -387,6 +392,7 @@ public class ChatService {
         return chatConversationQueries.running(user, conversationId);
     }
 
+
     /**
      * 사용자의 대화를 최근에 바뀐 것부터 한 쪽 읽는다.
      *
@@ -397,15 +403,18 @@ public class ChatService {
         return chatConversationQueries.conversationsOf(user, cursor, limit);
     }
 
+
     /** 사용자의 대화 한 줄을 읽는다. 없거나 남의 것이면 같은 응답으로 숨긴다. */
     public Conversation conversationOf(CurrentUser user, UUID publicId) {
         return chatConversationQueries.conversationOf(user, publicId);
     }
 
+
     @Transactional
     public Conversation rename(CurrentUser user, Long conversationId, String title) {
         return chatConversationManagement.rename(user, conversationId, title);
     }
+
 
     /**
      * 대화에서 쓸 모델과 effort 를 바꾼다. 그 뒤의 실행이 이 값을 쓴다.
@@ -421,12 +430,14 @@ public class ChatService {
         return chatConversationManagement.chooseModel(user, conversationId, choice);
     }
 
+
     /** 대화가 고른 단계를 저장한다. DEFAULT 는 에이전트 기본 모델만 쓰도록 사용자·그룹 기본값도 건너뛴다. */
     @Transactional
     public Conversation chooseModelTier(
-            CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
+        CurrentUser user, Long conversationId, ModelSelectionMode mode, ModelTier tier) {
         return chatConversationManagement.chooseModelTier(user, conversationId, mode, tier);
     }
+
 
     /**
      * 예약 작업 발화가 그 대화를 작업의 단계로 고르게 한다. 고른 모델과 effort 는 지운다.
@@ -436,6 +447,7 @@ public class ChatService {
     public void chooseTierForTask(Long conversationId, ModelTier tier) {
         chatConversationManagement.chooseTierForTask(conversationId, tier);
     }
+
 
     /**
      * 예약 작업이 「보고할 것 없음」 으로 끝낸 대화를 목록에서만 뺀다. 조회와 보내기는 그대로 된다.
@@ -447,10 +459,12 @@ public class ChatService {
         chatConversationManagement.hideTaskConversation(conversationId, now.truncatedTo(ChronoUnit.MICROS));
     }
 
+
     @Transactional
     public void delete(CurrentUser user, Long conversationId) {
         chatConversationManagement.delete(user, conversationId);
     }
+
 
     /**
      * 메시지 없이 제목이 빈 대화를 만든다.
@@ -462,6 +476,7 @@ public class ChatService {
     public Conversation startEmpty(CurrentUser user, String agentCode) {
         return chatConversationManagement.startEmpty(user, agentCode);
     }
+
 
     /**
      * 예약 작업이 결과를 남길 빈 대화를 만든다(ADR-078). 제목은 작업 이름이고 메시지는 첫 turn 이 남긴다.

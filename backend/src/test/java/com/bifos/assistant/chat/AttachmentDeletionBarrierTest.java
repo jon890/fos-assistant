@@ -240,7 +240,7 @@ public class AttachmentDeletionBarrierTest {
                 }
             };
             var reading = new AttachmentService(
-                access, attachments, deletingStore, properties, clock, images, inspection, cleaner, manager);
+                access, attachments, deletingStore, properties, clock, images, new AttachmentInspection(deletingStore), cleaner, manager);
             int selected = mode;
             assertCode(
                 () -> {

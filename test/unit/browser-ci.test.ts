@@ -9,7 +9,7 @@ import {
   publicError,
   HANDLING,
   publishFailures,
-} from "../../scripts/browser-ci.mjs";
+} from "../../scripts/ci/browser-ci.mjs";
 
 test("실패한 job 만 재실행하면 이전 성공과 최신 재실행 결과로 판정한다", () => {
   const previous = Array.from({ length: 4 }, (_, index) => ({

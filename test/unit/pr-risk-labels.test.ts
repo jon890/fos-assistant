@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
-const SCRIPT = new URL("../../scripts/pr-risk-labels.sh", import.meta.url).pathname;
+const SCRIPT = new URL("../../scripts/pr/pr-risk-labels.sh", import.meta.url).pathname;
 
 // 바뀐 파일 경로를 표준 입력으로 주고 스크립트가 낸 라벨 목록을 돌려받는다.
 function labelsFor(...paths: string[]): string[] {

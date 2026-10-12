@@ -91,6 +91,12 @@ native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 �
 처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
+### 첨부 원본 조회
+
+`AttachmentService`는 대화 주인과 업로더, 전송·삭제·만료 상태를 확인하고 원본 읽기 전후의 SQL 재검증을 맡는다.
+`AttachmentInspection`은 표시 크기와 영역 디코딩, 개요·GIF/WebP용 원본 bytes의 크기와 MIME magic 검사를 맡는다.
+원본 읽기는 같은 패키지에서만 호출하며, 권한 판정과 Clock·트랜잭션 경계는 서비스가 유지한다.
+
 ### 첨부 관찰
 
 첨부 관찰의 권한·원본 검사와 CAS/USER 보호는 `MediaObservationService`가 맡는다.
@@ -272,6 +278,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
 | `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
 | `connector.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
+| `connector.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
 | `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
@@ -291,6 +298,10 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 7. 스트림으로 오는 사건을 화면으로 중계하면서 `execution_event` 로도 옮겨 적는다.
 8. `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다. 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다([ADR-004](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
 9. `ExecutionRecorder` 가 완료 기록 서비스에 위임해 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「합계와 완전성」 이 갖는다.
+
+`ChatService`는 일반·예약·살펴보기·대기 메시지·다시 생성 turn의 종료 사건을 `ChatTurnCompletion`으로 만든다.
+이 helper는 저장을 마친 `ChatTurn`의 취소 여부와 식별자만 읽어 `done` 또는 `stopped`를 고른다.
+사건을 보내는 시점과 잠금을 닫는 순서는 `ChatService`가 유지하고, 흐름 실행의 종료 사건은 `ChatTurnRunner`가 보낸다.
 
 실행 기록의 공개 메서드는 `ExecutionRecorder`에 둔다. 시작과 실행 한도, 문맥 출처, 관측 상태와 시각 표시는 이 서비스가 맡는다.
 `ExecutionCompletionRecorder`는 완료·실패·취소 때 실제 provider와 모델, 사용량, 당시 가격과 버전, 종료 상태와 답을 같은 실행 줄에 저장한다.
@@ -464,7 +475,7 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 
 | 언제 | 어떻게 |
 | --- | --- |
-| 기준에 든 위반을 고쳤다 | 평소 테스트가 `StoreUpdateFailedException: Updating frozen violations is disabled` 로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. `scripts/quality.sh fix` 도 같은 명령으로 기준을 줄인다 |
+| 기준에 든 위반을 고쳤다 | 평소 테스트가 `StoreUpdateFailedException: Updating frozen violations is disabled` 로 실패한다. `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 기준에서 빼고 그 변경을 같은 커밋에 넣는다. `scripts/checks/quality.sh fix` 도 같은 명령으로 기준을 줄인다 |
 | 기준에 든 클래스의 이름만 바꿨다 | 같은 예외로 실패한다. 아래 「새 위반을 받아들이거나 다시 얼린다」 를 따른다 |
 | 규칙을 새로 더했다 | `./gradlew archTest --rerun -Parchunit.freeze.store.default.allowStoreUpdate=true` 로 그 규칙의 기준 파일을 만든다. `allowStoreCreation` 은 `stored.rules` 가 없을 때만 쓴다 |
 | 새 위반을 받아들이거나 다시 얼린다 | `./gradlew archTest --rerun --tests '*ArchitectureRulesTest.<메서드>' -Parchunit.freeze.refreeze=true -Parchunit.freeze.store.default.allowStoreUpdate=true`. 까닭을 커밋 메시지와 PR 본문에 적는다 |
@@ -513,12 +524,12 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 
 ### 파일 길이 기준 목록
 
-`scripts/check-file-length.mjs`가 언어 공통 파일 길이 규칙을 소유한다.
+`scripts/checks/check-file-length.mjs`가 언어 공통 파일 길이 규칙을 소유한다.
 빈 줄과 주석을 포함한 전체 줄 수를 세며 마지막 개행은 빈 줄로 더하지 않는다.
-`scripts/quality.sh check`, `scripts/check-local.sh`, CI의 `quality` 단계에서 검사한다.
+`scripts/checks/quality.sh check`, `scripts/dev/check-local.sh`, CI의 `quality` 단계에서 검사한다.
 
-상한과 검사 범위, 제외하는 시험 경로와 생성물은 `scripts/check-file-length.mjs` 가 갖는다.
-데이터 표는 `scripts/file-length-baseline.json`의 `exclusions`에 경로와 까닭을 명시한다.
+상한과 검사 범위, 제외하는 시험 경로와 생성물은 `scripts/checks/check-file-length.mjs` 가 갖는다.
+데이터 표는 `scripts/checks/file-length-baseline.json`의 `exclusions`에 경로와 까닭을 명시한다.
 
 기존 긴 파일은 같은 파일의 `files`에 현재 줄 수를 기준값으로 둔다.
 기준 목록에 없는 파일이 상한을 넘거나, 목록에 든 파일이 기준값보다 커지면 실패한다.
@@ -527,8 +538,8 @@ Gradle 도구 창에서 `spotlessApply`를 실행하거나 터미널에서 같�
 
 ```bash
 # cwd: 저장소 root
-node scripts/check-file-length.mjs
-node scripts/check-file-length.mjs --update
+node scripts/checks/check-file-length.mjs
+node scripts/checks/check-file-length.mjs --update
 ```
 
 `--update`는 기준값을 실제 줄 수로 낮춘다. 상한 이하가 됐거나 삭제된 파일은 목록에서 뺀다.
@@ -726,3 +737,11 @@ compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메�
 참가 함수만으로 현재 catalog를 검증했다고 판단하지 않는다. 원격 catalog와 DB commit은 원자적이지 않다.
 `ContentDraftAuthorizationHash`는 서버의 캡처 값으로 권한 지문을 계산하여 같은 내용의 재사용 범위를 구별한다.
 저장된 캡처 값과 현재 권한·원본 검사를 유지하며 기존 행의 지문이나 캡처 값은 갱신하지 않는다.
+
+### 원고 저장 승인과 worker 허가
+
+승인 요청·job 조회 port `ContentDraftSaveRequests`·`ContentDraftJobQueries`와 반환 record는 chat에 두고 connector의 `ContentDraftJobs`가 구현한다.
+승인 분기 `ContentDraftSaveApproval`, 허가 `ContentDraftJobAuthorizer`, 서명 `ContentDraftSaveTicket`, 공유 잠금 `ContentDraftJobLocks`는 `connector.application`에 둔다.
+worker 시작 전송은 `ContentDraftJobStarter` port이며 구현 빈이 없으면 시작을 지원하지 않는 것으로 본다.
+chat의 원고 타입은 connector와 mcp를 import하지 않는다. 검사: `ContentDraftSnapshotArchitectureTest`가 기준 파일 없이 새 타입의 층 순서·순환과 반환 타입을 본다.
+흐름과 잠금 순서는 [원고 기능](../../docs/features/content-draft.md#승인-snapshot과-저장-job)이 갖는다.
