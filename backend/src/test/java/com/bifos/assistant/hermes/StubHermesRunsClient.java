@@ -57,8 +57,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private final Map<String, SubagentSessionUsage> subagentUsages = new ConcurrentHashMap<>();
 
     private final Map<String, Deque<HermesRunLookup>> lookupAnswers = new ConcurrentHashMap<>();
-    private final Map<String, ApiException> lookupFailures = new ConcurrentHashMap<>();
-    private final Map<String, AtomicInteger> lookupFailuresLeft = new ConcurrentHashMap<>();
+    private final Map<String, LookupFailure> lookupFailures = new ConcurrentHashMap<>();
     private final List<String> lookups = new CopyOnWriteArrayList<>();
 
     /** 지우라고 받은 session 을 받은 순서대로 담는다. {@code failSessionDeletes} 를 걸면 받지 않고 그 예외를 던진다. */
@@ -133,8 +132,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     /** 처음 {@code times} 번은 예외를 던지고 그 뒤에는 {@link #willLookup} 의 답을 준다. 다시 부르면 남은 횟수를 바꾼다. */
     public void willFailLookup(String runId, ApiException failure, int times) {
-        lookupFailures.put(runId, failure);
-        lookupFailuresLeft.put(runId, new AtomicInteger(times));
+        lookupFailures.put(runId, new LookupFailure(failure, new AtomicInteger(times)));
     }
 
 
@@ -214,7 +212,6 @@ public class StubHermesRunsClient implements HermesRunsClient {
         };
         lookupAnswers.clear();
         lookupFailures.clear();
-        lookupFailuresLeft.clear();
         lookups.clear();
         releaseSubmits();
     }
@@ -256,10 +253,9 @@ public class StubHermesRunsClient implements HermesRunsClient {
     @Override
     public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
         lookups.add(runId);
-        AtomicInteger left = lookupFailuresLeft.get(runId);
-        ApiException failure = lookupFailures.get(runId);
-        if (left != null && failure != null && left.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
-            throw failure;
+        LookupFailure failure = lookupFailures.get(runId);
+        if (failure != null && failure.remaining().getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
+            throw failure.failure();
         }
         Deque<HermesRunLookup> queue = lookupAnswers.get(runId);
         if (queue == null) {
@@ -333,6 +329,11 @@ public class StubHermesRunsClient implements HermesRunsClient {
             }
         }
         return nextResult;
+    }
+
+
+    /** 예외와 그 예외를 던질 남은 횟수를 함께 교체한다. */
+    private record LookupFailure(ApiException failure, AtomicInteger remaining) {
     }
 
 

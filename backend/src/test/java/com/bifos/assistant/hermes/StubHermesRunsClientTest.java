@@ -1,9 +1,12 @@
 package com.bifos.assistant.hermes;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +70,62 @@ class StubHermesRunsClientTest {
                 }
             }
             assertThat(missing).as("응답 교체 중 사라진 run 조회 수").isZero();
+        });
+        CompletableFuture.allOf(replacing, lookingUp).join();
+    }
+
+
+    @Test
+    @DisplayName("정한 횟수만 조회를 실패시키고 0으로 바꾸면 실패를 해제한다")
+    void limitsLookupFailuresAndCanClearThem() {
+        StubHermesRunsClient stub = new StubHermesRunsClient();
+        ApiException failure = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "조회 실패");
+        stub.willLookup("run", HermesRunLookup.running());
+        stub.willFailLookup("run", failure, 2);
+
+        assertThatThrownBy(() -> stub.lookupRun("unused", "profile", "run")).isSameAs(failure);
+        assertThatThrownBy(() -> stub.lookupRun("unused", "profile", "run")).isSameAs(failure);
+        assertThat(stub.lookupRun("unused", "profile", "run").state()).isEqualTo(HermesRunLookup.State.RUNNING);
+
+        stub.willFailLookup("run", failure, Integer.MAX_VALUE);
+        stub.willFailLookup("run", failure, 0);
+        assertThat(stub.lookupRun("unused", "profile", "run").state()).isEqualTo(HermesRunLookup.State.RUNNING);
+    }
+
+
+    @Test
+    @DisplayName("조회 실패를 바꾸는 중에도 예외와 남은 횟수를 함께 읽는다")
+    void readsLookupFailureAndCountFromSameConfiguration() {
+        StubHermesRunsClient stub = new StubHermesRunsClient();
+        String runId = "run-failure-replacement";
+        ApiException previousFailure = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "이전 실패");
+        ApiException replacementFailure = new ApiException(ErrorCode.HERMES_UNAVAILABLE, "해제한 실패");
+        stub.willLookup(runId, HermesRunLookup.running());
+        CyclicBarrier start = new CyclicBarrier(2);
+        CyclicBarrier end = new CyclicBarrier(2);
+        CompletableFuture<Void> replacing = CompletableFuture.runAsync(() -> {
+            for (int attempt = 0; attempt < 4_000; attempt++) {
+                await(start);
+                stub.willFailLookup(runId, replacementFailure, 0);
+                await(end);
+            }
+        });
+        CompletableFuture<Void> lookingUp = CompletableFuture.runAsync(() -> {
+            int mixed = 0;
+            for (int attempt = 0; attempt < 4_000; attempt++) {
+                stub.willFailLookup(runId, previousFailure, 1);
+                await(start);
+                try {
+                    stub.lookupRun("unused", "profile", runId);
+                } catch (ApiException ex) {
+                    // 교체 전 예외 한 번 또는 교체 후 정상 응답은 가능하다. 새 예외와 옛 횟수의 조합은 불가능해야 한다.
+                    if (ex == replacementFailure) {
+                        mixed++;
+                    }
+                }
+                await(end);
+            }
+            assertThat(mixed).as("다른 설정의 예외와 횟수를 섞어 읽은 수").isZero();
         });
         CompletableFuture.allOf(replacing, lookingUp).join();
     }
