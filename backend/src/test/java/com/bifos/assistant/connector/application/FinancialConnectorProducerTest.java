@@ -56,6 +56,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -141,7 +142,15 @@ class FinancialConnectorProducerTest {
         plugin = new ProcessBuilder("python3", "../test/e2e/financial/producer_plugin_http.py",
             "http://127.0.0.1:" + springPort, properties.dashboardToken()).redirectError(ProcessBuilder.Redirect.INHERIT).start();
         var reader = new BufferedReader(new InputStreamReader(plugin.getInputStream()));
-        pluginUrl = JSON.readTree(reader.readLine()).get("url").stringValue();
+        try (var startup = Executors.newVirtualThreadPerTaskExecutor()) {
+            try {
+                pluginUrl = JSON.readTree(startup.submit(reader::readLine).get(30, TimeUnit.SECONDS)).get("url").stringValue();
+            } catch (Exception failure) {
+                // 첫 줄이 오지 않으면 프로세스를 끝내 읽기 스레드와 executor 정리도 멈추지 않게 한다.
+                plugin.destroyForcibly();
+                throw failure;
+            }
+        }
         client = new HttpHermesConnectorClient(new HermesProperties(properties.profileKeyDir(), pluginUrl,
             properties.dashboardToken(), properties.sharedListenerBaseUrl(), null, null, Duration.ofSeconds(2), Duration.ofSeconds(5)), attachmentDirectory);
         doAnswer(invocation -> client.readCatalog()).when(hermes).readCatalog();
