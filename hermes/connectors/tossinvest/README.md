@@ -80,4 +80,4 @@
 ---
 
 서비스는 [토스증권 공식 사이트](https://www.tossinvest.com/) 에서 볼 수 있어요.
-부르는 API, 인자와 결과, 호출 간격, 오류 코드, 보안 설계 같은 개발 내용은 [토스증권 커넥터 개발 문서](../../../docs/features/connector.md#토스증권-커넥터) 에 있어요.
+부르는 API, 인자와 결과, 호출 간격, 오류 코드, 보안 설계 같은 개발 내용은 [토스증권 커넥터 개발 문서](../../../docs/features/tossinvest-connector.md) 에 있어요.

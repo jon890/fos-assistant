@@ -96,7 +96,7 @@ hermes/
 
 ## 토스증권 REST 전체 지원의 배치 (구현 전)
 
-서비스의 REST 입력·필드·권한은 [커넥터 연결](../../docs/features/connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
+서비스의 REST 입력·필드·권한은 [토스증권 커넥터](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 새 의존성, 서비스, DB 표와 profile 설정은 추가하지 않는다. 기존 Bun MCP와 범용 Java 승인, Python 실행 전달을 재사용한다.
 
 | 자리 | 책임 |

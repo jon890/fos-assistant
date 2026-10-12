@@ -188,8 +188,13 @@ export function stringRoutes(source: string): Route[] {
   }));
 }
 
-/** `hermes/connectors/<id>/` 아래 파일이면 그 커넥터 디렉터리를 낸다. */
+/**
+ * `hermes/connectors/<id>/` 아래 파일이면 그 커넥터 디렉터리를 낸다.
+ * 커넥터별 기능 파일 `docs/features/<id>-connector.md` 도 그 커넥터의 문서로 본다.
+ */
 export function connectorOf(file: string): string | undefined {
+  const feature = /^docs\/features\/([a-z0-9-]+)-connector\.md$/.exec(file);
+  if (feature) return `hermes/connectors/${feature[1]}`;
   return /^hermes\/connectors\/[^/]+(?=\/)/.exec(file)?.[0];
 }
 
@@ -558,6 +563,8 @@ test("멤버는 선언과 클래스 안 호출로 찾고 다른 객체의 멤버
 test("커넥터 문서의 API 경로는 그 커넥터 소스의 문자열과 맞춘다", () => {
   assert.equal(connectorOf("hermes/connectors/guide/src/client.ts"), "hermes/connectors/guide");
   assert.equal(connectorOf("hermes/connectors/README.md"), undefined);
+  assert.equal(connectorOf("docs/features/guide-connector.md"), "hermes/connectors/guide");
+  assert.equal(connectorOf("docs/features/connector.md"), undefined);
   const routes = stringRoutes('request("/api/v1/accounts"); request(`/api/v1/stocks/${code}/price?x=1`);');
   assert.equal(matchesRoute("GET /api/v1/stocks/005930/price", routes), true);
   assert.equal(matchesRoute("GET /api/v1/orders", routes), false);

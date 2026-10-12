@@ -92,4 +92,4 @@ Google 비밀번호를 바꾸거나, 6개월 동안 쓰지 않거나, 같은 cli
 
 ---
 
-인자와 오류 코드, scope, 보안 설계 같은 개발 내용은 [Gmail 커넥터 개발 문서](../../../docs/features/connector.md#gmail-커넥터) 에 있어요.
+인자와 오류 코드, scope, 보안 설계 같은 개발 내용은 [Gmail 커넥터 개발 문서](../../../docs/features/gmail-connector.md) 에 있어요.

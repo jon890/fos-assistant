@@ -14,7 +14,7 @@
 
 ## 컨텍스트
 
-**근거 문서**: `docs/features/connector.md` 의 「도구 이름과 요약」, `hermes/connectors/README.md` 의 「문서와 소유자」 와 「공통 검사」
+**근거 문서**: `docs/features/connector.md` 의 「도구 이름과 요약」, `docs/adr/ADR-20261009-feature-docs.md` 의 커넥터별 기능 파일 예외, `hermes/connectors/README.md` 의 「문서와 소유자」 와 「공통 검사」
 
 - 화면용 칸이 지나는 경로는 앞 PR 에서 끝났다. 대시보드 plugin 의 `tool_summaries`, Control Plane 의 `ConnectorToolSummary.summary`, 웹의 `ConnectorTool.summary` 다. 이 phase 는 경로를 바꾸지 않는다
 - 계약 검사는 `hermes/tests/test_connectors_contract.py` 의 `check_connector` 다. 네이버 블로그는 `PENDING_USER_COPY` 로 빠져 있다
@@ -33,7 +33,8 @@
 ### 2. 네이버 블로그 README 와 개발 문서
 
 - README 는 「할 수 있는 일」, 「연결하는 방법」, 「도구 목록」, 「문제가 생겼을 때」 로 다시 쓴다. 도구 목록은 `| title | summary |` 줄을 그대로 둔다
-- 인자, 오류 코드, 서버와 검사, 보안 같은 개발 내용은 Gmail, 토스증권의 개발 내용이 있는 곳에 같은 모양으로 옮긴다. 내용을 버리지 않는다
+- 인자, 오류 코드, 서버와 검사, 보안 같은 개발 내용은 새 기능 파일 `docs/features/naver-blog-connector.md` 로 옮긴다. `gmail-connector.md` 와 같은 모양이고 covers 는 `hermes/connectors/naver-blog/` 다. 내용을 버리지 않는다
+- `connector.md` 의 「네이버 read_draft 사진 메타데이터」 처럼 네이버 블로그에만 해당하는 절도 그 파일로 옮긴다
 - README 와 개발 문서를 가리키던 링크(ADR, `hermes/docs/code-architecture.md`, 스킬, 스크립트 주석)를 함께 고친다
 
 ### 3. 필수 검사 켜기
