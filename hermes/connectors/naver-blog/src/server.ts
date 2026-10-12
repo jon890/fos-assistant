@@ -185,13 +185,16 @@ async function overwriteDraft(
 /**
  * 작업 상태를 읽고, 돌고 있으면 1초마다 다시 읽어 끝나거나 `waitSeconds` 가 차면 돌려준다.
  * 돌고 있다는 작업의 프로세스가 사라졌거나 멈췄으면 묵은 작업으로 끝내고 잠금을 푼다.
+ * 원고 snapshot job 은 private 조회만 읽으므로 여기서는 없는 작업이다.
  */
 async function draftJob(env: Env, jobId: string, waitSeconds: number) {
   const dir = await openJobDir(env);
   const deadline = Date.now() + waitSeconds * 1_000;
   for (;;) {
     let state = await readState(dir, jobId);
-    if (!state) throw new ToolError("NAVER_BLOG_JOB_NOT_FOUND");
+    // 원고 snapshot job 은 stamp 값이 깨졌어도 공개 조회로 읽거나 묵은 작업으로 끝내지 않는다.
+    if (!state || Object.hasOwn(state, "snapshot_stamp"))
+      throw new ToolError("NAVER_BLOG_JOB_NOT_FOUND");
     if (
       state.status === "running" &&
       !jobAlive(state, Date.parse(state.started_at))

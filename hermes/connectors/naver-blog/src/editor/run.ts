@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { SnapshotGuard } from "../content-snapshot-guard.ts";
 import { ATTACHMENT_DIR_ENV, type Block, type DraftInput } from "../draft.ts";
 import { type Env, readConnection } from "../session.ts";
 import { components } from "./components.ts";
@@ -44,6 +45,7 @@ function draftHash(input: DraftInput) {
  * 단계 사이와 기다리는 동안 `signal` 을 보고, 중단되면 `editor_failed` 와 `aborted` 로 끝난다.
  * 저장 수가 늘어난 것을 확인한 뒤의 `state` 단계 실패는 삼키고 `state: null` 로 성공한다. 임시저장은 이미 됐다.
  * 성공이든 실패든 연 탭 하나를 닫는다.
+ * 원고 snapshot job 만 `guard` 를 넘긴다. 기존 DSL 호출은 생략한다.
  */
 export async function runDraft(
   env: Env,
@@ -52,6 +54,7 @@ export async function runDraft(
   onStage: (stage: RunStage) => unknown,
   signal: AbortSignal,
   options: Omit<EditorOptions, "signal"> = {},
+  guard?: SnapshotGuard,
 ): Promise<RunResult> {
   const { cdpUrl, blogId } = readConnection(env);
   const hash = draftHash(input);
@@ -71,7 +74,7 @@ export async function runDraft(
     await enter("fill");
     await fill(page, input.title, blocks, hash);
     await enter("photos");
-    await photos(page, input, blocks, hash, env[ATTACHMENT_DIR_ENV]);
+    await photos(page, input, blocks, hash, env[ATTACHMENT_DIR_ENV], guard);
     await enter("components");
     await components(page, blocks, hash);
     await enter("settings");

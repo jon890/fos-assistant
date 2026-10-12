@@ -1,5 +1,16 @@
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname } from "node:path";
+import {
+  type Fetcher,
+  type SaveAuthorizer,
+  SnapshotGuardError,
+  takeAuthorizer,
+  verifySnapshot,
+} from "./content-snapshot-guard.ts";
+import {
+  type SnapshotJobState,
+  snapshotStampSchema,
+} from "./content-snapshot-job.ts";
 import { type DraftInput, parseBody } from "./draft.ts";
 import {
   type OverwriteInput,
@@ -29,6 +40,8 @@ export type WorkerDeps = {
   limitMs: number;
   /** 연결 칸 값을 읽는 env. 작업 프로세스는 자기 env 를 쓴다. */
   env: Env;
+  /** 원고 snapshot job 의 CP authorize 호출. 시험은 대역 CP 로 바꾼다. */
+  fetch: Fetcher;
 };
 
 const DEFAULT_DEPS: WorkerDeps = {
@@ -36,12 +49,14 @@ const DEFAULT_DEPS: WorkerDeps = {
   runOverwrite,
   limitMs: 600_000,
   env: process.env,
+  fetch: (url, init) => fetch(url, init),
 };
 
 /** 입력 파일이 담은 작업. */
 type JobInput =
   | { kind: "save"; draft: DraftInput }
-  | { kind: "overwrite"; input: OverwriteInput };
+  | { kind: "overwrite"; input: OverwriteInput }
+  | { kind: "content_snapshot"; snapshot: unknown };
 
 /** 입력 파일의 다섯 칸만 꺼낸다. 모양이 틀리면 `null`. */
 function draftFrom(raw: unknown): DraftInput | null {
@@ -93,6 +108,9 @@ function jobFrom(raw: unknown): JobInput | null {
     const input = overwriteFrom(value);
     return input ? { kind: "overwrite", input } : null;
   }
+  // snapshot 은 시작 전에 hash·tuple·manifest 를 다시 검사하므로 여기서는 그대로 넘긴다.
+  if (value.kind === "content_snapshot")
+    return { kind: "content_snapshot", snapshot: value.snapshot };
   if (value.kind !== undefined) return null;
   const draft = draftFrom(value);
   return draft ? { kind: "save", draft } : null;
@@ -112,6 +130,7 @@ async function takeInput(dir: string, jobId: string) {
 
 /** `EditorError` 를 작업 상태의 `error` 로 옮긴다. 그 밖의 예외는 원문을 싣지 않는다. */
 function errorOf(error: unknown, stage: string): Record<string, unknown> {
+  if (error instanceof SnapshotGuardError) return { code: error.code, stage };
   if (error instanceof EditorError) {
     const { focus_diagnostics, open_diagnostics, ...extra } = error.extra;
     const safe = filterFocusDiagnostics(focus_diagnostics);
@@ -143,6 +162,37 @@ function timeoutOf(error: unknown, stage: string): Record<string, unknown> {
 }
 
 /**
+ * 원고 snapshot job 의 시작 검사. snapshot 을 다시 compile 해 대조하고, 상태 파일 stamp 의 jobId·hash 와 맞춘 뒤
+ * CP authorize(start) 를 통과해야 기존 `runDraft` 로 넘어간다. 어느 하나라도 어긋나면 브라우저를 열지 않는다.
+ */
+async function checkedSnapshot(
+  dir: string,
+  jobId: string,
+  raw: unknown,
+  authorize: SaveAuthorizer | null,
+) {
+  const snapshot = verifySnapshot(raw);
+  const state = (await readState(dir, jobId)) as SnapshotJobState | null;
+  const stamp = snapshotStampSchema.safeParse(state?.snapshot_stamp).data;
+  if (
+    !snapshot ||
+    !authorize ||
+    stamp?.jobId !== jobId ||
+    stamp.snapshotHash !== snapshot.snapshotHash
+  )
+    throw new SnapshotGuardError("snapshot_invalid");
+  await authorize("start");
+  return {
+    payload: snapshot.payload,
+    authorize,
+    guard: {
+      manifest: snapshot.assetManifest,
+      authorizePhoto: (position: number) => authorize("photo", position),
+    },
+  };
+}
+
+/**
  * 분리된 작업 프로세스의 본체. `jobFile` 은 `<작업 디렉터리>/<job_id>.json` 이다.
  * 자기 `pid` 를 적고 5초마다 `heartbeat_at` 을 갱신하며, 입력 파일을 읽고 지운 뒤
  * 새 글이면 `runDraft` 를, 덮어쓰기면 `runOverwrite` 를 돌린다.
@@ -156,6 +206,8 @@ export async function runWorker(
   overrides: Partial<WorkerDeps> = {},
 ) {
   const deps = { ...DEFAULT_DEPS, ...overrides };
+  // ticket 과 authorize 주소는 env 로만 받고 무엇을 하기 전에 env 에서 지운다.
+  const authorize = takeAuthorizer(deps.env, deps.fetch);
   const dir = dirname(jobFile);
   const jobId = basename(jobFile).replace(/\.json$/, "");
   if (!JOB_ID_PATTERN.test(jobId) || basename(jobFile) !== `${jobId}.json`)
@@ -204,8 +256,11 @@ export async function runWorker(
       if (!job) {
         outcome = { status: "failed", error: { code: "editor_failed", stage } };
       } else {
+        let authorizeSave: (() => Promise<void>) | null = null;
         const onStage = async (next: RunStage | OverwriteStage) => {
           if (next === "save_clicking") {
+            // 원고 job 은 CP 의 save claim 을 먼저 받는다. 거절·장애면 저장 단추를 누르지 않는다.
+            if (authorizeSave) await authorizeSave();
             const written = await updateState(dir, jobId, {
               save_clicked: true,
               stage: "save",
@@ -236,12 +291,22 @@ export async function runWorker(
             );
             outcome = { status: "succeeded", result };
           } else {
+            const snapshot =
+              job.kind === "content_snapshot"
+                ? await checkedSnapshot(dir, jobId, job.snapshot, authorize)
+                : null;
+            if (snapshot) authorizeSave = () => snapshot.authorize("save");
+            const draft = snapshot
+              ? snapshot.payload
+              : (job as { draft: DraftInput }).draft;
             const { state, savedBefore, savedAfter } = await deps.runDraft(
               deps.env,
-              parseBody(job.draft.body),
-              job.draft,
+              parseBody(draft.body),
+              draft,
               onStage,
               controller.signal,
+              {},
+              snapshot?.guard,
             );
             outcome = {
               status: "succeeded",

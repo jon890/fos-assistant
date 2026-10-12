@@ -1,3 +1,8 @@
+import {
+  fingerprintOf,
+  type SnapshotGuard,
+  SnapshotGuardError,
+} from "../content-snapshot-guard.ts";
 import { type Block, type DraftInput, readPhoto } from "../draft.ts";
 import {
   ABORTED,
@@ -169,6 +174,8 @@ async function attachPhoto(
  * 사진 자리마다 자리표시 글을 지우고 사진 바이트를 넣는다.
  * 전송이 끝나면 `문서 너비` 를 적용한다. 실패하면 `photo_upload_failed` 와 몇 번째 사진 자리인지다.
  * 사진 파일은 바인딩 주인의 첨부 디렉터리(`attachmentDir`) 아래에서만 읽는다.
+ * `guard` 가 있으면 사진 i 번째(0부터)를 manifest i 번째와 대조한다. 읽은 바이트의 지문과
+ * 그 자리의 authorize 를 통과한 뒤 바로 그 바이트를 넣고, 검사하지 않은 기존 사진이 있으면 시작하지 않는다.
  */
 export async function photos(
   page: EditorPage,
@@ -176,12 +183,21 @@ export async function photos(
   blocks: Block[],
   draftHash: string,
   attachmentDir: string | undefined,
+  guard?: SnapshotGuard,
 ) {
   await setStage(page, draftHash, "photos", false);
   const images = blocks.filter(
     (block): block is Extract<Block, { type: "image" }> =>
       block.type === "image",
   );
+  if (
+    guard &&
+    (guard.manifest.length !== images.length ||
+      images.some(
+        (block, index) => block.file !== guard.manifest[index]!.fileName,
+      ))
+  )
+    throw new SnapshotGuardError("photo_mismatch");
   if (images.length === 0) {
     await setStage(page, draftHash, "photos", true);
     return;
@@ -197,6 +213,9 @@ export async function photos(
     );
 
   let inserted = await imageCount(page);
+  if (guard && inserted !== 0) throw new SnapshotGuardError("photo_mismatch");
+  // 기존 `inserted + offset + 1` 은 inserted 도 늘어 1·3·5 가 된다. manifest 자리는 고정한 시작값으로 찾는다.
+  const initial = inserted;
   if (inserted > images.length)
     throw page.fail(
       "editor_failed",
@@ -228,6 +247,12 @@ export async function photos(
       photo = await readPhoto(input, block.file, attachmentDir);
     } catch {
       throw failed(number, "사진 파일을 읽지 못했다");
+    }
+    if (guard) {
+      const entry = guard.manifest[initial + offset]!;
+      if (fingerprintOf(photo.bytes) !== entry.sourceFingerprint)
+        throw new SnapshotGuardError("photo_mismatch");
+      await guard.authorizePhoto(entry.position);
     }
     if (!(await focusPlaceholder(page, imagePlaceholder(block))))
       throw failed(number, "사진 자리를 찾지 못했다");
