@@ -299,11 +299,12 @@ class FinancialConnectorProducerTest {
         long snapshots = contents.count();
         String toolName = "create_order";
         Object original = ReflectionTestUtils.getField(producer, "cipher");
+        Long check = null;
         try {
             switch (change) {
                 case "cipher-disabled" -> ReflectionTestUtils.setField(producer, "cipher", mock(TextCipher.class));
                 case "user-not-allowed" -> jdbc.update("delete from allowed_person where email = ?", user.email());
-                case "read-only-check" -> readOnlyCheck();
+                case "read-only-check" -> check = readOnlyCheck();
                 case "agent-disabled" -> jdbc.update("update agent set enabled = false where id = " + agentSql(), bindingId);
                 case "agent-owner" -> jdbc.update("update agent set owner_user_id = ? where id = " + agentSql(), otherUser(), bindingId);
                 case "connection-owner" -> jdbc.update("update connector_connection set user_id = ? where id = ?", otherUser(), connectionId);
@@ -314,6 +315,10 @@ class FinancialConnectorProducerTest {
                 "mcp__tossinvest__" + name, name, ARGS)).isInstanceOf(ApiException.class);
         } finally {
             ReflectionTestUtils.setField(producer, "cipher", original);
+            // RUNNING 살펴보기 줄을 남기면 같은 context를 쓰는 살펴보기 테스트의 시간 한도 정리가 이 줄을 집는다.
+            if (check != null) {
+                checks.deleteById(check);
+            }
         }
         assertThat(actions.count()).isEqualTo(count);
         assertThat(contents.count()).isEqualTo(snapshots);
@@ -333,12 +338,12 @@ class FinancialConnectorProducerTest {
     }
 
 
-    private void readOnlyCheck() {
-        tx().executeWithoutResult(status -> {
+    private Long readOnlyCheck() {
+        return tx().execute(status -> {
             var run = runs.findAll().stream().filter(row -> session.equals(row.hermesSessionId())).findFirst().orElseThrow();
             var check = ProactiveCheck.started(user.id(), run.agentId(), run.conversationId(), CheckTrigger.MANUAL, false, now);
             check.attachRoot(run.id(), session);
-            checks.saveAndFlush(check);
+            return checks.saveAndFlush(check).id();
         });
     }
 
