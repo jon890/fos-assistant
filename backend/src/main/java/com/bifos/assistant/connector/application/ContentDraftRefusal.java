@@ -10,10 +10,12 @@ class ContentDraftRefusal extends RuntimeException {
 
     private final String code;
 
+
     ContentDraftRefusal(String code) {
         super(code, null, false, false);
         this.code = code;
     }
+
 
     String code() {
         return code;

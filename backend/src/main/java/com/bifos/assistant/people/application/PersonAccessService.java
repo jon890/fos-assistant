@@ -35,6 +35,7 @@ public class PersonAccessService {
     private final UserConversationActivity activity;
     private final ApplicationEventPublisher events;
 
+
     /**
      * 허용 목록 전체를 준다.
      *
@@ -44,25 +45,24 @@ public class PersonAccessService {
     @Transactional(readOnly = true)
     public List<PersonAccess> list() {
         List<AppUser> foundUsers = users.findAll();
-        Map<Long, Instant> lastMessageAt =
-                activity.lastMessageAt(foundUsers.stream().map(AppUser::id).toList());
-        Map<String, List<AppUser>> usersByEmail =
-                foundUsers.stream().collect(Collectors.groupingBy(user -> AllowedPerson.normalizeEmail(user.email())));
+        Map<Long, Instant> lastMessageAt = activity.lastMessageAt(foundUsers.stream().map(AppUser::id).toList());
+        Map<String, List<AppUser>> usersByEmail = foundUsers.stream().collect(Collectors.groupingBy(user -> AllowedPerson.normalizeEmail(user.email())));
         return people.findAll().stream()
-                .map(person -> {
-                    List<AppUser> matchingUsers = usersByEmail.get(person.email());
-                    Instant lastConversationAt = matchingUsers == null
-                            ? null
-                            : matchingUsers.stream()
-                                    .map(AppUser::id)
-                                    .map(lastMessageAt::get)
-                                    .filter(Objects::nonNull)
-                                    .max(Instant::compareTo)
-                                    .orElse(null);
-                    return new PersonAccess(person, matchingUsers != null, lastConversationAt);
-                })
-                .toList();
+            .map(person -> {
+                List<AppUser> matchingUsers = usersByEmail.get(person.email());
+                Instant lastConversationAt = matchingUsers == null
+                    ? null
+                    : matchingUsers.stream()
+                        .map(AppUser::id)
+                        .map(lastMessageAt::get)
+                        .filter(Objects::nonNull)
+                        .max(Instant::compareTo)
+                        .orElse(null);
+                return new PersonAccess(person, matchingUsers != null, lastConversationAt);
+            })
+            .toList();
     }
+
 
     /**
      * 들어올 수 있는지를 올리거나 내린다. 내리면 그 사용자가 가진 것을 거두는 사건을 낸다.
@@ -74,15 +74,14 @@ public class PersonAccessService {
      */
     @Transactional
     public PersonAccess setEnabled(Long id, boolean enabled) {
-        String email =
-                people.findEmailById(id).orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+        String email = people.findEmailById(id).orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
         // 원고 저장 허가처럼 사용자 행 다음 허용 목록 행을 잠그는 쪽과 같은 순서로 잠근다. 사용자 번호 오름차순이 먼저다.
         users.findAllByNormalizedEmail(AllowedPerson.normalizeEmail(email)).stream()
-                .map(AppUser::id)
-                .sorted()
-                .forEach(userId -> users.findByIdForUpdate(userId));
+            .map(AppUser::id)
+            .sorted()
+            .forEach(userId -> users.findByIdForUpdate(userId));
         AllowedPerson person = people.findByIdForUpdate(id)
-                .orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+            .orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
         if (enabled) {
             person.enable();
         } else {
@@ -95,10 +94,10 @@ public class PersonAccessService {
             joined.forEach(found -> events.publishEvent(new UserAccessRevoked(found.id())));
         }
         Instant lastConversationAt = joined.isEmpty()
-                ? null
-                : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
-                        .max(Instant::compareTo)
-                        .orElse(null);
+            ? null
+            : activity.lastMessageAt(joined.stream().map(AppUser::id).toList()).values().stream()
+                .max(Instant::compareTo)
+                .orElse(null);
         return new PersonAccess(saved, !joined.isEmpty(), lastConversationAt);
     }
 }

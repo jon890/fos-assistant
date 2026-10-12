@@ -77,6 +77,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
+
     @Override
     public ContentDraftSaveRequestView requestSave(CurrentUser user, Long originExecutionId, UUID snapshotId) {
         var snapshot = snapshotRows.findByPublicIdAndOwnerUserId(snapshotId, user.id()).orElseThrow(ContentDraftJobs::notFound);
@@ -122,6 +123,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         }
     }
 
+
     @Override
     @Transactional(readOnly = true)
     public ContentDraftJobView refresh(CurrentUser user, Long conversationId, UUID draftId, UUID snapshotId) {
@@ -135,6 +137,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         }
         return view;
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -156,11 +159,13 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         return new ContentDraftJobPage(items, rows.size() > limit ? items.getLast().snapshotId() : null);
     }
 
+
     private ContentDraftSaveRequestView requestView(ContentDraftSnapshot snapshot, ContentDraftJob job) {
         var action = actions.findById(job.actionId()).orElseThrow(ContentDraftJobs::notFound);
         return new ContentDraftSaveRequestView(snapshot.publicId(), action.publicId(), job.jobId() == null ? null : UUID.fromString(job.jobId()),
             status(job, action));
     }
+
 
     /** 몇 개의 묶음 조회로 공개 ID 와 원고 판을 붙인다. 본문은 읽지 않는다. */
     private List<ContentDraftJobView> views(List<ContentDraftJob> rows) {
@@ -184,6 +189,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         }).toList();
     }
 
+
     /** 승인 전에 거절·만료로 끝난 줄의 job 은 실행하지 않은 snapshot 이다. */
     static ContentDraftJobStatus status(ContentDraftJob job, ConnectorAction action) {
         if (job.status() == ContentDraftJobStatus.PREVIEW_READY && action != null
@@ -193,9 +199,11 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         return job.status();
     }
 
+
     private static <T> Map<Long, T> byId(List<T> rows, Function<T, Long> id) {
         return rows.stream().collect(Collectors.toMap(id, Function.identity()));
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다.");

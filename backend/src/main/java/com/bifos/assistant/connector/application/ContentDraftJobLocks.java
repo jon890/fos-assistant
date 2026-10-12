@@ -31,6 +31,7 @@ class ContentDraftJobLocks {
     private final ContentDraftSnapshotRepository snapshots;
     private final ContentDraftJobRepository jobs;
 
+
     /** 트랜잭션 밖에서 잠글 실행 번호를 모은다. 루트 번호는 바뀌지 않는 값이다. */
     List<Long> executionIds(Long... originIds) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -40,6 +41,7 @@ class ContentDraftJobLocks {
             .flatMap(id -> Stream.of(id, executions.findById(id).orElseThrow(() -> new ContentDraftRefusal("origin")).treeRootId()))
             .distinct().sorted().toList();
     }
+
 
     /** coordinator 콜백 안에서만 부른다. 맞지 않으면 {@link ContentDraftRefusal} 로 끝낸다. */
     ContentDraftLockedJob lock(CurrentUser user, Long conversationId, Long agentId, List<Long> executionIds, UUID actionId,
@@ -63,6 +65,7 @@ class ContentDraftJobLocks {
         }
         return new ContentDraftLockedJob(action, snapshot, job);
     }
+
 
     private static void require(boolean condition, String code) {
         if (!condition) {

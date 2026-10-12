@@ -23,13 +23,14 @@ public class AllowedUserAccessPolicy implements UserAccessPolicy {
     private final SignInPolicy signInPolicy;
     private final AllowedPersonRepository people;
 
+
     @Override
     @Transactional(readOnly = true)
     public boolean allowed(Long userId) {
         return users.findById(userId)
-                .map(AppUser::email)
-                .flatMap(signInPolicy::admit)
-                .isPresent();
+            .map(AppUser::email)
+            .flatMap(signInPolicy::admit)
+            .isPresent();
     }
 
 
@@ -37,10 +38,10 @@ public class AllowedUserAccessPolicy implements UserAccessPolicy {
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean allowedForUpdate(Long userId) {
         return users.findById(userId)
-                .map(AppUser::email)
-                .filter(email -> !email.isBlank())
-                .flatMap(email -> people.findByEmailForUpdate(AllowedPerson.normalizeEmail(email)))
-                .map(AllowedPerson::enabled)
-                .orElse(false);
+            .map(AppUser::email)
+            .filter(email -> !email.isBlank())
+            .flatMap(email -> people.findByEmailForUpdate(AllowedPerson.normalizeEmail(email)))
+            .map(AllowedPerson::enabled)
+            .orElse(false);
     }
 }

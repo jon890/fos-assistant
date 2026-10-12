@@ -15,12 +15,15 @@ import tools.jackson.databind.JsonNode;
  */
 public class RecordingContentDraftJobStarter implements ContentDraftJobStarter {
     /** 받은 시작 한 번이다. ticket 원문은 검사가 authorize 에 다시 싣는 데만 쓴다. */
-    public record Started(String profile, String connectorId, JsonNode snapshot, UUID jobId, String ticket) {}
+    public record Started(String profile, String connectorId, JsonNode snapshot, UUID jobId, String ticket) {
+    }
+
 
     private final List<Started> started = new CopyOnWriteArrayList<>();
     private volatile Function<Started, Optional<String>> answer = ignored -> {
         throw new IllegalStateException("content draft starter is not configured");
     };
+
 
     @Override
     public Optional<String> start(String profile, String connectorId, JsonNode snapshot, UUID jobId, String ticket) {
@@ -29,13 +32,16 @@ public class RecordingContentDraftJobStarter implements ContentDraftJobStarter {
         return answer.apply(call);
     }
 
+
     public void answer(Function<Started, Optional<String>> next) {
         this.answer = next;
     }
 
+
     public List<Started> started() {
         return List.copyOf(started);
     }
+
 
     public void reset() {
         started.clear();

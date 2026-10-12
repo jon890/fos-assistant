@@ -66,19 +66,20 @@ public class ContentDraftSaveApproval {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     public ContentDraftSaveApproval(
-            ConnectorActionRepository actions,
-            ContentDraftJobRepository jobs,
-            ContentDraftSnapshotRepository snapshotRows,
-            ContentDraftSnapshots snapshots,
-            ContentDraftBindingAccess bindings,
-            ConnectorCatalogCache catalog,
-            ChatContentMutationCoordinator mutations,
-            ContentDraftJobLocks locks,
-            ContentDraftSaveTicket tickets,
-            ObjectProvider<ContentDraftJobStarter> starters,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        ConnectorActionRepository actions,
+        ContentDraftJobRepository jobs,
+        ContentDraftSnapshotRepository snapshotRows,
+        ContentDraftSnapshots snapshots,
+        ContentDraftBindingAccess bindings,
+        ConnectorCatalogCache catalog,
+        ChatContentMutationCoordinator mutations,
+        ContentDraftJobLocks locks,
+        ContentDraftSaveTicket tickets,
+        ObjectProvider<ContentDraftJobStarter> starters,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         this.actions = actions;
         this.jobs = jobs;
         this.snapshotRows = snapshotRows;
@@ -93,6 +94,7 @@ public class ContentDraftSaveApproval {
         this.clock = clock;
     }
 
+
     /** 주인의 줄에 원고 job 링크가 있으면 그 snapshot 공개 ID 다. 인자 글이나 도구 이름으로 고르지 않는다. */
     public Optional<UUID> select(CurrentUser user, UUID actionId) {
         requireNoTransaction();
@@ -102,6 +104,7 @@ public class ContentDraftSaveApproval {
             .flatMap(job -> snapshotRows.findById(job.snapshotId()))
             .map(snapshot -> snapshot.publicId());
     }
+
 
     /** DB 식별자와 불변 catalog 선언을 잠금 밖에서 준비한다. 준비하지 못한 값은 잠금 안에서 거절로 끝낸다. */
     public PreparedContentDraftApproval prepare(CurrentUser user, UUID actionId) {
@@ -125,6 +128,7 @@ public class ContentDraftSaveApproval {
         return new PreparedContentDraftApproval(actionId, job.id(), snapshot.id(), snapshot.publicId(),
             snapshot.conversationId(), snapshot.agentId(), executionIds, stamp, manifest, supported);
     }
+
 
     /**
      * 바깥 트랜잭션 없이 coordinator 한 번으로 예약을 커밋하고, 커밋 뒤 시작을 최대 한 번 보낸다.
@@ -163,6 +167,7 @@ public class ContentDraftSaveApproval {
         return transactions.execute(status -> record(prepared, finished));
     }
 
+
     /**
      * 기존 새 글 임시저장 정책을 지금 선언으로 판정한다. 원고 저장은 상시 허락을 보지 않고 늘 사람의 승인을 받는다.
      *
@@ -178,6 +183,7 @@ public class ContentDraftSaveApproval {
         }
         return Optional.of(new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, decision.risk(), ToolApproval.ALWAYS));
     }
+
 
     private Reserved reserve(CurrentUser user, PreparedContentDraftApproval prepared) {
         if (prepared.executionIds().isEmpty()) {
@@ -221,6 +227,7 @@ public class ContentDraftSaveApproval {
         return new Reserved(jobId, input, payload);
     }
 
+
     /** 실행하지 않고 끝낸다. 외부 호출은 없다. */
     private ConnectorAction refuse(CurrentUser user, PreparedContentDraftApproval prepared, String code) {
         var action = actions.findByPublicIdForUpdate(prepared.actionId()).filter(found -> found.userId().equals(user.id()))
@@ -239,6 +246,7 @@ public class ContentDraftSaveApproval {
         jobs.save(job);
         return actions.save(action);
     }
+
 
     /** 시작 결과를 적는다. 이미 다른 경로가 끝낸 상태는 덮지 않는다. */
     private ConnectorAction record(PreparedContentDraftApproval prepared, Outcome outcome) {
@@ -266,6 +274,7 @@ public class ContentDraftSaveApproval {
         return actions.save(action);
     }
 
+
     private static <T> T attempt(Supplier<T> work) {
         try {
             return work.get();
@@ -274,9 +283,11 @@ public class ContentDraftSaveApproval {
         }
     }
 
+
     private Instant now() {
         return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
+
 
     private static void requireNoTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
@@ -284,15 +295,19 @@ public class ContentDraftSaveApproval {
         }
     }
 
+
     private static ApiException notPending() {
         return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, "this connector action is not waiting for approval");
     }
 
-    private record Reserved(UUID jobId, ContentDraftSnapshotInput input, ContentDraftSaveTicketPayload ticket) {}
+
+    private record Reserved(UUID jobId, ContentDraftSnapshotInput input, ContentDraftSaveTicketPayload ticket) {
+    }
 
     private record Outcome(String errorCode) {
         static final Outcome ACCEPTED = new Outcome(null);
         static final Outcome UNKNOWN = new Outcome(null);
+
 
         static Outcome rejected(String errorCode) {
             return new Outcome(errorCode);

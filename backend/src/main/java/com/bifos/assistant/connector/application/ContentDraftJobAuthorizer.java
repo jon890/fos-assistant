@@ -48,6 +48,7 @@ public class ContentDraftJobAuthorizer {
     private final ContentDraftJobLocks locks;
     private final Clock clock;
 
+
     /**
      * @param position 사진 단계에서 전송할 canonical block 위치. 다른 단계에서는 null
      * @throws ApiException 서명·형식이 틀리면 401, 그 밖의 거절은 403
@@ -83,6 +84,7 @@ public class ContentDraftJobAuthorizer {
         }
     }
 
+
     private void claim(CurrentUser user, ContentDraftSaveTicketPayload payload, String stage, Integer position,
         List<Long> executionIds, Long jobRowId, Long snapshotRowId, Long agentId) {
         var locked = locks.lock(user, payload.conversationId(), agentId, executionIds, payload.actionId(), snapshotRowId, jobRowId);
@@ -109,11 +111,13 @@ public class ContentDraftJobAuthorizer {
         }
     }
 
+
     private static void require(boolean condition) {
         if (!condition) {
             throw denied();
         }
     }
+
 
     private static ApiException denied() {
         return new ApiException(ErrorCode.FORBIDDEN, "content save not allowed");

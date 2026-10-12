@@ -117,6 +117,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     AllowedPerson person;
     UUID draftId;
 
+
     @BeforeEach
     void prepareSave() throws Exception {
         jobRows.deleteAll();
@@ -141,6 +142,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         starter.answer(call -> Optional.empty());
     }
 
+
     @AfterEach
     void removeSave() {
         jobRows.deleteAll();
@@ -153,6 +155,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         agents.deleteById(binding.agent().id());
         people.deleteById(person.id());
     }
+
 
     @Test
     @DisplayName("같은 snapshot의 반복·동시 저장 요청은 상시 허락 없는 승인 줄 하나와 job 하나만 만든다")
@@ -189,6 +192,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(actionRows.findAll().getFirst().status()).isEqualTo(ActionStatus.PENDING);
     }
 
+
     @Test
     @DisplayName("catalog가 시작을 선언하지 않으면 승인 줄을 실행 없이 거절하고 snapshot은 STALE이다")
     void refusesWithoutStartWhenCapabilityIsNotDeclared() {
@@ -205,6 +209,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(saves.requestSave(owner, origin.id(), snapshotId).status()).isEqualTo(ContentDraftJobStatus.STALE);
         assertThat(actionRows.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("동시 승인은 jobId 하나를 예약하고 시작을 한 번만 보내며 재요청은 같은 job을 돌려준다")
@@ -247,6 +252,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(bindings.findById(binding.id()).orElseThrow().updatedAt()).isEqualTo(before);
     }
 
+
     @Test
     @DisplayName("시작 응답을 잃으면 UNKNOWN으로 두고 다시 요청·승인해도 시작을 더 보내지 않는다")
     void keepsUnknownWithoutRestartWhenStartAnswerIsLost() {
@@ -263,6 +269,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(actionRows.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("worker가 시작 전에 거절하면 FAILED이고 같은 snapshot으로 다시 시작하지 않는다")
     void failsWithoutRestartWhenWorkerRejectsBeforeStart() {
@@ -276,6 +283,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(saves.requestSave(owner, origin.id(), snapshotId).status()).isEqualTo(ContentDraftJobStatus.FAILED);
         assertThat(starter.started()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("요청 뒤 원고 revision이 바뀌거나 사진이 삭제되면 승인은 실행 없이 STALE로 끝난다")
@@ -295,6 +303,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(approvals.approve(owner, next.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
         assertThat(starter.started()).isEmpty();
     }
+
 
     @Test
     @DisplayName("worker 허가는 시작과 저장을 각각 한 번만 주고 manifest 밖 사진 위치를 거절한다")
@@ -318,6 +327,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         code(() -> authorizer.authorize(ticket + "x", "save", null), ErrorCode.UNAUTHENTICATED);
     }
 
+
     @Test
     @DisplayName("사용자 끄기·에이전트 비활성·origin 취소가 먼저 커밋되면 저장 허가는 거절되고 claim은 비어 있다")
     void rejectsSaveAfterRevocationCommittedFirst() {
@@ -334,6 +344,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(jobRows.findAll().getFirst().saveClaimedAt()).isNull();
     }
 
+
     @Test
     @DisplayName("실행 취소가 행 잠금을 쥔 동안 저장 허가는 기다렸다가 커밋을 보고 거절하고 rollback이면 허가한다")
     void waitsForHeldCancelThenFollowsItsOutcome() throws Exception {
@@ -344,6 +355,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(heldCancel(ticket, true)).isEqualTo("ALLOWED");
         assertThat(jobRows.findAll().getFirst().saveClaimedAt()).isNotNull();
     }
+
 
     @Test
     @DisplayName("사용자 끄기가 허용 목록 행을 쥔 동안 저장 허가는 기다렸다가 끄기 커밋을 보고 거절한다")
@@ -370,6 +382,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(jobRows.findAll().getFirst().saveClaimedAt()).isNull();
     }
 
+
     @Test
     @DisplayName("실제 HTTP는 JWT 없이 정확한 경로에 닿고 위조 ticket은 401, 유효 ticket은 허가만 돌려준다")
     void authorizesOverHttpWithoutUserJwt() throws Exception {
@@ -385,6 +398,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(again.statusCode()).isEqualTo(403);
         assertThat(again.body()).doesNotContain(ticket, "비밀");
     }
+
 
     @Test
     @DisplayName("원래 대화의 job 목록은 cursor로 한 페이지씩 보관 상태만 돌려준다")
@@ -404,12 +418,14 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         code(() -> jobQueries.refresh(owner, conversation.id(), UUID.randomUUID(), snapshotId), ErrorCode.CONVERSATION_NOT_FOUND);
     }
 
+
     private String approved() {
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
         assertThat(approvals.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
         return starter.started().getLast().ticket();
     }
+
 
     private String heldCancel(String ticket, boolean rollback) throws Exception {
         var held = new CountDownLatch(1);
@@ -434,9 +450,11 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         }
     }
 
+
     private UUID preview() {
         return snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), origin.id()).snapshotId();
     }
+
 
     private void catalog(boolean start) {
         var declaration = new ConnectorSnapshotDeclaration("content-snapshot-v1", "compile_snapshot", "start_snapshot", "status_snapshot",
@@ -454,11 +472,13 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         }
     }
 
+
     private HttpResponse<String> post(String body) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/internal/content-draft-jobs/authorize"))
             .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build();
         return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
     }
+
 
     private static String outcome(Runnable action) {
         try {
@@ -469,6 +489,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         }
     }
 
+
     private static void await(CountDownLatch latch) {
         try {
             assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
@@ -477,6 +498,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
             throw new IllegalStateException(ex);
         }
     }
+
 
     private static void forbidden(Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,

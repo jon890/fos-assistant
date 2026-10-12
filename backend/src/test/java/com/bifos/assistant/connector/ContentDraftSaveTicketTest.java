@@ -24,6 +24,7 @@ class ContentDraftSaveTicketTest {
     private static final Instant NOW = Instant.parse("2026-10-12T01:00:00.123456Z");
     private static final Instant UPDATED = Instant.parse("2026-10-11T00:00:00.000001Z");
 
+
     @Test
     @DisplayName("발급한 ticket은 같은 칸으로 인증되고 기한은 660초와 원고 기한 가운데 이른 쪽이다")
     void authenticatesIssuedTicketWithBoundedLifetime() {
@@ -39,6 +40,7 @@ class ContentDraftSaveTicketTest {
             .startsWith("{\"v\":1,\"purpose\":\"content-snapshot-save\",\"jobId\":")
             .contains("\"ownerUserId\":\"7\"", "\"bindingUpdatedAt\":\"2026-10-11T00:00:00.000001Z\"");
     }
+
 
     @Test
     @DisplayName("만료·다른 key·변조·금융 domain 서명·사용자 JWT 모양은 401이다")
@@ -57,6 +59,7 @@ class ContentDraftSaveTicketTest {
         unauthenticated(() -> tickets("", NOW).authenticate(ticket));
     }
 
+
     @Test
     @DisplayName("authorize 요청의 문자열 표현과 오류에 ticket을 싣지 않는다")
     void redactsTicketFromRequestRepresentation() {
@@ -74,16 +77,19 @@ class ContentDraftSaveTicketTest {
         }
     }
 
+
     private static ContentDraftSaveTicket tickets(String token, Instant now) {
         return new ContentDraftSaveTicket(new HermesProperties(null, "http://127.0.0.1", token, null, null, null, null, null),
             Clock.fixed(now, ZoneOffset.UTC));
     }
+
 
     private static ContentDraftSaveTicketPayload payload() {
         return new ContentDraftSaveTicketPayload(UUID.fromString("0190a8a4-0000-7000-8000-000000000001"),
             UUID.fromString("0190a8a4-0000-7000-8000-000000000002"), "a".repeat(64), UUID.fromString("0190a8a4-0000-7000-8000-000000000003"),
             7L, 11L, 13L, 17L, UPDATED, UPDATED, NOW, NOW);
     }
+
 
     private static String financialSignature(String body) {
         try {
@@ -96,6 +102,7 @@ class ContentDraftSaveTicketTest {
             throw new IllegalStateException(ex);
         }
     }
+
 
     private static void unauthenticated(Runnable action) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(ApiException.class,

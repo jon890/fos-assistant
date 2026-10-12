@@ -23,8 +23,11 @@ public final class ContentDraftJobAuthorizeDtos {
         .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(1).build()).build())
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 
+
     /** ticket 은 문자열 표현과 로그에 싣지 않는다. */
     public record AuthorizeRequest(String ticket, String stage, Integer position) {
+
+
         private static final Set<String> KEYS = Set.of("ticket", "stage");
         private static final Set<String> PHOTO_KEYS = Set.of("ticket", "stage", "position");
 
@@ -50,10 +53,12 @@ public final class ContentDraftJobAuthorizeDtos {
             }
         }
 
+
         @Override
         public String toString() {
             return "AuthorizeRequest[redacted]";
         }
+
 
         private static void require(boolean condition) {
             if (!condition) {

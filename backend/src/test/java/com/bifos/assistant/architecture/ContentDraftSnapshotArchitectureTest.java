@@ -34,6 +34,7 @@ class ContentDraftSnapshotArchitectureTest {
         "ContentDraftJobAuthorizer", "com.bifos.assistant.connector.application",
         "PreparedContentDraftApproval", "com.bifos.assistant.connector.application.model");
 
+
     @Test
     @DisplayName("새 원고 저장 타입은 각각 하나이고 정해진 패키지에 있다")
     void placesEachNewTypeOnce() {
@@ -41,6 +42,7 @@ class ContentDraftSnapshotArchitectureTest {
             .filter(type -> type.getSimpleName().equals(name)).map(JavaClass::getPackageName).toList())
                 .as("운영 타입 %s", name).containsExactly(owner));
     }
+
 
     @Test
     @DisplayName("connector 구현이 두 chat port 를 정확한 반환 타입으로 구현한다")
@@ -54,6 +56,7 @@ class ContentDraftSnapshotArchitectureTest {
         assertThat(ContentDraftJobQueries.class.getMethod("list", CurrentUser.class, Long.class,
             UUID.class, int.class).getReturnType()).isEqualTo(ContentDraftJobPage.class);
     }
+
 
     @Test
     @DisplayName("chat 의 원고 타입은 connector 와 mcp 를 쓰지 않고 새 타입의 간선은 층 순서와 순환 규칙을 그대로 통과한다")

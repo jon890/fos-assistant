@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ContentDraftJobAuthorizeController {
     private final ContentDraftJobAuthorizer authorizer;
 
+
     @PostMapping(value = "/internal/content-draft-jobs/authorize", produces = MediaType.APPLICATION_JSON_VALUE)
     public AuthorizeResponse authorize(HttpServletRequest request) throws IOException {
         // Content-Length가 없거나 틀려도 실제 받은 바이트로 상한을 지킨다.

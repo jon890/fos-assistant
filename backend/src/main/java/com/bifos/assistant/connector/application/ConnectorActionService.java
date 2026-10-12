@@ -50,77 +50,80 @@ public class ConnectorActionService {
     private final ConnectorActionApproval approval;
     private final ConnectorActionLifecycle lifecycle;
 
+
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
     // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorActionService(
-            ConnectorActionRepository actions,
-            ConnectorToolGrantRepository grants,
-            ConnectorConnectionRepository connections,
-            ConnectorBindingRepository bindings,
-            AppUserRepository users,
-            ConnectorCatalogCache catalog,
-            HermesConnectorClient connector,
-            LiveProperties<DelegationProperties> delegation,
-            ApplicationEventPublisher events,
-            NotificationService notifications,
-            ConversationNotices conversations,
-            DecisionFeedbackRecorder feedback,
-            ContentDraftSaveApproval contentDrafts,
-            PlatformTransactionManager transactionManager) {
+        ConnectorActionRepository actions,
+        ConnectorToolGrantRepository grants,
+        ConnectorConnectionRepository connections,
+        ConnectorBindingRepository bindings,
+        AppUserRepository users,
+        ConnectorCatalogCache catalog,
+        HermesConnectorClient connector,
+        LiveProperties<DelegationProperties> delegation,
+        ApplicationEventPublisher events,
+        NotificationService notifications,
+        ConversationNotices conversations,
+        DecisionFeedbackRecorder feedback,
+        ContentDraftSaveApproval contentDrafts,
+        PlatformTransactionManager transactionManager) {
         this(
-                actions,
-                grants,
-                connections,
-                bindings,
-                users,
-                catalog,
-                connector,
-                delegation,
-                events,
-                notifications,
-                conversations,
-                feedback,
-                contentDrafts,
-                transactionManager,
-                Clock.systemUTC());
+            actions,
+            grants,
+            connections,
+            bindings,
+            users,
+            catalog,
+            connector,
+            delegation,
+            events,
+            notifications,
+            conversations,
+            feedback,
+            contentDrafts,
+            transactionManager,
+            Clock.systemUTC());
     }
 
+
     public ConnectorActionService(
-            ConnectorActionRepository actions,
-            ConnectorToolGrantRepository grants,
-            ConnectorConnectionRepository connections,
-            ConnectorBindingRepository bindings,
-            AppUserRepository users,
-            ConnectorCatalogCache catalog,
-            HermesConnectorClient connector,
-            LiveProperties<DelegationProperties> delegation,
-            ApplicationEventPublisher events,
-            NotificationService notifications,
-            ConversationNotices conversations,
-            DecisionFeedbackRecorder feedback,
-            ContentDraftSaveApproval contentDrafts,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        ConnectorActionRepository actions,
+        ConnectorToolGrantRepository grants,
+        ConnectorConnectionRepository connections,
+        ConnectorBindingRepository bindings,
+        AppUserRepository users,
+        ConnectorCatalogCache catalog,
+        HermesConnectorClient connector,
+        LiveProperties<DelegationProperties> delegation,
+        ApplicationEventPublisher events,
+        NotificationService notifications,
+        ConversationNotices conversations,
+        DecisionFeedbackRecorder feedback,
+        ContentDraftSaveApproval contentDrafts,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         this.details = new ConnectorActionDetails(actions, catalog);
         ConnectorActionSignals signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
-                actions,
-                grants,
-                connections,
-                bindings,
-                users,
-                connector,
-                delegation,
-                feedback,
-                details,
-                signals,
-                contentDrafts,
-                transactions,
-                clock);
+            actions,
+            grants,
+            connections,
+            bindings,
+            users,
+            connector,
+            delegation,
+            feedback,
+            details,
+            signals,
+            contentDrafts,
+            transactions,
+            clock);
         this.lifecycle = new ConnectorActionLifecycle(actions, grants, details, signals, transactions, clock);
     }
+
 
     /**
      * 그 대화의 승인 줄이다. 답을 기다리는 줄 전부와 끝난 줄 가운데 최근 20개를 만든 순으로 준다.
@@ -131,6 +134,7 @@ public class ConnectorActionService {
     public List<ConnectorActionView> listForConversation(CurrentUser user, Long conversationId) {
         return details.listForConversation(user, conversationId);
     }
+
 
     /**
      * 대화마다 승인 줄의 결과를 전한 가장 늦은 시각이다. 전한 줄이 없는 대화는 빠진다. 먼저 알리기가 할 일에 연결한 대화의 결과
@@ -146,6 +150,7 @@ public class ConnectorActionService {
         return details.lastResultDeliveredAt(conversationIds);
     }
 
+
     /**
      * 그 사용자의 답을 기다리는 승인 줄을 만든 순으로 준다. 먼저 알리기의 판정이 읽는다.
      *
@@ -156,11 +161,13 @@ public class ConnectorActionService {
         return details.pendingApprovalsOf(user);
     }
 
+
     /** 그 대화에서 결과를 아직 전하지 않은 승인 줄이다. 실행을 보낸 뒤 끝난 것만이고 만든 순이다. */
     @Transactional(readOnly = true)
     public List<ConnectorActionResult> undeliveredResults(Long conversationId) {
         return details.undeliveredResults(conversationId);
     }
+
 
     /**
      * 그 대화와 그 사용자의 실행한 승인 줄을 번호의 순서로 다시 읽는다. 결과를 다시 전달할 때 쓴다(ADR-075).
@@ -172,17 +179,20 @@ public class ConnectorActionService {
         return details.resultsFor(conversationId, userId, actionIds);
     }
 
+
     /** 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. */
     @Transactional(readOnly = true)
     public List<ConnectorActionResult> undeliveredClosures(Long conversationId) {
         return details.undeliveredClosures(conversationId);
     }
 
+
     /** 대화에 전했다고 적는다. 이미 전한 줄은 건드리지 않는다. 부르는 쪽의 트랜잭션에 함께 묶인다. */
     @Transactional
     public void markDelivered(List<UUID> actionIds, Instant now) {
         details.markDelivered(actionIds, now);
     }
+
 
     /**
      * 그 줄을 전하는 일을 이 호출이 맡았는가. 먼저 적은 쪽만 참을 받는다.
@@ -194,11 +204,13 @@ public class ConnectorActionService {
         return details.claimDelivery(actionId, now);
     }
 
+
     /** 실행한 결과를 아직 전하지 않은 대화들이다. 기동할 때 훑는다. */
     @Transactional(readOnly = true)
     public List<Long> conversationsWithUndelivered() {
         return details.conversationsWithUndelivered();
     }
+
 
     /**
      * 승인하고 저장한 인자로 한 번 실행한다.
@@ -217,10 +229,12 @@ public class ConnectorActionService {
         return approval.approve(user, actionId, grant);
     }
 
+
     /** 승인 줄을 거절한다. 실행하지 않는다. */
     public ConnectorActionView reject(CurrentUser user, UUID actionId) {
         return approval.reject(user, actionId);
     }
+
 
     /**
      * 내 상시 허락 가운데 유효한 것이다.
@@ -232,6 +246,7 @@ public class ConnectorActionService {
     public List<ConnectorGrantView> grants(CurrentUser user) {
         return lifecycle.grants(user);
     }
+
 
     /**
      * 지금 선언이 상시 허락을 닫은 도구의 유효한 허락 줄을 거둔다(ADR-065).
@@ -249,11 +264,13 @@ public class ConnectorActionService {
         return lifecycle.revokeClosedGrants(now);
     }
 
+
     /** 허락을 거둔다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다. */
     @Transactional
     public void revokeGrant(CurrentUser user, Long grantId) {
         lifecycle.revokeGrant(user, grantId);
     }
+
 
     /**
      * {@code now} 에 기다리는 시간이 지난 승인 줄을 만료로 바꾼다. 한 줄이 실패해도 나머지를 계속한다.
@@ -268,6 +285,7 @@ public class ConnectorActionService {
         return lifecycle.expire(now);
     }
 
+
     /**
      * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
      *
@@ -276,6 +294,7 @@ public class ConnectorActionService {
     public int markInterrupted(Instant now) {
         return lifecycle.markInterrupted(now);
     }
+
 
     /**
      * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
@@ -289,6 +308,7 @@ public class ConnectorActionService {
     public int markStale(Instant before, Instant now) {
         return lifecycle.markStale(before, now);
     }
+
 
     /**
      * 그 연결의 답을 기다리는 줄을 모두 거절하고 유효한 상시 허락을 거둔다. 연결을 해제하거나 값을 다시 등록하는
@@ -304,6 +324,7 @@ public class ConnectorActionService {
     public void rejectPendingFor(ConnectorConnection connection, Instant now) {
         lifecycle.rejectPendingFor(connection, now);
     }
+
 
     /**
      * 그 에이전트에서 연결을 뗄 때 그 에이전트의 실행이 판정한 줄만 거절한다. 트랜잭션 안에서 부른다.
