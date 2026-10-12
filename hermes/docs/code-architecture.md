@@ -56,9 +56,9 @@ writer 소유와 설치 검사를, `bodyless_requests.py`는 profile별 안전�
 
 | 커넥터 | 하는 일 | 문서 |
 | --- | --- | --- |
-| `gmail` | Gmail 을 찾고 읽고, 승인받은 메일과 라벨, 자동 분류 필터를 쓴다 | [Gmail 커넥터](../connectors/gmail/README.md) |
+| `gmail` | Gmail 을 찾고 읽고, 승인받은 메일과 라벨, 자동 분류 필터를 쓴다 | [개발 문서](../../docs/features/gmail-connector.md), [사용자 안내](../connectors/gmail/README.md) |
 | `naver-blog` | 「내 브라우저」 에 로그인해 둔 네이버 계정으로 승인받은 글을 네이버 블로그에 임시저장한다. 발행하지 않는다 | [네이버 블로그 커넥터](../connectors/naver-blog/README.md) |
-| `tossinvest` | 토스증권 계좌의 보유 종목, 시세, 주문 가능 현금, 주문 내역을 읽는다. 주문하지 않는다 | [토스증권 커넥터](../connectors/tossinvest/README.md) |
+| `tossinvest` | 토스증권 계좌의 보유 종목, 시세, 주문 가능 현금, 주문 내역을 읽는다. 주문하지 않는다 | [개발 문서](../../docs/features/tossinvest-connector.md), [사용자 안내](../connectors/tossinvest/README.md) |
 
 커넥터의 MCP 서버는 TypeScript 로 쓰고 의존성까지 검사와 패키징 때 한 JavaScript 파일로 묶는다. 생성된 실행 파일은 Git 으로 추적하지 않는다.
 운영 목록의 `command` 는 Bun 실행 파일이어야 한다. 서버 실행 중 패키지를 내려받지 않는다.
