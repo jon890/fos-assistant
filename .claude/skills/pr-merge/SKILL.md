@@ -67,7 +67,16 @@ main 에 새 커밋이 없으면 합칠 것이 없다. 같은 head 의 CI 결과
 
 **Draft CI 뒤에 들어온 main 커밋이 5단계의 예외 조건을 모두 만족하면 합치지 않고 그대로 Ready 로 바꾼다.**
 겹치지 않는 main 변경 때문에 합치면 CI 가 한 번 더 돌고, 그동안 main 이 또 바뀌어 같은 일이 되풀이된다.
-판정 방법과 명령은 5단계 1번을 따른다. 조건을 하나라도 만족하지 못하면 위 순서대로 합친다.
+판정 조건과 겹침 검사 명령은 5단계 1번을 따르되, 합친 커밋이 없으므로 `$CI_BASE` 는 부모를 읽지 않고 Draft CI 가 시작된 시각의 main 으로 정한다.
+`refs/pull/N/merge` 는 main 이 움직이면 GitHub 가 다시 만들어 그때의 base 를 git 에서 읽을 수 없다. 지금의 `origin/main` 을 넣으면 검사가 비어 늘 통과한다.
+
+```bash
+# cwd: 저장소 root. 가장 이른 검사 시작 시각 이전의 마지막 main 커밋이다.
+CI_START="$(gh pr checks "$PR" --json startedAt --jq 'map(.startedAt) | min')"
+CI_BASE="$(git rev-list -1 --before="$CI_START" origin/main)"
+```
+
+예외로 Ready 를 바꿨으면 그 근거(`$CI_BASE`, 겹침 검사가 비었다는 것)를 PR 에 한 줄 남긴다. 조건을 하나라도 만족하지 못하면 위 순서대로 합친다.
 
 ## 4. 리뷰 반영
 
