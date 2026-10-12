@@ -202,6 +202,7 @@ export function closedPortUrl() {
 
 /** 편집기 단계가 쓰는 CDP 메서드. 이 목록 밖의 메서드가 오면 위반이다. */
 export const EDITOR_METHODS = [
+  "Network.enable",
   "Page.enable",
   "Page.handleJavaScriptDialog",
   "Page.setInterceptFileChooserDialog",
@@ -364,6 +365,7 @@ export class FakeEditor {
   private nextSpot = 1;
 
   install(cdp: FakeCdp) {
+    cdp.on("Network.enable", () => ({}));
     cdp.on("Page.enable", (_, target) => {
       if (this.alertOnEnable)
         cdp.emit(target, "Page.javascriptDialogOpening", {

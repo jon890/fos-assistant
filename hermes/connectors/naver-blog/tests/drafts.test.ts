@@ -112,6 +112,7 @@ test("목록은 목록 API 의 글 번호, 제목, 고친 시각을 차례대로
 
   expect(result).toEqual({
     count: 2,
+    autosave_requests: 0,
     drafts: [
       {
         draft_id: "224000000001",
@@ -174,6 +175,7 @@ test("글 하나를 불러와 제목, 카테고리, 태그, 기존 구성요소 
     ],
     photo_count: 1,
     photos_truncated: false,
+    autosave_requests: 0,
     autosave_check: {
       count_before: 2,
       count_after: 2,
@@ -482,6 +484,33 @@ test("같은 글을 연달아 읽으면 같은 지문을 돌려주고 목록은 
   expect(second.revision).toBe(first.revision);
   expect(second.autosave_check?.changed).toBe(false);
   expect(editor.drafts.length).toBe(2);
+  expect(cdp.violations).toEqual([]);
+});
+
+test("읽기 탭의 자동저장 요청만 세고 중복 이벤트와 다른 주소는 제외한다", async () => {
+  const { cdp, env, otherTab } = await setup();
+  cdp.on("Network.enable", (_, target) => {
+    const request = { url: "https://blog.naver.com/RabbitAutoSaveWrite.naver" };
+    cdp.emit(target, "Network.requestWillBeSent", { requestId: "1", request });
+    cdp.emit(target, "Network.requestWillBeSent", { requestId: "1", request });
+    cdp.emit(target, "Network.requestWillBeSent", { requestId: "2", request });
+    cdp.emit(`page/${otherTab}`, "Network.requestWillBeSent", {
+      requestId: "3",
+      request,
+    });
+    cdp.emit(target, "Network.requestWillBeSent", {
+      requestId: "4",
+      request: { url: "https://example.com/RabbitAutoSaveWrite.naver" },
+    });
+    cdp.emit(target, "Network.requestWillBeSent", {
+      requestId: "5",
+      request: { url: "https://blog.naver.com/TempPostList.naver" },
+    });
+    return {};
+  });
+  const result = await readDraft(env, "224000000001", TIMES);
+  expect(result.autosave_requests).toBe(2);
+  expect(result.autosave_check?.changed).toBe(false);
   expect(cdp.violations).toEqual([]);
 });
 

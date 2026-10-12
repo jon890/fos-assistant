@@ -59,7 +59,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | --- | --- | --- |
 | `session_status` | 없음 | `{browser: "connected", logged_in: true, blog_id}`. 로그인 쿠키가 없으면 `NAVER_BLOG_LOGIN_REQUIRED` 로 실패한다 |
 | `render_draft` | 아래 「초안」 의 다섯 칸, `base`(덮어쓸 때 `read_draft` 가 준 `title`, `category`, `tags`, `body`, 선택), `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `index.html` 이나 `<폴더>/index.html`, 폴더는 세 단계까지), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다. `base` 를 주면 `changes` 와 `base_revision` 이 더 온다(아래 「임시저장 글 덮어쓰기」) |
-| `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}]}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
+| `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}], autosave_requests}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
 | `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body, photos, photo_count, photos_truncated, autosave_check}`. 아래 「임시저장 글 읽기」 를 본다 |
 | `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status}`. `job_id` 는 UUID 고, `status` 는 시작 확인 때 읽은 `running`, `succeeded`, `failed`, `unknown` 중 하나다 |
 | `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status}`. 상태는 `save_draft` 와 같다. 아래 「임시저장 글 덮어쓰기」 를 본다 |
@@ -98,6 +98,8 @@ MCP 서버 이름은 `naver-blog` 다.
 | `changed` | 수나 고친 시각이 다르거나 뒤 목록에 그 글이 없으면 참이다 |
 
 `changed` 가 거짓이어도 부작용이 없다는 증명이 아니다. 탭을 닫은 뒤의 자동저장과 목록에 드러나지 않는 편집기 상태는 담지 못한다.
+
+`read_draft` 와 `list_drafts` 의 `autosave_requests` 는 읽기 탭에서 CDP `Network.enable` 뒤 관측한 `RabbitAutoSaveWrite.naver` 요청 수다. 관측 시작 전과 탭을 닫은 뒤의 요청, 다른 탭의 요청은 담지 못한다. `changed` 가 거짓이어도 자동저장이 없었다는 뜻은 아니다.
 
 본문은 새 글 초안과 같이 한 줄이 한 문단이다. 글 구성요소의 문단마다 한 줄이고, 문단 안의 줄바꿈은 공백이 된다.
 글이 아닌 구성요소는 1부터 센 번호를 단 줄 하나다. 번호는 사진, 스티커, 지도, 구성요소 넷마다 따로 세고, 「구성요소」 는 편집기 종류가 달라도 한 번호를 함께 센다.

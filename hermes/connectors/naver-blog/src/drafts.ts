@@ -97,6 +97,7 @@ async function withWriteTab<T>(
       ...times,
       signal: controller.signal,
     });
+    await tab.page.observeAutosaveRequests();
     const opened = await open(tab.page, { keepDraftNotice: true });
     return await work(tab.page, blogId, opened === "draft_notice");
   } catch (error) {
@@ -123,7 +124,11 @@ export function listDrafts(env: Env, options: ReadOptions = {}) {
       ...draft,
       title: [...draft.title].slice(0, TITLE_MAX).join(""),
     }));
-    return { count: drafts.length, drafts };
+    return {
+      count: drafts.length,
+      drafts,
+      autosave_requests: page.autosaveRequests,
+    };
   });
 }
 
@@ -195,6 +200,7 @@ export function readDraft(
       ...draft,
       ...photos,
       autosave_check: autosaveCheck(before, after, draftId),
+      autosave_requests: page.autosaveRequests,
     };
   });
 }
