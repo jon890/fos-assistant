@@ -42,7 +42,8 @@ export type ClaimVerdict = {
   rows: {
     assetKey: string;
     route: VisionRoute;
-    verdict: "OBSERVED" | "FALLBACK" | "NOT_RECEIVED" | "UNMEASURED";
+    /** 입력의 전달 상태다. IMAGE_RECEIVED 는 이미지 수신이며 관찰이나 판독 성공을 뜻하지 않는다. */
+    verdict: "IMAGE_RECEIVED" | "FALLBACK" | "NOT_RECEIVED" | "UNMEASURED";
     /** 픽셀 표식으로 자리를 구분할 수 있는지. 같은 바이트는 첨부 번호로만, 같은 표식은 바이트로만 구분한다 */
     pixelIdentity: "UNIQUE" | "SHA_ONLY" | "AMBIGUOUS";
   }[];
@@ -119,7 +120,7 @@ export function judgeObservationClaims(
         route === "UNKNOWN"
           ? ("UNMEASURED" as const)
           : route === "NATIVE"
-            ? ("OBSERVED" as const)
+            ? ("IMAGE_RECEIVED" as const)
             : route === "AUX_DESCRIPTION"
               ? ("FALLBACK" as const)
               : ("NOT_RECEIVED" as const),

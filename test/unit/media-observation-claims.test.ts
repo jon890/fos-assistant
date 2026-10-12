@@ -177,7 +177,19 @@ test("vision 지원 provider 는 30장을 모두 받은 것으로 판정한다",
     embedded.map((key) => observation(key)),
   );
   assert.equal(verdict.delivery, "NATIVE");
-  assert.ok(verdict.rows.every((row) => row.verdict === "OBSERVED"));
+  assert.ok(verdict.rows.every((row) => row.verdict === "IMAGE_RECEIVED"));
+});
+
+test("이미지 수신 판정은 관찰 누락이나 판독 실패를 성공으로 바꾸지 않는다", () => {
+  const { traits, embedded } = thirty(0);
+  const routes = all(embedded, "NATIVE");
+  for (const observations of [[], [observation(embedded[0]!, {
+    status: "FAILED", coverage: null, claims: [],
+  })]]) {
+    const verdict = judgeObservationClaims(traits, routes, observations);
+    assert.equal(verdict.delivery, "NATIVE");
+    assert.ok(verdict.rows.every((row) => row.verdict === "IMAGE_RECEIVED"));
+  }
 });
 
 test("vision 미지원 provider 의 보조 설명은 fallback 이고 확인했다는 주장을 거절한다", () => {
