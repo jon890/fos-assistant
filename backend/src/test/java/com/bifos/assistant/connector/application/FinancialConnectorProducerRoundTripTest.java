@@ -7,8 +7,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionTicket;
+import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -19,10 +21,13 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import tools.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -35,6 +40,136 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     @Autowired
     ConnectorPolicyService publicPolicy;
 
+    @Autowired
+    TextCipher cipher;
+
+
+    @ParameterizedTest
+    @DisplayName("실제 claim과 기동 정리가 같은 사용자 잠금에서 기다려도 미소비일 때만 실패로 끝낸다")
+    @ValueSource(booleans = {false, true})
+    void serializesClaimAndSweepOnDatabaseLocks(boolean claimFirst) throws Exception {
+        var requested = request();
+        tx().executeWithoutResult(status -> actions.findByPublicIdForUpdate(requested.actionId()).orElseThrow().beginExecution(now));
+        String ticket = tickets.issue(requested.actionId());
+        var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher);
+        var execution = new ConnectorApprovedExecution(ticket,
+            snapshot.executionArgsJson(), snapshot.executionArgsSha256());
+        var locked = new CountDownLatch(1);
+        var waiting = new CountDownLatch(1);
+        var resume = new CountDownLatch(1);
+        var calls = new AtomicInteger();
+        doAnswer(invocation -> {
+            int turn = calls.incrementAndGet();
+            if (turn == 2) {
+                waiting.countDown();
+            }
+            jdbc.queryForObject("select id from app_user where id = ? for update", Long.class, user.id());
+            if (turn == 1) {
+                locked.countDown();
+                assertThat(resume.await(15, TimeUnit.SECONDS)).isTrue();
+            }
+            return users.findById(user.id());
+        }).when(users).findByIdForUpdate(user.id());
+        Callable<Object> claiming = () -> client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", execution);
+        Callable<Object> sweeping = () -> publicApproval.markInterrupted(now);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(claimFirst ? claiming : sweeping);
+            try {
+                assertThat(locked.await(15, TimeUnit.SECONDS)).isTrue();
+                var second = executor.submit(claimFirst ? sweeping : claiming);
+                try {
+                    assertThat(waiting.await(15, TimeUnit.SECONDS)).isTrue();
+                    assertThat(second.isDone()).isFalse();
+                } finally {
+                    resume.countDown();
+                }
+                first.get(20, TimeUnit.SECONDS);
+                second.get(20, TimeUnit.SECONDS);
+            } finally {
+                resume.countDown();
+            }
+        }
+        assertThat(action(requested).status()).isEqualTo(claimFirst ? ActionStatus.UNKNOWN : ActionStatus.FAILED);
+        assertThat(contents.findById(action(requested).id()).orElseThrow().consumedAt() != null).isEqualTo(claimFirst);
+        assertThat(counters().path("financial").intValue()).isEqualTo(claimFirst ? 1 : 0);
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("ticket 발급 전후의 미소비 실행을 실패로 정리하고 같은 의도의 새 승인을 허용한다")
+    @ValueSource(booleans = {false, true})
+    void interruptedUnclaimedActionAllowsNewApproval(boolean issued) {
+        var requested = request();
+        tx().executeWithoutResult(status -> actions.findByPublicIdForUpdate(requested.actionId()).orElseThrow().beginExecution(now));
+        String ticket = issued ? tickets.issue(requested.actionId()) : null;
+        var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher);
+        publicApproval.markInterrupted(now);
+        assertThat(action(requested).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(action(requested).errorCode()).isEqualTo("unavailable");
+        assertThat(publicApproval.markInterrupted(now)).isZero();
+        if (issued) {
+            var row = contents.findById(action(requested).id()).orElseThrow();
+            assertThat(client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order",
+                new ConnectorApprovedExecution(ticket,
+                    snapshot.executionArgsJson(), row.executionArgsSha256()))
+                .ok()).isFalse();
+        }
+        assertThatThrownBy(() -> tickets.issue(requested.actionId())).isInstanceOf(ApiException.class);
+        assertThat(action(request()).status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("실행 응답을 잃거나 상세 없는 unavailable을 받으면 claim 소비 여부로 끝낸다")
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void settlesLostResponseAndUnavailableUsingClaim(boolean consumed, boolean lost) {
+        var requested = request();
+        doAnswer(invocation -> {
+            if (consumed) {
+                sent = invocation.getArgument(3);
+                assertThat(client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", sent).ok()).isTrue();
+            }
+            if (lost) {
+                throw new IllegalStateException("test response lost");
+            }
+            return CallResult.failure(ConnectorCallError.UNAVAILABLE);
+        }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
+        assertThat(approval.approve(user, requested.actionId()).status())
+            .isEqualTo(consumed ? ActionStatus.UNKNOWN : ActionStatus.FAILED);
+        assertThat(counters().path("financial").intValue()).isEqualTo(consumed ? 1 : 0);
+    }
+
+
+    @ParameterizedTest
+    @DisplayName("claim과 정리가 겹쳐도 먼저 커밋한 쪽에 따라 미전송만 실패가 된다")
+    @ValueSource(booleans = {false, true})
+    void overlapsExecutionAndSweepWithoutReopeningClaim(boolean claimFirst) throws Exception {
+        var requested = request();
+        var reached = new CountDownLatch(1);
+        var resume = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            sent = invocation.getArgument(3);
+            CallResult result = claimFirst
+                ? client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", sent) : null;
+            reached.countDown();
+            assertThat(resume.await(15, TimeUnit.SECONDS)).isTrue();
+            return claimFirst ? result : client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", sent);
+        }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var executing = executor.submit(() -> approval.approve(user, requested.actionId()));
+            try {
+                assertThat(reached.await(15, TimeUnit.SECONDS)).isTrue();
+                publicApproval.markStale(now.plusSeconds(1), now.plusSeconds(2));
+                assertThat(action(requested).status()).isEqualTo(claimFirst ? ActionStatus.UNKNOWN : ActionStatus.FAILED);
+            } finally {
+                resume.countDown();
+            }
+            assertThat(executing.get(20, TimeUnit.SECONDS).status()).isEqualTo(claimFirst ? ActionStatus.UNKNOWN : ActionStatus.FAILED);
+        }
+        assertThat(counters().path("financial").intValue()).isEqualTo(claimFirst ? 1 : 0);
+    }
+
 
     @Test
     @DisplayName("실제 claim은 금융 POST를 한 번 보내고 재호출은 보내지 않는다")
@@ -43,6 +178,10 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         var result = approval.approve(user, requested.actionId());
         assertThat(result.status()).as("목적지 관측=%s, ticket 전달=%s, 오류=%s", counters(), sent != null, action(requested).errorCode()).isEqualTo(ActionStatus.SUCCEEDED);
         assertThat(action(requested).resultText()).contains("new-official-id");
+        assertThat(action(requested).argsKeyId()).isNotNull();
+        assertThat(action(requested).storedArgsJson()).startsWith("v1.").doesNotContain("symbol");
+        assertThat(action(requested).resultKeyId()).isNotNull();
+        assertThat(action(requested).storedResultText()).startsWith("v1.").doesNotContain("new-official-id");
         var row = contents.findById(action(requested).id()).orElseThrow();
         assertThat(row.ticketId()).isNotNull();
         assertThat(row.consumedAt()).isEqualTo(now);
@@ -278,6 +417,16 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     void plaintextSnapshotIsNotExecuted() {
         var requested = request();
         jdbc.update("update connector_action_execution set content_key_id = null where action_id = ?", action(requested).id());
+        assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
+        assertRejectedBeforeTransmission(requested.actionId());
+    }
+
+
+    @Test
+    @DisplayName("암호화하지 않은 승인 인자는 금융 실행과 claim 전에 거절한다")
+    void rejectsFinancialArgumentsWithoutDataKey() {
+        var requested = request();
+        jdbc.update("update connector_action set args_key_id = null, args_json = ? where id = ?", ARGS, action(requested).id());
         assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
         assertRejectedBeforeTransmission(requested.actionId());
     }

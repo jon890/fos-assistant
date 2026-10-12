@@ -16,6 +16,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
@@ -73,6 +74,7 @@ class ConnectorActionApproval {
     private final ConnectorActionSignals signals;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final ConnectorActionBodies bodies;
 
 
     ConnectorActionApproval(
@@ -88,6 +90,7 @@ class ConnectorActionApproval {
         ConnectorActionDetails details,
         ConnectorActionSignals signals,
         TransactionTemplate transactions,
+        ConnectorActionBodies bodies,
         Clock clock) {
         this.actions = actions;
         this.grants = grants;
@@ -102,6 +105,7 @@ class ConnectorActionApproval {
         this.signals = signals;
         this.transactions = transactions;
         this.clock = clock;
+        this.bodies = bodies;
     }
 
 
@@ -136,7 +140,7 @@ class ConnectorActionApproval {
         CallResult result = null;
         try {
             result = connector.execute(
-                approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.argsJson());
+                approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.executableArgs().orElseThrow());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
         } catch (RuntimeException ex) {
@@ -186,6 +190,10 @@ class ConnectorActionApproval {
             return Approval.refused(saved);
         }
         Optional<ConnectorManifest> manifest = details.readManifest(action.connectorId());
+        if (action.executableArgs().isEmpty()) {
+            action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
+            return Approval.refused(actions.save(action));
+        }
         // 승인 줄이 `hiddenArgs` 로 낸 것과 같은 조건이다. 사람이 다 읽지 못한 인자로는 실행하지 않는다. 기간을 실은
         // 승인도 같으므로 허락을 볼 것보다 먼저 본다.
         if (hiddenArgs(manifest, action)) {
@@ -253,7 +261,7 @@ class ConnectorActionApproval {
             manifest.schema(),
             ConnectorToolPolicies.find(manifest, action.toolName()),
             false,
-            action.argsJson().getBytes(StandardCharsets.UTF_8).length,
+            action.executableArgs().orElseThrow().getBytes(StandardCharsets.UTF_8).length,
             CheckBoundary.NOT_CHECK);
     }
 
@@ -278,11 +286,12 @@ class ConnectorActionApproval {
             // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.
             action.unknown(now);
         } else if (result.ok()) {
-            action.succeed(clip(result.result().toString()), now);
+            bodies.succeed(action, clip(result.result().toString()), now);
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
         } else {
             // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
-            action.fail(
+            bodies.fail(
+                action,
                 result.error().word(),
                 result.detail() == null ? null : result.detail().toStored(),
                 now);

@@ -32,6 +32,7 @@ import com.bifos.assistant.connector.application.model.ContentDraftWorkerStatus;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
@@ -90,6 +91,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private final ContentDraftRevisionRepository revisions;
     private final ContentDraftRepository drafts;
     private final ConnectorActionRepository actions;
+    private final ConnectorActionBodies bodies;
     private final ConnectorBindingRepository bindingRows;
     private final ConnectorCatalogCache catalog;
     private final AgentExecutionRepository executions;
@@ -134,8 +136,9 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 var action = ConnectorAction.decided(connection, snapshot.agentId(), origin,
                     HERMES_TOOL, ContentDraftSaveApproval.SAVE_TOOL,
                     decision, false, Sha256.hex(DEDUPE_PREFIX + ":" + user.id() + ":" + snapshotId), Sha256.hex(argsJson), now);
-                action.awaitApproval(argsJson, now.plus(policy.current().approvalTtl()));
+                action.awaitApproval(now.plus(policy.current().approvalTtl()));
                 var saved = actions.saveAndFlush(action);
+                bodies.sealArgs(saved, argsJson);
                 var job = jobs.saveAndFlush(new ContentDraftJob(snapshot.id(), saved.id(), user.id(), conversationId, now));
                 inserted.set(true);
                 return requestView(snapshot, job);
@@ -300,8 +303,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             return;
         }
         switch (job.status()) {
-            case SUCCEEDED -> action.succeed(null, clock.instant());
-            case FAILED -> action.fail("unavailable", null, clock.instant());
+            case SUCCEEDED -> action.succeed(null, null, clock.instant());
+            case FAILED -> action.fail("unavailable", null, null, clock.instant());
             case UNKNOWN -> action.unknown(clock.instant());
             default -> {
             }

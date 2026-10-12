@@ -12,6 +12,7 @@ import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.application.model.FeedbackEntry;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
@@ -59,6 +60,7 @@ class ConnectorFinancialApproval {
     private final ApplicationEventPublisher events;
     private final PlatformTransactionManager transactionManager;
     private final Clock clock;
+    private final ConnectorActionBodies bodies;
 
 
     ConnectorActionView approve(CurrentUser user, UUID actionId) {
@@ -109,14 +111,18 @@ class ConnectorFinancialApproval {
             users.findByIdForUpdate(user.id()).orElseThrow(ConnectorActionDetails::notFound);
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
             if (action.status() == ActionStatus.EXECUTING) {
-                if (executed == null) {
-                    action.unknown(clock.instant());
-                } else if (executed.ok()) {
-                    action.succeed(clip(executed.result().toString()), clock.instant());
+                var row = contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorFinancialProducer::rejected);
+                if (executed != null && executed.ok()) {
+                    if (row.consumedAt() == null) {
+                        log.warn("claim 없이 금융 성공을 받았다 actionId={}", actionId);
+                    }
+                    bodies.succeed(action, clip(executed.result().toString()), clock.instant());
                     feedback.record(entry(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
                 } else {
-                    action.fail(executed.error().word(), executed.detail() == null ? null : executed.detail().toStored(), clock.instant());
-                    feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
+                    ConnectorFinancialOutcome.settle(action, row, executed, bodies, clock.instant());
+                    if (action.status() == ActionStatus.FAILED) {
+                        feedback.record(entry(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM).reason(action.errorCode()));
+                    }
                 }
                 new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
             }

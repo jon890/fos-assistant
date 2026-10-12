@@ -79,7 +79,7 @@ ticket과 본문은 두 표 어디에도 저장하지 않는다. worker 상태�
 | `conversation` | `title` | 아직 |
 | `agent_execution` | `output_text` | 아직 |
 | `execution_event` | `detail` | 아직 |
-| `connector_action` | `args_json`, `result_text` | 아직 |
+| `connector_action` | `args_json`, `result_text` | 함. 옆 칸은 각각 `args_key_id`, `result_key_id`. 금융은 암호화 필수 |
 | `connector_action_execution` | `execution_args_json`, `summary_json`, `scope_json` | 함. 세 칸이 같은 `content_key_id`를 사용하며 key가 없던 줄은 평문이다 |
 | `notification` | `title`, `body` | 아직 |
 | `follow_up` | `title` | 아직 |
@@ -640,7 +640,25 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `check_tree` 는 먼저 살펴보기 트리의 실행에서 나온 줄인가다. 그 트리의 쓰기는 허락과 상관없이 승인 줄로 가므로, 참인 승인 줄은 대화 허락을 주지 않는다. 칸을 더하기 전의 줄은 거짓이다
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
-- 인자 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+- 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+
+인자와 결과는 기존 사용자 데이터 key와 `TextCipher`로 각각 암호화한다.
+AAD는 `connector_action:<id>:column:<칸 이름>:user:<user_id>`다.
+새 승인 인자는 본문 없이 INSERT한 뒤 같은 트랜잭션에서 암호문을 채워 원문이 DB에 한 번도 쓰이지 않는다.
+key 칸이 NULL인 기존 본문은 호환 읽기를 허용하고, 기동 정리 뒤 사용자·승인 줄 순서로 잠가 이관한다.
+이관은 상태와 해시, 승인·실행 시각을 보존하며, 실패한 줄은 다음 기동에서 다시 시도한다.
+이관 뒤 `sealed`와 `failed`, 다시 센 `remaining`을 로그에 남긴다. `remaining=0`이 완료 확인 신호다.
+그 확인 전에 만든 백업과 binlog에는 평문이 남는다. 그 사본을 언제 지울지는 `fos-home-infra`가 정한다.
+금융은 데이터 암호화를 사용할 수 없으면 준비하지 않고, 인자 key가 없는 줄은 승인·발급·claim하지 않는다.
+일반 쓰기는 암호화가 꺼져 있으면 평문 호환으로 저장한다.
+풀지 못한 인자는 화면에 안내만 표시하고 실행하지 않는다. 실행 전 인자 SHA-256도 저장 해시와 대조한다.
+풀지 못한 결과는 안내 글로 표시하고 대화에 전한다.
+
+옆 key 칸을 더하는 expand DDL과 애플리케이션 이관으로 평문 저장을 교체한다.
+NULL key 호환은 기존 줄과 암호화를 쓰지 않는 일반 쓰기에 남긴다.
+이관 뒤 옛 코드로 되돌리면 암호문을 인자로 전송하므로 되돌리지 않는다.
+`args_sha256`, `scope_sha256`, `request_key`는 key 없는 해시여서 좁은 범위의 인자를 대입해 추측하는 공격은 막지 못한다.
+해시의 사용자 key 적용과 기존 해시 호환은 공개 금융 연결을 여는 작업에서 함께 정한다.
 
 ### connector_action_execution
 
@@ -672,6 +690,7 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 저장 함수는 ticket 식별자와 발급·소비 시각을 NULL로 둔다.
 발급은 세 권한 칸이 모두 NULL일 때 ticket_id와 ticket_expires_at을 한 번만 채운다.
 소비는 같은 미만료 ticket_id이며 consumed_at이 NULL일 때 그 칸을 한 번만 채운다.
+중단 정리는 claim과 같은 사용자·승인 줄·실행 줄 잠금 안에서 consumed_at이 NULL이면 FAILED, 아니면 UNKNOWN으로 끝낸다.
 ticket_expires_at과 consumed_at은 Java에서도 MICROS로 절삭해 MySQL DATETIME(6)과 정확히 대조한다.
 issued_at 컬럼과 ticket 원문·서명은 저장하지 않는다.
 발급·소비 응답은 실제 커밋 뒤에만 반환하며 실패와 롤백은 이전 권한 상태를 보존한다.
