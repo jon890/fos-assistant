@@ -300,10 +300,11 @@ class FinancialConnectorProducerTest {
         String toolName = "create_order";
         Object original = ReflectionTestUtils.getField(producer, "cipher");
         Long check = null;
+        boolean disallowed = false;
         try {
             switch (change) {
                 case "cipher-disabled" -> ReflectionTestUtils.setField(producer, "cipher", mock(TextCipher.class));
-                case "user-not-allowed" -> jdbc.update("delete from allowed_person where email = ?", user.email());
+                case "user-not-allowed" -> disallowed = jdbc.update("delete from allowed_person where email = ?", user.email()) == 1;
                 case "read-only-check" -> check = readOnlyCheck();
                 case "agent-disabled" -> jdbc.update("update agent set enabled = false where id = " + agentSql(), bindingId);
                 case "agent-owner" -> jdbc.update("update agent set owner_user_id = ? where id = " + agentSql(), otherUser(), bindingId);
@@ -315,9 +316,13 @@ class FinancialConnectorProducerTest {
                 "mcp__tossinvest__" + name, name, ARGS)).isInstanceOf(ApiException.class);
         } finally {
             ReflectionTestUtils.setField(producer, "cipher", original);
-            // RUNNING 살펴보기 줄을 남기면 같은 context를 쓰는 살펴보기 테스트의 시간 한도 정리가 이 줄을 집는다.
+            // 다른 테스트가 RUNNING 살펴보기 줄을 보지 않도록 지운다.
             if (check != null) {
                 checks.deleteById(check);
+            }
+            // 허용 목록 행을 지운 채 두면 같은 context를 쓰는 살펴보기 테스트가 전체 실행에서 실패한다.
+            if (disallowed) {
+                people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile, now));
             }
         }
         assertThat(actions.count()).isEqualTo(count);
