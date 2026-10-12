@@ -172,8 +172,19 @@ class MediaFixtureGenerator {
         return (marker >> 8) == 0xa5 ? marker & 255 : null;
     }
 
-    /** Control Plane 사본 규격으로 줄인다. 긴 변 1600px 보다 작으면 키우지 않는다. */
-    static BufferedImage prepared(BufferedImage source) throws Exception {
+    /** EXIF 가 없는 특수 사례를 Control Plane 처럼 subsampling 디코딩한 뒤 1600px JPEG 로 줄인다. */
+    static BufferedImage prepared(Path file) throws Exception {
+        BufferedImage source;
+        try (ImageInputStream input = ImageIO.createImageInputStream(file.toFile())) {
+            ImageReader reader = ImageIO.getImageReaders(input).next();
+            try {
+                reader.setInput(input, true, true);
+                int sampling = Math.max(1, Math.max(reader.getWidth(0), reader.getHeight(0)) / 1600);
+                var parameters = reader.getDefaultReadParam();
+                parameters.setSourceSubsampling(sampling, sampling, 0, 0);
+                source = reader.read(0, parameters);
+            } finally { reader.dispose(); }
+        }
         double ratio = Math.min(1.0, 1600.0 / Math.max(source.getWidth(), source.getHeight()));
         int width = (int)Math.round(source.getWidth() * ratio), height = (int)Math.round(source.getHeight() * ratio);
         BufferedImage scaled = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -204,7 +215,7 @@ class MediaFixtureGenerator {
     static String specialEntry(Path file, String key, String format, int id, int scale, boolean text) throws Exception {
         byte[] bytes = Files.readAllBytes(file);
         BufferedImage raw = ImageIO.read(file.toFile());
-        BufferedImage copy = prepared(raw);
+        BufferedImage copy = prepared(file);
         double ratio = (double)copy.getWidth() / raw.getWidth();
         // 이름표 글씨는 간판에서 24배 제목이고, 작은 사진에서는 기존 위치(16,100)의 1배 bitmap 이다. 메뉴 글씨는 간판에만 있다.
         boolean sign = key.equals("sign-hires");
