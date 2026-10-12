@@ -19,6 +19,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -30,6 +31,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
+@Slf4j
 public class HermesRunEventStream {
     private static final Pattern THINK_BLOCK = Pattern.compile("(?is)<think>.*?(?:</think>|$)");
 
@@ -168,6 +170,9 @@ public class HermesRunEventStream {
             String type = firstText(root, root.path("data"), "event", "type");
             if (type != null && WIRE_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
                 onEvent.accept(toRunEvent(root, scope, state));
+            } else {
+                // 본문은 로그에도 남기지 않는다. 새 사건 이름만 판 올리기 때 확인한다.
+                log.debug("알 수 없는 Hermes 사건을 건너뛴다: {}", type);
             }
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event");
