@@ -24,6 +24,7 @@ import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.shared.util.Sha256;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
@@ -203,8 +204,12 @@ public class ContentDraftSaveApproval {
         if (!action.expiresAt().isAfter(now)) {
             throw new ContentDraftRefusal(ContentDraftRefusal.EXPIRED);
         }
+        String args = action.argsJson();
+        if (args == null || ConnectorAction.UNREADABLE_ARGS.equals(args) || !Sha256.hex(args).equals(action.argsSha256())) {
+            throw new ContentDraftRefusal(ConnectorAction.NOT_EXECUTABLE);
+        }
         if (!prepared.startSupported() || prepared.stamp() == null || prepared.manifest() == null
-            || decide(prepared.manifest(), action.argsJson()).isEmpty()) {
+            || decide(prepared.manifest(), args).isEmpty()) {
             throw new ContentDraftRefusal(ConnectorAction.NOT_EXECUTABLE);
         }
         ContentDraftSnapshotInput input;
