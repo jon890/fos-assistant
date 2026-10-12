@@ -47,6 +47,9 @@ jobs:
         run: |
           bun install --cwd hermes/connectors/naver-blog --frozen-lockfile
           bun run --cwd hermes/connectors/naver-blog build
+      # 금융 producer 왕복 검사가 tossinvest 테스트 원본을 생성하고 금융 SDK를 bundle한다.
+      - name: 금융 producer 왕복 fixture 의존성
+        run: bun install --cwd hermes/connectors/tossinvest --frozen-lockfile
       - name: 백엔드 테스트
         if: matrix.suite == 'unit'
         working-directory: backend
