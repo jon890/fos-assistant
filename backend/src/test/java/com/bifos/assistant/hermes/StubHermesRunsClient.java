@@ -37,9 +37,11 @@ public class StubHermesRunsClient implements HermesRunsClient {
     private final Map<String, HermesRunResult> submittedResults = new ConcurrentHashMap<>();
     private volatile Function<HermesRunCommand, HermesRunResult> answer;
     private volatile ApiException nextFailure;
-    private volatile Runnable beforeAwait = () -> {};
+    private volatile Runnable beforeAwait = () -> {
+    };
     private final List<String> stopped = new CopyOnWriteArrayList<>();
-    private volatile Consumer<String> onStop = runId -> {};
+    private volatile Consumer<String> onStop = runId -> {
+    };
 
     /** 비어 있지 않으면 제출이 이것이 열릴 때까지 멈춘다. */
     private volatile CountDownLatch submitGate;
@@ -64,10 +66,12 @@ public class StubHermesRunsClient implements HermesRunsClient {
 
     private volatile RuntimeException sessionDeleteFailure;
 
+
     public void willReturn(HermesRunResult result) {
         this.nextResult = result;
         this.nextFailure = null;
     }
+
 
     /** 대화 실행과 후속 실행처럼 순서가 있는 결과를 차례로 돌려준다. */
     public void willReturnInOrder(HermesRunResult... results) {
@@ -77,6 +81,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
         }
         nextFailure = null;
     }
+
 
     /**
      * 받은 지시를 보고 결과를 정한다.
@@ -89,25 +94,30 @@ public class StubHermesRunsClient implements HermesRunsClient {
         this.nextFailure = null;
     }
 
+
     /** 세션 조회가 실제로 돈 provider 와 모델을 이렇게 답하게 한다. */
     public void willReportSessionRuntime(SessionRuntime runtime) {
         this.sessionRuntime = runtime;
     }
+
 
     /** 그 자식 session 을 물으면 이 사용량을 답하게 한다. */
     public void willReportSubagentUsage(String sessionId, SubagentSessionUsage usage) {
         subagentUsages.put(sessionId, usage);
     }
 
+
     /** 세션 조회가 받은 주소와 profile, session 번호. 부른 순서다. */
     public List<SessionLookup> sessionLookups() {
         return sessionLookups;
     }
 
+
     /** 자식 session 조회가 받은 주소와 profile, session 번호. 부른 순서다. */
     public List<SessionLookup> subagentUsageLookups() {
         return subagentUsageLookups;
     }
+
 
     /**
      * 그 run 을 물을 때 차례로 돌려줄 답이다. 마지막 답은 되풀이한다.
@@ -120,30 +130,36 @@ public class StubHermesRunsClient implements HermesRunsClient {
         lookupAnswers.put(runId, queue);
     }
 
+
     /** 처음 {@code times} 번은 예외를 던지고 그 뒤에는 {@link #willLookup} 의 답을 준다. 다시 부르면 남은 횟수를 바꾼다. */
     public void willFailLookup(String runId, ApiException failure, int times) {
         lookupFailures.put(runId, failure);
         lookupFailuresLeft.put(runId, new AtomicInteger(times));
     }
 
+
     /** 물은 run 번호를 순서대로. */
     public List<String> lookups() {
         return lookups;
     }
+
 
     public void willFail(ApiException failure) {
         this.nextFailure = failure;
         this.nextResult = null;
     }
 
+
     public List<HermesRunCommand> received() {
         return received;
     }
+
 
     /** 완료를 기다리기 직전에 실행해 제출 뒤 저장된 상태를 검사한다. */
     public void beforeAwait(Runnable action) {
         this.beforeAwait = action;
     }
+
 
     /**
      * 이 뒤의 제출을 {@link #releaseSubmits()} 까지 붙잡는다. 제출을 기다리는 쪽의 제한 시간을 검사할 때 쓴다.
@@ -155,6 +171,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
         submitGate = new CountDownLatch(1);
     }
 
+
     /** 붙잡은 제출을 모두 놓는다. */
     public void releaseSubmits() {
         CountDownLatch gate = submitGate;
@@ -164,13 +181,16 @@ public class StubHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     public void onStop(Consumer<String> action) {
         this.onStop = action;
     }
 
+
     public List<String> stopped() {
         return stopped;
     }
+
 
     public void reset() {
         received.clear();
@@ -181,7 +201,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         submittedResults.clear();
         answer = null;
         nextFailure = null;
-        beforeAwait = () -> {};
+        beforeAwait = () -> {
+        };
         sessionRuntime = null;
         sessionLookups.clear();
         subagentUsageLookups.clear();
@@ -189,13 +210,15 @@ public class StubHermesRunsClient implements HermesRunsClient {
         deletedSessions.clear();
         sessionDeleteFailure = null;
         stopped.clear();
-        onStop = runId -> {};
+        onStop = runId -> {
+        };
         lookupAnswers.clear();
         lookupFailures.clear();
         lookupFailuresLeft.clear();
         lookups.clear();
         releaseSubmits();
     }
+
 
     @Override
     public String submit(HermesRunCommand command) {
@@ -212,6 +235,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
         return runId;
     }
 
+
     @Override
     public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
         beforeAwait.run();
@@ -221,11 +245,13 @@ public class StubHermesRunsClient implements HermesRunsClient {
         return submittedResults.getOrDefault(runId, nextResult);
     }
 
+
     @Override
     public void stop(String apiBaseUrl, String profileName, String runId) {
         stopped.add(runId);
         onStop.accept(runId);
     }
+
 
     @Override
     public HermesRunLookup lookupRun(String apiBaseUrl, String profileName, String runId) {
@@ -248,11 +274,13 @@ public class StubHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     @Override
     public SessionRuntime readSessionRuntime(String apiBaseUrl, String profileName, String sessionId) {
         sessionLookups.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
         return sessionRuntime;
     }
+
 
     @Override
     public void deleteSession(String apiBaseUrl, String profileName, String sessionId) {
@@ -263,20 +291,24 @@ public class StubHermesRunsClient implements HermesRunsClient {
         deletedSessions.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
     }
 
+
     public List<SessionLookup> deletedSessions() {
         return List.copyOf(deletedSessions);
     }
+
 
     /** 다음 session 삭제부터 그 예외를 던진다. null 을 주면 다시 받는다. */
     public void failSessionDeletes(RuntimeException failure) {
         this.sessionDeleteFailure = failure;
     }
 
+
     @Override
     public SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
         subagentUsageLookups.add(new SessionLookup(apiBaseUrl, profileName, sessionId));
         return subagentUsages.get(sessionId);
     }
+
 
     private void awaitGate() {
         CountDownLatch gate = submitGate;
@@ -290,6 +322,7 @@ public class StubHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     private HermesRunResult resultFor(HermesRunCommand command) {
         if (answer != null) {
             return answer.apply(command);
@@ -302,6 +335,8 @@ public class StubHermesRunsClient implements HermesRunsClient {
         return nextResult;
     }
 
+
     /** session 을 물은 한 번이다. 어느 Hermes 의 어느 profile 에 물었는지 함께 담는다. */
-    public record SessionLookup(String apiBaseUrl, String profileName, String sessionId) {}
+    public record SessionLookup(String apiBaseUrl, String profileName, String sessionId) {
+    }
 }

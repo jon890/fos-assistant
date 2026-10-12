@@ -35,6 +35,7 @@ class StubHermesRunsClientTest {
         assertThat(stub.lookupRun("unused", "profile", "run").state()).isEqualTo(HermesRunLookup.State.NOT_FOUND);
     }
 
+
     @Test
     @DisplayName("응답을 바꾸는 중에도 등록된 run 을 없다고 답하지 않는다")
     void keepsRegisteredRunVisibleWhileReplacingLookupAnswers() {
@@ -67,6 +68,7 @@ class StubHermesRunsClientTest {
         });
         CompletableFuture.allOf(replacing, lookingUp).join();
     }
+
 
     private static void await(CyclicBarrier barrier) {
         try {
