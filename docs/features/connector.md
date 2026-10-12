@@ -27,6 +27,7 @@ Hermes 의 `tool_descriptions` 와 `tool_summaries` 는 정책과 분리하고 �
 
 요약과 설명은 같은 문자 규칙으로 정제한다. 앞뒤 공백을 자른 뒤 1자부터 2,000 Unicode code point 까지, UTF-8 8,192바이트 이하이다. 탭·CR·LF 는 허용하고 그 밖의 C0, DEL, C1, 방향 제어문자와 잘못된 surrogate 는 금지한다. HTML 이나 Markdown 도 React 텍스트로 그린다. 문자와 공백 경계는 Python·Java·웹이 공통 fixture 로 검사한다.
 200자 상한과 필수 여부, 도구 이름이 문구에 들지 않았는지, 커넥터 README 의 도구 표가 같은 문구인지는 `hermes/tests/test_connectors_contract.py` 가 커넥터마다 본다. 아직 채우지 않은 커넥터는 그 파일의 `PENDING_USER_COPY` 에 있다.
+200자는 쓰는 사람에게 거는 작성 규칙이다. 실행 중의 plugin, Control Plane, 웹은 설명과 같은 2,000자 규칙으로 읽는다. 운영 목록에 이 저장소 밖의 커넥터가 들어와도 요약이 길다는 까닭만으로 화면에서 사라지지 않게 하고, 세 언어의 정제 규칙을 하나로 유지하기 위해서다.
 
 ## 요구
 
