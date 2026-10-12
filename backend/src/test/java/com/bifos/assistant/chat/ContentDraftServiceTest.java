@@ -207,6 +207,27 @@ class ContentDraftServiceTest extends ContentDraftFixture {
 
 
     @Test
+    @DisplayName("관찰을 참조한 원고를 세 번 고쳐도 관찰 revision과 요청 alias를 새로 만들지 않는다")
+    void revisesObservedDraftThreeTimesWithoutNewObservation() {
+        var saved = record(0, UUID.randomUUID(), input(), model());
+        var observation = observations.findAll().getFirst();
+        var id = drafts.create(owner, conversation.id(), observedDraft("첫 원고", observation.id())).draft().draftId();
+        for (int revision = 1; revision < 4; revision++) {
+            var revised = drafts.revise(owner, conversation.id(), id, revision, observedDraft("원고" + revision, observation.id()));
+            assertThat(revised.draft().revision()).isEqualTo(revision + 1);
+            var ref = revised.draft().blocks().get(0).get("observationRef");
+            assertThat(ref.get("id").asString()).isEqualTo(observation.id().toString());
+            assertThat(ref.get("revision").asLong()).isEqualTo(1);
+        }
+        assertThat(drafts.read(owner, conversation.id(), id, null).draft().title()).isEqualTo("원고3");
+        // 원고 수정은 관찰을 다시 쓰지 않는다. 행과 alias 수, 목록의 최초 관찰이 그대로다.
+        assertThat(observations.count()).isEqualTo(1);
+        assertThat(requests.count()).isEqualTo(1);
+        assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(saved);
+    }
+
+
+    @Test
     @DisplayName("PROCESSING 관찰 참조는 STALE로 거절하고 원고 행을 남기지 않는다")
     void rejectsProcessingObservationRefWithoutWrites() {
         var processing = new MediaObservationInput(ObservationStatus.PROCESSING, null, List.of(), List.of(),
@@ -436,6 +457,14 @@ abstract class ContentDraftFixture extends ObservationFixture {
             blocks.add(json.createObjectNode().put("type", "image").put("assetId", photo.id().toString()));
         }
         node.set("blocks", blocks);
+        return reader.read(node);
+    }
+
+
+    ContentDraftInput observedDraft(String title, Long observationId) {
+        var node = json.valueToTree(inputDraft(title, true));
+        ((ObjectNode)node.get("blocks").get(0)).set("observationRef",
+            json.createObjectNode().put("id", observationId.toString()).put("revision", 1));
         return reader.read(node);
     }
 
