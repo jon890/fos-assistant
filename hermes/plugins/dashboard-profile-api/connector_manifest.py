@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from .connector_guard import _guard_manifest
-from .connector_description import _tool_descriptions
+from .connector_description import _tool_descriptions, _tool_summaries
 from .connector_appearance import _tool_arg_labels
 from .connector_snapshot_manifest import _snapshot_manifest
 
@@ -259,6 +259,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "tools": tools,
         "snapshot": snapshot,
         "tool_descriptions": _tool_descriptions(declared),
+        "tool_summaries": _tool_summaries(declared),
         "tool_arg_labels": {name: _tool_arg_labels(tool) for name, tool in declared.get("tools", {}).items()},
         "server": definition,
     }
@@ -353,8 +354,9 @@ def _connector_catalog_response():
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
           **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
           **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
-          # 사람 말 제목이 없는 도구는 `title` 을 내지 않는다. 읽는 쪽이 도구 이름을 보인다.
+          # 사람 말 제목과 요약이 없는 도구는 `title` 과 `summary` 를 내지 않는다. 화면은 도구 이름 대신 대체 문구를 보인다.
           "tools": {name: {key: value for key, value in {**policy, "description": manifest["tool_descriptions"].get(name),
+                                                       "summary": manifest["tool_summaries"].get(name),
                                                        "arg_labels": manifest["tool_arg_labels"].get(name, {})}.items()
                            if value is not None}
                     for name, policy in manifest["tools"].items()}}

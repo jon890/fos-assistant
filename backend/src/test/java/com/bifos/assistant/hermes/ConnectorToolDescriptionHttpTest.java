@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class ConnectorToolDescriptionHttpTest {
     @Test
-    @DisplayName("실제 HTTP 카탈로그는 공통 경계마다 정책을 보존하고 설명만 정제한다")
+    @DisplayName("실제 HTTP 카탈로그는 공통 경계마다 정책을 보존하고 설명과 요약만 정제한다")
     void preservesPoliciesAndNormalizesDescriptionsFromHttp() throws Exception {
         var mapper = JsonMapper.builder().build();
         var vectors = mapper.readTree(Files.readString(Path.of("../test/fixtures/connector-tool-descriptions.json")));
@@ -32,6 +32,7 @@ class ConnectorToolDescriptionHttpTest {
             String raw = "[{\"id\":\"demo-notes\",\"schema\":2,\"title\":\"검사\",\"description\":\"검사\","
                 + "\"fields\":[],\"verify\":{\"tool\":\"read_note\"},\"mcp_server\":\"demo\","
                 + "\"tools\":{\"read_note\":{\"risk\":\"READ\",\"approval\":\"none\",\"title\":\"읽기\",\"description\":"
+                + asciiJson(mapper.writeValueAsString(vector.get("value"))) + ",\"summary\":"
                 + asciiJson(mapper.writeValueAsString(vector.get("value"))) + "}}}]";
             server.expect(requestTo("https://example.test/api/connectors/catalog"))
                 .andRespond(withSuccess(raw, MediaType.APPLICATION_JSON));
@@ -39,8 +40,9 @@ class ConnectorToolDescriptionHttpTest {
             assertThat(tool.risk()).isEqualTo("READ");
             assertThat(tool.approval()).isEqualTo("none");
             assertThat(tool.title()).isEqualTo("읽기");
-            assertThat(tool.description()).as(vector.get("name").asString())
-                .isEqualTo(vector.get("expected").isNull() ? null : vector.get("expected").asString());
+            String expected = vector.get("expected").isNull() ? null : vector.get("expected").asString();
+            assertThat(tool.description()).as(vector.get("name").asString()).isEqualTo(expected);
+            assertThat(tool.summary()).as(vector.get("name").asString()).isEqualTo(expected);
             server.verify();
         }
     }
@@ -52,6 +54,7 @@ class ConnectorToolDescriptionHttpTest {
         var old = new ConnectorTool("write_note", "WRITE", "required", "메모", true, List.of("note_id"));
         var oldest = new ConnectorTool("write_note", "WRITE", "required", "메모", false);
         assertThat(old.description()).isNull();
+        assertThat(old.summary()).isNull();
         assertThat(old.identifiers()).containsExactly("note_id");
         assertThat(old.grant()).isTrue();
         assertThat(oldest.description()).isNull();

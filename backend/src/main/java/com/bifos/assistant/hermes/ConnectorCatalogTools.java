@@ -63,7 +63,8 @@ final class ConnectorCatalogTools {
                 grant(policy),
                 identifiers(policy),
                 text(policy, "description"),
-                argLabels(policy)));
+                argLabels(policy),
+                text(policy, "summary")));
         }
         return List.copyOf(tools);
     }
