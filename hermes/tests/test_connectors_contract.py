@@ -26,8 +26,6 @@ SERVER_TIMEOUT_SECONDS = 30
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
 # 화면은 도구 이름 대신 `title` 과 `summary` 를 보인다. 요약은 한두 문장이다.
 TOOL_SUMMARY_MAX_CHARS = 200
-# 화면용 `title` 과 `summary` 를 아직 채우지 않은 커넥터다. 채우는 PR 에서 이 목록과 함께 지운다.
-PENDING_USER_COPY = {"naver-blog"}
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
@@ -228,9 +226,8 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     lines = owners.read_text(encoding="utf-8").splitlines() if owners.is_file() else []
     if not any(len(parts) >= 2 and parts[0].startswith(prefix) for parts in (line.split() for line in lines)):
         problems.append("CODEOWNERS 에 %s 소유자 줄이 없다" % prefix)
-    if name not in PENDING_USER_COPY:
-        readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").is_file() else ""
-        problems.extend(user_copy_problems(tools, loaded, readme, served_args))
+    readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").is_file() else ""
+    problems.extend(user_copy_problems(tools, loaded, readme, served_args))
 
     return problems
 
