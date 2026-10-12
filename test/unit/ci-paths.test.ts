@@ -156,7 +156,11 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     git("-c", "user.name=CI test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "commit", "-m", message);
   };
   try {
-    for (const event of ["push", "schedule", "workflow_dispatch"]) {
+    assert.equal(run("push").status, 0, "push");
+    assert.deepEqual(selected(), {
+      backend: "false", web: "true", browser: "false", e2e: "false", hermes: "false", quality: "true",
+    });
+    for (const event of ["schedule", "workflow_dispatch"]) {
       assert.equal(run(event).status, 0, event);
       assert.deepEqual(selected(), Object.fromEntries(JOBS.map((job) => [job, "true"])));
     }
@@ -330,4 +334,16 @@ test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다",
       assert.ok(jobsFor(file).includes(flag), `${work} 가 부르는 ${file} 이 ${flag} 를 돌리지 않는다`);
     }
   }
+});
+
+test("main push 는 가벼운 검사만 돌고 전체 검사는 정기 실행과 수동 실행이 돈다", () => {
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  const triggers = /^on:\n([\s\S]*?)\n\npermissions:/m.exec(ci)?.[1] ?? "";
+  for (const trigger of ["pull_request:", "push:", "workflow_dispatch:", "schedule:"]) assert.match(triggers, new RegExp(`^  ${trigger}`, "m"), trigger);
+  assert.match(triggers, /cron: '\d+ \d+ \* \* \*'/);
+  // push 에서 생략된 browser 로 실패 이슈를 열지 않는다. 정기 실행과 수동 실행의 main 실패만 이슈로 모은다.
+  const failures = workflowJobs().get("browser-failures") ?? "";
+  assert.doesNotMatch(failures, /github\.event_name == 'push'/);
+  assert.match(failures, /github\.event_name == 'schedule'/);
+  assert.match(failures, /github\.event_name == 'workflow_dispatch'/);
 });

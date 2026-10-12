@@ -3,10 +3,12 @@ name: CI
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # main push 는 공개 정보, unit, quality(웹 빌드 포함)만 돈다. 전체 검사는 정기 실행과 수동 실행이 돈다.
   push:
     branches: [main]
+  workflow_dispatch:
   schedule:
-    # 한국 시간 매일 04:23. 변경이 없어도 외부 의존성과 흔들리는 검사를 확인한다.
+    # 한국 시간 매일 04:23. PR 이 거의 없는 시간에 전체 검사를 돌려 동시 job 한도를 PR CI 와 다투지 않는다.
     - cron: '23 19 * * *'
 
 permissions:
@@ -271,7 +273,7 @@ jobs:
     needs: browser
     if: >-
       always() && needs.browser.result != 'success' &&
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
