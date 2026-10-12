@@ -200,8 +200,9 @@ list는 1~20개를 job 내부 번호 역순으로 읽고 21번째 행으로 다�
 
 ### 승인과 jobId 예약
 
-`ConnectorActionApproval.approve`는 트랜잭션 밖에서 `ContentDraftSaveApproval.select`로 job 링크를 찾는다. 인자 글이나 도구 이름으로 고르지 않는다.
-링크가 있으면 상시 허락 요청을 `VALIDATION_FAILED`로 거절하고 `prepare`와 `approvePrepared`로 넘긴다. 링크가 없는 일반 줄은 기존 경로 그대로다.
+기존 승인 경로 `POST /api/v1/connector-actions/{actionId}/approve`의 controller가 트랜잭션 밖에서 `ContentDraftSaveApproval.select`로 job 링크를 찾는다. 인자 글이나 도구 이름으로 고르지 않는다.
+링크가 있으면 `ContentDraftSaveApproval.approve`가 상시 허락 요청을 `VALIDATION_FAILED`로 거절하고 `prepare`와 `approvePrepared`로 넘긴다. 링크가 없는 일반 줄은 `ConnectorActionService`의 기존 경로 그대로다.
+원고 승인 줄의 등록 이름 `fos_content_draft_save`는 MCP 서버 도구가 아니다. 이 줄이 일반 승인 경로로 들어와도 선언 없는 도구로 판정되어 실행 없이 거절된다.
 prepare는 잠글 실행 번호, 지금 catalog로 계산한 바인딩 stamp, catalog 선언을 잠금 밖에서 읽는다.
 시작은 catalog의 snapshot 선언이 start·status를 모두 참으로 선언하고 `ContentDraftJobStarter` 구현 빈이 있을 때만 지원한다.
 지금 catalog decoder는 compile 전용 선언만 받고 시작 전송 빈도 없으므로 운영에서는 실행 없이 거절한다.

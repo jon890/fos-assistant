@@ -8,7 +8,7 @@
 
 - `hermes/connectors/naver-blog/connector.json`의 `save_draft`는 바꾸지 않았다. `grant:false`를 넣으면 기존 DSL 저장의 상시 허락이 거둬지고 긴 본문 인자가 가림 거절된다. 원고 승인 줄은 `save_draft` 위험도로 판정하되 승인 방식 `always`로 저장해 상시 허락을 닫는다.
 - 허가는 `ContentDraftJobs.authorize` 대신 `ContentDraftJobAuthorizer.authorize`가 맡고, 잠금 순서는 `ContentDraftJobLocks`가 승인과 함께 쓴다.
-- `approvePrepared`는 `ConnectorActionView` 대신 끝난 `ConnectorAction`을 돌려주고, 판단 피드백·사건·화면 값은 기존 `ConnectorActionApproval`이 만든다.
+- 승인 분기는 `ConnectorActionApproval` 대신 승인 controller가 job 링크로 고른다. 두 서비스 파일을 건드리면 전체 포맷 변경으로 운영 코드 상한을 넘는다. 원고 승인 줄의 등록 이름은 서버 도구가 아니어서 일반 승인 경로로 들어와도 실행 없이 거절된다.
 - 시작 전송은 `ContentDraftJobStarter` port다. 구현 빈이 없거나 catalog가 start·status를 선언하지 않으면 승인은 실행 없이 거절한다.
 - job 목록은 snapshot 번호 대신 job 번호 역순이다. main의 job 표에 owner·대화 칸과 `(owner_user_id,conversation_id,id)` 색인이 있다.
 - 오래된 EXECUTING 정리(5분)가 승인 줄을 UNKNOWN으로 바꿔도 job과 claim은 그대로 쓸 수 있다. claim은 job의 DISPATCHED·SAVING·UNKNOWN에서만 받는다.
