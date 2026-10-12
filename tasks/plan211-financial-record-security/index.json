@@ -1,0 +1,12 @@
+{
+  "name": "plan211-financial-record-security",
+  "description": "공개 금융 승인 전에 미전송 금융 줄의 영구 UNKNOWN 을 claim 소비 여부로 풀고, 승인 줄의 인자와 결과 본문을 사용자 데이터 key 로 암호화한다",
+  "status": "pending",
+  "created_at": "2026-10-12",
+  "total_phases": 2,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "deep" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" }
+  ]
+}
