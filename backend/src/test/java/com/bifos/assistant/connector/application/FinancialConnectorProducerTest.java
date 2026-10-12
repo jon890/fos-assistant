@@ -310,8 +310,8 @@ class FinancialConnectorProducerTest {
 
 
     @Test
-    @DisplayName("kill switch 가 꺼져 있으면 prepare 전에 거절하고 아무것도 저장하지 않는다")
-    void closedSwitchRejectsBeforePrepare() {
+    @DisplayName("keyed hash key 파일이 없으면 prepare 전에 거절하고 아무것도 저장하지 않는다")
+    void missingDigestKeyRejectsBeforePrepare() {
         long count = actions.count();
         OverridableLiveProperties.during(gate, financial(false, List.of("7"), "1000000"));
         assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
@@ -346,8 +346,8 @@ class FinancialConnectorProducerTest {
 
 
     @Test
-    @DisplayName("승인 전에 kill switch 를 끄면 승인을 거절하고 PENDING 으로 남긴다")
-    void approvalAfterSwitchClosedKeepsPending() {
+    @DisplayName("승인 전에 key 파일을 치우면 승인을 거절하고 PENDING 으로 남긴다")
+    void approvalAfterDigestKeyRemovedKeepsPending() {
         var requested = request();
         OverridableLiveProperties.during(gate, financial(false, List.of("7"), "1000000"));
         assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
@@ -356,10 +356,10 @@ class FinancialConnectorProducerTest {
     }
 
 
-    static ConnectorFinancialProperties financial(boolean enabled, List<String> accounts, String maxOrder) {
+    static ConnectorFinancialProperties financial(boolean keyed, List<String> accounts, String maxOrder) {
         BigDecimal order = new BigDecimal(maxOrder);
-        return new ConnectorFinancialProperties(enabled, accounts, order, order, new BigDecimal("1000"),
-            new BigDecimal("10000000"), new BigDecimal("100000"), TEST_DIGEST_KEY);
+        return new ConnectorFinancialProperties(accounts, order, order, new BigDecimal("1000"),
+            new BigDecimal("10000000"), new BigDecimal("100000"), keyed ? TEST_DIGEST_KEY : "");
     }
 
 
