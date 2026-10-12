@@ -21,6 +21,7 @@ import com.bifos.assistant.chat.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ContentDraftActionSummary;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
@@ -47,6 +48,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -96,6 +98,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private final Clock clock;
     private final HttpContentDraftSnapshotClient worker;
     private final AppUserRepository owners;
+    private final ConversationRepository conversations;
 
 
     @Override
@@ -350,8 +353,27 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         var rows = jobs.findByActionIdIn(rowIds).stream()
             .filter(job -> job.ownerUserId().equals(user.id()) && job.conversationId().equals(conversationId)).toList();
         return views(rows).stream().filter(view -> view.actionId() != null).collect(Collectors.toMap(ContentDraftJobView::actionId,
-            view -> new ContentDraftActionSummary(view.snapshotId(), view.draftId(), view.revision(), conversationPublicId,
-                view.status(), view.stage(), view.saveClicked(), view.errorCode())));
+            view -> summary(view, conversationPublicId)));
+    }
+
+
+    /**
+     * 승인·거절 응답의 그 줄에 붙일 원고 요약이다. 주인의 줄이 아니거나 job 링크가 없으면 빈 값이다. 보관한 상태만 읽는다.
+     * 응답에 요약이 없으면 화면이 그 줄을 일반 카드로 바꿔 그린다.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ContentDraftActionSummary> summaryOf(CurrentUser user, UUID actionId) {
+        return actions.findByPublicId(actionId).filter(action -> user.id().equals(action.userId()))
+            .flatMap(action -> jobs.findByActionId(action.id()))
+            .filter(job -> job.ownerUserId().equals(user.id()))
+            .flatMap(job -> conversations.findById(job.conversationId())
+                .map(conversation -> summary(views(List.of(job)).getFirst(), conversation.publicId())));
+    }
+
+
+    private static ContentDraftActionSummary summary(ContentDraftJobView view, UUID conversationPublicId) {
+        return new ContentDraftActionSummary(view.snapshotId(), view.draftId(), view.revision(), conversationPublicId,
+            view.status(), view.stage(), view.saveClicked(), view.errorCode());
     }
 
 

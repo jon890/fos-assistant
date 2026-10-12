@@ -124,6 +124,57 @@ class ContentDraftSnapshotControllerTest extends ContentDraftJobFixture {
     }
 
 
+    @Test
+    @DisplayName("승인·거절 응답도 원고 줄에 요약을 붙여 시작 지원이 없을 때의 실행 없는 거절과 사용자 거절을 구분한다")
+    void attachesSummaryToApproveAndRejectResponses() throws Exception {
+        catalog(false);
+        var refused = saves.requestSave(owner, origin.id(), preview());
+
+        JsonNode approved = json.readTree(post(owner, "/api/v1/connector-actions/" + refused.actionId() + "/approve").body());
+
+        assertThat(approved.path("status").stringValue()).isEqualTo("REJECTED");
+        assertThat(approved.path("errorCode").stringValue()).isEqualTo("not_executable");
+        assertThat(approved.path("contentDraft").path("status").stringValue()).isEqualTo("STALE");
+        assertThat(approved.path("contentDraft").path("errorCode").stringValue()).isEqualTo("not_executable");
+        assertThat(approved.path("contentDraft").path("conversationId").stringValue()).isEqualTo(conversation.publicId().toString());
+        catalog(true);
+        drafts.revise(owner, conversation.id(), draftId, 1L, inputDraft("거절할 원고", true));
+        var declined = saves.requestSave(owner, origin.id(),
+            snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId());
+
+        JsonNode rejected = json.readTree(post(owner, "/api/v1/connector-actions/" + declined.actionId() + "/reject").body());
+
+        assertThat(rejected.path("status").stringValue()).isEqualTo("REJECTED");
+        assertThat(rejected.path("contentDraft").path("status").stringValue()).isEqualTo("STALE");
+        assertThat(rejected.path("contentDraft").path("errorCode").isNull()).isTrue();
+        assertThat(approved.toString() + rejected).doesNotContain(INTERNAL);
+        assertThat(starter.started()).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("시작을 접수한 승인 응답은 진행 중인 원고 요약을 싣는다")
+    void attachesRunningSummaryToAcceptedApproval() throws Exception {
+        var request = saves.requestSave(owner, origin.id(), preview());
+
+        JsonNode approved = json.readTree(post(owner, "/api/v1/connector-actions/" + request.actionId() + "/approve").body());
+
+        assertThat(approved.path("status").stringValue()).isEqualTo("EXECUTING");
+        assertThat(approved.path("contentDraft").path("status").stringValue()).isIn("DISPATCHED", "SAVING");
+        assertThat(starter.started()).hasSize(1);
+    }
+
+
+    private HttpResponse<String> post(CurrentUser user, String path) throws Exception {
+        Instant now = Instant.now();
+        String token = Jwts.builder().subject(user.email()).issuedAt(Date.from(now)).expiration(Date.from(now.plusSeconds(600)))
+            .signWith(Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret".getBytes(StandardCharsets.UTF_8))).compact();
+        return HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+            .header("Authorization", "Bearer " + token).POST(HttpRequest.BodyPublishers.noBody()).build(),
+            HttpResponse.BodyHandlers.ofString());
+    }
+
+
     private HttpResponse<String> get(CurrentUser user, String suffix) throws Exception {
         return HttpClient.newHttpClient().send(request(user, "/api/v1/chat/conversations/" + conversation.publicId() + suffix),
             HttpResponse.BodyHandlers.ofString());

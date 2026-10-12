@@ -65,7 +65,9 @@ public class ConnectorActionController {
         boolean conversationGrant = request != null && Boolean.TRUE.equals(request.conversationGrant());
         // 원고 snapshot 에 연결된 줄은 job 링크로 골라 원고 저장 승인으로 넘긴다. 인자 글이나 도구 이름으로 고르지 않는다.
         if (contentDrafts.select(user, actionId).isPresent()) {
-            return ActionView.from(contentDrafts.approve(user, actionId, grant, conversationGrant));
+            var approved = contentDrafts.approve(user, actionId, grant, conversationGrant);
+            // 화면이 응답으로 자기 줄을 바꾸므로 원고 줄은 목록과 같은 요약을 붙여 돌려준다.
+            return ActionView.from(approved, contentDraftJobs.summaryOf(user, actionId).orElse(null));
         }
         return ActionView.from(actions.approve(user, actionId, grant, conversationGrant));
     }
@@ -91,7 +93,9 @@ public class ConnectorActionController {
 
     @PostMapping("/connector-actions/{actionId}/reject")
     public ActionView reject(@PathVariable UUID actionId) {
-        return ActionView.from(actions.reject(currentUser.require(), actionId));
+        CurrentUser user = currentUser.require();
+        var rejected = actions.reject(user, actionId);
+        return ActionView.from(rejected, contentDraftJobs.summaryOf(user, actionId).orElse(null));
     }
 
 
