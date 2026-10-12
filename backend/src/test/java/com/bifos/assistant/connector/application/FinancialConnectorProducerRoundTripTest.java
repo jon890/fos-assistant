@@ -231,8 +231,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         var requested = request();
         switch (change) {
             case "desired-disabled" -> jdbc.update("update agent_connector_binding set desired_enabled = false where id = ?", bindingId);
-            case "disconnected" -> tx().executeWithoutResult(status ->
-                connections.findById(connectionId).orElseThrow().disconnected(now.plusSeconds(1)));
+            case "disconnected" -> tx().executeWithoutResult(status -> connections.findById(connectionId).orElseThrow().disconnected(now.plusSeconds(1)));
             case "profile" -> jdbc.update("update agent set hermes_profile = ? where id = (select agent_id from agent_connector_binding where id = ?)",
                 profile + "-moved", bindingId);
             default -> {
