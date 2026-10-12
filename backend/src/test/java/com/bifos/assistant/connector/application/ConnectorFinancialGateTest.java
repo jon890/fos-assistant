@@ -31,8 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ConnectorFinancialGateTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String KEY = "src/test/resources/financial/test-digest.key";
-    private static final FinancialDigest DIGEST =
-        new FinancialDigest(LiveProperties.fixed(ConnectorFinancialProperties.class, open("1", "1", "1")));
+    private static final FinancialDigest DIGEST = new FinancialDigest(LiveProperties.fixed(ConnectorFinancialProperties.class, open("1", "1", "1")));
     // KST 2026-10-13 10:00 이다. 하루의 시작은 UTC 2026-10-12T15:00 이다.
     private static final Instant NOW = Instant.parse("2026-10-13T01:00:00Z");
     private static final String LIMIT_BUY = "{\"symbol\":\"A\",\"market\":\"KOSPI\",\"currency\":\"KRW\",\"side\":\"BUY\",\"quantity\":\"2\",\"price\":\"1000\","

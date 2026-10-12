@@ -13,9 +13,11 @@ import org.springframework.data.repository.query.Param;
 public interface ConnectorActionExecutionRepository extends JpaRepository<ConnectorActionExecution, Long> {
     List<ConnectorActionExecution> findByRequestKeyOrderByActionIdAsc(String requestKey);
 
+
     /** keyed hash 이전의 평문 request_key 줄이 남았는지 본다. 남았으면 같은 의도 차단이 그 줄을 놓치므로 금융 관문을 닫는다. */
     @Query("select count(e) > 0 from ConnectorActionExecution e where e.requestKey not like 'k1%'")
     boolean existsUnkeyedRequestKey();
+
 
     /** 사용자와 승인 줄을 잠근 뒤 실행 내용을 마지막으로 잠근다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
