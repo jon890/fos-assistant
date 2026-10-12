@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,7 +57,7 @@ public class ContentDraftJobAuthorizer {
      * @throws ApiException 서명·형식이 틀리면 401, 그 밖의 거절은 403
      */
     public void authorize(String ticket, String stage, Integer position) {
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         var payload = tickets.authenticate(ticket);
         boolean photo = PHOTO.equals(stage);
         if (!(START.equals(stage) || SAVE.equals(stage) || photo) || photo != (position != null)

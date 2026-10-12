@@ -309,7 +309,12 @@ public class ContentDraftSaveApproval {
     }
 
     private record Outcome(Kind kind, String errorCode) {
-        enum Kind { ACCEPTED, REJECTED, UNKNOWN }
+        enum Kind {
+            ACCEPTED,
+            REJECTED,
+            UNKNOWN
+        }
+
 
         static final Outcome ACCEPTED = new Outcome(Kind.ACCEPTED, null);
         static final Outcome UNKNOWN = new Outcome(Kind.UNKNOWN, null);

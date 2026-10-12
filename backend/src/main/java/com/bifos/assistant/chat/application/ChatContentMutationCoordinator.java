@@ -26,7 +26,7 @@ public class ChatContentMutationCoordinator {
 
 
     public <T> T run(Long ownerUserId, ChatContentMutationTarget target, Supplier<T> work) {
-        return run(ownerUserId, target, org.springframework.transaction.TransactionDefinition.TIMEOUT_DEFAULT, work);
+        return run(ownerUserId, target, TransactionDefinition.TIMEOUT_DEFAULT, work);
     }
 
 

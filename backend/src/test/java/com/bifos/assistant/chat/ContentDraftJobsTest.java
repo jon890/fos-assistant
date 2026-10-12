@@ -8,6 +8,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.admin.application.AgentAdminService;
+import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.util.Date;
+import java.nio.charset.StandardCharsets;
+import org.springframework.dao.TransientDataAccessResourceException;
+import org.springframework.dao.TransientDataAccessException;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -96,7 +104,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     @Autowired
     AgentRepository agents;
     @Autowired
-    com.bifos.assistant.agent.admin.application.AgentAdminService agentAdmin;
+    AgentAdminService agentAdmin;
     @Autowired
     AgentExecutionRepository executions;
     @Autowired
@@ -178,10 +186,11 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         code(() -> jobQueries.list(other, conversation.id(), null, 20), ErrorCode.CONVERSATION_NOT_FOUND);
         code(() -> jobQueries.list(other, conversation.id(), snapshotId, 20), ErrorCode.CONVERSATION_NOT_FOUND);
         Instant now = Instant.now();
-        String token = io.jsonwebtoken.Jwts.builder().subject(other.email()).issuedAt(java.util.Date.from(now))
-            .expiration(java.util.Date.from(now.plusSeconds(600)))
-            .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret"
-                .getBytes(java.nio.charset.StandardCharsets.UTF_8))).compact();
+        String token = Jwts.builder().subject(other.email()).issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusSeconds(600)))
+            .signWith(Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret"
+                .getBytes(StandardCharsets.UTF_8)))
+            .compact();
         var http = HttpRequest.newBuilder(URI.create("http://localhost:" + port
             + "/api/v1/connector-actions/" + request.actionId() + "/approve"))
             .header("Authorization", "Bearer " + token).POST(HttpRequest.BodyPublishers.noBody()).build();
@@ -250,9 +259,9 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     void preservesPendingApprovalDuringCatalogFailure() {
         var request = saves.requestSave(owner, origin.id(), preview());
         catalog(true);
-        when(catalog.readCatalog()).thenThrow(new org.springframework.dao.TransientDataAccessResourceException("synthetic"));
+        when(catalog.readCatalog()).thenThrow(new TransientDataAccessResourceException("synthetic"));
         assertThatThrownBy(() -> contentApproval.approve(owner, request.actionId(), null))
-            .isInstanceOf(org.springframework.dao.TransientDataAccessException.class);
+            .isInstanceOf(TransientDataAccessException.class);
         assertThat(actionRows.findAll().getFirst().status()).isEqualTo(ActionStatus.PENDING);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.PREVIEW_READY);
         assertThat(starter.started()).isEmpty();
@@ -441,7 +450,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
 
 
     private void setAgentEnabled(boolean enabled) {
-        agentAdmin.update(binding.agent().code(), new com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand(
+        agentAdmin.update(binding.agent().code(), new AgentUpdateCommand(
             enabled, AgentVisibility.PRIVATE, null, null, null));
     }
 
