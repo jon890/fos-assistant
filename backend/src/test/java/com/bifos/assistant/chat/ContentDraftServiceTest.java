@@ -44,6 +44,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -228,7 +229,11 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         // 원고 경로는 관찰을 읽기만 한다. 앞으로 관찰 쓰기가 생기는 회귀를 막는다.
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
-        assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(saved);
+        // 두 번째 이미지 블록은 다른 첨부다(같은 사진은 한 번만 쓴다). 그 첨부도 관찰이 새로 생기지 않는다.
+        var listed = service.list(owner, conversation.id(), null, 10);
+        assertThat(listed).filteredOn(view -> view.assetId().equals(photo.id().toString())).containsExactly(saved);
+        assertThat(listed).filteredOn(view -> view.assetId().equals(secondPhoto.id().toString()))
+            .singleElement().satisfies(view -> assertThat(view.revision()).isZero());
     }
 
 
@@ -437,6 +442,15 @@ abstract class ContentDraftFixture extends ObservationFixture {
     @Autowired
     ConversationPurger purger;
 
+    /** 같은 사진은 원고에 한 번만 쓸 수 있어 두 이미지 블록에 다른 첨부를 둔다. */
+    ChatAttachment secondPhoto;
+
+
+    @BeforeEach
+    void prepareSecondPhoto() {
+        secondPhoto = photo();
+    }
+
 
     @AfterEach
     void removeDrafts() {
@@ -459,7 +473,7 @@ abstract class ContentDraftFixture extends ObservationFixture {
         var blocks = json.createArrayNode();
         if (image) {
             blocks.add(json.createObjectNode().put("type", "image").put("assetId", photo.id().toString()));
-            blocks.add(json.createObjectNode().put("type", "image").put("assetId", photo.id().toString()));
+            blocks.add(json.createObjectNode().put("type", "image").put("assetId", secondPhoto.id().toString()));
         }
         node.set("blocks", blocks);
         return reader.read(node);

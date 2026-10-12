@@ -102,7 +102,7 @@ test("공개 목록에는 private 도구가 없으며 env와 모델 인자로 pr
   }
 });
 
-test("private 목록은 compile 하나이고 기존 golden 구조·hash·notes·반복과 미사용 asset을 보존한다", async () => {
+test("private 목록은 compile 하나이고 기존 golden 구조·hash·notes·미사용 asset을 보존하며 같은 사진의 반복은 거절한다", async () => {
   const { client, close } = await connected(true, {
     NAVER_BLOG_ATTACHMENT_DIR: root,
   });
@@ -113,16 +113,6 @@ test("private 목록은 compile 하나이고 기존 golden 구조·hash·notes·
     for (const args of [
       input(),
       { ...input(), resolvedAssets: input().resolvedAssets.reverse() },
-      {
-        ...input(),
-        canonicalDraft: {
-          ...input().canonicalDraft,
-          blocks: [
-            ...input().canonicalDraft.blocks,
-            { type: "image" as const, assetId: "101" },
-          ],
-        },
-      },
     ]) {
       const result = await client.callTool({
         name: "compile_content_snapshot",
@@ -133,6 +123,23 @@ test("private 목록은 compile 하나이고 기존 golden 구조·hash·notes·
         compileContentDraft(args.canonicalDraft, args.resolvedAssets),
       );
     }
+    const repeated = await client.callTool({
+      name: "compile_content_snapshot",
+      arguments: {
+        ...input(),
+        canonicalDraft: {
+          ...input().canonicalDraft,
+          blocks: [
+            ...input().canonicalDraft.blocks,
+            { type: "image" as const, assetId: "101" },
+          ],
+        },
+      },
+    });
+    expect(repeated.isError).toBe(true);
+    expect(repeated.content).toEqual([
+      { type: "text", text: '{"error":"invalid_input"}' },
+    ]);
   } finally {
     await close();
   }
