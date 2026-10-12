@@ -415,6 +415,10 @@ class UserExecutionLimitBackgroundTest { ... }
   30초 상한은 멈춘 작업을 잡는 데만 쓴다. 넘으면 남은 스레드 이름과 함께 그 검사가 실패한다.
   turn 을 붙잡는 대역(`holdSubmits()` 등)을 쓴 검사는 끝나기 전에 푼다.
   검사 안에서 작업 결과를 단언할 때는 그 검사가 기다릴 조건을 직접 기다린다. 공통 확장의 join 은 검사가 끝난 뒤에 돈다.
+- **Hermes 조회 대역의 응답 교체는 동시 조회에서도 등록된 run 을 유지한다.**
+  `StubHermesRunsClient` 는 마지막 응답을 큐 안에 남기고 새 큐를 한 번에 등록한다.
+  마지막 응답을 먼저 지우면 재시작 정리의 동시 조회가 `NOT_FOUND` 를 받아 실행을 `REMOTE_RUN_LOST` 로 끝낼 수 있다.
+  `StubHermesRunsClientTest` 가 응답 순서, 마지막 응답 반복과 동시 교체를 확인한다.
 - **앞 검사가 남긴 줄에 기대지 않는다.** 사용자와 에이전트는 검사마다 새로 만든다.
   고정 code 를 쓰는 검사가 검사 트랜잭션 안에서 지우고 다시 넣으면, Hibernate 가 넣기를 먼저 내보내 유일 제약에 걸린다. 지운 뒤 `flush()` 한다.
 - **기반의 spy 는 `verify(...)` 의 matcher 사이에서 부르지 않는다.** Mockito 가 그 호출을 matcher 를 쓰는 호출로 읽는다. 값을 먼저 지역 변수로 받는다.

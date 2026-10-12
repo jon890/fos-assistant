@@ -1,0 +1,23 @@
+: open
+event: ignored-transport-name
+id: 0
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":1,"seq":0,"future":{"nested":true},"delta":"앞"}
+
+data: {"event":"replay.truncated","run_id":"fixture-run","timestamp":1.1,"oldest_retained_seq":1}
+
+id: 1
+data: {"event":"tool.failed","seq":1,"preview":"아직 지원하지 않는 사건"}
+
+id: 2
+data: {"event":"tool.progress","seq":2,"preview":"아직 지원하지 않는 사건"}
+
+id: 3
+data: {"event":"future.event","seq":3,"delta":"섞이면 안 되는 조각"}
+
+id: 4
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":2,"seq":4,"delta":"뒤","future":null}
+
+id: 5
+data: {"event":"run.completed","run_id":"fixture-run","timestamp":3,"seq":5,"output":"앞뒤","usage":{},"future":[1,2]}
+
+: stream closed

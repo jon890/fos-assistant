@@ -61,6 +61,15 @@ from __future__ import annotations
 
 import os
 
+# Hermes v0.21.6은 PyYAML을 기본으로 설치하지 않는다. 관리 API를 열기 전에 확인한다.
+try:
+    import yaml
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "dashboard-profile-api에는 PyYAML==6.0.3이 필요하다. "
+        "상류 경고가 안내하는 `hermes pm repair`에 기대지 말고 이미지 빌드에 PyYAML을 넣는다"
+    ) from exc
+
 # 시험과 기존 호출부가 쓰는 이름을 진입점에서 다시 내보낸다.
 from .common import (
     BASE_ENV_KEYS,

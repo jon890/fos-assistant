@@ -173,7 +173,9 @@ class BodylessSourceTest(unittest.TestCase):
                 "display_hermes_home": lambda: "synthetic", "nonretryable_copy": lambda *args, **kwargs: "failure",
                 "exhausted_copy": lambda *args, **kwargs: "failure", "_stamp_limit_reset": lambda *args: None,
                 "_welcome_outage_copy": lambda *args, **kwargs: None, "is_thinking_timeout": lambda *args: False,
-                "_STREAM_DROP_MARKERS": ("connection lost",)}
+                "_STREAM_DROP_MARKERS": ("connection lost",),
+                # v0.21.6의 집계 호출은 요청 writer 경계 밖이다. provider 인자 보존은 아래에서 확인한다.
+                "observe_request_tools": lambda agent, tools: None}
             relative = "agent/turn_api_request.py"
             tree = _tree(self.source, relative)
             definition = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "ApiRequestBuild")
@@ -181,7 +183,8 @@ class BodylessSourceTest(unittest.TestCase):
             relative = "agent/turn_recovery.py"
             tree = _tree(self.source, relative)
             _execute_nodes(self.source, relative, [_function(tree, name) for name in
-                ("_failed_turn_result", "nonretryable_client_error_result", "max_retries_exhausted_result")], environment)
+                ("_failed_turn_result", "_with_delivered_partial", "nonretryable_client_error_result",
+                 "max_retries_exhausted_result")], environment)
             build_args = dict(api_messages=payload["messages"], _moa_prepared_request=None, tools_for_api=[],
                 system_message="", messages=[], original_user_message=CANARY, approx_tokens=1, total_chars=1,
                 retry_count=0, api_call_count=1, api_request_id="synthetic", api_start_time=0, effective_task_id="synthetic", turn_id="synthetic")
@@ -195,7 +198,7 @@ class BodylessSourceTest(unittest.TestCase):
                 usage = strict_provider(built.api_kwargs)
                 first = environment["nonretryable_client_error_result"](agent, error, classified, status_code=422, **terminal_args)
                 second = environment["max_retries_exhausted_result"](agent, error, classified,
-                    max_retries=2, is_rate_limited=False, error_msg="synthetic rejection", **terminal_args)
+                    attempts=2, is_rate_limited=False, error_msg="synthetic rejection", **terminal_args)
                 return first, second, usage
             counters = []
             self.helper.dump_api_request_debug = lambda agent, request, **kwargs: counters.append(kwargs["reason"])

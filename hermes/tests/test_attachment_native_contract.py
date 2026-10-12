@@ -50,7 +50,9 @@ class NativeImageContractTest(unittest.TestCase):
     def test_pillow_is_already_pinned_in_runtime_core(self):
         import tomllib
         project = tomllib.loads((pathlib.Path(os.environ["HERMES_SOURCE"]) / "pyproject.toml").read_text())
-        self.assertIn("Pillow==" + contract.NATIVE_IMAGE_PILLOW_VERSION, project["project"]["dependencies"])
+        # v0.21.6은 Python 3.14부터 core 의존성을 설치한다. pin과 지원 Python을 함께 확인한다.
+        self.assertIn("Pillow==" + contract.NATIVE_IMAGE_PILLOW_VERSION + "; python_version >= '3.14'",
+                      project["project"]["dependencies"])
 
     def test_plugin_result_reaches_responses_as_native_image(self):
         source = pathlib.Path(os.environ["HERMES_SOURCE"])
