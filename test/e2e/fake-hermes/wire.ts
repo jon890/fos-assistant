@@ -20,7 +20,7 @@ export function wireEvents(wire: string): Record<string, unknown>[] {
 const templates = new Map(wireEvents(wireFixture("events")).map((payload) => [payload.event, payload]));
 
 /** 판별 칸은 공유 표본에서 가져오고 실행 식별자와 종료 결과는 실제 대역 상태에서 붙인다. */
-export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage">, fields: Record<string, unknown>): Record<string, unknown> {
+export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>): Record<string, unknown> {
   const template = templates.get(fields.event);
   if (template === undefined) throw new Error(`${HERMES_VERSION}의 사건 표본이 없다: ${fields.event}`);
   const { event: _event, run_id: _runId, timestamp: _timestamp, ...defaults } = template;
@@ -31,11 +31,12 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage">, fie
   if (fields.event === "run.completed") {
     payload.output = fields.output ?? run.output;
     payload.usage = fields.usage ?? run.usage;
+    payload.runtime = fields.runtime ?? run.runtime;
   }
   return payload;
 }
 
-export function runEventWriter(response: ServerResponse, run: Pick<Run, "run_id" | "output" | "usage">) {
+export function runEventWriter(response: ServerResponse, run: Pick<Run, "run_id" | "output" | "usage" | "runtime">) {
   return (fields: Record<string, unknown>): void => {
     response.write(`data: ${JSON.stringify(eventEnvelope(run, fields))}\n\n`);
   };

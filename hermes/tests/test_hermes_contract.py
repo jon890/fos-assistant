@@ -334,6 +334,36 @@ class HermesSourceTest(unittest.TestCase):
         callback("tool.progress", tool_name="web_search")
         self.assertEqual(len(emitted), count)
 
+    def test_shared_wire_covers_terminal_and_approval_fields(self):
+        """완료와 승인 표본의 필수 칸도 상류 소스의 호출과 사전에서 꺼내 대조한다."""
+        fixture = pathlib.Path(__file__).resolve().parents[2] / (
+            "backend/src/test/resources/hermes/%s/events.sse" % contract.HERMES_VERSION)
+        samples = {event["event"]: event for line in fixture.read_text().splitlines()
+                   if line.startswith("data:") for event in [json.loads(line[5:])]}
+        runs = self.tree(self.root / "gateway/platforms/api_server_runs.py")
+        calls = [node for node in ast.walk(runs) if isinstance(node, ast.Call)
+                 and isinstance(node.func, ast.Name)]
+        completed = [call for call in calls if call.func.id == "_finish"
+                     and {"output", "usage"} <= {keyword.arg for keyword in call.keywords}]
+        self.assertTrue(completed)
+        for call in completed:
+            self.assertTrue({keyword.arg for keyword in call.keywords if keyword.arg}
+                            <= samples["run.completed"].keys())
+        responded = [call for call in calls if call.func.id == "_mark_run_event"
+                     and any(isinstance(arg, ast.Constant) and arg.value == "approval.responded"
+                             for arg in call.args)]
+        self.assertTrue(responded)
+        for call in responded:
+            self.assertTrue({keyword.arg for keyword in call.keywords if keyword.arg}
+                            <= samples["approval.responded"].keys())
+        approval = self.tree(self.root / "tools/approval.py")
+        dictionaries = [{key.value for key in node.keys if isinstance(key, ast.Constant)}
+                        for node in ast.walk(approval) if isinstance(node, ast.Dict)]
+        notified = [keys for keys in dictionaries if {"command", "pattern_key", "allow_session"} <= keys]
+        self.assertTrue(notified)
+        for keys in notified:
+            self.assertTrue(keys <= samples["approval.request"].keys())
+
     def test_decision_profile_blocks_implicit_mcp_tools_in_upstream_resolver(self):
         """상류의 순수 합집합 함수를 실행해 no_mcp 가 기본 MCP 도구를 넣지 않는지 본다."""
         node = self.resolve("hermes_cli.tools_config", "_merge_mcp_servers")

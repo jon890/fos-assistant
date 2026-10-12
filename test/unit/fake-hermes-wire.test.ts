@@ -42,6 +42,7 @@ test("대역 HTTP 사건에는 제출한 실행 번호와 timestamp 및 완료 �
     const status = await (await fetch(`${hermes.baseUrl}/p/browser/v1/runs/${run_id}`, { headers })).json();
     assert.equal(events.at(-1)?.output, status.output);
     assert.deepEqual(events.at(-1)?.usage, status.usage);
+    assert.deepEqual(events.at(-1)?.runtime, status.runtime);
   } finally {
     await hermes.close();
   }
