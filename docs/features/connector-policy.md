@@ -137,7 +137,7 @@ sequenceDiagram
 | `tools.<이름>.approval` | 승인 방식. 없으면 그 위험도의 기본값 |
 | `tools.<이름>.title` | 승인 카드와 알림 줄에 보일 사람 말. 없으면 `이름 없는 동작` 으로 보인다 |
 | `tools.<이름>.grant` | 거짓이면 상시 허락을 줄 수 없고 호출마다 승인을 받는다. 없으면 참이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)) |
-| `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다 |
+| `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. `READ` 가 아니고 `approval` 이 `required` 인 도구가 빠뜨리면 manifest 를 거절한다. 그 밖의 도구는 거짓으로 채운다 |
 | `tools.<이름>.conversation_grant` | 참이면 승인 카드의 「이 대화에서 계속 허용」 을 받는다. 없으면 거짓이다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 선언한다([ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md)) |
 | `tools.<이름>.identifiers` | 승인 카드가 길이로 가리지 않을 맨 위 인자 이름. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다 |

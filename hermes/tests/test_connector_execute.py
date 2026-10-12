@@ -126,7 +126,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
     def declare_schema_two(self):
         """시험 커넥터를 `schema: 2` 로 바꾼다. `env_view` 는 선언하지 않는다."""
         self.rewrite("connector.json", lambda value: value.update(
-            schema=2, tools={"list_scopes": {"risk": "READ"}, "write_note": {"risk": "WRITE"}}))
+            schema=2, tools={"list_scopes": {"risk": "READ"}, "write_note": {"risk": "WRITE", "outbound": False}}))
 
     def test_write_tool_runs_with_the_given_arguments(self):
         """설치한 profile 에서 쓰기 도구를 받은 인자로 부르고 결과를 그대로 돌려준다."""

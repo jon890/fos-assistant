@@ -120,6 +120,7 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
     `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
     `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
+    `READ` 가 아니고 `approval` 이 `required` 인 도구는 반드시 선언한다. 그 밖의 도구는 빠뜨리면 거짓으로 채운다.
     `conversation_grant` 는 그 도구를 한 대화에서 계속 허용할 수 있는지다(ADR-20261012 / conversation-grant). 참이라고
     선언한 도구만 열고 기본값은 거짓이다. `approval` 이 `required` 이고 밖으로 나가지 않는 도구에만 선언한다.
     `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
@@ -167,6 +168,10 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
             if approval != "required":
                 raise ValueError("grant 는 approval 이 required 인 도구에만 선언한다")
         grant = approval == "required" and declared_tool.get("grant") is not False
+        # 밖으로 나가는지를 빠뜨린 쓰기를 거짓으로 채우면 만든 사람이 판단하지 않은 도구가 나가지 않는 도구로 읽힌다.
+        # 늘 승인을 받는 도구는 허락으로 풀리지 않아 그 칸이 판정을 바꾸지 않으므로 묻지 않는다.
+        if risk != "READ" and approval == "required" and "outbound" not in declared_tool:
+            raise ValueError("READ 가 아닌 required 도구는 outbound 를 true 나 false 로 선언한다")
         outbound = declared_tool.get("outbound", False)
         if type(outbound) is not bool:
             raise ValueError("outbound 는 true 나 false 다")
