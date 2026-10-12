@@ -32,11 +32,15 @@ export function spawnWorker(
   jobFile: string,
   env: Record<string, string>,
 ) {
-  const child = spawn(process.execPath, [workerEntry, "--worker", jobFile], {
-    detached: true,
-    stdio: "ignore",
-    env,
-  });
+  const child = spawn(
+    process.execPath,
+    ["--no-env-file", workerEntry, "--worker", jobFile],
+    {
+      detached: true,
+      stdio: "ignore",
+      env,
+    },
+  );
   child.on("error", () => {});
   child.unref();
 }
