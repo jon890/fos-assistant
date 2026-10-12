@@ -827,7 +827,7 @@ class ConnectorActionServiceTest {
 
         ConnectorActionView approved = service.approve(me, answer.actionId(), null);
         assertThat(approved.status()).isEqualTo(ActionStatus.SUCCEEDED);
-        assertThat(approved.title()).isEqualTo("네이버 임시저장 글 불러오기 · 자동저장 가능");
+        assertThat(approved.title()).isEqualTo("임시저장 글 불러오기");
         verify(connector, times(1)).execute(PROFILE, DEMO, "mcp__demo__read_draft", args);
         assertThat(grants.findAll()).isEmpty();
         assertThat(ask(tool.name(), "{\"draft_id\":\"987654321\"}").allowed()).isFalse();
