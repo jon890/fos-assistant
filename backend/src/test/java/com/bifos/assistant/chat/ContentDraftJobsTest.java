@@ -285,6 +285,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(actionRows.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("원고 저장 승인 인자를 복호화하지 못하면 jobId 예약과 worker 시작을 하지 않는다")
     void refusesUnreadableSaveArgumentsBeforeStartingWorker() {
