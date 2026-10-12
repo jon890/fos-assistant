@@ -68,6 +68,12 @@ READ 데이터의 인터넷 전파 위험은 [커넥터 도구 정책](connector
 - 연결 확인이 `CONNECTOR_NOT_CONNECTED` 로 끝나면 값을 다시 입력하라고 안내하고 연결을 다시 읽는다. 서버가 연결을 `PENDING` 으로 커밋했기 때문이다
 - 운영 목록에서 빠진 커넥터의 기존 연결은 「쓸 수 없음」 으로 보이고 해제만 된다
 - 목록 화면이 `?agent=<번호>` 로 열리면 보던 에이전트에서 쓸 서비스를 고르라고 안내하고, 카드 링크가 그 번호를 연결 하나의 화면으로 넘긴다
+- 쓸 수 있는 서비스에 안전한 HTTPS `ownerBrowserLoginUrl`이 있으면 카드에 「내 브라우저에서 로그인」 링크를 보인다. 도구나 소개 링크가 없어도 로그인 안내를 그리며, 카드 상세 링크와 별개로 클릭하거나 키보드로 열 수 있다
+- 연결 전에는 「이 서비스는 내 브라우저에서 먼저 로그인해야 해요.」, 그 밖의 상태에는 「이 서비스는 내 브라우저에 로그인한 계정을 써요.」로 안내한다. 로그인 주소가 없는 OAuth·API 입력 카드와 운영 목록에서 빠진 카드는 이 안내를 그리지 않는다
+
+목록 위의 「내 브라우저」 입구와 상세 화면의 기존 로그인·자격 증명 거절 안내는 함께 유지한다.
+실행할 수 없어 취소된 요청의 알림 줄은 「외부 서비스 연결에서 연결을 확인해 주세요」로 안내한다.
+준비되지 않은 연결의 모델 안내와 Gmail 스킬·토큰 발급 스크립트·커넥터 README도 같은 화면 이름인 「외부 서비스 연결」을 쓴다.
 
 연결 화면의 「묻지 않고 실행하는 동작」 은 상시 허락을 읽은 결과만 보인다. 이 연결의 허락이 없으면 그 절을 그리지 않는다.
 허락을 읽지 못하면 앞서 보이던 허락을 지우고 「다시 확인」 을 보인다. 해제나 다시 등록 뒤에 다시 읽을 때도 같다. 해제가 서버에서 허락을 거뒀는데 화면에 옛 허락이 남지 않게 한다.
@@ -345,7 +351,33 @@ callback이 없는 vault 저장·가져오기·삭제와 detach 자체는 기존
 외부 설치까지 원자적으로 정리하려면 Hermes가 설치의 식별자를 대조하는 조건부 설치·삭제 계약을 제공해야 한다.
 현재 시도 UUID는 DB 안에서만 쓰므로, 지금 계약은 DB 권한 차단까지 보장하고 남은 외부 상태의 자동 정리는 보장하지 않는다.
 READ·WRITE의 설치, 재시작 대기와 반영 예정 계약은 그대로이며 FINANCIAL·DESTRUCTIVE는 계속 `RISK_NOT_OPEN`이다.
-guard를 실은 설치와 지원 확인은 후속 구현이며 이번 변경으로 금융 도구를 노출하지 않는다.
+
+### guard 설치와 지원 확인
+
+시작 트랜잭션은 카탈로그의 `execution_guard`를 기존 선언 검사기로 검증하고 protocol과 전체 manifest SHA를
+불변 설치 입력에 캡처한다. 선언이 없으면 기존 5인자 설치를 쓴다. 선언이나 SHA가 잘못됐으면 설치를 보내지 않는다.
+설치 입력에는 엔티티와 가변 JSON을 보관하지 않으며, 일반 바인딩의 유효한 선언만 6인자 `bindConnector`에 연결한다.
+
+`bind.guard`는 `v`, `protocol`, `bindingId`, `connectionId`, `connectionUpdatedAt`, `manifestSha256`만 갖는다.
+번호는 문자열이고 연결 revision은 시작 트랜잭션이 커밋한 값이다. 시도 UUID와 바인딩 revision, nonce는 설치 wire에 넣지 않는다.
+manifest가 바뀌면 새 설치 시도가 새 SHA를 캡처하며 과거 verified를 재사용하지 않는다.
+
+| 순서 | 관측하는 상태 |
+| --- | --- |
+| 시작 커밋 | 새 시도와 `PENDING`, 커밋된 연결 revision |
+| Python 설치 callback | 실제 support가 `409`로 거절하고 plugin은 `pending`을 반환 |
+| 설치·상태·probe와 결과 CAS | 재시작·반영 예정 계약에 따라 현재 시도만 `READY`로 전이 |
+| READY 뒤 상태 조회 | 새 nonce로 실제 support를 확인하고 일치하면 `verified` |
+
+READY 이전의 verified를 설치 완료 조건으로 요구하지 않는다. 지원 확인 실패는 금융 차단 상태이며 일반 설치의
+configured·enabled·mode·policy hook과 probe 판정을 대신하지 않는다. verified도 거래 권한이 아니므로
+금융 도구의 exclude와 상시 허락 없음, `RISK_NOT_OPEN`을 유지한다.
+실제 Spring MVC·DB와 Python 설치·상태·support 소비자의 왕복은 H2와 새 Flyway MySQL DB에서 같은 시험으로 확인한다.
+왕복 fixture의 전송 계수는 그 Python 프로세스의 urllib 요청 시도만 관측한다.
+loopback 대역의 인증 경로(`/oauth/token`) POST와 금융 경로(`/financial/orders`) POST·DELETE를 따로 센다.
+support POST와 다른 경로는 금융 계수에 넣지 않으며, 독립 loopback 수신 회귀가 각 1회 요청의 증가를 확인한다.
+연결 실패도 시도로 세지만 MCP 자식과 다른 HTTP 라이브러리의 전송은 관측하지 않는다.
+운영 배포와 실제 실행 왕복의 확인 절차는 `fos-home-infra`가 소유한다.
 
 ### 재시작
 
@@ -359,6 +391,11 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 - 배포한 뒤 확인할 것은 [도구 hook 과 승인](../../hermes/docs/hermes-contract.md) 의 「배포한 뒤 확인할 것」 에 모았다
 
 ## 대시보드 plugin 계약
+
+카탈로그 도구의 `arg_labels`는 도구별 승인 인자 표시 이름이다.
+정책과 분리한 `tool_arg_labels`를 카탈로그에서만 합치며 DB와 설치 정책에는 저장하지 않는다.
+현재 도구 이름과 정확히 맞추고, 가린 인자 객체에 그대로 남은 원래 키의 표시 이름만 승인 조회·승인·거절 응답의 `argLabels`로 전달한다.
+검증과 옛 응답 호환은 [승인 인자 표시 이름](connector-policy.md#승인-인자-표시-이름)이 갖는다.
 
 Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의 커넥터 경로에 기대는 약속이다.
 경로마다의 요청과 응답, 두 설치 방식의 차이, 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.

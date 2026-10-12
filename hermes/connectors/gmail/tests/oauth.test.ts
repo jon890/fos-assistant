@@ -110,3 +110,14 @@ test("callback 대기는 실제로 300초 상한에서 None으로 끝난다", as
   expect(exitCode).toBe(0);
   expect(stdout.trim()).toBe("None");
 });
+
+test("CLI 성공은 토큰만 표준 출력에 내고 외부 서비스 연결 안내를 오류 출력에 둔다", async () => {
+  const { exitCode, stdout, stderr } = await probeMode("main-success");
+  expect(exitCode).toBe(0);
+  expect(stdout).toBe("mock-refresh-token\n");
+  expect(stderr).toContain(
+    "refresh token 입니다. 외부 서비스 연결에 붙여 넣은 뒤 터미널 기록에서 지우세요.",
+  );
+  expect(stderr).not.toContain("mock-secret");
+  expect(stderr).not.toContain("mock-refresh-token");
+});

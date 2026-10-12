@@ -1,6 +1,6 @@
 package com.bifos.assistant.connector.application;
 
-import com.bifos.assistant.agent.application.AgentPurgeParticipant;
+import com.bifos.assistant.agent.purge.application.AgentPurgeParticipant;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
@@ -25,10 +25,12 @@ class ConnectorAgentPurge implements AgentPurgeParticipant {
     private final ConnectorConnectionRepository connections;
     private final ConnectorActionRepository actions;
 
+
     @Override
     public boolean blocksPurge(Long agentId) {
         return false;
     }
+
 
     @Override
     public void release(Long agentId) {
