@@ -32,7 +32,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
@@ -127,7 +126,7 @@ class ConnectorActionApproval {
         CallResult result = null;
         try {
             result = connector.execute(
-                approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.argsJson());
+                    approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.executableArgs().orElseThrow());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
         } catch (RuntimeException ex) {
@@ -177,8 +176,7 @@ class ConnectorActionApproval {
             return Approval.refused(saved);
         }
         Optional<ConnectorManifest> manifest = details.readManifest(action.connectorId());
-        String plain = action.argsJson();
-        if (plain == null || ConnectorAction.UNREADABLE_ARGS.equals(plain) || !Sha256.hex(plain).equals(action.argsSha256())) {
+        if (action.executableArgs().isEmpty()) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
         }
@@ -235,7 +233,7 @@ class ConnectorActionApproval {
             manifest.schema(),
             ConnectorToolPolicies.find(manifest, action.toolName()),
             false,
-            action.argsJson().getBytes(StandardCharsets.UTF_8).length,
+                action.executableArgs().orElseThrow().getBytes(StandardCharsets.UTF_8).length,
             CheckBoundary.NOT_CHECK);
     }
 

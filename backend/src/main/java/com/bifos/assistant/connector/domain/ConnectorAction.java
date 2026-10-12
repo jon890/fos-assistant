@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -17,6 +18,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -318,6 +320,15 @@ public class ConnectorAction {
         return plainArgs;
     }
 
+
+    /** 풀 수 있고 저장 해시와 일치하는 실행 인자만 준다. 화면은 argsJson을 쓴다. */
+    public Optional<String> executableArgs() {
+        String plain = argsJson();
+        if (plain == null || UNREADABLE_ARGS.equals(plain) || !Sha256.hex(plain).equals(argsSha256)) {
+            return Optional.empty();
+        }
+        return Optional.of(plain);
+    }
 
     public String resultText() {
         if (resultKeyId == null) {
