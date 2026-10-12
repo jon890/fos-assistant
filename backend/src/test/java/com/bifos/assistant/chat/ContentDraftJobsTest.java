@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -23,6 +25,7 @@ import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.application.ContentDraftJobAuthorizer;
+import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
@@ -79,6 +82,8 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     ContentDraftJobAuthorizer authorizer;
     @Autowired
     ConnectorActionService approvals;
+    @Autowired
+    ContentDraftSaveApproval contentApproval;
     @Autowired
     ConnectorBindingService bindingService;
     @Autowired
@@ -188,8 +193,19 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(card.grantAllowed()).isFalse();
         assertThat(card.hiddenArgs()).isFalse();
         assertThat(saves.requestSave(owner, origin.id(), snapshotId).actionId()).isEqualTo(results.getFirst().actionId());
-        code(() -> approvals.approve(owner, action.publicId(), GrantPeriod.TODAY), ErrorCode.VALIDATION_FAILED);
+        code(() -> contentApproval.approve(owner, action.publicId(), GrantPeriod.TODAY), ErrorCode.VALIDATION_FAILED);
         assertThat(actionRows.findAll().getFirst().status()).isEqualTo(ActionStatus.PENDING);
+    }
+
+
+    @Test
+    @DisplayName("원고 승인 줄이 일반 승인 경로로 들어오면 선언 없는 도구로 보고 실행 없이 거절한다")
+    void refusesContentLineOnGenericApprovalWithoutExecution() {
+        var request = saves.requestSave(owner, origin.id(), preview());
+        var view = approvals.approve(owner, request.actionId(), null);
+        assertThat(view.status()).isEqualTo(ActionStatus.REJECTED);
+        verify(catalog, never()).execute(any(), any(), any(), any());
+        assertThat(starter.started()).isEmpty();
     }
 
 
@@ -199,7 +215,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         catalog(false);
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
-        var view = approvals.approve(owner, request.actionId(), null);
+        var view = contentApproval.approve(owner, request.actionId(), null);
         assertThat(view.status()).isEqualTo(ActionStatus.REJECTED);
         assertThat(view.errorCode()).isEqualTo("not_executable");
         assertThat(starter.started()).isEmpty();
@@ -222,7 +238,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
             var pending = List.of(1, 2).stream().map(i -> pool.submit(() -> {
                 assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
                 try {
-                    return approvals.approve(owner, request.actionId(), null).status().name();
+                    return contentApproval.approve(owner, request.actionId(), null).status().name();
                 } catch (ApiException ex) {
                     return ex.code().name();
                 }
@@ -244,7 +260,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         var again = saves.requestSave(owner, origin.id(), snapshotId);
         assertThat(again.jobId().toString()).isEqualTo(job.jobId());
         assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SAVING);
-        code(() -> approvals.approve(owner, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        code(() -> contentApproval.approve(owner, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         assertThat(starter.started()).hasSize(1);
         // 실행 중인 원고 저장 줄이 있는 동안 기존 연결 해제는 거절하고 바인딩 판을 그대로 둔다.
         var before = bindings.findById(binding.id()).orElseThrow().updatedAt();
@@ -261,10 +277,10 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         });
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
-        assertThat(approvals.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.UNKNOWN);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
         assertThat(saves.requestSave(owner, origin.id(), snapshotId).status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
-        code(() -> approvals.approve(owner, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        code(() -> contentApproval.approve(owner, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         assertThat(starter.started()).hasSize(1);
         assertThat(actionRows.count()).isEqualTo(1);
     }
@@ -276,7 +292,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         starter.answer(call -> Optional.of("NAVER_BLOG_BUSY"));
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
-        assertThat(approvals.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.FAILED);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.FAILED);
         var job = jobRows.findAll().getFirst();
         assertThat(job.status()).isEqualTo(ContentDraftJobStatus.FAILED);
         assertThat(job.errorCode()).isEqualTo("NAVER_BLOG_BUSY");
@@ -291,7 +307,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
         drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", true));
-        assertThat(approvals.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.STALE);
         assertThat(jobRows.findAll().getFirst().errorCode()).isEqualTo("CONTENT_DRAFT_STALE");
         jobRows.deleteAll();
@@ -300,7 +316,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         UUID second = snapshots.preview(owner, conversation.id(), draftId, 2, binding.id(), origin.id()).snapshotId();
         var next = saves.requestSave(owner, origin.id(), second);
         attachmentCleaner.delete(photo, NOW);
-        assertThat(approvals.approve(owner, next.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(contentApproval.approve(owner, next.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
         assertThat(starter.started()).isEmpty();
     }
 
@@ -422,7 +438,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     private String approved() {
         UUID snapshotId = preview();
         var request = saves.requestSave(owner, origin.id(), snapshotId);
-        assertThat(approvals.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
         return starter.started().getLast().ticket();
     }
 

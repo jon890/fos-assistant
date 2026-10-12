@@ -23,7 +23,6 @@ import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.domain.ConnectorAction;
-import com.bifos.assistant.connector.domain.HermesToolName;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
@@ -59,6 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJobQueries {
     static final int MAX_PAGE = 20;
     private static final String DEDUPE_PREFIX = "v1-content-save";
+    /** MCP 서버의 등록 이름이 아니므로 일반 승인 경로는 이 줄을 선언 없는 도구로 보고 실행 없이 거절한다. */
+    static final String HERMES_TOOL = "fos_content_draft_save";
 
     private final ContentDraftSnapshots snapshots;
     private final ContentDraftSnapshotInputs inputs;
@@ -108,7 +109,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 var origin = executions.findById(originExecutionId).orElseThrow(ContentDraftSnapshotHash::unavailable);
                 var connection = bindingRows.findById(snapshot.bindingId()).orElseThrow(ContentDraftSnapshotHash::unavailable).connection();
                 var action = ConnectorAction.decided(connection, snapshot.agentId(), origin,
-                    HermesToolName.of(manifest.mcpServer(), ContentDraftSaveApproval.SAVE_TOOL), ContentDraftSaveApproval.SAVE_TOOL,
+                    HERMES_TOOL, ContentDraftSaveApproval.SAVE_TOOL,
                     decision, false, Sha256.hex(DEDUPE_PREFIX + ":" + user.id() + ":" + snapshotId), Sha256.hex(argsJson), now);
                 action.awaitApproval(argsJson, now.plus(policy.current().approvalTtl()));
                 var saved = actions.saveAndFlush(action);

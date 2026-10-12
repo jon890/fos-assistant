@@ -2,6 +2,8 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
+import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ApproveRequest;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.GrantView;
@@ -35,36 +37,47 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ConnectorActionController {
     private final ConnectorActionService actions;
+    private final ContentDraftSaveApproval contentDrafts;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
+
 
     /** 주소의 번호는 대화의 공개 식별자다. 주인의 대화가 아니면 다른 대화 경로와 같은 응답이다. */
     @GetMapping("/chat/conversations/{conversationId}/connector-actions")
     public List<ActionView> list(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         return actions.listForConversation(user, conversations.requireOwnId(user, conversationId)).stream()
-                .map(ActionView::from)
-                .toList();
+            .map(ActionView::from)
+            .toList();
     }
+
 
     /** 본문이 없으면 상시 허락을 주지 않는 승인이다. */
     @PostMapping("/connector-actions/{actionId}/approve")
     public ActionView approve(@PathVariable UUID actionId, @RequestBody(required = false) ApproveRequest request) {
-        return ActionView.from(
-                actions.approve(currentUser.require(), actionId, request == null ? null : request.grant()));
+        CurrentUser user = currentUser.require();
+        GrantPeriod grant = request == null ? null : request.grant();
+        // 원고 snapshot 에 연결된 줄은 job 링크로 골라 원고 저장 승인으로 넘긴다. 인자 글이나 도구 이름으로 고르지 않는다.
+        if (contentDrafts.select(user, actionId).isPresent()) {
+            return ActionView.from(contentDrafts.approve(user, actionId, grant));
+        }
+        return ActionView.from(actions.approve(user, actionId, grant));
     }
+
 
     @PostMapping("/connector-actions/{actionId}/reject")
     public ActionView reject(@PathVariable UUID actionId) {
         return ActionView.from(actions.reject(currentUser.require(), actionId));
     }
 
+
     @GetMapping("/connector-grants")
     public List<GrantView> grants() {
         return actions.grants(currentUser.require()).stream()
-                .map(GrantView::from)
-                .toList();
+            .map(GrantView::from)
+            .toList();
     }
+
 
     @DeleteMapping("/connector-grants/{grantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -72,10 +85,11 @@ public class ConnectorActionController {
         actions.revokeGrant(currentUser.require(), grantId);
     }
 
+
     /** {@code grant} 가 모르는 글이면 입력 오류다. 다른 입력 오류와 같은 모양으로 답한다. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> unreadableRequest() {
         return ResponseEntity.badRequest()
-                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "invalid connector action request"));
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "invalid connector action request"));
     }
 }

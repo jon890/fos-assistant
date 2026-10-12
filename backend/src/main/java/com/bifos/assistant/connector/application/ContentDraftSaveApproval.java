@@ -32,6 +32,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.connector.application.model.ConnectorActionView;
+import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
+import com.bifos.assistant.feedback.application.model.FeedbackEntry;
+import com.bifos.assistant.feedback.domain.type.FeedbackActor;
+import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
+import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
+import com.bifos.assistant.notification.application.NotificationService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
@@ -41,14 +52,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 
 /**
- * 원고 snapshot 에 연결된 승인 줄의 승인이다. 일반 도구의 승인은 {@link ConnectorActionApproval} 의 기존 경로가 그대로 맡는다.
+ * 원고 snapshot 에 연결된 승인 줄의 승인이다. 승인 controller 가 job 링크로 고른 줄만 여기로 온다.
  *
  * <p>선택과 catalog 준비는 트랜잭션 밖에서, 현재 권한 검사와 jobId 예약은 coordinator 한 번 안에서 끝낸다. 예약을 커밋한 뒤에만
  * worker 시작을 최대 한 번 보낸다. 시작 응답을 잃으면 다시 보내지 않고 UNKNOWN 으로 둔다. 계약은
- * {@code docs/features/content-draft.md} 의 「승인·권한 철회와 경합의 경계」 가 갖는다.
+ * {@code docs/features/content-draft.md} 의 「승인과 jobId 예약」 이 갖는다.
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ContentDraftSaveApproval {
     /** 원고 저장 승인 줄이 정책을 빌려 오는 기존 새 글 임시저장 도구다. */
     static final String SAVE_TOOL = "save_draft";
@@ -63,35 +75,29 @@ public class ContentDraftSaveApproval {
     private final ContentDraftJobLocks locks;
     private final ContentDraftSaveTicket tickets;
     private final ObjectProvider<ContentDraftJobStarter> starters;
-    private final TransactionTemplate transactions;
+    private final DecisionFeedbackRecorder feedback;
+    private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
+    private final ConversationNotices conversations;
+    private final PlatformTransactionManager transactionManager;
     private final Clock clock;
 
 
-    public ContentDraftSaveApproval(
-        ConnectorActionRepository actions,
-        ContentDraftJobRepository jobs,
-        ContentDraftSnapshotRepository snapshotRows,
-        ContentDraftSnapshots snapshots,
-        ContentDraftBindingAccess bindings,
-        ConnectorCatalogCache catalog,
-        ChatContentMutationCoordinator mutations,
-        ContentDraftJobLocks locks,
-        ContentDraftSaveTicket tickets,
-        ObjectProvider<ContentDraftJobStarter> starters,
-        PlatformTransactionManager transactionManager,
-        Clock clock) {
-        this.actions = actions;
-        this.jobs = jobs;
-        this.snapshotRows = snapshotRows;
-        this.snapshots = snapshots;
-        this.bindings = bindings;
-        this.catalog = catalog;
-        this.mutations = mutations;
-        this.locks = locks;
-        this.tickets = tickets;
-        this.starters = starters;
-        this.transactions = new TransactionTemplate(transactionManager);
-        this.clock = clock;
+    /**
+     * 원고 job 링크가 있는 줄을 승인한다. 상시 허락은 주지 않는다. 일반 줄은 {@code ConnectorActionService} 가 맡는다.
+     *
+     * @return 거절·만료로 끝난 줄, 또는 시작을 보낸 뒤의 줄. 접수한 줄은 저장 결과를 확인할 때까지 EXECUTING 이다
+     */
+    public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
+        if (grant != null) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted standing approval");
+        }
+        ConnectorAction finished = approvePrepared(user, prepare(user, actionId));
+        feedback.record(FeedbackEntry.of(finished.userId(), FeedbackSubjectType.CONNECTOR_ACTION, finished.publicId(),
+            FeedbackEventType.APPROVED, FeedbackActor.USER, now()).conversation(finished.conversationId())
+            .originExecution(finished.originExecutionId()).version(finished.argsSha256()));
+        new ConnectorActionSignals(events, notifications, conversations).publish(finished);
+        return new ConnectorActionDetails(actions, catalog).view(finished);
     }
 
 
@@ -130,12 +136,8 @@ public class ContentDraftSaveApproval {
     }
 
 
-    /**
-     * 바깥 트랜잭션 없이 coordinator 한 번으로 예약을 커밋하고, 커밋 뒤 시작을 최대 한 번 보낸다.
-     *
-     * @return 거절·만료로 끝난 줄, 또는 시작을 보낸 뒤의 줄. 접수한 줄은 저장 결과를 확인할 때까지 EXECUTING 이다
-     */
-    public ConnectorAction approvePrepared(CurrentUser user, PreparedContentDraftApproval prepared) {
+    /** 바깥 트랜잭션 없이 coordinator 한 번으로 예약을 커밋하고, 커밋 뒤 시작을 최대 한 번 보낸다. */
+    ConnectorAction approvePrepared(CurrentUser user, PreparedContentDraftApproval prepared) {
         requireNoTransaction();
         var target = new ChatContentMutationTarget(prepared.conversationId(), List.of());
         Reserved reserved;
@@ -149,7 +151,7 @@ public class ContentDraftSaveApproval {
             ticket = tickets.issue(reserved.ticket(), reserved.input().expiresAt());
         } catch (RuntimeException ex) {
             // 아직 시작을 보내지 않았다. 저장 클릭이 없으므로 실패로 끝낸다.
-            return transactions.execute(status -> record(prepared, Outcome.rejected("CONTENT_DRAFT_JOB_UNAVAILABLE")));
+            return new TransactionTemplate(transactionManager).execute(status -> record(prepared, Outcome.rejected("CONTENT_DRAFT_JOB_UNAVAILABLE")));
         }
         Outcome outcome;
         try {
@@ -164,7 +166,7 @@ public class ContentDraftSaveApproval {
             outcome = Outcome.UNKNOWN;
         }
         Outcome finished = outcome;
-        return transactions.execute(status -> record(prepared, finished));
+        return new TransactionTemplate(transactionManager).execute(status -> record(prepared, finished));
     }
 
 
