@@ -92,7 +92,7 @@ test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기
     risk: "WRITE",
     approval: "required",
     grant: false,
-    title: "네이버 임시저장 글 불러오기 · 자동저장 가능",
+    title: "임시저장 글 불러오기",
     outbound: false,
   });
   const readDraft = tools.find((tool) => tool.name === "read_draft")!;

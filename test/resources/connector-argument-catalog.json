@@ -353,7 +353,7 @@
       "read_draft": {
         "risk": "WRITE",
         "approval": "required",
-        "title": "네이버 임시저장 글 불러오기 · 자동저장 가능",
+        "title": "임시저장 글 불러오기",
         "grant": false,
         "outbound": false,
         "identifiers": [],
