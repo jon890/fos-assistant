@@ -56,6 +56,14 @@ jobs:
       - name: 실제 MySQL 검사
         if: matrix.suite == 'mysql'
         run: scripts/checks/check-mysql-migration.sh
+      - name: 실패한 백엔드 검사 보고서
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: backend-report-${{ matrix.suite }}-attempt-${{ github.run_attempt }}
+          path: backend/build/test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   backend:
     name: backend
