@@ -1,6 +1,7 @@
 import { requestControlPlane } from "@/lib/control-plane";
 import { readControlPlaneResult } from "@/lib/control-plane-result";
 import { errorResponse } from "@/lib/api-response";
+import { rejectCrossOrigin } from "@/lib/same-origin";
 
 /**
  * 내 브라우저의 로그인 화면 SSE 를 그대로 흘린다. 꺼져 있으면 Control Plane 이 켠다.
@@ -8,6 +9,9 @@ import { errorResponse } from "@/lib/api-response";
  * <p>시작 주소 `url` 만 넘긴다. 브라우저가 끊으면 `request.signal` 로 Control Plane 쪽 연결도 끊는다.
  */
 export async function GET(request: Request) {
+  // 화면을 열면 꺼진 브라우저가 켜지므로 다른 사이트에서 연 요청은 여기서 막는다.
+  const rejected = rejectCrossOrigin(request);
+  if (rejected) return rejected;
   const url = new URL(request.url).searchParams.get("url");
   const query = url ? `?${new URLSearchParams({ url })}` : "";
   let opened: Awaited<ReturnType<typeof requestControlPlane>>;

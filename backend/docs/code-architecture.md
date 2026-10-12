@@ -91,6 +91,12 @@ native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 �
 처리는 `shared/error` 의 `GlobalExceptionHandler` 가 갖는다.
 요청 본문의 형식 오류는 이 규칙에 걸리지 않고 Control Plane 에서 500 이다. 본문의 대화 식별자는 web 서버 라우트가 먼저 검사해 400 으로 막는다.
 
+### 첨부 원본 조회
+
+`AttachmentService`는 대화 주인과 업로더, 전송·삭제·만료 상태를 확인하고 원본 읽기 전후의 SQL 재검증을 맡는다.
+`AttachmentInspection`은 표시 크기와 영역 디코딩, 개요·GIF/WebP용 원본 bytes의 크기와 MIME magic 검사를 맡는다.
+원본 읽기는 같은 패키지에서만 호출하며, 권한 판정과 Clock·트랜잭션 경계는 서비스가 유지한다.
+
 ### 첨부 관찰
 
 첨부 관찰의 권한·원본 검사와 CAS/USER 보호는 `MediaObservationService`가 맡는다.
@@ -143,6 +149,12 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 켜진 브라우저만 저장하며 시계 역행이나 엔티티의 기록 거절 때는 DB의 활동 시각을 기억한다.
 낙관적 잠금 실패 때는 캐시를 갱신하지 않아 다음 활동이 다시 시도한다.
 켜기 잠금과 컨테이너 수명, CDP 대기는 `UserBrowserService`에 둔다.
+
+### 로그인 화면 입력
+
+로그인 화면의 연결, 잠금과 입력 상태는 `BrowserScreenSession`이 소유한다.
+같은 `application`의 package-private `BrowserScreenInputParams`는 좌표와 키 입력의 CDP 인자만 만든다.
+명령 전송과 실패 처리, 탭 전환과 종료는 세션에 남겨 연결 수명과 입력 변환을 함께 바꾸지 않도록 한다.
 
 ### 스킬
 
@@ -286,10 +298,18 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 8. `CostEstimator` 가 토큰을 models.dev 가격표로 환산한다. 환산은 이 자리에서 한 번만 하고 쓴 가격표를 함께 적는다([ADR-004](adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)).
 9. `ExecutionRecorder` 가 완료 기록 서비스에 위임해 4번에서 만든 줄을 끝난 상태로 갱신한다. 실패해도 그 줄은 남는다. 합계 규칙은 [모델 단계와 실행 기록](../../docs/features/model-usage.md) 의 「합계와 완전성」 이 갖는다.
 
+`ChatService`는 일반·예약·살펴보기·대기 메시지·다시 생성 turn의 종료 사건을 `ChatTurnCompletion`으로 만든다.
+이 helper는 저장을 마친 `ChatTurn`의 취소 여부와 식별자만 읽어 `done` 또는 `stopped`를 고른다.
+사건을 보내는 시점과 잠금을 닫는 순서는 `ChatService`가 유지하고, 흐름 실행의 종료 사건은 `ChatTurnRunner`가 보낸다.
+
 실행 기록의 공개 메서드는 `ExecutionRecorder`에 둔다. 시작과 실행 한도, 문맥 출처, 관측 상태와 시각 표시는 이 서비스가 맡는다.
 `ExecutionCompletionRecorder`는 완료·실패·취소 때 실제 provider와 모델, 사용량, 당시 가격과 버전, 종료 상태와 답을 같은 실행 줄에 저장한다.
 provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 사건의 버전 차이」](../../hermes/docs/hermes-contract.md#runs-응답과-사건의-버전-차이)가 갖는다. 시스템 판단은 실제 모델을 모르면 요청값으로 대체하지 않는다.
 최종 결과 없는 실패·취소는 이미 저장한 사용량을 보존하고, 취소의 후속 저장은 기존 종료 시각을 보존한다. 두 서비스 사이에 새 트랜잭션을 두지 않는다.
+
+`AgentExecution`은 실행 한 줄의 상태 전이와 사용량 대입을 맡는다. 성공·실패·취소가 받은 provider와 모델,
+토큰 네 칸은 private `recordUsage`에서 같은 순서로 적고, 비용과 종료 시각, 관측 종료와 상태 변경은 각 종료 메서드가 맡는다.
+공개 중첩 Builder와 JPA 필드 매핑은 유지하며, getter는 클래스의 `@Getter`가 만든다.
 
 `instructions` 를 조립하는 순서는 아래와 같다.
 
@@ -526,6 +546,12 @@ node scripts/check-file-length.mjs --update
 갱신한 기준 파일은 같은 커밋에 넣는다. 새 코드는 기준 목록에 추가하지 않고 나눈다.
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
+
+`RestartReconciler`는 기동 시 잡기와 묻기, 중지와 재시작, 대화 잠금의 획득과 해제 순서를 맡는다.
+같은 package의 `RecoveredConversationLock`은 복구한 대화 잠금의 handle과 아직 정해지지 않은 실행 수,
+실행 번호 목록과 루트 포함 여부만 담는다. Spring bean이 아니며 공개 API를 추가하지 않는다.
+변경 가능한 값은 `RestartReconciler`의 모니터로 지킨다.
+마지막 실행을 정한 뒤 대기 행 멈춤과 끝 사건을 처리하고 handle을 닫는 순서도 그 클래스에 남는다.
 
 `MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
 `MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.

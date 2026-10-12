@@ -24,6 +24,18 @@ class MediaFixtureGenerator {
     };
 
     public static void main(String[] args) throws Exception {
+        if (args[0].equals("inspect-prepared-batch")) {
+            int count = (args.length - 1) / 2;
+            if (args.length % 2 != 1 || count < 1 || count > 30) {
+                throw new IllegalArgumentException("준비 이미지 배치는 1~30장이다");
+            }
+            var measurements = new ArrayList<String>();
+            for (int index = 1; index < args.length; index += 2) {
+                measurements.add(inspectPrepared(Path.of(args[index]), Integer.parseInt(args[index + 1])));
+            }
+            System.out.println("[" + String.join(",", measurements) + "]");
+            return;
+        }
         if (args[0].equals("inspect")) {
             System.out.println(inspect(Path.of(args[1]), args[2], Integer.parseInt(args[3])));
             return;
@@ -50,6 +62,61 @@ class MediaFixtureGenerator {
         ImageIO.write(ambiguous, "png", dir.resolve("ambiguous.png").toFile());
         Files.write(dir.resolve("corrupt.jpeg"), new byte[]{(byte)255, (byte)216, 0, 0});
         System.out.println("[" + String.join(",", entries) + "]");
+    }
+
+    /** 원본 inspect와 분리한다. 방향이 이미 적용된 실제 JPEG의 크기와 픽셀만 읽는다. */
+    static String inspectPrepared(Path file, int orientation) throws Exception {
+        if (orientation < 1 || orientation > 8) throw new IllegalArgumentException("EXIF 방향 오류");
+        byte[] bytes = Files.readAllBytes(file);
+        Integer width = null, height = null, recovered = null;
+        String error = null;
+        try (ImageInputStream in = ImageIO.createImageInputStream(file.toFile())) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
+            if (!readers.hasNext()) error = "DECODE_FAILED";
+            else {
+                ImageReader reader = readers.next();
+                try {
+                    reader.setInput(in);
+                    width = reader.getWidth(0);
+                    height = reader.getHeight(0);
+                    if (!reader.getFormatName().equalsIgnoreCase("JPEG")) error = "NOT_JPEG";
+                    else if (width != (orientation >= 5 ? HEIGHT : WIDTH)
+                        || height != (orientation >= 5 ? WIDTH : HEIGHT)) error = "DIMENSION_MISMATCH";
+                    else {
+                        BufferedImage image = reader.read(0);
+                        int marker = 0;
+                        for (int bit = 0; bit < 16; bit++) {
+                            int x = 28 + 24 * (bit % 8), y = 28 + 24 * (bit / 8);
+                            // 기대 ID와 파일 이름을 읽지 않는다. 수신 크기의 픽셀 좌표로만 회수한다.
+                            int[] point = switch (orientation) {
+                                case 2 -> new int[]{width - 1 - x, y};
+                                case 3 -> new int[]{width - 1 - x, height - 1 - y};
+                                case 4 -> new int[]{x, height - 1 - y};
+                                case 5 -> new int[]{y, x};
+                                case 6 -> new int[]{width - 1 - y, x};
+                                case 7 -> new int[]{width - 1 - y, height - 1 - x};
+                                case 8 -> new int[]{y, height - 1 - x};
+                                default -> new int[]{x, y};
+                            };
+                            int pixel = image.getRGB(point[0], point[1]);
+                            int r = pixel >> 16 & 255, g = pixel >> 8 & 255, b = pixel & 255;
+                            boolean black = r <= 64 && g <= 64 && b <= 64;
+                            boolean white = r >= 192 && g >= 192 && b >= 192;
+                            if (!black && !white) { error = "MARKER_UNREADABLE"; break; }
+                            marker = marker << 1 | (white ? 1 : 0);
+                        }
+                        if (error == null) {
+                            if ((marker >> 8) == 0xa5) recovered = marker & 255;
+                            else error = "MARKER_UNREADABLE";
+                        }
+                    }
+                } finally { reader.dispose(); }
+            }
+        } catch (java.io.IOException exception) { error = "DECODE_FAILED"; }
+        return "{\"recoveredId\":" + recovered + ",\"width\":" + width + ",\"height\":" + height
+            + ",\"byteLength\":" + bytes.length + ",\"bytesSha256\":\""
+            + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)) + "\""
+            + (error == null ? "" : ",\"errorCode\":\"" + error + "\"") + "}";
     }
 
     static BufferedImage image(int id, boolean alpha) {

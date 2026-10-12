@@ -183,11 +183,28 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         var first = preview();
         assertThat(preview().snapshotId()).isEqualTo(first.snapshotId());
         assertThat(snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()).preview().title()).isEqualTo("비밀 원고 😀");
-        assertThat(first.assetIds()).containsExactly(photo.id().toString());
+        assertThat(first.assetIds()).containsExactly(photo.id().toString(), secondPhoto.id().toString());
         assertThat(json.writeValueAsString(first)).doesNotContain("photo_dir", "fileName", "storedName", "payload", "authorizationFingerprint", properties.agentRoot());
         assertThat(snapshotRows.count()).isEqualTo(1);
         assertThat(jobRows.count()).isZero();
         assertThat(revisionRows.findAll()).allSatisfy(row -> assertThat(row.body()).startsWith("v1.").doesNotContain("비밀"));
+    }
+
+
+    @Test
+    @DisplayName("규칙 전에 저장한 반복 사진 판의 preview는 일시 장애가 아닌 중복 사진 코드로 커넥터 호출 전에 멈춘다")
+    void rejectsLegacyDuplicatePhotoRevisionBeforeCompiler() {
+        var draft = draftRows.findAll().getFirst();
+        var row = revisionRows.findAll().getFirst();
+        var legacy = json.createObjectNode().put("title", "옛 원고").put("category", "분류");
+        legacy.putArray("tags");
+        var blocks = legacy.putArray("blocks");
+        blocks.addObject().put("type", "image").put("assetId", photo.id().toString());
+        blocks.addObject().put("type", "image").put("assetId", photo.id().toString());
+        var sealed = draftBodies.seal(draft, 1, json.writeValueAsString(legacy));
+        jdbc.update("update content_draft_revision set body=?, body_key_id=? where id=?", sealed.content(), sealed.keyId(), row.id());
+        code(this::preview, ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO);
+        assertThat(snapshotRows.count()).isZero();
     }
 
 
