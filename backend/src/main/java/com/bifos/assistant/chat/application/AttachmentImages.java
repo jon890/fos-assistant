@@ -74,6 +74,7 @@ public class AttachmentImages {
     private final AttachmentStore store;
     private final Semaphore decoding = new Semaphore(DECODING_SLOTS);
 
+
     /**
      * 줄인 사본이 없으면 만든다. 올린 뒤에 부르며, 디코딩 차례를 30초까지 기다린다. 트랜잭션 밖에서 부른다. 디코딩하는
      * 동안 데이터베이스 연결을 쥐지 않게 하기 위해서다.
@@ -83,6 +84,7 @@ public class AttachmentImages {
     public boolean prepareSmall(ChatAttachment attachment) {
         return prepareSmall(attachment, TimeUnit.SECONDS.toNanos(DECODING_WAIT_SECONDS));
     }
+
 
     /**
      * 줄인 사본이 없으면 만든다. 디코딩 차례를 {@code waitNanos} 나노초까지 기다린다. 0 이면 기다리지 않는다. 트랜잭션 밖에서
@@ -113,12 +115,13 @@ public class AttachmentImages {
             return false;
         } catch (IOException | RuntimeException ex) {
             log.warn(
-                    "could not prepare the small copy attachmentId={} error={}",
-                    attachment.id(),
-                    ex.getClass().getSimpleName());
+                "could not prepare the small copy attachmentId={} error={}",
+                attachment.id(),
+                ex.getClass().getSimpleName());
             return false;
         }
     }
+
 
     /**
      * 보내는 메시지의 사진마다 에이전트에게 어떻게 보일지를 첨부 순서대로 정한다.
@@ -152,15 +155,15 @@ public class AttachmentImages {
                 throw new IllegalStateException("attachment " + attachment.id() + " is not bound to a message");
             }
             boolean small = embed
-                    ? prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime()))
-                    : hasSmallQuietly(attachment);
+                ? prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime()))
+                : hasSmallQuietly(attachment);
             if (small && embed) {
                 byte[] copy = readSmallQuietly(attachment);
                 small = copy != null;
                 int index = ordinals.size();
                 if (small) {
                     AgentImageResizer.dimensions(copy)
-                            .ifPresent(size -> candidates.add(new Candidate(index, attachment.id(), copy, size)));
+                        .ifPresent(size -> candidates.add(new Candidate(index, attachment.id(), copy, size)));
                 }
             }
             ordinals.add(ordinal);
@@ -178,6 +181,7 @@ public class AttachmentImages {
         return photos;
     }
 
+
     /**
      * 마감 {@code deadlineNanos} 까지 남은 시간과 {@link #SEND_WAIT_SECONDS} 가운데 짧은 쪽(나노초)이다. 마감이 지났으면
      * 0 이다. 두 시각은 {@link System#nanoTime()} 기준이다.
@@ -185,6 +189,7 @@ public class AttachmentImages {
     static long sendWaitNanos(long deadlineNanos, long nowNanos) {
         return Math.max(0, Math.min(TimeUnit.SECONDS.toNanos(SEND_WAIT_SECONDS), deadlineNanos - nowNanos));
     }
+
 
     /**
      * 후보를 한 단계로 싣는다. 실은 사진의 {@code data:} 주소를 {@code dataUrls} 의 제자리에 채운다.
@@ -204,17 +209,17 @@ public class AttachmentImages {
                 return;
             }
         }
-        List<String> encoded =
-                encodeAt(candidates, smallest, SMALLEST_QUALITIES.getLast(), Long.MAX_VALUE, deadlineNanos);
+        List<String> encoded = encodeAt(candidates, smallest, SMALLEST_QUALITIES.getLast(), Long.MAX_VALUE, deadlineNanos);
         place(candidates, admitInOrder(encoded), dataUrls);
     }
+
 
     /**
      * 긴 변 {@code longSide}, 품질 {@code quality} 로 만든 주소를 모두 담을 수 있으면 {@code dataUrls} 에 채우고 참을
      * 돌려준다. 하나라도 담지 못하면 아무것도 채우지 않고 거짓이다.
      */
     private boolean placeAll(
-            List<Candidate> candidates, int longSide, float quality, String[] dataUrls, long deadlineNanos) {
+        List<Candidate> candidates, int longSide, float quality, String[] dataUrls, long deadlineNanos) {
         List<String> encoded = encodeAt(candidates, longSide, quality, MAX_ENCODED_BYTES, deadlineNanos);
         if (encoded == null) {
             return false;
@@ -227,13 +232,14 @@ public class AttachmentImages {
         return true;
     }
 
+
     /**
      * 후보마다 긴 변 {@code longSide}, 품질 {@code quality} 의 {@code data:} 주소를 만든다. 만들지 못한 사진의 자리는 null
      * 이다. 길이 합이 {@code maxEncodedBytes} 를 넘으면 남은 사진을 줄이지 않고 null 을 돌려준다. 이 단계로는 모두 싣지
      * 못하기 때문이다.
      */
     private List<String> encodeAt(
-            List<Candidate> candidates, int longSide, float quality, long maxEncodedBytes, long deadlineNanos) {
+        List<Candidate> candidates, int longSide, float quality, long maxEncodedBytes, long deadlineNanos) {
         List<String> encoded = new ArrayList<>(candidates.size());
         long total = 0;
         for (Candidate candidate : candidates) {
@@ -249,6 +255,7 @@ public class AttachmentImages {
         return encoded;
     }
 
+
     /**
      * 사본 하나를 긴 변 {@code longSide}, 품질 {@code quality} 의 {@code data:} 주소로 만든다. 크기가 그대로이고 품질이
      * {@link AgentImageResizer#QUALITY} 이면 사본을 그대로 쓰고, 아니면 디코딩 차례를 얻어 다시 줄인다. 차례는
@@ -257,8 +264,8 @@ public class AttachmentImages {
     private String encodedAt(Candidate candidate, int longSide, float quality, long deadlineNanos) {
         Dimension size = candidate.size();
         if (quality == AgentImageResizer.QUALITY
-                && AgentImageResizer.scaledSize(size.width, size.height, longSide)
-                        .equals(size)) {
+            && AgentImageResizer.scaledSize(size.width, size.height, longSide)
+                .equals(size)) {
             return dataUrl(candidate.copy());
         }
         try {
@@ -269,10 +276,10 @@ public class AttachmentImages {
                 Optional<byte[]> shrunk = AgentImageResizer.shrink(candidate.copy(), longSide, quality);
                 if (shrunk.isEmpty()) {
                     log.warn(
-                            "could not shrink the small copy attachmentId={} longSide={} quality={}",
-                            candidate.attachmentId(),
-                            longSide,
-                            quality);
+                        "could not shrink the small copy attachmentId={} longSide={} quality={}",
+                        candidate.attachmentId(),
+                        longSide,
+                        quality);
                 }
                 return shrunk.map(AttachmentImages::dataUrl).orElse(null);
             } finally {
@@ -284,6 +291,7 @@ public class AttachmentImages {
         }
     }
 
+
     /**
      * 앞 사진부터 바이트 예산까지 담는다. 주소가 없는 사진은 건너뛰고, 담지 못하는 사진을 만나면 그 뒤는 담지 않는다. 담은
      * 사진의 자리에만 주소가 있다.
@@ -291,7 +299,7 @@ public class AttachmentImages {
      * @param encoded 사진마다 만든 {@code data:} 주소. 만들지 못한 자리는 null 이다
      */
     static List<String> admitInOrder(List<String> encoded) {
-        List<String> admitted = new ArrayList<>(Collections.nCopies(encoded.size(), (String) null));
+        List<String> admitted = new ArrayList<>(Collections.nCopies(encoded.size(), (String)null));
         long encodedBytes = 0;
         for (int i = 0; i < encoded.size(); i++) {
             String dataUrl = encoded.get(i);
@@ -307,23 +315,26 @@ public class AttachmentImages {
         return admitted;
     }
 
+
     private static void place(List<Candidate> candidates, List<String> admitted, String[] dataUrls) {
         for (int i = 0; i < candidates.size(); i++) {
             dataUrls[candidates.get(i).index()] = admitted.get(i);
         }
     }
 
+
     private boolean hasSmallQuietly(ChatAttachment attachment) {
         try {
             return store.hasSmall(attachment);
         } catch (RuntimeException ex) {
             log.warn(
-                    "could not check the small copy attachmentId={} error={}",
-                    attachment.id(),
-                    ex.getClass().getSimpleName());
+                "could not check the small copy attachmentId={} error={}",
+                attachment.id(),
+                ex.getClass().getSimpleName());
             return false;
         }
     }
+
 
     /** 사본을 읽는다. 읽지 못하면 null 이다. */
     private byte[] readSmallQuietly(ChatAttachment attachment) {
@@ -331,16 +342,18 @@ public class AttachmentImages {
             return store.readSmall(attachment);
         } catch (RuntimeException ex) {
             log.warn(
-                    "could not read the small copy attachmentId={} error={}",
-                    attachment.id(),
-                    ex.getClass().getSimpleName());
+                "could not read the small copy attachmentId={} error={}",
+                attachment.id(),
+                ex.getClass().getSimpleName());
             return null;
         }
     }
 
+
     private static String dataUrl(byte[] jpeg) {
         return DATA_URL_PREFIX + Base64.getEncoder().encodeToString(jpeg);
     }
+
 
     /**
      * 실을 수 있는 사진이다.
@@ -349,5 +362,6 @@ public class AttachmentImages {
      * @param copy 사본 JPEG 바이트
      * @param size 사본의 가로와 세로
      */
-    private record Candidate(int index, Long attachmentId, byte[] copy, Dimension size) {}
+    private record Candidate(int index, Long attachmentId, byte[] copy, Dimension size) {
+    }
 }
