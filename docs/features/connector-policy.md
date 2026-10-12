@@ -601,7 +601,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 - 모델 원문 `args_json`과 실행 결과 `result_text`는 평문 칸에 남는다.
 - ticket 발급 전에 프로세스가 멈추면 미전송인 줄도 UNKNOWN이 되어 같은 의도를 계속 막는다.
 - request_key에 연결 번호가 들어가므로 같은 계좌를 새 연결로 다시 붙이면 이전 UNKNOWN과 충돌하지 않는다.
-- execute의 `409`를 FAILED로 읽으므로 Python이 금융 전송 뒤에 `409`를 돌려주지 않는다는 계약을 확인해야 한다.
+- execute의 `400`·`401`·`404`·`409`를 FAILED로 읽으므로 Python이 금융 전송 뒤 불확실한 결과를 이 상태 코드로 돌려주지 않는다는 계약을 확인해야 한다.
 
 ## 커넥터 READ 데이터의 흐름
 
