@@ -90,7 +90,7 @@
     "NAVER_BLOG_BUSY": { "category": "unavailable", "recovery": "retry_later" },
     "NAVER_BLOG_JOB_NOT_FOUND": "invalid_input",
     "NAVER_BLOG_DRAFT_NOT_FOUND": { "category": "invalid_input", "recovery": "recheck" },
-    "NAVER_BLOG_EDITOR_IN_USE": { "category": "unavailable", "recovery": "retry_later" },
+    "NAVER_BLOG_EDITOR_IN_USE": "unavailable",
     "NAVER_BLOG_START_UNKNOWN": "outcome_unknown",
     "NAVER_BLOG_UNAVAILABLE": "unavailable"
   },
