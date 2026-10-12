@@ -20,6 +20,8 @@ export function wireEvents(wire: string): Record<string, unknown>[] {
 // 전송 계층이 끼우는 replay.truncated는 events 표본에 없고 unknown 표본에서 가져온다.
 const templates = new Map([...wireEvents(wireFixture("unknown")), ...wireEvents(wireFixture("events"))].map((payload) => [payload.event, payload]));
 
+const sequenced = wireEvents(wireFixture("events")).some((payload) => "seq" in payload);
+
 /** 버전별 칸은 공유 표본에서 가져오고 실행 식별자와 종료 결과는 실제 대역 상태에서 붙인다. */
 export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>, sequence = 0): Record<string, unknown> {
   const template = templates.get(fields.event);
@@ -47,8 +49,8 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
     payload.usage = fields.usage ?? run.usage;
     payload.runtime = fields.runtime ?? run.runtime;
   }
-  // v0.21.6은 callback 뒤의 SSE transport에서 seq를 덧붙인다.
-  if (HERMES_VERSION === "v0.21.6" && fields.event !== "replay.truncated") payload.seq = sequence;
+  // 기준 버전이 callback 뒤의 SSE transport에서 seq를 덧붙이는지는 공유 표본이 갖는다.
+  if (sequenced && fields.event !== "replay.truncated") payload.seq = sequence;
   return payload;
 }
 
