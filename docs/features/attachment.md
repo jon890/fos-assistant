@@ -279,8 +279,9 @@ WebP는 바이트와 픽셀을 만들지 않는 metadata 사례이며 실제 관
 unit 검사는 독립 준비기와 대역 수신 계약을 확인한다.
 MCP 통합 검사는 실제 Control Plane에 JPEG/PNG/GIF 30장을 올려 역순으로 보내고, HTTP로 받은 FakeHermes의 JPEG 픽셀을 첨부·순서·원본 SHA와 대조한다.
 서명된 MCP로 관찰을 저장한 뒤 사진 없는 새 turn에서 30개 본문과 revision을 재조회하며 추가 저장은 하지 않는다.
-최초 저장 완료부터 후속 실행의 재조회 종료까지 실제 record 요청 증가량이 0인지 검사한다.
-같은 UUID·본문·expectedRevision의 재호출도 추가 요청으로 세며, 이후 USER 정정과 MODEL 덮어쓰기 거부 검사는 이 측정 구간 밖이다.
+최초 저장 완료부터 후속 실행의 재조회 종료까지 테스트 프로세스(대역 Hermes 포함)가 보낸 record 요청이 늘지 않는지 검사한다.
+카운터는 저장 구간의 30건으로 먼저 대조한다. 같은 UUID 재시도의 revision 보존은 DB 검사가 맡는다.
+이후 USER 정정, MODEL 덮어쓰기 거부, 큰 본문의 MCP 페이지 예산 검사는 이 측정 구간 밖이다.
 관찰은 `NEEDS_REVIEW`, `MODEL_UNVERIFIED`이고 JPEG/PNG는 `OVERVIEW`, GIF는 `FIRST_FRAME`의 frame 0으로 기록한다.
 실제 DB 검사는 소유권·다른 대화·삭제·만료·UUID 재시도·USER 정정 보호와 암호화 본문을 확인한다.
 실제 provider 전달, 사진 의미와 OCR 정확도는 미측정이다.
