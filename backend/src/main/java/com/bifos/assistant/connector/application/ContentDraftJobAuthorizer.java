@@ -22,6 +22,8 @@ import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 원고 저장 worker 가 시작, 사진 전송, 저장 클릭 직전에 묻는 현재 권한 확인이다.
@@ -54,6 +56,7 @@ public class ContentDraftJobAuthorizer {
      * @throws ApiException 서명·형식이 틀리면 401, 그 밖의 거절은 403
      */
     public void authorize(String ticket, String stage, Integer position) {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
         var payload = tickets.authenticate(ticket);
         boolean photo = PHOTO.equals(stage);
         if (!(START.equals(stage) || SAVE.equals(stage) || photo) || photo != (position != null)
@@ -73,7 +76,15 @@ public class ContentDraftJobAuthorizer {
             var owner = users.findById(payload.ownerUserId()).orElseThrow(ContentDraftJobAuthorizer::denied);
             var user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
             var executionIds = locks.executionIds(action.originExecutionId(), snapshot.originExecutionId());
-            mutations.run(user.id(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), () -> {
+            mutations.run(user.id(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), 5, () -> {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void beforeCommit(boolean readOnly) {
+                        // DB 잠금 뒤에도 worker의 응답 한도와 ticket 기한을 넘긴 claim은 커밋하지 않는다.
+                        require(System.nanoTime() < deadline);
+                        tickets.authenticate(ticket);
+                    }
+                });
                 claim(user, payload, stage, position, executionIds, job.id(), snapshot.id(), snapshot.agentId());
                 return null;
             });

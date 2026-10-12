@@ -26,12 +26,19 @@ public class ChatContentMutationCoordinator {
 
 
     public <T> T run(Long ownerUserId, ChatContentMutationTarget target, Supplier<T> work) {
+        return run(ownerUserId, target, org.springframework.transaction.TransactionDefinition.TIMEOUT_DEFAULT, work);
+    }
+
+
+    /** 짧은 원격 허가 요청은 모든 잠금 읽기에 같은 트랜잭션 시간 한도를 적용한다. */
+    public <T> T run(Long ownerUserId, ChatContentMutationTarget target, int timeoutSeconds, Supplier<T> work) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("content mutation must start outside a transaction");
         }
         var transaction = new TransactionTemplate(transactions);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        transaction.setTimeout(timeoutSeconds);
         return transaction.execute(status -> {
             users.findByIdForUpdate(ownerUserId).orElseThrow(ChatContentMutationCoordinator::notFound);
             var conversation = conversations
