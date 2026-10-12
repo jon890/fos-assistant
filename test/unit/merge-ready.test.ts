@@ -109,7 +109,8 @@ function fakeRun(overrides: Record<string, { status?: number; stdout?: string }>
   const table: Record<string, { status?: number; stdout?: string }> = {
     "gh pr view": { stdout: JSON.stringify({ isDraft: false, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", headRefOid: "abc", baseRefName: "main" }) },
     "gh repo view": { stdout: JSON.stringify({ owner: { login: "o" }, name: "r" }) },
-    "gh api repos": { stdout: "unit\nbackend\n" },
+    "gh api repos/o/r/branches": { stdout: "unit\nbackend\n" },
+    "gh api repos/o/r/actions": { stdout: "2026-10-12T00:59:00Z\n" },
     "gh pr checks": { status: 8, stdout: JSON.stringify([ok("unit"), ok("backend")]) },
     "gh api graphql": { stdout: JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [{ isResolved: true }, { isResolved: false }] } } } } }) },
     "git fetch": {},
@@ -150,9 +151,20 @@ test("조회하는 동안 head 가 바뀌었으면 대기다", () => {
   assert.match(moved.verdict, /abc.*def/);
 });
 
+test("CI 기준 main 은 workflow run 생성과 검사 시작 중 이른 시각으로 정한다", () => {
+  const calls: string[][] = [];
+  const inner = fakeRun({ "git merge-base": { status: 1 }, "git rev-list": { stdout: "deadbeef\n" }, "git diff": { stdout: "" }, "gh pr diff": { stdout: "web/src/a.ts\n" } });
+  collect("7", (command: string, args: string[]) => {
+    calls.push([command, ...args]);
+    return inner(command, args);
+  });
+  const revList = calls.find((call) => call[1] === "rev-list");
+  assert.ok(revList?.includes("--before=2026-10-12T00:59:00Z"));
+});
+
 test("필수 검사 조회가 실패하거나 0개면 판정하지 않는다", () => {
-  assert.throws(() => collect("7", fakeRun({ "gh api repos": { status: 1 } })), /브랜치 보호 필수 검사 조회 실패/);
-  assert.throws(() => collect("7", fakeRun({ "gh api repos": { stdout: "" } })), /0개/);
+  assert.throws(() => collect("7", fakeRun({ "gh api repos/o/r/branches": { status: 1 } })), /브랜치 보호 필수 검사 조회 실패/);
+  assert.throws(() => collect("7", fakeRun({ "gh api repos/o/r/branches": { stdout: "" } })), /0개/);
 });
 
 test("PR 번호가 없으면 종료 코드 2 로 끝난다", () => {

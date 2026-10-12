@@ -13,7 +13,7 @@
 //   4. 조회하는 동안 head 가 바뀌지 않았는지 마지막에 다시 읽는다. 바뀌었으면 대기다.
 //      판정한 head 는 출력 맨 앞의 head 줄에 있고, 머지는 그 해시로 고정한다(--match-head-commit).
 //
-// CI 가 돈 기준 main 은 PR 의 merge 커밋 부모가 아니라 가장 이른 검사 시작 시각의 main 으로 정한다.
+// CI 가 돈 기준 main 은 PR 의 merge 커밋 부모가 아니라 가장 이른 workflow run 생성과 검사 시작 시각의 main 으로 정한다.
 // refs/pull/N/merge 는 main 이 움직이면 GitHub 가 다시 만들어 그때의 base 를 git 에서 읽을 수 없다.
 import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
@@ -157,7 +157,10 @@ export function collect(pr, run = realRun) {
   const containsMain = run("git", ["merge-base", "--is-ancestor", base, view.headRefOid]).status === 0;
   let reasons = [];
   if (!containsMain) {
-    const started = runs.map((r) => r.startedAt).filter((t) => t && !t.startsWith("0001")).sort()[0];
+    // 전체 재실행은 check 의 startedAt 을 재실행 시각으로 바꾸므로 workflow run 의 created_at 도 함께 본다.
+    // run 의 created_at 은 처음 만들어진 시각이라 더 이르다. 이른 쪽을 쓰면 더 많은 main 커밋을 살피는 쪽이라 안전하다.
+    const created = lines(must(run, "gh", ["api", `repos/${slug}/actions/runs?head_sha=${view.headRefOid}&event=pull_request&per_page=100`, "--jq", ".workflow_runs[].created_at"], "workflow run"));
+    const started = [...runs.map((r) => r.startedAt), ...created].filter((t) => t && !t.startsWith("0001")).sort()[0];
     if (!started) throw new LookupError("검사 시작 시각을 찾지 못해 CI 가 돈 기준 main 을 정할 수 없다");
     const ciBase = lines(must(run, "git", ["rev-list", "-1", `--before=${started}`, base], "CI 기준 main"))[0];
     if (!ciBase) throw new LookupError("CI 시작 시각 이전의 main 커밋이 없다");
