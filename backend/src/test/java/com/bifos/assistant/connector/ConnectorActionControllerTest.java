@@ -152,10 +152,10 @@ class ConnectorActionControllerTest {
     @DisplayName("원고 job 링크가 있는 줄의 승인은 원고 저장 승인으로 넘기고 일반 승인을 부르지 않는다")
     void approveRoutesContentDraftLineByJobLink() throws Exception {
         when(contentDrafts.select(MEMBER, ACTION)).thenReturn(Optional.of(ACTION));
-        when(contentDrafts.approve(MEMBER, ACTION, null)).thenReturn(PENDING);
+        when(contentDrafts.approve(MEMBER, ACTION, null, false)).thenReturn(PENDING);
         mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)).andExpect(status().isOk());
-        verify(contentDrafts).approve(MEMBER, ACTION, null);
-        verify(service, never()).approve(any(), any(), any());
+        verify(contentDrafts).approve(MEMBER, ACTION, null, false);
+        verify(service, never()).approve(any(), any(), any(), anyBoolean());
     }
 
 
