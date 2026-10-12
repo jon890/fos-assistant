@@ -298,7 +298,8 @@ MCP 통합 검사는 실제 Control Plane에 JPEG/PNG/GIF 30장을 올려 역순
 
 [관찰 주장 판정기](../../test/support/media-observation-claims.ts)는 모델이 받은 입력보다 많이 읽었다고 기록했는지 본다.
 사본만 본 관찰이 작은 메뉴 글씨를 확인했다고 하거나 풍경의 글씨를 확인했다고 하면 거절한다.
-메뉴 글씨는 원본(`ORIGINAL`)이나 영역(`CROP`) 조회의 관찰만 확인으로 받는다.
+메뉴 글씨는 테스트가 별도로 확인한 원본(`ORIGINAL`)이나 영역(`CROP`) 조회 증거와 관찰의 범위가 일치해야 확인으로 받는다.
+모델이 적은 `coverage` 만으로는 조회 증거가 되지 않으며, 증거가 없으면 사본만 받은 것으로 본다.
 
 Control Plane 은 provider 의 vision 지원을 판정하지 않는다([ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md)).
 vision 을 지원하지 않는 모델에는 Hermes 가 보조 모델의 설명 글을 보내고, 상류가 이미지를 거절하면 이미지를 뗀 채 다시 시도한다.

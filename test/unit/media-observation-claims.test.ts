@@ -109,11 +109,25 @@ test("사본만 본 관찰은 작은 메뉴 글씨와 풍경의 글씨를 확인
       judgeObservationClaims(traits, routes, [observation("sign-hires", { claims: [ocr] })]),
     /OVERCLAIM_SMALL_TEXT/,
   );
-  assert.doesNotThrow(() =>
-    judgeObservationClaims(traits, routes, [
-      observation("sign-hires", { coverage: "CROP", claims: [ocr] }),
-    ]),
-  );
+  for (const coverage of ["ORIGINAL", "CROP"] as const) {
+    const observations = [observation("sign-hires", { coverage, claims: [ocr] })];
+    assert.throws(
+      () => judgeObservationClaims(traits, routes, observations),
+      /OVERCLAIM_SMALL_TEXT/,
+    );
+    assert.throws(
+      () => judgeObservationClaims(traits, routes, observations, new Map([["landscape", coverage]])),
+      /OVERCLAIM_SMALL_TEXT/,
+    );
+    assert.throws(
+      () => judgeObservationClaims(traits, routes, observations,
+        new Map([["sign-hires", coverage === "CROP" ? "ORIGINAL" : "CROP"]])),
+      /OVERCLAIM_SMALL_TEXT/,
+    );
+    assert.doesNotThrow(() =>
+      judgeObservationClaims(traits, routes, observations, new Map([["sign-hires", coverage]])),
+    );
+  }
   assert.throws(
     () =>
       judgeObservationClaims(traits, routes, [

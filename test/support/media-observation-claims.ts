@@ -66,6 +66,8 @@ export function judgeObservationClaims(
   traits: readonly AssetTraits[],
   routes: ReadonlyMap<string, VisionRoute>,
   observations: readonly RecordedObservation[],
+  /** 모델의 coverage 와 별개로 테스트가 확인한 원본·영역 조회 증거다. 없으면 사본만 받은 것으로 본다. */
+  retrievedCoverage: ReadonlyMap<string, "ORIGINAL" | "CROP"> = new Map(),
 ): ClaimVerdict {
   const byKey = new Map(traits.map((trait) => [trait.assetKey, trait]));
   if (byKey.size !== traits.length) throw new Error("DUPLICATE_ASSET_KEY");
@@ -102,8 +104,9 @@ export function judgeObservationClaims(
       if (
         trait.text === "ORIGINAL_ONLY" &&
         confirmed(observation, "OCR") &&
-        observation.coverage !== "ORIGINAL" &&
-        observation.coverage !== "CROP"
+        (route !== "NATIVE" ||
+          !retrievedCoverage.has(trait.assetKey) ||
+          observation.coverage !== retrievedCoverage.get(trait.assetKey))
       )
         throw new Error("OVERCLAIM_SMALL_TEXT");
     }
