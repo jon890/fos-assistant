@@ -528,7 +528,7 @@ Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한�
 메서드와 함수 길이 경고는 그대로 유지한다.
 
 `RestartReconciler`는 기동 시 잡기와 묻기, 중지와 재시작, 대화 잠금의 획득과 해제 순서를 맡는다.
-같은 package의 `RecoveredConversationLock`은 복구한 대화 잠금의 handle과 실행 참조 수,
+같은 package의 `RecoveredConversationLock`은 복구한 대화 잠금의 handle과 아직 정해지지 않은 실행 수,
 실행 번호 목록과 루트 포함 여부만 담는다. Spring bean이 아니며 공개 API를 추가하지 않는다.
 변경 가능한 값은 `RestartReconciler`의 모니터로 지킨다.
 마지막 실행을 정한 뒤 대기 행 멈춤과 끝 사건을 처리하고 handle을 닫는 순서도 그 클래스에 남는다.
