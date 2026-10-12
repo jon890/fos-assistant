@@ -126,7 +126,7 @@ public class ContentDraftSaveApproval {
             executionIds = List.of();
         }
         var stamp = attempt(() -> bindings.prepare(user, snapshot.agentId(), snapshot.bindingId()));
-        var manifest = attempt(() -> catalog.find(action.connectorId()).orElse(null));
+        var manifest = catalog.find(action.connectorId()).orElse(null);
         boolean supported = manifest != null && manifest.snapshot() != null
             && Boolean.TRUE.equals(manifest.snapshot().capabilities().get("start"))
             && Boolean.TRUE.equals(manifest.snapshot().capabilities().get("status"))
@@ -210,7 +210,7 @@ public class ContentDraftSaveApproval {
         ContentDraftSnapshotInput input;
         try {
             input = snapshots.requireCurrentSnapshotParticipant(user, prepared.conversationId(), prepared.snapshotId());
-        } catch (RuntimeException ex) {
+        } catch (ApiException ex) {
             throw new ContentDraftRefusal("stale");
         }
         // 준비한 catalog 정책 지문까지 preview 때와 같아야 한다. 현재 DB 판은 참가 함수가 확인했다.
@@ -282,7 +282,7 @@ public class ContentDraftSaveApproval {
     private static <T> T attempt(Supplier<T> work) {
         try {
             return work.get();
-        } catch (RuntimeException ignored) {
+        } catch (ApiException ignored) {
             return null;
         }
     }

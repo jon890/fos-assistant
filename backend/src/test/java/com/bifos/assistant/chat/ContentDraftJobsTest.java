@@ -246,6 +246,20 @@ class ContentDraftJobsTest extends ContentDraftFixture {
 
 
     @Test
+    @DisplayName("catalog의 일시 장애는 승인과 job을 대기 상태로 보존한다")
+    void preservesPendingApprovalDuringCatalogFailure() {
+        var request = saves.requestSave(owner, origin.id(), preview());
+        catalog(true);
+        when(catalog.readCatalog()).thenThrow(new org.springframework.dao.TransientDataAccessResourceException("synthetic"));
+        assertThatThrownBy(() -> contentApproval.approve(owner, request.actionId(), null))
+            .isInstanceOf(org.springframework.dao.TransientDataAccessException.class);
+        assertThat(actionRows.findAll().getFirst().status()).isEqualTo(ActionStatus.PENDING);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.PREVIEW_READY);
+        assertThat(starter.started()).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("catalog가 시작을 선언하지 않으면 승인 줄을 실행 없이 거절하고 snapshot은 STALE이다")
     void refusesWithoutStartWhenCapabilityIsNotDeclared() {
         catalog(false);
