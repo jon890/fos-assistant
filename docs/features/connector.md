@@ -543,6 +543,7 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 ## 네이버 read_draft 사진 메타데이터
 
 `read_draft`는 임시저장 글을 편집기에 불러와 기존 `draft_id`, `revision`, `title`, `category`, `tags`, `body`에 사진 메타데이터를 더한다.
+읽기 앞뒤 목록 변화 관측은 `autosave_check`, 읽기 탭에서 관측한 자동저장 요청 수는 `autosave_requests`로 함께 돌려준다. 목록이나 고친 시각을 읽지 못하면 변화 판정은 `null`이며, `changed`가 거짓이어도 자동저장이 없었다는 뜻은 아니다.
 기존 본문의 `[기존 사진 1]` 같은 줄과 덮어쓰기용 구성요소 대응은 그대로다.
 불러오기 중 네이버 자동저장이 발생할 수 있으므로 기존 WRITE 정책을 유지한다.
 

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { draftRevision } from "../src/changes.ts";
-import { listDrafts, readDraft } from "../src/drafts.ts";
+import { autosaveCheck, listDrafts, readDraft } from "../src/drafts.ts";
 import { ToolError } from "../src/errors.ts";
 import { acquireLock, createState, openJobDir } from "../src/jobs.ts";
 import {
@@ -66,12 +66,22 @@ const DRAFTS: FakeDraft[] = [
   },
 ];
 
+const LOGIN_COOKIES = [
+  { name: "NID_AUT", domain: ".naver.com" },
+  { name: "NID_SES", domain: ".naver.com" },
+];
+
 async function setup() {
-  const cdp = new FakeCdp({ allowed: EDITOR_METHODS });
+  // 까닭을 모르는 실패 뒤에는 로그인 쿠키를 한 번 더 본다.
+  const cdp = new FakeCdp({
+    allowed: [...EDITOR_METHODS, "Storage.getCookies"],
+  });
   cleanups.push(() => cdp.stop());
+  const session = { cookies: LOGIN_COOKIES };
+  cdp.on("Storage.getCookies", () => ({ cookies: session.cookies }));
   const otherTab = cdp.addTarget("https://example.com/other");
   const editor = new FakeEditor();
-  editor.drafts = DRAFTS;
+  editor.drafts = structuredClone(DRAFTS);
   editor.install(cdp);
   const jobDir = join(
     await mkdtemp(join(tmpdir(), "naver-blog-drafts-")),
@@ -83,7 +93,7 @@ async function setup() {
     NAVER_BLOG_ID: "example-blog",
     NAVER_BLOG_JOB_DIR: jobDir,
   };
-  return { cdp, editor, env, otherTab };
+  return { cdp, editor, env, otherTab, session };
 }
 
 /** 연 탭 하나만 닫혔고 미리 열려 있던 탭은 그대로인지 본다. */
@@ -102,6 +112,7 @@ test("목록은 목록 API 의 글 번호, 제목, 고친 시각을 차례대로
 
   expect(result).toEqual({
     count: 2,
+    autosave_requests: 0,
     drafts: [
       {
         draft_id: "224000000001",
@@ -164,6 +175,14 @@ test("글 하나를 불러와 제목, 카테고리, 태그, 기존 구성요소 
     ],
     photo_count: 1,
     photos_truncated: false,
+    autosave_requests: 0,
+    autosave_check: {
+      count_before: 2,
+      count_after: 2,
+      saved_at_before: "2026-10-01T03:00:00.000Z",
+      saved_at_after: "2026-10-01T03:00:00.000Z",
+      changed: false,
+    },
   });
   expect(editor.loaded?.logNo).toBe(224000000001);
   // 저장 단추는 누르지 않는다.
@@ -338,4 +357,325 @@ test("시간 상한이 지나면 멈추고 연 탭을 닫는다", async () => {
   expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
   expect(performance.now() - started).toBeLessThan(5_000);
   expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("새 탭의 편집기에 글이 남아 있으면 알림이 없어도 불러오지 않고 NAVER_BLOG_EDITOR_IN_USE 다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.document = {
+    document: {
+      components: [
+        { "@ctype": "documentTitle", title: [paragraph("")] },
+        { "@ctype": "text", value: [paragraph("쓰던 문장")] },
+      ],
+    },
+  };
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_EDITOR_IN_USE");
+  expect(editor.loaded).toBeNull();
+  expect(editor.listOpen).toBe(false);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("새 탭의 편집기에 글 번호가 실려 있으면 불러오지 않고 NAVER_BLOG_EDITOR_IN_USE 다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.document = { document: { components: [] } };
+  editor.documentId = "224000000002";
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_EDITOR_IN_USE");
+  expect(editor.loaded).toBeNull();
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("빈 문단만 있는 새 편집기는 비었다고 보고 글을 불러온다", async () => {
+  const { editor, env } = await setup();
+  editor.document = {
+    document: {
+      components: [
+        { "@ctype": "documentTitle", title: [paragraph("")] },
+        { "@ctype": "text", value: [paragraph(" ")] },
+      ],
+    },
+  };
+
+  const result = await readDraft(env, "224000000002", TIMES);
+
+  expect(result.draft_id).toBe("224000000002");
+  expect(editor.loaded?.logNo).toBe(224000000002);
+});
+
+test("빈 편집기의 숫자 문서 번호가 목록에 없으면 글을 읽는다", async () => {
+  const { editor, env } = await setup();
+  editor.document = { document: { components: [] } };
+  editor.documentId = "224000000099";
+  expect((await readDraft(env, "224000000001", TIMES)).draft_id).toBe(
+    "224000000001",
+  );
+});
+
+test("편집기 객체를 읽지 못하면 글 단추를 누르기 전에 NAVER_BLOG_UNAVAILABLE 이다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.documentUnavailable = true;
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(editor.loaded).toBeNull();
+  expect(editor.listOpen).toBe(false);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("목록 응답이 실패하고 쿠키가 없으면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
+  const { cdp, editor, env, otherTab, session } = await setup();
+  editor.listStatus = 302;
+  session.cookies = [];
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
+  expect(editor.loaded).toBeNull();
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("목록 응답이 실패해도 로그인 쿠키가 있으면 NAVER_BLOG_UNAVAILABLE 로 남긴다", async () => {
+  const { env, editor } = await setup();
+  editor.listStatus = 500;
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+});
+
+test("쿠키 실패 진단을 시작하기 전에 읽기 탭을 닫는다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.listStatus = 500;
+  let targetsAtCheck: string[] = [];
+  cdp.on("Storage.getCookies", () => {
+    targetsAtCheck = cdp.targetIds();
+    return { cookies: LOGIN_COOKIES };
+  });
+  await readDraft(env, "224000000001", TIMES).catch(() => {});
+  expect(targetsAtCheck).toEqual([otherTab]);
+});
+
+test("불러오는 동안 탭이 로그인 화면으로 넘어가면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.loginOnLoad = true;
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("같은 글을 연달아 읽으면 같은 지문을 돌려주고 목록은 그대로다", async () => {
+  const { cdp, editor, env } = await setup();
+
+  const first = await readDraft(env, "224000000001", TIMES);
+  // 대역은 탭마다 편집기를 새로 만들지 않아 새 탭의 빈 편집기로 되돌린다.
+  editor.document = null;
+  editor.documentId = "";
+  editor.loaded = null;
+  const second = await readDraft(env, "224000000001", TIMES);
+
+  expect(second.revision).toBe(first.revision);
+  expect(second.autosave_check?.changed).toBe(false);
+  expect(editor.drafts.length).toBe(2);
+  expect(cdp.violations).toEqual([]);
+});
+
+test("두 번째 읽기 전에 글이 바뀌면 새 지문을 돌려준다", async () => {
+  const { editor, env } = await setup();
+  const first = await readDraft(env, "224000000001", TIMES);
+  editor.document = null;
+  editor.documentId = "";
+  editor.loaded = null;
+  editor.drafts[0]!.components.push({
+    "@ctype": "text",
+    value: [paragraph("추가한 문장")],
+  });
+  const second = await readDraft(env, "224000000001", TIMES);
+  expect(second.revision).not.toBe(first.revision);
+  expect(second.body).toContain("추가한 문장");
+});
+
+test("뒤 목록 응답이 실패하면 읽은 글을 돌려주되 목록 변화 관측은 null이다", async () => {
+  const { cdp, editor, env } = await setup();
+  const evaluate = cdp.calls;
+  // 입력 시점에 뒤 목록 응답만 실패하도록 대역의 응답 상태를 바꾼다.
+  cdp.on("Network.enable", (_, target) => {
+    cdp.emit(target, "Network.requestWillBeSent", {
+      requestId: "autosave",
+      request: { url: "https://blog.naver.com/RabbitAutoSaveWrite.naver" },
+    });
+    return {};
+  });
+  editor.listStatusAfterLoad = 500;
+  const result = await readDraft(env, "224000000001", TIMES);
+  expect(result.autosave_check).toBeNull();
+  expect(result.title).toBe(DRAFTS[0]!.title);
+  expect(result.autosave_requests).toBe(1);
+  expect(
+    evaluate.filter(
+      (call) =>
+        call.method === "Runtime.evaluate" &&
+        call.params.expression.includes("TempPostList.naver"),
+    ).length,
+  ).toBe(2);
+});
+
+test("실패 뒤 쿠키 확인도 실패하면 원문 없이 unavailable로 남긴다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.listStatus = 500;
+  cdp.on("Storage.getCookies", () => {
+    throw new Error(upstreamText);
+  });
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(JSON.stringify(error)).not.toContain(upstreamText);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test("불러오기 중 문서 제목만 로그인 화면으로 바뀌어도 로그인 오류다", async () => {
+  const { env, editor } = await setup();
+  editor.loginTitleOnLoad = true;
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+  expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
+});
+
+test("읽기 탭의 자동저장 요청만 세고 중복 이벤트와 다른 주소는 제외한다", async () => {
+  const { cdp, env, otherTab } = await setup();
+  cdp.on("Network.enable", (_, target) => {
+    const request = { url: "https://blog.naver.com/RabbitAutoSaveWrite.naver" };
+    cdp.emit(target, "Network.requestWillBeSent", { requestId: "1", request });
+    cdp.emit(target, "Network.requestWillBeSent", { requestId: "1", request });
+    cdp.emit(target, "Network.requestWillBeSent", { requestId: "2", request });
+    cdp.emit(`page/${otherTab}`, "Network.requestWillBeSent", {
+      requestId: "3",
+      request,
+    });
+    cdp.emit(target, "Network.requestWillBeSent", {
+      requestId: "4",
+      request: { url: "https://example.com/RabbitAutoSaveWrite.naver" },
+    });
+    cdp.emit(target, "Network.requestWillBeSent", {
+      requestId: "5",
+      request: { url: "https://blog.naver.com/TempPostList.naver" },
+    });
+    return {};
+  });
+  const result = await readDraft(env, "224000000001", TIMES);
+  expect(result.autosave_requests).toBe(2);
+  expect(result.autosave_check?.changed).toBe(false);
+  expect(cdp.violations).toEqual([]);
+});
+
+test("읽는 동안 자동저장이 그 글의 고친 시각을 바꾸면 autosave_check 가 알린다", async () => {
+  const { editor, env } = await setup();
+  editor.autosaveOnLoad = true;
+
+  const result = await readDraft(env, "224000000001", TIMES);
+
+  expect(result.autosave_check).toEqual({
+    count_before: 2,
+    count_after: 2,
+    saved_at_before: "2026-10-01T03:00:00.000Z",
+    saved_at_after: "2026-10-01T03:00:01.000Z",
+    changed: true,
+  });
+});
+
+test("읽기 앞뒤 목록 비교는 수나 고친 시각이 바뀌거나 글이 사라지면 바뀐 것으로 본다", () => {
+  const item = (saved_at: string | null) => ({
+    draft_id: "1",
+    title: "가",
+    saved_at,
+  });
+  const before = { drafts: [item("2026-10-01T00:00:00.000Z")], count: 1 };
+
+  expect(autosaveCheck(before, null, "1")).toBeNull();
+  expect(autosaveCheck(before, before, "1")?.changed).toBe(false);
+  const unknown = { drafts: [item(null)], count: 1 };
+  expect(autosaveCheck(unknown, unknown, "1")?.changed).toBeNull();
+  expect(autosaveCheck(unknown, { ...unknown, count: 2 }, "1")?.changed).toBe(
+    true,
+  );
+  expect(
+    autosaveCheck(
+      before,
+      {
+        drafts: [
+          item("2026-10-01T00:00:00.000Z"),
+          { ...item(null), draft_id: "2" },
+        ],
+        count: 2,
+      },
+      "1",
+    )?.changed,
+  ).toBe(true);
+  expect(autosaveCheck(before, { drafts: [], count: 0 }, "1")).toMatchObject({
+    saved_at_after: null,
+    changed: true,
+  });
+});
+
+test("새 탭의 편집기에 사진만 남아 있어도 불러오지 않고 NAVER_BLOG_EDITOR_IN_USE 다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.document = {
+    document: {
+      components: [
+        { "@ctype": "documentTitle", title: [paragraph("")] },
+        { "@ctype": "image", id: "SE-left" },
+      ],
+    },
+  };
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_EDITOR_IN_USE");
+  expect(editor.loaded).toBeNull();
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
+test.each([
+  {},
+  { document: { components: [{ "@ctype": "unknown-placeholder" }] } },
+  { document: {} },
+  { document: { components: [{ "@ctype": "text", value: "쓰던 글" }] } },
+  { document: { components: [{ "@ctype": "text", value: [{}] }] } },
+  {
+    document: {
+      components: [{ "@ctype": "text", value: [{ nodes: [{ value: 1 }] }] }],
+    },
+  },
+])("편집기 문서 모양이 달라지면 불러오기 전에 멈춘다: %j", async (document) => {
+  const { editor, env } = await setup();
+  editor.document = document as typeof editor.document;
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(editor.loaded).toBeNull();
+  expect(editor.listOpen).toBe(false);
 });

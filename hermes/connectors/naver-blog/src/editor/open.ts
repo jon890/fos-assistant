@@ -16,7 +16,7 @@ import {
 const OPEN_TRIES = 40;
 
 /** 원문 없이 최상위 문서와 프레임의 구조만 살핀다. 실행 문맥은 바꾸지 않는다. */
-async function probe(page: EditorPage, attempts: number) {
+export async function probe(page: EditorPage, attempts: number) {
   const last = await page.js(`(() => {
   const openProbe = true;
   ${fieldCandidates(TITLE_SELECTOR, true)}

@@ -150,10 +150,21 @@ test("overwrite_draft 는 일곱 칸을 받고 changes 를 1자부터 CHANGES_MA
 
 test("작업 오류 코드는 공통 어휘에 이어진다", () => {
   expect(manifest.errors).toMatchObject({
-    NAVER_BLOG_BUSY: "unavailable",
+    NAVER_BLOG_BUSY: { category: "unavailable", recovery: "retry_later" },
     NAVER_BLOG_JOB_NOT_FOUND: "invalid_input",
-    NAVER_BLOG_DRAFT_NOT_FOUND: "invalid_input",
+    NAVER_BLOG_DRAFT_NOT_FOUND: {
+      category: "invalid_input",
+      recovery: "recheck",
+    },
     NAVER_BLOG_EDITOR_IN_USE: "unavailable",
+    NAVER_BLOG_UNAVAILABLE: {
+      category: "unavailable",
+      recovery: "retry_later",
+    },
+    NAVER_BLOG_LOGIN_REQUIRED: {
+      category: "credential_rejected",
+      recovery: "reconnect",
+    },
     NAVER_BLOG_START_UNKNOWN: "outcome_unknown",
   });
 });

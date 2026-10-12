@@ -86,4 +86,65 @@ public class ContentDraftJob {
         this.createdAt = createdAt;
         this.status = ContentDraftJobStatus.PREVIEW_READY;
     }
+
+
+    /** 승인과 함께 실제 worker가 쓸 jobId를 한 번만 예약한다. */
+    public void approve(Long approvedBy, Instant at, String jobId) {
+        require(status == ContentDraftJobStatus.PREVIEW_READY && this.jobId == null);
+        this.approvedBy = approvedBy;
+        this.approvedAt = at;
+        this.jobId = jobId;
+        this.status = ContentDraftJobStatus.DISPATCHED;
+    }
+
+
+    /** 실행하지 않고 끝난 snapshot이다. 새 preview가 필요하다. */
+    public void stale(String errorCode) {
+        require(status == ContentDraftJobStatus.PREVIEW_READY);
+        this.status = ContentDraftJobStatus.STALE;
+        this.errorCode = errorCode;
+    }
+
+
+    /** worker가 예약 job을 접수했다. 저장 성공이 아니다. */
+    public void accepted(Instant at) {
+        if (status == ContentDraftJobStatus.DISPATCHED) {
+            this.status = ContentDraftJobStatus.SAVING;
+        }
+        this.lastCheckedAt = at;
+    }
+
+
+    /** 저장 클릭 전 실패다. 클릭 뒤의 실패는 결과를 모르는 것으로 둔다. */
+    public void fail(String errorCode, Instant at) {
+        requireRunning();
+        this.status = saveClicked || saveClaimedAt != null ? ContentDraftJobStatus.UNKNOWN : ContentDraftJobStatus.FAILED;
+        this.errorCode = errorCode;
+        this.lastCheckedAt = at;
+    }
+
+
+    /** 전송 여부나 결과를 모른다. 다시 시작하지 않고 같은 job만 조회한다. */
+    public void unknown(Instant at) {
+        requireRunning();
+        this.status = ContentDraftJobStatus.UNKNOWN;
+        this.lastCheckedAt = at;
+    }
+
+
+    public boolean running() {
+        return status == ContentDraftJobStatus.DISPATCHED || status == ContentDraftJobStatus.SAVING;
+    }
+
+
+    private void requireRunning() {
+        require(running());
+    }
+
+
+    private static void require(boolean condition) {
+        if (!condition) {
+            throw new IllegalStateException("content draft job state does not allow this transition");
+        }
+    }
 }
