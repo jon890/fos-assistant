@@ -158,7 +158,11 @@ export function autosaveCheck(
     changed:
       !found ||
       check.count_before !== check.count_after ||
-      check.saved_at_before !== check.saved_at_after,
+      check.saved_at_before !== check.saved_at_after
+        ? true
+        : check.saved_at_before === null && check.saved_at_after === null
+          ? null
+          : false,
   };
 }
 

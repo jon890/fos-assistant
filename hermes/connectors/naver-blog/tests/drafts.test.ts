@@ -614,6 +614,11 @@ test("읽기 앞뒤 목록 비교는 수나 고친 시각이 바뀌거나 글이
 
   expect(autosaveCheck(before, null, "1")).toBeNull();
   expect(autosaveCheck(before, before, "1")?.changed).toBe(false);
+  const unknown = { drafts: [item(null)], count: 1 };
+  expect(autosaveCheck(unknown, unknown, "1")?.changed).toBeNull();
+  expect(autosaveCheck(unknown, { ...unknown, count: 2 }, "1")?.changed).toBe(
+    true,
+  );
   expect(
     autosaveCheck(
       before,
