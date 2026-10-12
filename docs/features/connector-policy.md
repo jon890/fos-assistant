@@ -778,8 +778,8 @@ RF-21의 근거는 Hermes v0.21.5(태그 `v2026.9.24`)의 소스다.
 
 ## 표시 메타데이터와 보호 해시
 
-schema 2의 도구 `description`은 선택 표시 칸이며 위험도·승인·상시 허락·외부 전송·식별자 정책에 들어가지 않는다. 불량 설명은 설명만 비운다. 이 처리는 원문 manifest 전체를 유효한 UTF-8 canonical JSON으로 만들 수 있을 때의 표시 fallback이다. 잘못된 surrogate처럼 전체 원문을 해시할 수 없는 선언은 보호 manifest 전체가 거절되는 기존 동작을 유지한다. 불량 메타데이터를 원문에서 지우거나 해시 대상에서 빼서 금융 도구를 살리지 않는다.
+schema 2의 도구 `description`과 `summary`는 선택 표시 칸이며 위험도·승인·상시 허락·외부 전송·식별자 정책에 들어가지 않는다. 불량 설명과 요약은 그 칸만 비운다. 이 처리는 원문 manifest 전체를 유효한 UTF-8 canonical JSON으로 만들 수 있을 때의 표시 fallback이다. 잘못된 surrogate처럼 전체 원문을 해시할 수 없는 선언은 보호 manifest 전체가 거절되는 기존 동작을 유지한다. 불량 메타데이터를 원문에서 지우거나 해시 대상에서 빼서 금융 도구를 살리지 않는다.
 
-보호 SHA는 설명과 루트 링크를 포함한 raw declared 전체에 의존한다. 설명만 바뀌어 정규화 정책이 같더라도 SHA는 달라지고 기존 바인딩은 pending이며 옛 승인 ticket은 거절된다. 지원 확인·claim·거래를 실행하지 않고 금융 도구의 exclude를 유지한다. fingerprint 알고리즘과 보호 프로토콜, nonce 및 실행 권한은 바꾸지 않는다.
+보호 SHA는 설명과 루트 링크를 포함한 raw declared 전체에 의존한다. 설명이나 요약만 바뀌어 정규화 정책이 같더라도 SHA는 달라지고 기존 바인딩은 pending이며 옛 승인 ticket은 거절된다. 지원 확인·claim·거래를 실행하지 않고 금융 도구의 exclude를 유지한다. fingerprint 알고리즘과 보호 프로토콜, nonce 및 실행 권한은 바꾸지 않는다.
 
-옛 엄격 reader는 description을 거절한다. 설명이 들어간 manifest를 설치하기 전에 새 reader가 실제 실행 중인 plugin에 로드되어야 한다. 파일 복사만으로 로드 완료를 판단하지 않는다. 설치·재시작·되돌리기 순서와 배포 뒤 실제 Hermes 왕복 확인은 비공개 운영 저장소가 소유한다.
+옛 엄격 reader는 description을 거절하고, `summary`를 아는 reader가 나오기 전의 reader는 summary를 거절한다. 설명이나 요약이 들어간 manifest를 설치하기 전에 새 reader가 실제 실행 중인 plugin에 로드되어야 한다. 파일 복사만으로 로드 완료를 판단하지 않는다. 설치·재시작·되돌리기 순서와 배포 뒤 실제 Hermes 왕복 확인은 비공개 운영 저장소가 소유한다.

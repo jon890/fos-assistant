@@ -32,9 +32,17 @@ export const DEMO_CONNECTOR = {
   // `grant` 는 대시보드 plugin 이 기본값을 채워 내는 값이다. 승인이 `required` 인 도구만 참이다.
   // `outbound` 도 기본값을 채워 낸다. 밖으로 나간다고 선언한 도구만 참이다.
   // `identifiers` 는 선언한 도구만 낸다. 칸이 없으면 Control Plane 이 빈 목록으로 읽는다.
+  // `title` 과 `summary` 는 화면에 보일 말이다. `purge_notes` 는 둘 다 없어 화면이 대체 문구를 보인다.
+  // `description` 은 모델이 읽는 설명이라 화면에 닿지 않아야 한다.
   tools: {
-    list_scopes: { risk: "READ", approval: "none", grant: false, outbound: false },
-    write_note: { risk: "WRITE", approval: "required", title: "메모 쓰기", grant: true, outbound: false },
+    list_scopes: {
+      risk: "READ", approval: "none", grant: false, outbound: false, title: "범위 목록 보기",
+      summary: "메모를 둘 범위를 읽어요.", description: "scopes 배열로 범위 id 와 name 을 돌려줍니다.",
+    },
+    write_note: {
+      risk: "WRITE", approval: "required", title: "메모 쓰기", grant: true, outbound: false,
+      summary: "메모를 한 건 남겨요.", description: "note 인자로 메모 한 건을 저장합니다.",
+    },
     purge_notes: { risk: "DESTRUCTIVE", approval: "always", grant: false, outbound: false },
     // 상시 허락을 닫고 `note_id` 를 식별자로 선언한 도구다(ADR-089). Gmail 의 필터 지우기와 같은 모양이다.
     delete_note: {

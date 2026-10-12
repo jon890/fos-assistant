@@ -146,9 +146,9 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
             raise ValueError("tools 의 키는 도구 이름이다")
         if not isinstance(declared_tool, dict) or set(declared_tool) - {
                 "risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers", "description",
-                "arg_labels"}:
+                "summary", "arg_labels"}:
             raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, conversation_grant, identifiers, description,"
-                             " arg_labels 만 갖는 객체다")
+                             " summary, arg_labels 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")

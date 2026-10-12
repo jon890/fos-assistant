@@ -64,6 +64,7 @@ final class ConnectorCatalogTools {
                 identifiers(policy),
                 text(policy, "description"),
                 argLabels(policy),
+                text(policy, "summary"),
                 outbound(policy),
                 conversationGrant(policy)));
         }
