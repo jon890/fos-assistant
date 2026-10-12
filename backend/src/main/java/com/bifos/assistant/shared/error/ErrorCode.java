@@ -151,7 +151,7 @@ public enum ErrorCode {
     /** 일시 장애로 원고 본문을 사용할 수 없다. */
     CONTENT_DRAFT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     /**
-     * 새로 쓰는 원고가 같은 사진을 두 이미지 블록에 두었다. 네이버 커넥터의 사진 자리는 파일 이름만 담아 두 자리를 구별하지
+     * 새로 쓰는 원고가 같은 사진을 두 이미지 블록에 두었다. 블로그 커넥터의 사진 자리는 파일 이름만 담아 두 자리를 구별하지
      * 못하므로 저장 전에 막는다. 형식 오류와 달리 모델과 화면이 고칠 방법을 알 수 있게 따로 적는다.
      */
     CONTENT_DRAFT_DUPLICATE_PHOTO(HttpStatus.BAD_REQUEST),
