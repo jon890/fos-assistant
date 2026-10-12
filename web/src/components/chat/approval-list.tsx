@@ -13,11 +13,13 @@ import {
   type ConnectorAction,
 } from "@/lib/connector-action";
 import {
+  isContentDraftTerminal,
   readContentDraftJobs,
   type ContentDraftJob,
+  type ContentDraftJobStatus,
 } from "@/lib/content-draft-snapshot";
 
-/** 카드로 보이는 상태다. 끝난 줄의 결과는 알림 줄과 답으로 이미 대화에 있다. 원고 저장 줄은 끝나도 보인다. */
+/** 카드로 보이는 상태다. 끝난 줄의 결과는 알림 줄과 답으로 이미 대화에 있다. 원고 저장 줄은 끝나도 보이되 처음부터 끝나 있던 줄은 접어 둔다. */
 const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN"];
 
 /** 「모두 승인」 이 다음 건으로 넘어가는 결과다. 그 밖의 결과(실패, 모름, 실행하지 않음)를 만나면 멈춘다. */
@@ -201,6 +203,10 @@ export function ApprovalList({
   const [expanded, setExpanded] = useState<string[]>([]);
   /** 카드가 혼자 승인이나 거절을 보내는 중인 줄이다. 그 줄이 든 묶음의 「모두 승인」 을 막는다 */
   const [sending, setSending] = useState<string[]>([]);
+  /** 이 화면에서 끝나지 않은 상태로 본 원고 줄이다. 그 줄은 끝나도 결과를 보이게 펼쳐 둔다 */
+  const [live, setLive] = useState<string[]>([]);
+  /** 처음부터 끝나 있던 원고 카드를 펼쳤는가. 대화를 열 때마다 지난 저장 카드가 쌓이지 않게 접어 둔다 */
+  const [finishedOpen, setFinishedOpen] = useState(false);
   const jobs = useContentDraftJobs(conversationId, refreshKey + reloads);
   const bulk = useBulkApproval(replace, () => setReloads((count) => count + 1));
 
@@ -241,6 +247,31 @@ export function ApprovalList({
     else setReloads((count) => count + 1);
   }
 
+  useEffect(() => {
+    setFinishedOpen(false);
+  }, [conversationId]);
+
+  useEffect(() => {
+    const running = [
+      ...(loaded?.actions ?? []).flatMap((action) =>
+        action.contentDraft &&
+        !isContentDraftTerminal(action.contentDraft.status)
+          ? [action.actionId]
+          : [],
+      ),
+      ...jobs.items.flatMap((job) =>
+        isContentDraftTerminal(job.status) ? [] : [job.actionId],
+      ),
+    ];
+    if (running.some((id) => !live.includes(id)))
+      setLive((current) => [...new Set([...current, ...running])]);
+  }, [loaded, jobs.items, live]);
+
+  /** 처음 본 때부터 끝나 있던 원고 줄이다. 펼치기 전에는 그리지 않는다. */
+  function finished(actionId: string, status: ContentDraftJobStatus) {
+    return isContentDraftTerminal(status) && !live.includes(actionId);
+  }
+
   function dismiss(actionId: string) {
     setDismissed((current) => [...current, actionId]);
   }
@@ -262,6 +293,11 @@ export function ApprovalList({
             !dismissed.includes(action.actionId),
         )
       : [];
+  const finishedActions = actions.filter(
+    (action) =>
+      action.contentDraft &&
+      finished(action.actionId, action.contentDraft.status),
+  );
   // 승인 줄 목록에 없는 원고 job 만 카드로 더한다. 같은 actionId 는 한 장만 그린다.
   const seen = new Set([
     ...dismissed,
@@ -272,6 +308,16 @@ export function ApprovalList({
   const jobOnly = jobs.items.filter(
     (job) => !seen.has(job.actionId) && (seen.add(job.actionId), true),
   );
+  const finishedJobs = jobOnly.filter((job) =>
+    finished(job.actionId, job.status),
+  );
+  const hiddenCount = finishedActions.length + finishedJobs.length;
+  const shownActions = finishedOpen
+    ? actions
+    : actions.filter((action) => !finishedActions.includes(action));
+  const shownJobs = finishedOpen
+    ? jobOnly
+    : jobOnly.filter((job) => !finishedJobs.includes(job));
   if (conversationId === null) return null;
   if (actions.length === 0 && jobOnly.length === 0 && jobs.next === null)
     return null;
@@ -289,7 +335,7 @@ export function ApprovalList({
           {bulk.error}
         </Notice>
       ) : null}
-      {grouped(actions).map(({ key, actions: group }) =>
+      {grouped(shownActions).map(({ key, actions: group }) =>
         group.length === 1 ? (
           <ApprovalCard
             key={group[0].actionId}
@@ -325,7 +371,7 @@ export function ApprovalList({
           />
         ),
       )}
-      {jobOnly.map((job) => (
+      {shownJobs.map((job) => (
         <ContentDraftSaveCard
           key={job.actionId}
           action={{ actionId: job.actionId, status: "PENDING" }}
@@ -334,7 +380,21 @@ export function ApprovalList({
           onDismiss={() => dismiss(job.actionId)}
         />
       ))}
-      {jobs.next !== null ? (
+      {!finishedOpen && (hiddenCount > 0 || jobs.next !== null) ? (
+        <div>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="content-draft-finished"
+            onClick={() => setFinishedOpen(true)}
+          >
+            {hiddenCount > 0
+              ? `끝난 저장 ${hiddenCount}건 보기`
+              : "이전 저장 보기"}
+          </Button>
+        </div>
+      ) : null}
+      {finishedOpen && jobs.next !== null ? (
         <div>
           <Button
             size="sm"

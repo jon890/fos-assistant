@@ -289,7 +289,10 @@ for (const [status, text] of [
     });
     await page.goto(`/chat/${conversationId}`);
 
+    // 처음부터 끝나 있던 원고 카드는 접혀 있다가 펼치면 보인다.
     const card = page.getByTestId("content-draft-card");
+    await expect(card).toHaveCount(0);
+    await page.getByTestId("content-draft-finished").click();
     await expect(card.getByTestId("content-draft-result")).toHaveText(text);
     await expect(card.getByRole("button")).toHaveText(["닫기"]);
     expect(counts.job).toBe(0);
@@ -418,6 +421,11 @@ test("일반 승인 줄에 밀린 끝난 원고도 job 목록에서 다시 찾�
   await expect(group.getByTestId("approval-approve-all")).toBeVisible();
   await expect(group.getByTestId("approval-grant").first()).toBeVisible();
   const cards = page.getByTestId("content-draft-card");
+  await expect(cards).toHaveCount(1);
+  await expect(page.getByTestId("content-draft-finished")).toHaveText(
+    "끝난 저장 1건 보기",
+  );
+  await page.getByTestId("content-draft-finished").click();
   await expect(cards).toHaveCount(2);
   await expect(cards.nth(0)).toHaveAttribute("data-status", "PREVIEW_READY");
   await expect(cards.nth(1)).toHaveAttribute("data-status", "SUCCEEDED");
@@ -454,6 +462,9 @@ test("원고 job 이 21개면 이전 저장 더 보기로 오래된 원고를 �
   await page.goto(`/chat/${conversationId}`);
 
   const cards = page.getByTestId("content-draft-card");
+  await expect(cards).toHaveCount(0);
+  await expect(page.getByTestId("content-draft-more")).toHaveCount(0);
+  await page.getByTestId("content-draft-finished").click();
   await expect(cards).toHaveCount(20);
   await page.getByTestId("content-draft-more").click();
   await expect(cards).toHaveCount(21);
