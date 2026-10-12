@@ -264,7 +264,7 @@ coordinator가 사용자 → 대화 → 첨부를 잠그고, 그 안에서 허�
 | `ExecutionRecorder.cancel` | CANCELLED UPDATE가 같은 실행 행을 잠근다. 먼저 커밋하면 claim 거절, 잠금을 쥐는 동안 claim이 기다렸다가 커밋이면 거절, rollback이면 허가 |
 | `PersonAccessService.setEnabled` | 사용자 행을 번호 오름차순으로 잠근 뒤 허용 목록 행을 잠근다. 끄기가 먼저 커밋하면 claim 거절 |
 | `AgentAdminService.update`·`AgentLifecycleService` | 에이전트 행 잠금을 공유한다. 비활성이 먼저 커밋하면 claim 거절 |
-| `RecoveredRunRecorder.finishOnce` | 실행 행을 먼저 잠그고 대화 행을 잠가 순서가 반대다. 겹치면 InnoDB 가 한쪽을 되돌린다. 허가가 지면 403 으로 끝나 클릭은 0회이고, 승인이 지면 승인 줄은 PENDING 으로 남는다. 순서 정렬은 후속 과제다 |
+| `RecoveredRunRecorder.finishOnce`의 완료·취소 기록 | 실행 행을 먼저 잠그고 대화 행을 잠가 순서가 반대다. 취소 결과도 `ExecutionRecorder.cancel` 뒤 `ConversationWriter.touchSession`을 같은 트랜잭션에서 부른다. 겹치면 InnoDB 가 한쪽을 되돌린다. 허가가 지면 403 으로 끝나 클릭은 0회이고, 승인이 지면 승인 줄은 PENDING 으로 남는다. 순서 정렬은 후속 과제다 |
 | `ConnectorBindingService.unbind`·`ConnectorConnectionService.apply/disconnect` | 사용자 행을 먼저 잠그고 원고 승인 줄이 EXECUTING이면 기존처럼 `CONNECTOR_ACTION_EXECUTING`으로 실패하며 바인딩 판을 바꾸지 않는다 |
 
 claim이 먼저 커밋하면 뒤의 writer는 그 행을 기다렸다가 바뀐다. 이미 허가한 원격 클릭을 되돌리지 못하며 저장을 멈췄다고 보고하지 않는다.
