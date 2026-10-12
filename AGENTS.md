@@ -185,7 +185,7 @@ P1 과 P2 는 머지 전에 고치고, P3 부터 P5 까지는 고치거나 고�
 
 머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
 CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이션, 빌드와 의존성 파일, `test/unit/`, 공유 계약을 건드리지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
-필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 머지는 `gh pr merge <PR> --merge` 로 하고 이력을 한 줄로 합치지 않는다.
+필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `gh pr merge <PR> --merge --match-head-commit <해시>` 로 머지하고, 이력을 한 줄로 합치지 않는다. 판정한 뒤 push 가 들어오면 머지가 거절된다.
 머지한 뒤에는 위 「작업 단위」 의 `scripts/dev/finish-task.sh` 로 정리한다.
 GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.
 

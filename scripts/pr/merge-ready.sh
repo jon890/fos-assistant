@@ -9,9 +9,10 @@
 # 공유 계약으로 볼 경로와 까닭은 scripts/pr/merge-ready.mjs 의 RISK_PATHS 에 있다.
 # 필수가 아닌 claude-review 만 실패해 UNSTABLE 이면 머지할 수 있는 것으로 본다.
 #
+# 첫 줄이 판정한 head 의 해시이고, 머지는 그 해시로 고정한다(gh pr merge --match-head-commit).
 # 마지막 줄이 판정이고 종료 코드가 같이 갈린다.
 #   0   머지 가능
-#   10  대기(도는 중이거나 아직 없는 필수 검사, mergeable 계산 중)
+#   10  대기(도는 중이거나 아직 없는 필수 검사, mergeable 계산 중, 조회 중 head 변경)
 #   11  main 다시 합치기 필요(까닭)
 #   12  막힘(까닭): Draft, 충돌, 필수 검사 실패, 미해결 스레드, 그 밖의 UNSTABLE 과 BLOCKED
 #   2   판정 불가: 사용법이 틀렸거나 gh, git 조회가 실패했거나 필수 검사가 0개

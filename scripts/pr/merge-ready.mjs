@@ -10,6 +10,8 @@
 //   3. head 가 origin/main 을 포함하지 않으면 다시 합쳐야 하는지 가른다.
 //      CI 뒤 main 에 들어온 커밋이 아래 조건에 하나도 걸리지 않으면 직전 CI 결과를 쓴다.
 //      main 이 바뀔 때마다 전체 CI 를 다시 돌리면 여러 PR 이 함께 돌 때 머지가 끝없이 밀린다.
+//   4. 조회하는 동안 head 가 바뀌지 않았는지 마지막에 다시 읽는다. 바뀌었으면 대기다.
+//      판정한 head 는 출력 맨 앞의 head 줄에 있고, 머지는 그 해시로 고정한다(--match-head-commit).
 //
 // CI 가 돈 기준 main 은 PR 의 merge 커밋 부모가 아니라 가장 이른 검사 시작 시각의 main 으로 정한다.
 // refs/pull/N/merge 는 main 이 움직이면 GitHub 가 다시 만들어 그때의 base 를 git 에서 읽을 수 없다.
@@ -79,11 +81,12 @@ export function failedOthers(required, runs) {
 
 /**
  * 모은 사실로 판정 하나를 낸다. 순서가 곧 우선순위다.
- * input: { required, runs, isDraft, mergeable, mergeStateStatus, unresolvedThreads, containsMain, remergeReasons }
+ * input: { required, runs, isDraft, mergeable, mergeStateStatus, unresolvedThreads, containsMain, remergeReasons, headRefOid, headRecheck }
  */
 export function decide(input) {
   const { required, runs, isDraft, mergeable, mergeStateStatus, unresolvedThreads, containsMain } = input;
   const blocked = (why) => ({ verdict: `${VERDICT.BLOCKED}(${why})`, code: EXIT.BLOCKED });
+  if (input.headRecheck !== input.headRefOid) return { verdict: `${VERDICT.WAIT}(조회하는 동안 head 가 ${input.headRefOid} 에서 ${input.headRecheck} 로 바뀌었다. 다시 실행한다)`, code: EXIT.WAIT };
   if (isDraft) return blocked("Draft 상태라 gh pr ready 가 먼저다");
   if (mergeable === "CONFLICTING" || mergeStateStatus === "DIRTY") return blocked("main 과 충돌한다");
   const { pending, failed } = checkRequired(required, runs);
@@ -162,7 +165,8 @@ export function collect(pr, run = realRun) {
     const prFiles = lines(must(run, "gh", ["pr", "diff", pr, "--name-only"], "PR 변경 파일"));
     reasons = remergeReasons(prFiles, mainFiles);
   }
-  return { ...view, required, runs, unresolvedThreads, containsMain, remergeReasons: reasons };
+  const headRecheck = JSON.parse(must(run, "gh", ["pr", "view", pr, "--json", "headRefOid"], "PR head 재확인")).headRefOid;
+  return { ...view, required, runs, unresolvedThreads, containsMain, remergeReasons: reasons, headRecheck };
 }
 
 function main() {
@@ -180,6 +184,7 @@ function main() {
     process.exit(EXIT.LOOKUP);
   }
   const { pending, failed } = checkRequired(facts.required, facts.runs);
+  console.log(`head: ${facts.headRefOid}`);
   console.log(`필수 검사 ${facts.required.length}개: 통과 ${facts.required.length - pending.length - failed.length}, 도는 중 ${pending.length}, 실패 ${failed.length}`);
   console.log(`Draft: ${facts.isDraft ? "예" : "아니오"}, mergeable: ${facts.mergeable}, mergeStateStatus: ${facts.mergeStateStatus}`);
   console.log(`미해결 리뷰 스레드: ${facts.unresolvedThreads}개`);

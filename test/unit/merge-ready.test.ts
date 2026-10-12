@@ -14,6 +14,8 @@ const base = {
   unresolvedThreads: 0,
   containsMain: true,
   remergeReasons: [],
+  headRefOid: "abc",
+  headRecheck: "abc",
 };
 
 test("필수 검사를 이름으로 대조하고 아직 없는 검사는 도는 중으로 본다", () => {
@@ -140,6 +142,12 @@ test("head 가 main 을 포함하지 않으면 CI 시작 시각의 main 과 PR �
   const facts = collect("7", run);
   assert.equal(facts.containsMain, false);
   assert.match(facts.remergeReasons.join(), /main 이 빌드와 의존성/);
+});
+
+test("조회하는 동안 head 가 바뀌었으면 대기다", () => {
+  const moved = decide({ ...base, headRecheck: "def" });
+  assert.equal(moved.code, EXIT.WAIT);
+  assert.match(moved.verdict, /abc.*def/);
 });
 
 test("필수 검사 조회가 실패하거나 0개면 판정하지 않는다", () => {
