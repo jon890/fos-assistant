@@ -64,4 +64,4 @@
     - 한 브라우저에서 작업은 하나씩 돈다. 앞 작업이 끝나기 전의 저장 요청은 거절한다. 잠금은 CDP 주소마다 둔다.
     - 작업 프로세스는 대시보드가 정리하는 프로세스 묶음 밖에서 돌도록 새 세션으로 띄운다. 작업이 살아 있는지는 작업 프로세스가 5초마다 작업 파일에 쓰는 갱신 시각으로 본다. pid 로 프로세스를 찾지 않으므로 대시보드와 Hermes 의 MCP 서버가 PID 네임스페이스를 달리해도 살아 있는 작업을 끝내지 않는다. 그 대신 작업 프로세스가 죽었다는 판정이 최대 30초 늦어진다.
 
-- **적용 범위**: `hermes/connectors/naver-blog/`, [네이버 블로그 커넥터](../../hermes/connectors/naver-blog/README.md), [결과물 파일](../features/attachment.md) 의 첨부 참조 계약. 블로그 전용 profile 의 정리 순서는 운영 저장소가 갖는다.
+- **적용 범위**: `hermes/connectors/naver-blog/`, [네이버 블로그 커넥터](../features/naver-blog-connector.md), [결과물 파일](../features/attachment.md) 의 첨부 참조 계약. 블로그 전용 profile 의 정리 순서는 운영 저장소가 갖는다.

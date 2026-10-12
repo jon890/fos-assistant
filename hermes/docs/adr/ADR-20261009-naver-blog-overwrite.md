@@ -64,4 +64,4 @@
 
 ### 적용 범위
 
-`hermes/connectors/naver-blog/`, [네이버 블로그 커넥터](../../connectors/naver-blog/README.md).
+`hermes/connectors/naver-blog/`, [네이버 블로그 커넥터](../../../docs/features/naver-blog-connector.md).

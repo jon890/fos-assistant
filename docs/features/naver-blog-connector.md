@@ -1,9 +1,13 @@
 # 네이버 블로그 커넥터
 
-사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고 고치며, 블로그 글을 임시저장하는 범용 커넥터다. 코드는 [`hermes/connectors/naver-blog/`](.) 에 있다.
-이 문서는 도구와 정책, 초안의 모양, 임시저장 글 읽기와 덮어쓰기, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다.
-결정과 근거는 [ADR-20261007 / naver-blog-connector](../../../docs/adr/ADR-20261007-naver-blog-connector.md) , [ADR-20261009 / naver-blog-primitives](../../docs/adr/ADR-20261009-naver-blog-primitives.md), [ADR-20261009 / naver-blog-overwrite](../../docs/adr/ADR-20261009-naver-blog-overwrite.md) 에 있다.
-커넥터 공통 계약은 [커넥터 연결](../../../docs/features/connector.md) 과 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 이 갖는다.
+사용자가 「내 브라우저」 에 로그인해 둔 네이버 계정의 임시저장 글을 읽고 고치며, 블로그 글을 임시저장하는 범용 커넥터의 개발 문서다.
+
+covers: `hermes/connectors/naver-blog/`
+
+코드는 [`hermes/connectors/naver-blog/`](../../hermes/connectors/naver-blog) 에 있다.
+이 문서는 도구와 정책, 초안의 모양, 임시저장 글 읽기와 덮어쓰기, 보안, 설정 안내, 실제 계정으로 확인하는 절차를 갖는다. 사용자 안내는 [네이버 블로그 커넥터 README](../../hermes/connectors/naver-blog/README.md) 가 갖는다.
+결정과 근거는 [ADR-20261007 / naver-blog-connector](../adr/ADR-20261007-naver-blog-connector.md), [ADR-20261009 / naver-blog-primitives](../../hermes/docs/adr/ADR-20261009-naver-blog-primitives.md), [ADR-20261009 / naver-blog-overwrite](../../hermes/docs/adr/ADR-20261009-naver-blog-overwrite.md) 에 있다.
+커넥터 공통 계약은 [커넥터 연결](connector.md) 과 [커넥터 도구 정책](connector-policy.md) 이 갖는다.
 
 **발행하지 않는다.** 글은 임시저장 상태로 남고, 공개는 사용자가 네이버에서 직접 한다.
 
@@ -20,10 +24,10 @@
 
 | env | 선언 | 값 |
 | --- | --- | --- |
-| `NAVER_BLOG_ATTACHMENT_DIR` | `owner_attachments_env` | 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다([ADR-20261007 / connector-owner-attachments](../../../docs/adr/ADR-20261007-connector-owner-attachments.md)) |
-| `NAVER_BLOG_BROWSER_URL` | `owner_browser_env` | 주인의 「내 브라우저」 로 가는 Control Plane 중계 주소다. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
+| `NAVER_BLOG_ATTACHMENT_DIR` | `owner_attachments_env` | 바인딩 설치가 그 에이전트 주인의 첨부 디렉터리를 넣는다([ADR-20261007 / connector-owner-attachments](../adr/ADR-20261007-connector-owner-attachments.md)) |
+| `NAVER_BLOG_BROWSER_URL` | `owner_browser_env` | 주인의 「내 브라우저」 로 가는 Control Plane 중계 주소다. 바인딩 설치는 그 바인딩의 표식 주소를, 확인 도구 호출은 요청자의 호출 표식 주소를 넣는다. 중계가 꺼졌으면 빈 값이다([ADR-20261008 / browser-gateway-token](../../backend/docs/adr/ADR-20261008-browser-gateway-token.md)) |
 
-커넥터는 중계 주소를 Chrome 의 CDP 주소처럼 부른다. 중계 계약은 [사용자 브라우저](../../../docs/features/user-browser.md) 의 「중계」 가 갖는다.
+커넥터는 중계 주소를 Chrome 의 CDP 주소처럼 부른다. 중계 계약은 [사용자 브라우저](user-browser.md) 의 「중계」 가 갖는다.
 `connector.json` 의 `owner_browser_login_url` 은 네이버 로그인 화면 주소다. 외부 서비스 연결 화면이 그 주소를 「내 브라우저에서 로그인」 링크로 연다.
 확인 도구는 `session_status` 다. 등록과 연결 확인 때 요청자의 「내 브라우저」 에 중계로 붙어 네이버 로그인 쿠키가 있는지 보고, 있으면 저장한다.
 
@@ -68,7 +72,7 @@ MCP 서버 이름은 `naver-blog` 다.
 ## 임시저장 글 읽기
 
 두 도구 모두 그 블로그의 글쓰기 화면을 새 탭에 열고, 끝나면 그 탭만 닫는다. 같은 블로그에 살아 있는 저장 작업이 있으면 탭을 열지 않고 `NAVER_BLOG_BUSY` 다. 읽기는 잠금을 잡지 않는다.
-한 번의 읽기는 2분이 지나면 멈춘다. 근거와 실측한 편집기 동작은 [ADR-20261009 / naver-blog-primitives](../../docs/adr/ADR-20261009-naver-blog-primitives.md) 가 갖는다.
+한 번의 읽기는 2분이 지나면 멈춘다. 근거와 실측한 편집기 동작은 [ADR-20261009 / naver-blog-primitives](../../hermes/docs/adr/ADR-20261009-naver-blog-primitives.md) 가 갖는다.
 
 「작성 중인 글이 있습니다」 알림은 닫지 않는다. `list_drafts` 는 그 알림이 있어도 읽고, `read_draft` 는 글을 불러오지 않고 `NAVER_BLOG_EDITOR_IN_USE` 로 멈춘다.
 알림이 없어도 새 탭의 편집기 제목이나 글 문단에 글자가 있거나, 사진처럼 글이 아닌 구성요소가 있거나, 문서 번호가 목록에 있는 글 번호이면 같은 코드로 멈춘다. 모르는 구성요소 종류는 편집기 모양 오류로 처리한다.
@@ -118,9 +122,40 @@ MCP 서버 이름은 `naver-blog` 다.
 
 `revision` 은 `[title, category, tags, 본문 줄 목록]` 을 JSON 으로 적은 글의 SHA-256 앞 16자리다. 줄 끝 `\r` 은 넣지 않는다.
 
+### 사진 메타데이터
+
+`read_draft`는 임시저장 글을 편집기에 불러와 기존 `draft_id`, `revision`, `title`, `category`, `tags`, `body`에 사진 메타데이터를 더한다.
+읽기 앞뒤 목록 변화 관측은 `autosave_check`, 읽기 탭에서 관측한 자동저장 요청 수는 `autosave_requests`로 함께 돌려준다. 목록이나 고친 시각을 읽지 못하면 변화 판정은 `null`이며, `changed`가 거짓이어도 자동저장이 없었다는 뜻은 아니다.
+기존 본문의 `[기존 사진 1]` 같은 줄과 덮어쓰기용 구성요소 대응은 그대로다.
+불러오기 중 네이버 자동저장이 발생할 수 있으므로 기존 WRITE 정책을 유지한다.
+
+`photos`는 `document.components`에 직접 놓인 `@ctype=image`만 현재 배열 차례로 읽는다.
+중첩 이미지와 이미지 그룹은 분석하지 않으므로 전체 사진 검증 완료를 뜻하지 않는다.
+
+| 사진 항목의 칸 | 의미 |
+| --- | --- |
+| `position` | 직접 이미지 중 1부터 센 현재 순서 |
+| `componentIndex` | 원래 components 배열에서 0부터 센 위치 |
+| `componentId` | 편집기 구성요소의 식별자. 영문, 숫자, 밑줄과 하이픈으로 된 1자 이상 200자 이하 문자열이며 그 밖은 null |
+| `fileName` | 실제 이미지 필드의 파일명. 누락되거나 잘못된 값은 null이며 URL에서 추정하지 않는다 |
+
+파일명은 UTF-16 코드 단위로 1개 이상 255개 이하만 허용한다.
+경로 구분자, 콜론, URL query·fragment 기호, 제어 문자, 보이지 않는 형식 문자, 줄 구분자, 잘못된 surrogate, 앞뒤 공백과 점 경로는 거절한다.
+값을 자르거나 고쳐서 유효한 파일명으로 만들지 않으며, 잘못된 메타데이터 때문에 기존 본문 읽기를 실패시키지 않는다.
+사진 항목에는 src, domain, path, 좌표, origin, caption, 원시 객체와 본문을 넣지 않는다.
+
+사진 항목은 최대 50개다. `photo_count`는 직접 이미지의 실제 관측 수이며 `photos_truncated`는 상한 때문에 응답에서 빠진 항목이 있는지 알린다.
+사진이 없으면 빈 배열, 0, false를 반환한다. 51개라면 앞의 50개와 관측 수 51, 잘림 여부 true를 반환하며 본문의 기존 사진 줄은 모두 유지한다.
+중복 파일명도 현재 순서대로 각각 반환한다.
+
+`revision`은 제목, 카테고리, 태그와 본문 네 칸의 기존 지문이며 사진 메타데이터를 포함하지 않는다.
+사진 수와 본문 줄이 같은 상태에서 사진 식별자나 파일명만 바뀌어도 이 지문은 그대로일 수 있다.
+파일명과 component id는 첨부 번호나 권한, 사진 hash가 아니다. 업로드 바이트나 픽셀의 동일성, 승인 시점 사진의 불변성을 증명하지 않는다.
+사용자와 첨부의 신뢰할 수 있는 대응과 접근 권한은 후속 Control Plane이 확인해야 하며 모델이 반환 파일명을 권한 근거로 사용할 수 없다.
+
 ## 임시저장 글 덮어쓰기
 
-`read_draft` 로 읽은 글을 고쳐 같은 글에 저장한다. 근거는 [ADR-20261009 / naver-blog-overwrite](../../docs/adr/ADR-20261009-naver-blog-overwrite.md) 가 갖는다.
+`read_draft` 로 읽은 글을 고쳐 같은 글에 저장한다. 근거는 [ADR-20261009 / naver-blog-overwrite](../../hermes/docs/adr/ADR-20261009-naver-blog-overwrite.md) 가 갖는다.
 
 ### 고친 글의 모양
 
@@ -233,7 +268,7 @@ MCP 서버 이름은 `naver-blog` 다.
 `render_draft` 가 돌려준 `html` 을 에이전트가 `artifact_write` 로 `artifact_path` 에 쓴다. 대화 화면이 그 결과물을 답 아래에 보인다.
 
 - 네이버 모바일 화면 폭으로 그린다. 사진 자리마다 몇 번째 사진인지와 `photo_notes` 의 설명을 붙인다. 설명은 미리보기에만 보이고 네이버에는 들어가지 않는다
-- 사진은 바이트를 담지 않고 같은 대화의 첨부 주소를 상대 경로로 부른다. 파일 이름이 `<첨부 번호>.<확장자>` 인 사진만 그렇게 그리고, 다른 이름이면 이름표만 보인다. 계약은 [결과물 파일](../../../docs/features/attachment.md) 의 「같은 대화의 첨부 사진을 부를 때」 가 갖는다
+- 사진은 바이트를 담지 않고 같은 대화의 첨부 주소를 상대 경로로 부른다. 파일 이름이 `<첨부 번호>.<확장자>` 인 사진만 그렇게 그리고, 다른 이름이면 이름표만 보인다. 계약은 [결과물 파일](attachment.md) 의 「같은 대화의 첨부 사진을 부를 때」 가 갖는다
 - `artifact_path` 는 `index.html` 이나 `<폴더>/index.html` 이고 폴더는 세 단계까지 받는다. 사진 주소의 `../` 수를 그 깊이로 정한다(`index.html` 은 `../attachments`, `a/index.html` 은 `../../attachments`)
 - 에이전트는 `artifact_write` 의 `path` 를 `artifact_path` 와 글자까지 같게 준다. 다른 깊이에 쓰면 사진 주소가 풀리지 않아 사진이 404 로 보이지 않는다
 - 스티커는 네이버 편집기에 들어가는 것과 같은 그림으로 보인다. 결과물 화면은 외부 그림을 막으므로(`img-src 'self' data:`) HTML 은 `stickers/<코드>.png` 를 상대 경로로 부르고, 에이전트가 `assets` 의 항목마다 `artifact_write` 의 주소 방식(`source_url`)으로 그 그림을 같은 폴더에 받아 둔다
@@ -316,7 +351,7 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `editor_failed` | 그 밖에 화면이 기대한 상태가 아니었다 | `stage` 와 `message`: 무엇을 찾지 못했는지. `message` 는 커넥터가 정한 문장이다. 발행 설정을 열지 못했으면 `diagnosis` 가 붙는다: `publish_button`(`shown`, `disabled`, `hidden`, `missing`), 단추 가운데를 차지한 요소 `covered_by`, 보이는 레이어 `layers`. 요소는 태그와 앞 클래스 둘로만 적고 화면의 글은 싣지 않는다 |
 | `timeout` | 작업이 10분 안에 끝나지 않았다 | |
 
-승인한 원고 snapshot 으로 띄운 작업은 `draft_job` 이 없는 작업(`NAVER_BLOG_JOB_NOT_FOUND`)으로 다룬다. 그 작업은 Control Plane 만 private 조회로 읽는다. 계약은 [원고 기능](../../../docs/features/content-draft.md#커넥터의-예약-job-시작과-조회)이 갖는다.
+승인한 원고 snapshot 으로 띄운 작업은 `draft_job` 이 없는 작업(`NAVER_BLOG_JOB_NOT_FOUND`)으로 다룬다. 그 작업은 Control Plane 만 private 조회로 읽는다. 계약은 [원고 기능](content-draft.md#커넥터의-예약-job-시작과-조회)이 갖는다.
 
 작업 파일은 커넥터가 도는 컨테이너의 임시 디렉터리에 두고 24시간 뒤 지운다. 작업에 넘긴 초안 사본은 작업이 끝나면 지운다.
 작업 프로세스는 10분이 지나면 탭을 닫고 `timeout` 으로 끝낸다. 작업 프로세스가 30초 넘게 갱신 시각을 쓰지 않았거나 11분이 지나도 끝나지 않았으면 다음 상태 조회가 그 작업을 `timeout` 으로 끝내고 잠금을 푼다. 저장 단추를 누른 뒤였으면 둘 다 `unknown` 이다. 끝난 작업의 상태는 다시 쓰지 않는다.
@@ -349,14 +384,14 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 
 ## 서버와 검사
 
-[커넥터 만들기](../README.md) 의 「MCP 서버」 를 따른다. 같은 묶음 파일이 `--worker <작업 파일>` 인자로 작업 프로세스가 된다.
+[커넥터 만들기](../../hermes/connectors/README.md) 의 「MCP 서버」 를 따른다. 같은 묶음 파일이 `--worker <작업 파일>` 인자로 작업 프로세스가 된다.
 CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이브러리를 들이지 않는다.
 
 일반 검사는 `tests/`의 가짜 CDP 서버가 중계처럼 HTTP 창구와 WebSocket 명령에 답한다.
 커서 회귀는 전용 임시 profile의 로컬 headless Chrome에서 합성 HTML을 열어 실제 DOM과 CDP 입력을 검증한다.
 제목·본문 입력 회귀는 `Control+A`를 쓰는 기존 키 계약에 맞춰 Linux Chrome 환경에서 실행한다.
 실제 네이버와 사용자 브라우저에는 닿지 않는다. Chrome이 없으면 테스트를 생략하지 않고 실패한다.
-기본 `bun run test`는 Linux에서 설치된 Chrome을 쓰고, macOS에서는 `scripts/test.Dockerfile`로 Linux Chromium과 Bun 1.3.14를 실행한다.
+기본 `bun run test`는 Linux에서 설치된 Chrome을 쓰고, macOS에서는 `hermes/connectors/naver-blog/scripts/test.Dockerfile`로 Linux Chromium과 Bun 1.3.14를 실행한다.
 `scripts/checks/check-connectors.sh`도 이 기본 경로를 부른다. macOS에는 실행 중인 Docker와 Git이 필요하다.
 첫 실행은 이미지를 내려받아 만들고, 각 실행은 잠금 파일에 정해진 패키지를 설치한다.
 검사에는 Git으로 추적하는 공개 코드와 합성 fixture만 복사한다. 개인 환경 파일, 사진과 실제 profile은 넣지 않고, 실행마다 임시 profile과 자기 컨테이너를 정리한다.
@@ -428,7 +463,7 @@ Chrome 부재, 이미지 생성·패키지 설치 실패와 회귀 실패는 비
 
 ### 기존 연결 옮기기
 
-브라우저 연결 주소 칸이 없어졌다. 자동으로 옮기는 코드는 없다. 까닭은 [ADR-20261007 / user-browser](../../../docs/adr/ADR-20261007-user-browser.md) 의 「네이버 블로그 이행(2026-10-08 추가)」 이 갖는다.
+브라우저 연결 주소 칸이 없어졌다. 자동으로 옮기는 코드는 없다. 까닭은 [ADR-20261007 / user-browser](../adr/ADR-20261007-user-browser.md) 의 「네이버 블로그 이행(2026-10-08 추가)」 이 갖는다.
 보관 파일에 남은 옛 `cdp_url` 값은 대시보드가 읽을 때 버려 쓰이지 않고, 사용자가 블로그 아이디를 다시 등록하면 보관 파일이 새로 쓰여 사라진다.
 
 1. 배포 뒤 사용자는 「내 브라우저」 에서 네이버에 로그인하고 「외부 서비스 연결」 화면에서 연결 확인을 한 번 누른다
@@ -452,7 +487,7 @@ Chrome 부재, 이미지 생성·패키지 설치 실패와 회귀 실패는 비
 
 ### 읽기 부작용 확인
 
-`read_draft` 가 사용자의 다른 글과 자동저장본을 바꾸는지 확인하는 절차다. [ADR-20261009 / naver-blog-primitives](../../docs/adr/ADR-20261009-naver-blog-primitives.md) 의 위험도 판단이 이 결과를 근거로 삼는다.
+`read_draft` 가 사용자의 다른 글과 자동저장본을 바꾸는지 확인하는 절차다. [ADR-20261009 / naver-blog-primitives](../../hermes/docs/adr/ADR-20261009-naver-blog-primitives.md) 의 위험도 판단이 이 결과를 근거로 삼는다.
 소유자가 승인한 자기 계정에서만 하고, 발행하지 않는다. 로그인과 캡차는 사람이 하고 우회하지 않는다. 결과에는 계정, 주소, 글 원문을 적지 않고 아래 관측값만 적는다.
 
 준비:
