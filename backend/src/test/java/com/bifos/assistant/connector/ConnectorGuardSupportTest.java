@@ -315,7 +315,9 @@ class ConnectorGuardSupportTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"metadata", "missingGuard", "guardBool", "guardExtra", "hashBool", "hashMissing", "hashShort"})
+    @ValueSource(strings = {
+        "metadata", "missingGuard", "guardBool", "guardExtra", "kindsEmpty", "kindsTool", "kindsValue",
+        "hashBool", "hashMissing", "hashShort"})
     @DisplayName("캐시된 성공 대신 새 카탈로그의 전체 manifest 해시와 원형 보호 선언을 대조한다")
     void rechecksFreshCatalogAndStrictGuard(String defect) throws Exception {
         ObjectNode request = request(fixture());
@@ -329,6 +331,9 @@ class ConnectorGuardSupportTest {
             case "missingGuard" -> manifest.remove("execution_guard");
             case "guardBool" -> manifest.put("execution_guard", true);
             case "guardExtra" -> ((ObjectNode)manifest.get("execution_guard")).put("extra", true);
+            case "kindsEmpty" -> ((ObjectNode)manifest.get("execution_guard")).putObject("kinds");
+            case "kindsTool" -> ((ObjectNode)manifest.get("execution_guard")).putObject("kinds").put("prepare", "ORDER");
+            case "kindsValue" -> ((ObjectNode)manifest.get("execution_guard")).putObject("kinds").put("place_order", "TRADE");
             case "hashBool" -> manifest.put("execution_guard_manifest_sha256", true);
             case "hashMissing" -> manifest.remove("execution_guard_manifest_sha256");
             case "hashShort" -> manifest.put("execution_guard_manifest_sha256", "abc");

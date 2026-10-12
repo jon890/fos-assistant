@@ -257,6 +257,52 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 4. 대화에서 보유 종목, 현재가, 주문 가능 현금, 이번 달 끝난 주문을 묻는다. 보유 종목의 손익과 비율 칸이 null 이 아닌지 본다. 서비스가 공식 decimal 형식이 아닌 값을 주면 응답 오류로 끝난다
 5. 연결 확인을 누른 직후 대화에서 다시 보유 종목을 물어, 토큰을 한 번 다시 받고 성공하는지 본다
 
+## 매매 개방 조건
+
+**지금은 주문을 실행할 수 없다.** 아래 조건을 모두 채우고, 소유자가 개방을 명시적으로 승인한 뒤 따로 여는 PR 에서만 연다.
+조건을 채우는 PR 들은 kill switch 를 꺼 둔 채로 머지한다. 머지만으로 주문이 열리지 않아야 한다.
+첫 개방 대상은 일반 주문의 `create_order` 와 `cancel_order` 다. `modify_order` 와 조건주문 세 쓰기는 첫 개방에 넣지 않는다.
+
+| 조건 | 무엇을 보장하는가 | 지금 |
+| --- | --- | --- |
+| kill switch | 운영 설정 하나로 금융 실행 전체를 켜고 끈다. 기본값은 꺼짐이다. 꺼져 있으면 준비, 승인, claim 이 모두 금융 전송 없이 거절한다 | 없음 |
+| 호출마다 승인 | FINANCIAL 도구는 `always` 다. 상시 허락과 대화 허락을 받지 않는다(grant 불가) | 있음 |
+| 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 없음. 연결에서 고른 계좌와 실행 scope 의 대조만 있다 |
+| 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 운영 설정 상한을 둔다. 기본값은 보수적으로 작게 둔다 | 없음. 고액 주문은 토스 서버의 거절에 맡긴다 |
+| 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
+| UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
+| 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 없음 (#507 후속) |
+| 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 없음 (#507 후속) |
+| 공개 진입점 연결 | 정책 판정과 승인 API 가 FINANCIAL 을 producer 와 금융 승인으로 보낸다. 토스 서버와 manifest 가 두 도구를 등록한다 | 없음. producer 와 금융 승인은 package-private 이다 |
+| 승인 카드 표시 | 승인 카드가 저장한 summary(종목, 방향, 수량, 가격, 정규화)를 보인다. 계좌는 summary 가 아니라 Control Plane 이 실제 전송 scope(`account_seq`)와 연결의 공개 칸, 허용 목록에서 만들어 보인다. 모델 인자만 보이고 승인하지 않는다 | 없음 |
+
+계획은 `tasks/plan208-toss-conditional-financial/` 이 갖는다.
+
+### 첫 실제 호출 절차
+
+개방 PR 이 배포된 뒤 소유자가 직접 한다. 계좌번호, 금액, 종목은 어디에도 적지 않는다.
+체결되지 않을 주문 하나를 넣고 바로 취소해, 전송과 기록이 한 번씩만 남는지 본다.
+
+1. 배포 직후 kill switch 가 꺼져 있는지 확인한다. 대화에서 주문을 요청해 금융 전송 없이 거절되는지 본다
+2. 계좌 허용 목록에 쓸 계좌 하나만 있고, 주문 상한이 아래 주문을 겨우 담을 만큼 작은지 확인한다
+3. kill switch 를 켠다. 켜는 것은 소유자가 그 자리에서 승인한다
+4. 대화에서 국내 종목 하나를 1주, 당일 하한가에 가까워 체결되지 않을 지정가로 매수하라고 요청한다. 가격은 `get_price_limits` 와 `get_orderbook` 으로 먼저 읽는다
+   주문은 국내 정규장 안에서 넣고, 장 시작과 마감의 동시호가 시간과 마감 직전은 피한다. 정규장 밖에서 넣으면 토스가 예약 주문으로 받거나 거절해 미체결 주문 하나와 취소를 확인하지 못할 수 있다.
+   그 종목이 하한가로 내려가면 이 주문은 체결된다. 그때의 최대 손실은 1주 가격이다
+5. 승인 카드의 계좌가 허용 목록에 적은 그 계좌인지, 종목, 방향, 수량, 가격이 요청과 같은지 보고 승인한다. 카드의 계좌는 Control Plane 이 실제 전송 계좌에서 만든 값이다. summary 의 끝 네 자리는 커넥터가 낸 값이라 계좌 확인의 근거로 쓰지 않는다
+6. `list_orders` 로 미체결 주문이 하나만 생겼는지 본다. 토스증권 앱에서도 같은 주문 하나를 확인한다
+7. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
+8. kill switch 를 끈다
+
+승인 줄과 실행 줄의 상태가 SUCCEEDED 하나씩이고 UNKNOWN 과 중복 전송이 없는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
+도중에 UNKNOWN 이 나오면 다시 요청하지 않는다. 토스증권 앱에서 주문 상태를 먼저 확인한다.
+
+### 되돌리기
+
+kill switch 를 끄면 새 준비, 대기 중인 승인, 아직 소비하지 않은 claim 이 모두 금융 전송 없이 거절된다. 배포를 되돌리지 않아도 된다.
+이미 토스에 들어간 주문은 kill switch 가 취소하지 않는다. 토스증권 앱에서 취소한다.
+끄는 방법은 `fos-home-infra` 가 갖는다.
+
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
@@ -385,6 +431,249 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | orders CLOSED | limit=1..100, 기본 20과 opaque cursor를 노출한다. nextCursor/hasNext를 보존하고 마지막 페이지에서 커서를 만들지 않는다. 임의 366일 제한은 제거한다 |
 | conditional-orders | OPEN/CLOSED 모두 cursor/limit 페이지를 지원한다. 다른 채널의 주문도 조회한다. 응답 PROFIT_RATE는 읽되 ConditionRequest에 없는 생성 필드를 발명하지 않는다 |
 | 큰 응답 | 1 MiB 상한과 4초 HTTP timeout을 유지한다. 공식 페이지가 있으면 사용자가 다음 페이지를 읽는다. 페이지가 없는 큰 응답은 명확한 크기 초과 오류로 끝내며 몰래 일부 행을 남기지 않는다 |
+
+### 조건주문 REST 쓰기의 구현 보완안
+
+이 절은 구현 제안이다. 운영 금융 도구는 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
+SDK와 실제 Python 소비자를 loopback에서 검증하는 구현은 실제 DB producer 연결 및 운영 금융 허가와 별개로 완료할 수 있다.
+일반 주문과 조건주문은 같은 ticket·claim을 쓰되 본문과 표시 값을 각각의 엄격한 계약으로 검증한다. 공개 hook·approve를 열거나 새 grant·permit flag를 만들지 않는다.
+
+#### 공식 계약과 입력
+
+2026-10-11 공개 GET으로 확인한 [공식 OpenAPI](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)는 1.2.24, OpenAPI 3.1.0이며 REST operation은 인증을 포함해 41개다.
+원문 SHA-256은 `7e753c21dc4b938d8f9610ce3efd6542783018977cb030e39db5a006f5b59d40`이다. 기존 fixture 및 생성 계약을 재사용한다.
+41개 각각의 method/path/body/response/group과 운영 등록 여부를 별개로 확인한다. 이번에는 쓰기 세 개만 테스트 entry에 연결하며 WS는 제외한다.
+
+| operation | method/path | 본문 | 성공 |
+| --- | --- | --- | --- |
+| createConditionalOrder | POST /api/v1/conditional-orders | ConditionalOrderCreateRequest | 200, result.conditionalOrderId 필수; clientOrderId 선택/nullable |
+| modifyConditionalOrder | POST /api/v1/conditional-orders/{conditionalOrderId}/modify | ConditionalOrderModifyRequest | 200, result.conditionalOrderId 필수; 새 ID를 보존하며 기존 ID와 같으면 UNKNOWN |
+| cancelConditionalOrder | DELETE /api/v1/conditional-orders/{conditionalOrderId} | 없음 | 빈 204; JSON 성공 응답을 만들지 않는다 |
+
+모두 Bearer와 `X-Tossinvest-Account`를 사용한다. 계좌 int64는 연결 공개 칸 account와 env의 문자열로 대조한다.
+CREATE의 모델 입력은 symbol/type/quantity/orderType/expireDate/first, 선택 second/confirmHighValueOrder다.
+MODIFY는 conditionalOrderId/type/quantity/orderType/expireDate/first, 선택 second/confirmHighValueOrder다. 부분 patch가 아니라 전체 재설정이다.
+CANCEL의 모델 입력은 conditionalOrderId 하나다. 나머지 키, 모델 clientOrderId·scope·expected 값은 거절한다.
+본문에서 scope·currency·market·현재 원주문을 제거한다. CREATE만 prepare에서 UUID clientOrderId를 한 번 만들고 MODIFY는 symbol/clientOrderId를 보내지 않는다.
+confirmHighValueOrder는 입력 false만 허용하고 본문은 false를 명시한다. 금액 orderAmount와 일반 주문 timeInForce는 세 operation 모두 허용하지 않는다.
+
+quantity는 주 단위이며 양의 1~30자 decimal 문자열이다. KR/US 모두 공식 decimal 계약을 적용한다. 조건 quantity에는 KR 정수 제한을 추가하지 않는다. 일반 주문의 소수 수량 시간 제한을 조건주문 규칙으로 복사하지 않는다.
+first/second의 쓰기 leg는 orderSide와 triggerPrice, LIMIT일 때 orderPrice만 받는다. 가격은 양의 decimal 문자열이며 숫자·지수·공백·부호는 거절한다.
+KR orderPrice는 원 단위 정수, US는 1달러 미만 4자리·이상 2자리까지다. KR 호가표를 예시 하나로 추론하지 않으며 서버의 invalid-request/tickSize 거절을 보존하고 자동 절삭·보정·재전송하지 않는다.
+SINGLE은 second를 생략한다. OCO는 두 SELL leg, OTO는 BUY→SELL leg이며 둘 다 LIMIT만 허용한다.
+OCO는 준비와 claim 뒤 전송 직전의 현재가 조회에서 first.triggerPrice > 현재가 > second.triggerPrice를 확인한다. 값 비교는 decimal 문자열을 정확히 비교하며 Number로 바꾸지 않는다.
+expireDate는 실제 YYYY-MM-DD이며 KST 오늘부터 달력상 1년 뒤까지다. 윤년의 다음 해 같은 날짜가 없으면 말일을 상한으로 삼는다. 실행에서도 현재 날짜를 검사하며 만료일을 바꾸지 않는다.
+executionArgs.market은 StockInfo.market의 KOSPI/KOSDAQ/KR_ETC/NYSE/NASDAQ/AMEX/US_ETC 중 하나를 그대로 저장한다.
+KOSPI/KOSDAQ/KR_ETC와 KRW 조합은 KR, NYSE/NASDAQ/AMEX/US_ETC와 USD 조합은 US다. 나머지 조합은 거절한다.
+summary.market과 expected_conditional_order.market은 KR/US다. Python·Spring 조건 검증기는 이 고정 대응으로 실행 시장을 변환한 뒤 summary 및 원주문과 동일성을 검사한다. 일반 주문의 market 문자열 직접 동일성 검사를 복사하지 않는다.
+
+#### 표시 값과 현재 원주문
+
+조회의 ConditionalOrderDetailResponse·ConditionalOrderCondition과 알려진 필드 투영을 재사용한다.
+불투명 ID는 기존 조건 조회와 같은 한 segment 검사로 검증한다. 빈 값·점 경로·공백·슬래시·역슬래시·query/hash/percent/colon·C0/C1과 잘못된 surrogate(Cs)를 거절하고 encodeURIComponent로 한 번 인코딩한다.
+조회 응답의 null과 부재는 구분한다. 현재 원주문 대조는 공식 필드만 투영한 객체의 키·값·타입을 비교한다. first/second의 type/status/triggerPrice/targetProfitRate/orderPrice/triggeredOrderId와 상위 createdAt/expireDate까지 포함한다.
+새 prepare의 원주문 수용과 claim 뒤 변화 검사를 분리한다. 공식 DELETE와 MODIFY에는 WATCHING/PAUSED만 허용하거나 terminal leg를 무조건 거절하는 규칙이 없다.
+
+| operation | 새 prepare가 받는 원주문 | claim 뒤 전송 조건 |
+| --- | --- | --- |
+| CREATE | 원주문 없음; 새 ConditionRequest를 검증한다 | 날짜·env 및 OCO 현재가 관계를 재검사한다 |
+| MODIFY | 공식 상세 schema의 모든 group/leg 상태와 STOP/PROFIT_RATE; 새 STOP 본문은 전체 재설정 계약으로 검사한다 | 투영 원문이 준비 당시와 키·값·타입까지 같아야 한다 |
+| CANCEL | 공식 상세 schema의 모든 group/leg 상태와 STOP/PROFIT_RATE; expireDate 부재를 허용한다 | 투영 원문이 준비 당시와 키·값·타입까지 같아야 한다 |
+
+group 상태는 WATCHING/PAUSED/ORDERING/ORDERED/COMPLETED/EXPIRED, leg 상태는 여기에 HOLDING/CANCELED를 더한 공식 enum이다. 새 prepare에서 terminal first만으로 차단하지 않는다.
+OTO first=ORDERED 또는 COMPLETED, second=WATCHING인 CANCEL과 PROFIT_RATE 원주문→SINGLE STOP 전체 재설정 MODIFY를 지원 vector로 둔다.
+PROFIT_RATE의 targetProfitRate는 퍼센트 문자열 그대로 보존한다. 신규 PROFIT_RATE 생성 필드는 공식 ConditionRequest에 없으므로 만들지 않는다.
+이 수용은 공개 REST 계약을 지원한다는 뜻이다. 실서버가 모든 거래 상태에서 성공한다는 보증은 아니며 upstream 거절은 아래 단일전송 결과 규칙을 따른다.
+claim 뒤 원문의 어느 공식 필드라도 바뀌거나 ID가 다르면 금융 전송은 0회다. 새 prepare에서 이미 존재한 상태와 준비 이후 발생한 변화를 혼동하지 않는다.
+유효기간이 없는 기존 조회도 CANCEL은 원문 부재를 보존해 수용한다. CREATE/MODIFY의 새 유효기간은 필수다.
+
+조건주문 summary의 정확한 키는 orderKind/account/operation/conditionalOrderId/symbol/market/currency/type/quantity/orderType/expireDate/first/second/original/normalization이다.
+orderKind는 CONDITIONAL, account는 끝 네 자리, market은 KR/US, currency는 KRW/USD, operation은 기존 CREATE/MODIFY/CANCEL이다.
+CREATE의 conditionalOrderId/original은 null이며 MODIFY/CANCEL은 승인 대상 ID와 공식 원주문 투영이다.
+CREATE/MODIFY의 first/second는 쓰기 leg이고 SINGLE second는 표시에서 null이다. CANCEL은 조회 leg를 표시하며 목표수익률·상태·발동 주문 ID까지 읽을 수 있다.
+CANCEL의 expireDate 부재는 summary에서 null로 표시하되 original/expected_conditional_order에서는 부재를 보존한다.
+normalization은 symbol/quantity/first.triggerPrice/first.orderPrice/second.triggerPrice/second.orderPrice의 표기 변경만 `{field,before,after}`로 남긴다.
+symbol은 공식 허용 문자열의 ASCII 소문자만 대문자로 바꾼다. decimal은 ASCII `[0-9]+(\.[0-9]+)?`, 원문 1~30자와 양수 여부를 검사하고 정수부 선행 0·소수부 후행 0·빈 소수점을 제거한다. 반올림·절삭·Number 변환은 없다.
+각 변경은 before가 모델 원문, after가 실행 값이어야 하며 반드시 canonical(before)==after다. 002→2와 00100.00→100은 허용하지만 002→200, 00100.00→200, AAPL→MSFT는 거절한다.
+모델에 존재하는 허용 필드의 표기가 실제 달라진 경우만 경로 순서대로 한 번 기록한다. 중복·누락·추가·동일 before/after·숫자 타입·없는 필드 추가·null↔부재 변경은 거절한다.
+type/orderType/expireDate/conditionalOrderId와 leg.orderSide는 모델과 실행이 정확히 같아야 한다. first/second는 이름 있는 객체이며 교환·배열 변환·leg 추가·삭제는 거절한다.
+현재 일반 소비자의 값 변경 수용 결손은 별도 수정의 책임이다. 조건 검증은 이 의미 보존 규칙을 새로 보완하고, 일반 분기 이동은 그 수정이 반영된 main의 회귀를 보존한다.
+executionArgs는 정규화한 모델 입력에서 false 동의를 뺀 값, account_seq/market/currency와 CREATE의 clientOrderId, MODIFY/CANCEL의 expected_conditional_order를 가진다.
+CANCEL의 symbol 등 원주문 표시 값은 실행 입력에 복제하지 않고 expected_conditional_order에서 읽는다.
+
+#### 실제 소비 계약의 결손과 보완
+
+현재 Python connector_guard_validation._prepare_result는 일반 주문 SUMMARY와 orderId/side/timeInForce를 요구하므로 조건주문을 거절한다.
+Spring ConnectorExecutionSnapshot도 일반 주문의 SUMMARY/ORIGINAL/EXPECTED만 허용하며 requestKey는 expected_order/clientOrderId 이외의 값을 문자열로 요구한다. leg 객체를 그대로 넣으면 실패한다.
+Python에 별도 connector_conditional_validation.py, Spring에 ConnectorConditionalSnapshot을 두고 조건 summary와 실행 입력의 정확한 키·타입·공식 분기·정규화 전후를 검증한다.
+기존 외피 `{v:1,executionArgs,summary}`와 approval-claim-v1, 바이트·깊이 상한은 유지한다. 검증 분기는 manifest `execution_guard.kinds` 가 도구에 선언한 종류가 고르고, summary 의 orderKind 는 그 종류와 같아야 한다. 금융 권한은 기존 guard·현재 바인딩·서명·DB 소비가 정한다.
+일반 주문 분기를 수정해 임의 JSON을 허용하지 않는다. 조건 분기는 신규 summary 키가 정확히 일치할 때만 선택하고 모델 인자·실행 인자·표시 값을 함께 검증한다.
+Python RESERVED와 Spring RESERVED_SCOPE_NAMES는 다음 전체 집합으로 같게 한다.
+`orderId symbol market currency side quantity orderAmount price orderType timeInForce status filledQuantity execution clientOrderId expected_order confirmHighValueOrder userId connectionId tool orderKind account operation original normalization conditionalOrderId type expireDate first second expected_conditional_order orderSide triggerPrice targetProfitRate orderPrice triggeredOrderId createdAt`.
+조건 scope는 정확히 `{account_seq: 문자열}` 하나다. 양쪽 scope_fields도 account_seq만 선언하고 연결 공개 account와 env를 대조한다. 이 필드는 예약 집합에 넣지 않는다.
+
+조건 의도 키는 다음 고정 순서로 SHA-256을 계산한다. 일반 주문 키는 바꾸지 않는다.
+
+| operation | 순서대로 넣는 경로 |
+| --- | --- |
+| 공통 접두 필드 | operation, userId, connectionId, tool, account_seq, market, currency |
+| CREATE | 공통 뒤 symbol, type, quantity, orderType, expireDate, first, first.orderSide, first.triggerPrice, first.orderPrice, second, second.orderSide, second.triggerPrice, second.orderPrice |
+| MODIFY | 공통 뒤 conditionalOrderId, type, quantity, orderType, expireDate, first, first.orderSide, first.triggerPrice, first.orderPrice, second, second.orderSide, second.triggerPrice, second.orderPrice |
+| CANCEL | 공통 뒤 conditionalOrderId |
+
+market은 실행의 StockInfo.market 원문이다. symbol과 decimal은 위 canonical 값이며 userId/connectionId는 양의 정수의 10진 문자열이다.
+LP(s)는 UTF-8 byte 길이의 ASCII 10진수, `:`, UTF-8(s)를 차례로 붙인 값이다. 해시 원문은 LP(`fos-conditional-intent-v1`) 뒤 각 경로마다 경로의 LP와 value를 붙인 바이트다. 구분자·BOM·개행을 더하지 않는다.
+value는 문자열이면 `S`+LP(value), 부재면 `A`, null이면 `N`, 존재하는 first/second 객체면 `O`다. 부재 객체의 하위 경로도 각각 A다. 쓰기 입력의 null은 검증에서 거절하되 인코딩 A/N을 혼동하지 않는다.
+clientOrderId와 expected_conditional_order는 의도에 넣지 않는다. 원주문과 generated UUID를 바꾸어 UNKNOWN 충돌을 우회할 수 없어야 한다.
+
+공통 known hash 입력은 operation=CREATE, userId=1, connectionId=2, tool=create_conditional_order, account_seq=1234, market=NASDAQ, currency=USD, symbol=AAPL, type=SINGLE, quantity=1, orderType=MARKET, expireDate=2026-10-12, first={orderSide:BUY,triggerPrice:100}, second 부재다. first.orderPrice와 second 하위 값은 A다.
+아래 값은 독립 Python 계산의 expected이며 미래 Java 실행 증거가 아니다.
+
+| vector | expected SHA-256 |
+| --- | --- |
+| KEY-AAPL | 76499167ff1329a07ededd73d5cb9f9508f787b079053d9a4e4bebd17ce8f332 |
+| KEY-MSFT: symbol만 MSFT | b004ccf50aea679e139c997826e79955cca0f6b91a762f5cce1adbb003e96dda |
+| KEY-MODIFY: operation=MODIFY, tool=modify_conditional_order, symbol 대신 conditionalOrderId=cond-1 | 8c57876cd9da4fd1f23cb283b3125947d1fdbbc49bbf1c85ec480ca96d8e77bf |
+| KEY-CANCEL: operation=CANCEL, tool=cancel_conditional_order, conditionalOrderId=cond-1 | 918d32df5f532d4e22cca7404487c8b15f7122f1707483415b082bb0a1f66fca |
+
+Python/Java는 같은 원문 바이트와 expected를 검사한다. aapl→AAPL, 001.00→1, 00100.00→100은 KEY-AAPL과 같고 다른 symbol·대상 ID·operation은 달라야 한다. UTF-8 다중 byte 길이와 A/N 차이도 검사한다.
+실제 producer의 사용자 잠금 아래 conflicts로 PENDING/EXECUTING/UNKNOWN 중복을 검증하는 것은 실제 DB 통합의 완료 조건이다. clientOrderId 또는 expected만 바꾼 같은 의도는 차단하고 다른 종목은 차단하지 않는다.
+암호화 저장·원문 SHA·AAD·ticket/claim DTO는 재사용하며 신규 컬럼·migration·새 wire 권한 칸은 없다.
+공통 vector는 modelArgsJson/executionArgsJson/summaryJson/scopeJson을 객체 대신 정확한 UTF-8 원문 문자열로 보관하고 각 SHA를 명시한다. 검증 뒤 원문을 재직렬화하지 않는다.
+model/execution은 각16 KiB, summary8 KiB, scope2 KiB이며 strict duplicate/trailing token·nesting5를 유지한다. 한글 다중 byte로 상한 직전/초과와 중복 키·trailing JSON을 검사한다.
+AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`이고 column은 execution_args_json/summary_json/scope_json이다. 실제 TextCipher와 동일 keyId로 세 원문을 seal/open하며 column·action·user·keyId 변경을 거절한다.
+현재 main 및 고정 일반 금융 source에는 sourceContext라는 정의나 조건 producer가 없다. 임의 DTO가 이미 있다고 가정하지 않는다. 실제 producer가 준비 전 복사하는 소유권 맥락과 저장 후 summary 읽기는 별도 통합에서 확인한다.
+기존 승인 카드 조회는 현재 카탈로그와 원래 모델 인자를 사용한다. 저장 summary를 공개 화면에 연결하는 일과 일괄 승인 제외는 운영 개방의 후속 범위이며 이 보완안의 완료 조건이 아니다.
+
+#### 일회 실행과 HTTP 예산
+
+prepare → 실제 Python 결과 검증 → 불변 원문·summary 저장 → 별도 승인 → ticket → 원문 대조 → claim 1회 → 현재 원주문/현재가 대조 → 금융 전송 1회 순서다.
+prepare는 금융 전송을 하지 않는다. 승인 뒤 prepare·UUID·본문 정규화를 다시 수행하지 않는다. SDK schema에도 coercion/default/strip을 두지 않는다.
+claim 요청은 기존 ticket/tool/argsSha256/scope, 응답은 v/allowed/ticketId/expiresAt이다. 성공은 200, replay는 409이며 redirect·재시도는 0회다.
+SDK 테스트의 합성 claim은 이 실제 DTO·codec·MVC 테스트와 대조하지만 실제 서명·DB 일회 소비를 증명한 것으로 보고하지 않는다.
+claim 뒤 조회·auth·quota 대기와 금융 queue callback에서 만료 및 계좌 env를 다시 확인한다. 불일치하면 금융 전송 0회다.
+claimApproval은 검증된 `ClaimedApproval={beforeSend:()=>void, deadlineMs:number}`를 반환한다. deadlineMs는 응답과 ticket expiresAt를 한 번 대조한 직후 `clock.now()+max(0,expiresAt-max(Date.now(),clock.now()))`로 변환한 절대 deadline이며 immutable이다.
+`financial(method,path,body,authorization:(()=>void)|ClaimedApproval)`은 기존 callback 인자를 계속 받는다. 새 일반/조건 호출부는 ClaimedApproval을 넘기며 `min(clock.now()+timeoutMs,deadlineMs)`를 auth·quota·fetch·본문 읽기에 적용한다. 다른 모듈은 ticket을 재파싱하지 않는다.
+큐 안에서 beforeSend와 deadline을 다시 검사한 뒤에만 started=true로 만들고 fetch를 호출한다. 잔여100ms 전송은 같은 deadline에 abort하고 시작 뒤 실패는 UNKNOWN이다. 만료 전에 끝내지 못한 본문 읽기도 abort/cancel하여 UNKNOWN으로 끝내며 추가 전송은 없다.
+Spring의 prepare 응답 읽기 제한2초는 여러 GET 각각의4초와 다르다. 실제 HttpHermesConnectorGuard.prepareClient의 read timeout을 재사용한다.
+cold auth·429 대기로 prepare 응답 읽기가2초를 넘거나1 MiB 초과 응답을 받으면 prepare 실패, snapshot 저장0회·금융0회다. 읽기 제한을 연결 시간을 포함한 전체 처리 deadline이나 모든 준비의2초 내 성공 보장으로 설명하지 않는다.
+
+| 구간 | 논리 호출 상한 | 재시도와 시간 경계 |
+| --- | --- | --- |
+| prepare CREATE | accounts·stocks 각 1, OCO만 prices 1 | READ는 기존 GET 최대 3회 전송 정책, 금융 0회; Spring prepare 읽기 제한 2초 |
+| prepare MODIFY/CANCEL | 상세·accounts·stocks 각 1, MODIFY OCO만 prices 1 | 동일 READ 정책; CANCEL은 prices 0회 |
+| 실행 | claim 1, MODIFY/CANCEL 상세 1, CREATE/MODIFY OCO prices 1 | READ 재시도 예산을 금융 재시도와 분리한다 |
+| 금융 | CREATE/MODIFY POST 1 또는 CANCEL DELETE 1 | retry 0, noAuthRetry; 기존 REQUEST_TIMEOUT_MS와 ticket 남은 시간 중 짧은 deadline |
+| 토큰 | 기존 client identity의 공유 확보 | 각 금융 호출의 확보는 1회, 금융 응답 401 뒤 재발급·재전송 0회; READ 재발급 counter는 별도로 센다 |
+
+[공식 개요](https://openapi.tossinvest.com/openapi-docs/overview.md)의 CONDITIONAL_ORDER는 초당 5회, CONDITIONAL_ORDER_HISTORY는 10회다. 기존 그룹 queue와 응답 헤더 기반 완화를 재사용한다.
+전송 전 검증·토큰 실패는 FAILED다. 전송 후 공식 ErrorResponse와 확인된 operation별 거절 코드가 맞는 경우만 FAILED다.
+아래 allowlist는 [공식 OpenAPI](https://openapi.tossinvest.com/openapi-docs/latest/openapi.json)의 operation 응답과 [공식 개요](https://openapi.tossinvest.com/openapi-docs/overview.md)의 HTTP/code 표를 함께 대조한 것이다. 정확한 operation+status+code와 유효한 ErrorResponse가 모두 맞을 때만 FAILED다.
+
+| 적용 operation | HTTP | code | 근거 |
+| --- | --- | --- | --- |
+| CREATE/MODIFY/CANCEL | 400 | invalid-request, account-header-required | 각 operation의400 + 개요 공통 계좌/요청 오류 |
+| CREATE/MODIFY | 400 | confirm-high-value-required | 개요 생성/정정 동의 오류; false 계약은 유지 |
+| CREATE | 404 | stock-not-found | CREATE 응답 예시 |
+| MODIFY/CANCEL | 404 | conditional-order-not-found | MODIFY 예시·CANCEL404 schema + 개요 조건 ID 오류 |
+| CREATE/MODIFY/CANCEL | 404 | account-not-found, edge-blocked | 개요 공통 계좌/경로 거절 |
+| CREATE/MODIFY/CANCEL | 401 | invalid-token, edge-blocked, expired-token, token-revoked, login-user-not-found | 개요 공통 인증 오류 |
+| CREATE/MODIFY/CANCEL | 403 | edge-blocked, ip-not-allowed, forbidden | 개요 공통 권한/IP 오류 |
+| CREATE/MODIFY/CANCEL | 414 | edge-blocked | 개요 공통 URI 오류 |
+| CREATE/MODIFY | 415 | unsupported-content-type | 개요 JSON 본문 오류 |
+| CREATE/MODIFY | 422 | duplicate-conditional-order, condition-already-met | operation422 + 개요 조건주문 명시 코드 |
+| CREATE | 422 | idempotency-key-conflict | 개요 조건주문 생성의 clientOrderId 충돌 |
+
+422의 나머지 일반주문 전용/적용 범위 미확정 코드는 조건 allowlist에 복사하지 않는다. 이는 REST 본문 지원 범위를 줄이는 제한이 아니라 결과가 불확실할 때 재전송을 막는 분류다.
+ErrorResponse.error의 requestId/message/code 문자열과 선택 data의 object/null 계약을 공식 parser로 검사한다. HTTP만 같고 code가 다르거나 envelope가 불량이면 UNKNOWN이다.
+모르는 code·409 처리 중·429·5xx·timeout·본문 읽기 실패·불량 2xx/204는 UNKNOWN이다. allowlist 인증 거절이어도 금융 응답 뒤 auth 재발급·금융 재전송은0회다.
+CREATE의 clientOrderId 누락/null은 공식상 성공이며 존재하면 보낸 UUID와 같아야 한다. MODIFY는 새 conditionalOrderId만 요구한다. 설명에 언급된 type을 응답 필수 필드로 발명하지 않는다.
+UNKNOWN은 자동 재실행·ticket 재발급·UUID 교체를 하지 않는다. 실제 producer의 동일 의도 PENDING/EXECUTING/UNKNOWN 충돌 차단을 재사용하고 supersedes_unknown_action_id는 NULL로 유지한다.
+
+#### 구현 관심사와 증거
+
+| 관심사 | 예상 운영 변경 | 필수 완료 증거 | 실제 main 선행 조건 |
+| --- | --- | --- | --- |
+| 조건 snapshot 소비 계약 | 일반 주문 검증 이동·삭제와 Python·Spring 분기1310줄 배분; 여유190줄 | 공통 정상/거절 vector의 직접 Python 소비와 실제 Spring validate/capture/open; 일반 금융 회귀 | 기존 snapshot·ticket·claim 정의만 필요 |
+| 조건 SDK 준비와 단일전송 | TS 모듈·client와 guard982줄 배분; 여유518줄 | 실제 SDK→실제 Python loader/_prepare_result→합성 claim→loopback 목적지, 세 method/path/body/response 수신 및 retry 0 | 일반 금융 모듈과 조건 조회 모듈이 main에 존재해야 한다; 실제 DB producer와 운영 허가는 불필요 |
+| 실제 DB producer 통합 | 기존 업무 구현으로 추가 운영0줄 가정; actual main에서 재검증 | H2/MySQL 저장·승인·실제 claim HTTP→Python→SDK→목적지 왕복과 UNKNOWN DB 상태 | guard 설치·일반 금융 모듈·실제 dormant producer가 main에 존재해야 한다 |
+
+각 관심사는 설계·구현·회귀를 함께 담은 독립 PR이며 운영 변경 1500줄 상한과 파일 길이를 지킨다. 계획만 PR로 올리지 않는다.
+모든 관심사는 먼저 실패하는 회귀를 확인하고 같은 커밋에서 구현과 성공 증거를 남긴다. 직접 수신 counter는 auth POST/prepare GET/claim POST/금융 POST/DELETE로 나눈다.
+변조·숫자 decimal·null/부재 변경·C0/C1/Cs·만료·revision/owner/profile/manifest 변경·철회·replay는 금융 0회다. 429/5xx/끊김/불량 성공의 UNKNOWN과 추가 전송 0회를 실패 주입으로 확인한다.
+운영 server/manifest의 금융 도구 0개, 착수 당시 main의 READ 합집합, noGrant와 RISK_NOT_OPEN을 회귀로 지킨다.
+실계좌·실토큰·거래·배포는 세 관심사 모두 범위 밖이다. mock 성공을 운영 거래나 공개 승인 E2E 완료로 보고하지 않는다.
+
+### 조건주문 snapshot 소비 계약
+
+Python의 `connector_conditional_validation`과 Spring의 `ConnectorConditionalSnapshot`은 조건주문 prepare 결과를 검증한다.
+manifest `execution_guard.kinds` 가 도구를 `CONDITIONAL` 로 선언한 경우에만 이 분기를 고르고, 그 도구의 summary 는 `orderKind=CONDITIONAL` 이어야 한다.
+선언하지 않은 도구는 일반 주문(`ORDER`)이며 조건 summary 를 내면 거절한다. prepare 가 낸 summary 가 분기를 정하면 사람은 조건주문 카드를 승인하는데 일반 도구가 불리는 일이 생긴다.
+Spring 은 producer 와 승인·claim 재검증(`ConnectorExecutionCurrent`) 두 곳에서, Python 은 `_prepare_result` 에서 같은 대조를 한다.
+일반 주문은 기존 정규화 의미 보존 규칙을 유지하며 `ConnectorOrderSnapshot`이 검증한다.
+이 구현은 금융 권한을 발급하지 않는다. 금융 도구의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
+실제 producer, SDK 금융 전송, claim 뒤 원주문 조회, 등록과 운영 개방은 아직 연결하지 않았다.
+
+조건 summary는 정확히 다음 15개 키를 갖는다.
+`orderKind account operation conditionalOrderId symbol market currency type quantity orderType expireDate first second original normalization`.
+account는 끝 네 자리이고, scope와 선언은 연결 공개 account에 대응하는 `account_seq` 하나만 받는다.
+실행 시장은 KOSPI/KOSDAQ/KR_ETC이면 KRW와 KR, NYSE/NASDAQ/AMEX/US_ETC이면 USD와 US에 대응한다.
+실행에는 일곱 시장 원문을 저장하고 summary와 원주문에는 KR/US를 쓴다. 다른 통화 조합과 실행의 KR/US는 거절한다.
+
+| operation | 모델 입력과 실행 입력 | 표시와 원주문 |
+| --- | --- | --- |
+| CREATE | symbol/type/quantity/orderType/expireDate/first가 필수다. second와 false 동의만 선택이며 실행에는 scope·market·currency·UUID clientOrderId를 더한다 | conditionalOrderId와 original은 null이다. SINGLE의 표시 second는 null이고 실행에는 없다 |
+| MODIFY | conditionalOrderId와 새 쓰기 값 전체가 필수다. symbol과 clientOrderId는 받지 않으며 실행에 expected_conditional_order를 더한다 | 공식 원주문과 expected의 키·값·타입이 같아야 한다. 원주문 symbol을 표시하며 타입 전환을 허용한다 |
+| CANCEL | conditionalOrderId만 모델에서 받는다. 실행에는 scope·market·currency·expected_conditional_order만 더한다 | 원주문의 공식 상세와 leg를 표시한다. expireDate 부재는 표시에서만 null이며 원주문에는 부재로 남긴다 |
+
+쓰기 leg는 orderSide/triggerPrice와 LIMIT일 때 orderPrice만 받는다. SINGLE은 second를 생략하고 OCO는 SELL→SELL, OTO는 BUY→SELL이며 두 타입은 LIMIT만 받는다.
+quantity는 KR/US 모두 양의 1~30자 decimal 문자열이다. KR 소수 수량에 별도 정수 제약을 넣지 않는다.
+KR의 새 orderPrice는 정수, US는 1달러 미만 소수 네 자리·이상 두 자리까지다. 원주문의 가격을 새 쓰기 가격 규칙으로 다시 제한하지 않는다.
+OCO는 first.triggerPrice가 second.triggerPrice보다 커야 한다. 현재가 사이 관계는 실제 준비·전송 단계가 확인해야 한다.
+expireDate는 실제 YYYY-MM-DD인지 검증한다. 저장 원문은 지난 날짜에도 읽을 수 있어야 하므로 오늘부터 1년의 실행 시점 제한은 producer와 SDK가 별도로 확인해야 한다.
+금액·timeInForce·모델 scope·generated ID·expected 입력과 true 동의, 추가 키·숫자 decimal·잘못된 leg를 거절한다.
+
+원주문은 공식 `ConditionalOrderDetailResponse`와 `ConditionalOrderCondition`의 필드만 받는다.
+모든 공식 group/leg 상태와 STOP/PROFIT_RATE를 수용한다. OTO 첫 leg가 ORDERED/COMPLETED이고 둘째가 WATCHING인 CANCEL과 PROFIT_RATE 원주문에서 STOP으로 전체 재설정하는 MODIFY도 수용한다.
+PROFIT_RATE의 targetProfitRate는 퍼센트 원문을 그대로 둔다. 신규 쓰기에 PROFIT_RATE 필드를 만들지 않는다.
+부재와 null을 구분하고 createdAt/expireDate, leg 타입·상태·가격·발동 주문 ID까지 expected와 대조한다.
+이 대조는 새 prepare의 소비 검증이며 claim 뒤 원주문이 그대로인지 확인하는 실행 검증은 후속 연결의 책임이다.
+불투명 ID는 점 경로·공백·슬래시·역슬래시·query/hash/percent/colon·C0/C1·잘못된 surrogate를 거절한다.
+
+normalization은 symbol/quantity/first.triggerPrice/first.orderPrice/second.triggerPrice/second.orderPrice 순서의 실제 표기 변경만 `{field,before,after}`로 기록한다.
+ASCII symbol 대문자화와 decimal의 선행·후행 0 제거만 허용한다. before는 모델 원문, after는 실행 값이며 canonical(before)==after여야 한다.
+002→2와 00100.00→100은 허용하고 002→200은 거절한다. enum/date/ID/orderSide, leg 순서와 null/부재를 바꾸지 않는다.
+중복·누락·추가 기록, 같은 before/after, 없는 값 추가와 leg 배열화를 거절한다.
+
+조건 분기에서 거절하는 전체 예약 이름은 다음과 같다. 정확한 account_seq 하나만 받으므로 이 이름들은 scope에 들어갈 수 없다.
+`orderId symbol market currency side quantity orderAmount price orderType timeInForce status filledQuantity execution clientOrderId expected_order confirmHighValueOrder userId connectionId tool orderKind account operation original normalization conditionalOrderId type expireDate first second expected_conditional_order orderSide triggerPrice targetProfitRate orderPrice triggeredOrderId createdAt`.
+일반 주문과 manifest의 기존 19개 예약 이름은 유지한다. manifest에는 orderKind 분류 정보가 없고 기존 일반 snapshot은 account arg도 허용하므로 공통 집합을 확대하면 기존 저장 내용의 재검증을 거절하게 된다.
+조건 분기에서만 이 제약을 적용해 일반 계약을 보존한다. 연결의 공개 field 이름은 두 분기 모두 예약 검사의 대상이 아니다.
+
+조건 의도 키는 LP(`fos-conditional-intent-v1`) 뒤 경로마다 LP(경로)와 값 인코딩을 붙인 SHA-256이다.
+LP는 UTF-8 byte 길이의 10진수, 콜론, 원문 byte다. 문자열은 S+LP(값), 부재는 A, null은 N, 존재하는 leg 객체는 O이며 부재 객체의 하위 값도 A다.
+조건 의도 키 primitive는 tool을 포함한 LP 문자열의 UTF-8 인코딩을 엄격히 검사한다. 잘못된 surrogate를 대체 문자로 바꾸지 않고 거절하며 한글과 정상 비 BMP 문자의 해시는 유지한다.
+manifest의 도구 이름은 기존 ASCII 등록 규칙을 유지한다. primitive에서 정상 UTF-8인 `tool?`의 키를 계산해도 그 이름을 등록할 수 있다는 뜻은 아니다.
+
+| operation | 고정 경로 순서 |
+| --- | --- |
+| 공통 | operation/userId/connectionId/tool/account_seq/market/currency |
+| CREATE | 공통 뒤 symbol/type/quantity/orderType/expireDate/first/first.orderSide/first.triggerPrice/first.orderPrice/second/second.orderSide/second.triggerPrice/second.orderPrice |
+| MODIFY | CREATE의 symbol 대신 conditionalOrderId를 넣는다 |
+| CANCEL | 공통 뒤 conditionalOrderId |
+
+userId/connectionId는 양의 정수의 10진 문자열이며 market은 실행 원문이다. clientOrderId와 expected는 의도 키에서 제외한다.
+다른 symbol·대상 ID·operation은 다른 키가 된다. UUID와 현재 원주문만 바꾸어 같은 의도를 우회하지 못하며 일반 주문 의도 키는 유지한다.
+실제 DB producer의 중복 의도 차단은 이 키 계산과 별도로 연결해야 한다.
+
+공통 [원문 vector](../../test/resources/conditional-snapshot-v1.json)는 model/execution/summary/scope를 정확한 UTF-8 문자열과 각각의 SHA로 보관한다.
+Python은 strict parser와 실제 prepare 소비를, Spring은 validate/capture와 실제 사용자 암호화·H2/MySQL 저장 후 open을 검사한다.
+Spring 원문 상한은 각각 16/16/8/2 KiB와 nesting5이며 중복 키와 trailing JSON을 거절한다. Python은 prepare 외피와 각 객체의 기존 byte·깊이 상한을 적용한다.
+공통 179개에서 Spring 원문 경계의 기대와 실제는 수용 47개·거절 132개다. Python의 실제 `_strict_json`과 `_prepare_result` 객체 소비는 수용 51개·거절 128개다.
+차이인 `RAW-modelArgs-BYTES`, `RAW-executionArgs-BYTES`, `RAW-summary-BYTES`, `RAW-scope-BYTES`는 추가 공백이 객체 변환 뒤 사라져 Python에서 허용되며 나머지 175개는 기대가 같다.
+테스트의 네 원문 길이 단언은 Spring 경계의 기대를 설명하는 검사이며 Python production의 거절로 세지 않는다. Python 외부 API는 기존 객체 계약을 유지한다.
+저장 시 실행·scope 원문 SHA를 유지하고 세 원문을 다시 직렬화하지 않는다. 같은 keyId로 seal/open하며 AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`다.
+열·action·사용자·keyId와 저장 summary의 변조를 거절한다. table·migration·ticket·claim DTO와 암호화 형식은 바꾸지 않는다.
 
 ### 요청 경계와 테스트
 

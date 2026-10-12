@@ -58,7 +58,7 @@ def _guard_manifest(manifest, declared):
     if guard is None:
         return manifest
     if (declared["schema"] != 2 or not isinstance(guard, dict)
-            or set(guard) != {"protocol", "prepare_tool", "scope_fields", "operations"}
+            or set(guard) - {"kinds"} != {"protocol", "prepare_tool", "scope_fields", "operations"}
             or guard["protocol"] != PROTOCOL):
         raise ValueError("지원하지 않는 보호 선언이다")
     policies = manifest["tools"]
@@ -71,6 +71,12 @@ def _guard_manifest(manifest, declared):
                    or policies[name]["approval"] != "always" or operation not in {"CREATE", "MODIFY", "CANCEL"}
                    for name, operation in operations.items())):
         raise ValueError("operations 는 FINANCIAL/always 도구의 동작이다")
+    # 도구가 받는 summary 종류다. 선언하지 않은 도구는 일반 주문이다
+    kinds = guard.get("kinds")
+    if "kinds" in guard and (not isinstance(kinds, dict) or not kinds
+                             or any(name not in operations or kind not in {"ORDER", "CONDITIONAL"}
+                                    for name, kind in kinds.items())):
+        raise ValueError("kinds 는 operations 도구의 summary 종류다")
     fields = guard["scope_fields"]
     public = {field["key"] for field in manifest["fields"] if not field.get("secret", False)}
     args, names = set(), set()

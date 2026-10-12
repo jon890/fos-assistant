@@ -19,15 +19,16 @@ import tools.jackson.databind.JsonNode;
 public class ConnectorExecutionGuard {
     public ConnectorExecutionGuardContract read(ConnectorManifest manifest) {
         JsonNode node = manifest.executionGuard();
-        require(node != null
-                && node.isObject()
-                && node.propertyNames().equals(Set.of("protocol", "prepare_tool", "scope_fields", "operations")));
+        require(node != null && node.isObject());
+        var keys = new HashSet<>(node.propertyNames());
+        keys.remove("kinds");
+        require(keys.equals(Set.of("protocol", "prepare_tool", "scope_fields", "operations")));
         String protocol = text(node.get("protocol"));
         String prepare = text(node.get("prepare_tool"));
         require(ConnectorExecutionSnapshot.PROTOCOL.equals(protocol));
         require(ConnectorToolPolicies.find(manifest, prepare)
-                .filter(p -> p.risk() == ToolRisk.READ && p.approval() == ToolApproval.NONE)
-                .isPresent());
+            .filter(p -> p.risk() == ToolRisk.READ && p.approval() == ToolApproval.NONE)
+            .isPresent());
         JsonNode operations = node.get("operations");
         require(operations.isObject() && !operations.isEmpty() && operations.size() <= 8);
         var declared = new LinkedHashMap<String, String>();
@@ -35,8 +36,8 @@ public class ConnectorExecutionGuard {
             String operation = text(entry.getValue());
             require(Set.of("CREATE", "MODIFY", "CANCEL").contains(operation) && !prepare.equals(entry.getKey()));
             require(ConnectorToolPolicies.find(manifest, entry.getKey())
-                    .filter(p -> p.risk() == ToolRisk.FINANCIAL && p.approval() == ToolApproval.ALWAYS)
-                    .isPresent());
+                .filter(p -> p.risk() == ToolRisk.FINANCIAL && p.approval() == ToolApproval.ALWAYS)
+                .isPresent());
             declared.put(entry.getKey(), operation);
         }
         JsonNode fields = node.get("scope_fields");
@@ -49,19 +50,32 @@ public class ConnectorExecutionGuard {
             String arg = text(field.get("arg"));
             String name = text(field.get("field"));
             require(arg.matches("[A-Za-z][A-Za-z0-9_]{0,63}")
-                    && name.matches("[A-Za-z][A-Za-z0-9_]{0,63}")
-                    && args.add(arg)
-                    && names.add(name));
+                && name.matches("[A-Za-z][A-Za-z0-9_]{0,63}")
+                && args.add(arg)
+                && names.add(name));
             require(manifest.fields().stream().anyMatch(f -> name.equals(f.key()) && !f.secret()));
             scopes.add(new ScopeField(arg, name));
         }
-        return new ConnectorExecutionGuardContract(protocol, prepare, scopes, declared);
+        var kinds = new LinkedHashMap<String, String>();
+        if (node.has("kinds")) {
+            JsonNode declaredKinds = node.get("kinds");
+            require(declaredKinds.isObject() && !declaredKinds.isEmpty());
+            for (var entry : declaredKinds.properties()) {
+                String kind = text(entry.getValue());
+                require(declared.containsKey(entry.getKey())
+                    && Set.of(ConnectorExecutionSnapshot.ORDER, ConnectorExecutionSnapshot.CONDITIONAL).contains(kind));
+                kinds.put(entry.getKey(), kind);
+            }
+        }
+        return new ConnectorExecutionGuardContract(protocol, prepare, scopes, declared, kinds);
     }
+
 
     private static String text(JsonNode node) {
         require(node != null && node.isString() && !node.stringValue().isBlank());
         return node.stringValue();
     }
+
 
     private static void require(boolean condition) {
         if (!condition) {

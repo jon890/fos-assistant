@@ -489,9 +489,10 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 발급 함수를 운영 승인이나 controller에서 호출하지 않으며 금융 위험도 판정을 바꾸지 않는다.
 
 카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
-정확한 키는 `protocol,prepare_tool,scope_fields,operations`이며 protocol은 `approval-claim-v1`이다.
+정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v1`이다.
 prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
+kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
 scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다.
 카탈로그 원문에서 중복 키와 뒤따르는 JSON을 먼저 거절하고, 보호 선언의 타입이나 키를 보충하지 않는다.
 이 읽기 계약은 plugin producer나 설치 지원 확인, 금융 노출의 근거가 아니다.
@@ -638,6 +639,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
 
 연결을 다시 붙일 때의 request_key 문제는 공개 금융 연결을 여는 작업에서 해결한다.
+이 문제와 해시 추측 방어를 포함한 개방 전 필수 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
 연결 번호를 빼면 기존 해시와의 호환 검사와 커넥터별 계좌 식별 범위를 함께 정해야 하므로 이번 본문 보안 변경에 넣지 않는다.
 그 작업이 끝나기 전까지 공개 hook과 승인 경로는 계속 `RISK_NOT_OPEN`으로 막는다.
 

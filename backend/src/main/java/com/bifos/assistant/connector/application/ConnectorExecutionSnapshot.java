@@ -10,15 +10,12 @@ import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.crypto.domain.SealedText;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.util.Sha256;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Accessors(fluent = true)
 public final class ConnectorExecutionSnapshot {
     public static final String PROTOCOL = "approval-claim-v1";
+    public static final String ORDER = "ORDER";
+    public static final String CONDITIONAL = "CONDITIONAL";
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
         .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .streamReadConstraints(
@@ -43,21 +42,11 @@ public final class ConnectorExecutionSnapshot {
         .build())
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
         .build();
-    private static final Set<String> SUMMARY = Set.of(("account,symbol,market,currency,side,quantity,orderAmount,price,"
-        + "orderType,timeInForce,operation,orderId,original,normalization")
-            .split(","));
-    private static final Set<String> ORIGINAL = Set.of(("orderId,symbol,market,currency,side,quantity,orderAmount,price,"
-        + "orderType,timeInForce,status,filledQuantity")
-            .split(","));
-    private static final Set<String> EXPECTED = Set.of(
-        ("orderId,symbol,currency,side,quantity,orderAmount,price," + "orderType,timeInForce,status,execution")
-            .split(","));
-    private static final Set<String> ORDER_VALUES = Set.of("symbol", "side", "quantity", "orderAmount", "price", "orderType", "timeInForce");
     private static final Set<String> RESERVED_SCOPE_NAMES;
 
     static {
-        Set<String> names = new HashSet<>(ORIGINAL);
-        names.addAll(EXPECTED);
+        Set<String> names = new HashSet<>(ConnectorOrderSnapshot.ORIGINAL);
+        names.addAll(ConnectorOrderSnapshot.EXPECTED);
         names.addAll(
             Set.of("clientOrderId", "expected_order", "confirmHighValueOrder", "userId", "connectionId", "tool"));
         RESERVED_SCOPE_NAMES = Set.copyOf(names);
@@ -97,15 +86,33 @@ public final class ConnectorExecutionSnapshot {
             require(bytes(entry.getValue().stringValue()) <= 128);
             equal(entry.getValue(), args.get(entry.getKey()));
         }
-        keys(summary, SUMMARY);
-        display(summary, false);
-        require(summary.get("account").isString()
-            && summary.get("account").stringValue().matches("[0-9]{4}"));
-        equal(summary.get("operation"), JSON.valueToTree(operation));
-        validateArgs(input, args, summary, scope, operation);
-        ConnectorNormalization.validate(input, args, summary.get("normalization"), JSON.nullNode());
+        if (conditional(summary)) {
+            ConnectorConditionalSnapshot.validate(input, args, summary, scope, operation);
+        } else {
+            ConnectorOrderSnapshot.validate(input, args, summary, scope, operation);
+        }
         return new ConnectorExecutionSnapshot(
             executionArgsJson, summaryJson, scopeJson, Sha256.hex(executionArgsJson), Sha256.hex(scopeJson), args);
+    }
+
+
+    /** manifest 가 도구에 선언한 종류와 summary 종류가 같아야 한다. 조건 summary 로 일반 도구를 부르지 못한다. */
+    public static ConnectorExecutionSnapshot validate(
+        String modelArgsJson,
+        String executionArgsJson,
+        String summaryJson,
+        String scopeJson,
+        String operation,
+        String kind) {
+        ConnectorExecutionSnapshot snapshot = validate(modelArgsJson, executionArgsJson, summaryJson, scopeJson, operation);
+        require(snapshot.kind().equals(kind));
+        return snapshot;
+    }
+
+
+    /** summary 가 보이는 종류다. 호출자가 manifest 의 도구 종류와 대조한다. */
+    public String kind() {
+        return conditional(object(summaryJson, 8 * 1024)) ? CONDITIONAL : ORDER;
     }
 
 
@@ -202,25 +209,11 @@ public final class ConnectorExecutionSnapshot {
             && connectionId > 0
             && tool != null
             && !tool.isBlank());
-        Map<String, String> values = new TreeMap<>();
-        for (var entry : execution.properties()) {
-            if (Set.of("clientOrderId", "expected_order").contains(entry.getKey())) {
-                continue;
-            }
-            require(entry.getValue().isString());
-            String value = entry.getValue().stringValue();
-            if (Set.of("quantity", "orderAmount", "price").contains(entry.getKey())) {
-                value = ConnectorNormalization.canonicalDecimal(value);
-            }
-            values.put(entry.getKey(), value);
+        JsonNode summary = object(summaryJson, 8 * 1024);
+        if (conditional(summary)) {
+            return ConnectorConditionalSnapshot.requestKey(execution, userId, connectionId, tool, summary.get("operation").stringValue());
         }
-        require(!values.containsKey("userId") && !values.containsKey("connectionId") && !values.containsKey("tool"));
-        values.put("userId", userId.toString());
-        values.put("connectionId", connectionId.toString());
-        values.put("tool", tool);
-        StringBuilder body = new StringBuilder(lengthPrefix("fos-financial-intent-v1"));
-        values.forEach((name, value) -> body.append(lengthPrefix(name)).append(lengthPrefix(value)));
-        return Sha256.hex(body.toString());
+        return ConnectorOrderSnapshot.requestKey(execution, userId, connectionId, tool);
     }
 
 
@@ -229,6 +222,10 @@ public final class ConnectorExecutionSnapshot {
         JsonNode scope = object(scopeJson, 2 * 1024);
         JsonNode fields = parse(raw, 2 * 1024);
         require(fields.isArray() && !fields.isEmpty() && fields.size() <= 8);
+        if (conditional(object(summaryJson, 8 * 1024))) {
+            require(fields.size() == 1 && "account_seq".equals(text(fields.get(0).get("arg"), 1, 64))
+                && "account".equals(text(fields.get(0).get("field"), 1, 64)));
+        }
         Set<String> args = new HashSet<>();
         Set<String> names = new HashSet<>();
         for (JsonNode item : fields) {
@@ -243,158 +240,6 @@ public final class ConnectorExecutionSnapshot {
             equal(scope.get(arg), JSON.valueToTree(publicFields.get(field)));
         }
         keys(scope, args);
-    }
-
-
-    private static void validateArgs(
-        JsonNode input, JsonNode args, JsonNode summary, JsonNode scope, String operation) {
-        Set<String> allowed = new HashSet<>(scope.propertyNames());
-        allowed.addAll(Set.of("market", "currency"));
-        JsonNode original = summary.get("original");
-        boolean create = "CREATE".equals(operation);
-        if (create) {
-            allowed.addAll(Set.of("symbol", "side", "orderType", "timeInForce", "clientOrderId"));
-            require(original.isNull() && summary.get("orderId").isNull());
-            clientOrderId(args.get("clientOrderId"));
-        } else {
-            allowed.addAll(Set.of("orderId", "expected_order"));
-            if ("MODIFY".equals(operation)) {
-                allowed.add("orderType");
-            }
-            keys(original, ORIGINAL);
-            display(original, true);
-            expectedOrder(original, args.get("expected_order"));
-            equal(original.get("market"), args.get("market"));
-            equal(original.get("currency"), args.get("currency"));
-            equal(original.get("orderId"), args.get("orderId"));
-            equal(summary.get("orderId"), args.get("orderId"));
-            for (String name : ORDER_VALUES) {
-                JsonNode value = args.get(name);
-                if (value == null && ("CANCEL".equals(operation) || !"price".equals(name))) {
-                    equal(summary.get(name), original.get(name));
-                }
-            }
-        }
-        if (!"CANCEL".equals(operation)) {
-            for (String name : Set.of("quantity", "orderAmount", "price")) {
-                if (args.has(name)) {
-                    decimal(args.get(name), false);
-                    allowed.add(name);
-                }
-            }
-            require(!args.has("quantity") || !args.has("orderAmount"));
-            require(create ? args.has("quantity") != args.has("orderAmount") : !args.has("orderAmount"));
-            text(args.get("orderType"), 1, 6);
-            require(Set.of("LIMIT", "MARKET").contains(args.get("orderType").stringValue()));
-            require("LIMIT".equals(args.get("orderType").stringValue()) == args.has("price"));
-        }
-        keys(args, allowed);
-        for (String name : ORDER_VALUES) {
-            if (args.has(name)) {
-                equal(summary.get(name), args.get(name));
-            } else if (create || "price".equals(name) && !"CANCEL".equals(operation)) {
-                require(summary.get(name).isNull());
-            }
-        }
-        equal(summary.get("market"), args.get("market"));
-        equal(summary.get("currency"), args.get("currency"));
-        validateInput(input, operation);
-    }
-
-
-    private static void expectedOrder(JsonNode original, JsonNode expected) {
-        keys(expected, EXPECTED);
-        keys(expected.get("execution"), Set.of("filledQuantity"));
-        for (String name : EXPECTED) {
-            if (!"execution".equals(name)) {
-                equal(original.get(name), expected.get(name));
-            }
-        }
-        equal(original.get("filledQuantity"), expected.get("execution").get("filledQuantity"));
-    }
-
-
-    private static void clientOrderId(JsonNode node) {
-        String value = text(node, 36, 36);
-        try {
-            require(UUID.fromString(value).toString().equals(value));
-        } catch (IllegalArgumentException ignored) {
-            throw invalid();
-        }
-    }
-
-
-    private static void validateInput(JsonNode input, String operation) {
-        Set<String> allowed = new HashSet<>();
-        if ("CREATE".equals(operation)) {
-            allowed.addAll(Set.of("symbol", "side", "orderType"));
-        } else {
-            allowed.add("orderId");
-            text(input.get("orderId"), 1, 256);
-            if ("MODIFY".equals(operation)) {
-                allowed.add("orderType");
-            }
-        }
-        if (!"CANCEL".equals(operation)) {
-            Set<String> optionals = "CREATE".equals(operation)
-                ? Set.of("quantity", "orderAmount", "price", "timeInForce")
-                : Set.of("quantity", "price");
-            for (String name : optionals) {
-                if (input.has(name)) {
-                    allowed.add(name);
-                    if ("timeInForce".equals(name)) {
-                        text(input.get(name), 1, 3);
-                        require(Set.of("DAY", "CLS", "OPG")
-                            .contains(input.get(name).stringValue()));
-                    } else {
-                        decimal(input.get(name), false);
-                    }
-                }
-            }
-            if (input.has("confirmHighValueOrder")) {
-                allowed.add("confirmHighValueOrder");
-                require(input.get("confirmHighValueOrder").isBoolean()
-                    && !input.get("confirmHighValueOrder").booleanValue());
-            }
-            text(input.get("orderType"), 1, 6);
-            require(Set.of("LIMIT", "MARKET").contains(input.get("orderType").stringValue()));
-            require("LIMIT".equals(input.get("orderType").stringValue()) == input.has("price"));
-            require(!input.has("quantity") || !input.has("orderAmount"));
-            require(
-                "CREATE".equals(operation)
-                    ? input.has("quantity") != input.has("orderAmount")
-                    : !input.has("orderAmount"));
-        }
-        if ("CREATE".equals(operation)) {
-            require(text(input.get("symbol"), 1, 32).matches("[A-Za-z0-9.-]{1,32}"));
-            require(Set.of("BUY", "SELL").contains(text(input.get("side"), 1, 4)));
-        }
-        keys(input, allowed);
-    }
-
-
-    private static void display(JsonNode node, boolean original) {
-        require(text(node.get("symbol"), 1, 32).matches("[A-Za-z0-9.-]{1,32}"));
-        text(node.get("market"), 1, 16);
-        require(text(node.get("currency"), 3, 3).matches("[A-Z]{3}"));
-        require(Set.of("BUY", "SELL").contains(text(node.get("side"), 1, 4)));
-        require(Set.of("LIMIT", "MARKET").contains(text(node.get("orderType"), 1, 6)));
-        require(Set.of("DAY", "CLS", "OPG").contains(text(node.get("timeInForce"), 1, 3)));
-        for (String name : Set.of("quantity", "orderAmount", "price")) {
-            require(node.get(name) != null);
-            if (!node.get(name).isNull()) {
-                decimal(node.get(name), false);
-            }
-        }
-        require("LIMIT".equals(node.get("orderType").stringValue()) != node.get("price").isNull());
-        require(node.get("orderAmount").isNull()
-            || "MARKET".equals(node.get("orderType").stringValue()));
-        if (original) {
-            text(node.get("orderId"), 1, 256);
-            text(node.get("status"), 1, 32);
-            decimal(node.get("quantity"), false);
-            decimal(node.get("filledQuantity"), true);
-        }
     }
 
 
@@ -417,8 +262,8 @@ public final class ConnectorExecutionSnapshot {
     }
 
 
-    private static String lengthPrefix(String value) {
-        return bytes(value) + ":" + value;
+    private static boolean conditional(JsonNode summary) {
+        return summary.has("orderKind") && CONDITIONAL.equals(summary.get("orderKind").stringValue());
     }
 
 
@@ -454,12 +299,6 @@ public final class ConnectorExecutionSnapshot {
             && StandardCharsets.UTF_8.newEncoder().canEncode(value)
             && value.chars().noneMatch(Character::isISOControl));
         return value;
-    }
-
-
-    private static void decimal(JsonNode node, boolean zero) {
-        String value = text(node, 1, 30);
-        require(value.matches("[0-9]+(\\.[0-9]+)?") && (zero || new BigDecimal(value).signum() > 0));
     }
 
 
