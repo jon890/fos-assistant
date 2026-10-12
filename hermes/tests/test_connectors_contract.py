@@ -165,6 +165,13 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
                 missing = sorted(set(spec.get("identifiers", [])) - served.get(tool, (False, set()))[1])
                 if missing:
                     problems.append("identifiers 에 서버의 입력 스키마에 없는 인자가 있다: %s %s" % (tool, missing))
+                if "arg_labels" in spec:
+                    labels = spec["arg_labels"]
+                    normalized = loaded.get("tool_arg_labels", {}).get(tool) if loaded is not None else None
+                    if not isinstance(labels, dict) or labels != normalized:
+                        problems.append("arg_labels 가 표시 이름 검증을 통과하지 못했다: %s" % tool)
+                    elif set(labels) != served.get(tool, (False, set()))[1]:
+                        problems.append("arg_labels 와 서버 입력 스키마의 인자 이름이 다르다: %s" % tool)
 
     allowed = set(sys.stdlib_module_names) | ALLOWED_IMPORTS
     for source in sorted(root.rglob("*.py")):

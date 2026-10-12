@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures.ts";
+import { readFileSync } from "node:fs";
 import type {
   Page,
   Route,
@@ -6,6 +7,21 @@ import type {
 
 const ACTION_ID = "0f0e0d0c-0b0a-4908-8706-050403020100";
 const TOOL_NAME = "write_note";
+const PRODUCED_CATALOG = JSON.parse(
+  readFileSync(
+    new URL("../resources/connector-argument-catalog.json", import.meta.url),
+    "utf8",
+  ),
+);
+const MASKED_DTO = JSON.parse(
+  readFileSync(
+    new URL(
+      "../resources/connector-argument-masked-action.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 type Action = Record<string, unknown> & { status: string };
 
@@ -76,6 +92,139 @@ async function openWith(page: Page, label: string, first: Action) {
 
 test.afterEach(async ({ page }) => {
   await page.unrouteAll({ behavior: "ignoreErrors" });
+});
+
+test("실제 Python 카탈로그의 메일 인자 이름과 선언 밖 충돌 키를 구분하고 승인 요청은 유지한다", async ({
+  page,
+}) => {
+  const argLabels = PRODUCED_CATALOG[0].tools.send_message.arg_labels;
+  await openWith(
+    page,
+    "메일 인자 표시 이름",
+    action({
+      argLabels,
+      grantAllowed: false,
+      argsJson: JSON.stringify({
+        to: "friend@example.com",
+        "받는 사람": "모델이 보낸 키",
+        "받는 사람 (to)": "병기한 이름과 같은 키",
+        "받는 사람 (to) [1]": "",
+        subject: "합성 제목",
+        cc: "",
+      }),
+    }),
+  );
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText([
+    "받는 사람 (to) [2]",
+    "받는 사람 (받는 사람)",
+    "받는 사람 (to) [3]",
+    "제목",
+  ]);
+  await expect(card.locator("dd")).toHaveText([
+    "friend@example.com",
+    "모델이 보낸 키",
+    "병기한 이름과 같은 키",
+    "합성 제목",
+  ]);
+  await expect(card.getByTestId("approval-args-empty")).toHaveText(
+    "비어 있는 항목: 받는 사람 (to) [1], 참조",
+  );
+  let submitted: unknown;
+  await page.route(`**/api/connector-actions/${ACTION_ID}/approve`, (route) => {
+    submitted = route.request().postDataJSON();
+    return route.fulfill({ json: action({ status: "SUCCEEDED", argLabels }) });
+  });
+  await card.getByTestId("approval-approve").click();
+  await expect.poll(() => submitted).toEqual({ grant: null });
+});
+
+test("네이버 본문 이름과 가림 안내는 표시만 바꾸며 승인 금지는 유지한다", async ({
+  page,
+}) => {
+  const argLabels = PRODUCED_CATALOG[1].tools.save_draft.arg_labels;
+  await openWith(
+    page,
+    "블로그 인자 표시 이름",
+    action({
+      argLabels,
+      grantAllowed: false,
+      hiddenArgs: true,
+      argsJson: JSON.stringify({
+        title: "합성 제목",
+        body: "[가림]",
+        "[가림]": "[가림]",
+        tags: [],
+      }),
+    }),
+  );
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["제목", "본문", "[가림]"]);
+  await expect(card.getByTestId("approval-hidden-args-reason")).toContainText(
+    "가려진 칸(본문, [가림])",
+  );
+  await expect(card.getByTestId("approval-args-empty")).toHaveText(
+    "비어 있는 항목: 태그",
+  );
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toBeVisible();
+});
+
+test("인자 표시 이름의 HTML은 요소를 만들지 않고 글자로 보인다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "표시 이름 HTML",
+    action({ argLabels: { title: "<b>제목</b>" } }),
+  );
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["<b>제목</b>", "count"]);
+  await expect(card.locator("dt b")).toHaveCount(0);
+});
+
+test("실제 Java 가림 DTO는 원래 키 없이 카드와 승인 금지를 유지한다", async ({
+  page,
+}) => {
+  await openWith(page, "가린 키 metadata", MASKED_DTO);
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText(["범위", "[가림]"]);
+  await expect(card.getByTestId("approval-hidden-args-reason")).toContainText(
+    "가려진 칸([가림])",
+  );
+  await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(card.getByTestId("approval-grant")).toHaveCount(0);
+  await expect(card.getByTestId("approval-reject")).toBeVisible();
+});
+
+test("병기 뒤 충돌한 제목은 가림 안내와 빈 항목에도 같은 최종 이름을 쓴다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "최종 제목 충돌",
+    action({
+      argLabels: PRODUCED_CATALOG[0].tools.send_message.arg_labels,
+      grantAllowed: false,
+      hiddenArgs: true,
+      argsJson: JSON.stringify({
+        to: "[가림]",
+        "받는 사람": "값",
+        "받는 사람 (to)": "",
+      }),
+    }),
+  );
+  const card = page.getByTestId("approval-card");
+  await expect(card.locator("dt")).toHaveText([
+    "받는 사람 (to) [1]",
+    "받는 사람 (받는 사람)",
+  ]);
+  await expect(card.getByTestId("approval-hidden-args-reason")).toContainText(
+    "가려진 칸(받는 사람 (to) [1])",
+  );
+  await expect(card.getByTestId("approval-args-empty")).toHaveText(
+    "비어 있는 항목: 받는 사람 (to) [2]",
+  );
 });
 
 test("승인 줄이 없는 대화에는 카드 자리가 없다", async ({ page }) => {
@@ -517,7 +666,11 @@ test("390px 폭에서 긴 인자도 가로로 넘치지 않는다", async ({ pag
 });
 
 /** 라벨 만들기 승인 줄이다. 운영에서 본 모양처럼 값이 빈 인자와 원 이름 인자를 함께 싣는다. */
-function labelAction(index: number, name: string, overrides: Record<string, unknown> = {}): Action {
+function labelAction(
+  index: number,
+  name: string,
+  overrides: Record<string, unknown> = {},
+): Action {
   return action({
     actionId: `0f0e0d0c-0b0a-4908-8706-0504030201${String(index).padStart(2, "0")}`,
     connectorId: "gmail",
@@ -537,11 +690,20 @@ function labelAction(index: number, name: string, overrides: Record<string, unkn
 const LABELS = ["업무", "가족", "영수증", "뉴스레터"];
 
 /** 승인 줄 여럿이 있는 대화를 연다. `turns` 만큼 질문을 더 보내 메시지 목록이 넘치게 한다. */
-async function openWithMany(page: Page, label: string, actions: Action[], turns = 0) {
+async function openWithMany(
+  page: Page,
+  label: string,
+  actions: Action[],
+  turns = 0,
+) {
   const conversationId = await createConversation(page, label);
   for (let index = 0; index < turns; index += 1) {
     const sent = await page.request.post("/api/chat", {
-      data: { conversationId, text: `${label} ${index}번째 물음`, agentCode: "browser" },
+      data: {
+        conversationId,
+        text: `${label} ${index}번째 물음`,
+        agentCode: "browser",
+      },
     });
     expect(sent.ok()).toBeTruthy();
   }
@@ -556,11 +718,17 @@ async function openWithMany(page: Page, label: string, actions: Action[], turns 
 async function routeDecisions(page: Page, state: { actions: Action[] }) {
   const calls: { actionId: string; kind: string; body: unknown }[] = [];
   await page.route("**/api/connector-actions/*/*", (route: Route) => {
-    const [actionId, kind] = new URL(route.request().url()).pathname.split("/").slice(-2);
+    const [actionId, kind] = new URL(route.request().url()).pathname
+      .split("/")
+      .slice(-2);
     calls.push({ actionId, kind, body: route.request().postDataJSON() });
     const status = kind === "approve" ? "SUCCEEDED" : "REJECTED";
-    state.actions = state.actions.map((item) => (item.actionId === actionId ? { ...item, status } : item));
-    return route.fulfill({ json: state.actions.find((item) => item.actionId === actionId) });
+    state.actions = state.actions.map((item) =>
+      item.actionId === actionId ? { ...item, status } : item,
+    );
+    return route.fulfill({
+      json: state.actions.find((item) => item.actionId === actionId),
+    });
   });
   return calls;
 }
@@ -569,13 +737,18 @@ for (const [project, size] of [
   ["desktop", { width: 1040, height: 600 }],
   ["mobile", { width: 390, height: 844 }],
 ] as const) {
-  test(`${size.width}px 에서 승인 줄이 넷 이상이어도 메시지 목록이 보이고 스크롤된다`, async ({ page }, testInfo) => {
+  test(`${size.width}px 에서 승인 줄이 넷 이상이어도 메시지 목록이 보이고 스크롤된다`, async ({
+    page,
+  }, testInfo) => {
     test.skip(testInfo.project.name !== project, `${project} 에서만 돈다`);
     await page.setViewportSize(size);
     await openWithMany(
       page,
       "승인 여럿 화면 검사",
-      [...LABELS.map((name, index) => labelAction(index, name)), action({ title: "메모 쓰기" })],
+      [
+        ...LABELS.map((name, index) => labelAction(index, name)),
+        action({ title: "메모 쓰기" }),
+      ],
       4,
     );
 
@@ -596,29 +769,42 @@ for (const [project, size] of [
     await list.evaluate((element) => {
       element.scrollTop = 0;
     });
-    await expect(page.getByTestId("assistant-message").first()).toBeInViewport();
-    await expect(page.getByRole("textbox", { name: "메시지" })).toBeInViewport();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await expect(
+      page.getByTestId("assistant-message").first(),
+    ).toBeInViewport();
+    await expect(
+      page.getByRole("textbox", { name: "메시지" }),
+    ).toBeInViewport();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
   });
 }
 
-test("같은 도구의 승인 줄은 한 묶음으로 접혀 보이고 펼치면 건마다 인자가 보인다", async ({ page }) => {
-  await openWithMany(
-    page,
-    "승인 묶음 검사",
-    [...LABELS.map((name, index) => labelAction(index, name)), action({ title: "메모 쓰기" })],
-  );
+test("같은 도구의 승인 줄은 한 묶음으로 접혀 보이고 펼치면 건마다 인자가 보인다", async ({
+  page,
+}) => {
+  await openWithMany(page, "승인 묶음 검사", [
+    ...LABELS.map((name, index) => labelAction(index, name)),
+    action({ title: "메모 쓰기" }),
+  ]);
 
   const group = page.getByTestId("approval-group");
   await expect(group).toHaveCount(1);
   await expect(group).toHaveAttribute("data-count", "4");
   await expect(group).toContainText("라벨 만들기");
   await expect(group).toContainText("4건");
-  await expect(group.getByTestId("approval-group-summary")).toHaveText("업무, 가족, 영수증, 뉴스레터");
+  await expect(group.getByTestId("approval-group-summary")).toHaveText(
+    "업무, 가족, 영수증, 뉴스레터",
+  );
   await expect(group.getByTestId("approval-card")).toHaveCount(0);
   await expect(group.getByTestId("approval-approve-all")).toHaveCount(0);
   // 다른 도구의 줄은 묶음 밖에 한 장으로 남는다.
-  await expect(page.getByTestId("approval-list").getByTestId("approval-card")).toHaveCount(1);
+  await expect(
+    page.getByTestId("approval-list").getByTestId("approval-card"),
+  ).toHaveCount(1);
 
   const toggle = group.getByTestId("approval-group-toggle");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -627,7 +813,9 @@ test("같은 도구의 승인 줄은 한 묶음으로 접혀 보이고 펼치면
   const items = group.getByTestId("approval-card");
   await expect(items).toHaveCount(4);
   for (const [index, name] of LABELS.entries()) {
-    await expect(items.nth(index).getByTestId("approval-args").locator("dd").first()).toHaveText(name);
+    await expect(
+      items.nth(index).getByTestId("approval-args").locator("dd").first(),
+    ).toHaveText(name);
   }
   await expect(group.getByTestId("approval-group-summary")).toHaveCount(0);
 
@@ -635,7 +823,9 @@ test("같은 도구의 승인 줄은 한 묶음으로 접혀 보이고 펼치면
   await expect(group.getByTestId("approval-card")).toHaveCount(0);
 });
 
-test("묶음 안에서 건마다 승인하고 거절하며 펼친 상태가 남는다", async ({ page }) => {
+test("묶음 안에서 건마다 승인하고 거절하며 펼친 상태가 남는다", async ({
+  page,
+}) => {
   const { state } = await openWithMany(
     page,
     "묶음 한 건씩 검사",
@@ -646,21 +836,35 @@ test("묶음 안에서 건마다 승인하고 거절하며 펼친 상태가 남�
   const group = page.getByTestId("approval-group");
   await group.getByTestId("approval-group-toggle").click();
 
-  await group.getByTestId("approval-card").nth(1).getByTestId("approval-approve").click();
+  await group
+    .getByTestId("approval-card")
+    .nth(1)
+    .getByTestId("approval-approve")
+    .click();
   await expect(group).toHaveAttribute("data-count", "3");
   await expect(group.getByTestId("approval-card")).toHaveCount(3);
-  await group.getByTestId("approval-card").nth(1).getByTestId("approval-reject").click();
+  await group
+    .getByTestId("approval-card")
+    .nth(1)
+    .getByTestId("approval-reject")
+    .click();
   await expect(group).toHaveAttribute("data-count", "2");
 
   expect(calls).toEqual([
     { actionId: ids[1], kind: "approve", body: { grant: null } },
     { actionId: ids[2], kind: "reject", body: null },
   ]);
-  await expect(group.getByTestId("approval-args").locator("dd").first()).toHaveText("업무");
-  await expect(group.getByTestId("approval-args").nth(1).locator("dd").first()).toHaveText("뉴스레터");
+  await expect(
+    group.getByTestId("approval-args").locator("dd").first(),
+  ).toHaveText("업무");
+  await expect(
+    group.getByTestId("approval-args").nth(1).locator("dd").first(),
+  ).toHaveText("뉴스레터");
 });
 
-test("모두 승인은 펼친 묶음에서 건마다 차례로 승인하고 카드를 치운다", async ({ page }) => {
+test("모두 승인은 펼친 묶음에서 건마다 차례로 승인하고 카드를 치운다", async ({
+  page,
+}) => {
   const { state } = await openWithMany(
     page,
     "모두 승인 검사",
@@ -674,7 +878,13 @@ test("모두 승인은 펼친 묶음에서 건마다 차례로 승인하고 카�
   await group.getByTestId("approval-approve-all").click();
 
   await expect(page.getByTestId("approval-list")).toHaveCount(0);
-  expect(calls).toEqual(ids.map((actionId) => ({ actionId, kind: "approve", body: { grant: null } })));
+  expect(calls).toEqual(
+    ids.map((actionId) => ({
+      actionId,
+      kind: "approve",
+      body: { grant: null },
+    })),
+  );
 });
 
 for (const [name, overrides] of [
@@ -696,24 +906,42 @@ for (const [name, overrides] of [
   });
 }
 
-test("값이 빈 인자는 숨기고 짧은 인자 둘만 위에 보이며 나머지는 자세히에 접는다", async ({ page }) => {
+test("값이 빈 인자는 숨기고 짧은 인자 둘만 위에 보이며 나머지는 자세히에 접는다", async ({
+  page,
+}) => {
   await openWith(page, "빈 인자 숨김 검사", labelAction(0, "업무"));
 
   const card = page.getByTestId("approval-card");
-  await expect(card.getByTestId("approval-args").locator("dt")).toHaveText(["name", "label_list_visibility"]);
-  await expect(card.getByTestId("approval-args").locator("dd")).toHaveText(["업무", "labelShow"]);
+  await expect(card.getByTestId("approval-args").locator("dt")).toHaveText([
+    "name",
+    "label_list_visibility",
+  ]);
+  await expect(card.getByTestId("approval-args").locator("dd")).toHaveText([
+    "업무",
+    "labelShow",
+  ]);
   const more = card.getByTestId("approval-args-more");
   await expect(more.locator("summary")).toHaveText("자세히 (3개)");
   await expect(card.getByTestId("approval-args-folded")).toBeHidden();
   await expect(card.getByTestId("approval-args-empty")).toBeHidden();
 
   await more.locator("summary").click();
-  await expect(card.getByTestId("approval-args-folded").locator("dt")).toHaveText(["message_list_visibility"]);
-  await expect(card.getByTestId("approval-args-empty")).toHaveText("비어 있는 항목: background_color, text_color");
+  await expect(
+    card.getByTestId("approval-args-folded").locator("dt"),
+  ).toHaveText(["message_list_visibility"]);
+  await expect(card.getByTestId("approval-args-empty")).toHaveText(
+    "비어 있는 항목: background_color, text_color",
+  );
 });
 
-test("상시 허락을 닫은 줄은 빈 인자를 빼고 나머지를 모두 펼치며 빈 인자의 이름도 보인다", async ({ page }) => {
-  await openWith(page, "닫은 도구 빈 인자 검사", labelAction(0, "업무", { grantAllowed: false }));
+test("상시 허락을 닫은 줄은 빈 인자를 빼고 나머지를 모두 펼치며 빈 인자의 이름도 보인다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "닫은 도구 빈 인자 검사",
+    labelAction(0, "업무", { grantAllowed: false }),
+  );
 
   const card = page.getByTestId("approval-card");
   await expect(card.getByTestId("approval-args").locator("dt")).toHaveText([
@@ -723,10 +951,14 @@ test("상시 허락을 닫은 줄은 빈 인자를 빼고 나머지를 모두 �
   ]);
   await expect(card.getByTestId("approval-args-more")).toHaveCount(0);
   await expect(card.getByTestId("approval-args-empty")).toBeVisible();
-  await expect(card.getByTestId("approval-args-empty")).toHaveText("비어 있는 항목: background_color, text_color");
+  await expect(card.getByTestId("approval-args-empty")).toHaveText(
+    "비어 있는 항목: background_color, text_color",
+  );
 });
 
-test("모두 승인 중 요청이 실패하면 멈추고 오류를 보이며 목록을 다시 읽는다", async ({ page }) => {
+test("모두 승인 중 요청이 실패하면 멈추고 오류를 보이며 목록을 다시 읽는다", async ({
+  page,
+}) => {
   const { state, reads } = await openWithMany(
     page,
     "모두 승인 실패 검사",
@@ -737,9 +969,14 @@ test("모두 승인 중 요청이 실패하면 멈추고 오류를 보이며 목
   await page.route("**/api/connector-actions/*/approve", (route: Route) => {
     const actionId = new URL(route.request().url()).pathname.split("/").at(-2)!;
     calls.push(actionId);
-    if (actionId === ids[1]) return route.fulfill({ status: 500, json: { code: "" } });
-    state.actions = state.actions.map((item) => (item.actionId === actionId ? { ...item, status: "SUCCEEDED" } : item));
-    return route.fulfill({ json: state.actions.find((item) => item.actionId === actionId) });
+    if (actionId === ids[1])
+      return route.fulfill({ status: 500, json: { code: "" } });
+    state.actions = state.actions.map((item) =>
+      item.actionId === actionId ? { ...item, status: "SUCCEEDED" } : item,
+    );
+    return route.fulfill({
+      json: state.actions.find((item) => item.actionId === actionId),
+    });
   });
   const group = page.getByTestId("approval-group");
   await group.getByTestId("approval-group-toggle").click();
@@ -755,7 +992,9 @@ test("모두 승인 중 요청이 실패하면 멈추고 오류를 보이며 목
   await expect(group).toHaveAttribute("data-count", "3");
 });
 
-test("모두 승인 중 실행했다고 볼 수 없는 결과가 오면 나머지를 보내지 않는다", async ({ page }) => {
+test("모두 승인 중 실행했다고 볼 수 없는 결과가 오면 나머지를 보내지 않는다", async ({
+  page,
+}) => {
   const { state } = await openWithMany(
     page,
     "모두 승인 결과 모름 검사",
@@ -765,8 +1004,12 @@ test("모두 승인 중 실행했다고 볼 수 없는 결과가 오면 나머�
   await page.route("**/api/connector-actions/*/approve", (route: Route) => {
     const actionId = new URL(route.request().url()).pathname.split("/").at(-2)!;
     calls.push(actionId);
-    state.actions = state.actions.map((item) => (item.actionId === actionId ? { ...item, status: "UNKNOWN" } : item));
-    return route.fulfill({ json: state.actions.find((item) => item.actionId === actionId) });
+    state.actions = state.actions.map((item) =>
+      item.actionId === actionId ? { ...item, status: "UNKNOWN" } : item,
+    );
+    return route.fulfill({
+      json: state.actions.find((item) => item.actionId === actionId),
+    });
   });
   const group = page.getByTestId("approval-group");
   await group.getByTestId("approval-group-toggle").click();
@@ -777,23 +1020,41 @@ test("모두 승인 중 실행했다고 볼 수 없는 결과가 오면 나머�
     "한 건이 끝나지 않아 나머지는 승인하지 않았어요. 남은 건을 확인해 주세요.",
   );
   expect(calls).toHaveLength(1);
-  await expect(page.getByTestId("approval-card").filter({ hasText: "실행했는지 알 수 없어요" })).toHaveCount(1);
+  await expect(
+    page
+      .getByTestId("approval-card")
+      .filter({ hasText: "실행했는지 알 수 없어요" }),
+  ).toHaveCount(1);
   await expect(group).toHaveAttribute("data-count", "3");
 });
 
-test("모두 승인 중 묶음이 한 장이 되어도 남은 줄의 단추는 막혀 있다", async ({ page }) => {
-  const { state } = await openWithMany(page, "모두 승인 한 장 검사", [labelAction(0, "업무"), labelAction(1, "가족")]);
+test("모두 승인 중 묶음이 한 장이 되어도 남은 줄의 단추는 막혀 있다", async ({
+  page,
+}) => {
+  const { state } = await openWithMany(page, "모두 승인 한 장 검사", [
+    labelAction(0, "업무"),
+    labelAction(1, "가족"),
+  ]);
   const ids = state.actions.map((item) => item.actionId);
   let release!: () => void;
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/connector-actions/*/approve", async (route: Route) => {
-    const actionId = new URL(route.request().url()).pathname.split("/").at(-2)!;
-    if (actionId === ids[1]) await held;
-    state.actions = state.actions.map((item) => (item.actionId === actionId ? { ...item, status: "SUCCEEDED" } : item));
-    return route.fulfill({ json: state.actions.find((item) => item.actionId === actionId) });
-  });
+  await page.route(
+    "**/api/connector-actions/*/approve",
+    async (route: Route) => {
+      const actionId = new URL(route.request().url()).pathname
+        .split("/")
+        .at(-2)!;
+      if (actionId === ids[1]) await held;
+      state.actions = state.actions.map((item) =>
+        item.actionId === actionId ? { ...item, status: "SUCCEEDED" } : item,
+      );
+      return route.fulfill({
+        json: state.actions.find((item) => item.actionId === actionId),
+      });
+    },
+  );
   await page.getByTestId("approval-group-toggle").click();
 
   await page.getByTestId("approval-approve-all").click();
@@ -808,41 +1069,77 @@ test("모두 승인 중 묶음이 한 장이 되어도 남은 줄의 단추는 �
   await expect(page.getByTestId("approval-list")).toHaveCount(0);
 });
 
-test("묶음의 한 건을 보내는 동안에는 모두 승인을 누를 수 없다", async ({ page }) => {
-  const { state } = await openWithMany(page, "한 건 보내는 중 검사", LABELS.map((name, index) => labelAction(index, name)));
+test("묶음의 한 건을 보내는 동안에는 모두 승인을 누를 수 없다", async ({
+  page,
+}) => {
+  const { state } = await openWithMany(
+    page,
+    "한 건 보내는 중 검사",
+    LABELS.map((name, index) => labelAction(index, name)),
+  );
   let release!: () => void;
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/connector-actions/*/approve", async (route: Route) => {
-    const actionId = new URL(route.request().url()).pathname.split("/").at(-2)!;
-    await held;
-    state.actions = state.actions.map((item) => (item.actionId === actionId ? { ...item, status: "SUCCEEDED" } : item));
-    return route.fulfill({ json: state.actions.find((item) => item.actionId === actionId) });
-  });
+  await page.route(
+    "**/api/connector-actions/*/approve",
+    async (route: Route) => {
+      const actionId = new URL(route.request().url()).pathname
+        .split("/")
+        .at(-2)!;
+      await held;
+      state.actions = state.actions.map((item) =>
+        item.actionId === actionId ? { ...item, status: "SUCCEEDED" } : item,
+      );
+      return route.fulfill({
+        json: state.actions.find((item) => item.actionId === actionId),
+      });
+    },
+  );
   const group = page.getByTestId("approval-group");
   await group.getByTestId("approval-group-toggle").click();
 
-  await group.getByTestId("approval-card").first().getByTestId("approval-approve").click();
+  await group
+    .getByTestId("approval-card")
+    .first()
+    .getByTestId("approval-approve")
+    .click();
   await expect(group.getByTestId("approval-approve-all")).toBeDisabled();
   release();
   await expect(group).toHaveAttribute("data-count", "3");
   await expect(group.getByTestId("approval-approve-all")).toBeEnabled();
 });
 
-test("두 건 묶음에서 한 건을 처리하면 남은 건은 한 장의 카드가 된다", async ({ page }) => {
-  const { state } = await openWithMany(page, "두 건 묶음 검사", [labelAction(0, "업무"), labelAction(1, "가족")]);
+test("두 건 묶음에서 한 건을 처리하면 남은 건은 한 장의 카드가 된다", async ({
+  page,
+}) => {
+  const { state } = await openWithMany(page, "두 건 묶음 검사", [
+    labelAction(0, "업무"),
+    labelAction(1, "가족"),
+  ]);
   await routeDecisions(page, state);
   await page.getByTestId("approval-group-toggle").click();
 
-  await page.getByTestId("approval-card").first().getByTestId("approval-reject").click();
+  await page
+    .getByTestId("approval-card")
+    .first()
+    .getByTestId("approval-reject")
+    .click();
 
   await expect(page.getByTestId("approval-group")).toHaveCount(0);
   await expect(page.getByTestId("approval-card")).toContainText("라벨 만들기");
-  await expect(page.getByTestId("approval-card").getByTestId("approval-args").locator("dd").first()).toHaveText("가족");
+  await expect(
+    page
+      .getByTestId("approval-card")
+      .getByTestId("approval-args")
+      .locator("dd")
+      .first(),
+  ).toHaveText("가족");
 });
 
-test("같은 도구라도 실행 중인 줄과 도구 이름이 없는 줄은 묶지 않는다", async ({ page }) => {
+test("같은 도구라도 실행 중인 줄과 도구 이름이 없는 줄은 묶지 않는다", async ({
+  page,
+}) => {
   await openWithMany(page, "묶지 않는 줄 검사", [
     labelAction(0, "업무"),
     labelAction(1, "가족"),
@@ -852,7 +1149,14 @@ test("같은 도구라도 실행 중인 줄과 도구 이름이 없는 줄은 �
   ]);
 
   await expect(page.getByTestId("approval-group")).toHaveCount(1);
-  await expect(page.getByTestId("approval-group")).toHaveAttribute("data-count", "2");
+  await expect(page.getByTestId("approval-group")).toHaveAttribute(
+    "data-count",
+    "2",
+  );
   // 실행 중인 줄 하나와 이름 없는 줄 둘이 한 장씩이다.
-  await expect(page.getByTestId("approval-list").locator(":scope > [data-testid=approval-card]")).toHaveCount(3);
+  await expect(
+    page
+      .getByTestId("approval-list")
+      .locator(":scope > [data-testid=approval-card]"),
+  ).toHaveCount(3);
 });
