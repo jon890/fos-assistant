@@ -413,7 +413,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(post("{\"ticket\":\"" + ticket + "\",\"stage\":\"start\",\"x\":1}").statusCode()).isEqualTo(400);
         var allowed = post("{\"ticket\":\"" + ticket + "\",\"stage\":\"start\"}");
         assertThat(allowed.statusCode()).isEqualTo(200);
-        assertThat(json.readTree(allowed.body()).propertyNames()).containsExactly("allowed");
+        assertThat(json.readTree(allowed.body())).isEqualTo(json.readTree("{\"allowed\":true}"));
         var again = post("{\"ticket\":\"" + ticket + "\",\"stage\":\"start\"}");
         assertThat(again.statusCode()).isEqualTo(403);
         assertThat(again.body()).doesNotContain(ticket, "비밀");
