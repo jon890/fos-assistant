@@ -52,6 +52,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -201,9 +202,12 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     @Test
     @DisplayName("원고 승인 줄이 일반 승인 경로로 들어오면 선언 없는 도구로 보고 실행 없이 거절한다")
     void refusesContentLineOnGenericApprovalWithoutExecution() {
+        // 일반 승인 경로는 시스템 시계로 기한을 본다. 기한 만료가 아니라 선언 판정으로 거절되는지 보려고 시계를 맞춘다.
+        clock.set(Instant.now());
         var request = saves.requestSave(owner, origin.id(), preview());
         var view = approvals.approve(owner, request.actionId(), null);
         assertThat(view.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(view.errorCode()).isEqualTo("not_executable");
         verify(catalog, never()).execute(any(), any(), any(), any());
         assertThat(starter.started()).isEmpty();
     }

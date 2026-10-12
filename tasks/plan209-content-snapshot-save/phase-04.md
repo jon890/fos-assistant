@@ -18,7 +18,7 @@ runDraft는 저장 수 증가 뒤 state 실패를 삼키고 state:null로 성공
 
 ## phase03 뒤 실제 main
 
-- 시작 전송은 `connector.application.ContentDraftJobStarter`의 `Optional<String> start(String profile, String connectorId, JsonNode snapshot, UUID jobId, String ticket)` 구현 빈으로 연결한다. 빈 값은 접수, 값은 시작 전 거절 code, 예외는 결과 모름이다.
+- 시작 전송은 `connector.application.ContentDraftJobStarter`의 `Optional<String> start(String profile, String connectorId, JsonNode snapshot, ContentDraftSaveTicketPayload job, String ticket)` 구현 빈으로 연결한다. job 은 예약 jobId·snapshotId·hash·바인딩과 연결의 판을 담고, 구현은 여기와 profile 의 SHA-256 으로 start 입력의 stamp 를 만든다. 빈 값은 접수, 값은 시작 전 거절 code, 예외는 결과 모름이다.
 - ticket 형식과 authorize 요청·응답은 `docs/features/content-draft.md`의 「저장 ticket과 authorize」가 갖는다. worker는 ticket을 해석하지 않고 그대로 싣는다.
 - `ConnectorSnapshotDeclaration.read`와 `HttpContentDraftSnapshotClient.compile`의 capability 검사는 아직 compile 전용만 받는다. 시작을 선언하는 catalog를 열 때 함께 바꾼다.
 

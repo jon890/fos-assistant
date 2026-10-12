@@ -157,7 +157,7 @@ public class ContentDraftSaveApproval {
         try {
             JsonNode compiled = ContentDraftSnapshotHash.compile(reserved.input().canonicalDraft(), reserved.input().resolvedAssets());
             outcome = starters.getObject()
-                .start(reserved.input().binding().profile(), reserved.input().binding().connectorId(), compiled, reserved.jobId(), ticket)
+                .start(reserved.input().binding().profile(), reserved.input().binding().connectorId(), compiled, reserved.ticket(), ticket)
                 .map(Outcome::rejected)
                 .orElse(Outcome.ACCEPTED);
         } catch (RuntimeException ex) {
@@ -225,7 +225,7 @@ public class ContentDraftSaveApproval {
         var stamp = input.binding();
         var payload = new ContentDraftSaveTicketPayload(jobId, snapshot.publicId(), snapshot.snapshotHash(), action.publicId(),
             user.id(), prepared.conversationId(), stamp.bindingId(), stamp.connectionId(), stamp.bindingUpdatedAt(),
-            stamp.connectionUpdatedAt(), now, now);
+            stamp.connectionUpdatedAt(), null, null);
         return new Reserved(jobId, input, payload);
     }
 

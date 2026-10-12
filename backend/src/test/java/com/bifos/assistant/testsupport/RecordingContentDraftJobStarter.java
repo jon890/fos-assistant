@@ -1,6 +1,7 @@
 package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.connector.application.ContentDraftJobStarter;
+import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,8 +27,8 @@ public class RecordingContentDraftJobStarter implements ContentDraftJobStarter {
 
 
     @Override
-    public Optional<String> start(String profile, String connectorId, JsonNode snapshot, UUID jobId, String ticket) {
-        var call = new Started(profile, connectorId, snapshot.deepCopy(), jobId, ticket);
+    public Optional<String> start(String profile, String connectorId, JsonNode snapshot, ContentDraftSaveTicketPayload job, String ticket) {
+        var call = new Started(profile, connectorId, snapshot.deepCopy(), job.jobId(), ticket);
         started.add(call);
         return answer.apply(call);
     }
