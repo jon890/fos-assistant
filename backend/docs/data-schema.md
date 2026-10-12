@@ -54,7 +54,10 @@ snapshot의 모든 칸은 필수이며 공개 UUID와 `(revision_id,binding_id,s
 snapshot과 action 참조는 각각 유일하고 필수다. owner·conversation은 후속 목록을 같은 범위로 조회하기 위한 필수 칸이다.
 job ID는 예약 전 NULL이며 값이 있으면 유일하다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code도 처음에는 NULL이다.
 status·생성 시각·save_clicked는 필수이고 save_clicked 기본값은 false다.
-저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다. 승인·claim·worker 실행은 아직 구현하지 않았다.
+저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다.
+job 행은 저장 요청의 PENDING 승인 줄과 같은 트랜잭션에서 만들고, job ID는 승인 때 소문자 정규 UUID로 한 번 예약한다.
+`start_claimed_at`·`save_claimed_at`은 NULL 조건 갱신 결과 1에서만 MICROS 시각으로 채우며, 현재 권한·실행 잠금과 같은 트랜잭션에서 커밋한다.
+ticket과 본문은 두 표 어디에도 저장하지 않는다. worker 상태의 조회와 stage·save_clicked 반영은 아직 구현하지 않았다.
 
 두 표 모두 `(owner_user_id,conversation_id,id)` 색인을 갖는다.
 삭제 가능한 원고·첨부·binding·connection·대화·origin과 이력용 action·snapshot에는 물리 FK와 삭제 cascade를 두지 않는다.

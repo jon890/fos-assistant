@@ -55,6 +55,13 @@ public class IntegrationTestDoubles {
     }
 
 
+    /** catalog 가 시작을 선언한 원고 저장 검사만 닿는다. */
+    @Bean
+    RecordingContentDraftJobStarter recordingContentDraftJobStarter() {
+        return new RecordingContentDraftJobStarter();
+    }
+
+
     /** 운영 시계 빈을 받는 곳이 이 시계를 받는다. */
     @Bean
     @Primary

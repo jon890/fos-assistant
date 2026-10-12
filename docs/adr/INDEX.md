@@ -105,6 +105,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 
 | [ADR-20261010 / attachment-inspect](ADR-20261010-attachment-inspect.md) | 현재 실행이 같은 대화의 원본 사진을 native 도구 결과로 다시 읽는다 | backend, hermes | Accepted |
 | [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) | 금융 실행 내용은 승인 이력에 묶어 불변으로 저장한다 | backend, hermes | Accepted |
+| [ADR-20261011 / content-snapshot-job](ADR-20261011-content-snapshot-job.md) | 승인한 원고는 불변 참조와 예약 job으로 한 번만 저장한다 | backend, hermes | Accepted |
 | [ADR-20261012 / conversation-grant](ADR-20261012-conversation-grant.md) | 승인 카드에서 도구를 그 대화에서만 계속 허용할 수 있고, 커넥터가 도구마다 연다고 선언한 것만 받는다 | backend, frontend, hermes | Accepted. ADR-050 의 상시 허락 옆에 대화 범위의 허락을 더한다. `conversation_grant` 를 선언한 도구만 열고 ADR-065 의 `outbound` 도구는 선언해도 닫는다 |
 
 ## 보관

@@ -266,6 +266,10 @@ test("실제 SDK read_draft가 편집기 사진을 반환하고 메타데이터 
   try {
     await client.connect(transport);
     const call = async () => {
+      // 대역은 탭마다 편집기를 새로 만들지 않아 새 탭의 빈 편집기로 되돌린다.
+      editor.document = null;
+      editor.documentId = "";
+      editor.loaded = null;
       const result = await client.callTool({
         name: "read_draft",
         arguments: { draft_id: "224000000004" },
@@ -285,6 +289,14 @@ test("실제 SDK read_draft가 편집기 사진을 반환하고 메타데이터 
       revision: draftRevision(draft),
       ...draft,
       ...documentPhotos(fixture),
+      autosave_requests: 0,
+      autosave_check: {
+        count_before: 1,
+        count_after: 1,
+        saved_at_before: "2026-01-01T00:00:00.000Z",
+        saved_at_after: "2026-01-01T00:00:00.000Z",
+        changed: false,
+      },
     });
     for (const p of first.photos)
       expect(Object.keys(p).sort()).toEqual([

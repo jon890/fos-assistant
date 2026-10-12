@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
@@ -32,6 +33,7 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -63,8 +65,9 @@ class ConnectorActionControllerTest {
     private final ConnectorActionService service = mock(ConnectorActionService.class);
     private final ConversationAccess conversations = mock(ConversationAccess.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
+    private final ContentDraftSaveApproval contentDrafts = mock(ContentDraftSaveApproval.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new ConnectorActionController(service, conversations, currentUser))
+        new ConnectorActionController(service, contentDrafts, conversations, currentUser))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -142,6 +145,17 @@ class ConnectorActionControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("PENDING"));
         mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)).andExpect(status().isOk());
+    }
+
+
+    @Test
+    @DisplayName("원고 job 링크가 있는 줄의 승인은 원고 저장 승인으로 넘기고 일반 승인을 부르지 않는다")
+    void approveRoutesContentDraftLineByJobLink() throws Exception {
+        when(contentDrafts.select(MEMBER, ACTION)).thenReturn(Optional.of(ACTION));
+        when(contentDrafts.approve(MEMBER, ACTION, null)).thenReturn(PENDING);
+        mvc.perform(post("/api/v1/connector-actions/{id}/approve", ACTION)).andExpect(status().isOk());
+        verify(contentDrafts).approve(MEMBER, ACTION, null);
+        verify(service, never()).approve(any(), any(), any());
     }
 
 

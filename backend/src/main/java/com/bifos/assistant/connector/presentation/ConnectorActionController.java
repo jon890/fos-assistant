@@ -2,6 +2,8 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
+import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ApproveRequest;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ConversationGrantView;
@@ -36,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ConnectorActionController {
     private final ConnectorActionService actions;
+    private final ContentDraftSaveApproval contentDrafts;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
@@ -53,11 +56,14 @@ public class ConnectorActionController {
     /** 본문이 없으면 상시 허락도 대화 허락도 주지 않는 승인이다. */
     @PostMapping("/connector-actions/{actionId}/approve")
     public ActionView approve(@PathVariable UUID actionId, @RequestBody(required = false) ApproveRequest request) {
-        return ActionView.from(actions.approve(
-            currentUser.require(),
-            actionId,
-            request == null ? null : request.grant(),
-            request != null && Boolean.TRUE.equals(request.conversationGrant())));
+        CurrentUser user = currentUser.require();
+        GrantPeriod grant = request == null ? null : request.grant();
+        boolean conversationGrant = request != null && Boolean.TRUE.equals(request.conversationGrant());
+        // 원고 snapshot 에 연결된 줄은 job 링크로 골라 원고 저장 승인으로 넘긴다. 인자 글이나 도구 이름으로 고르지 않는다.
+        if (contentDrafts.select(user, actionId).isPresent()) {
+            return ActionView.from(contentDrafts.approve(user, actionId, grant, conversationGrant));
+        }
+        return ActionView.from(actions.approve(user, actionId, grant, conversationGrant));
     }
 
 
