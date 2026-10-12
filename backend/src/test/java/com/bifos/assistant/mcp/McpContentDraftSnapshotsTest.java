@@ -13,7 +13,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
+import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
 import com.bifos.assistant.chat.application.ContentDraftSaveRequests;
 import com.bifos.assistant.chat.application.ContentDraftService;
 import com.bifos.assistant.chat.application.ContentDraftSnapshots;
@@ -61,6 +63,7 @@ class McpContentDraftSnapshotsTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private final ContentDraftSnapshots snapshots = mock(ContentDraftSnapshots.class);
     private final ContentDraftSaveRequests saves = mock(ContentDraftSaveRequests.class);
+    private final ContentDraftBindingAccess bindings = mock(ContentDraftBindingAccess.class);
     private final McpCurrentCallerGuard guard = mock(McpCurrentCallerGuard.class);
     private final McpCallerResolver callers = mock(McpCallerResolver.class);
     private final McpToolService tools = mock(McpToolService.class);
@@ -72,7 +75,7 @@ class McpContentDraftSnapshotsTest {
     @BeforeEach
     void setUp() {
         var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftInputReader.class), guard, json);
-        var tool = new McpContentDraftSnapshots(snapshots, saves, drafts);
+        var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
         controller = new McpController(tools, callers, mock(McpMediaObservationTools.class), drafts, tool, checks,
             mock(BuildProperties.class));
         var origin = mock(AgentExecution.class);
@@ -113,7 +116,7 @@ class McpContentDraftSnapshotsTest {
             previewArgs().put("bindingId", 0),
             previewArgs().put("bindingId", "9"),
             previewArgs().put("draftId", DRAFT.toString().toUpperCase()),
-            (ObjectNode)previewArgs().without("bindingId"));
+            (ObjectNode)previewArgs().without("revision"));
         for (ObjectNode args : previews) {
             assertThat(error(call(McpContentDraftSnapshots.PREVIEW, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.");
         }
@@ -124,6 +127,26 @@ class McpContentDraftSnapshotsTest {
             assertThat(error(call(McpContentDraftSnapshots.SAVE, args))).as(args.toString()).isEqualTo("인자 형식이 올바르지 않습니다.");
         }
         verifyNoInteractions(snapshots, saves);
+    }
+
+
+    @Test
+    @DisplayName("bindingId 를 생략하면 요청자 에이전트의 유일한 snapshot 바인딩을 쓰고 정하지 못하면 까닭을 싣는다")
+    void choosesSoleBindingOrExplainsWhyNot() {
+        var origin = caller.originExecution();
+        when(origin.agentId()).thenReturn(5L);
+        when(bindings.soleSnapshotBinding(OWNER, 5L)).thenReturn(9L);
+        when(snapshots.preview(OWNER, 41L, DRAFT, 3L, 9L, 31L)).thenReturn(view());
+
+        var chosen = result(call(McpContentDraftSnapshots.PREVIEW, (ObjectNode)previewArgs().without("bindingId")));
+
+        assertThat(chosen.path("isError").booleanValue()).isFalse();
+        when(bindings.soleSnapshotBinding(OWNER, 5L)).thenThrow(new ContentDraftBindingChoiceException(ContentDraftBindingChoiceException.MANY));
+        var many = result(call(McpContentDraftSnapshots.PREVIEW, (ObjectNode)previewArgs().without("bindingId")));
+        assertThat(many.path("isError").booleanValue()).isTrue();
+        assertThat(json.readTree(text(many)).path("code").stringValue()).isEqualTo("VALIDATION_FAILED");
+        assertThat(json.readTree(text(many)).path("message").stringValue()).isEqualTo(ContentDraftBindingChoiceException.MANY);
+        verify(snapshots, times(1)).preview(any(), any(), any(), anyLong(), any(), any());
     }
 
 
@@ -183,13 +206,13 @@ class McpContentDraftSnapshotsTest {
     @Test
     @DisplayName("두 도구 schema 는 소유자·경로 없이 필요한 인자만 받는다")
     void definesStrictSchemas() {
-        var tool = new McpContentDraftSnapshots(snapshots, saves, mock(McpContentDraftTools.class));
+        var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, mock(McpContentDraftTools.class));
         JsonNode preview = json.valueToTree(tool.previewDefinition()).path("inputSchema");
         JsonNode save = json.valueToTree(tool.saveDefinition()).path("inputSchema");
 
         assertThat(preview.path("additionalProperties").booleanValue()).isFalse();
         assertThat(preview.path("properties").propertyNames()).containsExactlyInAnyOrder("draftId", "revision", "bindingId");
-        assertThat(preview.path("required")).hasSize(3);
+        assertThat(preview.path("required")).hasSize(2);
         assertThat(save.path("additionalProperties").booleanValue()).isFalse();
         assertThat(save.path("properties").propertyNames()).containsExactly("snapshotId");
     }

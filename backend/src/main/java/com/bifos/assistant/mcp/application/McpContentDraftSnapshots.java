@@ -1,5 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
+import com.bifos.assistant.chat.application.ContentDraftBindingAccess;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftSaveRequests;
 import com.bifos.assistant.chat.application.ContentDraftSnapshots;
@@ -18,13 +19,19 @@ public class McpContentDraftSnapshots {
     public static final String SAVE = "content_draft_save";
     private final ContentDraftSnapshots snapshots;
     private final ContentDraftSaveRequests saves;
+    private final ContentDraftBindingAccess bindings;
     private final McpContentDraftTools drafts;
 
 
-    public Map<String, Object> preview(McpCaller caller, UUID draftId, long revision, long bindingId) {
+    /**
+     * @param bindingId 생략하면 null. 요청자 에이전트의 snapshot 지원 바인딩이 정확히 하나일 때만 그것을 쓴다. 지정한 번호도
+     * 같은 에이전트·요청자 범위인지 preview 가 검사한다
+     */
+    public Map<String, Object> preview(McpCaller caller, UUID draftId, long revision, Long bindingId) {
         return drafts.guarded(caller, () -> {
             var origin = caller.originExecution();
-            return snapshots.preview(caller.user(), origin.conversationId(), draftId, revision, bindingId, origin.id());
+            Long binding = bindingId == null ? bindings.soleSnapshotBinding(caller.user(), origin.agentId()) : bindingId;
+            return snapshots.preview(caller.user(), origin.conversationId(), draftId, revision, binding, origin.id());
         });
     }
 
@@ -39,9 +46,9 @@ public class McpContentDraftSnapshots {
         return Map.of("name", PREVIEW, "description",
             "현재 대화의 원고 revision 을 네이버 임시저장용으로 컴파일해 바뀌지 않는 preview 를 만든다. "
                 + "결과의 preview 와 포함한 사진 assetIds, 빠진 사진 omittedAssetIds 를 사용자에게 그대로 알린다. 모든 사진을 썼다고 말하지 않는다. "
-                + "bindingId 는 이 에이전트에 붙인 네이버 블로그 연결의 번호다.",
+                + "bindingId 는 생략한다. 원고 저장을 지원하는 연결이 여럿이라는 오류를 받았을 때만 지정한다.",
             "inputSchema", object(Map.of("draftId", uuid(), "revision", positive(ContentDraftInputReader.MAX_REVISION),
-                "bindingId", positive(Long.MAX_VALUE)), List.of("draftId", "revision", "bindingId")));
+                "bindingId", positive(Long.MAX_VALUE)), List.of("draftId", "revision")));
     }
 
 

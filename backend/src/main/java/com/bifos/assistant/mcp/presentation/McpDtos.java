@@ -41,16 +41,16 @@ public final class McpDtos {
         }
     }
 
-    /** 원고 ID·revision·바인딩 번호만 받는다. 소유자·profile·경로는 받지 않는다. */
-    public record ContentDraftPreviewArguments(UUID draftId, long revision, long bindingId) {
+    /** 원고 ID·revision 과 선택 바인딩 번호만 받는다. 소유자·profile·경로는 받지 않는다. */
+    public record ContentDraftPreviewArguments(UUID draftId, long revision, Long bindingId) {
         static ContentDraftPreviewArguments from(JsonNode node) {
-            ContentDraftInputReader.fields(node, Set.of("draftId", "revision", "bindingId"), Set.of());
+            ContentDraftInputReader.fields(node, Set.of("draftId", "revision"), Set.of("bindingId"));
             JsonNode binding = node.get("bindingId");
-            if (!binding.isIntegralNumber() || !binding.canConvertToLong() || binding.longValue() < 1) {
+            if (binding != null && (!binding.isIntegralNumber() || !binding.canConvertToLong() || binding.longValue() < 1)) {
                 throw ContentDraftInputReader.invalid();
             }
             return new ContentDraftPreviewArguments(draftUuid(node.get("draftId")),
-                ContentDraftInputReader.revision(node.get("revision")), binding.longValue());
+                ContentDraftInputReader.revision(node.get("revision")), binding == null ? null : binding.longValue());
         }
     }
 
