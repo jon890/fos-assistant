@@ -44,7 +44,7 @@ public class McpContentDraftSnapshots {
 
     public Map<String, Object> previewDefinition() {
         return Map.of("name", PREVIEW, "description",
-            "현재 대화의 원고 revision 을 네이버 임시저장용으로 컴파일해 바뀌지 않는 preview 를 만든다. "
+            "현재 대화의 원고 revision 을 연결한 서비스의 임시저장용으로 컴파일해 바뀌지 않는 preview 를 만든다. "
                 + "결과의 preview 와 포함한 사진 assetIds, 빠진 사진 omittedAssetIds 를 사용자에게 그대로 알린다. 모든 사진을 썼다고 말하지 않는다. "
                 + "bindingId 는 생략한다. 원고 저장을 지원하는 연결이 여럿이라는 오류를 받았을 때만 지정한다.",
             "inputSchema", object(Map.of("draftId", uuid(), "revision", positive(ContentDraftInputReader.MAX_REVISION),
