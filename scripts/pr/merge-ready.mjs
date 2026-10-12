@@ -27,8 +27,8 @@ export const RISK_PATHS = [
   ["마이그레이션", /^backend\/src\/main\/(resources\/db\/migration\/|java\/db\/migration\/)/],
   ["빌드와 의존성 파일", /(^|\/)(build\.gradle\.kts|settings\.gradle\.kts|gradle\.properties|package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|bun\.lockb?|Dockerfile|pyproject\.toml|requirements[^/]*\.txt)$/],
   ["저장소 전체를 보는 test/unit 검사", /^test\/unit\//],
-  // Hermes 계약 문서(hermes 테스트의 입력), 커넥터 계약 테스트, 합성 커넥터 catalog(backend 와 hermes 가 읽음), CI 판정 자체.
-  ["공유 계약", /^(hermes\/docs\/hermes-contract\.md|hermes\/connectors\/[^/]+\/tests\/contracts?\.test\.ts|hermes\/tests\/[^/]*contract[^/]*|test\/resources\/|\.github\/workflows\/)/],
+  // Hermes 계약 문서(hermes 테스트의 입력), 커넥터 계약 테스트, 합성 커넥터 catalog 와 fixture(backend 와 hermes 가 읽음), 테스트 지원 코드와 가짜 Hermes(실제와 다르면 테스트가 통과한다), CI 판정 자체.
+  ["공유 계약", /^(hermes\/docs\/hermes-contract\.md|hermes\/connectors\/[^/]+\/tests\/contracts?\.test\.ts|hermes\/tests\/[^/]*contract[^/]*|test\/(resources|fixtures|support)\/|test\/e2e\/fake-hermes\/|\.github\/workflows\/)/],
 ];
 
 /**
