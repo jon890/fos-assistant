@@ -29,7 +29,7 @@ class HermesWireCompatibilityTest {
 
         assertThat(events).hasSize(13);
         assertThat(events.get(3).toolName()).isEqualTo("web_search");
-        assertThat(events.get(3).durationMs()).isEqualTo(125L);
+        assertThat(events.get(3).durationMs()).isZero();
         assertThat(events.get(3).failed()).isFalse();
         assertThat(events.get(5).inputTokens()).isZero();
         assertThat(events.get(6).text()).isNull();

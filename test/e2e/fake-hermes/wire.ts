@@ -23,7 +23,18 @@ const templates = new Map(wireEvents(wireFixture("events")).map((payload) => [pa
 export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>): Record<string, unknown> {
   const template = templates.get(fields.event);
   if (template === undefined) throw new Error(`${HERMES_VERSION}의 사건 표본이 없다: ${fields.event}`);
-  const { event: _event, run_id: _runId, timestamp: _timestamp, ...defaults } = template;
+  const fixedFields: Record<string, string[]> = {
+    "tool.started": ["preview"], "tool.completed": ["duration", "error", "preview"],
+    "message.interim": ["already_streamed"],
+    "run.completed": ["completed", "partial", "interrupted"], "run.interrupted": ["error"],
+  };
+  const defaults = Object.fromEntries((fixedFields[String(fields.event)] ?? []).map((name) => [name, template[name]]));
+  const required = fields.event === "message.delta" ? "delta"
+    : ["message.interim", "reasoning.available"].includes(String(fields.event)) ? "text"
+    : ["tool.started", "tool.completed"].includes(String(fields.event)) ? "tool" : undefined;
+  if (required !== undefined && typeof fields[required] !== "string") {
+    throw new Error(`${fields.event}의 내용 칸이 없다: ${required}`);
+  }
   const { event, run_id: _scriptedRunId, timestamp, ...specific } = fields;
   const payload: Record<string, unknown> = {
     event, run_id: run.run_id, timestamp: timestamp ?? Date.now() / 1000, ...defaults, ...specific,

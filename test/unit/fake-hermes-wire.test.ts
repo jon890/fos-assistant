@@ -10,7 +10,7 @@ test("기준 판은 Python 계약에서 읽고 공유 wire의 모든 사건에 �
   const samples = wireEvents(wireFixture("events"));
   assert.equal(samples.length, 13);
   for (const sample of samples) {
-    const event = eventEnvelope({ run_id: "submitted-run", output: "완료 답", usage: FAKE_USAGE }, { event: sample.event });
+    const event = eventEnvelope({ run_id: "submitted-run", output: "완료 답", usage: FAKE_USAGE }, sample);
     assert.equal(event.run_id, "submitted-run");
     assert.equal(typeof event.timestamp, "number");
     assert.equal(event.event, sample.event);
@@ -20,6 +20,17 @@ test("기준 판은 Python 계약에서 읽고 공유 wire의 모든 사건에 �
   assert.equal(completed.output, "완료 답");
   assert.deepEqual(completed.usage, FAKE_USAGE);
   assert.throws(() => eventEnvelope({ run_id: "r", output: "", usage: FAKE_USAGE }, { event: "invented.event" }), /사건 표본이 없다/);
+  const run = { run_id: "r", output: "", usage: FAKE_USAGE };
+  for (const event of ["message.delta", "message.interim", "reasoning.available"]) {
+    assert.throws(() => eventEnvelope(run, { event }), /내용 칸이 없다/);
+  }
+  for (const event of ["subagent.start", "subagent.complete"]) {
+    assert.deepEqual(eventEnvelope(run, { event, timestamp: 1 }), { event, run_id: "r", timestamp: 1 });
+  }
+  assert.deepEqual(eventEnvelope(run, { event: "tool.completed", tool: "test", timestamp: 1 }), {
+    event: "tool.completed", run_id: "r", timestamp: 1, duration: 0, error: false, preview: "",
+    tool: "test",
+  });
 });
 
 test("대역 HTTP 사건에는 제출한 실행 번호와 timestamp 및 완료 결과가 실린다", async () => {

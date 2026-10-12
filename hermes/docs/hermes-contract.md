@@ -774,10 +774,12 @@ Java 검사는 Gradle의 `processTestResources`가 복사한 원본을 `HermesWi
 `unknown.sse`는 미지 사건과 칸 및 SSE 메타데이터를 건너뛰는 검사를 갖는다.
 실제 실행 녹화와 운영 본문은 넣지 않는다. 없는 판이나 사건 표본을 고르면 TS 대역이 바로 실패한다.
 
-`eventEnvelope` 하나가 표본의 기본 칸에 시나리오의 값을 합쳐
+`eventEnvelope` 하나가 상류가 늘 붙이는 고정 칸에만 표본의 기본값을 쓰고 시나리오의 값을 합쳐
 요청한 실행의 `run_id`와 초 단위 `timestamp`를 붙인다.
 대본의 시각은 중간 안내 중복 검사 때문에 보존하되 실행 번호는 현재 실행으로 바꾼다.
-`run.completed`에는 그 실행의 `output`과 `usage`를 싣고 `tool.completed`에는 `preview`를 싣는다.
+`run.completed`에는 그 실행의 `output`과 `usage`, `runtime`을 싣고 `tool.completed`에는 `preview`를 싣는다.
+답 조각과 안내 본문, 도구 이름이 빠지면 실패한다.
+자식의 목표와 모델, 토큰과 결과 본문은 기본값으로 만들지 않는다.
 자식의 식별자와 session 번호는 실제로 그 자식을 만드는 시나리오에서 준다.
 상류 callback도 값이 없는 자식 칸을 생략하므로 공통 표본이 가짜 자식 session을 만들지 않는다.
 
