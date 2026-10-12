@@ -65,3 +65,9 @@ test("memory_search 는 이름을 보여주지 않고 기억을 찾는 말로 �
     assert.equal(isReadableDetail(name), false);
   }
 });
+
+test("원고 저장 요청 도구는 저장했다고 말하지 않고 승인을 요청했다고 보인다", () => {
+  assert.equal(toolLabel("mcp__fos_assistant__content_draft_preview", false), "원고 미리보기를 만들었어요");
+  assert.equal(toolLabel("mcp__fos_assistant__content_draft_save", false), "임시저장 승인을 요청했어요");
+  assert.doesNotMatch(toolLabel("mcp__fos_assistant__content_draft_save", false), /저장했어요/);
+});

@@ -36,6 +36,15 @@ const LABELS: Record<string, Label> = {
     running: "할 일을 제안하고 있어요",
     done: "할 일을 제안했어요",
   },
+  content_draft_preview: {
+    running: "원고 미리보기를 만들고 있어요",
+    done: "원고 미리보기를 만들었어요",
+  },
+  // 승인 카드만 만들고 저장은 하지 않는다. 저장한 것처럼 읽히지 않게 쓴다.
+  content_draft_save: {
+    running: "임시저장 승인을 요청하고 있어요",
+    done: "임시저장 승인을 요청했어요",
+  },
 };
 
 /** 표에 없는 MCP 도구다. 도구 이름 원문을 보이지 않고 연결된 서비스를 썼다고만 알린다. */
