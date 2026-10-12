@@ -336,6 +336,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "연결된 브라우저에 닿는지와 네이버 로그인 쿠키가 있는지 확인합니다. 입력 인자는 없으며 browser, logged_in, blog_id를 돌려줍니다. 새 탭을 열거나 글을 저장하지 않습니다. 쿠키 존재 확인이므로 모든 편집 작업의 성공을 보장하지는 않습니다.",
+        "summary": "내 브라우저에 연결되는지와 네이버에 로그인돼 있는지 확인해요. 글을 저장하거나 새 탭을 열지 않아요.",
         "arg_labels": {}
       },
       "list_drafts": {
@@ -346,6 +347,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "네이버 블로그의 임시저장 글 목록을 읽고 앞 200개를 count와 drafts로 돌려줍니다. count는 전체 임시저장 수가 아닌 반환한 목록의 길이입니다. 각 항목에는 draft_id, 제목과 고친 시각이 있으며 제목은 최대 200자로 줄입니다. 입력 인자는 없습니다. 목록 조회를 위해 글쓰기 탭을 열었다가 닫지만 글을 편집기에 불러오지는 않습니다. 같은 블로그에서 저장 작업이 진행 중이면 조회를 거절합니다.",
+        "summary": "네이버 블로그의 임시저장 글 제목과 고친 시각을 앞쪽 200개까지 읽어요. 글 내용은 열지 않아요.",
         "arg_labels": {}
       },
       "read_draft": {
@@ -356,6 +358,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "list_drafts가 준 draft_id로 임시저장 글을 편집기에 불러와 title, category, tags, body와 원본 지문 revision을 읽습니다. 불러오는 과정에서 네이버 자동저장이 발생할 수 있습니다. 저장 단추와 발행 단추는 누르지 않습니다. 사진, 스티커와 지도는 본문에서 기존 구성요소를 나타내는 줄로 돌려줍니다. 사용자가 작성 중인 글이 편집기에 있거나 저장 작업이 진행 중이면 불러오지 않습니다. 읽기 전후 임시저장 목록의 수와 그 글의 고친 시각을 autosave_check로 함께 돌려주며, changed가 참이면 읽는 동안 목록이 바뀐 것입니다. 읽기 탭에서 관측한 자동저장 요청 수는 autosave_requests로 돌려주며, changed가 거짓이어도 자동저장이 없었다는 뜻은 아닙니다. 목록의 앞 200개 안에 있는 글만 불러올 수 있습니다.",
+        "summary": "임시저장 글 하나를 편집기에 불러와 제목과 본문을 읽어요. 불러오는 동안 네이버가 자동저장을 할 수 있어서 읽을 때마다 승인해요.",
         "arg_labels": {
           "draft_id": "임시저장 글 ID"
         }
@@ -368,6 +371,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "title, category, tags, body를 검사하고 kind가 preview이면 모바일 미리보기, package이면 수동 등록용 HTML을 돌려줍니다. 제목은 최대 100자, 카테고리는 최대 50자, 태그는 최대 30개, 본문은 최대 20,000자입니다. 사진을 넣으면 photo_dir이 필요하고 photo_notes는 미리보기에만 쓰는 설명입니다. artifact_path는 index.html 또는 폴더 아래 index.html이며 폴더는 세 단계까지 받습니다. 덮어쓰기에는 read_draft 결과를 base에 넣어 changes와 base_revision을 받습니다. problems가 있으면 html은 null입니다. HTML과 assets 정보만 만들며 파일 저장이나 네이버 임시저장, 발행은 하지 않습니다.",
+        "summary": "쓸 글을 모바일 화면처럼 미리 보여 줘요. 네이버에는 저장하지도 발행하지도 않아요.",
         "arg_labels": {}
       },
       "save_draft": {
@@ -378,6 +382,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "title, category, tags, body를 검사한 뒤 네이버 블로그에 새 임시저장 글을 만드는 작업을 시작합니다. 제목은 1자에서 100자, 기존 카테고리 이름은 1자에서 50자, 태그는 최대 30개, 각 태그는 최대 30자이고 #과 쉼표는 넣지 않으며, 본문은 최대 20,000자입니다. 사진 지시가 있으면 photo_dir이 필요하며 첨부 사진만 사용하며 사진 한 장은 최대 20MiB입니다. 사진은 최대 50장, 스티커와 지도는 각각 최대 30개입니다. job_id와 시작 상태를 돌려주므로 draft_job으로 완료나 실패를 확인해야 합니다. 발행하지 않으며 같은 블로그의 저장 작업은 동시에 실행하지 않습니다.",
+        "summary": "승인한 글을 네이버 블로그에 새 임시저장 글로 만들어요. 발행하지 않고, 저장할 때마다 승인해요.",
         "arg_labels": {
           "title": "제목",
           "category": "카테고리",
@@ -394,6 +399,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "read_draft로 읽고 render_draft의 base로 미리 본 임시저장 글을 고칩니다. draft_id, 미리보기의 base_revision을 넣은 revision, 미리보기의 changes와 고칠 title, category, tags, body를 함께 보냅니다. 실제 글의 지문과 변경 내용을 다시 대조하고 원래 글을 덮어쓰기 전 원본 사본으로 남깁니다. 새 사진, 스티커와 지도는 추가할 수 없으며 기존 구성요소를 나타내는 줄만 유지하거나 제거할 수 있습니다. job_id를 돌려주면 draft_job으로 결과를 확인합니다. 발행하지 않습니다. changes는 최대 100,000자이고 승인 카드에서 가려지는 내용은 거절합니다. 실패해도 원본 사본이 남을 수 있으므로 draft_job의 오류와 backup_draft_id를 확인합니다.",
+        "summary": "미리 본 임시저장 글을 승인한 내용으로 고쳐요. 고치기 전 원래 글을 사본으로 남기고, 발행하지 않으며, 고칠 때마다 승인해요.",
         "arg_labels": {
           "draft_id": "임시저장 글 ID",
           "revision": "원본 버전",
@@ -412,6 +418,7 @@
         "outbound": false,
         "identifiers": [],
         "description": "save_draft 또는 overwrite_draft가 준 job_id로 status, 진행 단계, save_clicked, result와 error를 읽습니다. wait_seconds는 기본 45초이고 0초에서 50초까지 받습니다. running이면 아직 완료되지 않았고 succeeded이면 저장이 확인됐으며 failed 또는 unknown이면 실패나 결과 불명 상태입니다. unknown일 때는 바로 재실행하지 말고 임시저장 목록을 확인합니다. 멈춘 작업을 발견하면 실패 또는 결과 불명 상태로 정리하고 잠금을 풀 수 있습니다. 발행 결과를 확인하는 도구는 아닙니다.",
+        "summary": "임시저장이나 덮어쓰기가 끝났는지 확인해요. 발행했는지는 알려 주지 않아요.",
         "arg_labels": {}
       }
     }
