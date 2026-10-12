@@ -268,10 +268,15 @@ class ConnectorActionLifecycle {
      * 있어 줄마다 claim 과 같은 순서로 잠근다.
      * 함께 준 대화 허락도 거둔다.
      *
+     * <p>원고 job 링크가 있는 줄은 job 이 수명을 소유한다. {@link ContentDraftJobExpirer} 가 job 과 함께 끝낸다.
+     *
      * @return 바꾼 건수
      */
     int markInterrupted(Instant now) {
-        return settleAll(actions.findByStatus(ActionStatus.EXECUTING), now, "기동 전에 끊긴 실행 줄을 정리하지 못했다");
+        return settleAll(
+            actions.findByStatusWithoutContentJob(ActionStatus.EXECUTING),
+            now,
+            "기동 전에 끊긴 실행 줄을 정리하지 못했다");
     }
 
 
@@ -287,7 +292,7 @@ class ConnectorActionLifecycle {
      */
     int markStale(Instant before, Instant now) {
         return settleAll(
-            actions.findByStatusAndDecidedAtBefore(ActionStatus.EXECUTING, before),
+            actions.findByStatusWithoutContentJobDecidedBefore(ActionStatus.EXECUTING, before),
             now,
             "오래 남은 실행 줄을 정리하지 못했다");
     }

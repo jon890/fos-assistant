@@ -39,7 +39,8 @@ public class ConnectorContentDraftBindings implements ContentDraftBindingAccess 
                 throw ContentDraftSnapshotHash.unavailable();
             }
             var tuple = JSON.createArrayNode().add(declaration.protocol()).add(declaration.compileTool())
-                .add(declaration.startTool()).add(declaration.statusTool()).add(true).add(false).add(false);
+                .add(declaration.startTool()).add(declaration.statusTool()).add(true)
+                .add(declaration.capabilities().get("start")).add(declaration.capabilities().get("status"));
             tuple.add(JSON.valueToTree(manifest.tools().stream().sorted(Comparator.comparing(tool -> tool.name())).toList()));
             return new ContentDraftBindingStamp(stamp.agentId(), stamp.connectionId(), stamp.bindingId(),
                 stamp.connectionUpdatedAt(), stamp.bindingUpdatedAt(), stamp.profile(), stamp.connectorId(),
