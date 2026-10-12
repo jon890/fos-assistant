@@ -278,6 +278,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `connector.presentation.ConnectorPolicyController` | `POST /internal/hermes/connector-policy`. profile 토큰으로 인증한 요청을 받아 서명을 확인하고 판정을 돌려준다 |
 | `connector.application.ConnectorPolicyRequest` | 요청 본문과 서명 검증. `_fos_ctx` 와 같은 key 를 쓰고 HMAC 은 `mcp.application.McpCallContext` 의 것을 부른다 |
 | `connector.application.ConnectorPolicyService` | 실행과, 그 실행의 에이전트에 붙은 바인딩과, 카탈로그를 찾아 판정하고 `connector_action` 한 줄을 남긴다. 승인 줄이면 같은 트랜잭션에서 `APPROVAL_REQUESTED` 알림도 남긴다 |
+| `connector.application.ConnectorApprovalReply` | 서비스가 승인 줄로 판정한 호출의 hook 응답을 조립하는 package-private 함수다. 대화가 없으면 승인 화면을 약속하지 않고, 승인 요청 번호와 차단 응답을 돌려준다 |
 | `connector.application.ConnectorCatalogCache` | 판정 경로가 쓰는 카탈로그를 60초 동안 메모리에 둔다. 화면 경로는 쓰지 않는다 |
 | `connector.domain.ToolPolicyDecision` | 판정 함수. Hermes 와 DB 를 모른다 |
 | `connector.domain.ConnectorAction` | 판정 한 줄과 승인 줄. 승인 상태 전이를 갖는다 |
