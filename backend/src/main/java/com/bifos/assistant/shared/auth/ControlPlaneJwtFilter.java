@@ -97,6 +97,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
         return UNFILTERED_PATHS.contains(uri)
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/support".equals(uri))
+            || ("POST".equals(request.getMethod()) && "/internal/content-draft-jobs/authorize".equals(uri))
             || uri.startsWith(SERVICE_API_PREFIX)
             || uri.startsWith(BROWSER_GATEWAY_PREFIX);
     }

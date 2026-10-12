@@ -62,6 +62,7 @@ class IntegrationTestIsolationTest {
         context.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
         context.getBeanFactory().registerSingleton("browsers", browsers);
         context.getBeanFactory().registerSingleton("relays", new EchoCdpRelayConnector());
+        context.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
         context.refresh();
         stub.willReportSessionRuntime(new SessionRuntime("model", "provider"));
         clock.set(FIXED);
@@ -157,6 +158,7 @@ class IntegrationTestIsolationTest {
             broken.getBeanFactory().registerSingleton("counting", new AttentionTestCandidates.ReadCountingCandidates());
             broken.getBeanFactory().registerSingleton("browsers", browsers);
             broken.getBeanFactory().registerSingleton("relays", new EchoCdpRelayConnector());
+            broken.getBeanFactory().registerSingleton("contentStarter", new RecordingContentDraftJobStarter());
             broken.refresh();
 
             assertThatThrownBy(() -> IntegrationTestIsolation.afterTest(broken, Duration.ofSeconds(5)))

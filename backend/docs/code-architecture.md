@@ -737,3 +737,11 @@ compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메�
 참가 함수만으로 현재 catalog를 검증했다고 판단하지 않는다. 원격 catalog와 DB commit은 원자적이지 않다.
 `ContentDraftAuthorizationHash`는 서버의 캡처 값으로 권한 지문을 계산하여 같은 내용의 재사용 범위를 구별한다.
 저장된 캡처 값과 현재 권한·원본 검사를 유지하며 기존 행의 지문이나 캡처 값은 갱신하지 않는다.
+
+### 원고 저장 승인과 worker 허가
+
+승인 요청·job 조회 port `ContentDraftSaveRequests`·`ContentDraftJobQueries`와 반환 record는 chat에 두고 connector의 `ContentDraftJobs`가 구현한다.
+승인 분기 `ContentDraftSaveApproval`, 허가 `ContentDraftJobAuthorizer`, 서명 `ContentDraftSaveTicket`, 공유 잠금 `ContentDraftJobLocks`는 `connector.application`에 둔다.
+worker 시작 전송은 `ContentDraftJobStarter` port이며 구현 빈이 없으면 시작을 지원하지 않는 것으로 본다.
+chat의 원고 타입은 connector와 mcp를 import하지 않는다. 검사: `ContentDraftSnapshotArchitectureTest`가 기준 파일 없이 새 타입의 층 순서·순환과 반환 타입을 본다.
+흐름과 잠금 순서는 [원고 기능](../../docs/features/content-draft.md#승인-snapshot과-저장-job)이 갖는다.
