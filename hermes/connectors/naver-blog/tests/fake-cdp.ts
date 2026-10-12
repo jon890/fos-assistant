@@ -333,6 +333,8 @@ export class FakeEditor {
   documentUnavailable = false;
   /** 참이면 글 단추를 눌렀을 때 글 대신 로그인 화면으로 넘어간다. 읽는 도중 세션이 끝난 상황을 만든다. */
   loginOnLoad = false;
+  /** 참이면 불러오기 중 호스트는 그대로이고 문서 제목만 로그인으로 바뀐다. */
+  loginTitleOnLoad = false;
   /** 참이면 글을 불러올 때 편집기 자동저장이 그 글의 고친 시각을 1초 늦춘다. */
   autosaveOnLoad = false;
   listOpen = false;
@@ -551,9 +553,10 @@ export class FakeEditor {
       const draft = this.drafts[indexIn(finder, "tpb*s.tlist")];
       if (!this.listOpen || !draft) return null;
       return () => {
-        if (this.loginOnLoad) {
+        if (this.loginOnLoad || this.loginTitleOnLoad) {
           this.listOpen = false;
-          this.host = "nid.naver.com";
+          if (this.loginOnLoad) this.host = "nid.naver.com";
+          if (this.loginTitleOnLoad) this.docTitle = "NAVER 로그인";
           return;
         }
         if (this.autosaveOnLoad) draft.modiDate += 1000;

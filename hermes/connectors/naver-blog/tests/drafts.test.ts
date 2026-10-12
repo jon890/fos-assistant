@@ -499,6 +499,15 @@ test("같은 글을 연달아 읽으면 같은 지문을 돌려주고 목록은 
   expect(cdp.violations).toEqual([]);
 });
 
+test("불러오기 중 문서 제목만 로그인 화면으로 바뀌어도 로그인 오류다", async () => {
+  const { env, editor } = await setup();
+  editor.loginTitleOnLoad = true;
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+  expect((error as ToolError).code).toBe("NAVER_BLOG_LOGIN_REQUIRED");
+});
+
 test("읽기 탭의 자동저장 요청만 세고 중복 이벤트와 다른 주소는 제외한다", async () => {
   const { cdp, env, otherTab } = await setup();
   cdp.on("Network.enable", (_, target) => {

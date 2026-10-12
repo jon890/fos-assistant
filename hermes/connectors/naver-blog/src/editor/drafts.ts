@@ -1,5 +1,6 @@
 import type { EditorDocument } from "../document.ts";
 import { ToolError } from "../errors.ts";
+import { probe } from "./open.ts";
 import { blockingPopup, type EditorPage, normalize } from "./page.ts";
 
 /** 임시저장 목록 단추. 이 단추의 aria-label 에 임시저장 수가 있다. */
@@ -187,8 +188,8 @@ export async function assertEmptyEditor(page: EditorPage, listed: TempDraft[]) {
 
 /** 로그인 화면으로 넘어간 탭이면 `login_required` 로 멈춘다. 글을 불러오지 못한 까닭을 가를 때 부른다. */
 async function failIfLoginPage(page: EditorPage) {
-  const host = await page.js<string>("location.hostname").catch(() => "");
-  if (host === "nid.naver.com")
+  const diagnostics = await probe(page, 1);
+  if (diagnostics.last.reason === "login_required")
     throw page.fail("login_required", "로그인 화면으로 넘어갔다");
 }
 
