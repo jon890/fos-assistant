@@ -16,6 +16,7 @@ import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,15 +48,18 @@ class ConnectorActionDetails {
     private final ConnectorActionRepository actions;
     private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorCatalogCache catalog;
+    private final Clock clock;
 
 
     ConnectorActionDetails(
         ConnectorActionRepository actions,
         ConnectorConversationGrantRepository conversationGrants,
-        ConnectorCatalogCache catalog) {
+        ConnectorCatalogCache catalog,
+        Clock clock) {
         this.actions = actions;
         this.conversationGrants = conversationGrants;
         this.catalog = catalog;
+        this.clock = clock;
     }
 
 
@@ -196,7 +200,7 @@ class ConnectorActionDetails {
             action.resultText(),
             action.userId(),
             action.executedAt(),
-            action.status() != null && conversationGrants.existsByActionId(action.id()));
+            action.status() != null && conversationGrants.existsActiveByActionId(action.id(), Instant.now(clock)));
     }
 
 

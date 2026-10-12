@@ -251,6 +251,26 @@ class ConnectorConversationGrantTest {
 
 
     @Test
+    @DisplayName("다시 전할 때 이미 거두었거나 기간이 지난 허락은 결과에 알리지 않는다")
+    void redeliveredResultDropsEndedConversationGrant() {
+        UUID revoked = ask(root, WRITE, ARGS).actionId();
+        service.approve(me, revoked, null, true);
+        Long revokedGrant = conversationGrants.findAll().getFirst().id();
+        service.revokeConversationGrant(me, conversation.id(), revokedGrant);
+        UUID expired = ask(root, DRAFT, ARGS).actionId();
+        service.approve(me, expired, null, true);
+        jdbc.update(
+            "UPDATE connector_conversation_grant SET expires_at = ? WHERE id <> ?",
+            Instant.parse("2020-01-01T00:00:00Z"),
+            revokedGrant);
+
+        assertThat(service.resultsFor(conversation.id(), owner.id(), List.of(revoked, expired)))
+            .extracting(ConnectorActionResult::actionId, ConnectorActionResult::conversationGranted)
+            .containsExactly(tuple(revoked, false), tuple(expired, false));
+    }
+
+
+    @Test
     @DisplayName("대화 허락은 다른 대화의 실행에서 통하지 않고 그 대화에서는 다시 승인을 기다린다")
     void conversationGrantDoesNotPassInAnotherConversation() {
         service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);

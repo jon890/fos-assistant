@@ -107,7 +107,7 @@ public class ConnectorActionService {
         PlatformTransactionManager transactionManager,
         Clock clock) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
-        this.details = new ConnectorActionDetails(actions, conversationGrants, catalog);
+        this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock);
         ConnectorActionSignals signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
             actions,

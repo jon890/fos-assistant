@@ -38,8 +38,15 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
         @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("now") Instant now);
 
 
-    /** 그 승인 줄과 함께 준 허락이 있는가. 거둔 뒤에도 참이다. 결과의 알림 줄이 허락을 함께 알릴지 정한다. */
-    boolean existsByActionId(Long actionId);
+    /**
+     * 그 승인 줄과 함께 준 허락이 아직 유효한가. 결과의 알림 줄이 허락을 함께 알릴지 정한다. 다시 전할 때 이미 거두었거나 기간이
+     * 지난 허락을 「다시 묻지 않고 실행해요」 로 알리지 않는다.
+     */
+    @Query("""
+            select count(g) > 0 from ConnectorConversationGrant g
+            where g.actionId = :actionId and g.revokedAt is null and g.expiresAt > :now
+            """)
+    boolean existsActiveByActionId(@Param("actionId") Long actionId, @Param("now") Instant now);
 
 
     /**
