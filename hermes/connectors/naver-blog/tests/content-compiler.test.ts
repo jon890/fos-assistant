@@ -71,14 +71,22 @@ test("30장과 문단을 교차 배치하며 문서 순서와 사진 자리 번�
   expect(compileContentDraft(draft(blocks), assets)).toEqual(snapshot);
 });
 
-test("같은 asset의 반복 자리와 포함 subset을 manifest로 구별한다", () => {
-  const snapshot = compileContentDraft(draft([image(), paragraph("사이"), image()]), [asset(), asset("102")]);
-  expect(snapshot.assetManifest.map((entry) => entry.assetId)).toEqual(["101", "101"]);
+test("같은 asset을 두 이미지 블록에 두면 사진 자리 이름이 겹치므로 거절한다", () => {
+  expectError(() => compileContentDraft(draft([image(), paragraph("사이"), image()]), [asset(), asset("102")]),
+    "CONTENT_DRAFT_DUPLICATE_PHOTO");
+  expectError(() => compileContentDraft(draft([{ type: "image", assetId: "101", caption: "첫 자리" },
+    { type: "image", assetId: "101", observationRef: { id: "901", revision: 1 } }]), [asset()]),
+  "CONTENT_DRAFT_DUPLICATE_PHOTO");
+});
+
+test("서로 다른 asset의 자리와 포함 subset을 manifest로 구별한다", () => {
+  const snapshot = compileContentDraft(draft([image(), paragraph("사이"), image("102")]),
+    [asset(), asset("102"), asset("103")]);
+  expect(snapshot.assetManifest.map((entry) => entry.assetId)).toEqual(["101", "102"]);
   expect(snapshot.assetManifest.map((entry) => entry.position)).toEqual([0, 2]);
-  expect(new Set(snapshot.assetManifest.map((entry) => entry.assetId)).size).toBe(1);
-  expect(snapshot.payload.body).toBe("[사진 1: 101.jpg]\n사이\n[사진 2: 101.jpg]");
+  expect(snapshot.payload.body).toBe("[사진 1: 101.jpg]\n사이\n[사진 2: 102.jpg]");
   expect(snapshot.payload.photo_dir).toBe(photoDir);
-  expect(compileContentDraft(draft([image(), paragraph("사이"), image()]), [asset()])).toEqual(snapshot);
+  expect(compileContentDraft(draft([image(), paragraph("사이"), image("102")]), [asset("102"), asset()])).toEqual(snapshot);
 });
 
 test("caption은 실제 문단이고 관찰 설명은 미리보기 안내에만 남는다", async () => {
@@ -206,16 +214,18 @@ test.each([
 });
 
 test("블록·사진·스티커·지도 상한까지 기존 DSL로 변환하고 하나 초과는 거절한다", () => {
-  const cases: [CanonicalBlock, number, ResolvedAsset[]][] = [
-    [image(), 50, [asset()]], [{ type: "sticker", code: "a_1-2" }, 30, []],
-    [{ type: "map", name: "😀".repeat(200), address: "😀".repeat(200) }, 30, []],
-    [paragraph(""), 500, []],
+  // 같은 사진은 한 번만 쓸 수 있으므로 사진 상한은 서로 다른 asset 50개로 채운다.
+  const photos = Array.from({ length: 50 }, (_, index) => asset(String(index + 1)));
+  const cases: [(index: number) => CanonicalBlock, number, ResolvedAsset[]][] = [
+    [(index) => image(String((index % 50) + 1)), 50, photos], [() => ({ type: "sticker", code: "a_1-2" }), 30, []],
+    [() => ({ type: "map", name: "😀".repeat(200), address: "😀".repeat(200) }), 30, []],
+    [() => paragraph(""), 500, []],
   ];
   for (const [block, max, assets] of cases) {
-    const snapshot = compileContentDraft(draft(Array.from({ length: max }, () => block)), assets);
+    const snapshot = compileContentDraft(draft(Array.from({ length: max }, (_, index) => block(index))), assets);
     expect(validateDraft(snapshot.payload)).toEqual([]);
     expect(snapshot.canonicalBlocks).toHaveLength(max);
-    expectError(() => compileContentDraft(draft(Array.from({ length: max + 1 }, () => block)), assets),
+    expectError(() => compileContentDraft(draft(Array.from({ length: max + 1 }, (_, index) => block(index))), assets),
       "CONTENT_DRAFT_INVALID");
   }
   expect(compileContentDraft(draft([], { tags: Array.from({ length: 30 }, (_, index) => `태그${index}`) }), [])
