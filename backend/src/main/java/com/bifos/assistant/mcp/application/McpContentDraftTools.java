@@ -76,6 +76,10 @@ public class McpContentDraftTools {
             if (error instanceof ContentDraftException typed && typed.currentRevision() != null) {
                 failure.put("currentRevision", typed.currentRevision());
             }
+            if (error.code() == ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO) {
+                // 모델이 고칠 방법을 알도록 고정 문구만 싣는다. 예외 message 는 싣지 않는다.
+                failure.put("message", ContentDraftInputReader.DUPLICATE_PHOTO_MESSAGE);
+            }
             return McpToolService.result(json.writeValueAsString(failure), true);
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.VALIDATION_FAILED) {
@@ -103,7 +107,8 @@ public class McpContentDraftTools {
         return Map.of("name", WRITE, "description",
             "현재 대화의 원고를 저장한다. 첫 생성은 requestId UUID를 한 번 정한다. 응답 유실 뒤 재시도는 같은 requestId와 최초 원고를 그대로 보낸다. "
                 + "별도 원고 의도일 때만 새 requestId와 새 도구 호출을 쓴다. 수정은 draftId와 expectedRevision을 함께 주고 requestId는 생략한다. "
-                + "사진은 다시 분석하지 않으며 충돌은 현재 revision을 읽고 판단한다.",
+                + "사진은 다시 분석하지 않으며 충돌은 현재 revision을 읽고 판단한다. "
+                + "같은 사진(assetId)은 원고 전체에서 이미지 블록 하나에만 넣는다. 두 번 넣으면 CONTENT_DRAFT_DUPLICATE_PHOTO로 거절된다.",
             "inputSchema", schema);
     }
 
