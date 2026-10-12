@@ -88,7 +88,3 @@ export function toolStartedPreview(argsJson: string): string | null {
   const key = ["query", "text", "command", "path", "name", "prompt", "code", "goal"].find((candidate) => candidate in args);
   return key === undefined ? null : String(args[key]);
 }
-
-export function event(response: ServerResponse, payload: unknown): void {
-  response.write(`data: ${JSON.stringify(payload)}\n\n`);
-}

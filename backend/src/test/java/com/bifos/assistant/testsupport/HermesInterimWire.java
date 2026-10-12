@@ -23,9 +23,7 @@ import tools.jackson.databind.json.JsonMapper;
 public final class HermesInterimWire {
 
     public static String fixture() throws IOException {
-        try (var input = HermesInterimWire.class.getResourceAsStream("/hermes/message-interim-v2026.9.24.sse")) {
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        }
+        return HermesWire.fixture("message-interim");
     }
 
 

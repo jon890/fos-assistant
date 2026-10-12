@@ -1,0 +1,18 @@
+: open
+id: synthetic-1
+event: ignored-transport-name
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":1,"seq":1,"future":{"nested":true},"delta":"앞"}
+
+data: {"event":"replay.truncated","seq":2,"text":"섞이면 안 되는 본문"}
+
+data: {"event":"tool.failed","seq":3,"preview":"아직 지원하지 않는 사건"}
+
+data: {"event":"tool.progress","seq":4,"preview":"아직 지원하지 않는 사건"}
+
+data: {"event":"future.event","seq":5,"delta":"섞이면 안 되는 조각"}
+
+data: {"event":"message.delta","run_id":"fixture-run","timestamp":2,"seq":6,"delta":"\ub4a4","future":null}
+
+data: {"event":"run.completed","run_id":"fixture-run","timestamp":3,"seq":7,"output":"앞뒤","usage":{},"future":[1,2]}
+
+: stream closed
