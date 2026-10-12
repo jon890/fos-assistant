@@ -1,11 +1,13 @@
 package com.bifos.assistant.connector.application;
 
+import static com.bifos.assistant.connector.application.ConnectorActionDetails.conversationGrantable;
 import static com.bifos.assistant.connector.application.ConnectorActionDetails.grantable;
 import static com.bifos.assistant.connector.application.ConnectorActionDetails.hiddenArgs;
 
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
+import com.bifos.assistant.connector.domain.ConnectorConversationGrant;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision.CheckBoundary;
@@ -16,6 +18,7 @@ import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.application.model.FeedbackEntry;
@@ -34,6 +37,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -51,10 +55,14 @@ class ConnectorActionApproval {
      *
      * <p>{@code UsageController} 의 달 경계와 같은 값이다. 그룹마다 시간대를 두게 되면 둘을 함께 고친다.
      */
-    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+    static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+
+    /** 대화 허락의 상한이다. 오래 이어지는 대화에서 사용자가 잊은 허락이 남지 않게 한다(ADR-20261012 / conversation-grant). */
+    static final Duration CONVERSATION_GRANT_TTL = Duration.ofHours(24);
 
     private final ConnectorActionRepository actions;
     private final ConnectorToolGrantRepository grants;
+    private final ConnectorConversationGrantRepository conversationGrants;
     private final ConnectorConnectionRepository connections;
     private final ConnectorBindingRepository bindings;
     private final AppUserRepository users;
@@ -66,21 +74,24 @@ class ConnectorActionApproval {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     ConnectorActionApproval(
-            ConnectorActionRepository actions,
-            ConnectorToolGrantRepository grants,
-            ConnectorConnectionRepository connections,
-            ConnectorBindingRepository bindings,
-            AppUserRepository users,
-            HermesConnectorClient connector,
-            LiveProperties<DelegationProperties> delegation,
-            DecisionFeedbackRecorder feedback,
-            ConnectorActionDetails details,
-            ConnectorActionSignals signals,
-            TransactionTemplate transactions,
-            Clock clock) {
+        ConnectorActionRepository actions,
+        ConnectorToolGrantRepository grants,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConnectorConnectionRepository connections,
+        ConnectorBindingRepository bindings,
+        AppUserRepository users,
+        HermesConnectorClient connector,
+        LiveProperties<DelegationProperties> delegation,
+        DecisionFeedbackRecorder feedback,
+        ConnectorActionDetails details,
+        ConnectorActionSignals signals,
+        TransactionTemplate transactions,
+        Clock clock) {
         this.actions = actions;
         this.grants = grants;
+        this.conversationGrants = conversationGrants;
         this.connections = connections;
         this.bindings = bindings;
         this.users = users;
@@ -92,6 +103,7 @@ class ConnectorActionApproval {
         this.transactions = transactions;
         this.clock = clock;
     }
+
 
     /**
      * 승인하고 저장한 인자로 한 번 실행한다.
@@ -105,12 +117,16 @@ class ConnectorActionApproval {
      * 끝난 줄을 그대로 돌려준다. 부른 쪽이 「이미 처리됐다」 와 「승인했지만 실행하지 않았다」 를 구분한다.
      *
      * @param grant 승인하면서 그 도구에 줄 상시 허락의 기간. 주지 않으면 null
+     * @param conversationGrant 승인하면서 그 도구를 그 대화에서 계속 허용하는가. {@code grant} 와 함께 줄 수 없다
      */
-    ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
-        Approval approval = transactions.execute(status -> beginApproval(user, actionId, grant));
+    ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
+        if (grant != null && conversationGrant) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "choose either a standing or a conversation grant");
+        }
+        Approval approval = transactions.execute(status -> beginApproval(user, actionId, grant, conversationGrant));
         // 사용자가 승인했다. 그 뒤 실행하지 못하고 끝난 줄도 사용자의 반응은 승인이다.
         feedback.record(actionFeedback(approval.action(), FeedbackEventType.APPROVED, FeedbackActor.USER)
-                .reason(grant == null ? null : "WITH_GRANT"));
+            .reason(grant != null ? "WITH_GRANT" : conversationGrant ? "WITH_CONVERSATION_GRANT" : null));
         if (approval.profile() == null) {
             // 실행하지 않고 끝낸 줄이다. 그 상태를 커밋한 뒤에 알린다.
             signals.publish(approval.action());
@@ -120,21 +136,22 @@ class ConnectorActionApproval {
         CallResult result = null;
         try {
             result = connector.execute(
-                    approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.argsJson());
+                approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.argsJson());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
         } catch (RuntimeException ex) {
             // 실행됐는지 알 수 없는 것으로 둔다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다.
             log.warn(
-                    "승인한 호출의 실행이 예외로 끝났다 actionId={} kind={}",
-                    actionId,
-                    ex.getClass().getSimpleName());
+                "승인한 호출의 실행이 예외로 끝났다 actionId={} kind={}",
+                actionId,
+                ex.getClass().getSimpleName());
         }
         CallResult executed = result;
         ConnectorAction finished = transactions.execute(status -> record(actionId, executed));
         signals.publish(finished);
         return details.view(finished);
     }
+
 
     /** 승인 줄을 거절한다. 실행하지 않는다. */
     ConnectorActionView reject(CurrentUser user, UUID actionId) {
@@ -148,6 +165,7 @@ class ConnectorActionApproval {
         return details.view(rejected);
     }
 
+
     /**
      * 줄을 잠그고 승인할 수 있는지 본 뒤 {@code EXECUTING} 으로 바꾼다. 트랜잭션 안에서만 부른다.
      *
@@ -155,7 +173,7 @@ class ConnectorActionApproval {
      * 실행할 수 없는 줄은 실행하지 않고 끝낸다. 실행은 그 줄의 에이전트에 붙은 바인딩의 profile 에서 한다(ADR-083). 그 상태를 커밋해야 하므로 예외로 알리지 않고 profile 없는 결과로 돌려준다. 정책은 요청을 만들 때가
      * 아니라 지금 것으로 다시 본다. 그 사이 운영자가 도구를 선언에서 뺐거나 위험도를 올렸을 수 있다.
      */
-    private Approval beginApproval(CurrentUser user, UUID actionId, GrantPeriod grant) {
+    private Approval beginApproval(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
         Instant now = now();
         // 연결을 다시 등록하거나 해제하는 쪽과 같은 순서로 잠근다. 사용자 행이 먼저이고 승인 줄이 다음이다.
         // 그쪽이 값을 바꾸는 동안에는 여기서 기다리고, 그쪽이 커밋한 뒤에는 이 줄이 이미 PENDING 이 아니다.
@@ -178,12 +196,15 @@ class ConnectorActionApproval {
         if (grant != null && !(action.grantAllowed() && grantable(manifest, action))) {
             throw grantNotAllowed();
         }
+        // 승인 줄이 `conversationGrantAllowed` 로 낸 것과 같은 조건이다. 밖으로 나가는 도구는 대화 허락도 받지 않는다.
+        if (conversationGrant && !(action.conversationGrantAllowed() && conversationGrantable(manifest, action))) {
+            throw grantNotAllowed();
+        }
         // 붙이고 떼는 쪽도 사용자 행을 먼저 잠그므로 여기서 본 바인딩은 커밋할 때까지 떼어지지 않는다.
         Optional<ConnectorBinding> binding = connections
-                .findByUserIdAndConnectorId(action.userId(), action.connectorId())
-                .flatMap(found -> bindings.findByAgentIdAndConnectionId(action.agentId(), found.id()));
-        Optional<ToolPolicyDecision> decision =
-                binding.flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
+            .findByUserIdAndConnectorId(action.userId(), action.connectorId())
+            .flatMap(found -> bindings.findByAgentIdAndConnectionId(action.agentId(), found.id()));
+        Optional<ToolPolicyDecision> decision = binding.flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
         if (decision.isEmpty() || decision.get().decision() == ActionDecision.DENIED) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
@@ -195,15 +216,26 @@ class ConnectorActionApproval {
                 throw grantNotAllowed();
             }
             grants.save(ConnectorToolGrant.of(
-                    action.userId(),
-                    action.connectorId(),
-                    action.toolName(),
-                    grant.expiresAt(now, HOUSEHOLD_ZONE),
-                    now));
+                action.userId(),
+                action.connectorId(),
+                action.toolName(),
+                grant.expiresAt(now, HOUSEHOLD_ZONE),
+                now));
+        }
+        if (conversationGrant) {
+            // 상시 허락과 같이 지금 정책으로 다시 본다. 그 사이 선언이 밖으로 나가는 도구로 바뀌었으면 주지 않는다.
+            if (decision.get().approval() != ToolApproval.REQUIRED || !conversationGrantable(manifest, action)) {
+                throw grantNotAllowed();
+            }
+            // 같은 도구의 앞선 허락은 거두고 새 줄 하나만 남긴다. 기다리던 카드 둘을 모두 허락과 함께 승인해도 유효한 줄이 하나다.
+            conversationGrants.revokeAllOfTool(
+                action.userId(), action.conversationId(), action.agentId(), action.connectorId(), action.toolName(), now);
+            conversationGrants.save(ConnectorConversationGrant.of(action, now.plus(CONVERSATION_GRANT_TTL), now));
         }
         action.beginExecution(now);
         return new Approval(actions.save(action), binding.get().agent().hermesProfile());
     }
+
 
     /**
      * 상시 허락은 없는 것으로 두고 지금 정책으로 다시 판정한다. 허락이 있어 통과하는 호출은 승인 줄이 되지 않는다.
@@ -214,16 +246,17 @@ class ConnectorActionApproval {
      * 줄은 사람이 승인한 것이라 보통 실행의 줄과 같게 판정한다.
      */
     private static ToolPolicyDecision redecide(
-            ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action) {
+        ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action) {
         return ToolPolicyDecision.decide(
-                ConnectorPolicyService.usableStatus(binding.connection(), binding),
-                ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
-                manifest.schema(),
-                ConnectorToolPolicies.find(manifest, action.toolName()),
-                false,
-                action.argsJson().getBytes(StandardCharsets.UTF_8).length,
-                CheckBoundary.NOT_CHECK);
+            ConnectorPolicyService.usableStatus(binding.connection(), binding),
+            ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
+            manifest.schema(),
+            ConnectorToolPolicies.find(manifest, action.toolName()),
+            false,
+            action.argsJson().getBytes(StandardCharsets.UTF_8).length,
+            CheckBoundary.NOT_CHECK);
     }
+
 
     /**
      * 실행 결과를 줄에 적는다. 트랜잭션 안에서만 부른다.
@@ -232,11 +265,14 @@ class ConnectorActionApproval {
      */
     private ConnectorAction record(UUID actionId, CallResult result) {
         Instant now = now();
-        ConnectorAction action =
-                actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
+        ConnectorAction action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.EXECUTING) {
             // 실행하는 동안 기동 정리가 이 줄을 이미 끝냈다. 그 상태를 그대로 둔다.
             return action;
+        }
+        if (result == null || !result.ok()) {
+            // 사용자가 본 실행이 끝나지 않았는데 뒤 호출이 묻지 않고 나가지 않게 함께 준 대화 허락을 거둔다.
+            conversationGrants.revokeOfAction(action.id(), now);
         }
         if (result == null) {
             // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.
@@ -247,14 +283,15 @@ class ConnectorActionApproval {
         } else {
             // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
             action.fail(
-                    result.error().word(),
-                    result.detail() == null ? null : result.detail().toStored(),
-                    now);
+                result.error().word(),
+                result.detail() == null ? null : result.detail().toStored(),
+                now);
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM)
-                    .reason(action.errorCode()));
+                .reason(action.errorCode()));
         }
         return actions.save(action);
     }
+
 
     /**
      * 승인 줄의 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 인자 해시다. 인자와 결과 글은 담지 않는다.
@@ -262,11 +299,12 @@ class ConnectorActionApproval {
      */
     private FeedbackEntry actionFeedback(ConnectorAction action, FeedbackEventType type, FeedbackActor actor) {
         return FeedbackEntry.of(
-                        action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(), type, actor, now())
-                .conversation(action.conversationId())
-                .originExecution(action.originExecutionId())
-                .version(action.argsSha256());
+            action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(), type, actor, now())
+            .conversation(action.conversationId())
+            .originExecution(action.originExecutionId())
+            .version(action.argsSha256());
     }
+
 
     /** 위임 답과 같은 상한으로 자른다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private String clip(String text) {
@@ -277,28 +315,33 @@ class ConnectorActionApproval {
         return text.substring(0, Character.isHighSurrogate(text.charAt(max - 1)) ? max - 1 : max);
     }
 
+
     /** 줄을 잠그고 읽는다. 없는 줄과 남의 줄은 같은 응답이다. 트랜잭션 안에서만 부른다. */
     private ConnectorAction requirePending(CurrentUser user, UUID actionId) {
         ConnectorAction action = actions.findByPublicIdForUpdate(actionId)
-                .filter(found -> found.userId().equals(user.id()))
-                .orElseThrow(ConnectorActionDetails::notFound);
+            .filter(found -> found.userId().equals(user.id()))
+            .orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.PENDING) {
             throw notPending();
         }
         return action;
     }
 
+
     private Instant now() {
         return Instant.now(clock);
     }
+
 
     private static ApiException notPending() {
         return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, NOT_PENDING_MESSAGE);
     }
 
+
     private static ApiException grantNotAllowed() {
-        return new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted standing approval");
+        return new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted this approval");
     }
+
 
     /**
      * 승인의 첫 트랜잭션이 낸 결과다.

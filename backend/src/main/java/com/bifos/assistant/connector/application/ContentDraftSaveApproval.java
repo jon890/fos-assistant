@@ -20,6 +20,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -66,6 +67,7 @@ public class ContentDraftSaveApproval {
     static final String SAVE_TOOL = "save_draft";
 
     private final ConnectorActionRepository actions;
+    private final ConnectorConversationGrantRepository conversationGrants;
     private final ContentDraftJobRepository jobs;
     private final ContentDraftSnapshotRepository snapshotRows;
     private final ContentDraftSnapshots snapshots;
@@ -89,6 +91,18 @@ public class ContentDraftSaveApproval {
      * @return 거절·만료로 끝난 줄, 또는 시작을 보낸 뒤의 줄. 접수한 줄은 저장 결과를 확인할 때까지 EXECUTING 이다
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
+        return approve(user, actionId, grant, false);
+    }
+
+
+    /**
+     * 원고 job 링크가 있는 줄을 승인한다. 원고 저장은 늘 사람의 승인을 받으므로 대화 허락도 주지 않는다(ADR-20261012 /
+     * conversation-grant). 나머지는 {@link #approve(CurrentUser, UUID, GrantPeriod)} 와 같다.
+     */
+    public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
+        if (conversationGrant) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted for the conversation");
+        }
         if (grant != null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted standing approval");
         }
@@ -97,7 +111,7 @@ public class ContentDraftSaveApproval {
             FeedbackEventType.APPROVED, FeedbackActor.USER, now()).conversation(finished.conversationId())
             .originExecution(finished.originExecutionId()).version(finished.argsSha256()));
         new ConnectorActionSignals(events, notifications, conversations).publish(finished);
-        return new ConnectorActionDetails(actions, catalog).view(finished);
+        return new ConnectorActionDetails(actions, conversationGrants, catalog, clock).view(finished);
     }
 
 

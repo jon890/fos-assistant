@@ -94,6 +94,7 @@ test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기
     grant: false,
     title: "네이버 임시저장 글 불러오기 · 자동저장 가능",
     outbound: false,
+    conversation_grant: true,
   });
   const readDraft = tools.find((tool) => tool.name === "read_draft")!;
   expect(readDraft.annotations?.readOnlyHint).toBe(false);
@@ -109,7 +110,19 @@ test("도구 일곱을 선언하고 불러오기와 임시저장과 덮어쓰기
     title: "네이버 블로그 임시저장 글 덮어쓰기",
     outbound: false,
     grant: false,
+    conversation_grant: true,
   });
+  // 대화 허락은 이 두 도구만 연다. 임시저장은 상시 허락이 열려 있어 선언하지 않는다.
+  expect(
+    Object.entries(manifest.tools)
+      .filter(
+        ([, tool]) =>
+          (tool as { conversation_grant?: boolean }).conversation_grant ===
+          true,
+      )
+      .map(([name]) => name)
+      .sort(),
+  ).toEqual(["overwrite_draft", "read_draft"]);
   expect(manifest.tools.draft_job).toMatchObject({ risk: "READ" });
 });
 

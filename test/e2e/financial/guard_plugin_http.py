@@ -33,7 +33,7 @@ class Fixture(ProfileApiRouteTest):
         declared = json.loads((self.connector / "connector.json").read_text())
         declared.update(schema=2, tools={
             "list_scopes": {"risk": "READ"},
-            "write_note": {"risk": "WRITE"},
+            "write_note": {"risk": "WRITE", "outbound": False},
             "place_order": {"risk": "FINANCIAL", "approval": "always"}},
             execution_guard={"protocol": "approval-claim-v1", "prepare_tool": "list_scopes",
                              "scope_fields": [{"arg": "account_seq", "field": "scope"}],

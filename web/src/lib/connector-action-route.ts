@@ -12,6 +12,7 @@ import {
   type ConnectorAction,
   type ConnectorActionStatus,
   type ConnectorGrant,
+  type ConversationGrant,
 } from "@/lib/connector-action";
 
 /** 브라우저에 그대로 넘기는 오류 코드다. 그 밖의 코드는 `INTERNAL_ERROR` 로 바꾼다. */
@@ -55,7 +56,7 @@ export function connectorActionResponse<T>(result: ControlPlaneResult<T>) {
   return NextResponse.json(result.data, { status: result.status });
 }
 
-type Kind = "actions" | "action" | "grants" | "none";
+type Kind = "actions" | "action" | "grants" | "conversationGrants" | "none";
 
 /** 응답 모양이 계약과 달라 읽다가 던져도 고정 오류로 돌린다. */
 export async function connectorActionCall<T>(
@@ -80,6 +81,8 @@ function safeData(kind: Kind, value: unknown) {
       return safeAction(value);
     case "grants":
       return list(value).map(safeGrant);
+    case "conversationGrants":
+      return list(value).map(safeConversationGrant);
     case "none":
       return null;
   }
@@ -140,13 +143,32 @@ function safeAction(value: unknown): ConnectorAction {
       item.argLabels,
       nullableText(item.argsJson),
     ),
+    conversationGrantAllowed: item.conversationGrantAllowed === true,
+  };
+}
+
+function grantId(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) <= 0) throw new Error();
+  return value as number;
+}
+
+/**
+ * 대화 허락은 이름과 끝나는 시각, 다른 에이전트에 준 허락이면 그 에이전트 이름만 옮긴다. 커넥터와 도구의 원래 이름은 화면이
+ * 쓰지 않는다.
+ */
+function safeConversationGrant(value: unknown): ConversationGrant {
+  const item = record(value);
+  return {
+    grantId: grantId(item.grantId),
+    title: text(item.title),
+    expiresAt: text(item.expiresAt),
+    agentName: typeof item.agentName === "string" ? item.agentName : null,
   };
 }
 
 function safeGrant(value: unknown): ConnectorGrant {
   const item = record(value);
-  if (!Number.isSafeInteger(item.grantId) || (item.grantId as number) <= 0)
-    throw new Error();
+  grantId(item.grantId);
   return {
     grantId: item.grantId as number,
     connectorId: connectorId(item.connectorId),
