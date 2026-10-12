@@ -172,6 +172,9 @@ public class AttachmentImages {
         for (int i = 0; i < attached.size(); i++) {
             photos.add(new AgentPhoto(attached.get(i).id(), ordinals.get(i), agentFileNames.get(i), dataUrls[i]));
         }
+        if (embed && !attached.isEmpty()) {
+            MediaPipelineEvents.embedded(attached.getFirst().conversationId(), photos);
+        }
         return photos;
     }
 

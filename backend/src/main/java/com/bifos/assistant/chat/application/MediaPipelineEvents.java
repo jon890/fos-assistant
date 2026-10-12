@@ -3,8 +3,9 @@ package com.bifos.assistant.chat.application;
 import com.bifos.assistant.chat.domain.entity.ContentDraftAsset;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -14,15 +15,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>줄의 모양은 {@code media-pipeline {"schemaVersion":1,...}} 이다. 합성 E2E 가 이 줄을 모아 단계별 증거로 판정한다.
  * 사건은 그 단계가 실제로 일어났다는 사실만 뜻한다. 모델이 사진을 읽었다는 증거가 아니다.
  */
+@Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MediaPipelineEvents {
-
-    private static final Logger log = LoggerFactory.getLogger(MediaPipelineEvents.class);
-
-    private MediaPipelineEvents() {}
 
     /**
      * Control Plane 이 실행 입력에 이미지로 실은 사진과 싣지 못한 사진을 남긴다. 자리는 실린 이미지 목록 안의 순서다.
-     * 입력을 만든 사실만 뜻하며 Hermes 나 provider 가 이미지를 받았다는 뜻이 아니다.
+     * 입력을 만든 사실만 뜻하며 Hermes 나 provider 가 이미지를 받았다는 뜻이 아니다. 보관이 끝나 사본을 시도하지 않은 첨부는
+     * 목록에 들지 않는다.
      */
     public static void embedded(Long conversationId, List<AgentPhoto> photos) {
         if (photos.isEmpty()) {
@@ -33,6 +33,7 @@ public final class MediaPipelineEvents {
         log.info("media-pipeline {}", "{\"schemaVersion\":1,\"stage\":\"embedded\",\"conversationId\":" + conversationId
             + ",\"count\":" + embedded.size() + ",\"assets\":" + positions(embedded) + ",\"missing\":" + ids(missing) + "}");
     }
+
 
     /**
      * 원고 revision 이 참조한 사진을 커밋 뒤에 남긴다. 자리는 블록 목록 안의 순서다. 롤백한 저장은 남기지 않는다.
@@ -48,6 +49,7 @@ public final class MediaPipelineEvents {
         afterCommit(() -> log.info("media-pipeline {}", message));
     }
 
+
     private static String positions(List<Long> ids) {
         var result = new StringBuilder("[");
         for (int position = 0; position < ids.size(); position++) {
@@ -59,9 +61,11 @@ public final class MediaPipelineEvents {
         return result.append(']').toString();
     }
 
+
     private static String ids(List<Long> ids) {
         return ids.stream().map(id -> "\"" + id + "\"").collect(Collectors.joining(",", "[", "]"));
     }
+
 
     private static void afterCommit(Runnable work) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
