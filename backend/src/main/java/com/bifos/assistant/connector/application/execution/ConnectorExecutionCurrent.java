@@ -123,7 +123,8 @@ public class ConnectorExecutionCurrent {
             require(operation != null
                 && operation.equals(JSON.readTree(snapshot.summaryJson())
                     .get("operation")
-                    .stringValue()));
+                    .stringValue())
+                && catalog.guard().kind(action.toolName()).equals(snapshot.kind()));
             require(catalog.guard().scopeFields().stream()
                 .allMatch(f -> catalog.publicFieldNames().contains(f.field())));
             snapshot.validateDeclaredScope(

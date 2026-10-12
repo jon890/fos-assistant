@@ -31,10 +31,17 @@ kill switch 가 꺼진 기본 상태를 유지한 채, 켜면 `create_order` 와
 ## 작업 항목
 
 1. kill switch 꺼짐에서 지금과 같은 RISK_NOT_OPEN 과 금융 전송 0회를 확인하는 회귀를 먼저 둔다.
+   켜짐이어도 digest key 파일이 없거나, 열린 `approval-claim-v1` 줄이 남아 있으면 같은 결과인지 함께 확인한다. phase-02 와 phase-03 선행을 이 테스트가 지킨다.
 2. 판정, 승인 API, plugin, manifest, 서버 등록을 위 표대로 잇는다. 켜짐 분기는 `ConnectorFinancialGate` 를 반드시 지난다.
 3. 승인 카드에 summary 를 보이고, summary 를 열지 못하면 승인 단추를 막는다.
-4. loopback 토스 대역으로 준비 → 승인 → claim → 전송 → 결과를 한 번 왕복하고, 재승인과 replay 가 추가 전송 0회인지 센다.
-5. `tossinvest-connector.md` 의 「이 커넥터는 주문하지 않는다」, 도구 표, 보안 절을 바꾸고 「매매 개방 조건」 표를 모두 채운다. README 사용자 안내도 함께 고친다.
+   계좌 표시는 summary.account 가 아니라 저장 scope 의 `account_seq` 에서 만든다. 그 값은 연결의 공개 칸 `account` 와 대조되고 phase-02 허용 목록을 지난 실제 전송 계좌다.
+   summary.account 는 prepare 가 낸 끝 네 자리라 Control Plane 이 전송 계좌와 대조하지 못한다. 공개 칸은 계좌 순번이라 끝 네 자리를 Control Plane 이 계산할 수도 없다.
+   카드는 계좌 순번을 보이고, summary.account 는 계좌 근거로 보이지 않는다. 다른 계좌의 scope 로 만든 summary 가 카드에 같은 계좌로 보이지 않는지 테스트한다.
+4. 하루 합계를 계좌 단위로도 묶는다. phase-02 의 합계는 사용자 단위라 같은 계좌를 두 사용자가 각자 연결하면 상한이 사용자 수만큼 늘어난다.
+   허용 목록은 계좌 기준이므로, 사용자 합계와 함께 (실행 scope 의 계좌, KST 날짜) 합계도 같은 상한으로 본다. 다른 사용자의 줄은 그 사용자의 데이터 key 로 열어 금액만 읽는다.
+   가족이 한 계좌를 함께 연결하지 않기로 소유자가 정하면, 대신 허용 목록 항목에 사용자를 함께 적어 한 계좌를 한 사용자에게만 연다. 개방 승인 때 둘 중 하나를 고른다.
+5. loopback 토스 대역으로 준비 → 승인 → claim → 전송 → 결과를 한 번 왕복하고, 재승인과 replay 가 추가 전송 0회인지 센다.
+6. `tossinvest-connector.md` 의 「이 커넥터는 주문하지 않는다」, 도구 표, 보안 절을 바꾸고 「매매 개방 조건」 표를 모두 채운다. README 사용자 안내도 함께 고친다.
 
 ## 검증
 

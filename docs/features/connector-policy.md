@@ -492,9 +492,10 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 발급 함수를 운영 승인이나 controller에서 호출하지 않으며 금융 위험도 판정을 바꾸지 않는다.
 
 카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
-정확한 키는 `protocol,prepare_tool,scope_fields,operations`이며 protocol은 `approval-claim-v1`이다.
+정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v1`이다.
 prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
+kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
 scope_fields는 위의 예약 이름과 공개 칸 검증을 그대로 사용한다.
 카탈로그 원문에서 중복 키와 뒤따르는 JSON을 먼저 거절하고, 보호 선언의 타입이나 키를 보충하지 않는다.
 이 읽기 계약은 plugin producer나 설치 지원 확인, 금융 노출의 근거가 아니다.
@@ -616,9 +617,10 @@ executeApproved를 각각 한 번 호출한다. 승인 때 prepare를 다시 부
 ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTTP 읽기 제한이다.
 
 `ConnectorFinancialGate`는 준비·승인·claim이 함께 지나는 운영 관문이다. 설정은 `assistant.connector.financial`이고 기본값은 모두 닫힌 쪽이다.
+kill switch를 켜도 keyed hash key 파일(`digest-key-file`)을 읽지 못하면 열리지 않는다. key를 쓰는 request_key와 해시 단계 없이 금융이 열리지 않게 코드로 막는다.
 준비는 prepare 전에 kill switch와 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
 승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 kill switch와 저장 scope의 계좌를 본다.
-하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정, 조건주문 생성·정정은 거절한다.
+하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 취소는 새로 쓰는 금액이 없어 금액 상한과 하루 합계 밖에 두고 kill switch와 계좌 허용 목록만 본다. 하루 합계에도 금액이 있는 생성만 더한다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정, 조건주문 생성·정정은 거절한다.
 
 `ConnectorFinancialConflicts`는 준비·승인·claim이 함께 쓰는 같은 의도 검사다.
 사용자 잠금 아래 동일 request_key의 PENDING·EXECUTING·UNKNOWN을 차단하며 자기 action은 제외한다.

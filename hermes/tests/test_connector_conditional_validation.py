@@ -28,7 +28,8 @@ class ConnectorConditionalValidationTest(ConnectorGateCase):
         model, args, summary, scope = [self.guard._strict_json(case[field + 'Json'])
                                        for field in ('modelArgs', 'executionArgs', 'summary', 'scope')]
         manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {
-            'operations': {case['tool']: case['operation']}, 'scope_fields': [{'arg': key, 'field': 'account'} for key in scope]}}
+            'operations': {case['tool']: case['operation']}, 'kinds': {case['tool']: 'CONDITIONAL'},
+            'scope_fields': [{'arg': key, 'field': 'account'} for key in scope]}}
         return self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': summary}, model,
                                                 manifest, case['tool'], {'TEST_ACCOUNT': '1234'})
 
@@ -70,7 +71,8 @@ class ConnectorConditionalValidationTest(ConnectorGateCase):
         case = self.cases[0]
         args, summary, model = [json.loads(case[field + 'Json']) for field in ('executionArgs', 'summary', 'modelArgs')]
         manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {
-            'operations': {case['tool']: 'CREATE'}, 'scope_fields': [{'arg': 'account_seq', 'field': 'account'}]}}
+            'operations': {case['tool']: 'CREATE'}, 'kinds': {case['tool']: 'CONDITIONAL'},
+            'scope_fields': [{'arg': 'account_seq', 'field': 'account'}]}}
         for changed in ({'TEST_ACCOUNT': '5678'}, {}):
             with self.assertRaises(ValueError):
                 self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': summary}, model, manifest, case['tool'], changed)
@@ -105,12 +107,33 @@ class ConnectorConditionalValidationTest(ConnectorGateCase):
         self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': summary}, original,
                                         manifest, general['tool'], {'TEST_ACCOUNT': args['account']})
 
+    def test_tool_kind_decides_branch(self):
+        case = self.cases[0]
+        model, args, summary = [json.loads(case[field + 'Json']) for field in ('modelArgs', 'executionArgs', 'summary')]
+        guard = {'operations': {'create_order': 'CREATE'}, 'scope_fields': [{'arg': 'account_seq', 'field': 'account'}]}
+        # 일반 도구에 조건 summary 를 넣으면, 선언이 없을 때도 ORDER 를 선언했을 때도 거절한다.
+        for kinds in ({}, {'kinds': {'create_order': 'ORDER'}}):
+            manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {**guard, **kinds}}
+            with self.subTest(kinds=kinds), self.assertRaises(ValueError):
+                self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': summary}, model,
+                                                manifest, 'create_order', {'TEST_ACCOUNT': '1234'})
+        general = json.loads((REPO / 'test/fixtures/financial-approval-v1.json').read_text())['cases'][0]
+        args = json.loads(general['executionArgsJson'].replace('account_seq', 'account'))
+        manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {
+            'operations': {general['tool']: 'CREATE'}, 'kinds': {general['tool']: 'CONDITIONAL'},
+            'scope_fields': [{'arg': 'account', 'field': 'account'}]}}
+        with self.assertRaises(ValueError):
+            self.validation._prepare_result({'v': 1, 'executionArgs': args, 'summary': json.loads(general['summaryJson'])},
+                                            json.loads(general['modelArgsJson']), manifest, general['tool'],
+                                            {'TEST_ACCOUNT': args['account']})
+
     def test_actual_text_prepare_parser(self):
         prepare = importlib.import_module(self.plugin.__name__ + '.connector_prepare')
         case = self.cases[0]
         model = json.loads(case['modelArgsJson'])
         manifest = {'fields': [{'key': 'account', 'env': 'TEST_ACCOUNT'}], 'execution_guard': {
-            'operations': {case['tool']: 'CREATE'}, 'scope_fields': [{'arg': 'account_seq', 'field': 'account'}]}}
+            'operations': {case['tool']: 'CREATE'}, 'kinds': {case['tool']: 'CONDITIONAL'},
+            'scope_fields': [{'arg': 'account_seq', 'field': 'account'}]}}
         raw = '{"v":1,"executionArgs":' + case['executionArgsJson'] + ',"summary":' + case['summaryJson'] + '}'
         for value in (raw, raw + ' {}', raw[:-1] + ',"v":1}'):
             result = types.SimpleNamespace(is_error=False, structured_content=None,

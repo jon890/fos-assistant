@@ -11,7 +11,7 @@ const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].r
 
 test("문서와 계획서만 바꾸면 무거운 job 을 모두 건너뛴다", () => {
   const docs = [
-    "docs/adr/INDEX.md", "docs/features/connector.md", "tasks/plan1/phase-01.md", ".claude/skills/pr-merge/SKILL.md",
+    "docs/adr/INDEX.md", "docs/features/connector.md", "tasks/plan1/phase-01.md", ".claude/skills/other/SKILL.md",
     "AGENTS.md", "README.ko.md", "backend/docs/data-schema.md", "backend/AGENTS.md", "web/docs/code-architecture.md",
     "web/AGENTS.md", ".github/workflows/code-review-prompt.txt", ".github/workflows/pr-size.yml", "scripts/pr/pr-size.mjs",
     "scripts/dev/check-local.sh", "test/unit/doc-files.test.ts",
