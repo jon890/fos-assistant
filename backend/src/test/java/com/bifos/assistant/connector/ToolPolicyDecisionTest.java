@@ -285,11 +285,11 @@ class ToolPolicyDecisionTest {
 
 
     @Test
-    @DisplayName("대화 허락은 밖으로 나가지 않는 required 도구만 허용하고, 상시 허락을 닫은 도구도 대화 허락으로는 허용한다")
+    @DisplayName("대화 허락은 선언이 연 required 도구만 허용하고, 상시 허락을 닫은 도구도 대화 허락으로는 허용한다")
     void conversationGrantAllowsOnlyToolsThatStayInside() {
         Optional<ToolPolicy> inside = Optional.of(
             new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false, Set.of(), true));
-        Optional<ToolPolicy> outbound = Optional.of(
+        Optional<ToolPolicy> undeclared = Optional.of(
             new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, false, Set.of(), false));
         ToolPolicyDecision allowed = new ToolPolicyDecision(ActionDecision.ALLOWED, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
         ToolPolicyDecision needsApproval = new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.REQUIRED);
@@ -299,8 +299,11 @@ class ToolPolicyDecisionTest {
         assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, inside, true, false, 2, NOT_CHECK))
             .as("상시 허락을 닫은 도구의 남은 상시 허락")
             .isEqualTo(needsApproval);
-        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, outbound, false, true, 2, NOT_CHECK))
-            .as("밖으로 나가는 도구")
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 2, undeclared, false, true, 2, NOT_CHECK))
+            .as("대화 허락을 선언하지 않은 도구")
+            .isEqualTo(needsApproval);
+        assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 1, Optional.empty(), false, true, 2, NOT_CHECK))
+            .as("도구를 선언하지 않는 판의 선언 없는 도구")
             .isEqualTo(needsApproval);
     }
 

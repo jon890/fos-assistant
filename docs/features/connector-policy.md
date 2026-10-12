@@ -138,6 +138,7 @@ sequenceDiagram
 | `tools.<이름>.title` | 승인 카드와 알림 줄에 보일 사람 말. 없으면 `이름 없는 동작` 으로 보인다 |
 | `tools.<이름>.grant` | 거짓이면 상시 허락을 줄 수 없고 호출마다 승인을 받는다. 없으면 참이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)) |
 | `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다 |
+| `tools.<이름>.conversation_grant` | 참이면 승인 카드의 「이 대화에서 계속 허용」 을 받는다. 없으면 거짓이다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 선언한다([ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md)) |
 | `tools.<이름>.identifiers` | 승인 카드가 길이로 가리지 않을 맨 위 인자 이름. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다 |
 
@@ -359,7 +360,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 | 상황 | 처리 |
 | --- | --- |
-| 줄 수 있는 도구 | `approval` 이 `required` 이고 카탈로그의 `outbound` 가 거짓인 도구다. `grant: false` 여도 받는다. `outbound` 를 내지 않는 옛 대시보드 plugin 이면 상시 허락이 열린 도구만 받는다 |
+| 줄 수 있는 도구 | 카탈로그의 `conversation_grant` 가 참이고 `approval` 이 `required` 이며 `outbound` 가 참이 아닌 도구다. `grant: false` 여도 받는다. 그 칸을 내지 않는 옛 대시보드 plugin 과 `schema: 1` 은 어느 도구도 받지 않는다 |
 | 승인 줄의 `conversationGrantAllowed` | 위 조건에 더해 줄에 원래 도구 이름, 대화, 에이전트가 있어야 참이다. 줄을 읽을 때의 카탈로그로 본다 |
 | `conversationGrant` 를 실은 승인 | 승인할 때의 카탈로그로 다시 보고 실행 전 트랜잭션에서 허락 줄을 저장한다. 기간은 24시간이다 |
 | 줄 수 없는 도구에 실었다. `grant` 와 함께 실었다 | `VALIDATION_FAILED`. 승인 줄은 `PENDING` 그대로다 |
@@ -372,7 +373,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 | 같은 줄을 동시에 승인한다 | 승인 줄의 행 잠금이 하나만 통과시켜 허락도 한 줄이다 |
 | 결과를 대화에 전한다 | 알림 줄에 「이 대화에서는 같은 동작을 다시 묻지 않고 실행해요. 다른 대화에서는 다시 물어요」 를 더하고, 모델 입력에 같은 동작이 승인 없이 실행된다는 줄을 더한다 |
 
-- 대화 허락 목록(`GET /api/v1/chat/conversations/{id}/connector-conversation-grants`)은 번호, 제목, 끝나는 시각만 낸다. 지금 선언이 밖으로 나가는 도구의 줄은 효력이 없어 내지 않는다
+- 대화 허락 목록(`GET /api/v1/chat/conversations/{id}/connector-conversation-grants`)은 번호, 제목, 끝나는 시각만 낸다. 지금 선언이 대화 허락을 닫은 도구의 줄은 효력이 없어 내지 않는다
 - 승인할 때와 떼거나 해제할 때 모두 사용자 행을 먼저 잠그므로, 뗀 뒤에 승인이 허락을 남기지 못한다. 그 승인은 `not_executable` 로 끝난다
 
 ## 금융 실행 내용의 저장과 검증

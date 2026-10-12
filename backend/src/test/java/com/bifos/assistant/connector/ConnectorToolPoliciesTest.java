@@ -142,21 +142,32 @@ class ConnectorToolPoliciesTest {
 
 
     @Test
-    @DisplayName("대화 허락은 required 이고 밖으로 나가지 않는 도구에만 열고, outbound 를 모르는 옛 카탈로그면 상시 허락을 따른다")
-    void readsConversationGrantFromOutbound() {
+    @DisplayName("대화 허락은 conversation_grant 를 참으로 선언한 required 도구에만 열고, 선언이 없거나 밖으로 나가면 닫는다")
+    void readsConversationGrantOnlyFromTheDeclaration() {
         ConnectorManifest manifest = manifest(
             2,
             VERIFY,
             OPTIONS,
-            tool("inside_closed", Boolean.FALSE, Boolean.FALSE),
-            tool("outbound", Boolean.FALSE, Boolean.TRUE),
-            tool("old_open", null, null),
-            tool("old_closed", Boolean.FALSE, null));
+            tool("declared", Boolean.FALSE, Boolean.FALSE, Boolean.TRUE),
+            tool("inside_undeclared", Boolean.FALSE, Boolean.FALSE, null),
+            tool("inside_open_undeclared", null, Boolean.FALSE, null),
+            tool("declared_false", Boolean.FALSE, Boolean.FALSE, Boolean.FALSE),
+            tool("outbound", Boolean.FALSE, Boolean.TRUE, Boolean.TRUE),
+            tool("old_catalog", null, null, null),
+            new ConnectorTool(
+                "always", "WRITE", "always", null, null, List.of(), null, Map.of(), Boolean.FALSE, Boolean.TRUE));
 
-        assertThat(ConnectorToolPolicies.find(manifest, "inside_closed").orElseThrow().conversationGrantable()).isTrue();
+        assertThat(ConnectorToolPolicies.find(manifest, "declared").orElseThrow().conversationGrantable()).isTrue();
+        assertThat(ConnectorToolPolicies.find(manifest, "inside_undeclared").orElseThrow().conversationGrantable())
+            .as("grant:false, outbound:false 이지만 선언하지 않은 도구")
+            .isFalse();
+        assertThat(ConnectorToolPolicies.find(manifest, "inside_open_undeclared").orElseThrow().conversationGrantable())
+            .as("상시 허락은 열렸지만 선언하지 않은 도구")
+            .isFalse();
+        assertThat(ConnectorToolPolicies.find(manifest, "declared_false").orElseThrow().conversationGrantable()).isFalse();
         assertThat(ConnectorToolPolicies.find(manifest, "outbound").orElseThrow().conversationGrantable()).isFalse();
-        assertThat(ConnectorToolPolicies.find(manifest, "old_open").orElseThrow().conversationGrantable()).isTrue();
-        assertThat(ConnectorToolPolicies.find(manifest, "old_closed").orElseThrow().conversationGrantable()).isFalse();
+        assertThat(ConnectorToolPolicies.find(manifest, "old_catalog").orElseThrow().conversationGrantable()).isFalse();
+        assertThat(ConnectorToolPolicies.find(manifest, "always").orElseThrow().conversationGrantable()).isFalse();
         assertThat(ConnectorToolPolicies.find(manifest, VERIFY.name()).orElseThrow().conversationGrantable()).isFalse();
     }
 
@@ -220,8 +231,9 @@ class ConnectorToolPoliciesTest {
 
 
     /** 확인 도구가 {@code check} 이고 선택지 도구가 {@code list_scopes} 인 커넥터다. */
-    private static ConnectorTool tool(String name, Boolean grant, Boolean outbound) {
-        return new ConnectorTool(name, "WRITE", "required", null, grant, List.of(), null, Map.of(), outbound);
+    private static ConnectorTool tool(String name, Boolean grant, Boolean outbound, Boolean conversationGrant) {
+        return new ConnectorTool(
+            name, "WRITE", "required", null, grant, List.of(), null, Map.of(), outbound, conversationGrant);
     }
 
 

@@ -86,7 +86,7 @@ public record ToolPolicyDecision(
             return denied(ActionDenyReason.UNDECLARED, null);
         }
         // 도구를 선언하지 않는 판의 선언 없는 도구는 쓰기로 읽는다. 무엇을 하는지 모르므로 읽기로 풀어 주지 않는다.
-        // 그 판은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다. 대화 허락도 같다.
+        // 그 판은 상시 허락을 닫는 선언을 둘 수 없어 허락을 줄 수 있는 것으로 둔다. 대화 허락은 여는 선언이 없어 닫는다.
         ToolPolicy policy = declared.orElseGet(() -> new ToolPolicy(ToolRisk.WRITE, ToolApproval.REQUIRED, null, true));
         if (policy.risk() == ToolRisk.DESTRUCTIVE || policy.risk() == ToolRisk.FINANCIAL) {
             return denied(ActionDenyReason.RISK_NOT_OPEN, policy);
@@ -105,7 +105,7 @@ public record ToolPolicyDecision(
         if (boundary == CheckBoundary.APPROVAL_ONLY && !readWithoutApproval) {
             return new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, policy.risk(), policy.approval());
         }
-        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065). 밖으로 나가는 도구는 대화 허락도 보지 않는다
+        // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065). 대화 허락은 선언이 연 도구에서만 본다
         // (ADR-20261012 / conversation-grant).
         boolean allowedByGrant = (granted && policy.grantable())
             || (conversationGranted && policy.conversationGrantable());

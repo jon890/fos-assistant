@@ -94,6 +94,8 @@ class ConnectorConversationGrantTest {
     /** 계정 밖의 사람에게 보내는 도구다. */
     private static final String MAIL = "mail_note";
     private static final String ALWAYS = "send_note";
+    /** 상시 허락을 닫고 밖으로 나가지 않지만 대화 허락을 선언하지 않은 도구다. Gmail 의 필터 도구와 같은 선언이다. */
+    private static final String FILTER = "create_filter";
     private static final String ARGS = "{\"text\":\"안녕\"}";
 
     private static final ConnectorManifest DECLARING = new ConnectorManifest(
@@ -108,10 +110,11 @@ class ConnectorConversationGrantTest {
         2,
         List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null, List.of(), null, Map.of(), false),
-            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", true, List.of(), null, Map.of(), false),
-            new ConnectorTool(DRAFT, "WRITE", "required", "글 불러오기", false, List.of(), null, Map.of(), false),
+            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", true, List.of(), null, Map.of(), false, true),
+            new ConnectorTool(DRAFT, "WRITE", "required", "글 불러오기", false, List.of(), null, Map.of(), false, true),
             new ConnectorTool(MAIL, "WRITE", "required", "메모 보내기", false, List.of(), null, Map.of(), true),
-            new ConnectorTool(ALWAYS, "WRITE", "always", null, false, List.of(), null, Map.of(), false)));
+            new ConnectorTool(ALWAYS, "WRITE", "always", null, false, List.of(), null, Map.of(), false),
+            new ConnectorTool(FILTER, "WRITE", "required", "필터 만들기", false, List.of(), null, Map.of(), false)));
 
     @Autowired
     ConnectorPolicyService policies;
@@ -280,9 +283,9 @@ class ConnectorConversationGrantTest {
 
 
     @Test
-    @DisplayName("밖으로 나가는 도구와 늘 승인을 받는 도구는 대화 허락을 줄 수 없고 VALIDATION_FAILED 이며 줄은 PENDING 그대로다")
-    void outboundAndAlwaysToolsCannotBeGrantedForTheConversation() {
-        for (String tool : List.of(MAIL, ALWAYS)) {
+    @DisplayName("밖으로 나가는 도구와 늘 승인을 받는 도구, 대화 허락을 선언하지 않은 도구는 대화 허락을 줄 수 없고 VALIDATION_FAILED 이며 줄은 PENDING 그대로다")
+    void undeclaredOutboundAndAlwaysToolsCannotBeGrantedForTheConversation() {
+        for (String tool : List.of(MAIL, ALWAYS, FILTER)) {
             UUID actionId = ask(root, tool, ARGS).actionId();
             ConnectorActionView listed = listed(actionId);
             assertThat(listed.conversationGrantAllowed()).as(tool).isFalse();

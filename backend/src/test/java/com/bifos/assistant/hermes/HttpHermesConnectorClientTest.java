@@ -518,6 +518,38 @@ class HttpHermesConnectorClientTest {
     }
 
 
+    @DisplayName("도구의 conversation_grant 는 칸이 없으면 null, boolean 이면 그 값이고 그 밖의 모양은 거짓으로 읽는다")
+    @Test
+    void readsConversationGrantOfToolPolicies() {
+        String tail = "\"mcp_server\":\"demo\"";
+        String required = "{\"risk\":\"WRITE\",\"approval\":\"required\",\"outbound\":false";
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(
+                CATALOG.replace(
+                    tail,
+                    tail + ",\"schema\":2,\"tools\":{"
+                        + "\"absent\":" + required + "},"
+                        + "\"open\":" + required + ",\"conversation_grant\":true},"
+                        + "\"closed\":" + required + ",\"conversation_grant\":false},"
+                        + "\"word\":" + required + ",\"conversation_grant\":\"true\"},"
+                        + "\"empty\":" + required + ",\"conversation_grant\":null}}"),
+                MediaType.APPLICATION_JSON));
+
+        ConnectorManifest declared = client.readCatalog().get(0);
+
+        assertThat(declared.tools())
+            .extracting(ConnectorTool::name, ConnectorTool::conversationGrant)
+            .containsExactly(
+                tuple("absent", null),
+                tuple("open", true),
+                tuple("closed", false),
+                // 읽을 수 없는 선언은 대화 허락을 여는 쪽으로 읽지 않는다.
+                tuple("word", false),
+                tuple("empty", false));
+        server.verify();
+    }
+
+
     @DisplayName("도구의 identifiers 는 문자열 배열이면 그 순서대로 읽고, 칸이 없거나 그 밖의 모양이면 빈 목록으로 읽는다")
     @Test
     void readsIdentifiersOfToolPolicies() {

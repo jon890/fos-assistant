@@ -18,15 +18,24 @@ import java.util.Map;
  * @param argLabels 승인 카드 인자의 표시 이름. 정책과 분리하며 누락·불량 메타데이터는 빈 객체다
  * @param outbound 데이터를 계정 밖의 사람에게 보내는 도구인가. 옛 대시보드 plugin 은 이 칸을 내지 않고, 응답에 없으면 null
  * 이다. boolean 이 아닌 값은 참으로 읽는다
+ * @param conversationGrant 그 도구를 한 대화에서 계속 허용할 수 있다고 선언했는가(ADR-20261012 / conversation-grant). 옛 대시보드
+ * plugin 은 이 칸을 내지 않고, 응답에 없으면 null 이다. boolean 이 아닌 값은 거짓으로 읽는다
  */
 public record ConnectorTool(
     String name, String risk, String approval, String title, Boolean grant, List<String> identifiers, String description,
-    Map<String, String> argLabels, Boolean outbound) {
+    Map<String, String> argLabels, Boolean outbound, Boolean conversationGrant) {
 
     public ConnectorTool {
         description = ConnectorToolDescription.read(description);
         identifiers = identifiers == null ? List.of() : List.copyOf(identifiers);
         argLabels = ConnectorArgumentLabels.read(argLabels);
+    }
+
+
+    /** 대화 허락을 선언하는 칸을 내지 않는 옛 카탈로그다. */
+    public ConnectorTool(String name, String risk, String approval, String title, Boolean grant, List<String> identifiers,
+        String description, Map<String, String> argLabels, Boolean outbound) {
+        this(name, risk, approval, title, grant, identifiers, description, argLabels, outbound, null);
     }
 
 

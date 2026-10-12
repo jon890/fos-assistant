@@ -111,7 +111,7 @@ def _tool_identifiers(declared_tool: dict, approval: str, risk: str | None = Non
 
 
 def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_server: str) -> dict:
-    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "identifiers"}}` 로 낸다.
+    """`connector.json` 의 도구 정책을 검증해 `{도구 이름: {"risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers"}}` 로 낸다.
 
     틀리면 예외다.
 
@@ -120,6 +120,8 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
     `grant` 는 그 도구에 상시 허락을 줄 수 있는지다(ADR-065). 기본값을 채운 값이고,
     `approval` 이 `required` 이고 선언이 닫지 않았을 때만 참이다.
     `outbound` 는 그 도구가 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 상시 허락이 닫혀 있어야 한다.
+    `conversation_grant` 는 그 도구를 한 대화에서 계속 허용할 수 있는지다(ADR-20261012 / conversation-grant). 참이라고
+    선언한 도구만 열고 기본값은 거짓이다. `approval` 이 `required` 이고 밖으로 나가지 않는 도구에만 선언한다.
     `identifiers` 는 승인 카드가 길이로 가리지 않을 식별자 인자의 이름이다(ADR-089). 기본값은 빈 배열이다.
     """
     call_tools = {verify_tool} | set(option_tools)
@@ -127,7 +129,7 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         if "tools" in declared or "default_tool_policy" in declared:
             raise ValueError("tools 와 default_tool_policy 는 schema 2 에서만 선언한다")
         return {name: {"risk": "READ", "approval": "none", "title": None, "grant": False, "outbound": False,
-                       "identifiers": []}
+                       "conversation_grant": False, "identifiers": []}
                 for name in sorted(call_tools)}
     if declared["schema"] != 2:
         raise ValueError("schema 는 1 이나 2 만 받는다")
@@ -142,8 +144,10 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         if not isinstance(name, str) or not TOOL_NAME_RE.match(name):
             raise ValueError("tools 의 키는 도구 이름이다")
         if not isinstance(declared_tool, dict) or set(declared_tool) - {
-                "risk", "approval", "title", "grant", "outbound", "identifiers", "description", "arg_labels"}:
-            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, identifiers, description, arg_labels 만 갖는 객체다")
+                "risk", "approval", "title", "grant", "outbound", "conversation_grant", "identifiers", "description",
+                "arg_labels"}:
+            raise ValueError("tools 의 값은 risk, approval, title, grant, outbound, conversation_grant, identifiers, description,"
+                             " arg_labels 만 갖는 객체다")
         risk = declared_tool.get("risk")
         if not isinstance(risk, str) or risk not in TOOL_RISKS:
             raise ValueError("risk 는 정해 둔 위험도 가운데 하나다")
@@ -169,9 +173,16 @@ def _connector_tools(declared: dict, verify_tool: str, option_tools: set, mcp_se
         # 밖으로 나가는 도구는 호출마다 사람이 본다. 상시 허락이 열려 있으면 고쳐 읽지 않고 거절한다.
         if outbound and (approval != "required" or grant):
             raise ValueError("outbound 가 참인 도구는 approval 이 required 이고 grant 가 false 여야 한다")
+        conversation_grant = declared_tool.get("conversation_grant", False)
+        if "conversation_grant" in declared_tool:
+            if type(conversation_grant) is not bool:
+                raise ValueError("conversation_grant 는 true 나 false 다")
+            # 밖으로 나가는 도구는 한 대화 안에서도 사람이 매번 본다. 늘 승인을 받는 도구는 허락으로 풀 수 없다.
+            if approval != "required" or outbound:
+                raise ValueError("conversation_grant 는 approval 이 required 이고 outbound 가 거짓인 도구에만 선언한다")
         identifiers = _tool_identifiers(declared_tool, approval, risk)
         policies[name] = {"risk": risk, "approval": approval, "title": title, "grant": grant, "outbound": outbound,
-                          "identifiers": identifiers}
+                          "conversation_grant": conversation_grant, "identifiers": identifiers}
     for name in call_tools:
         # 대시보드가 승인 없이 부르는 도구다. 읽기 전용이고 승인이 없는 선언만 맞는다.
         if policies.get(name, {}).get("risk") != "READ" or policies[name]["approval"] != "none":
