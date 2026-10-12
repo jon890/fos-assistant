@@ -23,9 +23,12 @@ compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_dra
 trim과 소문자로 비교했을 때 중복 태그를 거절한다.
 태그 값 자체는 자동 정규화하지 않는다.
 알 수 없는 필드와 block 종류는 거절한다.
-원본 사진의 중복 참조는 허용하고 블록 position으로 구별한다.
+같은 원본 사진(assetId)은 원고 전체에서 이미지 블록 하나에만 둔다.
+기존 DSL의 사진 자리는 파일 이름만 담아, 같은 사진을 두 자리에 두면 저장 worker가 두 자리를 구별하지 못하고 업로드 전에 멈춘다.
+Control Plane은 새 생성과 수정에서, compiler는 compile에서 같은 뜻의 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 거절한다.
+저장한 판을 다시 읽는 경로는 이 규칙을 검사하지 않는다. 규칙 전에 저장한 판도 읽고 고쳐 저장할 수 있다.
+사진 자리 형식을 바꾸는 일은 실제로 필요해질 때 정한다.
 누락은 허용하되 호출자가 preview에 포함 ID와 빠진 ID의 subset을 표시하며 모두 사용했다고 말하지 않는다.
-같은 사진이 두 번 나오면 업로드 자리 수는 2, 고유 asset 수는 1이다.
 caption은 이미지 바로 뒤의 실제 문단으로 컴파일한다.
 photo_notes는 관찰 설명이며 미리보기에만 보이는 안내로 표시한다.
 photo_notes는 canonical caption을 대체하지 않는다.
@@ -39,6 +42,7 @@ paragraph 또는 caption이 기존 사진·스티커·지도·기존 구성요�
 FS, DB, HTTP, 날짜, random, Java 타입을 import하지 않는다.
 권한과 원본 지문, observationRef가 같은 asset의 관찰인지 검증하는 일은 호출자가 끝낸다.
 컴파일러는 missing asset, 상이한 photoDir, 중복 asset 정의와 `.small.jpg` 이름을 거절한다.
+같은 asset을 두 이미지 블록에 둔 원고는 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 거절한다. compile transport는 다른 compile 오류처럼 `invalid_input`만 돌려준다.
 원본 이름과 경로의 허용 형식은 `resolvedAssetSchema`가 참조하는 `fileName`과 `photoDir` 정의를 따른다.
 이미지 DSL 순번은 문서 이미지 자리의 1부터 시작하며 기존 화면 순번은 호출자가 preview 안내에 따로 표시한다.
 fileName과 photoDir은 서버가 `ChatAttachment.storedName`과 설정에서 정한 원본 경로다.
@@ -110,7 +114,7 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 | canonical 원고 65,536 bytes | Python 요청과 private compiler |
 | 요청·응답 envelope 각각 524,288 bytes | 요청 스트림은 JSON 변환 전, MCP 결과와 HTTP 응답은 전달 전 |
 | compiled JSON 262,144 bytes | payload·tuple·notes·manifest를 포함한 전체 직렬화 |
-| 이미지 자리·manifest·resolvedAssets 각각 50개 | 같은 asset 반복은 자리마다 세고 asset 정의 중복은 거절 |
+| 이미지 자리·manifest·resolvedAssets 각각 50개 | 같은 asset의 반복 자리와 asset 정의 중복은 모두 거절 |
 | photoDir 4,096 bytes·fileName 255 bytes | 내부 원본 참조 스키마와 Python 입력 |
 | asset ID 양수 Long, 최대 19자리 | 정규형 십진 문자열이며 앞자리 0은 거절 |
 
@@ -139,7 +143,7 @@ chat은 `ContentDraftBindingAccess`의 불변 stamp만 사용하고 connector �
 원본은 `AttachmentFingerprint`로 실제 크기와 SHA-256을 다시 읽는다. DB 참조 유효성만으로 원본 일치를 주장하지 않는다.
 observationRef는 고정한 attachment·owner·conversation·revision·지문과 일치하고 읽을 수 있는 관찰이어야 한다.
 설명은 그 관찰 summary의 앞 300 code point이며 새 분석을 하지 않는다. 반복 사진의 설명이 서로 다르면 거절한다.
-한 asset의 반복 자리는 canonical position별로 보존하며 resolvedAssets에는 한 번만 전달한다.
+resolvedAssets에는 asset마다 한 번만 전달한다. 새로 쓴 판에는 반복 자리가 없고, 규칙 전에 저장한 판의 반복 자리는 compiler가 거절하므로 그 판은 고쳐 저장한 뒤에 preview를 만든다.
 미리보기에는 canonical 원고와 포함·빠진 첨부 ID를 돌려주고 파일명·내부 경로·compiled payload는 내보내지 않는다.
 
 `readCurrentSnapshot`은 외부 트랜잭션 없이 coordinator에 한 번 들어가는 독립 조회다.
@@ -244,6 +248,7 @@ REST POST 재전송은 별도 원고 생성이다. 첫 MCP 생성은 아래 영�
 | --- | --- |
 | 없음·다른 사용자·다른 대화·삭제한 대화 | 404 `CONVERSATION_NOT_FOUND` |
 | 입력 형식·예약 줄·상한 위반 | 400 `VALIDATION_FAILED` |
+| 같은 사진을 두 이미지 블록에 둠 | 400 `CONTENT_DRAFT_DUPLICATE_PHOTO`, 한 번만 넣고 중복 블록을 지우라는 고정 문구 |
 | 기대 revision 불일치 | 409 `CONTENT_DRAFT_CONFLICT`, 공개 응답에 currentRevision 정수 |
 | 살아 있는 첨부지만 지문 또는 observationRef 대응이 다름 | 409 `CONTENT_DRAFT_STALE`, 권한 확인 뒤 본문 없이 currentRevision |
 | 새 쓰기에 없는·타대화·미전송·삭제 요청·삭제·만료한 첨부를 사용 | 410 `ATTACHMENT_GONE` |
@@ -275,6 +280,7 @@ draft의 필드·상한은 ContentDraftInputReader와 일치시킨다.
 문단과 caption은 각각 0부터 20,000자까지와 0부터 300자까지다.
 지도 name·address는 각각 1부터 200자까지이고 sticker code는 1부터 64자까지다.
 문자열은 Unicode code point로 세며 UTF-8 compact JSON 64KiB, 예약 줄, 짝 없는 surrogate 검사도 재사용한다.
+같은 assetId의 이미지 블록은 하나만 받는다. 도구 설명도 모델에게 이 규칙을 알린다.
 REST strict 파싱과 MCP JsonNode의 중복 키 경계는 「입력과 응답」의 구분을 따른다.
 
 `McpCallerResolver`가 서명을 확인한 origin의 사용자와 대화만 사용한다.
@@ -298,6 +304,7 @@ args, time과 nonce는 서명하지 않으며 현재 tool_call_id 중복 검사�
 | 성공 | 안전한 ContentDraftView JSON을 ExternalData.wrap으로 감싼 기존 도구 result, isError=false |
 | 인자 모양·본문·예약 줄·크기의 VALIDATION_FAILED | HTTP 200의 JSON-RPC -32602와 기존 고정 INVALID_ARGUMENTS |
 | CONTENT_DRAFT_CONFLICT·CONTENT_DRAFT_STALE | isError=true, text JSON의 code와 typed currentRevision 정수 |
+| CONTENT_DRAFT_DUPLICATE_PHOTO | isError=true, text JSON의 code와 고정 안내 `message`. 안내는 예외 message가 아닌 상수다 |
 | CONTENT_DRAFT_GONE·CONTENT_DRAFT_UNAVAILABLE와 다른 domain 오류 | isError=true, text JSON의 code만 전달 |
 | 서명·현재 맥락 오류 | 기존 MCP_CALL_CONTEXT_INVALID 고정 결과, 본문·revision 없음 |
 
