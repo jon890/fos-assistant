@@ -93,21 +93,23 @@ async function withWriteTab<T>(
   const limit = setTimeout(() => controller.abort(), limitMs);
   let tab: Awaited<ReturnType<typeof openWriteTab>> | null = null;
   try {
-    tab = await openWriteTab(cdpUrl, blogId, {
-      ...times,
-      signal: controller.signal,
-    });
-    await tab.page.observeAutosaveRequests();
-    const opened = await open(tab.page, { keepDraftNotice: true });
-    return await work(tab.page, blogId, opened === "draft_notice");
+    try {
+      tab = await openWriteTab(cdpUrl, blogId, {
+        ...times,
+        signal: controller.signal,
+      });
+      await tab.page.observeAutosaveRequests();
+      const opened = await open(tab.page, { keepDraftNotice: true });
+      return await work(tab.page, blogId, opened === "draft_notice");
+    } finally {
+      clearTimeout(limit);
+      if (tab) {
+        tab.page.close();
+        await closeTab(cdpUrl, tab.targetId).catch(() => {});
+      }
+    }
   } catch (error) {
     throw await toolErrorOf(env, error);
-  } finally {
-    clearTimeout(limit);
-    if (tab) {
-      tab.page.close();
-      await closeTab(cdpUrl, tab.targetId).catch(() => {});
-    }
   }
 }
 

@@ -459,6 +459,18 @@ test("목록 응답이 실패해도 로그인 쿠키가 있으면 NAVER_BLOG_UNA
   expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
 });
 
+test("쿠키 실패 진단을 시작하기 전에 읽기 탭을 닫는다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.listStatus = 500;
+  let targetsAtCheck: string[] = [];
+  cdp.on("Storage.getCookies", () => {
+    targetsAtCheck = cdp.targetIds();
+    return { cookies: LOGIN_COOKIES };
+  });
+  await readDraft(env, "224000000001", TIMES).catch(() => {});
+  expect(targetsAtCheck).toEqual([otherTab]);
+});
+
 test("불러오는 동안 탭이 로그인 화면으로 넘어가면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
   const { cdp, editor, env, otherTab } = await setup();
   editor.loginOnLoad = true;
