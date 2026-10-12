@@ -3,7 +3,7 @@
  *
  * <p>Control Plane 은 provider 의 vision 지원을 판정하지 않는다(ADR-20261009 / native-image-input).
  * Hermes 가 보조 vision 모델의 설명 글로 바꾸거나 이미지를 뗀 채 다시 시도해도 Control Plane 응답에는 드러나지 않는다.
- * 그래서 실제 흐름의 경로는 `UNKNOWN` 이고, 대역 시나리오만 경로를 정해 넣는다.
+ * 그래서 실제 흐름의 경로는 `UNKNOWN` 이고, 단위 테스트만 경로를 정해 넣는다.
  */
 
 /** provider 가 사진을 어떤 모양으로 받았는지다. */
@@ -148,7 +148,7 @@ export function judgeObservationClaims(
 }
 
 /**
- * 대역 provider 의 경로를 정한다. Control Plane 의 `embedded` 사건에서 싣지 못한 사진은 늘 `NOT_EMBEDDED` 다.
+ * 단위 테스트에 주어진 provider 경로를 정한다. `embedded` 사건에서 싣지 못한 사진은 늘 `NOT_EMBEDDED` 다.
  * 실은 사진은 provider 모양에 따라 바뀐다. `vision` 은 그대로, `unsupported` 는 보조 설명 글로, `rejecting` 은 이미지를 뗀다.
  */
 export function fakeProviderRoutes(

@@ -304,9 +304,11 @@ MCP 통합 검사는 실제 Control Plane에 JPEG/PNG/GIF 30장을 올려 역순
 Control Plane 은 provider 의 vision 지원을 판정하지 않는다([ADR-20261009 / native-image-input](../../backend/docs/adr/ADR-20261009-native-image-input.md)).
 vision 을 지원하지 않는 모델에는 Hermes 가 보조 모델의 설명 글을 보내고, 상류가 이미지를 거절하면 이미지를 뗀 채 다시 시도한다.
 어느 쪽도 Control Plane 응답에 드러나지 않으므로 실제 흐름의 경로는 `UNKNOWN` 이고 판정은 `UNMEASURED` 다.
-대역 시나리오는 경로를 정해 넣어 판정을 나눈다.
+단위 테스트는 provider 경로와 `embedded` 로그 줄을 직접 만들어 판정 규칙을 확인한다.
+가짜 Hermes 나 provider 가 vision 을 거절하거나 이미지를 뗀 채 다시 시도하는 흐름을 실행하는 검사는 아니다.
+이 검사가 보장하는 것은 주어진 경로에 따른 전달 상태와 과장된 관찰 주장의 거절이다.
 
-| 대역 경로 | 판정 | 거절하는 주장 |
+| 단위 테스트에 주어진 경로 | 판정 | 거절하는 주장 |
 | --- | --- | --- |
 | 모두 이미지로 받음 | `NATIVE` | |
 | vision 미지원으로 설명 글만 받음 | `FALLBACK` | `SUCCEEDED`, `ORIGINAL`·`CROP` 범위, 확인(`CONFIRMED`)한 시각·글씨 주장 |

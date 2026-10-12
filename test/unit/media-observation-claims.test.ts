@@ -142,7 +142,7 @@ test("사본만 본 관찰은 작은 메뉴 글씨와 풍경의 글씨를 확인
   );
 });
 
-/** 30장 대역 흐름이다. Control Plane 의 `embedded` 사건에서 실은 사진과 싣지 못한 사진을 나눈다. */
+/** 경로 판정용 단위 입력이다. 로그 줄을 직접 만들며 실제 Control Plane 이나 대역 Hermes 를 실행하지 않는다. */
 function thirty(missingCount: number) {
   const traits: AssetTraits[] = Array.from({ length: 30 }, (_, index) => ({
     assetKey: `synthetic-${index + 1}`,
