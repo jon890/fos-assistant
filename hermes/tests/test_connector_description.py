@@ -31,7 +31,28 @@ class ConnectorDescriptionTest(ConnectorGateCase):
         (self.connector_root / "connector.json").write_text(original)
         self.assertEqual(self.plugin._connector_manifest(DEMO)["tools"], baseline["tools"])
 
+    def test_summary_follows_description_rules_and_stays_out_of_policy(self):
+        original = (self.connector_root / "connector.json").read_text()
+        for case in json.loads(FIXTURE.read_text()):
+            with self.subTest(case=case["name"]):
+                declared = json.loads(original)
+                declared["schema"] = 2
+                declared["tools"] = {"list_scopes": {
+                    "risk": "READ", "title": "범위 보기", "summary": case["value"], "description": "모델용 설명"}}
+                (self.connector_root / "connector.json").write_text(json.dumps(declared))
+                manifest = self.plugin._connector_manifest(DEMO)
+                self.assertIsNotNone(manifest)
+                self.assertEqual(manifest["tool_summaries"]["list_scopes"], case["expected"])
+                self.assertNotIn("summary", manifest["tools"]["list_scopes"])
+                status, response = self.request("/api/connectors/catalog", "GET")
+                self.assertEqual(status, 200)
+                self.assertEqual(response[0]["tools"]["list_scopes"].get("summary"), case["expected"])
+                self.assertEqual(response[0]["tools"]["list_scopes"]["description"], "모델용 설명")
+        (self.connector_root / "connector.json").write_text(original)
+
     def test_legacy_missing_and_empty_catalog(self):
         module = importlib.import_module(self.plugin.__name__ + ".connector_description")
         self.assertEqual(module._tool_descriptions({"schema": 1}), {})
         self.assertEqual(module._tool_descriptions({"schema": 2, "tools": {"a": {"risk": "READ"}}}), {"a": None})
+        self.assertEqual(module._tool_summaries({"schema": 1}), {})
+        self.assertEqual(module._tool_summaries({"schema": 2, "tools": {"a": {"risk": "READ"}}}), {"a": None})

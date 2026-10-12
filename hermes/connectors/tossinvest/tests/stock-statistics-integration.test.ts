@@ -64,6 +64,8 @@ async function checkProduction(client: Client, fake: FakeToss) {
     expect(manifest.tools[name]).toEqual({
       risk: "READ",
       approval: "none",
+      title: expect.any(String),
+      summary: expect.any(String),
       description: registered.description,
     });
     expect(registered.description).toContain(detail);

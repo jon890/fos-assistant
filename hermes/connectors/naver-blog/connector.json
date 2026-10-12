@@ -27,10 +27,12 @@
   "tools": {
     "session_status": {
       "risk": "READ",
+      "title": "로그인 상태 확인",
       "description": "연결된 브라우저에 닿는지와 네이버 로그인 쿠키가 있는지 확인합니다. 입력 인자는 없으며 browser, logged_in, blog_id를 돌려줍니다. 새 탭을 열거나 글을 저장하지 않습니다. 쿠키 존재 확인이므로 모든 편집 작업의 성공을 보장하지는 않습니다."
     },
     "list_drafts": {
       "risk": "READ",
+      "title": "임시저장 글 목록 보기",
       "description": "네이버 블로그의 임시저장 글 목록을 읽고 앞 200개를 count와 drafts로 돌려줍니다. count는 전체 임시저장 수가 아닌 반환한 목록의 길이입니다. 각 항목에는 draft_id, 제목과 고친 시각이 있으며 제목은 최대 200자로 줄입니다. 입력 인자는 없습니다. 목록 조회를 위해 글쓰기 탭을 열었다가 닫지만 글을 편집기에 불러오지는 않습니다. 같은 블로그에서 저장 작업이 진행 중이면 조회를 거절합니다."
     },
     "read_draft": {
@@ -46,6 +48,7 @@
     },
     "render_draft": {
       "risk": "READ",
+      "title": "글 미리 보기",
       "description": "title, category, tags, body를 검사하고 kind가 preview이면 모바일 미리보기, package이면 수동 등록용 HTML을 돌려줍니다. 제목은 최대 100자, 카테고리는 최대 50자, 태그는 최대 30개, 본문은 최대 20,000자입니다. 사진을 넣으면 photo_dir이 필요하고 photo_notes는 미리보기에만 쓰는 설명입니다. artifact_path는 index.html 또는 폴더 아래 index.html이며 폴더는 세 단계까지 받습니다. 덮어쓰기에는 read_draft 결과를 base에 넣어 changes와 base_revision을 받습니다. problems가 있으면 html은 null입니다. HTML과 assets 정보만 만들며 파일 저장이나 네이버 임시저장, 발행은 하지 않습니다."
     },
     "save_draft": {
@@ -79,6 +82,7 @@
     },
     "draft_job": {
       "risk": "READ",
+      "title": "임시저장 진행 확인",
       "description": "save_draft 또는 overwrite_draft가 준 job_id로 status, 진행 단계, save_clicked, result와 error를 읽습니다. wait_seconds는 기본 45초이고 0초에서 50초까지 받습니다. running이면 아직 완료되지 않았고 succeeded이면 저장이 확인됐으며 failed 또는 unknown이면 실패나 결과 불명 상태입니다. unknown일 때는 바로 재실행하지 말고 임시저장 목록을 확인합니다. 멈춘 작업을 발견하면 실패 또는 결과 불명 상태로 정리하고 잠금을 풀 수 있습니다. 발행 결과를 확인하는 도구는 아닙니다."
     }
   },

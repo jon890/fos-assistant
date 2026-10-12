@@ -141,6 +141,8 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
       expect(manifest.tools[name]).toEqual({
         risk: "READ",
         approval: "none",
+        title: expect.any(String),
+        summary: expect.any(String),
         description: tools.find((entry) => entry.name === name)!.description!,
       });
       const entry = tools.find((entry) => entry.name === name)!;

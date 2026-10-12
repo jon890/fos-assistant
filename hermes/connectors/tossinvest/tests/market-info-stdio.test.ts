@@ -94,6 +94,8 @@ test("빌드한 stdio 서버는 SDK와 raw JSON-RPC에서 시세·시장 7 opera
       if (i < 3) expect(definition.description).toContain("metadata");
       expect(manifest.tools[name]).toEqual({
         risk: "READ",
+        title: expect.any(String),
+        summary: expect.any(String),
         description: definition.description,
       });
       const { result, body } = await tool(client, name, args);

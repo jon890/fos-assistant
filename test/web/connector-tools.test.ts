@@ -5,7 +5,7 @@ import test from "node:test";
 import vm from "node:vm";
 import { renderToStaticMarkup } from "../../web/node_modules/react-dom/server.js";
 import * as connection from "../../web/src/lib/connection.ts";
-import { toolDescription } from "../../web/src/lib/connector-tool-description.ts";
+import { toolText } from "../../web/src/lib/connector-tool-text.ts";
 import ts from "../../web/node_modules/typescript/lib/typescript.js";
 
 async function render(tools: connection.ConnectorTool[]) {
@@ -35,7 +35,7 @@ async function render(tools: connection.ConnectorTool[]) {
   };
   const dependencies: Record<string, unknown> = {
     "@/lib/connection": connection,
-    "@/lib/connector-tool-description": { toolDescription },
+    "@/lib/connector-tool-text": { toolText },
     "@/components/ui/badge": {
       Badge: ({ children }: { children: React.ReactNode }) => children,
     },
@@ -48,41 +48,46 @@ async function render(tools: connection.ConnectorTool[]) {
   return renderToStaticMarkup(module.exports.ConnectorTools({ tools }));
 }
 
-test("실제 도구 컴포넌트는 설명을 HTML로 실행하지 않고 이름과 정책 밑에 평문으로 그린다", async () => {
+test("실제 도구 컴포넌트는 요약을 HTML로 실행하지 않고 제목과 정책 밑에 평문으로 그린다", async () => {
   const html = await render([
     {
-      name: "write",
+      name: "write_secret_tool",
       title: "쓰기",
       risk: "WRITE",
       approval: "REQUIRED",
       grant: false,
-      description: "<script>alert(1)</script>\n**설명**\t입력",
+      summary: "<script>alert(1)</script>\n**요약**\t입력",
     },
   ]);
   assert.ok(
-    html.includes("&lt;script&gt;alert(1)&lt;/script&gt;\n**설명**\t입력"),
+    html.includes("&lt;script&gt;alert(1)&lt;/script&gt;\n**요약**\t입력"),
   );
   assert.ok(!html.includes("<script>"));
+  assert.ok(!html.includes("write_secret_tool"));
   assert.ok(
     html.indexOf("실행할 때마다 물어봐요") <
-      html.indexOf("connector-tool-description"),
+      html.indexOf("connector-tool-caption"),
   );
 });
 
-test("옛 도구와 빈 설명·불량 설명은 기존 정책 배지만 보이고 빈 목록 안내를 유지한다", async () => {
-  for (const description of [undefined, null, "", "글\u202e", "\ud800"]) {
-    const html = await render([
-      {
-        name: "read",
-        title: null,
-        risk: "READ",
-        approval: "NONE",
-        grant: false,
-        description,
-      },
-    ]);
-    assert.ok(!html.includes("connector-tool-description"));
-    assert.ok(html.includes("바로 실행해요"));
+test("제목이 없거나 빈 도구는 실제 이름 대신 대체 이름을 보이고 빈·불량 요약은 그리지 않는다", async () => {
+  for (const summary of [undefined, null, "", "글\u202e", "\ud800"]) {
+    for (const title of [null, " "]) {
+      const html = await render([
+        {
+          name: "read_hidden_tool",
+          title,
+          risk: "READ",
+          approval: "NONE",
+          grant: false,
+          summary,
+        },
+      ]);
+      assert.ok(!html.includes("connector-tool-caption"));
+      assert.ok(!html.includes("read_hidden_tool"));
+      assert.ok(html.includes("이름 없는 도구"));
+      assert.ok(html.includes("바로 실행해요"));
+    }
   }
   assert.ok((await render([])).includes("connector-tools-empty"));
 });
