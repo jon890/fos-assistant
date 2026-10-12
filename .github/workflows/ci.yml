@@ -17,8 +17,34 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      backend: ${{ steps.paths.outputs.backend }}
+      web: ${{ steps.paths.outputs.web }}
+      browser: ${{ steps.paths.outputs.browser }}
+      e2e: ${{ steps.paths.outputs.e2e }}
+      hermes: ${{ steps.paths.outputs.hermes }}
+      quality: ${{ steps.paths.outputs.quality }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 바뀐 파일로 실행할 검사 선택
+        id: paths
+        run: node scripts/ci/ci-paths.mjs changes
+
   backend-tests:
     name: backend-${{ matrix.suite }}
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -47,6 +73,9 @@ jobs:
         run: |
           bun install --cwd hermes/connectors/naver-blog --frozen-lockfile
           bun run --cwd hermes/connectors/naver-blog build
+      # 금융 producer 왕복 검사가 tossinvest 테스트 원본을 생성하고 금융 SDK를 bundle한다.
+      - name: 금융 producer 왕복 fixture 의존성
+        run: bun install --cwd hermes/connectors/tossinvest --frozen-lockfile
       - name: 백엔드 테스트
         if: matrix.suite == 'unit'
         working-directory: backend
@@ -59,19 +88,29 @@ jobs:
 
   backend:
     name: backend
-    needs: backend-tests
+    needs: [changes, backend-tests]
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      # 두 suite를 병렬 실행하되 어느 하나 실패·취소·생략이면 필수 검사도 실패한다.
-      - name: 백엔드 검사 결과 확인
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 변경 판정과 검사 결과 확인
         env:
-          BACKEND_RESULT: ${{ needs.backend-tests.result }}
-        run: test "$BACKEND_RESULT" = success
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHOULD_RUN: ${{ needs.changes.outputs.backend }}
+          JOB_RESULT: ${{ needs.backend-tests.result }}
+        run: node scripts/ci/ci-paths.mjs gate
 
-  web:
-    name: web
+  web-build:
+    name: web-build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -102,9 +141,32 @@ jobs:
           AUTH_GOOGLE_SECRET: build-time-placeholder
         run: pnpm build
 
+  web:
+    name: web
+    needs: [changes, web-build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 변경 판정과 검사 결과 확인
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHOULD_RUN: ${{ needs.changes.outputs.web }}
+          JOB_RESULT: ${{ needs.web-build.result }}
+        run: node scripts/ci/ci-paths.mjs gate
+
   browser:
     name: browser-${{ matrix.project }}-shard-${{ matrix.shard }}
     # runner 마다 웹, Control Plane, H2 메모리 DB 를 새로 띄운다. job 안에서는 직렬로 돈다.
+    needs: changes
+    if: needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -176,7 +238,7 @@ jobs:
 
   browser-required:
     name: browser-${{ matrix.project }}
-    needs: browser
+    needs: [changes, browser]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -195,7 +257,14 @@ jobs:
         with:
           node-version: '22.18.0'
           package-manager-cache: false
+      - name: 변경 판정과 검사 결과 확인
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHOULD_RUN: ${{ needs.changes.outputs.browser }}
+          JOB_RESULT: ${{ needs.browser.result }}
+        run: node scripts/ci/ci-paths.mjs gate
       - name: 폭별 shard 결과 판정
+        if: needs.changes.outputs.browser == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/browser-ci.mjs check ${{ matrix.project }} 4
@@ -234,8 +303,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/ci/browser-ci.mjs issues "$RUNNER_TEMP/browser-reports"
 
-  e2e:
-    name: e2e
+  e2e-tests:
+    name: e2e-tests
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -260,6 +331,27 @@ jobs:
           path: /tmp/fos-assistant-e2e-results-*/backend.log
           if-no-files-found: ignore
           retention-days: 7
+
+  e2e:
+    name: e2e
+    needs: [changes, e2e-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 변경 판정과 검사 결과 확인
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHOULD_RUN: ${{ needs.changes.outputs.e2e }}
+          JOB_RESULT: ${{ needs.e2e-tests.result }}
+        run: node scripts/ci/ci-paths.mjs gate
 
   unit:
     name: unit
@@ -286,8 +378,10 @@ jobs:
           FEATURE_BASE: ${{ github.event.pull_request.base.sha }}
         run: node scripts/ci/check-feature-covers.mjs "$FEATURE_BASE"
 
-  hermes:
-    name: hermes
+  hermes-tests:
+    name: hermes-tests
+    needs: changes
+    if: needs.changes.outputs.hermes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -311,34 +405,71 @@ jobs:
       # dashboard-profile-api 가 기대는 Hermes 내부 지점을 계약의 판 소스에서 확인한다(ADR-088).
       - run: bash scripts/checks/check-hermes-contract.sh
 
+  hermes:
+    name: hermes
+    needs: [changes, hermes-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.18.0'
+          package-manager-cache: false
+      - name: 변경 판정과 검사 결과 확인
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHOULD_RUN: ${{ needs.changes.outputs.hermes }}
+          JOB_RESULT: ${{ needs.hermes-tests.result }}
+        run: node scripts/ci/ci-paths.mjs gate
+
   quality:
     name: quality
+    needs: changes
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: 변경 판정 확인
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHOULD_RUN: ${{ needs.changes.outputs.quality }}
+        run: test "$CHANGES_RESULT" = success && { test "$SHOULD_RUN" = true || test "$SHOULD_RUN" = false; }
       # 바뀐 파일만 검사하는 도구(Spotless, OpenRewrite, Prettier)가 origin/main 이력을 쓴다. 깊이를 제한하지 않고 모두 받는다.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: 파일 길이 검사
+        run: node scripts/checks/check-file-length.mjs
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        if: needs.changes.outputs.quality == 'true'
         with:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+        if: needs.changes.outputs.quality == 'true'
       - run: python3 test/spotless-jdt.test.py
+        if: needs.changes.outputs.quality == 'true'
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        if: needs.changes.outputs.quality == 'true'
         with:
           version: 10.22.0
           package_json_file: web/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: needs.changes.outputs.quality == 'true'
         with:
           node-version: '22.18.0'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile
+        if: needs.changes.outputs.quality == 'true'
       # 파일 길이 기준 목록도 quality.sh 에서 검사한다.
       - run: scripts/checks/quality.sh check
+        if: needs.changes.outputs.quality == 'true'
 
   public-safe:
     name: public-safe

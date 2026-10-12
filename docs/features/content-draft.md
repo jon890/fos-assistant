@@ -1,6 +1,6 @@
 # 사진 참조를 고정한 원고와 단계별 검증
 
-covers: `backend/src/main/java/com/bifos/assistant/chat/**/ContentDraft*`, `backend/src/main/java/com/bifos/assistant/connector/**/ContentDraft*`, `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`, `test/support/media-pipeline-evidence.ts`, `test/unit/media-pipeline-evidence.test.ts`
+covers: `backend/src/main/java/com/bifos/assistant/chat/**/ContentDraft*`, `backend/src/main/java/com/bifos/assistant/connector/**/ContentDraft*`, `hermes/connectors/naver-blog/src/content-draft.ts`, `hermes/connectors/naver-blog/src/content-compiler.ts`, `hermes/connectors/naver-blog/src/content-snapshot*.ts`, `test/support/media-pipeline-evidence.ts`, `test/unit/media-pipeline-evidence.test.ts`
 
 typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으로 변환한다.
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.
@@ -127,6 +127,47 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 로컬 합성 시험은 잘못된 stdout과 JSONRPC·notification validation, callback 예외의 전후 본문 노출을 검사한다.
 운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
 compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다. 원고 최초 MCP 생성도 구현되어 있으며 공개 preview API·승인과 실제 네이버 저장은 후속 범위다.
+
+### 커넥터의 예약 job 시작과 조회
+
+커넥터에는 승인한 snapshot을 기존 worker로 한 번 저장하는 private start와 같은 job만 읽는 private status가 있다.
+운영 선언은 여전히 `{compile:true,start:false,status:false}`다. 묶음의 connector.json이 capability를 켜지 않으면 `--content-snapshot-operation start|status` 자식도 열리지 않는다.
+plugin 전달과 Control Plane 호출은 아직 연결하지 않았다. 아래는 그 둘이 따라야 할 커넥터 쪽 계약이다.
+
+| 칸 | 계약 |
+| --- | --- |
+| stamp | `protocol, snapshotId, jobId, snapshotHash, bindingId, connectionId, bindingUpdatedAt, connectionUpdatedAt, profileHash`의 strict 객체. ID는 소문자 UUID, 두 binding ID는 정규형 십진 문자열, 두 시각은 UTC 소수 여섯 자리, hash는 소문자 64자리 16진수 |
+| start 입력 | `{snapshot, jobId, ticket, stamp}`. snapshot은 CompiledSnapshotV1, `stamp.jobId`와 `stamp.snapshotHash`는 jobId·snapshot과 같아야 한다. ticket은 공백 없는 ASCII 1~4,096자 |
+| start 결과 | `{job_id, status, stamp, error_code}`. 시작 확인 전에 끝났으면 그 종료 상태다. 시작 전 거절 code를 같은 응답으로 읽으며 status와 같은 허용 규칙을 쓴다 |
+| status 입력 | `{stamp}`만 받는다 |
+| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다 |
+| 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}` |
+
+private 서버는 profile을 모르므로 profileHash를 다시 계산하지 않는다. 상태 파일의 stamp와 모든 칸이 같은지만 본다.
+요청 profile의 SHA-256과 stamp.profileHash의 대조는 plugin이 private 도구를 부르기 전에 해야 한다.
+authorize 주소는 private 자식 env `FOS_CONTENT_SAVE_AUTHORIZE_URL`에서만 받고 고정 경로 `/internal/content-draft-jobs/authorize`로 끝나는 http(s) 주소만 쓴다. <!-- ref-ignore: 구현할 Control Plane 내부 경로다 -->
+
+start는 같은 jobId의 상태 파일을 `O_EXCL`로 먼저 만들어 예약 ID를 고정한다. 이미 있으면 stamp가 모두 같을 때 그 상태만 돌려주고 worker를 띄우지 않는다.
+그 뒤의 세션 확인·잠금·입력 쓰기·spawn 실패는 상태를 지우지 않고 failed로 끝낸다. 잠금이 바쁘면 code는 `busy`다.
+worker가 시작 확인 시간 안에 pid를 적지 않으면 `start_unknown`이고 예약 ID는 그대로 남는다. 다시 보내도 새 worker는 없다.
+상태 파일은 끝난 뒤 24시간에 지워지므로 그 뒤의 재전송은 커넥터가 막지 못한다. 같은 job의 두 번째 실행은 Control Plane의 authorize(start) 단일 claim이 거절해야 한다.
+ticket은 입력 파일과 상태 파일에 쓰지 않는다. 기존 env whitelist에 ticket과 authorize 주소만 더해 그 worker에 넘긴다. worker는 무엇을 하기 전에 런타임 env에서 지워 이후 코드와 자식 프로세스에 넘기지 않는다. 커널이 보여 주는 최초 environ까지 지우지는 못한다.
+
+worker는 snapshot의 canonical tuple·manifest·notes로 원고를 다시 compile해 결과 전체와 두 지문이 같은지 본다. 상태 파일 stamp의 jobId·snapshotHash와도 맞춘다.
+어긋나면 브라우저를 열지 않고 `snapshot_invalid`로 끝난다. 통과하면 authorize(start) 뒤 기존 runDraft를 부른다.
+사진 i번째(0부터)는 manifest i번째와 대조한다. 읽은 바이트의 SHA-256이 sourceFingerprint와 같고 그 canonical position의 authorize(photo)를 통과해야 바로 그 바이트를 넣는다.
+검사하지 않은 기존 사진이 편집기에 있거나 manifest의 수·파일 이름이 다르면 `photo_mismatch`로 업로드 전에 멈춘다.
+save_clicking에서는 authorize(save)를 먼저 받고 기존 save_clicked 기록·재읽기·finishClaimed 검사를 그대로 한다. 거절이면 클릭 0회와 `authorize_denied`다. save 허가 뒤 save_clicked 기록이 실패해도 클릭 0회의 failed이므로, Control Plane은 save 허가를 저장 완료로 다루지 않는다.
+authorize는 HTTP 200의 정확한 `{"allowed":true}`만 허가로 보고 10초 뒤 끊으며 다시 보내지 않는다.
+clicked=false 실패, clicked=true 뒤 unknown, 600초 timeout과 30초 heartbeat·11분 stale 규칙은 기존 DSL job과 같다.
+
+공개 `draft_job`은 상태 파일에 `snapshot_stamp` 키가 있으면 값이 null이거나 깨졌어도 `NAVER_BLOG_JOB_NOT_FOUND`다. 묵은 작업 정리 전에 막아 공개 조회가 private 상태를 바꾸지 못한다.
+private status만 stamp를 strict decode해 대조하고, 묵은 job은 공개 조회와 같은 규칙으로 끝낸다. 상태 파일이 없거나 정리됐으면 `not_found`이며 worker를 새로 띄우지 않는다.
+pid가 없는 queued 예약은 세션 확인 상한 45초와 spawn 여유 10초를 합친 55초까지 기다린다. 세션 확인 중 status가 예약을 먼저 timeout으로 끝내지 않는다.
+Control Plane과 compiler가 중복 사진을 미리 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 거절한다. compiler를 거치지 않은 반복 snapshot도 worker가 재compile할 때 `snapshot_invalid`로 막아 authorize 호출과 브라우저 실행을 하지 않는다.
+
+검증은 실제 TS MCP Client와 InMemoryTransport, 분리한 worker 프로세스, loopback 대역 authorize 서버로 한다. 업로드와 저장 클릭은 대역 runDraft가 남긴 독립 기록으로 센다.
+30장 서로 다른 합성 바이트의 순서와 업로드 바이트는 대역 편집기로 확인한다. 실제 네이버 편집기·provider 사진 대응·운영 Hermes 왕복은 확인하지 않았다.
 
 ## 불변 preview snapshot
 

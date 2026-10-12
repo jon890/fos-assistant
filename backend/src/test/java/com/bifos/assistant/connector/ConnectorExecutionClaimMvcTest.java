@@ -45,6 +45,28 @@ class ConnectorExecutionClaimMvcTest extends ConnectorExecutionClaimTest {
     }
 
 
+    @ParameterizedTest
+    @ValueSource(strings = {"agent-disabled", "user-not-allowed"})
+    @DisplayName("발급 뒤 에이전트 또는 사용자 접근을 끄면 실제 claim HTTP는 ticket을 소비하지 않고 거부한다")
+    void rejectsClaimAfterAuthorityIsRevoked(String change) throws Exception {
+        Fixture f = fixture();
+        String request = JSON.writeValueAsString(input(tickets.issue(f.action())));
+        if ("agent-disabled".equals(change)) {
+            assertThat(jdbc.update("update agent set enabled = false where id = (select agent_id from connector_action where id = ?)", f.actionId())).isEqualTo(1);
+        } else {
+            assertThat(jdbc.update("update allowed_person set enabled = false where email = ?", f.user().email())).isEqualTo(1);
+        }
+        try {
+            assertThat(post(CLAIM, request, null, false).statusCode()).isEqualTo(409);
+            assertThat(row(f).consumedAt()).isNull();
+        } finally {
+            if ("user-not-allowed".equals(change)) {
+                jdbc.update("update allowed_person set enabled = true where email = ?", f.user().email());
+            }
+        }
+    }
+
+
     @Test
     @DisplayName("유효 JWT와 profile Bearer만으로 본문 ticket을 대신 인증할 수 없다")
     void rejectsJwtAndProfileBearerWithoutTicket() throws Exception {

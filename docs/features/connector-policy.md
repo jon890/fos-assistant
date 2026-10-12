@@ -558,8 +558,50 @@ HTTP 뒤 DB 상태를 다시 확인한다. 철회·재설치·카탈로그 변�
 PENDING 설치 callback의 `409/pending`은 실패나 READY의 필수 조건으로 바꾸지 않는다.
 설치·상태·probe 결과를 현재 시도의 CAS로 READY에 저장한 뒤 새 nonce로 verified를 확인한다.
 옛 backend의 401·403·404와 guard 누락, SHA·nonce 불일치 및 재시작 뒤 확인 실패는 이전 verified를 되살리지 못한다.
-금융 승인 hook과 주문 producer가 없으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
+금융 승인 hook이 없고 아래 producer도 공개 경로에 연결하지 않으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
 DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
+
+### 운영 비활성 금융 snapshot producer
+
+`ConnectorFinancialProducer`와 `ConnectorFinancialApproval`은 package-private Spring 컴포넌트다.
+실제 금융 준비·저장·승인 규칙을 갖지만 controller, MCP hook, 공개 approve, 스케줄러에는 연결하지 않는다.
+테스트는 같은 application 패키지에서 내부 메서드만 호출한다. 공개 정책의 `RISK_NOT_OPEN`과
+plugin의 금융 도구 exclude는 유지하며 별도 허용 정책, featureflag, 상시 허락은 만들지 않는다.
+
+요청자의 session 실행과 에이전트 바인딩에서 연결을 고른다. 소유자와 profile, 활성 사용자,
+READ_ONLY 실행 금지, READY와 desiredEnabled, guard의 FINANCIAL/always 선언을 검증한다.
+prepare는 DB 트랜잭션 밖에서 한 번만 실행하며 전후 fresh catalog의 manifest SHA와
+현재 상태의 verified guard를 대조한다. scope는 선언한 공개 연결 칸에서 만들고 snapshot 검증기를 재사용한다.
+사용자 행을 먼저 잠근 저장 트랜잭션에서 현재 맥락과 두 revision을 다시 대조하고 PENDING action,
+암호화 snapshot, 알림을 함께 저장한다. 사건과 판단 피드백은 커밋한 뒤에 전한다.
+
+승인은 CurrentUser와 승인 UUID만 받는다. fresh catalog와 상태를 확인한 뒤 사용자→action→execution
+순서로 잠그고 현재 권한과 snapshot을 재검증한다. EXECUTING을 커밋한 뒤 기존 ticket 발급과
+executeApproved를 각각 한 번 호출한다. 승인 때 prepare를 다시 부르거나 실행 UUID를 다시 만들지 않는다.
+발급 뒤 에이전트를 끈 경우도 claim의 현재 권한 검사에서 거부하며 ticket을 소비하지 않는다.
+ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTTP 읽기 제한이다.
+
+`ConnectorFinancialConflicts`는 준비·승인·claim이 함께 쓰는 같은 의도 검사다.
+사용자 잠금 아래 동일 request_key의 PENDING·EXECUTING·UNKNOWN을 차단하며 자기 action은 제외한다.
+claim은 이 검사를 ticket 소비 직전에 수행한다. clientOrderId 교체로 UNKNOWN을 우회하지 못하며
+supersedes_unknown_action_id는 NULL로 남긴다. 자동 재전송과 ticket 재발급은 하지 않는다.
+명백한 미전송·공식 거절은 FAILED, 불확실한 결과는 UNKNOWN, 성공은 SUCCEEDED로 저장한다.
+결과 저장은 현재 EXECUTING인 줄에만 적용하므로 기동 정리가 끝낸 상태를 덮지 않는다.
+
+Spring의 실제 DB snapshot·ticket·HMAC claim HTTP와 source Python 처리기, 금융 SDK bundle을
+loopback 금융 목적지에 연결해 검증한다. 테스트 설치 원본은 SDK의 기존 trading-entry 생성 명령이 만들고
+Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·support에 동일하게 연결한다.
+금융 POST와 auth POST, DELETE 및 execute 호출을 따로 센다. 이 검증은 테스트 내부 application 통합이며
+공개 승인 E2E, 운영 활성화, 계정 인증이나 실거래 완료의 증거는 아니다.
+공개 연결과 승인 카드 summary 표시·일괄 승인 제외는 별도 결정 및 보안 리뷰 전까지 보류한다.
+
+데이터 key가 꺼져 있으면 준비를 시작하지 않고, `content_key_id`가 없는 snapshot은 승인하지 않는다.
+공개 연결 전 보안 리뷰는 아래 남은 문제를 함께 정한다.
+
+- 모델 원문 `args_json`과 실행 결과 `result_text`는 평문 칸에 남는다.
+- ticket 발급 전에 프로세스가 멈추면 미전송인 줄도 UNKNOWN이 되어 같은 의도를 계속 막는다.
+- request_key에 연결 번호가 들어가므로 같은 계좌를 새 연결로 다시 붙이면 이전 UNKNOWN과 충돌하지 않는다.
+- execute의 `400`·`401`·`404`·`409`를 FAILED로 읽으므로 Python이 금융 전송 뒤 불확실한 결과를 이 상태 코드로 돌려주지 않는다는 계약을 확인해야 한다.
 
 ## 커넥터 READ 데이터의 흐름
 
