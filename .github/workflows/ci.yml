@@ -144,9 +144,17 @@ jobs:
         with:
           node-version: '22.18.0'
           package-manager-cache: false
+      - name: 통합한 quality job 결과 확인
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          if [ "$QUALITY_RESULT" != success ]; then
+            echo "::error::quality job이 성공하지 않았다: $QUALITY_RESULT"
+            exit 1
+          fi
       - name: 변경 판정과 검사 결과 확인
         env:
-          CHANGES_RESULT: ${{ needs.changes.result == 'success' && needs.quality.result == 'success' && 'success' || 'failure' }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
           SHOULD_RUN: ${{ needs.changes.outputs.web }}
           JOB_RESULT: ${{ needs.quality.outputs.web-result }}
         run: node scripts/ci/ci-paths.mjs gate

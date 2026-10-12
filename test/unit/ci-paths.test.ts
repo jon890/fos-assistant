@@ -284,14 +284,19 @@ test("웹 검사는 quality와 설치를 공유하되 변경 여부와 실제 �
   assert.match(web, /needs: \[changes, quality\]\n {4}if: always\(\)/);
   assert.match(web, /JOB_RESULT: \$\{\{ needs\.quality\.outputs\.web-result \}\}/);
   assert.match(web, /SHOULD_RUN: \$\{\{ needs\.changes\.outputs\.web \}\}/);
-  const expression = /CHANGES_RESULT: \$\{\{ (.*) \}\}/.exec(web)![1];
-  const evaluate = new Function("needs", `return ${expression};`);
+  assert.match(web, /CHANGES_RESULT: \$\{\{ needs.changes.result \}\}/);
+  assert.match(web, /QUALITY_RESULT: \$\{\{ needs.quality.result \}\}/);
+  const diagnostic = web.split("      - name: 통합한 quality job 결과 확인\n")[1].split("      - name:")[0];
+  const script = diagnostic.split("        run: |\n")[1].replace(/^ {10}/gm, "");
   for (const changes of ["success", "failure", "cancelled", "skipped"]) {
     for (const quality of ["success", "failure", "cancelled", "skipped"]) {
+      const check = spawnSync("bash", ["-euc", script], { encoding: "utf8", env: { ...process.env, QUALITY_RESULT: quality } });
+      assert.equal(check.status, quality === "success" ? 0 : 1);
+      if (quality !== "success") assert.match(check.stdout, /quality job이 성공하지 않았다/);
       for (const run of ["true", "false"]) {
         for (const result of ["success", "failure", "cancelled", "skipped", ""]) {
-          const actual = gate({ changes: evaluate({ changes: { result: changes }, quality: { result: quality } }), run, result });
-          assert.equal(actual.pass, changes === "success" && quality === "success" && ((run === "true" && result === "success") || (run === "false" && result === "skipped")));
+          const actual = check.status === 0 && gate({ changes, run, result }).pass;
+          assert.equal(actual, changes === "success" && quality === "success" && ((run === "true" && result === "success") || (run === "false" && result === "skipped")));
         }
       }
     }
