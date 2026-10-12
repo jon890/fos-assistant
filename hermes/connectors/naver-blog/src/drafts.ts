@@ -4,7 +4,14 @@ import {
   documentPhotos,
   documentToDraft,
 } from "./document.ts";
-import { editorDocument, loadDraft, tempDrafts } from "./editor/drafts.ts";
+import {
+  assertEmptyEditor,
+  editorDocument,
+  loadDraft,
+  type TempList,
+  tempDrafts,
+  tempList,
+} from "./editor/drafts.ts";
 import { open } from "./editor/open.ts";
 import {
   closeTab,
@@ -23,18 +30,34 @@ import {
   readLock,
   readState,
 } from "./jobs.ts";
-import { readConnection, type Env } from "./session.ts";
+import { readConnection, sessionStatus, type Env } from "./session.ts";
 
 /** 읽기 도구 하나의 시간 상한. Hermes 의 도구 호출 제한(300초)보다 짧다. */
 const READ_LIMIT_MS = 120_000;
 
 export type ReadOptions = Omit<EditorOptions, "signal"> & { limitMs?: number };
 
-/** 편집기 단계의 실패를 도구 오류로 바꾼다. 화면에서 읽은 글과 문장은 싣지 않는다. */
-function toolErrorOf(error: unknown): ToolError {
+/** 실패 뒤 로그인 쿠키를 다시 볼 때의 시간 상한. */
+const LOGIN_CHECK_MS = 5_000;
+
+/**
+ * 편집기 단계의 실패를 도구 오류로 바꾼다. 화면에서 읽은 글과 문장은 싣지 않는다.
+ * 까닭을 모르는 실패는 로그인 쿠키를 한 번 더 보고, 쿠키가 없으면 로그인이 풀린 것으로 알린다.
+ * 읽는 도중 세션이 끝나면 목록 응답이 로그인 화면으로 넘어가 모양 오류로만 보이기 때문이다.
+ */
+async function toolErrorOf(env: Env, error: unknown): Promise<ToolError> {
   if (error instanceof ToolError) return error;
   if (error instanceof EditorError && error.code === "login_required")
     return new ToolError("NAVER_BLOG_LOGIN_REQUIRED");
+  try {
+    await sessionStatus(env, { timeoutMs: LOGIN_CHECK_MS });
+  } catch (checked) {
+    if (
+      checked instanceof ToolError &&
+      checked.code === "NAVER_BLOG_LOGIN_REQUIRED"
+    )
+      return checked;
+  }
   return new ToolError("NAVER_BLOG_UNAVAILABLE");
 }
 
@@ -77,7 +100,7 @@ async function withWriteTab<T>(
     const opened = await open(tab.page, { keepDraftNotice: true });
     return await work(tab.page, blogId, opened === "draft_notice");
   } catch (error) {
-    throw toolErrorOf(error);
+    throw await toolErrorOf(env, error);
   } finally {
     clearTimeout(limit);
     if (tab) {
@@ -105,11 +128,40 @@ export function listDrafts(env: Env, options: ReadOptions = {}) {
 }
 
 /**
+ * 읽기 앞뒤의 임시저장 목록을 견준 결과. 읽는 동안 네이버 자동저장이 목록을 바꿨는지 알리는 관측값이다.
+ * 탭을 닫은 뒤의 자동저장과 목록에 보이지 않는 편집기 상태는 담지 못한다. 뒤 목록을 읽지 못하면 `null` 이다.
+ */
+export function autosaveCheck(
+  before: TempList,
+  after: TempList | null,
+  draftId: string,
+) {
+  if (!after) return null;
+  const savedAt = (list: TempList) =>
+    list.drafts.find((draft) => draft.draft_id === draftId)?.saved_at ?? null;
+  const found = after.drafts.some((draft) => draft.draft_id === draftId);
+  const check = {
+    count_before: before.count,
+    count_after: after.count,
+    saved_at_before: savedAt(before),
+    saved_at_after: savedAt(after),
+  };
+  return {
+    ...check,
+    changed:
+      !found ||
+      check.count_before !== check.count_after ||
+      check.saved_at_before !== check.saved_at_after,
+  };
+}
+
+/**
  * 승인 뒤 임시저장 글 하나를 편집기에 불러와 제목, 카테고리, 태그, 본문을 읽는다.
  * 저장 단추는 누르지 않지만 불러오면서 네이버 자동저장이 발생할 수 있어 WRITE 도구다.
  * 본문은 한 줄이 한 문단이고, 글이 아닌 구성요소는 `[기존 사진 1]` 같은 줄이다.
  * `revision` 은 그 네 칸의 지문이다. 별도로 읽는 사진 메타데이터는 지문에 넣지 않는다.
- * 「작성 중인 글」 알림이 떠 있으면 사용자가 쓰던 글이 편집기에 남은 것이라 불러오지 않고 `NAVER_BLOG_EDITOR_IN_USE` 다.
+ * 「작성 중인 글」 알림이 떠 있거나 새 탭의 편집기에 글이 남아 있으면 불러오지 않고 `NAVER_BLOG_EDITOR_IN_USE` 다.
+ * 읽기 앞뒤의 목록을 견준 `autosave_check` 를 함께 돌려준다.
  */
 export function readDraft(
   env: Env,
@@ -118,7 +170,11 @@ export function readDraft(
 ) {
   return withWriteTab(env, options, async (page, blogId, notice) => {
     if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
-    await loadDraft(page, blogId, draftId);
+    const before = await tempList(page, blogId);
+    if (!before.drafts.some((draft) => draft.draft_id === draftId))
+      throw new ToolError("NAVER_BLOG_DRAFT_NOT_FOUND");
+    await assertEmptyEditor(page);
+    await loadDraft(page, blogId, draftId, before.drafts);
     let content;
     let photos;
     try {
@@ -132,11 +188,13 @@ export function readDraft(
     }
     const { category, tags } = await readSettings(page);
     const draft = { title: content.title, category, tags, body: content.body };
+    const after = await tempList(page, blogId).catch(() => null);
     return {
       draft_id: draftId,
       revision: draftRevision(draft),
       ...draft,
       ...photos,
+      autosave_check: autosaveCheck(before, after, draftId),
     };
   });
 }

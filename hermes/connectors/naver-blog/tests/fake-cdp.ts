@@ -328,6 +328,12 @@ export class FakeEditor {
   loadInstead?: FakeDraft;
   /** 참이면 목록 응답을 부르는 식에 답하지 않는다. */
   hangList = false;
+  /** 참이면 편집기 객체의 `getDocumentData` 가 없다. 편집기 모양이 바뀐 화면을 만든다. */
+  documentUnavailable = false;
+  /** 참이면 글 단추를 눌렀을 때 글 대신 로그인 화면으로 넘어간다. 읽는 도중 세션이 끝난 상황을 만든다. */
+  loginOnLoad = false;
+  /** 참이면 글을 불러올 때 편집기 자동저장이 그 글의 고친 시각을 1초 늦춘다. */
+  autosaveOnLoad = false;
   listOpen = false;
   /** 지금 편집기 문서. 비면 `loaded` 로 답한다. `setDocumentData` 가 바꾼다. */
   document: FakeDocument | null = null;
@@ -543,6 +549,12 @@ export class FakeEditor {
       const draft = this.drafts[indexIn(finder, "tpb*s.tlist")];
       if (!this.listOpen || !draft) return null;
       return () => {
+        if (this.loginOnLoad) {
+          this.listOpen = false;
+          this.host = "nid.naver.com";
+          return;
+        }
+        if (this.autosaveOnLoad) draft.modiDate += 1000;
         this.loaded = this.loadInstead ?? draft;
         this.document = {
           document: { components: structuredClone(this.loaded.components) },
@@ -652,6 +664,9 @@ export class FakeEditor {
         this.listStatus === 200 ? `\n${JSON.stringify(body)}` : upstreamText;
       return JSON.stringify({ status: this.listStatus, text });
     }
+    if (expression === "location.hostname") return this.host;
+    if (expression.includes("getDocumentData()") && this.documentUnavailable)
+      return null;
     if (expression.includes("getDocumentData()") && this.document)
       return JSON.stringify({ ...this.document, documentId: this.documentId });
     if (expression.includes("getDocumentData()"))
