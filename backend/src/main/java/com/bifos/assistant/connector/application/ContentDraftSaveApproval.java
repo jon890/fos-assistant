@@ -147,17 +147,19 @@ public class ContentDraftSaveApproval {
             return mutations.run(user.id(), target, () -> refuse(user, prepared, ex.code()));
         }
         String ticket;
+        JsonNode compiled;
+        ContentDraftJobStarter starter;
         try {
             ticket = tickets.issue(reserved.ticket(), reserved.input().expiresAt());
+            compiled = ContentDraftSnapshotHash.compile(reserved.input().canonicalDraft(), reserved.input().resolvedAssets());
+            starter = starters.getObject();
         } catch (RuntimeException ex) {
             // 아직 시작을 보내지 않았다. 저장 클릭이 없으므로 실패로 끝낸다.
             return new TransactionTemplate(transactionManager).execute(status -> record(prepared, Outcome.rejected("CONTENT_DRAFT_JOB_UNAVAILABLE")));
         }
         Outcome outcome;
         try {
-            JsonNode compiled = ContentDraftSnapshotHash.compile(reserved.input().canonicalDraft(), reserved.input().resolvedAssets());
-            outcome = starters.getObject()
-                .start(reserved.input().binding().profile(), reserved.input().binding().connectorId(), compiled, reserved.ticket(), ticket)
+            outcome = starter.start(reserved.input().binding().profile(), reserved.input().binding().connectorId(), compiled, reserved.ticket(), ticket)
                 .map(Outcome::rejected)
                 .orElse(Outcome.ACCEPTED);
         } catch (RuntimeException ex) {

@@ -236,7 +236,7 @@ worker는 ticket을 해석할 필요가 없다. 받은 문자열을 그대로 au
 `POST /internal/content-draft-jobs/authorize`는 사용자 JWT 필터를 건너뛰고 controller가 ticket을 직접 인증한다. <!-- ref-ignore: worker가 부르는 내부 경로다 -->
 요청은 `{"ticket":..,"stage":"start"|"save"}` 또는 `{"ticket":..,"stage":"photo","position":<0~499>}`이고 다른 키·타입·중복 키·8,192바이트 초과는 400이다.
 position은 canonical block 위치이며 그 위치가 image block이어야 한다. 사진 DSL의 1부터 시작하는 번호가 아니다.
-허가는 200 `{"allowed":true}`다. 서명·형식·기한 실패는 401, 그 밖의 거절은 403이며 본문에는 고정 문구만 있다. 응답 누락·timeout·다른 모양을 허가로 읽지 않는다.
+허가는 200 `{"allowed":true}`다. 서명·형식·기한 실패는 401, 그 밖의 거절은 403이며 본문에는 고정 문구만 있다. DB 일시 장애와 잠금 경합에서 되돌린 claim도 403이다. 응답 누락·timeout·다른 모양을 허가로 읽지 않는다.
 
 매 호출은 ticket의 job·snapshot·hash·승인 줄·owner·대화·바인딩 판이 DB와 같은지 보고, 잠금 안에서 승인 사실, 사용자 허용, 에이전트, origin·루트 실행, 현재 원고·원본·바인딩을 다시 확인한다.
 start는 `start_claimed_at`, save는 `save_claimed_at`을 NULL에서 시각으로 바꾸는 조건부 갱신 결과 1일 때만 허가하고 그 트랜잭션을 커밋한 뒤 응답한다.
@@ -254,6 +254,7 @@ coordinator가 사용자 → 대화 → 첨부를 잠그고, 그 안에서 허�
 | `ExecutionRecorder.cancel` | CANCELLED UPDATE가 같은 실행 행을 잠근다. 먼저 커밋하면 claim 거절, 잠금을 쥐는 동안 claim이 기다렸다가 커밋이면 거절, rollback이면 허가 |
 | `PersonAccessService.setEnabled` | 사용자 행을 번호 오름차순으로 잠근 뒤 허용 목록 행을 잠근다. 끄기가 먼저 커밋하면 claim 거절 |
 | `AgentAdminService.update`·`AgentLifecycleService` | 에이전트 행 잠금을 공유한다. 비활성이 먼저 커밋하면 claim 거절 |
+| `RecoveredRunRecorder.finishOnce` | 실행 행을 먼저 잠그고 대화 행을 잠가 순서가 반대다. 겹치면 InnoDB 가 한쪽을 되돌린다. 허가가 지면 403 으로 끝나 클릭은 0회이고, 승인이 지면 승인 줄은 PENDING 으로 남는다. 순서 정렬은 후속 과제다 |
 | `ConnectorBindingService.unbind`·`ConnectorConnectionService.apply/disconnect` | 사용자 행을 먼저 잠그고 원고 승인 줄이 EXECUTING이면 기존처럼 `CONNECTOR_ACTION_EXECUTING`으로 실패하며 바인딩 판을 바꾸지 않는다 |
 
 claim이 먼저 커밋하면 뒤의 writer는 그 행을 기다렸다가 바뀐다. 이미 허가한 원격 클릭을 되돌리지 못하며 저장을 멈췄다고 보고하지 않는다.

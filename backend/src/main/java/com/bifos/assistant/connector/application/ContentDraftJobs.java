@@ -82,14 +82,14 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     @Override
     public ContentDraftSaveRequestView requestSave(CurrentUser user, Long originExecutionId, UUID snapshotId) {
         var snapshot = snapshotRows.findByPublicIdAndOwnerUserId(snapshotId, user.id()).orElseThrow(ContentDraftJobs::notFound);
-        var existing = jobs.findBySnapshotId(snapshot.id());
-        if (existing.isPresent()) {
-            return requestView(snapshot, existing.get());
-        }
         Long conversationId = snapshot.conversationId();
         // 지금 호출한 실행이 같은 사용자·대화의 취소되지 않은 실행이고 snapshot 의 에이전트와 같아야 한다.
         if (!snapshot.agentId().equals(inputs.agent(user, conversationId, originExecutionId))) {
             throw ContentDraftSnapshotHash.unavailable();
+        }
+        var existing = jobs.findBySnapshotId(snapshot.id());
+        if (existing.isPresent()) {
+            return requestView(snapshot, existing.get());
         }
         var stamp = bindings.prepare(user, snapshot.agentId(), snapshot.bindingId());
         var manifest = catalog.find(stamp.connectorId()).orElseThrow(ContentDraftSnapshotHash::unavailable);
