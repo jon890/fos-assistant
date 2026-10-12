@@ -133,13 +133,18 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     }
 
 
-    @Test
-    @DisplayName("claim 중 바뀐 바인딩은 금융 전송과 ticket 소비 전에 거부된다")
-    void changedRevisionDuringClaimIsRejectedWithZeroFinancialRequests() {
+    @ParameterizedTest
+    @DisplayName("claim 직전 바뀐 바인딩과 꺼진 에이전트는 금융 전송과 ticket 소비 전에 거부된다")
+    @ValueSource(strings = {"revision", "agent-disabled"})
+    void changedAuthorityDuringClaimIsRejectedWithZeroFinancialRequests(String change) {
         var requested = request();
         doAnswer(invocation -> {
             sent = invocation.getArgument(3);
-            tx().executeWithoutResult(status -> bindings.findById(bindingId).orElseThrow().pending(now.plusSeconds(1)));
+            if ("revision".equals(change)) {
+                tx().executeWithoutResult(status -> bindings.findById(bindingId).orElseThrow().pending(now.plusSeconds(1)));
+            } else {
+                jdbc.update("update agent set enabled = false where id = (select agent_id from agent_connector_binding where id = ?)", bindingId);
+            }
             return client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order", sent);
         }).when(hermes).executeApproved(anyString(), anyString(), anyString(), any());
         assertThat(approval.approve(user, requested.actionId()).status()).isEqualTo(ActionStatus.FAILED);
@@ -229,11 +234,12 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
 
     @ParameterizedTest
     @DisplayName("요청 뒤 바뀐 권한 맥락은 승인 전에 거부된다")
-    @ValueSource(strings = {"desired-disabled", "disconnected", "profile", "owner"})
+    @ValueSource(strings = {"desired-disabled", "disconnected", "profile", "owner", "agent-disabled"})
     void changedAuthorityAfterRequestIsRejectedBeforeTransmission(String change) {
         var requested = request();
         switch (change) {
             case "desired-disabled" -> jdbc.update("update agent_connector_binding set desired_enabled = false where id = ?", bindingId);
+            case "agent-disabled" -> jdbc.update("update agent set enabled = false where id = (select agent_id from agent_connector_binding where id = ?)", bindingId);
             case "disconnected" -> tx().executeWithoutResult(status -> connections.findById(connectionId).orElseThrow().disconnected(now.plusSeconds(1)));
             case "profile" -> jdbc.update("update agent set hermes_profile = ? where id = (select agent_id from agent_connector_binding where id = ?)",
                 profile + "-moved", bindingId);

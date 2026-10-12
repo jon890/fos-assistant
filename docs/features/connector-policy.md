@@ -578,6 +578,7 @@ prepare는 DB 트랜잭션 밖에서 한 번만 실행하며 전후 fresh catalo
 승인은 CurrentUser와 승인 UUID만 받는다. fresh catalog와 상태를 확인한 뒤 사용자→action→execution
 순서로 잠그고 현재 권한과 snapshot을 재검증한다. EXECUTING을 커밋한 뒤 기존 ticket 발급과
 executeApproved를 각각 한 번 호출한다. 승인 때 prepare를 다시 부르거나 실행 UUID를 다시 만들지 않는다.
+발급 뒤 에이전트를 끈 경우도 claim의 현재 권한 검사에서 거부하며 ticket을 소비하지 않는다.
 ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTTP 읽기 제한이다.
 
 `ConnectorFinancialConflicts`는 준비·승인·claim이 함께 쓰는 같은 의도 검사다.

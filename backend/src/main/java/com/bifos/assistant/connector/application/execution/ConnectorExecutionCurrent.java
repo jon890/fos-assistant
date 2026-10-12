@@ -132,6 +132,7 @@ public class ConnectorExecutionCurrent {
         var binding = bindings.findById(row.bindingId()).orElseThrow(ConnectorExecutionCurrent::rejected);
         var agent = binding.agent();
         require(access.allowed(action.userId())
+                && agent.enabled()
                 && connection.status() == ConnectionStatus.READY
                 && binding.status() == BindingStatus.READY
                 && binding.desiredEnabled());
