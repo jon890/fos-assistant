@@ -84,14 +84,11 @@ test("compiler 는 반복 사진을 CONTENT_DRAFT_DUPLICATE_PHOTO 로 조기에 
   ).rejects.toMatchObject({ code: "CONTENT_DRAFT_DUPLICATE_PHOTO" });
 });
 
-test("compiler 를 거치지 않은 반복 snapshot 은 지문이 맞아도 worker 재검증에서 거절한다", async () => {
-  const original = await syntheticSnapshot(join(await photoRoot(), "p"), 2);
-  const snapshot = structuredClone(original);
-  snapshot.canonicalBlocks.push(snapshot.canonicalBlocks[1]!);
-  snapshot.assetManifest.push({ ...snapshot.assetManifest[0]!, position: 3 });
-  snapshot.payload.body += "\n[사진 3: 1.jpg]";
+/** 옛 compiler 방식으로 두 지문을 다시 만든다. 유효한 compiler 결과와 먼저 대조한다. */
+function recompute(snapshot: CompiledSnapshotV1) {
+  const computed = structuredClone(snapshot);
   const payload = snapshot.payload;
-  snapshot.payloadFingerprint = sha256(
+  computed.payloadFingerprint = sha256(
     JSON.stringify([
       payload.title,
       payload.category,
@@ -100,7 +97,7 @@ test("compiler 를 거치지 않은 반복 snapshot 은 지문이 맞아도 work
       payload.photo_dir ?? null,
     ]),
   );
-  snapshot.snapshotHash = sha256(
+  computed.snapshotHash = sha256(
     JSON.stringify([
       1,
       snapshot.compilerVersion,
@@ -113,10 +110,24 @@ test("compiler 를 거치지 않은 반복 snapshot 은 지문이 맞아도 work
         entry.sourceFingerprint,
         entry.fileName,
       ]),
-      snapshot.payloadFingerprint,
-      [],
+      computed.payloadFingerprint,
+      Object.entries(snapshot.photoNotes).map(([number, note]) => [
+        Number(number),
+        note,
+      ]),
     ]),
   );
+  return computed;
+}
+
+test("compiler 를 거치지 않은 반복 snapshot 은 지문이 맞아도 worker 재검증에서 거절한다", async () => {
+  const original = await syntheticSnapshot(join(await photoRoot(), "p"), 2);
+  expect(recompute(original)).toEqual(original);
+  const repeated = structuredClone(original);
+  repeated.canonicalBlocks.push(repeated.canonicalBlocks[1]!);
+  repeated.assetManifest.push({ ...repeated.assetManifest[0]!, position: 3 });
+  repeated.payload.body += "\n[사진 3: 1.jpg]";
+  const snapshot = recompute(repeated);
   // 옛 compiler 와 같은 지문을 갖췄으므로 형식 오류나 hash 불일치만으로는 거절할 수 없다.
   expect(compiledSnapshotV1Schema.safeParse(snapshot).success).toBe(true);
   expect(verifySnapshot(snapshot)).toBeNull();
