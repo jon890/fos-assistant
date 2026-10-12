@@ -1,11 +1,89 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   readExecution,
   summarizeExecution,
 } from "../../scripts/pr/review-execution-summary.mjs";
+
+test("리뷰 진단과 위험 라벨은 기본 브랜치의 새 경로와 옛 경로를 모두 받는다", () => {
+  const workflow = readFileSync(
+    ".github/workflows/claude-code-review.yml",
+    "utf8",
+  );
+  const stepScript = (name) =>
+    workflow
+      .split(`- name: ${name}`)[1]
+      .split("\n      - name:")[0]
+      .split("run: |\n")[1]
+      .split("\n")
+      .filter((line) => line.startsWith("          "))
+      .map((line) => line.slice(10))
+      .join("\n")
+      .replace(/\$\{\{[^}]+\}\}/g, "fixture");
+  for (const layout of ["pr/", ""]) {
+    const directory = mkdtempSync(join(tmpdir(), "scripts-by-role-tools-"));
+    try {
+      const tools = join(directory, ".review-tools/scripts", layout);
+      mkdirSync(tools, { recursive: true });
+      copyFileSync(
+        "scripts/pr/review-execution-summary.mjs",
+        join(tools, "review-execution-summary.mjs"),
+      );
+      const summary = spawnSync(
+        "bash",
+        ["-euc", stepScript("본문을 제외한 리뷰 실행 진단 정보 기록")],
+        {
+          cwd: directory,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            EXECUTION_FILE: "",
+            GITHUB_STEP_SUMMARY: "/dev/null",
+          },
+        },
+      );
+      assert.equal(summary.status, 0, summary.stderr);
+      const risk = spawnSync(
+        "bash",
+        [
+          "-euc",
+          `
+        git() {
+          if [ "$1" = fetch ]; then return 0; fi
+          if [ "$2" != "origin/main:scripts/${layout}pr-risk-labels.sh" ]; then return 1; fi
+          printf 'echo fixture-label\\n'
+        }
+        gh() { return 0; }
+        ${stepScript("경로로 위험 라벨 달기")}
+      `,
+        ],
+        {
+          cwd: directory,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            RUNNER_TEMP: directory,
+            GITHUB_OUTPUT: "/dev/null",
+            GITHUB_STEP_SUMMARY: "/dev/null",
+          },
+        },
+      );
+      assert.equal(risk.status, 0, risk.stderr);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
 
 test("Draft 는 자동 리뷰를 건너뛰고 Ready 와 일반 PR, 권한 있는 댓글은 리뷰한다", () => {
   const workflow = readFileSync(
@@ -166,15 +244,21 @@ test("워크플로 게시 확인 단계는 누락과 커밋 변경, API 오류�
     .split("\n")
     .map((line) => line.replace(/^          /, ""))
     .join("\n")
-    .replace(/\$\{\{[^}]+\}\}/g, "fixture")
-    // CI 는 기본 브랜치의 사본을 .review-tools 에 두고 쓴다. 여기서는 작업 트리의 같은 파일을 쓴다.
-    .replaceAll(".review-tools/", "");
-  const run = (head, reviews, apiFailure = false) =>
-    spawnSync(
-      "bash",
-      [
-        "-c",
-        `
+    .replace(/\$\{\{[^}]+\}\}/g, "fixture");
+  const run = (head, reviews, apiFailure = false, layout = "pr/") => {
+    const directory = mkdtempSync(join(tmpdir(), "scripts-by-role-review-"));
+    const tools = join(directory, ".review-tools/scripts", layout);
+    mkdirSync(tools, { recursive: true });
+    copyFileSync(
+      "scripts/pr/submitted-claude-reviews.jq",
+      join(tools, "submitted-claude-reviews.jq"),
+    );
+    try {
+      return spawnSync(
+        "bash",
+        [
+          "-c",
+          `
     set -euo pipefail
     gh() {
       if [ "$1" = "pr" ]; then
@@ -187,20 +271,25 @@ test("워크플로 게시 확인 단계는 누락과 커밋 변경, API 오류�
     }
     ${script}
   `,
-      ],
-      {
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          MOCK_HEAD: head,
-          MOCK_REVIEWS: JSON.stringify(reviews),
-          MOCK_API_FAILURE: String(apiFailure),
-          REVIEW_HEAD: "head",
-          LAST_REVIEW_ID: "10",
-          GITHUB_STEP_SUMMARY: "/dev/null",
+        ],
+        {
+          encoding: "utf8",
+          cwd: directory,
+          env: {
+            ...process.env,
+            MOCK_HEAD: head,
+            MOCK_REVIEWS: JSON.stringify(reviews),
+            MOCK_API_FAILURE: String(apiFailure),
+            REVIEW_HEAD: "head",
+            LAST_REVIEW_ID: "10",
+            GITHUB_STEP_SUMMARY: "/dev/null",
+          },
         },
-      },
-    );
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  };
   const review = {
     id: 11,
     user: { login: "claude[bot]" },
@@ -211,6 +300,8 @@ test("워크플로 게시 확인 단계는 누락과 커밋 변경, API 오류�
   };
   const success = run("head", [[review]]);
   assert.equal(success.status, 0, success.stderr);
+  const legacy = run("head", [[review]], false, "");
+  assert.equal(legacy.status, 0, legacy.stderr);
   assert.equal(run("head", []).status, 1);
   assert.equal(run("new-head", [[review]]).status, 1);
   assert.notEqual(run("head", [[review]], true).status, 0);
