@@ -32,7 +32,10 @@
 - 키 공식은 버전 접두로 가른다. 일반 주문은 `fos-financial-intent-v2`, 조건주문은 `fos-conditional-intent-v2` 다. 경로에서 connectionId 를 빼고 connectorId 를 넣는다. account_seq 는 이미 있다.
 - keyed hash 는 HMAC-SHA256 앞 16바이트로 해 칸 길이를 바꾸지 않는다. 마이그레이션은 없다.
 - key 는 비밀값이므로 DB 에 넣지 않는다. 운영 비밀 파일에서 환경 변수로 받는다. 없으면 phase-02 의 gate 가 금융을 열지 않는다.
-- 기존 줄과의 호환: 운영에는 금융 caller 가 없어 금융 줄이 0개여야 한다. 기동 때 금융 위험도의 승인 줄이 하나라도 있으면 경고를 남기고 gate 를 닫는다. 남은 줄을 새 공식으로 다시 계산하지 않는다.
+- 기존 줄과의 호환은 행 단위 버전 칸으로 가른다. `ConnectorExecutionSnapshot.PROTOCOL` 을 `approval-claim-v2` 로 올리고 manifest `execution_guard.protocol` 도 같이 올린다.
+  v1 줄은 `open` 의 protocol 대조에서 자동으로 거절된다. gate 는 `protocol = 'approval-claim-v1'` 이면서 PENDING, EXECUTING, UNKNOWN 인 줄이 있을 때만 닫는다.
+  「금융 줄이 하나라도 있으면 닫는다」 로 두면 첫 실제 호출이 만든 v2 줄 때문에 그 뒤 재기동마다 gate 가 닫힌다. request_key 의 버전 접두는 해시 입력 안에 있어 저장된 값으로는 버전을 알 수 없다.
+  남은 v1 줄을 새 공식으로 다시 계산하지 않는다. 운영에는 금융 caller 가 없어 v1 줄은 0개여야 한다.
 - 조건주문의 공통 vector(`test/resources/conditional-snapshot-v1.json`)의 의도 키 기대값은 v2 로 다시 만들고 Python 과 Spring 이 같은 값을 내는지 확인한다.
 
 ## 작업 항목
@@ -41,6 +44,7 @@
 
 연결을 해제하고 다시 등록한 뒤, 그리고 같은 계좌를 다른 connectionId 로 둔 뒤 같은 의도의 준비가 기존 UNKNOWN 에 막히는지 확인한다.
 DB 에 저장된 네 칸이 key 없는 SHA 로 다시 계산되지 않는지, key 를 바꾸면 값이 달라지는지 확인한다.
+열린 v1 줄이 있으면 gate 가 닫히고, v2 줄이 SUCCEEDED 나 UNKNOWN 으로 남아 있어도 재기동 뒤 gate 가 열리는지 확인한다.
 
 ### 2. 구현
 
