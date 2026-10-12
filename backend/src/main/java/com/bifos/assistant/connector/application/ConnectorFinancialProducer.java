@@ -136,8 +136,10 @@ class ConnectorFinancialProducer {
                 false, key, hash, now);
             action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
             actions.saveAndFlush(action);
-            contents.saveAndFlush(ConnectorExecutionSnapshot.capture(action, binding, operation,
-                JSON.writeValueAsString(contract.scopeFields()), executionArgs, summary, scopeJson, cipher, now));
+            var row = ConnectorExecutionSnapshot.capture(action, binding, operation,
+                JSON.writeValueAsString(contract.scopeFields()), executionArgs, summary, scopeJson, cipher, now);
+            require(row.contentKeyId() != null);
+            contents.saveAndFlush(row);
             if (action.conversationId() != null && checkNotifications.allows(origin, now)) {
                 String title = ConnectorActionView.titleOf(ConnectorToolPolicies.find(manifest, toolName));
                 conversations.publicIdOf(action.conversationId()).ifPresent(id -> notifications.notify(action.userId(),

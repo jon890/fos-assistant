@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -271,6 +272,28 @@ class FinancialConnectorProducerTest {
         assertThatThrownBy(this::request).isInstanceOf(RuntimeException.class);
         assertThat(action(first).status()).isEqualTo(ActionStatus.PENDING);
         assertThat(counters().path("prepare").intValue()).isEqualTo(2);
+        assertThat(counters().path("financial").intValue()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("prepare 뒤 암호화가 꺼지면 평문 snapshot과 승인과 알림을 저장하지 않는다")
+    void rejectsDisabledEncryptionAfterPrepareWithoutSaving() {
+        Object original = ReflectionTestUtils.getField(producer, "cipher");
+        var changing = mock(TextCipher.class);
+        when(changing.enabled()).thenReturn(true, false);
+        long count = actions.count();
+        long snapshots = contents.count();
+        ReflectionTestUtils.setField(producer, "cipher", changing);
+        try {
+            assertThatThrownBy(this::request).isInstanceOf(ApiException.class);
+        } finally {
+            ReflectionTestUtils.setField(producer, "cipher", original);
+        }
+        assertThat(actions.count()).isEqualTo(count);
+        assertThat(contents.count()).isEqualTo(snapshots);
+        assertThat(jdbc.queryForObject("select count(*) from notification where user_id = ?", Long.class, user.id())).isZero();
+        assertThat(counters().path("prepare").intValue()).isEqualTo(1);
         assertThat(counters().path("financial").intValue()).isZero();
     }
 
