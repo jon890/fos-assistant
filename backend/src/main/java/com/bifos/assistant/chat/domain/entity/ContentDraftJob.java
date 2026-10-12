@@ -137,6 +137,23 @@ public class ContentDraftJob {
     }
 
 
+    /** 같은 job의 늦은 terminal로 UNKNOWN을 해소하되 확정한 terminal은 덮지 않는다. */
+    public void observed(ContentDraftJobStatus observed, String stage, boolean clicked, String code, Instant at) {
+        if (!running() && status != ContentDraftJobStatus.UNKNOWN) {
+            return;
+        }
+        this.stage = stage;
+        this.saveClicked = saveClicked || clicked;
+        this.lastCheckedAt = at;
+        this.errorCode = code;
+        if (observed == ContentDraftJobStatus.FAILED && (saveClicked || saveClaimedAt != null)) {
+            this.status = ContentDraftJobStatus.UNKNOWN;
+        } else if (status != ContentDraftJobStatus.UNKNOWN || observed != ContentDraftJobStatus.SAVING) {
+            this.status = observed;
+        }
+    }
+
+
     private void requireRunning() {
         require(running());
     }

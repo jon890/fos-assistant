@@ -6,7 +6,7 @@ typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으�
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.
 관찰 저장과 REST·MCP 연결은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결)에 따라 구현되었다.
 순수 compiler와 합성 판정, Control Plane의 원고 revision 저장 REST가 구현되어 있다. MCP 도구·실행 사건 가림·fos-ctx 서명 필수 목록도 구현되어 있다.
-원고 revision의 불변 preview snapshot 서비스와 최소 참조 표, 승인 요청·jobId 예약·worker 허가가 구현되어 있다. 공개 preview API·worker 시작 전송·화면 연동은 후속 범위다.
+원고 revision의 불변 preview snapshot 서비스와 최소 참조 표, 승인 요청·jobId 예약·worker 허가·시작 전송·private 상태 조회가 구현되어 있다. 공개 preview API와 화면 연동은 후속 범위다.
 
 ## 정적 canonical 계약
 
@@ -76,32 +76,32 @@ compiler 회귀와 공유 golden vector는 `hermes/connectors/naver-blog/tests/c
 테스트는 고정 ResolvedAsset mock과 임시 디렉터리의 합성 사진만 사용한다.
 다른 구현의 신규 파일이나 실제 provider 호출에 의존하지 않는다.
 
-### compile 전용 내부 transport
+### private snapshot 내부 transport
 
 `POST /api/connectors/{id}/snapshot`은 Control Plane 서비스 Bearer로만 호출한다. <!-- ref-ignore: plugin이 middleware에서 처리하는 서비스 경로다 -->
-대시보드 쿠키만 있는 요청은 거절한다. 요청의 정확한 키는 `profile`, `operation`, `args`이며 이번 구현은 `operation:"compile"`만 받는다.
-args는 서버가 검증한 `canonicalDraft`와 `resolvedAssets`다. 모델 공개 도구에는 내부 경로와 private 도구를 등록하지 않는다.
+대시보드 쿠키만 있는 요청은 거절한다. 요청의 정확한 키는 `profile`, `operation`, `args`이며 operation은 `compile`, `start`, `status`다.
+compile args는 서버가 검증한 `canonicalDraft`와 `resolvedAssets`다. start·status args는 아래 private worker 계약을 따른다. 모델 공개 도구에는 내부 경로와 private 도구를 등록하지 않는다.
 
 connector.json의 snapshot은 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`의 다섯 키만 받는다.
 protocol은 `content-snapshot-v1`, 도구 이름은 서로 다르고 공개 도구와 겹치지 않는다.
-capabilities는 `compile`, `start`, `status` 세 boolean이며 이번 구현은 `{compile:true,start:false,status:false}`만 선언한다.
+capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 운영 선언은 `{compile:true,start:false,status:false}`를 유지한다.
 카탈로그의 별도 snapshot 칸과 성공 HTTP 응답은 같은 검증된 선언을 사용한다.
-Java catalog decoder도 이 다섯 키 계약을 따르며 compile 전용 선언만 받는다. DB와 승인은 구현되어 있고 worker 시작 전송·조회는 후속 범위다.
+Java catalog decoder도 같은 키와 capability 계약을 따른다. transport 구현이 있어도 운영 선언이 켜지지 않으면 시작하지 않는다.
 
 dashboard는 기존 설치 소유 기록과 profile 표식, 주인 첨부·브라우저 환경 선택 규칙을 확인한 뒤 별도 stdio 자식을 띄운다.
 실행 UID는 기존 dashboard 자식과 같고 권한을 올리지 않는다.
-private process는 dashboard가 붙인 `--content-snapshot-operation compile` 인자로만 열린다.
+private process는 dashboard가 붙인 `--content-snapshot-operation compile|start|status` 인자로만 열린다.
 공개 설치 args의 private flag와 manifest·profile의 `FOS_CONTENT_SNAPSHOT_OPERATION`, `FOS_CONTENT_SAVE_TICKET`, `FOS_CONTENT_SAVE_AUTHORIZE_URL` 선언은 거절한다.
 부모 env 전체를 복사하지 않으며 별도 private env를 일반 MCP 설치에 남기지 않는다.
 Naver 실행 선언의 `--no-env-file`로 Bun이 dashboard의 작업 디렉터리에서 `.env`를 자동으로 읽는 것도 차단한다.
-실제 private 도구 목록이 선언한 compile 하나와 다르면 호출하지 않는다.
-start·status와 미지원 operation은 자식 실행 전 409로 끝나며 일반 execute로 우회하지 않는다.
+실제 private 도구 목록이 선언한 해당 operation 하나와 다르면 호출하지 않는다. compile·status의 readOnlyHint는 true, start는 false여야 한다.
+꺼진 capability와 미지원 operation은 자식 실행 전 409로 끝나며 일반 execute로 우회하지 않는다.
 
-성공 응답은 `{ok:true,result,capabilities}`이고 result는 기존 `CompiledSnapshotV1`이다.
+성공 응답은 `{ok:true,result,capabilities}`이고 compile result는 기존 `CompiledSnapshotV1`이다. start·status 결과는 job projection의 정확한 키·stamp·타입만 받는다.
 오류는 본문·경로·cause·stderr 없는 `{ok:false,error}`이며 compile timeout은 504다.
-전체 MCP 왕복은 5초로 제한하고 기존 call·execute와 동시 호출 4개 한도를 공유한다. 자동 재전송은 없다.
+compile·status MCP 왕복은 5초, start는 세션 확인과 spawn 대기를 포함해 60초다. 기존 call·execute와 동시 호출 4개 한도를 공유한다. 자동 재전송은 없다.
 adapter 자체는 원고와 인자·결과를 파일이나 로그에 남기지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
-Python MCP SDK의 compile 진단은 `connector_diagnostics.py`가 호출별 ContextVar로 가린다.
+Python MCP SDK의 compile·start·status 진단은 `connector_diagnostics.py`가 호출별 ContextVar로 가린다. 본문과 ticket에 같은 정책을 적용한다.
 실제 emission logger 세 곳에 영구 Filter를 설치하고 stdio와 session 정리가 끝난 뒤 scope를 해제한다.
 scope 안에서는 msg, args, 예외, stack과 formatter의 cached message를 제거해 고정 문자열만 남긴다.
 logger 이름, ERROR/WARNING 등급과 record 수, 정상 RPC 결과는 유지하며 scope 밖 로그는 바꾸지 않는다.
@@ -126,7 +126,7 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 **본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
 로컬 합성 시험은 잘못된 stdout과 JSONRPC·notification validation, callback 예외의 전후 본문 노출을 검사한다.
 운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
-compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다. 원고 최초 MCP 생성도 구현되어 있으며 공개 preview API·승인과 실제 네이버 저장은 후속 범위다.
+private transport와 preview snapshot 서비스는 합성 원고로 검증한다. 원고 최초 MCP 생성과 승인도 구현되어 있으며 공개 preview API와 실제 네이버 저장은 후속 범위다.
 
 ### 커넥터의 예약 job 시작과 조회
 
@@ -144,7 +144,7 @@ plugin 전달과 Control Plane 호출은 아직 연결하지 않았다. 아래�
 | 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}` |
 
 private 서버는 profile을 모르므로 profileHash를 다시 계산하지 않는다. 상태 파일의 stamp와 모든 칸이 같은지만 본다.
-요청 profile의 SHA-256과 stamp.profileHash의 대조는 plugin이 private 도구를 부르기 전에 해야 한다.
+요청 profile의 SHA-256과 stamp.profileHash는 plugin이 자식 실행 전에 대조한다. authorize 주소는 dashboard의 기존 `FOS_CONNECTOR_EXECUTIONS_BASE_URL` 접두사에 고정 내부 경로를 붙인다. 요청·manifest·profile이 다른 주소를 지정하지 못한다.
 authorize 주소는 private 자식 env `FOS_CONTENT_SAVE_AUTHORIZE_URL`에서만 받고 고정 경로 `/internal/content-draft-jobs/authorize`로 끝나는 http(s) 주소만 쓴다. <!-- ref-ignore: 구현할 Control Plane 내부 경로다 -->
 
 start는 같은 jobId의 상태 파일을 `O_EXCL`로 먼저 만들어 예약 ID를 고정한다. 이미 있으면 stamp가 모두 같을 때 그 상태만 돌려주고 worker를 띄우지 않는다.
@@ -210,7 +210,7 @@ UNIQUE 실패 뒤에는 새 owner 범위 읽기로 기존 행을 찾고, 기존 
 Java HTTP client는 POST·서비스 Bearer·profile/operation/args tuple만 전달한다.
 512KiB 응답은 chunked여도 tree 전에 차단하고 전체 응답은 5초로 제한한다. canonical 64KiB·compiled 256KiB·원본 50개 상한을 유지한다.
 Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두 적용하며 중단·실패 시 반환한다.
-성공 envelope의 capabilities는 compile=true/start=false/status=false만 수용한다. 오류 body·raw 인자·exception cause를 로그나 응답에 싣지 않는다.
+성공 envelope의 capabilities는 catalog와 같은 strict boolean 계약을 따르며 요청 operation이 true여야 한다. 오류 body·raw 인자·exception cause를 로그나 응답에 싣지 않는다.
 스키마·설치·HTTP 장애는 원고의 기존 안전한 오류로 끝낸다.
 
 검증은 공유 golden의 Java UTF-8 바이트·두 지문, 실제 HTTP 대역, Spring 동시 revision·권한 철회·원본 교체, H2 마이그레이션과 fresh MySQL을 사용한다.
@@ -220,7 +220,7 @@ Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두
 
 #396·#398의 새 글 임시저장을 기존 승인 줄과 서버가 예약한 worker jobId로 잇는다. 결정 근거는 [ADR-20261011 / content-snapshot-job](../adr/ADR-20261011-content-snapshot-job.md)이다.
 승인 요청·jobId 예약·worker 허가·보관 상태 조회는 Control Plane에 구현되어 있다.
-worker 시작 전송, private 상태 조회, MCP 도구와 REST·화면 연결은 후속 범위다. catalog가 시작을 선언하지 않는 동안 승인은 실행 없이 거절한다.
+worker 시작 전송과 private 상태 조회는 구현되어 있다. MCP 도구와 REST·화면 연결은 후속 범위다. catalog가 시작을 선언하지 않는 동안 승인은 실행 없이 거절한다.
 
 ### 승인 요청과 조회 port
 
@@ -252,14 +252,15 @@ list는 1~20개를 job 내부 번호 역순으로 읽고 21번째 행으로 다�
 원고 승인 줄의 등록 이름 `fos_content_draft_save`는 MCP 서버 도구가 아니다. 이 줄이 일반 승인 경로로 들어와도 선언 없는 도구로 판정되어 실행 없이 거절된다.
 prepare는 잠글 실행 번호, 지금 catalog로 계산한 바인딩 stamp, catalog 선언을 잠금 밖에서 읽는다.
 시작은 catalog의 snapshot 선언이 start·status를 모두 참으로 선언하고 `ContentDraftJobStarter` 구현 빈이 있을 때만 지원한다.
-지금 catalog decoder는 compile 전용 선언만 받고 시작 전송 빈도 없으므로 운영에서는 실행 없이 거절한다.
+catalog decoder와 시작 전송 빈은 준비되어 있지만 운영 capability가 false이므로 운영에서는 실행 없이 거절한다.
 
 approvePrepared는 coordinator 한 번 안에서 아래 「잠금 순서」로 잠그고 승인 줄 PENDING, job PREVIEW_READY, 기한, 시작 지원, 현재 `save_draft` 정책, 현재 원고·원본·바인딩 판, 준비한 정책 지문을 확인한다.
 모두 맞으면 소문자 정규 UUID jobId를 예약하고 승인 줄 EXECUTING, job DISPATCHED와 승인자·승인 시각을 함께 커밋한다.
 하나라도 맞지 않으면 그 트랜잭션을 되돌리고 새 트랜잭션에서 승인 줄을 `not_executable`로 거절하거나 만료로 끝낸다. job은 STALE과 `CONTENT_DRAFT_STALE` 또는 `not_executable`이며 외부 호출은 0회다.
 커밋 뒤 ticket을 발급하고 Java로 재계산한 compiled snapshot과 함께 시작을 최대 한 번 보낸다. 전송 구현은 예약 jobId와 snapshot·바인딩 판을 받아 start 입력의 stamp를 만든다.
 시작 전송 port는 `ContentDraftJobStarter.start(String profile, String connectorId, JsonNode snapshot, ContentDraftSaveTicketPayload job, String ticket)`이다.
-후속 구현은 `{snapshot, jobId, ticket, stamp}`를 보내며 stamp에 snapshot·job 식별자와 해시, 바인딩·연결 버전, profile의 SHA-256인 profileHash를 담는다. 후속 Python plugin이 profileHash를 대조한다.
+`HttpContentDraftJobStarter`가 예약 payload를 `ContentDraftWorkerStamp`로 옮긴 뒤 HTTP client에 넘긴다. HTTP client의 start 인자는 `profile, connectorId, snapshot, stamp, ticket`이다. hermes가 상위 connector의 ticket 타입에 의존하지 않도록 이 변환은 connector가 맡는다.
+전송은 `{snapshot, jobId, ticket, stamp}`이며 stamp에 snapshot·job 식별자와 해시, 바인딩·연결 버전, profile의 SHA-256인 profileHash를 담는다. Python plugin이 profileHash를 대조한다.
 private 상태 도구 이름은 manifest의 `content_snapshot_status`다.
 
 | 시작 결과 | 승인 줄 | job |
@@ -323,7 +324,10 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 | 시작 전 거절 | FAILED | 같은 snapshot 재시도 없음 |
 | 시작 결과 모름 | UNKNOWN | 예약 jobId로만 조회, 재승인으로 재실행하지 않음 |
 
-worker 결과의 조회와 SUCCEEDED·terminal 반영, 늦게 읽은 terminal로 UNKNOWN을 해소하는 일은 후속 private status 구현이 맡는다.
+`ContentDraftJobs.refresh`는 주인·원래 대화·원고 ID를 먼저 확인한다. 현재 binding·connection 버전과 정책이 snapshot과 같고 status capability가 켜져 있을 때만 같은 예약 ID를 조회한다. 연결이 없거나 바뀌면 마지막 CP 상태만 읽는다.
+원격 호출 동안 DB 잠금을 유지하지 않는다. 응답 뒤 coordinator에서 현재 ACL·binding을 다시 확인하고 승인 줄 → snapshot → job 순서로 잠근다. stamp와 jobId가 정확한 결과만 기록한다.
+`ContentDraftWorkerStatusDecoder`는 소문자 worker 상태를 CP enum으로 명시적으로 옮기며 단계·boolean·수치·종료 시각의 타입을 검사한다. 조회 오류는 `CONTENT_DRAFT_JOB_UNAVAILABLE`이고 기존 상태를 FAILED로 바꾸지 않는다.
+늦은 terminal은 UNKNOWN job을 해소할 수 있다. 확정한 SUCCEEDED·FAILED는 덮지 않고 UNKNOWN을 running 응답으로 되돌리지 않는다. save claim 또는 save_clicked 뒤의 실패는 UNKNOWN이다. ConnectorAction은 EXECUTING일 때만 terminal로 바꾸고 기존 UNKNOWN 승인 줄은 유지한다.
 FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장이 없었다는 증거가 아니다. save claim 뒤의 실패는 UNKNOWN으로 둔다.
 
 ### 승인과 허가 검증
@@ -331,6 +335,10 @@ FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장
 `ContentDraftJobsTest`는 승인·요청 경합, 재전송 금지, 실제 HTTP의 ticket 인증과 start·save 단일 claim을 검사한다.
 `ContentDraftClaimMysqlTest`는 실제 MySQL에서 실행 취소와 사용자 끄기의 행 잠금, 커밋과 rollback에 따른 허가를 검사한다.
 `ContentDraftSaveTicketTest`와 `ContentDraftSnapshotArchitectureTest`는 ticket 분리·가림과 모듈 경계를 검사한다. 실제 provider 저장과 운영 Hermes 왕복은 이 검사에 포함하지 않는다.
+
+`ContentDraftJobLoopbackTest`는 RANDOM_PORT의 실제 CP HTTP와 Bun 자식 worker·fake CDP를 잇는다. 파일 업로드의 실제 CDP 바이트와 저장 단추의 마우스 처리 횟수를 manifest·예정 응답과 따로 센다. 시작 응답 유실, 사진 교체, 철회, 클릭 직전·직후 중단을 검사한다.
+CP 재기동 검사는 같은 합성 DB를 유지하며 JVM 안에서 운영 ApplicationContext·HTTP server·DB 연결을 종료하고 재생성한다. 별도 JVM 종료와 운영 DB 장애 복구를 검증한 것은 아니다.
+macOS와 Linux CI 모두 기존 합성 Chrome image에 고정 의존성을 더한 Docker runner를 쓴다. 합성 CP와 worker가 서로 다른 첨부 경로를 쓰는 기존 fixture 계약을 유지하고 Linux에서는 host-gateway로 CP에 닿는다. 실제 계정 env는 복사하지 않는다. Bun·Docker 부재를 skip하지 않으며 자식·컨테이너·합성 사진을 finally에서 정리한다.
 
 ## 단계별 합성 판정
 
@@ -635,7 +643,7 @@ revision·asset·현재 번호·만료 단축은 한 트랜잭션으로 커밋�
 
 ### 후속 경계와 완료 판정
 
-preview snapshot 서비스와 Java 재계산, 승인 요청과 jobId 예약, worker 허가는 구현되어 있다. 공개 preview API·worker 시작 전송·상태 조회와 웹 편집은 후속 범위다.
+preview snapshot 서비스와 Java 재계산, 승인 요청과 jobId 예약, worker 허가·시작 전송·상태 조회는 구현되어 있다. 공개 preview API와 웹 편집은 후속 범위다.
 무효화 포트·빈 구현·preview 파일을 미리 만들지 않는다.
 일반 커넥터 승인 줄은 job 링크가 없으므로 원고 승인으로 취급하지 않는다. 잠금 순서는 위 「잠금 순서와 철회의 선형화」가 갖는다.
 Alpine 위험 수용, 원본 파일 순서 실증의 미완료 상태, 실제 거래·발행 금지와 신규 네이버 테스트만 실행하는 기존 경계를 유지한다.

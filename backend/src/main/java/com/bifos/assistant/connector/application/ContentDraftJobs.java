@@ -22,6 +22,9 @@ import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
+import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
+import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
+import com.bifos.assistant.hermes.HttpContentDraftSnapshotClient;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
@@ -52,7 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 원고 snapshot 의 저장 요청과 보관한 job 조회를 맡는다. chat 의 두 port 를 구현한다.
  *
  * <p>저장 요청은 기존 승인 줄 하나와 job 링크 하나를 같은 트랜잭션에서 만든다. 같은 snapshot 의 두 번째 요청은 앞의 줄을 그대로
- * 돌려준다. 조회는 Control Plane 이 이미 보관한 상태만 읽고 외부를 부르지 않는다.
+ * 돌려준다. 현재 연결이 같은 조회만 예약한 private job을 읽고 시작은 재전송하지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -78,6 +81,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
     private final LiveProperties<ConnectorPolicyProperties> policy;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final HttpContentDraftSnapshotClient worker;
 
 
     @Override
@@ -131,7 +135,6 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
 
 
     @Override
-    @Transactional(readOnly = true)
     public ContentDraftJobView refresh(CurrentUser user, Long conversationId, UUID draftId, UUID snapshotId) {
         access.requireOwn(user, conversationId);
         var snapshot = snapshotRows.findByPublicIdAndOwnerUserIdAndConversationId(snapshotId, user.id(), conversationId)
@@ -141,7 +144,60 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         if (!draftId.equals(view.draftId())) {
             throw notFound();
         }
-        return view;
+        if (job.jobId() == null || !job.running() && job.status() != ContentDraftJobStatus.UNKNOWN) {
+            return view;
+        }
+        ContentDraftBindingStamp binding;
+        try {
+            binding = bindings.prepare(user, snapshot.agentId(), snapshot.bindingId());
+            if (!sameBinding(snapshot, binding)) {
+                return view;
+            }
+        } catch (ApiException ignored) {
+            // 연결이 없거나 다른 버전이면 마지막 CP 상태만 읽는다. 새 연결로 옛 job을 조회하지 않는다.
+            return view;
+        }
+        var declaration = catalog.find(binding.connectorId()).map(manifest -> manifest.snapshot()).orElse(null);
+        if (declaration == null || !Boolean.TRUE.equals(declaration.capabilities().get("status"))) {
+            return view;
+        }
+        var ticketFields = new ContentDraftSaveTicketPayload(UUID.fromString(job.jobId()), snapshotId, snapshot.snapshotHash(),
+            view.actionId(), user.id(), conversationId, snapshot.bindingId(), snapshot.connectionId(),
+            snapshot.bindingUpdatedAt(), snapshot.connectionUpdatedAt(), null, null);
+        var stamp = ContentDraftWorkerStatusDecoder.stamp(binding.profile(), ticketFields);
+        var observed = ContentDraftWorkerStatusDecoder.decode(worker.status(binding.profile(), binding.connectorId(), stamp), stamp, false);
+        return mutations.run(user.id(), new ChatContentMutationTarget(conversationId, List.of()), () -> {
+            access.requireOwn(user, conversationId);
+            try {
+                bindings.requireUnchanged(user, binding);
+            } catch (ApiException ignored) {
+                return views(List.of(jobs.findById(job.id()).orElseThrow(ContentDraftJobs::notFound))).getFirst();
+            }
+            // 승인과 같은 행 순서다. 원격 IO 동안 잡았던 행·TX는 없다.
+            var action = actions.findByPublicIdForUpdate(view.actionId()).orElseThrow(ContentDraftJobs::notFound);
+            var currentSnapshot = snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
+            var currentJob = jobs.lockById(job.id()).orElseThrow(ContentDraftJobs::notFound);
+            if (!sameBinding(currentSnapshot, binding) || !currentJob.jobId().equals(stamp.jobId().toString())) {
+                throw ContentDraftWorkerStatusDecoder.unavailable();
+            }
+            currentJob.observed(observed.status(), observed.stage(), observed.saveClicked(), observed.errorCode(), clock.instant());
+            if (action.status() == ActionStatus.EXECUTING) {
+                switch (currentJob.status()) {
+                    case SUCCEEDED -> action.succeed(null, clock.instant());
+                    case FAILED -> action.fail("unavailable", null, clock.instant());
+                    case UNKNOWN -> action.unknown(clock.instant());
+                    default -> { }
+                }
+            }
+            return views(List.of(currentJob)).getFirst();
+        });
+    }
+
+
+    private static boolean sameBinding(ContentDraftSnapshot snapshot, ContentDraftBindingStamp binding) {
+        return snapshot.connectionId().equals(binding.connectionId()) && snapshot.bindingId().equals(binding.bindingId())
+            && snapshot.connectionUpdatedAt().equals(binding.connectionUpdatedAt())
+            && snapshot.bindingUpdatedAt().equals(binding.bindingUpdatedAt()) && snapshot.policyFingerprint().equals(binding.policyFingerprint());
     }
 
 
