@@ -202,6 +202,7 @@ export function closedPortUrl() {
 
 /** 편집기 단계가 쓰는 CDP 메서드. 이 목록 밖의 메서드가 오면 위반이다. */
 export const EDITOR_METHODS = [
+  "Network.enable",
   "Page.enable",
   "Page.handleJavaScriptDialog",
   "Page.setInterceptFileChooserDialog",
@@ -320,6 +321,8 @@ export class FakeEditor {
   drafts: FakeDraft[] = [];
   /** 목록 API 의 HTTP 상태. */
   listStatus = 200;
+  /** 글을 불러온 뒤의 목록 응답 상태. 뒤 목록 실패만 만든다. */
+  listStatusAfterLoad?: number;
   /** 목록 화면이 보일 제목. 비우면 `drafts` 의 제목이다. 차례가 어긋난 화면을 만든다. */
   listTitles?: string[];
   /** 편집기에 불러온 글. */
@@ -328,6 +331,14 @@ export class FakeEditor {
   loadInstead?: FakeDraft;
   /** 참이면 목록 응답을 부르는 식에 답하지 않는다. */
   hangList = false;
+  /** 참이면 편집기 객체의 `getDocumentData` 가 없다. 편집기 모양이 바뀐 화면을 만든다. */
+  documentUnavailable = false;
+  /** 참이면 글 단추를 눌렀을 때 글 대신 로그인 화면으로 넘어간다. 읽는 도중 세션이 끝난 상황을 만든다. */
+  loginOnLoad = false;
+  /** 참이면 불러오기 중 호스트는 그대로이고 문서 제목만 로그인으로 바뀐다. */
+  loginTitleOnLoad = false;
+  /** 참이면 글을 불러올 때 편집기 자동저장이 그 글의 고친 시각을 1초 늦춘다. */
+  autosaveOnLoad = false;
   listOpen = false;
   /** 지금 편집기 문서. 비면 `loaded` 로 답한다. `setDocumentData` 가 바꾼다. */
   document: FakeDocument | null = null;
@@ -358,6 +369,7 @@ export class FakeEditor {
   private nextSpot = 1;
 
   install(cdp: FakeCdp) {
+    cdp.on("Network.enable", () => ({}));
     cdp.on("Page.enable", (_, target) => {
       if (this.alertOnEnable)
         cdp.emit(target, "Page.javascriptDialogOpening", {
@@ -543,7 +555,16 @@ export class FakeEditor {
       const draft = this.drafts[indexIn(finder, "tpb*s.tlist")];
       if (!this.listOpen || !draft) return null;
       return () => {
+        if (this.loginOnLoad || this.loginTitleOnLoad) {
+          this.listOpen = false;
+          if (this.loginOnLoad) this.host = "nid.naver.com";
+          if (this.loginTitleOnLoad) this.docTitle = "NAVER 로그인";
+          return;
+        }
+        if (this.autosaveOnLoad) draft.modiDate += 1000;
         this.loaded = this.loadInstead ?? draft;
+        if (this.listStatusAfterLoad !== undefined)
+          this.listStatus = this.listStatusAfterLoad;
         this.document = {
           document: { components: structuredClone(this.loaded.components) },
         };
@@ -652,6 +673,9 @@ export class FakeEditor {
         this.listStatus === 200 ? `\n${JSON.stringify(body)}` : upstreamText;
       return JSON.stringify({ status: this.listStatus, text });
     }
+    if (expression === "location.hostname") return this.host;
+    if (expression.includes("getDocumentData()") && this.documentUnavailable)
+      return null;
     if (expression.includes("getDocumentData()") && this.document)
       return JSON.stringify({ ...this.document, documentId: this.documentId });
     if (expression.includes("getDocumentData()"))

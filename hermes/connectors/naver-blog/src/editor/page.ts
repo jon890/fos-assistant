@@ -58,6 +58,31 @@ const q = (value: unknown) => JSON.stringify(value);
 export class EditorPage {
   /** 지금 단계. 실패와 중단이 이 이름으로 알린다. */
   stage = "open";
+  private readonly autosaveRequestIds = new Set<string>();
+
+  /** 이 탭에서 관측을 시작한 뒤 나간 자동저장 요청 수. 주소나 요청 본문은 보관하지 않는다. */
+  get autosaveRequests() {
+    return this.autosaveRequestIds.size;
+  }
+
+  /** 읽기 탭의 요청만 수동으로 관측한다. 이미 나간 요청이나 탭을 닫은 뒤의 요청은 세지 못한다. */
+  async observeAutosaveRequests() {
+    this.session.onEvent("Network.requestWillBeSent", (event) => {
+      try {
+        const url = new URL(event.request?.url);
+        if (
+          url.protocol === "https:" &&
+          url.hostname === "blog.naver.com" &&
+          url.pathname === "/RabbitAutoSaveWrite.naver" &&
+          typeof event.requestId === "string"
+        )
+          this.autosaveRequestIds.add(event.requestId);
+      } catch {
+        // 주소를 읽지 못한 이벤트는 보관하지 않는다.
+      }
+    });
+    await this.call("Network.enable");
+  }
 
   private constructor(
     private readonly session: CdpSession,
