@@ -1,4 +1,4 @@
-"""서비스 토큰으로만 열리는 compile 전용 snapshot transport다."""
+"""서비스 토큰으로만 열리는 private snapshot transport다."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .connector_run import (_installed_server_env, _installed_owner_attachments,
                             _installed_owner_browser)
 from .connector_schema import BIND_MODE, CONNECTOR_ID_RE, CONNECTOR_STATE
 from .connector_snapshot_manifest import SNAPSHOT_ENV, SNAPSHOT_FLAG
+from .connector_snapshot_job import _job_args, _job_result, _authorize_url
 from .connector_state import _connector_state
 
 ENVELOPE_CAP = 524288
@@ -94,13 +95,13 @@ def _snapshot_env(profile, manifest):
     return env
 
 
-async def _run_connector_snapshot(manifest, args, env):
+async def _run_connector_snapshot(manifest, args, env, operation="compile"):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
     server = manifest["server"]
     params = StdioServerParameters(command=server["command"],
-                                  args=[*server["args"], SNAPSHOT_FLAG, "compile"], env=env)
-    tool = manifest["snapshot"]["compile_tool"]
+                                  args=[*server["args"], SNAPSHOT_FLAG, operation], env=env)
+    tool = manifest["snapshot"][operation + "_tool"]
     with snapshot_diagnostics_scope(), open(os.devnull, "w", encoding="utf-8") as sink:
         async with stdio_client(params, errlog=sink) as (read, write):
             async with ClientSession(read, write) as session:
@@ -109,10 +110,11 @@ async def _run_connector_snapshot(manifest, args, env):
                 # private process에는 구현한 operation 하나만 있다. 선언과 실제 목록이 다르면 호출하지 않는다.
                 if (len(listed.tools) != 1 or listed.tools[0].name != tool
                         or listed.tools[0].annotations is None
-                        or listed.tools[0].annotations.read_only_hint is not True):
+                        or listed.tools[0].annotations.read_only_hint is not (operation != "start")):
                     raise ValueError("snapshot 선언 불일치")
                 result = await session.call_tool(tool, args)
-                return _snapshot_tool_result(result)
+                payload = _snapshot_tool_result(result)
+                return payload if operation == "compile" else _job_result(operation, args, payload)
 
 
 def _snapshot_tool_result(result):
@@ -147,10 +149,16 @@ async def _connector_snapshot_request(request, connector_id):
         if manifest is None:
             return _rejected("없는 connector다", 404)
         declaration = manifest.get("snapshot")
-        if (declaration is None or body["operation"] != "compile"
-                or declaration["capabilities"]["compile"] is not True):
+        operation = body["operation"]
+        if (declaration is None or operation not in {"compile", "start", "status"}
+                or declaration["capabilities"][operation] is not True):
             return _rejected("지원하지 않는 snapshot operation이다", 409)
-        _snapshot_args(body["args"])
+        if operation == "compile":
+            _snapshot_args(body["args"])
+        else:
+            _job_args(body["profile"], operation, body["args"])
+            if operation == "start" and len(_json_bytes(body["args"]["snapshot"])) > COMPILED_CAP:
+                raise ValueError("snapshot 상한 초과")
     except (ValueError, UnicodeError, TypeError, OverflowError):
         return _rejected("snapshot 입력이 올바르지 않다")
     rejected = _profile_rejection(body["profile"], request)
@@ -161,6 +169,8 @@ async def _connector_snapshot_request(request, connector_id):
         if missing is not None:
             return _rejected("없는 snapshot profile이다", missing.status_code)
         env = _snapshot_env(body["profile"], manifest)
+        if operation == "start":
+            env["FOS_CONTENT_SAVE_AUTHORIZE_URL"] = _authorize_url()
     except PermissionError:
         return _rejected("snapshot profile을 허용하지 않는다", 401)
     except FileNotFoundError:
@@ -171,7 +181,8 @@ async def _connector_snapshot_request(request, connector_id):
         return _rejected("snapshot을 실행할 수 없다", 503)
     connector_run._connector_calls += 1
     try:
-        result = await asyncio.wait_for(_run_connector_snapshot(manifest, body["args"], env), 5)
+        result = await asyncio.wait_for(_run_connector_snapshot(manifest, body["args"], env, operation),
+                                        60 if operation == "start" else 5)
         if len(_json_bytes(result)) > COMPILED_CAP:
             raise ValueError("snapshot result 상한 초과")
         answer = {"ok": True, "result": result, "capabilities": declaration["capabilities"]}

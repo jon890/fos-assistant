@@ -175,6 +175,110 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
         self.assertEqual(self.call(method="GET", cookie=True, token=None)[0], 200)
         self.assertEqual(self.call(path=PATH + "/nested", token="valid")[0], 401)
 
+    def job_body(self, operation="status"):
+        stamp = {"protocol": "content-snapshot-v1", "snapshotId": "11111111-1111-4111-8111-111111111111",
+                 "jobId": "22222222-2222-4222-8222-222222222222", "snapshotHash": "a" * 64,
+                 "bindingId": "1", "connectionId": "2", "bindingUpdatedAt": "2026-10-11T00:00:00.000000Z",
+                 "connectionUpdatedAt": "2026-10-11T00:00:00.123400Z",
+                 "profileHash": hashlib.sha256(b"alice").hexdigest()}
+        args = {"stamp": stamp}
+        if operation == "start":
+            args.update(snapshot={"snapshotHash": stamp["snapshotHash"]}, jobId=stamp["jobId"], ticket="TICKET_MARKER")
+        return {"profile": "alice", "operation": operation, "args": args}
+
+    def enable_jobs(self):
+        self.rewrite("connector.json", lambda value: value["snapshot"].update(
+            capabilities={"compile": True, "start": True, "status": True}))
+        self.install_state()
+
+    def test_start_status_caps_stamp_and_fixed_authorize_url(self):
+        self.enable_jobs()
+        calls = []
+
+        async def run(manifest, args, env, operation):
+            calls.append((operation, dict(env), copy.deepcopy(args)))
+            return {"job_id": args["stamp"]["jobId"], "stamp": args["stamp"], "status": "running", "error_code": None}
+        with mock.patch.object(self.module, "_run_connector_snapshot", side_effect=run), mock.patch.dict(
+                os.environ, {"FOS_CONNECTOR_EXECUTIONS_BASE_URL": "http://cp.test/prefix",
+                             "FOS_CONTENT_SAVE_AUTHORIZE_URL": "http://untrusted.test", "UNRELATED_SECRET": "BODY_MARKER"}):
+            self.assertEqual(self.call(self.job_body("start"))[0], 200)
+            self.assertEqual(self.call(self.job_body())[0], 200)
+        self.assertEqual(calls[0][1]["FOS_CONTENT_SAVE_AUTHORIZE_URL"],
+                         "http://cp.test/prefix/internal/content-draft-jobs/authorize")
+        self.assertNotIn("FOS_CONTENT_SAVE_AUTHORIZE_URL", calls[1][1])
+        self.assertNotIn("FOS_CONTENT_SAVE_TICKET", calls[0][1])
+        self.assertNotIn("UNRELATED_SECRET", calls[0][1])
+        with mock.patch.object(self.module, "_run_connector_snapshot", new_callable=mock.AsyncMock) as child:
+            body = self.job_body()
+            for key, value in [("profileHash", "b" * 64), ("bindingId", "01"),
+                               ("bindingUpdatedAt", "2026-10-11T00:00:00Z"), ("jobId", "BAD")]:
+                changed = copy.deepcopy(body)
+                changed["args"]["stamp"][key] = value
+                self.assertEqual(self.call(changed)[0], 400)
+            changed = self.job_body("start")
+            changed["args"]["authorizeUrl"] = "http://untrusted.test"
+            self.assertEqual(self.call(changed)[0], 400)
+            child.assert_not_awaited()
+
+    def test_actual_sdk_job_operation_and_body_ticket_diagnostics_are_redacted(self):
+        self.enable_jobs()
+        # 실제 Python SDK·Bun 자식이 정확한 private 도구와 annotation을 협상한다.
+        (self.connector_root / "snapshot.js").write_text(
+            'import {McpServer} from ' + json.dumps(str(CONNECTOR / "node_modules/@modelcontextprotocol/sdk/dist/esm/server/mcp.js")) + ';\n'
+            'import {StdioServerTransport} from ' + json.dumps(str(CONNECTOR / "node_modules/@modelcontextprotocol/sdk/dist/esm/server/stdio.js")) + ';\n'
+            'import {z} from ' + json.dumps(str(CONNECTOR / "node_modules/zod/index.js")) + ';\n'
+            'const op = process.argv.at(-1), server = new McpServer({name:"fixture",version:"1"});\n'
+            'server.registerTool(op === "start" ? "start_content_snapshot" : "content_snapshot_status", '
+            '{inputSchema:{stamp:z.any(),snapshot:z.any().optional(),jobId:z.string().optional(),ticket:z.string().optional()},'
+            'annotations:{readOnlyHint:op !== "start"}}, async args => {\n'
+            'console.error("BODY_MARKER TICKET_MARKER");\n'
+            'const result={job_id:args.stamp.jobId,stamp:args.stamp,status:"running",error_code:null};\n'
+            'if(op === "status") Object.assign(result,{stage:"queued",save_clicked:false,finished_at:null,saved_before:null,saved_after:null});\n'
+            'return {content:[{type:"text",text:JSON.stringify(result)}],structuredContent:result};});\n'
+            'await server.connect(new StdioServerTransport());\n')
+        with mock.patch.dict(os.environ, {"FOS_CONNECTOR_EXECUTIONS_BASE_URL": "http://cp.test"}), collected_logs() as logs:
+            for operation in ("start", "status"):
+                status, result = self.call(self.job_body(operation))
+                self.assertEqual(status, 200, result)
+                self.assertNotIn("TICKET_MARKER", json.dumps(result))
+        self.assertNotIn("BODY_MARKER", "\n".join(logs))
+        self.assertNotIn("TICKET_MARKER", "\n".join(logs))
+
+    def test_job_projection_rejects_extra_body_ticket_stamp_and_boolean_coercion(self):
+        from_module = sys.modules[self.plugin.__name__ + ".connector_snapshot_job"]
+        args = self.job_body()["args"]
+        valid = {"job_id": args["stamp"]["jobId"], "stamp": args["stamp"], "status": "running",
+                 "stage": "queued", "save_clicked": False, "finished_at": None,
+                 "saved_before": None, "saved_after": None, "error_code": None}
+        self.assertEqual(from_module._job_result("status", args, valid), valid)
+        for changed in [{**valid, "ticket": "TICKET_MARKER"}, {**valid, "body": "BODY_MARKER"},
+                        {**valid, "save_clicked": 1}, {**valid, "status": "SUCCEEDED"},
+                        {**valid, "stage": "save_clicking"}, {**valid, "saved_before": 1},
+                        {**valid, "stamp": {**args["stamp"], "profileHash": "b" * 64}}]:
+            with self.assertRaises(ValueError):
+                from_module._job_result("status", args, changed)
+
+    def test_start_and_status_deadlines_cancel_without_retry_or_ticket_response(self):
+        self.enable_jobs()
+        deadlines = []
+        real_wait = asyncio.wait_for
+
+        async def slow(*args):
+            await asyncio.sleep(60)
+
+        async def short(future, seconds):
+            deadlines.append(seconds)
+            return await real_wait(future, 0.01)
+        with mock.patch.dict(os.environ, {"FOS_CONNECTOR_EXECUTIONS_BASE_URL": "http://cp.test"}), mock.patch.object(
+                self.module, "_run_connector_snapshot", side_effect=slow) as runner, mock.patch.object(
+                self.module.asyncio, "wait_for", new=short):
+            for operation in ("start", "status"):
+                status, result = self.call(self.job_body(operation))
+                self.assertEqual(status, 504)
+                self.assertNotIn("TICKET_MARKER", json.dumps(result))
+            self.assertEqual(runner.call_count, 2)
+        self.assertEqual(deadlines, [60, 5])
+
     def test_chunked_envelope_cap_is_checked_before_json_parse(self):
         async def read(size):
             async def stream():
