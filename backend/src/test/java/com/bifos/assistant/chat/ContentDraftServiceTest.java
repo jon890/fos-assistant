@@ -229,7 +229,11 @@ class ContentDraftServiceTest extends ContentDraftFixture {
         // 원고 경로는 관찰을 읽기만 한다. 앞으로 관찰 쓰기가 생기는 회귀를 막는다.
         assertThat(observations.count()).isEqualTo(1);
         assertThat(requests.count()).isEqualTo(1);
-        assertThat(service.list(owner, conversation.id(), null, 10)).containsExactly(saved);
+        // 두 번째 이미지 블록은 다른 첨부다(같은 사진은 한 번만 쓴다). 그 첨부도 관찰이 새로 생기지 않는다.
+        var listed = service.list(owner, conversation.id(), null, 10);
+        assertThat(listed).filteredOn(view -> view.assetId().equals(photo.id().toString())).containsExactly(saved);
+        assertThat(listed).filteredOn(view -> view.assetId().equals(secondPhoto.id().toString()))
+            .singleElement().satisfies(view -> assertThat(view.revision()).isZero());
     }
 
 
