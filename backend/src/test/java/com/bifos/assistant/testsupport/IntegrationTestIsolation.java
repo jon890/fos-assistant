@@ -1,6 +1,7 @@
 package com.bifos.assistant.testsupport;
 
 import com.bifos.assistant.crypto.application.DataKeyService;
+import com.bifos.assistant.chat.infra.ChatMessageContents;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
@@ -33,6 +34,7 @@ import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.core.annotation.MergedAnnotations.SearchStrategy;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * 컨텍스트를 함께 쓰는 검사 사이에 남는 것을 정리하고, 검사가 정한 설정을 적용한다.
@@ -163,6 +165,13 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         attempt(failures, () -> context.getBean(TestClock.class).reset());
         // H2는 지운 사용자와 데이터 key의 번호를 다시 쓸 수 있다. 앞 검사의 key 캐시가 새 사용자에게 남지 않게 비운다.
         attempt(failures, () -> context.getBean(DataKeyService.class).forgetCachedKeys());
+        // 시계를 되돌리고 대화 번호를 재사용해도 앞 검사의 소유자와 경고 시각을 가져가지 않는다.
+        attempt(failures, () -> {
+            var contents = context.getBean(ChatMessageContents.class);
+            for (String field : List.of("owners", "warned")) {
+                ((Map<?, ?>)ReflectionTestUtils.getField(contents, field)).clear();
+            }
+        });
         attempt(failures, () -> context.getBean(CapturingTaskScheduler.class).reset());
         attempt(failures, () -> context.getBean(WakeRetryThreads.class).reset());
         attempt(failures, () -> context.getBean(ConnectorChangeRecorder.class).reset());
