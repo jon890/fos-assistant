@@ -140,8 +140,6 @@ assistant:
       expire-cron: "0 * * * * *"
     # 금융 실행의 운영 관문. 기본값은 모두 닫힌 쪽이고, 켜거나 바꾸면 재기동해야 반영된다
     financial:
-      # kill switch. 거짓이면 준비, 승인, claim 이 모두 금융 전송 없이 거절한다
-      enabled: ${ASSISTANT_FINANCIAL_ENABLED:false}
       # 주문할 수 있는 계좌 식별자(쉼표로 구분). 비면 아무 계좌도 주문하지 못한다
       allowed-accounts: ${ASSISTANT_FINANCIAL_ALLOWED_ACCOUNTS:}
       # 한 건 상한. 0 이면 그 통화나 수량 주문을 받지 않는다

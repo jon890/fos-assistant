@@ -41,9 +41,9 @@ class ConnectorFinancialGateTest {
 
 
     @Test
-    @DisplayName("설정 기본값은 kill switch 꺼짐, 빈 허용 목록, 상한 0 이다")
+    @DisplayName("설정 기본값은 key 파일 없음, 빈 허용 목록, 상한 0 이다")
     void defaultsAreClosed() {
-        var closed = new ConnectorFinancialProperties(false, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+        var closed = new ConnectorFinancialProperties(null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
             BigDecimal.ZERO, BigDecimal.ZERO, "");
         var gate = gate(closed);
         assertThatThrownBy(gate::requireOpen).isInstanceOf(ApiException.class);
@@ -54,10 +54,10 @@ class ConnectorFinancialGateTest {
 
 
     @Test
-    @DisplayName("keyed hash key 가 없으면 kill switch 를 켜도 닫는다")
+    @DisplayName("keyed hash key 가 없으면 허용 목록과 상한을 채워도 닫는다")
     void closesWithoutDigestKey() {
         var noKey = open("1", "1", "1");
-        noKey = new ConnectorFinancialProperties(true, noKey.allowedAccounts(), noKey.maxOrderAmountKrw(),
+        noKey = new ConnectorFinancialProperties(noKey.allowedAccounts(), noKey.maxOrderAmountKrw(),
             noKey.maxOrderAmountUsd(), noKey.maxOrderQuantity(), noKey.maxDailyAmountKrw(), noKey.maxDailyAmountUsd(), "");
         assertThatThrownBy(gate(noKey)::requireOpen).isInstanceOf(ApiException.class);
         assertThatCode(gate(open("1", "1", "1"))::requireOpen).doesNotThrowAnyException();
@@ -67,9 +67,9 @@ class ConnectorFinancialGateTest {
     @Test
     @DisplayName("음수 상한과 빈 계좌 식별자는 기동을 멈춘다")
     void rejectsInvalidSettings() {
-        assertThatThrownBy(() -> new ConnectorFinancialProperties(true, List.of("7"), new BigDecimal("-1"), BigDecimal.ONE,
+        assertThatThrownBy(() -> new ConnectorFinancialProperties(List.of("7"), new BigDecimal("-1"), BigDecimal.ONE,
             BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, KEY)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new ConnectorFinancialProperties(true, List.of(" "), BigDecimal.ONE, BigDecimal.ONE,
+        assertThatThrownBy(() -> new ConnectorFinancialProperties(List.of(" "), BigDecimal.ONE, BigDecimal.ONE,
             BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, KEY)).isInstanceOf(IllegalStateException.class);
     }
 
@@ -175,7 +175,7 @@ class ConnectorFinancialGateTest {
 
 
     private static ConnectorFinancialProperties open(String maxOrder, String maxQuantity, String maxDaily) {
-        return new ConnectorFinancialProperties(true, List.of("7"), new BigDecimal(maxOrder), new BigDecimal(maxOrder),
+        return new ConnectorFinancialProperties(List.of("7"), new BigDecimal(maxOrder), new BigDecimal(maxOrder),
             new BigDecimal(maxQuantity), new BigDecimal(maxDaily), new BigDecimal(maxDaily), KEY);
     }
 }

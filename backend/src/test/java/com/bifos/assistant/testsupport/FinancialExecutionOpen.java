@@ -16,7 +16,6 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties({
-    "assistant.connector.financial.enabled=true",
     "assistant.connector.financial.allowed-accounts=7,000007",
     "assistant.connector.financial.max-order-amount-krw=1000000",
     "assistant.connector.financial.max-order-amount-usd=10000",

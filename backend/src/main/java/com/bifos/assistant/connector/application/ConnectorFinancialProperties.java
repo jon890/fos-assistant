@@ -9,9 +9,9 @@ import org.springframework.validation.annotation.Validated;
 /**
  * 금융 실행의 운영 관문이다. 기본값은 모두 닫힌 쪽이다.
  *
- * <p>값은 기동 때 한 번 읽는다. 끄거나 바꾸려면 운영 값을 고치고 재기동한다.
+ * <p>값은 기동 때 한 번 읽는다. 바꾸려면 운영 값을 고치고 재기동한다. 따로 켜고 끄는 설정은 두지 않는다.
+ * 허용 목록이 비었거나 상한이 0 이거나 key 파일이 없으면 닫혀 있다.
  *
- * @param enabled kill switch. 거짓이면 준비, 승인, claim 이 모두 금융 전송 없이 거절한다
  * @param allowedAccounts 주문할 수 있는 계좌 식별자. 실행 scope 의 값이 이 목록에 있어야 한다. 비면 아무 계좌도 주문하지 못한다
  * @param maxOrderAmountKrw 원화 주문 한 건의 금액 상한. 0 이면 원화 주문을 받지 않는다
  * @param maxOrderAmountUsd 달러 주문 한 건의 금액 상한. 0 이면 달러 주문을 받지 않는다
@@ -23,7 +23,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.financial")
 public record ConnectorFinancialProperties(
-    @DefaultValue("false") boolean enabled,
     @DefaultValue List<String> allowedAccounts,
     @DefaultValue("0") BigDecimal maxOrderAmountKrw,
     @DefaultValue("0") BigDecimal maxOrderAmountUsd,

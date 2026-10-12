@@ -86,7 +86,7 @@ class ConnectorFinancialApproval {
             var checked = current.validateLocked(context, catalog, action, row);
             require(action.expiresAt().isAfter(clock.instant()));
             conflicts.requireAvailable(row.requestKey(), action.id());
-            // 승인 사이에 kill switch 를 끄거나 목록과 상한을 줄였으면 여기서 막는다.
+            // 승인 사이에 key 파일을 치우거나 목록과 상한을 줄였으면 여기서 막는다.
             gate.requireOpen();
             gate.requireScope(checked.scopeJson());
             gate.requireWithinLimits(user.id(), action.id(), checked.executionArgsJson(), clock.instant());

@@ -171,17 +171,17 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
 
     @Test
-    @DisplayName("발급 뒤 kill switch 를 끄거나 계좌를 목록에서 빼면 ticket 을 소비하지 않는다")
+    @DisplayName("발급 뒤 key 파일을 치우거나 계좌를 목록에서 빼면 ticket 을 소비하지 않는다")
     void closedGateKeepsTicketUnconsumed() {
         Fixture f = fixture();
         String raw = tickets.issue(f.action());
         var open = gate.current();
-        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(false, open.allowedAccounts(),
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(open.allowedAccounts(),
             open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
-            open.maxDailyAmountUsd(), open.digestKeyFile()));
+            open.maxDailyAmountUsd(), ""));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isNull();
-        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(true, List.of("000009"),
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("000009"),
             open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
             open.maxDailyAmountUsd(), open.digestKeyFile()));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);

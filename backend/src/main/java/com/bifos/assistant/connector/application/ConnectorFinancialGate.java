@@ -26,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 준비, 승인, claim 이 함께 지나는 금융 실행의 운영 관문이다.
  *
- * <p>kill switch, 계좌 허용 목록, 한 건과 하루 상한을 본다. 모두 닫힌 쪽이 기본이며 거절은 금융 전송 없이 끝난다.
+ * <p>keyed hash key, 계좌 허용 목록, 한 건과 하루 상한을 본다. 모두 닫힌 쪽이 기본이며 거절은 금융 전송 없이 끝난다.
  * 첫 개방은 일반 주문의 생성과 취소뿐이다. 일반 주문 정정과 조건주문 생성·정정은 금액 상한을 계산하지 않고 거절한다.
  */
 @Component
@@ -43,9 +43,9 @@ public class ConnectorFinancialGate {
     private final FinancialDigest digest;
 
 
-    /** kill switch 와 함께 keyed hash key 를 본다. key 를 쓰는 단계 없이 켜면 열리지 않는다. */
+    /** keyed hash key 를 읽을 수 있어야 열린다. key 파일이 운영에서 금융을 여는 마지막 잠금이다. */
     public void requireOpen() {
-        require(properties.current().enabled() && digest.available());
+        require(digest.available());
     }
 
 
