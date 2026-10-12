@@ -4,7 +4,7 @@ import type { Run } from "./state.ts";
 
 const contract = readFileSync(new URL("../../../hermes/tests/hermes_contract.py", import.meta.url), "utf8");
 const version = /^HERMES_VERSION = "([^"]+)"$/m.exec(contract)?.[1];
-if (version === undefined) throw new Error("Hermes 계약의 버전를 읽을 수 없다");
+if (version === undefined) throw new Error("Hermes 계약의 버전을 읽을 수 없다");
 export const HERMES_VERSION = version;
 
 /** TS와 Java가 같은 버전의 합성 wire를 읽는다. 없는 버전으로 바꾸면 바로 실패한다. */
@@ -20,7 +20,7 @@ export function wireEvents(wire: string): Record<string, unknown>[] {
 const templates = new Map(wireEvents(wireFixture("events")).map((payload) => [payload.event, payload]));
 
 /** 버전별 칸은 공유 표본에서 가져오고 실행 식별자와 종료 결과는 실제 대역 상태에서 붙인다. */
-export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>): Record<string, unknown> {
+export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>, sequence = 0): Record<string, unknown> {
   const template = templates.get(fields.event);
   if (template === undefined) throw new Error(`${HERMES_VERSION}의 사건 표본이 없다: ${fields.event}`);
   const fixedFields: Record<string, string[]> = {
@@ -36,7 +36,7 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
   if (required !== undefined && typeof fields[required] !== "string") {
     throw new Error(`${fields.event}의 내용 칸이 없다: ${required}`);
   }
-  const { event, run_id: _scriptedRunId, timestamp, ...specific } = fields;
+  const { event, run_id: _scriptedRunId, timestamp, seq: _scriptedSequence, ...specific } = fields;
   const envelope = { event, run_id: run.run_id, timestamp: timestamp ?? Date.now() / 1000 };
   const payload: Record<string, unknown> = fields.event === "approval.request"
     ? { ...specific, ...envelope, ...defaults }
@@ -46,13 +46,18 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
     payload.usage = fields.usage ?? run.usage;
     payload.runtime = fields.runtime ?? run.runtime;
   }
+  // v0.21.6은 callback 뒤의 SSE transport에서 seq를 덧붙인다.
+  if (HERMES_VERSION === "v0.21.6" && fields.event !== "replay.truncated") payload.seq = sequence;
   return payload;
 }
 
 export function runEventWriter(response: ServerResponse, run: Pick<Run, "run_id" | "output" | "usage" | "runtime">) {
+  let sequence = 0;
   return (fields: Record<string, unknown>): Record<string, unknown> => {
-    const payload = eventEnvelope(run, fields);
-    response.write(`data: ${JSON.stringify(payload)}\n\n`);
+    const payload = eventEnvelope(run, fields, sequence);
+    const prefix = payload.seq === undefined ? "" : `id: ${payload.seq}\n`;
+    if (payload.seq !== undefined) sequence++;
+    response.write(`${prefix}data: ${JSON.stringify(payload)}\n\n`);
     return payload;
   };
 }
