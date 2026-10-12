@@ -23,8 +23,11 @@ const templates = new Map(wireEvents(wireFixture("events")).map((payload) => [pa
 export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage">, fields: Record<string, unknown>): Record<string, unknown> {
   const template = templates.get(fields.event);
   if (template === undefined) throw new Error(`${HERMES_VERSION}의 사건 표본이 없다: ${fields.event}`);
-  const { run_id: _runId, timestamp: _timestamp, ...defaults } = template;
-  const payload: Record<string, unknown> = { ...defaults, ...fields, run_id: run.run_id, timestamp: fields.timestamp ?? Date.now() / 1000 };
+  const { event: _event, run_id: _runId, timestamp: _timestamp, ...defaults } = template;
+  const { event, run_id: _scriptedRunId, timestamp, ...specific } = fields;
+  const payload: Record<string, unknown> = {
+    event, run_id: run.run_id, timestamp: timestamp ?? Date.now() / 1000, ...defaults, ...specific,
+  };
   if (fields.event === "run.completed") {
     payload.output = fields.output ?? run.output;
     payload.usage = fields.usage ?? run.usage;
