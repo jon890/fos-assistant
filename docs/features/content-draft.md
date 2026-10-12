@@ -277,6 +277,7 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 | 요청 뒤 미승인 | PREVIEW_READY | 기존 승인 카드에서 승인 또는 거절 |
 | 승인 전 거절·만료·현재 검사 실패 | STALE | 새 preview 필요, 같은 snapshot은 다시 저장하지 않음 |
 | 예약 커밋 뒤 시작 전 | DISPATCHED | 시작 재전송 없음 |
+| 시작 전송 뒤 결과 기록 실패 | DISPATCHED 또는 이미 claim한 SAVING | 결과를 모르는 상태로 취급하고 같은 job만 조회하며 시작을 재전송하지 않음 |
 | 시작 접수·start claim | SAVING | 같은 job만 조회 |
 | 시작 전 거절 | FAILED | 같은 snapshot 재시도 없음 |
 | 시작 결과 모름 | UNKNOWN | 예약 jobId로만 조회, 재승인으로 재실행하지 않음 |
