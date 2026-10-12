@@ -28,6 +28,7 @@ CI shard마다 웹 서버, Control Plane, H2 DB와 임시 파일을 따로 만�
 - SSE는 끝나지 않을 수 있으므로 전역 `networkidle`을 준비 조건으로 쓰지 않는다.
 - 비동기 서버 작업은 해당 API의 완료 상태를 폴링한다. 고정 시간만 기다리지 않는다.
   폴링 간격 자체를 검사할 때는 `page.clock`으로 시간을 진행하고 요청 횟수와 화면 상태를 함께 본다.
+- 첫 요청만 실패시키는 route는 카운터로 분기하고 검사 끝까지 유지한다. Chromium 155 미만은 마지막 `times: 1` route를 해제하는 동안 뒤따른 fetch를 유실할 수 있다([Playwright 회귀 검사](https://github.com/microsoft/playwright/pull/42924)). 복구 조회를 하는 검사는 HTTP 오류 수신만이 아니라 실제 이력과 추가 POST 횟수도 확인한다.
 - 날짜만 보는 대역 화면은 `fixBrowserTime`으로 시각을 고정한다. 서버와 왕복하는 테스트는 서버 시각을 기준으로 데이터를 만든다.
   월별 집계의 준비 데이터는 러너의 시간대와 관계없이 `Asia/Seoul` 달력으로 만든다.
 - 일반 동작 테스트는 움직임 줄이기를 켠다. 움직임 자체를 검사하는 spec은 `reducedMotion: "no-preference"`를 명시한다.
