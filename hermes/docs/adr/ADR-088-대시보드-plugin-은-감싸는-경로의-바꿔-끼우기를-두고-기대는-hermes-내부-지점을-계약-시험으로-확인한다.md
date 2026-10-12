@@ -5,7 +5,7 @@
   - `dashboard-profile-api` 는 `token_auth_middleware` 를 바꿔 끼우는 방식을 유지한다. v2026.9.24 의 공개 확장점으로는 Hermes 처리기를 감싸는 경로를 대신할 수 없다.
   - plugin 이 기대는 Hermes 내부 지점을 `hermes/tests/hermes_contract.py` 한곳에 선언한다.
     `hermes/tests/test_hermes_contract.py` 가 두 가지를 확인한다. plugin 이 쓰는 Hermes 이름이 모두 선언에 있는지, 선언한 지점이 지정한 Hermes 소스에 그대로인지다.
-  - Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh` 를 돌린다. CI 의 hermes job 은 선언의 `HERMES_VERSION` 으로 같은 확인을 돌린다.
+  - Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-contract.sh` 를 돌린다. CI 의 hermes job 은 선언의 `HERMES_VERSION` 으로 같은 확인을 돌린다.
   - plugin 을 기능 모듈 여럿으로 나눈다. 나누는 경계는 아래 「모듈 경계」 를 따른다. plugin 이름은 바꾸지 않는다.
 - **맥락**:
   처음에 이 plugin 은 대시보드의 profile 경로를 토큰으로 여는 일만 맡았다([ADR-018](../../../backend/docs/adr/ADR-018-사람을-더하는-것을-control-plane-이-끝낸다.md), [ADR-041](../../../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)).
@@ -73,5 +73,5 @@
     - `register_token_route` 와 `is_token_route` 의 시그니처가 바뀌면 시험이 실패한다. 메서드 단위 등록 같은 확장점이 생겼을 수 있으니 이 판정을 다시 본다.
     - 원래 `token_auth_middleware` 는 토큰을 받아들인 provider 를 구분하지 않는다. 다른 plugin 이 등록한 토큰 경로는 우리 토큰으로도 열린다. 바꿔 끼운 함수가 우리 경로가 아닌 요청을 원래 함수에 그대로 넘기기 때문이다.
     - 바꿔 끼운 함수가 직접 답하는 경로는 대시보드의 Host 검사보다 앞에서 끝난다. 이 경로들은 Bearer 토큰을 요구한다.
-- **적용 범위**: `hermes/plugins/dashboard-profile-api/`, `hermes/tests/hermes_contract.py`, `hermes/tests/test_hermes_contract.py`, `scripts/check-hermes-contract.sh`.
+- **적용 범위**: `hermes/plugins/dashboard-profile-api/`, `hermes/tests/hermes_contract.py`, `hermes/tests/test_hermes_contract.py`, `scripts/checks/check-hermes-contract.sh`.
   Hermes 를 올리는 순서는 [`hermes/docs/hermes-contract.md`](../hermes-contract.md) 의 「대시보드 plugin 이 기대는 내부 지점」 이 갖는다. 운영 절차는 `fos-home-infra` 가 갖는다.

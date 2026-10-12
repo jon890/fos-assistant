@@ -67,7 +67,7 @@ KEK 를 넣기 전에 저장한 평문 줄을 조금씩 암호화한다. 대상�
 cd backend && ./gradlew test --tests '*PlaintextBackfillTest' --tests '*ExecutionOutputBackfillTest'
 cd backend && ./gradlew test
 cd backend && ./gradlew qualityCheck
-scripts/check-mysql-migration.sh
+scripts/checks/check-mysql-migration.sh
 ```
 
 넷 다 실패 없이 끝난다. 마지막 명령은 Docker 가 있어야 돈다.

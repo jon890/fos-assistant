@@ -20,13 +20,13 @@
 #   2  검사를 돌리지 못했다
 set -Eeuo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 DENYLIST="${PUBLIC_REPO_DENYLIST:-$HOME/personal/fos-home-infra/config/public-repo-denylist.txt}"
 
 # AGENTS.md 를 빼지 않는다. 그 문서에 값을 예시로 적어 두 번 새어 나갔다.
 EXCLUDES=(
-  ':(exclude)scripts/check-public-safe.sh'
+  ':(exclude)scripts/checks/check-public-safe.sh'
   # 컨테이너가 자기 자신을 부르는 헬스체크다. 우리 환경의 값이 아니다.
   ':(exclude)backend/Dockerfile'
   ':(exclude)web/Dockerfile'
