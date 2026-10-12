@@ -331,6 +331,7 @@
       "session_status": {
         "risk": "READ",
         "approval": "none",
+        "title": "로그인 상태 확인",
         "grant": false,
         "outbound": false,
         "identifiers": [],
@@ -340,6 +341,7 @@
       "list_drafts": {
         "risk": "READ",
         "approval": "none",
+        "title": "임시저장 글 목록 보기",
         "grant": false,
         "outbound": false,
         "identifiers": [],
@@ -361,6 +363,7 @@
       "render_draft": {
         "risk": "READ",
         "approval": "none",
+        "title": "글 미리 보기",
         "grant": false,
         "outbound": false,
         "identifiers": [],
@@ -404,6 +407,7 @@
       "draft_job": {
         "risk": "READ",
         "approval": "none",
+        "title": "임시저장 진행 확인",
         "grant": false,
         "outbound": false,
         "identifiers": [],
