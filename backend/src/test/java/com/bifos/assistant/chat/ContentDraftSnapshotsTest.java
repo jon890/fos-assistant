@@ -192,6 +192,23 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
 
 
     @Test
+    @DisplayName("규칙 전에 저장한 반복 사진 판의 preview는 일시 장애가 아닌 중복 사진 코드로 커넥터 호출 전에 멈춘다")
+    void rejectsLegacyDuplicatePhotoRevisionBeforeCompiler() {
+        var draft = draftRows.findAll().getFirst();
+        var row = revisionRows.findAll().getFirst();
+        var legacy = json.createObjectNode().put("title", "옛 원고").put("category", "분류");
+        legacy.putArray("tags");
+        var blocks = legacy.putArray("blocks");
+        blocks.addObject().put("type", "image").put("assetId", photo.id().toString());
+        blocks.addObject().put("type", "image").put("assetId", photo.id().toString());
+        var sealed = draftBodies.seal(draft, 1, json.writeValueAsString(legacy));
+        jdbc.update("update content_draft_revision set body=?, body_key_id=? where id=?", sealed.content(), sealed.keyId(), row.id());
+        code(this::preview, ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO);
+        assertThat(snapshotRows.count()).isZero();
+    }
+
+
+    @Test
     @DisplayName("compiler를 기다리는 동안 실제 revision 수정이 커밋되면 snapshot을 남기지 않는다")
     void rejectsRevisionCommittedDuringCompiler() throws Exception {
         race(() -> drafts.revise(owner, conversation.id(), draftId, 1, inputDraft("수정", false)), ErrorCode.CONTENT_DRAFT_STALE);

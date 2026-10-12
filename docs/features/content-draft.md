@@ -27,6 +27,7 @@ trim과 소문자로 비교했을 때 중복 태그를 거절한다.
 기존 DSL의 사진 자리는 파일 이름만 담아, 같은 사진을 두 자리에 두면 저장 worker가 두 자리를 구별하지 못하고 업로드 전에 멈춘다.
 Control Plane은 새 생성과 수정에서, compiler는 compile에서 같은 뜻의 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 거절한다.
 저장한 판을 다시 읽는 경로는 이 규칙을 검사하지 않는다. 규칙 전에 저장한 판도 읽고 고쳐 저장할 수 있다.
+MCP 첫 생성은 저장된 생성 요청을 찾기 전에 이 규칙을 검사하므로, 규칙 전에 보낸 반복 사진 요청을 같은 requestId로 다시 보내면 원래 원고 대신 이 코드를 받는다.
 사진 자리 형식을 바꾸는 일은 실제로 필요해질 때 정한다.
 누락은 허용하되 호출자가 preview에 포함 ID와 빠진 ID의 subset을 표시하며 모두 사용했다고 말하지 않는다.
 caption은 이미지 바로 뒤의 실제 문단으로 컴파일한다.
@@ -143,7 +144,8 @@ chat은 `ContentDraftBindingAccess`의 불변 stamp만 사용하고 connector �
 원본은 `AttachmentFingerprint`로 실제 크기와 SHA-256을 다시 읽는다. DB 참조 유효성만으로 원본 일치를 주장하지 않는다.
 observationRef는 고정한 attachment·owner·conversation·revision·지문과 일치하고 읽을 수 있는 관찰이어야 한다.
 설명은 그 관찰 summary의 앞 300 code point이며 새 분석을 하지 않는다. 반복 사진의 설명이 서로 다르면 거절한다.
-resolvedAssets에는 asset마다 한 번만 전달한다. 새로 쓴 판에는 반복 자리가 없고, 규칙 전에 저장한 판의 반복 자리는 compiler가 거절하므로 그 판은 고쳐 저장한 뒤에 preview를 만든다.
+resolvedAssets에는 asset마다 한 번만 전달한다. 새로 쓴 판에는 반복 자리가 없다.
+규칙 전에 저장한 판에 반복 자리가 있으면 preview는 커넥터를 부르기 전에 400 `CONTENT_DRAFT_DUPLICATE_PHOTO`로 멈춘다. 그 판은 고쳐 저장한 뒤에 preview를 만든다.
 미리보기에는 canonical 원고와 포함·빠진 첨부 ID를 돌려주고 파일명·내부 경로·compiled payload는 내보내지 않는다.
 
 `readCurrentSnapshot`은 외부 트랜잭션 없이 coordinator에 한 번 들어가는 독립 조회다.
