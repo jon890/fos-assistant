@@ -16,4 +16,4 @@
 - **수명**: 원고 승인 줄은 job이 수명을 소유한다. 일반 실행 정리(5분 정리와 기동 정리)는 이 줄을 UNKNOWN으로 바꾸지 않는다. 대신 job 기한 정리가 승인 뒤 15분 동안 끝나지 않은 job을 한 번 조회하고 닫으며 승인 줄을 같은 결과로 끝낸다. 15분은 ticket 최대 수명과 worker 실행 상한보다 길어 그 뒤에는 새 claim이 없다. 승인 줄은 EXECUTING일 때만 terminal로 바꾼다. 바인딩 버전이 달라지면 옛 stamp로 조회하지 않고, 끝나지 않은 job을 그 자리에서 start claim 유무로 FAILED나 UNKNOWN으로 닫는다. 진행 중이나 다시 조회할 UNKNOWN으로 영구히 남는 경로를 두지 않는다.
 - **조회**: stamped private job은 공개 draft_job에서 거절하고 정확한 CP stamp로만 projection한다. 일반 action 최근 20개와 별도의 bounded 원고 job 링크 페이지로 terminal을 재발견한다.
 
-- **적용 범위**: #396·#398의 새 글 임시저장 연결에만 적용한다. 승인 요청·jobId 예약·worker 허가·시작 전송·private 상태 조회는 구현되어 있고 MCP와 화면 연결은 후속이다. 운영 start·status capability는 false를 유지한다. 원고 MCP 최초 생성의 중복 방지와 진단 정책의 운영 수락, 실제 사진 component 관측을 대신하지 않는다. 상세 계약은 [원고 기능](../features/content-draft.md#승인-snapshot과-저장-job)이 갖는다.
+- **적용 범위**: #396·#398의 새 글 임시저장 연결에만 적용한다. 승인 요청·jobId 예약·worker 허가·시작 전송·private 상태 조회와 MCP·화면 연결이 구현되어 있다. 운영 start·status capability는 false를 유지한다. 원고 MCP 최초 생성의 중복 방지와 진단 정책의 운영 수락, 실제 사진 component 관측을 대신하지 않는다. 상세 계약은 [원고 기능](../features/content-draft.md#승인-snapshot과-저장-job)이 갖는다.
