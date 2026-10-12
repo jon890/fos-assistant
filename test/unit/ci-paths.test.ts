@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { JOBS, classify, gate, jobsFor } from "../../scripts/ci/ci-paths.mjs";
+import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
 
 const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].run);
 
@@ -141,12 +141,12 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
   const script = fileURLToPath(new URL("../../scripts/ci/ci-paths.mjs", import.meta.url));
   const output = join(dir, "output");
   const summary = join(dir, "summary");
-  const run = (event: string) => {
+  const run = (event: string, fullLabel = "false") => {
     writeFileSync(output, "");
     writeFileSync(summary, "");
     return spawnSync(process.execPath, [script, "changes"], {
       cwd: dir, encoding: "utf8",
-      env: { ...process.env, GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary },
+      env: { ...process.env, GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, FULL_LABEL: fullLabel },
     });
   };
   const selected = () => Object.fromEntries(readFileSync(output, "utf8").trim().split("\n").map((line) => line.split("=")));
@@ -183,13 +183,40 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     git("-c", "user.name=CI test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "merge", "--no-ff", "pr", "-m", "merge");
     const valid = run("pull_request");
     assert.equal(valid.status, 0, valid.stderr);
+    // PR 은 브라우저와 E2E 를 정기 실행으로 미룬다.
+    assert.deepEqual(selected(), {
+      backend: "true", web: "false", browser: "false", e2e: "false", hermes: "false", quality: "true",
+    });
+    assert.match(readFileSync(summary, "utf8"), /backend\/A.java/);
+    // 전체 검사 라벨이 붙으면 경로 판정대로 브라우저와 E2E 도 돈다.
+    const full = run("pull_request", "true");
+    assert.equal(full.status, 0, full.stderr);
     assert.deepEqual(selected(), {
       backend: "true", web: "false", browser: "true", e2e: "true", hermes: "false", quality: "true",
     });
-    assert.match(readFileSync(summary, "utf8"), /backend\/A.java/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("PR 은 느린 검사를 기본으로 건너뛰고 전체 검사 라벨이 있으면 경로 판정을 그대로 쓴다", () => {
+  const judged = classify(["web/src/app.tsx"]);
+  assert.equal(judged.browser.run, true);
+  const skipped = withoutSlow(judged, false);
+  for (const job of SLOW_JOBS) {
+    assert.equal(skipped[job].run, false, job);
+    assert.match(skipped[job].because ?? "", new RegExp(FULL_LABEL));
+  }
+  assert.equal(skipped.web.run, true);
+  assert.deepEqual(withoutSlow(judged, true), judged);
+  // 원래 판정 결과는 바꾸지 않는다.
+  assert.equal(judged.browser.run, true);
+});
+
+test("workflow 는 전체 검사 라벨을 판정에 넘기고 라벨을 붙이면 다시 돈다", () => {
+  const text = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(text, /types: \[opened, synchronize, reopened, labeled\]/);
+  assert.ok(text.includes(`FULL_LABEL: \${{ contains(github.event.pull_request.labels.*.name, '${FULL_LABEL}') }}`));
 });
 
 // ci.yml 을 job 단위 본문으로 나눈다. 들여쓰기 두 칸의 `<id>:` 줄이 job 의 시작이다.

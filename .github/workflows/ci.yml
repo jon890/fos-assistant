@@ -2,7 +2,8 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # labeled: 「검사:전체」 라벨을 붙이면 브라우저와 E2E 까지 다시 돈다.
+    types: [opened, synchronize, reopened, labeled]
   # main push 는 공개 정보, unit, quality(웹 빌드 포함)만 돈다. 전체 검사는 정기 실행과 수동 실행이 돈다.
   push:
     branches: [main]
@@ -42,6 +43,8 @@ jobs:
           package-manager-cache: false
       - name: 바뀐 파일로 실행할 검사 선택
         id: paths
+        env:
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, '검사:전체') }}
         run: node scripts/ci/ci-paths.mjs changes
       - name: 공개 정보 검사
         env:
