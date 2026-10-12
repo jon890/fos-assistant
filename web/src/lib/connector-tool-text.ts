@@ -1,5 +1,5 @@
-/** 도구 설명만 정제한다. 도구 정책과 원문 manifest의 보호 SHA는 바꾸지 않는다. */
-export function toolDescription(value: unknown): string | null {
+/** 화면에 보일 도구 요약을 정제한다. 규칙은 모델용 설명과 같다. 도구 정책과 원문 manifest의 보호 SHA는 바꾸지 않는다. */
+export function toolText(value: unknown): string | null {
   if (typeof value !== "string") return null;
   for (const character of value) {
     const point = character.codePointAt(0)!;

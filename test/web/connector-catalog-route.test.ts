@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import vm from "node:vm";
 import ts from "../../web/node_modules/typescript/lib/typescript.js";
-import { toolDescription } from "../../web/src/lib/connector-tool-description.ts";
+import { toolText } from "../../web/src/lib/connector-tool-text.ts";
 import * as connection from "../../web/src/lib/connection.ts";
 import { AGENT_CODE_PATTERN } from "../../web/src/lib/agent.ts";
 
@@ -44,7 +44,7 @@ async function getCatalog(items: unknown[]): Promise<Response> {
       },
     },
     "@/lib/connection": connection,
-    "@/lib/connector-tool-description": { toolDescription },
+    "@/lib/connector-tool-text": { toolText },
     "@/lib/agent": { AGENT_CODE_PATTERN },
     "@/lib/json-body": {},
   };
@@ -167,7 +167,7 @@ test("두 링크는 독립적으로 정제하고 정책과 로그인 주소를 �
   const tools = [
     {
       name: "write",
-      description: null,
+      summary: null,
       title: null,
       risk: "WRITE",
       approval: "REQUIRED",
@@ -220,7 +220,7 @@ test("두 링크는 독립적으로 정제하고 정책과 로그인 주소를 �
   ]);
 });
 
-test("실제 GET은 공통 설명 경계마다 정책을 보존하고 설명만 정제한다", async () => {
+test("실제 GET은 공통 경계마다 정책을 보존하고 요약만 정제하며 모델용 설명은 버린다", async () => {
   const vectors = JSON.parse(
     await readFile(
       new URL("../fixtures/connector-tool-descriptions.json", import.meta.url),
@@ -237,13 +237,20 @@ test("실제 GET은 공통 설명 경계마다 정책을 보존하고 설명만 
     };
     const response = await getCatalog([
       summary({
-        tools: [{ ...tool, description: vector.value, secret: "제외" }],
+        tools: [
+          {
+            ...tool,
+            summary: vector.value,
+            description: "모델만 읽는 설명",
+            secret: "제외",
+          },
+        ],
       }),
     ]);
     const body = await response.json();
     assert.deepEqual(
       body[0].tools,
-      [{ ...tool, description: vector.expected }],
+      [{ ...tool, summary: vector.expected }],
       vector.name,
     );
   }

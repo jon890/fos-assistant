@@ -612,7 +612,9 @@ test("반영 완료가 설치 상태 어긋남으로 거절되면 그 까닭의 
   await expect(page.getByText("raw upstream")).toHaveCount(0);
 });
 
-test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", async ({ page }) => {
+test("연결 화면이 도구마다 사람 말 이름과 요약, 위험도와 실행 방식을 보이고 실제 이름은 숨긴다", async ({
+  page,
+}) => {
   await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
     route.fulfill({ json: disconnected }),
   );
@@ -623,13 +625,24 @@ test("연결 화면이 도구마다 위험도와 실행 방식을 보인다", as
     .filter({ hasText: "메모 쓰기" });
   await expect(write).toContainText("쓰기");
   await expect(write).toContainText("실행 전에 물어봐요");
+  await expect(write).toContainText("메모를 한 건 남겨요.");
   await expect(
-    page.getByTestId("connector-tool").filter({ hasText: "list_scopes" }),
+    page.getByTestId("connector-tool").filter({ hasText: "범위 목록 보기" }),
   ).toContainText("바로 실행해요");
   await expect(
-    page.getByTestId("connector-tool").filter({ hasText: "purge_notes" }),
+    page.getByTestId("connector-tool").filter({ hasText: "이름 없는 도구" }),
   ).toContainText("아직 쓸 수 없어요");
   await expect(page.getByTestId("connection-undeclared")).toHaveCount(0);
+  // 실제 도구 이름과 모델이 읽는 설명은 화면에 보이지 않는다.
+  const text = await page.locator("body").innerText();
+  for (const hidden of [
+    "list_scopes",
+    "write_note",
+    "purge_notes",
+    "delete_note",
+    "메모 한 건을 저장합니다",
+  ])
+    expect(text).not.toContain(hidden);
 });
 
 test("쓰기 도구라도 늘 승인을 받게 선언했으면 아직 쓸 수 없다고 보인다", async ({
