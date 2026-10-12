@@ -19,7 +19,7 @@
    API 목록, 표와 칸 목록, 커넥터 도구 목록, 설정 값 목록이 여기 든다.
 4. 기능 파일 머리에 다루는 코드 경로를 `covers:` 로 적는다.
    PR 이 그 경로를 바꾸고 기능 파일을 건드리지 않으면 CI 가 경고만 낸다.
-   검사는 `scripts/check-feature-covers.mjs` 가 하고 CI 의 unit job 에서 PR 에만 돈다.
+   검사는 `scripts/ci/check-feature-covers.mjs` 가 하고 CI 의 unit job 에서 PR 에만 돈다.
 5. 기능 파일은 500줄을 넘으면 알림을 낸다. 실패로 막지 않는다.
 
 **예외: 커넥터별 기능 파일.** `hermes/connectors/<id>/` 의 커넥터 하나는 `docs/features/<id>-connector.md` 를 따로 갖는다(2026-10-12 추가).
@@ -35,9 +35,9 @@
 
 - `test/unit/doc-files.test.ts`: `docs/features/` 아래에는 위 이름 규칙에 맞는 `.md` 만 통과한다.
 - `test/unit/doc-code-references.test.ts`: 기능 파일도 백틱으로 적은 코드 이름이 코드에 있는지 본다.
-- `scripts/check-feature-covers.mjs`: covers 경로를 바꾸고 기능 파일을 고치지 않은 PR 에 경고만 낸다.
+- `scripts/ci/check-feature-covers.mjs`: covers 경로를 바꾸고 기능 파일을 고치지 않은 PR 에 경고만 낸다.
 - `test/unit/feature-covers.test.ts`: 모든 기능 파일에 covers 가 있고 각 경로가 추적 파일과 맞는지 본다.
-- `scripts/check-file-length.mjs`: 기능 파일이 500줄을 넘으면 `알림:` 을 낸다.
+- `scripts/checks/check-file-length.mjs`: 기능 파일이 500줄을 넘으면 `알림:` 을 낸다.
 
 ### 맥락
 

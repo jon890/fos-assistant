@@ -5,8 +5,8 @@
 # 머지 기준으로 쓸 수 없다. 규칙이 틀렸으면 이 파일을 고친다.
 #
 # 사용법:
-#   git diff --name-only origin/main...HEAD | scripts/pr-risk-labels.sh
-#   gh pr diff 12 --name-only | scripts/pr-risk-labels.sh
+#   git diff --name-only origin/main...HEAD | scripts/pr/pr-risk-labels.sh
+#   gh pr diff 12 --name-only | scripts/pr/pr-risk-labels.sh
 #
 # 라벨이 하나도 없으면 아무것도 내지 않고 종료 코드 0 으로 끝난다.
 
@@ -31,7 +31,7 @@ while IFS= read -r path; do
     web/src/auth.ts | \
     web/src/lib/control-plane.ts | \
     web/src/app/api/* | \
-    scripts/check-public-safe.sh | \
+    scripts/checks/check-public-safe.sh | \
     hermes/plugins/*)
       security=1 ;;
   esac

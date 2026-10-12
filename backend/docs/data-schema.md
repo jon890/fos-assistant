@@ -106,7 +106,7 @@ H2 로 도는 검사를 모두 통과해도 운영 MySQL 에서 실패할 수 �
 운영과 테스트는 `spring.flyway.out-of-order=true` 로 낮은 시각 버전이 나중에 머지되어도 적용한다.
 서로 의존하는 마이그레이션은 한 PR 에 두고, 의존하는 파일의 시각을 더 크게 정한다. 다른 PR 의 미적용 스키마에 기대는 SQL 은 만들지 않는다.
 적용된 파일을 고치지 않는 규칙은 루트 [`AGENTS.md`](../../AGENTS.md) 의 「용어」 절이 갖는다.
-검사는 `node scripts/check-migration-versions.mjs [기준 ref]` 가 하고, 무엇을 어느 기준과 비교하는지는 그 스크립트와 CI 가 갖는다. 결정 근거는 [ADR-20261007 / numbering-scheme](../../docs/adr/ADR-20261007-numbering-scheme.md) 에 있다.
+검사는 `node scripts/checks/check-migration-versions.mjs [기준 ref]` 가 하고, 무엇을 어느 기준과 비교하는지는 그 스크립트와 CI 가 갖는다. 결정 근거는 [ADR-20261007 / numbering-scheme](../../docs/adr/ADR-20261007-numbering-scheme.md) 에 있다.
 
 ### DDL 과 DML 을 한 파일에 섞지 않는다
 
@@ -133,7 +133,7 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 
 ```bash
 # cwd: 저장소 root
-scripts/check-mysql-migration.sh
+scripts/checks/check-mysql-migration.sh
 ```
 
 Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄우고 `@Tag("mysql")` 이 붙은 검사를 모두 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.

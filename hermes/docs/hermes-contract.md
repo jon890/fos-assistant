@@ -2735,7 +2735,7 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 감싸는 미들웨어, import 하는 내부 함수, session 저장소의 칸, 감싸는 대시보드 경로가 여기 해당한다.
 목록은 [`hermes/tests/hermes_contract.py`](../tests/hermes_contract.py) 가 갖고, 왜 공개 확장점으로 바꾸지 못하는지는 [ADR-088](adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
 
-Hermes 를 올리기 전에 새 판의 tag 로 `scripts/check-hermes-contract.sh <tag>` 를 돌린다.
+Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-contract.sh <tag>` 를 돌린다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
 
 #### MCP 설정 맞추기와 스킬 색인 캐시 키

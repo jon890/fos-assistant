@@ -394,7 +394,7 @@ API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`�
 공식 예시의 모든 필드, nullable, 긴 decimal과 cursor, 빈 결과와 여러 페이지를 검사한다.
 잘못된 입력은 HTTP 0회이고 429, 5xx, timeout, credential/IP/revoke, malformed, 응답 크기 초과를 각 도구 그룹에서 검사한다.
 소스 AST와 자체 복제 schema의 일치만으로 통과시키지 않는다. 빌드한 bundle의 SDK 호출이 로컬 HTTP 목적지에 도달해야 한다.
-CI의 `hermes` job과 `scripts/check-connectors.sh`가 새 테스트를 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
+CI의 `hermes` job과 `scripts/checks/check-connectors.sh`가 새 테스트를 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
 
 ### 일반 금융 모듈
 

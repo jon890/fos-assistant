@@ -6,12 +6,12 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
-const root = fileURLToPath(new URL("../", import.meta.url));
-const require = createRequire(new URL("../web/package.json", import.meta.url));
+const root = fileURLToPath(new URL("../../", import.meta.url));
+const require = createRequire(new URL("../../web/package.json", import.meta.url));
 const prettier = require("prettier");
 const mode = process.argv[2];
 if (mode !== "check" && mode !== "fix") {
-  console.error("사용법: node scripts/format-connectors.mjs <check|fix>");
+  console.error("사용법: node scripts/checks/format-connectors.mjs <check|fix>");
   process.exit(2);
 }
 

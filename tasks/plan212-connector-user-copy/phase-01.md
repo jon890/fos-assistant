@@ -51,10 +51,10 @@
 
 ```bash
 # cwd: 저장소 root
-bash scripts/check-connectors.sh
+bash scripts/checks/check-connectors.sh
 python3 -m unittest discover -s hermes/tests
 python3 hermes/tests/scripts/export_argument_catalog.py --check
-scripts/check-local.sh --fast
+scripts/dev/check-local.sh --fast
 ```
 
 - 바뀐 한국어 문장은 `korean-check` 스킬의 검사기를 0 으로 통과한다
