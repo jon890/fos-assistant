@@ -14,6 +14,7 @@ class ConnectorActionBodyMigrationTest {
         return new Database("jdbc:h2:mem:action-body-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
     }
 
+
     @Test
     @DisplayName("본문 key 칸을 더해도 기존 승인 인자와 결과와 상태는 그대로 남는다")
     void expandsKeysWithoutChangingExistingBodies() throws Exception {
@@ -42,10 +43,13 @@ class ConnectorActionBodyMigrationTest {
         }
     }
 
+
     private void migrate(Database database, String target) {
         Flyway.configure().dataSource(database.url(), database.username(), database.password())
             .locations("classpath:db/migration").target(target).load().migrate();
     }
 
-    record Database(String url, String username, String password) {}
+
+    record Database(String url, String username, String password) {
+    }
 }

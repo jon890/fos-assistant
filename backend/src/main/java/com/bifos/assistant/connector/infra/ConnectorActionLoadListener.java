@@ -17,11 +17,13 @@ class ConnectorActionLoadListener implements PostLoadEventListener {
     private final EntityManagerFactory entityManagerFactory;
     private final ConnectorActionBodies bodies;
 
+
     @PostConstruct
     void register() {
         entityManagerFactory.unwrap(SessionFactoryImplementor.class).getEventListenerRegistry()
             .appendListeners(EventType.POST_LOAD, this);
     }
+
 
     @Override
     public void onPostLoad(PostLoadEvent event) {

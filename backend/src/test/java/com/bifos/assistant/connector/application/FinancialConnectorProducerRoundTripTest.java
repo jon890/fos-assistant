@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.application.execution.ConnectorExecutionTic
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -42,6 +43,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     @Autowired
     TextCipher cipher;
 
+
     @ParameterizedTest
     @DisplayName("실제 claim과 기동 정리가 같은 사용자 잠금에서 기다려도 미소비일 때만 실패로 끝낸다")
     @ValueSource(booleans = {false, true})
@@ -50,7 +52,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         tx().executeWithoutResult(status -> actions.findByPublicIdForUpdate(requested.actionId()).orElseThrow().beginExecution(now));
         String ticket = tickets.issue(requested.actionId());
         var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher);
-        var execution = new com.bifos.assistant.hermes.dto.ConnectorApprovedExecution(ticket,
+        var execution = new ConnectorApprovedExecution(ticket,
             snapshot.executionArgsJson(), snapshot.executionArgsSha256());
         var locked = new CountDownLatch(1);
         var waiting = new CountDownLatch(1);
@@ -92,6 +94,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         assertThat(counters().path("financial").intValue()).isEqualTo(claimFirst ? 1 : 0);
     }
 
+
     @ParameterizedTest
     @DisplayName("ticket 발급 전후의 미소비 실행을 실패로 정리하고 같은 의도의 새 승인을 허용한다")
     @ValueSource(booleans = {false, true})
@@ -107,13 +110,15 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         if (issued) {
             var row = contents.findById(action(requested).id()).orElseThrow();
             assertThat(client.executeApproved(profile, "tossinvest", "mcp__tossinvest__create_order",
-                new com.bifos.assistant.hermes.dto.ConnectorApprovedExecution(ticket,
-                    snapshot.executionArgsJson(), row.executionArgsSha256())).ok()).isFalse();
+                new ConnectorApprovedExecution(ticket,
+                    snapshot.executionArgsJson(), row.executionArgsSha256()))
+                .ok()).isFalse();
         }
         assertThatThrownBy(() -> tickets.issue(requested.actionId())).isInstanceOf(ApiException.class);
         assertThat(action(request()).status()).isEqualTo(ActionStatus.PENDING);
         assertThat(counters().path("financial").intValue()).isZero();
     }
+
 
     @ParameterizedTest
     @DisplayName("실행 응답을 잃거나 상세 없는 unavailable을 받으면 claim 소비 여부로 끝낸다")
@@ -134,6 +139,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
             .isEqualTo(consumed ? ActionStatus.UNKNOWN : ActionStatus.FAILED);
         assertThat(counters().path("financial").intValue()).isEqualTo(consumed ? 1 : 0);
     }
+
 
     @ParameterizedTest
     @DisplayName("claim과 정리가 겹쳐도 먼저 커밋한 쪽에 따라 미전송만 실패가 된다")
@@ -424,6 +430,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);
         assertRejectedBeforeTransmission(requested.actionId());
     }
+
 
     @Test
     @DisplayName("같은 의도의 동시 준비는 PENDING 한 줄만 남긴다")

@@ -246,6 +246,7 @@ class ConnectorActionServiceTest {
         }
     }
 
+
     @Test
     @DisplayName("승인 인자와 결과를 암호문으로 저장하고 주인의 조회와 실행에서만 푼다")
     void storesEncryptedBodiesAndExecutesOriginalArguments() {
@@ -266,6 +267,7 @@ class ConnectorActionServiceTest {
         assertThatThrownBy(() -> service.approve(admin, actionId, null)).isInstanceOf(ApiException.class);
     }
 
+
     @Test
     @DisplayName("같은 사용자의 승인 암호문을 맞바꿔도 인자를 실행하지 못한다")
     void rejectsArgumentsMovedBetweenActions() {
@@ -279,6 +281,7 @@ class ConnectorActionServiceTest {
         }
         verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
     }
+
 
     @Test
     @DisplayName("평문 이관은 상태와 원문을 유지하고 두 번 실행해도 암호문을 다시 쓰지 않는다")
@@ -303,6 +306,7 @@ class ConnectorActionServiceTest {
         verify(connector).execute(PROFILE, DEMO, "mcp__demo__write_note", ARGS);
     }
 
+
     @Test
     @DisplayName("읽을 수 없는 결과는 암호문을 노출하지 않고 안내 글로 표시한다")
     void displaysUnreadableResultWithoutLeakingStoredCiphertext() {
@@ -313,6 +317,7 @@ class ConnectorActionServiceTest {
         assertThat(actions.findById(action.id()).orElseThrow().resultText()).isEqualTo(ConnectorAction.UNREADABLE_RESULT);
         assertThat(service.listForConversation(me, CONVERSATION).getFirst().resultText()).isEqualTo(ConnectorAction.UNREADABLE_RESULT);
     }
+
 
     @Test
     @DisplayName("암호화가 꺼져 있으면 일반 쓰기는 평문 호환으로 저장하고 이관하지 않는다")
@@ -333,6 +338,7 @@ class ConnectorActionServiceTest {
             ReflectionTestUtils.setField(bodies, "cipher", previous);
         }
     }
+
 
     @BeforeEach
     void setUp() {

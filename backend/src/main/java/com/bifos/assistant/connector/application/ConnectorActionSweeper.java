@@ -17,6 +17,7 @@ public class ConnectorActionSweeper {
     private final ConnectorActionService actions;
     private final Clock clock = Clock.systemUTC();
 
+
     /**
      * 끊긴 실행 기록의 정리 뒤, 대화를 깨우는 기동 훑기 앞에 돈다. 결과를 모르는 줄로 바뀐 것을 깨우기가 함께 전한다.
      */

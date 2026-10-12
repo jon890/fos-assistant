@@ -16,15 +16,18 @@ import org.springframework.stereotype.Component;
 public class ConnectorActionBodies implements ConnectorActionBodyOpener {
     private final TextCipher cipher;
 
+
     public boolean enabled() {
         return cipher.enabled();
     }
+
 
     public void sealArgs(ConnectorAction action, String plain) {
         var sealed = seal(action, "args_json", plain);
         action.sealArgs(sealed.content(), sealed.keyId());
         action.attachOpener(this);
     }
+
 
     public void sealResult(ConnectorAction action) {
         if (action.storedResultText() == null || action.resultKeyId() != null) {
@@ -34,6 +37,7 @@ public class ConnectorActionBodies implements ConnectorActionBodyOpener {
         action.sealResult(sealed.content(), sealed.keyId());
         action.attachOpener(this);
     }
+
 
     private SealedText seal(ConnectorAction action, String column, String plain) {
         if (action.id() == null || plain == null) {
@@ -50,6 +54,7 @@ public class ConnectorActionBodies implements ConnectorActionBodyOpener {
         return sealed;
     }
 
+
     @Override
     public String open(ConnectorAction action, String column, Long keyId, String stored) {
         try {
@@ -59,6 +64,7 @@ public class ConnectorActionBodies implements ConnectorActionBodyOpener {
             return null;
         }
     }
+
 
     private static String aad(ConnectorAction action, String column) {
         return "connector_action:" + action.id() + ":column:" + column + ":user:" + action.userId();

@@ -34,11 +34,11 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(
-        name = "connector_action",
-        uniqueConstraints = {
-            @UniqueConstraint(name = "uk_connector_action_dedupe_key", columnNames = "dedupe_key"),
-            @UniqueConstraint(name = "uk_connector_action_public_id", columnNames = "public_id")
-        })
+    name = "connector_action",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_connector_action_dedupe_key", columnNames = "dedupe_key"),
+        @UniqueConstraint(name = "uk_connector_action_public_id", columnNames = "public_id")
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -175,6 +175,7 @@ public class ConnectorAction {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     /**
      * 판정 한 줄이다. 인자 원문과 승인 상태는 담지 않는다.
      *
@@ -183,16 +184,16 @@ public class ConnectorAction {
      * @param passed hook 에 통과로 답했는가
      */
     public static ConnectorAction decided(
-            ConnectorConnection connection,
-            Long agentId,
-            AgentExecution origin,
-            String hermesTool,
-            String toolName,
-            ToolPolicyDecision decision,
-            boolean passed,
-            String dedupeKey,
-            String argsSha256,
-            Instant now) {
+        ConnectorConnection connection,
+        Long agentId,
+        AgentExecution origin,
+        String hermesTool,
+        String toolName,
+        ToolPolicyDecision decision,
+        boolean passed,
+        String dedupeKey,
+        String argsSha256,
+        Instant now) {
         ConnectorAction action = new ConnectorAction();
         action.userId = connection.userId();
         action.agentId = agentId;
@@ -212,6 +213,7 @@ public class ConnectorAction {
         return action;
     }
 
+
     /**
      * 판정 줄을 승인 줄로 만든다. 저장하기 전에만 부른다.
      *
@@ -225,12 +227,14 @@ public class ConnectorAction {
         this.expiresAt = expiresAt;
     }
 
+
     /** 승인했다. 이 전이를 커밋한 뒤에만 실행을 보낸다. */
     public void beginExecution(Instant now) {
         require(ActionStatus.PENDING);
         this.status = ActionStatus.EXECUTING;
         this.decidedAt = now;
     }
+
 
     public void succeed(String resultText, Instant now) {
         require(ActionStatus.EXECUTING);
@@ -240,6 +244,7 @@ public class ConnectorAction {
         this.plainResult = null;
         this.executedAt = now;
     }
+
 
     /**
      * @param errorCode 공통 오류 어휘의 글자
@@ -255,6 +260,7 @@ public class ConnectorAction {
         this.executedAt = now;
     }
 
+
     /** 실행을 보냈으나 결과를 모른다. 다시 실행하지 않는다. */
     public void unknown(Instant now) {
         require(ActionStatus.EXECUTING);
@@ -262,11 +268,13 @@ public class ConnectorAction {
         this.executedAt = now;
     }
 
+
     public void reject(Instant now) {
         require(ActionStatus.PENDING);
         this.status = ActionStatus.REJECTED;
         this.decidedAt = now;
     }
+
 
     /**
      * 사용자가 거절한 것이 아니라 시스템이 실행하지 않고 끝냈다. 상태는 거절과 같고 까닭을 {@code errorCode} 에 남긴다.
@@ -278,21 +286,25 @@ public class ConnectorAction {
         this.errorCode = reason;
     }
 
+
     public void expire(Instant now) {
         require(ActionStatus.PENDING);
         this.status = ActionStatus.EXPIRED;
         this.decidedAt = now;
     }
 
+
     /** 결과나 거절, 만료를 대화에 전했다. */
     public void markDelivered(Instant now) {
         this.resultDeliveredAt = now;
     }
 
+
     /** 이 도구에 상시 허락을 줄 수 있는가. 늘 승인을 받는 도구와 원래 이름을 모르는 호출에는 주지 못한다. */
     public boolean grantAllowed() {
         return approvalMode == ToolApproval.REQUIRED && toolName != null;
     }
+
 
     /** 본문 접근은 모두 이 두 접근자를 거친다. 암호문은 처음 꺼낼 때만 푼다. */
     public String argsJson() {
@@ -306,6 +318,7 @@ public class ConnectorAction {
         return plainArgs;
     }
 
+
     public String resultText() {
         if (resultKeyId == null) {
             return storedResultText;
@@ -317,9 +330,11 @@ public class ConnectorAction {
         return plainResult;
     }
 
+
     public void attachOpener(ConnectorActionBodyOpener opener) {
         this.opener = opener;
     }
+
 
     /** keyがnullなら移行前または暗号化を使わない保存だ。キャッシュは保存ごとに捨てる。 */
     public void sealArgs(String stored, Long keyId) {
@@ -328,11 +343,13 @@ public class ConnectorAction {
         this.plainArgs = null;
     }
 
+
     public void sealResult(String stored, Long keyId) {
         this.storedResultText = stored;
         this.resultKeyId = keyId;
         this.plainResult = null;
     }
+
 
     private void require(ActionStatus expected) {
         if (status != expected) {
