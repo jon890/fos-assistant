@@ -2788,7 +2788,7 @@ MCP 실제 목록에 read-only compile 하나만 있어야 호출한다. Python 
 compile은 기존 call·execute의 동시 실행 한도를 공유하고 전체 왕복을 5초로 제한한다.
 adapter 자체는 오류 원문·인자·결과를 로그에 넣지 않으며 자식 stderr를 버린다. HTTP 오류 응답에도 본문을 넣지 않는다.
 compile의 Python MCP SDK 진단은 아래 source 계약에 따라 본문 없이 남긴다.
-입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#compile-전용-내부-transport)이 갖는다.
+입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약은 [원고 기능](../../docs/features/content-draft.md#private-snapshot-내부-transport)이 갖는다.
 
 본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
 운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
