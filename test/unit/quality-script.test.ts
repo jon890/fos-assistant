@@ -7,8 +7,8 @@ import { join } from "node:path";
 import test from "node:test";
 
 const ROOT = join(import.meta.dirname, "../..");
-const QUALITY_SH = join(ROOT, "scripts/quality.sh");
-const QUALITY_REPORT = join(ROOT, "scripts/quality-report.mjs");
+const QUALITY_SH = join(ROOT, "scripts/checks/quality.sh");
+const QUALITY_REPORT = join(ROOT, "scripts/checks/quality-report.mjs");
 
 test("quality.sh 는 인자 없이 부르면 2 로 끝나고 사용법을 표준 오류에 낸다", () => {
   const result = spawnSync("bash", [QUALITY_SH], { encoding: "utf8" });

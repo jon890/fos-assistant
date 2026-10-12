@@ -2,7 +2,7 @@
 # 커넥터별 타입, 동작, 소스에서 빌드한 묶음 파일을 한 명령으로 검사한다.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 expected_bun="1.3.14"
 actual_bun="$(bun --version)"
 if [ "${actual_bun}" != "${expected_bun}" ]; then

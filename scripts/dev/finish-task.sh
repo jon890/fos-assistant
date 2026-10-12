@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 작업 단위의 마지막 「정리」 단계를 돌린다. 무엇을 지우는지와 순서는 이 스크립트가 정본이다.
 #
-#   scripts/finish-task.sh <브랜치>
+#   scripts/dev/finish-task.sh <브랜치>
 #
 # 이 저장소에서 머지된 PR 의 끝 커밋까지만 담긴 브랜치를 정리한다.
 # 다음이면 아무것도 지우지 않고 2 로 끝난다.
@@ -22,7 +22,7 @@ set -euo pipefail
 REPO="jon890/fos-assistant"
 
 if [ "$#" -ne 1 ]; then
-  echo "사용법: scripts/finish-task.sh <브랜치>" >&2
+  echo "사용법: scripts/dev/finish-task.sh <브랜치>" >&2
   exit 2
 fi
 branch="$1"

@@ -76,7 +76,7 @@ ALTER TABLE task ADD COLUMN instruction_key_id BIGINT NULL;
 cd backend && ./gradlew test --tests '*ConversationTitleEncryptionTest' --tests '*TaskContentEncryptionTest' --tests '*ConversationPurgerTest'
 cd backend && ./gradlew test
 cd backend && ./gradlew qualityCheck
-scripts/check-mysql-migration.sh
+scripts/checks/check-mysql-migration.sh
 ```
 
 넷 다 실패 없이 끝난다. 마지막 명령은 Docker 가 있어야 돈다.
