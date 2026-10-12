@@ -134,9 +134,9 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
 
 
     @ParameterizedTest
-    @DisplayName("claim 직전 바뀐 바인딩과 꺼진 에이전트는 금융 전송과 ticket 소비 전에 거부된다")
+    @DisplayName("실행 직전 바뀐 바인딩과 꺼진 에이전트는 support 또는 claim에서 금융 전송과 ticket 소비 전에 거부된다")
     @ValueSource(strings = {"revision", "agent-disabled"})
-    void changedAuthorityDuringClaimIsRejectedWithZeroFinancialRequests(String change) {
+    void changedAuthorityBeforeExecutionIsRejectedWithZeroFinancialRequests(String change) {
         var requested = request();
         doAnswer(invocation -> {
             sent = invocation.getArgument(3);
