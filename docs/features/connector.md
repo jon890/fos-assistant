@@ -499,6 +499,25 @@ Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `a
 먼저 살펴보기를 쓰는 분야는 그 분야 패키지의 `proactive-check` 스킬을 붙은 커넥터 도구가 있으면 직접 부르고 없으면 옛 연결 에이전트에 맡기도록 먼저 고친 뒤 옮긴다([`docs/features/proactive.md`](proactive.md)).
 모든 옛 에이전트가 지워지면 격리 경로의 코드와 `connector_connection` 의 쓰지 않는 칸을 지운다.
 
+### guard 설치의 후속 계약 보완안
+
+아래는 구현 전 보완안이다. 설치 CAS와 guard 전달은 구분하며, support 제공자가 있다는 이유만으로
+guard 설치가 연결되었다고 보지 않는다. 설치 시작이 커밋한 바인딩·연결 번호와 연결 revision,
+검증한 protocol·manifest 전체 SHA만 기존 선택 `bind.guard`에 싣는다. 설치 시도 UUID는 DB에만 둔다.
+
+지원 제공자는 READY와 켜려는 의도를 요구하므로 PENDING 설치 callback은 pending으로 남는다.
+기존 설치 결과 CAS가 READY를 커밋한 뒤 새 nonce로 상태를 확인해야 verified가 될 수 있다.
+READ·WRITE의 READY 판정과 금융 도구 숨김은 유지한다. verified는 거래 권한이 아니다.
+
+떼기 뒤 앞선 bind가 늦게 끝나면 행 없는 외부 설치가 남을 수 있다. 현재 바인딩이 없으면
+정책 hook·support·claim이 차단한다. 무조건 unbind하면 새 정상 설치까지 지울 수 있으므로 보내지 않는다.
+외부 상태의 자동 정리는 설치 식별자를 대조하는 조건부 설치·삭제 계약이 있어야 보장할 수 있다.
+이 보완안은 그 후속 계약이나 운영 개방을 포함하지 않는다.
+
+설치 구현자는 이 설치 절과 정책 문서의 설치·지원 확인 절을 소유한다. 일반 금융 모듈과 snapshot producer 절은
+각 구현자가 따로 소유하고 메인 코디네이터가 최종 통합한다. 독립 checkout에서 구현한 뒤 먼저 머지한 PR을
+다른 PR이 일반 merge로 포함한다. rebase와 force push는 하지 않으며 상대 절을 보존하고 문서 검사를 다시 실행한다.
+
 ## MCP SDK 계약
 
 대시보드 plugin 의 `call` 은 공식 `mcp` Python SDK 로 커넥터 서버를 부른다. plugin 은 SDK 를 스스로 설치하지 않고 Hermes 가 설치한 버전을 쓴다.
@@ -653,6 +672,39 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getBuyingPower` | `get_buying_power` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
 | `getSellableQuantity` | `get_sellable_quantity` | READ/none; ORDER_INFO | 기반 구현 | 기반 |
 | `getCommissions` | `get_commissions` | READ/none; ORDER_INFO | 구현 | 일반주문 |
+
+### 일반 금융 모듈의 구현 경계 보완안
+
+아래는 구현 전 보완안이다. 일반 금융 모듈은 mock 검증 동안 운영 서버에 등록하지 않고,
+운영 manifest의 FINANCIAL 선언과 execution_guard도 추가하지 않는다. 기존 READ 등록은 유지한다.
+실제 모듈을 테스트의 SDK entry에서만 등록·bundle하며 운영 bundle의 금융 연결 완료로 보고하지 않는다.
+
+모듈의 독립 구현은 설치 CAS의 통합을 기다리지 않는다. 실제 main의 기본 계획 검사, 독립 검토의 지적 반영과
+client·오류 manifest의 독점 소유권을 확인하면 착수할 수 있다. 이 단계는 실제 SDK, claim loopback 대역과
+mock 금융 목적지의 단일전송으로 검증한다. 대역 protocol vector는 실제 main의 claim 응답·실패 계약과 직접 대조한다.
+대역끼리의 일치만으로 완료하지 않으며 실제 서명 인증이나 DB 소비를 검증했다고 보고하지 않는다.
+실제 DB/Spring claim과 Python·SDK·mock 목적지를 잇는 증거는 snapshot producer 통합의 필수 완료 조건이다.
+
+테스트 금융 connector 원본은 테스트 SDK entry의 생성 명령 한 곳에서 만든다. Bun 시험과 Python fixture는
+같은 명령으로 /tmp 아래 고유 임시 원본을 받는다. 운영 manifest와 loader에 필요한 파일을 복사하고 테스트 사본에만
+READ prepare, FINANCIAL/always, guard, scope_fields와 금융 SDK entry를 선언한다. Python은 manifest를 다시 쓰지 않는다.
+실제 manifest loader가 계산한 SHA를 catalog·bind·support에 동일하게 연결하는 검증은 snapshot producer 통합이 맡는다.
+
+client 변경은 운영 READ bundle에도 영향을 준다. PR 444가 실제 main에 미통합인 동안 모듈 구현자가 운영 bundle을
+재생성하고 검사한다. 444가 실제 main에 통합되면 새 생성 산출물을 추적하지 않고 그 main의 소스 build/check만 수행한다.
+두 경우 모두 운영 SDK의 금융 도구 0개와 착수 시 현재 READ 합집합을 보존한다. bundle 크기를 PR 규모 예외 이유로 쓰지 않는다.
+
+공식 OrderCreateRequest의 inline oneOf 두 분기를 따르고 body는 해당 분기의 공식 필드만 담는다.
+scope·계좌·market·currency·expected_order는 본문에 넣지 않는다. 계좌는 env를 대조한 공식 헤더로 전달한다.
+금액 주문 본문에는 timeInForce·price를 넣지 않으며 confirmHighValueOrder는 false로 유지한다.
+US 가격은 1달러 미만 소수 넷째 자리, 1달러 이상 둘째 자리를 넘으면 prepare에서 거절하고 절삭하지 않는다.
+일반 취소는 공식 POST 경로에 예시 `{}`를 보내고 정정·취소 응답의 새 orderId를 보존한다.
+
+POST·DELETE는 GET의 401·429 재시도 루프를 공유하지 않는다. 명백한 전송 전 실패와 공식 거절은 FAILED,
+429·5xx·timeout·불량2xx와 처리 여부가 불분명한 응답은 UNKNOWN으로 두고 자동 재전송하지 않는다.
+금융 전송 queue callback 안에서 ticket 만료를 최종 확인한다. claim 뒤 GET·auth·quota 지연으로 만료되면 금융 POST는 0회다.
+모든 테스트는 가짜 credential과 loopback만 사용하고 금융 POST·DELETE와 auth POST를 별도로 센다.
+일반 주문의 금융 DELETE는 0회다. 조건주문 DELETE와 저장 계약 확장은 별도 구현 범위다.
 
 ### 필드 계약
 
