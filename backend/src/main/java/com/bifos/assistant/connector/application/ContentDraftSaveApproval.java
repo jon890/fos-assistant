@@ -257,11 +257,11 @@ public class ContentDraftSaveApproval {
         Instant now = now();
         var action = actions.findByPublicIdForUpdate(prepared.actionId()).orElseThrow(ConnectorActionDetails::notFound);
         var job = jobs.lockById(prepared.jobRowId()).orElseThrow(ConnectorActionDetails::notFound);
-        if (outcome == Outcome.ACCEPTED) {
+        if (outcome.kind() == Outcome.Kind.ACCEPTED) {
             if (job.running()) {
                 job.accepted(now);
             }
-        } else if (outcome == Outcome.UNKNOWN) {
+        } else if (outcome.kind() == Outcome.Kind.UNKNOWN) {
             if (job.status() == ContentDraftJobStatus.DISPATCHED) {
                 job.unknown(now);
             }
@@ -308,13 +308,15 @@ public class ContentDraftSaveApproval {
     private record Reserved(UUID jobId, ContentDraftSnapshotInput input, ContentDraftSaveTicketPayload ticket) {
     }
 
-    private record Outcome(String errorCode) {
-        static final Outcome ACCEPTED = new Outcome(null);
-        static final Outcome UNKNOWN = new Outcome(null);
+    private record Outcome(Kind kind, String errorCode) {
+        enum Kind { ACCEPTED, REJECTED, UNKNOWN }
+
+        static final Outcome ACCEPTED = new Outcome(Kind.ACCEPTED, null);
+        static final Outcome UNKNOWN = new Outcome(Kind.UNKNOWN, null);
 
 
         static Outcome rejected(String errorCode) {
-            return new Outcome(errorCode);
+            return new Outcome(Kind.REJECTED, errorCode);
         }
     }
 }
