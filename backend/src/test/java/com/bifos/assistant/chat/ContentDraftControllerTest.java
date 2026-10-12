@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -131,6 +132,30 @@ class ContentDraftControllerTest extends ContentDraftFixture {
         assertThat(revised.statusCode()).isEqualTo(200);
         assertThat(json.readTree(revised.body()).path("draft").path("title").asString()).isEqualTo(value + " 수정");
         assertThat(json.readTree(send(owner, "/" + id + "/revisions/1", "GET", "").body()).path("draft")).isEqualTo(first);
+    }
+
+
+    @Test
+    @DisplayName("HTTP 생성과 수정은 같은 사진의 반복을 고정 코드와 안내로 거절하고 서로 다른 사진은 저장한다")
+    void rejectsDuplicatePhotoOnHttpCreateAndRevise() throws Exception {
+        var repeated = (ObjectNode)json.valueToTree(inputDraft("반복 사진", true));
+        ((ObjectNode)repeated.path("blocks").get(1)).put("assetId", photo.id().toString());
+        var post = send(owner, "", "POST", json.writeValueAsString(repeated));
+        assertThat(post.statusCode()).isEqualTo(400);
+        assertThat(json.readTree(post.body()).path("code").asString()).isEqualTo("CONTENT_DRAFT_DUPLICATE_PHOTO");
+        assertThat(json.readTree(post.body()).path("message").asString()).isEqualTo(ContentDraftInputReader.DUPLICATE_PHOTO_MESSAGE);
+        assertThat(draftRows.count()).isZero();
+
+        var created = send(owner, "", "POST", json.writeValueAsString(inputDraft("서로 다른 사진", true)));
+        assertThat(created.statusCode()).isEqualTo(201);
+        var id = json.readTree(created.body()).path("draft").path("draftId").asString();
+        var put = send(owner, "/" + id, "PUT", "{\"expectedRevision\":1,\"draft\":" + json.writeValueAsString(repeated) + "}");
+        assertThat(put.statusCode()).isEqualTo(400);
+        assertThat(json.readTree(put.body()).path("code").asString()).isEqualTo("CONTENT_DRAFT_DUPLICATE_PHOTO");
+        assertThat(revisionRows.count()).isEqualTo(1);
+        var distinct = json.createObjectNode().put("expectedRevision", 1);
+        distinct.set("draft", json.valueToTree(inputDraft("다시 다른 사진", true)));
+        assertThat(send(owner, "/" + id, "PUT", json.writeValueAsString(distinct)).statusCode()).isEqualTo(200);
     }
 
 

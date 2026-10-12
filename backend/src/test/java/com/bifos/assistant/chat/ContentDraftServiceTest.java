@@ -44,6 +44,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -411,6 +412,15 @@ abstract class ContentDraftFixture extends ObservationFixture {
     @Autowired
     ConversationPurger purger;
 
+    /** 같은 사진은 원고에 한 번만 쓸 수 있어 두 이미지 블록에 다른 첨부를 둔다. */
+    ChatAttachment secondPhoto;
+
+
+    @BeforeEach
+    void prepareSecondPhoto() {
+        secondPhoto = photo();
+    }
+
 
     @AfterEach
     void removeDrafts() {
@@ -433,7 +443,7 @@ abstract class ContentDraftFixture extends ObservationFixture {
         var blocks = json.createArrayNode();
         if (image) {
             blocks.add(json.createObjectNode().put("type", "image").put("assetId", photo.id().toString()));
-            blocks.add(json.createObjectNode().put("type", "image").put("assetId", photo.id().toString()));
+            blocks.add(json.createObjectNode().put("type", "image").put("assetId", secondPhoto.id().toString()));
         }
         node.set("blocks", blocks);
         return reader.read(node);

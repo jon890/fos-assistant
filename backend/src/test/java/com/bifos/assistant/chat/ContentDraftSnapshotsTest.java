@@ -183,7 +183,7 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
         var first = preview();
         assertThat(preview().snapshotId()).isEqualTo(first.snapshotId());
         assertThat(snapshots.readCurrentSnapshot(owner, conversation.id(), first.snapshotId()).preview().title()).isEqualTo("비밀 원고 😀");
-        assertThat(first.assetIds()).containsExactly(photo.id().toString());
+        assertThat(first.assetIds()).containsExactly(photo.id().toString(), secondPhoto.id().toString());
         assertThat(json.writeValueAsString(first)).doesNotContain("photo_dir", "fileName", "storedName", "payload", "authorizationFingerprint", properties.agentRoot());
         assertThat(snapshotRows.count()).isEqualTo(1);
         assertThat(jobRows.count()).isZero();
