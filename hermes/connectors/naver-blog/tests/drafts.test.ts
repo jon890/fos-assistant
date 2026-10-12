@@ -499,6 +499,60 @@ test("같은 글을 연달아 읽으면 같은 지문을 돌려주고 목록은 
   expect(cdp.violations).toEqual([]);
 });
 
+test("두 번째 읽기 전에 글이 바뀌면 새 지문을 돌려준다", async () => {
+  const { editor, env } = await setup();
+  const first = await readDraft(env, "224000000001", TIMES);
+  editor.document = null;
+  editor.documentId = "";
+  editor.loaded = null;
+  editor.drafts[0]!.components.push({
+    "@ctype": "text",
+    value: [paragraph("추가한 문장")],
+  });
+  const second = await readDraft(env, "224000000001", TIMES);
+  expect(second.revision).not.toBe(first.revision);
+  expect(second.body).toContain("추가한 문장");
+});
+
+test("뒤 목록 응답이 실패하면 읽은 글을 돌려주되 목록 변화 관측은 null이다", async () => {
+  const { cdp, editor, env } = await setup();
+  const evaluate = cdp.calls;
+  // 입력 시점에 뒤 목록 응답만 실패하도록 대역의 응답 상태를 바꾼다.
+  cdp.on("Network.enable", (_, target) => {
+    cdp.emit(target, "Network.requestWillBeSent", {
+      requestId: "autosave",
+      request: { url: "https://blog.naver.com/RabbitAutoSaveWrite.naver" },
+    });
+    return {};
+  });
+  editor.listStatusAfterLoad = 500;
+  const result = await readDraft(env, "224000000001", TIMES);
+  expect(result.autosave_check).toBeNull();
+  expect(result.title).toBe(DRAFTS[0]!.title);
+  expect(result.autosave_requests).toBe(1);
+  expect(
+    evaluate.filter(
+      (call) =>
+        call.method === "Runtime.evaluate" &&
+        call.params.expression.includes("TempPostList.naver"),
+    ).length,
+  ).toBe(2);
+});
+
+test("실패 뒤 쿠키 확인도 실패하면 원문 없이 unavailable로 남긴다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.listStatus = 500;
+  cdp.on("Storage.getCookies", () => {
+    throw new Error(upstreamText);
+  });
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(JSON.stringify(error)).not.toContain(upstreamText);
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
+
 test("불러오기 중 문서 제목만 로그인 화면으로 바뀌어도 로그인 오류다", async () => {
   const { env, editor } = await setup();
   editor.loginTitleOnLoad = true;

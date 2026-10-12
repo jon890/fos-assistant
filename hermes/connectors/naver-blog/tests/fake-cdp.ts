@@ -321,6 +321,8 @@ export class FakeEditor {
   drafts: FakeDraft[] = [];
   /** 목록 API 의 HTTP 상태. */
   listStatus = 200;
+  /** 글을 불러온 뒤의 목록 응답 상태. 뒤 목록 실패만 만든다. */
+  listStatusAfterLoad?: number;
   /** 목록 화면이 보일 제목. 비우면 `drafts` 의 제목이다. 차례가 어긋난 화면을 만든다. */
   listTitles?: string[];
   /** 편집기에 불러온 글. */
@@ -561,6 +563,8 @@ export class FakeEditor {
         }
         if (this.autosaveOnLoad) draft.modiDate += 1000;
         this.loaded = this.loadInstead ?? draft;
+        if (this.listStatusAfterLoad !== undefined)
+          this.listStatus = this.listStatusAfterLoad;
         this.document = {
           document: { components: structuredClone(this.loaded.components) },
         };
