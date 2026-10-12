@@ -130,6 +130,38 @@ test("사진 줄이 없으면 파일 선택 창을 가로채지 않는다", asyn
   expect(cdp.methods()).not.toContain("Input.dispatchMouseEvent");
 });
 
+test("guard 없는 DSL 에서 둘째 사진 업로드 실패는 기존 사진 유무와 무관하게 photo=2 다", async () => {
+  for (const initial of [0, 1]) {
+    const { cdp, editor, page, input, blocks, attachmentDir } = await setup(
+      "[사진 1: 101.jpg]\n[사진 2: 102.jpg]\n[사진 3: 103.jpg]",
+    );
+    await writeFile(join(attachmentDir, "102.jpg"), PHOTO);
+    await writeFile(join(attachmentDir, "103.jpg"), PHOTO);
+    editor.body = [
+      initial === 0 ? "[사진 자리: 101.jpg]" : "",
+      "[사진 자리: 102.jpg]",
+      "[사진 자리: 103.jpg]",
+    ];
+    if (initial === 1) editor.images.push({ fitted: true });
+    cdp.on("Runtime.callFunctionOn", () => {
+      if (editor.images.length === 1) throw new Error("둘째 사진 업로드 실패");
+      editor.images.push({ fitted: false });
+      return { result: { type: "number", value: 1 } };
+    });
+    const failure = await photos(
+      page,
+      input,
+      blocks,
+      "draft-hash",
+      attachmentDir,
+    ).catch((error) => error);
+    expect(failure.code).toBe("photo_upload_failed");
+    expect(failure.extra).toEqual({ photo: 2 });
+    expect(editor.images).toHaveLength(1);
+    expect(paramsOf(cdp, "Runtime.callFunctionOn")).toHaveLength(2 - initial);
+  }
+});
+
 /** guard 가 있는 사진 넣기. 업로드한 바이트의 지문과 authorize 한 자리를 순서대로 모은다. */
 async function guarded(
   count: number,
