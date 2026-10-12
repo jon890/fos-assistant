@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { errorResponse } from "@/lib/api-response";
+import { rejectCrossOrigin } from "@/lib/same-origin";
 
 function respond(result: Awaited<ReturnType<typeof callControlPlane>>) {
   if (!result.ok)
@@ -16,12 +17,16 @@ export async function GET() {
 }
 
 /** 내 브라우저를 만든다. 꺼진 채로 생긴다. 본문이 없다. */
-export async function POST() {
+export async function POST(request: Request) {
+  const rejected = rejectCrossOrigin(request);
+  if (rejected) return rejected;
   return respond(await callControlPlane("/api/v1/browser", { method: "POST" }));
 }
 
 /** 내 브라우저를 끄고 프로필까지 지운다. */
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const rejected = rejectCrossOrigin(request);
+  if (rejected) return rejected;
   return respond(
     await callControlPlane("/api/v1/browser", { method: "DELETE" }),
   );

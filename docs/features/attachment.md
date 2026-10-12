@@ -274,6 +274,19 @@ WebP는 바이트와 픽셀을 만들지 않는 metadata 사례이며 실제 관
 실제 WebP 첫 프레임은 기존 runtime 변환 회귀가 검증하며 합성 성공으로 대신하지 않는다.
 단계별 ID와 미측정의 판정은 [단계별 증거](content-draft.md#단계별-증거)가 갖는다.
 
+테스트의 [픽셀 대응 검증기](../../test/support/media-pipeline-mapping.ts)는 합성 이미지 30장의 방향이 반영된 JPEG에서 픽셀 ID를 회수하고 첨부 ID, 순서, 원본 SHA와 준비 JPEG SHA를 따로 비교한다.
+8방향 회전 JPEG는 독립 좌표 벡터로 확인하며 누락, 중복, 순서 변경과 디코딩 실패는 대응 검증 실패다.
+unit 검사는 독립 준비기와 대역 수신 계약을 확인한다.
+MCP 통합 검사는 실제 Control Plane에 JPEG/PNG/GIF 30장을 올려 역순으로 보내고, HTTP로 받은 FakeHermes의 JPEG 픽셀을 첨부·순서·원본 SHA와 대조한다.
+서명된 MCP로 관찰을 저장한 뒤 사진 없는 새 turn에서 30개 본문과 revision을 재조회하며 추가 저장은 하지 않는다.
+최초 저장 완료부터 후속 실행의 재조회 종료까지 테스트 프로세스(대역 Hermes 포함)가 보낸 record 요청이 늘지 않는지 검사한다.
+카운터는 저장 구간의 30건으로 먼저 대조한다. 같은 UUID 재시도의 revision 보존은 DB 검사가 맡는다.
+이후 USER 정정, MODEL 덮어쓰기 거부, 큰 본문의 MCP 페이지 예산 검사는 이 측정 구간 밖이다.
+관찰은 `NEEDS_REVIEW`, `MODEL_UNVERIFIED`이고 JPEG/PNG는 `OVERVIEW`, GIF는 `FIRST_FRAME`의 frame 0으로 기록한다.
+실제 DB 검사는 소유권·다른 대화·삭제·만료·UUID 재시도·USER 정정 보호와 암호화 본문을 확인한다.
+실제 provider 전달, 사진 의미와 OCR 정확도는 미측정이다.
+기존 원본 픽셀 evidence V1과 `actuallyObserved` 판정에는 수신 JPEG 결과를 넣지 않는다.
+
 ## 요구
 
 - 사진을 고르면 그 자리에서 올라가고, 보내기를 눌러야 에이전트가 그 사진을 받는다.
@@ -399,6 +412,8 @@ sequenceDiagram
 [ADR-20261010 / attachment-inspect](../adr/ADR-20261010-attachment-inspect.md)가 권한과 실패 계약을 정한다.
 모델은 첨부 참조와 선택 `region=[x1,y1,x2,y2]` 또는 `overview=true`를 고른다. 좌표는 회전된 원본 표시 방향이며 오른쪽·아래 끝은 제외한다.
 서버는 현재 실행의 사용자와 대화에서 보낸 원본만 읽으며 다른 대화, 미전송, 삭제·만료된 첨부는 거절한다.
+`AttachmentService`가 원본을 읽기 전후에 권한과 SQL 상태를 확인한다.
+`AttachmentInspection`은 개요·GIF/WebP에 전달할 원본 bytes를 읽고 20MiB 상한, 저장 크기와 MIME magic을 검사한다.
 최상위 session을 압축했거나 다음 turn을 시작해도 현재 실행에서 다시 조회한다. 옛 실행의 서명은 쓰지 못한다.
 
 한도를 넘는 전체 사진은 작은 영역으로 한 번만 다시 조회한다. 한 사진은 최대 3회이며

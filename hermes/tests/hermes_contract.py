@@ -10,7 +10,7 @@ Hermes 를 올리면 이 지점이 조용히 바뀔 수 있다. v0.21.5 로 올�
 
 본문 없는 writer와 관리 bootstrap의 별도 source 계약은 `test_bodyless_*_contract.py`가 확인한다.
 
-Hermes 를 올리기 전에 `scripts/check-hermes-contract.sh <tag>` 로 새 판의 소스를 확인한다.
+Hermes 를 올리기 전에 `scripts/checks/check-hermes-contract.sh <tag>` 로 새 판의 소스를 확인한다.
 plugin 이 새 지점에 기대게 되면 같은 커밋에서 여기에 더한다.
 """
 

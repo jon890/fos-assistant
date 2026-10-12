@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 같은 checkout에서 생성 entry를 비우고 Docker 빌드와 runner 재빌드의 모든 파일을 비교한다.
 set -Eeuo pipefail
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 # Python을 부르는 기존 커넥터 검사가 다음 Docker context에 캐시를 남기지 않게 한다.
 export PYTHONDONTWRITEBYTECODE=1
@@ -46,7 +46,7 @@ for id in "${connectors[@]}"; do
   cp -p "$work/bundle/hermes/connectors/$id/dist/$id-mcp.js" "hermes/connectors/$id/dist/$id-mcp.js"
 done
 # 소스에서 entry를 다시 빌드한 뒤 기존 HTTP 대역과 재현성을 검사한다.
-bash scripts/check-connectors.sh
+bash scripts/checks/check-connectors.sh
 for id in "${connectors[@]}"; do
   cmp "$work/bundle/hermes/connectors/$id/dist/$id-mcp.js" "hermes/connectors/$id/dist/$id-mcp.js"
 done

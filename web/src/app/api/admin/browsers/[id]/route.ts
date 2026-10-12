@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { errorResponse } from "@/lib/api-response";
+import { rejectCrossOrigin } from "@/lib/same-origin";
 
 /** 관리자. 그 브라우저를 끄고 프로필까지 지운다. */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
+  const rejected = rejectCrossOrigin(request);
+  if (rejected) return rejected;
   const { id } = await context.params;
   if (!/^[1-9]\d{0,18}$/.test(id))
     return errorResponse(

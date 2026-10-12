@@ -68,6 +68,16 @@ hermes/connectors/<id>/
 - 결과를 모를 때 쓰기를 다시 부르지 않는다. 보낸 뒤 답을 받지 못한 쓰기는 따로 둔 오류 코드로 끝내고 `errors` 표에서 `outcome_unknown` 에 잇는다. 그 호출은 실패가 아니라 「실행했는지 모름」 으로 기록된다
 - **에이전트가 실패 뒤에 할 일이 코드마다 다르면 `errors` 항목을 객체로 쓴다.** `recovery` 로 복구 어휘를 고르고, 다음 판단에 필요한 수는 오류 객체의 맨 위 칸에 정수로 내고 `details` 에 그 이름을 적는다. 글은 세부로 넘어가지 않는다([ADR-092](../../docs/adr/ADR-092-승인한-실행의-실패는-커넥터가-선언한-오류-코드와-복구-어휘와-정수-세부만-에이전트까지-전한다.md))
 
+#### 인자 표시 이름
+
+계정 입력칸의 `label`과 승인 카드 인자 이름은 별개다.
+도구마다 선택적인 `arg_labels`로 원래 인자 키에 표시 이름을 붙인다.
+[승인 인자 표시 이름](../../docs/features/connector-policy.md#승인-인자-표시-이름)이 검증과 호환 규칙을 갖는다.
+Gmail의 WRITE 도구와 네이버 블로그의 `read_draft`, `save_draft`, `overwrite_draft`가 선언한다.
+표시 이름을 선언한 도구는 실제 MCP 입력 스키마의 모든 키를 덮으며 공통 계약 검사가 둘을 대조한다.
+정규화에서 버려진 불량 metadata도 이 저장소의 선언 검사에서는 실패다.
+표시 이름은 위험도, 승인 방식, 상시 허락, 밖으로 전송하는지의 선언, 식별자와 실행 인자를 바꾸지 않는다.
+
 ### 비밀값과 권한
 
 - 자격 증명은 `fields` 에 선언한 env 로만 받는다. 파일에서 읽거나 파일에 쓰지 않는다
@@ -123,7 +133,7 @@ hermes/connectors/<id>/
 - TypeScript 로 쓰고 `@modelcontextprotocol/sdk` 와 `zod` 를 포함해 의존성을 한 JavaScript 파일로 묶는다. 생성 entry는 Git에 커밋하지 않는다. 실행할 때 패키지를 내려받지 않는다
 - `.mcp.json` 의 `command` 는 `bun`, 인자는 `${CLAUDE_PLUGIN_ROOT}/dist/<id>-mcp.js` 하나다. 실제 실행 파일은 운영 목록이 정한다. Python MCP 서버는 허용하지 않는다
 - 빌드는 Bun `1.3.14` 와 lockfile 로 고정한다. 런타임은 검증한 최소 버전 이상을 허용한다. `hermes/connectors/<id>/scripts/build.ts` 는 `target: "bun"` 을 쓰고 `hermes/connectors/<id>/scripts/check-bundle.ts` 는 임시 디렉터리 두 곳에 빌드해 정확한 단일 출력 목록과 entry 선언, 전체 바이트 재현성을 검사하고 로컬 빌드 entry와 비교한 뒤 임시 파일을 지운다
-- 변경된 TypeScript 는 `scripts/quality.sh check` 와 `fix` 가 web 에 설치한 Prettier 로 검사하고 고친다. 토스증권의 생성 구간은 [생성기](tossinvest/scripts/generate-contract.ts)의 `--check` 로 재현성을 검사한다. 원문 fixture 와 minify 한 묶음 파일은 소스 포맷 대상이 아니다
+- 변경된 TypeScript 는 `scripts/checks/quality.sh check` 와 `fix` 가 web 에 설치한 Prettier 로 검사하고 고친다. 토스증권의 생성 구간은 [생성기](tossinvest/scripts/generate-contract.ts)의 `--check` 로 재현성을 검사한다. 원문 fixture 와 minify 한 묶음 파일은 소스 포맷 대상이 아니다
 - 사용자 컴퓨터에서 한 번 돌리는 자격 증명 발급 스크립트는 Python 표준 라이브러리를 써도 된다. 서버 실행 의존성에는 포함하지 않는다
 - 외부 호출에는 제한 시간을 둔다. 대시보드가 확인 도구를 기다리는 시간은 10초, 승인한 호출을 기다리는 시간은 60초다
 - 외부에서 온 글을 결과에 담을 때 길이를 자른다
@@ -232,7 +242,7 @@ root 빌드 정의를 커넥터 inventory에 넣거나 `*/dist/*`를 통째로 �
 
 ### CI에서 확인하는 범위
 
-`scripts/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
+`scripts/ci/check-connector-package.sh`는 정확한 생성 entry를 비운 checkout에서 실제 Docker 빌드를 실행한다.
 이미지에서 실행 없이 꺼낸 묶음을 검증하고 entry를 작업 트리에 놓는다. 각 패키지의 `test`와 `check:bundle`은 먼저 소스로 entry를 빌드한다. 네이버의 macOS 합성 시험도 Docker 안에서 entry를 빌드한다. 기존 HTTP 대역과 실제 entry의 SDK stdio 검사, `check:bundle`을 실행한 뒤 Docker entry와 로컬 entry를 바이트로 대조한다.
 runner에서 별도로 만든 전체 묶음과 Docker 출력의 manifest 및 모든 파일을 대조해 빌드 환경 차이도 확인한다.
 검사가 성공하면 새 checkout에 빌드한 entry를 남겨 후속 Hermes 검사에서 실행한다. 원래 있던 entry는 보존하고, 실패하면 원래 파일 상태로 돌린다. Git index는 바꾸지 않는다.
@@ -242,8 +252,8 @@ CI에는 새 권한이나 secret, 묶음 artifact, Release를 추가하지 않�
 ## 공통 검사
 
 `hermes/tests/test_connectors_contract.py` 가 `hermes/connectors/` 바로 아래 디렉터리를 모두 찾아 아래를 본다.
-CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
-`scripts/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
+CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를 더하면 검사 대상이 된다.
+`scripts/checks/check-connectors.sh` 는 커넥터마다 lockfile 설치, 타입 검사, 전용 시험과 실제 entry의 stdio 계약, 묶음 파일 재현성을 확인한다. 빈 `dist`의 새 checkout에서도 같은 명령으로 빌드하고 검사한다.
 전용 시험은 각 커넥터의 `tests/` 에 모으고, 여러 커넥터에 걸친 계약 검사만 `hermes/tests/` 에 둔다.
 
 | 보는 것 | 어긋나면 |
@@ -257,6 +267,7 @@ CI 의 `hermes` job 과 `scripts/check-local.sh` 가 돌린다. 커넥터를 더
 | `DESTRUCTIVE` 와 `FINANCIAL` 선언이 없다 | 닫힌 도구를 두지 않는다 |
 | `READ` 가 아닌 도구가 모두 `outbound` 를 boolean 으로 선언했고, 참인 도구는 `grant` 가 거짓이다 | 밖으로 나가는 도구에 상시 허락이 열린다 |
 | `identifiers` 에 적은 이름이 모두 서버의 그 도구 입력 스키마에 있다 | 없는 인자의 선언은 아무것도 가림에서 빼지 않는 죽은 글이다 |
+| `arg_labels`를 선언한 도구의 표시 이름이 검증을 통과하고 키가 실제 입력 스키마와 정확히 같다 | 승인 카드의 이름이 빠지거나 실행 인자와 다른 칸을 가리킨다 |
 | env 이름에 `TOKEN`, `SECRET`, `PASSWORD`, `KEY` 가 든 칸이 `secret: true` 다 | 비밀값이 화면과 응답에 보인다 |
 | `operator_env` 와 `operator_secrets` 가 비었다 | 운영 값 없이 돌지 않는다 |
 | `.mcp.json` 의 `command` 가 `bun` 이고 `dist/<id>-mcp.js` 하나를 실행한다. TypeScript 소스가 있고 Python 서버는 없다 | 운영자의 환경에서 뜨지 않는다 |
@@ -317,6 +328,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | 칸 | 뜻 |
 | --- | --- |
 | `schema` | `1` 이나 `2`. `2` 는 [커넥터 도구 정책](../../docs/features/connector-policy.md) 의 「도구 정책」 이 적은 `tools` 를 선언한다 |
+| `tools.<이름>.arg_labels` | 선택. 도구별 승인 인자의 표시 이름 객체다. 누락·불량 metadata는 빈 객체로 읽고 원래 키로 표시한다 |
 | `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
 | `title`, `description` | 화면에 그대로 보인다 |
 | `icon` | 선택. 커넥터 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |

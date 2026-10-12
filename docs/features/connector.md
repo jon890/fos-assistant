@@ -392,6 +392,11 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 
 ## 대시보드 plugin 계약
 
+카탈로그 도구의 `arg_labels`는 도구별 승인 인자 표시 이름이다.
+정책과 분리한 `tool_arg_labels`를 카탈로그에서만 합치며 DB와 설치 정책에는 저장하지 않는다.
+현재 도구 이름과 정확히 맞추고, 가린 인자 객체에 그대로 남은 원래 키의 표시 이름만 승인 조회·승인·거절 응답의 `argLabels`로 전달한다.
+검증과 옛 응답 호환은 [승인 인자 표시 이름](connector-policy.md#승인-인자-표시-이름)이 갖는다.
+
 Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의 커넥터 경로에 기대는 약속이다.
 경로마다의 요청과 응답, 두 설치 방식의 차이, 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.
 
@@ -685,7 +690,7 @@ API base는 고정한다. path 식별자는 한 segment로 `encodeURIComponent`�
 공식 예시의 모든 필드, nullable, 긴 decimal과 cursor, 빈 결과와 여러 페이지를 검사한다.
 잘못된 입력은 HTTP 0회이고 429, 5xx, timeout, credential/IP/revoke, malformed, 응답 크기 초과를 각 도구 그룹에서 검사한다.
 소스 AST와 자체 복제 schema의 일치만으로 통과시키지 않는다. 빌드한 bundle의 SDK 호출이 로컬 HTTP 목적지에 도달해야 한다.
-CI의 `hermes` job과 `scripts/check-connectors.sh`가 새 시험을 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
+CI의 `hermes` job과 `scripts/checks/check-connectors.sh`가 새 시험을 실행하며 구현 PR마다 전체 로컬 검사와 별도 검토를 통과한다.
 
 ### 일반 금융 모듈
 

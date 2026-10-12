@@ -10,7 +10,7 @@
 # utf8mb4_unicode_ci 가 되고 MysqlMigrationTest 가 잡는다. 까닭과 규칙은 backend/docs/data-schema.md 의 「마이그레이션 작성 규칙」 에 있다.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IMAGE="mysql:8.4"
 NAME="mysql-migration-check-$$"
 # 일회용 컨테이너에만 쓰는 값이다. 컨테이너는 이 머신의 loopback 에만 열린다.
@@ -21,7 +21,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --name "${NAME}" \
+# 표식은 비정상 종료로 trap 이 돌지 못해 남은 컨테이너를 scripts/dev/finish-task.sh 가 찾는 데 쓴다.
+docker run -d --name "${NAME}" --label fos-assistant.temp=mysql-migration-check \
   -e MYSQL_ROOT_PASSWORD="${ROOT_PASSWORD}" \
   -p 127.0.0.1::3306 \
   --health-cmd "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p${ROOT_PASSWORD} --silent" \

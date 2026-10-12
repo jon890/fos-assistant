@@ -132,7 +132,7 @@ function readFeatures() {
 
 function main([base, head = "HEAD"]) {
   if (!base) {
-    console.log("알림: 비교할 base 가 없어 기능 문서 covers 검사를 건너뛴다. 사용법: node scripts/check-feature-covers.mjs <base> [head]");
+    console.log("알림: 비교할 base 가 없어 기능 문서 covers 검사를 건너뛴다. 사용법: node scripts/ci/check-feature-covers.mjs <base> [head]");
     return;
   }
   let changed;

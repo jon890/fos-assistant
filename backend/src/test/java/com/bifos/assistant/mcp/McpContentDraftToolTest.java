@@ -57,6 +57,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /** 실제 HTTP 인증·서명·원고 TX를 검사한다. Hermes와 외부 서비스는 호출하지 않는다. */
@@ -263,6 +264,49 @@ class McpContentDraftToolTest {
         assertThat(denied.toString()).contains("호출 맥락을 확인할 수 없습니다").doesNotContain("currentRevision", "17");
         tools.write(caller, UUID.randomUUID(), null, null, body(MARKER));
         Mockito.verify(fake, Mockito.times(1)).createIdempotent(any(), any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("MCP 생성과 수정은 같은 사진의 반복을 고정 코드와 안내로 거절하고 서로 다른 사진은 중복 검사를 지난다")
+    void rejectsDuplicatePhotoOnMcpCreateAndRevise() throws Exception {
+        var repeated = photos(MARKER, "7", "7");
+        var create = creating();
+        create.set("draft", repeated);
+        assertDuplicate(call(McpContentDraftTools.WRITE, create, root, "call_1"));
+        assertThat(drafts.count()).isZero();
+        assertThat(requests.count()).isZero();
+
+        var id = data(call(McpContentDraftTools.WRITE, creating(), root, "call_2")).path("draft").path("draftId").stringValue();
+        var update = json.createObjectNode().put("draftId", id).put("expectedRevision", 1);
+        update.set("draft", repeated);
+        assertDuplicate(call(McpContentDraftTools.WRITE, update, root, "call_3"));
+        assertThat(revisions.count()).isEqualTo(1);
+
+        // 없는 첨부라 저장되지는 않지만 중복 검사가 아닌 참조 검사에서 멈춘다.
+        update.set("draft", photos(MARKER, "7", "8"));
+        var distinct = call(McpContentDraftTools.WRITE, update, root, "call_4");
+        assertThat(distinct.path("result").path("isError").booleanValue()).isTrue();
+        assertThat(json.readTree(distinct.path("result").path("content").get(0).path("text").stringValue()).path("code").stringValue())
+            .isEqualTo("ATTACHMENT_GONE");
+    }
+
+
+    private ObjectNode photos(String title, String... assetIds) {
+        var body = body(title);
+        for (String assetId : assetIds) {
+            ((ArrayNode)body.get("blocks")).addObject().put("type", "image").put("assetId", assetId);
+        }
+        return body;
+    }
+
+
+    private void assertDuplicate(JsonNode response) {
+        assertThat(response.path("result").path("isError").booleanValue()).as(response.toString()).isTrue();
+        var failure = json.readTree(response.path("result").path("content").get(0).path("text").stringValue());
+        assertThat(failure.path("code").stringValue()).isEqualTo("CONTENT_DRAFT_DUPLICATE_PHOTO");
+        assertThat(failure.path("message").stringValue()).isEqualTo(ContentDraftInputReader.DUPLICATE_PHOTO_MESSAGE);
+        assertThat(response.toString()).doesNotContain(MARKER);
     }
 
 
