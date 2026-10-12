@@ -48,6 +48,12 @@ test("브라우저 서버가 쓰는 테스트 지원 API 와 리소스는 브라
   ]) assert.deepEqual(running([file]), ["backend", "browser", "e2e", "hermes", "quality"], file);
 });
 
+test("커넥터 카드가 읽는 manifest 와 아이콘 변경도 브라우저 검사를 돌린다", () => {
+  for (const file of ["hermes/connectors/gmail/connector.json", "hermes/connectors/naver-blog/icon.svg"]) {
+    assert.deepEqual(running([file]), ["backend", "browser", "e2e", "hermes", "quality"], file);
+  }
+});
+
 test("모듈 안의 설정과 의존 목록도 모듈 코드로 본다", () => {
   for (const file of ["web/package.json", "web/pnpm-lock.yaml", "web/Dockerfile", "backend/build.gradle.kts", "hermes/connectors/naver-blog/bun.lock"]) {
     assert.ok(running([file]).length >= 4, file);

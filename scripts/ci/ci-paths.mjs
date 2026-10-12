@@ -46,6 +46,8 @@ export const RULES = [
   // 브라우저 검사가 Control Plane 을, E2E 가 Control Plane 과 web/src 를 띄운다.
   [/^backend\//, ["backend", "browser", "e2e", "quality"]],
   [/^web\//, ["web", "browser", "e2e", "quality"]],
+  // 커넥터 카드 검사가 실제 manifest 와 아이콘을 읽는다.
+  [/^hermes\/connectors\/[^/]+\/(connector\.json|[^/]+\.svg)$/, ["backend", "browser", "e2e", "hermes", "quality"]],
   // backend 테스트가 커넥터와 plugin 원본을 읽는다. Hermes 만 바꾸면 브라우저 shard 는 건너뛴다.
   [/^hermes\//, ["hermes", "backend", "e2e", "quality"]],
 
