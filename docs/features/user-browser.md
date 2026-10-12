@@ -97,9 +97,9 @@ Docker proxy 는 chunked 요청을 거절한다. 그래서 Control Plane 은 작
 경로는 `UserBrowserController` 와 `UserBrowserAdminController` 가, 응답 칸은 `UserBrowserDtos` 가, 오류 코드는 `ErrorCode` 의 `BROWSER_*` 가 갖는다.
 응답에는 컨테이너 번호와 프로필 키를 싣지 않는다.
 
-웹의 `/api/browser` 아래에서 상태를 바꾸는 라우트(만들기, 지우기, 켜기, 끄기, 화면 열기, 입력)는 Control Plane 을 부르기 전에 출처를 본다.
+웹에서 브라우저 상태를 바꾸는 라우트(`/api/browser` 아래의 만들기, 지우기, 켜기, 끄기, 화면 열기, 입력과 관리자의 끄기, 지우기)는 Control Plane 을 부르기 전에 출처를 본다.
 세션 쿠키의 SameSite 기본값에만 기대지 않으려는 것이고, 판정은 `web/src/lib/same-origin.ts` 가 갖는다.
-`Origin` 이 있으면 그 host 가 요청 host(`x-forwarded-host`, 없으면 `Host`)와 같아야 하고, 다르면 403 `FORBIDDEN` 이다.
+`Origin` 이 있으면 그 host 가 `x-forwarded-host` 의 첫 값이나 `Host` 중 하나와 같아야 하고(Next.js 의 Server Action 과 같은 비교), 다르면 403 `FORBIDDEN` 이다.
 `Origin` 이 없으면 Next.js 의 Server Action 처럼 넘기되, `Sec-Fetch-Site` 가 `cross-site` 나 `same-site` 면 막는다.
 화면 열기는 GET 이라 같은 출처에서도 `Origin` 이 없으므로 이 값으로 가린다. `test/web/browser-same-origin.test.ts` 가 확인한다.
 
