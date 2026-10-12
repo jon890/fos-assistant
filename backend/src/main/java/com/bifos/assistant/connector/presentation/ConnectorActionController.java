@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConnectorActionController {
     private final ConnectorActionService actions;
     private final ContentDraftSaveApproval contentDrafts;
+    private final ContentDraftJobs contentDraftJobs;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
@@ -47,9 +49,11 @@ public class ConnectorActionController {
     @GetMapping("/chat/conversations/{conversationId}/connector-actions")
     public List<ActionView> list(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
-        return actions.listForConversation(user, conversations.requireOwnId(user, conversationId)).stream()
-            .map(ActionView::from)
-            .toList();
+        Long id = conversations.requireOwnId(user, conversationId);
+        var views = actions.listForConversation(user, id);
+        // 원고 저장 줄은 job 링크로 찾은 요약을 붙인다. 화면은 이 요약이 있는 줄만 원고 카드로 그린다.
+        var summaries = contentDraftJobs.summaries(user, id, conversationId, views.stream().map(view -> view.actionId()).toList());
+        return views.stream().map(view -> ActionView.from(view, summaries.get(view.actionId()))).toList();
     }
 
 

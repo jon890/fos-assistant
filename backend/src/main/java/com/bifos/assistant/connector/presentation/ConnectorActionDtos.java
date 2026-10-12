@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
+import com.bifos.assistant.connector.application.model.ContentDraftActionSummary;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
@@ -23,7 +24,11 @@ public final class ConnectorActionDtos {
     public record ApproveRequest(GrantPeriod grant, Boolean conversationGrant) {
     }
 
-    /** 주인에게만 내는 승인 줄이다. 가린 인자와 결과를 담는다. */
+    /**
+     * 주인에게만 내는 승인 줄이다. 가린 인자와 결과를 담는다.
+     *
+     * @param contentDraft 원고 저장 job 이 연결된 줄의 요약. 일반 줄은 null
+     */
     public record ActionView(
         UUID actionId,
         String connectorId,
@@ -39,9 +44,15 @@ public final class ConnectorActionDtos {
         boolean grantAllowed,
         boolean hiddenArgs,
         Map<String, String> argLabels,
-        boolean conversationGrantAllowed) {
+        boolean conversationGrantAllowed,
+        ContentDraftActionSummary contentDraft) {
 
         public static ActionView from(ConnectorActionView action) {
+            return from(action, null);
+        }
+
+
+        public static ActionView from(ConnectorActionView action, ContentDraftActionSummary contentDraft) {
             return new ActionView(
                 action.actionId(),
                 action.connectorId(),
@@ -57,7 +68,8 @@ public final class ConnectorActionDtos {
                 action.grantAllowed(),
                 action.hiddenArgs(),
                 action.argLabels(),
-                action.conversationGrantAllowed());
+                action.conversationGrantAllowed(),
+                contentDraft);
         }
     }
 

@@ -21,6 +21,7 @@ import com.bifos.assistant.chat.infra.ContentDraftJobRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRepository;
 import com.bifos.assistant.chat.infra.ContentDraftRevisionRepository;
 import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
+import com.bifos.assistant.connector.application.model.ContentDraftActionSummary;
 import com.bifos.assistant.connector.application.model.ConnectorActionChanged;
 import com.bifos.assistant.connector.application.model.ContentDraftSaveTicketPayload;
 import com.bifos.assistant.chat.application.model.ContentDraftBindingStamp;
@@ -42,6 +43,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -329,6 +331,27 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         }
         var items = views(rows.subList(0, Math.min(limit, rows.size())));
         return new ContentDraftJobPage(items, rows.size() > limit ? items.getLast().snapshotId() : null);
+    }
+
+
+    /**
+     * 승인 카드에 붙일 원고 요약이다. job 링크가 없는 일반 줄은 빠진다. 보관한 상태만 읽고 외부를 부르지 않는다.
+     *
+     * @param conversationId 주인인 것을 이미 확인한 대화의 번호
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, ContentDraftActionSummary> summaries(CurrentUser user, Long conversationId, UUID conversationPublicId,
+        Collection<UUID> actionIds) {
+        if (actionIds.isEmpty()) {
+            return Map.of();
+        }
+        var rowIds = actions.findByConversationIdAndUserIdAndPublicIdIn(conversationId, user.id(), actionIds).stream()
+            .map(ConnectorAction::id).toList();
+        var rows = jobs.findByActionIdIn(rowIds).stream()
+            .filter(job -> job.ownerUserId().equals(user.id()) && job.conversationId().equals(conversationId)).toList();
+        return views(rows).stream().filter(view -> view.actionId() != null).collect(Collectors.toMap(ContentDraftJobView::actionId,
+            view -> new ContentDraftActionSummary(view.snapshotId(), view.draftId(), view.revision(), conversationPublicId,
+                view.status(), view.stage(), view.saveClicked(), view.errorCode())));
     }
 
 
