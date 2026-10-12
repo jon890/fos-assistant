@@ -251,7 +251,7 @@ list는 1~20개를 job 내부 번호 역순으로 읽고 21번째 행으로 다�
 원고 승인 줄의 등록 이름 `fos_content_draft_save`는 MCP 서버 도구가 아니다. 이 줄이 일반 승인 경로로 들어와도 선언 없는 도구로 판정되어 실행 없이 거절된다.
 prepare는 잠글 실행 번호, 지금 catalog로 계산한 바인딩 stamp, catalog 선언을 잠금 밖에서 읽는다.
 시작은 catalog의 snapshot 선언이 start·status를 모두 참으로 선언하고 `ContentDraftJobStarter` 구현 빈이 있을 때만 지원한다.
-catalog decoder와 시작 전송 빈은 준비되어 있지만 운영 capability가 false이므로 운영에서는 실행 없이 거절한다.
+운영 선언이 start·status를 켜고 있어 승인한 snapshot의 예약 job만 시작한다. 선언을 끄면 실행 없이 거절한다.
 
 approvePrepared는 coordinator 한 번 안에서 아래 「잠금 순서」로 잠그고 승인 줄 PENDING, job PREVIEW_READY, 기한, 시작 지원, 현재 `save_draft` 정책, 현재 원고·원본·바인딩 판, 준비한 정책 지문을 확인한다.
 모두 맞으면 소문자 정규 UUID jobId를 예약하고 승인 줄 EXECUTING, job DISPATCHED와 승인자·승인 시각을 함께 커밋한다.
