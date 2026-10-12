@@ -29,7 +29,8 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
      예외로 커넥터 인자 catalog 는 backend 와 hermes 계약 검사의 입력이므로 그 두 검사만 돌린다.
    - 바뀐 파일을 하나도 찾지 못하면 모든 job 을 돌린다.
    - 브라우저 shard 는 웹 코드와 설정, `test/browser`, Control Plane 코드와 빌드 설정, 공유 E2E 대역, 브라우저 실행 스크립트를 바꾸면 돌린다.
-     `backend/src/test` 와 Hermes 코드만 바꾸면 건너뛴다. workflow 와 경로 판정 자체를 바꾸면 전체 검사를 돌린다.
+     backend 테스트 소스만 바꾸면 건너뛰되, 브라우저가 쓰는 `testsupport` 와 테스트 리소스는 브라우저도 돌린다.
+     Hermes 코드만 바꾸면 브라우저는 건너뛴다. workflow 와 경로 판정 자체를 바꾸면 전체 검사를 돌린다.
 4. push 와 정기 실행은 언제나 모든 job 을 돌린다. 규칙이 놓친 의존은 main 에서 드러난다.
 5. 필수 검사 이름의 job 은 판정만 한다. 규칙은 `ci-paths.mjs gate` 가 갖는다.
    - `changes` job 이 성공하지 않았으면 실패다. 판정 job 이 실패하면 뒤 job 이 생략되는데, 그것을 건너뛴 것으로 읽지 않으려는 것이다.
@@ -59,5 +60,6 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
 ### 감수할 것
 
 - 규칙이 실제 의존보다 좁으면 PR 에서 깨진 것을 main push 에서야 본다. 새 job 입력을 만들면 `RULES` 를 함께 고친다.
+- 브라우저 서버는 `smokeRun` 의 테스트 classpath 로 기동한다. 테스트 지원 API 와 리소스도 브라우저 입력으로 관리한다.
 - Hermes 만 바꾸면 브라우저 shard 를 건너뛰기로 했다. 브라우저의 커넥터 아이콘 검사는 Hermes manifest 와 아이콘을 직접 읽지만, 이 경우의 화면 회귀는 main push 와 정기 실행에서 확인한다.
 - PR CI 가 판정한 바뀐 파일은 그 CI 를 돌린 시점의 main 기준이다. 뒤에 main 이 움직여도 PR 이 바꾼 파일은 같으므로 판정은 그대로 쓴다.

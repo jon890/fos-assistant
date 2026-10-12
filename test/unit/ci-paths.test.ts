@@ -36,6 +36,13 @@ test("브라우저는 backend 테스트와 커넥터 catalog 만 바꾸면 건�
   assert.deepEqual(running(["test/resources/connector-argument-masked-catalog.json"]), ["backend", "hermes"]);
 });
 
+test("브라우저 서버가 쓰는 테스트 지원 API 와 리소스는 브라우저 검사도 돌린다", () => {
+  for (const file of [
+    "backend/src/test/java/com/bifos/assistant/testsupport/NowTestSupportController.java",
+    "backend/src/test/resources/pricing/models-dev-sample.json",
+  ]) assert.deepEqual(running([file]), ["backend", "browser", "e2e", "hermes", "quality"], file);
+});
+
 test("모듈 안의 설정과 의존 목록도 모듈 코드로 본다", () => {
   for (const file of ["web/package.json", "web/pnpm-lock.yaml", "web/Dockerfile", "backend/build.gradle.kts", "hermes/connectors/naver-blog/bun.lock"]) {
     assert.ok(running([file]).length >= 4, file);
