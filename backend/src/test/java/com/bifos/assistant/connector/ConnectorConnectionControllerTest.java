@@ -95,7 +95,7 @@ class ConnectorConnectionControllerTest {
                     new ConnectorFieldSummary("token", "토큰", "", true, true, "^demo_.+$", false, false),
                     new ConnectorFieldSummary("scope", "범위", "", false, false, null, true, true)),
                 List.of(new ConnectorToolSummary(
-                    "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true, "메모 한 건을 저장합니다.")),
+                    "write_note", "메모 쓰기", ToolRisk.WRITE, ToolApproval.REQUIRED, true, "메모를 한 건 남겨요.")),
                 ConnectionStatus.PENDING,
                 true,
                 BINDINGS)));
@@ -121,7 +121,8 @@ class ConnectorConnectionControllerTest {
             .andExpect(jsonPath("$[0].tools[0].risk").value("WRITE"))
             .andExpect(jsonPath("$[0].tools[0].approval").value("REQUIRED"))
             .andExpect(jsonPath("$[0].tools[0].grant").value(true))
-            .andExpect(jsonPath("$[0].tools[0].description").value("메모 한 건을 저장합니다."))
+            .andExpect(jsonPath("$[0].tools[0].summary").value("메모를 한 건 남겨요."))
+            .andExpect(jsonPath("$[0].tools[0].description").doesNotExist())
             .andExpect(jsonPath("$[0].bindings[0].agentCode").value(AGENT))
             .andExpect(jsonPath("$[0].bindings[0].agentName").value("비서"))
             .andExpect(jsonPath("$[0].bindings[0].status").value("PENDING"))

@@ -31,7 +31,7 @@ export type ToolRisk =
 export type ToolApproval = "NONE" | "REQUIRED" | "ALWAYS";
 
 /**
- * 커넥터가 선언한 도구 한 개다. `title` 이 없으면 `name` 으로 보인다.
+ * 커넥터가 선언한 도구 한 개다. 화면은 `name` 을 보이지 않고 `title` 과 `summary` 만 보인다.
  * `grant` 는 승인하면서 그 도구에 상시 허락을 줄 수 있는지다.
  */
 export type ConnectorTool = {
@@ -40,8 +40,8 @@ export type ConnectorTool = {
   risk: ToolRisk;
   approval: ToolApproval;
   grant: boolean;
-  /** 옛 응답은 상세 설명이 없을 수 있다. */
-  description?: string | null;
+  /** 옛 응답은 요약이 없을 수 있다. */
+  summary?: string | null;
 };
 
 /** 연결 목록의 카드 한 장이다. `available` 이 거짓이면 운영 목록에서 빠진 커넥터다. */
