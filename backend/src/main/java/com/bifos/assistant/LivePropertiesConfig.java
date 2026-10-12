@@ -37,75 +37,90 @@ public class LivePropertiesConfig {
         return LiveProperties.fixed(DelegationWakeProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<UserExecutionProperties> userExecutionPropertiesLive(UserExecutionProperties value) {
         return LiveProperties.fixed(UserExecutionProperties.class, value);
     }
+
 
     @Bean
     public LiveProperties<ProactiveCheckProperties> proactiveCheckPropertiesLive(ProactiveCheckProperties value) {
         return LiveProperties.fixed(ProactiveCheckProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<StarterProperties> starterPropertiesLive(StarterProperties value) {
         return LiveProperties.fixed(StarterProperties.class, value);
     }
+
 
     @Bean
     public LiveProperties<DelegationProperties> delegationPropertiesLive(DelegationProperties value) {
         return LiveProperties.fixed(DelegationProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<AutonomyProperties> autonomyPropertiesLive(AutonomyProperties value) {
         return LiveProperties.fixed(AutonomyProperties.class, value);
     }
+
 
     @Bean
     public LiveProperties<ProactiveLoopProperties> proactiveLoopPropertiesLive(ProactiveLoopProperties value) {
         return LiveProperties.fixed(ProactiveLoopProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<PricingProperties> pricingPropertiesLive(PricingProperties value) {
         return LiveProperties.fixed(PricingProperties.class, value);
     }
+
 
     @Bean
     public LiveProperties<MemoryEncryptionProperties> memoryEncryptionPropertiesLive(MemoryEncryptionProperties value) {
         return LiveProperties.fixed(MemoryEncryptionProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<ModelTierProperties> modelTierPropertiesLive(ModelTierProperties value) {
         return LiveProperties.fixed(ModelTierProperties.class, value);
     }
+
 
     @Bean
     public LiveProperties<ConnectorPolicyProperties> connectorPolicyPropertiesLive(ConnectorPolicyProperties value) {
         return LiveProperties.fixed(ConnectorPolicyProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<ConnectorFinancialProperties> connectorFinancialPropertiesLive(ConnectorFinancialProperties value) {
         return LiveProperties.fixed(ConnectorFinancialProperties.class, value);
     }
+
 
     @Bean
     public LiveProperties<MemoryProposalProperties> memoryProposalPropertiesLive(MemoryProposalProperties value) {
         return LiveProperties.fixed(MemoryProposalProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<BrowserProperties> browserPropertiesLive(BrowserProperties value) {
         return LiveProperties.fixed(BrowserProperties.class, value);
     }
 
+
     @Bean
     public LiveProperties<WorkspaceProperties> workspacePropertiesLive(WorkspaceProperties value) {
         return LiveProperties.fixed(WorkspaceProperties.class, value);
     }
+
 
     /** {@code runTimeout()} 과 {@code pollInterval()} 을 읽는 곳만 쓴다. 나머지 칸은 {@link HermesProperties} 를 그대로 주입받는다. */
     @Bean

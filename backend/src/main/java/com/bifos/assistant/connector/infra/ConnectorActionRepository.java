@@ -179,6 +179,7 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
         @Param("conversationIds") Collection<Long> conversationIds,
         @Param("statuses") Collection<ActionStatus> statuses);
 
+
     /** 금융 하루 상한이 KST 하루 안에 승인으로 넘어간 금융 줄을 읽는다. 호출자가 상태로 다시 거른다. */
     List<ConnectorAction> findByUserIdAndRiskAndDecidedAtGreaterThanEqual(Long userId, ToolRisk risk, Instant from);
 }

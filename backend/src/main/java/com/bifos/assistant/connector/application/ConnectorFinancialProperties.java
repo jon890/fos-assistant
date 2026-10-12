@@ -22,13 +22,13 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.financial")
 public record ConnectorFinancialProperties(
-        @DefaultValue("false") boolean enabled,
-        @DefaultValue List<String> allowedAccounts,
-        @DefaultValue("0") BigDecimal maxOrderAmountKrw,
-        @DefaultValue("0") BigDecimal maxOrderAmountUsd,
-        @DefaultValue("0") BigDecimal maxOrderQuantity,
-        @DefaultValue("0") BigDecimal maxDailyAmountKrw,
-        @DefaultValue("0") BigDecimal maxDailyAmountUsd) {
+    @DefaultValue("false") boolean enabled,
+    @DefaultValue List<String> allowedAccounts,
+    @DefaultValue("0") BigDecimal maxOrderAmountKrw,
+    @DefaultValue("0") BigDecimal maxOrderAmountUsd,
+    @DefaultValue("0") BigDecimal maxOrderQuantity,
+    @DefaultValue("0") BigDecimal maxDailyAmountKrw,
+    @DefaultValue("0") BigDecimal maxDailyAmountUsd) {
 
     /** 음수 상한과 빈 계좌 식별자는 기동을 멈춘다. 잘못 넣은 값이 「상한 없음」 으로 읽히지 않게 한다. */
     public ConnectorFinancialProperties {

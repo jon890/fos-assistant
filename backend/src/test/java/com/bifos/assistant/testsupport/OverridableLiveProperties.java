@@ -17,31 +17,37 @@ public final class OverridableLiveProperties<T> implements LiveProperties<T> {
     private final T startup;
     private volatile T current;
 
+
     OverridableLiveProperties(LiveProperties<T> startup) {
         this.type = Objects.requireNonNull(startup.type(), "type");
         this.startup = Objects.requireNonNull(startup.current(), "current");
         this.current = this.startup;
     }
 
+
     @Override
     public T current() {
         return current;
     }
+
 
     @Override
     public Class<T> type() {
         return type;
     }
 
+
     /** 기동 때 바인딩한 값이다. */
     T startup() {
         return startup;
     }
 
+
     /** 다음 {@link #reset} 까지 {@link #current} 가 이 값을 돌려준다. */
     void override(Object value) {
         current = type.cast(Objects.requireNonNull(value, "value"));
     }
+
 
     /**
      * 검사 도중 값을 바꾼다. {@link IntegrationTestIsolation} 이 검사 앞뒤에 기동 값으로 되돌린다.

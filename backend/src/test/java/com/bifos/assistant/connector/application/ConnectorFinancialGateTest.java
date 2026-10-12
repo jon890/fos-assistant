@@ -32,9 +32,8 @@ class ConnectorFinancialGateTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     // KST 2026-10-13 10:00 이다. 하루의 시작은 UTC 2026-10-12T15:00 이다.
     private static final Instant NOW = Instant.parse("2026-10-13T01:00:00Z");
-    private static final String LIMIT_BUY =
-        "{\"symbol\":\"A\",\"market\":\"KOSPI\",\"currency\":\"KRW\",\"side\":\"BUY\",\"quantity\":\"2\",\"price\":\"1000\","
-            + "\"orderType\":\"LIMIT\",\"clientOrderId\":\"c\",\"account_seq\":\"7\"}";
+    private static final String LIMIT_BUY = "{\"symbol\":\"A\",\"market\":\"KOSPI\",\"currency\":\"KRW\",\"side\":\"BUY\",\"quantity\":\"2\",\"price\":\"1000\","
+        + "\"orderType\":\"LIMIT\",\"clientOrderId\":\"c\",\"account_seq\":\"7\"}";
     private final ConnectorActionRepository actions = mock(ConnectorActionRepository.class);
     private final ConnectorActionExecutionRepository contents = mock(ConnectorActionExecutionRepository.class);
     private final List<ConnectorAction> today = new ArrayList<>();

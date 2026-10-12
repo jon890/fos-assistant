@@ -23,4 +23,5 @@ import java.lang.annotation.Target;
     "assistant.connector.financial.max-order-quantity=1000",
     "assistant.connector.financial.max-daily-amount-krw=10000000",
     "assistant.connector.financial.max-daily-amount-usd=100000"})
-public @interface FinancialExecutionOpen {}
+public @interface FinancialExecutionOpen {
+}
