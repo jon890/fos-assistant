@@ -28,7 +28,8 @@ description: |
 
 push 전에 빠른 로컬 검사만 돌리고 Draft 로 연다.
 backend 테스트와 MySQL, 브라우저처럼 무거운 검사는 로컬에서 기다리지 않고 Draft CI 에 맡긴다.
-Draft 에서는 브라우저 전체 shard 를 포함한 CI 가 돌고 Claude 리뷰는 돌지 않는다.
+Draft 에서는 바뀐 경로에 해당하는 무거운 검사만 돌고, 건너뛴 필수 검사는 판정 job 이 통과로 보고한다.
+경로 기준은 [ADR-20261012 / ci-path-filter](../../../docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다. Claude 리뷰는 돌지 않는다.
 
 ```bash
 # cwd: 저장소 root
