@@ -38,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -95,6 +96,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         var manifest = catalog.find(stamp.connectorId()).orElseThrow(ContentDraftSnapshotHash::unavailable);
         String argsJson = "{\"snapshotId\":\"" + snapshotId + "\"}";
         var decision = ContentDraftSaveApproval.decide(manifest, argsJson).orElseThrow(ContentDraftSnapshotHash::unavailable);
+        var inserted = new AtomicBoolean();
         try {
             var created = mutations.run(user.id(), new ChatContentMutationTarget(conversationId, List.of()), () -> {
                 var input = snapshots.requireCurrentSnapshotParticipant(user, conversationId, snapshotId);
@@ -114,10 +116,13 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 action.awaitApproval(argsJson, now.plus(policy.current().approvalTtl()));
                 var saved = actions.saveAndFlush(action);
                 var job = jobs.saveAndFlush(new ContentDraftJob(snapshot.id(), saved.id(), user.id(), conversationId, now));
+                inserted.set(true);
                 return requestView(snapshot, job);
             });
             // 사건은 커밋한 뒤에 낸다. 받은 쪽이 읽을 때 승인 줄이 있어야 한다.
-            events.publishEvent(new ConnectorActionChanged(conversationId, created.actionId()));
+            if (inserted.get()) {
+                events.publishEvent(new ConnectorActionChanged(conversationId, created.actionId()));
+            }
             return created;
         } catch (DataIntegrityViolationException ex) {
             return jobs.findBySnapshotId(snapshot.id()).map(job -> requestView(snapshot, job)).orElseThrow(() -> ex);
