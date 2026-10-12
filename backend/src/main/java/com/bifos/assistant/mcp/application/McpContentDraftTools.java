@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.chat.application.ContentDraftService;
 import com.bifos.assistant.chat.application.model.ContentDraftCreationContext;
-import com.bifos.assistant.chat.application.model.ContentDraftView;
 import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -51,10 +50,11 @@ public class McpContentDraftTools {
     }
 
 
-    private Map<String, Object> guarded(McpCaller caller, Supplier<ContentDraftView> work) {
+    /** 원고 snapshot 도구도 같은 사전·사후 검사와 오류 변환을 쓴다. */
+    <T> Map<String, Object> guarded(McpCaller caller, Supplier<T> work) {
         try {
             guard.requireCurrent(caller);
-            ContentDraftView result = null;
+            T result = null;
             ApiException error = null;
             try {
                 result = work.get();

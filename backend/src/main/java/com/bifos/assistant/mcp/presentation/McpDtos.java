@@ -42,6 +42,27 @@ public final class McpDtos {
     }
 
 
+    /** 원고 ID·revision·바인딩 번호만 받는다. 소유자·profile·경로는 받지 않는다. */
+    public record ContentDraftPreviewArguments(UUID draftId, long revision, long bindingId) {
+        static ContentDraftPreviewArguments from(JsonNode node) {
+            ContentDraftInputReader.fields(node, Set.of("draftId", "revision", "bindingId"), Set.of());
+            JsonNode binding = node.get("bindingId");
+            if (!binding.isIntegralNumber() || !binding.canConvertToLong() || binding.longValue() < 1) {
+                throw ContentDraftInputReader.invalid();
+            }
+            return new ContentDraftPreviewArguments(draftUuid(node.get("draftId")),
+                ContentDraftInputReader.revision(node.get("revision")), binding.longValue());
+        }
+    }
+
+    public record ContentDraftSaveArguments(UUID snapshotId) {
+        static ContentDraftSaveArguments from(JsonNode node) {
+            ContentDraftInputReader.fields(node, Set.of("snapshotId"), Set.of());
+            return new ContentDraftSaveArguments(draftUuid(node.get("snapshotId")));
+        }
+    }
+
+
     private static UUID draftUuid(JsonNode node) {
         if (node == null || !node.isString()) {
             throw ContentDraftInputReader.invalid();

@@ -16,6 +16,7 @@ public class McpToolCatalog {
     private final McpMemoryRemember memoryRemember;
     private final McpMediaObservationTools mediaObservations;
     private final McpContentDraftTools contentDrafts;
+    private final McpContentDraftSnapshots contentSnapshots;
 
 
     public List<Map<String, Object>> tools() {
@@ -149,6 +150,8 @@ public class McpToolCatalog {
             mediaObservations.recordDefinition(),
             contentDrafts.writeDefinition(),
             contentDrafts.readDefinition(),
+            contentSnapshots.previewDefinition(),
+            contentSnapshots.saveDefinition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",

@@ -23,6 +23,9 @@ class McpToolCatalogTest {
         var drafts = mock(McpContentDraftTools.class);
         when(drafts.writeDefinition()).thenReturn(Map.of("name", McpContentDraftTools.WRITE));
         when(drafts.readDefinition()).thenReturn(Map.of("name", McpContentDraftTools.READ));
+        var snapshots = mock(McpContentDraftSnapshots.class);
+        when(snapshots.previewDefinition()).thenReturn(Map.of("name", McpContentDraftSnapshots.PREVIEW));
+        when(snapshots.saveDefinition()).thenReturn(Map.of("name", McpContentDraftSnapshots.SAVE));
         Map<String, Object> list = Map.of("name", McpMediaObservationTools.LIST);
         Map<String, Object> record = Map.of("name", McpMediaObservationTools.RECORD);
         Map<String, Object> memory = Map.of("name", "memory_remember");
@@ -30,14 +33,15 @@ class McpToolCatalogTest {
         when(observations.recordDefinition()).thenReturn(record);
         when(remember.definition()).thenReturn(memory);
         when(properties.current()).thenReturn(settings(20), settings(40));
-        var catalog = new McpToolCatalog(properties, remember, observations, drafts);
+        var catalog = new McpToolCatalog(properties, remember, observations, drafts, snapshots);
 
         var first = catalog.tools();
         assertThat(first).extracting(tool -> tool.get("name"))
             .doesNotHaveDuplicates()
             .containsExactly("memory_read", "artifact_write", "agent_list", "agent_delegate", "agent_status",
                 "agent_stop", "follow_up_propose", McpMediaObservationTools.LIST, McpMediaObservationTools.RECORD,
-                McpContentDraftTools.WRITE, McpContentDraftTools.READ, "memory_remember", "memory_search");
+                McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
+                "memory_remember", "memory_search");
         assertThat(first).contains(list, record, memory);
         assertThat(description(first))
             .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")

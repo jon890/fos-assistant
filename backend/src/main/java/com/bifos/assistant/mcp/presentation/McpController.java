@@ -4,9 +4,8 @@ import com.bifos.assistant.agent.domain.AgentToolPolicy;
 import com.bifos.assistant.chat.application.ArtifactWriteRequest;
 import com.bifos.assistant.mcp.application.McpCallContext;
 import com.bifos.assistant.mcp.application.McpCaller;
+import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
-import com.bifos.assistant.mcp.presentation.McpDtos.ContentDraftWriteArguments;
-import com.bifos.assistant.mcp.presentation.McpDtos.ContentDraftReadArguments;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpPrincipal;
@@ -80,6 +79,7 @@ public class McpController {
     private final McpCallerResolver callers;
     private final McpMediaObservationTools mediaObservations;
     private final McpContentDraftTools contentDrafts;
+    private final McpContentDraftSnapshots contentSnapshots;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -102,9 +102,13 @@ public class McpController {
             Map.entry(McpMediaObservationTools.RECORD, (caller, id, args) -> validated(id, args,
                 MediaObservationRecordArguments::from, value -> this.mediaObservations.record(caller, value.assetId(), value.expectedRevision(), value.requestId(), value.observation()))),
             Map.entry(McpContentDraftTools.WRITE, (caller, id, args) -> validated(id, args,
-                ContentDraftWriteArguments::from, value -> this.contentDrafts.write(caller, value.requestId(), value.draftId(), value.expectedRevision(), value.draft()))),
+                McpDtos.ContentDraftWriteArguments::from, value -> this.contentDrafts.write(caller, value.requestId(), value.draftId(), value.expectedRevision(), value.draft()))),
             Map.entry(McpContentDraftTools.READ, (caller, id, args) -> validated(id, args,
-                ContentDraftReadArguments::from, value -> this.contentDrafts.read(caller, value.draftId(), value.revision()))));
+                McpDtos.ContentDraftReadArguments::from, value -> this.contentDrafts.read(caller, value.draftId(), value.revision()))),
+            Map.entry(McpContentDraftSnapshots.PREVIEW, (caller, id, args) -> validated(id, args, McpDtos.ContentDraftPreviewArguments::from,
+                value -> this.contentSnapshots.preview(caller, value.draftId(), value.revision(), value.bindingId()))),
+            Map.entry(McpContentDraftSnapshots.SAVE, (caller, id, args) -> validated(id, args,
+                McpDtos.ContentDraftSaveArguments::from, value -> this.contentSnapshots.save(caller, value.snapshotId()))));
     }
 
 
