@@ -84,7 +84,7 @@ python3 -m unittest discover -s hermes/tests -p 'test_fos_ctx.py'
 node test/e2e/run.ts
 (cd web && pnpm typecheck && pnpm lint)
 (cd web && pnpm test:browser content-snapshot-save.spec.ts connector-card.spec.ts --repeat-each=3 --retries=0)
-scripts/check-local.sh content-snapshot-save connector-card
+scripts/dev/check-local.sh content-snapshot-save connector-card
 ```
 
 check-local.sh는 Backend·MySQL·BFF·build·관련 browser·전체 E2E·unit·Hermes·public-safe·quality를 검사하고 첫 실패로 종료한다.
