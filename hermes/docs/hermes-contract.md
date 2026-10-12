@@ -741,20 +741,25 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 
 ### 실행 이벤트가 실제로 오는 형태
 
-v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측으로 확인했다.
+기준 판의 `gateway/platforms/api_server_runs.py` 소스와 공유 wire 검사로 확인한다.
+아래 표의 모든 사건에 `run_id`와 초 단위 `timestamp`가 붙는다.
 
 **사건 이름은 `type` 이 아니라 `event` 다.** 중계하는 쪽이 `type` 을 읽으면 아무것도 받지 못한다.
 
 | `event` | 함께 오는 칸 |
 | --- | --- |
 | `message.delta` | `delta` 에 답의 조각 |
+| `message.interim` | `text`, `already_streamed`. 중간 안내이며 실행은 이어 간다 |
 | `tool.started` | `tool` 에 도구 이름, `preview` 에 주요 인자 하나의 값. 아래 「붙은 커넥터 서버의 도구 사건」 을 본다 |
-| `tool.completed` | `tool`, `duration` 초, `error` 참거짓. v0.21.5 는 `preview` 에 결과를 더한다 |
+| `tool.completed` | `tool`, `duration` 초, `error` 참거짓, `preview` 에 결과 |
 | `subagent.start`, `subagent.complete` | [「자식 토큰을 SSE 로 받을 수 있다」](hermes-contract.md#자식-토큰을-sse-로-받을-수-있다) 의 식별자와 작업·사용량 필드 |
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
-| `run.completed` | `output` 과 `usage` |
+| `approval.request` | `command`, `pattern_key`, `pattern_keys`, `description`, `allow_permanent`, `allow_session`, `choices` |
+| `approval.responded` | `choice`, `resolved`, 요청을 지정하면 `request_id` |
+| `run.steered` | `accepted=true` |
+| `run.completed` | `output`, `usage`, `runtime`, `completed`, `partial`, `interrupted` |
 | `run.failed`, `run.cancelled` | 끝 |
-| `run.interrupted` | 끝. v0.21.5 부터 온다. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
+| `run.interrupted` | `error`. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
 
 `data:` 줄의 JSON 안에 `event` 가 들어 있다. SSE 의 `event:` 줄로 오지 않는다.
 10초마다 `: keepalive` 주석이 온다.
