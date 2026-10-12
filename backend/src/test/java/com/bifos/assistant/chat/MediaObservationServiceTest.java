@@ -43,11 +43,14 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,6 +66,95 @@ import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.ObjectMapper;
 
 class MediaObservationServiceTest extends ObservationFixture {
+    @Test
+    @DisplayName("유효한 픽셀 서른 장의 역순 첨부와 암호화 저장을 재조회하고 중간 삭제 자리를 보존한다")
+    void retainsReversePixelMappingAndEncryptedBodiesAfterMiddleDeletion() throws Exception {
+        assertThat(MediaObservationPixelFixture.marker(IMAGE)).isEqualTo(1);
+        var target = conversations.save(Conversation.startedBy(owner.id(), "픽셀 대응", null, NOW));
+        var uploaded = new ArrayList<ChatAttachment>();
+        var fingerprints = new HashSet<String>();
+        for (int marker = 1; marker <= 30; marker++) {
+            byte[] bytes = MediaObservationPixelFixture.gif(marker);
+            assertThat(MediaObservationPixelFixture.marker(bytes)).isEqualTo(marker);
+            fingerprints.add(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+            var row = attachmentService.upload(owner, target.id(), "pixel.gif", "image/gif", bytes.length,
+                () -> new ByteArrayInputStream(bytes));
+            uploaded.add(attachments.findById(row.id()).orElseThrow());
+        }
+        assertThat(fingerprints).hasSize(30);
+        var reversed = uploaded.reversed();
+        attachmentService.attach(9000L, target.id(), reversed.stream().map(ChatAttachment::id).toList());
+        var storedAttachments = attachments.findByConversationIdOrderByMessageIdAscPositionAsc(target.id());
+        var saved = new ArrayList<MediaObservationView>();
+        for (int position = 0; position < 30; position++) {
+            var row = storedAttachments.get(position);
+            int marker = MediaObservationPixelFixture.marker(Files.readAllBytes(file(row)));
+            assertThat(row.id()).isEqualTo(reversed.get(position).id());
+            assertThat(row.position()).isEqualTo(position);
+            assertThat(marker).isEqualTo(30 - position);
+            var view = service.record(owner, target.id(), row.id(), 0, UUID.randomUUID(), input("합성 픽셀 ID " + marker), model());
+            assertThat(view.ordinal()).isEqualTo(position + 1);
+            assertThat(view.sourceFingerprint()).isEqualTo(HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file(row)))));
+            saved.add(view);
+        }
+        assertThat(cipher.enabled()).isTrue();
+        for (var row : observations.findAll()) {
+            assertThat(row.bodyKeyId()).isNotNull();
+            assertThat(row.body()).doesNotContain("합성 픽셀");
+            assertThat(bodies.open(row, owner.id())).isPresent().get().asString().contains("합성 픽셀");
+        }
+        var reread = new ArrayList<MediaObservationView>();
+        String cursor = null;
+        do {
+            var page = service.list(owner, target.id(), cursor, 7);
+            reread.addAll(page);
+            cursor = page.size() == 7 ? page.getLast().assetId() : null;
+        } while (cursor != null);
+        assertThat(reread).containsExactlyElementsOf(saved);
+        assertThat(observations.count()).isEqualTo(30);
+        assertThat(requests.count()).isEqualTo(30);
+        attachmentCleaner.delete(storedAttachments.get(14), NOW);
+        var after = service.list(owner, target.id(), null, 100);
+        assertThat(after).hasSize(30);
+        assertThat(after.get(14).ordinal()).isEqualTo(15);
+        assertThat(after.get(14).status()).isEqualTo(ObservationStatus.UNAVAILABLE);
+        assertThat(after.get(14).observation()).isNull();
+        assertThat(after.get(14).revision()).isNull();
+        assertThat(after.get(14).sourceFingerprint()).isNull();
+        for (int index = 0; index < 30; index++) {
+            if (index != 14) {
+                assertThat(after.get(index)).isEqualTo(saved.get(index));
+            }
+        }
+        assertThat(observations.count()).isEqualTo(29);
+        assertThat(requests.count()).isEqualTo(29);
+        assertThat(file(storedAttachments.get(14))).doesNotExist();
+    }
+
+
+    @Test
+    @DisplayName("다른 사용자와 같은 소유자의 다른 대화 접근은 유효 이미지로도 DB 본문과 alias를 만들지 않는다")
+    void deniesForeignOwnerAndConversationWithoutCreatingRows() {
+        var other = user();
+        var foreignConversation = conversations.save(Conversation.startedBy(other.id(), "다른 사용자", null, NOW));
+        var foreign = photo(other, foreignConversation, MediaObservationPixelFixture.gif(2));
+        var ownOtherConversation = conversations.save(Conversation.startedBy(owner.id(), "다른 대화", null, NOW));
+        var ownOther = photo(owner, ownOtherConversation, MediaObservationPixelFixture.gif(3));
+        for (var row : List.of(foreign, ownOther)) {
+            code(() -> service.record(owner, conversation.id(), row.id(), 0, UUID.randomUUID(), input(), model()),
+                ErrorCode.CONVERSATION_NOT_FOUND);
+            code(() -> service.list(owner, conversation.id(), row.id().toString(), 10), ErrorCode.CONVERSATION_NOT_FOUND);
+        }
+        code(() -> service.list(other, conversation.id(), null, 10), ErrorCode.CONVERSATION_NOT_FOUND);
+        code(() -> service.record(other, conversation.id(), photo.id(), 0, UUID.randomUUID(), input(), model()),
+            ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThat(observations.count()).isZero();
+        assertThat(requests.count()).isZero();
+        assertThat(jdbc.queryForObject("select count(body) from media_observation", Long.class)).isZero();
+    }
+
+
     @Test
     @DisplayName("전송 사진 서른 장을 페이지로 읽고 삭제된 순번을 보존한다")
     void pagesThirtySentPhotosAndRetainsDeletedOrdinal() {
@@ -386,7 +478,7 @@ class MediaObservationServiceTest extends ObservationFixture {
 @BackendIntegrationTest
 abstract class ObservationFixture {
     static final Instant NOW = Instant.parse("2026-10-10T01:00:00Z");
-    static final byte[] IMAGE = {'G', 'I', 'F', '8', '9', 'a', 1, 2, 3};
+    static final byte[] IMAGE = MediaObservationPixelFixture.gif(1);
 
     @Autowired
     MediaObservationService service;
@@ -500,8 +592,13 @@ abstract class ObservationFixture {
 
 
     ChatAttachment photo(CurrentUser user, Conversation target) {
+        return photo(user, target, IMAGE);
+    }
+
+
+    ChatAttachment photo(CurrentUser user, Conversation target, byte[] bytes) {
         var row = attachmentService.upload(
-            user, target.id(), "a.gif", "image/gif", IMAGE.length, () -> new ByteArrayInputStream(IMAGE));
+            user, target.id(), "a.gif", "image/gif", bytes.length, () -> new ByteArrayInputStream(bytes));
         attachmentService.attach(100L + row.id(), target.id(), List.of(row.id()));
         return attachments.findById(row.id()).orElseThrow();
     }
