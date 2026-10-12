@@ -816,7 +816,8 @@ class ConnectorActionExecutionTest {
             Sha256.hex(UUID.randomUUID().toString()),
             Sha256.hex(raw),
             NOW);
-        action.awaitApproval(raw, NOW.plusSeconds(300));
+        action.awaitApproval(NOW.plusSeconds(300));
+        action.sealArgs(raw, null);
         return actions.saveAndFlush(action);
     }
 

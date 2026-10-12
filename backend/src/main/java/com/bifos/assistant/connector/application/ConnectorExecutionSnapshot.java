@@ -129,8 +129,8 @@ public final class ConnectorExecutionSnapshot {
             && Objects.equals(action.agentId(), binding.agent().id())
             && Objects.equals(action.connectorId(), binding.connection().connectorId()));
         require(action.toolName() != null && !action.toolName().isBlank());
-        require(action.argsJson() != null && Sha256.hex(action.argsJson()).equals(action.argsSha256()));
-        ConnectorExecutionSnapshot snapshot = validate(action.argsJson(), executionArgsJson, summaryJson, scopeJson, operation);
+        String modelArgs = action.executableArgs().orElseThrow(ConnectorExecutionSnapshot::invalid);
+        ConnectorExecutionSnapshot snapshot = validate(modelArgs, executionArgsJson, summaryJson, scopeJson, operation);
         snapshot.validateDeclaredScope(
             scopeFieldsJson, binding.connection().fields().values());
         String key = snapshot.requestKey(action.userId(), binding.connection().id(), action.toolName());
@@ -178,7 +178,7 @@ public final class ConnectorExecutionSnapshot {
         ConnectorAction action, ConnectorActionExecution row, TextCipher cipher) {
         require(action != null && row != null && Objects.equals(action.id(), row.actionId()));
         require(PROTOCOL.equals(row.protocol()));
-        require(action.argsJson() != null && Sha256.hex(action.argsJson()).equals(action.argsSha256()));
+        String modelArgs = action.executableArgs().orElseThrow(ConnectorExecutionSnapshot::invalid);
         String args = openColumn(action, row.contentKeyId(), "execution_args_json", row.executionArgsJson(), cipher);
         String summary = openColumn(action, row.contentKeyId(), "summary_json", row.summaryJson(), cipher);
         String scope = openColumn(action, row.contentKeyId(), "scope_json", row.scopeJson(), cipher);
@@ -187,7 +187,7 @@ public final class ConnectorExecutionSnapshot {
         JsonNode shown = object(summary, 8 * 1024);
         text(shown.get("operation"), 1, 6);
         ConnectorExecutionSnapshot snapshot = validate(
-            action.argsJson(), args, summary, scope, shown.get("operation").stringValue());
+            modelArgs, args, summary, scope, shown.get("operation").stringValue());
         require(snapshot.requestKey(action.userId(), row.connectionId(), action.toolName())
             .equals(row.requestKey()));
         return snapshot;

@@ -616,6 +616,7 @@ ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTT
 claim은 이 검사를 ticket 소비 직전에 수행한다. clientOrderId 교체로 UNKNOWN을 우회하지 못하며
 supersedes_unknown_action_id는 NULL로 남긴다. 자동 재전송과 ticket 재발급은 하지 않는다.
 명백한 미전송·공식 거절은 FAILED, 불확실한 결과는 UNKNOWN, 성공은 SUCCEEDED로 저장한다.
+응답 유실과 상세 없는 unavailable 실패는 잠금 안에서 claim 미소비를 증명할 때만 FAILED로 끝낸다.
 결과 저장은 현재 EXECUTING인 줄에만 적용하므로 기동 정리가 끝낸 상태를 덮지 않는다.
 
 Spring의 실제 DB snapshot·ticket·HMAC claim HTTP와 source Python 처리기, 금융 SDK bundle을
@@ -628,10 +629,21 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 데이터 key가 꺼져 있으면 준비를 시작하지 않고, `content_key_id`가 없는 snapshot은 승인하지 않는다.
 공개 연결 전 보안 리뷰는 아래 남은 문제를 함께 정한다.
 
-- 모델 원문 `args_json`과 실행 결과 `result_text`는 평문 칸에 남는다.
-- ticket 발급 전에 프로세스가 멈추면 미전송인 줄도 UNKNOWN이 되어 같은 의도를 계속 막는다.
 - request_key에 연결 번호가 들어가므로 같은 계좌를 새 연결로 다시 붙이면 이전 UNKNOWN과 충돌하지 않는다.
-- execute의 `400`·`401`·`404`·`409`를 FAILED로 읽으므로 Python이 금융 전송 뒤 불확실한 결과를 이 상태 코드로 돌려주지 않는다는 계약을 확인해야 한다.
+
+중단된 금융 실행과 오류 상세 없는 execute 실패는 claim 소비 여부로 끝낸다.
+사용자·승인 줄·실행 줄을 같은 순서로 잠그고 `consumed_at`이 비어 있으면 `FAILED`, 차 있으면 `UNKNOWN`이다.
+이 규칙은 execute의 `400`·`401`·`404`·`409`에도 적용한다.
+증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
+
+연결을 다시 붙일 때의 request_key 문제는 공개 금융 연결을 여는 작업에서 해결한다.
+연결 번호를 빼면 기존 해시와의 호환 검사와 커넥터별 계좌 식별 범위를 함께 정해야 하므로 이번 본문 보안 변경에 넣지 않는다.
+그 작업이 끝나기 전까지 공개 hook과 승인 경로는 계속 `RISK_NOT_OPEN`으로 막는다.
+
+모든 승인 줄의 `args_json`과 `result_text`는 기존 사용자 데이터 key로 암호화한다.
+금융은 암호화가 필수이며 일반 쓰기만 암호화가 꺼져 있을 때 평문 호환을 허용한다.
+인자와 결과 key는 따로 저장하고, 다른 줄이나 사용자로 옮긴 암호문은 풀지 못한다.
+기존 평문 이관과 읽기 실패·실행 차단 규칙은 [저장 모델](../../backend/docs/data-schema.md)의 「connector_action」이 갖는다.
 
 ## 커넥터 READ 데이터의 흐름
 

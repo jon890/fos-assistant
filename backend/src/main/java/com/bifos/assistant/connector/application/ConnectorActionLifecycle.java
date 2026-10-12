@@ -12,13 +12,16 @@ import com.bifos.assistant.connector.domain.ConnectorConversationGrant;
 import com.bifos.assistant.connector.domain.ConnectorToolGrant;
 import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +40,8 @@ class ConnectorActionLifecycle {
     private static final String EXECUTING_MESSAGE = "an approved action of this connection is still executing";
 
     private final ConnectorActionRepository actions;
+    private final ConnectorActionExecutionRepository contents;
+    private final AppUserRepository users;
     private final ConnectorToolGrantRepository grants;
     private final ConnectorConversationGrantRepository conversationGrants;
     private final ConversationRepository conversations;
@@ -45,10 +50,13 @@ class ConnectorActionLifecycle {
     private final ConnectorActionSignals signals;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final ConnectorActionBodies bodies;
 
 
     ConnectorActionLifecycle(
         ConnectorActionRepository actions,
+        ConnectorActionExecutionRepository contents,
+        AppUserRepository users,
         ConnectorToolGrantRepository grants,
         ConnectorConversationGrantRepository conversationGrants,
         ConversationRepository conversations,
@@ -56,8 +64,11 @@ class ConnectorActionLifecycle {
         ConnectorActionDetails details,
         ConnectorActionSignals signals,
         TransactionTemplate transactions,
+        ConnectorActionBodies bodies,
         Clock clock) {
         this.actions = actions;
+        this.contents = contents;
+        this.users = users;
         this.grants = grants;
         this.conversationGrants = conversationGrants;
         this.conversations = conversations;
@@ -66,6 +77,7 @@ class ConnectorActionLifecycle {
         this.signals = signals;
         this.transactions = transactions;
         this.clock = clock;
+        this.bodies = bodies;
     }
 
 
@@ -249,30 +261,28 @@ class ConnectorActionLifecycle {
 
 
     /**
-     * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다. 함께 준
-     * 대화 허락도 거둔다.
+     * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 끝낸다. 다시 실행하지 않는다.
+     *
+     * <p>금융 줄은 claim 이 소비되지 않았으면 보내지 않은 것이 분명해 실패로, 소비됐으면 결과를 모르는 것으로 끝낸다
+     * (ADR-20261012 / financial-unsent-proof). 그 밖의 줄은 결과를 모르는 것으로 끝낸다. 기동 중에도 claim 이 들어올 수
+     * 있어 줄마다 claim 과 같은 순서로 잠근다.
+     * 함께 준 대화 허락도 거둔다.
      *
      * <p>원고 job 링크가 있는 줄은 job 이 수명을 소유한다. {@link ContentDraftJobExpirer} 가 job 과 함께 끝낸다.
      *
      * @return 바꾼 건수
      */
     int markInterrupted(Instant now) {
-        List<ConnectorAction> interrupted = transactions.execute(status -> {
-            List<ConnectorAction> executing = actions.findByStatusWithoutContentJob(ActionStatus.EXECUTING);
-            executing.forEach(action -> {
-                action.unknown(now);
-                conversationGrants.revokeOfAction(action.id(), now);
-            });
-            return actions.saveAll(executing);
-        });
-        interrupted.forEach(signals::publish);
-        return interrupted.size();
+        return settleAll(
+            actions.findByStatusWithoutContentJob(ActionStatus.EXECUTING),
+            now,
+            "기동 전에 끊긴 실행 줄을 정리하지 못했다");
     }
 
 
     /**
-     * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다. 함께 준
-     * 대화 허락도 거둔다.
+     * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 {@link #markInterrupted} 와 같은 규칙으로 끝낸다. 다시 실행하지
+     * 않는다. 함께 준 대화 허락도 거둔다.
      *
      * <p>실행은 끝났는데 결과를 적는 저장이 실패하면 줄이 이 상태로 남고, 그 연결의 해제와 다시 등록이 다음 기동까지
      * 막힌다. 결과를 적는 쪽은 {@code EXECUTING} 이 아닌 줄을 건드리지 않으므로 늦게 온 결과와 겹쳐도 안전하다.
@@ -281,25 +291,39 @@ class ConnectorActionLifecycle {
      * @return 바꾼 건수
      */
     int markStale(Instant before, Instant now) {
+        return settleAll(
+            actions.findByStatusWithoutContentJobDecidedBefore(ActionStatus.EXECUTING, before),
+            now,
+            "오래 남은 실행 줄을 정리하지 못했다");
+    }
+
+
+    private int settleAll(List<ConnectorAction> candidates, Instant now, String failureLog) {
         int changed = 0;
-        for (ConnectorAction stale : actions.findByStatusWithoutContentJobDecidedBefore(ActionStatus.EXECUTING, before)) {
+        for (ConnectorAction candidate : candidates) {
             try {
-                Optional<ConnectorAction> unknown = transactions.execute(status -> actions.findByPublicIdForUpdate(stale.publicId())
-                    .filter(action -> action.status() == ActionStatus.EXECUTING)
-                    .map(action -> {
-                        action.unknown(now);
-                        conversationGrants.revokeOfAction(action.id(), now);
-                        return actions.save(action);
-                    }));
-                if (unknown.isPresent()) {
-                    signals.publish(unknown.get());
+                Optional<ConnectorAction> settled = transactions.execute(status -> {
+                    // claim 과 발급이 잡는 순서(사용자, 승인 줄, 실행 줄)를 지킨다.
+                    users.findByIdForUpdate(candidate.userId()).orElseThrow(ConnectorActionDetails::notFound);
+                    return actions.findByPublicIdForUpdate(candidate.publicId())
+                        .filter(action -> action.status() == ActionStatus.EXECUTING)
+                        .map(action -> {
+                            ConnectorFinancialOutcome.settle(
+                                action,
+                                contents.findByActionIdForUpdate(action.id()).orElse(null),
+                                null,
+                                bodies,
+                                now);
+                            conversationGrants.revokeOfAction(action.id(), now);
+                            return actions.save(action);
+                        });
+                });
+                if (settled.isPresent()) {
+                    signals.publish(settled.get());
                     changed++;
                 }
             } catch (RuntimeException ex) {
-                log.warn(
-                    "오래 남은 실행 줄을 정리하지 못했다 actionId={} kind={}",
-                    stale.publicId(),
-                    ex.getClass().getSimpleName());
+                log.warn("{} actionId={} kind={}", failureLog, candidate.publicId(), ex.getClass().getSimpleName());
             }
         }
         return changed;

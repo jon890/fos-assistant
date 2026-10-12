@@ -232,6 +232,21 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
 
 
     @Test
+    @DisplayName("원고 저장 승인 인자를 복호화하지 못하면 jobId 예약과 worker 시작을 하지 않는다")
+    void refusesUnreadableSaveArgumentsBeforeStartingWorker() {
+        var request = saves.requestSave(owner, origin.id(), preview());
+        var action = actionRows.findByPublicId(request.actionId()).orElseThrow();
+        assertThat(action.argsKeyId()).isNotNull();
+        jdbc.update("update connector_action set args_json = ? where id = ?", "손상된 암호문", action.id());
+        var view = contentApproval.approve(owner, request.actionId(), null);
+        assertThat(view.status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(view.errorCode()).isEqualTo("not_executable");
+        assertThat(starter.started()).isEmpty();
+        assertThat(jobRows.findAll().getFirst().jobId()).isNull();
+    }
+
+
+    @Test
     @DisplayName("동시 승인은 jobId 하나를 예약하고 시작을 한 번만 보내며 재요청은 같은 job을 돌려준다")
     void reservesOneJobAndStartsOnceUnderConcurrentApproval() throws Exception {
         UUID snapshotId = preview();

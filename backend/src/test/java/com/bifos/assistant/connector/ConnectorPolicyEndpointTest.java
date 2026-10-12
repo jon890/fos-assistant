@@ -18,6 +18,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
@@ -139,6 +140,9 @@ class ConnectorPolicyEndpointTest {
     ConnectorToolGrantRepository grants;
 
     @Autowired
+    ConnectorActionRepository actions;
+
+    @Autowired
     ConversationRepository conversations;
 
     @Autowired
@@ -230,7 +234,7 @@ class ConnectorPolicyEndpointTest {
 
 
     @Test
-    @DisplayName("WRITE 와 required 인 도구는 block 과 action_id 로 답하고 인자 원문을 담은 PENDING 승인 줄을 남긴다")
+    @DisplayName("WRITE 와 required 인 도구는 block 과 action_id 로 답하고 암호화한 인자를 담은 PENDING 승인 줄을 남긴다")
     void writeToolIsBlockedWithActionIdAndRecordedAsPendingApproval() throws Exception {
         connect(true);
 
@@ -242,7 +246,7 @@ class ConnectorPolicyEndpointTest {
         assertThat(row.get("DENY_REASON")).isNull();
         assertThat(row.get("PASSED")).isEqualTo(false);
         assertThat(row.get("STATUS")).isEqualTo("PENDING");
-        assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
+        assertEncryptedArgs(row);
         assertThat(row.get("EXPIRES_AT")).isNotNull();
         assertThat(row.get("RISK")).isEqualTo("WRITE");
         assertThat(row.get("APPROVAL_MODE")).isEqualTo("REQUIRED");
@@ -351,7 +355,7 @@ class ConnectorPolicyEndpointTest {
             + actionId + " 다. 이 실행은 대화가 없어 승인받을 화면이 없으므로 실행되지 않는다. 같은 도구를 다시 부르지 않는다.");
         assertThat(json.readTree(repeated.body())).isEqualTo(reply);
         assertThat(onlyRow().get("STATUS")).isEqualTo("PENDING");
-        assertThat(onlyRow().get("ARGS_JSON")).isEqualTo(ARGS);
+        assertEncryptedArgs(onlyRow());
         assertThat(notifications.count()).isZero();
     }
 
@@ -385,7 +389,7 @@ class ConnectorPolicyEndpointTest {
         assertApprovalRequested(first);
         assertBlocked(otherTool, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
         assertBlocked(otherArgs, "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.");
-        assertThat(onlyRow().get("ARGS_JSON")).isEqualTo(ARGS);
+        assertEncryptedArgs(onlyRow());
     }
 
 
@@ -948,7 +952,7 @@ class ConnectorPolicyEndpointTest {
         assertThat(row.get("DENY_REASON")).isNull();
         assertThat(row.get("PASSED")).isEqualTo(false);
         assertThat(row.get("STATUS")).isEqualTo("PENDING");
-        assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
+        assertEncryptedArgs(row);
         assertThat(notifications.count()).as("승인 알림").isEqualTo(1);
     }
 
@@ -1020,7 +1024,7 @@ class ConnectorPolicyEndpointTest {
         Map<String, Object> row = onlyRow();
         assertThat(row.get("DECISION")).isEqualTo("NEEDS_APPROVAL");
         assertThat(row.get("STATUS")).isEqualTo("PENDING");
-        assertThat(row.get("ARGS_JSON")).isEqualTo(ARGS);
+        assertEncryptedArgs(row);
         assertThat(((Number)row.get("AGENT_ID")).longValue()).isEqualTo(plain.id());
         assertThat(notifications.count()).as("승인 알림").isEqualTo(1);
     }
@@ -1226,6 +1230,13 @@ class ConnectorPolicyEndpointTest {
                 + " 다. 대화 화면에 승인 카드가 떴으니 사용자에게 거기서 승인해 달라고 알린다. 번호는 사용자에게 말하지 않는다. "
                 + "같은 도구를 다시 부르지 않는다. 승인하면 저장한 인자 그대로 한 번 실행되고 결과가 이 대화로 온다.");
         return actionId;
+    }
+
+
+    private void assertEncryptedArgs(Map<String, Object> row) {
+        assertThat((String)row.get("ARGS_JSON")).startsWith("v1.").isNotEqualTo(ARGS);
+        assertThat(row.get("ARGS_KEY_ID")).isNotNull();
+        assertThat(actions.findById(((Number)row.get("ID")).longValue()).orElseThrow().argsJson()).isEqualTo(ARGS);
     }
 
 

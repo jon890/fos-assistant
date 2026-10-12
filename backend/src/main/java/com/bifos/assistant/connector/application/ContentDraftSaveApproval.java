@@ -217,8 +217,12 @@ public class ContentDraftSaveApproval {
         if (!action.expiresAt().isAfter(now)) {
             throw new ContentDraftRefusal(ContentDraftRefusal.EXPIRED);
         }
+        var executable = action.executableArgs();
+        if (executable.isEmpty()) {
+            throw new ContentDraftRefusal(ConnectorAction.NOT_EXECUTABLE);
+        }
         if (!prepared.startSupported() || prepared.stamp() == null || prepared.manifest() == null
-            || decide(prepared.manifest(), action.argsJson()).isEmpty()) {
+            || decide(prepared.manifest(), executable.get()).isEmpty()) {
             throw new ContentDraftRefusal(ConnectorAction.NOT_EXECUTABLE);
         }
         ContentDraftSnapshotInput input;
@@ -285,7 +289,7 @@ public class ContentDraftSaveApproval {
         } else if (job.running() && job.startClaimedAt() == null) {
             job.fail(outcome.errorCode(), now);
             if (action.status() == ActionStatus.EXECUTING) {
-                action.fail("unavailable", null, now);
+                action.fail("unavailable", null, null, now);
             }
         }
         jobs.save(job);

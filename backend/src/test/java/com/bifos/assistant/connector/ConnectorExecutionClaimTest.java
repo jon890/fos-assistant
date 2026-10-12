@@ -31,6 +31,7 @@ import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
@@ -112,6 +113,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
     @Autowired
     ConnectorActionRepository actions;
+
+    @Autowired
+    ConnectorActionBodies bodies;
 
     @Autowired
     ConnectorActionExecutionRepository contents;
@@ -782,8 +786,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 Sha256.hex(id),
                 Sha256.hex(args),
                 NOW);
-            action.awaitApproval(args, approvalExpiry);
+            action.awaitApproval(approvalExpiry);
             actions.saveAndFlush(action);
+            bodies.sealArgs(action, args);
             contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
                 action,
                 binding,

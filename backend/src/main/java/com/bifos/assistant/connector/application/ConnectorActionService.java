@@ -10,7 +10,9 @@ import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
@@ -60,6 +62,7 @@ public class ConnectorActionService {
     @Autowired
     public ConnectorActionService(
         ConnectorActionRepository actions,
+        ConnectorActionExecutionRepository contents,
         ConnectorToolGrantRepository grants,
         ConnectorConversationGrantRepository conversationGrants,
         ConversationRepository conversationRows,
@@ -74,9 +77,11 @@ public class ConnectorActionService {
         NotificationService notifications,
         ConversationNotices conversations,
         DecisionFeedbackRecorder feedback,
+        ConnectorActionBodies bodies,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
+            contents,
             grants,
             conversationGrants,
             conversationRows,
@@ -91,6 +96,7 @@ public class ConnectorActionService {
             notifications,
             conversations,
             feedback,
+            bodies,
             transactionManager,
             Clock.systemUTC());
     }
@@ -98,6 +104,7 @@ public class ConnectorActionService {
 
     public ConnectorActionService(
         ConnectorActionRepository actions,
+        ConnectorActionExecutionRepository contents,
         ConnectorToolGrantRepository grants,
         ConnectorConversationGrantRepository conversationGrants,
         ConversationRepository conversationRows,
@@ -112,6 +119,7 @@ public class ConnectorActionService {
         NotificationService notifications,
         ConversationNotices conversations,
         DecisionFeedbackRecorder feedback,
+        ConnectorActionBodies bodies,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
@@ -130,9 +138,10 @@ public class ConnectorActionService {
             details,
             signals,
             transactions,
+            bodies,
             clock);
         this.lifecycle = new ConnectorActionLifecycle(
-            actions, grants, conversationGrants, conversationRows, agents, details, signals, transactions, clock);
+            actions, contents, users, grants, conversationGrants, conversationRows, agents, details, signals, transactions, bodies, clock);
     }
 
 
@@ -348,7 +357,7 @@ public class ConnectorActionService {
 
 
     /**
-     * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
+     * 오래 남은 {@code EXECUTING} 줄을 끝낸다. 미소비 금융 실행은 실패, 나머지는 결과 불명이다. 다시 실행하지 않는다.
      *
      * <p>실행은 끝났는데 결과를 적는 저장이 실패하면 줄이 이 상태로 남고, 그 연결의 해제와 다시 등록이 다음 기동까지
      * 막힌다. 결과를 적는 쪽은 {@code EXECUTING} 이 아닌 줄을 건드리지 않으므로 늦게 온 결과와 겹쳐도 안전하다.

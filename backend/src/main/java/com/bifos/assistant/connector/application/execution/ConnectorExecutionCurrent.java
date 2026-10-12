@@ -103,7 +103,7 @@ public class ConnectorExecutionCurrent {
         require(TransactionSynchronizationManager.isActualTransactionActive());
         try {
             // 승인·ticket 발급·claim 모두 암호화된 금융 snapshot만 실행한다.
-            require(row.contentKeyId() != null);
+            require(row.contentKeyId() != null && action.argsKeyId() != null);
             var latest = context(action, row);
             require(expected.equals(latest));
             require(catalog.connectorId().equals(latest.connectorId())
