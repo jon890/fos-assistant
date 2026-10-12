@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,14 +56,15 @@ class ConnectorFinancialGateTest {
 
 
     @Test
-    @DisplayName("keyed hash key 가 없거나 옛 평문 request_key 줄이 남았으면 kill switch 를 켜도 닫는다")
-    void closesWithoutDigestKeyOrWithUnkeyedRows() {
+    @DisplayName("keyed hash key 가 없거나 keyed hash 이전 protocol 의 열린 줄이 남았으면 kill switch 를 켜도 닫는다")
+    void closesWithoutDigestKeyOrWithOpenLegacyRows() {
         var noKey = open("1", "1", "1");
         noKey = new ConnectorFinancialProperties(true, noKey.allowedAccounts(), noKey.maxOrderAmountKrw(),
             noKey.maxOrderAmountUsd(), noKey.maxOrderQuantity(), noKey.maxDailyAmountKrw(), noKey.maxDailyAmountUsd(), "");
         assertThatThrownBy(gate(noKey)::requireOpen).isInstanceOf(ApiException.class);
         assertThatCode(gate(open("1", "1", "1"))::requireOpen).doesNotThrowAnyException();
-        when(contents.existsUnkeyedRequestKey()).thenReturn(true);
+        when(contents.existsOpenWithProtocol(eq(ConnectorFinancialGate.LEGACY_PROTOCOL),
+            eq(Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN)))).thenReturn(true);
         assertThatThrownBy(gate(open("1", "1", "1"))::requireOpen).isInstanceOf(ApiException.class);
     }
 

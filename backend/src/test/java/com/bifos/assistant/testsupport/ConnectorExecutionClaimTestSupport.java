@@ -58,7 +58,7 @@ public abstract class ConnectorExecutionClaimTestSupport {
               "verify":{"tool":"prepare"},"mcp_server":"demo",
               "tools":{"prepare":{"title":"조회","risk":"READ","approval":"none"},
                        "place_order":{"title":"주문","risk":"FINANCIAL","approval":"always"}},
-              "execution_guard":{"protocol":"approval-claim-v1","prepare_tool":"prepare",
+              "execution_guard":{"protocol":"approval-claim-v2","prepare_tool":"prepare",
                 "scope_fields":[{"arg":"account_seq","field":"account"}],
                 "operations":{"place_order":"CREATE"}},
               "execution_guard_manifest_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]

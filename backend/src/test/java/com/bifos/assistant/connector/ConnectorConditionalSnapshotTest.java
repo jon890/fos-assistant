@@ -17,6 +17,7 @@ import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
+import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
@@ -39,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -168,6 +170,22 @@ class ConnectorConditionalSnapshotTest {
         }
         assertThat(accepted).isEqualTo(47);
         assertThat(rejected).isEqualTo(132);
+    }
+
+
+    @Test
+    @DisplayName("기동 닫기 검사는 keyed hash 이전 protocol 의 열린 줄만 보고 지금 protocol 줄과 끝난 줄은 보지 않는다")
+    void legacyProtocolCheckSeesOnlyOpenV1Rows() {
+        var open = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+        Fixture fixture = fixture();
+        ConnectorActionExecution row = contents.saveAndFlush(capture(fixture.action(), fixture.binding(), BASE));
+        assertThat(row.protocol()).isEqualTo("approval-claim-v2");
+        // 첫 실제 호출이 남긴 지금 protocol 의 줄은 열려 있어도 관문을 닫지 않는다.
+        assertThat(contents.existsOpenWithProtocol("approval-claim-v1", open)).isFalse();
+        jdbc.update("UPDATE connector_action_execution SET protocol = 'approval-claim-v1' WHERE action_id = ?", row.actionId());
+        assertThat(contents.existsOpenWithProtocol("approval-claim-v1", open)).isTrue();
+        jdbc.update("UPDATE connector_action SET status = 'SUCCEEDED' WHERE id = ?", row.actionId());
+        assertThat(contents.existsOpenWithProtocol("approval-claim-v1", open)).isFalse();
     }
 
 

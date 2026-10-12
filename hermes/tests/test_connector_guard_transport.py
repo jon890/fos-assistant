@@ -38,14 +38,14 @@ class ConnectorGuardCase(execute_base.ConnectorExecuteTest):
         self.rewrite("connector.json", lambda value: value.update(schema=2, tools={
             "list_scopes": {"risk": "READ"}, "prepare_order": {"risk": "READ"},
             "place_order": {"risk": "FINANCIAL", "identifiers": ["symbol"]}}, execution_guard={
-                "protocol": "approval-claim-v1", "prepare_tool": "prepare_order",
+                "protocol": "approval-claim-v2", "prepare_tool": "prepare_order",
                 "scope_fields": [{"arg": "account_seq", "field": "scope"}], "operations": {"place_order": "CREATE"}}))
         shutil.copyfile(REPO / "hermes/tests/fixtures/financial-transport-server.py", self.connector_root / "server.py")
         (self.connector_root / "prepare-case.json").write_text(json.dumps(self.case))
         self.manifest = self.plugin._connector_manifest(base.DEMO)
         self.profile = self.profile_root / PROFILE
         (self.profile / ".env").write_text("DEMO_TOKEN=demo_ok_0123456789\nDEMO_SCOPE=000007\n")
-        self.guard = {"v": 1, "protocol": "approval-claim-v1", "bindingId": "14", "connectionId": "13",
+        self.guard = {"v": 1, "protocol": "approval-claim-v2", "bindingId": "14", "connectionId": "13",
                       "connectionUpdatedAt": "2026-10-10T00:00:00.123456Z",
                       "manifestSha256": self.manifest["execution_guard_manifest_sha256"]}
         self.entry = {"server": self.manifest["server"], "allowlist_added": True, "mcp_server": "demo", "mode": "bind",
@@ -133,7 +133,7 @@ class ConnectorGuardCase(execute_base.ConnectorExecuteTest):
             raw = base64.urlsafe_b64encode(json.dumps(claims, separators=(",", ":")).encode()).decode().rstrip("=")
             key = hmac.digest(self.ticket_vector["token"].encode(), b"fos-approval-signing-key-v1", "sha256")
             signature = base64.urlsafe_b64encode(hmac.digest(key, b"fos-approval-claim-v1" + raw.encode(), "sha256")).decode().rstrip("=")
-            body["execution"] = {"v": 1, "protocol": "approval-claim-v1", "ticket": raw + "." + signature,
+            body["execution"] = {"v": 1, "protocol": "approval-claim-v2", "ticket": raw + "." + signature,
                                  "argsJson": self.vector["argsJson"], "argsSha256": self.vector["argsSha256"]}
         return body
 

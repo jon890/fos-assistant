@@ -84,7 +84,7 @@ class ConnectorGuardSupportTest {
               "verify":{"tool":"prepare"},"mcp_server":"demo",
               "tools":{"prepare":{"risk":"READ","approval":"none"},
                 "place_order":{"risk":"FINANCIAL","approval":"always"}},
-              "execution_guard":{"protocol":"approval-claim-v1","prepare_tool":"prepare",
+              "execution_guard":{"protocol":"approval-claim-v2","prepare_tool":"prepare",
                 "scope_fields":[{"arg":"account_seq","field":"account"}],
                 "operations":{"place_order":"CREATE"}},
               "execution_guard_manifest_sha256":"%s"}]
@@ -385,7 +385,7 @@ class ConnectorGuardSupportTest {
 
 
     private ObjectNode request(Fixture f) {
-        return JSON.createObjectNode().put("v", 1).put("protocol", "approval-claim-v1")
+        return JSON.createObjectNode().put("v", 1).put("protocol", "approval-claim-v2")
             .put("bindingId", f.bindingId().toString()).put("connectionId", f.connectionId().toString())
             .put("connectionUpdatedAt", f.connectionUpdatedAt().toString()).put("manifestSha256", SHA)
             .put("nonce", UUID.randomUUID().toString()).put("profile", f.profile()).put("connectorId", "demo-financial");

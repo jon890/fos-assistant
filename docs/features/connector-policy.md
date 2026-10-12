@@ -469,7 +469,7 @@ timeInForce는 CREATE에서 생략한 값을 DAY로 보충하는 기존 기본�
 Hermes와 SDK로 보내는 원문 해시는 암호화 전 UTF-8 바이트의 소문자 SHA-256이며 복호화한 원문과 다시 대조한다.
 DB에는 이 값을 적지 않는다. 금융 줄의 `args_sha256`, `execution_args_sha256`, `scope_sha256`, `request_key`는 `FinancialDigest`의 keyed hash다.
 keyed hash는 운영 비밀 key 파일과 칸 이름으로 만든 HMAC-SHA256이며 `k1` 접두와 앞 31바이트의 16진수로 64글자다.
-DB만 읽은 사람이 인자 후보를 대입해 맞혀 보지 못하게 하려는 것이다. key 파일이 없거나 옛 평문 request_key 줄이 남았으면 금융 관문이 닫힌다.
+DB만 읽은 사람이 인자 후보를 대입해 맞혀 보지 못하게 하려는 것이다. key 파일이 없거나 keyed hash 이전 protocol(`approval-claim-v1`)의 PENDING·EXECUTING·UNKNOWN 줄이 남았으면 금융 관문이 닫힌다. 지금 protocol(`approval-claim-v2`)의 줄과 끝난 줄은 보지 않으므로 첫 실제 호출 뒤 재기동해도 관문이 다시 열린다.
 request_key의 원재료는 사용자, 커넥터, 도구와 실행 args의 정규화한 문자열 필드로 만든다. 연결 번호는 넣지 않는다.
 scope arg, market, currency와 원래 orderId는 포함하고 clientOrderId와 expected_order는 제외한다.
 decimal은 앞의 0과 불필요한 소수점 끝 0을 제거한 정확한 문자열로 맞춘다.
@@ -492,7 +492,7 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 발급 함수를 운영 승인이나 controller에서 호출하지 않으며 금융 위험도 판정을 바꾸지 않는다.
 
 카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
-정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v1`이다.
+정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v2`이다.
 prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
 kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.

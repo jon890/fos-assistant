@@ -202,7 +202,7 @@ class FinancialConnectorProducerTest {
                 .conversationId(conversation.id())
                 .hermesSessionId(session).costMode(CostMode.SUBSCRIPTION).status(ExecutionStatus.RUNNING).startedAt(now).build());
         });
-        control("configure", Map.of("profile", profile, "guard", Map.of("v", 1, "protocol", "approval-claim-v1",
+        control("configure", Map.of("profile", profile, "guard", Map.of("v", 1, "protocol", "approval-claim-v2",
             "bindingId", bindingId.toString(), "connectionId", connectionId.toString(), "connectionUpdatedAt", connectionRevision.toString(), "manifestSha256", sha)));
     }
 

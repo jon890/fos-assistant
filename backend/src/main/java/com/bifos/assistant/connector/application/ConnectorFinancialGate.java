@@ -35,6 +35,9 @@ public class ConnectorFinancialGate {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     // 결과를 모르는 UNKNOWN 도 센다. 빼면 응답을 잃은 주문만큼 하루 상한을 넘을 수 있다.
+    // keyed hash 이전 protocol 이다. 그 열린 줄의 request_key 는 평문 SHA 라 같은 의도 차단이 놓친다.
+    static final String LEGACY_PROTOCOL = "approval-claim-v1";
+    private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
     private static final Set<ActionStatus> SPENT = Set.of(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN);
     private final LiveProperties<ConnectorFinancialProperties> properties;
     private final ConnectorActionRepository actions;
@@ -43,9 +46,10 @@ public class ConnectorFinancialGate {
     private final FinancialDigest digest;
 
 
-    /** kill switch 와 함께 keyed hash key 와 옛 평문 request_key 줄의 부재를 본다. */
+    /** kill switch 와 함께 keyed hash key 와, keyed hash 이전 protocol 의 열린 줄이 없는지를 본다. */
     public void requireOpen() {
-        require(properties.current().enabled() && digest.available() && !contents.existsUnkeyedRequestKey());
+        require(properties.current().enabled() && digest.available()
+            && !contents.existsOpenWithProtocol(LEGACY_PROTOCOL, OPEN));
     }
 
 

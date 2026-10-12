@@ -54,7 +54,7 @@ final class HttpHermesConnectorGuard {
             }
             ObjectNode guard = body.putObject("execution");
             guard.put("v", 1);
-            guard.put("protocol", "approval-claim-v1");
+            guard.put("protocol", "approval-claim-v2");
             guard.put("ticket", execution.ticket());
             guard.put("argsJson", raw);
             guard.put("argsSha256", execution.argsSha256());
@@ -94,7 +94,7 @@ final class HttpHermesConnectorGuard {
         if (node != null
             && node.isObject()
             && node.path("protocol").isString()
-            && "approval-claim-v1".equals(node.path("protocol").stringValue())
+            && "approval-claim-v2".equals(node.path("protocol").stringValue())
             && node.path("state").isString()
             && Set.of("unsupported", "pending", "verified")
                 .contains(node.path("state").stringValue())
@@ -108,7 +108,7 @@ final class HttpHermesConnectorGuard {
                     && node.path("manifestSha256").stringValue().matches("[0-9a-f]{64}")))) {
             return node;
         }
-        return MAPPER.createObjectNode().put("protocol", "approval-claim-v1").put("state", "unsupported");
+        return MAPPER.createObjectNode().put("protocol", "approval-claim-v2").put("state", "unsupported");
     }
 
 

@@ -310,7 +310,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
             }
             var answer = post(pluginUrl + "/api/connectors/tossinvest/execute", Map.of("profile", profile,
                 "hermes_tool", "mcp__tossinvest__create_order", "args", args, "execution", Map.of("v", 1,
-                    "protocol", "approval-claim-v1", "ticket", sent.ticket(), "argsJson", sent.argsJson(),
+                    "protocol", "approval-claim-v2", "ticket", sent.ticket(), "argsJson", sent.argsJson(),
                     "argsSha256", "sha".equals(change) ? "0".repeat(64) : sent.argsSha256())),
                 properties.dashboardToken());
             // 손상된 wire는 Python 처리기가 실패로 답해야 한다. 승인 상태는 그 거절을 받은 것으로 정산한다.
@@ -487,7 +487,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     private void configureMode(String mode) {
         String sha = client.readCatalog().getFirst().executionGuardManifestSha256();
         control("configure", Map.of("profile", profile, "mode", mode, "guard", Map.of("v", 1,
-            "protocol", "approval-claim-v1", "bindingId", bindingId.toString(), "connectionId", connectionId.toString(),
+            "protocol", "approval-claim-v2", "bindingId", bindingId.toString(), "connectionId", connectionId.toString(),
             "connectionUpdatedAt", connectionRevision.toString(), "manifestSha256", sha)));
     }
 }

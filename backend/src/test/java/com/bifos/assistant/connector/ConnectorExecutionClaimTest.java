@@ -652,7 +652,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         Fixture f = fixture();
         String raw = tickets.issue(f.action());
         switch (reason) {
-            case "protocol" -> CATALOG_BODY.set(CATALOG.replace("approval-claim-v1", "approval-claim-v2"));
+            case "protocol" -> CATALOG_BODY.set(CATALOG.replace("approval-claim-v2", "approval-claim-v1"));
             case "risk" -> CATALOG_BODY.set(CATALOG.replace("FINANCIAL", "WRITE"));
             case "scope" -> CATALOG_BODY.set(CATALOG.replace("\"field\":\"account\"", "\"field\":\"secret\""));
             case "missing" -> CATALOG_BODY.set("[]");

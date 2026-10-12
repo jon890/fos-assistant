@@ -2850,7 +2850,7 @@ MCP 입력은 `{v:1,tool,args}`이며 tool은 접두사를 뺀 금융 도구 이
 일반 verify/options는 빈 args를 유지한다.
 
 금융 execute 본문은 기존 세 칸에 `execution`을 추가한다.
-execution은 `{v:1,protocol,ticket,argsJson,argsSha256}`이고 protocol은 `approval-claim-v1`이다.
+execution은 `{v:1,protocol,ticket,argsJson,argsSha256}`이고 protocol은 `approval-claim-v2`이다. 서명 도메인 `fos-approval-claim-v1` 은 ticket 형식이 같아 그대로 둔다.
 argsJson은 저장 원문 그대로이며 해시와 SDK 인자의 키·값·타입·추가 키를 모두 대조한다.
 ticket의 payload 14키와 MICROS·최대 60초 계약을 읽고 실제 인증과 현재 권한은 claim이 판정한다.
 실행 자식만 `FOS_APPROVAL_TICKET`, `FOS_APPROVAL_ARGS_JSON`, `FOS_APPROVAL_CLAIM_URL`을 받는다.

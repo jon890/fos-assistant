@@ -32,7 +32,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Accessors(fluent = true)
 public final class ConnectorExecutionSnapshot {
-    public static final String PROTOCOL = "approval-claim-v1";
+    public static final String PROTOCOL = "approval-claim-v2";
     public static final String ORDER = "ORDER";
     public static final String CONDITIONAL = "CONDITIONAL";
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()

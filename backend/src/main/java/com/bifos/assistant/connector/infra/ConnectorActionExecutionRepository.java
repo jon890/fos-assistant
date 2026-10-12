@@ -1,7 +1,9 @@
 package com.bifos.assistant.connector.infra;
 
 import com.bifos.assistant.connector.domain.ConnectorActionExecution;
+import com.bifos.assistant.connector.domain.type.ActionStatus;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,9 +16,15 @@ public interface ConnectorActionExecutionRepository extends JpaRepository<Connec
     List<ConnectorActionExecution> findByRequestKeyOrderByActionIdAsc(String requestKey);
 
 
-    /** keyed hash 이전의 평문 request_key 줄이 남았는지 본다. 남았으면 같은 의도 차단이 그 줄을 놓치므로 금융 관문을 닫는다. */
-    @Query("select count(e) > 0 from ConnectorActionExecution e where e.requestKey not like 'k1%'")
-    boolean existsUnkeyedRequestKey();
+    /**
+     * 그 protocol 로 저장한 줄 가운데 아직 열린 승인 줄이 있는지 본다.
+     *
+     * <p>keyed hash 이전 protocol 의 열린 줄은 같은 의도 차단이 놓치므로 금융 관문을 닫는다. 끝난 줄은 보지 않는다.
+     * 모든 금융 줄을 보면 첫 실제 호출이 남긴 줄 때문에 그 뒤 재기동마다 관문이 닫힌다.
+     */
+    @Query("select count(e) > 0 from ConnectorActionExecution e, ConnectorAction a"
+        + " where a.id = e.actionId and e.protocol = :protocol and a.status in :statuses")
+    boolean existsOpenWithProtocol(@Param("protocol") String protocol, @Param("statuses") Collection<ActionStatus> statuses);
 
 
     /** 사용자와 승인 줄을 잠근 뒤 실행 내용을 마지막으로 잠근다. */

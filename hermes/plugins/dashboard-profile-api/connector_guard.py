@@ -10,7 +10,7 @@ import urllib.request
 import urllib.error
 import uuid
 
-PROTOCOL = "approval-claim-v1"
+PROTOCOL = "approval-claim-v2"
 EXECUTION_ENV = frozenset({"FOS_APPROVAL_TICKET", "FOS_APPROVAL_ARGS_JSON", "FOS_APPROVAL_CLAIM_URL"})
 GUARD_KEYS = {"v", "protocol", "bindingId", "connectionId", "connectionUpdatedAt", "manifestSha256"}
 RESERVED = set("orderId symbol market currency side quantity orderAmount price orderType timeInForce status "
