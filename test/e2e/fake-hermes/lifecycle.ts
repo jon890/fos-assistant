@@ -49,7 +49,6 @@ export function createLifecycle(state: FakeHermesState) {
   };
   return { runNotFound, finishSlowRun, authorized, dashboardAuthorized, releaseHeldSoul, releaseHeldRun, releaseLongActivity };
 }
-
 export function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -87,8 +86,4 @@ export function toolStartedPreview(argsJson: string): string | null {
   const args = JSON.parse(argsJson) as Record<string, unknown>;
   const key = ["query", "text", "command", "path", "name", "prompt", "code", "goal"].find((candidate) => candidate in args);
   return key === undefined ? null : String(args[key]);
-}
-
-export function event(response: ServerResponse, payload: unknown): void {
-  response.write(`data: ${JSON.stringify(payload)}\n\n`);
 }

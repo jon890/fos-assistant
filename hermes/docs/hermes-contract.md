@@ -762,6 +762,38 @@ v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측�
 **가짜 Hermes 를 이 형태로 맞춰 둔다.**
 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
 
+#### 판별 공유 wire와 가짜 사건
+
+판 번호의 원본은 `hermes/tests/hermes_contract.py`의 `HERMES_VERSION` 하나다.
+계약 CI는 이 값을 읽어 상류 소스를 받고, TS의 `test/e2e/fake-hermes/wire.ts`는 같은 파일을 직접 읽는다.
+Java 검사는 Gradle의 `processTestResources`가 복사한 원본을 `HermesWire`로 읽는다.
+판 번호를 다른 곳에 상수로 옮겨 쓰지 않는다.
+
+공유 합성 SSE는 `backend/src/test/resources/hermes/<판>/`에 둔다.
+`events.sse`는 사건별 기본 칸, `message-interim.sse`는 안내와 답 조각의 흐름,
+`unknown.sse`는 미지 사건과 칸 및 SSE 메타데이터를 건너뛰는 검사를 갖는다.
+실제 실행 녹화와 운영 본문은 넣지 않는다. 없는 판이나 사건 표본을 고르면 TS 대역이 바로 실패한다.
+
+`eventEnvelope` 하나가 표본의 기본 칸에 시나리오의 값을 합쳐
+요청한 실행의 `run_id`와 초 단위 `timestamp`를 붙인다.
+대본의 시각은 중간 안내 중복 검사 때문에 보존하되 실행 번호는 현재 실행으로 바꾼다.
+`run.completed`에는 그 실행의 `output`과 `usage`를 싣고 `tool.completed`에는 `preview`를 싣는다.
+자식의 식별자와 session 번호는 실제로 그 자식을 만드는 시나리오에서 준다.
+상류 callback도 값이 없는 자식 칸을 생략하므로 공통 표본이 가짜 자식 session을 만들지 않는다.
+
+기준 판의 `api_server_runs.py`에서 `_make_run_event_callback`은
+`tool.failed`와 `tool.progress`를 SSE로 내보내지 않는다.
+실패한 도구는 `tool.completed.error=true`로 온다.
+이 두 이름을 현재 판 사건으로 만들지 않고 미지 사건 표본에 넣어 호환성을 확인한다.
+`reasoning.available`, `approval.request`, `approval.responded`, `run.interrupted`는
+공유 표본으로 대본에 넣어 재현할 수 있다. 승인 HTTP 경로 전체를 구현한 것은 아니다.
+
+Java HTTP parser 검사는 이 공유 표본부터 쓴다.
+각자의 HTTP 상태·timeout·요청 본문을 보는 다른 stub은 그대로 두어 검사 목적을 보존한다.
+파서는 알려진 사건만 소비자에게 넘기고 모르는 JSON 칸과 `id:`, `event:`, 주석 줄을 건너뛴다.
+이 검사는 `seq`, `: open`, `replay.truncated`가 끼어도 다음 답 조각을 읽는다는 뜻이며,
+`Last-Event-ID` 재연결이나 실제 재생 기능을 구현하지 않는다.
+
 #### 붙은 커넥터 서버의 도구 사건
 
 붙은 커넥터 서버의 MCP 도구도 내장 도구와 같은 길로 사건을 보낸다.

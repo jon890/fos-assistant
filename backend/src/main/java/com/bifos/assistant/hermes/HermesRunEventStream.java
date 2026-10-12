@@ -33,6 +33,12 @@ import tools.jackson.databind.ObjectMapper;
 public class HermesRunEventStream {
     private static final Pattern THINK_BLOCK = Pattern.compile("(?is)<think>.*?(?:</think>|$)");
 
+    /** 알고 있는 사건만 상태와 소비자에게 넘긴다. 새 사건은 이후 답 조각을 막지 않는다. */
+    private static final Set<String> WIRE_EVENTS = Set.of(
+        "reset", "run.started", "run.steered", "message.delta", "message.interim", "reasoning.available",
+        "tool.started", "tool.completed", "subagent.start", "subagent.complete",
+        "approval.request", "approval.responded", "run.completed", "run.failed", "run.cancelled", "run.interrupted");
+
     /** 모델이 스킬을 읽는 Hermes 도구의 이름이다. */
     private static final String SKILL_VIEW_TOOL = "skill_view";
 
@@ -158,7 +164,11 @@ public class HermesRunEventStream {
         String raw = data.toString();
         data.setLength(0);
         try {
-            onEvent.accept(toRunEvent(objectMapper.readTree(raw), scope, state));
+            JsonNode root = objectMapper.readTree(raw);
+            String type = firstText(root, root.path("data"), "event", "type");
+            if (type != null && WIRE_EVENTS.contains(type.toLowerCase(Locale.ROOT))) {
+                onEvent.accept(toRunEvent(root, scope, state));
+            }
         } catch (JacksonException ex) {
             throw new IOException("Hermes sent an invalid event");
         }

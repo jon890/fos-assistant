@@ -15,12 +15,15 @@ scripts/checks/check-hermes-contract.sh v2026.10.1
 """
 
 import ast
+import json
 import os
 import pathlib
 import re
 import sqlite3
 import sys
 import typing
+from contextlib import suppress
+from types import SimpleNamespace
 import unittest
 import warnings
 import yaml
@@ -289,6 +292,47 @@ class HermesSourceTest(unittest.TestCase):
         if path not in self.trees:
             self.trees[path] = _parse(path)
         return self.trees[path]
+
+    def test_shared_wire_matches_upstream_event_callback(self):
+        """공유 사건 표본의 칸을 기준 판 callback의 실제 출력과 대조한다."""
+        source = self.root / "gateway/platforms/api_server_runs.py"
+        wanted = {"_run_event", "_tool_completed_preview", "_make_run_event_callback",
+                  "_FIXED_EVENT_FIELDS", "_TOOL_COMPLETED_PREVIEW_MAX_CHARS",
+                  "_SUBAGENT_EVENT_KEYS", "_SUBAGENT_TEXT_KEYS"}
+        nodes = [node for node in self.tree(source).body
+                 if (isinstance(node, ast.FunctionDef) and node.name in wanted)
+                 or (isinstance(node, ast.Assign) and any(
+                     isinstance(target, ast.Name) and target.id in wanted for target in node.targets))]
+        namespace = {"Any": typing.Any, "Dict": typing.Dict, "Callable": typing.Callable,
+                     "json": json, "suppress": suppress, "time": SimpleNamespace(time=lambda: 1.0)}
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), namespace)
+        fixture = pathlib.Path(__file__).resolve().parents[2] / (
+            "backend/src/test/resources/hermes/%s/events.sse" % contract.HERMES_VERSION)
+        samples = {event["event"]: event for line in fixture.read_text().splitlines()
+                   if line.startswith("data:") for event in [json.loads(line[5:])]}
+        emitted = []
+        owner = SimpleNamespace(
+            _run_statuses={}, _set_run_status=lambda *args, **kwargs: None,
+            _run_streams={"fixture-run": SimpleNamespace(put_nowait=emitted.append)})
+        loop = SimpleNamespace(call_soon_threadsafe=lambda callback, value: callback(value))
+        api = SimpleNamespace(redact_sensitive_text=lambda value, **kwargs: value)
+        callback = namespace["_make_run_event_callback"](owner, "fixture-run", loop, _api_server=api)
+        for kind in ("tool.started", "tool.completed", "reasoning.available", "subagent.start", "subagent.complete"):
+            with self.subTest(event=kind):
+                sample = samples[kind]
+                fields = {key: value for key, value in sample.items()
+                          if key in namespace["_SUBAGENT_EVENT_KEYS"]}
+                fields.update(duration=sample.get("duration", 0), is_error=sample.get("error", False),
+                              result=sample.get("preview"))
+                callback(kind, tool_name=sample.get("tool"),
+                         preview=sample.get("text") if kind == "reasoning.available" else sample.get("preview"),
+                         **fields)
+                self.assertEqual({key: value for key, value in emitted[-1].items() if key != "timestamp"},
+                                 {key: value for key, value in sample.items() if key != "timestamp"})
+        count = len(emitted)
+        callback("tool.failed", tool_name="web_search")
+        callback("tool.progress", tool_name="web_search")
+        self.assertEqual(len(emitted), count)
 
     def test_decision_profile_blocks_implicit_mcp_tools_in_upstream_resolver(self):
         """상류의 순수 합집합 함수를 실행해 no_mcp 가 기본 MCP 도구를 넣지 않는지 본다."""

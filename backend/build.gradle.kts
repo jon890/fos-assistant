@@ -57,6 +57,13 @@ dependencies {
     rewrite(libs.openrewrite.migrate.java)
 }
 
+// 판 번호 원본을 테스트 classpath에 싣는다. Java에 별도 판 상수를 두지 않는다.
+tasks.processTestResources {
+    from("../hermes/tests/hermes_contract.py") {
+        into("hermes")
+    }
+}
+
 tasks.test {
     // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
     useJUnitPlatform {

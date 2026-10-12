@@ -1,0 +1,35 @@
+package com.bifos.assistant.testsupport;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
+import java.util.regex.Pattern;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+/** Python 계약 원본의 판 번호로 공유 wire를 고른다. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class HermesWire {
+    private static final Pattern VERSION = Pattern.compile("(?m)^HERMES_VERSION = \"(v[0-9.]+)\"$");
+
+
+    public static String version() throws IOException {
+        var match = VERSION.matcher(resource("/hermes/hermes_contract.py"));
+        if (!match.find()) {
+            throw new IOException("Hermes 계약의 판 번호를 읽을 수 없다");
+        }
+        return match.group(1);
+    }
+
+
+    public static String fixture(String name) throws IOException {
+        return resource("/hermes/" + version() + "/" + name + ".sse");
+    }
+
+
+    private static String resource(String name) throws IOException {
+        try (var input = Objects.requireNonNull(HermesWire.class.getResourceAsStream(name), name)) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+}
