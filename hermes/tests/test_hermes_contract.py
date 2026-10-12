@@ -9,8 +9,8 @@
 ```bash
 # cwd: 저장소 root
 # 계약의 판이나 지정한 tag 의 소스를 받아 확인한다
-scripts/check-hermes-contract.sh
-scripts/check-hermes-contract.sh v2026.10.1
+scripts/checks/check-hermes-contract.sh
+scripts/checks/check-hermes-contract.sh v2026.10.1
 ```
 """
 

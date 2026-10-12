@@ -37,7 +37,7 @@ CI shard마다 웹 서버, Control Plane, H2 DB와 임시 파일을 따로 만�
 
 ## 반복 실행
 
-CI 가 어느 spec 을 몇 번 반복하는지는 `scripts/browser-stability.mjs` 가 정한다.
+CI 가 어느 spec 을 몇 번 반복하는지는 `scripts/ci/browser-stability.mjs` 가 정한다.
 반복 단계는 서버와 DB를 새로 띄우므로 빌드와 기동 시간이 한 번 더 든다. PR에 반복 단계의 실제 소요 시간을 적는다.
 
 로컬에서도 관련 spec에 `--repeat-each=3 --retries=0`을 주어 반복과 두 폭을 확인한다.

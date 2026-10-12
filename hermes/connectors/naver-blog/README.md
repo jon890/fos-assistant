@@ -333,7 +333,7 @@ CDP 는 Bun 의 WebSocket 으로 직접 부르고 브라우저 자동화 라이�
 제목·본문 입력 회귀는 `Control+A`를 쓰는 기존 키 계약에 맞춰 Linux Chrome 환경에서 실행한다.
 실제 네이버와 사용자 브라우저에는 닿지 않는다. Chrome이 없으면 테스트를 생략하지 않고 실패한다.
 기본 `bun run test`는 Linux에서 설치된 Chrome을 쓰고, macOS에서는 `scripts/test.Dockerfile`로 Linux Chromium과 Bun 1.3.14를 실행한다.
-`scripts/check-connectors.sh`도 이 기본 경로를 부른다. macOS에는 실행 중인 Docker와 Git이 필요하다.
+`scripts/checks/check-connectors.sh`도 이 기본 경로를 부른다. macOS에는 실행 중인 Docker와 Git이 필요하다.
 첫 실행은 이미지를 내려받아 만들고, 각 실행은 잠금 파일에 정해진 패키지를 설치한다.
 검사에는 Git으로 추적하는 공개 코드와 합성 fixture만 복사한다. 개인 환경 파일, 사진과 실제 profile은 넣지 않고, 실행마다 임시 profile과 자기 컨테이너를 정리한다.
 macOS Chrome의 기존 본문 Delete 명령 대기는 아직 해결하지 않았다. Linux 검사 성공은 macOS Chrome이나 실제 SmartEditor의 성공을 증명하지 않는다.
@@ -344,7 +344,7 @@ macOS Chrome의 기존 본문 Delete 명령 대기는 아직 해결하지 않았
 # cwd: 저장소 root
 bun run --cwd hermes/connectors/naver-blog test
 bun run --cwd hermes/connectors/naver-blog test -- ./tests/editor-focus.chrome.test.ts
-bash scripts/check-connectors.sh
+bash scripts/checks/check-connectors.sh
 ```
 
 Chrome 부재, 이미지 생성·패키지 설치 실패와 회귀 실패는 비영 종료 코드로 전달한다. Linux CI는 기존 native Chrome 검사를 계속 실행한다.

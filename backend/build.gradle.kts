@@ -106,7 +106,7 @@ tasks.register<Test>("archTest") {
 /**
  * 마이그레이션과 저장소 쿼리를 실제 MySQL 에서 검사한다. H2 는 정렬 규칙이 다른 칸의 비교 같은 MySQL 고유의 실패를 내지 않는다.
  * 태스크 이름은 마이그레이션만 말하지만 mysql 태그가 붙은 검사를 모두 돌린다.
- * 서버 접속 값을 환경 변수로 받으므로 직접 부르지 않고 scripts/check-mysql-migration.sh 로 돌린다.
+ * 서버 접속 값을 환경 변수로 받으므로 직접 부르지 않고 scripts/checks/check-mysql-migration.sh 로 돌린다.
  */
 tasks.register<Test>("mysqlMigrationTest") {
     group = "verification"
@@ -144,7 +144,7 @@ tasks.withType<Checkstyle>().configureEach {
 
 /**
  * 구조 규칙, 코드 규칙, 포맷을 한 번에 검사한다. 파일을 바꾸지 않는다.
- * scripts/quality.sh 가 이 태스크와 web 검사를 함께 돌린다.
+ * scripts/checks/quality.sh 가 이 태스크와 web 검사를 함께 돌린다.
  */
 tasks.register("qualityCheck") {
     group = "verification"
