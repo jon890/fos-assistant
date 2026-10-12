@@ -230,7 +230,7 @@ test("quality 는 판정 job 이 실패해도 생략되지 않고, 무거운 단
   assert.match(body, /SHOULD_RUN: \$\{\{ needs\.changes\.outputs\.quality \}\}/);
   assert.match(body, /test "\$SHOULD_RUN" = true \|\| test "\$SHOULD_RUN" = false/);
   const steps = body.split(/^ {6}- /m).slice(1);
-  const always = steps.filter((step) => !step.includes("if: needs.changes.outputs."));
+  const always = steps.filter((step) => !/^ {8}if:/m.test(step));
   // 언제나 도는 단계는 판정 확인, checkout, 파일 길이 검사뿐이다.
   assert.equal(always.length, 3, always.join("\n---\n"));
   assert.ok(always.some((step) => step.includes("check-file-length.mjs")));
@@ -264,7 +264,18 @@ test("웹 검사는 quality와 설치를 공유하되 변경 여부와 실제 �
   assert.equal(jobs.has("web-build"), false);
   assert.match(quality, /web-result: \$\{\{ steps\.web-tests\.outcome \}\}/);
   const webStep = quality.split("        id: web-tests\n")[1];
-  assert.match(webStep, /^ {8}if: needs.changes.outputs.web == 'true'\n/);
+  assert.match(webStep, /^ {8}if: \$\{\{ !cancelled\(\) && needs.changes.outputs.web == 'true' && steps.install.outcome == 'success' \}\}\n/);
+  assert.match(quality, /run: cd web && pnpm install --frozen-lockfile\n {8}id: install/);
+  const condition = /^ {8}if: \$\{\{ (.*) \}\}/.exec(webStep)![1];
+  const runWeb = new Function("needs", "steps", "cancelled", `return ${condition};`);
+  for (const cancelled of [false, true]) {
+    for (const web of ["true", "false"]) {
+      for (const install of ["success", "failure", "cancelled", "skipped"]) {
+        // 앞의 quality 검사 실패는 조건에 넣지 않아 설치가 성공했으면 웹도 검사한다.
+        assert.equal(runWeb({ changes: { outputs: { web } } }, { install: { outcome: install } }, () => cancelled), !cancelled && web === "true" && install === "success");
+      }
+    }
+  }
   for (const command of ["pnpm test:node", "pnpm typecheck", "pnpm build"]) assert.ok(webStep.includes(command));
   const shared = quality.split(/^ {6}- /m).filter((step) => /uses: (pnpm\/action-setup|actions\/setup-node)|run: cd web && pnpm install/.test(step));
   assert.equal(shared.length, 3);

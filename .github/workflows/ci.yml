@@ -461,6 +461,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile
+        id: install
         if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
       # 파일 길이 기준 목록도 quality.sh 에서 검사한다.
       - run: scripts/checks/quality.sh check
@@ -468,7 +469,7 @@ jobs:
       # quality와 웹 검사가 pnpm 설치와 캐시를 공유한다. 웹 단계의 결과를 web 판정에 전달한다.
       - name: 웹 테스트와 타입 검사, 빌드
         id: web-tests
-        if: needs.changes.outputs.web == 'true'
+        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' && steps.install.outcome == 'success' }}
         working-directory: web
         env:
           AUTH_SECRET: build-time-placeholder

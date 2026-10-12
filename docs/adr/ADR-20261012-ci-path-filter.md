@@ -129,6 +129,7 @@ browser 행은 shard별 중앙값 중 최솟값과 최댓값이다.
 웹 전체 작업이 설치보다 길지만 개별 짧은 검사보다 설치가 길고, quality가 같은 pnpm 설치를 반복하고 있어 합친다.
 quality만 필요한 경우와 웹만 필요한 경우를 구분해 Java는 quality에만, pnpm은 둘 중 하나가 필요하면 설치한다.
 웹 단계가 생략되면 `skipped`, 실행되면 실제 `outcome`을 web 판정에 전달한다.
+pnpm 설치가 성공하고 실행이 취소되지 않았으면, 앞의 quality 검사에 실패해도 웹 검사를 실행한다.
 quality 실패와 취소도 web 판정의 실패가 된다.
 
 backend 두 suite와 E2E, Hermes는 실제 검사가 수백 초라 독립 병렬 실행을 유지한다.
