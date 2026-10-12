@@ -120,18 +120,19 @@ Ready 로 바꾸면 GitHub 의 Claude 리뷰(`claude-code-review.yml`)도 돈다
 
    ```bash
    # cwd: 저장소 root. 통과하지 않은 필수 검사 이름을 낸다. 조회가 실패하면 출력 없이 1 로 끝난다.
-   REQUIRED="$(gh api repos/jon890/fos-assistant/branches/main/protection/required_status_checks --jq '.contexts[]')" \
+   REQUIRED="$(gh api repos/{owner}/{repo}/branches/main/protection/required_status_checks --jq '.contexts[]')" \
      && [ -n "$REQUIRED" ] \
      && comm -23 <(printf '%s\n' "$REQUIRED" | sort) \
        <(gh pr checks "$PR" --json name,state --jq '.[] | select(.state=="SUCCESS") | .name' | sort)
    ```
+
+   필수 검사가 `SKIPPED` 로 끝나면 GitHub 는 통과로 보지만 이 명령은 미통과로 낸다. 보수적인 쪽이라 그대로 둔다.
 
    종료 코드가 0 이고 출력이 비어 있어야 통과다. 1 이면 조회가 실패한 것이므로 통과로 읽지 않는다.
 3. 4단계를 충족하면 머지한다. 이력을 한 줄로 합치지 않는다.
 
 ```bash
 # cwd: 저장소 root
-gh pr checks "$PR" --required
 gh pr merge "$PR" --merge
 ```
 
