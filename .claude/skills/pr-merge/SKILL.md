@@ -84,8 +84,17 @@ Ready 로 바꾸면 Claude 리뷰가 돈다. Draft 가 아닌 PR 을 바로 열 
 
 1. CI 가 PR 을 지금 main 과 합친 상태에서 실행했는지 확인한다.
    CI 가 시작된 뒤 main 이 바뀌었으면 `gh pr update-branch` 로 갱신하고 새 CI 가 끝날 때까지 기다린다.
-   예외가 하나 있다. 뒤에 들어온 main 커밋이 이 PR 이 고친 파일을 하나도 건드리지 않았고 GitHub 이 `MERGEABLE` 과 `CLEAN` 으로 보면, 직전 CI 결과로 머지하고 그 근거를 PR 에 한 줄 남긴다.
+   예외가 하나 있다. 아래를 모두 만족하면 직전 CI 결과로 머지하고 그 근거를 PR 에 한 줄 남긴다.
    여러 PR 이 함께 돌 때 main 이 바뀔 때마다 전체 CI 를 다시 돌리면 머지가 끝없이 밀리기 때문이다.
+   - CI 가 돈 기준 커밋부터 지금 main 까지 바뀐 파일과 이 PR 이 고친 파일이 하나도 겹치지 않는다.
+   - 양쪽 어디도 마이그레이션(`backend/src/main/resources/db/migration/`), 빌드 설정과 의존성 파일, 저장소 전체를 보는 `test/unit/` 검사, 여러 모듈이 함께 쓰는 계약 파일을 건드리지 않았다. 파일이 겹치지 않아도 함께 깨질 수 있는 곳이다.
+   - `mergeable` 이 `MERGEABLE` 이고 `mergeStateStatus` 가 `CLEAN` 이다. 필수가 아닌 `claude-review` 만 실패해 `UNSTABLE` 이면 `CLEAN` 과 같이 본다. 그 밖의 `UNSTABLE` 이나 `UNKNOWN` 이면 예외를 쓰지 않는다.
+
+   ```bash
+   # cwd: 저장소 root. $CI_BASE 는 CI 가 돈 merge 커밋의 main 쪽 부모다.
+   gh pr view "$PR" --json mergeable,mergeStateStatus
+   comm -12 <(git diff --name-only "$CI_BASE" origin/main | sort) <(gh pr diff "$PR" --name-only | sort)
+   ```
 2. main 브랜치 보호가 정한 필수 검사의 통과를 직접 확인한다. 브랜치 보호의 `strict` 는 켜지 않는다.
 3. 4단계를 충족하면 머지한다. 이력을 한 줄로 합치지 않는다.
 
