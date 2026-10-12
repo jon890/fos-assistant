@@ -77,7 +77,6 @@ class ConnectorActionApproval {
     private final ConnectorActionBodies bodies;
 
 
-
     ConnectorActionApproval(
         ConnectorActionRepository actions,
         ConnectorToolGrantRepository grants,

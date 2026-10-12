@@ -53,7 +53,6 @@ class ConnectorActionLifecycle {
     private final ConnectorActionBodies bodies;
 
 
-
     ConnectorActionLifecycle(
         ConnectorActionRepository actions,
         ConnectorActionExecutionRepository contents,
