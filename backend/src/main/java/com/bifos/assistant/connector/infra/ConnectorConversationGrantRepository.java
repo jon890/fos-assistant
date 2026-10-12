@@ -19,12 +19,13 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
               and exists (select c.id from Conversation c where c.id = g.conversationId and c.deletedAt is null)
             """)
     boolean existsActive(
-            @Param("userId") Long userId,
-            @Param("conversationId") Long conversationId,
-            @Param("agentId") Long agentId,
-            @Param("connectorId") String connectorId,
-            @Param("toolName") String toolName,
-            @Param("now") Instant now);
+        @Param("userId") Long userId,
+        @Param("conversationId") Long conversationId,
+        @Param("agentId") Long agentId,
+        @Param("connectorId") String connectorId,
+        @Param("toolName") String toolName,
+        @Param("now") Instant now);
+
 
     /** 그 대화에서 사용자가 준 유효한 허락이다. 승인 영역의 「계속 허용 중」 줄이 읽는다. */
     @Query("""
@@ -34,10 +35,12 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
             order by g.id
             """)
     List<ConnectorConversationGrant> findActiveInConversation(
-            @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("now") Instant now);
+        @Param("userId") Long userId, @Param("conversationId") Long conversationId, @Param("now") Instant now);
+
 
     /** 그 승인 줄과 함께 준 허락이 있는가. 거둔 뒤에도 참이다. 결과의 알림 줄이 허락을 함께 알릴지 정한다. */
     boolean existsByActionId(Long actionId);
+
 
     /**
      * 그 사용자의 그 커넥터에 준 대화 허락을 모두 거둔다. 연결을 해제하거나 값을 다시 등록할 때 부른다.
@@ -50,7 +53,8 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
             where g.userId = :userId and g.connectorId = :connectorId and g.revokedAt is null
             """)
     int revokeAllOfConnector(
-            @Param("userId") Long userId, @Param("connectorId") String connectorId, @Param("now") Instant now);
+        @Param("userId") Long userId, @Param("connectorId") String connectorId, @Param("now") Instant now);
+
 
     /**
      * 그 에이전트에 준 그 커넥터의 대화 허락을 거둔다. 그 에이전트에서 연결을 뗄 때 부른다.
@@ -64,8 +68,8 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
               and g.revokedAt is null
             """)
     int revokeAllOfAgent(
-            @Param("userId") Long userId,
-            @Param("connectorId") String connectorId,
-            @Param("agentId") Long agentId,
-            @Param("now") Instant now);
+        @Param("userId") Long userId,
+        @Param("connectorId") String connectorId,
+        @Param("agentId") Long agentId,
+        @Param("now") Instant now);
 }

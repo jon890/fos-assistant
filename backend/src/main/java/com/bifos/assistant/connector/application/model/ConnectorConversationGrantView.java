@@ -13,8 +13,8 @@ public record ConnectorConversationGrantView(Long grantId, String title, Instant
     /** @param declaredTitle 카탈로그가 선언한 이름. 없거나 읽지 못했으면 null */
     public static ConnectorConversationGrantView from(ConnectorConversationGrant grant, String declaredTitle) {
         return new ConnectorConversationGrantView(
-                grant.id(),
-                declaredTitle == null || declaredTitle.isBlank() ? ConnectorActionView.UNNAMED_TITLE : declaredTitle,
-                grant.expiresAt());
+            grant.id(),
+            declaredTitle == null || declaredTitle.isBlank() ? ConnectorActionView.UNNAMED_TITLE : declaredTitle,
+            grant.expiresAt());
     }
 }

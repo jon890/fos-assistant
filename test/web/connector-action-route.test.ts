@@ -37,7 +37,12 @@ function item(argLabels: unknown) {
 
 /** 실제 조회·승인·거절 라우트를 실행한다. 인증이 필요한 Control Plane 호출만 대역한다. */
 async function callRoute(
-  kind: "list" | "approve" | "reject" | "conversationGrants" | "revokeConversationGrant",
+  kind:
+    | "list"
+    | "approve"
+    | "reject"
+    | "conversationGrants"
+    | "revokeConversationGrant",
   value: unknown,
   approveBody: unknown = { grant: null, argLabels: { to: "요청의 가짜 이름" } },
 ) {
@@ -86,7 +91,8 @@ async function callRoute(
   dependencies["@/lib/connector-action-route"] = await load(
     "../../web/src/lib/connector-action-route.ts",
   );
-  const conversationRoutes = "../../web/src/app/api/chat/conversations/[conversationId]";
+  const conversationRoutes =
+    "../../web/src/app/api/chat/conversations/[conversationId]";
   const relative =
     kind === "list"
       ? `${conversationRoutes}/connector-actions/route.ts`
@@ -275,4 +281,3 @@ test("대화 허락 목록은 번호와 이름과 끝나는 시각만 옮기고,
   );
   assert.equal(JSON.stringify(revoked.calls[0].init), '{"method":"DELETE"}');
 });
-

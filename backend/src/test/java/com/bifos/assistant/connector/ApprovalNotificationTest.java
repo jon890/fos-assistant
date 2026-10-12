@@ -78,19 +78,19 @@ class ApprovalNotificationTest {
     private static final String ARGS = "{\"text\":\"안녕\"}";
 
     private static final ConnectorManifest DECLARING = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(
-                    new ConnectorTool("list_scopes", "READ", "none", null, null),
-                    new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null),
-                    new ConnectorTool(UNTITLED, "WRITE", "always", null, null)));
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(),
+        "list_scopes",
+        "demo",
+        List.of(),
+        false,
+        2,
+        List.of(
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null),
+            new ConnectorTool(UNTITLED, "WRITE", "always", null, null)));
 
     @Autowired
     ConnectorPolicyService policies;
@@ -138,12 +138,14 @@ class ApprovalNotificationTest {
     CheckNotificationPolicy checkNotifications;
 
     private final List<NotificationEvent> received = new CopyOnWriteArrayList<>();
-    private Runnable subscription = () -> {};
+    private Runnable subscription = () -> {
+    };
     private AppUser owner;
     private CurrentUser me;
     private Agent agent;
     private Conversation conversation;
     private String root;
+
 
     @BeforeEach
     void setUp() {
@@ -152,20 +154,20 @@ class ApprovalNotificationTest {
         ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenReturn(List.of(DECLARING));
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
+            .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
 
         owner = users.save(AppUser.of("approval-notice@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
         me = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         agent = Agent.of(
-                "notice-" + UUID.randomUUID(),
-                "검사용 메모",
-                PROFILE,
-                "http://localhost",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now());
+            "notice-" + UUID.randomUUID(),
+            "검사용 메모",
+            PROFILE,
+            "http://localhost",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            Instant.now());
         agent.markConnectorManaged();
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "승인 대화", agent.id(), Instant.now()));
@@ -180,12 +182,14 @@ class ApprovalNotificationTest {
         subscription = hub.subscribe(owner.id(), received::add);
     }
 
+
     @AfterEach
     void tearDown() {
         subscription.run();
         notifications.deleteAll();
         deleteRows();
     }
+
 
     @Test
     @DisplayName("조용한 시간의 승인 요청은 승인 카드를 유지하고 알림과 알림 사건만 생략한다")
@@ -203,6 +207,7 @@ class ApprovalNotificationTest {
         assertThat(received).isEmpty();
     }
 
+
     @Test
     @DisplayName("승인 줄을 새로 만들면 그 대화를 가리키는 APPROVAL_REQUESTED 가 하나 생기고 커밋 뒤 created 사건이 간다")
     void newApprovalCreatesRequestedNotificationForItsConversation() {
@@ -219,6 +224,7 @@ class ApprovalNotificationTest {
         assertThat(received).containsExactly(NotificationEvent.created(notice.publicId(), 1));
     }
 
+
     @Test
     @DisplayName("같은 실행이 같은 호출을 다시 판정받아 앞선 승인 줄을 돌려받으면 알림이 늘지 않는다")
     void reusedPendingActionDoesNotNotifyAgain() {
@@ -228,6 +234,7 @@ class ApprovalNotificationTest {
         assertThat(second.actionId()).isEqualTo(first.actionId());
         assertThat(notifications.findAll()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("대화 없이 돈 실행의 승인 줄은 알림을 만들지 않는다")
@@ -241,6 +248,7 @@ class ApprovalNotificationTest {
         assertThat(received).isEmpty();
     }
 
+
     @Test
     @DisplayName("대화를 지운 실행의 승인 줄은 알림을 만들지 않는다")
     void approvalInDeletedConversationDoesNotNotify() {
@@ -252,6 +260,7 @@ class ApprovalNotificationTest {
         assertThat(notifications.findAll()).isEmpty();
     }
 
+
     @Test
     @DisplayName("선언에 제목이 없는 도구의 알림 본문은 「이름 없는 동작」 이다")
     void untitledToolUsesUnnamedTitle() {
@@ -259,6 +268,7 @@ class ApprovalNotificationTest {
 
         assertThat(onlyNotification().body()).isEqualTo("「" + ConnectorActionView.UNNAMED_TITLE + "」");
     }
+
 
     @Test
     @DisplayName("만료 정리가 줄을 만료하면 APPROVAL_EXPIRED 가 하나 생기고 본문은 승인 카드의 제목과 같다")
@@ -272,9 +282,9 @@ class ApprovalNotificationTest {
 
         Notification notice = onlyNotification();
         ConnectorActionView card = service.listForConversation(me, conversation.id()).stream()
-                .filter(view -> view.actionId().equals(actionId))
-                .findFirst()
-                .orElseThrow();
+            .filter(view -> view.actionId().equals(actionId))
+            .findFirst()
+            .orElseThrow();
         assertThat(card.status()).isEqualTo(ActionStatus.EXPIRED);
         assertThat(notice.kind()).isEqualTo(NotificationKind.APPROVAL_EXPIRED);
         assertThat(notice.title()).isEqualTo("승인 요청이 만료됐어요");
@@ -282,10 +292,11 @@ class ApprovalNotificationTest {
         assertThat(notice.targetPublicId()).isEqualTo(conversation.publicId());
         assertThat(received).containsExactly(NotificationEvent.created(notice.publicId(), 1));
         assertThat(service.expire(expiresAt.plusMillis(2)))
-                .as("이미 만료한 줄은 다시 알리지 않는다")
-                .isZero();
+            .as("이미 만료한 줄은 다시 알리지 않는다")
+            .isZero();
         assertThat(notifications.findAll()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("카탈로그를 읽지 못한 채 만료하면 본문은 「이름 없는 동작」 이다")
@@ -300,6 +311,7 @@ class ApprovalNotificationTest {
 
         assertThat(onlyNotification().body()).isEqualTo("「" + ConnectorActionView.UNNAMED_TITLE + "」");
     }
+
 
     @Test
     @DisplayName("대화 없이 돈 실행의 승인 줄만 만료하면 알림을 만들지 않고 카탈로그도 읽지 않는다")
@@ -316,6 +328,7 @@ class ApprovalNotificationTest {
         assertThat(received).isEmpty();
     }
 
+
     @Test
     @DisplayName("대화를 지운 뒤 만료한 승인 줄은 알림을 만들지 않는다")
     void expiryInDeletedConversationDoesNotNotify() {
@@ -328,6 +341,7 @@ class ApprovalNotificationTest {
 
         assertThat(notifications.findAll()).isEmpty();
     }
+
 
     @Test
     @DisplayName("기다리는 시간이 지난 줄을 승인하려다 만료되면 APPROVAL_EXPIRED 를 남긴다")
@@ -345,42 +359,48 @@ class ApprovalNotificationTest {
         assertThat(notice.targetPublicId()).isEqualTo(conversation.publicId());
     }
 
+
     /** 그 대화로 도는 실행 하나를 만들고 그 루트 session 을 돌려준다. 대화가 없으면 null 을 넘긴다. */
     private String startRun(Long conversationId) {
         String session = "fos-" + UUID.randomUUID();
         executions.save(AgentExecution.builder()
-                .userId(owner.id())
-                .agentId(agent.id())
-                .conversationId(conversationId)
-                .profileName(PROFILE)
-                .hermesSessionId(session)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.parse("2026-10-01T00:00:00Z"))
-                .build());
+            .userId(owner.id())
+            .agentId(agent.id())
+            .conversationId(conversationId)
+            .profileName(PROFILE)
+            .hermesSessionId(session)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.parse("2026-10-01T00:00:00Z"))
+            .build());
         return session;
     }
+
 
     /** 루트 session 에서 부른 새 호출 하나의 판정을 묻는다. */
     private ConnectorPolicyAnswer ask(String session, String tool, String args) {
         return policies.decide(
-                PROFILE, session, session, "call_" + UUID.randomUUID(), "mcp__demo__" + tool, tool, args);
+            PROFILE, session, session, "call_" + UUID.randomUUID(), "mcp__demo__" + tool, tool, args);
     }
+
 
     private void deleteConversation() {
         jdbc.update("UPDATE conversation SET deleted_at = ? WHERE id = ?", Instant.now(), conversation.id());
     }
+
 
     private Instant onlyActionExpiry() {
         assertThat(actions.findAll()).as("connector_action 의 줄").hasSize(1);
         return actions.findAll().getFirst().expiresAt();
     }
 
+
     private Notification onlyNotification() {
         List<Notification> rows = notifications.findAll();
         assertThat(rows).as("notification 의 줄").hasSize(1);
         return rows.getFirst();
     }
+
 
     /** 이 검사가 쓰는 표를 비운다. 컨텍스트를 함께 쓰는 다음 검사에 행을 남기지 않게 검사 뒤에도 부른다. */
     private void deleteRows() {

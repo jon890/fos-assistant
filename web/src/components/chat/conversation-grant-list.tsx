@@ -53,7 +53,8 @@ export function ConversationGrantList({
     setError(null);
     const result = await revokeConversationGrant(conversationId, grantId);
     setRevoking(null);
-    if (!result.ok) setError("다시 묻도록 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요.");
+    if (!result.ok)
+      setError("다시 묻도록 바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요.");
     setReloads((count) => count + 1);
   }
 

@@ -18,7 +18,9 @@ import java.util.Optional;
  * @param approval 판정에 쓴 승인 방식. 위와 같을 때 null
  */
 public record ToolPolicyDecision(
-        ActionDecision decision, ActionDenyReason denyReason, ToolRisk risk, ToolApproval approval) {
+    ActionDecision decision, ActionDenyReason denyReason, ToolRisk risk, ToolApproval approval) {
+
+
     /** 승인 줄에 원문으로 둘 수 있는 인자 글의 UTF-8 바이트 상한이다. */
     public static final int MAX_ARGS_BYTES = 16 * 1024;
 
@@ -38,22 +40,25 @@ public record ToolPolicyDecision(
         APPROVAL_ONLY
     }
 
+
     /** manifest 를 읽지 못했을 때다. */
     public static ToolPolicyDecision policyUnavailable() {
         return denied(ActionDenyReason.POLICY_UNAVAILABLE, null);
     }
 
+
     /** 대화 허락이 없는 호출이다. 뜻은 {@link #decide(ConnectionStatus, boolean, int, Optional, boolean, boolean, int, CheckBoundary)} 와 같다. */
     public static ToolPolicyDecision decide(
-            ConnectionStatus connectionStatus,
-            boolean ownServerTool,
-            int schema,
-            Optional<ToolPolicy> declared,
-            boolean granted,
-            int argsBytes,
-            CheckBoundary boundary) {
+        ConnectionStatus connectionStatus,
+        boolean ownServerTool,
+        int schema,
+        Optional<ToolPolicy> declared,
+        boolean granted,
+        int argsBytes,
+        CheckBoundary boundary) {
         return decide(connectionStatus, ownServerTool, schema, declared, granted, false, argsBytes, boundary);
     }
+
 
     /**
      * @param ownServerTool 등록 이름이 그 커넥터의 MCP 서버가 낸 도구의 것인가. 아니면 판과 상관없이 선언 없는 도구다
@@ -65,14 +70,14 @@ public record ToolPolicyDecision(
      * @param boundary 먼저 살펴보기 트리 안의 호출인지와 그 살펴보기의 경계. 뜻은 {@link CheckBoundary} 가 갖는다
      */
     public static ToolPolicyDecision decide(
-            ConnectionStatus connectionStatus,
-            boolean ownServerTool,
-            int schema,
-            Optional<ToolPolicy> declared,
-            boolean granted,
-            boolean conversationGranted,
-            int argsBytes,
-            CheckBoundary boundary) {
+        ConnectionStatus connectionStatus,
+        boolean ownServerTool,
+        int schema,
+        Optional<ToolPolicy> declared,
+        boolean granted,
+        boolean conversationGranted,
+        int argsBytes,
+        CheckBoundary boundary) {
         if (connectionStatus != ConnectionStatus.READY) {
             return denied(ActionDenyReason.NOT_READY, null);
         }
@@ -103,19 +108,20 @@ public record ToolPolicyDecision(
         // 선언이 상시 허락을 닫은 도구는 남은 허락을 보지 않는다(ADR-065). 밖으로 나가는 도구는 대화 허락도 보지 않는다
         // (ADR-20261012 / conversation-grant).
         boolean allowedByGrant = (granted && policy.grantable())
-                || (conversationGranted && policy.conversationGrantable());
+            || (conversationGranted && policy.conversationGrantable());
         if (policy.approval() == ToolApproval.NONE
-                || (policy.approval() == ToolApproval.REQUIRED && allowedByGrant)) {
+            || (policy.approval() == ToolApproval.REQUIRED && allowedByGrant)) {
             return new ToolPolicyDecision(ActionDecision.ALLOWED, null, policy.risk(), policy.approval());
         }
         return new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, policy.risk(), policy.approval());
     }
 
+
     private static ToolPolicyDecision denied(ActionDenyReason reason, ToolPolicy policy) {
         return new ToolPolicyDecision(
-                ActionDecision.DENIED,
-                reason,
-                policy == null ? null : policy.risk(),
-                policy == null ? null : policy.approval());
+            ActionDecision.DENIED,
+            reason,
+            policy == null ? null : policy.risk(),
+            policy == null ? null : policy.approval());
     }
 }

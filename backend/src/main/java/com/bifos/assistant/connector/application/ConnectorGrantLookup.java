@@ -20,11 +20,13 @@ class ConnectorGrantLookup {
     private final ConnectorToolGrantRepository grants;
     private final ConnectorConversationGrantRepository conversationGrants;
 
+
     /** 그 사용자가 그 커넥터의 그 도구에 준 유효한 상시 허락이 있는가(ADR-050). */
     boolean standing(ConnectorConnection connection, String confirmedTool, Instant now) {
         return confirmedTool != null
-                && grants.existsActive(connection.userId(), connection.connectorId(), confirmedTool, now);
+            && grants.existsActive(connection.userId(), connection.connectorId(), confirmedTool, now);
     }
+
 
     /**
      * 그 실행의 대화와 에이전트에 그 도구의 유효한 대화 허락이 있는가(ADR-20261012 / conversation-grant).
@@ -33,14 +35,14 @@ class ConnectorGrantLookup {
      */
     boolean inConversation(AgentExecution origin, ConnectorConnection connection, String confirmedTool, Instant now) {
         return confirmedTool != null
-                && origin.conversationId() != null
-                && origin.agentId() != null
-                && conversationGrants.existsActive(
-                        connection.userId(),
-                        origin.conversationId(),
-                        origin.agentId(),
-                        connection.connectorId(),
-                        confirmedTool,
-                        now);
+            && origin.conversationId() != null
+            && origin.agentId() != null
+            && conversationGrants.existsActive(
+                connection.userId(),
+                origin.conversationId(),
+                origin.agentId(),
+                connection.connectorId(),
+                confirmedTool,
+                now);
     }
 }

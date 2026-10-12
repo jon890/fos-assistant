@@ -74,20 +74,21 @@ class ConnectorActionApproval {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     ConnectorActionApproval(
-            ConnectorActionRepository actions,
-            ConnectorToolGrantRepository grants,
-            ConnectorConversationGrantRepository conversationGrants,
-            ConnectorConnectionRepository connections,
-            ConnectorBindingRepository bindings,
-            AppUserRepository users,
-            HermesConnectorClient connector,
-            LiveProperties<DelegationProperties> delegation,
-            DecisionFeedbackRecorder feedback,
-            ConnectorActionDetails details,
-            ConnectorActionSignals signals,
-            TransactionTemplate transactions,
-            Clock clock) {
+        ConnectorActionRepository actions,
+        ConnectorToolGrantRepository grants,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConnectorConnectionRepository connections,
+        ConnectorBindingRepository bindings,
+        AppUserRepository users,
+        HermesConnectorClient connector,
+        LiveProperties<DelegationProperties> delegation,
+        DecisionFeedbackRecorder feedback,
+        ConnectorActionDetails details,
+        ConnectorActionSignals signals,
+        TransactionTemplate transactions,
+        Clock clock) {
         this.actions = actions;
         this.grants = grants;
         this.conversationGrants = conversationGrants;
@@ -102,6 +103,7 @@ class ConnectorActionApproval {
         this.transactions = transactions;
         this.clock = clock;
     }
+
 
     /**
      * 승인하고 저장한 인자로 한 번 실행한다.
@@ -124,7 +126,7 @@ class ConnectorActionApproval {
         Approval approval = transactions.execute(status -> beginApproval(user, actionId, grant, conversationGrant));
         // 사용자가 승인했다. 그 뒤 실행하지 못하고 끝난 줄도 사용자의 반응은 승인이다.
         feedback.record(actionFeedback(approval.action(), FeedbackEventType.APPROVED, FeedbackActor.USER)
-                .reason(grant != null ? "WITH_GRANT" : conversationGrant ? "WITH_CONVERSATION_GRANT" : null));
+            .reason(grant != null ? "WITH_GRANT" : conversationGrant ? "WITH_CONVERSATION_GRANT" : null));
         if (approval.profile() == null) {
             // 실행하지 않고 끝낸 줄이다. 그 상태를 커밋한 뒤에 알린다.
             signals.publish(approval.action());
@@ -134,21 +136,22 @@ class ConnectorActionApproval {
         CallResult result = null;
         try {
             result = connector.execute(
-                    approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.argsJson());
+                approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.argsJson());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
         } catch (RuntimeException ex) {
             // 실행됐는지 알 수 없는 것으로 둔다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다.
             log.warn(
-                    "승인한 호출의 실행이 예외로 끝났다 actionId={} kind={}",
-                    actionId,
-                    ex.getClass().getSimpleName());
+                "승인한 호출의 실행이 예외로 끝났다 actionId={} kind={}",
+                actionId,
+                ex.getClass().getSimpleName());
         }
         CallResult executed = result;
         ConnectorAction finished = transactions.execute(status -> record(actionId, executed));
         signals.publish(finished);
         return details.view(finished);
     }
+
 
     /** 승인 줄을 거절한다. 실행하지 않는다. */
     ConnectorActionView reject(CurrentUser user, UUID actionId) {
@@ -161,6 +164,7 @@ class ConnectorActionApproval {
         signals.publish(rejected);
         return details.view(rejected);
     }
+
 
     /**
      * 줄을 잠그고 승인할 수 있는지 본 뒤 {@code EXECUTING} 으로 바꾼다. 트랜잭션 안에서만 부른다.
@@ -198,10 +202,9 @@ class ConnectorActionApproval {
         }
         // 붙이고 떼는 쪽도 사용자 행을 먼저 잠그므로 여기서 본 바인딩은 커밋할 때까지 떼어지지 않는다.
         Optional<ConnectorBinding> binding = connections
-                .findByUserIdAndConnectorId(action.userId(), action.connectorId())
-                .flatMap(found -> bindings.findByAgentIdAndConnectionId(action.agentId(), found.id()));
-        Optional<ToolPolicyDecision> decision =
-                binding.flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
+            .findByUserIdAndConnectorId(action.userId(), action.connectorId())
+            .flatMap(found -> bindings.findByAgentIdAndConnectionId(action.agentId(), found.id()));
+        Optional<ToolPolicyDecision> decision = binding.flatMap(found -> manifest.map(declared -> redecide(found, declared, action)));
         if (decision.isEmpty() || decision.get().decision() == ActionDecision.DENIED) {
             action.refuse(ConnectorAction.NOT_EXECUTABLE, now);
             return Approval.refused(actions.save(action));
@@ -213,11 +216,11 @@ class ConnectorActionApproval {
                 throw grantNotAllowed();
             }
             grants.save(ConnectorToolGrant.of(
-                    action.userId(),
-                    action.connectorId(),
-                    action.toolName(),
-                    grant.expiresAt(now, HOUSEHOLD_ZONE),
-                    now));
+                action.userId(),
+                action.connectorId(),
+                action.toolName(),
+                grant.expiresAt(now, HOUSEHOLD_ZONE),
+                now));
         }
         if (conversationGrant) {
             // 상시 허락과 같이 지금 정책으로 다시 본다. 그 사이 선언이 밖으로 나가는 도구로 바뀌었으면 주지 않는다.
@@ -230,6 +233,7 @@ class ConnectorActionApproval {
         return new Approval(actions.save(action), binding.get().agent().hermesProfile());
     }
 
+
     /**
      * 상시 허락은 없는 것으로 두고 지금 정책으로 다시 판정한다. 허락이 있어 통과하는 호출은 승인 줄이 되지 않는다.
      *
@@ -239,16 +243,17 @@ class ConnectorActionApproval {
      * 줄은 사람이 승인한 것이라 보통 실행의 줄과 같게 판정한다.
      */
     private static ToolPolicyDecision redecide(
-            ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action) {
+        ConnectorBinding binding, ConnectorManifest manifest, ConnectorAction action) {
         return ToolPolicyDecision.decide(
-                ConnectorPolicyService.usableStatus(binding.connection(), binding),
-                ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
-                manifest.schema(),
-                ConnectorToolPolicies.find(manifest, action.toolName()),
-                false,
-                action.argsJson().getBytes(StandardCharsets.UTF_8).length,
-                CheckBoundary.NOT_CHECK);
+            ConnectorPolicyService.usableStatus(binding.connection(), binding),
+            ConnectorPolicyService.ownServerTool(manifest, action.hermesTool()),
+            manifest.schema(),
+            ConnectorToolPolicies.find(manifest, action.toolName()),
+            false,
+            action.argsJson().getBytes(StandardCharsets.UTF_8).length,
+            CheckBoundary.NOT_CHECK);
     }
+
 
     /**
      * 실행 결과를 줄에 적는다. 트랜잭션 안에서만 부른다.
@@ -257,8 +262,7 @@ class ConnectorActionApproval {
      */
     private ConnectorAction record(UUID actionId, CallResult result) {
         Instant now = now();
-        ConnectorAction action =
-                actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
+        ConnectorAction action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.EXECUTING) {
             // 실행하는 동안 기동 정리가 이 줄을 이미 끝냈다. 그 상태를 그대로 둔다.
             return action;
@@ -272,14 +276,15 @@ class ConnectorActionApproval {
         } else {
             // 커넥터가 선언한 코드와 복구 계약만 저장한다. 외부 서비스의 오류 원문은 이 값에 들어오지 못한다(ADR-092).
             action.fail(
-                    result.error().word(),
-                    result.detail() == null ? null : result.detail().toStored(),
-                    now);
+                result.error().word(),
+                result.detail() == null ? null : result.detail().toStored(),
+                now);
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_FAILED, FeedbackActor.SYSTEM)
-                    .reason(action.errorCode()));
+                .reason(action.errorCode()));
         }
         return actions.save(action);
     }
+
 
     /**
      * 승인 줄의 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 인자 해시다. 인자와 결과 글은 담지 않는다.
@@ -287,11 +292,12 @@ class ConnectorActionApproval {
      */
     private FeedbackEntry actionFeedback(ConnectorAction action, FeedbackEventType type, FeedbackActor actor) {
         return FeedbackEntry.of(
-                        action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(), type, actor, now())
-                .conversation(action.conversationId())
-                .originExecution(action.originExecutionId())
-                .version(action.argsSha256());
+            action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(), type, actor, now())
+            .conversation(action.conversationId())
+            .originExecution(action.originExecutionId())
+            .version(action.argsSha256());
     }
+
 
     /** 위임 답과 같은 상한으로 자른다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private String clip(String text) {
@@ -302,28 +308,33 @@ class ConnectorActionApproval {
         return text.substring(0, Character.isHighSurrogate(text.charAt(max - 1)) ? max - 1 : max);
     }
 
+
     /** 줄을 잠그고 읽는다. 없는 줄과 남의 줄은 같은 응답이다. 트랜잭션 안에서만 부른다. */
     private ConnectorAction requirePending(CurrentUser user, UUID actionId) {
         ConnectorAction action = actions.findByPublicIdForUpdate(actionId)
-                .filter(found -> found.userId().equals(user.id()))
-                .orElseThrow(ConnectorActionDetails::notFound);
+            .filter(found -> found.userId().equals(user.id()))
+            .orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.PENDING) {
             throw notPending();
         }
         return action;
     }
 
+
     private Instant now() {
         return Instant.now(clock);
     }
+
 
     private static ApiException notPending() {
         return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, NOT_PENDING_MESSAGE);
     }
 
+
     private static ApiException grantNotAllowed() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "this tool cannot be granted this approval");
     }
+
 
     /**
      * 승인의 첫 트랜잭션이 낸 결과다.

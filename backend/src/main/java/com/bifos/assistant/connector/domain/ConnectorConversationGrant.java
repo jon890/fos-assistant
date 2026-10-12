@@ -21,13 +21,13 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "connector_conversation_grant",
-        indexes = {
-            @Index(
-                    name = "idx_connector_conversation_grant_lookup",
-                    columnList = "conversation_id, agent_id, connector_id, tool_name"),
-            @Index(name = "idx_connector_conversation_grant_connector", columnList = "user_id, connector_id")
-        })
+    name = "connector_conversation_grant",
+    indexes = {
+        @Index(
+            name = "idx_connector_conversation_grant_lookup",
+            columnList = "conversation_id, agent_id, connector_id, tool_name"),
+        @Index(name = "idx_connector_conversation_grant_connector", columnList = "user_id, connector_id")
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -68,6 +68,7 @@ public class ConnectorConversationGrant {
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
+
     public static ConnectorConversationGrant of(ConnectorAction action, Instant expiresAt, Instant now) {
         ConnectorConversationGrant grant = new ConnectorConversationGrant();
         grant.userId = action.userId();
@@ -80,6 +81,7 @@ public class ConnectorConversationGrant {
         grant.createdAt = now;
         return grant;
     }
+
 
     /** 이미 거둔 허락은 처음 거둔 시각을 그대로 둔다. */
     public void revoke(Instant now) {
