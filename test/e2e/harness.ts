@@ -34,6 +34,8 @@ export type Context = {
    * <p>데이터베이스는 파일이라 남지만 메모리에만 있던 turn 잠금과 SSE 구독이 사라진다.
    */
   restartControlPlane(): Promise<void>;
+  /** 지금까지 쌓인 Control Plane 로그 전체. 본문 없는 단계 사건을 모으는 시나리오가 읽는다 */
+  readBackendLog(): Promise<string>;
 };
 
 export type Scenario = {

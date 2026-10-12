@@ -214,3 +214,49 @@ export function mediaMetadataCases(): MediaFixture[] {
     },
   ];
 }
+
+export type SpecialMediaCase = {
+  assetKey:
+    | "sign-hires"
+    | "landscape"
+    | "identical-a"
+    | "identical-b"
+    | "near-a"
+    | "near-b";
+  format: "JPEG" | "PNG";
+  expectedMarker: number;
+  fileName: string;
+  width: number;
+  height: number;
+  byteLength: number;
+  bytesSha256: string;
+  recoveredId: number | null;
+  preparedWidth: number;
+  preparedHeight: number;
+  preparedRecoveredId: number | null;
+  /** 표식 밖의 검은 화소 수. 0 이면 글씨가 없는 사진이다 */
+  textPixels: number;
+  labelTextOriginal: boolean;
+  labelTextPrepared: boolean;
+  menuTextOriginal: boolean;
+  menuTextPrepared: boolean;
+};
+
+/**
+ * 고해상도 간판, 글씨 없는 풍경, 바이트가 같은 두 장, 몇 화소만 다른 두 장을 만든다.
+ * 각 측정은 JDK 가 실제 파일과 Control Plane 사본 규격으로 줄인 사본을 다시 읽어 얻는다.
+ */
+export function createSpecialMediaCases(tempDir: string): SpecialMediaCase[] {
+  const cases: SpecialMediaCase[] = JSON.parse(
+    runGenerator(["special", tempDir]),
+  );
+  for (const item of cases) {
+    const bytes = readFileSync(join(tempDir, item.fileName));
+    requireSourceByteLength(bytes, item.byteLength);
+    if (
+      createHash("sha256").update(bytes).digest("hex") !== item.bytesSha256
+    )
+      throw new Error("합성 바이트 검증 실패");
+  }
+  return cases;
+}
