@@ -7,6 +7,7 @@ import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
@@ -55,6 +56,7 @@ public class ConnectorActionService {
     @Autowired
     public ConnectorActionService(
             ConnectorActionRepository actions,
+            ConnectorActionExecutionRepository contents,
             ConnectorToolGrantRepository grants,
             ConnectorConnectionRepository connections,
             ConnectorBindingRepository bindings,
@@ -69,6 +71,7 @@ public class ConnectorActionService {
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
+                contents,
                 grants,
                 connections,
                 bindings,
@@ -86,6 +89,7 @@ public class ConnectorActionService {
 
     public ConnectorActionService(
             ConnectorActionRepository actions,
+            ConnectorActionExecutionRepository contents,
             ConnectorToolGrantRepository grants,
             ConnectorConnectionRepository connections,
             ConnectorBindingRepository bindings,
@@ -115,7 +119,7 @@ public class ConnectorActionService {
                 signals,
                 transactions,
                 clock);
-        this.lifecycle = new ConnectorActionLifecycle(actions, grants, details, signals, transactions, clock);
+        this.lifecycle = new ConnectorActionLifecycle(actions, contents, users, grants, details, signals, transactions, clock);
     }
 
     /**
