@@ -131,6 +131,9 @@ export async function editorDocument(
   }
 }
 
+/** 새 편집기에 놓일 수 있는 구성요소 종류. 그 밖의 종류가 있으면 쓰던 글로 본다. */
+const EMPTY_KINDS = new Set(["documentTitle", "text"]);
+
 /** 문단 배열에 공백 밖의 글자가 있는지 본다. 모르는 모양은 글이 없는 것으로 읽는다. */
 function hasText(paragraphs: unknown) {
   if (!Array.isArray(paragraphs)) return false;
@@ -149,7 +152,7 @@ function hasText(paragraphs: unknown) {
 /**
  * 글을 불러오기 전에 새 탭의 편집기가 비었는지 본다. 읽기 도구가 사용자가 쓰던 글 위에 다른 글을 싣지 않게 한다.
  * 편집기 객체를 읽지 못하면 누르기 전에 `editor_failed` 다. 불러온 뒤에야 모양이 바뀐 것을 알면 그 사이 자동저장이 돌 수 있다.
- * 제목이나 글 문단에 글자가 있거나 문서 번호가 글 번호 모양이면 「작성 중인 글」 알림이 없어도 `NAVER_BLOG_EDITOR_IN_USE` 다.
+ * 제목이나 글 문단에 글자가 있거나, 사진처럼 글이 아닌 구성요소가 있거나, 문서 번호가 글 번호 모양이면 「작성 중인 글」 알림이 없어도 `NAVER_BLOG_EDITOR_IN_USE` 다.
  */
 export async function assertEmptyEditor(page: EditorPage) {
   const doc = await editorDocument(page);
@@ -157,7 +160,10 @@ export async function assertEmptyEditor(page: EditorPage) {
   const written =
     Array.isArray(components) &&
     components.some(
-      (component) => hasText(component?.title) || hasText(component?.value),
+      (component) =>
+        hasText(component?.title) ||
+        hasText(component?.value) ||
+        !EMPTY_KINDS.has(String(component?.["@ctype"] ?? "")),
     );
   if (written || DRAFT_ID_PATTERN.test(String(doc.documentId ?? "")))
     throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");

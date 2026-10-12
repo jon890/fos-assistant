@@ -519,3 +519,23 @@ test("읽기 앞뒤 목록 비교는 수나 고친 시각이 바뀌거나 글이
     changed: true,
   });
 });
+
+test("새 탭의 편집기에 사진만 남아 있어도 불러오지 않고 NAVER_BLOG_EDITOR_IN_USE 다", async () => {
+  const { cdp, editor, env, otherTab } = await setup();
+  editor.document = {
+    document: {
+      components: [
+        { "@ctype": "documentTitle", title: [paragraph("")] },
+        { "@ctype": "image", id: "SE-left" },
+      ],
+    },
+  };
+
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+
+  expect((error as ToolError).code).toBe("NAVER_BLOG_EDITOR_IN_USE");
+  expect(editor.loaded).toBeNull();
+  expectOnlyOwnTabClosed(cdp, otherTab);
+});
