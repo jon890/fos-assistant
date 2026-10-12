@@ -456,6 +456,8 @@ sequenceDiagram
 [ADR-20261010 / attachment-inspect](../adr/ADR-20261010-attachment-inspect.md)가 권한과 실패 계약을 정한다.
 모델은 첨부 참조와 선택 `region=[x1,y1,x2,y2]` 또는 `overview=true`를 고른다. 좌표는 회전된 원본 표시 방향이며 오른쪽·아래 끝은 제외한다.
 서버는 현재 실행의 사용자와 대화에서 보낸 원본만 읽으며 다른 대화, 미전송, 삭제·만료된 첨부는 거절한다.
+`AttachmentService`가 원본을 읽기 전후에 권한과 SQL 상태를 확인한다.
+`AttachmentInspection`은 개요·GIF/WebP에 전달할 원본 bytes를 읽고 20MiB 상한, 저장 크기와 MIME magic을 검사한다.
 최상위 session을 압축했거나 다음 turn을 시작해도 현재 실행에서 다시 조회한다. 옛 실행의 서명은 쓰지 못한다.
 
 한도를 넘는 전체 사진은 작은 영역으로 한 번만 다시 조회한다. 한 사진은 최대 3회이며

@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -64,5 +65,27 @@ class ContentDraftInputReaderTest {
             ((ArrayNode)node.get("blocks")).add(json.createObjectNode().put("type", "paragraph").put("text", line));
             assertThatThrownBy(() -> reader.read(node)).isInstanceOf(ApiException.class);
         }
+    }
+
+
+    @Test
+    @DisplayName("같은 assetId를 두 이미지 블록에 두면 고정 코드와 문구로 거절하고 서로 다른 사진은 받는다")
+    void rejectsDuplicatePhotoAssetsWithStableCode() {
+        var duplicated = reader.read(json.readTree("""
+            {"title":"제목","category":"분류","tags":[],"blocks":[
+              {"type":"image","assetId":"7"},{"type":"paragraph","text":"사이"},
+              {"type":"image","assetId":"7","caption":"다른 설명"}]}
+            """));
+        assertThatThrownBy(() -> ContentDraftInputReader.requireUniquePhotos(duplicated))
+            .isInstanceOfSatisfying(ApiException.class, ex -> {
+                assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO);
+                assertThat(ex.getMessage()).isEqualTo(ContentDraftInputReader.DUPLICATE_PHOTO_MESSAGE)
+                    .contains("한 번만").contains("지우고");
+            });
+        var distinct = reader.read(json.readTree("""
+            {"title":"제목","category":"분류","tags":[],"blocks":[
+              {"type":"image","assetId":"7"},{"type":"image","assetId":"8"},{"type":"sticker","code":"a"},{"type":"sticker","code":"a"}]}
+            """));
+        ContentDraftInputReader.requireUniquePhotos(distinct);
     }
 }

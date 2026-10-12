@@ -21,7 +21,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run -d --name "${NAME}" \
+# 표식은 비정상 종료로 trap 이 돌지 못해 남은 컨테이너를 scripts/finish-task.sh 가 찾는 데 쓴다.
+docker run -d --name "${NAME}" --label fos-assistant.temp=mysql-migration-check \
   -e MYSQL_ROOT_PASSWORD="${ROOT_PASSWORD}" \
   -p 127.0.0.1::3306 \
   --health-cmd "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p${ROOT_PASSWORD} --silent" \

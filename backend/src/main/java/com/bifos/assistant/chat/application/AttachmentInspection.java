@@ -14,6 +14,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.SequenceInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +40,7 @@ public class AttachmentInspection {
     private final AttachmentStore store;
     private final Semaphore decoding = new Semaphore(1, true);
 
+
     /** 매 turn에 복원할 표시 크기다. 크기와 방향만 읽고 영상은 디코딩하지 않는다. */
     public String displaySize(ChatAttachment attachment) {
         if (!attachment.isVisible()) {
@@ -46,20 +49,57 @@ public class AttachmentInspection {
         try (InputStream in = store.open(attachment)) {
             byte[] header = in.readNBytes(256 * 1024);
             int orientation = AgentImageResizer.isPng(header)
-                    ? AgentImageResizer.pngOrientation(
-                            new SequenceInputStream(new ByteArrayInputStream(header), in), MAX_SOURCE_BYTES)
-                    : AgentImageResizer.orientation(header);
+                ? AgentImageResizer.pngOrientation(
+                    new SequenceInputStream(new ByteArrayInputStream(header), in), MAX_SOURCE_BYTES)
+                : AgentImageResizer.orientation(header);
             return AgentImageResizer.dimensions(header)
-                    .map(size -> orientation >= 5 ? size.height + "x" + size.width : size.width + "x" + size.height)
-                    .orElse("확인 불가");
+                .map(size -> orientation >= 5 ? size.height + "x" + size.width : size.width + "x" + size.height)
+                .orElse("확인 불가");
         } catch (IOException | RuntimeException ex) {
             return "확인 불가";
         }
     }
 
+
+    /** 디코딩 없이 원본을 읽고 크기와 MIME magic을 확인한다. 권한과 상태 재검증은 서비스가 맡는다. */
+    InspectedImage readRaw(ChatAttachment attachment) {
+        int limit = 20 * 1024 * 1024;
+        try (InputStream in = store.open(attachment)) {
+            byte[] raw = in.readNBytes(limit + 1);
+            boolean magic = switch (attachment.contentType()) {
+                case "image/gif" ->
+                    raw.length >= 6 && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
+                case "image/webp" ->
+                    raw.length >= 12
+                        && raw[0] == 'R'
+                        && raw[1] == 'I'
+                        && raw[2] == 'F'
+                        && raw[3] == 'F'
+                        && raw[8] == 'W'
+                        && raw[9] == 'E'
+                        && raw[10] == 'B'
+                        && raw[11] == 'P';
+                case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte)0xff && raw[1] == (byte)0xd8;
+                case "image/png" ->
+                    raw.length >= 8
+                        && Arrays.equals(
+                            Arrays.copyOf(raw, 8), new byte[] {(byte)0x89, 'P', 'N', 'G', 13, 10, 26, 10});
+                default -> false;
+            };
+            if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {
+                throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "invalid original image");
+            }
+            return new InspectedImage(attachment.contentType(), raw);
+        } catch (IOException ex) {
+            throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "could not read original image", ex);
+        }
+    }
+
+
     public InspectedImage read(ChatAttachment attachment, List<Integer> region) {
         return read(attachment, region, () -> true);
     }
+
 
     public InspectedImage read(ChatAttachment attachment, List<Integer> region, BooleanSupplier active) {
         if (!List.of("image/jpeg", "image/png").contains(attachment.contentType())) {
@@ -78,6 +118,7 @@ public class AttachmentInspection {
             decoding.release();
         }
     }
+
 
     private void acquire(BooleanSupplier active) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
@@ -105,6 +146,7 @@ public class AttachmentInspection {
         }
     }
 
+
     static InspectedImage inspect(byte[] original, String mime, List<Integer> region) throws IOException {
         try (ImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(original))) {
             var readers = ImageIO.getImageReaders(input);
@@ -114,7 +156,7 @@ public class AttachmentInspection {
             ImageReader reader = readers.next();
             try {
                 if (!("JPEG".equalsIgnoreCase(reader.getFormatName()) && "image/jpeg".equals(mime))
-                        && !("PNG".equalsIgnoreCase(reader.getFormatName()) && "image/png".equals(mime))) {
+                    && !("PNG".equalsIgnoreCase(reader.getFormatName()) && "image/png".equals(mime))) {
                     throw invalid("original image format does not match its stored type");
                 }
                 boolean[] warning = {false};
@@ -153,6 +195,7 @@ public class AttachmentInspection {
                         super.write(value);
                     }
 
+
                     @Override
                     public void write(byte[] bytes, int offset, int length) throws IOException {
                         if (getStreamPosition() + length > MAX_OUTPUT_BYTES) {
@@ -186,40 +229,43 @@ public class AttachmentInspection {
         }
     }
 
+
     private static Rectangle sourceRegion(int width, int height, int orientation, List<Integer> region) {
         Dimension display = orientation >= 5 ? new Dimension(height, width) : new Dimension(width, height);
         if (region == null) {
             return new Rectangle(0, 0, width, height);
         }
         if (region.size() != 4
-                || region.stream().anyMatch(n -> n == null || n < 0)
-                || region.get(2) <= region.get(0)
-                || region.get(3) <= region.get(1)
-                || region.get(2) > display.width
-                || region.get(3) > display.height) {
+            || region.stream().anyMatch(n -> n == null || n < 0)
+            || region.get(2) <= region.get(0)
+            || region.get(3) <= region.get(1)
+            || region.get(2) > display.width
+            || region.get(3) > display.height) {
             throw invalid("region is outside original display coordinates");
         }
         try {
             var inverse = AgentImageResizer.orientationTransform(orientation, width, height)
-                    .createInverse();
+                .createInverse();
             Point2D first = inverse.transform(new Point2D.Double(region.get(0), region.get(1)), null);
             Point2D last = inverse.transform(new Point2D.Double(region.get(2), region.get(3)), null);
             return new Rectangle(
-                    (int) Math.min(first.getX(), last.getX()),
-                    (int) Math.min(first.getY(), last.getY()),
-                    (int) Math.abs(first.getX() - last.getX()),
-                    (int) Math.abs(first.getY() - last.getY()));
+                (int)Math.min(first.getX(), last.getX()),
+                (int)Math.min(first.getY(), last.getY()),
+                (int)Math.abs(first.getX() - last.getX()),
+                (int)Math.abs(first.getY() - last.getY()));
         } catch (NoninvertibleTransformException ex) {
             throw invalid("invalid image orientation");
         }
     }
 
+
     private static ApiException invalid(String message) {
         return new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, message);
     }
 
+
     private static ApiException limit() {
         return new ApiException(
-                ErrorCode.ATTACHMENT_INSPECTION_LIMIT, "select a smaller region in original display coordinates");
+            ErrorCode.ATTACHMENT_INSPECTION_LIMIT, "select a smaller region in original display coordinates");
     }
 }

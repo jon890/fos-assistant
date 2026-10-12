@@ -63,6 +63,7 @@ public class ContentDraftService {
     public ContentDraftView create(CurrentUser user, Long conversationId, ContentDraftInput input) {
         requireWritable(user, conversationId);
         var accepted = reader.read(json.valueToTree(input));
+        ContentDraftInputReader.requireUniquePhotos(accepted);
         UUID id = UUID.randomUUID();
         mutations.run(user.id(), target(conversationId), () -> {
             requireWritable(user, conversationId);
@@ -81,6 +82,7 @@ public class ContentDraftService {
         }
         requireWritable(user, context.conversationId());
         var accepted = reader.read(json.valueToTree(input));
+        ContentDraftInputReader.requireUniquePhotos(accepted);
         byte[] hash = ContentDraftCreationContext.requestHash(accepted);
         ReadResult result;
         try {
@@ -186,6 +188,7 @@ public class ContentDraftService {
             throw ContentDraftInputReader.invalid();
         }
         var accepted = reader.read(json.valueToTree(input));
+        ContentDraftInputReader.requireUniquePhotos(accepted);
         var error = mutations.run(user.id(), target(conversationId), () -> {
             requireWritable(user, conversationId);
             var draft = requireDraft(user, conversationId, id);

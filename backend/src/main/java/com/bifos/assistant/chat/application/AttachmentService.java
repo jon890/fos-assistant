@@ -11,11 +11,9 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,68 +54,39 @@ public class AttachmentService {
     private final AttachmentCleaner cleaner;
     private final PlatformTransactionManager transactions;
 
+
     /** 보낸 원본만 읽는다. 만료된 파일이 아직 정리되지 않았어도 도구에는 주지 않는다. */
     public InspectedImage inspect(CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region) {
         return inspect(user, conversationId, attachmentId, region, () -> true);
     }
 
+
     /** decode 차례를 기다리는 동안에도 실행 취소를 검사한다. */
     public InspectedImage inspect(
-            CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
+        CurrentUser user, Long conversationId, Long attachmentId, List<Integer> region, BooleanSupplier active) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
-        InspectedImage result =
-                "image/gif".equals(attachment.contentType()) || "image/webp".equals(attachment.contentType())
-                        ? readRaw(attachment)
-                        : inspection.read(attachment, region, active);
+        InspectedImage result = "image/gif".equals(attachment.contentType()) || "image/webp".equals(attachment.contentType())
+            ? inspection.readRaw(attachment)
+            : inspection.read(attachment, region, active);
         requireInspectable(user, conversationId, attachmentId);
         return result;
     }
 
+
     /** 명시적으로 요청한 개요는 원본을 그대로 넘겨 Pillow에서 표시 방향으로 줄인다. */
     public InspectedImage inspectOverview(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireInspectable(user, conversationId, attachmentId);
-        InspectedImage result = readRaw(attachment);
+        InspectedImage result = inspection.readRaw(attachment);
         requireInspectable(user, conversationId, attachmentId);
         return result;
     }
+
 
     /** 변환 진행 중에도 원본을 읽지 않고 SQL 상태만 다시 확인한다. */
     public void validateInspection(CurrentUser user, Long conversationId, Long attachmentId) {
         requireInspectable(user, conversationId, attachmentId);
     }
 
-    private InspectedImage readRaw(ChatAttachment attachment) {
-        int limit = 20 * 1024 * 1024;
-        try (InputStream in = store.open(attachment)) {
-            byte[] raw = in.readNBytes(limit + 1);
-            boolean magic = switch (attachment.contentType()) {
-                case "image/gif" ->
-                    raw.length >= 6 && new String(raw, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
-                case "image/webp" ->
-                    raw.length >= 12
-                            && raw[0] == 'R'
-                            && raw[1] == 'I'
-                            && raw[2] == 'F'
-                            && raw[3] == 'F'
-                            && raw[8] == 'W'
-                            && raw[9] == 'E'
-                            && raw[10] == 'B'
-                            && raw[11] == 'P';
-                case "image/jpeg" -> raw.length >= 2 && raw[0] == (byte) 0xff && raw[1] == (byte) 0xd8;
-                case "image/png" ->
-                    raw.length >= 8
-                            && Arrays.equals(
-                                    Arrays.copyOf(raw, 8), new byte[] {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10});
-                default -> false;
-            };
-            if (raw.length == 0 || raw.length > limit || raw.length != attachment.byteSize() || !magic) {
-                throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "invalid original image");
-            }
-            return new InspectedImage(attachment.contentType(), raw);
-        } catch (IOException ex) {
-            throw new ApiException(ErrorCode.ATTACHMENT_INSPECTION_FAILED, "could not read original image", ex);
-        }
-    }
 
     private ChatAttachment requireInspectable(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireOwnAttachment(user, conversationId, attachmentId);
@@ -133,6 +102,7 @@ public class AttachmentService {
         return attachment;
     }
 
+
     /**
      * 사진 한 장을 올린다.
      *
@@ -141,24 +111,23 @@ public class AttachmentService {
      */
     @Transactional
     public ChatAttachment upload(
-            CurrentUser user,
-            Long conversationId,
-            String originalName,
-            String contentType,
-            long byteSize,
-            InputStreamSource body) {
+        CurrentUser user,
+        Long conversationId,
+        String originalName,
+        String contentType,
+        long byteSize,
+        InputStreamSource body) {
         access.requireOwnForUpload(user, conversationId);
         String normalizedType = normalize(contentType);
         String extension = AttachmentStore.extensionFor(normalizedType)
-                .orElseThrow(() -> new ApiException(
-                        ErrorCode.VALIDATION_FAILED, "only jpeg, png, gif and webp images are accepted"));
+            .orElseThrow(() -> new ApiException(
+                ErrorCode.VALIDATION_FAILED, "only jpeg, png, gif and webp images are accepted"));
         if (byteSize > properties.maxBytes()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "the image is larger than the limit");
         }
         // 상한은 한 번 보낼 때의 장수다. 대화 전체를 세면 이미 보낸 사진 때문에 보관 기간 내내 더
         // 올리지 못한다.
-        if (attachments.countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(conversationId)
-                >= properties.maxFiles()) {
+        if (attachments.countByConversationIdAndMessageIdIsNullAndDeletedAtIsNull(conversationId) >= properties.maxFiles()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "too many images are waiting to be sent");
         }
 
@@ -177,13 +146,13 @@ public class AttachmentService {
         }
         Instant now = clock.instant();
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                conversationId,
-                user.id(),
-                displayName(originalName),
-                normalizedType,
-                byteSize,
-                now.plus(Duration.ofDays(properties.retentionDays())),
-                now));
+            conversationId,
+            user.id(),
+            displayName(originalName),
+            normalizedType,
+            byteSize,
+            now.plus(Duration.ofDays(properties.retentionDays())),
+            now));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), extension));
 
         try (InputStream in = jpeg == null ? body.getInputStream() : new ByteArrayInputStream(jpeg)) {
@@ -194,6 +163,7 @@ public class AttachmentService {
         return attachment;
     }
 
+
     /**
      * 올린 사진의 줄인 사본을 만든다. 만들지 못해도 실패하지 않는다.
      *
@@ -203,6 +173,7 @@ public class AttachmentService {
     public void prepareSmall(ChatAttachment attachment) {
         images.prepareSmall(attachment);
     }
+
 
     /** 사진 한 장의 본문을 연다. 지워졌으면 있었다는 것만 알린다. */
     public AttachmentContent read(CurrentUser user, Long conversationId, Long attachmentId) {
@@ -226,11 +197,13 @@ public class AttachmentService {
         }
     }
 
+
     /** 보관 기간을 기다리지 않고 지운다. 이미 지워졌으면 아무것도 하지 않는다. 행은 남긴다. */
     public void deleteByUser(CurrentUser user, Long conversationId, Long attachmentId) {
         ChatAttachment attachment = requireOwnAttachment(user, conversationId, attachmentId);
         cleaner.delete(attachment, clock.instant(), () -> requireOwnAttachment(user, conversationId, attachmentId));
     }
+
 
     /**
      * 이 첨부들을 이 대화의 메시지에 묶을 수 있는지 메시지를 저장하기 전에 판정한다.
@@ -245,22 +218,23 @@ public class AttachmentService {
             return List.of();
         }
         if (attachmentIds.size() > properties.maxFiles()
-                || new HashSet<>(attachmentIds).size() != attachmentIds.size()) {
+            || new HashSet<>(attachmentIds).size() != attachmentIds.size()) {
             throw notAttachable();
         }
         List<ChatAttachment> found = attachments.findByConversationIdAndIdIn(conversationId, attachmentIds);
         boolean allFree = found.size() == attachmentIds.size()
-                && found.stream()
-                        .allMatch(it -> it.messageId() == null
-                                && it.isVisible()
-                                && readable(it.id(), conversationId, it.uploadedByUserId()));
+            && found.stream()
+                .allMatch(it -> it.messageId() == null
+                    && it.isVisible()
+                    && readable(it.id(), conversationId, it.uploadedByUserId()));
         if (!allFree) {
             throw notAttachable();
         }
         return found.stream()
-                .sorted(Comparator.comparingInt(it -> attachmentIds.indexOf(it.id())))
-                .toList();
+            .sorted(Comparator.comparingInt(it -> attachmentIds.indexOf(it.id())))
+            .toList();
     }
+
 
     /**
      * 저장한 메시지에 첨부들을 묶는다.
@@ -275,12 +249,13 @@ public class AttachmentService {
         }
         for (int position = 0; position < attachmentIds.size(); position++) {
             int updated = attachments.attachToMessageAtPosition(
-                    messageId, conversationId, attachmentIds.get(position), position);
+                messageId, conversationId, attachmentIds.get(position), position);
             if (updated != 1) {
                 throw notAttachable();
             }
         }
     }
+
 
     /**
      * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름, 사진을 어떻게 볼지를 사용자가 쓴 글 앞에 붙인다.
@@ -301,91 +276,89 @@ public class AttachmentService {
      */
     public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
         List<ChatAttachment> sent = allOf(conversationId).stream()
-                .filter(it -> it.messageId() != null)
-                .toList();
+            .filter(it -> it.messageId() != null)
+            .toList();
         if (sent.isEmpty()) {
             return new AgentInput(text, List.of());
         }
         attached = attached == null ? List.of() : attached;
         Long ownerUserId = sent.getFirst().uploadedByUserId();
         boolean sameOwnerAndConversation = attached.stream()
-                .allMatch(attachment -> ownerUserId.equals(attachment.uploadedByUserId())
-                        && conversationId.equals(attachment.conversationId()));
+            .allMatch(attachment -> ownerUserId.equals(attachment.uploadedByUserId())
+                && conversationId.equals(attachment.conversationId()));
         if (!sameOwnerAndConversation) {
             throw notAttachable();
         }
         String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
-                + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
+            + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
-        Map<Long, AgentPhoto> prepared =
-                images.photos(attached.stream().filter(this::inspectable).toList(), order, embedImages).stream()
-                        .collect(Collectors.toMap(AgentPhoto::attachmentId, photo -> photo));
+        Map<Long, AgentPhoto> prepared = images.photos(attached.stream().filter(this::inspectable).toList(), order, embedImages).stream()
+            .collect(Collectors.toMap(AgentPhoto::attachmentId, photo -> photo));
         List<AgentPhoto> photos = attached.stream()
-                .map(attachment -> inspectable(attachment) && prepared.containsKey(attachment.id())
-                        ? prepared.get(attachment.id())
-                        : new AgentPhoto(attachment.id(), order.get(attachment.id()), null, null))
-                .toList();
+            .map(attachment -> inspectable(attachment) && prepared.containsKey(attachment.id())
+                ? prepared.get(attachment.id())
+                : new AgentPhoto(attachment.id(), order.get(attachment.id()), null, null))
+            .toList();
         String files = sent.stream()
-                .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id()
-                        + (inspectable(it)
-                                ? ", 원본 표시 크기=" + inspection.displaySize(it) + ", 파일=" + it.storedName() + " (올린 이름: "
-                                        + it.originalName() + ")"
-                                : " [보관 종료]"))
-                .collect(Collectors.joining("\n"));
+            .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id()
+                + (inspectable(it)
+                    ? ", 원본 표시 크기=" + inspection.displaySize(it) + ", 파일=" + it.storedName() + " (올린 이름: "
+                        + it.originalName() + ")"
+                    : " [보관 종료]"))
+            .collect(Collectors.joining("\n"));
         String input = "[이 대화의 사진 참조]\n"
-                + directory + "\n"
-                + files + "\n"
-                + "\n"
-                + photoGuidance(directory, photos, embedImages)
-                + (embedImages
-                        ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
-                                + "GIF/WebP는 첫 표시 프레임만 본다. 움직임과 뒤 프레임을 확인했다고 답하지 않는다.\n"
-                                + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
-                                + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
-                                + "큰 사진의 위치를 모르면 overview=true로 축소 전체 개요를 먼저 보고 원본 region을 고른다."
-                                + " overview와 region은 함께 쓰지 않는다. 개요만 보고 작은 글자를 읽었다고 하지 않는다.\n"
-                                + "한도 오류는 개요 또는 작은 영역으로 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
-                                + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
-                                + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
-                        : "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
-                                + " read_file 로 읽지 않는다.\n")
-                + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
-                + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
-                + "\n"
-                + text;
+            + directory + "\n"
+            + files + "\n"
+            + "\n"
+            + photoGuidance(directory, photos, embedImages)
+            + (embedImages
+                ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
+                    + "GIF/WebP는 첫 표시 프레임만 본다. 움직임과 뒤 프레임을 확인했다고 답하지 않는다.\n"
+                    + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
+                    + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
+                    + "큰 사진의 위치를 모르면 overview=true로 축소 전체 개요를 먼저 보고 원본 region을 고른다."
+                    + " overview와 region은 함께 쓰지 않는다. 개요만 보고 작은 글자를 읽었다고 하지 않는다.\n"
+                    + "한도 오류는 개요 또는 작은 영역으로 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
+                    + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
+                    + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
+                : "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
+                    + " read_file 로 읽지 않는다.\n")
+            + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
+            + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
+            + "\n"
+            + text;
         List<HermesImage> hermesImages = photos.stream()
-                .filter(AgentPhoto::embedded)
-                .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl()))
-                .toList();
+            .filter(AgentPhoto::embedded)
+            .map(photo -> new HermesImage(photo.ordinal() + "번째 사진", photo.dataUrl()))
+            .toList();
         return new AgentInput(input, hermesImages);
     }
+
 
     /**
      * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. {@code embedImages} 가 참이면 싣지 못한 사진의 순번을 한
      * 줄에 적고 원본 도구로 조회하게 한다. 거짓(흐름)이면 기존 사본 경로 안내를 유지한다.
      */
     private static String photoGuidance(String directory, List<AgentPhoto> photos, boolean embedImages) {
-        StringBuilder guidance =
-                new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
+        StringBuilder guidance = new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
         List<AgentPhoto> embedded = photos.stream().filter(AgentPhoto::embedded).toList();
         if (!embedded.isEmpty()) {
             guidance.append("이 메시지에 이미지로 함께 실은 사진: ")
-                    .append(embedded.stream()
-                            .map(photo -> photo.ordinal() + "번째")
-                            .collect(Collectors.joining(", ")))
-                    .append(" 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n");
+                .append(embedded.stream()
+                    .map(photo -> photo.ordinal() + "번째")
+                    .collect(Collectors.joining(", ")))
+                .append(" 사진. 이미 보이므로 파일로 다시 읽지 않아도 된다.\n");
         }
-        List<AgentPhoto> notEmbedded =
-                photos.stream().filter(photo -> !photo.embedded()).toList();
+        List<AgentPhoto> notEmbedded = photos.stream().filter(photo -> !photo.embedded()).toList();
         if (notEmbedded.isEmpty()) {
             return guidance.toString();
         }
         if (embedImages) {
             guidance.append("입력에 싣지 못한 사진: ")
-                    .append(notEmbedded.stream()
-                            .map(photo -> photo.ordinal() + "번째")
-                            .collect(Collectors.joining(", ")))
-                    .append(" 사진. attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n");
+                .append(notEmbedded.stream()
+                    .map(photo -> photo.ordinal() + "번째")
+                    .collect(Collectors.joining(", ")))
+                .append(" 사진. attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n");
         } else {
             guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
             for (AgentPhoto photo : notEmbedded) {
@@ -393,32 +366,35 @@ public class AttachmentService {
                     continue;
                 }
                 guidance.append("- ")
-                        .append(photo.ordinal())
-                        .append("번째 사진: ")
-                        .append(directory)
-                        .append("/")
-                        .append(photo.agentFileName())
-                        .append("\n");
+                    .append(photo.ordinal())
+                    .append("번째 사진: ")
+                    .append(directory)
+                    .append("/")
+                    .append(photo.agentFileName())
+                    .append("\n");
             }
         }
         return guidance.toString();
     }
 
+
     private boolean inspectable(ChatAttachment attachment) {
         return attachment.isVisible()
-                && attachment.expiresAt().isAfter(clock.instant())
-                && latest(
-                        () -> attachments
-                                .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
-                                        attachment.id(),
-                                        attachment.conversationId(),
-                                        attachment.uploadedByUserId(),
-                                        clock.instant()));
+            && attachment.expiresAt().isAfter(clock.instant())
+            && latest(
+                () -> attachments
+                    .existsByIdAndConversationIdAndUploadedByUserIdAndMessageIdIsNotNullAndDeletedAtIsNullAndExpiresAtAfter(
+                        attachment.id(),
+                        attachment.conversationId(),
+                        attachment.uploadedByUserId(),
+                        clock.instant()));
     }
+
 
     private boolean readable(Long id, Long conversationId, Long owner) {
         return latest(() -> attachments.existsReadable(id, conversationId, owner));
     }
+
 
     /** 호출자의 옛 snapshot과 엔티티 캐시를 피하여 응답 직전 상태를 읽는다. */
     private boolean latest(BooleanSupplier query) {
@@ -429,6 +405,7 @@ public class AttachmentService {
         return Boolean.TRUE.equals(read.execute(status -> query.getAsBoolean()));
     }
 
+
     /**
      * 메시지에 묶인 첨부를 화면에 보이는 차례로 세어 첨부 번호마다 1부터 매긴 순번을 돌려준다.
      *
@@ -438,23 +415,26 @@ public class AttachmentService {
     private Map<Long, Integer> orderInConversation(Long conversationId) {
         Map<Long, Integer> order = new HashMap<>();
         attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId).stream()
-                .filter(attachment -> attachment.messageId() != null)
-                .forEach(attachment -> order.put(attachment.id(), order.size() + 1));
+            .filter(attachment -> attachment.messageId() != null)
+            .forEach(attachment -> order.put(attachment.id(), order.size() + 1));
         return order;
     }
+
 
     /** 그 대화의 첨부를 메시지와 메시지 안의 자리 순으로 돌려준다. 지난 대화에 자리를 남기려고 지워진 것도 담는다. */
     public List<ChatAttachment> allOf(Long conversationId) {
         return attachments.findByConversationIdOrderByMessageIdAscPositionAsc(conversationId);
     }
 
+
     private ChatAttachment requireOwnAttachment(CurrentUser user, Long conversationId, Long attachmentId) {
         access.requireOwn(user, conversationId);
         return attachments
-                .findByIdAndConversationId(attachmentId, conversationId)
-                .orElseThrow(
-                        () -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
+            .findByIdAndConversationId(attachmentId, conversationId)
+            .orElseThrow(
+                () -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "this conversation does not exist"));
     }
+
 
     private static String stripTrailingSlash(String path) {
         String stripped = path.strip();
@@ -464,9 +444,11 @@ public class AttachmentService {
         return stripped;
     }
 
+
     private static ApiException notAttachable() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "these attachments cannot be sent with this message");
     }
+
 
     /** {@code image/JPEG; charset=...} 같은 값을 비교할 수 있게 매개변수를 떼고 소문자로 맞춘다. */
     private static String normalize(String contentType) {
@@ -477,6 +459,7 @@ public class AttachmentService {
         String bare = separator < 0 ? contentType : contentType.substring(0, separator);
         return bare.strip().toLowerCase(Locale.ROOT);
     }
+
 
     /**
      * 화면과 Hermes 입력에 보일 이름을 만든다.
