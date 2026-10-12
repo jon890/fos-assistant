@@ -303,7 +303,7 @@ class ToolPolicyDecisionTest {
             .as("대화 허락을 선언하지 않은 도구")
             .isEqualTo(needsApproval);
         assertThat(ToolPolicyDecision.decide(ConnectionStatus.READY, true, 1, Optional.empty(), false, true, 2, NOT_CHECK))
-            .as("도구를 선언하지 않는 판의 선언 없는 도구")
+            .as("도구를 선언하지 않는 schema 1 의 선언 없는 도구")
             .isEqualTo(needsApproval);
     }
 
