@@ -12,10 +12,9 @@ import {
   readConnectorActions,
   type ConnectorAction,
 } from "@/lib/connector-action";
+import { useContentDraftJobs } from "@/components/chat/use-content-draft-jobs";
 import {
   isContentDraftTerminal,
-  readContentDraftJobs,
-  type ContentDraftJob,
   type ContentDraftJobStatus,
 } from "@/lib/content-draft-snapshot";
 
@@ -26,18 +25,6 @@ const SHOWN = ["PENDING", "EXECUTING", "UNKNOWN"];
 const CONTINUE = ["SUCCEEDED", "EXECUTING"];
 
 type Loaded = { conversationId: string; actions: ConnectorAction[] };
-
-/**
- * 원고 job 목록이다. 일반 승인 줄 목록은 최근 20개뿐이라 그 밖으로 밀린 원고 결과를 여기서 다시 찾는다.
- * `paged` 면 「이전 저장 더 보기」 로 다음 페이지를 읽은 뒤라 첫 페이지를 다시 읽어도 cursor 를 되돌리지 않는다.
- */
-type Jobs = {
-  conversationId: string;
-  first: ContentDraftJob[];
-  older: ContentDraftJob[];
-  next: string | null;
-  paged: boolean;
-};
 
 /**
  * 기다리는 줄은 같은 커넥터의 같은 도구끼리 묶는다. 묶음의 자리는 그 도구가 처음 나온 자리다.
@@ -119,66 +106,6 @@ function useBulkApproval(
 }
 
 /**
- * 그 대화의 원고 job 을 첫 페이지부터 읽는다. 「이전 저장 더 보기」 가 `loadMore` 로 다음 페이지를 붙인다.
- * 원격 상태를 조회하지 않는 GET 이라 승인 사건이 거듭 와도 저장을 다시 보내지 않는다.
- */
-function useContentDraftJobs(conversationId: string | null, reloadKey: number) {
-  const [jobs, setJobs] = useState<Jobs | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  useEffect(() => {
-    if (conversationId === null) return;
-    let stale = false;
-    void readContentDraftJobs(conversationId, null).then((result) => {
-      if (stale || !result.ok) return;
-      setJobs((current) => {
-        const kept =
-          current?.conversationId === conversationId && current.paged;
-        return {
-          conversationId,
-          first: result.data.items,
-          older: kept ? current.older : [],
-          next: kept ? current.next : result.data.nextBeforeSnapshotId,
-          paged: kept,
-        };
-      });
-    });
-    return () => {
-      stale = true;
-    };
-  }, [conversationId, reloadKey]);
-
-  const current = jobs?.conversationId === conversationId ? jobs : null;
-
-  async function loadMore() {
-    const next = current?.next;
-    if (!next || conversationId === null || loadingMore) return;
-    setLoadingMore(true);
-    const result = await readContentDraftJobs(conversationId, next);
-    setLoadingMore(false);
-    if (!result.ok) return;
-    const page = result.data;
-    setJobs((current) =>
-      current?.conversationId === conversationId
-        ? {
-            ...current,
-            older: [...current.older, ...page.items],
-            next: page.nextBeforeSnapshotId,
-            paged: true,
-          }
-        : current,
-    );
-  }
-
-  return {
-    items: current ? [...current.first, ...current.older] : [],
-    next: current?.next ?? null,
-    loadingMore,
-    loadMore,
-  };
-}
-
-/**
  * 입력창 위에 그 대화의 승인 카드를 모아 보인다.
  *
  * <p>승인을 기다리는 동안에도 대화를 읽을 수 있게 이 영역은 화면 높이의 40% 까지만 차지하고 안에서 스크롤한다.
@@ -205,8 +132,8 @@ export function ApprovalList({
   const [sending, setSending] = useState<string[]>([]);
   /** 이 화면에서 끝나지 않은 상태로 본 원고 줄이다. 그 줄은 끝나도 결과를 보이게 펼쳐 둔다 */
   const [live, setLive] = useState<string[]>([]);
-  /** 처음부터 끝나 있던 원고 카드를 펼쳤는가. 대화를 열 때마다 지난 저장 카드가 쌓이지 않게 접어 둔다 */
-  const [finishedOpen, setFinishedOpen] = useState(false);
+  /** 처음부터 끝나 있던 원고 카드를 펼친 대화다. 대화를 열 때마다 지난 저장 카드가 쌓이지 않게 접어 둔다 */
+  const [openedFor, setOpenedFor] = useState<string | null>(null);
   const jobs = useContentDraftJobs(conversationId, refreshKey + reloads);
   const bulk = useBulkApproval(replace, () => setReloads((count) => count + 1));
 
@@ -247,25 +174,20 @@ export function ApprovalList({
     else setReloads((count) => count + 1);
   }
 
-  useEffect(() => {
-    setFinishedOpen(false);
-  }, [conversationId]);
-
-  useEffect(() => {
-    const running = [
-      ...(loaded?.actions ?? []).flatMap((action) =>
-        action.contentDraft &&
-        !isContentDraftTerminal(action.contentDraft.status)
-          ? [action.actionId]
-          : [],
-      ),
-      ...jobs.items.flatMap((job) =>
-        isContentDraftTerminal(job.status) ? [] : [job.actionId],
-      ),
-    ];
-    if (running.some((id) => !live.includes(id)))
-      setLive((current) => [...new Set([...current, ...running])]);
-  }, [loaded, jobs.items, live]);
+  // 진행 중으로 본 원고 줄을 그리는 동안 더한다. 받은 목록에서 바로 정해지는 값이라 effect 를 거치지 않는다.
+  const running = [
+    ...(loaded?.actions ?? []).flatMap((action) =>
+      action.contentDraft && !isContentDraftTerminal(action.contentDraft.status)
+        ? [action.actionId]
+        : [],
+    ),
+    ...jobs.items.flatMap((job) =>
+      isContentDraftTerminal(job.status) ? [] : [job.actionId],
+    ),
+  ];
+  if (running.some((id) => !live.includes(id)))
+    setLive([...new Set([...live, ...running])]);
+  const finishedOpen = openedFor === conversationId;
 
   /** 처음 본 때부터 끝나 있던 원고 줄이다. 펼치기 전에는 그리지 않는다. */
   function finished(actionId: string, status: ContentDraftJobStatus) {
@@ -386,7 +308,7 @@ export function ApprovalList({
             size="sm"
             variant="ghost"
             data-testid="content-draft-finished"
-            onClick={() => setFinishedOpen(true)}
+            onClick={() => setOpenedFor(conversationId)}
           >
             {hiddenCount > 0
               ? `끝난 저장 ${hiddenCount}건 보기`
