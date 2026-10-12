@@ -3,6 +3,7 @@ package com.bifos.assistant.hermes;
 import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorSnapshotDeclaration;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -47,7 +48,8 @@ final class ConnectorCatalogDecoder {
             optionalBoolean(item, "owner_browser", false),
             loginUrl(item),
             item.get("execution_guard"),
-            text(item, "execution_guard_manifest_sha256"));
+            text(item, "execution_guard_manifest_sha256"),
+            ConnectorSnapshotDeclaration.read(item.get("snapshot"), readable ? ConnectorCatalogTools.read(tools) : List.of()));
     }
 
 

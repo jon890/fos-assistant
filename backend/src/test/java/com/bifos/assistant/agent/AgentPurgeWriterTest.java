@@ -2,8 +2,8 @@ package com.bifos.assistant.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.bifos.assistant.agent.application.AgentPurgeWriter;
-import com.bifos.assistant.agent.application.model.AgentPurgeOutcome;
+import com.bifos.assistant.agent.purge.application.AgentPurgeWriter;
+import com.bifos.assistant.agent.purge.application.model.AgentPurgeOutcome;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.AgentMemoryCollection;
 import com.bifos.assistant.agent.domain.AgentMemoryCollectionChange;
