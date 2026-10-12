@@ -165,7 +165,9 @@ export function collect(pr, run = realRun) {
     const ciBase = lines(must(run, "git", ["rev-list", "-1", `--before=${started}`, base], "CI 기준 main"))[0];
     if (!ciBase) throw new LookupError("CI 시작 시각 이전의 main 커밋이 없다");
     const mainFiles = must(run, "git", ["diff", "--name-only", "--no-renames", ciBase, base], "main 변경 파일").split("\n").filter(Boolean);
-    const prFiles = lines(must(run, "gh", ["pr", "diff", pr, "--name-only"], "PR 변경 파일"));
+    // gh pr diff 는 이름이 바뀐 파일의 새 경로만 내므로 main 쪽과 같이 --no-renames 로 옛 경로까지 구한다.
+    const mergeBase = lines(must(run, "git", ["merge-base", base, view.headRefOid], "merge-base"))[0];
+    const prFiles = must(run, "git", ["diff", "--name-only", "--no-renames", mergeBase, view.headRefOid], "PR 변경 파일").split("\n").filter(Boolean);
     reasons = remergeReasons(prFiles, mainFiles);
   }
   const headRecheck = JSON.parse(must(run, "gh", ["pr", "view", pr, "--json", "headRefOid"], "PR head 재확인")).headRefOid;

@@ -104,7 +104,7 @@ test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어�
   }
 });
 
-// gh 와 git 호출을 흉내 낸다. 키는 명령과 인자를 공백으로 이은 앞부분이다.
+// gh 와 git 호출을 흉내 낸다. 키는 명령과 인자를 공백으로 이은 앞부분이고 가장 긴 키가 이긴다.
 function fakeRun(overrides: Record<string, { status?: number; stdout?: string }> = {}) {
   const table: Record<string, { status?: number; stdout?: string }> = {
     "gh pr view": { stdout: JSON.stringify({ isDraft: false, mergeable: "MERGEABLE", mergeStateStatus: "CLEAN", headRefOid: "abc", baseRefName: "main" }) },
@@ -114,12 +114,15 @@ function fakeRun(overrides: Record<string, { status?: number; stdout?: string }>
     "gh pr checks": { status: 8, stdout: JSON.stringify([ok("unit"), ok("backend")]) },
     "gh api graphql": { stdout: JSON.stringify({ data: { repository: { pullRequest: { reviewThreads: { pageInfo: { hasNextPage: false }, nodes: [{ isResolved: true }, { isResolved: false }] } } } } }) },
     "git fetch": {},
-    "git merge-base": {},
+    "git merge-base --is-ancestor": {},
+    "git merge-base origin/main": { stdout: "mb111\n" },
     ...overrides,
   };
   return (command: string, args: string[]) => {
-    const key = [command, ...args].slice(0, 3).join(" ");
-    const hit = Object.entries(table).find(([prefix]) => key.startsWith(prefix));
+    const key = [command, ...args].join(" ");
+    const hit = Object.entries(table)
+      .filter(([prefix]) => key.startsWith(prefix))
+      .sort((a, b) => b[0].length - a[0].length)[0];
     if (!hit) return { status: 1, stdout: "", stderr: `대역에 없는 호출: ${key}` };
     return { status: hit[1].status ?? 0, stdout: hit[1].stdout ?? "", stderr: "" };
   };
@@ -135,10 +138,10 @@ test("조회한 사실을 모아 판정 입력으로 만든다", () => {
 
 test("head 가 main 을 포함하지 않으면 CI 시작 시각의 main 과 PR 파일을 비교한다", () => {
   const run = fakeRun({
-    "git merge-base": { status: 1 },
+    "git merge-base --is-ancestor": { status: 1 },
     "git rev-list": { stdout: "deadbeef\n" },
-    "git diff": { stdout: "backend/build.gradle.kts\n" },
-    "gh pr diff": { stdout: "web/src/a.ts\n" },
+    "git diff --name-only --no-renames deadbeef": { stdout: "backend/build.gradle.kts\n" },
+    "git diff --name-only --no-renames mb111": { stdout: "web/src/a.ts\n" },
   });
   const facts = collect("7", run);
   assert.equal(facts.containsMain, false);
@@ -153,13 +156,23 @@ test("조회하는 동안 head 가 바뀌었으면 대기다", () => {
 
 test("CI 기준 main 은 workflow run 생성과 검사 시작 중 이른 시각으로 정한다", () => {
   const calls: string[][] = [];
-  const inner = fakeRun({ "git merge-base": { status: 1 }, "git rev-list": { stdout: "deadbeef\n" }, "git diff": { stdout: "" }, "gh pr diff": { stdout: "web/src/a.ts\n" } });
+  const inner = fakeRun({ "git merge-base --is-ancestor": { status: 1 }, "git rev-list": { stdout: "deadbeef\n" }, "git diff": { stdout: "" } });
   collect("7", (command: string, args: string[]) => {
     calls.push([command, ...args]);
     return inner(command, args);
   });
   const revList = calls.find((call) => call[1] === "rev-list");
   assert.ok(revList?.includes("--before=2026-10-12T00:59:00Z"));
+});
+
+test("PR 쪽 변경 파일도 옛 경로까지 구해 main 의 수정과 겹침을 잡는다", () => {
+  const run = fakeRun({
+    "git merge-base --is-ancestor": { status: 1 },
+    "git rev-list": { stdout: "deadbeef\n" },
+    "git diff --name-only --no-renames deadbeef": { stdout: "web/src/old.ts\n" },
+    "git diff --name-only --no-renames mb111": { stdout: "web/src/old.ts\nweb/src/new.ts\n" },
+  });
+  assert.match(collect("7", run).remergeReasons.join(), /같은 파일.*web\/src\/old\.ts/);
 });
 
 test("필수 검사 조회가 실패하거나 0개면 판정하지 않는다", () => {
