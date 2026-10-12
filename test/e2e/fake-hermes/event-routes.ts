@@ -95,7 +95,7 @@ export function createEventRoutes(state: FakeHermesState, { authorized, runNotFo
             response.end();
             return;
           }
-          // 기준 판의 공유 fixture가 사건 봉투와 기본 칸을 정한다.
+          // 기준 버전의 공유 fixture가 사건 봉투와 기본 칸을 정한다.
           // 사건 이름은 `event`, 조각은 `delta`, 도구 이름은 `tool`, 설명은 `preview` 다.
           // 여기가 실제와 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
           const streamedOutput = specialOutputFor(run.input);

@@ -57,7 +57,7 @@ dependencies {
     rewrite(libs.openrewrite.migrate.java)
 }
 
-// 판 번호 원본을 테스트 classpath에 싣는다. Java에 별도 판 상수를 두지 않는다.
+// 버전 원본을 테스트 classpath에 싣는다. Java에 별도 버전 상수를 두지 않는다.
 tasks.processTestResources {
     from("../hermes/tests/hermes_contract.py") {
         into("hermes")

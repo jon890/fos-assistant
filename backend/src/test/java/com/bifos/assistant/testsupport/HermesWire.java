@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-/** Python 계약 원본의 판 번호로 공유 wire를 고른다. */
+/** Python 계약 원본의 버전로 공유 wire를 고른다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HermesWire {
     private static final Pattern VERSION = Pattern.compile("(?m)^HERMES_VERSION = \"([^\"]+)\"$");
@@ -15,7 +15,7 @@ public final class HermesWire {
     public static String version() throws IOException {
         var match = VERSION.matcher(resource("/hermes/hermes_contract.py"));
         if (!match.find()) {
-            throw new IOException("Hermes 계약의 판 번호를 읽을 수 없다");
+            throw new IOException("Hermes 계약의 버전를 읽을 수 없다");
         }
         return match.group(1);
     }

@@ -22,7 +22,7 @@ class HermesWireCompatibilityTest {
 
 
     @Test
-    @DisplayName("현재 판의 공유 사건 표본을 실제 HTTP 파서로 읽는다")
+    @DisplayName("현재 버전의 공유 사건 표본을 실제 HTTP 파서로 읽는다")
     void readsPinnedEventFixturesThroughHttpParser() throws Exception {
         var events = new ArrayList<RunEvent>();
         HermesInterimWire.read(HermesWire.fixture("events"), ToolDetailScope.NONE, events::add);

@@ -294,7 +294,7 @@ class HermesSourceTest(unittest.TestCase):
         return self.trees[path]
 
     def test_shared_wire_matches_upstream_event_callback(self):
-        """공유 사건 표본의 칸을 기준 판 callback의 실제 출력과 대조한다."""
+        """공유 사건 표본의 칸을 기준 버전 callback의 실제 출력과 대조한다."""
         source = self.root / "gateway/platforms/api_server_runs.py"
         wanted = {"_run_event", "_tool_completed_preview", "_make_run_event_callback",
                   "_FIXED_EVENT_FIELDS", "_TOOL_COMPLETED_PREVIEW_MAX_CHARS",
