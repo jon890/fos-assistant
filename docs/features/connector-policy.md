@@ -638,6 +638,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
 
 연결을 다시 붙일 때의 request_key 문제는 공개 금융 연결을 여는 작업에서 해결한다.
+이 문제와 해시 추측 방어를 포함한 개방 전 필수 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
 연결 번호를 빼면 기존 해시와의 호환 검사와 커넥터별 계좌 식별 범위를 함께 정해야 하므로 이번 본문 보안 변경에 넣지 않는다.
 그 작업이 끝나기 전까지 공개 hook과 승인 경로는 계속 `RISK_NOT_OPEN`으로 막는다.
 

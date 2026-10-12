@@ -257,6 +257,50 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 4. 대화에서 보유 종목, 현재가, 주문 가능 현금, 이번 달 끝난 주문을 묻는다. 보유 종목의 손익과 비율 칸이 null 이 아닌지 본다. 서비스가 공식 decimal 형식이 아닌 값을 주면 응답 오류로 끝난다
 5. 연결 확인을 누른 직후 대화에서 다시 보유 종목을 물어, 토큰을 한 번 다시 받고 성공하는지 본다
 
+## 매매 개방 조건
+
+**지금은 주문을 실행할 수 없다.** 아래 조건을 모두 채우고, 소유자가 개방을 명시적으로 승인한 뒤 따로 여는 PR 에서만 연다.
+조건을 채우는 PR 들은 kill switch 를 꺼 둔 채로 머지한다. 머지만으로 주문이 열리지 않아야 한다.
+첫 개방 대상은 일반 주문의 `create_order` 와 `cancel_order` 다. `modify_order` 와 조건주문 세 쓰기는 첫 개방에 넣지 않는다.
+
+| 조건 | 무엇을 보장하는가 | 지금 |
+| --- | --- | --- |
+| kill switch | 운영 설정 하나로 금융 실행 전체를 켜고 끈다. 기본값은 꺼짐이다. 꺼져 있으면 준비, 승인, claim 이 모두 금융 전송 없이 거절한다 | 없음 |
+| 호출마다 승인 | FINANCIAL 도구는 `always` 다. 상시 허락과 대화 허락을 받지 않는다(grant 불가) | 있음 |
+| 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 없음. 연결에서 고른 계좌와 실행 scope 의 대조만 있다 |
+| 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 운영 설정 상한을 둔다. 기본값은 보수적으로 작게 둔다 | 없음. 고액 주문은 토스 서버의 거절에 맡긴다 |
+| 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
+| UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
+| 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 없음 (#507 후속) |
+| 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 없음 (#507 후속) |
+| 공개 진입점 연결 | 정책 판정과 승인 API 가 FINANCIAL 을 producer 와 금융 승인으로 보낸다. 토스 서버와 manifest 가 두 도구를 등록한다 | 없음. producer 와 금융 승인은 package-private 이다 |
+| 승인 카드 표시 | 승인 카드가 저장한 summary(계좌 끝 네 자리, 종목, 방향, 수량, 가격, 정규화)를 보인다. 모델 인자만 보이고 승인하지 않는다 | 없음 |
+
+계획은 `tasks/plan208-toss-conditional-financial/` 이 갖는다.
+
+### 첫 실제 호출 절차
+
+개방 PR 이 배포된 뒤 소유자가 직접 한다. 계좌번호, 금액, 종목은 어디에도 적지 않는다.
+체결되지 않을 주문 하나를 넣고 바로 취소해, 전송과 기록이 한 번씩만 남는지 본다.
+
+1. 배포 직후 kill switch 가 꺼져 있는지 확인한다. 대화에서 주문을 요청해 금융 전송 없이 거절되는지 본다
+2. 계좌 허용 목록에 쓸 계좌 하나만 있고, 주문 상한이 아래 주문을 겨우 담을 만큼 작은지 확인한다
+3. kill switch 를 켠다. 켜는 것은 소유자가 그 자리에서 승인한다
+4. 대화에서 국내 종목 하나를 1주, 당일 하한가에 가까워 체결되지 않을 지정가로 매수하라고 요청한다. 가격은 `get_price_limits` 와 `get_orderbook` 으로 먼저 읽는다
+5. 승인 카드의 계좌 끝 네 자리, 종목, 방향, 수량, 가격이 요청과 같은지 보고 승인한다
+6. `list_orders` 로 미체결 주문이 하나만 생겼는지 본다. 토스증권 앱에서도 같은 주문 하나를 확인한다
+7. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
+8. kill switch 를 끈다
+
+승인 줄과 실행 줄의 상태가 SUCCEEDED 하나씩이고 UNKNOWN 과 중복 전송이 없는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
+도중에 UNKNOWN 이 나오면 다시 요청하지 않는다. 토스증권 앱에서 주문 상태를 먼저 확인한다.
+
+### 되돌리기
+
+kill switch 를 끄면 새 준비, 대기 중인 승인, 아직 소비하지 않은 claim 이 모두 금융 전송 없이 거절된다. 배포를 되돌리지 않아도 된다.
+이미 토스에 들어간 주문은 kill switch 가 취소하지 않는다. 토스증권 앱에서 취소한다.
+끄는 방법은 `fos-home-infra` 가 갖는다.
+
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
@@ -504,7 +548,7 @@ AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`이�
 prepare → 실제 Python 결과 검증 → 불변 원문·summary 저장 → 별도 승인 → ticket → 원문 대조 → claim 1회 → 현재 원주문/현재가 대조 → 금융 전송 1회 순서다.
 prepare는 금융 전송을 하지 않는다. 승인 뒤 prepare·UUID·본문 정규화를 다시 수행하지 않는다. SDK schema에도 coercion/default/strip을 두지 않는다.
 claim 요청은 기존 ticket/tool/argsSha256/scope, 응답은 v/allowed/ticketId/expiresAt이다. 성공은 200, replay는 409이며 redirect·재시도는 0회다.
-SDK 테스트의 합성 claim은 이 실제 DTO·codec·MVC 시험과 대조하지만 실제 서명·DB 일회 소비를 증명한 것으로 보고하지 않는다.
+SDK 테스트의 합성 claim은 이 실제 DTO·codec·MVC 테스트와 대조하지만 실제 서명·DB 일회 소비를 증명한 것으로 보고하지 않는다.
 claim 뒤 조회·auth·quota 대기와 금융 queue callback에서 만료 및 계좌 env를 다시 확인한다. 불일치하면 금융 전송 0회다.
 claimApproval은 검증된 `ClaimedApproval={beforeSend:()=>void, deadlineMs:number}`를 반환한다. deadlineMs는 응답과 ticket expiresAt를 한 번 대조한 직후 `clock.now()+max(0,expiresAt-max(Date.now(),clock.now()))`로 변환한 절대 deadline이며 immutable이다.
 `financial(method,path,body,authorization:(()=>void)|ClaimedApproval)`은 기존 callback 인자를 계속 받는다. 새 일반/조건 호출부는 ClaimedApproval을 넘기며 `min(clock.now()+timeoutMs,deadlineMs)`를 auth·quota·fetch·본문 읽기에 적용한다. 다른 모듈은 ticket을 재파싱하지 않는다.
@@ -622,7 +666,7 @@ Python은 strict parser와 실제 prepare 소비를, Spring은 validate/capture�
 Spring 원문 상한은 각각 16/16/8/2 KiB와 nesting5이며 중복 키와 trailing JSON을 거절한다. Python은 prepare 외피와 각 객체의 기존 byte·깊이 상한을 적용한다.
 공통 179개에서 Spring 원문 경계의 기대와 실제는 수용 47개·거절 132개다. Python의 실제 `_strict_json`과 `_prepare_result` 객체 소비는 수용 51개·거절 128개다.
 차이인 `RAW-modelArgs-BYTES`, `RAW-executionArgs-BYTES`, `RAW-summary-BYTES`, `RAW-scope-BYTES`는 추가 공백이 객체 변환 뒤 사라져 Python에서 허용되며 나머지 175개는 기대가 같다.
-시험의 네 원문 길이 단언은 Spring 경계의 기대를 설명하는 검사이며 Python production의 거절로 세지 않는다. Python 외부 API는 기존 객체 계약을 유지한다.
+테스트의 네 원문 길이 단언은 Spring 경계의 기대를 설명하는 검사이며 Python production의 거절로 세지 않는다. Python 외부 API는 기존 객체 계약을 유지한다.
 저장 시 실행·scope 원문 SHA를 유지하고 세 원문을 다시 직렬화하지 않는다. 같은 keyId로 seal/open하며 AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`다.
 열·action·사용자·keyId와 저장 summary의 변조를 거절한다. table·migration·ticket·claim DTO와 암호화 형식은 바꾸지 않는다.
 
