@@ -22,6 +22,12 @@
    검사는 `scripts/ci/check-feature-covers.mjs` 가 하고 CI 의 unit job 에서 PR 에만 돈다.
 5. 기능 파일은 500줄을 넘으면 알림을 낸다. 실패로 막지 않는다.
 
+**예외: 커넥터별 기능 파일.** `hermes/connectors/<id>/` 의 커넥터 하나는 `docs/features/<id>-connector.md` 를 따로 갖는다(2026-10-12 추가).
+그 파일은 그 커넥터의 등록 칸, 도구와 정책, 인자와 결과, 오류, 권한, 보안, 실제 계정 확인을 갖는다.
+커넥터 공통 계약은 `connector.md` 와 `connector-policy.md` 에 남긴다.
+커넥터 README 는 연결 카드가 여는 사용자 안내라 개발 내용을 둘 수 없고, 서비스마다 수백 줄인 개발 내용을 `connector.md` 의 절로 쌓으면 공통 계약을 읽기 어렵기 때문이다.
+`test/unit/doc-files.test.ts` 가 `-connector.md` 로 끝나는 기능 파일마다 같은 이름의 커넥터 디렉터리가 있는지 본다.
+
 `docs/features/` 는 루트에만 둔다. 모듈 아래 `features/` 는 만들지 않는다. 기능은 여러 모듈을 가로지르기 때문이다.
 기능 파일 이름은 소문자 영문과 숫자, 하이픈이다(`agent-skill.md`). `features/` 아래에 하위 디렉터리를 두지 않는다.
 

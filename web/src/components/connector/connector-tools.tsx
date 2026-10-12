@@ -1,4 +1,4 @@
-import { toolDescription } from "@/lib/connector-tool-description";
+import { toolText } from "@/lib/connector-tool-text";
 import { Badge } from "@/components/ui/badge";
 import {
   toolBlocked,
@@ -13,7 +13,10 @@ function policyVariant(tool: ConnectorTool) {
   return tool.approval === "NONE" ? "success" : "warning";
 }
 
-/** 커넥터가 선언한 도구마다 위험도와 실행 방식을 보인다. */
+/** 제목을 선언하지 않은 도구에 보이는 이름이다. 실제 도구 이름은 화면에 보이지 않는다. */
+const UNNAMED_TOOL_TITLE = "이름 없는 도구";
+
+/** 커넥터가 선언한 도구마다 사람 말 이름과 요약, 위험도와 실행 방식을 보인다. */
 export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
   if (!Array.isArray(tools) || tools.length === 0) {
     return (
@@ -33,17 +36,19 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
           data-testid="connector-tool"
           className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3 text-sm"
         >
-          <span className="min-w-0 break-all">{tool.title ?? tool.name}</span>
+          <span className="min-w-0 break-words">
+            {tool.title?.trim() || UNNAMED_TOOL_TITLE}
+          </span>
           <span className="flex flex-wrap gap-1">
             <Badge variant="outline">{toolRiskLabel(tool.risk)}</Badge>
             <Badge variant={policyVariant(tool)}>{toolPolicyLabel(tool)}</Badge>
           </span>
-          {toolDescription(tool.description) && (
+          {toolText(tool.summary) && (
             <p
-              data-testid="connector-tool-description"
+              data-testid="connector-tool-caption"
               className="w-full whitespace-pre-wrap break-words text-muted-foreground [overflow-wrap:anywhere]"
             >
-              {toolDescription(tool.description)}
+              {toolText(tool.summary)}
             </p>
           )}
         </li>

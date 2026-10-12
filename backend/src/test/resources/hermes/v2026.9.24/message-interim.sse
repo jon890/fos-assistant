@@ -8,7 +8,7 @@ data: {"event":"reasoning.available","run_id":"fixture-run","timestamp":17916300
 
 data: {"event":"tool.started","run_id":"fixture-run","timestamp":1791630000.3,"tool":"web_search","preview":"자료 찾기"}
 
-data: {"event":"tool.completed","run_id":"fixture-run","timestamp":1791630000.4,"tool":"web_search","duration":0.1,"error":false}
+data: {"event":"tool.completed","run_id":"fixture-run","timestamp":1791630000.4,"tool":"web_search","duration":0.1,"error":false,"preview":""}
 
 data: {"event":"message.delta","run_id":"fixture-run","timestamp":1791630000.5,"delta":"두 번째  안내"}
 
@@ -20,5 +20,5 @@ data: {"event":"message.interim","run_id":"fixture-run","timestamp":1791630000.8
 
 data: {"event":"message.delta","run_id":"fixture-run","timestamp":1791630000.9,"delta":"확인한 최종 답이에요."}
 
-data: {"event":"run.completed","run_id":"fixture-run","timestamp":1791630001.0}
+data: {"event":"run.completed","run_id":"fixture-run","timestamp":1791630001.0,"output":"확인한 최종 답이에요.","usage":{"input_tokens":120,"output_tokens":40,"total_tokens":160,"cache_read_tokens":80,"cache_write_tokens":0},"completed":true,"partial":false,"interrupted":false}
 

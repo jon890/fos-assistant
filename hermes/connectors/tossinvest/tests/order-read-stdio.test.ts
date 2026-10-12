@@ -79,6 +79,8 @@ for (const mode of ["source", "bundle"]) {
         expect(manifest.tools[name]).toEqual({
           risk: "READ",
           approval: "none",
+          title: expect.any(String),
+          summary: expect.any(String),
           description: listed.find((entry) => entry.name === name)!
             .description!,
         });

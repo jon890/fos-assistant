@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { wireEvents, wireFixture } from "../fake-hermes/wire.ts";
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 import { readEventStream } from "../../../web/src/lib/stream.ts";
 import type { ChatEvent } from "../../../web/src/lib/chat-event.ts";
@@ -7,9 +7,7 @@ import { applyStreamText, type TurnStreamText } from "../../../web/src/component
 
 /** backend 단위 검사와 브라우저도 이 pinned wire의 합성 envelope를 쓴다. */
 export async function interimWireEvents(): Promise<Record<string, unknown>[]> {
-  const wire = await readFile(new URL("../../../backend/src/test/resources/hermes/message-interim-v2026.9.24.sse", import.meta.url), "utf8");
-  return wire.split("\n").filter((line) => line.startsWith("data: "))
-    .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
+  return wireEvents(wireFixture("message-interim"))
     .filter((event) => event.event !== "run.completed");
 }
 

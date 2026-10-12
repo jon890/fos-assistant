@@ -540,23 +540,25 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 1280, height: 900 },
 ]) {
-  test(`상세 도구 설명은 평문과 개행을 보존하고 폭 ${viewport.width}에서 넘치지 않는다`, async ({
+  test(`상세 도구 요약은 평문과 개행을 보존하고 실제 이름 없이 폭 ${viewport.width}에서 넘치지 않는다`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
-    const description =
-      "<img src=x onerror=alert(1)> **설명**\n" + "가".repeat(1900);
+    const summary =
+      "<img src=x onerror=alert(1)> **요약**\n" + "가".repeat(1900);
     await listConnectors(page, [
       connector("description-card", {
         tools: [
-          { ...tool("write_one", "WRITE"), description },
+          { ...tool("write_one", "WRITE"), title: "쓰기 하나", summary },
           { ...tool("old_one", "READ"), approval: "NONE", grant: false },
-          { ...tool("bad_one", "WRITE"), description: "글\u202e" },
+          { ...tool("bad_one", "WRITE"), summary: "글\u202e" },
           {
             ...tool("empty_one", "READ"),
+            title: " ",
             approval: "NONE",
             grant: false,
-            description: " ",
+            summary: " ",
+            description: "모델만 읽는 설명이에요.",
           },
         ],
       }),
@@ -577,9 +579,22 @@ for (const viewport of [
     await page.goto("/connections/description-card");
     const tools = page.getByTestId("connector-tools");
     await expect(tools.getByTestId("connector-tool")).toHaveCount(4);
-    const text = tools.getByTestId("connector-tool-description");
+    const text = tools.getByTestId("connector-tool-caption");
     await expect(text).toHaveCount(1);
-    expect(await text.textContent()).toBe(description);
+    expect(await text.textContent()).toBe(summary);
+    await expect(tools.getByText("쓰기 하나", { exact: true })).toHaveCount(1);
+    await expect(
+      tools.getByText("이름 없는 도구", { exact: true }),
+    ).toHaveCount(3);
+    const shown = await page.locator("body").innerText();
+    for (const hidden of [
+      "write_one",
+      "old_one",
+      "bad_one",
+      "empty_one",
+      "모델만 읽는 설명이에요.",
+    ])
+      expect(shown).not.toContain(hidden);
     await expect(text.locator("img")).toHaveCount(0);
     await expect(
       tools.getByText("실행 전에 물어봐요", { exact: true }),

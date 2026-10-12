@@ -741,26 +741,65 @@ Responses 계열끼리 오갈 때 표시가 없는 옛 조각이 남아 있으�
 
 ### 실행 이벤트가 실제로 오는 형태
 
-v0.21.0 의 `gateway/platforms/api_server_runs.py` 가 보내는 것을 실측으로 확인했다.
+기준 버전의 `gateway/platforms/api_server_runs.py` 소스와 공유 wire 검사로 확인한다.
+아래 표의 모든 사건에 `run_id`와 초 단위 `timestamp`가 붙는다.
 
 **사건 이름은 `type` 이 아니라 `event` 다.** 중계하는 쪽이 `type` 을 읽으면 아무것도 받지 못한다.
 
 | `event` | 함께 오는 칸 |
 | --- | --- |
 | `message.delta` | `delta` 에 답의 조각 |
+| `message.interim` | `text`, `already_streamed`. 중간 안내이며 실행은 이어 간다 |
 | `tool.started` | `tool` 에 도구 이름, `preview` 에 주요 인자 하나의 값. 아래 「붙은 커넥터 서버의 도구 사건」 을 본다 |
-| `tool.completed` | `tool`, `duration` 초, `error` 참거짓. v0.21.5 는 `preview` 에 결과를 더한다 |
+| `tool.completed` | `tool`, `duration` 초, `error` 참거짓, `preview` 에 결과 |
 | `subagent.start`, `subagent.complete` | [「자식 토큰을 SSE 로 받을 수 있다」](hermes-contract.md#자식-토큰을-sse-로-받을-수-있다) 의 식별자와 작업·사용량 필드 |
 | `reasoning.available` | `text` 에 그때까지의 답 전체 |
-| `run.completed` | `output` 과 `usage` |
+| `approval.request` | `command`, `pattern_key`, `pattern_keys`, `description`, `allow_permanent`, `allow_session`, `choices` |
+| `approval.responded` | `choice`, `resolved`, 요청을 지정하면 `request_id` |
+| `run.steered` | `accepted=true` |
+| `run.completed` | `output`, `usage`, `runtime`, `completed`, `partial`, `interrupted` |
 | `run.failed`, `run.cancelled` | 끝 |
-| `run.interrupted` | 끝. v0.21.5 부터 온다. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
+| `run.interrupted` | `error`. `ChatRunEvents` 는 이것도 끝 사건으로 본다 |
 
 `data:` 줄의 JSON 안에 `event` 가 들어 있다. SSE 의 `event:` 줄로 오지 않는다.
 10초마다 `: keepalive` 주석이 온다.
 
 **가짜 Hermes 를 이 형태로 맞춰 둔다.**
 어긋나면 테스트는 통과하는데 운영에서 조각이 흐르지 않는다.
+
+#### 버전별 공유 wire와 가짜 사건
+
+버전의 원본은 `hermes/tests/hermes_contract.py`의 `HERMES_VERSION` 하나다.
+계약 CI는 이 값을 읽어 상류 소스를 받고, TS의 `test/e2e/fake-hermes/wire.ts`는 같은 파일을 직접 읽는다.
+Java 검사는 Gradle의 `processTestResources`가 복사한 원본을 `HermesWire`로 읽는다.
+버전를 다른 곳에 상수로 옮겨 쓰지 않는다.
+
+공유 합성 SSE는 `backend/src/test/resources/hermes/<version>/`에 둔다.
+`events.sse`는 사건별 기본 칸, `message-interim.sse`는 안내와 답 조각의 흐름,
+`unknown.sse`는 미지 사건과 칸 및 SSE 메타데이터를 건너뛰는 검사를 갖는다.
+실제 실행 녹화와 운영 본문은 넣지 않는다. 없는 버전이나 사건 표본을 고르면 TS 대역이 바로 실패한다.
+
+`eventEnvelope` 하나가 상류가 늘 붙이는 고정 칸에만 표본의 기본값을 쓰고 시나리오의 값을 합쳐
+요청한 실행의 `run_id`와 초 단위 `timestamp`를 붙인다.
+대본의 시각은 중간 안내 중복 검사 때문에 보존하되 실행 번호는 현재 실행으로 바꾼다.
+`run.completed`에는 그 실행의 `output`과 `usage`, `runtime`을 싣고 `tool.completed`에는 `preview`를 싣는다.
+답 조각과 안내 본문, 도구 이름이 빠지면 실패한다.
+자식의 목표와 모델, 토큰과 결과 본문은 기본값으로 만들지 않는다.
+자식의 식별자와 session 번호는 실제로 그 자식을 만드는 시나리오에서 준다.
+상류 callback도 값이 없는 자식 칸을 생략하므로 공통 표본이 가짜 자식 session을 만들지 않는다.
+
+기준 버전의 `api_server_runs.py`에서 `_make_run_event_callback`은
+`tool.failed`와 `tool.progress`를 SSE로 내보내지 않는다.
+실패한 도구는 `tool.completed.error=true`로 온다.
+이 두 이름을 현재 버전 사건으로 만들지 않고 미지 사건 표본에 넣어 호환성을 확인한다.
+`reasoning.available`, `approval.request`, `approval.responded`, `run.interrupted`는
+공유 표본으로 대본에 넣어 재현할 수 있다. 승인 HTTP 경로 전체를 구현한 것은 아니다.
+
+Java HTTP parser 검사는 이 공유 표본부터 쓴다.
+각자의 HTTP 상태·timeout·요청 본문을 보는 다른 stub은 그대로 두어 검사 목적을 보존한다.
+파서는 알려진 사건만 소비자에게 넘기고 모르는 JSON 칸과 `id:`, `event:`, 주석 줄을 건너뛴다.
+이 검사는 `seq`, `: open`, `replay.truncated`가 끼어도 다음 답 조각을 읽는다는 뜻이며,
+`Last-Event-ID` 재연결이나 실제 재생 기능을 구현하지 않는다.
 
 #### 붙은 커넥터 서버의 도구 사건
 
@@ -2736,6 +2775,7 @@ session 상세의 비캐시 입력 토큰과 혼동하지 않는다.
 목록은 [`hermes/tests/hermes_contract.py`](../tests/hermes_contract.py) 가 갖고, 왜 공개 확장점으로 바꾸지 못하는지는 [ADR-088](adr/ADR-088-대시보드-plugin-은-감싸는-경로의-바꿔-끼우기를-두고-기대는-hermes-내부-지점을-계약-시험으로-확인한다.md) 이 갖는다.
 
 Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-contract.sh <tag>` 를 돌린다.
+새 사건이 있으면 `HermesRunEventStream.WIRE_EVENTS`와 버전별 공유 wire를 함께 갱신한다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
 
 #### MCP 설정 맞추기와 스킬 색인 캐시 키
@@ -2847,7 +2887,7 @@ Hermes 를 올릴 때 아래가 그대로인지 본다. 하나라도 달라지�
 
 ## 토스증권 REST 전체 지원의 호출 한도
 
-서비스별 계약은 [커넥터 연결](../../docs/features/connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
+서비스별 계약은 [토스증권 커넥터](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 Hermes core에는 서비스 이름이나 주문 기능을 더하지 않는다. Bun 커넥터의 기존 client와 범용 승인 plugin 경계를 사용한다.
 Bun client는 [공식 OpenAPI 1.2.24](../connectors/tossinvest/tests/fixtures/openapi-1.2.24.json)의 41 operation 고정 계약과 19그룹 예산을 갖는다. READ 도구 33개는 GET 34개와 내부 인증 1개를 사용한다. 인증·조회 operation의 정본은 [api-contract.ts](../connectors/tossinvest/src/api-contract.ts)의 `CURRENT_OPERATIONS`이며, 여기에 선언한 operation이 이 큐를 사용한다. 나머지 6개 금융 producer는 구현·등록하지 않았다. 새 조회 도구의 운영 반영은 배포 뒤 확인해야 한다.
 
@@ -2888,8 +2928,8 @@ GET은 429 재시도 최대 1회, expired-token/token-revoked 재발급 최대 1
 Authorization, secret, ticket, 계좌번호 원문과 upstream 오류 본문은 로그와 모델 응답에 싣지 않는다. 오류는 허용한 code와 안전한 reason으로 전달한다.
 
 
-## 카탈로그의 도구 상세 설명
+## 카탈로그의 도구 상세 설명과 요약
 
-`/api/connectors/catalog`의 schema 2 `tools.<이름>.description`은 선택 평문이다. 원문 선언에서 별도 `tool_descriptions`로 정규화한 뒤 응답에만 합친다. 정책 dict에는 넣지 않으며, 누락하거나 표시 계약을 어긴 값은 응답에서 생략한다. 표시 문자·길이 계약과 SDK 정본 연결은 [커넥터 연결](../../docs/features/connector.md)의 「도구 상세 설명」이 갖는다.
+`/api/connectors/catalog`의 schema 2 `tools.<이름>.description`과 `tools.<이름>.summary`는 선택 평문이다. 원문 선언에서 별도 `tool_descriptions`와 `tool_summaries`로 정규화한 뒤 응답에만 합친다. 정책 dict에는 넣지 않으며, 누락하거나 표시 계약을 어긴 값은 응답에서 생략한다. 표시 문자·길이 계약과 SDK 정본 연결은 [커넥터 연결](../../docs/features/connector.md)의 「도구 이름과 요약」이 갖는다.
 
 원문 전체 canonical SHA와 호환 순서는 [커넥터 도구 정책](../../docs/features/connector-policy.md)의 「표시 메타데이터와 보호 해시」가 갖는다. 카탈로그 읽기는 MCP 프로세스나 서비스 API를 시작하지 않는다.
