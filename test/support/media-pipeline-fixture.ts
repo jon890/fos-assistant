@@ -43,6 +43,47 @@ export type MediaFixture = {
 
 const GENERATOR = join(import.meta.dirname, "MediaFixtureGenerator.java");
 
+/** 서로 다른 압축 파일의 길이는 같을 수 있다. 각 원본의 실제 길이만 대조한다. */
+export function requireSourceByteLength(
+  bytes: Uint8Array,
+  declared: unknown,
+): void {
+  if (
+    typeof declared !== "number" ||
+    !Number.isSafeInteger(declared) ||
+    declared <= 0 ||
+    declared !== bytes.byteLength
+  )
+    throw new Error("SOURCE_BYTE_LENGTH_INVALID");
+}
+
+export type PreparedPixelMeasurement = {
+  recoveredId: number | null;
+  width: number | null;
+  height: number | null;
+  byteLength: number;
+  bytesSha256: string;
+  errorCode?: string;
+};
+
+/** 최대 30장을 한 Java 프로세스에서 순차 검사한다. 기대 ID는 입력받지 않는다. */
+export function inspectPreparedMediaBatch(
+  inputs: readonly { file: string; orientation: number }[],
+): PreparedPixelMeasurement[] {
+  if (inputs.length < 1 || inputs.length > 30)
+    throw new Error("준비 이미지 배치는 1~30장이다");
+  for (const { orientation } of inputs) {
+    if (!Number.isInteger(orientation) || orientation < 1 || orientation > 8)
+      throw new Error("EXIF 방향 오류");
+  }
+  return JSON.parse(
+    runGenerator([
+      "inspect-prepared-batch",
+      ...inputs.flatMap(({ file, orientation }) => [file, String(orientation)]),
+    ]),
+  );
+}
+
 /** 실제 바이트에서 얻은 결과만 반환하며 Java 오류 원문과 임시 경로를 로그로 내지 않는다. */
 function runGenerator(args: string[]): string {
   try {
@@ -86,6 +127,7 @@ export function createMediaFixture(
   return generated.map(({ ordinal, format, orientation, measurement }) => {
     const fileName = `asset-${ordinal}.${format.toLowerCase()}`;
     const bytes = readFileSync(join(tempDir, fileName));
+    requireSourceByteLength(bytes, measurement.byteLength);
     const bytesSha256 = createHash("sha256").update(bytes).digest("hex");
     const signature =
       format === "JPEG"

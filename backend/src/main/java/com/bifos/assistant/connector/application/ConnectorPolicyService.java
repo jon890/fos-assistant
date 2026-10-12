@@ -73,7 +73,7 @@ public class ConnectorPolicyService {
     static final String CONTEXT_MESSAGE = "이 도구 호출의 실행 맥락을 확인하지 못해 실행하지 않았다.";
 
     private static final String POLICY_UNAVAILABLE_MESSAGE = "이 도구의 사용 정책을 지금 확인하지 못해 실행하지 않았다. 잠시 뒤 다시 시도하라고 사용자에게 알린다.";
-    private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 연결 화면에서 연결을 확인하라고 알린다.";
+    private static final String NOT_READY_MESSAGE = "이 연결이 준비되지 않아 실행하지 않았다. 사용자에게 외부 서비스 연결에서 연결을 확인하라고 알린다.";
     /**
      * 연결은 쓸 수 있는데 이 에이전트에 붙인 것이 아직 반영되지 않았다. 대개 반영 예정 시각이 지나면 Control Plane 이 스스로
      * 확인해 풀린다(ADR-20261007 / connector-live-reload). 재시작이 필요한 바인딩은 관리자 반영 완료가 푼다.
@@ -373,14 +373,9 @@ public class ConnectorPolicyService {
 
 
     /**
-     * 같은 키로 이미 남긴 줄의 판정을 돌려준다. 그 줄의 등록 이름이나 인자 해시가 이번 요청과 다르면 돌려주지 않고 막는다.
-     *
-     * <p>한 session 에서 같은 {@code tool_call_id} 가 되풀이되면 키가 같다. 줄의 판정을 그대로 주면 앞서 허용한
-     * 읽기 도구의 답이 다른 도구나 다른 인자의 호출에 나간다. 새 줄은 만들지 않는다. 키가 유니크라 만들 수 없다.
-     *
-     * <p>허용한 줄은 그 에이전트에 그 연결이 지금도 붙어 있고 연결과 바인딩이 모두 {@code READY} 일 때만 다시 허용한다.
-     * 연결을 해제하거나 떼어 낸 뒤에 같은 호출이 다시 와도 앞의 허용이 나가지 않게 한다. 막은 줄과 승인 줄은 연결 상태와
-     * 상관없이 처음 답을 돌려준다.
+     * 같은 session 의 {@code tool_call_id} 는 키가 같아 새 줄을 만들지 않는다. 등록 이름이나 인자 해시가 다르면 앞의 판정을 주지 않고 막는다.
+     * 허용한 줄은 연결이 여전히 그 에이전트에 붙어 있고 연결과 바인딩이 모두 {@code READY} 일 때만 다시 허용한다.
+     * 막은 줄과 승인 줄은 연결 상태와 상관없이 처음 답을 돌려준다.
      */
     private ConnectorPolicyAnswer replayed(ConnectorAction recorded, String hermesTool, String argsSha256) {
         if (!recorded.hermesTool().equals(hermesTool)) {
@@ -405,10 +400,8 @@ public class ConnectorPolicyService {
 
 
     /**
-     * 판정에 넘길 연결 상태다. 연결이 {@code READY} 이고 그 에이전트에 붙인 바인딩도 {@code READY} 일 때만 {@code READY} 다.
-     *
-     * <p>값이 확인됐어도 공유 gateway 가 아직 그 profile 의 MCP 서버를 보지 못했으면 쓸 수 없다. 승인한 호출의 실행도 같은
-     * 규칙으로 다시 판정한다.
+     * 연결과 바인딩이 모두 {@code READY} 일 때만 판정에 {@code READY} 를 넘긴다.
+     * 값 확인뿐 아니라 공유 gateway 의 MCP 서버 반영도 필요하며 승인한 호출의 실행에도 같은 규칙을 쓴다.
      */
     static ConnectionStatus usableStatus(ConnectorConnection connection, ConnectorBinding binding) {
         return connection.status() == ConnectionStatus.READY && binding.status() == BindingStatus.READY

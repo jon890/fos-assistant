@@ -19,6 +19,17 @@ const symbolSchema = z
   .enum(symbols)
   .describe("지수는 point, 국채는 금리 percent입니다. 3.25는 3.25%입니다.");
 
+function parseIndicatorSymbols(value: unknown): string[] | null {
+  if (typeof value !== "string") return null;
+  const items = value.split(",").map((item) => item.trim());
+  if (
+    items.length > 200 ||
+    items.some((item) => !symbols.includes(item as (typeof symbols)[number]))
+  )
+    return null;
+  return items;
+}
+
 export function registerIndicatorTools(
   register: RegisterTool,
   client: Tossinvest,
@@ -28,25 +39,19 @@ export function registerIndicatorTools(
     {
       symbols: z
         .string()
-        .regex(/^[A-Za-z0-9_,]+$/)
-        .refine((value) => {
-          const items = value.split(",");
-          return (
-            items.length <= 200 &&
-            items.every((item) =>
-              symbols.includes(item as (typeof symbols)[number]),
-            )
-          );
-        })
+        .refine((value) => parseIndicatorSymbols(value) !== null)
         .describe(
-          "KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y를 쉼표로 나눕니다. 지수는 point, 국채 금리는 percent입니다.",
+          "KOSPI/KOSDAQ와 KR_BOND_2Y/3Y/5Y/10Y/20Y/30Y를 쉼표로 나눕니다. 각 항목 양끝 공백은 제거합니다. 지수는 point, 국채 금리는 percent입니다.",
         ),
     },
     { readOnlyHint: true },
     async ({ symbols }) => {
+      const requested = parseIndicatorSymbols(symbols);
+      if (requested === null)
+        throw new TossinvestError("TOSSINVEST_INVALID_INPUT");
       const envelope = await client.request(
         "/api/v1/market-indicators/prices",
-        { query: new URLSearchParams({ symbols }) },
+        { query: new URLSearchParams({ symbols: requested.join(",") }) },
       );
       return {
         result: officialFields(envelope.result, {

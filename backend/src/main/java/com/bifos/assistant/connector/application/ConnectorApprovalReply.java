@@ -9,11 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 final class ConnectorApprovalReply {
     /**
-     * 승인을 기다리는 호출에 답하는 글이다. 모델이 읽는다.
-     *
-     * <p>약속은 실제 동작과 같아야 한다. 대화 화면에 승인 카드가 뜨고, 승인하면 저장한 인자로 한 번 실행한 결과가 그
-     * 대화의 다음 turn 으로 온다({@link ConnectorActionResultSource}). 번호는 줄을 가리키는 값이라 사용자에게 읽어 줄
-     * 것이 아니다.
+     * 모델이 읽는 승인 대기 안내다. 번호는 사용자에게 읽어 주지 않는다.
+     * 승인 카드에서 허락하면 저장한 인자로 한 번 실행하고 결과가 같은 대화의 다음 turn 으로 온다({@link ConnectorActionResultSource}).
      */
     private static final String APPROVAL_MESSAGE = "이 동작은 사용자의 승인이 필요하다. 승인 요청 번호는 %s 다. "
         + "대화 화면에 승인 카드가 떴으니 사용자에게 거기서 승인해 달라고 알린다. 번호는 사용자에게 말하지 않는다. "

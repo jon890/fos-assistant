@@ -7,9 +7,14 @@
 # 단계마다 임시 로그를 만들고, 처음 실패한 단계에서 멈춰 마지막 40줄을 보인다.
 # 정상·오류 종료 모두 임시 로그를 지운다.
 #
-# 사용법: scripts/check-local.sh [--skip-browser] [브라우저 spec ...]
+# 사용법: scripts/check-local.sh [--fast | --skip-browser] [브라우저 spec ...]
+# --fast 는 Draft PR 을 열기 전에 쓴다. 몇 분 안에 끝나는 단계만 돈다.
+#   공개 정보, 파일 길이, 마이그레이션 버전, 웹 typecheck, 웹 node 테스트, test/unit, 품질(컴파일과 구조 규칙, 포맷) 검사다.
+#   공개 정보 검사는 push 하면 되돌릴 수 없으므로 빼지 않고 맨 앞에 둔다.
+#   이 검사는 추적 파일의 지금 내용만 본다. 커밋 메시지와 앞 커밋에 넣었다 지운 값은 push 전에 직접 확인한다.
+#   backend 테스트, MySQL, 웹 빌드, 브라우저, e2e, 커넥터, Hermes 는 Draft CI 가 확인한다.
 # 인자는 브라우저 검사에만 넘긴다. 인자가 없으면 브라우저 검사 전체를 돌린다.
-# 로컬 확인에서는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 준다. 전체는 Draft CI 가 확인한다.
+# 화면을 고쳤는데 --fast 를 쓰지 않을 때는 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 을 준다.
 # CI 가 돌지 못하면 머지 전에 인자 없이 전체를 돌린다.
 set -Eeuo pipefail
 
@@ -18,13 +23,17 @@ tmp_root="${TMPDIR:-/tmp}"
 LOG_DIR="$(mktemp -d "${tmp_root%/}/fos-assistant-check.XXXXXX")"
 trap 'rm -rf "${LOG_DIR}"' EXIT
 
+fast=false
 skip_browser=false
-if [ "${1:-}" = "--skip-browser" ]; then
-  skip_browser=true
-  shift
-fi
+case "${1:-}" in
+  --fast) fast=true; skip_browser=true; shift ;;
+  --skip-browser) skip_browser=true; shift ;;
+esac
+case "${1:-}" in
+  --*) echo "옵션은 --fast 나 --skip-browser 중 하나만 맨 앞에 준다: $1" >&2; exit 2 ;;
+esac
 if [ "${skip_browser}" = true ] && [ "$#" -gt 0 ]; then
-  echo "--skip-browser 와 브라우저 spec 을 함께 줄 수 없다." >&2
+  echo "--fast 나 --skip-browser 와 브라우저 spec 을 함께 줄 수 없다." >&2
   exit 2
 fi
 
@@ -86,6 +95,18 @@ PY
 }
 
 echo "임시 로그(종료 시 삭제): ${LOG_DIR}"
+if [ "${fast}" = true ]; then
+  step public-safe     "${ROOT}/scripts/check-public-safe.sh"
+  step file-length     node "${ROOT}/scripts/check-file-length.mjs"
+  step web-install     pnpm --dir "${ROOT}/web" install --frozen-lockfile
+  step migration-versions bash -c "cd '${ROOT}' && node scripts/check-migration-versions.mjs"
+  step web-typecheck   pnpm --dir "${ROOT}/web" typecheck
+  step web-test        pnpm --dir "${ROOT}/web" test:node
+  step unit            bash -c "cd '${ROOT}' && node --test 'test/unit/**/*.test.ts'"
+  step quality         bash -c "cd '${ROOT}' && scripts/quality.sh check"
+  echo "빠른 검사를 모두 통과했다. 나머지는 Draft CI 가 확인한다."
+  exit 0
+fi
 if [ "$#" -gt 0 ]; then
   echo "브라우저 검사는 인자로 준 spec 만 돌린다: $*"
 fi
