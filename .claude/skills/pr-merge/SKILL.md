@@ -15,22 +15,23 @@ description: |
 
 | 단계 | 이름 | 통과 조건 | reference |
 | --- | --- | --- | --- |
-| 1 | Draft PR 열기 | `scripts/check-local.sh` 가 0 으로 끝났고 `gh pr create --draft` 가 PR 주소를 냈다 | |
+| 1 | Draft PR 열기 | `scripts/check-local.sh --fast` 가 0 으로 끝났고 `gh pr create --draft` 가 PR 주소를 냈다 | |
 | 2 | Draft CI | `gh pr checks` 의 모든 검사가 통과다 | |
 | 3 | main 합치고 Ready | 최신 main 을 합친 커밋의 CI 가 모두 통과했고 `gh pr ready` 가 끝났다 | |
 | 4 | 리뷰 반영 | 남은 🔴 P1 과 🟠 P2 를 한 번 고쳐 push 했거나 P2 를 고치지 않는 까닭을 PR 에 남겼다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
 | 5 | 머지 판정 | 지금 main 과 합친 상태에서 돈 CI 가 필수 검사를 모두 통과했다 | |
 
-아래 명령의 `$PR` 은 PR 번호, `$SPEC` 은 고친 화면과 그 컴포넌트를 쓰는 화면의 spec 이름이다.
+아래 명령의 `$PR` 은 PR 번호다.
 
 ## 1. Draft PR 열기
 
-push 전에 로컬 검사를 돌리고 Draft 로 연다.
+push 전에 빠른 로컬 검사만 돌리고 Draft 로 연다.
+backend 테스트와 MySQL, 브라우저처럼 무거운 검사는 로컬에서 기다리지 않고 Draft CI 에 맡긴다.
 Draft 에서는 브라우저 전체 shard 를 포함한 CI 가 돌고 Claude 리뷰는 돌지 않는다.
 
 ```bash
 # cwd: 저장소 root
-scripts/check-local.sh "$SPEC"
+scripts/check-local.sh --fast
 git push -u origin HEAD
 gh pr create --draft --title "$TITLE" --body-file "$BODY_FILE"
 ```
@@ -48,13 +49,13 @@ gh pr checks "$PR" --watch
 
 Draft CI 가 전체 통과하면 Ready 직전에 최신 main 을 작업 브랜치에 merge 한다.
 rebase 와 force push 로 이력을 바꾸지 않는다.
-합친 뒤 관련 spec 을 포함해 다시 검사하고 push 한다. 코디네이터가 충돌을 직접 풀었을 때도 같은 검사를 거친다.
+합친 뒤 빠른 검사를 다시 돌리고 push 한다. 코디네이터가 충돌을 직접 풀었을 때도 같은 검사를 거친다.
 
 ```bash
 # cwd: 저장소 root
 git fetch origin
 git merge origin/main
-scripts/check-local.sh "$SPEC"
+scripts/check-local.sh --fast
 git push
 gh pr checks "$PR" --watch
 gh pr ready "$PR"

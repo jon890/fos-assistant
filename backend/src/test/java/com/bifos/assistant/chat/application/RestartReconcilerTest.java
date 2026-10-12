@@ -864,6 +864,70 @@ class RestartReconcilerTest {
     }
 
 
+    @Test
+    @DisplayName("같은 흐름의 두 자식을 정할 때 마지막 자식까지 잠금을 유지하고 끝 사건을 한 번 낸다")
+    void releasesSharedFlowLockAfterLastChild() {
+        Conversation flowConversation = flowConversation();
+        AgentExecution first = runningFlowChild(flowConversation);
+        AgentExecution second = executions.save(running(flowConversation, worker)
+            .parentExecutionId(first.parentExecutionId())
+            .rootExecutionId(first.treeRootId())
+            .hermesRunId("run-" + UUID.randomUUID())
+            .build());
+        stub.willLookup(first.hermesRunId(), finished(first, "cancelled", ""));
+        stub.willLookup(second.hermesRunId(), HermesRunLookup.running());
+        List<ChatEvent> events = new CopyOnWriteArrayList<>();
+        Runnable stopListening = hub.subscribe(flowConversation.id(), events::add);
+        try {
+            reconciler.claim();
+            reconciler.reconcile(LONG_WAIT);
+            awaitStatus(first, ExecutionStatus.CANCELLED);
+            awaitLookups(second, 1);
+            assertThat(turns.markOf(flowConversation.id()))
+                .isEqualTo(new TurnMark(true, first.treeRootId()));
+            assertThat(events).isEmpty();
+            stub.willLookup(second.hermesRunId(), finished(second, "cancelled", ""));
+            awaitStatus(second, ExecutionStatus.CANCELLED);
+            awaitIdle(flowConversation.id());
+            assertThat(events).extracting(ChatEvent::type, ChatEvent::code)
+                .containsExactly(tuple("error", "HERMES_RUN_FAILED"));
+        } finally {
+            stub.willLookup(second.hermesRunId(), finished(second, "cancelled", ""));
+            awaitIdle(flowConversation.id());
+            stopListening.run();
+        }
+    }
+
+
+    @Test
+    @DisplayName("같은 프로세스에서 다시 시작하면 남겨 둔 잠금을 버리고 같은 실행을 새 잠금으로 복구한다")
+    void recoversSameRunAfterLifecycleRestart() {
+        AgentExecution row = chatTurn(conversation, chief);
+        stub.willLookup(row.hermesRunId(), HermesRunLookup.running());
+        reconciler.claim();
+        TurnHandle oldHandle = turns.find(row.id()).orElseThrow();
+        reconciler.reconcile(LONG_WAIT);
+        awaitLookups(row, 1);
+        reconciler.stop();
+        try {
+            awaitUntil(() -> reconciler.activeThreads() == 0, "중지한 묻기가 끝나지 않았다");
+            assertThat(statusOf(row)).isEqualTo(ExecutionStatus.RUNNING);
+            assertThat(turns.find(row.id())).contains(oldHandle);
+            stub.willLookup(row.hermesRunId(), finished(row, "completed", "복구한 답"));
+        } finally {
+            reconciler.start();
+        }
+        // 테스트 설정은 기동 시 자동 잡기를 끈다. 새 lifecycle에서 잡기는 직접 시작한다.
+        reconciler.claim();
+        assertThat(turns.find(row.id()).orElseThrow()).isNotSameAs(oldHandle);
+        reconciler.reconcile(LONG_WAIT);
+        awaitStatus(row, ExecutionStatus.SUCCEEDED);
+        awaitIdle(conversation.id());
+        assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
+            .extracting(ChatMessage::content).containsExactly("복구한 답");
+    }
+
+
     private Conversation flowConversation() {
         Agent flowed = agent("flowed", "흐름");
         flowed.assignFlow(ResearchAndBuildFlow.NAME);

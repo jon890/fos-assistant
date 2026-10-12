@@ -8,7 +8,25 @@ import {
   createMediaFixture,
   inspectMediaFixture,
   mediaMetadataCases,
+  requireSourceByteLength,
 } from "../support/media-pipeline-fixture.ts";
+
+test("원본 길이는 같은 값도 허용하고 불일치·0·음수·비정수는 거부한다", () => {
+  const first = Buffer.from([1, 2, 3]);
+  const second = Buffer.from([4, 5, 6]);
+  assert.doesNotThrow(() => requireSourceByteLength(first, 3));
+  assert.doesNotThrow(() => requireSourceByteLength(second, 3));
+  for (const length of [0, -1, 2, 3.5, NaN, Infinity, "3", undefined]) {
+    assert.throws(
+      () => requireSourceByteLength(first, length),
+      /SOURCE_BYTE_LENGTH_INVALID/,
+    );
+  }
+  assert.throws(
+    () => requireSourceByteLength(Buffer.alloc(0), 0),
+    /SOURCE_BYTE_LENGTH_INVALID/,
+  );
+});
 
 const coordinates = [
   [28, 28],

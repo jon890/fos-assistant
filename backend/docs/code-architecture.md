@@ -297,6 +297,10 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 사건의 버전 차이」](../../hermes/docs/hermes-contract.md#runs-응답과-사건의-버전-차이)가 갖는다. 시스템 판단은 실제 모델을 모르면 요청값으로 대체하지 않는다.
 최종 결과 없는 실패·취소는 이미 저장한 사용량을 보존하고, 취소의 후속 저장은 기존 종료 시각을 보존한다. 두 서비스 사이에 새 트랜잭션을 두지 않는다.
 
+`AgentExecution`은 실행 한 줄의 상태 전이와 사용량 대입을 맡는다. 성공·실패·취소가 받은 provider와 모델,
+토큰 네 칸은 private `recordUsage`에서 같은 순서로 적고, 비용과 종료 시각, 관측 종료와 상태 변경은 각 종료 메서드가 맡는다.
+공개 중첩 Builder와 JPA 필드 매핑은 유지하며, getter는 클래스의 `@Getter`가 만든다.
+
 `instructions` 를 조립하는 순서는 아래와 같다.
 
 | 순서 | 담는 것 |
@@ -532,6 +536,12 @@ node scripts/check-file-length.mjs --update
 갱신한 기준 파일은 같은 커밋에 넣는다. 새 코드는 기준 목록에 추가하지 않고 나눈다.
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
+
+`RestartReconciler`는 기동 시 잡기와 묻기, 중지와 재시작, 대화 잠금의 획득과 해제 순서를 맡는다.
+같은 package의 `RecoveredConversationLock`은 복구한 대화 잠금의 handle과 아직 정해지지 않은 실행 수,
+실행 번호 목록과 루트 포함 여부만 담는다. Spring bean이 아니며 공개 API를 추가하지 않는다.
+변경 가능한 값은 `RestartReconciler`의 모니터로 지킨다.
+마지막 실행을 정한 뒤 대기 행 멈춤과 끝 사건을 처리하고 handle을 닫는 순서도 그 클래스에 남는다.
 
 `MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
 `MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
