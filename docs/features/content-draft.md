@@ -6,7 +6,7 @@ typed 원고와 호출자가 검증한 원본 참조를 기존 `DraftInput`으�
 compiler는 파일이나 외부 서비스를 읽지 않으며 기존 `render_draft/save_draft`의 자유 형식 입력을 바꾸지 않는다.
 관찰 저장과 REST·MCP 연결은 [사진 첨부 계약](attachment.md#관찰-api와-mcp-연결)에 따라 구현되었다.
 순수 compiler와 합성 판정, Control Plane의 원고 revision 저장 REST가 구현되어 있다. MCP 도구·실행 사건 가림·fos-ctx 서명 필수 목록도 구현되어 있다.
-미리보기 API·승인·job·화면 연동은 원고 저장 이후의 범위다.
+원고 revision의 불변 preview snapshot 서비스와 최소 참조 표가 구현되어 있다. 공개 preview API·승인·job 실행·화면 연동은 후속 범위다.
 
 ## 정적 canonical 계약
 
@@ -121,7 +121,53 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 **본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
 로컬 합성 시험은 잘못된 stdout과 JSONRPC·notification validation, callback 예외의 전후 본문 노출을 검사한다.
 운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
-이번 구현은 로컬 compile 경계이며 원고 최초 MCP 생성, snapshot 영속화, 승인과 실제 네이버 저장을 열지 않는다.
+compile transport와 preview snapshot 서비스는 로컬 원고로 검증한다. 원고 최초 MCP 생성도 구현되어 있으며 공개 preview API·승인과 실제 네이버 저장은 후속 범위다.
+
+## 불변 preview snapshot
+
+`ContentDraftSnapshots.preview`는 기존 REST 원고의 ID·revision·binding ID와 인증 내부 맥락의 origin 실행 ID를 받는다.
+최초 MCP 생성 idempotency와 독립적이며 MCP 생성 타입이나 handler를 재사용하지 않는다.
+사용자 입력에서 owner·profile·origin 실행·파일명·경로를 받지 않는다. 현재 profile과 connector ID는 요청자의 실제 바인딩에서 정한다.
+chat은 `ContentDraftBindingAccess`의 불변 stamp만 사용하고 connector 엔티티와 `McpCaller`를 import하지 않는다.
+
+1. 트랜잭션 밖에서 현재 origin·사용자 권한과 binding을 확인하고 compile 전용 선언·정책을 준비한다.
+2. coordinator에 한 번 진입하여 사용자 → 대화 → 첨부 ID 오름차순으로 잠근다. 현재 revision·기한·원본 byte·관찰 참조·binding 판을 고정한다.
+3. 잠금을 풀고 compiler HTTP를 호출한다. 서버의 원본 파일명·실행 관점 첨부 루트·사용자 디렉터리 키·내부 대화 ID로 `ResolvedAsset`을 계산한다. prompt를 파싱하지 않는다.
+4. 응답의 전체 canonical tuple·manifest·관찰 설명·payload와 두 지문을 요청에서 재계산한 값에 대조한다. 다시 잠금 밖에서 선언과 stamp를 준비한다.
+5. 같은 순서로 잠가 현재 권한·기한·revision·원본 byte·관찰 대응·binding 판이 그대로일 때만 참조와 지문을 저장한다.
+
+원본은 `AttachmentFingerprint`로 실제 크기와 SHA-256을 다시 읽는다. DB 참조 유효성만으로 원본 일치를 주장하지 않는다.
+observationRef는 고정한 attachment·owner·conversation·revision·지문과 일치하고 읽을 수 있는 관찰이어야 한다.
+설명은 그 관찰 summary의 앞 300 code point이며 새 분석을 하지 않는다. 반복 사진의 설명이 서로 다르면 거절한다.
+한 asset의 반복 자리는 canonical position별로 보존하며 resolvedAssets에는 한 번만 전달한다.
+미리보기에는 canonical 원고와 포함·빠진 첨부 ID를 돌려주고 파일명·내부 경로·compiled payload는 내보내지 않는다.
+
+`readCurrentSnapshot`은 외부 트랜잭션 없이 coordinator에 한 번 들어가는 독립 조회다.
+`requireCurrentSnapshotParticipant`는 MANDATORY와 coordinator 참가 여부를 모두 확인하는 내부 API다.
+참가 함수는 저장소·본문 복호화·입력 reader·원본 검사를 직접 사용하고 기존 원고 서비스의 read나 private helper를 재호출하지 않는다.
+참가 경로의 호출자는 선언과 정책 포함 stamp를 잠금 밖에서 준비하고 반환 입력의 binding과 명시적으로 대조한 뒤 사용해야 한다.
+참가 함수는 저장된 정책 지문을 반환하며 현재 catalog까지 검증하지 않는다. 참가 함수에서 catalog나 compiler HTTP를 기다리지 않는다.
+원격 catalog와 DB commit의 원자성을 보장하지 않으며 준비한 선언의 판과 현재 DB binding 판을 각각 검사한다.
+
+같은 owner·대화·revision·binding·compiler hash와 권한 지문의 반복·동시 preview는 같은 공개 snapshot ID를 반환한다.
+서버는 `[1,"content-draft-preview-authorization",ownerUserId,conversationId,revisionId,originExecutionId,agentId,connectionId,bindingId,connectionUpdatedAt,bindingUpdatedAt,profileHash,connectorId,policyFingerprint]`를 고정 순서 UTF-8 JSON tuple로 직렬화해 SHA-256 권한 지문을 계산한다.
+두 시각은 DB와 같은 MICRO 정밀도로 절삭하고 UTC 소수 여섯 자리로 적는다. profileHash는 profile 원문의 UTF-8 SHA-256이다.
+이 지문은 암호학적 서명이 아니며 현재 권한·캡처 값·기한·원본 검사를 대신하지 않는다. 모델이나 DTO에서 지문을 받지 않는다.
+유효한 binding·connection 판이나 정책이 바뀌거나 새 유효 origin으로 실행하면 같은 원고 revision에도 새 공개 ID를 만든다.
+옛 행과 job·승인의 identity 및 캡처 값은 바꾸거나 지우지 않으며 옛 권한은 계속 거절한다. CANCELLED origin은 새 지문을 만들어도 허용하지 않는다.
+현재 운영 API에는 agent profile 변경 기능이 없다. profile hash는 실행·설치 맥락을 구별하기 위한 캡처 값이다.
+UNIQUE 실패 뒤에는 새 owner 범위 읽기로 기존 행을 찾고, 기존 origin과 기한도 계속 검사한다.
+허용 목록 철회·binding 해제·원고 수정·첨부 교체·삭제 요청·만료는 새 snapshot을 수락하지 않는다.
+기존 snapshot과 job 이력은 자동 정리하지 않는다. 본문은 기존 암호화 revision에만 남는다.
+
+Java HTTP client는 POST·서비스 Bearer·profile/operation/args tuple만 전달한다.
+512KiB 응답은 chunked여도 tree 전에 차단하고 전체 응답은 5초로 제한한다. canonical 64KiB·compiled 256KiB·원본 50개 상한을 유지한다.
+Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두 적용하며 중단·실패 시 반환한다.
+성공 envelope의 capabilities는 compile=true/start=false/status=false만 수용한다. 오류 body·raw 인자·exception cause를 로그나 응답에 싣지 않는다.
+스키마·설치·HTTP 장애는 원고의 기존 안전한 오류로 끝낸다.
+
+검증은 공유 golden의 Java UTF-8 바이트·두 지문, 실제 HTTP 대역, Spring 동시 revision·권한 철회·원본 교체, H2 마이그레이션과 fresh MySQL을 사용한다.
+운영 Hermes 왕복·실제 provider·승인·worker 시작·복구·공개 handler·프론트·실제 30장 canary는 이 범위에서 실행하지 않는다.
 
 ## 단계별 합성 판정
 
@@ -423,7 +469,7 @@ revision·asset·현재 번호·만료 단축은 한 트랜잭션으로 커밋�
 
 ### 후속 경계와 완료 판정
 
-preview, snapshot의 Java 재계산, 승인, 영속 job, 웹 편집은 이 저장 기능의 후속이다.
+preview snapshot 서비스와 Java 재계산은 구현되어 있다. 공개 preview API·승인·job 실행과 웹 편집은 후속 범위다.
 승인 표·무효화 포트·빈 구현·preview 파일을 미리 만들지 않는다.
 승인을 구현할 때 PENDING 취소와 EXECUTING 판정, 사용자 다음 action 잠금 순서를 별도 검토한다.
 현재 일반 커넥터 승인을 원고 승인으로 취급하지 않는다.

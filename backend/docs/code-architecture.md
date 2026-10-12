@@ -170,6 +170,23 @@ domain과 infra는 admin을 import하지 않는다.
 현재 admin 범위의 Service·공개 application record·HTTP record·설정 선언의 역할과 의존도 검사하며,
 기존 위반 기준 파일로 얼리지 않는다. 목적별 하위 패키지도 기존 층·웹 의존 방향 검사의 대상이다.
 
+### 에이전트 지연 정리
+
+`agent.purge.application`에 `AgentPurger`, `AgentPurgeWriter`, `AgentPurgeParticipant`를 모은다.
+정리 결과 `AgentPurgeOutcome`는 그 아래 `application.model`에 둔다.
+설정 `AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application`에 둔다.
+참여 구현은 `chat`, `connector`, `proactive`가 소유하며 정리 실행은 구현 기능을 import하지 않는다.
+
+먼저 읽기 트랜잭션으로 대기 여부를 확인하고, 관리하는 profile을 회수한 뒤,
+쓰기 트랜잭션에서 에이전트 행을 잠그고 다시 확인한다.
+참여 표와 FK 참조를 해제한 뒤 에이전트 행을 지운다.
+`WAITING`, `GONE`, `PURGED`와 실패 시 행 보존·backoff, 주기와 설정 키는 기존 계약을 유지한다.
+
+검사: `ArchitectureRules.AGENT_PURGE_CONTRACT_PLACEMENT`
+전체 운영 루트의 top-level 이름으로 네 타입을 선택하고 기대 FQN과 각 대상 수 1을 강제한다.
+누락·중복·빈 선택과 옛 위치 복귀, purge 하위 기능의 잘못된 역할과 역방향 의존도 raw 검사로 실패한다.
+기존 층·웹 의존 규칙과 공용 fixture를 함께 쓰며 기존 위반 기준 파일을 추가하지 않는다.
+
 ### 최상위 패키지의 층 순서
 
 최상위 패키지의 순서는 `TopLevelPackageOrder.ORDER` 가 아래에서 위로 적어 갖는다.
@@ -203,7 +220,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 `followup` 은 `chat` 바로 위다. 대화 주인을 확인하고 공개 식별자를 얻으려고 `chat` 을 쓰고, 제안 도구(`mcp`)와 먼저 알리기(`attention`)가 `followup` 을 쓴다.
 `browser` 는 `user` 바로 위다. 관리자 목록의 사용자 이름을 읽으려고 `user` 를 쓰고, 사용자를 끈 사건(`shared.auth.UserAccessRevoked`)을 받는다. 커넥터 바인딩이 브라우저 중계를 쓰게 되므로 `connector` 보다 아래에 둔다. 중계가 바인딩 표식의 주인을 찾으려고 `browser` 에 port(`BrowserGrantOwners`)를 두고 `connector` 가 구현한다.
 `notification` 은 `user` 바로 위다. 알림을 만드는 쪽(`connector`, 그 위의 패키지)이 모두 이 패키지를 부르고, 이 패키지는 알림을 받는 사용자 말고 다른 도메인을 모른다.
-`agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent` 에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
+`agent` 는 지운 에이전트의 행을 정리할 때 위 패키지 표의 딸린 줄을 직접 지우지 않는다. `agent.purge.application`에 port(`AgentPurgeParticipant`)를 두고 `chat`, `proactive`, `connector` 가 구현해, 기다릴지 답하고 자기 표의 줄을 지우거나 비운다([ADR-20261009 / agent-purge](adr/ADR-20261009-agent-purge.md)).
 `attention` 은 `workspace` 바로 아래다. 먼저 알리기의 후보를 읽으려고 `usage`, `chat`, `agent`, `memory`, `connector`, `followup` 의 `application` 을 부르고, 어느 패키지도 `attention` 을 import 하지 않는다.
 `workspace` 는 맨 위다. 함께 쓰는 에이전트와 관리자 용량의 에이전트 이름을 읽으려고 `agent` 를, 도는 실행 수를 읽으려고 `usage` 를, 관리자 용량의 사용자 이름을 읽으려고 `user` 를 부른다. 어느 패키지도 `workspace` 를 import 하지 않는다.
 검사: `ArchitectureRules.TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER`, 근거: ADR-068
@@ -339,6 +356,10 @@ MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
 **검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@Tag("mysql")` 검사는 예외다.
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
+
+`ContentDraftSnapshotJpaMigrationTest`는 공유 컨텍스트를 그대로 쓰며, 실제 Flyway·JPA 기동은 별도 H2 DB의 애플리케이션을 직접 띄워 검사 안에서 닫는다.
+기동용 컨텍스트를 Spring 검사 캐시에 넣으면 캐시에서 밀려난 `create-drop` 컨텍스트가 다른 검사의 공유 스키마를 지울 수 있다.
+`ContentDraftSnapshotContextIsolationTest`는 공유 검사와 claim 검사 컨텍스트가 이미 떠 있을 때도 기동과 종료 뒤에도 두 컨텍스트에서 공유 스키마를 읽을 수 있는지 확인한다.
 - 기반에 있는 타입은 `@Autowired` 로 받는다.
 - 설정 값을 바꿔야 하면 아래 「설정 바꾸기」 를 쓴다.
 - mock 이 필요하던 빈은 기반의 spy 로 올리고 `doReturn(...).when(spy)` 로 바꾼다. 정하지 않은 메서드는 실제로 돈다.
@@ -675,3 +696,17 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 줄은 `bytes` 가 큰 순서다.
 
 루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
+
+### 원고 snapshot의 참가 경계
+
+chat의 `ContentDraftSnapshots`가 preview 저장과 현재 원본 재검사를 소유한다.
+`ContentDraftSnapshotInputs`는 기존 원고·revision·asset 저장소와 복호화·reader를 사용하며 기존 `ContentDraftService`의 helper를 넓히지 않는다.
+`ContentDraftBindingAccess`는 DB 권한 검사와 잠금 밖의 선언 준비를 나누고 connector의 `ConnectorContentDraftBindings`가 구현한다.
+`ContentDraftBindingStamp`에는 식별자·수정 시각·profile·connector ID·정책 지문만 담는다. catalog 전체와 비밀값은 넘기지 않는다.
+`HttpContentDraftSnapshotClient`는 제한된 서비스 HTTP만 맡고, chat의 hash 검증은 요청과 응답 전체를 대조한다.
+독립 조회는 coordinator에 한 번 진입한다. 참가 API는 MANDATORY와 `requireParticipant`를 모두 확인한다.
+compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메인·port를 이유로 패키지 순서나 기존 구조 규칙을 바꾸지 않는다.
+참가 호출자는 밖에서 준비한 정책 포함 stamp를 반환 입력의 binding과 명시적으로 대조한 뒤 사용한다.
+참가 함수만으로 현재 catalog를 검증했다고 판단하지 않는다. 원격 catalog와 DB commit은 원자적이지 않다.
+`ContentDraftAuthorizationHash`는 서버의 캡처 값으로 권한 지문을 계산하여 같은 내용의 재사용 범위를 구별한다.
+저장된 캡처 값과 현재 권한·원본 검사를 유지하며 기존 행의 지문이나 캡처 값은 갱신하지 않는다.

@@ -8,6 +8,7 @@ import {
   CONNECTOR_ACTION_ERROR_MESSAGES,
   CONNECTOR_ACTION_STATUSES,
   connectorActionErrorMessage,
+  visibleApprovalArgLabels,
   type ConnectorAction,
   type ConnectorActionStatus,
   type ConnectorGrant,
@@ -135,6 +136,10 @@ function safeAction(value: unknown): ConnectorAction {
     expiresAt: nullableText(item.expiresAt),
     grantAllowed: item.grantAllowed === true,
     hiddenArgs: item.hiddenArgs === true,
+    argLabels: visibleApprovalArgLabels(
+      item.argLabels,
+      nullableText(item.argsJson),
+    ),
   };
 }
 
