@@ -96,6 +96,8 @@ class ContentDraftJobsTest extends ContentDraftFixture {
     @Autowired
     AgentRepository agents;
     @Autowired
+    com.bifos.assistant.agent.admin.application.AgentAdminService agentAdmin;
+    @Autowired
     AgentExecutionRepository executions;
     @Autowired
     ExecutionRecorder recorder;
@@ -386,12 +388,47 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         personAccess.setEnabled(person.id(), false);
         forbidden(() -> authorizer.authorize(ticket, "save", null));
         personAccess.setEnabled(person.id(), true);
-        jdbc.update("update agent set enabled=false where id=?", binding.agent().id());
+        setAgentEnabled(false);
         forbidden(() -> authorizer.authorize(ticket, "save", null));
-        jdbc.update("update agent set enabled=true where id=?", binding.agent().id());
+        setAgentEnabled(true);
         recorder.cancel(executions.findById(origin.id()).orElseThrow());
         forbidden(() -> authorizer.authorize(ticket, "save", null));
         assertThat(jobRows.findAll().getFirst().saveClaimedAt()).isNull();
+    }
+
+
+    @Test
+    @DisplayName("관리자 비활성이 에이전트 잠금을 쥐면 저장 허가는 커밋을 기다린 뒤 거절한다")
+    void waitsForAgentAdminRevocation() throws Exception {
+        String ticket = approved();
+        authorizer.authorize(ticket, "start", null);
+        var held = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            var writer = pool.submit(() -> new TransactionTemplate(manager).executeWithoutResult(status -> {
+                setAgentEnabled(false);
+                agents.flush();
+                held.countDown();
+                await(release);
+            }));
+            assertThat(held.await(5, TimeUnit.SECONDS)).isTrue();
+            var claim = pool.submit(() -> outcome(() -> authorizer.authorize(ticket, "save", null)));
+            try {
+                Thread.sleep(300);
+                assertThat(claim.isDone()).isFalse();
+            } finally {
+                release.countDown();
+            }
+            writer.get(10, TimeUnit.SECONDS);
+            assertThat(claim.get(10, TimeUnit.SECONDS)).isEqualTo("FORBIDDEN");
+        }
+        assertThat(jobRows.findAll().getFirst().saveClaimedAt()).isNull();
+    }
+
+
+    private void setAgentEnabled(boolean enabled) {
+        agentAdmin.update(binding.agent().code(), new com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand(
+            enabled, AgentVisibility.PRIVATE, null, null, null));
     }
 
 
