@@ -41,7 +41,7 @@
     "get_profile": {
       "risk": "READ",
       "title": "계정 정보 보기",
-      "summary": "연결한 Gmail 주소와 전체 메일 수를 확인해요.",
+      "summary": "연결한 Gmail 주소와 전체 메일 수를 읽어요.",
       "description": "연결한 Gmail 계정의 이메일 주소와 전체 메일 수, 스레드 수를 읽습니다. 입력 인자는 없으며 email, messages_total, threads_total을 돌려줍니다."
     },
     "list_labels": {
@@ -64,8 +64,8 @@
     },
     "get_thread": {
       "risk": "READ",
-      "title": "스레드 읽기",
-      "summary": "같은 대화로 묶인 메일을 차례로 읽어요. 한 번에 20통까지 읽어요.",
+      "title": "주고받은 메일 읽기",
+      "summary": "한 메일에 이어진 답장까지 차례로 읽어요. 한 번에 20통까지 읽어요.",
       "description": "thread_id로 같은 스레드에 속한 메일을 응답 순서대로 읽습니다. 최대 20통, 각 본문 최대 5,000자이며 messages_truncated와 각 메일의 body_truncated로 잘림을 확인합니다. 각 메일의 머리 정보, 라벨과 첨부 목록도 포함하지만 첨부 파일을 내려받지는 않습니다."
     },
     "create_draft": {
@@ -94,7 +94,7 @@
         "message_id"
       ],
       "title": "라벨 바꾸기",
-      "summary": "메일 한 통에 라벨을 붙이거나 떼요. 보관과 읽음 표시도 여기서 하고, 매번 승인을 받아요.",
+      "summary": "메일 한 통에 라벨을 붙이거나 떼요. 보관과 읽음 표시도 여기서 하고, 바꿀 때마다 승인해요.",
       "description": "message_id가 가리키는 메일 한 통에 라벨을 붙이거나 뗍니다. add_labels와 remove_labels는 쉼표로 구분한 라벨 ID 또는 이름이며 둘 중 하나는 필요합니다. 예를 들어 remove_labels에 INBOX를 넣으면 받은편지함에서 보관합니다. TRASH와 SPAM 라벨은 추가와 제거 모두 허용하지 않습니다. 변경한 메일 ID와 라벨 목록을 돌려줍니다.",
       "arg_labels": {
         "message_id": "메일 ID",
@@ -107,7 +107,7 @@
       "grant": false,
       "outbound": true,
       "title": "메일 보내기",
-      "summary": "새 메일을 보내요. 보낼 때마다 받는 사람과 내용을 보고 승인해야 해요.",
+      "summary": "새 메일을 보내요. 보낼 때마다 내용을 보고 승인해요.",
       "description": "to, subject, body로 새 메일을 실제 발송합니다. cc와 bcc는 선택 사항이며 수신자는 쉼표로 구분한 이메일 주소를 받습니다. 제목과 본문은 필수이고 본문은 평문입니다. 첨부 입력은 지원하지 않습니다. 발송 응답의 id와 thread_id를 돌려주며 결과를 확인할 수 없으면 보낸편지함을 확인한 뒤 처리해야 합니다. 확인 없이 다시 보내면 중복 발송될 수 있습니다.",
       "arg_labels": {
         "to": "받는 사람",
@@ -125,7 +125,7 @@
         "message_id"
       ],
       "title": "답장 보내기",
-      "summary": "받은 메일에 같은 스레드로 답장을 보내요. 보낼 때마다 승인해야 해요.",
+      "summary": "받은 메일에 이어서 답장을 보내요. 보낼 때마다 승인해요.",
       "description": "message_id로 원래 메일의 스레드를 확인한 뒤 to, subject, body로 답장을 실제 발송합니다. 받는 사람과 제목은 직접 지정해야 하며 cc를 추가할 수 있습니다. bcc와 첨부 입력은 지원하지 않습니다. 발송한 메일의 id와 thread_id를 돌려줍니다. 결과가 불명확하면 보낸편지함에서 확인하고 같은 답장을 바로 다시 보내지 않습니다.",
       "arg_labels": {
         "message_id": "메일 ID",
@@ -176,7 +176,7 @@
       "grant": false,
       "outbound": false,
       "title": "필터 만들기",
-      "summary": "앞으로 받는 메일을 자동으로 분류할 필터를 만들어요. 매번 승인을 받아요.",
+      "summary": "앞으로 받는 메일을 자동으로 분류할 필터를 만들어요. 만들 때마다 승인해요.",
       "description": "앞으로 도착하는 메일에 적용할 필터를 만듭니다. from, to, subject, query, negated_query, has_attachment, size 중 검색 조건이 하나 이상 필요하고 add_labels 또는 remove_labels로 라벨 동작도 지정해야 합니다. has_attachment는 문자열 true 또는 false, size는 숫자 문자열이며 size_comparison의 larger 또는 smaller와 함께 넣습니다. 라벨은 쉼표로 구분한 ID나 이름을 받습니다. forward를 통한 전달과 TRASH, SPAM 라벨 변경은 허용하지 않습니다. 만든 필터를 돌려주며 기존 메일은 일괄 변경하지 않습니다.",
       "arg_labels": {
         "from": "보낸 사람",
@@ -200,7 +200,7 @@
         "filter_id"
       ],
       "title": "필터 지우기",
-      "summary": "저장된 필터 하나를 지워요. 메일은 지우지 않고, 매번 승인을 받아요.",
+      "summary": "저장된 필터 하나를 지워요. 메일은 지우지 않고, 지울 때마다 승인해요.",
       "description": "filter_id로 저장된 Gmail 필터 한 개를 삭제하고 deleted와 filter_id를 돌려줍니다. 이후 도착하는 메일에는 이 규칙이 적용되지 않지만 기존 메일에 이미 붙은 라벨은 되돌리지 않습니다.",
       "arg_labels": {
         "filter_id": "필터 ID"
@@ -211,7 +211,7 @@
       "grant": false,
       "outbound": false,
       "title": "검색한 메일의 라벨 바꾸기",
-      "summary": "검색에 걸린 메일 500통까지 라벨을 한꺼번에 바꿔요. 승인할 때 바뀔 메일 수를 함께 보여 줘요.",
+      "summary": "검색에 걸린 메일 500통까지 라벨을 한꺼번에 바꿔요. 바꿀 때마다 바뀔 메일 수를 보고 승인해요.",
       "description": "query에 맞는 기존 메일의 라벨을 일괄 변경합니다. add_labels와 remove_labels는 쉼표로 구분한 라벨 ID 또는 이름이며 TRASH와 SPAM은 허용하지 않습니다. expected_count에는 사용자가 확인한 정확한 대상 수를 숫자 문자열로 넣습니다. 최대 500통까지 처리하며 검색 결과 수가 다르면 변경하지 않습니다. 변경 건수와 적용한 라벨 ID를 돌려주며 새 메일에 적용할 필터는 만들지 않습니다.",
       "arg_labels": {
         "query": "검색 조건",
