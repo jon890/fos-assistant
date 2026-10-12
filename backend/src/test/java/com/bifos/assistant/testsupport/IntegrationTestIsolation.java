@@ -154,6 +154,7 @@ public class IntegrationTestIsolation implements BeforeEachCallback, AfterEachCa
         List<Throwable> failures = new ArrayList<>();
         attempt(failures, () -> overridables(context).forEach(OverridableLiveProperties::reset));
         attempt(failures, () -> context.getBean(StubHermesRunsClient.class).reset());
+        attempt(failures, () -> context.getBean(RecordingContentDraftJobStarter.class).reset());
         attempt(failures, () -> context.getBean(TestClock.class).reset());
         attempt(failures, () -> context.getBean(CapturingTaskScheduler.class).reset());
         attempt(failures, () -> context.getBean(WakeRetryThreads.class).reset());

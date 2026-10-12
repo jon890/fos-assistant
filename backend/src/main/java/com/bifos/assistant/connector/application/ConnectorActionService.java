@@ -66,6 +66,7 @@ public class ConnectorActionService {
             NotificationService notifications,
             ConversationNotices conversations,
             DecisionFeedbackRecorder feedback,
+            ContentDraftSaveApproval contentDrafts,
             PlatformTransactionManager transactionManager) {
         this(
                 actions,
@@ -80,6 +81,7 @@ public class ConnectorActionService {
                 notifications,
                 conversations,
                 feedback,
+                contentDrafts,
                 transactionManager,
                 Clock.systemUTC());
     }
@@ -97,6 +99,7 @@ public class ConnectorActionService {
             NotificationService notifications,
             ConversationNotices conversations,
             DecisionFeedbackRecorder feedback,
+            ContentDraftSaveApproval contentDrafts,
             PlatformTransactionManager transactionManager,
             Clock clock) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
@@ -113,6 +116,7 @@ public class ConnectorActionService {
                 feedback,
                 details,
                 signals,
+                contentDrafts,
                 transactions,
                 clock);
         this.lifecycle = new ConnectorActionLifecycle(actions, grants, details, signals, transactions, clock);

@@ -63,6 +63,7 @@ class ConnectorActionApproval {
     private final DecisionFeedbackRecorder feedback;
     private final ConnectorActionDetails details;
     private final ConnectorActionSignals signals;
+    private final ContentDraftSaveApproval contentDrafts;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -77,6 +78,7 @@ class ConnectorActionApproval {
             DecisionFeedbackRecorder feedback,
             ConnectorActionDetails details,
             ConnectorActionSignals signals,
+            ContentDraftSaveApproval contentDrafts,
             TransactionTemplate transactions,
             Clock clock) {
         this.actions = actions;
@@ -89,6 +91,7 @@ class ConnectorActionApproval {
         this.feedback = feedback;
         this.details = details;
         this.signals = signals;
+        this.contentDrafts = contentDrafts;
         this.transactions = transactions;
         this.clock = clock;
     }
@@ -107,6 +110,16 @@ class ConnectorActionApproval {
      * @param grant 승인하면서 그 도구에 줄 상시 허락의 기간. 주지 않으면 null
      */
     ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
+        // 원고 snapshot 에 연결된 줄은 트랜잭션 밖에서 고르고 준비한 뒤 원고 저장 승인으로 넘긴다. 상시 허락은 주지 않는다.
+        if (contentDrafts.select(user, actionId).isPresent()) {
+            if (grant != null) {
+                throw grantNotAllowed();
+            }
+            ConnectorAction finished = contentDrafts.approvePrepared(user, contentDrafts.prepare(user, actionId));
+            feedback.record(actionFeedback(finished, FeedbackEventType.APPROVED, FeedbackActor.USER));
+            signals.publish(finished);
+            return details.view(finished);
+        }
         Approval approval = transactions.execute(status -> beginApproval(user, actionId, grant));
         // 사용자가 승인했다. 그 뒤 실행하지 못하고 끝난 줄도 사용자의 반응은 승인이다.
         feedback.record(actionFeedback(approval.action(), FeedbackEventType.APPROVED, FeedbackActor.USER)
