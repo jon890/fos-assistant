@@ -21,6 +21,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.type.SqlTypes;
@@ -110,6 +111,7 @@ public class ConnectorAction {
     private boolean passed;
 
     /** 먼저 살펴보기 트리의 실행에서 나온 줄인가. 그 트리의 쓰기는 허락과 상관없이 늘 승인을 받아 대화 허락을 주지 않는다. */
+    @ColumnDefault("false")
     @Column(name = "check_tree", nullable = false)
     private boolean checkTree;
 
