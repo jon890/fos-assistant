@@ -39,7 +39,10 @@
       "grant": false,
       "title": "네이버 임시저장 글 불러오기 · 자동저장 가능",
       "outbound": false,
-      "description": "list_drafts가 준 draft_id로 임시저장 글을 편집기에 불러와 title, category, tags, body와 원본 지문 revision을 읽습니다. 불러오는 과정에서 네이버 자동저장이 발생할 수 있습니다. 저장 단추와 발행 단추는 누르지 않습니다. 사진, 스티커와 지도는 본문에서 기존 구성요소를 나타내는 줄로 돌려줍니다. 사용자가 작성 중인 글이 편집기에 있거나 저장 작업이 진행 중이면 불러오지 않습니다. 목록의 앞 200개 안에 있는 글만 불러올 수 있습니다."
+      "description": "list_drafts가 준 draft_id로 임시저장 글을 편집기에 불러와 title, category, tags, body와 원본 지문 revision을 읽습니다. 불러오는 과정에서 네이버 자동저장이 발생할 수 있습니다. 저장 단추와 발행 단추는 누르지 않습니다. 사진, 스티커와 지도는 본문에서 기존 구성요소를 나타내는 줄로 돌려줍니다. 사용자가 작성 중인 글이 편집기에 있거나 저장 작업이 진행 중이면 불러오지 않습니다. 목록의 앞 200개 안에 있는 글만 불러올 수 있습니다.",
+      "arg_labels": {
+        "draft_id": "임시저장 글 ID"
+      }
     },
     "render_draft": {
       "risk": "READ",
@@ -49,14 +52,30 @@
       "risk": "WRITE",
       "title": "네이버 블로그에 임시저장",
       "outbound": false,
-      "description": "title, category, tags, body를 검사한 뒤 네이버 블로그에 새 임시저장 글을 만드는 작업을 시작합니다. 제목은 1자에서 100자, 기존 카테고리 이름은 1자에서 50자, 태그는 최대 30개, 각 태그는 최대 30자이고 #과 쉼표는 넣지 않으며, 본문은 최대 20,000자입니다. 사진 지시가 있으면 photo_dir이 필요하며 첨부 사진만 사용하며 사진 한 장은 최대 20MiB입니다. 사진은 최대 50장, 스티커와 지도는 각각 최대 30개입니다. job_id와 시작 상태를 돌려주므로 draft_job으로 완료나 실패를 확인해야 합니다. 발행하지 않으며 같은 블로그의 저장 작업은 동시에 실행하지 않습니다."
+      "description": "title, category, tags, body를 검사한 뒤 네이버 블로그에 새 임시저장 글을 만드는 작업을 시작합니다. 제목은 1자에서 100자, 기존 카테고리 이름은 1자에서 50자, 태그는 최대 30개, 각 태그는 최대 30자이고 #과 쉼표는 넣지 않으며, 본문은 최대 20,000자입니다. 사진 지시가 있으면 photo_dir이 필요하며 첨부 사진만 사용하며 사진 한 장은 최대 20MiB입니다. 사진은 최대 50장, 스티커와 지도는 각각 최대 30개입니다. job_id와 시작 상태를 돌려주므로 draft_job으로 완료나 실패를 확인해야 합니다. 발행하지 않으며 같은 블로그의 저장 작업은 동시에 실행하지 않습니다.",
+      "arg_labels": {
+        "title": "제목",
+        "category": "카테고리",
+        "tags": "태그",
+        "body": "본문",
+        "photo_dir": "사진 폴더"
+      }
     },
     "overwrite_draft": {
       "risk": "WRITE",
       "title": "네이버 블로그 임시저장 글 덮어쓰기",
       "outbound": false,
       "grant": false,
-      "description": "read_draft로 읽고 render_draft의 base로 미리 본 임시저장 글을 고칩니다. draft_id, 미리보기의 base_revision을 넣은 revision, 미리보기의 changes와 고칠 title, category, tags, body를 함께 보냅니다. 실제 글의 지문과 변경 내용을 다시 대조하고 원래 글을 덮어쓰기 전 원본 사본으로 남깁니다. 새 사진, 스티커와 지도는 추가할 수 없으며 기존 구성요소를 나타내는 줄만 유지하거나 제거할 수 있습니다. job_id를 돌려주면 draft_job으로 결과를 확인합니다. 발행하지 않습니다. changes는 최대 100,000자이고 승인 카드에서 가려지는 내용은 거절합니다. 실패해도 원본 사본이 남을 수 있으므로 draft_job의 오류와 backup_draft_id를 확인합니다."
+      "description": "read_draft로 읽고 render_draft의 base로 미리 본 임시저장 글을 고칩니다. draft_id, 미리보기의 base_revision을 넣은 revision, 미리보기의 changes와 고칠 title, category, tags, body를 함께 보냅니다. 실제 글의 지문과 변경 내용을 다시 대조하고 원래 글을 덮어쓰기 전 원본 사본으로 남깁니다. 새 사진, 스티커와 지도는 추가할 수 없으며 기존 구성요소를 나타내는 줄만 유지하거나 제거할 수 있습니다. job_id를 돌려주면 draft_job으로 결과를 확인합니다. 발행하지 않습니다. changes는 최대 100,000자이고 승인 카드에서 가려지는 내용은 거절합니다. 실패해도 원본 사본이 남을 수 있으므로 draft_job의 오류와 backup_draft_id를 확인합니다.",
+      "arg_labels": {
+        "draft_id": "임시저장 글 ID",
+        "revision": "원본 버전",
+        "changes": "바뀌는 내용",
+        "title": "제목",
+        "category": "카테고리",
+        "tags": "태그",
+        "body": "본문"
+      }
     },
     "draft_job": {
       "risk": "READ",
