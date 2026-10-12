@@ -86,7 +86,7 @@ connector.json의 snapshot은 `protocol`, `compile_tool`, `start_tool`, `status_
 protocol은 `content-snapshot-v1`, 도구 이름은 서로 다르고 공개 도구와 겹치지 않는다.
 capabilities는 `compile`, `start`, `status` 세 boolean이며 이번 구현은 `{compile:true,start:false,status:false}`만 선언한다.
 카탈로그의 별도 snapshot 칸과 성공 HTTP 응답은 같은 검증된 선언을 사용한다.
-후속 Java catalog decoder도 이 다섯 키 계약을 따라야 한다. decoder와 DB, 승인, worker 시작·조회는 아직 구현하지 않았다.
+Java catalog decoder도 이 다섯 키 계약을 따르며 compile 전용 선언만 받는다. DB와 승인은 구현되어 있고 worker 시작 전송·조회는 후속 범위다.
 
 dashboard는 기존 설치 소유 기록과 profile 표식, 주인 첨부·브라우저 환경 선택 규칙을 확인한 뒤 별도 stdio 자식을 띄운다.
 실행 UID는 기존 dashboard 자식과 같고 권한을 올리지 않는다.
@@ -217,6 +217,9 @@ approvePrepared는 coordinator 한 번 안에서 아래 「잠금 순서」로 �
 모두 맞으면 소문자 정규 UUID jobId를 예약하고 승인 줄 EXECUTING, job DISPATCHED와 승인자·승인 시각을 함께 커밋한다.
 하나라도 맞지 않으면 그 트랜잭션을 되돌리고 새 트랜잭션에서 승인 줄을 `not_executable`로 거절하거나 만료로 끝낸다. job은 STALE과 `CONTENT_DRAFT_STALE` 또는 `not_executable`이며 외부 호출은 0회다.
 커밋 뒤 ticket을 발급하고 Java로 재계산한 compiled snapshot과 함께 시작을 최대 한 번 보낸다. 전송 구현은 예약 jobId와 snapshot·바인딩 판을 받아 start 입력의 stamp를 만든다.
+시작 전송 port는 `ContentDraftJobStarter.start(String profile, String connectorId, JsonNode snapshot, ContentDraftSaveTicketPayload job, String ticket)`이다.
+후속 구현은 `{snapshot, jobId, ticket, stamp}`를 보내며 stamp에 snapshot·job 식별자와 해시, 바인딩·연결 버전, profile의 SHA-256인 profileHash를 담는다. 후속 Python plugin이 profileHash를 대조한다.
+private 상태 도구 이름은 manifest의 `content_snapshot_status`다.
 
 | 시작 결과 | 승인 줄 | job |
 | --- | --- | --- |
@@ -243,6 +246,7 @@ worker는 ticket을 해석할 필요가 없다. 받은 문자열을 그대로 au
 요청은 `{"ticket":..,"stage":"start"|"save"}` 또는 `{"ticket":..,"stage":"photo","position":<0~499>}`이고 다른 키·타입·중복 키·8,192바이트 초과는 400이다.
 position은 canonical block 위치이며 그 위치가 image block이어야 한다. 사진 DSL의 1부터 시작하는 번호가 아니다.
 허가는 200 `{"allowed":true}`다. 서명·형식·기한 실패는 401, 그 밖의 거절은 403이며 본문에는 고정 문구만 있다. DB 일시 장애와 잠금 경합에서 되돌린 claim도 403이다. 응답 누락·timeout·다른 모양을 허가로 읽지 않는다.
+worker는 authorize 요청을 10초 timeout으로 한 번만 보내고 재시도하지 않는다. save 허가는 저장 클릭의 허가이며 저장 완료를 뜻하지 않는다.
 
 매 호출은 ticket의 job·snapshot·hash·승인 줄·owner·대화·바인딩 판이 DB와 같은지 보고, 잠금 안에서 승인 사실, 사용자 허용, 에이전트, origin·루트 실행, 현재 원고·원본·바인딩을 다시 확인한다.
 start는 `start_claimed_at`, save는 `save_claimed_at`을 NULL에서 시각으로 바꾸는 조건부 갱신 결과 1일 때만 허가하고 그 트랜잭션을 커밋한 뒤 응답한다.
@@ -279,6 +283,12 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 
 worker 결과의 조회와 SUCCEEDED·terminal 반영, 늦게 읽은 terminal로 UNKNOWN을 해소하는 일은 후속 private status 구현이 맡는다.
 FAILED는 명시적 저장 클릭 전 실패를 뜻하며 편집기 자동저장이 없었다는 증거가 아니다. save claim 뒤의 실패는 UNKNOWN으로 둔다.
+
+### 승인과 허가 검증
+
+`ContentDraftJobsTest`는 승인·요청 경합, 재전송 금지, 실제 HTTP의 ticket 인증과 start·save 단일 claim을 검사한다.
+`ContentDraftClaimMysqlTest`는 실제 MySQL에서 실행 취소와 사용자 끄기의 행 잠금, 커밋과 rollback에 따른 허가를 검사한다.
+`ContentDraftSaveTicketTest`와 `ContentDraftSnapshotArchitectureTest`는 ticket 분리·가림과 모듈 경계를 검사한다. 실제 provider 저장과 운영 Hermes 왕복은 이 검사에 포함하지 않는다.
 
 ## 단계별 합성 판정
 

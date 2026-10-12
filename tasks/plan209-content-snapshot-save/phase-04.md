@@ -37,7 +37,7 @@ runDraft는 저장 수 증가 뒤 state 실패를 삼키고 state:null로 성공
 
 ### 1. private start·status와 예약 ID
 
-content-snapshot.ts에 start_content_snapshot·content_snapshot_job을 추가한다. generic snapshot transport의 정확한 선언으로만 호출한다.
+content-snapshot.ts에 start_content_snapshot·content_snapshot_status를 추가한다. generic snapshot transport의 정확한 선언으로만 호출한다.
 JobState에 선택적 snapshot stamp를 더한다. 기존 DSL job은 필드가 없어도 읽는다. stamp에는 기능 문서의 protocol·snapshotId·jobId·두 연결 버전·hash·profileHash가 있고 본문·token·CDP 주소는 없다.
 같은 ID 상태가 존재하면 stamp를 대조해 그것만 반환한다. running·terminal·UNKNOWN에서 worker를 새로 띄우지 않는다.
 상태 생성 뒤 input 쓰기·spawn·접수 응답 사이 실패에도 예약 ID를 없애고 다시 생성하지 않는다. 실패 상태나 tombstone을 유지한다.
@@ -46,7 +46,7 @@ private status는 jobs.ts publicState를 그대로 노출하지 않고 허용된
 원본 fileName·manifest·ticket·raw URL·이미지 bytes를 결과에 넣지 않는다.
 
 공개 draftJob은 snapshot stamp 키가 있으면 null/malformed까지 NAVER_BLOG_JOB_NOT_FOUND를 반환한다. stale 처리/publicState 호출 전에 막아 공개 조회가 private 상태를 바꾸지 못한다.
-private content_snapshot_job만 `{stamp}`를 strict decode하고 CP가 저장한 원래 job·hash·binding/connection 버전·profileHash를 정확히 대조한 뒤 projection한다. stamp 없는 legacy job은 공개 계약만 유지한다.
+private content_snapshot_status만 `{stamp}`를 strict decode하고 CP가 저장한 원래 job·hash·binding/connection 버전·profileHash를 정확히 대조한 뒤 projection한다. stamp 없는 legacy job은 공개 계약만 유지한다.
 실제 TS MCP Client·InMemoryTransport로 기능 문서의 혼입/변조/다른 profile/terminal/stale 반례 표를 실행한다. 일반 도구 목록과 env 입력으로 private mode를 켤 수 없음을 확인한다.
 
 ### 2. 기존 worker와 업로드 지문
