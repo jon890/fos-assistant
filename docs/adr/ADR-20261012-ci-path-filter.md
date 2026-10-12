@@ -45,7 +45,7 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
    - 돌려야 했던 job 은 `success` 만 통과다.
    - 건너뛰기로 한 job 은 `skipped` 만 통과다.
    필수 검사의 이름은 그대로라 브랜치 보호를 바꾸지 않는다.
-6. merge queue 는 쓰지 않는다. main 이 움직였을 때는 `pr-merge` 스킬 5단계의 규칙을 그대로 쓴다.
+6. merge queue 는 쓰지 않는다. main 이 움직였을 때는 `scripts/pr/merge-ready.sh` 가 판정하는 규칙(AGENTS.md 「머지는 PR 로 한다」)을 쓴다. 처음에는 `pr-merge` 스킬(2026-10-12 삭제)에 있던 규칙이다.
    뒤에 들어온 main 커밋이 PR 과 겹치지 않고, 빌드 설정·공유 계약·마이그레이션·저장소 전체 검사도 바꾸지 않았을 때만 직전 CI 를 쓴다.
 
 `test/unit/ci-paths.test.ts` 가 규칙의 대표 경우와 판정의 모든 조합을 확인한다.
@@ -173,7 +173,7 @@ job 수가 23개에서 19개로 줄어든 것은 확인했지만, 이 표본의 
 GitHub Free 의 동시 job 20개를 PR CI 와 main push CI 가 나눠 쓴다.
 머지마다 도는 main push 의 전체 검사가 job 약 20개를 차지해, 이어진 PR CI 가 줄을 섰다. main push run 하나가 34분 대기한 것을 실측했다.
 
-main 에 들어오는 커밋은 최신 main 을 포함한 head 로 PR CI 를 통과했거나 `pr-merge` 스킬 5단계의 예외를 만족한 것이다.
+main 에 들어오는 커밋은 최신 main 을 포함한 head 로 PR CI 를 통과했거나 `scripts/pr/merge-ready.sh` 의 예외 조건을 만족한 것이다.
 같은 검사를 push 에서 다시 돌리는 가치가 낮아 다음과 같이 나눈다.
 
 | 실행 | 도는 것 | 실제 job 수 |
