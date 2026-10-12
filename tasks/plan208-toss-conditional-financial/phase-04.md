@@ -11,7 +11,7 @@ kill switch 가 꺼진 기본 상태를 유지한 채, 켜면 `create_order` 와
 
 ## Blocked 조건
 
-- 금융 관문 `ConnectorFinancialGate`(kill switch, 계좌 허용 목록, 상한)와 phase-03(request_key 계좌 범위, keyed hash)이 main 에 있어야 한다.
+- 금융 관문 `ConnectorFinancialGate`(kill switch, 계좌 허용 목록, 상한)와 #507 후속(request_key v2, `FinancialDigest`)이 main 에 있어야 한다.
 - 소유자의 개방 승인 기록이 코디네이터에게 있어야 한다. 없으면 PHASE_BLOCKED 로 멈추고 묻는다.
 
 ## 컨텍스트
