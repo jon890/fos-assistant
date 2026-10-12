@@ -39,13 +39,14 @@ public class ConnectorActionListener {
     private final TransactionTemplate ownTransaction;
     private final Clock clock = Clock.systemUTC();
 
+
     public ConnectorActionListener(
-            ConnectorActionService actions,
-            ConversationEventHub hub,
-            ConversationNotices notices,
-            NextTurnDispatcher dispatcher,
-            TurnCancellation turns,
-            PlatformTransactionManager transactionManager) {
+        ConnectorActionService actions,
+        ConversationEventHub hub,
+        ConversationNotices notices,
+        NextTurnDispatcher dispatcher,
+        TurnCancellation turns,
+        PlatformTransactionManager transactionManager) {
         this.actions = actions;
         this.hub = hub;
         this.notices = notices;
@@ -59,6 +60,7 @@ public class ConnectorActionListener {
         turns.addCloseListener(closed -> deliverClosures(closed.conversationId()));
     }
 
+
     @EventListener
     public void onChanged(ConnectorActionChanged event) {
         Long conversationId = event.conversationId();
@@ -67,12 +69,12 @@ public class ConnectorActionListener {
         }
         try {
             notices.publicIdOf(conversationId)
-                    .ifPresent(publicId -> hub.publish(conversationId, ChatEvent.approval(publicId, event.actionId())));
+                .ifPresent(publicId -> hub.publish(conversationId, ChatEvent.approval(publicId, event.actionId())));
         } catch (RuntimeException ex) {
             log.warn(
-                    "승인 줄이 바뀐 것을 화면에 알리지 못했다 actionId={} kind={}",
-                    event.actionId(),
-                    ex.getClass().getSimpleName());
+                "승인 줄이 바뀐 것을 화면에 알리지 못했다 actionId={} kind={}",
+                event.actionId(),
+                ex.getClass().getSimpleName());
         }
         deliverClosures(conversationId);
         try {
@@ -80,11 +82,12 @@ public class ConnectorActionListener {
             dispatcher.tryNext(conversationId);
         } catch (RuntimeException ex) {
             log.warn(
-                    "승인 결과를 전할 대화를 깨우지 못했다 conversationId={} kind={}",
-                    conversationId,
-                    ex.getClass().getSimpleName());
+                "승인 결과를 전할 대화를 깨우지 못했다 conversationId={} kind={}",
+                conversationId,
+                ex.getClass().getSimpleName());
         }
     }
+
 
     /**
      * 실행하지 않고 끝난 줄마다 알림 줄을 남긴다. 전했다는 표시와 알림 줄을 한 트랜잭션에 넣는다.
@@ -97,18 +100,19 @@ public class ConnectorActionListener {
     private void deliverClosures(Long conversationId) {
         try {
             if (turns.markOf(conversationId).running()
-                    || actions.undeliveredClosures(conversationId).isEmpty()) {
+                || actions.undeliveredClosures(conversationId).isEmpty()) {
                 return;
             }
             // 잠금을 풀 때 닫기 리스너가 다시 불리므로, 남은 줄이 없을 때는 잠금을 잡지 않아 되풀이가 끊긴다.
             turns.runIfIdle(conversationId, () -> postClosures(conversationId));
         } catch (RuntimeException ex) {
             log.warn(
-                    "끝난 승인 요청을 대화에 알리지 못했다 conversationId={} kind={}",
-                    conversationId,
-                    ex.getClass().getSimpleName());
+                "끝난 승인 요청을 대화에 알리지 못했다 conversationId={} kind={}",
+                conversationId,
+                ex.getClass().getSimpleName());
         }
     }
+
 
     private void postClosures(Long conversationId) {
         ownTransaction.executeWithoutResult(status -> {
@@ -120,6 +124,7 @@ public class ConnectorActionListener {
         });
     }
 
+
     /** 사용자가 거절한 것과 시스템이 실행하지 않고 끝낸 것을 다른 글로 알린다. */
     private static String closureNotice(ConnectorActionResult closure) {
         String name = "「" + closure.title() + "」";
@@ -130,7 +135,7 @@ public class ConnectorActionListener {
             return "연결이 바뀌어 " + name + " 요청을 취소했어요";
         }
         if (ConnectorAction.NOT_EXECUTABLE.equals(closure.errorCode())) {
-            return name + " 요청을 지금은 실행할 수 없어 취소했어요. 연결 화면에서 연결을 확인해 주세요";
+            return name + " 요청을 지금은 실행할 수 없어 취소했어요. 외부 서비스 연결에서 연결을 확인해 주세요";
         }
         if (ConnectorAction.HIDDEN_ARGS.equals(closure.errorCode())) {
             return name + " 요청에 화면에 가려지는 내용이 있어 취소했어요. 에이전트에게 그 부분을 빼거나 다시 쓰게 해 주세요";

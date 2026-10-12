@@ -80,5 +80,5 @@ description: Gmail 메일을 찾고 읽고, 승인받은 메일과 라벨, 자�
 ## 오류
 
 메일을 읽지 못했으면 읽지 못했다고 말한다. 내용을 지어내지 않는다.
-자격 증명이 거절됐으면 연결 화면에서 값을 다시 등록해야 한다고 알린다.
+자격 증명이 거절됐으면 외부 서비스 연결에서 값을 다시 등록해야 한다고 알린다.
 필터 쓰기나 `list_filters` 의 오류 코드가 `GMAIL_FILTER_SCOPE_REQUIRED` 이면 Google Cloud 동의 화면에 `gmail.settings.basic` 을 더하고, `gmail.modify` 와 함께 토큰을 다시 받아 연결 값을 바꾸라고 알린다. 오류 코드가 `GMAIL_FORBIDDEN` 이면 필터 권한 부족으로 단정하지 않는다.

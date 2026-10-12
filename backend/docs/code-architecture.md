@@ -150,6 +150,12 @@ profile 스킬 파일과 커넥터 바인딩을 읽는 port는 `agent.applicatio
 낙관적 잠금 실패 때는 캐시를 갱신하지 않아 다음 활동이 다시 시도한다.
 켜기 잠금과 컨테이너 수명, CDP 대기는 `UserBrowserService`에 둔다.
 
+### 로그인 화면 입력
+
+로그인 화면의 연결, 잠금과 입력 상태는 `BrowserScreenSession`이 소유한다.
+같은 `application`의 package-private `BrowserScreenInputParams`는 좌표와 키 입력의 CDP 인자만 만든다.
+명령 전송과 실패 처리, 탭 전환과 종료는 세션에 남겨 연결 수명과 입력 변환을 함께 바꾸지 않도록 한다.
+
 ### 스킬
 
 `skill.application.SkillService`는 권한, 에이전트 행 잠금, 트랜잭션과 스킬 게시 순서, `SkillsChanged` 사건을 맡는다.
@@ -297,6 +303,10 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 provider와 모델을 고르는 순서는 [Hermes 계약의 「Runs 응답과 사건의 버전 차이」](../../hermes/docs/hermes-contract.md#runs-응답과-사건의-버전-차이)가 갖는다. 시스템 판단은 실제 모델을 모르면 요청값으로 대체하지 않는다.
 최종 결과 없는 실패·취소는 이미 저장한 사용량을 보존하고, 취소의 후속 저장은 기존 종료 시각을 보존한다. 두 서비스 사이에 새 트랜잭션을 두지 않는다.
 
+`AgentExecution`은 실행 한 줄의 상태 전이와 사용량 대입을 맡는다. 성공·실패·취소가 받은 provider와 모델,
+토큰 네 칸은 private `recordUsage`에서 같은 순서로 적고, 비용과 종료 시각, 관측 종료와 상태 변경은 각 종료 메서드가 맡는다.
+공개 중첩 Builder와 JPA 필드 매핑은 유지하며, getter는 클래스의 `@Getter`가 만든다.
+
 `instructions` 를 조립하는 순서는 아래와 같다.
 
 | 순서 | 담는 것 |
@@ -362,6 +372,10 @@ MySQL 태그 검사의 기준 클래스만 `@SpringBootTest` 로 따로 둔다.
 
 **검사 클래스에 컨텍스트 키를 바꾸는 선언을 두지 않는다.** `@MockitoBean`, `@MockitoSpyBean`, `@Import`, `@TestPropertySource`, `@DynamicPropertySource`, 중첩 `@TestConfiguration`, 슬라이스 주석 등이다. 전체 목록은 구조 규칙 `ArchitectureRules.TESTS_DO_NOT_SPLIT_CONTEXT` 가 갖는다. `@Tag("mysql")` 검사는 예외다.
 하나라도 두면 Spring 이 컨텍스트를 새로 띄운다. 구조 규칙이 막는다.
+
+`ContentDraftSnapshotJpaMigrationTest`는 공유 컨텍스트를 그대로 쓰며, 실제 Flyway·JPA 기동은 별도 H2 DB의 애플리케이션을 직접 띄워 검사 안에서 닫는다.
+기동용 컨텍스트를 Spring 검사 캐시에 넣으면 캐시에서 밀려난 `create-drop` 컨텍스트가 다른 검사의 공유 스키마를 지울 수 있다.
+`ContentDraftSnapshotContextIsolationTest`는 공유 검사와 claim 검사 컨텍스트가 이미 떠 있을 때도 기동과 종료 뒤에도 두 컨텍스트에서 공유 스키마를 읽을 수 있는지 확인한다.
 - 기반에 있는 타입은 `@Autowired` 로 받는다.
 - 설정 값을 바꿔야 하면 아래 「설정 바꾸기」 를 쓴다.
 - mock 이 필요하던 빈은 기반의 spy 로 올리고 `doReturn(...).when(spy)` 로 바꾼다. 정하지 않은 메서드는 실제로 돈다.
@@ -528,6 +542,12 @@ node scripts/check-file-length.mjs --update
 갱신한 기준 파일은 같은 커밋에 넣는다. 새 코드는 기준 목록에 추가하지 않고 나눈다.
 Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한다.
 메서드와 함수 길이 경고는 그대로 유지한다.
+
+`RestartReconciler`는 기동 시 잡기와 묻기, 중지와 재시작, 대화 잠금의 획득과 해제 순서를 맡는다.
+같은 package의 `RecoveredConversationLock`은 복구한 대화 잠금의 handle과 아직 정해지지 않은 실행 수,
+실행 번호 목록과 루트 포함 여부만 담는다. Spring bean이 아니며 공개 API를 추가하지 않는다.
+변경 가능한 값은 `RestartReconciler`의 모니터로 지킨다.
+마지막 실행을 정한 뒤 대기 행 멈춤과 끝 사건을 처리하고 handle을 닫는 순서도 그 클래스에 남는다.
 
 `MemoryService`는 읽기·권한·쓰기 잠금과 검색 트랜잭션을 맡고, 같은 package의
 `MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
@@ -698,3 +718,17 @@ Control Plane 은 경로 규칙을 먼저 검사하고 읽기 마운트에서 �
 줄은 `bytes` 가 큰 순서다.
 
 루트가 설정되지 않았거나 링크가 아닌 디렉터리가 아니면 200 과 `available` 거짓, 빈 `spaces` 다. 루트 바로 아래를 읽지 못하면 500 `INTERNAL_ERROR` 이고 로그에는 예외 종류만 남는다.
+
+### 원고 snapshot의 참가 경계
+
+chat의 `ContentDraftSnapshots`가 preview 저장과 현재 원본 재검사를 소유한다.
+`ContentDraftSnapshotInputs`는 기존 원고·revision·asset 저장소와 복호화·reader를 사용하며 기존 `ContentDraftService`의 helper를 넓히지 않는다.
+`ContentDraftBindingAccess`는 DB 권한 검사와 잠금 밖의 선언 준비를 나누고 connector의 `ConnectorContentDraftBindings`가 구현한다.
+`ContentDraftBindingStamp`에는 식별자·수정 시각·profile·connector ID·정책 지문만 담는다. catalog 전체와 비밀값은 넘기지 않는다.
+`HttpContentDraftSnapshotClient`는 제한된 서비스 HTTP만 맡고, chat의 hash 검증은 요청과 응답 전체를 대조한다.
+독립 조회는 coordinator에 한 번 진입한다. 참가 API는 MANDATORY와 `requireParticipant`를 모두 확인한다.
+compiler와 catalog HTTP는 그 callback 밖에서 실행한다. 신규 도메인·port를 이유로 패키지 순서나 기존 구조 규칙을 바꾸지 않는다.
+참가 호출자는 밖에서 준비한 정책 포함 stamp를 반환 입력의 binding과 명시적으로 대조한 뒤 사용한다.
+참가 함수만으로 현재 catalog를 검증했다고 판단하지 않는다. 원격 catalog와 DB commit은 원자적이지 않다.
+`ContentDraftAuthorizationHash`는 서버의 캡처 값으로 권한 지문을 계산하여 같은 내용의 재사용 범위를 구별한다.
+저장된 캡처 값과 현재 권한·원본 검사를 유지하며 기존 행의 지문이나 캡처 값은 갱신하지 않는다.
