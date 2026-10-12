@@ -109,6 +109,10 @@ public class ConnectorAction {
     @Column(name = "passed", nullable = false)
     private boolean passed;
 
+    /** 먼저 살펴보기 트리의 실행에서 나온 줄인가. 그 트리의 쓰기는 허락과 상관없이 늘 승인을 받아 대화 허락을 주지 않는다. */
+    @Column(name = "check_tree", nullable = false)
+    private boolean checkTree;
+
     /** 승인 줄만 채운다. */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20)
@@ -189,6 +193,12 @@ public class ConnectorAction {
         action.argsSha256 = argsSha256;
         action.createdAt = now;
         return action;
+    }
+
+
+    /** 먼저 살펴보기 트리의 실행에서 나온 줄이라고 적는다. 저장하기 전에만 부른다. */
+    public void markCheckTree() {
+        this.checkTree = true;
     }
 
 
@@ -283,10 +293,10 @@ public class ConnectorAction {
 
     /**
      * 이 도구를 이 대화에서 계속 허용할 수 있는가(ADR-20261012 / conversation-grant). 상시 허락과 같은 조건에 더해, 허락이 묶일
-     * 대화와 에이전트가 있어야 한다.
+     * 대화와 에이전트가 있어야 한다. 먼저 살펴보기 트리의 줄은 그 트리의 호출이 허락을 보지 않으므로 줄 수 없다.
      */
     public boolean conversationGrantAllowed() {
-        return grantAllowed() && conversationId != null && agentId != null;
+        return grantAllowed() && conversationId != null && agentId != null && !checkTree;
     }
 
 

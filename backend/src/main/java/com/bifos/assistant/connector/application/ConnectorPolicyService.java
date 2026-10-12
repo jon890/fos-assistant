@@ -273,6 +273,9 @@ public class ConnectorPolicyService {
             dedupeKey,
             argsSha256,
             now);
+        if (boundary != CheckBoundary.NOT_CHECK) {
+            action.markCheckTree();
+        }
         if (needsApproval) {
             action.awaitApproval(argsJson, now.plus(properties.current().approvalTtl()));
         }
