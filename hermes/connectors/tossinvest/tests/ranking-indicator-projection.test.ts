@@ -109,10 +109,32 @@ async function verify(
     const examples = content.example
       ? [content.example]
       : Object.values(content.examples).map((entry: any) => entry.value);
+    // 원형의 대용량 회귀 fixture처럼 공식 첫 행을 복제하고 배열 순서를 보존한다.
+    const large = structuredClone(examples[0]);
+    const arrays = {
+      get_rankings: ["rankings", 100],
+      get_market_indicator_candles: ["candles", 200],
+      get_market_indicator_investor_trading: ["records", 100],
+    } as const;
+    if (name !== "get_market_indicator_prices") {
+      const [key, count] = arrays[name];
+      const first = large.result[key][0];
+      large.result[key] = Array.from({ length: count }, (_, index) => ({
+        ...structuredClone(first),
+        ...(key === "rankings" ? { rank: index + 1 } : {}),
+        ...(key === "candles" ? { closePrice: String(index + 1) } : {}),
+        ...(key === "records"
+          ? {
+              updatedAt: `2026-10-11T09:00:${String(index % 60).padStart(2, "0")}+09:00`,
+            }
+          : {}),
+      }));
+    }
     const cases = extensions
-      ? [sample(content.schema, "full")]
+      ? [sample(content.schema, "full"), large]
       : [
           ...examples,
+          large,
           ...["full", "nullable", "absent", "unknown"].map((mode) =>
             sample(content.schema, mode),
           ),
