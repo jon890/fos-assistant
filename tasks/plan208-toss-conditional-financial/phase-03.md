@@ -8,7 +8,7 @@
 금융 줄의 해시 칸을 서버 비밀로 keyed hash 해 DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못하게 한다.
 **매매 개방 전 필수다.** phase-04 는 이 단계가 머지된 뒤에만 시작한다.
 
-**범위 외**: 금융이 아닌 승인 줄의 `args_sha256`, kill switch 와 상한(phase-02), 공개 진입점(phase-04)이다.
+**범위 외**: 금융이 아닌 승인 줄의 `args_sha256`, kill switch 와 상한(`ConnectorFinancialGate`), 공개 진입점(phase-04)이다.
 
 ## 컨텍스트
 
@@ -31,7 +31,7 @@
 
 - 키 공식은 버전 접두로 가른다. 일반 주문은 `fos-financial-intent-v2`, 조건주문은 `fos-conditional-intent-v2` 다. 경로에서 connectionId 를 빼고 connectorId 를 넣는다. account_seq 는 이미 있다.
 - keyed hash 는 HMAC-SHA256 앞 16바이트로 해 칸 길이를 바꾸지 않는다. 마이그레이션은 없다.
-- key 는 비밀값이므로 DB 에 넣지 않는다. 운영 비밀 파일에서 환경 변수로 받는다. 없으면 phase-02 의 gate 가 금융을 열지 않는다.
+- key 는 비밀값이므로 DB 에 넣지 않는다. 운영 비밀 파일에서 환경 변수로 받는다. 없으면 `ConnectorFinancialGate` 가 금융을 열지 않는다.
 - 기존 줄과의 호환: 운영에는 금융 caller 가 없어 금융 줄이 0개여야 한다. 기동 때 금융 위험도의 승인 줄이 하나라도 있으면 경고를 남기고 gate 를 닫는다. 남은 줄을 새 공식으로 다시 계산하지 않는다.
 - 조건주문의 공통 vector(`test/resources/conditional-snapshot-v1.json`)의 의도 키 기대값은 v2 로 다시 만들고 Python 과 Spring 이 같은 값을 내는지 확인한다.
 

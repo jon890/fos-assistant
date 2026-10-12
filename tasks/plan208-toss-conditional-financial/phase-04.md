@@ -11,7 +11,7 @@ kill switch 가 꺼진 기본 상태를 유지한 채, 켜면 `create_order` 와
 
 ## Blocked 조건
 
-- phase-02(kill switch, 계좌 허용 목록, 상한)와 phase-03(request_key 계좌 범위, keyed hash)이 main 에 있어야 한다.
+- 금융 관문 `ConnectorFinancialGate`(kill switch, 계좌 허용 목록, 상한)와 phase-03(request_key 계좌 범위, keyed hash)이 main 에 있어야 한다.
 - 소유자의 개방 승인 기록이 코디네이터에게 있어야 한다. 없으면 PHASE_BLOCKED 로 멈추고 묻는다.
 
 ## 컨텍스트
@@ -31,7 +31,7 @@ kill switch 가 꺼진 기본 상태를 유지한 채, 켜면 `create_order` 와
 ## 작업 항목
 
 1. kill switch 꺼짐에서 지금과 같은 RISK_NOT_OPEN 과 금융 전송 0회를 확인하는 회귀를 먼저 둔다.
-2. 판정, 승인 API, plugin, manifest, 서버 등록을 위 표대로 잇는다. 켜짐 분기는 phase-02 gate 를 반드시 지난다.
+2. 판정, 승인 API, plugin, manifest, 서버 등록을 위 표대로 잇는다. 켜짐 분기는 `ConnectorFinancialGate` 를 반드시 지난다.
 3. 승인 카드에 summary 를 보이고, summary 를 열지 못하면 승인 단추를 막는다.
 4. loopback 토스 대역으로 준비 → 승인 → claim → 전송 → 결과를 한 번 왕복하고, 재승인과 replay 가 추가 전송 0회인지 센다.
 5. `tossinvest-connector.md` 의 「이 커넥터는 주문하지 않는다」, 도구 표, 보안 절을 바꾸고 「매매 개방 조건」 표를 모두 채운다. README 사용자 안내도 함께 고친다.

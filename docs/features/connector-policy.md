@@ -612,6 +612,11 @@ executeApproved를 각각 한 번 호출한다. 승인 때 prepare를 다시 부
 발급 뒤 에이전트를 끈 경우도 claim의 현재 권한 검사에서 거부하며 ticket을 소비하지 않는다.
 ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTTP 읽기 제한이다.
 
+`ConnectorFinancialGate`는 준비·승인·claim이 함께 지나는 운영 관문이다. 설정은 `assistant.connector.financial`이고 기본값은 모두 닫힌 쪽이다.
+준비는 prepare 전에 kill switch와 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
+승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 kill switch와 저장 scope의 계좌를 본다.
+하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정, 조건주문 생성·정정은 거절한다.
+
 `ConnectorFinancialConflicts`는 준비·승인·claim이 함께 쓰는 같은 의도 검사다.
 사용자 잠금 아래 동일 request_key의 PENDING·EXECUTING·UNKNOWN을 차단하며 자기 action은 제외한다.
 claim은 이 검사를 ticket 소비 직전에 수행한다. clientOrderId 교체로 UNKNOWN을 우회하지 못하며
