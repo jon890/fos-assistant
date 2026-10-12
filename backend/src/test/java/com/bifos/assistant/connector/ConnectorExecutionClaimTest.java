@@ -195,6 +195,27 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    @DisplayName("정상 평문 snapshot도 ticket 발급과 claim에서 거절하고 소비하지 않는다")
+    void rejectsPlaintextSnapshotBeforeIssuingOrConsumingTicket(boolean consume) {
+        Fixture f = fixture();
+        String raw = consume ? tickets.issue(f.action()) : null;
+        var snapshot = tx().execute(status -> ConnectorExecutionSnapshot.open(
+            actions.findByPublicId(f.action()).orElseThrow(), contents.findById(f.actionId()).orElseThrow(), cipher));
+        jdbc.update("update connector_action_execution set content_key_id = null, execution_args_json = ?, summary_json = ?, scope_json = ? where action_id = ?",
+            snapshot.executionArgsJson(), snapshot.summaryJson(), snapshot.scopeJson(), f.actionId());
+        var before = row(f);
+        if (consume) {
+            assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
+        } else {
+            assertThatThrownBy(() -> tickets.issue(f.action())).isInstanceOf(ApiException.class);
+        }
+        assertThat(row(f).ticketId()).isEqualTo(before.ticketId());
+        assertThat(row(f).consumedAt()).isNull();
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     @DisplayName("짧은 승인 만료가 실제 commit 직전에 도달하면 발급과 소비를 롤백한다")
     void rejectsShortApprovalExpiryAtCommit(boolean consume) {
         Fixture f = fixture(NOW.plusSeconds(30));

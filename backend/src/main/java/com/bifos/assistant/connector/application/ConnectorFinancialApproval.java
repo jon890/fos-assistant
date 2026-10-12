@@ -79,8 +79,6 @@ class ConnectorFinancialApproval {
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
             require(Objects.equals(action.userId(), user.id()) && action.status() == ActionStatus.PENDING);
             var row = contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorFinancialProducer::rejected);
-            // 암호화하지 않고 저장된 snapshot은 실행하지 않는다.
-            require(row.contentKeyId() != null);
             var checked = current.validateLocked(context, catalog, action, row);
             require(action.expiresAt().isAfter(clock.instant()));
             conflicts.requireAvailable(row.requestKey(), action.id());
