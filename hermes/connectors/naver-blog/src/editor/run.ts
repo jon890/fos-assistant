@@ -23,12 +23,18 @@ export type RunStage =
   | "state";
 
 /** `state` 가 `null` 이면 임시저장은 확인했지만 편집기 상태를 읽지 못했다. */
-export type RunResult = { state: EditorState | null; savedBefore: number; savedAfter: number };
+export type RunResult = {
+  state: EditorState | null;
+  savedBefore: number;
+  savedAfter: number;
+};
 
 /** 탭의 진행 표시가 같은 초안을 가리키는지 보려고 쓰는 초안의 해시. */
 function draftHash(input: DraftInput) {
   return createHash("sha256")
-    .update(JSON.stringify([input.title, input.category, input.tags, input.body]))
+    .update(
+      JSON.stringify([input.title, input.category, input.tags, input.body]),
+    )
     .digest("hex");
 }
 
@@ -49,7 +55,10 @@ export async function runDraft(
 ): Promise<RunResult> {
   const { cdpUrl, blogId } = readConnection(env);
   const hash = draftHash(input);
-  const { targetId, page } = await openWriteTab(cdpUrl, blogId, { ...options, signal });
+  const { targetId, page } = await openWriteTab(cdpUrl, blogId, {
+    ...options,
+    signal,
+  });
   try {
     const enter = async (stage: RunStage) => {
       page.throwIfAborted();
@@ -68,7 +77,13 @@ export async function runDraft(
     await enter("settings");
     await settings(page, input, hash);
     await enter("save");
-    const saved = await save(page, input, blocks, hash, onStage as (stage: string) => unknown);
+    const saved = await save(
+      page,
+      input,
+      blocks,
+      hash,
+      onStage as (stage: string) => unknown,
+    );
     try {
       await enter("state");
       return { state: await state(page), ...saved };
