@@ -12,6 +12,7 @@ import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
+import com.bifos.assistant.connector.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaimCodec;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaims;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionCurrent;
@@ -101,6 +102,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
     ConnectorExecutionCurrent current;
 
     @Autowired
+    ConnectorFinancialConflicts conflicts;
+
+    @Autowired
     HermesProperties properties;
 
     @Autowired
@@ -148,6 +152,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
     @Autowired
     JdbcTemplate jdbc;
 
+
     @Test
     @DisplayName("MICROS 발급 값을 DB에서 다시 읽고 한 번 소비한 권한은 재사용할 수 없다")
     void issuesAndConsumesExactlyOnce() {
@@ -163,6 +168,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
     }
 
+
     @ParameterizedTest
     @ValueSource(longs = {30, 300})
     @DisplayName("나노초 Clock의 실제 발급과 소비를 MICROS로 저장하고 승인 만료와 60초 중 먼저 만료한다")
@@ -177,14 +183,36 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         assertThat(payload.expiresAt()).isEqualTo(expiry);
         assertThat(row(f).ticketExpiresAt()).isEqualTo(expiry);
         assertThat(jdbc.<Instant>queryForObject(
-                        "select ticket_expires_at from connector_action_execution where action_id = ?",
-                        (result, number) -> result.getTimestamp(1, Calendar.getInstance(TimeZone.getTimeZone("UTC")))
-                                .toInstant(),
-                        f.actionId()))
+            "select ticket_expires_at from connector_action_execution where action_id = ?",
+            (result, number) -> result.getTimestamp(1, Calendar.getInstance(TimeZone.getTimeZone("UTC")))
+                .toInstant(),
+            f.actionId()))
                 .isEqualTo(expiry);
         assertThat(claims.claim(input(raw)).allowed()).isTrue();
         assertThat(row(f).consumedAt()).isEqualTo(clock.instant().truncatedTo(ChronoUnit.MICROS));
     }
+
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("정상 평문 snapshot도 ticket 발급과 claim에서 거절하고 소비하지 않는다")
+    void rejectsPlaintextSnapshotBeforeIssuingOrConsumingTicket(boolean consume) {
+        Fixture f = fixture();
+        String raw = consume ? tickets.issue(f.action()) : null;
+        var snapshot = tx().execute(status -> ConnectorExecutionSnapshot.open(
+            actions.findByPublicId(f.action()).orElseThrow(), contents.findById(f.actionId()).orElseThrow(), cipher));
+        jdbc.update("update connector_action_execution set content_key_id = null, execution_args_json = ?, summary_json = ?, scope_json = ? where action_id = ?",
+            snapshot.executionArgsJson(), snapshot.summaryJson(), snapshot.scopeJson(), f.actionId());
+        var before = row(f);
+        if (consume) {
+            assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
+        } else {
+            assertThatThrownBy(() -> tickets.issue(f.action())).isInstanceOf(ApiException.class);
+        }
+        assertThat(row(f).ticketId()).isEqualTo(before.ticketId());
+        assertThat(row(f).consumedAt()).isNull();
+    }
+
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -209,45 +237,46 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 return status;
             }
 
+
             @Override
             public void commit(TransactionStatus status) {
                 manager.commit(status);
             }
+
 
             @Override
             public void rollback(TransactionStatus status) {
                 manager.rollback(status);
             }
         };
-        var issuing =
-                new ConnectorExecutionTicket(current, codec, actions, contents, users, expiring, clock, properties);
-        var consuming =
-                new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, expiring, clock);
+        var issuing = new ConnectorExecutionTicket(current, codec, actions, contents, users, expiring, clock, properties);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, expiring, clock);
         assertThatThrownBy(() -> {
-                    if (consume) {
-                        consuming.claim(input(raw));
-                    } else {
-                        issuing.issue(f.action());
-                    }
-                })
-                .isInstanceOf(ApiException.class);
+            if (consume) {
+                consuming.claim(input(raw));
+            } else {
+                issuing.issue(f.action());
+            }
+        })
+            .isInstanceOf(ApiException.class);
         assertThat(reached).isTrue();
         assertUnchanged(f, before);
     }
 
+
     @ParameterizedTest
     @ValueSource(
-            strings = {
-                "inactive",
-                "readOnly",
-                "originMissing",
-                "originUser",
-                "originAgent",
-                "owner",
-                "profile",
-                "connectionRevision",
-                "bindingRevision"
-            })
+        strings = {
+            "inactive",
+            "readOnly",
+            "originMissing",
+            "originUser",
+            "originAgent",
+            "owner",
+            "profile",
+            "connectionRevision",
+            "bindingRevision"
+        })
     @DisplayName("발급 뒤 현재 권한·origin·소유자·profile·각 revision이 달라지면 claim과 외부 실행을 거절한다")
     void rejectsChangedClaimContextWithoutConsuming(String defect) {
         Fixture f = fixture();
@@ -255,12 +284,13 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var before = row(f);
         injectContextDefect(f, defect);
         assertThatThrownBy(() -> claims.claim(input(raw)))
-                .isInstanceOf(ApiException.class)
-                .extracting("code")
-                .isEqualTo(ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+            .isInstanceOf(ApiException.class)
+            .extracting("code")
+            .isEqualTo(ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         assertUnchanged(f, before);
         assertThat(EXECUTE_REQUESTS.get()).isZero();
     }
+
 
     private void injectContextDefect(Fixture f, String defect) {
         var context = current.readContext(f.action());
@@ -268,15 +298,15 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         switch (defect) {
             case "inactive" ->
                 jdbc.update(
-                        "update allowed_person set enabled = false where email = ?",
-                        f.user().email());
+                    "update allowed_person set enabled = false where email = ?",
+                    f.user().email());
             case "readOnly" ->
                 tx().executeWithoutResult(status -> {
                     var conversation = Conversation.startedForCheck(f.user().id(), "검사", context.agentId(), NOW);
                     em.persist(conversation);
                     em.flush();
                     var check = ProactiveCheck.started(
-                            f.user().id(), context.agentId(), conversation.id(), CheckTrigger.MANUAL, false, NOW);
+                        f.user().id(), context.agentId(), conversation.id(), CheckTrigger.MANUAL, false, NOW);
                     check.attachRoot(context.originExecutionId(), "test-root");
                     em.persist(check);
                 });
@@ -284,7 +314,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 jdbc.update("delete from agent_execution where id = ?", context.originExecutionId());
             case "owner" -> {
                 var other = users.saveAndFlush(
-                        AppUser.of(UUID.randomUUID() + "@example.test", "다른 주인", 1L, UserRole.MEMBER, NOW));
+                    AppUser.of(UUID.randomUUID() + "@example.test", "다른 주인", 1L, UserRole.MEMBER, NOW));
                 jdbc.update("update connector_connection set user_id = ? where id = ?", other.id(), f.connection());
             }
             case "originUser", "originAgent" -> {
@@ -293,35 +323,36 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 switch (defect) {
                     case "originUser" ->
                         jdbc.update(
-                                "update agent_execution set user_id = ? where id = ?",
-                                other.user().id(),
-                                context.originExecutionId());
+                            "update agent_execution set user_id = ? where id = ?",
+                            other.user().id(),
+                            context.originExecutionId());
                     case "originAgent" ->
                         jdbc.update(
-                                "update agent_execution set agent_id = ? where id = ?",
-                                otherContext.agentId(),
-                                context.originExecutionId());
+                            "update agent_execution set agent_id = ? where id = ?",
+                            otherContext.agentId(),
+                            context.originExecutionId());
                     default -> throw new IllegalArgumentException(defect);
                 }
             }
             case "profile" ->
                 jdbc.update(
-                        "update agent set hermes_profile = ? where id = ?",
-                        "changed-" + UUID.randomUUID(),
-                        context.agentId());
+                    "update agent set hermes_profile = ? where id = ?",
+                    "changed-" + UUID.randomUUID(),
+                    context.agentId());
             case "connectionRevision" ->
                 jdbc.update(
-                        "update connector_connection set updated_at = ? where id = ?",
-                        Timestamp.from(NOW.plusSeconds(1)),
-                        f.connection());
+                    "update connector_connection set updated_at = ? where id = ?",
+                    Timestamp.from(NOW.plusSeconds(1)),
+                    f.connection());
             case "bindingRevision" ->
                 jdbc.update(
-                        "update agent_connector_binding set updated_at = ? where id = ?",
-                        Timestamp.from(NOW.plusSeconds(1)),
-                        f.binding());
+                    "update agent_connector_binding set updated_at = ? where id = ?",
+                    Timestamp.from(NOW.plusSeconds(1)),
+                    f.binding());
             default -> throw new IllegalArgumentException(defect);
         }
     }
+
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -332,20 +363,20 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var start = new CountDownLatch(1);
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var jobs = IntStream.range(0, 6)
-                    .mapToObj(i -> pool.submit(() -> {
-                        start.await();
-                        try {
-                            if (consume) {
-                                claims.claim(input(raw));
-                            } else {
-                                tickets.issue(f.action());
-                            }
-                            return 1;
-                        } catch (ApiException ignored) {
-                            return 0;
+                .mapToObj(i -> pool.submit(() -> {
+                    start.await();
+                    try {
+                        if (consume) {
+                            claims.claim(input(raw));
+                        } else {
+                            tickets.issue(f.action());
                         }
-                    }))
-                    .toList();
+                        return 1;
+                    } catch (ApiException ignored) {
+                        return 0;
+                    }
+                }))
+                .toList();
             start.countDown();
             int succeeded = 0;
             for (var job : jobs) {
@@ -354,6 +385,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             assertThat(succeeded).isEqualTo(1);
         }
     }
+
 
     @ParameterizedTest
     @CsvSource({"false,register", "false,disconnect", "false,unbind", "true,register", "true,disconnect", "true,unbind"
@@ -382,17 +414,17 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             clock.advance(Duration.ofSeconds(1));
             var changed = pool.submit(() -> {
                 assertThatThrownBy(() -> {
-                            switch (mutation) {
-                                case "register" ->
-                                    connectionService.register(f.user(), "demo-financial", Map.of("account", "000008"));
-                                case "disconnect" -> connectionService.disconnect(f.user(), "demo-financial");
-                                case "unbind" -> bindingService.unbind(f.user(), f.agentCode(), "demo-financial");
-                                default -> throw new IllegalArgumentException(mutation);
-                            }
-                        })
-                        .isInstanceOf(ApiException.class)
-                        .extracting("code")
-                        .isEqualTo(ErrorCode.CONNECTOR_ACTION_EXECUTING);
+                    switch (mutation) {
+                        case "register" ->
+                            connectionService.register(f.user(), "demo-financial", Map.of("account", "000008"));
+                        case "disconnect" -> connectionService.disconnect(f.user(), "demo-financial");
+                        case "unbind" -> bindingService.unbind(f.user(), f.agentCode(), "demo-financial");
+                        default -> throw new IllegalArgumentException(mutation);
+                    }
+                })
+                    .isInstanceOf(ApiException.class)
+                    .extracting("code")
+                    .isEqualTo(ErrorCode.CONNECTOR_ACTION_EXECUTING);
             });
             changed.get(3, TimeUnit.SECONDS);
             tx().executeWithoutResult(status -> {
@@ -415,6 +447,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         }
     }
 
+
     @ParameterizedTest
     @CsvSource({"false,expiry", "true,expiry", "false,failure", "true,failure", "false,timeout", "true,timeout"})
     @DisplayName("HTTP 대기 중 만료와 실제 실패·timeout은 권한 상태를 바꾸지 않는다")
@@ -431,13 +464,13 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var pending = pool.submit(() -> {
                 assertThatThrownBy(() -> {
-                            if (consume) {
-                                claims.claim(input(raw));
-                            } else {
-                                tickets.issue(f.action());
-                            }
-                        })
-                        .isInstanceOf(ApiException.class);
+                    if (consume) {
+                        claims.claim(input(raw));
+                    } else {
+                        tickets.issue(f.action());
+                    }
+                })
+                    .isInstanceOf(ApiException.class);
             });
             if (!"failure".equals(reason)) {
                 assertThat(held.entered.await(3, TimeUnit.SECONDS)).isTrue();
@@ -453,6 +486,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         }
     }
 
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     @DisplayName("HTTP 중 실제 반영 완료의 PENDING 커밋이 먼저 보이고 옛 발급·claim 맥락은 거절된다")
@@ -465,29 +499,29 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         try (var pool = Executors.newVirtualThreadPerTaskExecutor()) {
             var pending = pool.submit(() -> {
                 assertThatThrownBy(() -> {
-                            if (consume) {
-                                claims.claim(input(raw));
-                            } else {
-                                tickets.issue(f.action());
-                            }
-                        })
-                        .isInstanceOf(ApiException.class);
+                    if (consume) {
+                        claims.claim(input(raw));
+                    } else {
+                        tickets.issue(f.action());
+                    }
+                })
+                    .isInstanceOf(ApiException.class);
             });
             assertThat(held.entered.await(3, TimeUnit.SECONDS)).isTrue();
             CONFIGURED.set(false);
             var admin = new CurrentUser(f.user().id(), f.user().email(), "검사 관리자", 1L, UserRole.ADMIN);
             var changed = pool.submit(() -> assertThatThrownBy(
-                            () -> bindingService.confirmApplied(admin, f.agentCode(), "demo-financial", null))
+                () -> bindingService.confirmApplied(admin, f.agentCode(), "demo-financial", null))
                     .isInstanceOf(ApiException.class));
             changed.get(3, TimeUnit.SECONDS);
             assertThat(jdbc.queryForObject(
-                            "select status from agent_connector_binding where id = ?", String.class, f.binding()))
+                "select status from agent_connector_binding where id = ?", String.class, f.binding()))
                     .isEqualTo("PENDING");
             assertThat(jdbc.queryForObject(
-                                    "select updated_at from agent_connector_binding where id = ?",
-                                    Timestamp.class,
-                                    f.binding())
-                            .toInstant())
+                "select updated_at from agent_connector_binding where id = ?",
+                Timestamp.class,
+                f.binding())
+                .toInstant())
                     .isNotEqualTo(before.bindingUpdatedAt());
             held.release.countDown();
             pending.get(5, TimeUnit.SECONDS);
@@ -496,6 +530,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             held.release.countDown();
         }
     }
+
 
     @Test
     @DisplayName("외부 트랜잭션과 잘못된 서명은 카탈로그와 상태 변경 전에 거절한다")
@@ -508,14 +543,15 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         });
         String wrong = raw.substring(0, raw.indexOf('.') + 1)
-                + Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);
+            + Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);
         assertThatThrownBy(() -> claims.claim(input(wrong)))
-                .isInstanceOf(ApiException.class)
-                .extracting("code")
-                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+            .isInstanceOf(ApiException.class)
+            .extracting("code")
+            .isEqualTo(ErrorCode.UNAUTHENTICATED);
         assertThat(CATALOG_REQUESTS.get()).isEqualTo(requests);
         assertThat(row(f).consumedAt()).isNull();
     }
+
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
@@ -540,30 +576,32 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 return result;
             }
 
+
             @Override
             public void commit(TransactionStatus status) {
                 manager.commit(status);
             }
+
 
             @Override
             public void rollback(TransactionStatus status) {
                 manager.rollback(status);
             }
         };
-        var issuing =
-                new ConnectorExecutionTicket(current, codec, actions, contents, users, failing, clock, properties);
-        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, failing, clock);
+        var issuing = new ConnectorExecutionTicket(current, codec, actions, contents, users, failing, clock, properties);
+        var consuming = new ConnectorExecutionClaims(tickets, codec, current, users, actions, contents, conflicts, failing, clock);
         assertThatThrownBy(() -> {
-                    if (consume) {
-                        consuming.claim(input(raw));
-                    } else {
-                        issuing.issue(f.action());
-                    }
-                })
-                .isInstanceOf(ApiException.class);
+            if (consume) {
+                consuming.claim(input(raw));
+            } else {
+                issuing.issue(f.action());
+            }
+        })
+            .isInstanceOf(ApiException.class);
         assertThat(armed).isFalse();
         assertUnchanged(f, before);
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"protocol", "risk", "scope", "missing", "unknown"})
@@ -577,14 +615,14 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             case "scope" -> CATALOG_BODY.set(CATALOG.replace("\"field\":\"account\"", "\"field\":\"secret\""));
             case "missing" -> CATALOG_BODY.set("[]");
             case "unknown" ->
-                tx().executeWithoutResult(status ->
-                        actions.findByPublicId(f.action()).orElseThrow().unknown(NOW));
+                tx().executeWithoutResult(status -> actions.findByPublicId(f.action()).orElseThrow().unknown(NOW));
             default -> throw new IllegalArgumentException(reason);
         }
         assertThatThrownBy(() -> tickets.issue(f.action())).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isNull();
     }
+
 
     @Test
     @DisplayName("권한 payload의 지수·overflow·중복·추가 키·시각 표현을 strict하게 거절한다")
@@ -602,23 +640,24 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             body.replace("\"v\":1", "\"v\":1,\"extra\":0")
         }) {
             assertThatThrownBy(() -> tickets.authenticate(signed(invalid)))
-                    .isInstanceOf(ApiException.class)
-                    .extracting("code")
-                    .isEqualTo(ErrorCode.VALIDATION_FAILED);
+                .isInstanceOf(ApiException.class)
+                .extracting("code")
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
         }
         assertThatThrownBy(() -> tickets.authenticate(raw + "=")).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> codec.decodeRequest("{\"tool\":\"x\"}".getBytes(StandardCharsets.UTF_8)))
-                .isInstanceOf(ApiException.class)
-                .extracting("code")
-                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+            .isInstanceOf(ApiException.class)
+            .extracting("code")
+            .isEqualTo(ErrorCode.UNAUTHENTICATED);
         String request = JSON.writeValueAsString(input(raw));
         assertThatThrownBy(() -> codec.decodeRequest((request + "{}").getBytes(StandardCharsets.UTF_8)))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> codec.decodeRequest(
-                        request.replace("\"scope\":{", "\"scope\":{\"pad\":\"" + "x".repeat(2048) + "\",")
-                                .getBytes(StandardCharsets.UTF_8)))
-                .isInstanceOf(ApiException.class);
+            request.replace("\"scope\":{", "\"scope\":{\"pad\":\"" + "x".repeat(2048) + "\",")
+                .getBytes(StandardCharsets.UTF_8)))
+                    .isInstanceOf(ApiException.class);
     }
+
 
     @Test
     @DisplayName("응답 유실 뒤 새 codec과 서비스도 DB의 발급·소비 상태를 재사용할 수 없다")
@@ -626,15 +665,15 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         Fixture f = fixture();
         String raw = tickets.issue(f.action());
         var freshCodec = new ConnectorExecutionClaimCodec();
-        var freshTickets =
-                new ConnectorExecutionTicket(current, freshCodec, actions, contents, users, manager, clock, properties);
+        var freshTickets = new ConnectorExecutionTicket(current, freshCodec, actions, contents, users, manager, clock, properties);
         var freshClaims = new ConnectorExecutionClaims(
-                freshTickets, freshCodec, current, users, actions, contents, manager, clock);
+            freshTickets, freshCodec, current, users, actions, contents, conflicts, manager, clock);
         assertThatThrownBy(() -> freshTickets.issue(f.action())).isInstanceOf(ApiException.class);
         assertThat(freshClaims.claim(input(raw)).allowed()).isTrue();
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isEqualTo(NOW);
     }
+
 
     @Test
     @DisplayName("서명이 맞아도 미발급 ticket과 미래 시각, 만료 경계와 다른 scope를 거절한다")
@@ -643,27 +682,27 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         var context = current.readContext(f.action());
         var stored = row(f);
         var unissued = new ConnectorExecutionTicketPayload(
-                1,
-                UUID.randomUUID(),
-                f.action(),
-                f.user().id(),
-                context.agentId(),
-                f.connection(),
-                f.binding(),
-                context.profile(),
-                "demo-financial",
-                "place_order",
-                stored.executionArgsSha256(),
-                stored.scopeSha256(),
-                NOW,
-                NOW.plusSeconds(60));
+            1,
+            UUID.randomUUID(),
+            f.action(),
+            f.user().id(),
+            context.agentId(),
+            f.connection(),
+            f.binding(),
+            context.profile(),
+            "demo-financial",
+            "place_order",
+            stored.executionArgsSha256(),
+            stored.scopeSha256(),
+            NOW,
+            NOW.plusSeconds(60));
         assertThatThrownBy(() -> claims.claim(input(signed(JSON.writeValueAsString(unissued)))))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
         assertThat(row(f).ticketId()).isNull();
         String raw = tickets.issue(f.action());
         var issued = tickets.authenticate(raw);
         assertThatThrownBy(() -> claims.claim(new ConnectorExecutionClaimInput(
-                        raw, issued.tool(), issued.argsSha256(), Map.of("account_seq", "000008"))))
+            raw, issued.tool(), issued.argsSha256(), Map.of("account_seq", "000008"))))
                 .isInstanceOf(ApiException.class);
         clock.set(NOW.minusNanos(1000));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
@@ -672,11 +711,12 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         assertThat(row(f).consumedAt()).isNull();
     }
 
+
     @Test
     @DisplayName("잘못된 UTF-8과 payload·본문·scope의 독립 바이트 상한을 거절한다")
     void rejectsMalformedUtf8AndIndependentByteLimits() {
-        assertThatThrownBy(() -> codec.decodeRequest(new byte[] {'{', (byte) 0xc0, (byte) 0xaf, '}'}))
-                .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> codec.decodeRequest(new byte[] {'{', (byte)0xc0, (byte)0xaf, '}'}))
+            .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> codec.decodePayload(new byte[3073])).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> codec.decodeRequest(new byte[8193])).isInstanceOf(ApiException.class);
         Fixture f = fixture();
@@ -684,15 +724,17 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         String oversizedScope = request.replace("\"scope\":{", "\"scope\":{ " + " ".repeat(2048));
         assertThat(oversizedScope.getBytes(StandardCharsets.UTF_8).length).isLessThan(8192);
         assertThatThrownBy(() -> codec.decodeRequest(oversizedScope.getBytes(StandardCharsets.UTF_8)))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
         String oversizedValue = request.replace("000007", "가".repeat(43));
         assertThatThrownBy(() -> codec.decodeRequest(oversizedValue.getBytes(StandardCharsets.UTF_8)))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
     }
+
 
     Fixture fixture() {
         return fixture(NOW.plusSeconds(300));
     }
+
 
     Fixture fixture(Instant approvalExpiry) {
         return tx().execute(status -> {
@@ -701,15 +743,15 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             String profile = "claim-" + id;
             people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile, NOW));
             var agent = agents.saveAndFlush(Agent.of(
-                    "claim-" + id,
-                    "검사",
-                    profile,
-                    "http://localhost",
-                    CostMode.SUBSCRIPTION,
-                    CredentialScope.SHARED_HOUSEHOLD,
-                    AgentVisibility.PRIVATE,
-                    user.id(),
-                    NOW));
+                "claim-" + id,
+                "검사",
+                profile,
+                "http://localhost",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                user.id(),
+                NOW));
             var connection = ConnectorConnection.pending(user.id(), "demo-financial", NOW);
             connection.connected(new ConnectionFields(Map.of("account", "000007"), Map.of()), NOW);
             connection.ready(NOW);
@@ -719,65 +761,69 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             binding.ready(NOW);
             bindings.saveAndFlush(binding);
             var origin = runs.saveAndFlush(AgentExecution.builder()
-                    .userId(user.id())
-                    .agentId(agent.id())
-                    .profileName(profile)
-                    .hermesSessionId("fos-" + id)
-                    .costMode(CostMode.SUBSCRIPTION)
-                    .status(ExecutionStatus.RUNNING)
-                    .startedAt(NOW)
-                    .build());
+                .userId(user.id())
+                .agentId(agent.id())
+                .profileName(profile)
+                .hermesSessionId("fos-" + id)
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(NOW)
+                .build());
             String args = VECTOR.get("modelArgsJson").stringValue();
             var action = ConnectorAction.decided(
-                    connection,
-                    agent.id(),
-                    origin,
-                    HermesToolName.of("demo", "place_order"),
-                    "place_order",
-                    new ToolPolicyDecision(
-                            ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
-                    false,
-                    Sha256.hex(id),
-                    Sha256.hex(args),
-                    NOW);
+                connection,
+                agent.id(),
+                origin,
+                HermesToolName.of("demo", "place_order"),
+                "place_order",
+                new ToolPolicyDecision(
+                    ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
+                false,
+                Sha256.hex(id),
+                Sha256.hex(args),
+                NOW);
             action.awaitApproval(args, approvalExpiry);
             actions.saveAndFlush(action);
             contents.saveAndFlush(ConnectorExecutionSnapshot.capture(
-                    action,
-                    binding,
-                    "CREATE",
-                    DECLARATION,
-                    VECTOR.get("executionArgsJson").stringValue(),
-                    VECTOR.get("summaryJson").stringValue(),
-                    VECTOR.get("scopeJson").stringValue(),
-                    cipher,
-                    NOW));
+                action,
+                binding,
+                "CREATE",
+                DECLARATION,
+                VECTOR.get("executionArgsJson").stringValue(),
+                VECTOR.get("summaryJson").stringValue(),
+                VECTOR.get("scopeJson").stringValue(),
+                cipher,
+                NOW));
             action.beginExecution(NOW);
             return new Fixture(
-                    action.publicId(),
-                    action.id(),
-                    connection.id(),
-                    binding.id(),
-                    agent.code(),
-                    new CurrentUser(user.id(), user.email(), "검사 주인", 1L, UserRole.MEMBER));
+                action.publicId(),
+                action.id(),
+                connection.id(),
+                binding.id(),
+                agent.code(),
+                new CurrentUser(user.id(), user.email(), "검사 주인", 1L, UserRole.MEMBER));
         });
     }
+
 
     ConnectorActionExecution row(Fixture fixture) {
         return tx().execute(status -> contents.findById(fixture.actionId()).orElseThrow());
     }
 
+
     ConnectorExecutionClaimInput input(String raw) {
         return new ConnectorExecutionClaimInput(
-                raw,
-                "place_order",
-                Sha256.hex(VECTOR.get("executionArgsJson").stringValue()),
-                Map.of("account_seq", "000007"));
+            raw,
+            "place_order",
+            Sha256.hex(VECTOR.get("executionArgsJson").stringValue()),
+            Map.of("account_seq", "000007"));
     }
+
 
     TransactionTemplate tx() {
         return new TransactionTemplate(manager);
     }
+
 
     private void assertUnchanged(Fixture fixture, ConnectorActionExecution before) {
         var after = row(fixture);
@@ -786,33 +832,36 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         assertThat(after.consumedAt()).isNull();
     }
 
+
     static String signed(String body) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(TOKEN.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] key = mac.doFinal("fos-approval-signing-key-v1".getBytes(StandardCharsets.US_ASCII));
             mac.init(new SecretKeySpec(key, "HmacSHA256"));
-            String encoded =
-                    Base64.getUrlEncoder().withoutPadding().encodeToString(body.getBytes(StandardCharsets.UTF_8));
+            String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(body.getBytes(StandardCharsets.UTF_8));
             return encoded + "."
-                    + Base64.getUrlEncoder()
-                            .withoutPadding()
-                            .encodeToString(mac.doFinal(
-                                    ("fos-approval-claim-v1" + encoded).getBytes(StandardCharsets.US_ASCII)));
+                + Base64.getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(mac.doFinal(
+                        ("fos-approval-claim-v1" + encoded).getBytes(StandardCharsets.US_ASCII)));
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException(e);
         }
     }
 
+
     private static JsonNode vectors() {
         try {
             return JSON.readTree(Files.readString(Path.of("../test/fixtures/financial-approval-v1.json")))
-                    .get("cases")
-                    .get(0);
+                .get("cases")
+                .get(0);
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    record Fixture(UUID action, Long actionId, Long connection, Long binding, String agentCode, CurrentUser user) {}
+
+    record Fixture(UUID action, Long actionId, Long connection, Long binding, String agentCode, CurrentUser user) {
+    }
 }
