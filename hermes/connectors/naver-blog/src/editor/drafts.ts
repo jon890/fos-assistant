@@ -134,18 +134,20 @@ export async function editorDocument(
 /** 새 편집기에 놓일 수 있는 구성요소 종류. 그 밖의 종류가 있으면 쓰던 글로 본다. */
 const EMPTY_KINDS = new Set(["documentTitle", "text"]);
 
-/** 문단 배열에 공백 밖의 글자가 있는지 본다. 모르는 모양은 글이 없는 것으로 읽는다. */
-function hasText(paragraphs: unknown) {
-  if (!Array.isArray(paragraphs)) return false;
+/** 문단 배열에 공백 밖의 글자가 있는지 본다. 모르는 모양은 빈 글로 간주하지 않는다. */
+function hasText(page: EditorPage, paragraphs: unknown) {
+  if (!Array.isArray(paragraphs))
+    throw page.fail("editor_failed", "편집기 문단의 모양이 다르다");
   return paragraphs.some((paragraph) => {
     const nodes = (paragraph as { nodes?: unknown } | null)?.nodes;
-    return (
-      Array.isArray(nodes) &&
-      nodes.some((node) => {
-        const value = (node as { value?: unknown } | null)?.value;
-        return typeof value === "string" && /\S/.test(value);
-      })
-    );
+    if (!Array.isArray(nodes))
+      throw page.fail("editor_failed", "편집기 문단의 모양이 다르다");
+    return nodes.some((node) => {
+      const value = (node as { value?: unknown } | null)?.value;
+      if (typeof value !== "string")
+        throw page.fail("editor_failed", "편집기 글 조각의 모양이 다르다");
+      return /\S/.test(value);
+    });
   });
 }
 
@@ -157,14 +159,18 @@ function hasText(paragraphs: unknown) {
 export async function assertEmptyEditor(page: EditorPage) {
   const doc = await editorDocument(page);
   const components = doc.document?.components;
-  const written =
-    Array.isArray(components) &&
-    components.some(
-      (component) =>
-        hasText(component?.title) ||
-        hasText(component?.value) ||
-        !EMPTY_KINDS.has(String(component?.["@ctype"] ?? "")),
-    );
+  if (!Array.isArray(components))
+    throw page.fail("editor_failed", "편집기 구성요소의 모양이 다르다");
+  const written = components.some(
+    (component) =>
+      !EMPTY_KINDS.has(String(component?.["@ctype"] ?? "")) ||
+      hasText(
+        page,
+        component?.["@ctype"] === "documentTitle"
+          ? component.title
+          : component.value,
+      ),
+  );
   if (written || DRAFT_ID_PATTERN.test(String(doc.documentId ?? "")))
     throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
 }

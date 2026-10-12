@@ -539,3 +539,24 @@ test("새 탭의 편집기에 사진만 남아 있어도 불러오지 않고 NAV
   expect(editor.loaded).toBeNull();
   expectOnlyOwnTabClosed(cdp, otherTab);
 });
+
+test.each([
+  {},
+  { document: {} },
+  { document: { components: [{ "@ctype": "text", value: "쓰던 글" }] } },
+  { document: { components: [{ "@ctype": "text", value: [{}] }] } },
+  {
+    document: {
+      components: [{ "@ctype": "text", value: [{ nodes: [{ value: 1 }] }] }],
+    },
+  },
+])("편집기 문서 모양이 달라지면 불러오기 전에 멈춘다: %j", async (document) => {
+  const { editor, env } = await setup();
+  editor.document = document as typeof editor.document;
+  const error = await readDraft(env, "224000000001", TIMES).catch(
+    (caught) => caught,
+  );
+  expect((error as ToolError).code).toBe("NAVER_BLOG_UNAVAILABLE");
+  expect(editor.loaded).toBeNull();
+  expect(editor.listOpen).toBe(false);
+});
