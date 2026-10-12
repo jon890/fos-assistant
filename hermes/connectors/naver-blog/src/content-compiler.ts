@@ -14,7 +14,8 @@ import type { DraftInput } from "./draft.ts";
 export type ContentDraftErrorCode =
   | "CONTENT_DRAFT_INVALID"
   | "CONTENT_DRAFT_RESERVED_LINE"
-  | "CONTENT_DRAFT_ASSET_INVALID";
+  | "CONTENT_DRAFT_ASSET_INVALID"
+  | "CONTENT_DRAFT_DUPLICATE_PHOTO";
 
 /** 입력 본문과 경로를 오류에 싣지 않는다. */
 export class ContentDraftError extends Error {
@@ -69,6 +70,8 @@ export function compileContentDraft(
   const assetManifest: CompiledSnapshotV1["assetManifest"] = [];
   const photoNotes: Record<string, string> = {};
   const noteTuples: [number, string][] = [];
+  // 기존 DSL 사진 자리는 파일 이름만 담아 같은 사진의 두 자리를 구별하지 못한다. Control Plane 과 같은 뜻으로 막는다.
+  const placed = new Set<string>();
   canonical.blocks.forEach((block, position) => {
     switch (block.type) {
       case "paragraph":
@@ -78,6 +81,9 @@ export function compileContentDraft(
       case "image": {
         const asset = byId.get(block.assetId);
         if (!asset) throw new ContentDraftError("CONTENT_DRAFT_ASSET_INVALID");
+        if (placed.has(block.assetId))
+          throw new ContentDraftError("CONTENT_DRAFT_DUPLICATE_PHOTO");
+        placed.add(block.assetId);
         const number = assetManifest.length + 1;
         lines.push(`[사진 ${number}: ${asset.fileName}]`);
         if (block.caption !== undefined) lines.push(block.caption);

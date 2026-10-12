@@ -17,6 +17,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 public class ContentDraftInputReader {
     public static final long MAX_REVISION = 9_007_199_254_740_991L;
+    /** 같은 사진 중복의 응답 문구다. MCP 결과도 이 상수만 싣고 예외 message 는 싣지 않는다. */
+    public static final String DUPLICATE_PHOTO_MESSAGE = "같은 사진은 원고에 한 번만 넣을 수 있습니다. 중복된 사진 블록을 지우고 다시 저장해 주세요.";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Pattern TRIM = Pattern.compile("^[\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+|[\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+$");
     private static final List<Pattern> RESERVED = List.of(
@@ -81,6 +83,21 @@ public class ContentDraftInputReader {
             throw invalid();
         }
         return new ContentDraftInput(title, category, tags.deepCopy(), blocks.deepCopy());
+    }
+
+
+    /**
+     * 새로 쓰는 원고의 이미지 블록이 같은 assetId 를 두 번 쓰면 거절한다.
+     *
+     * <p>{@link #read} 는 저장한 판을 다시 읽을 때도 쓰므로 이 규칙을 넣지 않는다. 규칙 전에 저장한 판도 읽고 고칠 수 있어야 한다.
+     */
+    public static void requireUniquePhotos(ContentDraftInput input) {
+        Set<String> seen = new HashSet<>();
+        for (var block : input.blocks()) {
+            if ("image".equals(block.path("type").asString()) && !seen.add(block.path("assetId").asString())) {
+                throw new ApiException(ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO, DUPLICATE_PHOTO_MESSAGE);
+            }
+        }
     }
 
 
