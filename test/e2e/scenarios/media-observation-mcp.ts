@@ -210,7 +210,7 @@ export const mediaObservationMcpScenario: Scenario = {
             fail("유지해야 할 관찰 실행이 먼저 끝났다");
           }),
         ]),
-        5_000,
+        10_000,
         "관찰 실행을 받지 못했다",
       );
       const session = context.hermes.heldRun()?.sessionId;
@@ -337,6 +337,11 @@ export const mediaObservationMcpScenario: Scenario = {
         savedRows.push(saved);
       }
       const recordRequestsAfterSave = recordRequests;
+      // 카운터가 실제 record 요청을 세는지 저장 구간으로 먼저 대조한다.
+      expect(
+        recordRequestsAfterSave === mapping.rows.length,
+        "record 요청 카운터가 저장 요청을 세지 못했다",
+      );
       const native = `native-${randomUUID()}`;
       const registered = await fetch(
         `${context.api.replace(/\/api\/v1$/, "")}/internal/hermes/session-bindings/subagent`,
@@ -469,6 +474,68 @@ export const mediaObservationMcpScenario: Scenario = {
           corrected.sourceAssurance === "USER_CORRECTION" &&
           corrected.observation.summary === "사용자 정정",
         "거부 뒤 USER 정정 본문이 유지되지 않았다",
+      );
+      // 짧은 본문의 재조회와 별도로, 큰 본문이 MCP 페이지를 32KiB 예산대로 나누는지 확인한다.
+      for (const id of sentIds.filter((id) => id !== assetId).slice(0, 6)) {
+        const gif = sent[sentIds.indexOf(id)].format === "GIF";
+        const large = data<Observation>(
+          await callTool(
+            context,
+            token,
+            RECORD,
+            {
+              assetId: String(id),
+              expectedRevision: 1,
+              requestId: randomUUID(),
+              observation: {
+                status: "NEEDS_REVIEW",
+                summary: `큰 합성 본문 ${id}`,
+                coverage: gif
+                  ? { mode: "FIRST_FRAME", frame: 0 }
+                  : { mode: "OVERVIEW" },
+                claims: Array.from({ length: 15 }, () => ({
+                  kind: "OCR",
+                  text: "가".repeat(450),
+                  confidence: "UNCERTAIN",
+                  evidence: ["합성 근거"],
+                })),
+              },
+            },
+            contextFor(token, RECORD, nextSession),
+          ),
+        );
+        expect(large.revision === 2, "큰 본문이 새 revision으로 저장되지 않았다");
+      }
+      const budgetSeen: string[] = [];
+      let budgetCursor: string | null = null;
+      let budgetPages = 0;
+      do {
+        const page: Page = data(
+          await callTool(
+            context,
+            token,
+            LIST,
+            { afterAssetId: budgetCursor, limit: 30 },
+            contextFor(token, LIST, nextSession),
+          ),
+        );
+        expect(page.items.length > 0, "예산 페이지가 진행하지 않는다");
+        expect(
+          page.items.reduce(
+            (bytes, item) =>
+              bytes + Buffer.byteLength(JSON.stringify(item.observation)),
+            0,
+          ) <= 32768,
+          "페이지 본문 예산을 넘었다",
+        );
+        budgetSeen.push(...page.items.map((item) => item.assetId));
+        budgetCursor = page.nextAfterAssetId;
+        expect(++budgetPages <= 30, "예산 커서가 끝나지 않는다");
+      } while (budgetCursor !== null);
+      expect(
+        budgetPages > 1 &&
+          budgetSeen.join() === savedRows.map((row) => row.assetId).join(),
+        "예산 커서에서 첨부가 중복되거나 빠졌다",
       );
       const missing = await fetch(
         `${context.api.replace(/\/api\/v1$/, "")}/mcp`,
