@@ -55,7 +55,7 @@ key 는 대시보드 프로세스의 환경 변수가 가리키는 파일에서 
 ```bash
 python3 -m unittest discover -s hermes/tests -p 'test_dashboard_profile_api_connector_vault.py'
 python3 -m unittest discover -s hermes/tests
-node scripts/check-file-length.mjs
+node scripts/checks/check-file-length.mjs
 ```
 
 셋 다 실패 없이 끝난다.

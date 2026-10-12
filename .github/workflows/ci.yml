@@ -58,7 +58,7 @@ jobs:
       # 마이그레이션과 저장소 쿼리를 검사한다.
       - name: 실제 MySQL 검사
         if: matrix.suite == 'mysql'
-        run: scripts/check-mysql-migration.sh
+        run: scripts/checks/check-mysql-migration.sh
 
   backend:
     name: backend
@@ -158,7 +158,7 @@ jobs:
         env:
           BROWSER_STABILITY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
-        run: node scripts/browser-stability.mjs --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
+        run: node scripts/ci/browser-stability.mjs --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
       - name: 브라우저 JSON 결과
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -201,7 +201,7 @@ jobs:
       - name: 폭별 shard 결과 판정
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/browser-ci.mjs check ${{ matrix.project }} 4
+        run: node scripts/ci/browser-ci.mjs check ${{ matrix.project }} 4
 
   browser-failures:
     name: browser-failures
@@ -235,7 +235,7 @@ jobs:
       - name: main 브라우저 실패 이슈 집계
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/browser-ci.mjs issues "$RUNNER_TEMP/browser-reports"
+        run: node scripts/ci/browser-ci.mjs issues "$RUNNER_TEMP/browser-reports"
 
   e2e:
     name: e2e
@@ -282,12 +282,12 @@ jobs:
         env:
           # PR 은 main 의 base, push 는 직전 main, 정기 실행은 현재 main 과 비교한다.
           MIGRATION_BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
-        run: node scripts/check-migration-versions.mjs "$MIGRATION_BASE"
+        run: node scripts/checks/check-migration-versions.mjs "$MIGRATION_BASE"
       - name: 기능 문서 covers 검사
         if: github.event_name == 'pull_request'
         env:
           FEATURE_BASE: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/check-feature-covers.mjs "$FEATURE_BASE"
+        run: node scripts/ci/check-feature-covers.mjs "$FEATURE_BASE"
 
   hermes:
     name: hermes
@@ -309,10 +309,10 @@ jobs:
           test -x /usr/bin/google-chrome || { echo '합성 DOM 회귀에 실제 Chrome 설치가 필요합니다.' >&2; exit 1; }
           /usr/bin/google-chrome --version
       - name: 커넥터 배포 묶음과 기존 HTTP 대역 검사
-        run: bash scripts/check-connector-package.sh
+        run: bash scripts/ci/check-connector-package.sh
       - run: python -m unittest discover -s hermes/tests -v
       # dashboard-profile-api 가 기대는 Hermes 내부 지점을 계약의 판 소스에서 확인한다(ADR-088).
-      - run: bash scripts/check-hermes-contract.sh
+      - run: bash scripts/checks/check-hermes-contract.sh
 
   quality:
     name: quality
@@ -341,7 +341,7 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile
       # 파일 길이 기준 목록도 quality.sh 에서 검사한다.
-      - run: scripts/quality.sh check
+      - run: scripts/checks/quality.sh check
 
   public-safe:
     name: public-safe
@@ -366,7 +366,7 @@ jobs:
           fi
           unset DENYLIST_PATTERNS
           # 위반한 줄에도 비공개 값이 있을 수 있어 검사 원문은 로그에 내지 않는다.
-          if PUBLIC_REPO_DENYLIST="$work/denylist" scripts/check-public-safe.sh > "$work/check.log" 2>&1; then
+          if PUBLIC_REPO_DENYLIST="$work/denylist" scripts/checks/check-public-safe.sh > "$work/check.log" 2>&1; then
             printf '%s\n' '통과: 공개 저장소에 적으면 안 되는 것을 찾지 못했다.'
           else
             status=$?

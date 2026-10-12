@@ -6,7 +6,7 @@
 # 소스의 AST와 선택한 함수의 분리 실행을 검사한다. 전체 Hermes import나 의존성 설치는 하지 않는다.
 set -Eeuo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 target="${1:-}"
 
 contract() {
