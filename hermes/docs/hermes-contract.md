@@ -1,7 +1,7 @@
 # Hermes 의 동작 계약
 
 이 저장소가 기대는 Hermes 의 동작을 Hermes 표면마다 갖는다. 우리 코드가 아니라 upstream 의 동작이다.
-기준 판은 `hermes/tests/hermes_contract.py` 의 `HERMES_VERSION` 이고, 다른 판에서 확인한 대목에만 판을 적는다.
+기준 버전은 `hermes/tests/hermes_contract.py`의 `HERMES_VERSION`이고, 이전 버전에서 확인한 대목은 버전을 함께 적는다.
 Hermes 내부 지점에 새로 기대면 같은 커밋에서 `hermes_contract.py` 에 선언한다.
 우리 plugin 의 계약은 [`hermes/plugins/fos-ctx/README.md`](../plugins/fos-ctx/README.md) 와 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 가 갖는다.
 
@@ -142,7 +142,7 @@ profile 마다 자기 `API_SERVER_KEY` 가 필요하고, 다른 profile 의 `run
 
 plugin 은 `~/.hermes/plugins/<이름>/` 에 `plugin.yaml` 과 `__init__.py` 를 두고
 `register(ctx)` 에서 도구와 hook 을 등록한다.
-hook 은 27종이 있고 그중 아래가 우리에게 쓸모 있다.
+hook 목록은 `hermes_cli/plugins.py`의 `VALID_HOOKS`가 갖고, 그중 아래가 우리에게 쓸모 있다.
 
 | hook | 얻는 것 |
 | --- | --- |
@@ -2638,6 +2638,57 @@ ADR-088 의 `test_hermes_contract.py` 는 상류 소스에서 이름·시그니�
 실제 usage 가 위 환산 가정과 다르면 provider 이름별 보정값을 추측해 넣지 않고, 확인한 계약과 그에 맞는 fixture·처리를 함께 고친다.
 
 ### 버전을 올릴 때 달라지는 계약
+
+#### v0.21.6의 연동 기준
+
+2026-10-12에 이전 기준 `v2026.9.24`와 `v0.21.6`의 공식 소스를 대조했다.
+tag가 가리키는 commit은 `hermes_contract.py`의 `HERMES_COMMIT`으로 고정한다.
+운영 이미지 갱신과 실제 provider 왕복은 별도 작업이다.
+
+| 대상 | v0.21.6의 변경과 적용 | 근거 |
+| --- | --- | --- |
+| Runs 요청·조회 | `/v1/runs`의 입력과 flat 조회, profile 소유 검사, `usage`와 실제 `runtime`을 유지한다. `message.interim`과 종료 사건 이름도 유지한다 | [api_server_runs.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/gateway/platforms/api_server_runs.py) |
+| SSE transport | 보관한 사건에 0부터 증가하는 JSON `seq`와 같은 값의 `id:`를 붙인다. 첫 연결부터 보관분을 보내고, 오래된 부분이 빠졌으면 `replay.truncated`를 먼저 보낸다. 그 안내에는 `seq`와 `id:`가 없다 | 같은 파일의 `_RunStream`, `_handle_run_events` |
+| API server | 여러 구독자에게 사건을 보내며 보관 상한은 1,000개다. 느린 구독자의 queue가 넘치거나 write가 5초를 넘기면 해당 연결을 닫는다. 종료 사건은 앞서 예약한 callback 뒤에 전달한다 | 같은 파일의 `_execute_run`, `_handle_run_events` |
+| 승인 사건 | Runs 승인 callback이 공통 `_approval_request_event`를 사용한다. command 가림과 봉투, choices의 의미는 유지한다 | [api_server.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/gateway/platforms/api_server.py) |
+| 대시보드 내부 지점 | ADR-088의 import·인자, 요청마다 middleware import, route와 session 칸을 유지한다. 도구·스킬 live reload와 unattended 승인 경계도 source 계약을 통과한다 | `test_hermes_contract.py`와 [plugins.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/plugins.py) |
+| profile·plugin | 외부 plugin을 profile별 별도 host에 올리는 `plugins.isolation: host`를 추가했다. 기본은 `in_process`다. host는 dashboard auth provider 등록을 지원하지 않으므로 이 plugin은 기존 in-process 적재를 사용한다. provider 등록은 launch scope에서만 허용한다 | [plugin_isolation.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/plugin_isolation.py), `PluginContext.register_dashboard_auth_provider` |
+| 의존성 | core 의존성에 Python 3.14 조건을 붙이고 YAML을 ruamel 기반으로 바꿨다. Pillow 12.3.0과 MCP extra의 mcp 2.0.0 pin은 유지한다. 우리 plugin은 기존 PyYAML 6.0.3을 유지한다 | [pyproject.toml](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/pyproject.toml) |
+| 설정·DB | config migration 47~50은 기존 기본 compression 상한·sandbox image·Vercel runtime 값과 퇴역한 tirith 설정을 정리한다. session DB schema는 30에서 31로 오른다. 이미지 되돌리기만으로 저장 상태가 복구되지는 않는다 | [config_migrations.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/config_migrations.py), [hermes_state_common.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_state_common.py) |
+
+Control Plane은 `id:`, `seq`와 `replay.truncated`를 무시하고 기존 사건을 읽는다.
+이번 변경에 `Last-Event-ID` 재연결이나 누락 사건 복구를 더하지 않는다.
+느린 구독자로 닫히면 `: stream closed` 와 종료 사건 없이 스트림이 끝난다. Control Plane 은 이를 정상 EOF 로 읽고 결과 조회로 최종 답만 받는다.
+끊긴 뒤의 답 조각, 도구, 중간 안내 사건은 화면과 실행 기록에 남지 않으며, 다른 실패와 구분할 단서는 사건 관측이 완료되지 못했다는 플래그 하나뿐이다.
+v0.21.6 합성 fixture와 단일 사건 봉투 함수가 transport 차이를 갖고, 이전 버전 fixture도 남긴다.
+공식 SSE handler를 분리 실행해 `events.sse` 의 `id/seq` 를 대조하고, 첫 연결의 누락 안내는 같은 handler 가 만든 것을 손으로 쓴 사건과 따로 대조한다.
+`events.sse` 에는 누락 안내가 없고, 파서가 안내를 건너뛰는지는 `unknown.sse` 가 본다.
+녹화한 운영 본문은 사용하지 않는다.
+
+dashboard plugin의 `python_dependencies`는 `PyYAML==6.0.3`을 선언한다.
+upstream manifest reader는 이 칸을 검증하고 loader는 누락을 경고하지만, discovery에서 설치하지 않는다.
+따라서 운영 이미지 갱신 단계에서 plugin을 읽기 전에 이 의존성을 준비해야 한다.
+PyYAML이 없으면 plugin 진입점이 필요한 패키지와 버전을 오류로 남기고 적재를 중단한다.
+근거는 [plugins_manifest.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/plugins_manifest.py)와
+[plugins_loader.py](https://github.com/NousResearch/hermes-agent/blob/v0.21.6/hermes_cli/plugins_loader.py)의 `_warn_python_dependencies`다.
+
+관리 bootstrap의 source 계약도 바뀐다. constructor에 `setup_choose_callback`을 더하고,
+secret scope는 관리 env를 마지막에 합쳐 사용자 값을 덮어쓴다.
+cron worker는 UTF-8 BOM을 받으며, profile의 plugin discovery와 config hook 등록 뒤에 소유권을 인수한다.
+job 반환값을 보존하고 정상 반환 뒤에만 stderr 파일을 정리한다.
+module 진입점의 `finish_worker_boot`와 worker env 표식도 새 계약에 포함된다.
+변경한 함수 여섯 개와 module 진입점의 AST 지문을 검토한 뒤 갱신했다.
+분리 실행은 snapshot 1회 읽기, 소유권 인수·atomic ack 이후 job 실행, 실패 반환과 문맥 복원을 확인한다.
+이 검사가 운영 저장소의 private bootstrap 호환을 증명하지는 않는다.
+이미지 갱신 전에 그쪽의 constructor·cron wrapper와 writer 파일 지문을 함께 확인해야 한다.
+
+이미지를 갱신하기 전에 모든 profile 의 설정과 session 저장소를 백업하고, 되돌릴 때 그 백업을 쓴다. 절차와 위치는 `fos-home-infra` 가 갖는다.
+배포 뒤에는 profile 관리·설정 저장, 연결 도구 호출과 승인, 실행 시작부터 SSE 답·도구·중간 안내·종료,
+캐시 사용량과 실제 provider/model, 원본 사진의 native 결과, cron의 관리 writer 적재를 왕복 확인한다.
+도구를 여러 번 부르는 긴 답 하나를 넣어, 사건 관측이 완료로 남는지도 확인한다.
+운영 값과 실행 절차는 `fos-home-infra`가 갖는다.
+
+#### v0.21.3에서 v0.21.5까지
 
 2026-09-28 에 v0.21.3 과 v0.21.5 의 태그 소스와 변경 이력을 대조했다.
 v0.21.3 은 `v2026.9.14`, commit `345cd2b057a452236de401d3534b8502a7465e8d` 이다.

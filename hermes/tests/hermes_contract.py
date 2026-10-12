@@ -17,10 +17,10 @@ plugin 이 새 지점에 기대게 되면 같은 커밋에서 여기에 더한�
 from dataclasses import dataclass
 
 
-# 운영이 쓰는 Hermes 판이다. 상류 저장소의 tag 이름이다. CI 가 이 판의 소스로 계약을 확인한다.
-HERMES_VERSION = "v2026.9.24"
+# 연동 기준 Hermes 버전이다. 상류 저장소의 tag 이름이다. CI 가 이 버전의 소스로 계약을 확인한다.
+HERMES_VERSION = "v0.21.6"
 # 그 tag 가 가리키는 commit 이다. 상류가 tag 를 옮기면 확인이 실패한다.
-HERMES_COMMIT = "f97608f178d1ffeca59860195ab7da295f7c8e5f"
+HERMES_COMMIT = "818c13be1dc4fd28987e1e881a9408224afd4535"
 HERMES_REPOSITORY = "https://github.com/NousResearch/hermes-agent"
 
 # plugin 이 import 하는 최상위 이름 중 Hermes 의 것이다. 이 이름으로 시작하는 import 는 모두 아래 표에 있어야 한다.
@@ -162,7 +162,8 @@ BODYLESS_MANAGED_FUNCTIONS = {
              'callable=None, clarify_callback: callable=None, read_terminal_callback: callable=None, '
              'read_preview_callback: callable=None, drive_preview_callback: callable=None, '
              'read_window_below_callback: callable=None, connection_callback: callable=None, tour_callback: '
-             'callable=None, step_callback: callable=None, stream_delta_callback: callable=None, '
+             'callable=None, setup_choose_callback: callable=None, step_callback: callable=None, '
+             'stream_delta_callback: callable=None, '
              'interim_assistant_callback: callable=None, tool_gen_callback: callable=None, status_callback: '
              'callable=None, notice_callback: callable=None, notice_clear_callback: callable=None, event_callback:'
              ' Optional[Callable[[str, dict], None]]=None, reaction_callback: Optional[Callable[[str], '
@@ -179,7 +180,7 @@ BODYLESS_MANAGED_FUNCTIONS = {
              'Optional[str]=None, side_agent: bool=False, memory_manager=None, tool_result_metadata_callback: '
              'Optional[Callable[..., dict]]=None'),
             None,
-            '24e81445f633b0cb893b31c8bf8308c91350eb1f2b1c10ea9ba8d61ad41b1ddc'),
+            'ee793abc8771756a84cbbd28bf70ff787a14ae31c65bdc1af69dd3ed93a7c6c6'),
     },
     'run_agent.py': {
         'AIAgent.__init__': (
@@ -196,7 +197,8 @@ BODYLESS_MANAGED_FUNCTIONS = {
              'thinking_callback: callable=None, reasoning_callback: callable=None, clarify_callback: '
              'callable=None, read_terminal_callback: callable=None, read_preview_callback: callable=None, '
              'drive_preview_callback: callable=None, read_window_below_callback: callable=None, '
-             'connection_callback: callable=None, tour_callback: callable=None, step_callback: callable=None, '
+             'connection_callback: callable=None, tour_callback: callable=None, '
+             'setup_choose_callback: callable=None, step_callback: callable=None, '
              'stream_delta_callback: callable=None, interim_assistant_callback: callable=None, tool_gen_callback: '
              'callable=None, status_callback: callable=None, notice_callback: callable=None, '
              'notice_clear_callback: callable=None, event_callback: Optional[Callable[[str, dict], None]]=None, '
@@ -213,7 +215,7 @@ BODYLESS_MANAGED_FUNCTIONS = {
              'str=None, capabilities: Dict[str, bool] | None=None, cwd: str | None=None, side_agent: bool=False, '
              'memory_manager=None, tool_result_metadata_callback: Optional[Callable[..., dict]]=None'),
             None,
-            'a27921f79931c73411b3365c173c4f3e58917aefffbda1e79783fd2a5b7cf385'),
+            '81effa5c4102f83a66acbc2cbb5ef578eef27ae689c1c38208fa9cf881f3929f'),
         'AIAgent.close': (
             ('self'),
             'None',
@@ -242,7 +244,7 @@ BODYLESS_MANAGED_FUNCTIONS = {
         'build_profile_secret_scope': (
             ('hermes_home: Path'),
             'Dict[str, str]',
-            '6d74a2a909aa278f40b741c8f6cefd6b35bbcd32b7fabb60aba9043fbdb038a1'),
+            '8a1580b149d71982c2a2c86133703f820c8c9b02d3d06d8fe20a82cdf0d8d59c'),
         'set_secret_scope': (
             ('secrets: Optional[Mapping[str, str]], *, profile_home: Optional[str]=None'),
             'Token',
@@ -271,15 +273,15 @@ BODYLESS_MANAGED_FUNCTIONS = {
             ('job: dict, *, adapters=None, loop=None, verbose: bool=False, '
              'extra_prompt: Optional[str]=None, cancel_event: Optional[_CancelEventLike]=None'),
             'bool',
-            'd2910271e855c4ea97bd2fc96aa6acf160442313e58f0b7cf3d29bea0839a63d'),
+            'c5be4bef1178f3434502499fd1df641b3a4ea4f0a5d5621eb652b875bb194146'),
         '_launch_external_cron_worker': (
             ('job: dict'),
             'bool',
-            'f4ee0cdb1cb564bcfb6e1bd4cbac48413a2e5f44092a752e69e331c63420cac4'),
+            '94c831733d9faa0424f95425be317c79e8598c06f3005ccb91796eb743100287'),
         '_run_external_worker_payload': (
             ('payload_path: Path, ack_path: Path'),
             'bool',
-            '44d2d5aaf7c9b0917d90d2652633bd1f948f558e2623e49627cbe80d91e3f5c8'),
+            '828ffebd9fef767b23221af8b873b732179b84f3bca04bd8ac9eb40a0ff07461'),
     },
 }
 
@@ -297,7 +299,7 @@ BODYLESS_MANAGED_MODULE_NODES = {
     },
     'cron/scheduler.py': {
         'import sys': 'f7252e3c1dbe1d5edf1f34c020a58a05b55f706b2c1d9479eae91f9a9d4be275',
-        '__main__': 'a95554d31aa1030d555af64cc3ff46e9f34e686f0ff04edda0c53c1853107a1d',
+        '__main__': 'a17f73ab00b24c1f21e1ba7dcd46af2cf598ddea7e0cb9356846919b3b0b842a',
     },
 }
 
