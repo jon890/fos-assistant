@@ -246,6 +246,11 @@ test("unit 과 경로 판정에 합친 public-safe 는 경로와 무관하게 �
   assert.match(changes, /run: node scripts\/ci\/ci-paths.mjs changes/);
   assert.match(changes, /PUBLIC_REPO_DENYLIST.*scripts\/checks\/check-public-safe\.sh/);
   assert.equal(changes.match(/uses: actions\/checkout@/g)?.length, 1);
+  const publicSafe = changes.split("      - name: 공개 정보 검사\n")[1];
+  assert.doesNotMatch(publicSafe, /^ {8}(if|continue-on-error):/m);
+  assert.match(publicSafe, /DENYLIST_PATTERNS: \$\{\{ secrets.PUBLIC_REPO_DENYLIST \}\}/);
+  assert.match(publicSafe, /scripts\/checks\/check-public-safe\.sh > "\$work\/check.log" 2>&1/);
+  assert.match(publicSafe, /status=\$\?\n[\s\S]*exit "\$status"/);
 });
 
 test("브라우저 필수 검사는 shard 를 돌린 경우에만 폭별 실제 결과를 조회한다", () => {
