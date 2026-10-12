@@ -108,7 +108,11 @@ native 사진이 없거나 조회가 실패하면 보았다고 하지 말고 판
 
 새 글은 원고 도구로 저장한다. 순서는 아래와 같다.
 
-1. `content_draft_write` 로 확인받은 원고를 남긴다
+1. `content_draft_write` 로 확인받은 원고를 남긴다. 위 「초안」 의 칸은 `draft` 로 이렇게 옮긴다
+   - `title`, `category`, `tags` 는 같은 이름의 칸에 그대로 넣는다
+   - 본문은 순서대로 `blocks` 로 나눈다. 글은 `{"type":"paragraph","text":...}`, 사진은 `{"type":"image","assetId":...,"caption":...}`, 지도는 `{"type":"map","name":...,"address":...}` 이다
+   - 사진의 `assetId` 는 대화에 첨부된 사진의 ID 다. 파일 이름을 넣지 않는다. `photo_dir` 은 넣지 않는다
+   - 처음 저장할 때는 `requestId` 를 하나 정해 넣고, 고칠 때는 `draftId` 와 `expectedRevision` 을 넣는다
 2. `content_draft_preview` 를 `draftId` 와 `revision` 으로 부른다. `bindingId` 는 생략한다
 3. 결과의 preview 와 포함한 사진, 빠진 사진을 사용자에게 그대로 알린다. 모든 사진을 썼다고 말하지 않는다
 4. `content_draft_save` 를 `snapshotId` 로 부른다. 사용자에게 승인 카드가 간다
