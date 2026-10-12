@@ -124,10 +124,25 @@ def _prepare_result(payload, original_args, manifest, tool, env):
              and type(payload["v"]) is int and payload["v"] == 1)
     _bounded(payload, 32768)
     args, summary = payload["executionArgs"], payload["summary"]
-    _require(isinstance(args, dict) and isinstance(summary, dict) and set(summary) == SUMMARY)
+    _require(isinstance(args, dict) and isinstance(summary, dict))
     _bounded(args, 16384)
     _bounded(summary, 8192)
     operation = manifest["execution_guard"]["operations"][tool]
+    scopes = manifest["execution_guard"]["scope_fields"]
+    fields = {field["key"]: field for field in manifest["fields"]}
+    scope_keys = {field["arg"] for field in scopes}
+    for field in scopes:
+        value = args.get(field["arg"])
+        _require(isinstance(value, str) and 1 <= len(value.encode("utf-8")) <= 128
+                 and value == env.get(fields[field["field"]]["env"]))
+    # 검증 분기는 prepare 가 낸 summary 가 아니라 manifest 가 도구에 선언한 종류가 정한다
+    kind = manifest["execution_guard"].get("kinds", {}).get(tool, "ORDER")
+    _require((summary.get("orderKind") == "CONDITIONAL") == (kind == "CONDITIONAL"))
+    if kind == "CONDITIONAL":
+        from .connector_conditional_validation import validate_conditional_prepare
+        _require(scopes == [{"arg": "account_seq", "field": "account"}])
+        return validate_conditional_prepare(payload, original_args, operation, {key: args[key] for key in scope_keys})
+    _require(set(summary) == SUMMARY)
     allowed = ({"symbol", "side", "orderType", "quantity", "orderAmount", "price", "timeInForce", "confirmHighValueOrder"}
                if operation == "CREATE" else {"orderId", "orderType", "quantity", "price", "confirmHighValueOrder"}
                if operation == "MODIFY" else {"orderId"})
@@ -151,13 +166,6 @@ def _prepare_result(payload, original_args, manifest, tool, env):
     _require(summary["operation"] == operation and isinstance(summary["account"], str)
              and re.fullmatch(r"[0-9]{4}", summary["account"]))
     _order(summary)
-    scopes = manifest["execution_guard"]["scope_fields"]
-    fields = {field["key"]: field for field in manifest["fields"]}
-    scope_keys = {field["arg"] for field in scopes}
-    for field in scopes:
-        value = args.get(field["arg"])
-        _require(isinstance(value, str) and 1 <= len(value.encode("utf-8")) <= 128
-                 and value == env.get(fields[field["field"]]["env"]))
     common = scope_keys | {"market", "currency"}
     if operation == "CREATE":
         expected = common | {"symbol", "side", "orderType", "timeInForce", "clientOrderId"}

@@ -119,7 +119,8 @@ class ConnectorFinancialProducer {
         String summary = JSON.writeValueAsString(result.get("summary"));
         String scopeJson = JSON.writeValueAsString(scope);
         String operation = contract.operations().get(toolName);
-        var snapshot = ConnectorExecutionSnapshot.validate(argsJson, executionArgs, summary, scopeJson, operation);
+        var snapshot = ConnectorExecutionSnapshot.validate(
+            argsJson, executionArgs, summary, scopeJson, operation, contract.kind(toolName));
         var tx = new TransactionTemplate(transactionManager);
         ConnectorAction saved = tx.execute(status -> {
             users.findByIdForUpdate(before.user()).orElseThrow(ConnectorFinancialProducer::rejected);

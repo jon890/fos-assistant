@@ -190,11 +190,18 @@ class ConnectorGuardBindingTest(ConnectorGuardCase):
         for change in (lambda value: value["execution_guard"].update(extra=True),
                        lambda value: value["execution_guard"].update(prepare_tool="place_order"),
                        lambda value: value["execution_guard"]["scope_fields"][0].update(arg="clientOrderId"),
-                       lambda value: value["execution_guard"]["scope_fields"][0].update(field="token")):
+                       lambda value: value["execution_guard"]["scope_fields"][0].update(field="token"),
+                       lambda value: value["execution_guard"].update(kinds={}),
+                       lambda value: value["execution_guard"].update(kinds={"list_scopes": "ORDER"}),
+                       lambda value: value["execution_guard"].update(kinds={"place_order": "TRADE"})):
             modified = copy.deepcopy(original)
             change(modified)
             (self.connector_root / "connector.json").write_text(json.dumps(modified))
             self.assertIsNone(self.plugin._connector_manifest(base.DEMO))
+        modified = copy.deepcopy(original)
+        modified["execution_guard"]["kinds"] = {"place_order": "CONDITIONAL"}
+        (self.connector_root / "connector.json").write_text(json.dumps(modified))
+        self.assertEqual(self.plugin._connector_manifest(base.DEMO)["execution_guard"]["kinds"], {"place_order": "CONDITIONAL"})
         (self.connector_root / "connector.json").write_text(json.dumps(original))
         modified = copy.deepcopy(self.manifest)
         modified["server"]["env"]["FOS_APPROVAL_TICKET"] = "${FOS_APPROVAL_TICKET}"

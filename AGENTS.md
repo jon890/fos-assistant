@@ -108,7 +108,7 @@ key 값 자체를 적지 않는 것은 당연하고, **그것이 어디 있고 �
 | 단계 | 하는 일 | 끝난 조건 |
 | --- | --- | --- |
 | 계획 | 범위와 검증 기준을 정해 `docs/` 와 `tasks/` 에 남긴다 | 구현자가 이 대화 없이 읽고 실행할 수 있다 |
-| 구현 | 워크트리 하나에서 브랜치 하나로 만들고 PR 로 머지한다 | `pr-merge` 스킬의 5단계까지 끝나 PR 이 머지됐다 |
+| 구현 | 워크트리 하나에서 브랜치 하나로 만들고 PR 로 머지한다 | 「머지는 PR 로 한다」 의 순서로 PR 이 머지됐다 |
 | 정리 | 그 작업이 만든 것을 모두 지운다 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 |
 
 - 한 작업은 PR 하나로 끝나는 크기로 자른다. 구현이 여러 PR 로 나뉘면 PR 마다 작업 하나로 보고 각각 정리한다.
@@ -164,8 +164,7 @@ push 전에 `scripts/dev/check-local.sh --fast` 로 빠른 검사만 돌리고 D
 scripts/dev/check-local.sh --fast
 ```
 
-**PR 을 열거나 Ready 로 바꾸거나 머지할 때는 [`.claude/skills/pr-merge/SKILL.md`](.claude/skills/pr-merge/SKILL.md) 를 읽는다.**
-Draft CI, main 합치기, 리뷰 반영, 머지 판정의 순서를 그 파일이 갖는다.
+PR CI 에서 브라우저 shard 와 E2E 는 기본으로 건너뛴다. 그 둘은 하루 한 번 정기 실행이 돌리고, 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이면 다음 push 부터 PR 에서도 돈다. 경로 기준은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
@@ -179,8 +178,16 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-**Claude 리뷰는 한 번 반영하고 머지한다. 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.**
-리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가, 등급마다 무엇을 할지는 `pr-merge` 스킬의 「4. 리뷰 반영」 이 갖는다.
+Draft PR 을 열면 독립 리뷰(작성자와 다른 에이전트나 모델)를 CI 와 동시에 돌린다. Ready 뒤에 도는 GitHub 의 Claude 리뷰도 그 지적을 같은 방식으로 한 번에 반영한다.
+**리뷰는 등급과 상관없이 모든 지적에 답하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
+등급별 처리는 이렇다. P1 과 P2 는 머지 전에 고친다. P3 부터 P5 까지는 고치거나, 고치지 않는 까닭을 스레드에 회신한다. 답한 스레드는 resolve 한다.
+리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
+
+머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
+CI 뒤 main 에 들어온 커밋이 이 PR 과 겹치지 않고 마이그레이션, 빌드와 의존성 파일, `test/unit/`, 공유 계약을 건드리지 않았으면 다시 합치지 않는다. 판정과 경로 목록은 그 스크립트가 갖는다.
+필수가 아닌 `claude-review` 만 실패한 `UNSTABLE` 은 머지할 수 있다. 스크립트가 출력한 `head:` 의 해시로 고정해 `gh pr merge <PR> --merge --match-head-commit <해시>` 로 머지하고, 이력을 한 줄로 합치지 않는다. 판정한 뒤 push 가 들어오면 머지가 거절된다.
+머지한 뒤에는 위 「작업 단위」 의 `scripts/dev/finish-task.sh` 로 정리한다.
+GitHub Actions 장애로 CI 가 돌지 못하면 머지 전에 인자 없이 `scripts/dev/check-local.sh` 를 돌려 전체 통과를 확인한다.
 
 `scripts/pr/pr-risk-labels.sh` 가 위험 라벨을 단다. 2026-10-11 까지는 라벨만 달고 머지 규칙은 바꾸지 않는다.
 그 뒤 라벨이 실제 위험과 맞았는지 보고, 라벨이 붙은 PR 의 머지 전에 사람 확인을 받을지 정한다.
