@@ -76,6 +76,38 @@ class HttpHermesConnectorClientTest {
 
 
     @Test
+    @DisplayName("snapshot 다섯 필드와 compile 전용 capability를 읽고 옛 생성자를 보존한다")
+    void readsCompileOnlySnapshotDeclaration() {
+        String declaration = "\"snapshot\":{\"protocol\":\"content-snapshot-v1\",\"compile_tool\":\"compile_snapshot\","
+            + "\"start_tool\":\"start_snapshot\",\"status_tool\":\"status_snapshot\","
+            + "\"capabilities\":{\"compile\":true,\"start\":false,\"status\":false}}";
+        String tail = "\"mcp_server\":\"demo\"";
+        server.expect(requestTo(BASE + "/api/connectors/catalog")).andRespond(withSuccess(CATALOG, MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/connectors/catalog"))
+            .andRespond(withSuccess(CATALOG.replace(tail, tail + "," + declaration), MediaType.APPLICATION_JSON));
+        for (String broken : List.of(declaration.replace("\"compile\":true", "\"compile\":false"),
+            declaration.replace("\"status\":false", "\"status\":true"),
+            declaration.replace("\"compile_snapshot\"", "\"start_snapshot\""),
+            declaration.replace(",\"status\":false", ""))) {
+            server.expect(requestTo(BASE + "/api/connectors/catalog"))
+                .andRespond(withSuccess(CATALOG.replace(tail, tail + "," + broken), MediaType.APPLICATION_JSON));
+        }
+        assertThat(client.readCatalog().getFirst().snapshot()).isNull();
+        var current = client.readCatalog().getFirst();
+        assertThat(current.snapshot().capabilities()).containsEntry("compile", true).containsEntry("start", false).containsEntry("status", false);
+        var old = new ConnectorManifest(current.id(), current.title(), current.description(), current.fields(), current.verifyTool(),
+            current.mcpServer(), current.toolsets(), current.attachments(), current.schema(), current.tools(), current.skills(),
+            current.appearance(), current.singleBinding(), current.ownerBrowser(), current.ownerBrowserLoginUrl(),
+            current.executionGuard(), current.executionGuardManifestSha256());
+        assertThat(old.snapshot()).isNull();
+        for (int i = 0; i < 4; i++) {
+            assertThatThrownBy(client::readCatalog).isInstanceOf(IllegalStateException.class);
+        }
+        server.verify();
+    }
+
+
+    @Test
     @DisplayName("바인딩 보호 맥락은 선택 본문으로 전달하고 옛 상태의 누락은 미지원이다")
     void bindingGuardIsOptionalAndOldStateIsUnsupported() {
         var guard = JsonMapper.builder().build().readTree("""

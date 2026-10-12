@@ -35,6 +35,14 @@ entity 하위 패키지와 공개 중첩 DTO, model, enum, config, policy도 금
 예외는 private 비영속 구현 값뿐이며 참조되지 않은 `@Embeddable`은 영속 ID가 아니다.
 검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`.
 
+### memory의 영속 타입
+
+엔티티 여섯 타입과 복합 ID 세 타입은 `memory.domain.entity`에 둔다.
+`MemoryPlacement`, `StoredContent`, projection과 event는 `memory.domain`에 남기고
+저장 enum은 `memory.domain.type`에 둔다. 새 엔티티와 실제 영속 ID에도 crypto와 같은 역할 규칙을 적용한다.
+기존 아홉 타입은 전체 운영 루트에서 이름 또는 표 계약으로 선택해 정확한 소유 패키지와 각 기대 수 1을 검사한다.
+검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`, `MemoryPlacementTest`.
+
 ### 데이터 클래스는 컨트롤러 안에 두지 않는다
 
 **`presentation` 의 요청과 응답 모양은 그 패키지의 `*Dtos.java` 하나에 모은다.**
@@ -58,6 +66,16 @@ HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 
 이 소유 타입은 운영 루트 전체에서 이름으로 찾고 기대 FQN과 대상 수 1을 강제한다.
 누락·중복·빈 선택도 실패하며 기존 위반 기준 파일을 쓰지 않는다.
 공유 lifecycle과 기본 모델, endpoint probe와 영속 타입은 기존 위치를 유지한다.
+
+### 에이전트 지연 정리
+
+정리 실행과 writer 및 참여 port는 `agent.purge.application`에,
+정리 결과 enum은 그 아래 `application.model`에 둔다.
+참여 구현은 각 기능에 남기고 정리 실행이 구현 기능을 import하지 않는다.
+`AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application`에 둔다.
+검사: `ArchitectureRules.AGENT_PURGE_CONTRACT_PLACEMENT`
+전체 운영 루트의 top-level 이름과 기대 FQN·각 대상 수 1을 검사하며 누락·중복·빈 선택도 실패한다.
+정리 하위 기능의 역할과 방향은 기존 기준 파일 없이 raw 검사한다.
 
 `application` 과 `domain` 은 타입 하나에 파일 하나다.
 

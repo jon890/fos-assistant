@@ -15,7 +15,7 @@ import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.mcp.presentation.AgentTokenAuthenticationFilter;
 import com.bifos.assistant.memory.application.MemoryService;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;

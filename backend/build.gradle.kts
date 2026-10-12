@@ -116,6 +116,8 @@ tasks.register<Test>("mysqlMigrationTest") {
     useJUnitPlatform {
         includeTags("mysql")
     }
+    // 전체 MySQL 검사도 Spring 문맥을 보존하므로 일반 test와 같은 힙을 사용한다.
+    maxHeapSize = "1g"
     // 검사별 컨텍스트에 남은 연결 풀이 누적되지 않도록, 일반 test 와 같은 상한을 두고 축출할 때 닫는다.
     systemProperty("spring.test.context.cache.maxSize", "2")
     // 결과가 밖의 MySQL 서버에 달려 있어 앞선 결과를 다시 쓰지 않는다.

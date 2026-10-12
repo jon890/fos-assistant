@@ -4,7 +4,7 @@ import com.bifos.assistant.chat.infra.ChatMessageRepository;
 import com.bifos.assistant.memory.application.AcceptedMemoryLookup;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.usage.application.ExecutionMemoryRef;
 import com.bifos.assistant.usage.application.ExecutionMemoryRefs;
@@ -34,6 +34,7 @@ public class MemoryUseService {
     private final AcceptedMemoryLookup accepted;
     private final MemoryService memoryService;
 
+
     /** 답 실행 번호 오름차순으로, 한 실행 안에서는 실은 순서 뒤에 읽은 순서로 낸다. */
     @Transactional(readOnly = true)
     public List<MemoryUse> usesOf(CurrentUser user, Long conversationId) {
@@ -54,6 +55,7 @@ public class MemoryUseService {
         }
         return uses;
     }
+
 
     /** {@code memory_read} 로 읽은 항목은 그 실행의 에이전트가 지금 읽을 수 있을 때만 낸다. 에이전트마다 접근 범위를 한 번만 읽는다. */
     private boolean readable(Map<Long, MemoryAccess> accesses, ExecutionMemoryRef ref, Memory memory) {

@@ -4,7 +4,7 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.MemorySources;
 import com.bifos.assistant.memory.application.OmittedMemories;
 import com.bifos.assistant.memory.application.model.MemorySource;
-import com.bifos.assistant.memory.domain.Memory;
+import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.presentation.MemoryDtos.CreateMemoryRequest;
 import com.bifos.assistant.memory.presentation.MemoryDtos.MemoryView;
 import com.bifos.assistant.memory.presentation.MemoryDtos.UpdateMemoryRequest;
@@ -33,6 +33,7 @@ public class MemoryController {
     private final MemorySources sources;
     private final CurrentUserProvider currentUser;
 
+
     /**
      * 볼 수 있는 Memory 를 모두 돌려준다.
      *
@@ -48,35 +49,40 @@ public class MemoryController {
         List<Memory> readable = memories.readableBy(user);
         Map<Long, MemorySource> bySource = sources.of(user, readable);
         return readable.stream()
-                .map(memory -> MemoryView.from(memory, omitted.contains(memory.id()), bySource.get(memory.id())))
-                .toList();
+            .map(memory -> MemoryView.from(memory, omitted.contains(memory.id()), bySource.get(memory.id())))
+            .toList();
     }
+
 
     @PostMapping
     public MemoryView create(@Valid @RequestBody CreateMemoryRequest request) {
         CurrentUser user = currentUser.require();
         return MemoryView.from(memories.create(
-                user,
-                request.scope(),
-                request.title(),
-                request.content(),
-                Boolean.TRUE.equals(request.alwaysInject())));
+            user,
+            request.scope(),
+            request.title(),
+            request.content(),
+            Boolean.TRUE.equals(request.alwaysInject())));
     }
+
 
     @PatchMapping("/{id}")
     public MemoryView update(@PathVariable Long id, @Valid @RequestBody UpdateMemoryRequest request) {
         return MemoryView.from(memories.update(currentUser.require(), id, request.content(), request.alwaysInject()));
     }
 
+
     @PostMapping("/{id}/accept")
     public MemoryView accept(@PathVariable Long id) {
         return MemoryView.from(memories.accept(currentUser.require(), id));
     }
 
+
     @PostMapping("/{id}/reject")
     public MemoryView reject(@PathVariable Long id) {
         return MemoryView.from(memories.reject(currentUser.require(), id));
     }
+
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {

@@ -137,7 +137,7 @@ public final class ArchitectureRules {
                         && type.getAnnotationOfType(Table.class).name().equals("memory_collection"));
                 if (collection) {
                     entities++;
-                    require(type, type.getName().equals("com.bifos.assistant.memory.domain.MemoryCollection")
+                    require(type, type.getName().equals("com.bifos.assistant.memory.domain.entity.MemoryCollection")
                         && type.isAnnotatedWith(Entity.class), "MemoryCollection 선택과 Entity 선언", events);
                     require(type, type.isAnnotatedWith(EntityListeners.class)
                         && Arrays.asList(type.getAnnotationOfType(EntityListeners.class).value())
@@ -303,6 +303,82 @@ public final class ArchitectureRules {
     /** 관리자 HTTP 계약은 지정한 presentation 에 각각 하나씩 있고 모든 mapped 메서드가 requireAdmin 을 부른다. */
     public static final ArchRule AGENT_ADMIN_HTTP_CONTRACT = agentAdminHttpContract("com.bifos.assistant");
 
+    /** 지연 정리 실행·참여 port·결과는 purge 소유 경계에 각각 하나씩 두고 역할과 의존 방향을 지킨다. */
+    public static final ArchRule AGENT_PURGE_CONTRACT_PLACEMENT = agentPurgeContractPlacement("com.bifos.assistant");
+
+
+    /** 전체 운영 루트에서 소유 타입을 찾으므로 옛 위치·다른 기능·누락·중복도 실패한다. */
+    static ArchRule agentPurgeContractPlacement(String root) {
+        Map<String, String> owners = Map.of(
+            "AgentPurger", "agent.purge.application.AgentPurger",
+            "AgentPurgeWriter", "agent.purge.application.AgentPurgeWriter",
+            "AgentPurgeParticipant", "agent.purge.application.AgentPurgeParticipant",
+            "AgentPurgeOutcome", "agent.purge.application.model.AgentPurgeOutcome");
+        return classes()
+            .that()
+            .resideInAPackage(root + "..")
+            .should(ownedTypes(root, owners, true))
+            .andShould(agentPurgeRoles(root))
+            .as("AGENT_PURGE_CONTRACT_PLACEMENT: 정리 실행과 참여 계약의 소유·역할·방향을 지킨다");
+    }
+
+
+    private static ArchCondition<JavaClass> agentPurgeRoles(String root) {
+        return new ArchCondition<>("purge 의 실행과 공개 결과 역할 및 아래 층의 의존 방향을 지킨다") {
+            @Override
+            public void check(JavaClass item, ConditionEvents events) {
+                String boundary = root + ".agent.purge.";
+                String application = boundary + "application";
+                if (item.getPackageName().startsWith(boundary)) {
+                    boolean config = item.isAnnotatedWith(ConfigurationProperties.class)
+                        || item.isAnnotatedWith(Configuration.class);
+                    if (config) {
+                        require(item, item.getPackageName().equals(boundary + "config"), "설정 선언은 config 에 있다", events);
+                    } else if (item.isAnnotatedWith(Service.class)
+                        || item.isAnnotatedWith(Component.class)) {
+                        require(item, item.getPackageName().equals(application), "Service·Component 는 purge.application 에 있다", events);
+                    }
+                    if (item.getPackageName().startsWith(application)
+                        && item.getModifiers().contains(JavaModifier.PUBLIC)
+                        && (item.isRecord() || item.isEnum()) && !config) {
+                        require(item, item.getPackageName().equals(application + ".model"), "공개 결과는 application.model 에 있다", events);
+                    }
+                    if (Set.of("AgentPurger", "AgentPurgeWriter").contains(item.getSimpleName()) && item.getEnclosingClass().isEmpty()) {
+                        require(item, item.isAnnotatedWith(Component.class), "정리 실행은 Component 다", events);
+                    }
+                    if (item.getSimpleName().equals("AgentPurgeParticipant") && item.getEnclosingClass().isEmpty()) {
+                        require(item, item.isInterface(), "참여 port 는 interface 다", events);
+                    }
+                    if (item.getSimpleName().equals("AgentPurgeOutcome") && item.getEnclosingClass().isEmpty()) {
+                        require(item, item.isEnum(), "정리 결과는 enum 이다", events);
+                    }
+                }
+                item.getDirectDependenciesFromSelf().forEach(dependency -> {
+                    JavaClass target = dependency.getTargetClass();
+                    String sourcePackage = item.getPackageName();
+                    String targetPackage = target.getPackageName();
+                    boolean inside = sourcePackage.startsWith(boundary);
+                    boolean lower = sourcePackage.contains(".domain") || sourcePackage.contains(".infra");
+                    if (lower && targetPackage.startsWith(application)) {
+                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " domain 과 infra 는 purge.application 을 쓰지 않는다"));
+                    }
+                    if (inside && sourcePackage.contains(".presentation") && targetPackage.contains(".infra")) {
+                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " presentation 은 infra 를 직접 쓰지 않는다"));
+                    }
+                    if (inside && sourcePackage.contains(".domain")
+                        && (targetPackage.contains(".presentation") || targetPackage.startsWith("org.springframework.web")
+                            || targetPackage.startsWith("org.springframework.http") || targetPackage.startsWith("jakarta.servlet"))) {
+                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " domain 은 웹 계층에 의존하지 않는다"));
+                    }
+                    if (inside && (targetPackage.startsWith(root + ".chat.")
+                        || targetPackage.startsWith(root + ".connector.") || targetPackage.startsWith(root + ".proactive."))) {
+                        events.add(SimpleConditionEvent.violated(item, dependency.getDescription() + " agent 는 참여 구현의 기능을 import 하지 않는다"));
+                    }
+                });
+            }
+        };
+    }
+
 
     /** 정상·위반 fixture 도 운영 규칙과 같은 조건을 쓰며 바뀌는 것은 루트뿐이다. */
     static ArchRule agentAdminApplicationPlacement(String root) {
@@ -338,6 +414,11 @@ public final class ArchitectureRules {
 
     /** 이름으로 전체 루트를 골라 누락과 중복을 막고, 위치는 FQN 으로 따로 판정한다. */
     static ArchCondition<JavaClass> ownedTypes(String root, Map<String, String> owners) {
+        return ownedTypes(root, owners, false);
+    }
+
+
+    private static ArchCondition<JavaClass> ownedTypes(String root, Map<String, String> owners, boolean topLevelOnly) {
         return new ArchCondition<>("소유 타입이 기대한 FQN 에 각각 하나씩 있다") {
             private final Map<String, Integer> counts = new HashMap<>();
 
@@ -351,7 +432,7 @@ public final class ArchitectureRules {
             @Override
             public void check(JavaClass item, ConditionEvents events) {
                 String key = item.getSimpleName();
-                if (!owners.containsKey(key)) {
+                if (!owners.containsKey(key) || (topLevelOnly && item.getEnclosingClass().isPresent())) {
                     return;
                 }
                 counts.merge(key, 1, Integer::sum);
@@ -863,68 +944,90 @@ public final class ArchitectureRules {
         .should(notReadHermesTimeoutsFromInjectedProperties())
         .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
 
-    /** crypto 의 엔티티는 domain.entity 에 두고 UserDataKey 또는 같은 표의 타입은 정확히 하나다. */
+    /** crypto 와 memory 의 저장 타입은 정확한 소유 domain.entity 에 하나씩 둔다. */
     public static final ArchRule ENTITIES_IN_OWNED_ENTITY_PACKAGE = entitiesInOwnedEntityPackage("com.bifos.assistant");
 
-    /** crypto 의 영속 ID 는 소유 엔티티와 같은 패키지에 두고 정책과 projection 은 entity 에 두지 않는다. */
+    /** 영속 ID 는 소유 엔티티와 같은 패키지에 두고 정책과 projection 은 entity 에 두지 않는다. */
     public static final ArchRule EMBEDDED_IDS_WITH_ENTITIES = embeddedIdsWithEntities("com.bifos.assistant");
 
+    private static final Map<String, Map<String, String>> OWNED_PERSISTENT_TYPES = Map.of(
+        "crypto", Map.of("UserDataKey", "user_data_key"),
+        "memory", Map.of(
+            "Memory", "memory", "MemoryCapture", "memory_capture", "MemoryCollection", "memory_collection",
+            "MemoryCollectionId", "", "MemoryRevision", "memory_revision", "MemoryRevisionId", "",
+            "ServiceToken", "service_token", "ServiceTokenCollection", "service_token_collection",
+            "ServiceTokenCollectionId", ""));
 
-    /** fixture 도 운영 규칙의 선택 조건을 그대로 쓰며 루트만 바꾼다. */
-    static ArchRule entitiesInOwnedEntityPackage(String root) {
-        String entityPackage = root + ".crypto.domain.entity";
+
+    /** fixture 도 운영 소유 목록과 선택 조건을 쓰며 루트와 검사할 기능만 지정한다. */
+    static ArchRule entitiesInOwnedEntityPackage(String root, String... features) {
+        List<String> owners = features.length == 0 ? List.of("crypto", "memory") : List.of(features);
         return classes().that().resideInAPackage(root + "..")
-            .should(new ArchCondition<JavaClass>("소유 엔티티를 정확히 하나의 domain.entity 에 둔다") {
-                private int ownedCount;
-                private int tableCount;
+            .should(new ArchCondition<JavaClass>("소유 저장 타입을 정확히 하나의 domain.entity 에 둔다") {
+                private final Map<String, Integer> counts = new HashMap<>();
+                private final Map<String, Integer> tables = new HashMap<>();
 
 
                 @Override
                 public void init(Collection<JavaClass> all) {
-                    ownedCount = 0;
-                    tableCount = 0;
+                    counts.clear();
+                    tables.clear();
                 }
 
 
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
-                    boolean ownsTable = item.tryGetAnnotationOfType(Table.class)
-                        .map(table -> table.name().equals("user_data_key")).orElse(false);
-                    boolean existing = (item.getEnclosingClass().isEmpty()
-                        && item.getSimpleName().equals("UserDataKey")) || ownsTable;
-                    if (ownsTable) {
-                        tableCount++;
-                    }
-                    if (existing) {
-                        ownedCount++;
-                    }
-                    boolean cryptoEntity = isCryptoEntity(item, root);
-                    if ((existing || cryptoEntity)
-                        && (!item.getPackageName().equals(entityPackage) || !item.isAnnotatedWith(Entity.class))) {
-                        events.add(SimpleConditionEvent.violated(item,
-                            item.getName() + " 엔티티의 위치는 " + entityPackage + " 이다"));
+                    for (String feature : owners) {
+                        String entityPackage = root + "." + feature + ".domain.entity";
+                        for (var owner : OWNED_PERSISTENT_TYPES.get(feature).entrySet()) {
+                            String key = feature + "." + owner.getKey();
+                            boolean ownsTable = !owner.getValue().isEmpty() && item.tryGetAnnotationOfType(Table.class)
+                                .map(table -> table.name().equals(owner.getValue())).orElse(false);
+                            boolean named = item.getEnclosingClass().isEmpty() && item.getSimpleName().equals(owner.getKey());
+                            if (ownsTable) {
+                                tables.merge(key, 1, Integer::sum);
+                            }
+                            if (named || ownsTable) {
+                                counts.merge(key, 1, Integer::sum);
+                                boolean correctRole = item.isAnnotatedWith(owner.getValue().isEmpty() ? Embeddable.class : Entity.class);
+                                if (!item.getPackageName().equals(entityPackage) || !correctRole) {
+                                    events.add(SimpleConditionEvent.violated(item,
+                                        item.getName() + " 저장 타입의 위치와 역할은 " + entityPackage + " 이다"));
+                                }
+                            }
+                        }
+                        if (isOwnedEntity(item, root, List.of(feature)) && !item.getPackageName().equals(entityPackage)) {
+                            events.add(SimpleConditionEvent.violated(item,
+                                item.getName() + " 엔티티의 위치는 " + entityPackage + " 이다"));
+                        }
                     }
                 }
 
 
                 @Override
                 public void finish(ConditionEvents events) {
-                    if (tableCount != 1) {
-                        events.add(SimpleConditionEvent.violated(root,
-                            root + ".user_data_key Table 기대 수 1, 실제 " + tableCount));
-                    }
-                    if (ownedCount != 1) {
-                        events.add(SimpleConditionEvent.violated(root,
-                            root + ".UserDataKey/user_data_key 기대 수 1, 실제 " + ownedCount));
+                    for (String feature : owners) {
+                        for (var owner : OWNED_PERSISTENT_TYPES.get(feature).entrySet()) {
+                            String key = feature + "." + owner.getKey();
+                            int count = counts.getOrDefault(key, 0);
+                            if (count != 1) {
+                                events.add(SimpleConditionEvent.violated(root,
+                                    root + "." + key + "/" + owner.getValue() + " 기대 수 1, 실제 " + count));
+                            }
+                            if (!owner.getValue().isEmpty() && tables.getOrDefault(key, 0) != 1) {
+                                events.add(SimpleConditionEvent.violated(root,
+                                    root + "." + owner.getValue() + " Table 기대 수 1, 실제 " + tables.getOrDefault(key, 0)));
+                            }
+                        }
                     }
                 }
-            }).as("ENTITIES_IN_OWNED_ENTITY_PACKAGE: crypto 엔티티는 domain.entity 에 정확히 하나씩 둔다");
+            }).as("ENTITIES_IN_OWNED_ENTITY_PACKAGE: " + owners + " 저장 타입은 domain.entity 에 정확히 하나씩 둔다");
     }
 
 
-    /** 아직 이동하지 않은 기능을 제한하지 않고 crypto 의 ID 연결과 entity 패키지 역할만 검사한다. */
-    static ArchRule embeddedIdsWithEntities(String root) {
-        String entityPackage = root + ".crypto.domain.entity";
+    /** 이동한 기능의 실제 ID 연결과 entity 패키지 역할만 검사한다. */
+    static ArchRule embeddedIdsWithEntities(String root, String... features) {
+        List<String> owners = features.length == 0 ? List.of("crypto", "memory") : List.of(features);
         return classes().that().resideInAPackage(root + "..")
             .should(new ArchCondition<JavaClass>("영속 ID 를 소유 엔티티와 같은 패키지에 둔다") {
                 private final Set<JavaClass> idClasses = new HashSet<>();
@@ -936,7 +1039,7 @@ public final class ArchitectureRules {
                     idClasses.clear();
                     entityCount = 0;
                     for (JavaClass item : all) {
-                        if (isCryptoEntity(item, root)) {
+                        if (isOwnedEntity(item, root, owners)) {
                             entityCount++;
                             idClasses.addAll(persistentIdsOf(item));
                         }
@@ -946,20 +1049,23 @@ public final class ArchitectureRules {
 
                 @Override
                 public void check(JavaClass item, ConditionEvents events) {
-                    if (isCryptoEntity(item, root)) {
+                    if (isOwnedEntity(item, root, owners)) {
                         persistentIdsOf(item).forEach(id -> checkIdPackage(item, id, events));
                     }
-                    boolean inEntityPackage = item.getPackageName().equals(entityPackage);
-                    boolean inSubpackage = item.getPackageName().startsWith(entityPackage + ".");
-                    boolean persistent = item.isAnnotatedWith(Entity.class) || idClasses.contains(item);
-                    boolean privateNested = item.getEnclosingClass().isPresent()
-                        && item.getModifiers().contains(JavaModifier.PRIVATE);
-                    boolean privateValue = privateNested && !persistent
-                        && !item.isAnnotatedWith(Embeddable.class) && !item.isAnnotatedWith(MappedSuperclass.class);
-                    if (inSubpackage || (inEntityPackage && !privateValue && (!persistent || privateNested))) {
-                        events.add(SimpleConditionEvent.violated(item,
-                            item.getName() + " 은 " + entityPackage
-                                + " 의 엔티티나 실제 영속 ID 또는 private 비영속 구현 값이어야 한다"));
+                    for (String feature : owners) {
+                        String entityPackage = root + "." + feature + ".domain.entity";
+                        boolean inEntityPackage = item.getPackageName().equals(entityPackage);
+                        boolean inSubpackage = item.getPackageName().startsWith(entityPackage + ".");
+                        boolean persistent = item.isAnnotatedWith(Entity.class) || idClasses.contains(item);
+                        boolean privateNested = item.getEnclosingClass().isPresent()
+                            && item.getModifiers().contains(JavaModifier.PRIVATE);
+                        boolean privateValue = privateNested && !persistent
+                            && !item.isAnnotatedWith(Embeddable.class) && !item.isAnnotatedWith(MappedSuperclass.class);
+                        if (inSubpackage || (inEntityPackage && !privateValue && (!persistent || privateNested))) {
+                            events.add(SimpleConditionEvent.violated(item,
+                                item.getName() + " 은 " + entityPackage
+                                    + " 의 엔티티나 실제 영속 ID 또는 private 비영속 구현 값이어야 한다"));
+                        }
                     }
                 }
 
@@ -968,16 +1074,15 @@ public final class ArchitectureRules {
                 public void finish(ConditionEvents events) {
                     if (entityCount == 0) {
                         events.add(SimpleConditionEvent.violated(root,
-                            root + " 의 crypto 엔티티 검사 대상이 0개다"));
+                            root + " 의 " + String.join(", ", owners) + " 엔티티 검사 대상이 0개다"));
                     }
                 }
-            }).as("EMBEDDED_IDS_WITH_ENTITIES: crypto 영속 ID 는 엔티티와 같은 패키지에 둔다");
+            }).as("EMBEDDED_IDS_WITH_ENTITIES: " + owners + " 영속 ID 는 엔티티와 같은 패키지에 둔다");
     }
 
 
-    private static boolean isCryptoEntity(JavaClass item, String root) {
-        return (item.getPackageName().equals(root + ".crypto")
-            || item.getPackageName().startsWith(root + ".crypto.")) && item.isAnnotatedWith(Entity.class);
+    private static boolean isOwnedEntity(JavaClass item, String root, List<String> owners) {
+        return item.isAnnotatedWith(Entity.class) && owners.stream().anyMatch(feature -> item.getPackageName().equals(root + "." + feature) || item.getPackageName().startsWith(root + "." + feature + "."));
     }
 
 
