@@ -116,6 +116,22 @@ class ConnectorFinancialGateTest {
 
 
     @Test
+    @DisplayName("상한을 주문 하나만 겨우 담게 둬도 같은 날 그 주문의 취소는 지나고 하루 합계에 들어가지 않는다")
+    void cancelPassesTightLimitAndIsNotCountedTwice() {
+        String cancel = "{\"orderId\":\"o\",\"market\":\"KOSPI\",\"currency\":\"KRW\",\"account_seq\":\"7\"}";
+        spent(1L, ActionStatus.SUCCEEDED, LIMIT_BUY);
+        assertThatCode(() -> gate(open("2000", "2", "2000")).requireWithinLimits(9L, null, cancel, NOW))
+            .doesNotThrowAnyException();
+        spent(2L, ActionStatus.SUCCEEDED, cancel);
+        // 원주문 2000 과 새 주문 2000 이다. 취소 줄을 원주문 금액으로 세면 6000 이 되어 막힌다.
+        assertThatCode(() -> gate(open("2000", "2", "4000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .doesNotThrowAnyException();
+        assertThatThrownBy(() -> gate(open("2000", "2", "3999")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOf(ApiException.class);
+    }
+
+
+    @Test
     @DisplayName("하루 합계는 승인으로 넘어간 같은 통화 주문을 UNKNOWN 까지 세고 자기 줄과 끝난 실패는 뺀다")
     void sumsDailyAmountIncludingUnknown() {
         spent(1L, ActionStatus.SUCCEEDED, LIMIT_BUY);
