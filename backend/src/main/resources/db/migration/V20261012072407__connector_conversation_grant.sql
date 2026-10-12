@@ -18,3 +18,4 @@ CREATE TABLE connector_conversation_grant (
 CREATE INDEX idx_connector_conversation_grant_lookup
     ON connector_conversation_grant (conversation_id, agent_id, connector_id, tool_name);
 CREATE INDEX idx_connector_conversation_grant_connector ON connector_conversation_grant (user_id, connector_id);
+CREATE INDEX idx_connector_conversation_grant_action ON connector_conversation_grant (action_id);

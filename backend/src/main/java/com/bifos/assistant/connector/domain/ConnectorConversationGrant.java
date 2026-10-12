@@ -26,7 +26,8 @@ import lombok.experimental.Accessors;
         @Index(
             name = "idx_connector_conversation_grant_lookup",
             columnList = "conversation_id, agent_id, connector_id, tool_name"),
-        @Index(name = "idx_connector_conversation_grant_connector", columnList = "user_id, connector_id")
+        @Index(name = "idx_connector_conversation_grant_connector", columnList = "user_id, connector_id"),
+        @Index(name = "idx_connector_conversation_grant_action", columnList = "action_id")
     })
 @Getter
 @Accessors(fluent = true)
