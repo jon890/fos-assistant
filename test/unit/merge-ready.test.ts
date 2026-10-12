@@ -88,6 +88,9 @@ test("마이그레이션, 빌드와 의존성, test/unit, 공유 계약은 어�
     ["test/fixtures/connector-tool-descriptions.json", "공유 계약"],
     ["test/support/pick-port.ts", "공유 계약"],
     ["test/e2e/fake-hermes/run-routes.ts", "공유 계약"],
+    ["hermes/tests/fixtures/toss-trading-contract.py", "공유 계약"],
+    ["scripts/ci/ci-paths.mjs", "공유 계약"],
+    ["scripts/dev/check-local.sh", "공유 계약"],
     [".github/workflows/ci.yml", "공유 계약"],
   ];
   for (const [file, label] of cases) {
