@@ -74,8 +74,15 @@ public class PersonAccessService {
      */
     @Transactional
     public PersonAccess setEnabled(Long id, boolean enabled) {
-        AllowedPerson person =
-                people.findById(id).orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+        String email =
+                people.findEmailById(id).orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
+        // 원고 저장 허가처럼 사용자 행 다음 허용 목록 행을 잠그는 쪽과 같은 순서로 잠근다. 사용자 번호 오름차순이 먼저다.
+        users.findAllByNormalizedEmail(AllowedPerson.normalizeEmail(email)).stream()
+                .map(AppUser::id)
+                .sorted()
+                .forEach(userId -> users.findByIdForUpdate(userId));
+        AllowedPerson person = people.findByIdForUpdate(id)
+                .orElseThrow(() -> new ApiException(ErrorCode.PERSON_NOT_FOUND, "no such person"));
         if (enabled) {
             person.enable();
         } else {

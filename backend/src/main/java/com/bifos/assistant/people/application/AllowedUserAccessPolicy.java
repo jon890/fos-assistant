@@ -1,10 +1,13 @@
 package com.bifos.assistant.people.application;
 
+import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -18,6 +21,7 @@ public class AllowedUserAccessPolicy implements UserAccessPolicy {
 
     private final AppUserRepository users;
     private final SignInPolicy signInPolicy;
+    private final AllowedPersonRepository people;
 
     @Override
     @Transactional(readOnly = true)
@@ -26,5 +30,17 @@ public class AllowedUserAccessPolicy implements UserAccessPolicy {
                 .map(AppUser::email)
                 .flatMap(signInPolicy::admit)
                 .isPresent();
+    }
+
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean allowedForUpdate(Long userId) {
+        return users.findById(userId)
+                .map(AppUser::email)
+                .filter(email -> !email.isBlank())
+                .flatMap(email -> people.findByEmailForUpdate(AllowedPerson.normalizeEmail(email)))
+                .map(AllowedPerson::enabled)
+                .orElse(false);
     }
 }
