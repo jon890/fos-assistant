@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.application.execution;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.application.ConnectorManifests;
 import com.bifos.assistant.connector.application.ConnectorToolPolicies;
+import com.bifos.assistant.connector.application.FinancialDigest;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionCatalog;
 import com.bifos.assistant.connector.application.model.ConnectorExecutionReadContext;
 import com.bifos.assistant.connector.domain.ConnectorAction;
@@ -42,6 +43,7 @@ public class ConnectorExecutionCurrent {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
+    private final FinancialDigest digest;
     private final ConnectorConnectionRepository connections;
     private final ConnectorBindingRepository bindings;
     private final AgentExecutionRepository executions;
@@ -116,7 +118,7 @@ public class ConnectorExecutionCurrent {
                 && policy.approval() == ToolApproval.ALWAYS
                 && action.risk() == ToolRisk.FINANCIAL
                 && action.approvalMode() == ToolApproval.ALWAYS);
-            var snapshot = ConnectorExecutionSnapshot.open(action, row, cipher);
+            var snapshot = ConnectorExecutionSnapshot.open(action, row, cipher, digest);
             String operation = catalog.guard().operations().get(action.toolName());
             require(operation != null
                 && operation.equals(JSON.readTree(snapshot.summaryJson())

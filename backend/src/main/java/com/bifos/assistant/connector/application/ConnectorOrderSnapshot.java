@@ -45,8 +45,8 @@ final class ConnectorOrderSnapshot {
     }
 
 
-    /** 기존 일반 주문 의도 키의 정렬과 길이 접두 표기를 유지한다. */
-    static String requestKey(JsonNode execution, Long userId, Long connectionId, String tool) {
+    /** 일반 주문 의도 키의 정렬과 길이 접두 표기다. v2 는 연결 번호 대신 커넥터 이름을 넣는다. */
+    static String requestKey(JsonNode execution, Long userId, String connectorId, String tool) {
         Map<String, String> values = new TreeMap<>();
         for (var entry : execution.properties()) {
             if (Set.of("clientOrderId", "expected_order").contains(entry.getKey())) {
@@ -59,11 +59,11 @@ final class ConnectorOrderSnapshot {
             }
             values.put(entry.getKey(), value);
         }
-        require(!values.containsKey("userId") && !values.containsKey("connectionId") && !values.containsKey("tool"));
+        require(!values.containsKey("userId") && !values.containsKey("connectorId") && !values.containsKey("tool"));
         values.put("userId", userId.toString());
-        values.put("connectionId", connectionId.toString());
+        values.put("connectorId", connectorId);
         values.put("tool", tool);
-        StringBuilder body = new StringBuilder(lengthPrefix("fos-financial-intent-v1"));
+        StringBuilder body = new StringBuilder(lengthPrefix("fos-financial-intent-v2"));
         values.forEach((name, value) -> body.append(lengthPrefix(name)).append(lengthPrefix(value)));
         return Sha256.hex(body.toString());
     }

@@ -89,6 +89,7 @@ import tools.jackson.databind.json.JsonMapper;
 @FinancialExecutionOpen
 class FinancialConnectorProducerTest {
     static final JsonMapper JSON = JsonMapper.builder().build();
+    static final String TEST_DIGEST_KEY = "src/test/resources/financial/test-digest.key";
     Instant now;
     static final String ARGS = "{\"symbol\":\"abc\",\"side\":\"BUY\",\"orderType\":\"LIMIT\",\"quantity\":\"002\",\"price\":\"0012.3400\"}";
     @Autowired
@@ -99,6 +100,8 @@ class FinancialConnectorProducerTest {
     ConnectorFinancialApproval approval;
     @Autowired
     LiveProperties<ConnectorFinancialProperties> gate;
+    @Autowired
+    FinancialDigest digest;
     @Autowired
     ConnectorActionRepository actions;
     @Autowired
@@ -356,7 +359,7 @@ class FinancialConnectorProducerTest {
     static ConnectorFinancialProperties financial(boolean enabled, List<String> accounts, String maxOrder) {
         BigDecimal order = new BigDecimal(maxOrder);
         return new ConnectorFinancialProperties(enabled, accounts, order, order, new BigDecimal("1000"),
-            new BigDecimal("10000000"), new BigDecimal("100000"));
+            new BigDecimal("10000000"), new BigDecimal("100000"), TEST_DIGEST_KEY);
     }
 
 

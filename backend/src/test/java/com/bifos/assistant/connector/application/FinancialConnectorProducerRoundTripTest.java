@@ -51,7 +51,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         var requested = request();
         tx().executeWithoutResult(status -> actions.findByPublicIdForUpdate(requested.actionId()).orElseThrow().beginExecution(now));
         String ticket = tickets.issue(requested.actionId());
-        var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher);
+        var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher, digest);
         var execution = new ConnectorApprovedExecution(ticket,
             snapshot.executionArgsJson(), snapshot.executionArgsSha256());
         var locked = new CountDownLatch(1);
@@ -102,7 +102,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
         var requested = request();
         tx().executeWithoutResult(status -> actions.findByPublicIdForUpdate(requested.actionId()).orElseThrow().beginExecution(now));
         String ticket = issued ? tickets.issue(requested.actionId()) : null;
-        var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher);
+        var snapshot = ConnectorExecutionSnapshot.open(action(requested), contents.findById(action(requested).id()).orElseThrow(), cipher, digest);
         publicApproval.markInterrupted(now);
         assertThat(action(requested).status()).isEqualTo(ActionStatus.FAILED);
         assertThat(action(requested).errorCode()).isEqualTo("unavailable");

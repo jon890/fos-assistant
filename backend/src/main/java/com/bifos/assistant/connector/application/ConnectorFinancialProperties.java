@@ -18,6 +18,7 @@ import org.springframework.validation.annotation.Validated;
  * @param maxOrderQuantity 주문 한 건의 수량 상한. 0 이면 수량 주문을 받지 않는다
  * @param maxDailyAmountKrw 한 사용자가 KST 하루에 승인한 원화 주문 금액 합의 상한
  * @param maxDailyAmountUsd 한 사용자가 KST 하루에 승인한 달러 주문 금액 합의 상한
+ * @param digestKeyFile 금융 줄의 DB 해시 칸을 keyed hash 하는 key 파일. 없거나 읽지 못하면 금융 관문이 닫힌다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.financial")
@@ -28,7 +29,8 @@ public record ConnectorFinancialProperties(
     @DefaultValue("0") BigDecimal maxOrderAmountUsd,
     @DefaultValue("0") BigDecimal maxOrderQuantity,
     @DefaultValue("0") BigDecimal maxDailyAmountKrw,
-    @DefaultValue("0") BigDecimal maxDailyAmountUsd) {
+    @DefaultValue("0") BigDecimal maxDailyAmountUsd,
+    @DefaultValue("") String digestKeyFile) {
 
     /** 음수 상한과 빈 계좌 식별자는 기동을 멈춘다. 잘못 넣은 값이 「상한 없음」 으로 읽히지 않게 한다. */
     public ConnectorFinancialProperties {

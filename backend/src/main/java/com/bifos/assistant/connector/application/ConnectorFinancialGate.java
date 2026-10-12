@@ -40,10 +40,12 @@ public class ConnectorFinancialGate {
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
     private final TextCipher cipher;
+    private final FinancialDigest digest;
 
 
+    /** kill switch 와 함께 keyed hash key 와 옛 평문 request_key 줄의 부재를 본다. */
     public void requireOpen() {
-        require(properties.current().enabled());
+        require(properties.current().enabled() && digest.available() && !contents.existsUnkeyedRequestKey());
     }
 
 
@@ -83,7 +85,7 @@ public class ConnectorFinancialGate {
                 continue;
             }
             var row = contents.findById(action.id()).orElseThrow(ConnectorFinancialGate::closed);
-            JsonNode spentArgs = ConnectorExecutionSnapshot.openExecutionArgs(action, row, cipher);
+            JsonNode spentArgs = ConnectorExecutionSnapshot.openExecutionArgs(action, row, cipher, digest);
             var spent = amount(spentArgs, null);
             if (spent.isPresent() && currency.equals(spentArgs.get("currency").stringValue())) {
                 total = total.add(spent.get());

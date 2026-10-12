@@ -13,6 +13,7 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
+import com.bifos.assistant.connector.application.FinancialDigest;
 import com.bifos.assistant.connector.domain.ConnectionFields;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionExecution;
@@ -94,6 +95,9 @@ class ConnectorActionExecutionTest {
     ConnectorActionExecutionRepository contents;
 
     @Autowired
+    FinancialDigest digest;
+
+    @Autowired
     ConnectorActionRepository actions;
 
     @Autowired
@@ -148,7 +152,7 @@ class ConnectorActionExecutionTest {
             assertThat(snapshot.executionArgsJson()).as(name).isEqualTo(value(sample, "executionArgsJson"));
             assertThat(snapshot.executionArgsSha256()).isEqualTo(value(sample, "executionArgsSha256"));
             assertThat(snapshot.scopeSha256()).isEqualTo(value(sample, "scopeSha256"));
-            assertThat(snapshot.requestKey(901L, 701L, value(sample, "tool"))).isEqualTo(value(sample, "requestKey"));
+            assertThat(snapshot.requestKey(901L, "demo-financial", value(sample, "tool"))).isEqualTo(value(sample, "requestKey"));
         } else {
             assertThatThrownBy(() -> validate(sample))
                 .as(name)
@@ -179,7 +183,7 @@ class ConnectorActionExecutionTest {
             value(sample, "summaryJson"),
             value(sample, "scopeJson"),
             cipher,
-            NOW))
+            NOW, digest))
                 .as(name)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("invalid financial execution snapshot");
@@ -206,8 +210,8 @@ class ConnectorActionExecutionTest {
             value(sample, "summaryJson"),
             value(sample, "scopeJson"),
             null,
-            Sha256.hex(value(sample, "executionArgsJson")),
-            Sha256.hex(value(sample, "scopeJson")),
+            digest.of("execution_args_json", value(sample, "executionArgsJson")),
+            digest.of("scope_json", value(sample, "scopeJson")),
             value(sample, "name").startsWith("normalization-integrity-")
                 ? historicalRequestKey(sample, action, binding)
                 : "0".repeat(64),
@@ -216,7 +220,7 @@ class ConnectorActionExecutionTest {
         em.clear();
         ConnectorAction reloaded = actions.findById(action.id()).orElseThrow();
         ConnectorActionExecution row = contents.findById(action.id()).orElseThrow();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher))
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher, digest))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("invalid financial execution snapshot")
             .satisfies(error -> assertThat(error.getStackTrace())
@@ -276,7 +280,7 @@ class ConnectorActionExecutionTest {
             value(BASE, "summaryJson"),
             scope.toString(),
             cipher,
-            NOW))
+            NOW, digest))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(contents.existsById(fixture.action().id())).isFalse();
     }
@@ -301,12 +305,12 @@ class ConnectorActionExecutionTest {
             value(BASE, "summaryJson"),
             scope,
             cipher,
-            NOW));
+            NOW, digest));
         em.clear();
         ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(
             actions.findById(row.actionId()).orElseThrow(),
             contents.findById(row.actionId()).orElseThrow(),
-            cipher);
+            cipher, digest);
         assertThat(opened.executionArgsJson()).isEqualTo(args);
         assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
         assertThat(opened.scopeJson()).isEqualTo(scope);
@@ -333,12 +337,12 @@ class ConnectorActionExecutionTest {
         em.clear();
         ConnectorAction action = actions.findById(fixture.action().id()).orElseThrow();
         ConnectorActionExecution stored = contents.findById(action.id()).orElseThrow();
-        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, stored, cipher);
+        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, stored, cipher, digest);
         assertThat(opened.executionArgsJson()).isEqualTo(value(BASE, "executionArgsJson"));
         assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
         assertThat(opened.scopeJson()).isEqualTo(value(BASE, "scopeJson"));
         assertThat(action.argsJson()).isEqualTo(value(BASE, "modelArgsJson"));
-        assertThat(action.argsSha256()).isEqualTo(Sha256.hex(value(BASE, "modelArgsJson")));
+        assertThat(action.argsSha256()).isEqualTo(digest.of("args_json", value(BASE, "modelArgsJson")));
         assertThat(action.grantAllowed()).isFalse();
     }
 
@@ -359,14 +363,14 @@ class ConnectorActionExecutionTest {
             value(sample, "summaryJson"),
             value(sample, "scopeJson"),
             cipher,
-            NOW));
+            NOW, digest));
         assertThat(second.requestKey()).isEqualTo(first.requestKey());
         assertThat(second.executionArgsSha256()).isNotEqualTo(first.executionArgsSha256());
         assertThat(contents.findByRequestKeyOrderByActionIdAsc(first.requestKey()))
             .hasSize(2);
-        assertThat(validate(BASE).requestKey(902L, 701L, "place_order")).isNotEqualTo(value(BASE, "requestKey"));
-        assertThat(validate(BASE).requestKey(901L, 702L, "place_order")).isNotEqualTo(value(BASE, "requestKey"));
-        assertThat(validate(BASE).requestKey(901L, 701L, "other_tool")).isNotEqualTo(value(BASE, "requestKey"));
+        assertThat(validate(BASE).requestKey(902L, "demo-financial", "place_order")).isNotEqualTo(value(BASE, "requestKey"));
+        assertThat(validate(BASE).requestKey(901L, "other-connector", "place_order")).isNotEqualTo(value(BASE, "requestKey"));
+        assertThat(validate(BASE).requestKey(901L, "demo-financial", "other_tool")).isNotEqualTo(value(BASE, "requestKey"));
     }
 
 
@@ -387,7 +391,7 @@ class ConnectorActionExecutionTest {
             value(BASE, "summaryJson"),
             value(BASE, "scopeJson"),
             cipher,
-            NOW);
+            NOW, digest);
         assertThat(second.isNew()).isTrue();
         assertThatThrownBy(() -> contents.saveAndFlush(second)).isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -400,10 +404,10 @@ class ConnectorActionExecutionTest {
         TextCipher disabled = new ForcedCipher(cipher, false);
         ConnectorActionExecution row = save(fixture, disabled);
         assertThat(row.contentKeyId()).isNull();
-        assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, cipher)
+        assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, cipher, digest)
             .executionArgsJson())
                 .isEqualTo(value(BASE, "executionArgsJson"));
-        assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, disabled)
+        assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, disabled, digest)
             .executionArgsJson())
                 .isEqualTo(value(BASE, "executionArgsJson"));
         jdbc.update(
@@ -412,7 +416,7 @@ class ConnectorActionExecutionTest {
             row.actionId());
         em.clear();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher, digest))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -422,13 +426,13 @@ class ConnectorActionExecutionTest {
     void encryptedReadDoesNotDependOnCurrentEnabledFlag() {
         Fixture fixture = fixture();
         ConnectorActionExecution row = save(fixture, cipher);
-        assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, new ForcedCipher(cipher, false))
+        assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, new ForcedCipher(cipher, false), digest)
             .scopeJson())
                 .isEqualTo(value(BASE, "scopeJson"));
         DataEncryptionProperties disabled = new DataEncryptionProperties("", "", false, Duration.ofMinutes(1), 20);
         DataKeyService withoutKek = new DataKeyService(new FileKeyEncryptionKeys(disabled), writer, keys, disabled, Clock.systemUTC());
         assertThat(withoutKek.enabled()).isFalse();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, withoutKek))
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, withoutKek, digest))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("financial snapshot decryption failed");
     }
@@ -444,7 +448,7 @@ class ConnectorActionExecutionTest {
                 ConnectorActionExecution row = contents.findById(fixture.action().id()).orElseThrow();
                 assertThat(keys.existsById(row.contentKeyId())).isTrue();
                 cipher.forgetCachedKeys();
-                assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, cipher)
+                assertThat(ConnectorExecutionSnapshot.open(fixture.action(), row, cipher, digest)
                     .executionArgsJson())
                         .isEqualTo(value(BASE, "executionArgsJson"));
                 return row.contentKeyId();
@@ -458,7 +462,7 @@ class ConnectorActionExecutionTest {
             transactions.executeWithoutResult(status -> {
                 assertThat(keys.existsById(keyId)).isFalse();
                 ConnectorActionExecution row = contents.findById(fixture.action().id()).orElseThrow();
-                assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, cipher))
+                assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, cipher, digest))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("financial snapshot decryption failed");
             });
@@ -478,7 +482,7 @@ class ConnectorActionExecutionTest {
             DataKeyService fresh = new DataKeyService(
                 new FileKeyEncryptionKeys(properties), writer, keys, properties, Clock.systemUTC());
             ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(
-                actions.findById(row.actionId()).orElseThrow(), row, fresh);
+                actions.findById(row.actionId()).orElseThrow(), row, fresh, digest);
             assertThat(opened.executionArgsJson()).isEqualTo(value(BASE, "executionArgsJson"));
             assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
             assertThat(opened.scopeJson()).isEqualTo(value(BASE, "scopeJson"));
@@ -549,7 +553,7 @@ class ConnectorActionExecutionTest {
                     ConnectorAction reloaded = actions.findById(target.action().id()).orElseThrow();
                     ConnectorActionExecution row = contents.findById(reloaded.id()).orElseThrow();
                     assertThat(keys.existsById(row.contentKeyId())).isTrue();
-                    assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher))
+                    assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(reloaded, row, cipher, digest))
                         .isInstanceOf(IllegalStateException.class)
                         .hasMessage("financial snapshot decryption failed");
                 });
@@ -577,7 +581,7 @@ class ConnectorActionExecutionTest {
         ConnectorAction action = actions.findById(fixture.action().id()).orElseThrow();
         ConnectorActionExecution row = contents.findById(action.id()).orElseThrow();
         assertThat(keys.existsById(row.contentKeyId())).isTrue();
-        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, row, cipher);
+        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, row, cipher, digest);
         assertThat(opened.executionArgsJson()).isEqualTo(value(BASE, "executionArgsJson"));
         assertThat(opened.summaryJson()).isEqualTo(value(BASE, "summaryJson"));
         assertThat(opened.scopeJson()).isEqualTo(value(BASE, "scopeJson"));
@@ -603,7 +607,7 @@ class ConnectorActionExecutionTest {
             row.actionId());
         em.clear();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher, digest))
                 .isInstanceOf(IllegalStateException.class);
         jdbc.update(
             "UPDATE connector_action_execution SET execution_args_json = ?, scope_sha256 = ? WHERE action_id = ?",
@@ -612,7 +616,7 @@ class ConnectorActionExecutionTest {
             row.actionId());
         em.clear();
         assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(
-            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+            fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher, digest))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -643,7 +647,7 @@ class ConnectorActionExecutionTest {
         TextCipher empty = mock(TextCipher.class);
         when(empty.enabled()).thenReturn(true);
         when(empty.open(anyLong(), anyLong(), anyString(), anyString())).thenReturn(Optional.empty());
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, empty))
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), row, empty, digest))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("financial snapshot decryption failed");
     }
@@ -671,7 +675,7 @@ class ConnectorActionExecutionTest {
                 value(BASE, "summaryJson"),
                 value(BASE, "scopeJson"),
                 cipher,
-                NOW))
+                NOW, digest))
                     .isInstanceOf(IllegalArgumentException.class);
         }
         fixture.binding().connection().connected(new ConnectionFields(Map.of("account", "8"), Map.of()), NOW);
@@ -732,7 +736,7 @@ class ConnectorActionExecutionTest {
             value(BASE, "summaryJson"),
             value(BASE, "scopeJson"),
             selected,
-            NOW));
+            NOW, digest));
     }
 
 
@@ -814,7 +818,7 @@ class ConnectorActionExecutionTest {
             new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
             false,
             Sha256.hex(UUID.randomUUID().toString()),
-            Sha256.hex(raw),
+            digest.of("args_json", raw),
             NOW);
         action.awaitApproval(NOW.plusSeconds(300));
         action.sealArgs(raw, null);
@@ -832,7 +836,7 @@ class ConnectorActionExecutionTest {
     }
 
 
-    private static String historicalRequestKey(JsonNode sample, ConnectorAction action, ConnectorBinding binding) {
+    private String historicalRequestKey(JsonNode sample, ConnectorAction action, ConnectorBinding binding) {
         Map<String, String> values = new TreeMap<>();
         JsonNode args = JSON.readTree(value(sample, "executionArgsJson"));
         for (var entry : args.properties()) {
@@ -845,13 +849,13 @@ class ConnectorActionExecutionTest {
             }
         }
         values.put("userId", action.userId().toString());
-        values.put("connectionId", binding.connection().id().toString());
+        values.put("connectorId", action.connectorId());
         values.put("tool", action.toolName());
-        StringBuilder body = new StringBuilder("23:fos-financial-intent-v1");
+        StringBuilder body = new StringBuilder("23:fos-financial-intent-v2");
         values.forEach((key, value) -> body.append(key.getBytes(StandardCharsets.UTF_8).length)
             .append(':').append(key).append(value.getBytes(StandardCharsets.UTF_8).length)
             .append(':').append(value));
-        return Sha256.hex(body.toString());
+        return digest.of("request_key", Sha256.hex(body.toString()));
     }
 
 
