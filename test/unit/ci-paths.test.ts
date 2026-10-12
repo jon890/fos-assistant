@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { JOBS, classify, gate, jobsFor } from "../../scripts/ci/ci-paths.mjs";
+import { FULL_LABEL, JOBS, SLOW_JOBS, classify, gate, jobsFor, withoutSlow } from "../../scripts/ci/ci-paths.mjs";
 
 const running = (files: string[]) => JOBS.filter((job) => classify(files)[job].run);
 
@@ -141,12 +141,12 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
   const script = fileURLToPath(new URL("../../scripts/ci/ci-paths.mjs", import.meta.url));
   const output = join(dir, "output");
   const summary = join(dir, "summary");
-  const run = (event: string) => {
+  const run = (event: string, fullLabel = "false") => {
     writeFileSync(output, "");
     writeFileSync(summary, "");
     return spawnSync(process.execPath, [script, "changes"], {
       cwd: dir, encoding: "utf8",
-      env: { ...process.env, GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary },
+      env: { ...process.env, GITHUB_EVENT_NAME: event, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary, FULL_LABEL: fullLabel },
     });
   };
   const selected = () => Object.fromEntries(readFileSync(output, "utf8").trim().split("\n").map((line) => line.split("=")));
@@ -156,7 +156,11 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     git("-c", "user.name=CI test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "commit", "-m", message);
   };
   try {
-    for (const event of ["push", "schedule", "workflow_dispatch"]) {
+    assert.equal(run("push").status, 0, "push");
+    assert.deepEqual(selected(), {
+      backend: "false", web: "true", browser: "false", e2e: "false", hermes: "false", quality: "true",
+    });
+    for (const event of ["schedule", "workflow_dispatch"]) {
       assert.equal(run(event).status, 0, event);
       assert.deepEqual(selected(), Object.fromEntries(JOBS.map((job) => [job, "true"])));
     }
@@ -179,13 +183,40 @@ test("changes 명령은 PR 밖에서 전체를 고르고, PR 은 merge 부모 �
     git("-c", "user.name=CI test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "merge", "--no-ff", "pr", "-m", "merge");
     const valid = run("pull_request");
     assert.equal(valid.status, 0, valid.stderr);
+    // PR 은 브라우저와 E2E 를 정기 실행으로 미룬다.
+    assert.deepEqual(selected(), {
+      backend: "true", web: "false", browser: "false", e2e: "false", hermes: "false", quality: "true",
+    });
+    assert.match(readFileSync(summary, "utf8"), /backend\/A.java/);
+    // 전체 검사 라벨이 붙으면 경로 판정대로 브라우저와 E2E 도 돈다.
+    const full = run("pull_request", "true");
+    assert.equal(full.status, 0, full.stderr);
     assert.deepEqual(selected(), {
       backend: "true", web: "false", browser: "true", e2e: "true", hermes: "false", quality: "true",
     });
-    assert.match(readFileSync(summary, "utf8"), /backend\/A.java/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("PR 은 느린 검사를 기본으로 건너뛰고 전체 검사 라벨이 있으면 경로 판정을 그대로 쓴다", () => {
+  const judged = classify(["web/src/app.tsx"]);
+  assert.equal(judged.browser.run, true);
+  const skipped = withoutSlow(judged, false);
+  for (const job of SLOW_JOBS) {
+    assert.equal(skipped[job].run, false, job);
+    assert.match(skipped[job].because ?? "", new RegExp(FULL_LABEL));
+  }
+  assert.equal(skipped.web.run, true);
+  assert.deepEqual(withoutSlow(judged, true), judged);
+  // 원래 판정 결과는 바꾸지 않는다.
+  assert.equal(judged.browser.run, true);
+});
+
+test("workflow 는 전체 검사 라벨을 판정에 넘기고, 다른 라벨이 CI 를 다시 돌리지 않게 labeled 를 받지 않는다", () => {
+  const text = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(text, /types: \[opened, synchronize, reopened\]/);
+  assert.ok(text.includes(`FULL_LABEL: \${{ contains(github.event.pull_request.labels.*.name, '${FULL_LABEL}') }}`));
 });
 
 // ci.yml 을 job 단위 본문으로 나눈다. 들여쓰기 두 칸의 `<id>:` 줄이 job 의 시작이다.
@@ -201,7 +232,6 @@ function workflowJobs(): Map<string, string> {
 // 무거운 검사 job 과 그 결과를 필수 검사 이름으로 판정하는 job 이다.
 const GATED = [
   { flag: "backend", work: "backend-tests", gate: "backend" },
-  { flag: "web", work: "web-build", gate: "web" },
   { flag: "browser", work: "browser", gate: "browser-required" },
   { flag: "e2e", work: "e2e-tests", gate: "e2e" },
   { flag: "hermes", work: "hermes-tests", gate: "hermes" },
@@ -227,28 +257,100 @@ test("무거운 job 은 자기 판정 값으로만 돌고, 필수 검사 job 은
 test("quality 는 판정 job 이 실패해도 생략되지 않고, 무거운 단계만 판정 값으로 건너뛴다", () => {
   const body = workflowJobs().get("quality") ?? assert.fail("quality job 이 없다");
   assert.match(body, /^ {4}needs: changes\n {4}if: always\(\)\n/m);
-  assert.match(body, /run: test "\$CHANGES_RESULT" = success/);
+  assert.match(body, /test "\$CHANGES_RESULT" = success/);
   assert.match(body, /SHOULD_RUN: \$\{\{ needs\.changes\.outputs\.quality \}\}/);
   assert.match(body, /test "\$SHOULD_RUN" = true \|\| test "\$SHOULD_RUN" = false/);
   const steps = body.split(/^ {6}- /m).slice(1);
-  const always = steps.filter((step) => !step.includes("if: needs.changes.outputs.quality == 'true'"));
+  const always = steps.filter((step) => !/^ {8}if:/m.test(step));
   // 언제나 도는 단계는 판정 확인, checkout, 파일 길이 검사뿐이다.
   assert.equal(always.length, 3, always.join("\n---\n"));
   assert.ok(always.some((step) => step.includes("check-file-length.mjs")));
 });
 
-test("unit 과 public-safe 는 경로 판정과 무관하게 항상 돈다", () => {
-  for (const job of ["unit", "public-safe"]) {
+test("unit 과 경로 판정에 합친 public-safe 는 경로와 무관하게 항상 돈다", () => {
+  for (const job of ["unit", "changes"]) {
     const body = workflowJobs().get(job) ?? assert.fail(`${job} job 이 없다`);
     assert.doesNotMatch(body, /^ {4}(needs|if):/m, job);
   }
+  const changes = workflowJobs().get("changes")!;
+  assert.match(changes, /^ {4}name: public-safe$/m);
+  assert.match(changes, /run: node scripts\/ci\/ci-paths.mjs changes/);
+  assert.match(changes, /PUBLIC_REPO_DENYLIST.*scripts\/checks\/check-public-safe\.sh/);
+  assert.equal(changes.match(/uses: actions\/checkout@/g)?.length, 1);
+  const publicSafe = changes.split("      - name: 공개 정보 검사\n")[1];
+  assert.doesNotMatch(publicSafe, /^ {8}(if|continue-on-error):/m);
+  assert.match(publicSafe, /DENYLIST_PATTERNS: \$\{\{ secrets.PUBLIC_REPO_DENYLIST \}\}/);
+  assert.match(publicSafe, /scripts\/checks\/check-public-safe\.sh > "\$work\/check.log" 2>&1/);
+  assert.match(publicSafe, /status=\$\?\n[\s\S]*exit "\$status"/);
 });
 
 test("브라우저 필수 검사는 shard 를 돌린 경우에만 폭별 실제 결과를 조회한다", () => {
   const body = workflowJobs().get("browser-required") ?? assert.fail("browser-required job 이 없다");
   assert.match(body, /matrix:\n {8}project: \[mobile, desktop\]/);
   assert.match(body, /if: needs.changes.outputs.browser == 'true'\n {8}env:/);
-  assert.match(body, /run: node scripts\/ci\/browser-ci.mjs check \$\{\{ matrix.project \}\} 4/);
+  assert.match(body, /run: node scripts\/ci\/browser-ci.mjs check \$\{\{ matrix.project \}\} 3/);
+  const work = workflowJobs().get("browser")!;
+  assert.match(work, /shard: \[1, 2, 3\]/);
+  assert.equal(work.match(/--shard=\$\{\{ matrix.shard \}\}\/3/g)?.length, 2);
+});
+
+test("웹 검사는 quality와 설치를 공유하되 변경 여부와 실제 단계 결과로 판정한다", () => {
+  const jobs = workflowJobs();
+  const quality = jobs.get("quality")!;
+  assert.equal(jobs.has("web-build"), false);
+  assert.match(quality, /web-result: \$\{\{ steps\.web-tests\.outcome \}\}/);
+  const webStep = quality.split("        id: web-tests\n")[1];
+  assert.match(webStep, /^ {8}if: \$\{\{ !cancelled\(\) && needs.changes.outputs.web == 'true' && steps.install.outcome == 'success' \}\}\n/);
+  assert.match(quality, /run: cd web && pnpm install --frozen-lockfile\n {8}id: install/);
+  const condition = /^ {8}if: \$\{\{ (.*) \}\}/.exec(webStep)![1];
+  const runWeb = new Function("needs", "steps", "cancelled", `return ${condition};`);
+  for (const cancelled of [false, true]) {
+    for (const web of ["true", "false"]) {
+      for (const install of ["success", "failure", "cancelled", "skipped"]) {
+        // 앞의 quality 검사 실패는 조건에 넣지 않아 설치가 성공했으면 웹도 검사한다.
+        assert.equal(runWeb({ changes: { outputs: { web } } }, { install: { outcome: install } }, () => cancelled), !cancelled && web === "true" && install === "success");
+      }
+    }
+  }
+  for (const command of ["pnpm test:node", "pnpm typecheck", "pnpm build"]) assert.ok(webStep.includes(command));
+  const shared = quality.split(/^ {6}- /m).filter((step) => /uses: (pnpm\/action-setup|actions\/setup-node)|run: cd web && pnpm install/.test(step));
+  assert.equal(shared.length, 3);
+  for (const step of shared) assert.match(step, /if: needs.changes.outputs.quality == 'true' \|\| needs.changes.outputs.web == 'true'/);
+  const web = jobs.get("web")!;
+  assert.match(web, /needs: \[changes, quality\]\n {4}if: always\(\)/);
+  assert.match(web, /JOB_RESULT: \$\{\{ needs\.quality\.outputs\.web-result \}\}/);
+  assert.match(web, /SHOULD_RUN: \$\{\{ needs\.changes\.outputs\.web \}\}/);
+  assert.match(web, /CHANGES_RESULT: \$\{\{ needs.changes.result \}\}/);
+  assert.match(web, /QUALITY_RESULT: \$\{\{ needs.quality.result \}\}/);
+  const diagnostic = web.split("      - name: 통합한 quality job 결과 확인\n")[1].split("      - name:")[0];
+  const script = diagnostic.split("        run: |\n")[1].replace(/^ {10}/gm, "");
+  for (const changes of ["success", "failure", "cancelled", "skipped"]) {
+    for (const quality of ["success", "failure", "cancelled", "skipped"]) {
+      const check = spawnSync("bash", ["-euc", script], { encoding: "utf8", env: { ...process.env, QUALITY_RESULT: quality } });
+      assert.equal(check.status, quality === "success" ? 0 : 1);
+      if (quality !== "success") assert.match(check.stdout, /quality job이 성공하지 않았다/);
+      for (const run of ["true", "false"]) {
+        for (const result of ["success", "failure", "cancelled", "skipped", ""]) {
+          const actual = check.status === 0 && gate({ changes, run, result }).pass;
+          assert.equal(actual, changes === "success" && quality === "success" && ((run === "true" && result === "success") || (run === "false" && result === "skipped")));
+        }
+      }
+    }
+  }
+});
+
+test("통합 뒤에도 필수 검사 이름 9개와 전체 검사 job 19개를 유지한다", () => {
+  const jobs = workflowJobs();
+  const names = [...jobs.values()].flatMap((body) => {
+    const name = /^ {4}name: (.+)$/m.exec(body)?.[1];
+    if (name === "browser-${{ matrix.project }}") return ["browser-mobile", "browser-desktop"];
+    return name ? [name] : [];
+  });
+  for (const name of ["backend", "web", "e2e", "unit", "hermes", "quality", "public-safe", "browser-mobile", "browser-desktop"]) {
+    assert.equal(names.filter((candidate) => candidate === name).length, 1, name);
+  }
+  // browser-failures는 성공한 PR에서는 생략된다. backend 2개, browser 6개, 폭별 판정 2개다.
+  assert.equal(jobs.size - 1 + (2 - 1) + (6 - 1) + (2 - 1), 19);
 });
 
 test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다", () => {
@@ -259,4 +361,16 @@ test("job 이 부르는 스크립트는 그 job 을 돌리는 규칙에 있다",
       assert.ok(jobsFor(file).includes(flag), `${work} 가 부르는 ${file} 이 ${flag} 를 돌리지 않는다`);
     }
   }
+});
+
+test("main push 는 가벼운 검사만 돌고 전체 검사는 정기 실행과 수동 실행이 돈다", () => {
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  const triggers = /^on:\n([\s\S]*?)\n\npermissions:/m.exec(ci)?.[1] ?? "";
+  for (const trigger of ["pull_request:", "push:", "workflow_dispatch:", "schedule:"]) assert.match(triggers, new RegExp(`^  ${trigger}`, "m"), trigger);
+  assert.match(triggers, /cron: '\d+ \d+ \* \* \*'/);
+  // push 에서 생략된 browser 로 실패 이슈를 열지 않는다. 정기 실행과 수동 실행의 main 실패만 이슈로 모은다.
+  const failures = workflowJobs().get("browser-failures") ?? "";
+  assert.doesNotMatch(failures, /github\.event_name == 'push'/);
+  assert.match(failures, /github\.event_name == 'schedule'/);
+  assert.match(failures, /github\.event_name == 'workflow_dispatch'/);
 });

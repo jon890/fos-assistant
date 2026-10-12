@@ -29,7 +29,7 @@ const GRANT_CHOICES: { period: GrantPeriod; label: string }[] = [
   { period: "DAYS_30", label: "30일 동안" },
 ];
 
-type Sending = "approve" | "reject" | "grant" | null;
+type Sending = "approve" | "reject" | "grant" | "conversation" | null;
 
 function ArgRows({
   rows,
@@ -232,7 +232,11 @@ export function ApprovalCard({
     const result =
       kind === "reject"
         ? await rejectConnectorAction(action.actionId)
-        : await approveConnectorAction(action.actionId, grant);
+        : await approveConnectorAction(
+            action.actionId,
+            grant,
+            kind === "conversation",
+          );
     setSending(null);
     onSendingChange?.(false);
     if (result.ok) return onChanged(result.data);
@@ -295,6 +299,19 @@ export function ApprovalCard({
           >
             거절
           </Button>
+          {action.conversationGrantAllowed && !blocked ? (
+            // 밖으로 나가는 도구와 금융 도구는 서버가 이 칸을 거짓으로 내서 단추가 없다.
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="approval-conversation-grant"
+              disabled={busy}
+              loading={sending === "conversation"}
+              onClick={() => void send("conversation", null)}
+            >
+              이 대화에서 계속 허용 (24시간)
+            </Button>
+          ) : null}
           {action.grantAllowed && !blocked ? (
             <GrantMenu
               disabled={busy}

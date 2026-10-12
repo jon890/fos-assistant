@@ -62,7 +62,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-059](ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) | 꺼진 사용자는 Control Plane 이 요청마다 막고 웹이 세션을 끊는다 | backend, frontend | Accepted |
 | [ADR-060](ADR-060-reasoning-effort-의-지원은-확인한-것만-보이고-모르면-미확인으로-둔다.md) | reasoning effort 의 지원은 Hermes 가 알린 것만 확인으로 보이고 모르면 미확인으로 둔다 | backend, frontend | Accepted. ADR-030 의 「받지 않는 effort 는 Hermes 가 맞춘다」 는 그대로 두고 지원 표시와 `none` 선택을 더한다 |
 | [ADR-063](ADR-063-관리자-전용-표시와-동작은-관리자-영역에만-두고-일반-경로의-응답은-서버가-역할에-따라-줄인다.md) | 관리자 전용 표시와 동작은 관리자 영역에만 두고 일반 경로의 응답은 서버가 역할에 따라 줄인다 | backend, frontend | Accepted. ADR-038 의 「서버가 응답에서 뺀다」 를 금액과 모델과 토큰으로 넓힌다 |
-| [ADR-065](ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) | 외부로 나가는 도구는 상시 허락을 닫는 선언을 둔다 | backend, hermes | Accepted. ADR-050 의 상시 허락에 도구별 선언을 더한다 |
+| [ADR-065](ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md) | 외부로 나가는 도구는 상시 허락을 닫는 선언을 둔다 | backend, hermes | Accepted. ADR-050 의 상시 허락에 도구별 선언을 더한다. `outbound` 가 참인 도구는 [ADR-20261012 / conversation-grant](ADR-20261012-conversation-grant.md) 의 대화 허락도 선언할 수 없다 |
 | [ADR-069](ADR-069-사용자-전체-실행-한도는-turn-자리와-실행-줄을-사용자-잠금-하나에서-센다.md) | 사용자 전체 실행 한도는 turn 자리와 실행 줄을 사용자 잠금 하나에서 센다 | backend, frontend | Accepted |
 | [ADR-070](ADR-070-알림은-control-plane-의-notification-표가-원장이고-웹은-사용자-단위-SSE-로-받는다.md) | 알림은 Control Plane 의 `notification` 표가 원장이고 웹은 사용자 단위 SSE 로 받는다 | backend, frontend | Accepted |
 | [ADR-072](ADR-072-먼저-알리기의-기본값은-알리지-않음이고-control-plane-기록에서-정한-신호만-화면-안에-올린다.md) | 먼저 알리기의 기본값은 알리지 않음이고 Control Plane 기록에서 정한 신호만 화면 안에 올린다 | backend, frontend | Accepted. 매일 루프 판정을 후보 기록에 더하는 부분은 [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) 이 정한다 |
@@ -107,6 +107,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) | 금융 실행 내용은 승인 이력에 묶어 불변으로 저장한다 | backend, hermes | Accepted |
 | [ADR-20261011 / content-snapshot-job](ADR-20261011-content-snapshot-job.md) | 승인한 원고는 불변 참조와 예약 job으로 한 번만 저장한다 | backend, hermes | Accepted |
 | [ADR-20261012 / ci-path-filter](ADR-20261012-ci-path-filter.md) | PR CI 는 바뀐 파일이 입력인 job 만 돌리고, 필수 검사는 건너뛴 까닭까지 판정한다 | 공통 | Accepted |
+| [ADR-20261012 / conversation-grant](ADR-20261012-conversation-grant.md) | 승인 카드에서 도구를 그 대화에서만 계속 허용할 수 있고, 커넥터가 도구마다 연다고 선언한 것만 받는다 | backend, frontend, hermes | Accepted. ADR-050 의 상시 허락 옆에 대화 범위의 허락을 더한다. `conversation_grant` 를 선언한 도구만 열고 ADR-065 의 `outbound` 도구는 선언해도 닫는다 |
 
 ## 보관
 
