@@ -2,7 +2,6 @@ package com.bifos.assistant.testsupport;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -10,7 +9,7 @@ import lombok.NoArgsConstructor;
 /** Python 계약 원본의 판 번호로 공유 wire를 고른다. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HermesWire {
-    private static final Pattern VERSION = Pattern.compile("(?m)^HERMES_VERSION = \"(v[0-9.]+)\"$");
+    private static final Pattern VERSION = Pattern.compile("(?m)^HERMES_VERSION = \"([^\"]+)\"$");
 
 
     public static String version() throws IOException {
@@ -28,7 +27,11 @@ public final class HermesWire {
 
 
     private static String resource(String name) throws IOException {
-        try (var input = Objects.requireNonNull(HermesWire.class.getResourceAsStream(name), name)) {
+        try (var input = HermesWire.class.getResourceAsStream(name)) {
+            if (input == null) {
+                throw new IOException("Hermes 테스트 리소스가 없다: " + name
+                    + ". ./gradlew processTestResources를 먼저 실행한다.");
+            }
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);
         }
     }

@@ -3,7 +3,7 @@ import type { ServerResponse } from "node:http";
 import type { Run } from "./state.ts";
 
 const contract = readFileSync(new URL("../../../hermes/tests/hermes_contract.py", import.meta.url), "utf8");
-const version = /^HERMES_VERSION = "(v[0-9.]+)"$/m.exec(contract)?.[1];
+const version = /^HERMES_VERSION = "([^"]+)"$/m.exec(contract)?.[1];
 if (version === undefined) throw new Error("Hermes 계약의 판 번호를 읽을 수 없다");
 export const HERMES_VERSION = version;
 
@@ -37,9 +37,10 @@ export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "ru
     throw new Error(`${fields.event}의 내용 칸이 없다: ${required}`);
   }
   const { event, run_id: _scriptedRunId, timestamp, ...specific } = fields;
-  const payload: Record<string, unknown> = {
-    event, run_id: run.run_id, timestamp: timestamp ?? Date.now() / 1000, ...defaults, ...specific,
-  };
+  const envelope = { event, run_id: run.run_id, timestamp: timestamp ?? Date.now() / 1000 };
+  const payload: Record<string, unknown> = fields.event === "approval.request"
+    ? { ...specific, ...envelope, ...defaults }
+    : { ...envelope, ...defaults, ...specific };
   if (fields.event === "run.completed") {
     payload.output = fields.output ?? run.output;
     payload.usage = fields.usage ?? run.usage;

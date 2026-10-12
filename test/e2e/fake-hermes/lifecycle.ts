@@ -49,6 +49,7 @@ export function createLifecycle(state: FakeHermesState) {
   };
   return { runNotFound, finishSlowRun, authorized, dashboardAuthorized, releaseHeldSoul, releaseHeldRun, releaseLongActivity };
 }
+
 export function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

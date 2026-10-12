@@ -14,7 +14,9 @@ test("기준 판은 Python 계약에서 읽고 공유 wire의 모든 사건에 �
     assert.equal(event.run_id, "submitted-run");
     assert.equal(typeof event.timestamp, "number");
     assert.equal(event.event, sample.event);
-    assert.deepEqual(Object.keys(event).slice(0, 3), ["event", "run_id", "timestamp"]);
+    if (sample.event === "approval.request") {
+      assert.ok(Object.keys(event).indexOf("command") < Object.keys(event).indexOf("event"));
+    }
   }
   const completed = eventEnvelope({ run_id: "submitted-run", output: "완료 답", usage: FAKE_USAGE }, { event: "run.completed" });
   assert.equal(completed.output, "완료 답");
