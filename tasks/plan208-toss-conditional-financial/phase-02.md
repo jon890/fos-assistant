@@ -41,7 +41,9 @@
 
 ### 2. 설정과 검사
 
-신규 `ConnectorFinancialProperties`(`assistant.connector.financial`)를 둔다. 칸은 `enabled`(기본 false), `allowedAccounts`(기본 빈 목록), `maxOrderAmountKrw`, `maxOrderAmountUsd`, `maxOrderQuantity`, `maxDailyAmountKrw`, `maxDailyAmountUsd` 다.
+신규 `ConnectorFinancialProperties`(`assistant.connector.financial`)를 둔다. 칸은 `enabled`(기본 false), `allowedAccounts`(기본 빈 목록), `maxOrderAmountKrw`, `maxOrderAmountUsd`, `maxOrderQuantity`, `maxDailyAmountKrw`, `maxDailyAmountUsd`, `digestKeyFile`(기본 빈 값) 다.
+`digestKeyFile` 은 phase-03 의 keyed hash key 파일이다. phase-03 보다 먼저 이 단계에서 두고, `requireOpen()` 은 kill switch 가 켜져 있고 이 파일을 key 로 읽을 수 있을 때만 통과한다.
+phase-03 을 건너뛰면 key 를 쓰는 코드가 없으므로 운영 값으로 켜도 gate 가 열리지 않는다. 계획서 문장이 아니라 코드가 phase-03 선행을 강제한다.
 상한 기본값은 0 이며 0 은 「주문 불가」 다. 켤 때 운영자가 값을 넣는다. 음수와 형식 오류는 기동을 멈춘다.
 `LiveProperties` 로 읽어 재기동 없이 끌 수 있으면 그 경로를 쓴다. 안 되면 재기동으로 반영하고 그 사실을 「되돌리기」 에 적는다.
 신규 `ConnectorFinancialGate` 가 `requireOpen()`, `requireAccount(account)`, `requireWithinLimits(summary, userId, now)` 를 갖는다.

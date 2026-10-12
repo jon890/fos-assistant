@@ -48,7 +48,7 @@ DB 에 저장된 네 칸이 key 없는 SHA 로 다시 계산되지 않는지, ke
 
 ### 2. 구현
 
-신규 `FinancialDigest`(connector.application)가 `digest(purpose, bytes)` 를 갖고 HMAC key 를 `ConnectorFinancialProperties` 의 비밀 칸에서 받는다. purpose 는 칸 이름이다.
+신규 `FinancialDigest`(connector.application)가 `digest(purpose, bytes)` 를 갖고 HMAC key 를 phase-02 가 둔 `ConnectorFinancialProperties.digestKeyFile` 에서 받는다. gate 는 key 를 읽지 못하면 이미 닫혀 있다. purpose 는 칸 이름이다.
 `ConnectorOrderSnapshot.requestKey` 와 `ConnectorConditionalSnapshot.requestKey` 를 v2 경로로 바꾸고 최종 해시를 `FinancialDigest` 로 낸다.
 producer 가 금융 줄의 `args_sha256` 을, `ConnectorExecutionSnapshot.capture` 가 실행 원문과 scope 해시를 `FinancialDigest` 로 만든다. `open` 은 같은 방식으로 다시 계산해 대조한다.
 Python 쪽은 해시를 계산하지 않는다. 조건주문 의도 키를 Python 이 대조하는 곳이 있으면 Spring 이 낸 값만 비교하게 한다.

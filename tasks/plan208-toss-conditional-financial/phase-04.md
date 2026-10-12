@@ -31,6 +31,7 @@ kill switch 가 꺼진 기본 상태를 유지한 채, 켜면 `create_order` 와
 ## 작업 항목
 
 1. kill switch 꺼짐에서 지금과 같은 RISK_NOT_OPEN 과 금융 전송 0회를 확인하는 회귀를 먼저 둔다.
+   켜짐이어도 digest key 파일이 없거나, 열린 `approval-claim-v1` 줄이 남아 있으면 같은 결과인지 함께 확인한다. phase-02 와 phase-03 선행을 이 테스트가 지킨다.
 2. 판정, 승인 API, plugin, manifest, 서버 등록을 위 표대로 잇는다. 켜짐 분기는 phase-02 gate 를 반드시 지난다.
 3. 승인 카드에 summary 를 보이고, summary 를 열지 못하면 승인 단추를 막는다.
 4. loopback 토스 대역으로 준비 → 승인 → claim → 전송 → 결과를 한 번 왕복하고, 재승인과 replay 가 추가 전송 0회인지 센다.
