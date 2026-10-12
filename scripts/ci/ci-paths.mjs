@@ -8,7 +8,7 @@
 // 어느 규칙에도 맞지 않는 파일은 모든 job 을 돌린다. 새 디렉터리나 설정 파일이 검사를 건너뛰게 두지 않는다.
 // CI 의 changes job 은 의존을 설치하지 않으므로 Node 내장 모듈만 쓴다.
 import { execFileSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 // unit, public-safe 와 quality 의 파일 길이 검사는 언제나 돌아 여기에 두지 않는다.
@@ -150,4 +150,4 @@ function main() {
   process.exit(2);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();

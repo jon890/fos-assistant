@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -92,6 +92,41 @@ test("필수 검사는 돌려야 했으면 성공만, 건너뛰기로 했으면 
         assert.equal(gate({ changes, run, result }).pass, expected, JSON.stringify({ changes, run, result }));
       }
     }
+  }
+});
+
+test("gate 명령은 직접 경로와 심볼릭 링크에서 환경값을 같은 종료 코드로 판정한다", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ci-path-filter-gate-"));
+  const script = fileURLToPath(new URL("../../scripts/ci/ci-paths.mjs", import.meta.url));
+  const link = join(dir, "gate.mjs");
+  symlinkSync(script, link);
+  const cases = [
+    { changes: "success", run: "true", result: "success" },
+    { changes: "success", run: "false", result: "skipped" },
+    { changes: "success", run: "true", result: "failure" },
+    { changes: "success", run: "true", result: "cancelled" },
+    { changes: "success", run: "true", result: "skipped" },
+    { changes: "success", run: "false", result: "success" },
+    { changes: "failure", run: "false", result: "skipped" },
+    { changes: "cancelled", run: "false", result: "skipped" },
+    { changes: "success", run: "invalid", result: "skipped" },
+    { changes: undefined, run: undefined, result: undefined },
+  ];
+  try {
+    for (const entry of [script, link]) {
+      for (const values of cases) {
+        const verdict = gate(values);
+        const actual = spawnSync(process.execPath, [entry, "gate"], {
+          encoding: "utf8", env: {
+            ...process.env, CHANGES_RESULT: values.changes, SHOULD_RUN: values.run, JOB_RESULT: values.result,
+          },
+        });
+        assert.equal(actual.status, verdict.pass ? 0 : 1, `${entry}: ${JSON.stringify(values)}`);
+        assert.equal(actual.stdout.trim(), verdict.reason);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
