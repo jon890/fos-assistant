@@ -289,6 +289,7 @@ test("실제 SDK read_draft가 편집기 사진을 반환하고 메타데이터 
       revision: draftRevision(draft),
       ...draft,
       ...documentPhotos(fixture),
+      autosave_requests: 0,
       autosave_check: {
         count_before: 1,
         count_after: 1,
