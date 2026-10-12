@@ -34,8 +34,10 @@ import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.feedback.application.FeedbackConversations;
+import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.mcp.McpCallSigner;
@@ -384,6 +386,26 @@ class ConnectorConversationGrantTest {
         service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);
         jdbc.update("UPDATE connector_conversation_grant SET expires_at = ?", Instant.parse("2020-01-01T00:00:00Z"));
         assertThat(ask(root, WRITE, "{\"text\":\"기간이 지난 뒤\"}").allowed()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("함께 승인한 실행이 실패하거나 결과를 모르면 그 대화 허락을 거두어 다음 호출은 다시 승인을 기다린다")
+    void failedOrUnknownExecutionRevokesConversationGrant() {
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenReturn(CallResult.failure(ConnectorCallError.FORBIDDEN))
+            .thenThrow(new ConnectorExecutionUnknown());
+
+        assertThat(service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true).status())
+            .isEqualTo(ActionStatus.FAILED);
+        assertThat(ask(root, WRITE, "{\"text\":\"실패한 뒤\"}").allowed()).isFalse();
+        assertThat(service.approve(me, ask(root, DRAFT, ARGS).actionId(), null, true).status())
+            .isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(ask(root, DRAFT, "{\"text\":\"결과를 모른 뒤\"}").allowed()).isFalse();
+
+        assertThat(conversationGrants.findAll()).hasSize(2)
+            .allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
+        assertThat(service.conversationGrants(me, conversation.id())).isEmpty();
     }
 
 

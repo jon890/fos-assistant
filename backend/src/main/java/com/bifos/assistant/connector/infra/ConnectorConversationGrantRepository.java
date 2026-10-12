@@ -48,6 +48,16 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
 
 
     /**
+     * 그 승인 줄과 함께 준 대화 허락을 거둔다. 그 실행이 실패했거나 결과를 모를 때 부른다.
+     *
+     * @return 거둔 건수
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("update ConnectorConversationGrant g set g.revokedAt = :now where g.actionId = :actionId and g.revokedAt is null")
+    int revokeOfAction(@Param("actionId") Long actionId, @Param("now") Instant now);
+
+
+    /**
      * 번호의 대화 허락을 거둔다. 그 사이 사용자가 먼저 거둔 줄은 처음 거둔 시각을 그대로 둔다.
      *
      * @return 거둔 건수

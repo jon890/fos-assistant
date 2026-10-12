@@ -225,14 +225,18 @@ class ConnectorActionLifecycle {
 
 
     /**
-     * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
+     * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다. 함께 준
+     * 대화 허락도 거둔다.
      *
      * @return 바꾼 건수
      */
     int markInterrupted(Instant now) {
         List<ConnectorAction> interrupted = transactions.execute(status -> {
             List<ConnectorAction> executing = actions.findByStatus(ActionStatus.EXECUTING);
-            executing.forEach(action -> action.unknown(now));
+            executing.forEach(action -> {
+                action.unknown(now);
+                conversationGrants.revokeOfAction(action.id(), now);
+            });
             return actions.saveAll(executing);
         });
         interrupted.forEach(signals::publish);
@@ -241,7 +245,8 @@ class ConnectorActionLifecycle {
 
 
     /**
-     * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
+     * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다. 함께 준
+     * 대화 허락도 거둔다.
      *
      * <p>실행은 끝났는데 결과를 적는 저장이 실패하면 줄이 이 상태로 남고, 그 연결의 해제와 다시 등록이 다음 기동까지
      * 막힌다. 결과를 적는 쪽은 {@code EXECUTING} 이 아닌 줄을 건드리지 않으므로 늦게 온 결과와 겹쳐도 안전하다.
@@ -257,6 +262,7 @@ class ConnectorActionLifecycle {
                     .filter(action -> action.status() == ActionStatus.EXECUTING)
                     .map(action -> {
                         action.unknown(now);
+                        conversationGrants.revokeOfAction(action.id(), now);
                         return actions.save(action);
                     }));
                 if (unknown.isPresent()) {

@@ -270,6 +270,10 @@ class ConnectorActionApproval {
             // 실행하는 동안 기동 정리가 이 줄을 이미 끝냈다. 그 상태를 그대로 둔다.
             return action;
         }
+        if (result == null || !result.ok()) {
+            // 사용자가 본 실행이 끝나지 않았는데 뒤 호출이 묻지 않고 나가지 않게 함께 준 대화 허락을 거둔다.
+            conversationGrants.revokeOfAction(action.id(), now);
+        }
         if (result == null) {
             // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.
             action.unknown(now);
