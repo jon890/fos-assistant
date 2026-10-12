@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  appendFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -21,9 +22,12 @@ import { readState, stateFile } from "../src/jobs.ts";
 import { EDITOR_METHODS, FakeCdp, FakeEditor } from "./fake-cdp.ts";
 
 const workerIndex = process.argv.indexOf("--worker");
+const WORKER_LOG = "workers.log";
 if (workerIndex >= 0) {
   const file = process.argv[workerIndex + 1]!;
   const directory = dirname(file);
+  // 어떤 경로로 떴든 worker 실행을 worker 쪽에서 센다. 시작 명령이 읽은 pid 만으로는 두 번째 실행이 보이지 않는다.
+  await appendFile(join(directory, WORKER_LOG), `${process.pid}\n`);
   const scenario = JSON.parse(
     await readFile(join(directory, "fixture.json"), "utf8"),
   ).scenario;
@@ -161,7 +165,7 @@ if (workerIndex >= 0) {
             );
           answer({
             status,
-            workersStarted: pids.size,
+            workersStarted: (await workerRuns(root)).length,
             clicks: editor.saveClicks,
             uploads,
             violations: cdp.violations,
@@ -172,7 +176,7 @@ if (workerIndex >= 0) {
       }
     }
   } finally {
-    for (const pid of pids) {
+    for (const pid of [...pids, ...(await workerRuns(root))]) {
       try {
         process.kill(pid, "SIGTERM");
       } catch {}
@@ -182,4 +186,10 @@ if (workerIndex >= 0) {
       await rm(dir, { recursive: true, force: true });
     await rm(root, { recursive: true, force: true });
   }
+}
+
+/** worker 가 시작할 때 남긴 pid 목록이다. 아직 뜬 worker 가 없으면 비어 있다. */
+async function workerRuns(root: string) {
+  const text = await readFile(join(root, WORKER_LOG), "utf8").catch(() => "");
+  return text.split("\n").filter(Boolean).map(Number);
 }
