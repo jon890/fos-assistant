@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { callControlPlane } from "@/lib/control-plane";
 import { errorResponse } from "@/lib/api-response";
+import { rejectCrossOrigin } from "@/lib/same-origin";
 
 /** 내 브라우저를 켠다. 본문이 없다. */
-export async function POST() {
+export async function POST(request: Request) {
+  const rejected = rejectCrossOrigin(request);
+  if (rejected) return rejected;
   const result = await callControlPlane("/api/v1/browser/start", {
     method: "POST",
   });
