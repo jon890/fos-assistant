@@ -23,6 +23,7 @@ public class ContentDraftJobExpirer {
     private final ContentDraftJobs jobs;
     private final Clock clock;
 
+
     /** 승인 줄 만료와 같은 주기로 돈다. 검사에서는 {@code -} 로 끄고 본체를 직접 부른다. */
     @Scheduled(cron = "${assistant.connector.policy.expire-cron}")
     public void runScheduled() {

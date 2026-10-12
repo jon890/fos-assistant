@@ -34,13 +34,14 @@ class ConnectorActionLifecycle {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     ConnectorActionLifecycle(
-            ConnectorActionRepository actions,
-            ConnectorToolGrantRepository grants,
-            ConnectorActionDetails details,
-            ConnectorActionSignals signals,
-            TransactionTemplate transactions,
-            Clock clock) {
+        ConnectorActionRepository actions,
+        ConnectorToolGrantRepository grants,
+        ConnectorActionDetails details,
+        ConnectorActionSignals signals,
+        TransactionTemplate transactions,
+        Clock clock) {
         this.actions = actions;
         this.grants = grants;
         this.details = details;
@@ -48,6 +49,7 @@ class ConnectorActionLifecycle {
         this.transactions = transactions;
         this.clock = clock;
     }
+
 
     /**
      * 내 상시 허락 가운데 유효한 것이다.
@@ -60,16 +62,17 @@ class ConnectorActionLifecycle {
         List<ConnectorGrantView> views = new ArrayList<>();
         for (ConnectorToolGrant grant : grants.findActiveByUserId(user.id(), now())) {
             Optional<ToolPolicy> declared = manifests
-                    .computeIfAbsent(grant.connectorId(), details::readManifest)
-                    .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
+                .computeIfAbsent(grant.connectorId(), details::readManifest)
+                .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
             if (declared.isPresent() && !declared.get().grantable()) {
                 continue;
             }
             views.add(ConnectorGrantView.from(
-                    grant, declared.map(ToolPolicy::title).orElse(null)));
+                grant, declared.map(ToolPolicy::title).orElse(null)));
         }
         return views;
     }
+
 
     /**
      * 지금 선언이 상시 허락을 닫은 도구의 유효한 허락 줄을 거둔다(ADR-065).
@@ -86,13 +89,13 @@ class ConnectorActionLifecycle {
     int revokeClosedGrants(Instant now) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         List<Long> closed = grants.findActive(now).stream()
-                .filter(grant -> manifests
-                        .computeIfAbsent(grant.connectorId(), details::readManifest)
-                        .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
-                        .filter(declared -> !declared.grantable())
-                        .isPresent())
-                .map(ConnectorToolGrant::id)
-                .toList();
+            .filter(grant -> manifests
+                .computeIfAbsent(grant.connectorId(), details::readManifest)
+                .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()))
+                .filter(declared -> !declared.grantable())
+                .isPresent())
+            .map(ConnectorToolGrant::id)
+            .toList();
         if (closed.isEmpty()) {
             return 0;
         }
@@ -100,14 +103,16 @@ class ConnectorActionLifecycle {
         return revoked == null ? 0 : revoked;
     }
 
+
     /** 허락을 거둔다. 남의 허락은 없는 것과 같은 응답이다. 있는지를 알리지 않는다. */
     void revokeGrant(CurrentUser user, Long grantId) {
         ConnectorToolGrant grant = grants.findById(grantId)
-                .filter(found -> found.userId().equals(user.id()))
-                .orElseThrow(ConnectorActionDetails::notFound);
+            .filter(found -> found.userId().equals(user.id()))
+            .orElseThrow(ConnectorActionDetails::notFound);
         grant.revoke(now());
         grants.save(grant);
     }
+
 
     /**
      * {@code now} 에 기다리는 시간이 지난 승인 줄을 만료로 바꾼다. 한 줄이 실패해도 나머지를 계속한다.
@@ -122,35 +127,36 @@ class ConnectorActionLifecycle {
         List<ConnectorAction> dueActions = actions.findByStatusAndExpiresAtBefore(ActionStatus.PENDING, now);
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         dueActions.stream()
-                .filter(due -> due.conversationId() != null)
-                .forEach(due -> manifests.computeIfAbsent(due.connectorId(), details::readManifest));
+            .filter(due -> due.conversationId() != null)
+            .forEach(due -> manifests.computeIfAbsent(due.connectorId(), details::readManifest));
         int expired = 0;
         for (ConnectorAction due : dueActions) {
             try {
                 // 줄을 잠그고 다시 읽는다. 그 사이 승인이나 거절이 끝났으면 건드리지 않는다.
                 Optional<ConnectorAction> changed = transactions.execute(status -> actions.findByPublicIdForUpdate(
-                                due.publicId())
-                        .filter(action -> action.status() == ActionStatus.PENDING
-                                && action.expiresAt().isBefore(now))
-                        .map(action -> {
-                            action.expire(now);
-                            ConnectorAction saved = actions.save(action);
-                            signals.notifyExpired(saved, manifests.getOrDefault(saved.connectorId(), Optional.empty()));
-                            return saved;
-                        }));
+                    due.publicId())
+                    .filter(action -> action.status() == ActionStatus.PENDING
+                        && action.expiresAt().isBefore(now))
+                    .map(action -> {
+                        action.expire(now);
+                        ConnectorAction saved = actions.save(action);
+                        signals.notifyExpired(saved, manifests.getOrDefault(saved.connectorId(), Optional.empty()));
+                        return saved;
+                    }));
                 if (changed.isPresent()) {
                     signals.publish(changed.get());
                     expired++;
                 }
             } catch (RuntimeException ex) {
                 log.warn(
-                        "승인 줄을 만료로 바꾸지 못했다 actionId={} kind={}",
-                        due.publicId(),
-                        ex.getClass().getSimpleName());
+                    "승인 줄을 만료로 바꾸지 못했다 actionId={} kind={}",
+                    due.publicId(),
+                    ex.getClass().getSimpleName());
             }
         }
         return expired;
     }
+
 
     /**
      * 실행을 보낸 채 서버가 내려가 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
@@ -161,13 +167,14 @@ class ConnectorActionLifecycle {
      */
     int markInterrupted(Instant now) {
         List<ConnectorAction> interrupted = transactions.execute(status -> {
-            List<ConnectorAction> executing = actions.findExecutingWithoutContentJob();
+            List<ConnectorAction> executing = actions.findByStatusWithoutContentJob(ActionStatus.EXECUTING);
             executing.forEach(action -> action.unknown(now));
             return actions.saveAll(executing);
         });
         interrupted.forEach(signals::publish);
         return interrupted.size();
     }
+
 
     /**
      * 실행을 보낸 지 오래됐는데 {@code EXECUTING} 으로 남은 줄을 결과를 모르는 것으로 바꾼다. 다시 실행하지 않는다.
@@ -180,28 +187,28 @@ class ConnectorActionLifecycle {
      */
     int markStale(Instant before, Instant now) {
         int changed = 0;
-        for (ConnectorAction stale : actions.findExecutingWithoutContentJobDecidedBefore(before)) {
+        for (ConnectorAction stale : actions.findByStatusWithoutContentJobDecidedBefore(ActionStatus.EXECUTING, before)) {
             try {
-                Optional<ConnectorAction> unknown =
-                        transactions.execute(status -> actions.findByPublicIdForUpdate(stale.publicId())
-                                .filter(action -> action.status() == ActionStatus.EXECUTING)
-                                .map(action -> {
-                                    action.unknown(now);
-                                    return actions.save(action);
-                                }));
+                Optional<ConnectorAction> unknown = transactions.execute(status -> actions.findByPublicIdForUpdate(stale.publicId())
+                    .filter(action -> action.status() == ActionStatus.EXECUTING)
+                    .map(action -> {
+                        action.unknown(now);
+                        return actions.save(action);
+                    }));
                 if (unknown.isPresent()) {
                     signals.publish(unknown.get());
                     changed++;
                 }
             } catch (RuntimeException ex) {
                 log.warn(
-                        "오래 남은 실행 줄을 정리하지 못했다 actionId={} kind={}",
-                        stale.publicId(),
-                        ex.getClass().getSimpleName());
+                    "오래 남은 실행 줄을 정리하지 못했다 actionId={} kind={}",
+                    stale.publicId(),
+                    ex.getClass().getSimpleName());
             }
         }
         return changed;
     }
+
 
     /**
      * 그 연결의 답을 기다리는 줄을 모두 거절하고 유효한 상시 허락을 거둔다. 연결을 해제하거나 값을 다시 등록하는
@@ -216,19 +223,19 @@ class ConnectorActionLifecycle {
      */
     void rejectPendingFor(ConnectorConnection connection, Instant now) {
         if (actions.existsByUserIdAndConnectorIdAndStatus(
-                connection.userId(), connection.connectorId(), ActionStatus.EXECUTING)) {
+            connection.userId(), connection.connectorId(), ActionStatus.EXECUTING)) {
             throw new ApiException(ErrorCode.CONNECTOR_ACTION_EXECUTING, EXECUTING_MESSAGE);
         }
         List<ConnectorAction> pending = actions.findByUserIdAndConnectorIdAndStatusForUpdate(
-                connection.userId(), connection.connectorId(), ActionStatus.PENDING);
+            connection.userId(), connection.connectorId(), ActionStatus.PENDING);
         pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
         List<ConnectorAction> rejected = actions.saveAll(pending);
-        List<ConnectorToolGrant> active =
-                grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
+        List<ConnectorToolGrant> active = grants.findActiveByUserIdAndConnectorId(connection.userId(), connection.connectorId(), now);
         active.forEach(grant -> grant.revoke(now));
         grants.saveAll(active);
         signals.publishAfterCommit(rejected);
     }
+
 
     /**
      * 그 에이전트에서 연결을 뗄 때 그 에이전트의 실행이 판정한 줄만 거절한다. 트랜잭션 안에서 부른다.
@@ -240,15 +247,16 @@ class ConnectorActionLifecycle {
      */
     void rejectPendingFor(ConnectorConnection connection, Long agentId, Instant now) {
         if (!actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
-                        connection.userId(), connection.connectorId(), agentId, ActionStatus.EXECUTING)
-                .isEmpty()) {
+            connection.userId(), connection.connectorId(), agentId, ActionStatus.EXECUTING)
+            .isEmpty()) {
             throw new ApiException(ErrorCode.CONNECTOR_ACTION_EXECUTING, EXECUTING_MESSAGE);
         }
         List<ConnectorAction> pending = actions.findByUserIdAndConnectorIdAndAgentIdAndStatus(
-                connection.userId(), connection.connectorId(), agentId, ActionStatus.PENDING);
+            connection.userId(), connection.connectorId(), agentId, ActionStatus.PENDING);
         pending.forEach(action -> action.refuse(ConnectorAction.CONNECTION_CHANGED, now));
         signals.publishAfterCommit(actions.saveAll(pending));
     }
+
 
     private Instant now() {
         return Instant.now(clock);

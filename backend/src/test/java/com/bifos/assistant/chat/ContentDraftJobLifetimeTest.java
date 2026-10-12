@@ -16,6 +16,7 @@ import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.hermes.ContentDraftJobNotFound;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -137,7 +138,7 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
     @DisplayName("시작 전송 직후의 DISPATCHED job은 not_found를 일시 장애로 보고 닫지 않는다")
     void keepsFreshDispatchedJobOnNotFound() {
         accepted();
-        jdbc.update("update content_draft_job set status = 'DISPATCHED', approved_at = ?", java.sql.Timestamp.from(clock.instant()));
+        jdbc.update("update content_draft_job set status = 'DISPATCHED', approved_at = ?", Timestamp.from(clock.instant()));
         when(compiler.status(any(), any(), any())).thenThrow(new ContentDraftJobNotFound());
         code(this::refresh, ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.DISPATCHED);
@@ -178,7 +179,7 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
     /** 연결 확인이나 재반영이 바인딩의 updatedAt 을 올린 것과 같다. */
     private void touchBinding() {
         jdbc.update("update agent_connector_binding set updated_at = ? where id = ?",
-            java.sql.Timestamp.from(clock.instant().plusSeconds(60)), binding.id());
+            Timestamp.from(clock.instant().plusSeconds(60)), binding.id());
     }
 
 
