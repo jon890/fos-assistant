@@ -4,5 +4,7 @@ description: "Control Plane 이 Hermes 대시보드의 profile 관리와 도구 
 author: "fos-assistant"
 kind: backend
 hooks: []
+python_dependencies:
+  - PyYAML==6.0.3
 requires_env:
   - HERMES_DASHBOARD_PROFILE_API_SECRET

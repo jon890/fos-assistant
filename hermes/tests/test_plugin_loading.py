@@ -1,10 +1,14 @@
 """분리한 plugin 의 적재와 mock 복원 경계를 검사한다."""
 
 import pathlib
+import builtins
 import sys
 import tempfile
 import types
 import unittest
+from unittest.mock import patch
+
+import yaml
 
 from plugin_loading import load_plugin, patch_plugin, set_plugin
 
@@ -47,3 +51,21 @@ class PluginLoadingTest(unittest.TestCase):
             load_plugin("failed_loading_test", self.entrypoint, self.addCleanup)
         self.assertNotIn("failed_loading_test", sys.modules)
         self.assertNotIn("failed_loading_test.part", sys.modules)
+
+    def test_dashboard_requires_declared_pyyaml_before_loading_routes(self):
+        entrypoint = pathlib.Path(__file__).resolve().parents[1] / "plugins/dashboard-profile-api/__init__.py"
+        manifest = yaml.safe_load(entrypoint.with_name("plugin.yaml").read_text())
+        self.assertEqual(["PyYAML==6.0.3"], manifest["python_dependencies"])
+        original = builtins.__import__
+
+        def without_yaml(name, *args, **kwargs):
+            if name == "yaml":
+                raise ModuleNotFoundError("No module named 'yaml'", name="yaml")
+            return original(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=without_yaml):
+            with self.assertRaisesRegex(RuntimeError, "PyYAML==6.0.3") as error:
+                load_plugin("missing_dashboard_yaml", entrypoint, self.addCleanup)
+        self.assertIsInstance(error.exception.__cause__, ModuleNotFoundError)
+        self.assertNotIn("missing_dashboard_yaml", sys.modules)
+        self.assertFalse(any(name.startswith("missing_dashboard_yaml.") for name in sys.modules))
