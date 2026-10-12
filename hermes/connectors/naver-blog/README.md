@@ -60,7 +60,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | `session_status` | 없음 | `{browser: "connected", logged_in: true, blog_id}`. 로그인 쿠키가 없으면 `NAVER_BLOG_LOGIN_REQUIRED` 로 실패한다 |
 | `render_draft` | 아래 「초안」 의 다섯 칸, `base`(덮어쓸 때 `read_draft` 가 준 `title`, `category`, `tags`, `body`, 선택), `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `index.html` 이나 `<폴더>/index.html`, 폴더는 세 단계까지), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다. `base` 를 주면 `changes` 와 `base_revision` 이 더 온다(아래 「임시저장 글 덮어쓰기」) |
 | `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}], autosave_requests}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
-| `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body, photos, photo_count, photos_truncated, autosave_check}`. 아래 「임시저장 글 읽기」 를 본다 |
+| `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body, photos, photo_count, photos_truncated, autosave_check, autosave_requests}`. 아래 「임시저장 글 읽기」 를 본다 |
 | `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status}`. `job_id` 는 UUID 고, `status` 는 시작 확인 때 읽은 `running`, `succeeded`, `failed`, `unknown` 중 하나다 |
 | `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status}`. 상태는 `save_draft` 와 같다. 아래 「임시저장 글 덮어쓰기」 를 본다 |
 | `draft_job` | `job_id`, `wait_seconds`(0~50, 기본 45) | 아래 「작업」 의 상태 |
@@ -338,7 +338,7 @@ CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전�
 | `NAVER_BLOG_START_UNKNOWN` | `outcome_unknown` | 작업 프로세스를 띄웠는데 5초 안에 시작을 알리지 않았다. 늦게 시작할 수 있어 다시 부르지 않는다 |
 | `NAVER_BLOG_UNAVAILABLE` | `unavailable` | 그 밖의 실패 |
 
-`NAVER_BLOG_LOGIN_REQUIRED`, `NAVER_BLOG_BUSY`, `NAVER_BLOG_DRAFT_NOT_FOUND`, `NAVER_BLOG_EDITOR_IN_USE` 는 `connector.json` 에 복구 어휘(`reconnect`, `retry_later`, `recheck`, `retry_later`)를 함께 선언한다. 승인한 `read_draft` 가 이 코드로 실패하면 복구 안내가 에이전트까지 간다.
+`NAVER_BLOG_LOGIN_REQUIRED`, `NAVER_BLOG_BUSY`, `NAVER_BLOG_DRAFT_NOT_FOUND`, `NAVER_BLOG_UNAVAILABLE` 는 `connector.json` 에 복구 어휘(`reconnect`, `retry_later`, `recheck`, `retry_later`)를 함께 선언한다. `BUSY` 의 `retry_later` 는 읽기뿐 아니라 새 글 저장과 덮어쓰기에도 쓰인다. 승인한 호출이 이 코드로 실패하면 복구 안내가 에이전트까지 간다. `EDITOR_IN_USE` 는 자동 재시도 대신 스킬의 글 정리 안내를 따른다.
 
 꺼진 브라우저를 켜는 데 30초까지 걸린다. 연결 확인은 10초 제한이라 처음 한 번 `NAVER_BLOG_BROWSER_UNREACHABLE` 로 실패할 수 있다. 잠시 뒤 다시 누르면 된다.
 `save_draft` 와 `overwrite_draft` 는 브라우저를 확인할 때 45초까지 기다린다.
