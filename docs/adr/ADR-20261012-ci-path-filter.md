@@ -36,6 +36,7 @@ GitHub 문서는 merge queue 를 organization 이 소유한 공개 저장소와 
      workflow 와 경로 판정 자체를 바꾸면 전체 검사를 돌린다.
 4. push 와 정기 실행은 언제나 모든 job 을 돌린다. 규칙이 놓친 의존은 main 에서 드러난다.
 5. 필수 검사 이름의 job 은 판정만 한다. 규칙은 `ci-paths.mjs gate` 가 갖는다.
+   checkout 과 Node 설정을 각각 수행하고 `if: always()` 를 유지한다. 취소 때문에 판정까지 생략해 통과로 보고하지 않기 위해서다.
    - `changes` job 이 성공하지 않았으면 실패다. 판정 job 이 실패하면 뒤 job 이 생략되는데, 그것을 건너뛴 것으로 읽지 않으려는 것이다.
    - 돌려야 했던 job 은 `success` 만 통과다.
    - 건너뛰기로 한 job 은 `skipped` 만 통과다.
