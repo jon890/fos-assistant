@@ -434,7 +434,7 @@ test("편집기 객체를 읽지 못하면 글 단추를 누르기 전에 NAVER_
   expectOnlyOwnTabClosed(cdp, otherTab);
 });
 
-test("목록 응답이 로그인 화면으로 넘어가고 쿠키가 없으면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
+test("목록 응답이 실패하고 쿠키가 없으면 NAVER_BLOG_LOGIN_REQUIRED 다", async () => {
   const { cdp, editor, env, otherTab, session } = await setup();
   editor.listStatus = 302;
   session.cookies = [];
