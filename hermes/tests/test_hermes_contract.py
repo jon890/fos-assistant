@@ -328,7 +328,7 @@ class HermesSourceTest(unittest.TestCase):
                          preview=sample.get("text") if kind == "reasoning.available" else sample.get("preview"),
                          **fields)
                 self.assertEqual({key: value for key, value in emitted[-1].items() if key != "timestamp"},
-                                 {key: value for key, value in sample.items() if key != "timestamp"})
+                                 {key: value for key, value in sample.items() if key not in {"timestamp", "seq"}})
         count = len(emitted)
         callback("tool.failed", tool_name="web_search")
         callback("tool.progress", tool_name="web_search")
@@ -370,6 +370,24 @@ class HermesSourceTest(unittest.TestCase):
         self.assertTrue(notified)
         for keys in notified:
             self.assertTrue(keys <= samples["approval.request"].keys())
+
+    def test_plugin_dependencies_warn_without_installing_during_discovery(self):
+        """v0.21.6의 실제 loader로 plugin 의존성 경고를 확인한다. 설치 호출은 제공하지 않는다."""
+        loader = self.tree(self.root / "hermes_cli/plugins_loader.py")
+        manager = next(node for node in loader.body if isinstance(node, ast.ClassDef) and node.name == "PluginLoaderMixin")
+        function = next(node for node in manager.body if isinstance(node, ast.FunctionDef)
+                        and node.name == "_warn_python_dependencies")
+        warnings = []
+        namespace = {"PluginManifest": object, "manifest_key": lambda manifest: "dashboard-profile-api",
+                     "_dist_installed": lambda requirement: False,
+                     "logger": SimpleNamespace(warning=lambda *args: warnings.append(args))}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), "upstream_dependency_warning", "exec"), namespace)
+        manifest = yaml.safe_load((PLUGIN_DIR / "plugin.yaml").read_text())
+        namespace["_warn_python_dependencies"](None, SimpleNamespace(
+            python_dependencies=manifest["python_dependencies"]))
+        self.assertEqual(1, len(warnings))
+        self.assertIn("Discovery does not install dependencies", warnings[0][0])
+        self.assertEqual("PyYAML==6.0.3", warnings[0][2])
 
     def test_decision_profile_blocks_implicit_mcp_tools_in_upstream_resolver(self):
         """상류의 순수 합집합 함수를 실행해 no_mcp 가 기본 MCP 도구를 넣지 않는지 본다."""

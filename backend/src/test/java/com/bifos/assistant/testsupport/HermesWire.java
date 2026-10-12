@@ -15,7 +15,7 @@ public final class HermesWire {
     public static String version() throws IOException {
         var match = VERSION.matcher(resource("/hermes/hermes_contract.py"));
         if (!match.find()) {
-            throw new IOException("Hermes 계약의 버전를 읽을 수 없다");
+            throw new IOException("Hermes 계약의 버전을 읽을 수 없다");
         }
         return match.group(1);
     }

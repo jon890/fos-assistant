@@ -27,6 +27,7 @@ class HermesWireCompatibilityTest {
         var events = new ArrayList<RunEvent>();
         HermesInterimWire.read(HermesWire.fixture("events"), ToolDetailScope.NONE, events::add);
 
+        // replay.truncated와 id/seq는 무시하고 지원하는 사건 14개를 읽는다.
         assertThat(events).hasSize(14);
         assertThat(events.get(3).toolName()).isEqualTo("web_search");
         assertThat(events.get(3).durationMs()).isZero();

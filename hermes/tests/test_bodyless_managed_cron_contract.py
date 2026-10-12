@@ -124,8 +124,7 @@ class ManagedCronSourceTest(unittest.TestCase):
                 node.body.insert(0, ast.parse("run_one_job({})").body[0])
             elif mutation == "false_to_true":
                 result = next(item for item in ast.walk(node) if isinstance(item, ast.Return)
-                    and isinstance(item.value, ast.Call) and isinstance(item.value.func, ast.Name)
-                    and item.value.func.id == "run_one_job")
+                    and isinstance(item.value, ast.Name) and item.value.id == "completed")
                 result.value = ast.Constant(value=True)
             else:
                 replace = next(item for item in ast.walk(node) if isinstance(item, ast.Attribute)
@@ -182,8 +181,7 @@ class ManagedCronSourceTest(unittest.TestCase):
                 ack_try.body.insert(0, ast.parse("run_one_job(job, adapters=None, loop=None, verbose=False)").body[0])
             else:
                 result = next(item for item in ast.walk(worker) if isinstance(item, ast.Return)
-                    and isinstance(item.value, ast.Call) and isinstance(item.value.func, ast.Name)
-                    and item.value.func.id == "run_one_job")
+                    and isinstance(item.value, ast.Name) and item.value.id == "completed")
                 result.value = ast.Constant(value=True)
             with self.subTest(mutation=mutation), self.assertRaises(AssertionError):
                 self.run_worker(adopted=True, ack_ok=True, job_result=mutation != "false_to_true",
@@ -197,7 +195,7 @@ class ManagedCronSourceTest(unittest.TestCase):
 
             class Snapshot:
                 def read_text(self, *, encoding):
-                    self_outer.assertEqual("utf-8", encoding)
+                    self_outer.assertEqual("utf-8-sig", encoding)
                     events.append("read")
                     return text
 
@@ -210,7 +208,8 @@ class ManagedCronSourceTest(unittest.TestCase):
 
             self_outer = self
             modules = {}
-            for name in ("agent.secret_scope", "cron.executions", "hermes_cli.env_loader", "hermes_constants"):
+            for name in ("agent.secret_scope", "cron.executions", "hermes_cli.env_loader", "hermes_constants",
+                    "hermes_cli.plugins", "gateway.run_startup"):
                 modules[name] = types.ModuleType(name)
             secret = modules["agent.secret_scope"]
             secret.is_multiplex_active = lambda: False
@@ -222,6 +221,9 @@ class ManagedCronSourceTest(unittest.TestCase):
             constants.set_hermes_home_override = lambda profile: "home-token"
             constants.reset_hermes_home_override = lambda token: events.append(("reset-home", token))
             modules["hermes_cli.env_loader"].hydrate_profile_secret_sources = lambda profile: None
+            modules["hermes_cli.plugins"].discover_plugins = lambda: events.append("discover")
+            modules["gateway.run_startup"].GatewayStartupMixin = types.SimpleNamespace(
+                _register_config_hooks=lambda *args, **kwargs: events.append("hooks"))
 
             def adopt(execution):
                 self.assertEqual("synthetic-execution", execution)
@@ -254,6 +256,7 @@ class ManagedCronSourceTest(unittest.TestCase):
                 return job_result
 
             namespace: dict[str, Any] = dict(Path=Path, json=json, os=os_proxy, contextlib=contextlib,
+                logging=types.SimpleNamespace(WARNING=30),
                 logger=types.SimpleNamespace(error=lambda *args: None, exception=lambda *args: None),
                 use_cron_store=lambda profile: contextlib.nullcontext(), run_one_job=lambda *args, **kwargs: self.fail("오래된 job binding"))
             if worker is None:
@@ -270,6 +273,8 @@ class ManagedCronSourceTest(unittest.TestCase):
             self.assertEqual(1, events.count("read"))
             self.assertEqual(1, events.count("unlink"))
             self.assertEqual(adopted and ack_ok, "job" in events)
+            self.assertLess(events.index("discover"), events.index("hooks"))
+            self.assertLess(events.index("hooks"), events.index("adopt"))
             self.assertEqual(adopted and ack_ok, ack.exists())
             self.assertEqual("previous", environment["_HERMES_CRON_EXTERNAL_WORKER"])
             self.assertIn(("reset-secret", "secret-token"), events)
