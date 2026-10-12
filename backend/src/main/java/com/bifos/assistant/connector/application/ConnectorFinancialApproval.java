@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -39,6 +40,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 공개 승인 경로와 분리된 내부 금융 승인이다. grant 입력과 자동 재실행을 받지 않는다. */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 class ConnectorFinancialApproval {
@@ -77,6 +79,8 @@ class ConnectorFinancialApproval {
             var action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
             require(Objects.equals(action.userId(), user.id()) && action.status() == ActionStatus.PENDING);
             var row = contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorFinancialProducer::rejected);
+            // 암호화하지 않고 저장된 snapshot은 실행하지 않는다.
+            require(row.contentKeyId() != null);
             var checked = current.validateLocked(context, catalog, action, row);
             require(action.expiresAt().isAfter(clock.instant()));
             conflicts.requireAvailable(row.requestKey(), action.id());
@@ -88,16 +92,18 @@ class ConnectorFinancialApproval {
         String ticket = null;
         try {
             ticket = tickets.issue(actionId);
-        } catch (RuntimeException ignored) {
-            // 발급 실패는 실행 HTTP를 보내지 않은 것이 분명하다. 재발급하지 않는다.
+        } catch (RuntimeException failure) {
+            // 발급 실패는 실행 HTTP를 보내지 않은 것이 분명하다. 재발급하지 않는다. 원문과 ticket은 남기지 않는다.
+            log.warn("금융 실행 ticket 발급 실패 actionId={} kind={}", actionId, failure.getClass().getSimpleName());
             result = CallResult.failure(ConnectorCallError.UNAVAILABLE);
         }
         if (ticket != null) {
             try {
                 result = hermes.executeApproved(context.profile(), context.connectorId(), context.hermesTool(),
                     new ConnectorApprovedExecution(ticket, snapshot.executionArgsJson(), snapshot.executionArgsSha256()));
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException failure) {
                 // 전송 응답을 잃으면 UNKNOWN으로 남기고 다시 실행하지 않는다.
+                log.warn("금융 실행 결과 불명 actionId={} kind={}", actionId, failure.getClass().getSimpleName());
             }
         }
         CallResult executed = result;

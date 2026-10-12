@@ -83,6 +83,8 @@ class ConnectorFinancialProducer {
     ConnectorPolicyAnswer request(String profileName, String rootSessionId, String sessionId,
         String toolCallId, String hermesTool, String toolName, String argsJson) {
         require(!TransactionSynchronizationManager.isActualTransactionActive());
+        // 금융 snapshot은 평문으로 저장하지 않는다. 데이터 key가 꺼져 있으면 준비 HTTP 전에 거절한다.
+        require(cipher.enabled());
         String key = ConnectorActionKey.of(profileName, rootSessionId, sessionId, toolCallId).value();
         String hash = Sha256.hex(argsJson);
         var recorded = actions.findByDedupeKey(key);
