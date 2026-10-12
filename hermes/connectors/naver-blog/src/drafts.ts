@@ -173,7 +173,7 @@ export function readDraft(
     const before = await tempList(page, blogId);
     if (!before.drafts.some((draft) => draft.draft_id === draftId))
       throw new ToolError("NAVER_BLOG_DRAFT_NOT_FOUND");
-    await assertEmptyEditor(page);
+    await assertEmptyEditor(page, before.drafts);
     await loadDraft(page, blogId, draftId, before.drafts);
     let content;
     let photos;

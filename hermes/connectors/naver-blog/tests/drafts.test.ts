@@ -409,6 +409,15 @@ test("빈 문단만 있는 새 편집기는 비었다고 보고 글을 불러온
   expect(editor.loaded?.logNo).toBe(224000000002);
 });
 
+test("빈 편집기의 숫자 문서 번호가 목록에 없으면 글을 읽는다", async () => {
+  const { editor, env } = await setup();
+  editor.document = { document: { components: [] } };
+  editor.documentId = "224000000099";
+  expect((await readDraft(env, "224000000001", TIMES)).draft_id).toBe(
+    "224000000001",
+  );
+});
+
 test("편집기 객체를 읽지 못하면 글 단추를 누르기 전에 NAVER_BLOG_UNAVAILABLE 이다", async () => {
   const { cdp, editor, env, otherTab } = await setup();
   editor.documentUnavailable = true;

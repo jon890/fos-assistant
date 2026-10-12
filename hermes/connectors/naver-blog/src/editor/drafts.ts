@@ -154,9 +154,9 @@ function hasText(page: EditorPage, paragraphs: unknown) {
 /**
  * 글을 불러오기 전에 새 탭의 편집기가 비었는지 본다. 읽기 도구가 사용자가 쓰던 글 위에 다른 글을 싣지 않게 한다.
  * 편집기 객체를 읽지 못하면 누르기 전에 `editor_failed` 다. 불러온 뒤에야 모양이 바뀐 것을 알면 그 사이 자동저장이 돌 수 있다.
- * 제목이나 글 문단에 글자가 있거나, 사진처럼 글이 아닌 구성요소가 있거나, 문서 번호가 글 번호 모양이면 「작성 중인 글」 알림이 없어도 `NAVER_BLOG_EDITOR_IN_USE` 다.
+ * 제목이나 글 문단에 글자가 있거나, 사진처럼 글이 아닌 구성요소가 있거나, 문서 번호가 목록에 있는 글 번호면 「작성 중인 글」 알림이 없어도 `NAVER_BLOG_EDITOR_IN_USE` 다.
  */
-export async function assertEmptyEditor(page: EditorPage) {
+export async function assertEmptyEditor(page: EditorPage, listed: TempDraft[]) {
   const doc = await editorDocument(page);
   const components = doc.document?.components;
   if (!Array.isArray(components))
@@ -171,7 +171,10 @@ export async function assertEmptyEditor(page: EditorPage) {
           : component.value,
       ),
   );
-  if (written || DRAFT_ID_PATTERN.test(String(doc.documentId ?? "")))
+  if (
+    written ||
+    listed.some((draft) => draft.draft_id === String(doc.documentId ?? ""))
+  )
     throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
 }
 
