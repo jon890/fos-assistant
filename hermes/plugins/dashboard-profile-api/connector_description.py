@@ -1,4 +1,4 @@
-"""도구 설명을 정책과 분리한 평문 표시 메타데이터로 읽는다."""
+"""도구 설명과 화면용 요약을 정책과 분리한 평문 표시 메타데이터로 읽는다."""
 
 import re
 
@@ -22,3 +22,10 @@ def _tool_descriptions(declared):
     if declared["schema"] != 2:
         return {}
     return {name: _tool_description(tool.get("description")) for name, tool in declared["tools"].items()}
+
+
+def _tool_summaries(declared):
+    """화면에 보일 도구 요약(`summary`)을 설명과 같은 규칙으로 정규화한다. 모델이 읽는 `description` 과 따로 둔다."""
+    if declared["schema"] != 2:
+        return {}
+    return {name: _tool_description(tool.get("summary")) for name, tool in declared["tools"].items()}

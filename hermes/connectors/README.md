@@ -6,7 +6,7 @@
 이 저장소가 유지보수하는 범용 커넥터를 만들고 PR 로 올리는 방법이다.
 어떤 커넥터를 여기 두는지와 그 근거는 [ADR-064](../docs/adr/ADR-064-범용-커넥터는-이-저장소의-hermes-connectors-에-두고-저장소가-유지보수한다.md) 가 갖는다.
 `connector.json` 의 형식은 이 파일의 「connector.json」 이, 위험도와 승인은 [커넥터 도구 정책](../../docs/features/connector-policy.md) 이 갖는다.
-따라 할 본보기는 [`hermes/connectors/gmail/`](gmail) 이고 그 문서는 [Gmail 커넥터](gmail/README.md) 다.
+따라 할 본보기는 [`hermes/connectors/gmail/`](gmail) 이고, 개발 문서는 [Gmail 커넥터](../../docs/features/gmail-connector.md), 사용자 안내는 [Gmail README](gmail/README.md) 다.
 
 ## 여기 두는 커넥터
 
@@ -45,7 +45,7 @@ hermes/connectors/<id>/
 ### 도구 정책
 
 - `schema: 2` 로 쓰고, MCP 서버가 내는 도구를 `tools` 에 빠짐없이 선언한다. 선언과 서버의 도구 목록이 정확히 같아야 한다
-- 도구마다 위험도를 고르고 그 까닭을 커넥터 문서의 표에 적는다
+- 도구마다 위험도를 고르고 그 까닭을 커넥터 개발 문서의 표에 적는다
 
 | 도구가 하는 일 | 선언 |
 | --- | --- |
@@ -164,12 +164,19 @@ Hermes 는 스킬을 읽을 때 그 칸의 이름으로 profile 의 값과 파�
 
 ### 문서와 소유자
 
-`hermes/connectors/<id>/README.md` 에 아래를 둔다.
+`hermes/connectors/<id>/README.md` 는 연결 카드의 「커넥터 README」 가 여는 사용자 안내다. 「~해요」체로 짧게 아래만 둔다.
+
+- 할 수 있는 일과 하지 않는 일
+- 연결하는 방법. 자격 증명을 만들고 넣는 단계
+- 도구 목록. `connector.json` 의 `title` 과 `summary` 를 `| title | summary |` 줄로 그대로 옮긴다
+- 문제가 생겼을 때. 만료와 철회, 다시 연결하기
+
+개발 내용은 커넥터마다 `docs/features/<id>-connector.md` 기능 파일에 적는다. 본보기는 [Gmail 커넥터](../../docs/features/gmail-connector.md) 다.
 
 - 등록 칸과 도구 표. 도구마다 위험도, 승인, 상시 허락, 그 까닭
+- 인자와 결과, 오류 코드
 - scope 나 권한과 그것을 고른 까닭
 - 보안. 외부 글이 모델을 속였을 때 닿는 범위
-- 사용자를 위한 설정 안내. 자격 증명을 만들고 넣는 단계, 만료와 철회
 - 실제 계정으로 확인하는 절차
 
 `.github/CODEOWNERS` 에 `/hermes/connectors/<id>/` 와 그 검사와 문서의 소유자를 적는다.
@@ -264,6 +271,7 @@ CI 의 `hermes` job 과 `scripts/dev/check-local.sh` 가 돌린다. 커넥터를
 | 서버를 띄워 읽은 도구 이름이 `tools` 의 키와 정확히 같다 | 선언 없는 도구는 거절되고, 없는 도구의 선언은 죽은 글이다 |
 | `READ` 도구만 서버에서 `read_only_hint` 가 참이다 | 선언과 서버의 뜻이 다르다 |
 | `READ` 가 아닌 도구에 `title` 이 있다 | 승인 카드가 「이름 없는 동작」 으로 보인다 |
+| 모든 도구에 `title` 과 200자 안의 `summary` 가 있고, 둘 다 도구 이름을 담지 않으며, README 의 도구 표에 `\| title \| summary \|` 줄이 있다 | 화면이 「이름 없는 도구」 를 보이거나 README 와 화면의 말이 어긋난다 |
 | `DESTRUCTIVE` 와 `FINANCIAL` 선언이 없다 | 닫힌 도구를 두지 않는다 |
 | `READ` 가 아닌 도구가 모두 `outbound` 를 boolean 으로 선언했고, 참인 도구는 `grant` 가 거짓이다 | 밖으로 나가는 도구에 상시 허락이 열린다 |
 | `identifiers` 에 적은 이름이 모두 서버의 그 도구 입력 스키마에 있다 | 없는 인자의 선언은 아무것도 가림에서 빼지 않는 죽은 글이다 |
@@ -331,6 +339,8 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `tools.<이름>.arg_labels` | 선택. 도구별 승인 인자의 표시 이름 객체다. 누락·불량 metadata는 빈 객체로 읽고 원래 키로 표시한다 |
 | `id` | 커넥터 번호. `^[a-z0-9][a-z0-9-]{0,63}$`. 운영 목록의 이름과 같아야 한다 |
 | `title`, `description` | 화면에 그대로 보인다 |
+| `tools.<이름>.title`, `tools.<이름>.summary` | 화면에 보일 한글 도구 이름과 「~해요」체 한두 문장의 요약. 모든 도구에 둔다. 화면은 도구 이름을 보이지 않는다. 쓰는 법은 [커넥터 연결](../../docs/features/connector.md) 의 「도구 이름과 요약」 이 갖는다 |
+| `tools.<이름>.description` | 모델이 읽는 설명. 화면에 보이지 않는다 |
 | `icon` | 선택. 커넥터 카드의 아이콘 파일. plugin 디렉터리 기준 상대 경로이고 `.svg` 나 `.png` 다. 아래 「아이콘과 링크」 가 규칙을 갖는다 |
 | `link` | 선택. 서비스의 공식 사이트나 프로젝트 GitHub의 HTTPS 주소 |
 | `readme_url` | 선택. 커넥터 README의 HTTPS 주소. `link`와 따로 검사한다 |
