@@ -8,6 +8,7 @@ import ast
 import asyncio
 import json
 import pathlib
+import re
 import shutil
 import sys
 import tempfile
@@ -23,6 +24,10 @@ CLOSED_RISKS = {"DESTRUCTIVE", "FINANCIAL"}
 SERVER_TIMEOUT_SECONDS = 30
 # `<img>` 로 그리는 SVG 는 이 이름공간 선언이 없으면 아무것도 그리지 않는다.
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
+# 화면은 도구 이름 대신 `title` 과 `summary` 를 보인다. 요약은 한두 문장이다.
+TOOL_SUMMARY_MAX_CHARS = 200
+# 화면용 `title` 과 `summary` 를 아직 채우지 않은 커넥터다. 채우는 PR 에서 이 목록과 함께 지운다.
+PENDING_USER_COPY = {"naver-blog"}
 
 
 def connector_dirs(connectors: pathlib.Path = CONNECTORS) -> list[pathlib.Path]:
@@ -68,12 +73,43 @@ def imported_roots(source: str) -> set[str]:
     return names
 
 
+def user_copy_problems(tools: dict, loaded: dict | None, readme: str, arg_names: set[str]) -> list[str]:
+    """화면용 `title` 과 `summary` 의 위반이다. 화면은 실제 도구 이름과 인자 이름을 보이지 않는다."""
+    problems = []
+    hidden = set(tools) | arg_names
+    for tool, spec in tools.items():
+        if not str(spec.get("title", "")).strip():
+            problems.append("화면에 보일 title 이 없다: %s" % tool)
+        summary = spec.get("summary")
+        normalized = loaded.get("tool_summaries", {}).get(tool) if loaded is not None else None
+        if not isinstance(summary, str) or summary != normalized or len(summary) > TOOL_SUMMARY_MAX_CHARS:
+            problems.append("화면에 보일 summary 가 없거나 %d자 안의 평문이 아니다: %s" % (TOOL_SUMMARY_MAX_CHARS, tool))
+            continue
+        # 영문 낱말 단위로 견준다. 「Gmail」 같은 서비스 이름은 도구나 인자 이름이 아니라 통과한다.
+        words = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", "%s %s" % (spec.get("title", ""), summary)))
+        if words & hidden:
+            problems.append("title 이나 summary 에 도구나 인자 이름이 있다: %s %s" % (tool, sorted(words & hidden)))
+        # 사용자 README 의 도구 표는 화면과 같은 말을 쓴다. 손으로 고친 표가 선언과 어긋나지 않게 한다.
+        elif "| %s | %s |" % (spec.get("title"), summary) not in readme:
+            problems.append("README 의 도구 표에 title 과 summary 줄이 없다: %s" % tool)
+    # 표는 도구마다 한 줄이고, README 어디에도 실제 도구 이름을 쓰지 않는다.
+    section = readme.split("## 도구 목록", 1)[1].split("\n## ", 1)[0] if "## 도구 목록" in readme else ""
+    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| 도구 |", "| ---"))]
+    if len(rows) != len(tools):
+        problems.append("README 의 도구 목록 줄 수(%d)가 도구 수(%d)와 다르다" % (len(rows), len(tools)))
+    named = sorted(set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", readme)) & set(tools))
+    if named:
+        problems.append("README 에 실제 도구 이름이 있다: %s" % named)
+    return problems
+
+
 def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> list[str]:
     """커넥터 하나의 위반 글 목록을 돌려준다. 비면 통과다. `load_connector` 는 plugin 의 `_load_connector` 다."""
     name = root.name
     problems: list[str] = []
 
     loaded = None
+    served_args: set[str] = set()
     try:
         loaded = load_connector(name, {"root": root, "command": sys.executable, "env": {}})
     except Exception as error:
@@ -148,6 +184,7 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
             problems.append("Python MCP 서버는 허용하지 않는다")
         try:
             served = server_tools(server, root)
+            served_args = set().union(*(args for _, args in served.values()))
         except Exception as error:
             problems.append("서버를 띄워 도구를 읽지 못한다: %r" % error)
         else:
@@ -191,6 +228,10 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
     lines = owners.read_text(encoding="utf-8").splitlines() if owners.is_file() else []
     if not any(len(parts) >= 2 and parts[0].startswith(prefix) for parts in (line.split() for line in lines)):
         problems.append("CODEOWNERS 에 %s 소유자 줄이 없다" % prefix)
+    if name not in PENDING_USER_COPY:
+        readme = (root / "README.md").read_text(encoding="utf-8") if (root / "README.md").is_file() else ""
+        problems.extend(user_copy_problems(tools, loaded, readme, served_args))
+
     return problems
 
 
@@ -338,6 +379,34 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
     def test_write_tool_without_title_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["create_draft"].pop("title")))
         self.assert_reported(problems, "title")
+
+    def test_tool_without_user_copy_is_reported(self):
+        problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["get_profile"].pop("title")))
+        self.assert_reported(problems, "title 이 없다")
+        problems = self.broken_copy(self.edit_declaration(lambda v: v["tools"]["get_profile"].pop("summary")))
+        self.assert_reported(problems, "summary")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="get_profile 로 계정을 읽어요.")))
+        self.assert_reported(problems, "도구나 인자 이름")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="search_messages 와 함께 써요.")))
+        self.assert_reported(problems, "search_messages")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="query 로 찾아요.")))
+        self.assert_reported(problems, "query")
+
+    def test_readme_tool_table_must_match_the_declared_tools(self):
+        def add_row(root):
+            path = root / "README.md"
+            path.write_text(path.read_text().replace("| 메일 찾기 |", "| 남은 줄 | 지운 도구예요. |\n| 메일 찾기 |"))
+        self.assert_reported(self.broken_copy(add_row), "줄 수")
+        def name_tool(root):
+            path = root / "README.md"
+            path.write_text(path.read_text() + "\n`send_message` 로 보내요.\n")
+        self.assert_reported(self.broken_copy(name_tool), "send_message")
+        problems = self.broken_copy(self.edit_declaration(
+            lambda v: v["tools"]["get_profile"].update(summary="README 에 없는 요약이에요.")))
+        self.assert_reported(problems, "README")
 
     def test_connector_without_icon_is_reported(self):
         problems = self.broken_copy(self.edit_declaration(lambda v: v.pop("icon")))

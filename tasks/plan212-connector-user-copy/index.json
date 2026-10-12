@@ -1,0 +1,11 @@
+{
+  "name": "plan212-connector-user-copy",
+  "description": "네이버 블로그 도구에도 화면용 제목과 요약을 넣고 README 를 사용자 안내로 바꾼 뒤, 모든 커넥터에 제목과 요약을 필수로 한다",
+  "status": "pending",
+  "created_at": "2026-10-12",
+  "total_phases": 1,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" }
+  ]
+}
