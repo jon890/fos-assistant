@@ -55,5 +55,14 @@ def timeout(module):
     print(module.wait_for_callback(Listener(), "state"))
 
 
+def main_success(module):
+    # CLI의 성공 경로만 대역으로 받는다. 실제 계정이나 Google 토큰 서버에는 닿지 않는다.
+    module.input = lambda: "mock-client"
+    module.getpass.getpass = lambda prompt: "mock-secret"
+    module.wait_for_callback = lambda listener, state: {"code": "mock-code"}
+    module.exchange_code = lambda *args: "mock-refresh-token"
+    sys.exit(module.main())
+
+
 module = load(sys.argv[2])
-{"callback": callback, "exchange-error": exchange_error, "timeout": timeout}[sys.argv[1]](module)
+{"callback": callback, "exchange-error": exchange_error, "timeout": timeout, "main-success": main_success}[sys.argv[1]](module)
