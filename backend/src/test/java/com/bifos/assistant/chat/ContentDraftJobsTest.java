@@ -63,6 +63,31 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
 
 
     @Test
+    @DisplayName("정상 접수 뒤 조회가 succeeded를 읽으면 job과 EXECUTING 승인 줄이 SUCCEEDED가 된다")
+    void succeedsActionAfterAcceptedStartAndSucceededStatus() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "succeeded", true));
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
+        assertThat(actionRows.findByPublicId(request.actionId()).orElseThrow().status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(starter.started()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("정상 접수 뒤 클릭 전 failed를 읽으면 job과 EXECUTING 승인 줄이 FAILED가 된다")
+    void failsActionAfterAcceptedStartAndFailedStatusBeforeClick() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "failed", false));
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.FAILED);
+        assertThat(actionRows.findByPublicId(request.actionId()).orElseThrow().status()).isEqualTo(ActionStatus.FAILED);
+    }
+
+
+    @Test
     @DisplayName("조회 timeout과 stamp 변조는 안전한 오류로 끝나고 기존 job 상태를 FAILED로 바꾸지 않는다")
     void preservesJobOnLookupFailureAndStampTampering() {
         UUID snapshotId = preview();
