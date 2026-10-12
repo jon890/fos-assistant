@@ -37,8 +37,6 @@ export const RULES = [
   [/^\.github\/workflows\/(claude-code-review|claude-architecture-audit|pr-size)\.yml$/, NONE],
   [/^\.github\/workflows\/[^/]+\.txt$/, NONE],
 
-  // hermes 의 계약 테스트가 hermes/docs 를 읽는다.
-  [/^hermes\/docs\//, ["hermes"]],
   // 브라우저가 쓰는 테스트 지원 API 와 리소스는 smokeRun 의 입력이다.
   [/^backend\/src\/test\/(java\/com\/bifos\/assistant\/testsupport\/|resources\/)/, ["backend", "browser", "e2e", "hermes", "quality"]],
   // 그 밖의 backend 테스트 소스만 바꾸면 브라우저 shard 는 건너뛴다.
@@ -69,7 +67,6 @@ export const RULES = [
   [/^scripts\/checks\/(check-public-safe\.sh|check-migration-versions\.mjs)$/, NONE],
   [/^scripts\/ci\/check-feature-covers\.mjs$/, NONE],
   [/^scripts\/(dev|pr)\//, NONE],
-  [/^scripts\/README\.md$/, NONE],
   // 알 수 없는 스크립트도 기본값 ALL 을 쓴다. 다른 스크립트에서 간접 호출해도 검사를 놓치지 않는다.
 ];
 
