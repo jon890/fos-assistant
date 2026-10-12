@@ -102,7 +102,7 @@ public class ContentDraftJobAuthorizer {
         var locked = locks.lock(user, payload.conversationId(), agentId, executionIds, payload.actionId(), snapshotRowId, jobRowId);
         var action = locked.action();
         var job = locked.job();
-        // 저장 결과를 기다리는 동안 오래된 실행 정리가 줄을 UNKNOWN 으로 바꿀 수 있다. 승인 사실은 그대로다.
+        // 시작 응답을 잃으면 승인 줄은 UNKNOWN 이다. 승인 사실은 그대로다. 일반 실행 정리는 원고 승인 줄을 바꾸지 않는다.
         require((action.status() == ActionStatus.EXECUTING || action.status() == ActionStatus.UNKNOWN) && action.decidedAt() != null);
         require(payload.jobId().toString().equals(job.jobId()) && user.id().equals(job.approvedBy()) && job.approvedAt() != null
             && (job.running() || job.status() == ContentDraftJobStatus.UNKNOWN));

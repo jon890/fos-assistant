@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat;
 
+import org.mockito.Mockito;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,7 +10,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.admin.application.AgentAdminService;
 import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -16,46 +17,13 @@ import java.util.Date;
 import java.nio.charset.StandardCharsets;
 import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.dao.TransientDataAccessException;
-import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
-import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.agent.domain.type.CredentialScope;
-import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.chat.application.ContentDraftJobQueries;
-import com.bifos.assistant.chat.application.ContentDraftSaveRequests;
-import com.bifos.assistant.chat.application.ContentDraftSnapshotHash;
-import com.bifos.assistant.chat.application.ContentDraftSnapshots;
 import com.bifos.assistant.chat.application.model.ContentDraftSaveRequestView;
 import com.bifos.assistant.chat.domain.type.ContentDraftJobStatus;
-import com.bifos.assistant.chat.infra.ContentDraftJobRepository;
-import com.bifos.assistant.chat.infra.ContentDraftSnapshotRepository;
-import com.bifos.assistant.connector.application.ConnectorActionService;
-import com.bifos.assistant.connector.application.ConnectorBindingService;
-import com.bifos.assistant.connector.application.ConnectorCatalogCache;
-import com.bifos.assistant.connector.application.ContentDraftJobAuthorizer;
-import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
-import com.bifos.assistant.connector.domain.ConnectorBinding;
-import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
-import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
-import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
-import com.bifos.assistant.hermes.HermesConnectorClient;
-import com.bifos.assistant.hermes.HttpContentDraftSnapshotClient;
-import com.bifos.assistant.hermes.dto.ConnectorManifest;
-import com.bifos.assistant.hermes.dto.ConnectorSnapshotDeclaration;
-import com.bifos.assistant.hermes.dto.ConnectorTool;
-import com.bifos.assistant.people.application.PersonAccessService;
-import com.bifos.assistant.people.domain.AllowedPerson;
-import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.testsupport.RecordingContentDraftJobStarter;
-import com.bifos.assistant.usage.application.ExecutionRecorder;
-import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
-import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -63,113 +31,90 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 원고 저장 요청, 승인과 jobId 예약, worker 허가를 실제 Spring 트랜잭션과 저장소로 확인한다. */
-class ContentDraftJobsTest extends ContentDraftFixture {
-    private static final String CONNECTOR = "snapshot-test";
-
-    @Autowired
-    ContentDraftSnapshots snapshots;
-    @Autowired
-    ContentDraftSaveRequests saves;
-    @Autowired
-    ContentDraftJobQueries jobQueries;
-    @Autowired
-    ContentDraftJobAuthorizer authorizer;
-    @Autowired
-    ConnectorActionService approvals;
-    @Autowired
-    ContentDraftSaveApproval contentApproval;
-    @Autowired
-    ConnectorBindingService bindingService;
-    @Autowired
-    ConnectorActionRepository actionRows;
-    @Autowired
-    ContentDraftSnapshotRepository snapshotRows;
-    @Autowired
-    ContentDraftJobRepository jobRows;
-    @Autowired
-    AgentRepository agents;
-    @Autowired
-    AgentAdminService agentAdmin;
-    @Autowired
-    AgentExecutionRepository executions;
-    @Autowired
-    ExecutionRecorder recorder;
-    @Autowired
-    AllowedPersonRepository people;
-    @Autowired
-    PersonAccessService personAccess;
-    @Autowired
-    ConnectorConnectionRepository connections;
-    @Autowired
-    ConnectorBindingRepository bindings;
-    @Autowired
-    HermesConnectorClient catalog;
-    @Autowired
-    HttpContentDraftSnapshotClient compiler;
-    @Autowired
-    ConnectorCatalogCache cache;
-    @Autowired
-    RecordingContentDraftJobStarter starter;
-    @LocalServerPort
-    int port;
-
-    ConnectorBinding binding;
-    AgentExecution origin;
-    AllowedPerson person;
-    UUID draftId;
-
-
-    @BeforeEach
-    void prepareSave() throws Exception {
-        jobRows.deleteAll();
-        snapshotRows.deleteAll();
-        String profile = "save-" + UUID.randomUUID().toString().substring(0, 8);
-        person = people.save(AllowedPerson.of(owner.email(), "주인", profile, NOW));
-        var agent = agents.save(Agent.of(profile, "save", profile, "http://localhost", CostMode.SUBSCRIPTION,
-            CredentialScope.DEDICATED, AgentVisibility.PRIVATE, owner.id(), NOW));
-        var connection = ConnectorConnection.pending(owner.id(), CONNECTOR, NOW);
-        connection.ready(NOW);
-        connection = connections.save(connection);
-        binding = ConnectorBinding.pending(agent, connection, CONNECTOR, NOW);
-        binding.installed(false, NOW);
-        binding.ready(NOW);
-        binding = bindings.save(binding);
-        origin = executions.save(AgentExecution.builder().userId(owner.id()).conversationId(conversation.id()).agentId(agent.id())
-            .profileName(profile).costMode(CostMode.SUBSCRIPTION).status(ExecutionStatus.RUNNING).startedAt(NOW).build());
-        catalog(true);
-        doAnswer(call -> ContentDraftSnapshotHash.compile(call.getArgument(2), call.getArgument(3)))
-            .when(compiler).compile(any(), any(), any(), any());
-        draftId = drafts.create(owner, conversation.id(), inputDraft("비밀 원고", true)).draft().draftId();
-        starter.answer(call -> Optional.empty());
+class ContentDraftJobsTest extends ContentDraftJobFixture {
+    @Test
+    @DisplayName("늦은 terminal 조회는 UNKNOWN job을 해소하고 UNKNOWN 승인 줄과 시작 횟수는 보존한다")
+    void resolvesUnknownJobWithoutRestartingUnknownAction() {
+        starter.answer(call -> {
+            throw new IllegalStateException("응답 유실");
+        });
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        contentApproval.approve(owner, request.actionId(), null);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "succeeded", true));
+        var view = jobQueries.refresh(owner, conversation.id(), draftId, snapshotId);
+        assertThat(view.status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
+        assertThat(view.saveClicked()).isTrue();
+        assertThat(actionRows.findByPublicId(request.actionId()).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(starter.started()).hasSize(1);
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
+        Mockito.verify(compiler, Mockito.times(1)).status(any(), any(), any());
     }
 
 
-    @AfterEach
-    void removeSave() {
-        jobRows.deleteAll();
-        snapshotRows.deleteAll();
-        actionRows.deleteAll();
-        bindings.deleteById(binding.id());
-        connections.deleteById(binding.connection().id());
-        executions.deleteById(origin.id());
-        jdbc.update("delete from agent_memory_collection where agent_id=?", binding.agent().id());
-        agents.deleteById(binding.agent().id());
-        people.deleteById(person.id());
+    @Test
+    @DisplayName("정상 접수 뒤 조회가 succeeded를 읽으면 job과 EXECUTING 승인 줄이 SUCCEEDED가 된다")
+    void succeedsActionAfterAcceptedStartAndSucceededStatus() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "succeeded", true));
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SUCCEEDED);
+        assertThat(actionRows.findByPublicId(request.actionId()).orElseThrow().status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(starter.started()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("정상 접수 뒤 클릭 전 failed를 읽으면 job과 EXECUTING 승인 줄이 FAILED가 된다")
+    void failsActionAfterAcceptedStartAndFailedStatusBeforeClick() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        assertThat(contentApproval.approve(owner, request.actionId(), null).status()).isEqualTo(ActionStatus.EXECUTING);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "failed", false));
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.FAILED);
+        assertThat(actionRows.findByPublicId(request.actionId()).orElseThrow().status()).isEqualTo(ActionStatus.FAILED);
+    }
+
+
+    @Test
+    @DisplayName("조회 timeout과 stamp 변조는 안전한 오류로 끝나고 기존 job 상태를 FAILED로 바꾸지 않는다")
+    void preservesJobOnLookupFailureAndStampTampering() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        contentApproval.approve(owner, request.actionId(), null);
+        when(compiler.status(any(), any(), any())).thenThrow(new ApiException(ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE, "unavailable"));
+        code(() -> jobQueries.refresh(owner, conversation.id(), draftId, snapshotId), ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
+        doAnswer(call -> statusAnswer(call.getArgument(2), "succeeded", true).put("job_id", UUID.randomUUID().toString()))
+            .when(compiler).status(any(), any(), any());
+        code(() -> jobQueries.refresh(owner, conversation.id(), draftId, snapshotId), ErrorCode.CONTENT_DRAFT_JOB_UNAVAILABLE);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.SAVING);
+        assertThat(starter.started()).hasSize(1);
+    }
+
+
+    @Test
+    @DisplayName("조회 도중 사용자 권한이 철회되면 원격 terminal을 기록하지 않는다")
+    void rejectsRemoteTerminalAfterRevocation() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        contentApproval.approve(owner, request.actionId(), null);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> {
+            personAccess.setEnabled(person.id(), false);
+            return statusAnswer(call.getArgument(2), "succeeded", true);
+        });
+        assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SAVING);
+        assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.SAVING);
     }
 
 
@@ -318,6 +263,7 @@ class ContentDraftJobsTest extends ContentDraftFixture {
         assertThat(starter.started().getFirst().profile()).isEqualTo(binding.agent().hermesProfile());
         var again = saves.requestSave(owner, origin.id(), snapshotId);
         assertThat(again.jobId().toString()).isEqualTo(job.jobId());
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "running", false));
         assertThat(jobQueries.refresh(owner, conversation.id(), draftId, snapshotId).status()).isEqualTo(ContentDraftJobStatus.SAVING);
         code(() -> contentApproval.approve(owner, request.actionId(), null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         assertThat(starter.started()).hasSize(1);
@@ -557,28 +503,6 @@ class ContentDraftJobsTest extends ContentDraftFixture {
             release.countDown();
             writer.get(10, TimeUnit.SECONDS);
             return claim.get(10, TimeUnit.SECONDS);
-        }
-    }
-
-
-    private UUID preview() {
-        return snapshots.preview(owner, conversation.id(), draftId, 1, binding.id(), origin.id()).snapshotId();
-    }
-
-
-    private void catalog(boolean start) {
-        var declaration = new ConnectorSnapshotDeclaration("content-snapshot-v1", "compile_snapshot", "start_snapshot", "status_snapshot",
-            Map.of("compile", true, "start", start, "status", start));
-        var tools = List.of(new ConnectorTool("verify", "READ", "none", null, null),
-            new ConnectorTool("save_draft", "WRITE", "required", "임시저장", null));
-        when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest(CONNECTOR, "검사", "", List.of(), "verify", CONNECTOR,
-            List.of(), false, 2, tools, List.of(), null, false, false, null, null, null, declaration)));
-        try {
-            var field = cache.getClass().getDeclaredField("readAt");
-            field.setAccessible(true);
-            field.set(cache, null);
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException(ex);
         }
     }
 

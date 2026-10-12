@@ -299,6 +299,8 @@ export class FakeEditor {
   category = "";
   tags: string[] = [];
   saved = 3;
+  /** 실제 저장 단추의 마우스 처리 함수가 실행된 횟수다. 저장 수의 증감과 따로 센다. */
+  saveClicks = 0;
   saveIncrements = true;
   /** 이 글자를 넣으면 화면에 들어가지 않는다. 빠진 줄을 만든다. */
   dropText?: string;
@@ -606,6 +608,7 @@ export class FakeEditor {
    * 문서 번호가 목록의 글이면 그 글을 지금 문서와 설정으로 고치고, 비었으면 새 글로 맨 앞에 넣는다.
    */
   private save() {
+    this.saveClicks += 1;
     if (!this.saveIncrements) return;
     if (!this.document) {
       this.saved += 1;

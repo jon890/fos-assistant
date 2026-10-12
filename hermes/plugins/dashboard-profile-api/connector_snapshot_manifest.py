@@ -25,6 +25,7 @@ def _snapshot_manifest(declared, server, tools, env_names):
         raise ValueError("snapshot 도구 이름은 공개 도구와 겹치지 않는다")
     caps = value["capabilities"]
     if (not isinstance(caps, dict) or set(caps) != set(SNAPSHOT_CAPABILITIES)
-            or any(type(item) is not bool for item in caps.values()) or caps != SNAPSHOT_CAPABILITIES):
-        raise ValueError("snapshot은 compile만 지원한다")
+            or any(type(item) is not bool for item in caps.values()) or caps["compile"] is not True
+            or caps["start"] != caps["status"]):
+        raise ValueError("snapshot capability가 올바르지 않다")
     return {**value, "capabilities": dict(caps)}
