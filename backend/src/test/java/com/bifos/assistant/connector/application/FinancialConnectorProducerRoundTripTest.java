@@ -234,11 +234,12 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
 
     @ParameterizedTest
     @DisplayName("요청 뒤 바뀐 권한 맥락은 승인 전에 거부된다")
-    @ValueSource(strings = {"desired-disabled", "disconnected", "profile", "owner", "agent-disabled"})
+    @ValueSource(strings = {"desired-disabled", "disconnected", "profile", "owner", "agent-disabled", "user-not-allowed"})
     void changedAuthorityAfterRequestIsRejectedBeforeTransmission(String change) {
         var requested = request();
         switch (change) {
             case "desired-disabled" -> jdbc.update("update agent_connector_binding set desired_enabled = false where id = ?", bindingId);
+            case "user-not-allowed" -> jdbc.update("update allowed_person set enabled = false where email = ?", user.email());
             case "agent-disabled" -> jdbc.update("update agent set enabled = false where id = (select agent_id from agent_connector_binding where id = ?)", bindingId);
             case "disconnected" -> tx().executeWithoutResult(status -> connections.findById(connectionId).orElseThrow().disconnected(now.plusSeconds(1)));
             case "profile" -> jdbc.update("update agent set hermes_profile = ? where id = (select agent_id from agent_connector_binding where id = ?)",
@@ -251,8 +252,14 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
             }
         }
         // 옮긴 profile은 Hermes 상태 조회에서, 나머지는 잠금 아래 재검증에서 거부된다.
-        assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(RuntimeException.class);
-        assertRejectedBeforeTransmission(requested.actionId());
+        try {
+            assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(RuntimeException.class);
+            assertRejectedBeforeTransmission(requested.actionId());
+        } finally {
+            if ("user-not-allowed".equals(change)) {
+                jdbc.update("update allowed_person set enabled = true where email = ?", user.email());
+            }
+        }
     }
 
 
