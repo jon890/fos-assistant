@@ -50,6 +50,27 @@ public interface ConnectorConversationGrantRepository extends JpaRepository<Conn
 
 
     /**
+     * 그 대화의 그 에이전트에 준 그 도구의 대화 허락을 모두 거둔다. 같은 도구에 새 허락을 줄 때와 사용자가 「다시 묻기」 를 누를 때
+     * 부른다. 같은 열쇠의 유효한 줄이 둘 남아 하나만 거둬지는 일이 없게 한다.
+     *
+     * @return 거둔 건수
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update ConnectorConversationGrant g set g.revokedAt = :now
+            where g.userId = :userId and g.conversationId = :conversationId and g.agentId = :agentId
+              and g.connectorId = :connectorId and g.toolName = :toolName and g.revokedAt is null
+            """)
+    int revokeAllOfTool(
+        @Param("userId") Long userId,
+        @Param("conversationId") Long conversationId,
+        @Param("agentId") Long agentId,
+        @Param("connectorId") String connectorId,
+        @Param("toolName") String toolName,
+        @Param("now") Instant now);
+
+
+    /**
      * 그 사용자의 그 커넥터에 준 대화 허락을 모두 거둔다. 연결을 해제하거나 값을 다시 등록할 때 부른다.
      *
      * @return 거둔 건수

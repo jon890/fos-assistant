@@ -142,13 +142,16 @@ class ConnectorActionLifecycle {
     }
 
 
-    /** 대화 허락을 거둔다. 남의 허락과 다른 대화의 허락은 없는 것과 같은 응답이다. */
+    /**
+     * 대화 허락을 거둔다. 남의 허락과 다른 대화의 허락은 없는 것과 같은 응답이다. 같은 대화의 같은 에이전트에 준 그 도구의 허락을
+     * 모두 거둔다. 사용자가 고른 것은 그 줄이 아니라 그 도구를 다시 묻는 것이다.
+     */
     void revokeConversationGrant(CurrentUser user, Long conversationId, Long grantId) {
         ConnectorConversationGrant grant = conversationGrants.findById(grantId)
             .filter(found -> found.userId().equals(user.id()) && found.conversationId().equals(conversationId))
             .orElseThrow(ConnectorActionDetails::notFound);
-        grant.revoke(now());
-        conversationGrants.save(grant);
+        conversationGrants.revokeAllOfTool(
+            grant.userId(), grant.conversationId(), grant.agentId(), grant.connectorId(), grant.toolName(), now());
     }
 
 

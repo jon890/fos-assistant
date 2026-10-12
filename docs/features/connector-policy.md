@@ -362,11 +362,11 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 | --- | --- |
 | 줄 수 있는 도구 | 카탈로그의 `conversation_grant` 가 참이고 `approval` 이 `required` 이며 `outbound` 가 참이 아닌 도구다. `grant: false` 여도 받는다. 그 칸을 내지 않는 옛 대시보드 plugin 과 `schema: 1` 은 어느 도구도 받지 않는다 |
 | 승인 줄의 `conversationGrantAllowed` | 위 조건에 더해 줄에 원래 도구 이름, 대화, 에이전트가 있어야 참이다. 줄을 읽을 때의 카탈로그로 본다 |
-| `conversationGrant` 를 실은 승인 | 승인할 때의 카탈로그로 다시 보고 실행 전 트랜잭션에서 허락 줄을 저장한다. 기간은 24시간이다 |
+| `conversationGrant` 를 실은 승인 | 승인할 때의 카탈로그로 다시 보고 실행 전 트랜잭션에서 허락 줄을 저장한다. 기간은 24시간이다. 같은 대화의 같은 에이전트에 준 그 도구의 앞선 허락은 거두어 유효한 줄이 하나다 |
 | 줄 수 없는 도구에 실었다. `grant` 와 함께 실었다 | `VALIDATION_FAILED`. 승인 줄은 `PENDING` 그대로다 |
 | 같은 대화의 같은 에이전트가 같은 도구를 다시 부른다 | 허용. 판정 줄은 `ALLOWED` 로 남는다 |
 | 다른 대화, 새 대화, 같은 대화의 다른 에이전트 위임 실행 | 허락이 없는 것으로 판정한다 |
-| 사용자가 「다시 묻기」 를 누른다 | `DELETE /api/v1/chat/conversations/{id}/connector-conversation-grants/{grantId}`. 남의 허락이나 다른 대화의 번호는 `CONNECTOR_ACTION_NOT_FOUND` 다 |
+| 사용자가 「다시 묻기」 를 누른다 | `DELETE /api/v1/chat/conversations/{id}/connector-conversation-grants/{grantId}`. 그 줄과 같은 대화, 에이전트, 도구의 허락을 모두 거둔다. 남의 허락이나 다른 대화의 번호는 `CONNECTOR_ACTION_NOT_FOUND` 다 |
 | 대화를 지운다 | 판정이 지운 대화의 허락을 보지 않는다 |
 | 그 에이전트에서 연결을 뗀다 | 그 에이전트의 그 커넥터 대화 허락을 거둔다. 다시 붙여도 돌아오지 않는다 |
 | 연결을 해제하거나 값을 다시 등록한다 | 그 커넥터의 대화 허락을 모두 거둔다 |

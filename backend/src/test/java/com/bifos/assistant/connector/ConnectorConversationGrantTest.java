@@ -388,6 +388,27 @@ class ConnectorConversationGrantTest {
 
 
     @Test
+    @DisplayName("기다리던 카드 둘을 모두 대화 허락과 함께 승인해도 유효한 허락은 한 줄이고, 다시 묻기 한 번으로 모두 거둔다")
+    void sameToolKeepsOneActiveConversationGrant() {
+        UUID first = ask(root, WRITE, ARGS).actionId();
+        UUID second = ask(root, WRITE, "{\"text\":\"두 번째\"}").actionId();
+        service.approve(me, first, null, true);
+        service.approve(me, second, null, true);
+
+        assertThat(conversationGrants.findAll()).hasSize(2);
+        assertThat(service.conversationGrants(me, conversation.id())).hasSize(1);
+        // 거둔 줄과 같은 도구의 다른 줄이 남아 있으면 그 줄로 계속 통과한다. 남은 줄까지 거두는지 본다.
+        jdbc.update("UPDATE connector_conversation_grant SET revoked_at = NULL");
+        Long grantId = service.conversationGrants(me, conversation.id()).getFirst().grantId();
+
+        service.revokeConversationGrant(me, conversation.id(), grantId);
+
+        assertThat(conversationGrants.findAll()).allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
+        assertThat(ask(root, WRITE, "{\"text\":\"거둔 뒤\"}").allowed()).isFalse();
+    }
+
+
+    @Test
     @DisplayName("에이전트에서 연결을 떼면 그 에이전트의 대화 허락을 거두고 다시 붙여도 돌아오지 않는다")
     void unbindRevokesConversationGrantOfThatAgent() {
         service.approve(me, ask(root, WRITE, ARGS).actionId(), null, true);

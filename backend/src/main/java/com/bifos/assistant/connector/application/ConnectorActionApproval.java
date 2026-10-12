@@ -227,6 +227,9 @@ class ConnectorActionApproval {
             if (decision.get().approval() != ToolApproval.REQUIRED || !conversationGrantable(manifest, action)) {
                 throw grantNotAllowed();
             }
+            // 같은 도구의 앞선 허락은 거두고 새 줄 하나만 남긴다. 기다리던 카드 둘을 모두 허락과 함께 승인해도 유효한 줄이 하나다.
+            conversationGrants.revokeAllOfTool(
+                action.userId(), action.conversationId(), action.agentId(), action.connectorId(), action.toolName(), now);
             conversationGrants.save(ConnectorConversationGrant.of(action, now.plus(CONVERSATION_GRANT_TTL), now));
         }
         action.beginExecution(now);
