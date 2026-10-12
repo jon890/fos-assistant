@@ -21,6 +21,7 @@ test("문서와 계획서만 바꾸면 무거운 job 을 모두 건너뛴다", (
 
 test("커넥터 README 는 존재 여부를 확인하는 hermes 검사만 돌린다", () => {
   assert.deepEqual(running(["hermes/connectors/naver-blog/README.md"]), ["hermes"]);
+  assert.deepEqual(running([".github/CODEOWNERS"]), ["hermes"]);
 });
 
 test("모듈 코드는 그 모듈과 그것을 띄우는 job 을 돌린다", () => {

@@ -26,11 +26,12 @@ export const RULES = [
   // Hermes 계약 문서와 커넥터 README 존재 여부는 hermes 테스트의 입력이다.
   [/^hermes\/docs\/hermes-contract\.md$/, ["hermes"]],
   [/^hermes\/connectors\/[^/]+\/README\.md$/, ["hermes"]],
+  [/^\.github\/CODEOWNERS$/, ["hermes"]],
 
   // 어느 job 의 입력도 아닌 문서다. 문서를 읽는 테스트는 언제나 도는 unit 에 있다.
   [/^(docs|tasks|\.claude)\//, NONE],
   [/(^|\/)(README(?:\.[^/.]+)?|AGENTS|CLAUDE|ICON-SOURCE)\.md$/, NONE],
-  [/^(LICENSE|\.gitignore|\.github\/CODEOWNERS)$/, NONE],
+  [/^(LICENSE|\.gitignore)$/, NONE],
   [/^(backend|web|hermes)\/docs\//, NONE],
   // 다른 workflow 와 리뷰 지시문은 CI job 이 읽지 않는다. 이것을 검사하는 테스트는 unit 에 있다.
   [/^\.github\/workflows\/(claude-code-review|claude-architecture-audit|pr-size)\.yml$/, NONE],
