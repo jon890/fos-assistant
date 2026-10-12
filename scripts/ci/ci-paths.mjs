@@ -21,6 +21,11 @@ export const RULES = [
   // 판정 자체를 바꾸는 파일은 모두 돌린다.
   [/^\.github\/workflows\/ci\.yml$/, ALL],
   [/^scripts\/ci\/ci-paths\.mjs$/, ALL],
+  // 스킬 본문은 실행에 주입하므로 설명 문서와 달리 Hermes 관련 검사를 돌린다.
+  [/^hermes\/.*\/skills\/.*\.md$/, ["backend", "e2e", "hermes", "quality"]],
+  // Hermes 계약 문서는 hermes 테스트의 입력이다. 나머지 Markdown 은 무거운 검사를 켜지 않는다.
+  [/^hermes\/docs\/hermes-contract\.md$/, ["hermes"]],
+  [/\.md$/, NONE],
 
   // 어느 job 의 입력도 아닌 문서다. 문서를 읽는 테스트는 언제나 도는 unit 에 있다.
   [/^(docs|tasks|\.claude)\//, NONE],
@@ -34,11 +39,13 @@ export const RULES = [
 
   // hermes 의 계약 테스트가 hermes/docs 를 읽는다.
   [/^hermes\/docs\//, ["hermes"]],
+  // backend 테스트만 바꾸면 브라우저 shard 는 건너뛴다.
+  [/^backend\/src\/test\//, ["backend", "e2e", "hermes", "quality"]],
   // 브라우저 검사가 Control Plane 을, E2E 가 Control Plane 과 web/src 를 띄운다.
   [/^backend\//, ["backend", "browser", "e2e", "quality"]],
   [/^web\//, ["web", "browser", "e2e", "quality"]],
-  // backend 테스트가 커넥터와 plugin 원본을, 브라우저 검사가 커넥터 아이콘을 읽는다.
-  [/^hermes\//, ["hermes", "backend", "browser", "e2e", "quality"]],
+  // backend 테스트가 커넥터와 plugin 원본을 읽는다. Hermes 만 바꾸면 브라우저 shard 는 건너뛴다.
+  [/^hermes\//, ["hermes", "backend", "e2e", "quality"]],
 
   [/^test\/unit\//, NONE],
   [/^test\/web\//, ["web"]],
@@ -46,17 +53,21 @@ export const RULES = [
   // 브라우저 검사가 E2E 의 가짜 Hermes 를, backend 와 hermes 테스트가 E2E 의 Python plugin 을 쓴다.
   [/^test\/e2e\//, ["e2e", "browser", "backend", "hermes"]],
   [/^test\/spotless-jdt\.test\.py$/, ["quality"]],
+  // 합성 커넥터 catalog 는 backend 와 hermes 계약 검사가 읽고 브라우저 대역은 읽지 않는다.
+  [/^test\/resources\/connector-argument-(?:masked-)?catalog\.json$/, ["backend", "hermes"]],
 
   [/^scripts\/checks\/check-mysql-migration\.sh$/, ["backend"]],
   [/^scripts\/checks\/(check-connectors\.sh|check-hermes-contract\.sh)$/, ["hermes"]],
   [/^scripts\/ci\/check-connector-package\.sh$/, ["hermes"]],
   [/^scripts\/checks\/(quality\.sh|quality-report\.mjs|format-connectors\.mjs|check-file-length\.mjs|file-length-baseline\.json)$/, ["quality"]],
-  [/^scripts\/ci\/(browser-ci|browser-stability)\.mjs$/, ["browser"]],
+  [/^scripts\/(?:ci\/)?browser-[^/]+\.mjs$/, ["browser"]],
   // unit 과 public-safe 가 언제나 부르는 검사와, CI job 이 부르지 않는 로컬 입구와 PR 스크립트다.
   [/^scripts\/checks\/(check-public-safe\.sh|check-migration-versions\.mjs)$/, NONE],
   [/^scripts\/ci\/check-feature-covers\.mjs$/, NONE],
   [/^scripts\/(dev|pr)\//, NONE],
   [/^scripts\/README\.md$/, NONE],
+  // 브라우저가 쓰는 스크립트는 위에서 따로 고른다. 그 밖의 새 스크립트도 브라우저 shard 는 켜지 않는다.
+  [/^scripts\//, ["backend", "web", "e2e", "hermes", "quality"]],
 ];
 
 /** 파일 하나가 돌려야 하는 job 목록. 맞는 규칙이 없으면 모두 돌린다. */
