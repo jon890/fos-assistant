@@ -95,7 +95,8 @@ class ToolDetailStreamTest {
                 "mcp__fos_assistant__record_media_observation",
                 "content_draft_write", "content_draft_read",
                 "mcp__fos_assistant__content_draft_write", "mcp__fos_assistant__content_draft_read")) {
-                for (String event : List.of("tool.started", "tool.completed", "tool.failed")) {
+                // tool.failed는 미지 wire 사건으로 버린다. 별도 호환 검사와 JSON 변환 검사가 그 범위를 확인한다.
+                for (String event : List.of("tool.started", "tool.completed")) {
                     for (boolean nested : new boolean[] {false, true}) {
                         for (String field : List.of("preview", "detail", "result", "delta", "text", "output")) {
                             var root = json.createObjectNode();
