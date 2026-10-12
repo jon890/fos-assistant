@@ -103,6 +103,12 @@ const LABEL_FORBIDDEN =
   /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069]/;
 const LABEL_EDGE_SPACE =
   /^[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]|[ \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]$/;
+/**
+ * 짝이 없는 surrogate 다. 승인 카드는 브라우저에서도 이 검사를 부르므로 ES2024 의 `isWellFormed` 와
+ * 정규식 lookbehind 를 쓰지 않는다. 둘 다 Safari 16.4 이전에 없다.
+ */
+const LABEL_LONE_SURROGATE =
+  /[\ud800-\udbff](?![\udc00-\udfff])|(?:^|[^\ud800-\udbff])[\udc00-\udfff]/;
 
 /** 불량 표시 이름만 버리고 승인 줄과 값은 유지한다. */
 export function approvalArgLabels(value: unknown): Record<string, string> {
@@ -120,7 +126,7 @@ export function approvalArgLabels(value: unknown): Record<string, string> {
       [...label].length > 80 ||
       LABEL_EDGE_SPACE.test(label) ||
       LABEL_FORBIDDEN.test(label) ||
-      !label.isWellFormed() ||
+      LABEL_LONE_SURROGATE.test(label) ||
       names.has(label) ||
       (Object.hasOwn(value, label) && key !== label)
     )
