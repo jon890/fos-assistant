@@ -45,6 +45,17 @@ export type ConnectorAction = {
   hiddenArgs: boolean;
   /** 도구별 표시 이름이다. 옛 서버는 이 칸을 내지 않는다. */
   argLabels?: Record<string, string>;
+  /** 승인하면서 이 대화에서 계속 허용할 수 있는 줄인가. 밖으로 나가는 도구는 거짓이다. */
+  conversationGrantAllowed: boolean;
+};
+
+/** 이 대화에서 계속 허용 중인 도구 한 개다. 화면에는 `title` 을 보인다. */
+export type ConversationGrant = {
+  grantId: number;
+  title: string;
+  expiresAt: string;
+  /** 대화의 에이전트와 다른 에이전트에만 통하는 허락이면 그 이름이다. 아니면 null 이다. */
+  agentName: string | null;
 };
 
 /** 묻지 않고 실행하게 허락한 도구 한 개다. 화면에는 `title` 을 보인다. */
@@ -331,13 +342,15 @@ export const readConnectorActions = (conversationId: string) =>
     `/api/chat/conversations/${conversationId}/connector-actions`,
   );
 
+/** `conversationGrant` 가 참이면 이 대화에서 계속 허용한다. `grant` 와 함께 보내지 않는다. */
 export const approveConnectorAction = (
   actionId: string,
   grant: GrantPeriod | null,
+  conversationGrant = false,
 ) =>
   call<ConnectorAction>(`/api/connector-actions/${actionId}/approve`, {
     method: "POST",
-    body: { grant },
+    body: conversationGrant ? { grant, conversationGrant } : { grant },
   });
 
 export const rejectConnectorAction = (actionId: string) =>
@@ -350,3 +363,17 @@ export const readConnectorGrants = () =>
 
 export const revokeConnectorGrant = (grantId: number) =>
   call<null>(`/api/connector-grants/${grantId}`, { method: "DELETE" });
+
+export const readConversationGrants = (conversationId: string) =>
+  call<ConversationGrant[]>(
+    `/api/chat/conversations/${conversationId}/connector-conversation-grants`,
+  );
+
+export const revokeConversationGrant = (
+  conversationId: string,
+  grantId: number,
+) =>
+  call<null>(
+    `/api/chat/conversations/${conversationId}/connector-conversation-grants/${grantId}`,
+    { method: "DELETE" },
+  );

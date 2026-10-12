@@ -188,7 +188,7 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
     def test_stale_tools_exclude_marks_only_that_connector_unconfigured(self):
         """승인 방식만 올라 서버 정의의 `tools.exclude` 만 어긋나면 그 커넥터 항목만 거짓이고 같은 profile 의 다른 바인딩과 hook 은 참이다."""
         demo, _ = self.bind_fixture()
-        self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE"}})
+        self.declare_tools(demo, {"list_scopes": {"risk": "READ"}, "purge": {"risk": "WRITE", "outbound": False}})
         self.assertEqual(self.bind(DEMO, "c1").status_code, 200)
         self.assertEqual(self.bind(OTHER, "c2").status_code, 200)
         self.assertNotIn("tools", self.alice_config()["mcp_servers"]["demo"])

@@ -1267,6 +1267,7 @@ class ConnectorPolicyEndpointTest {
     private void deleteRows() {
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
+        jdbc.update("DELETE FROM connector_conversation_grant");
         notifications.deleteAll();
         bindings.deleteAll();
         connections.deleteAll();

@@ -14,6 +14,11 @@ import { pathToFileURL } from "node:url";
 // unit, public-safe 와 quality 의 파일 길이 검사는 언제나 돌아 여기에 두지 않는다.
 export const JOBS = ["backend", "web", "browser", "e2e", "hermes", "quality"];
 const ALL = JOBS;
+// main push 에서 돌리는 가벼운 검사. quality job 이 웹 테스트, typecheck, 빌드를 함께 돈다.
+const PUSH_JOBS = ["web", "quality"];
+// PR 에서 기본으로 건너뛰는 느린 검사. 정기 실행, 수동 실행, 전체 검사 라벨이 붙은 PR 에서만 돈다.
+export const SLOW_JOBS = ["browser", "e2e"];
+export const FULL_LABEL = "검사:전체";
 const NONE = [];
 
 // 위에서부터 처음 맞는 규칙 하나만 쓴다. 좁은 규칙을 넓은 규칙보다 위에 둔다.
@@ -115,6 +120,19 @@ export function gate({ changes, run, result }) {
   return { pass: false, reason: `돌릴지 여부가 올바르지 않다: ${run || "없음"}` };
 }
 
+/**
+ * PR 판정에서 느린 검사를 뺀다. 전체 검사 라벨이 붙었으면 그대로 둔다.
+ * 화면 회귀는 정기 실행이 하루 안에 잡는다. 결정과 까닭은 ADR-20261012-ci-path-filter 가 갖는다.
+ */
+export function withoutSlow(result, full) {
+  if (full) return result;
+  const next = { ...result };
+  for (const job of SLOW_JOBS) {
+    if (next[job].run) next[job] = { run: false, because: `(PR 에서는 정기 실행으로 미룸. 「${FULL_LABEL}」 라벨로 돌린다)` };
+  }
+  return next;
+}
+
 /** PR 의 merge 커밋이 첫 부모(base) 에 대해 바꾼 파일. 이름 변경은 옛 경로와 새 경로를 모두 낸다. */
 function changedFiles() {
   const parents = execFileSync("git", ["rev-list", "--parents", "-n", "1", "HEAD"], { encoding: "utf8" }).trim().split(" ");
@@ -126,11 +144,14 @@ function changedFiles() {
 function main() {
   const [command] = process.argv.slice(2);
   if (command === "changes") {
-    // push 와 정기 실행은 모든 검사를 돌려 main 에서 판정 규칙이 놓친 것을 잡는다.
-    const pr = process.env.GITHUB_EVENT_NAME === "pull_request";
-    const result = pr
-      ? classify(changedFiles())
-      : Object.fromEntries(JOBS.map((job) => [job, { run: true, because: `(${process.env.GITHUB_EVENT_NAME || "PR 밖"} 실행)` }]));
+    // main 에 들어온 커밋은 PR CI 를 이미 통과했다. push 는 빌드가 깨졌는지만 보고,
+    // 정기 실행과 수동 실행이 모든 검사를 돌려 판정 규칙이 놓친 것을 잡는다.
+    const event = process.env.GITHUB_EVENT_NAME;
+    const result = event === "pull_request"
+      ? withoutSlow(classify(changedFiles()), process.env.FULL_LABEL === "true")
+      : Object.fromEntries(JOBS.map((job) => [job, event === "push"
+        ? { run: PUSH_JOBS.includes(job), because: "(main push 빠른 검사)" }
+        : { run: true, because: `(${event || "PR 밖"} 실행)` }]));
     const lines = JOBS.map((job) => `${job}=${result[job].run}`);
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${lines.join("\n")}\n`);
     const table = ["| job | 실행 | 처음 맞은 파일 |", "| --- | --- | --- |",

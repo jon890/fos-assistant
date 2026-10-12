@@ -577,6 +577,23 @@ class ConnectorActionServiceTest {
 
 
     @Test
+    @DisplayName("살펴보기 트리의 승인 줄은 대화 허락을 선언한 도구여도 대화 허락을 내지 않고, 실어 보내면 VALIDATION_FAILED 다")
+    void checkTreeActionCannotTakeConversationGrant() {
+        catalogBecomes(manifest(List.of(
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null, List.of(), null, Map.of(), false, true))));
+        UUID normal = ask(WRITE, ARGS).actionId();
+        UUID inCheck = askInWritesAllowedCheck(WRITE, "{\"text\":\"살펴보기\"}").actionId();
+
+        assertThat(service.listForConversation(me, CONVERSATION))
+            .extracting(ConnectorActionView::actionId, ConnectorActionView::conversationGrantAllowed)
+            .containsExactlyInAnyOrder(tuple(normal, true), tuple(inCheck, false));
+        assertCode(() -> service.approve(me, inCheck, null, true), ErrorCode.VALIDATION_FAILED);
+        verify(connector, never()).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+
+    @Test
     @DisplayName("쓰기를 허용한 살펴보기 트리의 READ 와 always 승인 줄은 기간을 실은 승인이 VALIDATION_FAILED 이고 기간 없이 승인하면 한 번 실행한다")
     void grantOnAlwaysReadToolFromCheckIsRejectedAndPlainApprovalExecutes() {
         catalogBecomes(manifest(List.of(
@@ -1900,6 +1917,7 @@ class ConnectorActionServiceTest {
         jdbc.update("DELETE FROM decision_feedback_event");
         jdbc.update("DELETE FROM connector_action");
         jdbc.update("DELETE FROM connector_tool_grant");
+        jdbc.update("DELETE FROM connector_conversation_grant");
         bindings.deleteAll();
         connections.deleteAll();
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE, OTHER_PROFILE));

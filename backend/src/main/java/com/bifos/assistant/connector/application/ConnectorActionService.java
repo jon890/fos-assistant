@@ -1,8 +1,11 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
+import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
@@ -12,6 +15,7 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.infra.ConnectorConversationGrantRepository;
 import com.bifos.assistant.connector.infra.ConnectorToolGrantRepository;
 import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.hermes.HermesConnectorClient;
@@ -60,6 +64,9 @@ public class ConnectorActionService {
         ConnectorActionRepository actions,
         ConnectorActionExecutionRepository contents,
         ConnectorToolGrantRepository grants,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConversationRepository conversationRows,
+        AgentRepository agents,
         ConnectorConnectionRepository connections,
         ConnectorBindingRepository bindings,
         AppUserRepository users,
@@ -76,6 +83,9 @@ public class ConnectorActionService {
             actions,
             contents,
             grants,
+            conversationGrants,
+            conversationRows,
+            agents,
             connections,
             bindings,
             users,
@@ -96,6 +106,9 @@ public class ConnectorActionService {
         ConnectorActionRepository actions,
         ConnectorActionExecutionRepository contents,
         ConnectorToolGrantRepository grants,
+        ConnectorConversationGrantRepository conversationGrants,
+        ConversationRepository conversationRows,
+        AgentRepository agents,
         ConnectorConnectionRepository connections,
         ConnectorBindingRepository bindings,
         AppUserRepository users,
@@ -110,11 +123,12 @@ public class ConnectorActionService {
         PlatformTransactionManager transactionManager,
         Clock clock) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
-        this.details = new ConnectorActionDetails(actions, catalog);
+        this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock);
         ConnectorActionSignals signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
             actions,
             grants,
+            conversationGrants,
             connections,
             bindings,
             users,
@@ -126,7 +140,8 @@ public class ConnectorActionService {
             transactions,
             bodies,
             clock);
-        this.lifecycle = new ConnectorActionLifecycle(actions, contents, users, grants, details, signals, transactions, bodies, clock);
+        this.lifecycle = new ConnectorActionLifecycle(
+            actions, contents, users, grants, conversationGrants, conversationRows, agents, details, signals, transactions, bodies, clock);
     }
 
 
@@ -231,7 +246,18 @@ public class ConnectorActionService {
      * @param grant 승인하면서 그 도구에 줄 상시 허락의 기간. 주지 않으면 null
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant) {
-        return approval.approve(user, actionId, grant);
+        return approve(user, actionId, grant, false);
+    }
+
+
+    /**
+     * 승인하고, 고르면 그 도구를 그 대화에서 계속 허용한다(ADR-20261012 / conversation-grant). 나머지는
+     * {@link #approve(CurrentUser, UUID, GrantPeriod)} 와 같다.
+     *
+     * @param conversationGrant 그 대화에서 계속 허용하는가. {@code grant} 와 함께 줄 수 없다
+     */
+    public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
+        return approval.approve(user, actionId, grant, conversationGrant);
     }
 
 
@@ -267,6 +293,35 @@ public class ConnectorActionService {
      */
     public int revokeClosedGrants(Instant now) {
         return lifecycle.revokeClosedGrants(now);
+    }
+
+
+    /**
+     * 지금 선언이 대화 허락을 닫은 도구의 유효한 대화 허락 줄을 거둔다(ADR-20261012 / conversation-grant). 규칙은
+     * {@link #revokeClosedGrants} 와 같다.
+     *
+     * @return 거둔 건수
+     */
+    public int revokeClosedConversationGrants(Instant now) {
+        return lifecycle.revokeClosedConversationGrants(now);
+    }
+
+
+    /**
+     * 그 대화에서 계속 허용 중인 도구다. 지금 선언이 대화 허락을 닫은 도구는 내지 않는다.
+     *
+     * @param conversationId 주인인 것을 이미 확인한 대화의 번호
+     */
+    @Transactional(readOnly = true)
+    public List<ConnectorConversationGrantView> conversationGrants(CurrentUser user, Long conversationId) {
+        return lifecycle.conversationGrants(user, conversationId);
+    }
+
+
+    /** 대화 허락을 거둔다. 남의 허락과 다른 대화의 허락은 없는 것과 같은 응답이다. */
+    @Transactional
+    public void revokeConversationGrant(CurrentUser user, Long conversationId, Long grantId) {
+        lifecycle.revokeConversationGrant(user, conversationId, grantId);
     }
 
 

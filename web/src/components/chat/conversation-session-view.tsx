@@ -6,6 +6,7 @@ import { Composer } from "./composer";
 import { StartScreenHeader, StarterPrompts } from "./start-screen";
 import { PendingQueueView } from "./pending-queue";
 import { ApprovalList } from "./approval-list";
+import { ConversationGrantList } from "./conversation-grant-list";
 import { MessageList } from "./message-list";
 import { ActivityPanel } from "./activity/activity-panel";
 import { ArtifactPanel } from "./artifact/artifact-panel";
@@ -267,6 +268,10 @@ export function ConversationSessionView({
             </div>
           ) : null}
           <ApprovalList
+            conversationId={conversationId}
+            refreshKey={approvalRefresh}
+          />
+          <ConversationGrantList
             conversationId={conversationId}
             refreshKey={approvalRefresh}
           />

@@ -2,7 +2,7 @@
 
 커넥터 도구 호출을 위험도와 정책으로 판정하고, 승인이 필요한 호출을 사용자가 승인하는 기능이다.
 
-covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/chat/approval-*`, `web/src/components/connector/connector-tools.tsx`, `web/src/lib/connector-action.ts`, `hermes/plugins/dashboard-profile-api/connector_policy.py`, `hermes/plugins/fos-ctx/connector_policy.py`
+covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/components/chat/approval-*`, `web/src/components/chat/conversation-grant-list.tsx`, `web/src/components/connector/connector-tools.tsx`, `web/src/lib/connector-action.ts`, `hermes/plugins/dashboard-profile-api/connector_policy.py`, `hermes/plugins/fos-ctx/connector_policy.py`
 
 ## 요구
 
@@ -10,6 +10,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 - 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
+- 사용자는 승인하면서 그 도구를 그 대화에서만 계속 허용할 수 있다. 밖으로 나가는 도구와 `always` 도구는 열지 않는다. 아래 「대화 허락」 이 정한다
 - `DESTRUCTIVE` 와 `FINANCIAL` 은 선언할 수 있지만 호출은 늘 거절한다
 - 커넥터에서 읽은 글이 어디로 갈 수 있는지는 아래 「커넥터 READ 데이터의 흐름」 이 정한다
 - 위험도는 plugin 을 만든 사람의 판단이다. Control Plane 은 그 판단이 맞는지 확인하지 못하고, 운영자가 고른 plugin 만 목록에 오른다는 전제에 기댄다
@@ -23,7 +24,8 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 
 | 때 | 화면 |
 | --- | --- |
-| `approval` 사건을 받거나 대화를 연다 | 승인 줄을 다시 읽어 `PENDING` 인 줄마다 카드를 보인다. 상시 허락을 줄 수 있는 줄(`grantAllowed`)에는 「승인하고 묻지 않기」 가 더 있다 |
+| `approval` 사건을 받거나 대화를 연다 | 승인 줄을 다시 읽어 `PENDING` 인 줄마다 카드를 보인다. 상시 허락을 줄 수 있는 줄(`grantAllowed`)에는 「승인하고 묻지 않기」 가, 대화 허락을 줄 수 있는 줄(`conversationGrantAllowed`)에는 기간을 함께 적은 「이 대화에서 계속 허용 (24시간)」 이 더 있다. 대화 허락 목록도 다시 읽는다 |
+| 그 대화에 유효한 대화 허락이 있다 | 입력창 위에 「이 대화에서 묻지 않고 실행해요: 「제목」」 과 「다시 묻기」 를 한 줄씩 보인다. 코드는 `components/chat/conversation-grant-list.tsx` 가 갖는다 |
 | 승인 줄이 하나도 없다 | 카드 자리를 그리지 않는다 |
 | 같은 커넥터의 같은 도구로 기다리는 줄이 둘 이상이다 | 한 묶음으로 접어 보인다. 펼치면 건마다 단추가 있고, 한 건만 남으면 한 장의 카드가 된다 |
 | 펼친 묶음의 모든 건을 한 번에 승인할 수 있다 | 「N건 모두 승인」. 조건은 [ADR-087](../../web/docs/adr/ADR-087-같은-도구의-승인-줄은-묶음으로-보이고-상시-허락을-줄-수-있는-줄만-한꺼번에-승인한다.md) 이 갖는다 |
@@ -135,7 +137,8 @@ sequenceDiagram
 | `tools.<이름>.approval` | 승인 방식. 없으면 그 위험도의 기본값 |
 | `tools.<이름>.title` | 승인 카드와 알림 줄에 보일 사람 말. 없으면 `이름 없는 동작` 으로 보인다 |
 | `tools.<이름>.grant` | 거짓이면 상시 허락을 줄 수 없고 호출마다 승인을 받는다. 없으면 참이다. `approval` 이 `required` 인 도구에만 선언한다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)) |
-| `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다 |
+| `tools.<이름>.outbound` | 참이면 데이터를 계정 밖의 사람에게 보낸다는 선언이다. 참인 도구는 `approval` 이 `required` 이고 `grant` 가 거짓이어야 한다. `READ` 가 아니고 `approval` 이 `required` 인 도구가 빠뜨리면 manifest 를 거절한다. 그 밖의 도구는 거짓으로 채운다 |
+| `tools.<이름>.conversation_grant` | 참이면 승인 카드의 「이 대화에서 계속 허용」 을 받는다. 없으면 거짓이다. `approval` 이 `required` 이고 `outbound` 가 거짓인 도구에만 선언한다([ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md)) |
 | `tools.<이름>.identifiers` | 승인 카드가 길이로 가리지 않을 맨 위 인자 이름. `approval` 이 `required` 인 도구에만 선언한다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md)) |
 | `default_tool_policy` | `tools` 에 없는 도구의 처리. `deny` 만 받는다 |
 
@@ -217,6 +220,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - Control Plane 은 hook 이 보낸 `tool` 을 그대로 믿지 않는다. 카탈로그의 서버 이름과 `tool` 로 등록 이름을 다시 계산해 `hermes_tool` 과 다르면 `tool` 이 없는 호출로 읽는다
 - `schema: 1` 에서 `tool` 이 없는 호출은 승인 필요로 막는다. 다른 서버의 등록 이름은 `schema: 1` 에서도 `UNDECLARED` 로 거절한다
 - 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
+- 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -323,6 +327,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 커넥터가 `identifiers` 로 선언한 맨 위 인자는 긴 덩어리를 가리는 규칙에서 빠진다. 알려진 비밀 접두사로 시작하는 값과 비밀 키 이름의 칸은 그래도 가린다([ADR-089](../adr/ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md))
 - **상시 허락을 닫은 도구의 승인 줄은 인자가 하나도 가려지지 않아야 승인된다**([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md)). 그 도구는 밖으로 나가는 호출이라 사람이 원문을 다 읽어야 한다. 가린 글이 원문과 다르면 `hiddenArgs` 가 참이고, 그 줄에 승인 요청이 오면 실행하지 않고 `REJECTED`(`hidden_args`)로 끝낸 줄을 200 으로 돌려준다
 - `grantAllowed`, `hiddenArgs`, `identifiers` 의 선언은 줄을 읽을 때와 승인할 때의 카탈로그로 본다. 카탈로그를 읽지 못했으면 거짓이거나 선언이 없는 것으로 보고, 그 줄의 승인은 정책을 판정하지 못해 `not_executable` 로 끝난다
+- `conversationGrant` 는 대화 허락을 함께 주는 승인이다. 받는 조건과 거절은 「대화 허락」 이 갖는다
 - `grant` 는 `required` 이고 선언이 상시 허락을 닫지 않은 도구에만 받는다. 그 밖의 도구나 원래 도구 이름을 모르는 줄이면 `VALIDATION_FAILED` 다. `TODAY` 는 서버의 시간대와 상관없이 `Asia/Seoul` 의 그날 끝까지다. 사용량 화면의 달 경계와 같은 고정 시간대다
 - `title` 은 선언에 이름이 없거나 카탈로그를 읽지 못했으면 `이름 없는 동작` 이다. 도구의 원래 이름은 내부 값이라 `title` 과 알림 줄과 모델 입력에 싣지 않는다
 - 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 커넥터의 줄은 두고 본다
@@ -347,6 +352,31 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 도구가 `errors` 표에 있는 코드로 실패하면 그 코드와 복구 계약을 싣고, Control Plane 은 같은 규칙으로 다시 검증해 `FAILED` 줄에 저장한다. `outcome_unknown` 인 코드는 504 로 답해 `UNKNOWN` 이 된다
 - 도구가 오류 없이 끝났는데 구조화 결과도 JSON 텍스트도 없으면 첫 텍스트 칸의 글로 성공을 답한다. 실행된 쓰기를 실패로 기록하지 않기 위해서다
 - 커넥터의 도구 하나는 프로세스 안의 상태에 기대지 않아야 한다. 이 경로는 Hermes 가 쥔 MCP 연결이 아니라 새 프로세스에서 돈다
+
+### 대화 허락
+
+승인 카드의 「이 대화에서 계속 허용」 이다. 결정은 [ADR-20261012 / conversation-grant](../adr/ADR-20261012-conversation-grant.md) 에 있고, 표는 [저장 모델](../../backend/docs/data-schema.md) 의 「connector_conversation_grant」 가 갖는다.
+코드는 `ConnectorActionApproval` 이 주고, `ConnectorGrantLookup` 이 판정에 찾아 주고, `ConnectorActionLifecycle` 이 거둔다.
+
+| 상황 | 처리 |
+| --- | --- |
+| 줄 수 있는 도구 | 카탈로그의 `conversation_grant` 가 참이고 `approval` 이 `required` 이며 `outbound` 가 참이 아닌 도구다. `grant: false` 여도 받는다. 그 칸을 내지 않는 옛 대시보드 plugin 과 `schema: 1` 은 어느 도구도 받지 않는다 |
+| 승인 줄의 `conversationGrantAllowed` | 위 조건에 더해 줄에 원래 도구 이름, 대화, 에이전트가 있어야 참이다. 먼저 살펴보기 트리의 줄은 그 트리의 쓰기가 허락을 보지 않으므로 거짓이다. 줄을 읽을 때의 카탈로그로 본다 |
+| `conversationGrant` 를 실은 승인 | 승인할 때의 카탈로그로 다시 보고 실행 전 트랜잭션에서 허락 줄을 저장한다. 기간은 24시간이다. 같은 대화의 같은 에이전트에 준 그 도구의 앞선 허락은 거두어 유효한 줄이 하나다 |
+| 줄 수 없는 도구에 실었다. `grant` 와 함께 실었다 | `VALIDATION_FAILED`. 승인 줄은 `PENDING` 그대로다 |
+| 같은 대화의 같은 에이전트가 같은 도구를 다시 부른다 | 허용. 판정 줄은 `ALLOWED` 로 남는다 |
+| 다른 대화, 새 대화, 같은 대화의 다른 에이전트 위임 실행 | 허락이 없는 것으로 판정한다 |
+| 사용자가 「다시 묻기」 를 누른다 | `DELETE /api/v1/chat/conversations/{id}/connector-conversation-grants/{grantId}`. 그 줄과 같은 대화, 에이전트, 도구의 허락을 모두 거둔다. 남의 허락이나 다른 대화의 번호는 `CONNECTOR_ACTION_NOT_FOUND` 다 |
+| 대화를 지운다 | 판정이 지운 대화의 허락을 보지 않는다 |
+| 그 에이전트에서 연결을 뗀다 | 그 에이전트의 그 커넥터 대화 허락을 거둔다. 다시 붙여도 돌아오지 않는다 |
+| 연결을 해제하거나 값을 다시 등록한다 | 그 커넥터의 대화 허락을 모두 거둔다 |
+| 함께 승인한 실행이 실패했거나 결과를 모른다 | 그 승인 줄과 함께 준 허락을 거둔다. 기동 정리와 오래 남은 실행 정리가 결과를 모르는 것으로 바꿀 때도 같다 |
+| 선언이 그 도구의 대화 허락을 닫는다 | 승인 줄 정리가 1분마다 유효한 허락을 거둔다. 선언이 다시 열어도 앞선 허락은 돌아오지 않는다. 카탈로그를 읽지 못한 커넥터는 건드리지 않는다 |
+| 같은 줄을 동시에 승인한다 | 승인 줄의 행 잠금이 하나만 통과시켜 허락도 한 줄이다 |
+| 결과를 대화에 전한다 | 그 승인과 함께 준 허락이 아직 유효하면 알림 줄에 「이 대화에서는 10월 13일 14:00까지 같은 동작을 다시 묻지 않고 실행해요. 다른 대화에서는 다시 물어요」 처럼 끝나는 시각을 넣어 더한다. 모델 입력에는 그 시각까지 이 대화에서 이 에이전트가 부르는 같은 동작이 승인 없이 실행되고 다른 에이전트는 다시 승인을 받는다는 줄을 더한다. 시각은 가족이 사는 곳의 시각이다 |
+
+- 대화 허락 목록(`GET /api/v1/chat/conversations/{id}/connector-conversation-grants`)은 번호, 제목, 끝나는 시각과, 대화의 에이전트와 다른 에이전트에 준 허락이면 그 에이전트 이름(`agentName`)만 낸다. 화면은 줄마다 끝나는 시각을 보이고 다른 에이전트의 허락이면 그 이름을 함께 보인다. 지금 선언이 대화 허락을 닫은 도구의 줄은 효력이 없어 내지 않는다
+- 승인할 때와 떼거나 해제할 때 모두 사용자 행을 먼저 잠그므로, 뗀 뒤에 승인이 허락을 남기지 못한다. 그 승인은 `not_executable` 로 끝난다
 
 ## 금융 실행 내용의 저장과 검증
 
@@ -664,7 +694,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 | `WRAPPED_CONTEXT` | 허용 | 모델 문맥에 출처 표시와 함께 들어간다 |
 | `SAME_OWNER_SINK` | 허용 | 그 사용자만 보는 곳에 남는다. 서버 관리자는 DB 에서 볼 수 있다 |
 | `REDACTED_RECORD` | 허용 | 기록에는 가린 값만 남는다 |
-| `STANDING_GRANT` | 허용 | 사용자가 그 도구에 미리 준 상시 허락으로 나간다. 글의 출처는 보지 않는다 |
+| `STANDING_GRANT` | 허용 | 사용자가 그 도구에 미리 준 상시 허락이나 그 대화의 대화 허락으로 나간다. 글의 출처는 보지 않는다 |
 | `PER_CALL_APPROVAL` | 사용자 승인 | 호출마다 사람이 인자를 보고 승인해야 나간다 |
 | `PROPOSAL_ONLY` | 사용자 승인 | 제안으로만 남고 사람이 받아들여야 효력이 생긴다 |
 | `RISK_NOT_OPEN` | 거절 | 위험도가 `DESTRUCTIVE` 나 `FINANCIAL` 이라 늘 거절한다 |
@@ -685,7 +715,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 | RF-01 | READ 결과가 모델 문맥으로 | 허용 | `WRAPPED_CONTEXT` | `fos-ctx` `transform_tool_result` | `test_read_data_flow` `test_read_result_reaches_model_inside_external_data`, `test_fos_ctx` `TransformToolResultTest` |
 | RF-02 | 최종 답과 대화 기록으로 | 허용 | `SAME_OWNER_SINK` | 대화 주인 확인 | 별도 시험 없음. 대화 읽기 권한 시험이 본다 |
 | RF-03 | 같은 커넥터의 밖으로 나가는 쓰기로 (메일 보내기, 답장) | 사용자 승인 | `PER_CALL_APPROVAL` | Control Plane 판정. `outbound` 와 `"grant": false` | `ToolPolicyDecisionTest` 의 상시 허락을 닫은 도구 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
-| RF-04 | 다른 커넥터의 쓰기로, 상시 허락이 있을 때 (블로그 임시저장, 메일 초안) | 허용 | `STANDING_GRANT` | Control Plane 판정 | `ToolPolicyDecisionTest` 의 상시 허락 허용 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
+| RF-04 | 다른 커넥터의 쓰기로, 상시 허락이나 그 대화의 대화 허락이 있을 때 (블로그 임시저장, 메일 초안) | 허용 | `STANDING_GRANT` | Control Plane 판정 | `ToolPolicyDecisionTest` 의 상시 허락 허용 시험, `test_read_data_flow` `test_writes_carrying_read_body_are_left_to_control_plane` |
 | RF-05 | 다른 커넥터의 쓰기로, 상시 허락이 없거나 닫혔을 때 | 사용자 승인 | `PER_CALL_APPROVAL` | Control Plane 판정 | `ToolPolicyDecisionTest` |
 | RF-06 | `DESTRUCTIVE`, `FINANCIAL` 도구로 | 거절 | `RISK_NOT_OPEN` | Control Plane 판정. 설치가 모델에게서 뺀다 | `ToolPolicyDecisionTest` |
 | RF-07 | 먼저 살펴보기 트리 안에서 쓰기로 | 거절. 쓰기를 허용한 살펴보기는 사용자 승인 | `READ_ONLY_RUN`, `PER_CALL_APPROVAL` | Control Plane 판정 | `ToolPolicyDecisionTest` 의 살펴보기 시험 |
