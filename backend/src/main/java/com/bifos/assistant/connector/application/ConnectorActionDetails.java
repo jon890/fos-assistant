@@ -11,6 +11,7 @@ import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.hermes.ToolDetailRedactor;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -34,12 +35,10 @@ class ConnectorActionDetails {
     private static final String NOT_FOUND_MESSAGE = "this connector action does not exist";
 
     /** 실행을 보낸 뒤 끝난 상태들이다. 자동 turn 으로 모델에게 전한다. */
-    private static final Set<ActionStatus> EXECUTED =
-            Set.of(ActionStatus.SUCCEEDED, ActionStatus.FAILED, ActionStatus.UNKNOWN);
+    private static final Set<ActionStatus> EXECUTED = Set.of(ActionStatus.SUCCEEDED, ActionStatus.FAILED, ActionStatus.UNKNOWN);
 
     /** 실행하지 않고 끝난 상태들이다. 대화에 알림 줄만 남긴다. */
-    private static final Set<ActionStatus> CLOSED_WITHOUT_EXECUTION =
-            Set.of(ActionStatus.REJECTED, ActionStatus.EXPIRED);
+    private static final Set<ActionStatus> CLOSED_WITHOUT_EXECUTION = Set.of(ActionStatus.REJECTED, ActionStatus.EXPIRED);
 
     /** 도구를 선언하지 않는 manifest 판이다. */
     private static final int SCHEMA_WITHOUT_TOOLS = 1;
@@ -47,10 +46,12 @@ class ConnectorActionDetails {
     private final ConnectorActionRepository actions;
     private final ConnectorCatalogCache catalog;
 
+
     ConnectorActionDetails(ConnectorActionRepository actions, ConnectorCatalogCache catalog) {
         this.actions = actions;
         this.catalog = catalog;
     }
+
 
     /**
      * 그 대화의 승인 줄이다. 답을 기다리는 줄 전부와 끝난 줄 가운데 최근 20개를 만든 순으로 준다.
@@ -59,15 +60,16 @@ class ConnectorActionDetails {
      */
     List<ConnectorActionView> listForConversation(CurrentUser user, Long conversationId) {
         List<ConnectorAction> found = new ArrayList<>(actions.findByConversationIdAndUserIdAndStatusOrderByIdAsc(
-                conversationId, user.id(), ActionStatus.PENDING));
+            conversationId, user.id(), ActionStatus.PENDING));
         found.addAll(actions.findTop20ByConversationIdAndUserIdAndStatusNotOrderByIdDesc(
-                conversationId, user.id(), ActionStatus.PENDING));
+            conversationId, user.id(), ActionStatus.PENDING));
         found.sort(Comparator.comparing(ConnectorAction::id));
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return found.stream()
-                .map(action -> view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest)))
-                .toList();
+            .map(action -> view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest)))
+            .toList();
     }
+
 
     /**
      * 대화마다 승인 줄의 결과를 전한 가장 늦은 시각이다. 전한 줄이 없는 대화는 빠진다. 먼저 알리기가 할 일에 연결한 대화의 결과
@@ -83,8 +85,9 @@ class ConnectorActionDetails {
             return Map.of();
         }
         return actions.findLastDeliveredByConversation(conversationIds, EXECUTED).stream()
-                .collect(Collectors.toMap(ActionDelivery::getConversationId, ActionDelivery::getDeliveredAt));
+            .collect(Collectors.toMap(ActionDelivery::getConversationId, ActionDelivery::getDeliveredAt));
     }
+
 
     /**
      * 그 사용자의 답을 기다리는 승인 줄을 만든 순으로 준다. 먼저 알리기의 판정이 읽는다.
@@ -94,21 +97,23 @@ class ConnectorActionDetails {
     List<PendingApproval> pendingApprovalsOf(CurrentUser user) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return actions.findByUserIdAndStatusOrderByIdAsc(user.id(), ActionStatus.PENDING).stream()
-                .map(action -> new PendingApproval(
-                        action.publicId(),
-                        view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest))
-                                .title(),
-                        action.agentId(),
-                        action.conversationId(),
-                        action.createdAt(),
-                        action.expiresAt()))
-                .toList();
+            .map(action -> new PendingApproval(
+                action.publicId(),
+                view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest))
+                    .title(),
+                action.agentId(),
+                action.conversationId(),
+                action.createdAt(),
+                action.expiresAt()))
+            .toList();
     }
+
 
     /** 그 대화에서 결과를 아직 전하지 않은 승인 줄이다. 실행을 보낸 뒤 끝난 것만이고 만든 순이다. */
     List<ConnectorActionResult> undeliveredResults(Long conversationId) {
         return undelivered(conversationId, EXECUTED);
     }
+
 
     /**
      * 그 대화와 그 사용자의 실행한 승인 줄을 번호의 순서로 다시 읽는다. 결과를 다시 전달할 때 쓴다(ADR-075).
@@ -121,21 +126,23 @@ class ConnectorActionDetails {
         }
         Map<UUID, ConnectorAction> found = new HashMap<>();
         actions.findByConversationIdAndUserIdAndPublicIdIn(conversationId, userId, actionIds).stream()
-                .filter(action -> EXECUTED.contains(action.status()))
-                .forEach(action -> found.put(action.publicId(), action));
+            .filter(action -> EXECUTED.contains(action.status()))
+            .forEach(action -> found.put(action.publicId(), action));
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return actionIds.stream()
-                .distinct()
-                .map(found::get)
-                .filter(Objects::nonNull)
-                .map(action -> resultOf(action, manifests))
-                .toList();
+            .distinct()
+            .map(found::get)
+            .filter(Objects::nonNull)
+            .map(action -> resultOf(action, manifests))
+            .toList();
     }
+
 
     /** 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. */
     List<ConnectorActionResult> undeliveredClosures(Long conversationId) {
         return undelivered(conversationId, CLOSED_WITHOUT_EXECUTION);
     }
+
 
     /** 대화에 전했다고 적는다. 이미 전한 줄은 건드리지 않는다. 부르는 쪽의 트랜잭션에 함께 묶인다. */
     void markDelivered(List<UUID> actionIds, Instant now) {
@@ -143,6 +150,7 @@ class ConnectorActionDetails {
             actions.markDelivered(actionIds, now);
         }
     }
+
 
     /**
      * 그 줄을 전하는 일을 이 호출이 맡았는가. 먼저 적은 쪽만 참을 받는다.
@@ -153,47 +161,56 @@ class ConnectorActionDetails {
         return actions.markDelivered(List.of(actionId), now) == 1;
     }
 
+
     /** 실행한 결과를 아직 전하지 않은 대화들이다. 기동할 때 훑는다. */
     List<Long> conversationsWithUndelivered() {
         return actions.findConversationsWithUndelivered(EXECUTED);
     }
 
+
     private List<ConnectorActionResult> undelivered(Long conversationId, Set<ActionStatus> statuses) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         return actions
-                .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
-                .stream()
-                .map(action -> resultOf(action, manifests))
-                .toList();
+            .findByConversationIdAndStatusInAndResultDeliveredAtIsNullOrderByIdAsc(conversationId, statuses)
+            .stream()
+            .map(action -> resultOf(action, manifests))
+            .toList();
     }
+
 
     /** @param manifests 커넥터마다 한 번만 읽으려고 부르는 쪽이 들고 있는 manifest 들 */
     private ConnectorActionResult resultOf(ConnectorAction action, Map<String, Optional<ConnectorManifest>> manifests) {
         ConnectorActionView view = view(action, manifests.computeIfAbsent(action.connectorId(), this::readManifest));
         return new ConnectorActionResult(
-                action.publicId(),
-                view.title(),
-                action.toolName() == null ? action.hermesTool() : action.toolName(),
-                action.status(),
-                action.errorCode(),
-                action.resultText(),
-                action.userId(),
-                action.executedAt());
+            action.publicId(),
+            view.title(),
+            action.toolName() == null ? action.hermesTool() : action.toolName(),
+            action.status(),
+            action.errorCode(),
+            action.resultText(),
+            action.userId(),
+            action.executedAt());
     }
+
 
     /** 카탈로그에서 그 도구의 이름을 찾아 붙인다. 카탈로그를 읽지 못해도 줄은 돌려준다. */
     ConnectorActionView view(ConnectorAction action) {
         return view(action, readManifest(action.connectorId()));
     }
 
+
     /** @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값 */
     static ConnectorActionView view(ConnectorAction action, Optional<ConnectorManifest> manifest) {
         return ConnectorActionView.from(
-                action,
-                manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())),
-                grantable(manifest, action),
-                hiddenArgs(manifest, action));
+            action,
+            manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())),
+            grantable(manifest, action),
+            hiddenArgs(manifest, action),
+            manifest.flatMap(found -> found.tools().stream()
+                .filter(tool -> Objects.equals(tool.name(), action.toolName()))
+                .findFirst()).map(ConnectorTool::argLabels).orElse(Map.of()));
     }
+
 
     /**
      * 지금 카탈로그로 볼 때 그 줄의 도구에 상시 허락을 줄 수 있는가(ADR-065).
@@ -209,9 +226,10 @@ class ConnectorActionDetails {
             return false;
         }
         return ConnectorToolPolicies.find(manifest.get(), action.toolName())
-                .map(ToolPolicy::grantable)
-                .orElse(manifest.get().schema() == SCHEMA_WITHOUT_TOOLS);
+            .map(ToolPolicy::grantable)
+            .orElse(manifest.get().schema() == SCHEMA_WITHOUT_TOOLS);
     }
+
 
     /**
      * 지금 카탈로그로 볼 때 그 줄의 도구가 상시 허락을 닫은 도구인가(ADR-065).
@@ -224,9 +242,10 @@ class ConnectorActionDetails {
      */
     private static boolean grantClosed(Optional<ConnectorManifest> manifest, ConnectorAction action) {
         return manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName()))
-                .filter(declared -> declared.approval() == ToolApproval.REQUIRED && !declared.grantable())
-                .isPresent();
+            .filter(declared -> declared.approval() == ToolApproval.REQUIRED && !declared.grantable())
+            .isPresent();
     }
+
 
     /**
      * 답을 기다리는 줄인데 사람이 인자를 다 읽을 수 없는가. 상시 허락을 닫은 도구의 인자에 화면에서 가려지는 글이
@@ -237,12 +256,13 @@ class ConnectorActionDetails {
      */
     static boolean hiddenArgs(Optional<ConnectorManifest> manifest, ConnectorAction action) {
         return action.status() == ActionStatus.PENDING
-                && grantClosed(manifest, action)
-                && ToolDetailRedactor.hidesArguments(
-                        action.argsJson(),
-                        ConnectorActionView.identifiersOf(
-                                manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName()))));
+            && grantClosed(manifest, action)
+            && ToolDetailRedactor.hidesArguments(
+                action.argsJson(),
+                ConnectorActionView.identifiersOf(
+                    manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName()))));
     }
+
 
     /** 읽지 못했거나 카탈로그에 없으면 빈 값이다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다. */
     Optional<ConnectorManifest> readManifest(String connectorId) {
@@ -250,12 +270,13 @@ class ConnectorActionDetails {
             return catalog.find(connectorId);
         } catch (RuntimeException ex) {
             log.warn(
-                    "connector {} catalog read failed: {}",
-                    connectorId,
-                    ex.getClass().getSimpleName());
+                "connector {} catalog read failed: {}",
+                connectorId,
+                ex.getClass().getSimpleName());
             return Optional.empty();
         }
     }
+
 
     static ApiException notFound() {
         return new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_FOUND, NOT_FOUND_MESSAGE);

@@ -8,8 +8,10 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import pathlib
+import re
 import stat
 
 from .connector_schema import (
@@ -20,11 +22,37 @@ from .connector_schema import (
     LINK_RE,
     PNG_SIGNATURE,
     SVG_FORBIDDEN_RE,
+    TOOL_ARG_LABELS_MAX,
+    TOOL_ARG_LABEL_MAX_CHARS,
+    TOOL_ARG_LABELS_MAX_BYTES,
+    TOOL_IDENTIFIER_RE,
 )
 
 
 # Java 정규식의 `\s` 와 같은 ASCII 공백이다.
 _ASCII_SPACE = " \t\r\n\f\v"
+
+# 세 언어가 동일한 공백과 제어문자를 거절한다. Unicode의 언어별 strip 차이를 피한다.
+_LABEL_SPACE = " \u00a0\u1680" + "".join(chr(n) for n in range(0x2000, 0x200b)) + "\u202f\u205f\u3000\ufeff"
+_LABEL_FORBIDDEN = re.compile(r"[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u2028\u2029\u202a-\u202e\u2066-\u2069\ud800-\udfff]")
+_LABEL_RESERVED = frozenset({"__proto__", "constructor", "prototype"})
+
+
+def _tool_arg_labels(declared_tool: dict) -> dict[str, str]:
+    """표시용 선언만 검사한다. 틀리면 빈 객체이며 값과 오류 원문은 로그에 싣지 않는다."""
+    labels = declared_tool.get("arg_labels", {})
+    if not isinstance(labels, dict) or len(labels) > TOOL_ARG_LABELS_MAX:
+        return {}
+    for key, value in labels.items():
+        if (not isinstance(key, str) or not TOOL_IDENTIFIER_RE.fullmatch(key) or key in _LABEL_RESERVED
+                or not isinstance(value, str) or not 1 <= len(value) <= TOOL_ARG_LABEL_MAX_CHARS
+                or value != value.strip(_LABEL_SPACE) or _LABEL_FORBIDDEN.search(value)):
+            return {}
+    if len(set(labels.values())) != len(labels) or any(value in labels and value != key for key, value in labels.items()):
+        return {}
+    if len(json.dumps(labels, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > TOOL_ARG_LABELS_MAX_BYTES:
+        return {}
+    return dict(labels)
 
 
 def _connector_icon(root: pathlib.Path, declared) -> dict | None:
