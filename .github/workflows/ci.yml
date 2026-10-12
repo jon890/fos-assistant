@@ -2,11 +2,15 @@ name: CI
 
 on:
   pull_request:
+    # labeled 는 넣지 않는다. pr-size 가 PR 마다 라벨을 붙여, 넣으면 진행 중인 CI 가 취소되고 다시 돈다.
+    # 「검사:전체」 라벨은 붙인 뒤의 다음 push 부터 적용된다.
     types: [opened, synchronize, reopened]
+  # main push 는 공개 정보, unit, quality(웹 빌드 포함)만 돈다. 전체 검사는 정기 실행과 수동 실행이 돈다.
   push:
     branches: [main]
+  workflow_dispatch:
   schedule:
-    # 한국 시간 매일 04:23. 변경이 없어도 외부 의존성과 흔들리는 검사를 확인한다.
+    # 한국 시간 매일 04:23. PR 이 거의 없는 시간에 전체 검사를 돌려 동시 job 한도를 PR CI 와 다투지 않는다.
     - cron: '23 19 * * *'
 
 permissions:
@@ -17,8 +21,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # 경로 판정과 짧은 공개 정보 검사가 checkout을 공유한다. 필수 이름은 유지한다.
   changes:
-    name: changes
+    name: public-safe
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
@@ -39,7 +44,31 @@ jobs:
           package-manager-cache: false
       - name: 바뀐 파일로 실행할 검사 선택
         id: paths
+        env:
+          FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, '검사:전체') }}
         run: node scripts/ci/ci-paths.mjs changes
+      - name: 공개 정보 검사
+        env:
+          DENYLIST_PATTERNS: ${{ secrets.PUBLIC_REPO_DENYLIST }}
+        shell: bash
+        run: |
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          chmod 700 "$work"
+          printf '%s\n' "$DENYLIST_PATTERNS" > "$work/denylist"
+          chmod 600 "$work/denylist"
+          if [ -z "$DENYLIST_PATTERNS" ]; then
+            printf '%s\n' '알림: PUBLIC_REPO_DENYLIST secret 이 비어 형태 패턴만 검사한다.'
+          fi
+          unset DENYLIST_PATTERNS
+          # 위반한 줄에도 비공개 값이 있을 수 있어 검사 원문은 로그에 내지 않는다.
+          if PUBLIC_REPO_DENYLIST="$work/denylist" scripts/checks/check-public-safe.sh > "$work/check.log" 2>&1; then
+            printf '%s\n' '통과: 공개 저장소에 적으면 안 되는 것을 찾지 못했다.'
+          else
+            status=$?
+            printf '%s\n' '::error::공개 정보 검사에 실패했다. 비공개 값 보호를 위해 상세 출력은 생략한다.'
+            exit "$status"
+          fi
 
   backend-tests:
     name: backend-${{ matrix.suite }}
@@ -107,43 +136,9 @@ jobs:
           JOB_RESULT: ${{ needs.backend-tests.result }}
         run: node scripts/ci/ci-paths.mjs gate
 
-  web-build:
-    name: web-build
-    needs: changes
-    if: needs.changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          version: 10.22.0
-          package_json_file: web/package.json
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '22.18.0'
-          cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:node
-      - run: pnpm typecheck
-      - name: 웹 빌드
-        env:
-          AUTH_SECRET: build-time-placeholder
-          ASSISTANT_JWT_SECRET: build-time-placeholder
-          CONTROL_PLANE_BASE_URL: http://build-time-placeholder
-          AUTH_GOOGLE_ID: build-time-placeholder
-          AUTH_GOOGLE_SECRET: build-time-placeholder
-        run: pnpm build
-
   web:
     name: web
-    needs: [changes, web-build]
+    needs: [changes, quality]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -155,11 +150,19 @@ jobs:
         with:
           node-version: '22.18.0'
           package-manager-cache: false
+      - name: 통합한 quality job 결과 확인
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: |
+          if [ "$QUALITY_RESULT" != success ]; then
+            echo "::error::quality job이 성공하지 않았다: $QUALITY_RESULT"
+            exit 1
+          fi
       - name: 변경 판정과 검사 결과 확인
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           SHOULD_RUN: ${{ needs.changes.outputs.web }}
-          JOB_RESULT: ${{ needs.web-build.result }}
+          JOB_RESULT: ${{ needs.quality.outputs.web-result }}
         run: node scripts/ci/ci-paths.mjs gate
 
   browser:
@@ -173,7 +176,7 @@ jobs:
       fail-fast: false
       matrix:
         project: [mobile, desktop]
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: web
@@ -209,7 +212,7 @@ jobs:
       - name: 브라우저 shard 검사
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
-        run: pnpm test:browser --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4 --reporter=list,json
+        run: pnpm test:browser --project=${{ matrix.project }} --shard=${{ matrix.shard }}/3 --reporter=list,json
       # 전체 검사가 통과한 뒤에도 변경 spec과 매일 회귀 묶음은 재시도 없이 3회 연속 통과해야 한다.
       # JSON 결과는 마지막 단계의 결과로 바꿔, 반복 단계에서 실패한 spec도 기존 실패 이슈 집계에 들어간다.
       - name: 브라우저 변경 spec 연속 통과
@@ -217,7 +220,7 @@ jobs:
         env:
           BROWSER_STABILITY_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/browser-report-${{ matrix.project }}-${{ matrix.shard }}.json
-        run: node scripts/ci/browser-stability.mjs --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
+        run: node scripts/ci/browser-stability.mjs --project=${{ matrix.project }} --shard=${{ matrix.shard }}/3
       - name: 브라우저 JSON 결과
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -267,14 +270,14 @@ jobs:
         if: needs.changes.outputs.browser == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/browser-ci.mjs check ${{ matrix.project }} 4
+        run: node scripts/ci/browser-ci.mjs check ${{ matrix.project }} 3
 
   browser-failures:
     name: browser-failures
     needs: browser
     if: >-
       always() && needs.browser.result != 'success' &&
-      (github.event_name == 'push' || github.event_name == 'schedule') &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -432,12 +435,18 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      web-result: ${{ steps.web-tests.outcome }}
     steps:
       - name: 변경 판정 확인
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           SHOULD_RUN: ${{ needs.changes.outputs.quality }}
-        run: test "$CHANGES_RESULT" = success && { test "$SHOULD_RUN" = true || test "$SHOULD_RUN" = false; }
+          WEB_RUN: ${{ needs.changes.outputs.web }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          test "$SHOULD_RUN" = true || test "$SHOULD_RUN" = false
+          test "$WEB_RUN" = true || test "$WEB_RUN" = false
       # 바뀐 파일만 검사하는 도구(Spotless, OpenRewrite, Prettier)가 origin/main 이력을 쓴다. 깊이를 제한하지 않고 모두 받는다.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -455,49 +464,34 @@ jobs:
       - run: python3 test/spotless-jdt.test.py
         if: needs.changes.outputs.quality == 'true'
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        if: needs.changes.outputs.quality == 'true'
+        if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
         with:
           version: 10.22.0
           package_json_file: web/package.json
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        if: needs.changes.outputs.quality == 'true'
+        if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
         with:
           node-version: '22.18.0'
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: cd web && pnpm install --frozen-lockfile
-        if: needs.changes.outputs.quality == 'true'
+        id: install
+        if: needs.changes.outputs.quality == 'true' || needs.changes.outputs.web == 'true'
       # 파일 길이 기준 목록도 quality.sh 에서 검사한다.
       - run: scripts/checks/quality.sh check
         if: needs.changes.outputs.quality == 'true'
-
-  public-safe:
-    name: public-safe
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          persist-credentials: false
-      - name: 공개 정보 검사
+      # quality와 웹 검사가 pnpm 설치와 캐시를 공유한다. 웹 단계의 결과를 web 판정에 전달한다.
+      - name: 웹 테스트와 타입 검사, 빌드
+        id: web-tests
+        if: ${{ !cancelled() && needs.changes.outputs.web == 'true' && steps.install.outcome == 'success' }}
+        working-directory: web
         env:
-          DENYLIST_PATTERNS: ${{ secrets.PUBLIC_REPO_DENYLIST }}
-        shell: bash
+          AUTH_SECRET: build-time-placeholder
+          ASSISTANT_JWT_SECRET: build-time-placeholder
+          CONTROL_PLANE_BASE_URL: http://build-time-placeholder
+          AUTH_GOOGLE_ID: build-time-placeholder
+          AUTH_GOOGLE_SECRET: build-time-placeholder
         run: |
-          work=$(mktemp -d)
-          trap 'rm -rf "$work"' EXIT
-          chmod 700 "$work"
-          printf '%s\n' "$DENYLIST_PATTERNS" > "$work/denylist"
-          chmod 600 "$work/denylist"
-          if [ -z "$DENYLIST_PATTERNS" ]; then
-            printf '%s\n' '알림: PUBLIC_REPO_DENYLIST secret 이 비어 형태 패턴만 검사한다.'
-          fi
-          unset DENYLIST_PATTERNS
-          # 위반한 줄에도 비공개 값이 있을 수 있어 검사 원문은 로그에 내지 않는다.
-          if PUBLIC_REPO_DENYLIST="$work/denylist" scripts/checks/check-public-safe.sh > "$work/check.log" 2>&1; then
-            printf '%s\n' '통과: 공개 저장소에 적으면 안 되는 것을 찾지 못했다.'
-          else
-            status=$?
-            printf '%s\n' '::error::공개 정보 검사에 실패했다. 비공개 값 보호를 위해 상세 출력은 생략한다.'
-            exit "$status"
-          fi
+          pnpm test:node
+          pnpm typecheck
+          pnpm build
