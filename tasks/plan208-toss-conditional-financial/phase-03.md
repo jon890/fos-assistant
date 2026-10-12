@@ -8,7 +8,7 @@
 금융 줄의 해시 칸을 서버 비밀로 keyed hash 해 DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못하게 한다.
 **매매 개방 전 필수다.** phase-04 는 이 단계가 머지된 뒤에만 시작한다.
 
-**범위 외**: 금융이 아닌 승인 줄의 `args_sha256`, kill switch 와 상한(`ConnectorFinancialGate`), 공개 진입점(phase-04)이다.
+**범위 외**: 금융이 아닌 승인 줄의 `args_sha256`, 계좌 허용 목록과 상한(`ConnectorFinancialGate`), 공개 진입점(phase-04)이다.
 
 ## 컨텍스트
 
