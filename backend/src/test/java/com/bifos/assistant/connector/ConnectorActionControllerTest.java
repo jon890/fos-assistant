@@ -240,19 +240,20 @@ class ConnectorActionControllerTest {
 
 
     @Test
-    @DisplayName("대화 허락 목록은 주인의 대화 번호로 읽고 grantId, title, expiresAt 만 낸다")
+    @DisplayName("대화 허락 목록은 주인의 대화 번호로 읽고 grantId, title, expiresAt, agentName 만 낸다")
     void conversationGrantsReturnContractFields() throws Exception {
         when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
         when(service.conversationGrants(MEMBER, 42L))
             .thenReturn(List.of(new ConnectorConversationGrantView(
-                7L, "메모 쓰기", Instant.parse("2026-10-13T00:00:00Z"))));
+                7L, "메모 쓰기", Instant.parse("2026-10-13T00:00:00Z"), "글 다듬기")));
 
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-conversation-grants", CONVERSATION))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].length()").value(3))
+            .andExpect(jsonPath("$[0].length()").value(4))
             .andExpect(jsonPath("$[0].grantId").value(7))
             .andExpect(jsonPath("$[0].title").value("메모 쓰기"))
-            .andExpect(jsonPath("$[0].expiresAt").exists());
+            .andExpect(jsonPath("$[0].expiresAt").exists())
+            .andExpect(jsonPath("$[0].agentName").value("글 다듬기"));
     }
 
 

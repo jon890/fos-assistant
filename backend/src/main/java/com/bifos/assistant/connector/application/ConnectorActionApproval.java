@@ -55,7 +55,7 @@ class ConnectorActionApproval {
      *
      * <p>{@code UsageController} 의 달 경계와 같은 값이다. 그룹마다 시간대를 두게 되면 둘을 함께 고친다.
      */
-    private static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
+    static final ZoneId HOUSEHOLD_ZONE = ZoneId.of("Asia/Seoul");
 
     /** 대화 허락의 상한이다. 오래 이어지는 대화에서 사용자가 잊은 허락이 남지 않게 한다(ADR-20261012 / conversation-grant). */
     static final Duration CONVERSATION_GRANT_TTL = Duration.ofHours(24);

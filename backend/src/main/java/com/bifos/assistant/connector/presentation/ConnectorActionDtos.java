@@ -69,10 +69,11 @@ public final class ConnectorActionDtos {
         }
     }
 
-    public record ConversationGrantView(Long grantId, String title, Instant expiresAt) {
+    /** @param agentName 대화의 에이전트와 다른 에이전트에 준 허락이면 그 이름. 아니면 null */
+    public record ConversationGrantView(Long grantId, String title, Instant expiresAt, String agentName) {
 
         public static ConversationGrantView from(ConnectorConversationGrantView grant) {
-            return new ConversationGrantView(grant.grantId(), grant.title(), grant.expiresAt());
+            return new ConversationGrantView(grant.grantId(), grant.title(), grant.expiresAt(), grant.agentName());
         }
     }
 }

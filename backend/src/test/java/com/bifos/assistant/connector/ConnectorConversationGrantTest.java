@@ -18,11 +18,13 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ConversationRepository;
+import com.bifos.assistant.connector.application.ConnectorActionResultSource;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorBindingService;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
+import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorPolicyAnswer;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
@@ -55,6 +57,8 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -123,6 +127,9 @@ class ConnectorConversationGrantTest {
 
     @Autowired
     ConnectorActionService service;
+
+    @Autowired
+    ConnectorActionResultSource resultSource;
 
     @Autowired
     ConnectorBindingService bindingService;
@@ -249,6 +256,16 @@ class ConnectorConversationGrantTest {
             .extracting(ConnectorActionResult::actionId, ConnectorActionResult::conversationGranted)
             .containsExactly(
                 tuple(granted, true), tuple(plain, false));
+        String until = DateTimeFormatter.ofPattern("M월 d일 HH:mm")
+            .withZone(ZoneId.of("Asia/Seoul"))
+            .format(conversationGrants.findAll().getFirst().expiresAt());
+        assertThat(resultSource.resultsFor(conversation.id(), owner.id(), List.of(granted.toString(), plain.toString())))
+            .satisfiesExactly(
+                result -> {
+                    assertThat(result.notice()).contains(until + "까지 같은 동작을 다시 묻지 않고 실행해요");
+                    assertThat(result.input()).contains("이 에이전트가", until + "까지");
+                },
+                result -> assertThat(result.notice()).doesNotContain("묻지 않고"));
     }
 
 
@@ -301,6 +318,12 @@ class ConnectorConversationGrantTest {
 
         assertThat(child.allowed()).isFalse();
         assertThat(child.actionId()).isNotNull();
+
+        service.approve(me, child.actionId(), null, true);
+        assertThat(service.conversationGrants(me, conversation.id()))
+            .extracting(ConnectorConversationGrantView::agentName)
+            .as("대화의 에이전트에 준 허락은 이름을 싣지 않고 위임 자식의 에이전트에 준 허락만 싣는다")
+            .containsExactly(null, other.name());
     }
 
 

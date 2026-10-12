@@ -1,6 +1,8 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.ConversationNotices;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ConnectorActionResult;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
@@ -60,6 +62,8 @@ public class ConnectorActionService {
         ConnectorActionRepository actions,
         ConnectorToolGrantRepository grants,
         ConnectorConversationGrantRepository conversationGrants,
+        ConversationRepository conversationRows,
+        AgentRepository agents,
         ConnectorConnectionRepository connections,
         ConnectorBindingRepository bindings,
         AppUserRepository users,
@@ -75,6 +79,8 @@ public class ConnectorActionService {
             actions,
             grants,
             conversationGrants,
+            conversationRows,
+            agents,
             connections,
             bindings,
             users,
@@ -94,6 +100,8 @@ public class ConnectorActionService {
         ConnectorActionRepository actions,
         ConnectorToolGrantRepository grants,
         ConnectorConversationGrantRepository conversationGrants,
+        ConversationRepository conversationRows,
+        AgentRepository agents,
         ConnectorConnectionRepository connections,
         ConnectorBindingRepository bindings,
         AppUserRepository users,
@@ -124,7 +132,7 @@ public class ConnectorActionService {
             transactions,
             clock);
         this.lifecycle = new ConnectorActionLifecycle(
-            actions, grants, conversationGrants, details, signals, transactions, clock);
+            actions, grants, conversationGrants, conversationRows, agents, details, signals, transactions, clock);
     }
 
 

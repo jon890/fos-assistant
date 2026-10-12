@@ -200,7 +200,7 @@ class ConnectorActionDetails {
             action.resultText(),
             action.userId(),
             action.executedAt(),
-            action.status() != null && conversationGrants.existsActiveByActionId(action.id(), Instant.now(clock)));
+            action.status() == null ? null : conversationGrants.findActiveExpiresAtByActionId(action.id(), Instant.now(clock)));
     }
 
 

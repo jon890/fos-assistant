@@ -1,5 +1,9 @@
 package com.bifos.assistant.connector.application;
 
+import com.bifos.assistant.agent.domain.Agent;
+import com.bifos.assistant.agent.infra.AgentRepository;
+import com.bifos.assistant.chat.domain.Conversation;
+import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
@@ -21,7 +25,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -33,6 +39,8 @@ class ConnectorActionLifecycle {
     private final ConnectorActionRepository actions;
     private final ConnectorToolGrantRepository grants;
     private final ConnectorConversationGrantRepository conversationGrants;
+    private final ConversationRepository conversations;
+    private final AgentRepository agents;
     private final ConnectorActionDetails details;
     private final ConnectorActionSignals signals;
     private final TransactionTemplate transactions;
@@ -43,6 +51,8 @@ class ConnectorActionLifecycle {
         ConnectorActionRepository actions,
         ConnectorToolGrantRepository grants,
         ConnectorConversationGrantRepository conversationGrants,
+        ConversationRepository conversations,
+        AgentRepository agents,
         ConnectorActionDetails details,
         ConnectorActionSignals signals,
         TransactionTemplate transactions,
@@ -50,6 +60,8 @@ class ConnectorActionLifecycle {
         this.actions = actions;
         this.grants = grants;
         this.conversationGrants = conversationGrants;
+        this.conversations = conversations;
+        this.agents = agents;
         this.details = details;
         this.signals = signals;
         this.transactions = transactions;
@@ -149,19 +161,31 @@ class ConnectorActionLifecycle {
      * 그 대화에서 계속 허용 중인 도구다(ADR-20261012 / conversation-grant). 지금 선언이 대화 허락을 닫은 도구는 판정이 보지 않아
      * 효력이 없으므로 내지 않는다. 카탈로그를 읽지 못했으면 낸다.
      *
+     * <p>허락은 그 실행의 에이전트에만 통한다. 위임 자식처럼 대화의 에이전트와 다른 에이전트에 준 허락이면 그 이름을 함께 낸다.
+     *
      * @param conversationId 주인인 것을 이미 확인한 대화의 번호
      */
     List<ConnectorConversationGrantView> conversationGrants(CurrentUser user, Long conversationId) {
         Map<String, Optional<ConnectorManifest>> manifests = new HashMap<>();
         List<ConnectorConversationGrantView> views = new ArrayList<>();
-        for (ConnectorConversationGrant grant : conversationGrants.findActiveInConversation(user.id(), conversationId, now())) {
+        List<ConnectorConversationGrant> active = conversationGrants.findActiveInConversation(user.id(), conversationId, now());
+        Long conversationAgent = conversations.findById(conversationId).map(Conversation::agentId).orElse(null);
+        Map<Long, String> otherAgents = agents
+            .findAllById(active.stream()
+                .map(ConnectorConversationGrant::agentId)
+                .filter(agentId -> !Objects.equals(agentId, conversationAgent))
+                .collect(Collectors.toSet()))
+            .stream()
+            .collect(Collectors.toMap(Agent::id, Agent::name));
+        for (ConnectorConversationGrant grant : active) {
             Optional<ToolPolicy> declared = manifests
                 .computeIfAbsent(grant.connectorId(), details::readManifest)
                 .flatMap(manifest -> ConnectorToolPolicies.find(manifest, grant.toolName()));
             if (declared.isPresent() && !declared.get().conversationGrantable()) {
                 continue;
             }
-            views.add(ConnectorConversationGrantView.from(grant, declared.map(ToolPolicy::title).orElse(null)));
+            views.add(ConnectorConversationGrantView.from(
+                grant, declared.map(ToolPolicy::title).orElse(null), otherAgents.get(grant.agentId())));
         }
         return views;
     }
