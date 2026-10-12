@@ -92,6 +92,14 @@ def user_copy_problems(tools: dict, loaded: dict | None, readme: str, arg_names:
         # 사용자 README 의 도구 표는 화면과 같은 말을 쓴다. 손으로 고친 표가 선언과 어긋나지 않게 한다.
         elif "| %s | %s |" % (spec.get("title"), summary) not in readme:
             problems.append("README 의 도구 표에 title 과 summary 줄이 없다: %s" % tool)
+    # 표는 도구마다 한 줄이고, README 어디에도 실제 도구 이름을 쓰지 않는다.
+    section = readme.split("## 도구 목록", 1)[1].split("\n## ", 1)[0] if "## 도구 목록" in readme else ""
+    rows = [line for line in section.splitlines() if line.startswith("| ") and not line.startswith(("| 도구 |", "| ---"))]
+    if len(rows) != len(tools):
+        problems.append("README 의 도구 목록 줄 수(%d)가 도구 수(%d)와 다르다" % (len(rows), len(tools)))
+    named = sorted(set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", readme)) & set(tools))
+    if named:
+        problems.append("README 에 실제 도구 이름이 있다: %s" % named)
     return problems
 
 
@@ -386,6 +394,16 @@ class ContractCatchesViolationsTest(base.ConnectorGateCase):
         problems = self.broken_copy(self.edit_declaration(
             lambda v: v["tools"]["get_profile"].update(summary="query 로 찾아요.")))
         self.assert_reported(problems, "query")
+
+    def test_readme_tool_table_must_match_the_declared_tools(self):
+        def add_row(root):
+            path = root / "README.md"
+            path.write_text(path.read_text().replace("| 메일 찾기 |", "| 남은 줄 | 지운 도구예요. |\n| 메일 찾기 |"))
+        self.assert_reported(self.broken_copy(add_row), "줄 수")
+        def name_tool(root):
+            path = root / "README.md"
+            path.write_text(path.read_text() + "\n`send_message` 로 보내요.\n")
+        self.assert_reported(self.broken_copy(name_tool), "send_message")
         problems = self.broken_copy(self.edit_declaration(
             lambda v: v["tools"]["get_profile"].update(summary="README 에 없는 요약이에요.")))
         self.assert_reported(problems, "README")
