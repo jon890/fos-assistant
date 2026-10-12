@@ -18,7 +18,7 @@ description: |
 | 1 | Draft PR 열기 | `scripts/dev/check-local.sh --fast` 가 0 으로 끝났고 `gh pr create --draft` 가 PR 주소를 냈다 | |
 | 2 | Draft CI | `gh pr checks` 의 모든 검사가 통과다 | |
 | 3 | main 합치고 Ready | 최신 main 을 합친 커밋의 CI 가 모두 통과했거나 5단계 예외를 만족했고, `gh pr ready` 가 끝났다 | |
-| 4 | 리뷰 반영 | 리뷰의 모든 지적(P1~P5)을 고쳐 push 했거나 고치지 않는 까닭을 회신했고, 미해결 스레드가 없다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
+| 4 | 리뷰 반영 | P1, P2 는 고쳐 push 했고 P3~P5 는 고쳤거나 고치지 않는 까닭을 회신했으며, 미해결 스레드가 없다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
 | 5 | 머지 판정 | 지금 main 과 합친 상태에서 돈 CI 가 필수 검사를 모두 통과했다 | |
 | 6 | 정리 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 | |
 
