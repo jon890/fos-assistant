@@ -17,8 +17,8 @@ description: |
 | --- | --- | --- | --- |
 | 1 | Draft PR 열기 | `scripts/dev/check-local.sh --fast` 가 0 으로 끝났고 `gh pr create --draft` 가 PR 주소를 냈다 | |
 | 2 | Draft CI | `gh pr checks` 의 모든 검사가 통과다 | |
-| 3 | main 합치고 Ready | 최신 main 을 합친 커밋의 CI 가 모두 통과했고 `gh pr ready` 가 끝났다 | |
-| 4 | 리뷰 반영 | 남은 🔴 P1 과 🟠 P2 를 한 번 고쳐 push 했거나 P2 를 고치지 않는 까닭을 PR 에 남겼다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
+| 3 | main 합치고 Ready | 최신 main 을 합친 커밋의 CI 가 모두 통과했거나 5단계 예외를 만족했고, `gh pr ready` 가 끝났다 | |
+| 4 | 리뷰 반영 | 리뷰의 모든 지적(P1~P5)을 고쳐 push 했거나 고치지 않는 까닭을 회신했고, 미해결 스레드가 없다 | [`code-review-prompt.txt`](../../../.github/workflows/code-review-prompt.txt) |
 | 5 | 머지 판정 | 지금 main 과 합친 상태에서 돈 CI 가 필수 검사를 모두 통과했다 | |
 | 6 | 정리 | `scripts/dev/finish-task.sh` 가 0 으로 끝났고, 위임한 세션을 끝냈다 | |
 
@@ -65,16 +65,24 @@ gh pr ready "$PR"
 
 main 에 새 커밋이 없으면 합칠 것이 없다. 같은 head 의 CI 결과를 쓰고, Ready 전환만으로 CI 를 다시 돌리지 않는다.
 
+**Draft CI 뒤에 들어온 main 커밋이 5단계의 예외 조건을 모두 만족하면 합치지 않고 그대로 Ready 로 바꾼다.**
+겹치지 않는 main 변경 때문에 합치면 CI 가 한 번 더 돌고, 그동안 main 이 또 바뀌어 같은 일이 되풀이된다.
+판정 방법과 명령은 5단계 1번을 따른다. 조건을 하나라도 만족하지 못하면 위 순서대로 합친다.
+
 ## 4. 리뷰 반영
 
-Ready 로 바꾸면 Claude 리뷰가 돈다. Draft 가 아닌 PR 을 바로 열 때도 돈다.
-리뷰가 도는 동안 PR 의 CI 결과를 확인한다.
+**리뷰는 Draft PR 을 push 하자마자 CI 와 동시에 시작한다.** CI 가 끝난 뒤 리뷰하면 리뷰 반영 커밋으로 CI 가 한 번 더 돈다.
+작성자와 다른 리뷰어(다른 에이전트나 다른 제공자의 모델)가 `pr-review` 스킬 형식으로 리뷰를 등록한다. 요약 리뷰 하나와 지적마다 인라인 댓글 하나다.
+Ready 로 바꾸면 GitHub 의 Claude 리뷰도 돈다. 그 리뷰도 같은 방식으로 반영한다.
 
-| 남은 지적 | 어떻게 |
+리뷰 반영은 `review-fix` 스킬로 한다. **등급과 상관없이 모든 지적을 처리한다.**
+
+| 지적 | 어떻게 |
 | --- | --- |
-| 🔴 P1 치명 | 고쳐 push 한다. 고친 커밋의 CI 가 통과하면 머지한다 |
-| 🟠 P2 높음 | 머지 전에 고쳐 push 한다. 이번에 고치지 않으면 그 까닭을 PR 에 한 줄 남긴다 |
-| 🟡 P3 부터 ⚪ P5 까지 | 반영할지 판단해 머지해도 된다 |
+| 🔴 P1 치명, 🟠 P2 높음 | 머지 전에 고쳐 push 한다 |
+| 🟡 P3 부터 ⚪ P5 까지 | 고치거나, 고치지 않으면 그 까닭을 스레드에 회신한다 |
+
+지적마다 커밋 하나와 회신 하나를 남기고 처리한 스레드를 resolve 한다. 반영 커밋의 CI 한 번으로 머지 판정을 받는다.
 
 **리뷰는 한 번 반영하고 끝낸다. 고친 뒤 `/review` 댓글로 리뷰를 다시 돌리지 않는다.**
 `/review` 는 사람이 다시 봐 달라고 요청할 때만 단다.
@@ -96,7 +104,14 @@ Ready 로 바꾸면 Claude 리뷰가 돈다. Draft 가 아닌 PR 을 바로 열 
    gh pr view "$PR" --json mergeable,mergeStateStatus
    comm -12 <(git diff --name-only "$CI_BASE" origin/main | sort) <(gh pr diff "$PR" --name-only | sort)
    ```
-2. main 브랜치 보호가 정한 필수 검사의 통과를 직접 확인한다. 브랜치 보호의 `strict` 는 켜지 않는다.
+2. main 브랜치 보호가 정한 필수 검사의 통과를 **이름으로** 직접 확인한다. 브랜치 보호의 `strict` 는 켜지 않는다.
+   `gh pr checks --required` 는 아직 생기지 않은 필수 검사를 빼고 성공으로 끝날 수 있다. 아래 명령의 출력이 비어 있어야 한다.
+
+   ```bash
+   # cwd: 저장소 root. 통과하지 않은 필수 검사 이름을 낸다.
+   comm -23 <(gh api repos/jon890/fos-assistant/branches/main/protection/required_status_checks --jq '.contexts[]' | sort) \
+     <(gh pr checks "$PR" --json name,state --jq '.[] | select(.state=="SUCCESS") | .name' | sort)
+   ```
 3. 4단계를 충족하면 머지한다. 이력을 한 줄로 합치지 않는다.
 
 ```bash
