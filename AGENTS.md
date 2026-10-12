@@ -164,7 +164,7 @@ push 전에 `scripts/dev/check-local.sh --fast` 로 빠른 검사만 돌리고 D
 scripts/dev/check-local.sh --fast
 ```
 
-PR CI 는 빠른 검사만 돈다. 브라우저 shard 와 E2E 는 하루 한 번 정기 실행이 돌리고, 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이면 다음 push 부터 PR 에서도 돈다. 경로 기준은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다.
+PR CI 에서 브라우저 shard 와 E2E 는 기본으로 건너뛴다. 그 둘은 하루 한 번 정기 실행이 돌리고, 화면 흐름을 크게 바꾼 PR 은 `검사:전체` 라벨을 붙이면 다음 push 부터 PR 에서도 돈다. 경로 기준은 [ADR-20261012 / ci-path-filter](docs/adr/ADR-20261012-ci-path-filter.md) 가 갖는다.
 
 공개 정보 검사의 값 목록은 repository secret `PUBLIC_REPO_DENYLIST` 다. `fos-home-infra` 의 목록이 바뀌면 secret 도 다시 넣는다.
 
@@ -178,9 +178,9 @@ Draft PR 을 열어 올린다. main 에 로컬에서 바로 머지하지 않는�
 **계획서만으로 PR 을 열지 않는다. 예외는 없다.** ADR, 설계 문서, 계획서(`docs/`, `tasks/`)와 그 구현을 한 브랜치에서 끝낸 뒤 한 PR 로 올린다.
 구현이 여러 단계로 나뉘어도 설계만 먼저 머지하지 않는다. 한 PR 이 너무 커지면 구현을 단계별 PR 로 나누되, 각 PR 이 그 단계의 설계와 구현을 함께 담는다.
 
-Draft PR 을 열면 독립 리뷰(작성자와 다른 에이전트나 모델)를 CI 와 동시에 돌린다. Ready 뒤에 도는 GitHub 의 Claude 리뷰도 같다.
-**리뷰는 등급과 상관없이 모든 지적을 처리하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
-P1 과 P2 는 머지 전에 고치고, P3 부터 P5 까지는 고치거나 고치지 않는 까닭을 스레드에 회신하며, 처리한 스레드는 resolve 한다.
+Draft PR 을 열면 독립 리뷰(작성자와 다른 에이전트나 모델)를 CI 와 동시에 돌린다. Ready 뒤에 도는 GitHub 의 Claude 리뷰도 그 지적을 같은 방식으로 한 번에 반영한다.
+**리뷰는 등급과 상관없이 모든 지적에 답하고 한 번 반영한다.** 고친 뒤 `/review` 로 리뷰를 다시 돌리지 않는다.
+등급별 처리는 이렇다. P1 과 P2 는 머지 전에 고친다. P3 부터 P5 까지는 고치거나, 고치지 않는 까닭을 스레드에 회신한다. 답한 스레드는 resolve 한다.
 리뷰 기준은 `.github/workflows/code-review-prompt.txt` 가 갖는다.
 
 머지 직전에 최신 main 을 포함한 head 의 필수 검사가 통과해야 한다. 브랜치 보호의 `strict` 는 켜지 않았으므로 확인은 `scripts/pr/merge-ready.sh <PR>` 가 한다.
