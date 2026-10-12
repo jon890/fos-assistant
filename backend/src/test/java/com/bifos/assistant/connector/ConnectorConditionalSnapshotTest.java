@@ -18,6 +18,7 @@ import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
@@ -79,6 +80,8 @@ class ConnectorConditionalSnapshotTest {
     AppUserRepository users;
     @Autowired
     DataKeyService cipher;
+    @Autowired
+    ConnectorActionBodies bodies;
     @Autowired
     EntityManager em;
     @Autowired
@@ -254,7 +257,9 @@ class ConnectorConditionalSnapshotTest {
             Sha256.hex(UUID.randomUUID().toString()),
             Sha256.hex(raw),
             NOW);
-        action.awaitApproval(raw, NOW.plusSeconds(300));
+        action.awaitApproval(NOW.plusSeconds(300));
+        actions.saveAndFlush(action);
+        bodies.sealArgs(action, raw);
         return actions.saveAndFlush(action);
     }
 
