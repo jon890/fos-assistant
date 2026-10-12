@@ -17,7 +17,8 @@ export function wireEvents(wire: string): Record<string, unknown>[] {
     .map((line) => JSON.parse(line.slice(5).trimStart()) as Record<string, unknown>);
 }
 
-const templates = new Map(wireEvents(wireFixture("events")).map((payload) => [payload.event, payload]));
+// 전송 계층이 끼우는 replay.truncated는 events 표본에 없고 unknown 표본에서 가져온다.
+const templates = new Map([...wireEvents(wireFixture("unknown")), ...wireEvents(wireFixture("events"))].map((payload) => [payload.event, payload]));
 
 /** 버전별 칸은 공유 표본에서 가져오고 실행 식별자와 종료 결과는 실제 대역 상태에서 붙인다. */
 export function eventEnvelope(run: Pick<Run, "run_id" | "output" | "usage" | "runtime">, fields: Record<string, unknown>, sequence = 0): Record<string, unknown> {

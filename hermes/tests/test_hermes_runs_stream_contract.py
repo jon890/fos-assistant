@@ -75,7 +75,6 @@ class RunsStreamContractTest(unittest.IsolatedAsyncioTestCase):
             self.assertLessEqual(len(data), 1, "각 합성 사건은 빈 줄로 구분해야 한다")
             if data:
                 samples.append(json.loads(data[0][5:]))
-        samples = [sample for sample in samples if sample["event"] != "replay.truncated"]
         frames = await self.render(samples)
         self.assertEqual(": open\n\n", frames[0])
         self.assertEqual(": stream closed\n\n", frames[-1])

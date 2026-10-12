@@ -42,6 +42,4 @@ data: {"event":"run.interrupted","run_id":"fixture-run","timestamp":2.3,"error":
 id: 13
 data: {"event":"run.steered","run_id":"fixture-run","timestamp":2.4,"accepted":true,"seq":13}
 
-data: {"event":"replay.truncated","run_id":"fixture-run","timestamp":2.5,"oldest_retained_seq":10}
-
 : stream closed

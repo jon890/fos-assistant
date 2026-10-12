@@ -2659,7 +2659,8 @@ tag가 가리키는 commit은 `hermes_contract.py`의 `HERMES_COMMIT`으로 고�
 Control Plane은 `id:`, `seq`와 `replay.truncated`를 무시하고 기존 사건을 읽는다.
 이번 변경에 `Last-Event-ID` 재연결이나 누락 사건 복구를 더하지 않는다.
 v0.21.6 합성 fixture와 단일 사건 봉투 함수가 transport 차이를 갖고, 이전 버전 fixture도 남긴다.
-공식 SSE handler를 분리 실행해 fixture의 `id/seq`와 첫 연결의 누락 안내를 대조한다.
+공식 SSE handler를 분리 실행해 `events.sse` 의 `id/seq` 를 대조하고, 첫 연결의 누락 안내는 같은 handler 가 만든 것을 손으로 쓴 사건과 따로 대조한다.
+`events.sse` 에는 누락 안내가 없고, 파서가 안내를 건너뛰는지는 `unknown.sse` 가 본다.
 녹화한 운영 본문은 사용하지 않는다.
 
 dashboard plugin의 `python_dependencies`는 `PyYAML==6.0.3`을 선언한다.
