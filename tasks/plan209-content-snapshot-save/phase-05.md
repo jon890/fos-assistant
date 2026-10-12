@@ -45,7 +45,7 @@ summary는 snapshotId·draftId·revision·원래 conversationId와 안전한 job
 McpContentDraftSnapshots는 신규 chat ContentDraftSaveRequests를 주입하고 save 요청을 port로 보낸다. chat controller는 ContentDraftJobQueries를 주입하고 jobs.refresh/list를 부른다. 정확한 생성자·반환 record는 기능 문서의 port 표를 따른다.
 실제 main의 McpCurrentCallerGuard 존재를 먼저 확인한다. canonical MCP 설계에만 있는 미래 producer를 가짜 재사용하지 않고 부재면 최소 guard 이동과 구현·관찰 회귀를 이 phase에 포함한다.
 generic approve는 기존 endpoint·경로를 보존한다. EXECUTING snapshot의 실제 binding 해제 성공을 가정하지 않으며 기존 거절과 실제 사용자/agent 철회 경로를 시험한다.
-원고 승인 줄은 일반 실행 정리가 UNKNOWN으로 바꾸지 않는다. job 기한 정리가 승인 뒤 15분 안에 job과 함께 끝내므로, 화면은 그때까지 EXECUTING 카드가 남는다고 가정한다. 계약은 `docs/features/content-draft.md`의 「승인과 jobId 예약」이 갖는다.
+원고 승인 줄은 일반 실행 정리가 UNKNOWN으로 바꾸지 않는다. job 기한 정리가 승인 뒤 15분 안에 job과 함께 끝내므로, 화면은 그때까지 EXECUTING 카드가 남는다고 가정한다. 바인딩 버전이 바뀐 job은 refresh가 그 자리에서 FAILED나 UNKNOWN으로 닫는다. 계약은 `docs/features/content-draft.md`의 「승인과 jobId 예약」이 갖는다.
 원래 대화의 신규 GET content-draft-jobs는 jobs.list로 bounded 20개+cursor를 반환한다. snapshot 공개 UUID cursor는 owner 범위로만 해석한다. 새 body transport나 원격 status를 목록에서 보내지 않는다.
 
 ### 2. 가림과 최소 화면

@@ -168,12 +168,13 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         ContentDraftBindingStamp binding;
         try {
             binding = bindings.prepare(user, snapshot.agentId(), snapshot.bindingId());
-            if (!sameBinding(snapshot, binding)) {
-                return view;
-            }
         } catch (ApiException ignored) {
-            // 연결이 없거나 다른 버전이면 마지막 CP 상태만 읽는다. 새 연결로 옛 job을 조회하지 않는다.
+            // 연결을 지금 쓸 수 없으면 마지막 CP 상태만 읽는다. 끝나지 않은 job 은 기한 정리가 닫는다.
             return view;
+        }
+        if (!sameBinding(snapshot, binding)) {
+            // 새 연결로 옛 job 을 조회하지 않는다. updatedAt 은 앞으로만 가므로 기다려도 같은 stamp 로 돌아오지 않는다.
+            return closeChanged(user, snapshot, job, view);
         }
         var declaration = catalog.find(binding.connectorId()).map(manifest -> manifest.snapshot()).orElse(null);
         if (declaration == null || !Boolean.TRUE.equals(declaration.capabilities().get("status"))) {
@@ -215,6 +216,22 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 currentJob.close(ContentDraftJob.NOT_FOUND, clock.instant());
             }
             finishAction(action, currentJob);
+            return views(List.of(currentJob)).getFirst();
+        });
+    }
+
+
+    /** 연결이나 바인딩 버전이 달라져 결과를 확인하지 못한 job 을 start claim 유무로 닫는다. 승인 줄도 같은 결과로 끝낸다. */
+    private ContentDraftJobView closeChanged(CurrentUser user, ContentDraftSnapshot snapshot, ContentDraftJob job, ContentDraftJobView view) {
+        return mutations.run(user.id(), new ChatContentMutationTarget(snapshot.conversationId(), List.of()), () -> {
+            access.requireOwn(user, snapshot.conversationId());
+            var action = actions.findByPublicIdForUpdate(view.actionId()).orElseThrow(ContentDraftJobs::notFound);
+            snapshotRows.lockById(snapshot.id()).orElseThrow(ContentDraftJobs::notFound);
+            var currentJob = jobs.lockById(job.id()).orElseThrow(ContentDraftJobs::notFound);
+            if (currentJob.awaitingResult()) {
+                currentJob.close(ContentDraftJob.BINDING_CHANGED, clock.instant());
+                finishAction(action, currentJob);
+            }
             return views(List.of(currentJob)).getFirst();
         });
     }

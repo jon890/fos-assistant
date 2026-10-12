@@ -31,6 +31,8 @@ public class ContentDraftJob {
     public static final String EXPIRED = "CONTENT_DRAFT_JOB_EXPIRED";
     /** worker 가 그 stamp 의 job 을 모른다. 상태 파일이 없거나 정리됐다. */
     public static final String NOT_FOUND = "CONTENT_DRAFT_JOB_NOT_FOUND";
+    /** 연결이나 바인딩 버전이 바뀌어 옛 stamp 로 결과를 확인하지 못했다. */
+    public static final String BINDING_CHANGED = "CONTENT_DRAFT_BINDING_CHANGED";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -151,7 +153,8 @@ public class ContentDraftJob {
 
     /** worker 의 답을 더 기다릴 job 이다. Control Plane 이 닫은 UNKNOWN 은 다시 조회하지 않는다. */
     public boolean awaitingResult() {
-        return running() || status == ContentDraftJobStatus.UNKNOWN && !EXPIRED.equals(errorCode) && !NOT_FOUND.equals(errorCode);
+        return running() || status == ContentDraftJobStatus.UNKNOWN && !EXPIRED.equals(errorCode) && !NOT_FOUND.equals(errorCode)
+            && !BINDING_CHANGED.equals(errorCode);
     }
 
 

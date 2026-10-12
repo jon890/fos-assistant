@@ -3,6 +3,7 @@ package com.bifos.assistant.chat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -142,6 +143,42 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
         assertThat(jobRows.findAll().getFirst().status()).isEqualTo(ContentDraftJobStatus.DISPATCHED);
         clock.advance(Duration.ofMinutes(3));
         assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.FAILED);
+    }
+
+
+    @Test
+    @DisplayName("바인딩 버전이 바뀌면 옛 stamp로 조회하지 않고 start claim 없는 job을 FAILED로 닫는다")
+    void failsUnclaimedJobAfterBindingVersionChange() {
+        var actionId = accepted();
+        touchBinding();
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.FAILED);
+        assertThat(jobRows.findAll().getFirst().errorCode()).isEqualTo(ContentDraftJob.BINDING_CHANGED);
+        assertThat(actionRows.findByPublicId(actionId).orElseThrow().status()).isEqualTo(ActionStatus.FAILED);
+        verify(compiler, never()).status(any(), any(), any());
+        forbidden(() -> authorizer.authorize(starter.started().getLast().ticket(), "start", null));
+    }
+
+
+    @Test
+    @DisplayName("start claim 뒤 바인딩 버전이 바뀌면 UNKNOWN으로 닫고 다시 조회하지 않으며 저장 허가도 거절한다")
+    void closesClaimedJobAsUnknownAfterBindingVersionChange() {
+        var actionId = accepted();
+        String ticket = starter.started().getLast().ticket();
+        authorizer.authorize(ticket, "start", null);
+        touchBinding();
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
+        assertThat(actionRows.findByPublicId(actionId).orElseThrow().status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(refresh().status()).isEqualTo(ContentDraftJobStatus.UNKNOWN);
+        verify(compiler, never()).status(any(), any(), any());
+        forbidden(() -> authorizer.authorize(ticket, "save", null));
+        assertThat(jobRows.findAll().getFirst().saveClaimedAt()).isNull();
+    }
+
+
+    /** 연결 확인이나 재반영이 바인딩의 updatedAt 을 올린 것과 같다. */
+    private void touchBinding() {
+        jdbc.update("update agent_connector_binding set updated_at = ? where id = ?",
+            java.sql.Timestamp.from(clock.instant().plusSeconds(60)), binding.id());
     }
 
 

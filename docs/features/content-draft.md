@@ -326,9 +326,12 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 | 시작 접수·start claim | SAVING | 같은 job만 조회 |
 | 시작 전 거절 | FAILED | 같은 snapshot 재시도 없음 |
 | 시작 결과 모름 | UNKNOWN | 예약 jobId로만 조회, 재승인으로 재실행하지 않음 |
+| 바인딩 버전이 바뀜 | start claim 없으면 FAILED, 있으면 UNKNOWN | 옛 stamp로 조회하지 않고 refresh가 그 자리에서 닫음 |
 | 승인 뒤 15분 동안 끝나지 않음 | start claim 없으면 FAILED, 있으면 UNKNOWN | 기한 정리가 마지막으로 한 번 조회한 뒤 닫음 |
 
-`ContentDraftJobs.refresh`는 주인·원래 대화·원고 ID를 먼저 확인한다. 현재 binding·connection 버전과 정책이 snapshot과 같고 status capability가 켜져 있을 때만 같은 예약 ID를 조회한다. 연결이 없거나 바뀌면 마지막 CP 상태만 읽는다.
+`ContentDraftJobs.refresh`는 주인·원래 대화·원고 ID를 먼저 확인한다. 현재 binding·connection 버전과 정책이 snapshot과 같고 status capability가 켜져 있을 때만 같은 예약 ID를 조회한다. 연결을 지금 쓸 수 없으면 마지막 CP 상태만 읽는다.
+바인딩 버전이 다르면 옛 stamp로 조회하지 않는다. 연결 확인과 재반영이 `updatedAt`을 올리고 그 값은 앞으로만 가므로 기다려도 같은 stamp로 돌아오지 않는다. 끝나지 않은 job은 그 자리에서 start claim이 없으면 FAILED, 있으면 UNKNOWN과 `CONTENT_DRAFT_BINDING_CHANGED`로 닫고 EXECUTING 승인 줄도 같은 결과로 끝낸다. 연결이 바뀌어 결과를 확인하지 못했다는 뜻이다.
+authorize도 바인딩 버전을 대조하므로 닫은 뒤의 worker는 claim을 받지 못한다.
 원격 호출 동안 DB 잠금을 유지하지 않는다. 응답 뒤 coordinator에서 현재 ACL·binding을 다시 확인하고 승인 줄 → snapshot → job 순서로 잠근다. stamp와 jobId가 정확한 결과만 기록한다.
 `ContentDraftWorkerStatusDecoder`는 소문자 worker 상태를 CP enum으로 명시적으로 옮기며 단계·boolean·수치·종료 시각의 타입을 검사한다. 조회 오류는 `CONTENT_DRAFT_JOB_UNAVAILABLE`이고 기존 상태를 FAILED로 바꾸지 않는다.
 worker의 `not_found`는 timeout·전송 실패와 다르다. HTTP client가 `ContentDraftJobNotFound`로 따로 알리고, refresh는 start claim이 없으면 FAILED, 있으면 UNKNOWN과 `CONTENT_DRAFT_JOB_NOT_FOUND`로 닫는다. worker는 브라우저를 열기 전에 반드시 start claim을 받으므로 claim이 없으면 저장 클릭도 없고, 늦게 온 worker는 FAILED에서 claim을 받지 못한다.
