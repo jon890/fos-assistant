@@ -60,6 +60,26 @@ const RESULTS: Partial<
   ],
 };
 
+/** 저장 기능이 꺼져 실행 없이 거절된 줄이다. 새 미리보기를 만들어도 같은 거절이라 다시 만들라고 하지 않는다. */
+const UNSUPPORTED = [
+  "warning",
+  "지금은 저장할 수 없어요. 원고는 그대로 남아 있어요.",
+] as const;
+const DECLINED = ["info", "임시저장을 거절했어요."] as const;
+
+/**
+ * STALE 은 사용자 거절, 실행 없는 거절, 원고 변경·만료를 함께 담는다. 오류 code 는 그리지 않고 문구만 고른다.
+ * job 만 있는 카드는 승인 줄 상태를 몰라 사용자 거절을 원고 변경과 구분하지 못한다.
+ */
+function staleNotice(
+  draft: ContentDraftSummary,
+  actionStatus: ConnectorActionStatus,
+) {
+  if (draft.errorCode === "not_executable") return UNSUPPORTED;
+  if (actionStatus === "REJECTED" && draft.errorCode === null) return DECLINED;
+  return RESULTS.STALE;
+}
+
 /** 사진은 주인 확인을 거치는 기존 대화 첨부 경로로 연다. 정규형 번호가 아니면 링크를 만들지 않는다. */
 function Photos({
   ids,
@@ -262,7 +282,10 @@ export function ContentDraftSaveCard({
 
   const shown =
     status === "PREVIEW_READY" && preview === "gone" ? "STALE" : status;
-  const result = RESULTS[shown];
+  const result =
+    shown === "STALE" && preview !== "gone"
+      ? staleNotice(draft, actionStatus)
+      : RESULTS[shown];
   const loaded = typeof preview === "object" && preview !== null;
 
   return (

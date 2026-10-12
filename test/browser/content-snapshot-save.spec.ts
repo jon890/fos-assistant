@@ -330,6 +330,37 @@ test("승인 응답이 실패로 끝나면 저장할 수 없다는 안내로 끝
   expect(counts.posts).toBe(1);
 });
 
+test("사용자가 거절하면 새 미리보기 안내 대신 거절했다는 안내를 보인다", async ({
+  page,
+}) => {
+  const conversationId = await createConversation(page, "원고 거절");
+  const state = {
+    actions: [draftAction(conversationId, "PENDING", "PREVIEW_READY")],
+  };
+  await routeDraft(page, conversationId, state);
+  await page.route(
+    `**/api/connector-actions/${ACTION_ID}/reject`,
+    (route: Route) => {
+      state.actions = [
+        action({
+          status: "REJECTED",
+          errorCode: null,
+          contentDraft: summary(conversationId, { status: "STALE" }),
+        }),
+      ];
+      return route.fulfill({ json: state.actions[0] });
+    },
+  );
+  await page.goto(`/chat/${conversationId}`);
+
+  const card = page.getByTestId("content-draft-card");
+  await card.getByTestId("content-draft-reject").click();
+  await expect(card.getByTestId("content-draft-result")).toHaveText(
+    "임시저장을 거절했어요.",
+  );
+  await expect(card).not.toContainText("새 미리보기");
+});
+
 test("재접속과 중복 승인 사건에서는 GET 만 보내고 끝난 카드를 유지한다", async ({
   page,
 }) => {
