@@ -33,6 +33,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Accessors(fluent = true)
 public final class ConnectorExecutionSnapshot {
     public static final String PROTOCOL = "approval-claim-v2";
+    /** keyed hash 이전 protocol 이다. 해시 칸이 평문 SHA-256 이다. */
+    public static final String LEGACY_PROTOCOL = "approval-claim-v1";
     public static final String ORDER = "ORDER";
     public static final String CONDITIONAL = "CONDITIONAL";
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
@@ -202,13 +204,28 @@ public final class ConnectorExecutionSnapshot {
     }
 
 
-    /** 하루 상한 합계가 쓰는 실행 원문만 푼다. 저장한 원문 해시와 다시 대조한다. */
+    /**
+     * 하루 상한 합계가 쓰는 실행 원문만 푼다. 실행은 지금 protocol 과 지금 key 의 줄만 받지만, 합계는 같은 날의 이전 줄도 센다.
+     *
+     * <p>keyed hash 이전 protocol 의 줄은 평문 SHA-256 으로, 지금 key 의 줄은 keyed hash 로 원문 해시를 다시 대조한다.
+     * 이전 key 로 만든 줄은 해시를 다시 계산할 수 없어, 줄과 칸과 사용자를 AAD 로 묶은 암호문을 연 것으로 원문을 믿는다.
+     * 그 줄을 빼면 key 를 바꾼 날 상한을 넘고, 열지 못한다고 닫으면 그날 새 주문이 모두 막힌다.
+     */
     static JsonNode openExecutionArgs(
         ConnectorAction action, ConnectorActionExecution row, TextCipher cipher, FinancialDigest digest) {
         require(action != null && row != null && Objects.equals(action.id(), row.actionId()));
-        require(PROTOCOL.equals(row.protocol()));
         String args = openColumn(action, row.contentKeyId(), "execution_args_json", row.executionArgsJson(), cipher);
-        require(digest.of("execution_args_json", args).equals(row.executionArgsSha256()));
+        String stored = row.executionArgsSha256();
+        if (LEGACY_PROTOCOL.equals(row.protocol())) {
+            require(Sha256.hex(args).equals(stored));
+        } else {
+            require(PROTOCOL.equals(row.protocol()) && FinancialDigest.keyed(stored));
+            if (stored.startsWith(digest.currentPrefix())) {
+                require(digest.of("execution_args_json", args).equals(stored));
+            } else {
+                require(row.contentKeyId() != null);
+            }
+        }
         return object(args, 16 * 1024);
     }
 

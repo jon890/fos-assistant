@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ConnectorFinancialGateTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String KEY = "src/test/resources/financial/test-digest.key";
+    private static final String ROTATED_KEY = "src/test/resources/financial/test-digest-rotated.key";
     private static final FinancialDigest DIGEST = new FinancialDigest(LiveProperties.fixed(ConnectorFinancialProperties.class, open("1", "1", "1")));
     // KST 2026-10-13 10:00 이다. 하루의 시작은 UTC 2026-10-12T15:00 이다.
     private static final Instant NOW = Instant.parse("2026-10-13T01:00:00Z");
@@ -39,6 +41,7 @@ class ConnectorFinancialGateTest {
         + "\"orderType\":\"LIMIT\",\"clientOrderId\":\"c\",\"account_seq\":\"7\"}";
     private final ConnectorActionRepository actions = mock(ConnectorActionRepository.class);
     private final ConnectorActionExecutionRepository contents = mock(ConnectorActionExecutionRepository.class);
+    private final TextCipher cipher = mock(TextCipher.class);
     private final List<ConnectorAction> today = new ArrayList<>();
 
 
@@ -180,12 +183,54 @@ class ConnectorFinancialGateTest {
     }
 
 
+    @Test
+    @DisplayName("같은 날 keyed hash 이전 protocol 로 성공한 주문은 평문 SHA 로 대조해 하루 합계에 넣고 새 주문을 막지 않는다")
+    void sumsLegacyRowsWithPlainSha() {
+        spent(1L, ActionStatus.SUCCEEDED, LIMIT_BUY, ConnectorExecutionSnapshot.LEGACY_PROTOCOL, Sha256.hex(LIMIT_BUY));
+        assertThatCode(() -> gate(open("2000", "2", "4000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .doesNotThrowAnyException();
+        assertThatThrownBy(() -> gate(open("2000", "2", "3999")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOf(ApiException.class);
+    }
+
+
+    @Test
+    @DisplayName("이전 protocol 줄이라도 평문 SHA 가 원문과 다르면 하루 합계를 내지 않고 닫는다")
+    void rejectsLegacyRowWithMismatchedSha() {
+        spent(1L, ActionStatus.SUCCEEDED, LIMIT_BUY, ConnectorExecutionSnapshot.LEGACY_PROTOCOL, Sha256.hex(LIMIT_BUY + " "));
+        assertThatThrownBy(() -> gate(open("2000", "2", "4000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOf(RuntimeException.class);
+    }
+
+
+    @Test
+    @DisplayName("key 를 바꾼 같은 날 이전 key 로 성공한 주문도 암호문을 열어 하루 합계에 넣는다")
+    void sumsRowsOfPreviousKey() {
+        var rotated = new FinancialDigest(LiveProperties.fixed(ConnectorFinancialProperties.class,
+            new ConnectorFinancialProperties(List.of("7"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
+                BigDecimal.ONE, ROTATED_KEY)));
+        var row = spent(1L, ActionStatus.SUCCEEDED, "sealed", ConnectorExecutionSnapshot.PROTOCOL,
+            rotated.of("execution_args_json", LIMIT_BUY));
+        when(row.contentKeyId()).thenReturn(3L);
+        when(cipher.open(eq(3L), any(), any(), eq("sealed"))).thenReturn(Optional.of(LIMIT_BUY));
+        assertThatCode(() -> gate(open("2000", "2", "4000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .doesNotThrowAnyException();
+        assertThatThrownBy(() -> gate(open("2000", "2", "3999")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOf(ApiException.class);
+        // 암호화하지 않은 줄은 해시로도 AAD 로도 원문을 확인할 수 없어 닫는다.
+        when(row.contentKeyId()).thenReturn(null);
+        when(row.executionArgsJson()).thenReturn(LIMIT_BUY);
+        assertThatThrownBy(() -> gate(open("2000", "2", "4000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOf(RuntimeException.class);
+    }
+
+
     private void spent(long id, ActionStatus status, String args) {
         spent(id, status, args, ConnectorExecutionSnapshot.PROTOCOL, DIGEST.of("execution_args_json", args));
     }
 
 
-    private void spent(long id, ActionStatus status, String args, String protocol, String executionArgsSha256) {
+    private ConnectorActionExecution spent(long id, ActionStatus status, String args, String protocol, String executionArgsSha256) {
         var action = mock(ConnectorAction.class);
         when(action.id()).thenReturn(id);
         when(action.status()).thenReturn(status);
@@ -198,6 +243,7 @@ class ConnectorFinancialGateTest {
         when(row.executionArgsSha256()).thenReturn(executionArgsSha256);
         when(contents.findById(id)).thenReturn(Optional.of(row));
         today.add(action);
+        return row;
     }
 
 
@@ -205,7 +251,7 @@ class ConnectorFinancialGateTest {
         when(actions.findByUserIdAndRiskAndDecidedAtGreaterThanEqual(eq(9L), eq(ToolRisk.FINANCIAL),
             eq(Instant.parse("2026-10-12T15:00:00Z")))).thenReturn(today);
         var live = LiveProperties.fixed(ConnectorFinancialProperties.class, properties);
-        return new ConnectorFinancialGate(live, actions, contents, mock(TextCipher.class), new FinancialDigest(live));
+        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live));
     }
 
 

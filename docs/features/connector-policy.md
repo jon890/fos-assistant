@@ -527,6 +527,7 @@ Hermes와 SDK로 보내는 원문 해시는 암호화 전 UTF-8 바이트의 소
 DB에는 이 값을 적지 않는다. 금융 줄의 `args_sha256`, `execution_args_sha256`, `scope_sha256`, `request_key`는 `FinancialDigest`의 keyed hash다.
 keyed hash는 운영 비밀 key 파일과 칸 이름으로 만든 HMAC-SHA256이며 `k1` 접두, key 식별자 8글자, 앞 27바이트의 16진수로 64글자다.
 DB만 읽은 사람이 인자 후보를 대입해 맞혀 보지 못하게 하려는 것이다. key 파일이 없거나, keyed hash 이전 protocol(`approval-claim-v1`)이나 이전 key로 만든 PENDING·EXECUTING·UNKNOWN 줄이 남았으면 금융 관문이 닫힌다. 지금 protocol(`approval-claim-v2`)과 지금 key로 만든 줄, 끝난 줄은 보지 않으므로 첫 실제 호출 뒤 재기동해도 관문이 다시 열린다.
+하루 상한 합계는 같은 날의 이전 protocol 줄과 이전 key 줄도 센다. 이전 protocol 줄은 평문 SHA-256으로 대조하고, 이전 key 줄은 AAD로 묶은 암호문을 열어 금액을 읽는다.
 key를 바꾸면 같은 의도도 request_key가 달라지므로 이전 key의 열린 줄이 끝날 때까지 닫는다. 근거는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md)이 갖는다.
 request_key의 원재료는 사용자, 커넥터, 도구와 실행 args의 정규화한 문자열 필드로 만든다. 연결 번호는 넣지 않는다.
 scope arg, market, currency와 원래 orderId는 포함하고 clientOrderId와 expected_order는 제외한다.

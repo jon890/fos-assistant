@@ -26,6 +26,7 @@ key 를 바꾸면 같은 사용자, 커넥터, 계좌, 주문도 다른 `request
 - `ConnectorFinancialGate.requireOpen()` 은 지금 protocol(`approval-claim-v2`)이 아니거나 `request_key` 가 지금 key 식별자로 시작하지 않는 `PENDING`, `EXECUTING`, `UNKNOWN` 줄이 있으면 닫는다.
 - 끝난 줄(`SUCCEEDED`, `FAILED`, `REJECTED` 같은 상태)은 보지 않는다. 보면 key 를 바꾼 뒤 재기동할 때마다 닫힌다.
 - 준비, 승인, claim 이 모두 이 검사를 지나므로, 이전 key 로 만든 대기 중인 승인과 아직 소비하지 않은 ticket 도 금융 전송 없이 거절된다.
+- 하루 합계는 같은 날 승인으로 넘어간 줄(`EXECUTING`, `SUCCEEDED`, `UNKNOWN`)을 key 와 protocol 에 상관없이 센다. `approval-claim-v1` 줄은 평문 SHA-256 으로, 지금 key 의 줄은 keyed hash 로 원문을 대조한다. 이전 key 의 줄은 해시를 다시 계산할 수 없어, 줄과 칸과 사용자를 AAD 로 묶은 암호문을 열어 금액을 읽는다. 빼면 key 를 바꾼 날 상한을 넘고, 닫으면 그날 새 주문이 모두 막힌다.
 
 key 를 바꾸기 전에 열린 금융 줄이 없는지 확인한다.
 남은 `UNKNOWN` 은 토스증권에서 결과를 확인한 뒤 정리한다. 확인하고 정리하는 방법은 `fos-home-infra` 가 갖는다.
