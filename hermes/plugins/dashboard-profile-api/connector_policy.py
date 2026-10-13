@@ -18,6 +18,7 @@ from .connector_schema import (
     FIELD_KEY_RE,
     HERMES_TOOL_NAME_MAX_CHARS,
     OUTCOME_UNKNOWN,
+    RETRY_KEY_RE,
     SECRET_ARGUMENT_NAMES,
     SECRET_ARGUMENT_SUFFIXES,
     TOOL_APPROVALS,
@@ -203,6 +204,8 @@ def _connector_errors(declared) -> tuple:
 
     항목은 공통 어휘 글이거나 `{category, recovery, details}` 객체다. 객체의 `recovery` 는 복구 어휘 하나이고
     `details` 는 도구 오류에서 넘길 칸 이름의 목록이다. 칸 값의 모양은 실행 경로가 본다.
+    `outcome_unknown` 인 객체는 `{category, retry_key}` 만이다. `retry_key` 는 다시 보낼 때 쓰는 식별자 칸 이름이다
+    (ADR-20261013 unknown-retry-key).
     """
     if not isinstance(declared, dict):
         raise ValueError("errors 는 객체다")
@@ -210,6 +213,15 @@ def _connector_errors(declared) -> tuple:
     for code, entry in declared.items():
         if not isinstance(code, str) or not ERROR_CODE_RE.fullmatch(code):
             raise ValueError("errors 의 코드는 대문자, 숫자, 밑줄로 64자까지다")
+        if isinstance(entry, dict) and entry.get("category") == OUTCOME_UNKNOWN:
+            # 실행 경로가 504 로 답하는 코드다. 실패로 기록되지 않으므로 복구 어휘와 세부는 없고 재시도 식별자만 싣는다.
+            if set(entry) != {"category", "retry_key"}:
+                raise ValueError("outcome_unknown 인 코드의 객체 항목은 category 와 retry_key 만 갖는다")
+            if not isinstance(entry["retry_key"], str) or not RETRY_KEY_RE.fullmatch(entry["retry_key"]):
+                raise ValueError("errors 의 retry_key 는 영문자로 시작하는 영문자, 숫자, 밑줄 32자까지다")
+            contracts[code] = {"recovery": None, "details": (), "retry_key": entry["retry_key"]}
+            words[code] = OUTCOME_UNKNOWN
+            continue
         if isinstance(entry, dict):
             if "category" not in entry or set(entry) - {"category", "recovery", "details"}:
                 raise ValueError("errors 의 객체 항목은 category 와 선택 칸 recovery, details 만 갖는다")
@@ -222,10 +234,7 @@ def _connector_errors(declared) -> tuple:
                     or len(set(details)) != len(details)):
                 raise ValueError("errors 의 details 는 겹치지 않는 칸 이름 %d개까지다" % ERROR_DETAILS_MAX)
             entry = entry["category"]
-            if entry == OUTCOME_UNKNOWN:
-                # 실행 경로가 504 로 답하는 코드다. 실패로 기록되지 않으므로 복구 정보를 실을 자리가 없다.
-                raise ValueError("outcome_unknown 인 코드는 복구 계약을 갖지 않는다")
-            contracts[code] = {"recovery": recovery, "details": tuple(details)}
+            contracts[code] = {"recovery": recovery, "details": tuple(details), "retry_key": None}
         if not isinstance(entry, str) or entry not in ERROR_WORDS:
             raise ValueError("errors 의 값은 공통 어휘 다섯 가운데 하나다")
         words[code] = entry

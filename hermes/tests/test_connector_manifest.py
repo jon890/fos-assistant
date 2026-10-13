@@ -169,7 +169,9 @@ class ConnectorCatalogTest(ConnectorGateCase):
         entry = body[0]
         self.assertEqual(set(entry), {"id", "schema", "title", "description", "icon", "link", "readme_url", "link_kind", "fields", "verify",
                                       "mcp_server", "toolsets", "attachments", "single_binding", "owner_browser",
-                                      "owner_browser_login_url", "tools", "skills"})
+                                      "owner_browser_login_url", "tools", "skills", "unknown_errors"})
+        # 글로 선언한 `outcome_unknown` 코드는 재시도 식별자 칸이 없다.
+        self.assertEqual(entry["unknown_errors"], {"DEMO_UNKNOWN": None})
         # `icon` 과 `link` 를 선언하지 않은 커넥터는 두 칸이 null 이다.
         self.assertIsNone(entry["icon"])
         self.assertIsNone(entry["link"])
@@ -202,6 +204,12 @@ class ConnectorCatalogTest(ConnectorGateCase):
         self.operator_list({})
         self.assertEqual(self.catalog(), [])
         self.assertIsNone(self.plugin._connector_manifest(DEMO))
+
+    def test_catalog_carries_declared_retry_key_of_unknown_codes(self):
+        """`outcome_unknown` 객체 항목의 `retry_key` 는 카탈로그의 `unknown_errors` 에 실린다. 다른 어휘의 코드는 싣지 않는다."""
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            DEMO_UNKNOWN={"category": "outcome_unknown", "retry_key": "attemptId"}))
+        self.assertEqual(self.catalog()[0]["unknown_errors"], {"DEMO_UNKNOWN": "attemptId"})
 
     def test_invalid_manifest_is_left_out_without_raising(self):
         """manifest 검증이 하나라도 실패하면 그 커넥터는 카탈로그에서 빠지고 예외가 나지 않는다."""
@@ -245,6 +253,17 @@ class ConnectorCatalogTest(ConnectorGateCase):
             ("errors contract on outcome_unknown", "connector.json",
              lambda value: value["errors"].update(DEMO_UNKNOWN={"category": "outcome_unknown",
                                                                 "recovery": "recheck"})),
+            ("errors retry_key with a recovery on outcome_unknown", "connector.json",
+             lambda value: value["errors"].update(DEMO_UNKNOWN={"category": "outcome_unknown",
+                                                                "retry_key": "attemptId", "recovery": "recheck"})),
+            ("errors outcome_unknown object without retry_key", "connector.json",
+             lambda value: value["errors"].update(DEMO_UNKNOWN={"category": "outcome_unknown"})),
+            ("errors retry_key format", "connector.json",
+             lambda value: value["errors"].update(DEMO_UNKNOWN={"category": "outcome_unknown",
+                                                                "retry_key": "attempt-id"})),
+            ("errors retry_key outside outcome_unknown", "connector.json",
+             lambda value: value["errors"].update(DEMO_FORBIDDEN={"category": "forbidden",
+                                                                  "retry_key": "attemptId"})),
             ("toolsets opens the shell", "connector.json", lambda value: value.update(toolsets=["terminal"])),
             ("toolsets mixes an allowed and a closed name", "connector.json",
              lambda value: value.update(toolsets=["vision", "file"])),

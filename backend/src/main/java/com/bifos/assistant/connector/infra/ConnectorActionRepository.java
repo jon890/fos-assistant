@@ -85,6 +85,11 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
     List<ConnectorAction> findByStatusAndExpiresAtBefore(ActionStatus status, Instant now);
 
 
+    /** 그 사용자가 그 커넥터의 그 도구로 남긴, 결과 글이 있는 줄이다. 재시도 식별자를 남긴 UNKNOWN 줄을 찾는다. */
+    List<ConnectorAction> findByUserIdAndConnectorIdAndHermesToolAndStatusAndStoredResultTextIsNotNull(
+        Long userId, String connectorId, String hermesTool, ActionStatus status);
+
+
     /** 그 사용자의 그 상태인 줄이다. 만든 순이다. 먼저 알리기가 답을 기다리는 줄을 읽는다. */
     List<ConnectorAction> findByUserIdAndStatusOrderByIdAsc(Long userId, ActionStatus status);
 

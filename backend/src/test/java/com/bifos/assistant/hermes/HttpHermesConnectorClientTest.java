@@ -20,6 +20,7 @@ import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -881,9 +882,48 @@ class HttpHermesConnectorClientTest {
                 .isInstanceOfSatisfying(ConnectorExecutionUnknown.class, ex -> {
                     assertThat(ex.getMessage()).isNull();
                     assertThat(ex.getCause()).isNull();
+                    assertThat(ex.detail()).isEmpty();
                 });
         }
         server.verify();
+    }
+
+
+    @DisplayName("실행의 504 본문에서 선언한 오류 코드와 재시도 식별자만 읽고 다른 칸과 식별자 형식이 아닌 값은 버린다")
+    @Test
+    void executeReadsDeclaredCodeAndRetryIdentifierFromUnknownAnswer() {
+        String url = BASE + "/api/connectors/demo-notes/execute";
+        String attemptId = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f";
+        // career 의 5xx 를 대시보드 plugin 이 옮긴 모양이다. plugin 이 걸러야 하는 칸이 섞여 와도 읽지 않는다.
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.GATEWAY_TIMEOUT).body(
+            "{\"detail\":\"도구가 실행 결과를 모른다고 답했다\",\"code\":\"CAREER_OUTCOME_UNKNOWN\","
+                + "\"retry\":{\"attemptId\":\"" + attemptId + "\"},\"message\":\"raw\",\"answer\":\"private answer\"}"));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.GATEWAY_TIMEOUT).body(
+            "{\"code\":\"CAREER_OUTCOME_UNKNOWN\",\"retry\":{\"attemptId\":\"me@example.com\"}}"));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.GATEWAY_TIMEOUT).body(
+            "{\"code\":\"CAREER_OUTCOME_UNKNOWN\",\"retry\":{\"attemptId\":\"a\",\"other\":\"b\"}}"));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.GATEWAY_TIMEOUT).body(
+            "{\"code\":\"Request had insufficient scopes\",\"retry\":{\"attemptId\":\"a\"}}"));
+
+        ConnectorUnknownDetail declared = unknownDetail();
+        assertThat(declared).isEqualTo(new ConnectorUnknownDetail("CAREER_OUTCOME_UNKNOWN", "attemptId", attemptId));
+        assertThat(declared.toStored()).doesNotContain("private answer").doesNotContain("raw");
+        assertThat(unknownDetail()).as("식별자 형식이 아닌 값").isEqualTo(
+            new ConnectorUnknownDetail("CAREER_OUTCOME_UNKNOWN", null, null));
+        assertThat(unknownDetail()).as("칸이 둘인 retry").isEqualTo(
+            new ConnectorUnknownDetail("CAREER_OUTCOME_UNKNOWN", null, null));
+        assertThat(unknownDetail()).as("코드 형식이 아닌 글").isNull();
+        server.verify();
+    }
+
+
+    private ConnectorUnknownDetail unknownDetail() {
+        try {
+            client.execute(PROFILE, DEMO, "mcp__demo__write_note", "{}");
+        } catch (ConnectorExecutionUnknown ex) {
+            return ex.detail().orElse(null);
+        }
+        throw new AssertionError("결과를 모르는 실행이어야 한다");
     }
 
 

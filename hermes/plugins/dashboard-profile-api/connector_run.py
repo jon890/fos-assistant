@@ -350,7 +350,11 @@ async def _connector_execute_request(request, connector_id: str, prepare=False):
         return _rejected("실행할 수 없는 도구다")
     if answer.get("error") == OUTCOME_UNKNOWN:
         # 도구가 쓰기를 보낸 뒤 답을 받지 못했다고 알렸다. 실패로 답하면 이미 나간 쓰기가 실패로 기록된다.
+        # 선언한 코드와 재시도 식별자만 더한다. 에이전트가 같은 식별자로 확인 호출을 하게 한다(ADR-20261013 unknown-retry-key).
         logger.warning("dashboard-profile-api: 커넥터 %s 의 도구 %s 가 실행 결과를 모른다고 답했다",
                        connector_id, hermes_tool)
-        return _rejected("도구가 실행 결과를 모른다고 답했다", 504)
+        unknown = {"detail": "도구가 실행 결과를 모른다고 답했다", "code": answer["code"]}
+        if "retry" in answer:
+            unknown["retry"] = answer["retry"]
+        return JSONResponse(unknown, status_code=504)
     return JSONResponse(answer, status_code=200)

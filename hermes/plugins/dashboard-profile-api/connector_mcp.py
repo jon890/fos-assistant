@@ -14,6 +14,10 @@ from .connector_policy import (
     _hermes_tool_name,
 )
 
+from .connector_schema import (
+    RETRY_VALUE_RE,
+)
+
 
 ERROR_DETAIL_INT_MAX = 1_000_000_000
 
@@ -132,6 +136,7 @@ def _connector_error_answer(manifest: dict, result, answer: dict) -> dict:
 
     `errors` 표에 있는 코드만 더한다. 세부 칸은 그 코드의 `details` 가 적은 이름이고 값이 정수나 boolean 인 것만 옮긴다.
     도구 오류의 다른 칸, 원문 메시지, 중첩 값은 옮기지 않는다. 복구 어휘는 도구 결과가 아니라 manifest 에서 꺼낸다.
+    `outcome_unknown` 인 코드가 `retry_key` 를 선언했으면 그 칸 하나만 `retry` 로 옮긴다(ADR-20261013 unknown-retry-key).
     """
     payload = _tool_payload(result)
     error, code = _tool_error(payload) if payload is not _UNREADABLE else ({}, None)
@@ -141,12 +146,28 @@ def _connector_error_answer(manifest: dict, result, answer: dict) -> dict:
     contract = manifest["error_contracts"].get(code)
     if contract is None:
         return answer
+    if contract["retry_key"] is not None:
+        value = _retry_value(payload, error, contract["retry_key"])
+        if value is not None:
+            answer["retry"] = {contract["retry_key"]: value}
     if contract["recovery"] is not None:
         answer["recovery"] = contract["recovery"]
     details = {key: error[key] for key in contract["details"] if key in error and _safe_error_detail(error[key])}
     if details:
         answer["details"] = details
     return answer
+
+
+def _retry_value(payload, error: dict, key: str):
+    """다시 보낼 때 쓰는 식별자 값이다. 오류 객체의 칸을 먼저 보고, 맞는 값이 없으면 결과 맨 위의 칸을 본다.
+
+    식별자 형식(`RETRY_VALUE_RE`)에 맞는 글만 돌려준다. 없거나 맞지 않으면 None 이다.
+    """
+    for source in (error, payload):
+        value = source.get(key) if isinstance(source, dict) else None
+        if isinstance(value, str) and RETRY_VALUE_RE.fullmatch(value):
+            return value
+    return None
 
 
 async def _run_connector_execute(manifest: dict, hermes_tool: str, args: dict, env: dict, progress: dict):

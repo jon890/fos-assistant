@@ -55,6 +55,14 @@ public class ConnectorActionBodies implements ConnectorActionBodyOpener {
     }
 
 
+    /** 결과를 모르는 줄에 커넥터가 선언한 코드와 재시도 식별자를 봉인해 남긴다. 결과 본문은 아니다. */
+    public void unknown(ConnectorAction action, String plain, Instant now) {
+        var sealed = seal(action, "result_text", plain);
+        action.unknown(sealed.content(), sealed.keyId(), now);
+        action.attachOpener(this);
+    }
+
+
     private SealedText seal(ConnectorAction action, String column, String plain) {
         if (action.id() == null || plain == null) {
             throw new IllegalStateException("connector action body requires an id and content");
