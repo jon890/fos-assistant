@@ -132,6 +132,41 @@ for (const scenario of failures) {
   });
 }
 
+test("실제 Chrome에서 제목 가운데만 덮이면 같은 문단의 다른 지점을 눌러 커서를 둔다", async () => {
+  const page = await ready();
+  await page.js(`(() => {const r=document.getElementById('title').getBoundingClientRect();
+    const tip=document.createElement('div');tip.className='synthetic-tooltip extra';
+    tip.style.cssText='position:fixed;z-index:100;background:white;width:80px;height:'+r.height+'px;'
+      +'left:'+(r.left+r.width/2-40)+'px;top:'+r.top+'px';document.body.append(tip)})()`);
+  const result = await focusTitle(page);
+  expect(result.focused).toBe(true);
+  expect(result.diagnostics.samples.at(-1)).toMatchObject({ hit: "title", covered_by: null, layers: [] });
+});
+
+test("실제 Chrome에서 제목 전체가 덮이면 덮은 요소와 보이는 레이어를 이름만 진단에 남긴다", async () => {
+  const page = await ready();
+  await page.js(`(() => {${overlay}
+    cover.className='synthetic-balloon wide private-third';cover.setAttribute('role','dialog')})()`);
+  const start = browser.calls.length;
+  const result = await focusTitle(page);
+  expect(result.focused).toBe(false);
+  const sample = result.diagnostics.samples.at(-1)!;
+  expect(sample.covered_by).toBe("div.synthetic-balloon.wide");
+  expect(sample.layers).toEqual(["div.synthetic-balloon.wide"]);
+  expect(JSON.stringify(sample)).not.toContain("synthetic-private");
+  expect(browser.calls.slice(start)).not.toContain("Input.dispatchMouseEvent");
+});
+
+test("진단 필터는 덮은 요소 이름을 안전한 글자와 개수로 제한한다", () => {
+  const safe = filterFocusDiagnostics({ attempts: 1, samples: [{
+    covered_by: "div.a b", layers: ["div.ok", "bad name", 3, ...Array(20).fill("div.x")],
+  }, { covered_by: "section.ok", layers: "nope" }] })!;
+  expect(safe.samples[0]!.covered_by).toBeNull();
+  expect(safe.samples[0]!.layers).toEqual(["div.ok", ...Array(5).fill("div.x")]);
+  expect(safe.samples[0]!.layers[0]).toBe("div.ok");
+  expect(safe.samples[1]).toMatchObject({ covered_by: "section.ok", layers: [] });
+});
+
 for (const property of ["opacity", "display"] as const) for (const recovers of [false, true]) {
   test(`실제 Chrome 준비 판정은 제목 조상의 ${property} 숨김을 ${recovers ? "회복" : "거절"}한다`, async () => {
     const { page, targetId } = await browser.tab({ openSeconds: recovers ? 0.5 : 0.15 });

@@ -14,6 +14,10 @@ export type FocusSample = {
   active: Region;
   collapsed: boolean;
   input_frame: boolean;
+  /** 클릭 지점을 차지한 문서 밖 요소. 태그와 앞 클래스 둘로만 적는다. 가리지 않으면 `null` 이다. */
+  covered_by: string | null;
+  /** 지금 보이는 레이어 요소. 태그와 앞 클래스 둘로만 적고 여덟 개까지다. */
+  layers: string[];
 };
 export type FocusDiagnostics = { attempts: number; samples: FocusSample[] };
 const MAX_ATTEMPTS = 10;
@@ -21,6 +25,10 @@ const bounded = (value: unknown, max: number) =>
   typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.min(max, Math.floor(value)))
     : 0;
+const MAX_LAYERS = 8;
+const ELEMENT_NAME = /^[A-Za-z0-9_.-]{1,80}$/;
+const elementName = (value: unknown) =>
+  typeof value === "string" && ELEMENT_NAME.test(value) ? value : null;
 const region = (value: unknown): Region =>
   value === "title" || value === "body" || value === "none" ? value : "other";
 
@@ -51,6 +59,13 @@ export function filterFocusDiagnostics(
         active: region(s.active),
         collapsed: s.collapsed === true,
         input_frame: s.input_frame === true,
+        covered_by: elementName(s.covered_by),
+        layers: Array.isArray(s.layers)
+          ? s.layers
+              .slice(0, MAX_LAYERS)
+              .map(elementName)
+              .filter((name): name is string => name !== null)
+          : [],
       };
     }),
   };
@@ -66,8 +81,17 @@ async function probe(page: EditorPage, selector: string, scope: string) {
   const sized = !!r && r.width > 0 && r.height > 0;
   const editable = !!el && (el.isContentEditable || bufferReady) &&
     el.checkVisibility({opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true});
-  const x = r ? r.left + r.width / 2 : 0, y = r ? r.top + r.height / 2 : 0;
-  const top = sized ? document.elementFromPoint(x, y) : null;
+  // 가운데가 다른 요소에 덮이면 같은 문단의 다른 지점을 본다. 덮은 요소를 치우거나 강제로 누르지는 않는다.
+  const spots = r ? [0.5, 0.1, 0.9, 0.25, 0.75].map(f => ({x: r.left + Math.max(4, r.width * f), y: r.top + r.height / 2})) : [];
+  const hits = sized ? spots.map(p => document.elementFromPoint(p.x, p.y)) : [];
+  const found = hits.findIndex(h => !!el && el.contains(h));
+  const pick = found >= 0 ? found : 0;
+  const x = spots[pick]?.x ?? 0, y = spots[pick]?.y ?? 0;
+  const top = hits[pick] ?? null;
+  const name = e => e ? (e.tagName.toLowerCase() + [...e.classList].slice(0, 2).map(c => "." + c).join(""))
+    .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 80) : null;
+  const shown = e => { const b = e.getBoundingClientRect(); const c = getComputedStyle(e);
+    return b.width > 0 && b.height > 0 && c.display !== "none" && c.visibility !== "hidden"; };
   const classify = n => {
     if (!n) return "none";
     const e = n.nodeType === 1 ? n : n.parentElement;
@@ -90,7 +114,10 @@ async function probe(page: EditorPage, selector: string, scope: string) {
     elements: Math.min(nodes.length, 100), sized, editable,
     page_focused: pageFocused, page_visible: pageVisible,
     hit: classify(top), anchor: classify(s?.anchorNode), end: classify(s?.focusNode),
-    active: classify(active), collapsed: !!s?.isCollapsed, input_frame: !!inputFrame
+    active: classify(active), collapsed: !!s?.isCollapsed, input_frame: !!inputFrame,
+    covered_by: sized && !el.contains(top) ? name(top) : null,
+    layers: sized && !el.contains(top) ? [...new Set([...document.querySelectorAll("[class*=layer], [class*=popup], [class*=dim], [class*=tooltip], [class*=balloon], [role=dialog]")]
+      .filter(e => shown(e) && !e.closest("[class*=toolbar]")).map(name))].slice(0, ${MAX_LAYERS}) : []
   }};
 })()`);
   const sample = filterFocusDiagnostics({
