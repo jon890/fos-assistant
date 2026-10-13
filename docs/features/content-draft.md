@@ -213,7 +213,7 @@ Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두
 스키마·설치·HTTP 장애는 원고의 기존 안전한 오류로 끝낸다.
 
 검증은 공유 golden의 Java UTF-8 바이트·두 지문, 실제 HTTP 대역, Spring 동시 revision·권한 철회·원본 교체, H2 마이그레이션과 fresh MySQL을 사용한다.
-운영 Hermes 왕복·실제 provider·승인·worker 시작·복구·공개 handler·프론트·실제 30장 canary는 이 범위에서 실행하지 않는다.
+이 절의 compile 검증은 운영 Hermes 왕복·실제 provider·실제 30장 canary를 실행하지 않는다. 승인·worker 시작·복구·공개 handler는 아래 절과 「후속 경계와 완료 판정」이 갖는다.
 
 ## 승인 snapshot과 저장 job
 
