@@ -367,8 +367,11 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         # 시간 초과 때와 같은 상태와 모양이다. Control Plane 이 두 경우를 같은 길로 읽는다. 글만 까닭을 따로 말한다.
         with patch_plugin(self.plugin, "CONNECTOR_EXECUTE_TIMEOUT_SECONDS", 3):
             slow_status, slow_body = self.execute("mcp__demo__list_scopes", profile="slow")
-        self.assertEqual((slow_status, set(slow_body)), (status, set(body)))
-        self.assertEqual(set(body), {"detail"})
+        self.assertEqual(slow_status, status)
+        self.assertEqual(set(slow_body), {"detail"})
+        # 선언한 코드는 함께 싣는다. 재시도 식별자를 선언하지 않았으므로 `retry` 는 없다.
+        self.assertEqual(set(body), {"detail", "code"})
+        self.assertEqual(body["code"], "DEMO_UNKNOWN")
         # 다른 코드는 그대로 200 과 공통 어휘다.
         self.install("bob", token=call_base.BAD_TOKEN)
         self.assertEqual(self.execute("mcp__demo__list_scopes", profile="bob"),
@@ -517,6 +520,34 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         # 표에 없는 코드는 지금처럼 unavailable 이고 코드도 넘기지 않는다.
         self.assertEqual(self.fixed_execute({"error": {"code": "DEMO_RAW_403", "actual_count": 1}}), UNAVAILABLE)
         self.assertEqual(self.fixed_execute({"error": "DEMO_STALE"}), UNAVAILABLE)
+
+    def test_outcome_unknown_forwards_only_code_and_declared_retry_identifier(self):
+        """`outcome_unknown` 코드가 `retry_key` 를 선언하면 504 본문에 코드와 그 칸 하나만 싣는다.
+
+        career 의 5xx 모양이다. 식별자는 오류 객체 밖 맨 위 칸에 있다. 원문 메시지와 다른 칸, 인자는 싣지 않는다.
+        """
+        self.rewrite("connector.json", lambda value: value["errors"].update(
+            DEMO_UNKNOWN={"category": "outcome_unknown", "retry_key": "attemptId"}))
+        attempt = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f"
+        career = {"error": {"code": "DEMO_UNKNOWN", "message": "저장 여부를 알 수 없습니다."},
+                  "attemptId": attempt, "answer": "private answer", "score": "pass"}
+        status, body = self.fixed_execute(career)
+        self.assertEqual(status, 504, body)
+        self.assertEqual({key: body[key] for key in body if key != "detail"},
+                         {"code": "DEMO_UNKNOWN", "retry": {"attemptId": attempt}})
+        self.assertNotIn("private answer", json.dumps(body, ensure_ascii=False))
+        # 오류 객체 안의 칸이 먼저다.
+        inner = {"error": {"code": "DEMO_UNKNOWN", "attemptId": "inner-1"}, "attemptId": "outer-1"}
+        self.assertEqual(self.fixed_execute(inner)[1]["retry"], {"attemptId": "inner-1"})
+        # 식별자 형식이 아닌 값은 버리고 코드만 싣는다.
+        for label, value in (("sentence", "저장 여부를 모릅니다"), ("email", "me@example.com"), ("number", 17),
+                             ("too long", "a" * 65), ("object", {"id": attempt}), ("missing", None)):
+            with self.subTest(label):
+                payload = {"error": {"code": "DEMO_UNKNOWN"}}
+                if value is not None:
+                    payload["attemptId"] = value
+                status, body = self.fixed_execute(payload)
+                self.assertEqual((status, set(body)), (504, {"detail", "code"}))
 
     def test_error_contract_stays_out_of_the_call_path(self):
         """선택지와 확인 도구의 `call` 경로는 공통 어휘만 준다. 복구 계약은 승인한 실행의 결과에만 싣는다."""

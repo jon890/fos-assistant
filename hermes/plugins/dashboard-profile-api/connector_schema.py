@@ -93,6 +93,15 @@ ERROR_RECOVERIES = frozenset({"recheck", "reconnect", "fix_input", "retry_later"
 ERROR_DETAILS_MAX = 4
 
 
+# `outcome_unknown` 객체 항목의 `retry_key` 이름과 그 칸 값의 형식이다(ADR-20261013 unknown-retry-key).
+# 값은 커넥터가 만든 UUID 같은 식별자만 받는다. 공백과 `@`, 따옴표가 든 글은 받지 않아 오류 원문이나 개인 정보가 이 길로 가지 못한다.
+# Control Plane 의 `ConnectorUnknownDetail` 과 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다.
+RETRY_KEY_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]{0,31}")
+
+
+RETRY_VALUE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
 CONNECTOR_TOOLSETS = frozenset({"vision"})
