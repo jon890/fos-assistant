@@ -53,7 +53,7 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 </details>
 
 다시 찍으려면 `web/` 에서 `pnpm screenshots` 를 돌린다. 스크립트는 `test/screenshots/tour.shots.ts` 다.
-지금 화면(`/now`), 연결 화면, 예약 작업 화면은 아직 이 둘러보기에 찍지 않았다.
+지금 화면(`/now`), 외부 서비스 연결 화면, 예약 작업 화면은 아직 이 둘러보기에 찍지 않았다.
 
 ## 만드는 까닭
 
@@ -120,9 +120,9 @@ Nous Research 의 [Hermes Agent](https://github.com/NousResearch/hermes-agent) �
 
 ### 커넥터와 승인
 
-- **한 번 연결하고 여러 에이전트에 붙인다.** 커넥터는 에이전트에게 외부 서비스의 도구를 쥐어 주어 그 에이전트의 역할을 넓힌다. 연결 화면에서 계정을 한 번 연결하고 그 연결을 내 비공개 에이전트에 붙이면, 그 에이전트가 서비스의 도구를 직접 부른다([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+- **한 번 연결하고 여러 에이전트에 붙인다.** 커넥터는 에이전트에게 외부 서비스의 도구를 쥐어 주어 그 에이전트의 역할을 넓힌다. 외부 서비스 연결 화면에서 계정을 한 번 연결하고 그 연결을 내 비공개 에이전트에 붙이면, 그 에이전트가 서비스의 도구를 직접 부른다([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 - **붙이면 재시작 없이 반영된다.** 처음 붙인 커넥터는 공유 gateway 를 재시작하지 않고 잠시 뒤의 실행부터 쓰인다. 그동안 다른 사용자의 대화가 끊기지 않는다([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
-- **연결 화면의 커넥터 카드.** 커넥터마다 아이콘과 소개 링크, 도구 요약을 카드로 보인다. 아이콘은 plugin 안의 파일만 쓰고 외부 주소를 부르지 않는다([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
+- **외부 서비스 연결 화면의 커넥터 카드.** 커넥터마다 아이콘과 소개 링크, 도구 요약을 카드로 보인다. 아이콘은 plugin 안의 파일만 쓰고 외부 주소를 부르지 않는다([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
 - **쓰기는 승인 카드에서.** 외부 서비스에 쓰는 호출은 보낼 내용을 그대로 보이는 카드에서 기다리고, 사용자가 승인한 뒤에 승인한 인자 그대로 한 번만 실행된다. 상시 허락을 줄 수 있는 도구는 사용자가 허락한 기간 동안 카드 없이 실행되고, 외부로 내보내는 도구는 상시 허락을 막아 둔다. 같은 도구의 승인은 묶어 보이고, 승인 요청과 만료는 어느 화면에서든 알림으로 온다([`docs/features/connector-policy.md`](docs/features/connector-policy.md), [`docs/features/attention.md`](docs/features/attention.md)).
 
 ### 먼저 살펴보기와 지금 화면
