@@ -12,6 +12,6 @@ public record BoundAgentSummary(String agentCode, String agentName, BindingStatu
 
     public static BoundAgentSummary from(ConnectorBinding binding) {
         return new BoundAgentSummary(
-                binding.agent().code(), binding.agent().name(), binding.status(), binding.restartRequired());
+            binding.agent().code(), binding.agent().name(), binding.status(), binding.restartRequired());
     }
 }
