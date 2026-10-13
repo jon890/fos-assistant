@@ -226,10 +226,10 @@ final class ConnectorConditionalSnapshot {
 
 
     /** operation별 고정 경로를 UTF-8 길이 접두 표기로 인코딩한다. */
-    static String requestKey(JsonNode args, Long userId, Long connectionId, String tool, String operation) {
-        StringBuilder body = new StringBuilder(lp("fos-conditional-intent-v1"));
-        String[] names = {"operation", "userId", "connectionId", "tool"};
-        String[] values = {operation, userId.toString(), connectionId.toString(), tool};
+    static String requestKey(JsonNode args, Long userId, String connectorId, String tool, String operation) {
+        StringBuilder body = new StringBuilder(lp("fos-conditional-intent-v2"));
+        String[] names = {"operation", "userId", "connectorId", "tool"};
+        String[] values = {operation, userId.toString(), connectorId, tool};
         for (int i = 0; i < names.length; i++) {
             body.append(lp(names[i])).append('S').append(lp(values[i]));
         }

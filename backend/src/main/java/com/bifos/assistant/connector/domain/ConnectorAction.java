@@ -20,6 +20,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -343,8 +344,14 @@ public class ConnectorAction {
 
     /** 풀 수 있고 저장 해시와 일치하는 실행 인자만 준다. 화면은 argsJson을 쓴다. */
     public Optional<String> executableArgs() {
+        return executableArgs(Sha256::hex);
+    }
+
+
+    /** 금융 줄처럼 저장 해시를 keyed hash 로 적은 줄은 그 함수로 대조한다. */
+    public Optional<String> executableArgs(UnaryOperator<String> hash) {
         String plain = argsJson();
-        if (plain == null || UNREADABLE_ARGS.equals(plain) || !Sha256.hex(plain).equals(argsSha256)) {
+        if (plain == null || UNREADABLE_ARGS.equals(plain) || !hash.apply(plain).equals(argsSha256)) {
             return Optional.empty();
         }
         return Optional.of(plain);

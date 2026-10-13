@@ -135,7 +135,7 @@ export async function generateTradingFixture(destination: string) {
   for (const tool of Object.keys(TRADE_OPERATIONS))
     manifest.tools[tool] = { risk: "FINANCIAL", approval: "always" };
   manifest.execution_guard = {
-    protocol: "approval-claim-v1",
+    protocol: "approval-claim-v2",
     prepare_tool: "prepare_trade",
     scope_fields: [{ arg: "account_seq", field: "account" }],
     operations: TRADE_OPERATIONS,

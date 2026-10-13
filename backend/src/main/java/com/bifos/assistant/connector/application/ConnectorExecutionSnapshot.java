@@ -32,7 +32,9 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Accessors(fluent = true)
 public final class ConnectorExecutionSnapshot {
-    public static final String PROTOCOL = "approval-claim-v1";
+    public static final String PROTOCOL = "approval-claim-v2";
+    /** keyed hash 이전 protocol 이다. 해시 칸이 평문 SHA-256 이다. */
+    public static final String LEGACY_PROTOCOL = "approval-claim-v1";
     public static final String ORDER = "ORDER";
     public static final String CONDITIONAL = "CONDITIONAL";
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
@@ -126,7 +128,8 @@ public final class ConnectorExecutionSnapshot {
         String summaryJson,
         String scopeJson,
         TextCipher cipher,
-        Instant now) {
+        Instant now,
+        FinancialDigest digest) {
         require(action != null && binding != null && action.id() != null && binding.id() != null);
         require(action.risk() == ToolRisk.FINANCIAL
             && action.approvalMode() == ToolApproval.ALWAYS
@@ -136,11 +139,11 @@ public final class ConnectorExecutionSnapshot {
             && Objects.equals(action.agentId(), binding.agent().id())
             && Objects.equals(action.connectorId(), binding.connection().connectorId()));
         require(action.toolName() != null && !action.toolName().isBlank());
-        String modelArgs = action.executableArgs().orElseThrow(ConnectorExecutionSnapshot::invalid);
+        String modelArgs = action.executableArgs(plain -> digest.of("args_json", plain)).orElseThrow(ConnectorExecutionSnapshot::invalid);
         ConnectorExecutionSnapshot snapshot = validate(modelArgs, executionArgsJson, summaryJson, scopeJson, operation);
         snapshot.validateDeclaredScope(
             scopeFieldsJson, binding.connection().fields().values());
-        String key = snapshot.requestKey(action.userId(), binding.connection().id(), action.toolName());
+        String key = snapshot.storedRequestKey(digest, action.userId(), action.connectorId(), action.toolName());
         String[] plain = {executionArgsJson, summaryJson, scopeJson};
         String[] columns = {"execution_args_json", "summary_json", "scope_json"};
         String[] stored = plain.clone();
@@ -172,8 +175,8 @@ public final class ConnectorExecutionSnapshot {
             stored[1],
             stored[2],
             keyId,
-            snapshot.executionArgsSha256,
-            snapshot.scopeSha256,
+            digest.of("execution_args_json", executionArgsJson),
+            digest.of("scope_json", scopeJson),
             key,
             PROTOCOL,
             now);
@@ -182,48 +185,75 @@ public final class ConnectorExecutionSnapshot {
 
     /** 저장된 key 식별자로 읽는 방식을 정하고 원문 해시와 표시 내용을 다시 검증한다. */
     public static ConnectorExecutionSnapshot open(
-        ConnectorAction action, ConnectorActionExecution row, TextCipher cipher) {
+        ConnectorAction action, ConnectorActionExecution row, TextCipher cipher, FinancialDigest digest) {
         require(action != null && row != null && Objects.equals(action.id(), row.actionId()));
         require(PROTOCOL.equals(row.protocol()));
-        String modelArgs = action.executableArgs().orElseThrow(ConnectorExecutionSnapshot::invalid);
+        String modelArgs = action.executableArgs(plain -> digest.of("args_json", plain)).orElseThrow(ConnectorExecutionSnapshot::invalid);
         String args = openColumn(action, row.contentKeyId(), "execution_args_json", row.executionArgsJson(), cipher);
         String summary = openColumn(action, row.contentKeyId(), "summary_json", row.summaryJson(), cipher);
         String scope = openColumn(action, row.contentKeyId(), "scope_json", row.scopeJson(), cipher);
-        require(Sha256.hex(args).equals(row.executionArgsSha256())
-            && Sha256.hex(scope).equals(row.scopeSha256()));
+        require(digest.of("execution_args_json", args).equals(row.executionArgsSha256())
+            && digest.of("scope_json", scope).equals(row.scopeSha256()));
         JsonNode shown = object(summary, 8 * 1024);
         text(shown.get("operation"), 1, 6);
         ConnectorExecutionSnapshot snapshot = validate(
             modelArgs, args, summary, scope, shown.get("operation").stringValue());
-        require(snapshot.requestKey(action.userId(), row.connectionId(), action.toolName())
+        require(snapshot.storedRequestKey(digest, action.userId(), action.connectorId(), action.toolName())
             .equals(row.requestKey()));
         return snapshot;
     }
 
 
-    /** 하루 상한 합계가 쓰는 실행 원문만 푼다. 저장한 원문 해시와 다시 대조한다. */
-    static JsonNode openExecutionArgs(ConnectorAction action, ConnectorActionExecution row, TextCipher cipher) {
+    /**
+     * 하루 상한 합계가 쓰는 실행 원문만 푼다. 실행은 지금 protocol 과 지금 key 의 줄만 받지만, 합계는 같은 날의 이전 줄도 센다.
+     *
+     * <p>keyed hash 이전 protocol 의 줄은 평문 SHA-256 으로, 지금 key 의 줄은 keyed hash 로 원문 해시를 다시 대조한다.
+     * 이전 key 로 만든 줄은 해시를 다시 계산할 수 없어, 줄과 칸과 사용자를 AAD 로 묶은 암호문을 연 것으로 원문을 믿는다.
+     * 그 줄을 빼면 key 를 바꾼 날 상한을 넘고, 열지 못한다고 닫으면 그날 새 주문이 모두 막힌다.
+     */
+    static JsonNode openExecutionArgs(
+        ConnectorAction action, ConnectorActionExecution row, TextCipher cipher, FinancialDigest digest) {
         require(action != null && row != null && Objects.equals(action.id(), row.actionId()));
-        require(PROTOCOL.equals(row.protocol()));
         String args = openColumn(action, row.contentKeyId(), "execution_args_json", row.executionArgsJson(), cipher);
-        require(Sha256.hex(args).equals(row.executionArgsSha256()));
+        String stored = row.executionArgsSha256();
+        if (LEGACY_PROTOCOL.equals(row.protocol())) {
+            require(Sha256.hex(args).equals(stored));
+        } else {
+            require(PROTOCOL.equals(row.protocol()) && FinancialDigest.keyed(stored));
+            if (stored.startsWith(digest.currentPrefix())) {
+                require(digest.of("execution_args_json", args).equals(stored));
+            } else {
+                require(row.contentKeyId() != null);
+            }
+        }
         return object(args, 16 * 1024);
     }
 
 
-    /** 중복 의도 키를 한 함수에서 계산한다. decimal은 정확한 문자열로 정규화한다. */
-    public String requestKey(Long userId, Long connectionId, String tool) {
+    /**
+     * 중복 의도 키의 원재료를 한 함수에서 계산한다. decimal은 정확한 문자열로 정규화한다.
+     *
+     * <p>연결 번호가 아니라 커넥터 이름을 넣는다. 같은 계좌를 다시 등록해 연결이 바뀌어도 같은 의도는 같은 키다(#507 후속).
+     * 계좌는 실행 원문의 scope 칸으로 이미 들어간다. 저장과 대조는 {@link #storedRequestKey} 를 쓴다.
+     */
+    public String requestKey(Long userId, String connectorId, String tool) {
         require(userId != null
             && userId > 0
-            && connectionId != null
-            && connectionId > 0
+            && connectorId != null
+            && !connectorId.isBlank()
             && tool != null
             && !tool.isBlank());
         JsonNode summary = object(summaryJson, 8 * 1024);
         if (conditional(summary)) {
-            return ConnectorConditionalSnapshot.requestKey(execution, userId, connectionId, tool, summary.get("operation").stringValue());
+            return ConnectorConditionalSnapshot.requestKey(execution, userId, connectorId, tool, summary.get("operation").stringValue());
         }
-        return ConnectorOrderSnapshot.requestKey(execution, userId, connectionId, tool);
+        return ConnectorOrderSnapshot.requestKey(execution, userId, connectorId, tool);
+    }
+
+
+    /** DB 의 request_key 칸과 같은 의도 차단이 쓰는 값이다. 원재료를 keyed hash 한다. */
+    public String storedRequestKey(FinancialDigest digest, Long userId, String connectorId, String tool) {
+        return digest.of("request_key", requestKey(userId, connectorId, tool));
     }
 
 

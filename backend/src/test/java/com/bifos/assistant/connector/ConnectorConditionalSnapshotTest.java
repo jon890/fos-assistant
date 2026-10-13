@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -9,6 +10,9 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
+import com.bifos.assistant.connector.application.ConnectorFinancialGate;
+import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
+import com.bifos.assistant.connector.application.FinancialDigest;
 import com.bifos.assistant.connector.domain.ConnectionFields;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionExecution;
@@ -16,6 +20,7 @@ import com.bifos.assistant.connector.domain.ConnectorBinding;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
+import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
@@ -24,7 +29,9 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.crypto.application.DataKeyService;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
@@ -34,10 +41,13 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
@@ -64,8 +74,13 @@ class ConnectorConditionalSnapshotTest {
     private static final JsonNode BASE = VECTOR.get("cases").get(0);
     private static final Instant NOW = Instant.parse("2026-10-11T00:00:00Z");
     private static final String DECLARATION = "[{\"arg\":\"account_seq\",\"field\":\"account\"}]";
+    private static final String KEY_FILE = "src/test/resources/financial/test-digest.key";
+    private static final String ROTATED_KEY_FILE = "src/test/resources/financial/test-digest-rotated.key";
     @Autowired
     ConnectorActionExecutionRepository contents;
+
+    @Autowired
+    FinancialDigest digest;
     @Autowired
     ConnectorActionRepository actions;
     @Autowired
@@ -106,13 +121,13 @@ class ConnectorConditionalSnapshotTest {
             return;
         }
         ConnectorExecutionSnapshot snapshot = validate(sample);
-        assertThat(snapshot.requestKey(1L, 2L, value(sample, "tool"))).isEqualTo(value(sample, "requestKey"));
+        assertThat(snapshot.requestKey(1L, "demo-financial", value(sample, "tool"))).isEqualTo(value(sample, "requestKey"));
         assertThat(snapshot.executionArgsSha256()).isEqualTo(value(sample, "executionArgsSha256"));
         assertThat(snapshot.scopeSha256()).isEqualTo(value(sample, "scopeSha256"));
         ConnectorActionExecution row = contents.saveAndFlush(capture(action, fixture.binding(), sample));
         assertThat(row.contentKeyId()).isNotNull();
         em.clear();
-        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, contents.findById(row.actionId()).orElseThrow(), cipher);
+        ConnectorExecutionSnapshot opened = ConnectorExecutionSnapshot.open(action, contents.findById(row.actionId()).orElseThrow(), cipher, digest);
         assertThat(opened.executionArgsJson()).isEqualTo(value(sample, "executionArgsJson"));
         assertThat(opened.summaryJson()).isEqualTo(value(sample, "summaryJson"));
         assertThat(opened.scopeJson()).isEqualTo(value(sample, "scopeJson"));
@@ -124,13 +139,13 @@ class ConnectorConditionalSnapshotTest {
     void rejectsMalformedToolEncodingAndPreservesUtf8Hash() {
         ConnectorExecutionSnapshot snapshot = validate(BASE);
         // primitive 호출만 검사한다. 두 tool 모두 manifest의 ASCII 등록 경계에서는 허용되지 않는다.
-        assertThat(snapshot.requestKey(1L, 2L, "tool?")).hasSize(64);
+        assertThat(snapshot.requestKey(1L, "demo-financial", "tool?")).hasSize(64);
         for (String tool : new String[] {"tool\uD800", "tool\uDC00", "tool\uD800?"}) {
-            assertThatThrownBy(() -> snapshot.requestKey(1L, 2L, tool)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> snapshot.requestKey(1L, "demo-financial", tool)).isInstanceOf(IllegalArgumentException.class);
         }
-        assertThat(snapshot.requestKey(1L, 2L, "도구😀"))
-            .isEqualTo("0b37ca3b111348cc0319f633d016e521d3ff675b75cef78e4cbc98a4eee04650");
-        assertThat(snapshot.requestKey(1L, 2L, value(BASE, "tool"))).isEqualTo(value(BASE, "requestKey"));
+        assertThat(snapshot.requestKey(1L, "demo-financial", "도구😀"))
+            .isEqualTo("f11e2a2da0cf572ee1f8753747d19ba649c290042017881f6122a15fdb100152");
+        assertThat(snapshot.requestKey(1L, "demo-financial", value(BASE, "tool"))).isEqualTo(value(BASE, "requestKey"));
     }
 
 
@@ -168,6 +183,45 @@ class ConnectorConditionalSnapshotTest {
 
 
     @Test
+    @DisplayName("기동 닫기 검사는 keyed hash 이전 protocol 의 열린 줄만 보고 지금 protocol 줄과 끝난 줄은 보지 않는다")
+    void legacyProtocolCheckSeesOnlyOpenV1Rows() {
+        var open = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+        String prefix = digest.currentPrefix();
+        Fixture fixture = fixture();
+        ConnectorActionExecution row = contents.saveAndFlush(capture(fixture.action(), fixture.binding(), BASE));
+        assertThat(row.protocol()).isEqualTo("approval-claim-v2");
+        assertThat(row.requestKey()).startsWith(prefix);
+        // 첫 실제 호출이 남긴 지금 protocol 의 줄은 열려 있어도 관문을 닫지 않는다.
+        assertThat(contents.existsOpenOutside("approval-claim-v2", prefix, open)).isFalse();
+        jdbc.update("UPDATE connector_action_execution SET protocol = 'approval-claim-v1' WHERE action_id = ?", row.actionId());
+        assertThat(contents.existsOpenOutside("approval-claim-v2", prefix, open)).isTrue();
+        jdbc.update("UPDATE connector_action SET status = 'SUCCEEDED' WHERE id = ?", row.actionId());
+        assertThat(contents.existsOpenOutside("approval-claim-v2", prefix, open)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("key 를 바꿔 재기동하면 이전 key 로 저장한 열린 줄이 관문을 닫고, 그 줄이 끝나면 다시 열린다")
+    void rotatedDigestKeyClosesGateWhileOldRowsAreOpen() {
+        Fixture fixture = fixture();
+        ConnectorActionExecution row = contents.saveAndFlush(capture(fixture.action(), fixture.binding(), BASE));
+        jdbc.update("UPDATE connector_action SET status = 'UNKNOWN' WHERE id = ?", row.actionId());
+        assertThatCode(gate(KEY_FILE)::requireOpen).doesNotThrowAnyException();
+        // 새 key 의 request_key 는 이전 UNKNOWN 과 달라 같은 의도 차단이 놓친다. 그래서 관문을 닫는다.
+        assertThatThrownBy(gate(ROTATED_KEY_FILE)::requireOpen).isInstanceOf(ApiException.class);
+        jdbc.update("UPDATE connector_action SET status = 'FAILED' WHERE id = ?", row.actionId());
+        assertThatCode(gate(ROTATED_KEY_FILE)::requireOpen).doesNotThrowAnyException();
+    }
+
+
+    private ConnectorFinancialGate gate(String keyFile) {
+        var live = LiveProperties.fixed(ConnectorFinancialProperties.class, new ConnectorFinancialProperties(
+            List.of("000007"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, keyFile));
+        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live));
+    }
+
+
+    @Test
     @DisplayName("AAD의 열·사용자·action과 key 식별자를 바꾸면 DB 읽기가 실패한다")
     void rejectsStoredCipherContextTampering() {
         Fixture fixture = fixture();
@@ -182,7 +236,7 @@ class ConnectorConditionalSnapshotTest {
         assertThat(cipher.open(row.contentKeyId() + 99999, fixture.action().userId(), "wrong", sealed)).isEmpty();
         jdbc.update("UPDATE connector_action_execution SET summary_json = execution_args_json WHERE action_id = ?", row.actionId());
         em.clear();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher, digest))
             .isInstanceOf(IllegalStateException.class);
     }
 
@@ -197,7 +251,7 @@ class ConnectorConditionalSnapshotTest {
         String sealed = cipher.seal(fixture.action().userId(), aad, changed).orElseThrow().content();
         jdbc.update("UPDATE connector_action_execution SET summary_json = ? WHERE action_id = ?", sealed, row.actionId());
         em.clear();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher, digest))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -214,16 +268,16 @@ class ConnectorConditionalSnapshotTest {
         String sealedArgs = cipher.seal(fixture.action().userId(), prefix + "execution_args_json" + suffix, args).orElseThrow().content();
         String sealedScope = cipher.seal(fixture.action().userId(), prefix + "scope_json" + suffix, scope).orElseThrow().content();
         jdbc.update("UPDATE connector_action_execution SET execution_args_json = ?, scope_json = ?, execution_args_sha256 = ?, scope_sha256 = ? WHERE action_id = ?",
-            sealedArgs, sealedScope, Sha256.hex(args), Sha256.hex(scope), row.actionId());
+            sealedArgs, sealedScope, digest.of("execution_args_json", args), digest.of("scope_json", scope), row.actionId());
         em.clear();
-        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher))
+        assertThatThrownBy(() -> ConnectorExecutionSnapshot.open(fixture.action(), contents.findById(row.actionId()).orElseThrow(), cipher, digest))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
 
     private ConnectorActionExecution capture(ConnectorAction action, ConnectorBinding binding, JsonNode sample) {
         return ConnectorExecutionSnapshot.capture(action, binding, value(sample, "operation"), DECLARATION,
-            value(sample, "executionArgsJson"), value(sample, "summaryJson"), value(sample, "scopeJson"), cipher, NOW);
+            value(sample, "executionArgsJson"), value(sample, "summaryJson"), value(sample, "scopeJson"), cipher, NOW, digest);
     }
 
 
@@ -269,7 +323,7 @@ class ConnectorConditionalSnapshotTest {
             new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
             false,
             Sha256.hex(UUID.randomUUID().toString()),
-            Sha256.hex(raw),
+            digest.of("args_json", raw),
             NOW);
         action.awaitApproval(NOW.plusSeconds(300));
         actions.saveAndFlush(action);

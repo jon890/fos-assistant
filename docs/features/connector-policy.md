@@ -434,7 +434,6 @@ Go 를 낸 뒤 개방 PR 을 배포하고 아래를 확인한다. 어긋나면 [
 - **네이버: `UNKNOWN` 뒤 새 snapshot 으로 다시 저장할 수 있다.** 같은 snapshot 은 막지만, 원고를 고치거나 바인딩 버전이 바뀌면 새 snapshot 과 새 승인이 생긴다. 이전 job 의 `UNKNOWN` 은 그 승인을 막지 않아 같은 글이 두 번 임시저장될 수 있다. 감수(2026-10-13 사용자 결정), 추적은 #526
 - **네이버: `FAILED` 는 편집기 자동저장이 없었다는 증거가 아니다.** 명시적 저장 클릭이 없었다는 뜻이다
 - **Gmail: 같은 메일을 다시 보내는 새 호출을 막지 않는다.** `tool_call_id` 가 다르면 새 승인 줄이 생기고, 앞의 `UNKNOWN` 과 같은 인자인지 보지 않는다. 사람이 다시 승인하면 메일이 두 번 나갈 수 있다. 감수(2026-10-13 사용자 결정)
-- **토스: `request_key` 에 연결 번호가 들어간다.** 지금은 연결을 해제하고 다시 등록해도 연결 번호가 같아(`connector_connection` 의 사용자, 커넥터 유일 제약) 이전 `UNKNOWN` 에 막힌다. 연결 번호가 바뀌는 경로가 생기면 우회가 열리므로 개방 조건의 「연결 재등록 우회 차단」 이 키를 계좌 범위로 바꿔 미리 닫는다
 - **세 경로 모두 Control Plane 의 검사와 외부 변경을 한 트랜잭션으로 묶지 못한다.** 허가한 뒤의 철회는 이미 나간 클릭이나 전송을 되돌리지 않는다
 
 ## 금융 실행 내용의 저장과 검증
@@ -524,12 +523,17 @@ timeInForce는 CREATE에서 생략한 값을 DAY로 보충하는 기존 기본�
 
 ### 원문 해시와 중복 의도 키
 
-원문 해시는 암호화 전 UTF-8 바이트의 소문자 SHA-256이며 복호화한 원문과 다시 대조한다.
-request_key는 사용자, 연결, 도구와 실행 args의 정규화한 문자열 필드로 만든다.
+Hermes와 SDK로 보내는 원문 해시는 암호화 전 UTF-8 바이트의 소문자 SHA-256이며 복호화한 원문과 다시 대조한다.
+DB에는 이 값을 적지 않는다. 금융 줄의 `args_sha256`, `execution_args_sha256`, `scope_sha256`, `request_key`는 `FinancialDigest`의 keyed hash다.
+keyed hash는 운영 비밀 key 파일과 칸 이름으로 만든 HMAC-SHA256이며 `k1` 접두, key 식별자 8글자, 앞 27바이트의 16진수로 64글자다.
+DB만 읽은 사람이 인자 후보를 대입해 맞혀 보지 못하게 하려는 것이다. key 파일이 없거나, keyed hash 이전 protocol(`approval-claim-v1`)이나 이전 key로 만든 PENDING·EXECUTING·UNKNOWN 줄이 남았으면 금융 관문이 닫힌다. 지금 protocol(`approval-claim-v2`)과 지금 key로 만든 줄, 끝난 줄은 보지 않으므로 첫 실제 호출 뒤 재기동해도 관문이 다시 열린다.
+하루 상한 합계는 같은 날의 이전 protocol 줄과 이전 key 줄도 센다. 이전 protocol 줄은 평문 SHA-256으로 대조하고, 이전 key 줄은 AAD로 묶은 암호문을 열어 금액을 읽는다.
+key를 바꾸면 같은 의도도 request_key가 달라지므로 이전 key의 열린 줄이 끝날 때까지 닫는다. 근거는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md)이 갖는다.
+request_key의 원재료는 사용자, 커넥터, 도구와 실행 args의 정규화한 문자열 필드로 만든다. 연결 번호는 넣지 않는다.
 scope arg, market, currency와 원래 orderId는 포함하고 clientOrderId와 expected_order는 제외한다.
 decimal은 앞의 0과 불필요한 소수점 끝 0을 제거한 정확한 문자열로 맞춘다.
 필드 이름을 ASCII 순으로 정렬하고 각 이름·값을 `UTF-8 바이트수:값`으로 붙인다.
-도메인 `fos-financial-intent-v1`도 같은 길이 접두사로 앞에 붙인 뒤 전체 바이트를 SHA-256으로 해시한다.
+도메인 `fos-financial-intent-v2`도 같은 길이 접두사로 앞에 붙인 뒤 전체 바이트를 SHA-256으로 해시하고, 그 값을 keyed hash 한다.
 request_key는 원래 인자 해시나 실행 원문 해시를 대신하지 않는다.
 현재 저장 모델은 이 키의 조회 인덱스만 제공하며 중복 의도의 승인·실행 차단은 후속 경로가 맡는다.
 
@@ -547,7 +551,7 @@ snapshot의 세 원문을 실제 복호화하고 저장 원문 해시와 표시 
 발급 함수를 운영 승인이나 controller에서 호출하지 않으며 금융 위험도 판정을 바꾸지 않는다.
 
 카탈로그의 nullable `execution_guard`는 누락되면 미지원이다.
-정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v1`이다.
+정확한 키는 `protocol,prepare_tool,scope_fields,operations`이고 선택 키 `kinds` 하나만 더 받는다. protocol은 `approval-claim-v2`이다.
 prepare_tool은 실제 선언된 `READ/NONE`, operations의 1~8개 도구는 `FINANCIAL/ALWAYS`이어야 한다.
 operations 값은 `CREATE/MODIFY/CANCEL`이며 저장 summary의 operation과 같다.
 kinds 는 비지 않은 객체이고, 키는 operations 의 도구, 값은 `ORDER/CONDITIONAL` 이다. 선언하지 않은 도구는 `ORDER` 이며 저장 summary 의 종류와 같아야 한다.
@@ -694,19 +698,14 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 공개 연결과 승인 카드 summary 표시·일괄 승인 제외는 별도 결정 및 보안 리뷰 전까지 보류한다.
 
 데이터 key가 꺼져 있으면 준비를 시작하지 않고, `content_key_id`가 없는 snapshot은 승인하지 않는다.
-공개 연결 전 보안 리뷰는 아래 남은 문제를 함께 정한다.
-
-- request_key에 연결 번호가 들어간다. 지금은 다시 등록해도 연결 번호가 같아 이전 UNKNOWN에 막히지만, 연결 번호가 바뀌는 경로가 생기면 충돌하지 않게 된다.
-
 중단된 금융 실행과 오류 상세 없는 execute 실패는 claim 소비 여부로 끝낸다.
 사용자·승인 줄·실행 줄을 같은 순서로 잠그고 `consumed_at`이 비어 있으면 `FAILED`, 차 있으면 `UNKNOWN`이다.
 이 규칙은 execute의 `400`·`401`·`404`·`409`에도 적용한다.
 증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
 
-연결을 다시 붙일 때의 request_key 문제는 공개 금융 연결을 여는 작업에서 해결한다.
-이 문제와 해시 추측 방어를 포함한 개방 전 필수 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
-연결 번호를 빼면 기존 해시와의 호환 검사와 커넥터별 계좌 식별 범위를 함께 정해야 하므로 이번 본문 보안 변경에 넣지 않는다.
-그 작업이 끝나기 전까지 공개 hook과 승인 경로는 계속 `RISK_NOT_OPEN`으로 막는다.
+request_key는 연결 번호 대신 커넥터 이름을 넣는다. 계좌는 실행 원문의 scope 칸으로 들어가므로 같은 사용자가 같은 계좌에 내는 같은 주문은 연결을 다시 등록해도 같은 키다.
+옛 v1 키와는 호환하지 않는다. 운영에 금융 caller가 없어 옛 줄이 없어야 하고, 남았으면 금융 관문이 닫혀 운영자가 먼저 정리한다.
+개방 전 필수 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다. 공개 hook과 승인 경로는 그 개방 PR 전까지 `RISK_NOT_OPEN`으로 막는다.
 
 모든 승인 줄의 `args_json`과 `result_text`는 기존 사용자 데이터 key로 암호화한다.
 금융은 암호화가 필수이며 일반 쓰기만 암호화가 꺼져 있을 때 평문 호환을 허용한다.

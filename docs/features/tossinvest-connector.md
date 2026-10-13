@@ -273,8 +273,8 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 | 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 운영 설정 상한을 둔다. 기본값은 0 이라 아무 주문도 받지 않는다 | 있음. `max-order-amount-krw`, `max-order-amount-usd`, `max-order-quantity`, `max-daily-amount-krw`, `max-daily-amount-usd` |
 | 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
 | UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
-| 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 없음 (#507 후속) |
-| 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 없음 (#507 후속) |
+| 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 있음. `fos-financial-intent-v2`. 저장 줄의 protocol 을 `approval-claim-v2` 로 올렸고, 열린 v1 줄이 남으면 관문이 닫힌다 |
+| 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 있음. `FinancialDigest`, key 파일은 `digest-key-file`. 없으면 관문이 닫힌다 |
 | 공개 진입점 연결 | 정책 판정과 승인 API 가 FINANCIAL 을 producer 와 금융 승인으로 보낸다. 토스 서버와 manifest 가 두 도구를 등록한다 | 없음. producer 와 금융 승인은 package-private 이다 |
 | 승인 카드 표시 | 승인 카드가 저장한 summary(종목, 방향, 수량, 가격, 정규화)를 보인다. 계좌는 summary 가 아니라 Control Plane 이 실제 전송 scope(`account_seq`)와 연결의 공개 칸, 허용 목록에서 만들어 보인다. 모델 인자만 보이고 승인하지 않는다 | 없음 |
 
@@ -289,7 +289,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 
 1. 배포 직후 key 파일이나 허용 목록이 아직 없는지 확인한다. 대화에서 주문을 요청해 금융 전송 없이 거절되는지 본다
 2. 계좌 허용 목록에 쓸 계좌 하나만 넣고, 주문 상한을 아래 주문을 겨우 담을 만큼 작게 둔다
-3. key 파일을 두고 재기동해 관문을 연다. 여는 것은 소유자가 그 자리에서 승인한다
+3. 금융 해시 key 파일을 두고 재기동해 관문을 연다. 여는 것은 소유자가 그 자리에서 승인한다
 4. 대화에서 국내 종목 하나를 1주, 당일 하한가에 가까워 체결되지 않을 지정가로 매수하라고 요청한다. 가격은 `get_price_limits` 와 `get_orderbook` 으로 먼저 읽는다
    주문은 국내 정규장 안에서 넣고, 장 시작과 마감의 동시호가 시간과 마감 직전은 피한다. 정규장 밖에서 넣으면 토스가 예약 주문으로 받거나 거절해 미체결 주문 하나와 취소를 확인하지 못할 수 있다.
    그 종목이 하한가로 내려가면 이 주문은 체결된다. 그때의 최대 손실은 1주 가격이다
@@ -307,6 +307,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 key 파일 설정을 비우거나 허용 목록을 비우면 새 준비, 대기 중인 승인, 아직 소비하지 않은 claim 이 모두 금융 전송 없이 거절된다. 상한을 0 으로 두면 새 주문과 대기 중인 주문의 승인이 거절된다. 배포를 되돌리지 않아도 된다.
 설정과 key 는 기동 뒤 한 번 읽으므로 운영 값을 바꾼 뒤 Control Plane 을 재기동해야 반영된다. key 파일만 지우고 재기동하지 않으면 닫히지 않는다.
 이미 토스에 들어간 주문은 이 설정이 취소하지 않는다. 토스증권 앱에서 취소한다.
+금융 해시 key 를 바꾸면 이전 key 로 만든 PENDING, EXECUTING, UNKNOWN 이 남은 동안 관문이 닫힌다. key 를 바꾸기 전에 열린 금융 줄이 없는지 확인한다. 근거는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md) 이 갖는다.
 닫는 방법은 `fos-home-infra` 가 갖는다.
 
 ## 토스증권 REST 전체 지원
@@ -512,7 +513,7 @@ CANCEL의 symbol 등 원주문 표시 값은 실행 입력에 복제하지 않�
 현재 Python connector_guard_validation._prepare_result는 일반 주문 SUMMARY와 orderId/side/timeInForce를 요구하므로 조건주문을 거절한다.
 Spring ConnectorExecutionSnapshot도 일반 주문의 SUMMARY/ORIGINAL/EXPECTED만 허용하며 requestKey는 expected_order/clientOrderId 이외의 값을 문자열로 요구한다. leg 객체를 그대로 넣으면 실패한다.
 Python에 별도 connector_conditional_validation.py, Spring에 ConnectorConditionalSnapshot을 두고 조건 summary와 실행 입력의 정확한 키·타입·공식 분기·정규화 전후를 검증한다.
-기존 외피 `{v:1,executionArgs,summary}`와 approval-claim-v1, 바이트·깊이 상한은 유지한다. 검증 분기는 manifest `execution_guard.kinds` 가 도구에 선언한 종류가 고르고, summary 의 orderKind 는 그 종류와 같아야 한다. 금융 권한은 기존 guard·현재 바인딩·서명·DB 소비가 정한다.
+기존 외피 `{v:1,executionArgs,summary}`와 approval-claim-v2, 바이트·깊이 상한은 유지한다. 검증 분기는 manifest `execution_guard.kinds` 가 도구에 선언한 종류가 고르고, summary 의 orderKind 는 그 종류와 같아야 한다. 금융 권한은 기존 guard·현재 바인딩·서명·DB 소비가 정한다.
 일반 주문 분기를 수정해 임의 JSON을 허용하지 않는다. 조건 분기는 신규 summary 키가 정확히 일치할 때만 선택하고 모델 인자·실행 인자·표시 값을 함께 검증한다.
 Python RESERVED와 Spring RESERVED_SCOPE_NAMES는 다음 전체 집합으로 같게 한다.
 `orderId symbol market currency side quantity orderAmount price orderType timeInForce status filledQuantity execution clientOrderId expected_order confirmHighValueOrder userId connectionId tool orderKind account operation original normalization conditionalOrderId type expireDate first second expected_conditional_order orderSide triggerPrice targetProfitRate orderPrice triggeredOrderId createdAt`.

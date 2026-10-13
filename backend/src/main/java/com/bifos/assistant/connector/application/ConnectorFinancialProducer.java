@@ -37,7 +37,6 @@ import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -70,6 +69,7 @@ class ConnectorFinancialProducer {
     private final ConnectorExecutionGuard guard;
     private final ConnectorFinancialConflicts conflicts;
     private final ConnectorFinancialGate gate;
+    private final FinancialDigest digest;
     private final TextCipher cipher;
     private final ConnectorActionBodies bodies;
     private final HermesConnectorClient hermes;
@@ -90,7 +90,8 @@ class ConnectorFinancialProducer {
         require(cipher.enabled());
         gate.requireOpen();
         String key = ConnectorActionKey.of(profileName, rootSessionId, sessionId, toolCallId).value();
-        String hash = Sha256.hex(argsJson);
+        // 금융 줄의 인자 해시도 keyed hash 로 적는다. 판단 피드백의 version 도 이 값을 복사한다.
+        String hash = digest.of("args_json", argsJson);
         var recorded = actions.findByDedupeKey(key);
         if (recorded.isPresent()) {
             require(recorded.get().hermesTool().equals(hermesTool) && recorded.get().argsSha256().equals(hash));
@@ -134,7 +135,7 @@ class ConnectorFinancialProducer {
                 require(duplicate.get().hermesTool().equals(hermesTool) && duplicate.get().argsSha256().equals(hash));
                 return duplicate.get();
             }
-            conflicts.requireAvailable(snapshot.requestKey(before.user(), before.connection(), toolName), null);
+            conflicts.requireAvailable(snapshot.storedRequestKey(digest, before.user(), before.connector(), toolName), null);
             gate.requireOpen();
             gate.requireWithinLimits(before.user(), null, executionArgs, clock.instant());
             var binding = bindings.findById(before.binding()).orElseThrow(ConnectorFinancialProducer::rejected);
@@ -147,7 +148,7 @@ class ConnectorFinancialProducer {
             actions.saveAndFlush(action);
             bodies.sealArgs(action, argsJson);
             var row = ConnectorExecutionSnapshot.capture(action, binding, operation,
-                JSON.writeValueAsString(contract.scopeFields()), executionArgs, summary, scopeJson, cipher, now);
+                JSON.writeValueAsString(contract.scopeFields()), executionArgs, summary, scopeJson, cipher, now, digest);
             require(row.contentKeyId() != null);
             contents.saveAndFlush(row);
             if (action.conversationId() != null && checkNotifications.allows(origin, now)) {

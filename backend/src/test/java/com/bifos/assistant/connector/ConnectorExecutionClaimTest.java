@@ -14,6 +14,7 @@ import com.bifos.assistant.connector.application.ConnectorConnectionService;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.application.ConnectorFinancialConflicts;
 import com.bifos.assistant.connector.application.ConnectorFinancialGate;
+import com.bifos.assistant.connector.application.FinancialDigest;
 import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaimCodec;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionClaims;
@@ -117,6 +118,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
     @Autowired
     ConnectorFinancialGate financialGate;
+
+    @Autowired
+    FinancialDigest digest;
 
     @Autowired
     HermesProperties properties;
@@ -238,7 +242,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         Fixture f = fixture();
         String raw = consume ? tickets.issue(f.action()) : null;
         var snapshot = tx().execute(status -> ConnectorExecutionSnapshot.open(
-            actions.findByPublicId(f.action()).orElseThrow(), contents.findById(f.actionId()).orElseThrow(), cipher));
+            actions.findByPublicId(f.action()).orElseThrow(), contents.findById(f.actionId()).orElseThrow(), cipher, digest));
         jdbc.update("update connector_action_execution set content_key_id = null, execution_args_json = ?, summary_json = ?, scope_json = ? where action_id = ?",
             snapshot.executionArgsJson(), snapshot.summaryJson(), snapshot.scopeJson(), f.actionId());
         var before = row(f);
@@ -648,7 +652,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         Fixture f = fixture();
         String raw = tickets.issue(f.action());
         switch (reason) {
-            case "protocol" -> CATALOG_BODY.set(CATALOG.replace("approval-claim-v1", "approval-claim-v2"));
+            case "protocol" -> CATALOG_BODY.set(CATALOG.replace("approval-claim-v2", "approval-claim-v1"));
             case "risk" -> CATALOG_BODY.set(CATALOG.replace("FINANCIAL", "WRITE"));
             case "scope" -> CATALOG_BODY.set(CATALOG.replace("\"field\":\"account\"", "\"field\":\"secret\""));
             case "missing" -> CATALOG_BODY.set("[]");
@@ -818,7 +822,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                     ActionDecision.NEEDS_APPROVAL, null, ToolRisk.FINANCIAL, ToolApproval.ALWAYS),
                 false,
                 Sha256.hex(id),
-                Sha256.hex(args),
+                digest.of("args_json", args),
                 NOW);
             action.awaitApproval(approvalExpiry);
             actions.saveAndFlush(action);
@@ -832,7 +836,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 VECTOR.get("summaryJson").stringValue(),
                 VECTOR.get("scopeJson").stringValue(),
                 cipher,
-                NOW));
+                NOW, digest));
             action.beginExecution(NOW);
             return new Fixture(
                 action.publicId(),

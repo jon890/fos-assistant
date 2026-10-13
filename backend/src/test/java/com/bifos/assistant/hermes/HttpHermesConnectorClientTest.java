@@ -147,13 +147,13 @@ class HttpHermesConnectorClientTest {
     @DisplayName("바인딩 보호 맥락은 선택 본문으로 전달하고 옛 상태의 누락은 미지원이다")
     void bindingGuardIsOptionalAndOldStateIsUnsupported() {
         var guard = JsonMapper.builder().build().readTree("""
-                {"v":1,"protocol":"approval-claim-v1","bindingId":"14","connectionId":"13",
+                {"v":1,"protocol":"approval-claim-v2","bindingId":"14","connectionId":"13",
                  "connectionUpdatedAt":"2026-10-10T00:00:00Z","manifestSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
                 """);
         server.expect(requestTo(BASE + "/api/connectors"))
             .andExpect(content().json("""
                         {"profile":"user-demo","plugin":"demo-notes","enabled":true,"sandbox_owner":"owner",
-                         "bind":{"vault":"c1","guard":{"v":1,"protocol":"approval-claim-v1","bindingId":"14","connectionId":"13",
+                         "bind":{"vault":"c1","guard":{"v":1,"protocol":"approval-claim-v2","bindingId":"14","connectionId":"13",
                          "connectionUpdatedAt":"2026-10-10T00:00:00Z","manifestSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}
                         """, JsonCompareMode.STRICT))
             .andRespond(withSuccess("""
