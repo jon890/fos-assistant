@@ -33,7 +33,7 @@ const inputSchema = z.strictObject({
 
 /**
  * 인자는 process 시작자가 정한다. 모델 도구 인자와 env로 private mode를 열지 않는다.
- * 묶음에 든 connector.json 이 capability 를 켠 operation 만 연다. 운영 선언은 compile 하나다.
+ * 묶음에 든 connector.json 이 capability 를 켠 operation 만 연다. 켜는 범위는 선언이 정한다.
  */
 export function snapshotOperation(
   argv: string[],
