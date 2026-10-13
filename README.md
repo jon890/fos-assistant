@@ -52,7 +52,7 @@ Everything shown is made-up demo data: the pictures are taken by a script agains
 </details>
 
 To take the pictures again, run `pnpm screenshots` in `web/`. The script is `test/screenshots/tour.shots.ts`.
-The Now screen (`/now`), the connections screen, and the scheduled tasks screen are not in this tour yet.
+The Now screen (`/now`), the external service connections screen, and the scheduled tasks screen are not in this tour yet.
 
 ## Why this exists
 
@@ -119,9 +119,9 @@ Adding a user is a single decision by an administrator, and it must not slow any
 
 ### Connectors and approval
 
-- **Connect once, attach to several agents.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+- **Connect once, attach to several agents.** A connector hands an agent the tools of an outside service and widens what that agent can do. Connect your account once on the external service connections screen, then attach that connection to any of your private agents, and the agent calls the service's tools directly ([`docs/prd.md`](docs/prd.md), [ADR-083](docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
 - **Attaching needs no restart.** A newly attached connector is picked up by runs shortly afterwards, without restarting the shared gateway, so nobody else's conversation is cut off in the meantime ([ADR-20261007 / connector-live-reload](docs/adr/ADR-20261007-connector-live-reload.md)).
-- **Connector cards.** The connections screen shows each connector as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
+- **Connector cards.** The external service connections screen shows each connector as a card with its icon, an about link, and a summary of its tools. Icons come only from files inside the plugin, and no outside address is fetched ([ADR-20261008 / connector-card](docs/adr/ADR-20261008-connector-card.md), [`docs/prd.md`](docs/prd.md)).
 - **Writes wait on an approval card.** A call that writes to an outside service waits on a card that shows exactly what will be sent, and runs only after you approve it, once, with exactly the arguments you approved. A tool that allows a standing grant runs without a card while the grant you gave lasts, and tools that send data out have standing grants closed. Approvals for the same tool are grouped, and approval requests and expiries reach you as notifications on any screen ([`docs/features/connector-policy.md`](docs/features/connector-policy.md), [`docs/features/attention.md`](docs/features/attention.md)).
 
 ### Proactive checks and the Now screen
