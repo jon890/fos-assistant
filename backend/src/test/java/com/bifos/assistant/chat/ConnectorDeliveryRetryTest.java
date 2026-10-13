@@ -320,6 +320,26 @@ class ConnectorDeliveryRetryTest {
 
 
     @Test
+    @DisplayName("재시도 식별자 없이 코드만 남은 결과를 모르는 승인 결과는 오류 코드만 싣고 재시도 안내 줄을 싣지 않는다")
+    void carriesCodeWithoutRetryLineWhenNoIdentifier() {
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new ConnectorExecutionUnknown(new ConnectorUnknownDetail("PLAIN_OUTCOME_UNKNOWN", null, null)));
+        ResultDelivery delivery = failedDeliveryOf(approved());
+
+        chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {
+        });
+
+        List<HermesRunCommand> received = stub().received();
+        assertThat(received).hasSize(2);
+        assertThat(received.get(1).input())
+            .contains("상태: UNKNOWN, 오류 코드: PLAIN_OUTCOME_UNKNOWN, 끝난 시각: ")
+            .contains("]\n" + UNKNOWN_INPUT)
+            .doesNotContain("재시도")
+            .isEqualTo(received.get(0).input());
+    }
+
+
+    @Test
     @DisplayName("다른 사용자의 승인 줄 열쇠와 UUID 가 아닌 열쇠는 다시 읽지 않는다")
     void readsOnlyOwnActionsByKey() {
         AppUser mom = users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER, Instant.now()));
