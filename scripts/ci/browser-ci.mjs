@@ -116,7 +116,7 @@ export async function collectJobFailures(jobs, readReport) {
         });
       }
     } catch {
-      // 취소 도중 잘린 JSON 도 다른 shard 의 실패 집계를 막지 않는다.
+      // 실패한 shard 의 JSON 이 잘렸거나 없어도 다른 shard 의 집계를 막지 않는다.
       found.push({
         file: `shard-${shard}-setup`,
         project,
