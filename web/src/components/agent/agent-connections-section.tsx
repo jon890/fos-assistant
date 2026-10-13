@@ -55,7 +55,7 @@ const RISK_MESSAGE =
 const SHELL_RISK_MESSAGE =
   "안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있어요. 분리된 에이전트도 읽은 내용을 인터넷으로 보낼 수 있어요.";
 
-/** 붙이기 확인 창이다. 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. 연결 화면의 에이전트 고르기도 쓴다. */
+/** 붙이기 확인 창이다. 요청이 도는 동안 닫히지 않고, 실패하면 창이 남아 까닭을 보인다. 외부 서비스 연결 화면의 에이전트 고르기도 쓴다. */
 export function BindConfirm({
   title,
   busy,
@@ -200,7 +200,7 @@ function ConnectionRow({
  *
  * <p>붙이기는 확인 창을 거친다. 붙인 연결의 도구를 이 에이전트가 직접 쓰므로, 셸과 파일 도구가 켜져 있으면 그 위험까지 알린다.
  * 안전하게 분리되지 않은 에이전트는 연결 정보를 읽고 승인 없이 서비스를 이용할 수 있고, 분리된 에이전트도 읽은
- * 내용을 인터넷으로 보낼 수 있다(ADR-086). 화면은 격리 적용 여부를 모르므로 두 경우를 함께 알린다. 계정 연결은 연결 화면이 한다.
+ * 내용을 인터넷으로 보낼 수 있다(ADR-086). 화면은 격리 적용 여부를 모르므로 두 경우를 함께 알린다. 계정 연결은 외부 서비스 연결 화면이 한다.
  */
 export function AgentConnectionsSection({
   code,
@@ -283,7 +283,7 @@ export function AgentConnectionsSection({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">이 에이전트가 쓰는 연결</h2>
-        {/* 이 에이전트를 실어 보내, 연결을 마치면 연결 화면이 이 에이전트에 붙이기를 먼저 권한다. 붙일 수 없는 에이전트에는 두지 않는다. */}
+        {/* 이 에이전트를 실어 보내, 연결을 마치면 외부 서비스 연결 화면이 이 에이전트에 붙이기를 먼저 권한다. 붙일 수 없는 에이전트에는 두지 않는다. */}
         {blockedReason ? null : (
           <Button asChild size="sm" variant="outline">
             <Link href={`/connections?agent=${code}`}>

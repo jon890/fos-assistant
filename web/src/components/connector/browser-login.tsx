@@ -39,7 +39,7 @@ export function LoginNotice({ url }: { url: string | null | undefined }) {
 }
 
 /**
- * 연결 화면의 오류 상자다. 글만 받은 오류는 그대로 보인다.
+ * 외부 서비스 연결 화면의 오류 상자다. 글만 받은 오류는 그대로 보인다.
  * 연결 확인이나 등록이 값을 확인하지 못해 실패했고 로그인할 곳이 있으면 문구 옆에 로그인 링크를 둔다.
  */
 export function ErrorNotice({

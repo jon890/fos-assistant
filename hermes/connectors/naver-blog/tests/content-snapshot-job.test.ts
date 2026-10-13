@@ -43,6 +43,7 @@ import {
 const ENTRY = join(import.meta.dir, "fake-snapshot-worker-entry.ts");
 const TICKET = "synthetic.ticket-value_ABC";
 const BODY_MARKER = "합성 원고 첫 줄";
+const COMPILE_ONLY = { compile: true, start: false, status: false };
 const cleanups: Array<() => unknown> = [];
 afterEach(async () => {
   while (cleanups.length) await cleanups.pop()!();
@@ -723,10 +724,10 @@ test("private status 는 묵은 job 을 기존 규칙으로 끝내고 허용한 
 
 test("일반 도구 목록·env·모델 인자로 private start·status 를 켤 수 없다", async () => {
   expect(() =>
-    snapshotOperation(["--content-snapshot-operation", "start"]),
+    snapshotOperation(["--content-snapshot-operation", "start"], COMPILE_ONLY),
   ).toThrow("CONTENT_SNAPSHOT_UNAVAILABLE");
   expect(() =>
-    snapshotOperation(["--content-snapshot-operation", "status"]),
+    snapshotOperation(["--content-snapshot-operation", "status"], COMPILE_ONLY),
   ).toThrow("CONTENT_SNAPSHOT_UNAVAILABLE");
   const enabled = { compile: true, start: true, status: true };
   expect(
