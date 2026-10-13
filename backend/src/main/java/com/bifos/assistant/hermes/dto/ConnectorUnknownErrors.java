@@ -24,6 +24,7 @@ public record ConnectorUnknownErrors(Map<String, String> retryKeys) {
 
     private static final Pattern RETRY_KEY = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,31}");
 
+
     public ConnectorUnknownErrors {
         retryKeys = Map.copyOf(retryKeys);
     }
