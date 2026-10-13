@@ -218,7 +218,7 @@ test("동시에 켤 수 있는 수가 차면 잠시 뒤 다시 켜라고 알린�
   ).toBeVisible();
 });
 
-test("연결 화면에서 내 브라우저로 간다", async ({ page }) => {
+test("외부 서비스 연결 화면에서 내 브라우저로 간다", async ({ page }) => {
   await fakeBrowserRoutes(page, {
     enabled: true,
     status: null,

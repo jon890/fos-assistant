@@ -114,8 +114,8 @@
     "status_tool": "content_snapshot_status",
     "capabilities": {
       "compile": true,
-      "start": false,
-      "status": false
+      "start": true,
+      "status": true
     }
   }
 }

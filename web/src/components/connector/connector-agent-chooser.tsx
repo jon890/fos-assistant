@@ -224,7 +224,7 @@ export function ConnectorAgentChooser({
   justConnected: boolean;
   /** 에이전트 화면에서 이 연결을 하러 왔으면 그 에이전트 번호다. */
   preferredAgent: string | null;
-  /** 붙였거나 붙이다 실패했다. 실패해도 서버에 바인딩이 남았을 수 있어 연결 화면이 붙인 에이전트 목록을 다시 읽는다. */
+  /** 붙였거나 붙이다 실패했다. 실패해도 서버에 바인딩이 남았을 수 있어 외부 서비스 연결 화면이 붙인 에이전트 목록을 다시 읽는다. */
   onBindingsChanged(): void;
   onClose(): void;
 }) {
