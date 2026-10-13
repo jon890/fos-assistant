@@ -276,7 +276,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 | --- | --- |
 | 같은 승인을 두 번 누른다 | 둘째는 `CONNECTOR_ACTION_NOT_PENDING` 이다. 실행은 한 번이다 |
 | 실행 요청이 시간 안에 답하지 않거나 연결이 끊긴다 | `UNKNOWN`. 다시 실행하지 않는다 |
-| 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝난다 | `UNKNOWN`. 다시 실행하지 않는다. 그 코드와, 선언한 `retry_key` 의 값 하나를 `result_text` 에 남겨 자동 turn 입력에 싣는다([ADR-20261013 / unknown-retry-key](../adr/ADR-20261013-unknown-retry-key.md)). 에이전트가 그 값으로 다시 부르면 새 호출이라 보통 호출과 같은 승인 판정을 거친다. 상시 허락이 있으면 묻지 않고 실행된다 |
+| 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 끝난다 | `UNKNOWN`. 다시 실행하지 않는다. 그 코드와, 선언한 `retry_key` 의 값 하나를 `result_text` 에 남겨 자동 turn 입력에 싣는다([ADR-20261013 / unknown-retry-key](../adr/ADR-20261013-unknown-retry-key.md)). 에이전트가 그 값을 실어 같은 도구를 다시 부르면 상시 허락과 대화 허락을 보지 않고 새 승인을 받는다 |
 | 실행을 보낸 뒤 서버가 다시 뜬다 | 기동 정리(`ConnectorActionSweeper`)가 `EXECUTING` 을 `UNKNOWN` 으로 바꾸고 대화에 전한다 |
 | 실행의 시간 제한보다 오래 `EXECUTING` 으로 남았다 | 주기 정리(`ConnectorActionExpirer`)가 결과를 적지 못한 것으로 보고 `UNKNOWN` 으로 바꾼다 |
 | 사용자가 거절한다 | `REJECTED`. 알림 줄만 남긴다 |

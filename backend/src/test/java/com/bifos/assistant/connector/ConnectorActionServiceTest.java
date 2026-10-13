@@ -761,6 +761,33 @@ class ConnectorActionServiceTest {
 
 
     @Test
+    @DisplayName("결과를 모르는 쓰기를 같은 재시도 식별자로 다시 부르면 허락이 없을 때도 상시 허락이 있을 때도 새 승인을 기다린다")
+    void resendWithRetryIdentifierAlwaysWaitsForApproval() {
+        catalogBecomes(declaringUnknown(DECLARING, UNKNOWN_CODE, "attemptId"));
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new ConnectorExecutionUnknown(new ConnectorUnknownDetail(UNKNOWN_CODE, "attemptId", ATTEMPT_ID)));
+        String resend = "{\"text\":\"안녕\",\"attemptId\":\"" + ATTEMPT_ID + "\"}";
+
+        // 허락 없이 승인한 줄이 결과를 모른다. 다시 부르면 새 승인 줄이다.
+        service.approve(me, ask(WRITE, ARGS).actionId(), null);
+        ConnectorPolicyAnswer withoutGrant = ask(WRITE, resend);
+        assertThat(withoutGrant.allowed()).isFalse();
+        assertThat(withoutGrant.actionId()).isNotNull();
+
+        // 상시 허락과 함께 승인한 줄이 결과를 모른다. 허락은 남지만 같은 식별자를 실은 호출에는 통하지 않는다.
+        service.approve(me, withoutGrant.actionId(), GrantPeriod.HOUR);
+        assertThat(service.grants(me)).extracting(ConnectorGrantView::toolName).containsExactly(WRITE);
+        ConnectorPolicyAnswer withGrant = ask(WRITE, resend);
+        assertThat(withGrant.allowed()).isFalse();
+        assertThat(withGrant.actionId()).isNotNull();
+        // 식별자를 싣지 않았거나 다른 식별자를 실은 호출에는 상시 허락이 그대로 통한다.
+        assertThat(ask(WRITE, "{\"text\":\"다른 글\"}").allowed()).isTrue();
+        assertThat(ask(WRITE, "{\"text\":\"안녕\",\"attemptId\":\"another-attempt\"}").allowed()).isTrue();
+        verify(connector, times(2)).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+
+    @Test
     @DisplayName("실행 호출이 다른 예외로 끝나도 UNKNOWN 이고 예외를 밖으로 내지 않는다")
     void unexpectedExecutionFailureIsRecordedAsUnknown() {
         UUID actionId = ask(WRITE, ARGS).actionId();
