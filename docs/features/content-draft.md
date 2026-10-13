@@ -84,7 +84,7 @@ compile args는 서버가 검증한 `canonicalDraft`와 `resolvedAssets`다. sta
 
 connector.json의 snapshot은 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`의 다섯 키만 받는다.
 protocol은 `content-snapshot-v1`, 도구 이름은 서로 다르고 공개 도구와 겹치지 않는다.
-capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 운영 선언은 `{compile:true,start:false,status:false}`를 유지한다.
+capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 운영 선언은 `{compile:true,start:true,status:true}`다.
 카탈로그의 별도 snapshot 칸과 성공 HTTP 응답은 같은 검증된 선언을 사용한다.
 Java catalog decoder도 같은 키와 capability 계약을 따른다. transport 구현이 있어도 운영 선언이 켜지지 않으면 시작하지 않는다.
 
@@ -123,16 +123,15 @@ renderer는 기존 첨부 검사에 사용하며 생성한 HTML은 저장하거�
 사진의 권한과 지문 대응은 호출자가 검증한다. compile의 파일 검사만으로 실제 provider의 사진 identity를 증명하지 않는다.
 합성 stdio·HTTP 검사는 Python mcp 2.0.0과 TypeScript SDK 1.28.0으로 수행한다.
 
-**본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.**
-로컬 합성 시험은 잘못된 stdout과 JSONRPC·notification validation, callback 예외의 전후 본문 노출을 검사한다.
-운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
+로컬 합성 테스트는 잘못된 stdout과 JSONRPC·notification validation, callback 예외의 전후 본문 노출을 검사한다.
+요청이 실패하면 고정 Hermes가 원고 본문과 사진을 진단 파일에 남길 수 있다. 본문 없는 writer의 운영 연결은 하지 않기로 했고(2026-10-13) 이 위험을 감수한다. upstream 추적은 [#518](https://github.com/jon890/fos-assistant/issues/518)이 갖는다.
 private transport와 preview snapshot 서비스는 합성 원고로 검증한다. 원고 최초 MCP 생성과 승인, 공개 preview API도 구현되어 있으며 실제 네이버 저장은 운영 capability를 켠 뒤의 범위다.
 
 ### 커넥터의 예약 job 시작과 조회
 
 커넥터에는 승인한 snapshot을 기존 worker로 한 번 저장하는 private start와 같은 job만 읽는 private status가 있다.
-운영 선언은 여전히 `{compile:true,start:false,status:false}`다. 묶음의 connector.json이 capability를 켜지 않으면 `--content-snapshot-operation start|status` 자식도 열리지 않는다.
-plugin 전달과 Control Plane 호출은 아직 연결하지 않았다. 아래는 그 둘이 따라야 할 커넥터 쪽 계약이다.
+운영 선언은 `{compile:true,start:true,status:true}`다. 묶음의 connector.json이 capability를 끄면 `--content-snapshot-operation start|status` 자식도 열리지 않는다.
+아래는 plugin 전달과 Control Plane 호출이 따르는 커넥터 쪽 계약이다.
 
 | 칸 | 계약 |
 | --- | --- |
@@ -214,7 +213,7 @@ Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두
 스키마·설치·HTTP 장애는 원고의 기존 안전한 오류로 끝낸다.
 
 검증은 공유 golden의 Java UTF-8 바이트·두 지문, 실제 HTTP 대역, Spring 동시 revision·권한 철회·원본 교체, H2 마이그레이션과 fresh MySQL을 사용한다.
-운영 Hermes 왕복·실제 provider·승인·worker 시작·복구·공개 handler·프론트·실제 30장 canary는 이 범위에서 실행하지 않는다.
+이 절의 compile 검증은 운영 Hermes 왕복·실제 provider·실제 30장 canary를 실행하지 않는다. 승인·worker 시작·복구·공개 handler는 아래 절과 「후속 경계와 완료 판정」이 갖는다.
 
 ## 승인 snapshot과 저장 job
 
@@ -252,7 +251,7 @@ list는 1~20개를 job 내부 번호 역순으로 읽고 21번째 행으로 다�
 원고 승인 줄의 등록 이름 `fos_content_draft_save`는 MCP 서버 도구가 아니다. 이 줄이 일반 승인 경로로 들어와도 선언 없는 도구로 판정되어 실행 없이 거절된다.
 prepare는 잠글 실행 번호, 지금 catalog로 계산한 바인딩 stamp, catalog 선언을 잠금 밖에서 읽는다.
 시작은 catalog의 snapshot 선언이 start·status를 모두 참으로 선언하고 `ContentDraftJobStarter` 구현 빈이 있을 때만 지원한다.
-catalog decoder와 시작 전송 빈은 준비되어 있지만 운영 capability가 false이므로 운영에서는 실행 없이 거절한다.
+운영 선언이 start·status를 켜고 있어 승인한 snapshot의 예약 job만 시작한다. 선언을 끄면 실행 없이 거절한다.
 
 approvePrepared는 coordinator 한 번 안에서 아래 「잠금 순서」로 잠그고 승인 줄 PENDING, job PREVIEW_READY, 기한, 시작 지원, 현재 `save_draft` 정책, 현재 원고·원본·바인딩 판, 준비한 정책 지문을 확인한다.
 모두 맞으면 소문자 정규 UUID jobId를 예약하고 승인 줄 EXECUTING, job DISPATCHED와 승인자·승인 시각을 함께 커밋한다.
@@ -707,11 +706,11 @@ Alpine 위험 수용, 원본 파일 순서 실증의 미완료 상태, 실제 �
 ### 배포 뒤 원격 확인
 
 로컬 구현 검증에서는 운영 브라우저·실계정·승인·저장·글 조회를 실행하지 않는다.
-모든 구현 단계를 배포하고 본문 없는 진단 정책의 구현·가림 검증을 마친 뒤, 새로 승인한 지정 테스트 글로만 확인한다. 기존 승인 영수증을 재사용하지 않는다.
+모든 구현 단계와 capability 선언을 배포한 뒤, 새로 승인한 지정 테스트 글로만 확인한다. 기존 승인 영수증을 재사용하지 않는다.
 
 | 선행 조건 | 확인 항목 | 기대값 |
 | --- | --- | --- |
-| 배포와 진단 정책 수락 | 실제 Hermes MCP·dashboard HTTP·CP·worker 왕복 | 승인 revision·hash·binding·jobId가 일치하고 start는 1회 |
+| 배포 | 실제 Hermes MCP·dashboard HTTP·CP·worker 왕복 | 승인 revision·hash·binding·jobId가 일치하고 start는 1회 |
 | 같은 저장 작업을 시작한 뒤 | 대화 끊김·재접속·조회 timeout·gateway와 CP 재시작 | 같은 job만 조회하고 추가 저장·승인·start는 0회 |
 | 새로 승인한 실패 주입 | 클릭 직전·직후 중단과 원고 수정·삭제·실제 사용자와 에이전트 철회·CANCELLED 커밋 | save claim 전은 클릭 차단, claim 뒤 불확실성은 UNKNOWN, 자동 재시도 없음 |
 | 전체 연결 구현 완료 | 합성 표식 30장과 manifest·실제 전송 bytes·포함과 빠진 ID | 입력 대응을 위치·ID·지문으로 판정하고 내용 판독은 따로 판정 |

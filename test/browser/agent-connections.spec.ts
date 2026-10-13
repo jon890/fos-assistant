@@ -115,7 +115,7 @@ test("비공개 에이전트에 연결을 붙이면 위험을 알리고 반영 �
     "반영 대기",
   );
 
-  // 새로 읽어도 붙은 채이고, 연결 화면의 붙인 에이전트 목록에도 이 에이전트가 보인다.
+  // 새로 읽어도 붙은 채이고, 외부 서비스 연결 화면의 붙인 에이전트 목록에도 이 에이전트가 보인다.
   await page.reload();
   await expect(
     section(page).getByTestId("agent-connection-state"),

@@ -94,7 +94,7 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("카드에서 연결 화면으로 들어가 값을 등록하고 확인한 뒤 연결됨을 본다", async ({
+test("카드에서 외부 서비스 연결 화면으로 들어가 값을 등록하고 확인한 뒤 연결됨을 본다", async ({
   page,
 }) => {
   let submitted: unknown;
@@ -439,7 +439,7 @@ test("서비스가 없으면 빈 상태를 보인다", async ({ page }) => {
   await expect(page.getByText("연결할 수 있는 서비스가 없어요")).toBeVisible();
 });
 
-test("옛 가계부 연결 주소는 새 연결 화면으로 넘어간다", async ({ page }) => {
+test("옛 가계부 연결 주소는 새 외부 서비스 연결 화면으로 넘어간다", async ({ page }) => {
   await page.route("**/api/connections/fos-accountbook", (route) =>
     route.fulfill({ status: 404, json: notFound }),
   );
@@ -616,7 +616,7 @@ test("반영 완료가 설치 상태 어긋남으로 거절되면 그 까닭의 
   await expect(page.getByText("raw upstream")).toHaveCount(0);
 });
 
-test("연결 화면이 도구마다 사람 말 이름과 요약, 위험도와 실행 방식을 보이고 실제 이름은 숨긴다", async ({
+test("외부 서비스 연결 화면이 도구마다 사람 말 이름과 요약, 위험도와 실행 방식을 보이고 실제 이름은 숨긴다", async ({
   page,
 }) => {
   await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
