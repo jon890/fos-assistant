@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -46,6 +47,7 @@ class HttpContentDraftSnapshotClientTest {
     private final AtomicReference<byte[]> response = new AtomicReference<>();
     private final AtomicReference<JsonNode> seen = new AtomicReference<>();
     private final AtomicInteger requests = new AtomicInteger();
+    private final List<String> upgrades = new CopyOnWriteArrayList<>();
     private int status = 200;
     private volatile boolean stall;
     private volatile boolean truncate;
@@ -68,6 +70,7 @@ class HttpContentDraftSnapshotClientTest {
             requests.incrementAndGet();
             assertThat(exchange.getRequestMethod()).isEqualTo("POST");
             assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer synthetic-token");
+            upgrades.add(String.valueOf(exchange.getRequestHeaders().getFirst("Upgrade")));
             seen.set(json.readTree(exchange.getRequestBody().readAllBytes()));
             slotsArrived.countDown();
             try {
@@ -251,6 +254,18 @@ class HttpContentDraftSnapshotClientTest {
                 assertThat(call.get(3, TimeUnit.SECONDS)).isEqualTo(golden.get("snapshot"));
             }
         }
+    }
+
+
+    @Test
+    @DisplayName("compile 과 start·status 요청은 h2c upgrade 없이 HTTP/1.1 로 보낸다")
+    void sendsHttp11WithoutH2cUpgrade() {
+        compile();
+        var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
+        response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", "unavailable"))));
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp)).isInstanceOf(ApiException.class);
+        // uvicorn(httptools)은 upgrade 를 붙인 POST 의 본문을 버린다. 이 검사 서버는 그 동작이 없어 헤더로 확인한다.
+        assertThat(upgrades).containsExactly("null", "null");
     }
 
 

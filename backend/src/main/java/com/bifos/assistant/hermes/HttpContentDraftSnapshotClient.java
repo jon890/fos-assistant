@@ -36,7 +36,12 @@ public class HttpContentDraftSnapshotClient {
     private static final Semaphore SLOTS = new Semaphore(4);
     private static final Set<String> WORKER_ERRORS = Set.of("invalid_input", "not_found", "start_unknown", "unavailable");
     private final HermesProperties properties;
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    /**
+     * HTTP/1.1 로 고정한다. 기본값(HTTP/2)은 평문 주소에 h2c upgrade 를 붙이고, 대시보드의 uvicorn(httptools)은 그 POST 의 본문을
+     * 버린 채 처리해 plugin 이 빈 본문을 400 으로 거절한다.
+     */
+    private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+        .connectTimeout(Duration.ofSeconds(5)).build();
 
 
     public JsonNode start(String profile, String connectorId, JsonNode snapshot, ContentDraftWorkerStamp stamp, String ticket) {

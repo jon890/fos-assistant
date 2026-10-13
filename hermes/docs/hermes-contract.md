@@ -2872,6 +2872,7 @@ nonce와 성공 원문을 저장하거나 자식에 서비스 비밀값을 전�
 
 snapshot은 별도 `POST /api/connectors/{id}/snapshot` 서비스 경로다. <!-- ref-ignore: plugin middleware가 처리하는 서비스 경로다 -->
 handler도 서비스 Bearer를 직접 검사하여 쿠키만 있는 요청은 받지 않는다.
+Control Plane은 이 경로에 HTTP/1.1로 보낸다. 대시보드의 uvicorn(httptools)은 `Upgrade: h2c`를 붙인 POST의 본문을 버린 채 처리하므로 plugin이 빈 본문을 400으로 거절한다. 그때 uvicorn은 `Unsupported upgrade request`와 `Invalid HTTP request received` 경고만 남긴다.
 manifest의 정확한 다섯 키는 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`다.
 protocol은 `content-snapshot-v1`이고 capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 추가 키·누락·boolean이 아닌 값은 거절한다.
 운영 선언은 `{compile:true,start:true,status:true}`다.
