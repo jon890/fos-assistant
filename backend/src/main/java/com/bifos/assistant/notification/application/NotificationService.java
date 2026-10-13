@@ -64,7 +64,25 @@ public class NotificationService {
     @Transactional(propagation = Propagation.MANDATORY)
     public Notification notify(
         Long userId, NotificationKind kind, String title, String body, NotificationTarget target) {
-        Notification saved = notifications.saveAndFlush(Notification.of(userId, kind, title, body, target, clock.instant()));
+        return notify(userId, kind, title, body, target, null);
+    }
+
+
+    /**
+     * 원인을 가리키는 알림을 저장한다. 원인이 끝나면 {@link #resolve} 가 그 원인의 알림만 읽음으로 바꾼다.
+     *
+     * @param sourcePublicId 원인의 공개 식별자. 가리키지 않으면 null
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Notification notify(
+        Long userId,
+        NotificationKind kind,
+        String title,
+        String body,
+        NotificationTarget target,
+        UUID sourcePublicId) {
+        Notification saved = notifications.saveAndFlush(
+            Notification.of(userId, kind, title, body, target, clock.instant()).caused(sourcePublicId));
         afterCommit(userId, unread -> NotificationEvent.created(saved.publicId(), unread));
         return saved;
     }
@@ -134,12 +152,12 @@ public class NotificationService {
 
 
     /**
-     * 원인이 끝나 더 알릴 것이 없는 알림을 읽음으로 표시한다. 같은 사용자의 같은 종류 가운데 {@code target} 을 가리키는
-     * 읽지 않은 줄만 바꾼다. 바꾼 줄이 있으면 커밋한 뒤 {@code read} 사건을 보낸다. 부르는 쪽의 트랜잭션에 참여한다.
+     * 원인이 끝나 더 알릴 것이 없는 알림을 읽음으로 표시한다. 같은 사용자의 같은 종류 가운데 그 원인이 만든 읽지 않은 줄만
+     * 바꾼다. 바꾼 줄이 있으면 커밋한 뒤 {@code read} 사건을 보낸다. 부르는 쪽의 트랜잭션에 참여한다.
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void resolve(Long userId, NotificationKind kind, NotificationTarget target) {
-        if (notifications.markReadByTarget(userId, kind, target.type(), target.publicId(), clock.instant()) > 0) {
+    public void resolve(Long userId, NotificationKind kind, UUID sourcePublicId) {
+        if (notifications.markReadBySource(userId, kind, sourcePublicId, clock.instant()) > 0) {
             afterCommit(userId, NotificationEvent::read);
         }
     }

@@ -361,7 +361,8 @@ public class ConnectorPolicyService {
                 NotificationKind.APPROVAL_REQUESTED,
                 APPROVAL_REQUESTED_TITLE,
                 "「" + toolTitle + "」",
-                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
+                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId),
+                action.publicId()));
     }
 
 

@@ -387,19 +387,37 @@ class ApprovalNotificationTest {
 
 
     @Test
-    @DisplayName("같은 대화에 기다리는 줄이 남아 있으면 하나를 처리해도 알림은 읽지 않음으로 남고 마지막 줄을 처리하면 읽음이 된다")
-    void notificationStaysUnreadWhileAnotherApprovalWaits() {
+    @DisplayName("같은 대화에 기다리는 줄이 둘이면 처리한 줄의 알림만 읽음이 되고 다른 줄의 알림은 읽지 않음으로 남는다")
+    void resolvesOnlyTheNotificationOfTheDecidedRequest() {
         UUID first = ask(root, WRITE, ARGS).actionId();
+        List<Long> firstIds = notifications.findAll().stream().map(Notification::id).toList();
         UUID second = ask(root, WRITE, "{\"text\":\"다른 글\"}").actionId();
-        assertThat(notifications.findAll()).hasSize(2);
+        Notification secondNotice = notifications.findAll().stream()
+            .filter(notice -> !firstIds.contains(notice.id()))
+            .findFirst()
+            .orElseThrow();
 
         service.reject(me, first);
 
-        assertThat(notifications.findAll()).allSatisfy(notice -> assertThat(notice.unread()).isTrue());
+        assertThat(notifications.findById(firstIds.getFirst()).orElseThrow().unread()).isFalse();
+        assertThat(notifications.findById(secondNotice.id()).orElseThrow().unread()).isTrue();
 
         service.reject(me, second);
 
-        assertThat(notifications.findAll()).allSatisfy(notice -> assertThat(notice.unread()).isFalse());
+        assertThat(notifications.findById(secondNotice.id()).orElseThrow().unread()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("대화를 지운 뒤 승인해도 그 요청의 알림은 읽음이 된다")
+    void resolvesNotificationEvenWhenConversationWasDeleted() {
+        UUID actionId = ask(root, WRITE, ARGS).actionId();
+        Notification requested = onlyNotification();
+        deleteConversation();
+
+        service.reject(me, actionId);
+
+        assertThat(notifications.findById(requested.id()).orElseThrow().unread()).isFalse();
     }
 
 

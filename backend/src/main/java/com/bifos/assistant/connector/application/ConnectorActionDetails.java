@@ -148,15 +148,9 @@ class ConnectorActionDetails {
     }
 
 
-    /**
-     * 그 줄의 대화에 승인을 기다리는 줄이 더는 없으면 그 줄을 돌려준다. 줄이 없거나 대화가 없거나 아직 기다리는 줄이
-     * 남았으면 빈 값이다.
-     */
-    Optional<ConnectorAction> withoutPendingSibling(UUID actionId) {
-        return actions.findByPublicId(actionId)
-            .filter(action -> action.conversationId() != null)
-            .filter(action -> !actions.existsByConversationIdAndUserIdAndStatus(
-                action.conversationId(), action.userId(), ActionStatus.PENDING));
+    /** 그 줄이 승인을 기다리는 상태를 벗어났으면 돌려준다. 줄이 없거나 아직 기다리면 빈 값이다. */
+    Optional<ConnectorAction> leftPending(UUID actionId) {
+        return actions.findByPublicId(actionId).filter(action -> action.status() != ActionStatus.PENDING);
     }
 
 

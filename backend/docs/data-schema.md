@@ -775,6 +775,7 @@ action을 지우면 실행 내용도 지운다.
 `id` 는 Control Plane 밖으로 나가지 않는다. 화면과 API 는 `public_id` 를 쓴다.
 `body` 는 빈 문자열을 받는다. 도구 인자 원문, 비밀값, 모델 답 전문을 넣지 않는다.
 `target_type` 과 `target_public_id` 는 함께 채우거나 함께 비운다. 목록 화면을 가리키는 `ADMIN_CONNECTIONS` 만 `target_type` 을 채우고 `target_public_id` 를 비운다.
+`source_public_id` 는 알림을 만든 원인(승인 줄)의 공개 식별자다. 원인이 끝나면 이 번호로 그 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는 알림과 옛 알림은 비어 있다.
 `user_id` 에만 외래 키를 둔다. 갈 곳은 지워져도 알림을 남긴다. 보관 기간이 지난 줄은 읽었는지와 상관없이 지운다.
 
 ## 예약 작업 표

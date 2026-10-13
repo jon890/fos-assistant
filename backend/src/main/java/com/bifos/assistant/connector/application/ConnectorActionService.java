@@ -202,15 +202,15 @@ public class ConnectorActionService {
 
 
     /**
-     * 그 줄이 바뀐 뒤 대화에 승인을 기다리는 줄이 하나도 없으면 「승인을 기다리는 요청」 알림을 읽음으로 표시한다. 대화 화면에서
+     * 그 줄이 승인을 기다리는 상태를 벗어났으면 그 줄이 만든 「승인을 기다리는 요청」 알림을 읽음으로 표시한다. 대화 화면에서
      * 승인하거나 거절했을 때, 기한이 지났을 때, 실행이 끝났을 때 알림 단추에 지난 요청이 남지 않게 한다.
      *
-     * <p>알림은 요청 한 줄이 아니라 대화를 가리키므로, 같은 대화에 기다리는 줄이 남았으면 그대로 둔다. 알림 저장이 실패하면
-     * 예외가 나간다. 부르는 쪽이 줄은 이미 커밋됐음을 알고 로그만 남긴다.
+     * <p>알림은 줄의 공개 식별자로 특정한다. 같은 대화의 다른 줄이나 이 줄을 처리하는 동안 새로 생긴 줄의 알림은 그대로다.
+     * 알림 저장이 실패하면 예외가 나간다. 부르는 쪽이 줄은 이미 커밋됐음을 알고 로그만 남긴다.
      */
     @Transactional
     public void resolveApprovalRequested(UUID actionId) {
-        details.withoutPendingSibling(actionId).ifPresent(signals::resolveRequested);
+        details.leftPending(actionId).ifPresent(signals::resolveRequested);
     }
 
 

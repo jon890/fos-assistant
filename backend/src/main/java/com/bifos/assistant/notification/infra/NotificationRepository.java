@@ -2,7 +2,6 @@ package com.bifos.assistant.notification.infra;
 
 import com.bifos.assistant.notification.domain.Notification;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
-import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -51,21 +50,20 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
 
     /**
-     * 그 사용자의 그 종류 읽지 않은 줄 가운데 같은 곳을 가리키는 것을 읽음으로 바꾼다.
+     * 그 사용자의 그 종류 읽지 않은 줄 가운데 그 원인이 만든 것을 읽음으로 바꾼다.
      *
      * @return 바꾼 줄 수
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update Notification n set n.readAt = :now
-             where n.userId = :userId and n.kind = :kind and n.targetType = :targetType
-               and n.targetPublicId = :targetPublicId and n.readAt is null
+             where n.userId = :userId and n.kind = :kind
+               and n.sourcePublicId = :sourcePublicId and n.readAt is null
             """)
-    int markReadByTarget(
+    int markReadBySource(
         @Param("userId") Long userId,
         @Param("kind") NotificationKind kind,
-        @Param("targetType") NotificationTargetType targetType,
-        @Param("targetPublicId") UUID targetPublicId,
+        @Param("sourcePublicId") UUID sourcePublicId,
         @Param("now") Instant now);
 
 

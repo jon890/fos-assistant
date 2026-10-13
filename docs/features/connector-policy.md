@@ -270,7 +270,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 ### 승인이 필요한 호출
 
 판정이 「승인 필요」 인 호출이 실행되기까지 갈리는 지점이다. 근거는 [ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 이다.
-새 승인 줄이 생기면 `APPROVAL_REQUESTED` 알림이 함께 생겨, 사용자가 다른 화면에 있어도 그 대화로 올 수 있다. 그 대화에 기다리는 줄이 없어지면 알림은 읽음이 된다([`docs/features/attention.md`](attention.md)).
+새 승인 줄이 생기면 `APPROVAL_REQUESTED` 알림이 함께 생겨, 사용자가 다른 화면에 있어도 그 대화로 올 수 있다. 그 줄이 끝나면 그 줄의 알림은 읽음이 된다([`docs/features/attention.md`](attention.md)).
 
 | 상황 | 처리 |
 | --- | --- |
