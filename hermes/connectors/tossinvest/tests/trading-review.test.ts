@@ -125,7 +125,8 @@ for (const [amount, target] of [
           expect(item.description).toContain(
             "UNKNOWN이면 새 권한이나 UUID로 자동 재전송하지",
           );
-        if (["prepare_trade", "modify_order"].includes(item.name))
+        // 운영 manifest의 prepare_trade 설명은 정정을 열지 않으므로 정정 도구만 이 제한을 적는다.
+        if (item.name === "modify_order")
           expect(item.description).toContain("금액 원주문을 LIMIT로 정정");
       }
       const unsupported = amount && target === "LIMIT";

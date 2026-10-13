@@ -555,7 +555,10 @@ test("production factory가 기존 도구와 종목 도구를 함께 등록한�
         "list_orders",
         "list_sectors",
         "list_stocks",
-      ]);
+        "prepare_trade",
+        "create_order",
+        "cancel_order",
+      ].sort());
     });
     expect(fake.requests).toHaveLength(0);
   } finally {

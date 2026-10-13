@@ -20,7 +20,6 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 CONNECTORS = REPO / "hermes/connectors"
 SECRET_WORDS = ("TOKEN", "SECRET", "PASSWORD", "KEY")
 ALLOWED_IMPORTS = {"mcp", "mcp_types", "anyio"}
-CLOSED_RISKS = {"DESTRUCTIVE", "FINANCIAL"}
 SERVER_TIMEOUT_SECONDS = 30
 # `<img>` 로 그리는 SVG 는 이 이름공간 선언이 없으면 아무것도 그리지 않는다.
 SVG_NAMESPACE = 'xmlns="http://www.w3.org/2000/svg"'
@@ -101,6 +100,23 @@ def user_copy_problems(tools: dict, loaded: dict | None, readme: str, arg_names:
     return problems
 
 
+def closed_risk_problems(declared: dict) -> list[str]:
+    """닫힌 위험도 선언의 위반이다. `DESTRUCTIVE` 는 늘 닫는다.
+
+    `FINANCIAL` 은 그 커넥터의 `execution_guard.operations` 에 든 도구만 연다(ADR-20261013 / financial-order-opening).
+    보호 선언 밖의 금융 도구는 승인과 claim 을 거치지 않으므로 위반이다.
+    """
+    guard = declared.get("execution_guard")
+    operations = guard.get("operations") if isinstance(guard, dict) else None
+    guarded = set(operations) if isinstance(operations, dict) else set()
+    problems = []
+    for tool, spec in declared.get("tools", {}).items():
+        risk = spec.get("risk")
+        if risk == "DESTRUCTIVE" or (risk == "FINANCIAL" and tool not in guarded):
+            problems.append("닫힌 위험도 %s 선언: %s" % (risk, tool))
+    return problems
+
+
 def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> list[str]:
     """커넥터 하나의 위반 글 목록을 돌려준다. 비면 통과다. `load_connector` 는 plugin 의 `_load_connector` 다."""
     name = root.name
@@ -142,9 +158,8 @@ def check_connector(root: pathlib.Path, repo: pathlib.Path, load_connector) -> l
             problems.append("아이콘 SVG 가 %s 를 선언하지 않았다: %s" % (SVG_NAMESPACE, name))
 
     tools = declared.get("tools", {})
+    problems.extend(closed_risk_problems(declared))
     for tool, spec in tools.items():
-        if spec.get("risk") in CLOSED_RISKS:
-            problems.append("닫힌 위험도 %s 선언: %s" % (spec["risk"], tool))
         if spec.get("risk") != "READ" and not str(spec.get("title", "")).strip():
             problems.append("READ 가 아닌 도구에 title 이 없다: %s" % tool)
         if spec.get("risk") != "READ":
@@ -270,6 +285,31 @@ class ConnectorsContractTest(base.ConnectorGateCase):
         path = pathlib.Path(tmp.name) / "SKILL.md"
         path.write_text("---\n- required_environment_variables\n---\n본문\n", encoding="utf-8")
         self.assertEqual(secret_requests(path), ["앞머리가 mapping 이 아니다"])
+
+
+class ClosedRiskTest(unittest.TestCase):
+    """금융 도구는 보호 선언의 operations 에 든 것만 열리고 DESTRUCTIVE 는 늘 닫힌다."""
+
+    @staticmethod
+    def declared(operations=None, **tools):
+        value = {"tools": {name: {"risk": risk} for name, risk in tools.items()}}
+        if operations is not None:
+            value["execution_guard"] = {"operations": operations}
+        return value
+
+    def test_financial_tool_in_guard_operations_is_allowed(self):
+        declared = self.declared({"place": "CREATE"}, prepare="READ", place="FINANCIAL")
+        self.assertEqual(closed_risk_problems(declared), [])
+
+    def test_financial_tool_outside_guard_operations_is_reported(self):
+        declared = self.declared({"place": "CREATE"}, place="FINANCIAL", amend="FINANCIAL")
+        self.assertEqual(closed_risk_problems(declared), ["닫힌 위험도 FINANCIAL 선언: amend"])
+        self.assertEqual(closed_risk_problems(self.declared(None, place="FINANCIAL")),
+                         ["닫힌 위험도 FINANCIAL 선언: place"])
+
+    def test_destructive_tool_is_reported_even_in_guard_operations(self):
+        declared = self.declared({"wipe": "CANCEL"}, wipe="DESTRUCTIVE")
+        self.assertEqual(closed_risk_problems(declared), ["닫힌 위험도 DESTRUCTIVE 선언: wipe"])
 
 
 def secret_requests(path: pathlib.Path) -> list[str]:

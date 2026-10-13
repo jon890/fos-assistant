@@ -67,14 +67,24 @@ for (const mode of ["source", "bundle"]) {
       expect(listed.map((item) => item.name).sort()).toEqual(
         Object.keys(manifest.tools).sort(),
       );
-      expect(listed).toHaveLength(33);
+      // READ 33개와 주문 준비 READ 하나, 실행 FINANCIAL 둘이다.
+      expect(listed).toHaveLength(36);
       expect(CURRENT_OPERATIONS.size).toBe(35);
       for (const item of listed) {
         expect(item.description?.length).toBeGreaterThan(20);
         expect(item.description).not.toContain("undefined");
-        expect(item.annotations?.readOnlyHint).toBe(true);
+        expect(item.annotations?.readOnlyHint).toBe(
+          (manifest.tools as Record<string, { risk: string }>)[item.name]!
+            .risk === "READ",
+        );
         expect(item.inputSchema.additionalProperties).toBe(false);
       }
+      expect(
+        listed
+          .filter((item) => !item.annotations?.readOnlyHint)
+          .map((item) => item.name)
+          .sort(),
+      ).toEqual(["cancel_order", "create_order"]);
       for (const name of ["get_order", "get_commissions"] as const) {
         expect(manifest.tools[name]).toEqual({
           risk: "READ",

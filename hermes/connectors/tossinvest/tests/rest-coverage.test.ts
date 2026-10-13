@@ -444,7 +444,14 @@ test("빌드한 production stdio bundle의 계좌·시세 도구가 실제 HTTP 
     );
     for (const entry of listed)
       expect(entry.description).toBe(manifest.tools[entry.name].description);
-    expect(listed).toHaveLength(33);
+    // READ 33개와 주문 준비 READ 하나, 실행 FINANCIAL 둘이다.
+    expect(listed).toHaveLength(36);
+    expect(
+      listed
+        .filter((item) => !item.annotations?.readOnlyHint)
+        .map((item) => item.name)
+        .sort(),
+    ).toEqual(["cancel_order", "create_order"]);
     for (const [name, args] of [
       ["get_stocks", { symbols: "AAPL" }],
       ["list_stocks", { market: "NASDAQ", commonShare: false }],

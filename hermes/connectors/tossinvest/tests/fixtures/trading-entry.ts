@@ -117,7 +117,11 @@ export function createTradingFixtureServer(options: TossinvestOptions) {
   const register = createToolRegistration(server);
   registerReadTools(register, client);
   registerAccountTools(register, client);
-  registerTradingTools(register, client);
+  registerTradingTools(register, client, [
+    "create_order",
+    "modify_order",
+    "cancel_order",
+  ]);
   return server;
 }
 

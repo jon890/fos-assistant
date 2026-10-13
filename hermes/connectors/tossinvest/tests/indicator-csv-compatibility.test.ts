@@ -53,8 +53,14 @@ const example =
 
 async function verify(client: Client, fake: FakeToss) {
   const listed = (await client.listTools()).tools;
-  expect(listed).toHaveLength(33);
-  expect(listed.every((entry) => entry.annotations?.readOnlyHint)).toBe(true);
+  // READ 33개와 주문 준비 READ 하나, 실행 FINANCIAL 둘이다.
+  expect(listed).toHaveLength(36);
+  expect(
+    listed
+      .filter((entry) => !entry.annotations?.readOnlyHint)
+      .map((entry) => entry.name)
+      .sort(),
+  ).toEqual(["cancel_order", "create_order"]);
   const schema = listed.find((entry) => entry.name === name)!.inputSchema;
   expect((schema.properties!.symbols as { type: string }).type).toBe("string");
   expect(schema.additionalProperties).toBe(false);

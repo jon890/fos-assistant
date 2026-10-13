@@ -124,6 +124,9 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
         "list_orders",
         "list_sectors",
         "list_stocks",
+        "prepare_trade",
+        "create_order",
+        "cancel_order",
       ]),
     );
     expect(new Set(tools.map(({ name }) => name))).toEqual(
@@ -132,8 +135,17 @@ test("standalone stdio의 설명·READ 정책·조건조회 GET과 계좌 마스
     for (const entry of tools) {
       expect(entry.description).not.toContain("undefined");
       expect(entry.description!.length).toBeGreaterThan(20);
-      expect(entry.annotations?.readOnlyHint).toBe(true);
+      expect(entry.annotations?.readOnlyHint).toBe(
+        (manifest.tools as Record<string, { risk: string }>)[entry.name]!
+          .risk === "READ",
+      );
     }
+    expect(
+      tools
+        .filter((entry) => !entry.annotations?.readOnlyHint)
+        .map((entry) => entry.name)
+        .sort(),
+    ).toEqual(["cancel_order", "create_order"]);
     for (const name of [
       "list_conditional_orders",
       "get_conditional_order",

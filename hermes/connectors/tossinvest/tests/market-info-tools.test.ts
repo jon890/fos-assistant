@@ -102,10 +102,17 @@ for (const [path, name, args] of [
             "list_orders",
             "list_sectors",
             "list_stocks",
-          ]);
-          expect(listed.tools.every((t) => t.annotations?.readOnlyHint)).toBe(
-            true,
-          );
+            "prepare_trade",
+            "create_order",
+            "cancel_order",
+          ].sort());
+          // 주문 실행 FINANCIAL 둘만 읽기 전용이 아니다.
+          expect(
+            listed.tools
+              .filter((t) => !t.annotations?.readOnlyHint)
+              .map((t) => t.name)
+              .sort(),
+          ).toEqual(["cancel_order", "create_order"]);
           const { result, body } = await tool(client, name, args);
           expect(result.isError).toBeUndefined();
           expect(body).toEqual({ result: example.value.result, metadata: {} });

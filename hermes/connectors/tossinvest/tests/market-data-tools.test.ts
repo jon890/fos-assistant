@@ -112,8 +112,13 @@ test("production에 등록한 네 시세 도구가 실제 수신 operation 네 �
           .map((item) => item.name),
       ),
     ).toEqual(new Set(tools.map((spec) => spec.name)));
-    for (const item of listed)
-      expect(item.annotations?.readOnlyHint).toBe(true);
+    // 주문 실행 FINANCIAL 둘만 읽기 전용이 아니다.
+    expect(
+      listed
+        .filter((item) => !item.annotations?.readOnlyHint)
+        .map((item) => item.name)
+        .sort(),
+    ).toEqual(["cancel_order", "create_order"]);
     for (const spec of tools)
       expect(
         (await tool(client, spec.name, args(spec.name))).result.isError,
