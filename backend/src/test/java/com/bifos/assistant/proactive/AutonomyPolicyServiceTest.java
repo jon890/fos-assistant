@@ -271,7 +271,6 @@ class AutonomyPolicyServiceTest {
     }
 
 
-    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("판정을 저장한 뒤 시작 전에 설치의 자동 실행 설정이 꺼지면 시작하지 않고 FAILED 로 남긴다")
     void executionDisabledAfterDecisionStopsStart() {
@@ -279,8 +278,9 @@ class AutonomyPolicyServiceTest {
         doAnswer(invocation -> {
             List<AutonomyDecision> saved = decisions.saveAll(invocation.<List<AutonomyDecision>>getArgument(0));
             decisions.flush();
-            ((OverridableLiveProperties<AutonomyProperties>)properties)
-                .override(new AutonomyProperties(
+            OverridableLiveProperties.during(
+                properties,
+                new AutonomyProperties(
                     false,
                     properties.current().maxEvaluationAge(),
                     properties.current().maxEvidenceAge()));

@@ -3,6 +3,8 @@ package com.bifos.assistant.browser.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.bifos.assistant.browser.domain.CdpConnection;
 import com.bifos.assistant.browser.domain.CdpEvent;
 import java.io.ByteArrayOutputStream;
@@ -37,9 +39,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+@ExtendWith(OutputCaptureExtension.class)
 class WebSocketCdpConnectorTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -48,11 +55,13 @@ class WebSocketCdpConnectorTest {
     private FakeCdpServer server;
     private WebSocketCdpConnector connector;
 
+
     @BeforeEach
     void setUp() throws IOException {
         server = new FakeCdpServer();
         connector = new WebSocketCdpConnector(Duration.ofMillis(300), 1_000_000);
     }
+
 
     @AfterEach
     void tearDown() throws Exception {
@@ -60,10 +69,13 @@ class WebSocketCdpConnectorTest {
         server.close();
     }
 
+
     @Test
     @DisplayName("탭의 devtools 경로로 붙고 명령 응답을 번호로 짝지어 돌려준다")
     void pairsResponsesById() throws Exception {
-        try (CdpConnection connection = connect(event -> {}, () -> {})) {
+        try (CdpConnection connection = connect(event -> {
+        }, () -> {
+        })) {
             CompletableFuture<JsonNode> first = connection.send("Page.enable", Map.of());
             CompletableFuture<JsonNode> second = connection.send("Page.reload", Map.of("ignoreCache", true));
             JsonNode a = server.nextMessage();
@@ -81,26 +93,82 @@ class WebSocketCdpConnectorTest {
         }
     }
 
+
     @Test
     @DisplayName("CDP 가 오류로 답하면 그 명령만 실패한다")
     void failsCommandOnErrorResponse() throws Exception {
-        try (CdpConnection connection = connect(event -> {}, () -> {})) {
+        try (CdpConnection connection = connect(event -> {
+        }, () -> {
+        })) {
             CompletableFuture<JsonNode> result = connection.send("Page.navigate", Map.of("url", "https://example.com"));
             JsonNode sent = server.nextMessage();
 
             server.sendText("{\"id\":" + sent.path("id").asLong() + ",\"error\":{\"code\":-32000,\"message\":\"x\"}}");
 
             assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .hasMessageNotContaining("example.com");
+                .isInstanceOf(ExecutionException.class)
+                .hasMessageNotContaining("example.com");
         }
     }
+
+
+    @Test
+    @DisplayName("글자 입력 명령이 실패해도 입력한 글자는 예외와 로그에 남지 않는다")
+    void keepsTypedTextOutOfFailuresAndLogs(CapturedOutput output) throws Exception {
+        String secret = "pw-SYNTH-7f3a9c";
+        Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
+        Level before = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        try (CdpConnection connection = connect(event -> {
+        }, () -> {
+        })) {
+            CompletableFuture<JsonNode> rejected = connection.send("Input.insertText", Map.of("text", secret));
+            JsonNode sent = server.nextMessage();
+            server.sendText("{\"id\":" + sent.path("id").asLong()
+                + ",\"error\":{\"code\":-32000,\"message\":\"" + secret + "\"}}");
+            CompletableFuture<JsonNode> unserializable = connection.send("Input.insertText", Map.of("text", new Object() {
+                @Override
+                public String toString() {
+                    return secret;
+                }
+            }));
+            CompletableFuture<JsonNode> unanswered = connection.send("Input.insertText", Map.of("text", secret));
+            server.nextMessage();
+            // JSON 이 아닌 메시지에 글자가 실려 와도 DEBUG 줄이 그것을 옮겨 적지 않는다
+            server.sendText("not-json " + secret);
+
+            assertThat(failureText(rejected)).doesNotContain(secret);
+            assertThat(failureText(unserializable)).doesNotContain(secret);
+            assertThat(failureText(unanswered)).doesNotContain(secret);
+        } finally {
+            logger.setLevel(before);
+        }
+
+        assertThat(output.getAll()).contains("cdp message is not json").doesNotContain(secret);
+    }
+
+
+    /** 실패한 결과의 예외 사슬을 메시지까지 한 문자열로 모은다. */
+    private static String failureText(CompletableFuture<JsonNode> result) {
+        try {
+            result.get(2, TimeUnit.SECONDS);
+            return "";
+        } catch (Exception ex) {
+            StringBuilder text = new StringBuilder();
+            for (Throwable each = ex; each != null; each = each.getCause()) {
+                text.append(each).append('\n');
+            }
+            return text.toString();
+        }
+    }
+
 
     @Test
     @DisplayName("번호 없는 메시지는 사건으로 넘기고 조각난 큰 메시지는 모아서 한 사건으로 읽는다")
     void deliversEventsAndJoinsFragments() throws Exception {
         BlockingQueue<CdpEvent> events = new LinkedBlockingQueue<>();
-        try (CdpConnection ignored = connect(events::add, () -> {})) {
+        try (CdpConnection ignored = connect(events::add, () -> {
+        })) {
             server.sendText("{\"method\":\"Page.loadEventFired\",\"params\":{\"timestamp\":1}}");
             String data = "a".repeat(400_000);
             String big = "{\"method\":\"Page.screencastFrame\",\"params\":{\"data\":\"" + data + "\",\"sessionId\":7}}";
@@ -116,24 +184,29 @@ class WebSocketCdpConnectorTest {
         }
     }
 
+
     @Test
     @DisplayName("정한 시간 안에 답이 없으면 그 명령을 시간 초과로 끝낸다")
     void timesOutUnansweredCommand() throws Exception {
-        try (CdpConnection connection = connect(event -> {}, () -> {})) {
+        try (CdpConnection connection = connect(event -> {
+        }, () -> {
+        })) {
             CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
             server.nextMessage();
 
             assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .hasCauseInstanceOf(TimeoutException.class);
+                .isInstanceOf(ExecutionException.class)
+                .hasCauseInstanceOf(TimeoutException.class);
         }
     }
+
 
     @Test
     @DisplayName("상대가 끊으면 기다리던 명령을 실패로 끝내고 닫힘을 한 번 알린다")
     void failsPendingAndNotifiesOnDisconnect() throws Exception {
         CountDownLatch closed = new CountDownLatch(1);
-        try (CdpConnection connection = connect(event -> {}, closed::countDown)) {
+        try (CdpConnection connection = connect(event -> {
+        }, closed::countDown)) {
             CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
             server.nextMessage();
 
@@ -145,19 +218,21 @@ class WebSocketCdpConnectorTest {
         }
     }
 
+
     @Test
     @DisplayName("상한을 넘는 메시지가 오면 연결을 끊고 기다리던 명령을 실패로 끝내며 닫힘을 알린다")
     void closesOnOversizedMessage() throws Exception {
         CountDownLatch closed = new CountDownLatch(1);
         try (WebSocketCdpConnector small = new WebSocketCdpConnector(Duration.ofSeconds(5), 1_000)) {
             CompletableFuture<Void> accepted = server.acceptAsync();
-            CdpConnection connection = small.connect(server.address(), TARGET, event -> {}, closed::countDown);
+            CdpConnection connection = small.connect(server.address(), TARGET, event -> {
+            }, closed::countDown);
             accepted.get(2, TimeUnit.SECONDS);
             CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
             server.nextMessage();
 
             server.sendFragmented(
-                    "{\"method\":\"Page.screencastFrame\",\"params\":{\"data\":\"" + "a".repeat(2_000) + "\"}}", 4);
+                "{\"method\":\"Page.screencastFrame\",\"params\":{\"data\":\"" + "a".repeat(2_000) + "\"}}", 4);
 
             assertThat(closed.await(2, TimeUnit.SECONDS)).isTrue();
             assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS)).isInstanceOf(ExecutionException.class);
@@ -165,34 +240,39 @@ class WebSocketCdpConnectorTest {
         }
     }
 
+
     @Test
     @DisplayName("close 로 닫으면 기다리던 명령을 실패로 끝내고 닫힘은 알리지 않는다")
     void closeFailsPendingWithoutNotifying() throws Exception {
         CountDownLatch closed = new CountDownLatch(1);
-        CdpConnection connection = connect(event -> {}, closed::countDown);
+        CdpConnection connection = connect(event -> {
+        }, closed::countDown);
         CompletableFuture<JsonNode> result = connection.send("Page.enable", Map.of());
         server.nextMessage();
 
         connection.close();
 
         assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS))
-                .isInstanceOf(ExecutionException.class)
-                .hasCauseInstanceOf(IllegalStateException.class);
+            .isInstanceOf(ExecutionException.class)
+            .hasCauseInstanceOf(IllegalStateException.class);
         assertThat(server.awaitDisconnected()).isTrue();
         assertThat(closed.await(300, TimeUnit.MILLISECONDS)).isFalse();
     }
+
 
     @Test
     @DisplayName("두 스레드가 동시에 여러 번 보내도 응답이 모두 제 명령과 짝지어진다")
     void pairsConcurrentSends() throws Exception {
         int perThread = 50;
-        try (CdpConnection connection = connect(event -> {}, () -> {})) {
+        try (CdpConnection connection = connect(event -> {
+        }, () -> {
+        })) {
             Thread echo = new Thread(() -> {
                 try {
                     for (int i = 0; i < perThread * 2; i++) {
                         JsonNode sent = server.nextMessage();
                         server.sendText("{\"id\":" + sent.path("id").asLong() + ",\"result\":{\"n\":"
-                                + sent.path("params").path("n").asInt() + "}}");
+                            + sent.path("params").path("n").asInt() + "}}");
                     }
                 } catch (InterruptedException | IOException ex) {
                     throw new IllegalStateException(ex);
@@ -221,15 +301,16 @@ class WebSocketCdpConnectorTest {
             for (int t = 0; t < 2; t++) {
                 for (int i = 0; i < perThread; i++) {
                     assertThat(results.get(t)
-                                    .get(i)
-                                    .get(2, TimeUnit.SECONDS)
-                                    .path("n")
-                                    .asInt())
+                        .get(i)
+                        .get(2, TimeUnit.SECONDS)
+                        .path("n")
+                        .asInt())
                             .isEqualTo(t * 1_000 + i);
                 }
             }
         }
     }
+
 
     @Test
     @DisplayName("사건 처리기가 막혀 있어도 명령 응답은 오고, 처리기는 읽는 스레드가 아닌 한 스레드에서 차례대로 불린다")
@@ -254,7 +335,8 @@ class WebSocketCdpConnectorTest {
                 }
             }
         };
-        try (CdpConnection connection = connect(events, () -> {})) {
+        try (CdpConnection connection = connect(events, () -> {
+        })) {
             server.sendText("{\"method\":\"Page.first\"}");
             assertThat(entered.await(2, TimeUnit.SECONDS)).isTrue();
             server.sendText("{\"method\":\"Page.second\"}");
@@ -271,6 +353,7 @@ class WebSocketCdpConnectorTest {
             assertThat(otherThreads.get()).isZero();
         }
     }
+
 
     @Test
     @DisplayName("붙는 중에 끊기면 늦게 열린 소켓을 닫고 사건과 닫힘 알림을 부르지 않는다")
@@ -300,15 +383,19 @@ class WebSocketCdpConnectorTest {
         assertThat(closed.getCount()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("대상 번호가 영문자와 숫자가 아니면 붙지 않고 거절한다")
     void rejectsMalformedTargetId() {
         URI cdp = server.address();
         for (String id : new String[] {"../browser", "a/b", "", null}) {
-            assertThatThrownBy(() -> connector.connect(cdp, id, event -> {}, () -> {}))
-                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> connector.connect(cdp, id, event -> {
+            }, () -> {
+            }))
+                .isInstanceOf(IllegalArgumentException.class);
         }
     }
+
 
     private CdpConnection connect(Consumer<CdpEvent> events, Runnable closed) throws Exception {
         CompletableFuture<Void> accepted = server.acceptAsync();
@@ -316,6 +403,7 @@ class WebSocketCdpConnectorTest {
         accepted.get(2, TimeUnit.SECONDS);
         return connection;
     }
+
 
     /** 핸드셰이크와 텍스트 프레임만 아는 가짜 CDP WebSocket 서버다. 연결 하나만 받는다. */
     static final class FakeCdpServer implements AutoCloseable {
@@ -330,17 +418,21 @@ class WebSocketCdpConnectorTest {
         private volatile Socket socket;
         private volatile Thread reader;
 
+
         FakeCdpServer() throws IOException {
             server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
         }
+
 
         URI address() {
             return URI.create("http://127.0.0.1:" + server.getLocalPort());
         }
 
+
         CompletableFuture<Void> acceptAsync() {
             return acceptAsync(new CountDownLatch(0));
         }
+
 
         /** 연결을 받은 뒤 {@code gate} 가 열릴 때까지 핸드셰이크 응답을 미룬다. 응답한 뒤에는 사건 하나를 보낸다. */
         CompletableFuture<Void> acceptAsync(CountDownLatch gate) {
@@ -369,22 +461,27 @@ class WebSocketCdpConnectorTest {
             return accepted;
         }
 
+
         String requestLine() {
             return headers.get(0);
         }
+
 
         List<String> headers() {
             return headers;
         }
 
+
         boolean awaitConnected() throws InterruptedException {
             return connected.await(2, TimeUnit.SECONDS);
         }
+
 
         /** 상대가 연결을 닫아 읽기를 마칠 때까지 기다린다. */
         boolean awaitDisconnected() throws InterruptedException {
             return disconnected.await(2, TimeUnit.SECONDS);
         }
+
 
         JsonNode nextMessage() throws InterruptedException {
             JsonNode message = received.poll(2, TimeUnit.SECONDS);
@@ -392,9 +489,11 @@ class WebSocketCdpConnectorTest {
             return message;
         }
 
+
         synchronized void sendText(String text) throws IOException {
             writeFrame(true, 0x1, text.getBytes(StandardCharsets.UTF_8));
         }
+
 
         synchronized void sendFragmented(String text, int parts) throws IOException {
             byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
@@ -407,9 +506,11 @@ class WebSocketCdpConnectorTest {
             }
         }
 
+
         void dropConnection() throws IOException {
             socket.close();
         }
+
 
         @Override
         public void close() throws Exception {
@@ -421,6 +522,7 @@ class WebSocketCdpConnectorTest {
                 reader.join(2_000);
             }
         }
+
 
         private void handshake() throws IOException {
             InputStream in = socket.getInputStream();
@@ -434,17 +536,18 @@ class WebSocketCdpConnectorTest {
             String accept;
             try {
                 accept = Base64.getEncoder()
-                        .encodeToString(MessageDigest.getInstance("SHA-1")
-                                .digest((key + GUID).getBytes(StandardCharsets.US_ASCII)));
+                    .encodeToString(MessageDigest.getInstance("SHA-1")
+                        .digest((key + GUID).getBytes(StandardCharsets.US_ASCII)));
             } catch (NoSuchAlgorithmException ex) {
                 throw new IllegalStateException(ex);
             }
             OutputStream out = socket.getOutputStream();
             out.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                            + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n")
+                + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n")
                     .getBytes(StandardCharsets.US_ASCII));
             out.flush();
         }
+
 
         private void readFrames() throws IOException {
             DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -463,7 +566,7 @@ class WebSocketCdpConnectorTest {
                     if ((second & 0x80) != 0) {
                         in.readFully(mask);
                     }
-                    byte[] payload = new byte[(int) length];
+                    byte[] payload = new byte[(int)length];
                     in.readFully(payload);
                     for (int i = 0; i < payload.length; i++) {
                         payload[i] ^= mask[i % 4];
@@ -485,6 +588,7 @@ class WebSocketCdpConnectorTest {
             }
         }
 
+
         private void writeFrame(boolean fin, int opcode, byte[] payload) throws IOException {
             ByteArrayOutputStream frame = new ByteArrayOutputStream();
             frame.write((fin ? 0x80 : 0) | opcode);
@@ -497,7 +601,7 @@ class WebSocketCdpConnectorTest {
             } else {
                 frame.write(127);
                 for (int shift = 56; shift >= 0; shift -= 8) {
-                    frame.write((int) (((long) payload.length >>> shift) & 0xFF));
+                    frame.write((int)(((long)payload.length >>> shift) & 0xFF));
                 }
             }
             frame.write(payload);
@@ -505,6 +609,7 @@ class WebSocketCdpConnectorTest {
             out.write(frame.toByteArray());
             out.flush();
         }
+
 
         private static String readLine(InputStream in) throws IOException {
             ByteArrayOutputStream line = new ByteArrayOutputStream();
