@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.domain.ContentDraftBindingChoiceException;
+import com.bifos.assistant.chat.domain.ContentDraftException;
 import com.bifos.assistant.connector.application.ConnectorCatalogCache;
 import com.bifos.assistant.connector.application.ConnectorContentDraftBindings;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
@@ -18,17 +20,23 @@ import com.bifos.assistant.hermes.dto.ConnectorSnapshotDeclaration;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.auth.UserAccessPolicy;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ErrorCode;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 /** bindingId 를 생략한 preview 가 요청자 범위의 snapshot 바인딩 하나만 고르는지 본다. */
 class ConnectorContentDraftBindingsTest {
     private static final CurrentUser OWNER = new CurrentUser(7L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
     private final ConnectorBindingRepository bindings = mock(ConnectorBindingRepository.class);
     private final ConnectorCatalogCache catalog = mock(ConnectorCatalogCache.class);
-    private final ConnectorContentDraftBindings access = new ConnectorContentDraftBindings(bindings, catalog, mock(UserAccessPolicy.class));
+    private final UserAccessPolicy users = mock(UserAccessPolicy.class);
+    private final ConnectorContentDraftBindings access = new ConnectorContentDraftBindings(bindings, catalog, users);
 
 
     @Test
@@ -66,6 +74,37 @@ class ConnectorContentDraftBindingsTest {
         when(bindings.findByAgentId(5L)).thenReturn(rows);
 
         assertThat(access.soleSnapshotBinding(OWNER, 5L)).isEqualTo(1L);
+    }
+
+
+    @Test
+    @DisplayName("쓸 수 없는 바인딩은 같은 오류로 거절하되 어느 조건에서 막혔는지 경고로 남긴다")
+    void logsWhichBindingConditionRefused() {
+        var row = binding(1L, 7L, "naver", BindingStatus.PENDING);
+        var agent = mock(Agent.class);
+        when(agent.enabled()).thenReturn(true);
+        when(agent.isReadableBy(7L)).thenReturn(true);
+        when(row.agent()).thenReturn(agent);
+        when(users.allowed(7L)).thenReturn(true);
+        when(bindings.findByAgentId(5L)).thenReturn(List.of(row));
+        var logs = new ListAppender<ILoggingEvent>();
+        logs.start();
+        var root = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+        root.addAppender(logs);
+        try {
+            assertThatThrownBy(() -> access.requireCurrent(OWNER, 5L, 1L)).isInstanceOfSatisfying(ContentDraftException.class,
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONTENT_DRAFT_UNAVAILABLE));
+            when(row.status()).thenReturn(BindingStatus.READY);
+            when(row.restartRequired()).thenReturn(true);
+            assertThatThrownBy(() -> access.requireCurrent(OWNER, 5L, 1L)).isInstanceOf(ContentDraftException.class);
+            assertThatThrownBy(() -> access.requireCurrent(OWNER, 5L, 2L)).isInstanceOf(ContentDraftException.class);
+        } finally {
+            root.detachAppender(logs);
+        }
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
+            "원고 snapshot 을 쓸 수 없다 stage=binding:binding-PENDING",
+            "원고 snapshot 을 쓸 수 없다 stage=binding:restart-required",
+            "원고 snapshot 을 쓸 수 없다 stage=binding:not-found");
     }
 
 

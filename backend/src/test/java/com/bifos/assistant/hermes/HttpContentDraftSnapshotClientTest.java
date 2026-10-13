@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -46,6 +47,7 @@ class HttpContentDraftSnapshotClientTest {
     private final AtomicReference<byte[]> response = new AtomicReference<>();
     private final AtomicReference<JsonNode> seen = new AtomicReference<>();
     private final AtomicInteger requests = new AtomicInteger();
+    private final List<String> upgrades = new CopyOnWriteArrayList<>();
     private int status = 200;
     private volatile boolean stall;
     private volatile boolean truncate;
@@ -68,6 +70,7 @@ class HttpContentDraftSnapshotClientTest {
             requests.incrementAndGet();
             assertThat(exchange.getRequestMethod()).isEqualTo("POST");
             assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer synthetic-token");
+            upgrades.add(String.valueOf(exchange.getRequestHeaders().getFirst("Upgrade")));
             seen.set(json.readTree(exchange.getRequestBody().readAllBytes()));
             slotsArrived.countDown();
             try {
@@ -250,6 +253,72 @@ class HttpContentDraftSnapshotClientTest {
             for (var call : pending) {
                 assertThat(call.get(3, TimeUnit.SECONDS)).isEqualTo(golden.get("snapshot"));
             }
+        }
+    }
+
+
+    @Test
+    @DisplayName("compile 과 start·status 요청은 h2c upgrade 없이 HTTP/1.1 로 보낸다")
+    void sendsHttp11WithoutH2cUpgrade() {
+        compile();
+        var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
+        var refused = json.createObjectNode().put("error", "unavailable");
+        response.set(json.writeValueAsBytes(jobAnswer(refused)));
+        assertThat(client.start("synthetic-profile", "snapshot-test", golden.path("snapshot"), stamp, "TICKET_MARKER")).isEqualTo(refused);
+        assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp)).isInstanceOf(ApiException.class);
+        // uvicorn(httptools)은 upgrade 를 붙인 POST 의 본문을 버린다. 이 검사 서버는 그 동작이 없어 헤더로 확인한다.
+        assertThat(upgrades).containsExactly("null", "null", "null");
+    }
+
+
+    @Test
+    @DisplayName("실패마다 단계와 HTTP 상태, 예외 종류만 경고로 남기고 profile 이름과 본문은 남기지 않는다")
+    void logsFailureStageStatusAndErrorKind() {
+        status = 503;
+        response.set("BODY_MARKER".getBytes(StandardCharsets.UTF_8));
+        unavailable();
+        status = 200;
+        var answer = answer();
+        ((ObjectNode)answer.path("capabilities")).remove("status");
+        reject(answer);
+        answer = answer();
+        ((ObjectNode)answer.path("result")).put("compilerVersion", "content-compiler-v2");
+        reject(answer);
+        response.set("{".getBytes(StandardCharsets.UTF_8));
+        unavailable();
+        server.stop(0);
+        unavailable();
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage).filteredOn(line -> line.startsWith("원고 snapshot compile"))
+            .containsExactly(
+                "원고 snapshot compile 실패 connector=snapshot-test stage=status status=503 error=-",
+                "원고 snapshot compile 실패 connector=snapshot-test stage=capabilities status=200 error=IllegalStateException",
+                "원고 snapshot compile 실패 connector=snapshot-test stage=result status=200 error=-",
+                "원고 snapshot compile 실패 connector=snapshot-test stage=envelope status=200 error=" + parseErrorName(),
+                "원고 snapshot compile 실패 connector=snapshot-test stage=send status=- error=ConnectException");
+        assertThat(logs.list).allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain("synthetic-profile", "synthetic-token"));
+    }
+
+
+    @Test
+    @DisplayName("요청 전에 막은 호출도 막은 단계를 경고로 남긴다")
+    void logsStageRejectedBeforeHttp() {
+        assertThatThrownBy(() -> client.compile("default", "snapshot-test", golden.get("draft"), golden.get("assets")))
+            .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> client.compile("synthetic-profile", "Bad/Id", golden.get("draft"), golden.get("assets")))
+            .isInstanceOf(ApiException.class);
+        assertThat(requests.get()).isZero();
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
+            "원고 snapshot compile 실패 connector=snapshot-test stage=request status=- error=-",
+            "원고 snapshot compile 실패 connector=invalid stage=request status=- error=-");
+    }
+
+
+    private String parseErrorName() {
+        try {
+            json.readTree("{");
+            throw new AssertionError("잘린 JSON 을 읽었다");
+        } catch (RuntimeException ex) {
+            return ex.getClass().getSimpleName();
         }
     }
 

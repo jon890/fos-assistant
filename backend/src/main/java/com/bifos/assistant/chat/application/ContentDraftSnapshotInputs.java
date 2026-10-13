@@ -63,15 +63,23 @@ public class ContentDraftSnapshotInputs {
 
     public Long agent(CurrentUser user, Long conversationId, Long originId) {
         access.requireOwn(user, conversationId);
-        if (originId == null || !users.allowed(user.id())) {
-            throw ContentDraftSnapshotHash.unavailable();
+        if (originId == null) {
+            throw ContentDraftSnapshotHash.unavailable("origin:missing");
         }
-        var origin = executions.findById(originId).orElseThrow(ContentDraftSnapshotHash::unavailable);
-        var root = executions.findById(origin.treeRootId()).orElseThrow(ContentDraftSnapshotHash::unavailable);
+        if (!users.allowed(user.id())) {
+            throw ContentDraftSnapshotHash.unavailable("origin:user-blocked");
+        }
+        var origin = executions.findById(originId).orElseThrow(() -> ContentDraftSnapshotHash.unavailable("origin:not-found"));
+        var root = executions.findById(origin.treeRootId()).orElseThrow(() -> ContentDraftSnapshotHash.unavailable("origin:root-not-found"));
         if (!user.id().equals(origin.userId()) || !conversationId.equals(origin.conversationId())
-            || !user.id().equals(root.userId()) || !conversationId.equals(root.conversationId())
-            || origin.status() == ExecutionStatus.CANCELLED || root.status() == ExecutionStatus.CANCELLED || origin.agentId() == null) {
-            throw ContentDraftSnapshotHash.unavailable();
+            || !user.id().equals(root.userId()) || !conversationId.equals(root.conversationId())) {
+            throw ContentDraftSnapshotHash.unavailable("origin:other-conversation");
+        }
+        if (origin.status() == ExecutionStatus.CANCELLED || root.status() == ExecutionStatus.CANCELLED) {
+            throw ContentDraftSnapshotHash.unavailable("origin:cancelled");
+        }
+        if (origin.agentId() == null) {
+            throw ContentDraftSnapshotHash.unavailable("origin:no-agent");
         }
         return origin.agentId();
     }
@@ -83,7 +91,8 @@ public class ContentDraftSnapshotInputs {
         var conversation = access.requireOwn(user, conversationId);
         var draft = drafts.findByPublicIdAndConversationIdAndOwnerUserId(draftId.toString(), conversationId, user.id())
             .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "대화를 찾을 수 없습니다."));
-        var row = revisions.findByDraftIdAndRevision(draft.id(), revision).orElseThrow(ContentDraftSnapshotHash::unavailable);
+        var row = revisions.findByDraftIdAndRevision(draft.id(), revision)
+            .orElseThrow(() -> ContentDraftSnapshotHash.unavailable("input:revision-not-found"));
         var links = assets.findByRevisionIdOrderByPositionAsc(row.id());
         if (!draft.expiresAt().isAfter(clock.instant()) || row.status() == ContentDraftRevisionStatus.EXPIRED) {
             throw new ContentDraftException(ErrorCode.CONTENT_DRAFT_GONE, null);
@@ -91,12 +100,21 @@ public class ContentDraftSnapshotInputs {
         if (draft.currentRevision() != revision || row.status() != ContentDraftRevisionStatus.VALID || !references.valid(draft, links, true)) {
             throw stale();
         }
-        if (!binding.agentId().equals(agent(user, conversationId, originId))
-            || !binding.profile().equals(executions.findById(originId).orElseThrow(ContentDraftSnapshotHash::unavailable).profileName())) {
-            throw ContentDraftSnapshotHash.unavailable();
+        if (!binding.agentId().equals(agent(user, conversationId, originId))) {
+            throw ContentDraftSnapshotHash.unavailable("input:binding-agent");
+        }
+        if (!binding.profile().equals(executions.findById(originId)
+            .orElseThrow(() -> ContentDraftSnapshotHash.unavailable("origin:not-found")).profileName())) {
+            throw ContentDraftSnapshotHash.unavailable("input:binding-profile");
         }
         try {
-            var input = reader.read(json.readTree(bodies.open(draft, row)));
+            String body;
+            try {
+                body = bodies.open(draft, row);
+            } catch (ContentDraftException ex) {
+                throw ContentDraftSnapshotHash.unavailable("input:body");
+            }
+            var input = reader.read(json.readTree(body));
             // 규칙 전에 저장한 판의 반복 사진은 일시 장애가 아니라 고쳐 저장할 원고다. 커넥터를 부르기 전에 같은 코드로 멈춘다.
             ContentDraftInputReader.requireUniquePhotos(input);
             var canonical = json.valueToTree(new CanonicalDraft(1, draftId, revision, conversation.publicId(),
@@ -120,7 +138,7 @@ public class ContentDraftSnapshotInputs {
             if (ex instanceof ApiException duplicate && duplicate.code() == ErrorCode.CONTENT_DRAFT_DUPLICATE_PHOTO) {
                 throw duplicate;
             }
-            throw ContentDraftSnapshotHash.unavailable();
+            throw ContentDraftSnapshotHash.unavailable("input", ex);
         }
     }
 
@@ -173,7 +191,7 @@ public class ContentDraftSnapshotInputs {
             .put("ordinal", order.get(link.attachmentId()));
         if (link.observationId() != null) {
             var observation = observations.findById(link.observationId()).orElseThrow(ContentDraftSnapshotInputs::stale);
-            var summary = json.readTree(observationBodies.open(observation, user.id()).orElseThrow(ContentDraftSnapshotHash::unavailable)).get("summary");
+            var summary = json.readTree(observationBodies.open(observation, user.id()).orElseThrow(() -> ContentDraftSnapshotHash.unavailable("input:observation-body"))).get("summary");
             if (summary != null && summary.isString()) {
                 String note = summary.stringValue();
                 value.put("observationNote", note.substring(0, note.offsetByCodePoints(0, Math.min(300, note.codePointCount(0, note.length())))));
@@ -185,7 +203,7 @@ public class ContentDraftSnapshotInputs {
             || name.toLowerCase(Locale.ROOT).endsWith(".small.jpg") || name.getBytes(StandardCharsets.UTF_8).length > 255
             || !directory.startsWith("/") || directory.indexOf(0) >= 0 || List.of(directory.split("/")).contains("..")
             || directory.getBytes(StandardCharsets.UTF_8).length > 4096) {
-            throw ContentDraftSnapshotHash.unavailable();
+            throw ContentDraftSnapshotHash.unavailable("input:asset-path");
         }
         return value;
     }
