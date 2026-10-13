@@ -44,6 +44,9 @@
     "skills": [
       "demo"
     ],
+    "unknown_errors": {
+      "DEMO_UNKNOWN": null
+    },
     "tools": {
       "write_note": {
         "risk": "WRITE",
