@@ -3,6 +3,8 @@ package com.bifos.assistant.browser.infra;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.bifos.assistant.browser.domain.CdpConnection;
 import com.bifos.assistant.browser.domain.CdpEvent;
 import java.io.ByteArrayOutputStream;
@@ -38,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.JsonNode;
@@ -113,6 +116,9 @@ class WebSocketCdpConnectorTest {
     @DisplayName("글자 입력 명령이 실패해도 입력한 글자는 예외와 로그에 남지 않는다")
     void keepsTypedTextOutOfFailuresAndLogs(CapturedOutput output) throws Exception {
         String secret = "pw-SYNTH-7f3a9c";
+        Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
+        Level before = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
         try (CdpConnection connection = connect(event -> {
         }, () -> {
         })) {
@@ -128,13 +134,17 @@ class WebSocketCdpConnectorTest {
             }));
             CompletableFuture<JsonNode> unanswered = connection.send("Input.insertText", Map.of("text", secret));
             server.nextMessage();
+            // JSON 이 아닌 메시지에 글자가 실려 와도 DEBUG 줄이 그것을 옮겨 적지 않는다
+            server.sendText("not-json " + secret);
 
             assertThat(failureText(rejected)).doesNotContain(secret);
             assertThat(failureText(unserializable)).doesNotContain(secret);
             assertThat(failureText(unanswered)).doesNotContain(secret);
+        } finally {
+            logger.setLevel(before);
         }
 
-        assertThat(output.getAll()).doesNotContain(secret);
+        assertThat(output.getAll()).contains("cdp message is not json").doesNotContain(secret);
     }
 
 
