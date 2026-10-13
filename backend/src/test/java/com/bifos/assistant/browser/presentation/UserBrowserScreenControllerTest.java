@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.bifos.assistant.browser.application.BrowserScreens;
 import com.bifos.assistant.browser.application.BrowserUsage;
 import com.bifos.assistant.browser.application.FakeCdp;
@@ -34,7 +36,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -50,9 +56,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
  * <p>요청자는 인증 필터가 채우는 것과 같은 보안 문맥으로 넣는다. 서비스는 실제 DB 와 대역 proxy, 대역 CDP 로 돈다.
  */
 @BackendIntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 class UserBrowserScreenControllerTest {
 
     private static final CurrentUser OWNER = new CurrentUser(311L, "owner@example.com", "주인", 1L, UserRole.MEMBER);
+    /** 화면에 친 비밀번호를 흉내 내는 합성 값이다. 어느 로그와 응답에도 이 값이 나오면 안 된다. */
+    private static final String SECRET = "pw-SYNTH-7f3a9c";
     private static final CurrentUser OTHER = new CurrentUser(312L, "other@example.com", "남", 1L, UserRole.ADMIN);
 
     @Autowired
@@ -102,6 +111,58 @@ class UserBrowserScreenControllerTest {
         assertThat(cdp.sent("Input.insertText").get(0).params()).containsEntry("text", "안녕");
         assertThat(cdp.sent("Runtime.evaluate").get(0).params())
             .containsEntry("expression", "window.scrollTo(0, document.documentElement.scrollHeight)");
+    }
+
+
+    @Test
+    @DisplayName("글자 입력이 받아들여져도 CDP 가 거절해도 입력한 글자가 로그에 남지 않는다")
+    void keepsTypedTextOutOfLogs(CapturedOutput output) throws Exception {
+        MockMvc mvc = mvc(true);
+        mvc.perform(post("/api/v1/browser")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/browser/screen").param("url", "https://example.com/login"))
+            .andExpect(request().asyncStarted());
+        Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
+        Level before = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        try {
+            input(mvc, "{\"type\":\"text\",\"text\":\"" + SECRET + "\"}").andExpect(status().isNoContent());
+            cdp.failMethod = "Input.insertText";
+            input(mvc, "{\"type\":\"text\",\"text\":\"" + SECRET + "\"}").andExpect(status().isNoContent());
+            input(mvc, "{\"type\":\"navigate\",\"url\":\"https://example.com/?q=" + SECRET + "\"}")
+                .andExpect(status().isNoContent());
+        } finally {
+            logger.setLevel(before);
+        }
+
+        assertThat(cdp.sent("Input.insertText")).hasSize(2);
+        assertThat(output.getAll()).contains("browser screen command failed").doesNotContain(SECRET);
+    }
+
+
+    @Test
+    @DisplayName("거절한 입력의 글자도 응답과 로그에 남지 않는다")
+    void keepsRejectedInputOutOfLogs(CapturedOutput output) throws Exception {
+        MockMvc mvc = mvc(true);
+        Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
+        Level before = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        try {
+            String[] bodies = {
+                "{\"type\":\"text\",\"text\":\"" + SECRET + "\"}",
+                "{\"type\":\"text\",\"text\":\"" + SECRET + "\"",
+                "{\"type\":\"" + SECRET + "\",\"text\":\"" + SECRET + "\"}",
+                "{\"type\":\"text\",\"text\":\"" + SECRET.repeat(100) + "\"}",
+                "{\"type\":\"text\",\"text\":" + SECRET + "}",
+            };
+            for (String body : bodies) {
+                String response = input(mvc, body).andReturn().getResponse().getContentAsString();
+                assertThat(response).doesNotContain(SECRET);
+            }
+        } finally {
+            logger.setLevel(before);
+        }
+
+        assertThat(output.getAll()).doesNotContain(SECRET);
     }
 
 
