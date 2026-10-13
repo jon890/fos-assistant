@@ -183,6 +183,7 @@ cd backend && git fetch origin && ./gradlew spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/connector/application/execution/ConnectorExecutionClaims.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialIntake.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialSummaries.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/FinancialActionSummary.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectorActionDtos.java` | 수정 |
