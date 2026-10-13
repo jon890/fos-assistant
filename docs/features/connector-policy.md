@@ -390,7 +390,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 | 단계 | 네이버 블로그 원고 임시저장 | 토스 주문 | Gmail 보내기와 답장 |
 | --- | --- | --- | --- |
-| 지금 운영 | 승인까지 열려 있다. snapshot capability 의 `start`, `status` 가 거짓이라 승인하면 실행 없이 `not_executable` 로 끝난다 | 닫혀 있다. FINANCIAL 판정은 `RISK_NOT_OPEN` 이고 커넥터 서버가 주문 도구를 등록하지 않는다. producer 와 금융 승인은 package-private 이다 | 열려 있다 |
+| 지금 운영 | 열려 있다. connector.json 의 snapshot capability 는 `{compile:true,start:true,status:true}` 다. 배포 뒤 실제 계정 확인은 아래 체크리스트가 갖는다 | 닫혀 있다. FINANCIAL 판정은 `RISK_NOT_OPEN` 이고 커넥터 서버가 주문 도구를 등록하지 않는다. producer 와 금융 승인은 package-private 이다 | 열려 있다 |
 | 준비 | `content_draft_preview` 가 원고 revision, 사진 원본 바이트, 바인딩 버전을 고정한 불변 snapshot 을 만든다. 같은 revision 과 권한 지문이면 같은 snapshot 이다. [불변 preview snapshot](content-draft.md#불변-preview-snapshot) | 준비 도구(`READ`, `none`)를 `POST /api/connectors/{id}/prepare` 로 한 번 부르고 원래 인자, 실행 인자, summary, scope 를 암호화한 snapshot 으로 저장한다. [금융 실행 내용의 저장과 검증](#금융-실행-내용의-저장과-검증) | 따로 없다. 모델이 보낸 인자 원문(`args_json`)과 그 해시(`args_sha256`)를 승인 줄에 저장한다. [승인의 불변식](#승인의-불변식) |
 | 승인하는 사람 | 연결 주인이 그 대화의 원고 카드에서 canonical 미리보기와 포함·빠진 사진을 보고 승인한다 | 연결 주인이 그 대화의 승인 카드에서 승인한다. 카드의 summary 와 계좌 표시는 아직 없다 | 연결 주인이 그 대화의 승인 카드에서 받는 사람, 제목, 본문 원문을 보고 승인한다. 가려지는 글이 하나라도 있으면 승인하지 못한다(`hidden_args`) |
 | 상시 허락, 대화 허락 | 둘 다 받지 않는다. 승인 줄을 `always` 로 저장하고 「N건 모두 승인」 에도 넣지 않는다 | 둘 다 받지 않는다. `FINANCIAL` 은 `always` 다 | 둘 다 받지 않는다. `grant: false` 이고 `conversation_grant` 를 선언하지 않는다 |
@@ -410,7 +410,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 네이버 블로그 실사용은 아래가 모두 채워지면 Go 다.
 
-- [ ] snapshot capability 의 `start`, `status` 를 켠 connector.json 이 배포됐다. 지금은 둘 다 거짓이다
+- [ ] snapshot capability 의 `start`, `status` 를 켠 connector.json 이 배포됐다. 저장소의 선언은 둘 다 참이다
 - [ ] 사용자가 실제 계정으로 지정 테스트 글을 저장하는 것과 쓸 사진 수를 명시적으로 승인했다
 - [ ] [배포 뒤 원격 확인](content-draft.md#배포-뒤-원격-확인) 표를 그 테스트 글로 돌았다. start 는 1회, 재접속과 재시작 뒤 추가 start 와 저장 클릭은 0회, claim 뒤의 불확실한 결과는 `UNKNOWN` 이다
 - [ ] [읽기 부작용 확인](naver-blog-connector.md#읽기-부작용-확인) 을 같은 자리에서 돌아 `read_draft` 를 `WRITE` 로 둘지 정했다
