@@ -14,11 +14,13 @@ import java.util.List;
 import tools.jackson.databind.node.ArrayNode;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /** v1 tuple과 UTF-8 직렬화로 compiler의 응답 전체를 요청과 대조한다. */
+@Slf4j
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ContentDraftSnapshotHash {
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -27,7 +29,7 @@ public final class ContentDraftSnapshotHash {
 
     public static ObjectNode compile(JsonNode draft, JsonNode assets) {
         if (!assets.isArray() || assets.size() > 50 || bytes(draft).length > 65536) {
-            throw unavailable();
+            throw unavailable("local-compile:input-size");
         }
         var byId = new HashMap<String, JsonNode>();
         String directory = null;
@@ -35,7 +37,7 @@ public final class ContentDraftSnapshotHash {
             String id = asset.path("assetId").stringValue();
             String current = asset.path("photoDir").stringValue();
             if (id == null || byId.put(id, asset) != null || current == null || directory != null && !directory.equals(current)) {
-                throw unavailable();
+                throw unavailable("local-compile:asset");
             }
             directory = current;
         }
@@ -51,7 +53,7 @@ public final class ContentDraftSnapshotHash {
         }
         String body = String.join("\n", lines);
         if (body.codePointCount(0, body.length()) > 20000) {
-            throw unavailable();
+            throw unavailable("local-compile:body-size");
         }
         var payload = JSON.createObjectNode();
         for (String key : Set.of("title", "category", "tags")) {
@@ -71,7 +73,7 @@ public final class ContentDraftSnapshotHash {
         result.put("payloadFingerprint", hash(payloadBytes(result)));
         result.put("snapshotHash", hash(snapshotBytes(result)));
         if (bytes(result).length > 262144) {
-            throw unavailable();
+            throw unavailable("local-compile:result-size");
         }
         // LongNode와 IntNode의 내부 구분 대신 실제 JSON wire의 정수 표현으로 대조한다.
         return (ObjectNode)JSON.readTree(bytes(result));
@@ -90,7 +92,7 @@ public final class ContentDraftSnapshotHash {
             case "image" -> {
                 var asset = byId.get(block.path("assetId").stringValue());
                 if (asset == null || manifest.size() == 50) {
-                    throw unavailable();
+                    throw unavailable("local-compile:image");
                 }
                 int number = manifest.size() + 1;
                 tuple.add(block.get("assetId")).add(block.get("caption"));
@@ -117,15 +119,16 @@ public final class ContentDraftSnapshotHash {
                 tuple.add(block.get("name")).add(block.get("address"));
                 lines.add("[지도: " + block.path("name").stringValue() + " | " + block.path("address").stringValue() + "]");
             }
-            default -> throw unavailable();
+            default -> throw unavailable("local-compile:block-type");
         }
         return tuple;
     }
 
 
     public static void verify(JsonNode draft, JsonNode assets, JsonNode result) {
+        // compiler 버전이나 직렬화가 Control Plane 과 다르면 여기서 갈린다.
         if (result == null || !compile(draft, assets).equals(result)) {
-            throw unavailable();
+            throw unavailable("verify:mismatch");
         }
     }
 
@@ -162,7 +165,20 @@ public final class ContentDraftSnapshotHash {
     }
 
 
-    public static ContentDraftException unavailable() {
+    /**
+     * 응답은 어느 단계에서 막혔는지 알리지 않으므로 그 단계를 경고로 남긴다.
+     *
+     * @param stage 고정 낱말로 쓴 단계다. 사용자 값, profile 이름, 본문을 넣지 않는다
+     */
+    public static ContentDraftException unavailable(String stage) {
+        log.warn("원고 snapshot 을 쓸 수 없다 stage={}", stage);
+        return new ContentDraftException(ErrorCode.CONTENT_DRAFT_UNAVAILABLE, null);
+    }
+
+
+    /** 예외로 끝난 단계다. 예외 메시지와 cause 는 원격 응답이나 본문을 담을 수 있어 종류만 남긴다. */
+    public static ContentDraftException unavailable(String stage, Exception ex) {
+        log.warn("원고 snapshot 을 쓸 수 없다 stage={} error={}", stage, ex.getClass().getSimpleName());
         return new ContentDraftException(ErrorCode.CONTENT_DRAFT_UNAVAILABLE, null);
     }
 }

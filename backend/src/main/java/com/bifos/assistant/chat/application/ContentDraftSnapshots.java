@@ -76,7 +76,7 @@ public class ContentDraftSnapshots {
                 now.revisionId(), now.binding().bindingId(), result.path("snapshotHash").stringValue(), authorization, user.id(), conversationId).orElse(null);
             if (row == null) {
                 if (!insert) {
-                    throw ContentDraftSnapshotHash.unavailable();
+                    throw ContentDraftSnapshotHash.unavailable("accept:missing-row");
                 }
                 var stamp = now.binding();
                 row = snapshots.saveAndFlush(new ContentDraftSnapshot(UUID.randomUUID(), now.revisionId(), user.id(), conversationId,

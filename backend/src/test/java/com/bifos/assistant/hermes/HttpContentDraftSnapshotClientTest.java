@@ -254,6 +254,58 @@ class HttpContentDraftSnapshotClientTest {
     }
 
 
+    @Test
+    @DisplayName("실패마다 단계와 HTTP 상태, 예외 종류만 경고로 남기고 profile 이름과 본문은 남기지 않는다")
+    void logsFailureStageStatusAndErrorKind() {
+        status = 503;
+        response.set("BODY_MARKER".getBytes(StandardCharsets.UTF_8));
+        unavailable();
+        status = 200;
+        var answer = answer();
+        ((ObjectNode)answer.path("capabilities")).remove("status");
+        reject(answer);
+        answer = answer();
+        ((ObjectNode)answer.path("result")).put("compilerVersion", "content-compiler-v2");
+        reject(answer);
+        response.set("{".getBytes(StandardCharsets.UTF_8));
+        unavailable();
+        server.stop(0);
+        unavailable();
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage).filteredOn(line -> line.startsWith("원고 snapshot compile"))
+            .containsExactly(
+                "원고 snapshot compile 실패 connector=snapshot-test stage=status status=503 error=-",
+                "원고 snapshot compile 실패 connector=snapshot-test stage=capabilities status=200 error=IllegalStateException",
+                "원고 snapshot compile 실패 connector=snapshot-test stage=result status=200 error=-",
+                "원고 snapshot compile 실패 connector=snapshot-test stage=envelope status=200 error=" + parseErrorName(),
+                "원고 snapshot compile 실패 connector=snapshot-test stage=send status=- error=ConnectException");
+        assertThat(logs.list).allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain("synthetic-profile", "synthetic-token"));
+    }
+
+
+    @Test
+    @DisplayName("요청 전에 막은 호출도 막은 단계를 경고로 남긴다")
+    void logsStageRejectedBeforeHttp() {
+        assertThatThrownBy(() -> client.compile("default", "snapshot-test", golden.get("draft"), golden.get("assets")))
+            .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> client.compile("synthetic-profile", "Bad/Id", golden.get("draft"), golden.get("assets")))
+            .isInstanceOf(ApiException.class);
+        assertThat(requests.get()).isZero();
+        assertThat(logs.list).extracting(ILoggingEvent::getFormattedMessage).containsExactly(
+            "원고 snapshot compile 실패 connector=snapshot-test stage=request status=- error=-",
+            "원고 snapshot compile 실패 connector=invalid stage=request status=- error=-");
+    }
+
+
+    private String parseErrorName() {
+        try {
+            json.readTree("{");
+            throw new AssertionError("잘린 JSON 을 읽었다");
+        } catch (RuntimeException ex) {
+            return ex.getClass().getSimpleName();
+        }
+    }
+
+
     private ObjectNode answer() {
         var node = json.createObjectNode().put("ok", true).set("result", golden.get("snapshot").deepCopy());
         node.set("capabilities", json.createObjectNode().put("compile", true).put("start", false).put("status", false));
