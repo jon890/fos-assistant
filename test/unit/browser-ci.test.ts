@@ -94,7 +94,7 @@ function report(status = "unexpected") {
 test("잘린 JSON, 누락 결과, 기동 실패가 다른 shard 의 실패 집계를 막지 않는다", async () => {
   const jobs = [1, 2, 3, 4].map((shard) => ({
     name: `browser-mobile-shard-${shard}`,
-    conclusion: shard === 1 ? "cancelled" : "failure",
+    conclusion: "failure",
   }));
   const failures = await collectJobFailures(jobs, async (filename: string) => {
     if (filename.endsWith("1.json")) return JSON.parse("{");
@@ -108,6 +108,25 @@ test("잘린 JSON, 누락 결과, 기동 실패가 다른 shard 의 실패 집�
     ["shard-1-setup", "shard-2-setup", "shard-3-setup", "chat.spec.ts"],
   );
   assert.equal(failures[2].error, "Error: 전역 설정 실패");
+});
+
+test("취소된 shard 는 이슈로 모으지 않고 실패 shard 만 모은다", async () => {
+  const jobs = [
+    { name: "browser-mobile-shard-1", conclusion: "cancelled" },
+    { name: "browser-mobile-shard-2", conclusion: "failure" },
+    { name: "browser-desktop-shard-1", conclusion: "success" },
+  ];
+  const failures = await collectJobFailures(jobs, async () => {
+    throw new Error("missing");
+  });
+  assert.deepEqual(
+    failures.map((failure: any) => failure.file),
+    ["shard-2-setup"],
+  );
+  assert.deepEqual(
+    await collectJobFailures(jobs.slice(0, 1), async () => report()),
+    [],
+  );
 });
 
 test("중첩된 JSON 에서 실패한 테스트와 첫 오류 두 줄만 모은다", () => {
@@ -175,10 +194,13 @@ test("동일 spec 은 열린 이슈에 재발 횟수를 남기고 실행 재시�
     context,
   );
   assert.equal(issues.length, 1);
+  assert.equal(issues[0].title, "mobile: chat.spec.ts");
   assert.ok(issues[0].body.endsWith(HANDLING));
   assert.equal(posts.filter((path) => path.endsWith("/issues")).length, 1);
   await publishFailures(failures, api, context);
   assert.equal(comments.length, 0);
+  // 옛 제목으로 열린 이슈도 marker 로 찾아 새 이슈를 만들지 않고 재발로 남긴다.
+  issues[0].title = "[브라우저 실패] mobile: chat.spec.ts";
   await publishFailures(failures, api, { ...context, runId: "2" });
   assert.equal(comments.length, 1);
   assert.match(comments[0].body, /재발 2회/);

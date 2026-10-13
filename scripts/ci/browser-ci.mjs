@@ -91,7 +91,8 @@ export async function collectJobFailures(jobs, readReport) {
     /^browser-(mobile|desktop)-shard-\d+$/.test(job.name),
   );
   for (const job of shards) {
-    if (job.conclusion === "success") continue;
+    // 다음 push 에 밀려 취소된 실행은 테스트 실패가 아니다. 실제 실패(failure)만 이슈로 모은다.
+    if (job.conclusion === "success" || job.conclusion === "cancelled") continue;
     const [, project, shard] = job.name.match(
       /^browser-(mobile|desktop)-shard-(\d+)$/,
     );
@@ -122,7 +123,7 @@ export async function collectJobFailures(jobs, readReport) {
       found.push({
         file: `shard-${shard}-setup`,
         project,
-        title: "실패한 테스트 기록 없이 shard 실패 또는 취소",
+        title: "실패한 테스트 기록 없이 shard 실패",
         error: `job 결과: ${job.conclusion}`,
       });
     }
@@ -189,7 +190,8 @@ export async function publishFailures(failures, api, context) {
       });
     } else {
       const created = await api("POST", `${prefix}/issues`, {
-        title: `[브라우저 실패] ${first.project}: ${first.file}`,
+        // 분류는 라벨이 맡는다. 기존 이슈는 본문 marker 로 찾으므로 옛 제목의 이슈도 이어진다.
+        title: `${first.project}: ${first.file}`,
         labels: [LABEL],
         body: `${body}\n\n${HANDLING}`,
       });
