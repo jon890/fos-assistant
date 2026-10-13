@@ -67,9 +67,9 @@ description: 토스증권 계좌와 종목·시장·섹터 정보, 주문 내역
 
 읽지 못했으면 읽지 못했다고 말한다. 값을 지어내지 않는다.
 
-- `TOSSINVEST_IP_NOT_ALLOWED`: 허용 IP 가 바뀌었을 수 있다. 「토스증권 WTS 의 설정 > Open API 에서 허용 IP 를 확인하고, 연결 화면에서 연결 확인을 눌러 달라」 고 안내한다
-- `TOSSINVEST_UNAUTHORIZED`: client 값이 바뀌었거나 철회됐다. 연결 화면에서 다시 등록하라고 안내한다
-- `TOSSINVEST_ACCOUNT_NOT_FOUND`: 연결한 계좌를 찾지 못했다. 연결 화면에서 계좌를 다시 골라 달라고 안내한다
+- `TOSSINVEST_IP_NOT_ALLOWED`: 허용 IP 가 바뀌었을 수 있다. 「토스증권 WTS 의 설정 > Open API 에서 허용 IP 를 확인하고, 외부 서비스 연결 화면에서 연결 확인을 눌러 달라」 고 안내한다
+- `TOSSINVEST_UNAUTHORIZED`: client 값이 바뀌었거나 철회됐다. 외부 서비스 연결 화면에서 다시 등록하라고 안내한다
+- `TOSSINVEST_ACCOUNT_NOT_FOUND`: 연결한 계좌를 찾지 못했다. 외부 서비스 연결 화면에서 계좌를 다시 골라 달라고 안내한다
 - `TOSSINVEST_INVALID_INPUT`: 종목 기호나 인자를 확인한다. 없는 섹터라면 `list_sectors`에서 `sectorId`를 다시 확인한다
 - `TOSSINVEST_RATE_LIMITED`, `TOSSINVEST_NETWORK`, `TOSSINVEST_UNAVAILABLE`: 잠시 뒤 다시 시도한다
 
