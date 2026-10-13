@@ -119,6 +119,8 @@ QR 로그인은 세션 쿠키만 준다(2026-10-08 실측). 그래서 QR 로그�
 사건(`frame`, `tabs`, `closed`)의 본문은 `BrowserScreenSession` 이, 입력의 칸과 범위, 크기 상한은 `UserBrowserDtos` 가, 입력마다 부르는 CDP 명령은 `BrowserScreenSession` 이 갖는다.
 그 밖의 CDP 명령은 어느 경로로도 보낼 수 없다. `scroll` 은 `Runtime.evaluate` 로 고정 식만 실행하고 요청자가 식을 정하지 못한다.
 입력 본문(글자, 좌표, 주소)과 시작 주소는 로그와 오류 응답에 싣지 않는다.
+화면에 친 글자는 웹의 `/api/browser/screen/input` 이 받은 바이트 그대로 Control Plane 에 넘기고, Control Plane 이 CDP 의 글자 넣기 명령(insertText)으로 브라우저에 보낸다. 이 길에서 글자를 읽는 곳은 입력 검사와 CDP 명령 인자뿐이다.
+`UserBrowserScreenControllerTest` 와 `WebSocketCdpConnectorTest` 가 합성 비밀값으로 DEBUG 로그와 응답, 예외 메시지에 글자가 남지 않는 것을 확인한다. 새 로그나 예외 메시지에 입력 값이나 CDP 인자를 넣지 않는다.
 
 | 경우 | 결과 |
 | --- | --- |
