@@ -22,6 +22,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public record ConnectorUnknownDetail(String code, String retryKey, String retryValue) {
 
+
     /** 승인 줄의 {@code result_text} 에 저장한 글이 이 형식임을 밝히는 {@code kind} 값이다. */
     public static final String KIND = "connector_unknown";
 
@@ -43,6 +44,7 @@ public record ConnectorUnknownDetail(String code, String retryKey, String retryV
             throw new IllegalArgumentException("connector retry identifier must be a short identifier");
         }
     }
+
 
     /**
      * 대시보드 실행 경로의 504 본문에서 {@code code} 와 {@code retry} 를 읽는다. {@code retry} 가 칸 하나짜리 객체가 아니거나 형식에
@@ -72,6 +74,7 @@ public record ConnectorUnknownDetail(String code, String retryKey, String retryV
         return Optional.of(new ConnectorUnknownDetail(code.asString(), entry.getKey(), value.asString()));
     }
 
+
     /**
      * 승인 줄의 {@code result_text} 에 저장한 글을 읽는다. {@code kind} 가 {@link #KIND} 인 JSON object 만 읽는다.
      *
@@ -92,6 +95,7 @@ public record ConnectorUnknownDetail(String code, String retryKey, String retryV
             return Optional.empty();
         }
     }
+
 
     /** {@code result_text} 에 저장할 글이다. {@link #fromStored} 가 읽는다. */
     public String toStored() {
