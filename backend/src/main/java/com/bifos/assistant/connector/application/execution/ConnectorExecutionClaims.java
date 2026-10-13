@@ -60,7 +60,7 @@ public class ConnectorExecutionClaims {
                     && payload.scopeSha256().equals(snapshot.scopeSha256())
                     && codec.readScope(snapshot.scopeJson()).equals(input.scope()));
                 conflicts.requireAvailable(row.requestKey(), action.id());
-                // 승인 뒤 key 파일을 치웠거나 계좌를 목록에서 뺐으면 ticket 을 소비하지 않는다.
+                // 승인 뒤 재기동으로 key 파일 설정을 비웠거나 계좌를 목록에서 뺐으면 ticket 을 소비하지 않는다.
                 gate.requireOpen();
                 gate.requireScope(snapshot.scopeJson());
                 row.consumeTicket(payload.ticketId(), now.truncatedTo(ChronoUnit.MICROS));

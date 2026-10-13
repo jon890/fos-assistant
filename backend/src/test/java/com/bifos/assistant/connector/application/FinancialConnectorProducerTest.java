@@ -346,8 +346,8 @@ class FinancialConnectorProducerTest {
 
 
     @Test
-    @DisplayName("승인 전에 key 파일을 치우면 승인을 거절하고 PENDING 으로 남긴다")
-    void approvalAfterDigestKeyRemovedKeepsPending() {
+    @DisplayName("승인 전에 설정에서 key 파일을 비우면 승인을 거절하고 PENDING 으로 남긴다")
+    void approvalAfterDigestKeyUnsetKeepsPending() {
         var requested = request();
         OverridableLiveProperties.during(gate, financial(false, List.of("7"), "1000000"));
         assertThatThrownBy(() -> approval.approve(user, requested.actionId())).isInstanceOf(ApiException.class);

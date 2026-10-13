@@ -13,10 +13,16 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>keyed hash key, 계좌 허용 목록, 한 건과 하루 상한을 본다. 모두 닫힌 쪽이 기본이며 거절은 금융 전송 없이 끝난다.
  * 첫 개방은 일반 주문의 생성과 취소뿐이다. 일반 주문 정정과 조건주문 생성·정정은 금액 상한을 계산하지 않고 거절한다.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ConnectorFinancialGate {
@@ -44,6 +51,30 @@ public class ConnectorFinancialGate {
     private final ConnectorActionExecutionRepository contents;
     private final TextCipher cipher;
     private final FinancialDigest digest;
+
+
+    /**
+     * 기동 때 관문 상태를 값 없이 한 줄 남긴다. 거절은 어느 검사에 걸렸는지 밝히지 않으므로 소유자가 무엇을 채울지 여기서 본다.
+     * key 도 이때 처음 읽어 재기동 전까지 쓴다.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void logState() {
+        var current = properties.current();
+        log.info("financial gate: digestKey={}, allowedAccounts={}, zeroLimits={}",
+            digest.available() ? "readable" : "missing", current.allowedAccounts().size(), zeroLimits(current));
+    }
+
+
+    /** 0 이라 그 주문을 모두 거절하는 상한의 설정 이름이다. */
+    static List<String> zeroLimits(ConnectorFinancialProperties limits) {
+        var named = new LinkedHashMap<String, BigDecimal>();
+        named.put("max-order-amount-krw", limits.maxOrderAmountKrw());
+        named.put("max-order-amount-usd", limits.maxOrderAmountUsd());
+        named.put("max-order-quantity", limits.maxOrderQuantity());
+        named.put("max-daily-amount-krw", limits.maxDailyAmountKrw());
+        named.put("max-daily-amount-usd", limits.maxDailyAmountUsd());
+        return named.entrySet().stream().filter(entry -> entry.getValue().signum() == 0).map(Map.Entry::getKey).toList();
+    }
 
 
     /** keyed hash key 를 읽을 수 있고 keyed hash 이전 protocol 의 열린 줄이 없어야 열린다. key 파일이 운영에서 금융을 여는 마지막 잠금이다. */

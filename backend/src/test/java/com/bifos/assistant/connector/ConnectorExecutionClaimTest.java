@@ -175,7 +175,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
 
     @Test
-    @DisplayName("발급 뒤 key 파일을 치우거나 계좌를 목록에서 빼면 ticket 을 소비하지 않는다")
+    @DisplayName("발급 뒤 설정에서 key 파일을 비우거나 계좌를 목록에서 빼면 ticket 을 소비하지 않는다")
     void closedGateKeepsTicketUnconsumed() {
         Fixture f = fixture();
         String raw = tickets.issue(f.action());

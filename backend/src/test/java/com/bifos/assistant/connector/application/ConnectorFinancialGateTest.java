@@ -81,6 +81,16 @@ class ConnectorFinancialGateTest {
 
 
     @Test
+    @DisplayName("기동 로그는 0 인 상한의 설정 이름만 남긴다")
+    void namesZeroLimitsForStartupLog() {
+        var limits = new ConnectorFinancialProperties(List.of("7"), BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ONE,
+            BigDecimal.ZERO, BigDecimal.ONE, KEY);
+        assertThat(ConnectorFinancialGate.zeroLimits(limits)).containsExactly("max-order-amount-usd", "max-daily-amount-krw");
+        assertThat(ConnectorFinancialGate.zeroLimits(open("1", "1", "1"))).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("음수 상한과 빈 계좌 식별자는 기동을 멈춘다")
     void rejectsInvalidSettings() {
         assertThatThrownBy(() -> new ConnectorFinancialProperties(List.of("7"), new BigDecimal("-1"), BigDecimal.ONE,
