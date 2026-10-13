@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 /**
  * 도구 호출 판정이 보는 두 허락을 찾는다. 원래 도구 이름을 확인하지 못한 호출은 어느 허락도 없는 것이다.
  *
- * <p>허락을 볼지는 선언이 정한다. 그 판단은 {@code ToolPolicyDecision.decide} 가 한다.
+ * <p>허락을 볼지는 선언이 정한다. 그 판단은 {@code ToolPolicyDecision.decide} 가 한다. 결과를 모르는 쓰기를 같은 재시도 식별자로
+ * 다시 보내는 호출은 두 허락이 모두 없는 것으로 본다(ADR-20261013 unknown-retry-key).
  */
 @Component
 @RequiredArgsConstructor
@@ -19,6 +20,13 @@ class ConnectorGrantLookup {
 
     private final ConnectorToolGrantRepository grants;
     private final ConnectorConversationGrantRepository conversationGrants;
+    private final ConnectorUnknownResends unknownResends;
+
+
+    /** 결과를 모르는 쓰기를 같은 재시도 식별자로 다시 보내는 호출인가. 참이면 판정에 두 허락을 넘기지 않는다. */
+    boolean resendsUnknown(ConnectorConnection connection, String hermesTool, String argsJson) {
+        return unknownResends.resends(connection, hermesTool, argsJson);
+    }
 
 
     /** 그 사용자가 그 커넥터의 그 도구에 준 유효한 상시 허락이 있는가(ADR-050). */

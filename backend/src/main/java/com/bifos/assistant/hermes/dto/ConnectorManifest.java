@@ -21,6 +21,8 @@ import tools.jackson.databind.JsonNode;
  * @param ownerBrowser 참이면 그 커넥터는 사용자 브라우저를 쓴다. 설치와 확인 호출이 중계 주소를 싣는다
  * (ADR-20261008 / browser-gateway-token). 옛 대시보드 plugin 은 내지 않고, 없으면 거짓
  * @param ownerBrowserLoginUrl 사용자가 브라우저에서 먼저 로그인할 곳. 선언하지 않았으면 null
+ * @param unknownErrors 결과를 모르는 코드와 재시도 식별자 칸의 선언(ADR-20261013 unknown-retry-key). 옛 대시보드 plugin 은 내지 않고,
+ * 없으면 {@link ConnectorUnknownErrors#NONE}
  */
 public record ConnectorManifest(
     String id,
@@ -40,15 +42,29 @@ public record ConnectorManifest(
     String ownerBrowserLoginUrl,
     JsonNode executionGuard,
     String executionGuardManifestSha256,
-    ConnectorSnapshotDeclaration snapshot) {
+    ConnectorSnapshotDeclaration snapshot,
+    ConnectorUnknownErrors unknownErrors) {
 
     public ConnectorManifest {
         description = description == null ? "" : description;
+        unknownErrors = unknownErrors == null ? ConnectorUnknownErrors.NONE : unknownErrors;
         fields = List.copyOf(fields);
         toolsets = List.copyOf(toolsets);
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
+    }
+
+
+    /** 결과 불명 선언을 모르는 기존 생성자다. 누락은 어느 코드도 받지 않는 것이다. */
+    public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
+        String verifyTool, String mcpServer, List<String> toolsets, boolean attachments, int schema,
+        List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
+        boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256,
+        ConnectorSnapshotDeclaration snapshot) {
+        this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, skills,
+            appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, snapshot,
+            ConnectorUnknownErrors.NONE);
     }
 
 

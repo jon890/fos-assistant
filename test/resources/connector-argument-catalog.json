@@ -50,6 +50,9 @@
     "skills": [
       "gmail"
     ],
+    "unknown_errors": {
+      "GMAIL_SEND_UNKNOWN": null
+    },
     "tools": {
       "get_profile": {
         "risk": "READ",
@@ -331,6 +334,9 @@
     "skills": [
       "naver-blog"
     ],
+    "unknown_errors": {
+      "NAVER_BLOG_START_UNKNOWN": null
+    },
     "snapshot": {
       "protocol": "content-snapshot-v1",
       "compile_tool": "compile_content_snapshot",
