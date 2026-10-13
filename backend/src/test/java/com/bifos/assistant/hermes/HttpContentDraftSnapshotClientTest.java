@@ -262,10 +262,12 @@ class HttpContentDraftSnapshotClientTest {
     void sendsHttp11WithoutH2cUpgrade() {
         compile();
         var stamp = ContentDraftWorkerStatusDecoder.stamp("synthetic-profile", job());
-        response.set(json.writeValueAsBytes(jobAnswer(json.createObjectNode().put("error", "unavailable"))));
+        var refused = json.createObjectNode().put("error", "unavailable");
+        response.set(json.writeValueAsBytes(jobAnswer(refused)));
+        assertThat(client.start("synthetic-profile", "snapshot-test", golden.path("snapshot"), stamp, "TICKET_MARKER")).isEqualTo(refused);
         assertThatThrownBy(() -> client.status("synthetic-profile", "snapshot-test", stamp)).isInstanceOf(ApiException.class);
         // uvicorn(httptools)은 upgrade 를 붙인 POST 의 본문을 버린다. 이 검사 서버는 그 동작이 없어 헤더로 확인한다.
-        assertThat(upgrades).containsExactly("null", "null");
+        assertThat(upgrades).containsExactly("null", "null", "null");
     }
 
 
