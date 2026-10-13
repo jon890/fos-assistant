@@ -41,10 +41,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class ConnectorFinancialGate {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    // 결과를 모르는 UNKNOWN 도 센다. 빼면 응답을 잃은 주문만큼 하루 상한을 넘을 수 있다.
-    // keyed hash 이전 protocol 이다. 그 열린 줄의 request_key 는 평문 SHA 라 같은 의도 차단이 놓친다.
-    static final String LEGACY_PROTOCOL = "approval-claim-v1";
     private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+    // 결과를 모르는 UNKNOWN 도 센다. 빼면 응답을 잃은 주문만큼 하루 상한을 넘을 수 있다.
     private static final Set<ActionStatus> SPENT = Set.of(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN);
     private final LiveProperties<ConnectorFinancialProperties> properties;
     private final ConnectorActionRepository actions;
@@ -77,9 +75,13 @@ public class ConnectorFinancialGate {
     }
 
 
-    /** keyed hash key 를 읽을 수 있고 keyed hash 이전 protocol 의 열린 줄이 없어야 열린다. key 파일이 운영에서 금융을 여는 마지막 잠금이다. */
+    /**
+     * keyed hash key 를 읽을 수 있고, 지금 protocol 과 지금 key 로 만들지 않은 열린 줄이 없어야 열린다.
+     * key 파일이 운영에서 금융을 여는 마지막 잠금이다. key 를 바꾸면 이전 key 의 PENDING, EXECUTING, UNKNOWN 이 남은 동안 닫힌다.
+     */
     public void requireOpen() {
-        require(digest.available() && !contents.existsOpenWithProtocol(LEGACY_PROTOCOL, OPEN));
+        require(digest.available()
+            && !contents.existsOpenOutside(ConnectorExecutionSnapshot.PROTOCOL, digest.currentPrefix(), OPEN));
     }
 
 

@@ -33,7 +33,8 @@
 ## 작업 항목
 
 1. digest key 파일이 없거나 허용 목록이 비었거나 상한이 0 일 때 금융 전송 0회로 거절되는지 확인하는 회귀를 먼저 둔다.
-   열린 `approval-claim-v1` 줄이 남아 있으면 같은 결과인지 함께 확인한다. phase-02 와 phase-03 선행을 이 테스트가 지킨다.
+   열린 `approval-claim-v1` 줄이나 이전 key 로 만든 열린 줄이 남아 있으면 같은 결과인지 함께 확인한다. phase-02 와 phase-03 선행을 이 테스트가 지킨다.
+   key 교체 규칙은 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md) 을 따른다. 개방 PR 의 「첫 실제 호출 절차」 와 「되돌리기」 에 key 를 바꾸기 전 열린 줄 확인을 넣는다.
 2. 판정, 승인 API, plugin, manifest, 서버 등록을 위 표대로 잇는다. producer 로 가는 분기는 `ConnectorFinancialGate` 를 반드시 지난다.
 3. 승인 카드에 summary 를 보이고, summary 를 열지 못하면 승인 단추를 막는다.
    계좌 표시는 summary.account 가 아니라 저장 scope 의 `account_seq` 에서 만든다. 그 값은 연결의 공개 칸 `account` 와 대조되고 phase-02 허용 목록을 지난 실제 전송 계좌다.

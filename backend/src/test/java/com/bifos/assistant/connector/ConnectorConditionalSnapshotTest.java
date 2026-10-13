@@ -1,6 +1,7 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.agent.domain.Agent;
@@ -9,6 +10,8 @@ import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
+import com.bifos.assistant.connector.application.ConnectorFinancialGate;
+import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.FinancialDigest;
 import com.bifos.assistant.connector.domain.ConnectionFields;
 import com.bifos.assistant.connector.domain.ConnectorAction;
@@ -26,7 +29,9 @@ import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
 import com.bifos.assistant.crypto.application.DataKeyService;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
+import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
@@ -36,9 +41,11 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -67,6 +74,8 @@ class ConnectorConditionalSnapshotTest {
     private static final JsonNode BASE = VECTOR.get("cases").get(0);
     private static final Instant NOW = Instant.parse("2026-10-11T00:00:00Z");
     private static final String DECLARATION = "[{\"arg\":\"account_seq\",\"field\":\"account\"}]";
+    private static final String KEY_FILE = "src/test/resources/financial/test-digest.key";
+    private static final String ROTATED_KEY_FILE = "src/test/resources/financial/test-digest-rotated.key";
     @Autowired
     ConnectorActionExecutionRepository contents;
 
@@ -177,15 +186,38 @@ class ConnectorConditionalSnapshotTest {
     @DisplayName("기동 닫기 검사는 keyed hash 이전 protocol 의 열린 줄만 보고 지금 protocol 줄과 끝난 줄은 보지 않는다")
     void legacyProtocolCheckSeesOnlyOpenV1Rows() {
         var open = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
+        String prefix = digest.currentPrefix();
         Fixture fixture = fixture();
         ConnectorActionExecution row = contents.saveAndFlush(capture(fixture.action(), fixture.binding(), BASE));
         assertThat(row.protocol()).isEqualTo("approval-claim-v2");
+        assertThat(row.requestKey()).startsWith(prefix);
         // 첫 실제 호출이 남긴 지금 protocol 의 줄은 열려 있어도 관문을 닫지 않는다.
-        assertThat(contents.existsOpenWithProtocol("approval-claim-v1", open)).isFalse();
+        assertThat(contents.existsOpenOutside("approval-claim-v2", prefix, open)).isFalse();
         jdbc.update("UPDATE connector_action_execution SET protocol = 'approval-claim-v1' WHERE action_id = ?", row.actionId());
-        assertThat(contents.existsOpenWithProtocol("approval-claim-v1", open)).isTrue();
+        assertThat(contents.existsOpenOutside("approval-claim-v2", prefix, open)).isTrue();
         jdbc.update("UPDATE connector_action SET status = 'SUCCEEDED' WHERE id = ?", row.actionId());
-        assertThat(contents.existsOpenWithProtocol("approval-claim-v1", open)).isFalse();
+        assertThat(contents.existsOpenOutside("approval-claim-v2", prefix, open)).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("key 를 바꿔 재기동하면 이전 key 로 저장한 열린 줄이 관문을 닫고, 그 줄이 끝나면 다시 열린다")
+    void rotatedDigestKeyClosesGateWhileOldRowsAreOpen() {
+        Fixture fixture = fixture();
+        ConnectorActionExecution row = contents.saveAndFlush(capture(fixture.action(), fixture.binding(), BASE));
+        jdbc.update("UPDATE connector_action SET status = 'UNKNOWN' WHERE id = ?", row.actionId());
+        assertThatCode(gate(KEY_FILE)::requireOpen).doesNotThrowAnyException();
+        // 새 key 의 request_key 는 이전 UNKNOWN 과 달라 같은 의도 차단이 놓친다. 그래서 관문을 닫는다.
+        assertThatThrownBy(gate(ROTATED_KEY_FILE)::requireOpen).isInstanceOf(ApiException.class);
+        jdbc.update("UPDATE connector_action SET status = 'FAILED' WHERE id = ?", row.actionId());
+        assertThatCode(gate(ROTATED_KEY_FILE)::requireOpen).doesNotThrowAnyException();
+    }
+
+
+    private ConnectorFinancialGate gate(String keyFile) {
+        var live = LiveProperties.fixed(ConnectorFinancialProperties.class, new ConnectorFinancialProperties(
+            List.of("000007"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, keyFile));
+        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live));
     }
 
 

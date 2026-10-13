@@ -17,14 +17,17 @@ public interface ConnectorActionExecutionRepository extends JpaRepository<Connec
 
 
     /**
-     * 그 protocol 로 저장한 줄 가운데 아직 열린 승인 줄이 있는지 본다.
+     * 지금 protocol 과 지금 key 로 만들지 않은 열린 승인 줄이 있는지 본다.
      *
-     * <p>keyed hash 이전 protocol 의 열린 줄은 같은 의도 차단이 놓치므로 금융 관문을 닫는다. 끝난 줄은 보지 않는다.
-     * 모든 금융 줄을 보면 첫 실제 호출이 남긴 줄 때문에 그 뒤 재기동마다 관문이 닫힌다.
+     * <p>keyed hash 이전 protocol 의 줄과 이전 key 로 만든 줄은 request_key 가 지금 계산과 달라 같은 의도 차단이 놓친다.
+     * 그런 줄이 열려 있으면 금융 관문을 닫는다. 끝난 줄은 보지 않는다.
+     * 모든 금융 줄을 보면 첫 실제 호출이 남긴 줄이나 key 교체 전의 끝난 줄 때문에 그 뒤 재기동마다 관문이 닫힌다.
      */
     @Query("select count(e) > 0 from ConnectorActionExecution e, ConnectorAction a"
-        + " where a.id = e.actionId and e.protocol = :protocol and a.status in :statuses")
-    boolean existsOpenWithProtocol(@Param("protocol") String protocol, @Param("statuses") Collection<ActionStatus> statuses);
+        + " where a.id = e.actionId and a.status in :statuses"
+        + " and (e.protocol <> :protocol or e.requestKey not like concat(:prefix, '%'))")
+    boolean existsOpenOutside(
+        @Param("protocol") String protocol, @Param("prefix") String prefix, @Param("statuses") Collection<ActionStatus> statuses);
 
 
     /** 사용자와 승인 줄을 잠근 뒤 실행 내용을 마지막으로 잠근다. */

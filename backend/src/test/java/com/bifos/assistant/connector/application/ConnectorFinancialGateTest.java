@@ -56,14 +56,14 @@ class ConnectorFinancialGateTest {
 
 
     @Test
-    @DisplayName("keyed hash key 가 없거나 keyed hash 이전 protocol 의 열린 줄이 남았으면 허용 목록과 상한을 채워도 닫는다")
-    void closesWithoutDigestKeyOrWithOpenLegacyRows() {
+    @DisplayName("keyed hash key 가 없거나 이전 protocol, 이전 key 의 열린 줄이 남았으면 허용 목록과 상한을 채워도 닫는다")
+    void closesWithoutDigestKeyOrWithOpenRowsOfOtherKey() {
         var noKey = open("1", "1", "1");
         noKey = new ConnectorFinancialProperties(noKey.allowedAccounts(), noKey.maxOrderAmountKrw(),
             noKey.maxOrderAmountUsd(), noKey.maxOrderQuantity(), noKey.maxDailyAmountKrw(), noKey.maxDailyAmountUsd(), "");
         assertThatThrownBy(gate(noKey)::requireOpen).isInstanceOf(ApiException.class);
         assertThatCode(gate(open("1", "1", "1"))::requireOpen).doesNotThrowAnyException();
-        when(contents.existsOpenWithProtocol(eq(ConnectorFinancialGate.LEGACY_PROTOCOL),
+        when(contents.existsOpenOutside(eq(ConnectorExecutionSnapshot.PROTOCOL), eq(DIGEST.currentPrefix()),
             eq(Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN)))).thenReturn(true);
         assertThatThrownBy(gate(open("1", "1", "1"))::requireOpen).isInstanceOf(ApiException.class);
     }
@@ -76,6 +76,10 @@ class ConnectorFinancialGateTest {
         assertThat(DIGEST.of("scope_json", value)).hasSize(64).startsWith(FinancialDigest.PREFIX)
             .isNotEqualTo(DIGEST.of("execution_args_json", value));
         assertThat(FinancialDigest.keyed(DIGEST.of("scope_json", value))).isTrue();
+        // 앞 10글자는 key 마다 같은 식별자다. 관문이 이전 key 로 만든 열린 줄을 DB 조회로 가른다.
+        assertThat(DIGEST.of("scope_json", value)).startsWith(DIGEST.currentPrefix());
+        assertThat(DIGEST.of("request_key", value)).startsWith(DIGEST.currentPrefix());
+        assertThat(DIGEST.currentPrefix()).hasSize(10).startsWith(FinancialDigest.PREFIX);
         assertThat(FinancialDigest.keyed(Sha256.hex(value))).isFalse();
     }
 
@@ -177,16 +181,21 @@ class ConnectorFinancialGateTest {
 
 
     private void spent(long id, ActionStatus status, String args) {
+        spent(id, status, args, ConnectorExecutionSnapshot.PROTOCOL, DIGEST.of("execution_args_json", args));
+    }
+
+
+    private void spent(long id, ActionStatus status, String args, String protocol, String executionArgsSha256) {
         var action = mock(ConnectorAction.class);
         when(action.id()).thenReturn(id);
         when(action.status()).thenReturn(status);
         var row = mock(ConnectorActionExecution.class);
         when(row.actionId()).thenReturn(id);
-        when(row.protocol()).thenReturn(ConnectorExecutionSnapshot.PROTOCOL);
+        when(row.protocol()).thenReturn(protocol);
         // key 가 없으면 원문을 그대로 읽는다. 하루 합계의 복호화 경로는 통합 테스트가 본다.
         when(row.contentKeyId()).thenReturn(null);
         when(row.executionArgsJson()).thenReturn(args);
-        when(row.executionArgsSha256()).thenReturn(DIGEST.of("execution_args_json", args));
+        when(row.executionArgsSha256()).thenReturn(executionArgsSha256);
         when(contents.findById(id)).thenReturn(Optional.of(row));
         today.add(action);
     }
