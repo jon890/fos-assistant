@@ -1,6 +1,6 @@
 ## ADR-20261012 / bodyless-request-diagnostics: 관리 bootstrap이 요청 진단 writer를 본문 없는 writer로 교체한다
 
-- **status**: `accepted`
+- **status**: `accepted` (운영 연결은 2026-10-13에 보류, 아래 「운영 연결 보류」)
 - Date: 2026-10-12
 
 ### 맥락
@@ -72,3 +72,13 @@ SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 �
 이 writer가 새 진단을 가리는 것만으로 SDK·framework·session·trajectory 전체가 본문 없이 남는다고 판정하지 않는다.
 운영 배포와 실제 Hermes 왕복 전까지 운영 보호 완료로 보고하지 않는다.
 private prototype의 합성 검증은 별도 근거이며 공개 actual main 반영과 private 활성화 수락은 아직 남아 있다.
+
+### 운영 연결 보류 (2026-10-13)
+
+운영 gateway는 프로세스 하나가 모든 profile을 처리하고 턴마다 home과 secret scope를 바꾼다. profile은 dashboard API가 동적으로 만들고 cron 자식과 dashboard도 같은 방식이다.
+기동 때 profile 하나를 정하는 관리 bootstrap은 이 구조와 맞지 않아, 그대로 연결하면 default가 아닌 profile의 턴이 실패한다.
+맞추려면 턴 scope를 profile 근거로 삼도록 설계를 바꿔야 하는데, 사용자는 그 비용 대신 위험을 감수하기로 했다.
+
+- 감수하는 것: 요청이 실패하면 원고 본문, 첨부 사진, 금융 요청의 인자가 운영 서버의 진단 파일에 남을 수 있다. 서버가 침해되면 그 파일도 노출된다.
+- addon 코드(`hermes/runtime/bodyless_*`)와 계약 시험은 남긴다. upstream에 공식 disable 또는 opt-in이 생기면 그것을 적용하고 이 addon을 지울지 정한다.
+- 추적: [#518](https://github.com/jon890/fos-assistant/issues/518)
