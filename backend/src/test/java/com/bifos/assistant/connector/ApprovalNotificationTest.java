@@ -360,6 +360,85 @@ class ApprovalNotificationTest {
     }
 
 
+    @Test
+    @DisplayName("대화 화면에서 승인하면 그 대화의 승인 요청 알림이 읽음이 되고 read 사건이 간다")
+    void approvingResolvesRequestedNotification() {
+        UUID actionId = ask(root, WRITE, ARGS).actionId();
+        Notification requested = onlyNotification();
+        received.clear();
+
+        service.approve(me, actionId, null);
+
+        assertThat(notifications.findById(requested.id()).orElseThrow().unread()).isFalse();
+        assertThat(received).containsExactly(NotificationEvent.read(0));
+    }
+
+
+    @Test
+    @DisplayName("거절해도 승인 요청 알림이 읽음이 된다")
+    void rejectingResolvesRequestedNotification() {
+        UUID actionId = ask(root, WRITE, ARGS).actionId();
+        Notification requested = onlyNotification();
+
+        service.reject(me, actionId);
+
+        assertThat(notifications.findById(requested.id()).orElseThrow().unread()).isFalse();
+    }
+
+
+    @Test
+    @DisplayName("같은 대화에 기다리는 줄이 남아 있으면 하나를 처리해도 알림은 읽지 않음으로 남고 마지막 줄을 처리하면 읽음이 된다")
+    void notificationStaysUnreadWhileAnotherApprovalWaits() {
+        UUID first = ask(root, WRITE, ARGS).actionId();
+        UUID second = ask(root, WRITE, "{\"text\":\"다른 글\"}").actionId();
+        assertThat(notifications.findAll()).hasSize(2);
+
+        service.reject(me, first);
+
+        assertThat(notifications.findAll()).allSatisfy(notice -> assertThat(notice.unread()).isTrue());
+
+        service.reject(me, second);
+
+        assertThat(notifications.findAll()).allSatisfy(notice -> assertThat(notice.unread()).isFalse());
+    }
+
+
+    @Test
+    @DisplayName("기한이 지나 만료되면 승인 요청 알림은 읽음이 되고 만료 알림은 읽지 않음으로 남는다")
+    void expiryResolvesRequestedButKeepsExpiredUnread() {
+        ask(root, WRITE, ARGS);
+        Instant expiresAt = onlyActionExpiry();
+
+        service.expire(expiresAt.plusMillis(1));
+
+        assertThat(notifications.findAll()).hasSize(2).allSatisfy(notice -> {
+            if (notice.kind() == NotificationKind.APPROVAL_REQUESTED) {
+                assertThat(notice.unread()).isFalse();
+            } else {
+                assertThat(notice.kind()).isEqualTo(NotificationKind.APPROVAL_EXPIRED);
+                assertThat(notice.unread()).isTrue();
+            }
+        });
+    }
+
+
+    @Test
+    @DisplayName("다른 대화의 승인 요청 알림은 건드리지 않는다")
+    void otherConversationNotificationStaysUnread() {
+        Conversation other = conversations.save(Conversation.startedBy(owner.id(), "다른 대화", agent.id(), Instant.now()));
+        String otherRoot = startRun(other.id());
+        ask(otherRoot, WRITE, ARGS);
+        UUID mine = ask(root, WRITE, ARGS).actionId();
+
+        service.reject(me, mine);
+
+        assertThat(notifications.findAll())
+            .filteredOn(Notification::unread)
+            .singleElement()
+            .satisfies(notice -> assertThat(notice.targetPublicId()).isEqualTo(other.publicId()));
+    }
+
+
     /** 그 대화로 도는 실행 하나를 만들고 그 루트 session 을 돌려준다. 대화가 없으면 null 을 넘긴다. */
     private String startRun(Long conversationId) {
         String session = "fos-" + UUID.randomUUID();
