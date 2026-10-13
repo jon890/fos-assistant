@@ -49,6 +49,8 @@ async function connected(privateMode = true, env: Record<string, string> = {}) {
     },
   };
 }
+const COMPILE_ONLY = { compile: true, start: false, status: false };
+
 const input = () => ({
   canonicalDraft: canonicalDraftV1Schema.parse(golden.draft),
   resolvedAssets: resolvedAssetSchema
@@ -94,7 +96,7 @@ test("공개 목록에는 private 도구가 없으며 env와 모델 인자로 pr
         "compile",
       ],
     ])
-      expect(() => snapshotOperation(args)).toThrow(
+      expect(() => snapshotOperation(args, COMPILE_ONLY)).toThrow(
         "CONTENT_SNAPSHOT_UNAVAILABLE",
       );
   } finally {

@@ -978,7 +978,8 @@ Gemini functionResponse의 parts는 읽되 임의 response 객체는 탐색하�
 immutable manifest는 image·실제 interpreter·core helper와 lazy forward/callsite·writer bundle·adapter를 독립적으로 봉인한다.
 SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 별도로 수락해야 한다.
 이 writer는 새 요청 진단과 자신의 출력만 제한한다. SDK·framework·session·trajectory 전체 가림이나 운영 보호 완료를 증명하지 않는다.
-운영 연결은 2026-10-13 에 보류했다([ADR-20261012](adr/ADR-20261012-bodyless-request-diagnostics.md)). 연결하게 되면 배포 뒤 실제 Hermes 왕복은 `fos-home-infra`가 맡는다.
+본문 없는 writer는 운영에 연결하지 않았다. 오류 때 요청 원문이 진단 파일에 남을 수 있는 위험을 감수하며 upstream 추적은 [#518](https://github.com/jon890/fos-assistant/issues/518)이 갖는다.
+배포 뒤 실제 Hermes 왕복은 원고 기능의 확인 순서를 따른다.
 
 ## 동시 실행
 
@@ -2873,7 +2874,7 @@ snapshot은 별도 `POST /api/connectors/{id}/snapshot` 서비스 경로다. <!-
 handler도 서비스 Bearer를 직접 검사하여 쿠키만 있는 요청은 받지 않는다.
 manifest의 정확한 다섯 키는 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`다.
 protocol은 `content-snapshot-v1`이고 capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 추가 키·누락·boolean이 아닌 값은 거절한다.
-운영 선언은 `{compile:true,start:false,status:false}`를 유지한다.
+운영 선언은 `{compile:true,start:true,status:true}`다.
 검증된 snapshot은 공개 tools와 분리해 catalog 응답에 싣고 같은 capabilities를 성공 envelope에 넣는다. Control Plane의 Java decoder도 이 선언을 소비한다.
 요청 operation은 `compile`, `start`, `status` 가운데 하나이며 선언이 false인 operation은 자식 생성 전 409다.
 
@@ -2890,8 +2891,8 @@ adapter 자체는 오류 원문·인자·결과·ticket을 로그에 넣지 않�
 세 operation의 Python MCP SDK 진단은 아래 source 계약에 따라 본문 없이 남긴다.
 입력·출력 byte cap과 기존 renderer의 첨부 검사, golden 계약, stamp 칸과 job 결과 칸은 [원고 기능](../../docs/features/content-draft.md#private-snapshot-내부-transport)이 갖는다.
 
-본문 없는 진단 정책의 운영 수락 전에는 본문 transport를 운영에서 활성화하지 않는다.
-운영 owner는 배포 뒤 실제 Hermes 왕복과 진단 정책을 별도로 수락해야 한다.
+본문 없는 writer는 운영에 연결하지 않았다. 오류 때 요청 원문이 진단 파일에 남을 수 있는 위험을 감수하며 upstream 추적은 [#518](https://github.com/jon890/fos-assistant/issues/518)이 갖는다.
+배포 뒤 실제 Hermes 왕복은 [원고 기능](../../docs/features/content-draft.md#배포-뒤-원격-확인)의 확인 순서를 따른다.
 최초 원고 MCP 생성과 실제 네이버 접근은 이 전달 경계의 범위 밖이다.
 
 ### private snapshot SDK 진단

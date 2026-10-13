@@ -127,7 +127,7 @@ class HttpContentDraftSnapshotClientTest {
             var catalog = new HttpHermesConnectorClient(new HermesProperties(null,
                 "http://127.0.0.1:" + server.getAddress().getPort(), "synthetic-token", null, null, null, null, null),
                 new SandboxAttachmentDirectory(System.getProperty("java.io.tmpdir")));
-            assertThat(catalog.readCatalog().getFirst().snapshot().capabilities()).containsEntry("compile", true).containsEntry("start", false);
+            assertThat(catalog.readCatalog().getFirst().snapshot().capabilities()).containsEntry("compile", true).containsEntry("start", true).containsEntry("status", true);
             assertThat(compile()).isEqualTo(golden.path("snapshot"));
             assertThat(generated.path("payloadHex").stringValue()).isEqualTo(golden.path("payloadUtf8Hex").stringValue());
         } finally {

@@ -7,8 +7,8 @@
 
 - **결정 날짜**: 2026-10-13. 사용자가 정했다.
 - **결정**: `hermes/runtime/` 의 writer 를 운영 gateway 에 연결하지 않는다. 운영의 preflight 와 두 오류 경로는 upstream 기본 writer 가 요청 전체를 `request_dump_*.json` 으로 남긴다.
-- **까닭**: 운영 gateway 는 프로세스 하나가 모든 profile 을 요청마다 scope 를 바꿔 처리한다. 기동 때 profile 하나를 정하는 관리 bootstrap 과 맞지 않는다. 맞추려면 설계를 바꿔야 하고, 그 비용에 비해 얻는 것이 작다고 판단했다.
-- **감수한 위험**: 오류가 난 요청의 원문(원고 본문, 첨부 사진, 금융 요청의 인자)이 운영 서버의 진단 파일에 남을 수 있다. 서버 자체가 침해되면 그 파일도 노출된다. v0.21.6 의 mcp stdio 검증 오류 로그에 원문 stdout 줄이 들어가는 것도 같은 위험으로 감수한다.
+- **까닭**: 운영 gateway 는 프로세스 하나가 모든 profile 을 처리하고 턴마다 home 과 secret scope 를 바꾼다. profile 은 dashboard API 가 동적으로 만들고 cron 자식과 dashboard 도 같은 방식이다. 기동 때 profile 하나를 정하는 관리 bootstrap 은 이 구조와 맞지 않아, 그대로 연결하면 default 가 아닌 profile 의 턴이 실패한다. 맞추려면 턴 scope 를 profile 근거로 삼도록 설계를 바꿔야 하고, 그 비용 대신 위험을 감수하기로 했다.
+- **감수한 위험**: 오류가 난 요청의 원문(원고 본문, 첨부 사진, 금융 요청의 인자)이 운영 서버의 진단 파일에 남을 수 있다. 서버 자체가 침해되면 그 파일도 노출된다. v0.21.6 의 mcp stdio 검증 오류 로그에 원문 stdout 줄이 들어가는 것도 같은 위험으로 감수한다. `request_dump_*.json` 의 보존 기간과 정리 주기는 이 저장소가 정하지 않으며, 운영 저장소가 정한다.
 - **다시 검토할 조건**
   - Hermes upstream 에 요청 진단 dump 를 끄거나 명시적으로 켜야만 남기는 공식 설정이 생길 때. 새 버전을 올릴 때마다 release note 와 `agent` 의 request dump 경로를 확인한다.
   - 추적은 #518 에서 한다.
