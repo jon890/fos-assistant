@@ -148,6 +148,18 @@ class ConnectorActionDetails {
     }
 
 
+    /**
+     * 그 줄의 대화에 승인을 기다리는 줄이 더는 없으면 그 줄을 돌려준다. 줄이 없거나 대화가 없거나 아직 기다리는 줄이
+     * 남았으면 빈 값이다.
+     */
+    Optional<ConnectorAction> withoutPendingSibling(UUID actionId) {
+        return actions.findByPublicId(actionId)
+            .filter(action -> action.conversationId() != null)
+            .filter(action -> !actions.existsByConversationIdAndUserIdAndStatus(
+                action.conversationId(), action.userId(), ActionStatus.PENDING));
+    }
+
+
     /** 그 대화에서 알림 줄만 남길 줄이다. 실행하지 않고 끝났고 아직 전하지 않은 것이다. */
     List<ConnectorActionResult> undeliveredClosures(Long conversationId) {
         return undelivered(conversationId, CLOSED_WITHOUT_EXECUTION);

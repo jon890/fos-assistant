@@ -75,6 +75,22 @@ class ConnectorActionSignals {
     }
 
     /**
+     * 승인을 기다리는 줄이 더는 없는 대화의 「승인을 기다리는 요청」 알림을 읽음으로 표시한다. 알림은 대화를 가리키므로
+     * 같은 대화에 기다리는 줄이 남아 있으면 부르는 쪽이 부르지 않는다. 트랜잭션 안에서 부른다.
+     */
+    void resolveRequested(ConnectorAction action) {
+        if (action.conversationId() == null) {
+            return;
+        }
+        conversations
+                .publicIdOf(action.conversationId())
+                .ifPresent(conversationId -> notifications.resolve(
+                        action.userId(),
+                        NotificationKind.APPROVAL_REQUESTED,
+                        new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
+    }
+
+    /**
      * 대화 없는 실행이 만든 줄은 전할 곳이 없어 내지 않는다. 줄을 커밋한 뒤에만 부른다.
      *
      * <p>듣는 쪽의 예외를 밖으로 내지 않는다. 줄은 이미 커밋됐고, 예외가 나가면 실행한 승인이 실패한 것처럼 보인다.

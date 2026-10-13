@@ -77,6 +77,10 @@ public interface ConnectorActionRepository extends JpaRepository<ConnectorAction
         Long conversationId, Long userId, ActionStatus status);
 
 
+    /** 그 대화에 그 사용자의 그 상태인 줄이 하나라도 있는가. */
+    boolean existsByConversationIdAndUserIdAndStatus(Long conversationId, Long userId, ActionStatus status);
+
+
     /** 그 상태가 아닌 승인 줄이다. 승인 줄이 아닌 판정 줄은 상태가 비어 있어 걸리지 않는다. */
     List<ConnectorAction> findTop20ByConversationIdAndUserIdAndStatusNotOrderByIdDesc(
         Long conversationId, Long userId, ActionStatus status);

@@ -129,6 +129,17 @@ public class NotificationService {
         return 0;
     }
 
+    /**
+     * 원인이 끝나 더 알릴 것이 없는 알림을 읽음으로 표시한다. 같은 사용자의 같은 종류 가운데 {@code target} 을 가리키는
+     * 읽지 않은 줄만 바꾼다. 바꾼 줄이 있으면 커밋한 뒤 {@code read} 사건을 보낸다. 부르는 쪽의 트랜잭션에 참여한다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void resolve(Long userId, NotificationKind kind, NotificationTarget target) {
+        if (notifications.markReadByTarget(userId, kind, target.type(), target.publicId(), clock.instant()) > 0) {
+            afterCommit(userId, NotificationEvent::read);
+        }
+    }
+
     @Transactional(readOnly = true)
     public long unreadCount(Long userId) {
         return notifications.countByUserIdAndReadAtIsNull(userId);

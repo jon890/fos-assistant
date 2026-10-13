@@ -55,6 +55,7 @@ public class ConnectorActionService {
     private final ConnectorActionDetails details;
     private final ConnectorActionApproval approval;
     private final ConnectorActionLifecycle lifecycle;
+    private final ConnectorActionSignals signals;
 
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -124,7 +125,7 @@ public class ConnectorActionService {
         Clock clock) {
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock);
-        ConnectorActionSignals signals = new ConnectorActionSignals(events, notifications, conversations);
+        this.signals = new ConnectorActionSignals(events, notifications, conversations);
         this.approval = new ConnectorActionApproval(
             actions,
             grants,
@@ -197,6 +198,19 @@ public class ConnectorActionService {
     @Transactional(readOnly = true)
     public List<ConnectorActionResult> resultsFor(Long conversationId, Long userId, List<UUID> actionIds) {
         return details.resultsFor(conversationId, userId, actionIds);
+    }
+
+
+    /**
+     * 그 줄이 바뀐 뒤 대화에 승인을 기다리는 줄이 하나도 없으면 「승인을 기다리는 요청」 알림을 읽음으로 표시한다. 대화 화면에서
+     * 승인하거나 거절했을 때, 기한이 지났을 때, 실행이 끝났을 때 알림 단추에 지난 요청이 남지 않게 한다.
+     *
+     * <p>알림은 요청 한 줄이 아니라 대화를 가리키므로, 같은 대화에 기다리는 줄이 남았으면 그대로 둔다. 알림 저장이 실패하면
+     * 예외가 나간다. 부르는 쪽이 줄은 이미 커밋됐음을 알고 로그만 남긴다.
+     */
+    @Transactional
+    public void resolveApprovalRequested(UUID actionId) {
+        details.withoutPendingSibling(actionId).ifPresent(signals::resolveRequested);
     }
 
 
