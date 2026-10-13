@@ -264,6 +264,9 @@ class AutonomyPolicyServiceTest {
         assertThat(decision.level()).isEqualTo(AutonomyLevel.EXECUTE);
         assertThat(decision.executionStatus()).isEqualTo(AutonomyExecutionStatus.FAILED);
         assertThat(decision.executionError()).isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE.name());
+        assertThat(feedbackEvents.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(
+            OWNER.id(), List.of("autonomy_decision:" + decision.id())))
+                .isEmpty();
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 

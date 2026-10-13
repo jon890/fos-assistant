@@ -277,9 +277,11 @@ public class AutonomyPolicyService {
     private AutonomyDecision execute(CurrentUser user, String agentCode, AutonomyDecision row) {
         AtomicReference<Long> startedCheck = new AtomicReference<>();
         String error = null;
+        boolean withdrawn = false;
         try {
             // 판정을 저장한 뒤 동의를 철회했거나 설치의 자동 실행을 껐으면 시작하지 않는다. 시작 직전의 기록이 기준이다.
             if (!properties.current().executionEnabled() || !readOnlyExecutionConsented(user)) {
+                withdrawn = true;
                 throw new ApiException(
                     ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "autonomous execution is no longer permitted");
             }
@@ -291,7 +293,8 @@ public class AutonomyPolicyService {
             error = ErrorCode.INTERNAL_ERROR.name();
         }
         String failure = error;
-        if (failure != null) {
+        // 사용자가 스스로 끈 결과는 실행 실패 신호가 아니므로 판단 피드백을 남기지 않는다.
+        if (failure != null && !withdrawn) {
             recordStartFailure(user, row, failure);
         }
         try {
