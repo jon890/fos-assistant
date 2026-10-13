@@ -121,7 +121,7 @@ class UserBrowserScreenControllerTest {
         mvc.perform(post("/api/v1/browser")).andExpect(status().isOk());
         mvc.perform(get("/api/v1/browser/screen").param("url", "https://example.com/login"))
             .andExpect(request().asyncStarted());
-        Logger logger = (Logger) LoggerFactory.getLogger("com.bifos.assistant");
+        Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
         Level before = logger.getLevel();
         logger.setLevel(Level.DEBUG);
         try {
@@ -143,7 +143,7 @@ class UserBrowserScreenControllerTest {
     @DisplayName("거절한 입력의 글자도 응답과 로그에 남지 않는다")
     void keepsRejectedInputOutOfLogs(CapturedOutput output) throws Exception {
         MockMvc mvc = mvc(true);
-        Logger logger = (Logger) LoggerFactory.getLogger("com.bifos.assistant");
+        Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
         Level before = logger.getLevel();
         logger.setLevel(Level.DEBUG);
         try {
