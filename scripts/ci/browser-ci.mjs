@@ -85,14 +85,19 @@ export function collectFailures(report, project) {
   return failures;
 }
 
+// 이슈로 모으는 job 결론. 다음 push 에 밀려 취소된 실행(cancelled)과 skipped, neutral,
+// action_required 는 테스트 실패가 아니라서 허용 목록에 없다.
+// timeout-minutes 를 넘긴 job 이 API 에서 timed_out 으로 오는지 cancelled 로 오는지는 문서로 확인하지 못했다.
+// cancelled 로 오면 멈춘 shard 가 이슈 없이 지나가므로, 그 shard 는 필수 검사(check)가 실패로 막는다.
+const ISSUE_CONCLUSIONS = ["failure", "timed_out"];
+
 export async function collectJobFailures(jobs, readReport) {
   const failures = [];
   const shards = jobs.filter((job) =>
     /^browser-(mobile|desktop)-shard-\d+$/.test(job.name),
   );
   for (const job of shards) {
-    // 다음 push 에 밀려 취소된 실행은 테스트 실패가 아니다. 실제 실패(failure)만 이슈로 모은다.
-    if (job.conclusion === "success" || job.conclusion === "cancelled") continue;
+    if (!ISSUE_CONCLUSIONS.includes(job.conclusion)) continue;
     const [, project, shard] = job.name.match(
       /^browser-(mobile|desktop)-shard-(\d+)$/,
     );

@@ -110,18 +110,22 @@ test("잘린 JSON, 누락 결과, 기동 실패가 다른 shard 의 실패 집�
   assert.equal(failures[2].error, "Error: 전역 설정 실패");
 });
 
-test("취소된 shard 는 이슈로 모으지 않고 실패 shard 만 모은다", async () => {
+test("failure 와 timed_out 만 이슈로 모으고 취소와 건너뜀은 모으지 않는다", async () => {
   const jobs = [
     { name: "browser-mobile-shard-1", conclusion: "cancelled" },
     { name: "browser-mobile-shard-2", conclusion: "failure" },
     { name: "browser-desktop-shard-1", conclusion: "success" },
+    { name: "browser-desktop-shard-2", conclusion: "skipped" },
+    { name: "browser-desktop-shard-3", conclusion: "neutral" },
+    { name: "browser-desktop-shard-4", conclusion: "action_required" },
+    { name: "browser-desktop-shard-5", conclusion: "timed_out" },
   ];
   const failures = await collectJobFailures(jobs, async () => {
     throw new Error("missing");
   });
   assert.deepEqual(
     failures.map((failure: any) => failure.file),
-    ["shard-2-setup"],
+    ["shard-2-setup", "shard-5-setup"],
   );
   assert.deepEqual(
     await collectJobFailures(jobs.slice(0, 1), async () => report()),
