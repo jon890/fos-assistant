@@ -421,7 +421,10 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 - [ ] [매매 개방 조건](tossinvest-connector.md#매매-개방-조건) 표의 모든 줄이 「있음」 이다. 승인 카드의 summary 와 계좌 표시, 공개 진입점 연결이 이 표에 든다
 - [ ] 첫 개방은 `create_order` 와 `cancel_order` 뿐이다. `modify_order` 와 조건주문 쓰기는 별도 개방이다
-- [ ] 개방 PR 을 배포한 뒤 [첫 실제 호출 절차](tossinvest-connector.md#첫-실제-호출-절차) 를 마쳤고 `UNKNOWN` 과 중복 전송이 없다
+
+Go 를 낸 뒤 개방 PR 을 배포하고 아래를 확인한다. 어긋나면 [되돌리기](tossinvest-connector.md#되돌리기) 로 닫는다.
+
+- [ ] [첫 실제 호출 절차](tossinvest-connector.md#첫-실제-호출-절차) 를 마쳤고 `UNKNOWN` 과 중복 전송이 없다
 
 ### 남은 공백
 
