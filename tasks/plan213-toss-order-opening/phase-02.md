@@ -39,15 +39,15 @@
 
 ### 1. 등록 함수가 열 도구를 인자로 받게 한다
 
-`hermes/connectors/tossinvest/src/trading-body.ts` 에 `export const OPEN_TRADE_TOOLS = ["create_order", "cancel_order"] as const satisfies readonly TradeTool[];` 를 더한다.
+`hermes/connectors/tossinvest/src/trading-body.ts` 에 `export const OPEN_TRADE_TOOLS: readonly [TradeTool, ...TradeTool[]] = ["create_order", "cancel_order"];` 를 더한다.
 
 `hermes/connectors/tossinvest/src/trading-tools.ts`
 
-- `registerTradingTools(register, client, tools: readonly TradeTool[] = OPEN_TRADE_TOOLS)` 로 바꾼다.
+- `registerTradingTools(register, client, tools: readonly [TradeTool, ...TradeTool[]] = OPEN_TRADE_TOOLS)` 로 바꾼다. `z.enum` 이 비지 않은 튜플을 요구하므로 인자 타입을 이렇게 둔다.
 - `prepare_trade` 의 `tool` 입력은 `z.enum(tools)` 로, 실행 도구 등록 반복은 `tools` 로 돈다.
 - 파일 머리 주석 「운영 server에서는 아직 호출하지 않는다」 를 지금 동작으로 고친다.
 
-`hermes/connectors/tossinvest/tests/fixtures/trading-entry.ts` 는 `registerTradingTools(register, client, Object.keys(TRADE_OPERATIONS) as TradeTool[])` 로 세 도구를 그대로 등록한다. fixture manifest 의 금융 선언 덧붙이기는 그대로 둔다.
+`hermes/connectors/tossinvest/tests/fixtures/trading-entry.ts` 는 `registerTradingTools(register, client, ["create_order", "modify_order", "cancel_order"])` 로 세 도구를 그대로 등록한다. fixture manifest 의 금융 선언 덧붙이기는 그대로 둔다.
 
 ### 2. 운영 서버가 두 도구를 등록한다
 
@@ -75,7 +75,15 @@
 - 실행 도구 둘의 `description` 은 「모델이 직접 부르지 않는다. 승인 뒤 Control Plane 만 부른다」 를 적는다.
 - title 과 summary 는 해요체이고 도구 이름과 영문 인자 이름을 쓰지 않는다. 예: 「주문 준비하기」 「주문을 넣기 전에 내용을 정리해 승인을 요청해요.」, 「주문 넣기」, 「주문 취소하기」.
 
-### 4. README 의 사용자 안내를 고친다
+### 4. 모델이 읽는 스킬과 README 의 사용자 안내를 고친다
+
+`hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` 는 모델에게 설치된다. 지금 「주문하지 않는다」 절이 주문을 앱으로 넘기라고 지시해, 이대로면 모델이 준비 도구를 부르지 않는다.
+
+- front matter `description` 의 「주문하지 않는다.」 를 「승인받은 일반 주문을 넣거나 취소한다. 정정과 조건주문은 하지 않는다.」 로 고친다.
+- 「주문하지 않는다」 절을 「주문」 절로 바꾼다. 담을 것: 사용자가 대화에서 직접 시킨 주문만 준비한다. 주문과 취소는 `prepare_trade` 하나로 `{v: 1, tool: "create_order" | "cancel_order", args}` 를 부른다. 이 호출은 승인 요청만 남기고, 실제 주문은 사용자가 승인 카드에서 승인한 뒤 한 번만 나간다. 승인 전에 주문했다고 말하지 않는다. 소수점 매수와 매도는 미국 종목의 `MARKET` 금액 주문(`orderAmount`, 달러)으로만 한다. 지정가와 국내의 소수 수량, 정정, 조건주문은 하지 않는다. 금액 주문은 미국 정규장 시작부터 종료 1시간 전까지만 받는다. 거절이나 결과 불명이면 다시 부르지 말고 사용자에게 승인 카드와 토스증권 앱을 확인해 달라고 한다.
+- 다른 절의 「주문이나 WebSocket 도구는 제공하지 않는다」 같은 문장을 「WebSocket 은 제공하지 않는다」 처럼 지금 동작에 맞게 고친다. `grep -n '주문' hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` 로 남은 문장을 모두 본다.
+
+README 는 아래처럼 고친다.
 
 `hermes/connectors/tossinvest/README.md`
 
@@ -83,7 +91,22 @@
 - 「주문하지 않는다」 류의 문장을 「주문은 대화에서 요청하면 승인 카드가 뜨고, 승인한 한 건만 들어간다. 정정과 조건주문은 하지 않는다」 로 고친다.
 - 운영자가 허용 목록과 상한, key 파일을 넣기 전에는 주문이 거절된다는 것을 한 줄로 적는다. 값과 위치는 적지 않는다.
 
-### 5. 금융 비활성을 기대하던 테스트를 지금 선언에 맞춘다
+### 5. 금융 비활성과 도구 수를 기대하던 테스트를 지금 선언에 맞춘다
+
+운영 서버에 세 도구가 더해지면 「도구가 33개이고 모두 READ, `readOnlyHint` 참」 을 단정한 테스트가 깨진다. 기대를 「READ 도구 33개는 그대로이고, `prepare_trade` READ 하나와 FINANCIAL 둘(`create_order`, `cancel_order`)이 따로 있다」 로 바꾼다. 아래가 그 자리다.
+
+- `hermes/connectors/tossinvest/tests/market-info-stdio.test.ts` 86-92행
+- `hermes/connectors/tossinvest/tests/indicator-csv-compatibility.test.ts` 56-57행
+- `hermes/connectors/tossinvest/tests/order-read-stdio.test.ts` 67-75행
+- `hermes/connectors/tossinvest/tests/read-union-stdio.test.ts` 25행, 64-74행
+- `hermes/connectors/tossinvest/tests/rest-coverage.test.ts` 447-461행
+- `hermes/connectors/tossinvest/tests/ranking-indicator-production.test.ts` 95-100행
+- `hermes/connectors/tossinvest/tests/stock-statistics-integration.test.ts` 50-58행
+- `hermes/connectors/tossinvest/tests/conditional-stdio.test.ts` 128-135행
+- `hermes/connectors/tossinvest/tests/market-data-tools.test.ts` 116행
+- `hermes/tests/test_connector_manifest.py` 의 `test_toss_read_union_preserves_descriptions_and_read_policy`(887-916행 근처). READ 도구 집합만 33개와 견주고, 금융 셋은 따로 단언한다
+
+행 번호는 이 계획을 쓴 시점의 값이다. 각 파일에서 `33`, `readOnlyHint`, `READ` 를 찾아 같은 단언을 고친다. 그 밖에도 같은 단언이 있으면 `bun run test` 가 알려 준다.
 
 - `hermes/connectors/tossinvest/tests/execution-guard.test.ts` 의 「운영 SDK·manifest의 READ 합집합과 금융 비활성을 유지한다」: 운영 manifest 의 `execution_guard` 가 위 선언과 같고, FINANCIAL 도구는 `create_order`, `cancel_order` 둘뿐이며, 서버 `listTools` 가 manifest 도구 집합과 같고 `modify_order` 가 없는지로 바꾼다. 대역 HTTP 0회 기대는 둔다.
 - `hermes/connectors/tossinvest/tests/tossinvest.test.ts` 의 「manifest 의 도구 선언과 서버의 도구 목록이 같고 모두 읽기 전용이다」: READ 도구는 `readOnlyHint` 참, FINANCIAL 도구는 `readOnlyHint` 거짓과 `destructiveHint` 참인지로 나눈다. 설명이 manifest 와 같은지는 모든 도구에 둔다.
@@ -93,9 +116,11 @@
 
 `hermes/connectors/tossinvest/tests/trading.test.ts` 에 더한다. 기존 대역(`FakeToss`)으로 `prepareTrade` 와 운영 서버의 `prepare_trade` 를 부르고, 금융 POST 가 0회인지 센다.
 
+`prepareTrade` 는 `timeInForce` 가 없으면 `DAY` 로 채우고 소문자 `symbol` 을 대문자로 바꾸며, 둘 다 `normalization` 에 적는다. 아래 입력은 모두 대문자 `symbol` 과 `timeInForce: "DAY"` 를 준다.
+
 - 미국 `MARKET` 매도 `quantity` "0.1": 실행 인자의 `quantity` 가 "0.1" 이고 `normalization` 이 비었다
-- 미국 `LIMIT` 매수 `quantity` "1", `price` "12.34": 실행 인자와 summary 의 가격이 "12.34" 그대로다. `price` "0.1234" 도 그대로다
-- 미국 `MARKET` 매수 `orderAmount` "25.50": 실행 인자가 "25.5" 이고 `normalization` 에 `{field:"orderAmount", before:"25.50", after:"25.5"}` 하나가 있다. summary 의 `price` 와 `quantity` 는 null 이다
+- 미국 `LIMIT` 매수 `quantity` "1", `price` "12.34": 실행 인자와 summary 의 가격이 "12.34" 그대로이고 `normalization` 이 비었다. `price` "0.1234" 도 그대로다
+- 미국 `MARKET` 매수 `orderAmount` "25.50": 실행 인자가 "25.5" 이고 `normalization` 은 `{field:"orderAmount", before:"25.50", after:"25.5"}` 하나뿐이다. summary 의 `price` 와 `quantity` 는 null 이다
 - 거절: 미국 `LIMIT` 매수 `quantity` "0.1", 국내 종목의 `orderAmount`, `LIMIT` 의 `orderAmount`, `modify_order` 를 운영 서버의 `prepare_trade` 로 부른 호출
 
 ## 검증
@@ -103,10 +128,12 @@
 ```bash
 cd hermes/connectors/tossinvest && bun install --frozen-lockfile && bun run typecheck && bun run build
 cd hermes/connectors/tossinvest && bun test ./tests/execution-guard.test.ts ./tests/tossinvest.test.ts ./tests/trading.test.ts
+cd hermes/connectors/tossinvest && bun test ./tests/market-info-stdio.test.ts ./tests/indicator-csv-compatibility.test.ts ./tests/order-read-stdio.test.ts ./tests/read-union-stdio.test.ts ./tests/rest-coverage.test.ts ./tests/ranking-indicator-production.test.ts ./tests/stock-statistics-integration.test.ts ./tests/conditional-stdio.test.ts ./tests/market-data-tools.test.ts
 cd hermes/connectors/tossinvest && bun run test && bun run check:bundle
 bash scripts/ci/check-connector-package.sh
 PYTHONPATH=hermes/tests python3 -m unittest hermes/tests/test_connectors_contract.py
 PYTHONPATH=hermes/tests python3 -m unittest test_connector_guard_binding test_connector_guard_transport
+PYTHONPATH=hermes/tests python3 -m unittest hermes/tests/test_connector_manifest.py
 ```
 
 모두 0 으로 끝나야 한다.
@@ -121,8 +148,19 @@ Python 계약 테스트는 커넥터 묶음(`dist/`)이 빌드돼 있어야 돈�
 | `hermes/connectors/tossinvest/src/server.ts` | 수정 |
 | `hermes/connectors/tossinvest/connector.json` | 수정 |
 | `hermes/connectors/tossinvest/README.md` | 수정 |
+| `hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` | 수정 |
 | `hermes/connectors/tossinvest/tests/fixtures/trading-entry.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/execution-guard.test.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/tossinvest.test.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/trading.test.ts` | 수정 |
 | `hermes/tests/test_connectors_contract.py` | 수정 |
+| `hermes/tests/test_connector_manifest.py` | 수정 |
+| `hermes/connectors/tossinvest/tests/market-info-stdio.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/indicator-csv-compatibility.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/order-read-stdio.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/read-union-stdio.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/rest-coverage.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/ranking-indicator-production.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/stock-statistics-integration.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/conditional-stdio.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/market-data-tools.test.ts` | 수정 |

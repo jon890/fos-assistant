@@ -51,7 +51,8 @@
   - 종목 `symbol`(`market`), 방향 「매수」/「매도」, 주문 유형 「지정가」/「시장가」
   - 수량이 있으면 「수량 {quantity}주」, 금액이 있으면 「금액 {orderAmount} {currency}」, 가격이 있으면 「가격 {price} {currency}」
   - `normalization` 이 있으면 「입력을 이렇게 바꿨어요」 아래에 「{field}: {before ?? '없음'} → {after}」 를 줄마다 보인다
-- `blocked` 에 「PENDING 이고 `action.financial` 이 있으며 `available` 이 거짓」 을 더한다. 그때 `Notice variant="warning"`(`data-testid="approval-financial-unavailable"`)로 「주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.」 를 보인다.
+- `blocked` 에 「PENDING 이고 `risk === "FINANCIAL"` 이며, `action.financial` 이 null 이거나 `available` 이 거짓」 을 더한다. 옛 서버이거나 응답 경로에서 요약이 빠져도 인자만 보고 승인하지 못하게 한다. 그때 `Notice variant="warning"`(`data-testid="approval-financial-unavailable"`)로 「주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.」 를 보이고 인자 표는 그리지 않는다.
+- PENDING 이 아닌 금융 줄(EXECUTING, UNKNOWN, 끝난 줄)은 `available` 이 참일 때만 요약 블록을 그린다. 거짓이거나 null 이면 요약 블록도 안내도 인자 표도 그리지 않고 상태 표시만 둔다.
 - 금융 줄에는 상시 허락과 대화 허락 선택지를 그리지 않는다. 지금도 `grantAllowed` 와 `conversationGrantAllowed` 가 거짓이면 그리지 않으니 그 값에 기댄다.
 - 글은 모두 글자 그대로 그린다. HTML 로 해석하지 않는다.
 
@@ -62,7 +63,7 @@
 - `test/web/connector-action-route.test.ts`: 정상 금융 요약이 칸 그대로 지나가는지, 계약 밖 칸이 버려지는지, `accountSeq` 가 숫자가 아니거나 `side` 가 모르는 값이면 고정 오류인지.
 - `test/browser/approval-card.spec.ts`: 픽스처 `action(overrides)` 로
   - 금융 줄이 계좌 순번, 종목, 방향, 금액과 통화를 보이고 승인 단추가 있다
-  - `available: false` 인 금융 줄은 승인 단추가 없고 거절만 있으며 안내가 보인다
+  - `available: false` 인 금융 줄과, `risk: "FINANCIAL"` 인데 `financial: null` 인 줄은 둘 다 승인 단추가 없고 거절만 있으며 안내가 보인다
   - 같은 도구의 금융 PENDING 줄 둘이 묶이지 않고 두 장으로 보인다
 
 ### 4. 기능 문서를 지금 동작으로 고친다
@@ -78,13 +79,17 @@
 - 「첫 실제 호출 절차」 를 둘로 나눈다.
   1. 소수점 매수: 미국 종목 하나를 소액의 `MARKET` 금액 주문으로 매수한다. 정규장 시작 뒤부터 종료 1시간 전 사이에 넣는다. 즉시 체결될 수 있어 이 주문으로는 취소를 확인하지 않는다
   2. 취소: 소유자가 정한 체결되지 않을 지정가 주문 하나를 넣고 바로 취소한다
+  배포 직후 단계에 「외부 서비스 연결 화면에서 토스 연결을 다시 동기화해 바인딩이 새 manifest 의 보호 선언을 받게 한다. 하지 않으면 준비가 모두 거절되고 `financial gate:` 로그에는 그 까닭이 나오지 않는다」 를 둔다.
   관문을 여는 단계 앞에 「금융 해시 key 를 바꾸거나 새로 둘 때는 열린 금융 줄(PENDING, EXECUTING, UNKNOWN)이 없는지 먼저 확인한다」 를 둔다. 확인 방법은 `fos-home-infra` 를 가리킨다. 승인 카드에서 보는 것은 계좌 순번, 종목, 방향, 금액이나 수량과 가격이다.
 - 「되돌리기」 에 허용 목록에서 그 항목을 빼면 그 사용자의 그 계좌만 닫힌다는 것을 더한다.
 - 「일반 금융 모듈」 의 「운영 `server.ts`는 이 등록 함수를 호출하지 않는다 …」 단락을 지금 동작(운영 서버는 생성과 취소만 등록, `modify_order` 는 테스트 entry 만)으로 고친다.
-- 「계획은 `tasks/plan208-toss-conditional-financial/` 이 갖는다」 줄은 조건주문 계획을 가리키는 문장으로 남긴다.
+- 「계획은 `tasks/plan208-toss-conditional-financial/` 이 갖는다」 줄은 지운다. 문서는 계획서를 가리키지 않는다(루트 `AGENTS.md` 「tasks 는 구현 문서만 담는다」). 근거가 필요하면 ADR-20261013 / financial-order-opening 을 가리킨다.
+- 「매매 개방 조건」 아래에 카드의 계좌 순번은 사용자에게 익숙한 값이 아니어서, 허용 목록에 그 순번을 적은 운영자와 연결 화면의 계좌 선택지로 대조한다는 한계를 한 줄로 적는다.
 
 `docs/features/connector-policy.md`
 
+- 「도구 호출 판정」 절(`ConnectorPolicyService` 의 Javadoc 이 판정 순서의 소유자로 가리키는 절)에, 커넥터의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비로 넘기고, 같은 dedupe key 의 금융 줄이면 이르게 돌려주지 않으며, 살펴보기 트리 안이면 넘기지 않는다는 분기를 더한다. 절 이름이 다르면 `grep -n '판정' docs/features/connector-policy.md` 로 그 절을 찾는다.
+- 「승인 줄과 경로」 절에, 공개 승인 API 가 위험도 `FINANCIAL` 인 줄을 금융 승인으로 보내고 주인 확인 뒤 허락 입력을 거절한다는 분기를 더한다.
 - 「커넥터별 준비, 승인, 실행, 확인」 표의 토스 열: 「지금 운영」 을 열림(관문의 운영 값이 채워졌을 때)으로, 「승인하는 사람」 칸의 「카드의 summary 와 계좌 표시는 아직 없다」 를 계좌 순번과 요약을 보이고 열지 못하면 승인하지 못한다로 고친다.
 - Go/No-Go 의 토스 두 항목을 체크한다.
 - 「금융 실행 내용의 저장과 검증」 첫 단락의 「현재 `FINANCIAL`과 `DESTRUCTIVE` 호출은 계속 `RISK_NOT_OPEN`으로 거절하며 … 실제 주문 실행은 아직 구현하지 않았다」 를, 실행 도구 직접 호출은 계속 거절하고 준비 도구 호출만 금융 준비로 넘긴다로 고친다.
@@ -93,6 +98,8 @@
 `hermes/connectors/README.md`
 
 - 「`DESTRUCTIVE` 와 `FINANCIAL` 은 선언하지 않는다」 를 「`DESTRUCTIVE` 는 선언하지 않는다. `FINANCIAL` 은 `execution_guard` 의 `operations` 에 든 도구만 선언한다」 로 고치고 근거로 ADR-20261013 / financial-order-opening 을 가리킨다. 검사 표의 「`DESTRUCTIVE` 와 `FINANCIAL` 선언이 없다」 줄도 같이 고친다.
+
+`hermes/docs/code-architecture.md` 의 커넥터 표에서 `tossinvest` 줄의 「주문하지 않는다」 를 「승인받은 일반 주문을 넣거나 취소한다. 정정과 조건주문은 하지 않는다」 로 고친다.
 
 `hermes/docs/hermes-contract.md` 의 「이 소비자는 금융 도구의 exclude를 풀지 않는다. … 금융 호출이 계속 차단된다」 단락을, exclude 는 그대로 두고 모델은 준비 도구만 부르며 실행은 승인 뒤 claim 으로만 한다로 고친다.
 
@@ -121,3 +128,4 @@ node --test 'test/unit/**/*.test.ts'
 | `docs/features/connector-policy.md` | 수정 |
 | `hermes/connectors/README.md` | 수정 |
 | `hermes/docs/hermes-contract.md` | 수정 |
+| `hermes/docs/code-architecture.md` | 수정 |

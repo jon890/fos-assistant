@@ -31,6 +31,8 @@
 - USD 금액 주문은 환율로 바꾸지 않는다. `ConnectorFinancialGate.amount` 가 이미 통화별 상한(`max-order-amount-usd`, `max-daily-amount-usd`)과 견주고, 가격이 없는 수량 주문을 닫는다. 그 동작을 바꾸지 말고 테스트로 보인다.
 - 거절은 어느 검사에 걸렸는지 모델 답에 밝히지 않는다. 운영자는 기동 로그의 `financial gate:` 한 줄로 가린다.
 - `ConnectorFinancialProducer.request` 와 `ConnectorFinancialApproval.approve` 는 트랜잭션 안에서 부르면 거절한다(`require(!isActualTransactionActive())`). 새 호출부도 트랜잭션 밖에서 부른다.
+- 살펴보기(먼저 살펴보기, 예약 작업) 트리 안의 준비 도구 호출은 쓰기를 허용한 살펴보기여도 금융 준비로 넘기지 않는다. 사람이 보지 않는 실행이 외부 글에 속아 주문 승인 요청을 쌓지 않게 한다.
+- 새 테스트 클래스는 `FinancialConnectorProducerTest` 를 상속하지 않는다. 상속하면 부모의 `@Test` 가 한 번 더 돌아, plugin 프로세스를 띄우는 묶음이 세 번 돈다. 공용 준비를 추상 기반 클래스로 옮긴다(작업 항목 1).
 
 ## Blocked 조건
 
@@ -40,8 +42,9 @@
 
 ### 1. 닫힌 관문 회귀를 먼저 둔다
 
-새 테스트 클래스 `backend/src/test/java/com/bifos/assistant/connector/application/FinancialOrderOpeningTest.java` 를 만든다.
-`FinancialConnectorProducerTest` 를 상속해 실제 plugin 과 loopback 토스 대역, claim HTTP 를 그대로 쓴다.
+`FinancialConnectorProducerTest` 의 필드, `@BeforeEach`, `@AfterEach`, 보조 메서드(실제 plugin 과 loopback 토스 대역, claim HTTP 를 띄우는 준비)를 새 추상 클래스 `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConnectorTestBase.java` 로 옮긴다. 클래스 애노테이션(`@BackendIntegrationTest`, `@FinancialExecutionOpen`)도 기반 클래스에 둔다.
+`FinancialConnectorProducerTest` 는 그 기반을 상속하고 자기 `@Test` 만 남긴다. `FinancialConnectorProducerRoundTripTest` 는 지금처럼 `FinancialConnectorProducerTest` 를 상속한다.
+새 테스트 클래스 `backend/src/test/java/com/bifos/assistant/connector/application/FinancialOrderOpeningTest.java` 는 `FinancialConnectorTestBase` 를 상속한다.
 항목 2~5 를 구현하기 전에 아래 회귀를 먼저 쓰고, 지금 main 에서도 금융 전송 0회인지 확인한다.
 
 공개 진입점은 `ConnectorPolicyService.decide`(준비 도구 호출)와 `ConnectorActionService.approve`(승인)다. 아래 각 조건에서 둘 다 금융 POST 0회, claim 0회여야 한다.
@@ -66,11 +69,11 @@
 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialGate.java`
 
 - `requireAccounts(Collection<String>)` 를 `requireAccounts(Long userId, Collection<String> scopeValues)` 로, `requireScope(String)` 을 `requireScope(Long userId, String scopeJson)` 으로 바꾼다.
-- `AppUserRepository` 를 주입해 `findById(userId)` 의 메일을 읽고, scope 의 모든 값에 대해 `ownerOf(value)` 가 그 메일과 정확히 같아야 지난다. 사용자가 없으면 닫는다.
+- `AppUserRepository` 를 주입해 `findById(userId)` 의 메일을 읽고, scope 의 모든 값에 대해 `ownerOf(value)` 가 그 메일과 같아야 지난다. 비교는 둘 다 `toLowerCase(Locale.ROOT)` 로 바꾼 뒤 한다. 사용자가 없으면 닫는다.
 - 호출부 셋을 고친다. `ConnectorFinancialProducer` 의 `gate.requireAccounts(scope.values())` 는 `before.user()`, `ConnectorFinancialApproval` 은 `user.id()`, `execution/ConnectorExecutionClaims` 는 `payload.userId()` 를 넘긴다.
 - 기동 로그 `financial gate:` 의 형식은 그대로 둔다. `allowedAccounts` 수는 항목 수다.
 
-`backend/src/main/resources/application.yml` 의 `allowed-accounts` 줄 위에 형식 주석 한 줄을 둔다. 실제 값은 적지 않는다.
+`backend/src/main/resources/application.yml` 의 `allowed-accounts` 줄 위에 형식 주석을 둔다. `<계좌 순번>:<사용자 메일>` 을 쉼표로 잇고, 메일은 대소문자를 가리지 않으며, 한 계좌는 한 번만 적고, 옛 형식(계좌 순번만)이면 기동이 멈춘다는 것이다. 실제 값은 적지 않는다.
 
 `backend/src/test/java/com/bifos/assistant/testsupport/FinancialExecutionOpen.java` 의 `allowed-accounts` 기본값은 지운다.
 금융 테스트는 주인 사용자를 만든 뒤 `OverridableLiveProperties.during` 으로 `7:<그 메일>` 같은 항목을 넣는다.
@@ -81,13 +84,15 @@
 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` 의 `decide`
 
 - 생성자에 `ConnectorFinancialProducer` 와 `ConnectorExecutionGuard` 를 더한다.
-- 처음의 `actions.findByDedupeKey(dedupeKey)` 가 줄을 찾았고 그 줄의 `risk()` 가 `FINANCIAL` 이면 `replayed` 대신 아래 금융 경로로 보낸다. producer 가 같은 dedupe key 의 줄을 찾아 같은 답을 낸다.
-- 바인딩과 manifest 를 고르고 `confirmedTool` 을 정한 뒤, `manifest.executionGuard()` 가 있고 `confirmedTool` 이 `guard.read(manifest).prepareTool()` 과 같으면 금융 경로로 보낸다. `guard.read` 가 던지면 기록 없이 막는다.
+- 처음의 `actions.findByDedupeKey(dedupeKey)` 가 찾은 줄의 `risk()` 가 `FINANCIAL` 이면 `replayed` 로 이르게 돌려주지 않고 아래 바인딩 해석을 계속한다. 이어지는 준비 도구 판정이 producer 로 넘기고, producer 의 dedupe 조회가 같은 승인 번호를 돌려준다. 바인딩 해석 뒤에도 준비 도구 호출이 아니면 기록 없이 막는다.
+- 바인딩과 manifest 를 고르고 `confirmedTool` 을 정한 뒤, `manifest.executionGuard()` 가 객체이고 그 `prepare_tool` 원문 문자열이 `confirmedTool` 과 같으면 금융 경로로 보낸다. 같지 않으면 지금 판정을 그대로 한다.
+  금융 경로 안에서 `guard.read(manifest)` 가 던지면 기록 없이 막는다. 준비 도구 호출만 막고 그 커넥터의 다른 도구는 막지 않는다.
+- `checkBoundary(origin)` 이 `NOT_CHECK` 가 아니면 금융 경로는 producer 를 부르지 않고 기록 없이 막는다.
 - 금융 경로는 private 메서드 하나로 둔다.
   - `argsJson` 을 중복 키를 거절하는 `JsonMapper`(`StreamReadFeature.STRICT_DUPLICATE_DETECTION`)로 읽는다. 최상위가 정확히 `v`, `tool`, `args` 세 키의 객체이고 `v` 는 정수 1, `tool` 은 문자열, `args` 는 객체여야 한다.
   - `tool` 이 `contract.operations()` 에 있고 그 값이 `CREATE` 나 `CANCEL` 이며 `contract.kind(tool)` 이 `ORDER` 여야 한다.
   - 맞으면 `producer.request(profileName, rootSessionId, sessionId, toolCallId, HermesToolName.of(binding.mcpServer(), tool), tool, JSON.writeValueAsString(args))` 의 답을 그대로 돌려준다.
-  - 맞지 않거나 producer 가 `RuntimeException` 을 던지면 `new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null)` 을 돌려준다. 문구는 「금융 요청을 준비하지 못해 실행하지 않았다. 다시 부르지 않는다.」 이다. 로그에는 예외의 클래스 이름만 남긴다.
+  - 맞지 않거나 producer 가 `RuntimeException` 을 던지면 `new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null)` 을 돌려준다. 문구는 「금융 요청을 준비하지 못해 실행하지 않았다. 같은 주문의 승인 요청이 이미 있을 수 있다. 다시 부르지 말고 사용자에게 승인 카드와 토스증권 앱을 확인해 달라고 안내한다.」 이다. 같은 의도 충돌로 거절된 다른 `tool_call_id` 의 호출도 이 답을 받는다. 로그에는 예외의 클래스 이름만 남긴다.
 - 금융 경로는 `ToolPolicyDecision.decide` 를 부르지 않고 일반 승인 줄을 만들지 않는다. 실행 도구 이름으로 들어온 호출은 지금처럼 `RISK_NOT_OPEN` 이다.
 
 ### 4. 공개 승인 API 의 금융 줄을 금융 승인으로 보낸다
@@ -95,7 +100,7 @@
 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` 의 `approve(CurrentUser, UUID, GrantPeriod, boolean)`
 
 - 생성자에 `ConnectorFinancialApproval` 을 더한다.
-- `actions.findByPublicId(actionId)` 의 줄이 있고 `risk()` 가 `FINANCIAL` 이면, `grant != null` 이거나 `conversationGrant` 가 참일 때 `ApiException(ErrorCode.VALIDATION_FAILED, "financial actions take no grant")` 를 던진다. 아니면 `financialApproval.approve(user, actionId)` 를 돌려준다. 주인 확인은 금융 승인이 한다.
+- `actions.findByPublicId(actionId)` 의 줄이 있고 `risk()` 가 `FINANCIAL` 이면 금융 분기다. 먼저 줄의 `userId()` 가 `user.id()` 와 다르면 `ConnectorActionDetails.notFound()` 를 던진다. 남의 줄에 입력 오류를 내면 그 줄이 있다는 단서가 된다. 그다음 `grant != null` 이거나 `conversationGrant` 가 참이면 `ApiException(ErrorCode.VALIDATION_FAILED, "financial actions take no grant")` 를 던지고, 아니면 `financialApproval.approve(user, actionId)` 를 돌려준다.
 - 이 메서드는 트랜잭션 없이 부른다. 클래스나 메서드에 `@Transactional` 을 더하지 않는다.
 - 금융 PENDING 줄의 거절(`reject`)이 실행하지 않고 `REJECTED` 로 끝나는지 테스트로 확인한다. 다르면 같은 분기를 `reject` 에도 둔다.
 
@@ -139,14 +144,16 @@ public record FinancialActionSummary(
 - 같은 `tool_call_id` 로 다시 부르면 같은 승인 번호이고 준비 HTTP 가 늘지 않는다
 - `tool` 이 `modify_order` 인 호출, `v` 가 2 인 호출, 중복 키나 추가 키가 있는 호출은 줄 없이 막힌다
 - 실행 도구 이름으로 직접 부른 호출은 `RISK_NOT_OPEN` 이다
-- 읽기 경계의 살펴보기 실행에서 준비 도구를 부르면 줄 없이 막힌다
+- 읽기 경계의 살펴보기와 쓰기를 허용한 살펴보기 실행에서 준비 도구를 부르면 둘 다 줄 없이 막히고 준비 HTTP 가 0회다
 - 공개 승인(`ConnectorActionService.approve`)이 금융 POST 를 한 번 보내고 줄이 `SUCCEEDED` 다. 같은 줄을 다시 승인하면 `CONNECTOR_ACTION_NOT_PENDING` 이고 금융 POST 가 늘지 않는다. claim 재생도 0회다
 - 승인에 `grant` 나 `conversationGrant` 를 주면 입력 오류이고 실행하지 않는다
 - 금융 PENDING 줄을 거절하면 실행 없이 `REJECTED` 다
 - 허용 목록 항목의 메일이 다른 사용자면 준비부터 거절된다. 같은 계좌를 두 항목에 적으면 `ConnectorFinancialProperties` 생성이 실패한다
-- USD 금액 주문(`orderAmount` "25", USD 한 건 상한 30, 원화 상한 0)은 지난다. "31" 은 거절된다. 같은 날 "20" 두 건은 하루 USD 상한 30 에서 둘째가 거절된다
+- USD 금액 주문(`orderAmount` "25", USD 한 건 상한 30, 원화 상한 0)은 지난다. "31" 은 거절된다
+- 하루 합계는 PENDING 을 세지 않는다(`ConnectorFinancialGate` 의 `SPENT`). 대역 토스(`test/e2e/financial/trading_http.ts`)는 종목 `ABC`(NASDAQ, USD) 하나만 돌려주므로 종목은 `ABC` 로 두고 금액을 바꾼다. request_key 가 `orderAmount` 를 포함하므로 금액이 다르면 같은 의도 충돌이 아니다.
+  하루 USD 상한 30 에서 "20" 금액 주문을 준비하고 승인해 `SUCCEEDED` 로 만든다. 이어 "11" 을 준비하면 거절되고(합계 31) 줄이 생기지 않는다. 그다음 "10" 을 준비하면 PENDING 줄이 생긴다(합계 30). 통과하는 대조군이 있어야 거절의 까닭이 상한임이 드러난다
 - 가격 없는 수량 주문(미국 `MARKET` 매도 `quantity` "0.1")은 거절된다
-- `ConnectorFinancialSummaries` 가 scope 의 계좌 순번을 싣는다. summary 의 `account` 가 같고 scope 계좌가 다른 두 줄은 서로 다른 `accountSeq` 를 낸다
+- `ConnectorFinancialSummaries` 가 scope 의 계좌 순번을 싣는다. summary 의 `account` 가 같고 scope 계좌가 다른 두 줄은 서로 다른 `accountSeq` 를 낸다. 대역 plugin 은 계좌 하나로 고정돼 있으므로 이 두 줄은 `ConnectorConditionalSnapshotTest` 처럼 `ConnectorExecutionSnapshot.capture` 와 저장소로 직접 만든다
 - 암호문을 망가뜨린 줄은 요약이 `available=false` 이고, 그 줄을 승인해도 금융 POST 가 0회다
 
 기존 테스트의 기대를 고친다.
@@ -182,6 +189,7 @@ cd backend && git fetch origin && ./gradlew spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectorActionController.java` | 수정 |
 | `backend/src/main/resources/application.yml` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/testsupport/FinancialExecutionOpen.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConnectorTestBase.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/application/FinancialOrderOpeningTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConnectorProducerTest.java` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConnectorProducerRoundTripTest.java` | 수정 |
