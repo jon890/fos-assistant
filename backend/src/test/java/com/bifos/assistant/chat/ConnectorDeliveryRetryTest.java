@@ -38,9 +38,11 @@ import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.CallResult;
+import com.bifos.assistant.hermes.dto.ConnectorAppearance;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownErrors;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -61,6 +63,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,7 +106,16 @@ class ConnectorDeliveryRetryTest {
         2,
         List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
-            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
+            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)),
+        List.of(),
+        ConnectorAppearance.NONE,
+        false,
+        false,
+        null,
+        null,
+        null,
+        null,
+        new ConnectorUnknownErrors(Map.of("CAREER_OUTCOME_UNKNOWN", "attemptId", "PLAIN_OUTCOME_UNKNOWN", "")));
 
     /** {@code ConnectorActionResultSource} 의 입력 글이다. 상수는 package-private 이라 글로 견준다. */
     private static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";

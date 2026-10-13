@@ -426,6 +426,7 @@ Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [커넥터 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
 - Control Plane은 웹에 `readmeUrl`, `linkKind`를 전달한다. 옛 응답의 README 주소는 null이고, `link_kind`가 없거나 `project`가 아니면 `service`로 읽는다. 목록 카드와 상세 머리는 `link`를 「공식 사이트」 또는 「프로젝트 GitHub」로, `readmeUrl`을 「커넥터 README」로 표시하고 각각 새 탭으로 연다
 - 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 `attachments` 와 같이 카탈로그 읽기를 실패로 다룬다
+- 카탈로그의 `unknown_errors` 는 `outcome_unknown` 코드마다 선언한 `retry_key` 이름이나 null 이다. 없거나 모양이 틀리면 어느 코드도 받지 않는 것으로 읽고 커넥터는 카탈로그에 남긴다([ADR-20261013 / unknown-retry-key](../adr/ADR-20261013-unknown-retry-key.md))
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `enabled: false` 를 받고 그 기록이 참조하던 env 를 지운다. 소유 기록도 없으면 끌 것이 없어 `changed: false` 로 성공한다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
 - `GET /api/connectors` 는 설치하지 않은 커넥터를 `isolated` 로 답하므로 `mode` 는 설치한 항목의 값만 읽는다. 목록에 없는 커넥터는 설치 안 됨으로 읽는다
 - 커넥터 표식만 있는 profile 의 떼기는 소유 기록에 그 항목이 없어도 `changed: false` 로 답한다. 다시 보낸 떼기가 401 로 실패하면 Control Plane 의 바인딩 행이 지워지지 않기 때문이다

@@ -145,7 +145,11 @@ class ConnectorActionApproval {
                 approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.executableArgs().orElseThrow());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
-            unknown = ex.detail().orElse(null);
+            // 형식만이 아니라 그 커넥터 manifest 의 outcome_unknown 선언과도 대조한다. 카탈로그를 읽지 못하면 싣지 않는다.
+            unknown = ex.detail()
+                .flatMap(received -> details.readManifest(waiting.connectorId())
+                    .flatMap(manifest -> manifest.unknownErrors().admit(received)))
+                .orElse(null);
         } catch (RuntimeException ex) {
             // 실행됐는지 알 수 없는 것으로 둔다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다.
             log.warn(

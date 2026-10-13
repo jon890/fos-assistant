@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorFieldOptions;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorSnapshotDeclaration;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownErrors;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
@@ -49,7 +50,8 @@ final class ConnectorCatalogDecoder {
             loginUrl(item),
             item.get("execution_guard"),
             text(item, "execution_guard_manifest_sha256"),
-            ConnectorSnapshotDeclaration.read(item.get("snapshot"), readable ? ConnectorCatalogTools.read(tools) : List.of()));
+            ConnectorSnapshotDeclaration.read(item.get("snapshot"), readable ? ConnectorCatalogTools.read(tools) : List.of()),
+            ConnectorUnknownErrors.read(item.get("unknown_errors")));
     }
 
 

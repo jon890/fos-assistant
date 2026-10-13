@@ -61,6 +61,7 @@ import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
 import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownErrors;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -139,6 +140,8 @@ class ConnectorActionServiceTest {
     private static final String WRITE = "write_note";
     private static final String MAIL = "mail_note";
     private static final String ARGS = "{\"text\":\"안녕\",  \"count\":2}";
+    private static final String UNKNOWN_CODE = "CAREER_OUTCOME_UNKNOWN";
+    private static final String ATTEMPT_ID = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f";
     private static final long CONVERSATION = 7L;
 
     /** Gmail 필터 id 처럼 32자 이상의 영숫자 식별자다. 선언하지 않은 칸에서는 가려진다. */
@@ -722,9 +725,9 @@ class ConnectorActionServiceTest {
     @Test
     @DisplayName("결과를 모르는 실행이 선언한 오류 코드와 재시도 식별자를 주면 UNKNOWN 줄에 그것만 저장하고 다시 실행하지 않는다")
     void unknownExecutionKeepsDeclaredCodeAndRetryIdentifier() {
+        catalogBecomes(declaringUnknown(DECLARING, UNKNOWN_CODE, "attemptId"));
         UUID actionId = ask(WRITE, ARGS).actionId();
-        ConnectorUnknownDetail detail = new ConnectorUnknownDetail(
-            "CAREER_OUTCOME_UNKNOWN", "attemptId", "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f");
+        ConnectorUnknownDetail detail = new ConnectorUnknownDetail(UNKNOWN_CODE, "attemptId", ATTEMPT_ID);
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
             .thenThrow(new ConnectorExecutionUnknown(detail));
 
@@ -735,6 +738,25 @@ class ConnectorActionServiceTest {
         assertThat(approved.errorCode()).isNull();
         assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("manifest 가 결과 불명으로 선언하지 않은 코드는 버리고, 선언과 다른 식별자 칸은 식별자만 버린다")
+    void unknownDetailIsAdmittedOnlyAsDeclaredInManifest() {
+        catalogBecomes(declaringUnknown(DECLARING, UNKNOWN_CODE, "attemptId"));
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new ConnectorExecutionUnknown(new ConnectorUnknownDetail("OTHER_UNKNOWN", "attemptId", ATTEMPT_ID)))
+            .thenThrow(new ConnectorExecutionUnknown(new ConnectorUnknownDetail(UNKNOWN_CODE, "requestId", ATTEMPT_ID)));
+
+        ConnectorActionView undeclared = service.approve(me, ask(WRITE, ARGS).actionId(), null);
+        ConnectorActionView otherKey = service.approve(me, ask(WRITE, "{\"text\":\"다른 글\"}").actionId(), null);
+
+        assertThat(undeclared.status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(undeclared.resultText()).isNull();
+        assertThat(otherKey.status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(ConnectorUnknownDetail.fromStored(otherKey.resultText()))
+            .contains(new ConnectorUnknownDetail(UNKNOWN_CODE, null, null));
     }
 
 
@@ -1929,6 +1951,31 @@ class ConnectorActionServiceTest {
 
     private static ConnectorManifest manifest(List<ConnectorTool> tools) {
         return new ConnectorManifest(DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", List.of(), false, 2, tools);
+    }
+
+
+    /** {@code manifest} 에 결과를 모르는 코드 하나와 그 재시도 식별자 칸 선언을 더한다(ADR-20261013 unknown-retry-key). */
+    private static ConnectorManifest declaringUnknown(ConnectorManifest manifest, String code, String retryKey) {
+        return new ConnectorManifest(
+            manifest.id(),
+            manifest.title(),
+            manifest.description(),
+            manifest.fields(),
+            manifest.verifyTool(),
+            manifest.mcpServer(),
+            manifest.toolsets(),
+            manifest.attachments(),
+            manifest.schema(),
+            manifest.tools(),
+            manifest.skills(),
+            manifest.appearance(),
+            manifest.singleBinding(),
+            manifest.ownerBrowser(),
+            manifest.ownerBrowserLoginUrl(),
+            manifest.executionGuard(),
+            manifest.executionGuardManifestSha256(),
+            manifest.snapshot(),
+            new ConnectorUnknownErrors(Map.of(code, retryKey)));
     }
 
 
