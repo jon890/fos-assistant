@@ -395,7 +395,7 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 | `unavailable` | `CONNECTOR_UNAVAILABLE` | 503 |
 | `outcome_unknown` | `CONNECTOR_UNAVAILABLE` | 503 |
 
-`outcome_unknown` 은 승인한 호출의 실행 경로에서만 다르게 읽는다. 대시보드가 `{ok: false}` 대신 504 로 답하고 Control Plane 이 그 줄을 `UNKNOWN` 으로 둔다. 선택지와 확인 도구의 호출에서는 `unavailable` 과 같다.
+`outcome_unknown` 은 승인한 호출의 실행 경로에서만 다르게 읽는다. 대시보드가 `{ok: false}` 대신 504 로 답하고 Control Plane 이 그 줄을 `UNKNOWN` 으로 둔다. 504 본문에는 그 코드와, 아래 「오류 복구 계약」 의 `retry_key` 를 선언했으면 그 값 하나가 실린다. 선택지와 확인 도구의 호출에서는 `unavailable` 과 같다.
 
 ### 오류 복구 계약
 
@@ -403,11 +403,13 @@ plugin 디렉터리 root 에 둔다. 소유는 그 plugin 의 저장소다. 같�
 
 | 칸 | 뜻 |
 | --- | --- |
-| `category` | 필수. 공통 어휘 하나. `outcome_unknown` 은 객체로 쓸 수 없다 |
+| `category` | 필수. 공통 어휘 하나. `outcome_unknown` 이면 아래 `retry_key` 만 더할 수 있다 |
 | `recovery` | 선택. `recheck`(대상이 바뀌었다. 지금 값을 알리고 다시 조회할지 묻는다), `reconnect`(연결의 권한이나 값이 모자라다), `fix_input`(인자를 고쳐 새로 승인을 받는다), `retry_later`(서비스가 응답하지 않았다) 가운데 하나 |
 | `details` | 선택. 도구 오류 객체의 맨 위 칸 가운데 옮길 이름. 넷까지, `^[a-z][a-z0-9_]{0,31}$`, 겹치지 않는다 |
+| `retry_key` | `outcome_unknown` 에서만 쓰고 그때는 필수다. 결과를 모를 때 다시 보내며 같은 값을 넣는 칸의 이름이다. `^[A-Za-z][A-Za-z0-9_]{0,31}$`. 도구 오류 객체의 칸을 먼저 보고 없으면 결과 맨 위의 칸을 본다([ADR-20261013 / unknown-retry-key](../../docs/adr/ADR-20261013-unknown-retry-key.md)) |
 
 - 세부 값은 절댓값 10억 이하의 정수와 boolean 만 옮긴다. 글, 실수, 배열, 객체, null 은 그 칸만 버린다. 외부 서비스의 오류 원문은 이 길로 가지 않는다
+- `retry_key` 의 값은 `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$` 인 글만 옮긴다. UUID 를 쓴다. 형식이 틀리면 식별자만 버리고 코드는 남긴다. Control Plane 은 다시 보내지 않는다. 같은 식별자로 다시 받은 요청을 한 번만 기록하는 것은 커넥터가 지킨다
 - 복구 어휘의 안내 글은 Control Plane 이 정한다. 커넥터는 글을 쓰지 않는다
 - 글로 선언한 코드도 승인한 실행의 실패 답에 코드는 실린다. 복구 어휘와 세부는 없다
 - 선택지와 확인 도구의 `call` 은 공통 어휘만 준다
