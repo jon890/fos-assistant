@@ -380,6 +380,63 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 대화 허락 목록(`GET /api/v1/chat/conversations/{id}/connector-conversation-grants`)은 번호, 제목, 끝나는 시각과, 대화의 에이전트와 다른 에이전트에 준 허락이면 그 에이전트 이름(`agentName`)만 낸다. 화면은 줄마다 끝나는 시각을 보이고 다른 에이전트의 허락이면 그 이름을 함께 보인다. 지금 선언이 대화 허락을 닫은 도구의 줄은 효력이 없어 내지 않는다
 - 승인할 때와 떼거나 해제할 때 모두 사용자 행을 먼저 잠그므로, 뗀 뒤에 승인이 허락을 남기지 못한다. 그 승인은 `not_executable` 로 끝난다
 
+## 커넥터별 준비, 승인, 실행, 확인
+
+외부 상태를 바꾸는 세 경로가 준비부터 확인까지 무엇으로 중복과 결과 불명을 다루는지 한 표에 둔다.
+네이버 블로그 실사용과 토스 매매 개방의 Go/No-Go 는 이 표와 아래 체크리스트로 판단한다.
+
+**실행 요청이 한 번인 것과 외부 변경이 정확히 한 번인 것은 다르다.**
+세 경로 모두 앞의 것만 보장한다. 결과를 모르면 `UNKNOWN` 으로 남기고 다시 보내지 않으며, 사용자가 그 서비스에서 확인한다.
+칸마다 세부 계약은 가리키는 절이 갖는다.
+
+| 단계 | 네이버 블로그 원고 임시저장 | 토스 주문 | Gmail 보내기와 답장 |
+| --- | --- | --- | --- |
+| 지금 운영 | 열려 있다. connector.json 의 snapshot capability 는 `{compile:true,start:true,status:true}` 다. 배포 뒤 실제 계정 확인은 아래 체크리스트가 갖는다 | 닫혀 있다. FINANCIAL 판정은 `RISK_NOT_OPEN` 이고 커넥터 서버가 주문 도구를 등록하지 않는다. producer 와 금융 승인은 package-private 이다 | 열려 있다 |
+| 준비 | `content_draft_preview` 가 원고 revision, 사진 원본 바이트, 바인딩 버전을 고정한 불변 snapshot 을 만든다. 같은 revision 과 권한 지문이면 같은 snapshot 이다. [불변 preview snapshot](content-draft.md#불변-preview-snapshot) | 준비 도구(`READ`, `none`)를 `POST /api/connectors/{id}/prepare` 로 한 번 부르고 원래 인자, 실행 인자, summary, scope 를 암호화한 snapshot 으로 저장한다. [금융 실행 내용의 저장과 검증](#금융-실행-내용의-저장과-검증) | 따로 없다. 모델이 보낸 인자 원문(`args_json`)과 그 해시(`args_sha256`)를 승인 줄에 저장한다. [승인의 불변식](#승인의-불변식) |
+| 승인하는 사람 | 연결 주인이 그 대화의 원고 카드에서 canonical 미리보기와 포함·빠진 사진을 보고 승인한다 | 연결 주인이 그 대화의 승인 카드에서 승인한다. 카드의 summary 와 계좌 표시는 아직 없다 | 연결 주인이 그 대화의 승인 카드에서 받는 사람, 제목, 본문 원문을 보고 승인한다. 가려지는 글이 하나라도 있으면 승인하지 못한다(`hidden_args`) |
+| 상시 허락, 대화 허락 | 둘 다 받지 않는다. 승인 줄을 `always` 로 저장하고 「N건 모두 승인」 에도 넣지 않는다 | 둘 다 받지 않는다. `FINANCIAL` 은 `always` 다 | 둘 다 받지 않는다. `grant: false` 이고 `conversation_grant` 를 선언하지 않는다 |
+| `outbound` | 거짓. 계정 안의 임시저장이다 | 해당 없다. 돈이 움직이는 도구는 `FINANCIAL` 위험도로 따로 닫는다 | 참 |
+| 실행 | 승인이 jobId 를 예약하고 저장 ticket 을 발급해 worker 시작을 최대 한 번 보낸다. worker 는 authorize 의 `start`, 사진마다 `photo`, 저장 클릭 직전 `save` 허가를 받아야 진행한다. [승인과 jobId 예약](content-draft.md#승인과-jobid-예약) | 승인이 실행 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 커넥터는 주문을 보내기 직전에 claim 으로 ticket 을 한 번 소비한다 | 승인이 줄을 `EXECUTING` 으로 커밋한 뒤 대시보드 `execute` 로 저장한 인자를 한 번 보낸다. ticket 은 없다 |
+| 중복을 막는 키 | 승인 줄의 dedupe key(`v1-content-save`, 주인, snapshotId), job 의 snapshot 유일 색인, worker 상태 파일의 `O_EXCL`, Control Plane 의 `start_claimed_at`, `save_claimed_at` 단일 claim | 준비가 만든 `clientOrderId`, 같은 의도의 `request_key`(같은 키의 `PENDING`, `EXECUTING`, `UNKNOWN` 이 있으면 준비, 승인, claim 을 막는다), ticket 단일 소비 | 정책 판정의 `dedupe_key`(profile, 루트 session, session, `tool_call_id`)와 승인 줄의 행 잠금이다. Gmail 에 보내는 멱등 키는 없다 |
+| 결과 조회 | job GET 이 같은 jobId 만 private status 로 조회한다. 승인 뒤 15분이 지나면 `ContentDraftJobExpirer` 가 한 번 조회하고 닫는다. 사용자는 네이버 임시저장 목록에서 확인한다 | 실행 응답으로 끝난다. 사용자는 `list_orders`, `get_order` 와 토스증권 앱에서 확인한다 | 실행 응답으로 끝난다. 사용자는 Gmail 보낸편지함에서 확인한다 |
+| `UNKNOWN` 이 되는 때 | 시작 응답을 잃었다. save claim 이나 저장 클릭 뒤에 실패했다. 바인딩 버전이 바뀌었거나 15분 정리에 걸렸는데 start claim 이 있었다. [job 상태와 재접속](content-draft.md#job-상태와-재접속) | 응답을 잃었거나 결과가 불확실한데 claim 을 소비했다. 소비하지 않았음을 잠금 안에서 증명하면 `FAILED` 다 | `GMAIL_SEND_UNKNOWN`(보낸 뒤 시간 초과, 연결 끊김, 5xx), execute 시간 초과, 실행 중 서버 재시작(`ConnectorActionSweeper`), 오래 남은 `EXECUTING`(`ConnectorActionExpirer`) |
+| 다시 보내기 | 하지 않는다. 같은 snapshot 의 재승인, 재전송, outbox 가 없고 claim 과 ticket 을 다시 주지 않는다. 새 snapshot 의 재저장은 감수한다(아래 「남은 공백」) | 하지 않는다. ticket 재발급과 자동 재전송이 없고, 같은 의도의 `UNKNOWN` 이 새 준비를 막는다 | 하지 않는다. Control Plane 도 커넥터도 다시 부르지 않는다. 모델에게는 다시 실행하지 말고 사용자에게 확인을 부탁하라고 전한다. 같은 메일의 새 호출은 감수한다(아래 「남은 공백」) |
+| owner 코드 | [`ContentDraftSnapshots`](../../backend/src/main/java/com/bifos/assistant/chat/application/ContentDraftSnapshots.java), [`ContentDraftJobs`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftJobs.java), [`ContentDraftSaveApproval`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftSaveApproval.java), [`ContentDraftJobAuthorizer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftJobAuthorizer.java), [`ContentDraftJobExpirer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftJobExpirer.java), [`connector_snapshot_job.py`](../../hermes/plugins/dashboard-profile-api/connector_snapshot_job.py), [`content-snapshot-job.ts`](../../hermes/connectors/naver-blog/src/content-snapshot-job.ts) | [`ConnectorFinancialProducer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialProducer.java), [`ConnectorFinancialApproval`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialApproval.java), [`ConnectorFinancialConflicts`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialConflicts.java), [`ConnectorExecutionSnapshot`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorExecutionSnapshot.java), [`ConnectorExecutionClaims`](../../backend/src/main/java/com/bifos/assistant/connector/application/execution/ConnectorExecutionClaims.java), [`connector_prepare.py`](../../hermes/plugins/dashboard-profile-api/connector_prepare.py), [`trading-tools.ts`](../../hermes/connectors/tossinvest/src/trading-tools.ts) | [`ToolPolicyDecision`](../../backend/src/main/java/com/bifos/assistant/connector/domain/ToolPolicyDecision.java), [`ConnectorActionApproval`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionApproval.java), [`ConnectorActionLifecycle`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionLifecycle.java), [`ConnectorActionSweeper`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionSweeper.java), [`ConnectorActionExpirer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionExpirer.java), [`connector_run.py`](../../hermes/plugins/dashboard-profile-api/connector_run.py), [`mail-tools.ts`](../../hermes/connectors/gmail/src/mail-tools.ts) |
+
+이 표 밖의 쓰기는 Gmail 열과 같은 일반 승인 줄 경로를 탄다.
+네이버의 자유 형식 `save_draft`, `overwrite_draft`, `read_draft` 와 Gmail 의 초안, 라벨, 필터 도구가 그렇다.
+상시 허락과 대화 허락을 받는지는 도구마다 다르고 [네이버 블로그 커넥터](naver-blog-connector.md#도구와-정책) 와 [Gmail 커넥터](gmail-connector.md#도구와-정책) 가 갖는다.
+
+### Go/No-Go 체크리스트
+
+네이버 블로그 실사용은 아래가 모두 채워지면 Go 다.
+
+- [ ] snapshot capability 의 `start`, `status` 를 켠 connector.json 이 배포됐다. 저장소의 선언은 둘 다 참이다
+- [ ] 사용자가 실제 계정으로 지정 테스트 글을 저장하는 것과 쓸 사진 수를 명시적으로 승인했다
+- [ ] [배포 뒤 원격 확인](content-draft.md#배포-뒤-원격-확인) 표를 그 테스트 글로 돌았다. start 는 1회, 재접속과 재시작 뒤 추가 start 와 저장 클릭은 0회, claim 뒤의 불확실한 결과는 `UNKNOWN` 이다
+- [ ] [읽기 부작용 확인](naver-blog-connector.md#읽기-부작용-확인) 을 같은 자리에서 돌아 `read_draft` 를 `WRITE` 로 둘지 정했다
+- [x] `UNKNOWN` 뒤 새 snapshot 재저장을 감수할지 정했다. 감수(2026-10-13 사용자 결정), 막는 일은 #526 이 추적한다
+- [ ] 두 확인의 결과를 [ADR-20261009 / naver-blog-primitives](../../hermes/docs/adr/ADR-20261009-naver-blog-primitives.md) 와 [원고 문서](content-draft.md) 에 적었다
+
+토스 매매 개방은 아래가 모두 채워지고 소유자가 개방을 명시적으로 승인해야 Go 다.
+
+- [ ] [매매 개방 조건](tossinvest-connector.md#매매-개방-조건) 표의 모든 줄이 「있음」 이다. 승인 카드의 summary 와 계좌 표시, 공개 진입점 연결이 이 표에 든다
+- [ ] 첫 개방은 `create_order` 와 `cancel_order` 뿐이다. `modify_order` 와 조건주문 쓰기는 별도 개방이다
+
+Go 를 낸 뒤 개방 PR 을 배포하고 아래를 확인한다. 어긋나면 [되돌리기](tossinvest-connector.md#되돌리기) 로 닫는다.
+
+- [ ] [첫 실제 호출 절차](tossinvest-connector.md#첫-실제-호출-절차) 를 마쳤고 `UNKNOWN` 과 중복 전송이 없다
+
+### 남은 공백
+
+어느 경로도 아직 막지 않는 것이다. 감수하기로 정한 것은 그 결정을 적었고, 나머지는 Go/No-Go 를 낼 때 감수할지 함께 정한다.
+
+- **네이버: `UNKNOWN` 뒤 새 snapshot 으로 다시 저장할 수 있다.** 같은 snapshot 은 막지만, 원고를 고치거나 바인딩 버전이 바뀌면 새 snapshot 과 새 승인이 생긴다. 이전 job 의 `UNKNOWN` 은 그 승인을 막지 않아 같은 글이 두 번 임시저장될 수 있다. 감수(2026-10-13 사용자 결정), 추적은 #526
+- **네이버: `FAILED` 는 편집기 자동저장이 없었다는 증거가 아니다.** 명시적 저장 클릭이 없었다는 뜻이다
+- **Gmail: 같은 메일을 다시 보내는 새 호출을 막지 않는다.** `tool_call_id` 가 다르면 새 승인 줄이 생기고, 앞의 `UNKNOWN` 과 같은 인자인지 보지 않는다. 사람이 다시 승인하면 메일이 두 번 나갈 수 있다. 감수(2026-10-13 사용자 결정)
+- **토스: `request_key` 에 연결 번호가 들어간다.** 지금은 연결을 해제하고 다시 등록해도 연결 번호가 같아(`connector_connection` 의 사용자, 커넥터 유일 제약) 이전 `UNKNOWN` 에 막힌다. 연결 번호가 바뀌는 경로가 생기면 우회가 열리므로 개방 조건의 「연결 재등록 우회 차단」 이 키를 계좌 범위로 바꿔 미리 닫는다
+- **세 경로 모두 Control Plane 의 검사와 외부 변경을 한 트랜잭션으로 묶지 못한다.** 허가한 뒤의 철회는 이미 나간 클릭이나 전송을 되돌리지 않는다
+
 ## 금융 실행 내용의 저장과 검증
 
 금융 실행 원문과 승인 표시 값을 함께 검증하고 저장하는 모델이다.
@@ -639,7 +696,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 데이터 key가 꺼져 있으면 준비를 시작하지 않고, `content_key_id`가 없는 snapshot은 승인하지 않는다.
 공개 연결 전 보안 리뷰는 아래 남은 문제를 함께 정한다.
 
-- request_key에 연결 번호가 들어가므로 같은 계좌를 새 연결로 다시 붙이면 이전 UNKNOWN과 충돌하지 않는다.
+- request_key에 연결 번호가 들어간다. 지금은 다시 등록해도 연결 번호가 같아 이전 UNKNOWN에 막히지만, 연결 번호가 바뀌는 경로가 생기면 충돌하지 않게 된다.
 
 중단된 금융 실행과 오류 상세 없는 execute 실패는 claim 소비 여부로 끝낸다.
 사용자·승인 줄·실행 줄을 같은 순서로 잠그고 `consumed_at`이 비어 있으면 `FAILED`, 차 있으면 `UNKNOWN`이다.

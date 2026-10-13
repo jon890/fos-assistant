@@ -76,6 +76,7 @@ public class AutonomyPolicyService {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     /**
      * 평가의 후보마다 판정을 남기고, {@code EXECUTE} 가 있으면 시작한다.
      *
@@ -99,26 +100,29 @@ public class AutonomyPolicyService {
         return List.copyOf(rows);
     }
 
+
     public boolean readOnlyExecutionConsented(CurrentUser user) {
         return preferences
-                .findById(user.id())
-                .map(AutonomyPreference::readOnlyExecution)
-                .orElse(false);
+            .findById(user.id())
+            .map(AutonomyPreference::readOnlyExecution)
+            .orElse(false);
     }
+
 
     public boolean changeReadOnlyExecution(CurrentUser user, boolean consented) {
         Instant now = clock.instant();
         return Objects.requireNonNull(transactions.execute(status -> {
             AutonomyPreference row = preferences
-                    .findById(user.id())
-                    .map(existing -> {
-                        existing.change(consented, now);
-                        return existing;
-                    })
-                    .orElseGet(() -> AutonomyPreference.of(user.id(), consented, now));
+                .findById(user.id())
+                .map(existing -> {
+                    existing.change(consented, now);
+                    return existing;
+                })
+                .orElseGet(() -> AutonomyPreference.of(user.id(), consented, now));
             return preferences.save(row).readOnlyExecution();
         }));
     }
+
 
     private Decided record(CurrentUser user, Long evaluationId) {
         AutonomyProperties settings = properties.current();
@@ -127,79 +131,80 @@ public class AutonomyPolicyService {
             throw new ApiException(ErrorCode.VALUE_EVALUATION_STATE_CONFLICT, "value evaluation is still running");
         }
         ProactiveCheck source = checks.findByIdAndUserId(evaluation.checkId(), user.id())
-                .orElseThrow(
-                        () -> new ApiException(ErrorCode.VALUE_EVALUATION_NOT_FOUND, "value evaluation not found"));
+            .orElseThrow(
+                () -> new ApiException(ErrorCode.VALUE_EVALUATION_NOT_FOUND, "value evaluation not found"));
         Optional<Agent> agent = agents.findById(source.agentId());
         Facts facts = facts(user, source, agent);
         DecisionEvidence evidence = evaluation.evidence();
         Map<Long, CandidateJudgement> judgements = evidence.result().judgements().stream()
-                .collect(Collectors.toMap(
-                        CandidateJudgement::candidateId, Function.identity(), (first, ignored) -> first));
+            .collect(Collectors.toMap(
+                CandidateJudgement::candidateId, Function.identity(), (first, ignored) -> first));
         List<DecisionCandidate> ordered = ordered(evidence);
         List<AutonomyInputs> inputs = ordered.stream()
-                .map(candidate ->
-                        inputsOf(evaluation, candidate, judgements.get(candidate.candidateId()), facts, settings))
-                .toList();
-        List<AutonomyVerdict> verdicts =
-                AutonomyPolicy.decideAll(inputs, settings.maxEvaluationAge(), settings.maxEvidenceAge());
+            .map(candidate -> inputsOf(evaluation, candidate, judgements.get(candidate.candidateId()), facts, settings))
+            .toList();
+        List<AutonomyVerdict> verdicts = AutonomyPolicy.decideAll(inputs, settings.maxEvaluationAge(), settings.maxEvidenceAge());
         List<AutonomyDecision> rows = new ArrayList<>();
         for (int i = 0; i < ordered.size(); i++) {
             AutonomyVerdict verdict = verdicts.get(i);
             rows.add(AutonomyDecision.of(
-                    user.id(),
-                    evaluation.id(),
-                    ordered.get(i).candidateId(),
-                    source.id(),
-                    verdict.level(),
-                    verdict.reasons(),
-                    inputs.get(i),
-                    AutonomyPolicy.VERSION,
-                    facts.now()));
+                user.id(),
+                evaluation.id(),
+                ordered.get(i).candidateId(),
+                source.id(),
+                verdict.level(),
+                verdict.reasons(),
+                inputs.get(i),
+                AutonomyPolicy.VERSION,
+                facts.now()));
         }
         return new Decided(
-                decisions.saveAllAndFlush(rows), agent.map(Agent::code).orElse(null));
+            decisions.saveAllAndFlush(rows), agent.map(Agent::code).orElse(null));
     }
+
 
     /** 후보와 상관없이 판정 하나에 같은 값이다. 허락에 해당하는 값은 모두 여기서 Control Plane 의 기록으로 읽는다. */
     private Facts facts(CurrentUser user, ProactiveCheck source, Optional<Agent> agent) {
         return new Facts(
-                clock.instant(),
-                readOnlyExecutionConsented(user),
-                agent.map(Agent::proactiveCheckWritesAllowed).orElse(false),
-                source.trigger(),
-                agent.filter(each -> !each.isDeleted() && each.enabled() && each.isReadableBy(user.id()))
-                        .isPresent(),
-                decisions.existsByExecutionKey(AutonomyDecision.executionKey(source.id())));
+            clock.instant(),
+            readOnlyExecutionConsented(user),
+            agent.map(Agent::proactiveCheckWritesAllowed).orElse(false),
+            source.trigger(),
+            agent.filter(each -> !each.isDeleted() && each.enabled() && each.isReadableBy(user.id()))
+                .isPresent(),
+            decisions.existsByExecutionKey(AutonomyDecision.executionKey(source.id())));
     }
 
+
     private AutonomyInputs inputsOf(
-            ValueEvaluation evaluation,
-            DecisionCandidate candidate,
-            CandidateJudgement judgement,
-            Facts facts,
-            AutonomyProperties settings) {
+        ValueEvaluation evaluation,
+        DecisionCandidate candidate,
+        CandidateJudgement judgement,
+        Facts facts,
+        AutonomyProperties settings) {
         return new AutonomyInputs(
-                evaluation.outcome(),
-                evaluation.replayOfId() != null,
-                evaluation.createdAt(),
-                evaluation.evidence().state().asOf(),
-                facts.now(),
-                judgement != null,
-                current(evaluation.checkId(), candidate),
-                candidate.actionType(),
-                candidate.sideEffect(),
-                candidate.confidence(),
-                choices(judgement),
-                axisConfidences(judgement),
-                judgement == null ? null : judgement.confidence(),
-                candidate.evidenceCheckedAt(),
-                settings.executionEnabled(),
-                facts.consented(),
-                facts.writesAllowed(),
-                facts.sourceTrigger(),
-                facts.startable(),
-                facts.alreadyExecuted());
+            evaluation.outcome(),
+            evaluation.replayOfId() != null,
+            evaluation.createdAt(),
+            evaluation.evidence().state().asOf(),
+            facts.now(),
+            judgement != null,
+            current(evaluation.checkId(), candidate),
+            candidate.actionType(),
+            candidate.sideEffect(),
+            candidate.confidence(),
+            choices(judgement),
+            axisConfidences(judgement),
+            judgement == null ? null : judgement.confidence(),
+            candidate.evidenceCheckedAt(),
+            settings.executionEnabled(),
+            facts.consented(),
+            facts.writesAllowed(),
+            facts.sourceTrigger(),
+            facts.startable(),
+            facts.alreadyExecuted());
     }
+
 
     /**
      * 평가가 순서를 냈으면 그 순서로, 아니면 후보 식별자 순서로 둔다. 순서에 없는 후보는 뒤에 식별자 순서로 붙인다. 모델이 낸 순서는 어느 후보가
@@ -208,8 +213,8 @@ public class AutonomyPolicyService {
     private static List<DecisionCandidate> ordered(DecisionEvidence evidence) {
         Map<Long, DecisionCandidate> byId = new LinkedHashMap<>();
         evidence.state().candidates().stream()
-                .sorted(Comparator.comparing(DecisionCandidate::candidateId))
-                .forEach(candidate -> byId.putIfAbsent(candidate.candidateId(), candidate));
+            .sorted(Comparator.comparing(DecisionCandidate::candidateId))
+            .forEach(candidate -> byId.putIfAbsent(candidate.candidateId(), candidate));
         List<DecisionCandidate> ordered = new ArrayList<>();
         if (evidence.result().outcome() == DecisionOutcome.EVALUATED) {
             for (Long id : evidence.result().orderedCandidateIds()) {
@@ -223,21 +228,24 @@ public class AutonomyPolicyService {
         return ordered;
     }
 
+
     /** 지금의 후보 줄이 같은 살펴보기의 받아들인 줄이고, 판정에 쓰는 칸이 스냅샷과 같은가. */
     private boolean current(Long checkId, DecisionCandidate snapshot) {
         return problems.findById(snapshot.candidateId())
-                .filter(row -> checkId.equals(row.checkId()))
-                .filter(row -> row.status() == ProblemStatus.ACCEPTED)
-                .filter(row -> same(row, snapshot))
-                .isPresent();
+            .filter(row -> checkId.equals(row.checkId()))
+            .filter(row -> row.status() == ProblemStatus.ACCEPTED)
+            .filter(row -> same(row, snapshot))
+            .isPresent();
     }
+
 
     private static boolean same(ProactiveCheckProblem row, DecisionCandidate snapshot) {
         return Objects.equals(row.problemKey(), snapshot.problemKey())
-                && Objects.equals(row.actionType(), snapshot.actionType())
-                && Objects.equals(row.actionText(), snapshot.actionText())
-                && Objects.equals(row.sideEffect(), snapshot.sideEffect());
+            && Objects.equals(row.actionType(), snapshot.actionType())
+            && Objects.equals(row.actionText(), snapshot.actionText())
+            && Objects.equals(row.sideEffect(), snapshot.sideEffect());
     }
+
 
     private static Map<DecisionAxis, DecisionLevel> choices(CandidateJudgement judgement) {
         Map<DecisionAxis, DecisionLevel> choices = new EnumMap<>(DecisionAxis.class);
@@ -249,6 +257,7 @@ public class AutonomyPolicyService {
         return choices;
     }
 
+
     private static Map<DecisionAxis, DecisionConfidence> axisConfidences(CandidateJudgement judgement) {
         Map<DecisionAxis, DecisionConfidence> confidences = new EnumMap<>(DecisionAxis.class);
         if (judgement != null) {
@@ -259,14 +268,23 @@ public class AutonomyPolicyService {
         return confidences;
     }
 
+
     /**
-     * 커밋한 실행 키로 읽기 전용 살펴보기를 시작하고 결과를 적는다. 실패해도 다시 시작하지 않는다. 결과를 적지 못하면 줄은 {@code PENDING}
+     * 커밋한 실행 키로 읽기 전용 살펴보기를 시작하고 결과를 적는다. 시작 직전에 사용자 동의와 설치의 자동 실행 설정을 다시 읽어 하나라도 꺼져
+     * 있으면 시작하지 않는다. 실패해도 다시 시작하지 않는다. 결과를 적지 못하면 줄은 {@code PENDING}
      * 으로 남고 그것도 다시 시작하지 않는다.
      */
     private AutonomyDecision execute(CurrentUser user, String agentCode, AutonomyDecision row) {
         AtomicReference<Long> startedCheck = new AtomicReference<>();
         String error = null;
+        boolean withdrawn = false;
         try {
+            // 판정을 저장한 뒤 동의를 철회했거나 설치의 자동 실행을 껐으면 시작하지 않는다. 시작 직전의 기록이 기준이다.
+            if (!properties.current().executionEnabled() || !readOnlyExecutionConsented(user)) {
+                withdrawn = true;
+                throw new ApiException(
+                    ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "autonomous execution is no longer permitted");
+            }
             checkService.startAutonomous(user, agentCode, check -> startedCheck.set(check.id()));
         } catch (ApiException ex) {
             error = ex.code().name();
@@ -275,7 +293,8 @@ public class AutonomyPolicyService {
             error = ErrorCode.INTERNAL_ERROR.name();
         }
         String failure = error;
-        if (failure != null) {
+        // 사용자가 스스로 끈 결과는 실행 실패 신호가 아니므로 판단 피드백을 남기지 않는다.
+        if (failure != null && !withdrawn) {
             recordStartFailure(user, row, failure);
         }
         try {
@@ -294,35 +313,39 @@ public class AutonomyPolicyService {
         }
     }
 
+
     /** 시작하지 못한 판정의 판단 피드백 사건이다. 관측용이라 점검 대화를 읽지 못해도 판정 결과 저장을 막지 않는다. */
     private void recordStartFailure(CurrentUser user, AutonomyDecision row, String failure) {
         try {
             // 시작한 살펴보기의 결과는 그 살펴보기가 끝날 때 남는다. 여기서는 시작하지 못한 것만 남긴다.
             feedback.record(FeedbackEntry.of(
-                            user.id(),
-                            FeedbackSubjectType.AUTONOMY_DECISION,
-                            row.id(),
-                            FeedbackEventType.EXECUTION_FAILED,
-                            FeedbackActor.SYSTEM,
-                            clock.instant())
-                    .conversation(checks.findById(row.sourceCheckId())
-                            .map(ProactiveCheck::conversationId)
-                            .orElse(null))
-                    .sourceCheck(row.sourceCheckId())
-                    .autonomyDecision(row.id())
-                    .reason(failure));
+                user.id(),
+                FeedbackSubjectType.AUTONOMY_DECISION,
+                row.id(),
+                FeedbackEventType.EXECUTION_FAILED,
+                FeedbackActor.SYSTEM,
+                clock.instant())
+                .conversation(checks.findById(row.sourceCheckId())
+                    .map(ProactiveCheck::conversationId)
+                    .orElse(null))
+                .sourceCheck(row.sourceCheckId())
+                .autonomyDecision(row.id())
+                .reason(failure));
         } catch (RuntimeException ex) {
             log.warn("자동 실행 실패의 판단 피드백을 남기지 못했다 decisionId={}", row.id());
         }
     }
 
-    private record Decided(List<AutonomyDecision> rows, String agentCode) {}
+
+    private record Decided(List<AutonomyDecision> rows, String agentCode) {
+    }
 
     private record Facts(
-            Instant now,
-            boolean consented,
-            boolean writesAllowed,
-            CheckTrigger sourceTrigger,
-            boolean startable,
-            boolean alreadyExecuted) {}
+        Instant now,
+        boolean consented,
+        boolean writesAllowed,
+        CheckTrigger sourceTrigger,
+        boolean startable,
+        boolean alreadyExecuted) {
+    }
 }

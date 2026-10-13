@@ -1,7 +1,19 @@
 ## ADR-20261012 / bodyless-request-diagnostics: 관리 bootstrap이 요청 진단 writer를 본문 없는 writer로 교체한다
 
-- **status**: `accepted` (운영 연결은 2026-10-13에 보류, 아래 「운영 연결 보류」)
+- **status**: `accepted`, 운영 미연결 (2026-10-13)
 - Date: 2026-10-12
+
+### 운영 연결 보류 (2026-10-13)
+
+- **결정 날짜**: 2026-10-13. 사용자가 정했다.
+- **결정**: `hermes/runtime/` 의 writer 를 운영 gateway 에 연결하지 않는다. 운영의 preflight 와 두 오류 경로는 upstream 기본 writer 가 요청 전체를 `request_dump_*.json` 으로 남긴다.
+- **까닭**: 운영 gateway 는 프로세스 하나가 모든 profile 을 처리하고 턴마다 home 과 secret scope 를 바꾼다. profile 은 dashboard API 가 동적으로 만들고 cron 자식과 dashboard 도 같은 방식이다. 기동 때 profile 하나를 정하는 관리 bootstrap 은 이 구조와 맞지 않아, 그대로 연결하면 default 가 아닌 profile 의 턴이 실패한다. 맞추려면 턴 scope 를 profile 근거로 삼도록 설계를 바꿔야 하고, 그 비용 대신 위험을 감수하기로 했다.
+- **감수한 위험**: 오류가 난 요청의 원문(원고 본문, 첨부 사진, 금융 요청의 인자)이 운영 서버의 진단 파일에 남을 수 있다. 서버 자체가 침해되면 그 파일도 노출된다. v0.21.6 의 mcp stdio 검증 오류 로그에 원문 stdout 줄이 들어가는 것도 같은 위험으로 감수한다. `request_dump_*.json` 의 보존 기간과 정리 주기는 이 저장소가 정하지 않으며, 운영 저장소가 정한다.
+- **다시 검토할 조건**
+  - Hermes upstream 에 요청 진단 dump 를 끄거나 명시적으로 켜야만 남기는 공식 설정이 생길 때. 새 버전을 올릴 때마다 release note 와 `agent` 의 request dump 경로를 확인한다.
+  - 추적은 #518 에서 한다.
+- **조건이 생기면**: 그 설정을 운영 profile 에 적용하고, 이 ADR 의 상태를 갱신하고, `hermes/runtime/bodyless_*` 를 지울지 정한다.
+- 이 보류 상태에서 운영 보호가 설치됐다고 보고하지 않는다. 아래 설계와 계약 테스트는 addon 이 준비된 상태로 그대로 둔다.
 
 ### 맥락
 
@@ -72,13 +84,3 @@ SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 �
 이 writer가 새 진단을 가리는 것만으로 SDK·framework·session·trajectory 전체가 본문 없이 남는다고 판정하지 않는다.
 운영 배포와 실제 Hermes 왕복 전까지 운영 보호 완료로 보고하지 않는다.
 private prototype의 합성 검증은 별도 근거이며 공개 actual main 반영과 private 활성화 수락은 아직 남아 있다.
-
-### 운영 연결 보류 (2026-10-13)
-
-운영 gateway는 프로세스 하나가 모든 profile을 처리하고 턴마다 home과 secret scope를 바꾼다. profile은 dashboard API가 동적으로 만들고 cron 자식과 dashboard도 같은 방식이다.
-기동 때 profile 하나를 정하는 관리 bootstrap은 이 구조와 맞지 않아, 그대로 연결하면 default가 아닌 profile의 턴이 실패한다.
-맞추려면 턴 scope를 profile 근거로 삼도록 설계를 바꿔야 하는데, 사용자는 그 비용 대신 위험을 감수하기로 했다.
-
-- 감수하는 것: 요청이 실패하면 원고 본문, 첨부 사진, 금융 요청의 인자가 운영 서버의 진단 파일에 남을 수 있다. 서버가 침해되면 그 파일도 노출된다.
-- addon 코드(`hermes/runtime/bodyless_*`)와 계약 시험은 남긴다. upstream에 공식 disable 또는 opt-in이 생기면 그것을 적용하고 이 addon을 지울지 정한다.
-- 추적: [#518](https://github.com/jon890/fos-assistant/issues/518)
