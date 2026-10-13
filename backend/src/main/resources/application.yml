@@ -140,7 +140,8 @@ assistant:
       expire-cron: "0 * * * * *"
     # 금융 실행의 운영 관문. 기본값은 모두 닫힌 쪽이고, 켜거나 바꾸면 재기동해야 반영된다
     financial:
-      # 주문할 수 있는 계좌 식별자(쉼표로 구분). 비면 아무 계좌도 주문하지 못한다
+      # 주문할 수 있는 계좌와 그 계좌를 쓰는 사용자. <계좌 순번>:<사용자 메일> 을 쉼표로 잇는다. 비면 아무 계좌도 주문하지 못한다
+      # 메일은 대소문자를 가리지 않는다. 한 계좌는 한 번만 적는다. 옛 형식(계좌 순번만)이면 기동이 멈춘다
       allowed-accounts: ${ASSISTANT_FINANCIAL_ALLOWED_ACCOUNTS:}
       # 한 건 상한. 0 이면 그 통화나 수량 주문을 받지 않는다
       max-order-amount-krw: ${ASSISTANT_FINANCIAL_MAX_ORDER_AMOUNT_KRW:0}

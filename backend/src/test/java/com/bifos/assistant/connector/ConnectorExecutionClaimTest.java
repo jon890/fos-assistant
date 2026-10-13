@@ -175,7 +175,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
 
 
     @Test
-    @DisplayName("발급 뒤 설정에서 key 파일을 비우거나 계좌를 목록에서 빼면 ticket 을 소비하지 않는다")
+    @DisplayName("발급 뒤 설정에서 key 파일을 비우거나 계좌를 목록에서 빼거나 다른 사용자에게 주면 ticket 을 소비하지 않는다")
     void closedGateKeepsTicketUnconsumed() {
         Fixture f = fixture();
         String raw = tickets.issue(f.action());
@@ -185,7 +185,13 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
             open.maxDailyAmountUsd(), ""));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isNull();
-        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("000009"),
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("9:" + f.user().email()),
+            open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
+            open.maxDailyAmountUsd(), open.digestKeyFile()));
+        assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
+        assertThat(row(f).consumedAt()).isNull();
+        // 계좌는 목록에 있어도 다른 사용자의 항목이면 소비하지 않는다.
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("7:other-" + f.user().email()),
             open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
             open.maxDailyAmountUsd(), open.digestKeyFile()));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
@@ -838,6 +844,11 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 cipher,
                 NOW, digest));
             action.beginExecution(NOW);
+            // 허용 목록 항목은 계좌와 그 주인 메일이다. 대역 계좌를 이 fixture 의 사용자에게 연다. 앞의 0 은 같은 계좌로 읽는다.
+            var open = gate.current();
+            OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("7:" + user.email()),
+                open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
+                open.maxDailyAmountUsd(), open.digestKeyFile()));
             return new Fixture(
                 action.publicId(),
                 action.id(),

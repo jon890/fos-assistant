@@ -1,7 +1,9 @@
 package com.bifos.assistant.connector.application;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -12,7 +14,8 @@ import org.springframework.validation.annotation.Validated;
  * <p>값은 기동 때 한 번 읽는다. 바꾸려면 운영 값을 고치고 재기동한다. 따로 켜고 끄는 설정은 두지 않는다.
  * 허용 목록이 비었거나 상한이 0 이거나 key 파일이 없으면 닫혀 있다.
  *
- * @param allowedAccounts 주문할 수 있는 계좌 식별자. 실행 scope 의 값이 이 목록에 있어야 한다. 비면 아무 계좌도 주문하지 못한다
+ * @param allowedAccounts 주문할 수 있는 계좌와 그 계좌를 쓰는 사용자. 항목은 {@code <계좌 순번>:<사용자 메일>} 이고 한 계좌는 한 번만 적는다.
+ * 실행 scope 의 값이 목록의 계좌이고 그 항목의 메일이 줄 주인의 메일이어야 한다. 메일은 대소문자를 가리지 않는다. 비면 아무 계좌도 주문하지 못한다
  * @param maxOrderAmountKrw 원화 주문 한 건의 금액 상한. 0 이면 원화 주문을 받지 않는다
  * @param maxOrderAmountUsd 달러 주문 한 건의 금액 상한. 0 이면 달러 주문을 받지 않는다
  * @param maxOrderQuantity 주문 한 건의 수량 상한. 0 이면 수량 주문을 받지 않는다
@@ -31,12 +34,24 @@ public record ConnectorFinancialProperties(
     @DefaultValue("0") BigDecimal maxDailyAmountUsd,
     @DefaultValue("") String digestKeyFile) {
 
-    /** 음수 상한과 빈 계좌 식별자는 기동을 멈춘다. 잘못 넣은 값이 「상한 없음」 으로 읽히지 않게 한다. */
+
+    private static final String ACCOUNT = "[1-9][0-9]{0,18}";
+    private static final String EMAIL = "[^\\s:]*@[^\\s:]*";
+
+    /**
+     * 음수 상한, 형식이 틀린 허용 목록 항목, 두 번 나온 계좌는 기동을 멈춘다. 잘못 넣은 값이 「상한 없음」 이나 다른 사용자의 계좌로 읽히지 않게 한다.
+     * 값 원문을 메시지에 넣으면 메일과 계좌 순번이 기동 로그에 남으므로 넣지 않는다.
+     */
     public ConnectorFinancialProperties {
         allowedAccounts = allowedAccounts == null ? List.of() : List.copyOf(allowedAccounts);
-        for (String account : allowedAccounts) {
-            if (account == null || account.isBlank()) {
-                throw new IllegalStateException("assistant.connector.financial.allowed-accounts must not contain blanks");
+        var accounts = new HashSet<String>();
+        for (String entry : allowedAccounts) {
+            int separator = entry == null ? -1 : entry.indexOf(':');
+            if (separator < 0 || !entry.substring(0, separator).matches(ACCOUNT) || !entry.substring(separator + 1).matches(EMAIL)) {
+                throw new IllegalStateException("assistant.connector.financial.allowed-accounts entries must be <account>:<email>");
+            }
+            if (!accounts.add(entry.substring(0, separator))) {
+                throw new IllegalStateException("assistant.connector.financial.allowed-accounts must list each account once");
             }
         }
         for (BigDecimal limit : new BigDecimal[] {
@@ -45,5 +60,22 @@ public record ConnectorFinancialProperties(
                 throw new IllegalStateException("assistant.connector.financial limits must be zero or positive: " + limit);
             }
         }
+    }
+
+
+    /**
+     * 그 계좌를 쓰는 사용자의 메일이다. 목록에 없으면 빈 값이다.
+     *
+     * <p>계좌 순번은 숫자로 견준다. 앞의 0 만 다른 표기는 같은 계좌다.
+     */
+    public Optional<String> ownerOf(String account) {
+        if (account == null || !account.matches("[0-9]{1,19}")) {
+            return Optional.empty();
+        }
+        String canonical = account.replaceFirst("^0+(?=[0-9])", "");
+        return allowedAccounts.stream()
+            .filter(entry -> entry.substring(0, entry.indexOf(':')).equals(canonical))
+            .map(entry -> entry.substring(entry.indexOf(':') + 1))
+            .findFirst();
     }
 }

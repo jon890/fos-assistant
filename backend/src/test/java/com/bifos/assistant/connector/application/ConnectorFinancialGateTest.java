@@ -16,8 +16,11 @@ import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.config.LiveProperties;
+import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +37,7 @@ class ConnectorFinancialGateTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String KEY = "src/test/resources/financial/test-digest.key";
     private static final String ROTATED_KEY = "src/test/resources/financial/test-digest-rotated.key";
+    private static final String OWNER = "owner@example.test";
     private static final FinancialDigest DIGEST = new FinancialDigest(LiveProperties.fixed(ConnectorFinancialProperties.class, open("1", "1", "1")));
     // KST 2026-10-13 10:00 이다. 하루의 시작은 UTC 2026-10-12T15:00 이다.
     private static final Instant NOW = Instant.parse("2026-10-13T01:00:00Z");
@@ -42,6 +46,7 @@ class ConnectorFinancialGateTest {
     private final ConnectorActionRepository actions = mock(ConnectorActionRepository.class);
     private final ConnectorActionExecutionRepository contents = mock(ConnectorActionExecutionRepository.class);
     private final TextCipher cipher = mock(TextCipher.class);
+    private final AppUserRepository users = mock(AppUserRepository.class);
     private final List<ConnectorAction> today = new ArrayList<>();
 
 
@@ -52,7 +57,7 @@ class ConnectorFinancialGateTest {
             BigDecimal.ZERO, BigDecimal.ZERO, "");
         var gate = gate(closed);
         assertThatThrownBy(gate::requireOpen).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> gate.requireAccounts(List.of("7"))).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> gate.requireAccounts(9L, List.of("7"))).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(LIMIT_BUY), closed))
             .isInstanceOf(ApiException.class);
     }
@@ -90,7 +95,7 @@ class ConnectorFinancialGateTest {
     @Test
     @DisplayName("기동 로그는 0 인 상한의 설정 이름만 남긴다")
     void namesZeroLimitsForStartupLog() {
-        var limits = new ConnectorFinancialProperties(List.of("7"), BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ONE,
+        var limits = new ConnectorFinancialProperties(List.of("7:" + OWNER), BigDecimal.ONE, BigDecimal.ZERO, BigDecimal.ONE,
             BigDecimal.ZERO, BigDecimal.ONE, KEY);
         assertThat(ConnectorFinancialGate.zeroLimits(limits)).containsExactly("max-order-amount-usd", "max-daily-amount-krw");
         assertThat(ConnectorFinancialGate.zeroLimits(open("1", "1", "1"))).isEmpty();
@@ -100,10 +105,55 @@ class ConnectorFinancialGateTest {
     @Test
     @DisplayName("음수 상한과 빈 계좌 식별자는 기동을 멈춘다")
     void rejectsInvalidSettings() {
-        assertThatThrownBy(() -> new ConnectorFinancialProperties(List.of("7"), new BigDecimal("-1"), BigDecimal.ONE,
+        assertThatThrownBy(() -> new ConnectorFinancialProperties(List.of("7:" + OWNER), new BigDecimal("-1"), BigDecimal.ONE,
             BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, KEY)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new ConnectorFinancialProperties(List.of(" "), BigDecimal.ONE, BigDecimal.ONE,
-            BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, KEY)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> accounts(" ")).isInstanceOf(IllegalStateException.class);
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {"7", "7:", ":" + OWNER, "0:" + OWNER, "07:" + OWNER, "a7:" + OWNER, "12345678901234567890:" + OWNER,
+        "7:owner", "7:own er@example.test", "7:owner@example.test:x"})
+    @DisplayName("허용 목록 항목이 계좌 순번과 메일 모양이 아니면 값 원문 없이 기동을 멈춘다")
+    void rejectsMalformedAllowListEntry(String entry) {
+        assertThatThrownBy(() -> accounts(entry)).isInstanceOf(IllegalStateException.class)
+            .hasMessageNotContaining(entry);
+    }
+
+
+    @Test
+    @DisplayName("같은 계좌를 두 항목에 적으면 메일이 달라도 기동을 멈춘다")
+    void rejectsDuplicatedAccount() {
+        assertThatThrownBy(() -> accounts("7:" + OWNER, "7:other@example.test")).isInstanceOf(IllegalStateException.class);
+        assertThat(accounts("7:" + OWNER, "8:" + OWNER).ownerOf("8")).contains(OWNER);
+    }
+
+
+    @Test
+    @DisplayName("허용 목록은 계좌의 주인 메일을 돌려주고 목록에 없는 계좌는 빈 값이다")
+    void findsOwnerOfAccount() {
+        var listed = accounts("7:" + OWNER, "1234567890123456789:Other@Example.Test");
+        assertThat(listed.ownerOf("7")).contains(OWNER);
+        assertThat(listed.ownerOf("1234567890123456789")).contains("Other@Example.Test");
+        assertThat(listed.ownerOf("8")).isEmpty();
+        assertThat(listed.ownerOf("")).isEmpty();
+        assertThat(listed.ownerOf(null)).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("scope 계좌의 항목 메일이 줄 주인의 메일과 대소문자 없이 같을 때만 지나고 다른 사용자와 없는 사용자는 닫는다")
+    void requiresAccountOwnedByUser() {
+        when(users.findById(9L)).thenReturn(Optional.of(AppUser.of("Owner@Example.Test", "주인", 1L, UserRole.MEMBER, NOW)));
+        when(users.findById(10L)).thenReturn(Optional.of(AppUser.of("other@example.test", "다른 사람", 1L, UserRole.MEMBER, NOW)));
+        var gate = gate(open("1", "1", "1"));
+        assertThatCode(() -> gate.requireAccounts(9L, List.of("7"))).doesNotThrowAnyException();
+        assertThatCode(() -> gate.requireScope(9L, "{\"account_seq\":\"7\"}")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> gate.requireAccounts(10L, List.of("7"))).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> gate.requireScope(10L, "{\"account_seq\":\"7\"}")).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> gate.requireAccounts(11L, List.of("7"))).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> gate.requireAccounts(9L, List.of("8"))).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> gate.requireAccounts(9L, List.of())).isInstanceOf(ApiException.class);
     }
 
 
@@ -207,7 +257,7 @@ class ConnectorFinancialGateTest {
     @DisplayName("key 를 바꾼 같은 날 이전 key 로 성공한 주문도 암호문을 열어 하루 합계에 넣는다")
     void sumsRowsOfPreviousKey() {
         var rotated = new FinancialDigest(LiveProperties.fixed(ConnectorFinancialProperties.class,
-            new ConnectorFinancialProperties(List.of("7"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
+            new ConnectorFinancialProperties(List.of("7:" + OWNER), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
                 BigDecimal.ONE, ROTATED_KEY)));
         var row = spent(1L, ActionStatus.SUCCEEDED, "sealed", ConnectorExecutionSnapshot.PROTOCOL,
             rotated.of("execution_args_json", LIMIT_BUY));
@@ -251,12 +301,18 @@ class ConnectorFinancialGateTest {
         when(actions.findByUserIdAndRiskAndDecidedAtGreaterThanEqual(eq(9L), eq(ToolRisk.FINANCIAL),
             eq(Instant.parse("2026-10-12T15:00:00Z")))).thenReturn(today);
         var live = LiveProperties.fixed(ConnectorFinancialProperties.class, properties);
-        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live));
+        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live), users);
     }
 
 
     private static ConnectorFinancialProperties open(String maxOrder, String maxQuantity, String maxDaily) {
-        return new ConnectorFinancialProperties(List.of("7"), new BigDecimal(maxOrder), new BigDecimal(maxOrder),
+        return new ConnectorFinancialProperties(List.of("7:" + OWNER), new BigDecimal(maxOrder), new BigDecimal(maxOrder),
             new BigDecimal(maxQuantity), new BigDecimal(maxDaily), new BigDecimal(maxDaily), KEY);
+    }
+
+
+    private static ConnectorFinancialProperties accounts(String... entries) {
+        return new ConnectorFinancialProperties(List.of(entries), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
+            BigDecimal.ONE, KEY);
     }
 }

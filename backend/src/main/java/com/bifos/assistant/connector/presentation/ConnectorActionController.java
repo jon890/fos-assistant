@@ -2,6 +2,7 @@ package com.bifos.assistant.connector.presentation;
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ConnectorFinancialSummaries;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
@@ -41,6 +42,7 @@ public class ConnectorActionController {
     private final ConnectorActionService actions;
     private final ContentDraftSaveApproval contentDrafts;
     private final ContentDraftJobs contentDraftJobs;
+    private final ConnectorFinancialSummaries financialSummaries;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
@@ -52,8 +54,13 @@ public class ConnectorActionController {
         Long id = conversations.requireOwnId(user, conversationId);
         var views = actions.listForConversation(user, id);
         // 원고 저장 줄은 job 링크로 찾은 요약을 붙인다. 화면은 이 요약이 있는 줄만 원고 카드로 그린다.
-        var summaries = contentDraftJobs.summaries(user, id, conversationId, views.stream().map(view -> view.actionId()).toList());
-        return views.stream().map(view -> ActionView.from(view, summaries.get(view.actionId()))).toList();
+        var actionIds = views.stream().map(view -> view.actionId()).toList();
+        var summaries = contentDraftJobs.summaries(user, id, conversationId, actionIds);
+        // 금융 줄은 저장한 snapshot 의 요약을 붙인다. 화면은 요약을 열지 못한 금융 줄에 승인 단추를 그리지 않는다.
+        var financial = financialSummaries.summaries(user, actionIds);
+        return views.stream()
+            .map(view -> ActionView.from(view, summaries.get(view.actionId()), financial.get(view.actionId())))
+            .toList();
     }
 
 
@@ -69,7 +76,8 @@ public class ConnectorActionController {
             // 화면이 응답으로 자기 줄을 바꾸므로 원고 줄은 목록과 같은 요약을 붙여 돌려준다.
             return ActionView.from(approved, contentDraftJobs.summaryOf(user, actionId).orElse(null));
         }
-        return ActionView.from(actions.approve(user, actionId, grant, conversationGrant));
+        var approved = actions.approve(user, actionId, grant, conversationGrant);
+        return ActionView.from(approved, null, financialSummaries.summaryOf(user, actionId).orElse(null));
     }
 
 
@@ -95,7 +103,8 @@ public class ConnectorActionController {
     public ActionView reject(@PathVariable UUID actionId) {
         CurrentUser user = currentUser.require();
         var rejected = actions.reject(user, actionId);
-        return ActionView.from(rejected, contentDraftJobs.summaryOf(user, actionId).orElse(null));
+        return ActionView.from(rejected, contentDraftJobs.summaryOf(user, actionId).orElse(null),
+            financialSummaries.summaryOf(user, actionId).orElse(null));
     }
 
 

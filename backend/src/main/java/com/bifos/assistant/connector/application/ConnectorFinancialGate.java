@@ -8,6 +8,8 @@ import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import com.bifos.assistant.user.domain.AppUser;
+import com.bifos.assistant.user.infra.AppUserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -15,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -49,6 +52,7 @@ public class ConnectorFinancialGate {
     private final ConnectorActionExecutionRepository contents;
     private final TextCipher cipher;
     private final FinancialDigest digest;
+    private final AppUserRepository users;
 
 
     /**
@@ -85,14 +89,20 @@ public class ConnectorFinancialGate {
     }
 
 
-    /** 실행 scope 의 값이 모두 허용 목록에 있어야 한다. 금융 scope 는 계좌 하나만 담는다. */
-    public void requireAccounts(Collection<String> scopeValues) {
-        require(!scopeValues.isEmpty() && properties.current().allowedAccounts().containsAll(scopeValues));
+    /**
+     * 실행 scope 의 값이 모두 허용 목록의 계좌이고 그 항목의 메일이 그 사용자의 메일이어야 한다. 금융 scope 는 계좌 하나만 담는다.
+     * 한 계좌의 주문이 한 사용자의 하루 합계에만 쌓이게 한다. 사용자가 없으면 닫는다.
+     */
+    public void requireAccounts(Long userId, Collection<String> scopeValues) {
+        var limits = properties.current();
+        String email = userId == null ? null : users.findById(userId).map(AppUser::email).orElse(null);
+        require(email != null && !scopeValues.isEmpty() && scopeValues.stream().allMatch(value -> limits.ownerOf(value)
+            .filter(owner -> owner.toLowerCase(Locale.ROOT).equals(email.toLowerCase(Locale.ROOT))).isPresent()));
     }
 
 
-    /** 저장한 scope 원문의 값을 허용 목록과 대조한다. */
-    public void requireScope(String scopeJson) {
+    /** 저장한 scope 원문의 값을 허용 목록과 그 사용자에 대조한다. */
+    public void requireScope(Long userId, String scopeJson) {
         JsonNode scope = JSON.readTree(scopeJson);
         require(scope.isObject());
         var values = new ArrayList<String>();
@@ -100,7 +110,7 @@ public class ConnectorFinancialGate {
             require(entry.getValue().isString());
             values.add(entry.getValue().stringValue());
         });
-        requireAccounts(values);
+        requireAccounts(userId, values);
     }
 
 

@@ -62,7 +62,7 @@ public class ConnectorExecutionClaims {
                 conflicts.requireAvailable(row.requestKey(), action.id());
                 // 승인 뒤 재기동으로 key 파일 설정을 비웠거나 계좌를 목록에서 뺐으면 ticket 을 소비하지 않는다.
                 gate.requireOpen();
-                gate.requireScope(snapshot.scopeJson());
+                gate.requireScope(payload.userId(), snapshot.scopeJson());
                 row.consumeTicket(payload.ticketId(), now.truncatedTo(ChronoUnit.MICROS));
                 tickets.beforeCommit(action, payload);
                 return new ConnectorExecutionClaimResult(1, true, payload.ticketId(), payload.expiresAt());

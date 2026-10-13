@@ -104,6 +104,7 @@ public class ConnectorPolicyService {
     private final TransactionTemplate transactions;
     private final Clock clock;
     private final ConnectorActionBodies bodies;
+    private final ConnectorFinancialIntake financial;
 
 
     // 생성자를 직접 쓴다. TransactionTemplate 은 transaction manager 로 여기서 만들고,
@@ -122,7 +123,7 @@ public class ConnectorPolicyService {
         ProactiveCheckGuard checkGuard,
         CheckNotificationPolicy checkNotifications,
         DecisionFeedbackRecorder feedback,
-        ConnectorActionBodies bodies,
+        ConnectorActionBodies bodies, ConnectorFinancialIntake financial,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
@@ -137,7 +138,7 @@ public class ConnectorPolicyService {
             checkGuard,
             checkNotifications,
             feedback,
-            bodies,
+            bodies, financial,
             transactionManager,
             Clock.systemUTC());
     }
@@ -156,7 +157,7 @@ public class ConnectorPolicyService {
         ProactiveCheckGuard checkGuard,
         CheckNotificationPolicy checkNotifications,
         DecisionFeedbackRecorder feedback,
-        ConnectorActionBodies bodies,
+        ConnectorActionBodies bodies, ConnectorFinancialIntake financial,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.actions = actions;
@@ -172,6 +173,7 @@ public class ConnectorPolicyService {
         this.checkNotifications = checkNotifications;
         this.feedback = feedback;
         this.bodies = bodies;
+        this.financial = financial;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
@@ -198,7 +200,7 @@ public class ConnectorPolicyService {
             .value();
         String argsSha256 = Sha256.hex(argsJson);
         Optional<ConnectorAction> recorded = actions.findByDedupeKey(dedupeKey);
-        if (recorded.isPresent()) {
+        if (recorded.isPresent() && !ConnectorFinancialIntake.owns(recorded.get())) {
             return replayed(recorded.get(), hermesTool, argsSha256);
         }
         final AgentExecution origin;
@@ -242,6 +244,10 @@ public class ConnectorPolicyService {
         // 등록 이름과 맞는 것을 확인한 원래 이름만 쓴다. manifest 가 없으면 확인할 수 없어 비운다.
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
             .orElse(null);
+        // 금융 준비 도구의 호출과 같은 키의 금융 줄은 금융 준비가 맡는다(ADR-20261013 / financial-order-opening).
+        if (recorded.isPresent() || manifest.filter(value -> ConnectorFinancialIntake.prepares(value, confirmedTool)).isPresent()) {
+            return financial.prepare(manifest, confirmedTool, binding, origin, profileName, rootSessionId, sessionId, toolCallId, argsJson);
+        }
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
         // 직접 부른 호출도 위임 자식의 호출도 같은 트리 루트로 경계가 정해진다. 살펴보기 turn 의 트리면 루트가 그 turn 이다
@@ -451,7 +457,7 @@ public class ConnectorPolicyService {
     }
 
 
-    private static ConnectorPolicyAnswer blockedWithoutRecord(String reason) {
+    static ConnectorPolicyAnswer blockedWithoutRecord(String reason) {
         log.warn("커넥터 도구 호출을 줄 없이 막았다 reason={}", reason);
         return new ConnectorPolicyAnswer(false, CONTEXT_MESSAGE, null);
     }

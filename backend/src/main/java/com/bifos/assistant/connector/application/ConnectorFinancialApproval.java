@@ -40,7 +40,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 공개 승인 경로와 분리된 내부 금융 승인이다. grant 입력과 자동 재실행을 받지 않는다. */
+/** 공개 승인 API 가 위험도 FINANCIAL 줄을 넘기는 금융 승인이다. grant 입력과 자동 재실행을 받지 않는다. */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -89,7 +89,7 @@ class ConnectorFinancialApproval {
             // 준비와 승인 사이의 재기동으로 key 파일 설정을 비우거나 목록과 상한을 줄였으면 여기서 막는다.
             // key 는 기동 뒤 처음 읽은 값을 쓰므로 실행 중에 파일만 지워서는 닫히지 않는다.
             gate.requireOpen();
-            gate.requireScope(checked.scopeJson());
+            gate.requireScope(user.id(), checked.scopeJson());
             gate.requireWithinLimits(user.id(), action.id(), checked.executionArgsJson(), clock.instant());
             action.beginExecution(clock.instant());
             feedback.record(entry(action, FeedbackEventType.APPROVED, FeedbackActor.USER));

@@ -239,13 +239,12 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
 
 
     @Test
-    @DisplayName("공개 정책과 승인 경로의 금융 실행 차단을 유지한다")
-    void publicHookAndPublicApprovalKeepFinancialClosed() {
+    @DisplayName("실행 도구를 직접 부른 공개 정책 호출은 금융 실행 차단을 유지한다")
+    void publicHookKeepsDirectExecutionToolClosed() {
         var blocked = publicPolicy.decide(profile, session, session, "public", "mcp__tossinvest__create_order", "create_order", ARGS);
         assertThat(blocked.allowed()).isFalse();
         assertThat(blocked.actionId()).isNull();
-        var requested = request();
-        assertThat(publicApproval.approve(user, requested.actionId(), null).status()).isEqualTo(ActionStatus.REJECTED);
+        assertThat(counters().path("prepare").intValue()).isZero();
         assertThat(counters().path("execute").intValue()).isZero();
         assertThat(counters().path("financial").intValue()).isZero();
     }
