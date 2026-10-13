@@ -399,7 +399,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 | 중복을 막는 키 | 승인 줄의 dedupe key(`v1-content-save`, 주인, snapshotId), job 의 snapshot 유일 색인, worker 상태 파일의 `O_EXCL`, Control Plane 의 `start_claimed_at`, `save_claimed_at` 단일 claim | 준비가 만든 `clientOrderId`, 같은 의도의 `request_key`(같은 키의 `PENDING`, `EXECUTING`, `UNKNOWN` 이 있으면 준비, 승인, claim 을 막는다), ticket 단일 소비 | 정책 판정의 `dedupe_key`(profile, 루트 session, session, `tool_call_id`)와 승인 줄의 행 잠금이다. Gmail 에 보내는 멱등 키는 없다 |
 | 결과 조회 | job GET 이 같은 jobId 만 private status 로 조회한다. 승인 뒤 15분이 지나면 `ContentDraftJobExpirer` 가 한 번 조회하고 닫는다. 사용자는 네이버 임시저장 목록에서 확인한다 | 실행 응답으로 끝난다. 사용자는 `list_orders`, `get_order` 와 토스증권 앱에서 확인한다 | 실행 응답으로 끝난다. 사용자는 Gmail 보낸편지함에서 확인한다 |
 | `UNKNOWN` 이 되는 때 | 시작 응답을 잃었다. save claim 이나 저장 클릭 뒤에 실패했다. 바인딩 버전이 바뀌었거나 15분 정리에 걸렸는데 start claim 이 있었다. [job 상태와 재접속](content-draft.md#job-상태와-재접속) | 응답을 잃었거나 결과가 불확실한데 claim 을 소비했다. 소비하지 않았음을 잠금 안에서 증명하면 `FAILED` 다 | `GMAIL_SEND_UNKNOWN`(보낸 뒤 시간 초과, 연결 끊김, 5xx), execute 시간 초과, 실행 중 서버 재시작(`ConnectorActionSweeper`), 오래 남은 `EXECUTING`(`ConnectorActionExpirer`) |
-| 다시 보내기 | 하지 않는다. 같은 snapshot 의 재승인, 재전송, outbox 가 없고 claim 과 ticket 을 다시 주지 않는다 | 하지 않는다. ticket 재발급과 자동 재전송이 없고, 같은 의도의 `UNKNOWN` 이 새 준비를 막는다 | 하지 않는다. Control Plane 도 커넥터도 다시 부르지 않는다. 모델에게는 다시 실행하지 말고 사용자에게 확인을 부탁하라고 전한다 |
+| 다시 보내기 | 하지 않는다. 같은 snapshot 의 재승인, 재전송, outbox 가 없고 claim 과 ticket 을 다시 주지 않는다. 새 snapshot 의 재저장은 감수한다(아래 「남은 공백」) | 하지 않는다. ticket 재발급과 자동 재전송이 없고, 같은 의도의 `UNKNOWN` 이 새 준비를 막는다 | 하지 않는다. Control Plane 도 커넥터도 다시 부르지 않는다. 모델에게는 다시 실행하지 말고 사용자에게 확인을 부탁하라고 전한다. 같은 메일의 새 호출은 감수한다(아래 「남은 공백」) |
 | owner 코드 | [`ContentDraftSnapshots`](../../backend/src/main/java/com/bifos/assistant/chat/application/ContentDraftSnapshots.java), [`ContentDraftJobs`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftJobs.java), [`ContentDraftSaveApproval`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftSaveApproval.java), [`ContentDraftJobAuthorizer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftJobAuthorizer.java), [`ContentDraftJobExpirer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ContentDraftJobExpirer.java), [`connector_snapshot_job.py`](../../hermes/plugins/dashboard-profile-api/connector_snapshot_job.py), [`content-snapshot-job.ts`](../../hermes/connectors/naver-blog/src/content-snapshot-job.ts) | [`ConnectorFinancialProducer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialProducer.java), [`ConnectorFinancialApproval`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialApproval.java), [`ConnectorFinancialConflicts`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialConflicts.java), [`ConnectorExecutionSnapshot`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorExecutionSnapshot.java), [`ConnectorExecutionClaims`](../../backend/src/main/java/com/bifos/assistant/connector/application/execution/ConnectorExecutionClaims.java), [`connector_prepare.py`](../../hermes/plugins/dashboard-profile-api/connector_prepare.py), [`trading-tools.ts`](../../hermes/connectors/tossinvest/src/trading-tools.ts) | [`ToolPolicyDecision`](../../backend/src/main/java/com/bifos/assistant/connector/domain/ToolPolicyDecision.java), [`ConnectorActionApproval`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionApproval.java), [`ConnectorActionLifecycle`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionLifecycle.java), [`ConnectorActionSweeper`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionSweeper.java), [`ConnectorActionExpirer`](../../backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionExpirer.java), [`connector_run.py`](../../hermes/plugins/dashboard-profile-api/connector_run.py), [`mail-tools.ts`](../../hermes/connectors/gmail/src/mail-tools.ts) |
 
 이 표 밖의 쓰기는 Gmail 열과 같은 일반 승인 줄 경로를 탄다.
@@ -414,6 +414,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - [ ] 사용자가 실제 계정으로 지정 테스트 글을 저장하는 것과 쓸 사진 수를 명시적으로 승인했다
 - [ ] [배포 뒤 원격 확인](content-draft.md#배포-뒤-원격-확인) 표를 그 테스트 글로 돌았다. start 는 1회, 재접속과 재시작 뒤 추가 start 와 저장 클릭은 0회, claim 뒤의 불확실한 결과는 `UNKNOWN` 이다
 - [ ] [읽기 부작용 확인](naver-blog-connector.md#읽기-부작용-확인) 을 같은 자리에서 돌아 `read_draft` 를 `WRITE` 로 둘지 정했다
+- [x] `UNKNOWN` 뒤 새 snapshot 재저장을 감수할지 정했다. 감수(2026-10-13 사용자 결정), 막는 일은 #526 이 추적한다
 - [ ] 두 확인의 결과를 [ADR-20261009 / naver-blog-primitives](../../hermes/docs/adr/ADR-20261009-naver-blog-primitives.md) 와 [원고 문서](content-draft.md) 에 적었다
 
 토스 매매 개방은 아래가 모두 채워지고 소유자가 개방을 명시적으로 승인해야 Go 다.
@@ -424,11 +425,11 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 ### 남은 공백
 
-어느 경로도 아직 막지 않는 것이다. Go/No-Go 를 낼 때 감수할지 함께 정한다.
+어느 경로도 아직 막지 않는 것이다. 감수하기로 정한 것은 그 결정을 적었고, 나머지는 Go/No-Go 를 낼 때 감수할지 함께 정한다.
 
-- **네이버: `UNKNOWN` 뒤 새 snapshot 으로 다시 저장할 수 있다.** 같은 snapshot 은 막지만, 원고를 고치거나 바인딩 버전이 바뀌면 새 snapshot 과 새 승인이 생긴다. 이전 job 의 `UNKNOWN` 은 그 승인을 막지 않아 같은 글이 두 번 임시저장될 수 있다
+- **네이버: `UNKNOWN` 뒤 새 snapshot 으로 다시 저장할 수 있다.** 같은 snapshot 은 막지만, 원고를 고치거나 바인딩 버전이 바뀌면 새 snapshot 과 새 승인이 생긴다. 이전 job 의 `UNKNOWN` 은 그 승인을 막지 않아 같은 글이 두 번 임시저장될 수 있다. 감수(2026-10-13 사용자 결정), 추적은 #526
 - **네이버: `FAILED` 는 편집기 자동저장이 없었다는 증거가 아니다.** 명시적 저장 클릭이 없었다는 뜻이다
-- **Gmail: 같은 메일을 다시 보내는 새 호출을 막지 않는다.** `tool_call_id` 가 다르면 새 승인 줄이 생기고, 앞의 `UNKNOWN` 과 같은 인자인지 보지 않는다. 사람이 다시 승인하면 메일이 두 번 나갈 수 있다
+- **Gmail: 같은 메일을 다시 보내는 새 호출을 막지 않는다.** `tool_call_id` 가 다르면 새 승인 줄이 생기고, 앞의 `UNKNOWN` 과 같은 인자인지 보지 않는다. 사람이 다시 승인하면 메일이 두 번 나갈 수 있다. 감수(2026-10-13 사용자 결정)
 - **토스: `request_key` 에 연결 번호가 들어간다.** 같은 계좌를 새 연결로 다시 붙이면 이전 `UNKNOWN` 과 충돌하지 않는다. 개방 조건의 「연결 재등록 우회 차단」 이 이것을 닫는다
 - **세 경로 모두 Control Plane 의 검사와 외부 변경을 한 트랜잭션으로 묶지 못한다.** 허가한 뒤의 철회는 이미 나간 클릭이나 전송을 되돌리지 않는다
 
