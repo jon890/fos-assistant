@@ -13,6 +13,7 @@ import com.bifos.assistant.context.ContextTrust;
 import com.bifos.assistant.context.ResultHeader;
 import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorRecovery;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.shared.util.ExternalData;
@@ -42,6 +43,14 @@ import org.springframework.stereotype.Component;
 public class ConnectorActionResultSource implements AutoTurnResultSource {
 
     static final String UNKNOWN_INPUT = "실행 여부를 알 수 없다. 다시 실행하지 말고 사용자에게 확인을 부탁한다.";
+
+    /**
+     * 결과를 모르는 줄에 커넥터가 재시도 식별자를 남겼을 때 더하는 줄이다(ADR-20261013 unknown-retry-key). Control Plane 은 자동으로
+     * 다시 보내지 않는다. 커넥터 스킬이 그 식별자로 확인하는 절차를 정해 둔 경우에만 에이전트가 새 호출을 한다.
+     */
+    static final String UNKNOWN_RETRY_INPUT = "재시도: 커넥터 스킬이 같은 식별자로 다시 보내 결과를 확인하라고 안내하면,"
+        + " 나머지 인자는 바꾸지 않고 이 식별자를 넣어 같은 도구를 한 번 부를 수 있다. 그 호출도 새 호출과 같은 승인 판정을 거친다."
+        + " 스킬에 그 안내가 없으면 다시 부르지 않는다. 식별자는 사용자에게 말하지 않는다.";
 
     /** 대화 허락을 함께 준 결과의 알림 줄에 더하는 문장이다. 빈 자리에 허락이 끝나는 시각이 들어간다. */
     static final String CONVERSATION_GRANT_NOTICE = "이 대화에서는 %s까지 같은 동작을 다시 묻지 않고 실행해요. 다른 대화에서는 다시 물어요";
@@ -199,6 +208,16 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
                         .collect(Collectors.joining(", ")));
             }
         });
+        // 결과를 모르는 줄의 글은 Control Plane 이 검증해 저장한 코드와 재시도 식별자뿐이다. 본문으로 옮기지 않는다.
+        Optional<ConnectorUnknownDetail> unknown = result.status() == ActionStatus.UNKNOWN
+            ? ConnectorUnknownDetail.fromStored(result.resultText())
+            : Optional.empty();
+        unknown.ifPresent(found -> {
+            fields.add("오류 코드: " + found.code());
+            if (found.retryKey() != null) {
+                fields.add("재시도 식별자: " + found.retryKey() + "=" + found.retryValue());
+            }
+        });
         StringBuilder input = new StringBuilder("승인한 동작의 결과가 도착했다.\n")
             .append(ResultHeader.render("승인한 동작", fields, result.executedAt(), freshness, staleAfter));
         if (result.conversationGranted()) {
@@ -206,7 +225,11 @@ public class ConnectorActionResultSource implements AutoTurnResultSource {
                 .append(CONVERSATION_GRANT_INPUT.formatted(GRANT_UNTIL.format(result.conversationGrantExpiresAt())));
         }
         if (result.status() == ActionStatus.UNKNOWN) {
-            return input.append('\n').append(UNKNOWN_INPUT).toString();
+            input.append('\n').append(UNKNOWN_INPUT);
+            if (unknown.map(ConnectorUnknownDetail::retryKey).isPresent()) {
+                input.append('\n').append(UNKNOWN_RETRY_INPUT);
+            }
+            return input.toString();
         }
         if (result.status() == ActionStatus.FAILED) {
             // 실패 줄의 글은 Control Plane 이 검증해 저장한 오류 계약뿐이다. 본문으로 옮기지 않고 복구 안내만 잇는다.

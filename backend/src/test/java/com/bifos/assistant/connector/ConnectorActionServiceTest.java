@@ -60,6 +60,7 @@ import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorRecovery;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -715,6 +716,25 @@ class ConnectorActionServiceTest {
         assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
         verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
         assertThat(onlyAction().status()).isEqualTo(ActionStatus.UNKNOWN);
+    }
+
+
+    @Test
+    @DisplayName("결과를 모르는 실행이 선언한 오류 코드와 재시도 식별자를 주면 UNKNOWN 줄에 그것만 저장하고 다시 실행하지 않는다")
+    void unknownExecutionKeepsDeclaredCodeAndRetryIdentifier() {
+        UUID actionId = ask(WRITE, ARGS).actionId();
+        ConnectorUnknownDetail detail = new ConnectorUnknownDetail(
+            "CAREER_OUTCOME_UNKNOWN", "attemptId", "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f");
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new ConnectorExecutionUnknown(detail));
+
+        ConnectorActionView approved = service.approve(me, actionId, null);
+
+        assertThat(approved.status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(ConnectorUnknownDetail.fromStored(approved.resultText())).contains(detail);
+        assertThat(approved.errorCode()).isNull();
+        assertCode(() -> service.approve(me, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_PENDING);
+        verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
     }
 
 

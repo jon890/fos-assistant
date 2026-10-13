@@ -40,6 +40,7 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
@@ -280,6 +281,29 @@ class ConnectorDeliveryRetryTest {
             .contains("[출처: 승인한 동작, 동작: 메모 쓰기, 상태: UNKNOWN, 끝난 시각: ")
             .contains("]\n" + UNKNOWN_INPUT);
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
+    }
+
+
+    @Test
+    @DisplayName("결과를 모르는 승인 결과에 커넥터가 선언한 오류 코드와 재시도 식별자를 싣고 다시 전달해도 같은 입력이다")
+    void carriesDeclaredCodeAndRetryIdentifierOnUnknownResult() {
+        String attemptId = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f";
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new ConnectorExecutionUnknown(
+                new ConnectorUnknownDetail("CAREER_OUTCOME_UNKNOWN", "attemptId", attemptId)));
+        ResultDelivery delivery = failedDeliveryOf(approved());
+
+        chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {
+        });
+
+        verify(connector, times(1)).execute(anyString(), anyString(), anyString(), anyString());
+        List<HermesRunCommand> received = stub().received();
+        assertThat(received).hasSize(2);
+        assertThat(received.get(1).input())
+            .contains("상태: UNKNOWN, 오류 코드: CAREER_OUTCOME_UNKNOWN, 재시도 식별자: attemptId=" + attemptId + ", 끝난 시각: ")
+            .contains("]\n" + UNKNOWN_INPUT + "\n재시도: 커넥터 스킬이 같은 식별자로 다시 보내 결과를 확인하라고 안내하면,")
+            .doesNotContain("<external-data>")
+            .isEqualTo(received.get(0).input());
     }
 
 

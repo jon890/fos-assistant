@@ -30,6 +30,7 @@ import com.bifos.assistant.hermes.ConnectorExecutionUnknown;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
@@ -138,11 +139,13 @@ class ConnectorActionApproval {
         }
         ConnectorAction waiting = approval.action();
         CallResult result = null;
+        ConnectorUnknownDetail unknown = null;
         try {
             result = connector.execute(
                 approval.profile(), waiting.connectorId(), waiting.hermesTool(), waiting.executableArgs().orElseThrow());
         } catch (ConnectorExecutionUnknown ex) {
             log.warn("승인한 호출의 실행 결과를 알 수 없다 actionId={}", actionId);
+            unknown = ex.detail().orElse(null);
         } catch (RuntimeException ex) {
             // 실행됐는지 알 수 없는 것으로 둔다. 예외 메시지에는 원격 응답이 섞일 수 있어 종류만 남긴다.
             log.warn(
@@ -151,7 +154,8 @@ class ConnectorActionApproval {
                 ex.getClass().getSimpleName());
         }
         CallResult executed = result;
-        ConnectorAction finished = transactions.execute(status -> record(actionId, executed));
+        ConnectorUnknownDetail unknownDetail = unknown;
+        ConnectorAction finished = transactions.execute(status -> record(actionId, executed, unknownDetail));
         signals.publish(finished);
         return details.view(finished);
     }
@@ -270,8 +274,9 @@ class ConnectorActionApproval {
      * 실행 결과를 줄에 적는다. 트랜잭션 안에서만 부른다.
      *
      * @param result 실행 결과. 실행됐는지 알 수 없으면 null
+     * @param unknown 실행됐는지 알 수 없을 때 커넥터가 선언한 코드와 재시도 식별자. 없으면 null
      */
-    private ConnectorAction record(UUID actionId, CallResult result) {
+    private ConnectorAction record(UUID actionId, CallResult result, ConnectorUnknownDetail unknown) {
         Instant now = now();
         ConnectorAction action = actions.findByPublicIdForUpdate(actionId).orElseThrow(ConnectorActionDetails::notFound);
         if (action.status() != ActionStatus.EXECUTING) {
@@ -284,7 +289,12 @@ class ConnectorActionApproval {
         }
         if (result == null) {
             // 실행됐는지 모르는 줄은 성공도 실패도 아니라 판단 피드백 사건을 남기지 않는다.
-            action.unknown(now);
+            // 커넥터가 선언한 코드와 재시도 식별자만 남긴다. 에이전트가 같은 식별자로 확인 호출을 하게 한다.
+            if (unknown == null) {
+                action.unknown(now);
+            } else {
+                bodies.unknown(action, unknown.toStored(), now);
+            }
         } else if (result.ok()) {
             bodies.succeed(action, clip(result.result().toString()), now);
             feedback.record(actionFeedback(action, FeedbackEventType.EXECUTION_SUCCEEDED, FeedbackActor.SYSTEM));
