@@ -49,6 +49,7 @@ class ConnectorFinancialApproval {
     private final ConnectorExecutionGuard guard;
     private final ConnectorExecutionTicket tickets;
     private final ConnectorFinancialConflicts conflicts;
+    private final ConnectorFinancialGate gate;
     private final AppUserRepository users;
     private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
@@ -65,6 +66,7 @@ class ConnectorFinancialApproval {
 
     ConnectorActionView approve(CurrentUser user, UUID actionId) {
         require(!TransactionSynchronizationManager.isActualTransactionActive());
+        gate.requireOpen();
         var owned = actions.findByPublicId(actionId).orElseThrow(ConnectorActionDetails::notFound);
         if (!Objects.equals(user.id(), owned.userId())) {
             throw ConnectorActionDetails.notFound();
@@ -84,6 +86,11 @@ class ConnectorFinancialApproval {
             var checked = current.validateLocked(context, catalog, action, row);
             require(action.expiresAt().isAfter(clock.instant()));
             conflicts.requireAvailable(row.requestKey(), action.id());
+            // 준비와 승인 사이의 재기동으로 key 파일 설정을 비우거나 목록과 상한을 줄였으면 여기서 막는다.
+            // key 는 기동 뒤 처음 읽은 값을 쓰므로 실행 중에 파일만 지워서는 닫히지 않는다.
+            gate.requireOpen();
+            gate.requireScope(checked.scopeJson());
+            gate.requireWithinLimits(user.id(), action.id(), checked.executionArgsJson(), clock.instant());
             action.beginExecution(clock.instant());
             feedback.record(entry(action, FeedbackEventType.APPROVED, FeedbackActor.USER));
             return checked;

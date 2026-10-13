@@ -8,7 +8,7 @@
 금융 줄의 해시 칸을 서버 비밀로 keyed hash 해 DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못하게 한다.
 **매매 개방 전 필수다.** phase-04 는 이 단계가 머지된 뒤에만 시작한다.
 
-**범위 외**: 금융이 아닌 승인 줄의 `args_sha256`, kill switch 와 상한(phase-02), 공개 진입점(phase-04)이다.
+**범위 외**: 금융이 아닌 승인 줄의 `args_sha256`, 계좌 허용 목록과 상한(`ConnectorFinancialGate`), 공개 진입점(phase-04)이다.
 
 ## 컨텍스트
 
@@ -31,7 +31,7 @@
 
 - 키 공식은 버전 접두로 가른다. 일반 주문은 `fos-financial-intent-v2`, 조건주문은 `fos-conditional-intent-v2` 다. 경로에서 connectionId 를 빼고 connectorId 를 넣는다. account_seq 는 이미 있다.
 - keyed hash 는 HMAC-SHA256 앞 16바이트로 해 칸 길이를 바꾸지 않는다. 마이그레이션은 없다.
-- key 는 비밀값이므로 DB 에 넣지 않는다. 운영 비밀 파일에서 환경 변수로 받는다. 없으면 phase-02 의 gate 가 금융을 열지 않는다.
+- key 는 비밀값이므로 DB 에 넣지 않는다. 운영 비밀 파일에서 환경 변수로 받는다. 없으면 `ConnectorFinancialGate` 가 금융을 열지 않는다.
 - 기존 줄과의 호환은 행 단위 버전 칸으로 가른다. `ConnectorExecutionSnapshot.PROTOCOL` 을 `approval-claim-v2` 로 올리고 manifest `execution_guard.protocol` 도 같이 올린다.
   v1 줄은 `open` 의 protocol 대조에서 자동으로 거절된다. gate 는 `protocol = 'approval-claim-v1'` 이면서 PENDING, EXECUTING, UNKNOWN 인 줄이 있을 때만 닫는다.
   「금융 줄이 하나라도 있으면 닫는다」 로 두면 첫 실제 호출이 만든 v2 줄 때문에 그 뒤 재기동마다 gate 가 닫힌다. request_key 의 버전 접두는 해시 입력 안에 있어 저장된 값으로는 버전을 알 수 없다.
