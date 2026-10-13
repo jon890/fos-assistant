@@ -52,6 +52,7 @@ public class NotificationService {
     private final Clock clock;
     private final PlatformTransactionManager transactionManager;
 
+
     /**
      * 알림을 저장한다. 부르는 쪽의 트랜잭션에 참여하고, 트랜잭션 밖에서 부르면 실패한다.
      *
@@ -62,12 +63,12 @@ public class NotificationService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public Notification notify(
-            Long userId, NotificationKind kind, String title, String body, NotificationTarget target) {
-        Notification saved =
-                notifications.saveAndFlush(Notification.of(userId, kind, title, body, target, clock.instant()));
+        Long userId, NotificationKind kind, String title, String body, NotificationTarget target) {
+        Notification saved = notifications.saveAndFlush(Notification.of(userId, kind, title, body, target, clock.instant()));
         afterCommit(userId, unread -> NotificationEvent.created(saved.publicId(), unread));
         return saved;
     }
+
 
     /**
      * 내 알림을 최근 것부터 한 쪽 읽는다.
@@ -95,8 +96,9 @@ public class NotificationService {
         }
         List<Notification> items = rows.subList(0, limit);
         return new NotificationPage(
-                items, NotificationCursor.of(items.getLast()).encode(), unread);
+            items, NotificationCursor.of(items.getLast()).encode(), unread);
     }
+
 
     /**
      * 내 알림 하나를 읽음으로 표시한다. 이미 읽은 줄은 바꾸지 않고 그대로 돌려준다.
@@ -106,8 +108,8 @@ public class NotificationService {
     @Transactional
     public Notification markRead(CurrentUser user, UUID notificationId) {
         Notification notification = notifications
-                .findByPublicIdAndUserId(notificationId, user.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.NOTIFICATION_NOT_FOUND, NOT_FOUND_MESSAGE));
+            .findByPublicIdAndUserId(notificationId, user.id())
+            .orElseThrow(() -> new ApiException(ErrorCode.NOTIFICATION_NOT_FOUND, NOT_FOUND_MESSAGE));
         if (!notification.unread()) {
             return notification;
         }
@@ -116,6 +118,7 @@ public class NotificationService {
         afterCommit(user.id(), NotificationEvent::read);
         return saved;
     }
+
 
     /**
      * 내 읽지 않은 알림을 모두 읽음으로 표시하고 커밋한 뒤 {@code read} 사건을 보낸다.
@@ -129,6 +132,7 @@ public class NotificationService {
         return 0;
     }
 
+
     /**
      * 원인이 끝나 더 알릴 것이 없는 알림을 읽음으로 표시한다. 같은 사용자의 같은 종류 가운데 {@code target} 을 가리키는
      * 읽지 않은 줄만 바꾼다. 바꾼 줄이 있으면 커밋한 뒤 {@code read} 사건을 보낸다. 부르는 쪽의 트랜잭션에 참여한다.
@@ -140,10 +144,12 @@ public class NotificationService {
         }
     }
 
+
     @Transactional(readOnly = true)
     public long unreadCount(Long userId) {
         return notifications.countByUserIdAndReadAtIsNull(userId);
     }
+
 
     /**
      * 트랜잭션이 커밋한 뒤에 그 사용자의 읽지 않은 수를 새로 세어 사건을 만들고 보낸다. 되돌아가면 보내지 않는다.
@@ -158,7 +164,7 @@ public class NotificationService {
             public void afterCommit() {
                 try {
                     Long unread = new TransactionTemplate(transactionManager, NEW_READ)
-                            .execute(status -> notifications.countByUserIdAndReadAtIsNull(userId));
+                        .execute(status -> notifications.countByUserIdAndReadAtIsNull(userId));
                     hub.publish(userId, event.apply(unread == null ? 0 : unread));
                 } catch (RuntimeException ex) {
                     log.warn("알림 사건을 보내지 못했다 userId={}", userId, ex);
@@ -167,9 +173,9 @@ public class NotificationService {
         });
     }
 
+
     private static TransactionDefinition newRead() {
-        DefaultTransactionDefinition definition =
-                new DefaultTransactionDefinition(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        DefaultTransactionDefinition definition = new DefaultTransactionDefinition(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         definition.setReadOnly(true);
         return definition;
     }
