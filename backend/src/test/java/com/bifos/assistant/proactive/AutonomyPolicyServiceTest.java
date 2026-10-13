@@ -21,6 +21,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
+import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.AutonomyInputs;
@@ -51,10 +52,12 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ValueEvaluationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -107,6 +110,9 @@ class AutonomyPolicyServiceTest {
 
     @Autowired
     FeedbackEventRepository feedbackEvents;
+
+    @Autowired
+    LiveProperties<AutonomyProperties> properties;
 
     /** 실제 살펴보기를 시작하지 않는다. 시작 경로를 불렀는지와 그 결과를 검사마다 정한다. */
     @Autowired
@@ -231,6 +237,52 @@ class AutonomyPolicyServiceTest {
         assertThat(decision.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(decision.reasons()).containsExactly(AutonomyReason.USER_AUTONOMY_DISABLED);
         assertThat(service.readOnlyExecutionConsented(OWNER)).isFalse();
+        verify(checkService, never()).startAutonomous(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("판정을 저장한 뒤 시작 전에 동의를 철회하면 시작하지 않고 FAILED 로 남긴다")
+    void consentWithdrawnAfterDecisionStopsStart() {
+        ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
+        doAnswer(invocation -> {
+                    List<AutonomyDecision> saved = decisions.saveAll(invocation.<List<AutonomyDecision>>getArgument(0));
+                    decisions.flush();
+                    service.changeReadOnlyExecution(OWNER, false);
+                    return saved;
+                })
+                .when(decisions)
+                .saveAllAndFlush(any());
+
+        AutonomyDecision decision = service.decide(OWNER, evaluation.id()).getFirst();
+
+        assertThat(decision.level()).isEqualTo(AutonomyLevel.EXECUTE);
+        assertThat(decision.executionStatus()).isEqualTo(AutonomyExecutionStatus.FAILED);
+        assertThat(decision.executionError()).isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE.name());
+        verify(checkService, never()).startAutonomous(any(), any(), any());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    @DisplayName("판정을 저장한 뒤 시작 전에 설치의 자동 실행 설정이 꺼지면 시작하지 않고 FAILED 로 남긴다")
+    void executionDisabledAfterDecisionStopsStart() {
+        ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
+        doAnswer(invocation -> {
+                    List<AutonomyDecision> saved = decisions.saveAll(invocation.<List<AutonomyDecision>>getArgument(0));
+                    decisions.flush();
+                    ((OverridableLiveProperties<AutonomyProperties>) properties)
+                            .override(new AutonomyProperties(
+                                    false,
+                                    properties.current().maxEvaluationAge(),
+                                    properties.current().maxEvidenceAge()));
+                    return saved;
+                })
+                .when(decisions)
+                .saveAllAndFlush(any());
+
+        AutonomyDecision decision = service.decide(OWNER, evaluation.id()).getFirst();
+
+        assertThat(decision.executionStatus()).isEqualTo(AutonomyExecutionStatus.FAILED);
+        assertThat(decision.executionError()).isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE.name());
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 

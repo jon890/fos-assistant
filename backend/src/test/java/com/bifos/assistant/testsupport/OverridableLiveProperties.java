@@ -39,7 +39,7 @@ public final class OverridableLiveProperties<T> implements LiveProperties<T> {
     }
 
     /** 다음 {@link #reset} 까지 {@link #current} 가 이 값을 돌려준다. */
-    void override(Object value) {
+    public void override(Object value) {
         current = type.cast(Objects.requireNonNull(value, "value"));
     }
 

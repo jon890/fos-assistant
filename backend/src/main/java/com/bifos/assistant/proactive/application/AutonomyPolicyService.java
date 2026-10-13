@@ -260,13 +260,19 @@ public class AutonomyPolicyService {
     }
 
     /**
-     * 커밋한 실행 키로 읽기 전용 살펴보기를 시작하고 결과를 적는다. 실패해도 다시 시작하지 않는다. 결과를 적지 못하면 줄은 {@code PENDING}
+     * 커밋한 실행 키로 읽기 전용 살펴보기를 시작하고 결과를 적는다. 시작 직전에 사용자 동의와 설치의 자동 실행 설정을 다시 읽어 하나라도 꺼져
+     * 있으면 시작하지 않는다. 실패해도 다시 시작하지 않는다. 결과를 적지 못하면 줄은 {@code PENDING}
      * 으로 남고 그것도 다시 시작하지 않는다.
      */
     private AutonomyDecision execute(CurrentUser user, String agentCode, AutonomyDecision row) {
         AtomicReference<Long> startedCheck = new AtomicReference<>();
         String error = null;
         try {
+            // 판정을 저장한 뒤 동의를 철회했거나 설치의 자동 실행을 껐으면 시작하지 않는다. 시작 직전의 기록이 기준이다.
+            if (!properties.current().executionEnabled() || !readOnlyExecutionConsented(user)) {
+                throw new ApiException(
+                        ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "autonomous execution is no longer permitted");
+            }
             checkService.startAutonomous(user, agentCode, check -> startedCheck.set(check.id()));
         } catch (ApiException ex) {
             error = ex.code().name();
