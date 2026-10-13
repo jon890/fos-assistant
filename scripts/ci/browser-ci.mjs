@@ -85,13 +85,19 @@ export function collectFailures(report, project) {
   return failures;
 }
 
+// 이슈로 모으는 job 결론. 다음 push 에 밀려 취소된 실행(cancelled)과 skipped, neutral,
+// action_required 는 테스트 실패가 아니라서 허용 목록에 없다.
+// timeout-minutes 를 넘긴 job 이 API 에서 timed_out 으로 오는지 cancelled 로 오는지는 문서로 확인하지 못했다.
+// cancelled 로 오면 멈춘 shard 가 이슈 없이 지나가므로, 그 shard 는 필수 검사(check)가 실패로 막는다.
+const ISSUE_CONCLUSIONS = ["failure", "timed_out"];
+
 export async function collectJobFailures(jobs, readReport) {
   const failures = [];
   const shards = jobs.filter((job) =>
     /^browser-(mobile|desktop)-shard-\d+$/.test(job.name),
   );
   for (const job of shards) {
-    if (job.conclusion === "success") continue;
+    if (!ISSUE_CONCLUSIONS.includes(job.conclusion)) continue;
     const [, project, shard] = job.name.match(
       /^browser-(mobile|desktop)-shard-(\d+)$/,
     );
@@ -110,7 +116,7 @@ export async function collectJobFailures(jobs, readReport) {
         });
       }
     } catch {
-      // 취소 도중 잘린 JSON 도 다른 shard 의 실패 집계를 막지 않는다.
+      // 실패한 shard 의 JSON 이 잘렸거나 없어도 다른 shard 의 집계를 막지 않는다.
       found.push({
         file: `shard-${shard}-setup`,
         project,
@@ -122,7 +128,7 @@ export async function collectJobFailures(jobs, readReport) {
       found.push({
         file: `shard-${shard}-setup`,
         project,
-        title: "실패한 테스트 기록 없이 shard 실패 또는 취소",
+        title: "실패한 테스트 기록 없이 shard 실패",
         error: `job 결과: ${job.conclusion}`,
       });
     }
@@ -189,7 +195,8 @@ export async function publishFailures(failures, api, context) {
       });
     } else {
       const created = await api("POST", `${prefix}/issues`, {
-        title: `[브라우저 실패] ${first.project}: ${first.file}`,
+        // 분류는 라벨이 맡는다. 기존 이슈는 본문 marker 로 찾으므로 옛 제목의 이슈도 이어진다.
+        title: `${first.project}: ${first.file}`,
         labels: [LABEL],
         body: `${body}\n\n${HANDLING}`,
       });

@@ -17,6 +17,7 @@ case = fixture.ConnectorSnapshotTest("test_real_sdk_compile_and_catalog_use_the_
 try:
     case.setUpClass()
     case.setUp()
+    case.enable_jobs()
     bun = shutil.which("bun")
     if bun is None:
         raise RuntimeError("Bun이 필요합니다.")
@@ -44,7 +45,7 @@ try:
     catalog = json.loads(case.plugin._connector_catalog_response().body)
     sys.stdout.buffer.write(case.module._json_bytes({
         "catalog": catalog,
-        "answer": {"ok": True, "result": snapshot, "capabilities": fixture.SNAPSHOT["capabilities"]},
+        "answer": {"ok": True, "result": snapshot, "capabilities": {"compile": True, "start": True, "status": True}},
         "payloadHex": payload_bytes.hex(),
     }))
 finally:
