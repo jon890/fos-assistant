@@ -164,3 +164,6 @@ Python 계약 테스트는 커넥터 묶음(`dist/`)이 빌드돼 있어야 돈�
 | `hermes/connectors/tossinvest/tests/stock-statistics-integration.test.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/conditional-stdio.test.ts` | 수정 |
 | `hermes/connectors/tossinvest/tests/market-data-tools.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/market-info-tools.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/stock-tools.test.ts` | 수정 |
+| `hermes/connectors/tossinvest/tests/trading-review.test.ts` | 수정 |
