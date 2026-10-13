@@ -247,13 +247,15 @@ public class ConnectorPolicyService {
         // 직접 부른 호출도 위임 자식의 호출도 같은 트리 루트로 경계가 정해진다. 살펴보기 turn 의 트리면 루트가 그 turn 이다
         // (ADR-080). 그 살펴보기가 쓰기 도구를 허용했으면 쓰기를 거절하지 않고 승인 줄로 보낸다(ADR-082).
         CheckBoundary boundary = checkBoundary(origin);
+        // 결과를 모르는 쓰기를 같은 재시도 식별자로 다시 보내면 허락을 보지 않고 사람이 다시 본다(ADR-20261013 unknown-retry-key).
+        boolean resend = grants.resendsUnknown(connection, hermesTool, argsJson);
         ToolPolicyDecision decision = manifest.map(value -> ToolPolicyDecision.decide(
             usable,
             ownServerTool(value, hermesTool),
             value.schema(),
             declared,
-            grants.standing(connection, confirmedTool, now),
-            grants.inConversation(origin, connection, confirmedTool, now),
+            !resend && grants.standing(connection, confirmedTool, now),
+            !resend && grants.inConversation(origin, connection, confirmedTool, now),
             argsJson.getBytes(StandardCharsets.UTF_8).length,
             boundary))
             .orElseGet(ToolPolicyDecision::policyUnavailable);

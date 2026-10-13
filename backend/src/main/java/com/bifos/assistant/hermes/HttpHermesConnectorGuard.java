@@ -4,6 +4,7 @@ import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorApprovedExecution;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorErrorDetail;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
 import com.bifos.assistant.shared.util.Sha256;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -170,6 +171,11 @@ final class HttpHermesConnectorGuard {
             if (Set.of(400, 401, 404).contains(status) || (status == 409 && body.has("execution"))) {
                 return CallResult.failure(ConnectorCallError.UNAVAILABLE);
             }
+            if (status == 504 && response.getBody() != null) {
+                // 결과를 모른다. 커넥터가 선언한 코드와 재시도 식별자만 다시 검증해 싣는다(ADR-20261013 unknown-retry-key).
+                throw new ConnectorExecutionUnknown(ConnectorUnknownDetail.fromAnswer(MAPPER.readTree(response.getBody()))
+                    .orElse(null));
+            }
             if (status != 200 || response.getBody() == null) {
                 throw new ConnectorExecutionUnknown();
             }
@@ -188,6 +194,8 @@ final class HttpHermesConnectorGuard {
                 ConnectorCallError.fromWord(answer.path("error").asString())
                     .orElseThrow(ConnectorExecutionUnknown::new),
                 ConnectorErrorDetail.fromAnswer(answer).orElse(null));
+        } catch (ConnectorExecutionUnknown unknown) {
+            throw unknown;
         } catch (RuntimeException ignored) {
             throw new ConnectorExecutionUnknown();
         }

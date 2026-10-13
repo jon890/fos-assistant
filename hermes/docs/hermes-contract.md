@@ -546,7 +546,7 @@ v0.21.5(`v2026.9.24`)의 소스를 읽어 확인했다. 운영 Hermes 에서 왕
 | session 기록 | 이미지 파트는 `[screenshot]` 글로 저장된다(`session_persistence.py` 의 `_durable_content`). 다음 실행의 기록에 이미지가 다시 실리지 않는다 |
 | 같은 턴의 도구 루프 | 모델을 다시 부를 때마다 사용자가 올린 이미지가 다시 실린다. 요청에서 빼는 정책은 도구 결과 이미지에만 적용된다 |
 | 압축이 그 턴에 돈다 | 원본 파트가 기록에 남을 수 있다. 압축은 가장 최근 이미지 메시지 앞의 이미지를 「[Attached image — stripped after compression]」 으로 바꾼다 |
-| API 오류 | upstream 기본 writer는 요청 전체를 `request_dump_*.json`으로 남기며 base64도 들어간다. 관리 addon의 [본문 없는 요청 진단](#본문-없는-요청-진단)은 설치한 interpreter의 이 writer만 교체한다 |
+| API 오류 | upstream 기본 writer는 요청 전체를 `request_dump_*.json`으로 남기며 base64도 들어간다. 관리 addon의 [본문 없는 요청 진단](#본문-없는-요청-진단)은 설치한 interpreter의 이 writer만 교체한다. 운영 gateway 에는 2026-10-13 결정으로 설치하지 않아, 운영에서는 이 기본 writer 가 그대로 남긴다 |
 | `pre_llm_call`, `post_llm_call` hook | `user_message` 로 목록을 그대로 받는다. 우리 plugin 은 두 hook 을 쓰지 않는다 |
 | 사용량 | 이미지 토큰을 따로 나누지 않는다. provider 가 준 입력 토큰에 섞인다 |
 | `detail` | Responses 만 옮기고 Anthropic, Gemini 는 무시한다. Control Plane 은 보내지 않는다. openai-codex 의 클라이언트는 `low` 를 지원하지 않는다며 막는다 |
@@ -841,6 +841,10 @@ Control Plane 은 지운 대화를 정리할 때 이 경로를 부른다. 근거
 
 ## 본문 없는 요청 진단
 
+**운영 상태: 연결하지 않음 (2026-10-13).** 아래는 addon 의 계약이다. 운영 gateway 에는 설치하지 않으며,
+두 오류 경로는 upstream 기본 writer 가 요청 전체를 남긴다. 결정과 감수한 위험, 재검토 조건은
+[ADR-20261012 / bodyless-request-diagnostics](adr/ADR-20261012-bodyless-request-diagnostics.md) 가 갖는다.
+
 고정 upstream의 `HERMES_DUMP_REQUESTS`는 preflight만 켜거나 끈다. 두 terminal 오류는 이 값과 무관하게
 `agent.agent_runtime_helpers.dump_api_request_debug`를 호출한다. `HERMES_DUMP_REQUEST_STDOUT`은
 파일 저장 뒤 stdout에도 같은 내용을 출력하는 옵션이며 전체 dump 금지가 아니다.
@@ -974,7 +978,8 @@ Gemini functionResponse의 parts는 읽되 임의 response 객체는 탐색하�
 immutable manifest는 image·실제 interpreter·core helper와 lazy forward/callsite·writer bundle·adapter를 독립적으로 봉인한다.
 SDK의 malformed stdout 처리와 framework의 기존 오류 로그 가림도 별도로 수락해야 한다.
 이 writer는 새 요청 진단과 자신의 출력만 제한한다. SDK·framework·session·trajectory 전체 가림이나 운영 보호 완료를 증명하지 않는다.
-운영 연결과 배포 뒤 실제 Hermes 왕복은 `fos-home-infra`가 맡는다.
+본문 없는 writer는 운영에 연결하지 않았다. 오류 때 요청 원문이 진단 파일에 남을 수 있는 위험을 감수하며 upstream 추적은 [#518](https://github.com/jon890/fos-assistant/issues/518)이 갖는다.
+배포 뒤 실제 Hermes 왕복은 원고 기능의 확인 순서를 따른다.
 
 ## 동시 실행
 
@@ -2867,6 +2872,7 @@ nonce와 성공 원문을 저장하거나 자식에 서비스 비밀값을 전�
 
 snapshot은 별도 `POST /api/connectors/{id}/snapshot` 서비스 경로다. <!-- ref-ignore: plugin middleware가 처리하는 서비스 경로다 -->
 handler도 서비스 Bearer를 직접 검사하여 쿠키만 있는 요청은 받지 않는다.
+Control Plane은 이 경로에 HTTP/1.1로 보낸다. uvicorn 0.54.0과 httptools 0.9.0에서 `Upgrade: h2c`를 붙인 POST는 본문 없이 처리돼 plugin이 빈 본문을 400으로 거절했다.
 manifest의 정확한 다섯 키는 `protocol`, `compile_tool`, `start_tool`, `status_tool`, `capabilities`다.
 protocol은 `content-snapshot-v1`이고 capabilities는 `compile`, `start`, `status` 세 boolean이다. compile은 true이고 start와 status는 함께 켜거나 끈다. 추가 키·누락·boolean이 아닌 값은 거절한다.
 운영 선언은 `{compile:true,start:true,status:true}`다.

@@ -21,6 +21,7 @@ import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.infra.FeedbackEventRepository;
 import com.bifos.assistant.proactive.application.AutonomyPolicyService;
+import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.AutonomyDecision;
 import com.bifos.assistant.proactive.domain.AutonomyInputs;
@@ -51,10 +52,12 @@ import com.bifos.assistant.proactive.infra.ProactiveCheckProblemRepository;
 import com.bifos.assistant.proactive.infra.ProactiveCheckRepository;
 import com.bifos.assistant.proactive.infra.ValueEvaluationRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -74,8 +77,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @OverrideProperties("assistant.autonomy.execution-enabled=true")
 class AutonomyPolicyServiceTest {
 
-    private static final CurrentUser OWNER =
-            new CurrentUser(951_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(951_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
     private static final CurrentUser OTHER = new CurrentUser(951_002L, "other@example.com", "사용자B", 1L, UserRole.ADMIN);
 
     @Autowired
@@ -108,6 +110,9 @@ class AutonomyPolicyServiceTest {
     @Autowired
     FeedbackEventRepository feedbackEvents;
 
+    @Autowired
+    LiveProperties<AutonomyProperties> properties;
+
     /** 실제 살펴보기를 시작하지 않는다. 시작 경로를 불렀는지와 그 결과를 검사마다 정한다. */
     @Autowired
     ProactiveCheckService checkService;
@@ -117,20 +122,21 @@ class AutonomyPolicyServiceTest {
     private ProactiveCheck source;
     private ProactiveCheck started;
 
+
     @BeforeEach
     void setUp() {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         transactions.executeWithoutResult(status -> {
             agent = agents.save(Agent.of(
-                    "autonomy-" + UUID.randomUUID(),
-                    "커리어",
-                    "autonomy-profile-" + UUID.randomUUID(),
-                    "http://agent-runtime.test/p/autonomy",
-                    CostMode.SUBSCRIPTION,
-                    CredentialScope.SHARED_HOUSEHOLD,
-                    AgentVisibility.PRIVATE,
-                    OWNER.id(),
-                    now));
+                "autonomy-" + UUID.randomUUID(),
+                "커리어",
+                "autonomy-profile-" + UUID.randomUUID(),
+                "http://agent-runtime.test/p/autonomy",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                OWNER.id(),
+                now));
             conversation = conversations.save(Conversation.startedForCheck(OWNER.id(), "행동 정책", agent.id(), now));
             source = succeeded(CheckTrigger.MANUAL, now);
             started = succeeded(CheckTrigger.AUTONOMY, now);
@@ -139,11 +145,12 @@ class AutonomyPolicyServiceTest {
         doReturn(null).when(checkService).startAutonomous(any(), any(), any());
     }
 
+
     @AfterEach
     void tearDown() {
         transactions.executeWithoutResult(status -> {
             feedbackEvents.deleteAll(feedbackEvents.findByUserIdAndOccurredAtGreaterThanEqualOrderByOccurredAtAscIdAsc(
-                    OWNER.id(), Instant.EPOCH));
+                OWNER.id(), Instant.EPOCH));
             decisions.deleteAll();
             preferences.deleteAll();
             evaluations.deleteAll();
@@ -154,16 +161,17 @@ class AutonomyPolicyServiceTest {
         });
     }
 
+
     @Test
     @DisplayName("안전한 후보는 읽기 전용 살펴보기를 한 번 시작하고 같은 원천을 다시 판정해도 다시 시작하지 않는다")
     void executesOnceForSource() {
         ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
         doAnswer(invocation -> {
-                    invocation.<Consumer<ProactiveCheck>>getArgument(2).accept(started);
-                    return conversation.publicId();
-                })
-                .when(checkService)
-                .startAutonomous(eq(OWNER), eq(agent.code()), any());
+            invocation.<Consumer<ProactiveCheck>>getArgument(2).accept(started);
+            return conversation.publicId();
+        })
+            .when(checkService)
+            .startAutonomous(eq(OWNER), eq(agent.code()), any());
 
         AutonomyDecision first = service.decide(OWNER, evaluation.id()).getFirst();
         AutonomyDecision second = service.decide(OWNER, evaluation.id()).getFirst();
@@ -172,12 +180,13 @@ class AutonomyPolicyServiceTest {
         assertThat(first.reasons()).containsExactly(AutonomyReason.READ_ONLY_SAFE);
         assertThat(first.executionStatus()).isEqualTo(AutonomyExecutionStatus.STARTED);
         assertThat(decisions.findById(first.id()).orElseThrow().executionCheckId())
-                .isEqualTo(started.id());
+            .isEqualTo(started.id());
         assertThat(second.level()).isEqualTo(AutonomyLevel.SURFACE);
         assertThat(second.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
         assertThat(second.executionKey()).isNull();
         verify(checkService, times(1)).startAutonomous(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("다른 요청이 실행 키를 먼저 저장해 유일 제약에 걸리면 다시 판정해 ALREADY_EXECUTED 로 남기고 시작하지 않는다")
@@ -185,15 +194,15 @@ class AutonomyPolicyServiceTest {
         ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
         // 첫 판정이 실행 키를 보지 못한 사이에 다른 요청이 같은 원천의 실행 키를 커밋한 상황이다.
         transactions.executeWithoutResult(status -> decisions.save(AutonomyDecision.of(
-                OWNER.id(),
-                evaluation.id(),
-                evaluation.evidence().state().candidates().getFirst().candidateId(),
-                source.id(),
-                AutonomyLevel.EXECUTE,
-                List.of(AutonomyReason.READ_ONLY_SAFE),
-                decisionsInputsPlaceholder(),
-                1,
-                Instant.now())));
+            OWNER.id(),
+            evaluation.id(),
+            evaluation.evidence().state().candidates().getFirst().candidateId(),
+            source.id(),
+            AutonomyLevel.EXECUTE,
+            List.of(AutonomyReason.READ_ONLY_SAFE),
+            decisionsInputsPlaceholder(),
+            1,
+            Instant.now())));
         doReturn(false).doReturn(true).when(decisions).existsByExecutionKey(any());
 
         List<AutonomyDecision> decided = service.decide(OWNER, evaluation.id());
@@ -205,6 +214,7 @@ class AutonomyPolicyServiceTest {
         });
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("가치가 높은 외부 쓰기 후보는 ASK_APPROVAL 이고 시작 경로를 부르지 않는다")
@@ -220,6 +230,7 @@ class AutonomyPolicyServiceTest {
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
+
     @Test
     @DisplayName("동의를 끄면 USER_AUTONOMY_DISABLED 로 SURFACE 이고 시작하지 않는다")
     void withdrawnConsentSurfaces() {
@@ -234,6 +245,58 @@ class AutonomyPolicyServiceTest {
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
+
+    @Test
+    @DisplayName("판정을 저장한 뒤 시작 전에 동의를 철회하면 시작하지 않고 FAILED 로 남긴다")
+    void consentWithdrawnAfterDecisionStopsStart() {
+        ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
+        doAnswer(invocation -> {
+            List<AutonomyDecision> saved = decisions.saveAll(invocation.<List<AutonomyDecision>>getArgument(0));
+            decisions.flush();
+            service.changeReadOnlyExecution(OWNER, false);
+            return saved;
+        })
+            .when(decisions)
+            .saveAllAndFlush(any());
+
+        AutonomyDecision decision = service.decide(OWNER, evaluation.id()).getFirst();
+
+        assertThat(decision.level()).isEqualTo(AutonomyLevel.EXECUTE);
+        assertThat(decision.executionStatus()).isEqualTo(AutonomyExecutionStatus.FAILED);
+        assertThat(decision.executionError()).isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE.name());
+        assertThat(feedbackEvents.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(
+            OWNER.id(), List.of("autonomy_decision:" + decision.id())))
+                .isEmpty();
+        verify(checkService, never()).startAutonomous(any(), any(), any());
+    }
+
+
+    @Test
+    @DisplayName("판정을 저장한 뒤 시작 전에 설치의 자동 실행 설정이 꺼지면 시작하지 않고 FAILED 로 남긴다")
+    void executionDisabledAfterDecisionStopsStart() {
+        ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
+        doAnswer(invocation -> {
+            List<AutonomyDecision> saved = decisions.saveAll(invocation.<List<AutonomyDecision>>getArgument(0));
+            decisions.flush();
+            OverridableLiveProperties.during(
+                properties,
+                new AutonomyProperties(
+                    false,
+                    properties.current().maxEvaluationAge(),
+                    properties.current().maxEvidenceAge()));
+            return saved;
+        })
+            .when(decisions)
+            .saveAllAndFlush(any());
+
+        AutonomyDecision decision = service.decide(OWNER, evaluation.id()).getFirst();
+
+        assertThat(decision.executionStatus()).isEqualTo(AutonomyExecutionStatus.FAILED);
+        assertThat(decision.executionError()).isEqualTo(ErrorCode.PROACTIVE_CHECK_UNAVAILABLE.name());
+        verify(checkService, never()).startAutonomous(any(), any(), any());
+    }
+
+
     @Test
     @DisplayName("replay 평가는 다른 조건이 맞아도 시작하지 않는다")
     void replayNeverStarts() {
@@ -247,13 +310,14 @@ class AutonomyPolicyServiceTest {
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
+
     @Test
     @DisplayName("시작이 거절되면 FAILED 로 남기고 다시 판정해도 다시 시작하지 않는다")
     void failedStartIsNotRetried() {
         ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
         doThrow(new ApiException(ErrorCode.USER_BUSY, "busy"))
-                .when(checkService)
-                .startAutonomous(any(), any(), any());
+            .when(checkService)
+            .startAutonomous(any(), any(), any());
 
         AutonomyDecision failed = service.decide(OWNER, evaluation.id()).getFirst();
         AutonomyDecision again = service.decide(OWNER, evaluation.id()).getFirst();
@@ -263,7 +327,7 @@ class AutonomyPolicyServiceTest {
         assertThat(again.reasons()).containsExactly(AutonomyReason.ALREADY_EXECUTED);
         verify(checkService, times(1)).startAutonomous(any(), any(), any());
         assertThat(feedbackEvents.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(
-                        OWNER.id(), List.of("autonomy_decision:" + failed.id())))
+            OWNER.id(), List.of("autonomy_decision:" + failed.id())))
                 .singleElement()
                 .satisfies(event -> {
                     assertThat(event.eventType()).isEqualTo(FeedbackEventType.EXECUTION_FAILED);
@@ -273,24 +337,25 @@ class AutonomyPolicyServiceTest {
                 });
     }
 
+
     @Test
     @DisplayName("다른 사용자의 평가는 관리자에게도 없는 평가다")
     void otherUserCannotDecide() {
         ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
 
         assertThatThrownBy(() -> service.decide(OTHER, evaluation.id()))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALUE_EVALUATION_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALUE_EVALUATION_NOT_FOUND));
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
+
 
     @Test
     @DisplayName("평가 뒤 후보 줄이 지워졌으면 IGNORE 다")
     void missingCandidateIgnores() {
         ValueEvaluation evaluation = evaluation(null, candidate("study:example", "NONE"));
-        transactions.executeWithoutResult(status ->
-                problems.deleteAll(problems.findByCheckIdAndStatusOrderByIdAsc(source.id(), ProblemStatus.ACCEPTED)));
+        transactions.executeWithoutResult(status -> problems.deleteAll(problems.findByCheckIdAndStatusOrderByIdAsc(source.id(), ProblemStatus.ACCEPTED)));
 
         AutonomyDecision decision = service.decide(OWNER, evaluation.id()).getFirst();
 
@@ -299,10 +364,12 @@ class AutonomyPolicyServiceTest {
         verify(checkService, never()).startAutonomous(any(), any(), any());
     }
 
+
     /** 미리 넣는 실행 키 줄의 입력이다. 판정에는 쓰이지 않는다. */
     private static AutonomyInputs decisionsInputsPlaceholder() {
         return AutonomyFixtures.safe().build();
     }
+
 
     private ProactiveCheck succeeded(CheckTrigger trigger, Instant now) {
         ProactiveCheck check = ProactiveCheck.started(OWNER.id(), agent.id(), conversation.id(), trigger, false, now);
@@ -310,51 +377,53 @@ class AutonomyPolicyServiceTest {
         return checks.save(check);
     }
 
+
     private ProactiveCheckProblem candidate(String key, String sideEffect) {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         return transactions.execute(status -> problems.save(ProactiveCheckProblem.of(
-                source.id(),
-                conversation.id(),
-                ProblemStatus.ACCEPTED,
-                null,
-                key,
-                "합성 문제",
-                "합성 목표",
-                "ACTION",
-                "합성 행동",
-                "HIGH",
-                "합성 효과",
-                sideEffect,
-                null,
-                null,
-                List.of(new ProblemEvidence(key, "https://docs.example.com/" + key, now.minusSeconds(60))),
-                now.minusSeconds(60),
-                now)));
+            source.id(),
+            conversation.id(),
+            ProblemStatus.ACCEPTED,
+            null,
+            key,
+            "합성 문제",
+            "합성 목표",
+            "ACTION",
+            "합성 행동",
+            "HIGH",
+            "합성 효과",
+            sideEffect,
+            null,
+            null,
+            List.of(new ProblemEvidence(key, "https://docs.example.com/" + key, now.minusSeconds(60))),
+            now.minusSeconds(60),
+            now)));
     }
+
 
     /** 모든 축이 실행에 맞는 판단을 가진 평가를 저장한다. */
     private ValueEvaluation evaluation(Long replayOfId, ProactiveCheckProblem problem) {
         Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         DecisionCandidate snapshot = DecisionCandidate.from(problem);
         List<AxisJudgement> axes = Arrays.stream(DecisionAxis.values())
-                .map(axis -> new AxisJudgement(
-                        axis,
-                        axis == DecisionAxis.COST || axis == DecisionAxis.RISK ? DecisionLevel.LOW : DecisionLevel.HIGH,
-                        DecisionConfidence.HIGH,
-                        "합성 판단",
-                        List.of(problem.problemKey())))
-                .toList();
+            .map(axis -> new AxisJudgement(
+                axis,
+                axis == DecisionAxis.COST || axis == DecisionAxis.RISK ? DecisionLevel.LOW : DecisionLevel.HIGH,
+                DecisionConfidence.HIGH,
+                "합성 판단",
+                List.of(problem.problemKey())))
+            .toList();
         DecisionEvidence evidence = new DecisionEvidence(
-                new DecisionState(1, now, List.of(snapshot)),
-                List.of(),
-                new DecisionProviderInfo("fixture", "1", null, null, null, null, null),
-                new DecisionResult(
-                        DecisionOutcome.EVALUATED,
-                        List.of(new CandidateJudgement(snapshot.candidateId(), axes, DecisionConfidence.HIGH, "합성")),
-                        List.of(snapshot.candidateId()),
-                        "합성 비교",
-                        null));
+            new DecisionState(1, now, List.of(snapshot)),
+            List.of(),
+            new DecisionProviderInfo("fixture", "1", null, null, null, null, null),
+            new DecisionResult(
+                DecisionOutcome.EVALUATED,
+                List.of(new CandidateJudgement(snapshot.candidateId(), axes, DecisionConfidence.HIGH, "합성")),
+                List.of(snapshot.candidateId()),
+                "합성 비교",
+                null));
         return transactions.execute(
-                status -> evaluations.save(ValueEvaluation.of(source.id(), OWNER.id(), replayOfId, evidence, now)));
+            status -> evaluations.save(ValueEvaluation.of(source.id(), OWNER.id(), replayOfId, evidence, now)));
     }
 }

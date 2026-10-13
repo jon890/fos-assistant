@@ -109,16 +109,17 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
         Long conversationId = snapshot.conversationId();
         // 지금 호출한 실행이 같은 사용자·대화의 취소되지 않은 실행이고 snapshot 의 에이전트와 같아야 한다.
         if (!snapshot.agentId().equals(inputs.agent(user, conversationId, originExecutionId))) {
-            throw ContentDraftSnapshotHash.unavailable();
+            throw ContentDraftSnapshotHash.unavailable("save:other-agent");
         }
         var existing = jobs.findBySnapshotId(snapshot.id());
         if (existing.isPresent()) {
             return requestView(snapshot, existing.get());
         }
         var stamp = bindings.prepare(user, snapshot.agentId(), snapshot.bindingId());
-        var manifest = catalog.find(stamp.connectorId()).orElseThrow(ContentDraftSnapshotHash::unavailable);
+        var manifest = catalog.find(stamp.connectorId()).orElseThrow(() -> ContentDraftSnapshotHash.unavailable("save:catalog-missing"));
         String argsJson = "{\"snapshotId\":\"" + snapshotId + "\"}";
-        var decision = ContentDraftSaveApproval.decide(manifest, argsJson).orElseThrow(ContentDraftSnapshotHash::unavailable);
+        var decision = ContentDraftSaveApproval.decide(manifest, argsJson)
+            .orElseThrow(() -> ContentDraftSnapshotHash.unavailable("save:approval-undecided"));
         var inserted = new AtomicBoolean();
         try {
             var created = mutations.run(user.id(), new ChatContentMutationTarget(conversationId, List.of()), () -> {
@@ -131,8 +132,9 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                     return requestView(snapshot, again.get());
                 }
                 Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-                var origin = executions.findById(originExecutionId).orElseThrow(ContentDraftSnapshotHash::unavailable);
-                var connection = bindingRows.findById(snapshot.bindingId()).orElseThrow(ContentDraftSnapshotHash::unavailable).connection();
+                var origin = executions.findById(originExecutionId).orElseThrow(() -> ContentDraftSnapshotHash.unavailable("origin:not-found"));
+                var connection = bindingRows.findById(snapshot.bindingId())
+                    .orElseThrow(() -> ContentDraftSnapshotHash.unavailable("binding:not-found")).connection();
                 var action = ConnectorAction.decided(connection, snapshot.agentId(), origin,
                     HERMES_TOOL, ContentDraftSaveApproval.SAVE_TOOL,
                     decision, false, Sha256.hex(DEDUPE_PREFIX + ":" + user.id() + ":" + snapshotId), Sha256.hex(argsJson), now);

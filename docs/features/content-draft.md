@@ -218,6 +218,7 @@ Java의 네 compile slot과 dashboard의 기존 공유 네 호출 slot을 모두
 ## 승인 snapshot과 저장 job
 
 #396·#398의 새 글 임시저장을 기존 승인 줄과 서버가 예약한 worker jobId로 잇는다. 결정 근거는 [ADR-20261011 / content-snapshot-job](../adr/ADR-20261011-content-snapshot-job.md)이다.
+토스 주문, Gmail 보내기와 견준 준비, 승인, 실행, 확인의 요약과 실사용 Go/No-Go 는 [커넥터별 준비, 승인, 실행, 확인](connector-policy.md#커넥터별-준비-승인-실행-확인)이 갖는다.
 승인 요청·jobId 예약·worker 허가·보관 상태 조회는 Control Plane에 구현되어 있다.
 worker 시작 전송과 private 상태 조회, MCP 도구와 REST·화면 연결이 구현되어 있다. catalog가 시작을 선언하지 않는 동안 승인은 실행 없이 거절한다.
 

@@ -42,6 +42,8 @@ import com.bifos.assistant.hermes.dto.CallResult;
 import com.bifos.assistant.hermes.dto.ConnectorCallError;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.hermes.dto.ConnectorTool;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownDetail;
+import com.bifos.assistant.hermes.dto.ConnectorUnknownErrors;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.mcp.infra.AgentTokenRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -429,6 +431,49 @@ class ConnectorConversationGrantTest {
         assertThat(conversationGrants.findAll()).hasSize(2)
             .allSatisfy(grant -> assertThat(grant.revokedAt()).isNotNull());
         assertThat(service.conversationGrants(me, conversation.id())).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("결과를 모르는 쓰기를 같은 재시도 식별자로 다시 부르면 다른 줄이 준 대화 허락이 있어도 새 승인을 기다린다")
+    void resendWithRetryIdentifierIgnoresConversationGrant() {
+        String attemptId = "0b7f3c1e-5d2a-4c8e-9f61-2a3b4c5d6e7f";
+        ConnectorManifest declaring = new ConnectorManifest(
+            DECLARING.id(),
+            DECLARING.title(),
+            DECLARING.description(),
+            DECLARING.fields(),
+            DECLARING.verifyTool(),
+            DECLARING.mcpServer(),
+            DECLARING.toolsets(),
+            DECLARING.attachments(),
+            DECLARING.schema(),
+            DECLARING.tools(),
+            DECLARING.skills(),
+            DECLARING.appearance(),
+            DECLARING.singleBinding(),
+            DECLARING.ownerBrowser(),
+            DECLARING.ownerBrowserLoginUrl(),
+            DECLARING.executionGuard(),
+            DECLARING.executionGuardManifestSha256(),
+            DECLARING.snapshot(),
+            new ConnectorUnknownErrors(Map.of("CAREER_OUTCOME_UNKNOWN", "attemptId")));
+        when(connector.readCatalog()).thenReturn(List.of(declaring));
+        ConnectorCatalogTimes.expire();
+        when(connector.execute(anyString(), anyString(), anyString(), anyString()))
+            .thenThrow(new ConnectorExecutionUnknown(new ConnectorUnknownDetail("CAREER_OUTCOME_UNKNOWN", "attemptId", attemptId)))
+            .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
+
+        assertThat(service.approve(me, ask(root, WRITE, ARGS).actionId(), null).status()).isEqualTo(ActionStatus.UNKNOWN);
+        assertThat(service.approve(me, ask(root, WRITE, "{\"text\":\"다른 글\"}").actionId(), null, true).status())
+            .isEqualTo(ActionStatus.SUCCEEDED);
+
+        ConnectorPolicyAnswer resend = ask(root, WRITE, "{\"text\":\"안녕\",\"attemptId\":\"" + attemptId + "\"}");
+        assertThat(resend.allowed()).isFalse();
+        assertThat(resend.actionId()).isNotNull();
+        // 식별자를 싣지 않은 호출에는 대화 허락이 그대로 통한다.
+        assertThat(ask(root, WRITE, "{\"text\":\"세 번째 글\"}").allowed()).isTrue();
+        assertThat(service.conversationGrants(me, conversation.id())).hasSize(1);
     }
 
 

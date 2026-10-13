@@ -352,6 +352,10 @@ def _connector_catalog_response():
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),
+          # 결과를 모르는 코드와 그 재시도 식별자 칸 이름이다. Control Plane 이 504 본문을 이 선언과 대조한다
+          # (ADR-20261013 unknown-retry-key). `retry_key` 를 선언하지 않은 코드는 null 이다.
+          "unknown_errors": {code: (manifest["error_contracts"].get(code) or {}).get("retry_key")
+                             for code, word in sorted(manifest["errors"].items()) if word == OUTCOME_UNKNOWN},
           **({"snapshot": manifest["snapshot"]} if manifest.get("snapshot") is not None else {}),
           **{key: manifest[key] for key in ("execution_guard", "execution_guard_manifest_sha256") if manifest[key] is not None},
           # 사람 말 제목과 요약이 없는 도구는 `title` 과 `summary` 를 내지 않는다. 화면은 도구 이름 대신 대체 문구를 보인다.

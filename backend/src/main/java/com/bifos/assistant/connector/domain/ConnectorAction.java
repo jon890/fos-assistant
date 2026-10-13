@@ -281,6 +281,17 @@ public class ConnectorAction {
     }
 
 
+    /**
+     * 결과를 모르는 줄에 커넥터가 선언한 코드와 재시도 식별자를 함께 남긴다(ADR-20261013 unknown-retry-key).
+     *
+     * @param storedResult 저장할 글. 암호화가 켜져 있으면 이미 봉인한 글이다
+     */
+    public void unknown(String storedResult, Long keyId, Instant now) {
+        unknown(now);
+        sealResult(storedResult, keyId);
+    }
+
+
     public void reject(Instant now) {
         require(ActionStatus.PENDING);
         this.status = ActionStatus.REJECTED;
