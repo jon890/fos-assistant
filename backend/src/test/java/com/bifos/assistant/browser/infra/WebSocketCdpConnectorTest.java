@@ -37,9 +37,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+@ExtendWith(OutputCaptureExtension.class)
 class WebSocketCdpConnectorTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -93,6 +97,46 @@ class WebSocketCdpConnectorTest {
             assertThatThrownBy(() -> result.get(2, TimeUnit.SECONDS))
                     .isInstanceOf(ExecutionException.class)
                     .hasMessageNotContaining("example.com");
+        }
+    }
+
+    @Test
+    @DisplayName("글자 입력 명령이 실패해도 입력한 글자는 예외와 로그에 남지 않는다")
+    void keepsTypedTextOutOfFailuresAndLogs(CapturedOutput output) throws Exception {
+        String secret = "pw-SYNTH-7f3a9c";
+        try (CdpConnection connection = connect(event -> {}, () -> {})) {
+            CompletableFuture<JsonNode> rejected = connection.send("Input.insertText", Map.of("text", secret));
+            JsonNode sent = server.nextMessage();
+            server.sendText("{\"id\":" + sent.path("id").asLong()
+                    + ",\"error\":{\"code\":-32000,\"message\":\"" + secret + "\"}}");
+            CompletableFuture<JsonNode> unserializable = connection.send("Input.insertText", Map.of("text", new Object() {
+                @Override
+                public String toString() {
+                    return secret;
+                }
+            }));
+            CompletableFuture<JsonNode> unanswered = connection.send("Input.insertText", Map.of("text", secret));
+            server.nextMessage();
+
+            assertThat(failureText(rejected)).doesNotContain(secret);
+            assertThat(failureText(unserializable)).doesNotContain(secret);
+            assertThat(failureText(unanswered)).doesNotContain(secret);
+        }
+
+        assertThat(output.getAll()).doesNotContain(secret);
+    }
+
+    /** 실패한 결과의 예외 사슬을 메시지까지 한 문자열로 모은다. */
+    private static String failureText(CompletableFuture<JsonNode> result) {
+        try {
+            result.get(2, TimeUnit.SECONDS);
+            return "";
+        } catch (Exception ex) {
+            StringBuilder text = new StringBuilder();
+            for (Throwable each = ex; each != null; each = each.getCause()) {
+                text.append(each).append('\n');
+            }
+            return text.toString();
         }
     }
 

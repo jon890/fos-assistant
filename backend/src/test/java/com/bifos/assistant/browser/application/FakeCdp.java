@@ -31,6 +31,8 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
 
     public volatile boolean failConnect;
     public volatile boolean failList;
+    /** 이 메서드의 명령은 인자를 메시지에 담은 예외로 실패한다. 예외 메시지가 로그로 새는지 보는 검사가 쓴다. */
+    public volatile String failMethod;
     /** 이 탭의 다음 {@code Page.startScreencast} 응답을 {@link #releaseScreencast()} 까지 붙잡는다. */
     public volatile String holdScreencast;
 
@@ -132,6 +134,9 @@ public final class FakeCdp implements CdpTargets, CdpConnector {
                 return CompletableFuture.failedFuture(new IllegalStateException("cdp connection is closed"));
             }
             sent.add(new Sent(targetId, method, params));
+            if (method.equals(failMethod)) {
+                return CompletableFuture.failedFuture(new IllegalStateException("cdp rejected " + params));
+            }
             if ("Page.startScreencast".equals(method) && targetId.equals(holdScreencast)) {
                 holdScreencast = null;
                 heldScreencast = new CompletableFuture<>();
