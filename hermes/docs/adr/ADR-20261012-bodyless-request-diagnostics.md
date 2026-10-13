@@ -1,7 +1,19 @@
 ## ADR-20261012 / bodyless-request-diagnostics: 관리 bootstrap이 요청 진단 writer를 본문 없는 writer로 교체한다
 
-- **status**: `accepted`
+- **status**: `accepted`, 운영 미연결 (2026-10-13)
 - Date: 2026-10-12
+
+### 운영 연결 보류 (2026-10-13)
+
+- **결정 날짜**: 2026-10-13. 사용자가 정했다.
+- **결정**: `hermes/runtime/` 의 writer 를 운영 gateway 에 연결하지 않는다. 운영의 preflight 와 두 오류 경로는 upstream 기본 writer 가 요청 전체를 `request_dump_*.json` 으로 남긴다.
+- **까닭**: 운영 gateway 는 프로세스 하나가 모든 profile 을 요청마다 scope 를 바꿔 처리한다. 기동 때 profile 하나를 정하는 관리 bootstrap 과 맞지 않는다. 맞추려면 설계를 바꿔야 하고, 그 비용에 비해 얻는 것이 작다고 판단했다.
+- **감수한 위험**: 오류가 난 요청의 원문(원고 본문, 첨부 사진, 금융 요청의 인자)이 운영 서버의 진단 파일에 남을 수 있다. 서버 자체가 침해되면 그 파일도 노출된다. v0.21.6 의 mcp stdio 검증 오류 로그에 원문 stdout 줄이 들어가는 것도 같은 위험으로 감수한다.
+- **다시 검토할 조건**
+  - Hermes upstream 에 요청 진단 dump 를 끄거나 명시적으로 켜야만 남기는 공식 설정이 생길 때. 새 버전을 올릴 때마다 release note 와 `agent` 의 request dump 경로를 확인한다.
+  - 추적은 #518 에서 한다.
+- **조건이 생기면**: 그 설정을 운영 profile 에 적용하고, 이 ADR 의 상태를 갱신하고, `hermes/runtime/bodyless_*` 를 지울지 정한다.
+- 이 보류 상태에서 운영 보호가 설치됐다고 보고하지 않는다. 아래 설계와 계약 테스트는 addon 이 준비된 상태로 그대로 둔다.
 
 ### 맥락
 

@@ -17,8 +17,10 @@ plugin 디렉터리의 모든 `*.py` 와 `plugin.yaml`, 주소를 채운 `defaul
 묶음을 Hermes 에 넣고 대시보드를 다시 띄우는 것은 운영 저장소가 한다.
 디렉터리 배치와 배포 순서는 [`hermes/docs/code-architecture.md`](docs/code-architecture.md) 의 「디렉터리 배치와 배포 순서」 가 갖는다.
 
-`runtime/`은 PluginManager가 선택 등록하는 plugin이 아니다. 운영은 이 묶음을 별도 관리 import 경로에 두고,
-검증한 bootstrap에서 `from runtime import install_bodyless_writer`로 명시 설치한다.
+`runtime/`은 PluginManager가 선택 등록하는 plugin이 아니다. 설계는 이 묶음을 별도 관리 import 경로에 두고,
+검증한 bootstrap에서 `from runtime import install_bodyless_writer`로 명시 설치하는 것이다.
+다만 2026-10-13 에 운영 gateway 에는 연결하지 않기로 했다. 요청 진단이 본문을 남기는 위험을 감수하고,
+upstream 에 공식 설정이 생길 때 다시 본다. 까닭과 재검토 조건은 [ADR-20261012 / bodyless-request-diagnostics](docs/adr/ADR-20261012-bodyless-request-diagnostics.md) 가 갖는다.
 묶음에 들어 있다는 사실만으로 보호가 설치되지는 않는다. API와 resolver·release manifest 계약은
 [본문 없는 요청 진단](docs/hermes-contract.md#본문-없는-요청-진단)이 갖는다.
 
