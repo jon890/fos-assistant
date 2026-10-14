@@ -4,9 +4,8 @@
   "status": "in_progress",
   "created_at": "2026-10-11",
   "total_phases": 6,
-  "current_phase": 4,
+  "current_phase": 5,
   "phases": [
-    { "number": 4, "file": "phase-04.md", "execution_profile": "deep" },
     { "number": 5, "file": "phase-05.md", "execution_profile": "deep" },
     { "number": 6, "file": "phase-06.md", "execution_profile": "deep" }
   ]
