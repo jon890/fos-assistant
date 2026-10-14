@@ -135,7 +135,7 @@ async function probe(page: EditorPage, selector: string, scope: string) {
   };
 }
 
-/** 기존 대기 안에서 문단을 다시 찾고, 가림을 우회하지 않으며 실제 클릭 뒤 커서를 확인한다. */
+/** 기존 대기 안에서 문단을 다시 찾고, 덮은 요소를 누르거나 치우지 않고 같은 문단에서 덮이지 않은 지점만 누르며 실제 클릭 뒤 커서를 확인한다. */
 export async function focusField(
   page: EditorPage,
   selector: string,
