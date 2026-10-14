@@ -625,7 +625,11 @@ test("운영 서버의 prepare_trade는 정정을 받지 않고 HTTP 0회다", a
       async (client) => {
         const response = await client.callTool({
           name: "prepare_trade",
-          arguments: { v: 1, tool: "modify_order", args: model("modify_order") },
+          arguments: {
+            v: 1,
+            tool: "modify_order",
+            args: model("modify_order"),
+          },
         });
         expect(response.isError).toBe(true);
         expect(

@@ -66,8 +66,7 @@ describe("토스증권 커넥터 계약", () => {
         const risk =
           manifest.tools[item.name as keyof typeof manifest.tools].risk;
         expect(["READ", "FINANCIAL"]).toContain(risk);
-        if (risk === "READ")
-          expect(item.annotations?.readOnlyHint).toBe(true);
+        if (risk === "READ") expect(item.annotations?.readOnlyHint).toBe(true);
         else {
           expect(item.annotations?.readOnlyHint).toBe(false);
           expect(item.annotations?.destructiveHint).toBe(true);
