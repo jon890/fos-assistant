@@ -90,7 +90,7 @@ public class ConnectorActionListener {
     }
 
 
-    /** 기다리는 줄이 없어진 대화의 승인 요청 알림을 읽음으로 한다. 실패해도 줄의 처리를 막지 않는다. */
+    /** 끝난 승인 줄이 만든 승인 요청 알림을 읽음으로 한다. 실패해도 줄의 처리를 막지 않는다. */
     private void resolveRequested(ConnectorActionChanged event) {
         try {
             ownTransaction.executeWithoutResult(status -> actions.resolveApprovalRequested(event.actionId()));
