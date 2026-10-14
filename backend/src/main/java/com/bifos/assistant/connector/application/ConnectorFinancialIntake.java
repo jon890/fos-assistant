@@ -57,8 +57,24 @@ class ConnectorFinancialIntake {
     }
 
 
+    /**
+     * 같은 키의 금융 줄이 있거나 이 호출이 금융 준비 도구이면 금융 준비가 답한다. 그 밖의 호출은 빈 값이라 정책 판정이 이어서 판정한다.
+     *
+     * @param recorded 같은 키로 이미 남은 줄. {@link #owns} 가 참인 줄만 온다
+     * @param confirmedTool 등록 이름과 맞는 것을 확인한 원래 도구 이름. 확인하지 못했으면 null
+     */
+    Optional<ConnectorPolicyAnswer> intercept(Optional<ConnectorAction> recorded, Optional<ConnectorManifest> manifest,
+        String confirmedTool, ConnectorBinding binding, AgentExecution origin, String profileName, String rootSessionId,
+        String sessionId, String toolCallId, String argsJson) {
+        if (recorded.isEmpty() && manifest.filter(value -> prepares(value, confirmedTool)).isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(prepare(manifest, confirmedTool, binding, origin, profileName, rootSessionId, sessionId, toolCallId, argsJson));
+    }
+
+
     /** 커넥터가 금융 보호를 선언했고 이 호출이 그 준비 도구인가. 선언의 나머지 검증은 {@link #prepare} 가 한다. */
-    static boolean prepares(ConnectorManifest manifest, String confirmedTool) {
+    private static boolean prepares(ConnectorManifest manifest, String confirmedTool) {
         JsonNode declared = manifest.executionGuard();
         return confirmedTool != null && declared != null && declared.isObject() && declared.path("prepare_tool").isString()
             && declared.path("prepare_tool").stringValue().equals(confirmedTool);
@@ -73,12 +89,13 @@ class ConnectorFinancialIntake {
      * 속아 주문 승인 요청을 쌓지 않게 한다.
      *
      * <p>인자는 정확히 {@code {v: 1, tool, args}} 이고, {@code tool} 은 지금 여는 일반 주문 동작이어야 한다.
-     *
-     * @param confirmedTool 등록 이름과 맞는 것을 확인한 원래 도구 이름. 확인하지 못했으면 null
      */
-    ConnectorPolicyAnswer prepare(Optional<ConnectorManifest> manifest, String confirmedTool, ConnectorBinding binding,
+    private ConnectorPolicyAnswer prepare(Optional<ConnectorManifest> manifest, String confirmedTool, ConnectorBinding binding,
         AgentExecution origin, String profileName, String rootSessionId, String sessionId, String toolCallId, String argsJson) {
-        if (manifest.filter(value -> prepares(value, confirmedTool)).isEmpty()) {
+        if (manifest.isEmpty()) {
+            return ConnectorPolicyService.blockedWithoutRecord("같은 키의 금융 줄이 있는데 커넥터 선언을 읽지 못했다");
+        }
+        if (!prepares(manifest.get(), confirmedTool)) {
             return ConnectorPolicyService.blockedWithoutRecord("같은 키의 금융 줄에 준비 도구가 아닌 호출이 왔다");
         }
         final ConnectorExecutionGuardContract contract;
@@ -96,7 +113,9 @@ class ConnectorFinancialIntake {
                 && input.get("v").isInt() && input.get("v").intValue() == 1
                 && input.get("tool").isString() && input.get("args").isObject();
             String tool = shaped ? input.get("tool").stringValue() : null;
-            if (tool == null || !OPEN_OPERATIONS.contains(contract.operations().get(tool))
+            // 선언하지 않은 도구는 동작이 없다. Set.of 의 contains 는 null 에 예외를 던지므로 먼저 거른다.
+            String operation = tool == null ? null : contract.operations().get(tool);
+            if (operation == null || !OPEN_OPERATIONS.contains(operation)
                 || !ConnectorExecutionSnapshot.ORDER.equals(contract.kind(tool))) {
                 log.warn("금융 준비 도구의 인자가 지금 여는 주문이 아니다");
                 return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);

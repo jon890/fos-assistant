@@ -94,7 +94,7 @@ hermes/
 **plugin 은 한 배포 동안 옛 Control Plane 의 호출도 받는다.** 운영은 plugin 을 먼저 올리고 Control Plane 을 올린다.
 경로나 요청 모양을 바꿀 때는 새 것을 더하고, 옛 것은 그다음 배포에서 뺀다.
 
-## 토스증권 REST 전체 지원의 배치 (구현 전)
+## 토스증권 REST 전체 지원의 배치
 
 서비스의 REST 입력·필드·권한은 [토스증권 커넥터](../../docs/features/tossinvest-connector.md)의 「토스증권 REST 전체 지원」이 갖는다.
 새 의존성, 서비스, DB 표와 profile 설정은 추가하지 않는다. 기존 Bun MCP와 범용 Java 승인, Python 실행 전달을 재사용한다.
@@ -108,7 +108,7 @@ hermes/
 | backend connector/application/ConnectorExecutionSnapshot, ConnectorConditionalExecution | 범용 불변 금융 union 검증, 중첩 의도 키. 서비스 이름과 URL은 모름 |
 | 기존 승인 DTO와 ApprovalCard | 서버가 저장한 전체 전략과 금액, 고액 명시 확인. 계좌 선택과 모델 문자열 요약은 사용하지 않음 |
 
-현재 client/api-contract/rate-limit과 기존 READ 도구는 구현했다. 시장정보·일반주문·조건주문의 새 producer는 아직 구현하지 않았다. 저장과 claim, prepare·transport, 바인딩 지원과 일반주문 producer는 각 선행 구현의 책임이며 이 확장에서 중복 작성하지 않는다.
+현재 client/api-contract/rate-limit과 기존 READ 도구는 구현했다. 일반 주문의 생성과 취소는 [ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)이 열었고, 일반 주문 정정과 조건주문 쓰기 producer는 아직 운영에 등록하지 않았다. 저장과 claim, prepare·transport, 바인딩 지원과 일반주문 producer는 각 선행 구현의 책임이며 이 확장에서 중복 작성하지 않는다.
 조회 기반과 조건주문 READ는 금융 후속과 별도 착수한다. 계좌 원문 마스킹은 표시뿐 아니라 공식 result를 만드는 producer의 책임이다.
 금융 execution_baseline은 argsJson 원문 해시에 묶어 실행 자식에 전달하고 summary.executionBaseline과 대조한다. HTTP body·경제적 request_key·scope에는 넣지 않는다. 정확한 schema는 커넥터 도구 정책의 「예약 실행 메타데이터」가 갖는다.
 계약·schema 소비자, 승인 카드와 producer는 같은 작동 단계에서 호환을 확인한다. 미지원 소비자는 새 금융 도구를 열지 않는다.

@@ -21,6 +21,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class ConnectorActionSignals {
     /** 만료한 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
     static final String APPROVAL_EXPIRED_TITLE = "승인 요청이 만료됐어요";
+    /** 새 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
+    static final String APPROVAL_REQUESTED_TITLE = "승인을 기다리는 요청이 있어요";
 
     private final ApplicationEventPublisher events;
     private final NotificationService notifications;
@@ -50,6 +52,19 @@ class ConnectorActionSignals {
                 rejected.forEach(ConnectorActionSignals.this::publish);
             }
         });
+    }
+
+
+    /** 승인 줄의 주인에게 새 요청을 알린다. 대화가 지워졌거나 없으면 눌러도 갈 곳이 없어 남기지 않는다. 그 줄을 저장하는 트랜잭션 안에서 부른다. */
+    void notifyRequested(ConnectorAction action, String toolTitle) {
+        conversations
+            .publicIdOf(action.conversationId())
+            .ifPresent(conversationId -> notifications.notify(
+                action.userId(),
+                NotificationKind.APPROVAL_REQUESTED,
+                APPROVAL_REQUESTED_TITLE,
+                "「" + toolTitle + "」",
+                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
     }
 
 

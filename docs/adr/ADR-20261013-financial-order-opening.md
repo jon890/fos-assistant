@@ -4,11 +4,15 @@
 - Date: 2026-10-13
 - [ADR-20261010 / financial-execution-guard](ADR-20261010-financial-execution-guard.md) 의 snapshot 과 claim, [ADR-20261012 / financial-unsent-proof](ADR-20261012-financial-unsent-proof.md) 의 미전송 판정 위에 선다.
   금융 해시 key 교체는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md) 을 그대로 따른다.
+- [ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md) 의 「`FINANCIAL` 은 FOS 소유 MCP wrapper 를 둔 뒤에 연다」 를 개정한다. wrapper 대신 커넥터가 claim 으로 ticket 을 한 번 소비하지 못하면 전송하지 않는 것이 hook 이 빠졌을 때 닫는 장치다.
+- ADR-20261010 / financial-execution-guard 의 「적용 범위」 에 적은 「이 결정은 해당 경로를 열지 않는다」 를 개정한다. 이 결정이 일반 주문의 생성과 취소에 한해 그 경로를 연다.
 
 ### 맥락
 
 금융 준비(`ConnectorFinancialProducer`)와 금융 승인(`ConnectorFinancialApproval`)은 구현돼 있었지만 공개 진입점에 이어지지 않았다.
 정책 판정은 `FINANCIAL` 을 `RISK_NOT_OPEN` 으로 거절했고, 토스 서버는 주문 도구를 등록하지 않았다.
+ADR-049 는 hook 이 모든 실패에서 닫히지 않으므로 `FINANCIAL` 을 wrapper 뒤에 열기로 했다.
+지금은 실행 도구가 모델 목록에 없고, 커넥터는 Control Plane 이 발급한 ticket 을 claim 으로 소비해야만 금융 요청을 보낸다. hook 이 빠져 준비 도구가 판정 없이 돌아도 읽기만 하고 주문은 나가지 않는다. 그래서 wrapper 없이 연다.
 소유자가 2026-10-13 에 매매 개방을 명시적으로 승인했다. kill switch 는 두지 않으므로 이 결정을 담은 PR 의 머지가 곧 개방이다.
 운영에서는 key 파일, 허용 목록, 0 이 아닌 상한이 채워질 때까지 `ConnectorFinancialGate` 가 계속 거절한다.
 
@@ -35,10 +39,11 @@
 - `tool` 이 그 선언의 `operations` 에 있고, 그 동작이 지금 여는 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 `ConnectorFinancialProducer` 로 넘긴다.
   넘길 때 등록 이름은 그 실행 도구의 이름이고 인자 글은 `args` 다. 그 밖은 기록 없이 거절한다.
 - hook 의 답은 언제나 막힘이다. 준비가 되면 승인 번호를 함께 돌려주고, 거절은 어느 검사에 걸렸는지 밝히지 않는다.
-- 살펴보기(먼저 살펴보기, 예약 작업) 트리 안의 호출은 쓰기를 허용한 살펴보기여도 넘기지 않는다. 사람이 보지 않는 실행이 외부 글에 속아 주문 승인 요청을 쌓지 않게 한다.
-- 같은 `tool_call_id` 로 다시 부르면 같은 승인 번호다. 같은 의도를 다른 호출로 다시 부르면 같은 의도 차단에 걸려 거절되고, 모델에게는 승인 카드와 토스증권 앱을 확인해 달라고 안내하게 한다.
+- 살펴보기 트리(`ProactiveCheckGuard.checkOf` 가 찾는 실행, 매일 깨우기 포함) 안의 호출은 쓰기를 허용한 살펴보기여도 넘기지 않는다. 사람이 보지 않는 실행이 외부 글에 속아 주문 승인 요청을 쌓지 않게 한다.
+- 살펴보기가 아닌 일반 예약 작업은 승인 줄을 만든다. 예약 작업의 쓰기는 사람이 있을 때와 같이 승인을 기다린다는 제품 규칙을 따르고, 주문은 사람이 카드에서 한 건씩 승인해야만 나간다. 정기 매수처럼 사용자가 직접 예약한 주문 요청을 막지 않기 위해서다.
+- 같은 `tool_call_id` 로 다시 부르면 같은 승인 번호다. 같은 의도를 다른 호출로 다시 부르면 같은 의도 차단에 걸려 거절되고, 모델에게는 승인 카드와 그 서비스의 주문 내역을 확인해 달라고 안내하게 한다. Control Plane 은 서비스 이름을 모르므로 답 문구에 서비스 이름을 넣지 않는다.
 - 실행 도구를 직접 부른 호출은 지금처럼 `RISK_NOT_OPEN` 이다. `ToolPolicyDecision` 의 금융 차단은 바꾸지 않는다.
-- 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 `ConnectorFinancialApproval` 로 보낸다. 상시 허락과 대화 허락을 함께 보낸 요청은 입력 오류다.
+- 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 `ConnectorFinancialApproval` 로 보낸다. 상시 허락이나 대화 허락을 보낸 요청은 입력 오류(`VALIDATION_FAILED`)다. 남의 줄이면 그보다 먼저 없는 줄과 같은 응답을 낸다.
 
 토스 서버는 `prepare_trade`, `create_order`, `cancel_order` 셋을 등록하고 `modify_order` 는 등록하지 않는다.
 manifest 의 `execution_guard.operations` 도 두 도구만 선언한다.
@@ -52,7 +57,7 @@ manifest 의 `execution_guard.operations` 도 두 도구만 선언한다.
 
 소유자가 둘째를 골랐다(「한 계좌는 한 사용자만」).
 
-- 항목은 `<계좌 순번>:<사용자 메일>` 이다. 계좌 순번은 숫자뿐이라 첫 `:` 에서 나눈다. 메일은 대소문자를 가리지 않고 비교한다.
+- 항목은 `<계좌 순번>:<사용자 메일>` 이다. 계좌 순번은 숫자뿐이라 첫 `:` 에서 나눈다. 계좌 순번은 실행 scope 의 값과 글자 그대로 견주고, 메일은 대소문자를 가리지 않고 비교한다.
 - 형식이 틀리거나, 같은 계좌가 두 번 나오면 기동을 멈춘다. 잘못 넣은 값이 조용히 닫히거나 열리지 않게 한다.
 - 준비, 승인, claim 이 실행 scope 의 계좌와 함께 그 줄의 사용자를 보고, 그 계좌의 항목이 그 사용자의 메일일 때만 지난다.
 - 하루 합계는 지금처럼 사용자 단위다. 계좌가 한 사용자에게만 열리므로 계좌 단위 합계는 만들지 않는다.

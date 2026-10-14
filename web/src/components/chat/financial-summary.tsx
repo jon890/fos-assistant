@@ -1,4 +1,5 @@
-import type { FinancialSummary } from "@/lib/connector-action";
+import type { ConnectorAction } from "@/lib/connector-action";
+import type { FinancialSummary } from "@/lib/financial-summary";
 
 const OPERATION_LABELS = { CREATE: "주문", CANCEL: "주문 취소" } as const;
 const SIDE_LABELS = { BUY: "매수", SELL: "매도" } as const;
@@ -10,6 +11,28 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="whitespace-pre-wrap break-all">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * 금융 줄은 모델 인자가 아니라 저장 요약을 보고 승인한다. 요약이 없거나 열지 못했으면 인자만 보고 승인하지 못하게
+ * 한다. `closed` 는 기다리는 금융 줄이 요약 없이 남은 경우다.
+ */
+export function financialView(action: ConnectorAction) {
+  const line = action.financial != null || action.risk === "FINANCIAL";
+  const summary = action.financial?.available ? action.financial : null;
+  return {
+    line,
+    summary,
+    closed: action.status === "PENDING" && line && summary === null,
+  };
+}
+
+/** 사람이 다 읽지 못한 인자나 열지 못한 금융 요약으로는 승인을 받지 않는다. 서버도 이런 줄의 승인을 실행하지 않고 끝낸다. */
+export function approvalBlocked(action: ConnectorAction) {
+  return (
+    (action.status === "PENDING" && action.hiddenArgs) ||
+    financialView(action).closed
   );
 }
 

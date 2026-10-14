@@ -109,7 +109,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261012 / ci-path-filter](ADR-20261012-ci-path-filter.md) | PR CI 는 바뀐 파일이 입력인 job 만 돌리고, 필수 검사는 건너뛴 까닭까지 판정한다 | 공통 | Accepted |
 | [ADR-20261012 / conversation-grant](ADR-20261012-conversation-grant.md) | 승인 카드에서 도구를 그 대화에서만 계속 허용할 수 있고, 커넥터가 도구마다 연다고 선언한 것만 받는다 | backend, frontend, hermes | Accepted. ADR-050 의 상시 허락 옆에 대화 범위의 허락을 더한다. `conversation_grant` 를 선언한 도구만 열고 ADR-065 의 `outbound` 도구는 선언해도 닫는다 |
 | [ADR-20261012 / financial-unsent-proof](ADR-20261012-financial-unsent-proof.md) | 소비하지 않은 금융 ticket 은 미전송의 증거로 보고 결과 불명 대신 실패로 끝낸다 | backend, hermes | Accepted. ADR-20261010 / financial-execution-guard 의 claim 위에 선다 |
-| [ADR-20261013 / financial-order-opening](ADR-20261013-financial-order-opening.md) | 토스 일반 주문의 생성과 취소를 준비 도구 하나로 열고, 계좌는 한 사용자에게만 묶는다 | backend, frontend, hermes | Accepted. ADR-20261010 / financial-execution-guard 와 ADR-20261012 / financial-unsent-proof 위에 선다 |
+| [ADR-20261013 / financial-order-opening](ADR-20261013-financial-order-opening.md) | 토스 일반 주문의 생성과 취소를 준비 도구 하나로 열고, 계좌는 한 사용자에게만 묶는다 | backend, frontend, hermes | Accepted. ADR-20261010 / financial-execution-guard 와 ADR-20261012 / financial-unsent-proof 위에 선다. ADR-049 의 「`FINANCIAL` 은 wrapper 뒤에 연다」 와 ADR-20261010 / financial-execution-guard 의 「경로를 열지 않는다」 를 일반 주문의 생성과 취소에 한해 개정한다 |
 | [ADR-20261013 / unknown-retry-key](ADR-20261013-unknown-retry-key.md) | 결과를 모르는 승인 실행은 커넥터가 선언한 오류 코드와 재시도 식별자 하나만 에이전트까지 전한다 | backend, hermes | Accepted. ADR-092 의 「`outcome_unknown` 은 객체 항목을 쓸 수 없다」 를 개정한다. ADR-050 의 자동 재전송 금지는 그대로다 |
 
 ## 보관

@@ -154,7 +154,7 @@ class ConnectorFinancialProducer {
             if (action.conversationId() != null && checkNotifications.allows(origin, now)) {
                 String title = ConnectorActionView.titleOf(ConnectorToolPolicies.find(manifest, toolName));
                 conversations.publicIdOf(action.conversationId()).ifPresent(id -> notifications.notify(action.userId(),
-                    NotificationKind.APPROVAL_REQUESTED, ConnectorPolicyService.APPROVAL_REQUESTED_TITLE,
+                    NotificationKind.APPROVAL_REQUESTED, ConnectorActionSignals.APPROVAL_REQUESTED_TITLE,
                     "「" + title + "」", new NotificationTarget(NotificationTargetType.CONVERSATION, id)));
             }
             new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));

@@ -24,8 +24,18 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.shared.util.Sha256;
+import com.bifos.assistant.task.domain.Task;
+import com.bifos.assistant.task.domain.TaskRun;
+import com.bifos.assistant.task.domain.TaskTrigger;
+import com.bifos.assistant.task.domain.type.ConversationMode;
+import com.bifos.assistant.task.domain.type.MissedPolicy;
+import com.bifos.assistant.task.domain.type.NotifyPolicy;
+import com.bifos.assistant.task.infra.TaskRepository;
+import com.bifos.assistant.task.infra.TaskRunRepository;
+import com.bifos.assistant.task.infra.TaskTriggerRepository;
 import com.bifos.assistant.testsupport.OverridableLiveProperties;
 import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +60,12 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     ConnectorActionBodies bodies;
     @Autowired
     TextCipher cipher;
+    @Autowired
+    TaskRepository tasks;
+    @Autowired
+    TaskTriggerRepository triggers;
+    @Autowired
+    TaskRunRepository taskRuns;
 
 
     @ParameterizedTest
@@ -160,6 +176,47 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
         } finally {
             // 다른 테스트가 RUNNING 살펴보기 줄을 보지 않도록 지운다.
             checks.deleteById(check);
+        }
+    }
+
+
+    @Test
+    @DisplayName("살펴보기가 아닌 예약 작업 실행의 준비 호출은 PENDING 금융 줄을 만들고 사람이 승인한 뒤에만 금융 POST 를 보낸다")
+    void scheduledTaskRunPreparesPendingUntilApproved() {
+        Long[] created = new Long[3];
+        try {
+            tx().executeWithoutResult(status -> {
+                var run = runs.findAll().stream().filter(row -> session.equals(row.hermesSessionId())).findFirst().orElseThrow();
+                var task = tasks.save(Task.create(user.id(), run.agentId(), "매일 주문", "주문해 줘", ConversationMode.NEW_PER_RUN,
+                    NotifyPolicy.NEVER, now));
+                var trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", ZoneId.of("Asia/Seoul"), MissedPolicy.RUN_ONCE,
+                    now, now));
+                var taskRun = TaskRun.queued(task.id(), trigger.id(), user.id(), now, now);
+                taskRun.useConversation(run.conversationId());
+                taskRun.start(now);
+                created[0] = taskRuns.save(taskRun).id();
+                created[1] = trigger.id();
+                created[2] = task.id();
+            });
+            // 도는 발화는 끝날 때 루트 실행 번호를 적는다. 이 fixture 의 실행이 그 발화의 루트임을 미리 잇는다.
+            assertThat(jdbc.update("update task_run set execution_id = (select id from agent_execution where hermes_session_id = ?)"
+                + " where id = ?", session, created[0])).isEqualTo(1);
+            var requested = prepare(UUID.randomUUID().toString(), trade("create_order", ARGS));
+            assertThat(requested.allowed()).isFalse();
+            assertThat(action(requested).status()).isEqualTo(ActionStatus.PENDING);
+            assertThat(rows()).isEqualTo(1);
+            assertThat(counters().path("prepare").intValue()).isEqualTo(1);
+            assertThat(counters().path("financial").intValue()).isZero();
+            assertThat(claims()).isZero();
+            assertThat(publicApproval.approve(user, requested.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+            assertThat(counters().path("financial").intValue()).isEqualTo(1);
+            assertThat(claims()).isEqualTo(1);
+        } finally {
+            if (created[0] != null) {
+                taskRuns.deleteById(created[0]);
+                triggers.deleteById(created[1]);
+                tasks.deleteById(created[2]);
+            }
         }
     }
 

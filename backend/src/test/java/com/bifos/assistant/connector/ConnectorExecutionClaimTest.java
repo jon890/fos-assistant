@@ -191,7 +191,7 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
         assertThat(row(f).consumedAt()).isNull();
         // 계좌는 목록에 있어도 다른 사용자의 항목이면 소비하지 않는다.
-        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("7:other-" + f.user().email()),
+        OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("000007:other-" + f.user().email()),
             open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
             open.maxDailyAmountUsd(), open.digestKeyFile()));
         assertThatThrownBy(() -> claims.claim(input(raw))).isInstanceOf(ApiException.class);
@@ -844,9 +844,9 @@ class ConnectorExecutionClaimTest extends ConnectorExecutionClaimTestSupport {
                 cipher,
                 NOW, digest));
             action.beginExecution(NOW);
-            // 허용 목록 항목은 계좌와 그 주인 메일이다. 대역 계좌를 이 fixture 의 사용자에게 연다. 앞의 0 은 같은 계좌로 읽는다.
+            // 허용 목록 항목은 계좌와 그 주인 메일이다. 공용 vector 의 계좌를 글자 그대로 이 fixture 의 사용자에게 연다.
             var open = gate.current();
-            OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("7:" + user.email()),
+            OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of("000007:" + user.email()),
                 open.maxOrderAmountKrw(), open.maxOrderAmountUsd(), open.maxOrderQuantity(), open.maxDailyAmountKrw(),
                 open.maxDailyAmountUsd(), open.digestKeyFile()));
             return new Fixture(

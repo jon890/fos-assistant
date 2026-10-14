@@ -112,8 +112,8 @@ class ConnectorFinancialGateTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"7", "7:", ":" + OWNER, "0:" + OWNER, "07:" + OWNER, "a7:" + OWNER, "12345678901234567890:" + OWNER,
-        "7:owner", "7:own er@example.test", "7:owner@example.test:x"})
+    @ValueSource(strings = {"7", "7:", ":" + OWNER, "a7:" + OWNER, "12345678901234567890:" + OWNER,
+        "7:owner", "7:@", "7:a@", "7:@example.test", "7:own er@example.test", "7:owner@example.test:x", "7:a@b@example.test"})
     @DisplayName("허용 목록 항목이 계좌 순번과 메일 모양이 아니면 값 원문 없이 기동을 멈춘다")
     void rejectsMalformedAllowListEntry(String entry) {
         assertThatThrownBy(() -> accounts(entry)).isInstanceOf(IllegalStateException.class)
@@ -126,6 +126,8 @@ class ConnectorFinancialGateTest {
     void rejectsDuplicatedAccount() {
         assertThatThrownBy(() -> accounts("7:" + OWNER, "7:other@example.test")).isInstanceOf(IllegalStateException.class);
         assertThat(accounts("7:" + OWNER, "8:" + OWNER).ownerOf("8")).contains(OWNER);
+        // 중복은 글자 그대로 본다. 앞의 0 만 다른 표기는 다른 계좌다.
+        assertThat(accounts("7:" + OWNER, "000007:other@example.test").ownerOf("000007")).contains("other@example.test");
     }
 
 
@@ -136,6 +138,7 @@ class ConnectorFinancialGateTest {
         assertThat(listed.ownerOf("7")).contains(OWNER);
         assertThat(listed.ownerOf("1234567890123456789")).contains("Other@Example.Test");
         assertThat(listed.ownerOf("8")).isEmpty();
+        assertThat(listed.ownerOf("07")).isEmpty();
         assertThat(listed.ownerOf("")).isEmpty();
         assertThat(listed.ownerOf(null)).isEmpty();
     }
@@ -154,6 +157,19 @@ class ConnectorFinancialGateTest {
         assertThatThrownBy(() -> gate.requireAccounts(11L, List.of("7"))).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> gate.requireAccounts(9L, List.of("8"))).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> gate.requireAccounts(9L, List.of())).isInstanceOf(ApiException.class);
+    }
+
+
+    @Test
+    @DisplayName("000007 항목이 있어도 scope 7 은 맞지 않고 scope 000007 만 지난다")
+    void comparesAccountTextExactly() {
+        when(users.findById(9L)).thenReturn(Optional.of(AppUser.of(OWNER, "주인", 1L, UserRole.MEMBER, NOW)));
+        var limits = new ConnectorFinancialProperties(List.of("000007:" + OWNER), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE,
+            BigDecimal.ONE, BigDecimal.ONE, KEY);
+        var gate = gate(limits);
+        assertThat(limits.ownerOf("7")).isEmpty();
+        assertThatThrownBy(() -> gate.requireAccounts(9L, List.of("7"))).isInstanceOf(ApiException.class);
+        assertThatCode(() -> gate.requireAccounts(9L, List.of("000007"))).doesNotThrowAnyException();
     }
 
 

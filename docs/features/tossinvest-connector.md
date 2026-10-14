@@ -233,7 +233,7 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 공식 JSON fixture의 41 operation 중 인증 1개와 조회 GET 34개를 연결한다. MCP 도구는 조회 READ 33개와 준비 도구 하나, 실행 도구 둘이다. `getStocks`를 사용하는 `get_quotes`와 `get_stocks`, `getSellableQuantity`를 공유하는 두 도구는 고유 operation으로 한 번만 센다. 일반 주문 생성과 취소 둘을 등록했고 정정과 조건주문 쓰기 넷은 등록하지 않았다. `hermes/connectors/tossinvest/scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다.
 도구와 고유 operation은 다른 수치다. coverage 테스트는 모든 도구와 한국·미국 시장 일정을 호출해 인증 1회와 조회 36회를 수신한다. `getStocks`와 `getSellableQuantity`는 여러 도구가 공유한다.
 
-SDK 설명과 manifest의 tools.description은 33개 모두 같은 평문이다. 설명은 표시 정보이며 READ/none 정책과 분리된다. 설명을 넣은 manifest의 운영 설치는 새 reader가 실제 plugin에 로드된 것을 확인한 뒤 진행한다.
+SDK 설명과 manifest의 tools.description은 모든 도구에서 같은 평문이다. 설명은 표시 정보이며 위험도와 승인 정책과 분리된다. 설명을 넣은 manifest의 운영 설치는 새 reader가 실제 plugin에 로드된 것을 확인한 뒤 진행한다.
 
 대역은 받은 요청의 메서드와 고정 경로 template을 명시적으로 주입한 허용 operation 집합과 견준다. 테스트별로 필요한 `GET`과 `POST /oauth2/token`만 허용한다. 다른 GET이나 금융 POST·DELETE가 오면 테스트가 실패한다. 공식 성공 예시 78개와 production SDK·소스에서 빌드한 stdio bundle의 실제 HTTP 도달을 검사한다.
 
@@ -277,7 +277,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 | --- | --- | --- |
 | keyed hash key 파일 | 운영 비밀 파일 하나를 읽지 못하면 준비, 승인, claim 이 모두 금융 전송 없이 거절한다 | 있음. `digest-key-file`. key 를 쓰는 해시 계산은 「해시 추측 방어」 가 더한다 |
 | 호출마다 승인 | FINANCIAL 도구는 `always` 다. 상시 허락과 대화 허락을 받지 않는다(grant 불가) | 있음 |
-| 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 있음. `allowed-accounts`. 항목은 `<계좌 순번>:<사용자 메일>` 이고 한 계좌는 한 사용자에게만 연다. 메일은 대소문자를 가리지 않고, 계좌 순번은 앞의 0 을 뺀 숫자로 견준다. 형식이 틀리거나 같은 계좌가 두 번 나오면 기동을 멈춘다. 승인과 claim 에서도 저장 scope 로 다시 본다 |
+| 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 있음. `allowed-accounts`. 항목은 `<계좌 순번>:<사용자 메일>` 이고 한 계좌는 한 사용자에게만 연다. 메일은 대소문자를 가리지 않고, 계좌 순번은 연결 칸의 값과 글자 그대로 견준다. 형식이 틀리거나 같은 계좌가 두 번 나오면 기동을 멈춘다. 승인과 claim 에서도 저장 scope 로 다시 본다 |
 | 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 운영 설정 상한을 둔다. 기본값은 0 이라 아무 주문도 받지 않는다 | 있음. `max-order-amount-krw`, `max-order-amount-usd`, `max-order-quantity`, `max-daily-amount-krw`, `max-daily-amount-usd`. USD 금액 주문은 환율로 바꾸지 않고 USD 상한과만 견준다 |
 | 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
 | UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
@@ -639,8 +639,8 @@ manifest `execution_guard.kinds` 가 도구를 `CONDITIONAL` 로 선언한 경�
 선언하지 않은 도구는 일반 주문(`ORDER`)이며 조건 summary 를 내면 거절한다. prepare 가 낸 summary 가 분기를 정하면 사람은 조건주문 카드를 승인하는데 일반 도구가 불리는 일이 생긴다.
 Spring 은 producer 와 승인·claim 재검증(`ConnectorExecutionCurrent`) 두 곳에서, Python 은 `_prepare_result` 에서 같은 대조를 한다.
 일반 주문은 기존 정규화 의미 보존 규칙을 유지하며 `ConnectorOrderSnapshot`이 검증한다.
-이 구현은 금융 권한을 발급하지 않는다. 금융 도구의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
-실제 producer, SDK 금융 전송, claim 뒤 원주문 조회, 등록과 운영 개방은 아직 연결하지 않았다.
+이 구현은 조건주문 도구에 금융 권한을 발급하지 않는다. noGrant와 `confirmHighValueOrder=false`를 유지한다.
+조건주문 도구의 실제 producer, SDK 금융 전송, claim 뒤 원주문 조회, 등록과 운영 개방은 아직 연결하지 않았다. 일반 주문의 생성과 취소는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)이 열었다.
 
 조건 summary는 정확히 다음 15개 키를 갖는다.
 `orderKind account operation conditionalOrderId symbol market currency type quantity orderType expireDate first second original normalization`.
@@ -760,7 +760,7 @@ auth POST, 준비 GET, claim HTTP와 금융 POST·DELETE는 별도로 센다. �
 
 이 증거는 실제 SDK·claim 대역·mock 금융 목적지의 왕복이다. 대역의 protocol vector는 main의
 ClaimResponse·codec·claims·MVC 테스트와 직접 대조하지만 실제 서명 인증·DB 일회 소비는 검증하지 않는다.
-실제 DB/Spring claim→Python→SDK→mock 목적지 왕복은 [운영 비활성 금융 snapshot producer](connector-policy.md#운영-비활성-금융-snapshot-producer)가 검증한다.
+실제 DB/Spring claim→Python→SDK→mock 목적지 왕복은 [금융 snapshot producer 와 금융 승인](connector-policy.md#금융-snapshot-producer-와-금융-승인)가 검증한다.
 일반 주문 DELETE는 0회다. DELETE transport의 합성 204 검사는 조건주문 등록의 근거가 아니다.
 ### 국내 종목 통계 계약
 

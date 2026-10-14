@@ -658,14 +658,14 @@ key 칸이 NULL인 기존 본문은 호환 읽기를 허용하고, 기동 정리
 옆 key 칸을 더하는 expand DDL과 애플리케이션 이관으로 평문 저장을 교체한다.
 NULL key 호환은 기존 줄과 암호화를 쓰지 않는 일반 쓰기에 남긴다.
 이관 뒤 옛 코드로 되돌리면 암호문을 인자로 전송하므로 되돌리지 않는다.
-`args_sha256`, `scope_sha256`, `request_key`는 key 없는 해시여서 좁은 범위의 인자를 대입해 추측하는 공격은 막지 못한다.
-해시의 사용자 key 적용과 기존 해시 호환은 공개 금융 연결을 여는 작업에서 함께 정한다.
+금융 줄의 `args_sha256`, `scope_sha256`, `request_key`는 운영 비밀 key 파일로 만든 keyed hash(`FinancialDigest`)다. DB만 읽은 사람이 인자를 대입해 맞혀 보지 못한다.
+key 교체와 이전 key 줄의 처리는 [ADR-20261013 / financial-digest-key-rotation](adr/ADR-20261013-financial-digest-key-rotation.md)이 갖는다.
 
 ### connector_action_execution
 
 승인 줄 하나에 속한 금융 실행 내용이다.
-저장과 검증, 일회성 ticket 발급·소비 모델을 구현했으며 현재 금융 호출은 계속 차단한다.
-운영 승인 연결, 준비 API 및 주문 실행은 후속 구현이 맡는다.
+정책 판정이 받은 준비 도구 호출이 이 줄을 만들고, 공개 승인 API 가 이 줄을 금융 승인으로 실행한다. 실행 도구의 직접 호출은 계속 거절한다.
+근거는 [ADR-20261013 / financial-order-opening](../../docs/adr/ADR-20261013-financial-order-opening.md)이 갖는다.
 JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md)의 「금융 실행 내용의 저장과 검증」이 갖는다.
 
 | 컬럼 | 타입과 제약 |

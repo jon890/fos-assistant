@@ -124,7 +124,7 @@ class ConnectorActionControllerTest {
             "DAY", null, List.of(new FinancialActionSummary.Normalization("timeInForce", null, "DAY")));
         when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
         when(service.listForConversation(MEMBER, 42L)).thenReturn(List.of(PENDING, financialView));
-        when(financialSummaries.summaries(MEMBER, List.of(ACTION, financialAction))).thenReturn(Map.of(financialAction, summary));
+        when(financialSummaries.summaries(MEMBER, List.of(financialAction))).thenReturn(Map.of(financialAction, summary));
         when(financialSummaries.summaryOf(MEMBER, financialAction)).thenReturn(Optional.of(summary));
         when(service.approve(MEMBER, financialAction, null, false)).thenReturn(financialView);
         when(service.reject(MEMBER, financialAction)).thenReturn(financialView);
@@ -139,6 +139,8 @@ class ConnectorActionControllerTest {
             .andExpect(jsonPath("$[1].financial.quantity").isEmpty())
             .andExpect(jsonPath("$[1].financial.normalization[0].field").value("timeInForce"))
             .andExpect(jsonPath("$[1].financial.normalization[0].after").value("DAY"));
+        // 금융이 아닌 줄의 번호는 요약 조회에 넘기지 않는다.
+        verify(financialSummaries).summaries(MEMBER, List.of(financialAction));
         mvc.perform(post("/api/v1/connector-actions/{id}/approve", financialAction))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.financial.accountSeq").value("7"));

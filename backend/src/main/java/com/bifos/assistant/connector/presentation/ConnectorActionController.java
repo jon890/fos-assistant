@@ -6,6 +6,7 @@ import com.bifos.assistant.connector.application.ConnectorFinancialSummaries;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ActionView;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ApproveRequest;
 import com.bifos.assistant.connector.presentation.ConnectorActionDtos.ConversationGrantView;
@@ -57,7 +58,8 @@ public class ConnectorActionController {
         var actionIds = views.stream().map(view -> view.actionId()).toList();
         var summaries = contentDraftJobs.summaries(user, id, conversationId, actionIds);
         // 금융 줄은 저장한 snapshot 의 요약을 붙인다. 화면은 요약을 열지 못한 금융 줄에 승인 단추를 그리지 않는다.
-        var financial = financialSummaries.summaries(user, actionIds);
+        var financial = financialSummaries.summaries(user,
+            views.stream().filter(view -> view.risk() == ToolRisk.FINANCIAL).map(view -> view.actionId()).toList());
         return views.stream()
             .map(view -> ActionView.from(view, summaries.get(view.actionId()), financial.get(view.actionId())))
             .toList();

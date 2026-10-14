@@ -221,7 +221,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - `schema: 1` 에서 `tool` 이 없는 호출은 승인 필요로 막는다. 다른 서버의 등록 이름은 `schema: 1` 에서도 `UNDECLARED` 로 거절한다
 - 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
-- 커넥터의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리 안의 호출은 넘기지 않고 줄 없이 막는다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
+- 커넥터의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -335,7 +335,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 커넥터의 줄은 두고 본다
 - 다른 사용자의 줄은 `CONNECTOR_ACTION_NOT_FOUND` 다. 관리자도 같다
 - 대화의 승인 줄 목록과 그 줄의 승인·거절 응답에서 원고 저장 job 이 연결된 줄은 `contentDraft` 요약을 싣는다. 일반 줄은 null 이다. 화면이 응답으로 자기 줄을 바꿔도 원고 카드로 남게 하기 위해서다. 요약의 칸과 화면 동작은 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) 이 갖는다
-- 공개 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 금융 승인(`ConnectorFinancialApproval`)으로 보낸다. 주인이 아니면 없는 줄과 같은 응답을 먼저 내고, 주인이면 상시 허락과 대화 허락을 함께 보낸 요청을 `VALIDATION_FAILED` 로 거절한다. 그 뒤 금융 승인이 저장한 snapshot 을 다시 검증한다
+- 공개 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 금융 승인(`ConnectorFinancialApproval`)으로 보낸다. 주인이 아니면 없는 줄과 같은 응답을 먼저 내고, 주인이면 상시 허락이나 대화 허락을 보낸 요청을 `VALIDATION_FAILED` 로 거절한다. 그 뒤 금융 승인이 저장한 snapshot 을 다시 검증한다
 - 금융 줄의 응답은 `financial` 요약(계좌 순번, 동작, 종목, 방향, 수량이나 금액, 가격, 통화, 주문 유형, 정규화)을 싣는다. 계좌 순번은 저장 scope 의 값이다. 저장한 내용을 열지 못하면 `available` 이 거짓이고 화면은 승인 단추를 그리지 않는다. 금융 줄이 아니면 null 이다. 금융 줄은 묶지 않고 「모두 승인」 에 넣지 않는다
 - 부른 쪽은 이미 처리된 요청(409 `CONNECTOR_ACTION_NOT_PENDING`)과 승인했지만 실행하지 않은 요청(200 과 끝난 줄의 `status`)을 구분한다
 - 승인은 사용자 행을 먼저, 승인 줄을 다음에 잠그고 `EXECUTING` 으로 커밋한 뒤 트랜잭션 밖에서 실행 경로를 부른다. 연결을 다시 등록하거나 해제하는 쪽, 붙이고 떼는 쪽과 같은 순서라 승인이 본 바인딩은 커밋할 때까지 떼어지지 않는다
@@ -658,7 +658,7 @@ PENDING 설치 callback의 `409/pending`은 실패나 READY의 필수 조건으�
 금융 실행 도구는 모델 목록에 두지 않으므로 FINANCIAL 도구의 exclude와 직접 호출의 `RISK_NOT_OPEN`을 유지한다. 모델은 준비 도구만 부른다.
 DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
 
-### 운영 비활성 금융 snapshot producer
+### 금융 snapshot producer 와 금융 승인
 
 `ConnectorFinancialProducer`와 `ConnectorFinancialApproval`은 package-private Spring 컴포넌트다.
 실제 금융 준비·저장·승인 규칙을 갖는다. 정책 판정의 준비 도구 가로채기와 공개 approve 에 연결했고 스케줄러에는 연결하지 않는다.
@@ -681,7 +681,8 @@ ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTT
 금융 실행 전체를 켜고 끄는 설정은 따로 두지 않는다. 허용 목록이 비었거나 상한이 0이면 주문이 거절되고, keyed hash key 파일(`digest-key-file`)을 읽지 못하면 관문 전체가 닫힌다.
 key 파일이 운영에서 금융을 여는 마지막 잠금이다. key를 쓰는 request_key와 해시 단계 없이 금융이 열리지 않게 코드로 막는다.
 준비는 prepare 전에 key 파일과 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
-승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌를 본다.
+허용 목록은 계좌와 그 계좌를 쓰는 사용자의 메일을 묶은 항목이다. 세 단계 모두 그 계좌의 항목이 있고 그 메일이 줄 주인의 메일인지 본다. 형식은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
+승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌와 그 주인을 본다.
 하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 취소는 새로 쓰는 금액이 없어 금액 상한과 하루 합계 밖에 두고 key 파일과 계좌 허용 목록만 본다. 하루 합계에도 금액이 있는 생성만 더한다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정, 조건주문 생성·정정은 거절한다.
 
 `ConnectorFinancialConflicts`는 준비·승인·claim이 함께 쓰는 같은 의도 검사다.
@@ -706,7 +707,7 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
 
 request_key는 연결 번호 대신 커넥터 이름을 넣는다. 계좌는 실행 원문의 scope 칸으로 들어가므로 같은 사용자가 같은 계좌에 내는 같은 주문은 연결을 다시 등록해도 같은 키다.
-옛 v1 키와는 호환하지 않는다. 운영에 금융 caller가 없어 옛 줄이 없어야 하고, 남았으면 금융 관문이 닫혀 운영자가 먼저 정리한다.
+옛 v1 키와는 호환하지 않는다. v2 로 올릴 때는 운영에 금융 caller가 없어 옛 v1 줄이 없었다. 남았으면 금융 관문이 닫혀 운영자가 먼저 정리한다.
 개방 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다. 운영 값이 채워지기 전에는 관문이 주문을 거절한다.
 
 모든 승인 줄의 `args_json`과 `result_text`는 기존 사용자 데이터 key로 암호화한다.

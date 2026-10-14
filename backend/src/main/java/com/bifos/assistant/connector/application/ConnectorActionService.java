@@ -9,8 +9,8 @@ import com.bifos.assistant.connector.application.model.ConnectorConversationGran
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;

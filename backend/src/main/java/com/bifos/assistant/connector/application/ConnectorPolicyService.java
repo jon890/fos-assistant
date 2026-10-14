@@ -27,9 +27,6 @@ import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.feedback.domain.type.FeedbackSubjectType;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.notification.application.NotificationService;
-import com.bifos.assistant.notification.domain.NotificationTarget;
-import com.bifos.assistant.notification.domain.type.NotificationKind;
-import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
@@ -86,8 +83,6 @@ public class ConnectorPolicyService {
     private static final String RISK_NOT_OPEN_MESSAGE = "이 도구는 아직 열리지 않아 실행하지 않았다. 다시 부르지 않는다.";
     private static final String ARGS_TOO_LARGE_MESSAGE = "인자가 너무 커서 실행하지 않았다. 나눠서 요청한다.";
     private static final String READ_ONLY_RUN_MESSAGE = "먼저 살펴보기에서는 읽기 도구만 쓸 수 있습니다.";
-    /** 새 승인 줄을 알리는 알림의 제목이다. 본문은 도구 제목이다. */
-    static final String APPROVAL_REQUESTED_TITLE = "승인을 기다리는 요청이 있어요";
 
     private final ConnectorActionRepository actions;
     private final ConnectorBindingRepository bindings;
@@ -123,7 +118,8 @@ public class ConnectorPolicyService {
         ProactiveCheckGuard checkGuard,
         CheckNotificationPolicy checkNotifications,
         DecisionFeedbackRecorder feedback,
-        ConnectorActionBodies bodies, ConnectorFinancialIntake financial,
+        ConnectorActionBodies bodies,
+        ConnectorFinancialIntake financial,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
@@ -138,7 +134,8 @@ public class ConnectorPolicyService {
             checkGuard,
             checkNotifications,
             feedback,
-            bodies, financial,
+            bodies,
+            financial,
             transactionManager,
             Clock.systemUTC());
     }
@@ -157,7 +154,8 @@ public class ConnectorPolicyService {
         ProactiveCheckGuard checkGuard,
         CheckNotificationPolicy checkNotifications,
         DecisionFeedbackRecorder feedback,
-        ConnectorActionBodies bodies, ConnectorFinancialIntake financial,
+        ConnectorActionBodies bodies,
+        ConnectorFinancialIntake financial,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.actions = actions;
@@ -245,8 +243,10 @@ public class ConnectorPolicyService {
         String confirmedTool = manifest.map(value -> confirmedTool(value, hermesTool, toolName))
             .orElse(null);
         // 금융 준비 도구의 호출과 같은 키의 금융 줄은 금융 준비가 맡는다(ADR-20261013 / financial-order-opening).
-        if (recorded.isPresent() || manifest.filter(value -> ConnectorFinancialIntake.prepares(value, confirmedTool)).isPresent()) {
-            return financial.prepare(manifest, confirmedTool, binding, origin, profileName, rootSessionId, sessionId, toolCallId, argsJson);
+        Optional<ConnectorPolicyAnswer> financialAnswer = financial.intercept(recorded, manifest, confirmedTool, binding, origin,
+            profileName, rootSessionId, sessionId, toolCallId, argsJson);
+        if (financialAnswer.isPresent()) {
+            return financialAnswer.get();
         }
         // 승인 카드와 알림이 같은 도구 제목을 쓰도록 선언을 한 번 찾아 둔다.
         Optional<ToolPolicy> declared = manifest.flatMap(value -> ConnectorToolPolicies.find(value, confirmedTool));
@@ -301,7 +301,8 @@ public class ConnectorPolicyService {
                 }
                 // 알림은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
                 if (needsApproval && stored.conversationId() != null && checkNotifications.allows(origin, now)) {
-                    notifyApprovalRequested(stored, ConnectorActionView.titleOf(declared));
+                    new ConnectorActionSignals(events, notifications, conversations)
+                        .notifyRequested(stored, ConnectorActionView.titleOf(declared));
                 }
                 return stored;
             });
@@ -355,19 +356,6 @@ public class ConnectorPolicyService {
             .checkOf(origin)
             .map(check -> check.writesAllowed() ? CheckBoundary.APPROVAL_ONLY : CheckBoundary.READ_ONLY)
             .orElse(CheckBoundary.NOT_CHECK);
-    }
-
-
-    /** 승인 줄의 주인에게 새 요청을 알린다. 대화가 지워졌거나 없으면 눌러도 갈 곳이 없어 남기지 않는다. */
-    private void notifyApprovalRequested(ConnectorAction action, String toolTitle) {
-        conversations
-            .publicIdOf(action.conversationId())
-            .ifPresent(conversationId -> notifications.notify(
-                action.userId(),
-                NotificationKind.APPROVAL_REQUESTED,
-                APPROVAL_REQUESTED_TITLE,
-                "「" + toolTitle + "」",
-                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
     }
 
 

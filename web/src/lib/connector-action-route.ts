@@ -13,13 +13,13 @@ import {
   type ConnectorActionStatus,
   type ConnectorGrant,
   type ConversationGrant,
-  type FinancialSummary,
 } from "@/lib/connector-action";
 import {
   CONTENT_DRAFT_JOB_STATUSES,
   type ContentDraftJobStatus,
   type ContentDraftSummary,
 } from "@/lib/content-draft-snapshot";
+import type { FinancialSummary } from "@/lib/financial-summary";
 import { isPublicId } from "@/lib/conversation-id";
 
 /** 브라우저에 그대로 넘기는 오류 코드다. 그 밖의 코드는 `INTERNAL_ERROR` 로 바꾼다. */
@@ -181,29 +181,40 @@ function nullableDecimal(value: unknown): string | null {
   return item;
 }
 
+const UNAVAILABLE_FINANCIAL: FinancialSummary = {
+  available: false,
+  accountSeq: null,
+  operation: null,
+  symbol: null,
+  market: null,
+  currency: null,
+  side: null,
+  quantity: null,
+  orderAmount: null,
+  price: null,
+  orderType: null,
+  timeInForce: null,
+  orderId: null,
+  normalization: [],
+};
+
 /**
- * 금융 요약은 계약의 칸만 옮긴다. 저장한 내용을 열지 못한 줄은 나머지 칸을 모두 비운다. 열었다면 계좌 순번과
- * 방향 같은 칸의 모양을 검사하고, 틀리면 던져 고정 오류로 바꾼다.
+ * 금융 요약은 계약의 칸만 옮긴다. 저장한 내용을 열지 못한 줄과 모양이 계약과 다른 줄은 나머지 칸을 모두 비운
+ * `available: false` 로 낮춘다. 던지면 한 줄 때문에 승인 목록 전체가 오류가 되어 다른 줄을 거절하는 길까지 막힌다.
+ * 낮춘 줄은 카드가 승인 단추 없이 거절만 남긴다.
  */
 function safeFinancial(value: unknown): FinancialSummary {
+  try {
+    return openFinancial(value);
+  } catch {
+    return { ...UNAVAILABLE_FINANCIAL, normalization: [] };
+  }
+}
+
+function openFinancial(value: unknown): FinancialSummary {
   const item = record(value);
   if (item.available !== true)
-    return {
-      available: false,
-      accountSeq: null,
-      operation: null,
-      symbol: null,
-      market: null,
-      currency: null,
-      side: null,
-      quantity: null,
-      orderAmount: null,
-      price: null,
-      orderType: null,
-      timeInForce: null,
-      orderId: null,
-      normalization: [],
-    };
+    return { ...UNAVAILABLE_FINANCIAL, normalization: [] };
   return {
     available: true,
     accountSeq: matching(item.accountSeq, ACCOUNT_SEQ_PATTERN),
