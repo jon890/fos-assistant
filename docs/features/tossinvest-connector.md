@@ -1,6 +1,6 @@
 # 토스증권 커넥터
 
-사용자의 토스증권 계좌를 읽는 범용 커넥터의 개발 문서다.
+사용자의 토스증권 계좌를 읽고 승인한 일반 주문을 넣는 커넥터의 개발 문서다.
 
 covers: `hermes/connectors/tossinvest/`
 
@@ -11,7 +11,7 @@ covers: `hermes/connectors/tossinvest/`
 
 서비스는 [토스증권 공식 사이트](https://www.tossinvest.com/) 에 있다. API 설정 근거는 [토스증권 개발자 문서](https://developers.tossinvest.com/)다.
 
-**이 커넥터는 주문하지 않는다.** 주문, 정정, 취소 도구가 없다. 매수와 매도는 사용자가 토스증권 앱이나 웹에서 한다.
+**이 커넥터는 사용자가 승인한 일반 주문을 한 건씩 넣거나 취소한다.** 정정과 조건주문은 하지 않는다. 그 둘은 사용자가 토스증권 앱이나 웹에서 한다.
 
 ## 등록 칸
 
@@ -33,7 +33,7 @@ covers: `hermes/connectors/tossinvest/`
 
 ## 도구와 정책
 
-MCP 서버 이름은 `tossinvest` 다. 도구 33개는 모두 `READ` 이고 승인 없이 돈다. SDK 설명은 connector.json의 본문을 그대로 쓴다. 서버의 도구에도 `readOnlyHint` 를 참으로 둔다.
+MCP 서버 이름은 `tossinvest` 다. 도구 36개 가운데 조회 33개와 준비 도구 `prepare_trade` 는 `READ` 이고 승인 없이 돈다. 실행 도구 `create_order` 와 `cancel_order` 는 `FINANCIAL` 이고 호출마다 승인을 받는다. SDK 설명은 connector.json의 본문을 그대로 쓴다. 조회 도구와 준비 도구의 `readOnlyHint` 는 참이고 실행 도구 둘은 거짓이다.
 
 | 도구 | 부르는 API | 하는 일 |
 | --- | --- | --- |
@@ -70,8 +70,17 @@ MCP 서버 이름은 `tossinvest` 다. 도구 33개는 모두 `READ` 이고 승�
 | `get_stock_short_selling` | `GET /api/v1/stocks/{symbol}/short-selling` | 공매도 수량과 금액, 비중을 읽는다 |
 | `get_stock_credit_trades` | `GET /api/v1/stocks/{symbol}/credit-trades` | 개인 신용거래를 읽는다 |
 | `get_stock_securities_lending` | `GET /api/v1/stocks/{symbol}/securities-lending` | 기관 대차거래를 읽는다 |
+| `prepare_trade` | `GET /api/v1/accounts`, `GET /api/v1/stocks`, 취소면 `GET /api/v1/orders/{orderId}` | 주문 생성이나 취소 한 건의 내용을 검증하고 정리한다. 읽기만 하고 주문을 넣지 않는다. 모델이 부르는 유일한 주문 도구다 |
+| `create_order` | `POST /api/v1/orders` | 승인한 일반 주문 한 건을 넣는다. FINANCIAL/always 다 |
+| `cancel_order` | `POST /api/v1/orders/{orderId}/cancel` | 승인한 대로 주문 한 건을 취소한다. FINANCIAL/always 다 |
 
 계좌 데이터(보유, 잔고, 주문)도 `READ` 다. 연결이 붙은 에이전트는 주인만 쓰고, 메일 본문을 `READ` 로 둔 Gmail 커넥터와 같은 판단이다. 먼저 살펴보기와 예약 작업이 계좌를 읽는다.
+
+모델은 준비 도구 `prepare_trade` 만 부른다. 인자는 `{v: 1, tool, args}` 이고 `tool` 은 `create_order` 나 `cancel_order` 다.
+Control Plane 의 정책 판정은 이 호출을 판정 전에 금융 준비로 넘겨 승인 줄을 만들고, 모델에게는 언제나 막힘으로 답한다.
+사용자가 승인 카드에서 승인하면 Control Plane 이 claim 을 한 번 소비하고 실행 도구를 부른다. 실행 도구는 모델 목록에 없다.
+실행 도구를 모델이 직접 부르면 거절하고, 살펴보기 트리 안의 준비 호출은 넘기지 않는다.
+근거는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md) 이 갖는다.
 
 ### 도구의 인자와 결과
 
@@ -134,7 +143,7 @@ get_order는 list_orders의 페이지와 별개로 주문 하나를 반환한다
 시장 일정은 API가 반환한 3영업일 정보 그대로다. 모든 응답 시각은 KST(+09:00)이며 날짜를 계산하거나 세션을 합치지 않는다. 국내는 KRX+NXT 통합 세션이고 장전·장후 시간외종가는 제외된다. 미국은 `dayMarket`, `preMarket`, `regularMarket`, `afterMarket`을 각각 보존한다. 휴장과 부분 휴장의 null도 바꾸지 않는다.
 세 조회는 `MARKET_INFO` 그룹의 공용 큐를 사용하며 최소 간격은 334ms다. 두 도구의 metadata는 현재 빈 객체다. 인자 검증은 HTTP 전송 전에 끝나며 같은 통화 쌍, 실제로 없는 날짜, 초를 생략하거나 시간대가 없는 시각과 추가 인자를 거절한다.
 
-`connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 현재 `execution_guard`가 없고 해시 값은 null이며 조회 도구 33개의 승인 정책은 `none`이다. 금융 승인 ticket도 없으므로 이번 변경으로 무효화되는 ticket은 없다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 조회 도구는 `READ`로 선언하며 금융 쓰기 권한을 열지 않는다.
+`connector_guard.py`는 `execution_guard`가 있을 때만 전체 선언 원문인 `declared`를 재귀 키 정렬·공백 없는 UTF-8 JSON으로 직렬화해 SHA-256을 계산한다. 도구 추가도 그 SHA를 바꾸므로 보호 선언이 있는 커넥터에서는 이전 SHA에 묶인 승인 ticket이 무효가 된다. 이 커넥터는 `execution_guard`(`protocol` 은 `approval-claim-v2`, `prepare_tool` 은 `prepare_trade`, `operations` 는 `create_order`=`CREATE` 와 `cancel_order`=`CANCEL`, `scope_fields` 는 `account_seq`=`account`)를 선언하므로 해시 값이 있다. 도구 목록이나 선언을 바꾸면 이전 해시에 묶인 승인 ticket 이 무효가 된다. 조회 도구 33개와 준비 도구의 승인 정책은 `none`, 실행 도구 둘은 `always` 다. 도구 목록 반영은 운영 저장소의 절차에 따라 연결을 수동으로 다시 동기화해야 한다. 다시 동기화하지 않으면 바인딩이 새 manifest 의 보호 선언을 받지 못해 준비가 모두 거절된다.
 
 ### 섹터 조회
 
@@ -221,7 +230,7 @@ GET이 429로 거절되면 같은 그룹의 큐에서 최소 1초 기다려 한 
 ## 서버와 검사
 
 `src/server.ts` 가 stdio MCP 서버이고 `dist/tossinvest-mcp.js` 로 묶는다. 생성 entry는 Git에서 추적하지 않고 테스트와 배포 묶음 생산 때 소스에서 빌드한다. 검사는 `tests/` 에서 로컬 HTTP 대역으로 돈다. 실제 서비스에 닿지 않는다.
-공식 JSON fixture의 41 operation 중 인증 1개와 조회 GET 34개를 연결한다. MCP 도구는 READ 33개다. `getStocks`를 사용하는 `get_quotes`와 `get_stocks`, `getSellableQuantity`를 공유하는 두 도구는 고유 operation으로 한 번만 센다. 나머지 6개 금융 쓰기 operation은 구현·등록하지 않았으며 주문을 실행할 수 없다. `hermes/connectors/tossinvest/scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다.
+공식 JSON fixture의 41 operation 중 인증 1개와 조회 GET 34개를 연결한다. MCP 도구는 조회 READ 33개와 준비 도구 하나, 실행 도구 둘이다. `getStocks`를 사용하는 `get_quotes`와 `get_stocks`, `getSellableQuantity`를 공유하는 두 도구는 고유 operation으로 한 번만 센다. 일반 주문 생성과 취소 둘을 등록했고 정정과 조건주문 쓰기 넷은 등록하지 않았다. `hermes/connectors/tossinvest/scripts/generate-contract.ts --check`가 원문 고정 계약의 재현성을 검사한다.
 도구와 고유 operation은 다른 수치다. coverage 테스트는 모든 도구와 한국·미국 시장 일정을 호출해 인증 1회와 조회 36회를 수신한다. `getStocks`와 `getSellableQuantity`는 여러 도구가 공유한다.
 
 SDK 설명과 manifest의 tools.description은 33개 모두 같은 평문이다. 설명은 표시 정보이며 READ/none 정책과 분리된다. 설명을 넣은 manifest의 운영 설치는 새 reader가 실제 plugin에 로드된 것을 확인한 뒤 진행한다.
@@ -230,8 +239,8 @@ SDK 설명과 manifest의 tools.description은 33개 모두 같은 평문이다.
 
 ## 보안
 
-- **돈이 움직이는 도구가 없다.** 그러나 키 자체는 주문할 수 있다. 키가 새면 허용 IP 에서 주문할 수 있다. 실행 공간도 같은 공인 IP 로 나가므로 허용 IP 는 셸에 샌 키를 막지 못한다. 그래서 `sandbox_required` 다.
-- 외부 글이 모델을 속였을 때 닿는 범위: 이 커넥터에는 쓰는 도구가 없다. 속은 모델이 할 수 있는 것은 읽은 계좌 데이터를 다른 도구(셸, 웹)로 내보내는 것이다. 그 길은 [READ 데이터 흐름](connector-policy.md) 의 RF-08, RF-09 와 같다.
+- **모델이 직접 부를 수 있는 돈이 움직이는 도구는 없다.** 모델은 준비 도구만 보고, 실행 도구 둘은 사람이 승인 카드에서 승인한 뒤 Control Plane 이 부른다. 그러나 키 자체는 주문할 수 있다. 키가 새면 허용 IP 에서 주문할 수 있다. 실행 공간도 같은 공인 IP 로 나가므로 허용 IP 는 셸에 샌 키를 막지 못한다. 그래서 `sandbox_required` 다.
+- 외부 글이 모델을 속였을 때 닿는 범위: 속은 모델이 할 수 있는 것은 주문 승인 요청을 만드는 것이다. 실행은 사람이 카드에서 계좌와 내용을 보고 승인한 한 건뿐이다. 살펴보기 트리 안에서는 승인 요청도 만들지 못한다. 읽은 계좌 데이터를 다른 도구(셸, 웹)로 내보내는 길은 [READ 데이터 흐름](connector-policy.md) 의 RF-08, RF-09 와 같다.
 - 보유와 잔고가 모델 공급자에게 간다(RF-20). 사용자가 받아들였다.
 - 토스증권 이용 약관은 시세의 제3자 제공을 금지한다. 모델 공급자 전송이 여기 드는지는 확인하지 못했다.
 
@@ -259,44 +268,55 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 
 ## 매매 개방 조건
 
-**지금은 주문을 실행할 수 없다.** 아래 조건을 모두 채우고, 소유자가 개방을 명시적으로 승인한 뒤 따로 여는 PR 에서만 연다.
-금융 실행 전체를 켜고 끄는 설정(kill switch)은 두지 않는다. **개방 PR 의 머지가 곧 개방이다.**
-그 PR 전까지는 공개 진입점이 이어지지 않아 머지만으로 주문이 열리지 않는다.
-개방 PR 이 머지된 뒤에도 운영에 keyed hash key 파일과 허용 목록, 0 이 아닌 상한을 넣기 전에는 주문이 거절된다. key 파일이 운영의 마지막 잠금이다.
-첫 개방 대상은 일반 주문의 `create_order` 와 `cancel_order` 다. `modify_order` 와 조건주문 세 쓰기는 첫 개방에 넣지 않는다.
+**소유자가 2026-10-13 에 개방을 승인했고 개방 PR 이 머지됐다.**
+금융 실행 전체를 켜고 끄는 설정(kill switch)은 두지 않는다. 개방 PR 의 머지가 곧 개방이었다.
+운영에 keyed hash key 파일과 허용 목록, 0 이 아닌 상한을 넣기 전에는 주문이 거절된다. key 파일이 운영의 마지막 잠금이다.
+첫 개방 대상은 일반 주문의 `create_order` 와 `cancel_order` 다. `modify_order` 와 조건주문 세 쓰기는 열지 않았다.
 
 | 조건 | 무엇을 보장하는가 | 지금 |
 | --- | --- | --- |
 | keyed hash key 파일 | 운영 비밀 파일 하나를 읽지 못하면 준비, 승인, claim 이 모두 금융 전송 없이 거절한다 | 있음. `digest-key-file`. key 를 쓰는 해시 계산은 「해시 추측 방어」 가 더한다 |
 | 호출마다 승인 | FINANCIAL 도구는 `always` 다. 상시 허락과 대화 허락을 받지 않는다(grant 불가) | 있음 |
-| 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 있음. `allowed-accounts`. 승인과 claim 에서도 저장 scope 로 다시 본다 |
-| 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 운영 설정 상한을 둔다. 기본값은 0 이라 아무 주문도 받지 않는다 | 있음. `max-order-amount-krw`, `max-order-amount-usd`, `max-order-quantity`, `max-daily-amount-krw`, `max-daily-amount-usd` |
+| 계좌 허용 목록 | 운영 설정에 미리 적은 계좌만 주문한다. 연결의 공개 칸 `account` 가 목록에 없으면 준비부터 거절한다 | 있음. `allowed-accounts`. 항목은 `<계좌 순번>:<사용자 메일>` 이고 한 계좌는 한 사용자에게만 연다. 메일은 대소문자를 가리지 않고, 계좌 순번은 앞의 0 을 뺀 숫자로 견준다. 형식이 틀리거나 같은 계좌가 두 번 나오면 기동을 멈춘다. 승인과 claim 에서도 저장 scope 로 다시 본다 |
+| 주문 상한 | 한 건의 금액과 수량, 하루 합계 금액에 운영 설정 상한을 둔다. 기본값은 0 이라 아무 주문도 받지 않는다 | 있음. `max-order-amount-krw`, `max-order-amount-usd`, `max-order-quantity`, `max-daily-amount-krw`, `max-daily-amount-usd`. USD 금액 주문은 환율로 바꾸지 않고 USD 상한과만 견준다 |
 | 멱등 key | 준비가 만든 `clientOrderId` 하나로 한 번만 보낸다. 같은 의도의 PENDING, EXECUTING, UNKNOWN 이 있으면 새 준비를 막는다 | 있음 |
 | UNKNOWN 은 재시도하지 않는다 | 결과를 모르는 주문은 ticket 을 다시 내지 않고 다시 보내지 않는다. 사용자가 토스에서 확인한다 | 있음 |
 | 연결 재등록 우회 차단 | request_key 를 연결 번호가 아니라 사용자, 커넥터, 계좌 범위로 계산한다. 기존 키와의 호환은 키 버전 접두로 가른다 | 있음. `fos-financial-intent-v2`. 저장 줄의 protocol 을 `approval-claim-v2` 로 올렸고, 열린 v1 줄이 남으면 관문이 닫힌다 |
 | 해시 추측 방어 | 금융 줄의 인자 해시와 request_key 를 서버 비밀로 keyed hash 한다. DB 만 읽은 사람이 인자를 대입해 맞혀 보지 못한다 | 있음. `FinancialDigest`, key 파일은 `digest-key-file`. 없으면 관문이 닫힌다 |
-| 공개 진입점 연결 | 정책 판정과 승인 API 가 FINANCIAL 을 producer 와 금융 승인으로 보낸다. 토스 서버와 manifest 가 두 도구를 등록한다 | 없음. producer 와 금융 승인은 package-private 이다 |
-| 승인 카드 표시 | 승인 카드가 저장한 summary(종목, 방향, 수량, 가격, 정규화)를 보인다. 계좌는 summary 가 아니라 Control Plane 이 실제 전송 scope(`account_seq`)와 연결의 공개 칸, 허용 목록에서 만들어 보인다. 모델 인자만 보이고 승인하지 않는다 | 없음 |
+| 공개 진입점 연결 | 정책 판정이 준비 도구 호출을 producer 로, 승인 API 가 FINANCIAL 줄을 금융 승인으로 보낸다. 토스 서버와 manifest 가 준비 도구와 실행 도구 둘을 등록한다 | 있음. 준비 호출은 판정 전에 금융 준비로 넘기고, 공개 승인은 주인 확인 뒤 허락 입력을 거절하고 금융 승인으로 보낸다 |
+| 승인 카드 표시 | 승인 카드가 저장한 summary(종목, 방향, 수량, 가격, 정규화)를 보인다. 계좌는 summary 가 아니라 Control Plane 이 실제 전송 scope(`account_seq`)와 연결의 공개 칸, 허용 목록에서 만들어 보인다. 모델 인자만 보고 승인하게 두지 않는다 | 있음. 카드가 계좌 순번과 저장 요약을 보이고, 요약을 열지 못하면 승인 단추를 그리지 않는다 |
 
-계획은 `tasks/plan208-toss-conditional-financial/` 이 갖는다.
+카드의 계좌 순번은 사용자에게 익숙한 값이 아니다. 허용 목록에 그 순번을 적은 운영자와 연결 화면의 계좌 선택지로 대조한다. 근거는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md) 이 갖는다.
 
 지금 있는 준비, 승인, 실행, 확인의 경로와 네이버, Gmail 과의 차이, 개방 Go/No-Go 는 [커넥터별 준비, 승인, 실행, 확인](connector-policy.md#커넥터별-준비-승인-실행-확인)이 갖는다.
 
 ### 첫 실제 호출 절차
 
 개방 PR 이 배포된 뒤 소유자가 직접 한다. 계좌번호, 금액, 종목은 어디에도 적지 않는다.
-체결되지 않을 주문 하나를 넣고 바로 취소해, 전송과 기록이 한 번씩만 남는지 본다.
+둘로 나눈다. 소수점 매수로 전송과 기록이 한 번씩만 남는지 보고, 체결되지 않을 지정가 주문으로 취소를 본다.
 
-1. 배포 직후 key 파일이나 허용 목록이 아직 없는지 확인한다. 대화에서 주문을 요청해 금융 전송 없이 거절되는지 본다
-2. 계좌 허용 목록에 쓸 계좌 하나만 넣고, 주문 상한을 아래 주문을 겨우 담을 만큼 작게 둔다
-3. 금융 해시 key 파일을 두고 재기동해 관문을 연다. 여는 것은 소유자가 그 자리에서 승인한다
-4. 대화에서 국내 종목 하나를 1주, 당일 하한가에 가까워 체결되지 않을 지정가로 매수하라고 요청한다. 가격은 `get_price_limits` 와 `get_orderbook` 으로 먼저 읽는다
-   주문은 국내 정규장 안에서 넣고, 장 시작과 마감의 동시호가 시간과 마감 직전은 피한다. 정규장 밖에서 넣으면 토스가 예약 주문으로 받거나 거절해 미체결 주문 하나와 취소를 확인하지 못할 수 있다.
-   그 종목이 하한가로 내려가면 이 주문은 체결된다. 그때의 최대 손실은 1주 가격이다
-5. 승인 카드의 계좌가 허용 목록에 적은 그 계좌인지, 종목, 방향, 수량, 가격이 요청과 같은지 보고 승인한다. 카드의 계좌는 Control Plane 이 실제 전송 계좌에서 만든 값이다. summary 의 끝 네 자리는 커넥터가 낸 값이라 계좌 확인의 근거로 쓰지 않는다
-6. `list_orders` 로 미체결 주문이 하나만 생겼는지 본다. 토스증권 앱에서도 같은 주문 하나를 확인한다
-7. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
-8. 계속 쓰지 않을 거면 아래 「되돌리기」 로 다시 닫는다
+1. 배포 직후 외부 서비스 연결 화면에서 토스 연결을 다시 동기화해 바인딩이 새 manifest 의 보호 선언을 받게 한다. 하지 않으면 준비가 모두 거절되고 `financial gate:` 로그에는 그 까닭이 나오지 않는다
+2. key 파일이나 허용 목록이 아직 없는지 확인한다. 대화에서 주문을 요청해 금융 전송 없이 거절되는지 본다
+3. 계좌 허용 목록에 `<계좌 순번>:<사용자 메일>` 로 계좌 하나와 사용자 하나만 넣고, 주문 상한을 아래 두 주문을 겨우 담을 만큼 작게 둔다. 미국 금액 주문은 USD 상한 둘(`max-order-amount-usd`, `max-daily-amount-usd`)만 본다
+4. 금융 해시 key 를 바꾸거나 새로 둘 때는 열린 금융 줄(PENDING, EXECUTING, UNKNOWN)이 없는지 먼저 확인한다. 열린 줄은 승인 카드에서 계좌 순번, 종목, 방향, 금액이나 수량과 가격으로 알아본다. 확인 방법은 `fos-home-infra` 가 갖는다
+5. 금융 해시 key 파일을 두고 재기동해 관문을 연다. 여는 것은 소유자가 그 자리에서 승인한다
+
+#### 소수점 매수
+
+6. 대화에서 미국 종목 하나를 소액의 `MARKET` 금액 주문으로 매수하라고 요청한다. 종목과 금액은 소유자가 정한다.
+   정규장 시작 뒤부터 종료 1시간 전 사이에 넣는다. 그 밖의 시간에는 토스가 거절한다.
+   즉시 체결될 수 있어 이 주문으로는 취소를 확인하지 않는다
+7. 승인 카드의 계좌 순번이 허용 목록에 적은 그 순번인지, 종목, 방향, 금액과 통화가 요청과 같은지 보고 승인한다. 카드의 계좌 순번은 Control Plane 이 실제 전송 계좌에서 만든 값이다. 카드에 끝 네 자리가 없으므로 허용 목록에 그 순번을 적은 운영자와 연결 화면의 계좌 선택지로 대조한다
+8. `list_orders` 와 토스증권 앱에서 같은 주문이 하나만 생기고 체결됐는지 본다
+
+#### 취소
+
+9. 소유자가 정한 체결되지 않을 지정가 주문 하나를 요청한다. 가격은 `get_price_limits` 와 `get_orderbook` 으로 먼저 읽는다.
+   정규장 안에서 넣고, 장 시작과 마감의 동시호가 시간과 마감 직전은 피한다. 정규장 밖에서 넣으면 토스가 예약 주문으로 받거나 거절해 미체결 주문 하나와 취소를 확인하지 못할 수 있다.
+   가격이 움직여 체결되면 그 주문의 최대 손실은 주문 금액이다
+10. 7번처럼 카드를 확인하고 승인한다. `list_orders` 로 미체결 주문이 하나만 생겼는지 보고, 토스증권 앱에서도 같은 주문을 확인한다
+11. 그 주문을 취소하라고 요청하고 승인한다. 미체결 목록에서 사라졌는지 앱과 `list_orders` 로 본다
+12. 계속 쓰지 않을 거면 아래 「되돌리기」 로 다시 닫는다
 
 거절은 어느 검사에 걸렸는지 응답에 밝히지 않는다. 무엇을 채울지는 기동 로그의 `financial gate:` 한 줄(key 읽힘 여부, 허용 계좌 수, 0 인 상한 이름)로 가린다.
 승인 줄과 실행 줄의 상태가 SUCCEEDED 하나씩이고 UNKNOWN 과 중복 전송이 없는지 확인하는 방법은 `fos-home-infra` 가 갖는다.
@@ -306,6 +326,7 @@ WTS 에서 허용 IP 를 고친 뒤 외부 서비스 연결 화면에서 연결 
 
 key 파일 설정을 비우거나 허용 목록을 비우면 새 준비, 대기 중인 승인, 아직 소비하지 않은 claim 이 모두 금융 전송 없이 거절된다. 상한을 0 으로 두면 새 주문과 대기 중인 주문의 승인이 거절된다. 배포를 되돌리지 않아도 된다.
 설정과 key 는 기동 뒤 한 번 읽으므로 운영 값을 바꾼 뒤 Control Plane 을 재기동해야 반영된다. key 파일만 지우고 재기동하지 않으면 닫히지 않는다.
+허용 목록에서 그 항목을 빼면 그 사용자의 그 계좌만 닫히고 다른 항목은 그대로 열려 있다.
 이미 토스에 들어간 주문은 이 설정이 취소하지 않는다. 토스증권 앱에서 취소한다.
 금융 해시 key 를 바꾸면 이전 key 로 만든 PENDING, EXECUTING, UNKNOWN 이 남은 동안 관문이 닫힌다. key 를 바꾸기 전에 열린 금융 줄이 없는지 확인한다. 근거는 [ADR-20261013 / financial-digest-key-rotation](../../backend/docs/adr/ADR-20261013-financial-digest-key-rotation.md) 이 갖는다.
 닫는 방법은 `fos-home-infra` 가 갖는다.
@@ -313,9 +334,9 @@ key 파일 설정을 비우거나 허용 목록을 비우면 새 준비, 대기 
 ## 토스증권 REST 전체 지원
 
 목표는 공식 REST의 정상 기능을 MCP 사용자에게 모두 제공하는 것이다. WebSocket 연결, 구독, 실시간 사건은 범위 밖이다.
-현재 READ 도구 33개가 조회 GET 34개와 내부 인증 1개의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었으며 나머지 6개 금융 쓰기 operation은 구현·등록하지 않았다. READ 조회 추가가 금융 실행 허용을 뜻하지 않는다.
+현재 READ 도구 33개가 조회 GET 34개와 내부 인증 1개의 공식 결과와 페이지를 지원한다. 공식 41 operation의 계약과 19그룹 한도를 갖추었고, 일반 주문 생성과 취소 둘을 등록했으며 정정과 조건주문 쓰기 넷은 등록하지 않았다. READ 조회 추가가 금융 실행 허용을 뜻하지 않는다.
 종목 참조 도구 `get_stocks`, `list_stocks`, `get_stock_warnings`는 production 서버에 등록되어 있다. `getStocks`는 기존 `get_quotes`와 공유하므로 고유 operation 증가분은 `listStocks`, `getStockWarnings` 두 개다. 전체 목록은 7개 시장과 선택 필터를 지원하며 페이지 없이 전량을 반환한다. 유의사항의 exchange는 상장 시장 market과 구분하고 빈 배열과 미존재 오류를 구분한다. 이 세 도구도 READ/none이며 SDK의 readOnlyHint는 참이다.
-현재 금융 도구는 차단돼 있다. 아래 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
+일반 주문 생성과 취소 도구는 등록했고 모델은 준비 도구만 본다. 아래 표에서 `미연결` 로 남은 이름은 구현할 도구의 계약이며 등록 완료를 뜻하지 않는다.
 
 ### 공식 기준과 완료 조건
 
@@ -398,10 +419,10 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 | `getAccounts` | `list_accounts` | READ/none; ACCOUNT | 기반 구현 | 기반 |
 | `getHoldings` | `get_holdings` | READ/none; ASSET | 기반 구현 | 기반 |
 | `getOrders` | `list_orders` | READ/none; ORDER_HISTORY | 기반 구현 | 기반 |
-| `createOrder` | `create_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
+| `createOrder` | `create_order` | FINANCIAL/always; ORDER | 구현 | 일반주문 |
 | `getOrder` | `get_order` | READ/none; ORDER_HISTORY | 구현 | 일반주문 |
 | `modifyOrder` | `modify_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
-| `cancelOrder` | `cancel_order` | FINANCIAL/always; ORDER | 미연결 | 일반주문 |
+| `cancelOrder` | `cancel_order` | FINANCIAL/always; ORDER | 구현 | 일반주문 |
 | `createConditionalOrder` | `create_conditional_order` | FINANCIAL/always; CONDITIONAL_ORDER | 미연결 | 조건주문 |
 | `getConditionalOrders` | `list_conditional_orders` | READ/none; CONDITIONAL_ORDER_HISTORY | 구현 | 조건 조회 |
 | `getConditionalOrder` | `get_conditional_order` | READ/none; CONDITIONAL_ORDER_HISTORY | 구현 | 조건 조회 |
@@ -441,7 +462,7 @@ schema 위반은 명확한 오류로 끝내며 누락을 null로 바꾸거나 �
 
 ### 조건주문 REST 쓰기의 구현 보완안
 
-이 절은 구현 제안이다. 운영 금융 도구는 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
+이 절은 구현 제안이다. 조건주문 쓰기 도구는 운영에 미등록이며 FINANCIAL의 `RISK_NOT_OPEN`, noGrant와 `confirmHighValueOrder=false`를 유지한다.
 SDK와 실제 Python 소비자를 loopback에서 검증하는 구현은 실제 DB producer 연결 및 운영 금융 허가와 별개로 완료할 수 있다.
 일반 주문과 조건주문은 같은 ticket·claim을 쓰되 본문과 표시 값을 각각의 엄격한 계약으로 검증한다. 공개 hook·approve를 열거나 새 grant·permit flag를 만들지 않는다.
 
@@ -550,7 +571,7 @@ Python/Java는 같은 원문 바이트와 expected를 검사한다. aapl→AAPL,
 model/execution은 각16 KiB, summary8 KiB, scope2 KiB이며 strict duplicate/trailing token·nesting5를 유지한다. 한글 다중 byte로 상한 직전/초과와 중복 키·trailing JSON을 검사한다.
 AAD는 `connector_action_execution:<actionId>:column:<column>:user:<userId>`이고 column은 execution_args_json/summary_json/scope_json이다. 실제 TextCipher와 동일 keyId로 세 원문을 seal/open하며 column·action·user·keyId 변경을 거절한다.
 현재 main 및 고정 일반 금융 source에는 sourceContext라는 정의나 조건 producer가 없다. 임의 DTO가 이미 있다고 가정하지 않는다. 실제 producer가 준비 전 복사하는 소유권 맥락과 저장 후 summary 읽기는 별도 통합에서 확인한다.
-기존 승인 카드 조회는 현재 카탈로그와 원래 모델 인자를 사용한다. 저장 summary를 공개 화면에 연결하는 일과 일괄 승인 제외는 운영 개방의 후속 범위이며 이 보완안의 완료 조건이 아니다.
+승인 카드는 일반 주문 금융 줄의 저장 summary를 보이고 금융 줄을 일괄 승인에서 뺀다. 조건주문 summary의 카드 표시는 조건주문을 여는 때의 범위이며 이 보완안의 완료 조건이 아니다.
 
 #### 일회 실행과 HTTP 예산
 
@@ -608,7 +629,7 @@ UNKNOWN은 자동 재실행·ticket 재발급·UUID 교체를 하지 않는다. 
 각 관심사는 설계·구현·회귀를 함께 담은 독립 PR이며 운영 변경 1500줄 상한과 파일 길이를 지킨다. 계획만 PR로 올리지 않는다.
 모든 관심사는 먼저 실패하는 회귀를 확인하고 같은 커밋에서 구현과 성공 증거를 남긴다. 직접 수신 counter는 auth POST/prepare GET/claim POST/금융 POST/DELETE로 나눈다.
 변조·숫자 decimal·null/부재 변경·C0/C1/Cs·만료·revision/owner/profile/manifest 변경·철회·replay는 금융 0회다. 429/5xx/끊김/불량 성공의 UNKNOWN과 추가 전송 0회를 실패 주입으로 확인한다.
-운영 server/manifest의 금융 도구 0개, 착수 당시 main의 READ 합집합, noGrant와 RISK_NOT_OPEN을 회귀로 지킨다.
+운영 server/manifest의 조건주문 쓰기 도구 0개, 착수 당시 main의 READ 합집합, noGrant와 RISK_NOT_OPEN을 회귀로 지킨다.
 실계좌·실토큰·거래·배포는 세 관심사 모두 범위 밖이다. mock 성공을 운영 거래나 공개 승인 E2E 완료로 보고하지 않는다.
 
 ### 조건주문 snapshot 소비 계약
@@ -695,9 +716,11 @@ CI의 `hermes` job과 `scripts/checks/check-connectors.sh`가 새 테스트를 �
 ### 일반 금융 모듈
 
 `prepare-trade.ts`와 `trading-tools.ts`는 일반 주문 CREATE·MODIFY·CANCEL을 구현한다.
-운영 `server.ts`는 이 등록 함수를 호출하지 않는다. 운영 manifest는 READ 목록을 유지하고
-FINANCIAL 도구와 execution_guard를 선언하지 않는다. 공개 hook·approve의 RISK_NOT_OPEN과
-plugin의 금융 숨김, 상시 허락 차단, DESTRUCTIVE 차단도 유지한다.
+운영 `server.ts`는 `registerTradingTools`를 기본값으로 불러 준비 도구와 `create_order`, `cancel_order`만 등록한다.
+`modify_order`는 테스트 entry만 명시해 등록한다. 운영 manifest는 `prepare_trade`를 READ/none으로,
+두 실행 도구를 FINANCIAL/always로 선언하고 `execution_guard`가 `CREATE`와 `CANCEL`만 연다.
+모델이 실행 도구를 직접 부른 호출의 `RISK_NOT_OPEN`과 plugin의 금융 숨김, 상시 허락 차단,
+DESTRUCTIVE 차단은 유지한다.
 
 prepare는 계좌 끝 네 자리, 공식 StockInfo의 market·currency와 정정·취소의 원주문을 조회한다.
 실행 args와 summary는 [금융 저장 계약](connector-policy.md#표시-값과-실행-인자)을 따른다.
@@ -766,7 +789,7 @@ caller의 계좌, token, URL과 추가 인자도 HTTP 0회로 거절한다. 통�
 
 종목 참조·섹터·조건주문 조회·랭킹과 지표·주문 상세와 수수료·국내 수급 통계를 같은 production 서버에 등록한다.
 기존 시세와 시장 조회, 계좌 조회의 입력·페이지·오류 계약을 유지한다. `getStocks`와 `getSellableQuantity`의 공유 호출은 중복 operation으로 세지 않는다.
-조회 GET 34개는 공식 REST의 모든 GET이며 나머지 6개 POST·DELETE 금융 producer는 별도 구현 대상이다.
+조회 GET 34개는 공식 REST의 모든 GET이며 나머지 POST 6개 가운데 일반 주문 생성과 취소는 등록했고 정정과 조건주문 쓰기 넷은 별도 구현 대상이다.
 
 조건조회, 랭킹·시장 지표, 주문 상세·수수료와 통계는 검증 뒤 공용 `officialFields(value, schema)`로 공식 알려진 필드를 투영한다.
 조건조회의 nullable·ref·allOf와 통계의 설명 전용 result 구체화, 정확한 ref/null 두 분기 계약을 함께 사용한다.

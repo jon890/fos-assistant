@@ -28,6 +28,34 @@ export const GRANT_PERIODS: readonly GrantPeriod[] = [
   "DAYS_30",
 ];
 
+/** 금융 줄에서 입력을 바꾼 칸 하나다. 없던 값은 null 이다. */
+export type FinancialNormalization = {
+  field: string;
+  before: string | null;
+  after: string;
+};
+
+/**
+ * 금융 승인 줄의 저장 요약이다. `available` 이 거짓이면 저장한 내용을 열지 못한 줄이라 나머지 칸은 null 이고
+ * `normalization` 은 비어 있다. `accountSeq` 는 실제로 전송할 계좌 순번이다.
+ */
+export type FinancialSummary = {
+  available: boolean;
+  accountSeq: string | null;
+  operation: "CREATE" | "CANCEL" | null;
+  symbol: string | null;
+  market: string | null;
+  currency: string | null;
+  side: "BUY" | "SELL" | null;
+  quantity: string | null;
+  orderAmount: string | null;
+  price: string | null;
+  orderType: "LIMIT" | "MARKET" | null;
+  timeInForce: string | null;
+  orderId: string | null;
+  normalization: FinancialNormalization[];
+};
+
 /** 승인 줄 한 개다. 카드는 이 응답으로만 그린다. `toolName` 과 `errorCode` 는 내부 값이라 화면에 그리지 않는다. */
 export type ConnectorAction = {
   actionId: string;
@@ -50,6 +78,8 @@ export type ConnectorAction = {
   conversationGrantAllowed: boolean;
   /** 원고 저장 job 이 붙은 줄의 요약이다. 일반 줄은 null 이다. */
   contentDraft: ContentDraftSummary | null;
+  /** 금융 줄의 저장 요약이다. 금융 줄이 아니면 null 이다. */
+  financial: FinancialSummary | null;
 };
 
 /** 이 대화에서 계속 허용 중인 도구 한 개다. 화면에는 `title` 을 보인다. */

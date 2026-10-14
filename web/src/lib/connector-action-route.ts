@@ -13,6 +13,7 @@ import {
   type ConnectorActionStatus,
   type ConnectorGrant,
   type ConversationGrant,
+  type FinancialSummary,
 } from "@/lib/connector-action";
 import {
   CONTENT_DRAFT_JOB_STATUSES,
@@ -152,6 +153,79 @@ function safeAction(value: unknown): ConnectorAction {
     conversationGrantAllowed: item.conversationGrantAllowed === true,
     contentDraft:
       item.contentDraft == null ? null : safeContentDraft(item.contentDraft),
+    financial: item.financial == null ? null : safeFinancial(item.financial),
+  };
+}
+
+const ACCOUNT_SEQ_PATTERN = /^[1-9][0-9]{0,18}$/;
+const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const DECIMAL_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
+
+function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T {
+  const item = text(value);
+  if (!allowed.includes(item as T)) throw new Error();
+  return item as T;
+}
+
+function matching(value: unknown, pattern: RegExp): string {
+  const item = text(value);
+  if (!pattern.test(item)) throw new Error();
+  return item;
+}
+
+/** 수량, 금액, 가격이다. 없으면 null 이고 있으면 30자 이하의 십진 글이다. */
+function nullableDecimal(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const item = matching(value, DECIMAL_PATTERN);
+  if (item.length > 30) throw new Error();
+  return item;
+}
+
+/**
+ * 금융 요약은 계약의 칸만 옮긴다. 저장한 내용을 열지 못한 줄은 나머지 칸을 모두 비운다. 열었다면 계좌 순번과
+ * 방향 같은 칸의 모양을 검사하고, 틀리면 던져 고정 오류로 바꾼다.
+ */
+function safeFinancial(value: unknown): FinancialSummary {
+  const item = record(value);
+  if (item.available !== true)
+    return {
+      available: false,
+      accountSeq: null,
+      operation: null,
+      symbol: null,
+      market: null,
+      currency: null,
+      side: null,
+      quantity: null,
+      orderAmount: null,
+      price: null,
+      orderType: null,
+      timeInForce: null,
+      orderId: null,
+      normalization: [],
+    };
+  return {
+    available: true,
+    accountSeq: matching(item.accountSeq, ACCOUNT_SEQ_PATTERN),
+    operation: oneOf(item.operation, ["CREATE", "CANCEL"] as const),
+    symbol: nullableText(item.symbol),
+    market: nullableText(item.market),
+    currency: matching(item.currency, CURRENCY_PATTERN),
+    side: oneOf(item.side, ["BUY", "SELL"] as const),
+    quantity: nullableDecimal(item.quantity),
+    orderAmount: nullableDecimal(item.orderAmount),
+    price: nullableDecimal(item.price),
+    orderType: oneOf(item.orderType, ["LIMIT", "MARKET"] as const),
+    timeInForce: nullableText(item.timeInForce),
+    orderId: nullableText(item.orderId),
+    normalization: list(item.normalization).map((change) => {
+      const entry = record(change);
+      return {
+        field: text(entry.field),
+        before: nullableText(entry.before),
+        after: text(entry.after),
+      };
+    }),
   };
 }
 
