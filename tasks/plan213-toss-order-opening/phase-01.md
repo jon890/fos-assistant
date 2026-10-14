@@ -31,7 +31,8 @@
 - USD 금액 주문은 환율로 바꾸지 않는다. `ConnectorFinancialGate.amount` 가 이미 통화별 상한(`max-order-amount-usd`, `max-daily-amount-usd`)과 견주고, 가격이 없는 수량 주문을 닫는다. 그 동작을 바꾸지 말고 테스트로 보인다.
 - 거절은 어느 검사에 걸렸는지 모델 답에 밝히지 않는다. 운영자는 기동 로그의 `financial gate:` 한 줄로 가린다.
 - `ConnectorFinancialProducer.request` 와 `ConnectorFinancialApproval.approve` 는 트랜잭션 안에서 부르면 거절한다(`require(!isActualTransactionActive())`). 새 호출부도 트랜잭션 밖에서 부른다.
-- 살펴보기(먼저 살펴보기, 예약 작업) 트리 안의 준비 도구 호출은 쓰기를 허용한 살펴보기여도 금융 준비로 넘기지 않는다. 사람이 보지 않는 실행이 외부 글에 속아 주문 승인 요청을 쌓지 않게 한다.
+- 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 준비 도구 호출은 쓰기를 허용한 살펴보기여도 금융 준비로 넘기지 않는다. 사람이 보지 않는 실행이 외부 글에 속아 주문 승인 요청을 쌓지 않게 한다.
+- 살펴보기가 아닌 일반 예약 작업(task 실행)은 승인 줄을 만든다(2026-10-14 사용자 결정). 외부 글에 속아 요청이 쌓일 수는 있으나 사람이 승인 카드에서 승인하지 않으면 나가지 않는다. 정기 매수처럼 사용자가 예약한 주문 요청을 막지 않기 위해서다.
 - 새 테스트 클래스는 `FinancialConnectorProducerTest` 를 상속하지 않는다. 상속하면 부모의 `@Test` 가 한 번 더 돌아, plugin 프로세스를 띄우는 묶음이 세 번 돈다. 공용 준비를 추상 기반 클래스로 옮긴다(작업 항목 1).
 
 ## Blocked 조건
@@ -61,7 +62,7 @@
 
 `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialProperties.java`
 
-- `allowedAccounts` 의 각 항목을 첫 `:` 에서 나눈다. 앞은 `[1-9][0-9]{0,18}` 인 계좌 순번, 뒤는 공백과 `:` 가 없고 `@` 가 있는 비지 않은 메일이다.
+- `allowedAccounts` 의 각 항목을 첫 `:` 에서 나눈다. 앞은 `[0-9]{1,19}` 인 계좌 순번(공용 vector 의 `000007` 을 쓰는 테스트를 위해 앞자리 0 을 받는다. 비교는 글자 그대로다), 뒤는 공백과 `:` 가 없고 `@` 가 있는 비지 않은 메일이다.
 - 형식이 틀리거나 같은 계좌가 두 번 나오면 `IllegalStateException` 으로 기동을 멈춘다. 메시지에 값 원문을 넣지 않는다.
 - 공개 메서드 `Optional<String> ownerOf(String account)` 를 더한다. 계좌의 메일을 돌려준다.
 - Javadoc 의 `@param allowedAccounts` 를 새 형식으로 고친다.
@@ -145,6 +146,7 @@ public record FinancialActionSummary(
 - `tool` 이 `modify_order` 인 호출, `v` 가 2 인 호출, 중복 키나 추가 키가 있는 호출은 줄 없이 막힌다
 - 실행 도구 이름으로 직접 부른 호출은 `RISK_NOT_OPEN` 이다
 - 읽기 경계의 살펴보기와 쓰기를 허용한 살펴보기 실행에서 준비 도구를 부르면 둘 다 줄 없이 막히고 준비 HTTP 가 0회다
+- 일반 예약 작업 실행에서 준비 도구를 부르면 PENDING 금융 줄 하나가 생기고 금융 POST 와 claim 은 0회다. 공개 승인 뒤에 금융 POST 가 1회다
 - 공개 승인(`ConnectorActionService.approve`)이 금융 POST 를 한 번 보내고 줄이 `SUCCEEDED` 다. 같은 줄을 다시 승인하면 `CONNECTOR_ACTION_NOT_PENDING` 이고 금융 POST 가 늘지 않는다. claim 재생도 0회다
 - 승인에 `grant` 나 `conversationGrant` 를 주면 입력 오류이고 실행하지 않는다
 - 금융 PENDING 줄을 거절하면 실행 없이 `REJECTED` 다
@@ -184,6 +186,7 @@ cd backend && git fetch origin && ./gradlew spotlessCheck
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorPolicyService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionService.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialIntake.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorActionSignals.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialSummaries.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/FinancialActionSummary.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/ConnectorActionDtos.java` | 수정 |

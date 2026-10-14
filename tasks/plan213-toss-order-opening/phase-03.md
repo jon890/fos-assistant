@@ -39,7 +39,7 @@
 `web/src/lib/connector-action-route.ts`
 
 - `safeFinancial` 을 더해 `safeAction` 에서 부른다. 계약 밖 칸은 버린다.
-- `available` 이 참일 때 `accountSeq` 는 `^[1-9][0-9]{0,18}$`, `currency` 는 `^[A-Z]{3}$`, `side` 는 `BUY`/`SELL`, `orderType` 은 `LIMIT`/`MARKET`, `operation` 은 `CREATE`/`CANCEL`, 수량과 금액과 가격은 null 이거나 `^[0-9]+(\.[0-9]+)?$` 인 30자 이하 문자열이어야 한다. 아니면 던져 고정 오류로 바꾼다.
+- `available` 이 참일 때 `accountSeq` 는 `^[1-9][0-9]{0,18}$`, `currency` 는 `^[A-Z]{3}$`, `side` 는 `BUY`/`SELL`, `orderType` 은 `LIMIT`/`MARKET`, `operation` 은 `CREATE`/`CANCEL`, 수량과 금액과 가격은 null 이거나 `^[0-9]+(\.[0-9]+)?$` 인 30자 이하 문자열이어야 한다. 아니면 그 줄의 요약을 `{available: false, 나머지 null, normalization: []}` 로 낮춘다. 던지면 대화의 승인 목록 전체가 고정 오류가 되어 다른 줄을 거절하는 길까지 막히므로 낮추는 쪽을 고른다(코드 리뷰 반영, team-lead 결정).
 
 ### 2. 승인 카드의 금융 요약
 
@@ -122,6 +122,7 @@ node --test 'test/unit/**/*.test.ts'
 | `web/src/lib/connector-action-route.ts` | 수정 |
 | `web/src/components/chat/approval-card.tsx` | 수정 |
 | `web/src/components/chat/financial-summary.tsx` | 신규 |
+| `web/src/lib/financial-summary.ts` | 신규 |
 | `web/src/components/chat/approval-list.tsx` | 수정 |
 | `test/web/connector-action-route.test.ts` | 수정 |
 | `test/browser/approval-card.spec.ts` | 수정 |
@@ -130,3 +131,13 @@ node --test 'test/unit/**/*.test.ts'
 | `hermes/connectors/README.md` | 수정 |
 | `hermes/docs/hermes-contract.md` | 수정 |
 | `hermes/docs/code-architecture.md` | 수정 |
+| `docs/adr/ADR-20261013-financial-order-opening.md` | 수정 |
+| `docs/adr/INDEX.md` | 수정 |
+| `docs/prd.md` | 수정 |
+| `README.md` | 수정 |
+| `README.ko.md` | 수정 |
+| `backend/docs/data-schema.md` | 수정 |
+| `backend/docs/code-architecture.md` | 수정 |
+| `hermes/connectors/tossinvest/skills/tossinvest/SKILL.md` | 수정 |
+
+문서 검토가 찾은 옛 문장을 고치며 위 표의 마지막 여덟 파일이 더해졌다. ADR 에는 ADR-049 의 wrapper 조건과 ADR-20261010 / financial-execution-guard 적용 범위의 개정을 적었다(team-lead 승인).
