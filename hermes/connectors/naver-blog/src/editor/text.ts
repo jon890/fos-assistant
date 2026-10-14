@@ -1,4 +1,5 @@
 import type { Block } from "../draft.ts";
+import type { FocusDiagnostics } from "./focus.ts";
 import {
   BODY_SELECTOR,
   clearField,
@@ -59,24 +60,55 @@ function bodyMismatch(want: string[], got: string[]) {
   return "";
 }
 
+/**
+ * 커서를 두지 못한 까닭의 고정 사유 코드. 마지막 시도에서 클릭 지점이 그 자리 밖 요소를 맞았으면 덮였다고 본다.
+ * Control Plane 이 이 코드만 보관하므로 화면의 글과 요소 이름은 담지 않는다.
+ */
+function cursorReason(area: "title" | "body", diagnostics: FocusDiagnostics) {
+  const last = diagnostics.samples.at(-1);
+  return `${area}_cursor_${last?.hit === "other" ? "covered" : "failed"}`;
+}
+
 /** 제목과 본문 글자를 넣고, 구성요소 자리에는 자리표시 글을 둔다. 넣은 뒤 화면과 초안을 대조한다. */
-export async function fill(page: EditorPage, title: string, blocks: Block[], draftHash: string) {
+export async function fill(
+  page: EditorPage,
+  title: string,
+  blocks: Block[],
+  draftHash: string,
+) {
   await setStage(page, draftHash, "fill", false);
   const note = await requireClearScreen(page);
-  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 글자를 넣지 못한다");
+  if (note)
+    throw page.fail(
+      "editor_failed",
+      "화면을 덮은 알림이 있어 글자를 넣지 못한다",
+      {
+        reason: "screen_blocked",
+      },
+    );
 
-  const titleFocus = await focusField(page, TITLE_SELECTOR, ".se-documentTitle");
+  const titleFocus = await focusField(
+    page,
+    TITLE_SELECTOR,
+    ".se-documentTitle",
+  );
   if (!titleFocus.focused)
     throw page.fail("editor_failed", "제목 자리에 커서를 두지 못했다", {
       focus_diagnostics: titleFocus.diagnostics,
+      reason: cursorReason("title", titleFocus.diagnostics),
     });
   await clearField(page);
   await typeLine(page, TITLE_SELECTOR, title);
 
-  const bodyFocus = await focusField(page, BODY_SELECTOR, ".se-component.se-text");
+  const bodyFocus = await focusField(
+    page,
+    BODY_SELECTOR,
+    ".se-component.se-text",
+  );
   if (!bodyFocus.focused)
     throw page.fail("editor_failed", "본문 자리에 커서를 두지 못했다", {
       focus_diagnostics: bodyFocus.diagnostics,
+      reason: cursorReason("body", bodyFocus.diagnostics),
     });
   await clearField(page);
   const lines = bodyLines(blocks);
@@ -86,11 +118,19 @@ export async function fill(page: EditorPage, title: string, blocks: Block[], dra
   }
 
   const landed = normalize((await paragraphs(page, TITLE_SELECTOR)).join(""));
-  if (landed !== normalize(title)) throw page.fail("editor_failed", "제목이 들어가지 않았다");
+  if (landed !== normalize(title))
+    throw page.fail("editor_failed", "제목이 들어가지 않았다", {
+      reason: "title_mismatch",
+    });
 
   const want = lines.map(normalize).filter(Boolean);
-  const got = (await paragraphs(page, BODY_SELECTOR)).map(normalize).filter(Boolean);
+  const got = (await paragraphs(page, BODY_SELECTOR))
+    .map(normalize)
+    .filter(Boolean);
   const wrong = bodyMismatch(want, got);
-  if (wrong) throw page.fail("editor_failed", `본문이 초안과 다르다. ${wrong}`);
+  if (wrong)
+    throw page.fail("editor_failed", `본문이 초안과 다르다. ${wrong}`, {
+      reason: "body_mismatch",
+    });
   await setStage(page, draftHash, "fill", true);
 }

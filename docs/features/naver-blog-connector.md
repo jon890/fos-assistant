@@ -303,6 +303,7 @@ JS Range로 커서를 강제로 옮기지 않으며, 입력 뒤 제목과 본문
 분류는 `title`, `body`, `other`, `none`만 허용하고 시도와 상태는 10개까지다.
 좌표, DOM 원문, id, 덮은 요소와 레이어 밖의 태그·클래스, 제목·본문·사진·URL·계정·환경값은 읽어 진단에 넣지 않는다.
 브라우저 결과와 예외 직렬화 경계에서 허용 필드만 복사한다.
+`fill` 단계의 실패는 `error.reason`에 고정 사유 코드도 남긴다: `screen_blocked`, `title_cursor_covered`, `title_cursor_failed`, `body_cursor_covered`, `body_cursor_failed`, `title_mismatch`, `body_mismatch`. `covered`는 마지막 시도에서 클릭 지점이 그 문단 밖 요소를 맞은 경우다. 원고 snapshot job의 status 응답은 이 코드를 `error_reason`으로 옮긴다.
 CDP 명령 실패와 중단은 기존 오류 문장을 유지하고, 작업 전체 시간 초과는 기존 `timeout` 계약을 따른다.
 이 진단은 실패 시점의 상태이며 과거 실패 원인을 확정하는 자료가 아니다.
 
