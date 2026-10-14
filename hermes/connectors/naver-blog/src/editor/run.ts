@@ -6,11 +6,12 @@ import { components } from "./components.ts";
 import { open } from "./open.ts";
 import { closeTab, type EditorOptions, openWriteTab } from "./page.ts";
 import { photos } from "./photos.ts";
-import { type EditorState, save, settings, state } from "./settings.ts";
+import { type EditorState, save, state } from "./save.ts";
+import { settings } from "./settings.ts";
 import { fill } from "./text.ts";
 
 export { EditorError, type EditorErrorCode } from "./page.ts";
-export type { EditorState } from "./settings.ts";
+export type { EditorState } from "./save.ts";
 
 /** 단계 이름. `save_clicking` 은 저장 단추를 누르기 직전에 한 번 알린다. */
 export type RunStage =
