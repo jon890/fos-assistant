@@ -121,6 +121,7 @@ node --test 'test/unit/**/*.test.ts'
 | `web/src/lib/connector-action.ts` | 수정 |
 | `web/src/lib/connector-action-route.ts` | 수정 |
 | `web/src/components/chat/approval-card.tsx` | 수정 |
+| `web/src/components/chat/financial-summary.tsx` | 신규 |
 | `web/src/components/chat/approval-list.tsx` | 수정 |
 | `test/web/connector-action-route.test.ts` | 수정 |
 | `test/browser/approval-card.spec.ts` | 수정 |
