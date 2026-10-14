@@ -1,4 +1,5 @@
 import type { Block, DraftInput } from "../draft.ts";
+import { LAYER_DIAGNOSIS_JS } from "./fields.ts";
 import { componentProblems, componentState } from "./components.ts";
 import {
   ABORTED,
@@ -38,10 +39,7 @@ const ANIMATING =
 // 요소를 태그와 앞 클래스 둘로만 적는다. 바뀌는 해시가 붙어도 어느 레이어인지는 알아볼 수 있다.
 // 편집기 도구 막대 안의 layer 클래스는 늘 보이므로 레이어 목록에서 뺀다.
 const PUBLISH_DIAGNOSIS = `(() => {
-  const name = e => e ? (e.tagName.toLowerCase() + [...e.classList].slice(0, 2).map(c => "." + c).join(""))
-    .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 80) : null;
-  const shown = e => { const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
-    return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden"; };
+  ${LAYER_DIAGNOSIS_JS}
   const button = document.querySelector(${JSON.stringify(PUBLISH_SETTINGS_BUTTON)});
   let state = "missing", covered = null;
   if (button) {
@@ -53,10 +51,9 @@ const PUBLISH_DIAGNOSIS = `(() => {
       if (!hit || !(hit === button || button.contains(hit))) covered = name(hit);
     }
   }
-  const layers = [...document.querySelectorAll("[class*=layer], [class*=popup], [class*=dim], [role=dialog]")]
-    .filter(e => shown(e) && !e.closest("[class*=toolbar]")).map(name);
+  const layers = visibleLayers(${DIAGNOSIS_LAYERS});
   return JSON.stringify({ publish_button: state, covered_by: covered,
-    layers: [...new Set(layers)].slice(0, ${DIAGNOSIS_LAYERS}) });
+    layers });
 })()`;
 
 const q = (value: unknown) => JSON.stringify(value);
@@ -67,7 +64,9 @@ const draftTags = (input: DraftInput) =>
 
 /** 접힌 설정도 화면을 가리므로 발행 설정 레이어가 있는지를 읽는다. */
 async function settingsOpen(page: EditorPage) {
-  return Boolean(await page.js("!!document.querySelector('[class^=layer_publish]')"));
+  return Boolean(
+    await page.js("!!document.querySelector('[class^=layer_publish]')"),
+  );
 }
 
 /**
@@ -117,8 +116,14 @@ export async function settingsState(page: EditorPage) {
       "   .map(e => e.getAttribute('aria-label'))" +
       "})",
   );
-  const state = JSON.parse(raw || "{}") as { category?: string; tags?: string[] };
-  return { category: state.category ?? "", tags: [...new Set(state.tags ?? [])] };
+  const state = JSON.parse(raw || "{}") as {
+    category?: string;
+    tags?: string[];
+  };
+  return {
+    category: state.category ?? "",
+    tags: [...new Set(state.tags ?? [])],
+  };
 }
 
 /** 목록의 카테고리 이름만 대조해 보이는 label 을 찾는 식. */
@@ -137,7 +142,10 @@ async function categoryNames(page: EditorPage) {
     "JSON.stringify([...document.querySelectorAll('[data-testid^=categoryItemText_]')]" +
       ".map(name => name.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean))",
   );
-  return [...new Set(JSON.parse(raw || "[]") as string[])].slice(0, CATEGORIES_MAX);
+  return [...new Set(JSON.parse(raw || "[]") as string[])].slice(
+    0,
+    CATEGORIES_MAX,
+  );
 }
 
 /** 움직이는 화면이 멈추고 단추가 드러난 뒤 누른다. */
@@ -159,7 +167,12 @@ async function clickStableControl(page: EditorPage, selector: string) {
       lastTop = null;
       return false;
     }
-    const current = JSON.parse(raw) as { top: number; x: number; y: number; uncovered: boolean };
+    const current = JSON.parse(raw) as {
+      top: number;
+      x: number;
+      y: number;
+      uncovered: boolean;
+    };
     if (!current.uncovered) {
       lastTop = null;
       return false;
@@ -183,12 +196,17 @@ async function clickStableControl(page: EditorPage, selector: string) {
 }
 
 /** 카테고리와 태그를 발행 설정에 넣고 설정만 닫는다. */
-export async function settings(page: EditorPage, input: DraftInput, draftHash: string) {
+export async function settings(
+  page: EditorPage,
+  input: DraftInput,
+  draftHash: string,
+) {
   await setStage(page, draftHash, "settings", false);
   const category = input.category.trim();
   const tags = draftTags(input);
   const note = await requireClearScreen(page);
-  if (note) throw page.fail("editor_failed", "화면을 덮은 알림이 있어 설정하지 못한다");
+  if (note)
+    throw page.fail("editor_failed", "화면을 덮은 알림이 있어 설정하지 못한다");
   if (!(await openSettings(page)))
     throw page.fail("editor_failed", "발행 설정을 열지 못했다", {
       diagnosis: await publishDiagnosis(page),
@@ -196,13 +214,22 @@ export async function settings(page: EditorPage, input: DraftInput, draftHash: s
   if (!(await clickStableControl(page, CATEGORY_BUTTON)))
     throw page.fail("editor_failed", "카테고리 선택기를 열지 못했다");
   const label = categoryOptionFinder(category);
-  if (!(await page.waitUntil(async () => Boolean(await page.js(`!!(${label})`)), page.step(10))))
+  if (
+    !(await page.waitUntil(
+      async () => Boolean(await page.js(`!!(${label})`)),
+      page.step(10),
+    ))
+  )
     throw page.fail("category_not_found", "그 이름의 카테고리가 없다", {
       categories: await categoryNames(page),
     });
   if (!(await page.mouseClick(label)))
     throw page.fail("editor_failed", "카테고리 항목을 누르지 못했다");
-  if (!(await page.waitUntil(async () => (await settingsState(page)).category === category)))
+  if (
+    !(await page.waitUntil(
+      async () => (await settingsState(page)).category === category,
+    ))
+  )
     throw page.fail("editor_failed", "카테고리 선택이 반영되지 않았다");
 
   for (const tag of tags) {
@@ -210,18 +237,25 @@ export async function settings(page: EditorPage, input: DraftInput, draftHash: s
       throw page.fail("editor_failed", "태그 입력칸을 누르지 못했다");
     await page.insertText(tag);
     const typed = await page.waitUntil(
-      async () => (await page.js(`document.querySelector(${q(TAG_INPUT)})?.value`)) === tag,
+      async () =>
+        (await page.js(`document.querySelector(${q(TAG_INPUT)})?.value`)) ===
+        tag,
     );
     if (!typed) throw page.fail("editor_failed", "태그 글자가 입력되지 않았다");
     await page.sleep(page.step(SETTLE_SECONDS));
     await page.enter();
-    if (!(await page.waitUntil(async () => (await settingsState(page)).tags.includes(tag))))
+    if (
+      !(await page.waitUntil(async () =>
+        (await settingsState(page)).tags.includes(tag),
+      ))
+    )
       throw page.fail("editor_failed", "태그 칩이 생기지 않았다");
   }
   const got = await settingsState(page);
   if (got.category !== category || tags.some((tag) => !got.tags.includes(tag)))
     throw page.fail("editor_failed", "카테고리나 태그가 화면과 다르다");
-  if (!(await closeSettings(page))) throw page.fail("editor_failed", "발행 설정을 닫지 못했다");
+  if (!(await closeSettings(page)))
+    throw page.fail("editor_failed", "발행 설정을 닫지 못했다");
   await setStage(page, draftHash, "settings", true);
 }
 
@@ -243,19 +277,25 @@ async function saveReadiness(
   draftHash: string,
 ) {
   const current = await progress(page);
-  if (current.draftHash !== draftHash) return ["이 탭에서 검사한 초안과 저장할 초안이 다르다"];
-  const missing = STAGES.filter((stage) => !(current.passed ?? []).includes(stage));
+  if (current.draftHash !== draftHash)
+    return ["이 탭에서 검사한 초안과 저장할 초안이 다르다"];
+  const missing = STAGES.filter(
+    (stage) => !(current.passed ?? []).includes(stage),
+  );
   if (missing.length) return [`끝나지 않은 단계: ${missing.join(", ")}`];
 
   const problems: string[] = [];
   const title = normalize((await paragraphs(page, TITLE_SELECTOR)).join(""));
   if (title !== normalize(input.title)) problems.push("제목이 초안과 다르다");
-  const body = (await paragraphs(page, BODY_SELECTOR)).map(normalize).filter(Boolean);
+  const body = (await paragraphs(page, BODY_SELECTOR))
+    .map(normalize)
+    .filter(Boolean);
   const wantedText = blocks
     .flatMap((block) => (block.type === "text" ? [normalize(block.line)] : []))
     .filter(Boolean);
   let cursor = 0;
-  for (const line of body) if (cursor < wantedText.length && line === wantedText[cursor]) cursor++;
+  for (const line of body)
+    if (cursor < wantedText.length && line === wantedText[cursor]) cursor++;
   if (cursor !== wantedText.length)
     problems.push(`본문 글이 빠졌다: ${cursor}/${wantedText.length}줄 확인`);
   if (body.some((line) => /^\[(사진|스티커|장소) 자리:/.test(line)))
@@ -273,25 +313,36 @@ async function saveReadiness(
   };
   for (const name of Object.keys(expected) as Array<keyof typeof expected>)
     if (actual[name] !== expected[name])
-      problems.push(`${name} 수가 다르다: 초안 ${expected[name]}, 화면 ${actual[name]}`);
+      problems.push(
+        `${name} 수가 다르다: 초안 ${expected[name]}, 화면 ${actual[name]}`,
+      );
   problems.push(...componentProblems(blocks, await componentState(page), body));
   const fit = (await page.js<number>(FITTED_COUNT)) || 0;
   if (fit !== expected.사진)
-    problems.push(`문서 너비 사진 수가 다르다: 초안 ${expected.사진}, 화면 ${fit}`);
+    problems.push(
+      `문서 너비 사진 수가 다르다: 초안 ${expected.사진}, 화면 ${fit}`,
+    );
 
-  if (!(await openSettings(page))) problems.push("카테고리와 태그를 읽을 수 없다");
+  if (!(await openSettings(page)))
+    problems.push("카테고리와 태그를 읽을 수 없다");
   else {
     const state = await settingsState(page);
-    if (state.category !== input.category.trim()) problems.push("카테고리가 초안과 다르다");
+    if (state.category !== input.category.trim())
+      problems.push("카테고리가 초안과 다르다");
     const tags = draftTags(input);
-    if (state.tags.length !== new Set(tags).size || tags.some((tag) => !state.tags.includes(tag)))
+    if (
+      state.tags.length !== new Set(tags).size ||
+      tags.some((tag) => !state.tags.includes(tag))
+    )
       problems.push("태그가 초안과 다르다");
     if (!(await closeSettings(page))) problems.push("발행 설정을 닫지 못했다");
   }
   if (actual.사진 === expected.사진) {
     const incomplete = await incompleteImages(page, actual.사진);
     if (incomplete.length)
-      problems.push(`사진 전송이 끝나지 않았다: ${incomplete.map((i) => i + 1).join(", ")}번째`);
+      problems.push(
+        `사진 전송이 끝나지 않았다: ${incomplete.map((i) => i + 1).join(", ")}번째`,
+      );
   }
   return problems;
 }
@@ -310,10 +361,16 @@ export async function save(
   onStage: (stage: string) => unknown,
 ) {
   if (await settingsOpen(page))
-    throw page.fail("editor_failed", "발행 설정을 먼저 닫아야 임시저장할 수 있다");
+    throw page.fail(
+      "editor_failed",
+      "발행 설정을 먼저 닫아야 임시저장할 수 있다",
+    );
   const problems = await saveReadiness(page, input, blocks, draftHash);
   if (problems.length)
-    throw page.fail("editor_failed", `임시저장을 거절했다: ${problems.join("; ")}`);
+    throw page.fail(
+      "editor_failed",
+      `임시저장을 거절했다: ${problems.join("; ")}`,
+    );
   const savedBefore = await saveCount(page);
   if (typeof savedBefore !== "number")
     throw page.fail("editor_failed", "임시저장 수를 읽지 못해 저장하지 않는다");
@@ -322,7 +379,10 @@ export async function save(
     (await imageCount(page)) !== photoCount ||
     (await incompleteImages(page, photoCount)).length
   )
-    throw page.fail("editor_failed", "저장 직전에 사진 수나 전송 상태가 달라져 저장하지 않는다");
+    throw page.fail(
+      "editor_failed",
+      "저장 직전에 사진 수나 전송 상태가 달라져 저장하지 않는다",
+    );
   const finder = buttonFinder("button", SAVE_BUTTON);
   if (!(await page.js(`!!(${finder})`)))
     throw page.fail("editor_failed", "저장 단추를 찾지 못했다");
@@ -340,9 +400,15 @@ export async function save(
         return { savedBefore, savedAfter };
     }
   } catch (error) {
-    throw page.fail("save_unconfirmed", `저장 단추를 누른 뒤 확인하지 못했다: ${(error as Error).message}`);
+    throw page.fail(
+      "save_unconfirmed",
+      `저장 단추를 누른 뒤 확인하지 못했다: ${(error as Error).message}`,
+    );
   }
-  throw page.fail("save_unconfirmed", "저장 단추는 눌렀지만 임시저장 수가 늘지 않았다");
+  throw page.fail(
+    "save_unconfirmed",
+    "저장 단추는 눌렀지만 임시저장 수가 늘지 않았다",
+  );
 }
 
 /** 발행 설정을 열어 카테고리와 태그를 읽고 설정만 닫는다. 열거나 닫지 못하면 `editor_failed` 다. */

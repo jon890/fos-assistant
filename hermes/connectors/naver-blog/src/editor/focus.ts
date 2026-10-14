@@ -1,5 +1,5 @@
 import type { EditorPage } from "./page.ts";
-import { fieldCandidates } from "./fields.ts";
+import { fieldCandidates, LAYER_DIAGNOSIS_JS } from "./fields.ts";
 
 type Region = "title" | "body" | "other" | "none";
 export type FocusSample = {
@@ -88,10 +88,7 @@ async function probe(page: EditorPage, selector: string, scope: string) {
   const pick = found >= 0 ? found : 0;
   const x = spots[pick]?.x ?? 0, y = spots[pick]?.y ?? 0;
   const top = hits[pick] ?? null;
-  const name = e => e ? (e.tagName.toLowerCase() + [...e.classList].slice(0, 2).map(c => "." + c).join(""))
-    .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 80) : null;
-  const shown = e => { const b = e.getBoundingClientRect(); const c = getComputedStyle(e);
-    return b.width > 0 && b.height > 0 && c.display !== "none" && c.visibility !== "hidden"; };
+  ${LAYER_DIAGNOSIS_JS}
   const classify = n => {
     if (!n) return "none";
     const e = n.nodeType === 1 ? n : n.parentElement;
@@ -116,8 +113,7 @@ async function probe(page: EditorPage, selector: string, scope: string) {
     hit: classify(top), anchor: classify(s?.anchorNode), end: classify(s?.focusNode),
     active: classify(active), collapsed: !!s?.isCollapsed, input_frame: !!inputFrame,
     covered_by: sized && !el.contains(top) ? name(top) : null,
-    layers: sized && !el.contains(top) ? [...new Set([...document.querySelectorAll("[class*=layer], [class*=popup], [class*=dim], [class*=tooltip], [class*=balloon], [role=dialog]")]
-      .filter(e => shown(e) && !e.closest("[class*=toolbar]")).map(name))].slice(0, ${MAX_LAYERS}) : []
+    layers: sized && !el.contains(top) ? visibleLayers(${MAX_LAYERS}) : []
   }};
 })()`);
   const sample = filterFocusDiagnostics({
