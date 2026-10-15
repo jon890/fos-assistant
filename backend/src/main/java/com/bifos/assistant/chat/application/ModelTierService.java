@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,11 +30,17 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>단계 정의는 DB 의 행만 읽는다. 행이 없는 그룹의 세 단계는 모두 빈 mapping 이고 에이전트 기본값으로 돈다.
  * 에이전트 기본값도 없으면 요청에 모델을 싣지 않아 Hermes profile 의 값으로 돈다(ADR-054).
  *
+ * <p>실행할 때는 단계가 가리키는 모델이 Hermes 목록에 없다는 이유만으로 막지 않는다. Hermes 가 돌려준 목록이
+ * 대체 목록일 수 있고(최근 모델이 빠진다), 정말 못 쓰는 모델이면 Hermes 가 그 실행을 거절해 실행 기록에 남는다.
+ * 목록에 없으면 캐시를 건너뛰고 한 번 다시 읽어 보고, 그래도 없으면 경고만 남기고 그 값으로 보낸다. 단계를 고르는
+ * 입력 검증({@link #resolveTier})은 다시 읽은 뒤에도 없으면 거절한다.
+ *
  * <p>실행 직전의 숨김 판정은 profile 의 기본 모델까지 본다. 요청에 모델을 싣지 않는 실행도 그 모델이 그룹이
  * 숨긴 것이면 거절한다.
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ModelTierService {
 
     private final ModelTierDefinitionRepository definitions;
@@ -41,6 +48,7 @@ public class ModelTierService {
     private final AppUserRepository users;
     private final ModelOptionsService modelOptions;
     private final ModelVisibilityService visibility;
+
 
     /**
      * 요청자가 고를 수 있는 단계와 기본값이다.
@@ -53,21 +61,22 @@ public class ModelTierService {
         List<ModelTierDefinition> definitions = definitionsFor(user.groupId());
         boolean internal = InternalValuePolicy.visibleTo(user);
         String defaultProvider = internal && needsDefaultProvider(definitions)
-                ? modelOptions.optionsForAgent(user.groupId(), agent).defaultProvider()
-                : null;
+            ? modelOptions.optionsForAgent(user.groupId(), agent).defaultProvider()
+            : null;
         return new ModelTierOptions(
-                definitions.stream()
-                        .map(definition -> internal ? view(definition, defaultProvider) : nameOnly(definition))
-                        .toList(),
-                users.findById(user.id())
-                        .map(it -> tierOf(it.modelDefaultTier()))
-                        .orElse(null),
-                groupSettings
-                        .findById(user.groupId())
-                        .map(it -> it.defaultTier())
-                        .orElse(null),
-                user.isAdmin());
+            definitions.stream()
+                .map(definition -> internal ? view(definition, defaultProvider) : nameOnly(definition))
+                .toList(),
+            users.findById(user.id())
+                .map(it -> tierOf(it.modelDefaultTier()))
+                .orElse(null),
+            groupSettings
+                .findById(user.groupId())
+                .map(it -> it.defaultTier())
+                .orElse(null),
+            user.isAdmin());
     }
+
 
     /**
      * 관리자가 고칠 그룹의 단계 정의와 그룹 기본 단계다.
@@ -82,14 +91,15 @@ public class ModelTierService {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
         return new GroupModelTiers(
-                definitionsFor(admin.groupId()).stream()
-                        .map(ModelTierService::stored)
-                        .toList(),
-                groupSettings
-                        .findById(admin.groupId())
-                        .map(it -> it.defaultTier())
-                        .orElse(null));
+            definitionsFor(admin.groupId()).stream()
+                .map(ModelTierService::stored)
+                .toList(),
+            groupSettings
+                .findById(admin.groupId())
+                .map(it -> it.defaultTier())
+                .orElse(null));
     }
+
 
     @Transactional
     public void saveUserDefault(CurrentUser user, ModelTier tier) {
@@ -98,19 +108,18 @@ public class ModelTierService {
         }
     }
 
+
     @Transactional
     public void saveGroup(CurrentUser user, List<ModelTierOptions.Tier> tiers, ModelTier defaultTier) {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
-        List<ModelTierOptions.Tier> normalizedTiers =
-                tiers.stream().map(ModelTierService::normalize).toList();
+        List<ModelTierOptions.Tier> normalizedTiers = tiers.stream().map(ModelTierService::normalize).toList();
         if (normalizedTiers.size() != ModelTier.values().length
-                || normalizedTiers.stream()
-                                .map(ModelTierOptions.Tier::tier)
-                                .distinct()
-                                .count()
-                        != ModelTier.values().length) {
+            || normalizedTiers.stream()
+                .map(ModelTierOptions.Tier::tier)
+                .distinct()
+                .count() != ModelTier.values().length) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "all model tiers must be supplied exactly once");
         }
         for (ModelTierOptions.Tier tier : normalizedTiers) {
@@ -130,17 +139,19 @@ public class ModelTierService {
         definitions.deleteByGroupId(user.groupId());
         definitions.flush();
         definitions.saveAll(normalizedTiers.stream()
-                .map(tier -> ModelTierDefinition.of(
-                        user.groupId(), tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
-                .toList());
+            .map(tier -> ModelTierDefinition.of(
+                user.groupId(), tier.tier(), tier.provider(), tier.model(), tier.reasoningEffort()))
+            .toList());
         groupSettings.save(ModelTierGroupSetting.of(user.groupId(), defaultTier));
     }
+
 
     /** 대화에 직접 고른 모델을 저장하기 전에 그룹이 숨긴 모델인지 본다. */
     @Transactional(readOnly = true)
     public void requireVisible(CurrentUser user, ModelChoice choice) {
         visibility.requireVisible(user.groupId(), choice);
     }
+
 
     /**
      * 대화에 저장하려는 effort 가 그 모델에서 고를 수 있는 값인지 본다.
@@ -156,11 +167,12 @@ public class ModelTierService {
             return;
         }
         if (!modelOptions
-                .optionsForAgent(user.groupId(), agent)
-                .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
+            .optionsForAgent(user.groupId(), agent)
+            .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model");
         }
     }
+
 
     /**
      * 이번 실행이 Hermes 에 보낼 값을 정한다.
@@ -174,10 +186,12 @@ public class ModelTierService {
         return resolved;
     }
 
+
     /** 대화 없이 도는 실행이 보낼 에이전트 기본값이다. 숨김은 판정하지 않는다. */
     public ModelChoice detachedChoice(Agent agent) {
         return agentDefault(agent);
     }
+
 
     /**
      * 보내려는 값이 그룹이 숨긴 모델이면 {@code MODEL_HIDDEN} 으로 거절한다.
@@ -189,6 +203,7 @@ public class ModelTierService {
     public void requireRunnable(CurrentUser user, Agent agent, ModelChoice choice) {
         requireRunnable(user.groupId(), agent, choice);
     }
+
 
     /** 이 실행이 돌 모델이 그룹이 숨긴 것이면 거절한다. 모델을 싣지 않는 실행은 profile 의 기본 모델로 본다(ADR-054). */
     private void requireRunnable(Long groupId, Agent agent, ModelChoice choice) {
@@ -209,6 +224,7 @@ public class ModelTierService {
         }
     }
 
+
     private ResolvedModelTier resolveUnchecked(CurrentUser user, Conversation conversation, Agent agent) {
         if (conversation.modelSelectionMode() == ModelSelectionMode.CUSTOM) {
             return new ResolvedModelTier(customChoice(conversation.modelChoice(), agent), null);
@@ -217,32 +233,45 @@ public class ModelTierService {
             return new ResolvedModelTier(agentDefault(agent), null);
         }
         ModelTier selected = conversation.modelSelectionMode() == ModelSelectionMode.TIER
-                ? conversation.modelTier()
-                : users.findById(user.id())
-                        .map(it -> tierOf(it.modelDefaultTier()))
-                        .orElse(null);
+            ? conversation.modelTier()
+            : users.findById(user.id())
+                .map(it -> tierOf(it.modelDefaultTier()))
+                .orElse(null);
         if (selected == null) {
             selected = groupSettings
-                    .findById(user.groupId())
-                    .map(it -> it.defaultTier())
-                    .orElse(null);
+                .findById(user.groupId())
+                .map(it -> it.defaultTier())
+                .orElse(null);
         }
         if (selected == null) {
             return new ResolvedModelTier(agentDefault(agent), null);
         }
-        return resolveTier(user, selected, agent);
+        return resolveTier(user, selected, agent, false);
     }
 
-    /** 저장된 단계에서 실제 요청 값을 만든다. mapping 이 빈 단계는 에이전트 기본값으로 돈다. */
+
+    /**
+     * 단계를 고르는 입력을 검증하며 실제 요청 값을 만든다. mapping 이 빈 단계는 에이전트 기본값으로 돈다.
+     *
+     * <p>단계가 가리키는 모델이 목록에 없으면 목록을 다시 읽고, 그래도 없으면 {@code VALIDATION_FAILED} 이다.
+     */
     @Transactional(readOnly = true)
     public ResolvedModelTier resolveTier(CurrentUser user, ModelTier tier, Agent agent) {
+        return resolveTier(user, tier, agent, true);
+    }
+
+
+    /**
+     * @param strict 참이면 다시 읽은 뒤에도 목록에 없는 모델을 거절한다. 거짓이면(실행) 경고만 남기고 보낸다
+     */
+    private ResolvedModelTier resolveTier(CurrentUser user, ModelTier tier, Agent agent, boolean strict) {
         if (tier == null) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier");
         }
         ModelTierDefinition definition = definitionsFor(user.groupId()).stream()
-                .filter(candidate -> candidate.tier() == tier)
-                .findFirst()
-                .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier"));
+            .filter(candidate -> candidate.tier() == tier)
+            .findFirst()
+            .orElseThrow(() -> new ApiException(ErrorCode.VALIDATION_FAILED, "unknown model tier"));
         if (isFallback(definition)) {
             ModelChoice fallback = agentDefault(agent);
             requireRunnable(user.groupId(), agent, fallback);
@@ -256,10 +285,41 @@ public class ModelTierService {
         ModelChoice choice = ModelChoice.of(provider, definition.model(), definition.reasoningEffort());
         visibility.requireVisible(user.groupId(), choice);
         if (!options.offers(choice.provider(), choice.model())) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable for this agent");
+            log.warn(
+                "단계 모델이 들고 있던 목록에 없어 다시 읽는다 profile={} tier={} provider={} model={} providerModels={}",
+                agent.hermesProfile(),
+                tier,
+                choice.provider(),
+                choice.model(),
+                providerModelCount(options, choice.provider()));
+            options = modelOptions.refreshedOptionsForAgent(user.groupId(), agent);
+            if (!options.offers(choice.provider(), choice.model())) {
+                log.warn(
+                    "다시 읽어도 단계 모델이 목록에 없다 {} profile={} tier={} provider={} model={} providerModels={}",
+                    strict ? "입력을 거절한다" : "그대로 보낸다",
+                    agent.hermesProfile(),
+                    tier,
+                    choice.provider(),
+                    choice.model(),
+                    providerModelCount(options, choice.provider()));
+                if (strict) {
+                    throw new ApiException(
+                        ErrorCode.VALIDATION_FAILED, "the selected model is unavailable for this agent");
+                }
+            }
         }
         return new ResolvedModelTier(choice, tier);
     }
+
+
+    /** 목록에서 그 provider 가 가진 모델 수다. 없는 provider 는 0 이다. */
+    private static int providerModelCount(ModelOptions options, String provider) {
+        return options.providers().stream()
+            .filter(row -> row.slug().equals(provider))
+            .mapToInt(row -> row.models().size())
+            .sum();
+    }
+
 
     /**
      * 에이전트에 저장된 기본 모델과 effort 다. 비어 있으면 요청에 싣지 않아 profile 의 값으로 돈다.
@@ -271,6 +331,7 @@ public class ModelTierService {
         return ModelChoice.stored(agent.defaultModelProvider(), agent.defaultModel(), agent.defaultReasoningEffort());
     }
 
+
     /** 대화가 모델을 비워 둔 직접 선택은 에이전트 기본 모델로 돌고, effort 는 대화가 고른 값이 먼저다. */
     private static ModelChoice customChoice(ModelChoice own, Agent agent) {
         if (!own.usesDefaultModel()) {
@@ -278,46 +339,51 @@ public class ModelTierService {
         }
         ModelChoice base = agentDefault(agent);
         return ModelChoice.stored(
-                base.provider(),
-                base.model(),
-                own.reasoningEffort() != null ? own.reasoningEffort() : base.reasoningEffort());
+            base.provider(),
+            base.model(),
+            own.reasoningEffort() != null ? own.reasoningEffort() : base.reasoningEffort());
     }
+
 
     private static ModelTierOptions.Tier view(ModelTierDefinition definition, String defaultProvider) {
         if (isFallback(definition)) {
             return nameOnly(definition);
         }
         return new ModelTierOptions.Tier(
-                definition.tier(),
-                labelOf(definition.tier()),
-                definition.provider() == null ? defaultProvider : definition.provider(),
-                definition.model(),
-                definition.reasoningEffort());
+            definition.tier(),
+            labelOf(definition.tier()),
+            definition.provider() == null ? defaultProvider : definition.provider(),
+            definition.model(),
+            definition.reasoningEffort());
     }
+
 
     /** 저장된 값 그대로 담는다. 빈 칸을 채우지 않는다. */
     private static ModelTierOptions.Tier stored(ModelTierDefinition definition) {
         return new ModelTierOptions.Tier(
-                definition.tier(),
-                labelOf(definition.tier()),
-                definition.provider(),
-                definition.model(),
-                definition.reasoningEffort());
+            definition.tier(),
+            labelOf(definition.tier()),
+            definition.provider(),
+            definition.model(),
+            definition.reasoningEffort());
     }
+
 
     /** 단계와 이름만 담는다. 가리키는 모델을 싣지 않는 요청자와 mapping 이 빈 단계가 함께 쓴다. */
     private static ModelTierOptions.Tier nameOnly(ModelTierDefinition definition) {
         return new ModelTierOptions.Tier(definition.tier(), labelOf(definition.tier()), null, null, null);
     }
 
+
     private static ModelTierOptions.Tier normalize(ModelTierOptions.Tier tier) {
         return new ModelTierOptions.Tier(
-                tier.tier(),
-                tier.label(),
-                blankToNull(tier.provider()),
-                blankToNull(tier.model()),
-                tier.reasoningEffort());
+            tier.tier(),
+            tier.label(),
+            blankToNull(tier.provider()),
+            blankToNull(tier.model()),
+            tier.reasoningEffort());
     }
+
 
     private static boolean isValidMapping(ModelTierOptions.Tier tier) {
         if (tier == null || tier.tier() == null) {
@@ -327,19 +393,22 @@ public class ModelTierService {
             return true;
         }
         return tier.model() != null
-                && tier.model().length() <= ModelChoice.MODEL_MAX_LENGTH
-                && (tier.provider() == null || tier.provider().length() <= ModelChoice.PROVIDER_MAX_LENGTH)
-                && tier.reasoningEffort() != null
-                && ModelChoice.REASONING_EFFORTS.contains(tier.reasoningEffort());
+            && tier.model().length() <= ModelChoice.MODEL_MAX_LENGTH
+            && (tier.provider() == null || tier.provider().length() <= ModelChoice.PROVIDER_MAX_LENGTH)
+            && tier.reasoningEffort() != null
+            && ModelChoice.REASONING_EFFORTS.contains(tier.reasoningEffort());
     }
+
 
     private static boolean isFallback(ModelTierOptions.Tier tier) {
         return tier.provider() == null && tier.model() == null && tier.reasoningEffort() == null;
     }
 
+
     private static boolean isFallback(ModelTierDefinition definition) {
         return definition.provider() == null && definition.model() == null && definition.reasoningEffort() == null;
     }
+
 
     private static String blankToNull(String value) {
         if (value == null) {
@@ -349,6 +418,7 @@ public class ModelTierService {
         return stripped.isEmpty() ? null : stripped;
     }
 
+
     /**
      * 정의 행이 없는 그룹은 세 단계를 빈 mapping 으로 보인다. 조회에서 저장하지 않는다.
      * 일부 행만 있으면 관리자가 저장한 정의가 깨진 것이므로 임의의 기본값과 섞지 않는다.
@@ -357,21 +427,23 @@ public class ModelTierService {
         List<ModelTierDefinition> stored = definitions.findByGroupIdOrderByTier(groupId);
         if (stored.isEmpty()) {
             return Arrays.stream(ModelTier.values())
-                    .map(tier -> ModelTierDefinition.of(groupId, tier, null, null, null))
-                    .toList();
+                .map(tier -> ModelTierDefinition.of(groupId, tier, null, null, null))
+                .toList();
         }
         Map<ModelTier, ModelTierDefinition> byTier = stored.stream()
-                .collect(Collectors.toMap(ModelTierDefinition::tier, Function.identity(), (left, right) -> left));
+            .collect(Collectors.toMap(ModelTierDefinition::tier, Function.identity(), (left, right) -> left));
         if (byTier.size() != ModelTier.values().length
-                || Arrays.stream(ModelTier.values()).anyMatch(tier -> !byTier.containsKey(tier))) {
+            || Arrays.stream(ModelTier.values()).anyMatch(tier -> !byTier.containsKey(tier))) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "stored model tier definitions are incomplete");
         }
         return Arrays.stream(ModelTier.values()).map(byTier::get).toList();
     }
 
+
     private static boolean needsDefaultProvider(List<ModelTierDefinition> definitions) {
         return definitions.stream().anyMatch(definition -> !isFallback(definition) && definition.provider() == null);
     }
+
 
     private static String labelOf(ModelTier tier) {
         return switch (tier) {
@@ -380,6 +452,7 @@ public class ModelTierService {
             case DEEP -> "깊게";
         };
     }
+
 
     private static ModelTier tierOf(String value) {
         if (value == null) {

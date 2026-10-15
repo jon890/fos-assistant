@@ -69,11 +69,13 @@ class HermesModelCatalogTest {
 
     private final List<String> authorizations = new ArrayList<>();
     private final List<String> paths = new ArrayList<>();
+    private final List<String> queries = new ArrayList<>();
 
     private HttpServer server;
     private HermesModelClient client;
     private int status = 200;
     private String responseBody = REAL_SHAPE;
+
 
     @BeforeEach
     void start(@TempDir Path keyDir) throws IOException {
@@ -81,6 +83,7 @@ class HermesModelCatalogTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             paths.add(exchange.getRequestURI().getPath());
+            queries.add(exchange.getRequestURI().getRawQuery());
             authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
             byte[] payload = responseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -90,25 +93,28 @@ class HermesModelCatalogTest {
         });
         server.start();
         HermesProperties properties = new HermesProperties(
-                keyDir.toString(),
-                baseUrl(),
-                "dashboard-token",
-                "https://hermes-listener.example.com",
-                Duration.ofMillis(10),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1));
+            keyDir.toString(),
+            baseUrl(),
+            "dashboard-token",
+            "https://hermes-listener.example.com",
+            Duration.ofMillis(10),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1));
         client = new HermesModelClient(new HermesProfileKeyStore(properties), properties);
     }
+
 
     @AfterEach
     void stop() {
         server.stop(0);
     }
 
+
     private String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort() + "/p/dad";
     }
+
 
     @Test
     @DisplayName("기본값과 인증된 provider 의 모델을 읽고 설정하지 않은 provider 는 뺀다")
@@ -124,16 +130,18 @@ class HermesModelCatalogTest {
         });
     }
 
+
     @Test
     @DisplayName("capabilities 의 reasoning 을 모델 이름 표로 옮긴다")
     void mapsCapabilitiesReasoningToModelNameTable() {
         HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
 
         assertThat(catalog.providers().get(0).reasoning())
-                .isEqualTo(Map.of(
-                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
-                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)));
+            .isEqualTo(Map.of(
+                "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)));
     }
+
 
     @Test
     @DisplayName("capabilities 에 칸이 없는 모델도 표에 넣고 UNKNOWN 으로 둔다")
@@ -149,9 +157,10 @@ class HermesModelCatalogTest {
         assertThat(catalog.defaultModel()).isNull();
         assertThat(catalog.providers().get(0).name()).isEqualTo("p");
         assertThat(catalog.providers().get(0).reasoning())
-                .isEqualTo(
-                        Map.of("a", new ReasoningCapability(SUPPORTED, UNKNOWN), "b", ReasoningCapability.UNKNOWN_ALL));
+            .isEqualTo(
+                Map.of("a", new ReasoningCapability(SUPPORTED, UNKNOWN), "b", ReasoningCapability.UNKNOWN_ALL));
     }
+
 
     @Test
     @DisplayName("reasoning 이 거짓인 모델은 UNSUPPORTED 이고 칸이 없거나 capabilities 가 없는 모델은 UNKNOWN 이다")
@@ -175,6 +184,7 @@ class HermesModelCatalogTest {
         assertThat(catalog.providers().get(1).reasoning()).isEqualTo(Map.of("x", ReasoningCapability.UNKNOWN_ALL));
     }
 
+
     @Test
     @DisplayName("can_disable_reasoning 이 참이면 SUPPORTED, 거짓이면 UNSUPPORTED, 없으면 UNKNOWN 이다")
     void mapsCanDisableReasoningToDisableSupport() {
@@ -186,13 +196,23 @@ class HermesModelCatalogTest {
                    "unsaid": {"reasoning": true}}}]}
                 """);
 
-        Map<String, ReasoningCapability> reasoning =
-                client.readCatalog(baseUrl(), "dad").providers().get(0).reasoning();
+        Map<String, ReasoningCapability> reasoning = client.readCatalog(baseUrl(), "dad").providers().get(0).reasoning();
 
         assertThat(reasoning.get("yes")).isEqualTo(new ReasoningCapability(SUPPORTED, SUPPORTED));
         assertThat(reasoning.get("no")).isEqualTo(new ReasoningCapability(SUPPORTED, UNSUPPORTED));
         assertThat(reasoning.get("unsaid")).isEqualTo(new ReasoningCapability(SUPPORTED, UNKNOWN));
     }
+
+
+    @Test
+    @DisplayName("다시 읽기는 refresh=true 를 싣고 평소 읽기는 쿼리를 싣지 않는다")
+    void refreshReadCarriesRefreshQueryOnlyWhenAsked() {
+        client.readCatalog(baseUrl(), "dad");
+        client.readCatalog(baseUrl(), "dad", true);
+
+        assertThat(queries).containsExactly(null, "refresh=true");
+    }
+
 
     @Test
     @DisplayName("profile 의 key 를 bearer 로 싣고 model options 경로를 부른다")
@@ -203,6 +223,7 @@ class HermesModelCatalogTest {
         assertThat(authorizations).containsExactly("Bearer " + KEY);
     }
 
+
     @Test
     @DisplayName("인증된 provider 가 하나도 없으면 빈 목록이다")
     void returnsEmptyListWhenNoProviderIsAuthenticated() {
@@ -211,6 +232,7 @@ class HermesModelCatalogTest {
         assertThat(client.readCatalog(baseUrl(), "dad").providers()).isEmpty();
     }
 
+
     @Test
     @DisplayName("서버 오류와 429 는 모두 HERMES UNAVAILABLE 이다")
     void serverErrorAnd429AreBothHermesUnavailable() {
@@ -218,21 +240,23 @@ class HermesModelCatalogTest {
             respondWith(failure, "{}");
 
             assertThatThrownBy(() -> client.readCatalog(baseUrl(), "dad"))
-                    .as("응답 코드 %d", failure)
-                    .isInstanceOfSatisfying(
-                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+                .as("응답 코드 %d", failure)
+                .isInstanceOfSatisfying(
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
         }
     }
+
 
     @Test
     @DisplayName("key 가 없는 profile 은 그 예외를 그대로 올린다")
     void rethrowsAsIsForProfileWithoutKey() {
         assertThatThrownBy(() -> client.readCatalog(baseUrl(), "kid"))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_PROFILE_KEY_MISSING));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_PROFILE_KEY_MISSING));
         assertThat(paths).isEmpty();
     }
+
 
     @Test
     @DisplayName("같은 모델 이름도 provider 별로 reasoning 지원을 읽고 이름으로 추정하지 않는다")
@@ -250,15 +274,16 @@ class HermesModelCatalogTest {
         HermesModelCatalog catalog = client.readCatalog(baseUrl(), "dad");
 
         assertThat(catalog.providers())
-                .extracting(HermesModelCatalog.Provider::slug)
-                .containsExactly("openai-codex", "anthropic", "openrouter");
+            .extracting(HermesModelCatalog.Provider::slug)
+            .containsExactly("openai-codex", "anthropic", "openrouter");
         assertThat(catalog.providers())
-                .extracting(provider -> provider.reasoning().get("shared-model"))
-                .containsExactly(
-                        new ReasoningCapability(UNSUPPORTED, SUPPORTED),
-                        new ReasoningCapability(SUPPORTED, UNSUPPORTED),
-                        ReasoningCapability.UNKNOWN_ALL);
+            .extracting(provider -> provider.reasoning().get("shared-model"))
+            .containsExactly(
+                new ReasoningCapability(UNSUPPORTED, SUPPORTED),
+                new ReasoningCapability(SUPPORTED, UNSUPPORTED),
+                ReasoningCapability.UNKNOWN_ALL);
     }
+
 
     private void respondWith(int status, String body) {
         this.status = status;

@@ -704,6 +704,20 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 `fallback_providers` 는 목록에 영향을 주지 않는다.
 쿼리는 `refresh` 하나만 읽는다.
 
+**`refresh` 가 없으면 디스크 캐시만 읽고, 캐시가 없거나 자격 증명이 바뀌었으면 고정 대체 목록이 나온다.**
+`refresh=false`(기본)는 `inventory.build_model_options_payload` 가 `non_blocking_catalogs=True` 로 만들어, `models.cached_provider_model_ids` 가 provider 별 디스크 캐시만 읽는다.
+같은 자격 증명의 줄은 오래돼도 그대로 주고 뒤에서 데운다. 줄이 없거나 자격 증명 지문이 다르면 빈 목록을 돌려 호출자가 고정 목록을 낸다. Codex 는 `DEFAULT_CODEX_MODELS` 다.
+그래서 자격 증명이 바뀐 직후(토큰 갱신 등) 첫 요청 하나가 대체 목록을 받을 수 있다. 그 요청이 뒤에서 캐시를 다시 채우므로 다음 요청은 정상이다.
+`refresh=true` 는 「Refresh Models」 와 같다. 실제 조회를 기다리고 provider 별 디스크 캐시를 비워 다시 채우며, custom provider 와 가격도 다시 읽어 느리다(Codex 조회만 timeout 10초).
+Control Plane 은 목록 불일치로 다시 읽을 때만 `refresh=true` 를 싣고 읽기 timeout 을 30초로 둔다. 평소 읽기에는 싣지 않는다.
+
+**Codex 의 목록은 실제 조회가 실패하면 고정된 대체 목록으로 바뀐다.**
+Hermes v0.21.6 의 `hermes_cli/codex_models.py` 는 `get_codex_model_ids` 에서 Codex 의 실제 목록 조회(timeout 10초)가 실패하거나 빈 답이면 `DEFAULT_CODEX_MODELS` 를 돌려준다.
+대체 목록은 조회 시점의 최신 모델을 담지 않아 최근 추가된 모델이 빠진다.
+응답에는 이것이 대체 목록이라는 표시가 없어 한 번의 응답만으로는 구분할 수 없다.
+같은 profile 의 목록이 몇십 분 사이에 모델 하나 적은 목록이었다가 정상으로 돌아오는 것이 그 모습이다.
+그래서 Control Plane 은 목록에 없다는 사실만으로 실행을 막지 않는다. 정책은 [model-usage](../../docs/features/model-usage.md) 의 「실행 때 목록 대조 정책」 이 갖는다.
+
 다른 경로는 이 목록을 대신하지 못한다.
 `/v1/models` 는 profile 이름만 준다.
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
