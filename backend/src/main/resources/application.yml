@@ -104,7 +104,7 @@ assistant:
   user-execution:
     # 한 사용자가 Hermes 에 동시에 맡길 수 있는 실행 수. turn 자리와 RUNNING 실행 줄의 합이다(ADR-069)
     max-running: 4
-    # 추천 질문과 Memory 제안이 돈 뒤에도 남겨 둘 사용자 자리 수
+    # 백그라운드 실행이 돈 뒤에도 남겨 둘 사용자 자리 수
     background-reserve: 1
     # Hermes 에서 끝났는지 모르는 run 의 자리를 쥐는 상한. 비우면 hermes.run-timeout 과 같다
     remote-end-max-wait: ${ASSISTANT_USER_EXECUTION_REMOTE_END_MAX_WAIT:}

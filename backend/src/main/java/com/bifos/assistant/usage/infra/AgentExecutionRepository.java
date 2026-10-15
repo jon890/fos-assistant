@@ -112,7 +112,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /**
      * 한 루트 아래에서 그 상태인 위임 실행의 수다. 위임 동시 한도를 셀 때 쓴다.
      *
-     * <p>{@code delegation_key} 가 없는 자식(흐름의 하위 실행, Memory 제안)은 세지 않는다.
+     * <p>{@code delegation_key} 가 없는 자식(흐름의 하위 실행, 과거 Memory 제안)은 세지 않는다.
      */
     long countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(Long rootExecutionId, ExecutionStatus status);
 
