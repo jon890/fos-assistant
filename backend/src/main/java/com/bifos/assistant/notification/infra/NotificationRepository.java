@@ -1,6 +1,7 @@
 package com.bifos.assistant.notification.infra;
 
 import com.bifos.assistant.notification.domain.Notification;
+import com.bifos.assistant.notification.domain.type.NotificationKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -16,8 +17,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /** 그 사용자의 알림 한 줄이다. 남의 줄은 없는 줄과 같다. */
     Optional<Notification> findByPublicIdAndUserId(UUID publicId, Long userId);
 
+
     /** 그 사용자의 알림을 최근 것부터 첫 쪽만큼 읽는다. 같은 시각이면 번호가 큰 쪽이 앞이다. 개수는 {@code pageable} 이 정한다. */
     List<Notification> findByUserIdOrderByCreatedAtDescIdDesc(Long userId, Pageable pageable);
+
 
     /** {@code (createdAt, id)} 로 정한 자리 바로 다음 줄부터 읽는다. 정렬은 첫 쪽과 같다. */
     @Query("""
@@ -27,12 +30,14 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
              order by n.createdAt desc, n.id desc
             """)
     List<Notification> findPageAfter(
-            @Param("userId") Long userId,
-            @Param("createdAt") Instant createdAt,
-            @Param("id") Long id,
-            Pageable pageable);
+        @Param("userId") Long userId,
+        @Param("createdAt") Instant createdAt,
+        @Param("id") Long id,
+        Pageable pageable);
+
 
     long countByUserIdAndReadAtIsNull(Long userId);
+
 
     /**
      * 그 사용자의 읽지 않은 줄을 모두 읽음으로 바꾼다. 이미 읽은 줄의 시각은 그대로 둔다.
@@ -42,6 +47,25 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Notification n set n.readAt = :now where n.userId = :userId and n.readAt is null")
     int markAllRead(@Param("userId") Long userId, @Param("now") Instant now);
+
+
+    /**
+     * 그 사용자의 그 종류 읽지 않은 줄 가운데 그 원인이 만든 것을 읽음으로 바꾼다.
+     *
+     * @return 바꾼 줄 수
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update Notification n set n.readAt = :now
+             where n.userId = :userId and n.kind = :kind
+               and n.sourcePublicId = :sourcePublicId and n.readAt is null
+            """)
+    int markReadBySource(
+        @Param("userId") Long userId,
+        @Param("kind") NotificationKind kind,
+        @Param("sourcePublicId") UUID sourcePublicId,
+        @Param("now") Instant now);
+
 
     /**
      * {@code before} 보다 먼저 만든 줄을 읽었는지와 상관없이 지운다.

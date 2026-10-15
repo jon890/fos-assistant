@@ -31,8 +31,8 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(
-        name = "notification",
-        uniqueConstraints = @UniqueConstraint(name = "uk_notification_public_id", columnNames = "public_id"))
+    name = "notification",
+    uniqueConstraints = @UniqueConstraint(name = "uk_notification_public_id", columnNames = "public_id"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -85,6 +85,14 @@ public class Notification {
     @Column(name = "target_public_id", columnDefinition = "BINARY(16)")
     private UUID targetPublicId;
 
+    /**
+     * 이 알림을 만든 원인의 공개 식별자다. 원인이 끝나면 이 번호로 이 알림만 읽음으로 바꾼다. 원인을 따로 가리키지 않는
+     * 알림은 비운다. 외래 키를 걸지 않는다.
+     */
+    @JdbcTypeCode(SqlTypes.BINARY)
+    @Column(name = "source_public_id", columnDefinition = "BINARY(16)")
+    private UUID sourcePublicId;
+
     /** 칸이 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다. */
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -93,13 +101,14 @@ public class Notification {
     @Column(name = "read_at")
     private Instant readAt;
 
+
     /**
      * 읽지 않은 알림 한 줄이다. 제목과 본문은 칸 길이를 넘으면 잘라 둔다.
      *
      * @param target 누르면 갈 곳. 갈 곳이 없으면 null
      */
     public static Notification of(
-            Long userId, NotificationKind kind, String title, String body, NotificationTarget target, Instant now) {
+        Long userId, NotificationKind kind, String title, String body, NotificationTarget target, Instant now) {
         Notification notification = new Notification();
         notification.userId = Objects.requireNonNull(userId, "userId");
         notification.kind = Objects.requireNonNull(kind, "kind");
@@ -113,6 +122,14 @@ public class Notification {
         return notification;
     }
 
+
+    /** 이 알림을 만든 원인을 적는다. 저장하기 전에 부른다. */
+    public Notification caused(UUID sourcePublicId) {
+        this.sourcePublicId = sourcePublicId;
+        return this;
+    }
+
+
     /** 읽음으로 표시한다. 이미 읽은 줄은 처음 읽은 시각을 그대로 둔다. */
     public void markRead(Instant now) {
         if (readAt == null) {
@@ -120,9 +137,11 @@ public class Notification {
         }
     }
 
+
     public boolean unread() {
         return readAt == null;
     }
+
 
     /** 칸 길이까지만 남긴다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private static String clip(String text, int max) {

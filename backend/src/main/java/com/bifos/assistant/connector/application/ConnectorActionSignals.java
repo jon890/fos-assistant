@@ -26,12 +26,14 @@ class ConnectorActionSignals {
     private final NotificationService notifications;
     private final ConversationNotices conversations;
 
+
     ConnectorActionSignals(
-            ApplicationEventPublisher events, NotificationService notifications, ConversationNotices conversations) {
+        ApplicationEventPublisher events, NotificationService notifications, ConversationNotices conversations) {
         this.events = events;
         this.notifications = notifications;
         this.conversations = conversations;
     }
+
 
     /** 거절한 줄의 사건을 트랜잭션이 커밋한 뒤에 낸다. 트랜잭션 밖이면 바로 낸다. */
     void publishAfterCommit(List<ConnectorAction> rejected) {
@@ -50,6 +52,7 @@ class ConnectorActionSignals {
         });
     }
 
+
     /**
      * 만료한 승인 줄의 주인에게 알린다. 그 줄을 만료로 바꾼 트랜잭션 안에서 부른다.
      *
@@ -63,16 +66,26 @@ class ConnectorActionSignals {
             return;
         }
         String toolTitle = ConnectorActionView.titleOf(
-                manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())));
+            manifest.flatMap(found -> ConnectorToolPolicies.find(found, action.toolName())));
         conversations
-                .publicIdOf(action.conversationId())
-                .ifPresent(conversationId -> notifications.notify(
-                        action.userId(),
-                        NotificationKind.APPROVAL_EXPIRED,
-                        APPROVAL_EXPIRED_TITLE,
-                        "「" + toolTitle + "」",
-                        new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
+            .publicIdOf(action.conversationId())
+            .ifPresent(conversationId -> notifications.notify(
+                action.userId(),
+                NotificationKind.APPROVAL_EXPIRED,
+                APPROVAL_EXPIRED_TITLE,
+                "「" + toolTitle + "」",
+                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
     }
+
+
+    /**
+     * 끝난 승인 줄의 「승인을 기다리는 요청」 알림을 읽음으로 표시한다. 그 줄이 만든 알림만 바꾸므로 같은 대화의 다른 줄이나
+     * 그 뒤에 생긴 줄의 알림은 건드리지 않는다. 대화가 지워졌어도 바꾼다. 트랜잭션 안에서 부른다.
+     */
+    void resolveRequested(ConnectorAction action) {
+        notifications.resolve(action.userId(), NotificationKind.APPROVAL_REQUESTED, action.publicId());
+    }
+
 
     /**
      * 대화 없는 실행이 만든 줄은 전할 곳이 없어 내지 않는다. 줄을 커밋한 뒤에만 부른다.
