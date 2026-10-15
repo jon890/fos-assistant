@@ -80,6 +80,7 @@ async function callRoute(
   dependencies["@/lib/content-draft-snapshot"] = await load(
     "../../web/src/lib/content-draft-snapshot.ts",
   );
+  dependencies["@/lib/decimal"] = await load("../../web/src/lib/decimal.ts");
   dependencies["@/lib/financial-limits"] = await load(
     "../../web/src/lib/financial-limits.ts",
   );
