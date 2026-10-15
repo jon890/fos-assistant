@@ -240,7 +240,7 @@ class HookTest(PluginFixture):
         """서명이 없으면 memory, artifact, 할 일 제안 도구 호출을 막는다."""
         for tool in ("memory_read", "memory_search", "artifact_write", "follow_up_propose", "memory_remember",
                      "list_media_observations", "record_media_observation", "content_draft_write", "content_draft_read",
-                     "content_draft_preview", "content_draft_save"):
+                     "content_draft_preview", "content_draft_save", "order_limit_read", "order_limit_change"):
             name = "mcp__fos_assistant__" + tool
             with self.subTest(tool=tool, state="signed"):
                 self.token, self.secret_error = FAKE_MCP_CREDENTIAL, None
@@ -261,7 +261,7 @@ class HookTest(PluginFixture):
     def test_observation_tools_replace_forged_context_and_require_material(self):
         """사진 관찰도 위조된 맥락을 덮어쓰고 session과 호출 ID가 없으면 막는다."""
         for tool in ("list_media_observations", "record_media_observation", "content_draft_write", "content_draft_read",
-                     "content_draft_preview", "content_draft_save"):
+                     "content_draft_preview", "content_draft_save", "order_limit_read", "order_limit_change"):
             name = "mcp__fos_assistant__" + tool
             with self.subTest(tool=tool, state="forged native context"):
                 self.token, self.secret_error = FAKE_MCP_CREDENTIAL, None
