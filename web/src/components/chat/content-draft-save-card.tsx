@@ -20,6 +20,7 @@ import {
   type ContentDraftSnapshot,
   type ContentDraftSummary,
 } from "@/lib/content-draft-snapshot";
+import { FAILURE_REASONS } from "@/lib/content-draft-failure";
 
 /** 화면이 열린 동안 저장 중인 job 을 다시 읽는 간격이다. */
 const POLL_MS = 3000;
@@ -58,18 +59,6 @@ const RESULTS: Partial<
     "warning",
     "원고가 바뀌었거나 볼 수 없어요. 새 미리보기를 만들어 주세요.",
   ],
-};
-
-/** 실패 사유 코드를 사용자 문구로 옮긴다. 모르는 코드는 덧붙이지 않는다. */
-const FAILURE_REASONS: Record<string, string> = {
-  screen_blocked: "글쓰기 화면에 알림이 떠 있었어요.",
-  title_cursor_covered:
-    "글쓰기 화면의 다른 요소가 제목 자리를 가리고 있었어요.",
-  body_cursor_covered: "글쓰기 화면의 다른 요소가 본문 자리를 가리고 있었어요.",
-  title_cursor_failed: "글쓰기 화면의 제목 자리에 글을 넣지 못했어요.",
-  body_cursor_failed: "글쓰기 화면의 본문 자리에 글을 넣지 못했어요.",
-  title_mismatch: "글쓰기 화면에 제목이 맞게 들어가지 않았어요.",
-  body_mismatch: "글쓰기 화면에 본문이 맞게 들어가지 않았어요.",
 };
 
 /** 저장 기능이 꺼져 실행 없이 거절된 줄이다. 새 미리보기를 만들어도 같은 거절이라 다시 만들라고 하지 않는다. */
