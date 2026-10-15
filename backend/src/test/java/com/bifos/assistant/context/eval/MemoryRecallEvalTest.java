@@ -184,6 +184,33 @@ class MemoryRecallEvalTest {
 
 
     @Test
+    @DisplayName("대체 관계와 판정 질문이 어긋난 사례 묶음은 읽을 때 거절한다")
+    void rejectsBrokenSupersedesAndJudgeWhileLoading() {
+        assertThat(MemoryEvalDataset.parse(SUPERSEDING).cases().getFirst().judge()).hasSize(1);
+
+        assertRejected(SUPERSEDING.replace("\"supersedes\": \"m1\"", "\"supersedes\": \"zz\""), "supersedes");
+        assertRejected(SUPERSEDING.replace("\"supersedes\": \"m1\"", "\"supersedes\": \"m2\""), "supersedes");
+        assertRejected(
+            SUPERSEDING.replace("{ \"key\": \"m1\", \"owner\": \"parentA\"", "{ \"key\": \"m1\", \"owner\": \"parentB\""),
+            "supersedes");
+        assertRejected(SUPERSEDING.replace(", \"supersedes\": \"m1\"", ""), "supersedes");
+        assertRejected(
+            SUPERSEDING.replace(
+                "\"judge\": [ { \"id\": \"j1\", \"question\": \"옛 값을 말하는가?\", \"expect\": false } ]",
+                "\"judge\": [ { \"id\": \"j1\", \"question\": \"가?\", \"expect\": false }, "
+                    + "{ \"id\": \"j1\", \"question\": \"나?\", \"expect\": true } ]"),
+            "judge");
+    }
+
+
+    private static void assertRejected(String json, String message) {
+        assertThatThrownBy(() -> MemoryEvalDataset.parse(json))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining(message);
+    }
+
+
+    @Test
     @DisplayName("분모가 0 인 비율은 해당 없음으로 내고 OMITTED 도 권한 경계 노출로 센다")
     void reportsNotApplicableAndCountsOmittedAsBoundaryExposure() {
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(1);
@@ -391,7 +418,37 @@ class MemoryRecallEvalTest {
                     { "key": "m1", "owner": "parentA", "scope": "USER", "title": "제목", "content": "내용" }
                   ],
                   "expect": ["m1"],
-                  "forbidden": []
+                  "forbidden": [],
+                  "judge": [ { "id": "j1", "question": "답이 내용을 말하는가?", "expect": true } ]
+                }
+              ]
+            }
+            """;
+
+    /** 대체 관계와 판정 질문의 검사를 확인하는 사례 묶음이다. m2 가 m1 을 대체한다. */
+    private static final String SUPERSEDING = """
+            {
+              "version": 2,
+              "note": "검사용",
+              "users": [
+                { "key": "parentA", "role": "ADMIN", "group": "home" },
+                { "key": "parentB", "role": "ADMIN", "group": "home" }
+              ],
+              "agents": [ { "key": "general", "collections": [ { "collection": "core", "allowSensitive": false } ] } ],
+              "cases": [
+                {
+                  "id": "KU-X",
+                  "category": "KNOWLEDGE_UPDATE",
+                  "asker": "parentA",
+                  "agent": "general",
+                  "question": "질문",
+                  "memories": [
+                    { "key": "m1", "owner": "parentA", "scope": "USER", "title": "제목", "content": "옛 값" },
+                    { "key": "m2", "owner": "parentA", "scope": "USER", "title": "제목", "content": "새 값", "supersedes": "m1" }
+                  ],
+                  "expect": ["m2"],
+                  "forbidden": [ { "memory": "m1", "kind": "SUPERSEDED" } ],
+                  "judge": [ { "id": "j1", "question": "옛 값을 말하는가?", "expect": false } ]
                 }
               ]
             }
