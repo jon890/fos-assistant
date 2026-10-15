@@ -6,4 +6,5 @@ package com.bifos.assistant.crypto.domain;
  * @param content {@code v1.<IV>.<암호문과 태그>}. 두 조각은 채움 문자 없는 base64url 이다
  * @param keyId {@code user_data_key.id}
  */
-public record SealedText(String content, Long keyId) {}
+public record SealedText(String content, Long keyId) {
+}

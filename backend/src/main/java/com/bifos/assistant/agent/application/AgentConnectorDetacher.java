@@ -15,7 +15,7 @@ public interface AgentConnectorDetacher {
      * 그 에이전트의 바인딩을 모두 떼고 행을 지운다. 부르는 쪽의 트랜잭션 안에서 부른다.
      *
      * @throws com.bifos.assistant.shared.error.ApiException 떼지 못했을 때. 그 승인 실행이 아직 돌고 있으면
-     *     {@code CONNECTOR_ACTION_EXECUTING}, 대시보드 호출이 실패하면 {@code CONNECTOR_OPERATION_FAILED} 다
+     * {@code CONNECTOR_ACTION_EXECUTING}, 대시보드 호출이 실패하면 {@code CONNECTOR_OPERATION_FAILED} 다
      */
     void detachAll(Agent agent);
 }

@@ -14,11 +14,12 @@ import java.util.List;
  * @param decisions 그 평가의 판정 가운데 마지막으로 함께 남긴 묶음. 판정하지 않았으면 빈 목록
  */
 public record EvaluationOverview(
-        ProactiveCheck check, int acceptedCandidates, ValueEvaluation evaluation, List<AutonomyDecision> decisions) {
+    ProactiveCheck check, int acceptedCandidates, ValueEvaluation evaluation, List<AutonomyDecision> decisions) {
 
     public EvaluationOverview {
         decisions = List.copyOf(decisions);
     }
+
 
     /** 고른 살펴보기가 없는 묶음이다. */
     public static EvaluationOverview none() {

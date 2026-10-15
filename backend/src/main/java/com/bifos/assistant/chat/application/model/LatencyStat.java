@@ -9,4 +9,5 @@ package com.bifos.assistant.chat.application.model;
  * @param p50Ms 중앙값. 밀리초
  * @param p90Ms 90번째 백분위. 밀리초
  */
-public record LatencyStat(long count, Long p50Ms, Long p90Ms) {}
+public record LatencyStat(long count, Long p50Ms, Long p90Ms) {
+}

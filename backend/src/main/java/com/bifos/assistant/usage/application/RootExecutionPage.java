@@ -14,15 +14,16 @@ import java.util.UUID;
  * @param conversationPublicIds 목록 실행의 대화 번호를 그 대화의 공개 식별자로 잇는 표. 대화가 없는 실행은 빠진다
  */
 public record RootExecutionPage(
-        List<AgentExecution> executions,
-        Set<Long> idsHavingChildren,
-        Map<Long, UUID> conversationPublicIds,
-        String nextCursor) {
+    List<AgentExecution> executions,
+    Set<Long> idsHavingChildren,
+    Map<Long, UUID> conversationPublicIds,
+    String nextCursor) {
 
     public RootExecutionPage(
-            List<AgentExecution> executions, Set<Long> idsHavingChildren, Map<Long, UUID> conversationPublicIds) {
+        List<AgentExecution> executions, Set<Long> idsHavingChildren, Map<Long, UUID> conversationPublicIds) {
         this(executions, idsHavingChildren, conversationPublicIds, null);
     }
+
 
     public RootExecutionPage {
         executions = List.copyOf(executions);

@@ -33,10 +33,12 @@ public class AttentionController {
     private final AttentionControlService controls;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public ViewResponse view() {
         return ViewResponse.from(attention.view(currentUser.require()));
     }
+
 
     /** 사이드바와 홈의 한 줄이 읽는 건수다. */
     @GetMapping("/summary")
@@ -44,19 +46,22 @@ public class AttentionController {
         return new SummaryResponse(attention.summary(currentUser.require()));
     }
 
+
     @PostMapping("/hide")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void hide(@RequestBody HideRequest request) {
         controls.hide(
-                currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.stateKey());
+            currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.stateKey());
     }
+
 
     @PostMapping("/snooze")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void snooze(@RequestBody SnoozeRequest request) {
         controls.snooze(
-                currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.until());
+            currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey(), request.until());
     }
+
 
     @PostMapping("/restore")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -64,13 +69,14 @@ public class AttentionController {
         controls.restore(currentUser.require(), AttentionDtos.cardOf(request.card()), request.itemKey());
     }
 
+
     @PostMapping("/events")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void record(@RequestBody EventRequest request) {
         controls.record(
-                currentUser.require(),
-                request.itemKey(),
-                request.stateKey(),
-                AttentionDtos.eventTypeOf(request.type()));
+            currentUser.require(),
+            request.itemKey(),
+            request.stateKey(),
+            AttentionDtos.eventTypeOf(request.type()));
     }
 }

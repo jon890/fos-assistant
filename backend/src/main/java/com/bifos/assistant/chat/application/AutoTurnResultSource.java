@@ -20,8 +20,10 @@ public interface AutoTurnResultSource {
      */
     String source();
 
+
     /** 그 대화에 아직 전하지 않은 결과다. 생긴 순서다. */
     List<AutoTurnResult> undelivered(Long conversationId);
+
 
     /**
      * 전했다고 적는다. 알림 줄을 저장하는 트랜잭션 안에서 부른다.
@@ -29,6 +31,7 @@ public interface AutoTurnResultSource {
      * @param keys {@link AutoTurnResult#key()} 들
      */
     void markDelivered(List<String> keys, Instant now);
+
 
     /**
      * 이미 전한 결과를 열쇠로 다시 읽는다. 사용자가 결과를 다시 전달할 때 부른다(ADR-075).
@@ -39,6 +42,7 @@ public interface AutoTurnResultSource {
      * @param keys 전달 묶음의 항목에 적힌 결과 이름들
      */
     List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys);
+
 
     /** 전하지 않은 결과가 있는 대화들이다. 기동할 때 훑는다. */
     List<Long> conversationsWithUndelivered();

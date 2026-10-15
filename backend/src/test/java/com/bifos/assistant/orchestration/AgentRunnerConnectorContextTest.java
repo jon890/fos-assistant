@@ -75,6 +75,7 @@ class AgentRunnerConnectorContextTest {
     private final AgentExecution completed = mock(AgentExecution.class);
     private AgentRunner runner;
 
+
     @BeforeEach
     void setUp() {
         when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
@@ -83,27 +84,28 @@ class AgentRunnerConnectorContextTest {
         when(completed.id()).thenReturn(3L);
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
         when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(started);
+            .thenReturn(started);
         when(executions.complete(any(), any(), any(), any())).thenReturn(completed);
         when(executions.complete(any(), any(), any(), any(), any())).thenReturn(completed);
         when(hermes.submit(any())).thenReturn(RUN_ID);
         when(hermes.awaitCompletion(any(), eq(RUN_ID)))
-                .thenReturn(HermesRunResult.of(
-                        RUN_ID, "sess-1", "completed", ANSWER, "example-model", null, TokenUsage.empty()));
+            .thenReturn(HermesRunResult.of(
+                RUN_ID, "sess-1", "completed", ANSWER, "example-model", null, TokenUsage.empty()));
         runner = new AgentRunner(
-                contextAssembler,
-                hermes,
-                executions,
-                mock(ExecutionEventRecorder.class),
-                mock(ExecutionEventRepository.class),
-                new DelegationOutput(LiveProperties.fixed(
-                        DelegationProperties.class,
-                        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
-                modelTiers,
-                Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC),
-                mock(UserExecutionLimiter.class),
-                proactiveChecks);
+            contextAssembler,
+            hermes,
+            executions,
+            mock(ExecutionEventRecorder.class),
+            mock(ExecutionEventRepository.class),
+            new DelegationOutput(LiveProperties.fixed(
+                DelegationProperties.class,
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
+            modelTiers,
+            Clock.fixed(REQUEST_RECEIVED_AT, ZoneOffset.UTC),
+            mock(UserExecutionLimiter.class),
+            proactiveChecks);
     }
+
 
     @Test
     @DisplayName("Flow와 위임 실행은 해석한 단계 값을 보내고 요청·제출 시각을 기록한다")
@@ -118,25 +120,26 @@ class AgentRunnerConnectorContextTest {
         assertThat(command.model()).isEqualTo(choice.model());
         assertThat(command.reasoningEffort()).isEqualTo(choice.reasoningEffort());
         verify(executions)
-                .start(
-                        same(user),
-                        any(),
-                        any(),
-                        any(),
-                        any(),
-                        any(),
-                        same(choice),
-                        any(),
-                        any(),
-                        any(),
-                        eq(ModelTier.DEEP),
-                        eq(REQUEST_RECEIVED_AT));
+            .start(
+                same(user),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                same(choice),
+                any(),
+                any(),
+                any(),
+                eq(ModelTier.DEEP),
+                eq(REQUEST_RECEIVED_AT));
         verify(executions).markSubmitted(started);
         verify(executions, never()).markFirstDelta(any());
         var submissionOrder = inOrder(executions, hermes);
         submissionOrder.verify(executions).markSubmitted(started);
         submissionOrder.verify(hermes).submit(any());
     }
+
 
     @Test
     @DisplayName("커넥터 실행은 Memory 없이 공통 지침과 덧붙인 지시를 보낸다")
@@ -150,8 +153,9 @@ class AgentRunnerConnectorContextTest {
         ExecutionContextSnapshot snapshot = recordedSnapshot();
         assertThat(snapshot.contextChars()).isEqualTo(commonInstructions.length());
         assertThat(snapshot.instructionsHash())
-                .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
+            .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
     }
+
 
     @Test
     @DisplayName("커넥터 실행에 덧붙일 지시가 없어도 공통 표 지침은 보낸다")
@@ -164,6 +168,7 @@ class AgentRunnerConnectorContextTest {
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length());
     }
 
+
     @Test
     @DisplayName("일반 에이전트의 실행은 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
     void sendsAssembledMemoryForOrdinaryAgent() {
@@ -175,27 +180,31 @@ class AgentRunnerConnectorContextTest {
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
     }
 
+
     @Test
     @DisplayName("살펴보기 트리의 자식은 Memory 를 읽되 기억을 남기는 지침은 받지 않는다")
     void excludesRememberInstructionsFromProactiveChild() {
         when(proactiveChecks.existsByRootExecutionId(10L)).thenReturn(true);
 
         runner.run(
-                user,
-                Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
-                agent(),
-                "일",
-                10L,
-                10L,
-                RunSession.fresh(),
-                execution -> {},
-                (execution, runId) -> {},
-                () -> false,
-                null);
+            user,
+            Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
+            agent(),
+            "일",
+            10L,
+            10L,
+            RunSession.fresh(),
+            execution -> {
+            },
+            (execution, runId) -> {
+            },
+            () -> false,
+            null);
 
         assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");
         verify(contextAssembler).withResponseInstructions(any(), eq(false));
     }
+
 
     @Test
     @DisplayName("위임받은 커넥터 에이전트의 실행이 성공하면 Memory 없이도 답이 output_text 로 넘어간다")
@@ -213,18 +222,21 @@ class AgentRunnerConnectorContextTest {
         assertThat(run.result().output()).as("위임 실행의 답").isEqualTo(ANSWER);
     }
 
+
     private HermesRunCommand submitted() {
         ArgumentCaptor<HermesRunCommand> command = ArgumentCaptor.forClass(HermesRunCommand.class);
         verify(hermes).submit(command.capture());
         return command.getValue();
     }
 
+
     private ExecutionContextSnapshot recordedSnapshot() {
         ArgumentCaptor<ExecutionContextSnapshot> snapshot = ArgumentCaptor.forClass(ExecutionContextSnapshot.class);
         verify(executions)
-                .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
+            .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
         return snapshot.getValue();
     }
+
 
     private static Agent connectorAgent() {
         Agent agent = agent();
@@ -232,32 +244,36 @@ class AgentRunnerConnectorContextTest {
         return agent;
     }
 
+
     private static Agent agent() {
         return Agent.of(
-                "runner",
-                "실행기",
-                "runner-profile",
-                "http://agent-runtime.test/p/runner",
-                CostMode.API,
-                CredentialScope.DEDICATED,
-                AgentVisibility.PRIVATE,
-                1L,
-                Instant.now());
+            "runner",
+            "실행기",
+            "runner-profile",
+            "http://agent-runtime.test/p/runner",
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            1L,
+            Instant.now());
     }
+
 
     private AgentRun run(Agent agent, String instructionAddition, DelegationKey delegationKey) {
         return runner.run(
-                user,
-                Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
-                agent,
-                "일",
-                null,
-                null,
-                RunSession.fresh(),
-                execution -> {},
-                (execution, runId) -> {},
-                () -> false,
-                instructionAddition,
-                delegationKey);
+            user,
+            Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
+            agent,
+            "일",
+            null,
+            null,
+            RunSession.fresh(),
+            execution -> {
+            },
+            (execution, runId) -> {
+            },
+            () -> false,
+            instructionAddition,
+            delegationKey);
     }
 }

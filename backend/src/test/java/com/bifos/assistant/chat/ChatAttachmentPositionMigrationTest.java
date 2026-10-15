@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 class ChatAttachmentPositionMigrationTest {
     private Database database;
 
+
     @BeforeEach
     void setUp() throws SQLException {
         database = createDatabase();
@@ -30,13 +31,15 @@ class ChatAttachmentPositionMigrationTest {
         migrateAll();
     }
 
+
     /** 실제 MySQL 검사가 같은 마이그레이션과 줄을 쓴다. */
     Database createDatabase() {
         return new Database(
-                "jdbc:h2:mem:chat-attachment-position-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1",
-                "sa",
-                "");
+            "jdbc:h2:mem:chat-attachment-position-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1",
+            "sa",
+            "");
     }
+
 
     @Test
     @DisplayName("메시지마다 첨부 번호 오름차순으로 0부터 position 을 채운다")
@@ -45,51 +48,56 @@ class ChatAttachmentPositionMigrationTest {
         assertThat(positionsOf(202L)).containsExactly(new Position(2L, 0), new Position(7L, 1));
     }
 
+
     @Test
     @DisplayName("아직 메시지에 묶이지 않은 첨부는 기본 position 을 그대로 둔다")
     void leavesUnboundAttachmentAtDefaultPosition() throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery("SELECT position FROM chat_attachment WHERE id = 11")) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT position FROM chat_attachment WHERE id = 11")) {
             assertThat(row.next()).isTrue();
             assertThat(row.getInt(1)).isZero();
         }
     }
 
+
     private void migrate(String target) {
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .target(target)
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .target(target)
+            .load()
+            .migrate();
     }
+
 
     private void migrateBeforePosition() {
         Flyway migrationInfo = Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .load();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .load();
         String target = Arrays.stream(migrationInfo.info().all())
-                .map(MigrationInfo::getVersion)
-                .filter(version -> version != null && version.compareTo(MigrationVersion.fromVersion("75")) < 0)
-                .max(MigrationVersion::compareTo)
-                .orElseThrow()
-                .getVersion();
+            .map(MigrationInfo::getVersion)
+            .filter(version -> version != null && version.compareTo(MigrationVersion.fromVersion("75")) < 0)
+            .max(MigrationVersion::compareTo)
+            .orElseThrow()
+            .getVersion();
         migrate(target);
     }
 
+
     private void migrateAll() {
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
     }
+
 
     private void seedAttachments() throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO chat_attachment
                         (id, conversation_id, message_id, uploaded_by_user_id, original_name, stored_name,
@@ -104,11 +112,12 @@ class ChatAttachmentPositionMigrationTest {
         }
     }
 
+
     private List<Position> positionsOf(long messageId) throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("SELECT id, position FROM chat_attachment WHERE message_id = "
-                        + messageId + " ORDER BY position")) {
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("SELECT id, position FROM chat_attachment WHERE message_id = "
+                + messageId + " ORDER BY position")) {
             ArrayList<Position> positions = new ArrayList<>();
             while (rows.next()) {
                 positions.add(new Position(rows.getLong(1), rows.getInt(2)));
@@ -117,11 +126,15 @@ class ChatAttachmentPositionMigrationTest {
         }
     }
 
+
     private Connection connect() throws SQLException {
         return DriverManager.getConnection(database.url(), database.username(), database.password());
     }
 
-    record Database(String url, String username, String password) {}
 
-    record Position(long id, int position) {}
+    record Database(String url, String username, String password) {
+    }
+
+    record Position(long id, int position) {
+    }
 }

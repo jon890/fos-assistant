@@ -70,10 +70,12 @@ public class HermesDecisionProvider implements DecisionProvider {
     private final ObjectMapper json;
     private final BackgroundTasks backgroundTasks;
 
+
     @Override
     public String id() {
         return "hermes";
     }
+
 
     @Override
     public DecisionResponse evaluate(DecisionState state, List<DecisionQuestion> questions, DecisionRequest request) {
@@ -91,14 +93,14 @@ public class HermesDecisionProvider implements DecisionProvider {
             baseUrl = hermesProperties.profileBaseUrl(properties.profile());
             execution = executions.startSystem(request.user(), properties.profile(), properties.costMode(), choice);
             HermesRunCommand command = new HermesRunCommand(
-                    properties.profile(),
-                    baseUrl,
-                    prompt(state, questions),
-                    INSTRUCTIONS,
-                    null,
-                    choice.provider(),
-                    choice.model(),
-                    choice.reasoningEffort());
+                properties.profile(),
+                baseUrl,
+                prompt(state, questions),
+                INSTRUCTIONS,
+                null,
+                choice.provider(),
+                choice.model(),
+                choice.reasoningEffort());
             executions.markSubmitted(execution);
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
@@ -106,7 +108,7 @@ public class HermesDecisionProvider implements DecisionProvider {
             if (!result.succeeded()) {
                 executions.failSystem(execution, result, baseUrl, "DECISION_PROVIDER_FAILED");
                 return new DecisionResponse(
-                        info(choice, execution, true), DecisionResult.fallback(DecisionFailure.PROVIDER_FAILED));
+                    info(choice, execution, true), DecisionResult.fallback(DecisionFailure.PROVIDER_FAILED));
             }
             executions.completeSystem(execution, result, baseUrl);
             DecisionResult decision = parse(result.output());
@@ -115,13 +117,14 @@ public class HermesDecisionProvider implements DecisionProvider {
             if (execution != null) {
                 if (runId != null && result == null) {
                     limiter.holdUntilRemoteEnds(
-                            request.user().id(), execution.id(), baseUrl, properties.profile(), runId, false);
+                        request.user().id(), execution.id(), baseUrl, properties.profile(), runId, false);
                 }
                 executions.fail(execution, "DECISION_" + failure(ex).name());
             }
             return failed(choice, execution, failure(ex));
         }
     }
+
 
     private ModelChoice choice(ModelChoice requested) {
         if (!requested.usesDefaultModel()) {
@@ -132,10 +135,11 @@ public class HermesDecisionProvider implements DecisionProvider {
             throw new IllegalStateException("system decision model is unknown");
         }
         return ModelChoice.of(
-                profile.provider(),
-                profile.model(),
-                requested.reasoningEffort() == null ? profile.reasoningEffort() : requested.reasoningEffort());
+            profile.provider(),
+            profile.model(),
+            requested.reasoningEffort() == null ? profile.reasoningEffort() : requested.reasoningEffort());
     }
+
 
     private HermesRunResult await(HermesRunCommand command, String runId) throws Exception {
         FutureTask<HermesRunResult> pending = new FutureTask<>(() -> hermes.awaitCompletion(command, runId));
@@ -147,10 +151,12 @@ public class HermesDecisionProvider implements DecisionProvider {
         }
     }
 
+
     private String prompt(DecisionState state, List<DecisionQuestion> questions) {
         return PROMPT_MARK + "\n"
-                + ExternalData.wrap(json.writeValueAsString(Map.of("state", state, "questions", questions)));
+            + ExternalData.wrap(json.writeValueAsString(Map.of("state", state, "questions", questions)));
     }
+
 
     private DecisionResult parse(String output) {
         if (output == null || output.length() > MAX_OUTPUT_CHARS) {
@@ -163,32 +169,36 @@ public class HermesDecisionProvider implements DecisionProvider {
                 content = fence.group(1);
             }
             return json.readerFor(DecisionResult.class)
-                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-                    .readValue(content);
+                .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                .readValue(content);
         } catch (RuntimeException ex) {
             return DecisionResult.fallback(DecisionFailure.INVALID_RESULT);
         }
     }
 
+
     private DecisionResponse failed(ModelChoice choice, AgentExecution execution, DecisionFailure reason) {
         return new DecisionResponse(info(choice, execution), DecisionResult.fallback(reason));
     }
+
 
     private DecisionProviderInfo info(ModelChoice choice, AgentExecution execution) {
         return info(choice, execution, false);
     }
 
+
     private DecisionProviderInfo info(ModelChoice choice, AgentExecution execution, boolean terminalResult) {
         boolean succeeded = execution != null && (terminalResult || execution.status() == ExecutionStatus.SUCCEEDED);
         return new DecisionProviderInfo(
-                id(),
-                VERSION,
-                choice.provider(),
-                choice.model(),
-                succeeded ? execution.provider() : null,
-                succeeded ? execution.model() : null,
-                execution == null ? null : execution.id());
+            id(),
+            VERSION,
+            choice.provider(),
+            choice.model(),
+            succeeded ? execution.provider() : null,
+            succeeded ? execution.model() : null,
+            execution == null ? null : execution.id());
     }
+
 
     private static DecisionFailure failure(Exception ex) {
         if (ex instanceof InterruptedException) {

@@ -9,11 +9,12 @@ package com.bifos.assistant.hermes.dto;
  * @param options 선택지 칸이면 선택지를 읽는 방법. 아니면 null
  */
 public record ConnectorField(
-        String key,
-        String env,
-        String label,
-        String description,
-        boolean secret,
-        boolean required,
-        String pattern,
-        ConnectorFieldOptions options) {}
+    String key,
+    String env,
+    String label,
+    String description,
+    boolean secret,
+    boolean required,
+    String pattern,
+    ConnectorFieldOptions options) {
+}

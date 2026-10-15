@@ -29,11 +29,13 @@ class McpCallContextTest {
     private static final String DELEGATE_SIG = "b28a128dbb642aba7a8b4c35dcb237e2feb5a452305ec275909c32a00ae1b25b";
     private static final String STATUS_SIG = "62109c6c99e7ed4638e4343f1e5b6b22a3f55dd974560916149986866c253236";
 
+
     @Test
     @DisplayName("토큰 해시는 표에 적은 key 와 같다")
     void tokenHashEqualsKeyInTable() {
         assertThat(AgentTokenService.hash(TOKEN)).isEqualTo(TOKEN_HASH);
     }
+
 
     @Test
     @DisplayName("test vector 가 통과하고 세 칸을 그대로 돌려준다")
@@ -45,14 +47,16 @@ class McpCallContextTest {
         assertThat(context.toolCallId()).isEqualTo(TOOL_CALL_ID);
     }
 
+
     @Test
     @DisplayName("도구 이름이 서명에 들어가 다른 도구의 서명은 통과하지 못한다")
     void toolNameIsInSignatureSoOtherToolsSignatureFails() {
         assertThat(McpCallContext.verify("agent_status", ctx(STATUS_SIG), TOKEN_HASH)
-                        .toolCallId())
+            .toolCallId())
                 .isEqualTo(TOOL_CALL_ID);
         assertRejected("agent_status", ctx(DELEGATE_SIG));
     }
+
 
     @Test
     @DisplayName("한 글자 바꾼 sig 와 대문자 sig 는 거절한다")
@@ -63,11 +67,13 @@ class McpCallContextTest {
         assertRejected("agent_delegate", ctx(DELEGATE_SIG.toUpperCase()));
     }
 
+
     @Test
     @DisplayName("다른 토큰의 해시로는 통과하지 못한다")
     void doesNotPassWithHashOfOtherToken() {
         assertRejected("agent_delegate", ctx(DELEGATE_SIG), AgentTokenService.hash("test-mcp-token-0002"));
     }
+
 
     @Test
     @DisplayName(" fos ctx 가 없거나 객체가 아니면 거절한다")
@@ -75,6 +81,7 @@ class McpCallContextTest {
         assertRejected("agent_delegate", null);
         assertRejected("agent_delegate", JSON.getNodeFactory().stringNode("{}"));
     }
+
 
     @Test
     @DisplayName("키 하나가 빠지거나 비었거나 문자열이 아니면 거절한다")
@@ -92,6 +99,7 @@ class McpCallContextTest {
         assertRejected("agent_delegate", number);
     }
 
+
     @Test
     @DisplayName("v 는 정수 1 만 받는다")
     void acceptsOnlyIntegerOneForV() {
@@ -107,18 +115,20 @@ class McpCallContextTest {
         assertRejected("agent_delegate", decimal);
     }
 
+
     @Test
     @DisplayName("JSON 본문에서 읽은 정수 1 은 받고 1 0 과 지수 표기는 거절한다")
     void acceptsIntegerOneReadFromJsonBodyAndRejectsOneDotZeroAndExponent() {
         String body = "{\"v\":%s,\"session_id\":\"" + SESSION_ID + "\",\"root_session_id\":\"" + ROOT_SESSION_ID
-                + "\",\"tool_call_id\":\"" + TOOL_CALL_ID + "\",\"sig\":\"" + DELEGATE_SIG + "\"}";
+            + "\",\"tool_call_id\":\"" + TOOL_CALL_ID + "\",\"sig\":\"" + DELEGATE_SIG + "\"}";
 
         assertThat(McpCallContext.verify("agent_delegate", JSON.readTree(body.formatted("1")), TOKEN_HASH)
-                        .rootSessionId())
+            .rootSessionId())
                 .isEqualTo(ROOT_SESSION_ID);
         assertRejected("agent_delegate", JSON.readTree(body.formatted("1.0")));
         assertRejected("agent_delegate", JSON.readTree(body.formatted("1e0")));
     }
+
 
     private static ObjectNode ctx(String sig) {
         ObjectNode node = JSON.createObjectNode();
@@ -130,14 +140,16 @@ class McpCallContextTest {
         return node;
     }
 
+
     private static void assertRejected(String toolName, JsonNode fosCtx) {
         assertRejected(toolName, fosCtx, TOKEN_HASH);
     }
 
+
     private static void assertRejected(String toolName, JsonNode fosCtx, String tokenHash) {
         assertThatThrownBy(() -> McpCallContext.verify(toolName, fosCtx, tokenHash))
-                .as("tool=%s ctx=%s", toolName, fosCtx)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+            .as("tool=%s ctx=%s", toolName, fosCtx)
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
 }

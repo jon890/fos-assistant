@@ -11,9 +11,10 @@ import java.util.UUID;
  * @param unreadCount 그 사용자의 읽지 않은 알림 수
  */
 public record NotificationEvent(
-        String type,
-        @JsonInclude(JsonInclude.Include.NON_NULL) UUID notificationId,
-        long unreadCount) {
+    String type,
+    @JsonInclude(JsonInclude.Include.NON_NULL) UUID notificationId,
+    long unreadCount) {
+
 
     public static final String CREATED = "created";
     public static final String READ = "read";
@@ -22,6 +23,7 @@ public record NotificationEvent(
     public static NotificationEvent created(UUID notificationId, long unreadCount) {
         return new NotificationEvent(CREATED, notificationId, unreadCount);
     }
+
 
     /** 알림 하나나 전부를 읽음으로 표시했다. */
     public static NotificationEvent read(long unreadCount) {

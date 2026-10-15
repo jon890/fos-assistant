@@ -18,6 +18,7 @@ class SkillCommandTest {
         assertThat(command.hermesInput()).contains("skill_view(name=\"shopping\")", "이번 주");
     }
 
+
     @Test
     @DisplayName("나머지 글의 앞뒤 공백은 뺀다")
     void trimsWhitespaceAroundRest() {
@@ -25,6 +26,7 @@ class SkillCommandTest {
 
         assertThat(command.rest()).isEqualTo("두부 사기");
     }
+
 
     @Test
     @DisplayName("이름만 있으면 나머지가 비고 입력이 절차를 처음부터 진행하게 한다")
@@ -35,6 +37,7 @@ class SkillCommandTest {
         assertThat(command.hermesInput()).contains("skill_view(name=\"shopping\")", "처음부터");
     }
 
+
     @Test
     @DisplayName("이름 뒤가 공백이나 끝이 아니거나 이름 규칙에 맞지 않으면 커맨드가 아니다")
     void isNotCommandWhenAfterNameIsNotSpaceOrEndOrNameBreaksRule() {
@@ -44,6 +47,7 @@ class SkillCommandTest {
         assertThat(SkillCommand.parse(null)).isEmpty();
     }
 
+
     /** 이름 뒤 공백은 Java 정규식의 {@code \s} 인 공백, 탭, 줄바꿈, 세로 탭, 폼 피드, 캐리지 리턴만 받는다. */
     @Test
     @DisplayName("이름 뒤가 전각 공백이나 NBSP 면 커맨드가 아니고 탭이나 줄바꿈이면 커맨드다")
@@ -51,14 +55,15 @@ class SkillCommandTest {
         assertThat(SkillCommand.parse("/shopping　이번 주")).as("전각 공백").isEmpty();
         assertThat(SkillCommand.parse("/shopping 이번 주")).as("NBSP").isEmpty();
         assertThat(SkillCommand.parse("/shopping\t이번 주"))
-                .as("탭")
-                .map(SkillCommand::rest)
-                .contains("이번 주");
+            .as("탭")
+            .map(SkillCommand::rest)
+            .contains("이번 주");
         assertThat(SkillCommand.parse("/shopping\n이번 주"))
-                .as("줄바꿈")
-                .map(SkillCommand::rest)
-                .contains("이번 주");
+            .as("줄바꿈")
+            .map(SkillCommand::rest)
+            .contains("이번 주");
     }
+
 
     @Test
     @DisplayName("이름은 64자까지이고 65자면 커맨드가 아니다")
@@ -66,8 +71,8 @@ class SkillCommandTest {
         String longest = "a".repeat(64);
 
         assertThat(SkillCommand.parse("/" + longest + " 해 줘"))
-                .map(SkillCommand::name)
-                .contains(longest);
+            .map(SkillCommand::name)
+            .contains(longest);
         assertThat(SkillCommand.parse("/" + "a".repeat(65) + " 해 줘")).isEmpty();
     }
 }

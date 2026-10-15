@@ -29,13 +29,16 @@ public record DelegationResult(Long executionId, ExecutionStatus status, Failure
         CHECK_LIMIT
     }
 
+
     public static DelegationResult started(Long executionId, ExecutionStatus status) {
         return new DelegationResult(Objects.requireNonNull(executionId), Objects.requireNonNull(status), null);
     }
 
+
     public static DelegationResult rejected(Failure failure) {
         return new DelegationResult(null, null, Objects.requireNonNull(failure));
     }
+
 
     public boolean accepted() {
         return failure == null;

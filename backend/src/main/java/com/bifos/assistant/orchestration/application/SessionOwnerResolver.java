@@ -38,6 +38,7 @@ public class SessionOwnerResolver {
     private final AgentExecutionRepository executions;
     private final DelegationParentResolver parents;
 
+
     /**
      * @param profileName 토큰이 증명한 profile
      * @param rootSessionId {@code _fos_ctx} 에서 서명을 확인한 루트 session
@@ -54,8 +55,8 @@ public class SessionOwnerResolver {
                 throw reject(profileName, "등록의 루트가 서명한 루트와 다르다");
             }
             AgentExecution origin = executions
-                    .findById(binding.get().originExecutionId())
-                    .orElseThrow(() -> reject(profileName, "등록의 origin 실행이 없다"));
+                .findById(binding.get().originExecutionId())
+                .orElseThrow(() -> reject(profileName, "등록의 origin 실행이 없다"));
             // 중지해도 Hermes 하위 에이전트는 계속 돌 수 있다. 사용자가 멈춘 turn 의 권한을 그 자식이 쓰지 못하게 한다.
             if (origin.status() == ExecutionStatus.CANCELLED) {
                 throw reject(profileName, "중지된 origin 실행이다 ORIGIN_CANCELLED");
@@ -71,6 +72,7 @@ public class SessionOwnerResolver {
         throw reject(profileName, "등록이 없는 하위 session 이다 SUBAGENT_SESSION_UNREGISTERED");
     }
 
+
     /** 루트 자신은 {@code root_execution_id} 가 비어 있다. 루트 줄이 없으면 origin 판정만 따른다. */
     private boolean rootCancelled(AgentExecution origin) {
         Long rootId = origin.rootExecutionId();
@@ -78,16 +80,18 @@ public class SessionOwnerResolver {
             return false;
         }
         return executions
-                .findById(rootId)
-                .map(root -> root.status() == ExecutionStatus.CANCELLED)
-                .orElse(false);
+            .findById(rootId)
+            .map(root -> root.status() == ExecutionStatus.CANCELLED)
+            .orElse(false);
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 서명 실패와 같다. */
     private static ApiException reject(String profileName, String reason) {
         log.warn("MCP 호출의 origin 실행을 정하지 못했다 profile={} reason={}", profileName, reason);
         return new ApiException(ErrorCode.MCP_CALL_CONTEXT_INVALID, "call context is invalid");
     }
+
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();

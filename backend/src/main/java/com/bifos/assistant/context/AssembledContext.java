@@ -18,20 +18,24 @@ public record AssembledContext(String instructions, long chars, List<Long> omitt
         bundle = bundle == null ? ContextBundle.empty() : bundle;
     }
 
+
     /** 빠진 항목이 하나도 없고 묶음이 빈 문맥이다. */
     public AssembledContext(String instructions, long chars) {
         this(instructions, chars, List.of());
     }
+
 
     /** 묶음이 빈 문맥이다. */
     public AssembledContext(String instructions, long chars, List<Long> omittedMemoryIds) {
         this(instructions, chars, omittedMemoryIds, ContextBundle.empty());
     }
 
+
     /** 넣을 항목이 없으면 빈 문자열 대신 null 을 보낸다. */
     public static AssembledContext empty() {
         return new AssembledContext(null, 0, List.of(), ContextBundle.empty());
     }
+
 
     /**
      * 자리가 없어 싣지 못한 항목 수다.
@@ -42,6 +46,7 @@ public record AssembledContext(String instructions, long chars, List<Long> omitt
     public int omittedItems() {
         return omittedMemoryIds.size();
     }
+
 
     /**
      * 실행 기록에 남길 지문이다. SHA-256 의 앞 16바이트를 16진수 32글자로 적는다.
@@ -59,10 +64,11 @@ public record AssembledContext(String instructions, long chars, List<Long> omitt
         return Sha256.hex16(instructions);
     }
 
+
     /** 본문이 로그에 남지 않게 글자 수와 빠진 수와 항목 수만 낸다. */
     @Override
     public String toString() {
         return "AssembledContext[chars=" + chars + ", omittedItems=" + omittedItems() + ", items="
-                + bundle.items().size() + "]";
+            + bundle.items().size() + "]";
     }
 }

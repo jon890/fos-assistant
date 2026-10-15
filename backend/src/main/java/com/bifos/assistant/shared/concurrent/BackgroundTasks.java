@@ -10,6 +10,7 @@ public interface BackgroundTasks {
     /** 이름 붙인 가상 스레드에서 작업을 바로 시작한다. */
     Thread start(String name, Runnable task);
 
+
     /** 이름 붙인 가상 스레드를 만들기만 한다. 부르는 쪽이 시작한다. */
     Thread unstarted(String name, Runnable task);
 }

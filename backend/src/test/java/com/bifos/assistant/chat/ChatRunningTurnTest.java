@@ -88,9 +88,11 @@ class ChatRunningTurnTest {
     @Autowired
     HermesRunsClient hermes;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void reset() {
@@ -104,22 +106,24 @@ class ChatRunningTurnTest {
         users.deleteAll();
     }
 
+
     private CurrentUser member(String name) {
         return member(name, null);
     }
 
+
     private CurrentUser member(String name, String flow) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         Agent agent = Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now());
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            Instant.now());
         if (flow != null) {
             agent.assignFlow(flow);
         }
@@ -127,22 +131,26 @@ class ChatRunningTurnTest {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private AgentExecution latestExecution(CurrentUser user) {
         return executions
-                .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
-                .getFirst();
+            .findByUserIdOrderByIdDesc(user.id(), PageRequest.of(0, 1))
+            .getFirst();
     }
+
 
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(runId, "session", "completed", output, "model", "provider", TokenUsage.empty());
     }
 
+
     private static void assertNotFound(Runnable call) {
         assertThatThrownBy(call::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("도는 turn이 없는 내 대화는 돌지 않는다고 답한다")
@@ -152,6 +160,7 @@ class ChatRunningTurnTest {
 
         assertThat(chat.running(dad, conversation.id())).isEqualTo(new RunningTurn(false, null, null));
     }
+
 
     @Test
     @DisplayName("도는 turn이 있으면 루트 실행 번호와 시작 시각을 답하고 끝나면 돌지 않는다고 답한다")
@@ -169,12 +178,13 @@ class ChatRunningTurnTest {
         ChatTurn turn = chat.send(dad, null, "질문", "dad");
 
         assertThat(whileRunning.get())
-                .isEqualTo(
-                        new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
+            .isEqualTo(
+                new RunningTurn(true, heldRow.get().id(), heldRow.get().startedAt()));
         assertThat(whileRunning.get().executionId()).isEqualTo(turn.executionId());
         assertThat(whileRunning.get().startedAt()).isNotNull();
         assertThat(chat.running(dad, turn.conversationId())).isEqualTo(new RunningTurn(false, null, null));
     }
+
 
     @Test
     @DisplayName("표시는 있는데 실행 번호가 붙기 전이면 돈다고만 답한다")
@@ -188,6 +198,7 @@ class ChatRunningTurnTest {
             turns.close(handle);
         }
     }
+
 
     @Test
     @DisplayName("흐름에서 Chief가 끝나 루트 줄이 SUCCEEDED여도 자식이 도는 동안은 루트 번호로 돈다고 답한다")
@@ -208,9 +219,9 @@ class ChatRunningTurnTest {
                     RunningTurn running = chat.running(dad, child.conversationId());
                     whileChildRuns.set(running);
                     rootStatus.set(executions
-                            .findById(running.executionId())
-                            .orElseThrow()
-                            .status());
+                        .findById(running.executionId())
+                        .orElseThrow()
+                        .status());
                 } catch (Throwable ex) {
                     failure.set(ex);
                 }
@@ -231,35 +242,35 @@ class ChatRunningTurnTest {
         assertThat(chat.running(dad, turn.conversationId()).running()).isFalse();
     }
 
+
     @Test
     @DisplayName("막히면 넘기지 않고 실패하고 turn이 끝난다")
     void blockedFailsWithoutFallbackAndEndsTurn() {
         CurrentUser dad = member("dad");
         stub().willReturnInOrder(
-                        new HermesRunResult(
-                                "run-blocked",
-                                "session",
-                                "failed",
-                                "",
-                                null,
-                                null,
-                                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
-                                TokenUsage.empty()),
-                        completed("run-next", "답"));
+            new HermesRunResult(
+                "run-blocked",
+                "session",
+                "failed",
+                "",
+                null,
+                null,
+                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+                TokenUsage.empty()),
+            completed("run-next", "답"));
         AtomicReference<RunningTurn> whileRunning = new AtomicReference<>();
-        stub().beforeAwait(() ->
-                whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
+        stub().beforeAwait(() -> whileRunning.set(chat.running(dad, latestExecution(dad).conversationId())));
 
         List<ChatEvent> relayed = new ArrayList<>();
         assertThatThrownBy(() -> chat.stream(dad, null, "막힌 모델로 보내 줘", "dad", relayed::add))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
 
         List<Long> started = relayed.stream()
-                .filter(event -> event.type().equals("started"))
-                .map(ChatEvent::executionId)
-                .toList();
+            .filter(event -> event.type().equals("started"))
+            .map(ChatEvent::executionId)
+            .toList();
         assertThat(started).as("started 사건의 실행 번호").hasSize(1);
         assertThat(stub().received()).as("Hermes 를 부른 횟수").hasSize(1);
         assertThat(whileRunning.get().executionId()).isEqualTo(started.getFirst());
@@ -268,6 +279,7 @@ class ChatRunningTurnTest {
         assertThat(failed.errorCode()).isEqualTo("PROVIDER_BLOCKED");
         assertThat(chat.running(dad, failed.conversationId()).running()).isFalse();
     }
+
 
     @Test
     @DisplayName("남의 대화는 도는 turn이 있어도 찾을 수 없다고 답한다")
@@ -289,9 +301,10 @@ class ChatRunningTurnTest {
         chat.send(dad, null, "질문", "dad");
 
         assertThat(momSaw.get()).isInstanceOf(ApiException.class);
-        assertThat(((ApiException) momSaw.get()).code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+        assertThat(((ApiException)momSaw.get()).code()).isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
         assertNotFound(() -> chat.running(mom, dadConversation.get()));
     }
+
 
     @Test
     @DisplayName("지운 대화와 없는 대화는 찾을 수 없다고 답한다")

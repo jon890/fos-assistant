@@ -43,6 +43,7 @@ public class ModelTierDefinition {
     @Column(name = "reasoning_effort", length = 16)
     private String reasoningEffort;
 
+
     private ModelTierDefinition(Long groupId, ModelTier tier, String provider, String model, String reasoningEffort) {
         this.groupId = groupId;
         this.tier = tier;
@@ -51,8 +52,9 @@ public class ModelTierDefinition {
         this.reasoningEffort = reasoningEffort;
     }
 
+
     public static ModelTierDefinition of(
-            Long groupId, ModelTier tier, String provider, String model, String reasoningEffort) {
+        Long groupId, ModelTier tier, String provider, String model, String reasoningEffort) {
         return new ModelTierDefinition(groupId, tier, provider, model, reasoningEffort);
     }
 }

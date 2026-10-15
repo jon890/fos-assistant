@@ -29,6 +29,7 @@ class ConversationWriterTest {
     @Autowired
     ConversationRepository conversations;
 
+
     /**
      * 사용자를 만들지 않고 고정 번호로 제목이 빈 대화만 만든다.
      *
@@ -39,9 +40,11 @@ class ConversationWriterTest {
         return conversations.save(Conversation.startedBy(WRITER_USER_ID, "", null, Instant.now()));
     }
 
+
     private String storedTitle(Conversation conversation) {
         return conversations.findById(conversation.id()).orElseThrow().title();
     }
+
 
     @Test
     @DisplayName("트랜잭션 밖에서 Writer 로 빈 제목을 채우면 1 을 돌려주고 제목이 저장된다")
@@ -53,6 +56,7 @@ class ConversationWriterTest {
         assertThat(updated).isEqualTo(1);
         assertThat(storedTitle(conversation)).isEqualTo("새 제목");
     }
+
 
     @Test
     @DisplayName("이미 제목이 있으면 Writer 가 0 을 돌려주고 제목을 바꾸지 않는다")
@@ -66,13 +70,14 @@ class ConversationWriterTest {
         assertThat(storedTitle(conversation)).isEqualTo("먼저 채운 제목");
     }
 
+
     @Test
     @DisplayName("트랜잭션 밖에서 저장소의 update 를 직접 부르면 InvalidDataAccessApiUsageException 이 나고 제목은 그대로다")
     void rejectsDirectRepositoryUpdateOutsideTransaction() {
         Conversation conversation = newUntitledConversation();
 
         assertThatThrownBy(() -> conversations.fillTitleIfBlank(conversation.id(), "새 제목"))
-                .isInstanceOf(InvalidDataAccessApiUsageException.class);
+            .isInstanceOf(InvalidDataAccessApiUsageException.class);
 
         assertThat(storedTitle(conversation)).isEmpty();
     }

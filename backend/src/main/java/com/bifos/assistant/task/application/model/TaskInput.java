@@ -13,11 +13,12 @@ import com.bifos.assistant.task.domain.type.NotifyPolicy;
  * @param modelTier 발화하는 대화를 고를 모델 단계. 비우면 작업의 단계를 지운다
  */
 public record TaskInput(
-        String title,
-        String agentCode,
-        String instruction,
-        ScheduleInput schedule,
-        ConversationMode conversationMode,
-        MissedPolicy missedPolicy,
-        NotifyPolicy notifyPolicy,
-        ModelTier modelTier) {}
+    String title,
+    String agentCode,
+    String instruction,
+    ScheduleInput schedule,
+    ConversationMode conversationMode,
+    MissedPolicy missedPolicy,
+    NotifyPolicy notifyPolicy,
+    ModelTier modelTier) {
+}

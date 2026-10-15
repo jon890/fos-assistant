@@ -11,6 +11,7 @@ public enum DeliveryStatus {
     /** 사용자가 부모 turn 을 중지했다. */
     STOPPED;
 
+
     /** 사용자가 다시 전달할 수 있는 상태인지다. */
     public boolean retryable() {
         return this == FAILED || this == STOPPED;

@@ -10,10 +10,12 @@ public class DecisionEvidenceJsonConverter implements AttributeConverter<Decisio
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     @Override
     public String convertToDatabaseColumn(DecisionEvidence value) {
         return JSON.writeValueAsString(value);
     }
+
 
     @Override
     public DecisionEvidence convertToEntityAttribute(String value) {

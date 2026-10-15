@@ -16,6 +16,7 @@ public class ConnectorCheckReportApprovals implements CheckReportApprovalSource 
 
     private final ConnectorActionRepository actions;
 
+
     @Override
     @Transactional(readOnly = true)
     public List<UUID> pendingPublicIds(Long rootExecutionId) {

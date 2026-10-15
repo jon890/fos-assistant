@@ -25,6 +25,7 @@ class HttpCdpTargetsTest {
     private HttpServer server;
     private URI cdp;
 
+
     @BeforeEach
     void setUp() throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
@@ -42,11 +43,13 @@ class HttpCdpTargetsTest {
         cdp = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
     }
 
+
     @AfterEach
     void tearDown() {
         targets.close();
         server.stop(0);
     }
+
 
     @Test
     @DisplayName("탭 목록은 page 이면서 번호가 영문자와 숫자인 대상만 돌려준다")
@@ -54,11 +57,12 @@ class HttpCdpTargetsTest {
         List<CdpTarget> pages = targets.list(cdp);
 
         assertThat(pages)
-                .containsExactly(
-                        new CdpTarget("PAGE1", "첫 탭", "https://example.com/a"),
-                        new CdpTarget("PAGE2", "둘째 탭", "https://example.com/c"));
+            .containsExactly(
+                new CdpTarget("PAGE1", "첫 탭", "https://example.com/a"),
+                new CdpTarget("PAGE2", "둘째 탭", "https://example.com/c"));
         assertThat(requests).containsExactly("GET /json/list");
     }
+
 
     @Test
     @DisplayName("새 탭은 PUT 으로 주소를 풀어 읽을 수 있게 담아 연다")
@@ -68,6 +72,7 @@ class HttpCdpTargetsTest {
         assertThat(created.id()).isEqualTo("NEW1");
         assertThat(requests).containsExactly("PUT /json/new?https%3A%2F%2Fexample.com%2Flogin%3Fa%3D1%26b%3D2");
     }
+
 
     @Test
     @DisplayName("탭을 앞으로 가져오고 이상한 번호는 부르지 않고 거절한다")
@@ -80,6 +85,7 @@ class HttpCdpTargetsTest {
         assertThat(requests).containsExactly("GET /json/activate/PAGE1");
     }
 
+
     @Test
     @DisplayName("200 이 아니면 상태 코드만 담아 실패한다")
     void failsOnErrorStatus() {
@@ -87,17 +93,18 @@ class HttpCdpTargetsTest {
         server.createContext("/json/list", exchange -> answer(exchange, 500, "secret body"));
 
         assertThatThrownBy(() -> targets.list(cdp))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("500")
-                .hasMessageNotContaining("secret");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("500")
+            .hasMessageNotContaining("secret");
     }
+
 
     private void answer(HttpExchange exchange, int status, String body) throws IOException {
         requests.add(
-                exchange.getRequestMethod() + " " + exchange.getRequestURI().getRawPath()
-                        + (exchange.getRequestURI().getRawQuery() == null
-                                ? ""
-                                : "?" + exchange.getRequestURI().getRawQuery()));
+            exchange.getRequestMethod() + " " + exchange.getRequestURI().getRawPath()
+                + (exchange.getRequestURI().getRawQuery() == null
+                    ? ""
+                    : "?" + exchange.getRequestURI().getRawQuery()));
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(status, bytes.length);
         exchange.getResponseBody().write(bytes);

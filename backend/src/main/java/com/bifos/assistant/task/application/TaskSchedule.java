@@ -28,6 +28,7 @@ public final class TaskSchedule {
     /** 최소 간격을 볼 때 펼치는 기간이다. */
     static final Duration HORIZON = Duration.ofDays(365);
 
+
     /** 5필드 cron 을 읽는다. 필드가 다섯이 아니거나 읽지 못하면 {@code TASK_SCHEDULE_INVALID} 다. */
     public static CronExpression parseCron(String fiveFields) {
         if (fiveFields == null || fiveFields.isBlank()) {
@@ -44,6 +45,7 @@ public final class TaskSchedule {
         }
     }
 
+
     /** IANA 시간대 이름을 읽는다. 읽지 못하면 {@code TASK_SCHEDULE_INVALID} 다. */
     public static ZoneId parseZone(String name) {
         try {
@@ -52,6 +54,7 @@ public final class TaskSchedule {
             throw invalid("this time zone is unknown");
         }
     }
+
 
     /**
      * {@code from} 부터 1년 안의 예정 시각을 차례로 펼쳐, 이어지는 두 시각의 간격이 {@code min} 보다 짧으면 {@code
@@ -72,11 +75,13 @@ public final class TaskSchedule {
         }
     }
 
+
     /** {@code after} 뒤의 첫 예정 시각이다. 없으면 null 이다. */
     public static Instant nextAfter(CronExpression cron, ZoneId zone, Instant after) {
         ZonedDateTime next = cron.next(after.atZone(zone));
         return next == null ? null : next.toInstant();
     }
+
 
     /** {@code from} 이상 {@code now} 이하의 예정 시각 가운데 가장 늦은 것이다. 없으면 null 이다. */
     public static Instant latestAtOrBefore(CronExpression cron, ZoneId zone, Instant from, Instant now) {
@@ -89,6 +94,7 @@ public final class TaskSchedule {
         return latest;
     }
 
+
     /** 시간대 없는 날짜와 시각을 그 시간대로 해석한다. 지금보다 뒤가 아니면 {@code TASK_SCHEDULE_INVALID} 다. */
     public static Instant onceAt(LocalDateTime fireAt, ZoneId zone, Instant now) {
         Instant at = fireAt.atZone(zone).toInstant();
@@ -97,6 +103,7 @@ public final class TaskSchedule {
         }
         return at;
     }
+
 
     private static ApiException invalid(String message) {
         return new ApiException(ErrorCode.TASK_SCHEDULE_INVALID, message);

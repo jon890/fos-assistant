@@ -43,6 +43,7 @@ final class SkillFiles {
     private static final int VERSION_RANDOM_CHARS = 4;
     private static final SecureRandom RANDOM = new SecureRandom();
 
+
     /**
      * 스킬 디렉터리 전체를 링크를 따라가지 않고 걸어 읽는다.
      *
@@ -64,6 +65,7 @@ final class SkillFiles {
                 return FileVisitResult.CONTINUE;
             }
 
+
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
                 if (isDotName(file)) {
@@ -79,6 +81,7 @@ final class SkillFiles {
                 return FileVisitResult.CONTINUE;
             }
 
+
             @Override
             public FileVisitResult visitFileFailed(Path file, IOException ex) throws IOException {
                 throw ex;
@@ -88,9 +91,11 @@ final class SkillFiles {
         return new SkillBundle(name, Files.readString(skillMd, StandardCharsets.UTF_8), files);
     }
 
+
     private static boolean isDotName(Path path) {
         return path.getFileName().toString().startsWith(".");
     }
+
 
     private static String relativePath(Path base, Path file) {
         Path relative = base.relativize(file);
@@ -98,6 +103,7 @@ final class SkillFiles {
         relative.forEach(segment -> segments.add(segment.toString()));
         return String.join("/", segments);
     }
+
 
     /**
      * 스킬 하나를 그 디렉터리에 쓴다. 파일의 부모 디렉터리는 스킬 디렉터리부터 한 단계씩 만들어 중간 디렉터리도
@@ -120,6 +126,7 @@ final class SkillFiles {
         }
     }
 
+
     static String randomSuffix() {
         StringBuilder suffix = new StringBuilder(VERSION_RANDOM_CHARS);
         for (int i = 0; i < VERSION_RANDOM_CHARS; i++) {
@@ -127,6 +134,7 @@ final class SkillFiles {
         }
         return suffix.toString();
     }
+
 
     /** 정규화한 결과가 {@code base} 아래가 아니면 거절한다. 이름 검사를 지나온 값도 한 번 더 본다. */
     static Path resolveInside(Path root, Path base, String relative) {
@@ -137,11 +145,13 @@ final class SkillFiles {
         return resolved;
     }
 
+
     static void requireProfile(String profile) {
         if (!HermesProfileName.isValid(profile)) {
             throw validation("profile name is not a valid Hermes profile");
         }
     }
+
 
     static void requireDirectory(Path path) throws IOException {
         if (Files.isSymbolicLink(path) || !Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
@@ -149,11 +159,13 @@ final class SkillFiles {
         }
     }
 
+
     static void requireRegularFile(Path path) throws IOException {
         if (Files.isSymbolicLink(path) || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("skill path is not a plain file: " + path.getFileName());
         }
     }
+
 
     static void createDirectory(Path dir) throws IOException {
         if (Files.exists(dir, LinkOption.NOFOLLOW_LINKS)) {
@@ -164,14 +176,17 @@ final class SkillFiles {
         setPermissions(dir, DIRECTORY_PERMISSIONS);
     }
 
+
     static void writeFile(Path file, String content) throws IOException {
         writeFile(file, content, FILE_PERMISSIONS);
     }
+
 
     static void writeFile(Path file, String content, Set<PosixFilePermission> permissions) throws IOException {
         Files.writeString(file, content, StandardCharsets.UTF_8);
         setPermissions(file, permissions);
     }
+
 
     /** POSIX 권한을 주지 못하는 파일 시스템에서는 그대로 둔다. */
     static void setPermissions(Path path, Set<PosixFilePermission> permissions) throws IOException {
@@ -182,6 +197,7 @@ final class SkillFiles {
         }
     }
 
+
     static void deleteQuietly(Path dir) {
         try {
             deleteRecursively(dir);
@@ -189,6 +205,7 @@ final class SkillFiles {
             log.warn("쓰다 실패한 스킬 임시 디렉터리를 지우지 못했다 path={}", dir.getFileName(), ex);
         }
     }
+
 
     /** 심볼릭 링크는 따라가지 않고 링크 자체만 지운다. 없으면 그냥 지나간다. */
     static void deleteRecursively(Path dir) {
@@ -202,6 +219,7 @@ final class SkillFiles {
                     Files.delete(file);
                     return FileVisitResult.CONTINUE;
                 }
+
 
                 @Override
                 public FileVisitResult postVisitDirectory(Path directory, IOException ex) throws IOException {
@@ -217,9 +235,11 @@ final class SkillFiles {
         }
     }
 
+
     static ApiException validation(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);
     }
+
 
     static ApiException storeFailure(IOException cause) {
         return new ApiException(ErrorCode.INTERNAL_ERROR, "could not access the skill store", cause);

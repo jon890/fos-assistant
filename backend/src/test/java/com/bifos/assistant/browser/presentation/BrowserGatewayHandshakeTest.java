@@ -27,12 +27,12 @@ import org.springframework.web.socket.WebSocketHandler;
 class BrowserGatewayHandshakeTest {
 
     private static final String TOKEN = "u7.1999999999.sig";
-    private static final String PATH =
-            "/internal/browser-gateway/" + TOKEN + "/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666";
+    private static final String PATH = "/internal/browser-gateway/" + TOKEN + "/devtools/browser/0a1b2c3d-1111-2222-3333-444455556666";
     private static final GatewayTarget TARGET = new GatewayTarget(7L, 70L, URI.create("http://192.0.2.10:9999"));
 
     private final BrowserGateway gateway = mock(BrowserGateway.class);
     private final BrowserGatewayHandshake handshake = new BrowserGatewayHandshake(gateway);
+
 
     @Test
     @DisplayName("GET 이 아닌 upgrade 요청은 브라우저를 켜지 않고 빈 400 으로 거절한다")
@@ -48,6 +48,7 @@ class BrowserGatewayHandshakeTest {
         verify(gateway, never()).open(anyString());
     }
 
+
     @Test
     @DisplayName("Upgrade 머리가 없거나 websocket 이 아니면 브라우저를 켜지 않고 빈 400 으로 거절한다")
     void refusesMissingOrOtherUpgradeWithoutOpening() throws Exception {
@@ -61,6 +62,7 @@ class BrowserGatewayHandshakeTest {
         verify(gateway, never()).open(anyString());
     }
 
+
     @Test
     @DisplayName("Upgrade 값은 대소문자를 가리지 않고 websocket 이면 판정을 이어 대상을 세션 속성에 둔다")
     void acceptsWebSocketUpgradeIgnoringCase() throws Exception {
@@ -70,10 +72,11 @@ class BrowserGatewayHandshakeTest {
 
         assertThat(result.accepted()).isTrue();
         assertThat(result.attributes())
-                .containsEntry(BrowserGatewayHandshake.TARGET, TARGET)
-                .containsEntry(BrowserGatewayHandshake.KIND, "browser");
+            .containsEntry(BrowserGatewayHandshake.TARGET, TARGET)
+            .containsEntry(BrowserGatewayHandshake.KIND, "browser");
         verify(gateway).open(TOKEN);
     }
+
 
     private static MockHttpServletRequest upgrade(String method, String upgrade) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, PATH);
@@ -84,16 +87,19 @@ class BrowserGatewayHandshakeTest {
         return request;
     }
 
+
     private Result judge(MockHttpServletRequest request) {
         MockHttpServletResponse response = new MockHttpServletResponse();
         Map<String, Object> attributes = new HashMap<>();
         boolean accepted = handshake.beforeHandshake(
-                new ServletServerHttpRequest(request),
-                new ServletServerHttpResponse(response),
-                mock(WebSocketHandler.class),
-                attributes);
+            new ServletServerHttpRequest(request),
+            new ServletServerHttpResponse(response),
+            mock(WebSocketHandler.class),
+            attributes);
         return new Result(accepted, response, attributes);
     }
 
-    private record Result(boolean accepted, MockHttpServletResponse response, Map<String, Object> attributes) {}
+
+    private record Result(boolean accepted, MockHttpServletResponse response, Map<String, Object> attributes) {
+    }
 }

@@ -45,15 +45,18 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
     private final LiveProperties<WorkspaceProperties> properties;
     private final Duration timeout;
 
+
     @Autowired
     public UnixSocketWorkspaceDeleter(LiveProperties<WorkspaceProperties> properties) {
         this(properties, DEFAULT_TIMEOUT);
     }
 
+
     UnixSocketWorkspaceDeleter(LiveProperties<WorkspaceProperties> properties, Duration timeout) {
         this.properties = properties;
         this.timeout = timeout;
     }
+
 
     @Override
     public WorkspaceDeletion delete(String owner, WorkspacePath path, int maxEntries) {
@@ -62,38 +65,40 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
             throw new ApiException(ErrorCode.WORKSPACE_DELETE_UNAVAILABLE, "workspace delete is not configured");
         }
         String request = JSON.writeValueAsString(JSON.createObjectNode()
-                        .put("version", 1)
-                        .put("owner", owner)
-                        .put("path", path.value())
-                        .put("max_entries", maxEntries))
-                + "\n";
+            .put("version", 1)
+            .put("owner", owner)
+            .put("path", path.value())
+            .put("max_entries", maxEntries))
+            + "\n";
         String answer;
         try {
             answer = exchange(current.deleteSocket(), request.getBytes(StandardCharsets.UTF_8));
         } catch (IOException | RuntimeException ex) {
             // 잘못된 socket 설정값도 500 이 아니라 도우미 실패로 답한다.
             log.warn(
-                    "workspace delete helper exchange failed error={}",
-                    ex.getClass().getSimpleName());
+                "workspace delete helper exchange failed error={}",
+                ex.getClass().getSimpleName());
             throw failed("workspace delete helper exchange failed");
         }
         return parse(answer);
     }
 
+
     private String exchange(String socket, byte[] request) throws IOException {
         long deadline = System.nanoTime() + timeout.toNanos();
         UnixDomainSocketAddress address = UnixDomainSocketAddress.of(Path.of(socket));
         try (SocketChannel channel = SocketChannel.open(StandardProtocolFamily.UNIX);
-                Selector selector = Selector.open()) {
+            Selector selector = Selector.open()) {
             channel.configureBlocking(false);
             channel.connect(address);
             return new String(exchangeBytes(channel, selector, request, deadline), StandardCharsets.UTF_8);
         }
     }
 
+
     /** 요청 줄을 보내고 답 한 줄을 읽는다. 줄바꿈 없이 닫히면 그때까지 받은 것을 답으로 본다. */
     private byte[] exchangeBytes(SocketChannel channel, Selector selector, byte[] request, long deadline)
-            throws IOException {
+        throws IOException {
         SelectionKey key = channel.register(selector, SelectionKey.OP_CONNECT);
         while (!channel.finishConnect()) {
             await(selector, deadline);
@@ -129,6 +134,7 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
         }
     }
 
+
     /** 제한 시간까지 남은 만큼 기다린다. 깨어난 까닭은 부르는 쪽이 채널을 다시 보고 판정한다. */
     private static void await(Selector selector, long deadline) throws IOException {
         long remainingNanos = deadline - System.nanoTime();
@@ -143,6 +149,7 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
         selector.selectedKeys().clear();
     }
 
+
     private static int indexOfNewline(byte[] bytes, int length) {
         for (int i = 0; i < length; i++) {
             if (bytes[i] == '\n') {
@@ -151,6 +158,7 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
         }
         return -1;
     }
+
 
     private static WorkspaceDeletion parse(String answer) {
         JsonNode root;
@@ -178,20 +186,22 @@ public class UnixSocketWorkspaceDeleter implements WorkspaceDeleter {
         JsonNode entries = root.get("entries");
         JsonNode bytes = root.get("bytes");
         if (kind == null
-                || !kind.isString()
-                || Arrays.stream(WorkspaceEntryKind.values())
-                        .noneMatch(value -> value.name().equals(kind.asString()))
-                || !nonNegativeLong(entries)
-                || !nonNegativeLong(bytes)) {
+            || !kind.isString()
+            || Arrays.stream(WorkspaceEntryKind.values())
+                .noneMatch(value -> value.name().equals(kind.asString()))
+            || !nonNegativeLong(entries)
+            || !nonNegativeLong(bytes)) {
             throw failed("workspace delete helper answered unknown result");
         }
         return new WorkspaceDeletion(
-                WorkspaceEntryKind.valueOf(kind.asString()), entries.longValue(), bytes.longValue());
+            WorkspaceEntryKind.valueOf(kind.asString()), entries.longValue(), bytes.longValue());
     }
+
 
     private static boolean nonNegativeLong(JsonNode node) {
         return node != null && node.isIntegralNumber() && node.canConvertToLong() && node.longValue() >= 0;
     }
+
 
     private static ApiException failed(String message) {
         return new ApiException(ErrorCode.WORKSPACE_DELETE_FAILED, message);

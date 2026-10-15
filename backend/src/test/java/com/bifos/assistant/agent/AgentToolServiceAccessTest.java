@@ -76,12 +76,14 @@ class AgentToolServiceAccessTest {
     private CurrentUser otherMember;
     private CurrentUser administrator;
 
+
     @BeforeEach
     void setUp() {
         owner = user(UserRole.MEMBER);
         otherMember = user(UserRole.MEMBER);
         administrator = user(UserRole.ADMIN);
     }
+
 
     @Test
     @DisplayName("관리자가 도구를 끄는 동안 원본 도구 추가는 행 잠금 뒤의 현재 목록만 읽는다")
@@ -92,18 +94,18 @@ class AgentToolServiceAccessTest {
         CountDownLatch release = new CountDownLatch(1);
         when(hermesToolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry("web", "Web", "검색")));
         when(hermesToolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenAnswer(invocation -> enabled.get());
+            .thenAnswer(invocation -> enabled.get());
         Mockito.doAnswer(invocation -> {
-                    List<String> desired = invocation.getArgument(1);
-                    if (!desired.contains("fos-attachments")) {
-                        adminWriting.countDown();
-                        assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
-                    }
-                    enabled.set(List.copyOf(desired));
-                    return null;
-                })
-                .when(hermesToolsets)
-                .writeApiServer(eq(agent.hermesProfile()), anyList(), eq(agent.sandboxOwner()));
+            List<String> desired = invocation.getArgument(1);
+            if (!desired.contains("fos-attachments")) {
+                adminWriting.countDown();
+                assertThat(release.await(10, TimeUnit.SECONDS)).isTrue();
+            }
+            enabled.set(List.copyOf(desired));
+            return null;
+        })
+            .when(hermesToolsets)
+            .writeApiServer(eq(agent.hermesProfile()), anyList(), eq(agent.sandboxOwner()));
         try (var pool = Executors.newFixedThreadPool(2)) {
             var admin = pool.submit(() -> agentTools.writeAsAdmin(administrator, agent.code(), List.of()));
             assertThat(adminWriting.await(5, TimeUnit.SECONDS)).isTrue();
@@ -129,12 +131,14 @@ class AgentToolServiceAccessTest {
         }
     }
 
+
     /** 그룹에 사용자가 남으면 다른 검사의 첫 사용자 판정이 달라지므로 이 클래스가 만든 행을 지운다. */
     @AfterEach
     void deleteCreatedRows() {
         agents.deleteAllById(createdAgentIds);
         users.deleteAllById(createdUserIds);
     }
+
 
     @Test
     @DisplayName("관리자가 지운 에이전트의 도구를 바꾸면 없는 에이전트이고 Hermes 를 부르지 않는다")
@@ -145,6 +149,7 @@ class AgentToolServiceAccessTest {
         verifyNoInteractions(hermesToolsets);
     }
 
+
     @Test
     @DisplayName("관리자가 지운 에이전트의 도구를 읽으면 없는 에이전트이고 Hermes 를 부르지 않는다")
     void readAsAdminOnDeletedAgentIsNotFound() {
@@ -153,6 +158,7 @@ class AgentToolServiceAccessTest {
         assertNotFound(() -> agentTools.readAsAdmin(administrator, code));
         verifyNoInteractions(hermesToolsets);
     }
+
 
     @Test
     @DisplayName("다른 사용자의 비공개 에이전트의 도구를 바꾸면 없는 에이전트이고 Hermes 를 부르지 않는다")
@@ -163,6 +169,7 @@ class AgentToolServiceAccessTest {
         verifyNoInteractions(hermesToolsets);
     }
 
+
     @Test
     @DisplayName("없는 코드로 도구를 바꾸면 주인 경로와 관리자 경로가 모두 없는 에이전트를 낸다")
     void writingUnknownCodeIsNotFoundOnBothPaths() {
@@ -171,6 +178,7 @@ class AgentToolServiceAccessTest {
         assertNotFound(() -> agentTools.writeReadable(owner, unknown, List.of("web")));
         assertNotFound(() -> agentTools.writeAsAdmin(administrator, unknown, List.of("web")));
     }
+
 
     @Test
     @DisplayName("주인이 트랜잭션 밖에서 자기 에이전트의 도구를 바꾸면 Hermes 에 저장하고 켜진 목록을 돌려준다")
@@ -181,13 +189,14 @@ class AgentToolServiceAccessTest {
         AgentToolsetsView view = agentTools.writeReadable(owner, agent.code(), List.of("web"));
 
         assertThat(view.toolsets())
-                .filteredOn(AgentToolView::enabled)
-                .extracting(AgentToolView::name)
-                .containsExactly("web");
+            .filteredOn(AgentToolView::enabled)
+            .extracting(AgentToolView::name)
+            .containsExactly("web");
         verify(hermesToolsets)
-                .writeApiServer(
-                        agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP), "u" + owner.id());
+            .writeApiServer(
+                agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP), "u" + owner.id());
     }
+
 
     @Test
     @DisplayName("관리자가 트랜잭션 밖에서 다른 사용자의 비공개 에이전트의 도구를 바꾸면 Hermes 에 저장하고 켜진 목록을 돌려준다")
@@ -198,34 +207,36 @@ class AgentToolServiceAccessTest {
         AgentToolsetsView view = agentTools.writeAsAdmin(administrator, agent.code(), List.of("web"));
 
         assertThat(view.toolsets())
-                .filteredOn(AgentToolView::enabled)
-                .extracting(AgentToolView::name)
-                .containsExactly("web");
+            .filteredOn(AgentToolView::enabled)
+            .extracting(AgentToolView::name)
+            .containsExactly("web");
         verify(hermesToolsets)
-                .writeApiServer(
-                        agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP), "u" + owner.id());
+            .writeApiServer(
+                agent.hermesProfile(), List.of("web", AgentToolPolicy.CONTROL_PLANE_MCP), "u" + owner.id());
     }
+
 
     @Test
     @DisplayName("주인이 없는 그룹 에이전트의 도구를 바꾸면 그 에이전트만의 실행 공간 주인을 보낸다")
     void writeOnOwnerlessGroupAgentSendsAgentSandboxOwner() {
         String code = randomCode("group-tools");
         Agent agent = saved(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                null,
-                Instant.now()));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null,
+            Instant.now()));
         stubHermesApplying(agent, "web");
 
         agentTools.writeAsAdmin(administrator, agent.code(), List.of("web"));
 
         verify(hermesToolsets).writeApiServer(eq(agent.hermesProfile()), anyList(), eq("a" + agent.id()));
     }
+
 
     /** 위 검사들이 트랜잭션을 보는 근거다. 이 검사가 실패하면 위 검사는 트랜잭션이 없어도 통과한다. */
     @Test
@@ -234,23 +245,26 @@ class AgentToolServiceAccessTest {
         String code = saved(privateAgentOf(owner)).code();
 
         assertThatThrownBy(() -> agents.findByCodeForUpdate(code))
-                .isInstanceOf(InvalidDataAccessApiUsageException.class);
+            .isInstanceOf(InvalidDataAccessApiUsageException.class);
     }
+
 
     /** 저장 전에는 꺼져 있고 저장 뒤에는 요청한 toolset 이 켜진 것으로 읽히는 Hermes 다. */
     private void stubHermesApplying(Agent agent, String toolset) {
         when(hermesToolsets.readCatalog()).thenReturn(List.of(new ToolsetCatalogEntry(toolset, toolset, toolset)));
         when(hermesToolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(List.of())
-                .thenReturn(List.of(toolset));
+            .thenReturn(List.of())
+            .thenReturn(List.of(toolset));
     }
+
 
     private void assertNotFound(Runnable call) {
         assertThatThrownBy(call::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.AGENT_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.AGENT_NOT_FOUND);
     }
+
 
     private String deletedAgentOf(CurrentUser agentOwner) {
         Agent agent = saved(privateAgentOf(agentOwner));
@@ -259,11 +273,13 @@ class AgentToolServiceAccessTest {
         return agent.code();
     }
 
+
     private Agent saved(Agent agent) {
         Agent saved = agents.save(agent);
         createdAgentIds.add(saved.id());
         return saved;
     }
+
 
     private CurrentUser user(UserRole role) {
         String email = "tool-access-" + UUID.randomUUID() + "@example.com";
@@ -272,22 +288,24 @@ class AgentToolServiceAccessTest {
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
+
     /** 에이전트 번호 규칙에 맞는 소문자와 숫자, {@code -} 로 만든다. */
     private static String randomCode(String prefix) {
         return prefix + "-" + UUID.randomUUID().toString().substring(0, 13);
     }
 
+
     private static Agent privateAgentOf(CurrentUser agentOwner) {
         String code = randomCode("tools");
         return Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                agentOwner.id(),
-                Instant.now());
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            agentOwner.id(),
+            Instant.now());
     }
 }

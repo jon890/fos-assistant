@@ -16,6 +16,7 @@ public interface CdpRelay {
      */
     void send(String fragment, boolean last);
 
+
     /** 닫는다. 두 번 불러도 된다. 이렇게 닫으면 {@link CdpRelayListener#onClosed()} 를 부르지 않는다. */
     void close();
 }

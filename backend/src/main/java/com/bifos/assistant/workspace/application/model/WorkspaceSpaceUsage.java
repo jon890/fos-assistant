@@ -10,4 +10,5 @@ package com.bifos.assistant.workspace.application.model;
  * @param partial 일부만 셌다. 요청 전체의 시간을 넘겨 세지 않은 공간도 참이다
  */
 public record WorkspaceSpaceUsage(
-        WorkspaceSpaceKind kind, long id, String name, long bytes, long entries, boolean partial) {}
+    WorkspaceSpaceKind kind, long id, String name, long bytes, long entries, boolean partial) {
+}

@@ -40,10 +40,12 @@ public class BrowserGatewayTokens {
     private final LiveProperties<BrowserProperties> properties;
     private final Clock clock;
 
+
     /** 중계가 켜져 있는가. 두 설정 가운데 하나라도 비면 꺼져 있다. */
     public boolean enabled() {
         return properties.current().gatewayEnabled();
     }
+
 
     /** 바인딩 표식을 실은 중계 주소다. 중계가 꺼졌으면 비어 있다. */
     public Optional<String> bindingAddress(long bindingId) {
@@ -56,6 +58,7 @@ public class BrowserGatewayTokens {
         String signature = sign(current.gatewaySecret(), bindingText(number));
         return Optional.of(current.gatewayBaseUrl() + "/b" + number + "." + signature);
     }
+
 
     /** 지금부터 5분 동안 쓸 수 있는 호출 표식을 실은 중계 주소다. 중계가 꺼졌으면 비어 있다. */
     public Optional<String> callAddress(long userId) {
@@ -70,6 +73,7 @@ public class BrowserGatewayTokens {
         return Optional.of(current.gatewayBaseUrl() + "/u" + number + "." + expiry + "." + signature);
     }
 
+
     /**
      * 그 표식으로 받은 요청의 WebSocket 중계 주소 앞부분이다. {@code gateway-base-url} 의 scheme 을 {@code ws} 나 {@code wss} 로
      * 바꾸고 {@code /<표식>} 을 붙인다. 중계가 꺼졌으면 비어 있다.
@@ -83,10 +87,11 @@ public class BrowserGatewayTokens {
         }
         String base = current.gatewayBaseUrl();
         String websocket = base.startsWith("https://")
-                ? "wss://" + base.substring("https://".length())
-                : "ws://" + base.substring("http://".length());
+            ? "wss://" + base.substring("https://".length())
+            : "ws://" + base.substring("http://".length());
         return Optional.of(websocket + "/" + token);
     }
+
 
     /**
      * 표식을 확인한다. 모양과 서명이 맞고, 호출 표식이면 만료 전일 때만 값을 준다.
@@ -102,8 +107,8 @@ public class BrowserGatewayTokens {
         if (binding.matches()) {
             String number = binding.group(1);
             return signatureMatches(current.gatewaySecret(), bindingText(number), binding.group(2))
-                    ? parse(number).map(id -> new BrowserGrant(BrowserGrant.Kind.BINDING, id))
-                    : Optional.empty();
+                ? parse(number).map(id -> new BrowserGrant(BrowserGrant.Kind.BINDING, id))
+                : Optional.empty();
         }
         Matcher call = CALL.matcher(token);
         if (!call.matches()) {
@@ -120,19 +125,23 @@ public class BrowserGatewayTokens {
         return parse(number).map(id -> new BrowserGrant(BrowserGrant.Kind.CALL, id));
     }
 
+
     private static String bindingText(String number) {
         return String.join("\n", VERSION_LINE, "binding", number);
     }
 
+
     private static String callText(String number, String expiry) {
         return String.join("\n", VERSION_LINE, "call", number, expiry);
     }
+
 
     /** 고정 시간 비교다. 두 쪽 모두 소문자 16진수 64자다. */
     private static boolean signatureMatches(String secret, String text, String signature) {
         byte[] expected = sign(secret, text).getBytes(StandardCharsets.US_ASCII);
         return MessageDigest.isEqual(expected, signature.getBytes(StandardCharsets.US_ASCII));
     }
+
 
     /** 19자리 번호는 {@code long} 을 넘을 수 있다. 넘으면 비어 있다. */
     private static Optional<Long> parse(String number) {
@@ -143,6 +152,7 @@ public class BrowserGatewayTokens {
         }
     }
 
+
     private static String sign(String secret, String text) {
         try {
             Mac mac = Mac.getInstance(HMAC);
@@ -152,6 +162,7 @@ public class BrowserGatewayTokens {
             throw new IllegalStateException("HmacSHA256 is unavailable", ex);
         }
     }
+
 
     /** 0 이하의 번호로 만든 표식은 확인을 지나지 못한다. 만들 때 막는다. */
     private static void requirePositive(long id) {

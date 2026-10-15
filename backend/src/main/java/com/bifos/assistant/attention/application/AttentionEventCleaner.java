@@ -19,17 +19,19 @@ public class AttentionEventCleaner {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     // 생성자를 직접 쓴다. 일정이 같은 객체의 메서드를 부르므로 @Transactional 대신 지우는 쿼리의 트랜잭션을 여기서 연다.
     public AttentionEventCleaner(
-            AttentionEventRepository events,
-            AttentionProperties properties,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        AttentionEventRepository events,
+        AttentionProperties properties,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         this.events = events;
         this.properties = properties;
         this.transactions = new TransactionTemplate(transactionManager);
         this.clock = clock;
     }
+
 
     /** 하루에 한 번 돈다. 시각은 Control Plane 의 시간대를 따르고, 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.attention.cleanup-cron}")
@@ -37,14 +39,14 @@ public class AttentionEventCleaner {
         clean(clock.instant());
     }
 
+
     /**
      * {@code now} 에서 보관 기간보다 먼저 남긴 사건을 지운다.
      *
      * @return 지운 줄 수
      */
     public int clean(Instant now) {
-        Integer result =
-                transactions.execute(status -> events.deleteCreatedBefore(now.minus(properties.eventRetention())));
+        Integer result = transactions.execute(status -> events.deleteCreatedBefore(now.minus(properties.eventRetention())));
         int deleted = result == null ? 0 : result;
         log.info("expired attention events cleaned deleted={}", deleted);
         return deleted;

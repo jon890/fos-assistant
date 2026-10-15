@@ -43,6 +43,7 @@ public class ChatMessageContents implements MessageContentOpener {
     /** 대화마다 마지막으로 풀기 실패를 경고한 시각이다. */
     private final ConcurrentMap<Long, Instant> warned = new ConcurrentHashMap<>();
 
+
     /**
      * 처음 저장할 메시지의 본문을 암호화한다. 줄 번호가 있어야 하므로 {@code persist} 뒤에 부른다.
      *
@@ -50,14 +51,16 @@ public class ChatMessageContents implements MessageContentOpener {
      */
     public void seal(ChatMessage message, Long ownerUserId, String plain) {
         SealedText sealed = cipher.seal(ownerUserId, aad(message, ownerUserId), plain)
-                .orElseThrow(() -> new IllegalStateException("message encryption is not enabled"));
+            .orElseThrow(() -> new IllegalStateException("message encryption is not enabled"));
         message.seal(sealed.content(), sealed.keyId());
     }
+
 
     /** 새 메시지를 암호화해 저장하는가. 거짓이면 평문으로 저장한다 */
     public boolean sealing() {
         return cipher.enabled();
     }
+
 
     @Override
     public String open(ChatMessage message) {
@@ -67,11 +70,12 @@ public class ChatMessageContents implements MessageContentOpener {
             return ChatMessage.UNREADABLE_CONTENT;
         }
         return cipher.open(message.contentKeyId(), owner.get(), aad(message, owner.get()), message.storedContent())
-                .orElseGet(() -> {
-                    warnOncePerMinute(message);
-                    return ChatMessage.UNREADABLE_CONTENT;
-                });
+            .orElseGet(() -> {
+                warnOncePerMinute(message);
+                return ChatMessage.UNREADABLE_CONTENT;
+            });
     }
+
 
     /** 한 대화의 메시지를 여럿 풀지 못해도 경고는 1분에 한 번만 남긴다. 첫 메시지의 번호를 남긴다. */
     private void warnOncePerMinute(ChatMessage message) {
@@ -87,6 +91,7 @@ public class ChatMessageContents implements MessageContentOpener {
         log.warn("메시지 본문을 풀지 못했다 messageId={} conversationId={}", message.id(), message.conversationId());
     }
 
+
     private Optional<Long> ownerOf(Long conversationId) {
         Instant now = clock.instant();
         Owner cached = owners.get(conversationId);
@@ -101,8 +106,11 @@ public class ChatMessageContents implements MessageContentOpener {
         return read;
     }
 
+
     /** 읽어 둔 대화 주인과 버릴 시각이다. */
-    private record Owner(Long userId, Instant expiresAt) {}
+    private record Owner(Long userId, Instant expiresAt) {
+    }
+
 
     private static String aad(ChatMessage message, Long ownerUserId) {
         return "chat_message:" + message.id() + ":conversation:" + message.conversationId() + ":user:" + ownerUserId;

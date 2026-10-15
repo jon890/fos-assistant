@@ -42,6 +42,7 @@ public class ArtifactController {
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
 
+
     /**
      * {@code {*path}} 는 디코딩한 상대 경로를 앞의 {@code /} 와 함께 준다.
      *
@@ -50,9 +51,9 @@ public class ArtifactController {
      */
     @GetMapping("/conversations/{conversationId}/files/{*path}")
     public ResponseEntity<InputStreamResource> read(
-            @PathVariable UUID conversationId,
-            @PathVariable("path") String path,
-            @RequestHeader HttpHeaders requestHeaders) {
+        @PathVariable UUID conversationId,
+        @PathVariable("path") String path,
+        @RequestHeader HttpHeaders requestHeaders) {
         CurrentUser user = currentUser.require();
         Long number = access.requireOwnId(user, conversationId);
         String relativePath = path.startsWith("/") ? path.substring(1) : path;
@@ -62,19 +63,21 @@ public class ArtifactController {
             return common(ResponseEntity.status(HttpStatus.NOT_MODIFIED), file).build();
         }
         return common(ResponseEntity.ok(), file)
-                .contentType(MediaType.parseMediaType(file.contentType()))
-                .contentLength(file.byteSize())
-                .body(new InputStreamResource(artifacts.open(file)));
+            .contentType(MediaType.parseMediaType(file.contentType()))
+            .contentLength(file.byteSize())
+            .body(new InputStreamResource(artifacts.open(file)));
     }
+
 
     /** 200 과 304 가 같은 코드로 붙이는 머리글이다. */
     private static ResponseEntity.BodyBuilder common(ResponseEntity.BodyBuilder builder, ArtifactFile file) {
         return builder.eTag(file.etag())
-                .lastModified(file.lastModified())
-                .header("X-Content-Type-Options", "nosniff")
-                .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
-                .header(HttpHeaders.CACHE_CONTROL, "private, no-cache");
+            .lastModified(file.lastModified())
+            .header("X-Content-Type-Options", "nosniff")
+            .header("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+            .header(HttpHeaders.CACHE_CONTROL, "private, no-cache");
     }
+
 
     /**
      * 요청의 조건이 지금 파일과 맞아 본문 없이 답해도 되는지 판정한다.
@@ -86,9 +89,9 @@ public class ArtifactController {
      * 맞는 것으로 본다. 두 판정을 견주는 검사는 {@code ArtifactControllerNotModifiedTest} 에 있다.
      *
      * <ul>
-     *   <li>{@code If-None-Match} 가 있으면 그것만 본다. {@code *} 이거나 값 하나가 {@code W/} 를 뗀 채 같으면 참이다.
-     *   <li>없고 {@code If-Modified-Since} 가 있으면, 수정 시각을 초 단위로 내린 값이 그 값보다 크지 않을 때 참이다.
-     *   <li>둘 다 없으면 거짓이다.
+     * <li>{@code If-None-Match} 가 있으면 그것만 본다. {@code *} 이거나 값 하나가 {@code W/} 를 뗀 채 같으면 참이다.
+     * <li>없고 {@code If-Modified-Since} 가 있으면, 수정 시각을 초 단위로 내린 값이 그 값보다 크지 않을 때 참이다.
+     * <li>둘 다 없으면 거짓이다.
      * </ul>
      */
     static boolean notModified(HttpHeaders requestHeaders, String etag, Instant lastModified) {
@@ -96,11 +99,12 @@ public class ArtifactController {
         if (!ifNoneMatch.isEmpty()) {
             String current = withoutWeakPrefix(etag);
             return ifNoneMatch.stream()
-                    .anyMatch(value -> "*".equals(value) || current.equals(withoutWeakPrefix(value)));
+                .anyMatch(value -> "*".equals(value) || current.equals(withoutWeakPrefix(value)));
         }
         long ifModifiedSince = requestHeaders.getIfModifiedSince();
         return ifModifiedSince >= 0 && lastModified.toEpochMilli() / 1000 * 1000 <= ifModifiedSince;
     }
+
 
     private static String withoutWeakPrefix(String etag) {
         String trimmed = etag.trim();

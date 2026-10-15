@@ -28,11 +28,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "attention_event",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_attention_event_once",
-                        columnNames = {"user_id", "item_key", "state_key", "event_type", "attention"}))
+    name = "attention_event",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_attention_event_once",
+        columnNames = {"user_id", "item_key", "state_key", "event_type", "attention"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -71,15 +70,16 @@ public class AttentionEvent {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     public static AttentionEvent of(
-            Long userId,
-            String itemKey,
-            String stateKey,
-            AttentionTrigger trigger,
-            AttentionLevel level,
-            AttentionEventType type,
-            boolean stale,
-            Instant now) {
+        Long userId,
+        String itemKey,
+        String stateKey,
+        AttentionTrigger trigger,
+        AttentionLevel level,
+        AttentionEventType type,
+        boolean stale,
+        Instant now) {
         AttentionEvent event = new AttentionEvent();
         event.userId = Objects.requireNonNull(userId, "userId");
         event.itemKey = Objects.requireNonNull(itemKey, "itemKey");

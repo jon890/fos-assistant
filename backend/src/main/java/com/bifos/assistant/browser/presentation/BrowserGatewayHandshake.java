@@ -39,17 +39,17 @@ public class BrowserGatewayHandshake implements HandshakeInterceptor {
     static final String TARGET_ID = BrowserGatewayHandshake.class.getName() + ".targetId";
 
     /** 경로는 풀지 않은 원문으로 본다. 표식은 {@code /} 를 담지 않는다. */
-    private static final Pattern PATH =
-            Pattern.compile("^/internal/browser-gateway/([^/]+)/devtools/(page|browser)/([A-Za-z0-9-]{1,128})$");
+    private static final Pattern PATH = Pattern.compile("^/internal/browser-gateway/([^/]+)/devtools/(page|browser)/([A-Za-z0-9-]{1,128})$");
 
     private final BrowserGateway gateway;
 
+
     @Override
     public boolean beforeHandshake(
-            ServerHttpRequest request,
-            ServerHttpResponse response,
-            WebSocketHandler handler,
-            Map<String, Object> attributes) {
+        ServerHttpRequest request,
+        ServerHttpResponse response,
+        WebSocketHandler handler,
+        Map<String, Object> attributes) {
         // 브라우저 페이지가 이 경로에 붙지 못하게 한다. 커넥터는 Origin 을 보내지 않는다
         if (request.getHeaders().getOrigin() != null) {
             return refuse(response, HttpStatus.FORBIDDEN);
@@ -78,16 +78,19 @@ public class BrowserGatewayHandshake implements HandshakeInterceptor {
         return true;
     }
 
+
     @Override
     public void afterHandshake(
-            ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler handler, Exception exception) {
+        ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler handler, Exception exception) {
         // 열린 뒤의 일은 처리기가 맡는다
     }
 
+
     private static boolean isUpgrade(ServerHttpRequest request) {
         return HttpMethod.GET.equals(request.getMethod())
-                && "websocket".equalsIgnoreCase(request.getHeaders().getUpgrade());
+            && "websocket".equalsIgnoreCase(request.getHeaders().getUpgrade());
     }
+
 
     private static boolean refuse(ServerHttpResponse response, HttpStatus status) {
         response.setStatusCode(status);

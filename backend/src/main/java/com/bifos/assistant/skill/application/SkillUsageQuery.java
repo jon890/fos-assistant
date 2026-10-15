@@ -38,6 +38,7 @@ public class SkillUsageQuery {
     private final AgentRepository agents;
     private final ActiveConversationPublicIds conversations;
 
+
     /** 그 에이전트의 실행 전체에서 센 스킬 이름별 합계다. 횟수는 실행 수다. 누가 불렀는지는 담지 않는다. */
     public Map<String, SkillUsageSummary> byAgent(Long agentId) {
         Map<String, SkillUsageSummary> summaries = new HashMap<>();
@@ -46,6 +47,7 @@ public class SkillUsageQuery {
         }
         return summaries;
     }
+
 
     /**
      * 그 사용자의 실행에서 부른 것을 에이전트와 스킬 이름으로 묶는다. 횟수는 실행 수다. 마지막 호출이 최근인
@@ -58,20 +60,19 @@ public class SkillUsageQuery {
         Map<GroupKey, Group> groups = new LinkedHashMap<>();
         for (SkillUseOccurrence occurrence : uses.findOccurrencesByUser(userId)) {
             groups.computeIfAbsent(new GroupKey(occurrence.agentId(), occurrence.skillName()), key -> new Group())
-                    .add(occurrence);
+                .add(occurrence);
         }
-        Map<Long, Agent> agentsById =
-                agents
-                        .findAllById(groups.keySet().stream()
-                                .map(GroupKey::agentId)
-                                .filter(Objects::nonNull)
-                                .toList())
-                        .stream()
-                        .collect(Collectors.toMap(Agent::id, Function.identity()));
-        Map<Long, UUID> activeConversations = conversations.activePublicIdsOf(groups.values().stream()
-                .map(group -> group.lastConversationId)
+        Map<Long, Agent> agentsById = agents
+            .findAllById(groups.keySet().stream()
+                .map(GroupKey::agentId)
                 .filter(Objects::nonNull)
-                .toList());
+                .toList())
+            .stream()
+            .collect(Collectors.toMap(Agent::id, Function.identity()));
+        Map<Long, UUID> activeConversations = conversations.activePublicIdsOf(groups.values().stream()
+            .map(group -> group.lastConversationId)
+            .filter(Objects::nonNull)
+            .toList());
         List<UserSkillUsage> usages = new ArrayList<>();
         for (Map.Entry<GroupKey, Group> entry : groups.entrySet()) {
             Long agentId = entry.getKey().agentId();
@@ -81,19 +82,20 @@ public class SkillUsageQuery {
             Agent agent = agentsById.get(agentId);
             Group group = entry.getValue();
             usages.add(new UserSkillUsage(
-                    agent == null ? null : agent.code(),
-                    agent == null ? null : agent.name(),
-                    entry.getKey().skillName(),
-                    group.count,
-                    group.lastInvokedAt,
-                    group.lastConversationId == null ? null : activeConversations.get(group.lastConversationId)));
+                agent == null ? null : agent.code(),
+                agent == null ? null : agent.name(),
+                entry.getKey().skillName(),
+                group.count,
+                group.lastInvokedAt,
+                group.lastConversationId == null ? null : activeConversations.get(group.lastConversationId)));
         }
         usages.sort(Comparator.comparing(UserSkillUsage::lastInvokedAt)
-                .reversed()
-                .thenComparing(UserSkillUsage::agentCode, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(UserSkillUsage::skillName));
+            .reversed()
+            .thenComparing(UserSkillUsage::agentCode, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(UserSkillUsage::skillName));
         return usages;
     }
+
 
     /**
      * 여러 실행에서 쓴 스킬 이름을 실행 번호별로 낸다. 목록 한 페이지의 실행을 한 번에 읽는다.
@@ -108,14 +110,16 @@ public class SkillUsageQuery {
         Map<Long, Set<String>> names = new LinkedHashMap<>();
         for (ExecutionSkillUse use : uses.findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(executionIds)) {
             names.computeIfAbsent(use.executionId(), id -> new LinkedHashSet<>())
-                    .add(use.skillName());
+                .add(use.skillName());
         }
         Map<Long, List<String>> result = new LinkedHashMap<>();
         names.forEach((executionId, skillNames) -> result.put(executionId, List.copyOf(skillNames)));
         return result;
     }
 
-    private record GroupKey(Long agentId, String skillName) {}
+
+    private record GroupKey(Long agentId, String skillName) {
+    }
 
     /**
      * 에이전트와 스킬 이름이 같은 사용을 모은다. 마지막 호출의 대화만 기억한다.
@@ -127,6 +131,7 @@ public class SkillUsageQuery {
         private long count;
         private Instant lastInvokedAt;
         private Long lastConversationId;
+
 
         void add(SkillUseOccurrence occurrence) {
             if (countedExecutions.add(occurrence.executionId())) {

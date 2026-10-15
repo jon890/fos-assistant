@@ -16,7 +16,7 @@ public interface CdpConnector {
      *
      * @param events CDP 가 보낸 사건을 받는다. 한 연결의 사건은 차례대로 한 번에 하나씩 온다
      * @param closed 붙은 뒤에 상대가 끊었거나 연결이 실패하면 한 번 부른다. 남은 사건을 모두 부른 뒤다. 붙지 못했거나
-     *     {@link CdpConnection#close()} 로 닫았으면 부르지 않는다
+     * {@link CdpConnection#close()} 로 닫았으면 부르지 않는다
      */
     CdpConnection connect(URI cdp, String targetId, Consumer<CdpEvent> events, Runnable closed);
 }

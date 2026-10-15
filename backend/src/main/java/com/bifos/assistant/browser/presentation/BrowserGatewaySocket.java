@@ -46,10 +46,12 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
     private final CdpRelayConnector connector;
     private final long maxMessageChars;
 
+
     @Autowired
     public BrowserGatewaySocket(BrowserGateway gateway, CdpRelayConnector connector) {
         this(gateway, connector, MAX_MESSAGE_CHARS);
     }
+
 
     BrowserGatewaySocket(BrowserGateway gateway, CdpRelayConnector connector, long maxMessageChars) {
         this.gateway = gateway;
@@ -57,11 +59,13 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         this.maxMessageChars = maxMessageChars;
     }
 
+
     /** 조각을 받는 대로 넘긴다. Tomcat 은 버퍼가 찰 때마다 조각을 넘긴다. */
     @Override
     public boolean supportsPartialMessages() {
         return true;
     }
+
 
     /**
      * 핸들을 쥐고 Chrome 쪽에 붙는다. 실패는 여기서 끝낸다. 던지면 Spring 이 표식이 든 세션 주소를 ERROR 로그에 남긴다.
@@ -70,9 +74,9 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) {
         Link link = null;
         try {
-            GatewayTarget target = (GatewayTarget) session.getAttributes().get(BrowserGatewayHandshake.TARGET);
-            String kind = (String) session.getAttributes().get(BrowserGatewayHandshake.KIND);
-            String id = (String) session.getAttributes().get(BrowserGatewayHandshake.TARGET_ID);
+            GatewayTarget target = (GatewayTarget)session.getAttributes().get(BrowserGatewayHandshake.TARGET);
+            String kind = (String)session.getAttributes().get(BrowserGatewayHandshake.KIND);
+            String id = (String)session.getAttributes().get(BrowserGatewayHandshake.TARGET_ID);
             if (target == null || kind == null || id == null) {
                 // handshake 판정을 지나지 않은 세션이다
                 closeQuietly(session, CloseStatus.SERVER_ERROR);
@@ -86,16 +90,16 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 relay = connector.open(target.cdp(), kind, id, link);
             } catch (RuntimeException ex) {
                 log.warn(
-                        "browser gateway relay connect failed error={}",
-                        ex.getClass().getSimpleName());
+                    "browser gateway relay connect failed error={}",
+                    ex.getClass().getSimpleName());
                 link.close(CloseStatus.SERVER_ERROR, "connect_failed");
                 return;
             }
             link.attach(relay);
         } catch (RuntimeException ex) {
             log.warn(
-                    "browser gateway socket setup failed error={}",
-                    ex.getClass().getSimpleName());
+                "browser gateway socket setup failed error={}",
+                ex.getClass().getSimpleName());
             if (link != null) {
                 link.close(CloseStatus.SERVER_ERROR, "setup_failed");
             } else {
@@ -103,6 +107,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
             }
         }
     }
+
 
     /**
      * 아무것도 주고받지 않는 세션을 자동 중지와 같은 유휴 시간이 지나면 닫게 한다. 반쯤 끊긴 연결이 핸들을 계속 쥐지 않게 한다. 컨테이너의
@@ -118,6 +123,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         }
     }
 
+
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         Link link = linkOf(session);
@@ -125,6 +131,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
             link.forward(message.getPayload(), message.isLast());
         }
     }
+
 
     /** 중계는 글 메시지만 잇는다. */
     @Override
@@ -137,6 +144,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         }
     }
 
+
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         Link link = linkOf(session);
@@ -144,6 +152,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
             link.close(CloseStatus.SERVER_ERROR, "transport_error");
         }
     }
+
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
@@ -153,9 +162,11 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         }
     }
 
+
     private static Link linkOf(WebSocketSession session) {
-        return (Link) session.getAttributes().get(LINK);
+        return (Link)session.getAttributes().get(LINK);
     }
+
 
     private static void closeQuietly(WebSocketSession session, CloseStatus status) {
         try {
@@ -164,10 +175,11 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
             }
         } catch (IOException | RuntimeException ex) {
             log.debug(
-                    "browser gateway session close failed error={}",
-                    ex.getClass().getSimpleName());
+                "browser gateway session close failed error={}",
+                ex.getClass().getSimpleName());
         }
     }
+
 
     /** 받은 연결 하나와 Chrome 쪽 연결 하나를 잇는다. */
     @RequiredArgsConstructor
@@ -185,6 +197,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
         /** 지금 받고 있는 메시지의 지난 조각 길이의 합이다. Tomcat 이 한 세션의 메시지를 차례로 넘기므로 한 스레드만 쓴다. */
         private long pending;
 
+
         /** 붙은 Chrome 쪽 연결을 둔다. 그 사이 닫혔으면 그 연결도 닫는다. */
         void attach(CdpRelay opened) {
             relay = opened;
@@ -192,6 +205,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 opened.close();
             }
         }
+
 
         /** 받은 조각을 Chrome 에 보낸다. 메시지가 끝나면 활동을 기록한다. */
         void forward(String fragment, boolean last) {
@@ -209,8 +223,8 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 current.send(fragment, last);
             } catch (RuntimeException ex) {
                 log.warn(
-                        "browser gateway relay send failed error={}",
-                        ex.getClass().getSimpleName());
+                    "browser gateway relay send failed error={}",
+                    ex.getClass().getSimpleName());
                 close(CloseStatus.SERVER_ERROR, "relay_send_failed");
                 return;
             }
@@ -218,6 +232,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 touch();
             }
         }
+
 
         /** Chrome 이 보낸 조각을 받은 쪽에 보낸다. 보내기가 끝나야 Chrome 쪽에서 다음 조각을 읽는다. */
         @Override
@@ -230,18 +245,20 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 session.sendMessage(new TextMessage(fragment, last));
             } catch (IOException | RuntimeException ex) {
                 log.warn(
-                        "browser gateway session send failed error={}",
-                        ex.getClass().getSimpleName());
+                    "browser gateway session send failed error={}",
+                    ex.getClass().getSimpleName());
                 close(CloseStatus.SERVER_ERROR, "session_send_failed");
             } finally {
                 sending.unlock();
             }
         }
 
+
         @Override
         public void onClosed() {
             close(CloseStatus.GOING_AWAY, "chrome_closed");
         }
+
 
         /**
          * 양쪽과 핸들을 닫는다. 두 번 불러도 한 번만 닫는다.
@@ -260,8 +277,8 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                     current.close();
                 } catch (RuntimeException ex) {
                     log.debug(
-                            "browser gateway relay close failed error={}",
-                            ex.getClass().getSimpleName());
+                        "browser gateway relay close failed error={}",
+                        ex.getClass().getSimpleName());
                 }
             }
             handle.close();
@@ -269,6 +286,7 @@ public class BrowserGatewaySocket extends AbstractWebSocketHandler {
                 closeQuietly(session, status);
             }
         }
+
 
         private void touch() {
             try {

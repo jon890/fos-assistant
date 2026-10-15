@@ -122,9 +122,11 @@ class PendingMessageServiceTest {
     private Agent chief;
     private Conversation conversation;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -146,12 +148,14 @@ class PendingMessageServiceTest {
         stub().willReturn(result("run", "답"));
     }
 
+
     @AfterEach
     void tearDown() {
         stub().releaseSubmits();
         awaitAllIdle();
         pendingRows.deleteAll();
     }
+
 
     @Test
     @DisplayName("turn 이 도는 동안 더한 두 글은 그 turn 이 끝난 뒤 합쳐져 사용자 메시지 하나로 간다")
@@ -178,25 +182,26 @@ class PendingMessageServiceTest {
         assertThat(stub().received().get(1).input()).endsWith(merged);
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
         assertThat(history)
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.USER, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.USER, MessageRole.ASSISTANT);
         assertThat(history.get(2).content()).isEqualTo(merged);
         assertThat(rowsOf(conversation)).as("보낸 뒤 남은 대기 행").isEmpty();
         assertThat(conversations.findById(conversation.id()).orElseThrow().autoTurnCount())
-                .isZero();
+            .isZero();
 
         assertThat(received)
-                .extracting(ChatEvent::type)
-                .as("대화 단위로 받은 사건")
-                .containsSubsequence("pending", "user", "started", "done");
+            .extracting(ChatEvent::type)
+            .as("대화 단위로 받은 사건")
+            .containsSubsequence("pending", "user", "started", "done");
         ChatEvent user = received.stream()
-                .filter(event -> "user".equals(event.type()))
-                .findFirst()
-                .orElseThrow();
+            .filter(event -> "user".equals(event.type()))
+            .findFirst()
+            .orElseThrow();
         assertThat(user.text()).isEqualTo(merged);
         assertThat(user.messageId()).isEqualTo(history.get(2).id());
         assertThat(user.conversationId()).isEqualTo(conversation.publicId());
     }
+
 
     @Test
     @DisplayName("도는 turn 이 없을 때 더하면 곧바로 turn 이 열려 그 글이 간다")
@@ -207,10 +212,11 @@ class PendingMessageServiceTest {
         assertThat(stub().received()).hasSize(1);
         assertThat(stub().received().getFirst().input()).endsWith("바로 갈 글");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.USER, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.USER, MessageRole.ASSISTANT);
         assertThat(rowsOf(conversation)).isEmpty();
     }
+
 
     @Test
     @DisplayName("취소한 대기 메시지는 가지 않고 같은 번호를 다시 취소하면 없는 것으로 답한다")
@@ -231,11 +237,12 @@ class PendingMessageServiceTest {
         assertThat(stub().received()).hasSize(1);
         assertThat(stub().received().getFirst().input()).endsWith("남길 글").doesNotContain("취소할 글");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())
-                        .getFirst()
-                        .content())
+            .getFirst()
+            .content())
                 .isEqualTo("남길 글");
         assertThatCode(() -> pending.cancel(dad, conversation.id(), cancelledId), ErrorCode.PENDING_MESSAGE_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("대기 메시지가 다섯이면 여섯째를 받지 않는다")
@@ -255,6 +262,7 @@ class PendingMessageServiceTest {
         }
     }
 
+
     @Test
     @DisplayName("합친 길이가 8000자를 넘으면 받지 않고 꼭 8000자면 받는다")
     void rejectsWhenMergedLengthExceedsLimitAndAcceptsAtLimit() {
@@ -264,7 +272,7 @@ class PendingMessageServiceTest {
 
             // 사이에 넣는 빈 줄이 두 글자라 4000 + 2 + 3999 = 8001 이다.
             assertThatCode(
-                    () -> pending.enqueue(dad, conversation.id(), "나".repeat(3999)), ErrorCode.PENDING_QUEUE_FULL);
+                () -> pending.enqueue(dad, conversation.id(), "나".repeat(3999)), ErrorCode.PENDING_QUEUE_FULL);
             assertThat(rowsOf(conversation)).hasSize(1);
 
             PendingQueue atLimit = pending.enqueue(dad, conversation.id(), "다".repeat(3998));
@@ -274,6 +282,7 @@ class PendingMessageServiceTest {
             turns.close(running);
         }
     }
+
 
     @Test
     @DisplayName("도는 turn 을 중지하면 대기 줄을 멈춰 두고 풀면 합친 글이 간다")
@@ -298,20 +307,20 @@ class PendingMessageServiceTest {
         awaitIdle(conversation.id());
 
         assertThat(rowsOf(conversation))
-                .as("중지한 turn 뒤의 대기 행")
-                .extracting(ChatPendingMessage::held)
-                .containsExactly(true);
+            .as("중지한 turn 뒤의 대기 행")
+            .extracting(ChatPendingMessage::held)
+            .containsExactly(true);
         assertThat(pending.queue(dad, conversation.id()).held()).isTrue();
         assertThat(executions.findById(stoppedExecutionId.get()).orElseThrow().status())
-                .as("중지한 turn 의 실행 줄")
-                .isEqualTo(ExecutionStatus.CANCELLED);
+            .as("중지한 turn 의 실행 줄")
+            .isEqualTo(ExecutionStatus.CANCELLED);
         assertThat(stub().received()).as("중지 뒤에 새 turn 이 열리지 않았다").hasSize(1);
         assertThat(pendingEventsBeforeClose.get())
-                .as("turn 이 닫히기 전에 받은 pending 사건")
-                .isEqualTo(1L);
+            .as("turn 이 닫히기 전에 받은 pending 사건")
+            .isEqualTo(1L);
         assertThat(pendingEventsIn(received))
-                .as("중지로 닫힐 때 대기 줄이 멈췄다는 pending 사건이 하나 더 온다")
-                .isEqualTo(2L);
+            .as("중지로 닫힐 때 대기 줄이 멈췄다는 pending 사건이 하나 더 온다")
+            .isEqualTo(2L);
 
         PendingQueue released = pending.release(dad, conversation.id());
         awaitIdle(conversation.id());
@@ -321,6 +330,7 @@ class PendingMessageServiceTest {
         assertThat(stub().received().get(1).input()).endsWith("기다린 글");
         assertThat(rowsOf(conversation)).isEmpty();
     }
+
 
     @Test
     @DisplayName("중지한 turn 의 잠금이 풀리기 전에 대기 줄이 이미 멈춰 있어 그때 다음 turn 을 정해도 열리지 않는다")
@@ -335,8 +345,8 @@ class PendingMessageServiceTest {
                 // stopped 는 잠금을 풀기 전에 온다. 이때 읽은 값이 잠금 안에서 멈췄는지를 말한다.
                 lockHeldAtStop.set(turns.markOf(conversation.id()).running());
                 heldAtStop.set(rowsOf(conversation).stream()
-                        .map(ChatPendingMessage::held)
-                        .toList());
+                    .map(ChatPendingMessage::held)
+                    .toList());
                 dispatcher.tryNext(conversation.id());
             }
         });
@@ -347,6 +357,7 @@ class PendingMessageServiceTest {
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
         assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
     }
+
 
     @Test
     @DisplayName("중지가 확정된 turn 이 예외로 끝나도 잠금을 풀기 전에 대기 줄을 멈춰 둔다")
@@ -362,19 +373,21 @@ class PendingMessageServiceTest {
         });
 
         assertThatCode(
-                () -> chat.stream(dad, conversation.id(), "질문", null, event -> {}), ErrorCode.HERMES_UNAVAILABLE);
+            () -> chat.stream(dad, conversation.id(), "질문", null, event -> {
+            }), ErrorCode.HERMES_UNAVAILABLE);
         awaitIdle(conversation.id());
 
         assertThat(rowsOf(conversation))
-                .as("중지한 turn 이 예외로 끝난 뒤의 대기 행")
-                .extracting(ChatPendingMessage::held)
-                .containsExactly(true);
+            .as("중지한 turn 이 예외로 끝난 뒤의 대기 행")
+            .extracting(ChatPendingMessage::held)
+            .containsExactly(true);
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .as("대기 글은 사용자 메시지가 되지 않았다")
-                .containsExactly("질문");
+            .extracting(ChatMessage::content)
+            .as("대기 글은 사용자 메시지가 되지 않았다")
+            .containsExactly("질문");
     }
+
 
     @Test
     @DisplayName("중지가 확정된 turn 이 실행 줄을 닫지 않는 예외로 끝나도 실행은 취소로 남고 잠금이 풀리며 대기 줄은 멈춘다")
@@ -392,18 +405,20 @@ class PendingMessageServiceTest {
             throw new IllegalStateException("완료를 기다리다 끊겼다");
         });
 
-        assertThatThrownBy(() -> chat.stream(dad, conversation.id(), "질문", null, event -> {}))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("완료를 기다리다 끊겼다");
+        assertThatThrownBy(() -> chat.stream(dad, conversation.id(), "질문", null, event -> {
+        }))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("완료를 기다리다 끊겼다");
         awaitIdle(conversation.id());
 
         assertThat(executions.findById(executionId.get()).orElseThrow().status())
-                .as("중지를 확정한 실행 줄")
-                .isEqualTo(ExecutionStatus.CANCELLED);
+            .as("중지를 확정한 실행 줄")
+            .isEqualTo(ExecutionStatus.CANCELLED);
         assertThat(turns.markOf(conversation.id()).running()).as("turn 잠금").isFalse();
         assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
         assertThat(stub().received()).as("Hermes 에 보낸 것은 중지한 turn 하나다").hasSize(1);
     }
+
 
     @Test
     @DisplayName("멈춘 대기 줄에 더한 글도 멈춘 채로 들어가고 turn 이 열리지 않는다")
@@ -417,6 +432,7 @@ class PendingMessageServiceTest {
         assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true, true);
         assertThat(stub().received()).isEmpty();
     }
+
 
     @Test
     @DisplayName("앞 turn 이 실패로 끝나도 대기 메시지는 간다")
@@ -440,9 +456,10 @@ class PendingMessageServiceTest {
         assertThat(stub().received().get(1).input()).endsWith("기다린 글");
         assertThat(rowsOf(conversation)).isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.USER, MessageRole.USER, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.USER, MessageRole.USER, MessageRole.ASSISTANT);
     }
+
 
     @Test
     @DisplayName("더한 뒤 에이전트가 꺼지면 대기 줄을 멈춰 두고 오류를 알리며 turn 을 되풀이해 열지 않는다")
@@ -464,13 +481,14 @@ class PendingMessageServiceTest {
 
         assertThat(rowsOf(conversation)).extracting(ChatPendingMessage::held).containsExactly(true);
         assertThat(received.stream().filter(event -> "error".equals(event.type())))
-                .as("같은 실패를 되풀이하지 않아 오류는 하나다")
-                .singleElement()
-                .satisfies(error -> assertThat(error.code()).isEqualTo(ErrorCode.AGENT_DISABLED.name()));
+            .as("같은 실패를 되풀이하지 않아 오류는 하나다")
+            .singleElement()
+            .satisfies(error -> assertThat(error.code()).isEqualTo(ErrorCode.AGENT_DISABLED.name()));
         assertThat(received).extracting(ChatEvent::type).containsSubsequence("pending", "error", "pending");
         assertThat(stub().received()).as("Hermes 에 보낸 것").isEmpty();
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("흐름이 붙은 에이전트의 대화는 대기 메시지를 받지 않는다")
@@ -478,12 +496,13 @@ class PendingMessageServiceTest {
         Agent flowAgent = agent("flowed", "흐름", dad.id());
         flowAgent.assignFlow(ResearchAndBuildFlow.NAME);
         Conversation flowed = conversations.save(
-                Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id(), Instant.now()));
+            Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id(), Instant.now()));
 
         assertThatCode(() -> pending.enqueue(dad, flowed.id(), "글"), ErrorCode.CONVERSATION_BUSY);
 
         assertThat(rowsOf(flowed)).isEmpty();
     }
+
 
     @Test
     @DisplayName("남의 대화에는 더하지도 읽지도 못한다")
@@ -496,11 +515,11 @@ class PendingMessageServiceTest {
         assertThat(rowsOf(conversation)).isEmpty();
     }
 
+
     @Test
     @DisplayName("기동 확인은 멈추지 않은 대기 메시지를 보내고 멈춘 대기 줄은 그대로 둔다")
     void startupDispatchSendsReadyQueueAndLeavesHeldQueue() {
-        Conversation heldConversation =
-                conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id(), Instant.now()));
+        Conversation heldConversation = conversations.save(Conversation.startedBy(dad.id(), "멈춘 대화", chief.id(), Instant.now()));
         pendingRows.save(ChatPendingMessage.queued(conversation.id(), dad.id(), "기동 뒤에 갈 글", false, QUEUED_AT));
         pendingRows.save(ChatPendingMessage.queued(heldConversation.id(), dad.id(), "멈춘 글", true, QUEUED_AT));
 
@@ -512,11 +531,12 @@ class PendingMessageServiceTest {
         assertThat(stub().received().getFirst().input()).endsWith("기동 뒤에 갈 글");
         assertThat(rowsOf(conversation)).isEmpty();
         assertThat(rowsOf(heldConversation))
-                .extracting(ChatPendingMessage::content)
-                .containsExactly("멈춘 글");
+            .extracting(ChatPendingMessage::content)
+            .containsExactly("멈춘 글");
         assertThat(messages.findByConversationIdOrderByIdAsc(heldConversation.id()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("대화를 지우면 그 대화의 대기 행도 지운다")
@@ -531,20 +551,24 @@ class PendingMessageServiceTest {
         assertThat(rowsOf(other)).hasSize(1);
     }
 
+
     private static void assertThatCode(ThrowingCallable call, ErrorCode expected) {
         assertThatThrownBy(call)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(expected);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(expected);
     }
+
 
     private List<ChatPendingMessage> rowsOf(Conversation target) {
         return pendingRows.findByConversationIdOrderByIdAsc(target.id());
     }
 
+
     private Thread startHeldTurn(String text) {
         return startHeldTurn(text, new AtomicReference<>());
     }
+
 
     /**
      * 대역 Hermes 의 제출에서 붙잡힌 turn 을 다른 스레드에서 돌린다. 제출에 닿아 turn 잠금이 잡힌 뒤에 돌아온다.
@@ -555,7 +579,8 @@ class PendingMessageServiceTest {
         stub().holdSubmits();
         Thread running = Thread.ofVirtual().start(() -> {
             try {
-                chat.stream(dad, conversation.id(), text, null, event -> {});
+                chat.stream(dad, conversation.id(), text, null, event -> {
+                });
             } catch (ApiException ex) {
                 failure.set(ex.code());
             }
@@ -563,6 +588,7 @@ class PendingMessageServiceTest {
         awaitUntil("앞 turn 의 제출", () -> !stub().received().isEmpty());
         return running;
     }
+
 
     /** 앞 turn 이 완료를 기다리기 직전에 대기 메시지를 더하고 그 turn 을 중지하게 한다. 한 번만 한다. */
     private void enqueueAndStopBeforeTurnCompletes(String text) {
@@ -576,53 +602,62 @@ class PendingMessageServiceTest {
         });
     }
 
+
     private Long latestExecutionId() {
         return executions
-                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                .getFirst()
-                .id();
+            .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+            .getFirst()
+            .id();
     }
+
 
     private static long pendingEventsIn(List<ChatEvent> events) {
         return events.stream().filter(event -> "pending".equals(event.type())).count();
     }
+
 
     private CurrentUser signedUp(String email, String name) {
         AppUser user = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private static Agent agent(String code, String name, Long ownerId) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerId,
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerId,
+            Instant.now());
     }
+
 
     private static HermesRunResult result(String runId, String output) {
         return HermesRunResult.of(runId, "session", "completed", output, "model", "provider", TokenUsage.empty());
     }
 
+
     private static HermesRunResult cancelled(String runId) {
         return HermesRunResult.of(runId, "session", "cancelled", "절반", "model", "provider", TokenUsage.empty());
     }
+
 
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
 
+
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {
         awaitUntil(
-                "대화 " + conversationId + " 의 turn 종료",
-                () -> !turns.markOf(conversationId).running());
+            "대화 " + conversationId + " 의 turn 종료",
+            () -> !turns.markOf(conversationId).running());
     }
+
 
     private static void awaitUntil(String what, BooleanSupplier condition) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();

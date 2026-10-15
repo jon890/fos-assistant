@@ -32,6 +32,7 @@ public class AutonomyPreference {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     public static AutonomyPreference of(Long userId, boolean readOnlyExecution, Instant now) {
         AutonomyPreference row = new AutonomyPreference();
         row.userId = userId;
@@ -39,6 +40,7 @@ public class AutonomyPreference {
         row.updatedAt = now;
         return row;
     }
+
 
     public void change(boolean readOnlyExecution, Instant now) {
         this.readOnlyExecution = readOnlyExecution;

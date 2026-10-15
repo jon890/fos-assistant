@@ -25,29 +25,30 @@ class ChatArtifactMigrationTest {
     void tableFromV24RejectsSamePathTwiceForSameReplyButAllowsOtherReply() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate(insert(10L));
             statement.executeUpdate(insert(11L));
 
             assertThatThrownBy(() -> statement.executeUpdate(insert(10L)))
-                    .isInstanceOf(SQLException.class)
-                    .hasMessageContaining("UK_CHAT_ARTIFACT_MESSAGE_PATH");
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("UK_CHAT_ARTIFACT_MESSAGE_PATH");
             try (ResultSet rows = statement.executeQuery(
-                    "SELECT COUNT(*) FROM chat_artifact WHERE conversation_id = 1 AND deleted_at IS NULL")) {
+                "SELECT COUNT(*) FROM chat_artifact WHERE conversation_id = 1 AND deleted_at IS NULL")) {
                 rows.next();
                 assertThat(rows.getLong(1)).isEqualTo(2);
             }
         }
     }
 
+
     private static String insert(Long messageId) {
         return "INSERT INTO chat_artifact (conversation_id, message_id, path, byte_size, created_at) " + "VALUES (1, "
-                + messageId + ", '초안/index.html', 42, CURRENT_TIMESTAMP(6))";
+            + messageId + ", '초안/index.html', 42, CURRENT_TIMESTAMP(6))";
     }
 }

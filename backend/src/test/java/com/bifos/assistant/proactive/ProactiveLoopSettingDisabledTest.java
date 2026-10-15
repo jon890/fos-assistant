@@ -33,8 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class ProactiveLoopSettingDisabledTest {
 
     private static final Instant NOW = Instant.parse("2026-03-02T00:00:00Z");
-    private static final CurrentUser OWNER =
-            new CurrentUser(963_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
+    private static final CurrentUser OWNER = new CurrentUser(963_001L, "owner@example.com", "사용자A", 1L, UserRole.MEMBER);
 
     @Autowired
     ProactiveLoopSettingService service;
@@ -53,20 +52,22 @@ class ProactiveLoopSettingDisabledTest {
 
     private Agent agent;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
         agent = agents.save(Agent.of(
-                "loop-off-" + UUID.randomUUID(),
-                "커리어",
-                "loop-off-profile-" + UUID.randomUUID(),
-                "http://agent-runtime.test/p/loop-off",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                OWNER.id(),
-                NOW));
+            "loop-off-" + UUID.randomUUID(),
+            "커리어",
+            "loop-off-profile-" + UUID.randomUUID(),
+            "http://agent-runtime.test/p/loop-off",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            OWNER.id(),
+            NOW));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -74,21 +75,24 @@ class ProactiveLoopSettingDisabledTest {
         jdbc.update("DELETE FROM agent WHERE id = ?", agent.id());
     }
 
+
     @Test
     @DisplayName("설치가 루프를 열지 않으면 available 이 거짓이다")
     void reportsUnavailable() {
         assertThat(service.get(OWNER, agent.code())).isEqualTo(new LoopSettingView(false, false, null));
     }
 
+
     @Test
     @DisplayName("켜기는 PROACTIVE_LOOP_UNAVAILABLE 로 거절하고 줄을 남기지 않는다")
     void rejectsEnabling() {
         assertThatThrownBy(() -> service.update(OWNER, agent.code(), true, null))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("끄기와 쉬기는 설치가 루프를 열지 않아도 저장한다")
@@ -99,11 +103,12 @@ class ProactiveLoopSettingDisabledTest {
 
         assertThat(view).isEqualTo(new LoopSettingView(false, false, snooze));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
-                .satisfies(row -> {
-                    assertThat(row.enabled()).isFalse();
-                    assertThat(row.snoozedUntil()).isEqualTo(snooze);
-                });
+            .satisfies(row -> {
+                assertThat(row.enabled()).isFalse();
+                assertThat(row.snoozedUntil()).isEqualTo(snooze);
+            });
     }
+
 
     @Test
     @DisplayName("이미 켠 줄을 켠 채 두는 요청은 설치가 루프를 열지 않아도 받고 쉬기를 저장한다")
@@ -115,11 +120,12 @@ class ProactiveLoopSettingDisabledTest {
 
         assertThat(view).isEqualTo(new LoopSettingView(false, true, snooze));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id()).orElseThrow())
-                .satisfies(row -> {
-                    assertThat(row.enabled()).isTrue();
-                    assertThat(row.snoozedUntil()).isEqualTo(snooze);
-                });
+            .satisfies(row -> {
+                assertThat(row.enabled()).isTrue();
+                assertThat(row.snoozedUntil()).isEqualTo(snooze);
+            });
     }
+
 
     @Test
     @DisplayName("꺼진 줄을 켜는 요청은 줄이 있어도 PROACTIVE_LOOP_UNAVAILABLE 로 거절하고 줄을 그대로 둔다")
@@ -127,12 +133,12 @@ class ProactiveLoopSettingDisabledTest {
         settings.save(ProactiveLoopSetting.of(OWNER.id(), agent.id(), false, null, NOW));
 
         assertThatThrownBy(() -> service.update(OWNER, agent.code(), true, null))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.PROACTIVE_LOOP_UNAVAILABLE));
         assertThat(settings.findByUserIdAndAgentId(OWNER.id(), agent.id())
-                        .orElseThrow()
-                        .enabled())
+            .orElseThrow()
+            .enabled())
                 .isFalse();
     }
 }

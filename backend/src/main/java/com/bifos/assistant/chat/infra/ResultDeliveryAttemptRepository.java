@@ -17,24 +17,28 @@ public interface ResultDeliveryAttemptRepository extends JpaRepository<ResultDel
     /** 아직 실행 줄이 없는 시도에만 잇는다. 바뀐 행 수를 돌려준다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ResultDeliveryAttempt a set a.executionId = :executionId"
-            + " where a.id = :id and a.executionId is null")
+        + " where a.id = :id and a.executionId is null")
     int attachExecution(@Param("id") Long id, @Param("executionId") Long executionId);
+
 
     /** 도는 중인 시도만 닫는다. 이미 닫힌 시도면 0 을 돌려준다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update ResultDeliveryAttempt a set a.status = :status, a.errorCode = :errorCode, a.finishedAt = :at"
-            + " where a.id = :id and a.status = com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus.RUNNING")
+        + " where a.id = :id and a.status = com.bifos.assistant.chat.domain.type.DeliveryAttemptStatus.RUNNING")
     int finish(
-            @Param("id") Long id,
-            @Param("status") DeliveryAttemptStatus status,
-            @Param("errorCode") String errorCode,
-            @Param("at") Instant at);
+        @Param("id") Long id,
+        @Param("status") DeliveryAttemptStatus status,
+        @Param("errorCode") String errorCode,
+        @Param("at") Instant at);
+
 
     /** 그 상태로 그 시각 전에 시작한 시도들이다. 기동할 때 이전 프로세스가 남긴 시도를 찾는다. */
     List<ResultDeliveryAttempt> findByStatusAndStartedAtBefore(DeliveryAttemptStatus status, Instant before);
 
+
     /** 그 실행 줄을 이은 시도 가운데 그 상태인 것 하나다. */
     Optional<ResultDeliveryAttempt> findFirstByExecutionIdAndStatus(Long executionId, DeliveryAttemptStatus status);
+
 
     /** 그 묶음들의 시도다. 순서는 정하지 않는다. */
     List<ResultDeliveryAttempt> findByDeliveryIdIn(Collection<Long> deliveryIds);

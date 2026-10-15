@@ -48,7 +48,9 @@ public class AppUser {
     @Accessors(fluent = true)
     private String modelDefaultTier;
 
+
     protected AppUser() {}
+
 
     private AppUser(String email, String displayName, Long groupId, UserRole role, Instant now) {
         this.email = email;
@@ -58,13 +60,16 @@ public class AppUser {
         this.createdAt = now;
     }
 
+
     public static AppUser of(String email, String displayName, Long groupId, UserRole role, Instant now) {
         return new AppUser(email, displayName, groupId, role, now);
     }
 
+
     public boolean isAdmin() {
         return role == UserRole.ADMIN;
     }
+
 
     public void rename(String displayName) {
         this.displayName = displayName;

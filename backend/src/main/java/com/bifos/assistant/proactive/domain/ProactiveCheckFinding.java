@@ -77,18 +77,19 @@ public class ProactiveCheckFinding {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+
     /** 칸 길이를 넘는 글은 잘라 넣는다. 모델이 쓴 글이라 길이를 믿지 않는다. */
     public static ProactiveCheckFinding of(
-            Long checkId,
-            Long conversationId,
-            FindingKind kind,
-            FindingReason reason,
-            String area,
-            String topicKey,
-            String title,
-            String sourceUrl,
-            Instant checkedAt,
-            Instant now) {
+        Long checkId,
+        Long conversationId,
+        FindingKind kind,
+        FindingReason reason,
+        String area,
+        String topicKey,
+        String title,
+        String sourceUrl,
+        Instant checkedAt,
+        Instant now) {
         ProactiveCheckFinding finding = new ProactiveCheckFinding();
         finding.checkId = checkId;
         finding.conversationId = conversationId;
@@ -102,6 +103,7 @@ public class ProactiveCheckFinding {
         finding.createdAt = now;
         return finding;
     }
+
 
     /** 칸 길이까지만 남긴다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private static String truncate(String value, int maxLength) {

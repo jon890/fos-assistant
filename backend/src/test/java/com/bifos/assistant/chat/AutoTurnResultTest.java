@@ -22,31 +22,33 @@ class AutoTurnResultTest {
 
     private static final String INPUT = "메모 본문: 화요일 10시 치과 예약";
 
+
     @Test
     @DisplayName("toString 은 key 와 글자 수와 항목의 출처와 참조만 내고 본문과 알림 줄의 글을 내지 않는다")
     void toStringOmitsInputAndNotice() {
         ContextItem item = new ContextItem(
-                ContextSource.CONNECTOR_RESULT,
-                "connector_action:41",
-                MemoryScope.USER,
-                7L,
-                MemorySensitivity.SENSITIVE,
-                ContextTrust.EXTERNAL,
-                Instant.parse("2026-10-03T05:00:00Z"),
-                ContextFreshness.FRESH,
-                ContextBodyMode.INLINE,
-                List.of(),
-                null,
-                null);
+            ContextSource.CONNECTOR_RESULT,
+            "connector_action:41",
+            MemoryScope.USER,
+            7L,
+            MemorySensitivity.SENSITIVE,
+            ContextTrust.EXTERNAL,
+            Instant.parse("2026-10-03T05:00:00Z"),
+            ContextFreshness.FRESH,
+            ContextBodyMode.INLINE,
+            List.of(),
+            null,
+            null);
 
         String text = new AutoTurnResult("result-key", NOTICE, INPUT, item).toString();
 
         assertThat(text)
-                .isEqualTo("AutoTurnResult[key=result-key, noticeChars=" + NOTICE.length() + ", inputChars="
-                        + INPUT.length() + ", item=CONNECTOR_RESULT:connector_action:41]")
-                .doesNotContain(NOTICE)
-                .doesNotContain(INPUT);
+            .isEqualTo("AutoTurnResult[key=result-key, noticeChars=" + NOTICE.length() + ", inputChars="
+                + INPUT.length() + ", item=CONNECTOR_RESULT:connector_action:41]")
+            .doesNotContain(NOTICE)
+            .doesNotContain(INPUT);
     }
+
 
     @Test
     @DisplayName("항목이 없는 결과의 toString 은 item=null 이고 본문을 내지 않는다")

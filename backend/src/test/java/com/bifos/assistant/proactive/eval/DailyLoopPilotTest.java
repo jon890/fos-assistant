@@ -121,8 +121,7 @@ class DailyLoopPilotTest {
     private static final String BACKLOG = "study:reading-backlog";
     private static final String FLASH_SALE = "event:flash-sale-ending";
     private static final String SUBMIT = "career:submit-application";
-    private static final String NOTHING_NEW =
-            "블록 밖의 글\n<fos-check-result>\n{\"version\":3,\"outcome\":\"NOTHING_NEW\"}\n</fos-check-result>";
+    private static final String NOTHING_NEW = "블록 밖의 글\n<fos-check-result>\n{\"version\":3,\"outcome\":\"NOTHING_NEW\"}\n</fos-check-result>";
     private static final String DEADLINE_CHANGE = "합성 변화: 마감이 오늘 밤으로 앞당겨졌다";
 
     @Autowired
@@ -195,6 +194,7 @@ class DailyLoopPilotTest {
     private Agent agent;
     private ReplayDecisionProvider provider;
 
+
     @BeforeEach
     void setUp() {
         clock.set(ENABLED_AT);
@@ -206,25 +206,26 @@ class DailyLoopPilotTest {
         doReturn(Set.of()).when(connectorBindings).connectorServers(any());
         doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         provider = providers.stream()
-                .filter(each -> each.id().equals(PROVIDER))
-                .findFirst()
-                .orElseThrow();
+            .filter(each -> each.id().equals(PROVIDER))
+            .findFirst()
+            .orElseThrow();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         AppUser user = users.save(
-                AppUser.of("daily-loop-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
+            AppUser.of("daily-loop-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "career-" + suffix;
         agent = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                ENABLED_AT));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            ENABLED_AT));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -243,23 +244,24 @@ class DailyLoopPilotTest {
         jdbc.update("DELETE FROM user_autonomy_preference WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM proactive_value_evaluation WHERE user_id = ?", userId);
         jdbc.update(
-                "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                userId);
+            "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
+            userId);
         jdbc.update(
-                "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                userId);
+            "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
+            userId);
         jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
         jdbc.update(
-                "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE user_id = ?)",
-                userId);
+            "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE user_id = ?)",
+            userId);
         jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
         jdbc.update(
-                "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
-                userId);
+            "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
+            userId);
         jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
         jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", userId);
         jdbc.update("DELETE FROM app_user WHERE id = ?", userId);
     }
+
 
     @Test
     @DisplayName("7일 동안 깨우기와 매일 루프를 이어 돌려도 승인 우회와 중복 실행이 없고 같은 사건을 다시 내도 늘지 않는다")
@@ -268,8 +270,8 @@ class DailyLoopPilotTest {
         EvalDataset.Check lowValue = DATASET.scenario("urgent-low-value").check();
         EvalDataset.Check unsafe = DATASET.scenario("high-value-unsafe").check();
         assertThat(schedules
-                        .update(owner, agent.code(), true, "08:30", SEOUL.getId())
-                        .nextRunAt())
+            .update(owner, agent.code(), true, "08:30", SEOUL.getId())
+            .nextRunAt())
                 .as("첫 발화 예정 시각")
                 .isEqualTo(FIRST_WAKE);
         loopSettings.update(owner, agent.code(), true, null);
@@ -284,10 +286,10 @@ class DailyLoopPilotTest {
         // 6일: 사용자가 읽기 전용 자동 실행에 동의하고, 같은 후보가 바뀐 점을 달고 다시 나온다.
         autonomy.changeReadOnlyExecution(owner, true);
         days.add(runDay(
-                6,
-                "동의 뒤 바뀐 점이 있는 후보",
-                () -> output(urgent, Set.of(DEADLINE), Map.of(DEADLINE, DEADLINE_CHANGE)),
-                true));
+            6,
+            "동의 뒤 바뀐 점이 있는 후보",
+            () -> output(urgent, Set.of(DEADLINE), Map.of(DEADLINE, DEADLINE_CHANGE)),
+            true));
         ProactiveCheck sixth = checks.findById(days.get(5).checkId()).orElseThrow();
         Counts beforeRepublish = counts();
         events.publishEvent(new ProactiveCheckSettled(owner, sixth.id()));
@@ -313,6 +315,7 @@ class DailyLoopPilotTest {
         assertThat(summary.failures()).as("이 반복의 실패 시도 수").isZero();
     }
 
+
     private void assertDay1(DayResult day) {
         assertThat(day.loopStatus()).as("1일 시도").isEqualTo(LoopRunStatus.DECIDED.name());
         assertThat(day.evaluationOutcome()).isEqualTo(DecisionOutcome.EVALUATED.name());
@@ -322,24 +325,27 @@ class DailyLoopPilotTest {
         assertLevelsAllowed(day, false);
     }
 
+
     /** 그날 판정을 받은 후보 가운데 fixture 가 중요하다고 적은 것의 수준이다. */
     private static List<String> importantLevels(DayResult day) {
         return day.levels().entrySet().stream()
-                .filter(each -> truthOf(each.getKey()).important())
-                .map(Map.Entry::getValue)
-                .toList();
+            .filter(each -> truthOf(each.getKey()).important())
+            .map(Map.Entry::getValue)
+            .toList();
     }
+
 
     private void assertDay2(DayResult day) {
         assertThat(day.loopStatus()).as("2일 시도").isEqualTo(LoopRunStatus.SKIPPED.name());
         assertThat(day.skippedReason()).isEqualTo(LoopSkippedReason.NO_CANDIDATE.name());
         assertThat(day.droppedKeys())
-                .as("문제 찾기가 되풀이를 버린다")
-                .containsExactly(DEADLINE + ":" + ProblemDropReason.DUPLICATE);
+            .as("문제 찾기가 되풀이를 버린다")
+            .containsExactly(DEADLINE + ":" + ProblemDropReason.DUPLICATE);
         assertThat(day.acceptedKeys()).isEmpty();
         assertThat(day.modelCalls()).as("2일 모델 호출").isZero();
         assertThat(day.evaluationTotal()).as("2일 뒤에도 평가는 1").isEqualTo(1);
     }
+
 
     private void assertDay3(DayResult day) {
         assertThat(day.loopStatus()).as("3일 시도").isEqualTo(LoopRunStatus.SKIPPED.name());
@@ -349,6 +355,7 @@ class DailyLoopPilotTest {
         assertThat(day.modelCalls()).as("3일 모델 호출").isZero();
     }
 
+
     private void assertDay4(DayResult day) {
         assertThat(day.loopStatus()).as("4일 시도").isEqualTo(LoopRunStatus.DECIDED.name());
         assertThat(day.levels()).containsEntry(FLASH_SALE, AutonomyLevel.IGNORE.name());
@@ -357,30 +364,33 @@ class DailyLoopPilotTest {
         assertThat(day.approvalDelta()).as("4일 승인 줄 증가").isZero();
     }
 
+
     private void assertDay5(DayResult day) {
         assertThat(day.loopStatus()).as("5일 시도").isEqualTo(LoopRunStatus.DECIDED.name());
         assertThat(day.levels()).containsEntry(SUBMIT, AutonomyLevel.ASK_APPROVAL.name());
         assertThat(day.approvalDelta()).as("5일 승인 줄 증가").isZero();
     }
 
+
     private void assertDay6(DayResult day, Counts before, Counts after) {
         assertThat(day.loopStatus()).as("6일 시도").isEqualTo(LoopRunStatus.DECIDED.name());
         assertThat(day.acceptedKeys()).containsExactly(DEADLINE);
         assertThat(day.levels().values().stream().filter(AutonomyLevel.EXECUTE.name()::equals))
-                .as("6일 EXECUTE 수")
-                .hasSize(1);
+            .as("6일 EXECUTE 수")
+            .hasSize(1);
         assertLevelsAllowed(day, true);
         assertThat(day.autonomousStarted()).as("6일 자동 실행 살펴보기 수").isEqualTo(1);
         assertThat(before.autonomousStarted()).as("재발행 전 자동 실행 수").isEqualTo(1);
         assertThat(after).as("같은 끝 사건을 다시 낸 뒤의 시도, 평가, 판정, 자동 실행 수").isEqualTo(before);
         List<Long> autonomousChecks = checksOfAgent().stream()
-                .filter(check -> check.trigger() == CheckTrigger.AUTONOMY)
-                .map(ProactiveCheck::id)
-                .toList();
+            .filter(check -> check.trigger() == CheckTrigger.AUTONOMY)
+            .map(ProactiveCheck::id)
+            .toList();
         assertThat(loopRuns.findBySourceCheckIdIn(autonomousChecks))
-                .as("자동 실행 살펴보기의 시도 줄")
-                .isEmpty();
+            .as("자동 실행 살펴보기의 시도 줄")
+            .isEmpty();
     }
+
 
     private void assertDay7(DayResult day) {
         assertThat(day.loopStatus()).as("7일 시도").isEqualTo(LoopRunStatus.SKIPPED.name());
@@ -388,25 +398,25 @@ class DailyLoopPilotTest {
         assertThat(day.modelCalls()).as("7일 모델 호출").isZero();
     }
 
+
     /** 모든 날에 걸치는 경계다. */
     private void assertSafetyAcrossDays(List<DayResult> days) {
         List<ProactiveCheck> scheduled = checksOfAgent().stream()
-                .filter(check -> check.trigger() == CheckTrigger.SCHEDULED)
-                .toList();
+            .filter(check -> check.trigger() == CheckTrigger.SCHEDULED)
+            .toList();
         Map<Long, Long> runsPerSource = loopRuns.findAll().stream()
-                .filter(run -> run.userId().equals(owner.id()))
-                .collect(Collectors.groupingBy(ProactiveLoopRun::sourceCheckId, Collectors.counting()));
+            .filter(run -> run.userId().equals(owner.id()))
+            .collect(Collectors.groupingBy(ProactiveLoopRun::sourceCheckId, Collectors.counting()));
         assertThat(runsPerSource.values()).as("원천 살펴보기마다 시도 줄").allMatch(count -> count == 1L);
         assertThat(runsPerSource.keySet())
-                .as("시도 줄이 있는 원천은 모두 매일 깨우기 살펴보기다")
-                .isSubsetOf(scheduled.stream().map(ProactiveCheck::id).toList());
+            .as("시도 줄이 있는 원천은 모두 매일 깨우기 살펴보기다")
+            .isSubsetOf(scheduled.stream().map(ProactiveCheck::id).toList());
 
-        Map<Long, ProactiveCheckProblem> problemById =
-                problems
-                        .findByCheckIdInOrderByIdAsc(
-                                checksOfAgent().stream().map(ProactiveCheck::id).toList())
-                        .stream()
-                        .collect(Collectors.toMap(ProactiveCheckProblem::id, each -> each));
+        Map<Long, ProactiveCheckProblem> problemById = problems
+            .findByCheckIdInOrderByIdAsc(
+                checksOfAgent().stream().map(ProactiveCheck::id).toList())
+            .stream()
+            .collect(Collectors.toMap(ProactiveCheckProblem::id, each -> each));
         for (AutonomyDecision decision : userDecisions()) {
             if (decision.level() != AutonomyLevel.EXECUTE) {
                 continue;
@@ -414,21 +424,21 @@ class DailyLoopPilotTest {
             ProactiveCheckProblem problem = problemById.get(decision.candidateId());
             assertThat(problem.sideEffect()).as("EXECUTE 를 받은 후보의 부작용 힌트").isEqualTo("NONE");
             assertThat(truthOf(problem.problemKey()).requiresApproval())
-                    .as("승인이 필요한 후보 %s 는 EXECUTE 를 받지 않는다", problem.problemKey())
-                    .isFalse();
+                .as("승인이 필요한 후보 %s 는 EXECUTE 를 받지 않는다", problem.problemKey())
+                .isFalse();
         }
 
         for (DayResult day : days) {
             if (day.levels().values().stream().allMatch(AutonomyLevel.IGNORE.name()::equals)) {
                 assertThat(day.notificationDelta())
-                        .as("%d일은 IGNORE 만 남아 알림이 늘지 않는다", day.day())
-                        .isZero();
+                    .as("%d일은 IGNORE 만 남아 알림이 늘지 않는다", day.day())
+                    .isZero();
             }
         }
 
         Map<Long, DecisionRecord> records = exporter.export(owner, Duration.ofDays(30)).records().stream()
-                .filter(each -> each.situation() != null)
-                .collect(Collectors.toMap(each -> each.situation().checkId(), each -> each));
+            .filter(each -> each.situation() != null)
+            .collect(Collectors.toMap(each -> each.situation().checkId(), each -> each));
         for (DayResult day : days) {
             ProactiveLoopRun run = loopRuns.findBySourceCheckId(day.checkId()).orElseThrow();
             Loop loop = records.get(day.checkId()).situation().loop();
@@ -440,6 +450,7 @@ class DailyLoopPilotTest {
             assertThat(loop.evaluationId()).isEqualTo(run.evaluationId());
         }
     }
+
 
     /** 후보마다 수준이 그 후보의 허용 목록에 든다. 동의 전에는 허용 목록의 EXECUTE 를 SURFACE 로 읽는다. */
     private void assertLevelsAllowed(DayResult day, boolean consented) {
@@ -453,9 +464,10 @@ class DailyLoopPilotTest {
         });
     }
 
+
     /** 그날 예정 시각 30초 뒤에 깨우고 루프가 끝나기를 기다린 뒤 그날 결과를 모은다. */
     private DayResult runDay(int day, String label, Supplier<String> output, boolean consented)
-            throws InterruptedException {
+        throws InterruptedException {
         // 결과 블록의 확인 시각이 깨우는 시각이어야 해서 Hermes 가 답하는 때 만든다.
         stub().willAnswer(command -> answer(output.get()));
         // 보고가 생긴 날은 다음 날 전에 열어 둔다. 열지 않은 보고가 있으면 다음 깨우기가 모델 없이 건너뛴다.
@@ -464,8 +476,7 @@ class DailyLoopPilotTest {
         long followUps = count("follow_up");
         long approvals = count("connector_action");
         int callsBefore = provider.calls();
-        long lastCheckId =
-                checksOfAgent().stream().mapToLong(ProactiveCheck::id).max().orElse(0);
+        long lastCheckId = checksOfAgent().stream().mapToLong(ProactiveCheck::id).max().orElse(0);
 
         Instant at = wakeAt(day);
         clock.set(at);
@@ -481,54 +492,54 @@ class DailyLoopPilotTest {
         ProactiveCheck check = checks.findById(started.id()).orElseThrow();
         ProactiveLoopRun run = loopRuns.findBySourceCheckId(check.id()).orElseThrow();
         List<ProactiveCheckProblem> found = problems.findByCheckIdInOrderByIdAsc(List.of(check.id()));
-        Map<Long, String> keys =
-                found.stream().collect(Collectors.toMap(ProactiveCheckProblem::id, ProactiveCheckProblem::problemKey));
-        List<ValueEvaluation> judged =
-                evaluations.findByUserIdAndCheckIdInOrderByIdAsc(owner.id(), List.of(check.id()));
+        Map<Long, String> keys = found.stream().collect(Collectors.toMap(ProactiveCheckProblem::id, ProactiveCheckProblem::problemKey));
+        List<ValueEvaluation> judged = evaluations.findByUserIdAndCheckIdInOrderByIdAsc(owner.id(), List.of(check.id()));
         List<AutonomyDecision> decided = judged.isEmpty()
-                ? List.of()
-                : decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(
-                        owner.id(), judged.stream().map(ValueEvaluation::id).toList());
+            ? List.of()
+            : decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(
+                owner.id(), judged.stream().map(ValueEvaluation::id).toList());
         Map<String, String> levels = new LinkedHashMap<>();
         decided.forEach(
-                each -> levels.put(keys.get(each.candidateId()), each.level().name()));
+            each -> levels.put(keys.get(each.candidateId()), each.level().name()));
         int modelCalls = provider.calls() - callsBefore;
         EvalDataset.ProviderProfile profile = DATASET.providers().get(PROVIDER);
         return new DayResult(
-                day,
-                label,
-                consented,
-                check.id(),
-                run.status().name(),
-                run.skippedReason() == null ? null : run.skippedReason().name(),
-                run.errorCode(),
-                judged.isEmpty() ? null : judged.getFirst().outcome().name(),
-                levels,
-                found.stream()
-                        .filter(each -> each.status() == ProblemStatus.ACCEPTED)
-                        .map(ProactiveCheckProblem::problemKey)
-                        .toList(),
-                found.stream()
-                        .filter(each -> each.status() == ProblemStatus.DROPPED)
-                        .map(each -> each.problemKey() + ":" + each.dropReason())
-                        .toList(),
-                modelCalls,
-                profile.latencyMs() * modelCalls,
-                (profile.inputTokens() + profile.outputTokens()) * modelCalls,
-                profile.costMicroUsd() * modelCalls,
-                (int) decided.stream()
-                        .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
-                        .count(),
-                check.report() != null,
-                evaluationCount(),
-                count("notification") - notifications,
-                count("follow_up") - followUps,
-                count("connector_action") - approvals);
+            day,
+            label,
+            consented,
+            check.id(),
+            run.status().name(),
+            run.skippedReason() == null ? null : run.skippedReason().name(),
+            run.errorCode(),
+            judged.isEmpty() ? null : judged.getFirst().outcome().name(),
+            levels,
+            found.stream()
+                .filter(each -> each.status() == ProblemStatus.ACCEPTED)
+                .map(ProactiveCheckProblem::problemKey)
+                .toList(),
+            found.stream()
+                .filter(each -> each.status() == ProblemStatus.DROPPED)
+                .map(each -> each.problemKey() + ":" + each.dropReason())
+                .toList(),
+            modelCalls,
+            profile.latencyMs() * modelCalls,
+            (profile.inputTokens() + profile.outputTokens()) * modelCalls,
+            profile.costMicroUsd() * modelCalls,
+            (int)decided.stream()
+                .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
+                .count(),
+            check.report() != null,
+            evaluationCount(),
+            count("notification") - notifications,
+            count("follow_up") - followUps,
+            count("connector_action") - approvals);
     }
+
 
     private static Instant wakeAt(int day) {
         return FIRST_WAKE.plus(Duration.ofDays(day - 1L)).plusSeconds(30);
     }
+
 
     private void openUnreadReports() {
         for (ProactiveCheck each : checksOfAgent()) {
@@ -538,12 +549,13 @@ class DailyLoopPilotTest {
         }
     }
 
+
     private ProactiveCheck awaitNewCheck(long afterId) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
         while (true) {
             List<ProactiveCheck> fresh = checksOfAgent().stream()
-                    .filter(each -> each.id() > afterId && each.trigger() == CheckTrigger.SCHEDULED)
-                    .toList();
+                .filter(each -> each.id() > afterId && each.trigger() == CheckTrigger.SCHEDULED)
+                .toList();
             if (!fresh.isEmpty()) {
                 return fresh.getFirst();
             }
@@ -559,59 +571,65 @@ class DailyLoopPilotTest {
         }
     }
 
+
     private Counts counts() {
         long started = userDecisions().stream()
-                .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
-                .count();
+            .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
+            .count();
         return new Counts(
-                loopRuns.findAll().stream()
-                        .filter(run -> run.userId().equals(owner.id()))
-                        .count(),
-                evaluationCount(),
-                userDecisions().size(),
-                started);
+            loopRuns.findAll().stream()
+                .filter(run -> run.userId().equals(owner.id()))
+                .count(),
+            evaluationCount(),
+            userDecisions().size(),
+            started);
     }
+
 
     private List<AutonomyDecision> userDecisions() {
         List<Long> evaluationIds = evaluations
-                .findByUserIdAndCheckIdInOrderByIdAsc(
-                        owner.id(),
-                        checksOfAgent().stream().map(ProactiveCheck::id).toList())
-                .stream()
-                .map(ValueEvaluation::id)
-                .toList();
+            .findByUserIdAndCheckIdInOrderByIdAsc(
+                owner.id(),
+                checksOfAgent().stream().map(ProactiveCheck::id).toList())
+            .stream()
+            .map(ValueEvaluation::id)
+            .toList();
         return evaluationIds.isEmpty()
-                ? List.of()
-                : decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(owner.id(), evaluationIds);
+            ? List.of()
+            : decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(owner.id(), evaluationIds);
     }
+
 
     private long evaluationCount() {
         return count("proactive_value_evaluation");
     }
 
+
     private long count(String table) {
-        Long count =
-                jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE user_id = ?", Long.class, owner.id());
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE user_id = ?", Long.class, owner.id());
         return count == null ? 0 : count;
     }
+
 
     private List<ProactiveCheck> checksOfAgent() {
         if (agent == null) {
             return List.of();
         }
         return checks.findAll().stream()
-                .filter(check -> check.agentId().equals(agent.id()))
-                .sorted(Comparator.comparing(ProactiveCheck::id))
-                .toList();
+            .filter(check -> check.agentId().equals(agent.id()))
+            .sorted(Comparator.comparing(ProactiveCheck::id))
+            .toList();
     }
+
 
     private static Truth truthOf(String problemKey) {
         return DATASET.scenarios().stream()
-                .map(scenario -> scenario.truth().get(problemKey))
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElseThrow();
+            .map(scenario -> scenario.truth().get(problemKey))
+            .filter(Objects::nonNull)
+            .findFirst()
+            .orElseThrow();
     }
+
 
     /**
      * 날마다 결과를 합쳐 지표를 센다. 중요한 날은 1, 5, 6일이고 침묵이어야 하는 날은 2, 3, 4, 7일이다.
@@ -620,37 +638,37 @@ class DailyLoopPilotTest {
         List<Integer> importantDays = List.of(1, 5, 6);
         List<Integer> silentDays = List.of(2, 3, 4, 7);
         long hits = importantDays.stream()
-                .filter(day -> {
-                    List<String> levels = importantLevels(days.get(day - 1));
-                    return !levels.isEmpty() && !levels.contains(AutonomyLevel.IGNORE.name());
-                })
-                .count();
-        long duplicatesPassed =
-                days.get(1).acceptedKeys().stream().filter(DEADLINE::equals).count();
+            .filter(day -> {
+                List<String> levels = importantLevels(days.get(day - 1));
+                return !levels.isEmpty() && !levels.contains(AutonomyLevel.IGNORE.name());
+            })
+            .count();
+        long duplicatesPassed = days.get(1).acceptedKeys().stream().filter(DEADLINE::equals).count();
         long silentKept = silentDays.stream()
-                .map(day -> days.get(day - 1))
-                .filter(day -> day.levels().values().stream().allMatch(AutonomyLevel.IGNORE.name()::equals)
-                        && day.notificationDelta() == 0
-                        && day.followUpDelta() == 0
-                        && day.approvalDelta() == 0)
-                .count();
+            .map(day -> days.get(day - 1))
+            .filter(day -> day.levels().values().stream().allMatch(AutonomyLevel.IGNORE.name()::equals)
+                && day.notificationDelta() == 0
+                && day.followUpDelta() == 0
+                && day.approvalDelta() == 0)
+            .count();
         long failures = days.stream()
-                .filter(day -> LoopRunStatus.FAILED.name().equals(day.loopStatus())
-                        || DecisionOutcome.FALLBACK.name().equals(day.evaluationOutcome()))
-                .count();
+            .filter(day -> LoopRunStatus.FAILED.name().equals(day.loopStatus())
+                || DecisionOutcome.FALLBACK.name().equals(day.evaluationOutcome()))
+            .count();
         int calls = days.stream().mapToInt(DayResult::modelCalls).sum();
         return new Summary(
-                importantDays.size(),
-                hits,
-                duplicatesPassed,
-                silentDays.size(),
-                silentKept,
-                failures,
-                calls,
-                days.stream().mapToLong(DayResult::simulatedLatencyMs).sum(),
-                days.stream().mapToLong(DayResult::simulatedTokens).sum(),
-                days.stream().mapToLong(DayResult::simulatedCostMicroUsd).sum());
+            importantDays.size(),
+            hits,
+            duplicatesPassed,
+            silentDays.size(),
+            silentKept,
+            failures,
+            calls,
+            days.stream().mapToLong(DayResult::simulatedLatencyMs).sum(),
+            days.stream().mapToLong(DayResult::simulatedTokens).sum(),
+            days.stream().mapToLong(DayResult::simulatedCostMicroUsd).sum());
     }
+
 
     private void writeReport(List<DayResult> days, Summary summary) {
         StringBuilder md = new StringBuilder();
@@ -659,28 +677,28 @@ class DailyLoopPilotTest {
         md.append("provider 는 `").append(PROVIDER).append("` 이고 비용과 지연은 fixture 에 적은 값에 호출 수를 곱한 흉내 값이다.\n\n");
         md.append("## 날마다\n\n");
         md.append(
-                "| 날 | 상황 | 시도 | 까닭 | 평가 | 후보별 수준 | 버린 후보 | 모델 호출 | 흉내 지연(ms) | 흉내 토큰 | 흉내 비용(micro USD) | 자동 실행 | 알림 | 할 일 | 승인 줄 |\n");
+            "| 날 | 상황 | 시도 | 까닭 | 평가 | 후보별 수준 | 버린 후보 | 모델 호출 | 흉내 지연(ms) | 흉내 토큰 | 흉내 비용(micro USD) | 자동 실행 | 알림 | 할 일 | 승인 줄 |\n");
         md.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
         for (DayResult day : days) {
             md.append("| %d | %s | %s | %s | %s | %s | %s | %d | %d | %d | %d | %d | %d | %d | %d |\n"
-                    .formatted(
-                            day.day(),
-                            day.label(),
-                            day.loopStatus(),
-                            day.skippedReason() == null ? "-" : day.skippedReason(),
-                            day.evaluationOutcome() == null ? "-" : day.evaluationOutcome(),
-                            day.levels().isEmpty() ? "-" : day.levels().toString(),
-                            day.droppedKeys().isEmpty()
-                                    ? "-"
-                                    : day.droppedKeys().toString(),
-                            day.modelCalls(),
-                            day.simulatedLatencyMs(),
-                            day.simulatedTokens(),
-                            day.simulatedCostMicroUsd(),
-                            day.autonomousStarted(),
-                            day.notificationDelta(),
-                            day.followUpDelta(),
-                            day.approvalDelta()));
+                .formatted(
+                    day.day(),
+                    day.label(),
+                    day.loopStatus(),
+                    day.skippedReason() == null ? "-" : day.skippedReason(),
+                    day.evaluationOutcome() == null ? "-" : day.evaluationOutcome(),
+                    day.levels().isEmpty() ? "-" : day.levels().toString(),
+                    day.droppedKeys().isEmpty()
+                        ? "-"
+                        : day.droppedKeys().toString(),
+                    day.modelCalls(),
+                    day.simulatedLatencyMs(),
+                    day.simulatedTokens(),
+                    day.simulatedCostMicroUsd(),
+                    day.autonomousStarted(),
+                    day.notificationDelta(),
+                    day.followUpDelta(),
+                    day.approvalDelta()));
         }
         md.append("\n## 합계\n\n");
         md.append("| 지표 | 값 |\n| --- | --- |\n");
@@ -701,13 +719,14 @@ class DailyLoopPilotTest {
             json.put("days", days);
             json.put("summary", summary);
             Files.writeString(
-                    REPORT_DIR.resolve("report.json"),
-                    JSON.writerWithDefaultPrettyPrinter().writeValueAsString(json));
+                REPORT_DIR.resolve("report.json"),
+                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(json));
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
         System.out.println(md);
     }
+
 
     /**
      * fixture 의 한 시나리오 확인에서 고른 문제 키의 후보와 그 근거 발견만 담은 버전 3 결과 블록이다. 확인 시각은 지금이다.
@@ -716,10 +735,9 @@ class DailyLoopPilotTest {
      */
     private String output(EvalDataset.Check fixture, Set<String> problemKeys, Map<String, String> changes) {
         List<EvalDataset.Problem> kept = fixture.problems().stream()
-                .filter(problem -> problemKeys.contains(problem.problemKey()))
-                .toList();
-        Set<String> topics =
-                kept.stream().flatMap(problem -> problem.evidence().stream()).collect(Collectors.toSet());
+            .filter(problem -> problemKeys.contains(problem.problemKey()))
+            .toList();
+        Set<String> topics = kept.stream().flatMap(problem -> problem.evidence().stream()).collect(Collectors.toSet());
         ObjectNode root = JSON.createObjectNode().put("version", 3).put("outcome", "FINDINGS");
         ArrayNode findings = root.putArray("findings");
         for (EvalDataset.Finding finding : fixture.findings()) {
@@ -727,30 +745,30 @@ class DailyLoopPilotTest {
                 continue;
             }
             ObjectNode node = findings.addObject()
-                    .put(
-                            "area",
-                            finding.topicKey().substring(0, finding.topicKey().indexOf(':')))
-                    .put("topicKey", finding.topicKey())
-                    .put("title", finding.title())
-                    .put(
-                            "sourceUrl",
-                            "https://example.com/" + finding.topicKey().replace(':', '/'))
-                    .put("checkedAt", clock.instant().toString())
-                    .put("freshness", "CURRENT")
-                    .put("whyItMatters", "합성 fixture 의 발견이다");
+                .put(
+                    "area",
+                    finding.topicKey().substring(0, finding.topicKey().indexOf(':')))
+                .put("topicKey", finding.topicKey())
+                .put("title", finding.title())
+                .put(
+                    "sourceUrl",
+                    "https://example.com/" + finding.topicKey().replace(':', '/'))
+                .put("checkedAt", clock.instant().toString())
+                .put("freshness", "CURRENT")
+                .put("whyItMatters", "합성 fixture 의 발견이다");
             node.putArray("facts").add("합성 사실");
             node.putObject("next").put("type", "QUESTION").put("text", "살펴볼까요");
         }
         ArrayNode candidates = root.putArray("problemCandidates");
         for (EvalDataset.Problem problem : kept) {
             ObjectNode node = candidates
-                    .addObject()
-                    .put("problemKey", problem.problemKey())
-                    .put("problem", problem.problem())
-                    .put("relatedGoal", problem.relatedGoal())
-                    .put("confidence", problem.confidence())
-                    .put("expectedBenefit", problem.expectedBenefit())
-                    .put("sideEffect", problem.sideEffect());
+                .addObject()
+                .put("problemKey", problem.problemKey())
+                .put("problem", problem.problem())
+                .put("relatedGoal", problem.relatedGoal())
+                .put("confidence", problem.confidence())
+                .put("expectedBenefit", problem.expectedBenefit())
+                .put("sideEffect", problem.sideEffect());
             ArrayNode evidence = node.putArray("evidence");
             problem.evidence().forEach(evidence::add);
             node.putObject("proposedAction").put("type", problem.actionType()).put("text", problem.actionText());
@@ -769,14 +787,17 @@ class DailyLoopPilotTest {
         return "블록 밖의 글\n<fos-check-result>\n" + JSON.writeValueAsString(root) + "\n</fos-check-result>";
     }
 
+
     private static HermesRunResult answer(String output) {
         return HermesRunResult.of(
-                "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
+            "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
     }
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     /** 예약 작업 줄은 모든 시험이 공유하므로 지난 줄이 이번 발화에 섞이지 않게 비운다. */
     private void cleanTasks() {
@@ -785,43 +806,47 @@ class DailyLoopPilotTest {
         jdbc.update("DELETE FROM task");
     }
 
+
     /** 같은 끝 사건을 다시 낸 전후로 견주는 수다. */
-    private record Counts(long runs, long evaluations, long decisions, long autonomousStarted) {}
+    private record Counts(long runs, long evaluations, long decisions, long autonomousStarted) {
+    }
 
     /** 하루의 결과다. 보고서에 그대로 실린다. */
     private record DayResult(
-            int day,
-            String label,
-            boolean consented,
-            long checkId,
-            String loopStatus,
-            String skippedReason,
-            String errorCode,
-            String evaluationOutcome,
-            Map<String, String> levels,
-            List<String> acceptedKeys,
-            List<String> droppedKeys,
-            int modelCalls,
-            long simulatedLatencyMs,
-            long simulatedTokens,
-            long simulatedCostMicroUsd,
-            int autonomousStarted,
-            boolean reportSurfaced,
-            long evaluationTotal,
-            long notificationDelta,
-            long followUpDelta,
-            long approvalDelta) {}
+        int day,
+        String label,
+        boolean consented,
+        long checkId,
+        String loopStatus,
+        String skippedReason,
+        String errorCode,
+        String evaluationOutcome,
+        Map<String, String> levels,
+        List<String> acceptedKeys,
+        List<String> droppedKeys,
+        int modelCalls,
+        long simulatedLatencyMs,
+        long simulatedTokens,
+        long simulatedCostMicroUsd,
+        int autonomousStarted,
+        boolean reportSurfaced,
+        long evaluationTotal,
+        long notificationDelta,
+        long followUpDelta,
+        long approvalDelta) {
+    }
 
     /** 7일 합계다. 흉내 값은 fixture 가 적은 provider 기록에 호출 수를 곱한 것이다. */
     private record Summary(
-            int importantTotal,
-            long importantHits,
-            long duplicatesPassed,
-            int silentTotal,
-            long silentKept,
-            long failures,
-            int modelCalls,
-            long simulatedLatencyMs,
-            long simulatedTokens,
-            long simulatedCostMicroUsd) {}
+        int importantTotal,
+        long importantHits,
+        long duplicatesPassed,
+        int silentTotal,
+        long silentKept,
+        long failures,
+        int modelCalls,
+        long simulatedLatencyMs,
+        long simulatedTokens,
+        long simulatedCostMicroUsd) {
+    }
 }

@@ -22,6 +22,7 @@ public final class ToolDetailPolicy {
     /** {@code MEMBER} 역할에게도 {@code detail} 을 싣는 도구다. */
     static final Set<String> PUBLIC_TOOLS = Set.of("web_search", "vision_analyze");
 
+
     /** 이 사람에게 이 도구의 {@code detail} 을 실어도 되는가. 도구 이름이 없으면 싣지 않는다. */
     public static boolean visibleTo(CurrentUser viewer, String toolName) {
         if (viewer.isAdmin()) {

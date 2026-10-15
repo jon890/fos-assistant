@@ -10,4 +10,5 @@ import com.bifos.assistant.usage.application.model.MemoryUseVia;
  * @param memoryId Memory 번호
  * @param via 받은 길
  */
-public record ExecutionMemoryRef(Long executionId, Long agentId, Long memoryId, MemoryUseVia via) {}
+public record ExecutionMemoryRef(Long executionId, Long agentId, Long memoryId, MemoryUseVia via) {
+}

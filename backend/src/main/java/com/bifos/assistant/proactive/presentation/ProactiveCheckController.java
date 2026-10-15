@@ -23,11 +23,13 @@ public class ProactiveCheckController {
     private final ProactiveCheckService checks;
     private final CurrentUserProvider currentUser;
 
+
     /** 살펴보기를 할 수 있는지, 막는 까닭, 요청자의 점검 대화, 요청자의 마지막 살펴보기를 준다. */
     @GetMapping
     public StatusResponse status(@PathVariable String code) {
         return StatusResponse.from(checks.status(currentUser.require(), code));
     }
+
 
     /** 살펴보기를 시작하고 곧바로 202 와 점검 대화의 공개 식별자를 준다. 결과는 그 대화의 SSE 와 이력으로 간다. */
     @PostMapping("/runs")

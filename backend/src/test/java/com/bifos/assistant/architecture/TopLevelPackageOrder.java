@@ -22,34 +22,36 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
 
     /** 최상위 패키지의 층 순서. 아래에서 위로 적는다. */
     static final List<String> ORDER = List.of(
-            "crypto",
-            "hermes",
-            "user",
-            "browser",
-            "notification",
-            "model",
-            "agent",
-            "skill",
-            "usage",
-            "feedback",
-            "memory",
-            "context",
-            "chat",
-            "followup",
-            "proactive",
-            "orchestration",
-            "mcp",
-            "people",
-            "connector",
-            "task",
-            "attention",
-            "workspace");
+        "crypto",
+        "hermes",
+        "user",
+        "browser",
+        "notification",
+        "model",
+        "agent",
+        "skill",
+        "usage",
+        "feedback",
+        "memory",
+        "context",
+        "chat",
+        "followup",
+        "proactive",
+        "orchestration",
+        "mcp",
+        "people",
+        "connector",
+        "task",
+        "attention",
+        "workspace");
 
     private TopLevelPackageEdges edges = TopLevelPackageEdges.of(List.of());
+
 
     TopLevelPackageOrder() {
         super("최상위 패키지가 층 순서의 아래쪽만 쓴다");
     }
+
 
     /**
      * 패키지 하나의 위반 문구를 이름 순으로 돌려준다.
@@ -69,10 +71,12 @@ final class TopLevelPackageOrder extends ArchCondition<JavaClass> {
         return violations;
     }
 
+
     @Override
     public void init(Collection<JavaClass> allObjectsToTest) {
         edges = TopLevelPackageEdges.of(allObjectsToTest);
     }
+
 
     @Override
     public void check(JavaClass item, ConditionEvents events) {

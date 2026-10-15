@@ -13,12 +13,13 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param root 결과물 폴더의 루트. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을 멈춘다
  * @param agentRoot 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. 에이전트에게 폴더 자리를 알릴 때 이것을
- *     적는다. 비어 있으면 기동을 멈춘다
+ * 적는다. 비어 있으면 기동을 멈춘다
  * @param retentionDays 파일이 마지막으로 바뀐 뒤 두는 날 수
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.artifact")
 public record ArtifactProperties(String root, String agentRoot, Integer retentionDays) {
+
 
     private static final int DEFAULT_RETENTION_DAYS = 30;
 

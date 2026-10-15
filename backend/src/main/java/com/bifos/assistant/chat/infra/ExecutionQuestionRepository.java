@@ -24,6 +24,7 @@ public interface ExecutionQuestionRepository extends JpaRepository<ExecutionQues
             """)
     boolean existsRunWithoutQuestion(@Param("conversationId") Long conversationId);
 
+
     /** 그 대화의 실행에 이은 질문 줄을 모두 지운다. 트랜잭션은 {@code ConversationPurgeWriter} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""

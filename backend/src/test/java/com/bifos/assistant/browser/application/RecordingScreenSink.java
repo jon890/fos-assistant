@@ -23,8 +23,11 @@ final class RecordingScreenSink implements BrowserScreenSink {
 
     private volatile Runnable onClose;
 
+
     /** 받은 사건 하나다. */
-    record Event(String name, Object data) {}
+    record Event(String name, Object data) {
+    }
+
 
     @Override
     public boolean send(String event, Object data) {
@@ -47,25 +50,30 @@ final class RecordingScreenSink implements BrowserScreenSink {
         return true;
     }
 
+
     @Override
     public boolean trySend(String event, Object data) {
         return !writing && send(event, data);
     }
+
 
     @Override
     public boolean ping() {
         return !pingFailing && !completed;
     }
 
+
     @Override
     public void complete() {
         completed = true;
     }
 
+
     @Override
     public void onClose(Runnable callback) {
         onClose = callback;
     }
+
 
     /** 받는 쪽이 먼저 끊긴 것처럼 건 일을 부른다. */
     void disconnect() {
@@ -73,12 +81,14 @@ final class RecordingScreenSink implements BrowserScreenSink {
         onClose.run();
     }
 
+
     List<Object> data(String name) {
         return events.stream()
-                .filter(event -> event.name().equals(name))
-                .map(Event::data)
-                .toList();
+            .filter(event -> event.name().equals(name))
+            .map(Event::data)
+            .toList();
     }
+
 
     /** 조건이 참이 될 때까지 2초까지 기다린다. */
     static void await(BooleanSupplier condition) throws InterruptedException {

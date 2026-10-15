@@ -7,4 +7,5 @@ package com.bifos.assistant.browser.domain;
  * @param profileKey 라벨에 적힌 프로필 키. 라벨이 없으면 비어 있다
  * @param running 켜져 있는가
  */
-public record RuntimeContainer(String id, String profileKey, boolean running) {}
+public record RuntimeContainer(String id, String profileKey, boolean running) {
+}

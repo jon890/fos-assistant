@@ -29,14 +29,14 @@ import org.springframework.data.domain.Persistable;
 /** 승인 줄에 속한 불변 금융 실행 내용이다. 본문은 contentKeyId가 있으면 암호문이다. */
 @Entity
 @Table(
-        name = "connector_action_execution",
-        indexes = @Index(name = "idx_connector_action_execution_request", columnList = "request_key"),
-        uniqueConstraints = {
-            @UniqueConstraint(name = "uk_connector_action_execution_ticket", columnNames = "ticket_id"),
-            @UniqueConstraint(
-                    name = "uk_connector_action_execution_supersedes",
-                    columnNames = "supersedes_unknown_action_id")
-        })
+    name = "connector_action_execution",
+    indexes = @Index(name = "idx_connector_action_execution_request", columnList = "request_key"),
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_connector_action_execution_ticket", columnNames = "ticket_id"),
+        @UniqueConstraint(
+            name = "uk_connector_action_execution_supersedes",
+            columnNames = "supersedes_unknown_action_id")
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -108,22 +108,23 @@ public class ConnectorActionExecution implements Persistable<Long> {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+
     /** 검증하고 암호화한 값을 담는다. 원래 action의 인자와 상태를 바꾸지 않는다. */
     public static ConnectorActionExecution stored(
-            ConnectorAction action,
-            Long connectionId,
-            Long bindingId,
-            Instant connectionUpdatedAt,
-            Instant bindingUpdatedAt,
-            String executionArgsJson,
-            String summaryJson,
-            String scopeJson,
-            Long contentKeyId,
-            String executionArgsSha256,
-            String scopeSha256,
-            String requestKey,
-            String protocol,
-            Instant now) {
+        ConnectorAction action,
+        Long connectionId,
+        Long bindingId,
+        Instant connectionUpdatedAt,
+        Instant bindingUpdatedAt,
+        String executionArgsJson,
+        String summaryJson,
+        String scopeJson,
+        Long contentKeyId,
+        String executionArgsSha256,
+        String scopeSha256,
+        String requestKey,
+        String protocol,
+        Instant now) {
         ConnectorActionExecution row = new ConnectorActionExecution();
         row.action = Objects.requireNonNull(action);
         row.actionId = Objects.requireNonNull(action.id());
@@ -143,11 +144,13 @@ public class ConnectorActionExecution implements Persistable<Long> {
         return row;
     }
 
+
     /** 기존 승인 번호를 기본 키로 쓰므로 새 내용은 persist 경로로 저장한다. */
     @Override
     public Long getId() {
         return actionId();
     }
+
 
     /** 한 번 발급한 권한은 만료되거나 응답이 유실돼도 다시 발급하지 않는다. */
     public void issueTicket(UUID id, Instant expiry) {
@@ -158,21 +161,24 @@ public class ConnectorActionExecution implements Persistable<Long> {
         ticketExpiresAt = Objects.requireNonNull(expiry);
     }
 
+
     /** 같은 식별자의 미만료 권한만 한 번 소비한다. */
     public void consumeTicket(UUID id, Instant now) {
         if (!Objects.equals(ticketId, id)
-                || ticketExpiresAt == null
-                || consumedAt != null
-                || !now.isBefore(ticketExpiresAt)) {
+            || ticketExpiresAt == null
+            || consumedAt != null
+            || !now.isBefore(ticketExpiresAt)) {
             throw new IllegalStateException("financial execution unavailable");
         }
         consumedAt = now;
     }
 
+
     @Override
     public boolean isNew() {
         return !persisted;
     }
+
 
     @PostLoad
     @PostPersist

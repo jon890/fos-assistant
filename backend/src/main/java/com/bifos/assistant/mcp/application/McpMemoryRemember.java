@@ -43,60 +43,62 @@ public class McpMemoryRemember {
      * {@code tool_search} 와 {@code tool_describe} 는 도구 정의만 읽는다. 실행을 중계하는 {@code tool_call} 은 넣지 않는다.
      */
     static final Set<String> INTERNAL_TOOLS = Set.of(
-            "mcp__fos_assistant__memory_read",
-            "mcp__fos_assistant__memory_remember",
-            "mcp__fos_assistant__follow_up_propose",
-            "mcp__fos_assistant__agent_list",
-            "mcp__fos_assistant__agent_delegate",
-            "mcp__fos_assistant__artifact_write",
-            "todo",
-            "tool_search",
-            "tool_describe");
+        "mcp__fos_assistant__memory_read",
+        "mcp__fos_assistant__memory_remember",
+        "mcp__fos_assistant__follow_up_propose",
+        "mcp__fos_assistant__agent_list",
+        "mcp__fos_assistant__agent_delegate",
+        "mcp__fos_assistant__artifact_write",
+        "todo",
+        "tool_search",
+        "tool_describe");
 
     static final String MEMORY_REMEMBER_DESCRIPTION = "사용자에 관한 오래 쓰일 사실을 기억으로 남긴다. "
-            + "남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다(예: 「아들 이름은 홍길동이다」, 「매운 음식을 못 먹는다」). "
-            + "작업 기록, 한 번만 쓰일 요청, 대화 요약, 메일이나 웹이나 도구 결과에서 읽은 내용은 남기지 않는다. "
-            + "사용자가 이번 메시지에서 직접 말한 사실을 content 에 짧게 옮긴다. "
-            + "「못」, 「안」, 「않」, 「없」, 「아니」 같은 부정은 content 에 그대로 살린다. "
-            + "조건이 맞으면 바로 저장되고, 아니면 제안으로 남아 사용자가 받아들여야 한다. 결과 글대로 사용자에게 알린다. "
-            + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고친다. "
-            + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. 한 번의 답에서 3개까지 남긴다.";
+        + "남길 것은 가족 구성, 이름과 관계, 선호, 상황, 결정이다(예: 「아들 이름은 홍길동이다」, 「매운 음식을 못 먹는다」). "
+        + "작업 기록, 한 번만 쓰일 요청, 대화 요약, 메일이나 웹이나 도구 결과에서 읽은 내용은 남기지 않는다. "
+        + "사용자가 이번 메시지에서 직접 말한 사실을 content 에 짧게 옮긴다. "
+        + "「못」, 「안」, 「않」, 「없」, 「아니」 같은 부정은 content 에 그대로 살린다. "
+        + "조건이 맞으면 바로 저장되고, 아니면 제안으로 남아 사용자가 받아들여야 한다. 결과 글대로 사용자에게 알린다. "
+        + "이미 기억한 사실이 바뀌었으면 지시문에 있는 번호를 memory_id 로 주어 그 항목을 고친다. "
+        + "건강, 금융, 신념처럼 민감한 내용은 sensitive 를 true 로 준다. 한 번의 답에서 3개까지 남긴다.";
 
     private final MemoryService memories;
     private final MemoryCaptureService memoryCaptures;
     private final TurnQuestions turnQuestions;
     private final ExecutionEventRepository executionEvents;
 
+
     /** {@code tools/list} 에 싣는 도구 정의다. Control Plane 도구 가운데 마지막이다. */
     Map<String, Object> definition() {
         return Map.of(
-                "name",
-                "memory_remember",
-                "description",
-                MEMORY_REMEMBER_DESCRIPTION,
-                "inputSchema",
+            "name",
+            "memory_remember",
+            "description",
+            MEMORY_REMEMBER_DESCRIPTION,
+            "inputSchema",
+            Map.of(
+                "type",
+                "object",
+                "additionalProperties",
+                false,
+                "properties",
                 Map.of(
-                        "type",
-                        "object",
-                        "additionalProperties",
-                        false,
-                        "properties",
-                        Map.of(
-                                "title",
-                                Map.of("type", "string", "minLength", 1, "maxLength", MEMORY_TITLE_MAX),
-                                "content",
-                                Map.of("type", "string", "minLength", 1, "maxLength", MEMORY_CONTENT_MAX),
-                                "evidence",
-                                Map.of("type", "string", "maxLength", MEMORY_EVIDENCE_MAX),
-                                "memory_id",
-                                Map.of("type", "integer"),
-                                "collection",
-                                Map.of("type", "string"),
-                                "sensitive",
-                                Map.of("type", "boolean")),
-                        "required",
-                        List.of("title", "content")));
+                    "title",
+                    Map.of("type", "string", "minLength", 1, "maxLength", MEMORY_TITLE_MAX),
+                    "content",
+                    Map.of("type", "string", "minLength", 1, "maxLength", MEMORY_CONTENT_MAX),
+                    "evidence",
+                    Map.of("type", "string", "maxLength", MEMORY_EVIDENCE_MAX),
+                    "memory_id",
+                    Map.of("type", "integer"),
+                    "collection",
+                    Map.of("type", "string"),
+                    "sensitive",
+                    Map.of("type", "boolean")),
+                "required",
+                List.of("title", "content")));
     }
+
 
     /**
      * 사람에 관한 사실 하나를 바로 저장하거나 제안으로 남기고 그 결과를 한 줄 글로 돌려준다(ADR-20261007 / memory-remember). 결과마다의
@@ -111,13 +113,13 @@ public class McpMemoryRemember {
      * @param collection 둘 collection. 없으면 null
      */
     Map<String, Object> remember(
-            McpCaller caller,
-            String title,
-            String content,
-            String evidence,
-            Long memoryId,
-            String collection,
-            boolean sensitive) {
+        McpCaller caller,
+        String title,
+        String content,
+        String evidence,
+        Long memoryId,
+        String collection,
+        boolean sensitive) {
         AgentExecution origin = caller.originExecution();
         MemoryAccess access = memories.accessOf(origin.agentId());
         if (access.isEmpty()) {
@@ -139,23 +141,23 @@ public class McpMemoryRemember {
         }
         boolean direct = directAllowed(caller, origin, strippedContent);
         MemoryRememberResult remembered = memoryCaptures.remember(
-                caller.user(),
-                access,
-                new MemoryRememberRequest(
-                        strippedTitle,
-                        strippedContent,
-                        collection,
-                        sensitive ? MemorySensitivity.SENSITIVE : MemorySensitivity.NORMAL,
-                        memoryId,
-                        origin.id(),
-                        origin.conversationId(),
-                        direct));
-        log.info(
-                "memory remember userId={} executionId={} direct={} outcome={}",
-                caller.user().id(),
+            caller.user(),
+            access,
+            new MemoryRememberRequest(
+                strippedTitle,
+                strippedContent,
+                collection,
+                sensitive ? MemorySensitivity.SENSITIVE : MemorySensitivity.NORMAL,
+                memoryId,
                 origin.id(),
-                direct,
-                remembered.outcome());
+                origin.conversationId(),
+                direct));
+        log.info(
+            "memory remember userId={} executionId={} direct={} outcome={}",
+            caller.user().id(),
+            origin.id(),
+            direct,
+            remembered.outcome());
         return switch (remembered.outcome()) {
             case REMEMBERED -> result("기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다.", false);
             case UPDATED -> result("기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.", false);
@@ -171,6 +173,7 @@ public class McpMemoryRemember {
         };
     }
 
+
     /**
      * 바로 저장 조건 가운데 실행의 출처로 정하는 것이다(ADR-20261007 / memory-remember). 민감도와 collection 과 상한은 {@link MemoryCaptureService} 가
      * 본다.
@@ -185,14 +188,14 @@ public class McpMemoryRemember {
         if (origin.parentExecutionId() != null || origin.conversationId() == null) {
             return false;
         }
-        Optional<String> question =
-                turnQuestions.questionOf(origin.id(), caller.user().id());
+        Optional<String> question = turnQuestions.questionOf(origin.id(), caller.user().id());
         if (question.isEmpty() || NegationMarkers.present(question.get()) != NegationMarkers.present(content)) {
             return false;
         }
         return !executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), INTERNAL_TOOLS)
-                && !turnQuestions.hasRunWithoutQuestion(origin.conversationId());
+            && !turnQuestions.hasRunWithoutQuestion(origin.conversationId());
     }
+
 
     private static boolean within(String text, int min, int max) {
         int length = text.codePointCount(0, text.length());

@@ -12,19 +12,19 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "assistant.value-evaluation")
 @Validated
 public record ValueEvaluationProperties(
-        @DefaultValue("false") boolean enabled,
-        String profile,
-        String provider,
-        String model,
-        String reasoningEffort,
-        @DefaultValue("30s") Duration timeout,
-        @DefaultValue("SUBSCRIPTION") CostMode costMode) {
+    @DefaultValue("false") boolean enabled,
+    String profile,
+    String provider,
+    String model,
+    String reasoningEffort,
+    @DefaultValue("30s") Duration timeout,
+    @DefaultValue("SUBSCRIPTION") CostMode costMode) {
 
     public ValueEvaluationProperties {
         if (timeout == null
-                || timeout.isNegative()
-                || timeout.isZero()
-                || timeout.compareTo(Duration.ofMinutes(2)) > 0) {
+            || timeout.isNegative()
+            || timeout.isZero()
+            || timeout.compareTo(Duration.ofMinutes(2)) > 0) {
             throw new IllegalArgumentException("value evaluation timeout must be positive and at most 2 minutes");
         }
         ModelChoice.of(provider, model, reasoningEffort);

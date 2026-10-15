@@ -19,7 +19,7 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.data-encryption")
 public record DataEncryptionProperties(
-        String kekFile, String activeKekId, boolean required, Duration dekCacheTtl, int dekCacheMaxEntries) {
+    String kekFile, String activeKekId, boolean required, Duration dekCacheTtl, int dekCacheMaxEntries) {
 
     public DataEncryptionProperties {
         kekFile = kekFile == null ? "" : kekFile.strip();
@@ -35,6 +35,7 @@ public record DataEncryptionProperties(
             throw new IllegalArgumentException("data encryption: required 인데 kek-file 이 비어 있다");
         }
     }
+
 
     public boolean configured() {
         return !kekFile.isEmpty();

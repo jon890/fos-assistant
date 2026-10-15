@@ -32,20 +32,22 @@ class ConnectorPolicyRequestTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     @Test
     @DisplayName("계약대로 계산한 서명 벡터는 통과하고 본문의 값을 그대로 돌려준다")
     void acceptsSignatureVector() {
         ConnectorPolicyRequest request = ConnectorPolicyRequest.verify(vector(), VECTOR_TOKEN_HASH);
 
         assertThat(request)
-                .isEqualTo(new ConnectorPolicyRequest(
-                        VECTOR_ROOT_SESSION_ID,
-                        VECTOR_SESSION_ID,
-                        VECTOR_TOOL_CALL_ID,
-                        VECTOR_HERMES_TOOL,
-                        "write_note",
-                        VECTOR_ARGS_JSON));
+            .isEqualTo(new ConnectorPolicyRequest(
+                VECTOR_ROOT_SESSION_ID,
+                VECTOR_SESSION_ID,
+                VECTOR_TOOL_CALL_ID,
+                VECTOR_HERMES_TOOL,
+                "write_note",
+                VECTOR_ARGS_JSON));
     }
+
 
     @Test
     @DisplayName("tool 이 null 이어도 통과한다. tool 은 서명에 들어가지 않는다")
@@ -54,8 +56,9 @@ class ConnectorPolicyRequestTest {
         body.putNull("tool");
 
         assertThat(ConnectorPolicyRequest.verify(body, VECTOR_TOKEN_HASH).tool())
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("args_json 한 글자를 바꾸면 거절한다")
@@ -65,6 +68,7 @@ class ConnectorPolicyRequestTest {
 
         assertRejected(() -> ConnectorPolicyRequest.verify(body, VECTOR_TOKEN_HASH));
     }
+
 
     @Test
     @DisplayName("서명한 다른 칸을 바꿔도 거절한다")
@@ -77,6 +81,7 @@ class ConnectorPolicyRequestTest {
         }
     }
 
+
     @Test
     @DisplayName("sig 를 바꾸거나 다른 토큰의 해시로 확인하면 거절한다")
     void rejectsChangedSignatureOrOtherToken() {
@@ -86,6 +91,7 @@ class ConnectorPolicyRequestTest {
         assertRejected(() -> ConnectorPolicyRequest.verify(body, VECTOR_TOKEN_HASH));
         assertRejected(() -> ConnectorPolicyRequest.verify(vector(), "f".repeat(64)));
     }
+
 
     @Test
     @DisplayName("args_json 이 JSON 객체가 아니면 서명이 맞아도 거절한다")
@@ -101,6 +107,7 @@ class ConnectorPolicyRequestTest {
         assertRejected(() -> ConnectorPolicyRequest.verify(notJson, VECTOR_TOKEN_HASH));
     }
 
+
     @Test
     @DisplayName("tool 이 도구 이름 형식이 아니거나 문자열이 아니면 거절한다")
     void rejectsToolThatIsNotToolName() {
@@ -115,6 +122,7 @@ class ConnectorPolicyRequestTest {
         assertRejected(() -> ConnectorPolicyRequest.verify(number, VECTOR_TOKEN_HASH));
         assertRejected(() -> ConnectorPolicyRequest.verify(tooLong, VECTOR_TOKEN_HASH));
     }
+
 
     @Test
     @DisplayName("v 가 정수 1 이 아니거나 칸이 빠졌거나 본문이 객체가 아니면 거절한다")
@@ -133,6 +141,7 @@ class ConnectorPolicyRequestTest {
         assertRejected(() -> ConnectorPolicyRequest.verify(null, VECTOR_TOKEN_HASH));
     }
 
+
     private static ObjectNode vector() {
         ObjectNode body = JSON.createObjectNode();
         body.put("v", 1);
@@ -146,9 +155,10 @@ class ConnectorPolicyRequestTest {
         return body;
     }
 
+
     private static void assertRejected(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_POLICY_REJECTED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_POLICY_REJECTED));
     }
 }

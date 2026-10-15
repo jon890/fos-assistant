@@ -11,14 +11,14 @@ import java.time.Instant;
  * @param model 모델 이름
  */
 public record CostByModel(
-        String provider,
-        String model,
-        Long executions,
-        Long estimatedMicros,
-        Long actualMicros,
-        Long inputTokens,
-        Long outputTokens,
-        Double avgContextChars,
-        Instant firstSeenAt,
-        Instant lastSeenAt) {
+    String provider,
+    String model,
+    Long executions,
+    Long estimatedMicros,
+    Long actualMicros,
+    Long inputTokens,
+    Long outputTokens,
+    Double avgContextChars,
+    Instant firstSeenAt,
+    Instant lastSeenAt) {
 }

@@ -20,11 +20,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "proactive_loop_setting",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_proactive_loop_setting_user_agent",
-                        columnNames = {"user_id", "agent_id"}))
+    name = "proactive_loop_setting",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_proactive_loop_setting_user_agent",
+        columnNames = {"user_id", "agent_id"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
@@ -50,8 +49,9 @@ public class ProactiveLoopSetting {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     public static ProactiveLoopSetting of(
-            Long userId, Long agentId, boolean enabled, Instant snoozedUntil, Instant now) {
+        Long userId, Long agentId, boolean enabled, Instant snoozedUntil, Instant now) {
         ProactiveLoopSetting row = new ProactiveLoopSetting();
         row.userId = userId;
         row.agentId = agentId;
@@ -61,11 +61,13 @@ public class ProactiveLoopSetting {
         return row;
     }
 
+
     public void change(boolean enabled, Instant snoozedUntil, Instant now) {
         this.enabled = enabled;
         this.snoozedUntil = snoozedUntil;
         this.updatedAt = now;
     }
+
 
     /** 지금 쉬는 중이다. 쉬기 시각이 지났으면 비운 것과 같다. */
     public boolean snoozedAt(Instant now) {

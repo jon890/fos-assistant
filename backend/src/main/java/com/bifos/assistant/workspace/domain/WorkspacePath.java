@@ -17,6 +17,7 @@ public record WorkspacePath(List<String> segments) {
     private static final int MAX_SEGMENT_BYTES = 255;
     private static final int MAX_SEGMENTS = 64;
 
+
     public WorkspacePath {
         segments = List.copyOf(segments);
         if (segments.size() > MAX_SEGMENTS) {
@@ -35,6 +36,7 @@ public record WorkspacePath(List<String> segments) {
         }
     }
 
+
     /** 목록의 {@code path} 인자를 읽는다. {@code null} 과 빈 값은 주인 디렉터리다. */
     public static WorkspacePath parse(String raw) {
         if (raw == null || raw.isEmpty()) {
@@ -46,24 +48,29 @@ public record WorkspacePath(List<String> segments) {
         return new WorkspacePath(List.of(raw.split("/", -1)));
     }
 
+
     /** 본문 경로처럼 이미 조각으로 나눈 값을 받는다. 검사는 {@link #parse} 와 같다. */
     public static WorkspacePath ofSegments(List<String> segments) {
         return new WorkspacePath(segments);
     }
 
+
     public boolean isRoot() {
         return segments.isEmpty();
     }
+
 
     /** 조각을 {@code /} 로 이은 값이다. 주인 디렉터리는 빈 문자열이다. */
     public String value() {
         return String.join("/", segments);
     }
 
+
     /** 마지막 조각이다. 주인 디렉터리는 빈 문자열이다. */
     public String name() {
         return segments.isEmpty() ? "" : segments.get(segments.size() - 1);
     }
+
 
     /**
      * 이름을 본문 주소의 조각으로 쓸 수 있는지다. {@code %}, {@code ;}, {@code \} 는 Control Plane 의 요청 방화벽이 주소에서
@@ -73,13 +80,16 @@ public record WorkspacePath(List<String> segments) {
         return name.indexOf('%') < 0 && name.indexOf(';') < 0 && name.indexOf('\\') < 0 && !hasControl(name);
     }
 
+
     private static boolean hasControl(String value) {
         return value.chars().anyMatch(c -> c < 0x20 || c == 0x7f);
     }
 
+
     private static int bytes(String value) {
         return value.getBytes(StandardCharsets.UTF_8).length;
     }
+
 
     private static ApiException invalid(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);

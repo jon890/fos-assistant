@@ -10,4 +10,5 @@ package com.bifos.assistant.usage.domain;
  * @param id 대화 번호
  * @param reasoningEffort 대화가 고른 값이고 고르지 않았으면 null 이다
  */
-public record ExecutionConversation(Long id, String reasoningEffort) {}
+public record ExecutionConversation(Long id, String reasoningEffort) {
+}

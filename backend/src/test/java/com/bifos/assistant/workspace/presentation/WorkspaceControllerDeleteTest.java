@@ -60,19 +60,22 @@ class WorkspaceControllerDeleteTest {
     private final List<String> calls = new ArrayList<>();
     private RuntimeException helperFailure;
 
+
     @BeforeEach
     void setUp() throws Exception {
         SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(MEMBER, null, List.of()));
+            .setAuthentication(new UsernamePasswordAuthenticationToken(MEMBER, null, List.of()));
         Files.createDirectory(root.resolve("u301"));
         Path sibling = Files.createDirectories(root.resolve("u302"));
         Files.writeString(sibling.resolve("b.txt"), "sibling");
     }
 
+
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
     }
+
 
     @Test
     @DisplayName("요청자의 파일을 지우면 도우미가 받은 주인은 요청자이고 경로는 요청한 경로다")
@@ -80,14 +83,15 @@ class WorkspaceControllerDeleteTest {
         Files.writeString(root.resolve("u301/a.txt"), "mine");
 
         mvc(SOCKET)
-                .perform(delete("/api/v1/workspace/entries").param("path", "a.txt"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.kind").value("FILE"))
-                .andExpect(jsonPath("$.entries").value(1))
-                .andExpect(jsonPath("$.bytes").value(4));
+            .perform(delete("/api/v1/workspace/entries").param("path", "a.txt"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.kind").value("FILE"))
+            .andExpect(jsonPath("$.entries").value(1))
+            .andExpect(jsonPath("$.bytes").value(4));
 
         assertThat(calls).containsExactly("u301 a.txt 10000");
     }
+
 
     @Test
     @DisplayName("상위 조각은 400 이고 남의 공간에만 있는 경로는 404 이며 도우미를 부르지 않는다")
@@ -95,14 +99,15 @@ class WorkspaceControllerDeleteTest {
         MockMvc mvc = mvc(SOCKET);
 
         mvc.perform(delete("/api/v1/workspace/entries").param("path", "../u302/b.txt"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
         mvc.perform(delete("/api/v1/workspace/entries").param("path", "b.txt"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_ENTRY_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_ENTRY_NOT_FOUND.name()));
 
         assertThat(calls).isEmpty();
     }
+
 
     @Test
     @DisplayName("빈 경로는 400 이고 링크를 지나는 경로는 404 이며 도우미를 부르지 않는다")
@@ -111,17 +116,18 @@ class WorkspaceControllerDeleteTest {
         MockMvc mvc = mvc(SOCKET);
 
         mvc.perform(delete("/api/v1/workspace/entries").param("path", ""))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
         mvc.perform(delete("/api/v1/workspace/entries"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
         mvc.perform(delete("/api/v1/workspace/entries").param("path", "peek/b.txt"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_ENTRY_NOT_FOUND.name()));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_ENTRY_NOT_FOUND.name()));
 
         assertThat(calls).isEmpty();
     }
+
 
     @Test
     @DisplayName("도우미가 항목이 너무 많다고 답하면 409 다")
@@ -130,12 +136,13 @@ class WorkspaceControllerDeleteTest {
         helperFailure = new ApiException(ErrorCode.WORKSPACE_DELETE_TOO_MANY, "too many");
 
         mvc(SOCKET)
-                .perform(delete("/api/v1/workspace/entries").param("path", "many"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_DELETE_TOO_MANY.name()));
+            .perform(delete("/api/v1/workspace/entries").param("path", "many"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_DELETE_TOO_MANY.name()));
 
         assertThat(calls).containsExactly("u301 many 10000");
     }
+
 
     @Test
     @DisplayName("socket 이 비면 지우기는 503 이고 상태의 deletable 이 거짓이다")
@@ -144,12 +151,13 @@ class WorkspaceControllerDeleteTest {
         MockMvc mvc = mvc("");
 
         mvc.perform(delete("/api/v1/workspace/entries").param("path", "a.txt"))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_DELETE_UNAVAILABLE.name()));
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.code").value(ErrorCode.WORKSPACE_DELETE_UNAVAILABLE.name()));
         mvc.perform(get("/api/v1/workspace")).andExpect(jsonPath("$.deletable").value(false));
 
         assertThat(calls).isEmpty();
     }
+
 
     private MockMvc mvc(String socket) {
         WorkspaceDeleter deleter = (owner, path, maxEntries) -> {
@@ -160,12 +168,12 @@ class WorkspaceControllerDeleteTest {
             return new WorkspaceDeletion(WorkspaceEntryKind.FILE, 1, 4);
         };
         WorkspaceService service = new WorkspaceService(
-                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(root.toString(), socket)),
-                agentService,
-                limiter,
-                deleter);
+            LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(root.toString(), socket)),
+            agentService,
+            limiter,
+            deleter);
         return MockMvcBuilders.standaloneSetup(new WorkspaceController(service, new CurrentUserProvider()))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
 }

@@ -6,4 +6,5 @@ package com.bifos.assistant.chat.application.model;
  * @param deliveryId 전달 묶음 번호
  * @param attemptId 첫 시도 번호
  */
-public record ResultDeliveryStart(Long deliveryId, Long attemptId) {}
+public record ResultDeliveryStart(Long deliveryId, Long attemptId) {
+}

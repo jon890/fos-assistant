@@ -17,6 +17,7 @@ public record ChildResult(Long executionId, boolean succeeded, String output, St
         return new ChildResult(executionId, true, output == null ? "" : output, null);
     }
 
+
     public static ChildResult failed(Long executionId, String errorCode) {
         return new ChildResult(executionId, false, null, errorCode);
     }

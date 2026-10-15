@@ -16,15 +16,15 @@ import java.util.List;
  * @param problems 검사의 문제 뒤에 에이전트에 따른 문제를 붙인 것. 50개까지다
  */
 public record SkillPackagePreview(
-        String name,
-        String description,
-        String skillMdHead,
-        boolean existing,
-        String baseDigest,
-        boolean hasScripts,
-        List<SkillPackageFile> files,
-        List<String> ignored,
-        List<SkillPackageProblem> problems) {
+    String name,
+    String description,
+    String skillMdHead,
+    boolean existing,
+    String baseDigest,
+    boolean hasScripts,
+    List<SkillPackageFile> files,
+    List<String> ignored,
+    List<SkillPackageProblem> problems) {
 
     public SkillPackagePreview {
         files = List.copyOf(files);

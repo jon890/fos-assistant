@@ -21,13 +21,13 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.task")
 public record TaskProperties(
-        @DefaultValue("*/30 * * * * *") String dispatchCron,
-        @DefaultValue("2m") Duration missedGrace,
-        @DefaultValue("10m") Duration startTimeout,
-        @DefaultValue("10") int maxPerUser,
-        @DefaultValue("15m") Duration minInterval,
-        @DefaultValue("48") int maxRunsPerDay,
-        @DefaultValue("Asia/Seoul") String defaultTimeZone) {
+    @DefaultValue("*/30 * * * * *") String dispatchCron,
+    @DefaultValue("2m") Duration missedGrace,
+    @DefaultValue("10m") Duration startTimeout,
+    @DefaultValue("10") int maxPerUser,
+    @DefaultValue("15m") Duration minInterval,
+    @DefaultValue("48") int maxRunsPerDay,
+    @DefaultValue("Asia/Seoul") String defaultTimeZone) {
 
     /** 잘못된 값이면 기동을 멈춘다. 작업을 하나도 만들지 못하거나 모든 시각이 거절되는데 기동은 성공해 알아채지 못한다. */
     public TaskProperties {
@@ -43,19 +43,22 @@ public record TaskProperties(
             ZoneId.of(defaultTimeZone);
         } catch (DateTimeException e) {
             throw new IllegalStateException(
-                    "assistant.task.default-time-zone is not a time zone: " + defaultTimeZone, e);
+                "assistant.task.default-time-zone is not a time zone: " + defaultTimeZone, e);
         }
     }
+
 
     public ZoneId defaultZone() {
         return ZoneId.of(defaultTimeZone);
     }
+
 
     private static void requirePositive(String name, Duration value) {
         if (value == null || value.isZero() || value.isNegative()) {
             throw new IllegalStateException("assistant.task." + name + " must be longer than zero: " + value);
         }
     }
+
 
     private static void requireAtLeastOne(String name, int value) {
         if (value < 1) {

@@ -31,31 +31,33 @@ class FileBrowserProfileStoreTest {
     private Path root;
     private FileBrowserProfileStore store;
 
+
     @BeforeEach
     void setUp() {
         root = temp.resolve("profiles");
         store = new FileBrowserProfileStore(LiveProperties.fixed(
-                BrowserProperties.class,
-                new BrowserProperties(
-                        false,
-                        null,
-                        null,
-                        null,
-                        null,
-                        root.toString(),
-                        null,
-                        null,
-                        1024,
-                        null,
-                        null,
-                        null,
-                        2,
-                        Duration.ofMinutes(10),
-                        Duration.ofSeconds(30),
-                        Duration.ofMinutes(30),
-                        null,
-                        null)));
+            BrowserProperties.class,
+            new BrowserProperties(
+                false,
+                null,
+                null,
+                null,
+                null,
+                root.toString(),
+                null,
+                null,
+                1024,
+                null,
+                null,
+                null,
+                2,
+                Duration.ofMinutes(10),
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(30),
+                null,
+                null)));
     }
+
 
     @Test
     @DisplayName("만들면 키 이름의 디렉터리가 주인만 쓰는 권한으로 생기고 다시 만들어도 그대로다")
@@ -70,9 +72,10 @@ class FileBrowserProfileStoreTest {
         assertThat(dir.resolve("Cookies")).exists();
         if (Files.getFileStore(dir).supportsFileAttributeView("posix")) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(dir)))
-                    .isEqualTo("rwx------");
+                .isEqualTo("rwx------");
         }
     }
+
 
     @Test
     @DisplayName("새 프로필에는 이전 세션을 이어서 여는 설정 파일을 주인만 읽는 권한으로 써 둔다")
@@ -83,9 +86,10 @@ class FileBrowserProfileStoreTest {
         assertThat(preferences).hasContent("{\"session\":{\"restore_on_startup\":1}}");
         if (Files.getFileStore(preferences).supportsFileAttributeView("posix")) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(preferences)))
-                    .isEqualTo("rw-------");
+                .isEqualTo("rw-------");
         }
     }
+
 
     @Test
     @DisplayName("설정 파일이 이미 있으면 내용을 그대로 두고, 설정 파일이 없던 기존 프로필에는 써 둔다")
@@ -101,6 +105,7 @@ class FileBrowserProfileStoreTest {
         assertThat(preferences).hasContent("{\"chrome\":\"owned\"}");
     }
 
+
     @Test
     @DisplayName("설정 파일 자리의 링크를 따라가지 않아 링크가 가리키는 파일은 그대로다")
     void doesNotFollowPreferencesLink() throws Exception {
@@ -114,6 +119,7 @@ class FileBrowserProfileStoreTest {
         assertThat(outside.resolve("target")).hasContent("keep");
     }
 
+
     @Test
     @DisplayName("Default 자리가 링크면 만들기를 거절하고 링크가 가리키는 곳에 쓰지 않는다")
     void doesNotWriteThroughLinkedDefault() throws Exception {
@@ -125,6 +131,7 @@ class FileBrowserProfileStoreTest {
 
         assertThat(outside.resolve("Preferences")).doesNotExist();
     }
+
 
     @Test
     @DisplayName("같은 프로필을 동시에 만들어도 모두 성공하고 설정 파일은 하나다")
@@ -149,8 +156,9 @@ class FileBrowserProfileStoreTest {
         }
 
         assertThat(root.resolve(KEY).resolve("Default/Preferences"))
-                .hasContent("{\"session\":{\"restore_on_startup\":1}}");
+            .hasContent("{\"session\":{\"restore_on_startup\":1}}");
     }
+
 
     @Test
     @DisplayName("지우면 디렉터리를 통째로 지우고 없는 디렉터리를 지워도 성공이다")
@@ -164,6 +172,7 @@ class FileBrowserProfileStoreTest {
 
         assertThat(root.resolve(KEY)).doesNotExist();
     }
+
 
     @Test
     @DisplayName("지울 때 디렉터리 안의 링크를 따라가지 않아 링크가 가리키는 곳은 남는다")
@@ -179,6 +188,7 @@ class FileBrowserProfileStoreTest {
         assertThat(outside.resolve("keep.txt")).hasContent("keep");
     }
 
+
     @Test
     @DisplayName("키 자리에 링크가 있으면 링크만 지우고 만들기는 거절한다")
     void treatsLinkedProfileAsLinkOnly() throws Exception {
@@ -193,6 +203,7 @@ class FileBrowserProfileStoreTest {
         assertThat(Files.exists(root.resolve(KEY), LinkOption.NOFOLLOW_LINKS)).isFalse();
         assertThat(outside.resolve("keep.txt")).hasContent("keep");
     }
+
 
     @Test
     @DisplayName("소문자 16진수 64자리가 아닌 키는 만들기와 지우기 모두 거절한다")

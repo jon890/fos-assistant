@@ -26,9 +26,11 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
     private final SSLSocketFactory sslSocketFactory;
     private final int port;
 
+
     public ArtifactSourceSocketTransport() {
-        this((SSLSocketFactory) SSLSocketFactory.getDefault(), HTTPS_PORT);
+        this((SSLSocketFactory)SSLSocketFactory.getDefault(), HTTPS_PORT);
     }
+
 
     /** TLS 검증에 쓸 factory와 포트를 바꿀 수 있는 좁은 생성자다. */
     ArtifactSourceSocketTransport(SSLSocketFactory sslSocketFactory, int port) {
@@ -39,21 +41,22 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
         this.port = port;
     }
 
+
     @Override
     public ArtifactSourceResponse get(
-            InetAddress address,
-            String host,
-            URI source,
-            Duration connectTimeout,
-            Duration readTimeout,
-            ArtifactSourceCancellation cancellation)
-            throws IOException {
+        InetAddress address,
+        String host,
+        URI source,
+        Duration connectTimeout,
+        Duration readTimeout,
+        ArtifactSourceCancellation cancellation)
+        throws IOException {
         Socket socket = new Socket();
         try {
             cancellation.register(socket);
-            socket.connect(new InetSocketAddress(address, port), (int) connectTimeout.toMillis());
-            socket.setSoTimeout((int) readTimeout.toMillis());
-            SSLSocket ssl = (SSLSocket) sslSocketFactory.createSocket(socket, host, port, true);
+            socket.connect(new InetSocketAddress(address, port), (int)connectTimeout.toMillis());
+            socket.setSoTimeout((int)readTimeout.toMillis());
+            SSLSocket ssl = (SSLSocket)sslSocketFactory.createSocket(socket, host, port, true);
             SSLParameters parameters = ssl.getSSLParameters();
             parameters.setEndpointIdentificationAlgorithm("HTTPS");
             parameters.setServerNames(List.of(new SNIHostName(host)));
@@ -74,6 +77,7 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
             throw ex;
         }
     }
+
 
     public static ArtifactSourceResponse parse(Socket socket, InputStream input) throws IOException {
         ByteArrayOutputStream header = new ByteArrayOutputStream();
@@ -125,11 +129,13 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
         return new ArtifactSourceResponse(200, Map.copyOf(headers), closeOnClose(input, socket));
     }
 
+
     public static byte[] requestBytes(String target, String host) {
         return ("GET " + target + " HTTP/1.1\r\nHost: " + host
-                        + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n")
+            + "\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n")
                 .getBytes(StandardCharsets.US_ASCII);
     }
+
 
     private static boolean isHeaderName(String value) {
         if (value.isEmpty()) {
@@ -138,14 +144,15 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
         for (int index = 0; index < value.length(); index++) {
             char character = value.charAt(index);
             if (!(character >= '0' && character <= '9')
-                    && !(character >= 'A' && character <= 'Z')
-                    && !(character >= 'a' && character <= 'z')
-                    && "!#$%&'*+-.^_`|~".indexOf(character) < 0) {
+                && !(character >= 'A' && character <= 'Z')
+                && !(character >= 'a' && character <= 'z')
+                && "!#$%&'*+-.^_`|~".indexOf(character) < 0) {
                 return false;
             }
         }
         return true;
     }
+
 
     private static InputStream closeOnClose(InputStream input, Socket socket) {
         return new FilterInputStream(input) {
@@ -160,20 +167,24 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
         };
     }
 
+
     private static final class ChunkedInputStream extends InputStream {
         private final InputStream input;
         private long remaining = -1;
         private boolean done;
 
+
         ChunkedInputStream(InputStream input) {
             this.input = input;
         }
+
 
         @Override
         public int read() throws IOException {
             byte[] one = new byte[1];
             return read(one) < 0 ? -1 : one[0] & 255;
         }
+
 
         @Override
         public int read(byte[] bytes, int off, int len) throws IOException {
@@ -186,7 +197,7 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
             if (done) {
                 return -1;
             }
-            int count = input.read(bytes, off, (int) Math.min(len, remaining));
+            int count = input.read(bytes, off, (int)Math.min(len, remaining));
             if (count < 0) {
                 throw new IOException("truncated chunk");
             }
@@ -198,6 +209,7 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
             }
             return count;
         }
+
 
         private void next() throws IOException {
             String line = readLine(input);
@@ -222,6 +234,7 @@ public final class ArtifactSourceSocketTransport implements ArtifactSourceTransp
                 done = true;
             }
         }
+
 
         private static String readLine(InputStream input) throws IOException {
             ByteArrayOutputStream line = new ByteArrayOutputStream();

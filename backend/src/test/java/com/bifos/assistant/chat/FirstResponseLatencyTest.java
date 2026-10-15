@@ -77,15 +77,16 @@ class FirstResponseLatencyTest {
     private LatencyAdminController controller;
     private final List<Conversation> savedConversations = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
-        FirstResponseLatencyService service =
-                new FirstResponseLatencyService(messages, scheduledTurns, Clock.fixed(NOW, ZoneOffset.UTC));
+        FirstResponseLatencyService service = new FirstResponseLatencyService(messages, scheduledTurns, Clock.fixed(NOW, ZoneOffset.UTC));
         controller = new LatencyAdminController(currentUser, service);
         when(currentUser.require()).thenReturn(admin(UserRole.ADMIN));
         // 관리자 확인은 대역이 아니라 실제 판정을 탄다.
         doCallRealMethod().when(currentUser).requireAdmin();
     }
+
 
     @AfterEach
     void tearDown() {
@@ -94,6 +95,7 @@ class FirstResponseLatencyTest {
         executions.deleteAll(savedExecutions);
         conversations.deleteAll(savedConversations);
     }
+
 
     @Test
     @DisplayName("사용자 질문 뒤 답이 있는 실행 셋은 첫 반응 시간의 건수와 중앙값과 90번째 백분위로 집계된다")
@@ -125,6 +127,7 @@ class FirstResponseLatencyTest {
         });
     }
 
+
     @Test
     @DisplayName("SYSTEM 알림 줄 뒤에 답한 자동 turn 은 세지 않는다")
     void doesNotCountAutoTurnAnsweredAfterSystemNotice() {
@@ -142,18 +145,17 @@ class FirstResponseLatencyTest {
         });
     }
 
+
     @Test
     @DisplayName("다시 생성한 두 번째 답의 실행도 사용자 turn 으로 센다")
     void countsExecutionOfRegeneratedAnswerAsUserTurn() {
         long conversationId = conversation(ADMIN_ID).id();
         AgentExecution first = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
-        AgentExecution second =
-                execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
+        AgentExecution second = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON.plusSeconds(30), 100L, 3_000L, null);
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "질문이에요", YESTERDAY_NOON));
-        ChatMessage firstAnswer =
-                message(ChatMessage.fromAssistant(conversationId, "첫 답", first.id(), YESTERDAY_NOON.plusSeconds(2)));
+        ChatMessage firstAnswer = message(ChatMessage.fromAssistant(conversationId, "첫 답", first.id(), YESTERDAY_NOON.plusSeconds(2)));
         message(ChatMessage.regeneratedAnswer(
-                conversationId, "다시 쓴 답", second.id(), firstAnswer.id(), YESTERDAY_NOON.plusSeconds(33)));
+            conversationId, "다시 쓴 답", second.id(), firstAnswer.id(), YESTERDAY_NOON.plusSeconds(33)));
 
         List<LatencyRowView> rows = rowsOf(30);
 
@@ -163,6 +165,7 @@ class FirstResponseLatencyTest {
             assertThat(row.firstResponse().p90Ms()).isEqualTo(3_000L);
         });
     }
+
 
     @Test
     @DisplayName("첫 조각 시각이 빈 turn 은 제출까지에만 들고 첫 반응 시간과 첫 조각까지에는 들지 않는다")
@@ -181,6 +184,7 @@ class FirstResponseLatencyTest {
         assertThat(row.toFirstDelta().p50Ms()).isNull();
     }
 
+
     @Test
     @DisplayName("자식 실행은 세지 않는다")
     void doesNotCountChildExecution() {
@@ -190,16 +194,16 @@ class FirstResponseLatencyTest {
         List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
-                .singleElement()
-                .satisfies(row -> assertThat(row.turns()).isOne());
+            .singleElement()
+            .satisfies(row -> assertThat(row.turns()).isOne());
     }
+
 
     @Test
     @DisplayName("예약 작업 발화가 연 turn 은 지시가 USER 메시지로 남아도 세지 않는다")
     void doesNotCountScheduledTaskTurnEvenThoughInstructionIsUserMessage() {
         long conversationId = conversation(ADMIN_ID).id();
-        AgentExecution scheduled =
-                execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
+        AgentExecution scheduled = execution(conversationId, ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 1_000L, null);
         message(ChatMessage.fromSystem(conversationId, "예약 작업이 시작됐어요", YESTERDAY_NOON));
         message(ChatMessage.fromUser(conversationId, ADMIN_ID, "화요일 회의 일정을 알려 줘", YESTERDAY_NOON));
         message(ChatMessage.fromAssistant(conversationId, "회의는 화요일 10시예요", scheduled.id(), YESTERDAY_NOON));
@@ -216,6 +220,7 @@ class FirstResponseLatencyTest {
         });
     }
 
+
     @Test
     @DisplayName("다른 사용자의 실행은 세지 않는다")
     void doesNotCountOtherUsersExecution() {
@@ -225,9 +230,10 @@ class FirstResponseLatencyTest {
         List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
-                .singleElement()
-                .satisfies(row -> assertThat(row.turns()).isOne());
+            .singleElement()
+            .satisfies(row -> assertThat(row.turns()).isOne());
     }
+
 
     @Test
     @DisplayName("한국 시각 자정을 넘는 실행은 다음 날짜 줄로 묶인다")
@@ -241,6 +247,7 @@ class FirstResponseLatencyTest {
         assertThat(rows).extracting(LatencyRowView::date).containsExactly(YESTERDAY, YESTERDAY.plusDays(1));
     }
 
+
     @Test
     @DisplayName("같은 날짜 안에서는 FAST, BALANCED, DEEP, 단계 없음 순서로 준다")
     void ordersTiersWithinDateAsFastBalancedDeepThenNone() {
@@ -252,9 +259,10 @@ class FirstResponseLatencyTest {
         List<LatencyRowView> rows = rowsOf(30);
 
         assertThat(rows)
-                .extracting(LatencyRowView::modelTier)
-                .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP, null);
+            .extracting(LatencyRowView::modelTier)
+            .containsExactly(ModelTier.FAST, ModelTier.BALANCED, ModelTier.DEEP, null);
     }
+
 
     @Test
     @DisplayName("집계 기간보다 오래된 실행은 세지 않는다")
@@ -263,10 +271,11 @@ class FirstResponseLatencyTest {
         userTurn(ADMIN_ID, ModelTier.FAST, YESTERDAY_NOON, 100L, 2_000L);
 
         assertThat(rowsOf(30))
-                .singleElement()
-                .satisfies(row -> assertThat(row.turns()).isOne());
+            .singleElement()
+            .satisfies(row -> assertThat(row.turns()).isOne());
         assertThat(rowsOf(90)).extracting(LatencyRowView::turns).containsExactly(1L, 1L);
     }
+
 
     @Test
     @DisplayName("MEMBER 역할의 요청은 FORBIDDEN 으로 거절한다")
@@ -274,35 +283,40 @@ class FirstResponseLatencyTest {
         when(currentUser.require()).thenReturn(admin(UserRole.MEMBER));
 
         assertThatThrownBy(() -> controller.latency(30))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
     }
+
 
     @Test
     @DisplayName("일수가 0 이거나 91 이면 VALIDATION_FAILED 로 거절한다")
     void rejectsDaysOutOfRangeWithValidationFailed() {
         for (int days : new int[] {0, 91}) {
             assertThatThrownBy(() -> controller.latency(days))
-                    .isInstanceOfSatisfying(
-                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+                .isInstanceOfSatisfying(
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         }
     }
+
 
     private List<LatencyRowView> rowsOf(int days) {
         return controller.latency(days).rows();
     }
 
+
     private static CurrentUser admin(UserRole role) {
         return new CurrentUser(ADMIN_ID, "dad@example.com", "dad", 1L, role);
     }
+
 
     private AgentExecution userTurn(Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs) {
         return userTurn(userId, tier, received, submitMs, firstDeltaMs, null);
     }
 
+
     /** 새 대화에 {@code USER} 질문과 그 실행이 낸 {@code ASSISTANT} 답을 심는다. */
     private AgentExecution userTurn(
-            Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
+        Long userId, ModelTier tier, Instant received, Long submitMs, Long firstDeltaMs, Long parentId) {
         long conversationId = conversation(userId).id();
         AgentExecution execution = execution(conversationId, userId, tier, received, submitMs, firstDeltaMs, parentId);
         message(ChatMessage.fromUser(conversationId, userId, "이번 주 일정이 어떻게 돼?", received));
@@ -310,26 +324,27 @@ class FirstResponseLatencyTest {
         return execution;
     }
 
+
     /** 요청을 받은 시각에서 밀리초만큼 뒤에 제출하고 첫 조각을 받은 실행이다. 밀리초가 null 이면 그 시각을 비운다. */
     private AgentExecution execution(
-            long conversationId,
-            Long userId,
-            ModelTier tier,
-            Instant received,
-            Long submitMs,
-            Long firstDeltaMs,
-            Long parentId) {
+        long conversationId,
+        Long userId,
+        ModelTier tier,
+        Instant received,
+        Long submitMs,
+        Long firstDeltaMs,
+        Long parentId) {
         AgentExecution execution = AgentExecution.builder()
-                .userId(userId)
-                .conversationId(conversationId)
-                .parentExecutionId(parentId)
-                .profileName("test-profile")
-                .modelTier(tier)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(received)
-                .requestReceivedAt(received)
-                .build();
+            .userId(userId)
+            .conversationId(conversationId)
+            .parentExecutionId(parentId)
+            .profileName("test-profile")
+            .modelTier(tier)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(received)
+            .requestReceivedAt(received)
+            .build();
         if (submitMs != null) {
             execution.markSubmitted(received.plusMillis(submitMs));
         }
@@ -341,11 +356,13 @@ class FirstResponseLatencyTest {
         return saved;
     }
 
+
     private Conversation conversation(Long userId) {
         Conversation saved = conversations.save(Conversation.startedBy(userId, "합성 응답 시간 대화", null, NOW));
         savedConversations.add(saved);
         return saved;
     }
+
 
     private ChatMessage message(ChatMessage message) {
         ChatMessage saved = messages.save(message);

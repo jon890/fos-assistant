@@ -30,6 +30,7 @@ public class DelegationParentResolver {
 
     private final AgentExecutionRepository executions;
 
+
     /**
      * @param profileName 토큰이 증명한 profile. 다른 profile 의 실행은 부모가 되지 못한다
      * @param rootSessionId {@code _fos_ctx} 에서 서명을 확인한 루트 session
@@ -44,7 +45,7 @@ public class DelegationParentResolver {
             throw reject(profileName, "루트 session 이 비었다");
         }
         List<AgentExecution> running = executions.findTop2ByHermesSessionIdAndStatusAndProfileName(
-                rootSessionId, ExecutionStatus.RUNNING, profileName);
+            rootSessionId, ExecutionStatus.RUNNING, profileName);
         if (running.size() == 1) {
             return running.get(0);
         }
@@ -57,6 +58,7 @@ public class DelegationParentResolver {
         // 옛 대화에서 압축 교체가 일어나 루트가 우리 기록과 달라진 경우도 여기 온다. 로그에서 찾을 표시를 붙인다.
         throw reject(profileName, "도는 실행이 없다 DELEGATION_CONTEXT_UNAVAILABLE");
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 서명 실패와 같다. */
     private static ApiException reject(String profileName, String reason) {

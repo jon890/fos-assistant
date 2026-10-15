@@ -21,9 +21,11 @@ final class BrowserScreenStream implements BrowserScreenSink {
     private volatile boolean open = true;
     private volatile Runnable onClose;
 
+
     BrowserScreenStream() {
         this(new SseEmitter(0L));
     }
+
 
     BrowserScreenStream(SseEmitter emitter) {
         this.emitter = emitter;
@@ -32,20 +34,24 @@ final class BrowserScreenStream implements BrowserScreenSink {
         emitter.onError(error -> ended());
     }
 
+
     SseEmitter emitter() {
         return emitter;
     }
+
 
     @Override
     public boolean send(String event, Object data) {
         return Boolean.TRUE.equals(write(SseEmitter.event().name(event).data(data, MediaType.APPLICATION_JSON), -1));
     }
 
+
     @Override
     public boolean trySend(String event, Object data) {
         return Boolean.TRUE.equals(
-                write(SseEmitter.event().name(event).data(data, MediaType.APPLICATION_JSON), CLOSE_WAIT_MILLIS));
+            write(SseEmitter.event().name(event).data(data, MediaType.APPLICATION_JSON), CLOSE_WAIT_MILLIS));
     }
+
 
     @Override
     public boolean ping() {
@@ -53,11 +59,13 @@ final class BrowserScreenStream implements BrowserScreenSink {
         return written == null ? open : written;
     }
 
+
     @Override
     public void complete() {
         open = false;
         finish();
     }
+
 
     @Override
     public void onClose(Runnable callback) {
@@ -66,6 +74,7 @@ final class BrowserScreenStream implements BrowserScreenSink {
             callback.run();
         }
     }
+
 
     /** 한 번에 하나만 쓴다. {@code waitMillis} 가 음수면 끝까지, 아니면 그만큼만 기다리고 못 잡으면 {@code null} 이다. */
     private Boolean write(SseEmitter.SseEventBuilder event, long waitMillis) {
@@ -92,6 +101,7 @@ final class BrowserScreenStream implements BrowserScreenSink {
         }
     }
 
+
     private boolean acquire(long waitMillis) {
         try {
             return lock.tryLock(waitMillis, TimeUnit.MILLISECONDS);
@@ -100,6 +110,7 @@ final class BrowserScreenStream implements BrowserScreenSink {
             return false;
         }
     }
+
 
     /** 쓰는 중이 아닐 때만 emitter 를 한 번 끝낸다. */
     private void finish() {
@@ -114,6 +125,7 @@ final class BrowserScreenStream implements BrowserScreenSink {
             lock.unlock();
         }
     }
+
 
     private void ended() {
         open = false;

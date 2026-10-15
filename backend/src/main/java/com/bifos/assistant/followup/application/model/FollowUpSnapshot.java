@@ -12,18 +12,18 @@ import java.util.UUID;
  * @param proposed 에이전트가 제안한 줄인가
  */
 public record FollowUpSnapshot(
-        UUID publicId,
-        Long conversationId,
-        UUID conversationPublicId,
-        String title,
-        Instant dueAt,
-        boolean waiting,
-        FollowUpStatus status,
-        boolean proposed,
-        Instant createdAt,
-        Instant updatedAt,
-        Instant acceptedAt,
-        Instant closedAt) {
+    UUID publicId,
+    Long conversationId,
+    UUID conversationPublicId,
+    String title,
+    Instant dueAt,
+    boolean waiting,
+    FollowUpStatus status,
+    boolean proposed,
+    Instant createdAt,
+    Instant updatedAt,
+    Instant acceptedAt,
+    Instant closedAt) {
 
     /** 제목을 빼고 번호와 상태만 낸다. 제목을 로그에 남기지 않는다. */
     @Override

@@ -45,8 +45,7 @@ import tools.jackson.databind.json.JsonMapper;
 @BackendIntegrationTest
 class PersonActivityTest {
 
-    private static final SecretKey KEY =
-            Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret".getBytes(StandardCharsets.UTF_8));
+    private static final SecretKey KEY = Keys.hmacShaKeyFor("test-secret-test-secret-test-secret-test-secret".getBytes(StandardCharsets.UTF_8));
 
     @LocalServerPort
     int port;
@@ -81,6 +80,7 @@ class PersonActivityTest {
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
 
+
     @BeforeEach
     void setUp() {
         messages.deleteAll();
@@ -88,6 +88,7 @@ class PersonActivityTest {
         people.deleteAll();
         users.deleteAll();
     }
+
 
     @Test
     @DisplayName("사용자가 보낸 마지막 메시지만 활동 시각으로 모은다")
@@ -105,13 +106,14 @@ class PersonActivityTest {
         messages.save(ChatMessage.fromUser(secondConversation.id(), user.id(), "last", last));
 
         PersonAccess result = access.list().stream()
-                .filter(entry -> entry.person().id().equals(allowed.id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(entry -> entry.person().id().equals(allowed.id()))
+            .findFirst()
+            .orElseThrow();
 
         assertThat(result.joined()).isTrue();
         assertThat(result.lastConversationAt()).isEqualTo(last);
     }
+
 
     @Test
     @DisplayName("대화가 없는 아직 로그인하지 않은 사람은 활동 시각이 비어 있다")
@@ -119,34 +121,30 @@ class PersonActivityTest {
         AllowedPerson allowed = people.save(AllowedPerson.of("new@example.com", "새 사용자", "new-user", Instant.EPOCH));
 
         PersonAccess result = access.list().stream()
-                .filter(entry -> entry.person().id().equals(allowed.id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(entry -> entry.person().id().equals(allowed.id()))
+            .findFirst()
+            .orElseThrow();
 
         assertThat(result.joined()).isFalse();
         assertThat(result.lastConversationAt()).isNull();
     }
 
+
     @Test
     @DisplayName("가입 여부와 상태와 정규화가 달라도 사용자 메시지의 가장 최근 시각을 붙인다")
     void assemblesActivityForJoinedDisabledAndNormalizedUsers() {
-        AllowedPerson inactive =
-                people.save(AllowedPerson.of("inactive@example.com", "미가입", "inactive", Instant.EPOCH));
+        AllowedPerson inactive = people.save(AllowedPerson.of("inactive@example.com", "미가입", "inactive", Instant.EPOCH));
         AllowedPerson joined = people.save(AllowedPerson.of("joined@example.com", "가입", "joined", Instant.EPOCH));
-        AllowedPerson noMessage =
-                people.save(AllowedPerson.of("no-message@example.com", "무대화", "no-message", Instant.EPOCH));
+        AllowedPerson noMessage = people.save(AllowedPerson.of("no-message@example.com", "무대화", "no-message", Instant.EPOCH));
         AllowedPerson disabled = people.save(AllowedPerson.of("disabled@example.com", "꺼짐", "disabled", Instant.EPOCH));
         disabled.disable();
         people.save(disabled);
-        AllowedPerson duplicate =
-                people.save(AllowedPerson.of("duplicate@example.com", "중복", "duplicate", Instant.EPOCH));
+        AllowedPerson duplicate = people.save(AllowedPerson.of("duplicate@example.com", "중복", "duplicate", Instant.EPOCH));
         AppUser joinedUser = users.save(AppUser.of("JOINED@example.com", "가입", 1L, UserRole.MEMBER, Instant.EPOCH));
         users.save(AppUser.of("NO-MESSAGE@example.com", "무대화", 1L, UserRole.MEMBER, Instant.EPOCH));
         AppUser disabledUser = users.save(AppUser.of("disabled@example.com", "꺼짐", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser duplicateOld =
-                users.save(AppUser.of("DUPLICATE@example.com", "중복A", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser duplicateNew =
-                users.save(AppUser.of("duplicate@example.com", "중복B", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AppUser duplicateOld = users.save(AppUser.of("DUPLICATE@example.com", "중복A", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AppUser duplicateNew = users.save(AppUser.of("duplicate@example.com", "중복B", 1L, UserRole.MEMBER, Instant.EPOCH));
         Instant old = Instant.parse("2026-10-08T01:00:00Z");
         Instant recent = old.plusSeconds(60);
         Conversation conversation = conversations.save(Conversation.startedBy(joinedUser.id(), "활동", null, old));
@@ -160,14 +158,15 @@ class PersonActivityTest {
         assertThat(activity(rows, inactive)).isNull();
         assertThat(activity(rows, joined)).isEqualTo(old);
         PersonAccess noMessageAccess = rows.stream()
-                .filter(row -> row.person().id().equals(noMessage.id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(row -> row.person().id().equals(noMessage.id()))
+            .findFirst()
+            .orElseThrow();
         assertThat(noMessageAccess.joined()).isTrue();
         assertThat(noMessageAccess.lastConversationAt()).isNull();
         assertThat(activity(rows, disabled)).isEqualTo(recent);
         assertThat(activity(rows, duplicate)).isEqualTo(recent);
     }
+
 
     @Test
     @DisplayName("사용자 수가 늘어도 활동 목록은 세 번 질의한다")
@@ -175,6 +174,7 @@ class PersonActivityTest {
         assertThat(listQueriesFor(2)).isEqualTo(3);
         assertThat(listQueriesFor(12)).isEqualTo(3);
     }
+
 
     @Test
     @DisplayName("관리자 목록과 추가와 변경 응답은 활동 시각 null을 내보내고 MEMBER는 거절한다")
@@ -189,8 +189,7 @@ class PersonActivityTest {
         assertThat(row.path("lastLoginAt").isNull()).isTrue();
         assertThat(row.path("lastConversationAt").isNull()).isTrue();
 
-        HttpResponse<String> updated =
-                api("PATCH", "/api/v1/admin/people/" + existing.id(), token(admin), "{\"enabled\":false}");
+        HttpResponse<String> updated = api("PATCH", "/api/v1/admin/people/" + existing.id(), token(admin), "{\"enabled\":false}");
         assertThat(updated.statusCode()).isEqualTo(200);
         JsonNode update = json.readTree(updated.body());
         assertThat(update.path("lastLoginAt").isNull()).isTrue();
@@ -198,21 +197,22 @@ class PersonActivityTest {
 
         doNothing().when(profiles).provision(any());
         HttpResponse<String> created = api(
-                "POST",
-                "/api/v1/admin/people",
-                token(admin),
-                "{\"email\":\"created@example.com\",\"displayName\":\"새 사용자\",\"hermesProfile\":\"created-user\"}");
+            "POST",
+            "/api/v1/admin/people",
+            token(admin),
+            "{\"email\":\"created@example.com\",\"displayName\":\"새 사용자\",\"hermesProfile\":\"created-user\"}");
         assertThat(created.statusCode()).isEqualTo(200);
         JsonNode added = json.readTree(created.body());
         assertThat(added.path("lastLoginAt").isNull()).isTrue();
         assertThat(added.path("lastConversationAt").isNull()).isTrue();
 
         assertThat(api("GET", "/api/v1/admin/people", token(member), null).statusCode())
-                .isEqualTo(403);
+            .isEqualTo(403);
         assertThat(api("PATCH", "/api/v1/admin/people/" + existing.id(), token(member), "{\"enabled\":true}")
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(403);
     }
+
 
     @Test
     @DisplayName("관리자 목록과 변경 응답은 기록된 두 활동 시각을 ISO 형식으로 준다")
@@ -233,13 +233,13 @@ class PersonActivityTest {
         assertThat(row.path("lastLoginAt").asString()).isEqualTo(login.toString());
         assertThat(row.path("lastConversationAt").asString()).isEqualTo(conversationAt.toString());
 
-        HttpResponse<String> updated =
-                api("PATCH", "/api/v1/admin/people/" + person.id(), token(admin), "{\"enabled\":false}");
+        HttpResponse<String> updated = api("PATCH", "/api/v1/admin/people/" + person.id(), token(admin), "{\"enabled\":false}");
         assertThat(updated.statusCode()).isEqualTo(200);
         JsonNode update = json.readTree(updated.body());
         assertThat(update.path("lastLoginAt").asString()).isEqualTo(login.toString());
         assertThat(update.path("lastConversationAt").asString()).isEqualTo(conversationAt.toString());
     }
+
 
     @Test
     @DisplayName("관리자 변경에 오래된 허용 목록 행을 저장해도 로그인 시각은 유지한다")
@@ -267,13 +267,15 @@ class PersonActivityTest {
         assertThat(people.findById(person.id()).orElseThrow().lastLoginAt()).isEqualTo(secondLogin);
     }
 
+
     private Instant activity(List<PersonAccess> rows, AllowedPerson person) {
         return rows.stream()
-                .filter(row -> row.person().id().equals(person.id()))
-                .findFirst()
-                .orElseThrow()
-                .lastConversationAt();
+            .filter(row -> row.person().id().equals(person.id()))
+            .findFirst()
+            .orElseThrow()
+            .lastConversationAt();
     }
+
 
     private long listQueriesFor(int count) {
         messages.deleteAll();
@@ -296,10 +298,11 @@ class PersonActivityTest {
         return statistics.getPrepareStatementCount();
     }
 
+
     private HttpResponse<String> api(String method, String path, String token, String body) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .header("Authorization", "Bearer " + token)
-                .header("Content-Type", "application/json");
+            .header("Authorization", "Bearer " + token)
+            .header("Content-Type", "application/json");
         if (body == null) {
             request.GET();
         } else {
@@ -308,13 +311,14 @@ class PersonActivityTest {
         return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+
     private String token(AppUser user) {
         return Jwts.builder()
-                .subject(user.email())
-                .claim("name", user.displayName())
-                .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plusSeconds(120)))
-                .signWith(KEY)
-                .compact();
+            .subject(user.email())
+            .claim("name", user.displayName())
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusSeconds(120)))
+            .signWith(KEY)
+            .compact();
     }
 }

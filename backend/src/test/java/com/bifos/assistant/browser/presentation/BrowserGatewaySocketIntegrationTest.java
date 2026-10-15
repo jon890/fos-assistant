@@ -71,6 +71,7 @@ class BrowserGatewaySocketIntegrationTest {
     private final HttpClient client = HttpClient.newHttpClient();
     private String token;
 
+
     @BeforeEach
     void setUp() {
         clean();
@@ -80,11 +81,13 @@ class BrowserGatewaySocketIntegrationTest {
         token = address.substring(address.lastIndexOf('/') + 1);
     }
 
+
     @AfterEach
     void tearDown() {
         client.close();
         clean();
     }
+
 
     private void clean() {
         jdbc.update("DELETE FROM user_browser");
@@ -92,35 +95,38 @@ class BrowserGatewaySocketIntegrationTest {
         users.findAllByNormalizedEmail(EMAIL).forEach(users::delete);
     }
 
+
     @Test
     @DisplayName("devtools 경로에 붙으면 10만 글자 메시지가 조각째 Chrome 쪽을 지나 온전히 되돌아온다")
     void relaysLargeMessageInFragments() throws Exception {
         Collector collector = new Collector();
         WebSocket socket = client.newWebSocketBuilder()
-                .buildAsync(devtools(token), collector)
-                .get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
+            .buildAsync(devtools(token), collector)
+            .get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
         String message = "{\"id\":1,\"method\":\"Runtime.evaluate\",\"params\":{\"expression\":\"" + "a".repeat(100_000)
-                + "\"}}";
+            + "\"}}";
 
         socket.sendText(message, true).get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
 
         assertThat(collector.message.get(WAIT.toMillis(), TimeUnit.MILLISECONDS))
-                .isEqualTo(message);
+            .isEqualTo(message);
         assertThat(chrome.opened()).isEqualTo(1);
         assertThat(chrome.fragments()).as("Chrome 쪽에 넘긴 조각 수").hasSizeGreaterThan(1);
         assertThat(String.join("", chrome.fragments())).isEqualTo(message);
         socket.abort();
     }
 
+
     @Test
     @DisplayName("Origin 을 실은 연결은 403 으로 거절하고 Chrome 쪽에 붙지 않는다")
     void rejectsBrowserPages() {
         int status = refusedStatus(
-                client.newWebSocketBuilder().header("Origin", "https://evil.example.test"), devtools(token));
+            client.newWebSocketBuilder().header("Origin", "https://evil.example.test"), devtools(token));
 
         assertThat(status).isEqualTo(403);
         assertThat(chrome.opened()).isZero();
     }
+
 
     @Test
     @DisplayName("틀린 표식은 404 로 거절한다")
@@ -133,6 +139,7 @@ class BrowserGatewaySocketIntegrationTest {
         assertThat(chrome.opened()).isZero();
     }
 
+
     @Test
     @DisplayName("중계 아래 devtools 가 아닌 경로의 WebSocket 연결은 404 로 거절한다")
     void rejectsOtherSocketPaths() {
@@ -144,45 +151,49 @@ class BrowserGatewaySocketIntegrationTest {
         assertThat(chrome.opened()).isZero();
     }
 
+
     @Test
     @DisplayName("같은 devtools 경로의 일반 GET 은 빈 본문의 404 이다")
     void answersEmptyNotFoundForPlainGet() throws Exception {
         URI address = URI.create(
-                "http://127.0.0.1:" + port + "/internal/browser-gateway/" + token + "/devtools/browser/" + BROWSER_ID);
+            "http://127.0.0.1:" + port + "/internal/browser-gateway/" + token + "/devtools/browser/" + BROWSER_ID);
 
-        HttpResponse<String> response =
-                client.send(HttpRequest.newBuilder(address).GET().build(), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = client.send(HttpRequest.newBuilder(address).GET().build(), HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(404);
         assertThat(response.body()).isEmpty();
         assertThat(chrome.opened()).isZero();
     }
 
+
     private URI devtools(String gatewayToken) {
         return relay(gatewayToken, "/devtools/browser/" + BROWSER_ID);
     }
+
 
     private URI relay(String gatewayToken, String path) {
         return URI.create("ws://localhost:" + port + "/internal/browser-gateway/" + gatewayToken + path);
     }
 
+
     /** handshake 가 거절되기를 기다려 그 상태 코드를 준다. 열리면 실패다. */
     private static int refusedStatus(WebSocket.Builder builder, URI address) {
         Throwable failure = catchThrowable(() -> builder.buildAsync(address, new Collector())
-                .get(WAIT.toMillis(), TimeUnit.MILLISECONDS)
-                .abort());
+            .get(WAIT.toMillis(), TimeUnit.MILLISECONDS)
+            .abort());
         assertThat(failure).as("handshake 거절").isInstanceOf(ExecutionException.class);
-        Throwable cause =
-                failure.getCause() instanceof CompletionException wrapped ? wrapped.getCause() : failure.getCause();
+        Throwable cause = failure.getCause() instanceof CompletionException wrapped ? wrapped.getCause() : failure.getCause();
         assertThat(cause).isInstanceOf(WebSocketHandshakeException.class);
-        return ((WebSocketHandshakeException) cause).getResponse().statusCode();
+        return ((WebSocketHandshakeException)cause).getResponse().statusCode();
     }
+
 
     /** 받은 조각을 모아 첫 메시지를 준다. */
     private static final class Collector implements WebSocket.Listener {
 
         final CompletableFuture<String> message = new CompletableFuture<>();
         private final StringBuilder buffer = new StringBuilder();
+
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {

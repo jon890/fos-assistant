@@ -9,4 +9,5 @@ package com.bifos.assistant.hermes.dto;
  * @param label 선택지 한 항목에서 화면에 보일 이름이 든 칸
  * @param autoSelectSingle 선택지가 하나뿐일 때 화면이 그것을 고르는가
  */
-public record ConnectorFieldOptions(String tool, String items, String value, String label, boolean autoSelectSingle) {}
+public record ConnectorFieldOptions(String tool, String items, String value, String label, boolean autoSelectSingle) {
+}

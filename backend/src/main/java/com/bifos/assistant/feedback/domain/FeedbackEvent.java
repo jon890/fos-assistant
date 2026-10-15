@@ -90,20 +90,21 @@ public class FeedbackEvent {
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private Instant occurredAt;
 
+
     public static FeedbackEvent of(
-            Long userId,
-            FeedbackSubjectType subjectType,
-            String subjectKey,
-            FeedbackEventType eventType,
-            FeedbackActor actor,
-            Long conversationId,
-            Long originExecutionId,
-            Long sourceCheckId,
-            Long autonomyDecisionId,
-            String subjectVersion,
-            String reasonCode,
-            List<String> changedFields,
-            Instant occurredAt) {
+        Long userId,
+        FeedbackSubjectType subjectType,
+        String subjectKey,
+        FeedbackEventType eventType,
+        FeedbackActor actor,
+        Long conversationId,
+        Long originExecutionId,
+        Long sourceCheckId,
+        Long autonomyDecisionId,
+        String subjectVersion,
+        String reasonCode,
+        List<String> changedFields,
+        Instant occurredAt) {
         FeedbackEvent event = new FeedbackEvent();
         event.userId = userId;
         event.subjectType = subjectType;
@@ -117,18 +118,20 @@ public class FeedbackEvent {
         event.subjectVersion = clip(subjectVersion, SHORT_MAX_LENGTH);
         event.reasonCode = clip(reasonCode, SHORT_MAX_LENGTH);
         event.changedFields = changedFields == null || changedFields.isEmpty()
-                ? null
-                : clip(String.join(",", changedFields), SHORT_MAX_LENGTH);
+            ? null
+            : clip(String.join(",", changedFields), SHORT_MAX_LENGTH);
         event.contractVersion = CONTRACT_VERSION;
         // 칸이 DATETIME(6) 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다.
         event.occurredAt = occurredAt.truncatedTo(ChronoUnit.MICROS);
         return event;
     }
 
+
     /** 바뀐 칸 이름의 목록이다. 없으면 빈 목록이다. */
     public List<String> changedFieldList() {
         return changedFields == null ? List.of() : Arrays.asList(changedFields.split(","));
     }
+
 
     private static String clip(String value, int max) {
         return value == null || value.length() <= max ? value : value.substring(0, max);

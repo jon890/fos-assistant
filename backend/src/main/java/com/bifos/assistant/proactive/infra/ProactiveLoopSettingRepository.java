@@ -14,9 +14,11 @@ public interface ProactiveLoopSettingRepository extends JpaRepository<ProactiveL
 
     Optional<ProactiveLoopSetting> findByUserIdAndAgentId(Long userId, Long agentId);
 
+
     /** 하루 상한을 세기 전에 그 사용자의 설정 줄을 모두 쓰기 잠금으로 읽는다. 같은 사용자의 시도가 상한을 함께 넘지 않게 한다. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<ProactiveLoopSetting> findByUserIdOrderByIdAsc(Long userId);
+
 
     /** 지운 에이전트를 정리할 때 그 에이전트의 설정 줄을 모두 지운다. 지운 행 수를 돌려준다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

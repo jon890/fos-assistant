@@ -13,6 +13,7 @@ public interface ActionDelivery {
     /** 대화 번호. */
     Long getConversationId();
 
+
     /** 그 대화의 승인 줄 가운데 가장 늦은 {@code result_delivered_at}. */
     Instant getDeliveredAt();
 }

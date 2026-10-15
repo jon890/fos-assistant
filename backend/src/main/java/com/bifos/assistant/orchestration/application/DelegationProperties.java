@@ -18,12 +18,12 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.delegation")
 public record DelegationProperties(
-        int maxDepth,
-        int maxConcurrentChildren,
-        int maxActive,
-        Duration submitTimeout,
-        int outputMaxChars,
-        @DefaultValue("20s") Duration statusWaitMax) {
+    int maxDepth,
+    int maxConcurrentChildren,
+    int maxActive,
+    Duration submitTimeout,
+    int outputMaxChars,
+    @DefaultValue("20s") Duration statusWaitMax) {
 
     /** 값이 비었거나 0 이하이면 기동을 멈춘다. 0 이면 모든 위임이 거절되거나 답이 통째로 잘리는데 기동은 성공해 알아채지 못한다. */
     public DelegationProperties {
@@ -35,11 +35,13 @@ public record DelegationProperties(
         requirePositive("status-wait-max", statusWaitMax);
     }
 
+
     private static void requirePositive(String name, Duration value) {
         if (value == null || value.isZero() || value.isNegative()) {
             throw new IllegalStateException("assistant.delegation." + name + " must be positive: " + value);
         }
     }
+
 
     private static void requirePositive(String name, int value) {
         if (value < 1) {

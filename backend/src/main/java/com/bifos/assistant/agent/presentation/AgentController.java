@@ -33,12 +33,14 @@ public class AgentController {
     private final AgentLifecycleService lifecycle;
     private final KnownFlows flows;
 
+
     /** 요청자가 쓸 수 있는 에이전트를 준다. 추천 질문은 에이전트마다 따로 읽는다. */
     @GetMapping
     public List<AgentView> readable() {
         CurrentUser user = currentUser.require();
         return agents.readableBy(user).stream().map(agent -> view(user, agent)).toList();
     }
+
 
     /** 요청자의 에이전트를 profile 까지 만든다. */
     @PostMapping
@@ -48,12 +50,14 @@ public class AgentController {
         return view(user, lifecycle.create(user, request.name(), request.visibility()));
     }
 
+
     /** 주인이나 {@code ADMIN} 이 공개 범위를 바꾼다. 주인은 그대로 남는다. */
     @PatchMapping("/{code}/visibility")
     public AgentView changeVisibility(@PathVariable String code, @Valid @RequestBody ChangeVisibilityRequest request) {
         CurrentUser user = currentUser.require();
         return view(user, lifecycle.changeVisibility(user, code, request.visibility()));
     }
+
 
     /** 주인이나 {@code ADMIN} 이 지운다. 대화는 읽기만 되게 남는다. */
     @DeleteMapping("/{code}")
@@ -62,11 +66,12 @@ public class AgentController {
         lifecycle.delete(currentUser.require(), code);
     }
 
+
     private AgentView view(CurrentUser user, Agent agent) {
         return AgentView.from(
-                agent,
-                agents.isEditableBy(user, agent),
-                Objects.equals(agent.ownerUserId(), user.id()),
-                !flows.known(agent.flow()));
+            agent,
+            agents.isEditableBy(user, agent),
+            Objects.equals(agent.ownerUserId(), user.id()),
+            !flows.known(agent.flow()));
     }
 }

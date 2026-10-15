@@ -29,6 +29,7 @@ public class ToolsetHidden {
     @Column(nullable = false, length = 64)
     private String name;
 
+
     public static ToolsetHidden of(Long groupId, String name) {
         ToolsetHidden row = new ToolsetHidden();
         row.groupId = groupId;

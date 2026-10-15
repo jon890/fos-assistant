@@ -22,14 +22,14 @@ class FollowUpMigrationTest {
 
     private static final String TITLE_KEY = "a".repeat(64);
 
+
     @Test
     @DisplayName("열린 같은 제목 둘은 막고 끝난 같은 제목 둘은 받는다")
     void rejectsTwoOpenRowsAndAcceptsTwoClosedRowsOfSameTitle() throws SQLException {
         Database database = createDatabase();
         migrate(database);
-        try (Connection connection =
-                        DriverManager.getConnection(database.url(), database.username(), database.password());
-                Statement statement = connection.createStatement()) {
+        try (Connection connection = DriverManager.getConnection(database.url(), database.username(), database.password());
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO app_user (email, display_name, group_id, role, created_at)
                     VALUES ('follow-up-migration@example.com', 'Dad', 1, 'ADMIN', CURRENT_TIMESTAMP(6))
@@ -38,7 +38,7 @@ class FollowUpMigrationTest {
 
             insert(statement, userId, 1, "OPEN", "1");
             assertThatThrownBy(() -> insert(statement, userId, 2, "PROPOSED", "1"))
-                    .isInstanceOf(SQLException.class);
+                .isInstanceOf(SQLException.class);
 
             insert(statement, userId, 3, "DONE", "NULL");
             insert(statement, userId, 4, "DROPPED", "NULL");
@@ -50,17 +50,18 @@ class FollowUpMigrationTest {
         }
     }
 
+
     private static long userId(Statement statement) throws SQLException {
-        try (ResultSet rows =
-                statement.executeQuery("SELECT id FROM app_user WHERE email = 'follow-up-migration@example.com'")) {
+        try (ResultSet rows = statement.executeQuery("SELECT id FROM app_user WHERE email = 'follow-up-migration@example.com'")) {
             assertThat(rows.next()).isTrue();
             return rows.getLong(1);
         }
     }
 
+
     /** 같은 사용자와 같은 {@code title_key} 로 한 줄을 넣는다. 공개 식별자는 {@code seq} 로 서로 다르게 한다. */
     private static void insert(Statement statement, long userId, int seq, String status, String openMarker)
-            throws SQLException {
+        throws SQLException {
         String publicId = "%032x".formatted(seq);
         statement.executeUpdate("""
                 INSERT INTO follow_up (
@@ -70,17 +71,21 @@ class FollowUpMigrationTest {
                 """.formatted(publicId, userId, TITLE_KEY, status, openMarker));
     }
 
+
     Database createDatabase() {
         return new Database("jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
     }
 
+
     private static void migrate(Database database) {
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
     }
 
-    record Database(String url, String username, String password) {}
+
+    record Database(String url, String username, String password) {
+    }
 }

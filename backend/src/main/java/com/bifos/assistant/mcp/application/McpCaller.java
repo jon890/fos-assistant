@@ -21,6 +21,7 @@ public record McpCaller(CurrentUser user, AgentExecution originExecution, McpCal
         Objects.requireNonNull(context, "context");
     }
 
+
     /** 로그에 적을 origin 실행 번호다. */
     public Long executionId() {
         return originExecution.id();

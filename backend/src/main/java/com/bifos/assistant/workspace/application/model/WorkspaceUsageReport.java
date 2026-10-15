@@ -8,4 +8,5 @@ import java.util.List;
  * @param available 루트가 설정되었고 링크가 아닌 디렉터리다. 거짓이면 {@code spaces} 가 비어 있다
  * @param spaces {@code bytes} 가 큰 순서다
  */
-public record WorkspaceUsageReport(boolean available, List<WorkspaceSpaceUsage> spaces) {}
+public record WorkspaceUsageReport(boolean available, List<WorkspaceSpaceUsage> spaces) {
+}

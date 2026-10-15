@@ -23,8 +23,10 @@ public interface HermesDashboardClient {
      */
     void createProfile(String name);
 
+
     /** 그 profile 의 {@code .env} 에 값 하나를 쓴다. */
     void putEnv(String profile, String key, String value);
+
 
     /**
      * profile 을 지운다.
@@ -37,6 +39,7 @@ public interface HermesDashboardClient {
      */
     void deleteProfile(String name);
 
+
     /**
      * 그 profile 의 {@code SOUL.md} 를 읽는다.
      *
@@ -44,6 +47,7 @@ public interface HermesDashboardClient {
      * 것은 다르다. 읽지 못하면 오류로 끝난다.
      */
     SoulDocument readSoul(String profileName);
+
 
     /**
      * 그 profile 의 {@code SOUL.md} 를 받은 본문으로 통째로 바꾼다.

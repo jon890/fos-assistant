@@ -124,9 +124,11 @@ class ProactiveCheckTimeLimitTest {
     private Agent agent;
     private Conversation conversation;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -134,38 +136,38 @@ class ProactiveCheckTimeLimitTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user =
-                users.save(AppUser.of("time-" + suffix + "@example.com", "시간", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("time-" + suffix + "@example.com", "시간", 1L, UserRole.MEMBER, Instant.now()));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "time-" + suffix;
         agent = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now()));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            Instant.now()));
         conversation = conversations.save(
-                Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
+            Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
     }
+
 
     @AfterEach
     void tearDown() {
         awaitIdle(conversation.id());
         stub().reset();
         checks.deleteAll(checks.findAll().stream()
-                .filter(check -> check.userId().equals(owner.id()))
-                .toList());
+            .filter(check -> check.userId().equals(owner.id()))
+            .toList());
         List<AgentExecution> ownExecutions = executions.findAll().stream()
-                .filter(execution -> execution.userId().equals(owner.id()))
-                .toList();
+            .filter(execution -> execution.userId().equals(owner.id()))
+            .toList();
         executionEvents.deleteAll(executionEvents.findAll().stream()
-                .filter(event -> ownExecutions.stream()
-                        .anyMatch(execution -> execution.id().equals(event.executionId())))
-                .toList());
+            .filter(event -> ownExecutions.stream()
+                .anyMatch(execution -> execution.id().equals(event.executionId())))
+            .toList());
         executions.deleteAll(ownExecutions);
         transactions.executeWithoutResult(status -> {
             messages.deleteAll(messages.findByConversationIdOrderByIdAsc(conversation.id()));
@@ -174,6 +176,7 @@ class ProactiveCheckTimeLimitTest {
         agents.deleteById(agent.id());
         users.deleteById(owner.id());
     }
+
 
     @Test
     @DisplayName("max-duration 이 지나도 끝나지 않으면 Hermes 에 중지가 가고 CHECK_TIME_LIMIT 와 시간 한도 알림 줄이 남는다")
@@ -189,21 +192,22 @@ class ProactiveCheckTimeLimitTest {
         assertThat(check.status()).isEqualTo(CheckStatus.STOPPED);
         assertThat(check.errorCode()).isEqualTo("CHECK_TIME_LIMIT");
         assertThat(stub().stopped())
-                .as("살펴보기 turn 의 run 에 간 중지")
-                .contains(executions
-                        .findById(check.rootExecutionId())
-                        .orElseThrow()
-                        .hermesRunId());
+            .as("살펴보기 turn 의 run 에 간 중지")
+            .contains(executions
+                .findById(check.rootExecutionId())
+                .orElseThrow()
+                .hermesRunId());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly("먼저 살펴보기를 시작했어요", "시간 한도에 닿아 살펴보기를 멈췄어요");
+            .extracting(ChatMessage::content)
+            .containsExactly("먼저 살펴보기를 시작했어요", "시간 한도에 닿아 살펴보기를 멈췄어요");
     }
+
 
     @Test
     @DisplayName("max-duration 안에 끝나면 그 시간이 지나도 시간 상한 스레드가 멈추기를 부르지 않는다")
     void doesNotStopAfterFinishingWithinTimeLimit() throws InterruptedException {
         stub().willAnswer(command -> result(
-                "completed", "<fos-check-result>\n{\"version\":1,\"outcome\":\"NOTHING_NEW\"}\n</fos-check-result>"));
+            "completed", "<fos-check-result>\n{\"version\":1,\"outcome\":\"NOTHING_NEW\"}\n</fos-check-result>"));
 
         runCheck();
         // 시간 상한 스레드가 깼을 시각을 넘겨 기다린다.
@@ -216,23 +220,27 @@ class ProactiveCheckTimeLimitTest {
         assertThat(stub().stopped()).as("Hermes 에 간 중지").isEmpty();
     }
 
+
     private void runCheck() {
         service.start(owner, agent.code(), CheckTrigger.MANUAL);
         awaitIdle(conversation.id());
     }
 
+
     private ProactiveCheck onlyCheck() {
         List<ProactiveCheck> found = checks.findAll().stream()
-                .filter(check -> check.conversationId().equals(conversation.id()))
-                .toList();
+            .filter(check -> check.conversationId().equals(conversation.id()))
+            .toList();
         assertThat(found).as("점검 대화의 살펴보기 줄").hasSize(1);
         return found.getFirst();
     }
 
+
     private static HermesRunResult result(String status, String output) {
         return HermesRunResult.of(
-                "run-" + UUID.randomUUID(), null, status, output, "model", "provider", TokenUsage.empty());
+            "run-" + UUID.randomUUID(), null, status, output, "model", "provider", TokenUsage.empty());
     }
+
 
     private static void await(CountDownLatch latch) {
         try {
@@ -241,6 +249,7 @@ class ProactiveCheckTimeLimitTest {
             Thread.currentThread().interrupt();
         }
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {

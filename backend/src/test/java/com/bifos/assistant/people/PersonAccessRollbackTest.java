@@ -36,11 +36,13 @@ class PersonAccessRollbackTest {
     @Autowired
     AppUserRepository users;
 
+
     @AfterEach
     void clean() {
         people.findAll().stream().filter(p -> p.email().equals(EMAIL)).forEach(people::delete);
         users.findAllByNormalizedEmail(EMAIL).forEach(users::delete);
     }
+
 
     @Test
     @DisplayName("폐기가 실패하면 끄는 저장도 롤백된다")

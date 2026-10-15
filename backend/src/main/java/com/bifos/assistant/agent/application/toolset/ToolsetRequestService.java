@@ -43,6 +43,7 @@ public class ToolsetRequestService {
     private final NotificationService notifications;
     private final Clock clock;
 
+
     @Transactional
     public ToolsetRequestView request(CurrentUser user, String code, String toolset) {
         users.findByIdForUpdate(user.id()).orElseThrow(ToolsetRequestService::notFound);
@@ -54,30 +55,31 @@ public class ToolsetRequestService {
             throw new ApiException(ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset cannot be requested");
         }
         AgentToolsetRequest pending = requests.findByAgentIdAndGroupIdAndRequesterUserIdAndToolsetAndPendingSlot(
-                        agent.id(), user.groupId(), user.id(), toolset, 1)
-                .orElse(null);
+            agent.id(), user.groupId(), user.id(), toolset, 1)
+            .orElse(null);
         if (pending != null) {
             return view(pending, agent);
         }
         AgentToolsetsView current = tools.read(user, agent);
         if (current.toolsets().stream().noneMatch(item -> item.name().equals(toolset) && !item.enabled())) {
             throw new ApiException(
-                    ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset is unavailable or already enabled");
+                ErrorCode.TOOLSET_REQUEST_UNAVAILABLE, "this toolset is unavailable or already enabled");
         }
         AgentToolsetRequest row = requests.saveAndFlush(
-                AgentToolsetRequest.of(user.groupId(), agent.id(), user.id(), toolset, clock.instant()));
+            AgentToolsetRequest.of(user.groupId(), agent.id(), user.id(), toolset, clock.instant()));
         for (AppUser admin : users.findByGroupIdAndRole(user.groupId(), UserRole.ADMIN)) {
             if (!access.revoked(admin.email())) {
                 notifications.notify(
-                        admin.id(),
-                        NotificationKind.TOOLSET_REQUESTED,
-                        "도구 사용 요청이 있어요",
-                        user.displayName() + "님이 「" + agent.name() + "」의 도구 사용을 요청했어요.",
-                        new NotificationTarget(NotificationTargetType.ADMIN_TOOL_REQUEST, row.publicId()));
+                    admin.id(),
+                    NotificationKind.TOOLSET_REQUESTED,
+                    "도구 사용 요청이 있어요",
+                    user.displayName() + "님이 「" + agent.name() + "」의 도구 사용을 요청했어요.",
+                    new NotificationTarget(NotificationTargetType.ADMIN_TOOL_REQUEST, row.publicId()));
             }
         }
         return view(row, agent);
     }
+
 
     @Transactional(readOnly = true)
     public List<ToolsetRequestView> list(CurrentUser user, String code, boolean adminView) {
@@ -89,10 +91,11 @@ public class ToolsetRequestService {
             requireOwner(user, agent);
         }
         return requests.findByAgentIdAndGroupIdOrderByRequestedAtDescIdDesc(agent.id(), user.groupId()).stream()
-                .filter(row -> adminView || Objects.equals(row.requesterUserId(), user.id()))
-                .map(row -> view(row, agent))
-                .toList();
+            .filter(row -> adminView || Objects.equals(row.requesterUserId(), user.id()))
+            .map(row -> view(row, agent))
+            .toList();
     }
+
 
     @Transactional(readOnly = true)
     public ToolsetRequestView read(CurrentUser user, UUID id, boolean adminView) {
@@ -100,6 +103,7 @@ public class ToolsetRequestService {
         AgentToolsetRequest row = requireRequest(user, id, adminView, false);
         return view(row, agents.findById(row.agentId()).orElseThrow(ToolsetRequestService::notFound));
     }
+
 
     @Transactional
     public ToolsetRequestView decide(CurrentUser user, UUID id, boolean approve, String reason) {
@@ -110,11 +114,11 @@ public class ToolsetRequestService {
             return view(row, agent);
         }
         if (!approve
-                && (reason == null
-                        || reason.isBlank()
-                        || reason.strip().length() > 200
-                        || reason.contains("\n")
-                        || reason.contains("\r"))) {
+            && (reason == null
+                || reason.isBlank()
+                || reason.strip().length() > 200
+                || reason.contains("\n")
+                || reason.contains("\r"))) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a rejection needs one line of at most 200 characters");
         }
         String invalid = ineligible(agent, row.requesterUserId(), row.groupId(), row.toolset());
@@ -130,9 +134,9 @@ public class ToolsetRequestService {
                 reason = "이 도구를 더 이상 사용할 수 없어요.";
             } else {
                 List<String> desired = new ArrayList<>(current.toolsets().stream()
-                        .filter(AgentToolView::enabled)
-                        .map(AgentToolView::name)
-                        .toList());
+                    .filter(AgentToolView::enabled)
+                    .map(AgentToolView::name)
+                    .toList());
                 if (!desired.contains(row.toolset())) {
                     desired.add(row.toolset());
                 }
@@ -149,16 +153,16 @@ public class ToolsetRequestService {
         if (changed == 0) {
             return view(finished, agent);
         }
-        String body =
-                result == ToolsetRequestStatus.APPROVED ? "「" + agent.name() + "」에서 요청한 도구를 다음 실행부터 쓸 수 있어요." : reason;
+        String body = result == ToolsetRequestStatus.APPROVED ? "「" + agent.name() + "」에서 요청한 도구를 다음 실행부터 쓸 수 있어요." : reason;
         notifications.notify(
-                row.requesterUserId(),
-                NotificationKind.TOOLSET_REQUEST_DECIDED,
-                result == ToolsetRequestStatus.APPROVED ? "도구 사용 요청이 승인됐어요" : "도구 사용 요청 결과가 있어요",
-                body,
-                new NotificationTarget(NotificationTargetType.TOOLSET_REQUEST, row.publicId()));
+            row.requesterUserId(),
+            NotificationKind.TOOLSET_REQUEST_DECIDED,
+            result == ToolsetRequestStatus.APPROVED ? "도구 사용 요청이 승인됐어요" : "도구 사용 요청 결과가 있어요",
+            body,
+            new NotificationTarget(NotificationTargetType.TOOLSET_REQUEST, row.publicId()));
         return view(finished, agent);
     }
+
 
     @Transactional
     public ToolsetRequestView cancel(CurrentUser user, UUID id) {
@@ -172,6 +176,7 @@ public class ToolsetRequestService {
         return view(row, agent);
     }
 
+
     private Agent lockAgent(UUID id) {
         Long requester = requests.findRequesterUserIdByPublicId(id).orElseThrow(ToolsetRequestService::notFound);
         users.findByIdForUpdate(requester).orElseThrow(ToolsetRequestService::notFound);
@@ -179,38 +184,41 @@ public class ToolsetRequestService {
         return agents.findByIdForUpdate(agentId).orElseThrow(ToolsetRequestService::notFound);
     }
 
+
     private AgentToolsetRequest requireRequest(CurrentUser user, UUID id, boolean adminView, boolean forUpdate) {
         AgentToolsetRequest row = (forUpdate ? requests.findByPublicIdForUpdate(id) : requests.findByPublicId(id))
-                .orElseThrow(ToolsetRequestService::notFound);
+            .orElseThrow(ToolsetRequestService::notFound);
         if (!Objects.equals(row.groupId(), user.groupId())
-                || (!adminView && !Objects.equals(row.requesterUserId(), user.id()))) {
+            || (!adminView && !Objects.equals(row.requesterUserId(), user.id()))) {
             throw notFound();
         }
         return row;
     }
 
+
     private void requireCurrent(CurrentUser user, boolean admin) {
         AppUser actual = users.findById(user.id()).orElseThrow(ToolsetRequestService::notFound);
         if (!Objects.equals(actual.groupId(), user.groupId())
-                || access.revoked(actual.email())
-                || (admin && (!user.isAdmin() || !actual.isAdmin()))) {
+            || access.revoked(actual.email())
+            || (admin && (!user.isAdmin() || !actual.isAdmin()))) {
             throw new ApiException(ErrorCode.FORBIDDEN, "current permissions do not allow this action");
         }
     }
 
+
     private String ineligible(Agent agent, Long requester, Long groupId, String toolset) {
         AppUser owner = users.findById(requester).orElse(null);
         if (agent.isDeleted()
-                || agent.connectorManaged()
-                || !Objects.equals(agent.ownerUserId(), requester)
-                || owner == null
-                || !Objects.equals(owner.groupId(), groupId)
-                || access.revoked(owner.email())) {
+            || agent.connectorManaged()
+            || !Objects.equals(agent.ownerUserId(), requester)
+            || owner == null
+            || !Objects.equals(owner.groupId(), groupId)
+            || access.revoked(owner.email())) {
             return "에이전트의 주인이나 사용 권한이 바뀌어 요청이 만료됐어요.";
         }
         if (!AgentToolPolicy.isKnown(toolset)
-                || AgentToolPolicy.tierOf(toolset) != AgentToolPolicy.Tier.ADMIN
-                || visibility.hiddenFor(groupId).contains(toolset)) {
+            || AgentToolPolicy.tierOf(toolset) != AgentToolPolicy.Tier.ADMIN
+            || visibility.hiddenFor(groupId).contains(toolset)) {
             return "지금은 이 도구를 요청할 수 없어요.";
         }
         if (agent.visibility() == AgentVisibility.GROUP && AgentToolPolicy.requiresPrivate(toolset)) {
@@ -218,6 +226,7 @@ public class ToolsetRequestService {
         }
         return null;
     }
+
 
     private void requireGroup(CurrentUser user, Agent agent) {
         if (agent.ownerUserId() == null) {
@@ -229,27 +238,29 @@ public class ToolsetRequestService {
         }
     }
 
+
     private static void requireOwner(CurrentUser user, Agent agent) {
         if (agent.isDeleted() || agent.connectorManaged() || !Objects.equals(user.id(), agent.ownerUserId())) {
             throw notFound();
         }
     }
 
+
     private ToolsetRequestView view(AgentToolsetRequest row, Agent agent) {
-        String name =
-                users.findById(row.requesterUserId()).map(AppUser::displayName).orElse("사용자");
+        String name = users.findById(row.requesterUserId()).map(AppUser::displayName).orElse("사용자");
         return new ToolsetRequestView(
-                row.publicId(),
-                agent.code(),
-                agent.name(),
-                agent.isDeleted(),
-                name,
-                row.toolset(),
-                row.status(),
-                row.reason(),
-                row.requestedAt(),
-                row.decidedAt());
+            row.publicId(),
+            agent.code(),
+            agent.name(),
+            agent.isDeleted(),
+            name,
+            row.toolset(),
+            row.status(),
+            row.reason(),
+            row.requestedAt(),
+            row.decidedAt());
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.TOOLSET_REQUEST_NOT_FOUND, "no such toolset request");

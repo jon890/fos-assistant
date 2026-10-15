@@ -13,10 +13,10 @@ public record ConnectorGrantView(Long grantId, String connectorId, String toolNa
     /** @param declaredTitle 카탈로그가 선언한 이름. 없거나 읽지 못했으면 null */
     public static ConnectorGrantView from(ConnectorToolGrant grant, String declaredTitle) {
         return new ConnectorGrantView(
-                grant.id(),
-                grant.connectorId(),
-                grant.toolName(),
-                declaredTitle == null || declaredTitle.isBlank() ? ConnectorActionView.UNNAMED_TITLE : declaredTitle,
-                grant.expiresAt());
+            grant.id(),
+            grant.connectorId(),
+            grant.toolName(),
+            declaredTitle == null || declaredTitle.isBlank() ? ConnectorActionView.UNNAMED_TITLE : declaredTitle,
+            grant.expiresAt());
     }
 }

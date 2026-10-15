@@ -33,9 +33,11 @@ final class HermesCallFailure {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     static ApiException of(RestClientException cause, String message) {
         return new ApiException(codeOf(cause), message, cause);
     }
+
 
     /**
      * 4xx 는 {@link HermesRequestRejected} 로, 나머지는 {@link #of} 와 같게 옮긴다.
@@ -44,11 +46,12 @@ final class HermesCallFailure {
      */
     static ApiException ofDistinguishingRejection(RestClientException cause, String message) {
         if (cause instanceof RestClientResponseException response
-                && response.getStatusCode().is4xxClientError()) {
+            && response.getStatusCode().is4xxClientError()) {
             return new HermesRequestRejected(codeOf(cause), message, response);
         }
         return of(cause, message);
     }
+
 
     /**
      * plugin 이 격리 실행 공간이 준비되지 않아 설정 쓰기를 거절했으면 그 거절을 돌려준다(ADR-086).
@@ -59,7 +62,7 @@ final class HermesCallFailure {
      */
     static Optional<HermesRequestRejected> sandboxRejection(RestClientException cause) {
         if (!(cause instanceof RestClientResponseException response)
-                || response.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
+            || response.getStatusCode().value() != HttpStatus.CONFLICT.value()) {
             return Optional.empty();
         }
         try {
@@ -71,12 +74,13 @@ final class HermesCallFailure {
             return Optional.empty();
         }
         return Optional.of(
-                new HermesRequestRejected(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, SANDBOX_UNAVAILABLE_MESSAGE, response));
+            new HermesRequestRejected(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, SANDBOX_UNAVAILABLE_MESSAGE, response));
     }
+
 
     private static ErrorCode codeOf(RestClientException cause) {
         if (cause instanceof RestClientResponseException response
-                && response.getStatusCode().value() == HttpStatus.TOO_MANY_REQUESTS.value()) {
+            && response.getStatusCode().value() == HttpStatus.TOO_MANY_REQUESTS.value()) {
             return ErrorCode.HERMES_BUSY;
         }
         return ErrorCode.HERMES_UNAVAILABLE;

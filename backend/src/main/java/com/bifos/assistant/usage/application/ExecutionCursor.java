@@ -13,14 +13,17 @@ record ExecutionCursor(Instant startedAt, long id) {
 
     private static final char SEPARATOR = '_';
 
+
     static ExecutionCursor of(AgentExecution execution) {
         return new ExecutionCursor(execution.startedAt(), execution.id());
     }
+
 
     String encode() {
         String raw = startedAt + String.valueOf(SEPARATOR) + id;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
+
 
     /** 읽을 수 없거나 번호가 양수가 아닌 값은 {@code VALIDATION_FAILED} 다. */
     static ExecutionCursor decode(String encoded) {
@@ -37,6 +40,7 @@ record ExecutionCursor(Instant startedAt, long id) {
             throw invalid();
         }
     }
+
 
     private static ApiException invalid() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "cursor is not valid");

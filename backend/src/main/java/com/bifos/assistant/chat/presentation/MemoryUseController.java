@@ -26,12 +26,13 @@ public class MemoryUseController {
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
+
     /** 주소의 번호는 대화의 공개 식별자다. 주인의 대화가 아니면 다른 대화 경로와 같은 응답이다. */
     @GetMapping("/chat/conversations/{conversationId}/memory-uses")
     public List<MemoryUseView> list(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         return uses.usesOf(user, conversations.requireOwnId(user, conversationId)).stream()
-                .map(MemoryUseView::from)
-                .toList();
+            .map(MemoryUseView::from)
+            .toList();
     }
 }

@@ -18,11 +18,11 @@ import lombok.NoArgsConstructor;
 public final class ResultHeader {
 
     /** 모델이 사용자에게 말할 시각이라 가족이 사는 곳의 시각으로 적는다. */
-    private static final DateTimeFormatter TIME =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.of("Asia/Seoul"));
 
     /** 끝난 시각이 비어 있을 때 머리줄에 적는 글이다. */
     private static final String UNKNOWN_TIME = "모름";
+
 
     /**
      * 결과가 지금도 참이라고 볼 수 있는지다.
@@ -38,6 +38,7 @@ public final class ResultHeader {
         return Duration.between(asOf, now).compareTo(staleAfter) > 0 ? ContextFreshness.STALE : ContextFreshness.FRESH;
     }
 
+
     /**
      * {@code [출처: <sourceLabel>, <fields>, 끝난 시각: <시각>]} 한 줄이다. 오래된 결과면 {@code ]} 앞에 신선도를 넣고 다음 줄에 안내를
      * 붙인다.
@@ -46,7 +47,7 @@ public final class ResultHeader {
      * @param asOf 결과가 끝난 시각. 비어 있으면 「모름」 이다
      */
     public static String render(
-            String sourceLabel, List<String> fields, Instant asOf, ContextFreshness freshness, Duration staleAfter) {
+        String sourceLabel, List<String> fields, Instant asOf, ContextFreshness freshness, Duration staleAfter) {
         StringBuilder header = new StringBuilder("[출처: ").append(sourceLabel);
         fields.forEach(field -> header.append(", ").append(field));
         header.append(", 끝난 시각: ").append(asOf == null ? UNKNOWN_TIME : TIME.format(asOf));
@@ -54,10 +55,11 @@ public final class ResultHeader {
             return header.append(']').toString();
         }
         return header.append(", 신선도: 오래됨]\n이 결과는 ")
-                .append(durationLabel(staleAfter))
-                .append("보다 전에 끝났다. 지금 상태와 다를 수 있다.")
-                .toString();
+            .append(durationLabel(staleAfter))
+            .append("보다 전에 끝났다. 지금 상태와 다를 수 있다.")
+            .toString();
     }
+
 
     /** 정시면 「N시간」, 정시가 아니면 「N분」 이다. 시간으로 내리면 30분이 「0시간」 이 된다. */
     private static String durationLabel(Duration staleAfter) {

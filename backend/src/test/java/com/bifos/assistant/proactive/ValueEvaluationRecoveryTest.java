@@ -35,19 +35,20 @@ class ValueEvaluationRecoveryTest {
         when(running.profileName()).thenReturn("decision-test");
         when(running.hermesRunId()).thenReturn("run-system");
         when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
-                .thenReturn(List.of(running));
+            .thenReturn(List.of(running));
         HermesProperties properties = new HermesProperties(
-                null, "http://hermes.example.com", "synthetic", "http://hermes.example.com", null, null, null, null);
+            null, "http://hermes.example.com", "synthetic", "http://hermes.example.com", null, null, null, null);
 
         new ValueEvaluationRecovery(store, executions, recorder, limiter, properties).recover();
 
         var order = inOrder(store, limiter, recorder);
         order.verify(store).findRunningIds();
         order.verify(limiter)
-                .holdUntilRemoteEnds(
-                        72L, 71L, "http://hermes.example.com/p/decision-test", "decision-test", "run-system", false);
+            .holdUntilRemoteEnds(
+                72L, 71L, "http://hermes.example.com/p/decision-test", "decision-test", "run-system", false);
         order.verify(recorder).fail(running, "DECISION_INTERRUPTED");
     }
+
 
     @Test
     @DisplayName("한 평가나 실행의 복구가 실패해도 다음 줄을 닫고 서버 기동을 이어 간다")
@@ -59,19 +60,20 @@ class ValueEvaluationRecoveryTest {
         AgentExecution good = mock(AgentExecution.class);
         when(store.findRunningIds()).thenReturn(List.of(1L, 2L));
         doThrow(new IllegalStateException("synthetic conversion failure"))
-                .when(store)
-                .recover(1L);
+            .when(store)
+            .recover(1L);
         when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
-                .thenReturn(List.of(bad, good));
+            .thenReturn(List.of(bad, good));
         when(recorder.fail(bad, "DECISION_INTERRUPTED"))
-                .thenThrow(new IllegalStateException("synthetic update failure"));
+            .thenThrow(new IllegalStateException("synthetic update failure"));
         ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(
-                store, executions, recorder, mock(UserExecutionLimiter.class), mock(HermesProperties.class));
+            store, executions, recorder, mock(UserExecutionLimiter.class), mock(HermesProperties.class));
         assertThatCode(recovery::start).doesNotThrowAnyException();
         assertThat(recovery.isRunning()).isTrue();
         verify(store).recover(2L);
         verify(recorder).fail(good, "DECISION_INTERRUPTED");
     }
+
 
     @Test
     @DisplayName("복구 목록 조회가 실패해도 다른 복구를 시도하고 기동을 이어 간다")
@@ -80,13 +82,13 @@ class ValueEvaluationRecoveryTest {
         AgentExecutionRepository executions = mock(AgentExecutionRepository.class);
         when(store.findRunningIds()).thenThrow(new IllegalStateException("synthetic database failure"));
         when(executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(any()))
-                .thenThrow(new IllegalStateException("synthetic database failure"));
+            .thenThrow(new IllegalStateException("synthetic database failure"));
         ValueEvaluationRecovery recovery = new ValueEvaluationRecovery(
-                store,
-                executions,
-                mock(ExecutionRecorder.class),
-                mock(UserExecutionLimiter.class),
-                mock(HermesProperties.class));
+            store,
+            executions,
+            mock(ExecutionRecorder.class),
+            mock(UserExecutionLimiter.class),
+            mock(HermesProperties.class));
         assertThatCode(recovery::start).doesNotThrowAnyException();
         assertThat(recovery.isRunning()).isTrue();
         verify(executions).findByAgentIdIsNullAndConversationIdIsNullAndStatus(any());

@@ -10,10 +10,12 @@ public class AutonomyInputsJsonConverter implements AttributeConverter<AutonomyI
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     @Override
     public String convertToDatabaseColumn(AutonomyInputs value) {
         return JSON.writeValueAsString(value);
     }
+
 
     @Override
     public AutonomyInputs convertToEntityAttribute(String value) {

@@ -7,4 +7,5 @@ package com.bifos.assistant.attention.application.model;
  * @param level {@code SURFACE} 나 {@code ASK_APPROVAL}
  * @param action 제안한 다음 행동 글. 비었을 수 있다
  */
-public record AttentionProblem(Long decisionId, String level, String action) {}
+public record AttentionProblem(Long decisionId, String level, String action) {
+}

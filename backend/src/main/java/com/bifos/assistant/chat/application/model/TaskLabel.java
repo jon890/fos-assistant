@@ -7,4 +7,5 @@ import java.util.UUID;
  *
  * @param taskId 작업의 공개 식별자
  */
-public record TaskLabel(UUID taskId, String title) {}
+public record TaskLabel(UUID taskId, String title) {
+}

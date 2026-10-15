@@ -36,29 +36,30 @@ public final class TaskDtos {
 
     /** 매일 깨우기를 켜거나 끄는 요청이다. */
     public record ProactiveScheduleRequest(
-            boolean enabled,
-            @NotBlank String time,
-            @NotBlank String timezone) {}
+        boolean enabled,
+        @NotBlank String time,
+        @NotBlank String timezone) {
+    }
 
     /** 에이전트별 매일 깨우기 설정이다. */
     public record ProactiveScheduleView(
-            boolean enabled,
-            String time,
-            String timezone,
-            Instant nextRunAt,
-            LastCheckView lastCheck,
-            boolean schedulingAvailable,
-            List<ProactiveBlockerView> blockers) {
+        boolean enabled,
+        String time,
+        String timezone,
+        Instant nextRunAt,
+        LastCheckView lastCheck,
+        boolean schedulingAvailable,
+        List<ProactiveBlockerView> blockers) {
 
         public static ProactiveScheduleView from(ProactiveSchedule schedule) {
             return new ProactiveScheduleView(
-                    schedule.enabled(),
-                    schedule.time(),
-                    schedule.timeZone(),
-                    schedule.nextRunAt(),
-                    schedule.lastCheck() == null ? null : LastCheckView.from(schedule.lastCheck()),
-                    schedule.schedulingAvailable(),
-                    schedule.blockers().stream().map(ProactiveBlockerView::from).toList());
+                schedule.enabled(),
+                schedule.time(),
+                schedule.timeZone(),
+                schedule.nextRunAt(),
+                schedule.lastCheck() == null ? null : LastCheckView.from(schedule.lastCheck()),
+                schedule.schedulingAvailable(),
+                schedule.blockers().stream().map(ProactiveBlockerView::from).toList());
         }
     }
 
@@ -72,21 +73,21 @@ public final class TaskDtos {
 
     /** 매일 깨우기가 마지막으로 연 살펴보기다. */
     public record LastCheckView(
-            String status,
-            String outcome,
-            String invalidReason,
-            String skippedReason,
-            Instant startedAt,
-            Instant finishedAt) {
+        String status,
+        String outcome,
+        String invalidReason,
+        String skippedReason,
+        Instant startedAt,
+        Instant finishedAt) {
 
         static LastCheckView from(LastCheck check) {
             return new LastCheckView(
-                    check.status().name(),
-                    check.outcome() == null ? null : check.outcome().name(),
-                    check.invalidReason() == null ? null : check.invalidReason().name(),
-                    check.skippedReason() == null ? null : check.skippedReason().name(),
-                    check.startedAt(),
-                    check.finishedAt());
+                check.status().name(),
+                check.outcome() == null ? null : check.outcome().name(),
+                check.invalidReason() == null ? null : check.invalidReason().name(),
+                check.skippedReason() == null ? null : check.skippedReason().name(),
+                check.startedAt(),
+                check.finishedAt());
         }
     }
 
@@ -98,25 +99,25 @@ public final class TaskDtos {
      * @param modelTier 발화하는 대화를 고를 모델 단계. 비우면 작업의 단계를 지운다
      */
     public record TaskRequest(
-            @NotBlank @Size(max = Task.TITLE_MAX) String title,
-            @NotBlank String agentCode,
-            @NotBlank @Size(max = Task.INSTRUCTION_MAX) String instruction,
-            @NotNull @Valid ScheduleRequest schedule,
-            ConversationMode conversationMode,
-            MissedPolicy missedPolicy,
-            @JsonProperty("notify") NotifyPolicy notifyPolicy,
-            ModelTier modelTier) {
+        @NotBlank @Size(max = Task.TITLE_MAX) String title,
+        @NotBlank String agentCode,
+        @NotBlank @Size(max = Task.INSTRUCTION_MAX) String instruction,
+        @NotNull @Valid ScheduleRequest schedule,
+        ConversationMode conversationMode,
+        MissedPolicy missedPolicy,
+        @JsonProperty("notify") NotifyPolicy notifyPolicy,
+        ModelTier modelTier) {
 
         public TaskInput toInput() {
             return new TaskInput(
-                    title,
-                    agentCode,
-                    instruction,
-                    schedule.toInput(),
-                    conversationMode,
-                    missedPolicy,
-                    notifyPolicy,
-                    modelTier);
+                title,
+                agentCode,
+                instruction,
+                schedule.toInput(),
+                conversationMode,
+                missedPolicy,
+                notifyPolicy,
+                modelTier);
         }
     }
 
@@ -142,10 +143,10 @@ public final class TaskDtos {
 
         static ScheduleView from(TaskTrigger trigger) {
             return new ScheduleView(
-                    trigger.type(),
-                    trigger.cronExpr(),
-                    trigger.fireAt() == null ? null : LocalDateTime.ofInstant(trigger.fireAt(), trigger.zone()),
-                    trigger.timeZone());
+                trigger.type(),
+                trigger.cronExpr(),
+                trigger.fireAt() == null ? null : LocalDateTime.ofInstant(trigger.fireAt(), trigger.zone()),
+                trigger.timeZone());
         }
     }
 
@@ -161,40 +162,40 @@ public final class TaskDtos {
      * @param modelTier 발화하는 대화를 고를 모델 단계. 비었으면 null
      */
     public record TaskView(
-            UUID id,
-            String title,
-            String agentCode,
-            String agentName,
-            String instruction,
-            TaskState state,
-            ScheduleView schedule,
-            Instant nextFireAt,
-            Instant lastFiredAt,
-            ConversationMode conversationMode,
-            MissedPolicy missedPolicy,
-            @JsonProperty("notify") NotifyPolicy notifyPolicy,
-            ModelTier modelTier,
-            Instant createdAt) {
+        UUID id,
+        String title,
+        String agentCode,
+        String agentName,
+        String instruction,
+        TaskState state,
+        ScheduleView schedule,
+        Instant nextFireAt,
+        Instant lastFiredAt,
+        ConversationMode conversationMode,
+        MissedPolicy missedPolicy,
+        @JsonProperty("notify") NotifyPolicy notifyPolicy,
+        ModelTier modelTier,
+        Instant createdAt) {
 
         public static TaskView from(TaskDetail detail) {
             Task task = detail.task();
             TaskTrigger trigger = detail.trigger();
             Agent agent = detail.agent();
             return new TaskView(
-                    task.publicId(),
-                    task.title(),
-                    agent == null ? null : agent.code(),
-                    agent == null ? null : agent.name(),
-                    task.instruction(),
-                    task.state(),
-                    ScheduleView.from(trigger),
-                    trigger.nextFireAt(),
-                    trigger.lastFiredAt(),
-                    task.conversationMode(),
-                    trigger.missedPolicy(),
-                    task.notifyPolicy(),
-                    task.modelTier(),
-                    task.createdAt());
+                task.publicId(),
+                task.title(),
+                agent == null ? null : agent.code(),
+                agent == null ? null : agent.name(),
+                task.instruction(),
+                task.state(),
+                ScheduleView.from(trigger),
+                trigger.nextFireAt(),
+                trigger.lastFiredAt(),
+                task.conversationMode(),
+                trigger.missedPolicy(),
+                task.notifyPolicy(),
+                task.modelTier(),
+                task.createdAt());
         }
     }
 
@@ -206,24 +207,24 @@ public final class TaskDtos {
      * @param conversationId 결과를 남긴 대화의 공개 식별자. 없으면 null
      */
     public record TaskRunView(
-            UUID id,
-            Instant scheduledFor,
-            TaskRunStatus status,
-            String reason,
-            UUID conversationId,
-            Instant startedAt,
-            Instant finishedAt) {
+        UUID id,
+        Instant scheduledFor,
+        TaskRunStatus status,
+        String reason,
+        UUID conversationId,
+        Instant startedAt,
+        Instant finishedAt) {
 
         public static TaskRunView from(TaskRunDetail detail) {
             TaskRun run = detail.run();
             return new TaskRunView(
-                    run.publicId(),
-                    run.scheduledFor(),
-                    run.status(),
-                    run.reason() == null ? null : run.reason().name(),
-                    detail.conversationId(),
-                    run.startedAt(),
-                    run.finishedAt());
+                run.publicId(),
+                run.scheduledFor(),
+                run.status(),
+                run.reason() == null ? null : run.reason().name(),
+                detail.conversationId(),
+                run.startedAt(),
+                run.finishedAt());
         }
     }
 }

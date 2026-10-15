@@ -7,6 +7,7 @@ public record StoredContent(String content, String keyId) {
         return new StoredContent(content, null);
     }
 
+
     public boolean sealed() {
         return keyId != null;
     }

@@ -42,30 +42,34 @@ public class SignInController {
     private final SignInPolicy policy;
     private final SecretKey key;
 
+
     public SignInController(SignInPolicy policy, AuthProperties properties) {
         this.policy = policy;
         this.key = Keys.hmacShaKeyFor(properties.jwtSecret().getBytes(StandardCharsets.UTF_8));
     }
 
+
     @PostMapping("/allowed")
     public SignInCheckView allowed(
-            @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestBody SignInCheckRequest request) {
+        @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody SignInCheckRequest request) {
         requireSignInToken(authorization);
         return policy.admit(request.email()).map(SignInCheckView::of).orElseGet(SignInCheckView::rejected);
     }
 
+
     /** 웹 세션을 만든 뒤 로그인 완료 시각만 기록한다. */
     @PostMapping("/completed")
     public ResponseEntity<Void> completed(
-            @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String authorization,
-            @RequestBody SignInCheckRequest request) {
+        @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+        @RequestBody SignInCheckRequest request) {
         requireSignInToken(authorization);
         if (!policy.recordCompletion(request.email())) {
             throw new ApiException(ErrorCode.UNAUTHENTICATED, "this address is not allowed to sign in");
         }
         return ResponseEntity.noContent().build();
     }
+
 
     /**
      * 웹 계층이 서명한 로그인 판정용 토큰인지 본다.
@@ -80,10 +84,10 @@ public class SignInController {
         Claims claims;
         try {
             claims = Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
         } catch (JwtException | IllegalArgumentException ex) {
             throw new ApiException(ErrorCode.UNAUTHENTICATED, "this token is not usable here");
         }

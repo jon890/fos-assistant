@@ -43,8 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Slf4j
 public class ModelsDevPriceCatalog implements PriceCatalog {
 
-    private static final DateTimeFormatter CAPTURED_ON =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter CAPTURED_ON = DateTimeFormatter.ofPattern("yyyy-MM-dd").withZone(ZoneOffset.UTC);
 
     /**
      * 우리 바인딩이 쓰는 provider 이름을 카탈로그의 이름으로 옮기는 표다.
@@ -73,16 +72,19 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
     private volatile String lastFailure;
     private volatile Instant failedModifiedAt;
 
+
     @Autowired
     public ModelsDevPriceCatalog(LiveProperties<PricingProperties> properties) {
         this(properties, Clock.systemUTC());
     }
+
 
     ModelsDevPriceCatalog(LiveProperties<PricingProperties> properties, Clock clock) {
         this.properties = properties;
         this.clock = clock;
         current();
     }
+
 
     @Override
     public Optional<CatalogPrice> find(String provider, String model) {
@@ -94,19 +96,22 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         // 스냅숏을 한 번만 꺼내 가격과 버전을 같은 가격표에서 읽는다.
         Snapshot read = current();
         return Optional.ofNullable(read.pricesByProvider().get(catalogProvider))
-                .map(models -> models.get(model.toLowerCase(Locale.ROOT)))
-                .map(price -> new CatalogPrice(price, read.version()));
+            .map(models -> models.get(model.toLowerCase(Locale.ROOT)))
+            .map(price -> new CatalogPrice(price, read.version()));
     }
+
 
     @Override
     public String version() {
         return current().version();
     }
 
+
     @Override
     public boolean isAvailable() {
         return current().version() != null;
     }
+
 
     private Snapshot current() {
         String catalogPath = properties.current().catalogPath();
@@ -118,6 +123,7 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         }
         return snapshot;
     }
+
 
     /**
      * 설정이 가리키는 파일로 바꾸고 들고 있던 가격을 버린다. 다음 조회가 새 파일을 곧바로 읽는다.
@@ -144,6 +150,7 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
             reloadLock.unlock();
         }
     }
+
 
     /**
      * 파일의 수정 시각이 지금 들고 있는 것과 다르면 다시 읽는다.
@@ -204,16 +211,19 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         }
     }
 
+
     /** 한 번 읽은 가격표다. 가격과 그 버전과 파일의 수정 시각을 함께 바꿔 조회가 섞인 값을 보지 않게 한다. */
     private record Snapshot(Map<String, Map<String, ModelPrice>> pricesByProvider, String version, Instant modifiedAt) {
 
         static final Snapshot EMPTY = new Snapshot(Map.of(), null, null);
     }
 
+
     /** 카탈로그를 언제 받아 왔는지는 파일의 수정 시각이 말한다. */
     private static Instant capturedAt(Path file) throws IOException {
         return Files.getLastModifiedTime(file).toInstant();
     }
+
 
     private static Map<String, Map<String, ModelPrice>> readProviders(JsonNode root) {
         Map<String, Map<String, ModelPrice>> byProvider = new HashMap<>();
@@ -226,6 +236,7 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         return Map.copyOf(byProvider);
     }
 
+
     private static Map<String, ModelPrice> readModels(JsonNode models) {
         Map<String, ModelPrice> byModel = new HashMap<>();
         models.properties().forEach(model -> {
@@ -237,14 +248,15 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
         return byModel;
     }
 
+
     private static ModelPrice readPrice(JsonNode cost) {
         if (!cost.isObject()) {
             return null;
         }
-        ModelPrice price =
-                new ModelPrice(rate(cost, "input"), rate(cost, "output"), rate(cost, "cache_read"), readTiers(cost));
+        ModelPrice price = new ModelPrice(rate(cost, "input"), rate(cost, "output"), rate(cost, "cache_read"), readTiers(cost));
         return price.isUnusable() ? null : price;
     }
+
 
     /**
      * 문맥 길이 구간을 읽는다.
@@ -259,23 +271,24 @@ public class ModelsDevPriceCatalog implements PriceCatalog {
             for (JsonNode tier : declared) {
                 JsonNode bound = tier.path("tier");
                 if (!"context".equals(bound.path("type").asString(null))
-                        || !bound.path("size").isNumber()) {
+                    || !bound.path("size").isNumber()) {
                     continue;
                 }
                 tiers.add(new ModelPrice.ContextTier(
-                        bound.path("size").asLong(),
-                        rate(tier, "input"),
-                        rate(tier, "output"),
-                        rate(tier, "cache_read")));
+                    bound.path("size").asLong(),
+                    rate(tier, "input"),
+                    rate(tier, "output"),
+                    rate(tier, "cache_read")));
             }
         }
         JsonNode legacy = cost.path("context_over_200k");
         if (tiers.isEmpty() && legacy.isObject()) {
             tiers.add(new ModelPrice.ContextTier(
-                    200_000L, rate(legacy, "input"), rate(legacy, "output"), rate(legacy, "cache_read")));
+                200_000L, rate(legacy, "input"), rate(legacy, "output"), rate(legacy, "cache_read")));
         }
         return tiers;
     }
+
 
     private static BigDecimal rate(JsonNode node, String field) {
         JsonNode value = node.path(field);

@@ -8,4 +8,5 @@ package com.bifos.assistant.chat.application;
  *
  * @param conversationId 다시 시도할 대화
  */
-public record WakeRetryDue(Long conversationId) {}
+public record WakeRetryDue(Long conversationId) {
+}

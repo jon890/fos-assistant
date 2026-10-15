@@ -24,11 +24,11 @@ import org.springframework.stereotype.Service;
  * <p>경계를 지키는 규칙이 넷이다.
  *
  * <ul>
- *   <li>사용자는 부모의 것이다. 그것을 바꾸는 인자가 없다
- *   <li>에이전트는 {@link AgentService#requireReadable} 를 지난 것만 쓴다. 위임은 켜졌는지까지 보는
- *       {@link AgentService#requireStartable} 을 쓴다
- *   <li>Memory 는 {@code ContextAssembler} 로 다시 조립한다. 부모 것을 복사하지 않는다
- *   <li>{@code parentExecutionId} 는 부모의 번호이고 {@code rootExecutionId} 는 부모의 루트다
+ * <li>사용자는 부모의 것이다. 그것을 바꾸는 인자가 없다
+ * <li>에이전트는 {@link AgentService#requireReadable} 를 지난 것만 쓴다. 위임은 켜졌는지까지 보는
+ * {@link AgentService#requireStartable} 을 쓴다
+ * <li>Memory 는 {@code ContextAssembler} 로 다시 조립한다. 부모 것을 복사하지 않는다
+ * <li>{@code parentExecutionId} 는 부모의 번호이고 {@code rootExecutionId} 는 부모의 루트다
  * </ul>
  *
  * <p>자식의 답을 {@code chat_message} 에 넣지 않는다. 사용자가 읽을 답은 마지막에 합친 하나이고,
@@ -41,6 +41,7 @@ public class ChildExecutionRunner {
 
     private final AgentService agents;
     private final AgentRunner runner;
+
 
     /**
      * 자식 실행 하나를 끝까지 돌린다.
@@ -55,48 +56,53 @@ public class ChildExecutionRunner {
      * @param task 이 자식에게만 주는 지시
      */
     public ChildResult run(
-            CurrentUser user, Conversation conversation, AgentExecution parent, String agentCode, String task) {
-        return run(user, conversation, parent, agentCode, task, (execution, runId) -> {}, () -> false);
+        CurrentUser user, Conversation conversation, AgentExecution parent, String agentCode, String task) {
+        return run(user, conversation, parent, agentCode, task, (execution, runId) -> {
+        }, () -> false);
     }
+
 
     /** Hermes run 번호를 붙인 직후 부모 흐름에 알린다. */
     public ChildResult run(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution parent,
-            String agentCode,
-            String task,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled) {
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution parent,
+        String agentCode,
+        String task,
+        BiConsumer<AgentExecution, String> onSubmitted,
+        BooleanSupplier cancelled) {
         return run(user, conversation, parent, agentCode, task, onSubmitted, cancelled, null);
     }
 
+
     /** turn 에만 적용할 지시는 자식의 문맥 뒤에도 같은 문구로 붙인다. */
     public ChildResult run(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution parent,
-            String agentCode,
-            String task,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled,
-            String instructionAddition) {
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution parent,
+        String agentCode,
+        String task,
+        BiConsumer<AgentExecution, String> onSubmitted,
+        BooleanSupplier cancelled,
+        String instructionAddition) {
         requireNotAChild(parent);
         Agent agent = agents.requireReadable(user, agentCode);
         return runner.run(
-                        user,
-                        conversation,
-                        agent,
-                        task,
-                        parent.id(),
-                        parent.treeRootId(),
-                        RunSession.fresh(),
-                        execution -> {},
-                        onSubmitted,
-                        cancelled,
-                        instructionAddition)
-                .result();
+            user,
+            conversation,
+            agent,
+            task,
+            parent.id(),
+            parent.treeRootId(),
+            RunSession.fresh(),
+            execution -> {
+            },
+            onSubmitted,
+            cancelled,
+            instructionAddition)
+            .result();
     }
+
 
     /**
      * 위임할 에이전트를 확인한다. MCP {@code agent_delegate} 의 요청 스레드에서 쓴다.
@@ -108,6 +114,7 @@ public class ChildExecutionRunner {
     public Agent startableAgent(CurrentUser user, String agentCode) {
         return agents.requireStartable(user, agentCode);
     }
+
 
     /**
      * 다른 에이전트에게 맡긴 실행 하나를 끝까지 돌린다. MCP {@code agent_delegate} 가 가상 스레드에서 쓴다.
@@ -127,30 +134,31 @@ public class ChildExecutionRunner {
      * @param cancelled 참이면 실행을 멈춘다. 실행 줄이 생긴 직후에 참이면 제출하지 않고 CANCELLED 로 끝낸다
      */
     public ChildResult delegate(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution parent,
-            Agent agent,
-            String task,
-            DelegationKey delegationKey,
-            Consumer<AgentExecution> onStarted,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled) {
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution parent,
+        Agent agent,
+        String task,
+        DelegationKey delegationKey,
+        Consumer<AgentExecution> onStarted,
+        BiConsumer<AgentExecution, String> onSubmitted,
+        BooleanSupplier cancelled) {
         return runner.run(
-                        user,
-                        conversation,
-                        agent,
-                        task,
-                        parent.id(),
-                        parent.treeRootId(),
-                        RunSession.fresh(),
-                        onStarted,
-                        onSubmitted,
-                        cancelled,
-                        null,
-                        delegationKey)
-                .result();
+            user,
+            conversation,
+            agent,
+            task,
+            parent.id(),
+            parent.treeRootId(),
+            RunSession.fresh(),
+            onStarted,
+            onSubmitted,
+            cancelled,
+            null,
+            delegationKey)
+            .result();
     }
+
 
     /**
      * 깊이를 1로 제한한다.

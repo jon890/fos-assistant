@@ -15,6 +15,7 @@ public record AgentMemoryGrants(Set<String> collections, Set<String> sensitiveCo
         sensitiveCollections = Set.copyOf(sensitiveCollections);
     }
 
+
     public static AgentMemoryGrants none() {
         return new AgentMemoryGrants(Set.of(), Set.of());
     }

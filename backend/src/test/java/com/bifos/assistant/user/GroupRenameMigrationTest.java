@@ -28,19 +28,20 @@ class GroupRenameMigrationTest {
 
     private String url;
 
+
     @BeforeEach
     void setUpV24Data() throws SQLException {
         url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         // V25 바로 앞까지 올린 뒤 그 시점의 사용자, 에이전트, Memory 를 넣는다.
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target("24")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target("24")
+            .load()
+            .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO app_user (email, display_name, family_id, role, created_at)
                     VALUES ('dad@example.com', 'Dad', 1, 'ADMIN', CURRENT_TIMESTAMP(6))
@@ -68,42 +69,42 @@ class GroupRenameMigrationTest {
         }
 
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
     }
+
 
     @Test
     @DisplayName("V25 가 group id 값을 보존하고 FAMILY 만 GROUP 으로 바꾼다")
     void v25KeepsGroupIdValuesAndChangesOnlyFamilyToGroup() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
-            try (ResultSet rows =
-                    statement.executeQuery("SELECT group_id FROM app_user WHERE email = 'dad@example.com'")) {
+            Statement statement = connection.createStatement()) {
+            try (ResultSet rows = statement.executeQuery("SELECT group_id FROM app_user WHERE email = 'dad@example.com'")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getLong("group_id")).isEqualTo(1L);
             }
 
             assertThat(pairs(statement, "SELECT code, visibility FROM agent WHERE code IN ('home', 'dad')"))
-                    .containsExactlyInAnyOrderEntriesOf(Map.of("home", "GROUP", "dad", "PRIVATE"));
+                .containsExactlyInAnyOrderEntriesOf(Map.of("home", "GROUP", "dad", "PRIVATE"));
 
             Map<String, String> memoryScopes = pairs(statement, "SELECT title, scope FROM memory");
             assertThat(memoryScopes).containsExactlyInAnyOrderEntriesOf(Map.of("그룹 제목", "GROUP", "개인 제목", "USER"));
 
-            Map<String, String> memoryGroups =
-                    pairs(statement, "SELECT title, CAST(group_id AS VARCHAR(20)) FROM memory");
+            Map<String, String> memoryGroups = pairs(statement, "SELECT title, CAST(group_id AS VARCHAR(20)) FROM memory");
             assertThat(memoryGroups).containsEntry("그룹 제목", "1").containsEntry("개인 제목", null);
         }
     }
+
 
     @Test
     @DisplayName("V25 뒤에는 색인도 group 이름으로 바뀌고 옛 이름은 남지 않는다")
     void afterV25IndexesAreRenamedToGroupAndNoOldNameRemains() throws SQLException {
         List<String> indexes = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("""
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("""
                         SELECT UPPER(INDEX_NAME) FROM INFORMATION_SCHEMA.INDEXES
                         WHERE UPPER(TABLE_NAME) IN ('APP_USER', 'MEMORY')
                         """)) {
@@ -112,21 +113,23 @@ class GroupRenameMigrationTest {
             }
         }
         assertThat(indexes)
-                .contains("IX_APP_USER_GROUP", "IDX_MEMORY_GROUP")
-                .doesNotContain("IX_APP_USER_FAMILY", "IDX_MEMORY_FAMILY");
+            .contains("IX_APP_USER_GROUP", "IDX_MEMORY_GROUP")
+            .doesNotContain("IX_APP_USER_FAMILY", "IDX_MEMORY_FAMILY");
     }
+
 
     @Test
     @DisplayName("V25 뒤에는 family id 컬럼을 읽을 수 없다")
     void afterV25FamilyIdColumnCannotBeRead() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             assertThatThrownBy(() -> statement.executeQuery("SELECT family_id FROM app_user"))
-                    .isInstanceOf(SQLException.class);
+                .isInstanceOf(SQLException.class);
             assertThatThrownBy(() -> statement.executeQuery("SELECT family_id FROM memory"))
-                    .isInstanceOf(SQLException.class);
+                .isInstanceOf(SQLException.class);
         }
     }
+
 
     private static Map<String, String> pairs(Statement statement, String sql) throws SQLException {
         Map<String, String> result = new LinkedHashMap<>();
