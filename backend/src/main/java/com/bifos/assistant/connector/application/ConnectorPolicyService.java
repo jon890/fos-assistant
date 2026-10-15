@@ -91,8 +91,7 @@ public class ConnectorPolicyService {
     private final ConnectorCatalogCache catalog;
     private final LiveProperties<ConnectorPolicyProperties> properties;
     private final ApplicationEventPublisher events;
-    private final NotificationService notifications;
-    private final ConversationNotices conversations;
+    private final ConnectorActionSignals signals;
     private final ProactiveCheckGuard checkGuard;
     private final CheckNotificationPolicy checkNotifications;
     private final DecisionFeedbackRecorder feedback;
@@ -165,8 +164,7 @@ public class ConnectorPolicyService {
         this.catalog = catalog;
         this.properties = properties;
         this.events = events;
-        this.notifications = notifications;
-        this.conversations = conversations;
+        this.signals = new ConnectorActionSignals(events, notifications, conversations);
         this.checkGuard = checkGuard;
         this.checkNotifications = checkNotifications;
         this.feedback = feedback;
@@ -301,8 +299,7 @@ public class ConnectorPolicyService {
                 }
                 // 알림은 승인 줄과 한 트랜잭션이다. 알림 저장이 실패하면 승인 줄도 남지 않는다(ADR-070).
                 if (needsApproval && stored.conversationId() != null && checkNotifications.allows(origin, now)) {
-                    new ConnectorActionSignals(events, notifications, conversations)
-                        .notifyRequested(stored, ConnectorActionView.titleOf(declared));
+                    signals.notifyRequested(stored, ConnectorActionView.titleOf(declared));
                 }
                 return stored;
             });
