@@ -15,7 +15,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByGroupIdAndRole(Long groupId, UserRole role);
 
+
     Optional<AppUser> findByEmail(String email);
+
 
     /**
      * 정규화한 메일 주소로 찾는다. {@code app_user.email} 은 로그인한 원문이라 대소문자와 공백이 허용 목록의
@@ -24,7 +26,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Query("select u from AppUser u where lower(trim(u.email)) = :normalizedEmail")
     List<AppUser> findAllByNormalizedEmail(@Param("normalizedEmail") String normalizedEmail);
 
+
     boolean existsByGroupId(Long groupId);
+
 
     /**
      * 사용자 한 줄을 쓰기 잠금으로 읽는다.
@@ -36,6 +40,7 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from AppUser u where u.id = :id")
     Optional<AppUser> findByIdForUpdate(@Param("id") Long id);
+
 
     @Modifying
     @Query("update AppUser u set u.modelDefaultTier = :tier where u.id = :userId")
