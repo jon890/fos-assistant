@@ -87,8 +87,7 @@ public class MemoryCaptureService {
         String dedupKey = MemoryService.proposalDedupKey(user.id(), request.title(), request.content());
         if (sensitivity == MemorySensitivity.NORMAL) {
             // 본문을 먼저 읽으면 뒤에 잠가도 관리 중인 옛 값이 남는다. 번호만 찾고 처음 읽을 때 잠근다.
-            Optional<Memory> existing = memories.findIdByProposalDedupKey(dedupKey)
-                .flatMap(memories::findByIdForUpdate)
+            Optional<Memory> existing = memories.findIdByProposalDedupKey(dedupKey).flatMap(memories::findByIdForUpdate)
                 .filter(memory -> dedupKey.equals(memory.proposalDedupKey()));
             if (existing.isPresent()) {
                 return existingOutcome(user, existing.get(), direct, request);

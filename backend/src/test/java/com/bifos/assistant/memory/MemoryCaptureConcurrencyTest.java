@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -160,6 +161,6 @@ class MemoryCaptureConcurrencyTest {
         assertThat(service.revisionsOf(USER, id)).extracting(MemoryRevision::content).containsExactly(contents);
         assertThat(revisions.findByIdMemoryIdOrderByIdRevisionAsc(id))
             .extracting(revision -> revision.id().revision())
-            .containsExactly(java.util.stream.IntStream.rangeClosed(1, contents.length).boxed().toArray(Integer[]::new));
+            .containsExactly(IntStream.rangeClosed(1, contents.length).boxed().toArray(Integer[]::new));
     }
 }
