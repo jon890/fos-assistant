@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -81,6 +82,12 @@ public class ContextAssembler implements OmittedMemories {
             """.stripTrailing();
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\r\\n|\\n|\\r");
+
+    /** 지금 조립의 층마다 고르는 규칙이다. 값의 뜻은 {@link ContextSelection} 이 갖는다. */
+    private static final Map<ContextSource, String> SELECTORS = Map.of(
+        ContextSource.MEMORY_ALWAYS, ContextSelection.ALWAYS_BY_ID,
+        ContextSource.MEMORY_FACTS, ContextSelection.FACTS_RECENT,
+        ContextSource.MEMORY_INDEX, ContextSelection.INDEX_BY_ID);
 
     private final MemoryService memories;
     private final ContextProperties properties;
@@ -161,7 +168,27 @@ public class ContextAssembler implements OmittedMemories {
         List<Memory> rest = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
         builder.limit(maxChars);
         appendIndex(builder, rest, sameNameDocuments(rest), now);
-        return builder.build();
+        return withSelections(builder.build());
+    }
+
+
+    /**
+     * Memory 항목마다 고른 규칙과 {@code source} 안의 순위를 붙인다(ADR-20261015 / memory-eval-gate). 빠진 항목도 순위를 받는다.
+     *
+     * <p>묶음 항목에만 붙고 글로 옮기지 않으므로 {@code instructions} 와 그 지문은 바뀌지 않는다.
+     */
+    private static AssembledContext withSelections(AssembledContext context) {
+        Map<ContextSource, Integer> ranks = new EnumMap<>(ContextSource.class);
+        List<ContextItem> items = context.bundle().items().stream().map(item -> {
+            String selector = SELECTORS.get(item.source());
+            if (selector == null) {
+                return item;
+            }
+            int rank = ranks.merge(item.source(), 1, Integer::sum);
+            return item.withSelection(ContextSelection.ranked(selector, rank));
+        }).toList();
+        return new AssembledContext(
+            context.instructions(), context.chars(), context.omittedMemoryIds(), new ContextBundle(items));
     }
 
 

@@ -47,7 +47,18 @@ public class ExecutionContextSourceWriter {
         for (int position = 0; position < sources.size(); position++) {
             ContextSourceRef ref = sources.get(position);
             rows.add(ExecutionContextSource.of(
-                executionId, position, ref.source(), ref.ref(), ref.bodyMode(), ref.freshness(), now));
+                executionId,
+                position,
+                ref.source(),
+                ref.ref(),
+                ref.bodyMode(),
+                ref.freshness(),
+                ref.selector(),
+                ref.selectionRank(),
+                ref.keywordScore(),
+                ref.semanticScore(),
+                ref.selectionScore(),
+                now));
         }
         try {
             new TransactionTemplate(transactionManager, NEW_TRANSACTION)
