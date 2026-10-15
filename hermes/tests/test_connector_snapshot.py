@@ -258,6 +258,23 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
             with self.assertRaises(ValueError):
                 from_module._job_result("status", args, changed)
 
+    def test_status_projection_accepts_optional_error_reason_only_as_fixed_code(self):
+        from_module = sys.modules[self.plugin.__name__ + ".connector_snapshot_job"]
+        args = self.job_body()["args"]
+        valid = {"job_id": args["stamp"]["jobId"], "stamp": args["stamp"], "status": "failed",
+                 "stage": "fill", "save_clicked": False, "finished_at": None,
+                 "saved_before": None, "saved_after": None, "error_code": "editor_failed"}
+        reasoned = {**valid, "error_reason": "title_cursor_covered"}
+        self.assertEqual(from_module._job_result("status", args, reasoned), reasoned)
+        for bad in ["Title Cursor", "secret/path", "", None, 1, "a" * 65]:
+            with self.assertRaises(ValueError):
+                from_module._job_result("status", args, {**valid, "error_reason": bad})
+        # start 응답에는 이 칸이 없다.
+        start = {"job_id": args["stamp"]["jobId"], "stamp": args["stamp"], "status": "running",
+                 "error_code": None, "error_reason": "title_cursor_covered"}
+        with self.assertRaises(ValueError):
+            from_module._job_result("start", args, start)
+
     def test_start_and_status_deadlines_cancel_without_retry_or_ticket_response(self):
         self.enable_jobs()
         deadlines = []
