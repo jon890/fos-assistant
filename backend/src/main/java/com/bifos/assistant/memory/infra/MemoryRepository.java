@@ -20,6 +20,11 @@ public interface MemoryRepository extends JpaRepository<Memory, Long>, JpaSpecif
     Optional<Memory> findByProposalDedupKey(String proposalDedupKey);
 
 
+    /** 엔티티를 먼저 읽지 않고 중복 후보의 번호만 찾는다. 쓰기 전에 잠가 다시 읽는다. */
+    @Query("select m.id from Memory m where m.proposalDedupKey = :proposalDedupKey")
+    Optional<Long> findIdByProposalDedupKey(@Param("proposalDedupKey") String proposalDedupKey);
+
+
     List<Memory> findByScopeAndOwnerUserIdAndEntryTypeOrderByCollectionAscDocumentKeyAsc(
         MemoryScope scope, Long ownerUserId, MemoryEntryType entryType);
 
