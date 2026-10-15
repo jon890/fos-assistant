@@ -22,42 +22,49 @@ public class ToolsetRequestController {
     private final ToolsetRequestService requests;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/agents/{code}/tool-requests")
     public List<ToolsetRequestResponse> list(@PathVariable String code) {
         return requests.list(currentUser.require(), code, false).stream()
-                .map(ToolsetRequestResponse::from)
-                .toList();
+            .map(ToolsetRequestResponse::from)
+            .toList();
     }
+
 
     @PostMapping("/agents/{code}/tool-requests")
     public ToolsetRequestResponse request(
-            @PathVariable String code, @Valid @RequestBody AgentDtos.RequestToolset body) {
+        @PathVariable String code, @Valid @RequestBody AgentDtos.RequestToolset body) {
         return ToolsetRequestResponse.from(requests.request(currentUser.require(), code, body.toolset()));
     }
+
 
     @GetMapping("/admin/agents/{code}/tool-requests")
     public List<ToolsetRequestResponse> listAdmin(@PathVariable String code) {
         return requests.list(currentUser.requireAdmin(), code, true).stream()
-                .map(ToolsetRequestResponse::from)
-                .toList();
+            .map(ToolsetRequestResponse::from)
+            .toList();
     }
+
 
     @GetMapping("/tool-requests/{id}")
     public ToolsetRequestResponse read(@PathVariable UUID id) {
         return ToolsetRequestResponse.from(requests.read(currentUser.require(), id, false));
     }
 
+
     @GetMapping("/admin/tool-requests/{id}")
     public ToolsetRequestResponse readAdmin(@PathVariable UUID id) {
         return ToolsetRequestResponse.from(requests.read(currentUser.requireAdmin(), id, true));
     }
 
+
     @PostMapping("/admin/tool-requests/{id}")
     public ToolsetRequestResponse decide(
-            @PathVariable UUID id, @Valid @RequestBody AgentDtos.DecideToolsetRequest body) {
+        @PathVariable UUID id, @Valid @RequestBody AgentDtos.DecideToolsetRequest body) {
         return ToolsetRequestResponse.from(
-                requests.decide(currentUser.requireAdmin(), id, body.approve(), body.reason()));
+            requests.decide(currentUser.requireAdmin(), id, body.approve(), body.reason()));
     }
+
 
     @PostMapping("/tool-requests/{id}/cancel")
     public ToolsetRequestResponse cancel(@PathVariable UUID id) {

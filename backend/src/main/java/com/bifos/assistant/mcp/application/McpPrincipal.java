@@ -19,6 +19,7 @@ public record McpPrincipal(Long tokenId, String profileName, String tokenHash) {
         Objects.requireNonNull(tokenHash, "tokenHash");
     }
 
+
     /** 인증 주체는 로그에 찍힐 수 있다. 서명의 key 인 토큰 해시를 빼고 적는다. */
     @Override
     public String toString() {

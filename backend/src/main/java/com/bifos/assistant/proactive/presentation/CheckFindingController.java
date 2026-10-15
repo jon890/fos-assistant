@@ -30,12 +30,14 @@ public class CheckFindingController {
     private final CheckFindingReactions reactions;
     private final CurrentUserProvider currentUser;
 
+
     /** 주소의 번호는 대화의 공개 식별자다. */
     @GetMapping("/chat/conversations/{conversationId}/check-findings")
     public CheckFindingsResponse list(@PathVariable UUID conversationId) {
         return new CheckFindingsResponse(
-                reactions.dismissWindowDays(), reactions.list(currentUser.require(), conversationId));
+            reactions.dismissWindowDays(), reactions.list(currentUser.require(), conversationId));
     }
+
 
     @PutMapping("/check-findings/{findingId}/reaction")
     @ResponseStatus(HttpStatus.NO_CONTENT)

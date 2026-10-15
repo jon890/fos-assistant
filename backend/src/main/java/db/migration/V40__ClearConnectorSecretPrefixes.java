@@ -28,12 +28,13 @@ public class V40__ClearConnectorSecretPrefixes extends BaseJavaMigration {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String SECRET_PREFIXES = "secretPrefixes";
 
+
     @Override
     public void migrate(Context context) throws Exception {
         Connection connection = context.getConnection();
         Map<Long, String> cleared = new LinkedHashMap<>();
         try (Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("SELECT id, fields FROM connector_connection")) {
+            ResultSet rows = statement.executeQuery("SELECT id, fields FROM connector_connection")) {
             while (rows.next()) {
                 long id = rows.getLong(1);
                 ObjectNode root = read(id, rows.getString(2));
@@ -46,8 +47,7 @@ public class V40__ClearConnectorSecretPrefixes extends BaseJavaMigration {
                 cleared.put(id, MAPPER.writeValueAsString(root));
             }
         }
-        try (PreparedStatement update =
-                connection.prepareStatement("UPDATE connector_connection SET fields = ? WHERE id = ?")) {
+        try (PreparedStatement update = connection.prepareStatement("UPDATE connector_connection SET fields = ? WHERE id = ?")) {
             for (Map.Entry<Long, String> row : cleared.entrySet()) {
                 update.setString(1, row.getValue());
                 update.setLong(2, row.getKey());
@@ -55,6 +55,7 @@ public class V40__ClearConnectorSecretPrefixes extends BaseJavaMigration {
             }
         }
     }
+
 
     /** 열의 원문에는 비밀값의 앞부분이 있으므로 예외에 싣지 않고 원인 예외도 잇지 않는다. */
     private static ObjectNode read(long id, String fields) {
@@ -66,6 +67,6 @@ public class V40__ClearConnectorSecretPrefixes extends BaseJavaMigration {
             // 아래에서 행 번호만 담아 멈춘다. 원인 예외의 메시지에는 읽던 원문의 일부가 들어간다.
         }
         throw new IllegalStateException(
-                "connector_connection 의 id " + id + " 행은 fields 를 JSON 객체로 읽지 못해 secretPrefixes 를 비우지 않는다");
+            "connector_connection 의 id " + id + " 행은 fields 를 JSON 객체로 읽지 못해 secretPrefixes 를 비우지 않는다");
     }
 }

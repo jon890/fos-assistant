@@ -36,8 +36,8 @@ class AttachmentInspectServiceTest {
     private final McpPrincipal principal = new McpPrincipal(1L, "demo", "key");
     private final McpCallContext context = new McpCallContext("root", "session", "actual-call");
     private final CurrentUser user = new CurrentUser(1L, "test@example.test", "사용자", 1L, UserRole.MEMBER);
-    private final AttachmentInspectService service =
-            new AttachmentInspectService(callers, attachments, executions, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final AttachmentInspectService service = new AttachmentInspectService(callers, attachments, executions, Clock.fixed(NOW, ZoneOffset.UTC));
+
 
     @BeforeEach
     void setUp() {
@@ -47,39 +47,42 @@ class AttachmentInspectServiceTest {
         when(execution.startedAt()).thenReturn(NOW.minusSeconds(1));
         when(execution.status()).thenReturn(ExecutionStatus.RUNNING);
         when(callers.resolveAttachmentInspection(eq(principal), any(), eq(true)))
-                .thenReturn(new McpCaller(user, execution, context));
+            .thenReturn(new McpCaller(user, execution, context));
         when(executions.findById(1L)).thenReturn(Optional.of(execution));
         when(executions.existsByIdAndStatus(1L, ExecutionStatus.RUNNING))
-                .thenAnswer(invocation -> execution.status() == ExecutionStatus.RUNNING);
+            .thenAnswer(invocation -> execution.status() == ExecutionStatus.RUNNING);
         when(attachments.inspect(eq(user), eq(2L), eq(7L), eq(null), any()))
-                .thenReturn(new InspectedImage("image/png", new byte[] {1}));
+            .thenReturn(new InspectedImage("image/png", new byte[] {1}));
     }
+
 
     private ObjectNode request(Instant issued) {
         return request(issued, 7, "actual-call");
     }
+
 
     private ObjectNode request(Instant issued, long attachmentId, String call) {
         ObjectNode body = JsonMapper.builder().build().createObjectNode().put("attachment_id", attachmentId);
         body.putObject("_fos_ctx").put("v", 1);
         McpCallContext selected = new McpCallContext("root", "session", call);
         when(callers.resolveAttachmentInspection(eq(principal), any(), eq(true)))
-                .thenReturn(new McpCaller(user, execution, selected));
+            .thenReturn(new McpCaller(user, execution, selected));
         String signed = String.join(
-                "\n",
-                "v1-attachment-inspect",
-                "root",
-                "session",
-                call,
-                Long.toString(issued.toEpochMilli()),
-                AttachmentInspectRequest.from(body).digest(),
-                "1");
+            "\n",
+            "v1-attachment-inspect",
+            "root",
+            "session",
+            call,
+            Long.toString(issued.toEpochMilli()),
+            AttachmentInspectRequest.from(body).digest(),
+            "1");
         body.putObject("_fos_inspect")
-                .put("issued_at_ms", issued.toEpochMilli())
-                .put("top_level", true)
-                .put("sig", HexFormat.of().formatHex(McpCallContext.hmac(principal.tokenHash(), signed)));
+            .put("issued_at_ms", issued.toEpochMilli())
+            .put("top_level", true)
+            .put("sig", HexFormat.of().formatHex(McpCallContext.hmac(principal.tokenHash(), signed)));
         return body;
     }
+
 
     @Test
     @DisplayName("반복 상태 확인은 사진 예산을 소비하지 않고 변조와 취소를 거절한다")
@@ -92,10 +95,11 @@ class AttachmentInspectServiceTest {
         service.inspect(principal, body);
         assertThatThrownBy(() -> service.inspect(principal, body)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> service.validate(principal, body.deepCopy().put("attachment_id", 8)))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
         when(execution.status()).thenReturn(ExecutionStatus.CANCELLED);
         assertThatThrownBy(() -> service.validate(principal, body)).isInstanceOf(ApiException.class);
     }
+
 
     @Test
     @DisplayName("현재 실행은 지난 사진을 읽고 옛 서명은 다음 실행에서 거절한다")
@@ -105,6 +109,7 @@ class AttachmentInspectServiceTest {
         assertThatThrownBy(() -> service.inspect(principal, request(NOW))).isInstanceOf(ApiException.class);
     }
 
+
     @Test
     @DisplayName("끝난 실행과 바뀐 인자 및 만료되거나 미래인 서명을 거절한다")
     void rejectsTerminalExecutionAndChangedDigestAndExpiredOrFutureProof() {
@@ -112,7 +117,7 @@ class AttachmentInspectServiceTest {
             if (status != ExecutionStatus.RUNNING) {
                 when(execution.status()).thenReturn(status);
                 assertThatThrownBy(() -> service.inspect(principal, request(NOW)))
-                        .isInstanceOf(ApiException.class);
+                    .isInstanceOf(ApiException.class);
             }
         }
         when(execution.status()).thenReturn(ExecutionStatus.RUNNING);
@@ -120,10 +125,11 @@ class AttachmentInspectServiceTest {
         assertThatThrownBy(() -> service.inspect(principal, changed)).isInstanceOf(ApiException.class);
         for (Instant issued : new Instant[] {NOW.minusSeconds(2), NOW.plusMillis(1), NOW.minusSeconds(61)}) {
             assertThatThrownBy(() -> service.inspect(principal, request(issued)))
-                    .isInstanceOf(ApiException.class);
+                .isInstanceOf(ApiException.class);
         }
         verifyNoInteractions(attachments);
     }
+
 
     @Test
     @DisplayName("같은 도구 호출의 반복 조회를 제한한다")
@@ -133,6 +139,7 @@ class AttachmentInspectServiceTest {
         service.inspect(principal, body);
         assertThatThrownBy(() -> service.inspect(principal, body)).isInstanceOf(ApiException.class);
     }
+
 
     @Test
     @DisplayName("읽는 동안 취소된 실행에는 사진을 반환하지 않는다")
@@ -144,31 +151,33 @@ class AttachmentInspectServiceTest {
         assertThatThrownBy(() -> service.inspect(principal, request(NOW))).isInstanceOf(ApiException.class);
     }
 
+
     @Test
     @DisplayName("30장을 각각 두 번 조회할 수 있고 한 사진의 반복은 제한한다")
     void thirtyPhotosCanAllBeReadTwiceAndPerPhotoRepeatsAreBounded() {
         when(attachments.inspect(eq(user), eq(2L), any(), eq(null), any()))
-                .thenReturn(new InspectedImage("image/png", new byte[] {1}));
+            .thenReturn(new InspectedImage("image/png", new byte[] {1}));
         for (long attachmentId = 1; attachmentId <= 30; attachmentId++) {
             for (int attempt = 0; attempt < 2; attempt++) {
                 assertThat(service.inspect(
-                                        principal, request(NOW, attachmentId, "call-" + attachmentId + "-" + attempt))
-                                .bytes())
+                    principal, request(NOW, attachmentId, "call-" + attachmentId + "-" + attempt))
+                    .bytes())
                         .containsExactly(1);
             }
         }
         service.inspect(principal, request(NOW, 1, "third"));
         assertThatThrownBy(() -> service.inspect(principal, request(NOW, 1, "fourth")))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
     }
+
 
     @Test
     @DisplayName("최상위 증명이 변조되면 현재 실행을 고르지 못한다")
     void tamperedTopLevelProofCannotSelectCurrentExecution() {
         ObjectNode body = request(NOW);
-        ((ObjectNode) body.get("_fos_inspect")).put("top_level", false);
+        ((ObjectNode)body.get("_fos_inspect")).put("top_level", false);
         when(callers.resolveAttachmentInspection(eq(principal), any(), eq(false)))
-                .thenReturn(new McpCaller(user, execution, context));
+            .thenReturn(new McpCaller(user, execution, context));
         assertThatThrownBy(() -> service.inspect(principal, body)).isInstanceOf(ApiException.class);
         verifyNoInteractions(attachments);
     }

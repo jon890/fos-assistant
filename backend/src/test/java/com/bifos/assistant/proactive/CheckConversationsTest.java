@@ -68,20 +68,22 @@ class CheckConversationsTest {
     private final List<Long> createdAgents = new ArrayList<>();
     private Agent agent;
 
+
     @BeforeEach
     void setUp() {
         agent = agents.save(Agent.of(
-                "check-" + UUID.randomUUID(),
-                "커리어",
-                "check-profile-" + UUID.randomUUID(),
-                "http://agent-runtime.test/p/check",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                NOW));
+            "check-" + UUID.randomUUID(),
+            "커리어",
+            "check-profile-" + UUID.randomUUID(),
+            "http://agent-runtime.test/p/check",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            NOW));
         createdAgents.add(agent.id());
     }
+
 
     @AfterEach
     void tearDown() {
@@ -89,19 +91,22 @@ class CheckConversationsTest {
         agents.deleteAllById(createdAgents);
     }
 
+
     /** 그 사용자의 자리를 한도만큼 모두 쥔다. */
     private List<TurnSlot> holdAllSlots() {
         return List.of(limiter.acquireTurn(user.id()), limiter.acquireTurn(user.id()));
     }
 
+
     /** 그 사용자와 에이전트의 점검 대화. 지운 것까지 넣을지 고른다. */
     private List<Conversation> checkConversationsOf(boolean withDeleted) {
         return conversations.findAll().stream()
-                .filter(c -> user.id().equals(c.userId()) && agent.id().equals(c.agentId()))
-                .filter(c -> c.purpose() == ConversationPurpose.CHECK)
-                .filter(c -> withDeleted || c.deletedAt() == null)
-                .toList();
+            .filter(c -> user.id().equals(c.userId()) && agent.id().equals(c.agentId()))
+            .filter(c -> c.purpose() == ConversationPurpose.CHECK)
+            .filter(c -> withDeleted || c.deletedAt() == null)
+            .toList();
     }
+
 
     @Test
     @DisplayName("점검 대화가 없으면 만들고, 있으면 같은 것을 돌려준다")
@@ -118,15 +123,15 @@ class CheckConversationsTest {
         assertThat(second.created()).as("두 번째는 만들지 않는다").isFalse();
         assertThat(second.conversation().id()).as("같은 점검 대화").isEqualTo(created.id());
         assertThat(checkConversations.find(user.id(), agent.id()))
-                .map(Conversation::id)
-                .contains(created.id());
+            .map(Conversation::id)
+            .contains(created.id());
     }
+
 
     @Test
     @DisplayName("지운 점검 대화는 다시 쓰지 않고 새로 만든다")
     void deletedCheckConversationIsNotReused() {
-        Long deletedId =
-                checkConversations.findOrCreate(user, agent).conversation().id();
+        Long deletedId = checkConversations.findOrCreate(user, agent).conversation().id();
         transactions.executeWithoutResult(status -> conversations.deleteIfActive(deletedId, user.id(), NOW));
 
         OpenedCheck reopened = checkConversations.findOrCreate(user, agent);
@@ -134,6 +139,7 @@ class CheckConversationsTest {
         assertThat(reopened.created()).isTrue();
         assertThat(reopened.conversation().id()).as("새 점검 대화").isNotEqualTo(deletedId);
     }
+
 
     @Test
     @DisplayName("두 스레드가 동시에 불러도 점검 대화는 하나만 생긴다")
@@ -160,26 +166,27 @@ class CheckConversationsTest {
         }
     }
 
+
     @Test
     @DisplayName("사용자 자리가 없으면 점검 대화를 만들지 않고 USER_BUSY 다")
     void rejectsWithoutCreatingWhenUserHasNoRoom() {
         List<TurnSlot> held = holdAllSlots();
         try {
             assertThatThrownBy(() -> checkConversations.findOrCreate(user, agent))
-                    .isInstanceOf(ApiException.class)
-                    .extracting(ex -> ((ApiException) ex).code())
-                    .isEqualTo(ErrorCode.USER_BUSY);
+                .isInstanceOf(ApiException.class)
+                .extracting(ex -> ((ApiException)ex).code())
+                .isEqualTo(ErrorCode.USER_BUSY);
             assertThat(checkConversationsOf(true)).as("만든 점검 대화").isEmpty();
         } finally {
             held.forEach(TurnSlot::release);
         }
     }
 
+
     @Test
     @DisplayName("이미 있는 점검 대화는 사용자 자리가 없어도 돌려준다")
     void returnsExistingEvenWhenUserHasNoRoom() {
-        Long existingId =
-                checkConversations.findOrCreate(user, agent).conversation().id();
+        Long existingId = checkConversations.findOrCreate(user, agent).conversation().id();
         List<TurnSlot> held = holdAllSlots();
         try {
             OpenedCheck found = checkConversations.findOrCreate(user, agent);
@@ -191,11 +198,11 @@ class CheckConversationsTest {
         }
     }
 
+
     @Test
     @DisplayName("방금 만든 점검 대화를 지우면 다시 찾지 못한다")
     void deleteCreatedRemovesConversation() {
-        Long createdId =
-                checkConversations.findOrCreate(user, agent).conversation().id();
+        Long createdId = checkConversations.findOrCreate(user, agent).conversation().id();
 
         checkConversations.deleteCreated(createdId);
 

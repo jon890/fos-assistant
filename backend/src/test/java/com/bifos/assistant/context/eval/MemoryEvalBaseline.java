@@ -25,6 +25,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 record MemoryEvalBaseline(int datasetVersion, String mode, double recallAt5, double falseMemoryExposure) {
 
+
     static final String RESOURCE = "/memory-eval/baseline.json";
 
     /** 다시 만들 때 쓰는 원본 경로다. 테스트의 작업 디렉터리는 {@code backend/} 다. */

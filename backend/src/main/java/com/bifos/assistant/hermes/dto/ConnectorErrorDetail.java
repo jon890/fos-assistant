@@ -23,6 +23,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public record ConnectorErrorDetail(String code, Map<String, Object> details, ConnectorRecovery recovery) {
 
+
     /** 승인 줄의 {@code result_text} 에 저장한 글이 이 형식임을 밝히는 {@code kind} 값이다. 성공 결과 글과 구분한다. */
     public static final String KIND = "connector_error";
 
@@ -46,6 +47,7 @@ public record ConnectorErrorDetail(String code, Map<String, Object> details, Con
         });
     }
 
+
     /**
      * 대시보드 실행 경로의 실패 답에서 {@code code}, {@code details}, {@code recovery} 를 읽는다.
      *
@@ -61,12 +63,13 @@ public record ConnectorErrorDetail(String code, Map<String, Object> details, Con
         }
         JsonNode recovery = answer.get("recovery");
         return Optional.of(new ConnectorErrorDetail(
-                code.asString(),
-                details(answer.get("details")),
-                recovery != null && recovery.isString()
-                        ? ConnectorRecovery.fromWord(recovery.asString()).orElse(null)
-                        : null));
+            code.asString(),
+            details(answer.get("details")),
+            recovery != null && recovery.isString()
+                ? ConnectorRecovery.fromWord(recovery.asString()).orElse(null)
+                : null));
     }
+
 
     /**
      * 승인 줄의 {@code result_text} 에 저장한 글을 읽는다. {@code kind} 가 {@link #KIND} 인 JSON object 만 읽는다.
@@ -89,6 +92,7 @@ public record ConnectorErrorDetail(String code, Map<String, Object> details, Con
         }
     }
 
+
     /** {@code result_text} 에 저장할 글이다. {@link #fromStored} 가 읽는다. */
     public String toStored() {
         ObjectNode stored = MAPPER.createObjectNode();
@@ -100,7 +104,7 @@ public record ConnectorErrorDetail(String code, Map<String, Object> details, Con
                 if (value instanceof Boolean flag) {
                     node.put(key, flag);
                 } else {
-                    node.put(key, (Long) value);
+                    node.put(key, (Long)value);
                 }
             });
         }
@@ -110,10 +114,12 @@ public record ConnectorErrorDetail(String code, Map<String, Object> details, Con
         return stored.toString();
     }
 
+
     /** {@code Math.abs} 는 {@code Long.MIN_VALUE} 에서 음수를 돌려주므로 두 끝을 따로 견준다. */
     private static boolean withinBound(long value) {
         return value >= -DETAIL_INT_MAX && value <= DETAIL_INT_MAX;
     }
+
 
     /** 칸이 넷을 넘으면 모두 버린다. plugin 이 넘겨서는 안 되는 모양이다. 넷 안에서는 규칙에 맞는 칸만 남긴다. */
     private static Map<String, Object> details(JsonNode node) {

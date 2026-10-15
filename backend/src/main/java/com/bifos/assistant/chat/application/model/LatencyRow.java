@@ -14,9 +14,10 @@ import java.time.LocalDate;
  * @param toFirstDelta 제출한 때부터 첫 조각을 받기까지
  */
 public record LatencyRow(
-        LocalDate date,
-        ModelTier modelTier,
-        long turns,
-        LatencyStat firstResponse,
-        LatencyStat toSubmit,
-        LatencyStat toFirstDelta) {}
+    LocalDate date,
+    ModelTier modelTier,
+    long turns,
+    LatencyStat firstResponse,
+    LatencyStat toSubmit,
+    LatencyStat toFirstDelta) {
+}

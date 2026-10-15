@@ -8,4 +8,5 @@ import java.time.Instant;
  *
  * @param size 연 뒤에 확인한 크기
  */
-public record WorkspaceOpenedFile(long size, Instant modifiedAt, InputStream body) {}
+public record WorkspaceOpenedFile(long size, Instant modifiedAt, InputStream body) {
+}

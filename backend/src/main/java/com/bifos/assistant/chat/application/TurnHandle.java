@@ -30,14 +30,17 @@ public final class TurnHandle {
     @Getter(AccessLevel.NONE)
     volatile TurnSlot slot;
 
+
     TurnHandle(Long userId, Long conversationId) {
         this.userId = userId;
         this.conversationId = conversationId;
     }
 
+
     public Long userId() {
         return userId;
     }
+
 
     public AtomicBoolean cancelled() {
         return cancelled;

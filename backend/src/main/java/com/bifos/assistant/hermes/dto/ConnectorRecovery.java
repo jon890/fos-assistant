@@ -24,7 +24,9 @@ public enum ConnectorRecovery {
     /** 서비스가 잠시 응답하지 않았다. 나중에 다시 시도할지 묻는다. */
     RETRY_LATER("retry_later");
 
+
     private final String word;
+
 
     public static Optional<ConnectorRecovery> fromWord(String word) {
         return Arrays.stream(values()).filter(value -> value.word.equals(word)).findFirst();

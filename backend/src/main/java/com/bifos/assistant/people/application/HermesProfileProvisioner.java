@@ -39,6 +39,7 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
     private final ProfileKeyFactory keys;
     private final AgentTokenService tokens;
 
+
     /**
      * profile 을 만들고 그 profile 의 key 를 {@code .env} 와 key 디렉터리에 함께 쓴다.
      *
@@ -66,6 +67,7 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
         }
     }
 
+
     /**
      * Control Plane 이 만든 profile 을 거둔다.
      *
@@ -79,6 +81,7 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
         dashboard.deleteProfile(profileName);
         keyStore.delete(profileName);
     }
+
 
     /**
      * 만든 것을 거두고, 부르는 쪽으로 올릴 오류를 고른다.
@@ -102,10 +105,11 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
             return failure;
         }
         return new ApiException(
-                ErrorCode.HERMES_PROVISION_FAILED,
-                "could not provision the Hermes profile; the half-made profile was removed",
-                failure);
+            ErrorCode.HERMES_PROVISION_FAILED,
+            "could not provision the Hermes profile; the half-made profile was removed",
+            failure);
     }
+
 
     private boolean revokeTokens(String profileName) {
         try {
@@ -113,12 +117,13 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
             return true;
         } catch (RuntimeException rollbackFailure) {
             log.error(
-                    "profile 을 만들다 실패해 MCP 토큰을 폐기하려 했으나 그것도 실패했다. 쓰이지 않을 토큰이 남는다 profile={}",
-                    profileName,
-                    rollbackFailure);
+                "profile 을 만들다 실패해 MCP 토큰을 폐기하려 했으나 그것도 실패했다. 쓰이지 않을 토큰이 남는다 profile={}",
+                profileName,
+                rollbackFailure);
             return false;
         }
     }
+
 
     private boolean removeKey(String profileName) {
         try {
@@ -126,12 +131,13 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
             return true;
         } catch (RuntimeException rollbackFailure) {
             log.error(
-                    "profile 을 만들다 실패해 key 파일을 거두려 했으나 그것도 실패했다. 그 이름으로 다시 만들 수 없다 profile={}",
-                    profileName,
-                    rollbackFailure);
+                "profile 을 만들다 실패해 key 파일을 거두려 했으나 그것도 실패했다. 그 이름으로 다시 만들 수 없다 profile={}",
+                profileName,
+                rollbackFailure);
             return false;
         }
     }
+
 
     private boolean removeProfile(String profileName) {
         try {
@@ -139,9 +145,9 @@ public class HermesProfileProvisioner implements ProfileProvisioning {
             return true;
         } catch (RuntimeException rollbackFailure) {
             log.error(
-                    "profile 을 만들다 실패해 되돌리려 했으나 그것도 실패했다. 반만 만들어진 profile 이 남는다 profile={}",
-                    profileName,
-                    rollbackFailure);
+                "profile 을 만들다 실패해 되돌리려 했으나 그것도 실패했다. 반만 만들어진 profile 이 남는다 profile={}",
+                profileName,
+                rollbackFailure);
             return false;
         }
     }

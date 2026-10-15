@@ -10,4 +10,5 @@ package com.bifos.assistant.usage.application;
  * @param bodyMode {@code INLINE}, {@code TITLE_ONLY}, {@code OMITTED}
  * @param freshness {@code FRESH}, {@code STALE}, {@code UNKNOWN}
  */
-public record ContextSourceRef(String source, String ref, String bodyMode, String freshness) {}
+public record ContextSourceRef(String source, String ref, String bodyMode, String freshness) {
+}

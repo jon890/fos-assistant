@@ -12,6 +12,7 @@ public interface DelegationOutputClip {
      */
     String clip(String output);
 
+
     /** 멈춘 위임 실행이 그때까지 받은 답이다. 받은 답이 없으면 null 이라 실행 줄의 답을 비워 둔다. */
     String partial(String output);
 }

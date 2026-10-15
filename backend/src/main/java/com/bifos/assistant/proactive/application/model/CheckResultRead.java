@@ -14,6 +14,7 @@ public record CheckResultRead(CheckResultBlock block, CheckInvalidReason invalid
         return new CheckResultRead(block, null);
     }
 
+
     public static CheckResultRead invalid(CheckInvalidReason reason) {
         return new CheckResultRead(null, reason);
     }

@@ -12,19 +12,19 @@ import com.bifos.assistant.memory.domain.type.MemorySensitivity;
  * @param direct 바로 저장 조건을 모두 만족하는가. 민감도와 collection 은 여기서 다시 본다
  */
 public record MemoryRememberRequest(
-        String title,
-        String content,
-        String collection,
-        MemorySensitivity sensitivity,
-        Long memoryId,
-        Long executionId,
-        Long conversationId,
-        boolean direct) {
+    String title,
+    String content,
+    String collection,
+    MemorySensitivity sensitivity,
+    Long memoryId,
+    Long executionId,
+    Long conversationId,
+    boolean direct) {
 
     /** 제목과 본문을 빼고 낸다. 로그에 남기지 않는다. */
     @Override
     public String toString() {
         return "MemoryRememberRequest[collection=" + collection + ", sensitivity=" + sensitivity + ", memoryId="
-                + memoryId + ", executionId=" + executionId + ", direct=" + direct + "]";
+            + memoryId + ", executionId=" + executionId + ", direct=" + direct + "]";
     }
 }

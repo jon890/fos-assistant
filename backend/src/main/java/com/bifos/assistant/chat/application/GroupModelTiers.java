@@ -8,4 +8,5 @@ import java.util.List;
  *
  * <p>저장된 값 그대로다. provider 를 비운 단계는 비운 채 싣는다. 어느 에이전트의 기본 provider 로도 채우지 않는다.
  */
-public record GroupModelTiers(List<ModelTierOptions.Tier> tiers, ModelTier groupDefaultTier) {}
+public record GroupModelTiers(List<ModelTierOptions.Tier> tiers, ModelTier groupDefaultTier) {
+}

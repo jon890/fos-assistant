@@ -7,11 +7,11 @@ import java.time.Duration;
 
 public interface ArtifactSourceTransport {
     ArtifactSourceResponse get(
-            InetAddress address,
-            String originalHost,
-            URI source,
-            Duration connectTimeout,
-            Duration readTimeout,
-            ArtifactSourceCancellation cancellation)
-            throws IOException;
+        InetAddress address,
+        String originalHost,
+        URI source,
+        Duration connectTimeout,
+        Duration readTimeout,
+        ArtifactSourceCancellation cancellation)
+        throws IOException;
 }

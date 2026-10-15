@@ -16,6 +16,6 @@ public record FollowUpPatch(String title, boolean dueAtPresent, Instant dueAt, B
     @Override
     public String toString() {
         return "FollowUpPatch[titlePresent=" + (title != null) + ", dueAtPresent=" + dueAtPresent + ", dueAt=" + dueAt
-                + ", waiting=" + waiting + "]";
+            + ", waiting=" + waiting + "]";
     }
 }

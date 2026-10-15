@@ -10,24 +10,26 @@ import java.util.List;
 
 /** 에이전트별 매일 깨우기 설정과 화면에 보일 상태다. */
 public record ProactiveSchedule(
-        boolean enabled,
-        String time,
-        String timeZone,
-        Instant nextRunAt,
-        LastCheck lastCheck,
-        boolean schedulingAvailable,
-        List<CheckBlocker> blockers) {
+    boolean enabled,
+    String time,
+    String timeZone,
+    Instant nextRunAt,
+    LastCheck lastCheck,
+    boolean schedulingAvailable,
+    List<CheckBlocker> blockers) {
 
     public ProactiveSchedule {
         blockers = List.copyOf(blockers);
     }
 
+
     /** 매일 깨우기가 마지막으로 연 살펴보기다. */
     public record LastCheck(
-            CheckStatus status,
-            CheckOutcome outcome,
-            CheckInvalidReason invalidReason,
-            CheckSkippedReason skippedReason,
-            Instant startedAt,
-            Instant finishedAt) {}
+        CheckStatus status,
+        CheckOutcome outcome,
+        CheckInvalidReason invalidReason,
+        CheckSkippedReason skippedReason,
+        Instant startedAt,
+        Instant finishedAt) {
+    }
 }

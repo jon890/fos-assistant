@@ -127,9 +127,11 @@ class ResultDeliveryRetryUserLimitTest {
     private Conversation conversation;
     private AgentExecution root;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -152,27 +154,29 @@ class ResultDeliveryRetryUserLimitTest {
         worker = agents.save(agent("worker", "조사원", user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
     }
+
 
     @AfterEach
     void tearDown() {
         awaitAllIdle();
     }
 
+
     @Test
     @DisplayName("한도에 닿으면 USER_BUSY 이고 묶음은 FAILED 그대로이며 제출과 예약이 없고, 자리가 나면 다시 전달한다")
     void rejectsRetryAtUserLimitWithoutTouchingDelivery() throws InterruptedException {
         stub().willReturn(result("auto", "failed", null));
         publisher.publishEvent(
-                new DelegationFinished(conversation.id(), delegated().id()));
+            new DelegationFinished(conversation.id(), delegated().id()));
         awaitIdle(conversation.id());
         ResultDelivery delivery = onlyDelivery();
         assertThat(delivery.status()).as("첫 시도가 실패한 묶음").isEqualTo(DeliveryStatus.FAILED);
@@ -180,9 +184,10 @@ class ResultDeliveryRetryUserLimitTest {
         scheduler.clear();
         List<AgentExecution> fillers = fillSlots();
 
-        assertThatThrownBy(() -> chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {}))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.USER_BUSY));
+        assertThatThrownBy(() -> chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {
+        }))
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.USER_BUSY));
         Thread.sleep(QUIET_PERIOD.toMillis());
 
         ResultDelivery rejected = deliveries.findById(delivery.id()).orElseThrow();
@@ -193,14 +198,16 @@ class ResultDeliveryRetryUserLimitTest {
         assertThat(scheduler.drain()).as("한도로 거절한 다시 전달의 예약").isEmpty();
 
         executions.deleteAll(fillers);
-        chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {});
+        chat.retryDelivery(dad, conversation.id(), delivery.id(), event -> {
+        });
 
         assertThat(deliveries.findById(delivery.id()).orElseThrow().status()).isEqualTo(DeliveryStatus.DELIVERED);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.SYSTEM, MessageRole.SYSTEM, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.SYSTEM, MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(limiter.used(dad.id())).as("다시 전달이 끝난 뒤 쥔 자리").isZero();
     }
+
 
     private ResultDelivery onlyDelivery() {
         List<ResultDelivery> rows = deliveries.findAll();
@@ -208,63 +215,69 @@ class ResultDeliveryRetryUserLimitTest {
         return rows.getFirst();
     }
 
+
     /** 대화 turn 의 루트가 아닌 RUNNING 줄 둘로 dad 의 자리를 채운다. 대화가 없어 결과로 전해지지 않는다. */
     private List<AgentExecution> fillSlots() {
         List<AgentExecution> fillers = new ArrayList<>();
         for (int index = 0; index < 2; index++) {
             fillers.add(executions.save(AgentExecution.builder()
-                    .userId(dad.id())
-                    .agentId(worker.id())
-                    .parentExecutionId(root.id())
-                    .rootExecutionId(root.id())
-                    .profileName("worker")
-                    .costMode(CostMode.SUBSCRIPTION)
-                    .status(ExecutionStatus.RUNNING)
-                    .startedAt(Instant.now())
-                    .build()));
+                .userId(dad.id())
+                .agentId(worker.id())
+                .parentExecutionId(root.id())
+                .rootExecutionId(root.id())
+                .profileName("worker")
+                .costMode(CostMode.SUBSCRIPTION)
+                .status(ExecutionStatus.RUNNING)
+                .startedAt(Instant.now())
+                .build()));
         }
         assertThat(limiter.used(dad.id())).as("채운 뒤 dad 가 쥔 자리").isEqualTo(2);
         return fillers;
     }
 
+
     /** 대화 turn 이 직접 맡긴 끝난 위임 실행 줄을 만든다. */
     private AgentExecution delegated() {
         AgentExecution execution = AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.id())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName("worker")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build();
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName("worker")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build();
         execution.recordOutput("조사 결과");
         return executions.save(execution);
     }
 
+
     private static Agent agent(String code, String name, Long ownerId) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerId,
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerId,
+            Instant.now());
     }
+
 
     private static HermesRunResult result(String runId, String status, String output) {
         return HermesRunResult.of(runId, "session", status, output, "model", "provider", TokenUsage.empty());
     }
 
+
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
+
 
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {

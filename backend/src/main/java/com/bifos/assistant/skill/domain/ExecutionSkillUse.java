@@ -28,11 +28,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "execution_skill_use",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_execution_skill_use_execution_skill_source",
-                        columnNames = {"execution_id", "skill_name", "source"}))
+    name = "execution_skill_use",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_execution_skill_use_execution_skill_source",
+        columnNames = {"execution_id", "skill_name", "source"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
 public class ExecutionSkillUse {
@@ -62,12 +61,14 @@ public class ExecutionSkillUse {
     @Getter
     private Instant occurredAt;
 
+
     private ExecutionSkillUse(Long executionId, String skillName, SkillUseSource source, Instant occurredAt) {
         this.executionId = executionId;
         this.skillName = skillName;
         this.source = source;
         this.occurredAt = occurredAt;
     }
+
 
     public static ExecutionSkillUse of(Long executionId, String skillName, SkillUseSource source, Instant occurredAt) {
         return new ExecutionSkillUse(executionId, skillName, source, occurredAt);

@@ -14,4 +14,5 @@ package com.bifos.assistant.connector.domain;
  * @param legacy 옛 커넥터 에이전트의 바인딩인가. 설치 판정이 바인딩 방식을 보지 않는다
  */
 public record ReadyBinding(
-        Long bindingId, Long agentId, Long userId, String profile, String connectorId, boolean legacy) {}
+    Long bindingId, Long agentId, Long userId, String profile, String connectorId, boolean legacy) {
+}

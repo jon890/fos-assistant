@@ -28,6 +28,7 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
     private final String baseUrl;
     private final String token;
 
+
     public HttpHermesDashboardClient(HermesProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
@@ -37,39 +38,41 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
         this.token = properties.dashboardToken();
     }
 
+
     @Override
     public void createProfile(String name) {
         try {
             restClient
-                    .post()
-                    .uri(baseUrl + "/api/profiles")
-                    .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    // 번들 스킬을 심지 않는다. 스킬 설명은 매 대화의 입력에 실리므로 쓰는 스킬만 따로 붙인다.
-                    .body(Map.of("name", name, "no_skills", true))
-                    .retrieve()
-                    .toBodilessEntity();
+                .post()
+                .uri(baseUrl + "/api/profiles")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                // 번들 스킬을 심지 않는다. 스킬 설명은 매 대화의 입력에 실리므로 쓰는 스킬만 따로 붙인다.
+                .body(Map.of("name", name, "no_skills", true))
+                .retrieve()
+                .toBodilessEntity();
         } catch (RestClientException ex) {
             if (isConflict(ex)) {
                 throw new ApiException(
-                        ErrorCode.HERMES_PROFILE_EXISTS, "this Hermes profile name is already taken", ex);
+                    ErrorCode.HERMES_PROFILE_EXISTS, "this Hermes profile name is already taken", ex);
             }
             log.warn("Hermes profile 을 만들지 못했다 profile={}", name, ex);
             throw HermesCallFailure.of(ex, "could not create the Hermes profile");
         }
     }
 
+
     @Override
     public void putEnv(String profile, String key, String value) {
         try {
             restClient
-                    .put()
-                    .uri(baseUrl + "/api/env")
-                    .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("profile", profile, "key", key, "value", value))
-                    .retrieve()
-                    .toBodilessEntity();
+                .put()
+                .uri(baseUrl + "/api/env")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("profile", profile, "key", key, "value", value))
+                .retrieve()
+                .toBodilessEntity();
         } catch (RestClientException ex) {
             // 값은 적지 않는다. key 이름까지만 남겨도 어느 항목에서 걸렸는지 알 수 있다.
             log.warn("Hermes profile 의 환경 값을 쓰지 못했다 profile={} key={}", profile, key, ex);
@@ -77,15 +80,16 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
         }
     }
 
+
     @Override
     public void deleteProfile(String name) {
         try {
             restClient
-                    .delete()
-                    .uri(baseUrl + "/api/profiles/{name}", name)
-                    .header("Authorization", "Bearer " + token)
-                    .retrieve()
-                    .toBodilessEntity();
+                .delete()
+                .uri(baseUrl + "/api/profiles/{name}", name)
+                .header("Authorization", "Bearer " + token)
+                .retrieve()
+                .toBodilessEntity();
         } catch (HttpClientErrorException.NotFound ex) {
             // 대시보드 plugin 은 없는 profile 에 404 를 준다. 이미 지운 것이므로 할 일이 끝났다.
             log.info("지우려던 Hermes profile 이 이미 없다 profile={}", name);
@@ -95,24 +99,25 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
         }
     }
 
+
     @Override
     public SoulDocument readSoul(String profileName) {
         requireValidProfileName(profileName);
         try {
             SoulDocument soul = restClient
-                    .get()
-                    .uri(baseUrl + "/api/profiles/{name}/soul", profileName)
-                    .header("Authorization", "Bearer " + token)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .body(SoulDocument.class);
+                .get()
+                .uri(baseUrl + "/api/profiles/{name}/soul", profileName)
+                .header("Authorization", "Bearer " + token)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(SoulDocument.class);
             if (soul == null) {
                 // 아직 쓰지 않은 성격은 `exists=false` 인 본문으로 온다. 본문이 통째로 비어 오는 것은
                 // 그것과 다른 계약 위반이라서 「성격이 없다」로 바꾸지 않고 실패로 올린다.
                 log.warn("Hermes 대시보드가 SOUL.md 응답 본문을 주지 않았다 profile={}", profileName);
                 throw HermesCallFailure.of(
-                        new RestClientException("the dashboard returned an empty SOUL.md body"),
-                        "could not read the persona of this profile");
+                    new RestClientException("the dashboard returned an empty SOUL.md body"),
+                    "could not read the persona of this profile");
             }
             return soul;
         } catch (RestClientException ex) {
@@ -121,24 +126,26 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
         }
     }
 
+
     @Override
     public void putSoul(String profileName, String content) {
         requireValidProfileName(profileName);
         try {
             restClient
-                    .put()
-                    .uri(baseUrl + "/api/profiles/{name}/soul", profileName)
-                    .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("content", content))
-                    .retrieve()
-                    .toBodilessEntity();
+                .put()
+                .uri(baseUrl + "/api/profiles/{name}/soul", profileName)
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("content", content))
+                .retrieve()
+                .toBodilessEntity();
         } catch (RestClientException ex) {
             // 본문은 적지 않는다. 사람이 쓴 글이라 로그에 남기지 않는다.
             log.warn("Hermes profile 의 SOUL.md 를 쓰지 못했다 profile={}", profileName, ex);
             throw HermesCallFailure.of(ex, "could not write the persona of this profile");
         }
     }
+
 
     /**
      * profile 이름이 규칙에 맞는지 보고 아니면 거절한다.
@@ -153,6 +160,7 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
         }
     }
 
+
     /**
      * 그 이름이 이미 쓰이고 있다는 응답인지 본다.
      *
@@ -162,8 +170,9 @@ public class HttpHermesDashboardClient implements HermesDashboardClient {
      */
     private static boolean isConflict(RestClientException ex) {
         return ex instanceof RestClientResponseException response
-                && response.getStatusCode().value() == HttpStatus.CONFLICT.value();
+            && response.getStatusCode().value() == HttpStatus.CONFLICT.value();
     }
+
 
     private static String stripTrailingSlash(String url) {
         if (url == null) {

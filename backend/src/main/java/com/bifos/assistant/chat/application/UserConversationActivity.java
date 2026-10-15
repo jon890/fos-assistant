@@ -16,12 +16,13 @@ public class UserConversationActivity {
 
     private final ChatMessageRepository messages;
 
+
     @Transactional(readOnly = true)
     public Map<Long, Instant> lastMessageAt(Collection<Long> userIds) {
         if (userIds.isEmpty()) {
             return Map.of();
         }
         return messages.findLastUserMessages(userIds).stream()
-                .collect(Collectors.toMap(message -> message.userId(), message -> message.at()));
+            .collect(Collectors.toMap(message -> message.userId(), message -> message.at()));
     }
 }

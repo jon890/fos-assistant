@@ -22,12 +22,13 @@ public class TaskLabelSource implements ConversationTaskLabels {
 
     private final TaskRepository tasks;
 
+
     @Override
     public Map<Long, TaskLabel> labelsOf(Collection<Long> taskIds) {
         if (taskIds.isEmpty()) {
             return Map.of();
         }
         return tasks.findAllById(taskIds).stream()
-                .collect(Collectors.toMap(Task::id, task -> new TaskLabel(task.publicId(), task.title())));
+            .collect(Collectors.toMap(Task::id, task -> new TaskLabel(task.publicId(), task.title())));
     }
 }

@@ -26,6 +26,7 @@ class TaskScheduleTest {
     private static final Duration MIN = Duration.ofMinutes(15);
     private static final Instant NOW = Instant.parse("2026-10-04T00:00:00Z");
 
+
     @Test
     @DisplayName("매달 1일 9시는 서울 시간으로 계산해 다음 달 1일 0시 UTC 다")
     void computesNextMonthlyRunInSeoul() {
@@ -33,6 +34,7 @@ class TaskScheduleTest {
 
         assertThat(TaskSchedule.nextAfter(cron, SEOUL, NOW)).isEqualTo(Instant.parse("2026-11-01T00:00:00Z"));
     }
+
 
     @Test
     @DisplayName("2월 31일처럼 오지 않는 날은 다음 시각이 없다")
@@ -42,12 +44,14 @@ class TaskScheduleTest {
         assertThat(TaskSchedule.nextAfter(cron, SEOUL, NOW)).isNull();
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"0 9 * *", "0 0 9 * * *", "61 9 * * *", "abc", "", "   "})
     @DisplayName("필드가 다섯이 아니거나 읽지 못하는 cron 은 TASK_SCHEDULE_INVALID 다")
     void rejectsCronWithWrongFieldCountOrUnreadable(String cron) {
         assertInvalid(() -> TaskSchedule.parseCron(cron));
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"*/5 * * * *", "0,10 9 * * *"})
@@ -58,6 +62,7 @@ class TaskScheduleTest {
         assertInvalid(() -> TaskSchedule.requireMinInterval(cron, SEOUL, NOW, MIN));
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {"*/15 * * * *", "0 9 * * 1"})
     @DisplayName("이어지는 두 시각이 15분 이상인 cron 은 통과한다")
@@ -65,8 +70,9 @@ class TaskScheduleTest {
         CronExpression cron = TaskSchedule.parseCron(expression);
 
         assertThatCode(() -> TaskSchedule.requireMinInterval(cron, SEOUL, NOW, MIN))
-                .doesNotThrowAnyException();
+            .doesNotThrowAnyException();
     }
+
 
     @Test
     @DisplayName("사흘 놓친 매일 9시 작업은 마지막 하루의 시각 하나만 돌려준다")
@@ -76,8 +82,9 @@ class TaskScheduleTest {
         Instant now = Instant.parse("2026-10-03T03:00:00Z"); // 서울 10월 3일 12시
 
         assertThat(TaskSchedule.latestAtOrBefore(cron, SEOUL, from, now))
-                .isEqualTo(Instant.parse("2026-10-03T00:00:00Z"));
+            .isEqualTo(Instant.parse("2026-10-03T00:00:00Z"));
     }
+
 
     @Test
     @DisplayName("구간 안에 예정 시각이 없으면 가장 늦은 시각도 없다")
@@ -85,9 +92,10 @@ class TaskScheduleTest {
         CronExpression cron = TaskSchedule.parseCron("0 9 * * *");
 
         assertThat(TaskSchedule.latestAtOrBefore(
-                        cron, SEOUL, Instant.parse("2026-10-01T01:00:00Z"), Instant.parse("2026-10-01T02:00:00Z")))
+            cron, SEOUL, Instant.parse("2026-10-01T01:00:00Z"), Instant.parse("2026-10-01T02:00:00Z")))
                 .isNull();
     }
+
 
     @Test
     @DisplayName("서머타임이 시작하는 날 없는 2시 30분은 그날 건너뛴다")
@@ -99,9 +107,10 @@ class TaskScheduleTest {
         Instant first = TaskSchedule.nextAfter(cron, NEW_YORK, beforeGap);
 
         assertThat(first)
-                .isEqualTo(
-                        LocalDateTime.parse("2026-03-09T02:30").atZone(NEW_YORK).toInstant());
+            .isEqualTo(
+                LocalDateTime.parse("2026-03-09T02:30").atZone(NEW_YORK).toInstant());
     }
+
 
     @Test
     @DisplayName("서머타임이 끝나는 날 겹친 1시 30분은 서로 다른 두 순간이다")
@@ -116,23 +125,26 @@ class TaskScheduleTest {
         assertThat(second).isEqualTo(Instant.parse("2026-11-01T06:30:00Z"));
     }
 
+
     @Test
     @DisplayName("없는 시간대 이름은 TASK_SCHEDULE_INVALID 다")
     void rejectsUnknownTimeZone() {
         assertInvalid(() -> TaskSchedule.parseZone("Mars/Olympus"));
     }
 
+
     @Test
     @DisplayName("한 번 도는 시각은 그 시간대로 해석하고 지금보다 뒤가 아니면 TASK_SCHEDULE_INVALID 다")
     void readsOnceInZoneAndRejectsPast() {
         assertThat(TaskSchedule.onceAt(LocalDateTime.parse("2026-10-04T10:00"), SEOUL, NOW))
-                .isEqualTo(Instant.parse("2026-10-04T01:00:00Z"));
+            .isEqualTo(Instant.parse("2026-10-04T01:00:00Z"));
         assertInvalid(() -> TaskSchedule.onceAt(LocalDateTime.parse("2026-10-04T09:00"), SEOUL, NOW));
     }
 
+
     private static void assertInvalid(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.TASK_SCHEDULE_INVALID));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.TASK_SCHEDULE_INVALID));
     }
 }

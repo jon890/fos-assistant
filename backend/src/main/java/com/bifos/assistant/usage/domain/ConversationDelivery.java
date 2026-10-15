@@ -8,4 +8,5 @@ import java.time.Instant;
  * @param conversationId 대화 번호
  * @param deliveredAt 그 대화의 위임 실행 가운데 가장 늦은 {@code result_delivered_at}
  */
-public record ConversationDelivery(Long conversationId, Instant deliveredAt) {}
+public record ConversationDelivery(Long conversationId, Instant deliveredAt) {
+}

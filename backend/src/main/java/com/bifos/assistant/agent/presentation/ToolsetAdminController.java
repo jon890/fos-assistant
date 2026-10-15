@@ -23,12 +23,14 @@ public class ToolsetAdminController {
     private final ToolsetCatalogService catalog;
     private final ToolsetVisibilityService visibility;
 
+
     @GetMapping
     public List<AgentDtos.CatalogToolsetView> read() {
         return catalog.read(currentUser.requireAdmin()).stream()
-                .map(AgentDtos.CatalogToolsetView::from)
-                .toList();
+            .map(AgentDtos.CatalogToolsetView::from)
+            .toList();
     }
+
 
     @PutMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -31,6 +31,7 @@ public class UserBrowserController {
     private final UserBrowserService browsers;
     private final CurrentUserProvider currentUser;
 
+
     /** 기능이 꺼져 있어도 200 이다. 화면이 「준비 중」 을 그릴 수 있게 한다. */
     @GetMapping
     public BrowserView get() {
@@ -39,30 +40,35 @@ public class UserBrowserController {
             return BrowserView.disabled();
         }
         return browsers.get(userId)
-                .map(browser -> BrowserView.of(browser, browsers.idleTimeout()))
-                .orElseGet(() -> BrowserView.missing(browsers.idleTimeout()));
+            .map(browser -> BrowserView.of(browser, browsers.idleTimeout()))
+            .orElseGet(() -> BrowserView.missing(browsers.idleTimeout()));
     }
+
 
     @PostMapping
     public BrowserView create() {
         return BrowserView.of(browsers.create(currentUser.require().id()), browsers.idleTimeout());
     }
 
+
     @PostMapping("/start")
     public BrowserView start() {
         return BrowserView.of(browsers.start(currentUser.require().id()), browsers.idleTimeout());
     }
+
 
     @PostMapping("/stop")
     public BrowserView stop() {
         return BrowserView.of(browsers.stop(currentUser.require().id()), browsers.idleTimeout());
     }
 
+
     @DeleteMapping
     public ResponseEntity<Void> delete() {
         browsers.delete(currentUser.require().id());
         return ResponseEntity.noContent().build();
     }
+
 
     /** 로그인 화면을 연다. 꺼져 있으면 켜고 지금 탭에 붙어 SSE 를 연다. 시작 주소는 {@code http}, {@code https} 만 받는다. */
     @GetMapping(path = "/screen", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -75,6 +81,7 @@ public class UserBrowserController {
         browsers.openScreen(userId, url, stream);
         return stream.emitter();
     }
+
 
     /** 요청자의 열린 화면에 입력 하나를 보낸다. 본문은 직접 읽어 값이 오류 응답과 로그에 실리지 않게 한다. */
     @PostMapping("/screen/input")

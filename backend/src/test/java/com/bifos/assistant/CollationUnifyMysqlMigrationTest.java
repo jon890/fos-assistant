@@ -35,14 +35,14 @@ class CollationUnifyMysqlMigrationTest {
 
     /** 마이그레이션 번호 순서다. V58 이 첫 표를, V65 가 마지막 표를 바꾼다. */
     private static final List<String> TABLES = List.of(
-            "agent_token",
-            "chat_pending_message",
-            "execution_event",
-            "memory",
-            "model_hidden",
-            "model_tier_definition",
-            "model_tier_group_setting",
-            "subagent_usage_job");
+        "agent_token",
+        "chat_pending_message",
+        "execution_event",
+        "memory",
+        "model_hidden",
+        "model_tier_definition",
+        "model_tier_group_setting",
+        "subagent_usage_job");
 
     private static final String TOKEN_HASH = "AbCdEf0123456789aBcDeF";
     private static final String MEMORY_CONTENT = "아침에는 커피보다 보리차를 마신다.";
@@ -53,11 +53,13 @@ class CollationUnifyMysqlMigrationTest {
 
     private MysqlTestDatabase database;
 
+
     @BeforeEach
     void setUp() {
         database = MysqlTestDatabase.create();
         migrate(BEFORE_VERSION);
     }
+
 
     @Test
     @DisplayName("줄이 있는 표 여덟의 정렬 규칙만 바뀐다")
@@ -75,56 +77,57 @@ class CollationUnifyMysqlMigrationTest {
             String table = TABLES.get(i);
             assertThat(tableCollation(table)).as("올린 뒤 %s 의 정렬 규칙", table).isEqualTo(NEW_COLLATION);
             assertThat(columnCollations(table))
-                    .as("올린 뒤 %s 의 문자열 칸 정렬 규칙", table)
-                    .containsOnly(NEW_COLLATION);
+                .as("올린 뒤 %s 의 문자열 칸 정렬 규칙", table)
+                .containsOnly(NEW_COLLATION);
             Shape after = shape(table);
             assertThat(after.rows())
-                    .as("%s 의 줄 수", table)
-                    .isEqualTo(before.get(i).rows());
+                .as("%s 의 줄 수", table)
+                .isEqualTo(before.get(i).rows());
             assertThat(after.rows()).as("%s 에 넣은 줄이 있다", table).isPositive();
             assertThat(after.columns())
-                    .as("%s 의 칸 이름과 타입과 NULL 허용과 기본값과 extra", table)
-                    .isEqualTo(before.get(i).columns());
+                .as("%s 의 칸 이름과 타입과 NULL 허용과 기본값과 extra", table)
+                .isEqualTo(before.get(i).columns());
             assertThat(after.indexes())
-                    .as("%s 의 색인", table)
-                    .isEqualTo(before.get(i).indexes());
+                .as("%s 의 색인", table)
+                .isEqualTo(before.get(i).indexes());
         }
         assertThat(strings("SELECT token_hash FROM agent_token"))
-                .as("대소문자가 섞인 token_hash")
-                .containsExactly(TOKEN_HASH);
+            .as("대소문자가 섞인 token_hash")
+            .containsExactly(TOKEN_HASH);
         assertThat(strings("SELECT content FROM memory")).as("memory 의 한글 본문").containsExactly(MEMORY_CONTENT);
         assertThat(strings("SELECT content FROM chat_pending_message"))
-                .as("chat_pending_message 의 한글 본문")
-                .containsExactly(PENDING_CONTENT);
+            .as("chat_pending_message 의 한글 본문")
+            .containsExactly(PENDING_CONTENT);
     }
+
 
     @Test
     @DisplayName("새 정렬 규칙에서 겹치는 줄이 있으면 그 표에서 멈춘다")
     void stopsAtTableWithRowsThatCollideUnderNewCollation() throws SQLException {
         try (Connection connection = connect();
-                PreparedStatement insert = connection.prepareStatement(
-                        "INSERT INTO model_hidden (group_id, provider, model) VALUES (1, ?, 'same-model')")) {
+            PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO model_hidden (group_id, provider, model) VALUES (1, ?, 'same-model')")) {
             for (String provider : List.of("a", COMBINED_A)) {
                 insert.setString(1, provider);
                 insert.executeUpdate();
             }
         }
         assertThat(strings("SELECT HEX(provider) FROM model_hidden ORDER BY id"))
-                .as("결합 문자가 ? 로 바뀌지 않고 utf8mb4 로 들어갔다")
-                .containsExactly("61", "61E1B784");
+            .as("결합 문자가 ? 로 바뀌지 않고 utf8mb4 로 들어갔다")
+            .containsExactly("61", "61E1B784");
 
         assertThatThrownBy(() -> migrate(LAST_VERSION))
-                .isInstanceOf(FlywayException.class)
-                .satisfies(e -> assertThat(sqlErrorCodes(e))
-                        .as("실패 원인은 유일 색인 겹침(MySQL 오류 1062)이다")
-                        .contains(1062));
+            .isInstanceOf(FlywayException.class)
+            .satisfies(e -> assertThat(sqlErrorCodes(e))
+                .as("실패 원인은 유일 색인 겹침(MySQL 오류 1062)이다")
+                .contains(1062));
 
         assertThat(tableCollation("model_hidden"))
-                .as("실패한 model_hidden 의 정렬 규칙")
-                .isEqualTo(OLD_COLLATION);
+            .as("실패한 model_hidden 의 정렬 규칙")
+            .isEqualTo(OLD_COLLATION);
         assertThat(strings("SELECT HEX(provider) FROM model_hidden ORDER BY id"))
-                .as("실패한 model_hidden 의 줄")
-                .containsExactly("61", "61E1B784");
+            .as("실패한 model_hidden 의 줄")
+            .containsExactly("61", "61E1B784");
         for (String table : TABLES.subList(0, 4)) {
             assertThat(tableCollation(table)).as("실패한 표 앞의 %s", table).isEqualTo(NEW_COLLATION);
         }
@@ -132,11 +135,12 @@ class CollationUnifyMysqlMigrationTest {
             assertThat(tableCollation(table)).as("실패한 표 뒤의 %s", table).isEqualTo(OLD_COLLATION);
         }
         assertThat(
-                        strings(
-                                "SELECT CAST(MAX(CAST(version AS UNSIGNED)) AS CHAR) FROM flyway_schema_history WHERE success = 1"))
-                .as("성공으로 기록된 가장 큰 번호")
-                .containsExactly("61");
+            strings(
+                "SELECT CAST(MAX(CAST(version AS UNSIGNED)) AS CHAR) FROM flyway_schema_history WHERE success = 1"))
+                    .as("성공으로 기록된 가장 큰 번호")
+                    .containsExactly("61");
     }
+
 
     /** 원인 사슬에 든 {@link SQLException} 의 오류 번호를 모은다. */
     private static List<Integer> sqlErrorCodes(Throwable thrown) {
@@ -149,22 +153,24 @@ class CollationUnifyMysqlMigrationTest {
         return codes;
     }
 
+
     private void migrate(String version) {
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .target(version)
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .target(version)
+            .load()
+            .migrate();
     }
+
 
     private void seedEveryTable() throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO agent_token (token_hash, label, created_at) VALUES ('" + TOKEN_HASH
-                    + "', '집 비서', TIMESTAMP '2026-09-01 00:00:00')");
+                + "', '집 비서', TIMESTAMP '2026-09-01 00:00:00')");
             statement.executeUpdate("INSERT INTO chat_pending_message (conversation_id, user_id, content, created_at)"
-                    + " VALUES (1, 1, '" + PENDING_CONTENT + "', TIMESTAMP '2026-09-01 00:00:00')");
+                + " VALUES (1, 1, '" + PENDING_CONTENT + "', TIMESTAMP '2026-09-01 00:00:00')");
             statement.executeUpdate("""
                     INSERT INTO execution_event
                         (execution_id, sequence, event_type, hermes_session_id, completed_child_session_id, occurred_at)
@@ -180,9 +186,9 @@ class CollationUnifyMysqlMigrationTest {
                             TIMESTAMP '2026-09-01 00:00:00', TIMESTAMP '2026-09-01 00:00:00')
                     """.formatted(MEMORY_CONTENT));
             statement.executeUpdate(
-                    "INSERT INTO model_hidden (group_id, provider, model) VALUES (1, 'provider-a', 'model-a')");
+                "INSERT INTO model_hidden (group_id, provider, model) VALUES (1, 'provider-a', 'model-a')");
             statement.executeUpdate("INSERT INTO model_tier_definition (group_id, tier, provider, model)"
-                    + " VALUES (1, 'FAST', 'provider-a', 'model-a')");
+                + " VALUES (1, 'FAST', 'provider-a', 'model-a')");
             statement.executeUpdate("INSERT INTO model_tier_group_setting (group_id, default_tier) VALUES (1, 'FAST')");
             statement.executeUpdate("""
                     INSERT INTO subagent_usage_job
@@ -195,9 +201,10 @@ class CollationUnifyMysqlMigrationTest {
         }
     }
 
+
     private Shape shape(String table) throws SQLException {
         long rows = Long.parseLong(
-                strings("SELECT CAST(COUNT(*) AS CHAR) FROM " + table).get(0));
+            strings("SELECT CAST(COUNT(*) AS CHAR) FROM " + table).get(0));
         List<String> columns = strings("""
                 SELECT CONCAT(column_name, ' ', column_type, ' ', is_nullable,
                     ' default=', COALESCE(column_default, '<NULL>'), ' extra=', COALESCE(extra, '<NULL>'))
@@ -214,12 +221,14 @@ class CollationUnifyMysqlMigrationTest {
         return new Shape(rows, columns, indexes);
     }
 
+
     private String tableCollation(String table) throws SQLException {
         return strings("""
                 SELECT table_collation FROM information_schema.tables
                 WHERE table_schema = DATABASE() AND table_name = '%s'
                 """.formatted(table)).get(0);
     }
+
 
     private List<String> columnCollations(String table) throws SQLException {
         return strings("""
@@ -228,11 +237,12 @@ class CollationUnifyMysqlMigrationTest {
                 """.formatted(table));
     }
 
+
     private List<String> strings(String sql) throws SQLException {
         List<String> result = new ArrayList<>();
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery(sql)) {
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery(sql)) {
             while (rows.next()) {
                 result.add(rows.getString(1));
             }
@@ -240,9 +250,12 @@ class CollationUnifyMysqlMigrationTest {
         return result;
     }
 
+
     private Connection connect() throws SQLException {
         return DriverManager.getConnection(database.url(), database.username(), database.password());
     }
 
-    private record Shape(long rows, List<String> columns, List<String> indexes) {}
+
+    private record Shape(long rows, List<String> columns, List<String> indexes) {
+    }
 }

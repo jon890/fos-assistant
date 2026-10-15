@@ -20,16 +20,18 @@ class UserActivityMigrationTest {
 
     private String url;
 
+
     @BeforeEach
     void setUp() {
         url = "jdbc:h2:mem:user-activity-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target("20261008061000")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target("20261008061000")
+            .load()
+            .migrate();
     }
+
 
     @Test
     @DisplayName("기존 허용 목록의 마지막 로그인 시각은 비어 있고 메시지 집계 색인이 있다")
@@ -43,25 +45,26 @@ class UserActivityMigrationTest {
             }
         }
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                ResultSet row = connection
-                        .createStatement()
-                        .executeQuery(
-                                "SELECT last_login_at FROM allowed_person WHERE email = 'migration@example.com'")) {
+            ResultSet row = connection
+                .createStatement()
+                .executeQuery(
+                    "SELECT last_login_at FROM allowed_person WHERE email = 'migration@example.com'")) {
             assertThat(row.next()).isTrue();
             assertThat(row.getObject(1)).isNull();
             assertThat(indexColumns(connection.getMetaData(), "CHAT_MESSAGE", "IX_CHAT_MESSAGE_SENDER_ROLE_CREATED_AT"))
-                    .containsExactly("SENDER_USER_ID", "ROLE", "CREATED_AT");
+                .containsExactly("SENDER_USER_ID", "ROLE", "CREATED_AT");
         }
     }
 
+
     private static List<String> indexColumns(DatabaseMetaData metadata, String table, String index)
-            throws SQLException {
+        throws SQLException {
         List<String> columns = new ArrayList<>();
         try (ResultSet rows = metadata.getIndexInfo(null, null, table, false, false)) {
             while (rows.next()) {

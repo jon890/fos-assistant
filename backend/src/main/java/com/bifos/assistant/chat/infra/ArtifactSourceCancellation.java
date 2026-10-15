@@ -9,6 +9,7 @@ public final class ArtifactSourceCancellation {
     private final AtomicReference<Closeable> active = new AtomicReference<>();
     private final AtomicBoolean closed = new AtomicBoolean();
 
+
     public void register(Closeable closeable) {
         if (closed.get()) {
             close(closeable);
@@ -20,10 +21,12 @@ public final class ArtifactSourceCancellation {
         }
     }
 
+
     void close() {
         closed.set(true);
         close(active.getAndSet(null));
     }
+
 
     private static void close(Closeable closeable) {
         if (closeable != null) {

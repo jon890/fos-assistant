@@ -32,11 +32,13 @@ public class ModelAdminController {
     private final ModelVisibilityService visibility;
     private final ModelTierService modelTiers;
 
+
     /** 그룹의 단계 정의와 그룹 기본 단계다. 에이전트 없이 읽는다. 저장은 {@code PUT /api/v1/chat/model-tiers/group} 이 한다. */
     @GetMapping("/model-tiers")
     public GroupModelTiers groupModelTiers() {
         return modelTiers.groupTiers(currentUser.requireAdmin());
     }
+
 
     @GetMapping("/agents/{code}/model-settings")
     public AgentModelSettingsView modelSettings(@PathVariable String code) {
@@ -44,19 +46,22 @@ public class ModelAdminController {
         return AgentModelSettingsView.from(modelDefaults.settingsFor(user, code));
     }
 
+
     /** 세 값을 모두 비워 보내면 profile 의 값으로 돌아간다. */
     @PutMapping("/agents/{code}/model-default")
     public AgentModelDefaultView updateModelDefault(
-            @PathVariable String code, @RequestBody ChooseModelRequest request) {
+        @PathVariable String code, @RequestBody ChooseModelRequest request) {
         CurrentUser user = currentUser.requireAdmin();
         return AgentModelDefaultView.from(modelDefaults.save(user, code, request.toChoice()));
     }
+
 
     @GetMapping("/model-hidden")
     public HiddenModelsView hiddenModels() {
         CurrentUser user = currentUser.requireAdmin();
         return HiddenModelsView.from(visibility.hiddenFor(user.groupId()));
     }
+
 
     @PutMapping("/model-hidden")
     @ResponseStatus(HttpStatus.NO_CONTENT)

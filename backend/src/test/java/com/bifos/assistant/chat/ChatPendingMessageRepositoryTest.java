@@ -33,15 +33,18 @@ class ChatPendingMessageRepositoryTest {
     @Autowired
     TransactionTemplate transactions;
 
+
     @BeforeEach
     void setUp() {
         transactions.executeWithoutResult(status -> pendingMessages.deleteAll());
     }
 
+
     @AfterEach
     void tearDown() {
         transactions.executeWithoutResult(status -> pendingMessages.deleteAll());
     }
+
 
     @Test
     @DisplayName("대화의 대기 메시지만 넣은 순서로 읽는다")
@@ -50,8 +53,7 @@ class ChatPendingMessageRepositoryTest {
         queue(OTHER_CONVERSATION, "남의 글");
         queue(CONVERSATION, "둘째");
 
-        List<ChatPendingMessage> rows =
-                transactions.execute(status -> pendingMessages.findByConversationIdOrderByIdAsc(CONVERSATION));
+        List<ChatPendingMessage> rows = transactions.execute(status -> pendingMessages.findByConversationIdOrderByIdAsc(CONVERSATION));
 
         assertThat(rows).extracting(ChatPendingMessage::content).containsExactly("첫째", "둘째");
         assertThat(rows).extracting(ChatPendingMessage::conversationId).containsOnly(CONVERSATION);
@@ -59,16 +61,17 @@ class ChatPendingMessageRepositoryTest {
         assertThat(rows).extracting(ChatPendingMessage::createdAt).containsOnly(NOW);
     }
 
+
     @Test
     @DisplayName("대기 메시지가 없는 대화는 빈 목록을 준다")
     void findsNothingForConversationWithoutRows() {
         queue(OTHER_CONVERSATION, "남의 글");
 
-        List<ChatPendingMessage> rows =
-                transactions.execute(status -> pendingMessages.findByConversationIdOrderByIdAsc(CONVERSATION));
+        List<ChatPendingMessage> rows = transactions.execute(status -> pendingMessages.findByConversationIdOrderByIdAsc(CONVERSATION));
 
         assertThat(rows).isEmpty();
     }
+
 
     @Test
     @DisplayName("멈춘 대화는 보낼 대화에서 빠지고 멈춤을 내리면 다시 들어간다")
@@ -88,15 +91,17 @@ class ChatPendingMessageRepositoryTest {
         assertThat(readyToSend()).as("멈춤을 내린 뒤 보낼 대화").containsExactlyInAnyOrder(CONVERSATION, OTHER_CONVERSATION);
     }
 
+
     @Test
     @DisplayName("한 행만 멈춰 있어도 그 대화는 보낼 대화에서 빠진다")
     void excludesConversationWhenOnlyOneRowIsHeld() {
         queue(CONVERSATION, "첫째");
         transactions.executeWithoutResult(
-                status -> pendingMessages.save(ChatPendingMessage.queued(CONVERSATION, USER, "멈춘 글", true, NOW)));
+            status -> pendingMessages.save(ChatPendingMessage.queued(CONVERSATION, USER, "멈춘 글", true, NOW)));
 
         assertThat(readyToSend()).isEmpty();
     }
+
 
     @Test
     @DisplayName("다른 대화 번호로 취소하면 지우지 않고 0 을 돌려준다")
@@ -114,6 +119,7 @@ class ChatPendingMessageRepositoryTest {
         assertThat(pendingMessages.findById(row.id())).as("지운 뒤").isEmpty();
     }
 
+
     @Test
     @DisplayName("번호 목록으로 지우면 그 행만 지우고, 대화로 지우면 그 대화의 행만 지운다")
     void deletesByIdsAndByConversation() {
@@ -122,8 +128,7 @@ class ChatPendingMessageRepositoryTest {
         queue(CONVERSATION, "셋째");
         queue(OTHER_CONVERSATION, "남의 글");
 
-        Integer byIds =
-                transactions.execute(status -> pendingMessages.deleteAllByIdIn(List.of(first.id(), second.id())));
+        Integer byIds = transactions.execute(status -> pendingMessages.deleteAllByIdIn(List.of(first.id(), second.id())));
 
         assertThat(byIds).as("번호 목록으로 지운 행 수").isEqualTo(2);
         assertThat(contentsOf(CONVERSATION)).containsExactly("셋째");
@@ -135,17 +140,19 @@ class ChatPendingMessageRepositoryTest {
         assertThat(contentsOf(OTHER_CONVERSATION)).containsExactly("남의 글");
     }
 
+
     @Test
     @DisplayName("두 글을 빈 줄 하나로 잇고 이은 길이가 그 글의 길이와 같다")
     void mergesContentsWithOneBlankLine() {
         List<ChatPendingMessage> rows = List.of(
-                ChatPendingMessage.queued(CONVERSATION, USER, "첫째", false, NOW),
-                ChatPendingMessage.queued(CONVERSATION, USER, "둘째", false, NOW));
+            ChatPendingMessage.queued(CONVERSATION, USER, "첫째", false, NOW),
+            ChatPendingMessage.queued(CONVERSATION, USER, "둘째", false, NOW));
 
         assertThat(ChatPendingMessage.merged(rows)).isEqualTo("첫째\n\n둘째");
         assertThat(ChatPendingMessage.mergedLength(rows, null)).isEqualTo("첫째\n\n둘째".length());
         assertThat(ChatPendingMessage.mergedLength(rows, "셋째")).isEqualTo("첫째\n\n둘째\n\n셋째".length());
     }
+
 
     @Test
     @DisplayName("쌓인 글이 없으면 이은 글은 비고 더하는 글의 길이만 센다")
@@ -155,18 +162,21 @@ class ChatPendingMessageRepositoryTest {
         assertThat(ChatPendingMessage.mergedLength(List.of(), "셋째")).isEqualTo("셋째".length());
     }
 
+
     private ChatPendingMessage queue(long conversationId, String content) {
         return transactions.execute(
-                status -> pendingMessages.save(ChatPendingMessage.queued(conversationId, USER, content, false, NOW)));
+            status -> pendingMessages.save(ChatPendingMessage.queued(conversationId, USER, content, false, NOW)));
     }
+
 
     private List<Long> readyToSend() {
         return transactions.execute(status -> pendingMessages.findConversationsReadyToSend());
     }
 
+
     private List<String> contentsOf(long conversationId) {
         return transactions.execute(status -> pendingMessages.findByConversationIdOrderByIdAsc(conversationId).stream()
-                .map(ChatPendingMessage::content)
-                .toList());
+            .map(ChatPendingMessage::content)
+            .toList());
     }
 }

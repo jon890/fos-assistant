@@ -40,17 +40,18 @@ public class ProactiveLoopTestSupportController {
     private final SurfacedProblemSeed seed;
     private final Clock clock;
 
+
     public ProactiveLoopTestSupportController(
-            CurrentUserProvider currentUser,
-            AgentRepository agents,
-            CheckConversations checkConversations,
-            ProactiveCheckRepository checks,
-            ProactiveCheckProblemRepository problems,
-            ValueEvaluationRepository evaluations,
-            AutonomyDecisionRepository decisions,
-            ProactiveLoopRunRepository loopRuns,
-            SurfacedProblems surfacedProblems,
-            Clock clock) {
+        CurrentUserProvider currentUser,
+        AgentRepository agents,
+        CheckConversations checkConversations,
+        ProactiveCheckRepository checks,
+        ProactiveCheckProblemRepository problems,
+        ValueEvaluationRepository evaluations,
+        AutonomyDecisionRepository decisions,
+        ProactiveLoopRunRepository loopRuns,
+        SurfacedProblems surfacedProblems,
+        Clock clock) {
         this.currentUser = currentUser;
         this.agents = agents;
         this.checkConversations = checkConversations;
@@ -59,6 +60,7 @@ public class ProactiveLoopTestSupportController {
         this.clock = clock;
         this.seed = new SurfacedProblemSeed(checkConversations, checks, problems, evaluations, decisions, loopRuns);
     }
+
 
     /**
      * 부르는 사용자의 점검 대화에 먼저 다룰 문제를 하나 심는다. 문제 키는 호출마다 새로 만들어 서로 겹치지 않는다.
@@ -70,20 +72,22 @@ public class ProactiveLoopTestSupportController {
         CurrentUser user = currentUser.require();
         AutonomyLevel level = AutonomyLevel.valueOf(Objects.requireNonNull(request.level(), "level"));
         Agent agent = agents.findByCode(request.agentCode()).orElseThrow();
-        UUID conversationId =
-                checkConversations.findOrCreate(user, agent).conversation().publicId();
+        UUID conversationId = checkConversations.findOrCreate(user, agent).conversation().publicId();
         SurfacedProblemSeed.Seeded seeded = seed.decided(
-                user,
-                agent,
-                new SurfacedProblemSeed.Spec(
-                        "browser-" + UUID.randomUUID(), request.problem(), request.action(), level, clock.instant()));
+            user,
+            agent,
+            new SurfacedProblemSeed.Spec(
+                "browser-" + UUID.randomUUID(), request.problem(), request.action(), level, clock.instant()));
         surfacedProblems.surfaced(decisions.findById(seeded.decisionId()).orElseThrow());
         return new Surfaced(seeded.decisionId(), conversationId);
     }
 
+
     /** 심을 문제의 에이전트 코드, 문제 글, 제안한 다음 행동, 판정 수준이다. */
-    public record SurfacedRequest(String agentCode, String problem, String action, String level) {}
+    public record SurfacedRequest(String agentCode, String problem, String action, String level) {
+    }
 
     /** 심은 판정의 번호와 점검 대화의 공개 식별자다. */
-    public record Surfaced(Long decisionId, UUID conversationId) {}
+    public record Surfaced(Long decisionId, UUID conversationId) {
+    }
 }

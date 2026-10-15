@@ -12,12 +12,13 @@ import java.util.UUID;
  * @param count 호출 수
  * @param lastInvokedAt 마지막 호출 시각
  * @param lastConversationId 마지막 호출이 속한 대화의 공개 식별자. 그 대화를 지웠거나 대화 없이 돈 실행이면
- *     {@code null}
+ * {@code null}
  */
 public record UserSkillUsage(
-        String agentCode,
-        String agentName,
-        String skillName,
-        long count,
-        Instant lastInvokedAt,
-        UUID lastConversationId) {}
+    String agentCode,
+    String agentName,
+    String skillName,
+    long count,
+    Instant lastInvokedAt,
+    UUID lastConversationId) {
+}

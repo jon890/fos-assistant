@@ -29,10 +29,12 @@ public class ResultDeliveryRecovery {
     private final ResultDeliveryRecorder recorder;
     private final Instant startedAt;
 
+
     public ResultDeliveryRecovery(ResultDeliveryRecorder recorder, Clock clock) {
         this.recorder = recorder;
         this.startedAt = clock.instant();
     }
+
 
     /** 기준 시각 전에 시작한 시도를 닫는다. 실패해도 기동을 멈추지 않는다. 남은 시도는 다음 기동이 닫는다. */
     @EventListener(ApplicationReadyEvent.class)

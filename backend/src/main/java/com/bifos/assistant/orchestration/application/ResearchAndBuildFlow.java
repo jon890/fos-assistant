@@ -94,21 +94,23 @@ public class ResearchAndBuildFlow implements Flow {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+
     @Override
     public String name() {
         return NAME;
     }
 
+
     @Override
     public ChatTurn run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String text,
-            String input,
-            TurnIntent intent,
-            Consumer<AgentExecution> onRootStarted,
-            Consumer<ChatEvent> onEvent) {
+        CurrentUser user,
+        Conversation conversation,
+        Agent agent,
+        String text,
+        String input,
+        TurnIntent intent,
+        Consumer<AgentExecution> onRootStarted,
+        Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.Fresh) {
             messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
         }
@@ -118,24 +120,23 @@ public class ResearchAndBuildFlow implements Flow {
         // Chief 는 대화의 turn 이다. 보낼 session 과 실행 줄에 적을 루트 session 을 RunSession 으로 함께 넘긴다.
         RunSession session = sessions.ensure(conversation);
         AgentRun chief = runner.run(
-                user,
-                conversation,
-                agent,
-                chiefPrompt(input),
-                null,
-                null,
-                session,
-                execution -> {
-                    rootExecutionId.set(execution.id());
-                    onRootStarted.accept(execution);
-                },
-                (execution, runId) ->
-                        cancellation.trackRun(execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId),
-                () -> {
-                    Long executionId = rootExecutionId.get();
-                    return executionId != null && shouldStop(executionId);
-                },
-                TurnIntent.instructionFor(intent));
+            user,
+            conversation,
+            agent,
+            chiefPrompt(input),
+            null,
+            null,
+            session,
+            execution -> {
+                rootExecutionId.set(execution.id());
+                onRootStarted.accept(execution);
+            },
+            (execution, runId) -> cancellation.trackRun(execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId),
+            () -> {
+                Long executionId = rootExecutionId.get();
+                return executionId != null && shouldStop(executionId);
+            },
+            TurnIntent.instructionFor(intent));
         AgentExecution root = chief.execution();
         cancellation.untrackRun(root.id(), root.hermesRunId());
         if (shouldStop(root.id())) {
@@ -148,9 +149,9 @@ public class ResearchAndBuildFlow implements Flow {
         Instant now = clock.instant();
         conversation.rememberSession(chief.sessionId(), now);
         conversationWriter.touchSession(
-                conversation.id(),
-                chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(),
-                now);
+            conversation.id(),
+            chief.sessionId() == null || chief.sessionId().isBlank() ? null : chief.sessionId(),
+            now);
         onEvent.accept(ChatEvent.step(CHIEF, COMPLETED));
 
         Split split = split(root, chief.result().output(), onEvent);
@@ -174,8 +175,7 @@ public class ResearchAndBuildFlow implements Flow {
             ChildResult result = done.get(index);
             onEvent.accept(ChatEvent.step(planned.get(index).name(), result.succeeded() ? COMPLETED : FAILED));
         }
-        ChildResult firstFailure =
-                done.stream().filter(result -> !result.succeeded()).findFirst().orElse(null);
+        ChildResult firstFailure = done.stream().filter(result -> !result.succeeded()).findFirst().orElse(null);
         if (firstFailure != null) {
             if (shouldStop(root.id())) {
                 return cancelled(conversation, root, null);
@@ -201,6 +201,7 @@ public class ResearchAndBuildFlow implements Flow {
         return answer(conversation, root, synthesis.output(), intent);
     }
 
+
     /** 나눈 결과에서 실제로 돌릴 단계를 고른다. 갈래가 빈 단계는 건너뛴다. */
     private static List<Step> plan(Split split) {
         List<Step> planned = new ArrayList<>();
@@ -213,6 +214,7 @@ public class ResearchAndBuildFlow implements Flow {
         return List.copyOf(planned);
     }
 
+
     /**
      * Researcher 와 Engineer 를 함께 띄운다.
      *
@@ -223,26 +225,27 @@ public class ResearchAndBuildFlow implements Flow {
      * 부르는 쪽이 띄우기 전과 거둔 뒤에 한 스레드에서 낸다.
      */
     private List<ChildResult> runInParallel(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution root,
-            Agent agent,
-            List<Step> planned,
-            TurnIntent intent) {
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution root,
+        Agent agent,
+        List<Step> planned,
+        TurnIntent intent) {
         try (ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor()) {
             List<CompletableFuture<ChildResult>> pending = planned.stream()
-                    .map(step -> CompletableFuture.supplyAsync(
-                            () -> {
-                                if (shouldStop(root.id())) {
-                                    return ChildResult.failed(null, "CANCELLED");
-                                }
-                                return runChild(user, conversation, root, agent, step.task(), intent);
-                            },
-                            workers))
-                    .toList();
+                .map(step -> CompletableFuture.supplyAsync(
+                    () -> {
+                        if (shouldStop(root.id())) {
+                            return ChildResult.failed(null, "CANCELLED");
+                        }
+                        return runChild(user, conversation, root, agent, step.task(), intent);
+                    },
+                    workers))
+                .toList();
             return pending.stream().map(CompletableFuture::join).toList();
         }
     }
+
 
     /**
      * 하위 실행 하나를 돌린다.
@@ -254,26 +257,26 @@ public class ResearchAndBuildFlow implements Flow {
      * 다른 단계가 끝날 때까지 기다린 뒤 흐름을 멈추게 하기 위해서다.
      */
     private ChildResult runChild(
-            CurrentUser user,
-            Conversation conversation,
-            AgentExecution root,
-            Agent agent,
-            String task,
-            TurnIntent intent) {
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution root,
+        Agent agent,
+        String task,
+        TurnIntent intent) {
         AtomicReference<String> submittedRunId = new AtomicReference<>();
         try {
             return children.run(
-                    user,
-                    conversation,
-                    root,
-                    agent.code(),
-                    artifacts.agentPreamble(conversation) + task,
-                    (execution, runId) -> {
-                        submittedRunId.set(runId);
-                        cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);
-                    },
-                    () -> shouldStop(root.id()),
-                    TurnIntent.instructionFor(intent));
+                user,
+                conversation,
+                root,
+                agent.code(),
+                artifacts.agentPreamble(conversation) + task,
+                (execution, runId) -> {
+                    submittedRunId.set(runId);
+                    cancellation.trackRun(root.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId);
+                },
+                () -> shouldStop(root.id()),
+                TurnIntent.instructionFor(intent));
         } catch (ApiException ex) {
             if (ex.code() == ErrorCode.USER_BUSY) {
                 return ChildResult.failed(null, ErrorCode.USER_BUSY.name());
@@ -284,9 +287,11 @@ public class ResearchAndBuildFlow implements Flow {
         }
     }
 
+
     private boolean shouldStop(Long executionId) {
         return cancellation.isStopConfirmed(executionId) || cancellation.shouldStopBeforeSubmit(executionId);
     }
+
 
     /**
      * Chief 의 답을 나눈다.
@@ -298,14 +303,15 @@ public class ResearchAndBuildFlow implements Flow {
         try {
             JsonNode json = objectMapper.readTree(unwrap(output));
             return new Split(
-                    json.path("research").asString("").strip(),
-                    json.path("build").asString("").strip());
+                json.path("research").asString("").strip(),
+                json.path("build").asString("").strip());
         } catch (RuntimeException ex) {
             onEvent.accept(ChatEvent.step(CHIEF, FAILED));
             executions.fail(root, ErrorCode.ORCHESTRATION_CONTRACT_BROKEN.name());
             throw new ApiException(ErrorCode.ORCHESTRATION_CONTRACT_BROKEN, "the first step did not answer with JSON");
         }
     }
+
 
     /**
      * 흐름을 멈춘다. 어느 단계가 실패했는지를 Chief 의 실행 줄에 적는다.
@@ -322,6 +328,7 @@ public class ResearchAndBuildFlow implements Flow {
         return new ApiException(ErrorCode.ORCHESTRATION_STEP_FAILED, "a step of the flow failed");
     }
 
+
     /**
      * 최종 답을 대화 이력에 남긴다.
      *
@@ -332,24 +339,24 @@ public class ResearchAndBuildFlow implements Flow {
         String text = output == null ? "" : output;
         Instant now = clock.instant();
         ChatMessage saved = messages.save(
-                intent instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null
-                        ? ChatMessage.regeneratedAnswer(
-                                conversation.id(),
-                                text,
-                                root.id(),
-                                regenerate.previousAnswer().id(),
-                                now)
-                        : ChatMessage.fromAssistant(conversation.id(), text, root.id(), now));
+            intent instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null
+                ? ChatMessage.regeneratedAnswer(
+                    conversation.id(),
+                    text,
+                    root.id(),
+                    regenerate.previousAnswer().id(),
+                    now)
+                : ChatMessage.fromAssistant(conversation.id(), text, root.id(), now));
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), text, saved.id(), false);
     }
+
 
     /** 중지한 turn 은 답과 기억을 더 만들지 않고 Chief 를 취소 상태로 남긴다. */
     private ChatTurn cancelled(Conversation conversation, AgentExecution root, String sessionId) {
         executions.cancel(root);
         try {
-            boolean alreadyRecorded =
-                    executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(root.id())).stream()
-                            .anyMatch(event -> event.eventType() == ExecutionEventType.RUN_CANCELLED);
+            boolean alreadyRecorded = executionEvents.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(root.id())).stream()
+                .anyMatch(event -> event.eventType() == ExecutionEventType.RUN_CANCELLED);
             if (!alreadyRecorded) {
                 var event = eventRecorder.record(root, ExecutionEventType.RUN_CANCELLED, null, 99);
                 if (event != null) {
@@ -367,6 +374,7 @@ public class ResearchAndBuildFlow implements Flow {
         }
         return new ChatTurn(conversation.id(), conversation.publicId(), root.id(), "", null, true);
     }
+
 
     /**
      * 모델이 JSON 을 코드 블록으로 감싸 답하는 것을 벗긴다.
@@ -386,6 +394,7 @@ public class ResearchAndBuildFlow implements Flow {
         return trimmed.substring(firstLineEnd + 1, closing).strip();
     }
 
+
     private static String chiefPrompt(String text) {
         return """
                 아래 요청을 읽고 조사할 것과 만들 것을 나눈다.
@@ -398,6 +407,7 @@ public class ResearchAndBuildFlow implements Flow {
                 """.formatted(text);
     }
 
+
     private static String researcherPrompt(String research) {
         return """
                 아래를 조사해 사실만 정리한다. 결론을 내지 않는다.
@@ -406,6 +416,7 @@ public class ResearchAndBuildFlow implements Flow {
                 """.formatted(research);
     }
 
+
     private static String engineerPrompt(String build) {
         return """
                 아래를 만든다. 만든 것과 그 이유를 적는다.
@@ -413,6 +424,7 @@ public class ResearchAndBuildFlow implements Flow {
                 %s
                 """.formatted(build);
     }
+
 
     private static String synthesizerPrompt(String text, List<ChildResult> done) {
         StringBuilder gathered = new StringBuilder();
@@ -430,6 +442,7 @@ public class ResearchAndBuildFlow implements Flow {
                 """.formatted(text, gathered);
     }
 
+
     /** Chief 가 나눈 두 갈래다. 한쪽이 비면 그 단계를 건너뛴다. */
     private record Split(String research, String build) {
         boolean isEmpty() {
@@ -438,5 +451,6 @@ public class ResearchAndBuildFlow implements Flow {
     }
 
     /** 나란히 띄울 단계 하나다. 화면에 보일 이름과 그 단계에만 주는 지시를 갖는다. */
-    private record Step(String name, String task) {}
+    private record Step(String name, String task) {
+    }
 }

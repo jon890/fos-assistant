@@ -24,15 +24,15 @@ public class V41__RedactToolDetails extends BaseJavaMigration {
             ORDER BY e.execution_id, e.sequence, e.id
             """;
 
+
     @Override
     public void migrate(Context context) throws Exception {
         Connection connection = context.getConnection();
         Map<String, String> identifiers = new LinkedHashMap<>();
         long previousExecution = -1;
         try (Statement query = connection.createStatement();
-                ResultSet rows = query.executeQuery(SELECT_DETAILS);
-                PreparedStatement update =
-                        connection.prepareStatement("UPDATE execution_event SET detail = ? WHERE id = ?")) {
+            ResultSet rows = query.executeQuery(SELECT_DETAILS);
+            PreparedStatement update = connection.prepareStatement("UPDATE execution_event SET detail = ? WHERE id = ?")) {
             while (rows.next()) {
                 long executionId = rows.getLong("execution_id");
                 if (executionId != previousExecution) {
@@ -40,8 +40,7 @@ public class V41__RedactToolDetails extends BaseJavaMigration {
                     previousExecution = executionId;
                 }
                 String original = rows.getString("detail");
-                String redacted =
-                        ToolDetailRedactor.redact(original, rows.getBoolean("connector_managed"), identifiers);
+                String redacted = ToolDetailRedactor.redact(original, rows.getBoolean("connector_managed"), identifiers);
                 if (!original.equals(redacted)) {
                     update.setString(1, redacted);
                     update.setLong(2, rows.getLong("id"));

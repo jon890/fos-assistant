@@ -19,6 +19,7 @@ final class SkillPackageDiff {
 
     private static final int HEAD_CHARS = 2_000;
 
+
     /**
      * 묶음의 파일마다 지금 스킬과 견준 바뀜을 붙인다. {@code skillMd} 가 {@code null} 이면 빈 목록이다.
      *
@@ -41,14 +42,14 @@ final class SkillPackageDiff {
         for (SkillFile file : incoming) {
             String old = before.remove(file.path());
             SkillPackageChange change = old == null
-                    ? SkillPackageChange.ADDED
-                    : old.equals(file.content()) ? SkillPackageChange.SAME : SkillPackageChange.CHANGED;
+                ? SkillPackageChange.ADDED
+                : old.equals(file.content()) ? SkillPackageChange.SAME : SkillPackageChange.CHANGED;
             result.add(new SkillPackageFile(file.path(), utf8Bytes(file.content()), change));
         }
-        before.forEach((path, content) ->
-                result.add(new SkillPackageFile(path, utf8Bytes(content), SkillPackageChange.REMOVED)));
+        before.forEach((path, content) -> result.add(new SkillPackageFile(path, utf8Bytes(content), SkillPackageChange.REMOVED)));
         return result;
     }
+
 
     /** 앞 2,000자다. 끝 글자가 surrogate 쌍의 앞쪽이면 1,999자로 자른다. */
     static String head(String skillMd) {

@@ -16,13 +16,16 @@ public interface LiveProperties<T> {
     /** 지금 쓸 설정이다. 운영에서는 기동 때 바인딩한 값이다. */
     T current();
 
+
     /** 설정 record 의 타입이다. 검사 쪽 구현이 prefix 를 찾는 데 쓴다. */
     Class<T> type();
+
 
     /** 늘 같은 값을 돌려주는 구현이다. 운영 빈과 명시 생성자로 대역을 넣는 검사가 쓴다. */
     static <T> LiveProperties<T> fixed(Class<T> type, T value) {
         return new Fixed<>(type, value);
     }
+
 
     /** {@link #fixed} 의 구현이다. */
     record Fixed<T>(Class<T> type, T current) implements LiveProperties<T> {

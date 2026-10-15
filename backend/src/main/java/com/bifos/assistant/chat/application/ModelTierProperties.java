@@ -21,10 +21,12 @@ public record ModelTierProperties(Tier fast, Tier balanced, Tier deep) {
         deep = deep == null ? Tier.empty() : deep;
     }
 
+
     /** 세 단계 가운데 하나라도 모델을 정했는가. */
     public boolean hasAnyMapping() {
         return fast.model() != null || balanced.model() != null || deep.model() != null;
     }
+
 
     public Tier forTier(ModelTier tier) {
         return switch (tier) {
@@ -33,6 +35,7 @@ public record ModelTierProperties(Tier fast, Tier balanced, Tier deep) {
             case DEEP -> deep;
         };
     }
+
 
     /** 한 단계의 모델 제공사, 모델과 리즈닝 강도 설정이다. */
     public record Tier(String provider, String model, String reasoningEffort) {
@@ -45,7 +48,7 @@ public record ModelTierProperties(Tier fast, Tier balanced, Tier deep) {
             boolean missingReasoningEffort = reasoningEffort == null;
             if (missingModel != missingReasoningEffort || provider != null && missingModel) {
                 throw new IllegalStateException(
-                        "each assistant.model-tiers mapping needs both model and reasoning-effort");
+                    "each assistant.model-tiers mapping needs both model and reasoning-effort");
             }
             if (provider != null && provider.length() > ModelChoice.PROVIDER_MAX_LENGTH) {
                 throw new IllegalStateException("assistant.model-tiers provider is too long");
@@ -58,9 +61,11 @@ public record ModelTierProperties(Tier fast, Tier balanced, Tier deep) {
             }
         }
 
+
         private static Tier empty() {
             return new Tier(null, null, null);
         }
+
 
         private static String blankToNull(String value) {
             if (value == null) {

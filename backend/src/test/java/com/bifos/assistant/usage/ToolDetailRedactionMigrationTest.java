@@ -19,6 +19,7 @@ class ToolDetailRedactionMigrationTest {
     private static final String FIRST_ID = "12345678-1234-5678-9012-123456789abc";
     private static final String SECOND_ID = "abcdef01-1234-5678-9012-123456789abc";
 
+
     @Test
     @DisplayName("기존 도구 내용은 실행마다 같은 UUID 번호를 쓰고 연결용 내용은 전체를 가린다")
     void redactsExistingToolRowsAndKeepsNonToolRowsAndMetadata() throws SQLException {
@@ -40,9 +41,9 @@ class ToolDetailRedactionMigrationTest {
 
         Map<Long, String> details = new LinkedHashMap<>();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement query = connection.createStatement();
-                ResultSet rows = query.executeQuery(
-                        "SELECT id, detail, tool_name, duration_ms, failed FROM execution_event ORDER BY id")) {
+            Statement query = connection.createStatement();
+            ResultSet rows = query.executeQuery(
+                "SELECT id, detail, tool_name, duration_ms, failed FROM execution_event ORDER BY id")) {
             while (rows.next()) {
                 details.put(rows.getLong("id"), rows.getString("detail"));
                 assertThat(rows.getString("tool_name")).isEqualTo("test-tool");
@@ -51,30 +52,32 @@ class ToolDetailRedactionMigrationTest {
             }
         }
         assertThat(details)
-                .containsEntry(1L, "[항목 1] [항목 2]")
-                .containsEntry(2L, "[항목 2] [항목 1] [가림]")
-                .containsEntry(3L, FIRST_ID)
-                .containsEntry(4L, "[연결 도구 내용 가림]")
-                .containsEntry(5L, "[연결 도구 내용 가림]")
-                .containsEntry(6L, "[항목 1]")
-                .containsEntry(7L, "금액 12,000원, 2026-10-01, id=abc-12")
-                .containsEntry(8L, null)
-                .containsEntry(9L, "{\"token\":\"[가림]\",\"price\":12000}")
-                .containsEntry(10L, "[가림]");
+            .containsEntry(1L, "[항목 1] [항목 2]")
+            .containsEntry(2L, "[항목 2] [항목 1] [가림]")
+            .containsEntry(3L, FIRST_ID)
+            .containsEntry(4L, "[연결 도구 내용 가림]")
+            .containsEntry(5L, "[연결 도구 내용 가림]")
+            .containsEntry(6L, "[항목 1]")
+            .containsEntry(7L, "금액 12,000원, 2026-10-01, id=abc-12")
+            .containsEntry(8L, null)
+            .containsEntry(9L, "{\"token\":\"[가림]\",\"price\":12000}")
+            .containsEntry(10L, "[가림]");
     }
+
 
     private static void migrate(String url, String version) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target(version)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target(version)
+            .load()
+            .migrate();
     }
+
 
     private static void seedExecutions(String url) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,
                         credential_scope, visibility, enabled, created_at, connector_managed)
@@ -93,10 +96,11 @@ class ToolDetailRedactionMigrationTest {
         }
     }
 
+
     private static void insertEvent(String url, long id, long executionId, int sequence, String type, String detail)
-            throws SQLException {
+        throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                PreparedStatement insert = connection.prepareStatement("""
+            PreparedStatement insert = connection.prepareStatement("""
                         INSERT INTO execution_event (id, execution_id, sequence, event_type,
                             tool_name, detail, duration_ms, failed, occurred_at)
                         VALUES (?, ?, ?, ?, 'test-tool', ?, 100, FALSE, CURRENT_TIMESTAMP(6))

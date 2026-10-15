@@ -66,9 +66,11 @@ class ConversationManageTest {
     @Autowired
     HermesRunsClient hermes;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void reset() {
@@ -82,32 +84,36 @@ class ConversationManageTest {
         users.deleteAll();
     }
 
+
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private void successfulAnswer() {
         stub().willReturn(HermesRunResult.of(
-                "run-one", "session-one", "completed", "답", "example-model-large", "anthropic", TokenUsage.empty()));
+            "run-one", "session-one", "completed", "답", "example-model-large", "anthropic", TokenUsage.empty()));
     }
+
 
     private static void notFound(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("이름을 바꾸고 공백과 길이를 검사한다")
@@ -118,17 +124,18 @@ class ConversationManageTest {
 
         chat.rename(dad, id, "  새 이름  ");
         assertThat(chat.conversationsOf(dad, null, 100).items())
-                .singleElement()
-                .satisfies(it -> assertThat(it.title()).isEqualTo("새 이름"));
+            .singleElement()
+            .satisfies(it -> assertThat(it.title()).isEqualTo("새 이름"));
         assertThatThrownBy(() -> chat.rename(dad, id, "   "))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> chat.rename(dad, id, "가".repeat(201)))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
+
 
     @Test
     @DisplayName("지운 대화는 읽거나 이어 보낼 수 없지만 실행은 남는다")
@@ -144,6 +151,7 @@ class ConversationManageTest {
         assertThat(executions.findById(turn.executionId())).isPresent();
     }
 
+
     @Test
     @DisplayName("남의 대화는 이름을 바꾸거나 지울 수 없다")
     void othersConversationCannotBeRenamedOrDeleted() {
@@ -156,6 +164,7 @@ class ConversationManageTest {
         notFound(() -> chat.delete(kid, id));
         assertThat(chat.conversationsOf(dad, null, 100).items()).singleElement();
     }
+
 
     @Test
     @DisplayName("스트림은 실행을 만들자마자 번호를 보낸다")
@@ -172,31 +181,33 @@ class ConversationManageTest {
         assertThat(started.executionId()).isEqualTo(done.executionId());
     }
 
+
     @Test
     @DisplayName("provider가 막혀 실패해도 실패한 실행의 번호를 보낸다")
     void sendsFailedRunIdEvenWhenProviderBlockedFailure() {
         CurrentUser dad = member("manage-dad");
         stub().willReturn(new HermesRunResult(
-                "run-blocked",
-                null,
-                "failed",
-                null,
-                "example-model-large",
-                "anthropic",
-                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
-                TokenUsage.empty()));
+            "run-blocked",
+            null,
+            "failed",
+            null,
+            "example-model-large",
+            "anthropic",
+            HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
+            TokenUsage.empty()));
         List<ChatEvent> events = new ArrayList<>();
 
         assertThatThrownBy(() -> chat.stream(dad, null, "첫 질문", "manage-dad", events::add))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.PROVIDER_BLOCKED);
         assertThat(events).singleElement().satisfies(started -> {
             assertThat(started.type()).isEqualTo("started");
             assertThat(executions.findById(started.executionId()).orElseThrow().status())
-                    .isEqualTo(ExecutionStatus.FAILED);
+                .isEqualTo(ExecutionStatus.FAILED);
         });
     }
+
 
     @Test
     @DisplayName("실행 도중 지우거나 이름을 바꿔도 끝난 뒤에 남는다")
@@ -205,26 +216,26 @@ class ConversationManageTest {
         successfulAnswer();
         Long deletedId = chat.send(dad, null, "첫 질문", "manage-dad").conversationId();
         stub().willReturn(HermesRunResult.of(
-                "run-two", "session-two", "completed", "둘째 답", "example-model-large", "anthropic", TokenUsage.empty()));
+            "run-two", "session-two", "completed", "둘째 답", "example-model-large", "anthropic", TokenUsage.empty()));
         stub().beforeAwait(() -> chat.delete(dad, deletedId));
         chat.send(dad, deletedId, "이어 보내기", "manage-dad");
         assertThat(conversations.findById(deletedId).orElseThrow().deletedAt()).isNotNull();
         assertThat(conversations.findById(deletedId).orElseThrow().hermesSessionId())
-                .isEqualTo("session-two");
+            .isEqualTo("session-two");
 
         stub().willReturn(HermesRunResult.of(
-                "run-three",
-                "session-three",
-                "completed",
-                "셋째 답",
-                "example-model-large",
-                "anthropic",
-                TokenUsage.empty()));
+            "run-three",
+            "session-three",
+            "completed",
+            "셋째 답",
+            "example-model-large",
+            "anthropic",
+            TokenUsage.empty()));
         stub().beforeAwait(() -> chat.rename(
-                dad, chat.conversationsOf(dad, null, 100).items().getFirst().id(), "바뀐 이름"));
+            dad, chat.conversationsOf(dad, null, 100).items().getFirst().id(), "바뀐 이름"));
         Long renamedId = chat.send(dad, null, "다른 질문", "manage-dad").conversationId();
         assertThat(conversations.findById(renamedId).orElseThrow().title()).isEqualTo("바뀐 이름");
         assertThat(conversations.findById(renamedId).orElseThrow().hermesSessionId())
-                .isEqualTo("session-three");
+            .isEqualTo("session-three");
     }
 }

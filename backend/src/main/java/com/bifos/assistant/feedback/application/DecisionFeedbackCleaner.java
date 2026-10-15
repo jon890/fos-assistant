@@ -22,12 +22,14 @@ public class DecisionFeedbackCleaner {
     private final DecisionFeedbackProperties properties;
     private final Clock clock;
 
+
     /** 하루에 한 번 돈다. 시각은 Control Plane 의 시간대를 따르고, 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.decision-feedback.cleanup-cron}")
     @Transactional
     public void runScheduled() {
         clean(clock.instant());
     }
+
 
     /**
      * {@code now} 에서 보관 기간보다 먼저 마지막 사건이 일어난 제안의 사건을 모두 지운다. 사건 단위로 지우면 나중 사건만 남아 첫 반응을 잘못 읽는다.
@@ -36,13 +38,12 @@ public class DecisionFeedbackCleaner {
      */
     @Transactional
     public int clean(Instant now) {
-        Map<Long, List<String>> expired =
-                events.findSubjectsLastOccurredBefore(now.minus(properties.retention())).stream()
-                        .collect(Collectors.groupingBy(
-                                row -> (Long) row[0], Collectors.mapping(row -> (String) row[1], Collectors.toList())));
+        Map<Long, List<String>> expired = events.findSubjectsLastOccurredBefore(now.minus(properties.retention())).stream()
+            .collect(Collectors.groupingBy(
+                row -> (Long)row[0], Collectors.mapping(row -> (String)row[1], Collectors.toList())));
         int deleted = expired.entrySet().stream()
-                .mapToInt(entry -> events.deleteOfSubjects(entry.getKey(), entry.getValue()))
-                .sum();
+            .mapToInt(entry -> events.deleteOfSubjects(entry.getKey(), entry.getValue()))
+            .sum();
         log.info("expired decision feedback events cleaned deleted={}", deleted);
         return deleted;
     }

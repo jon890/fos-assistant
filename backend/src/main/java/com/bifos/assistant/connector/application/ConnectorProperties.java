@@ -19,6 +19,7 @@ public record ConnectorProperties(int maxConcurrentCalls, int callsPerMinute) {
         requirePositive("calls-per-minute", callsPerMinute);
     }
 
+
     private static void requirePositive(String name, int value) {
         if (value < 1) {
             throw new IllegalStateException("assistant.connector." + name + " must be at least 1: " + value);

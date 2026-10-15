@@ -38,6 +38,7 @@ class MethodNotAllowedTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private ListAppender<ILoggingEvent> logs;
 
+
     @BeforeEach
     void setUp() {
         logs = new ListAppender<>();
@@ -45,10 +46,12 @@ class MethodNotAllowedTest {
         handlerLogger().addAppender(logs);
     }
 
+
     @AfterEach
     void tearDown() {
         handlerLogger().detachAppender(logs);
     }
+
 
     @Test
     @DisplayName("POST 만 받는 경로에 온 HEAD 는 405 와 Allow 를 받고 ERROR 로 남지 않는다")
@@ -57,12 +60,13 @@ class MethodNotAllowedTest {
 
         assertThat(response.statusCode()).isEqualTo(405);
         assertThat(response.headers().firstValue("Allow"))
-                .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
+            .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
         assertThat(logs.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.ERROR));
         assertThat(logs.list)
-                .anyMatch(event -> event.getLevel() == Level.WARN
-                        && event.getFormattedMessage().contains("HEAD"));
+            .anyMatch(event -> event.getLevel() == Level.WARN
+                && event.getFormattedMessage().contains("HEAD"));
     }
+
 
     @Test
     @DisplayName("받지 않는 메서드의 응답 본문은 다른 오류와 같은 모양이다")
@@ -71,12 +75,13 @@ class MethodNotAllowedTest {
 
         assertThat(response.statusCode()).isEqualTo(405);
         assertThat(response.headers().firstValue("Allow"))
-                .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
+            .hasValueSatisfying(allow -> assertThat(allow).contains("POST"));
         JsonNode body = json.readTree(response.body());
         assertThat(body.path("code").asString()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.name());
         assertThat(body.path("message").asString()).contains("GET");
         assertThat(logs.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.ERROR));
     }
+
 
     @Test
     @DisplayName("GET 경로에 온 HEAD 는 Spring 이 GET 으로 처리해 405 가 아니다")
@@ -88,14 +93,16 @@ class MethodNotAllowedTest {
         assertThat(logs.list).noneMatch(event -> event.getLevel().isGreaterOrEqual(Level.ERROR));
     }
 
+
     private HttpResponse<String> send(String method, String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .method(method, HttpRequest.BodyPublishers.noBody())
-                .build();
+            .method(method, HttpRequest.BodyPublishers.noBody())
+            .build();
         return client.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
+
     private static Logger handlerLogger() {
-        return (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        return (Logger)LoggerFactory.getLogger(GlobalExceptionHandler.class);
     }
 }

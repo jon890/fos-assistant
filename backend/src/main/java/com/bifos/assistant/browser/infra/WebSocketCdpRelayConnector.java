@@ -39,18 +39,20 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
     private static final Set<String> KINDS = Set.of("page", "browser");
     private static final Pattern TARGET_ID = Pattern.compile("^[A-Za-z0-9-]{1,128}$");
 
-    private final HttpClient client =
-            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
     private final Duration sendTimeout;
+
 
     @Autowired
     public WebSocketCdpRelayConnector() {
         this(SEND_TIMEOUT);
     }
 
+
     WebSocketCdpRelayConnector(Duration sendTimeout) {
         this.sendTimeout = sendTimeout;
     }
+
 
     @Override
     public CdpRelay open(URI cdp, String kind, String id, CdpRelayListener listener) {
@@ -65,8 +67,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
         }
         URI address = URI.create("ws://" + cdp.getRawAuthority() + "/devtools/" + kind + "/" + id);
         Relay relay = new Relay(listener, sendTimeout);
-        CompletableFuture<WebSocket> opening =
-                client.newWebSocketBuilder().connectTimeout(CONNECT_TIMEOUT).buildAsync(address, relay);
+        CompletableFuture<WebSocket> opening = client.newWebSocketBuilder().connectTimeout(CONNECT_TIMEOUT).buildAsync(address, relay);
         try {
             relay.attach(opening.get(CONNECT_TIMEOUT.toMillis() * 2, TimeUnit.MILLISECONDS));
             return relay;
@@ -80,6 +81,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
         }
     }
 
+
     /** 붙기를 포기한다. 닫힘 알림을 부르지 않게 끝내고, 늦게 열린 소켓은 닫는다. */
     private static void abandon(CompletableFuture<WebSocket> opening, Relay relay) {
         relay.end(false);
@@ -90,10 +92,12 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
         });
     }
 
+
     @Override
     public void close() {
         client.shutdownNow();
     }
+
 
     /** 연결 하나다. WebSocket 의 듣는 쪽과 보내는 쪽을 함께 맡는다. */
     @RequiredArgsConstructor
@@ -105,12 +109,14 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
 
         private volatile WebSocket socket;
 
+
         void attach(WebSocket webSocket) {
             this.socket = webSocket;
             if (ended.get()) {
                 webSocket.abort();
             }
         }
+
 
         @Override
         public void onOpen(WebSocket webSocket) {
@@ -121,6 +127,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
             }
             webSocket.request(1);
         }
+
 
         @Override
         public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
@@ -141,6 +148,7 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
             return null;
         }
 
+
         /** 중계는 글 메시지만 잇는다. 바이너리가 오면 닫는다. */
         @Override
         public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
@@ -151,16 +159,19 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
             return null;
         }
 
+
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             end(true);
             return null;
         }
 
+
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             end(true);
         }
+
 
         /** 한 번에 하나만 보낸다. 앞 조각의 보내기가 끝나야 이 잠금을 놓는다. */
         @Override
@@ -178,12 +189,14 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
             }
         }
 
+
         @Override
         public void close() {
             if (end(false) && socket != null) {
                 socket.abort();
             }
         }
+
 
         /** 한 번만 끝낸다. 상대가 닫았거나 실패했으면 닫힘을 알린다. 처음 끝냈으면 참이다. */
         boolean end(boolean notify) {
@@ -195,8 +208,8 @@ public class WebSocketCdpRelayConnector implements CdpRelayConnector, AutoClosea
                     listener.onClosed();
                 } catch (RuntimeException ex) {
                     log.warn(
-                            "cdp relay close handler failed error={}",
-                            ex.getClass().getSimpleName());
+                        "cdp relay close handler failed error={}",
+                        ex.getClass().getSimpleName());
                 }
             }
             return true;

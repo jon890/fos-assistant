@@ -19,20 +19,21 @@ class ConnectorPropertiesTest {
         assertThat(properties.callsPerMinute()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("한도가 0 이하이면 어느 값인지 알리며 멈춘다")
     void stopsNamingWhichValueWhenLimitIsNotPositive() {
         assertThatThrownBy(() -> new ConnectorProperties(0, 10))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("assistant.connector.max-concurrent-calls");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("assistant.connector.max-concurrent-calls");
         assertThatThrownBy(() -> new ConnectorProperties(1, 0))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("assistant.connector.calls-per-minute");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("assistant.connector.calls-per-minute");
         assertThatThrownBy(() -> new ConnectorProperties(-1, 10))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("max-concurrent-calls");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-concurrent-calls");
         assertThatThrownBy(() -> new ConnectorProperties(1, -1))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("calls-per-minute");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("calls-per-minute");
     }
 }

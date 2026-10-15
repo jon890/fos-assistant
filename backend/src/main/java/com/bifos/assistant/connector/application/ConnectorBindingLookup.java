@@ -28,25 +28,29 @@ public class ConnectorBindingLookup implements AgentConnectorBindings {
 
     private final ConnectorBindingRepository bindings;
 
+
     @Override
     public boolean hasBindings(Long agentId) {
         return bindings.existsByAgentId(agentId);
     }
 
+
     @Override
     public Set<String> connectorServers(Long agentId) {
         return Collections.unmodifiableSortedSet(new TreeSet<>(bindings.findByAgentId(agentId).stream()
-                .map(ConnectorBinding::mcpServer)
-                .filter(Objects::nonNull)
-                .toList()));
+            .map(ConnectorBinding::mcpServer)
+            .filter(Objects::nonNull)
+            .toList()));
     }
+
 
     @Override
     public Set<String> connectorToolPrefixes(Long agentId) {
         return Collections.unmodifiableSortedSet(new TreeSet<>(connectorServers(agentId).stream()
-                .map(ConnectorBindingLookup::toolPrefix)
-                .toList()));
+            .map(ConnectorBindingLookup::toolPrefix)
+            .toList()));
     }
+
 
     /**
      * 그 서버 도구의 등록 이름이 늘 시작하는 글이다.

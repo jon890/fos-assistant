@@ -26,10 +26,11 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
     private final String dashboardToken;
     private final SandboxAttachmentDirectory attachmentDirectory;
 
+
     public HttpHermesToolsetClient(
-            HermesProfileKeyStore keyStore,
-            HermesProperties properties,
-            SandboxAttachmentDirectory attachmentDirectory) {
+        HermesProfileKeyStore keyStore,
+        HermesProperties properties,
+        SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
@@ -40,16 +41,17 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         this.attachmentDirectory = attachmentDirectory;
     }
 
+
     @Override
     public List<ToolsetCatalogEntry> readCatalog() {
         try {
             JsonNode response = restClient
-                    .get()
-                    .uri(dashboardBaseUrl + "/api/tools/toolsets")
-                    .header("Authorization", "Bearer " + dashboardToken)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(dashboardBaseUrl + "/api/tools/toolsets")
+                .header("Authorization", "Bearer " + dashboardToken)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(JsonNode.class);
             List<ToolsetCatalogEntry> result = new ArrayList<>();
             // 대시보드 `GET /api/tools/toolsets` 는 항목 배열을 그대로 돌려준다.
             for (JsonNode entry : entries(response)) {
@@ -66,16 +68,17 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         }
     }
 
+
     @Override
     public List<String> readEnabled(String apiBaseUrl, String profileName) {
         try {
             JsonNode response = restClient
-                    .get()
-                    .uri(stripTrailingSlash(apiBaseUrl) + "/v1/toolsets")
-                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(stripTrailingSlash(apiBaseUrl) + "/v1/toolsets")
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(JsonNode.class);
             // listener `GET /v1/toolsets` 는 `{"object": "list", "platform": "api_server", "data": [...]}` 로 감싼다.
             List<String> enabled = new ArrayList<>();
             for (JsonNode entry : entries(response == null ? null : response.get("data"))) {
@@ -95,15 +98,18 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         }
     }
 
+
     @Override
     public void writeApiServer(String profileName, List<String> toolsets, String sandboxOwner) {
         writeConfig(profileName, toolsets, sandboxOwner, false);
     }
 
+
     @Override
     public void writeApiServerInSandbox(String profileName, List<String> toolsets, String sandboxOwner) {
         writeConfig(profileName, toolsets, sandboxOwner, true);
     }
+
 
     private void writeConfig(String profileName, List<String> toolsets, String sandboxOwner, boolean requireSandbox) {
         attachmentDirectory.ensure(sandboxOwner);
@@ -117,13 +123,13 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         }
         try {
             restClient
-                    .put()
-                    .uri(dashboardBaseUrl + "/api/config")
-                    .header("Authorization", "Bearer " + dashboardToken)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .toBodilessEntity();
+                .put()
+                .uri(dashboardBaseUrl + "/api/config")
+                .header("Authorization", "Bearer " + dashboardToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes API 실행 toolset을 쓰지 못했다 profile={}", profileName, ex);
             Optional<HermesRequestRejected> sandboxRejection = HermesCallFailure.sandboxRejection(ex);
@@ -134,6 +140,7 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         }
     }
 
+
     private static Iterable<JsonNode> entries(JsonNode values) {
         if (values == null || !values.isArray() || values.isEmpty()) {
             throw malformedResponse();
@@ -143,14 +150,17 @@ public class HttpHermesToolsetClient implements HermesToolsetClient {
         return result;
     }
 
+
     private static ApiException malformedResponse() {
         return new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an invalid toolset response");
     }
+
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value == null || !value.isTextual() || value.asText().isBlank() ? null : value.asText();
     }
+
 
     private static String stripTrailingSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;

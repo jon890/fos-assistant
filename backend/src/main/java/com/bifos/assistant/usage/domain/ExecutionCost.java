@@ -18,11 +18,13 @@ package com.bifos.assistant.usage.domain;
  */
 public record ExecutionCost(Long estimatedMicros, Long actualMicros, String currency, String pricingVersion) {
 
+
     private static final ExecutionCost UNKNOWN = new ExecutionCost(null, null, null, null);
 
     public static ExecutionCost unknown() {
         return UNKNOWN;
     }
+
 
     public boolean isKnown() {
         return estimatedMicros != null;

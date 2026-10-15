@@ -33,36 +33,43 @@ public class TaskController {
     private final CurrentUserProvider currentUser;
     private final TaskService tasks;
 
+
     /** 보관하지 않은 작업을 만든 순서의 역순으로 돌려준다. */
     @GetMapping
     public List<TaskView> list() {
         return tasks.list(currentUser.require()).stream().map(TaskView::from).toList();
     }
 
+
     @PostMapping
     public TaskView create(@Valid @RequestBody TaskRequest request) {
         return TaskView.from(tasks.create(currentUser.require(), request.toInput()));
     }
+
 
     @GetMapping("/{taskId}")
     public TaskView get(@PathVariable UUID taskId) {
         return TaskView.from(tasks.get(currentUser.require(), taskId));
     }
 
+
     @PutMapping("/{taskId}")
     public TaskView update(@PathVariable UUID taskId, @Valid @RequestBody TaskRequest request) {
         return TaskView.from(tasks.update(currentUser.require(), taskId, request.toInput()));
     }
+
 
     @PostMapping("/{taskId}/pause")
     public TaskView pause(@PathVariable UUID taskId) {
         return TaskView.from(tasks.pause(currentUser.require(), taskId));
     }
 
+
     @PostMapping("/{taskId}/resume")
     public TaskView resume(@PathVariable UUID taskId) {
         return TaskView.from(tasks.resume(currentUser.require(), taskId));
     }
+
 
     /** 지운다. 줄은 보관한 채 남는다. */
     @DeleteMapping("/{taskId}")
@@ -71,11 +78,12 @@ public class TaskController {
         return ResponseEntity.noContent().build();
     }
 
+
     /** 발화 기록을 예정 시각의 역순으로 돌려준다. */
     @GetMapping("/{taskId}/runs")
     public List<TaskRunView> runs(@PathVariable UUID taskId, @RequestParam(defaultValue = "20") int limit) {
         return tasks.runs(currentUser.require(), taskId, limit).stream()
-                .map(TaskRunView::from)
-                .toList();
+            .map(TaskRunView::from)
+            .toList();
     }
 }

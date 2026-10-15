@@ -9,4 +9,5 @@ import java.time.Instant;
  * @param executionId 그 turn 의 루트 실행 번호. 돌지 않거나 아직 번호가 붙기 전이면 null
  * @param startedAt 그 실행 줄이 시작한 시각. 번호가 없거나 줄을 찾지 못하면 null
  */
-public record RunningTurn(boolean running, Long executionId, Instant startedAt) {}
+public record RunningTurn(boolean running, Long executionId, Instant startedAt) {
+}

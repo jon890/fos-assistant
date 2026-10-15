@@ -19,6 +19,7 @@ public class ProactiveCheckReportController {
     private final ProactiveCheckService checks;
     private final CurrentUserProvider currentUser;
 
+
     @PostMapping("/{checkId}/report/open")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void open(@PathVariable Long checkId) {

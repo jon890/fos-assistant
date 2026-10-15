@@ -18,9 +18,10 @@ public class LatencyAdminController {
     private final CurrentUserProvider currentUser;
     private final FirstResponseLatencyService latency;
 
+
     @GetMapping("/latency")
     public LatencySummaryView latency(@RequestParam(defaultValue = "30") int days) {
         return LatencySummaryView.from(
-                latency.summarize(currentUser.requireAdmin().id(), days));
+            latency.summarize(currentUser.requireAdmin().id(), days));
     }
 }

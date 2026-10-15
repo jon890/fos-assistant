@@ -30,8 +30,8 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "task_trigger",
-        uniqueConstraints = @UniqueConstraint(name = "uk_task_trigger_task", columnNames = "task_id"))
+    name = "task_trigger",
+    uniqueConstraints = @UniqueConstraint(name = "uk_task_trigger_task", columnNames = "task_id"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -80,13 +80,15 @@ public class TaskTrigger {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     /** 반복 시각이다. cron 과 다음 시각의 검사는 부르는 쪽이 끝낸다. */
     public static TaskTrigger cron(
-            Long taskId, String cronExpr, ZoneId zone, MissedPolicy missed, Instant nextFireAt, Instant now) {
+        Long taskId, String cronExpr, ZoneId zone, MissedPolicy missed, Instant nextFireAt, Instant now) {
         TaskTrigger trigger = created(taskId, missed, now);
         trigger.reschedule(TriggerType.CRON, Objects.requireNonNull(cronExpr, "cronExpr"), null, zone, nextFireAt, now);
         return trigger;
     }
+
 
     /** 한 번 도는 시각이다. 다음 예정 시각은 그 시각이다. */
     public static TaskTrigger once(Long taskId, Instant fireAt, ZoneId zone, MissedPolicy missed, Instant now) {
@@ -96,6 +98,7 @@ public class TaskTrigger {
         return trigger;
     }
 
+
     /**
      * 시각을 바꾼다. 종류에 맞지 않는 칸은 비운다.
      *
@@ -104,7 +107,7 @@ public class TaskTrigger {
      * @param nextFireAt 새 시각으로 계산한 다음 예정 시각. 없으면 null
      */
     public void reschedule(
-            TriggerType type, String cronExpr, Instant fireAt, ZoneId zone, Instant nextFireAt, Instant now) {
+        TriggerType type, String cronExpr, Instant fireAt, ZoneId zone, Instant nextFireAt, Instant now) {
         this.type = Objects.requireNonNull(type, "type");
         this.cronExpr = type == TriggerType.CRON ? cronExpr : null;
         this.fireAt = type == TriggerType.ONCE ? micros(fireAt) : null;
@@ -113,17 +116,20 @@ public class TaskTrigger {
         this.updatedAt = micros(now);
     }
 
+
     /** 놓친 발화를 어떻게 다룰지 바꾼다. 시각은 그대로다. */
     public void changeMissedPolicy(MissedPolicy missed, Instant now) {
         this.missedPolicy = Objects.requireNonNull(missed, "missed");
         this.updatedAt = micros(now);
     }
 
+
     /** 다음 예정 시각만 다시 정한다. 다시 켤 때 쓴다. 없으면 null 이다. */
     public void moveNext(Instant nextFireAt, Instant now) {
         this.nextFireAt = micros(nextFireAt);
         this.updatedAt = micros(now);
     }
+
 
     /**
      * 예정 시각 하나를 처리했다고 적고 다음 시각으로 옮긴다.
@@ -137,10 +143,12 @@ public class TaskTrigger {
         this.updatedAt = micros(now);
     }
 
+
     /** 저장된 시간대 이름을 읽은 값이다. */
     public ZoneId zone() {
         return ZoneId.of(timeZone);
     }
+
 
     private static TaskTrigger created(Long taskId, MissedPolicy missed, Instant now) {
         TaskTrigger trigger = new TaskTrigger();
@@ -149,6 +157,7 @@ public class TaskTrigger {
         trigger.createdAt = micros(Objects.requireNonNull(now, "now"));
         return trigger;
     }
+
 
     private static Instant micros(Instant instant) {
         return instant == null ? null : instant.truncatedTo(ChronoUnit.MICROS);

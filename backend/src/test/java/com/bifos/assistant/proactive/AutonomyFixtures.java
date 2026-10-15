@@ -21,6 +21,7 @@ final class AutonomyFixtures {
     static final Duration EVALUATION_AGE = Duration.ofHours(1);
     static final Duration EVIDENCE_AGE = Duration.ofHours(72);
 
+
     static Map<DecisionAxis, DecisionLevel> choices() {
         Map<DecisionAxis, DecisionLevel> choices = new EnumMap<>(DecisionAxis.class);
         choices.put(DecisionAxis.GOAL_ALIGNMENT, DecisionLevel.HIGH);
@@ -32,6 +33,7 @@ final class AutonomyFixtures {
         return choices;
     }
 
+
     static Map<DecisionAxis, DecisionConfidence> confidences(DecisionConfidence confidence) {
         Map<DecisionAxis, DecisionConfidence> confidences = new EnumMap<>(DecisionAxis.class);
         for (DecisionAxis axis : DecisionAxis.values()) {
@@ -40,9 +42,11 @@ final class AutonomyFixtures {
         return confidences;
     }
 
+
     static Builder safe() {
         return new Builder();
     }
+
 
     static final class Builder {
         DecisionOutcome outcome = DecisionOutcome.EVALUATED;
@@ -65,15 +69,18 @@ final class AutonomyFixtures {
         boolean startable = true;
         boolean alreadyExecuted;
 
+
         Builder outcome(DecisionOutcome value) {
             outcome = value;
             return this;
         }
 
+
         Builder replay() {
             replay = true;
             return this;
         }
+
 
         Builder evaluatedAt(Instant value) {
             evaluatedAt = value;
@@ -81,35 +88,42 @@ final class AutonomyFixtures {
             return this;
         }
 
+
         Builder judged(boolean value) {
             judged = value;
             return this;
         }
+
 
         Builder current(boolean value) {
             current = value;
             return this;
         }
 
+
         Builder actionType(String value) {
             actionType = value;
             return this;
         }
+
 
         Builder sideEffect(String value) {
             sideEffect = value;
             return this;
         }
 
+
         Builder candidateConfidence(String value) {
             candidateConfidence = value;
             return this;
         }
 
+
         Builder axis(DecisionAxis axis, DecisionLevel level) {
             choices.put(axis, level);
             return this;
         }
+
 
         Builder confidence(DecisionConfidence value) {
             axisConfidences = confidences(value);
@@ -117,63 +131,71 @@ final class AutonomyFixtures {
             return this;
         }
 
+
         Builder evidenceCheckedAt(Instant value) {
             evidenceCheckedAt = value;
             return this;
         }
+
 
         Builder executionEnabled(boolean value) {
             executionEnabled = value;
             return this;
         }
 
+
         Builder consented(boolean value) {
             consented = value;
             return this;
         }
+
 
         Builder writesAllowed(boolean value) {
             writesAllowed = value;
             return this;
         }
 
+
         Builder sourceTrigger(CheckTrigger value) {
             sourceTrigger = value;
             return this;
         }
+
 
         Builder startable(boolean value) {
             startable = value;
             return this;
         }
 
+
         Builder alreadyExecuted(boolean value) {
             alreadyExecuted = value;
             return this;
         }
 
+
         AutonomyInputs build() {
             return new AutonomyInputs(
-                    outcome,
-                    replay,
-                    evaluatedAt,
-                    asOf,
-                    NOW,
-                    judged,
-                    current,
-                    actionType,
-                    sideEffect,
-                    candidateConfidence,
-                    choices,
-                    axisConfidences,
-                    judgementConfidence,
-                    evidenceCheckedAt,
-                    executionEnabled,
-                    consented,
-                    writesAllowed,
-                    sourceTrigger,
-                    startable,
-                    alreadyExecuted);
+                outcome,
+                replay,
+                evaluatedAt,
+                asOf,
+                NOW,
+                judged,
+                current,
+                actionType,
+                sideEffect,
+                candidateConfidence,
+                choices,
+                axisConfidences,
+                judgementConfidence,
+                evidenceCheckedAt,
+                executionEnabled,
+                consented,
+                writesAllowed,
+                sourceTrigger,
+                startable,
+                alreadyExecuted);
         }
     }
 }

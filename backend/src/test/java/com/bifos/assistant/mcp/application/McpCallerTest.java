@@ -22,19 +22,21 @@ class McpCallerTest {
     private final AgentExecution execution = mock(AgentExecution.class);
     private final McpCallContext context = new McpCallContext("fos-root", "fos-root", "call_1");
 
+
     @Test
     @DisplayName("요청자와 origin 실행과 호출 맥락 중 하나라도 없으면 만들지 못한다")
     void cannotBeBuiltWhenAnyOfRequesterOriginRunOrCallContextIsMissing() {
         assertThatThrownBy(() -> new McpCaller(null, execution, context))
-                .as("요청자 없음")
-                .isInstanceOf(NullPointerException.class);
+            .as("요청자 없음")
+            .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new McpCaller(user, null, context))
-                .as("origin 실행 없음")
-                .isInstanceOf(NullPointerException.class);
+            .as("origin 실행 없음")
+            .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new McpCaller(user, execution, null))
-                .as("호출 맥락 없음")
-                .isInstanceOf(NullPointerException.class);
+            .as("호출 맥락 없음")
+            .isInstanceOf(NullPointerException.class);
     }
+
 
     @Test
     @DisplayName("세 값이 있으면 실행 번호는 origin 실행의 번호다")
@@ -44,19 +46,20 @@ class McpCallerTest {
         assertThat(new McpCaller(user, execution, context).executionId()).isEqualTo(42L);
     }
 
+
     @Test
     @DisplayName("인증 주체는 profile 과 토큰 해시 없이 만들지 못하고 로그 글에 해시를 싣지 않는다")
     void principalNeedsProfileAndTokenHashAndLogTextOmitsHash() {
         assertThatThrownBy(() -> new McpPrincipal(1L, null, "hash"))
-                .as("profile 없음")
-                .isInstanceOf(NullPointerException.class);
+            .as("profile 없음")
+            .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new McpPrincipal(1L, "p", null))
-                .as("토큰 해시 없음")
-                .isInstanceOf(NullPointerException.class);
+            .as("토큰 해시 없음")
+            .isInstanceOf(NullPointerException.class);
 
         String tokenHash = "a".repeat(64);
         assertThat(new McpPrincipal(1L, "shared-group", tokenHash).toString())
-                .contains("shared-group")
-                .doesNotContain(tokenHash);
+            .contains("shared-group")
+            .doesNotContain(tokenHash);
     }
 }

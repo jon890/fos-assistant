@@ -43,127 +43,137 @@ class ProblemJudgementTest {
 
     private static final Predicate<String> NO_OPEN_FOLLOW_UP = title -> false;
 
+
     private static Finding finding(String area, String topicKey, String sourceUrl, String checkedAt, String freshness) {
         return new Finding(
-                area,
-                topicKey,
-                "제목 " + topicKey,
-                sourceUrl,
-                checkedAt,
-                null,
-                freshness,
-                "지금 하는 일과 닿아 있다",
-                List.of("원문에서 확인한 사실"),
-                List.of(),
-                List.of(),
-                new Next("ACTION", "원문을 읽는다"),
-                null);
+            area,
+            topicKey,
+            "제목 " + topicKey,
+            sourceUrl,
+            checkedAt,
+            null,
+            freshness,
+            "지금 하는 일과 닿아 있다",
+            List.of("원문에서 확인한 사실"),
+            List.of(),
+            List.of(),
+            new Next("ACTION", "원문을 읽는다"),
+            null);
     }
+
 
     /** 공고 마감이 다가온 「새로 알릴 것」, 이미 알린 공부 자료, 마감 공고, 원문 없는 동향의 네 발견이다. */
     private static List<JudgedFinding> careerFindings() {
         Set<AnnouncedKey> announced = Set.of(new AnnouncedKey(STUDY_TOPIC, STUDY_URL));
         return List.of(
-                        finding("position", POSITION_TOPIC, POSITION_URL, CHECKED_AT, "CURRENT"),
-                        finding("study", STUDY_TOPIC, STUDY_URL, EARLIER_CHECKED_AT, "CURRENT"),
-                        finding("position", CLOSED_TOPIC, "https://jobs.example.com/closed", CHECKED_AT, "CLOSED"),
-                        finding("trend", UNSOURCED_TOPIC, "", CHECKED_AT, "CURRENT"))
-                .stream()
-                .map(each -> FindingJudgement.judge(each, START, NOW, announced, Set.of()))
-                .toList();
+            finding("position", POSITION_TOPIC, POSITION_URL, CHECKED_AT, "CURRENT"),
+            finding("study", STUDY_TOPIC, STUDY_URL, EARLIER_CHECKED_AT, "CURRENT"),
+            finding("position", CLOSED_TOPIC, "https://jobs.example.com/closed", CHECKED_AT, "CLOSED"),
+            finding("trend", UNSOURCED_TOPIC, "", CHECKED_AT, "CURRENT"))
+            .stream()
+            .map(each -> FindingJudgement.judge(each, START, NOW, announced, Set.of()))
+            .toList();
     }
+
 
     /** 공고 마감 전에 지원 여부를 정해야 하는 급한 문제다. */
     private static ProblemCandidate urgent() {
         return new ProblemCandidate(
-                "Position:Deadline:Example-Corp ",
-                "관심 회사의 백엔드 공고가 이틀 뒤 마감되는데 지원 여부를 정하지 않았다",
-                "백엔드 AI 포지션으로 이직을 준비한다",
-                List.of(POSITION_TOPIC),
-                new Next("QUESTION", "이번 주 안에 지원할지 정할까요"),
-                "HIGH",
-                "마감 전에 지원 기회를 놓치지 않는다",
-                "NONE",
-                null,
-                null);
+            "Position:Deadline:Example-Corp ",
+            "관심 회사의 백엔드 공고가 이틀 뒤 마감되는데 지원 여부를 정하지 않았다",
+            "백엔드 AI 포지션으로 이직을 준비한다",
+            List.of(POSITION_TOPIC),
+            new Next("QUESTION", "이번 주 안에 지원할지 정할까요"),
+            "HIGH",
+            "마감 전에 지원 기회를 놓치지 않는다",
+            "NONE",
+            null,
+            null);
     }
+
 
     /** 지금 급하지는 않지만 목표에 중요한 공부 문제다. 근거는 이미 알린 자료다. */
     private static ProblemCandidate importantLater() {
         return new ProblemCandidate(
-                "study:exactly-once-gap",
-                "정확히 한 번 처리를 면접에서 설명할 근거가 부족하다",
-                "다음 분기 면접 준비",
-                List.of(STUDY_TOPIC),
-                new Next("ACTION", "정확히 한 번 처리 예제를 한 번 돌려 보기"),
-                "MEDIUM",
-                "면접에서 설계 근거를 말할 수 있다",
-                "INTERNAL",
-                null,
-                null);
+            "study:exactly-once-gap",
+            "정확히 한 번 처리를 면접에서 설명할 근거가 부족하다",
+            "다음 분기 면접 준비",
+            List.of(STUDY_TOPIC),
+            new Next("ACTION", "정확히 한 번 처리 예제를 한 번 돌려 보기"),
+            "MEDIUM",
+            "면접에서 설계 근거를 말할 수 있다",
+            "INTERNAL",
+            null,
+            null);
     }
+
 
     private static ProblemCandidate withGoal(ProblemCandidate base, String relatedGoal) {
         return new ProblemCandidate(
-                base.problemKey(),
-                base.problem(),
-                relatedGoal,
-                base.evidence(),
-                base.proposedAction(),
-                base.confidence(),
-                base.expectedBenefit(),
-                base.sideEffect(),
-                base.risk(),
-                base.changeSinceLast());
+            base.problemKey(),
+            base.problem(),
+            relatedGoal,
+            base.evidence(),
+            base.proposedAction(),
+            base.confidence(),
+            base.expectedBenefit(),
+            base.sideEffect(),
+            base.risk(),
+            base.changeSinceLast());
     }
+
 
     private static ProblemCandidate withEvidence(ProblemCandidate base, List<String> evidence) {
         return new ProblemCandidate(
-                base.problemKey(),
-                base.problem(),
-                base.relatedGoal(),
-                evidence,
-                base.proposedAction(),
-                base.confidence(),
-                base.expectedBenefit(),
-                base.sideEffect(),
-                base.risk(),
-                base.changeSinceLast());
+            base.problemKey(),
+            base.problem(),
+            base.relatedGoal(),
+            evidence,
+            base.proposedAction(),
+            base.confidence(),
+            base.expectedBenefit(),
+            base.sideEffect(),
+            base.risk(),
+            base.changeSinceLast());
     }
+
 
     private static ProblemCandidate withChange(ProblemCandidate base, String changeSinceLast) {
         return new ProblemCandidate(
-                base.problemKey(),
-                base.problem(),
-                base.relatedGoal(),
-                base.evidence(),
-                base.proposedAction(),
-                base.confidence(),
-                base.expectedBenefit(),
-                base.sideEffect(),
-                base.risk(),
-                changeSinceLast);
+            base.problemKey(),
+            base.problem(),
+            base.relatedGoal(),
+            base.evidence(),
+            base.proposedAction(),
+            base.confidence(),
+            base.expectedBenefit(),
+            base.sideEffect(),
+            base.risk(),
+            changeSinceLast);
     }
+
 
     private static ProblemCandidate withConfidence(ProblemCandidate base, String confidence) {
         return new ProblemCandidate(
-                base.problemKey(),
-                base.problem(),
-                base.relatedGoal(),
-                base.evidence(),
-                base.proposedAction(),
-                confidence,
-                base.expectedBenefit(),
-                base.sideEffect(),
-                base.risk(),
-                base.changeSinceLast());
+            base.problemKey(),
+            base.problem(),
+            base.relatedGoal(),
+            base.evidence(),
+            base.proposedAction(),
+            confidence,
+            base.expectedBenefit(),
+            base.sideEffect(),
+            base.risk(),
+            base.changeSinceLast());
     }
+
 
     private static JudgedProblem only(List<ProblemCandidate> candidates, Set<String> accepted) {
         List<JudgedProblem> judged = ProblemJudgement.judge(candidates, careerFindings(), accepted, NO_OPEN_FOLLOW_UP);
         assertThat(judged).hasSize(1);
         return judged.getFirst();
     }
+
 
     @Test
     @DisplayName("급한 문제: 새로 알린 공고를 근거로 한 후보는 받아들이고 정규화한 키와 근거 참조와 확인 시각을 남긴다")
@@ -174,23 +184,25 @@ class ProblemJudgementTest {
         assertThat(judged.reason()).isNull();
         assertThat(judged.problemKey()).isEqualTo("position:deadline:example-corp");
         assertThat(judged.evidence())
-                .containsExactly(new ProblemEvidence(POSITION_TOPIC, POSITION_URL, Instant.parse(CHECKED_AT)));
+            .containsExactly(new ProblemEvidence(POSITION_TOPIC, POSITION_URL, Instant.parse(CHECKED_AT)));
         assertThat(judged.evidenceCheckedAt()).isEqualTo(Instant.parse(CHECKED_AT));
     }
+
 
     @Test
     @DisplayName("나중에 중요한 문제: 이미 알린 발견도 근거가 되고, 근거가 여럿이면 가장 이른 확인 시각을 신선도로 쓴다")
     void acceptsImportantLaterCandidateOnRepeatedFinding() {
         assertThat(careerFindings().get(1).reason()).isEqualTo(FindingReason.REPEATED);
         JudgedProblem judged = only(
-                List.of(withEvidence(importantLater(), List.of(STUDY_TOPIC, POSITION_TOPIC, STUDY_TOPIC))), Set.of());
+            List.of(withEvidence(importantLater(), List.of(STUDY_TOPIC, POSITION_TOPIC, STUDY_TOPIC))), Set.of());
 
         assertThat(judged.status()).isEqualTo(ProblemStatus.ACCEPTED);
         assertThat(judged.evidence())
-                .extracting(ProblemEvidence::topicKey)
-                .containsExactly(STUDY_TOPIC, POSITION_TOPIC);
+            .extracting(ProblemEvidence::topicKey)
+            .containsExactly(STUDY_TOPIC, POSITION_TOPIC);
         assertThat(judged.evidenceCheckedAt()).isEqualTo(Instant.parse(EARLIER_CHECKED_AT));
     }
+
 
     @Test
     @DisplayName("목표 없는 관찰: 새 자료가 나왔다는 사실만으로 낸 후보는 NO_GOAL 로 버린다")
@@ -201,11 +213,12 @@ class ProblemJudgementTest {
         assertThat(judged.reason()).isEqualTo(ProblemDropReason.NO_GOAL);
     }
 
+
     @Test
     @DisplayName("근거: 마감 공고, 원문 없는 발견, 블록에 없는 주제 키만 가리키면 NO_EVIDENCE 다")
     void dropsCandidateWithoutUsableEvidence() {
         for (List<String> evidence : List.of(
-                List.of(CLOSED_TOPIC), List.of(UNSOURCED_TOPIC), List.of("position:not-in-block"), List.<String>of())) {
+            List.of(CLOSED_TOPIC), List.of(UNSOURCED_TOPIC), List.of("position:not-in-block"), List.<String>of())) {
             JudgedProblem judged = only(List.of(withEvidence(urgent(), evidence)), Set.of());
 
             assertThat(judged.reason()).as("근거 %s", evidence).isEqualTo(ProblemDropReason.NO_EVIDENCE);
@@ -214,6 +227,7 @@ class ProblemJudgementTest {
         }
     }
 
+
     @Test
     @DisplayName("중복: 최근에 받아들인 키는 버리고, 달라진 점을 적으면 다시 받아들인다")
     void dropsDuplicateOfRecentlyAcceptedKeyUnlessChanged() {
@@ -221,92 +235,97 @@ class ProblemJudgementTest {
 
         assertThat(only(List.of(urgent()), accepted).reason()).isEqualTo(ProblemDropReason.DUPLICATE);
         assertThat(only(List.of(withChange(urgent(), "마감이 이틀 앞으로 다가왔다")), accepted)
-                        .status())
+            .status())
                 .isEqualTo(ProblemStatus.ACCEPTED);
     }
+
 
     @Test
     @DisplayName("중복: 같은 블록에서 같은 키를 두 번 내면 뒤의 것은 달라진 점이 있어도 버린다")
     void dropsDuplicateWithinBlock() {
         List<JudgedProblem> judged = ProblemJudgement.judge(
-                List.of(urgent(), withChange(urgent(), "다른 표현")), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
+            List.of(urgent(), withChange(urgent(), "다른 표현")), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
 
         assertThat(judged)
-                .extracting(JudgedProblem::status)
-                .containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
+            .extracting(JudgedProblem::status)
+            .containsExactly(ProblemStatus.ACCEPTED, ProblemStatus.DROPPED);
         assertThat(judged.getLast().reason()).isEqualTo(ProblemDropReason.DUPLICATE);
     }
+
 
     @Test
     @DisplayName("중복: 버린 후보의 키는 같은 블록의 뒤 후보를 막지 않는다")
     void droppedCandidateDoesNotBlockLaterOne() {
         List<JudgedProblem> judged = ProblemJudgement.judge(
-                List.of(withGoal(urgent(), null), urgent()), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
+            List.of(withGoal(urgent(), null), urgent()), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
 
         assertThat(judged)
-                .extracting(JudgedProblem::status)
-                .containsExactly(ProblemStatus.DROPPED, ProblemStatus.ACCEPTED);
+            .extracting(JudgedProblem::status)
+            .containsExactly(ProblemStatus.DROPPED, ProblemStatus.ACCEPTED);
     }
+
 
     @Test
     @DisplayName("이미 챙기는 일: 행동 글이 열린 할 일의 제목과 같으면 EXISTING_FOLLOW_UP 이다")
     void dropsCandidateMatchingOpenFollowUp() {
         Predicate<String> open = title -> title.equals("정확히 한 번 처리 예제를 한 번 돌려 보기");
 
-        List<JudgedProblem> judged =
-                ProblemJudgement.judge(List.of(importantLater(), urgent()), careerFindings(), Set.of(), open);
+        List<JudgedProblem> judged = ProblemJudgement.judge(List.of(importantLater(), urgent()), careerFindings(), Set.of(), open);
 
         assertThat(judged)
-                .extracting(JudgedProblem::reason)
-                .containsExactly(ProblemDropReason.EXISTING_FOLLOW_UP, null);
+            .extracting(JudgedProblem::reason)
+            .containsExactly(ProblemDropReason.EXISTING_FOLLOW_UP, null);
     }
+
 
     @Test
     @DisplayName("계약: 정해진 값 밖의 확신이나 빈 문제 키는 INCOMPLETE 이고 다른 검사보다 먼저 걸린다")
     void dropsIncompleteCandidateFirst() {
         assertThat(only(List.of(withGoal(withConfidence(urgent(), "VERY_HIGH"), null)), Set.of())
-                        .reason())
+            .reason())
                 .isEqualTo(ProblemDropReason.INCOMPLETE);
         ProblemCandidate blankKey = new ProblemCandidate(
-                " ",
-                "문제",
-                "목표",
-                List.of(POSITION_TOPIC),
-                new Next("ACTION", "행동"),
-                "LOW",
-                "효과",
-                "EXTERNAL",
-                "되돌리기 어렵다",
-                null);
+            " ",
+            "문제",
+            "목표",
+            List.of(POSITION_TOPIC),
+            new Next("ACTION", "행동"),
+            "LOW",
+            "효과",
+            "EXTERNAL",
+            "되돌리기 어렵다",
+            null);
         JudgedProblem judged = only(List.of(blankKey), Set.of());
         assertThat(judged.reason()).isEqualTo(ProblemDropReason.INCOMPLETE);
         assertThat(judged.problemKey()).isEmpty();
     }
 
+
     @Test
     @DisplayName("계약: 행동이 없거나 영향 힌트가 정해진 값 밖이면 INCOMPLETE 다")
     void dropsCandidateWithoutActionOrKnownSideEffect() {
         ProblemCandidate noAction = new ProblemCandidate(
-                "study:no-action", "문제", "목표", List.of(POSITION_TOPIC), null, "LOW", "효과", "NONE", null, null);
+            "study:no-action", "문제", "목표", List.of(POSITION_TOPIC), null, "LOW", "효과", "NONE", null, null);
         ProblemCandidate unknownSideEffect = new ProblemCandidate(
-                "study:side-effect",
-                "문제",
-                "목표",
-                List.of(POSITION_TOPIC),
-                new Next("ACTION", "행동"),
-                "LOW",
-                "효과",
-                "SEND_MAIL",
-                null,
-                null);
+            "study:side-effect",
+            "문제",
+            "목표",
+            List.of(POSITION_TOPIC),
+            new Next("ACTION", "행동"),
+            "LOW",
+            "효과",
+            "SEND_MAIL",
+            null,
+            null);
 
         List<JudgedProblem> judged = ProblemJudgement.judge(
-                List.of(noAction, unknownSideEffect), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
+            List.of(noAction, unknownSideEffect), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP);
 
         assertThat(judged)
-                .extracting(JudgedProblem::reason)
-                .containsExactly(ProblemDropReason.INCOMPLETE, ProblemDropReason.INCOMPLETE);
+            .extracting(JudgedProblem::reason)
+            .containsExactly(ProblemDropReason.INCOMPLETE, ProblemDropReason.INCOMPLETE);
     }
+
 
     @Test
     @DisplayName("근거: 주제 키의 앞뒤 공백은 무시하고 견준다")
@@ -317,12 +336,13 @@ class ProblemJudgementTest {
         assertThat(judged.evidence()).extracting(ProblemEvidence::topicKey).containsExactly(POSITION_TOPIC);
     }
 
+
     @Test
     @DisplayName("할 일 없음: 발견이 없는 블록은 후보를 검사하지도 남기지도 않는다")
     void returnsNothingWhenBlockHasNoFindings() {
         assertThat(ProblemJudgement.judge(List.of(urgent()), List.of(), Set.of(), NO_OPEN_FOLLOW_UP))
-                .isEmpty();
+            .isEmpty();
         assertThat(ProblemJudgement.judge(List.of(), careerFindings(), Set.of(), NO_OPEN_FOLLOW_UP))
-                .isEmpty();
+            .isEmpty();
     }
 }

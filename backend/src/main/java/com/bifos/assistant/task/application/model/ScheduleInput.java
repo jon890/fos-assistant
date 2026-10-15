@@ -10,4 +10,5 @@ import java.time.LocalDateTime;
  * @param fireAt {@code ONCE} 일 때 시간대 없는 날짜와 시각
  * @param timeZone IANA 시간대 이름. 비면 기본 시간대다
  */
-public record ScheduleInput(TriggerType type, String cron, LocalDateTime fireAt, String timeZone) {}
+public record ScheduleInput(TriggerType type, String cron, LocalDateTime fireAt, String timeZone) {
+}

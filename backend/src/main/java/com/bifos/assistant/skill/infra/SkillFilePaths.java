@@ -36,12 +36,14 @@ public final class SkillFilePaths {
 
     private static final String SCRIPTS_PREFIX = "scripts/";
 
+
     /** 스킬 이름이 규칙에 맞는지 본다. 아니면 {@link ErrorCode#VALIDATION_FAILED} 다. */
     public static void requireSkillName(String name) {
         if (name == null || !SKILL_NAME.matcher(name).matches() || RESERVED_SKILL_NAME.equals(name)) {
             throw validation("skill name must be lowercase letters, digits and dashes and not 'new'");
         }
     }
+
 
     /**
      * {@code SKILL.md} 를 뺀 스킬 파일의 경로가 규칙에 맞는지 본다. 아니면 {@link ErrorCode#VALIDATION_FAILED} 다.
@@ -56,6 +58,7 @@ public final class SkillFilePaths {
             throw validation("skill file paths must follow the skill file path rule");
         }
     }
+
 
     /**
      * 한 스킬의 파일 경로들이 함께 놓일 수 있는지 본다. 대소문자만 다른 두 경로와, 한 경로가 다른 경로의 디렉터리
@@ -78,10 +81,12 @@ public final class SkillFilePaths {
         }
     }
 
+
     /** 실행 공간에서 돌리는 스크립트 경로인가. {@code scripts/} 로 시작하면 참이다. */
     public static boolean isScript(String path) {
         return path != null && path.startsWith(SCRIPTS_PREFIX);
     }
+
 
     static boolean isValidFilePath(String path) {
         if (path == null || path.isEmpty() || path.length() > MAX_PATH_LENGTH) {
@@ -106,6 +111,7 @@ public final class SkillFilePaths {
         }
         return FILE_DIRECTORIES.contains(segments[0]);
     }
+
 
     /** 이름, {@code SKILL.md}, 파일 경로와 그 묶음을 본다. 아니면 {@link ErrorCode#VALIDATION_FAILED} 다. */
     static void requireBundle(SkillBundle bundle) {

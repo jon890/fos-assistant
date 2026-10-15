@@ -18,6 +18,7 @@ class RunSessionTest {
         assertThat(session.correlationSessionId()).isEqualTo("fos-a");
     }
 
+
     @Test
     @DisplayName("압축 교체 뒤에는 보낼 session만 바뀌고 적을 session은 루트를 가리킨다")
     void afterCompactionOnlySendSessionChangesAndRecordedPointsToRoot() {
@@ -27,6 +28,7 @@ class RunSessionTest {
         assertThat(session.correlationSessionId()).isEqualTo("fos-a");
     }
 
+
     @Test
     @DisplayName("루트가 빈 옛 대화는 두 값이 모두 보낸 session이다")
     void oldConversationWithBlankRootHasBothValuesAsSendSession() {
@@ -35,6 +37,7 @@ class RunSessionTest {
         assertThat(session.runtimeSessionId()).isEqualTo("legacy-session");
         assertThat(session.correlationSessionId()).isEqualTo("legacy-session");
     }
+
 
     @Test
     @DisplayName("fresh는 fos 접두사의 같은 값 둘이고 부를 때마다 다르다")

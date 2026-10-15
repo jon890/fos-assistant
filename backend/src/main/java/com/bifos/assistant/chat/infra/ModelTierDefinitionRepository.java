@@ -10,7 +10,9 @@ public interface ModelTierDefinitionRepository extends JpaRepository<ModelTierDe
 
     List<ModelTierDefinition> findByGroupIdOrderByTier(Long groupId);
 
+
     Optional<ModelTierDefinition> findByGroupIdAndTier(Long groupId, ModelTier tier);
+
 
     void deleteByGroupId(Long groupId);
 }

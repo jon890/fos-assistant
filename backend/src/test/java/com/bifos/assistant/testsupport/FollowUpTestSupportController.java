@@ -35,6 +35,7 @@ public class FollowUpTestSupportController {
     private final EntityManager entityManager;
     private final Clock clock;
 
+
     /**
      * 부르는 사람의 대화에 제안을 하나 넣는다. 제안한 실행은 그 대화의 마지막 실행으로 둔다.
      *
@@ -46,24 +47,27 @@ public class FollowUpTestSupportController {
         String title = Objects.requireNonNull(request.title(), "title");
         Long conversationId = conversations.requireOwnId(user, request.conversationId());
         Long executionId = entityManager
-                .createQuery("select max(e.id) from AgentExecution e where e.conversationId = :id", Long.class)
-                .setParameter("id", conversationId)
-                .getSingleResult();
+            .createQuery("select max(e.id) from AgentExecution e where e.conversationId = :id", Long.class)
+            .setParameter("id", conversationId)
+            .getSingleResult();
         FollowUp saved = followUps.saveAndFlush(FollowUp.proposed(
-                user.id(),
-                conversationId,
-                executionId,
-                title.strip(),
-                FollowUpService.titleKey(title),
-                null,
-                false,
-                clock.instant()));
+            user.id(),
+            conversationId,
+            executionId,
+            title.strip(),
+            FollowUpService.titleKey(title),
+            null,
+            false,
+            clock.instant()));
         return new ProposedFollowUp(saved.publicId());
     }
 
+
     /** 제안할 대화의 공개 식별자와 할 일 제목이다. */
-    public record ProposedRequest(UUID conversationId, String title) {}
+    public record ProposedRequest(UUID conversationId, String title) {
+    }
 
     /** 만든 할 일의 공개 식별자다. */
-    public record ProposedFollowUp(UUID id) {}
+    public record ProposedFollowUp(UUID id) {
+    }
 }

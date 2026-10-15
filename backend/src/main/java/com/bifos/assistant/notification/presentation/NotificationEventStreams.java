@@ -24,9 +24,11 @@ public class NotificationEventStreams {
 
     private final Duration heartbeat;
 
+
     public NotificationEventStreams(NotificationProperties properties) {
         this.heartbeat = properties.streamHeartbeat();
     }
+
 
     /**
      * 끝나지 않는 스트림을 열고 {@code subscribe} 가 넘기는 사건을 보낸다.
@@ -47,18 +49,18 @@ public class NotificationEventStreams {
             }
         });
         Thread heartbeatThread = Thread.ofVirtual()
-                .name("notification-follow-heartbeat-")
-                .start(() -> {
-                    try {
-                        do {
-                            Thread.sleep(heartbeat);
-                        } while (channel.comment("ping"));
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        unsubscribe.run();
-                    }
-                });
+            .name("notification-follow-heartbeat-")
+            .start(() -> {
+                try {
+                    do {
+                        Thread.sleep(heartbeat);
+                    } while (channel.comment("ping"));
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    unsubscribe.run();
+                }
+            });
         Runnable close = () -> {
             channel.close();
             unsubscribe.run();
@@ -69,6 +71,7 @@ public class NotificationEventStreams {
         emitter.onError(error -> close.run());
         return emitter;
     }
+
 
     /**
      * 사건과 주석 줄이 한 연결에 겹쳐 쓰이지 않게 한 번에 하나만 보낸다.
@@ -81,17 +84,21 @@ public class NotificationEventStreams {
         private final ReentrantLock lock = new ReentrantLock();
         private boolean open = true;
 
+
         private Channel(SseEmitter emitter) {
             this.emitter = emitter;
         }
+
 
         boolean send(NotificationEvent event) {
             return write(SseEmitter.event().data(event, MediaType.APPLICATION_JSON));
         }
 
+
         boolean comment(String text) {
             return write(SseEmitter.event().comment(text));
         }
+
 
         /** 연결이 이미 끝났을 때 더 쓰지 않게만 한다. 끝내는 것은 연결 쪽이 이미 했다. */
         void close() {
@@ -102,6 +109,7 @@ public class NotificationEventStreams {
                 lock.unlock();
             }
         }
+
 
         private boolean write(SseEmitter.SseEventBuilder event) {
             lock.lock();

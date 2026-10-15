@@ -24,22 +24,24 @@ public class ConversationNotices {
     private final ConversationEventHub hub;
     private final Clock clock;
 
+
     /** 알림 줄을 저장하고 열린 화면에 알린다. 대화가 없거나 지워졌으면 아무것도 하지 않는다. */
     public void post(Long conversationId, String text) {
         conversations
-                .findById(conversationId)
-                .filter(conversation -> conversation.deletedAt() == null)
-                .ifPresent(conversation -> {
-                    ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), text, clock.instant()));
-                    hub.publish(conversation.id(), ChatEvent.system(conversation.publicId(), saved.id(), text));
-                });
+            .findById(conversationId)
+            .filter(conversation -> conversation.deletedAt() == null)
+            .ifPresent(conversation -> {
+                ChatMessage saved = messages.save(ChatMessage.fromSystem(conversation.id(), text, clock.instant()));
+                hub.publish(conversation.id(), ChatEvent.system(conversation.publicId(), saved.id(), text));
+            });
     }
+
 
     /** 화면에 보이는 대화 식별자다. 대화가 없거나 지워졌으면 비어 있다. */
     public Optional<UUID> publicIdOf(Long conversationId) {
         return conversations
-                .findById(conversationId)
-                .filter(conversation -> conversation.deletedAt() == null)
-                .map(conversation -> conversation.publicId());
+            .findById(conversationId)
+            .filter(conversation -> conversation.deletedAt() == null)
+            .map(conversation -> conversation.publicId());
     }
 }

@@ -75,18 +75,21 @@ public final class MpoJpegNormalizer {
         return original;
     }
 
+
     private static boolean isMpf(byte[] image, int offset, int marker, int length) {
         return marker == 0xe2
-                && length >= 6
-                && image[offset + 2] == 'M'
-                && image[offset + 3] == 'P'
-                && image[offset + 4] == 'F'
-                && image[offset + 5] == 0;
+            && length >= 6
+            && image[offset + 2] == 'M'
+            && image[offset + 3] == 'P'
+            && image[offset + 4] == 'F'
+            && image[offset + 5] == 0;
     }
+
 
     private static int unsigned(byte value) {
         return value & 0xff;
     }
+
 
     private static boolean decodes(byte[] candidate) {
         try (MemoryCacheImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(candidate))) {

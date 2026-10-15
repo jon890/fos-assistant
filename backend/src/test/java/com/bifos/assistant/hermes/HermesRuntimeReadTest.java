@@ -34,6 +34,7 @@ class HermesRuntimeReadTest {
     private HttpHermesRunsClient client;
     private String baseUrl;
 
+
     @BeforeEach
     void start() throws IOException {
         when(keyStore.resolve("dad")).thenReturn("dad-key");
@@ -49,29 +50,31 @@ class HermesRuntimeReadTest {
         server.start();
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/p/dad";
         client = new HttpHermesRunsClient(
-                keyStore,
-                new HermesProperties(
-                        "keys",
-                        "https://hermes-dashboard.example.com",
-                        "test-dashboard-token",
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(2),
-                        Duration.ofSeconds(2)));
+            keyStore,
+            new HermesProperties(
+                "keys",
+                "https://hermes-dashboard.example.com",
+                "test-dashboard-token",
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(2)));
     }
+
 
     @AfterEach
     void stop() {
         server.stop(0);
     }
 
+
     @Test
     @DisplayName("세션 조회는 session 안의 model 을 읽는다")
     void sessionQueryReadsModelInsideSession() {
         bodies.put(
-                "/p/dad/api/sessions/sess-1",
-                "{\"object\":\"session\",\"session\":{\"id\":\"sess-1\",\"model\":\"example-fast\"}}");
+            "/p/dad/api/sessions/sess-1",
+            "{\"object\":\"session\",\"session\":{\"id\":\"sess-1\",\"model\":\"example-fast\"}}");
 
         SessionRuntime runtime = client.readSessionRuntime(baseUrl, "dad", "sess-1");
 
@@ -80,17 +83,18 @@ class HermesRuntimeReadTest {
         assertThat(runtime.provider()).isNull();
     }
 
+
     @Test
     @DisplayName("실행 조회는 runtime 의 provider 와 모델을 결과에 싣는다")
     void runQueryCarriesRuntimeProviderAndModelInResult() {
         // 기본값으로 보낸 실행이라 model 칸은 profile 이름을 되돌려 준다.
         bodies.put(
-                "/p/dad/v1/runs/run-1",
-                "{\"run_id\":\"run-1\",\"status\":\"completed\",\"session_id\":\"sess-1\",\"model\":\"dad\","
-                        + "\"runtime\":{\"provider\":\"openai-codex\",\"model\":\"example-fast\",\"route_source\":\"global\"}}");
+            "/p/dad/v1/runs/run-1",
+            "{\"run_id\":\"run-1\",\"status\":\"completed\",\"session_id\":\"sess-1\",\"model\":\"dad\","
+                + "\"runtime\":{\"provider\":\"openai-codex\",\"model\":\"example-fast\",\"route_source\":\"global\"}}");
 
         HermesRunResult result = client.awaitCompletion(
-                new HermesRunCommand("dad", baseUrl, "안녕", null, null, null, null, null), "run-1");
+            new HermesRunCommand("dad", baseUrl, "안녕", null, null, null, null, null), "run-1");
 
         assertThat(result.runtime()).isNotNull();
         assertThat(result.runtime().provider()).isEqualTo("openai-codex");
@@ -98,15 +102,16 @@ class HermesRuntimeReadTest {
         assertThat(result.model()).as("model 칸은 요청을 되돌려 준 값 그대로다").isEqualTo("dad");
     }
 
+
     @Test
     @DisplayName("자식 session의 중첩 응답에서 id와 source와 최종 카운터를 읽는다")
     void readsFinalSubagentUsageFromNestedSession() {
         bodies.put(
-                "/p/dad/api/sessions/child-1",
-                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
-                        + "\"parent_session_id\":\"parent-1\",\"model\":\"example-fast\","
-                        + "\"started_at\":10.25,\"ended_at\":12.75,\"input_tokens\":100,"
-                        + "\"output_tokens\":40,\"cache_read_tokens\":20,\"cache_write_tokens\":5}}");
+            "/p/dad/api/sessions/child-1",
+            "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                + "\"parent_session_id\":\"parent-1\",\"model\":\"example-fast\","
+                + "\"started_at\":10.25,\"ended_at\":12.75,\"input_tokens\":100,"
+                + "\"output_tokens\":40,\"cache_read_tokens\":20,\"cache_write_tokens\":5}}");
 
         SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
 
@@ -119,13 +124,14 @@ class HermesRuntimeReadTest {
         assertThat(usage.durationMs()).isEqualTo(2_500L);
     }
 
+
     @Test
     @DisplayName("자식 session 응답에 provider 가 없으면 billing_provider 를 읽는다")
     void readsSubagentBillingProviderWhenProviderIsAbsent() {
         bodies.put(
-                "/p/dad/api/sessions/child-1",
-                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
-                        + "\"model\":\"example-fast\",\"billing_provider\":\"example-provider\"}}");
+            "/p/dad/api/sessions/child-1",
+            "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                + "\"model\":\"example-fast\",\"billing_provider\":\"example-provider\"}}");
 
         SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
 
@@ -133,13 +139,14 @@ class HermesRuntimeReadTest {
         assertThat(usage.provider()).isEqualTo("example-provider");
     }
 
+
     @Test
     @DisplayName("자식 session 응답에 provider 가 있으면 billing_provider 보다 먼저 읽는다")
     void prefersSubagentProviderOverBillingProvider() {
         bodies.put(
-                "/p/dad/api/sessions/child-1",
-                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
-                        + "\"provider\":\"served-provider\",\"billing_provider\":\"example-provider\"}}");
+            "/p/dad/api/sessions/child-1",
+            "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                + "\"provider\":\"served-provider\",\"billing_provider\":\"example-provider\"}}");
 
         SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
 
@@ -147,12 +154,13 @@ class HermesRuntimeReadTest {
         assertThat(usage.provider()).isEqualTo("served-provider");
     }
 
+
     @Test
     @DisplayName("자식 session 응답에 provider 와 billing_provider 가 모두 없으면 provider 를 비운다")
     void leavesSubagentProviderNullWhenAbsent() {
         bodies.put(
-                "/p/dad/api/sessions/child-1",
-                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\",\"model\":\"example-fast\"}}");
+            "/p/dad/api/sessions/child-1",
+            "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\",\"model\":\"example-fast\"}}");
 
         SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
 
@@ -160,15 +168,16 @@ class HermesRuntimeReadTest {
         assertThat(usage.provider()).isNull();
     }
 
+
     @Test
     @DisplayName("자식 사용량의 음수, 소수, long 범위 밖 토큰은 모르는 값으로 둔다")
     void rejectsInvalidSubagentTokenNumbers() {
         bodies.put(
-                "/p/dad/api/sessions/child-1",
-                "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
-                        + "\"parent_session_id\":\"parent-1\",\"input_tokens\":-1,"
-                        + "\"output_tokens\":1.5,\"cache_read_tokens\":9223372036854775808,"
-                        + "\"cache_write_tokens\":0}}");
+            "/p/dad/api/sessions/child-1",
+            "{\"session\":{\"id\":\"child-1\",\"source\":\"subagent\","
+                + "\"parent_session_id\":\"parent-1\",\"input_tokens\":-1,"
+                + "\"output_tokens\":1.5,\"cache_read_tokens\":9223372036854775808,"
+                + "\"cache_write_tokens\":0}}");
 
         SubagentSessionUsage usage = client.readSubagentUsage(baseUrl, "dad", "child-1");
 
@@ -178,6 +187,7 @@ class HermesRuntimeReadTest {
         assertThat(usage.cacheReadTokens()).isNull();
         assertThat(usage.cacheWriteTokens()).isZero();
     }
+
 
     @Test
     @DisplayName("요청한 child id와 다른 session 응답은 사용량으로 쓰지 않는다")

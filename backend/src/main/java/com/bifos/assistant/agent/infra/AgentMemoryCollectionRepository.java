@@ -12,6 +12,7 @@ public interface AgentMemoryCollectionRepository extends JpaRepository<AgentMemo
 
     List<AgentMemoryCollection> findByIdAgentId(Long agentId);
 
+
     /** 지운 에이전트를 정리할 때 그 에이전트의 Memory 허용 줄을 모두 지운다. 지운 행 수를 돌려준다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from AgentMemoryCollection c where c.id.agentId = :agentId")

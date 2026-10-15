@@ -136,8 +136,9 @@ public class ProactiveCheck {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+
     private ProactiveCheck(
-            Long userId, Long agentId, Long conversationId, CheckTrigger trigger, boolean writesAllowed, Instant now) {
+        Long userId, Long agentId, Long conversationId, CheckTrigger trigger, boolean writesAllowed, Instant now) {
         this.userId = userId;
         this.agentId = agentId;
         this.conversationId = conversationId;
@@ -147,11 +148,13 @@ public class ProactiveCheck {
         this.startedAt = now;
     }
 
+
     /** @param writesAllowed 시작하는 지금 그 에이전트의 「먼저 살펴보기에 쓰기 도구 허용」 값 */
     public static ProactiveCheck started(
-            Long userId, Long agentId, Long conversationId, CheckTrigger trigger, boolean writesAllowed, Instant now) {
+        Long userId, Long agentId, Long conversationId, CheckTrigger trigger, boolean writesAllowed, Instant now) {
         return new ProactiveCheck(userId, agentId, conversationId, trigger, writesAllowed, now);
     }
+
 
     /** 살펴보기 turn 의 실행 줄과 그 turn 을 보낸 루트 session 을 적는다. */
     public void attachRoot(Long rootExecutionId, String hermesRootSessionId) {
@@ -159,17 +162,18 @@ public class ProactiveCheck {
         this.hermesRootSessionId = hermesRootSessionId;
     }
 
+
     public void succeed(
-            CheckOutcome outcome,
-            int newFindings,
-            int referenceFindings,
-            CheckReport report,
-            int toolCalls,
-            int delegations,
-            long treeInputTokens,
-            long treeCachedInputTokens,
-            long treeOutputTokens,
-            Instant now) {
+        CheckOutcome outcome,
+        int newFindings,
+        int referenceFindings,
+        CheckReport report,
+        int toolCalls,
+        int delegations,
+        long treeInputTokens,
+        long treeCachedInputTokens,
+        long treeOutputTokens,
+        Instant now) {
         this.status = CheckStatus.SUCCEEDED;
         this.outcome = outcome;
         this.newFindings = newFindings;
@@ -179,6 +183,7 @@ public class ProactiveCheck {
         finish(null, toolCalls, delegations, now);
     }
 
+
     /** turn 은 끝났지만 결과 블록을 읽지 못했다. 읽지 못한 까닭을 함께 적는다. */
     public void succeedInvalid(CheckInvalidReason invalidReason, int toolCalls, int delegations, Instant now) {
         this.status = CheckStatus.SUCCEEDED;
@@ -187,12 +192,14 @@ public class ProactiveCheck {
         finish(null, toolCalls, delegations, now);
     }
 
+
     /** 예약 실행이 모델을 부르지 않고 끝난 기록이다. */
     public void skip(CheckSkippedReason reason, Instant now) {
         this.status = CheckStatus.SUCCEEDED;
         this.skippedReason = reason;
         finish(null, 0, 0, now);
     }
+
 
     /** 보고를 처음 연 시각만 남긴다. */
     public void openReport(Instant now) {
@@ -201,16 +208,19 @@ public class ProactiveCheck {
         }
     }
 
+
     /** 상한에 닿았거나 사용자가 멈췄다. 사용자가 멈추면 {@code errorCode} 는 null 이다. */
     public void stop(String errorCode, int toolCalls, int delegations, Instant now) {
         this.status = CheckStatus.STOPPED;
         finish(errorCode, toolCalls, delegations, now);
     }
 
+
     public void fail(String errorCode, int toolCalls, int delegations, Instant now) {
         this.status = CheckStatus.FAILED;
         finish(errorCode, toolCalls, delegations, now);
     }
+
 
     private void finish(String errorCode, int toolCalls, int delegations, Instant now) {
         this.errorCode = errorCode;
@@ -218,6 +228,7 @@ public class ProactiveCheck {
         this.delegations = delegations;
         this.finishedAt = now;
     }
+
 
     private void recordTreeTokens(long input, long cachedInput, long output) {
         this.treeInputTokens = input;

@@ -28,13 +28,14 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.context")
 public record ContextProperties(
-        long maxChars,
-        int indexBudgetRatio,
-        Duration resultStaleAfter,
-        Duration memoryStaleAfter,
-        Map<String, Duration> memoryCollectionStaleAfter,
-        Integer factsMaxChars,
-        Integer factsItemMaxChars) {
+    long maxChars,
+    int indexBudgetRatio,
+    Duration resultStaleAfter,
+    Duration memoryStaleAfter,
+    Map<String, Duration> memoryCollectionStaleAfter,
+    Integer factsMaxChars,
+    Integer factsItemMaxChars) {
+
 
     /** 설정에 값이 없을 때 쓰는 몫이다. */
     private static final int DEFAULT_INDEX_BUDGET_RATIO = 4;
@@ -61,8 +62,7 @@ public record ContextProperties(
         if (memoryStaleAfter == null) {
             memoryStaleAfter = DEFAULT_MEMORY_STALE_AFTER;
         }
-        memoryCollectionStaleAfter =
-                memoryCollectionStaleAfter == null ? Map.of() : Map.copyOf(memoryCollectionStaleAfter);
+        memoryCollectionStaleAfter = memoryCollectionStaleAfter == null ? Map.of() : Map.copyOf(memoryCollectionStaleAfter);
         if (factsMaxChars == null || factsMaxChars < 0) {
             factsMaxChars = DEFAULT_FACTS_MAX_CHARS;
         }

@@ -51,6 +51,7 @@ public class AgentToken {
     @Getter
     private Instant revokedAt;
 
+
     private AgentToken(String profileName, String tokenHash, String label, Instant now) {
         this.profileName = profileName;
         this.tokenHash = tokenHash;
@@ -58,14 +59,17 @@ public class AgentToken {
         this.createdAt = now;
     }
 
+
     /** profile 에 묶인 새 토큰을 만든다. 사용자로 발급하는 길은 없다. */
     public static AgentToken issueFor(String profileName, String tokenHash, String label, Instant now) {
         return new AgentToken(profileName, tokenHash, label, now);
     }
 
+
     public void markUsed(Instant now) {
         lastUsedAt = now;
     }
+
 
     public void revoke(Instant now) {
         if (revokedAt == null) {

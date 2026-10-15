@@ -28,6 +28,7 @@ class MemoryV2MigrationTest {
 
     private String url;
 
+
     @BeforeEach
     void setUpV46DataAndMigrate() throws SQLException {
         url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
@@ -35,7 +36,7 @@ class MemoryV2MigrationTest {
         // V47 바로 앞까지 올린 뒤 그 시점의 사용자, 에이전트, Memory 를 넣는다.
         migrate("46");
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO app_user (email, display_name, group_id, role, created_at) VALUES
                         ('dad@example.com', 'Dad', 1, 'ADMIN', CURRENT_TIMESTAMP(6)),
@@ -70,66 +71,70 @@ class MemoryV2MigrationTest {
         migrate("47");
     }
 
+
     @Test
     @DisplayName("V47 은 기존 Memory 를 모두 남기고 always inject 를 꺼내는 방식으로 옮긴다")
     void v47KeepsEveryMemoryAndMovesAlwaysInjectToRetrieval() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             assertThat(pairs(statement, "SELECT title, retrieval FROM memory"))
-                    .containsExactlyInAnyOrderEntriesOf(
-                            Map.of("그룹 항상", "ALWAYS", "개인 색인", "SEARCH", "개인 제안", "SEARCH"));
+                .containsExactlyInAnyOrderEntriesOf(
+                    Map.of("그룹 항상", "ALWAYS", "개인 색인", "SEARCH", "개인 제안", "SEARCH"));
             assertThat(pairs(statement, "SELECT title, content FROM memory"))
-                    .containsExactlyInAnyOrderEntriesOf(Map.of("그룹 항상", "그룹 내용", "개인 색인", "개인 내용", "개인 제안", "제안 내용"));
+                .containsExactlyInAnyOrderEntriesOf(Map.of("그룹 항상", "그룹 내용", "개인 색인", "개인 내용", "개인 제안", "제안 내용"));
             assertThat(values(statement, """
                     SELECT DISTINCT CONCAT(collection, '/', entry_type, '/', sensitivity, '/', CAST(revision AS VARCHAR(10)))
                     FROM memory
                     """)).containsExactly("core/MEMORY/NORMAL/1");
             assertThat(values(
-                            statement,
-                            "SELECT title FROM memory WHERE document_key IS NOT NULL OR source_type IS NOT NULL"))
+                statement,
+                "SELECT title FROM memory WHERE document_key IS NOT NULL OR source_type IS NOT NULL"))
                     .isEmpty();
             // 옛 칸은 한 배포 동안 그대로 남는다.
             assertThat(pairs(statement, "SELECT title, CAST(always_inject AS VARCHAR(5)) FROM memory"))
-                    .containsEntry("그룹 항상", "TRUE")
-                    .containsEntry("개인 색인", "FALSE");
+                .containsEntry("그룹 항상", "TRUE")
+                .containsEntry("개인 색인", "FALSE");
         }
     }
+
 
     @Test
     @DisplayName("V47 은 커넥터 에이전트가 아닌 모든 에이전트에 core 를 주고 커넥터 에이전트에는 주지 않는다")
     void v47GrantsCoreToEveryAgentExceptConnectorAgents() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             assertThat(pairs(statement, """
                     SELECT a.code, CONCAT(g.collection, '/', CAST(g.allow_sensitive AS VARCHAR(5)))
                     FROM agent_memory_collection g JOIN agent a ON a.id = g.agent_id
                     """))
-                    .containsExactlyInAnyOrderEntriesOf(Map.of("home", "core/FALSE", "dad", "core/FALSE"));
+                .containsExactlyInAnyOrderEntriesOf(Map.of("home", "core/FALSE", "dad", "core/FALSE"));
         }
     }
+
 
     @Test
     @DisplayName("V47 은 사용자가 있는 그룹마다 기본 collection 일곱 개를 순서대로 넣는다")
     void v47SeedsSevenDefaultCollectionsForEveryGroup() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             for (int groupId : List.of(1, 2)) {
                 assertThat(values(
-                                statement,
-                                "SELECT collection_key FROM memory_collection WHERE group_id = " + groupId
-                                        + " ORDER BY sort_order"))
-                        .containsExactly("core", "career", "learning", "health", "finance", "home", "identity");
+                    statement,
+                    "SELECT collection_key FROM memory_collection WHERE group_id = " + groupId
+                        + " ORDER BY sort_order"))
+                            .containsExactly("core", "career", "learning", "health", "finance", "home", "identity");
             }
             assertThat(values(statement, "SELECT DISTINCT CAST(group_id AS VARCHAR(10)) FROM memory_collection"))
-                    .containsExactlyInAnyOrder("1", "2");
+                .containsExactlyInAnyOrder("1", "2");
         }
     }
+
 
     @Test
     @DisplayName("V47 뒤에도 옛 판의 코드가 쓰던 칸만으로 Memory 를 넣을 수 있다")
     void afterV47RowsWrittenWithOnlyTheOldColumnsStillInsert() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO memory (
                         scope, owner_user_id, group_id, title, content, always_inject, status,
@@ -144,20 +149,22 @@ class MemoryV2MigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("V47 뒤에는 같은 주인과 collection 에 같은 document key 를 둘 수 없고 key 가 없는 항목은 겹쳐도 된다")
     void afterV47DocumentKeyIsUniquePerOwnerAndCollection() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate(document(1, "career", "position-preferences"));
             // 다른 사용자와 다른 collection 은 같은 key 를 쓴다.
             statement.executeUpdate(document(2, "career", "position-preferences"));
             statement.executeUpdate(document(1, "health", "position-preferences"));
 
             assertThatThrownBy(() -> statement.executeUpdate(document(1, "career", "position-preferences")))
-                    .isInstanceOf(SQLException.class);
+                .isInstanceOf(SQLException.class);
         }
     }
+
 
     private static String document(int ownerUserId, String collection, String documentKey) {
         return """
@@ -169,14 +176,16 @@ class MemoryV2MigrationTest {
                 """.formatted(ownerUserId, collection, documentKey);
     }
 
+
     private void migrate(String target) {
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target(target)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target(target)
+            .load()
+            .migrate();
     }
+
 
     private static Map<String, String> pairs(Statement statement, String sql) throws SQLException {
         Map<String, String> result = new LinkedHashMap<>();
@@ -187,6 +196,7 @@ class MemoryV2MigrationTest {
         }
         return result;
     }
+
 
     private static List<String> values(Statement statement, String sql) throws SQLException {
         List<String> result = new ArrayList<>();

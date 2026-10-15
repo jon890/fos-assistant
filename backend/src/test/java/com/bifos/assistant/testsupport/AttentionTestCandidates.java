@@ -24,19 +24,23 @@ public final class AttentionTestCandidates {
     public static final class FailingCandidates implements AttentionCandidates {
         private volatile boolean failing;
 
+
         /** 이 뒤의 읽기를 실패시킨다. */
         public void fail() {
             failing = true;
         }
 
+
         public void reset() {
             failing = false;
         }
+
 
         @Override
         public Set<CardKey> cards() {
             return Set.of(CardKey.NEEDS_ME);
         }
+
 
         @Override
         public List<AttentionCandidate> read(CurrentUser user, Instant now) {
@@ -51,19 +55,23 @@ public final class AttentionTestCandidates {
     public static final class ReadCountingCandidates implements AttentionCandidates {
         private final AtomicInteger reads = new AtomicInteger();
 
+
         /** 마지막 {@link #reset()} 뒤에 읽은 횟수다. */
         public int reads() {
             return reads.get();
         }
 
+
         public void reset() {
             reads.set(0);
         }
+
 
         @Override
         public Set<CardKey> cards() {
             return Set.of(CardKey.NEEDS_ME);
         }
+
 
         @Override
         public List<AttentionCandidate> read(CurrentUser user, Instant now) {

@@ -16,16 +16,20 @@ public enum FindingReaction {
     /** 「관심 없음」. */
     DISMISSED(FeedbackEventType.DISMISSED);
 
+
     private final FeedbackEventType eventType;
+
 
     FindingReaction(FeedbackEventType eventType) {
         this.eventType = eventType;
     }
 
+
     /** 이 반응으로 남기는 사건 종류다. */
     public FeedbackEventType eventType() {
         return eventType;
     }
+
 
     /** 사건 종류에 맞는 반응이다. 반응이 아닌 사건이면 null 이다. */
     public static FindingReaction of(FeedbackEventType type) {
@@ -36,6 +40,7 @@ public enum FindingReaction {
         }
         return null;
     }
+
 
     /** 요청 본문의 값을 읽는다. 비었거나 모르는 값이면 {@code VALIDATION_FAILED} 다. */
     public static FindingReaction parse(String value) {

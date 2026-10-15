@@ -17,12 +17,13 @@ import com.bifos.assistant.attention.domain.type.AttentionTrigger;
  * @param medianSecondsToFirstAction 첫 {@code SHOWN} 에서 첫 {@code OPENED} 나 {@code ACTED} 까지 초의 중앙값. 없으면 null
  */
 public record AttentionMetric(
-        AttentionTrigger trigger,
-        long shown,
-        long hidden,
-        long snoozed,
-        long acted,
-        long nowShown,
-        long nowHiddenWithoutAction,
-        long staleShown,
-        Long medianSecondsToFirstAction) {}
+    AttentionTrigger trigger,
+    long shown,
+    long hidden,
+    long snoozed,
+    long acted,
+    long nowShown,
+    long nowHiddenWithoutAction,
+    long staleShown,
+    Long medianSecondsToFirstAction) {
+}

@@ -27,26 +27,29 @@ public class ProactiveQuietHours implements CheckNotificationPolicy {
     private final TaskRepository tasks;
     private final TaskTriggerRepository triggers;
 
+
     @Override
     public boolean allows(AgentExecution origin, Instant now) {
         return checks.checkOf(origin)
-                .map(check -> {
-                    if (check.trigger() != CheckTrigger.SCHEDULED) {
-                        return true;
-                    }
-                    return scheduleOf(check.userId(), check.agentId())
-                            .map(Task::id)
-                            .flatMap(triggers::findByTaskId)
-                            .map(trigger -> outsideQuietHours(trigger, now))
-                            .orElse(false);
-                })
-                .orElse(true);
+            .map(check -> {
+                if (check.trigger() != CheckTrigger.SCHEDULED) {
+                    return true;
+                }
+                return scheduleOf(check.userId(), check.agentId())
+                    .map(Task::id)
+                    .flatMap(triggers::findByTaskId)
+                    .map(trigger -> outsideQuietHours(trigger, now))
+                    .orElse(false);
+            })
+            .orElse(true);
     }
+
 
     private Optional<Task> scheduleOf(Long userId, Long agentId) {
         return tasks.findByOwnerUserIdAndAgentIdAndKind(userId, agentId, TaskKind.CHECK)
-                .filter(task -> !task.archived());
+            .filter(task -> !task.archived());
     }
+
 
     private static boolean outsideQuietHours(TaskTrigger trigger, Instant now) {
         LocalTime localTime = now.atZone(trigger.zone()).toLocalTime();

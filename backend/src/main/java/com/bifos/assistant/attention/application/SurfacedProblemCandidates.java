@@ -39,10 +39,12 @@ public class SurfacedProblemCandidates implements AttentionCandidates {
     private final AgentService agents;
     private final LiveProperties<ProactiveLoopProperties> properties;
 
+
     @Override
     public Set<CardKey> cards() {
         return Set.of(CardKey.NEEDS_ME);
     }
+
 
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
@@ -50,12 +52,13 @@ public class SurfacedProblemCandidates implements AttentionCandidates {
             return candidates(user, now);
         } catch (RuntimeException ex) {
             log.warn(
-                    "먼저 다룰 문제를 읽지 못했다 userId={} error={}",
-                    user.id(),
-                    ex.getClass().getSimpleName());
+                "먼저 다룰 문제를 읽지 못했다 userId={} error={}",
+                user.id(),
+                ex.getClass().getSimpleName());
             return List.of();
         }
     }
+
 
     private List<AttentionCandidate> candidates(CurrentUser user, Instant now) {
         // 지운 점검 대화와 찾지 못한 에이전트를 거른 뒤에 상한을 건다. 정렬 순서는 openOf 가 낸 그대로다.
@@ -64,39 +67,37 @@ public class SurfacedProblemCandidates implements AttentionCandidates {
             return List.of();
         }
         Map<Long, Conversation> owned = conversations.activeOf(
-                user, open.stream().map(SurfacedProblem::conversationId).toList());
-        Map<Long, Agent> agentsById =
-                agents.byIds(open.stream().map(SurfacedProblem::agentId).toList());
+            user, open.stream().map(SurfacedProblem::conversationId).toList());
+        Map<Long, Agent> agentsById = agents.byIds(open.stream().map(SurfacedProblem::agentId).toList());
         return open.stream()
-                .filter(problem ->
-                        owned.containsKey(problem.conversationId()) && agentsById.containsKey(problem.agentId()))
-                .limit(properties.current().surfaceMaxItems())
-                .map(problem ->
-                        candidate(problem, owned.get(problem.conversationId()), agentsById.get(problem.agentId())))
-                .toList();
+            .filter(problem -> owned.containsKey(problem.conversationId()) && agentsById.containsKey(problem.agentId()))
+            .limit(properties.current().surfaceMaxItems())
+            .map(problem -> candidate(problem, owned.get(problem.conversationId()), agentsById.get(problem.agentId())))
+            .toList();
     }
+
 
     private static AttentionCandidate candidate(SurfacedProblem problem, Conversation conversation, Agent agent) {
         String itemKey = "autonomy_decision:" + problem.decisionId();
         return new AttentionCandidate(
-                CardKey.NEEDS_ME,
-                itemKey,
-                AttentionCandidates.stateKey(
-                        AttentionTrigger.PROBLEM_SURFACED, problem.decisionId().toString()),
-                AttentionTrigger.PROBLEM_SURFACED,
-                false,
-                false,
-                List.of(),
-                AttentionConfidence.MODEL_INFERRED,
-                problem.problem(),
-                conversation.publicId(),
-                agent.name(),
-                problem.at(),
-                List.of(new AttentionSourceRef("AUTONOMY_DECISION", itemKey, problem.at())),
-                null,
-                null,
-                null,
-                null,
-                new AttentionProblem(problem.decisionId(), problem.level().name(), problem.action()));
+            CardKey.NEEDS_ME,
+            itemKey,
+            AttentionCandidates.stateKey(
+                AttentionTrigger.PROBLEM_SURFACED, problem.decisionId().toString()),
+            AttentionTrigger.PROBLEM_SURFACED,
+            false,
+            false,
+            List.of(),
+            AttentionConfidence.MODEL_INFERRED,
+            problem.problem(),
+            conversation.publicId(),
+            agent.name(),
+            problem.at(),
+            List.of(new AttentionSourceRef("AUTONOMY_DECISION", itemKey, problem.at())),
+            null,
+            null,
+            null,
+            null,
+            new AttentionProblem(problem.decisionId(), problem.level().name(), problem.action()));
     }
 }

@@ -33,23 +33,27 @@ public class SkillController {
     private final SkillService skills;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public SkillListView list(@PathVariable String code) {
         return SkillListView.from(skills.list(currentUser.require(), code));
     }
+
 
     @GetMapping("/{name}")
     public SkillDetailView read(@PathVariable String code, @PathVariable String name) {
         return SkillDetailView.from(skills.read(currentUser.require(), code, name));
     }
 
+
     /** 스킬 하나를 통째로 바꾼다. 없으면 만든다. */
     @PutMapping("/{name}")
     public SkillDetailView write(
-            @PathVariable String code, @PathVariable String name, @Valid @RequestBody WriteSkillRequest request) {
+        @PathVariable String code, @PathVariable String name, @Valid @RequestBody WriteSkillRequest request) {
         return SkillDetailView.from(
-                skills.save(currentUser.require(), code, name, request.skillMd(), request.inputs()));
+            skills.save(currentUser.require(), code, name, request.skillMd(), request.inputs()));
     }
+
 
     /** 이전 버전과 지금 버전을 맞바꿔 저장한다. */
     @PostMapping("/{name}/restore-previous")
@@ -57,17 +61,19 @@ public class SkillController {
         return SkillDetailView.from(skills.restorePrevious(currentUser.require(), code, name));
     }
 
+
     @DeleteMapping("/{name}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String code, @PathVariable String name) {
         skills.delete(currentUser.require(), code, name);
     }
 
+
     /** 대시보드의 전역 켜고 끄기를 쓴다. */
     @PutMapping("/{name}/enabled")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggle(
-            @PathVariable String code, @PathVariable String name, @Valid @RequestBody ToggleSkillRequest request) {
+        @PathVariable String code, @PathVariable String name, @Valid @RequestBody ToggleSkillRequest request) {
         skills.toggle(currentUser.require(), code, name, request.enabled());
     }
 }

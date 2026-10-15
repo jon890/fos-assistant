@@ -60,33 +60,35 @@ class ChatMemoryProposalTest {
 
     private CurrentUser user;
 
+
     @BeforeEach
     void setUp() {
         memories.deleteAll();
         executions.deleteAll();
         agents.deleteAll();
         users.deleteAll();
-        ((StubHermesRunsClient) hermes).reset();
+        ((StubHermesRunsClient)hermes).reset();
         AppUser saved = users.save(AppUser.of("proposal@example.com", "제안", 1L, UserRole.MEMBER, Instant.now()));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agents.save(Agent.of(
-                "proposal",
-                "제안",
-                "proposal",
-                "http://runtime.test",
-                CostMode.API,
-                CredentialScope.DEDICATED,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            "proposal",
+            "제안",
+            "proposal",
+            "http://runtime.test",
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            Instant.now()));
         doNothing()
-                .when(events)
-                .open(
-                        ArgumentMatchers.anyString(),
-                        ArgumentMatchers.anyString(),
-                        ArgumentMatchers.anyString(),
-                        ArgumentMatchers.any());
+            .when(events)
+            .open(
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.any());
     }
+
 
     @Test
     @DisplayName("일반 응답 뒤에 제안을 저장하고 자식 실행을 연결한다")
@@ -96,13 +98,16 @@ class ChatMemoryProposalTest {
         assertProposalExecution();
     }
 
+
     @Test
     @DisplayName("스트리밍 응답 뒤에도 제안을 저장하고 자식 실행을 연결한다")
     void savesProposalAfterStreamingResponseAndLinksChildRun() {
         runWithProposal();
-        chat.stream(user, null, "질문", "proposal", event -> {});
+        chat.stream(user, null, "질문", "proposal", event -> {
+        });
         assertProposalExecution();
     }
+
 
     @Test
     @DisplayName("모델을 고른 대화의 제안 실행도 그 선택으로 Hermes를 부른다")
@@ -113,7 +118,7 @@ class ChatMemoryProposalTest {
 
         chat.send(user, conversationId, "질문", null);
 
-        StubHermesRunsClient stub = (StubHermesRunsClient) hermes;
+        StubHermesRunsClient stub = (StubHermesRunsClient)hermes;
         assertThat(stub.received()).as("대화 실행과 제안 실행").hasSize(2);
         assertThat(stub.received().getLast()).satisfies(proposal -> {
             assertThat(proposal.provider()).isEqualTo("nvidia");
@@ -121,40 +126,42 @@ class ChatMemoryProposalTest {
             assertThat(proposal.reasoningEffort()).isEqualTo("low");
         });
         assertThat(executions.findAll())
-                .filteredOn(execution -> execution.parentExecutionId() != null)
-                .singleElement()
-                .satisfies(child -> assertThat(child.reasoningEffort()).isEqualTo("low"));
+            .filteredOn(execution -> execution.parentExecutionId() != null)
+            .singleElement()
+            .satisfies(child -> assertThat(child.reasoningEffort()).isEqualTo("low"));
     }
 
+
     private void runWithProposal() {
-        ((StubHermesRunsClient) hermes)
-                .willReturnInOrder(
-                        HermesRunResult.of(
-                                "parent", "session", "completed", "원래 답", "model", "provider", TokenUsage.empty()),
-                        HermesRunResult.of(
-                                "proposal",
-                                "new",
-                                "completed",
-                                "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}",
-                                "model",
-                                "provider",
-                                TokenUsage.empty()));
+        ((StubHermesRunsClient)hermes)
+            .willReturnInOrder(
+                HermesRunResult.of(
+                    "parent", "session", "completed", "원래 답", "model", "provider", TokenUsage.empty()),
+                HermesRunResult.of(
+                    "proposal",
+                    "new",
+                    "completed",
+                    "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}",
+                    "model",
+                    "provider",
+                    TokenUsage.empty()));
     }
+
 
     private void assertProposalExecution() {
         assertThat(memories.findAll())
-                .singleElement()
-                .satisfies(memory -> assertThat(memory.status().name()).isEqualTo("PROPOSED"));
+            .singleElement()
+            .satisfies(memory -> assertThat(memory.status().name()).isEqualTo("PROPOSED"));
         List<AgentExecution> all = executions.findAll();
         assertThat(all).hasSize(2);
         var parent = all.stream()
-                .filter(execution -> execution.parentExecutionId() == null)
-                .findFirst()
-                .orElseThrow();
+            .filter(execution -> execution.parentExecutionId() == null)
+            .findFirst()
+            .orElseThrow();
         var child = all.stream()
-                .filter(execution -> execution.parentExecutionId() != null)
-                .findFirst()
-                .orElseThrow();
+            .filter(execution -> execution.parentExecutionId() != null)
+            .findFirst()
+            .orElseThrow();
         assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);
         assertThat(child.parentExecutionId()).isEqualTo(parent.id());
         assertThat(child.rootExecutionId()).isEqualTo(parent.id());

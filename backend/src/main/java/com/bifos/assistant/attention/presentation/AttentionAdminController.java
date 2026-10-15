@@ -19,11 +19,12 @@ public class AttentionAdminController {
     private final AttentionMetricsService metrics;
     private final CurrentUserProvider currentUser;
 
+
     /** @param days 오늘부터 거꾸로 센 기간. 1 부터 90 까지다 */
     @GetMapping("/metrics")
     public MetricsResponse metrics(@RequestParam(defaultValue = "30") int days) {
         currentUser.requireAdmin();
         return new MetricsResponse(
-                days, metrics.metrics(days).stream().map(MetricRow::from).toList());
+            days, metrics.metrics(days).stream().map(MetricRow::from).toList());
     }
 }

@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class NotificationEventHub {
 
-    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<NotificationEvent>>> subscribers =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<NotificationEvent>>> subscribers = new ConcurrentHashMap<>();
+
 
     /**
      * 그 사용자의 알림 사건을 받는다. 돌려준 {@code Runnable} 을 부르면 더 받지 않는다.
@@ -28,13 +28,13 @@ public class NotificationEventHub {
     public Runnable subscribe(Long userId, Consumer<NotificationEvent> consumer) {
         // 빈 목록을 지우는 해제와 겹쳐도 지워진 목록에 넣지 않게 맵 안에서 더한다.
         subscribers.compute(userId, (id, list) -> {
-            CopyOnWriteArrayList<Consumer<NotificationEvent>> target =
-                    list == null ? new CopyOnWriteArrayList<>() : list;
+            CopyOnWriteArrayList<Consumer<NotificationEvent>> target = list == null ? new CopyOnWriteArrayList<>() : list;
             target.add(consumer);
             return target;
         });
         return () -> unsubscribe(userId, consumer);
     }
+
 
     /** 그 사용자의 모든 구독자에게 보낸다. 보내다 예외가 난 구독자는 끊긴 연결로 보고 뺀다. */
     public void publish(Long userId, NotificationEvent event) {
@@ -51,6 +51,7 @@ public class NotificationEventHub {
             }
         }
     }
+
 
     private void unsubscribe(Long userId, Consumer<NotificationEvent> consumer) {
         subscribers.computeIfPresent(userId, (id, list) -> {

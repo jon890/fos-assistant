@@ -33,6 +33,7 @@ public class ExecutionQuestion {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     public static ExecutionQuestion of(Long executionId, Long messageId, Instant now) {
         ExecutionQuestion question = new ExecutionQuestion();
         question.executionId = executionId;

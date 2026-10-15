@@ -15,11 +15,13 @@ package com.bifos.assistant.usage.domain;
  */
 public record EstimatedCost(Long micros, String currency, String pricingVersion) {
 
+
     private static final EstimatedCost UNKNOWN = new EstimatedCost(null, null, null);
 
     public static EstimatedCost unknown() {
         return UNKNOWN;
     }
+
 
     public boolean isKnown() {
         return micros != null;

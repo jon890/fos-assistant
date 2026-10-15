@@ -25,8 +25,8 @@ class ProactiveLoopDisabledTest extends ProactiveLoopTestSupport {
         Long checkId = wake(user, agent, candidateOutput());
 
         assertThat(checks.findById(checkId).orElseThrow().status())
-                .as("살펴보기 상태")
-                .isEqualTo(CheckStatus.SUCCEEDED);
+            .as("살펴보기 상태")
+            .isEqualTo(CheckStatus.SUCCEEDED);
         assertThat(runsOf(user)).as("시도 줄").isEmpty();
         assertThat(evaluationCount(user)).as("평가 수").isZero();
     }

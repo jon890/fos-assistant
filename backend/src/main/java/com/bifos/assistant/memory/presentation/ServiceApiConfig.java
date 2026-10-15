@@ -17,6 +17,7 @@ public class ServiceApiConfig implements WebMvcConfigurer {
 
     private final ServiceTokenInterceptor interceptor;
 
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(interceptor).addPathPatterns("/api/v1/service/**");

@@ -37,10 +37,10 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
 
     private static final Pattern KEY = Pattern.compile("^[0-9a-f]{64}$");
     /** Chrome 의 「이전 세션 이어서 열기」 다. */
-    private static final byte[] SESSION_RESTORE =
-            "{\"session\":{\"restore_on_startup\":1}}".getBytes(StandardCharsets.UTF_8);
+    private static final byte[] SESSION_RESTORE = "{\"session\":{\"restore_on_startup\":1}}".getBytes(StandardCharsets.UTF_8);
 
     private final LiveProperties<BrowserProperties> properties;
+
 
     @Override
     public void ensure(String profileKey) {
@@ -59,6 +59,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
         }
     }
 
+
     /** {@code Default/Preferences} 가 없을 때만 세션 이어가기 설정을 쓴다. 링크를 따라가지 않는다. */
     private static void writeSessionRestore(Path dir) throws IOException {
         Path defaults = dir.resolve("Default");
@@ -73,14 +74,13 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
             return;
         }
         // CREATE_NEW 는 그 자리에 링크가 생겨 있어도 따라가지 않고 실패한다. 권한은 만들 때 함께 준다
-        Set<OpenOption> options =
-                Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+        Set<OpenOption> options = Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
         try (SeekableByteChannel channel = posix(defaults)
-                ? Files.newByteChannel(
-                        preferences,
-                        options,
-                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
-                : Files.newByteChannel(preferences, options)) {
+            ? Files.newByteChannel(
+                preferences,
+                options,
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+            : Files.newByteChannel(preferences, options)) {
             ByteBuffer content = ByteBuffer.wrap(SESSION_RESTORE);
             while (content.hasRemaining()) {
                 channel.write(content);
@@ -90,12 +90,13 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
         }
     }
 
+
     /** 권한을 만들 때 함께 준다. 같은 자리를 동시에 만든 다른 요청이 먼저 만들었으면 그 디렉터리를 그대로 쓴다. */
     private static void createOwnerOnlyDirectory(Path dir) throws IOException {
         try {
             if (posix(dir.getParent())) {
                 Files.createDirectory(
-                        dir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+                    dir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
             } else {
                 Files.createDirectory(dir);
             }
@@ -106,9 +107,11 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
         }
     }
 
+
     private static boolean posix(Path dir) throws IOException {
         return Files.getFileStore(dir).supportsFileAttributeView("posix");
     }
+
 
     @Override
     public void delete(String profileKey) {
@@ -129,6 +132,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
                     return FileVisitResult.CONTINUE;
                 }
 
+
                 @Override
                 public FileVisitResult postVisitDirectory(Path visited, IOException failure) throws IOException {
                     if (failure != null) {
@@ -142,6 +146,7 @@ public class FileBrowserProfileStore implements BrowserProfileStore {
             throw new UncheckedIOException("cannot delete browser profile directory", ex);
         }
     }
+
 
     private Path directory(String profileKey) {
         if (profileKey == null || !KEY.matcher(profileKey).matches()) {

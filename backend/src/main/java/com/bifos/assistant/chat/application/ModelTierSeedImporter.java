@@ -28,6 +28,7 @@ public class ModelTierSeedImporter implements ApplicationRunner {
     private final ModelTierDefinitionRepository definitions;
     private final AppUserRepository users;
 
+
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
@@ -40,12 +41,12 @@ public class ModelTierSeedImporter implements ApplicationRunner {
                 continue;
             }
             definitions.saveAll(Arrays.stream(ModelTier.values())
-                    .map(tier -> {
-                        ModelTierProperties.Tier mapping = settings.forTier(tier);
-                        return ModelTierDefinition.of(
-                                groupId, tier, mapping.provider(), mapping.model(), mapping.reasoningEffort());
-                    })
-                    .toList());
+                .map(tier -> {
+                    ModelTierProperties.Tier mapping = settings.forTier(tier);
+                    return ModelTierDefinition.of(
+                        groupId, tier, mapping.provider(), mapping.model(), mapping.reasoningEffort());
+                })
+                .toList());
             log.info("단계 초기값을 설정에서 DB 로 옮겼다 groupId={}", groupId);
         }
     }

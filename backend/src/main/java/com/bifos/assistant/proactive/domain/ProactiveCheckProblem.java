@@ -106,25 +106,26 @@ public class ProactiveCheckProblem {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+
     /** 검사한 후보 하나를 줄로 만든다. 칸 길이를 넘는 글은 잘라 넣는다. 모델이 쓴 글이라 길이를 믿지 않는다. */
     public static ProactiveCheckProblem of(
-            Long checkId,
-            Long conversationId,
-            ProblemStatus status,
-            ProblemDropReason dropReason,
-            String problemKey,
-            String problem,
-            String relatedGoal,
-            String actionType,
-            String actionText,
-            String confidence,
-            String expectedBenefit,
-            String sideEffect,
-            String risk,
-            String changeSinceLast,
-            List<ProblemEvidence> evidence,
-            Instant evidenceCheckedAt,
-            Instant now) {
+        Long checkId,
+        Long conversationId,
+        ProblemStatus status,
+        ProblemDropReason dropReason,
+        String problemKey,
+        String problem,
+        String relatedGoal,
+        String actionType,
+        String actionText,
+        String confidence,
+        String expectedBenefit,
+        String sideEffect,
+        String risk,
+        String changeSinceLast,
+        List<ProblemEvidence> evidence,
+        Instant evidenceCheckedAt,
+        Instant now) {
         ProactiveCheckProblem row = new ProactiveCheckProblem();
         row.checkId = checkId;
         row.conversationId = conversationId;
@@ -145,6 +146,7 @@ public class ProactiveCheckProblem {
         row.createdAt = now;
         return row;
     }
+
 
     /** 칸 길이까지만 남긴다. 상한 자리에서 대리 쌍이 나뉘면 그 앞에서 자른다. */
     private static String truncate(String value, int maxLength) {

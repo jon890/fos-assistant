@@ -61,12 +61,14 @@ public class SkillStore {
     private final int keepVersions;
     private final Clock clock;
 
+
     public SkillStore(SkillProperties properties, Clock clock) {
         this.clock = clock;
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
         this.keepVersions = properties.keepVersions();
     }
+
 
     /** 표식이 있는 가장 새 버전이다. 없으면 빈 값이다. */
     public Optional<String> currentVersion(String profile) {
@@ -75,9 +77,10 @@ public class SkillStore {
             return Optional.empty();
         }
         return versionNames(profileDir).stream()
-                .filter(version -> isPublished(profileDir.resolve(version)))
-                .max(Comparator.naturalOrder());
+            .filter(version -> isPublished(profileDir.resolve(version)))
+            .max(Comparator.naturalOrder());
     }
+
 
     /** 지금 버전의 스킬들이다. 이름 차례이고, 지금 버전이 없으면 비어 있다. */
     public Map<String, SkillBundle> readCurrent(String profile) {
@@ -87,6 +90,7 @@ public class SkillStore {
         }
         return new LinkedHashMap<>(readVersion(profile, version.get()));
     }
+
 
     /**
      * 지금 버전보다 새로 쓰였지만 표식이 없는 버전들의 스킬이다. 같은 이름이면 더 새 버전의 것을 쓴다.
@@ -104,6 +108,7 @@ public class SkillStore {
         return new LinkedHashMap<>(bundles);
     }
 
+
     /** 표식 없는 더 새 버전의 스킬을 모두 읽는다. 비밀 요청 검사가 같은 이름의 어느 버전도 빠뜨리지 않게 한다. */
     public List<SkillBundle> readAllPending(String profile) {
         Path profileDir = profileDir(profile);
@@ -112,16 +117,17 @@ public class SkillStore {
         }
         String current = currentVersion(profile).orElse("");
         List<String> pending = versionNames(profileDir).stream()
-                .filter(version -> version.compareTo(current) > 0)
-                .filter(version -> !isPublished(profileDir.resolve(version)))
-                .sorted()
-                .toList();
+            .filter(version -> version.compareTo(current) > 0)
+            .filter(version -> !isPublished(profileDir.resolve(version)))
+            .sorted()
+            .toList();
         List<SkillBundle> bundles = new ArrayList<>();
         for (String version : pending) {
             bundles.addAll(readVersion(profile, version).values());
         }
         return List.copyOf(bundles);
     }
+
 
     /**
      * Hermes 가 가리킬 수 있는 버전에 스킬이 하나라도 있는가. 지금 버전과 표식 없는 더 새 버전을 본다.
@@ -130,6 +136,7 @@ public class SkillStore {
     public boolean hasUploadedSkills(String profile) {
         return !readCurrent(profile).isEmpty() || !readPending(profile).isEmpty();
     }
+
 
     private Map<String, SkillBundle> readVersion(String profile, String version) {
         Path versionDir = versionDir(profile, version);
@@ -143,6 +150,7 @@ public class SkillStore {
         }
         return bundles;
     }
+
 
     /**
      * 스킬 전체를 새 버전 디렉터리에 쓰고 그 버전 이름을 돌려준다.
@@ -180,6 +188,7 @@ public class SkillStore {
         }
     }
 
+
     /** 게시에 성공한 버전에 표식을 쓴다. 이때부터 그 버전이 지금 버전이다. */
     public void markPublished(String profile, String version) {
         Path versionDir = versionDir(profile, version);
@@ -193,15 +202,18 @@ public class SkillStore {
         }
     }
 
+
     /** 게시가 분명히 거절된 버전을 지운다. 없으면 그냥 지나간다. */
     public void discard(String profile, String version) {
         deleteRecursively(versionDir(profile, version));
     }
 
+
     /** 그 profile 디렉터리를 통째로 지운다. 에이전트를 지울 때 부른다. */
     public void deleteAll(String profile) {
         deleteRecursively(profileDir(profile));
     }
+
 
     /**
      * 그 profile 의 버전 디렉터리와 이전 버전, 남은 임시 디렉터리를 지우고 profile 디렉터리는 남긴다. 마지막 스킬을
@@ -220,8 +232,8 @@ public class SkillStore {
                 for (Path entry : stream) {
                     String name = entry.getFileName().toString();
                     if (VERSION.matcher(name).matches()
-                            || PreviousSkillStore.PREVIOUS_DIR.equals(name)
-                            || name.startsWith(TEMP_PREFIX)) {
+                        || PreviousSkillStore.PREVIOUS_DIR.equals(name)
+                        || name.startsWith(TEMP_PREFIX)) {
                         targets.add(entry);
                     }
                 }
@@ -231,6 +243,7 @@ public class SkillStore {
         }
         targets.forEach(SkillFiles::deleteRecursively);
     }
+
 
     /**
      * 옛 버전을 지운다.
@@ -271,12 +284,14 @@ public class SkillStore {
         }
     }
 
+
     /** 그 버전 디렉터리를 Hermes 컨테이너에서 보는 경로다. {@code external_dirs} 에 이것을 적는다. */
     public String agentPath(String profile, String version) {
         requireProfile(profile);
         requireVersion(version);
         return agentRoot + "/" + profile + "/" + version;
     }
+
 
     /** 버전 디렉터리 안의 스킬 이름들이다. 규칙에 맞는 이름의 디렉터리만 세고 심볼릭 링크는 거절한다. */
     private static List<String> skillNames(Path versionDir) throws IOException {
@@ -295,6 +310,7 @@ public class SkillStore {
         return names;
     }
 
+
     private static List<String> versionNames(Path profileDir) {
         List<String> names = new ArrayList<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(profileDir)) {
@@ -310,9 +326,11 @@ public class SkillStore {
         return names;
     }
 
+
     private static boolean isPublished(Path versionDir) {
         return Files.isRegularFile(versionDir.resolve(PUBLISHED_MARKER), LinkOption.NOFOLLOW_LINKS);
     }
+
 
     private String newVersionName(Path profileDir) {
         long millis = clock.millis();
@@ -325,26 +343,31 @@ public class SkillStore {
         return "v" + String.format("%013d", millis) + "-" + randomSuffix();
     }
 
+
     private Path profileDir(String profile) {
         requireProfile(profile);
         return resolveInside(root, profile);
     }
+
 
     private Path versionDir(String profile, String version) {
         requireVersion(version);
         return resolveInside(profileDir(profile), version);
     }
 
+
     /** 정규화한 결과가 {@code base} 아래가 아니면 거절한다. 이름 검사를 지나온 값도 한 번 더 본다. */
     private Path resolveInside(Path base, String relative) {
         return SkillFiles.resolveInside(root, base, relative);
     }
+
 
     private static void requireVersion(String version) {
         if (version == null || !VERSION.matcher(version).matches()) {
             throw validation("skill version name is invalid");
         }
     }
+
 
     private void deleteForPrune(Path dir) {
         try {
@@ -353,6 +376,7 @@ public class SkillStore {
             log.warn("옛 스킬 버전을 지우지 못했다 path={}", dir.getFileName(), ex);
         }
     }
+
 
     private static String stripTrailingSlash(String path) {
         String stripped = path.strip();

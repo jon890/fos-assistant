@@ -15,4 +15,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties("assistant.delegation-wake.enabled=true")
-public @interface DelegationWakeEnabled {}
+public @interface DelegationWakeEnabled {
+}

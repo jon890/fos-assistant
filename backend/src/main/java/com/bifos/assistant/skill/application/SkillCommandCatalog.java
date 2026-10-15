@@ -41,8 +41,11 @@ public class SkillCommandCatalog {
     private final Map<Long, Cached> cache = new ConcurrentHashMap<>();
     private final Map<Long, Long> generations = new ConcurrentHashMap<>();
 
+
     /** 읽은 시각과 그때의 켜진 스킬 이름이다. */
-    private record Cached(Instant readAt, Set<String> names) {}
+    private record Cached(Instant readAt, Set<String> names) {
+    }
+
 
     /** 그 에이전트에서 커맨드로 부를 수 있는 스킬 이름이다. {@code skills} toolset 이 꺼져 있으면 빈 집합이다. */
     public Set<String> enabledNames(Agent agent) {
@@ -55,16 +58,17 @@ public class SkillCommandCatalog {
         long generation = generationOf(agentId);
         SkillList list = skills.commandList(agent);
         Set<String> names = list.skillsToolsetEnabled()
-                ? list.skills().stream()
-                        .filter(SkillListItem::enabled)
-                        .map(SkillListItem::name)
-                        .collect(Collectors.toUnmodifiableSet())
-                : Set.of();
+            ? list.skills().stream()
+                .filter(SkillListItem::enabled)
+                .map(SkillListItem::name)
+                .collect(Collectors.toUnmodifiableSet())
+            : Set.of();
         // 사건은 세대 번호를 먼저 올리고 캐시를 비운다. 같은 칸의 compute 와 remove 는 차례로 돌아서, 번호를
         // 본 뒤에 온 사건이면 넣은 것을 그 사건이 비운다.
         cache.compute(agentId, (id, previous) -> generationOf(id) == generation ? new Cached(now, names) : previous);
         return names;
     }
+
 
     /**
      * 그 에이전트의 스킬이 바뀌었으니 다음 커맨드가 목록을 다시 읽게 한다.
@@ -79,6 +83,7 @@ public class SkillCommandCatalog {
         generations.merge(event.agentId(), 1L, Long::sum);
         cache.remove(event.agentId());
     }
+
 
     private long generationOf(Long agentId) {
         return generations.getOrDefault(agentId, 0L);

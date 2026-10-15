@@ -25,10 +25,12 @@ import org.junit.jupiter.api.io.TempDir;
 /** 보관 기간 정리가 판정한 뒤 바뀐 대화 폴더의 파일을 지우지 않는지 확인한다. */
 class ArtifactStoreCleanupTest {
 
-    private static final ArtifactCleanupProbe NO_PROBE = conversationId -> {};
+    private static final ArtifactCleanupProbe NO_PROBE = conversationId -> {
+    };
 
     @TempDir
     Path root;
+
 
     @Test
     @DisplayName("변경 없는 만료 대화의 파일을 모두 지운다")
@@ -40,18 +42,19 @@ class ArtifactStoreCleanupTest {
         List<ArtifactRemoved> removed = store.deleteOlderThan(cutoff());
 
         assertThat(removed)
-                .extracting(ArtifactRemoved::conversationId, ArtifactRemoved::path)
-                .containsExactlyInAnyOrder(tuple(7L, "a/index.html"), tuple(7L, "a/photo.png"));
+            .extracting(ArtifactRemoved::conversationId, ArtifactRemoved::path)
+            .containsExactlyInAnyOrder(tuple(7L, "a/index.html"), tuple(7L, "a/photo.png"));
         assertThat(root.resolve("7/a/index.html")).doesNotExist();
         assertThat(root.resolve("7/a/photo.png")).doesNotExist();
     }
+
 
     @Test
     @DisplayName("판정 뒤 같은 경로를 MCP 쓰기로 교체하면 그 폴더를 지우지 않는다")
     void keepsFolderWhenSamePathIsReplacedAfterJudgement() throws IOException {
         AtomicReference<ArtifactStore> holder = new AtomicReference<>();
         ArtifactStore store = store(
-                conversationId -> holder.get().write(7L, "a/index.html", "새 본문".getBytes(StandardCharsets.UTF_8)));
+            conversationId -> holder.get().write(7L, "a/index.html", "새 본문".getBytes(StandardCharsets.UTF_8)));
         holder.set(store);
         writeOld(7L, "a/index.html", "옛 본문");
         writeOld(7L, "a/photo.png", "png");
@@ -62,6 +65,7 @@ class ArtifactStoreCleanupTest {
         assertThat(Files.readString(root.resolve("7/a/index.html"))).isEqualTo("새 본문");
         assertThat(root.resolve("7/a/photo.png")).exists();
     }
+
 
     @Test
     @DisplayName("판정 뒤 새 HTML 이 더해지면 옛 사진을 남긴다")
@@ -83,6 +87,7 @@ class ArtifactStoreCleanupTest {
         assertThat(root.resolve("7/a/new.html")).exists();
     }
 
+
     @Test
     @DisplayName("정리 중 시작한 MCP 쓰기는 정리가 끝날 때까지 기다린다")
     void mcpWriteDuringCleanupWaitsUntilCleanupEnds() throws Exception {
@@ -90,11 +95,11 @@ class ArtifactStoreCleanupTest {
         AtomicReference<CompletableFuture<Long>> lateWrite = new AtomicReference<>();
         ArtifactStore store = store(conversationId -> {
             CompletableFuture<Long> future = CompletableFuture.supplyAsync(
-                    () -> holder.get().write(7L, "a/late.html", "늦은 본문".getBytes(StandardCharsets.UTF_8)));
+                () -> holder.get().write(7L, "a/late.html", "늦은 본문".getBytes(StandardCharsets.UTF_8)));
             lateWrite.set(future);
             assertThatThrownBy(() -> future.get(300, TimeUnit.MILLISECONDS))
-                    .as("정리가 잠금을 잡은 동안 다른 스레드의 쓰기가 끝나면 안 된다")
-                    .isInstanceOf(TimeoutException.class);
+                .as("정리가 잠금을 잡은 동안 다른 스레드의 쓰기가 끝나면 안 된다")
+                .isInstanceOf(TimeoutException.class);
         });
         holder.set(store);
         writeOld(7L, "a/index.html", "옛 본문");
@@ -105,6 +110,7 @@ class ArtifactStoreCleanupTest {
 
         assertThat(Files.readString(root.resolve("7/a/late.html"))).isEqualTo("늦은 본문");
     }
+
 
     @Test
     @DisplayName("다른 대화의 정리는 최근에 바뀐 대화의 영향을 받지 않는다")
@@ -118,18 +124,19 @@ class ArtifactStoreCleanupTest {
         List<ArtifactRemoved> removed = store.deleteOlderThan(cutoff());
 
         assertThat(removed)
-                .extracting(ArtifactRemoved::conversationId, ArtifactRemoved::path)
-                .containsExactly(tuple(8L, "b/index.html"));
+            .extracting(ArtifactRemoved::conversationId, ArtifactRemoved::path)
+            .containsExactly(tuple(8L, "b/index.html"));
         assertThat(recent).exists();
         assertThat(root.resolve("8/b/index.html")).doesNotExist();
     }
 
+
     private ArtifactStore store(ArtifactCleanupProbe probe) {
         ArtifactProperties properties = new ArtifactProperties(root.toString(), "/agent/artifacts", 30);
-        ArtifactAtomicMover mover = (source, target) ->
-                Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        ArtifactAtomicMover mover = (source, target) -> Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         return new ArtifactStore(properties, false, mover, probe);
     }
+
 
     private void writeOld(Long conversationId, String relativePath, String body) throws IOException {
         Path file = root.resolve(String.valueOf(conversationId)).resolve(relativePath);
@@ -137,6 +144,7 @@ class ArtifactStoreCleanupTest {
         Files.writeString(file, body);
         Files.setLastModifiedTime(file, FileTime.from(Instant.now().minus(Duration.ofDays(40))));
     }
+
 
     private static Instant cutoff() {
         return Instant.now().minus(Duration.ofDays(30));

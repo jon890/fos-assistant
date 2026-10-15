@@ -12,18 +12,19 @@ import java.util.UUID;
  * @param channel 늘 {@code IN_APP} 이다
  */
 public record AttentionItem(
-        String itemKey,
-        String stateKey,
-        AttentionLevel level,
-        AttentionChannel channel,
-        AttentionTrigger trigger,
-        String title,
-        UUID conversationId,
-        String agentName,
-        Instant at,
-        AttentionWhy why,
-        AttentionExecutionRef execution,
-        UUID actionId,
-        AttentionFollowUpRef followUp,
-        AttentionReport report,
-        AttentionProblem problem) {}
+    String itemKey,
+    String stateKey,
+    AttentionLevel level,
+    AttentionChannel channel,
+    AttentionTrigger trigger,
+    String title,
+    UUID conversationId,
+    String agentName,
+    Instant at,
+    AttentionWhy why,
+    AttentionExecutionRef execution,
+    UUID actionId,
+    AttentionFollowUpRef followUp,
+    AttentionReport report,
+    AttentionProblem problem) {
+}

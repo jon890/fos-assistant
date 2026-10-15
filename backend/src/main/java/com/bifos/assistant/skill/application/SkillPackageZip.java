@@ -44,6 +44,7 @@ public class SkillPackageZip {
     private static final int REGULAR_FILE = 0100000;
     private static final int DIRECTORY = 0040000;
 
+
     public ReceivedSkillPackage read(byte[] zip) {
         if (zip.length > MAX_ZIP_BYTES) {
             return ReceivedSkillPackage.failed(ZIP_TOO_LARGE, null);
@@ -62,16 +63,18 @@ public class SkillPackageZip {
         }
     }
 
+
     /**
      * Unicode Path 추가 칸을 쓰지 않는다. 그 칸은 원래 이름 바이트와 다른 이름을 줄 수 있어, 원래 바이트에서 {@code \} 를 찾는
      * 검사를 비켜 갈 수 있다. 이름은 원래 바이트를 UTF-8 로 읽은 것 하나다.
      */
     private static ZipFile open(byte[] zip) throws IOException {
         return ZipFile.builder()
-                .setSeekableByteChannel(new SeekableInMemoryByteChannel(zip))
-                .setUseUnicodeExtraFields(false)
-                .get();
+            .setSeekableByteChannel(new SeekableInMemoryByteChannel(zip))
+            .setUseUnicodeExtraFields(false)
+            .get();
     }
+
 
     private static ReceivedSkillPackage readEntries(ZipFile zipFile) {
         List<ZipArchiveEntry> entries = Collections.list(zipFile.getEntries());
@@ -95,6 +98,7 @@ public class SkillPackageZip {
         }
         return unpack(zipFile, files);
     }
+
 
     /**
      * 모든 항목을 차례로 풀며 합계를 센다. 합계가 상한을 넘는 순간 그 항목을 끝까지 읽지 않고 멈춘다. 압축 폭탄도 상한과 한
@@ -130,6 +134,7 @@ public class SkillPackageZip {
         return new ReceivedSkillPackage(List.copyOf(unpacked), null);
     }
 
+
     /**
      * 라이브러리는 FAT 항목 이름의 {@code \} 를 {@code /} 로 바꿔 주므로 {@code \} 는 원래 이름 바이트에서 찾는다. 나머지는
      * 라이브러리가 준 이름을 정규화하지 않고 본다.
@@ -156,6 +161,7 @@ public class SkillPackageZip {
         return true;
     }
 
+
     /**
      * 제어 문자(C0, DEL, C1), 서식 문자(U+202E 같은 방향 바꿈), 줄과 문단 구분자다. 화면에 보이는 이름과 실제 이름이 달라지거나
      * 줄이 나뉠 수 있다.
@@ -163,10 +169,11 @@ public class SkillPackageZip {
     private static boolean isInvisible(int codePoint) {
         int type = Character.getType(codePoint);
         return type == Character.CONTROL
-                || type == Character.FORMAT
-                || type == Character.LINE_SEPARATOR
-                || type == Character.PARAGRAPH_SEPARATOR;
+            || type == Character.FORMAT
+            || type == Character.LINE_SEPARATOR
+            || type == Character.PARAGRAPH_SEPARATOR;
     }
+
 
     /** 심볼릭 링크, 장치 파일처럼 unix mode 의 파일 종류가 일반 파일도 디렉터리도 아닌 항목이다. */
     private static boolean isSpecial(ZipArchiveEntry entry) {
@@ -179,6 +186,7 @@ public class SkillPackageZip {
         int type = entry.getUnixMode() & FILE_TYPE_MASK;
         return type != 0 && type != REGULAR_FILE && type != DIRECTORY;
     }
+
 
     /**
      * 암호가 없고 저장이나 DEFLATE 인 항목만 읽는다. ZSTD 와 XZ 는 {@code canReadEntryData} 가 참이지만 그 optional 의존이 없어

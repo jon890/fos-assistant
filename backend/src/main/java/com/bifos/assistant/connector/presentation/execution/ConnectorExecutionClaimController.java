@@ -19,6 +19,7 @@ public class ConnectorExecutionClaimController {
     private final ConnectorExecutionClaimCodec codec;
     private final ConnectorExecutionClaims claims;
 
+
     @PostMapping(value = "/internal/connector-executions/claim", produces = MediaType.APPLICATION_JSON_VALUE)
     public ClaimResponse claim(HttpServletRequest request) throws IOException {
         // Content-Length가 없거나 틀려도 실제 받은 바이트로 상한을 지킨다.

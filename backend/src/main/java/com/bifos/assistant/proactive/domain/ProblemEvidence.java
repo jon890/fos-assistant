@@ -8,4 +8,5 @@ import java.time.Instant;
  * @param sourceUrl 원문 주소 검사를 통과한 주소다
  * @param checkedAt 원문을 확인한 시각이다
  */
-public record ProblemEvidence(String topicKey, String sourceUrl, Instant checkedAt) {}
+public record ProblemEvidence(String topicKey, String sourceUrl, Instant checkedAt) {
+}

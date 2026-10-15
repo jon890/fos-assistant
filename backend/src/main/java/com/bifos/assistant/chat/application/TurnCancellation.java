@@ -38,16 +38,18 @@ public class TurnCancellation {
     private final UserExecutionLimiter limiter;
     private final BackgroundTasks backgroundTasks;
 
+
     public TurnCancellation(
-            HermesRunsClient hermes,
-            @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace,
-            UserExecutionLimiter limiter,
-            BackgroundTasks backgroundTasks) {
+        HermesRunsClient hermes,
+        @Value("${assistant.chat.stop-stream-grace:10s}") Duration streamGrace,
+        UserExecutionLimiter limiter,
+        BackgroundTasks backgroundTasks) {
         this.hermes = hermes;
         this.streamGrace = streamGrace;
         this.limiter = limiter;
         this.backgroundTasks = backgroundTasks;
     }
+
 
     /**
      * 대화 잠금을 잡고 그 turn 의 사용자 자리를 얻는다(ADR-069).
@@ -60,16 +62,18 @@ public class TurnCancellation {
      * 진 것이므로 {@code CONVERSATION_BUSY} 로 바꿔 던진다. 진 쪽이 대기 메시지로 들어가게 하려는 것이다.
      *
      * @throws ApiException {@code CONVERSATION_BUSY}. 그 대화에 도는 turn 이 있다. {@code USER_BUSY}. 그 사용자가 동시 실행
-     *     한도를 모두 쓰고 있다. 둘 다 잠금과 자리를 남기지 않는다
+     * 한도를 모두 쓰고 있다. 둘 다 잠금과 자리를 남기지 않는다
      */
     public TurnHandle open(Long userId, Long conversationId) {
         return open(userId, conversationId, false);
     }
 
+
     /** 사용자 대화 자리를 남겨 두는 매일 깨우기 전용 진입점이다. */
     public TurnHandle openBackground(Long userId, Long conversationId) {
         return open(userId, conversationId, true);
     }
+
 
     private TurnHandle open(Long userId, Long conversationId, boolean background) {
         if (byConversation.containsKey(conversationId)) {
@@ -91,6 +95,7 @@ public class TurnCancellation {
         return lock(userId, conversationId, slot);
     }
 
+
     /**
      * {@link #open} 과 같되 사용자 한도를 보지 않고 자리를 얻는다.
      *
@@ -103,6 +108,7 @@ public class TurnCancellation {
         return lock(userId, conversationId, limiter.acquireRecoveredTurn(userId));
     }
 
+
     /** 얻은 자리를 쥔 채 대화 잠금을 잡는다. 그 사이 다른 turn 이 잡았으면 자리를 돌려주고 거절한다. */
     private TurnHandle lock(Long userId, Long conversationId, TurnSlot slot) {
         TurnHandle handle = new TurnHandle(userId, conversationId);
@@ -114,9 +120,11 @@ public class TurnCancellation {
         return handle;
     }
 
+
     private static ApiException conversationBusy() {
         return new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation already has a running turn");
     }
+
 
     /**
      * 그 대화에 도는 turn 이 없으면 잠금을 잡고 작업을 돌린 뒤 푼다. turn 의 모델 실행은 열지 않는다.
@@ -144,6 +152,7 @@ public class TurnCancellation {
         return true;
     }
 
+
     public synchronized void rekey(TurnHandle handle, Long executionId) {
         Long old = handle.executionId;
         if (old != null) {
@@ -153,6 +162,7 @@ public class TurnCancellation {
         handle.runs.clear();
         byExecution.put(executionId, handle);
     }
+
 
     /**
      * 대화 번호로 도는 turn 표시를 읽는다. 표시를 바꾸지 않는다.
@@ -164,9 +174,11 @@ public class TurnCancellation {
         return handle == null ? TurnMark.NONE : new TurnMark(true, handle.executionId);
     }
 
+
     public Optional<TurnHandle> find(Long executionId) {
         return Optional.ofNullable(byExecution.get(executionId));
     }
+
 
     /**
      * turn 이 닫힐 때 그 대화 번호로 부를 것을 더한다.
@@ -176,6 +188,7 @@ public class TurnCancellation {
     public void addCloseListener(Consumer<TurnClosed> listener) {
         closeListeners.add(listener);
     }
+
 
     public void close(TurnHandle handle) {
         boolean removed = byConversation.remove(handle.conversationId, handle);
@@ -195,6 +208,7 @@ public class TurnCancellation {
         }
     }
 
+
     /** 리스너의 예외가 turn 을 닫는 쪽으로 번지지 않게 경고 로그만 남긴다. */
     private void notifyClosed(TurnClosed closed) {
         for (Consumer<TurnClosed> listener : closeListeners) {
@@ -206,10 +220,12 @@ public class TurnCancellation {
         }
     }
 
+
     public boolean isCancelled(Long executionId) {
         TurnHandle handle = byExecution.get(executionId);
         return handle != null && handle.cancelled.get();
     }
+
 
     /** Hermes 가 중지 요청을 받아들여 실제 취소로 전환된 turn 인지 본다. */
     public boolean isStopConfirmed(Long executionId) {
@@ -217,23 +233,28 @@ public class TurnCancellation {
         return handle != null && handle.cancelled.get() && handle.stopConfirmed.get();
     }
 
+
     /** 이 turn 이 중지로 끝났다고 적는다. 닫기 리스너가 {@link TurnClosed#stopped()} 로 읽는다. */
     public void markStopped(TurnHandle handle) {
         handle.stopped.set(true);
     }
 
+
     public boolean cancel(TurnHandle handle) {
         return handle.cancelled.compareAndSet(false, true);
     }
+
 
     /** 정상 완료 저장을 끝낸 turn 은 뒤늦은 중지 요청을 성공으로 답하지 않는다. */
     public void markFinished(TurnHandle handle) {
         handle.finished.set(true);
     }
 
+
     public boolean isFinished(TurnHandle handle) {
         return handle.finished.get();
     }
+
 
     /** Hermes 에 중지 요청을 보내지 못하면 turn 을 원래 실행 상태로 되돌린다. */
     public void resume(TurnHandle handle) {
@@ -249,30 +270,34 @@ public class TurnCancellation {
         handle.stopConfirmed.set(false);
     }
 
+
     /** Hermes 중지 요청이 모두 받아들여진 뒤에만 실행 경로가 취소로 분기한다. */
     public void confirmStop(TurnHandle handle) {
         if (!handle.cancelled.get() || !handle.stopConfirmed.compareAndSet(false, true)) {
             return;
         }
         handle.closeTask = scheduler.schedule(
-                () -> {
-                    handle.streamGraceExpired.complete(null);
-                    startCloseStream(handle);
-                },
-                streamGrace.toMillis(),
-                TimeUnit.MILLISECONDS);
+            () -> {
+                handle.streamGraceExpired.complete(null);
+                startCloseStream(handle);
+            },
+            streamGrace.toMillis(),
+            TimeUnit.MILLISECONDS);
     }
+
 
     /** 중지 요청은 시작됐지만 Hermes 가 아직 받아들이지 않았는지 본다. */
     public boolean isStopConfirmed(TurnHandle handle) {
         return handle.stopConfirmed.get();
     }
 
+
     /** 실행 번호가 아직 없어 Hermes 에 보낼 대상 없이 끝날 취소인지 본다. */
     public boolean shouldStopBeforeSubmit(Long executionId) {
         TurnHandle handle = byExecution.get(executionId);
         return handle != null && handle.cancelled.get() && handle.runs.isEmpty();
     }
+
 
     public boolean trackRun(Long executionId, String apiBaseUrl, String profileName, String runId) {
         TurnHandle handle = byExecution.get(executionId);
@@ -282,9 +307,9 @@ public class TurnCancellation {
         TurnRunRef run;
         synchronized (handle.runs) {
             run = handle.runs.stream()
-                    .filter(it -> it.runId.equals(runId))
-                    .findFirst()
-                    .orElse(null);
+                .filter(it -> it.runId.equals(runId))
+                .findFirst()
+                .orElse(null);
             if (run == null) {
                 run = new TurnRunRef(apiBaseUrl, profileName, runId);
                 handle.runs.add(run);
@@ -301,6 +326,7 @@ public class TurnCancellation {
         return sent;
     }
 
+
     /** 완료된 실행은 이후 자식을 멈출 때 다시 중지하지 않는다. */
     public void untrackRun(Long executionId, String runId) {
         TurnHandle handle = byExecution.get(executionId);
@@ -310,9 +336,11 @@ public class TurnCancellation {
         handle.runs.removeIf(run -> run.runId.equals(runId));
     }
 
+
     public List<TurnRunRef> pendingStops(TurnHandle handle) {
         return handle.runs.stream().filter(run -> !run.stopSent.get()).toList();
     }
+
 
     /** 같은 run 에 중지를 두 번 보내지 않고, 실패한 run 은 다음 요청에서 다시 보낸다. */
     public boolean stopRun(TurnRunRef run) {
@@ -331,14 +359,17 @@ public class TurnCancellation {
         }
     }
 
+
     public boolean hasRuns(TurnHandle handle) {
         return !handle.runs.isEmpty();
     }
+
 
     /** 일부 run 에 중지가 이미 전달됐으면 이전 실행 상태로 안전하게 되돌릴 수 없다. */
     public boolean hasStoppedRuns(TurnHandle handle) {
         return handle.runs.stream().anyMatch(run -> run.stopSent.get());
     }
+
 
     /** 중지가 제출보다 먼저 왔으면 첫 실행의 중지 결과를 기다린다. */
     public boolean awaitFirstStop(TurnHandle handle) {
@@ -352,6 +383,7 @@ public class TurnCancellation {
         }
     }
 
+
     public void attachStream(TurnHandle handle, Closeable stream) {
         handle.stream = stream;
         if (handle.streamGraceExpired.isDone()) {
@@ -359,17 +391,21 @@ public class TurnCancellation {
         }
     }
 
+
     private void startCloseStream(TurnHandle handle) {
         backgroundTasks.start("turn-stream-close-" + handle.conversationId, () -> closeStream(handle));
     }
+
 
     public void detachStream(TurnHandle handle) {
         handle.stream = null;
     }
 
+
     public void awaitStreamOrGrace(TurnHandle handle, CompletableFuture<Void> streamDone) {
         CompletableFuture.anyOf(streamDone, handle.streamGraceExpired).join();
     }
+
 
     /**
      * 스트림이 닫히거나 중지 유예가 끝나기를 기다리되 {@code maxWait} 를 넘기면 스트림을 닫고 돌아온다.
@@ -389,10 +425,12 @@ public class TurnCancellation {
         }
     }
 
+
     @PreDestroy
     public void shutdown() {
         scheduler.shutdownNow();
     }
+
 
     private void closeStream(TurnHandle handle) {
         Closeable stream = handle.stream;

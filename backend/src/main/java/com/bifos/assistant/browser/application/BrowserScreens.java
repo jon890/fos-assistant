@@ -36,35 +36,38 @@ public class BrowserScreens implements AutoCloseable {
     private final ScheduledThreadPoolExecutor scheduler;
     private final Map<Long, BrowserScreenSession> screens = new ConcurrentHashMap<>();
 
+
     @Autowired
     public BrowserScreens(
-            CdpTargets targets,
-            CdpConnector connector,
-            BrowserUsage usage,
-            LiveProperties<BrowserProperties> properties) {
+        CdpTargets targets,
+        CdpConnector connector,
+        BrowserUsage usage,
+        LiveProperties<BrowserProperties> properties) {
         this(targets, connector, usage, () -> properties.current().screenTimeout(), TAB_INTERVAL);
     }
 
+
     BrowserScreens(
-            CdpTargets targets,
-            CdpConnector connector,
-            BrowserUsage usage,
-            Supplier<Duration> timeout,
-            Duration tabInterval) {
+        CdpTargets targets,
+        CdpConnector connector,
+        BrowserUsage usage,
+        Supplier<Duration> timeout,
+        Duration tabInterval) {
         this.targets = targets;
         this.connector = connector;
         this.usage = usage;
         this.timeout = timeout;
         this.tabInterval = tabInterval;
         this.scheduler = new ScheduledThreadPoolExecutor(
-                1, Thread.ofPlatform().daemon().name("browser-screen-", 0).factory());
+            1, Thread.ofPlatform().daemon().name("browser-screen-", 0).factory());
         this.scheduler.setRemoveOnCancelPolicy(true);
     }
+
 
     /** 지금 탭에 화면을 열고 앞의 화면은 닫는다. 탭에 붙지 못했으면 {@code BROWSER_START_FAILED} 다. */
     public void open(Long browserId, Long userId, URI cdp, String url, BrowserScreenSink sink) {
         BrowserScreenSession session = new BrowserScreenSession(
-                browserId, userId, cdp, targets, connector, usage.open(browserId), sink, scheduler, this::forget);
+            browserId, userId, cdp, targets, connector, usage.open(browserId), sink, scheduler, this::forget);
         BrowserScreenSession previous = screens.put(browserId, session);
         if (previous != null) {
             previous.close(BrowserScreenSession.REPLACED);
@@ -79,14 +82,16 @@ public class BrowserScreens implements AutoCloseable {
         }
     }
 
+
     /** 요청자의 열린 화면에만 입력을 보낸다. 열린 화면이 없으면 {@code BROWSER_SCREEN_CLOSED} 다. */
     public void input(Long userId, BrowserScreenInput input) {
         screens.values().stream()
-                .filter(session -> session.userId().equals(userId) && !session.closed())
-                .findFirst()
-                .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_SCREEN_CLOSED, "no open browser screen"))
-                .input(input);
+            .filter(session -> session.userId().equals(userId) && !session.closed())
+            .findFirst()
+            .orElseThrow(() -> new ApiException(ErrorCode.BROWSER_SCREEN_CLOSED, "no open browser screen"))
+            .input(input);
     }
+
 
     /** 브라우저를 멈추기 전에 그 화면을 닫는다. 받는 쪽에 {@code closed}({@code stopped})를 보낸다. */
     public void close(Long browserId) {
@@ -96,10 +101,12 @@ public class BrowserScreens implements AutoCloseable {
         }
     }
 
+
     /** 그 브라우저에 열린 화면이 있는가. */
     boolean isOpen(Long browserId) {
         return screens.containsKey(browserId);
     }
+
 
     /** 끌 때 모든 화면을 닫고 스케줄러를 멈춘다. */
     @Override
@@ -107,6 +114,7 @@ public class BrowserScreens implements AutoCloseable {
         List.copyOf(screens.values()).forEach(session -> session.close(BrowserScreenSession.STOPPED));
         scheduler.shutdownNow();
     }
+
 
     private void forget(BrowserScreenSession session) {
         screens.remove(session.browserId(), session);

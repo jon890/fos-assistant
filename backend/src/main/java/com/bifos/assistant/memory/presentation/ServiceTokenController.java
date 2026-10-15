@@ -30,24 +30,27 @@ public class ServiceTokenController {
     private final ServiceTokenService tokens;
     private final CurrentUserProvider currentUser;
 
+
     @PostMapping
     public IssuedServiceTokenView issue(@Valid @RequestBody IssueServiceTokenRequest request) {
         IssuedServiceToken issued = tokens.issue(
-                currentUser.require(),
-                request.label(),
-                request.expiresInDays(),
-                request.collections().stream()
-                        .map(ServiceTokenGrantBody::toGrant)
-                        .toList());
+            currentUser.require(),
+            request.label(),
+            request.expiresInDays(),
+            request.collections().stream()
+                .map(ServiceTokenGrantBody::toGrant)
+                .toList());
         return new IssuedServiceTokenView(ServiceTokenView.from(issued.snapshot()), issued.rawToken());
     }
+
 
     @GetMapping
     public List<ServiceTokenView> list() {
         return tokens.listOf(currentUser.require()).stream()
-                .map(ServiceTokenView::from)
-                .toList();
+            .map(ServiceTokenView::from)
+            .toList();
     }
+
 
     @DeleteMapping("/{id}")
     public void revoke(@PathVariable Long id) {

@@ -22,10 +22,12 @@ public enum ExecutionEventType {
      */
     PROVIDER_SWITCHED;
 
+
     /** 도구 호출 사건인가. 도구 이름을 채울 사건을 고를 때 쓴다. */
     public boolean isTool() {
         return this == TOOL_STARTED || this == TOOL_COMPLETED;
     }
+
 
     /** 하위 에이전트 사건인가. 하위 에이전트 이름을 채울 사건을 고를 때 쓴다. */
     public boolean isSubagent() {

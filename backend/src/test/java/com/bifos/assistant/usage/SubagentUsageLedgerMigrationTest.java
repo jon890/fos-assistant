@@ -30,47 +30,50 @@ class SubagentUsageLedgerMigrationTest {
 
     private Database database;
 
+
     @BeforeEach
     void setUp() throws SQLException {
         database = createDatabase();
         migrate("54");
         seed();
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
     }
+
 
     /** 같은 검사를 실제 MySQL 에서 돌리는 하위 클래스가 바꿔 끼운다. */
     Database createDatabase() {
         return new Database(
-                "jdbc:h2:mem:subagent-usage-ledger-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+            "jdbc:h2:mem:subagent-usage-ledger-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
     }
+
 
     @Test
     @DisplayName("사용량과 금액을 적는 칸이 모두 비어 있어도 되는 칸으로 생긴다")
     void addsNullableLedgerColumns() throws SQLException {
         try (Connection connection = connect()) {
             for (String name : List.of(
-                    "PROVIDER",
-                    "MODEL",
-                    "INPUT_TOKENS",
-                    "CACHE_READ_TOKENS",
-                    "CACHE_WRITE_TOKENS",
-                    "OUTPUT_TOKENS",
-                    "ESTIMATED_COST_MICROS",
-                    "ACTUAL_COST_MICROS",
-                    "COST_CURRENCY",
-                    "PRICING_VERSION",
-                    "RECORDED_AT")) {
+                "PROVIDER",
+                "MODEL",
+                "INPUT_TOKENS",
+                "CACHE_READ_TOKENS",
+                "CACHE_WRITE_TOKENS",
+                "OUTPUT_TOKENS",
+                "ESTIMATED_COST_MICROS",
+                "ACTUAL_COST_MICROS",
+                "COST_CURRENCY",
+                "PRICING_VERSION",
+                "RECORDED_AT")) {
                 try (ResultSet column = column(connection, name)) {
                     assertThat(column.next())
-                            .as("subagent_usage_job.%s 칸", name)
-                            .isTrue();
+                        .as("subagent_usage_job.%s 칸", name)
+                        .isTrue();
                     assertThat(column.getString("IS_NULLABLE"))
-                            .as("subagent_usage_job.%s 의 NULL 허용", name)
-                            .isEqualTo("YES");
+                        .as("subagent_usage_job.%s 의 NULL 허용", name)
+                        .isEqualTo("YES");
                 }
             }
             assertThat(columnSize(connection, "PROVIDER")).isEqualTo(64);
@@ -79,6 +82,7 @@ class SubagentUsageLedgerMigrationTest {
             assertThat(columnSize(connection, "PRICING_VERSION")).isEqualTo(32);
         }
     }
+
 
     @Test
     @DisplayName("DONE 이던 줄은 사용량 칸이 빈 채 처음 시각부터 다시 조회 대기가 된다")
@@ -95,6 +99,7 @@ class SubagentUsageLedgerMigrationTest {
         assertThat(job.recordedAt()).isNull();
         assertThat(jobCount(801, "done-child")).as("이미 줄이 있는 자식은 다시 넣지 않는다").isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("WAITING 과 EXPIRED 이던 줄은 그대로 둔다")
@@ -114,6 +119,7 @@ class SubagentUsageLedgerMigrationTest {
         assertThat(expired.attempts()).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("작업 줄이 없던 자식은 시작 사건이 중복돼도 WAITING 한 줄로 들어온다")
     void insertsOneWaitingJobForChildWithoutJob() throws SQLException {
@@ -132,6 +138,7 @@ class SubagentUsageLedgerMigrationTest {
         assertThat(job.backoffAttempts()).isZero();
     }
 
+
     @Test
     @DisplayName("에이전트가 지워졌거나 없는 부모의 자식은 EXPIRED 와 AGENT_MISSING 으로 들어온다")
     void expiresChildOfMissingAgent() throws SQLException {
@@ -146,6 +153,7 @@ class SubagentUsageLedgerMigrationTest {
         assertThat(missing.apiBaseUrl()).as("에이전트 행이 없으면 빈 주소").isEmpty();
     }
 
+
     @Test
     @DisplayName("에이전트의 profile 이 부모와 다른 자식은 EXPIRED 와 PROFILE_CHANGED 로 들어온다")
     void expiresChildOfChangedProfile() throws SQLException {
@@ -157,41 +165,45 @@ class SubagentUsageLedgerMigrationTest {
         assertThat(job.apiBaseUrl()).isEqualTo("http://runtime.test/p/changed");
     }
 
+
     @Test
     @DisplayName("같은 profile 의 같은 session 이 두 실행에 있으면 실행 번호가 작은 쪽 한 줄만 들어온다")
     void insertsOnlySmallestExecutionForSharedSession() throws SQLException {
         assertThat(executionsOf("shared-child")).containsExactly(805L);
         assertThat(executionsOf("waiting-child"))
-                .as("다른 실행 아래 이미 줄이 있는 session 은 새로 넣지 않는다")
-                .containsExactly(801L);
+            .as("다른 실행 아래 이미 줄이 있는 session 은 새로 넣지 않는다")
+            .containsExactly(801L);
     }
+
 
     @Test
     @DisplayName("끝나지 않은 부모의 자식과 session 이 없는 시작 사건은 넣지 않는다")
     void skipsRunningParentAndSessionlessStart() throws SQLException {
         assertThat(executionsOf("running-child")).isEmpty();
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM subagent_usage_job")) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM subagent_usage_job")) {
             assertThat(row.next()).isTrue();
             assertThat(row.getInt(1))
-                    .as("기존 셋에 new, gone, orphan, moved, shared 다섯을 더한 줄 수")
-                    .isEqualTo(8);
+                .as("기존 셋에 new, gone, orphan, moved, shared 다섯을 더한 줄 수")
+                .isEqualTo(8);
         }
     }
 
+
     private void migrate(String version) {
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .target(version)
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .target(version)
+            .load()
+            .migrate();
     }
+
 
     private void seed() throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,
                         credential_scope, visibility, enabled, created_at, deleted_at)
@@ -256,6 +268,7 @@ class SubagentUsageLedgerMigrationTest {
         }
     }
 
+
     /** H2 는 이름을 대문자로, MySQL 은 적은 그대로 둔다. */
     private static ResultSet column(Connection connection, String name) throws SQLException {
         DatabaseMetaData meta = connection.getMetaData();
@@ -264,9 +277,11 @@ class SubagentUsageLedgerMigrationTest {
         return meta.getColumns(connection.getCatalog(), null, table, upper ? name : name.toLowerCase(Locale.ROOT));
     }
 
+
     private Connection connect() throws SQLException {
         return DriverManager.getConnection(database.url(), database.username(), database.password());
     }
+
 
     private static int columnSize(Connection connection, String name) throws SQLException {
         try (ResultSet column = column(connection, name)) {
@@ -275,23 +290,24 @@ class SubagentUsageLedgerMigrationTest {
         }
     }
 
+
     private int jobCount(long executionId, String childSessionId) throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM subagent_usage_job WHERE execution_id = "
-                        + executionId + " AND child_session_id = '" + childSessionId + "'")) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM subagent_usage_job WHERE execution_id = "
+                + executionId + " AND child_session_id = '" + childSessionId + "'")) {
             assertThat(row.next()).isTrue();
             return row.getInt(1);
         }
     }
 
+
     private List<Long> executionsOf(String childSessionId) throws SQLException {
         List<Long> result = new ArrayList<>();
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet rows =
-                        statement.executeQuery("SELECT execution_id FROM subagent_usage_job WHERE child_session_id = '"
-                                + childSessionId + "' ORDER BY execution_id")) {
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("SELECT execution_id FROM subagent_usage_job WHERE child_session_id = '"
+                + childSessionId + "' ORDER BY execution_id")) {
             while (rows.next()) {
                 result.add(rows.getLong(1));
             }
@@ -299,45 +315,49 @@ class SubagentUsageLedgerMigrationTest {
         return result;
     }
 
+
     private Job job(long executionId, String childSessionId) throws SQLException {
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery("""
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("""
                         SELECT status, unconfirmed_reason, parent_session_id, profile_name, api_base_url,
                             created_at, next_attempt_at, expires_at, attempts, backoff_attempts, recorded_at
                         FROM subagent_usage_job
                         WHERE execution_id = %d AND child_session_id = '%s'
                         """.formatted(executionId, childSessionId))) {
             assertThat(row.next())
-                    .as("실행 %d 의 자식 %s 작업 줄", executionId, childSessionId)
-                    .isTrue();
+                .as("실행 %d 의 자식 %s 작업 줄", executionId, childSessionId)
+                .isTrue();
             return new Job(
-                    row.getString(1),
-                    row.getString(2),
-                    row.getString(3),
-                    row.getString(4),
-                    row.getString(5),
-                    row.getTimestamp(6),
-                    row.getTimestamp(7),
-                    row.getTimestamp(8),
-                    row.getInt(9),
-                    row.getInt(10),
-                    row.getTimestamp(11));
+                row.getString(1),
+                row.getString(2),
+                row.getString(3),
+                row.getString(4),
+                row.getString(5),
+                row.getTimestamp(6),
+                row.getTimestamp(7),
+                row.getTimestamp(8),
+                row.getInt(9),
+                row.getInt(10),
+                row.getTimestamp(11));
         }
     }
 
-    private record Job(
-            String status,
-            String unconfirmedReason,
-            String parentSessionId,
-            String profileName,
-            String apiBaseUrl,
-            Timestamp createdAt,
-            Timestamp nextAttemptAt,
-            Timestamp expiresAt,
-            int attempts,
-            int backoffAttempts,
-            Timestamp recordedAt) {}
 
-    record Database(String url, String username, String password) {}
+    private record Job(
+        String status,
+        String unconfirmedReason,
+        String parentSessionId,
+        String profileName,
+        String apiBaseUrl,
+        Timestamp createdAt,
+        Timestamp nextAttemptAt,
+        Timestamp expiresAt,
+        int attempts,
+        int backoffAttempts,
+        Timestamp recordedAt) {
+    }
+
+    record Database(String url, String username, String password) {
+    }
 }

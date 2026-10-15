@@ -17,10 +17,11 @@ public interface ConnectorToolGrantRepository extends JpaRepository<ConnectorToo
               and g.revokedAt is null and g.expiresAt > :now
             """)
     boolean existsActive(
-            @Param("userId") Long userId,
-            @Param("connectorId") String connectorId,
-            @Param("toolName") String toolName,
-            @Param("now") Instant now);
+        @Param("userId") Long userId,
+        @Param("connectorId") String connectorId,
+        @Param("toolName") String toolName,
+        @Param("now") Instant now);
+
 
     @Query("""
             select g from ConnectorToolGrant g
@@ -28,6 +29,7 @@ public interface ConnectorToolGrantRepository extends JpaRepository<ConnectorToo
             order by g.id
             """)
     List<ConnectorToolGrant> findActiveByUserId(@Param("userId") Long userId, @Param("now") Instant now);
+
 
     /** 연결을 해제하거나 값을 다시 등록할 때 그 연결의 허락을 거두려고 읽는다. */
     @Query("""
@@ -37,7 +39,8 @@ public interface ConnectorToolGrantRepository extends JpaRepository<ConnectorToo
             order by g.id
             """)
     List<ConnectorToolGrant> findActiveByUserIdAndConnectorId(
-            @Param("userId") Long userId, @Param("connectorId") String connectorId, @Param("now") Instant now);
+        @Param("userId") Long userId, @Param("connectorId") String connectorId, @Param("now") Instant now);
+
 
     /** 선언이 상시 허락을 닫은 도구의 줄을 찾으려고 모든 사용자의 유효한 허락을 읽는다. */
     @Query("""
@@ -46,6 +49,7 @@ public interface ConnectorToolGrantRepository extends JpaRepository<ConnectorToo
             order by g.id
             """)
     List<ConnectorToolGrant> findActive(@Param("now") Instant now);
+
 
     /**
      * 번호의 허락을 거둔다. 그 사이 사용자가 먼저 거둔 줄은 처음 거둔 시각을 그대로 둔다.

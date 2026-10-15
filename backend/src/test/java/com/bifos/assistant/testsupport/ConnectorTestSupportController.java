@@ -52,6 +52,7 @@ public class ConnectorTestSupportController {
     private final HermesConnectorClient connector;
     private final Clock clock;
 
+
     /**
      * 그 사용자의 옛 커넥터 에이전트를 하나 만들고 에이전트 번호를 돌려준다. 에이전트 번호는 화면 주소에 쓰는 코드다.
      *
@@ -63,23 +64,22 @@ public class ConnectorTestSupportController {
     public ResponseEntity<LegacyAgent> legacyAgent(@RequestBody LegacyAgentRequest request) {
         String connectorId = Objects.requireNonNull(request.connectorId(), "connectorId");
         AppUser owner = users.findByEmail(Objects.requireNonNull(request.email(), "email"))
-                .orElse(null);
+            .orElse(null);
         if (owner == null) {
             return ResponseEntity.notFound().build();
         }
         String title = connector.readCatalog().stream()
-                .filter(manifest -> manifest.id().equals(connectorId))
-                .map(ConnectorManifest::title)
-                .findFirst()
-                .orElse(connectorId);
-        CurrentUser user =
-                new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+            .filter(manifest -> manifest.id().equals(connectorId))
+            .map(ConnectorManifest::title)
+            .findFirst()
+            .orElse(connectorId);
+        CurrentUser user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         Agent agent = lifecycle.create(user, title, AgentVisibility.PRIVATE);
         agent.markConnectorManaged();
         Instant now = clock.instant();
         ConnectorConnection connection = connections
-                .findByUserIdAndConnectorId(owner.id(), connectorId)
-                .orElseGet(() -> ConnectorConnection.pending(owner.id(), connectorId, now));
+            .findByUserIdAndConnectorId(owner.id(), connectorId)
+            .orElseGet(() -> ConnectorConnection.pending(owner.id(), connectorId, now));
         connection.connected(ConnectionFields.empty(), now);
         connection = connections.save(connection);
         ConnectorBinding binding = ConnectorBinding.pending(agent, connection, null, now);
@@ -91,9 +91,12 @@ public class ConnectorTestSupportController {
         return ResponseEntity.ok(new LegacyAgent(agent.code()));
     }
 
+
     /** 옛 에이전트의 주인 메일과 그 에이전트가 쓰던 커넥터다. */
-    public record LegacyAgentRequest(String email, String connectorId) {}
+    public record LegacyAgentRequest(String email, String connectorId) {
+    }
 
     /** 만든 옛 에이전트의 코드다. */
-    public record LegacyAgent(String code) {}
+    public record LegacyAgent(String code) {
+    }
 }

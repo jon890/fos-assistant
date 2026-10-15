@@ -8,10 +8,11 @@ package com.bifos.assistant.proactive.application.model;
  * @param reaction 그 발견의 마지막 사용자 반응. 없으면 null
  */
 public record CheckFindingView(
-        Long id,
-        Long checkId,
-        Long executionId,
-        String area,
-        String topicKey,
-        String title,
-        FindingReaction reaction) {}
+    Long id,
+    Long checkId,
+    Long executionId,
+    String area,
+    String topicKey,
+    String title,
+    FindingReaction reaction) {
+}

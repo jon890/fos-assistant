@@ -33,6 +33,7 @@ public class OwnConversations {
     private final ChatMessageRepository messages;
     private final ResultDeliveryRepository deliveries;
 
+
     /**
      * 번호들 가운데 요청자의 것이고 지우지 않은 대화만 번호로 묶어 낸다.
      *
@@ -43,10 +44,11 @@ public class OwnConversations {
             return Map.of();
         }
         return conversations.findAllById(ids).stream()
-                .filter(conversation -> user.id().equals(conversation.userId()))
-                .filter(conversation -> conversation.deletedAt() == null)
-                .collect(Collectors.toMap(Conversation::id, Function.identity()));
+            .filter(conversation -> user.id().equals(conversation.userId()))
+            .filter(conversation -> conversation.deletedAt() == null)
+            .collect(Collectors.toMap(Conversation::id, Function.identity()));
     }
+
 
     /**
      * 그 시각에 시작한 turn 을 사용자가 보냈는지 본다.
@@ -57,11 +59,12 @@ public class OwnConversations {
      */
     public boolean startedByUser(Long conversationId, Instant startedAt) {
         return messages.findTopByConversationIdAndRoleNotAndCreatedAtLessThanEqualOrderByIdDesc(
-                        conversationId, MessageRole.ASSISTANT, startedAt)
-                .map(ChatMessage::role)
-                .filter(MessageRole.USER::equals)
-                .isPresent();
+            conversationId, MessageRole.ASSISTANT, startedAt)
+            .map(ChatMessage::role)
+            .filter(MessageRole.USER::equals)
+            .isPresent();
     }
+
 
     /**
      * {@code since} 뒤에 {@code FAILED} 로 바뀐 요청자의 결과 전달 묶음을 대화마다 가장 최근 하나씩 최근 순으로 낸다.
@@ -71,14 +74,14 @@ public class OwnConversations {
     public List<FailedDelivery> failedDeliveriesOf(CurrentUser user, Instant since) {
         Map<Long, FailedDelivery> latest = new LinkedHashMap<>();
         deliveries
-                .findFailedOfUser(user.id(), since)
-                .forEach(delivery -> latest.putIfAbsent(
-                        delivery.conversationId(),
-                        new FailedDelivery(
-                                delivery.id(),
-                                delivery.conversationId(),
-                                delivery.attemptCount(),
-                                delivery.updatedAt())));
+            .findFailedOfUser(user.id(), since)
+            .forEach(delivery -> latest.putIfAbsent(
+                delivery.conversationId(),
+                new FailedDelivery(
+                    delivery.id(),
+                    delivery.conversationId(),
+                    delivery.attemptCount(),
+                    delivery.updatedAt())));
         return List.copyOf(latest.values());
     }
 }

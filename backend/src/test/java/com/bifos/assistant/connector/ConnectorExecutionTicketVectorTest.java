@@ -33,17 +33,18 @@ class ConnectorExecutionTicketVectorTest extends ConnectorExecutionClaimTestSupp
     @Autowired
     ConnectorExecutionClaimCodec codec;
 
+
     @Test
     @DisplayName("독립 계산한 14개 키의 고정 HMAC ticket을 실제 codec과 인증 함수가 받아들인다")
     void authenticatesIndependentFixedVector() {
         String payload = VECTOR.get("payload").stringValue();
         String encoded = VECTOR.get("payloadBase64Url").stringValue();
         assertThat(Base64.getUrlEncoder().withoutPadding().encodeToString(payload.getBytes(StandardCharsets.UTF_8)))
-                .isEqualTo(encoded);
+            .isEqualTo(encoded);
         assertThat(JSON.readTree(payload).size()).isEqualTo(14);
         assertThat(VECTOR.get("token").stringValue()).isEqualTo(TOKEN);
         assertThat(VECTOR.get("signatureBase64Url").stringValue())
-                .isEqualTo("-eV0tgxaRH9thxpz1lyj6T0ZMZM9r9KyrFUqdYh4aJg");
+            .isEqualTo("-eV0tgxaRH9thxpz1lyj6T0ZMZM9r9KyrFUqdYh4aJg");
         var expected = codec.decodePayload(payload.getBytes(StandardCharsets.UTF_8));
         var actual = tickets.authenticate(ticket("signatureBase64Url"));
         assertThat(actual).isEqualTo(expected);
@@ -51,18 +52,20 @@ class ConnectorExecutionTicketVectorTest extends ConnectorExecutionClaimTestSupp
         assertThat(actual.issuedAt()).isEqualTo(Instant.parse("2026-10-10T00:00:02.123456Z"));
         assertThat(actual.expiresAt()).isEqualTo(Instant.parse("2026-10-10T00:01:02.123456Z"));
         assertThat(new String(codec.encodePayload(actual), StandardCharsets.UTF_8))
-                .isEqualTo(payload);
+            .isEqualTo(payload);
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"wrongTokenSignature", "wrongKeyDomainSignature", "wrongSignDomainSignature"})
     @DisplayName("동일 payload라도 다른 토큰·키 유도 도메인·서명 도메인의 고정 서명은 거절한다")
     void rejectsIndependentWrongSignatures(String signature) {
         assertThatThrownBy(() -> tickets.authenticate(ticket(signature)))
-                .isInstanceOf(ApiException.class)
-                .extracting("code")
-                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+            .isInstanceOf(ApiException.class)
+            .extracting("code")
+            .isEqualTo(ErrorCode.UNAUTHENTICATED);
     }
+
 
     @Test
     @DisplayName("정상 고정 ticket도 다른 dashboardToken 설정과 서명 한 바이트 변조에서는 거절한다")
@@ -71,24 +74,25 @@ class ConnectorExecutionTicketVectorTest extends ConnectorExecutionClaimTestSupp
         // authenticate는 DB나 HTTP에 접근하지 않으므로 그 의존성을 전달하지 않는다.
         var other = new ConnectorExecutionTicket(null, codec, null, null, null, null, clock, properties);
         assertThatThrownBy(() -> other.authenticate(ticket("signatureBase64Url")))
-                .isInstanceOf(ApiException.class)
-                .extracting("code")
-                .isEqualTo(ErrorCode.UNAUTHENTICATED);
-        byte[] signature =
-                Base64.getUrlDecoder().decode(VECTOR.get("signatureBase64Url").stringValue());
+            .isInstanceOf(ApiException.class)
+            .extracting("code")
+            .isEqualTo(ErrorCode.UNAUTHENTICATED);
+        byte[] signature = Base64.getUrlDecoder().decode(VECTOR.get("signatureBase64Url").stringValue());
         signature[0] ^= 1;
         String tampered = VECTOR.get("payloadBase64Url").stringValue() + "."
-                + Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
+            + Base64.getUrlEncoder().withoutPadding().encodeToString(signature);
         assertThatThrownBy(() -> tickets.authenticate(tampered))
-                .isInstanceOf(ApiException.class)
-                .extracting("code")
-                .isEqualTo(ErrorCode.UNAUTHENTICATED);
+            .isInstanceOf(ApiException.class)
+            .extracting("code")
+            .isEqualTo(ErrorCode.UNAUTHENTICATED);
     }
+
 
     private static String ticket(String signature) {
         return VECTOR.get("payloadBase64Url").stringValue() + "."
-                + VECTOR.get(signature).stringValue();
+            + VECTOR.get(signature).stringValue();
     }
+
 
     private static JsonNode vector() {
         try {

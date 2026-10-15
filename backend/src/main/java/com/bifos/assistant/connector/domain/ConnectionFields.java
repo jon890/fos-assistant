@@ -20,9 +20,11 @@ public record ConnectionFields(Map<String, String> values, Map<String, String> s
         secretPrefixes = copy(secretPrefixes);
     }
 
+
     public static ConnectionFields empty() {
         return new ConnectionFields(Map.of(), Map.of());
     }
+
 
     private static Map<String, String> copy(Map<String, String> source) {
         return source == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(source));

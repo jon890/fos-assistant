@@ -48,8 +48,8 @@ public class ResultDeliveryRecorder {
 
     /** 사용자가 다시 전달할 수 있는 묶음 상태들이다. */
     private static final Set<DeliveryStatus> RETRYABLE = Arrays.stream(DeliveryStatus.values())
-            .filter(DeliveryStatus::retryable)
-            .collect(Collectors.toUnmodifiableSet());
+        .filter(DeliveryStatus::retryable)
+        .collect(Collectors.toUnmodifiableSet());
 
     private final ResultDeliveryRepository deliveries;
     private final ResultDeliveryItemRepository deliveryItems;
@@ -57,6 +57,7 @@ public class ResultDeliveryRecorder {
     private final AgentExecutionRepository executions;
     private final TransactionTemplate transactions;
     private final Clock clock;
+
 
     /**
      * 묶음, 항목, 첫 시도를 저장한다. 알림 줄을 저장하는 트랜잭션 안에서 부른다.
@@ -69,7 +70,7 @@ public class ResultDeliveryRecorder {
      */
     @Transactional
     public ResultDeliveryStart open(
-            Long conversationId, List<DeliveryItemRef> items, Long noticeMessageId, Instant now) {
+        Long conversationId, List<DeliveryItemRef> items, Long noticeMessageId, Instant now) {
         if (items.isEmpty()) {
             throw new IllegalArgumentException("a result delivery needs at least one item");
         }
@@ -77,10 +78,10 @@ public class ResultDeliveryRecorder {
         for (DeliveryItemRef item : items) {
             deliveryItems.save(ResultDeliveryItem.of(delivery.id(), item.source(), item.resultKey()));
         }
-        ResultDeliveryAttempt attempt =
-                attempts.save(ResultDeliveryAttempt.started(delivery.id(), 1, noticeMessageId, now));
+        ResultDeliveryAttempt attempt = attempts.save(ResultDeliveryAttempt.started(delivery.id(), 1, noticeMessageId, now));
         return new ResultDeliveryStart(delivery.id(), attempt.id());
     }
+
 
     /**
      * 그 대화의 묶음을 읽는다.
@@ -89,16 +90,18 @@ public class ResultDeliveryRecorder {
      */
     public ResultDelivery require(Long conversationId, Long deliveryId) {
         return deliveries
-                .findByIdAndConversationId(deliveryId, conversationId)
-                .orElseThrow(() -> new ApiException(ErrorCode.DELIVERY_NOT_FOUND, "no such result delivery"));
+            .findByIdAndConversationId(deliveryId, conversationId)
+            .orElseThrow(() -> new ApiException(ErrorCode.DELIVERY_NOT_FOUND, "no such result delivery"));
     }
+
 
     /** 묶음에 넣은 결과들이다. 넣은 순서다. */
     public List<DeliveryItemRef> itemsOf(Long deliveryId) {
         return deliveryItems.findByDeliveryIdOrderByIdAsc(deliveryId).stream()
-                .map(item -> new DeliveryItemRef(item.source(), item.resultKey()))
-                .toList();
+            .map(item -> new DeliveryItemRef(item.source(), item.resultKey()))
+            .toList();
     }
+
 
     /**
      * 묶음을 {@code FAILED} 나 {@code STOPPED} 에서 {@code DELIVERING} 으로 바꾸고 새 시도의 번호를 돌려준다. 다시 전달의
@@ -115,17 +118,19 @@ public class ResultDeliveryRecorder {
             throw notRetryable();
         }
         return deliveries
-                .findById(deliveryId)
-                .map(ResultDelivery::attemptCount)
-                .orElseThrow(ResultDeliveryRecorder::notRetryable);
+            .findById(deliveryId)
+            .map(ResultDelivery::attemptCount)
+            .orElseThrow(ResultDeliveryRecorder::notRetryable);
     }
+
 
     /** 도는 중인 시도를 저장하고 그 번호를 돌려준다. {@link #claimRetry} 와 같은 트랜잭션에서 부른다. */
     @Transactional
     public Long addAttempt(Long deliveryId, int attemptNo, Long noticeMessageId, Instant now) {
         return attempts.save(ResultDeliveryAttempt.started(deliveryId, attemptNo, noticeMessageId, now))
-                .id();
+            .id();
     }
+
 
     /**
      * 그 대화의 묶음마다 마지막 시도가 저장한 마지막 알림 줄을 열쇠로, 묶음의 번호와 상태를 낸다. 이력 API 가 알림 줄 아래에
@@ -137,32 +142,34 @@ public class ResultDeliveryRecorder {
     @Transactional(readOnly = true)
     public Map<Long, DeliveryState> statesByNotice(Long conversationId) {
         Map<Long, ResultDelivery> byId = deliveries.findByConversationId(conversationId).stream()
-                .collect(Collectors.toMap(ResultDelivery::id, Function.identity()));
+            .collect(Collectors.toMap(ResultDelivery::id, Function.identity()));
         if (byId.isEmpty()) {
             return Map.of();
         }
         Map<Long, ResultDeliveryAttempt> latest = new HashMap<>();
         for (ResultDeliveryAttempt attempt : attempts.findByDeliveryIdIn(byId.keySet())) {
             latest.merge(
-                    attempt.deliveryId(),
-                    attempt,
-                    (left, right) -> left.attemptNo() >= right.attemptNo() ? left : right);
+                attempt.deliveryId(),
+                attempt,
+                (left, right) -> left.attemptNo() >= right.attemptNo() ? left : right);
         }
         Map<Long, DeliveryState> states = new HashMap<>();
         latest.values().stream()
-                .filter(attempt -> attempt.noticeMessageId() != null)
-                .forEach(attempt -> {
-                    ResultDelivery delivery = byId.get(attempt.deliveryId());
-                    states.put(attempt.noticeMessageId(), new DeliveryState(delivery.id(), delivery.status()));
-                });
+            .filter(attempt -> attempt.noticeMessageId() != null)
+            .forEach(attempt -> {
+                ResultDelivery delivery = byId.get(attempt.deliveryId());
+                states.put(attempt.noticeMessageId(), new DeliveryState(delivery.id(), delivery.status()));
+            });
         return states;
     }
+
 
     /** 시도에 부모 turn 의 실행 줄을 잇는다. 이미 이어진 시도는 그대로 둔다. */
     @Transactional
     public void attachExecution(Long attemptId, Long executionId) {
         attempts.attachExecution(attemptId, executionId);
     }
+
 
     /**
      * 도는 중인 시도를 닫고 그 묶음의 상태를 시도의 끝에 맞춘다. 이미 닫힌 시도면 아무것도 하지 않는다.
@@ -173,6 +180,7 @@ public class ResultDeliveryRecorder {
     public void finish(Long attemptId, DeliveryAttemptStatus status, String errorCode) {
         close(attemptId, status, errorCode);
     }
+
 
     /**
      * 그 실행 줄을 이은 도는 중인 시도를 실행 줄이 끝난 방식으로 닫는다. 실행 줄을 적는 트랜잭션 안에서 부른다.
@@ -188,8 +196,9 @@ public class ResultDeliveryRecorder {
             return;
         }
         attempts.findFirstByExecutionIdAndStatus(execution.id(), DeliveryAttemptStatus.RUNNING)
-                .ifPresent(attempt -> close(attempt.id(), status, errorCodeOf(execution, status)));
+            .ifPresent(attempt -> close(attempt.id(), status, errorCodeOf(execution, status)));
     }
+
 
     /**
      * 그 시각 전에 시작해 {@code RUNNING} 으로 남은 시도를 닫고 닫은 수를 돌려준다. 이전 프로세스가 남긴 시도를 기동할 때
@@ -201,8 +210,7 @@ public class ResultDeliveryRecorder {
      */
     public int closeLeftovers(Instant startedBefore) {
         int closed = 0;
-        for (ResultDeliveryAttempt attempt :
-                attempts.findByStatusAndStartedAtBefore(DeliveryAttemptStatus.RUNNING, startedBefore)) {
+        for (ResultDeliveryAttempt attempt : attempts.findByStatusAndStartedAtBefore(DeliveryAttemptStatus.RUNNING, startedBefore)) {
             try {
                 if (Boolean.TRUE.equals(transactions.execute(status -> closeLeftover(attempt)))) {
                     closed++;
@@ -214,10 +222,11 @@ public class ResultDeliveryRecorder {
         return closed;
     }
 
+
     private boolean closeLeftover(ResultDeliveryAttempt attempt) {
         AgentExecution execution = attempt.executionId() == null
-                ? null
-                : executions.findById(attempt.executionId()).orElse(null);
+            ? null
+            : executions.findById(attempt.executionId()).orElse(null);
         if (execution == null) {
             return close(attempt.id(), DeliveryAttemptStatus.FAILED, INTERRUPTED);
         }
@@ -228,14 +237,15 @@ public class ResultDeliveryRecorder {
         return close(attempt.id(), status, errorCodeOf(execution, status));
     }
 
+
     /** 도는 중인 시도를 닫고 묶음 상태를 맞춘다. 실제로 닫았으면 참이다. 트랜잭션 안에서 부른다. */
     private boolean close(Long attemptId, DeliveryAttemptStatus status, String errorCode) {
         if (status == DeliveryAttemptStatus.RUNNING) {
             throw new IllegalArgumentException("an attempt cannot finish as RUNNING");
         }
         Long deliveryId = attempts.findById(attemptId)
-                .map(ResultDeliveryAttempt::deliveryId)
-                .orElse(null);
+            .map(ResultDeliveryAttempt::deliveryId)
+            .orElse(null);
         if (deliveryId == null) {
             return false;
         }
@@ -247,6 +257,7 @@ public class ResultDeliveryRecorder {
         return true;
     }
 
+
     /** 실행 줄이 끝난 방식에 맞는 시도의 상태다. 아직 도는 줄이면 null 이다. */
     private static DeliveryAttemptStatus attemptStatusOf(AgentExecution execution) {
         return switch (execution.status()) {
@@ -257,9 +268,11 @@ public class ResultDeliveryRecorder {
         };
     }
 
+
     private static String errorCodeOf(AgentExecution execution, DeliveryAttemptStatus status) {
         return status == DeliveryAttemptStatus.FAILED ? execution.errorCode() : null;
     }
+
 
     /** 다시 전달할 수 없는 묶음의 거절이다. 다시 전달을 판정하는 자리가 함께 쓴다. */
     static ApiException notRetryable() {

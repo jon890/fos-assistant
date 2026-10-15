@@ -42,6 +42,7 @@ function grouped(
       action.toolName === null ||
       action.contentDraft ||
       action.financial != null ||
+      action.limitChange != null ||
       action.risk === "FINANCIAL"
     ) {
       order.push({ key: action.actionId, actions: [action] });

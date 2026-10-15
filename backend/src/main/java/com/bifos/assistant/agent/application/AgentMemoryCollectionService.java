@@ -43,6 +43,7 @@ public class AgentMemoryCollectionService {
     private final AgentRepository agents;
     private final Clock clock;
 
+
     /**
      * 그 에이전트의 실행이 받는 collection 이다.
      *
@@ -55,14 +56,14 @@ public class AgentMemoryCollectionService {
             return AgentMemoryGrants.none();
         }
         List<AgentMemoryCollection> rows = grants.findByIdAgentId(agentId);
-        Set<String> collections =
-                rows.stream().map(AgentMemoryCollection::collection).collect(Collectors.toSet());
+        Set<String> collections = rows.stream().map(AgentMemoryCollection::collection).collect(Collectors.toSet());
         Set<String> sensitive = rows.stream()
-                .filter(AgentMemoryCollection::allowSensitive)
-                .map(AgentMemoryCollection::collection)
-                .collect(Collectors.toSet());
+            .filter(AgentMemoryCollection::allowSensitive)
+            .map(AgentMemoryCollection::collection)
+            .collect(Collectors.toSet());
         return new AgentMemoryGrants(collections, sensitive);
     }
+
 
     /**
      * 새로 저장한 에이전트에 기본 collection 을 준다. 커넥터 에이전트에는 주지 않는다.
@@ -77,8 +78,9 @@ public class AgentMemoryCollectionService {
             return;
         }
         grants.save(
-                AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false, clock.instant()));
+            AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false, clock.instant()));
     }
+
 
     /**
      * 관리자가 받는 collection 을 바꿀 수 있는 에이전트를 찾는다.
@@ -90,17 +92,20 @@ public class AgentMemoryCollectionService {
         return requireEditable(agents.findByCode(code));
     }
 
+
     /** 그 에이전트가 지금 받는 collection 줄이다. 순서는 정하지 않는다. */
     @Transactional(readOnly = true)
     public List<AgentMemoryCollection> rowsOf(Long agentId) {
         return grants.findByIdAgentId(agentId);
     }
 
+
     /** 그 에이전트의 받는 collection 이 바뀐 최근 기록 10줄이다. 새것부터 낸다. */
     @Transactional(readOnly = true)
     public List<AgentMemoryCollectionChange> recentChangesOf(Long agentId) {
         return changes.findTop10ByAgentIdOrderByIdDesc(agentId);
     }
+
 
     /**
      * 에이전트가 받는 collection 을 관리자가 고른 목록으로 바꾸고, 바뀐 collection 마다 기록을 한 줄 남긴다.
@@ -116,13 +121,13 @@ public class AgentMemoryCollectionService {
      * @param listedCollections 그룹의 collection 목록 key 다. 지금 받는 줄의 key 는 목록에 없어도 둘 수 있다
      * @param changedByUserId 바꾸는 관리자다
      * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 커넥터 에이전트면 {@code FORBIDDEN}, 목록에도 지금
-     *     줄에도 없는 collection 이 있으면 {@code VALIDATION_FAILED}
+     * 줄에도 없는 collection 이 있으면 {@code VALIDATION_FAILED}
      */
     @Transactional
     public void replace(Long agentId, Map<String, Boolean> next, Set<String> listedCollections, Long changedByUserId) {
         requireEditable(agents.findByIdForUpdate(agentId));
         Map<String, AgentMemoryCollection> current = grants.findByIdAgentId(agentId).stream()
-                .collect(Collectors.toMap(AgentMemoryCollection::collection, Function.identity()));
+            .collect(Collectors.toMap(AgentMemoryCollection::collection, Function.identity()));
         for (String key : next.keySet()) {
             if (!listedCollections.contains(key) && !current.containsKey(key)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "no such memory collection");
@@ -145,12 +150,12 @@ public class AgentMemoryCollectionService {
             } else if (!next.containsKey(key)) {
                 grants.delete(row);
                 record(
-                        agentId,
-                        key,
-                        AgentMemoryCollectionChangeType.REVOKED,
-                        row.allowSensitive(),
-                        changedByUserId,
-                        now);
+                    agentId,
+                    key,
+                    AgentMemoryCollectionChangeType.REVOKED,
+                    row.allowSensitive(),
+                    changedByUserId,
+                    now);
                 revoked.add(key);
             } else if (row.allowSensitive() != allow) {
                 row.changeAllowSensitive(allow);
@@ -162,27 +167,29 @@ public class AgentMemoryCollectionService {
             return;
         }
         log.info(
-                "agent memory collections changed agentId={} by={} granted={} revoked={} sensitiveChanged={}",
-                agentId,
-                changedByUserId,
-                granted,
-                revoked,
-                sensitiveChanged);
+            "agent memory collections changed agentId={} by={} granted={} revoked={} sensitiveChanged={}",
+            agentId,
+            changedByUserId,
+            granted,
+            revoked,
+            sensitiveChanged);
     }
 
+
     private void record(
-            Long agentId,
-            String collection,
-            AgentMemoryCollectionChangeType type,
-            boolean allowSensitive,
-            Long changedByUserId,
-            Instant now) {
+        Long agentId,
+        String collection,
+        AgentMemoryCollectionChangeType type,
+        boolean allowSensitive,
+        Long changedByUserId,
+        Instant now) {
         changes.save(AgentMemoryCollectionChange.of(agentId, collection, type, allowSensitive, changedByUserId, now));
     }
 
+
     private static Agent requireEditable(Optional<Agent> found) {
         Agent agent = found.filter(a -> !a.isDeleted())
-                .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
+            .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
         if (agent.connectorManaged()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "connector-managed agents receive no memory");
         }

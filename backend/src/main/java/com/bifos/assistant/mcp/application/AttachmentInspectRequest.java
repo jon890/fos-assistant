@@ -13,9 +13,9 @@ import tools.jackson.databind.JsonNode;
 public record AttachmentInspectRequest(long attachmentId, List<Integer> region, boolean overview) {
     public static AttachmentInspectRequest from(JsonNode body) {
         if (body == null
-                || !body.isObject()
-                || !Set.of("attachment_id", "region", "overview", "_fos_ctx", "_fos_inspect")
-                        .containsAll(body.propertyNames())) {
+            || !body.isObject()
+            || !Set.of("attachment_id", "region", "overview", "_fos_ctx", "_fos_inspect")
+                .containsAll(body.propertyNames())) {
             throw invalid();
         }
         JsonNode id = body.get("attachment_id");
@@ -51,11 +51,12 @@ public record AttachmentInspectRequest(long attachmentId, List<Integer> region, 
         return new AttachmentInspectRequest(id.longValue(), region, overview);
     }
 
+
     public String digest() {
-        String coordinates =
-                region == null ? "" : region.stream().map(String::valueOf).collect(Collectors.joining(","));
+        String coordinates = region == null ? "" : region.stream().map(String::valueOf).collect(Collectors.joining(","));
         return Sha256.hex(attachmentId + "\n" + coordinates + (overview ? "\noverview=1" : ""));
     }
+
 
     private static ApiException invalid() {
         return new ApiException(ErrorCode.VALIDATION_FAILED, "invalid attachment inspection arguments");

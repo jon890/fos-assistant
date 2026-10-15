@@ -21,12 +21,14 @@ public class ArtifactWriteService {
     private final ArtifactStore store;
     private final ArtifactSourceFetcher sourceFetcher;
 
+
     public ArtifactWriteService(
-            ConversationAccess conversations, ArtifactStore store, ArtifactSourceFetcher sourceFetcher) {
+        ConversationAccess conversations, ArtifactStore store, ArtifactSourceFetcher sourceFetcher) {
         this.conversations = conversations;
         this.store = store;
         this.sourceFetcher = sourceFetcher;
     }
+
 
     /**
      * 요청한 대화에 본문 파일 하나를 원자적으로 쓴다.
@@ -40,6 +42,7 @@ public class ArtifactWriteService {
         long byteSize = store.write(conversation.id(), request.path(), content);
         return new ArtifactWriteResult(request.path(), byteSize);
     }
+
 
     private byte[] contentOf(ArtifactWriteRequest request) {
         if ((request.content() == null) == (request.sourceUrl() == null)) {
@@ -62,6 +65,7 @@ public class ArtifactWriteService {
         return content;
     }
 
+
     private static void requireInlineExtension(String path) {
         if (path == null) {
             throw validation("artifact path is required");
@@ -74,18 +78,19 @@ public class ArtifactWriteService {
         }
     }
 
+
     private static String imageContentType(String path) {
         if (path == null) {
             throw validation("artifact path is required");
         }
-        String contentType =
-                ArtifactStore.contentTypeOf(path).orElseThrow(() -> validation("URL artifact path must be an image"));
+        String contentType = ArtifactStore.contentTypeOf(path).orElseThrow(() -> validation("URL artifact path must be an image"));
         String mediaType = contentType.split(";", 2)[0];
         if (!mediaType.startsWith("image/")) {
             throw validation("URL artifact path must be an image");
         }
         return mediaType;
     }
+
 
     private static ApiException validation(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);

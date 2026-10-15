@@ -26,70 +26,73 @@ public final class UserBrowserDtos {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record BrowserView(
-            boolean enabled,
-            Boolean exists,
-            String status,
-            @JsonInclude(JsonInclude.Include.ALWAYS) String lastError,
-            @JsonInclude(JsonInclude.Include.ALWAYS) Instant startedAt,
-            @JsonInclude(JsonInclude.Include.ALWAYS) Instant lastActiveAt,
-            Long idleTimeoutSeconds) {
+        boolean enabled,
+        Boolean exists,
+        String status,
+        @JsonInclude(JsonInclude.Include.ALWAYS) String lastError,
+        @JsonInclude(JsonInclude.Include.ALWAYS) Instant startedAt,
+        @JsonInclude(JsonInclude.Include.ALWAYS) Instant lastActiveAt,
+        Long idleTimeoutSeconds) {
 
         static BrowserView disabled() {
             return new BrowserView(false, null, null, null, null, null, null);
         }
 
+
         static BrowserView missing(Duration idleTimeout) {
             return new BrowserView(true, false, null, null, null, null, idleTimeout.toSeconds());
         }
 
+
         static BrowserView of(UserBrowserSnapshot browser, Duration idleTimeout) {
             return new BrowserView(
-                    true,
-                    true,
-                    browser.status().name(),
-                    browser.lastError(),
-                    browser.startedAt(),
-                    browser.lastActiveAt(),
-                    idleTimeout.toSeconds());
+                true,
+                true,
+                browser.status().name(),
+                browser.lastError(),
+                browser.startedAt(),
+                browser.lastActiveAt(),
+                idleTimeout.toSeconds());
         }
     }
 
     /** 관리자 목록의 한 줄이다. 컨테이너 번호와 프로필 키는 싣지 않는다. */
     public record AdminBrowserView(
-            Long id,
-            Long userId,
-            String userName,
-            String status,
-            String lastError,
-            Instant startedAt,
-            Instant lastActiveAt) {
+        Long id,
+        Long userId,
+        String userName,
+        String status,
+        String lastError,
+        Instant startedAt,
+        Instant lastActiveAt) {
 
         static AdminBrowserView of(UserBrowserSnapshot browser, String userName) {
             return new AdminBrowserView(
-                    browser.id(),
-                    browser.userId(),
-                    userName,
-                    browser.status().name(),
-                    browser.lastError(),
-                    browser.startedAt(),
-                    browser.lastActiveAt());
+                browser.id(),
+                browser.userId(),
+                userName,
+                browser.status().name(),
+                browser.lastError(),
+                browser.startedAt(),
+                browser.lastActiveAt());
         }
     }
 
     /** 화면 입력의 본문이다. 칸은 {@code type} 마다 필요한 것만 쓴다. 오류 메시지에는 칸 이름만 싣고 값은 싣지 않는다. */
     public record ScreenInputRequest(
-            String type,
-            String action,
-            Double x,
-            Double y,
-            String button,
-            Integer deltaY,
-            String key,
-            String text,
-            String url,
-            String id,
-            Integer width,
-            Integer height) {
+        String type,
+        String action,
+        Double x,
+        Double y,
+        String button,
+        Integer deltaY,
+        String key,
+        String text,
+        String url,
+        String id,
+        Integer width,
+        Integer height) {
+
 
         private static final JsonMapper JSON = JsonMapper.builder().build();
         private static final Pattern TARGET_ID = Pattern.compile("^[A-Za-z0-9]{1,128}$");
@@ -114,6 +117,7 @@ public final class UserBrowserDtos {
             }
             return request.toInput();
         }
+
 
         private BrowserScreenInput toInput() {
             Kind kind;
@@ -141,32 +145,36 @@ public final class UserBrowserDtos {
                     require("width", width != null && width >= 320 && width <= 1600);
                     require("height", height != null && height >= 320 && height <= 2000);
                 }
-                case BACK, RELOAD -> {}
+                case BACK, RELOAD -> {
+                }
             }
             return new BrowserScreenInput(
-                    kind,
-                    action,
-                    x == null ? 0 : x,
-                    y == null ? 0 : y,
-                    deltaY == null ? 0 : deltaY,
-                    key,
-                    text,
-                    url,
-                    id,
-                    width == null ? 0 : width,
-                    height == null ? 0 : height);
+                kind,
+                action,
+                x == null ? 0 : x,
+                y == null ? 0 : y,
+                deltaY == null ? 0 : deltaY,
+                key,
+                text,
+                url,
+                id,
+                width == null ? 0 : width,
+                height == null ? 0 : height);
         }
+
 
         private void requireRatio() {
             require("x", x != null && x >= 0 && x <= 1);
             require("y", y != null && y >= 0 && y <= 1);
         }
 
+
         private static void require(String field, boolean valid) {
             if (!valid) {
                 throw invalid(field);
             }
         }
+
 
         private static ApiException invalid(String field) {
             return new ApiException(ErrorCode.VALIDATION_FAILED, "screen input " + field + " is not valid");
