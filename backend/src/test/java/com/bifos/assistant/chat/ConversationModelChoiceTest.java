@@ -16,7 +16,6 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.SourceReadSummaries;
-import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
@@ -56,7 +55,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 대화마다 고르는 모델과 effort 를 저장하고 돌려주는 것을 확인한다. 실행이 그 값을 쓰는 것은 따로 본다. */
