@@ -131,6 +131,7 @@ public class ContentDraftJob {
         requireRunning();
         this.status = saveClicked || saveClaimedAt != null ? ContentDraftJobStatus.UNKNOWN : ContentDraftJobStatus.FAILED;
         this.errorCode = errorCode;
+        this.errorReason = null;
         this.lastCheckedAt = at;
     }
 
@@ -151,6 +152,7 @@ public class ContentDraftJob {
         require(running() || status == ContentDraftJobStatus.UNKNOWN);
         this.status = startClaimedAt == null ? ContentDraftJobStatus.FAILED : ContentDraftJobStatus.UNKNOWN;
         this.errorCode = errorCode;
+        this.errorReason = null;
         this.lastCheckedAt = at;
     }
 
