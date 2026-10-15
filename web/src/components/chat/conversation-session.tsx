@@ -91,7 +91,8 @@ export function ConversationSession(props: ConversationSessionProps) {
   const starters = useStarterSuggestions(
     startScreen && currentAgent ? currentAgent.code : null,
   );
-  const skillCommandsEnabled = currentAgent !== undefined && !currentAgent.connectorManaged;
+  const skillCommandsEnabled =
+    currentAgent !== undefined && !currentAgent.connectorManaged;
   const commandAgentCode = skillCommandsEnabled ? currentAgent.code : null;
   const skillNames =
     commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode

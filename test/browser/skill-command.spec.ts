@@ -1,9 +1,5 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
-import {
-  expect,
-  PERSONA_AGENT_CODE,
-  test,
-} from "./fixtures.ts";
+import { expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 
 /** 스킬을 올려 둘 에이전트다. 스킬 화면 검사가 쓰는 에이전트와 같아 다른 에이전트의 도구 상태를 바꾸지 않는다. */
 const SKILL_AGENT_CODE = PERSONA_AGENT_CODE;
@@ -159,37 +155,51 @@ test.describe("스킬을 올린 에이전트", () => {
     await expect(page.getByTestId("skill-command-notice")).toHaveCount(0);
   });
 
-  test("사진을 받지 않는 GROUP 에이전트도 스킬 목록과 보낸 커맨드의 칩을 보인다", async ({ page }) => {
+  test("사진을 받지 않는 GROUP 에이전트도 스킬 목록과 보낸 커맨드의 칩을 보인다", async ({
+    page,
+  }) => {
     // 화면의 공개 범위·사진 수신 값만 바꾼다. 실제 스킬 실행은 올려 둔 같은 에이전트로 왕복한다.
     await page.route("**/api/agents", async (route) => {
       const response = await route.fetch();
       const agents = await response.json();
       await route.fulfill({
         response,
-        json: agents.map((agent: { code: string }) => agent.code === SKILL_AGENT_CODE
-          ? { ...agent, visibility: "GROUP", acceptsAttachments: false }
-          : agent),
+        json: agents.map((agent: { code: string }) =>
+          agent.code === SKILL_AGENT_CODE
+            ? { ...agent, visibility: "GROUP", acceptsAttachments: false }
+            : agent,
+        ),
       });
     });
     await startWith(page, SKILL_AGENT_NAME);
     const input = composer(page);
     await input.fill("/");
-    await expect(skillList(page).getByRole("option", { name: `/${NAME}` })).toBeVisible();
+    await expect(
+      skillList(page).getByRole("option", { name: `/${NAME}` }),
+    ).toBeVisible();
     await input.fill(`/${NAME} 그룹 계획`);
     await input.press("Enter");
-    await expect(page.getByTestId("user-message").last().getByTestId("skill-chip")).toHaveText(`/${NAME}`);
-    await expect(page.getByRole("button", { name: "답 다시 만들기" })).toBeVisible();
+    await expect(
+      page.getByTestId("user-message").last().getByTestId("skill-chip"),
+    ).toHaveText(`/${NAME}`);
+    await expect(
+      page.getByRole("button", { name: "답 다시 만들기" }),
+    ).toBeVisible();
   });
 
-  test("사진을 받는 옛 커넥터 에이전트는 스킬 목록과 커맨드 칩을 함께 숨긴다", async ({ page }) => {
+  test("사진을 받는 옛 커넥터 에이전트는 스킬 목록과 커맨드 칩을 함께 숨긴다", async ({
+    page,
+  }) => {
     await page.route("**/api/agents", async (route) => {
       const response = await route.fetch();
       const agents = await response.json();
       await route.fulfill({
         response,
-        json: agents.map((agent: { code: string }) => agent.code === SKILL_AGENT_CODE
-          ? { ...agent, connectorManaged: true, acceptsAttachments: true }
-          : agent),
+        json: agents.map((agent: { code: string }) =>
+          agent.code === SKILL_AGENT_CODE
+            ? { ...agent, connectorManaged: true, acceptsAttachments: true }
+            : agent,
+        ),
       });
     });
     await startWith(page, SKILL_AGENT_NAME);
@@ -201,7 +211,9 @@ test.describe("스킬을 올린 에이전트", () => {
     const message = page.getByTestId("user-message").last();
     await expect(message.locator("p")).toHaveText(`/${NAME} 연결 계획`);
     await expect(message.getByTestId("skill-chip")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "답 다시 만들기" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "답 다시 만들기" }),
+    ).toBeVisible();
   });
 
   test("목록에서 숨긴 기본 스킬도 이름을 직접 입력하면 커맨드로 실행한다", async ({

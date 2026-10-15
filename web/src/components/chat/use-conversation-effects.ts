@@ -6,9 +6,7 @@ import { readEventStream } from "@/lib/stream";
 import { openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { ConversationSessionProps } from "./conversation-session-types";
-import {
-  EVENTS_RECONNECT_MS,
-} from "./conversation-session-helpers";
+import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationEvents } from "./use-conversation-events";
 import type { ConversationControls } from "./use-conversation-controls";
