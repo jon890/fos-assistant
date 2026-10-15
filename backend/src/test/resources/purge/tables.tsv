@@ -1,0 +1,70 @@
+# table|scope|fixture_key|user|conversation|agent|근거와 예외
+# USER는 물리 삭제 경로가 없으므로 개인 데이터의 사용자 삭제 기대값은 GAP이다.
+# KEEP는 근거가 있는 보존이고 GAP는 사용자 결정 전의 알려진 공백이다.
+agent|AGENT|id|GAP|KEEP|DELETE|owner_user_id로 사용자에 속한다. 지연 정리는 에이전트 행을 지운다.
+agent_connector_binding|AGENT|id|GAP|KEEP|DELETE|agent_id FK로 에이전트에 속한다. ConnectorAgentPurge가 지운다.
+agent_execution|CONVERSATION|id|GAP|SCRUB|KEEP|user_id와 conversation_id에 속한다. 사용량 원장은 남기고 output_text만 비운다.
+agent_memory_collection|AGENT|agent_id|GAP|KEEP|DELETE|agent_id FK로 에이전트에 속한다. AgentPurgeWriter가 지운다.
+agent_memory_collection_change|AGENT|id|GAP|KEEP|DELETE|agent_id FK로 에이전트에 속한다. 변경 이력도 지연 정리에서 지운다.
+agent_token|AGENT|id|GAP|KEEP|KEEP|profile_name으로 profile에 속한다. 운영 등록 profile은 에이전트 삭제 후에도 남기는 계약이다.
+agent_toolset_request|AGENT|id|GAP|KEEP|DELETE|agent_id와 requester_user_id FK가 있다. 에이전트 지연 정리에서 지운다.
+allowed_person|USER|id|GAP|KEEP|KEEP|FK 없이 정규화한 email로 app_user에 연결된다. 접근 해제는 허용 목록 행을 남긴다.
+app_user|USER|id|GAP|KEEP|KEEP|사용자 루트다. 접근 해제는 사용자와 개인 데이터를 물리 삭제하지 않는다.
+attention_control|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화 참조 대신 카드 식별자를 저장한다.
+attention_event|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 보관 기간 정리는 AttentionEventCleaner가 맡는다.
+chat_artifact|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id에 속한다. ConversationPurgeWriter가 지운다.
+chat_attachment|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id와 uploaded_by_user_id에 속한다. 대화 purge가 행을 지운다.
+chat_message|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id에 속한다. 대화 purge가 본문 행을 지운다.
+chat_pending_message|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id와 user_id에 속한다. 대화 삭제 즉시 지운다.
+connector_action|CONVERSATION|id|GAP|GAP|DETACH|user_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 args_json과 result_text가 남는다.
+connector_action_execution|CONVERSATION|action_id|GAP|GAP|KEEP|action_id FK로 승인에 속한다. 알려진 공백: 대화 purge 뒤 실행 인자와 요약·범위가 남는다.
+connector_connection|USER|id|GAP|KEEP|DETACH|user_id FK에 속한다. 연결은 사용자 소유라 남기고 에이전트 참조만 비운다.
+connector_conversation_grant|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id FK가 있다. 삭제된 대화와 붙지 않은 에이전트의 권한은 읽기에서 거절하며 행은 만료 이력으로 남긴다.
+connector_tool_grant|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
+content_draft|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id FK와 owner_user_id에 속한다. 대화 purge가 지운다.
+content_draft_asset|CONVERSATION|id|GAP|DELETE|KEEP|revision_id와 attachment_id FK로 원고와 첨부에 속한다. purge가 먼저 지운다.
+content_draft_creation_call|CONVERSATION|id|GAP|KEEP|KEEP|creation_request_id FK에 속한다. 같은 호출의 재생을 막는 alias는 본문 없이 보존한다.
+content_draft_creation_request|CONVERSATION|id|GAP|GONE|KEEP|conversation_id와 owner_user_id에 속한다. GONE으로 바꾸고 request_hash와 draft_public_id를 비운다.
+content_draft_job|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 원고 삭제 후에도 본문 없는 저장 상태 이력을 보존하는 계약이다.
+content_draft_revision|CONVERSATION|id|GAP|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
+content_draft_snapshot|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조를 보존하는 계약이다.
+conversation|CONVERSATION|id|GAP|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session을 비운 뒤 purged_at을 적는다.
+decision_feedback_event|CONVERSATION|id|GAP|DELETE|KEEP|user_id와 conversation_id FK가 있다. ChatService.delete가 제안에 딸린 사건까지 지운다.
+execution_context_source|CONVERSATION|execution_id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
+execution_event|CONVERSATION|id|GAP|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
+execution_question|CONVERSATION|execution_id|GAP|DELETE|KEEP|execution_id와 message_id로 대화에 속한다. 대화 purge가 지운다.
+execution_skill_use|CONVERSATION|id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 스킬 사용 이력을 남긴다.
+financial_limit_change|USER|action_id|GAP|KEEP|KEEP|user_id와 action_id FK가 있다. 사용자가 바꾼 금융 한도의 수치 이력을 보존한다.
+financial_order_limit|USER|user_id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
+follow_up|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK를 두지 않고 사용자의 할 일을 남기는 계약이다.
+hermes_session_binding|CONVERSATION|id|GAP|KEEP|KEEP|user_id와 origin_execution_id에 속한다. session 소유권 참조는 실행 기록과 함께 남기는 계약이다.
+media_observation|CONVERSATION|id|GAP|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.
+media_observation_request|CONVERSATION|id|GAP|DELETE|KEEP|observation_id FK로 관찰에 속한다. 관찰 삭제 때 ON DELETE CASCADE로 지운다.
+memory|USER|id|GAP|KEEP|KEEP|owner_user_id 또는 group_id에 속한다. 개인 기억을 넣어 검사하며 대화 삭제가 승인된 기억을 지우지 않는다.
+memory_capture|CONVERSATION|id|GAP|KEEP|KEEP|user_id와 conversation_id에 속한다. 기억 항목 삭제 뒤에도 기억한 기록을 남기는 계약이다.
+memory_collection|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 기억 영역이다. 사용자 한 사람의 삭제 대상이 아니다.
+memory_revision|USER|memory_id|GAP|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
+model_hidden|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 모델 설정이다.
+model_tier_definition|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 모델 단계 설정이다.
+model_tier_group_setting|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 기본 단계 설정이다.
+notification|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대상은 공개 식별자이며 NotificationCleaner가 기간이 지난 행을 지운다.
+proactive_autonomy_decision|AGENT|id|GAP|KEEP|DELETE|source_check_id와 evaluation_id FK로 점검에 속한다. 에이전트 purge가 cascade로 지운다.
+proactive_check|AGENT|id|GAP|GAP|DELETE|user_id와 agent_id와 conversation_id FK가 있다. 알려진 공백: 대화 purge 뒤 report_json이 남는다.
+proactive_check_finding|AGENT|id|GAP|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 발견 제목과 출처가 남는다.
+proactive_check_problem|AGENT|id|GAP|GAP|DELETE|check_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 문제 본문과 근거가 남는다.
+proactive_loop_run|AGENT|id|GAP|KEEP|DELETE|source_check_id FK로 점검에 속한다. 에이전트 purge가 cascade로 지운다.
+proactive_loop_setting|AGENT|id|GAP|KEEP|DELETE|agent_id와 user_id FK에 속한다. ProactiveAgentPurge가 지운다.
+proactive_value_evaluation|AGENT|id|GAP|GAP|DELETE|check_id FK로 점검에 속한다. 알려진 공백: 대화 purge 뒤 evidence_json이 남는다.
+result_delivery|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id에 속한다. 결과 본문 없이 전달 상태와 시도 횟수만 보존한다.
+result_delivery_attempt|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 결과 본문 없이 시도 상태와 실행 참조만 남긴다.
+result_delivery_item|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 결과 본문 없이 출처와 결과 식별자만 남긴다.
+service_token|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 접근 해제는 revoked_at을 적으며 발급 이력 행은 남긴다.
+service_token_collection|USER|token_id|GAP|KEEP|KEEP|token_id FK로 서비스 토큰에 속한다. 폐기한 토큰의 권한 이력도 남는다.
+subagent_usage_job|CONVERSATION|id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
+task|USER|id|GAP|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.
+task_run|USER|id|GAP|KEEP|KEEP|task_id와 trigger_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.
+task_trigger|USER|id|GAP|KEEP|KEEP|task_id FK로 예약 작업에 속한다. 대화와 에이전트 하나의 삭제로 지우지 않는다.
+toolset_hidden|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 toolset 설정이다.
+user_autonomy_preference|USER|user_id|GAP|KEEP|KEEP|user_id FK에 속한다. 사용자별 자동 실행 동의다.
+user_browser|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 브라우저 제거와 유휴 정리는 별도 경로가 맡는다.
+user_data_key|USER|id|GAP|KEEP|KEEP|user_id로 사용자에 속한다. 대화 하나를 지워도 다른 암호문을 읽어야 하므로 key를 남긴다.

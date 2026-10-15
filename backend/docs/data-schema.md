@@ -186,6 +186,49 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 
 알림(`notification`)은 보관 기간이 지나면 줄을 지운다. 알림은 다른 표의 사실을 알리는 사본이라, 원인이 된 승인 줄과 실행 기록이 남아 있다.
 
+### 삭제 경로의 테이블 분류와 검사
+
+모든 테이블의 소유 범위와 삭제 경로별 기대값은 [`purge/tables.tsv`](../src/test/resources/purge/tables.tsv)가 갖는다.
+주된 소유 범위는 `USER`, `CONVERSATION`, `AGENT`, `GLOBAL`이다.
+각 삭제 경로의 기대값과 여러 범위·FK 없는 연결의 보존 근거도 같은 행에 적는다.
+`flyway_schema_history`는 Flyway 내부 이력이라 분류에서 뺀다.
+
+`DELETE`는 0행, `KEEP`는 근거가 있는 보존, `GAP`은 별도 결정할 알려진 공백이다.
+`SCRUB`은 본문·session 제거, `DETACH`는 에이전트 참조 해제다.
+`GONE`은 원고 생성 상태를 바꾸고 재생에 쓰는 참조를 비우는 계약이다.
+
+새 테이블을 더하면 분류와 [`purge/fixture.sql`](../src/test/resources/purge/fixture.sql)의 데이터를 함께 더한다.
+`PurgeClassificationTest`는 Flyway가 만든 전체 스키마와 분류를 대조한다.
+분류 없이 테이블을 추가했을 때 실패 메시지가 수정할 파일과 테이블 이름을 알려주는지도 확인한다.
+
+`PurgeCoverageMysqlTest`는 Flyway로 만든 실제 MySQL에서 모든 분류 테이블에 행을 넣는다.
+삭제 전 대상과 다른 사용자의 행이 모두 있어야 한다.
+사용자 접근 해제, `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
+행 삭제, 본문 제거, 참조 해제와 원고 tombstone을 확인하고 다른 사용자의 모든 칸이 같은지도 비교한다.
+Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검사의 범위 밖이다.
+
+실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
+저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
+
+현재 알려진 공백은 사용자 물리 삭제 경로 전체와 다음 대화 purge 대상이다.
+접근 해제는 서비스 토큰을 폐기하지만 사용자와 개인 데이터는 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
+
+| 테이블 | 대화 purge 뒤 남는 내용 |
+| --- | --- |
+| `connector_action` | 도구 인자와 실행 결과 |
+| `connector_action_execution` | 실행 인자와 요약·범위 |
+| `proactive_check` | 점검 보고 |
+| `proactive_check_finding` | 발견 제목과 출처 |
+| `proactive_check_problem` | 문제 본문과 근거 |
+| `proactive_value_evaluation` | 평가 근거 |
+
+공백의 삭제 동작은 바꾸지 않는다. 해당 행이 그대로 남는지도 비교하므로 해소되면 기대값을 다시 정한다.
+새 공백은 분류에 `GAP`과 근거를 명시해야 한다. 본문 없는 사용량·전달·원고 snapshot 이력은 `KEEP`다.
+
+보관 기간 정리는 `AttachmentCleaner`, `ArtifactCleaner`, `MediaObservationCleaner`, `ContentDraftCleaner`가 파일과 관찰·원고 본문을 다룬다.
+`NotificationCleaner`, `AttentionEventCleaner`, `DecisionFeedbackCleaner`는 기간이 지난 기록을 지운다.
+주기 정리와 예약 만료는 사용자 삭제를 대신하지 않는다.
+
 ## 사용자와 에이전트 표
 
 ### app_user
