@@ -110,9 +110,11 @@ public class ConnectorFinancialSummaries {
         private Map<String, BigDecimal> spent;
         private boolean failed;
 
+
         Usage(Long userId) {
             this.userId = userId;
         }
+
 
         FinancialLimitStatus status(String currency) {
             if (!"KRW".equals(currency) && !"USD".equals(currency)) {

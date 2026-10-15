@@ -60,7 +60,7 @@ public class FinancialLimitSettings {
      * 화면에서 상한 하나를 바꾼다. 올리기도 바로 반영한다. null 은 사용자 값을 지워 최대치를 따르게 한다.
      *
      * @throws ApiException 허용 목록에 계좌가 없으면 {@code FORBIDDEN}, 값 모양이 틀리면 {@code VALIDATION_FAILED},
-     *     최대치보다 크면 {@code FINANCIAL_LIMIT_ABOVE_MAXIMUM}
+     * 최대치보다 크면 {@code FINANCIAL_LIMIT_ABOVE_MAXIMUM}
      */
     @Transactional
     public FinancialLimitsView set(CurrentUser user, FinancialLimitKind kind, BigDecimal value, Instant now) {
