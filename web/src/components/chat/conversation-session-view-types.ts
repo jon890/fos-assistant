@@ -17,7 +17,6 @@ export type Props = Pick<
   | "turns"
   | "sending"
   | "activity"
-  | "flowIsSlow"
   | "liveExpanded"
   | "liveExpandedRef"
   | "setLiveExpanded"

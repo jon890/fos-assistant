@@ -24,7 +24,6 @@ export function ConversationSessionView({
   turns,
   sending,
   activity,
-  flowIsSlow,
   liveExpanded,
   liveExpandedRef,
   setLiveExpanded,
@@ -166,7 +165,6 @@ export function ConversationSessionView({
             sending={sending}
             activity={activity}
             conversationId={conversationId}
-            flowIsSlow={flowIsSlow}
             liveExpanded={liveExpanded}
             onLiveExpandedChange={(value) => {
               liveExpandedRef.current = value;

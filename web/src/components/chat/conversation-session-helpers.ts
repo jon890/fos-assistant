@@ -48,14 +48,6 @@ export function savedIdsOf(turns: Turn[]): Set<Turn["id"]> {
   );
 }
 
-/**
- * 흐름이 오래 걸린다고 알리기까지 기다리는 시간이다.
- *
- * <p>실측한 포지션 추천 하나가 15분 넘게 걸렸고, 넷으로 나누면 더 걸릴 수도 있다. 2분이 지나면 한 번만
- * 알리고 그 뒤로는 다시 알리지 않는다.
- */
-export const SLOW_FLOW_MS = 120_000;
-
 /** 다른 창에서 도는 turn 과 그 실행 트리를 다시 묻는 주기다. */
 export const OBSERVE_INTERVAL_MS = 3_000;
 

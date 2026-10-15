@@ -30,7 +30,6 @@ type Context = Pick<
   | "currentExecutionId"
   | "setExecutionId"
   | "setActivity"
-  | "setFlowIsSlow"
   | "setLiveExpanded"
   | "liveExpandedRef"
   | "sentTurnToken"
@@ -60,7 +59,6 @@ export function useConversationEvents({
   currentExecutionId,
   setExecutionId,
   setActivity,
-  setFlowIsSlow,
   setLiveExpanded,
   liveExpandedRef,
   sentTurnToken,
@@ -135,13 +133,11 @@ export function useConversationEvents({
       settleFinishedActivity(finishedExecutionId);
       await callbacks.onDone?.(event);
       setActivity(null);
-      setFlowIsSlow(false);
     } else if (event.type === "error") {
       state.reportedError = true;
       setActivity((previous) => previous && failActivity(previous, Date.now()));
       setLiveExpanded(false);
       liveExpandedRef.current = false;
-      setFlowIsSlow(false);
       await callbacks.onError?.(event);
     }
   }
@@ -198,7 +194,6 @@ export function useConversationEvents({
     }
     settleFinishedActivity(currentExecutionId.current);
     setActivity(null);
-    setFlowIsSlow(false);
     currentExecutionId.current = null;
     setExecutionId(null);
     await Promise.all([
@@ -289,7 +284,6 @@ export function useConversationEvents({
       liveExpandedRef.current = false;
       setExpandedOnDone(null);
       setStopRequested(false);
-      setFlowIsSlow(false);
     }
     const current = autoTurn.current;
     if (current === null) {

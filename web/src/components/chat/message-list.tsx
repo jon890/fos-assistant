@@ -31,7 +31,6 @@ type Props = {
   activity: ActivityState | null;
   conversationId: string | null;
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
-  flowIsSlow: boolean;
   liveExpanded: boolean;
   onLiveExpandedChange(value: boolean): void;
   expandedOnDone: { executionId: number; expanded: boolean } | null;
@@ -72,7 +71,6 @@ export function MessageList({
   sending,
   activity,
   conversationId,
-  flowIsSlow,
   liveExpanded,
   onLiveExpandedChange,
   expandedOnDone,
@@ -187,7 +185,6 @@ export function MessageList({
     <ActivityBlock
       mode="live"
       state={activity}
-      slow={flowIsSlow}
       expanded={liveExpanded}
       onExpandedChange={onLiveExpandedChange}
       onOpenPanel={onOpenLive}
