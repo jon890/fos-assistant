@@ -15,15 +15,26 @@ import org.springframework.jdbc.core.JdbcTemplate;
 /** 모든 테이블의 분류와 검사 행의 키, 삭제 경로별 기대값을 읽는다. */
 public record PurgeTable(String table, Scope scope, String fixtureKey, Outcome user,
     Outcome conversation, Outcome agent, String reason) {
+
+
     public static final String RESOURCE = "purge/tables.tsv";
 
     public enum Scope {
-        USER, CONVERSATION, AGENT, GLOBAL
+        USER,
+        CONVERSATION,
+        AGENT,
+        GLOBAL
     }
 
     public enum Outcome {
-        DELETE, KEEP, SCRUB, DETACH, GONE, GAP
+        DELETE,
+        KEEP,
+        SCRUB,
+        DETACH,
+        GONE,
+        GAP
     }
+
 
     public static List<PurgeTable> readAll() throws IOException {
         String content = new ClassPathResource(RESOURCE).getContentAsString(StandardCharsets.UTF_8);
@@ -44,11 +55,11 @@ public record PurgeTable(String table, Scope scope, String fixtureKey, Outcome u
         return List.copyOf(tables.values());
     }
 
+
     /** H2와 실제 MySQL 모두 Flyway 적용 결과의 테이블 목록을 대조한다. */
     public static void assertSchema(JdbcTemplate jdbc) throws IOException {
-        String schema = jdbc.execute((ConnectionCallback<String>)connection ->
-            connection.getMetaData().getDatabaseProductName().equals("MySQL")
-                ? connection.getCatalog() : connection.getSchema());
+        String schema = jdbc.execute((ConnectionCallback<String>)connection -> connection.getMetaData().getDatabaseProductName().equals("MySQL")
+            ? connection.getCatalog() : connection.getSchema());
         List<String> actual = jdbc.queryForList("""
                 SELECT table_name FROM information_schema.tables
                 WHERE LOWER(table_schema) = LOWER(?) AND table_type = 'BASE TABLE'

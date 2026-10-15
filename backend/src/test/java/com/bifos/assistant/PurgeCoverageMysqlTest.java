@@ -66,6 +66,7 @@ class PurgeCoverageMysqlTest {
     private Map<String, List<Map<String, Object>>> before;
     private Map<String, List<Map<String, Object>>> untouched;
 
+
     @DynamicPropertySource
     static void useMysql(DynamicPropertyRegistry registry) {
         MysqlTestDatabase database = MysqlTestDatabase.create();
@@ -76,6 +77,7 @@ class PurgeCoverageMysqlTest {
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
+
 
     @BeforeEach
     void setUp() throws IOException {
@@ -97,6 +99,7 @@ class PurgeCoverageMysqlTest {
         }
     }
 
+
     @Test
     @DisplayName("접근 해제는 서비스 토큰을 폐기하지만 사용자 purge의 알려진 공백은 남는다")
     void recordsMissingUserPurgeAndRevokesAccess() {
@@ -109,6 +112,7 @@ class PurgeCoverageMysqlTest {
         assertThat(value("service_token", "revoked_at")).isNotNull();
         assertOtherUntouched();
     }
+
 
     @Test
     @DisplayName("대화를 지운 뒤 모든 테이블의 삭제·본문 제거·보존과 알려진 공백을 확인한다")
@@ -128,6 +132,7 @@ class PurgeCoverageMysqlTest {
         assertOtherUntouched();
     }
 
+
     @Test
     @DisplayName("에이전트 지연 정리는 모든 하위 표를 지우거나 참조를 풀고 사용량과 사용자 데이터는 남긴다")
     void coversEveryTableAfterAgentPurge() {
@@ -141,6 +146,7 @@ class PurgeCoverageMysqlTest {
         assertOtherUntouched();
     }
 
+
     private void insertFixture(long id) throws IOException {
         String sql = new ClassPathResource("purge/fixture.sql").getContentAsString(StandardCharsets.UTF_8)
             .replace("900000001", Long.toString(id));
@@ -149,6 +155,7 @@ class PurgeCoverageMysqlTest {
             return null;
         });
     }
+
 
     private void assertOutcome(PurgeTable table, Outcome outcome) {
         assertThat(rows(table, target))
@@ -175,18 +182,22 @@ class PurgeCoverageMysqlTest {
                     default -> throw new AssertionError(table.table() + "의 SCRUB 대상 칸을 검사에 더한다");
                 }
             }
-            default -> { }
+            default -> {
+            }
         }
     }
+
 
     private void assertCleared(String table, String column) {
         assertThat(before.get(table).getFirst().get(column)).as("%s.%s는 삭제 전에 값이 있어야 한다", table, column).isNotNull();
         assertThat(value(table, column)).as("%s.%s의 값이 남았다", table, column).isNull();
     }
 
+
     private List<Map<String, Object>> rows(PurgeTable table, long id) {
         return jdbc.queryForList("SELECT * FROM " + table.table() + " WHERE " + table.fixtureKey() + " = ?", id);
     }
+
 
     private Object value(String table, String column) {
         PurgeTable classified = tables.stream().filter(entry -> entry.table().equals(table)).findFirst().orElseThrow();
@@ -194,9 +205,11 @@ class PurgeCoverageMysqlTest {
             Object.class, target);
     }
 
+
     private CurrentUser currentUser() {
         return new CurrentUser(target, "coverage-" + target + "@example.test", "삭제 검사 사용자", target, UserRole.MEMBER);
     }
+
 
     private void assertOtherUntouched() {
         for (PurgeTable table : tables) {
