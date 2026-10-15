@@ -31,6 +31,10 @@ import org.springframework.stereotype.Service;
  * 다음 다시 읽기를 {@link #RETRY_DELAY} 만큼 미룬다. 그 profile 의 목록을 한 번도 읽지 못했다면 읽기의
  * 예외가 그대로 나간다. Hermes 가 답하지 않을 때는 {@code HERMES_UNAVAILABLE} 이다. 동시에 여러 요청이 와도
  * Hermes 를 한 번만 부르도록 막지 않는다. 가족 몇 명이 쓰는 규모라 같은 조회가 겹쳐도 비용이 작다.
+ *
+ * <p>Hermes 는 Codex 의 실제 목록을 읽지 못하면 고정된 대체 목록을 같은 모양으로 돌려준다. 그 목록을 받으면
+ * 최근에 추가된 모델이 빠져 있고, 응답만으로는 대체 목록인지 알 수 없다. 목록에 없는 모델을 만난 쪽이
+ * {@link #refreshedOptionsForAgent} 로 캐시를 건너뛰고 한 번 더 읽는다.
  */
 @Service
 @Slf4j
@@ -44,31 +48,43 @@ public class ModelOptionsService {
      */
     private static final Duration RETRY_DELAY = Duration.ofMinutes(1);
 
+    /**
+     * 캐시를 건너뛰는 다시 읽기를 같은 profile 에 허용하는 최소 간격이다.
+     *
+     * <p>목록에 없는 모델을 가리키는 요청이 몰릴 때 Hermes 의 목록 조회(timeout 10초)가 요청마다 일어나지 않게 한다.
+     */
+    public static final Duration MIN_REFRESH_INTERVAL = Duration.ofSeconds(30);
+
     private final AgentService agents;
     private final HermesModelClient hermes;
     private final ModelVisibilityService visibility;
     private final Duration ttl;
     private final Clock clock;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
+    private final Map<String, Instant> refreshedAt = new ConcurrentHashMap<>();
+
 
     /** 다음에 다시 읽을 시각과 마지막으로 읽은 목록이다. */
-    private record Cached(Instant rereadAt, HermesModelCatalog catalog) {}
+    private record Cached(Instant rereadAt, HermesModelCatalog catalog) {
+    }
+
 
     @Autowired
     public ModelOptionsService(
-            AgentService agents,
-            HermesModelClient hermes,
-            ModelVisibilityService visibility,
-            @Value("${assistant.chat.model-options-ttl:10m}") Duration ttl) {
+        AgentService agents,
+        HermesModelClient hermes,
+        ModelVisibilityService visibility,
+        @Value("${assistant.chat.model-options-ttl:10m}") Duration ttl) {
         this(agents, hermes, visibility, ttl, Clock.systemUTC());
     }
 
+
     public ModelOptionsService(
-            AgentService agents,
-            HermesModelClient hermes,
-            ModelVisibilityService visibility,
-            Duration ttl,
-            Clock clock) {
+        AgentService agents,
+        HermesModelClient hermes,
+        ModelVisibilityService visibility,
+        Duration ttl,
+        Clock clock) {
         this.agents = agents;
         this.hermes = hermes;
         this.visibility = visibility;
@@ -76,11 +92,13 @@ public class ModelOptionsService {
         this.clock = clock;
     }
 
+
     /** 요청자가 쓸 수 있는 에이전트의 profile 로 고를 수 있는 모델을 돌려준다. */
     public ModelOptions optionsFor(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
         return optionsForAgent(user.groupId(), agent);
     }
+
 
     /**
      * 이미 권한을 확인한 에이전트의 profile 모델 목록을 읽는다.
@@ -91,6 +109,31 @@ public class ModelOptionsService {
         return optionsOf(catalogFor(agent), agent, visibility.hiddenFor(groupId));
     }
 
+
+    /**
+     * 캐시를 건너뛰고 profile 의 목록을 다시 읽어 숨김을 적용해 돌려준다.
+     *
+     * <p>같은 profile 의 마지막 다시 읽기가 {@link #MIN_REFRESH_INTERVAL} 안이면 Hermes 를 부르지 않고 들고 있는
+     * 목록을 돌려준다. 다시 읽다 실패하면 들고 있던 목록을 돌려준다. 이 실패는 판정을 막지 않고 목록 불일치의
+     * 원인도 아니므로 호출한 쪽은 원래 목록으로 판정한 것과 같은 결과를 받는다.
+     */
+    public ModelOptions refreshedOptionsForAgent(Long groupId, Agent agent) {
+        String profile = agent.hermesProfile();
+        Instant now = clock.instant();
+        Instant last = refreshedAt.get(profile);
+        if (last == null || !now.isBefore(last.plus(MIN_REFRESH_INTERVAL))) {
+            refreshedAt.put(profile, now);
+            try {
+                HermesModelCatalog fresh = hermes.readCatalog(agent.apiBaseUrl(), profile);
+                cache.put(profile, new Cached(now.plus(ttl), fresh));
+            } catch (ApiException ex) {
+                log.warn("모델 목록을 건너뛰고 다시 읽지 못해 들고 있던 목록을 쓴다 profile={} code={}", profile, ex.code());
+            }
+        }
+        return optionsForAgent(groupId, agent);
+    }
+
+
     /**
      * 숨김을 적용하지 않은 목록을 읽는다. 관리자가 무엇을 숨길지 고르는 화면이 쓴다.
      *
@@ -100,11 +143,13 @@ public class ModelOptionsService {
         return optionsOf(catalogFor(agent), null, HiddenModels.none());
     }
 
+
     /** 그 profile 의 기본 provider 와 모델을 들고 있는 목록에서 읽는다. Hermes 가 주지 않은 값은 null 이다. */
     public ModelChoice profileDefaultOf(Agent agent) {
         HermesModelCatalog catalog = catalogFor(agent);
         return ModelChoice.stored(catalog.defaultProvider(), catalog.defaultModel(), null);
     }
+
 
     private HermesModelCatalog catalogFor(Agent agent) {
         String profile = agent.hermesProfile();
@@ -128,6 +173,7 @@ public class ModelOptionsService {
         }
     }
 
+
     /**
      * @param agent 기본값을 얹을 에이전트. null 이면 profile 의 값만 쓴다
      */
@@ -144,32 +190,32 @@ public class ModelOptionsService {
         String defaultModel = fromAgent ? agent.defaultModel() : catalog.defaultModel();
         // 기본 provider 를 맨 앞에 둔다. 나머지는 Hermes 가 준 차례를 지킨다.
         providers.sort((left, right) -> Boolean.compare(
-                !Objects.equals(left.slug(), defaultProvider), !Objects.equals(right.slug(), defaultProvider)));
+            !Objects.equals(left.slug(), defaultProvider), !Objects.equals(right.slug(), defaultProvider)));
         // Hermes 가 기본 provider 를 주지 않으면 모델 이름만으로 본다. 없는 값과 견주면 쓸 수 있는 기본 모델도 거짓이 된다.
         boolean available = defaultModel == null
-                || providers.stream()
-                        .anyMatch(provider ->
-                                (defaultProvider == null || provider.slug().equals(defaultProvider))
-                                        && provider.models().contains(defaultModel));
+            || providers.stream()
+                .anyMatch(provider -> (defaultProvider == null || provider.slug().equals(defaultProvider))
+                    && provider.models().contains(defaultModel));
         return new ModelOptions(
-                defaultProvider,
-                defaultModel,
-                agent == null ? null : agent.defaultReasoningEffort(),
-                fromAgent,
-                available,
-                List.copyOf(providers),
-                ModelChoice.REASONING_EFFORTS);
+            defaultProvider,
+            defaultModel,
+            agent == null ? null : agent.defaultReasoningEffort(),
+            fromAgent,
+            available,
+            List.copyOf(providers),
+            ModelChoice.REASONING_EFFORTS);
     }
+
 
     /** 숨긴 모델을 뺀 provider 다. provider 전체를 숨겼거나 남는 모델이 없으면 null 이다. */
     private static HermesModelCatalog.Provider withoutHidden(
-            HermesModelCatalog.Provider provider, HiddenModels hidden) {
+        HermesModelCatalog.Provider provider, HiddenModels hidden) {
         if (hidden.hidesProvider(provider.slug())) {
             return null;
         }
         List<String> models = provider.models().stream()
-                .filter(model -> !hidden.hides(provider.slug(), model))
-                .toList();
+            .filter(model -> !hidden.hides(provider.slug(), model))
+            .toList();
         if (models.isEmpty()) {
             return null;
         }
@@ -182,6 +228,6 @@ public class ModelOptionsService {
             }
         }
         return new HermesModelCatalog.Provider(
-                provider.slug(), provider.name(), models, Collections.unmodifiableMap(reasoning));
+            provider.slug(), provider.name(), models, Collections.unmodifiableMap(reasoning));
     }
 }

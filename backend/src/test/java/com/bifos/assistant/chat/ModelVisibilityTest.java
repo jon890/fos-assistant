@@ -60,6 +60,7 @@ class ModelVisibilityTest {
     @Autowired
     TransactionTemplate transactions;
 
+
     @AfterEach
     void cleanUp() {
         transactions.executeWithoutResult(status -> {
@@ -68,20 +69,21 @@ class ModelVisibilityTest {
         });
     }
 
+
     @Test
     @DisplayName("숨김 목록을 저장하면 provider 전체와 모델 하나를 따로 숨기고 다시 저장하면 통째로 바뀐다")
     void savingReplacesTheWholeHiddenList() {
         visibility.save(
-                admin,
-                List.of(
-                        new HiddenModels.Entry(" provider-a ", null),
-                        new HiddenModels.Entry("provider-b", " model-old "),
-                        new HiddenModels.Entry("provider-b", "model-old")));
+            admin,
+            List.of(
+                new HiddenModels.Entry(" provider-a ", null),
+                new HiddenModels.Entry("provider-b", " model-old "),
+                new HiddenModels.Entry("provider-b", "model-old")));
 
         HiddenModels saved = visibility.hiddenFor(GROUP_ID);
         assertThat(saved.entries())
-                .containsExactly(
-                        new HiddenModels.Entry("provider-a", null), new HiddenModels.Entry("provider-b", "model-old"));
+            .containsExactly(
+                new HiddenModels.Entry("provider-a", null), new HiddenModels.Entry("provider-b", "model-old"));
         assertThat(saved.hides("provider-a", "anything")).isTrue();
         assertThat(saved.hides("provider-b", "model-old")).isTrue();
         assertThat(saved.hides("provider-b", "model-new")).isFalse();
@@ -89,8 +91,9 @@ class ModelVisibilityTest {
         visibility.save(admin, List.of(new HiddenModels.Entry("provider-c", null)));
 
         assertThat(visibility.hiddenFor(GROUP_ID).entries())
-                .containsExactly(new HiddenModels.Entry("provider-c", null));
+            .containsExactly(new HiddenModels.Entry("provider-c", null));
     }
+
 
     @Test
     @DisplayName("다른 그룹의 숨김은 적용하지 않는다")
@@ -101,18 +104,20 @@ class ModelVisibilityTest {
         visibility.requireVisible(OTHER_GROUP_ID, ModelChoice.stored("provider-a", "model", null));
     }
 
+
     @Test
     @DisplayName("관리자가 아니면 숨김 목록을 바꾸지 못하고 provider 가 빈 항목은 저장하지 못한다")
     void rejectsMemberAndBlankProvider() {
         assertThatThrownBy(() -> visibility.save(member, List.of()))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.FORBIDDEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.FORBIDDEN);
         assertThatThrownBy(() -> visibility.save(admin, List.of(new HiddenModels.Entry(" ", "model"))))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
+
 
     @Test
     @DisplayName("숨긴 모델을 명시한 선택은 MODEL_HIDDEN 으로 거절하고 모델을 고르지 않은 선택은 통과한다")
@@ -122,18 +127,19 @@ class ModelVisibilityTest {
         visibility.requireVisible(GROUP_ID, ModelChoice.defaults());
         visibility.requireVisible(GROUP_ID, ModelChoice.stored("provider-b", "model-new", null));
         assertThatThrownBy(
-                        () -> visibility.requireVisible(GROUP_ID, ModelChoice.stored("provider-b", "model-old", null)))
+            () -> visibility.requireVisible(GROUP_ID, ModelChoice.stored("provider-b", "model-old", null)))
                 .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
+                .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(ErrorCode.MODEL_HIDDEN);
     }
+
 
     @Test
     @DisplayName("목록은 숨긴 provider 와 모델을 빼고, 기본 모델이 숨겨졌으면 쓸 수 없다고 알린다")
     void optionsLeaveOutHiddenProvidersAndModels() {
         visibility.save(
-                admin,
-                List.of(new HiddenModels.Entry("provider-a", null), new HiddenModels.Entry("provider-b", "model-old")));
+            admin,
+            List.of(new HiddenModels.Entry("provider-a", null), new HiddenModels.Entry("provider-b", "model-old")));
         Agent agent = agent();
         ModelOptionsService options = optionsService(agent);
 
@@ -149,6 +155,7 @@ class ModelVisibilityTest {
         assertThat(unfiltered.defaultAvailable()).isTrue();
     }
 
+
     @Test
     @DisplayName("에이전트 기본 모델이 있으면 목록의 기본 모델이 그 값이고 effort 도 함께 준다")
     void agentDefaultBecomesTheListedDefault() {
@@ -163,6 +170,7 @@ class ModelVisibilityTest {
         assertThat(options.defaultAvailable()).isTrue();
     }
 
+
     @Test
     @DisplayName("에이전트 기본 모델 저장은 목록에 있고 숨기지 않은 모델만 받고, 비우면 profile 값으로 돌아간다")
     void agentDefaultIsValidatedOnSave() {
@@ -172,21 +180,20 @@ class ModelVisibilityTest {
         when(agents.findByCode("helper")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("helper")).thenReturn(Optional.of(agent));
         when(agents.save(agent)).thenReturn(agent);
-        AgentModelDefaultService defaults =
-                new AgentModelDefaultService(new AgentService(agents), optionsService(agent), visibility);
+        AgentModelDefaultService defaults = new AgentModelDefaultService(new AgentService(agents), optionsService(agent), visibility);
 
         assertThatThrownBy(() -> defaults.save(member, "helper", ModelChoice.of("provider-b", "model-new", null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.FORBIDDEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.FORBIDDEN);
         assertThatThrownBy(() -> defaults.save(admin, "helper", ModelChoice.of("provider-a", "model-a", null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.MODEL_HIDDEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.MODEL_HIDDEN);
         assertThatThrownBy(() -> defaults.save(admin, "helper", ModelChoice.of("provider-b", "missing", null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
         ModelChoice saved = defaults.save(admin, "helper", ModelChoice.of("provider-b", "model-new", "low"));
         AgentModelSettings settings = defaults.settingsFor(admin, "helper");
@@ -200,6 +207,36 @@ class ModelVisibilityTest {
         assertThat(agent.defaultModel()).isNull();
     }
 
+
+    @Test
+    @DisplayName("기본 모델 저장은 들고 있던 목록에 모델이 없으면 다시 읽어 보고, 다시 읽은 목록에 있으면 저장한다")
+    void agentDefaultSaveRereadsCatalogBeforeRejecting() {
+        Agent agent = agent();
+        AgentRepository agents = mock(AgentRepository.class);
+        when(agents.findByCode("helper")).thenReturn(Optional.of(agent));
+        when(agents.findByCodeForUpdate("helper")).thenReturn(Optional.of(agent));
+        when(agents.save(agent)).thenReturn(agent);
+        HermesModelClient hermes = mock(HermesModelClient.class);
+        when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile()))
+            .thenReturn(new HermesModelCatalog(
+                "provider-b",
+                "model-old",
+                List.of(new Provider("provider-b", "B", List.of("model-old"), Map.of()))))
+            .thenReturn(new HermesModelCatalog(
+                "provider-b",
+                "model-old",
+                List.of(new Provider("provider-b", "B", List.of("model-old", "model-new"), Map.of()))));
+        ModelOptionsService options = new ModelOptionsService(
+            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+        AgentModelDefaultService defaults = new AgentModelDefaultService(new AgentService(agents), options, visibility);
+        options.optionsForAgent(GROUP_ID, agent);
+
+        ModelChoice saved = defaults.save(admin, "helper", ModelChoice.of("provider-b", "model-new", null));
+
+        assertThat(saved).isEqualTo(ModelChoice.stored("provider-b", "model-new", null));
+    }
+
+
     @Test
     @DisplayName("목록에서 빠진 모델을 쓰던 에이전트는 모델을 그대로 두고 effort 만 바꿔 저장할 수 있다")
     void unchangedModelSkipsCatalogValidation() {
@@ -209,13 +246,13 @@ class ModelVisibilityTest {
         when(agents.findByCode("helper")).thenReturn(Optional.of(agent));
         when(agents.findByCodeForUpdate("helper")).thenReturn(Optional.of(agent));
         when(agents.save(agent)).thenReturn(agent);
-        AgentModelDefaultService defaults =
-                new AgentModelDefaultService(new AgentService(agents), optionsService(agent), visibility);
+        AgentModelDefaultService defaults = new AgentModelDefaultService(new AgentService(agents), optionsService(agent), visibility);
 
         ModelChoice saved = defaults.save(admin, "helper", ModelChoice.of("provider-b", "model-gone", "high"));
 
         assertThat(saved).isEqualTo(ModelChoice.stored("provider-b", "model-gone", "high"));
     }
+
 
     @Test
     @DisplayName("에이전트 기본 effort none 은 끄기 지원이 SUPPORTED 인 모델이나 profile 기본 모델에서만 저장한다")
@@ -231,14 +268,15 @@ class ModelVisibilityTest {
 
         for (String model : List.of("cannot-off", "unsaid")) {
             assertThatThrownBy(() -> defaults.save(admin, "helper", ModelChoice.of("provider-c", model, "none")))
-                    .as("모델 %s", model)
-                    .isInstanceOf(ApiException.class)
-                    .extracting(error -> ((ApiException) error).code())
-                    .isEqualTo(ErrorCode.VALIDATION_FAILED);
+                .as("모델 %s", model)
+                .isInstanceOf(ApiException.class)
+                .extracting(error -> ((ApiException)error).code())
+                .isEqualTo(ErrorCode.VALIDATION_FAILED);
         }
         assertThat(agent.defaultModel()).as("거절한 저장은 기본값을 바꾸지 않는다").isEqualTo("can-off");
         assertThat(agent.defaultReasoningEffort()).isEqualTo("none");
     }
+
 
     @Test
     @DisplayName("profile 기본 모델의 끄기 지원을 모르면 모델을 비운 none 을 저장하지 않는다")
@@ -247,11 +285,12 @@ class ModelVisibilityTest {
         AgentModelDefaultService defaults = defaultsWith(agent, disableCatalog("unsaid"));
 
         assertThatThrownBy(() -> defaults.save(admin, "helper", ModelChoice.of(null, null, "none")))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThat(agent.defaultReasoningEffort()).isNull();
     }
+
 
     @Test
     @DisplayName("Hermes 가 목록을 답하지 못해도 저장된 기본값과 숨김 목록은 돌려준다")
@@ -263,9 +302,9 @@ class ModelVisibilityTest {
         when(agents.findByCode("helper")).thenReturn(Optional.of(agent));
         HermesModelClient hermes = mock(HermesModelClient.class);
         when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
         ModelOptionsService options = new ModelOptionsService(
-                mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
         AgentModelDefaultService defaults = new AgentModelDefaultService(new AgentService(agents), options, visibility);
 
         AgentModelSettings settings = defaults.settingsFor(admin, "helper");
@@ -275,16 +314,18 @@ class ModelVisibilityTest {
         assertThat(settings.hidden().entries()).containsExactly(new HiddenModels.Entry("provider-a", null));
     }
 
+
     @Test
     @DisplayName("대소문자만 다른 숨김 항목은 먼저 온 것 하나만 저장한다")
     void caseOnlyDuplicatesAreSavedOnce() {
         visibility.save(
-                admin,
-                List.of(new HiddenModels.Entry("Provider-A", "Model"), new HiddenModels.Entry("provider-a", "model")));
+            admin,
+            List.of(new HiddenModels.Entry("Provider-A", "Model"), new HiddenModels.Entry("provider-a", "model")));
 
         assertThat(visibility.hiddenFor(GROUP_ID).entries())
-                .containsExactly(new HiddenModels.Entry("Provider-A", "Model"));
+            .containsExactly(new HiddenModels.Entry("Provider-A", "Model"));
     }
+
 
     @Test
     @DisplayName("Hermes 가 기본 provider 를 주지 않아도 목록에 있는 기본 모델은 쓸 수 있다고 답한다")
@@ -292,27 +333,29 @@ class ModelVisibilityTest {
         Agent agent = agent();
         HermesModelClient hermes = mock(HermesModelClient.class);
         when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(new HermesModelCatalog(
-                        null, "model-old", List.of(new Provider("provider-b", "B", List.of("model-old"), Map.of()))));
+            .thenReturn(new HermesModelCatalog(
+                null, "model-old", List.of(new Provider("provider-b", "B", List.of("model-old"), Map.of()))));
         ModelOptionsService options = new ModelOptionsService(
-                mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
 
         assertThat(options.optionsForAgent(GROUP_ID, agent).defaultAvailable()).isTrue();
     }
 
+
     /** 끄기 지원이 SUPPORTED, UNSUPPORTED, UNKNOWN 인 모델을 한 provider 에 둔 목록이다. */
     private static HermesModelCatalog disableCatalog(String profileDefaultModel) {
         return new HermesModelCatalog(
+            "provider-c",
+            profileDefaultModel,
+            List.of(new Provider(
                 "provider-c",
-                profileDefaultModel,
-                List.of(new Provider(
-                        "provider-c",
-                        "C",
-                        List.of("can-off", "cannot-off", "unsaid"),
-                        Map.of(
-                                "can-off", new ReasoningCapability(Support.SUPPORTED, Support.SUPPORTED),
-                                "cannot-off", new ReasoningCapability(Support.SUPPORTED, Support.UNSUPPORTED)))));
+                "C",
+                List.of("can-off", "cannot-off", "unsaid"),
+                Map.of(
+                    "can-off", new ReasoningCapability(Support.SUPPORTED, Support.SUPPORTED),
+                    "cannot-off", new ReasoningCapability(Support.SUPPORTED, Support.UNSUPPORTED)))));
     }
+
 
     private AgentModelDefaultService defaultsWith(Agent agent, HermesModelCatalog catalog) {
         AgentRepository agents = mock(AgentRepository.class);
@@ -322,33 +365,35 @@ class ModelVisibilityTest {
         HermesModelClient hermes = mock(HermesModelClient.class);
         when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(catalog);
         ModelOptionsService options = new ModelOptionsService(
-                mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
         return new AgentModelDefaultService(new AgentService(agents), options, visibility);
     }
+
 
     private ModelOptionsService optionsService(Agent agent) {
         HermesModelClient hermes = mock(HermesModelClient.class);
         when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile()))
-                .thenReturn(new HermesModelCatalog(
-                        "provider-b",
-                        "model-old",
-                        List.of(
-                                new Provider("provider-a", "A", List.of("model-a"), Map.of()),
-                                new Provider("provider-b", "B", List.of("model-old", "model-new"), Map.of()))));
+            .thenReturn(new HermesModelCatalog(
+                "provider-b",
+                "model-old",
+                List.of(
+                    new Provider("provider-a", "A", List.of("model-a"), Map.of()),
+                    new Provider("provider-b", "B", List.of("model-old", "model-new"), Map.of()))));
         return new ModelOptionsService(
-                mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
+            mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
     }
+
 
     private static Agent agent() {
         return Agent.of(
-                "helper",
-                "helper",
-                "helper-profile",
-                "http://hermes.invalid",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                null,
-                Instant.now());
+            "helper",
+            "helper",
+            "helper-profile",
+            "http://hermes.invalid",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null,
+            Instant.now());
     }
 }
