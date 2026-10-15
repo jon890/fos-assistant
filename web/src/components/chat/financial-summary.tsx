@@ -1,6 +1,13 @@
 import { Notice } from "@/components/ui/notice";
 import { LimitChangeSummaryView } from "@/components/chat/limit-change-summary";
 import type { ConnectorAction } from "@/lib/connector-action";
+import {
+  compareDecimal,
+  decimalExceeds,
+  multiplyDecimal,
+  parseDecimal,
+  type Decimal,
+} from "@/lib/decimal";
 import type {
   FinancialLimitStatus,
   FinancialSummary,
@@ -63,12 +70,12 @@ export function FinancialLineView({ action }: { action: ConnectorAction }) {
   );
 }
 
-/** 지정가는 수량과 가격의 곱, 금액 주문은 그 금액이다. 정할 수 없으면 null 이다. */
-function orderValue(summary: FinancialSummary): number | null {
-  if (summary.orderAmount) return Number(summary.orderAmount);
-  if (summary.quantity && summary.price)
-    return Number(summary.quantity) * Number(summary.price);
-  return null;
+/** 지정가는 수량과 가격의 곱, 금액 주문은 그 금액이다. 정할 수 없으면 null 이다. 부동소수점 없이 계산한다. */
+function orderValue(summary: FinancialSummary): Decimal | null {
+  if (summary.orderAmount) return parseDecimal(summary.orderAmount);
+  const quantity = summary.quantity ? parseDecimal(summary.quantity) : null;
+  const price = summary.price ? parseDecimal(summary.price) : null;
+  return quantity && price ? multiplyDecimal(quantity, price) : null;
 }
 
 /** 이 주문이 넘는 상한의 안내다. 넘지 않으면 null 이다. 판정은 승인할 때 서버가 다시 한다. */
@@ -78,15 +85,18 @@ function exceededLimit(
 ): string | null {
   if (
     summary.quantity &&
-    Number(summary.quantity) > Number(limits.quantityLimit)
+    decimalExceeds(summary.quantity, limits.quantityLimit)
   )
     return "이 주문은 한 건 수량 상한을 넘어요.";
   const value = orderValue(summary);
-  if (value === null) return null;
-  if (value > Number(limits.orderLimit))
-    return "이 주문은 한 건 금액 상한을 넘어요.";
-  if (value > Number(limits.remainingToday))
-    return "이 주문은 오늘 남은 한도를 넘어요.";
+  const over = (limit: string) => {
+    const parsed = parseDecimal(limit);
+    return (
+      value !== null && parsed !== null && compareDecimal(value, parsed) > 0
+    );
+  };
+  if (over(limits.orderLimit)) return "이 주문은 한 건 금액 상한을 넘어요.";
+  if (over(limits.remainingToday)) return "이 주문은 오늘 남은 한도를 넘어요.";
   return null;
 }
 

@@ -1,4 +1,5 @@
 import { callConnectorApi } from "@/lib/connector-action";
+import { decimalExceeds } from "@/lib/decimal";
 
 /** 주문 상한의 API 이름이다. Control Plane 의 다섯 종류와 같다. */
 export const FINANCIAL_LIMIT_NAMES = [
@@ -40,9 +41,9 @@ export function isFinancialLimitName(
   return (FINANCIAL_LIMIT_NAMES as readonly string[]).includes(value);
 }
 
-/** 최대치를 넘는가. 두 값 모두 십진 글이다. */
+/** 최대치를 넘는가. 두 값 모두 십진 글이고 부동소수점 없이 견준다. */
 export function exceedsMaximum(value: string, maximum: string): boolean {
-  return Number(value) > Number(maximum);
+  return decimalExceeds(value, maximum);
 }
 
 export const readFinancialLimits = () =>
