@@ -94,6 +94,12 @@ async function callRoute(
   dependencies["@/lib/content-draft-snapshot"] = await load(
     "../../web/src/lib/content-draft-snapshot.ts",
   );
+  dependencies["@/lib/financial-limits"] = await load(
+    "../../web/src/lib/financial-limits.ts",
+  );
+  dependencies["@/lib/financial-limits-route"] = await load(
+    "../../web/src/lib/financial-limits-route.ts",
+  );
   dependencies["@/lib/connector-action-route"] = await load(
     "../../web/src/lib/connector-action-route.ts",
   );
@@ -309,6 +315,7 @@ const FINANCIAL = {
   timeInForce: "DAY",
   orderId: null,
   normalization: [{ field: "orderType", before: null, after: "MARKET" }],
+  limits: null,
 };
 
 test("금융 요약은 계약의 칸만 옮기고 금융 줄이 아니면 null 이다", async () => {
@@ -382,6 +389,7 @@ test("모양이 틀린 금융 요약은 그 줄만 열지 못한 것으로 낮�
         timeInForce: null,
         orderId: null,
         normalization: [],
+        limits: null,
       },
       label,
     );
@@ -436,4 +444,87 @@ test("대화 허락 목록은 번호와 이름과 끝나는 시각, 에이전트
     `/api/v1/chat/conversations/${ID}/connector-conversation-grants/7`,
   );
   assert.equal(JSON.stringify(revoked.calls[0].init), '{"method":"DELETE"}');
+});
+
+test("주문 카드의 상한은 계약의 칸만 옮기고 모양이 틀리면 그 표시만 비운다", async () => {
+  const limits = {
+    currency: "USD",
+    orderLimit: "500",
+    quantityLimit: "10",
+    dailyLimit: "1000",
+    spentToday: "250",
+    remainingToday: "750",
+    secret: "버릴 칸",
+  };
+  const financial = {
+    available: true,
+    accountSeq: "7",
+    operation: "CREATE",
+    symbol: "ABC",
+    market: "NASDAQ",
+    currency: "USD",
+    side: "BUY",
+    quantity: null,
+    orderAmount: "25",
+    price: null,
+    orderType: "MARKET",
+    timeInForce: null,
+    orderId: null,
+    normalization: [],
+  };
+  const { response } = await callRoute("list", [
+    { ...item({}), risk: "FINANCIAL", financial: { ...financial, limits } },
+    {
+      ...item({}),
+      risk: "FINANCIAL",
+      financial: { ...financial, limits: { ...limits, dailyLimit: "많이" } },
+    },
+  ]);
+  const body = await response.json();
+  assert.deepEqual(body[0].financial.limits, {
+    currency: "USD",
+    orderLimit: "500",
+    quantityLimit: "10",
+    dailyLimit: "1000",
+    spentToday: "250",
+    remainingToday: "750",
+  });
+  assert.equal(body[1].financial.available, true);
+  assert.equal(body[1].financial.limits, null);
+});
+
+test("상한 변경 요약은 계약의 칸만 옮기고 모양이 틀리면 그 줄만 승인할 수 없게 낮춘다", async () => {
+  const change = {
+    name: "order_amount_usd",
+    currency: "USD",
+    label: "한 건 달러 금액",
+    previous: "300",
+    requested: "500",
+    maximum: "1000",
+    current: "300",
+    secret: "버릴 칸",
+  };
+  const { response } = await callRoute("list", [
+    { ...item({}), toolName: "order_limit_change", limitChange: change },
+    {
+      ...item({}),
+      toolName: "order_limit_change",
+      limitChange: { ...change, name: "weekly_amount" },
+    },
+    item({}),
+  ]);
+  const body = await response.json();
+  assert.deepEqual(body[0].limitChange, {
+    available: true,
+    name: "order_amount_usd",
+    currency: "USD",
+    label: "한 건 달러 금액",
+    previous: "300",
+    requested: "500",
+    maximum: "1000",
+    current: "300",
+  });
+  assert.equal(body[1].limitChange.available, false);
+  assert.equal(body[1].limitChange.requested, "");
+  assert.equal(body[2].limitChange, null);
 });

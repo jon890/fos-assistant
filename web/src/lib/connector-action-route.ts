@@ -20,6 +20,10 @@ import {
   type ContentDraftSummary,
 } from "@/lib/content-draft-snapshot";
 import type { FinancialSummary } from "@/lib/financial-summary";
+import {
+  safeLimitChange,
+  safeLimitStatusOrNull,
+} from "@/lib/financial-limits-route";
 import { isPublicId } from "@/lib/conversation-id";
 
 /** 브라우저에 그대로 넘기는 오류 코드다. 그 밖의 코드는 `INTERNAL_ERROR` 로 바꾼다. */
@@ -154,6 +158,8 @@ function safeAction(value: unknown): ConnectorAction {
     contentDraft:
       item.contentDraft == null ? null : safeContentDraft(item.contentDraft),
     financial: item.financial == null ? null : safeFinancial(item.financial),
+    limitChange:
+      item.limitChange == null ? null : safeLimitChange(item.limitChange),
   };
 }
 
@@ -200,6 +206,7 @@ const UNAVAILABLE_FINANCIAL: FinancialSummary = {
   timeInForce: null,
   orderId: null,
   normalization: [],
+  limits: null,
 };
 
 /**
@@ -241,6 +248,7 @@ function openFinancial(value: unknown): FinancialSummary {
         after: text(entry.after),
       };
     }),
+    limits: safeLimitStatusOrNull(item.limits),
   };
 }
 

@@ -1,6 +1,9 @@
 import type { ToolRisk } from "@/lib/connection";
 import type { ContentDraftSummary } from "@/lib/content-draft-snapshot";
-import type { FinancialSummary } from "@/lib/financial-summary";
+import type {
+  FinancialSummary,
+  LimitChangeSummary,
+} from "@/lib/financial-summary";
 
 export type ConnectorActionStatus =
   | "PENDING"
@@ -53,6 +56,8 @@ export type ConnectorAction = {
   contentDraft: ContentDraftSummary | null;
   /** 금융 줄의 저장 요약이다. 금융 줄이 아니면 null 이다. */
   financial: FinancialSummary | null;
+  /** 주문 상한 변경 줄의 요약이다. 그 줄이 아니면 null 이다. */
+  limitChange: LimitChangeSummary | null;
 };
 
 /** 이 대화에서 계속 허용 중인 도구 한 개다. 화면에는 `title` 을 보인다. */
@@ -80,6 +85,9 @@ export const ACTION_ID_PATTERN =
 export const CONNECTOR_ACTION_ERROR_MESSAGES: Record<string, string> = {
   CONNECTOR_ACTION_NOT_PENDING: "이미 처리된 요청이에요.",
   CONNECTOR_ACTION_NOT_FOUND: "요청을 찾지 못했어요.",
+  FINANCIAL_LIMIT_EXCEEDED:
+    "주문 상한에 걸려 승인하지 못했어요. 카드에서 남은 한도를 확인해 주세요.",
+  FINANCIAL_LIMIT_ABOVE_MAXIMUM: "최대치보다 큰 값은 정할 수 없어요.",
 };
 
 const FALLBACK_MESSAGE =

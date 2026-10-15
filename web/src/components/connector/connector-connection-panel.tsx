@@ -9,6 +9,7 @@ import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
 import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
 import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
+import { FinancialLimitsSection } from "@/components/connector/financial-limits";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
 import { ConnectorToolsSection } from "@/components/connector/connector-tools";
 import { Input } from "@/components/ui/input";
@@ -408,6 +409,9 @@ export function ConnectorConnectionPanel({
             undeclaredTools={connection.undeclaredTools}
           />
           <ConnectorGrants connectorId={id} refreshKey={connection} />
+          {connector?.tools?.some((tool) => tool.risk === "FINANCIAL") ? (
+            <FinancialLimitsSection />
+          ) : null}
           {status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}
