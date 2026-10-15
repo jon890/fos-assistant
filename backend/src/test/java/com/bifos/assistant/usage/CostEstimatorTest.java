@@ -27,6 +27,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * 구독제로 돌고 있어도 화면이 금액을 보이려면 이 환산이 맞아야 한다.
@@ -41,19 +43,22 @@ class CostEstimatorTest {
     private static Path catalogFile;
     private static CostEstimator estimator;
 
+
     private static LiveProperties<PricingProperties> pricing(String catalogPath) {
         return LiveProperties.fixed(PricingProperties.class, new PricingProperties(catalogPath));
     }
 
+
     @BeforeAll
     static void loadCatalog() throws URISyntaxException, IOException {
         catalogFile = Path.of(CostEstimatorTest.class
-                .getResource("/pricing/models-dev-sample.json")
-                .toURI());
+            .getResource("/pricing/models-dev-sample.json")
+            .toURI());
         // pricing_version 은 파일의 수정 시각에서 나온다. 검사에서 그 날짜를 못 박는다.
         Files.setLastModifiedTime(catalogFile, FileTime.from(Instant.parse("2026-09-17T04:00:00Z")));
         estimator = new CostEstimator(new ModelsDevPriceCatalog(pricing(catalogFile.toString())));
     }
+
 
     @Test
     @DisplayName("카탈로그에서 가격을 찾아 금액을 계산한다")
@@ -66,6 +71,7 @@ class CostEstimatorTest {
         assertThat(cost.pricingVersion()).isEqualTo("models.dev@2026-09-17");
     }
 
+
     @Test
     @DisplayName("캐시된 입력은 캐시 단가로 세고 나머지만 입력 단가로 센다")
     void countsCachedInputAtCacheRateAndOnlyRestAtInputRate() {
@@ -74,6 +80,7 @@ class CostEstimatorTest {
 
         assertThat(cost.micros()).isEqualTo(16_400L);
     }
+
 
     @Test
     @DisplayName("캐시 단가가 없는 모델은 캐시 토큰도 입력 단가로 센다")
@@ -84,6 +91,7 @@ class CostEstimatorTest {
         assertThat(cost.micros()).isEqualTo(2_800L);
     }
 
+
     @Test
     @DisplayName("구간 경계를 넘으면 그 구간의 단가를 쓴다")
     void usesTierRateOnceTierBoundaryIsExceeded() {
@@ -92,6 +100,7 @@ class CostEstimatorTest {
 
         assertThat(cost.micros()).isEqualTo(3_045_000L);
     }
+
 
     @Test
     @DisplayName("구간 경계와 같으면 아직 기본 단가를 쓴다")
@@ -102,6 +111,7 @@ class CostEstimatorTest {
         assertThat(cost.micros()).isEqualTo(1_360_000L);
     }
 
+
     @Test
     @DisplayName("경계값을 적지 않은 옛 항목은 20만 토큰을 경계로 본다")
     void oldEntryWithoutBoundaryTreatsTwoHundredThousandTokensAsBoundary() {
@@ -110,6 +120,7 @@ class CostEstimatorTest {
 
         assertThat(cost.micros()).isEqualTo(1_500_120L);
     }
+
 
     @Test
     @DisplayName("provider 별칭이 동작한다")
@@ -121,6 +132,7 @@ class CostEstimatorTest {
         assertThat(aliased).isEqualTo(estimator.estimate("openai", "example-model", usage(1000L, null, 500L)));
     }
 
+
     @Test
     @DisplayName("별칭에 없는 provider 는 그 이름 그대로 찾는다")
     void providerNotInAliasIsLookedUpByItsOwnName() {
@@ -128,6 +140,7 @@ class CostEstimatorTest {
 
         assertThat(cost.micros()).isEqualTo(2_250L);
     }
+
 
     @Test
     @DisplayName("가격을 찾지 못하면 금액이 비어 있다")
@@ -143,12 +156,14 @@ class CostEstimatorTest {
         assertThat(unknownModel.pricingVersion()).isNull();
     }
 
+
     @Test
     @DisplayName("토큰을 하나도 보고하지 않은 실행은 금액이 비어 있다")
     void amountIsEmptyForRunThatReportedNoTokens() {
         assertThat(estimator.estimate("openai", "example-model", TokenUsage.empty()))
-                .isEqualTo(EstimatedCost.unknown());
+            .isEqualTo(EstimatedCost.unknown());
     }
+
 
     @Test
     @DisplayName("카탈로그가 없으면 기동을 막지 않고 금액만 비워 둔다")
@@ -157,10 +172,11 @@ class CostEstimatorTest {
         CostEstimator notConfigured = new CostEstimator(new ModelsDevPriceCatalog(pricing("")));
 
         assertThat(noCatalog.estimate("openai", "example-model", usage(1000L, null, 500L)))
-                .isEqualTo(EstimatedCost.unknown());
+            .isEqualTo(EstimatedCost.unknown());
         assertThat(notConfigured.estimate("openai", "example-model", usage(1000L, null, 500L)))
-                .isEqualTo(EstimatedCost.unknown());
+            .isEqualTo(EstimatedCost.unknown());
     }
+
 
     @Test
     @DisplayName("API 경로는 환산액과 실제 청구액이 같다")
@@ -173,29 +189,29 @@ class CostEstimatorTest {
         assertThat(cost.pricingVersion()).isEqualTo("models.dev@2026-09-17");
     }
 
+
     @Test
     @DisplayName("구독 경로는 환산액은 있고 실제 청구액은 비어 있다")
     void subscriptionPathHasConvertedAmountAndEmptyActualBilledAmount() {
-        ExecutionCost cost =
-                estimator.estimate("openai", "example-model", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+        ExecutionCost cost = estimator.estimate("openai", "example-model", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
 
         assertThat(cost.estimatedMicros()).isEqualTo(20_000L);
         assertThat(cost.actualMicros()).isNull();
     }
 
+
     @Test
     @DisplayName("가격표에 없는 모델은 cost mode 와 무관하게 둘 다 비어 있다")
     void modelNotInPriceTableGivesBothEmptyRegardlessOfCostMode() {
-        ExecutionCost apiCost =
-                estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.API);
-        ExecutionCost subscriptionCost =
-                estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
+        ExecutionCost apiCost = estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.API);
+        ExecutionCost subscriptionCost = estimator.estimate("openai", "gpt-does-not-exist", usage(1000L, null, 500L), CostMode.SUBSCRIPTION);
 
         assertThat(apiCost).isEqualTo(ExecutionCost.unknown());
         assertThat(subscriptionCost).isEqualTo(ExecutionCost.unknown());
         assertThat(apiCost.estimatedMicros()).isNull();
         assertThat(apiCost.actualMicros()).isNull();
     }
+
 
     @Test
     @DisplayName("금액에는 그 가격을 찾은 가격표의 버전을 적는다")
@@ -208,10 +224,12 @@ class CostEstimatorTest {
                 return Optional.of(new CatalogPrice(price, "models.dev@2026-09-17"));
             }
 
+
             @Override
             public String version() {
                 return "models.dev@2026-09-28";
             }
+
 
             @Override
             public boolean isAvailable() {
@@ -224,27 +242,52 @@ class CostEstimatorTest {
         assertThat(cost.pricingVersion()).isEqualTo("models.dev@2026-09-17");
     }
 
+
     @Test
     @DisplayName("모델 이름이 같아도 provider 별 가격을 쓰고 모르는 provider 는 금액을 비운다")
     void pricesSameModelSeparatelyForEachProvider() {
         PriceCatalog catalog = mock(PriceCatalog.class);
         when(catalog.find("provider-a", "shared-model"))
-                .thenReturn(Optional.of(new CatalogPrice(
-                        new ModelPrice(new BigDecimal("2"), new BigDecimal("8"), null, List.of()), "a@1")));
+            .thenReturn(Optional.of(new CatalogPrice(
+                new ModelPrice(new BigDecimal("2"), new BigDecimal("8"), null, List.of()), "a@1")));
         when(catalog.find("provider-b", "shared-model"))
-                .thenReturn(Optional.of(new CatalogPrice(
-                        new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), null, List.of()), "b@1")));
+            .thenReturn(Optional.of(new CatalogPrice(
+                new ModelPrice(new BigDecimal("5"), new BigDecimal("30"), null, List.of()), "b@1")));
         CostEstimator costs = new CostEstimator(catalog);
         TokenUsage tokens = usage(1000L, null, 500L);
 
         assertThat(costs.estimate("provider-a", "shared-model", tokens).micros())
-                .isEqualTo(6_000L);
+            .isEqualTo(6_000L);
         assertThat(costs.estimate("provider-b", "shared-model", tokens).micros())
-                .isEqualTo(20_000L);
+            .isEqualTo(20_000L);
         assertThat(costs.estimate("provider-b", "shared-model", tokens).pricingVersion())
-                .isEqualTo("b@1");
+            .isEqualTo("b@1");
         assertThat(costs.estimate("provider-c", "shared-model", tokens)).isEqualTo(EstimatedCost.unknown());
     }
+
+
+    @ParameterizedTest
+    @CsvSource({"120, , ,", ", , 40,", ", , , 160", "120, , , 160"})
+    @DisplayName("입력이나 출력 토큰이 누락되면 합계가 있어도 금액을 미확인으로 둔다")
+    void leavesCostUnknownWhenRequiredTokensAreMissing(Long input, Long cached, Long output, Long total) {
+        TokenUsage tokens = new TokenUsage(input, cached, output, total);
+
+        assertThat(estimator.estimate("openai", "example-model", tokens)).isEqualTo(EstimatedCost.unknown());
+        for (CostMode mode : CostMode.values()) {
+            assertThat(estimator.estimate("openai", "example-model", tokens, mode))
+                .isEqualTo(ExecutionCost.unknown());
+        }
+    }
+
+
+    @ParameterizedTest
+    @CsvSource({"120, 0, 600", "0, 40, 1200"})
+    @DisplayName("명시적인 입력 또는 출력 0은 누락과 구분해 환산한다")
+    void pricesExplicitZeroTokens(long input, long output, long expectedMicros) {
+        assertThat(estimator.estimate("openai", "example-model", usage(input, null, output)).micros())
+            .isEqualTo(expectedMicros);
+    }
+
 
     private static TokenUsage usage(Long input, Long cached, Long output) {
         long total = (input == null ? 0 : input) + (output == null ? 0 : output);
