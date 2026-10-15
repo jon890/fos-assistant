@@ -23,6 +23,7 @@ import com.bifos.assistant.hermes.HermesRunEventStream;
 import com.bifos.assistant.hermes.HermesSkillClient;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.memory.application.MemoryContentSealer;
+import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.people.application.HermesProfileProvisioner;
 import com.bifos.assistant.proactive.application.CheckNotificationPolicy;
@@ -111,6 +112,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
         FeedbackConversations.class,
         HermesProfileProvisioner.class,
         MemoryContentSealer.class,
+        MemoryRepository.class,
         PriceCatalog.class,
         ProactiveCheckGuard.class,
         ProactiveCheckService.class,
