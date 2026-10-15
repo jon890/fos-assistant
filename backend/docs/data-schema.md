@@ -98,6 +98,15 @@ Control Plane 이 쓰는 애플리케이션 계정과 운영 조회 계정을 �
 **이 표에 칸을 더하면 운영 조회 계정의 권한도 함께 고친다.** 새 표는 처음부터 본문 칸을 뺀 권한으로 준다.
 관리자의 실행 화면이 가린 도구 원문(`execution_event.detail`)을 보이는 예외는 [ADR-038](../../docs/adr/ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md) 이 갖는다.
 
+## 테이블을 추가하는 기준
+
+사용자, 그룹, 에이전트에 1:1로 붙는 단순한 값은 `app_user`, `agent` 같은 본체의 컬럼에 둔다.
+동의, 기본값, 스위치, 현재 설정을 따로 나누면 같은 수명의 값을 읽고 바꾸는 데 조인과 별도 저장 흐름이 늘어난다.
+새 테이블은 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다를 때만 만든다.
+예를 들어 자율 실행 동의처럼 사용자당 참/거짓 하나인 값은 `app_user` 컬럼에 둔다.
+이런 컬럼은 전용 `UPDATE`로 바꾸고 일반 엔티티 저장에서 제외해, 먼저 읽어 둔 엔티티가 나중에 저장될 때 옛 값으로 덮지 않게 한다.
+기존 `user_autonomy_preference`는 이 기준에 따라 본체 컬럼으로 옮길 대상이다. 이 문서 변경은 스키마를 옮기지 않으므로, 실제 이전 전까지 조회와 변경은 기존 표를 따른다.
+
 ## 마이그레이션 작성 규칙
 
 H2 로 도는 검사를 모두 통과해도 운영 MySQL 에서 실패할 수 있어 아래 규칙을 둔다.
@@ -185,6 +194,49 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 예약 작업은 지우면 `task.state` 를 `ARCHIVED` 로 둔다. 작업과 시각과 발화 기록의 줄은 남는다. 작업이 만든 대화와 그 실행 기록이 이 줄을 가리킨다.
 
 알림(`notification`)은 보관 기간이 지나면 줄을 지운다. 알림은 다른 표의 사실을 알리는 사본이라, 원인이 된 승인 줄과 실행 기록이 남아 있다.
+
+### 삭제 경로의 테이블 분류와 검사
+
+모든 테이블의 소유 범위와 삭제 경로별 기대값은 [`purge/tables.tsv`](../src/test/resources/purge/tables.tsv)가 갖는다.
+주된 소유 범위는 `USER`, `CONVERSATION`, `AGENT`, `GLOBAL`이다.
+각 삭제 경로의 기대값과 여러 범위·FK 없는 연결의 보존 근거도 같은 행에 적는다.
+`flyway_schema_history`는 Flyway 내부 이력이라 분류에서 뺀다.
+
+`DELETE`는 0행, `KEEP`는 근거가 있는 보존, `GAP`은 별도 결정할 알려진 공백이다.
+`SCRUB`은 본문·session 제거, `DETACH`는 에이전트나 지운 점검의 참조 해제다.
+`GONE`은 원고 생성 상태를 바꾸고 재생에 쓰는 참조를 비우는 계약이다.
+
+새 테이블을 더하면 분류와 [`purge/fixture.sql`](../src/test/resources/purge/fixture.sql)의 데이터를 함께 더한다.
+`PurgeClassificationTest`는 Flyway가 만든 전체 스키마와 분류를 대조한다.
+분류 없이 테이블을 추가했을 때 실패 메시지가 수정할 파일과 테이블 이름을 알려주는지도 확인한다.
+
+`PurgeCoverageMysqlTest`는 Flyway로 만든 실제 MySQL에서 모든 분류 테이블에 행을 넣는다.
+삭제 전 대상과 다른 사용자의 행이 모두 있어야 한다.
+사용자 접근 해제, `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
+행 삭제, 본문 제거, 참조 해제와 원고 tombstone을 확인하며 `KEEP` 대상과 다른 사용자의 모든 칸이 같은지도 비교한다.
+Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검사의 범위 밖이다.
+
+실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,
+저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
+
+현재 알려진 공백은 사용자 물리 삭제 경로 전체와 다음 대화 purge 대상이다.
+접근 해제는 서비스 토큰을 폐기하지만 사용자와 개인 데이터는 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
+
+| 테이블 | 대화 purge 뒤 남는 내용 |
+| --- | --- |
+| `connector_action` | 도구 인자와 실행 결과 |
+| `connector_action_execution` | 실행 인자와 요약·범위 |
+| `proactive_check` | 점검 보고 |
+| `proactive_check_finding` | 발견 제목과 출처 |
+| `proactive_check_problem` | 문제 본문과 근거 |
+| `proactive_value_evaluation` | 평가 근거 |
+
+공백의 삭제 동작은 바꾸지 않는다. 해당 행이 그대로 남는지도 비교하므로 해소되면 기대값을 다시 정한다.
+새 공백은 분류에 `GAP`과 근거를 명시해야 한다. 본문 없는 사용량·전달·원고 snapshot 이력은 `KEEP`다.
+
+보관 기간 정리는 `AttachmentCleaner`, `ArtifactCleaner`, `MediaObservationCleaner`, `ContentDraftCleaner`가 파일과 관찰·원고 본문을 다룬다.
+`NotificationCleaner`, `AttentionEventCleaner`, `DecisionFeedbackCleaner`는 기간이 지난 기록을 지운다.
+주기 정리와 예약 만료는 사용자 삭제를 대신하지 않는다.
 
 ## 사용자와 에이전트 표
 
@@ -864,7 +916,8 @@ action을 지우면 실행 내용도 지운다.
 ### `user_autonomy_preference`
 
 줄이 없으면 모두 꺼짐이다. 사용자를 지우면 함께 지운다.
-다른 종류의 자동 실행을 열 때 칸을 더한다. 한 칸이 여러 종류의 허락을 뜻하지 않게 한다.
+이 표는 「테이블을 추가하는 기준」에 따라 `app_user` 컬럼으로 옮길 대상이며, 새로운 단순 동의 칸을 이 표에 더하지 않는다.
+실제 이전 전까지 기존 동의의 저장과 조회는 이 표를 유지한다. 한 칸이 여러 종류의 허락을 뜻하지 않게 한다.
 
 ### `proactive_loop_setting`
 
