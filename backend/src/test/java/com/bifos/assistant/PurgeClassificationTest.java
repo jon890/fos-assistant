@@ -18,7 +18,7 @@ class PurgeClassificationTest {
     void limitsConversationGapsToProactiveTables() throws Exception {
         assertThat(PurgeTable.readAll().stream().filter(table -> table.conversation() == PurgeTable.Outcome.GAP)
             .map(PurgeTable::table))
-            .containsExactlyInAnyOrder("proactive_check", "proactive_check_finding", "proactive_check_problem", "proactive_value_evaluation");
+                .containsExactlyInAnyOrder("proactive_check", "proactive_check_finding", "proactive_check_problem", "proactive_value_evaluation");
     }
 
 
