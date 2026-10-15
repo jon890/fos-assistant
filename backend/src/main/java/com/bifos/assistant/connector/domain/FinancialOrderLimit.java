@@ -16,9 +16,9 @@ public record FinancialOrderLimit(
     BigDecimal dailyAmountKrw,
     BigDecimal dailyAmountUsd) {
 
+
     /** 아무것도 정하지 않은 상한이다. 다섯 종류 모두 운영 최대치를 따른다. */
     public static final FinancialOrderLimit NONE = new FinancialOrderLimit(null, null, null, null, null);
-
 
     /** 사용자가 정한 값이다. 정하지 않았으면 null 이다. */
     public BigDecimal value(FinancialLimitKind kind) {

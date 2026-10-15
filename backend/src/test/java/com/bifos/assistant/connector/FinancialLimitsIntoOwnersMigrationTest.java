@@ -69,8 +69,9 @@ class FinancialLimitsIntoOwnersMigrationTest {
     @Test
     @DisplayName("옮긴 뒤 옛 두 표는 없다")
     void dropsOldTables() throws SQLException {
-        try (Connection connection = connect(); ResultSet tables = connection.getMetaData().getTables(connection.getCatalog(), null, "%",
-            new String[] {"TABLE"})) {
+        try (Connection connection = connect();
+            ResultSet tables = connection.getMetaData().getTables(connection.getCatalog(), null, "%",
+                new String[] {"TABLE"})) {
             var names = new ArrayList<String>();
             while (tables.next()) {
                 names.add(tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT));
@@ -138,7 +139,8 @@ class FinancialLimitsIntoOwnersMigrationTest {
 
 
     private List<Object> userLimits(long userId) throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement();
+        try (Connection connection = connect();
+            Statement statement = connection.createStatement();
             ResultSet row = statement.executeQuery("""
                 SELECT limit_order_amount_krw, limit_order_amount_usd, limit_order_quantity, limit_daily_amount_krw,
                     limit_daily_amount_usd, limit_updated_at
@@ -156,7 +158,8 @@ class FinancialLimitsIntoOwnersMigrationTest {
 
 
     private List<Object> actionLimits(long actionId) throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement();
+        try (Connection connection = connect();
+            Statement statement = connection.createStatement();
             ResultSet row = statement.executeQuery(
                 "SELECT limit_kind, limit_requested, limit_previous FROM connector_action WHERE id = " + actionId)) {
             assertThat(row.next()).isTrue();
