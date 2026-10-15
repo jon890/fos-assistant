@@ -239,6 +239,8 @@ public enum ErrorCode {
     CONNECTOR_ACTION_NOT_FOUND(HttpStatus.NOT_FOUND),
     /** 그 승인 줄은 이미 승인, 거절, 만료 가운데 하나로 끝났다. 같은 승인을 두 번 눌러도 실행은 한 번이다. */
     CONNECTOR_ACTION_NOT_PENDING(HttpStatus.CONFLICT),
+    /** 금융 주문이 적용 상한에 걸렸다. 다른 금융 거절과 달리 걸린 상한을 감추지 않는다(ADR-20261015 / financial-user-limits). */
+    FINANCIAL_LIMIT_EXCEEDED(HttpStatus.CONFLICT),
     /** 그 연결에 승인해 실행을 보낸 호출이 아직 끝나지 않았다. 끝난 뒤에 다시 등록하거나 해제한다(ADR-050). */
     CONNECTOR_ACTION_EXECUTING(HttpStatus.CONFLICT),
     /** 붙이려는 연결이 값이 확인돼 쓸 수 있는 상태가 아니거나 보관 파일에 값이 없다(ADR-083). */

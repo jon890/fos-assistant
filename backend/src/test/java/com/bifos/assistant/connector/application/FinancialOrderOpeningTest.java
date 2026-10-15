@@ -313,6 +313,26 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("준비가 사용자 상한에 걸리면 답이 걸린 상한과 오늘 남은 한도를 밝히고 금융 POST 를 보내지 않는다")
+    void limitRejectionNamesLimitAndRemaining() {
+        OverridableLiveProperties.during(gate, limits("30", "100"));
+        // 운영 하루 최대치는 100 이고 사용자는 40 으로 낮췄다.
+        jdbc.update("insert into financial_order_limit (user_id, daily_amount_usd, updated_at) values (?, 40, current_timestamp)", user.id());
+        var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("25")));
+        assertThat(publicApproval.approve(user, spent.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        var over = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20")));
+        assertThat(over.allowed()).isFalse();
+        assertThat(over.actionId()).isNull();
+        assertThat(over.message()).contains("하루 달러 합계 40 USD").contains("오늘 남은 한도: 15 USD").contains("order_limit_change");
+        assertThat(rows()).isEqualTo(1);
+        assertThat(counters().path("financial").intValue()).isEqualTo(1);
+        // 한 건 상한은 운영 최대치 30 이다. 남은 한도는 같은 하루 합계에서 낸다.
+        var single = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("31")));
+        assertThat(single.message()).contains("한 건 달러 금액 30 USD").contains("오늘 남은 한도: 15 USD");
+    }
+
+
+    @Test
     @DisplayName("가격 없는 수량 주문은 금액을 미리 알 수 없어 거절한다")
     void marketQuantityOrderWithoutPriceIsRejected() {
         var answer = prepare(UUID.randomUUID().toString(),
