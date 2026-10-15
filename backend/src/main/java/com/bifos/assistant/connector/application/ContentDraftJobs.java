@@ -277,8 +277,9 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             try {
                 var user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
                 refreshJob(user, snapshot, due, views(List.of(due)).getFirst());
-            } catch (RuntimeException ignored) {
-                // 마지막 조회에 실패해도 닫는다. 결과는 start claim 유무로 정한다.
+            } catch (RuntimeException ex) {
+                // 마지막 조회에 실패해도 닫는다. 결과는 start claim 유무로 정한다. 조회 실패가 닫힘 사유로 묻히지 않게 종류만 남긴다.
+                log.warn("기한 정리 직전 원고 저장 job 조회에 실패했다 jobId={} kind={}", due.jobId(), ex.getClass().getSimpleName());
             }
         }
         var actionId = actions.findById(due.actionId()).orElseThrow(ContentDraftJobs::notFound).publicId();
