@@ -88,6 +88,22 @@ class ContentDraftJobsTest extends ContentDraftJobFixture {
 
 
     @Test
+    @DisplayName("worker 가 알린 실패 사유 코드를 job 에 보관하고 다음 조회에서 사유가 없으면 비운다")
+    void keepsWorkerErrorReason() {
+        UUID snapshotId = preview();
+        var request = saves.requestSave(owner, origin.id(), snapshotId);
+        contentApproval.approve(owner, request.actionId(), null);
+        when(compiler.status(any(), any(), any())).thenAnswer(call -> statusAnswer(call.getArgument(2), "failed", false)
+            .put("error_code", "editor_failed").put("error_reason", "title_cursor_covered"));
+        var view = jobQueries.refresh(owner, conversation.id(), draftId, snapshotId);
+        assertThat(view.status()).isEqualTo(ContentDraftJobStatus.FAILED);
+        assertThat(view.errorCode()).isEqualTo("editor_failed");
+        assertThat(view.errorReason()).isEqualTo("title_cursor_covered");
+        assertThat(jobRows.findAll().getFirst().errorReason()).isEqualTo("title_cursor_covered");
+    }
+
+
+    @Test
     @DisplayName("조회 timeout과 stamp 변조는 안전한 오류로 끝나고 기존 job 상태를 FAILED로 바꾸지 않는다")
     void preservesJobOnLookupFailureAndStampTampering() {
         UUID snapshotId = preview();
