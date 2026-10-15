@@ -83,7 +83,7 @@ sequenceDiagram
 | 0 | 측정 세 층과 악화 금지 게이트, 실행 기록의 선택 근거 컬럼(아래 「Memory 회수 측정」). 서버의 임베딩 지연은 운영 저장소가 재고 결과 수치만 여기 적는다 | [ADR-20261015 / memory-eval-gate](../../backend/docs/adr/ADR-20261015-memory-eval-gate.md) |
 | 1 | 임베딩 서비스와 질문 기반 하이브리드 선별(한국어 키워드와 의미, RRF). 개인 사실 구역은 그대로다 | [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) |
 | 2 | `memory_link` 의 연결과 대체, 외부 글을 읽은 저장의 출처 기록 | [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md) |
-| 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, `fact_kind`, 정비 루프의 제안 모드 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
+| 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, 자동 보관 허락 표시(`archivable`), 정비 루프의 제안 모드 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
 | 4 | 정비의 자동 전환과 먼저 살펴보기 연결 | 같은 ADR |
 
 ### 기억 화면
