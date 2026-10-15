@@ -84,6 +84,10 @@ public class ContentDraftJob {
     @Column(name = "error_code", nullable = true, columnDefinition = "VARCHAR(64)")
     private String errorCode;
 
+    /** worker 가 알린 실패 사유의 고정 코드다. error_code 와 같은 모양만 담는다. */
+    @Column(name = "error_reason", nullable = true, columnDefinition = "VARCHAR(64)")
+    private String errorReason;
+
 
     public ContentDraftJob(Long snapshotId, Long actionId, Long ownerUserId, Long conversationId, Instant createdAt) {
         this.snapshotId = snapshotId;
@@ -127,6 +131,7 @@ public class ContentDraftJob {
         requireRunning();
         this.status = saveClicked || saveClaimedAt != null ? ContentDraftJobStatus.UNKNOWN : ContentDraftJobStatus.FAILED;
         this.errorCode = errorCode;
+        this.errorReason = null;
         this.lastCheckedAt = at;
     }
 
@@ -147,6 +152,7 @@ public class ContentDraftJob {
         require(running() || status == ContentDraftJobStatus.UNKNOWN);
         this.status = startClaimedAt == null ? ContentDraftJobStatus.FAILED : ContentDraftJobStatus.UNKNOWN;
         this.errorCode = errorCode;
+        this.errorReason = null;
         this.lastCheckedAt = at;
     }
 
@@ -164,7 +170,7 @@ public class ContentDraftJob {
 
 
     /** 같은 job의 늦은 terminal로 UNKNOWN을 해소하되 확정한 terminal은 덮지 않는다. */
-    public void observed(ContentDraftJobStatus observed, String stage, boolean clicked, String code, Instant at) {
+    public void observed(ContentDraftJobStatus observed, String stage, boolean clicked, String code, String reason, Instant at) {
         if (!running() && status != ContentDraftJobStatus.UNKNOWN) {
             return;
         }
@@ -172,6 +178,7 @@ public class ContentDraftJob {
         this.saveClicked = saveClicked || clicked;
         this.lastCheckedAt = at;
         this.errorCode = code;
+        this.errorReason = reason;
         if (observed == ContentDraftJobStatus.FAILED && (saveClicked || saveClaimedAt != null)) {
             this.status = ContentDraftJobStatus.UNKNOWN;
         } else if (status != ContentDraftJobStatus.UNKNOWN || observed != ContentDraftJobStatus.SAVING) {

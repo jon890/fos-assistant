@@ -206,6 +206,11 @@ for (const scenario of failures) {
     expect(error.stage).toBe("fill");
     expect(error.message).toBe("제목 자리에 커서를 두지 못했다");
     expect(error.extra.focus_diagnostics.attempts).toBe(10);
+    expect(error.extra.reason).toBe(
+      error.extra.focus_diagnostics.samples.at(-1).hit === "other"
+        ? "title_cursor_covered"
+        : "title_cursor_failed",
+    );
     expect(error.extra.focus_diagnostics.samples.at(-1)).toMatchObject(
       scenario.expected,
     );

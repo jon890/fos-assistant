@@ -58,6 +58,23 @@ class ContentDraftWorkerStatusDecoderTest {
     }
 
 
+    @Test
+    @DisplayName("error_reason 은 status 응답에서만 선택으로 받고 고정 코드 모양만 허용한다")
+    void acceptsOptionalErrorReasonOnlyAsFixedCode() {
+        assertThat(ContentDraftWorkerStatusDecoder.decode(answer(), stamp, false).errorReason()).isNull();
+        assertThat(ContentDraftWorkerStatusDecoder.decode(answer().put("error_reason", "title_cursor_covered"), stamp, false)
+            .errorReason()).isEqualTo("title_cursor_covered");
+        for (var bad : List.of("Title Cursor", "secret/path", "", "a".repeat(65))) {
+            reject(answer().put("error_reason", bad));
+        }
+        reject(answer().putNull("error_reason"));
+        reject(answer().put("error_reason", 1));
+        var start = json.createObjectNode().put("job_id", stamp.jobId().toString()).set("stamp", json.valueToTree(stamp));
+        ((ObjectNode)start).put("status", "running").putNull("error_code").put("error_reason", "title_cursor_covered");
+        assertThatThrownBy(() -> ContentDraftWorkerStatusDecoder.decode((ObjectNode)start, stamp, true)).isInstanceOf(ApiException.class);
+    }
+
+
     private ObjectNode answer() {
         return json.createObjectNode().put("job_id", stamp.jobId().toString()).set("stamp", json.valueToTree(stamp))
             .put("status", "running").put("stage", "queued").put("save_clicked", false).putNull("finished_at")

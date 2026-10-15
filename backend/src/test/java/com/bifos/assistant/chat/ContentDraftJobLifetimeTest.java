@@ -80,6 +80,19 @@ class ContentDraftJobLifetimeTest extends ContentDraftJobFixture {
 
 
     @Test
+    @DisplayName("기한 정리가 job 을 닫으면 앞선 조회가 남긴 실패 사유도 비운다")
+    void clearsErrorReasonWhenClosingOverdueJob() {
+        accepted();
+        jdbc.update("update content_draft_job set error_reason = 'title_cursor_covered'");
+        unreachable();
+        assertThat(contentJobs.closeOverdue(clock.instant().plus(Duration.ofHours(1)))).isOne();
+        var job = jobRows.findAll().getFirst();
+        assertThat(job.errorCode()).isEqualTo(ContentDraftJob.EXPIRED);
+        assertThat(job.errorReason()).isNull();
+    }
+
+
+    @Test
     @DisplayName("예약 커밋 뒤 시작 전송 전에 끊겨 DISPATCHED로 남은 job도 기한 정리가 FAILED로 닫는다")
     void closesDispatchedJobLeftByControlPlaneRestart() {
         var actionId = accepted();

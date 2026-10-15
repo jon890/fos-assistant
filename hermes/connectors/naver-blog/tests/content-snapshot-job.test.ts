@@ -722,6 +722,36 @@ test("private status 는 묵은 job 을 기존 규칙으로 끝내고 허용한 
   });
 });
 
+test("private status 는 안전한 실패 사유 코드만 error_reason 으로 더한다", async () => {
+  const { jobDir, snapshot, call } = await setup();
+  for (const [reason, expected] of [
+    ["title_cursor_covered", "title_cursor_covered"],
+    ["Bad Reason", undefined],
+    [BODY_MARKER, undefined],
+  ] as const) {
+    const stamp = stampFor(snapshot);
+    await createState(
+      jobDir,
+      runningState(stamp.jobId, {
+        snapshot_stamp: stamp,
+        status: "failed",
+        stage: "fill",
+        finished_at: new Date().toISOString(),
+        error: { code: "editor_failed", message: BODY_MARKER, reason },
+      }),
+    );
+    const body = (await call("status", { stamp })).body as Record<
+      string,
+      unknown
+    >;
+    expect(body).toMatchObject({ error_code: "editor_failed", stage: "fill" });
+    expect(body.error_reason).toBe(expected);
+    // 사유가 없으면 칸 자체를 싣지 않는다. 옛 Control Plane 이 모르는 칸을 거절하기 때문이다.
+    expect("error_reason" in body).toBe(expected !== undefined);
+    expect(JSON.stringify(body)).not.toContain(BODY_MARKER);
+  }
+});
+
 test("일반 도구 목록·env·모델 인자로 private start·status 를 켤 수 없다", async () => {
   expect(() =>
     snapshotOperation(["--content-snapshot-operation", "start"], COMPILE_ONLY),
