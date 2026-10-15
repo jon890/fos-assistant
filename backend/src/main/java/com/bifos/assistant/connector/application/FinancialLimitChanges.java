@@ -139,6 +139,12 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
         String dedupeKey = Sha256.hex("fos-order-limit:" + user.id() + ":" + originExecutionId + ":" + kind + ":" + plain);
         var existing = actions.findByDedupeKey(dedupeKey);
         if (existing.isPresent()) {
+            // 끝난 카드를 기다리는 카드처럼 안내하지 않는다. 거절이나 만료로 끝났으면 그 상태를 알린다.
+            if (existing.get().status() != ActionStatus.PENDING) {
+                return Map.of("status", "closed", "actionId", existing.get().publicId().toString(), "actionStatus",
+                    existing.get().status().name(), "message", "같은 요청의 승인 카드가 이미 끝났다. 상한은 바뀌지 않았다. "
+                        + "다시 올리려면 사용자에게 확인한 뒤 사용자의 다음 요청에서 다시 부른다.");
+            }
             return requested(existing.get(), name, current, requested, maximum);
         }
         String argsJson = JSON.writeValueAsString(Map.of("name", name, "value", plain));

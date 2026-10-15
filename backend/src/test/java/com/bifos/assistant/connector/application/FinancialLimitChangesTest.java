@@ -107,6 +107,9 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
         changes.change(user, origin, "order_amount_usd", "300");
         UUID rejected = UUID.fromString((String)changes.change(user, origin, "order_amount_usd", "400").get("actionId"));
         assertThat(publicApproval.reject(user, rejected).status()).isEqualTo(ActionStatus.REJECTED);
+        // 같은 실행의 같은 요청은 끝난 카드를 기다리는 카드처럼 안내하지 않는다.
+        assertThat(changes.change(user, origin, "order_amount_usd", "400")).containsEntry("status", "closed")
+            .containsEntry("actionStatus", "REJECTED");
         UUID expired = UUID.fromString((String)changes.change(user, origin, "order_amount_usd", "500").get("actionId"));
         clock.set(now.plus(Duration.ofDays(2)));
         assertThatThrownBy(() -> publicApproval.approve(user, expired, null, false))
