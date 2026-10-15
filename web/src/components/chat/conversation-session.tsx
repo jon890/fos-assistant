@@ -91,9 +91,8 @@ export function ConversationSession(props: ConversationSessionProps) {
   const starters = useStarterSuggestions(
     startScreen && currentAgent ? currentAgent.code : null,
   );
-  const commandAgentCode = currentAgent?.connectorManaged
-    ? null
-    : (currentAgent?.code ?? null);
+  const skillCommandsEnabled = currentAgent !== undefined && !currentAgent.connectorManaged;
+  const commandAgentCode = skillCommandsEnabled ? currentAgent.code : null;
   const skillNames =
     commandAgentCode !== null && skillCommands?.agentCode === commandAgentCode
       ? skillCommands.names
@@ -134,6 +133,7 @@ export function ConversationSession(props: ConversationSessionProps) {
       agentMissing={agentMissing}
       currentAgent={currentAgent}
       startScreen={startScreen}
+      skillCommandsEnabled={skillCommandsEnabled}
       skillNames={skillNames}
       starters={starters}
     />

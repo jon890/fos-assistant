@@ -69,6 +69,7 @@ export type Props = Pick<
     agentMissing: boolean;
     currentAgent: AgentView | undefined;
     startScreen: boolean;
+    skillCommandsEnabled: boolean;
     skillNames: string[] | undefined;
     starters: ReturnType<typeof useStarterSuggestions>;
   };
