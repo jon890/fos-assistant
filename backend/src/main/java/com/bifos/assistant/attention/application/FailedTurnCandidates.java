@@ -41,10 +41,12 @@ public class FailedTurnCandidates implements AttentionCandidates {
     private final AgentService agents;
     private final AttentionProperties properties;
 
+
     @Override
     public Set<CardKey> cards() {
         return Set.of(CardKey.FAILURES);
     }
+
 
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
@@ -62,8 +64,8 @@ public class FailedTurnCandidates implements AttentionCandidates {
         for (AgentExecution execution : failed) {
             Long conversationId = execution.conversationId();
             if (owned.containsKey(conversationId)
-                    && !latestTurn.containsKey(conversationId)
-                    && conversations.startedByUser(conversationId, execution.startedAt())) {
+                && !latestTurn.containsKey(conversationId)
+                && conversations.startedByUser(conversationId, execution.startedAt())) {
                 latestTurn.put(conversationId, execution);
             }
         }
@@ -76,32 +78,30 @@ public class FailedTurnCandidates implements AttentionCandidates {
         Set<Long> reported = new LinkedHashSet<>(latestTurn.keySet());
         reported.addAll(deliveryByConversation.keySet());
         Map<Long, Agent> agentById = agents.byIds(reported.stream()
-                .map(conversationId -> owned.get(conversationId).agentId())
-                .toList());
+            .map(conversationId -> owned.get(conversationId).agentId())
+            .toList());
         return reported.stream()
-                .map(conversationId -> candidate(
-                        latestTurn.get(conversationId),
-                        deliveryByConversation.get(conversationId),
-                        owned.get(conversationId),
-                        agentById,
-                        now))
-                .toList();
+            .map(conversationId -> candidate(
+                latestTurn.get(conversationId),
+                deliveryByConversation.get(conversationId),
+                owned.get(conversationId),
+                agentById,
+                now))
+            .toList();
     }
+
 
     /** 실행과 결과 전달 가운데 하나 이상이 있다. 둘 다 있으면 합친다. */
     private static AttentionCandidate candidate(
-            AgentExecution execution,
-            FailedDelivery delivery,
-            Conversation conversation,
-            Map<Long, Agent> agentById,
-            Instant now) {
-        boolean deliveryIsLatest =
-                execution == null || (delivery != null && delivery.updatedAt().isAfter(execution.finishedAt()));
-        AttentionTrigger trigger =
-                deliveryIsLatest ? AttentionTrigger.DELIVERY_FAILED : AttentionTrigger.EXECUTION_FAILED;
+        AgentExecution execution,
+        FailedDelivery delivery,
+        Conversation conversation,
+        Map<Long, Agent> agentById,
+        Instant now) {
+        boolean deliveryIsLatest = execution == null || (delivery != null && delivery.updatedAt().isAfter(execution.finishedAt()));
+        AttentionTrigger trigger = deliveryIsLatest ? AttentionTrigger.DELIVERY_FAILED : AttentionTrigger.EXECUTION_FAILED;
         // 지문의 앞 글자는 실행이 있으면 실행 쪽으로 고정한다. 더 최근인 쪽이 바뀌어도 숨긴 항목이 되살아나지 않는다.
-        AttentionTrigger stateTrigger =
-                execution != null ? AttentionTrigger.EXECUTION_FAILED : AttentionTrigger.DELIVERY_FAILED;
+        AttentionTrigger stateTrigger = execution != null ? AttentionTrigger.EXECUTION_FAILED : AttentionTrigger.DELIVERY_FAILED;
         List<AttentionSignal> signals = new ArrayList<>();
         List<AttentionSourceRef> sources = new ArrayList<>();
         StringBuilder material = new StringBuilder();
@@ -113,7 +113,7 @@ public class FailedTurnCandidates implements AttentionCandidates {
         if (delivery != null) {
             signals.add(AttentionSignal.DELIVERY_NOT_DONE);
             sources.add(new AttentionSourceRef(
-                    "RESULT_DELIVERY", "result_delivery:" + delivery.deliveryId(), delivery.updatedAt()));
+                "RESULT_DELIVERY", "result_delivery:" + delivery.deliveryId(), delivery.updatedAt()));
             if (execution != null) {
                 material.append("|DELIVERY_FAILED|");
             }
@@ -122,21 +122,21 @@ public class FailedTurnCandidates implements AttentionCandidates {
         Instant at = deliveryIsLatest ? delivery.updatedAt() : execution.finishedAt();
         Agent agent = agentById.get(conversation.agentId());
         return new AttentionCandidate(
-                CardKey.FAILURES,
-                "conversation:" + conversation.publicId(),
-                AttentionCandidates.stateKey(stateTrigger, material.toString()),
-                trigger,
-                false,
-                true,
-                signals,
-                AttentionConfidence.CONTROL_PLANE,
-                conversation.title(),
-                conversation.publicId(),
-                agent == null ? null : agent.name(),
-                at,
-                sources,
-                null,
-                null,
-                null);
+            CardKey.FAILURES,
+            "conversation:" + conversation.publicId(),
+            AttentionCandidates.stateKey(stateTrigger, material.toString()),
+            trigger,
+            false,
+            true,
+            signals,
+            AttentionConfidence.CONTROL_PLANE,
+            conversation.title(),
+            conversation.publicId(),
+            agent == null ? null : agent.name(),
+            at,
+            sources,
+            null,
+            null,
+            null);
     }
 }

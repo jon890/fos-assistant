@@ -14,12 +14,14 @@ import java.util.List;
  */
 public record SkillBundle(String name, String skillMd, List<SkillFile> files) {
 
+
     private static final String SKILL_MD_PATH = "SKILL.md";
     private static final char NUL = '\u0000';
 
     public SkillBundle {
         files = files == null ? List.of() : List.copyOf(files);
     }
+
 
     /**
      * 이 스킬의 지문이다. 미리보기가 준 지문과 올릴 때의 지금 스킬을 견주어 그 사이에 바뀌었는지 본다.

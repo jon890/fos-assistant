@@ -22,8 +22,8 @@ import org.hibernate.annotations.OnDeleteAction;
 /** 수락한 모든 요청을 관찰과 같은 수명으로 보관한다. */
 @Entity
 @Table(
-        name = "media_observation_request",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"attachment_id", "request_id"}))
+    name = "media_observation_request",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"attachment_id", "request_id"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -47,14 +47,15 @@ public class MediaObservationRequest {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumns({
         @JoinColumn(
-                name = "attachment_id",
-                referencedColumnName = "attachment_id",
-                insertable = false,
-                updatable = false),
+            name = "attachment_id",
+            referencedColumnName = "attachment_id",
+            insertable = false,
+            updatable = false),
         @JoinColumn(name = "observation_id", referencedColumnName = "id", insertable = false, updatable = false)
     })
     @OnDelete(action = OnDeleteAction.CASCADE)
     private MediaObservation observation;
+
 
     public MediaObservationRequest(Long attachmentId, UUID requestId, String requestHash, Long observationId) {
         this.attachmentId = attachmentId;

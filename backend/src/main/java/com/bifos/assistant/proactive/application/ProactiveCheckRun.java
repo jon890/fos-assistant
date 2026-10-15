@@ -44,10 +44,12 @@ public class ProactiveCheckRun implements CheckTurn {
     static final String DIRECT_RULE = ProactiveCheckInstructions.DIRECT_RULE;
     static final String COMMON_RULES = ProactiveCheckInstructions.COMMON_RULES;
 
+
     /** 경계 줄과 연결 줄을 골라 지시를 만든다. */
     static String instructions(boolean writesAllowed, boolean directConnectors) {
         return ProactiveCheckInstructions.instructions(writesAllowed, directConnectors);
     }
+
 
     static final String START_NOTICE = "먼저 살펴보기를 시작했어요";
     static final String NOTHING_NEW_NOTICE = "살펴봤지만 새로 알릴 것이 없어요";
@@ -87,6 +89,7 @@ public class ProactiveCheckRun implements CheckTurn {
     /** 멈춤 알림 줄의 글을 내줬다. 그 줄은 부르는 쪽이 저장했다. */
     private volatile boolean stopped;
 
+
     /**
      * 살펴보기 한 번이 쓰는 저장소와 부품이다. {@code ProactiveCheckService} 가 자기 빈으로 채워 넘긴다.
      *
@@ -96,21 +99,23 @@ public class ProactiveCheckRun implements CheckTurn {
      * @param reactions 최근에 알린 발견의 지금 반응을 읽어 입력에 싣고 「관심 없음」 주제를 되풀이로 내린다
      */
     record Deps(
-            LiveProperties<ProactiveCheckProperties> properties,
-            ProactiveCheckRepository checks,
-            ProactiveCheckFindingRepository findings,
-            ProactiveCheckProblemRepository problems,
-            FollowUpService followUps,
-            CheckFindingReactions reactions,
-            ChatMessageRepository messages,
-            AgentExecutionRepository executions,
-            ContextAssembler contextAssembler,
-            CheckResultParser parser,
-            CheckAnswerRenderer renderer,
-            CheckReportFactory reportFactory,
-            ChatService chat,
-            Clock clock,
-            BackgroundTasks backgroundTasks) {}
+        LiveProperties<ProactiveCheckProperties> properties,
+        ProactiveCheckRepository checks,
+        ProactiveCheckFindingRepository findings,
+        ProactiveCheckProblemRepository problems,
+        FollowUpService followUps,
+        CheckFindingReactions reactions,
+        ChatMessageRepository messages,
+        AgentExecutionRepository executions,
+        ContextAssembler contextAssembler,
+        CheckResultParser parser,
+        CheckAnswerRenderer renderer,
+        CheckReportFactory reportFactory,
+        ChatService chat,
+        Clock clock,
+        BackgroundTasks backgroundTasks) {
+    }
+
 
     /**
      * @param check 이미 저장한 {@code RUNNING} 살펴보기 줄
@@ -118,12 +123,12 @@ public class ProactiveCheckRun implements CheckTurn {
      * @param directConnectors 시작할 때 그 에이전트에 붙은 연결이 있었는지. 있으면 지시가 연결한 서비스의 도구를 직접 부르게 한다
      */
     ProactiveCheckRun(
-            CurrentUser owner,
-            Long agentId,
-            ProactiveCheck check,
-            boolean renewSession,
-            boolean directConnectors,
-            Deps deps) {
+        CurrentUser owner,
+        Long agentId,
+        ProactiveCheck check,
+        boolean renewSession,
+        boolean directConnectors,
+        Deps deps) {
         this.check = check;
         this.renewSession = renewSession;
         this.directConnectors = directConnectors;
@@ -133,11 +138,13 @@ public class ProactiveCheckRun implements CheckTurn {
         this.limits = new ProactiveCheckLimits(owner, check, deps);
     }
 
+
     /** 시작할 때 옮겨 적은 쓰기 허용 값과 붙은 연결 유무로 지시를 고른다. 에이전트 칸과 바인딩을 다시 읽지 않는다. */
     @Override
     public String instructions() {
         return instructions(check.writesAllowed(), directConnectors);
     }
+
 
     /** 처음 부를 때 시각과 DB 를 읽어 만든다. 다시 불리면 처음 만든 값을 돌려준다. */
     @Override
@@ -148,20 +155,24 @@ public class ProactiveCheckRun implements CheckTurn {
         return input;
     }
 
+
     @Override
     public String startNotice() {
         return START_NOTICE;
     }
+
 
     @Override
     public boolean notifyStart() {
         return check.trigger() == CheckTrigger.MANUAL;
     }
 
+
     @Override
     public boolean renewSession() {
         return renewSession;
     }
+
 
     /** 루트 실행을 살펴보기 줄에 적은 뒤 {@code max-duration} 이 지나면 깨는 시간 상한 스레드를 띄운다. */
     @Override
@@ -169,11 +180,13 @@ public class ProactiveCheckRun implements CheckTurn {
         limits.started(executionId, hermesRootSessionId);
     }
 
+
     /** 스트림을 읽는 스레드에서 불린다. 센 값이 {@code max-tool-calls} 를 넘는 첫 순간 멈춘다. */
     @Override
     public void toolStarted(Long executionId) {
         limits.toolStarted(executionId);
     }
+
 
     /**
      * 자동 실행으로 시작해 답, 보고, 발견, 알림 줄을 남기지 않는 살펴보기인가. 문제 후보만 남겨 다시 가치 평가와 행동 정책을 거치게
@@ -183,6 +196,7 @@ public class ProactiveCheckRun implements CheckTurn {
     public boolean silent() {
         return results.silent();
     }
+
 
     /**
      * 결과 블록을 읽고 발견을 검사해 대화에 남길 글을 정한다. 발견은 들고 있다가 답 메시지를 저장한 뒤 {@link #saveFindings} 가
@@ -196,6 +210,7 @@ public class ProactiveCheckRun implements CheckTurn {
     public CheckAnswer answer(Long executionId, String output) {
         return results.answer(executionId, output);
     }
+
 
     /** 멈춘 까닭에 맞는 알림 줄의 글이다. 부르면 그 줄을 저장한 것으로 본다. */
     @Override
@@ -211,36 +226,43 @@ public class ProactiveCheckRun implements CheckTurn {
         return STOPPED_NOTICE;
     }
 
+
     /** 상한으로 멈췄으면 거짓이다. Control Plane 이 멈춘 것이라 대기 메시지를 그대로 보낸다. */
     @Override
     public boolean holdPendingOnStop() {
         return limits.stopReason() == null;
     }
 
+
     /** 시간 상한 스레드를 깨워 끝내고, 그 뒤로는 상한에 닿아도 멈추기를 부르지 않는다. 줄을 적기 전에 부른다. */
     public void close() {
         limits.close();
     }
+
 
     /** 상한에 닿아 멈춘 까닭이 남아 있는지다. 멈추기를 부르는 중이거나 멈췄으면 참이고, 멈추기가 실패했으면 거짓이다. */
     boolean limitStopped() {
         return limits.stopReason() != null;
     }
 
+
     /** 멈춤 알림 줄의 글을 이미 내줬는지다. 냈으면 그 줄은 대화에 저장됐다. */
     boolean stoppedNoticeSaved() {
         return stopped;
     }
+
 
     /** 이 turn 의 살펴보기 줄. {@link #record} 뒤에는 끝난 상태를 담는다. */
     ProactiveCheck check() {
         return check;
     }
 
+
     /** 살펴보기 turn 의 실행 줄. 실행 줄을 만들기 전에 끝났으면 null 이다. */
     Long rootExecutionId() {
         return check.rootExecutionId();
     }
+
 
     /**
      * turn 이 끝난 뒤 들고 있던 결과와 셈을 살펴보기 줄에 적는다. 멈춤 알림 줄을 냈으면 {@code STOPPED} 와 멈춘 까닭, 아니면
@@ -257,19 +279,20 @@ public class ProactiveCheckRun implements CheckTurn {
         } else {
             TreeTokens tokens = treeTokens();
             check.succeed(
-                    results.outcome(),
-                    results.newFindings(),
-                    results.referenceFindings(),
-                    silent() ? null : results.pendingReport(),
-                    limits.toolCalls(),
-                    delegations,
-                    tokens.input(),
-                    tokens.cachedInput(),
-                    tokens.output(),
-                    now);
+                results.outcome(),
+                results.newFindings(),
+                results.referenceFindings(),
+                silent() ? null : results.pendingReport(),
+                limits.toolCalls(),
+                delegations,
+                tokens.input(),
+                tokens.cachedInput(),
+                tokens.output(),
+                now);
         }
         deps.checks().save(check);
     }
+
 
     /**
      * 들고 있던 발견과 문제 후보를 저장한다. turn 이 답 메시지를 저장하고 돌아왔을 때만 부른다. 없으면 아무것도 하지 않는다. 사용자가 보지 못한
@@ -279,11 +302,13 @@ public class ProactiveCheckRun implements CheckTurn {
         results.saveFindings();
     }
 
+
     /** turn 이 예외로 끝났을 때 살펴보기 줄을 {@code FAILED} 와 그 오류 코드로 적는다. */
     void recordFailure(String errorCode, int delegations) {
         check.fail(errorCode, limits.toolCalls(), delegations, deps.clock().instant());
         deps.checks().save(check);
     }
+
 
     /** 루트와 자식 실행의 토큰을 모두 더한다. 아직 적히지 않은 토큰은 0으로 센다. */
     private TreeTokens treeTokens() {
@@ -295,16 +320,17 @@ public class ProactiveCheckRun implements CheckTurn {
         deps.executions().findById(rootId).ifPresent(tree::add);
         long input = tree.stream().mapToLong(each -> orZero(each.inputTokens())).sum();
         long cachedInput = tree.stream()
-                .mapToLong(each -> orZero(each.cachedInputTokens()))
-                .sum();
-        long output =
-                tree.stream().mapToLong(each -> orZero(each.outputTokens())).sum();
+            .mapToLong(each -> orZero(each.cachedInputTokens()))
+            .sum();
+        long output = tree.stream().mapToLong(each -> orZero(each.outputTokens())).sum();
         return new TreeTokens(input, cachedInput, output);
     }
+
 
     private static long orZero(Long value) {
         return value == null ? 0 : value;
     }
+
 
     private record TreeTokens(long input, long cachedInput, long output) {
         private static final TreeTokens ZERO = new TreeTokens(0, 0, 0);

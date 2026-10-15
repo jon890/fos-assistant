@@ -13,6 +13,7 @@ public interface CdpConnection extends AutoCloseable {
      */
     CompletableFuture<JsonNode> send(String method, Map<String, Object> params);
 
+
     /** 연결을 닫는다. 기다리던 명령은 실패로 끝난다. 두 번 닫아도 된다. 이렇게 닫으면 닫힘 알림을 부르지 않는다. */
     @Override
     void close();

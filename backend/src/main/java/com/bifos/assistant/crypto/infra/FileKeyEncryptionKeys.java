@@ -34,13 +34,14 @@ public class FileKeyEncryptionKeys implements KeyEncryptionKeys {
     private static final Pattern KEY_ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");
     private static final int KEY_BYTES = 32;
     private static final Set<PosixFilePermission> OTHERS = EnumSet.of(
-            PosixFilePermission.GROUP_READ,
-            PosixFilePermission.GROUP_WRITE,
-            PosixFilePermission.OTHERS_READ,
-            PosixFilePermission.OTHERS_WRITE);
+        PosixFilePermission.GROUP_READ,
+        PosixFilePermission.GROUP_WRITE,
+        PosixFilePermission.OTHERS_READ,
+        PosixFilePermission.OTHERS_WRITE);
 
     private final String activeKeyId;
     private final Map<String, SecretKey> keys;
+
 
     public FileKeyEncryptionKeys(DataEncryptionProperties properties) {
         if (!properties.configured()) {
@@ -58,20 +59,24 @@ public class FileKeyEncryptionKeys implements KeyEncryptionKeys {
         warnIfShared(file);
     }
 
+
     @Override
     public boolean available() {
         return !activeKeyId.isEmpty();
     }
+
 
     @Override
     public String activeKeyId() {
         return activeKeyId;
     }
 
+
     @Override
     public boolean has(String keyId) {
         return keys.containsKey(keyId);
     }
+
 
     @Override
     public String wrap(byte[] dataKey, byte[] aad) {
@@ -81,6 +86,7 @@ public class FileKeyEncryptionKeys implements KeyEncryptionKeys {
         return AesGcm.seal(keys.get(activeKeyId), dataKey, aad);
     }
 
+
     @Override
     public byte[] unwrap(String keyId, String wrapped, byte[] aad) {
         SecretKey key = keys.get(keyId);
@@ -89,6 +95,7 @@ public class FileKeyEncryptionKeys implements KeyEncryptionKeys {
         }
         return AesGcm.open(key, wrapped, aad);
     }
+
 
     private static Map<String, SecretKey> read(Path file) {
         List<String> lines;
@@ -123,6 +130,7 @@ public class FileKeyEncryptionKeys implements KeyEncryptionKeys {
         }
         return parsed;
     }
+
 
     private static void warnIfShared(Path file) {
         try {

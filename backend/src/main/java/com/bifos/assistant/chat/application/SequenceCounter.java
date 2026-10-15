@@ -4,9 +4,11 @@ package com.bifos.assistant.chat.application;
 final class SequenceCounter {
     private int next = 1;
 
+
     int peek() {
         return next;
     }
+
 
     void advance() {
         next++;

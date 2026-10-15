@@ -70,6 +70,7 @@ class SubagentSessionRegistrarTest {
     private String root;
     private AgentExecution dadRun;
 
+
     /** 같은 H2 를 다른 검사 클래스와 함께 쓰므로 이 검사의 사용자와 그 대화, 이 검사가 쓰는 profile 의 줄만 지운다. */
     @BeforeEach
     void setUp() {
@@ -83,6 +84,7 @@ class SubagentSessionRegistrarTest {
         root = newRoot();
         dadRun = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE_A, root);
     }
+
 
     @Test
     @DisplayName("루트에서 도는 실행 아래 하위 에이전트는 그 실행을 origin 으로 등록한다")
@@ -98,6 +100,7 @@ class SubagentSessionRegistrarTest {
         assertThat(row.parentSessionId()).as("부모").isEqualTo(root);
         assertThat(row.createdAt()).isNotNull();
     }
+
 
     @Test // 3
     @DisplayName("origin 실행이 끝난 뒤에도 하위 에이전트의 하위 에이전트는 그 origin 을 잇는다")
@@ -115,26 +118,27 @@ class SubagentSessionRegistrarTest {
         assertThat(row.parentSessionId()).as("부모").isEqualTo(s1);
     }
 
+
     @Test // 4
     @DisplayName("다른 에이전트에게 맡긴 FOS 실행 안의 하위 에이전트는 그 FOS 실행을 origin 으로 갖는다")
     void subagentInsideFosRunDelegatedToOtherAgentHasThatRunAsOrigin() {
         String delegatedRoot = newRoot();
-        AgentExecution delegated =
-                McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_B, delegatedRoot);
+        AgentExecution delegated = McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_B, delegatedRoot);
         jdbc.update(
-                "UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
-                dadRun.id(),
-                dadRun.id(),
-                delegated.id());
+            "UPDATE agent_execution SET parent_execution_id = ?, root_execution_id = ? WHERE id = ?",
+            dadRun.id(),
+            dadRun.id(),
+            delegated.id());
         String s3 = newChild();
 
         assertThat(registrar.register(PROFILE_B, delegatedRoot, delegatedRoot, s3))
-                .isEqualTo(SubagentRegistrationResult.CREATED);
+            .isEqualTo(SubagentRegistrationResult.CREATED);
 
         HermesSessionBinding row = binding(PROFILE_B, s3);
         assertThat(row.originExecutionId()).as("origin 실행").isEqualTo(delegated.id());
         assertThat(row.userId()).as("사용자").isEqualTo(kid.id());
     }
+
 
     @Test // 8
     @DisplayName("다른 profile 의 부모 등록이나 도는 실행으로는 등록하지 못한다")
@@ -148,9 +152,10 @@ class SubagentSessionRegistrarTest {
         assertRejected(PROFILE_B, root, root, underRoot);
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_B, underBinding))
-                .isEmpty();
+            .isEmpty();
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_B, underRoot)).isEmpty();
     }
+
 
     @Test // 9
     @DisplayName("같은 네 값으로 두 번 오면 두 번째는 그대로 두고 줄은 하나다")
@@ -162,6 +167,7 @@ class SubagentSessionRegistrarTest {
 
         assertThat(rowCount(PROFILE_A, s1)).isEqualTo(1);
     }
+
 
     @Test // 9
     @DisplayName("같은 네 값이 동시에 와도 줄은 하나이고 나머지는 그대로 둔다")
@@ -184,14 +190,15 @@ class SubagentSessionRegistrarTest {
             }
 
             assertThat(results)
-                    .as("결과 %s", results)
-                    .containsOnlyOnce(SubagentRegistrationResult.CREATED)
-                    .filteredOn(result -> result == SubagentRegistrationResult.EXISTS)
-                    .hasSize(threads - 1);
+                .as("결과 %s", results)
+                .containsOnlyOnce(SubagentRegistrationResult.CREATED)
+                .filteredOn(result -> result == SubagentRegistrationResult.EXISTS)
+                .hasSize(threads - 1);
         }
         assertThat(rowCount(PROFILE_A, s1)).isEqualTo(1);
         assertThat(binding(PROFILE_A, s1).originExecutionId()).isEqualTo(dadRun.id());
     }
+
 
     @Test // 10
     @DisplayName("이미 등록한 session 이 다른 origin 으로 오면 거절하고 덮어쓰지 않는다")
@@ -202,16 +209,17 @@ class SubagentSessionRegistrarTest {
         AgentExecution otherRun = McpCallSigner.running(executions, kid.id(), CONVERSATION_ID, PROFILE_A, otherRoot);
 
         assertThatThrownBy(() -> registrar.register(PROFILE_A, otherRoot, otherRoot, s1))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_CONFLICT));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_CONFLICT));
 
         HermesSessionBinding row = binding(PROFILE_A, s1);
         assertThat(row.originExecutionId())
-                .as("origin 은 %d 그대로", dadRun.id())
-                .isEqualTo(dadRun.id())
-                .isNotEqualTo(otherRun.id());
+            .as("origin 은 %d 그대로", dadRun.id())
+            .isEqualTo(dadRun.id())
+            .isNotEqualTo(otherRun.id());
         assertThat(row.userId()).isEqualTo(dad.id());
     }
+
 
     @Test
     @DisplayName("최상위 부모 실행이 끝난 뒤 같은 네 값의 재전송은 그대로 두고 다른 부모로 오면 거절한다")
@@ -229,6 +237,7 @@ class SubagentSessionRegistrarTest {
         assertThat(rowCount(PROFILE_A, s1)).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("대화가 보낼 session 이나 루트 session 으로 쓰는 값은 하위 에이전트로 등록하지 못한다")
     void cannotRegisterValueUsedAsConversationSendOrRootSessionAsSubagent() {
@@ -243,8 +252,9 @@ class SubagentSessionRegistrarTest {
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, compacted)).isEmpty();
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, conversationRoot))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("압축 교체된 최상위 session 이 만든 하위 에이전트는 루트에서 도는 실행으로 풀린다")
@@ -259,19 +269,21 @@ class SubagentSessionRegistrarTest {
         assertThat(row.parentSessionId()).isEqualTo(compacted);
     }
 
+
     @Test
     @DisplayName("최상위 session 은 하위 에이전트로 등록하지 못한다")
     void cannotRegisterTopSessionAsSubagent() {
         AgentExecution earlierTurn = McpCallSigner.save(
-                executions, dad.id(), CONVERSATION_ID, PROFILE_A, newRoot(), ExecutionStatus.SUCCEEDED);
+            executions, dad.id(), CONVERSATION_ID, PROFILE_A, newRoot(), ExecutionStatus.SUCCEEDED);
 
         assertRejected(PROFILE_A, root, root, root);
         assertRejected(PROFILE_A, root, root, earlierTurn.hermesSessionId());
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, root)).isEmpty();
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, earlierTurn.hermesSessionId()))
-                .isEmpty();
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("부모 등록이 없고 루트에서 도는 실행도 없으면 거절한다")
@@ -283,6 +295,7 @@ class SubagentSessionRegistrarTest {
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, child)).isEmpty();
     }
+
 
     @Test
     @DisplayName("부모 등록의 루트가 서명한 루트와 다르면 거절한다")
@@ -298,6 +311,7 @@ class SubagentSessionRegistrarTest {
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, child)).isEmpty();
     }
 
+
     @Test
     @DisplayName("부모 등록의 origin 실행 줄이 없으면 거절한다")
     void rejectsWhenParentRegistrationOriginRunRowIsMissing() {
@@ -310,6 +324,7 @@ class SubagentSessionRegistrarTest {
 
         assertThat(bindings.findByProfileNameAndSessionId(PROFILE_A, child)).isEmpty();
     }
+
 
     @Test
     @DisplayName("비었거나 칸 길이를 넘는 값은 거절하고 칸 길이까지는 받는다")
@@ -328,32 +343,37 @@ class SubagentSessionRegistrarTest {
         assertThat(binding(PROFILE_A, longest).sessionId()).isEqualTo(longest);
     }
 
+
     private HermesSessionBinding binding(String profileName, String sessionId) {
         return bindings.findByProfileNameAndSessionId(profileName, sessionId)
-                .orElseThrow(() -> new AssertionError("등록 줄이 없다 profile=" + profileName));
+            .orElseThrow(() -> new AssertionError("등록 줄이 없다 profile=" + profileName));
     }
+
 
     private long rowCount(String profileName, String sessionId) {
         return bindings.findAll().stream()
-                .filter(row ->
-                        row.profileName().equals(profileName) && row.sessionId().equals(sessionId))
-                .count();
+            .filter(row -> row.profileName().equals(profileName) && row.sessionId().equals(sessionId))
+            .count();
     }
+
 
     private void setStatus(AgentExecution execution, ExecutionStatus status) {
         jdbc.update("UPDATE agent_execution SET status = ? WHERE id = ?", status.name(), execution.id());
     }
 
+
     private void assertRejected(String profileName, String parentRoot, String parent, String child) {
         assertThatThrownBy(() -> registrar.register(profileName, parentRoot, parent, child))
-                .as("profile=%s", profileName)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+            .as("profile=%s", profileName)
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
+
 
     private static String newRoot() {
         return "fos-" + UUID.randomUUID();
     }
+
 
     private static String newChild() {
         return "하위-" + UUID.randomUUID();

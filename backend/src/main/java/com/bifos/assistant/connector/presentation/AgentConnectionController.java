@@ -27,16 +27,19 @@ public class AgentConnectionController {
     private final ConnectorBindingService bindings;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/{code}/connections")
     public AgentConnectionsResponse list(@PathVariable String code) {
         return AgentConnectionsResponse.from(bindings.listForAgent(currentUser.require(), code));
     }
+
 
     /** 이미 붙어 있으면 지금 상태를 돌려준다. 붙인 바인딩은 관리자 반영 완료 전까지 재시작 대기다. */
     @PutMapping("/{code}/connections/{connectorId}")
     public AgentConnectionResponse bind(@PathVariable String code, @PathVariable String connectorId) {
         return AgentConnectionResponse.from(bindings.bind(currentUser.require(), code, connectorId));
     }
+
 
     @DeleteMapping("/{code}/connections/{connectorId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

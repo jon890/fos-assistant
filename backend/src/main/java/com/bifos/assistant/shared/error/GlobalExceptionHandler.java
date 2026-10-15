@@ -22,25 +22,28 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleApi(ApiException ex) {
         log.warn("api error code={} message={}", ex.code(), ex.getMessage());
         return ResponseEntity.status(ex.code().status())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new ErrorResponse(ex.code().name(), ex.getMessage(), ex.missingToolsets()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(new ErrorResponse(ex.code().name(), ex.getMessage(), ex.missingToolsets()));
     }
+
 
     @ExceptionHandler(PessimisticLockingFailureException.class)
     public ResponseEntity<ErrorResponse> handleAgentLock(PessimisticLockingFailureException ex) {
         return ResponseEntity.status(ErrorCode.AGENT_BUSY.status())
-                .body(new ErrorResponse(ErrorCode.AGENT_BUSY.name(), "the agent is being updated"));
+            .body(new ErrorResponse(ErrorCode.AGENT_BUSY.name(), "the agent is being updated"));
     }
+
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
-                .findFirst()
-                .map(error -> error.getField() + " " + error.getDefaultMessage())
-                .orElse("invalid request");
+            .findFirst()
+            .map(error -> error.getField() + " " + error.getDefaultMessage())
+            .orElse("invalid request");
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
-                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), message));
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), message));
     }
+
 
     /**
      * 경로 변수나 요청 인자의 형식이 틀린 요청을 입력 오류로 돌려준다.
@@ -50,8 +53,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
-                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), ex.getName() + " has an invalid format"));
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), ex.getName() + " has an invalid format"));
     }
+
 
     /**
      * multipart 상한을 넘은 요청을 입력 오류로 돌려준다.
@@ -63,8 +67,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
         log.warn("upload rejected by the multipart limit: {}", ex.getMessage());
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.status())
-                .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "the upload is larger than the limit"));
+            .body(new ErrorResponse(ErrorCode.VALIDATION_FAILED.name(), "the upload is larger than the limit"));
     }
+
 
     /**
      * 경로가 받지 않는 메서드로 온 요청을 405 로 돌려준다. 받는 메서드는 {@code Allow} 헤더에 적는다.
@@ -77,10 +82,11 @@ public class GlobalExceptionHandler {
         log.warn("method not allowed method={} supported={}", ex.getMethod(), ex.getSupportedHttpMethods());
         var supported = ex.getSupportedHttpMethods();
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.status())
-                .allow(supported == null ? new HttpMethod[0] : supported.toArray(HttpMethod[]::new))
-                .body(new ErrorResponse(
-                        ErrorCode.METHOD_NOT_ALLOWED.name(), "method " + ex.getMethod() + " is not supported"));
+            .allow(supported == null ? new HttpMethod[0] : supported.toArray(HttpMethod[]::new))
+            .body(new ErrorResponse(
+                ErrorCode.METHOD_NOT_ALLOWED.name(), "method " + ex.getMethod() + " is not supported"));
     }
+
 
     /** 이미 쓸 수 없는 비동기 응답에는 오류 본문을 쓰지 않는다. */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
@@ -88,10 +94,11 @@ public class GlobalExceptionHandler {
         log.debug("async response is no longer usable: {}", ex.getMessage());
     }
 
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
         log.error("unexpected error", ex);
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.status())
-                .body(new ErrorResponse(ErrorCode.INTERNAL_ERROR.name(), "internal error"));
+            .body(new ErrorResponse(ErrorCode.INTERNAL_ERROR.name(), "internal error"));
     }
 }

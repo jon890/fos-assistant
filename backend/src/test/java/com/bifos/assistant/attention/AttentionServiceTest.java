@@ -76,18 +76,18 @@ class AttentionServiceTest {
 
     /** 승인을 받는 쓰기 도구 하나를 선언한다. 승인 줄의 이름이 이 선언에서 온다. */
     private static final ConnectorManifest MANIFEST = new ConnectorManifest(
-            CONNECTOR,
-            "먼저 알리기 검사용 메모",
-            "",
-            List.of(),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(
-                    new ConnectorTool("list_scopes", "READ", "none", null, null),
-                    new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
+        CONNECTOR,
+        "먼저 알리기 검사용 메모",
+        "",
+        List.of(),
+        "list_scopes",
+        "demo",
+        List.of(),
+        false,
+        2,
+        List.of(
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", null)));
 
     @Autowired
     TestClock clock;
@@ -133,6 +133,7 @@ class AttentionServiceTest {
     private CurrentUser dad;
     private Agent chief;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
@@ -140,6 +141,7 @@ class AttentionServiceTest {
         dad = member();
         chief = agentOf(dad, "집안일 도우미");
     }
+
 
     @AfterEach
     void tearDown() {
@@ -149,24 +151,25 @@ class AttentionServiceTest {
             jdbc.update("DELETE FROM attention_control WHERE user_id = ?", userId);
             String ownConversations = "(SELECT id FROM conversation WHERE user_id = ?)";
             jdbc.update(
-                    "DELETE FROM result_delivery_attempt WHERE delivery_id IN"
-                            + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
-                    userId);
+                "DELETE FROM result_delivery_attempt WHERE delivery_id IN"
+                    + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
+                userId);
             jdbc.update(
-                    "DELETE FROM result_delivery_item WHERE delivery_id IN"
-                            + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
-                    userId);
+                "DELETE FROM result_delivery_item WHERE delivery_id IN"
+                    + " (SELECT id FROM result_delivery WHERE conversation_id IN " + ownConversations + ")",
+                userId);
             jdbc.update("DELETE FROM result_delivery WHERE conversation_id IN " + ownConversations, userId);
             jdbc.update("DELETE FROM connector_action WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
             jdbc.update(
-                    "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
-                    userId);
+                "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
+                userId);
             jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", userId);
         }
         createdUsers.clear();
     }
+
 
     @Test
     @DisplayName("사용자 글 뒤에 실패한 루트 실행은 실패 카드에 NOT_RETRIED 와 실행 출처를 달고 NOW 로 보인다")
@@ -184,13 +187,14 @@ class AttentionServiceTest {
         assertThat(item.agentName()).isEqualTo("집안일 도우미");
         assertThat(item.why().signals()).containsExactly(AttentionSignal.NOT_RETRIED);
         assertThat(item.why().sources())
-                .extracting(AttentionSourceRef::source, AttentionSourceRef::ref)
-                .containsExactly(tuple("EXECUTION_STATE", "execution:" + failed.id()));
+            .extracting(AttentionSourceRef::source, AttentionSourceRef::ref)
+            .containsExactly(tuple("EXECUTION_STATE", "execution:" + failed.id()));
         assertThat(view.nowCount()).isEqualTo(1);
         assertThat(card(view, CardKey.CONTINUE).items())
-                .as("실패 카드에 남은 대화는 이어서 하기에서 빠진다")
-                .isEmpty();
+            .as("실패 카드에 남은 대화는 이어서 하기에서 빠진다")
+            .isEmpty();
     }
+
 
     @Test
     @DisplayName("같은 대화에서 그 뒤 성공한 루트 실행이 있으면 실패 항목이 없다")
@@ -200,10 +204,11 @@ class AttentionServiceTest {
         failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
         message(ChatMessage.fromUser(conversation.id(), dad.id(), "다시 해 줘", NOW.minusSeconds(300)));
         executions.save(
-                root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(300), NOW.minusSeconds(240)));
+            root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(300), NOW.minusSeconds(240)));
 
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
+
 
     @Test
     @DisplayName("시작 전 마지막 메시지가 알림 줄인 자동 turn 의 실패는 실패 카드에 없다")
@@ -217,6 +222,7 @@ class AttentionServiceTest {
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
 
+
     @Test
     @DisplayName("알림 줄 뒤에 지시를 사용자 글로 저장한 예약 turn 의 실패는 실패 카드에 있다")
     void showsScheduledTurnFailure() {
@@ -226,8 +232,9 @@ class AttentionServiceTest {
         failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
 
         assertThat(onlyItem(service.view(dad), CardKey.FAILURES).conversationId())
-                .isEqualTo(conversation.publicId());
+            .isEqualTo(conversation.publicId());
     }
+
 
     @Test
     @DisplayName("답 메시지 앞이 사용자 글인 다시 생성의 실패는 실패 카드에 있다")
@@ -238,8 +245,9 @@ class AttentionServiceTest {
         failedRoot(dad, conversation, NOW.minusSeconds(600), NOW.minusSeconds(540));
 
         assertThat(onlyItem(service.view(dad), CardKey.FAILURES).conversationId())
-                .isEqualTo(conversation.publicId());
+            .isEqualTo(conversation.publicId());
     }
+
 
     @Test
     @DisplayName("다른 사용자의 실패는 응답에 없다")
@@ -255,6 +263,7 @@ class AttentionServiceTest {
         assertThat(view.nowCount()).isZero();
     }
 
+
     @Test
     @DisplayName("끝난 지 8일 지난 실패는 응답에 없다")
     void skipsFailureOutsideWindow() {
@@ -265,6 +274,7 @@ class AttentionServiceTest {
 
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
+
 
     @Test
     @DisplayName("FAILED 결과 전달 묶음은 실패 카드에 DELIVERY_FAILED 와 DELIVERY_NOT_DONE 과 묶음 출처를 달고 보인다")
@@ -281,10 +291,11 @@ class AttentionServiceTest {
         assertThat(item.why().trigger()).isEqualTo(AttentionTrigger.DELIVERY_FAILED);
         assertThat(item.why().signals()).containsExactly(AttentionSignal.DELIVERY_NOT_DONE);
         assertThat(item.why().sources())
-                .extracting(AttentionSourceRef::source, AttentionSourceRef::ref, AttentionSourceRef::asOf)
-                .containsExactly(tuple("RESULT_DELIVERY", "result_delivery:" + delivery.id(), NOW));
+            .extracting(AttentionSourceRef::source, AttentionSourceRef::ref, AttentionSourceRef::asOf)
+            .containsExactly(tuple("RESULT_DELIVERY", "result_delivery:" + delivery.id(), NOW));
         assertThat(view.nowCount()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("같은 대화에 실패한 사용자 turn 도 있으면 항목 하나에 신호가 둘 다 들고 더 최근인 쪽이 trigger 다")
@@ -298,14 +309,15 @@ class AttentionServiceTest {
 
         assertThat(item.why().trigger()).isEqualTo(AttentionTrigger.DELIVERY_FAILED);
         assertThat(item.why().signals())
-                .containsExactly(AttentionSignal.NOT_RETRIED, AttentionSignal.DELIVERY_NOT_DONE);
+            .containsExactly(AttentionSignal.NOT_RETRIED, AttentionSignal.DELIVERY_NOT_DONE);
         assertThat(item.why().sources())
-                .extracting(AttentionSourceRef::source, AttentionSourceRef::ref)
-                .containsExactly(
-                        tuple("EXECUTION_STATE", "execution:" + failed.id()),
-                        tuple("RESULT_DELIVERY", "result_delivery:" + delivery.id()));
+            .extracting(AttentionSourceRef::source, AttentionSourceRef::ref)
+            .containsExactly(
+                tuple("EXECUTION_STATE", "execution:" + failed.id()),
+                tuple("RESULT_DELIVERY", "result_delivery:" + delivery.id()));
         assertThat(item.at()).isEqualTo(NOW.minusSeconds(60));
     }
+
 
     @Test
     @DisplayName("결과 전달 실패만 바뀌어도 stateKey 가 바뀌어 숨긴 항목이 다시 보인다")
@@ -319,6 +331,7 @@ class AttentionServiceTest {
 
         assertThat(after).isNotEqualTo(before);
     }
+
 
     @Test
     @DisplayName("stateKey 는 실패한 turn 만이면 실행 번호, 결과 전달만이면 묶음 번호와 시도 수, 둘 다면 실행 쪽 앞 글에 둘을 이은 글의 지문이다")
@@ -336,17 +349,18 @@ class AttentionServiceTest {
         List<AttentionItem> items = card(service.view(dad), CardKey.FAILURES).items();
 
         assertThat(items)
-                .extracting(AttentionItem::conversationId, AttentionItem::stateKey)
-                .containsExactlyInAnyOrder(
-                        tuple(turnOnly.publicId(), Sha256.hex16("EXECUTION_FAILED|" + turnOnlyFailed.id())),
-                        tuple(
-                                deliveryOnly.publicId(),
-                                Sha256.hex16("DELIVERY_FAILED|" + deliveryOnlyFailed.id() + "|1")),
-                        tuple(
-                                both.publicId(),
-                                Sha256.hex16("EXECUTION_FAILED|" + bothFailed.id() + "|DELIVERY_FAILED|"
-                                        + bothDelivery.id() + "|1")));
+            .extracting(AttentionItem::conversationId, AttentionItem::stateKey)
+            .containsExactlyInAnyOrder(
+                tuple(turnOnly.publicId(), Sha256.hex16("EXECUTION_FAILED|" + turnOnlyFailed.id())),
+                tuple(
+                    deliveryOnly.publicId(),
+                    Sha256.hex16("DELIVERY_FAILED|" + deliveryOnlyFailed.id() + "|1")),
+                tuple(
+                    both.publicId(),
+                    Sha256.hex16("EXECUTION_FAILED|" + bothFailed.id() + "|DELIVERY_FAILED|"
+                        + bothDelivery.id() + "|1")));
     }
+
 
     @Test
     @DisplayName("DELIVERING 과 STOPPED 와 DELIVERED 묶음은 실패 카드에 없다")
@@ -358,16 +372,18 @@ class AttentionServiceTest {
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
 
+
     @Test
     @DisplayName("끝난 지 8일 지난 FAILED 묶음은 실패 카드에 없다")
     void skipsFailedDeliveryOutsideWindow() {
         deliveryOf(
-                conversationOf(dad, "주간 장보기 목록 정리"),
-                DeliveryStatus.FAILED,
-                NOW.minus(Duration.ofDays(8)).minusSeconds(60));
+            conversationOf(dad, "주간 장보기 목록 정리"),
+            DeliveryStatus.FAILED,
+            NOW.minus(Duration.ofDays(8)).minusSeconds(60));
 
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
+
 
     @Test
     @DisplayName("다시 전달로 DELIVERED 가 된 뒤 사용자 turn 이 실패하면 그 실패는 EXECUTION_FAILED 로 남는다")
@@ -375,7 +391,7 @@ class AttentionServiceTest {
         Conversation conversation = conversationOf(dad, "주간 장보기 목록 정리");
         deliveryOf(conversation, DeliveryStatus.DELIVERED, NOW.minusSeconds(600));
         executions.save(
-                root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(600), NOW.minusSeconds(580)));
+            root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(600), NOW.minusSeconds(580)));
         message(ChatMessage.fromUser(conversation.id(), dad.id(), "다음 목록도 정리해 줘", NOW.minusSeconds(300)));
         failedRoot(dad, conversation, NOW.minusSeconds(300), NOW.minusSeconds(240));
 
@@ -384,6 +400,7 @@ class AttentionServiceTest {
         assertThat(item.why().trigger()).isEqualTo(AttentionTrigger.EXECUTION_FAILED);
         assertThat(item.why().signals()).containsExactly(AttentionSignal.NOT_RETRIED);
     }
+
 
     @Test
     @DisplayName("다른 사용자 대화의 FAILED 묶음은 응답에 없다")
@@ -397,6 +414,7 @@ class AttentionServiceTest {
         assertThat(view.nowCount()).isZero();
     }
 
+
     @Test
     @DisplayName("지운 대화의 FAILED 묶음은 응답에 없다")
     void hidesFailedDeliveryOfDeletedConversation() {
@@ -406,6 +424,7 @@ class AttentionServiceTest {
 
         assertThat(card(service.view(dad), CardKey.FAILURES).items()).isEmpty();
     }
+
 
     @Test
     @DisplayName("기한이 3시간 남은 승인 줄은 나를 기다리는 카드에 EXPIRES_SOON 과 승인 줄 식별자와 대화를 달고 보인다")
@@ -423,6 +442,7 @@ class AttentionServiceTest {
         assertThat(item.level()).isEqualTo(AttentionLevel.NOW);
     }
 
+
     @Test
     @DisplayName("대화가 없는 승인 줄은 응답에 없다")
     void skipsApprovalWithoutConversation() {
@@ -431,24 +451,25 @@ class AttentionServiceTest {
         assertThat(card(service.view(dad), CardKey.NEEDS_ME).items()).isEmpty();
     }
 
+
     @Test
     @DisplayName("40분 전에 시작한 위임 실행은 맡긴 일 카드에 LONG_RUNNING 을 달고 NOW 로 보이며 실행 칸을 채운다")
     void showsLongRunningDelegationAsNow() {
         Conversation conversation = conversationOf(dad, "여행 일정 짜기");
         AgentExecution parent = executions.save(
-                root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(2_500), NOW.minusSeconds(2_450)));
+            root(dad, conversation, ExecutionStatus.SUCCEEDED, NOW.minusSeconds(2_500), NOW.minusSeconds(2_450)));
         AgentExecution delegation = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .parentExecutionId(parent.id())
-                .rootExecutionId(parent.id())
-                .delegationKey("attention-" + UUID.randomUUID())
-                .profileName(chief.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(NOW.minus(Duration.ofMinutes(40)))
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .parentExecutionId(parent.id())
+            .rootExecutionId(parent.id())
+            .delegationKey("attention-" + UUID.randomUUID())
+            .profileName(chief.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(NOW.minus(Duration.ofMinutes(40)))
+            .build());
 
         AttentionItem item = onlyItem(service.view(dad), CardKey.DELEGATED);
 
@@ -459,6 +480,7 @@ class AttentionServiceTest {
         assertThat(item.execution().status()).isEqualTo("RUNNING");
         assertThat(item.followUp()).isNull();
     }
+
 
     @Test
     @DisplayName("한 출처의 기록 읽기가 실패하면 그 카드만 UNAVAILABLE 이고 나머지 카드는 그대로다")
@@ -480,6 +502,7 @@ class AttentionServiceTest {
         assertThat(view.nowCount()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("경로의 응답 글에는 실행의 오류 코드, 모델, 금액이 없다")
     void responseHasNoErrorCodeModelOrCost() {
@@ -492,8 +515,9 @@ class AttentionServiceTest {
 
         assertThat(body).contains("\"key\":\"failures\"", "\"attention\":\"NOW\"", "\"channel\":\"IN_APP\"");
         assertThat(body)
-                .doesNotContain("errorCode", "\"model\"", "estimatedCostMicros", "HERMES_BUSY", "example-model");
+            .doesNotContain("errorCode", "\"model\"", "estimatedCostMicros", "HERMES_BUSY", "example-model");
     }
+
 
     private CurrentUser member() {
         String email = "attention-" + UUID.randomUUID() + "@example.com";
@@ -502,92 +526,102 @@ class AttentionServiceTest {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private Agent agentOf(CurrentUser owner, String name) {
         String code = "attention-" + UUID.randomUUID().toString().substring(0, 8);
         return agents.save(Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW));
     }
+
 
     private Conversation conversationOf(CurrentUser owner, String title) {
         return conversations.save(Conversation.startedBy(owner.id(), title, chief.id(), NOW.minusSeconds(3_600)));
     }
 
+
     /** 열린 묶음을 저장하고 상태와 바뀐 시각을 그 값으로 맞춘다. */
     private ResultDelivery deliveryOf(Conversation conversation, DeliveryStatus status, Instant updatedAt) {
         ResultDelivery delivery = deliveries.save(ResultDelivery.opened(conversation.id(), updatedAt));
         new TransactionTemplate(transactionManager)
-                .executeWithoutResult(transaction -> deliveries.changeStatus(delivery.id(), status, updatedAt));
+            .executeWithoutResult(transaction -> deliveries.changeStatus(delivery.id(), status, updatedAt));
         return delivery;
     }
+
 
     private void message(ChatMessage message) {
         messages.save(message);
     }
+
 
     /** 오류 코드와 모델을 채운 실패한 대화 turn 루트 실행이다. 응답에 이 값이 새지 않는지 함께 본다. */
     private AgentExecution failedRoot(CurrentUser owner, Conversation conversation, Instant started, Instant finished) {
         return executions.save(root(owner, conversation, ExecutionStatus.FAILED, started, finished));
     }
 
+
     private AgentExecution root(
-            CurrentUser owner, Conversation conversation, ExecutionStatus status, Instant started, Instant finished) {
+        CurrentUser owner, Conversation conversation, ExecutionStatus status, Instant started, Instant finished) {
         return AgentExecution.builder()
-                .userId(owner.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName(chief.hermesProfile())
-                .costMode(CostMode.SUBSCRIPTION)
-                .model("example-model")
-                .status(status)
-                .errorCode(status == ExecutionStatus.FAILED ? "HERMES_BUSY" : null)
-                .timing(started, finished)
-                .build();
+            .userId(owner.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName(chief.hermesProfile())
+            .costMode(CostMode.SUBSCRIPTION)
+            .model("example-model")
+            .status(status)
+            .errorCode(status == ExecutionStatus.FAILED ? "HERMES_BUSY" : null)
+            .timing(started, finished)
+            .build();
     }
+
 
     /** 이 검사의 커넥터로 답을 기다리는 승인 줄 하나를 넣는다. 승인 줄을 만드는 길은 커넥터 검사가 본다. */
     private UUID insertPendingAction(CurrentUser owner, Long conversationId, Instant expiresAt) {
         UUID actionId = UUID.randomUUID();
         jdbc.update(
-                """
+            """
                 INSERT INTO connector_action (public_id, user_id, agent_id, connector_id, tool_name, hermes_tool, risk,
                     approval_mode, decision, passed, status, origin_execution_id, conversation_id, dedupe_key,
                     args_json, args_sha256, expires_at, created_at)
                 VALUES (?, ?, ?, ?, ?, 'mcp__demo__write_note', 'WRITE', 'REQUIRED', 'NEEDS_APPROVAL',
                     FALSE, 'PENDING', 0, ?, ?, '{"text":"안녕"}', 'sha', ?, ?)
                 """,
-                bytes(actionId),
-                owner.id(),
-                chief.id(),
-                CONNECTOR,
-                WRITE,
-                conversationId,
-                UUID.randomUUID().toString(),
-                Timestamp.from(expiresAt),
-                Timestamp.from(NOW.minusSeconds(60)));
+            bytes(actionId),
+            owner.id(),
+            chief.id(),
+            CONNECTOR,
+            WRITE,
+            conversationId,
+            UUID.randomUUID().toString(),
+            Timestamp.from(expiresAt),
+            Timestamp.from(NOW.minusSeconds(60)));
         return actionId;
     }
 
+
     private static byte[] bytes(UUID id) {
         return ByteBuffer.allocate(16)
-                .putLong(id.getMostSignificantBits())
-                .putLong(id.getLeastSignificantBits())
-                .array();
+            .putLong(id.getMostSignificantBits())
+            .putLong(id.getLeastSignificantBits())
+            .array();
     }
+
 
     private static AttentionCard card(AttentionView view, CardKey key) {
         return view.cards().stream()
-                .filter(card -> card.key() == key)
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("카드 " + key + " 가 응답에 없다: " + view.cards()));
+            .filter(card -> card.key() == key)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("카드 " + key + " 가 응답에 없다: " + view.cards()));
     }
+
 
     private static AttentionItem onlyItem(AttentionView view, CardKey key) {
         List<AttentionItem> items = card(view, key).items();

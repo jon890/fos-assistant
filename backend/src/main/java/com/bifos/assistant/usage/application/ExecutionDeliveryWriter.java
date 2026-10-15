@@ -17,11 +17,13 @@ public class ExecutionDeliveryWriter {
 
     private final AgentExecutionRepository repository;
 
+
     /** 이 실행의 결과를 부모에게 전했다고 적는다. 뜻은 {@link AgentExecutionRepository#markResultDelivered} 가 적는다. */
     @Transactional
     public int markResultDelivered(Long id, Instant at) {
         return repository.markResultDelivered(id, at);
     }
+
 
     /** 한 루트 아래의 위임 결과를 모두 전했다고 적는다. 뜻은 {@link AgentExecutionRepository#markTreeDelivered} 가 적는다. */
     @Transactional

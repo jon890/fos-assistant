@@ -12,9 +12,11 @@ class HermesUsageParsingTest {
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 
+
     private TokenUsage parse(String json) throws Exception {
         return HttpHermesRunsClient.readUsage(mapper.readTree(json));
     }
+
 
     @Test
     @DisplayName("Hermes v0 21 5 의 run usage 에서 캐시 읽기를 읽는다")
@@ -31,6 +33,7 @@ class HermesUsageParsingTest {
         assertThat(usage.cachedInputTokens()).isEqualTo(1024);
     }
 
+
     @Test
     @DisplayName("prompt tokens 와 completion tokens 를 읽는다")
     void readsTheOpenaiShape() throws Exception {
@@ -45,6 +48,7 @@ class HermesUsageParsingTest {
         assertThat(usage.cachedInputTokens()).isEqualTo(80);
     }
 
+
     @Test
     @DisplayName("input tokens 와 output tokens 를 읽고 합계를 계산한다")
     void readsTheAnthropicShapeAndDerivesTheTotal() throws Exception {
@@ -58,6 +62,7 @@ class HermesUsageParsingTest {
         assertThat(usage.totalTokens()).isEqualTo(15);
     }
 
+
     @Test
     @DisplayName("usage 에 토큰이 없으면 비워 둔다")
     void survivesAMissingUsageBlock() throws Exception {
@@ -66,6 +71,7 @@ class HermesUsageParsingTest {
         assertThat(usage.inputTokens()).isNull();
         assertThat(usage.totalTokens()).isNull();
     }
+
 
     @Test
     @DisplayName("usage 와 캐시 칸 이름이 달라도 같은 토큰 수로 읽는다")
@@ -76,19 +82,20 @@ class HermesUsageParsingTest {
             "\"prompt_tokens_details\":{\"cached_tokens\":80}", "\"cache_read_input_tokens\":80"
         }) {
             assertThat(parse("{\"input_tokens\":120,\"output_tokens\":40," + cache + "}"))
-                    .isEqualTo(expected);
+                .isEqualTo(expected);
             assertThat(parse("{\"prompt_tokens\":120,\"completion_tokens\":40," + cache + "}"))
-                    .isEqualTo(expected);
+                .isEqualTo(expected);
         }
     }
+
 
     @Test
     @DisplayName("보고하지 않은 캐시와 출력은 비워 두고 total 로 메우지 않는다")
     void keepsMissingCountsUnknownInsteadOfDerivingFromTotal() throws Exception {
         assertThat(parse("{\"input_tokens\":120,\"total_tokens\":160}"))
-                .isEqualTo(new TokenUsage(120L, null, null, 160L));
+            .isEqualTo(new TokenUsage(120L, null, null, 160L));
         assertThat(parse("{\"input_tokens\":120,\"output_tokens\":40}"))
-                .isEqualTo(new TokenUsage(120L, null, 40L, 160L));
+            .isEqualTo(new TokenUsage(120L, null, 40L, 160L));
         assertThat(parse("null")).isEqualTo(TokenUsage.empty());
     }
 }

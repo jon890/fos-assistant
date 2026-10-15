@@ -10,4 +10,5 @@ import java.time.Instant;
  * @param attemptCount 지금까지 만든 시도 수. 마지막 시도의 번호와 같다
  * @param updatedAt 묶음의 상태가 바뀐 시각
  */
-public record FailedDelivery(Long deliveryId, Long conversationId, int attemptCount, Instant updatedAt) {}
+public record FailedDelivery(Long deliveryId, Long conversationId, int attemptCount, Instant updatedAt) {
+}

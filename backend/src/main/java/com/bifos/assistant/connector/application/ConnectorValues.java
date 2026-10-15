@@ -34,18 +34,18 @@ final class ConnectorValues {
 
     private static final ConnectionFieldsConverter COLUMN = new ConnectionFieldsConverter();
 
+
     /**
      * 요청의 값을 manifest 로 검사하고 채운 칸만 남긴다.
      *
      * <p>비운 선택 칸은 결과에 넣지 않는다. 오류 메시지에는 칸 이름과 값을 싣지 않는다.
      *
      * @param requireAll 등록이면 참. 필수 칸이 모두 있어야 하고, 저장할 칸 값 전체가 {@code fields} 열에 들어가야 한다.
-     *     외부에 반영한 뒤 저장에서 실패하지 않도록 여기서 먼저 본다
+     * 외부에 반영한 뒤 저장에서 실패하지 않도록 여기서 먼저 본다
      */
     static Map<String, String> validated(ConnectorManifest manifest, Map<String, String> values, boolean requireAll) {
         Map<String, String> given = values == null ? Map.of() : values;
-        Map<String, ConnectorField> fields =
-                manifest.fields().stream().collect(Collectors.toMap(ConnectorField::key, field -> field));
+        Map<String, ConnectorField> fields = manifest.fields().stream().collect(Collectors.toMap(ConnectorField::key, field -> field));
         if (!fields.keySet().containsAll(given.keySet())) {
             throw ConnectorErrors.invalid();
         }
@@ -65,12 +65,12 @@ final class ConnectorValues {
             accepted.put(field.key(), value);
         }
         if (requireAll
-                && COLUMN.convertToDatabaseColumn(stored(manifest, accepted)).length()
-                        > ConnectorConnection.FIELDS_LENGTH) {
+            && COLUMN.convertToDatabaseColumn(stored(manifest, accepted)).length() > ConnectorConnection.FIELDS_LENGTH) {
             throw ConnectorErrors.invalid();
         }
         return accepted;
     }
+
 
     private static boolean matches(ConnectorField field, String value) {
         // 줄바꿈과 NUL 은 env 파일의 다른 줄을 쓰게 만들 수 있다.
@@ -87,6 +87,7 @@ final class ConnectorValues {
             return true;
         }
     }
+
 
     /**
      * 저장할 칸 값이다.
@@ -111,11 +112,12 @@ final class ConnectorValues {
         return new ConnectionFields(values, secretPrefixes);
     }
 
+
     /** 비밀값의 앞부분이다. 끝 자리에서 대리 쌍이 갈리면 그 앞에서 자른다. */
     private static String secretPrefix(String value) {
         int end = Character.isHighSurrogate(value.charAt(SECRET_PREFIX_LENGTH - 1))
-                ? SECRET_PREFIX_LENGTH - 1
-                : SECRET_PREFIX_LENGTH;
+            ? SECRET_PREFIX_LENGTH - 1
+            : SECRET_PREFIX_LENGTH;
         return value.substring(0, end);
     }
 }

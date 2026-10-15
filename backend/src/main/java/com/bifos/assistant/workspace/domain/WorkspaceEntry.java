@@ -10,4 +10,5 @@ import java.time.Instant;
  * @param openable 이름을 본문 주소의 조각으로 쓸 수 있는지다
  */
 public record WorkspaceEntry(
-        String name, WorkspaceEntryKind kind, Long size, Instant modifiedAt, boolean readable, boolean openable) {}
+    String name, WorkspaceEntryKind kind, Long size, Instant modifiedAt, boolean readable, boolean openable) {
+}

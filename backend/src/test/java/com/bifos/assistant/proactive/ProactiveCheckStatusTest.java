@@ -88,14 +88,16 @@ class ProactiveCheckStatusTest {
     private final List<Long> createdChecks = new ArrayList<>();
     private MockMvc mvc;
 
+
     @BeforeEach
     void setUp() {
         mvc = MockMvcBuilders.standaloneSetup(new ProactiveCheckController(service, currentUser))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -104,21 +106,23 @@ class ProactiveCheckStatusTest {
         agents.deleteAllById(createdAgents);
     }
 
+
     private Agent agent(AgentVisibility visibility) {
         String code = "status-" + UUID.randomUUID();
         Agent saved = agents.save(Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                owner.id(),
-                NOW));
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            owner.id(),
+            NOW));
         createdAgents.add(saved.id());
         return saved;
     }
+
 
     private Conversation checkConversationOf(CurrentUser user, Agent agent) {
         Conversation saved = conversations.save(Conversation.startedForCheck(user.id(), "점검", agent.id(), NOW));
@@ -126,32 +130,33 @@ class ProactiveCheckStatusTest {
         return saved;
     }
 
+
     /** 실행 번호와 루트 session 과 오류 코드가 적힌, 실패한 살펴보기를 남긴다. */
     private void failedCheck(CurrentUser user, Agent agent, Conversation conversation) {
-        ProactiveCheck check =
-                ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, NOW);
+        ProactiveCheck check = ProactiveCheck.started(user.id(), agent.id(), conversation.id(), CheckTrigger.MANUAL, false, NOW);
         check.attachRoot(987_654L, "root-session-secret");
         check.fail("HERMES_UNAVAILABLE", 3, 1, NOW.plusSeconds(30));
         createdChecks.add(checks.save(check).id());
     }
+
 
     @Test
     @DisplayName("결과를 읽지 못한 마지막 살펴보기는 그 까닭을 함께 받는다")
     void ownerSeesInvalidReasonOfLastCheck() throws Exception {
         Agent groupAgent = agent(AgentVisibility.GROUP);
         Conversation ownersCheck = checkConversationOf(owner, groupAgent);
-        ProactiveCheck check =
-                ProactiveCheck.started(owner.id(), groupAgent.id(), ownersCheck.id(), CheckTrigger.MANUAL, false, NOW);
+        ProactiveCheck check = ProactiveCheck.started(owner.id(), groupAgent.id(), ownersCheck.id(), CheckTrigger.MANUAL, false, NOW);
         check.succeedInvalid(CheckInvalidReason.EMPTY_ANSWER, 0, 0, NOW.plusSeconds(30));
         createdChecks.add(checks.save(check).id());
         when(currentUser.require()).thenReturn(owner);
 
         mvc.perform(get("/api/v1/agents/{code}/proactive-check", groupAgent.code()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lastCheck.status").value("SUCCEEDED"))
-                .andExpect(jsonPath("$.lastCheck.outcome").value("INVALID_RESULT"))
-                .andExpect(jsonPath("$.lastCheck.invalidReason").value("EMPTY_ANSWER"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.lastCheck.status").value("SUCCEEDED"))
+            .andExpect(jsonPath("$.lastCheck.outcome").value("INVALID_RESULT"))
+            .andExpect(jsonPath("$.lastCheck.invalidReason").value("EMPTY_ANSWER"));
     }
+
 
     @Test
     @DisplayName("다른 사용자의 비공개 에이전트는 404 AGENT_NOT_FOUND 이고 Hermes 를 부르지 않는다")
@@ -160,10 +165,11 @@ class ProactiveCheckStatusTest {
         when(currentUser.require()).thenReturn(other);
 
         mvc.perform(get("/api/v1/agents/{code}/proactive-check", privateAgent.code()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("AGENT_NOT_FOUND"));
         verifyNoInteractions(toolsets, skillClient);
     }
+
 
     @Test
     @DisplayName("점검 대화와 살펴보기가 없으면 conversationId 와 lastCheck 가 null 이고 시작할 수 있다")
@@ -172,12 +178,13 @@ class ProactiveCheckStatusTest {
         when(currentUser.require()).thenReturn(owner);
 
         mvc.perform(get("/api/v1/agents/{code}/proactive-check", privateAgent.code()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.available").value(true))
-                .andExpect(jsonPath("$.blockers.length()").value(0))
-                .andExpect(jsonPath("$.conversationId").value(nullValue()))
-                .andExpect(jsonPath("$.lastCheck").value(nullValue()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.available").value(true))
+            .andExpect(jsonPath("$.blockers.length()").value(0))
+            .andExpect(jsonPath("$.conversationId").value(nullValue()))
+            .andExpect(jsonPath("$.lastCheck").value(nullValue()));
     }
+
 
     @Test
     @DisplayName("막는 까닭이 있으면 까닭 코드와 끌 toolset 이름을 싣는다")
@@ -187,12 +194,13 @@ class ProactiveCheckStatusTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "terminal"));
 
         mvc.perform(get("/api/v1/agents/{code}/proactive-check", privateAgent.code()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.available").value(false))
-                .andExpect(jsonPath("$.blockers.length()").value(1))
-                .andExpect(jsonPath("$.blockers[0].code").value("TOOLSETS_NOT_ALLOWED"))
-                .andExpect(jsonPath("$.blockers[0].toolsets[0]").value("terminal"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.available").value(false))
+            .andExpect(jsonPath("$.blockers.length()").value(1))
+            .andExpect(jsonPath("$.blockers[0].code").value("TOOLSETS_NOT_ALLOWED"))
+            .andExpect(jsonPath("$.blockers[0].toolsets[0]").value("terminal"));
     }
+
 
     @Test
     @DisplayName("같은 그룹 공개 에이전트를 다른 사용자가 조회해도 남의 점검 대화와 살펴보기가 보이지 않는다")
@@ -203,10 +211,11 @@ class ProactiveCheckStatusTest {
         when(currentUser.require()).thenReturn(other);
 
         mvc.perform(get("/api/v1/agents/{code}/proactive-check", groupAgent.code()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.conversationId").value(nullValue()))
-                .andExpect(jsonPath("$.lastCheck").value(nullValue()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.conversationId").value(nullValue()))
+            .andExpect(jsonPath("$.lastCheck").value(nullValue()));
     }
+
 
     @Test
     @DisplayName("주인은 자기 점검 대화와 마지막 살펴보기를 받고 실행 번호, session, 오류 코드, profile 은 받지 않는다")
@@ -218,17 +227,17 @@ class ProactiveCheckStatusTest {
         when(currentUser.require()).thenReturn(owner);
 
         mvc.perform(get("/api/v1/agents/{code}/proactive-check", groupAgent.code()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.conversationId")
-                        .value(ownersCheck.publicId().toString()))
-                .andExpect(jsonPath("$.lastCheck.status").value("FAILED"))
-                .andExpect(jsonPath("$.lastCheck.outcome").value(nullValue()))
-                .andExpect(jsonPath("$.lastCheck.invalidReason").value(nullValue()))
-                .andExpect(jsonPath("$.lastCheck.startedAt").exists())
-                .andExpect(jsonPath("$.lastCheck.finishedAt").exists())
-                .andExpect(content().string(not(containsString("987654"))))
-                .andExpect(content().string(not(containsString("root-session-secret"))))
-                .andExpect(content().string(not(containsString("HERMES_UNAVAILABLE"))))
-                .andExpect(content().string(not(containsString(groupAgent.hermesProfile()))));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.conversationId")
+                .value(ownersCheck.publicId().toString()))
+            .andExpect(jsonPath("$.lastCheck.status").value("FAILED"))
+            .andExpect(jsonPath("$.lastCheck.outcome").value(nullValue()))
+            .andExpect(jsonPath("$.lastCheck.invalidReason").value(nullValue()))
+            .andExpect(jsonPath("$.lastCheck.startedAt").exists())
+            .andExpect(jsonPath("$.lastCheck.finishedAt").exists())
+            .andExpect(content().string(not(containsString("987654"))))
+            .andExpect(content().string(not(containsString("root-session-secret"))))
+            .andExpect(content().string(not(containsString("HERMES_UNAVAILABLE"))))
+            .andExpect(content().string(not(containsString(groupAgent.hermesProfile()))));
     }
 }

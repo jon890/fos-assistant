@@ -10,10 +10,13 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionExecution;
+import com.bifos.assistant.connector.domain.FinancialOrderLimit;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
+import com.bifos.assistant.connector.infra.FinancialOrderLimitRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -47,6 +50,7 @@ class ConnectorFinancialGateTest {
     private final ConnectorActionExecutionRepository contents = mock(ConnectorActionExecutionRepository.class);
     private final TextCipher cipher = mock(TextCipher.class);
     private final AppUserRepository users = mock(AppUserRepository.class);
+    private final FinancialOrderLimitRepository rows = mock(FinancialOrderLimitRepository.class);
     private final List<ConnectorAction> today = new ArrayList<>();
 
 
@@ -58,8 +62,7 @@ class ConnectorFinancialGateTest {
         var gate = gate(closed);
         assertThatThrownBy(gate::requireOpen).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> gate.requireAccounts(9L, List.of("7"))).isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(LIMIT_BUY), closed))
-            .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> gate.requireWithinLimits(9L, null, LIMIT_BUY, NOW)).isInstanceOf(FinancialLimitExceeded.class);
     }
 
 
@@ -174,14 +177,48 @@ class ConnectorFinancialGateTest {
 
 
     @Test
-    @DisplayName("지정가 생성은 수량과 가격의 곱을 한 건 금액으로 보고 상한을 넘으면 거절한다")
+    @DisplayName("지정가 생성은 수량과 가격의 곱을 한 건 금액으로 보고 상한을 넘으면 걸린 상한을 밝혀 거절한다")
     void limitsLimitOrderAmountAndQuantity() {
-        var amount = ConnectorFinancialGate.amount(JSON.readTree(LIMIT_BUY), open("2000", "2", "1000000"));
+        var amount = ConnectorFinancialGate.amount(JSON.readTree(LIMIT_BUY));
         assertThat(amount).hasValueSatisfying(value -> assertThat(value).isEqualByComparingTo("2000"));
-        assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(LIMIT_BUY), open("1999", "2", "1000000")))
-            .isInstanceOf(ApiException.class);
-        assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(LIMIT_BUY), open("2000", "1", "1000000")))
-            .isInstanceOf(ApiException.class);
+        assertThatCode(() -> gate(open("2000", "2", "1000000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .doesNotThrowAnyException();
+        assertThatThrownBy(() -> gate(open("1999", "2", "1000000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOfSatisfying(FinancialLimitExceeded.class, ex -> {
+                assertThat(ex.kind()).isEqualTo(FinancialLimitKind.ORDER_AMOUNT_KRW);
+                assertThat(ex.limit()).isEqualByComparingTo("1999");
+                assertThat(ex.remainingToday()).isEqualByComparingTo("1000000");
+            });
+        assertThatThrownBy(() -> gate(open("2000", "1", "1000000")).requireWithinLimits(9L, null, LIMIT_BUY, NOW))
+            .isInstanceOfSatisfying(FinancialLimitExceeded.class, ex -> {
+                assertThat(ex.kind()).isEqualTo(FinancialLimitKind.ORDER_QUANTITY);
+                assertThat(ex.remainingToday()).isNull();
+            });
+    }
+
+
+    @Test
+    @DisplayName("사용자가 정한 하루 달러 상한으로 판정하고 남은 한도를 함께 밝힌다")
+    void judgesByUserDailyLimitWithRemaining() {
+        String usd = "{\"symbol\":\"Q\",\"market\":\"US\",\"currency\":\"USD\",\"side\":\"BUY\",\"orderType\":\"MARKET\","
+            + "\"orderAmount\":\"100\",\"clientOrderId\":\"c\",\"account_seq\":\"7\"}";
+        spent(1L, ActionStatus.SUCCEEDED, usd.replace("\"100\"", "\"250\""));
+        own(FinancialLimitKind.DAILY_AMOUNT_USD, "300");
+        assertThatThrownBy(() -> gate(open("1000", "10", "1000")).requireWithinLimits(9L, null, usd, NOW))
+            .isInstanceOfSatisfying(FinancialLimitExceeded.class, ex -> {
+                assertThat(ex.kind()).isEqualTo(FinancialLimitKind.DAILY_AMOUNT_USD);
+                assertThat(ex.limit()).isEqualByComparingTo("300");
+                assertThat(ex.remainingToday()).isEqualByComparingTo("50");
+            });
+        // 오늘 쓴 금액보다 낮춘 상한은 남은 한도가 0 이다.
+        own(FinancialLimitKind.DAILY_AMOUNT_USD, "200");
+        assertThatThrownBy(() -> gate(open("1000", "10", "1000")).requireWithinLimits(9L, null, usd, NOW))
+            .isInstanceOfSatisfying(FinancialLimitExceeded.class, ex -> assertThat(ex.remainingToday()).isEqualByComparingTo("0"));
+        // 최대치보다 큰 사용자 값은 최대치가 이긴다.
+        own(FinancialLimitKind.DAILY_AMOUNT_USD, "5000");
+        assertThatCode(() -> gate(open("1000", "10", "350")).requireWithinLimits(9L, null, usd, NOW)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> gate(open("1000", "10", "349")).requireWithinLimits(9L, null, usd, NOW))
+            .isInstanceOf(FinancialLimitExceeded.class);
     }
 
 
@@ -200,17 +237,18 @@ class ConnectorFinancialGateTest {
         "{\"currency\":\"KRW\",\"quantity\":\"0\",\"price\":\"1\"}"})
     @DisplayName("금액을 정할 수 없거나 첫 개방 대상이 아닌 주문은 닫는다")
     void closesUnmeasurableOrders(String args) {
-        assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(args), open("1000000", "1000", "1000000")))
-            .isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> ConnectorFinancialGate.amount(JSON.readTree(args)))
+            .isInstanceOf(ApiException.class).isNotInstanceOf(FinancialLimitExceeded.class);
     }
 
 
     @Test
     @DisplayName("취소는 새로 쓰는 금액이 없어 상한과 무관하게 지난다")
     void cancelHasNoAmount() {
-        var limits = open("0", "0", "0");
-        assertThat(ConnectorFinancialGate.amount(JSON.readTree("{\"orderId\":\"o\",\"currency\":\"KRW\"}"), limits)).isEmpty();
-        assertThat(ConnectorFinancialGate.amount(JSON.readTree("{\"conditionalOrderId\":\"c\"}"), limits)).isEmpty();
+        assertThat(ConnectorFinancialGate.amount(JSON.readTree("{\"orderId\":\"o\",\"currency\":\"KRW\"}"))).isEmpty();
+        assertThat(ConnectorFinancialGate.amount(JSON.readTree("{\"conditionalOrderId\":\"c\"}"))).isEmpty();
+        assertThatCode(() -> gate(open("0", "0", "0")).requireWithinLimits(9L, null, "{\"orderId\":\"o\",\"currency\":\"KRW\"}", NOW))
+            .doesNotThrowAnyException();
     }
 
 
@@ -313,11 +351,20 @@ class ConnectorFinancialGateTest {
     }
 
 
+    private void own(FinancialLimitKind kind, String value) {
+        var row = FinancialOrderLimit.of(9L, NOW);
+        row.set(kind, new BigDecimal(value), NOW);
+        when(rows.findById(9L)).thenReturn(Optional.of(row));
+    }
+
+
     private ConnectorFinancialGate gate(ConnectorFinancialProperties properties) {
         when(actions.findByUserIdAndRiskAndDecidedAtGreaterThanEqual(eq(9L), eq(ToolRisk.FINANCIAL),
             eq(Instant.parse("2026-10-12T15:00:00Z")))).thenReturn(today);
         var live = LiveProperties.fixed(ConnectorFinancialProperties.class, properties);
-        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live), users);
+        var digest = new FinancialDigest(live);
+        var limits = new FinancialOrderLimits(live, rows, actions, contents, cipher, digest);
+        return new ConnectorFinancialGate(live, contents, digest, users, limits);
     }
 
 

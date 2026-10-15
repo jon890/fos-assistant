@@ -122,10 +122,29 @@ class ConnectorFinancialIntake {
             }
             return producer.request(profileName, rootSessionId, sessionId, toolCallId,
                 HermesToolName.of(binding.mcpServer(), tool), tool, JSON.writeValueAsString(input.get("args")));
+        } catch (FinancialLimitExceeded ex) {
+            log.info("금융 준비가 상한에 걸렸다 limit={}", ex.kind());
+            return new ConnectorPolicyAnswer(false, limitMessage(ex), null);
         } catch (RuntimeException ex) {
             // 예외 메시지에는 원격 응답과 인자가 섞일 수 있어 종류만 남긴다.
             log.warn("금융 준비를 거절했다 kind={}", ex.getClass().getSimpleName());
             return new ConnectorPolicyAnswer(false, FINANCIAL_UNAVAILABLE_MESSAGE, null);
         }
+    }
+
+
+    /**
+     * 상한에 걸린 준비의 답이다. 상한은 사용자가 정한 값이라 걸린 상한과 오늘 남은 한도를 밝힌다(ADR-20261015 / financial-user-limits).
+     * 수량 상한은 남은 한도가 없다.
+     */
+    static String limitMessage(FinancialLimitExceeded ex) {
+        String unit = ex.kind().currency() == null ? "" : " " + ex.kind().currency();
+        var message = new StringBuilder("주문이 상한에 걸려 실행하지 않았다. 걸린 상한: ")
+            .append(ex.kind().label()).append(' ').append(FinancialOrderLimits.plain(ex.limit())).append(unit).append('.');
+        if (ex.remainingToday() != null) {
+            message.append(" 오늘 남은 한도: ").append(FinancialOrderLimits.plain(ex.remainingToday())).append(unit).append('.');
+        }
+        return message.append(" 사용자에게 알린다. 상한을 바꾸려면 order_limit_change 로 요청한다. 올리기는 사용자의 승인이 있어야 반영된다.")
+            .toString();
     }
 }

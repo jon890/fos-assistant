@@ -7,4 +7,5 @@ package com.bifos.assistant.browser.domain;
  * @param contentType Chrome 이 준 {@code Content-Type}. 없으면 {@code null}
  * @param body 응답 본문. 1MB 까지다
  */
-public record CdpReply(int status, String contentType, byte[] body) {}
+public record CdpReply(int status, String contentType, byte[] body) {
+}

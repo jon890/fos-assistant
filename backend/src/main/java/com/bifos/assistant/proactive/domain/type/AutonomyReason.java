@@ -31,6 +31,7 @@ public enum AutonomyReason {
     ALREADY_EXECUTED(Group.EXECUTION_BLOCKED),
     READ_ONLY_SAFE(Group.SAFE);
 
+
     /** 까닭의 묶음이다. 앞 묶음이 있으면 뒤 묶음을 보지 않는다. */
     public enum Group {
         IGNORE,
@@ -40,11 +41,14 @@ public enum AutonomyReason {
         SAFE
     }
 
+
     private final Group group;
+
 
     AutonomyReason(Group group) {
         this.group = group;
     }
+
 
     public Group group() {
         return group;

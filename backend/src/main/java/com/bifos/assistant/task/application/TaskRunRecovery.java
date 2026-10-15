@@ -42,6 +42,7 @@ public class TaskRunRecovery {
     /** 기동 정리가 끝났는가. 끝나기 전에는 발화기가 돌지 않는다. */
     private final AtomicBoolean finished = new AtomicBoolean(false);
 
+
     /** 끊긴 실행 기록의 정리와 대화 깨우기 뒤에 돈다. 예외가 나도 기동을 실패시키지 않는다. */
     @EventListener(ApplicationReadyEvent.class)
     @Order(20)
@@ -58,10 +59,12 @@ public class TaskRunRecovery {
         }
     }
 
+
     /** 기동 정리가 끝났으면 true 다. */
     public boolean finished() {
         return finished.get();
     }
+
 
     /**
      * {@code RUNNING} 줄을 하나씩 잠그고 다시 읽어 닫는다. 한 줄의 실패는 그 줄만 남긴다.
@@ -81,6 +84,7 @@ public class TaskRunRecovery {
         }
         return closed;
     }
+
 
     private boolean close(Long runId, Instant now) {
         TaskRun run = runs.findByIdForUpdate(runId).orElse(null);

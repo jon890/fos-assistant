@@ -22,6 +22,7 @@ public class ProactiveCheckAnswerGuard implements RecoveredAnswerGuard {
 
     private final ProactiveCheckRepository checks;
 
+
     @Override
     public Optional<String> noticeInsteadOfAnswer(Long rootExecutionId, ExecutionStatus ended) {
         if (!checks.existsByRootExecutionId(rootExecutionId)) {
@@ -32,8 +33,8 @@ public class ProactiveCheckAnswerGuard implements RecoveredAnswerGuard {
             return Optional.of("");
         }
         return Optional.of(
-                ended == ExecutionStatus.CANCELLED
-                        ? ProactiveCheckRun.STOPPED_NOTICE
-                        : ProactiveCheckService.FAILED_NOTICE);
+            ended == ExecutionStatus.CANCELLED
+                ? ProactiveCheckRun.STOPPED_NOTICE
+                : ProactiveCheckService.FAILED_NOTICE);
     }
 }

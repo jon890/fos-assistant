@@ -23,6 +23,7 @@ public class AgentStarterController {
     private final StarterSuggestionService starters;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/{code}/starters")
     public StartersView read(@PathVariable String code) {
         return StartersView.from(starters.read(currentUser.require(), code));

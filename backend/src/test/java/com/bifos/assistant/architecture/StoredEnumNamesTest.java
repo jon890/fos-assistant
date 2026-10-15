@@ -39,82 +39,83 @@ import org.junit.jupiter.api.Test;
 class StoredEnumNamesTest {
 
     private static final Map<Class<? extends Enum<?>>, List<String>> STORED_ENUMS = Map.ofEntries(
-            Map.entry(CostMode.class, List.of("SUBSCRIPTION", "API")),
-            Map.entry(CredentialScope.class, List.of("SHARED_HOUSEHOLD", "DEDICATED")),
-            Map.entry(AgentVisibility.class, List.of("PRIVATE", "GROUP")),
-            Map.entry(MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM")),
-            Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK")),
-            Map.entry(SkillUseSource.class, List.of("COMMAND", "MODEL")),
-            Map.entry(BindingStatus.class, List.of("PENDING", "READY")),
-            Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),
-            Map.entry(ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED")),
-            Map.entry(ModelTier.class, List.of("FAST", "BALANCED", "DEEP")),
-            Map.entry(
-                    ExecutionEventType.class,
-                    List.of(
-                            "RUN_STARTED",
-                            "RUN_COMPLETED",
-                            "RUN_CANCELLED",
-                            "RUN_FAILED",
-                            "TOOL_STARTED",
-                            "TOOL_COMPLETED",
-                            "SUBAGENT_STARTED",
-                            "SUBAGENT_COMPLETED",
-                            "PROVIDER_SWITCHED")),
-            Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED", "AUTONOMY")),
-            Map.entry(AutonomyLevel.class, List.of("IGNORE", "SURFACE", "ASK_APPROVAL", "EXECUTE")),
-            Map.entry(AutonomyExecutionStatus.class, List.of("PENDING", "STARTED", "FAILED")),
-            Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
-            Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
-            Map.entry(
-                    CheckInvalidReason.class,
-                    List.of("EMPTY_ANSWER", "NO_BLOCK", "NOT_JSON", "BAD_VERSION", "BAD_OUTCOME")),
-            Map.entry(FindingKind.class, List.of("NEW", "REFERENCE")),
-            Map.entry(
-                    FindingReason.class,
-                    List.of(
-                            "NO_SOURCE",
-                            "NOT_CHECKED_NOW",
-                            "CLOSED",
-                            "STALE",
-                            "FRESHNESS_UNKNOWN",
-                            "INCOMPLETE",
-                            "REPEATED")),
-            Map.entry(
-                    FeedbackEventType.class,
-                    List.of(
-                            "SURFACED",
-                            "ACCEPTED",
-                            "DISMISSED",
-                            "POSTPONED",
-                            "EDITED",
-                            "APPROVED",
-                            "REJECTED",
-                            "EXECUTION_SUCCEEDED",
-                            "EXECUTION_FAILED")),
-            Map.entry(
-                    FeedbackSubjectType.class,
-                    List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "CHECK_FINDING", "AUTONOMY_DECISION")),
-            Map.entry(FeedbackActor.class, List.of("USER", "AGENT", "SYSTEM")));
+        Map.entry(CostMode.class, List.of("SUBSCRIPTION", "API")),
+        Map.entry(CredentialScope.class, List.of("SHARED_HOUSEHOLD", "DEDICATED")),
+        Map.entry(AgentVisibility.class, List.of("PRIVATE", "GROUP")),
+        Map.entry(MessageRole.class, List.of("USER", "ASSISTANT", "SYSTEM")),
+        Map.entry(ConversationPurpose.class, List.of("CHAT", "CHECK")),
+        Map.entry(SkillUseSource.class, List.of("COMMAND", "MODEL")),
+        Map.entry(BindingStatus.class, List.of("PENDING", "READY")),
+        Map.entry(UserRole.class, List.of("ADMIN", "MEMBER")),
+        Map.entry(ExecutionStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "CANCELLED")),
+        Map.entry(ModelTier.class, List.of("FAST", "BALANCED", "DEEP")),
+        Map.entry(
+            ExecutionEventType.class,
+            List.of(
+                "RUN_STARTED",
+                "RUN_COMPLETED",
+                "RUN_CANCELLED",
+                "RUN_FAILED",
+                "TOOL_STARTED",
+                "TOOL_COMPLETED",
+                "SUBAGENT_STARTED",
+                "SUBAGENT_COMPLETED",
+                "PROVIDER_SWITCHED")),
+        Map.entry(CheckTrigger.class, List.of("MANUAL", "SCHEDULED", "AUTONOMY")),
+        Map.entry(AutonomyLevel.class, List.of("IGNORE", "SURFACE", "ASK_APPROVAL", "EXECUTE")),
+        Map.entry(AutonomyExecutionStatus.class, List.of("PENDING", "STARTED", "FAILED")),
+        Map.entry(CheckStatus.class, List.of("RUNNING", "SUCCEEDED", "FAILED", "STOPPED")),
+        Map.entry(CheckOutcome.class, List.of("FINDINGS", "NOTHING_NEW", "INVALID_RESULT")),
+        Map.entry(
+            CheckInvalidReason.class,
+            List.of("EMPTY_ANSWER", "NO_BLOCK", "NOT_JSON", "BAD_VERSION", "BAD_OUTCOME")),
+        Map.entry(FindingKind.class, List.of("NEW", "REFERENCE")),
+        Map.entry(
+            FindingReason.class,
+            List.of(
+                "NO_SOURCE",
+                "NOT_CHECKED_NOW",
+                "CLOSED",
+                "STALE",
+                "FRESHNESS_UNKNOWN",
+                "INCOMPLETE",
+                "REPEATED")),
+        Map.entry(
+            FeedbackEventType.class,
+            List.of(
+                "SURFACED",
+                "ACCEPTED",
+                "DISMISSED",
+                "POSTPONED",
+                "EDITED",
+                "APPROVED",
+                "REJECTED",
+                "EXECUTION_SUCCEEDED",
+                "EXECUTION_FAILED")),
+        Map.entry(
+            FeedbackSubjectType.class,
+            List.of("FOLLOW_UP", "MEMORY", "CONNECTOR_ACTION", "CHECK", "CHECK_FINDING", "AUTONOMY_DECISION")),
+        Map.entry(FeedbackActor.class, List.of("USER", "AGENT", "SYSTEM")));
+
 
     @Test
     @DisplayName("저장되는 enum 의 상수 이름이 순서까지 옮기기 전과 같다")
     void constantNamesAreUnchanged() {
         STORED_ENUMS.forEach((type, expected) -> {
-            List<String> actual =
-                    Arrays.stream(type.getEnumConstants()).map(Enum::name).toList();
+            List<String> actual = Arrays.stream(type.getEnumConstants()).map(Enum::name).toList();
             assertThat(actual).as(type.getSimpleName()).containsExactlyElementsOf(expected);
         });
     }
+
 
     @Test
     @DisplayName("저장되는 enum 은 모두 domain.type 패키지에 있다")
     void storedEnumsLiveInDomainType() {
         List<String> misplaced = STORED_ENUMS.keySet().stream()
-                .filter(type -> !type.getPackageName().endsWith(".domain.type"))
-                .map(Class::getSimpleName)
-                .sorted()
-                .toList();
+            .filter(type -> !type.getPackageName().endsWith(".domain.type"))
+            .map(Class::getSimpleName)
+            .sorted()
+            .toList();
 
         assertThat(misplaced).as("domain.type 밖에 있는 타입").isEmpty();
     }

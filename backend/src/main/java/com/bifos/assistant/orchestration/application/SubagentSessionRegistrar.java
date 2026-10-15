@@ -25,11 +25,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>판정은 이 순서로 한다.
  *
  * <ol>
- *   <li>값을 검사한다. 빈 값과 칸 길이를 넘는 값, 부모나 루트와 같은 자식, 실행 줄이나 대화가 쓰는 session 을
- *       거절한다. 최상위 session 은 압축 교체로 대화의 {@code hermes_session_id} 에만 남을 수 있어 대화도 본다.
- *   <li>같은 자식의 줄이 이미 있고 루트와 부모가 요청과 같으면 부모를 풀지 않고 그대로 둔다. 첫 등록의 응답을
- *       잃은 재전송이 최상위 부모 실행이 끝난 뒤에 와도 받아들이기 위해서다.
- *   <li>그 밖에는 부모를 풀어 origin 실행을 정한다. 이미 있는 줄이면 origin 을 견주어 판정하고, 없으면 저장한다.
+ * <li>값을 검사한다. 빈 값과 칸 길이를 넘는 값, 부모나 루트와 같은 자식, 실행 줄이나 대화가 쓰는 session 을
+ * 거절한다. 최상위 session 은 압축 교체로 대화의 {@code hermes_session_id} 에만 남을 수 있어 대화도 본다.
+ * <li>같은 자식의 줄이 이미 있고 루트와 부모가 요청과 같으면 부모를 풀지 않고 그대로 둔다. 첫 등록의 응답을
+ * 잃은 재전송이 최상위 부모 실행이 끝난 뒤에 와도 받아들이기 위해서다.
+ * <li>그 밖에는 부모를 풀어 origin 실행을 정한다. 이미 있는 줄이면 origin 을 견주어 판정하고, 없으면 저장한다.
  * </ol>
  *
  * <p>메서드 전체를 한 트랜잭션으로 묶지 않는다. 동시에 온 두 요청이 유일 제약이나 잠금에 걸리면 그 트랜잭션은
@@ -54,16 +54,17 @@ public class SubagentSessionRegistrar {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     /**
      * @param profileName 등록 요청의 토큰이 증명한 profile
      * @param parentRootSessionId 서명을 확인한 루트 session
      * @param parentSessionId 이 하위 에이전트를 만든 session. 최상위 session 이거나 다른 하위 에이전트 session 이다
      * @param childSessionId 등록할 하위 에이전트 session
      * @throws ApiException {@link ErrorCode#SESSION_BINDING_REJECTED}. 값이 틀렸거나 부모를 풀지 못했거나, 저장에 실패했는데 다시 읽은 줄도 없을 때.
-     *     {@link ErrorCode#SESSION_BINDING_CONFLICT}. 다른 origin 으로 이미 등록돼 있을 때
+     * {@link ErrorCode#SESSION_BINDING_CONFLICT}. 다른 origin 으로 이미 등록돼 있을 때
      */
     public SubagentRegistrationResult register(
-            String profileName, String parentRootSessionId, String parentSessionId, String childSessionId) {
+        String profileName, String parentRootSessionId, String parentSessionId, String childSessionId) {
         if (isBlank(profileName)) {
             throw reject(profileName, "profile 이 비었다");
         }
@@ -94,21 +95,23 @@ public class SubagentSessionRegistrar {
 
         try {
             transactions.executeWithoutResult(status -> bindings.saveAndFlush(HermesSessionBinding.of(
-                    profileName, childSessionId, origin, parentRootSessionId, parentSessionId, clock.instant())));
+                profileName, childSessionId, origin, parentRootSessionId, parentSessionId, clock.instant())));
         } catch (DataIntegrityViolationException | PessimisticLockingFailureException ex) {
             // 동시에 온 다른 요청이 먼저 저장했거나 잠금에서 밀렸다. 그 줄을 다시 읽어 같은 규칙으로 판정한다.
             HermesSessionBinding raced = bindings.findByProfileNameAndSessionId(profileName, childSessionId)
-                    .orElseThrow(() -> reject(profileName, "저장에 실패했고 다시 읽은 줄도 없다"));
+                .orElseThrow(() -> reject(profileName, "저장에 실패했고 다시 읽은 줄도 없다"));
             return judge(profileName, raced, origin);
         }
         return accepted(profileName, origin.id(), SubagentRegistrationResult.CREATED);
     }
 
+
     private static boolean sameParents(
-            HermesSessionBinding existing, String parentRootSessionId, String parentSessionId) {
+        HermesSessionBinding existing, String parentRootSessionId, String parentSessionId) {
         return existing.rootSessionId().equals(parentRootSessionId)
-                && existing.parentSessionId().equals(parentSessionId);
+            && existing.parentSessionId().equals(parentSessionId);
     }
+
 
     /**
      * 부모 session 의 등록이 있으면 그 origin 을, 없으면 루트에서 도는 실행 하나를 origin 으로 한다.
@@ -122,8 +125,8 @@ public class SubagentSessionRegistrar {
                 throw reject(profileName, "부모 등록의 루트가 서명한 루트와 다르다");
             }
             return executions
-                    .findById(parent.get().originExecutionId())
-                    .orElseThrow(() -> reject(profileName, "부모 등록의 origin 실행이 없다"));
+                .findById(parent.get().originExecutionId())
+                .orElseThrow(() -> reject(profileName, "부모 등록의 origin 실행이 없다"));
         }
         try {
             return parents.resolve(profileName, parentRootSessionId);
@@ -135,9 +138,10 @@ public class SubagentSessionRegistrar {
         }
     }
 
+
     /** 이미 있는 줄이 같은 origin 이면 그대로 두고, 다르면 덮어쓰지 않고 거절한다. */
     private static SubagentRegistrationResult judge(
-            String profileName, HermesSessionBinding existing, AgentExecution origin) {
+        String profileName, HermesSessionBinding existing, AgentExecution origin) {
         if (existing.originExecutionId().equals(origin.id())) {
             return accepted(profileName, origin.id(), SubagentRegistrationResult.EXISTS);
         }
@@ -145,15 +149,17 @@ public class SubagentSessionRegistrar {
         throw new ApiException(ErrorCode.SESSION_BINDING_CONFLICT, "session binding conflicts");
     }
 
+
     private static SubagentRegistrationResult accepted(
-            String profileName, Long originExecutionId, SubagentRegistrationResult result) {
+        String profileName, Long originExecutionId, SubagentRegistrationResult result) {
         log.info(
-                "하위 에이전트 session 을 등록했다 profile={} originExecutionId={} result={}",
-                profileName,
-                originExecutionId,
-                result);
+            "하위 에이전트 session 을 등록했다 profile={} originExecutionId={} result={}",
+            profileName,
+            originExecutionId,
+            result);
         return result;
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 어느 이유든 같다. */
     private static ApiException reject(String profileName, String reason) {
@@ -161,9 +167,11 @@ public class SubagentSessionRegistrar {
         return new ApiException(ErrorCode.SESSION_BINDING_REJECTED, "session binding is rejected");
     }
 
+
     private static boolean isSessionId(String value) {
         return !isBlank(value) && value.length() <= SESSION_ID_MAX_LENGTH;
     }
+
 
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();

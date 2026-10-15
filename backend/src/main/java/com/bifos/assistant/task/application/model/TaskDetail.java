@@ -9,4 +9,5 @@ import com.bifos.assistant.task.domain.TaskTrigger;
  *
  * @param agent 에이전트 행이 없으면 null
  */
-public record TaskDetail(Task task, TaskTrigger trigger, Agent agent) {}
+public record TaskDetail(Task task, TaskTrigger trigger, Agent agent) {
+}

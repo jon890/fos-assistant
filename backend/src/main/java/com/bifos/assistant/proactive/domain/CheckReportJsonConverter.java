@@ -11,6 +11,7 @@ public class CheckReportJsonConverter implements AttributeConverter<CheckReport,
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     @Override
     public String convertToDatabaseColumn(CheckReport report) {
         if (report == null) {
@@ -22,6 +23,7 @@ public class CheckReportJsonConverter implements AttributeConverter<CheckReport,
             throw new IllegalStateException("cannot write check report", ex);
         }
     }
+
 
     @Override
     public CheckReport convertToEntityAttribute(String json) {

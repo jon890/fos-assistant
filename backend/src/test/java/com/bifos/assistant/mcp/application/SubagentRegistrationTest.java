@@ -34,11 +34,13 @@ class SubagentRegistrationTest {
      */
     private static final String FOS_CTX_RULE_SIG = "17dbb5b8aa4f08da9f262d69ab6191f9978c8bf9439f7260047f7e8444448f7e";
 
+
     @Test
     @DisplayName("토큰 해시는 표에 적은 key 와 같다")
     void tokenHashEqualsKeyInTable() {
         assertThat(AgentTokenService.hash(TOKEN)).isEqualTo(TOKEN_HASH);
     }
+
 
     @Test
     @DisplayName("최상위 자식의 test vector 가 통과하고 세 session 을 돌려준다")
@@ -47,6 +49,7 @@ class SubagentRegistrationTest {
 
         assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, ROOT, TOP_CHILD));
     }
+
 
     @Test
     @DisplayName("중첩 자식의 test vector 가 통과하고 세 session 을 돌려준다")
@@ -59,6 +62,7 @@ class SubagentRegistrationTest {
         assertThat(registration).isEqualTo(new SubagentRegistration(ROOT, TOP_CHILD, NESTED_CHILD));
     }
 
+
     @Test
     @DisplayName("서명하지 않는 칸이 없거나 null 이고 모르는 키가 있어도 받는다")
     void acceptsMissingOrNullUnsignedFieldsAndUnknownKeys() {
@@ -68,8 +72,9 @@ class SubagentRegistrationTest {
         body.put("added_later", 3);
 
         assertThat(SubagentRegistration.verify(body, TOKEN_HASH).childSessionId())
-                .isEqualTo(TOP_CHILD);
+            .isEqualTo(TOP_CHILD);
     }
+
 
     @Test
     @DisplayName("sig 가 대문자면 거절한다")
@@ -77,11 +82,13 @@ class SubagentRegistrationTest {
         assertRejected(body -> body.put("sig", TOP_SIG.toUpperCase()));
     }
 
+
     @Test
     @DisplayName("sig 를 한 글자 바꾸면 거절한다")
     void rejectsSigWithOneCharChanged() {
         assertRejected(body -> body.put("sig", (TOP_SIG.charAt(0) == '0' ? "1" : "0") + TOP_SIG.substring(1)));
     }
+
 
     @Test
     @DisplayName("v 가 문자열이면 거절한다")
@@ -89,11 +96,13 @@ class SubagentRegistrationTest {
         assertRejected(body -> body.put("v", "1"));
     }
 
+
     @Test
     @DisplayName("v 가 소수면 거절한다")
     void rejectsFractionalV() {
         assertRejected(body -> body.put("v", 1.0));
     }
+
 
     @Test
     @DisplayName("서명하는 칸이 하나 없으면 거절한다")
@@ -104,11 +113,13 @@ class SubagentRegistrationTest {
         assertRejected(body -> body.remove("sig"));
     }
 
+
     @Test
     @DisplayName("서명하는 칸이 빈 문자열이면 거절한다")
     void rejectsWhenSignedFieldIsEmptyString() {
         assertRejected(body -> body.put("child_session_id", ""));
     }
+
 
     @Test
     @DisplayName("child subagent id 가 숫자면 거절한다")
@@ -116,35 +127,40 @@ class SubagentRegistrationTest {
         assertRejected(body -> body.put("child_subagent_id", 7));
     }
 
+
     @Test
     @DisplayName("같은 값을 fos ctx 규칙으로 서명한 sig 는 거절한다")
     void rejectsSigSignedWithFosCtxRulesOverSameValue() {
         assertRejected(body -> body.put("sig", FOS_CTX_RULE_SIG));
     }
 
+
     @Test
     @DisplayName("본문이 객체가 아니거나 토큰 해시가 없으면 거절한다")
     void rejectsNonObjectBodyOrMissingTokenHash() {
         assertThatThrownBy(() -> SubagentRegistration.verify(JSON.createArrayNode(), TOKEN_HASH))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
         assertThatThrownBy(() -> SubagentRegistration.verify(topChild(), ""))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
+
 
     private static void assertRejected(Consumer<ObjectNode> change) {
         ObjectNode body = topChild();
         change.accept(body);
         assertThatThrownBy(() -> SubagentRegistration.verify(body, TOKEN_HASH))
-                .as("거절해야 하는 본문: %s", body)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
+            .as("거절해야 하는 본문: %s", body)
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.SESSION_BINDING_REJECTED));
     }
+
 
     private static ObjectNode topChild() {
         return body(ROOT, TOP_CHILD, TOP_SIG);
     }
+
 
     private static ObjectNode body(String parentSessionId, String childSessionId, String sig) {
         ObjectNode body = JSON.createObjectNode();

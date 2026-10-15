@@ -25,6 +25,7 @@ final class Handoff {
         ABANDONED
     }
 
+
     private final AtomicReference<Stage> stage = new AtomicReference<>(Stage.WAITING);
     /** 실행 줄이 생겼거나 줄 없이 끝났을 때 열린다. */
     private final CountDownLatch rowDecided = new CountDownLatch(1);
@@ -36,6 +37,7 @@ final class Handoff {
     private volatile RuntimeException failure;
     private volatile boolean checkEnded;
 
+
     /** 실행 스레드가 실행 줄을 만든 직후 부른다. 요청 스레드가 먼저 포기했으면 상태는 그대로 ABANDONED 다. */
     void onRowCreated(AgentExecution created) {
         execution = created;
@@ -43,10 +45,12 @@ final class Handoff {
         rowDecided.countDown();
     }
 
+
     void markSubmitted() {
         submitted = true;
         settled.countDown();
     }
+
 
     /** 실행 스레드가 끝날 때 부른다. 줄을 만들기 전에 끝났으면 그 예외를 남긴다. */
     void markEnded(RuntimeException cause) {
@@ -56,47 +60,58 @@ final class Handoff {
         settled.countDown();
     }
 
+
     /** 실행 스레드가 실행 줄을 만들기 전에 그 먼저 살펴보기가 끝난 것을 봤다. 곧이어 {@link #markEnded} 가 불린다. */
     void markCheckEnded() {
         checkEnded = true;
     }
+
 
     /** 요청 스레드가 포기한다. 실행 줄이 이미 생겼으면 거짓이고 그 줄을 돌려줘야 한다. */
     boolean abandon() {
         return stage.compareAndSet(Stage.WAITING, Stage.ABANDONED);
     }
 
+
     boolean abandoned() {
         return stage.get() == Stage.ABANDONED;
     }
+
 
     boolean rowCreated() {
         return stage.get() == Stage.ROW_CREATED;
     }
 
+
     boolean submitted() {
         return submitted;
     }
+
 
     AgentExecution execution() {
         return execution;
     }
 
+
     boolean checkEnded() {
         return checkEnded;
     }
+
 
     RuntimeException failure() {
         return failure;
     }
 
+
     boolean awaitRowDecided(long deadline) {
         return await(rowDecided, deadline);
     }
 
+
     boolean awaitSettled(long deadline) {
         return await(settled, deadline);
     }
+
 
     /** 끊기면 제한 시간이 지난 것과 같게 본다. 끊긴 표시는 되살린다. */
     private static boolean await(CountDownLatch latch, long deadline) {

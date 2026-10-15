@@ -16,28 +16,30 @@ import java.time.Instant;
  * @param inputTokens cache 를 뺀 일반 입력 토큰
  */
 public record SubagentLedgerRow(
-        Long agentId,
-        Instant parentStartedAt,
-        String runtimeFingerprint,
-        String status,
-        String provider,
-        String model,
-        Long inputTokens,
-        Long cacheReadTokens,
-        Long cacheWriteTokens,
-        Long outputTokens,
-        Long estimatedCostMicros,
-        Long actualCostMicros) {
+    Long agentId,
+    Instant parentStartedAt,
+    String runtimeFingerprint,
+    String status,
+    String provider,
+    String model,
+    Long inputTokens,
+    Long cacheReadTokens,
+    Long cacheWriteTokens,
+    Long outputTokens,
+    Long estimatedCostMicros,
+    Long actualCostMicros) {
 
     /** 종료를 확인해 사용량을 적은 줄인가. */
     public boolean recorded() {
         return "DONE".equals(status);
     }
 
+
     /** 금액까지 적힌 줄인가. 이 줄만 금액 합계에 더한다. */
     public boolean priced() {
         return recorded() && estimatedCostMicros != null;
     }
+
 
     /** 실행 줄의 입력 토큰처럼 cache 를 포함한 입력 토큰이다. 셋을 모두 모르면 null 이다. */
     public Long inclusiveInputTokens() {
@@ -46,6 +48,7 @@ public record SubagentLedgerRow(
         }
         return orZero(inputTokens) + orZero(cacheReadTokens) + orZero(cacheWriteTokens);
     }
+
 
     private static long orZero(Long value) {
         return value == null ? 0L : value;

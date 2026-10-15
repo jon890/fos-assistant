@@ -50,6 +50,7 @@ class UnixSocketWorkspaceDeleterTest {
     private ServerSocketChannel server;
     private ExecutorService helper;
 
+
     @BeforeEach
     void setUp() throws IOException {
         dir = Files.createTempDirectory(Path.of("/tmp"), "ws");
@@ -59,6 +60,7 @@ class UnixSocketWorkspaceDeleterTest {
         helper = Executors.newSingleThreadExecutor();
     }
 
+
     @AfterEach
     void tearDown() throws Exception {
         helper.shutdownNow();
@@ -67,6 +69,7 @@ class UnixSocketWorkspaceDeleterTest {
         Files.deleteIfExists(socket);
         Files.deleteIfExists(dir);
     }
+
 
     @Test
     @Timeout(10)
@@ -83,6 +86,7 @@ class UnixSocketWorkspaceDeleterTest {
         assertThat(request.get("path").asString()).isEqualTo("reports/a.csv");
         assertThat(request.get("max_entries").intValue()).isEqualTo(10_000);
     }
+
 
     @ParameterizedTest
     @Timeout(10)
@@ -101,22 +105,24 @@ class UnixSocketWorkspaceDeleterTest {
         assertFailsWith(deleter(Duration.ofSeconds(5)), expected);
     }
 
+
     @ParameterizedTest
     @Timeout(10)
     @ValueSource(
-            strings = {
-                "{not json\n",
-                "[1]\n",
-                "{\"ok\":true,\"kind\":\"PIPE\",\"entries\":1,\"bytes\":0}\n",
-                "{\"ok\":true,\"kind\":\"FILE\",\"entries\":-1,\"bytes\":0}\n",
-                ""
-            })
+        strings = {
+            "{not json\n",
+            "[1]\n",
+            "{\"ok\":true,\"kind\":\"PIPE\",\"entries\":1,\"bytes\":0}\n",
+            "{\"ok\":true,\"kind\":\"FILE\",\"entries\":-1,\"bytes\":0}\n",
+            ""
+        })
     @DisplayName("깨진 답, 모르는 종류, 답 없이 닫기는 지우기 실패다")
     void rejectsMalformedAnswers(String answer) {
         answerWith(answer);
 
         assertFailsWith(deleter(Duration.ofSeconds(5)), ErrorCode.WORKSPACE_DELETE_FAILED);
     }
+
 
     @Test
     @Timeout(10)
@@ -129,6 +135,7 @@ class UnixSocketWorkspaceDeleterTest {
         assertThat(deletion).isEqualTo(new WorkspaceDeletion(WorkspaceEntryKind.FILE, 1, 1));
     }
 
+
     @Test
     @Timeout(10)
     @DisplayName("64 KiB 를 넘는 답 한 줄은 지우기 실패다")
@@ -137,6 +144,7 @@ class UnixSocketWorkspaceDeleterTest {
 
         assertFailsWith(deleter(Duration.ofSeconds(5)), ErrorCode.WORKSPACE_DELETE_FAILED);
     }
+
 
     @Test
     @Timeout(10)
@@ -150,52 +158,58 @@ class UnixSocketWorkspaceDeleterTest {
         assertThat(Duration.ofNanos(System.nanoTime() - started)).isGreaterThanOrEqualTo(Duration.ofMillis(300));
     }
 
+
     @Test
     @Timeout(10)
     @DisplayName("socket 에 연결하지 못하면 지우기 실패다")
     void failsWhenSocketIsMissing() {
         UnixSocketWorkspaceDeleter deleter = new UnixSocketWorkspaceDeleter(
-                LiveProperties.fixed(
-                        WorkspaceProperties.class,
-                        new WorkspaceProperties("/", dir.resolve("none.sock").toString())),
-                Duration.ofSeconds(5));
+            LiveProperties.fixed(
+                WorkspaceProperties.class,
+                new WorkspaceProperties("/", dir.resolve("none.sock").toString())),
+            Duration.ofSeconds(5));
 
         assertFailsWith(deleter, ErrorCode.WORKSPACE_DELETE_FAILED);
     }
+
 
     @Test
     @Timeout(10)
     @DisplayName("socket 설정값이 경로가 될 수 없는 문자열이면 500 이 아니라 지우기 실패다")
     void failsWhenSocketSettingIsInvalid() {
         UnixSocketWorkspaceDeleter deleter = new UnixSocketWorkspaceDeleter(
-                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", "/tmp/bad\0.sock")),
-                Duration.ofSeconds(5));
+            LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", "/tmp/bad\0.sock")),
+            Duration.ofSeconds(5));
 
         assertFailsWith(deleter, ErrorCode.WORKSPACE_DELETE_FAILED);
     }
+
 
     @Test
     @Timeout(10)
     @DisplayName("socket 설정이 비면 지우기를 쓸 수 없다")
     void rejectsWhenSocketIsNotConfigured() {
         UnixSocketWorkspaceDeleter deleter = new UnixSocketWorkspaceDeleter(
-                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", "")));
+            LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", "")));
 
         assertFailsWith(deleter, ErrorCode.WORKSPACE_DELETE_UNAVAILABLE);
     }
 
+
     private UnixSocketWorkspaceDeleter deleter(Duration timeout) {
         return new UnixSocketWorkspaceDeleter(
-                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", socket.toString())),
-                timeout);
+            LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties("/", socket.toString())),
+            timeout);
     }
+
 
     private static void assertFailsWith(UnixSocketWorkspaceDeleter deleter, ErrorCode expected) {
         assertThatThrownBy(() -> deleter.delete("u301", PATH, 10_000))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(expected);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(expected);
     }
+
 
     /** 줄바꿈을 뺀 길이가 {@code length} 바이트인 성공 답이다. */
     private static String paddedSuccess(int length) {
@@ -203,6 +217,7 @@ class UnixSocketWorkspaceDeleterTest {
         String tail = "\"}";
         return head + "a".repeat(length - head.length() - tail.length()) + tail;
     }
+
 
     /**
      * 가짜 도우미가 연결 하나를 받아 요청 줄을 읽고 {@code answer} 를 보낸 뒤 닫는다. {@code null} 이면 답하지 않고 상대가 닫을 때까지
@@ -232,6 +247,7 @@ class UnixSocketWorkspaceDeleterTest {
             }
         });
     }
+
 
     private static String readLine(SocketChannel client) throws IOException {
         ByteArrayOutputStream line = new ByteArrayOutputStream();

@@ -9,6 +9,7 @@ public enum MemoryRetrieval {
     /** 색인에도 싣지 않는다. 사람이 화면에서 찾아 볼 때만 읽는다. */
     ARCHIVE;
 
+
     /** 옛 {@code always_inject} 칸의 값을 옮긴다. */
     public static MemoryRetrieval ofAlwaysInject(boolean alwaysInject) {
         return alwaysInject ? ALWAYS : SEARCH;

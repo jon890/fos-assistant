@@ -13,6 +13,7 @@ public enum FollowUpStatus {
     /** 제안을 거절했다. */
     REJECTED;
 
+
     /** 아직 끝나지 않은 상태인가. 열린 줄만 같은 제목의 유일 제약에 걸린다. */
     public boolean open() {
         return this == PROPOSED || this == OPEN;

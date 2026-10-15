@@ -40,16 +40,17 @@ class SourceReadMessagesTest {
     private final CurrentUser user = new CurrentUser(1L, "user@example.com", "사용자", 1L, UserRole.MEMBER);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final ChatController controller = new ChatController(
-            chat,
-            currentUser,
-            mock(UserDisplayNameService.class),
-            null,
-            access,
-            new ChatEventStreams(Duration.ofSeconds(1)),
-            null,
-            mock(ModelTierService.class),
-            List.of(),
-            sourceReads);
+        chat,
+        currentUser,
+        mock(UserDisplayNameService.class),
+        null,
+        access,
+        new ChatEventStreams(Duration.ofSeconds(1)),
+        null,
+        mock(ModelTierService.class),
+        List.of(),
+        sourceReads);
+
 
     @Test
     @DisplayName("비서 답에만 원문 열람 요약을 붙이고 실행 번호 없는 답은 미확인 요약을 쓴다")
@@ -79,18 +80,20 @@ class SourceReadMessagesTest {
         assertThat(result).extracting(MessageView::sourceReads).containsExactly(null, missing, null);
     }
 
+
     @Test
     @DisplayName("남의 대화는 원문 열람 집계 전에 거절한다")
     void rejectsOtherConversationBeforeReadingSourceSummaries() {
         UUID conversationId = UUID.randomUUID();
         when(currentUser.require()).thenReturn(user);
         when(access.requireOwnId(user, conversationId))
-                .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
+            .thenThrow(new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "missing"));
 
         assertThatThrownBy(() -> controller.messages(conversationId)).isInstanceOf(ApiException.class);
 
         verify(sourceReads, never()).of(any());
     }
+
 
     private static void set(Object target, String name, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(name);

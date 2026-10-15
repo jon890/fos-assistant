@@ -20,10 +20,12 @@ public class AttentionExecutionQuery {
 
     private final AgentExecutionRepository executions;
 
+
     /** {@code since} 뒤에 실패했고 같은 대화에서 아직 성공으로 다시 돌지 않은 대화 turn 루트 실행이다. 최근 순이다. */
     public List<AgentExecution> unresolvedFailedTurns(Long userId, Instant since) {
         return executions.findUnresolvedFailedTurns(userId, since);
     }
+
 
     /** 도는 중이거나 {@code finishedSince} 뒤에 끝난 위임 실행이다. 최근 순이다. */
     public List<AgentExecution> delegations(Long userId, Instant finishedSince) {

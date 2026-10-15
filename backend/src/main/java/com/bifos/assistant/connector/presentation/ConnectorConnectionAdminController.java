@@ -18,11 +18,12 @@ public class ConnectorConnectionAdminController {
     private final ConnectorConnectionService connections;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public List<AdminConnectionView> list() {
         CurrentUser admin = currentUser.requireAdmin();
         return connections.listForAdmin(admin).stream()
-                .map(AdminConnectionView::from)
-                .toList();
+            .map(AdminConnectionView::from)
+            .toList();
     }
 }

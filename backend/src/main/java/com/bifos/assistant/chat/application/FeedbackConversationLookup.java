@@ -17,11 +17,12 @@ public class FeedbackConversationLookup implements FeedbackConversations {
 
     private final ConversationRepository conversations;
 
+
     @Override
     public boolean isActive(Long conversationId) {
         return conversations
-                .findByIdForShare(conversationId)
-                .filter(conversation -> conversation.deletedAt() == null)
-                .isPresent();
+            .findByIdForShare(conversationId)
+            .filter(conversation -> conversation.deletedAt() == null)
+            .isPresent();
     }
 }

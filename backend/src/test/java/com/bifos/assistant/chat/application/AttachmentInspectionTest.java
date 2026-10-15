@@ -28,12 +28,12 @@ class AttachmentInspectionTest {
         ByteArrayOutputStream source = new ByteArrayOutputStream();
         ImageIO.write(image, "png", source);
         assertThat(source.size()).isGreaterThan(AttachmentInspection.MAX_OUTPUT_BYTES);
-        assertThatThrownBy(() ->
-                        AttachmentInspection.inspect(source.toByteArray(), "image/png", List.of(0, 0, 2100, 1900)))
-                .isInstanceOf(ApiException.class)
-                .extracting(error -> ((ApiException) error).code())
-                .isEqualTo(ErrorCode.ATTACHMENT_INSPECTION_LIMIT);
+        assertThatThrownBy(() -> AttachmentInspection.inspect(source.toByteArray(), "image/png", List.of(0, 0, 2100, 1900)))
+            .isInstanceOf(ApiException.class)
+            .extracting(error -> ((ApiException)error).code())
+            .isEqualTo(ErrorCode.ATTACHMENT_INSPECTION_LIMIT);
     }
+
 
     @Test
     @DisplayName("원본 바이트와 영역의 픽셀을 그대로 보존한다")
@@ -44,17 +44,18 @@ class AttachmentInspectionTest {
         ImageIO.write(image, "png", output);
         byte[] original = output.toByteArray();
         assertThat(AttachmentInspection.inspect(original, "image/png", null).bytes())
-                .isEqualTo(original);
+            .isEqualTo(original);
         BufferedImage crop = ImageIO.read(new ByteArrayInputStream(
-                AttachmentInspection.inspect(original, "image/png", List.of(1900, 900, 2000, 1000))
-                        .bytes()));
+            AttachmentInspection.inspect(original, "image/png", List.of(1900, 900, 2000, 1000))
+                .bytes()));
         assertThat(crop.getWidth()).isEqualTo(100);
         assertThat(crop.getRGB(99, 99)).isEqualTo(image.getRGB(1999, 999));
         assertThatThrownBy(() -> AttachmentInspection.inspect(original, "image/png", List.of(0, 0, 2001, 1000)))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> AttachmentInspection.inspect(new byte[] {1}, "image/png", null))
-                .isInstanceOf(ApiException.class);
+            .isInstanceOf(ApiException.class);
     }
+
 
     @Test
     @DisplayName("EXIF 방향 8가지에서 표시 좌표 영역을 동일하게 자른다")
@@ -71,8 +72,8 @@ class AttachmentInspectionTest {
         BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(jpeg));
         for (int orientation = 1; orientation <= 8; orientation++) {
             byte[] exif = {
-                (byte) 0xff,
-                (byte) 0xe1,
+                (byte)0xff,
+                (byte)0xe1,
                 0,
                 34,
                 'E',
@@ -100,7 +101,7 @@ class AttachmentInspectionTest {
                 0,
                 1,
                 0,
-                (byte) orientation,
+                (byte)orientation,
                 0,
                 0,
                 0,
@@ -114,17 +115,18 @@ class AttachmentInspectionTest {
             withExif.write(jpeg, 2, jpeg.length - 2);
             BufferedImage expected = AgentImageResizer.draw(decoded, orientation, Integer.MAX_VALUE);
             BufferedImage actual = ImageIO.read(new ByteArrayInputStream(
-                    AttachmentInspection.inspect(withExif.toByteArray(), "image/jpeg", List.of(3, 5, 13, 15))
-                            .bytes()));
+                AttachmentInspection.inspect(withExif.toByteArray(), "image/jpeg", List.of(3, 5, 13, 15))
+                    .bytes()));
             for (int y = 0; y < 10; y++) {
                 for (int x = 0; x < 10; x++) {
                     assertThat(actual.getRGB(x, y))
-                            .as("orientation=%s x=%s y=%s", orientation, x, y)
-                            .isEqualTo(expected.getRGB(x + 3, y + 5));
+                        .as("orientation=%s x=%s y=%s", orientation, x, y)
+                        .isEqualTo(expected.getRGB(x + 3, y + 5));
                 }
             }
         }
     }
+
 
     @Test
     @DisplayName("전체 픽셀 한도를 넘으면 영역 조회만 허용한다")
@@ -133,10 +135,10 @@ class AttachmentInspectionTest {
         ImageIO.write(new BufferedImage(4100, 4000, BufferedImage.TYPE_INT_RGB), "png", output);
         byte[] original = output.toByteArray();
         assertThatThrownBy(() -> AttachmentInspection.inspect(original, "image/png", null))
-                .isInstanceOf(ApiException.class)
-                .hasMessageContaining("smaller region");
+            .isInstanceOf(ApiException.class)
+            .hasMessageContaining("smaller region");
         assertThat(AttachmentInspection.inspect(original, "image/png", List.of(0, 0, 100, 100))
-                        .bytes())
+            .bytes())
                 .isNotEmpty();
     }
 }

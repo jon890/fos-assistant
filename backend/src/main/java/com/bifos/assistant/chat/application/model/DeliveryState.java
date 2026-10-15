@@ -8,4 +8,5 @@ import com.bifos.assistant.chat.domain.type.DeliveryStatus;
  * @param deliveryId 전달 묶음 번호. 다시 전달할 때 이 번호로 부른다
  * @param status 묶음의 상태
  */
-public record DeliveryState(Long deliveryId, DeliveryStatus status) {}
+public record DeliveryState(Long deliveryId, DeliveryStatus status) {
+}

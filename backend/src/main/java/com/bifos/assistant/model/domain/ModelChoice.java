@@ -21,6 +21,7 @@ import java.util.List;
  */
 public record ModelChoice(String provider, String model, String reasoningEffort) {
 
+
     /** 고를 수 있는 effort 다. 낮은 것부터 적는다. */
     public static final List<String> REASONING_EFFORTS = List.of("low", "medium", "high", "xhigh", "max");
 
@@ -48,11 +49,12 @@ public record ModelChoice(String provider, String model, String reasoningEffort)
         reasoningEffort = blankToNull(reasoningEffort);
     }
 
+
     /**
      * 요청으로 들어온 선택을 검증해 만든다.
      *
      * @throws ApiException {@code VALIDATION_FAILED}. provider 와 모델 중 하나만 있거나, 길이가 열보다 길거나,
-     *     effort 가 {@link #ACCEPTED_EFFORTS} 에 없을 때
+     * effort 가 {@link #ACCEPTED_EFFORTS} 에 없을 때
      */
     public static ModelChoice of(String provider, String model, String reasoningEffort) {
         ModelChoice choice = new ModelChoice(provider, model, reasoningEffort);
@@ -61,11 +63,11 @@ public record ModelChoice(String provider, String model, String reasoningEffort)
         }
         if (choice.provider != null && choice.provider.length() > PROVIDER_MAX_LENGTH) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "provider must have at most " + PROVIDER_MAX_LENGTH + " characters");
+                ErrorCode.VALIDATION_FAILED, "provider must have at most " + PROVIDER_MAX_LENGTH + " characters");
         }
         if (choice.model != null && choice.model.length() > MODEL_MAX_LENGTH) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "model must have at most " + MODEL_MAX_LENGTH + " characters");
+                ErrorCode.VALIDATION_FAILED, "model must have at most " + MODEL_MAX_LENGTH + " characters");
         }
         if (choice.reasoningEffort != null && !ACCEPTED_EFFORTS.contains(choice.reasoningEffort)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "unknown reasoning effort");
@@ -73,20 +75,24 @@ public record ModelChoice(String provider, String model, String reasoningEffort)
         return choice;
     }
 
+
     /** 대화에 저장된 선택을 검증하지 않고 읽는다. 저장된 값은 그대로 싣는다. */
     public static ModelChoice stored(String provider, String model, String reasoningEffort) {
         return new ModelChoice(provider, model, reasoningEffort);
     }
+
 
     /** 아무것도 고르지 않은 상태다. 그 profile 의 기본 모델과 기본 effort 로 돈다. */
     public static ModelChoice defaults() {
         return new ModelChoice(null, null, null);
     }
 
+
     /** 모델을 고르지 않아 그 profile 의 기본 모델로 도는가. */
     public boolean usesDefaultModel() {
         return model == null;
     }
+
 
     private static String blankToNull(String value) {
         if (value == null) {

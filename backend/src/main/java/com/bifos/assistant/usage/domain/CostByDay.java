@@ -13,7 +13,20 @@ import java.time.LocalDate;
  * @param day 묶은 날짜
  */
 public record CostByDay(
-        LocalDate day,
+    LocalDate day,
+    Long executions,
+    Long estimatedMicros,
+    Long actualMicros,
+    Long inputTokens,
+    Long outputTokens,
+    Double avgContextChars,
+    Instant firstSeenAt,
+    Instant lastSeenAt) {
+
+    public CostByDay(
+        Integer year,
+        Integer month,
+        Integer dayOfMonth,
         Long executions,
         Long estimatedMicros,
         Long actualMicros,
@@ -22,28 +35,15 @@ public record CostByDay(
         Double avgContextChars,
         Instant firstSeenAt,
         Instant lastSeenAt) {
-
-    public CostByDay(
-            Integer year,
-            Integer month,
-            Integer dayOfMonth,
-            Long executions,
-            Long estimatedMicros,
-            Long actualMicros,
-            Long inputTokens,
-            Long outputTokens,
-            Double avgContextChars,
-            Instant firstSeenAt,
-            Instant lastSeenAt) {
         this(
-                LocalDate.of(year, month, dayOfMonth),
-                executions,
-                estimatedMicros,
-                actualMicros,
-                inputTokens,
-                outputTokens,
-                avgContextChars,
-                firstSeenAt,
-                lastSeenAt);
+            LocalDate.of(year, month, dayOfMonth),
+            executions,
+            estimatedMicros,
+            actualMicros,
+            inputTokens,
+            outputTokens,
+            avgContextChars,
+            firstSeenAt,
+            lastSeenAt);
     }
 }

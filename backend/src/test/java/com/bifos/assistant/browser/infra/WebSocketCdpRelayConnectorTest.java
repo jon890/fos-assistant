@@ -40,17 +40,20 @@ class WebSocketCdpRelayConnectorTest {
     private FakeCdpServer server;
     private WebSocketCdpRelayConnector connector;
 
+
     @BeforeEach
     void setUp() throws Exception {
         server = new FakeCdpServer();
         connector = new WebSocketCdpRelayConnector();
     }
 
+
     @AfterEach
     void tearDown() throws Exception {
         connector.close();
         server.close();
     }
+
 
     @Test
     @DisplayName("GUID 모양 번호의 브라우저 대상에 Origin 없이 붙고, 보낸 조각이 한 메시지로 이어져 닿는다")
@@ -65,6 +68,7 @@ class WebSocketCdpRelayConnectorTest {
         assertThat(server.nextMessage().path("method").asString()).isEqualTo("Target.getTargets");
         relay.close();
     }
+
 
     @Test
     @DisplayName("조각 둘로 온 메시지는 모으지 않고 차례대로 넘기며 마지막 조각만 last 다")
@@ -92,6 +96,7 @@ class WebSocketCdpRelayConnectorTest {
         relay.close();
     }
 
+
     @Test
     @DisplayName("서버가 연결을 닫으면 닫힘을 한 번 알리고, 그 뒤의 보내기는 실패한다")
     void notifiesOnceWhenServerCloses() throws Exception {
@@ -107,6 +112,7 @@ class WebSocketCdpRelayConnectorTest {
         assertThat(listener.closed.get()).as("닫힘 알림 수").isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("Chrome 쪽이 읽지 않아 보내기가 정한 시간 안에 끝나지 않으면 보내기가 실패한다")
     void sendFailsWhenChromeStopsReading() throws Exception {
@@ -120,8 +126,8 @@ class WebSocketCdpRelayConnectorTest {
 
             long started = System.nanoTime();
             assertThatThrownBy(() -> relay.send(fragment, true))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasCauseInstanceOf(TimeoutException.class);
+                .isInstanceOf(IllegalStateException.class)
+                .hasCauseInstanceOf(TimeoutException.class);
             Duration elapsed = Duration.ofNanos(System.nanoTime() - started);
 
             assertThat(elapsed).as("실패하기까지 걸린 시간").isLessThan(Duration.ofSeconds(5));
@@ -130,6 +136,7 @@ class WebSocketCdpRelayConnectorTest {
             slow.close();
         }
     }
+
 
     @Test
     @DisplayName("close 로 닫으면 연결을 끊고 닫힘은 알리지 않는다")
@@ -143,18 +150,20 @@ class WebSocketCdpRelayConnectorTest {
         assertThat(listener.closedOnce.await(300, TimeUnit.MILLISECONDS)).isFalse();
     }
 
+
     @Test
     @DisplayName("번호에 / 가 있거나 128자를 넘거나, 종류가 page 와 browser 가 아니면 붙지 않고 거절한다")
     void rejectsMalformedTarget() {
         URI cdp = server.address();
         for (String id : new String[] {"../browser", "a/b", "", "a".repeat(129), null}) {
             assertThatThrownBy(() -> connector.open(cdp, "page", id, new Recording()))
-                    .as("번호 %s", id)
-                    .isInstanceOf(IllegalArgumentException.class);
+                .as("번호 %s", id)
+                .isInstanceOf(IllegalArgumentException.class);
         }
         assertThatThrownBy(() -> connector.open(cdp, "worker", "PAGE1", new Recording()))
-                .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(IllegalArgumentException.class);
     }
+
 
     @Test
     @DisplayName("128자 번호는 받는다")
@@ -167,12 +176,14 @@ class WebSocketCdpRelayConnectorTest {
         relay.close();
     }
 
+
     private CdpRelay open(String kind, String id, CdpRelayListener listener) throws Exception {
         CompletableFuture<Void> accepted = server.acceptAsync();
         CdpRelay relay = connector.open(server.address(), kind, id, listener);
         accepted.get(2, TimeUnit.SECONDS);
         return relay;
     }
+
 
     /** handshake 만 받고 아무것도 읽지 않는 WebSocket 서버다. 멈춘 Chrome 을 흉내 낸다. */
     private static final class SilentServer implements AutoCloseable {
@@ -182,6 +193,7 @@ class WebSocketCdpRelayConnectorTest {
         private final ServerSocket server;
         private volatile Socket socket;
 
+
         SilentServer() throws IOException {
             server = new ServerSocket();
             // 받는 창을 작게 두어 읽지 않으면 곧 보내기가 막히게 한다
@@ -189,9 +201,11 @@ class WebSocketCdpRelayConnectorTest {
             server.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 1);
         }
 
+
         URI address() {
             return URI.create("http://127.0.0.1:" + server.getLocalPort());
         }
+
 
         CompletableFuture<Void> acceptAsync() {
             return CompletableFuture.runAsync(() -> {
@@ -204,6 +218,7 @@ class WebSocketCdpRelayConnectorTest {
             });
         }
 
+
         @Override
         public void close() throws IOException {
             if (socket != null) {
@@ -212,9 +227,9 @@ class WebSocketCdpRelayConnectorTest {
             server.close();
         }
 
+
         private static void handshake(Socket socket) throws IOException, NoSuchAlgorithmException {
-            BufferedReader in =
-                    new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
             String key = null;
             for (String line = in.readLine(); line != null && !line.isEmpty(); line = in.readLine()) {
                 if (line.toLowerCase().startsWith("sec-websocket-key:")) {
@@ -222,17 +237,18 @@ class WebSocketCdpRelayConnectorTest {
                 }
             }
             String accept = Base64.getEncoder()
-                    .encodeToString(MessageDigest.getInstance("SHA-1")
-                            .digest((key + GUID).getBytes(StandardCharsets.US_ASCII)));
+                .encodeToString(MessageDigest.getInstance("SHA-1")
+                    .digest((key + GUID).getBytes(StandardCharsets.US_ASCII)));
             OutputStream out = socket.getOutputStream();
             out.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                            + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n")
+                + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n")
                     .getBytes(StandardCharsets.US_ASCII));
             out.flush();
         }
     }
 
-    private record Fragment(String text, boolean last) {}
+    private record Fragment(String text, boolean last) {
+    }
 
     /** 받은 조각과 닫힘 알림 수를 모은다. */
     private static final class Recording implements CdpRelayListener {
@@ -241,10 +257,12 @@ class WebSocketCdpRelayConnectorTest {
         final AtomicInteger closed = new AtomicInteger();
         final CountDownLatch closedOnce = new CountDownLatch(1);
 
+
         @Override
         public void onFragment(String fragment, boolean last) {
             fragments.add(new Fragment(fragment, last));
         }
+
 
         @Override
         public void onClosed() {

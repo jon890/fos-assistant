@@ -25,6 +25,26 @@ import java.util.UUID;
  * @param problem 먼저 다룰 문제 항목의 값. 해당하지 않으면 null
  */
 public record AttentionCandidate(
+    CardKey card,
+    String itemKey,
+    String stateKey,
+    AttentionTrigger trigger,
+    boolean resolved,
+    boolean nowSignal,
+    List<AttentionSignal> signals,
+    AttentionConfidence confidence,
+    String title,
+    UUID conversationId,
+    String agentName,
+    Instant at,
+    List<AttentionSourceRef> sources,
+    AttentionExecutionRef execution,
+    UUID actionId,
+    AttentionFollowUpRef followUp,
+    AttentionReport report,
+    AttentionProblem problem) {
+
+    public AttentionCandidate(
         CardKey card,
         String itemKey,
         String stateKey,
@@ -40,45 +60,25 @@ public record AttentionCandidate(
         List<AttentionSourceRef> sources,
         AttentionExecutionRef execution,
         UUID actionId,
-        AttentionFollowUpRef followUp,
-        AttentionReport report,
-        AttentionProblem problem) {
-
-    public AttentionCandidate(
-            CardKey card,
-            String itemKey,
-            String stateKey,
-            AttentionTrigger trigger,
-            boolean resolved,
-            boolean nowSignal,
-            List<AttentionSignal> signals,
-            AttentionConfidence confidence,
-            String title,
-            UUID conversationId,
-            String agentName,
-            Instant at,
-            List<AttentionSourceRef> sources,
-            AttentionExecutionRef execution,
-            UUID actionId,
-            AttentionFollowUpRef followUp) {
+        AttentionFollowUpRef followUp) {
         this(
-                card,
-                itemKey,
-                stateKey,
-                trigger,
-                resolved,
-                nowSignal,
-                signals,
-                confidence,
-                title,
-                conversationId,
-                agentName,
-                at,
-                sources,
-                execution,
-                actionId,
-                followUp,
-                null,
-                null);
+            card,
+            itemKey,
+            stateKey,
+            trigger,
+            resolved,
+            nowSignal,
+            signals,
+            confidence,
+            title,
+            conversationId,
+            agentName,
+            at,
+            sources,
+            execution,
+            actionId,
+            followUp,
+            null,
+            null);
     }
 }

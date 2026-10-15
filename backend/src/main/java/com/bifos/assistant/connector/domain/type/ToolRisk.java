@@ -12,18 +12,22 @@ public enum ToolRisk {
     DESTRUCTIVE(ToolApproval.ALWAYS, ToolApproval.ALWAYS),
     FINANCIAL(ToolApproval.ALWAYS, ToolApproval.ALWAYS);
 
+
     private final ToolApproval defaultApproval;
     private final ToolApproval floor;
+
 
     ToolRisk(ToolApproval defaultApproval, ToolApproval floor) {
         this.defaultApproval = defaultApproval;
         this.floor = floor;
     }
 
+
     /** 선언이 승인 방식을 적지 않았을 때의 값이다. */
     public ToolApproval defaultApproval() {
         return defaultApproval;
     }
+
 
     /** 선언이 이보다 느슨해질 수 없는 승인 방식이다. 하한이 없는 등급은 {@code NONE} 이다. */
     public ToolApproval floor() {

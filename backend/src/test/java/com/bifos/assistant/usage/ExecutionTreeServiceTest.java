@@ -72,6 +72,7 @@ class ExecutionTreeServiceTest {
     /** 어긋난 자료를 알리는 경고가 나갔는지 보려고 서비스의 로그를 받아 둔다. */
     private ListAppender<ILoggingEvent> logs;
 
+
     @BeforeEach
     void setUp() {
         logs = new ListAppender<>();
@@ -80,17 +81,18 @@ class ExecutionTreeServiceTest {
         events.deleteAll();
         executions.deleteAll();
         agent = agents.findByCode("tree-dad")
-                .orElseGet(() -> agents.save(Agent.of(
-                        "tree-dad",
-                        "트리 아빠",
-                        "dad",
-                        "http://127.0.0.1:1/p/dad",
-                        CostMode.SUBSCRIPTION,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.PRIVATE,
-                        OWNER_ID,
-                        Instant.now())));
+            .orElseGet(() -> agents.save(Agent.of(
+                "tree-dad",
+                "트리 아빠",
+                "dad",
+                "http://127.0.0.1:1/p/dad",
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                OWNER_ID,
+                Instant.now())));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -98,17 +100,20 @@ class ExecutionTreeServiceTest {
         logs.stop();
     }
 
+
     private static Logger serviceLogger() {
-        return (Logger) LoggerFactory.getLogger(ExecutionTreeService.class);
+        return (Logger)LoggerFactory.getLogger(ExecutionTreeService.class);
     }
+
 
     /** 어긋난 자료를 알린 경고만 고른다. */
     private List<String> warnings() {
         return logs.list.stream()
-                .filter(event -> event.getLevel().toInt() >= Level.WARN_INT)
-                .map(ILoggingEvent::getFormattedMessage)
-                .toList();
+            .filter(event -> event.getLevel().toInt() >= Level.WARN_INT)
+            .map(ILoggingEvent::getFormattedMessage)
+            .toList();
     }
+
 
     @Test
     @DisplayName("사건은 순서대로 나오고 에이전트 이름이 붙는다")
@@ -126,10 +131,11 @@ class ExecutionTreeServiceTest {
         assertThat(tree.root().agentName()).isEqualTo("트리 아빠");
         assertThat(tree.root().children()).isEmpty();
         assertThat(tree.root().events())
-                .extracting(ExecutionEventView::sequence, ExecutionEventView::eventType)
-                .containsExactly(tuple(1, "RUN_STARTED"), tuple(2, "TOOL_STARTED"), tuple(3, "RUN_COMPLETED"));
+            .extracting(ExecutionEventView::sequence, ExecutionEventView::eventType)
+            .containsExactly(tuple(1, "RUN_STARTED"), tuple(2, "TOOL_STARTED"), tuple(3, "RUN_COMPLETED"));
         assertThat(tree.root().events().get(1).toolName()).isEqualTo("fake-tool");
     }
+
 
     @Test
     @DisplayName("사건이 하나도 없는 실행도 오류 없이 나온다")
@@ -143,6 +149,7 @@ class ExecutionTreeServiceTest {
         assertThat(tree.truncated()).isFalse();
     }
 
+
     @Test
     @DisplayName("자식 실행은 children 에 담긴다")
     void childRunsAreInChildren() {
@@ -152,35 +159,36 @@ class ExecutionTreeServiceTest {
         ExecutionTree tree = trees.of(owner(), root.id());
 
         assertThat(tree.root().children())
-                .extracting(ExecutionNode::executionId)
-                .containsExactly(child.id());
+            .extracting(ExecutionNode::executionId)
+            .containsExactly(child.id());
         assertThat(tree.truncated()).isFalse();
     }
+
 
     @Test
     @DisplayName("자식 실행의 에이전트 행이 없어도 트리가 나오고 그 노드의 에이전트 칸이 비어 있다")
     void treeComesOutWithEmptyAgentColumnWhenChildAgentRowIsMissing() {
         AgentExecution root = execution(OWNER_ID, null, null);
         Agent gone = agents.save(Agent.of(
-                "tree-gone",
-                "지운 아빠",
-                "gone",
-                "http://127.0.0.1:1/p/gone",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                OWNER_ID,
-                Instant.now()));
+            "tree-gone",
+            "지운 아빠",
+            "gone",
+            "http://127.0.0.1:1/p/gone",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            OWNER_ID,
+            Instant.now()));
         AgentExecution child = executions.save(AgentExecution.builder()
-                .userId(OWNER_ID)
-                .agentId(gone.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.id())
-                .profileName("gone")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(OWNER_ID)
+            .agentId(gone.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.id())
+            .profileName("gone")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         agents.deleteById(gone.id());
 
         ExecutionTree tree = trees.of(owner(), root.id());
@@ -193,6 +201,7 @@ class ExecutionTreeServiceTest {
         });
     }
 
+
     @Test
     @DisplayName("자식의 번호로 물어도 루트부터 나온다")
     void askingByChildIdStartsFromRoot() {
@@ -203,9 +212,10 @@ class ExecutionTreeServiceTest {
 
         assertThat(tree.root().executionId()).isEqualTo(root.id());
         assertThat(tree.root().children())
-                .extracting(ExecutionNode::executionId)
-                .containsExactly(child.id());
+            .extracting(ExecutionNode::executionId)
+            .containsExactly(child.id());
     }
+
 
     @Test
     @DisplayName("남의 실행 번호로 물으면 없는 것과 같은 오류다")
@@ -213,19 +223,21 @@ class ExecutionTreeServiceTest {
         AgentExecution other = execution(STRANGER_ID, null, null);
 
         assertThatThrownBy(() -> trees.of(owner(), other.id()))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.EXECUTION_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.EXECUTION_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("없는 실행 번호로 물어도 같은 오류다")
     void askingByMissingRunIdGivesSameError() {
         assertThatThrownBy(() -> trees.of(owner(), 9_999_999L))
-                .isInstanceOf(ApiException.class)
-                .extracting(failure -> ((ApiException) failure).code())
-                .isEqualTo(ErrorCode.EXECUTION_NOT_FOUND);
+            .isInstanceOf(ApiException.class)
+            .extracting(failure -> ((ApiException)failure).code())
+            .isEqualTo(ErrorCode.EXECUTION_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("루트를 찾아 올라가는 길이 순환이면 멈추고 트리가 잘렸다고 알린다")
@@ -242,6 +254,7 @@ class ExecutionTreeServiceTest {
         assertThat(tree.root().executionId()).isIn(first.id(), second.id());
     }
 
+
     @Test
     @DisplayName("상한보다 깊은 트리는 상한까지만 내고 마지막 노드가 잘렸다고 알린다")
     void emitsTreeDeeperThanLimitOnlyToLimitAndFlagsLastNodeTruncated() {
@@ -249,7 +262,7 @@ class ExecutionTreeServiceTest {
         List<Long> chain = new ArrayList<>(List.of(root.id()));
         for (int depth = 2; depth <= MAX_DEPTH + 1; depth++) {
             chain.add(
-                    execution(OWNER_ID, chain.get(chain.size() - 1), root.id()).id());
+                execution(OWNER_ID, chain.get(chain.size() - 1), root.id()).id());
         }
 
         ExecutionTree tree = trees.of(owner(), root.id());
@@ -271,6 +284,7 @@ class ExecutionTreeServiceTest {
         assertThat(warnings()).isEmpty();
     }
 
+
     @Test
     @DisplayName("루트에 닿지 않는 실행은 트리에 넣지 않는다")
     void leavesRunNotReachingRootOutOfTree() {
@@ -285,6 +299,7 @@ class ExecutionTreeServiceTest {
         assertThat(warnings()).singleElement().asString().contains(String.valueOf(orphan.id()));
     }
 
+
     @Test
     @DisplayName("MEMBER 역할에게는 공개한 도구와 도구가 아닌 사건의 detail 만 실린다")
     void memberGetsDetailOnlyOfPublicToolsAndNonToolEvents() {
@@ -293,17 +308,18 @@ class ExecutionTreeServiceTest {
         ExecutionTree tree = trees.of(ownerAs(UserRole.MEMBER), execution.id());
 
         assertThat(tree.root().events())
-                .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
-                .as("terminal 의 명령 원문은 비우고 검색어와 하위 에이전트 목표는 싣는다")
-                .containsExactly(
-                        tuple("TOOL_STARTED", null),
-                        tuple("TOOL_STARTED", "제주 날씨"),
-                        tuple("SUBAGENT_STARTED", "숙소를 찾는다"));
+            .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
+            .as("terminal 의 명령 원문은 비우고 검색어와 하위 에이전트 목표는 싣는다")
+            .containsExactly(
+                tuple("TOOL_STARTED", null),
+                tuple("TOOL_STARTED", "제주 날씨"),
+                tuple("SUBAGENT_STARTED", "숙소를 찾는다"));
         // 응답에서만 빼고 저장한 값은 그대로 둔다.
         assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(execution.id())))
-                .extracting(ExecutionEvent::detail)
-                .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
+            .extracting(ExecutionEvent::detail)
+            .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
     }
+
 
     @Test
     @DisplayName("ADMIN 역할에게는 도구의 명령 원문이 그대로 실린다")
@@ -313,9 +329,10 @@ class ExecutionTreeServiceTest {
         ExecutionTree tree = trees.of(ownerAs(UserRole.ADMIN), execution.id());
 
         assertThat(tree.root().events())
-                .extracting(ExecutionEventView::detail)
-                .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
+            .extracting(ExecutionEventView::detail)
+            .containsExactly("python3 run.py", "제주 날씨", "숙소를 찾는다");
     }
+
 
     @Test
     @DisplayName("MEMBER 역할의 노드에는 모델과 토큰과 금액과 시각 구간이 비고 걸린 시간과 단계는 남는다")
@@ -346,6 +363,7 @@ class ExecutionTreeServiceTest {
         assertThat(node.startedAt()).isNotNull();
     }
 
+
     @Test
     @DisplayName("ADMIN 역할의 노드에는 모델과 토큰과 금액과 시각 구간이 그대로 실린다")
     void adminNodeKeepsModelTokensCostAndTimestamps() {
@@ -372,6 +390,7 @@ class ExecutionTreeServiceTest {
         assertThat(node.finishedAt()).isEqualTo(STARTED_AT.plusMillis(1_234));
     }
 
+
     @Test
     @DisplayName("MEMBER 역할의 사건에는 모델과 토큰이 비고 PROVIDER SWITCHED 사건이 없으며 RUN FAILED 의 detail 은 남는다")
     void memberEventsHaveNoModelOrTokensAndNoProviderSwitchedButKeepRunFailedDetail() {
@@ -380,8 +399,8 @@ class ExecutionTreeServiceTest {
         ExecutionTree tree = trees.of(ownerAs(UserRole.MEMBER), execution.id());
 
         assertThat(tree.root().events())
-                .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
-                .containsExactly(tuple("SUBAGENT_COMPLETED", "숙소를 찾는다"), tuple("RUN_FAILED", "PROVIDER_BLOCKED"));
+            .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
+            .containsExactly(tuple("SUBAGENT_COMPLETED", "숙소를 찾는다"), tuple("RUN_FAILED", "PROVIDER_BLOCKED"));
         assertThat(tree.root().events().get(0)).satisfies(event -> {
             assertThat(event.model()).as("model").isNull();
             assertThat(event.inputTokens()).as("inputTokens").isNull();
@@ -391,12 +410,13 @@ class ExecutionTreeServiceTest {
         });
         // 응답에서만 빼고 저장한 사건은 그대로 둔다.
         assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(execution.id())))
-                .extracting(ExecutionEvent::eventType)
-                .containsExactly(
-                        ExecutionEventType.PROVIDER_SWITCHED,
-                        ExecutionEventType.SUBAGENT_COMPLETED,
-                        ExecutionEventType.RUN_FAILED);
+            .extracting(ExecutionEvent::eventType)
+            .containsExactly(
+                ExecutionEventType.PROVIDER_SWITCHED,
+                ExecutionEventType.SUBAGENT_COMPLETED,
+                ExecutionEventType.RUN_FAILED);
     }
+
 
     @Test
     @DisplayName("ADMIN 역할의 사건에는 모델과 토큰이 실리고 PROVIDER SWITCHED 사건도 나온다")
@@ -406,11 +426,11 @@ class ExecutionTreeServiceTest {
         ExecutionTree tree = trees.of(ownerAs(UserRole.ADMIN), execution.id());
 
         assertThat(tree.root().events())
-                .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
-                .containsExactly(
-                        tuple("PROVIDER_SWITCHED", "example-provider/example-model-small"),
-                        tuple("SUBAGENT_COMPLETED", "숙소를 찾는다"),
-                        tuple("RUN_FAILED", "PROVIDER_BLOCKED"));
+            .extracting(ExecutionEventView::eventType, ExecutionEventView::detail)
+            .containsExactly(
+                tuple("PROVIDER_SWITCHED", "example-provider/example-model-small"),
+                tuple("SUBAGENT_COMPLETED", "숙소를 찾는다"),
+                tuple("RUN_FAILED", "PROVIDER_BLOCKED"));
         assertThat(tree.root().events().get(1)).satisfies(event -> {
             assertThat(event.model()).isEqualTo("example-model-small");
             assertThat(event.inputTokens()).isEqualTo(70L);
@@ -418,52 +438,56 @@ class ExecutionTreeServiceTest {
         });
     }
 
+
     private static final Instant STARTED_AT = Instant.parse("2026-09-10T01:00:00Z");
+
 
     /** 내부 값이 모두 채워진 실패 실행이다. */
     private AgentExecution detailedExecution() {
         AgentExecution execution = AgentExecution.builder()
-                .userId(OWNER_ID)
-                .conversationId(7L)
-                .agentId(agent.id())
-                .profileName("dad")
-                .provider("example-provider")
-                .model("example-model-large")
-                .reasoningEffort("high")
-                .reasoningEffortSource(ReasoningEffortSource.REQUESTED)
-                .modelTier(ModelTier.DEEP)
-                .requestReceivedAt(STARTED_AT.minusMillis(50))
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.FAILED)
-                .errorCode("PROVIDER_BLOCKED")
-                .tokens(100L, 40L, 20L, 120L)
-                .cost(new ExecutionCost(5_000L, null, "USD", "2026-09"))
-                .timing(STARTED_AT, STARTED_AT.plusMillis(1_234))
-                .build();
+            .userId(OWNER_ID)
+            .conversationId(7L)
+            .agentId(agent.id())
+            .profileName("dad")
+            .provider("example-provider")
+            .model("example-model-large")
+            .reasoningEffort("high")
+            .reasoningEffortSource(ReasoningEffortSource.REQUESTED)
+            .modelTier(ModelTier.DEEP)
+            .requestReceivedAt(STARTED_AT.minusMillis(50))
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.FAILED)
+            .errorCode("PROVIDER_BLOCKED")
+            .tokens(100L, 40L, 20L, 120L)
+            .cost(new ExecutionCost(5_000L, null, "USD", "2026-09"))
+            .timing(STARTED_AT, STARTED_AT.plusMillis(1_234))
+            .build();
         execution.markSubmitted(STARTED_AT.plusMillis(10));
         execution.markFirstDelta(STARTED_AT.plusMillis(300));
         return executions.save(execution);
     }
+
 
     /** 다른 모델로 넘어간 사건, 모델과 토큰을 가진 하위 에이전트 완료 사건, 실패 사건을 가진 실행이다. */
     private AgentExecution executionWithSwitchAndFailure() {
         AgentExecution execution = execution(OWNER_ID, null, null);
         event(execution, 1, ExecutionEventType.PROVIDER_SWITCHED, null, "example-provider/example-model-small");
         events.save(ExecutionEvent.builder()
-                .executionId(execution.id())
-                .sequence(2)
-                .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
-                .subagentName("researcher")
-                .durationMs(900L)
-                .detail("숙소를 찾는다")
-                .model("example-model-small")
-                .inputTokens(70L)
-                .outputTokens(9L)
-                .occurredAt(Instant.now())
-                .build());
+            .executionId(execution.id())
+            .sequence(2)
+            .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
+            .subagentName("researcher")
+            .durationMs(900L)
+            .detail("숙소를 찾는다")
+            .model("example-model-small")
+            .inputTokens(70L)
+            .outputTokens(9L)
+            .occurredAt(Instant.now())
+            .build());
         event(execution, 3, ExecutionEventType.RUN_FAILED, null, "PROVIDER_BLOCKED");
         return execution;
     }
+
 
     /** 공개하지 않는 도구, 공개하는 도구, 하위 에이전트 사건을 하나씩 가진 실행이다. */
     private AgentExecution executionWithToolAndSubagent() {
@@ -474,6 +498,7 @@ class ExecutionTreeServiceTest {
         return execution;
     }
 
+
     private static List<Long> flatten(ExecutionNode node) {
         List<Long> ids = new ArrayList<>();
         ids.add(node.executionId());
@@ -481,43 +506,49 @@ class ExecutionTreeServiceTest {
         return ids;
     }
 
+
     private static CurrentUser owner() {
         return ownerAs(UserRole.ADMIN);
     }
+
 
     private static CurrentUser ownerAs(UserRole role) {
         return new CurrentUser(OWNER_ID, "dad@example.com", "dad", 1L, role);
     }
 
+
     private AgentExecution execution(Long userId, Long parentId, Long rootId) {
         return executions.save(AgentExecution.builder()
-                .userId(userId)
-                .conversationId(7L)
-                .agentId(agent.id())
-                .parentExecutionId(parentId)
-                .rootExecutionId(rootId)
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(userId)
+            .conversationId(7L)
+            .agentId(agent.id())
+            .parentExecutionId(parentId)
+            .rootExecutionId(rootId)
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
     }
+
 
     private void event(AgentExecution execution, int sequence, ExecutionEventType type, String toolName) {
         event(execution, sequence, type, toolName, null);
     }
 
+
     private void event(
-            AgentExecution execution, int sequence, ExecutionEventType type, String toolName, String detail) {
+        AgentExecution execution, int sequence, ExecutionEventType type, String toolName, String detail) {
         events.save(ExecutionEvent.builder()
-                .executionId(execution.id())
-                .sequence(sequence)
-                .eventType(type)
-                .toolName(toolName)
-                .detail(detail)
-                .occurredAt(Instant.now())
-                .build());
+            .executionId(execution.id())
+            .sequence(sequence)
+            .eventType(type)
+            .toolName(toolName)
+            .detail(detail)
+            .occurredAt(Instant.now())
+            .build());
     }
+
 
     /**
      * 부모를 나중에 가리키게 만든다.

@@ -9,4 +9,5 @@ import java.time.Instant;
  * @param ref 그 기록의 참조. 문맥 묶음의 참조와 같은 형식이다(예: {@code execution:812})
  * @param asOf 그 기록을 어느 시각의 것으로 읽었는지
  */
-public record AttentionSourceRef(String source, String ref, Instant asOf) {}
+public record AttentionSourceRef(String source, String ref, Instant asOf) {
+}

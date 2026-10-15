@@ -42,12 +42,13 @@ public class HttpHermesRunsClient implements HermesRunsClient {
     private final HermesProfileKeyStore keyStore;
     private final HermesProperties properties;
 
+
     public HttpHermesRunsClient(HermesProfileKeyStore keyStore, HermesProperties properties) {
-        this.restClient =
-                RestClient.builder().requestFactory(requestFactory(properties)).build();
+        this.restClient = RestClient.builder().requestFactory(requestFactory(properties)).build();
         this.keyStore = keyStore;
         this.properties = properties;
     }
+
 
     private static SimpleClientHttpRequestFactory requestFactory(HermesProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -55,6 +56,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         factory.setReadTimeout(properties.readTimeout());
         return factory;
     }
+
 
     @Override
     public String submit(HermesRunCommand command) {
@@ -68,20 +70,22 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return runId;
     }
 
+
     @Override
     public HermesRunResult awaitCompletion(HermesRunCommand command, String runId) {
         return poll(command, runId, keyStore.resolve(command.profileName()));
     }
 
+
     @Override
     public void stop(String apiBaseUrl, String profileName, String runId) {
         try {
             restClient
-                    .post()
-                    .uri(apiBaseUrl + "/v1/runs/{runId}/stop", runId)
-                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve()
-                    .toBodilessEntity();
+                .post()
+                .uri(apiBaseUrl + "/v1/runs/{runId}/stop", runId)
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .retrieve()
+                .toBodilessEntity();
         } catch (HttpClientErrorException.NotFound ex) {
             log.info("이미 끝난 Hermes 실행을 멈추지 못했다 profile={} runId={}", profileName, runId);
         } catch (RestClientException ex) {
@@ -89,21 +93,23 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     @Override
     public void deleteSession(String apiBaseUrl, String profileName, String sessionId) {
         try {
             restClient
-                    .delete()
-                    .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
-                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve()
-                    .toBodilessEntity();
+                .delete()
+                .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .retrieve()
+                .toBodilessEntity();
         } catch (HttpClientErrorException.NotFound ex) {
             log.info("이미 없는 Hermes session 이다 profile={} sessionId={}", profileName, sessionId);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not delete the Hermes session");
         }
     }
+
 
     /**
      * 실행 하나를 한 번 읽는다. 종료 상태가 아닌 {@code status} 는 값이 없거나 모르는 값이어도 도는 것으로 본다.
@@ -114,11 +120,11 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         JsonNode run;
         try {
             run = restClient
-                    .get()
-                    .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
-                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .retrieve()
+                .body(JsonNode.class);
         } catch (HttpClientErrorException.NotFound ex) {
             return HermesRunLookup.notFound();
         } catch (RestClientException ex) {
@@ -130,6 +136,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
         return HermesRunLookup.running();
     }
+
 
     /**
      * 실제로 돈 provider 와 모델을 세션 행에서 읽는다.
@@ -144,11 +151,11 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
         try {
             JsonNode session = restClient
-                    .get()
-                    .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
-                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .retrieve()
+                .body(JsonNode.class);
             // v0.21.5 는 `{"object": ..., "session": {...}}` 로 감싸고 provider 칸을 주지 않는다. 주는 판을 위해 두 이름을 읽는다.
             JsonNode row = session != null && session.has("session") ? session.get("session") : session;
             String model = text(row, "model");
@@ -166,15 +173,16 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     @Override
     public SubagentSessionUsage readSubagentUsage(String apiBaseUrl, String profileName, String sessionId) {
         try {
             JsonNode response = restClient
-                    .get()
-                    .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
-                    .header("Authorization", "Bearer " + keyStore.resolve(profileName))
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(apiBaseUrl + "/api/sessions/{sessionId}", sessionId)
+                .header("Authorization", "Bearer " + keyStore.resolve(profileName))
+                .retrieve()
+                .body(JsonNode.class);
             JsonNode row = response == null ? null : response.get("session");
             if (row == null || !sessionId.equals(text(row, "id"))) {
                 return null;
@@ -184,22 +192,23 @@ public class HttpHermesRunsClient implements HermesRunsClient {
                 provider = text(row, "billing_provider");
             }
             return new SubagentSessionUsage(
-                    text(row, "id"),
-                    text(row, "source"),
-                    text(row, "parent_session_id"),
-                    text(row, "model"),
-                    provider,
-                    decimal(row, "started_at"),
-                    decimal(row, "ended_at"),
-                    number(row, "input_tokens"),
-                    number(row, "output_tokens"),
-                    number(row, "cache_read_tokens"),
-                    number(row, "cache_write_tokens"));
+                text(row, "id"),
+                text(row, "source"),
+                text(row, "parent_session_id"),
+                text(row, "model"),
+                provider,
+                decimal(row, "started_at"),
+                decimal(row, "ended_at"),
+                number(row, "input_tokens"),
+                number(row, "output_tokens"),
+                number(row, "cache_read_tokens"),
+                number(row, "cache_write_tokens"));
         } catch (RuntimeException ex) {
             log.warn("하위 에이전트 사용량을 읽지 못했다 profile={} sessionId={}", profileName, sessionId);
             return null;
         }
     }
+
 
     private static Double decimal(JsonNode row, String field) {
         JsonNode value = row.get(field);
@@ -209,6 +218,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         double number = value.asDouble();
         return Double.isFinite(number) && number >= 0 ? number : null;
     }
+
 
     /**
      * {@code provider} 와 {@code model} 이 함께 채워졌거나 함께 비었는지 본다.
@@ -223,9 +233,11 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     private static boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
+
 
     /**
      * 사진이 없으면 글 그대로, 있으면 user 메시지 하나의 목록으로 싣는다.
@@ -246,6 +258,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return List.of(Map.of("role", "user", "content", content));
     }
 
+
     private JsonNode submitRequest(HermesRunCommand command, String apiKey) {
         Map<String, Object> body = new HashMap<>();
         body.put("input", input(command));
@@ -264,18 +277,19 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
         try {
             return restClient
-                    .post()
-                    .uri(command.apiBaseUrl() + "/v1/runs")
-                    .header("Authorization", "Bearer " + apiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
+                .post()
+                .uri(command.apiBaseUrl() + "/v1/runs")
+                .header("Authorization", "Bearer " + apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
         } catch (RestClientException ex) {
             log.warn("hermes run submit failed profile={}", command.profileName(), ex);
             throw HermesCallFailure.of(ex, "could not reach the Hermes runtime");
         }
     }
+
 
     private HermesRunResult poll(HermesRunCommand command, String runId, String apiKey) {
         long deadline = System.nanoTime() + properties.runTimeout().toNanos();
@@ -292,18 +306,20 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         }
     }
 
+
     private JsonNode fetch(String apiBaseUrl, String runId, String apiKey) {
         try {
             return restClient
-                    .get()
-                    .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
-                    .header("Authorization", "Bearer " + apiKey)
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(apiBaseUrl + "/v1/runs/{runId}", runId)
+                .header("Authorization", "Bearer " + apiKey)
+                .retrieve()
+                .body(JsonNode.class);
         } catch (RestClientException ex) {
             throw HermesCallFailure.of(ex, "could not read the run status");
         }
     }
+
 
     /**
      * 끝난 실행을 결과로 옮긴다.
@@ -316,16 +332,17 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         String servedModel = text(runtime, "model");
         String servedProvider = text(runtime, "provider");
         return new HermesRunResult(
-                runId,
-                text(run, "session_id"),
-                status,
-                text(run, "output"),
-                text(run, "model"),
-                text(run, "provider"),
-                text(run, "error"),
-                readUsage(run.path("usage")),
-                servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider));
+            runId,
+            text(run, "session_id"),
+            status,
+            text(run, "output"),
+            text(run, "model"),
+            text(run, "provider"),
+            text(run, "error"),
+            readUsage(run.path("usage")),
+            servedModel == null && servedProvider == null ? null : new SessionRuntime(servedModel, servedProvider));
     }
+
 
     /**
      * 토큰 수를 너그럽게 읽는다. Hermes 는 provider 가 보고한 것을 그대로 넘기는데, 캐시된 입력
@@ -356,6 +373,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return new TokenUsage(input, cached, output, total);
     }
 
+
     private static Long firstNumber(JsonNode node, String... fields) {
         for (String field : fields) {
             Long value = number(node, field);
@@ -366,6 +384,7 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return null;
     }
 
+
     private static Long number(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         if (value == null || !value.isIntegralNumber() || !value.canConvertToLong()) {
@@ -375,10 +394,12 @@ public class HttpHermesRunsClient implements HermesRunsClient {
         return number >= 0 ? number : null;
     }
 
+
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value != null && value.isTextual() ? value.asText() : null;
     }
+
 
     private void sleep() {
         try {

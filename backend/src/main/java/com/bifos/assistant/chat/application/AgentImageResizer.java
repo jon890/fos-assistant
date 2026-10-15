@@ -51,7 +51,8 @@ final class AgentImageResizer {
     private static final int DEFAULT_ORIENTATION = 1;
     private static final int ORIENTATION_TAG = 0x0112;
     private static final int SHORT_TYPE = 3;
-    private static final byte[] PNG_SIGNATURE = {(byte) 137, 80, 78, 71, 13, 10, 26, 10};
+    private static final byte[] PNG_SIGNATURE = {(byte)137, 80, 78, 71, 13, 10, 26, 10};
+
 
     /** 줄인 JPEG 를 돌려준다. 읽지 못하면 빈 값이다. */
     static Optional<byte[]> toJpeg(byte[] original) {
@@ -69,6 +70,7 @@ final class AgentImageResizer {
         }
     }
 
+
     /**
      * 긴 변이 {@code longSide} 를 넘으면 그 길이로 줄인 크기를, 넘지 않으면 받은 크기를 그대로 돌려준다. 짧은 변은 비율대로
      * 줄이되 1 아래로 내리지 않는다. 가로와 세로가 같으면 가로를 긴 변으로 본다. 단계를 고를 때 계산한 화소와 실제로 줄인 사진의
@@ -79,10 +81,11 @@ final class AgentImageResizer {
             return new Dimension(width, height);
         }
         if (width >= height) {
-            return new Dimension(longSide, Math.max(1, (int) Math.round((double) height * longSide / width)));
+            return new Dimension(longSide, Math.max(1, (int)Math.round((double)height * longSide / width)));
         }
-        return new Dimension(Math.max(1, (int) Math.round((double) width * longSide / height)), longSide);
+        return new Dimension(Math.max(1, (int)Math.round((double)width * longSide / height)), longSide);
     }
+
 
     /** 디코딩하지 않고 머리의 가로와 세로만 읽는다. 읽는 리더가 없거나 읽지 못하면 빈 값이다. */
     static Optional<Dimension> dimensions(byte[] image) {
@@ -106,6 +109,7 @@ final class AgentImageResizer {
         }
     }
 
+
     /**
      * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide} 로 다시 줄인다. 품질은 {@link #QUALITY} 다. 긴 변이 이미
      * {@code longSide} 이하이면 받은 바이트를 그대로 돌려준다. 읽거나 쓰지 못하면 빈 값이다.
@@ -113,6 +117,7 @@ final class AgentImageResizer {
     static Optional<byte[]> shrink(byte[] jpeg, int longSide) {
         return shrink(jpeg, longSide, QUALITY);
     }
+
 
     /**
      * {@link #toJpeg} 가 만든 사본 JPEG 를 긴 변 {@code longSide}, JPEG 품질 {@code quality} 로 다시 줄인다. 사본은 EXIF 가
@@ -137,10 +142,12 @@ final class AgentImageResizer {
         }
     }
 
+
     /** 화소 수가 상한 안인지 본다. {@code int} 곱은 넘치므로 {@code long} 으로 곱한다. */
     static boolean withinPixelLimit(long width, long height, long maxPixels) {
         return width > 0 && height > 0 && width * height <= maxPixels;
     }
+
 
     /**
      * JPEG APP1 또는 PNG eXIf의 IFD0 방향 태그(1~8)를 읽는다. 메타데이터가 없거나 손상되었으면 1이다.
@@ -185,11 +192,13 @@ final class AgentImageResizer {
         return DEFAULT_ORIENTATION;
     }
 
+
     static boolean isPng(byte[] image) {
         return image != null
-                && image.length >= PNG_SIGNATURE.length
-                && Arrays.equals(image, 0, PNG_SIGNATURE.length, PNG_SIGNATURE, 0, PNG_SIGNATURE.length);
+            && image.length >= PNG_SIGNATURE.length
+            && Arrays.equals(image, 0, PNG_SIGNATURE.length, PNG_SIGNATURE, 0, PNG_SIGNATURE.length);
     }
+
 
     /**
      * 최대 {@code maxBytes} 안에서 PNG 청크를 순차 탐색한다. 영상 청크는 건너뛰고 eXIf만 메모리에 담는다.
@@ -212,7 +221,7 @@ final class AgentImageResizer {
             consumed += length + 12;
             long type = readInt(header, 4, false);
             if (type == 0x65584966L) {
-                byte[] exif = input.readNBytes((int) length);
+                byte[] exif = input.readNBytes((int)length);
                 byte[] checksum = input.readNBytes(4);
                 if (exif.length != length || checksum.length != 4) {
                     return DEFAULT_ORIENTATION;
@@ -221,8 +230,8 @@ final class AgentImageResizer {
                 crc.update(header, 4, 4);
                 crc.update(exif);
                 return crc.getValue() == readInt(checksum, 0, false)
-                        ? exifOrientation(exif, 0, exif.length)
-                        : DEFAULT_ORIENTATION;
+                    ? exifOrientation(exif, 0, exif.length)
+                    : DEFAULT_ORIENTATION;
             }
             if (type == 0x49454e44L) {
                 return DEFAULT_ORIENTATION;
@@ -231,6 +240,7 @@ final class AgentImageResizer {
         }
         return DEFAULT_ORIENTATION;
     }
+
 
     private static BufferedImage decode(byte[] original) throws IOException {
         try (ImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(original))) {
@@ -257,6 +267,7 @@ final class AgentImageResizer {
         }
     }
 
+
     /** 긴 변을 {@code longSide} 이하로 줄이고 방향을 바로잡아 흰 바탕에 그린다. */
     static BufferedImage draw(BufferedImage source, int orientation, int longSide) {
         int sourceWidth = source.getWidth();
@@ -265,8 +276,7 @@ final class AgentImageResizer {
         int width = size.width;
         int height = size.height;
         boolean swapsSides = orientation >= 5 && orientation <= 8;
-        BufferedImage result =
-                new BufferedImage(swapsSides ? height : width, swapsSides ? width : height, BufferedImage.TYPE_INT_RGB);
+        BufferedImage result = new BufferedImage(swapsSides ? height : width, swapsSides ? width : height, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = result.createGraphics();
         try {
             graphics.setColor(Color.WHITE);
@@ -274,13 +284,14 @@ final class AgentImageResizer {
             graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             AffineTransform transform = orientationTransform(orientation, width, height);
             transform.concatenate(
-                    AffineTransform.getScaleInstance((double) width / sourceWidth, (double) height / sourceHeight));
+                AffineTransform.getScaleInstance((double)width / sourceWidth, (double)height / sourceHeight));
             graphics.drawImage(source, transform, null);
         } finally {
             graphics.dispose();
         }
         return result;
     }
+
 
     /**
      * 줄인 크기 {@code width}×{@code height} 의 사진을 EXIF 방향대로 바로 세우는 변환이다. 5~8 은 가로와 세로가 바뀐다.
@@ -297,6 +308,7 @@ final class AgentImageResizer {
             default -> new AffineTransform();
         };
     }
+
 
     private static byte[] encode(BufferedImage image, float quality) throws IOException {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
@@ -317,15 +329,17 @@ final class AgentImageResizer {
         return bytes.toByteArray();
     }
 
+
     private static boolean isExif(byte[] jpeg, int body, int end) {
         return end - body >= 6
-                && jpeg[body] == 'E'
-                && jpeg[body + 1] == 'x'
-                && jpeg[body + 2] == 'i'
-                && jpeg[body + 3] == 'f'
-                && jpeg[body + 4] == 0
-                && jpeg[body + 5] == 0;
+            && jpeg[body] == 'E'
+            && jpeg[body + 1] == 'x'
+            && jpeg[body + 2] == 'i'
+            && jpeg[body + 3] == 'f'
+            && jpeg[body + 4] == 0
+            && jpeg[body + 5] == 0;
     }
+
 
     /** {@code tiff} 에서 시작하는 TIFF 머리와 IFD0 을 읽는다. 오프셋은 TIFF 머리 기준이다. */
     private static int exifOrientation(byte[] jpeg, int tiff, int end) {
@@ -347,7 +361,7 @@ final class AgentImageResizer {
         if (ifd < 8 || tiff + ifd + 2 > end) {
             return DEFAULT_ORIENTATION;
         }
-        int entries = tiff + (int) ifd;
+        int entries = tiff + (int)ifd;
         int count = readShort(jpeg, entries, littleEndian);
         for (int i = 0; i < count; i++) {
             int entry = entries + 2 + i * 12;
@@ -356,7 +370,7 @@ final class AgentImageResizer {
             }
             if (readShort(jpeg, entry, littleEndian) == ORIENTATION_TAG) {
                 if (readShort(jpeg, entry + 2, littleEndian) != SHORT_TYPE
-                        || readInt(jpeg, entry + 4, littleEndian) != 1) {
+                    || readInt(jpeg, entry + 4, littleEndian) != 1) {
                     return DEFAULT_ORIENTATION;
                 }
                 int value = readShort(jpeg, entry + 8, littleEndian);
@@ -366,11 +380,13 @@ final class AgentImageResizer {
         return DEFAULT_ORIENTATION;
     }
 
+
     private static int readShort(byte[] bytes, int offset, boolean littleEndian) {
         int first = unsigned(bytes[offset]);
         int second = unsigned(bytes[offset + 1]);
         return littleEndian ? (second << 8) | first : (first << 8) | second;
     }
+
 
     private static long readInt(byte[] bytes, int offset, boolean littleEndian) {
         long value = 0;
@@ -380,6 +396,7 @@ final class AgentImageResizer {
         }
         return value;
     }
+
 
     private static int unsigned(byte value) {
         return value & 0xff;

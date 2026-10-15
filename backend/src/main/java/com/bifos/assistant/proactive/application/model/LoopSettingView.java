@@ -9,4 +9,5 @@ import java.time.Instant;
  * @param enabled 사용자가 켰다. 설정 줄이 없으면 거짓이다
  * @param snoozedUntil 쉬는 끝 시각. 지금보다 뒤일 때만 싣고 아니면 null
  */
-public record LoopSettingView(boolean available, boolean enabled, Instant snoozedUntil) {}
+public record LoopSettingView(boolean available, boolean enabled, Instant snoozedUntil) {
+}

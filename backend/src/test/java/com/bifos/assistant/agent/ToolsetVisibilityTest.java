@@ -36,10 +36,12 @@ class ToolsetVisibilityTest {
     @Autowired
     HermesToolsetClient toolsets;
 
+
     @AfterEach
     void cleanUp() {
         transactions.executeWithoutResult(status -> hidden.deleteByGroupId(GROUP_ID));
     }
+
 
     @Test
     @DisplayName("새 그룹은 모두 보이고 숨김 목록은 중복 없이 저장되며 다른 그룹에 번지지 않는다")
@@ -55,17 +57,18 @@ class ToolsetVisibilityTest {
         verifyNoInteractions(toolsets);
     }
 
+
     @Test
     @DisplayName("잘못된 이름과 일반 사용자의 저장은 거절하고 기존 숨김을 보존한다")
     void rejectsInvalidAndUnauthorizedSavesWithoutChangingSettings() {
         visibility.save(admin, List.of("spotify"));
         assertThatThrownBy(() -> visibility.save(admin, List.of("memory")))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         CurrentUser member = new CurrentUser(2L, "member@example.com", "사용자", GROUP_ID, UserRole.MEMBER);
         assertThatThrownBy(() -> visibility.save(member, List.of()))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThat(visibility.hiddenFor(GROUP_ID)).containsExactly("spotify");
         verifyNoInteractions(toolsets);
     }

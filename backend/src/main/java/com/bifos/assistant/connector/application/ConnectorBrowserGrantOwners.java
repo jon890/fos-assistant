@@ -14,6 +14,7 @@ public class ConnectorBrowserGrantOwners implements BrowserGrantOwners {
 
     private final ConnectorBindingRepository bindings;
 
+
     @Override
     @Transactional(readOnly = true)
     public Optional<Long> bindingOwner(long bindingId) {

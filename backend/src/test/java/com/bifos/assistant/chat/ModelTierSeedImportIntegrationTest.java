@@ -51,11 +51,13 @@ class ModelTierSeedImportIntegrationTest {
     /** 이 검사 전에 있던 정의 행이다. 옮기기는 사용자가 있는 모든 그룹에 쓰므로 검사 뒤에 그 밖의 행을 지운다. */
     private Set<Long> existing;
 
+
     @BeforeEach
     void clearLeftovers() {
         cleanUp();
         existing = definitions.findAll().stream().map(ModelTierDefinition::id).collect(Collectors.toSet());
     }
+
 
     @AfterEach
     void cleanUp() {
@@ -64,11 +66,12 @@ class ModelTierSeedImportIntegrationTest {
             users.findByEmail(EMAIL).ifPresent(users::delete);
             if (existing != null) {
                 definitions.deleteAll(definitions.findAll().stream()
-                        .filter(definition -> !existing.contains(definition.id()))
-                        .toList());
+                    .filter(definition -> !existing.contains(definition.id()))
+                    .toList());
             }
         });
     }
+
 
     @Test
     @DisplayName("사용자가 있는 그룹에 정의 행이 없으면 설정의 세 단계를 저장하고, 다시 돌려도 저장된 정의를 바꾸지 않는다")
@@ -80,27 +83,27 @@ class ModelTierSeedImportIntegrationTest {
         List<ModelTierDefinition> imported = definitions.findByGroupIdOrderByTier(GROUP_ID);
         assertThat(imported).hasSize(3);
         assertThat(imported)
-                .filteredOn(definition -> definition.tier() == ModelTier.FAST)
-                .singleElement()
-                .satisfies(fast -> {
-                    assertThat(fast.provider()).isNull();
-                    assertThat(fast.model()).isEqualTo("example-fast");
-                    assertThat(fast.reasoningEffort()).isEqualTo("low");
-                });
+            .filteredOn(definition -> definition.tier() == ModelTier.FAST)
+            .singleElement()
+            .satisfies(fast -> {
+                assertThat(fast.provider()).isNull();
+                assertThat(fast.model()).isEqualTo("example-fast");
+                assertThat(fast.reasoningEffort()).isEqualTo("low");
+            });
         assertThat(imported)
-                .filteredOn(definition -> definition.tier() == ModelTier.BALANCED)
-                .singleElement()
-                .satisfies(balanced -> assertThat(balanced.provider()).isEqualTo("example-provider"));
+            .filteredOn(definition -> definition.tier() == ModelTier.BALANCED)
+            .singleElement()
+            .satisfies(balanced -> assertThat(balanced.provider()).isEqualTo("example-provider"));
         assertThat(imported)
-                .filteredOn(definition -> definition.tier() == ModelTier.DEEP)
-                .singleElement()
-                .satisfies(deep -> assertThat(deep.model()).isNull());
+            .filteredOn(definition -> definition.tier() == ModelTier.DEEP)
+            .singleElement()
+            .satisfies(deep -> assertThat(deep.model()).isNull());
         List<Long> ids = imported.stream().map(ModelTierDefinition::id).toList();
 
         importer.run(null);
 
         assertThat(definitions.findByGroupIdOrderByTier(GROUP_ID))
-                .extracting(ModelTierDefinition::id)
-                .containsExactlyInAnyOrderElementsOf(ids);
+            .extracting(ModelTierDefinition::id)
+            .containsExactlyInAnyOrderElementsOf(ids);
     }
 }

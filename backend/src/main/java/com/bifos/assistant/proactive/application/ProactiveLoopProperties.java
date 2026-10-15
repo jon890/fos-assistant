@@ -17,11 +17,11 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "assistant.proactive-loop")
 @Validated
 public record ProactiveLoopProperties(
-        @DefaultValue("false") boolean enabled,
-        @DefaultValue("hermes") String provider,
-        @DefaultValue("1") int maxRunsPerDay,
-        @DefaultValue("7d") Duration surfaceWindow,
-        @DefaultValue("3") int surfaceMaxItems) {
+    @DefaultValue("false") boolean enabled,
+    @DefaultValue("hermes") String provider,
+    @DefaultValue("1") int maxRunsPerDay,
+    @DefaultValue("7d") Duration surfaceWindow,
+    @DefaultValue("3") int surfaceMaxItems) {
 
     public ProactiveLoopProperties {
         if (provider == null || provider.isBlank()) {

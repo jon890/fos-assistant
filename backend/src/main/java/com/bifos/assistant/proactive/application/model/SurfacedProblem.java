@@ -16,11 +16,12 @@ import java.time.Instant;
  * @param at 판정을 남긴 시각
  */
 public record SurfacedProblem(
-        Long decisionId,
-        AutonomyLevel level,
-        Long checkId,
-        Long agentId,
-        Long conversationId,
-        String problem,
-        String action,
-        Instant at) {}
+    Long decisionId,
+    AutonomyLevel level,
+    Long checkId,
+    Long agentId,
+    Long conversationId,
+    String problem,
+    String action,
+    Instant at) {
+}

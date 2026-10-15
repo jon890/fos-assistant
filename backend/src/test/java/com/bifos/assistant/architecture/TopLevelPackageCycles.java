@@ -36,9 +36,11 @@ final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
 
     private TopLevelPackageEdges packageEdges = TopLevelPackageEdges.of(List.of());
 
+
     TopLevelPackageCycles() {
         super("최상위 패키지 사이의 간선이 순환에 속하지 않는다");
     }
+
 
     @Override
     public void init(Collection<JavaClass> allObjectsToTest) {
@@ -55,6 +57,7 @@ final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
         }));
     }
 
+
     @Override
     public void check(JavaClass item, ConditionEvents events) {
         if (!packageEdges.reports(item)) {
@@ -66,12 +69,12 @@ final class TopLevelPackageCycles extends ArchCondition<JavaClass> {
         }
     }
 
+
     /** Floyd–Warshall 로 패키지마다 닿을 수 있는 패키지를 구한다. 노드가 열 개 남짓이라 충분하다. */
     private static boolean[][] reachability(List<String> nodes, Map<String, SortedSet<String>> edges) {
         int size = nodes.size();
         boolean[][] reach = new boolean[size][size];
-        edges.forEach((source, targets) ->
-                targets.forEach(target -> reach[nodes.indexOf(source)][nodes.indexOf(target)] = true));
+        edges.forEach((source, targets) -> targets.forEach(target -> reach[nodes.indexOf(source)][nodes.indexOf(target)] = true));
         for (int via = 0; via < size; via++) {
             for (int from = 0; from < size; from++) {
                 if (!reach[from][via]) {

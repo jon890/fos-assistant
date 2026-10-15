@@ -15,4 +15,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties({"assistant.memory.encryption.active-key-id=", "assistant.memory.encryption.keys="})
-public @interface MemoryEncryptionDisabled {}
+public @interface MemoryEncryptionDisabled {
+}

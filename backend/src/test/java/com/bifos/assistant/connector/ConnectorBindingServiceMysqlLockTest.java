@@ -16,6 +16,7 @@ class ConnectorBindingServiceMysqlLockTest extends ConnectorBindingServiceLockTe
 
     private static MysqlTestDatabase database;
 
+
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         database = MysqlTestDatabase.create();

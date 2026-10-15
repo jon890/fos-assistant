@@ -43,6 +43,7 @@ public class FirstResponseLatencyService {
     private final ScheduledTurnExecutions scheduledTurns;
     private final Clock clock;
 
+
     /**
      * 그 사용자의 최근 {@code days} 일 첫 반응 시간을 집계한다.
      *
@@ -57,46 +58,48 @@ public class FirstResponseLatencyService {
         Instant from = to.minus(Duration.ofDays(days));
         List<TurnTiming> timings = messages.findUserTurnTimings(userId, from, to);
         Set<Long> scheduled = scheduledTurns.scheduledAmong(
-                timings.stream().map(TurnTiming::executionId).toList());
+            timings.stream().map(TurnTiming::executionId).toList());
         Map<Group, List<TurnTiming>> groups = timings.stream()
-                .filter(timing -> !scheduled.contains(timing.executionId()))
-                .collect(Collectors.groupingBy(
-                        timing -> new Group(
-                                timing.requestReceivedAt()
-                                        .atZone(HOUSEHOLD_ZONE)
-                                        .toLocalDate(),
-                                timing.modelTier()),
-                        Collectors.toList()));
+            .filter(timing -> !scheduled.contains(timing.executionId()))
+            .collect(Collectors.groupingBy(
+                timing -> new Group(
+                    timing.requestReceivedAt()
+                        .atZone(HOUSEHOLD_ZONE)
+                        .toLocalDate(),
+                    timing.modelTier()),
+                Collectors.toList()));
         List<LatencyRow> rows = groups.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey(GROUP_ORDER))
-                .map(entry -> row(entry.getKey(), entry.getValue()))
-                .toList();
+            .sorted(Map.Entry.comparingByKey(GROUP_ORDER))
+            .map(entry -> row(entry.getKey(), entry.getValue()))
+            .toList();
         return new LatencySummary(days, rows);
     }
 
+
     private static LatencyRow row(Group group, List<TurnTiming> timings) {
         return new LatencyRow(
-                group.date(),
-                group.modelTier(),
-                timings.size(),
-                stat(timings, TurnTiming::requestReceivedAt, TurnTiming::firstDeltaAt),
-                stat(timings, TurnTiming::requestReceivedAt, TurnTiming::submittedAt),
-                stat(timings, TurnTiming::submittedAt, TurnTiming::firstDeltaAt));
+            group.date(),
+            group.modelTier(),
+            timings.size(),
+            stat(timings, TurnTiming::requestReceivedAt, TurnTiming::firstDeltaAt),
+            stat(timings, TurnTiming::requestReceivedAt, TurnTiming::submittedAt),
+            stat(timings, TurnTiming::submittedAt, TurnTiming::firstDeltaAt));
     }
 
+
     private static LatencyStat stat(
-            List<TurnTiming> timings, Function<TurnTiming, Instant> start, Function<TurnTiming, Instant> end) {
+        List<TurnTiming> timings, Function<TurnTiming, Instant> start, Function<TurnTiming, Instant> end) {
         List<Long> sorted = timings.stream()
-                .filter(timing -> start.apply(timing) != null && end.apply(timing) != null)
-                .map(timing ->
-                        Duration.between(start.apply(timing), end.apply(timing)).toMillis())
-                .sorted()
-                .toList();
+            .filter(timing -> start.apply(timing) != null && end.apply(timing) != null)
+            .map(timing -> Duration.between(start.apply(timing), end.apply(timing)).toMillis())
+            .sorted()
+            .toList();
         if (sorted.isEmpty()) {
             return new LatencyStat(0, null, null);
         }
         return new LatencyStat(sorted.size(), nearestRank(sorted, 50), nearestRank(sorted, 90));
     }
+
 
     /** 오름차순 값의 p 백분위다. {@code ceil(p / 100 * n)} 번째 값을 정수 계산으로 구한다. */
     private static long nearestRank(List<Long> sorted, int percentile) {
@@ -104,10 +107,13 @@ public class FirstResponseLatencyService {
         return sorted.get(rank - 1);
     }
 
+
     /** 날짜와 모델 단계가 같은 turn 의 묶음 키다. 단계가 없는 묶음은 null 이다. */
-    private record Group(LocalDate date, ModelTier modelTier) {}
+    private record Group(LocalDate date, ModelTier modelTier) {
+    }
+
 
     /** 날짜 오름차순이고, 같은 날짜 안에서는 단계 선언 순서, 단계 없음이 마지막이다. */
     private static final Comparator<Group> GROUP_ORDER = Comparator.comparing(Group::date)
-            .thenComparing(Group::modelTier, Comparator.nullsLast(Comparator.naturalOrder()));
+        .thenComparing(Group::modelTier, Comparator.nullsLast(Comparator.naturalOrder()));
 }

@@ -22,17 +22,20 @@ public class ValueEvaluationController {
     private final ValueEvaluationService evaluations;
     private final CurrentUserProvider currentUser;
 
+
     @PostMapping("/api/v1/proactive-checks/{checkId}/value-evaluations")
     @ResponseStatus(HttpStatus.CREATED)
     public EvaluationResponse evaluate(@PathVariable Long checkId, @Valid @RequestBody EvaluationRequest request) {
         return EvaluationResponse.from(evaluations.evaluate(currentUser.require(), checkId, request.provider()));
     }
 
+
     @PostMapping("/api/v1/value-evaluations/{id}/replays")
     @ResponseStatus(HttpStatus.CREATED)
     public EvaluationResponse replay(@PathVariable Long id, @Valid @RequestBody EvaluationRequest request) {
         return EvaluationResponse.from(evaluations.replay(currentUser.require(), id, request.provider()));
     }
+
 
     @GetMapping("/api/v1/value-evaluations/{id}")
     public EvaluationResponse read(@PathVariable Long id) {

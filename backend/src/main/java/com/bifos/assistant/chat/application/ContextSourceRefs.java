@@ -21,14 +21,15 @@ public final class ContextSourceRefs {
         return of(context.bundle().items());
     }
 
+
     /** 항목을 받은 순서 그대로 옮긴다. 결과를 전하는 turn 이 Memory 항목 뒤로 결과 항목을 이을 때 쓴다. */
     public static List<ContextSourceRef> of(List<ContextItem> items) {
         return items.stream()
-                .map(item -> new ContextSourceRef(
-                        item.source().name(),
-                        item.ref(),
-                        item.bodyMode().name(),
-                        item.freshness().name()))
-                .toList();
+            .map(item -> new ContextSourceRef(
+                item.source().name(),
+                item.ref(),
+                item.bodyMode().name(),
+                item.freshness().name()))
+            .toList();
     }
 }

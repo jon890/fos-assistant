@@ -20,6 +20,7 @@ public class ScheduledTurnSource implements ScheduledTurnExecutions {
 
     private final TaskRunRepository runs;
 
+
     @Override
     public Set<Long> scheduledAmong(Collection<Long> executionIds) {
         if (executionIds.isEmpty()) {

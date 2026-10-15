@@ -28,11 +28,15 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
     private Supplier<RuntimeException> readSoulFailure;
     private Supplier<RuntimeException> putSoulFailure;
 
+
     /** {@code putSoul} 이 어느 profile 에 무엇을 넘겼는지다. */
-    public record SoulWrite(String profile, String content) {}
+    public record SoulWrite(String profile, String content) {
+    }
 
     /** {@code putEnv} 가 어느 profile 의 어느 key 를 썼는지다. 값은 {@link #env(String)} 로 본다. */
-    public record EnvWrite(String profile, String key) {}
+    public record EnvWrite(String profile, String key) {
+    }
+
 
     @Override
     public void createProfile(String name) {
@@ -43,6 +47,7 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         env.put(name, new LinkedHashMap<>());
     }
 
+
     @Override
     public void putEnv(String profile, String key, String value) {
         if (putEnvFailure != null) {
@@ -51,6 +56,7 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         envWrites.add(new EnvWrite(profile, key));
         env.computeIfAbsent(profile, ignored -> new LinkedHashMap<>()).put(key, value);
     }
+
 
     @Override
     public void deleteProfile(String name) {
@@ -61,6 +67,7 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         env.remove(name);
     }
 
+
     @Override
     public SoulDocument readSoul(String profileName) {
         if (readSoulFailure != null) {
@@ -69,6 +76,7 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         String content = souls.get(profileName);
         return content == null ? new SoulDocument("", false) : new SoulDocument(content, true);
     }
+
 
     @Override
     public void putSoul(String profileName, String content) {
@@ -79,35 +87,43 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         souls.put(profileName, content);
     }
 
+
     public void failOnCreate(Supplier<RuntimeException> failure) {
         this.createFailure = failure;
     }
+
 
     public void failOnPutEnv(Supplier<RuntimeException> failure) {
         this.putEnvFailure = failure;
     }
 
+
     public void failOnDelete(Supplier<RuntimeException> failure) {
         this.deleteFailure = failure;
     }
+
 
     public void failOnReadSoul(Supplier<RuntimeException> failure) {
         this.readSoulFailure = failure;
     }
 
+
     public void failOnPutSoul(Supplier<RuntimeException> failure) {
         this.putSoulFailure = failure;
     }
+
 
     /** 그 profile 의 {@code SOUL.md} 를 이 대역이 갖고 있는 상태로 둔다. */
     public void seedSoul(String profile, String content) {
         souls.put(profile, content);
     }
 
+
     /** {@code putSoul} 이 불린 순서대로의 기록이다. 불리지 않았으면 비어 있다. */
     public List<SoulWrite> soulWrites() {
         return List.copyOf(soulWrites);
     }
+
 
     /** 되돌린 뒤 같은 이름으로 다시 만드는 것을 검사할 때 쓴다. 기록은 그대로 둔다. */
     public void stopFailing() {
@@ -118,18 +134,22 @@ public class StubHermesDashboardClient implements HermesDashboardClient {
         this.putSoulFailure = null;
     }
 
+
     public List<String> createdProfiles() {
         return List.copyOf(createdProfiles);
     }
+
 
     public List<String> deletedProfiles() {
         return List.copyOf(deletedProfiles);
     }
 
+
     /** {@code putEnv} 가 성공한 호출을 불린 순서대로 담는다. 실패한 호출은 담지 않는다. */
     public List<EnvWrite> envWrites() {
         return List.copyOf(envWrites);
     }
+
 
     /** 그 profile 의 {@code .env} 에 들어간 것이다. 아직 만든 적이 없으면 비어 있다. */
     public Map<String, String> env(String profile) {

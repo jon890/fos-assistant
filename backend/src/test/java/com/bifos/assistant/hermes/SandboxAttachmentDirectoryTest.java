@@ -16,22 +16,25 @@ class SandboxAttachmentDirectoryTest {
     @TempDir
     Path root;
 
+
     @Test
     @DisplayName("키는 주인 문자열의 SHA-256 이고 plugin 과 같은 고정 기대값을 낸다")
     void keyMatchesTheAttachmentStoreAndPluginGoldenVector() {
         assertThat(SandboxAttachmentDirectory.key("u11"))
-                .isEqualTo("92ec86fa88925dabc1026bfc9335f5f6848886c98586c005f4a0c02716e3bbab");
+            .isEqualTo("92ec86fa88925dabc1026bfc9335f5f6848886c98586c005f4a0c02716e3bbab");
     }
+
 
     @Test
     @DisplayName("주인 형식이 plugin 계약과 다르면 경로를 만들지 않는다")
     void rejectsOwnersOutsideThePluginContract() {
         for (String owner : new String[] {null, "", "U1", "1u", "a/b", "..", "a".repeat(65)}) {
             assertThatThrownBy(() -> SandboxAttachmentDirectory.key(owner))
-                    .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(IllegalArgumentException.class);
         }
         assertThat(SandboxAttachmentDirectory.key("a".repeat(64))).hasSize(64);
     }
+
 
     @Test
     @DisplayName("users 가 없어도 만들고, 이미 있으면 그대로 둔다")
@@ -47,6 +50,7 @@ class SandboxAttachmentDirectoryTest {
         assertThat(expected.resolve("kept.txt")).hasContent("kept");
     }
 
+
     @Test
     @DisplayName("주인 디렉터리가 다른 사용자 디렉터리로 가는 링크이면 거절한다")
     void rejectsAnOwnerDirectoryLinkedToAnotherUser() throws IOException {
@@ -56,6 +60,7 @@ class SandboxAttachmentDirectoryTest {
 
         assertRejected(new SandboxAttachmentDirectory(root.toString()), "u1");
     }
+
 
     @Test
     @DisplayName("users 가 바깥으로 가는 링크이면 거절하고 바깥에 만들지 않는다")
@@ -67,6 +72,7 @@ class SandboxAttachmentDirectoryTest {
         assertRejected(new SandboxAttachmentDirectory(attachments.toString()), "u1");
         assertThat(outside.resolve(SandboxAttachmentDirectory.key("u1"))).doesNotExist();
     }
+
 
     @Test
     @DisplayName("첨부 루트 자체가 링크이거나 없으면 거절한다")
@@ -80,6 +86,7 @@ class SandboxAttachmentDirectoryTest {
         assertThat(root.resolve("missing")).doesNotExist();
     }
 
+
     @Test
     @DisplayName("주인 디렉터리 자리에 파일이 있으면 거절한다")
     void rejectsAFileInPlaceOfTheDirectory() throws IOException {
@@ -88,6 +95,7 @@ class SandboxAttachmentDirectoryTest {
 
         assertRejected(new SandboxAttachmentDirectory(root.toString()), "u1");
     }
+
 
     private static void assertRejected(SandboxAttachmentDirectory directory, String owner) {
         assertThatThrownBy(() -> directory.ensure(owner)).isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {

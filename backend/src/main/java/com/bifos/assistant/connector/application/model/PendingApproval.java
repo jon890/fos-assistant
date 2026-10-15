@@ -16,4 +16,5 @@ import java.util.UUID;
  * @param expiresAt 승인을 기다리는 기한
  */
 public record PendingApproval(
-        UUID actionId, String title, Long agentId, Long conversationId, Instant createdAt, Instant expiresAt) {}
+    UUID actionId, String title, Long agentId, Long conversationId, Instant createdAt, Instant expiresAt) {
+}

@@ -22,6 +22,7 @@ public class ConversationResultDeliveries {
 
     private final AgentExecutionRepository executions;
 
+
     /**
      * 대화마다 위임 실행의 결과를 가장 늦게 전한 시각이다. 전한 실행이 없는 대화는 빠진다.
      *
@@ -32,6 +33,6 @@ public class ConversationResultDeliveries {
             return Map.of();
         }
         return executions.findLastDeliveredByConversation(conversationIds).stream()
-                .collect(Collectors.toMap(ConversationDelivery::conversationId, ConversationDelivery::deliveredAt));
+            .collect(Collectors.toMap(ConversationDelivery::conversationId, ConversationDelivery::deliveredAt));
     }
 }

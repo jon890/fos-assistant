@@ -17,6 +17,7 @@ public record DecisionFeedbackProperties(Duration retention) {
 
     private static final Duration DEFAULT_RETENTION = Duration.ofDays(365);
 
+
     public DecisionFeedbackProperties {
         retention = retention == null || retention.isZero() || retention.isNegative() ? DEFAULT_RETENTION : retention;
     }

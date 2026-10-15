@@ -41,6 +41,7 @@ public class AttentionService {
     private final AttentionEventWriter events;
     private final Clock clock;
 
+
     /**
      * 카드 다섯과 건수를 계산한다. 읽지 못한 기록이 든 카드만 {@code UNAVAILABLE} 이다.
      *
@@ -52,11 +53,13 @@ public class AttentionService {
         return AttentionView.of(snapshot.now(), snapshot.cards());
     }
 
+
     /** {@link #view} 와 같은 계산의 맨 위 건수다. 사이드바의 수가 카드 배지의 합과 늘 같다. 사건을 남기지 않는다. */
     public int summary(CurrentUser user) {
         AttentionSnapshot snapshot = snapshot(user);
         return AttentionView.of(snapshot.now(), snapshot.cards()).nowCount();
     }
+
 
     /**
      * 억제 전 후보와, 요청자의 숨기기와 미루기를 적용한 판정을 함께 낸다. 사건을 남기지 않는다.
@@ -77,45 +80,48 @@ public class AttentionService {
                 continue;
             }
             read.forEach(candidate -> candidates
-                    .computeIfAbsent(candidate.card(), card -> new ArrayList<>())
-                    .add(candidate));
+                .computeIfAbsent(candidate.card(), card -> new ArrayList<>())
+                .add(candidate));
         }
         List<AttentionCard> cards = judge.judge(
-                candidates,
-                unavailable,
-                controlsOf(user),
-                now,
-                properties.maxItemsPerCard(),
-                properties.continueCount());
+            candidates,
+            unavailable,
+            controlsOf(user),
+            now,
+            properties.maxItemsPerCard(),
+            properties.continueCount());
         return new AttentionSnapshot(now, candidates, unavailable, cards);
     }
+
 
     /** 저장한 제어를 판정에 넘기는 값으로 바꾼다. 숨기기는 상태 지문을, 미루기는 기한을 채운다. */
     private List<AttentionControl> controlsOf(CurrentUser user) {
         return controls.findByUserId(user.id()).stream()
-                .map(AttentionService::control)
-                .toList();
+            .map(AttentionService::control)
+            .toList();
     }
+
 
     private static AttentionControl control(AttentionControlEntry entry) {
         return entry.action() == AttentionAction.HIDE
-                ? new AttentionControl(entry.cardKey(), entry.itemKey(), entry.stateKey(), null)
-                : new AttentionControl(entry.cardKey(), entry.itemKey(), null, entry.untilAt());
+            ? new AttentionControl(entry.cardKey(), entry.itemKey(), entry.stateKey(), null)
+            : new AttentionControl(entry.cardKey(), entry.itemKey(), null, entry.untilAt());
     }
+
 
     /** 응답에 실린 항목마다 {@code SHOWN} 사건 하나다. 지금의 출처는 모두 판정할 때 읽은 기록이라 오래되지 않았다. */
     private static List<AttentionEvent> shown(CurrentUser user, AttentionSnapshot snapshot) {
         return snapshot.cards().stream()
-                .flatMap(card -> card.items().stream())
-                .map(item -> AttentionEvent.of(
-                        user.id(),
-                        item.itemKey(),
-                        item.stateKey(),
-                        item.trigger(),
-                        item.level(),
-                        AttentionEventType.SHOWN,
-                        false,
-                        snapshot.now()))
-                .toList();
+            .flatMap(card -> card.items().stream())
+            .map(item -> AttentionEvent.of(
+                user.id(),
+                item.itemKey(),
+                item.stateKey(),
+                item.trigger(),
+                item.level(),
+                AttentionEventType.SHOWN,
+                false,
+                snapshot.now()))
+            .toList();
     }
 }

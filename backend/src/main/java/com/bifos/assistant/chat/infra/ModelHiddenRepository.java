@@ -8,5 +8,6 @@ public interface ModelHiddenRepository extends JpaRepository<ModelHidden, Long> 
 
     List<ModelHidden> findByGroupIdOrderByProviderAscModelAsc(Long groupId);
 
+
     void deleteByGroupId(Long groupId);
 }

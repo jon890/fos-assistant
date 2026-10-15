@@ -20,6 +20,7 @@ public final class GatewayRewriter {
     private static final String WEB_SOCKET = "webSocketDebuggerUrl";
     private static final Pattern DEVTOOLS_PATH = Pattern.compile("^/devtools/(page|browser)/([A-Za-z0-9-]{1,128})$");
 
+
     /**
      * 대상 한 줄을 바꾼 사본을 돌려준다. 객체가 아니면 그대로 돌려준다.
      *
@@ -45,6 +46,7 @@ public final class GatewayRewriter {
         }
         return copy;
     }
+
 
     /** 주소의 날 경로다. 주소 모양이 아니면 {@code null} 이다. */
     private static String pathOf(String address) {

@@ -15,6 +15,7 @@ public record SkillPackageProblem(SkillPackageReason reason, String path) {
 
     public static final int MAX_PATH_CHARS = 200;
 
+
     public SkillPackageProblem {
         if (path != null && path.length() > MAX_PATH_CHARS) {
             int end = Character.isHighSurrogate(path.charAt(MAX_PATH_CHARS - 1)) ? MAX_PATH_CHARS - 1 : MAX_PATH_CHARS;

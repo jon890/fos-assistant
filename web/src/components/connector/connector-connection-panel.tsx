@@ -9,8 +9,9 @@ import { ErrorNotice, LoginNotice } from "@/components/connector/browser-login";
 import { ConnectorAgentChooser } from "@/components/connector/connector-agent-chooser";
 import { BoundAgents } from "@/components/connector/connector-bound-agents";
 import { ConnectorHeading } from "@/components/connector/connector-identity";
+import { FinancialLimitsSection } from "@/components/connector/financial-limits";
 import { ConnectorGrants } from "@/components/connector/connector-grants";
-import { ConnectorTools } from "@/components/connector/connector-tools";
+import { ConnectorToolsSection } from "@/components/connector/connector-tools";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -403,21 +404,14 @@ export function ConnectorConnectionPanel({
               연결 다시 확인
             </Button>
           ) : null}
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold">할 수 있는 일</h2>
-            <ConnectorTools tools={connector?.tools ?? []} />
-            {connection.undeclaredTools > 0 ? (
-              <Notice
-                variant="info"
-                role="status"
-                data-testid="connection-undeclared"
-              >
-                이 서비스가 알려 주지 않은 도구 {connection.undeclaredTools}개는
-                쓰지 않아요.
-              </Notice>
-            ) : null}
-          </section>
+          <ConnectorToolsSection
+            tools={connector?.tools ?? []}
+            undeclaredTools={connection.undeclaredTools}
+          />
           <ConnectorGrants connectorId={id} refreshKey={connection} />
+          {connector?.tools?.some((tool) => tool.risk === "FINANCIAL") ? (
+            <FinancialLimitsSection />
+          ) : null}
           {status !== "DISCONNECTED" ? (
             <Button
               disabled={busy}

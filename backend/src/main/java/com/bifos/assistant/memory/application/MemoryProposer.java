@@ -40,6 +40,7 @@ public class MemoryProposer {
     private final ObjectMapper objectMapper;
     private final UserExecutionLimiter limiter;
 
+
     /**
      * 제안을 만들지 못하면 아무것도 만들지 않는다. 원래 대화 실행은 실패시키지 않는다.
      *
@@ -49,12 +50,12 @@ public class MemoryProposer {
      * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort
      */
     public void proposeFrom(
-            CurrentUser user,
-            ExecutionConversation conversation,
-            Agent agent,
-            AgentExecution parentExecution,
-            String answer,
-            ModelChoice requested) {
+        CurrentUser user,
+        ExecutionConversation conversation,
+        Agent agent,
+        AgentExecution parentExecution,
+        String answer,
+        ModelChoice requested) {
         if (!properties.current().enabled()) {
             return;
         }
@@ -66,22 +67,21 @@ public class MemoryProposer {
             ModelChoice choice = requested == null ? ModelChoice.defaults() : requested;
             proposalExecution = executions.startInheriting(user, conversation, agent, parentExecution, choice);
             HermesRunCommand command = new HermesRunCommand(
-                    agent.hermesProfile(),
-                    agent.apiBaseUrl(),
-                    prompt(answer),
-                    null,
-                    null,
-                    choice.provider(),
-                    choice.model(),
-                    choice.reasoningEffort());
+                agent.hermesProfile(),
+                agent.apiBaseUrl(),
+                prompt(answer),
+                null,
+                null,
+                choice.provider(),
+                choice.model(),
+                choice.reasoningEffort());
             runId = hermes.submit(command);
             executions.attachRunId(proposalExecution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
             awaited = true;
             if (result.providerBlocked()) {
                 // 고른 모델의 provider 가 막힌 것은 대화 실행과 같은 코드로 남긴다. 다른 모델로 넘기지 않는다.
-                AgentExecution failed =
-                        executions.fail(proposalExecution, agent, result, choice, ErrorCode.PROVIDER_BLOCKED.name());
+                AgentExecution failed = executions.fail(proposalExecution, agent, result, choice, ErrorCode.PROVIDER_BLOCKED.name());
                 appendFailed(failed, ErrorCode.PROVIDER_BLOCKED.name());
                 return;
             }
@@ -91,8 +91,7 @@ public class MemoryProposer {
             }
             AgentExecution completed = executions.complete(proposalExecution, agent, result, choice);
             proposalOf(result.output())
-                    .ifPresent(proposal ->
-                            memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
+                .ifPresent(proposal -> memories.proposeUser(user, proposal.title(), proposal.content(), completed.id()));
         } catch (Exception ex) {
             if (proposalExecution == null && ex instanceof ApiException api && api.code() == ErrorCode.USER_BUSY) {
                 // 사용자 실행 한도에 닿아 이번에는 건너뛴다(ADR-069). 실행 줄은 만들어지지 않았다.
@@ -102,7 +101,7 @@ public class MemoryProposer {
             if (runId != null && !awaited) {
                 // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
                 limiter.holdUntilRemoteEnds(
-                        user.id(), proposalExecution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+                    user.id(), proposalExecution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
             }
             if (proposalExecution != null) {
                 executions.fail(proposalExecution, errorCode(ex));
@@ -110,6 +109,7 @@ public class MemoryProposer {
             log.warn("Memory 제안을 만들지 못했습니다. parentExecutionId={}", parentExecution.id(), ex);
         }
     }
+
 
     /**
      * 실패 사건을 남긴다. 제안 실행은 다른 사건을 적지 않으므로 첫 번째다.
@@ -124,6 +124,7 @@ public class MemoryProposer {
             log.warn("제안 실행의 사건을 남기지 못했다 executionId={}", execution.id(), ex);
         }
     }
+
 
     private Optional<Proposal> proposalOf(String output) {
         if (output == null || output.isBlank() || "NONE".equals(output.strip())) {
@@ -144,6 +145,7 @@ public class MemoryProposer {
         }
     }
 
+
     private static String prompt(String answer) {
         return """
                 아래 답에서 다음에도 쓸 사람에 관한 사실 하나만 골라 JSON으로 답하세요.
@@ -158,13 +160,17 @@ public class MemoryProposer {
                 """.formatted(answer == null ? "" : answer);
     }
 
+
     private static String statusOf(HermesRunResult result) {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
     }
+
 
     private static String errorCode(Exception exception) {
         return exception instanceof ApiException api ? api.code().name() : "MEMORY_PROPOSAL_FAILED";
     }
 
-    private record Proposal(String title, String content) {}
+
+    private record Proposal(String title, String content) {
+    }
 }

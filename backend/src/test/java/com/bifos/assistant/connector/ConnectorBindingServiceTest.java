@@ -117,69 +117,68 @@ class ConnectorBindingServiceTest {
     private static final String TOKEN = "demo_ok_0123456789";
     private static final Map<String, String> VALUES = Map.of("token", TOKEN);
     private static final ConnectorManifest DEMO_MANIFEST = new ConnectorManifest(
-            DEMO,
-            "검사용 메모",
-            "",
-            List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
-            "list_scopes",
-            "demo",
-            List.of(),
-            false,
-            2,
-            List.of(
-                    new ConnectorTool("list_scopes", "READ", "none", null, null),
-                    new ConnectorTool("write_note", "WRITE", "required", null, null)),
-            List.of());
+        DEMO,
+        "검사용 메모",
+        "",
+        List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
+        "list_scopes",
+        "demo",
+        List.of(),
+        false,
+        2,
+        List.of(
+            new ConnectorTool("list_scopes", "READ", "none", null, null),
+            new ConnectorTool("write_note", "WRITE", "required", null, null)),
+        List.of());
     /** 연결 하나를 에이전트 하나에만 붙이라고 선언한 커넥터다. 칸과 도구는 {@link #DEMO_MANIFEST} 와 같다. */
     private static final ConnectorManifest SINGLE_MANIFEST = new ConnectorManifest(
-            SINGLE,
-            "에이전트 하나에만 붙는 메모",
-            "",
-            DEMO_MANIFEST.fields(),
-            "list_scopes",
-            "single",
-            List.of(),
-            false,
-            2,
-            DEMO_MANIFEST.tools(),
-            List.of(),
-            ConnectorAppearance.NONE,
-            true,
-            false,
-            null);
+        SINGLE,
+        "에이전트 하나에만 붙는 메모",
+        "",
+        DEMO_MANIFEST.fields(),
+        "list_scopes",
+        "single",
+        List.of(),
+        false,
+        2,
+        DEMO_MANIFEST.tools(),
+        List.of(),
+        ConnectorAppearance.NONE,
+        true,
+        false,
+        null);
     /** 입력 칸이 없는 일반 MCP 서버다. */
-    private static final ConnectorManifest PLAIN_MANIFEST =
-            new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", List.of(), false, 1, List.of());
+    private static final ConnectorManifest PLAIN_MANIFEST = new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", List.of(), false, 1, List.of());
     /** 붙일 때 스킬을 하나 설치하는 커넥터다. */
     private static final ConnectorManifest SKILLED_MANIFEST = new ConnectorManifest(
-            SKILLED,
-            "지침 있는 서버",
-            "",
-            List.of(),
-            "ping",
-            "skilled",
-            List.of(),
-            false,
-            1,
-            List.of(),
-            List.of("demo-guide"));
+        SKILLED,
+        "지침 있는 서버",
+        "",
+        List.of(),
+        "ping",
+        "skilled",
+        List.of(),
+        false,
+        1,
+        List.of(),
+        List.of("demo-guide"));
     /** 사용자 브라우저를 쓰는 커넥터다(ADR-20261008 / browser-gateway-token). */
     private static final ConnectorManifest BROWSER_MANIFEST = new ConnectorManifest(
-            BROWSER,
-            "브라우저 메모",
-            "",
-            List.of(),
-            "ping",
-            "browser",
-            List.of(),
-            false,
-            1,
-            List.of(),
-            List.of(),
-            ConnectorAppearance.NONE,
-            false,
-            true,
-            "https://login.example.test/sign-in");
+        BROWSER,
+        "브라우저 메모",
+        "",
+        List.of(),
+        "ping",
+        "browser",
+        List.of(),
+        false,
+        1,
+        List.of(),
+        List.of(),
+        ConnectorAppearance.NONE,
+        false,
+        true,
+        "https://login.example.test/sign-in");
     /** 설정의 반영 예정 지연 기본값이다. gateway 의 MCP 설정 맞추기 60초 두 주기와 연결 시간이다. */
     private static final Duration APPLY_DELAY = Duration.ofSeconds(150);
     /** 이 시각 뒤의 설치는 모두 관리자가 본 뒤의 설치다. */
@@ -227,24 +226,26 @@ class ConnectorBindingServiceTest {
     @Autowired
     BrowserGatewayTokens tokens;
 
+
     @BeforeEach
     void setUp() {
         when(connector.readCatalog())
-                .thenReturn(
-                        List.of(DEMO_MANIFEST, PLAIN_MANIFEST, SKILLED_MANIFEST, BROWSER_MANIFEST, SINGLE_MANIFEST));
+            .thenReturn(
+                List.of(DEMO_MANIFEST, PLAIN_MANIFEST, SKILLED_MANIFEST, BROWSER_MANIFEST, SINGLE_MANIFEST));
         when(connector.call(anyString(), anyString(), anyMap(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false));
+            .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
         when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
         when(skills.list(anyString())).thenReturn(List.of(new HermesSkill("hermes-help", "Hermes 기본", true)));
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web"));
     }
+
 
     @AfterEach
     void tearDown() {
@@ -254,6 +255,7 @@ class ConnectorBindingServiceTest {
         agents.deleteAll();
         users.deleteAll();
     }
+
 
     @Test
     @DisplayName("붙이면 바인딩 설치를 한 번 보내고 바인딩은 재시작 대기 PENDING 이며 skills 도구를 켜지 않는다")
@@ -265,7 +267,7 @@ class ConnectorBindingServiceTest {
         AgentConnectionView bound = service.bind(owner, agent.code(), DEMO);
 
         verify(connector, times(1))
-                .bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner(), null);
+            .bindConnector(agent.hermesProfile(), DEMO, connection.vault(), agent.sandboxOwner(), null);
         assertThat(bound.bound()).isTrue();
         assertThat(bound.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(bound.restartRequired()).isTrue();
@@ -277,11 +279,12 @@ class ConnectorBindingServiceTest {
         verify(skills, never()).publish(anyString(), anyList(), any(), anyString());
 
         assertThat(service.bind(owner, agent.code(), DEMO).status())
-                .as("다시 붙이기")
-                .isEqualTo(BindingStatus.PENDING);
+            .as("다시 붙이기")
+            .isEqualTo(BindingStatus.PENDING);
         verify(connector, times(1))
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("붙이기 설치가 reload_pending 이면 재시작 대기가 아니고 반영 예정 시각이 지금 더하기 지연이다")
@@ -290,7 +293,7 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
 
         Instant before = Instant.now();
         AgentConnectionView bound = service.bind(owner, agent.code(), DEMO);
@@ -302,11 +305,12 @@ class ConnectorBindingServiceTest {
         assertThat(stored.restartRequired()).isFalse();
         assertThat(stored.restartRequiredSince()).isNull();
         assertThat(stored.applyDueAt())
-                .isBetween(
-                        before.plus(APPLY_DELAY).minusMillis(1),
-                        after.plus(APPLY_DELAY).plusMillis(1));
+            .isBetween(
+                before.plus(APPLY_DELAY).minusMillis(1),
+                after.plus(APPLY_DELAY).plusMillis(1));
         verify(connector, never()).probe(anyString(), anyString());
     }
+
 
     @Test
     @DisplayName("반영 예정 시각 전의 연결 확인은 설치를 다시 보내지 않고 바인딩을 PENDING 으로 둔다")
@@ -315,22 +319,23 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         Instant due = onlyBinding().applyDueAt();
         when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         clearInvocations(connector);
 
         connectionService.check(owner, DEMO);
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.applyDueAt()).isEqualTo(due);
     }
+
 
     @Test
     @DisplayName("반영 예정 시각이 지나면 applyDue 가 설치를 다시 보내 probe 로 확인하고 READY 로 두며 예정을 비운다")
@@ -339,13 +344,13 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         assertThat(applier.applyDue()).as("예정 시각 전").isZero();
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         // gateway 가 이미 연결했으므로 다시 보낸 설치는 바뀐 것이 없다.
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         clearInvocations(connector);
 
         assertThat(applier.applyDue()).isEqualTo(1);
@@ -360,6 +365,7 @@ class ConnectorBindingServiceTest {
         assertThat(applier.applyDue()).as("다시 부르기").isZero();
     }
 
+
     @Test
     @DisplayName("예약 확인의 probe 가 실패하면 PENDING 이고 예정이 비어 다음 applyDue 가 다시 집지 않는다")
     void applyDueTriesOnceWhenProbeFails() {
@@ -367,11 +373,11 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
 
         assertThat(applier.applyDue()).isEqualTo(1);
@@ -382,8 +388,9 @@ class ConnectorBindingServiceTest {
         clearInvocations(connector);
         assertThat(applier.applyDue()).as("다시 부르기").isZero();
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("예약 확인에서 다시 보낸 설치가 또 reload_pending 이면 probe 없이 새 예정 시각을 적고 PENDING 이다")
@@ -392,7 +399,7 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         clearInvocations(connector);
@@ -405,8 +412,9 @@ class ConnectorBindingServiceTest {
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.restartRequired()).isFalse();
         assertThat(stored.applyDueAt())
-                .isAfterOrEqualTo(before.plus(APPLY_DELAY).minusMillis(1));
+            .isAfterOrEqualTo(before.plus(APPLY_DELAY).minusMillis(1));
     }
+
 
     @Test
     @DisplayName("재시작 대기 바인딩은 반영 예정 시각이 지났어도 applyDue 가 집지 않는다")
@@ -421,11 +429,12 @@ class ConnectorBindingServiceTest {
         assertThat(applier.applyDue()).isZero();
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.restartRequired()).isTrue();
     }
+
 
     @Test
     @DisplayName("에이전트가 지워진 바인딩은 예정이 비워지고 다시 집히지 않는다")
@@ -434,7 +443,7 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         jdbc.update("UPDATE agent SET deleted_at = ? WHERE id = ?", Timestamp.from(Instant.now()), agent.id());
@@ -443,13 +452,14 @@ class ConnectorBindingServiceTest {
         assertThat(applier.applyDue()).as("지워진 에이전트는 대상이 아니다").isZero();
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.applyDueAt()).as("비운 예정").isNull();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(bindings.findApplyDue(Instant.now())).as("다시 집을 대상").isEmpty();
     }
+
 
     @Test
     @DisplayName("예약 확인에서 카탈로그를 읽지 못하면 PENDING 이고 예정이 비워진 채 남아 다시 집히지 않는다")
@@ -458,7 +468,7 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         jdbc.update("UPDATE agent_connector_binding SET apply_due_at = ?", Timestamp.from(LONG_AGO));
         when(connector.readCatalog()).thenThrow(new IllegalStateException("catalog down"));
@@ -467,12 +477,13 @@ class ConnectorBindingServiceTest {
         assertThat(applier.applyDue()).isZero();
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.applyDueAt()).as("커밋된 비운 예정").isNull();
         assertThat(bindings.findApplyDue(Instant.now())).as("다시 집을 대상").isEmpty();
     }
+
 
     @Test
     @DisplayName("붙이기와 다시 설치는 그 에이전트 주인의 sandboxOwner 를 보내고, 다른 사용자의 에이전트에 붙이면 그 사용자의 값이다")
@@ -498,17 +509,18 @@ class ConnectorBindingServiceTest {
         assertThat(admin.id()).isNotEqualTo(second.id());
         String adminOwner = "u" + admin.id();
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         Instant shown = shownTo(admin);
         clearInvocations(connector);
         service.confirmApplied(admin, secondAgent.code(), DEMO, shown);
 
         verify(connector).bindConnector(secondAgent.hermesProfile(), DEMO, secondConnection.vault(), secondOwner, null);
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), eq(firstOwner), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), eq(firstOwner), nullable(String.class));
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), eq(adminOwner), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), eq(adminOwner), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("남의 비공개 에이전트는 AGENT_NOT_FOUND, 읽을 수 있는 남의 에이전트와 관리자는 FORBIDDEN 이다")
@@ -533,8 +545,9 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.bind(owner, "no-such-agent", DEMO), ErrorCode.AGENT_NOT_FOUND);
         assertThat(bindings.count()).isZero();
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("그룹 공개 에이전트, 옛 커넥터 에이전트, 연결되지 않은 연결은 각자의 오류 코드로 붙지 않는다")
@@ -554,8 +567,9 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.bind(owner, ordinary.code(), DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
         assertThat(bindings.count()).isZero();
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
     }
+
 
     @Test
     @DisplayName("보관 파일이 없는 옛 연결은 READY 여도 다른 에이전트에 붙지 않는다")
@@ -568,6 +582,7 @@ class ConnectorBindingServiceTest {
 
         assertCode(() -> service.bind(owner, ordinary.code(), DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
     }
+
 
     /**
      * 공개 범위 변경이 에이전트 행 잠금을 쥔 동안 붙이기는 기다리고, 그 변경이 커밋한 그룹 공개를 보고 거절된다.
@@ -589,11 +604,10 @@ class ConnectorBindingServiceTest {
         });
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<Agent> changing =
-                    pool.submit(() -> lifecycle.changeVisibility(owner, agent.code(), AgentVisibility.GROUP));
+            Future<Agent> changing = pool.submit(() -> lifecycle.changeVisibility(owner, agent.code(), AgentVisibility.GROUP));
             assertThat(locked.await(10, TimeUnit.SECONDS))
-                    .as("공개 범위 변경이 잠금을 쥐었다")
-                    .isTrue();
+                .as("공개 범위 변경이 잠금을 쥐었다")
+                .isTrue();
             Future<AgentConnectionView> binding = pool.submit(() -> service.bind(owner, agent.code(), DEMO));
             Thread.sleep(300);
             assertThat(binding.isDone()).as("붙이기가 에이전트 행 잠금을 기다린다").isFalse();
@@ -602,19 +616,20 @@ class ConnectorBindingServiceTest {
 
             assertThat(changing.get(10, TimeUnit.SECONDS).visibility()).isEqualTo(AgentVisibility.GROUP);
             assertThatThrownBy(() -> binding.get(10, TimeUnit.SECONDS))
-                    .isInstanceOf(ExecutionException.class)
-                    .cause()
-                    .isInstanceOfSatisfying(
-                            ApiException.class,
-                            ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE));
+                .isInstanceOf(ExecutionException.class)
+                .cause()
+                .isInstanceOfSatisfying(
+                    ApiException.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE));
             assertThat(bindings.count()).isZero();
             verify(connector, never())
-                    .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         } finally {
             release.countDown();
             pool.shutdownNow();
         }
     }
+
 
     @Test
     @DisplayName("대시보드의 409 와 401 은 새 오류 코드이고 바인딩 행이 남지 않는다")
@@ -624,17 +639,18 @@ class ConnectorBindingServiceTest {
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
 
         doThrow(new ConnectorInstallConflict())
-                .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .when(connector)
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.CONNECTOR_BIND_CONFLICT);
         assertThat(bindings.count()).isZero();
 
         doThrow(new ConnectorProfileRejected())
-                .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .when(connector)
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.CONNECTOR_PROFILE_NOT_READY);
         assertThat(bindings.count()).isZero();
     }
+
 
     @Test
     @DisplayName("대시보드가 409 sandbox_unavailable 로 거절하면 AGENT_SANDBOX_UNAVAILABLE 이고 바인딩 행이 남지 않는다")
@@ -643,13 +659,14 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         doThrow(new ConnectorSandboxUnavailable())
-                .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .when(connector)
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
 
         assertCode(() -> service.bind(owner, agent.code(), DEMO), ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
 
         assertThat(bindings.count()).isZero();
     }
+
 
     @Test
     @DisplayName("single_binding 커넥터의 연결은 다른 에이전트에 붙어 있으면 거절하고, 같은 에이전트에 다시 붙이면 지금 상태다")
@@ -663,18 +680,19 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.bind(owner, second.code(), SINGLE), ErrorCode.CONNECTOR_SINGLE_BINDING);
 
         verify(connector, times(1))
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(onlyBinding().id())
-                .isEqualTo(bindings.findByAgentIdAndConnectionId(first.id(), connection.id())
-                        .orElseThrow()
-                        .id());
+            .isEqualTo(bindings.findByAgentIdAndConnectionId(first.id(), connection.id())
+                .orElseThrow()
+                .id());
         AgentConnectionView again = service.bind(owner, first.code(), SINGLE);
         assertThat(again.bound()).isTrue();
         assertThat(again.status()).isEqualTo(BindingStatus.PENDING);
         verify(connector, times(1))
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         assertThat(bindings.findByConnectionId(connection.id())).hasSize(1);
     }
+
 
     @Test
     @DisplayName("single_binding 커넥터의 연결을 첫째 에이전트에서 떼면 둘째 에이전트에 붙는다")
@@ -690,12 +708,13 @@ class ConnectorBindingServiceTest {
 
         assertThat(bound.bound()).isTrue();
         assertThat(onlyBinding().id())
-                .isEqualTo(bindings.findByAgentIdAndConnectionId(second.id(), connection.id())
-                        .orElseThrow()
-                        .id());
+            .isEqualTo(bindings.findByAgentIdAndConnectionId(second.id(), connection.id())
+                .orElseThrow()
+                .id());
         verify(connector)
-                .bindConnector(second.hermesProfile(), SINGLE, connection.vault(), second.sandboxOwner(), null);
+            .bindConnector(second.hermesProfile(), SINGLE, connection.vault(), second.sandboxOwner(), null);
     }
+
 
     @Test
     @DisplayName("single_binding 을 선언하지 않은 커넥터의 연결은 두 에이전트에 붙는다")
@@ -710,10 +729,11 @@ class ConnectorBindingServiceTest {
 
         assertThat(bindings.findByConnectionId(connection.id())).hasSize(2);
         assertThat(bindings.findByAgentIdAndConnectionId(first.id(), connection.id()))
-                .isPresent();
+            .isPresent();
         assertThat(bindings.findByAgentIdAndConnectionId(second.id(), connection.id()))
-                .isPresent();
+            .isPresent();
     }
+
 
     @Test
     @DisplayName("그 밖의 붙이기 실패는 바인딩을 PENDING 으로 남기고 연결 실패로 끝난다")
@@ -722,8 +742,8 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         doThrow(new IllegalStateException())
-                .when(connector)
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .when(connector)
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
 
         assertThatThrownBy(() -> service.bind(owner, agent.code(), DEMO)).isInstanceOf(ConnectorOperationFailure.class);
 
@@ -731,6 +751,7 @@ class ConnectorBindingServiceTest {
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.desiredEnabled()).isFalse();
     }
+
 
     @Test
     @DisplayName("커넥터의 스킬 이름이 그 profile 의 스킬과 겹치면 SKILL_NAME_TAKEN 이고 설치하지 않는다")
@@ -744,11 +765,12 @@ class ConnectorBindingServiceTest {
 
         assertThat(bindings.count()).isZero();
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
 
         when(skills.list(agent.hermesProfile())).thenReturn(List.of());
         assertThat(service.bind(owner, agent.code(), SKILLED).skills()).containsExactly("demo-guide");
     }
+
 
     @Test
     @DisplayName("칸이 없는 커넥터는 빈 값으로 연결되고 그 보관 파일로 붙는다")
@@ -765,6 +787,7 @@ class ConnectorBindingServiceTest {
         verify(connector).bindConnector(agent.hermesProfile(), PLAIN, connection.vault(), agent.sandboxOwner(), null);
     }
 
+
     @Test
     @DisplayName("사용자 브라우저를 쓰는 커넥터는 연결 등록에 호출 표식 주소를, 붙이기에 그 바인딩의 표식 주소를 싣는다")
     void browserConnectorCarriesCallAddressOnRegisterAndBindingAddressOnBind() {
@@ -775,25 +798,26 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), BROWSER);
 
         verify(connector)
-                .call(
-                        eq(BROWSER),
-                        eq("ping"),
-                        eq(Map.of()),
-                        argThat(address -> address != null && address.startsWith(GATEWAY + "/u" + owner.id() + ".")));
+            .call(
+                eq(BROWSER),
+                eq("ping"),
+                eq(Map.of()),
+                argThat(address -> address != null && address.startsWith(GATEWAY + "/u" + owner.id() + ".")));
         ConnectorBinding binding = onlyBinding();
         String expected = tokens.bindingAddress(binding.id()).orElseThrow();
         assertThat(expected).startsWith(GATEWAY + "/b" + binding.id() + ".");
         verify(connector)
-                .bindConnector(agent.hermesProfile(), BROWSER, connection.vault(), agent.sandboxOwner(), expected);
+            .bindConnector(agent.hermesProfile(), BROWSER, connection.vault(), agent.sandboxOwner(), expected);
     }
+
 
     @Test
     @DisplayName("연결 확인은 확인 도구에 호출 표식 주소를 싣고, 다시 보내는 설치에 붙이기 때와 같은 바인딩 주소를 싣는다")
     void connectionCheckResendsTheSameBindingAddress() {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.callWithVault(anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
+            .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         ConnectorConnection connection = connect(owner, BROWSER, Map.of());
@@ -803,21 +827,22 @@ class ConnectorBindingServiceTest {
         connectionService.check(owner, BROWSER);
 
         verify(connector)
-                .callWithVault(
-                        eq(BROWSER),
-                        eq("ping"),
-                        eq(connection.vault()),
-                        argThat(address -> address != null && address.startsWith(GATEWAY + "/u" + owner.id() + ".")));
+            .callWithVault(
+                eq(BROWSER),
+                eq("ping"),
+                eq(connection.vault()),
+                argThat(address -> address != null && address.startsWith(GATEWAY + "/u" + owner.id() + ".")));
         verify(connector, times(2))
-                .bindConnector(agent.hermesProfile(), BROWSER, connection.vault(), agent.sandboxOwner(), expected);
+            .bindConnector(agent.hermesProfile(), BROWSER, connection.vault(), agent.sandboxOwner(), expected);
         verify(connector, never())
-                .bindConnector(
-                        anyString(),
-                        eq(BROWSER),
-                        anyString(),
-                        anyString(),
-                        argThat(address -> address == null || !address.equals(expected)));
+            .bindConnector(
+                anyString(),
+                eq(BROWSER),
+                anyString(),
+                anyString(),
+                argThat(address -> address == null || !address.equals(expected)));
     }
+
 
     @Test
     @DisplayName("에이전트의 연결 목록은 해제하지 않은 내 연결마다 붙었는지를 주고 붙일 수 없는 까닭을 함께 준다")
@@ -833,11 +858,12 @@ class ConnectorBindingServiceTest {
 
         assertThat(listed.blockedReason()).isNull();
         assertThat(listed.connections())
-                .extracting(AgentConnectionView::connectorId, AgentConnectionView::title, AgentConnectionView::bound)
-                .containsExactly(tuple(DEMO, "검사용 메모", false), tuple(PLAIN, "칸 없는 서버", true));
+            .extracting(AgentConnectionView::connectorId, AgentConnectionView::title, AgentConnectionView::bound)
+            .containsExactly(tuple(DEMO, "검사용 메모", false), tuple(PLAIN, "칸 없는 서버", true));
         assertThat(service.listForAgent(owner, groupAgent.code()).blockedReason())
-                .isEqualTo(AgentConnectionsView.AGENT_NOT_PRIVATE);
+            .isEqualTo(AgentConnectionsView.AGENT_NOT_PRIVATE);
     }
+
 
     @Test
     @DisplayName("떼면 unbindConnector 를 부르고 행을 지우며 그 에이전트가 판정한 승인 줄만 끝낸다")
@@ -855,13 +881,14 @@ class ConnectorBindingServiceTest {
 
         verify(connector).unbindConnector(agent.hermesProfile(), DEMO);
         assertThat(jdbc.queryForList("SELECT agent_id FROM agent_connector_binding", Long.class))
-                .containsExactly(other.id());
+            .containsExactly(other.id());
         assertThat(actionStatus(mine)).isEqualTo(tuple("REJECTED", "connection_changed"));
         assertThat(actionStatus(theirs)).isEqualTo(tuple("PENDING", null));
 
         service.unbind(owner, agent.code(), DEMO);
         verify(connector, times(1)).unbindConnector(anyString(), anyString());
     }
+
 
     @Test
     @DisplayName("그 에이전트의 승인 실행이 돌고 있으면 CONNECTOR_ACTION_EXECUTING 이고 떼지 않으며, 옛 에이전트의 바인딩은 떼지 않는다")
@@ -882,6 +909,7 @@ class ConnectorBindingServiceTest {
         verify(connector, never()).unbindConnector(anyString(), anyString());
     }
 
+
     @Test
     @DisplayName("관리자 반영 완료는 본 시각이 같으면 설치를 다시 보내 확인하고 READY 로 바꾼다")
     void confirmAppliedMakesBindingReady() {
@@ -893,7 +921,7 @@ class ConnectorBindingServiceTest {
         Instant shown = shownTo(admin);
         // 재시작한 뒤에는 설치를 다시 보내도 바뀐 것이 없다.
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
 
         AgentConnectionView confirmed = service.confirmApplied(admin, agent.code(), DEMO, shown);
 
@@ -905,6 +933,7 @@ class ConnectorBindingServiceTest {
         order.verify(connector).probe(agent.hermesProfile(), "demo");
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.READY);
     }
+
 
     @Test
     @DisplayName("관리자 목록을 읽은 뒤 다시 설치된 바인딩의 반영 완료는 CONNECTOR_RESTART_AGAIN 이고 대기가 풀리지 않는다")
@@ -929,6 +958,7 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, null), ErrorCode.CONNECTOR_RESTART_AGAIN);
     }
 
+
     @Test
     @DisplayName("재시작 대기 시각이 없고 관리자도 보지 못했으면 같은 값으로 보고 반영 완료를 받는다")
     void confirmAppliedTreatsTwoMissingInstantsAsSame() {
@@ -937,13 +967,14 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         service.bind(owner, agent.code(), DEMO);
         assertThat(shownTo(admin)).isNull();
 
         assertThat(service.confirmApplied(admin, agent.code(), DEMO, null).status())
-                .isEqualTo(BindingStatus.READY);
+            .isEqualTo(BindingStatus.READY);
     }
+
 
     @Test
     @DisplayName("반영 예정 시각 전의 관리자 반영 완료는 설치를 다시 보내지 않고 READY 로 두지 않으며 CONNECTOR_APPLY_SCHEDULED 로 끝난다")
@@ -953,7 +984,7 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         Instant due = onlyBinding().applyDueAt();
         Instant shown = shownTo(admin);
@@ -962,12 +993,13 @@ class ConnectorBindingServiceTest {
         assertCode(() -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_APPLY_SCHEDULED);
 
         verify(connector, never())
-                .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
+            .bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
         verify(connector, never()).probe(anyString(), anyString());
         ConnectorBinding stored = onlyBinding();
         assertThat(stored.status()).isEqualTo(BindingStatus.PENDING);
         assertThat(stored.applyDueAt()).isEqualTo(due);
     }
+
 
     @Test
     @DisplayName("반영 예정이 남은 바인딩이 값 교체로 재시작 대기가 되면 예정이 비워져 관리자 반영 완료가 READY 로 둔다")
@@ -977,24 +1009,25 @@ class ConnectorBindingServiceTest {
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false, true));
+            .thenReturn(new InstallResult(false, false, true));
         service.bind(owner, agent.code(), DEMO);
         assertThat(onlyBinding().applyDueAt()).isNotNull();
         // 값을 다시 등록하면 붙은 바인딩에 설치를 다시 보내고, 이미 있던 서버의 값이 바뀌어 재시작이 필요하다.
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(true, false, false));
+            .thenReturn(new InstallResult(true, false, false));
         connect(owner, DEMO, VALUES);
         ConnectorBinding waiting = onlyBinding();
         assertThat(waiting.restartRequired()).isTrue();
         assertThat(waiting.applyDueAt()).isNull();
         Instant shown = shownTo(admin);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
 
         AgentConnectionView confirmed = service.confirmApplied(admin, agent.code(), DEMO, shown);
 
         assertThat(confirmed.status()).isEqualTo(BindingStatus.READY);
     }
+
 
     @Test
     @DisplayName("반영 완료에서 다시 보낸 설치가 바뀐 것이 있다고 답하면 READY 가 아니고 CONNECTOR_RESTART_AGAIN 으로 끝난다")
@@ -1014,9 +1047,9 @@ class ConnectorBindingServiceTest {
         verify(connector, never()).probe(anyString(), anyString());
     }
 
+
     @Test
-    @DisplayName(
-            "반영 완료에서 다시 읽은 설치가 configured 가 아니면 CONNECTOR_INSTALL_MISMATCH, probe 가 실패하면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 과 재시작 대기로 남는다")
+    @DisplayName("반영 완료에서 다시 읽은 설치가 configured 가 아니면 CONNECTOR_INSTALL_MISMATCH, probe 가 실패하면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 과 재시작 대기로 남는다")
     void confirmAppliedKeepsRestartWaitWhenNotConfiguredOrProbeFails() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         CurrentUser admin = user(UserRole.ADMIN, 1L);
@@ -1025,25 +1058,26 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
 
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, false, false, true, HermesConnectorClient.MODE_BIND));
         assertCode(
-                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
+            () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
         assertThat(onlyBinding())
-                .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
-                .containsExactly(BindingStatus.PENDING, true);
+            .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
+            .containsExactly(BindingStatus.PENDING, true);
 
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(false, List.of()));
         assertCode(
-                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
+            () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
         assertThat(onlyBinding())
-                .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
-                .containsExactly(BindingStatus.PENDING, true);
+            .extracting(ConnectorBinding::status, ConnectorBinding::restartRequired)
+            .containsExactly(BindingStatus.PENDING, true);
     }
+
 
     @Test
     @DisplayName("반영 완료에서 다시 읽은 설치의 policy_hook 이 거짓이면 CONNECTOR_INSTALL_MISMATCH 이고 PENDING 이며 커넥터 번호와 까닭만 로그에 남는다")
@@ -1055,17 +1089,18 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
-                .thenReturn(new ConnectorState("p", true, true, false, false, HermesConnectorClient.MODE_BIND));
+            .thenReturn(new ConnectorState("p", true, true, false, false, HermesConnectorClient.MODE_BIND));
 
         assertCode(
-                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
+            () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_INSTALL_MISMATCH);
 
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
         verify(connector, never()).probe(anyString(), anyString());
         assertThat(output.getOut()).contains("connector demo-notes not applied: POLICY_HOOK_OFF");
     }
+
 
     @Test
     @DisplayName("반영 완료에서 probe 가 도구를 하나도 내지 않으면 CONNECTOR_TOOLS_UNVERIFIED 이고 PENDING 으로 커밋된다")
@@ -1077,15 +1112,16 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenReturn(new InstallResult(false, false));
+            .thenReturn(new InstallResult(false, false));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of()));
 
         assertCode(
-                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
+            () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_TOOLS_UNVERIFIED);
 
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
         assertThat(output.getOut()).contains("connector demo-notes not applied: NO_TOOLS");
     }
+
 
     @Test
     @DisplayName("반영 완료에서 설치를 다시 보내다 예외가 나면 CONNECTOR_OPERATION_FAILED 이고 PENDING 으로 커밋되며 까닭 로그는 남기지 않는다")
@@ -1097,14 +1133,15 @@ class ConnectorBindingServiceTest {
         service.bind(owner, agent.code(), DEMO);
         Instant shown = shownTo(admin);
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-                .thenThrow(new IllegalStateException());
+            .thenThrow(new IllegalStateException());
 
         assertCode(
-                () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_OPERATION_FAILED);
+            () -> service.confirmApplied(admin, agent.code(), DEMO, shown), ErrorCode.CONNECTOR_OPERATION_FAILED);
 
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
         assertThat(output.getOut()).doesNotContain("not applied");
     }
+
 
     @Test
     @DisplayName("MEMBER 는 반영 완료를 누를 수 없고, 다른 그룹의 관리자에게는 그 에이전트가 없는 것으로 답한다")
@@ -1120,24 +1157,26 @@ class ConnectorBindingServiceTest {
         assertThat(onlyBinding().status()).isEqualTo(BindingStatus.PENDING);
     }
 
+
     @Test
     @DisplayName("주인 없는 에이전트의 반영 완료는 없는 에이전트와 같은 404 다")
     void answersOwnerlessAgentAsNotFoundWhenConfirming() {
         CurrentUser administrator = user(UserRole.ADMIN, 1L);
         String code = "ownerless-" + UUID.randomUUID().toString().substring(0, 13);
         agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                null,
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null,
+            Instant.now()));
 
         assertCode(() -> service.confirmApplied(administrator, code, DEMO, null), ErrorCode.AGENT_NOT_FOUND);
     }
+
 
     @Test
     @DisplayName("해제가 두 번째 바인딩에서 실패하면 첫 바인딩 행만 지워지고 보관 파일이 남으며, 다시 해제하면 이어서 끝난다")
@@ -1158,11 +1197,11 @@ class ConnectorBindingServiceTest {
         });
 
         assertThatThrownBy(() -> connectionService.disconnect(owner, DEMO))
-                .isInstanceOf(ConnectorOperationFailure.class);
+            .isInstanceOf(ConnectorOperationFailure.class);
 
         assertThat(jdbc.queryForList(
-                        "SELECT a.hermes_profile FROM agent_connector_binding b JOIN agent a ON a.id = b.agent_id",
-                        String.class))
+            "SELECT a.hermes_profile FROM agent_connector_binding b JOIN agent a ON a.id = b.agent_id",
+            String.class))
                 .containsExactly(unbound.get(1));
         verify(connector, never()).deleteVault(anyString());
         assertThat(connections.findById(connection.id()).orElseThrow().status()).isEqualTo(ConnectionStatus.PENDING);
@@ -1174,6 +1213,7 @@ class ConnectorBindingServiceTest {
         assertThat(bindings.count()).isZero();
         verify(connector, times(1)).deleteVault(connection.vault());
     }
+
 
     @Test
     @DisplayName("옛 커넥터 에이전트의 바인딩을 모두 떼면 값을 먼저 보관 파일로 옮기고, 옮기지 못하면 떼지 않는다")
@@ -1205,8 +1245,9 @@ class ConnectorBindingServiceTest {
         order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
         assertThat(bindings.count()).isZero();
         assertThat(connections.findById(connection.id()).orElseThrow().vaultStored())
-                .isTrue();
+            .isTrue();
     }
+
 
     /** 관리자 목록이 보인 그 바인딩의 재시작 대기 시작 시각이다. */
     private Instant shownTo(CurrentUser admin) {
@@ -1215,10 +1256,12 @@ class ConnectorBindingServiceTest {
         return listed.get(0).restartRequiredSince();
     }
 
+
     private ConnectorConnection connect(CurrentUser owner, String connectorId, Map<String, String> values) {
         connectionService.register(owner, connectorId, values);
         return connections.findByUserIdAndConnectorId(owner.id(), connectorId).orElseThrow();
     }
+
 
     private ConnectorBinding onlyBinding() {
         List<ConnectorBinding> all = bindings.findAll();
@@ -1226,59 +1269,63 @@ class ConnectorBindingServiceTest {
         return all.get(0);
     }
 
+
     /** 그 에이전트의 실행이 판정한 승인 줄 한 줄을 넣는다. 대화 없는 실행의 줄이라 사건이 나가지 않는다. */
     private UUID action(CurrentUser owner, Agent agent, String status) {
         UUID publicId = UUID.randomUUID();
         byte[] bytes = ByteBuffer.allocate(16)
-                .putLong(publicId.getMostSignificantBits())
-                .putLong(publicId.getLeastSignificantBits())
-                .array();
+            .putLong(publicId.getMostSignificantBits())
+            .putLong(publicId.getLeastSignificantBits())
+            .array();
         jdbc.update(
-                "INSERT INTO connector_action (public_id, user_id, agent_id, connector_id, hermes_tool, decision,"
-                        + " passed, origin_execution_id, dedupe_key, args_sha256, created_at, status)"
-                        + " VALUES (?, ?, ?, ?, 'mcp__demo__write_note', 'NEEDS_APPROVAL', FALSE, 1, ?, 'sha', ?, ?)",
-                bytes,
-                owner.id(),
-                agent.id(),
-                DEMO,
-                publicId.toString().replace("-", ""),
-                Timestamp.from(Instant.now()),
-                status);
+            "INSERT INTO connector_action (public_id, user_id, agent_id, connector_id, hermes_tool, decision,"
+                + " passed, origin_execution_id, dedupe_key, args_sha256, created_at, status)"
+                + " VALUES (?, ?, ?, ?, 'mcp__demo__write_note', 'NEEDS_APPROVAL', FALSE, 1, ?, 'sha', ?, ?)",
+            bytes,
+            owner.id(),
+            agent.id(),
+            DEMO,
+            publicId.toString().replace("-", ""),
+            Timestamp.from(Instant.now()),
+            status);
         return publicId;
     }
 
+
     private Tuple actionStatus(UUID publicId) {
         return actions.findAll().stream()
-                .filter(action -> action.publicId().equals(publicId))
-                .map(action -> tuple(action.status().name(), action.errorCode()))
-                .findFirst()
-                .orElseThrow();
+            .filter(action -> action.publicId().equals(publicId))
+            .map(action -> tuple(action.status().name(), action.errorCode()))
+            .findFirst()
+            .orElseThrow();
     }
+
 
     private Agent agent(CurrentUser owner, AgentVisibility visibility) {
         String code = "bind-" + UUID.randomUUID().toString().substring(0, 13);
         return agents.save(Agent.of(
-                code,
-                code,
-                "profile-" + code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                owner.id(),
-                Instant.now()));
+            code,
+            code,
+            "profile-" + code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            owner.id(),
+            Instant.now()));
     }
+
 
     private CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved =
-                users.save(AppUser.of("binding-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("binding-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
+
     private static void assertCode(ThrowingCallable call, ErrorCode expected) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(expected));
     }
 }

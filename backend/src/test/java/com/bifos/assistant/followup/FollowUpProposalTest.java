@@ -80,6 +80,7 @@ class FollowUpProposalTest {
     private Agent agent;
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         clock.set(NOW);
@@ -87,6 +88,7 @@ class FollowUpProposalTest {
         agent = agentOf(dad);
         conversation = conversationOf(dad);
     }
+
 
     @AfterEach
     void tearDown() {
@@ -99,6 +101,7 @@ class FollowUpProposalTest {
         createdUsers.clear();
         clock.set(NOW);
     }
+
 
     @Test
     @DisplayName("대화의 실행이 제안하면 그 실행이 제안한 PROPOSED 줄이 생긴다")
@@ -117,6 +120,7 @@ class FollowUpProposalTest {
         assertThat(row.title()).isEqualTo(TITLE);
     }
 
+
     @Test
     @DisplayName("같은 제목을 다른 실행에서 다시 제안하면 DUPLICATE 이고 줄 수가 그대로다")
     void returnsDuplicateForSameOpenTitle() {
@@ -127,6 +131,7 @@ class FollowUpProposalTest {
         assertThat(again).isEqualTo(FollowUpProposalOutcome.DUPLICATE);
         assertThat(rowsOf(dad)).hasSize(1);
     }
+
 
     @Test
     @DisplayName("같은 대화에서 거절한 제목은 29일 뒤에도 DECLINED_BEFORE 이고 줄이 생기지 않는다")
@@ -144,6 +149,7 @@ class FollowUpProposalTest {
         assertThat(rowsOf(dad)).hasSize(1);
     }
 
+
     @Test
     @DisplayName("거절하고 31일이 지나면 같은 대화에서 같은 제목을 다시 제안할 수 있다")
     void allowsRejectedTitleAfterCooldown() {
@@ -155,9 +161,10 @@ class FollowUpProposalTest {
 
         assertThat(outcome).isEqualTo(FollowUpProposalOutcome.CREATED);
         assertThat(rowsOf(dad))
-                .extracting(FollowUp::status)
-                .containsExactly(FollowUpStatus.REJECTED, FollowUpStatus.PROPOSED);
+            .extracting(FollowUp::status)
+            .containsExactly(FollowUpStatus.REJECTED, FollowUpStatus.PROPOSED);
     }
+
 
     @Test
     @DisplayName("다른 대화에서 거절한 제목은 이 대화에서 제안할 수 있다")
@@ -169,11 +176,11 @@ class FollowUpProposalTest {
         assertThat(propose(run(), TITLE)).isEqualTo(FollowUpProposalOutcome.CREATED);
     }
 
+
     @Test
     @DisplayName("같은 대화에 PROPOSED 가 셋이면 넷째 제안은 TOO_MANY_PROPOSALS 이다")
     void limitsOpenProposalsPerConversation() {
-        List<FollowUpProposalOutcome> first =
-                List.of(propose(run(), "할 일 검사 1"), propose(run(), "할 일 검사 2"), propose(run(), "할 일 검사 3"));
+        List<FollowUpProposalOutcome> first = List.of(propose(run(), "할 일 검사 1"), propose(run(), "할 일 검사 2"), propose(run(), "할 일 검사 3"));
 
         FollowUpProposalOutcome fourth = propose(run(), "할 일 검사 4");
 
@@ -181,6 +188,7 @@ class FollowUpProposalTest {
         assertThat(fourth).isEqualTo(FollowUpProposalOutcome.TOO_MANY_PROPOSALS);
         assertThat(rowsOf(dad)).hasSize(3);
     }
+
 
     @Test
     @DisplayName("점검 대화의 7일 지난 제안은 남아 있지만 새 제안 상한에서 빠진다")
@@ -199,6 +207,7 @@ class FollowUpProposalTest {
         assertThat(rowsOf(dad)).allMatch(row -> row.status() == FollowUpStatus.PROPOSED);
     }
 
+
     @Test
     @DisplayName("보통 대화는 7일이 지나도 열린 제안 셋을 모두 센다")
     void keepsOldChatProposalsInLimit() {
@@ -212,21 +221,22 @@ class FollowUpProposalTest {
         assertThat(rowsOf(dad)).hasSize(3);
     }
 
+
     @Test
     @DisplayName("한 실행이 다른 제목 셋을 제안하면 셋째가 TOO_MANY_IN_RUN 이다")
     void limitsProposalsPerExecution() {
         AgentExecution run = run();
 
-        List<FollowUpProposalOutcome> outcomes =
-                List.of(propose(run, "할 일 검사 1"), propose(run, "할 일 검사 2"), propose(run, "할 일 검사 3"));
+        List<FollowUpProposalOutcome> outcomes = List.of(propose(run, "할 일 검사 1"), propose(run, "할 일 검사 2"), propose(run, "할 일 검사 3"));
 
         assertThat(outcomes)
-                .containsExactly(
-                        FollowUpProposalOutcome.CREATED,
-                        FollowUpProposalOutcome.CREATED,
-                        FollowUpProposalOutcome.TOO_MANY_IN_RUN);
+            .containsExactly(
+                FollowUpProposalOutcome.CREATED,
+                FollowUpProposalOutcome.CREATED,
+                FollowUpProposalOutcome.TOO_MANY_IN_RUN);
         assertThat(rowsOf(dad)).hasSize(2);
     }
+
 
     @Test
     @DisplayName("같은 제목을 동시에 여러 실행이 제안해도 줄은 하나이고 나머지는 DUPLICATE 다")
@@ -254,38 +264,42 @@ class FollowUpProposalTest {
             }
 
             assertThat(outcomes)
-                    .as("동시 제안의 결과")
-                    .containsExactlyInAnyOrder(
-                            FollowUpProposalOutcome.CREATED,
-                            FollowUpProposalOutcome.DUPLICATE,
-                            FollowUpProposalOutcome.DUPLICATE);
+                .as("동시 제안의 결과")
+                .containsExactlyInAnyOrder(
+                    FollowUpProposalOutcome.CREATED,
+                    FollowUpProposalOutcome.DUPLICATE,
+                    FollowUpProposalOutcome.DUPLICATE);
             assertThat(rowsOf(dad)).hasSize(1);
         } finally {
             pool.shutdownNow();
         }
     }
 
+
     private FollowUpProposalOutcome propose(AgentExecution run, String title) {
         return followUps.propose(dad, conversation.id(), run.id(), title, null, false);
     }
+
 
     private List<FollowUp> rowsOf(CurrentUser user) {
         return repository.findByUserIdAndStatusInOrderByIdAsc(user.id(), List.of(FollowUpStatus.values()));
     }
 
+
     /** 지금 대화에서 도는 아빠의 실행이다. 실행마다 따로 세므로 검사마다 새로 만든다. */
     private AgentExecution run() {
         return executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .agentId(agent.id())
-                .conversationId(conversation.id())
-                .profileName(agent.hermesProfile())
-                .hermesSessionId("fos-" + UUID.randomUUID())
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(clock.instant())
-                .build());
+            .userId(dad.id())
+            .agentId(agent.id())
+            .conversationId(conversation.id())
+            .profileName(agent.hermesProfile())
+            .hermesSessionId("fos-" + UUID.randomUUID())
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(clock.instant())
+            .build());
     }
+
 
     private CurrentUser member() {
         String email = "follow-up-proposal-" + UUID.randomUUID() + "@example.com";
@@ -294,19 +308,21 @@ class FollowUpProposalTest {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private Agent agentOf(CurrentUser owner) {
         String code = "follow-up-proposal-" + UUID.randomUUID().toString().substring(0, 8);
         return agents.save(Agent.of(
-                code,
-                "할 일 검사 도우미",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            "할 일 검사 도우미",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW));
     }
+
 
     private Conversation conversationOf(CurrentUser owner) {
         return conversations.save(Conversation.startedBy(owner.id(), "할 일 검사 대화", agent.id(), NOW));

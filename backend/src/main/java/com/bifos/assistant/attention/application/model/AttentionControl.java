@@ -11,4 +11,5 @@ import java.time.Instant;
  * @param stateKey 숨긴 상태의 지문. 숨기지 않았으면 null
  * @param snoozedUntil 미룬 기한. 미루지 않았으면 null
  */
-public record AttentionControl(CardKey card, String itemKey, String stateKey, Instant snoozedUntil) {}
+public record AttentionControl(CardKey card, String itemKey, String stateKey, Instant snoozedUntil) {
+}

@@ -12,6 +12,7 @@ public class UserDisplayNameService {
 
     private final AppUserRepository users;
 
+
     @Transactional(readOnly = true)
     public String find(Long userId) {
         return users.findById(userId).map(user -> user.displayName()).orElse(null);

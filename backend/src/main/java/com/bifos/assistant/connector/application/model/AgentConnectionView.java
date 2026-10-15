@@ -16,14 +16,14 @@ import java.util.List;
  * @param skills 붙이면 그 profile 에 설치되는 커넥터 스킬 이름
  */
 public record AgentConnectionView(
-        String connectorId,
-        String title,
-        ConnectionStatus connectionStatus,
-        boolean bound,
-        BindingStatus status,
-        boolean restartRequired,
-        int toolCount,
-        List<String> skills) {
+    String connectorId,
+    String title,
+    ConnectionStatus connectionStatus,
+    boolean bound,
+    BindingStatus status,
+    boolean restartRequired,
+    int toolCount,
+    List<String> skills) {
 
     public AgentConnectionView {
         skills = List.copyOf(skills);

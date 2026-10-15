@@ -25,10 +25,11 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 class AsyncRequestNotUsableTest {
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new FailingController())
-            .setControllerAdvice(new GlobalExceptionHandler())
-            .build();
+        .setControllerAdvice(new GlobalExceptionHandler())
+        .build();
     private ListAppender<ILoggingEvent> logs;
     private Level originalLevel;
+
 
     @BeforeEach
     void setUp() {
@@ -39,6 +40,7 @@ class AsyncRequestNotUsableTest {
         handlerLogger().addAppender(logs);
     }
 
+
     @AfterEach
     void tearDown() {
         handlerLogger().detachAppender(logs);
@@ -46,28 +48,30 @@ class AsyncRequestNotUsableTest {
         logs.stop();
     }
 
+
     @Test
     @DisplayName("쓸 수 없는 비동기 응답에는 본문 없이 DEBUG 한 줄만 남긴다")
     void handlesUnusableResponseWithoutBodyOrErrorLog() throws Exception {
         mvc.perform(get("/unusable"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(""));
+            .andExpect(status().isOk())
+            .andExpect(content().string(""));
 
         assertThat(logs.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.DEBUG);
             assertThat(event.getFormattedMessage())
-                    .isEqualTo("async response is no longer usable: disconnected client");
+                .isEqualTo("async response is no longer usable: disconnected client");
             assertThat(event.getThrowableProxy()).isNull();
         });
     }
+
 
     @Test
     @DisplayName("일반 예외는 여전히 ERROR 로그와 500 JSON 응답을 남긴다")
     void keepsUnexpectedExceptionsAsErrorWithJsonBody() throws Exception {
         mvc.perform(get("/unexpected"))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
-                .andExpect(jsonPath("$.message").value("internal error"));
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+            .andExpect(jsonPath("$.message").value("internal error"));
 
         assertThat(logs.list).singleElement().satisfies(event -> {
             assertThat(event.getLevel()).isEqualTo(Level.ERROR);
@@ -76,9 +80,11 @@ class AsyncRequestNotUsableTest {
         });
     }
 
+
     private static Logger handlerLogger() {
-        return (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        return (Logger)LoggerFactory.getLogger(GlobalExceptionHandler.class);
     }
+
 
     @RestController
     private static class FailingController {
@@ -87,6 +93,7 @@ class AsyncRequestNotUsableTest {
         String unusable() throws AsyncRequestNotUsableException {
             throw new AsyncRequestNotUsableException("disconnected client", new IOException("Broken pipe"));
         }
+
 
         @GetMapping("/unexpected")
         String unexpected() {

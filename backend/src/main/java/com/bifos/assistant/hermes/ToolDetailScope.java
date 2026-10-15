@@ -15,6 +15,8 @@ import java.util.function.Predicate;
  * @param connectorCalledInTree 그 사건 시각까지 트리에서 커넥터를 호출했는가
  */
 public record ToolDetailScope(boolean hideAll, Set<String> hiddenPrefixes, Predicate<Instant> connectorCalledInTree) {
+
+
     private static final Predicate<Instant> NO_HISTORY = at -> false;
 
     public ToolDetailScope(boolean hideAll, Set<String> hiddenPrefixes) {
@@ -27,19 +29,23 @@ public record ToolDetailScope(boolean hideAll, Set<String> hiddenPrefixes, Predi
     /** 모든 도구를 가린다. */
     public static final ToolDetailScope ALL = new ToolDetailScope(true, Set.of());
 
+
     public ToolDetailScope {
         hiddenPrefixes = Set.copyOf(hiddenPrefixes);
     }
+
 
     /** 그 붙은 커넥터 서버들의 도구만 가린다. */
     public static ToolDetailScope prefixes(Set<String> hiddenPrefixes) {
         return new ToolDetailScope(false, hiddenPrefixes);
     }
 
+
     /** 자식과 형제 실행의 호출도 확인한다. 이력 조회가 실패하면 원문을 남기지 않도록 가린다. */
     public ToolDetailScope withTreeHistory(Predicate<Instant> history) {
         return new ToolDetailScope(hideAll, hiddenPrefixes, history);
     }
+
 
     /** 그 도구의 내용을 통째로 가리는가. 이름을 모르는 도구는 모두 가릴 때만 가린다. */
     public boolean hides(String toolName) {

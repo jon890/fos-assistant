@@ -1,10 +1,8 @@
 package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.domain.type.ActionStatus;
-import com.bifos.assistant.connector.domain.type.ToolRisk;
+import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
-import com.bifos.assistant.connector.infra.ConnectorActionRepository;
-import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
@@ -12,14 +10,12 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 준비, 승인, claim 이 함께 지나는 금융 실행의 운영 관문이다.
  *
- * <p>keyed hash key, 계좌 허용 목록, 한 건과 하루 상한을 본다. 모두 닫힌 쪽이 기본이며 거절은 금융 전송 없이 끝난다.
+ * <p>keyed hash key, 계좌 허용 목록, 한 건과 하루 상한을 본다. 상한은 {@link FinancialOrderLimits} 가 정한 적용 상한이다. 모두 닫힌 쪽이 기본이며 거절은 금융 전송 없이 끝난다.
  * 첫 개방은 일반 주문의 생성과 취소뿐이다. 일반 주문 정정과 조건주문 생성·정정은 금액 상한을 계산하지 않고 거절한다.
  */
 @Slf4j
@@ -43,16 +39,12 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class ConnectorFinancialGate {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final Set<ActionStatus> OPEN = Set.of(ActionStatus.PENDING, ActionStatus.EXECUTING, ActionStatus.UNKNOWN);
-    // 결과를 모르는 UNKNOWN 도 센다. 빼면 응답을 잃은 주문만큼 하루 상한을 넘을 수 있다.
-    private static final Set<ActionStatus> SPENT = Set.of(ActionStatus.EXECUTING, ActionStatus.SUCCEEDED, ActionStatus.UNKNOWN);
     private final LiveProperties<ConnectorFinancialProperties> properties;
-    private final ConnectorActionRepository actions;
     private final ConnectorActionExecutionRepository contents;
-    private final TextCipher cipher;
     private final FinancialDigest digest;
     private final AppUserRepository users;
+    private final FinancialOrderLimits limits;
 
 
     /**
@@ -114,39 +106,42 @@ public class ConnectorFinancialGate {
     }
 
 
-    /** 호출자는 이 조회 전에 소유 사용자 행을 잠근다. 자기 승인 줄은 하루 합계에서 뺀다. */
+    /**
+     * 그 사용자에게 지금 적용하는 상한으로 판정한다(ADR-20261015 / financial-user-limits). 호출자는 이 조회 전에 소유 사용자 행을 잠근다.
+     * 상한을 바꾸는 쪽도 같은 행을 잠그므로 주문은 그 순간에 커밋된 상한으로 판정된다. 자기 승인 줄은 하루 합계에서 뺀다.
+     *
+     * <p>모양이 틀린 주문은 지금처럼 이유 없이 닫고, 상한에 걸린 주문만 {@link FinancialLimitExceeded} 로 걸린 상한을 밝힌다.
+     */
     @Transactional(propagation = Propagation.MANDATORY)
     public void requireWithinLimits(Long userId, Long ownActionId, String executionArgsJson, Instant now) {
-        var limits = properties.current();
         JsonNode args = JSON.readTree(executionArgsJson);
-        Optional<BigDecimal> order = amount(args, limits);
+        Optional<BigDecimal> order = amount(args);
         if (order.isEmpty()) {
             return;
         }
+        var values = limits.effective(userId);
         String currency = args.get("currency").stringValue();
-        BigDecimal total = order.get();
-        Instant from = now.atZone(KST).toLocalDate().atStartOfDay(KST).toInstant();
-        for (var action : actions.findByUserIdAndRiskAndDecidedAtGreaterThanEqual(userId, ToolRisk.FINANCIAL, from)) {
-            if (Objects.equals(action.id(), ownActionId) || !SPENT.contains(action.status())) {
-                continue;
-            }
-            var row = contents.findById(action.id()).orElseThrow(ConnectorFinancialGate::closed);
-            JsonNode spentArgs = ConnectorExecutionSnapshot.openExecutionArgs(action, row, cipher, digest);
-            var spent = amount(spentArgs, null);
-            if (spent.isPresent() && currency.equals(spentArgs.get("currency").stringValue())) {
-                total = total.add(spent.get());
+        BigDecimal spent = limits.spentToday(userId, ownActionId, now).getOrDefault(currency, BigDecimal.ZERO);
+        FinancialLimitKind daily = FinancialLimitKind.dailyAmount(currency);
+        BigDecimal remaining = values.value(daily).subtract(spent).max(BigDecimal.ZERO);
+        if (!args.has("orderAmount")) {
+            BigDecimal quantity = decimal(args.get("quantity"));
+            if (quantity.compareTo(values.value(FinancialLimitKind.ORDER_QUANTITY)) > 0) {
+                throw new FinancialLimitExceeded(FinancialLimitKind.ORDER_QUANTITY, values.value(FinancialLimitKind.ORDER_QUANTITY), null);
             }
         }
-        require(total.compareTo("KRW".equals(currency) ? limits.maxDailyAmountKrw() : limits.maxDailyAmountUsd()) <= 0);
+        FinancialLimitKind single = FinancialLimitKind.orderAmount(currency);
+        if (order.get().compareTo(values.value(single)) > 0) {
+            throw new FinancialLimitExceeded(single, values.value(single), remaining);
+        }
+        if (spent.add(order.get()).compareTo(values.value(daily)) > 0) {
+            throw new FinancialLimitExceeded(daily, values.value(daily), remaining);
+        }
     }
 
 
-    /**
-     * 실행 원문에서 새로 쓰는 금액을 읽는다. 취소는 빈 값이다. 값이 있으면 원문의 currency 는 KRW 나 USD 다.
-     *
-     * @param limits null 이 아니면 한 건 상한도 함께 본다
-     */
-    static Optional<BigDecimal> amount(JsonNode args, ConnectorFinancialProperties limits) {
+    /** 실행 원문에서 새로 쓰는 금액을 읽는다. 취소는 빈 값이다. 값이 있으면 원문의 currency 는 KRW 나 USD 다. 상한은 보지 않는다. */
+    static Optional<BigDecimal> amount(JsonNode args) {
         require(args != null && args.isObject());
         boolean changesMoney = args.has("quantity") || args.has("orderAmount") || args.has("price");
         if (args.has("first") || args.has("conditionalOrderId")) {
@@ -167,14 +162,7 @@ public class ConnectorFinancialGate {
         } else {
             // 시장가 수량 주문은 금액을 미리 알 수 없어 닫는다.
             require(args.has("quantity") && args.has("price"));
-            BigDecimal quantity = decimal(args.get("quantity"));
-            if (limits != null) {
-                require(quantity.compareTo(limits.maxOrderQuantity()) <= 0);
-            }
-            value = quantity.multiply(decimal(args.get("price")));
-        }
-        if (limits != null) {
-            require(value.compareTo("KRW".equals(currency) ? limits.maxOrderAmountKrw() : limits.maxOrderAmountUsd()) <= 0);
+            value = decimal(args.get("quantity")).multiply(decimal(args.get("price")));
         }
         return Optional.of(value);
     }

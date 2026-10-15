@@ -23,6 +23,7 @@ public class ChatTestSupportController {
 
     private final EntityManager entityManager;
 
+
     /**
      * 공개 식별자로 대화 번호를 찾는다.
      *
@@ -32,14 +33,15 @@ public class ChatTestSupportController {
     @GetMapping("/conversations/{conversationId}/number")
     public ResponseEntity<ConversationNumber> number(@PathVariable UUID conversationId) {
         return entityManager
-                .createQuery("select c.id from Conversation c where c.publicId = :id", Long.class)
-                .setParameter("id", conversationId)
-                .getResultList()
-                .stream()
-                .findFirst()
-                .map(number -> ResponseEntity.ok(new ConversationNumber(number)))
-                .orElseGet(() -> ResponseEntity.notFound().build());
+            .createQuery("select c.id from Conversation c where c.publicId = :id", Long.class)
+            .setParameter("id", conversationId)
+            .getResultList()
+            .stream()
+            .findFirst()
+            .map(number -> ResponseEntity.ok(new ConversationNumber(number)))
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
+
 
     /** 대화 표의 번호다. */
     public record ConversationNumber(Long number) {

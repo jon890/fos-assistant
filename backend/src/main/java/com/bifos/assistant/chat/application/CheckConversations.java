@@ -46,13 +46,17 @@ public class CheckConversations {
      */
     private final Map<Key, ReentrantLock> locks = new ConcurrentHashMap<>();
 
-    private record Key(Long userId, Long agentId) {}
+
+    private record Key(Long userId, Long agentId) {
+    }
+
 
     /** 그 사용자가 그 에이전트와 쓰는 점검 대화. 지운 것은 없는 것과 같다. */
     public Optional<Conversation> find(Long userId, Long agentId) {
         return conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
-                userId, agentId, ConversationPurpose.CHECK);
+            userId, agentId, ConversationPurpose.CHECK);
     }
+
 
     /**
      * 요청자의 점검 대화를 찾고, 없으면 만든다.
@@ -74,12 +78,13 @@ public class CheckConversations {
                 throw new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
             }
             Conversation created = conversations.save(
-                    Conversation.startedForCheck(user.id(), titleOf(agent), agent.id(), clock.instant()));
+                Conversation.startedForCheck(user.id(), titleOf(agent), agent.id(), clock.instant()));
             return new OpenedCheck(created, true);
         } finally {
             lock.unlock();
         }
     }
+
 
     /** 시작이 거절돼 방금 만든 점검 대화를 지운다. 지우다 실패하면 경고 로그만 남기고 부르는 쪽의 원래 예외를 가리지 않는다. */
     public void deleteCreated(Long conversationId) {
@@ -90,14 +95,14 @@ public class CheckConversations {
         }
     }
 
+
     /** 제목 칸의 길이를 넘으면 자른다. 자르는 자리가 두 글자로 된 문자의 가운데면 그 문자 앞에서 자른다. */
     private static String titleOf(Agent agent) {
         String title = TITLE_PREFIX + agent.name();
         if (title.length() <= TITLE_MAX_LENGTH) {
             return title;
         }
-        int end =
-                Character.isHighSurrogate(title.charAt(TITLE_MAX_LENGTH - 1)) ? TITLE_MAX_LENGTH - 1 : TITLE_MAX_LENGTH;
+        int end = Character.isHighSurrogate(title.charAt(TITLE_MAX_LENGTH - 1)) ? TITLE_MAX_LENGTH - 1 : TITLE_MAX_LENGTH;
         return title.substring(0, end);
     }
 }

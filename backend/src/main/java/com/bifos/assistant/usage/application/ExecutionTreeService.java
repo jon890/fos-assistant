@@ -57,6 +57,7 @@ public class ExecutionTreeService {
     private final SubagentUsageJobRepository jobs;
     private final ExecutionContextSourceRepository contextSources;
 
+
     /**
      * 질의를 여럿 내므로 한 트랜잭션으로 묶는다.
      *
@@ -86,6 +87,7 @@ public class ExecutionTreeService {
         return new ExecutionTree(rootNode, ascent.truncated() || isTruncatedSomewhere(rootBranch));
     }
 
+
     /**
      * 루트를 찾는다.
      *
@@ -103,8 +105,7 @@ public class ExecutionTreeService {
             if (climbed == MAX_DEPTH) {
                 return new Ascent(current, true);
             }
-            AgentExecution parent =
-                    executions.findById(current.parentExecutionId()).orElse(null);
+            AgentExecution parent = executions.findById(current.parentExecutionId()).orElse(null);
             if (parent == null || Objects.equals(parent.id(), current.id())) {
                 return new Ascent(current, false);
             }
@@ -113,13 +114,15 @@ public class ExecutionTreeService {
         return new Ascent(current, false);
     }
 
+
     /** 루트에 매달린 실행을 부모 번호로 묶는다. */
     private static Map<Long, List<AgentExecution>> byParent(List<AgentExecution> descendants) {
         return descendants.stream()
-                .filter(execution -> execution.parentExecutionId() != null)
-                .collect(Collectors.groupingBy(
-                        AgentExecution::parentExecutionId, LinkedHashMap::new, Collectors.toList()));
+            .filter(execution -> execution.parentExecutionId() != null)
+            .collect(Collectors.groupingBy(
+                AgentExecution::parentExecutionId, LinkedHashMap::new, Collectors.toList()));
     }
+
 
     /**
      * 한 실행과 그 아래를 잇는다.
@@ -129,15 +132,15 @@ public class ExecutionTreeService {
      * 것을 데이터가 어긋난 것과 섞어 경고하지 않기 위해서다.
      */
     private Branch branch(
-            AgentExecution execution,
-            Map<Long, List<AgentExecution>> byParent,
-            Set<Long> used,
-            Set<Long> cut,
-            int depth) {
+        AgentExecution execution,
+        Map<Long, List<AgentExecution>> byParent,
+        Set<Long> used,
+        Set<Long> cut,
+        int depth) {
         used.add(execution.id());
         List<AgentExecution> waiting = byParent.getOrDefault(execution.id(), List.of()).stream()
-                .filter(child -> !used.contains(child.id()))
-                .toList();
+            .filter(child -> !used.contains(child.id()))
+            .toList();
         if (waiting.isEmpty()) {
             return new Branch(execution, false, List.of());
         }
@@ -155,6 +158,7 @@ public class ExecutionTreeService {
         return new Branch(execution, false, List.copyOf(children));
     }
 
+
     /** 상한에서 잘라 낸 가지를 통째로 모은다. 같은 실행을 두 번 밟지 않아 순환에서도 끝난다. */
     private static void markCut(AgentExecution execution, Map<Long, List<AgentExecution>> byParent, Set<Long> cut) {
         if (!cut.add(execution.id())) {
@@ -162,6 +166,7 @@ public class ExecutionTreeService {
         }
         byParent.getOrDefault(execution.id(), List.of()).forEach(child -> markCut(child, byParent, cut));
     }
+
 
     /**
      * 루트에서 닿지 않는 실행을 남긴다.
@@ -173,15 +178,16 @@ public class ExecutionTreeService {
      * {@code truncated} 가 화면에 알린다.
      */
     private static void warnAboutUnreachable(
-            AgentExecution root, List<AgentExecution> descendants, Set<Long> used, Set<Long> cut) {
+        AgentExecution root, List<AgentExecution> descendants, Set<Long> used, Set<Long> cut) {
         List<Long> dropped = descendants.stream()
-                .map(AgentExecution::id)
-                .filter(id -> !used.contains(id) && !cut.contains(id))
-                .toList();
+            .map(AgentExecution::id)
+            .filter(id -> !used.contains(id) && !cut.contains(id))
+            .toList();
         if (!dropped.isEmpty()) {
             log.warn("루트에 닿지 않아 트리에서 뺀 실행이 있다 rootExecutionId={} executionIds={}", root.id(), dropped);
         }
     }
+
 
     /** 트리에 담긴 실행들의 사건을 한 번에 읽어 실행 번호로 묶는다. */
     private Map<Long, List<ExecutionEvent>> eventsOf(Set<Long> executionIds) {
@@ -189,8 +195,9 @@ public class ExecutionTreeService {
             return Map.of();
         }
         return events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(executionIds).stream()
-                .collect(Collectors.groupingBy(ExecutionEvent::executionId, LinkedHashMap::new, Collectors.toList()));
+            .collect(Collectors.groupingBy(ExecutionEvent::executionId, LinkedHashMap::new, Collectors.toList()));
     }
+
 
     /**
      * 트리에 담긴 실행들에 실은 문맥 항목의 참조를 한 번에 읽어 실행 번호로 묶는다. 실은 순서를 지킨다.
@@ -202,14 +209,15 @@ public class ExecutionTreeService {
             return Map.of();
         }
         return contextSources.findByIdExecutionIdInOrderByIdExecutionIdAscIdPositionAsc(executionIds).stream()
-                .collect(Collectors.groupingBy(
-                        ExecutionContextSource::executionId,
-                        LinkedHashMap::new,
-                        Collectors.mapping(
-                                row -> new ContextSourceRef(
-                                        row.source(), row.sourceRef(), row.bodyMode(), row.freshness()),
-                                Collectors.toList())));
+            .collect(Collectors.groupingBy(
+                ExecutionContextSource::executionId,
+                LinkedHashMap::new,
+                Collectors.mapping(
+                    row -> new ContextSourceRef(
+                        row.source(), row.sourceRef(), row.bodyMode(), row.freshness()),
+                    Collectors.toList())));
     }
+
 
     /**
      * 실행 트리를 응답으로 옮긴다. 도구 사건의 {@code detail} 은 보는 사람에 맞춰 싣는다.
@@ -218,77 +226,80 @@ public class ExecutionTreeService {
      * 구간과 실은 문맥 항목을 비우고 {@code PROVIDER_SWITCHED} 사건을 사건째 뺀다. 근거는 ADR-063 에 있다.
      */
     private ExecutionNode node(
-            Branch branch,
-            Map<Long, List<ExecutionEvent>> byExecution,
-            Map<Long, Map<String, String>> usageStatuses,
-            Map<Long, List<ContextSourceRef>> sources,
-            CurrentUser viewer) {
+        Branch branch,
+        Map<Long, List<ExecutionEvent>> byExecution,
+        Map<Long, Map<String, String>> usageStatuses,
+        Map<Long, List<ContextSourceRef>> sources,
+        CurrentUser viewer) {
         AgentExecution execution = branch.execution();
         Agent agent = agents.findById(execution.agentId()).orElse(null);
         boolean internal = InternalValuePolicy.visibleTo(viewer);
         return new ExecutionNode(
-                branch.truncated(),
-                execution.id(),
-                !internal || agent == null ? null : agent.code(),
-                agent == null ? null : agent.name(),
-                execution.status().name(),
-                internal ? execution.provider() : null,
-                internal ? execution.model() : null,
-                internal ? execution.reasoningEffort() : null,
-                !internal || execution.reasoningEffortSource() == null
+            branch.truncated(),
+            execution.id(),
+            !internal || agent == null ? null : agent.code(),
+            agent == null ? null : agent.name(),
+            execution.status().name(),
+            internal ? execution.provider() : null,
+            internal ? execution.model() : null,
+            internal ? execution.reasoningEffort() : null,
+            !internal || execution.reasoningEffortSource() == null
+                ? null
+                : execution.reasoningEffortSource().name(),
+            execution.modelTier() == null ? null : execution.modelTier().name(),
+            internal ? execution.inputTokens() : null,
+            internal ? execution.cachedInputTokens() : null,
+            internal ? execution.outputTokens() : null,
+            internal ? execution.totalTokens() : null,
+            internal ? execution.estimatedCostMicros() : null,
+            execution.latencyMs(),
+            internal ? execution.requestReceivedAt() : null,
+            internal ? execution.submittedAt() : null,
+            internal ? execution.firstDeltaAt() : null,
+            execution.startedAt(),
+            internal ? execution.finishedAt() : null,
+            internal ? sources.getOrDefault(execution.id(), List.of()) : null,
+            byExecution.getOrDefault(execution.id(), List.of()).stream()
+                .filter(event -> internal || event.eventType() != ExecutionEventType.PROVIDER_SWITCHED)
+                .map(event -> ExecutionEventView.from(
+                    event,
+                    viewer,
+                    event.hermesSessionId() == null
                         ? null
-                        : execution.reasoningEffortSource().name(),
-                execution.modelTier() == null ? null : execution.modelTier().name(),
-                internal ? execution.inputTokens() : null,
-                internal ? execution.cachedInputTokens() : null,
-                internal ? execution.outputTokens() : null,
-                internal ? execution.totalTokens() : null,
-                internal ? execution.estimatedCostMicros() : null,
-                execution.latencyMs(),
-                internal ? execution.requestReceivedAt() : null,
-                internal ? execution.submittedAt() : null,
-                internal ? execution.firstDeltaAt() : null,
-                execution.startedAt(),
-                internal ? execution.finishedAt() : null,
-                internal ? sources.getOrDefault(execution.id(), List.of()) : null,
-                byExecution.getOrDefault(execution.id(), List.of()).stream()
-                        .filter(event -> internal || event.eventType() != ExecutionEventType.PROVIDER_SWITCHED)
-                        .map(event -> ExecutionEventView.from(
-                                event,
-                                viewer,
-                                event.hermesSessionId() == null
-                                        ? null
-                                        : usageStatuses
-                                                .getOrDefault(execution.id(), Map.of())
-                                                .get(event.hermesSessionId())))
-                        .toList(),
-                branch.children().stream()
-                        .map(child -> node(child, byExecution, usageStatuses, sources, viewer))
-                        .toList());
+                        : usageStatuses
+                            .getOrDefault(execution.id(), Map.of())
+                            .get(event.hermesSessionId())))
+                .toList(),
+            branch.children().stream()
+                .map(child -> node(child, byExecution, usageStatuses, sources, viewer))
+                .toList());
     }
 
+
     private Map<Long, Map<String, String>> usageStatuses(
-            Set<Long> executionIds, Map<Long, List<ExecutionEvent>> byExecution) {
+        Set<Long> executionIds, Map<Long, List<ExecutionEvent>> byExecution) {
         Map<Long, Map<String, String>> statuses = new LinkedHashMap<>();
         for (SubagentUsageJob job : jobs.findByExecutionIdIn(executionIds)) {
             String status = "EXPIRED".equals(job.status()) ? "UNCONFIRMED" : "WAITING";
             statuses.computeIfAbsent(job.executionId(), ignored -> new LinkedHashMap<>())
-                    .put(job.childSessionId(), status);
+                .put(job.childSessionId(), status);
         }
         for (List<ExecutionEvent> executionEvents : byExecution.values()) {
             for (ExecutionEvent event : executionEvents) {
                 if (event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED && event.hermesSessionId() != null) {
                     statuses.computeIfAbsent(event.executionId(), ignored -> new LinkedHashMap<>())
-                            .put(event.hermesSessionId(), "RECORDED");
+                        .put(event.hermesSessionId(), "RECORDED");
                 }
             }
         }
         return statuses;
     }
 
+
     private static boolean isTruncatedSomewhere(Branch branch) {
         return branch.truncated() || branch.children().stream().anyMatch(ExecutionTreeService::isTruncatedSomewhere);
     }
+
 
     /** 없는 실행과 남의 실행을 같은 응답으로 숨긴다. */
     private static void requireOwner(CurrentUser user, AgentExecution execution) {
@@ -297,13 +308,17 @@ public class ExecutionTreeService {
         }
     }
 
+
     private static ApiException notFound() {
         return new ApiException(ErrorCode.EXECUTION_NOT_FOUND, "no such execution");
     }
 
+
     /** 루트를 찾아 올라간 결과다. 상한에서 멈췄으면 잘랐다고 알린다. */
-    private record Ascent(AgentExecution root, boolean truncated) {}
+    private record Ascent(AgentExecution root, boolean truncated) {
+    }
 
     /** 응답으로 옮기기 전의 트리다. 사건을 한 번에 읽으려고 구조를 먼저 정한다. */
-    private record Branch(AgentExecution execution, boolean truncated, List<Branch> children) {}
+    private record Branch(AgentExecution execution, boolean truncated, List<Branch> children) {
+    }
 }

@@ -162,6 +162,8 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 설정 대응과 IntelliJ 차이, IDE에서 실행하는 방법은 [`backend/docs/code-architecture.md`](docs/code-architecture.md)의 「Eclipse JDT와 Spotless의 Java 포맷」이 갖는다.
 실제 포맷 회귀는 저장소 루트에서 `python3 test/spotless-jdt.test.py`로 검사한다.
 
+전체 포맷 커밋을 `git blame`에서 제외하려면 저장소 루트에서 `git config blame.ignoreRevsFile .git-blame-ignore-revs`를 실행한다.
+
 **기능 변경과 포맷은 다른 커밋으로 나눈다.**
 먼저 기능을 고쳐 커밋하고, 그 뒤 `./gradlew spotlessApply` 결과를 따로 커밋한다.
 한 커밋에 섞으면 리뷰에서 기능 변경이 포맷 변경에 묻힌다.

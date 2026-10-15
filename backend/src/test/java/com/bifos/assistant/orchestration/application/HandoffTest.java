@@ -18,6 +18,7 @@ class HandoffTest {
 
     private static final int RACES = 500;
 
+
     @Test
     @DisplayName("줄이 먼저 생기면 포기하지 못하고 그 줄을 돌려준다")
     void cannotGiveUpOnceRowExistsAndReturnsRow() {
@@ -31,9 +32,10 @@ class HandoffTest {
         assertThat(handoff.abandoned()).isFalse();
         assertThat(handoff.execution()).isSameAs(row);
         assertThat(handoff.awaitRowDecided(deadlineAfter(Duration.ZERO)))
-                .as("줄이 정해졌다")
-                .isTrue();
+            .as("줄이 정해졌다")
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("포기한 뒤에 줄이 생기면 포기한 상태로 남는다")
@@ -46,6 +48,7 @@ class HandoffTest {
         assertThat(handoff.abandoned()).as("실행 스레드가 보고 제출하지 않는 표시").isTrue();
         assertThat(handoff.rowCreated()).as("요청 스레드는 줄을 돌려주지 않는다").isFalse();
     }
+
 
     @Test
     @DisplayName("줄 없이 끝나면 그 예외를 남기고 포기할 것도 없다")
@@ -64,6 +67,7 @@ class HandoffTest {
         assertThat(handoff.submitted()).isFalse();
     }
 
+
     @Test
     @DisplayName("제출하면 제출 대기가 열린다")
     void submitOpensSubmitWait() {
@@ -76,15 +80,17 @@ class HandoffTest {
         assertThat(handoff.submitted()).isTrue();
     }
 
+
     @Test
     @DisplayName("아무것도 정해지지 않으면 마감 시각에 기다리기를 그만둔다")
     void stopsWaitingAtDeadlineWhenNothingIsDecided() {
         Handoff handoff = new Handoff();
 
         assertThat(handoff.awaitRowDecided(deadlineAfter(Duration.ofMillis(20))))
-                .isFalse();
+            .isFalse();
         assertThat(handoff.awaitSettled(deadlineAfter(Duration.ofMillis(20)))).isFalse();
     }
+
 
     @Test
     @DisplayName("포기와 줄 생성이 겹치면 꼭 하나만 이긴다")
@@ -107,11 +113,12 @@ class HandoffTest {
 
                 assertThat(requestGaveUp).as("%d번째 경합: 포기가 이겼으면 줄은 돌려주지 않는다", i).isNotEqualTo(handoff.rowCreated());
                 assertThat(handoff.abandoned())
-                        .as("%d번째 경합: 실행 스레드가 보는 포기 표시", i)
-                        .isEqualTo(requestGaveUp);
+                    .as("%d번째 경합: 실행 스레드가 보는 포기 표시", i)
+                    .isEqualTo(requestGaveUp);
             }
         }
     }
+
 
     private static long deadlineAfter(Duration wait) {
         return System.nanoTime() + wait.toNanos();

@@ -37,37 +37,41 @@ public class HttpCdpGateway implements CdpGatewayHttp, AutoCloseable {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
 
-    private final HttpClient client =
-            HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
     private final Duration requestTimeout;
+
 
     public HttpCdpGateway() {
         this(REQUEST_TIMEOUT);
     }
+
 
     /** 시험이 시간 제한을 줄여 쓴다. */
     HttpCdpGateway(Duration requestTimeout) {
         this.requestTimeout = requestTimeout;
     }
 
+
     @Override
     public CdpReply get(URI cdp, String path) {
         return send(HttpRequest.newBuilder(endpoint(cdp, path)).GET());
     }
+
 
     @Override
     public CdpReply put(URI cdp, String pathAndQuery) {
         return send(HttpRequest.newBuilder(endpoint(cdp, pathAndQuery)).PUT(HttpRequest.BodyPublishers.noBody()));
     }
 
+
     @Override
     public void close() {
         client.shutdownNow();
     }
 
+
     private CdpReply send(HttpRequest.Builder request) {
-        CompletableFuture<HttpResponse<byte[]>> pending =
-                client.sendAsync(request.timeout(requestTimeout).build(), info -> new CappedBody());
+        CompletableFuture<HttpResponse<byte[]>> pending = client.sendAsync(request.timeout(requestTimeout).build(), info -> new CappedBody());
         HttpResponse<byte[]> response;
         try {
             response = pending.get(requestTimeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -89,10 +93,12 @@ public class HttpCdpGateway implements CdpGatewayHttp, AutoCloseable {
         return new CdpReply(response.statusCode(), contentType, response.body());
     }
 
+
     /** 본문이 상한을 넘었다. 주소와 본문을 싣지 않는다. */
     private static final class BodyTooLarge extends IOException {
 
         private static final long serialVersionUID = 1L;
+
 
         BodyTooLarge() {
             super("cdp gateway body is larger than " + MAX_BODY_BYTES + " bytes");
@@ -106,16 +112,19 @@ public class HttpCdpGateway implements CdpGatewayHttp, AutoCloseable {
         private final CompletableFuture<byte[]> result = new CompletableFuture<>();
         private Flow.Subscription subscription;
 
+
         @Override
         public CompletionStage<byte[]> getBody() {
             return result;
         }
+
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
             this.subscription = subscription;
             subscription.request(Long.MAX_VALUE);
         }
+
 
         @Override
         public void onNext(List<ByteBuffer> items) {
@@ -134,16 +143,19 @@ public class HttpCdpGateway implements CdpGatewayHttp, AutoCloseable {
             }
         }
 
+
         @Override
         public void onError(Throwable error) {
             result.completeExceptionally(error);
         }
+
 
         @Override
         public void onComplete() {
             result.complete(bytes.toByteArray());
         }
     }
+
 
     private static URI endpoint(URI cdp, String pathAndQuery) {
         if (cdp == null || !"http".equals(cdp.getScheme()) || cdp.getHost() == null) {

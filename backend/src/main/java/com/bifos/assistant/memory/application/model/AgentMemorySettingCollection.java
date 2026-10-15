@@ -10,10 +10,11 @@ package com.bifos.assistant.memory.application.model;
  * @param sensitiveEntryCount 그 가운데 민감 항목 수다
  */
 public record AgentMemorySettingCollection(
-        String key,
-        String displayName,
-        boolean listed,
-        boolean granted,
-        boolean allowSensitive,
-        long entryCount,
-        long sensitiveEntryCount) {}
+    String key,
+    String displayName,
+    boolean listed,
+    boolean granted,
+    boolean allowSensitive,
+    long entryCount,
+    long sensitiveEntryCount) {
+}

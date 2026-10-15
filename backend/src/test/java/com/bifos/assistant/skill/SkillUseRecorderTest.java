@@ -38,14 +38,17 @@ class SkillUseRecorderTest {
     @Autowired
     ExecutionSkillUseRepository uses;
 
+
     @BeforeEach
     void setUp() {
         uses.deleteAll();
     }
 
+
     private List<ExecutionSkillUse> recorded() {
         return uses.findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(List.of(EXECUTION_ID, OTHER_EXECUTION_ID));
     }
+
 
     @Test
     @DisplayName("이름만 있는 미리보기를 MODEL 로 적는다")
@@ -60,6 +63,7 @@ class SkillUseRecorderTest {
         });
     }
 
+
     @Test
     @DisplayName("참고 파일 경로가 붙은 미리보기는 화살표 앞의 이름만 적는다")
     void recordsOnlyNameBeforeArrowForPreviewWithReferenceFilePath() {
@@ -67,6 +71,7 @@ class SkillUseRecorderTest {
 
         assertThat(recorded()).extracting(ExecutionSkillUse::skillName).containsExactly("shopping");
     }
+
 
     @Test
     @DisplayName("Hermes 기본 스킬처럼 점과 밑줄이 든 이름도 MODEL 로 적는다")
@@ -79,6 +84,7 @@ class SkillUseRecorderTest {
         });
     }
 
+
     @Test
     @DisplayName("점과 밑줄이 든 이름에 참고 파일 경로가 붙어도 화살표 앞의 이름만 적는다")
     void recordsOnlyNameBeforeArrowForDotUnderscoreNameWithReferencePath() {
@@ -86,6 +92,7 @@ class SkillUseRecorderTest {
 
         assertThat(recorded()).extracting(ExecutionSkillUse::skillName).containsExactly("note_taking.v2");
     }
+
 
     @Test
     @DisplayName("점이나 밑줄로 시작하거나 대문자가 든 이름은 버린다")
@@ -96,6 +103,7 @@ class SkillUseRecorderTest {
 
         assertThat(recorded()).isEmpty();
     }
+
 
     @Test
     @DisplayName("규칙에 맞지 않는 미리보기는 버린다")
@@ -110,6 +118,7 @@ class SkillUseRecorderTest {
         assertThat(recorded()).isEmpty();
     }
 
+
     @Test
     @DisplayName("이름이 64자면 상한 안이라 적는다")
     void recordsNameOf64CharsAsWithinLimit() {
@@ -120,6 +129,7 @@ class SkillUseRecorderTest {
         assertThat(recorded()).extracting(ExecutionSkillUse::skillName).containsExactly(longest);
     }
 
+
     @Test
     @DisplayName("같은 실행에서 같은 스킬을 두 번 읽어도 한 줄이다")
     void readingSameSkillTwiceInOneRunLeavesOneRow() {
@@ -129,6 +139,7 @@ class SkillUseRecorderTest {
         assertThat(recorded()).hasSize(1);
     }
 
+
     @Test
     @DisplayName("출처가 다르거나 실행이 다르면 따로 적는다")
     void recordsSeparatelyWhenSourceOrRunDiffers() {
@@ -137,12 +148,13 @@ class SkillUseRecorderTest {
         recorder.recordModel(OTHER_EXECUTION_ID, "shopping");
 
         assertThat(recorded())
-                .extracting(ExecutionSkillUse::executionId, ExecutionSkillUse::source)
-                .containsExactlyInAnyOrder(
-                        tuple(EXECUTION_ID, SkillUseSource.MODEL),
-                        tuple(EXECUTION_ID, SkillUseSource.COMMAND),
-                        tuple(OTHER_EXECUTION_ID, SkillUseSource.MODEL));
+            .extracting(ExecutionSkillUse::executionId, ExecutionSkillUse::source)
+            .containsExactlyInAnyOrder(
+                tuple(EXECUTION_ID, SkillUseSource.MODEL),
+                tuple(EXECUTION_ID, SkillUseSource.COMMAND),
+                tuple(OTHER_EXECUTION_ID, SkillUseSource.MODEL));
     }
+
 
     @Test
     @DisplayName("저장소가 예외를 던져도 recordModel 은 던지지 않는다")
@@ -154,12 +166,13 @@ class SkillUseRecorderTest {
         assertThat(recorded()).isEmpty();
     }
 
+
     @Test
     @DisplayName("동시에 먼저 적혀 유일 제약에 걸려도 던지지 않는다")
     void doesNotThrowEvenIfUniqueConstraintHitByConcurrentEarlierWrite() {
         doThrow(new DataIntegrityViolationException("uk_execution_skill_use_execution_skill_source"))
-                .when(uses)
-                .save(any(ExecutionSkillUse.class));
+            .when(uses)
+            .save(any(ExecutionSkillUse.class));
 
         assertThatCode(() -> recorder.recordCommand(EXECUTION_ID, "shopping")).doesNotThrowAnyException();
     }

@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class DelegationSlots {
     private final AtomicInteger active = new AtomicInteger();
 
+
     /** 자리 하나를 얻는다. 이미 {@code max} 개를 쓰고 있으면 얻지 못한다. */
     boolean tryAcquire(int max) {
         while (true) {
@@ -23,6 +24,7 @@ final class DelegationSlots {
             }
         }
     }
+
 
     /** {@link #tryAcquire} 로 얻은 자리를 돌려준다. */
     void release() {

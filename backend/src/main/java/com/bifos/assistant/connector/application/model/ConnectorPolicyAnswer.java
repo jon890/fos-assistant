@@ -9,4 +9,5 @@ import java.util.UUID;
  * @param message 막을 때 모델에게 보일 글. 통과이면 빈 글이다. 내부 이름과 예외 본문을 넣지 않는다
  * @param actionId 승인 요청 번호. 승인 요청을 만들지 않았으면 null
  */
-public record ConnectorPolicyAnswer(boolean allowed, String message, UUID actionId) {}
+public record ConnectorPolicyAnswer(boolean allowed, String message, UUID actionId) {
+}

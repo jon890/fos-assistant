@@ -117,7 +117,7 @@ Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용�
 
 ### MCP 호출의 요청자를 정할 때
 
-`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`가 모두 이 길을 지난다.
+`memory_read`, `memory_search`, `memory_remember`, `artifact_write`, `agent_list`, `agent_delegate`, `agent_status`, `agent_stop`, `follow_up_propose`, `list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change`가 모두 이 길을 지난다.
 그 호출의 session 에 하위 에이전트 등록이 있으면 등록의 origin 실행을, 없고 session 이 루트와 같으면 그 루트 session 으로 도는 실행 하나를 origin 으로 삼는다. 그 실행의 `user_id` 가 요청자다.
 
 같은 profile 에서 두 사용자의 실행이 함께 돌아도 섞이지 않는다.
@@ -183,6 +183,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | `content_draft_write`, `content_draft_read` | [원고 저장 계약](content-draft.md#mcp와-배치) |
 | `content_draft_preview`, `content_draft_save` | [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) |
 | `memory_remember` | [`docs/features/memory.md`](memory.md) 의 「에이전트가 기억을 남기는 길」 |
+| `order_limit_read`, `order_limit_change` | [`docs/features/tossinvest-connector.md`](tossinvest-connector.md) 의 「주문 상한」. 올리기는 승인 카드만 만들고 반영하지 않는다 |
 
 **Hermes 는 MCP 도구 이름 앞에 서버 이름을 붙인다.** 그래서 서버 이름에 특정 기능의 이름을 넣지 않고, Control Plane 이 여는 도구는 모두 이 서버 하나에 둔다.
 

@@ -17,6 +17,7 @@ class RunningDelegationTest {
     private static final int RACES = 500;
     private static final String RUN_ID = "run-1";
 
+
     @Test
     @DisplayName("중지가 먼저 오면 run 번호를 붙이는 쪽이 보낸다")
     void sideAttachingRunIdSendsWhenStopComesFirst() {
@@ -28,6 +29,7 @@ class RunningDelegationTest {
         assertThat(delegation.runId()).isEqualTo(RUN_ID);
     }
 
+
     @Test
     @DisplayName("run 번호가 먼저 붙으면 멈추는 쪽이 그 번호로 보낸다")
     void sideStoppingSendsByRunIdWhenIdIsAttachedFirst() {
@@ -36,6 +38,7 @@ class RunningDelegationTest {
         assertThat(delegation.attachRun(RUN_ID)).as("중지 표시가 없어 붙이는 쪽은 보내지 않는다").isFalse();
         assertThat(delegation.requestStop()).isEqualTo(RUN_ID);
     }
+
 
     @Test
     @DisplayName("실행 번호는 줄이 생긴 뒤에 적히고 끝나면 기다리던 쪽이 깨어난다")
@@ -50,9 +53,10 @@ class RunningDelegationTest {
         long before = System.nanoTime();
         delegation.awaitEnded(Duration.ofSeconds(5));
         assertThat(Duration.ofNanos(System.nanoTime() - before))
-                .as("이미 끝나 기다리지 않는다")
-                .isLessThan(Duration.ofSeconds(1));
+            .as("이미 끝나 기다리지 않는다")
+            .isLessThan(Duration.ofSeconds(1));
     }
+
 
     @Test
     @DisplayName("중지와 run 번호 붙이기가 겹치면 보내는 쪽이 꼭 하나다")
@@ -73,8 +77,8 @@ class RunningDelegationTest {
                 boolean attacherSends = attached.get(5, TimeUnit.SECONDS);
 
                 assertThat(stopperSends)
-                        .as("%d번째 경합: 멈추는 쪽과 붙이는 쪽 가운데 하나만 보낸다", i)
-                        .isNotEqualTo(attacherSends);
+                    .as("%d번째 경합: 멈추는 쪽과 붙이는 쪽 가운데 하나만 보낸다", i)
+                    .isNotEqualTo(attacherSends);
             }
         }
     }

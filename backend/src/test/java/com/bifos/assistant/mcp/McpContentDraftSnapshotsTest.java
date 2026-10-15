@@ -30,6 +30,7 @@ import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpCurrentCallerGuard;
+import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
@@ -76,8 +77,8 @@ class McpContentDraftSnapshotsTest {
     void setUp() {
         var drafts = new McpContentDraftTools(mock(ContentDraftService.class), mock(ContentDraftInputReader.class), guard, json);
         var tool = new McpContentDraftSnapshots(snapshots, saves, bindings, drafts);
-        controller = new McpController(tools, callers, mock(McpMediaObservationTools.class), drafts, tool, checks,
-            mock(BuildProperties.class));
+        controller = new McpController(tools, callers, mock(McpMediaObservationTools.class), drafts, tool,
+            mock(McpFinancialLimitTools.class), checks, mock(BuildProperties.class));
         var origin = mock(AgentExecution.class);
         when(origin.id()).thenReturn(31L);
         when(origin.conversationId()).thenReturn(41L);

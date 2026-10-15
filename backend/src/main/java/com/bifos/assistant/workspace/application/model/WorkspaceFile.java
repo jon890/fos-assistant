@@ -10,4 +10,5 @@ import java.io.InputStream;
  * @param download 내려받기다
  */
 public record WorkspaceFile(
-        String name, String contentType, long size, boolean html, boolean download, InputStream body) {}
+    String name, String contentType, long size, boolean html, boolean download, InputStream body) {
+}

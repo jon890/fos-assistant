@@ -22,10 +22,12 @@ class SignInPolicyTest {
     @Autowired
     AllowedPersonRepository people;
 
+
     @BeforeEach
     void setUp() {
         people.deleteAll();
     }
+
 
     @Test
     @DisplayName("목록에 있고 켜진 주소는 profile 과 함께 통과한다")
@@ -33,10 +35,11 @@ class SignInPolicyTest {
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom", Instant.now()));
 
         assertThat(policy.admit("mom@example.com"))
-                .get()
-                .extracting(AllowedPerson::displayName, AllowedPerson::hermesProfile)
-                .containsExactly("엄마", "mom");
+            .get()
+            .extracting(AllowedPerson::displayName, AllowedPerson::hermesProfile)
+            .containsExactly("엄마", "mom");
     }
+
 
     @Test
     @DisplayName("목록에 없는 주소는 거절한다")
@@ -45,6 +48,7 @@ class SignInPolicyTest {
 
         assertThat(policy.admit("stranger@example.com")).isEmpty();
     }
+
 
     @Test
     @DisplayName("목록에 있어도 꺼진 주소는 거절한다")
@@ -56,16 +60,18 @@ class SignInPolicyTest {
         assertThat(policy.admit("mom@example.com")).isEmpty();
     }
 
+
     @Test
     @DisplayName("대문자가 섞인 주소도 같은 사람으로 찾는다")
     void findsSamePersonForAddressWithUppercase() {
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom", Instant.now()));
 
         assertThat(policy.admit("Mom@Example.com"))
-                .get()
-                .extracting(AllowedPerson::hermesProfile)
-                .isEqualTo("mom");
+            .get()
+            .extracting(AllowedPerson::hermesProfile)
+            .isEqualTo("mom");
     }
+
 
     @Test
     @DisplayName("대문자가 섞인 주소로 넣어도 중복 검사에 걸린다")
@@ -73,8 +79,9 @@ class SignInPolicyTest {
         people.save(AllowedPerson.of("MOM@Example.com", "엄마", "mom", Instant.now()));
 
         assertThat(people.existsByEmail(AllowedPerson.normalizeEmail("mom@example.com")))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("빈 주소는 거절한다")

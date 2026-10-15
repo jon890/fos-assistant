@@ -15,8 +15,10 @@ public interface ExecutionSkillUseRepository extends JpaRepository<ExecutionSkil
     /** {@code (execution_id, skill_name, source)} 유일 제약을 탄다. */
     boolean existsByExecutionIdAndSkillNameAndSource(Long executionId, String skillName, SkillUseSource source);
 
+
     /** 여러 실행의 사용을 한 번에 읽는다. 목록이 실행마다 질의하지 않게 한다. */
     List<ExecutionSkillUse> findByExecutionIdInOrderByExecutionIdAscSkillNameAsc(Collection<Long> executionIds);
+
 
     /**
      * 그 에이전트의 실행 전체에서 스킬 이름별로 묶는다. 출처는 가리지 않는다.
@@ -36,6 +38,7 @@ public interface ExecutionSkillUseRepository extends JpaRepository<ExecutionSkil
             group by u.skillName
             """)
     List<SkillUseCount> countByAgent(@Param("agentId") Long agentId);
+
 
     /** 그 사용자의 실행에서 쓰인 것을 실행과 에이전트와 대화 번호를 붙여 읽는다. */
     @Query("""

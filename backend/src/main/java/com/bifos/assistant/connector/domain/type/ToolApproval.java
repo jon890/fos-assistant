@@ -11,10 +11,12 @@ public enum ToolApproval {
     REQUIRED,
     ALWAYS;
 
+
     /** 이 방식이 {@code other} 보다 느슨한가. 같으면 거짓이다. */
     public boolean looserThan(ToolApproval other) {
         return ordinal() < other.ordinal();
     }
+
 
     /** manifest 가 쓰는 소문자 글을 읽는다. 모르는 글과 null 은 null 이다. */
     public static ToolApproval fromWord(String word) {

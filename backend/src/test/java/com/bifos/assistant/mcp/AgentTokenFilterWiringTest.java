@@ -29,23 +29,26 @@ class AgentTokenFilterWiringTest {
     @Autowired
     private FilterRegistrationBean<AgentTokenFilter> agentTokenFilterRegistration;
 
+
     @Test
     @DisplayName("profile 토큰 필터는 사용자 JWT 필터보다 앞에 한 번만 등록된다")
     void placesAgentTokenFilterOnceBeforeJwtFilter() {
         List<Class<?>> filterClasses = filterChain.getFilters().stream()
-                .<Class<?>>map(Filter::getClass)
-                .toList();
+            .<Class<?>>map(Filter::getClass)
+            .toList();
 
         assertThat(filterClasses)
-                .filteredOn(type -> type == AgentTokenAuthenticationFilter.class || type == ControlPlaneJwtFilter.class)
-                .containsExactly(AgentTokenAuthenticationFilter.class, ControlPlaneJwtFilter.class);
+            .filteredOn(type -> type == AgentTokenAuthenticationFilter.class || type == ControlPlaneJwtFilter.class)
+            .containsExactly(AgentTokenAuthenticationFilter.class, ControlPlaneJwtFilter.class);
     }
+
 
     @Test
     @DisplayName("AgentTokenFilter 타입으로 주입받은 빈의 실제 클래스는 AgentTokenAuthenticationFilter 다")
     void injectsAgentTokenAuthenticationFilterAsAgentTokenFilter() {
         assertThat(agentTokenFilter.getClass()).isEqualTo(AgentTokenAuthenticationFilter.class);
     }
+
 
     @Test
     @DisplayName("서블릿 필터 등록은 같은 필터 객체를 감싸고 꺼져 있어 필터가 두 번 돌지 않는다")

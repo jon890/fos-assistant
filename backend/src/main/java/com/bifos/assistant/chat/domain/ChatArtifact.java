@@ -58,6 +58,7 @@ public class ChatArtifact {
     @Getter
     private Instant deletedAt;
 
+
     private ChatArtifact(Long conversationId, Long messageId, String path, long byteSize, Instant now) {
         this.conversationId = conversationId;
         this.messageId = messageId;
@@ -66,9 +67,11 @@ public class ChatArtifact {
         this.createdAt = now;
     }
 
+
     public static ChatArtifact of(Long conversationId, Long messageId, String path, long byteSize, Instant now) {
         return new ChatArtifact(conversationId, messageId, path, byteSize, now);
     }
+
 
     public boolean isDeleted() {
         return deletedAt != null;

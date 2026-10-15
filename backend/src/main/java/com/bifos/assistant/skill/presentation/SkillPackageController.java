@@ -29,6 +29,7 @@ public class SkillPackageController {
     private final SkillPackageService packages;
     private final CurrentUserProvider currentUser;
 
+
     @PostMapping(value = "/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SkillPackagePreviewView preview(@PathVariable String code, @RequestParam("file") MultipartFile file) {
         if (file.getSize() > SkillPackageZip.MAX_ZIP_BYTES) {
@@ -37,17 +38,19 @@ public class SkillPackageController {
         return SkillPackagePreviewView.from(packages.preview(currentUser.require(), code, bytesOf(file)));
     }
 
+
     /** {@code baseDigest} 는 이미 있는 스킬을 덮어쓸 때 미리보기가 준 값이다. */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public SkillDetailView upload(
-            @PathVariable String code,
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "baseDigest", required = false) String baseDigest) {
+        @PathVariable String code,
+        @RequestParam("file") MultipartFile file,
+        @RequestParam(value = "baseDigest", required = false) String baseDigest) {
         if (file.getSize() > SkillPackageZip.MAX_ZIP_BYTES) {
             throw packages.uploadTooLarge(currentUser.require(), code);
         }
         return SkillDetailView.from(packages.upload(currentUser.require(), code, bytesOf(file), baseDigest));
     }
+
 
     private static byte[] bytesOf(MultipartFile file) {
         try {

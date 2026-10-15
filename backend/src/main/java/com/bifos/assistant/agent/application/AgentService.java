@@ -23,13 +23,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class AgentService {
     private final AgentRepository agents;
 
+
     /** 요청자가 고를 수 있는 에이전트 목록이다. 꺼진 것과 지운 것은 빠진다. */
     public List<Agent> readableBy(CurrentUser user) {
         return agents.findByEnabledTrueOrderByCodeAsc().stream()
-                .filter(agent -> !agent.isDeleted())
-                .filter(agent -> agent.isReadableBy(user.id()))
-                .toList();
+            .filter(agent -> !agent.isDeleted())
+            .filter(agent -> agent.isReadableBy(user.id()))
+            .toList();
     }
+
 
     /** 요청자가 읽을 수 있는 에이전트다. 지운 에이전트는 없는 에이전트와 같게 {@code AGENT_NOT_FOUND} 다. */
     public Agent requireReadable(CurrentUser user, String code) {
@@ -39,6 +41,7 @@ public class AgentService {
         }
         return agent;
     }
+
 
     /** 대화를 시작하거나 그 에이전트의 모델을 고를 수 있는 에이전트다. 요청자가 읽을 수 있고 켜져 있어야 한다. */
     public Agent requireStartable(CurrentUser user, String code) {
@@ -52,6 +55,7 @@ public class AgentService {
         return agent;
     }
 
+
     /**
      * 쓰기 전에 행 잠금을 잡고, 잠금을 잡은 뒤의 접근 범위를 다시 확인한다.
      *
@@ -64,6 +68,7 @@ public class AgentService {
         }
         return locked;
     }
+
 
     /**
      * 관리자가 고칠 에이전트를 읽는다. 다른 사람의 비공개 에이전트도 읽는다. 지운 에이전트는 없는 것과 같다.
@@ -79,6 +84,7 @@ public class AgentService {
         return agent;
     }
 
+
     /**
      * 관리자가 에이전트의 기본 모델과 effort 를 바꾼다. 값의 검증은 부르는 쪽이 끝낸다.
      *
@@ -89,7 +95,7 @@ public class AgentService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Agent changeDefaultModel(
-            CurrentUser user, String code, String provider, String model, String reasoningEffort) {
+        CurrentUser user, String code, String provider, String model, String reasoningEffort) {
         requireAdmin(user);
         Agent locked = agents.findByCodeForUpdate(code).orElseThrow(() -> notFound());
         if (locked.isDeleted()) {
@@ -99,11 +105,13 @@ public class AgentService {
         return agents.save(locked);
     }
 
+
     private static void requireAdmin(CurrentUser user) {
         if (!user.isAdmin()) {
             throw new ApiException(ErrorCode.FORBIDDEN, "this action is limited to the group admin");
         }
     }
+
 
     /**
      * 이미 읽은 에이전트의 행을 기다리는 쓰기 잠금으로 다시 읽는다.
@@ -120,6 +128,7 @@ public class AgentService {
         return locked;
     }
 
+
     /**
      * 요청자가 이 에이전트의 성격과 소개, 추천 질문을 고칠 수 있는가.
      *
@@ -132,6 +141,7 @@ public class AgentService {
         return !agent.connectorManaged() && (user.isAdmin() || Objects.equals(agent.ownerUserId(), user.id()));
     }
 
+
     /**
      * 번호로 에이전트를 읽는다. 지운 에이전트도 돌려준다.
      *
@@ -142,6 +152,7 @@ public class AgentService {
         return findById(id).orElseThrow(() -> notFound());
     }
 
+
     /**
      * 번호로 에이전트를 읽는다. 행이 없거나 {@code id} 가 null 이면 빈 값이다. 지운 에이전트도 돌려준다.
      *
@@ -150,6 +161,7 @@ public class AgentService {
     public Optional<Agent> findById(Long id) {
         return id == null ? Optional.empty() : agents.findById(id);
     }
+
 
     /**
      * 번호들의 에이전트를 한 번에 읽어 번호별로 돌려준다. 행이 없는 번호는 맵에 없다.
@@ -165,6 +177,7 @@ public class AgentService {
         }
         return agents.findAllById(present).stream().collect(Collectors.toMap(Agent::id, Function.identity()));
     }
+
 
     private static ApiException notFound() {
         return new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");

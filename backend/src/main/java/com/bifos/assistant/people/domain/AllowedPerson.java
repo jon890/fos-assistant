@@ -55,7 +55,9 @@ public class AllowedPerson {
     @Getter
     private Instant lastLoginAt;
 
+
     protected AllowedPerson() {}
+
 
     private AllowedPerson(String email, String displayName, String hermesProfile, Instant now) {
         this.email = normalizeEmail(email);
@@ -65,9 +67,11 @@ public class AllowedPerson {
         this.createdAt = now;
     }
 
+
     public static AllowedPerson of(String email, String displayName, String hermesProfile, Instant now) {
         return new AllowedPerson(email, displayName, hermesProfile, now);
     }
+
 
     /**
      * 메일 주소를 표에 넣고 표에서 찾는 하나의 모양으로 맞춘다.
@@ -79,10 +83,12 @@ public class AllowedPerson {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
+
     /** 들어오지 못하게 막는다. 행은 남는다. */
     public void disable() {
         this.enabled = false;
     }
+
 
     /**
      * 다시 들어올 수 있게 한다.

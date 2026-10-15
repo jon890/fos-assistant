@@ -153,6 +153,7 @@ public class Conversation {
     @Getter
     private Instant hiddenAt;
 
+
     private Conversation(Long userId, String title, Long agentId, ConversationPurpose purpose, Instant now) {
         this.userId = userId;
         this.title = title;
@@ -162,14 +163,17 @@ public class Conversation {
         this.updatedAt = this.createdAt;
     }
 
+
     public static Conversation startedBy(Long userId, String title, Long agentId, Instant now) {
         return new Conversation(userId, title, agentId, ConversationPurpose.CHAT, now);
     }
+
 
     /** 먼저 살펴보기의 결과가 남는 점검 대화를 만든다. */
     public static Conversation startedForCheck(Long userId, String title, Long agentId, Instant now) {
         return new Conversation(userId, title, agentId, ConversationPurpose.CHECK, now);
     }
+
 
     /** 예약 작업이 발화해 연 대화다. 제목은 작업 이름이다. */
     public static Conversation startedForTask(Long userId, String title, Long agentId, Long taskId, Instant now) {
@@ -177,6 +181,7 @@ public class Conversation {
         conversation.taskId = taskId;
         return conversation;
     }
+
 
     /**
      * 이 대화에서 고른 모델과 effort 다. 고르지 않았으면 셋 다 null 이다.
@@ -187,10 +192,12 @@ public class Conversation {
         return ModelChoice.stored(modelProvider, model, reasoningEffort);
     }
 
+
     /** 실행 줄이 이 대화에서 읽는 값만 담아 낸다. 대화 번호와 이 대화에서 고른 effort 다. */
     public ExecutionConversation executionConversation() {
         return new ExecutionConversation(id, modelChoice().reasoningEffort());
     }
+
 
     public static String normalizedTitle(String title) {
         String normalized = title == null ? "" : title.strip();
@@ -200,12 +207,14 @@ public class Conversation {
         return normalized;
     }
 
+
     /** 제목이 비어 있을 때만 채운다. 사진을 먼저 올리려고 만든 대화는 첫 메시지가 제목을 정한다. */
     public void titleIfBlank(String title) {
         if (this.title == null || this.title.isBlank()) {
             this.title = title;
         }
     }
+
 
     /**
      * Control Plane 이 정한 새 session 을 보낼 session 과 루트 session 에 함께 적는다.
@@ -218,11 +227,13 @@ public class Conversation {
         this.hermesRootSessionId = sessionId;
     }
 
+
     /** 저장소에 이미 적힌 두 session 을 이 객체에 옮긴다. 다른 turn 이 먼저 정했을 때 쓴다. */
     public void adoptSessions(String sessionId, String rootSessionId) {
         this.hermesSessionId = sessionId;
         this.hermesRootSessionId = rootSessionId;
     }
+
 
     public void rememberSession(String sessionId, Instant now) {
         if (sessionId != null && !sessionId.isBlank()) {

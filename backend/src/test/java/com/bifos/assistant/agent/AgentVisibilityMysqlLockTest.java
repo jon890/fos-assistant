@@ -16,6 +16,7 @@ class AgentVisibilityMysqlLockTest extends AgentVisibilityLockTest {
 
     private static MysqlTestDatabase database;
 
+
     @DynamicPropertySource
     static void mysqlProperties(DynamicPropertyRegistry registry) {
         database = MysqlTestDatabase.create();

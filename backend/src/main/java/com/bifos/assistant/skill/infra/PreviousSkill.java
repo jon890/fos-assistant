@@ -9,4 +9,5 @@ import java.time.Instant;
  * @param bundle 바뀌기 전 스킬 전체
  * @param savedAt 그 버전을 남긴 시각
  */
-public record PreviousSkill(SkillBundle bundle, Instant savedAt) {}
+public record PreviousSkill(SkillBundle bundle, Instant savedAt) {
+}

@@ -25,6 +25,7 @@ public class DecisionFeedbackRecorder {
     private final FeedbackEventWriter writer;
     private final FeedbackEventRepository events;
 
+
     /** 사건 하나를 남긴다. 트랜잭션 안에서 부르면 커밋한 뒤에 남기고, 되돌려지면 남기지 않는다. */
     public void record(FeedbackEntry entry) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -38,6 +39,7 @@ public class DecisionFeedbackRecorder {
         }
         write(entry);
     }
+
 
     /**
      * 그 대화에 묶인 사건과, 그 사건이 가리키는 제안의 다른 사건을 모두 지운다. 대화를 지울 때 그 트랜잭션 안에서 부른다.
@@ -54,15 +56,16 @@ public class DecisionFeedbackRecorder {
         return count;
     }
 
+
     private void write(FeedbackEntry entry) {
         try {
             writer.insert(entry);
         } catch (RuntimeException ex) {
             log.warn(
-                    "decision feedback event failed userId={} type={} kind={}",
-                    entry.userId(),
-                    entry.eventType(),
-                    ex.getClass().getSimpleName());
+                "decision feedback event failed userId={} type={} kind={}",
+                entry.userId(),
+                entry.eventType(),
+                ex.getClass().getSimpleName());
         }
     }
 }

@@ -14,20 +14,21 @@ import org.springframework.stereotype.Component;
 public class MediaObservationBodies {
     private final TextCipher cipher;
 
+
     public void requireEncryption() {
         if (!cipher.enabled()) {
             throw unavailable();
         }
     }
 
+
     public void seal(MediaObservation row, String plain) {
         requireEncryption();
         try {
-            var sealed =
-                    cipher.seal(row.ownerUserId(), aad(row), plain).orElseThrow(MediaObservationBodies::unavailable);
+            var sealed = cipher.seal(row.ownerUserId(), aad(row), plain).orElseThrow(MediaObservationBodies::unavailable);
             if (sealed.keyId() == null
-                    || sealed.content() == null
-                    || sealed.content().isBlank()) {
+                || sealed.content() == null
+                || sealed.content().isBlank()) {
                 throw unavailable();
             }
             row.seal(sealed.content(), sealed.keyId());
@@ -35,6 +36,7 @@ public class MediaObservationBodies {
             throw unavailable();
         }
     }
+
 
     public Optional<String> open(MediaObservation row, Long owner) {
         if (row.body() == null || !owner.equals(row.ownerUserId())) {
@@ -50,9 +52,11 @@ public class MediaObservationBodies {
         }
     }
 
+
     private static String aad(MediaObservation row) {
         return "media_observation:" + row.id() + ":conversation:" + row.conversationId() + ":user:" + row.ownerUserId();
     }
+
 
     private static ApiException unavailable() {
         return new ApiException(ErrorCode.MEDIA_ENCRYPTION_UNAVAILABLE, "media encryption is unavailable");

@@ -12,6 +12,7 @@ class WorkspacePreviewPolicyTest {
 
     private static final long MIB = 1024L * 1024L;
 
+
     @Test
     @DisplayName("HTML 은 html 미리보기이고 5 MiB 까지다")
     void previewsHtml() {
@@ -22,12 +23,14 @@ class WorkspacePreviewPolicyTest {
         assertThat(preview.maxBytes()).isEqualTo(5 * MIB);
     }
 
+
     @Test
     @DisplayName("CSS 는 text/css 로 준다")
     void previewsCssAsCss() {
         assertThat(WorkspacePreviewPolicy.of("a.css").orElseThrow().contentType())
-                .isEqualTo("text/css; charset=utf-8");
+            .isEqualTo("text/css; charset=utf-8");
     }
+
 
     @ParameterizedTest
     @ValueSource(strings = {"a.TXT", ".env", "Makefile", "a.svg", "a.csv"})
@@ -40,12 +43,14 @@ class WorkspacePreviewPolicyTest {
         assertThat(preview.html()).isFalse();
     }
 
+
     @ParameterizedTest
     @ValueSource(strings = {".gitignore", "a.bin", "a."})
     @DisplayName("정하지 않은 확장자는 미리보기가 없다")
     void hasNoPreviewForUnknownExtensions(String name) {
         assertThat(WorkspacePreviewPolicy.of(name)).isEmpty();
     }
+
 
     @Test
     @DisplayName("PNG 는 사진 형식이고 20 MiB 까지다")

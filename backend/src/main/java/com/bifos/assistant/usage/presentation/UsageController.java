@@ -59,6 +59,7 @@ public class UsageController {
     private final SkillUsageQuery skillUsage;
     private final UsageSummaryService summaries;
 
+
     /**
      * 로그인한 사용자 자신의 실행만 준다. 여러 사용자를 가로질러 보는 것은 admin 화면이 맡는다.
      *
@@ -76,16 +77,18 @@ public class UsageController {
         return executionViews(rootPage, internal);
     }
 
+
     /** 로그인한 사용자의 루트 실행을 커서 다음부터 읽는다. 기존 배열 응답은 {@link #myExecutions(int)} 에 남긴다. */
     @GetMapping("/executions/page")
     public ExecutionPageView myExecutionPage(
-            @RequestParam(defaultValue = "50") int limit, @RequestParam(required = false) String cursor) {
+        @RequestParam(defaultValue = "50") int limit, @RequestParam(required = false) String cursor) {
         int size = Math.clamp(limit, 1, MAX_LIMIT);
         CurrentUser user = currentUser.require();
         RootExecutionPage rootPage = rootExecutions.page(user.id(), size, cursor);
         return new ExecutionPageView(
-                executionViews(rootPage, InternalValuePolicy.visibleTo(user)), rootPage.nextCursor());
+            executionViews(rootPage, InternalValuePolicy.visibleTo(user)), rootPage.nextCursor());
     }
+
 
     private List<ExecutionView> executionViews(RootExecutionPage rootPage, boolean internal) {
         List<AgentExecution> page = rootPage.executions();
@@ -93,20 +96,20 @@ public class UsageController {
         Map<Long, UUID> publicIds = rootPage.conversationPublicIds();
         // 한 페이지의 실행 번호로 한 번에 읽는다. 줄마다 질의하지 않는다.
         Map<Long, List<String>> skillNames = skillUsage.skillNamesByExecution(
-                page.stream().map(AgentExecution::id).toList());
+            page.stream().map(AgentExecution::id).toList());
         // 에이전트도 한 번에 읽는다. 행이 없는 줄은 에이전트 칸만 비운다.
-        Map<Long, Agent> agentsById =
-                agents.byIds(page.stream().map(AgentExecution::agentId).toList());
+        Map<Long, Agent> agentsById = agents.byIds(page.stream().map(AgentExecution::agentId).toList());
         return page.stream()
-                .map(execution -> ExecutionView.from(
-                        execution,
-                        agentsById.get(execution.agentId()),
-                        execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
-                        withChildren.contains(execution.id()),
-                        skillNames.getOrDefault(execution.id(), List.of()),
-                        internal))
-                .toList();
+            .map(execution -> ExecutionView.from(
+                execution,
+                agentsById.get(execution.agentId()),
+                execution.conversationId() == null ? null : publicIds.get(execution.conversationId()),
+                withChildren.contains(execution.id()),
+                skillNames.getOrDefault(execution.id(), List.of()),
+                internal))
+            .toList();
     }
+
 
     /**
      * 로그인한 사용자 자신이 부른 스킬의 합계다. 에이전트와 스킬 이름으로 묶는다.
@@ -119,9 +122,10 @@ public class UsageController {
         CurrentUser user = currentUser.require();
         boolean internal = InternalValuePolicy.visibleTo(user);
         return skillUsage.byUser(user.id()).stream()
-                .map(usage -> MySkillUsageView.from(usage, internal))
-                .toList();
+            .map(usage -> MySkillUsageView.from(usage, internal))
+            .toList();
     }
+
 
     /**
      * 그 실행이 속한 트리를 낸다.
@@ -132,6 +136,7 @@ public class UsageController {
     public ExecutionTree executionTree(@PathVariable Long id) {
         return executionTrees.of(currentUser.require(), id);
     }
+
 
     /**
      * 이번 달 환산 금액의 합계다.
@@ -150,6 +155,7 @@ public class UsageController {
         MonthlyUsageSummary cost = summaries.monthly(user.id(), from, to);
         return MonthlyCostView.from(month.toString(), cost, InternalValuePolicy.visibleTo(user));
     }
+
 
     /**
      * 한 달치 실행을 축 하나로 묶어 준다.
@@ -174,29 +180,31 @@ public class UsageController {
         return new BreakdownView(axis, target.toString(), "USD", rows(axis, userId, from, to));
     }
 
+
     private List<BreakdownRow> rows(String axis, Long userId, Instant from, Instant to) {
         return switch (axis) {
             case "agent" ->
                 summaries.byAgent(userId, from, to).stream()
-                        .map(BreakdownRow::ofAgent)
-                        .toList();
+                    .map(BreakdownRow::ofAgent)
+                    .toList();
             case "model" ->
                 summaries.byModel(userId, from, to).stream()
-                        .map(BreakdownRow::ofModel)
-                        .toList();
+                    .map(BreakdownRow::ofModel)
+                    .toList();
             case "day" ->
                 summaries.byDay(userId, from, to, HOUSEHOLD_ZONE).stream()
-                        .map(BreakdownRow::ofDay)
-                        .toList();
+                    .map(BreakdownRow::ofDay)
+                    .toList();
             case "fingerprint" ->
                 summaries.byFingerprint(userId, from, to).stream()
-                        .map(BreakdownRow::ofFingerprint)
-                        .toList();
+                    .map(BreakdownRow::ofFingerprint)
+                    .toList();
             default ->
                 throw new ApiException(
-                        ErrorCode.VALIDATION_FAILED, "axis must be one of agent, model, day, fingerprint");
+                    ErrorCode.VALIDATION_FAILED, "axis must be one of agent, model, day, fingerprint");
         };
     }
+
 
     private static YearMonth parseMonth(String month) {
         if (month == null || month.isBlank()) {

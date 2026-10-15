@@ -20,6 +20,7 @@ class HttpCdpProbeTest {
 
     private final HttpCdpProbe probe = new HttpCdpProbe();
 
+
     @Test
     @DisplayName("Host 를 localhost 로 두고 /json/version 을 불러 200 이면 준비된 것으로 본다")
     void readsVersionWithLocalhostHost() throws Exception {
@@ -33,6 +34,7 @@ class HttpCdpProbeTest {
         }
     }
 
+
     @Test
     @DisplayName("200 이 아니거나 닿지 못하면 준비되지 않은 것으로 본다")
     void reportsNotReadyOnErrorOrUnreachable() throws Exception {
@@ -40,17 +42,17 @@ class HttpCdpProbeTest {
         try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
             answerOnce(server, "HTTP/1.1 500 Internal Server Error");
             assertThat(probe.ready(URI.create("http://127.0.0.1:" + server.getLocalPort())))
-                    .isFalse();
+                .isFalse();
             closedPort = server.getLocalPort();
         }
         assertThat(probe.ready(URI.create("http://127.0.0.1:" + closedPort))).isFalse();
     }
 
+
     private static CompletableFuture<List<String>> answerOnce(ServerSocket server, String status) {
         return CompletableFuture.supplyAsync(() -> {
             try (Socket socket = server.accept()) {
-                BufferedReader in =
-                        new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII));
                 List<String> lines = new ArrayList<>();
                 for (String line = in.readLine(); line != null && !line.isEmpty(); line = in.readLine()) {
                     lines.add(line);

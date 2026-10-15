@@ -13,6 +13,7 @@ import com.bifos.assistant.connector.application.ConnectorExecutionSnapshot;
 import com.bifos.assistant.connector.application.ConnectorFinancialGate;
 import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.FinancialDigest;
+import com.bifos.assistant.connector.application.FinancialOrderLimits;
 import com.bifos.assistant.connector.domain.ConnectionFields;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorActionExecution;
@@ -28,6 +29,7 @@ import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
 import com.bifos.assistant.connector.infra.ConnectorConnectionRepository;
+import com.bifos.assistant.connector.infra.FinancialOrderLimitRepository;
 import com.bifos.assistant.crypto.application.DataKeyService;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -93,6 +95,8 @@ class ConnectorConditionalSnapshotTest {
     AgentExecutionRepository runs;
     @Autowired
     AppUserRepository users;
+    @Autowired
+    FinancialOrderLimitRepository limitRows;
     @Autowired
     DataKeyService cipher;
     @Autowired
@@ -217,7 +221,9 @@ class ConnectorConditionalSnapshotTest {
     private ConnectorFinancialGate gate(String keyFile) {
         var live = LiveProperties.fixed(ConnectorFinancialProperties.class, new ConnectorFinancialProperties(
             List.of("7:owner@example.test"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, keyFile));
-        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live), users);
+        var digest = new FinancialDigest(live);
+        var limits = new FinancialOrderLimits(live, limitRows, actions, contents, cipher, digest);
+        return new ConnectorFinancialGate(live, contents, digest, users, limits);
     }
 
 

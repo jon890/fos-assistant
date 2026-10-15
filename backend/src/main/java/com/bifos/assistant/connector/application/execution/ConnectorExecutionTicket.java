@@ -42,6 +42,7 @@ public class ConnectorExecutionTicket {
     private final Clock clock;
     private final HermesProperties properties;
 
+
     public String issue(UUID actionPublicId) {
         ConnectorExecutionCurrent.requireNoTransaction();
         var context = current.readContext(actionPublicId);
@@ -50,9 +51,8 @@ public class ConnectorExecutionTicket {
             return new TransactionTemplate(transactionManager).execute(status -> {
                 users.findByIdForUpdate(context.userId()).orElseThrow(ConnectorExecutionCurrent::rejected);
                 var action = actions.findByPublicIdForUpdate(actionPublicId)
-                        .orElseThrow(ConnectorExecutionCurrent::rejected);
-                var row =
-                        contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorExecutionCurrent::rejected);
+                    .orElseThrow(ConnectorExecutionCurrent::rejected);
+                var row = contents.findByActionIdForUpdate(action.id()).orElseThrow(ConnectorExecutionCurrent::rejected);
                 var snapshot = current.validateLocked(context, catalog, action, row);
                 Instant now = clock.instant().truncatedTo(ChronoUnit.MICROS);
                 requireExecutable(action, now);
@@ -63,20 +63,20 @@ public class ConnectorExecutionTicket {
                 require(now.isBefore(expiry));
                 UUID id = UUID.randomUUID();
                 var payload = new ConnectorExecutionTicketPayload(
-                        1,
-                        id,
-                        action.publicId(),
-                        action.userId(),
-                        action.agentId(),
-                        row.connectionId(),
-                        row.bindingId(),
-                        context.profile(),
-                        action.connectorId(),
-                        action.toolName(),
-                        snapshot.executionArgsSha256(),
-                        snapshot.scopeSha256(),
-                        now,
-                        expiry);
+                    1,
+                    id,
+                    action.publicId(),
+                    action.userId(),
+                    action.agentId(),
+                    row.connectionId(),
+                    row.bindingId(),
+                    context.profile(),
+                    action.connectorId(),
+                    action.toolName(),
+                    snapshot.executionArgsSha256(),
+                    snapshot.scopeSha256(),
+                    now,
+                    expiry);
                 String ticket = sign(payload);
                 row.issueTicket(id, expiry);
                 beforeCommit(action, payload);
@@ -86,6 +86,7 @@ public class ConnectorExecutionTicket {
             throw ConnectorExecutionCurrent.rejected();
         }
     }
+
 
     public ConnectorExecutionTicketPayload authenticate(String ticket) {
         if (ticket == null || ticket.isEmpty()) {
@@ -104,18 +105,21 @@ public class ConnectorExecutionTicket {
         return payload;
     }
 
+
     void requireExecutable(ConnectorAction action, Instant now) {
         require(action.status() == ActionStatus.EXECUTING
-                && action.expiresAt() != null
-                && now.isBefore(action.expiresAt()));
+            && action.expiresAt() != null
+            && now.isBefore(action.expiresAt()));
     }
+
 
     void requireTime(ConnectorExecutionTicketPayload payload, Instant now) {
         require(!now.isBefore(payload.issuedAt())
-                && now.isBefore(payload.expiresAt())
-                && payload.expiresAt().isAfter(payload.issuedAt())
-                && !payload.expiresAt().isAfter(payload.issuedAt().plusSeconds(60)));
+            && now.isBefore(payload.expiresAt())
+            && payload.expiresAt().isAfter(payload.issuedAt())
+            && !payload.expiresAt().isAfter(payload.issuedAt().plusSeconds(60)));
     }
+
 
     void beforeCommit(ConnectorAction action, ConnectorExecutionTicketPayload payload) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -128,12 +132,14 @@ public class ConnectorExecutionTicket {
         });
     }
 
+
     private String sign(ConnectorExecutionTicketPayload payload) {
         String body = ENCODE.encodeToString(codec.encodePayload(payload));
         String ticket = body + "." + ENCODE.encodeToString(signature(body));
         require(ticket.length() <= 4096);
         return ticket;
     }
+
 
     private byte[] signature(String body) {
         try {
@@ -148,11 +154,13 @@ public class ConnectorExecutionTicket {
         }
     }
 
+
     private static byte[] hmac(byte[] key, String data) throws GeneralSecurityException {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(key, "HmacSHA256"));
         return mac.doFinal(data.getBytes(StandardCharsets.US_ASCII));
     }
+
 
     private static byte[] decode(String encoded) {
         try {
@@ -165,6 +173,7 @@ public class ConnectorExecutionTicket {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "financial execution request rejected");
         }
     }
+
 
     private static ApiException unauthenticated() {
         return new ApiException(ErrorCode.UNAUTHENTICATED, "financial execution authentication required");

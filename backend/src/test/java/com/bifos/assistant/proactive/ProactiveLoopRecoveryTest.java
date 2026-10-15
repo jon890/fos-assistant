@@ -24,6 +24,7 @@ class ProactiveLoopRecoveryTest extends ProactiveLoopTestSupport {
     @Autowired
     ProactiveLoopRecovery recovery;
 
+
     @Test
     @DisplayName("RUNNING 시도는 FAILED/INTERRUPTED 로 닫히고 평가 번호가 비며 평가 수가 그대로다. 끝난 시도는 그대로다")
     void closesRunningRunsAsInterrupted() {
@@ -43,21 +44,21 @@ class ProactiveLoopRecoveryTest extends ProactiveLoopTestSupport {
         assertThat(closed.createdAt()).as("저장 시각").isEqualTo(startedAt);
         assertThat(closed.finishedAt()).as("닫은 시각").isEqualTo(BASE);
         assertThat(loopRuns.findById(finished.id()).orElseThrow().status())
-                .as("끝난 시도")
-                .isEqualTo(LoopRunStatus.DECIDED);
+            .as("끝난 시도")
+            .isEqualTo(LoopRunStatus.DECIDED);
         assertThat(evaluationCount(user)).as("평가 수").isEqualTo(evaluationsBefore);
     }
 
+
     private Long newCheck(CurrentUser user, Agent agent) {
-        Long conversationId =
-                checkConversations.findOrCreate(user, agent).conversation().id();
+        Long conversationId = checkConversations.findOrCreate(user, agent).conversation().id();
         ProactiveCheck check = ProactiveCheck.started(
-                user.id(),
-                agent.id(),
-                conversationId,
-                CheckTrigger.SCHEDULED,
-                false,
-                BASE.minus(Duration.ofMinutes(6)));
+            user.id(),
+            agent.id(),
+            conversationId,
+            CheckTrigger.SCHEDULED,
+            false,
+            BASE.minus(Duration.ofMinutes(6)));
         check.succeed(CheckOutcome.FINDINGS, 1, 0, null, 0, 0, 0, 0, 0, BASE.minus(Duration.ofMinutes(5)));
         return checks.save(check).id();
     }

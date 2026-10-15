@@ -30,6 +30,7 @@ public final class FollowUpDueAt {
 
     private static final LocalTime END_OF_DAY = LocalTime.of(23, 59);
 
+
     /**
      * 사람이 쓰는 API 의 기한이다. {@code 2026-10-05T09:00:00Z} 나 {@code 2026-10-05T18:00:00+09:00} 처럼 시간대가 붙은 시각만
      * 읽는다.
@@ -48,6 +49,7 @@ public final class FollowUpDueAt {
         }
         return parsed;
     }
+
 
     /**
      * 제안 도구의 기한이다. 날짜만이면 그날 23시 59분, 시간대가 없으면 {@code Asia/Seoul} 이다.
@@ -79,6 +81,7 @@ public final class FollowUpDueAt {
         }
         return parsed == null || !inYearRange(parsed) ? Optional.empty() : Optional.of(parsed);
     }
+
 
     private static boolean inYearRange(Instant instant) {
         int year = instant.atZone(ZoneOffset.UTC).getYear();

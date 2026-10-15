@@ -14,8 +14,10 @@ public enum GrantPeriod {
     TODAY,
     DAYS_30;
 
+
     private static final Duration ONE_HOUR = Duration.ofHours(1);
     private static final Duration THIRTY_DAYS = Duration.ofDays(30);
+
 
     /**
      * {@code now} 에 준 허락이 끝나는 시각이다.

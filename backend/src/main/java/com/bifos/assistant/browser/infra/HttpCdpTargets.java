@@ -33,8 +33,8 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
     private static final int OK = 200;
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    private final HttpClient client =
-            HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+    private final HttpClient client = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
+
 
     @Override
     public List<CdpTarget> list(URI cdp) {
@@ -51,18 +51,20 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
         return targets;
     }
 
+
     @Override
     public CdpTarget create(URI cdp, String url) {
         // Chrome 은 물음표 뒤를 풀어서 주소로 읽는다. 더하기는 풀지 않으므로 빈칸을 %20 으로 둔다
         String query = URLEncoder.encode(url, StandardCharsets.UTF_8).replace("+", "%20");
         JsonNode body = call(
-                HttpRequest.newBuilder(endpoint(cdp, "/json/new?" + query)).PUT(HttpRequest.BodyPublishers.noBody()),
-                "create");
+            HttpRequest.newBuilder(endpoint(cdp, "/json/new?" + query)).PUT(HttpRequest.BodyPublishers.noBody()),
+            "create");
         if (!TARGET_ID.matcher(body.path("id").asString("")).matches()) {
             throw new IllegalStateException("cdp create returned no target id");
         }
         return target(body);
     }
+
 
     @Override
     public void activate(URI cdp, String id) {
@@ -70,10 +72,12 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
         send(HttpRequest.newBuilder(endpoint(cdp, "/json/activate/" + id)).GET(), "activate");
     }
 
+
     @Override
     public void close() {
         client.shutdownNow();
     }
+
 
     /** 대상 번호가 영문자와 숫자가 아니면 거절한다. */
     static void requireTargetId(String id) {
@@ -81,6 +85,7 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
             throw new IllegalArgumentException("cdp target id is not valid");
         }
     }
+
 
     private JsonNode call(HttpRequest.Builder request, String operation) {
         String body = send(request, operation);
@@ -91,14 +96,15 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
         }
     }
 
+
     private String send(HttpRequest.Builder request, String operation) {
         HttpResponse<String> response;
         try {
             response = client.send(
-                    request.timeout(TIMEOUT)
-                            .header("Accept", "application/json")
-                            .build(),
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                request.timeout(TIMEOUT)
+                    .header("Accept", "application/json")
+                    .build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (IOException ex) {
             throw new IllegalStateException("cdp " + operation + " failed", ex);
         } catch (InterruptedException ex) {
@@ -111,12 +117,14 @@ public class HttpCdpTargets implements CdpTargets, AutoCloseable {
         return response.body();
     }
 
+
     private static CdpTarget target(JsonNode node) {
         return new CdpTarget(
-                node.path("id").asString(""),
-                node.path("title").asString(""),
-                node.path("url").asString(""));
+            node.path("id").asString(""),
+            node.path("title").asString(""),
+            node.path("url").asString(""));
     }
+
 
     private static URI endpoint(URI cdp, String path) {
         if (cdp == null || !"http".equals(cdp.getScheme()) || cdp.getHost() == null) {

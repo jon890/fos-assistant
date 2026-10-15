@@ -33,7 +33,8 @@ class McpToolCatalogTest {
         when(observations.recordDefinition()).thenReturn(record);
         when(remember.definition()).thenReturn(memory);
         when(properties.current()).thenReturn(settings(20), settings(40));
-        var catalog = new McpToolCatalog(properties, remember, observations, drafts, snapshots);
+        var catalog = new McpToolCatalog(properties, remember, observations, drafts, snapshots,
+            new McpFinancialLimitTools(mock(FinancialLimitRequests.class)));
 
         var first = catalog.tools();
         assertThat(first).extracting(tool -> tool.get("name"))
@@ -41,7 +42,7 @@ class McpToolCatalogTest {
             .containsExactly("memory_read", "artifact_write", "agent_list", "agent_delegate", "agent_status",
                 "agent_stop", "follow_up_propose", McpMediaObservationTools.LIST, McpMediaObservationTools.RECORD,
                 McpContentDraftTools.WRITE, McpContentDraftTools.READ, McpContentDraftSnapshots.PREVIEW, McpContentDraftSnapshots.SAVE,
-                "memory_remember", "memory_search");
+                McpFinancialLimitTools.READ, McpFinancialLimitTools.CHANGE, "memory_remember", "memory_search");
         assertThat(first).contains(list, record, memory);
         assertThat(description(first))
             .contains("결과는 끝나면 자동으로 전달되므로 기다리려고 반복해서 부르지 않는다. 사용자가 진행 상황을 물을 때 한 번 부른다.")

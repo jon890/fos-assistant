@@ -12,20 +12,23 @@ public record ContextBundle(List<ContextItem> items) {
 
     private static final ContextBundle EMPTY = new ContextBundle(List.of());
 
+
     public ContextBundle {
         items = items == null ? List.of() : List.copyOf(items);
     }
+
 
     /** 항목이 하나도 없는 묶음이다. */
     public static ContextBundle empty() {
         return EMPTY;
     }
 
+
     /** 제목과 본문이 로그에 남지 않게 항목 수와 각 항목의 {@code source:ref} 만 낸다. */
     @Override
     public String toString() {
         return items.stream()
-                .map(item -> item.source() + ":" + item.ref())
-                .collect(Collectors.joining(", ", "ContextBundle[size=" + items.size() + ", items=[", "]]"));
+            .map(item -> item.source() + ":" + item.ref())
+            .collect(Collectors.joining(", ", "ContextBundle[size=" + items.size() + ", items=[", "]]"));
     }
 }

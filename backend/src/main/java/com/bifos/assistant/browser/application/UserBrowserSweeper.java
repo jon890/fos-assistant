@@ -49,18 +49,21 @@ public class UserBrowserSweeper {
     private final UserAccessPolicy access;
     private final Clock clock;
 
+
     @Scheduled(
-            fixedDelayString = "${assistant.browser.sweep-interval}",
-            initialDelayString = "${assistant.browser.sweep-interval}")
+        fixedDelayString = "${assistant.browser.sweep-interval}",
+        initialDelayString = "${assistant.browser.sweep-interval}")
     public void runScheduled() {
         sweep();
     }
+
 
     /** 재기동하면 {@code STARTING} 과 {@code STOPPING} 을 실제 컨테이너를 보고 정한다. */
     @EventListener(ApplicationReadyEvent.class)
     public void onReady() {
         sweep();
     }
+
 
     /** 자동 중지와 꺼진 사용자의 브라우저 멈춤, 상태 맞추기를 한 번 돈다. 예외는 로그만 남겨 기동과 다음 점검을 막지 않는다. */
     public void sweep() {
@@ -76,6 +79,7 @@ public class UserBrowserSweeper {
             log.warn("user browser sweep failed error={}", name(ex));
         }
     }
+
 
     /**
      * 사용자를 끄면 그 사용자의 브라우저를 멈춘다. 프로필은 남긴다(ADR 의 「삭제」).
@@ -98,12 +102,13 @@ public class UserBrowserSweeper {
         }
         try {
             service.get(event.userId())
-                    .filter(browser -> browser.status() != UserBrowserStatus.STOPPED)
-                    .ifPresent(browser -> service.stopById(browser.id()));
+                .filter(browser -> browser.status() != UserBrowserStatus.STOPPED)
+                .ifPresent(browser -> service.stopById(browser.id()));
         } catch (RuntimeException ex) {
             log.warn("user browser stop on access removal failed userId={} error={}", event.userId(), name(ex));
         }
     }
+
 
     /** 유휴 시간이 지났고 화면도 중계 연결도 없는 {@code RUNNING} 을 멈춘다. 멈추기 직전에 줄을 다시 읽어 아직 유휴인지 본다. */
     void stopIdle() {
@@ -122,14 +127,14 @@ public class UserBrowserSweeper {
         }
     }
 
+
     /**
      * 허용 목록에서 꺼진 사용자의 {@code RUNNING} 과 {@code FAILED} 를 멈춘다. 사용자 끄기 때 멈추지 못한 브라우저를 여기서 다시 본다.
      *
      * <p>{@code STARTING} 과 {@code STOPPING} 은 건너뛴다. 켜기가 끝나면 다음 점검이 멈추고, 끝나지 못하면 상태 맞추기가 정한다.
      */
     void stopRevoked() {
-        for (UserBrowser browser :
-                browsers.findByStatusIn(List.of(UserBrowserStatus.RUNNING, UserBrowserStatus.FAILED))) {
+        for (UserBrowser browser : browsers.findByStatusIn(List.of(UserBrowserStatus.RUNNING, UserBrowserStatus.FAILED))) {
             try {
                 if (!access.allowed(browser.userId())) {
                     service.stopById(browser.id());
@@ -140,6 +145,7 @@ public class UserBrowserSweeper {
             }
         }
     }
+
 
     /** 끄다 실패해 컨테이너가 남은 {@code FAILED} 를 다시 끈다. 남은 컨테이너가 동시 수와 메모리를 쥐고 있지 않게 한다. */
     void retryFailedStops() {
@@ -153,6 +159,7 @@ public class UserBrowserSweeper {
         }
     }
 
+
     /** 실제 컨테이너와 표를 견준다. 목록을 먼저 읽고 줄을 읽어, 목록 뒤에 켜진 줄을 사라진 것으로 보지 않는다. */
     void reconcile() {
         Instant listedAt = clock.instant();
@@ -164,7 +171,7 @@ public class UserBrowserSweeper {
             return;
         }
         Map<String, UserBrowser> byKey = browsers.findAllByOrderByIdAsc().stream()
-                .collect(Collectors.toMap(UserBrowser::profileKey, Function.identity()));
+            .collect(Collectors.toMap(UserBrowser::profileKey, Function.identity()));
         for (UserBrowser browser : byKey.values()) {
             reconcileRow(browser, containers, listedAt);
         }
@@ -175,17 +182,17 @@ public class UserBrowserSweeper {
         }
     }
 
+
     private void reconcileRow(UserBrowser browser, List<RuntimeContainer> containers, Instant listedAt) {
         try {
             List<RuntimeContainer> own = containers.stream()
-                    .filter(container -> browser.profileKey().equals(container.profileKey()))
-                    .toList();
+                .filter(container -> browser.profileKey().equals(container.profileKey()))
+                .toList();
             boolean changedAfterListing = !browser.updatedAt().isBefore(listedAt);
             switch (browser.status()) {
                 case RUNNING -> {
                     boolean alive = own.stream()
-                            .anyMatch(container ->
-                                    container.running() && container.id().equals(browser.containerId()));
+                        .anyMatch(container -> container.running() && container.id().equals(browser.containerId()));
                     if (!alive && !changedAfterListing) {
                         own.forEach(container -> runtime.remove(container.id()));
                         reset(browser, "container gone");
@@ -206,6 +213,7 @@ public class UserBrowserSweeper {
         }
     }
 
+
     private void reset(UserBrowser browser, String reason) {
         screens.close(browser.id());
         browser.resetStopped(clock.instant());
@@ -216,6 +224,7 @@ public class UserBrowserSweeper {
             log.debug("user browser reconcile skipped id={}: changed concurrently", browser.id());
         }
     }
+
 
     /** 줄이 없거나, 멈춘 줄이거나, 켜진 줄과 실패한 줄이 가리키지 않는 컨테이너다. 전이 중인 줄의 컨테이너는 두지 않는다. */
     private static boolean orphan(RuntimeContainer container, Optional<UserBrowser> row) {
@@ -230,6 +239,7 @@ public class UserBrowserSweeper {
         };
     }
 
+
     private void removeQuietly(String containerId) {
         try {
             runtime.remove(containerId);
@@ -238,6 +248,7 @@ public class UserBrowserSweeper {
             log.warn("orphan browser container removal failed error={}", name(ex));
         }
     }
+
 
     private static String name(RuntimeException ex) {
         return ex.getClass().getSimpleName();

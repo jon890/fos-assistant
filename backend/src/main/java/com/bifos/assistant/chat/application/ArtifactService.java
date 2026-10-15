@@ -41,6 +41,7 @@ public class ArtifactService {
     private final ChatArtifactRepository artifacts;
     private final Clock clock;
 
+
     /**
      * 실행 입력 맨 앞에 붙일 단락들이다. 결과물 폴더 단락 뒤에 스킬 관리 단락을 둔다. 끝에 빈 줄 하나를 둔다.
      *
@@ -49,19 +50,20 @@ public class ArtifactService {
      */
     public String agentPreamble(Conversation conversation) {
         return "[결과물 폴더]\n"
-                + store.agentFolder(conversation.id()) + "\n"
-                + "대화 식별자: " + conversation.publicId() + "\n"
-                // 조건 없이 「저장한다」 만 적으면 싼 모델이 요청과 상관없이 파일을 만든다(2026-09-29 gpt-6-luna 에서 확인).
-                + "이 폴더는 사용자가 HTML 페이지나 이미지 같은 파일을 만들어 달라고 할 때만 쓴다. 그런 요청이 없으면 파일을 만들지 않고 답을 글로만 한다.\n"
-                + "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
-                + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
-                + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
-                + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
-                // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
-                + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
-                + "\n"
-                + SkillAgentNotice.PARAGRAPH;
+            + store.agentFolder(conversation.id()) + "\n"
+            + "대화 식별자: " + conversation.publicId() + "\n"
+            // 조건 없이 「저장한다」 만 적으면 싼 모델이 요청과 상관없이 파일을 만든다(2026-09-29 gpt-6-luna 에서 확인).
+            + "이 폴더는 사용자가 HTML 페이지나 이미지 같은 파일을 만들어 달라고 할 때만 쓴다. 그런 요청이 없으면 파일을 만들지 않고 답을 글로만 한다.\n"
+            + "artifact_write 도구가 있으면 그것으로 저장한다. conversation_id 에 이 대화 식별자를 넣고 path 는 상대 경로로 쓴다.\n"
+            + "artifact_write 도구가 없고 파일 도구가 있으면 위 폴더에 결과물 파일을 직접 쓴다.\n"
+            + "artifact_write 에서는 HTML 과 CSS 는 content, 이미지는 source_url 을 쓴다. 둘 중 하나만 넣는다. 파일 하나는 5MB 까지다.\n"
+            + "HTML 이 사진을 부를 때는 이 폴더 안의 상대 경로를 쓴다.\n"
+            // 위에 폴더 경로가 적혀 있어 모델이 그것을 답에 옮긴다(2026-09-29 운영에서 확인). 결과물은 답 아래에 자동으로 붙는다.
+            + "이 폴더 경로와 파일 경로를 답에 쓰지 않는다. 만든 결과물은 답 아래에 자동으로 붙는다.\n"
+            + "\n"
+            + SkillAgentNotice.PARAGRAPH;
     }
+
 
     /**
      * turn 이 시작한 뒤 바뀐 HTML 을 그 turn 의 답 메시지에 묶는다.
@@ -81,7 +83,7 @@ public class ArtifactService {
             found = store.changedHtmlSince(conversationId, turnStartedAt);
         } catch (RuntimeException ex) {
             log.warn(
-                    "could not scan artifacts of a turn conversationId={} messageId={}", conversationId, messageId, ex);
+                "could not scan artifacts of a turn conversationId={} messageId={}", conversationId, messageId, ex);
             return;
         }
         if (found.isEmpty()) {
@@ -90,8 +92,8 @@ public class ArtifactService {
         Set<String> already;
         try {
             already = artifacts.findByMessageId(messageId).stream()
-                    .map(ChatArtifact::path)
-                    .collect(Collectors.toSet());
+                .map(ChatArtifact::path)
+                .collect(Collectors.toSet());
         } catch (RuntimeException ex) {
             log.warn("could not read artifacts of a message messageId={}", messageId, ex);
             return;
@@ -102,13 +104,14 @@ public class ArtifactService {
             }
             try {
                 artifacts.save(
-                        ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize(), clock.instant()));
+                    ChatArtifact.of(conversationId, messageId, file.path(), file.byteSize(), clock.instant()));
             } catch (RuntimeException ex) {
                 // 한 파일이 실패해도 나머지는 묶는다. 경로가 칸 길이를 넘는 것도 여기로 온다.
                 log.warn("could not record an artifact conversationId={} messageId={}", conversationId, messageId, ex);
             }
         }
     }
+
 
     /**
      * 대화 폴더 안의 파일 하나를 열지 않고 판정한다.
@@ -123,9 +126,9 @@ public class ArtifactService {
      */
     public ArtifactFile find(Long conversationId, String relativePath) {
         Path file = store.resolveInside(conversationId, relativePath)
-                .orElseThrow(() -> missing(conversationId, relativePath));
+            .orElseThrow(() -> missing(conversationId, relativePath));
         String contentType = ArtifactStore.contentTypeOf(file.getFileName().toString())
-                .orElseThrow(() -> missing(conversationId, relativePath));
+            .orElseThrow(() -> missing(conversationId, relativePath));
         try {
             long size = Files.size(file);
             Instant lastModified = Files.getLastModifiedTime(file).toInstant();
@@ -137,6 +140,7 @@ public class ArtifactService {
             throw new UncheckedIOException("could not read an artifact of conversation " + conversationId, ex);
         }
     }
+
 
     /** {@link #find} 가 판정한 파일의 본문을 연다. 받은 쪽이 스트림을 닫는다. */
     public InputStream open(ArtifactFile file) {
@@ -150,18 +154,20 @@ public class ArtifactService {
         }
     }
 
+
     /** 답 메시지마다 묶인 결과물을 한 번에 읽는다. 지워진 것도 담아 지난 대화에 자리를 남긴다. */
     public Map<Long, List<ChatArtifact>> byMessage(Collection<Long> messageIds) {
         if (messageIds == null || messageIds.isEmpty()) {
             return Map.of();
         }
         return artifacts.findByMessageIdInOrderByIdAsc(messageIds).stream()
-                .collect(Collectors.groupingBy(ChatArtifact::messageId));
+            .collect(Collectors.groupingBy(ChatArtifact::messageId));
     }
+
 
     private ApiException missing(Long conversationId, String relativePath) {
         if (relativePath != null
-                && artifacts.existsByConversationIdAndPathAndDeletedAtIsNotNull(conversationId, relativePath)) {
+            && artifacts.existsByConversationIdAndPathAndDeletedAtIsNotNull(conversationId, relativePath)) {
             return new ApiException(ErrorCode.ARTIFACT_GONE, "this file is no longer kept");
         }
         return new ApiException(ErrorCode.ARTIFACT_NOT_FOUND, "this file does not exist");

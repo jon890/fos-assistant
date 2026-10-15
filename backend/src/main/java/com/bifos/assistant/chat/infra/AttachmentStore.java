@@ -35,31 +35,36 @@ public class AttachmentStore {
 
     /** 받는 형식과 그 확장자. 이 밖의 형식은 받지 않는다. */
     private static final Map<String, String> EXTENSIONS = Map.of(
-            "image/jpeg", "jpg",
-            "image/png", "png",
-            "image/gif", "gif",
-            "image/webp", "webp");
+        "image/jpeg", "jpg",
+        "image/png", "png",
+        "image/gif", "gif",
+        "image/webp", "webp");
 
     private final Path root;
+
 
     public AttachmentStore(AttachmentProperties properties) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
     }
+
 
     /** 받는 형식이면 그 확장자를, 아니면 빈 값을 돌려준다. */
     public static Optional<String> extensionFor(String contentType) {
         return Optional.ofNullable(contentType).map(EXTENSIONS::get);
     }
 
+
     /** 디스크에 둘 이름이다. */
     public static String storedName(Long attachmentId, String extension) {
         return attachmentId + "." + extension;
     }
 
+
     /** 원본 옆에 둘 줄인 사본의 이름이다. */
     public static String smallName(Long attachmentId) {
         return attachmentId + ".small.jpg";
     }
+
 
     /** 실행 주인 {@code u<사용자 번호>} 의 디렉터리 키다. Hermes 를 부르기 전에 만드는 디렉터리와 같은 규칙을 쓴다. */
     public static String userDirectoryKey(Long userId) {
@@ -67,9 +72,11 @@ public class AttachmentStore {
         return SandboxAttachmentDirectory.key("u" + userId);
     }
 
+
     public synchronized void save(ChatAttachment attachment, InputStream body) {
         saveNewFile(privatePath(attachment), body);
     }
+
 
     private static void saveNewFile(Path target, InputStream body) {
         try {
@@ -83,6 +90,7 @@ public class AttachmentStore {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "could not store the attachment", ex);
         }
     }
+
 
     /**
      * 파일을 연다. 행은 보이는데 파일이 없으면 지워진 첨부로 알린다.
@@ -98,6 +106,7 @@ public class AttachmentStore {
             throw new UncheckedIOException("could not open attachment " + attachment.id(), ex);
         }
     }
+
 
     /**
      * 줄인 사본을 원본 옆에 쓴다. 원본이 없거나 사본이 이미 있으면 아무것도 쓰지 않는다.
@@ -123,10 +132,12 @@ public class AttachmentStore {
         }
     }
 
+
     /** 줄인 사본이 있는지 본다. */
     public synchronized boolean hasSmall(ChatAttachment attachment) {
         return Files.isRegularFile(smallPath(attachment), LinkOption.NOFOLLOW_LINKS);
     }
+
 
     /** 줄인 사본을 읽는다. 없으면 지워진 첨부로 알린다. */
     public synchronized byte[] readSmall(ChatAttachment attachment) {
@@ -138,6 +149,7 @@ public class AttachmentStore {
             throw new UncheckedIOException("could not read the small copy of attachment " + attachment.id(), ex);
         }
     }
+
 
     /** 원본과 줄인 사본, 쓰다 남은 임시 파일을 지운다. 이미 없으면 그대로 끝난다. */
     public synchronized void delete(ChatAttachment attachment) {
@@ -154,20 +166,24 @@ public class AttachmentStore {
         }
     }
 
+
     private Path privatePath(ChatAttachment attachment) {
         return checkedPath(root.resolve("users")
-                .resolve(userDirectoryKey(attachment.uploadedByUserId()))
-                .resolve(conversationDirectory(attachment))
-                .resolve(checkedStoredName(attachment)));
+            .resolve(userDirectoryKey(attachment.uploadedByUserId()))
+            .resolve(conversationDirectory(attachment))
+            .resolve(checkedStoredName(attachment)));
     }
+
 
     private Path smallPath(ChatAttachment attachment) {
         return checkedPath(privatePath(attachment).resolveSibling(smallName(attachment.id())));
     }
 
+
     private Path temporarySmallPath(ChatAttachment attachment) {
         return checkedPath(privatePath(attachment).resolveSibling(smallName(attachment.id()) + ".tmp"));
     }
+
 
     private Path checkedPath(Path path) {
         Path current = root;
@@ -183,15 +199,17 @@ public class AttachmentStore {
         return path;
     }
 
+
     private static String conversationDirectory(ChatAttachment attachment) {
         requirePositive(attachment.conversationId());
         return attachment.conversationId().toString();
     }
 
+
     private static String checkedStoredName(ChatAttachment attachment) {
         requirePositive(attachment.id());
         String extension = extensionFor(attachment.contentType())
-                .orElseThrow(() -> new IllegalArgumentException("unsupported attachment type"));
+            .orElseThrow(() -> new IllegalArgumentException("unsupported attachment type"));
         String expected = storedName(attachment.id(), extension);
         if (!expected.equals(attachment.storedName())) {
             throw new IllegalArgumentException("unexpected stored attachment name");
@@ -199,11 +217,13 @@ public class AttachmentStore {
         return expected;
     }
 
+
     private static void requirePositive(Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("attachment identifiers must be positive");
         }
     }
+
 
     private static void deleteQuietly(Path target) {
         try {

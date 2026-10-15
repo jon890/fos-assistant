@@ -9,6 +9,7 @@ public record CheckReadiness(List<CheckBlocker> blockers) {
         blockers = List.copyOf(blockers);
     }
 
+
     public boolean available() {
         return blockers.isEmpty();
     }

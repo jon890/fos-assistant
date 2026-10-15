@@ -25,9 +25,11 @@ public class ChatEventStreams {
 
     private final Duration heartbeat;
 
+
     public ChatEventStreams(@Value("${assistant.chat.stream-heartbeat:20s}") Duration heartbeat) {
         this.heartbeat = heartbeat;
     }
+
 
     /** {@code work} 를 가상 스레드에서 돌리며 그것이 내는 사건을 보내고, 끝나면 스트림을 닫는다. */
     public SseEmitter open(Consumer<Consumer<ChatEvent>> work) {
@@ -49,6 +51,7 @@ public class ChatEventStreams {
         return emitter;
     }
 
+
     /**
      * 끝나지 않는 스트림을 열고 {@code subscribe} 가 넘기는 사건을 보낸다.
      *
@@ -69,18 +72,18 @@ public class ChatEventStreams {
             }
         });
         Thread heartbeatThread = Thread.ofVirtual()
-                .name("chat-follow-heartbeat-")
-                .start(() -> {
-                    try {
-                        do {
-                            Thread.sleep(heartbeat);
-                        } while (channel.ping());
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        unsubscribe.run();
-                    }
-                });
+            .name("chat-follow-heartbeat-")
+            .start(() -> {
+                try {
+                    do {
+                        Thread.sleep(heartbeat);
+                    } while (channel.ping());
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    unsubscribe.run();
+                }
+            });
         Runnable close = () -> {
             channel.close();
             unsubscribe.run();
@@ -91,6 +94,7 @@ public class ChatEventStreams {
         emitter.onError(error -> close.run());
         return emitter;
     }
+
 
     private void beat(Thread worker, Channel channel) {
         try {
@@ -103,6 +107,7 @@ public class ChatEventStreams {
             Thread.currentThread().interrupt();
         }
     }
+
 
     /**
      * 사건과 주석 줄이 한 연결에 겹쳐 쓰이지 않게 한 번에 하나만 보낸다.
@@ -117,21 +122,26 @@ public class ChatEventStreams {
         private final ReentrantLock lock = new ReentrantLock();
         private boolean open = true;
 
+
         private Channel(SseEmitter emitter) {
             this.emitter = emitter;
         }
+
 
         boolean send(ChatEvent event) {
             return write(SseEmitter.event().data(event, MediaType.APPLICATION_JSON));
         }
 
+
         boolean ping() {
             return comment("ping");
         }
 
+
         boolean comment(String text) {
             return write(SseEmitter.event().comment(text));
         }
+
 
         void complete() {
             lock.lock();
@@ -145,6 +155,7 @@ public class ChatEventStreams {
             }
         }
 
+
         /** 연결이 이미 끝났을 때 더 쓰지 않게만 한다. 끝내는 것은 연결 쪽이 이미 했다. */
         void close() {
             lock.lock();
@@ -154,6 +165,7 @@ public class ChatEventStreams {
                 lock.unlock();
             }
         }
+
 
         private boolean write(SseEmitter.SseEventBuilder event) {
             lock.lock();

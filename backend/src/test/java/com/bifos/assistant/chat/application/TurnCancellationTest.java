@@ -35,10 +35,12 @@ class TurnCancellationTest {
 
     private final TurnCancellation turns = turnsWithLimit(1000);
 
+
     @AfterEach
     void closeScheduler() {
         turns.shutdown();
     }
+
 
     @Test
     @DisplayName("연 핸들은 연 사용자와 대화를 갖고 중지한 뒤에야 중지 표시가 선다")
@@ -54,6 +56,7 @@ class TurnCancellationTest {
         assertThat(handle.cancelled().get()).isTrue();
     }
 
+
     @Test
     @DisplayName("중지 뒤에 붙은 스트림도 유예 시간이 지나면 닫는다")
     void closesStreamAttachedAfterStopOnceGracePeriodPasses() throws InterruptedException {
@@ -68,6 +71,7 @@ class TurnCancellationTest {
 
         assertThat(closed.await(1, TimeUnit.SECONDS)).isTrue();
     }
+
 
     @Test
     @DisplayName("Hermes 중지가 확정되기 전에는 유예 시간으로 스트림을 닫지 않는다")
@@ -85,6 +89,7 @@ class TurnCancellationTest {
             delayed.shutdown();
         }
     }
+
 
     @Test
     @DisplayName("알림 줄을 저장하는 동안에는 도는 turn 으로 보이고 실행 번호가 없다")
@@ -107,10 +112,11 @@ class TurnCancellationTest {
         assertThat(markInside.get().running()).isTrue();
         assertThat(markInside.get().executionId()).isNull();
         assertThat(openInside.get()).isInstanceOf(ApiException.class);
-        assertThat(((ApiException) openInside.get()).code()).isEqualTo(ErrorCode.CONVERSATION_BUSY);
+        assertThat(((ApiException)openInside.get()).code()).isEqualTo(ErrorCode.CONVERSATION_BUSY);
         assertThat(turns.markOf(2L)).isEqualTo(TurnMark.NONE);
         assertThat(closed.get()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("도는 turn 이 있으면 작업을 돌리지 않는다")
@@ -123,6 +129,7 @@ class TurnCancellationTest {
         assertThatThrownBy(() -> turns.open(1L, 2L)).isInstanceOf(ApiException.class);
     }
 
+
     @Test
     @DisplayName("한도가 1 이면 다른 대화를 열 때 USER_BUSY 이고 그 대화의 잠금이 남지 않는다")
     void rejectsSecondConversationWithUserBusyAndLeavesNoLock() {
@@ -134,8 +141,8 @@ class TurnCancellationTest {
             limited.open(1L, 2L);
 
             assertThatThrownBy(() -> limited.open(1L, 3L))
-                    .isInstanceOfSatisfying(
-                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
+                .isInstanceOfSatisfying(
+                    ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
 
             assertThat(limited.markOf(3L)).isEqualTo(TurnMark.NONE);
             assertThat(closed.get()).as("열지 못한 대화의 닫기 리스너").isZero();
@@ -144,6 +151,7 @@ class TurnCancellationTest {
             limited.shutdown();
         }
     }
+
 
     @Test
     @DisplayName("같은 대화를 두 스레드가 함께 열면 하나만 열리고 자리는 하나만 쓰인다")
@@ -189,6 +197,7 @@ class TurnCancellationTest {
         }
     }
 
+
     @Test
     @DisplayName("같은 대화에 이미 turn 이 있으면 사용자 자리가 없어도 CONVERSATION_BUSY 가 먼저 나간다")
     void reportsConversationBusyBeforeUserBusy() {
@@ -198,13 +207,14 @@ class TurnCancellationTest {
             limited.open(1L, 2L);
 
             assertThatThrownBy(() -> limited.open(1L, 2L))
-                    .isInstanceOfSatisfying(
-                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+                .isInstanceOfSatisfying(
+                    ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
             assertThat(limiter.used(1L)).isEqualTo(1);
         } finally {
             limited.shutdown();
         }
     }
+
 
     @Test
     @DisplayName("자리를 얻는 사이 같은 대화를 다른 요청이 열어 자리가 없으면 USER_BUSY 가 아니라 CONVERSATION_BUSY 다")
@@ -213,29 +223,28 @@ class TurnCancellationTest {
         AtomicBoolean rivalStarted = new AtomicBoolean();
         AtomicReference<TurnHandle> rival = new AtomicReference<>();
         // 대화 잠금을 보고 지나간 뒤 자리를 얻기 전에, 같은 대화를 연 다른 요청이 하나뿐인 자리와 잠금을 먼저 가져간다.
-        UserExecutionLimiter limiter =
-                new UserExecutionLimiter(
-                        LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1, 0, null)),
-                        mock(AgentExecutionRepository.class),
-                        mock(HermesRunsClient.class),
-                        LiveProperties.fixed(
-                                HermesProperties.class,
-                                new HermesProperties(null, null, null, null, null, null, null, null)),
-                        new VirtualThreadBackgroundTasks()) {
-                    @Override
-                    public TurnSlot acquireTurn(Long userId) {
-                        if (rivalStarted.compareAndSet(false, true)) {
-                            rival.set(turnsRef.get().open(userId, 2L));
-                        }
-                        return super.acquireTurn(userId);
-                    }
-                };
+        UserExecutionLimiter limiter = new UserExecutionLimiter(
+            LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1, 0, null)),
+            mock(AgentExecutionRepository.class),
+            mock(HermesRunsClient.class),
+            LiveProperties.fixed(
+                HermesProperties.class,
+                new HermesProperties(null, null, null, null, null, null, null, null)),
+            new VirtualThreadBackgroundTasks()) {
+            @Override
+            public TurnSlot acquireTurn(Long userId) {
+                if (rivalStarted.compareAndSet(false, true)) {
+                    rival.set(turnsRef.get().open(userId, 2L));
+                }
+                return super.acquireTurn(userId);
+            }
+        };
         TurnCancellation limited = turnsWith(limiter);
         turnsRef.set(limited);
         try {
             assertThatThrownBy(() -> limited.open(1L, 2L))
-                    .isInstanceOfSatisfying(
-                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
+                .isInstanceOfSatisfying(
+                    ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.CONVERSATION_BUSY));
 
             assertThat(rival.get()).as("먼저 연 다른 요청의 turn").isNotNull();
             assertThat(limiter.used(1L)).as("진 쪽이 남긴 자리 없이 쓴 자리").isEqualTo(1);
@@ -246,6 +255,7 @@ class TurnCancellationTest {
             limited.shutdown();
         }
     }
+
 
     @Test
     @DisplayName("닫으면 자리가 돌아와 다른 대화를 열고, 두 번 닫아도 한 번만 돌아온다")
@@ -263,12 +273,13 @@ class TurnCancellationTest {
             limited.open(1L, 4L);
             assertThat(limiter.used(1L)).isEqualTo(2);
             assertThatThrownBy(() -> limited.open(1L, 5L))
-                    .isInstanceOfSatisfying(
-                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
+                .isInstanceOfSatisfying(
+                    ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
         } finally {
             limited.shutdown();
         }
     }
+
 
     @Test
     @DisplayName("닫기 리스너가 불릴 때 자리는 이미 돌아와 있다")
@@ -291,6 +302,7 @@ class TurnCancellationTest {
         }
     }
 
+
     @Test
     @DisplayName("기동 정리가 여는 turn 은 한도를 넘겨도 열린다")
     void opensRecoveredTurnBeyondLimit() {
@@ -310,20 +322,23 @@ class TurnCancellationTest {
         }
     }
 
+
     private static UserExecutionLimiter limiter(int maxRunning) {
         return new UserExecutionLimiter(
-                LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(maxRunning, 0, null)),
-                mock(AgentExecutionRepository.class),
-                mock(HermesRunsClient.class),
-                LiveProperties.fixed(
-                        HermesProperties.class, new HermesProperties(null, null, null, null, null, null, null, null)),
-                new VirtualThreadBackgroundTasks());
+            LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(maxRunning, 0, null)),
+            mock(AgentExecutionRepository.class),
+            mock(HermesRunsClient.class),
+            LiveProperties.fixed(
+                HermesProperties.class, new HermesProperties(null, null, null, null, null, null, null, null)),
+            new VirtualThreadBackgroundTasks());
     }
+
 
     private static TurnCancellation turnsWith(UserExecutionLimiter limiter) {
         return new TurnCancellation(
-                mock(HermesRunsClient.class), Duration.ofMillis(10), limiter, new VirtualThreadBackgroundTasks());
+            mock(HermesRunsClient.class), Duration.ofMillis(10), limiter, new VirtualThreadBackgroundTasks());
     }
+
 
     private static TurnCancellation turnsWithLimit(int maxRunning) {
         return turnsWith(limiter(maxRunning));

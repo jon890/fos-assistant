@@ -21,15 +21,15 @@ import java.time.Instant;
  * @param lastSeenAt 그 묶음에서 가장 늦은 시작 시각
  */
 public record CostByAgent(
-        Long agentId,
-        String agentCode,
-        String agentName,
-        Long executions,
-        Long estimatedMicros,
-        Long actualMicros,
-        Long inputTokens,
-        Long outputTokens,
-        Double avgContextChars,
-        Instant firstSeenAt,
-        Instant lastSeenAt) {
+    Long agentId,
+    String agentCode,
+    String agentName,
+    Long executions,
+    Long estimatedMicros,
+    Long actualMicros,
+    Long inputTokens,
+    Long outputTokens,
+    Double avgContextChars,
+    Instant firstSeenAt,
+    Instant lastSeenAt) {
 }
