@@ -111,7 +111,8 @@ public class ModelOptionsService {
 
 
     /**
-     * 캐시를 건너뛰고 profile 의 목록을 다시 읽어 숨김을 적용해 돌려준다.
+     * 캐시를 건너뛰고 profile 의 목록을 다시 읽어 숨김을 적용해 돌려준다. Hermes 에는 {@code refresh=true} 를 실어
+     * 그쪽 디스크 캐시도 건너뛴다.
      *
      * <p>같은 profile 의 마지막 다시 읽기가 {@link #MIN_REFRESH_INTERVAL} 안이면 Hermes 를 부르지 않고 들고 있는
      * 목록을 돌려준다. 다시 읽다 실패하면 들고 있던 목록을 돌려준다. 이 실패는 판정을 막지 않고 목록 불일치의
@@ -124,7 +125,7 @@ public class ModelOptionsService {
         if (last == null || !now.isBefore(last.plus(MIN_REFRESH_INTERVAL))) {
             refreshedAt.put(profile, now);
             try {
-                HermesModelCatalog fresh = hermes.readCatalog(agent.apiBaseUrl(), profile);
+                HermesModelCatalog fresh = hermes.readCatalog(agent.apiBaseUrl(), profile, true);
                 cache.put(profile, new Cached(now.plus(ttl), fresh));
             } catch (ApiException ex) {
                 log.warn("모델 목록을 건너뛰고 다시 읽지 못해 들고 있던 목록을 쓴다 profile={} code={}", profile, ex.code());

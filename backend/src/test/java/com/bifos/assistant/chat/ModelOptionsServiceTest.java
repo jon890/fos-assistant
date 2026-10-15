@@ -6,6 +6,7 @@ import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNSUPPO
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -162,7 +163,8 @@ class ModelOptionsServiceTest {
     @DisplayName("다시 읽기는 들고 있는 시간이 남았어도 Hermes 를 불러 새 목록으로 바꾼다")
     void refreshBypassesCacheAndReplacesHeldCatalog() {
         when(hermes.readCatalog(anyString(), anyString()))
-            .thenReturn(catalog("openai-codex", provider("openai-codex", "substitute")))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "substitute")));
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "substitute", "real")));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
         service.optionsFor(dad, "dad");
@@ -171,7 +173,8 @@ class ModelOptionsServiceTest {
 
         assertThat(refreshed.providers().get(0).models()).containsExactly("substitute", "real");
         assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("substitute", "real");
-        verify(hermes, times(2)).readCatalog(anyString(), anyString());
+        verify(hermes, times(1)).readCatalog(anyString(), anyString(), eq(true));
+        verify(hermes, times(1)).readCatalog(anyString(), anyString());
     }
 
 
@@ -180,24 +183,26 @@ class ModelOptionsServiceTest {
     void refreshIsLimitedToOncePerInterval() {
         when(hermes.readCatalog(anyString(), anyString()))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
         service.optionsFor(dad, "dad");
 
         service.refreshedOptionsForAgent(1L, agent);
         clock.advance(ModelOptionsService.MIN_REFRESH_INTERVAL.minusSeconds(1));
         service.refreshedOptionsForAgent(1L, agent);
-        verify(hermes, times(2)).readCatalog(anyString(), anyString());
+        verify(hermes, times(1)).readCatalog(anyString(), anyString(), eq(true));
 
         clock.advance(Duration.ofSeconds(1));
         service.refreshedOptionsForAgent(1L, agent);
-        verify(hermes, times(3)).readCatalog(anyString(), anyString());
+        verify(hermes, times(2)).readCatalog(anyString(), anyString(), eq(true));
     }
 
 
     @Test
     @DisplayName("다시 읽기가 다른 profile 의 간격에 막히지 않는다")
     void refreshIntervalIsPerProfile() {
-        when(hermes.readCatalog(anyString(), anyString()))
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
             .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
         Agent dadAgent = agentRepository.findByCode("dad").orElseThrow();
         Agent kidAgent = agentRepository.findByCode("kid").orElseThrow();
@@ -205,8 +210,8 @@ class ModelOptionsServiceTest {
         service.refreshedOptionsForAgent(1L, dadAgent);
         service.refreshedOptionsForAgent(1L, kidAgent);
 
-        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile");
-        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile");
+        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile", true);
+        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile", true);
     }
 
 
@@ -214,7 +219,8 @@ class ModelOptionsServiceTest {
     @DisplayName("다시 읽다 Hermes 가 실패하면 들고 있던 목록을 돌려준다")
     void refreshFailureReturnsHeldCatalog() {
         when(hermes.readCatalog(anyString(), anyString()))
-            .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "old")));
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
             .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
         service.optionsFor(dad, "dad");

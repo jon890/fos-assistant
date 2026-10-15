@@ -221,7 +221,8 @@ class ModelVisibilityTest {
             .thenReturn(new HermesModelCatalog(
                 "provider-b",
                 "model-old",
-                List.of(new Provider("provider-b", "B", List.of("model-old"), Map.of()))))
+                List.of(new Provider("provider-b", "B", List.of("model-old"), Map.of()))));
+        when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile(), true))
             .thenReturn(new HermesModelCatalog(
                 "provider-b",
                 "model-old",
@@ -372,13 +373,14 @@ class ModelVisibilityTest {
 
     private ModelOptionsService optionsService(Agent agent) {
         HermesModelClient hermes = mock(HermesModelClient.class);
-        when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile()))
-            .thenReturn(new HermesModelCatalog(
-                "provider-b",
-                "model-old",
-                List.of(
-                    new Provider("provider-a", "A", List.of("model-a"), Map.of()),
-                    new Provider("provider-b", "B", List.of("model-old", "model-new"), Map.of()))));
+        HermesModelCatalog catalog = new HermesModelCatalog(
+            "provider-b",
+            "model-old",
+            List.of(
+                new Provider("provider-a", "A", List.of("model-a"), Map.of()),
+                new Provider("provider-b", "B", List.of("model-old", "model-new"), Map.of())));
+        when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(catalog);
+        when(hermes.readCatalog(agent.apiBaseUrl(), agent.hermesProfile(), true)).thenReturn(catalog);
         return new ModelOptionsService(
             mock(AgentService.class), hermes, visibility, Duration.ofMinutes(10), Clock.systemUTC());
     }
