@@ -15,7 +15,6 @@ function agent(code: string, overrides: Partial<AgentView> = {}): AgentView {
     editable: true,
     ownedByMe: true,
     connectorManaged: false,
-    runsTasks: true,
     ...overrides,
   };
 }

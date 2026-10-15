@@ -45,25 +45,6 @@ export function actualModelFor(input: string, requested: string): string {
 }
 
 /**
- * Chief 에게만 주는 지시에 들어 있는 말이다.
- *
- * <p>Control Plane 의 `ResearchAndBuildFlow` 가 만드는 지시와 같아야 한다. 어긋나면 흐름 검사가
- * 계약을 지키지 않는 답을 받아 실패한다.
- */
-export const CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
-
-/**
- * 흐름의 첫 단계가 돌려줄 답을 정한다.
- *
- * <p>Chief 의 지시에는 사용자가 보낸 글이 그대로 들어 있어, 그 글로 어떤 답을 줄지 고른다.
- */
-export function chiefOutputFor(input: string): string {
-  if (input.includes("흐름 계약 위반 검사")) return "JSON 이 아니라 그냥 문장이다";
-  if (input.includes("흐름 단독 검사")) return '{"research":"","build":""}';
-  return '{"research":"전기차 보조금을 조사한다","build":"비교 표를 만든다"}';
-}
-
-/**
  * Control Plane 이 모든 대화 실행에 붙이는 묻는 형식 안내의 첫 줄이다. `AskFormat.GUIDE` 와 같아야 한다.
  *
  * <p>대역은 받은 instructions 를 답에 되돌려 준다. 안내에는 `<ask>` 예시가 있어서 그대로 두면 모든 답에 카드가 그려진다.
@@ -205,9 +186,6 @@ export function specialOutputFor(input: string): string | null {
       "<option>수육</option>",
       "</ask>",
     ].join("\n");
-  }
-  if (input.includes(CHIEF_MARK)) {
-    return chiefOutputFor(input);
   }
   if (input === ARTIFACT_PROBE || input === ARTIFACT_SAME_NAME_PROBE) {
     return "초안을 만들었다.";

@@ -122,7 +122,7 @@ export function useConversationEvents({
         if (state.textState.text) callbacks.onDelta?.(state.textState.text);
       }
       setActivity((previous) => previous && applyChatEvent(previous, event));
-    } else if (["tool", "subagent", "step"].includes(event.type)) {
+    } else if (["tool", "subagent"].includes(event.type)) {
       setActivity((previous) => previous && applyChatEvent(previous, event));
     } else if (
       (event.type === "done" || event.type === "stopped") &&
@@ -289,7 +289,7 @@ export function useConversationEvents({
       liveExpandedRef.current = false;
       setExpandedOnDone(null);
       setStopRequested(false);
-      setFlowIsSlow(false);
+    setFlowIsSlow(false);
     }
     const current = autoTurn.current;
     if (current === null) {

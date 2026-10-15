@@ -160,7 +160,7 @@ test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({
 }) => {
   await hermes.holdNextRun();
   await page.goto("/");
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page
     .getByRole("textbox", { name: "메시지" })
     .fill("중지 패널 Esc 검사");

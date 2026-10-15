@@ -68,8 +68,8 @@ export const EVENTS_RECONNECT_MS = 5_000;
 /**
  * 대기 메시지 요청의 실패를 문구로 바꾼다.
  *
- * <p>대기 경로의 `CONVERSATION_BUSY` 는 답을 만드는 중이라는 뜻이 아니다. 흐름이 붙은 에이전트라 대기 메시지를
- * 받지 않는다는 뜻이라 이 경로에서만 문구를 바꾼다. 요청이 닿지 못했으면 문구가 비어 오므로 `fallback` 을 쓴다.
+ * <p>대기 경로의 `CONVERSATION_BUSY` 는 답을 만드는 중이라는 뜻이 아니다. 요청이 닿지 못했으면 문구가 비어 오므로
+ * `fallback` 을 쓴다.
  */
 export function describePendingFailure(
   failure: Extract<PendingResult<unknown>, { ok: false }>,

@@ -1,7 +1,6 @@
 import type { Page } from "../../web/node_modules/@playwright/test/index.js";
 import {
   expect,
-  FLOW_AGENT_CODE,
   PERSONA_AGENT_CODE,
   test,
 } from "./fixtures.ts";
@@ -333,20 +332,4 @@ test("skills 도구가 꺼진 에이전트에서 / 를 치면 켜진 스킬이 �
   await page.goto("/");
   await composer(page).fill("/");
   await expect(skillList(page)).toHaveText("이 에이전트에는 스킬이 없어요");
-});
-
-test("흐름이 붙은 에이전트에서는 스킬 목록을 읽지 않고 / 목록을 띄우지 않는다", async ({
-  page,
-}) => {
-  const skillReads: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes(`/api/agents/${FLOW_AGENT_CODE}/skills`))
-      skillReads.push(request.url());
-  });
-  await startWith(page, "흐름 비서");
-  await composer(page).fill("/");
-  // 사진 단추가 없어진 것으로 흐름 에이전트가 반영된 것을 확인한 뒤에 목록이 없는지 본다.
-  await expect(page.getByRole("button", { name: "사진 첨부" })).toHaveCount(0);
-  await expect(skillList(page)).toHaveCount(0);
-  expect(skillReads).toEqual([]);
 });

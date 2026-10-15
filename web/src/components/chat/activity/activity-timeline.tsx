@@ -70,9 +70,6 @@ export function ActivityTimeline({ items }: { items: ActivityItem[] }) {
             data-kind={item.kind}
             data-state={item.state}
             data-tool={item.kind === "tool" ? item.name : undefined}
-            data-step={
-              item.kind === "step" ? (item.pairKey ?? undefined) : undefined
-            }
             className="flex min-w-0 gap-2 text-sm text-foreground-soft"
           >
             <span

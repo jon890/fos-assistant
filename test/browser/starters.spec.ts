@@ -1,5 +1,5 @@
 import { FAKE_STARTER_PROMPTS } from "../e2e/fake-hermes.ts";
-import { CONVERSATION_URL, expect, FLOW_AGENT_CODE, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 
 const STARTERS_PATTERN = "**/api/agents/*/starters";
 
@@ -42,7 +42,7 @@ test("만드는 중이면 자리를 비워 두었다가 다시 읽어 칩을 채
 test("추천이 나타나거나 사라져도 입력창이 움직이지 않는다", async ({ page }) => {
   let browserRequests = 0;
   await page.route(STARTERS_PATTERN, async (route) => {
-    if (route.request().url().includes(`/agents/${FLOW_AGENT_CODE}/`)) {
+    if (route.request().url().includes(`/agents/${PERSONA_AGENT_CODE}/`)) {
       await route.fulfill({ json: startersBody("NONE", []) });
       return;
     }
@@ -67,7 +67,7 @@ test("추천이 나타나거나 사라져도 입력창이 움직이지 않는다
   expect(await composerTop(), "칩이 나타난 뒤 입력창 위치").toBeCloseTo(loadingTop, 0);
 
   // 추천이 없는 에이전트로 바꿔 칩이 사라져도 같은 자리다.
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await page.getByRole("radio", { name: "성격 비서" }).click();
   await expect(page.getByRole("list", { name: "추천 질문" })).toHaveCount(0);
   await expect(page.getByRole("status").filter({ hasText: "추천 질문을 읽는 중" })).toHaveCount(0);
   expect(await composerTop(), "칩이 사라진 뒤 입력창 위치").toBeCloseTo(loadingTop, 0);
@@ -99,8 +99,8 @@ test("에이전트를 바꾸면 늦게 온 이전 에이전트의 추천은 그�
     firstFulfilled = resolve;
   });
   await page.route(STARTERS_PATTERN, async (route) => {
-    if (route.request().url().includes(`/agents/${FLOW_AGENT_CODE}/`)) {
-      await route.fulfill({ json: startersBody("READY", ["흐름 추천이다"]) });
+    if (route.request().url().includes(`/agents/${PERSONA_AGENT_CODE}/`)) {
+      await route.fulfill({ json: startersBody("READY", ["성격 추천이다"]) });
       return;
     }
     await firstReleased;
@@ -110,15 +110,15 @@ test("에이전트를 바꾸면 늦게 온 이전 에이전트의 추천은 그�
   await page.goto("/");
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
 
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
-  await expect(page.getByRole("button", { name: "흐름 추천이다", exact: true })).toBeVisible();
+  await page.getByRole("radio", { name: "성격 비서" }).click();
+  await expect(page.getByRole("button", { name: "성격 추천이다", exact: true })).toBeVisible();
 
   releaseFirst();
   await firstDone;
   // 응답이 화면에 닿을 시간을 준 뒤에도 이전 에이전트의 추천이 없어야 한다.
   await page.waitForTimeout(500);
   await expect(page.getByRole("button", { name: "늦게 온 추천이다", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "흐름 추천이다", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "성격 추천이다", exact: true })).toBeVisible();
 });
 
 test("에이전트 상세에는 추천 질문 편집 절이 없다", async ({ page }) => {
