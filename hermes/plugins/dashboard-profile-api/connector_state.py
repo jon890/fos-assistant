@@ -10,6 +10,7 @@ import pathlib
 from .common import (
     BASE_ENV_KEYS,
     SKILL_NAME_RE,
+    _atomic_private_write,
     logger,
 )
 
@@ -55,6 +56,30 @@ POLICY_PLUGIN = "fos-ctx"
 
 
 SOUL_FILE = "SOUL.md"
+
+
+def _recoverable_server(current: dict, recorded: dict, desired: dict) -> bool:
+    """설정이 새 정의이고 소유 기록과 tools.exclude만 다를 때만 복구한다."""
+    return (current == desired
+            and {key: value for key, value in current.items() if key != "tools"}
+            == {key: value for key, value in recorded.items() if key != "tools"})
+
+
+def _restore_binding_files(written: list, originals: dict, targets: dict, shared) -> None:
+    """한 파일의 복원이 실패해도 나머지를 복원하며 외부 변경은 보존한다."""
+    for path in reversed(written):
+        try:
+            if (path.read_bytes() if path.exists() else None) != targets[path]:
+                continue
+            value = originals[path]
+            if value is None:
+                path.unlink(missing_ok=True)
+            else:
+                _atomic_private_write(path, value)
+                if shared(path):
+                    os.chmod(path, 0o644)
+        except Exception as error:
+            logger.warning("dashboard-profile-api: 바인딩 파일 복원 실패 exception=%s", type(error).__name__)
 
 
 def _connector_server(manifest: dict) -> dict:

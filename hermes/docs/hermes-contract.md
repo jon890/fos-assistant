@@ -2858,6 +2858,16 @@ Hermes 를 올리기 전에 새 판의 tag 로 `scripts/checks/check-hermes-cont
 새 사건이 있으면 `HermesRunEventStream.WIRE_EVENTS`와 버전별 공유 wire를 함께 갱신한다.
 실패한 항목을 plugin 에서 고치고, `HERMES_VERSION` 을 새 tag 로 바꾼 PR 의 CI 가 통과한 뒤 이미지를 올린다.
 
+#### 바인딩 설치의 파일 복원과 소유 기록 복구
+
+바인딩 설치는 `config.yaml` 다음에 `.fos-connectors.json`을 교체한다.
+각 파일은 원자적으로 교체하지만 파일 묶음은 원자적이지 않다.
+일반 예외에서는 교체 직후 실패한 파일을 포함해 이번 요청이 쓴 값만 역순으로 복원하며, 복원 하나가 실패해도 나머지를 계속 처리한다.
+외부에서 바꾼 값은 복원으로 덮어쓰지 않는다. 프로세스 강제 종료와 지속적인 디스크 오류까지 복원을 보장하지 않는다.
+재설치는 기존 소유 기록이 있고 현재 서버 설정이 이번 요청의 새 정의와 정확히 같으며 기록과의 차이가 `tools.exclude`뿐이면 기록을 복구한다.
+이 복구는 `restart_required: true`로 답한다. 설정 파일이 이미 새 정의여도 살아 있는 연결은 옛 정의일 수 있다.
+기록이 없거나 다른 서버 설정이 달라진 경우는 409로 남긴다.
+
 #### MCP 설정 맞추기와 스킬 색인 캐시 키
 
 바인딩 설치가 재시작 없이 반영되는 것은 두 내부 동작에 기댄다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md)).
