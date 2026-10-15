@@ -34,7 +34,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.stubbing.Answer;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 /** 중복 후보 조회와 잠금 사이에 커밋된 사용자 수정을 H2와 MySQL에서 보존한다. */
 @BackendIntegrationTest
@@ -48,7 +47,7 @@ class MemoryCaptureConcurrencyTest {
     MemoryService service;
     @Autowired
     MemoryCaptureService captureService;
-    @MockitoSpyBean
+    @Autowired
     MemoryRepository memories;
     @Autowired
     MemoryRevisionRepository revisions;
