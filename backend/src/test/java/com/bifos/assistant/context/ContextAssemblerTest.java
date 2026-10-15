@@ -512,13 +512,15 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("Memory 항목마다 층의 규칙 이름과 층 안의 순위를 붙이고 빠진 항목도 순위를 받으며 지시문 글은 바뀌지 않는다")
+    @DisplayName("Memory 항목마다 층의 규칙 이름과 고른 순위를 붙이고 빠진 항목도 순위를 받으며 지시문 글은 바뀌지 않는다")
     void attachesSelectorAndRankPerSourceWithoutChangingText() {
         Memory tooLong = memories.create(ADMIN, MemoryScope.GROUP, "너무 긴 항목", "가".repeat(9_000), true);
         Memory group = memories.create(ADMIN, MemoryScope.GROUP, "그룹 회의", "주간 회의는 화요일 10시", true);
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "아침 습관", "아침에는 차를 마신다", true);
         Memory firstFact = memories.create(ADMIN, MemoryScope.USER, "장보기 목록", "우유와 달걀", false);
         Memory secondFact = memories.create(ADMIN, MemoryScope.USER, "운동", "저녁에 걷는다", false);
+        // 개인 사실 구역은 번호 순으로 싣지만 순위는 최근에 고친 순으로 고른 차례다. 나중에 고친 secondFact 가 1 위다
+        touch(firstFact, Instant.now().minusSeconds(60));
         Memory firstIndexed = memories.create(ADMIN, MemoryScope.USER, "긴 기록 하나", LONG_BODY, false);
         Memory secondIndexed = memories.create(ADMIN, MemoryScope.USER, "긴 기록 둘", LONG_BODY, false);
         Memory thirdIndexed = memories.create(ADMIN, MemoryScope.GROUP, "여행 계획", "가을에 바다", false);
@@ -531,8 +533,8 @@ class ContextAssemblerTest {
                 tuple("memory:" + tooLong.id(), ContextBodyMode.OMITTED, ContextSelection.ALWAYS_BY_ID, 1),
                 tuple("memory:" + group.id(), ContextBodyMode.INLINE, ContextSelection.ALWAYS_BY_ID, 2),
                 tuple("memory:" + personal.id(), ContextBodyMode.INLINE, ContextSelection.ALWAYS_BY_ID, 3),
-                tuple("memory:" + firstFact.id(), ContextBodyMode.INLINE, ContextSelection.FACTS_RECENT, 1),
-                tuple("memory:" + secondFact.id(), ContextBodyMode.INLINE, ContextSelection.FACTS_RECENT, 2),
+                tuple("memory:" + firstFact.id(), ContextBodyMode.INLINE, ContextSelection.FACTS_RECENT, 2),
+                tuple("memory:" + secondFact.id(), ContextBodyMode.INLINE, ContextSelection.FACTS_RECENT, 1),
                 tuple("memory:" + firstIndexed.id(), ContextBodyMode.TITLE_ONLY, ContextSelection.INDEX_BY_ID, 1),
                 tuple("memory:" + secondIndexed.id(), ContextBodyMode.TITLE_ONLY, ContextSelection.INDEX_BY_ID, 2),
                 tuple("memory:" + thirdIndexed.id(), ContextBodyMode.TITLE_ONLY, ContextSelection.INDEX_BY_ID, 3));

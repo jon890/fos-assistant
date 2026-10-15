@@ -12,7 +12,8 @@ package com.bifos.assistant.context;
  * </ul>
  *
  * @param selector 고른 규칙의 이름과 버전. 32자 이하다
- * @param rank 같은 실행의 같은 {@code source} 안에서 고른 순서. 1 부터 센다. 자리가 없어 빠진 항목도 받는다
+ * @param rank 같은 실행의 같은 {@code source} 안에서 고른 순서. 1 부터 센다. 자리가 없어 빠진 항목도 받는다. 개인 사실 구역은 싣는 차례(번호 순)가
+ * 아니라 고른 차례(최근에 고친 순)다
  * @param keywordScore 키워드 점수. 점수 없이 고르는 규칙은 null
  * @param semanticScore 의미 점수. 점수 없이 고르는 규칙은 null
  * @param score 합친 점수. 점수 없이 고르는 규칙은 null

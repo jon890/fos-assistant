@@ -181,7 +181,8 @@ public class ContextAssembler implements OmittedMemories {
         Map<ContextSource, Integer> ranks = new EnumMap<>(ContextSource.class);
         List<ContextItem> items = context.bundle().items().stream().map(item -> {
             String selector = SELECTORS.get(item.source());
-            if (selector == null) {
+            // 개인 사실 구역은 고른 차례와 실은 차례가 달라 담을 때 이미 순위를 붙였다
+            if (selector == null || item.selection() != null) {
                 return item;
             }
             int rank = ranks.merge(item.source(), 1, Integer::sum);
@@ -206,7 +207,10 @@ public class ContextAssembler implements OmittedMemories {
         }
         List<Memory> chosen = chooseFacts(indexed.stream().filter(this::factCandidate).toList(), budget, builder.isEmpty());
         Set<Long> placed = new HashSet<>();
+        Map<Long, Integer> chosenRanks = new HashMap<>();
+        chosen.forEach(memory -> chosenRanks.put(memory.id(), chosenRanks.size() + 1));
         chosen.stream().sorted(Comparator.comparing(Memory::id)).forEach(memory -> {
+            // 순위는 고른 차례(최근에 고친 순)다. 싣는 차례(번호 순)가 아니다
             ContextItem item = memoryItem(
                 memory,
                 ContextSource.MEMORY_FACTS,
@@ -214,7 +218,8 @@ public class ContextAssembler implements OmittedMemories {
                 List.of(),
                 memory.title(),
                 memory.content(),
-                memoryFreshness(memory, now));
+                memoryFreshness(memory, now))
+                    .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
             if (builder.appendIfFits(FACTS_HEADER, factLine(memory), item)) {
                 placed.add(memory.id());
             } else {
