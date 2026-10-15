@@ -10,9 +10,10 @@ import java.util.UUID;
  * @param messageId 저장한 답 메시지의 번호. 스트림이 마지막에 이 번호를 보낸다
  */
 public record ChatTurn(
-        Long conversationId,
-        UUID conversationPublicId,
-        Long executionId,
-        String assistantText,
-        Long messageId,
-        boolean cancelled) {}
+    Long conversationId,
+    UUID conversationPublicId,
+    Long executionId,
+    String assistantText,
+    Long messageId,
+    boolean cancelled) {
+}

@@ -61,6 +61,7 @@ public class ProactiveLoopCoordinator {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     @EventListener
     public void settled(ProactiveCheckSettled event) {
         ProactiveCheck check = checks.findById(event.checkId()).orElse(null);
@@ -84,6 +85,7 @@ public class ProactiveLoopCoordinator {
         evaluateAndDecide(event.user(), check.id(), run.id(), loop.provider());
     }
 
+
     /**
      * 시도 줄을 저장하지 못했다. 그 원천의 줄이 있으면 원천 유일 제약이고 이미 다른 처리가 이 살펴보기를 맡았다. 없으면 점검 대화나 살펴보기가
      * 지워진 것처럼 원천 중복이 아닌 저장 실패다. 어느 쪽이든 다시 부르지 않는다.
@@ -99,18 +101,20 @@ public class ProactiveLoopCoordinator {
             log.info("이미 이어진 살펴보기라 매일 루프를 건너뛴다 checkId={}", checkId);
         } else {
             log.warn(
-                    "매일 루프 시도 줄을 저장하지 못했다 checkId={} error={}",
-                    checkId,
-                    ex.getClass().getSimpleName());
+                "매일 루프 시도 줄을 저장하지 못했다 checkId={} error={}",
+                checkId,
+                ex.getClass().getSimpleName());
         }
     }
+
 
     /** 잠그기 전 읽기다. 동의하지 않은 사용자의 살펴보기마다 잠금을 잡지 않게 먼저 거른다. */
     private boolean consented(ProactiveCheck check) {
         return settings.findByUserIdAndAgentId(check.userId(), check.agentId())
-                .map(ProactiveLoopSetting::enabled)
-                .orElse(false);
+            .map(ProactiveLoopSetting::enabled)
+            .orElse(false);
     }
+
 
     /**
      * 그 사용자의 설정 줄을 모두 쓰기 잠금으로 잡고 시도 줄을 저장한다. 같은 사용자의 두 깨우기가 하루 상한을 함께 넘지 않게 같은 트랜잭션에서 센다.
@@ -120,9 +124,9 @@ public class ProactiveLoopCoordinator {
     private ProactiveLoopRun begin(ProactiveCheck check, int maxRunsPerDay) {
         Long userId = check.userId();
         ProactiveLoopSetting setting = settings.findByUserIdOrderByIdAsc(userId).stream()
-                .filter(each -> each.agentId().equals(check.agentId()))
-                .findFirst()
-                .orElse(null);
+            .filter(each -> each.agentId().equals(check.agentId()))
+            .findFirst()
+            .orElse(null);
         if (setting == null || !setting.enabled()) {
             return null;
         }
@@ -131,17 +135,17 @@ public class ProactiveLoopCoordinator {
         if (setting.snoozedAt(now)) {
             row = ProactiveLoopRun.skipped(userId, check.id(), LoopSkippedReason.SNOOZED, now);
         } else if (problems.findByCheckIdAndStatusOrderByIdAsc(check.id(), ProblemStatus.ACCEPTED)
-                .isEmpty()) {
+            .isEmpty()) {
             row = ProactiveLoopRun.skipped(userId, check.id(), LoopSkippedReason.NO_CANDIDATE, now);
         } else if (runs.countByUserIdAndStatusNotAndCreatedAtAfter(
-                        userId, LoopRunStatus.SKIPPED, now.minus(DAILY_WINDOW))
-                >= maxRunsPerDay) {
+            userId, LoopRunStatus.SKIPPED, now.minus(DAILY_WINDOW)) >= maxRunsPerDay) {
             row = ProactiveLoopRun.skipped(userId, check.id(), LoopSkippedReason.DAILY_LIMIT, now);
         } else {
             row = ProactiveLoopRun.running(userId, check.id(), now);
         }
         return runs.saveAndFlush(row);
     }
+
 
     /**
      * 트랜잭션 밖에서 평가와 판정을 부른다. 모델을 기다리는 동안 잠금을 쥐지 않는다. 시도를 {@code DECIDED} 로 적은 뒤에 보일 판정의
@@ -165,10 +169,10 @@ public class ProactiveLoopCoordinator {
         } catch (RuntimeException ex) {
             Long evaluated = evaluationId;
             log.warn(
-                    "매일 루프의 평가나 판정이 실패했다 checkId={} runId={} error={}",
-                    checkId,
-                    runId,
-                    ex.getClass().getSimpleName());
+                "매일 루프의 평가나 판정이 실패했다 checkId={} runId={} error={}",
+                checkId,
+                runId,
+                ex.getClass().getSimpleName());
             finish(runId, row -> row.failed(INTERNAL_ERROR, evaluated, clock.instant()));
             return;
         }
@@ -177,12 +181,13 @@ public class ProactiveLoopCoordinator {
                 surfacedProblems.surfaced(decision);
             } catch (RuntimeException ex) {
                 log.warn(
-                        "보인 판정의 판단 피드백을 남기지 못했다 decisionId={} error={}",
-                        decision.id(),
-                        ex.getClass().getSimpleName());
+                    "보인 판정의 판단 피드백을 남기지 못했다 decisionId={} error={}",
+                    decision.id(),
+                    ex.getClass().getSimpleName());
             }
         }
     }
+
 
     /** 시도 줄을 새 트랜잭션에서 다시 읽어 결과를 적는다. 적지 못해도 예외를 올리지 않는다. 남은 {@code RUNNING} 은 기동 복구가 닫는다. */
     private void finish(Long runId, Consumer<ProactiveLoopRun> change) {
@@ -190,9 +195,9 @@ public class ProactiveLoopCoordinator {
             transactions.executeWithoutResult(status -> runs.findById(runId).ifPresent(change));
         } catch (RuntimeException ex) {
             log.warn(
-                    "매일 루프 시도의 결과를 적지 못했다 runId={} error={}",
-                    runId,
-                    ex.getClass().getSimpleName());
+                "매일 루프 시도의 결과를 적지 못했다 runId={} error={}",
+                runId,
+                ex.getClass().getSimpleName());
         }
     }
 }

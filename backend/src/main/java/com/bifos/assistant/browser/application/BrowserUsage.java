@@ -16,6 +16,7 @@ public class BrowserUsage {
 
     private final Map<Long, Integer> open = new ConcurrentHashMap<>();
 
+
     /** 그 브라우저를 쓰기 시작한다. 쓰기를 마치면 돌려받은 핸들을 닫는다. */
     public BrowserUsageHandle open(Long userBrowserId) {
         open.merge(userBrowserId, 1, Integer::sum);
@@ -26,6 +27,7 @@ public class BrowserUsage {
             }
         };
     }
+
 
     /** 열린 핸들이 하나라도 있는가. */
     public boolean inUse(Long userBrowserId) {

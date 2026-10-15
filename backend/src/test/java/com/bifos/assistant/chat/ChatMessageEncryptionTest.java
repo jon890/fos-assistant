@@ -61,16 +61,19 @@ class ChatMessageEncryptionTest {
     private AppUser owner;
     private Conversation conversation;
 
+
     @BeforeEach
     void setUp() {
         owner = user();
         conversation = conversations.save(Conversation.startedBy(owner.id(), "월급 확인", null, NOW));
     }
 
+
     @AfterEach
     void tearDown() {
         dataKeys.forgetCachedKeys();
     }
+
 
     @Test
     @DisplayName("저장한 메시지는 데이터베이스에 암호문으로 남고 읽으면 평문이다")
@@ -78,11 +81,12 @@ class ChatMessageEncryptionTest {
         ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), owner.id(), QUESTION, NOW));
 
         Map<String, Object> row = rowOf(saved.id());
-        assertThat((String) row.get("CONTENT")).startsWith("v1.").doesNotContain("평문-표식");
+        assertThat((String)row.get("CONTENT")).startsWith("v1.").doesNotContain("평문-표식");
         assertThat(row.get("CONTENT_KEY_ID")).isNotNull();
         assertThat(saved.content()).isEqualTo(QUESTION);
         assertThat(contentsOf(conversation.id())).containsExactly(QUESTION);
     }
+
 
     @Test
     @DisplayName("저장하는 네 길 모두 처음 넣는 줄에는 빈 본문만 쓰고 평문을 쓰지 않는다")
@@ -94,19 +98,18 @@ class ChatMessageEncryptionTest {
             List<ChatMessage> batch = messages.saveAll(List.of(ChatMessage.fromSystem(conversation.id(), ANSWER, NOW)));
             assertThat(storedContentOf(batch.get(0).id())).isEmpty();
 
-            ChatMessage flushed =
-                    messages.saveAndFlush(ChatMessage.fromUser(conversation.id(), owner.id(), QUESTION, NOW));
-            List<ChatMessage> flushedBatch =
-                    messages.saveAllAndFlush(List.of(ChatMessage.fromSystem(conversation.id(), ANSWER, NOW)));
+            ChatMessage flushed = messages.saveAndFlush(ChatMessage.fromUser(conversation.id(), owner.id(), QUESTION, NOW));
+            List<ChatMessage> flushedBatch = messages.saveAllAndFlush(List.of(ChatMessage.fromSystem(conversation.id(), ANSWER, NOW)));
             assertThat(storedContentOf(flushed.id())).startsWith("v1.");
             assertThat(storedContentOf(flushedBatch.get(0).id())).startsWith("v1.");
         });
 
         assertThat(jdbc.queryForList(
-                        "SELECT content FROM chat_message WHERE conversation_id = ?", String.class, conversation.id()))
+            "SELECT content FROM chat_message WHERE conversation_id = ?", String.class, conversation.id()))
                 .hasSize(4)
                 .allSatisfy(content -> assertThat(content).startsWith("v1.").doesNotContain("평문-표식"));
     }
+
 
     @Test
     @DisplayName("두 메시지의 암호문을 맞바꾸면 둘 다 읽을 수 없는 메시지로 보이고 경고에는 식별자만 남는다")
@@ -120,11 +123,12 @@ class ChatMessageEncryptionTest {
         jdbc.update("UPDATE chat_message SET content = ? WHERE id = ?", first.get("CONTENT"), answer.id());
 
         assertThat(contentsOf(conversation.id()))
-                .containsExactly(ChatMessage.UNREADABLE_CONTENT, ChatMessage.UNREADABLE_CONTENT);
+            .containsExactly(ChatMessage.UNREADABLE_CONTENT, ChatMessage.UNREADABLE_CONTENT);
         assertThat(output.getAll())
-                .contains("메시지 본문을 풀지 못했다 messageId=" + question.id())
-                .doesNotContain("평문-표식");
+            .contains("메시지 본문을 풀지 못했다 messageId=" + question.id())
+            .doesNotContain("평문-표식");
     }
+
 
     @Test
     @DisplayName("대화의 주인을 데이터베이스에서 바꾸면 그 대화의 메시지가 풀리지 않는다")
@@ -137,6 +141,7 @@ class ChatMessageEncryptionTest {
         assertThat(contentsOf(conversation.id())).containsExactly(ChatMessage.UNREADABLE_CONTENT);
     }
 
+
     @Test
     @DisplayName("암호화하기 전에 저장한 평문 줄은 그대로 읽힌다")
     void readsLegacyPlaintextRows() {
@@ -146,6 +151,7 @@ class ChatMessageEncryptionTest {
 
         assertThat(contentsOf(conversation.id())).containsExactly("옛 평문 질문");
     }
+
 
     @Test
     @DisplayName("데이터 key 를 지우면 그 사용자의 메시지는 읽을 수 없는 메시지로 보이고 조회는 실패하지 않는다")
@@ -157,6 +163,7 @@ class ChatMessageEncryptionTest {
 
         assertThat(contentsOf(conversation.id())).containsExactly(ChatMessage.UNREADABLE_CONTENT);
     }
+
 
     @Test
     @DisplayName("관리자 활동의 마지막 대화 시각은 본문을 풀지 않고 보낸 시각만 읽는다")
@@ -171,6 +178,7 @@ class ChatMessageEncryptionTest {
         assertThat(output.getAll()).doesNotContain("풀지 못했다");
     }
 
+
     @Test
     @DisplayName("같은 사용자의 여러 대화는 데이터 key 하나를 함께 쓴다")
     void sharesOneDataKeyAcrossConversationsOfSameUser() {
@@ -180,24 +188,28 @@ class ChatMessageEncryptionTest {
         ChatMessage second = messages.save(ChatMessage.fromUser(other.id(), owner.id(), ANSWER, NOW));
 
         assertThat(rowOf(first.id()).get("CONTENT_KEY_ID"))
-                .isEqualTo(rowOf(second.id()).get("CONTENT_KEY_ID"));
+            .isEqualTo(rowOf(second.id()).get("CONTENT_KEY_ID"));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM user_data_key WHERE user_id = ?", Long.class, owner.id()))
-                .isEqualTo(1L);
+            .isEqualTo(1L);
     }
+
 
     private List<String> contentsOf(Long conversationId) {
         return messages.findByConversationIdOrderByIdAsc(conversationId).stream()
-                .map(ChatMessage::content)
-                .toList();
+            .map(ChatMessage::content)
+            .toList();
     }
+
 
     private String storedContentOf(Long messageId) {
         return jdbc.queryForObject("SELECT content FROM chat_message WHERE id = ?", String.class, messageId);
     }
 
+
     private Map<String, Object> rowOf(Long messageId) {
         return jdbc.queryForMap("SELECT content, content_key_id FROM chat_message WHERE id = ?", messageId);
     }
+
 
     private AppUser user() {
         String email = "cipher-" + UUID.randomUUID() + "@example.test";

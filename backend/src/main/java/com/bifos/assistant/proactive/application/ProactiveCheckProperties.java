@@ -16,19 +16,20 @@ import org.springframework.validation.annotation.Validated;
  * @param maxDelegations 살펴보기 트리에서 맡길 수 있는 위임 자식 수. 0 이면 맡기지 않는다
  * @param sessionMaxChecks 점검 대화의 루트 session 하나로 보내는 살펴보기 수. 닿으면 session 을 바꾼다
  * @param digestWindow 최근에 알린 발견과 받아들인 문제 후보로 읽는 기간. 발견과 후보의 중복 검사, 「관심 없음」 이 같은 주제를
- *     내리는 기간도 이 값이다
+ * 내리는 기간도 이 값이다
  * @param digestMaxItems 다음 살펴보기의 입력에 싣는 최근 발견 수와 받아들인 문제 후보 수. 둘을 따로 센다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.proactive-check")
 public record ProactiveCheckProperties(
-        @DefaultValue("true") boolean enabled,
-        @DefaultValue("4m") Duration maxDuration,
-        @DefaultValue("40") int maxToolCalls,
-        @DefaultValue("3") int maxDelegations,
-        @DefaultValue("14") int sessionMaxChecks,
-        @DefaultValue("30d") Duration digestWindow,
-        @DefaultValue("20") int digestMaxItems) {
+    @DefaultValue("true") boolean enabled,
+    @DefaultValue("4m") Duration maxDuration,
+    @DefaultValue("40") int maxToolCalls,
+    @DefaultValue("3") int maxDelegations,
+    @DefaultValue("14") int sessionMaxChecks,
+    @DefaultValue("30d") Duration digestWindow,
+    @DefaultValue("20") int digestMaxItems) {
+
 
     private static final String PREFIX = "assistant.proactive-check.";
 
@@ -42,6 +43,7 @@ public record ProactiveCheckProperties(
         requireAtLeast("digest-max-items", digestMaxItems, 1);
     }
 
+
     /**
      * {@code max-duration} 이 Hermes 실행 한도보다 짧은지 본다. 같거나 길면 살펴보기의 시간 상한보다 실행 한도가 먼저 닿아,
      * {@code CHECK_TIME_LIMIT} 으로 멈추지 않고 보통 실패로 끝난다.
@@ -49,9 +51,10 @@ public record ProactiveCheckProperties(
     public void requireShorterThan(Duration runTimeout) {
         if (maxDuration.compareTo(runTimeout) >= 0) {
             throw new IllegalStateException(PREFIX + "max-duration must be shorter than hermes.run-timeout: "
-                    + maxDuration + " >= " + runTimeout);
+                + maxDuration + " >= " + runTimeout);
         }
     }
+
 
     private static void requirePositive(String name, Duration value) {
         if (value == null || value.isZero() || value.isNegative()) {
@@ -59,11 +62,13 @@ public record ProactiveCheckProperties(
         }
     }
 
+
     private static void requireAtLeast(String name, int value, int min) {
         if (value < min) {
             throw new IllegalStateException(PREFIX + name + " must be at least " + min + ": " + value);
         }
     }
+
 
     /** 두 설정을 함께 읽어 기동할 때 {@link #requireShorterThan} 을 부른다. 한 설정 묶음의 생성자는 다른 묶음의 값을 보지 못한다. */
     @Configuration(proxyBeanMethods = false)

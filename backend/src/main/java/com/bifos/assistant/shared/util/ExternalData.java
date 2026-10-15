@@ -17,6 +17,7 @@ public final class ExternalData {
     /** 닫는 표시를 대소문자와 안쪽 공백에 상관없이 찾는다. 모델이 닫는 표시로 읽을 수 있는 변형을 함께 잡는다. */
     private static final Pattern CLOSE = Pattern.compile("<\\s*/\\s*external-data\\s*>", Pattern.CASE_INSENSITIVE);
 
+
     /**
      * 본문 안의 닫는 표시는 {@code <\/external-data>} 로 바꿔 넣는다. 본문이 바깥 표시를 먼저 닫아 뒤의 글을 표시
      * 밖으로 내보내지 못하게 한다.

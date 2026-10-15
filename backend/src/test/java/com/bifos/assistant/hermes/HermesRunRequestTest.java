@@ -36,19 +36,20 @@ class HermesRunRequestTest {
     private final AtomicReference<String> receivedBody = new AtomicReference<>();
     private final AtomicReference<String> receivedAuthorization = new AtomicReference<>();
     private final HttpHermesRunsClient client = new HttpHermesRunsClient(
-            keyStore,
-            new HermesProperties(
-                    "keys",
-                    "https://hermes-dashboard.example.com",
-                    "test-dashboard-token",
-                    "https://hermes-listener.example.com",
-                    Duration.ofMillis(10),
-                    Duration.ofSeconds(1),
-                    Duration.ofSeconds(1),
-                    Duration.ofSeconds(1)));
+        keyStore,
+        new HermesProperties(
+            "keys",
+            "https://hermes-dashboard.example.com",
+            "test-dashboard-token",
+            "https://hermes-listener.example.com",
+            Duration.ofMillis(10),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1)));
 
     private HttpServer server;
     private String baseUrl;
+
 
     @BeforeEach
     void start() throws IOException {
@@ -68,10 +69,12 @@ class HermesRunRequestTest {
         server.start();
     }
 
+
     @AfterEach
     void stop() {
         server.stop(0);
     }
+
 
     @Test
     @DisplayName("provider 와 모델이 모두 비면 세 키를 싣지 않는다")
@@ -86,12 +89,13 @@ class HermesRunRequestTest {
         assertThat(body.path("input").asString()).isEqualTo("안녕");
     }
 
+
     @Test
     @DisplayName("사진이 있으면 input 은 user 메시지 목록이고 글, 이름표, 이미지 순이다")
     void sendsListInputWithTextLabelAndImageWhenImagesGiven() {
         String dataUrl = "data:image/jpeg;base64,AAAA";
         client.submit(new HermesRunCommand(
-                "dad", baseUrl, "안녕", null, null, null, null, null, List.of(new HermesImage("1번째 사진", dataUrl))));
+            "dad", baseUrl, "안녕", null, null, null, null, null, List.of(new HermesImage("1번째 사진", dataUrl))));
 
         JsonNode input = submittedBody().path("input");
         assertThat(input.isArray()).as("input: %s", input).isTrue();
@@ -108,6 +112,7 @@ class HermesRunRequestTest {
         assertThat(content.get(2).path("image_url").has("detail")).isFalse();
     }
 
+
     @Test
     @DisplayName("사진의 문자열 표현은 이름표와 data 주소 길이만 담고 본문은 담지 않는다")
     void imageToStringHidesDataUrlBody() {
@@ -115,10 +120,11 @@ class HermesRunRequestTest {
         HermesImage image = new HermesImage("1번째 사진", "data:image/jpeg;base64," + body);
 
         assertThat(image.toString())
-                .contains("1번째 사진", String.valueOf(image.dataUrl().length()))
-                .doesNotContain(body)
-                .doesNotContain("base64");
+            .contains("1번째 사진", String.valueOf(image.dataUrl().length()))
+            .doesNotContain(body)
+            .doesNotContain("base64");
     }
+
 
     @Test
     @DisplayName("provider 와 모델과 effort 를 주면 셋이 모두 실린다")
@@ -129,9 +135,10 @@ class HermesRunRequestTest {
         assertThat(body.path("provider").asString()).isEqualTo("openai-codex");
         assertThat(body.path("model").asString()).isEqualTo("example-model");
         assertThat(body.path("model_options").path("reasoning").path("effort").asString())
-                .isEqualTo("high");
+            .isEqualTo("high");
         assertThat(body.path("model_options").has("reasoning_effort")).isFalse();
     }
+
 
     @Test
     @DisplayName("effort 가 비어 있으면 model options 를 싣지 않는다")
@@ -140,6 +147,7 @@ class HermesRunRequestTest {
 
         assertThat(submittedBody().has("model_options")).isFalse();
     }
+
 
     @Test
     @DisplayName("effort none 은 model options 에 그대로 싣고 null 은 model options 를 빼 둘을 다르게 보낸다")
@@ -151,23 +159,25 @@ class HermesRunRequestTest {
         JsonNode unspecified = submittedBody();
 
         assertThat(disabled.path("model_options")
-                        .path("reasoning")
-                        .path("effort")
-                        .asString())
+            .path("reasoning")
+            .path("effort")
+            .asString())
                 .isEqualTo("none");
         assertThat(unspecified.has("model_options")).isFalse();
     }
+
 
     @Test
     @DisplayName("provider 만 주면 Hermes 를 부르지 않고 실패한다")
     void failsWithoutCallingHermesWhenOnlyProviderGiven() {
         assertThatThrownBy(() -> client.submit(command("openai-codex", null, null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         verifyNoInteractions(keyStore);
         assertThat(receivedBody.get()).isNull();
     }
+
 
     @Test
     @DisplayName("provider 를 바꿔도 profile key 는 같고 모델과 effort 는 요청값 그대로 보낸다")
@@ -179,38 +189,42 @@ class HermesRunRequestTest {
             assertThat(body.path("provider").asString()).isEqualTo(provider);
             assertThat(body.path("model").asString()).isEqualTo("shared-model");
             assertThat(body.path("model_options")
-                            .path("reasoning")
-                            .path("effort")
-                            .asString())
+                .path("reasoning")
+                .path("effort")
+                .asString())
                     .isEqualTo("max");
             assertThat(receivedAuthorization.get()).isEqualTo("Bearer dad-key");
             assertThat(body.propertyNames()).containsExactlyInAnyOrder("input", "provider", "model", "model_options");
         }
     }
 
+
     private JsonNode submittedBody() {
         return JsonMapper.builder().build().readTree(receivedBody.get());
     }
+
 
     @Test
     @DisplayName("provider 가 비면 Hermes 를 부르지 않고 실패한다")
     void failsWithoutCallingHermesWhenProviderBlank() {
         assertThatThrownBy(() -> client.submit(command(null, "example-model", null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         verifyNoInteractions(keyStore);
     }
+
 
     @Test
     @DisplayName("모델이 비면 Hermes 를 부르지 않고 실패한다")
     void failsWithoutCallingHermesWhenModelBlank() {
         assertThatThrownBy(() -> client.submit(command("openai-codex", " ", null)))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         verifyNoInteractions(keyStore);
     }
+
 
     /**
      * 그 provider 의 계정이 전부 막혔을 때만 다음 순위로 넘어간다.
@@ -222,34 +236,37 @@ class HermesRunRequestTest {
     @DisplayName("계정이 전부 막힌 실패만 넘김 대상이다")
     void onlyFailuresWithAllAccountsBlockedAreFallbackTargets() {
         assertThat(failed(HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " No Codex credentials stored.")
-                        .providerBlocked())
+            .providerBlocked())
                 .isTrue();
         assertThat(failed("HTTP 404: 404 page not found").providerBlocked()).isFalse();
         assertThat(failed("HTTP 402: This request requires more credits").providerBlocked())
-                .isFalse();
+            .isFalse();
         assertThat(failed(null).providerBlocked()).isFalse();
     }
+
 
     @Test
     @DisplayName("성공한 실행은 넘김 대상이 아니다")
     void succeededRunIsNotFallbackTarget() {
         HermesRunResult completed = new HermesRunResult(
-                "run-1",
-                "sess-1",
-                "completed",
-                "네",
-                "example-model",
-                "openai-codex",
-                HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글",
-                TokenUsage.empty());
+            "run-1",
+            "sess-1",
+            "completed",
+            "네",
+            "example-model",
+            "openai-codex",
+            HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " 남아 있는 글",
+            TokenUsage.empty());
 
         assertThat(completed.providerBlocked()).isFalse();
     }
 
+
     private static HermesRunResult failed(String error) {
         return new HermesRunResult(
-                "run-1", "sess-1", "failed", null, "example-model", "openai-codex", error, TokenUsage.empty());
+            "run-1", "sess-1", "failed", null, "example-model", "openai-codex", error, TokenUsage.empty());
     }
+
 
     private HermesRunCommand command(String provider, String model, String reasoningEffort) {
         return new HermesRunCommand("dad", baseUrl, "안녕", null, null, provider, model, reasoningEffort);

@@ -20,6 +20,7 @@ public final class WorkspacePreviewPolicy {
     private static final WorkspacePreview TEXT = new WorkspacePreview("text/plain; charset=utf-8", MIB, false);
     private static final Map<String, WorkspacePreview> BY_EXTENSION = byExtension();
 
+
     /** 미리보기를 정하지 않은 확장자면 비어 있다. */
     public static Optional<WorkspacePreview> of(String name) {
         int dot = name.lastIndexOf('.');
@@ -29,6 +30,7 @@ public final class WorkspacePreviewPolicy {
         // 맨 앞의 . 하나뿐인 이름(.env)은 그 뒤 전체가 확장자다. lastIndexOf 가 0 이면 그렇게 읽힌다.
         return Optional.ofNullable(BY_EXTENSION.get(name.substring(dot + 1).toLowerCase(Locale.ROOT)));
     }
+
 
     private static Map<String, WorkspacePreview> byExtension() {
         Map<String, WorkspacePreview> map = new HashMap<>();
@@ -44,7 +46,7 @@ public final class WorkspacePreviewPolicy {
         map.put("css", new WorkspacePreview("text/css; charset=utf-8", MIB, false));
         // SVG 는 스크립트를 품을 수 있어 사진이 아니라 글로 준다.
         String texts = "csv tsv txt md markdown log json jsonl yaml yml toml ini cfg conf env py js mjs cjs ts tsx jsx "
-                + "java kt go rs rb sh bash zsh sql xml svg scss";
+            + "java kt go rs rb sh bash zsh sql xml svg scss";
         for (String extension : texts.split(" ")) {
             map.put(extension, TEXT);
         }

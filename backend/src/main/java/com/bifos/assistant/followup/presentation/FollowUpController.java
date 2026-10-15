@@ -34,22 +34,25 @@ public class FollowUpController {
     private final FollowUpService followUps;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public List<FollowUpView> list() {
         return followUps.list(currentUser.require()).stream()
-                .map(FollowUpView::from)
-                .toList();
+            .map(FollowUpView::from)
+            .toList();
     }
+
 
     @PostMapping
     public FollowUpView create(@RequestBody CreateFollowUpRequest request) {
         NewFollowUp input = new NewFollowUp(
-                request.title(),
-                request.dueAt() == null ? null : FollowUpDueAt.parseWithOffset(request.dueAt()),
-                Boolean.TRUE.equals(request.waiting()),
-                request.conversationId() == null ? null : parseConversationId(request.conversationId()));
+            request.title(),
+            request.dueAt() == null ? null : FollowUpDueAt.parseWithOffset(request.dueAt()),
+            Boolean.TRUE.equals(request.waiting()),
+            request.conversationId() == null ? null : parseConversationId(request.conversationId()));
         return FollowUpView.from(followUps.create(currentUser.require(), input));
     }
+
 
     /**
      * 본문에 있는 칸만 고친다. {@code dueAt} 은 키가 있는지와 값이 null 인지를 갈라야 해서 본문을 노드로 받는다.
@@ -87,28 +90,33 @@ public class FollowUpController {
             dueAt = FollowUpDueAt.parseWithOffset(dueAtNode.asString());
         }
         return FollowUpView.from(
-                followUps.update(currentUser.require(), id, new FollowUpPatch(title, dueAtPresent, dueAt, waiting)));
+            followUps.update(currentUser.require(), id, new FollowUpPatch(title, dueAtPresent, dueAt, waiting)));
     }
+
 
     @PostMapping("/{id}/accept")
     public FollowUpView accept(@PathVariable UUID id) {
         return FollowUpView.from(followUps.accept(currentUser.require(), id));
     }
 
+
     @PostMapping("/{id}/reject")
     public FollowUpView reject(@PathVariable UUID id) {
         return FollowUpView.from(followUps.reject(currentUser.require(), id));
     }
+
 
     @PostMapping("/{id}/done")
     public FollowUpView done(@PathVariable UUID id) {
         return FollowUpView.from(followUps.done(currentUser.require(), id));
     }
 
+
     @PostMapping("/{id}/drop")
     public FollowUpView drop(@PathVariable UUID id) {
         return FollowUpView.from(followUps.drop(currentUser.require(), id));
     }
+
 
     private static UUID parseConversationId(String text) {
         try {
@@ -117,6 +125,7 @@ public class FollowUpController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "conversationId must be a UUID", ex);
         }
     }
+
 
     private static ApiException invalid(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);

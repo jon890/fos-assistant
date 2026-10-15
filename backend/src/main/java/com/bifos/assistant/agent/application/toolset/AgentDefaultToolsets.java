@@ -33,6 +33,7 @@ public class AgentDefaultToolsets {
     private final ProfileSkillFiles skillFiles;
     private final AgentConnectorBindings connectorBindings;
 
+
     /**
      * 지금 켜진 도구에 기본 도구를 더해 쓴다.
      *
@@ -50,18 +51,19 @@ public class AgentDefaultToolsets {
             return written;
         } catch (RuntimeException failure) {
             log.warn(
-                    "기본 도구를 켜지 못했다. 관리자가 에이전트 도구 화면에서 켜야 한다 agent={} profile={}",
-                    agent.code(),
-                    agent.hermesProfile(),
-                    failure);
+                "기본 도구를 켜지 못했다. 관리자가 에이전트 도구 화면에서 켜야 한다 agent={} profile={}",
+                agent.code(),
+                agent.hermesProfile(),
+                failure);
             return List.of();
         }
     }
 
+
     private List<String> write(Agent agent, List<String> defaults) {
         List<String> current = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
-                .filter(AgentToolPolicy::isKnown)
-                .toList();
+            .filter(AgentToolPolicy::isKnown)
+            .toList();
         List<String> wanted = allowedFor(agent, defaults);
         if (current.containsAll(wanted)) {
             return List.of();
@@ -80,9 +82,9 @@ public class AgentDefaultToolsets {
                 throw rejected;
             }
             log.warn(
-                    "실행 공간을 쓸 수 없어 기본 도구에서 셸·파일·사진 도구를 뺐다. 정책 등록을 확인한 뒤 관리자가 켠다 agent={} profile={}",
-                    agent.code(),
-                    agent.hermesProfile());
+                "실행 공간을 쓸 수 없어 기본 도구에서 셸·파일·사진 도구를 뺐다. 정책 등록을 확인한 뒤 관리자가 켠다 agent={} profile={}",
+                agent.code(),
+                agent.hermesProfile());
         }
         List<String> fallbackWanted = AgentToolPolicy.withoutSandboxToolsets(wanted);
         if (current.containsAll(fallbackWanted)) {
@@ -92,50 +94,53 @@ public class AgentDefaultToolsets {
         List<String> fallback = desired(current, fallbackWanted, connectorServers);
         if (AgentToolPolicy.hasSandboxToolset(fallback)) {
             log.warn(
-                    "셸 계열이 이미 켜진 profile 이라 실행 공간 없이 기본 도구를 쓰지 않았다 agent={} profile={}",
-                    agent.code(),
-                    agent.hermesProfile());
+                "셸 계열이 이미 켜진 profile 이라 실행 공간 없이 기본 도구를 쓰지 않았다 agent={} profile={}",
+                agent.code(),
+                agent.hermesProfile());
             return List.of();
         }
         toolsets.writeApiServer(agent.hermesProfile(), fallback, agent.sandboxOwner());
         return fallback;
     }
 
+
     /** 쓴 내장 도구가 실제 API 실행에 켜졌는지 본다. profile 설정이 막은 도구는 여기서 드러난다. */
     private void warnIfNotApplied(Agent agent, List<String> written) {
         List<String> applied = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
         List<String> missing = written.stream()
-                .filter(AgentToolPolicy::isKnown)
-                .filter(name -> !applied.contains(name))
-                .toList();
+            .filter(AgentToolPolicy::isKnown)
+            .filter(name -> !applied.contains(name))
+            .toList();
         if (!missing.isEmpty()) {
             log.warn(
-                    "기본 도구 가운데 켜지지 않은 것이 있다 agent={} profile={} missing={}",
-                    agent.code(),
-                    agent.hermesProfile(),
-                    missing);
+                "기본 도구 가운데 켜지지 않은 것이 있다 agent={} profile={} missing={}",
+                agent.code(),
+                agent.hermesProfile(),
+                missing);
         }
     }
+
 
     /** 공개 범위와 올린 스킬 때문에 켤 수 없는 기본 도구를 빼고 남은 것이다. */
     private List<String> allowedFor(Agent agent, List<String> defaults) {
         List<String> result = defaults;
         if (agent.visibility() == AgentVisibility.GROUP) {
             result = result.stream()
-                    .filter(name -> !AgentToolPolicy.requiresPrivate(name))
-                    .toList();
+                .filter(name -> !AgentToolPolicy.requiresPrivate(name))
+                .toList();
         }
         // 셸 도구가 켜지면 Hermes 가 스킬이 요청한 profile 의 환경 값과 파일을 실행 공간에 넣는다(ADR-086).
         if (AgentToolPolicy.hasSandboxToolset(result)
-                && !skillFiles.uploadedRequestingSecrets(agent.hermesProfile()).isEmpty()) {
+            && !skillFiles.uploadedRequestingSecrets(agent.hermesProfile()).isEmpty()) {
             log.warn(
-                    "비밀 요청 칸이 있는 올린 스킬이 있어 기본 도구에서 셸·파일·사진 도구를 뺐다 agent={} profile={}",
-                    agent.code(),
-                    agent.hermesProfile());
+                "비밀 요청 칸이 있는 올린 스킬이 있어 기본 도구에서 셸·파일·사진 도구를 뺐다 agent={} profile={}",
+                agent.code(),
+                agent.hermesProfile());
             result = AgentToolPolicy.withoutSandboxToolsets(result);
         }
         return result;
     }
+
 
     /** 대시보드는 목록을 통째로 바꾸므로 지금 켜진 것과 Control Plane MCP, 붙은 커넥터 서버를 함께 보낸다(ADR-083). */
     private static List<String> desired(List<String> current, List<String> wanted, Set<String> connectorServers) {

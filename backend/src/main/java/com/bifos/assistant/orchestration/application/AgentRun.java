@@ -10,4 +10,5 @@ import com.bifos.assistant.usage.domain.AgentExecution;
  * @param result 성공 여부와 답
  * @param sessionId Hermes 가 알려 준 session. 대화를 이어 가려면 부르는 쪽이 기억한다
  */
-public record AgentRun(AgentExecution execution, ChildResult result, String sessionId) {}
+public record AgentRun(AgentExecution execution, ChildResult result, String sessionId) {
+}

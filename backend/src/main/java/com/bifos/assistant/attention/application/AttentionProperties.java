@@ -21,14 +21,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.attention")
 public record AttentionProperties(
-        Duration failureWindow,
-        Duration delegatedWindow,
-        Duration longRunningAfter,
-        Duration dueSoon,
-        int continueCount,
-        int maxItemsPerCard,
-        Duration snoozeMax,
-        Duration eventRetention) {
+    Duration failureWindow,
+    Duration delegatedWindow,
+    Duration longRunningAfter,
+    Duration dueSoon,
+    int continueCount,
+    int maxItemsPerCard,
+    Duration snoozeMax,
+    Duration eventRetention) {
+
 
     private static final Duration DEFAULT_FAILURE_WINDOW = Duration.ofDays(7);
     private static final Duration DEFAULT_DELEGATED_WINDOW = Duration.ofHours(24);
@@ -53,6 +54,7 @@ public record AttentionProperties(
         snoozeMax = positiveOr(snoozeMax, DEFAULT_SNOOZE_MAX);
         eventRetention = positiveOr(eventRetention, DEFAULT_EVENT_RETENTION);
     }
+
 
     private static Duration positiveOr(Duration value, Duration fallback) {
         return value == null || value.isZero() || value.isNegative() ? fallback : value;

@@ -34,11 +34,13 @@ public class ArtifactCleaner {
     private final ArtifactProperties properties;
     private final Clock clock;
 
+
     /** 첨부의 정리와 같은 시각에 돈다. 검사에서는 {@code -} 로 끈다. */
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
     public void runScheduled() {
         cleanExpired(clock.instant());
     }
+
 
     /**
      * {@code now} 에 보관 기간이 지난 파일을 지운다.
@@ -64,6 +66,7 @@ public class ArtifactCleaner {
         log.info("expired artifacts cleaned deleted={} unmarked={} reconciled={}", removed.size(), failed, reconciled);
         return removed.size();
     }
+
 
     /**
      * 파일이 없는데 지운 표시가 없는 행에 지운 시각을 적는다.
@@ -99,5 +102,7 @@ public class ArtifactCleaner {
         return reconciled;
     }
 
-    private record ArtifactKey(Long conversationId, String path) {}
+
+    private record ArtifactKey(Long conversationId, String path) {
+    }
 }

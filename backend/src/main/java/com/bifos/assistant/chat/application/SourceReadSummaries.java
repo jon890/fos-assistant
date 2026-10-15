@@ -35,6 +35,7 @@ public class SourceReadSummaries {
     private final AgentExecutionRepository executions;
     private final ExecutionEventRepository events;
 
+
     public Map<Long, SourceReadSummary> of(List<ChatMessage> history) {
         Map<Long, Long> ids = new LinkedHashMap<>();
         history.forEach(message -> {
@@ -64,44 +65,46 @@ public class SourceReadSummaries {
         for (AgentExecution child : children) {
             if (child.parentExecutionId() != null) {
                 childrenByParent
-                        .computeIfAbsent(child.parentExecutionId(), unused -> new ArrayList<>())
-                        .add(child);
+                    .computeIfAbsent(child.parentExecutionId(), unused -> new ArrayList<>())
+                    .add(child);
             }
         }
         Set<Long> treeIds = new LinkedHashSet<>();
         asked.values().stream()
-                .filter(execution -> rootRows.containsKey(execution.treeRootId()))
-                .forEach(execution -> treeIds.add(execution.id()));
+            .filter(execution -> rootRows.containsKey(execution.treeRootId()))
+            .forEach(execution -> treeIds.add(execution.id()));
         children.forEach(execution -> treeIds.add(execution.id()));
         Map<Long, List<ExecutionEvent>> eventRows = new LinkedHashMap<>();
         if (!treeIds.isEmpty()) {
             events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(treeIds)
-                    .forEach(event -> eventRows
-                            .computeIfAbsent(event.executionId(), unused -> new ArrayList<>())
-                            .add(event));
+                .forEach(event -> eventRows
+                    .computeIfAbsent(event.executionId(), unused -> new ArrayList<>())
+                    .add(event));
         }
         Map<Long, SourceReadSummary> result = new LinkedHashMap<>();
         Map<Long, SourceReadSummary> byExecution = new LinkedHashMap<>();
         ids.forEach((messageId, executionId) -> {
             AgentExecution execution = executionId == null ? null : asked.get(executionId);
             result.put(
-                    messageId,
-                    execution == null || !rootRows.containsKey(execution.treeRootId())
-                            ? missing()
-                            : byExecution.computeIfAbsent(
-                                    executionId, unused -> summarize(execution, childrenByParent, eventRows)));
+                messageId,
+                execution == null || !rootRows.containsKey(execution.treeRootId())
+                    ? missing()
+                    : byExecution.computeIfAbsent(
+                        executionId, unused -> summarize(execution, childrenByParent, eventRows)));
         });
         return result;
     }
+
 
     private static SourceReadSummary missing() {
         return new SourceReadSummary(0, List.of(), 0, false, List.of());
     }
 
+
     private static SourceReadSummary summarize(
-            AgentExecution start,
-            Map<Long, List<AgentExecution>> childrenByParent,
-            Map<Long, List<ExecutionEvent>> eventRows) {
+        AgentExecution start,
+        Map<Long, List<AgentExecution>> childrenByParent,
+        Map<Long, List<ExecutionEvent>> eventRows) {
         List<AgentExecution> pending = new ArrayList<>();
         List<AgentExecution> tree = new ArrayList<>();
         Set<Long> visited = new LinkedHashSet<>();
@@ -121,8 +124,7 @@ public class SourceReadSummaries {
         Set<String> requestedUrls = new LinkedHashSet<>();
         for (AgentExecution execution : tree) {
             observed &= execution.eventObservation() == EventObservation.OBSERVED;
-            ExecutionReads reads =
-                    reads(eventRows.getOrDefault(execution.id(), List.of()), execution.eventObservation());
+            ExecutionReads reads = reads(eventRows.getOrDefault(execution.id(), List.of()), execution.eventObservation());
             completed += reads.completed;
             unresolved += reads.unresolved;
             urls.addAll(reads.urls);
@@ -131,6 +133,7 @@ public class SourceReadSummaries {
         requestedUrls.removeAll(urls);
         return new SourceReadSummary(completed, List.copyOf(urls), unresolved, observed, List.copyOf(requestedUrls));
     }
+
 
     private static ExecutionReads reads(List<ExecutionEvent> events, EventObservation observation) {
         int completed = 0;
@@ -178,6 +181,7 @@ public class SourceReadSummaries {
         return new ExecutionReads(completed, unresolved, urls, requestedUrls);
     }
 
+
     private static Parsed parse(String detail) {
         if (detail == null) {
             return Parsed.unknown();
@@ -188,7 +192,7 @@ public class SourceReadSummaries {
                 return Parsed.unknown();
             }
             if (root.path("blocked_by_policy").asBoolean(false)
-                    || (root.has("success") && !root.path("success").asBoolean())) {
+                || (root.has("success") && !root.path("success").asBoolean())) {
                 return Parsed.empty();
             }
             JsonNode results = root.get("results");
@@ -200,6 +204,7 @@ public class SourceReadSummaries {
             return Parsed.unknown();
         }
     }
+
 
     private static Parsed parseResults(JsonNode results) {
         Set<String> urls = new LinkedHashSet<>();
@@ -213,10 +218,10 @@ public class SourceReadSummaries {
             JsonNode content = result.get("content");
             JsonNode error = result.get("error");
             if (result.path("blocked_by_policy").asBoolean(false)
-                    || (error != null && !error.isNull())
-                    || (content != null
-                            && (content.isNull()
-                                    || (content.isString() && content.asString().isBlank())))) {
+                || (error != null && !error.isNull())
+                || (content != null
+                    && (content.isNull()
+                        || (content.isString() && content.asString().isBlank())))) {
                 knownOutcome = true;
                 continue;
             }
@@ -235,9 +240,11 @@ public class SourceReadSummaries {
         return new Parsed(knownOutcome, unresolved, urls);
     }
 
+
     private static boolean hidden(String value) {
         return value.contains("[가림]") || value.contains("[항목 ") || value.contains("...") || value.contains("…");
     }
+
 
     private static String clean(String value) {
         if (value == null || hidden(value)) {
@@ -248,8 +255,8 @@ public class SourceReadSummaries {
             String scheme = uri.getScheme();
             String host = uri.getHost();
             if (scheme == null
-                    || host == null
-                    || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+                || host == null
+                || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
                 return null;
             }
             host = host.toLowerCase(Locale.ROOT);
@@ -257,12 +264,12 @@ public class SourceReadSummaries {
                 host = host.substring(0, host.length() - 1);
             }
             if (!host.contains(".")
-                    || host.equals("localhost")
-                    || host.endsWith(".localhost")
-                    || host.endsWith(".local")
-                    || host.endsWith(".internal")
-                    || IPV4.matcher(host).matches()
-                    || host.contains(":")) {
+                || host.equals("localhost")
+                || host.endsWith(".localhost")
+                || host.endsWith(".local")
+                || host.endsWith(".internal")
+                || IPV4.matcher(host).matches()
+                || host.contains(":")) {
                 return null;
             }
             String port = uri.getPort() < 0 ? "" : ":" + uri.getPort();
@@ -273,15 +280,18 @@ public class SourceReadSummaries {
         }
     }
 
+
     private record Parsed(boolean resultKnown, boolean unresolved, Set<String> urls) {
         static Parsed empty() {
             return new Parsed(true, false, Set.of());
         }
+
 
         static Parsed unknown() {
             return new Parsed(false, true, Set.of());
         }
     }
 
-    private record ExecutionReads(int completed, int unresolved, Set<String> urls, Set<String> requestedUrls) {}
+    private record ExecutionReads(int completed, int unresolved, Set<String> urls, Set<String> requestedUrls) {
+    }
 }

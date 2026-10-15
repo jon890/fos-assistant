@@ -50,6 +50,7 @@ class McpCallerResolverTest {
     private final DelegationParentResolver parents = mock(DelegationParentResolver.class);
     private final McpCallerResolver resolver = new McpCallerResolver(owners, users, agents, parents);
 
+
     @BeforeEach
     void setUp() {
         AppUser user = mock(AppUser.class);
@@ -64,37 +65,39 @@ class McpCallerResolverTest {
         when(owners.resolve(PROFILE, ROOT_SESSION_ID, ROOT_SESSION_ID)).thenReturn(origin);
     }
 
+
     @Test
     @DisplayName("압축한 최상위 session은 현재 루트를 쓰고 하위 session은 origin을 유지한다")
     void inspectUsesCurrentRootForProvenTopLevelCompressionAndKeepsSubagentOrigin() {
         String session = "compressed-session";
         var ctx = JsonMapper.builder().build().createObjectNode();
         ctx.put("v", 1)
-                .put("root_session_id", ROOT_SESSION_ID)
-                .put("session_id", session)
-                .put("tool_call_id", "actual")
-                .put(
-                        "sig",
-                        HexFormat.of()
-                                .formatHex(McpCallContext.hmac(
-                                        principal.tokenHash(),
-                                        String.join(
-                                                "\n",
-                                                "v1",
-                                                "attachment_inspect",
-                                                ROOT_SESSION_ID,
-                                                session,
-                                                "actual"))));
+            .put("root_session_id", ROOT_SESSION_ID)
+            .put("session_id", session)
+            .put("tool_call_id", "actual")
+            .put(
+                "sig",
+                HexFormat.of()
+                    .formatHex(McpCallContext.hmac(
+                        principal.tokenHash(),
+                        String.join(
+                            "\n",
+                            "v1",
+                            "attachment_inspect",
+                            ROOT_SESSION_ID,
+                            session,
+                            "actual"))));
         AgentExecution past = mock(AgentExecution.class);
         when(past.userId()).thenReturn(USER_ID);
         when(parents.resolve(PROFILE, ROOT_SESSION_ID)).thenReturn(origin);
         when(owners.resolve(PROFILE, ROOT_SESSION_ID, ROOT_SESSION_ID)).thenReturn(past);
         when(owners.resolve(PROFILE, ROOT_SESSION_ID, session)).thenReturn(past);
         assertThat(resolver.resolveAttachmentInspection(principal, ctx, true).originExecution())
-                .isSameAs(origin);
+            .isSameAs(origin);
         assertThat(resolver.resolveAttachmentInspection(principal, ctx, false).originExecution())
-                .isSameAs(past);
+            .isSameAs(past);
     }
+
 
     @Test
     @DisplayName("origin 실행의 에이전트가 커넥터 에이전트이면 MCP_CALL_CONTEXT_INVALID 로 거절한다")
@@ -104,12 +107,13 @@ class McpCallerResolverTest {
         when(agents.findById(AGENT_ID)).thenReturn(Optional.of(connector));
 
         assertThatThrownBy(() -> resolver.resolve(principal, TOOL, signedContext()))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code())
-                                .as("커넥터 에이전트의 호출을 거절한 코드")
-                                .isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                ex -> assertThat(ex.code())
+                    .as("커넥터 에이전트의 호출을 거절한 코드")
+                    .isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
     }
+
 
     @Test
     @DisplayName("origin 실행의 에이전트가 일반 에이전트이면 요청자는 origin 실행의 사용자다")
@@ -122,6 +126,7 @@ class McpCallerResolverTest {
         assertThat(caller.originExecution()).isSameAs(origin);
     }
 
+
     @Test
     @DisplayName("origin 실행의 에이전트 행이 없으면 거절하지 않는다")
     void doesNotRejectWhenAgentRowIsMissing() {
@@ -131,6 +136,7 @@ class McpCallerResolverTest {
 
         assertThat(caller.user().id()).as("요청자의 사용자 번호").isEqualTo(USER_ID);
     }
+
 
     @Test
     @DisplayName("origin 실행에 에이전트 번호가 없으면 거절하지 않는다")
@@ -142,20 +148,22 @@ class McpCallerResolverTest {
         assertThat(caller.user().id()).as("요청자의 사용자 번호").isEqualTo(USER_ID);
     }
 
+
     private static JsonNode signedContext() {
         return McpCallSigner.context(TOKEN, TOOL, ROOT_SESSION_ID);
     }
 
+
     private static Agent agent() {
         return Agent.of(
-                "calendar",
-                "일정",
-                PROFILE,
-                "http://agent-runtime.test/p/calendar",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.DEDICATED,
-                AgentVisibility.PRIVATE,
-                USER_ID,
-                Instant.now());
+            "calendar",
+            "일정",
+            PROFILE,
+            "http://agent-runtime.test/p/calendar",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            USER_ID,
+            Instant.now());
     }
 }

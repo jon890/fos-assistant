@@ -37,8 +37,8 @@ public class CheckResultParser {
 
     /** JSON 객체 뒤에 남는 글이 있으면 읽지 않는다. 여는 태그를 넓혀 볼 때 두 블록에 걸친 범위를 받지 않게 한다. */
     private static final JsonMapper JSON = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
+        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build();
 
     private static final Pattern LOOSE_OPEN_TAG = looseTag(OPEN_TAG);
     private static final Pattern LOOSE_CLOSE_TAG = looseTag(CLOSE_TAG);
@@ -79,6 +79,7 @@ public class CheckResultParser {
     /** 계약에 상한이 없는 짧은 칸(시각, 신선도, next 종류)이 끝없이 길어지지 않게 하는 값이다. */
     private static final int SHORT_FIELD_MAX = 64;
 
+
     /**
      * 마지막 블록을 읽는다. 블록이 없거나 읽지 못하면 그 까닭을 돌려준다.
      *
@@ -106,18 +107,21 @@ public class CheckResultParser {
         return CheckResultRead.invalid(CheckInvalidReason.NOT_JSON);
     }
 
+
     /** 태그 글자 사이에 서식 문자가 몇 개든 끼어도 맞는 패턴이다. */
     private static Pattern looseTag(String tag) {
         return Pattern.compile(tag.chars()
-                .mapToObj(ch -> Pattern.quote(Character.toString(ch)))
-                .collect(Collectors.joining("\\p{Cf}*")));
+            .mapToObj(ch -> Pattern.quote(Character.toString(ch)))
+            .collect(Collectors.joining("\\p{Cf}*")));
     }
+
 
     /** 서식 문자가 낀 태그를 원래 태그로 바꾼다. 태그 밖의 글은 건드리지 않는다. */
     private static String canonicalTags(String answer) {
         String opened = LOOSE_OPEN_TAG.matcher(answer).replaceAll(Matcher.quoteReplacement(OPEN_TAG));
         return LOOSE_CLOSE_TAG.matcher(opened).replaceAll(Matcher.quoteReplacement(CLOSE_TAG));
     }
+
 
     /** 태그 사이의 글이 JSON 객체 하나이면 그 객체다. 아니면 null 이다. */
     private static JsonNode objectOf(String between) {
@@ -130,6 +134,7 @@ public class CheckResultParser {
         }
     }
 
+
     /** 읽은 JSON 객체를 계약대로 검사해 블록으로 바꾼다. */
     private static CheckResultRead blockOf(JsonNode root) {
         JsonNode version = root.get("version");
@@ -141,16 +146,17 @@ public class CheckResultParser {
             return CheckResultRead.invalid(CheckInvalidReason.BAD_OUTCOME);
         }
         return CheckResultRead.of(new CheckResultBlock(
-                version.asInt(),
-                outcome.get(),
-                text(root.get("summary"), SUMMARY_MAX),
-                findings(root.get("findings")),
-                texts(root.get("questions"), QUESTIONS_MAX, QUESTION_MAX),
-                texts(root.get("followUpCandidates"), FOLLOW_UPS_MAX, FOLLOW_UP_MAX),
-                texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX),
-                version.asInt() >= 2 ? report(root.get("report")) : null,
-                version.asInt() == 3 ? problems(root.get("problemCandidates")) : List.of()));
+            version.asInt(),
+            outcome.get(),
+            text(root.get("summary"), SUMMARY_MAX),
+            findings(root.get("findings")),
+            texts(root.get("questions"), QUESTIONS_MAX, QUESTION_MAX),
+            texts(root.get("followUpCandidates"), FOLLOW_UPS_MAX, FOLLOW_UP_MAX),
+            texts(root.get("sourceFailures"), SOURCE_FAILURES_MAX, SOURCE_FAILURE_MAX),
+            version.asInt() >= 2 ? report(root.get("report")) : null,
+            version.asInt() == 3 ? problems(root.get("problemCandidates")) : List.of()));
     }
+
 
     /** 앞뒤를 코드 울타리({@code ```json} 등)로 감쌌으면 벗긴다. */
     private static String stripFence(String body) {
@@ -160,9 +166,10 @@ public class CheckResultParser {
         int lineEnd = body.indexOf('\n');
         String inner = lineEnd < 0 ? "" : body.substring(lineEnd + 1).strip();
         return inner.endsWith(CODE_FENCE)
-                ? inner.substring(0, inner.length() - CODE_FENCE.length()).strip()
-                : inner;
+            ? inner.substring(0, inner.length() - CODE_FENCE.length()).strip()
+            : inner;
     }
+
 
     /** 모델이 내는 값은 {@code FINDINGS} 와 {@code NOTHING_NEW} 뿐이다. {@code INVALID_RESULT} 는 이 코드가 정하는 값이다. */
     private static Optional<CheckOutcome> outcomeOf(JsonNode node) {
@@ -175,6 +182,7 @@ public class CheckResultParser {
         }
         return Optional.empty();
     }
+
 
     private static List<Finding> findings(JsonNode array) {
         List<Finding> found = new ArrayList<>();
@@ -192,26 +200,29 @@ public class CheckResultParser {
         return List.copyOf(found);
     }
 
+
     private static Finding finding(JsonNode node) {
         return new Finding(
-                text(node.get("area"), AREA_MAX),
-                text(node.get("topicKey"), TOPIC_KEY_MAX),
-                text(node.get("title"), TITLE_MAX),
-                text(node.get("sourceUrl"), SOURCE_URL_MAX),
-                text(node.get("checkedAt"), SHORT_FIELD_MAX),
-                text(node.get("publishedAt"), SHORT_FIELD_MAX),
-                text(node.get("freshness"), SHORT_FIELD_MAX),
-                text(node.get("whyItMatters"), WHY_IT_MATTERS_MAX),
-                texts(node.get("facts"), ITEMS_MAX, ITEM_MAX),
-                texts(node.get("inferences"), ITEMS_MAX, ITEM_MAX),
-                texts(node.get("unknowns"), ITEMS_MAX, ITEM_MAX),
-                next(node.get("next")),
-                text(node.get("changeSinceLast"), CHANGE_SINCE_LAST_MAX));
+            text(node.get("area"), AREA_MAX),
+            text(node.get("topicKey"), TOPIC_KEY_MAX),
+            text(node.get("title"), TITLE_MAX),
+            text(node.get("sourceUrl"), SOURCE_URL_MAX),
+            text(node.get("checkedAt"), SHORT_FIELD_MAX),
+            text(node.get("publishedAt"), SHORT_FIELD_MAX),
+            text(node.get("freshness"), SHORT_FIELD_MAX),
+            text(node.get("whyItMatters"), WHY_IT_MATTERS_MAX),
+            texts(node.get("facts"), ITEMS_MAX, ITEM_MAX),
+            texts(node.get("inferences"), ITEMS_MAX, ITEM_MAX),
+            texts(node.get("unknowns"), ITEMS_MAX, ITEM_MAX),
+            next(node.get("next")),
+            text(node.get("changeSinceLast"), CHANGE_SINCE_LAST_MAX));
     }
+
 
     private static Next next(JsonNode node) {
         return next(node, NEXT_TEXT_MAX);
     }
+
 
     private static Next next(JsonNode node, int textMax) {
         if (node == null || !node.isObject()) {
@@ -219,6 +230,7 @@ public class CheckResultParser {
         }
         return new Next(text(node.get("type"), SHORT_FIELD_MAX), text(node.get("text"), textMax));
     }
+
 
     /** 버전 3의 문제 후보를 읽는다. 객체가 아닌 원소는 건너뛰고 상한을 넘는 원소는 버린다. */
     private static List<CheckResultBlock.ProblemCandidate> problems(JsonNode array) {
@@ -237,19 +249,21 @@ public class CheckResultParser {
         return List.copyOf(found);
     }
 
+
     private static CheckResultBlock.ProblemCandidate problem(JsonNode node) {
         return new CheckResultBlock.ProblemCandidate(
-                text(node.get("problemKey"), PROBLEM_KEY_MAX),
-                text(node.get("problem"), PROBLEM_MAX),
-                text(node.get("relatedGoal"), RELATED_GOAL_MAX),
-                texts(node.get("evidence"), EVIDENCE_MAX, EVIDENCE_KEY_MAX),
-                next(node.get("proposedAction"), ACTION_TEXT_MAX),
-                text(node.get("confidence"), SHORT_FIELD_MAX),
-                text(node.get("expectedBenefit"), EXPECTED_BENEFIT_MAX),
-                text(node.get("sideEffect"), SHORT_FIELD_MAX),
-                text(node.get("risk"), RISK_MAX),
-                text(node.get("changeSinceLast"), CHANGE_SINCE_LAST_MAX));
+            text(node.get("problemKey"), PROBLEM_KEY_MAX),
+            text(node.get("problem"), PROBLEM_MAX),
+            text(node.get("relatedGoal"), RELATED_GOAL_MAX),
+            texts(node.get("evidence"), EVIDENCE_MAX, EVIDENCE_KEY_MAX),
+            next(node.get("proposedAction"), ACTION_TEXT_MAX),
+            text(node.get("confidence"), SHORT_FIELD_MAX),
+            text(node.get("expectedBenefit"), EXPECTED_BENEFIT_MAX),
+            text(node.get("sideEffect"), SHORT_FIELD_MAX),
+            text(node.get("risk"), RISK_MAX),
+            text(node.get("changeSinceLast"), CHANGE_SINCE_LAST_MAX));
     }
+
 
     /** 모델이 쓴 승인 번호와 근거 주소는 믿지 않고 읽지 않는다. */
     private static CheckResultBlock.ReportDraft report(JsonNode node) {
@@ -257,10 +271,11 @@ public class CheckResultParser {
             return null;
         }
         return new CheckResultBlock.ReportDraft(
-                texts(node.get("changed"), REPORT_CHANGED_MAX, REPORT_LINE_MAX),
-                texts(node.get("done"), REPORT_DONE_MAX, REPORT_LINE_MAX),
-                texts(node.get("next"), REPORT_NEXT_MAX, REPORT_LINE_MAX));
+            texts(node.get("changed"), REPORT_CHANGED_MAX, REPORT_LINE_MAX),
+            texts(node.get("done"), REPORT_DONE_MAX, REPORT_LINE_MAX),
+            texts(node.get("next"), REPORT_NEXT_MAX, REPORT_LINE_MAX));
     }
+
 
     /** 문자열 칸만 읽는다. 문자열이 아니거나 비어 있으면 {@code null} 이다. 앞뒤 공백은 벗기고 상한에서 자른다. */
     private static String text(JsonNode node, int max) {
@@ -270,6 +285,7 @@ public class CheckResultParser {
         String value = node.asString().strip();
         return value.isEmpty() ? null : clip(value, max);
     }
+
 
     /** 문자열 원소만 모은다. 문자열이 아니거나 빈 원소는 건너뛰고, 상한을 넘는 원소는 버린다. */
     private static List<String> texts(JsonNode array, int maxItems, int maxLength) {
@@ -288,6 +304,7 @@ public class CheckResultParser {
         }
         return List.copyOf(items);
     }
+
 
     /** UTF-16 대리쌍 한가운데에서 자르지 않는다. */
     private static String clip(String value, int max) {

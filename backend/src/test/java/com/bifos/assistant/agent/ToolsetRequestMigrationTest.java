@@ -19,17 +19,18 @@ import org.junit.jupiter.api.Test;
 class ToolsetRequestMigrationTest {
     private Database database;
 
+
     @BeforeEach
     void setUp() throws SQLException {
         database = createDatabase();
         Flyway.configure()
-                .dataSource(database.url(), database.username(), database.password())
-                .locations("classpath:db/migration")
-                .outOfOrder(true)
-                .load()
-                .migrate();
+            .dataSource(database.url(), database.username(), database.password())
+            .locations("classpath:db/migration")
+            .outOfOrder(true)
+            .load()
+            .migrate();
         try (Connection connection = connect();
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO app_user (id, email, display_name, group_id, role, created_at)
                     VALUES (1, 'request@example.com', '요청자', 1, 'MEMBER', CURRENT_TIMESTAMP)
@@ -43,10 +44,12 @@ class ToolsetRequestMigrationTest {
         }
     }
 
+
     Database createDatabase() {
         return new Database(
-                "jdbc:h2:mem:toolset-request-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+            "jdbc:h2:mem:toolset-request-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
     }
+
 
     @Test
     @DisplayName("같은 그룹·에이전트·요청자·도구의 대기 요청은 하나만 저장한다")
@@ -54,19 +57,20 @@ class ToolsetRequestMigrationTest {
         insert("PENDING", 1);
         assertThatThrownBy(() -> insert("PENDING", 1)).isInstanceOf(SQLException.class);
         try (Connection connection = connect();
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("UPDATE agent_toolset_request SET status = 'REJECTED', pending_slot = NULL");
         }
         insert("PENDING", 1);
         insert("REJECTED", null);
         insert("APPROVED", null);
         try (Connection connection = connect();
-                Statement statement = connection.createStatement();
-                var result = statement.executeQuery("SELECT COUNT(*) FROM agent_toolset_request")) {
+            Statement statement = connection.createStatement();
+            var result = statement.executeQuery("SELECT COUNT(*) FROM agent_toolset_request")) {
             assertThat(result.next()).isTrue();
             assertThat(result.getInt(1)).isEqualTo(4);
         }
     }
+
 
     @Test
     @DisplayName("대기 요청은 슬롯 1이 필수이고 끝난 요청은 슬롯을 비워야 한다")
@@ -76,14 +80,15 @@ class ToolsetRequestMigrationTest {
         assertThatThrownBy(() -> insert("APPROVED", 1)).isInstanceOf(SQLException.class);
     }
 
+
     private void insert(String state, Integer slot) throws SQLException {
         UUID id = UUID.randomUUID();
         byte[] bytes = ByteBuffer.allocate(16)
-                .putLong(id.getMostSignificantBits())
-                .putLong(id.getLeastSignificantBits())
-                .array();
+            .putLong(id.getMostSignificantBits())
+            .putLong(id.getLeastSignificantBits())
+            .array();
         try (Connection connection = connect();
-                PreparedStatement statement = connection.prepareStatement("""
+            PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO agent_toolset_request (public_id, group_id, agent_id, requester_user_id,
                     toolset, status, pending_slot, requested_at)
                 VALUES (?, 1, 1, 1, 'image_gen', ?, ?, CURRENT_TIMESTAMP)
@@ -95,9 +100,12 @@ class ToolsetRequestMigrationTest {
         }
     }
 
+
     private Connection connect() throws SQLException {
         return DriverManager.getConnection(database.url(), database.username(), database.password());
     }
 
-    record Database(String url, String username, String password) {}
+
+    record Database(String url, String username, String password) {
+    }
 }

@@ -31,6 +31,7 @@ class HermesRunLookupTest {
     private HttpHermesRunsClient client;
     private String baseUrl;
 
+
     @BeforeEach
     void start() throws IOException {
         when(keyStore.resolve("dad")).thenReturn("dad-key");
@@ -47,29 +48,31 @@ class HermesRunLookupTest {
         server.start();
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/p/dad";
         client = new HttpHermesRunsClient(
-                keyStore,
-                new HermesProperties(
-                        "keys",
-                        "https://hermes-dashboard.example.com",
-                        "test-dashboard-token",
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(2),
-                        Duration.ofSeconds(2)));
+            keyStore,
+            new HermesProperties(
+                "keys",
+                "https://hermes-dashboard.example.com",
+                "test-dashboard-token",
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(2)));
     }
+
 
     @AfterEach
     void stop() {
         server.stop(0);
     }
 
+
     @Test
     @DisplayName("끝난 실행은 답과 토큰과 실제로 돈 모델을 담아 돌려준다")
     void finishedRunCarriesTheResult() {
         body.set("{\"status\":\"completed\",\"output\":\"답\",\"session_id\":\"s1\","
-                + "\"usage\":{\"input_tokens\":10,\"output_tokens\":2,\"total_tokens\":12},"
-                + "\"runtime\":{\"provider\":\"p\",\"model\":\"m\"}}");
+            + "\"usage\":{\"input_tokens\":10,\"output_tokens\":2,\"total_tokens\":12},"
+            + "\"runtime\":{\"provider\":\"p\",\"model\":\"m\"}}");
 
         HermesRunLookup lookup = client.lookupRun(baseUrl, "dad", "run-1");
 
@@ -79,6 +82,7 @@ class HermesRunLookupTest {
         assertThat(lookup.result().runtime().model()).isEqualTo("m");
     }
 
+
     @Test
     @DisplayName("running 은 아직 돈다")
     void runningIsRunning() {
@@ -86,6 +90,7 @@ class HermesRunLookupTest {
 
         assertThat(client.lookupRun(baseUrl, "dad", "run-1").state()).isEqualTo(HermesRunLookup.State.RUNNING);
     }
+
 
     @Test
     @DisplayName("stopping 과 waiting_for_approval 도 아직 돈다")
@@ -97,6 +102,7 @@ class HermesRunLookupTest {
         assertThat(client.lookupRun(baseUrl, "dad", "run-1").state()).isEqualTo(HermesRunLookup.State.RUNNING);
     }
 
+
     @Test
     @DisplayName("status 가 없거나 글이 아니어도 아직 돈다")
     void missingOrNonTextStatusIsRunning() {
@@ -106,6 +112,7 @@ class HermesRunLookupTest {
         body.set("{\"status\":7}");
         assertThat(client.lookupRun(baseUrl, "dad", "run-1").state()).isEqualTo(HermesRunLookup.State.RUNNING);
     }
+
 
     @Test
     @DisplayName("interrupted 는 끝났지만 성공이 아니다")
@@ -118,6 +125,7 @@ class HermesRunLookupTest {
         assertThat(lookup.result().succeeded()).isFalse();
     }
 
+
     @Test
     @DisplayName("404 는 Hermes 가 그 run 을 모른다")
     void notFoundWhenHermesDoesNotKnowTheRun() {
@@ -126,16 +134,18 @@ class HermesRunLookupTest {
         assertThat(client.lookupRun(baseUrl, "dad", "run-1").state()).isEqualTo(HermesRunLookup.State.NOT_FOUND);
     }
 
+
     @Test
     @DisplayName("503 은 닿지 못한 것으로 예외를 올린다")
     void serviceUnavailableThrows() {
         status.set(503);
 
         assertThatThrownBy(() -> client.lookupRun(baseUrl, "dad", "run-1"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("429 는 붐벼서 거절당한 것으로 예외를 올린다")
@@ -143,10 +153,11 @@ class HermesRunLookupTest {
         status.set(429);
 
         assertThatThrownBy(() -> client.lookupRun(baseUrl, "dad", "run-1"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_BUSY);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_BUSY);
     }
+
 
     @Test
     @DisplayName("run 경로를 그 profile 의 key 로 부른다")

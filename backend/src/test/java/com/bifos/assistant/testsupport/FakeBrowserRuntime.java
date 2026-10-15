@@ -33,6 +33,7 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
 
     private int sequence;
 
+
     @Override
     public synchronized String create(String profileKey) {
         fail("create");
@@ -40,6 +41,7 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         containers.put(id, new RuntimeContainer(id, profileKey, false));
         return id;
     }
+
 
     @Override
     public synchronized void start(String containerId) {
@@ -50,6 +52,7 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
             exits.put(containerId, exitOnStart);
         }
     }
+
 
     @Override
     public synchronized void stop(String containerId) {
@@ -63,6 +66,7 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         }
     }
 
+
     @Override
     public synchronized void remove(String containerId) {
         fail("remove");
@@ -70,12 +74,14 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         removed.add(containerId);
     }
 
+
     @Override
     public synchronized Optional<URI> cdpAddress(String containerId) {
         return containers.containsKey(containerId) && !exits.containsKey(containerId)
-                ? Optional.of(URI.create("http://192.0.2.10:9999"))
-                : Optional.empty();
+            ? Optional.of(URI.create("http://192.0.2.10:9999"))
+            : Optional.empty();
     }
+
 
     @Override
     public synchronized OptionalInt exitCode(String containerId) {
@@ -83,41 +89,49 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         return code == null ? OptionalInt.empty() : OptionalInt.of(code);
     }
 
+
     @Override
     public synchronized List<RuntimeContainer> list() {
         fail("list");
         return List.copyOf(containers.values());
     }
 
+
     /** 지금 있는 컨테이너다. 번호 순이다. 검사가 비울 수도 있다. */
     public Map<String, RuntimeContainer> containers() {
         return containers;
     }
+
 
     /** 지운 컨테이너 번호다. 지운 순서대로다. */
     public List<String> removed() {
         return removed;
     }
 
+
     /** 여기 든 동작({@code create}, {@code start}, {@code stop}, {@code remove}, {@code list})은 실패한다. */
     public Set<String> failingActions() {
         return failingActions;
     }
+
 
     /** 여기 든 컨테이너를 멈추려 하면 실패한다. */
     public Set<String> failingStops() {
         return failingStops;
     }
 
+
     /** 비어 있지 않으면 다음 켜기부터 컨테이너가 곧바로 이 종료 코드로 끝난다. */
     public synchronized void exitOnStart(Integer code) {
         exitOnStart = code;
     }
 
+
     /** 표에 없는 컨테이너를 심는다. */
     public synchronized void plant(String id, String profileKey, boolean running) {
         containers.put(id, new RuntimeContainer(id, profileKey, running));
     }
+
 
     /** 컨테이너와 기록, 실패시킬 동작을 모두 비우고 번호를 처음부터 센다. */
     public synchronized void reset() {
@@ -129,6 +143,7 @@ public final class FakeBrowserRuntime implements BrowserRuntime {
         exitOnStart = null;
         sequence = 0;
     }
+
 
     private void fail(String action) {
         if (failingActions.contains(action)) {

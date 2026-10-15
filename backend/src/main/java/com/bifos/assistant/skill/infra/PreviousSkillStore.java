@@ -52,10 +52,12 @@ public class PreviousSkillStore {
     private final Path root;
     private final Clock clock;
 
+
     public PreviousSkillStore(SkillProperties properties, Clock clock) {
         this.clock = clock;
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
     }
+
 
     /**
      * 바뀌기 전 스킬을 그 스킬의 이전 버전으로 쓴다. 있던 이전 버전은 바뀐다.
@@ -109,6 +111,7 @@ public class PreviousSkillStore {
         }
     }
 
+
     /** 그 스킬의 이전 버전이다. 없으면 빈 값이다. */
     public Optional<PreviousSkill> readPrevious(String profile, String name) {
         Path skillDir = previousSkillDir(profile, name);
@@ -124,6 +127,7 @@ public class PreviousSkillStore {
         }
     }
 
+
     /** 그 스킬의 이전 버전을 남긴 시각이다. {@link #SAVED_AT} 만 읽고 본문은 읽지 않는다. 없으면 빈 값이다. */
     public Optional<Instant> previousSavedAt(String profile, String name) {
         Path skillDir = previousSkillDir(profile, name);
@@ -138,6 +142,7 @@ public class PreviousSkillStore {
         }
     }
 
+
     /** 그 스킬의 이전 버전을 지운다. 없으면 그냥 지나간다. {@code .previous} 가 링크면 지우지 않고 거절한다. */
     public void deletePrevious(String profile, String name) {
         Path skillDir = previousSkillDir(profile, name);
@@ -149,16 +154,19 @@ public class PreviousSkillStore {
         deleteRecursively(skillDir);
     }
 
+
     private Path previousSkillDir(String profile, String name) {
         requireSkillName(name);
         return resolveInside(resolveInside(profileDir(profile), PREVIOUS_DIR), name);
     }
+
 
     /** 이전 버전 디렉터리와 그 위 {@code .previous} 가 링크가 아닌 디렉터리인지 본다. */
     private static void requirePreviousSkillDir(Path skillDir) throws IOException {
         requireDirectory(skillDir.getParent());
         requireDirectory(skillDir);
     }
+
 
     /** {@code .previous} 가 있으면 링크가 아닌 디렉터리인지 본다. */
     static void requirePreviousRootIfPresent(Path profileDir) throws IOException {
@@ -167,6 +175,7 @@ public class PreviousSkillStore {
             requireDirectory(previousRoot);
         }
     }
+
 
     private static Instant readSavedAt(Path skillDir) throws IOException {
         Path savedAt = skillDir.resolve(SAVED_AT);
@@ -178,6 +187,7 @@ public class PreviousSkillStore {
             throw new IOException("skill previous version has an invalid saved time", ex);
         }
     }
+
 
     /** 앞선 쓰기가 남긴 {@code .old-} 와 {@code .tmp-} 항목을 지운다. 실패해도 쓰기를 막지 않고 경고 로그만 남긴다. */
     private static void removeLeftovers(Path previousRoot) {
@@ -202,6 +212,7 @@ public class PreviousSkillStore {
         }
     }
 
+
     /** 새 이전 버전을 옮기지 못했을 때 옮겨 둔 옛것을 제자리로 되돌린다. 되돌리기도 실패하면 원래 오류에 붙인다. */
     private static void restoreOld(Path old, Path target, IOException cause) {
         try {
@@ -212,10 +223,12 @@ public class PreviousSkillStore {
         }
     }
 
+
     private Path profileDir(String profile) {
         requireProfile(profile);
         return resolveInside(root, profile);
     }
+
 
     private Path resolveInside(Path base, String relative) {
         return SkillFiles.resolveInside(root, base, relative);

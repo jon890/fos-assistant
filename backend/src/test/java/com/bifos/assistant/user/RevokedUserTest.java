@@ -46,6 +46,7 @@ class RevokedUserTest {
     @Autowired
     HermesModelClient hermesModels;
 
+
     @BeforeEach
     void setUp() {
         agents.deleteAll();
@@ -53,11 +54,13 @@ class RevokedUserTest {
         people.deleteAll();
     }
 
+
     private AllowedPerson saveDisabledPerson() {
         AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now());
         person.disable();
         return people.save(person);
     }
+
 
     @Test
     @DisplayName("꺼진 주소는 비어 있는 값을 받고 사용자가 생기지 않는다")
@@ -71,6 +74,7 @@ class RevokedUserTest {
         assertThat(users.count()).isZero();
     }
 
+
     @Test
     @DisplayName("꺼진 주소를 대문자를 섞어 넘겨도 비어 있는 값을 받는다")
     void returnsEmptyForDisabledAddressInMixedCase() {
@@ -81,6 +85,7 @@ class RevokedUserTest {
         assertThat(resolved).isEmpty();
         assertThat(users.count()).isZero();
     }
+
 
     @Test
     @DisplayName("켜진 줄이 있는 주소는 사용자가 생긴다")
@@ -93,6 +98,7 @@ class RevokedUserTest {
         assertThat(users.findByEmail(EMAIL)).isPresent();
     }
 
+
     @Test
     @DisplayName("허용 목록에 줄이 없는 주소는 막지 않고 사용자가 생긴다")
     void createsUserForAddressWithoutAllowlistRow() {
@@ -101,6 +107,7 @@ class RevokedUserTest {
         assertThat(resolved).map(AppUser::email).contains("stranger@example.com");
         assertThat(users.findByEmail("stranger@example.com")).isPresent();
     }
+
 
     @Test
     @DisplayName("이미 들어온 사용자의 줄을 끄면 막히고 다시 켜면 같은 사용자가 돌아온다")
@@ -120,6 +127,7 @@ class RevokedUserTest {
         assertThat(users.count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("허용된 주소는 저장된 사용자와 칸이 같은 CurrentUser 를 받는다")
     void resolvesCurrentUserMatchingStoredUserForEnabledAddress() {
@@ -129,12 +137,13 @@ class RevokedUserTest {
 
         AppUser stored = users.findByEmail(EMAIL).orElseThrow();
         assertThat(resolved)
-                .contains(new CurrentUser(
-                        stored.id(), stored.email(), stored.displayName(), stored.groupId(), stored.role()));
+            .contains(new CurrentUser(
+                stored.id(), stored.email(), stored.displayName(), stored.groupId(), stored.role()));
         assertThat(resolved).map(CurrentUser::email).contains(EMAIL);
         assertThat(resolved).map(CurrentUser::displayName).contains(NAME);
         assertThat(users.count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("꺼진 주소는 CurrentUser 를 받지 못하고 사용자가 생기지 않는다")

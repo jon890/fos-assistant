@@ -48,6 +48,7 @@ class ConnectorBindingLookupTest {
     @Autowired
     HermesConnectorClient connector;
 
+
     @AfterEach
     void tearDown() {
         bindings.deleteAll();
@@ -55,6 +56,7 @@ class ConnectorBindingLookupTest {
         agents.deleteAll();
         users.deleteAll();
     }
+
 
     @Test
     @DisplayName("붙은 연결의 서버 이름과 등록 이름 앞부분을 바인딩 행으로 만들고 카탈로그를 부르지 않는다")
@@ -70,6 +72,7 @@ class ConnectorBindingLookupTest {
         assertThat(lookup.connectorToolPrefixes(agent.id())).containsExactly("mcp__demo_notes__", "mcp__mail__");
         verifyNoInteractions(connector);
     }
+
 
     @Test
     @DisplayName("붙은 연결이 없으면 비어 있고, 이름을 모르는 옛 바인딩은 있다고만 답한다")
@@ -87,6 +90,7 @@ class ConnectorBindingLookupTest {
         verifyNoInteractions(connector);
     }
 
+
     @Test
     @DisplayName("등록 이름이 잘리는 긴 서버 이름의 앞부분은 Hermes 가 남기는 55자까지다")
     void cutsPrefixOfLongServerNameAtKeptLength() {
@@ -98,31 +102,35 @@ class ConnectorBindingLookupTest {
         assertThat(lookup.connectorToolPrefixes(agent.id())).containsExactly(("mcp__" + server).substring(0, 55));
     }
 
+
     private void bind(Agent agent, ConnectorConnection connection, String server) {
         bindings.save(ConnectorBinding.pending(agent, connection, server, NOW));
     }
+
 
     private ConnectorConnection connection(AppUser owner, String connectorId) {
         return connections.save(ConnectorConnection.pending(owner.id(), connectorId, NOW));
     }
 
+
     private Agent agent(AppUser owner, boolean connectorManaged) {
         String code = "lookup-" + UUID.randomUUID().toString().substring(0, 12);
         Agent agent = Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW);
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW);
         if (connectorManaged) {
             agent.markConnectorManaged();
         }
         return agents.save(agent);
     }
+
 
     private AppUser user() {
         String suffix = UUID.randomUUID().toString();

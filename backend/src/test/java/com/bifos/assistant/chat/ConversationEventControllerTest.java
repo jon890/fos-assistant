@@ -97,6 +97,7 @@ class ConversationEventControllerTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private MockMvc mvc;
 
+
     @BeforeEach
     void setUp() {
         executionEvents.deleteAll();
@@ -107,10 +108,11 @@ class ConversationEventControllerTest {
         memories.deleteAll();
         users.deleteAll();
         mvc = MockMvcBuilders.standaloneSetup(new ConversationEventController(
-                        currentUser, access, hub, new ChatEventStreams(Duration.ofSeconds(20))))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            currentUser, access, hub, new ChatEventStreams(Duration.ofSeconds(20))))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
+
 
     @Test
     @DisplayName("주인이 구독하면 대화에 낸 system 사건을 받는다")
@@ -127,8 +129,9 @@ class ConversationEventControllerTest {
         assertThat(events.getFirst().path("text").asString()).isEqualTo("위임 결과가 도착했습니다");
         assertThat(events.getFirst().path("messageId").asLong()).isEqualTo(7L);
         assertThat(events.getFirst().path("conversationId").asString())
-                .isEqualTo(conversation.publicId().toString());
+            .isEqualTo(conversation.publicId().toString());
     }
+
 
     @Test
     @DisplayName("구독 직후 사건 없이도 첫 줄을 받는다")
@@ -140,6 +143,7 @@ class ConversationEventControllerTest {
         assertThat(body).as("주석 줄 간격(20초)을 기다리지 않고 받은 응답").startsWith(":connected\n");
         assertThat(received(subscribed)).isEmpty();
     }
+
 
     @Test
     @DisplayName("다른 대화에 낸 사건은 받지 않는다")
@@ -154,6 +158,7 @@ class ConversationEventControllerTest {
         assertThat(received(subscribed)).isEmpty();
     }
 
+
     @Test
     @DisplayName("남의 대화는 도는 turn 조회와 같은 오류다")
     void rejectsOthersConversationLikeRunningTurnLookup() throws Exception {
@@ -162,29 +167,30 @@ class ConversationEventControllerTest {
         signedIn("events-stranger", UserRole.MEMBER);
 
         MockHttpServletResponse events = mvc.perform(get("/api/v1/chat/conversations/{id}/events", dadsConversation))
-                .andReturn()
-                .getResponse();
+            .andReturn()
+            .getResponse();
         MockHttpServletResponse running = MockMvcBuilders.standaloneSetup(new ChatController(
-                        chat,
-                        currentUser,
-                        new UserDisplayNameService(users),
-                        null,
-                        access,
-                        new ChatEventStreams(Duration.ofSeconds(20)),
-                        null,
-                        mock(ModelTierService.class),
-                        List.of(),
-                        mock(SourceReadSummaries.class)))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build()
-                .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))
-                .andReturn()
-                .getResponse();
+            chat,
+            currentUser,
+            new UserDisplayNameService(users),
+            null,
+            access,
+            new ChatEventStreams(Duration.ofSeconds(20)),
+            null,
+            mock(ModelTierService.class),
+            List.of(),
+            mock(SourceReadSummaries.class)))
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build()
+            .perform(get("/api/v1/chat/conversations/{id}/running", dadsConversation))
+            .andReturn()
+            .getResponse();
 
         assertThat(events.getStatus()).isEqualTo(404).isEqualTo(running.getStatus());
         assertThat(events.getContentAsString(StandardCharsets.UTF_8))
-                .isEqualTo(running.getContentAsString(StandardCharsets.UTF_8));
+            .isEqualTo(running.getContentAsString(StandardCharsets.UTF_8));
     }
+
 
     @Test
     @DisplayName("MEMBER 역할에게는 tool 사건의 명령 원문을 싣지 않는다")
@@ -198,9 +204,10 @@ class ConversationEventControllerTest {
         JsonNode tool = received(subscribed).getFirst();
         assertThat(tool.path("toolName").asString()).isEqualTo("terminal");
         assertThat(tool.hasNonNull("detail"))
-                .as("MEMBER 역할의 terminal 사건에 detail 이 실렸다: %s", tool)
-                .isFalse();
+            .as("MEMBER 역할의 terminal 사건에 detail 이 실렸다: %s", tool)
+            .isFalse();
     }
+
 
     @Test
     @DisplayName("ADMIN 역할에게는 tool 사건의 명령 원문을 싣는다")
@@ -215,6 +222,7 @@ class ConversationEventControllerTest {
         assertThat(tool.path("detail").asString()).isEqualTo(COMMAND);
     }
 
+
     @Test
     @DisplayName("MEMBER 역할의 스트림에는 switched 사건이 없고 뒤따른 사건은 온다")
     void dropsSwitchedEventFromMemberStream() throws Exception {
@@ -227,13 +235,14 @@ class ConversationEventControllerTest {
 
         List<JsonNode> events = received(subscribed);
         assertThat(events)
-                .as("MEMBER 역할이 받은 사건: %s", events)
-                .extracting(event -> event.path("type").asString())
-                .containsExactly("system");
+            .as("MEMBER 역할이 받은 사건: %s", events)
+            .extracting(event -> event.path("type").asString())
+            .containsExactly("system");
         assertThat(subscribed.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .as("MEMBER 역할의 응답에 넘어간 곳의 모델이 실렸다")
-                .doesNotContain(SWITCHED_TO);
+            .as("MEMBER 역할의 응답에 넘어간 곳의 모델이 실렸다")
+            .doesNotContain(SWITCHED_TO);
     }
+
 
     @Test
     @DisplayName("ADMIN 역할의 스트림에는 switched 사건이 넘어간 곳과 함께 온다")
@@ -250,33 +259,37 @@ class ConversationEventControllerTest {
         assertThat(events.getFirst().path("text").asString()).isEqualTo(SWITCHED_TO);
     }
 
+
     /** 이 역할의 사용자와 그 사람의 에이전트를 만들고 로그인한 것으로 둔다. */
     private CurrentUser signedIn(String name, UserRole role) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, role, Instant.now()));
         agents.save(Agent.of(
-                name,
-                name,
-                name,
-                "http://agent-runtime.test/p/" + name,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            name,
+            name,
+            name,
+            "http://agent-runtime.test/p/" + name,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            Instant.now()));
         CurrentUser current = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), role);
         when(currentUser.require()).thenReturn(current);
         return current;
     }
 
+
     private Conversation conversationOf(CurrentUser user) {
         return chat.startEmpty(user, user.displayName());
     }
 
+
     private MvcResult subscribe(UUID conversationId) throws Exception {
         return mvc.perform(get("/api/v1/chat/conversations/{id}/events", conversationId))
-                .andExpect(request().asyncStarted())
-                .andReturn();
+            .andExpect(request().asyncStarted())
+            .andReturn();
     }
+
 
     /** 지금까지 쓰인 응답에서 {@code data:} 줄마다 사건 하나로 읽는다. */
     private List<JsonNode> received(MvcResult result) throws Exception {

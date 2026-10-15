@@ -31,27 +31,30 @@ public class ArtifactSourceFetcher {
     private final ArtifactSourceDnsResolver dnsResolver;
     private final ArtifactSourceTransport transport;
     private final ThreadPoolExecutor executor = new ThreadPoolExecutor(
-            0,
-            4,
-            30,
-            TimeUnit.SECONDS,
-            new SynchronousQueue<>(),
-            daemonFactory(),
-            new ThreadPoolExecutor.AbortPolicy());
+        0,
+        4,
+        30,
+        TimeUnit.SECONDS,
+        new SynchronousQueue<>(),
+        daemonFactory(),
+        new ThreadPoolExecutor.AbortPolicy());
+
 
     @Autowired
     public ArtifactSourceFetcher(ArtifactSourceProperties properties) {
         this(properties, InetAddress::getAllByName, new ArtifactSourceSocketTransport());
     }
 
+
     public ArtifactSourceFetcher(
-            ArtifactSourceProperties properties,
-            ArtifactSourceDnsResolver dnsResolver,
-            ArtifactSourceTransport transport) {
+        ArtifactSourceProperties properties,
+        ArtifactSourceDnsResolver dnsResolver,
+        ArtifactSourceTransport transport) {
         this.properties = properties;
         this.dnsResolver = dnsResolver;
         this.transport = transport;
     }
+
 
     public byte[] fetch(URI source, String expectedContentType) {
         ValidSource valid = validate(source);
@@ -78,8 +81,9 @@ public class ArtifactSourceFetcher {
         }
     }
 
+
     private byte[] fetchResolved(
-            ValidSource source, String expectedContentType, ArtifactSourceCancellation cancellation) throws Exception {
+        ValidSource source, String expectedContentType, ArtifactSourceCancellation cancellation) throws Exception {
         InetAddress[] addresses = dnsResolver.resolve(source.host());
         if (addresses == null || addresses.length == 0) {
             throw failed("artifact source host has no addresses", null);
@@ -94,12 +98,12 @@ public class ArtifactSourceFetcher {
         Throwable last = null;
         for (InetAddress address : publicAddresses) {
             try (ArtifactSourceResponse response = transport.get(
-                    address,
-                    source.host(),
-                    source.uri(),
-                    properties.connectTimeout(),
-                    properties.readTimeout(),
-                    cancellation)) {
+                address,
+                source.host(),
+                source.uri(),
+                properties.connectTimeout(),
+                properties.readTimeout(),
+                cancellation)) {
                 return validateResponse(response, expectedContentType);
             } catch (IOException ex) {
                 last = ex;
@@ -108,8 +112,9 @@ public class ArtifactSourceFetcher {
         throw failed("could not connect to artifact source", last);
     }
 
+
     private static byte[] validateResponse(ArtifactSourceResponse response, String expectedContentType)
-            throws IOException {
+        throws IOException {
         if (response.status() != 200) {
             throw failed("artifact source did not return success", null);
         }
@@ -134,9 +139,10 @@ public class ArtifactSourceFetcher {
         return readLimited(response.body(), expectedLength);
     }
 
+
     private static byte[] readLimited(InputStream body, Long expectedLength) throws IOException {
         try (InputStream input = body;
-                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int total = 0;
             while (true) {
@@ -163,18 +169,19 @@ public class ArtifactSourceFetcher {
         }
     }
 
+
     private ValidSource validate(URI source) {
         if (source == null
-                || !"https".equals(source.getScheme())
-                || source.getRawUserInfo() != null
-                || source.getRawFragment() != null
-                || source.getHost() == null
-                || source.getHost().endsWith(".")
-                || source.getPort() != -1 && source.getPort() != 443
-                || source.getHost().indexOf(':') >= 0
-                || source.getHost().matches("[0-9.]+")
-                || !source.getHost()
-                        .matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
+            || !"https".equals(source.getScheme())
+            || source.getRawUserInfo() != null
+            || source.getRawFragment() != null
+            || source.getHost() == null
+            || source.getHost().endsWith(".")
+            || source.getPort() != -1 && source.getPort() != 443
+            || source.getHost().indexOf(':') >= 0
+            || source.getHost().matches("[0-9.]+")
+            || !source.getHost()
+                .matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")) {
             throw failed("artifact source URL is invalid", null);
         }
         String host = source.getHost();
@@ -188,6 +195,7 @@ public class ArtifactSourceFetcher {
         }
         return new ValidSource(source, host);
     }
+
 
     static boolean isPublic(InetAddress address) {
         byte[] bytes = address.getAddress();
@@ -208,33 +216,35 @@ public class ArtifactSourceFetcher {
             return false;
         }
         return !address.isAnyLocalAddress()
-                && !address.isLoopbackAddress()
-                && !address.isLinkLocalAddress()
-                && !address.isMulticastAddress()
-                && !address.isSiteLocalAddress()
-                && (first & 0xfe) != 0xfc
-                && first != 0xff
-                && !isReservedV6(bytes);
+            && !address.isLoopbackAddress()
+            && !address.isLinkLocalAddress()
+            && !address.isMulticastAddress()
+            && !address.isSiteLocalAddress()
+            && (first & 0xfe) != 0xfc
+            && first != 0xff
+            && !isReservedV6(bytes);
     }
+
 
     private static boolean isPublicV4(int a, int b, int c, int d) {
         if (a == 0
-                || a == 10
-                || a == 127
-                || a >= 224
-                || (a == 100 && b >= 64 && b <= 127)
-                || (a == 169 && b == 254)
-                || (a == 172 && b >= 16 && b <= 31)
-                || (a == 192 && b == 168)
-                || (a == 192 && b == 0 && c == 0 && d != 9 && d != 10)
-                || (a == 192 && b == 88 && c == 99)
-                || (a == 198 && (b == 18 || b == 19))
-                || (a == 198 && b == 51 && c == 100)
-                || (a == 203 && b == 0 && c == 113)) {
+            || a == 10
+            || a == 127
+            || a >= 224
+            || (a == 100 && b >= 64 && b <= 127)
+            || (a == 169 && b == 254)
+            || (a == 172 && b >= 16 && b <= 31)
+            || (a == 192 && b == 168)
+            || (a == 192 && b == 0 && c == 0 && d != 9 && d != 10)
+            || (a == 192 && b == 88 && c == 99)
+            || (a == 198 && (b == 18 || b == 19))
+            || (a == 198 && b == 51 && c == 100)
+            || (a == 203 && b == 0 && c == 113)) {
             return false;
         }
         return true;
     }
+
 
     private static boolean isV4Mapped(byte[] bytes) {
         for (int i = 0; i < 10; i++) {
@@ -242,38 +252,45 @@ public class ArtifactSourceFetcher {
                 return false;
             }
         }
-        return bytes[10] == (byte) 0xff && bytes[11] == (byte) 0xff;
+        return bytes[10] == (byte)0xff && bytes[11] == (byte)0xff;
     }
+
 
     private static boolean hasControlCharacter(String value) {
         return value.chars().anyMatch(character -> character <= 0x1f || character == 0x7f);
     }
 
+
     private static boolean is6to4(byte[] bytes) {
         return bytes[0] == 0x20 && bytes[1] == 0x02;
     }
+
 
     private static boolean isTeredo(byte[] bytes) {
         return bytes[0] == 0x20 && bytes[1] == 0 && bytes[2] == 0 && bytes[3] == 0;
     }
 
+
     private static boolean isReservedV6(byte[] bytes) {
         return (bytes[0] == 0x20
-                        && bytes[1] == 0x01
-                        && bytes[2] == 0x00
-                        && (bytes[3] == 0x02 || (bytes[3] & 0xf0) == 0x10 || (bytes[3] & 0xf0) == 0x20))
-                || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == (byte) 0xb8);
+            && bytes[1] == 0x01
+            && bytes[2] == 0x00
+            && (bytes[3] == 0x02 || (bytes[3] & 0xf0) == 0x10 || (bytes[3] & 0xf0) == 0x20))
+            || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == (byte)0xb8);
     }
+
 
     private static String mediaType(String value) {
         return value == null ? "" : value.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
     }
 
+
     private static ApiException failed(String message, Throwable cause) {
         return cause == null
-                ? new ApiException(ErrorCode.INTERNAL_ERROR, message)
-                : new ApiException(ErrorCode.INTERNAL_ERROR, message, cause);
+            ? new ApiException(ErrorCode.INTERNAL_ERROR, message)
+            : new ApiException(ErrorCode.INTERNAL_ERROR, message, cause);
     }
+
 
     private static ThreadFactory daemonFactory() {
         return runnable -> {
@@ -283,5 +300,7 @@ public class ArtifactSourceFetcher {
         };
     }
 
-    private record ValidSource(URI uri, String host) {}
+
+    private record ValidSource(URI uri, String host) {
+    }
 }

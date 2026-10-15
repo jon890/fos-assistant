@@ -49,6 +49,7 @@ class ChatTurnRouting {
     private final UserExecutionLimiter limiter;
     private final ChatConversationQueries chatConversationQueries;
 
+
     /**
      * 대화와 에이전트를 정하고 어느 경로로 갈지 고른다.
      *
@@ -72,8 +73,7 @@ class ChatTurnRouting {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "attachments need an existing conversation");
         }
         Conversation existing = conversationId == null ? null : access.requireOwn(user, conversationId);
-        Agent agent =
-                existing == null ? agents.requireStartable(user, agentCode) : agents.requireById(existing.agentId());
+        Agent agent = existing == null ? agents.requireStartable(user, agentCode) : agents.requireById(existing.agentId());
         // 지운 에이전트의 대화는 읽기만 된다. 꺼진 것보다 먼저 봐야 없는 에이전트로 알린다.
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -92,11 +92,12 @@ class ChatTurnRouting {
             throw new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
         }
         Conversation conversation = existing != null
-                ? existing
-                : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
+            ? existing
+            : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
         return new Routed(conversation, agent, flow, attached, command, requestReceivedAt, existing == null);
     }
+
 
     /**
      * 그 대화의 turn 잠금과 사용자 자리를 얻는다.
@@ -116,6 +117,7 @@ class ChatTurnRouting {
         }
     }
 
+
     void deleteCreatedConversation(Long conversationId) {
         try {
             conversations.deleteById(conversationId);
@@ -123,6 +125,7 @@ class ChatTurnRouting {
             log.warn("사용자 실행 한도로 거절한 요청의 빈 대화를 지우지 못했다 conversationId={}", conversationId, ex);
         }
     }
+
 
     /**
      * 메시지가 스킬 커맨드이면 그 이름이 에이전트의 켜진 스킬인지 확인해 낸다. 근거는 ADR-035 에 있다.
@@ -145,6 +148,7 @@ class ChatTurnRouting {
         return command;
     }
 
+
     /**
      * 빈 대화를 먼저 만든 경우 첫 메시지로 제목을 채운다.
      *
@@ -159,13 +163,14 @@ class ChatTurnRouting {
         }
     }
 
+
     /** 다시 생성할 대화의 에이전트를 정한다. 저장된 질문이 스킬 커맨드이면 보낼 때와 같게 판별한다. */
     Routed routeExisting(
-            CurrentUser user,
-            Conversation conversation,
-            List<ChatAttachment> attached,
-            String question,
-            Instant requestReceivedAt) {
+        CurrentUser user,
+        Conversation conversation,
+        List<ChatAttachment> attached,
+        String question,
+        Instant requestReceivedAt) {
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted()) {
             throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
@@ -176,8 +181,9 @@ class ChatTurnRouting {
         requireAttachmentOwner(user, agent, !attached.isEmpty());
         Flow flow = flows.find(agent.flow());
         return new Routed(
-                conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
+            conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
     }
+
 
     static void requireAttachmentOwner(CurrentUser user, Agent agent, boolean withAttachments) {
         if (!withAttachments) {
@@ -190,25 +196,26 @@ class ChatTurnRouting {
         }
     }
 
+
     /**
      * 이 turn 의 질문을 남기고, 사람이 보낸 질문이면 그 메시지 번호를 돌려준다.
      *
      * @return 새 질문이면 방금 저장한 메시지, 다시 생성이면 이미 있는 질문의 번호. 사람 없이 열린 turn 이면 null 이다
      */
     Long saveQuestion(
-            CurrentUser user,
-            Conversation conversation,
-            String text,
-            List<Long> attachmentIds,
-            TurnIntent intent,
-            Consumer<ChatEvent> onEvent) {
+        CurrentUser user,
+        Conversation conversation,
+        String text,
+        List<Long> attachmentIds,
+        TurnIntent intent,
+        Consumer<ChatEvent> onEvent) {
         if (intent instanceof TurnIntent.ProactiveCheck proactive) {
             if (!proactive.check().notifyStart()) {
                 return null;
             }
             // 질문 대신 시작 알림 줄 하나를 남긴다. 제목, 자동 turn 수, 대기 행은 건드리지 않는다.
             ChatMessage notice = transactions.execute(status -> messages.save(
-                    ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));
+                ChatMessage.fromSystem(conversation.id(), proactive.check().startNotice(), clock.instant())));
             onEvent.accept(ChatEvent.system(conversation.publicId(), notice.id(), notice.content()));
             return null;
         }
@@ -217,8 +224,7 @@ class ChatTurnRouting {
             // 알림 줄, 지시, 자동 turn 수 초기화가 함께 남거나 함께 빠진다. 사람이 질문한 것과 같게 자동 turn 수를 새로 센다.
             List<ChatMessage> saved = transactions.execute(status -> {
                 Instant savedAt = clock.instant();
-                ChatMessage line =
-                        messages.save(ChatMessage.fromSystem(conversation.id(), scheduled.notice(), savedAt));
+                ChatMessage line = messages.save(ChatMessage.fromSystem(conversation.id(), scheduled.notice(), savedAt));
                 fillBlankTitle(conversation, text);
                 ChatMessage question = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, savedAt));
                 conversationWriter.resetAutoTurns(conversation.id());
@@ -239,8 +245,7 @@ class ChatTurnRouting {
         List<Long> pendingIds = fresh.pendingIds();
         ChatMessage question = transactions.execute(status -> {
             fillBlankTitle(conversation, text);
-            ChatMessage saved =
-                    messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
+            ChatMessage saved = messages.save(ChatMessage.fromUser(conversation.id(), user.id(), text, clock.instant()));
             attachments.attach(saved.id(), conversation.id(), attachmentIds);
             // 사람이 질문했으니 사용자의 질문 없이 연 turn 의 수를 새로 센다.
             conversationWriter.resetAutoTurns(conversation.id());
@@ -263,16 +268,18 @@ class ChatTurnRouting {
         return question.id();
     }
 
+
     List<ChatMessage> activeMessages(Long conversationId) {
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
         Set<Long> replaced = history.stream()
-                .map(ChatMessage::replacesMessageId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+            .map(ChatMessage::replacesMessageId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
         return history.stream()
-                .filter(message -> !replaced.contains(message.id()))
-                .toList();
+            .filter(message -> !replaced.contains(message.id()))
+            .toList();
     }
+
 
     /**
      * 답 앞의 질문을 뒤로 거슬러 찾는다.
@@ -292,6 +299,7 @@ class ChatTurnRouting {
         }
         return null;
     }
+
 
     static String titleFrom(String text) {
         String single = text.strip().replaceAll("\\s+", " ");

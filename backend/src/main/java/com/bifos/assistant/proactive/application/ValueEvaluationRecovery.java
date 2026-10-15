@@ -24,10 +24,12 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
     private final HermesProperties hermes;
     private volatile boolean running;
 
+
     public void recover() {
         recoverEvaluations();
         recoverExecutions();
     }
+
 
     private void recoverEvaluations() {
         try {
@@ -36,9 +38,9 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
                     store.recover(id);
                 } catch (RuntimeException ex) {
                     log.warn(
-                            "가치 평가의 기동 복구를 건너뛴다 evaluationId={} error={}",
-                            id,
-                            ex.getClass().getSimpleName());
+                        "가치 평가의 기동 복구를 건너뛴다 evaluationId={} error={}",
+                        id,
+                        ex.getClass().getSimpleName());
                 }
             }
         } catch (RuntimeException ex) {
@@ -46,17 +48,17 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
         }
     }
 
+
     private void recoverExecutions() {
         try {
-            for (AgentExecution execution :
-                    executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(ExecutionStatus.RUNNING)) {
+            for (AgentExecution execution : executions.findByAgentIdIsNullAndConversationIdIsNullAndStatus(ExecutionStatus.RUNNING)) {
                 try {
                     recoverExecution(execution);
                 } catch (RuntimeException ex) {
                     log.warn(
-                            "판단 실행의 기동 복구를 건너뛴다 executionId={} error={}",
-                            execution.id(),
-                            ex.getClass().getSimpleName());
+                        "판단 실행의 기동 복구를 건너뛴다 executionId={} error={}",
+                        execution.id(),
+                        ex.getClass().getSimpleName());
                 }
             }
         } catch (RuntimeException ex) {
@@ -64,18 +66,20 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
         }
     }
 
+
     private void recoverExecution(AgentExecution execution) {
         if (execution.hermesRunId() != null) {
             limiter.holdUntilRemoteEnds(
-                    execution.userId(),
-                    execution.id(),
-                    hermes.profileBaseUrl(execution.profileName()),
-                    execution.profileName(),
-                    execution.hermesRunId(),
-                    false);
+                execution.userId(),
+                execution.id(),
+                hermes.profileBaseUrl(execution.profileName()),
+                execution.profileName(),
+                execution.hermesRunId(),
+                false);
         }
         recorder.fail(execution, "DECISION_INTERRUPTED");
     }
+
 
     @Override
     public void start() {
@@ -88,15 +92,18 @@ public class ValueEvaluationRecovery implements SmartLifecycle {
         }
     }
 
+
     @Override
     public void stop() {
         running = false;
     }
 
+
     @Override
     public boolean isRunning() {
         return running;
     }
+
 
     @Override
     public int getPhase() {

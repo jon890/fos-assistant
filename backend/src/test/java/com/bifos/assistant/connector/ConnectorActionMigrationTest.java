@@ -26,23 +26,25 @@ class ConnectorActionMigrationTest {
 
     private String url;
 
+
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:connector-action-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target("46")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target("46")
+            .load()
+            .migrate();
         execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)" + " VALUES (" + OWNER
-                + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
+            + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
         execute("INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,"
-                + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed,"
-                + " connector_attachments)"
-                + " VALUES (" + OWNER + ", 'c', 'n', 'p', 'http://localhost', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD',"
-                + " 'PRIVATE', " + OWNER + ", TRUE, CURRENT_TIMESTAMP(6), TRUE, FALSE)");
+            + " credential_scope, visibility, owner_user_id, enabled, created_at, connector_managed,"
+            + " connector_attachments)"
+            + " VALUES (" + OWNER + ", 'c', 'n', 'p', 'http://localhost', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD',"
+            + " 'PRIVATE', " + OWNER + ", TRUE, CURRENT_TIMESTAMP(6), TRUE, FALSE)");
     }
+
 
     @Test
     @DisplayName("V46은 승인 상태와 인자 원문과 원래 도구 이름이 빈 판정 줄을 받는다")
@@ -50,10 +52,10 @@ class ConnectorActionMigrationTest {
         execute(row("01", KEY_A, OWNER, OWNER));
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery(
-                        "SELECT decision, passed, status, args_json, tool_name, conversation_id FROM connector_action"
-                                + " WHERE dedupe_key = '" + KEY_A + "'")) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery(
+                "SELECT decision, passed, status, args_json, tool_name, conversation_id FROM connector_action"
+                    + " WHERE dedupe_key = '" + KEY_A + "'")) {
             assertThat(row.next()).as("넣은 줄").isTrue();
             assertThat(row.getString("decision")).isEqualTo("NEEDS_APPROVAL");
             assertThat(row.getBoolean("passed")).isTrue();
@@ -64,6 +66,7 @@ class ConnectorActionMigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("V46은 dedupe_key 가 겹치는 둘째 줄을 거절한다")
     void v42RejectsSecondRowWithSameDedupeKey() throws SQLException {
@@ -72,6 +75,7 @@ class ConnectorActionMigrationTest {
         assertThatThrownBy(() -> execute(row("02", KEY_A, OWNER, OWNER))).isInstanceOf(SQLException.class);
         assertThat(count()).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("V46은 public_id 가 겹치는 둘째 줄을 거절한다")
@@ -82,6 +86,7 @@ class ConnectorActionMigrationTest {
         assertThat(count()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("V46은 없는 사용자나 없는 에이전트를 가리키는 줄을 거절한다")
     void v42RejectsRowOfUnknownUserOrAgent() throws SQLException {
@@ -90,26 +95,29 @@ class ConnectorActionMigrationTest {
         assertThat(count()).isZero();
     }
 
+
     /** 승인 엔진 전의 승인 필요 줄이다. 채우지 않는 칸은 적지 않는다. */
     private static String row(String publicIdLastByte, String dedupeKey, int userId, int agentId) {
         return "INSERT INTO connector_action (public_id, user_id, agent_id, connector_id, hermes_tool, risk,"
-                + " approval_mode, decision, passed, origin_execution_id, dedupe_key, args_sha256, created_at)"
-                + " VALUES (X'000000000000000000000000000000" + publicIdLastByte + "', " + userId + ", " + agentId
-                + ", 'demo-notes', 'mcp__demo__write_note', 'WRITE', 'REQUIRED', 'NEEDS_APPROVAL', TRUE, 1, '"
-                + dedupeKey + "', '" + "0".repeat(64) + "', CURRENT_TIMESTAMP(6))";
+            + " approval_mode, decision, passed, origin_execution_id, dedupe_key, args_sha256, created_at)"
+            + " VALUES (X'000000000000000000000000000000" + publicIdLastByte + "', " + userId + ", " + agentId
+            + ", 'demo-notes', 'mcp__demo__write_note', 'WRITE', 'REQUIRED', 'NEEDS_APPROVAL', TRUE, 1, '"
+            + dedupeKey + "', '" + "0".repeat(64) + "', CURRENT_TIMESTAMP(6))";
     }
+
 
     private void execute(String sql) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
         }
     }
 
+
     private int count() throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM connector_action")) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery("SELECT COUNT(*) FROM connector_action")) {
             row.next();
             return row.getInt(1);
         }

@@ -22,6 +22,7 @@ public class SignInPolicy implements SignInRevocation {
     private final AllowedPersonRepository people;
     private final Clock clock;
 
+
     /** 들어와도 되면 그 사람을, 아니면 비어 있는 값을 돌려준다. */
     @Transactional(readOnly = true)
     public Optional<AllowedPerson> admit(String email) {
@@ -30,6 +31,7 @@ public class SignInPolicy implements SignInRevocation {
         }
         return people.findByEmailAndEnabledTrue(AllowedPerson.normalizeEmail(email));
     }
+
 
     /** 그 주소의 줄이 꺼져 있는가. 줄이 없으면 거짓이다(ADR-059). */
     @Override
@@ -40,6 +42,7 @@ public class SignInPolicy implements SignInRevocation {
         }
         return people.existsByEmailAndEnabledFalse(AllowedPerson.normalizeEmail(email));
     }
+
 
     /** 로그인 완료 시각을 기록한다. 허용하지 않은 주소는 거절한다. */
     @Transactional

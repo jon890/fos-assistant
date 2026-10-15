@@ -28,26 +28,26 @@ import java.util.Map;
  * @param alreadyExecuted 그 원천 살펴보기의 실행 키가 이미 있다
  */
 public record AutonomyInputs(
-        DecisionOutcome evaluationOutcome,
-        boolean replay,
-        Instant evaluatedAt,
-        Instant asOf,
-        Instant decidedAt,
-        boolean judged,
-        boolean candidateCurrent,
-        String actionType,
-        String sideEffect,
-        String candidateConfidence,
-        Map<DecisionAxis, DecisionLevel> choices,
-        Map<DecisionAxis, DecisionConfidence> axisConfidences,
-        DecisionConfidence judgementConfidence,
-        Instant evidenceCheckedAt,
-        boolean executionEnabled,
-        boolean userConsented,
-        boolean writesAllowed,
-        CheckTrigger sourceTrigger,
-        boolean agentStartable,
-        boolean alreadyExecuted) {
+    DecisionOutcome evaluationOutcome,
+    boolean replay,
+    Instant evaluatedAt,
+    Instant asOf,
+    Instant decidedAt,
+    boolean judged,
+    boolean candidateCurrent,
+    String actionType,
+    String sideEffect,
+    String candidateConfidence,
+    Map<DecisionAxis, DecisionLevel> choices,
+    Map<DecisionAxis, DecisionConfidence> axisConfidences,
+    DecisionConfidence judgementConfidence,
+    Instant evidenceCheckedAt,
+    boolean executionEnabled,
+    boolean userConsented,
+    boolean writesAllowed,
+    CheckTrigger sourceTrigger,
+    boolean agentStartable,
+    boolean alreadyExecuted) {
 
     public AutonomyInputs {
         choices = Map.copyOf(choices);

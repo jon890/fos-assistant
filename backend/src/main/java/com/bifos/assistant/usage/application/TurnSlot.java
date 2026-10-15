@@ -14,15 +14,18 @@ public final class TurnSlot {
     private final Long backgroundConversationId;
     private final AtomicBoolean released = new AtomicBoolean();
 
+
     TurnSlot(UserExecutionLimiter limiter, Long userId) {
         this(limiter, userId, null);
     }
+
 
     TurnSlot(UserExecutionLimiter limiter, Long userId, Long backgroundConversationId) {
         this.limiter = limiter;
         this.userId = userId;
         this.backgroundConversationId = backgroundConversationId;
     }
+
 
     /** 자리를 제한기에 돌려준다. 두 번째부터는 아무것도 하지 않는다. */
     public void release() {

@@ -17,16 +17,19 @@ class FlowRegistryTest {
     private final Flow flow = mock(Flow.class);
     private final FlowRegistry registry;
 
+
     FlowRegistryTest() {
         when(flow.name()).thenReturn("research-and-build");
         registry = new FlowRegistry(List.of(flow), mock(AgentRepository.class));
     }
+
 
     @Test
     @DisplayName("등록한 흐름 이름은 안다")
     void knowsRegisteredName() {
         assertThat(registry.known("research-and-build")).isTrue();
     }
+
 
     @Test
     @DisplayName("모르는 이름과 null 과 빈 문자열은 예외 없이 모른다고 답한다")

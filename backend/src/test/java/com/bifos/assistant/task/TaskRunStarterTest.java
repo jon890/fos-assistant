@@ -183,19 +183,22 @@ class TaskRunStarterTest {
     private final List<Long> createdChecks = new ArrayList<>();
     private final List<TurnSlot> heldSlots = new ArrayList<>();
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
         stub().reset();
         stub().willReturn(HermesRunResult.of(
-                "run-task", "session", "completed", "정리한 답", "model", "provider", TokenUsage.empty()));
+            "run-task", "session", "completed", "정리한 답", "model", "provider", TokenUsage.empty()));
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         cleanTasks();
     }
+
 
     @AfterEach
     void tearDown() {
@@ -206,6 +209,7 @@ class TaskRunStarterTest {
         createdUsers.forEach(userId -> notifications.deleteAll(notificationsOf(userId)));
         createdUsers.clear();
     }
+
 
     @Test
     @DisplayName("QUEUED 를 열면 작업의 새 대화에 알림 줄, 지시, 답이 남고 SUCCEEDED 와 실행 번호가 적히며 ALWAYS 면 TASK_SUCCEEDED 하나다")
@@ -221,21 +225,20 @@ class TaskRunStarterTest {
         assertThat(finished.executionId()).as("루트 실행 번호").isNotNull();
         assertThat(finished.startedAt()).isEqualTo(NOW);
         assertThat(finished.finishedAt()).isNotNull();
-        Conversation conversation =
-                conversations.findById(finished.conversationId()).orElseThrow();
+        Conversation conversation = conversations.findById(finished.conversationId()).orElseThrow();
         assertThat(conversation.taskId()).as("대화의 작업").isEqualTo(fixture.task().id());
         assertThat(conversation.title()).as("대화 제목").isEqualTo(TITLE);
         assertThat(conversation.autoTurnCount()).as("자동 turn 수").isZero();
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
         assertThat(history)
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.SYSTEM, MessageRole.USER, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.SYSTEM, MessageRole.USER, MessageRole.ASSISTANT);
         assertThat(history)
-                .extracting(ChatMessage::content)
-                .containsExactly("예약 작업 「" + TITLE + "」 을 시작했어요", INSTRUCTION, "정리한 답");
+            .extracting(ChatMessage::content)
+            .containsExactly("예약 작업 「" + TITLE + "」 을 시작했어요", INSTRUCTION, "정리한 답");
         assertThat(stub().received().getLast().instructions())
-                .as("Hermes 에 간 지시")
-                .contains(TurnIntent.SCHEDULED_INSTRUCTION);
+            .as("Hermes 에 간 지시")
+            .contains(TurnIntent.SCHEDULED_INSTRUCTION);
         assertThat(notificationsOf(fixture.owner().id())).singleElement().satisfies(notification -> {
             assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SUCCEEDED);
             assertThat(notification.title()).isEqualTo("「" + TITLE + "」 실행을 마쳤어요");
@@ -244,6 +247,7 @@ class TaskRunStarterTest {
             assertThat(notification.targetPublicId()).isEqualTo(conversation.publicId());
         });
     }
+
 
     @Test
     @DisplayName("알림이 ON_FAILURE 면 성공한 발화를 알리지 않는다")
@@ -256,6 +260,7 @@ class TaskRunStarterTest {
         assertThat(awaitFinished(run).status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(notificationsOf(fixture.owner().id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("자리를 얻지 못하고 시작 시간을 넘긴 NEW_PER_RUN 발화의 빈 대화를 지우고 BUSY 로 알린다")
@@ -290,6 +295,7 @@ class TaskRunStarterTest {
         });
     }
 
+
     @Test
     @DisplayName("기다리는 동안 작업을 멈추면 빈 대화를 지운다")
     void discardsEmptyConversationWhenWaitingTaskPaused() {
@@ -313,6 +319,7 @@ class TaskRunStarterTest {
         assertThat(conversations.findById(conversationId)).isEmpty();
     }
 
+
     @Test
     @DisplayName("SINGLE 발화가 건너뛰어지면 대화를 지우지 않는다")
     void keepsSingleConversationWhenRunSkipped() {
@@ -329,9 +336,10 @@ class TaskRunStarterTest {
         assertThat(skipped.reason()).isEqualTo(TaskRunReason.BUSY);
         assertThat(skipped.conversationId()).isEqualTo(conversationId);
         assertThat(tasks.findById(fixture.task().id()).orElseThrow().conversationId())
-                .isEqualTo(conversationId);
+            .isEqualTo(conversationId);
         assertThat(conversations.findById(conversationId)).isPresent();
     }
+
 
     @Test
     @DisplayName("메시지가 있는 NEW_PER_RUN 대화는 발화를 건너뛰어도 지우지 않는다")
@@ -352,6 +360,7 @@ class TaskRunStarterTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)).hasSize(1);
     }
 
+
     @Test
     @DisplayName("기다리는 동안 에이전트를 바꾸면 새 에이전트의 새 대화로 돈다")
     void replacesWaitingConversationWhenAgentChanged() {
@@ -362,18 +371,18 @@ class TaskRunStarterTest {
         Long previousId = runs.findById(run.id()).orElseThrow().conversationId();
         String code = "replacement-" + UUID.randomUUID().toString().substring(0, 8);
         Agent replacement = agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                fixture.owner().id(),
-                NOW));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            fixture.owner().id(),
+            NOW));
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
         task.edit(
-                replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy(), NOW);
+            replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy(), NOW);
         tasks.save(task);
         heldSlots.forEach(TurnSlot::release);
         heldSlots.clear();
@@ -384,12 +393,13 @@ class TaskRunStarterTest {
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(finished.conversationId()).isNotEqualTo(previousId);
         assertThat(conversations
-                        .findById(finished.conversationId())
-                        .orElseThrow()
-                        .agentId())
+            .findById(finished.conversationId())
+            .orElseThrow()
+            .agentId())
                 .isEqualTo(replacement.id());
         assertThat(conversations.findById(previousId)).isEmpty();
     }
+
 
     @Test
     @DisplayName("QUEUED 로 기다리는 동안 줄의 대화를 지우면 다음에 열 때 새 대화로 SUCCEEDED 가 되고 알림이 새 대화를 가리킨다")
@@ -401,8 +411,8 @@ class TaskRunStarterTest {
         Long deleted = runs.findById(run.id()).orElseThrow().conversationId();
         assertThat(deleted).as("기다리는 줄의 대화").isNotNull();
         assertThat(conversationWriter.deleteIfActive(deleted, fixture.owner().id(), NOW))
-                .as("지운 대화 수")
-                .isEqualTo(1);
+            .as("지운 대화 수")
+            .isEqualTo(1);
         heldSlots.forEach(TurnSlot::release);
         heldSlots.clear();
 
@@ -412,20 +422,20 @@ class TaskRunStarterTest {
         TaskRun finished = awaitFinished(run);
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(finished.conversationId()).as("새로 적은 대화").isNotNull().isNotEqualTo(deleted);
-        Conversation conversation =
-                conversations.findById(finished.conversationId()).orElseThrow();
+        Conversation conversation = conversations.findById(finished.conversationId()).orElseThrow();
         assertThat(conversation.taskId())
-                .as("새 대화의 작업")
-                .isEqualTo(fixture.task().id());
+            .as("새 대화의 작업")
+            .isEqualTo(fixture.task().id());
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.SYSTEM, MessageRole.USER, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.SYSTEM, MessageRole.USER, MessageRole.ASSISTANT);
         assertThat(notificationsOf(fixture.owner().id())).singleElement().satisfies(notification -> {
             assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SUCCEEDED);
             assertThat(notification.targetType()).isEqualTo(NotificationTargetType.CONVERSATION);
             assertThat(notification.targetPublicId()).isEqualTo(conversation.publicId());
         });
     }
+
 
     @Test
     @DisplayName("놓친 발화로 예정 시각보다 30분 늦게 만든 줄은 만든 때부터 재므로 바로 열린다")
@@ -440,6 +450,7 @@ class TaskRunStarterTest {
         assertThat(awaitFinished(run).status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(notificationsOf(fixture.owner().id())).as("NEVER 의 알림").isEmpty();
     }
+
 
     @Test
     @DisplayName("에이전트를 끄면 AGENT_UNAVAILABLE 로 건너뛰고 알린다")
@@ -456,10 +467,11 @@ class TaskRunStarterTest {
         assertThat(skipped.status()).isEqualTo(TaskRunStatus.SKIPPED);
         assertThat(skipped.reason()).isEqualTo(TaskRunReason.AGENT_UNAVAILABLE);
         assertThat(notificationsOf(fixture.owner().id()))
-                .extracting(Notification::kind)
-                .containsExactly(NotificationKind.TASK_SKIPPED);
+            .extracting(Notification::kind)
+            .containsExactly(NotificationKind.TASK_SKIPPED);
         assertThat(conversationsOf(fixture.task())).as("작업의 대화").isEmpty();
     }
+
 
     @Test
     @DisplayName("주인을 허용 목록에서 끄면 OWNER_REVOKED 로 건너뛰고 알리지 않는다")
@@ -467,7 +479,7 @@ class TaskRunStarterTest {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
         AllowedPerson person = AllowedPerson.of(
-                fixture.owner().email(), "owner", fixture.owner().email(), NOW);
+            fixture.owner().email(), "owner", fixture.owner().email(), NOW);
         person.disable();
         people.save(person);
 
@@ -482,6 +494,7 @@ class TaskRunStarterTest {
             people.delete(person);
         }
     }
+
 
     @Test
     @DisplayName("멈춘 작업의 QUEUED 는 PAUSED 로 건너뛴다")
@@ -500,24 +513,26 @@ class TaskRunStarterTest {
         assertThat(notificationsOf(fixture.owner().id())).isEmpty();
     }
 
+
     @Test
     @DisplayName("준비 뒤 시작 전에 멈춘 작업은 새 실행을 열지 않는다")
     void skipsWhenPausedAfterPreparation() {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
         doAnswer(invocation -> {
-                    newUserTransaction()
-                            .executeWithoutResult(status -> service.pause(
-                                    currentUser(fixture.owner()), fixture.task().publicId()));
-                    return invocation.callRealMethod();
-                })
-                .when(turns)
-                .open(eq(fixture.owner().id()), anyLong());
+            newUserTransaction()
+                .executeWithoutResult(status -> service.pause(
+                    currentUser(fixture.owner()), fixture.task().publicId()));
+            return invocation.callRealMethod();
+        })
+            .when(turns)
+            .open(eq(fixture.owner().id()), anyLong());
 
         assertThat(starter.startQueued(NOW)).isZero();
 
         assertPausedWithoutSubmission(fixture, run);
     }
+
 
     @Test
     @DisplayName("준비 뒤 시작 전에 지운 작업도 새 실행을 열지 않는다")
@@ -525,18 +540,19 @@ class TaskRunStarterTest {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
         doAnswer(invocation -> {
-                    newUserTransaction()
-                            .executeWithoutResult(status -> service.archive(
-                                    currentUser(fixture.owner()), fixture.task().publicId()));
-                    return invocation.callRealMethod();
-                })
-                .when(turns)
-                .open(eq(fixture.owner().id()), anyLong());
+            newUserTransaction()
+                .executeWithoutResult(status -> service.archive(
+                    currentUser(fixture.owner()), fixture.task().publicId()));
+            return invocation.callRealMethod();
+        })
+            .when(turns)
+            .open(eq(fixture.owner().id()), anyLong());
 
         assertThat(starter.startQueued(NOW)).isZero();
 
         assertPausedWithoutSubmission(fixture, run);
     }
+
 
     @Test
     @DisplayName("멈추기가 커밋되기 전이면 시작 단계가 기다렸다가 멈춘 상태를 본다")
@@ -563,12 +579,12 @@ class TaskRunStarterTest {
                 return null;
             });
             doAnswer(invocation -> {
-                        opened.countDown();
-                        assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
-                        return invocation.callRealMethod();
-                    })
-                    .when(turns)
-                    .open(eq(fixture.owner().id()), anyLong());
+                opened.countDown();
+                assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+                return invocation.callRealMethod();
+            })
+                .when(turns)
+                .open(eq(fixture.owner().id()), anyLong());
 
             var start = executor.submit(() -> starter.startQueued(NOW));
             assertThat(start.get(10, TimeUnit.SECONDS)).isZero();
@@ -578,15 +594,18 @@ class TaskRunStarterTest {
         assertPausedWithoutSubmission(fixture, run);
     }
 
+
     private TransactionTemplate newUserTransaction() {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         return transaction;
     }
 
+
     private static CurrentUser currentUser(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
+
 
     private void assertPausedWithoutSubmission(Fixture fixture, TaskRun run) {
         TaskRun skipped = awaitFinished(run);
@@ -601,18 +620,19 @@ class TaskRunStarterTest {
             assertThat(skipped.conversationId()).isNull();
             assertThat(conversations.findById(conversationId)).isEmpty();
             assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
-                    .isEmpty();
+                .isEmpty();
         } else {
             assertThat(skipped.conversationId()).isEqualTo(conversationId);
             assertThat(conversations.findById(conversationId)).isPresent();
         }
         assertThat(messages.findByConversationIdOrderByIdAsc(conversationId))
-                .extracting(ChatMessage::role)
-                .doesNotContain(MessageRole.USER);
+            .extracting(ChatMessage::role)
+            .doesNotContain(MessageRole.USER);
         assertThat(turns.markOf(conversationId).running()).isFalse();
         assertThat(limiter.hasTurnRoom(fixture.owner().id())).isTrue();
         assertThat(notificationsOf(fixture.owner().id())).isEmpty();
     }
+
 
     @Test
     @DisplayName("Hermes 가 실패하면 FAILED 로 적고 그 대화를 가리키는 TASK_FAILED 를 알린다")
@@ -626,8 +646,7 @@ class TaskRunStarterTest {
         TaskRun failed = awaitFinished(run);
         assertThat(failed.status()).isEqualTo(TaskRunStatus.FAILED);
         assertThat(failed.reason()).isEqualTo(TaskRunReason.FAILED);
-        Conversation conversation =
-                conversations.findById(failed.conversationId()).orElseThrow();
+        Conversation conversation = conversations.findById(failed.conversationId()).orElseThrow();
         assertThat(notificationsOf(fixture.owner().id())).singleElement().satisfies(notification -> {
             assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_FAILED);
             assertThat(notification.title()).isEqualTo("「" + TITLE + "」 실행이 실패했어요");
@@ -636,6 +655,7 @@ class TaskRunStarterTest {
             assertThat(notification.targetPublicId()).isEqualTo(conversation.publicId());
         });
     }
+
 
     @Test
     @DisplayName("SINGLE 작업은 두 번째 발화가 첫 발화의 대화에 이어진다")
@@ -653,37 +673,36 @@ class TaskRunStarterTest {
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(finished.conversationId()).as("두 번째 발화의 대화").isEqualTo(firstConversation);
         assertThat(tasks.findById(fixture.task().id()).orElseThrow().conversationId())
-                .as("작업에 적은 대화")
-                .isEqualTo(firstConversation);
+            .as("작업에 적은 대화")
+            .isEqualTo(firstConversation);
         assertThat(messages.findByConversationIdOrderByIdAsc(firstConversation))
-                .extracting(ChatMessage::role)
-                .containsExactly(
-                        MessageRole.SYSTEM,
-                        MessageRole.USER,
-                        MessageRole.ASSISTANT,
-                        MessageRole.SYSTEM,
-                        MessageRole.USER,
-                        MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(
+                MessageRole.SYSTEM,
+                MessageRole.USER,
+                MessageRole.ASSISTANT,
+                MessageRole.SYSTEM,
+                MessageRole.USER,
+                MessageRole.ASSISTANT);
     }
+
 
     @Test
     @DisplayName("CHECK 발화는 점검 대화에서 SCHEDULED 살펴보기를 열고 task_run에 점검과 루트 실행을 연결한다")
     void startsScheduledCheckAndRecoversItsResult() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
-        Task checkTask =
-                tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger =
-                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        Task checkTask = tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
+        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
         TaskRun run = runs.save(TaskRun.queued(
-                checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
+            checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
         stub().willReturn(HermesRunResult.of(
-                "run-check",
-                "check-session",
-                "completed",
-                "<fos-check-result>{\"version\":1,\"outcome\":\"NOTHING_NEW\"}</fos-check-result>",
-                "model",
-                "provider",
-                TokenUsage.empty()));
+            "run-check",
+            "check-session",
+            "completed",
+            "<fos-check-result>{\"version\":1,\"outcome\":\"NOTHING_NEW\"}</fos-check-result>",
+            "model",
+            "provider",
+            TokenUsage.empty()));
 
         assertThat(starter.startQueued(NOW)).isEqualTo(1);
 
@@ -692,11 +711,11 @@ class TaskRunStarterTest {
         createdChecks.add(check.id());
         assertThat(check.trigger()).isEqualTo(CheckTrigger.SCHEDULED);
         assertThat(conversations.findById(check.conversationId()).orElseThrow().taskId())
-                .isNull();
+            .isNull();
         assertThat(linked.conversationId()).isEqualTo(check.conversationId());
         assertThat(service.list(currentUser(fixture.owner())))
-                .extracting(detail -> detail.task().id())
-                .doesNotContain(checkTask.id());
+            .extracting(detail -> detail.task().id())
+            .doesNotContain(checkTask.id());
 
         awaitCheckFinished(check);
         starter.startQueued(NOW.plusSeconds(1));
@@ -708,6 +727,7 @@ class TaskRunStarterTest {
         assertThat(finished.executionId()).isEqualTo(completed.rootExecutionId());
     }
 
+
     @Test
     @DisplayName("SINGLE 작업이 첫 발화로 대화를 적는 사이 사용자가 작업을 멈추고 이름을 바꿔도 그 변경이 남는다")
     void keepsUserEditCommittedWhileSingleRunRecordsConversation() {
@@ -718,23 +738,23 @@ class TaskRunStarterTest {
         TransactionTemplate userTransaction = new TransactionTemplate(transactionManager);
         userTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         doAnswer(invocation -> {
-                    // 시작 단계의 준비 트랜잭션이 작업을 읽은 뒤, 커밋하기 전에 사용자의 수정이 먼저 커밋된다.
-                    userTransaction.executeWithoutResult(status -> {
-                        Task task = tasks.findById(fixture.task().id()).orElseThrow();
-                        task.edit(
-                                task.agentId(),
-                                renamed,
-                                task.instruction(),
-                                task.conversationMode(),
-                                task.notifyPolicy(),
-                                edited);
-                        task.pause(edited);
-                    });
-                    return invocation.callRealMethod();
-                })
-                .when(chat)
-                .startForTask(
-                        anyLong(), anyLong(), anyString(), eq(fixture.task().id()));
+            // 시작 단계의 준비 트랜잭션이 작업을 읽은 뒤, 커밋하기 전에 사용자의 수정이 먼저 커밋된다.
+            userTransaction.executeWithoutResult(status -> {
+                Task task = tasks.findById(fixture.task().id()).orElseThrow();
+                task.edit(
+                    task.agentId(),
+                    renamed,
+                    task.instruction(),
+                    task.conversationMode(),
+                    task.notifyPolicy(),
+                    edited);
+                task.pause(edited);
+            });
+            return invocation.callRealMethod();
+        })
+            .when(chat)
+            .startForTask(
+                anyLong(), anyLong(), anyString(), eq(fixture.task().id()));
 
         starter.startQueued(NOW);
         TaskRun finished = awaitFinished(run);
@@ -745,6 +765,7 @@ class TaskRunStarterTest {
         assertThat(task.conversationId()).as("작업에 적은 대화").isNotNull().isEqualTo(finished.conversationId());
         assertPausedWithoutSubmission(fixture, run);
     }
+
 
     @Test
     @DisplayName("FAST 를 고른 NEW_PER_RUN 작업의 발화 대화와 루트 실행은 FAST 단계다")
@@ -757,14 +778,14 @@ class TaskRunStarterTest {
 
         TaskRun finished = awaitFinished(run);
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
-        Conversation conversation =
-                conversations.findById(finished.conversationId()).orElseThrow();
+        Conversation conversation = conversations.findById(finished.conversationId()).orElseThrow();
         assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isEqualTo(ModelSelectionMode.TIER);
         assertThat(conversation.modelTier()).as("대화의 단계").isEqualTo(ModelTier.FAST);
         assertThat(executions.findById(finished.executionId()).orElseThrow().modelTier())
-                .as("루트 실행의 단계")
-                .isEqualTo(ModelTier.FAST);
+            .as("루트 실행의 단계")
+            .isEqualTo(ModelTier.FAST);
     }
+
 
     @Test
     @DisplayName("DEEP 을 고른 SINGLE 작업은 사용자가 그 대화에서 모델을 골라도 다음 발화가 DEEP 단계로 되돌린다")
@@ -775,18 +796,18 @@ class TaskRunStarterTest {
         starter.startQueued(NOW);
         Long conversationId = awaitFinished(first).conversationId();
         new TransactionTemplate(transactionManager)
-                .executeWithoutResult(status -> assertThat(conversations.chooseModelIfActive(
-                                conversationId,
-                                fixture.owner().id(),
-                                "custom-provider",
-                                "custom-model",
-                                null,
-                                ModelSelectionMode.CUSTOM))
-                        .as("사용자가 고른 모델")
-                        .isEqualTo(1));
+            .executeWithoutResult(status -> assertThat(conversations.chooseModelIfActive(
+                conversationId,
+                fixture.owner().id(),
+                "custom-provider",
+                "custom-model",
+                null,
+                ModelSelectionMode.CUSTOM))
+                    .as("사용자가 고른 모델")
+                    .isEqualTo(1));
         assertThat(conversations.findById(conversationId).orElseThrow().modelSelectionMode())
-                .as("사용자가 고른 뒤의 선택 방식")
-                .isEqualTo(ModelSelectionMode.CUSTOM);
+            .as("사용자가 고른 뒤의 선택 방식")
+            .isEqualTo(ModelSelectionMode.CUSTOM);
 
         Instant nextMonth = Instant.parse("2026-12-01T00:00:00Z");
         TaskRun second = queued(fixture, nextMonth, nextMonth);
@@ -802,6 +823,7 @@ class TaskRunStarterTest {
         assertThat(conversation.modelChoice().model()).as("고른 모델").isNull();
     }
 
+
     @Test
     @DisplayName("단계가 빈 NEW_PER_RUN 작업의 발화 대화는 선택 방식이 비어 있다")
     void keepsSelectionEmptyWithoutTaskTier() {
@@ -812,11 +834,11 @@ class TaskRunStarterTest {
 
         TaskRun finished = awaitFinished(run);
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
-        Conversation conversation =
-                conversations.findById(finished.conversationId()).orElseThrow();
+        Conversation conversation = conversations.findById(finished.conversationId()).orElseThrow();
         assertThat(conversation.modelSelectionMode()).as("대화의 선택 방식").isNull();
         assertThat(conversation.modelTier()).as("대화의 단계").isNull();
     }
+
 
     @Test
     @DisplayName("답 전체가 [SILENT] 인 NEW_PER_RUN 발화는 NOTHING_TO_REPORT 로 끝나고 ALWAYS 여도 알리지 않으며 대화를 지우지 않고 목록에서만 뺀다")
@@ -832,11 +854,11 @@ class TaskRunStarterTest {
         assertThat(finished.reason()).as("발화의 까닭").isEqualTo(TaskRunReason.NOTHING_TO_REPORT);
         assertThat(finished.executionId()).as("루트 실행 번호").isNotNull();
         assertThat(notificationsOf(fixture.owner().id())).as("그 사용자의 알림").isEmpty();
-        Conversation conversation =
-                conversations.findById(finished.conversationId()).orElseThrow();
+        Conversation conversation = conversations.findById(finished.conversationId()).orElseThrow();
         assertThat(conversation.hiddenAt()).as("목록에서 뺀 시각").isNotNull();
         assertThat(conversation.deletedAt()).as("지운 시각").isNull();
     }
+
 
     @Test
     @DisplayName("답 전체가 [SILENT] 인 SINGLE 발화는 NOTHING_TO_REPORT 로 끝나고 알리지 않지만 대화를 목록에서 빼지 않는다")
@@ -852,12 +874,13 @@ class TaskRunStarterTest {
         assertThat(finished.reason()).as("발화의 까닭").isEqualTo(TaskRunReason.NOTHING_TO_REPORT);
         assertThat(notificationsOf(fixture.owner().id())).as("그 사용자의 알림").isEmpty();
         assertThat(conversations
-                        .findById(finished.conversationId())
-                        .orElseThrow()
-                        .hiddenAt())
+            .findById(finished.conversationId())
+            .orElseThrow()
+            .hiddenAt())
                 .as("목록에서 뺀 시각")
                 .isNull();
     }
+
 
     @Test
     @DisplayName("답이 [SILENT] 로 시작해도 뒤에 글이 있으면 보통 SUCCEEDED 이고 TASK_SUCCEEDED 하나다")
@@ -865,11 +888,13 @@ class TaskRunStarterTest {
         assertFinishesNormally("[SILENT] 새 영상 없음");
     }
 
+
     @Test
     @DisplayName("소문자 [silent] 는 표시로 보지 않아 보통 SUCCEEDED 이고 TASK_SUCCEEDED 하나다")
     void finishesNormallyWhenSilentMarkerIsLowerCase() {
         assertFinishesNormally("[silent]");
     }
+
 
     private void assertFinishesNormally(String answer) {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
@@ -882,22 +907,24 @@ class TaskRunStarterTest {
         assertThat(finished.status()).isEqualTo(TaskRunStatus.SUCCEEDED);
         assertThat(finished.reason()).as("답 %s 의 까닭", answer).isNull();
         assertThat(conversations
-                        .findById(finished.conversationId())
-                        .orElseThrow()
-                        .hiddenAt())
+            .findById(finished.conversationId())
+            .orElseThrow()
+            .hiddenAt())
                 .as("목록에서 뺀 시각")
                 .isNull();
         assertThat(notificationsOf(fixture.owner().id()))
-                .extracting(Notification::kind)
-                .as("답 %s 의 알림", answer)
-                .containsExactly(NotificationKind.TASK_SUCCEEDED);
+            .extracting(Notification::kind)
+            .as("답 %s 의 알림", answer)
+            .containsExactly(NotificationKind.TASK_SUCCEEDED);
     }
+
 
     /** 가짜 Hermes 가 이 글로 답하게 한다. 나머지는 준비 단계의 답과 같다. */
     private void answerWith(String text) {
         stub().willReturn(HermesRunResult.of(
-                "run-task", "session", "completed", text, "model", "provider", TokenUsage.empty()));
+            "run-task", "session", "completed", text, "model", "provider", TokenUsage.empty()));
     }
+
 
     /** 다시 읽은 작업에 단계를 고른다. fixture 의 분리된 객체를 저장하면 merge 가 다른 칸을 그 때의 값으로 덮는다. */
     private void chooseTier(Fixture fixture, ModelTier tier) {
@@ -906,12 +933,14 @@ class TaskRunStarterTest {
         tasks.save(task);
     }
 
+
     /** 그 사용자의 turn 자리 둘을 먼저 얻어 한도를 채운다. 정리 단계가 돌려준다. */
     private void fillSlots(AppUser owner) {
         heldSlots.add(limiter.acquireTurn(owner.id()));
         heldSlots.add(limiter.acquireTurn(owner.id()));
         assertThat(limiter.hasTurnRoom(owner.id())).as("채운 뒤 남은 자리").isFalse();
     }
+
 
     /** 그 줄이 {@code QUEUED} 나 {@code RUNNING} 을 벗어나고 대화의 turn 이 닫힐 때까지 기다린다. */
     private TaskRun awaitFinished(TaskRun run) {
@@ -920,7 +949,7 @@ class TaskRunStarterTest {
             TaskRun current = runs.findById(run.id()).orElseThrow();
             boolean open = current.status() == TaskRunStatus.QUEUED || current.status() == TaskRunStatus.RUNNING;
             boolean turnOpen = current.conversationId() != null
-                    && turns.markOf(current.conversationId()).running();
+                && turns.markOf(current.conversationId()).running();
             if (!open && !turnOpen) {
                 return current;
             }
@@ -930,6 +959,7 @@ class TaskRunStarterTest {
             pause();
         }
     }
+
 
     private TaskRun awaitCheckLinked(TaskRun run) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
@@ -945,6 +975,7 @@ class TaskRunStarterTest {
         }
     }
 
+
     private void awaitCheckFinished(ProactiveCheck check) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
         while (true) {
@@ -959,11 +990,13 @@ class TaskRunStarterTest {
         }
     }
 
+
     private void awaitNoRunning() {
         runs.findAll().stream()
-                .filter(run -> run.status() == TaskRunStatus.RUNNING)
-                .forEach(this::awaitFinished);
+            .filter(run -> run.status() == TaskRunStatus.RUNNING)
+            .forEach(this::awaitFinished);
     }
+
 
     private static void pause() {
         try {
@@ -974,10 +1007,12 @@ class TaskRunStarterTest {
         }
     }
 
+
     private TaskRun queued(Fixture fixture, Instant scheduledFor, Instant createdAt) {
         return runs.save(TaskRun.queued(
-                fixture.task().id(), fixture.trigger().id(), fixture.owner().id(), scheduledFor, createdAt));
+            fixture.task().id(), fixture.trigger().id(), fixture.owner().id(), scheduledFor, createdAt));
     }
+
 
     private Fixture fixture(ConversationMode mode, NotifyPolicy notify) {
         String email = "starter-" + UUID.randomUUID() + "@example.com";
@@ -985,30 +1020,33 @@ class TaskRunStarterTest {
         createdUsers.add(owner.id());
         String code = "starter-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW));
         Task task = tasks.save(Task.create(owner.id(), agent.id(), TITLE, INSTRUCTION, mode, notify, NOW));
         TaskTrigger trigger = triggers.save(TaskTrigger.cron(
-                task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, Instant.parse("2026-12-01T00:00:00Z"), NOW));
+            task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, Instant.parse("2026-12-01T00:00:00Z"), NOW));
         return new Fixture(owner, task, trigger);
     }
 
+
     private List<Conversation> conversationsOf(Task task) {
         return conversations.findAll().stream()
-                .filter(conversation -> task.id().equals(conversation.taskId()))
-                .toList();
+            .filter(conversation -> task.id().equals(conversation.taskId()))
+            .toList();
     }
+
 
     private List<Notification> notificationsOf(Long userId) {
         return notifications.findByUserIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0, 100));
     }
+
 
     private void cleanTasks() {
         checks.deleteAllById(createdChecks);
@@ -1018,5 +1056,7 @@ class TaskRunStarterTest {
         tasks.deleteAll();
     }
 
-    private record Fixture(AppUser owner, Task task, TaskTrigger trigger) {}
+
+    private record Fixture(AppUser owner, Task task, TaskTrigger trigger) {
+    }
 }

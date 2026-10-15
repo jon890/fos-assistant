@@ -46,10 +46,12 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
 
     private volatile boolean running;
 
+
     @Override
     public int getPhase() {
         return RestartReconciler.PHASE - 1;
     }
+
 
     /** 처음 시작할 때만 남은 줄을 닫는다. 예외가 나도 기동을 실패시키지 않는다. */
     @Override
@@ -67,15 +69,18 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
         running = true;
     }
 
+
     @Override
     public void stop() {
         running = false;
     }
 
+
     @Override
     public boolean isRunning() {
         return running;
     }
+
 
     /**
      * {@code RUNNING} 줄을 하나씩 닫는다. 한 줄의 실패는 그 줄만 남긴다.
@@ -99,18 +104,20 @@ public class ProactiveCheckRecovery implements SmartLifecycle {
         return closed;
     }
 
+
     /** 그 트리의 도는 위임 자식을 멈추라는 사건을 낸다. 실패해도 다음 줄로 넘어간다. 줄은 이미 닫혔다. */
     private void stopChildren(ProactiveCheck check) {
         try {
             events.publishEvent(new ProactiveCheckEnded(check.rootExecutionId()));
         } catch (RuntimeException ex) {
             log.warn(
-                    "닫은 살펴보기 트리의 위임 자식을 멈추지 못했다 checkId={} rootExecutionId={}",
-                    check.id(),
-                    check.rootExecutionId(),
-                    ex);
+                "닫은 살펴보기 트리의 위임 자식을 멈추지 못했다 checkId={} rootExecutionId={}",
+                check.id(),
+                check.rootExecutionId(),
+                ex);
         }
     }
+
 
     /**
      * 전달 표시를 먼저 적고 줄을 닫는다. 줄을 먼저 닫고 표시에서 실패하면 다음 기동이 그 줄을 다시 보지 않아 자동 turn 이 열린다. 거꾸로

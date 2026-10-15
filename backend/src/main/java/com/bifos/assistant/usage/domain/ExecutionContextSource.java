@@ -56,14 +56,15 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
     @Transient
     private boolean persisted;
 
+
     private ExecutionContextSource(
-            Long executionId,
-            int position,
-            String source,
-            String sourceRef,
-            String bodyMode,
-            String freshness,
-            Instant createdAt) {
+        Long executionId,
+        int position,
+        String source,
+        String sourceRef,
+        String bodyMode,
+        String freshness,
+        Instant createdAt) {
         this.id = new ExecutionContextSourceId(executionId, position);
         this.source = source;
         this.sourceRef = sourceRef;
@@ -72,30 +73,35 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
         this.createdAt = createdAt;
     }
 
+
     public static ExecutionContextSource of(
-            Long executionId,
-            int position,
-            String source,
-            String sourceRef,
-            String bodyMode,
-            String freshness,
-            Instant createdAt) {
+        Long executionId,
+        int position,
+        String source,
+        String sourceRef,
+        String bodyMode,
+        String freshness,
+        Instant createdAt) {
         return new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness, createdAt);
     }
+
 
     public Long executionId() {
         return id.executionId();
     }
 
+
     public int position() {
         return id.position();
     }
+
 
     /** Spring Data 의 {@link Persistable} 이 요구하는 이름이다. 값은 Lombok 이 만든 {@code id()} 와 같다. */
     @Override
     public ExecutionContextSourceId getId() {
         return id();
     }
+
 
     /**
      * 줄은 늘 새로 넣는다. 번호를 직접 정하므로 이것이 없으면 저장이 같은 position 의 줄을 조용히 덮어쓴다.
@@ -106,6 +112,7 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
     public boolean isNew() {
         return !persisted;
     }
+
 
     @PostLoad
     @PostPersist

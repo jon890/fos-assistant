@@ -18,15 +18,19 @@ public enum FeedbackSubjectType {
     /** 행동 정책 판정. 자동 실행을 시작하지 못한 것과 매일 루프가 보인 판정의 반응이다. 열쇠는 {@code autonomy_decision:<번호>} 다. */
     AUTONOMY_DECISION("autonomy_decision");
 
+
     private final String prefix;
+
 
     FeedbackSubjectType(String prefix) {
         this.prefix = prefix;
     }
 
+
     public String key(Object id) {
         return prefix + ":" + id;
     }
+
 
     /** 열쇠의 머리로 종류를 찾는다. 모르는 머리면 null 이다. */
     public static FeedbackSubjectType ofKey(String subjectKey) {

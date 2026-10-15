@@ -17,4 +17,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties("assistant.user-execution.max-running=2")
-public @interface SmallExecutionLimit {}
+public @interface SmallExecutionLimit {
+}

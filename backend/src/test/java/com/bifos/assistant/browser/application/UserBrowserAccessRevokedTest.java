@@ -55,10 +55,12 @@ class UserBrowserAccessRevokedTest {
     @Autowired
     JdbcTemplate jdbc;
 
+
     @BeforeEach
     void setUp() {
         clean();
     }
+
 
     @AfterEach
     void clean() {
@@ -66,6 +68,7 @@ class UserBrowserAccessRevokedTest {
         people.findAll().stream().filter(p -> p.email().equals(EMAIL)).forEach(people::delete);
         users.findAllByNormalizedEmail(EMAIL).forEach(users::delete);
     }
+
 
     @Test
     @DisplayName("사용자를 끄면 그 사용자의 켜진 브라우저가 STOPPED 가 되고 컨테이너가 지워진다")

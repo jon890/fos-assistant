@@ -15,6 +15,7 @@ class EntityClockTest {
     private static final Instant FIRST = Instant.parse("2026-01-01T00:00:00Z");
     private static final Instant SECOND = Instant.parse("2026-01-02T00:00:00Z");
 
+
     @Test
     @DisplayName("대화를 고정 시각으로 만들면 createdAt 과 updatedAt 이 그 시각이다")
     void conversationUsesGivenInstantWhenCreated() {
@@ -23,6 +24,7 @@ class EntityClockTest {
         assertThat(ReflectionTestUtils.getField(conversation, "createdAt")).isEqualTo(FIRST);
         assertThat(conversation.updatedAt()).isEqualTo(FIRST);
     }
+
 
     @Test
     @DisplayName("세션을 기억하면 updatedAt 이 넘긴 시각으로 바뀐다")
@@ -33,6 +35,7 @@ class EntityClockTest {
 
         assertThat(conversation.updatedAt()).isEqualTo(SECOND);
     }
+
 
     @Test
     @DisplayName("토큰을 두 번 폐기해도 폐기 시각은 처음 넘긴 값으로 남는다")

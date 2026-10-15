@@ -28,24 +28,28 @@ public class AutonomyController {
     private final SurfacedProblems surfacedProblems;
     private final CurrentUserProvider currentUser;
 
+
     @PostMapping("/api/v1/value-evaluations/{id}/autonomy-decisions")
     @ResponseStatus(HttpStatus.CREATED)
     public List<AutonomyDecisionResponse> decide(@PathVariable Long id) {
         return autonomy.decide(currentUser.require(), id).stream()
-                .map(AutonomyDecisionResponse::from)
-                .toList();
+            .map(AutonomyDecisionResponse::from)
+            .toList();
     }
+
 
     @GetMapping("/api/v1/autonomy/preference")
     public AutonomyPreferenceBody preference() {
         return new AutonomyPreferenceBody(autonomy.readOnlyExecutionConsented(currentUser.require()));
     }
 
+
     @PutMapping("/api/v1/autonomy/preference")
     public AutonomyPreferenceBody changePreference(@Valid @RequestBody AutonomyPreferenceBody body) {
         return new AutonomyPreferenceBody(
-                autonomy.changeReadOnlyExecution(currentUser.require(), body.readOnlyExecution()));
+            autonomy.changeReadOnlyExecution(currentUser.require(), body.readOnlyExecution()));
     }
+
 
     /** 매일 루프가 보인 판정에 반응을 남긴다. 기록만 하고 할 일, 승인 줄, 실행을 만들지 않는다. */
     @PutMapping("/api/v1/autonomy-decisions/{id}/reaction")

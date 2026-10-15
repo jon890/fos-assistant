@@ -24,6 +24,7 @@ public class TaskDispatcher {
     private final TaskRunRecovery recovery;
     private final Clock clock;
 
+
     @Scheduled(cron = "${assistant.task.dispatch-cron}")
     public void runScheduled() {
         if (!recovery.finished()) {
@@ -31,6 +32,7 @@ public class TaskDispatcher {
         }
         tick(clock.instant());
     }
+
 
     /** 발화를 만든 뒤 기다리는 발화를 연다. 발화가 실패해도 시작 단계는 돈다. */
     public void tick(Instant now) {

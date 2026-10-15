@@ -6,4 +6,5 @@ package com.bifos.assistant.hermes;
  * <p>대시보드는 이 경우 파일을 하나도 바꾸지 않는다. 응답 본문에는 profile 의 설정 이름이 섞일 수 있어 메시지와 cause 를
  * 담지 않는다.
  */
-public class ConnectorInstallConflict extends RuntimeException {}
+public class ConnectorInstallConflict extends RuntimeException {
+}

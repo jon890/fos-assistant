@@ -23,11 +23,13 @@ public class ValueEvaluationAdminController {
     private final ValueEvaluationOverviews overviews;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/api/v1/admin/agents/{code}/value-evaluation")
     public EvaluationOverviewResponse latest(@PathVariable String code) {
         CurrentUser admin = currentUser.requireAdmin();
         return EvaluationOverviewResponse.from(overviews.latest(admin, code));
     }
+
 
     @PostMapping("/api/v1/admin/proactive-checks/{checkId}/value-evaluation-runs")
     @ResponseStatus(HttpStatus.CREATED)

@@ -16,7 +16,9 @@ public enum ConnectorCallError {
     INVALID_INPUT("invalid_input"),
     UNAVAILABLE("unavailable");
 
+
     private final String word;
+
 
     public static Optional<ConnectorCallError> fromWord(String word) {
         return Arrays.stream(values()).filter(value -> value.word.equals(word)).findFirst();

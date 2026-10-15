@@ -17,13 +17,14 @@ package com.bifos.assistant.usage.application;
  * @param unpricedSubagents 사용량은 적었지만 금액을 내지 못한 자식 수
  */
 public record MonthlyUsageSummary(
-        long estimatedMicros,
-        long actualMicros,
-        long pricedExecutions,
-        long unpricedExecutions,
-        long subscriptionExecutions,
-        long pricedSubagents,
-        long pendingSubagents,
-        long unconfirmedSubagents,
-        long unpricedSubagents,
-        long observationIncompleteExecutions) {}
+    long estimatedMicros,
+    long actualMicros,
+    long pricedExecutions,
+    long unpricedExecutions,
+    long subscriptionExecutions,
+    long pricedSubagents,
+    long pendingSubagents,
+    long unconfirmedSubagents,
+    long unpricedSubagents,
+    long observationIncompleteExecutions) {
+}

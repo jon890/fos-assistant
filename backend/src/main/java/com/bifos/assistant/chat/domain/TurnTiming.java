@@ -15,4 +15,5 @@ import java.time.Instant;
  * @param modelTier 그 실행의 모델 단계. 단계를 고르지 않은 실행은 null
  */
 public record TurnTiming(
-        Long executionId, Instant requestReceivedAt, Instant submittedAt, Instant firstDeltaAt, ModelTier modelTier) {}
+    Long executionId, Instant requestReceivedAt, Instant submittedAt, Instant firstDeltaAt, ModelTier modelTier) {
+}

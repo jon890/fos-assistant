@@ -9,4 +9,5 @@ import java.net.URI;
  * @param browserId 사용자 브라우저 번호
  * @param cdp 컨테이너 IP 로 된 CDP 주소
  */
-public record GatewayTarget(Long userId, Long browserId, URI cdp) {}
+public record GatewayTarget(Long userId, Long browserId, URI cdp) {
+}

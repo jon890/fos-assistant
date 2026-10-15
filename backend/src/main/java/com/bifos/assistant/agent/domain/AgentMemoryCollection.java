@@ -36,19 +36,23 @@ public class AgentMemoryCollection {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     private AgentMemoryCollection(Long agentId, String collection, boolean allowSensitive, Instant now) {
         this.id = new AgentMemoryCollectionId(agentId, collection);
         this.allowSensitive = allowSensitive;
         this.createdAt = now;
     }
 
+
     public static AgentMemoryCollection of(Long agentId, String collection, boolean allowSensitive, Instant now) {
         return new AgentMemoryCollection(agentId, collection, allowSensitive, now);
     }
 
+
     public String collection() {
         return id.collection();
     }
+
 
     /** 민감 항목까지 받을지 바꾼다. 붙인 시각은 그대로 둔다. */
     public void changeAllowSensitive(boolean allowSensitive) {

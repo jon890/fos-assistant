@@ -15,7 +15,8 @@ import java.util.Set;
  * @param cards 요청자의 숨기기와 미루기를 적용해 판정한 카드 다섯
  */
 public record AttentionSnapshot(
-        Instant now,
-        Map<CardKey, List<AttentionCandidate>> candidates,
-        Set<CardKey> unavailable,
-        List<AttentionCard> cards) {}
+    Instant now,
+    Map<CardKey, List<AttentionCandidate>> candidates,
+    Set<CardKey> unavailable,
+    List<AttentionCard> cards) {
+}

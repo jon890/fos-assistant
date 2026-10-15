@@ -82,51 +82,56 @@ public class StarterSuggestionService {
     private final Set<Key> generating = ConcurrentHashMap.newKeySet();
     private final Map<Key, Instant> lastFailures = new ConcurrentHashMap<>();
 
+
     /** 캐시 키. 사용자마다 그 에이전트로 하는 일이 달라 둘을 함께 쓴다. */
-    private record Key(Long userId, Long agentId) {}
+    private record Key(Long userId, Long agentId) {
+    }
 
     /** 만든 추천과 만든 시각. */
-    private record Entry(List<String> prompts, Instant generatedAt) {}
+    private record Entry(List<String> prompts, Instant generatedAt) {
+    }
+
 
     @Autowired
     public StarterSuggestionService(
-            LiveProperties<StarterProperties> properties,
-            AgentService agents,
-            ConversationRepository conversations,
-            ChatMessageRepository messages,
-            HermesRunsClient hermes,
-            ExecutionRecorder executions,
-            ModelTierService modelTiers,
-            ObjectMapper objectMapper,
-            UserExecutionLimiter limiter,
-            BackgroundTasks backgroundTasks) {
+        LiveProperties<StarterProperties> properties,
+        AgentService agents,
+        ConversationRepository conversations,
+        ChatMessageRepository messages,
+        HermesRunsClient hermes,
+        ExecutionRecorder executions,
+        ModelTierService modelTiers,
+        ObjectMapper objectMapper,
+        UserExecutionLimiter limiter,
+        BackgroundTasks backgroundTasks) {
         this(
-                properties,
-                agents,
-                conversations,
-                messages,
-                hermes,
-                executions,
-                modelTiers,
-                objectMapper,
-                limiter,
-                Clock.systemUTC(),
-                task -> backgroundTasks.start("starter-suggestion", task));
+            properties,
+            agents,
+            conversations,
+            messages,
+            hermes,
+            executions,
+            modelTiers,
+            objectMapper,
+            limiter,
+            Clock.systemUTC(),
+            task -> backgroundTasks.start("starter-suggestion", task));
     }
+
 
     /** 시각과 실행기를 바꿔 끼운다. 테스트가 시간을 옮기고 만들기가 끝나기를 기다릴 때 쓴다. */
     public StarterSuggestionService(
-            LiveProperties<StarterProperties> properties,
-            AgentService agents,
-            ConversationRepository conversations,
-            ChatMessageRepository messages,
-            HermesRunsClient hermes,
-            ExecutionRecorder executions,
-            ModelTierService modelTiers,
-            ObjectMapper objectMapper,
-            UserExecutionLimiter limiter,
-            Clock clock,
-            Executor executor) {
+        LiveProperties<StarterProperties> properties,
+        AgentService agents,
+        ConversationRepository conversations,
+        ChatMessageRepository messages,
+        HermesRunsClient hermes,
+        ExecutionRecorder executions,
+        ModelTierService modelTiers,
+        ObjectMapper objectMapper,
+        UserExecutionLimiter limiter,
+        Clock clock,
+        Executor executor) {
         this.properties = properties;
         this.agents = agents;
         this.conversations = conversations;
@@ -139,6 +144,7 @@ public class StarterSuggestionService {
         this.clock = clock;
         this.executor = executor;
     }
+
 
     /**
      * 요청자가 그 에이전트에서 받을 추천을 돌려준다. 추천이 없으면 만들기를 시작하고 곧바로 돌아온다.
@@ -171,6 +177,7 @@ public class StarterSuggestionService {
         return current(key);
     }
 
+
     /**
      * 대화를 마쳤을 때 부른다. 추천이 있고 {@code refreshAfter} 보다 오래됐을 때만 다시 만든다.
      *
@@ -192,6 +199,7 @@ public class StarterSuggestionService {
             log.warn("추천 질문을 다시 만들기 시작하지 못했다 userId={} agentId={}", user.id(), agent.id(), ex);
         }
     }
+
 
     /**
      * 그 키의 만들기를 시작한다. 이미 도는 것이 있거나 조건이 맞지 않으면 시작하지 않는다.
@@ -217,6 +225,7 @@ public class StarterSuggestionService {
         }
     }
 
+
     /** 이력을 읽어 Hermes 실행 하나를 돌리고 답을 캐시에 넣는다. 어느 경우든 진행 중 표시를 지운다. */
     private void generate(Key key, CurrentUser user, Agent agent) {
         AgentExecution execution = null;
@@ -230,25 +239,25 @@ public class StarterSuggestionService {
             modelTiers.requireRunnable(user, agent, choice);
             // 대화가 없는 실행이라 에이전트 기본 모델로 돈다. 비어 있으면 profile 의 값이다(ADR-054).
             HermesRunCommand command = new HermesRunCommand(
-                    agent.hermesProfile(),
-                    agent.apiBaseUrl(),
-                    input,
-                    null,
-                    null,
-                    choice.provider(),
-                    choice.model(),
-                    choice.reasoningEffort());
+                agent.hermesProfile(),
+                agent.apiBaseUrl(),
+                input,
+                null,
+                null,
+                choice.provider(),
+                choice.model(),
+                choice.reasoningEffort());
             runId = hermes.submit(command);
             executions.attachRunId(execution, runId);
             HermesRunResult result = hermes.awaitCompletion(command, runId);
             awaited = true;
             if (!result.succeeded()) {
                 executions.fail(
-                        execution,
-                        agent,
-                        result,
-                        null,
-                        result.providerBlocked() ? ErrorCode.PROVIDER_BLOCKED.name() : statusOf(result));
+                    execution,
+                    agent,
+                    result,
+                    null,
+                    result.providerBlocked() ? ErrorCode.PROVIDER_BLOCKED.name() : statusOf(result));
                 lastFailures.put(key, clock.instant());
                 return;
             }
@@ -277,7 +286,7 @@ public class StarterSuggestionService {
             if (runId != null && !awaited) {
                 // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
                 limiter.holdUntilRemoteEnds(
-                        user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
             }
             if (execution != null) {
                 failQuietly(execution, errorCode(ex));
@@ -289,20 +298,22 @@ public class StarterSuggestionService {
         }
     }
 
+
     /** 그 사용자가 그 에이전트와 나눈 최근 대화마다 처음 꺼낸 말을 모은다. 다른 사용자의 대화는 읽지 않는다. */
     private List<String> firstQuestions(CurrentUser user, Agent agent) {
         List<Conversation> recent = conversations.findByUserIdAndAgentIdAndDeletedAtIsNullOrderByUpdatedAtDesc(
-                user.id(), agent.id(), PageRequest.of(0, properties.current().historyConversations()));
+            user.id(), agent.id(), PageRequest.of(0, properties.current().historyConversations()));
         List<String> questions = new ArrayList<>();
         for (Conversation conversation : recent) {
             messages.findFirstByConversationIdAndRoleOrderByIdAsc(conversation.id(), MessageRole.USER)
-                    .map(ChatMessage::content)
-                    .map(StarterSuggestionService::oneLine)
-                    .filter(text -> !text.isEmpty())
-                    .ifPresent(questions::add);
+                .map(ChatMessage::content)
+                .map(StarterSuggestionService::oneLine)
+                .filter(text -> !text.isEmpty())
+                .ifPresent(questions::add);
         }
         return questions;
     }
+
 
     private static String prompt(List<String> questions) {
         StringBuilder input = new StringBuilder(PROMPT_MARK).append('\n');
@@ -317,6 +328,7 @@ public class StarterSuggestionService {
         input.append("도구를 부르지 말고 JSON 문자열 배열 하나만 답한다.");
         return input.toString();
     }
+
 
     /**
      * 모델 답에서 추천을 읽는다. 읽을 것이 없으면 빈 값이다.
@@ -360,16 +372,19 @@ public class StarterSuggestionService {
         return prompts.isEmpty() ? Optional.empty() : Optional.of(List.copyOf(prompts));
     }
 
+
     private boolean isStale(Entry entry) {
         return clock.instant()
-                .isAfter(entry.generatedAt().plus(properties.current().refreshAfter()));
+            .isAfter(entry.generatedAt().plus(properties.current().refreshAfter()));
     }
+
 
     private boolean recentlyFailed(Key key) {
         Instant failedAt = lastFailures.get(key);
         return failedAt != null
-                && clock.instant().isBefore(failedAt.plus(properties.current().retryAfterFailure()));
+            && clock.instant().isBefore(failedAt.plus(properties.current().retryAfterFailure()));
     }
+
 
     private StarterSuggestions current(Key key) {
         Entry cached = cache.get(key);
@@ -379,6 +394,7 @@ public class StarterSuggestionService {
         return generating.contains(key) ? generating() : none();
     }
 
+
     private void failQuietly(AgentExecution execution, String code) {
         try {
             executions.fail(execution, code);
@@ -386,6 +402,7 @@ public class StarterSuggestionService {
             log.warn("추천 실행을 실패로 남기지 못했다 executionId={}", execution.id(), ex);
         }
     }
+
 
     /** 줄바꿈과 겹친 공백을 한 칸으로 줄이고 {@link #MAX_HISTORY_CHARS} 에서 자른다. */
     private static String oneLine(String content) {
@@ -396,25 +413,31 @@ public class StarterSuggestionService {
         return line.substring(0, line.offsetByCodePoints(0, MAX_HISTORY_CHARS)) + "…";
     }
 
+
     private static StarterSuggestions ready(Entry entry) {
         return new StarterSuggestions(entry.prompts(), StarterStatus.READY);
     }
+
 
     private static StarterSuggestions generating() {
         return new StarterSuggestions(List.of(), StarterStatus.GENERATING);
     }
 
+
     private static StarterSuggestions none() {
         return new StarterSuggestions(List.of(), StarterStatus.NONE);
     }
+
 
     private static String statusOf(HermesRunResult result) {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
     }
 
+
     private static boolean isUserBusy(Exception exception) {
         return exception instanceof ApiException api && api.code() == ErrorCode.USER_BUSY;
     }
+
 
     private static String errorCode(Exception exception) {
         return exception instanceof ApiException api ? api.code().name() : GENERATION_FAILED;

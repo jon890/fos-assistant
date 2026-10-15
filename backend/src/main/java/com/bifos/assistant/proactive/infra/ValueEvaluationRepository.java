@@ -12,11 +12,14 @@ public interface ValueEvaluationRepository extends JpaRepository<ValueEvaluation
 
     Optional<ValueEvaluation> findByIdAndUserId(Long id, Long userId);
 
+
     @Query("select e.id from ValueEvaluation e where e.outcome = :outcome order by e.id")
     List<Long> findIdsByOutcome(DecisionOutcome outcome);
 
+
     /** 그 사용자가 그 살펴보기들의 후보로 남긴 평가. replay 시도도 함께 읽는다. */
     List<ValueEvaluation> findByUserIdAndCheckIdInOrderByIdAsc(Long userId, Collection<Long> checkIds);
+
 
     /** 그 사용자가 그 살펴보기에 남긴 가장 최근 평가. replay 를 포함한다. */
     Optional<ValueEvaluation> findFirstByUserIdAndCheckIdOrderByIdDesc(Long userId, Long checkId);

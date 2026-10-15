@@ -13,8 +13,8 @@ public final class SandboxedContentPolicy {
 
     /** HTML 미리보기. 스크립트를 막고 같은 출처의 사진과 스타일만 부르게 한다. */
     public static final String HTML = "sandbox allow-same-origin allow-popups "
-            + "allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; "
-            + "style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'";
+        + "allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data:; "
+        + "style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'";
 
     /** HTML 이 아닌 미리보기와 내려받기. 아무것도 부르지 못하게 한다. */
     public static final String NONE = "sandbox; default-src 'none'";

@@ -83,15 +83,18 @@ class TaskFiringTest {
 
     private final List<Long> createdUsers = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         clean();
     }
 
+
     @AfterEach
     void tearDown() {
         clean();
     }
+
 
     @Test
     @DisplayName("예정 시각이 된 매달 작업은 QUEUED 하나를 만들고 다음 시각을 12월 1일로 옮기며, 다시 불러도 하나다")
@@ -113,6 +116,7 @@ class TaskFiringTest {
         assertThat(trigger.lastFiredAt()).as("마지막 예정 시각").isEqualTo(NOVEMBER_FIRST);
     }
 
+
     @Test
     @DisplayName("발화를 만든 뒤 다음 시각을 옮기기 전에 서버가 내려간 것처럼 되돌려도 줄은 하나이고 다음 시각만 다시 옮긴다")
     void keepsOneRunWhenNextFireAtWasNotMoved() {
@@ -127,9 +131,10 @@ class TaskFiringTest {
         assertThat(created).as("되돌린 뒤 만든 발화 수").isZero();
         assertThat(runsOf(fixture.task())).as("발화 줄").hasSize(1);
         assertThat(triggers.findById(fixture.trigger().id()).orElseThrow().nextFireAt())
-                .as("다시 옮긴 다음 예정 시각")
-                .isEqualTo(DECEMBER_FIRST);
+            .as("다시 옮긴 다음 예정 시각")
+            .isEqualTo(DECEMBER_FIRST);
     }
+
 
     @Test
     @DisplayName("시간대 이름이 틀린 trigger 가 실패해도 다른 trigger 는 발화하고, 실패한 trigger 는 그대로 남는다")
@@ -137,8 +142,8 @@ class TaskFiringTest {
         Fixture broken = monthly(MissedPolicy.RUN_ONCE, NOVEMBER_FIRST);
         Fixture healthy = monthly(MissedPolicy.RUN_ONCE, NOVEMBER_FIRST);
         jdbc.update(
-                "update task_trigger set time_zone = 'Mars/Olympus' where id = ?",
-                broken.trigger().id());
+            "update task_trigger set time_zone = 'Mars/Olympus' where id = ?",
+            broken.trigger().id());
 
         int created = firing.fireDue(NOW);
 
@@ -146,9 +151,10 @@ class TaskFiringTest {
         assertThat(runsOf(healthy.task())).as("정상 작업의 발화").hasSize(1);
         assertThat(runsOf(broken.task())).as("실패한 작업의 발화").isEmpty();
         assertThat(triggers.findById(broken.trigger().id()).orElseThrow().nextFireAt())
-                .as("실패한 trigger 의 다음 예정 시각")
-                .isEqualTo(NOVEMBER_FIRST);
+            .as("실패한 trigger 의 다음 예정 시각")
+            .isEqualTo(NOVEMBER_FIRST);
     }
+
 
     @Test
     @DisplayName("사흘 늦게 부르면 RUN_ONCE 는 마지막 예정 시각 하나를 열고, SKIP 은 알림 없이 MISSED 하나를 남긴다")
@@ -170,10 +176,11 @@ class TaskFiringTest {
         assertThat(notificationsOf(skip.task().ownerUserId())).as("놓친 발화의 알림").isEmpty();
         Instant nextDay = Instant.parse("2026-11-05T00:00:00Z");
         assertThat(triggers.findById(runOnce.trigger().id()).orElseThrow().nextFireAt())
-                .isEqualTo(nextDay);
+            .isEqualTo(nextDay);
         assertThat(triggers.findById(skip.trigger().id()).orElseThrow().nextFireAt())
-                .isEqualTo(nextDay);
+            .isEqualTo(nextDay);
     }
+
 
     @Test
     @DisplayName("멈춘 작업은 예정 시각이 지나도 발화하지 않는다")
@@ -188,8 +195,9 @@ class TaskFiringTest {
         assertThat(created).isZero();
         assertThat(runsOf(fixture.task())).isEmpty();
         assertThat(triggers.findById(fixture.trigger().id()).orElseThrow().nextFireAt())
-                .isEqualTo(NOVEMBER_FIRST);
+            .isEqualTo(NOVEMBER_FIRST);
     }
+
 
     @Test
     @DisplayName("그 사용자의 24시간 안 발화가 48개면 DAILY_LIMIT 로 건너뛰고 그 작업을 가리키는 TASK_SKIPPED 를 알린다")
@@ -200,25 +208,26 @@ class TaskFiringTest {
         firing.fireDue(NOW);
 
         TaskRun fired = runs.findAll().stream()
-                .filter(run -> run.scheduledFor().equals(NOVEMBER_FIRST))
-                .filter(run -> run.taskId().equals(fixture.task().id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(run -> run.scheduledFor().equals(NOVEMBER_FIRST))
+            .filter(run -> run.taskId().equals(fixture.task().id()))
+            .findFirst()
+            .orElseThrow();
         assertThat(fired.status()).isEqualTo(TaskRunStatus.SKIPPED);
         assertThat(fired.reason()).isEqualTo(TaskRunReason.DAILY_LIMIT);
         assertThat(notificationsOf(fixture.task().ownerUserId()))
-                .singleElement()
-                .satisfies(notification -> {
-                    assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SKIPPED);
-                    assertThat(notification.title()).isEqualTo("「매달 정리」 실행을 건너뛰었어요");
-                    assertThat(notification.body()).isEqualTo("하루 실행 횟수를 다 썼어요");
-                    assertThat(notification.targetType()).isEqualTo(NotificationTargetType.TASK);
-                    assertThat(notification.targetPublicId())
-                            .isEqualTo(fixture.task().publicId());
-                });
+            .singleElement()
+            .satisfies(notification -> {
+                assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_SKIPPED);
+                assertThat(notification.title()).isEqualTo("「매달 정리」 실행을 건너뛰었어요");
+                assertThat(notification.body()).isEqualTo("하루 실행 횟수를 다 썼어요");
+                assertThat(notification.targetType()).isEqualTo(NotificationTargetType.TASK);
+                assertThat(notification.targetPublicId())
+                    .isEqualTo(fixture.task().publicId());
+            });
         assertThat(triggers.findById(fixture.trigger().id()).orElseThrow().nextFireAt())
-                .isEqualTo(DECEMBER_FIRST);
+            .isEqualTo(DECEMBER_FIRST);
     }
+
 
     @Test
     @DisplayName("24시간 안 발화가 47개면 상한 전이라 QUEUED 를 만든다")
@@ -229,13 +238,14 @@ class TaskFiringTest {
         firing.fireDue(NOW);
 
         TaskRun fired = runs.findAll().stream()
-                .filter(run -> run.scheduledFor().equals(NOVEMBER_FIRST))
-                .filter(run -> run.taskId().equals(fixture.task().id()))
-                .findFirst()
-                .orElseThrow();
+            .filter(run -> run.scheduledFor().equals(NOVEMBER_FIRST))
+            .filter(run -> run.taskId().equals(fixture.task().id()))
+            .findFirst()
+            .orElseThrow();
         assertThat(fired.status()).isEqualTo(TaskRunStatus.QUEUED);
         assertThat(notificationsOf(fixture.task().ownerUserId())).isEmpty();
     }
+
 
     @Test
     @DisplayName("한 번 도는 작업은 발화한 뒤 다음 예정 시각이 비고 다시 발화하지 않는다")
@@ -243,31 +253,32 @@ class TaskFiringTest {
         AppUser owner = owner();
         Agent agent = agentOf(owner);
         Task task = tasks.save(task(owner, agent, NotifyPolicy.ALWAYS));
-        TaskTrigger trigger =
-                triggers.save(TaskTrigger.once(task.id(), NOVEMBER_FIRST, SEOUL, MissedPolicy.RUN_ONCE, NOW));
+        TaskTrigger trigger = triggers.save(TaskTrigger.once(task.id(), NOVEMBER_FIRST, SEOUL, MissedPolicy.RUN_ONCE, NOW));
 
         firing.fireDue(NOW);
         firing.fireDue(NOW.plus(Duration.ofDays(1)));
 
         assertThat(runsOf(task))
-                .singleElement()
-                .satisfies(run -> assertThat(run.status()).isEqualTo(TaskRunStatus.QUEUED));
+            .singleElement()
+            .satisfies(run -> assertThat(run.status()).isEqualTo(TaskRunStatus.QUEUED));
         TaskTrigger stored = triggers.findById(trigger.id()).orElseThrow();
         assertThat(stored.nextFireAt()).as("다음 예정 시각").isNull();
         assertThat(stored.lastFiredAt()).isEqualTo(NOVEMBER_FIRST);
     }
 
+
     /** 그 작업의 주인이 지금 앞 1시간에 만든 발화 {@code count} 개를 넣는다. 예정 시각은 서로 다르다. */
     private void fillRecentRuns(Fixture fixture, int count) {
         for (int i = 0; i < count; i++) {
             runs.save(TaskRun.queued(
-                    fixture.task().id(),
-                    fixture.trigger().id(),
-                    fixture.task().ownerUserId(),
-                    NOVEMBER_FIRST.minus(Duration.ofDays(i + 1L)),
-                    NOW.minus(Duration.ofHours(1))));
+                fixture.task().id(),
+                fixture.trigger().id(),
+                fixture.task().ownerUserId(),
+                NOVEMBER_FIRST.minus(Duration.ofDays(i + 1L)),
+                NOW.minus(Duration.ofHours(1))));
         }
     }
+
 
     private Fixture monthly(MissedPolicy missed, Instant nextFireAt) {
         AppUser owner = owner();
@@ -277,20 +288,22 @@ class TaskFiringTest {
         return new Fixture(task, trigger);
     }
 
+
     /** 매일 서울 9시 작업이다. 다음 예정 시각은 11월 1일에 멈춰 있다. */
     private Fixture daily(MissedPolicy missed) {
         AppUser owner = owner();
         Agent agent = agentOf(owner);
         Task task = tasks.save(task(owner, agent, NotifyPolicy.ALWAYS));
-        TaskTrigger trigger =
-                triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", SEOUL, missed, NOVEMBER_FIRST, NOW));
+        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", SEOUL, missed, NOVEMBER_FIRST, NOW));
         return new Fixture(task, trigger);
     }
 
+
     private static Task task(AppUser owner, Agent agent, NotifyPolicy notify) {
         return Task.create(
-                owner.id(), agent.id(), "매달 정리", "지난달 기록을 보고 정리해 줘", ConversationMode.NEW_PER_RUN, notify, NOW);
+            owner.id(), agent.id(), "매달 정리", "지난달 기록을 보고 정리해 줘", ConversationMode.NEW_PER_RUN, notify, NOW);
     }
+
 
     private AppUser owner() {
         String email = "firing-" + UUID.randomUUID() + "@example.com";
@@ -299,29 +312,33 @@ class TaskFiringTest {
         return user;
     }
 
+
     private Agent agentOf(AppUser owner) {
         String code = "firing-" + UUID.randomUUID().toString().substring(0, 8);
         return agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW));
     }
+
 
     private List<TaskRun> runsOf(Task task) {
         return runs.findAll().stream()
-                .filter(run -> run.taskId().equals(task.id()))
-                .toList();
+            .filter(run -> run.taskId().equals(task.id()))
+            .toList();
     }
+
 
     private List<Notification> notificationsOf(Long userId) {
         return notifications.findByUserIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0, 100));
     }
+
 
     private void clean() {
         runs.deleteAll();
@@ -331,5 +348,7 @@ class TaskFiringTest {
         createdUsers.clear();
     }
 
-    private record Fixture(Task task, TaskTrigger trigger) {}
+
+    private record Fixture(Task task, TaskTrigger trigger) {
+    }
 }

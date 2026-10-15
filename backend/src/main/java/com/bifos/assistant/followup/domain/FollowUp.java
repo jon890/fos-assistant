@@ -32,13 +32,13 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(
-        name = "follow_up",
-        uniqueConstraints = {
-            @UniqueConstraint(name = "uk_follow_up_public_id", columnNames = "public_id"),
-            @UniqueConstraint(
-                    name = "uk_follow_up_open_title",
-                    columnNames = {"user_id", "title_key", "open_marker"})
-        })
+    name = "follow_up",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_follow_up_public_id", columnNames = "public_id"),
+        @UniqueConstraint(
+            name = "uk_follow_up_open_title",
+            columnNames = {"user_id", "title_key", "open_marker"})
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -102,45 +102,48 @@ public class FollowUp {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+
     /** 에이전트가 제안한 할 일이다. 사람이 받아들이기 전까지 {@code PROPOSED} 다. */
     public static FollowUp proposed(
-            Long userId,
-            Long conversationId,
-            Long executionId,
-            String title,
-            String titleKey,
-            Instant dueAt,
-            boolean waiting,
-            Instant now) {
+        Long userId,
+        Long conversationId,
+        Long executionId,
+        String title,
+        String titleKey,
+        Instant dueAt,
+        boolean waiting,
+        Instant now) {
         FollowUp followUp = started(userId, conversationId, title, titleKey, dueAt, waiting, now);
         followUp.proposedByExecutionId = executionId;
         followUp.status = FollowUpStatus.PROPOSED;
         return followUp;
     }
 
+
     /** 사람이 직접 더한 할 일이다. 바로 {@code OPEN} 이고 받아들인 시각이 만든 시각이다. */
     public static FollowUp opened(
-            Long userId,
-            Long conversationId,
-            String title,
-            String titleKey,
-            Instant dueAt,
-            boolean waiting,
-            Instant now) {
+        Long userId,
+        Long conversationId,
+        String title,
+        String titleKey,
+        Instant dueAt,
+        boolean waiting,
+        Instant now) {
         FollowUp followUp = started(userId, conversationId, title, titleKey, dueAt, waiting, now);
         followUp.status = FollowUpStatus.OPEN;
         followUp.acceptedAt = now;
         return followUp;
     }
 
+
     private static FollowUp started(
-            Long userId,
-            Long conversationId,
-            String title,
-            String titleKey,
-            Instant dueAt,
-            boolean waiting,
-            Instant now) {
+        Long userId,
+        Long conversationId,
+        String title,
+        String titleKey,
+        Instant dueAt,
+        boolean waiting,
+        Instant now) {
         FollowUp followUp = new FollowUp();
         followUp.userId = userId;
         followUp.conversationId = conversationId;
@@ -154,6 +157,7 @@ public class FollowUp {
         return followUp;
     }
 
+
     /** 제안을 받아들였다. */
     public void accept(Instant now) {
         require(FollowUpStatus.PROPOSED);
@@ -162,11 +166,13 @@ public class FollowUp {
         this.updatedAt = now;
     }
 
+
     /** 제안을 거절했다. */
     public void reject(Instant now) {
         require(FollowUpStatus.PROPOSED);
         close(FollowUpStatus.REJECTED, now);
     }
+
 
     /** 끝냈다. */
     public void done(Instant now) {
@@ -174,11 +180,13 @@ public class FollowUp {
         close(FollowUpStatus.DONE, now);
     }
 
+
     /** 그만두었다. */
     public void drop(Instant now) {
         require(FollowUpStatus.OPEN);
         close(FollowUpStatus.DROPPED, now);
     }
+
 
     /** 제목, 기한, 기다리는 중을 고친다. 끝나지 않은 줄만 고친다. */
     public void revise(String title, String titleKey, Instant dueAt, boolean waiting, Instant now) {
@@ -190,10 +198,12 @@ public class FollowUp {
         this.updatedAt = now;
     }
 
+
     /** 에이전트가 제안한 줄인가. */
     public boolean proposedByAgent() {
         return proposedByExecutionId != null;
     }
+
 
     private void close(FollowUpStatus closed, Instant now) {
         this.status = closed;
@@ -202,10 +212,11 @@ public class FollowUp {
         this.updatedAt = now;
     }
 
+
     private void require(FollowUpStatus... expected) {
         if (!Arrays.asList(expected).contains(status)) {
             throw new IllegalStateException(
-                    "follow-up must be one of " + Arrays.toString(expected) + " but is " + status);
+                "follow-up must be one of " + Arrays.toString(expected) + " but is " + status);
         }
     }
 }

@@ -20,49 +20,49 @@ class ProactiveLoopMigrationTest {
     void enforcesUniqueKeysAndClearsEvaluation() throws Exception {
         String url = "jdbc:h2:mem:proactive-loop-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement sql = connection.createStatement()) {
+            Statement sql = connection.createStatement()) {
             sql.executeUpdate("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)"
-                    + " VALUES (941, 'user@example.com', '사용자A', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
+                + " VALUES (941, 'user@example.com', '사용자A', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
             sql.executeUpdate(
-                    "INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope,"
-                            + " visibility, owner_user_id, enabled, created_at) VALUES (942, 'a', 'n', 'a', 'http://localhost',"
-                            + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 941, TRUE, CURRENT_TIMESTAMP(6))");
+                "INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope,"
+                    + " visibility, owner_user_id, enabled, created_at) VALUES (942, 'a', 'n', 'a', 'http://localhost',"
+                    + " 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 941, TRUE, CURRENT_TIMESTAMP(6))");
             sql.executeUpdate(
-                    "INSERT INTO conversation (id, public_id, user_id, agent_id, title, created_at, updated_at)"
-                            + " VALUES (943, X'00000000000000000000000000000943', 941, 942, '점검', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
+                "INSERT INTO conversation (id, public_id, user_id, agent_id, title, created_at, updated_at)"
+                    + " VALUES (943, X'00000000000000000000000000000943', 941, 942, '점검', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
             sql.executeUpdate(
-                    "INSERT INTO proactive_check (id, user_id, agent_id, conversation_id, trigger_type, status, started_at)"
-                            + " VALUES (944, 941, 942, 943, 'SCHEDULED', 'SUCCEEDED', CURRENT_TIMESTAMP(6))");
+                "INSERT INTO proactive_check (id, user_id, agent_id, conversation_id, trigger_type, status, started_at)"
+                    + " VALUES (944, 941, 942, 943, 'SCHEDULED', 'SUCCEEDED', CURRENT_TIMESTAMP(6))");
             sql.executeUpdate(
-                    "INSERT INTO proactive_value_evaluation (id, check_id, user_id, outcome, evidence_json, created_at)"
-                            + " VALUES (945, 944, 941, 'EMPTY', '{\"state\":{\"version\":1}}', CURRENT_TIMESTAMP(6))");
+                "INSERT INTO proactive_value_evaluation (id, check_id, user_id, outcome, evidence_json, created_at)"
+                    + " VALUES (945, 944, 941, 'EMPTY', '{\"state\":{\"version\":1}}', CURRENT_TIMESTAMP(6))");
 
             sql.executeUpdate(
-                    "INSERT INTO proactive_loop_setting (user_id, agent_id, enabled, snoozed_until, updated_at)"
-                            + " VALUES (941, 942, TRUE, NULL, CURRENT_TIMESTAMP(6))");
+                "INSERT INTO proactive_loop_setting (user_id, agent_id, enabled, snoozed_until, updated_at)"
+                    + " VALUES (941, 942, TRUE, NULL, CURRENT_TIMESTAMP(6))");
             assertThatThrownBy(() -> sql.executeUpdate(
-                            "INSERT INTO proactive_loop_setting (user_id, agent_id, enabled, snoozed_until, updated_at)"
-                                    + " VALUES (941, 942, FALSE, NULL, CURRENT_TIMESTAMP(6))"))
-                    .as("같은 사용자와 에이전트의 두 번째 설정 줄")
-                    .isInstanceOf(SQLException.class);
+                "INSERT INTO proactive_loop_setting (user_id, agent_id, enabled, snoozed_until, updated_at)"
+                    + " VALUES (941, 942, FALSE, NULL, CURRENT_TIMESTAMP(6))"))
+                        .as("같은 사용자와 에이전트의 두 번째 설정 줄")
+                        .isInstanceOf(SQLException.class);
 
             sql.executeUpdate(
-                    "INSERT INTO proactive_loop_run (user_id, source_check_id, status, evaluation_id, created_at, finished_at)"
-                            + " VALUES (941, 944, 'DECIDED', 945, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
+                "INSERT INTO proactive_loop_run (user_id, source_check_id, status, evaluation_id, created_at, finished_at)"
+                    + " VALUES (941, 944, 'DECIDED', 945, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
             assertThatThrownBy(() -> sql.executeUpdate(
-                            "INSERT INTO proactive_loop_run (user_id, source_check_id, status, created_at)"
-                                    + " VALUES (941, 944, 'RUNNING', CURRENT_TIMESTAMP(6))"))
-                    .as("같은 원천 살펴보기의 두 번째 시도 줄")
-                    .isInstanceOf(SQLException.class);
+                "INSERT INTO proactive_loop_run (user_id, source_check_id, status, created_at)"
+                    + " VALUES (941, 944, 'RUNNING', CURRENT_TIMESTAMP(6))"))
+                        .as("같은 원천 살펴보기의 두 번째 시도 줄")
+                        .isInstanceOf(SQLException.class);
 
             sql.executeUpdate("DELETE FROM proactive_value_evaluation WHERE id = 945");
             try (ResultSet rows = sql.executeQuery(
-                    "SELECT status, evaluation_id FROM proactive_loop_run WHERE source_check_id = 944")) {
+                "SELECT status, evaluation_id FROM proactive_loop_run WHERE source_check_id = 944")) {
                 assertThat(rows.next()).as("평가를 지운 뒤에도 시도 줄이 남는다").isTrue();
                 assertThat(rows.getString(1)).isEqualTo("DECIDED");
                 assertThat(rows.getObject(2)).as("지운 평가의 번호").isNull();

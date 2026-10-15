@@ -11,4 +11,5 @@ import java.util.UUID;
  * @param conversationId 그 줄의 대화 번호
  * @param actionId 승인 요청 번호
  */
-public record ConnectorActionChanged(Long conversationId, UUID actionId) {}
+public record ConnectorActionChanged(Long conversationId, UUID actionId) {
+}

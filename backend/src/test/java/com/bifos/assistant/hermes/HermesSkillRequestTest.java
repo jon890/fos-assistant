@@ -37,18 +37,21 @@ class HermesSkillRequestTest {
     @TempDir
     Path attachmentRoot;
 
-    private record Call(String method, String path, String query, String authorization, String body) {}
+
+    private record Call(String method, String path, String query, String authorization, String body) {
+    }
+
 
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             calls.add(new Call(
-                    exchange.getRequestMethod(),
-                    exchange.getRequestURI().getPath(),
-                    exchange.getRequestURI().getQuery(),
-                    exchange.getRequestHeaders().getFirst("Authorization"),
-                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                exchange.getRequestMethod(),
+                exchange.getRequestURI().getPath(),
+                exchange.getRequestURI().getQuery(),
+                exchange.getRequestHeaders().getFirst("Authorization"),
+                new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, body.length);
@@ -57,22 +60,24 @@ class HermesSkillRequestTest {
         });
         server.start();
         client = new HttpHermesSkillClient(
-                new HermesProperties(
-                        "keys",
-                        "http://127.0.0.1:" + server.getAddress().getPort() + "/",
-                        TOKEN,
-                        "http://listener.test",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1)),
-                new SandboxAttachmentDirectory(attachmentRoot.toString()));
+            new HermesProperties(
+                "keys",
+                "http://127.0.0.1:" + server.getAddress().getPort() + "/",
+                TOKEN,
+                "http://listener.test",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(1)),
+            new SandboxAttachmentDirectory(attachmentRoot.toString()));
     }
+
 
     @AfterEach
     void stop() {
         server.stop(0);
     }
+
 
     @Test
     @DisplayName("게시는 profile 과 external dirs, 실행 공간 주인을 싣고 도구 목록이 있으면 함께 싣는다")
@@ -86,51 +91,53 @@ class HermesSkillRequestTest {
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
         });
         assertThat(new ObjectMapper().readValue(calls.get(0).body(), Map.class))
-                .isEqualTo(Map.of(
-                        "profile",
-                        "kid",
-                        "config",
-                        Map.of("skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2"))),
-                        "sandbox_owner",
-                        "u7"));
+            .isEqualTo(Map.of(
+                "profile",
+                "kid",
+                "config",
+                Map.of("skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2"))),
+                "sandbox_owner",
+                "u7"));
         assertThat(new ObjectMapper().readValue(calls.get(1).body(), Map.class))
-                .isEqualTo(Map.of(
-                        "profile",
-                        "kid",
-                        "config",
-                        Map.of(
-                                "skills", Map.of("external_dirs", List.of()),
-                                "platform_toolsets", Map.of("api_server", List.of("web", "skills", "fos-assistant"))),
-                        "sandbox_owner",
-                        "a12"));
+            .isEqualTo(Map.of(
+                "profile",
+                "kid",
+                "config",
+                Map.of(
+                    "skills", Map.of("external_dirs", List.of()),
+                    "platform_toolsets", Map.of("api_server", List.of("web", "skills", "fos-assistant"))),
+                "sandbox_owner",
+                "a12"));
     }
+
 
     @Test
     @DisplayName("실행 공간 필수 게시는 도구 목록과 require sandbox 를 싣고 보통 게시는 그 칸을 싣지 않는다")
     void publishRequiringSandboxCarriesToolListAndRequireSandbox() throws Exception {
         client.publishRequiringSandbox(
-                "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7");
+            "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7");
         status = 409;
         response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
 
         assertThatThrownBy(() -> client.publishRequiringSandbox(
-                        "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
+            "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
                 .isInstanceOfSatisfying(
-                        HermesRequestRejected.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+                    HermesRequestRejected.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
         assertThat(new ObjectMapper().readValue(calls.get(0).body(), Map.class))
-                .isEqualTo(Map.of(
-                        "profile",
-                        "kid",
-                        "config",
-                        Map.of(
-                                "skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2")),
-                                "platform_toolsets", Map.of("api_server", List.of("terminal", "skills"))),
-                        "sandbox_owner",
-                        "u7",
-                        "require_sandbox",
-                        true));
+            .isEqualTo(Map.of(
+                "profile",
+                "kid",
+                "config",
+                Map.of(
+                    "skills", Map.of("external_dirs", List.of("/skills/kid/v1790661162144-a1b2")),
+                    "platform_toolsets", Map.of("api_server", List.of("terminal", "skills"))),
+                "sandbox_owner",
+                "u7",
+                "require_sandbox",
+                true));
     }
+
 
     @Test
     @DisplayName("게시가 409 sandbox_unavailable 이면 실행 공간 오류 코드의 거절 예외다")
@@ -139,7 +146,7 @@ class HermesSkillRequestTest {
         response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
 
         assertThatThrownBy(() -> client.publish(
-                        "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
+            "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
                 .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
                     assertThat(ex.status()).isEqualTo(409);
                     assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
@@ -147,20 +154,21 @@ class HermesSkillRequestTest {
 
         response = "{\"code\":\"profile_busy\"}";
         assertThatThrownBy(() -> client.publish(
-                        "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
+            "kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("terminal", "skills"), "u7"))
                 .isInstanceOfSatisfying(
-                        HermesRequestRejected.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+                    HermesRequestRejected.class,
+                    ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
+
 
     @Test
     @DisplayName("목록은 query profile 로 묻고 배열을 읽는다")
     void listAsksByQueryProfileAndReadsArray() {
         response = "[{\"name\":\"weekly-plan\",\"description\":\"이번 주 계획\",\"category\":\"agent\","
-                + "\"enabled\":false,\"usage\":0,\"provenance\":\"agent\"},{\"name\":\"bare\"}]";
+            + "\"enabled\":false,\"usage\":0,\"provenance\":\"agent\"},{\"name\":\"bare\"}]";
 
         assertThat(client.list("kid"))
-                .containsExactly(new HermesSkill("weekly-plan", "이번 주 계획", false), new HermesSkill("bare", "", true));
+            .containsExactly(new HermesSkill("weekly-plan", "이번 주 계획", false), new HermesSkill("bare", "", true));
         assertThat(calls).singleElement().satisfies(call -> {
             assertThat(call.method()).isEqualTo("GET");
             assertThat(call.path()).isEqualTo("/api/skills");
@@ -168,6 +176,7 @@ class HermesSkillRequestTest {
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
         });
     }
+
 
     @Test
     @DisplayName("빈 배열은 스킬이 없는 profile 이고 배열이 아니면 받지 않는다")
@@ -177,9 +186,10 @@ class HermesSkillRequestTest {
 
         response = "{\"skills\":[]}";
         assertThatThrownBy(() -> client.list("kid"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
+
 
     @Test
     @DisplayName("켜고 끄기는 profile 과 이름과 값을 함께 싣는다")
@@ -190,9 +200,10 @@ class HermesSkillRequestTest {
             assertThat(call.method()).isEqualTo("PUT");
             assertThat(call.path()).isEqualTo("/api/skills/toggle");
             assertThat(new ObjectMapper().readValue(call.body(), Map.class))
-                    .isEqualTo(Map.of("profile", "kid", "name", "weekly-plan", "enabled", false));
+                .isEqualTo(Map.of("profile", "kid", "name", "weekly-plan", "enabled", false));
         });
     }
+
 
     @Test
     @DisplayName("첨부를 올린 적 없는 주인의 스킬도 보내기 전에 첨부 디렉터리를 만들어 게시한다")
@@ -200,9 +211,10 @@ class HermesSkillRequestTest {
         client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("vision"), "a12");
 
         assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("a12")))
-                .isDirectory();
+            .isDirectory();
         assertThat(calls).hasSize(1);
     }
+
 
     @Test
     @DisplayName("스킬 경로만 바꾸는 게시는 첨부 디렉터리를 만들지도 검사하지도 않는다")
@@ -213,21 +225,22 @@ class HermesSkillRequestTest {
         assertThat(calls).hasSize(1);
     }
 
+
     @Test
     @DisplayName("도구 목록을 함께 쓰는 게시는 첨부 디렉터리 자리에 링크가 있으면 보내지 않고 거절 예외를 던진다")
     void publishStopsOnALinkedUsersDirectory() throws IOException {
         Path outside = Files.createDirectory(attachmentRoot.resolveSibling(attachmentRoot.getFileName() + "-outside"));
         Files.createSymbolicLink(attachmentRoot.resolve("users"), outside);
 
-        assertThatThrownBy(() ->
-                        client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("vision"), "u7"))
-                .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
-                    assertThat(ex.status()).isEqualTo(409);
-                    assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
-                });
+        assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), List.of("vision"), "u7"))
+            .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                assertThat(ex.status()).isEqualTo(409);
+                assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+            });
         assertThat(calls).isEmpty();
         assertThat(outside.resolve(SandboxAttachmentDirectory.key("u7"))).doesNotExist();
     }
+
 
     @Test
     @DisplayName("게시가 4xx 면 거절 예외이고 5xx 면 닿지 못한 것과 같은 예외다")
@@ -235,25 +248,26 @@ class HermesSkillRequestTest {
         status = 400;
         response = "{\"error\":\"directory does not exist\"}";
         assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7"))
-                .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
-                    assertThat(ex.status()).isEqualTo(400);
-                    assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
-                });
+            .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                assertThat(ex.status()).isEqualTo(400);
+                assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            });
 
         status = 500;
         assertThatThrownBy(() -> client.publish("kid", List.of("/skills/kid/v1790661162144-a1b2"), null, "u7"))
-                .isInstanceOf(ApiException.class)
-                .isNotInstanceOf(HermesRequestRejected.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .isNotInstanceOf(HermesRequestRejected.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("profile 이름이 규칙에 맞지 않으면 대시보드를 부르지 않는다")
     void doesNotCallDashboardForProfileNameBreakingRule() {
         assertThatThrownBy(() -> client.list("Kid/../x"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
         assertThat(calls).isEmpty();
     }
 }

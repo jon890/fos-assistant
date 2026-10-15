@@ -55,6 +55,7 @@ public class UsageTestSupportController {
     private final AppUserRepository users;
     private final CurrentUserProvider currentUser;
 
+
     /** 브라우저 검사의 관리자 화면을 다른 검사 사용자와 분리해 준비한다. */
     @PostMapping("/admin-user")
     public SeededAdminUser seedAdminUser(@RequestBody SeededAdminUser requested) {
@@ -63,9 +64,10 @@ public class UsageTestSupportController {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "test admin user already exists");
         }
         users.save(AppUser.of(
-                requested.email(), requested.displayName(), caller.groupId(), UserRole.ADMIN, Instant.now()));
+            requested.email(), requested.displayName(), caller.groupId(), UserRole.ADMIN, Instant.now()));
         return requested;
     }
+
 
     /**
      * 끝난 실행을 여러 건 심는다.
@@ -80,22 +82,23 @@ public class UsageTestSupportController {
         for (SeededExecution seed : seeds) {
             Agent agent = agents.findByCode(seed.agentCode()).orElseThrow();
             executions.save(AgentExecution.builder()
-                    .userId(userId)
-                    .conversationId(1L)
-                    .agentId(agent.id())
-                    .profileName(agent.hermesProfile())
-                    .provider(seed.provider() == null ? DEFAULT_PROVIDER : seed.provider())
-                    .model(seed.model() == null ? DEFAULT_MODEL : seed.model())
-                    .costMode(agent.costMode())
-                    .status(ExecutionStatus.SUCCEEDED)
-                    .timing(seed.startedAt(), seed.startedAt().plusMillis(1_200L))
-                    .tokens(seed.inputTokens(), null, seed.outputTokens(), seed.inputTokens() + seed.outputTokens())
-                    .cost(new ExecutionCost(seed.estimatedCostMicros(), seed.actualCostMicros(), "USD", "test-support"))
-                    .contextChars(seed.contextChars())
-                    .runtimeFingerprint(seed.runtimeFingerprint())
-                    .build());
+                .userId(userId)
+                .conversationId(1L)
+                .agentId(agent.id())
+                .profileName(agent.hermesProfile())
+                .provider(seed.provider() == null ? DEFAULT_PROVIDER : seed.provider())
+                .model(seed.model() == null ? DEFAULT_MODEL : seed.model())
+                .costMode(agent.costMode())
+                .status(ExecutionStatus.SUCCEEDED)
+                .timing(seed.startedAt(), seed.startedAt().plusMillis(1_200L))
+                .tokens(seed.inputTokens(), null, seed.outputTokens(), seed.inputTokens() + seed.outputTokens())
+                .cost(new ExecutionCost(seed.estimatedCostMicros(), seed.actualCostMicros(), "USD", "test-support"))
+                .contextChars(seed.contextChars())
+                .runtimeFingerprint(seed.runtimeFingerprint())
+                .build());
         }
     }
+
 
     /**
      * 부르는 사람의 실행 기록과 그 실행의 하위 에이전트 재조회 작업 줄을 지운다. 검사가 심은 것만 남기려면 먼저 비워야 한다.
@@ -109,13 +112,13 @@ public class UsageTestSupportController {
     @DeleteMapping("/executions")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clearExecutions() {
-        List<AgentExecution> cleared =
-                executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE));
+        List<AgentExecution> cleared = executions.findByUserIdOrderByIdDesc(currentUser.require().id(), PageRequest.of(0, CLEARED_AT_ONCE));
         List<Long> ids = cleared.stream().map(AgentExecution::id).toList();
         jobs.deleteAll(jobs.findByExecutionIdIn(ids));
         ids.forEach(id -> proactiveChecks.findByRootExecutionId(id).ifPresent(proactiveChecks::delete));
         executions.deleteAll(cleared);
     }
+
 
     /**
      * 심을 실행 하나의 값이다.
@@ -126,27 +129,30 @@ public class UsageTestSupportController {
      * @param actualCostMicros 비우면 구독 경로처럼 실제 청구액이 없는 실행이 된다
      */
     public record SeededExecution(
-            String agentCode,
-            String provider,
-            String model,
-            String runtimeFingerprint,
-            Instant startedAt,
-            Long inputTokens,
-            Long outputTokens,
-            Long contextChars,
-            Long estimatedCostMicros,
-            Long actualCostMicros) {}
+        String agentCode,
+        String provider,
+        String model,
+        String runtimeFingerprint,
+        Instant startedAt,
+        Long inputTokens,
+        Long outputTokens,
+        Long contextChars,
+        Long estimatedCostMicros,
+        Long actualCostMicros) {
+    }
 
     /** 관리자 권한으로 따로 심을 브라우저 검사 사용자다. */
-    public record SeededAdminUser(String email, String displayName) {}
+    public record SeededAdminUser(String email, String displayName) {
+    }
+
 
     /** 가장 최근 실행을 고아 실행으로 표시한다. */
     @PostMapping("/last-execution/orphaned")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void orphanLastExecution() {
         AgentExecution execution = executions.findAll(PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id"))).stream()
-                .findFirst()
-                .orElseThrow();
+            .findFirst()
+            .orElseThrow();
         execution.markFailed("ORPHANED", Instant.now());
         executions.save(execution);
     }

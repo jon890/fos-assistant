@@ -29,21 +29,19 @@ class PngExifOrientationTest {
             for (int orientation = 1; orientation <= 8; orientation++) {
                 byte[] original = withExif(source, tiff(orientation, order));
                 byte[] unchanged = original.clone();
-                BufferedImage expected =
-                        ImageIO.read(new ByteArrayInputStream(resource("overview-" + orientation + ".png")));
-                BufferedImage full =
-                        ImageIO.read(new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", null)
-                                .bytes()));
+                BufferedImage expected = ImageIO.read(new ByteArrayInputStream(resource("overview-" + orientation + ".png")));
+                BufferedImage full = ImageIO.read(new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", null)
+                    .bytes()));
                 assertPixels(full, expected, 0, 0, expected.getWidth(), expected.getHeight());
                 List<Integer> region = List.of(0, expected.getHeight() - 6, 10, expected.getHeight());
                 BufferedImage crop = ImageIO.read(
-                        new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", region)
-                                .bytes()));
+                    new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", region)
+                        .bytes()));
                 assertPixels(crop, expected, 0, expected.getHeight() - 6, 10, 6);
                 assertThat(original).isEqualTo(unchanged);
                 assertThat(AgentImageResizer.orientation(original)).isEqualTo(orientation);
                 BufferedImage copy = ImageIO.read(new ByteArrayInputStream(
-                        AgentImageResizer.toJpeg(original).orElseThrow()));
+                    AgentImageResizer.toJpeg(original).orElseThrow()));
                 assertThat(copy.getWidth()).isEqualTo(expected.getWidth());
                 assertThat(copy.getHeight()).isEqualTo(expected.getHeight());
                 AttachmentStore store = mock(AttachmentStore.class);
@@ -51,10 +49,11 @@ class PngExifOrientationTest {
                 when(attachment.isVisible()).thenReturn(true);
                 when(store.open(attachment)).thenReturn(new ByteArrayInputStream(original));
                 assertThat(new AttachmentInspection(store).displaySize(attachment))
-                        .isEqualTo(expected.getWidth() + "x" + expected.getHeight());
+                    .isEqualTo(expected.getWidth() + "x" + expected.getHeight());
             }
         }
     }
+
 
     @Test
     @DisplayName("큰 IDAT 뒤의 PNG EXIF도 표시 크기와 영역에 반영한다")
@@ -70,16 +69,15 @@ class PngExifOrientationTest {
         ImageIO.write(source, "png", encoded);
         byte[] png = encoded.toByteArray();
         assertThat(png.length).isGreaterThan(256 * 1024);
-        byte[] original =
-                withChunk(png, png.length - 12, new byte[] {'e', 'X', 'I', 'f'}, tiff(6, ByteOrder.BIG_ENDIAN));
+        byte[] original = withChunk(png, png.length - 12, new byte[] {'e', 'X', 'I', 'f'}, tiff(6, ByteOrder.BIG_ENDIAN));
         AttachmentStore store = mock(AttachmentStore.class);
         ChatAttachment attachment = mock(ChatAttachment.class);
         when(attachment.isVisible()).thenReturn(true);
         when(store.open(attachment)).thenReturn(new ByteArrayInputStream(original));
         assertThat(new AttachmentInspection(store).displaySize(attachment)).isEqualTo("300x400");
         BufferedImage crop = ImageIO.read(
-                new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", List.of(0, 394, 10, 400))
-                        .bytes()));
+            new ByteArrayInputStream(AttachmentInspection.inspect(original, "image/png", List.of(0, 394, 10, 400))
+                .bytes()));
         assertThat(crop.getWidth()).isEqualTo(10);
         assertThat(crop.getHeight()).isEqualTo(6);
         for (int y = 0; y < 6; y++) {
@@ -89,6 +87,7 @@ class PngExifOrientationTest {
         }
     }
 
+
     @Test
     @DisplayName("PNG EXIF의 잘린 청크와 초과 길이 및 손상 CRC를 안전하게 무시한다")
     void ignoresTruncatedChunksOversizedLengthsAndInvalidCrc() throws Exception {
@@ -96,7 +95,7 @@ class PngExifOrientationTest {
         byte[] original = withExif(source, tiff(6, ByteOrder.BIG_ENDIAN));
         for (int end = 0; end < 71; end++) {
             assertThat(AgentImageResizer.orientation(Arrays.copyOf(original, end)))
-                    .isEqualTo(1);
+                .isEqualTo(1);
         }
         byte[] badCrc = original.clone();
         badCrc[70] ^= 1;
@@ -112,6 +111,7 @@ class PngExifOrientationTest {
         assertThat(AgentImageResizer.orientation(badSignature)).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("TIFF 범위를 벗어난 IFD와 잘못된 방향 태그의 타입·개수·값을 무시한다")
     void ignoresInvalidTiffOffsetsAndOrientationEntries() throws Exception {
@@ -121,34 +121,35 @@ class PngExifOrientationTest {
                 byte[] tiff = tiff(6, order);
                 ByteBuffer.wrap(tiff).order(order).putInt(4, offset);
                 assertThat(AgentImageResizer.orientation(withExif(source, tiff)))
-                        .isEqualTo(1);
+                    .isEqualTo(1);
             }
             for (int count : List.of(0, 2, -1)) {
                 byte[] tiff = tiff(6, order);
                 ByteBuffer.wrap(tiff).order(order).putInt(14, count);
                 assertThat(AgentImageResizer.orientation(withExif(source, tiff)))
-                        .isEqualTo(1);
+                    .isEqualTo(1);
             }
             for (int orientation : List.of(0, 9, 65535)) {
                 assertThat(AgentImageResizer.orientation(withExif(source, tiff(orientation, order))))
-                        .isEqualTo(1);
+                    .isEqualTo(1);
             }
             byte[] wrongType = tiff(6, order);
-            ByteBuffer.wrap(wrongType).order(order).putShort(12, (short) 4);
+            ByteBuffer.wrap(wrongType).order(order).putShort(12, (short)4);
             assertThat(AgentImageResizer.orientation(withExif(source, wrongType)))
-                    .isEqualTo(1);
+                .isEqualTo(1);
             byte[] wrongEndian = tiff(6, order);
             wrongEndian[0] = 'X';
             assertThat(AgentImageResizer.orientation(withExif(source, wrongEndian)))
-                    .isEqualTo(1);
+                .isEqualTo(1);
             byte[] wrongMagic = tiff(6, order);
             wrongMagic[2] ^= 1;
             assertThat(AgentImageResizer.orientation(withExif(source, wrongMagic)))
-                    .isEqualTo(1);
+                .isEqualTo(1);
             assertThat(AgentImageResizer.orientation(withExif(source, Arrays.copyOf(tiff(6, order), 21))))
-                    .isEqualTo(1);
+                .isEqualTo(1);
         }
     }
+
 
     private static byte[] resource(String name) throws Exception {
         try (var input = PngExifOrientationTest.class.getResourceAsStream("/attachments/png-orientation/" + name)) {
@@ -156,19 +157,22 @@ class PngExifOrientationTest {
         }
     }
 
+
     private static byte[] tiff(int orientation, ByteOrder order) {
         ByteBuffer bytes = ByteBuffer.allocate(26).order(order);
-        bytes.put(order == ByteOrder.LITTLE_ENDIAN ? (byte) 'I' : (byte) 'M');
-        bytes.put(order == ByteOrder.LITTLE_ENDIAN ? (byte) 'I' : (byte) 'M');
-        bytes.putShort((short) 42).putInt(8).putShort((short) 1);
-        bytes.putShort((short) 274).putShort((short) 3).putInt(1).putShort((short) orientation);
-        bytes.putShort((short) 0).putInt(0);
+        bytes.put(order == ByteOrder.LITTLE_ENDIAN ? (byte)'I' : (byte)'M');
+        bytes.put(order == ByteOrder.LITTLE_ENDIAN ? (byte)'I' : (byte)'M');
+        bytes.putShort((short)42).putInt(8).putShort((short)1);
+        bytes.putShort((short)274).putShort((short)3).putInt(1).putShort((short)orientation);
+        bytes.putShort((short)0).putInt(0);
         return bytes.array();
     }
+
 
     private static byte[] withExif(byte[] png, byte[] tiff) throws Exception {
         return withChunk(png, 33, new byte[] {'e', 'X', 'I', 'f'}, tiff);
     }
+
 
     private static byte[] withChunk(byte[] png, int offset, byte[] type, byte[] body) throws Exception {
         ByteArrayOutputStream result = new ByteArrayOutputStream();
@@ -179,13 +183,14 @@ class PngExifOrientationTest {
         CRC32 crc = new CRC32();
         crc.update(type);
         crc.update(body);
-        result.write(ByteBuffer.allocate(4).putInt((int) crc.getValue()).array());
+        result.write(ByteBuffer.allocate(4).putInt((int)crc.getValue()).array());
         result.write(png, offset, png.length - offset);
         return result.toByteArray();
     }
 
+
     private static void assertPixels(
-            BufferedImage actual, BufferedImage expected, int left, int top, int width, int height) {
+        BufferedImage actual, BufferedImage expected, int left, int top, int width, int height) {
         assertThat(actual.getWidth()).isEqualTo(width);
         assertThat(actual.getHeight()).isEqualTo(height);
         for (int y = 0; y < height; y++) {

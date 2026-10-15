@@ -26,33 +26,37 @@ public class FlowRegistry implements ApplicationRunner, KnownFlows {
     private final Map<String, Flow> byName;
     private final AgentRepository agents;
 
+
     public FlowRegistry(List<Flow> flows, AgentRepository agents) {
         this.byName = flows.stream()
-                .collect(Collectors.toMap(Flow::name, Function.identity(), (a, b) -> a, LinkedHashMap::new));
+            .collect(Collectors.toMap(Flow::name, Function.identity(), (a, b) -> a, LinkedHashMap::new));
         this.agents = agents;
     }
+
 
     /** 그 이름의 흐름. 없으면 null 이다. */
     public Flow find(String name) {
         return name == null ? null : byName.get(name);
     }
 
+
     @Override
     public boolean known(String name) {
         return find(name) != null;
     }
 
+
     /** 기동할 때 저장된 에이전트의 흐름 이름을 모두 확인한다. */
     @Override
     public void run(ApplicationArguments args) {
         List<String> unknown = agents.findAll().stream()
-                .map(Agent::flow)
-                .filter(flow -> flow != null && !byName.containsKey(flow))
-                .distinct()
-                .toList();
+            .map(Agent::flow)
+            .filter(flow -> flow != null && !byName.containsKey(flow))
+            .distinct()
+            .toList();
         if (!unknown.isEmpty()) {
             throw new IllegalStateException(
-                    "모르는 흐름 이름이 에이전트에 적혀 있다 unknown=%s known=%s".formatted(unknown, byName.keySet()));
+                "모르는 흐름 이름이 에이전트에 적혀 있다 unknown=%s known=%s".formatted(unknown, byName.keySet()));
         }
         log.info("등록된 흐름 flows={}", byName.keySet());
     }

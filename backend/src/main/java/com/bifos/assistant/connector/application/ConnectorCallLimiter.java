@@ -27,16 +27,19 @@ public class ConnectorCallLimiter {
     private final ConnectorProperties properties;
     private final Clock clock;
 
+
     // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorCallLimiter(ConnectorProperties properties) {
         this(properties, Clock.systemUTC());
     }
 
+
     public ConnectorCallLimiter(ConnectorProperties properties, Clock clock) {
         this.properties = properties;
         this.clock = clock;
     }
+
 
     /**
      * 한도 안이면 {@code action} 을 돌리고, 끝나면 예외여도 동시 자리를 돌려준다.
@@ -54,6 +57,7 @@ public class ConnectorCallLimiter {
         }
     }
 
+
     /** 판정과 갱신을 {@code compute} 안에서 해 같은 사용자의 요청이 겹쳐도 한 번에 하나만 본다. */
     private boolean acquire(Long userId) {
         Instant now = Instant.now(clock);
@@ -62,7 +66,7 @@ public class ConnectorCallLimiter {
             UserCalls state = current == null ? new UserCalls() : current;
             state.dropOlderThan(now.minus(WINDOW));
             if (state.running < properties.maxConcurrentCalls()
-                    && state.startedAt.size() < properties.callsPerMinute()) {
+                && state.startedAt.size() < properties.callsPerMinute()) {
                 state.running++;
                 state.startedAt.addLast(now);
                 accepted[0] = true;
@@ -71,6 +75,7 @@ public class ConnectorCallLimiter {
         });
         return accepted[0];
     }
+
 
     private void release(Long userId) {
         Instant oldest = Instant.now(clock).minus(WINDOW);
@@ -81,16 +86,19 @@ public class ConnectorCallLimiter {
         });
     }
 
+
     /** 사용자 한 명의 상태다. {@code compute} 안에서만 읽고 쓴다. */
     private static final class UserCalls {
         private final Deque<Instant> startedAt = new ArrayDeque<>();
         private int running;
+
 
         private void dropOlderThan(Instant oldest) {
             while (!startedAt.isEmpty() && startedAt.peekFirst().isBefore(oldest)) {
                 startedAt.removeFirst();
             }
         }
+
 
         /** 도는 호출도 남은 시각도 없으면 맵에 둘 까닭이 없다. */
         private boolean isIdle() {

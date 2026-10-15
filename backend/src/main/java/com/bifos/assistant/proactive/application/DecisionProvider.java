@@ -11,5 +11,6 @@ public interface DecisionProvider {
 
     String id();
 
+
     DecisionResponse evaluate(DecisionState state, List<DecisionQuestion> questions, DecisionRequest request);
 }

@@ -70,6 +70,7 @@ public class AgentRunner {
     private final UserExecutionLimiter limiter;
     private final ProactiveCheckRepository proactiveChecks;
 
+
     /**
      * 실행 하나를 끝까지 돌린다.
      *
@@ -82,39 +83,40 @@ public class AgentRunner {
      * @param parentExecutionId 이 실행을 부른 실행. 루트이면 null
      * @param rootExecutionId 이 실행이 속한 트리의 루트. 루트 자신이면 null
      * @param session Hermes 에 보낼 session 과 실행 줄에 제출하기 전에 적을 session. 대화의 첫 단계는 압축 교체 뒤에
-     *     보내는 session 이 바뀌어도 그 대화의 루트 session 을 적어야 하고(ADR-031), 하위 실행은 새
-     *     {@code fos-<uuid>} 를 보내고 적는다
+     * 보내는 session 이 바뀌어도 그 대화의 루트 session 을 적어야 하고(ADR-031), 하위 실행은 새
+     * {@code fos-<uuid>} 를 보내고 적는다
      * @param onStarted 실행 줄이 생긴 직후 호출한다
      * @param onSubmitted 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다
      * @param cancelled 참이면 실행을 멈춘다
      * @param instructionAddition 실행 문맥 뒤에 붙일 지시. 없으면 null
      */
     public AgentRun run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String task,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            RunSession session,
-            Consumer<AgentExecution> onStarted,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled,
-            String instructionAddition) {
+        CurrentUser user,
+        Conversation conversation,
+        Agent agent,
+        String task,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        RunSession session,
+        Consumer<AgentExecution> onStarted,
+        BiConsumer<AgentExecution, String> onSubmitted,
+        BooleanSupplier cancelled,
+        String instructionAddition) {
         return run(
-                user,
-                conversation,
-                agent,
-                task,
-                parentExecutionId,
-                rootExecutionId,
-                session,
-                onStarted,
-                onSubmitted,
-                cancelled,
-                instructionAddition,
-                null);
+            user,
+            conversation,
+            agent,
+            task,
+            parentExecutionId,
+            rootExecutionId,
+            session,
+            onStarted,
+            onSubmitted,
+            cancelled,
+            instructionAddition,
+            null);
     }
+
 
     /**
      * 실행 하나를 끝까지 돌리며 실행 줄에 {@code delegation_key} 를 처음부터 적는다.
@@ -127,64 +129,63 @@ public class AgentRunner {
      * @param delegationKey 위임이 아니면 null 이다. 나머지 인자는 11개 인자 판과 같다
      */
     public AgentRun run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String task,
-            Long parentExecutionId,
-            Long rootExecutionId,
-            RunSession session,
-            Consumer<AgentExecution> onStarted,
-            BiConsumer<AgentExecution, String> onSubmitted,
-            BooleanSupplier cancelled,
-            String instructionAddition,
-            DelegationKey delegationKey) {
+        CurrentUser user,
+        Conversation conversation,
+        Agent agent,
+        String task,
+        Long parentExecutionId,
+        Long rootExecutionId,
+        RunSession session,
+        Consumer<AgentExecution> onStarted,
+        BiConsumer<AgentExecution, String> onSubmitted,
+        BooleanSupplier cancelled,
+        String instructionAddition,
+        DelegationKey delegationKey) {
         Instant requestReceivedAt = clock.instant();
-        AssembledContext context =
-                agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
+        AssembledContext context = agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
         boolean rememberAllowed = !agent.connectorManaged()
-                && (rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId));
+            && (rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId));
         context = contextAssembler.withResponseInstructions(context, rememberAllowed);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
-                context.chars(),
-                null,
-                context.instructionsHash(),
-                context.omittedItems(),
-                ContextSourceRefs.of(context));
+            context.chars(),
+            null,
+            context.instructionsHash(),
+            context.omittedItems(),
+            ContextSourceRefs.of(context));
         ResolvedModelTier resolved;
         try {
             resolved = modelTiers.resolve(user, conversation, agent);
         } catch (RuntimeException ex) {
             AgentExecution execution = executions.start(
-                    user,
-                    conversation == null ? null : conversation.executionConversation(),
-                    agent,
-                    parentExecutionId,
-                    rootExecutionId,
-                    snapshot,
-                    ModelChoice.defaults(),
-                    null,
-                    session.correlationSessionId(),
-                    delegationKey,
-                    null,
-                    requestReceivedAt);
+                user,
+                conversation == null ? null : conversation.executionConversation(),
+                agent,
+                parentExecutionId,
+                rootExecutionId,
+                snapshot,
+                ModelChoice.defaults(),
+                null,
+                session.correlationSessionId(),
+                delegationKey,
+                null,
+                requestReceivedAt);
             onStarted.accept(execution);
             return fail(execution, ex, 1);
         }
         ModelChoice choice = resolved.choice();
         AgentExecution execution = executions.start(
-                user,
-                conversation.executionConversation(),
-                agent,
-                parentExecutionId,
-                rootExecutionId,
-                snapshot,
-                choice,
-                null,
-                session.correlationSessionId(),
-                delegationKey,
-                resolved.tier(),
-                requestReceivedAt);
+            user,
+            conversation.executionConversation(),
+            agent,
+            parentExecutionId,
+            rootExecutionId,
+            snapshot,
+            choice,
+            null,
+            session.correlationSessionId(),
+            delegationKey,
+            resolved.tier(),
+            requestReceivedAt);
         onStarted.accept(execution);
         if (cancelled.getAsBoolean()) {
             AgentExecution cancelledExecution = executions.cancel(execution);
@@ -192,14 +193,14 @@ public class AgentRunner {
             return new AgentRun(cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), null);
         }
         HermesRunCommand command = new HermesRunCommand(
-                agent.hermesProfile(),
-                agent.apiBaseUrl(),
-                task,
-                appendInstruction(context.instructions(), instructionAddition),
-                session.runtimeSessionId(),
-                choice.provider(),
-                choice.model(),
-                choice.reasoningEffort());
+            agent.hermesProfile(),
+            agent.apiBaseUrl(),
+            task,
+            appendInstruction(context.instructions(), instructionAddition),
+            session.runtimeSessionId(),
+            choice.provider(),
+            choice.model(),
+            choice.reasoningEffort());
 
         String runId = null;
         try {
@@ -214,7 +215,7 @@ public class AgentRunner {
                 stopSubmitted(agent, execution, runId);
                 // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
                 limiter.holdUntilRemoteEnds(
-                        user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, true);
+                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, true);
             }
             return fail(execution, ex, 1);
         }
@@ -225,7 +226,7 @@ public class AgentRunner {
         } catch (RuntimeException ex) {
             // Hermes 에서 끝났는지 모르는 run 은 끝날 때까지 사용자 자리를 쥔다(ADR-069).
             limiter.holdUntilRemoteEnds(
-                    user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
+                user.id(), execution.id(), agent.apiBaseUrl(), agent.hermesProfile(), runId, false);
             if (cancelled.getAsBoolean()) {
                 AgentExecution cancelledExecution = executions.cancel(execution);
                 append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
@@ -236,29 +237,30 @@ public class AgentRunner {
 
         if (cancelled.getAsBoolean() || "cancelled".equalsIgnoreCase(result.status())) {
             AgentExecution cancelledExecution = delegationKey == null
-                    ? executions.cancel(execution, agent, result, choice)
-                    : executions.cancel(execution, agent, result, choice, delegationOutput.partial(result.output()));
+                ? executions.cancel(execution, agent, result, choice)
+                : executions.cancel(execution, agent, result, choice, delegationOutput.partial(result.output()));
             append(cancelledExecution, ExecutionEventType.RUN_CANCELLED, null, 2);
             return new AgentRun(
-                    cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
+                cancelledExecution, ChildResult.failed(cancelledExecution.id(), "CANCELLED"), result.sessionId());
         }
 
         if (!result.succeeded()) {
             // 고른 모델의 provider 가 막힌 것은 보통 실패와 다른 코드로 남긴다. 다른 모델로 넘기지 않는다.
             String code = result.providerBlocked()
-                    ? ErrorCode.PROVIDER_BLOCKED.name()
-                    : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
+                ? ErrorCode.PROVIDER_BLOCKED.name()
+                : result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
             AgentExecution failed = executions.fail(execution, agent, result, choice, code);
             append(failed, ExecutionEventType.RUN_FAILED, code, 2);
             return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
         }
 
         AgentExecution completed = delegationKey == null
-                ? executions.complete(execution, agent, result, choice)
-                : executions.complete(execution, agent, result, choice, delegationOutput.clip(result.output()));
+            ? executions.complete(execution, agent, result, choice)
+            : executions.complete(execution, agent, result, choice, delegationOutput.clip(result.output()));
         append(completed, ExecutionEventType.RUN_COMPLETED, null, 2);
         return new AgentRun(completed, ChildResult.succeeded(completed.id(), result.output()), result.sessionId());
     }
+
 
     private AgentRun fail(AgentExecution execution, RuntimeException ex, int sequence) {
         String code = ex instanceof ApiException api ? api.code().name() : UNKNOWN_ERROR;
@@ -267,6 +269,7 @@ public class AgentRunner {
         log.warn("흐름의 한 단계가 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
         return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
     }
+
 
     /** 제출한 뒤 실패로 끝내는 run 에 중지를 한 번 보낸다. 보내지 못해도 실패로 끝내는 것은 그대로라 로그만 남긴다. */
     private void stopSubmitted(Agent agent, AgentExecution execution, String runId) {
@@ -277,12 +280,14 @@ public class AgentRunner {
         }
     }
 
+
     private static String appendInstruction(String instructions, String addition) {
         if (addition == null || addition.isBlank()) {
             return instructions;
         }
         return instructions == null || instructions.isBlank() ? addition : instructions + "\n\n" + addition;
     }
+
 
     /**
      * 사건 하나를 저장한다.

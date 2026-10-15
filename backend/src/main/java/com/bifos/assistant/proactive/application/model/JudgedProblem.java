@@ -15,9 +15,10 @@ import java.util.List;
  * @param evidenceCheckedAt 근거 발견의 확인 시각 가운데 가장 이른 것이다. 근거가 없으면 비어 있다
  */
 public record JudgedProblem(
-        CheckResultBlock.ProblemCandidate candidate,
-        String problemKey,
-        ProblemStatus status,
-        ProblemDropReason reason,
-        List<ProblemEvidence> evidence,
-        Instant evidenceCheckedAt) {}
+    CheckResultBlock.ProblemCandidate candidate,
+    String problemKey,
+    ProblemStatus status,
+    ProblemDropReason reason,
+    List<ProblemEvidence> evidence,
+    Instant evidenceCheckedAt) {
+}

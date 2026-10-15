@@ -28,14 +28,15 @@ public class TaskNotices {
 
     /** 알릴 까닭과 그 한 줄이다. 화면 문구라 오류 코드와 내부 원인은 넣지 않는다. 여기 없는 까닭은 알리지 않는다. */
     private static final Map<TaskRunReason, String> REASON_LINES = Map.of(
-            TaskRunReason.BUSY, "다른 대화가 오래 돌고 있어 시작하지 못했어요",
-            TaskRunReason.DAILY_LIMIT, "하루 실행 횟수를 다 썼어요",
-            TaskRunReason.AGENT_UNAVAILABLE, "에이전트를 쓸 수 없어요. 작업의 에이전트를 확인해 주세요",
-            TaskRunReason.FAILED, "실행 중에 문제가 생겼어요",
-            TaskRunReason.INTERRUPTED, "서버가 다시 시작돼 실행이 끊겼어요");
+        TaskRunReason.BUSY, "다른 대화가 오래 돌고 있어 시작하지 못했어요",
+        TaskRunReason.DAILY_LIMIT, "하루 실행 횟수를 다 썼어요",
+        TaskRunReason.AGENT_UNAVAILABLE, "에이전트를 쓸 수 없어요. 작업의 에이전트를 확인해 주세요",
+        TaskRunReason.FAILED, "실행 중에 문제가 생겼어요",
+        TaskRunReason.INTERRUPTED, "서버가 다시 시작돼 실행이 끊겼어요");
 
     private final NotificationService notifications;
     private final ConversationPublicIdLookup conversations;
+
 
     /**
      * 그 발화의 지금 상태에 맞는 알림을 만든다. 알릴 것이 없으면 아무것도 하지 않는다.
@@ -56,33 +57,33 @@ public class TaskNotices {
                 // 「보고할 것 없음」 으로 끝낸 발화는 알림 설정과 관계없이 알리지 않는다.
                 if (policy == NotifyPolicy.ALWAYS && run.reason() != TaskRunReason.NOTHING_TO_REPORT) {
                     notifications.notify(
-                            task.ownerUserId(),
-                            NotificationKind.TASK_SUCCEEDED,
-                            "「" + task.title() + "」 실행을 마쳤어요",
-                            "",
-                            conversationOrTask(task, run));
+                        task.ownerUserId(),
+                        NotificationKind.TASK_SUCCEEDED,
+                        "「" + task.title() + "」 실행을 마쳤어요",
+                        "",
+                        conversationOrTask(task, run));
                 }
             }
             case FAILED -> {
                 String line = REASON_LINES.get(run.reason());
                 if (line != null) {
                     notifications.notify(
-                            task.ownerUserId(),
-                            NotificationKind.TASK_FAILED,
-                            "「" + task.title() + "」 실행이 실패했어요",
-                            line,
-                            conversationOrTask(task, run));
+                        task.ownerUserId(),
+                        NotificationKind.TASK_FAILED,
+                        "「" + task.title() + "」 실행이 실패했어요",
+                        line,
+                        conversationOrTask(task, run));
                 }
             }
             case SKIPPED -> {
                 String line = REASON_LINES.get(run.reason());
                 if (line != null) {
                     notifications.notify(
-                            task.ownerUserId(),
-                            NotificationKind.TASK_SKIPPED,
-                            "「" + task.title() + "」 실행을 건너뛰었어요",
-                            line,
-                            taskTarget(task));
+                        task.ownerUserId(),
+                        NotificationKind.TASK_SKIPPED,
+                        "「" + task.title() + "」 실행을 건너뛰었어요",
+                        line,
+                        taskTarget(task));
                 }
             }
             default -> {
@@ -91,6 +92,7 @@ public class TaskNotices {
         }
     }
 
+
     /** 그 발화의 대화가 있으면 그 대화, 없으면 그 작업이다. */
     private NotificationTarget conversationOrTask(Task task, TaskRun run) {
         if (run.conversationId() == null) {
@@ -98,9 +100,10 @@ public class TaskNotices {
         }
         UUID publicId = conversations.publicIdsOf(List.of(run.conversationId())).get(run.conversationId());
         return publicId == null
-                ? taskTarget(task)
-                : new NotificationTarget(NotificationTargetType.CONVERSATION, publicId);
+            ? taskTarget(task)
+            : new NotificationTarget(NotificationTargetType.CONVERSATION, publicId);
     }
+
 
     private static NotificationTarget taskTarget(Task task) {
         return new NotificationTarget(NotificationTargetType.TASK, task.publicId());

@@ -30,6 +30,7 @@ public class ConversationEventController {
     private final ConversationEventHub hub;
     private final ChatEventStreams streams;
 
+
     @GetMapping(path = "/conversations/{conversationId}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter events(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
@@ -37,6 +38,6 @@ public class ConversationEventController {
         Long number = access.requireOwnId(user, conversationId);
         // 도구의 명령 원문과 내부 값은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 과 ADR-063 에 있다.
         return streams.follow(
-                send -> hub.subscribe(number, event -> event.forViewer(user).ifPresent(send)));
+            send -> hub.subscribe(number, event -> event.forViewer(user).ifPresent(send)));
     }
 }

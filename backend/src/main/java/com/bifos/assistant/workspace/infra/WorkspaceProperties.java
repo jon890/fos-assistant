@@ -21,10 +21,12 @@ public record WorkspaceProperties(String root, String deleteSocket) {
         return root != null && !root.isBlank();
     }
 
+
     /** 지우기 도우미의 socket 이 설정되었다. */
     public boolean deletable() {
         return deleteSocket != null && !deleteSocket.isBlank();
     }
+
 
     /** {@link #available()} 일 때만 부른다. */
     public Path rootPath() {

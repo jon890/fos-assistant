@@ -84,18 +84,19 @@ public class ChatController {
     private final List<ConversationTaskLabels> taskLabels;
     private final SourceReadSummaries sourceReads;
 
+
     @Autowired
     public ChatController(
-            ChatService chat,
-            CurrentUserProvider currentUser,
-            UserDisplayNameService userNames,
-            AgentService agents,
-            ConversationAccess access,
-            ChatEventStreams streams,
-            ModelOptionsService modelOptions,
-            ModelTierService modelTiers,
-            List<ConversationTaskLabels> taskLabels,
-            SourceReadSummaries sourceReads) {
+        ChatService chat,
+        CurrentUserProvider currentUser,
+        UserDisplayNameService userNames,
+        AgentService agents,
+        ConversationAccess access,
+        ChatEventStreams streams,
+        ModelOptionsService modelOptions,
+        ModelTierService modelTiers,
+        List<ConversationTaskLabels> taskLabels,
+        SourceReadSummaries sourceReads) {
         this.chat = chat;
         this.currentUser = currentUser;
         this.userNames = userNames;
@@ -108,17 +109,19 @@ public class ChatController {
         this.sourceReads = sourceReads;
     }
 
+
     @PostMapping("/messages")
     public SendMessageResponse send(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         ChatTurn turn = chat.send(
-                user,
-                numberOf(user, request.conversationId()),
-                request.text(),
-                request.agentCode(),
-                request.attachmentIds());
+            user,
+            numberOf(user, request.conversationId()),
+            request.text(),
+            request.agentCode(),
+            request.attachmentIds());
         return new SendMessageResponse(turn.conversationPublicId(), turn.executionId(), turn.assistantText());
     }
+
 
     @PostMapping("/executions/{executionId}/stop")
     @ResponseStatus(HttpStatus.ACCEPTED)
@@ -127,76 +130,82 @@ public class ChatController {
         return new StopResponse("stopping");
     }
 
+
     @PostMapping(path = "/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@Valid @RequestBody SendMessageRequest request) {
         CurrentUser user = currentUser.require();
         // 스트림 안에서 바꿔야 없는 대화가 지금처럼 SSE error 사건으로 알려진다.
         // 도구의 명령 원문과 내부 값은 보내기 직전에 보는 사람에 맞춰 뺀다. 근거는 ADR-038 과 ADR-063 에 있다.
         return streams.open(send -> chat.stream(
-                user,
-                numberOf(user, request.conversationId()),
-                request.text(),
-                request.agentCode(),
-                request.attachmentIds(),
-                event -> event.forViewer(user).ifPresent(send)));
+            user,
+            numberOf(user, request.conversationId()),
+            request.text(),
+            request.agentCode(),
+            request.attachmentIds(),
+            event -> event.forViewer(user).ifPresent(send)));
     }
 
+
     @PostMapping(
-            path = "/conversations/{conversationId}/regenerate/stream",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        path = "/conversations/{conversationId}/regenerate/stream",
+        produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter regenerate(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
         Long id = access.requireOwnId(user, conversationId);
         return streams.open(
-                send -> chat.regenerate(user, id, event -> event.forViewer(user).ifPresent(send)));
+            send -> chat.regenerate(user, id, event -> event.forViewer(user).ifPresent(send)));
     }
+
 
     /** 저장된 결과만 다시 읽어 그 전달 묶음을 부모 에이전트에 다시 넘긴다(ADR-075). 사건은 요청한 창에만 간다. */
     @PostMapping(
-            path = "/conversations/{conversationId}/deliveries/{deliveryId}/retry/stream",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        path = "/conversations/{conversationId}/deliveries/{deliveryId}/retry/stream",
+        produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter retryDelivery(@PathVariable UUID conversationId, @PathVariable Long deliveryId) {
         CurrentUser user = currentUser.require();
         // SSE 를 열기 전에 확인해야 남의 대화에 200 스트림 오류가 아닌 404를 돌려준다.
         Long id = access.requireOwnId(user, conversationId);
         return streams.open(send -> chat.retryDelivery(
-                user, id, deliveryId, event -> event.forViewer(user).ifPresent(send)));
+            user, id, deliveryId, event -> event.forViewer(user).ifPresent(send)));
     }
+
 
     /** 본문의 공개 식별자를 서비스가 받는 대화 번호로 바꾼다. 비어 있으면 새 대화다. */
     private Long numberOf(CurrentUser user, UUID publicId) {
         return publicId == null ? null : access.requireOwnId(user, publicId);
     }
 
+
     @PostMapping("/conversations")
     public StartConversationResponse start(@RequestBody StartConversationRequest request) {
         return new StartConversationResponse(
-                chat.startEmpty(currentUser.require(), request.agentCode()).publicId());
+            chat.startEmpty(currentUser.require(), request.agentCode()).publicId());
     }
+
 
     /** 대화 목록을 최근에 바뀐 것부터 한 쪽 돌려준다. 다음 쪽은 {@code nextCursor} 를 {@code cursor} 로 넘겨 읽는다. */
     @GetMapping("/conversations")
     public ConversationPageView conversations(
-            @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
+        @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
         ConversationPage page = chat.conversationsOf(currentUser.require(), cursor, limit);
         // 목록은 에이전트와 작업 이름을 줄마다 읽지 않고 한 번에 읽는다. 행이 없는 줄은 그 칸만 비운다.
-        Map<Long, Agent> byId =
-                agents.byIds(page.items().stream().map(Conversation::agentId).toList());
+        Map<Long, Agent> byId = agents.byIds(page.items().stream().map(Conversation::agentId).toList());
         Map<Long, TaskLabel> labels = labelsOf(page.items().stream()
-                .map(Conversation::taskId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList());
+            .map(Conversation::taskId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList());
         return new ConversationPageView(
-                page.items().stream()
-                        .map(conversation -> viewOf(
-                                conversation,
-                                byId.get(conversation.agentId()),
-                                conversation.taskId() == null ? null : labels.get(conversation.taskId())))
-                        .toList(),
-                page.nextCursor());
+            page.items().stream()
+                .map(conversation -> viewOf(
+                    conversation,
+                    byId.get(conversation.agentId()),
+                    conversation.taskId() == null ? null : labels.get(conversation.taskId())))
+                .toList(),
+            page.nextCursor());
     }
+
 
     /** 대화 한 줄을 읽는다. 목록의 첫 쪽에 없는 오래된 대화를 열 때 쓴다. */
     @GetMapping("/conversations/{conversationId}")
@@ -205,13 +214,15 @@ public class ChatController {
         return viewOf(found);
     }
 
+
     @PatchMapping("/conversations/{conversationId}")
     public ConversationView rename(
-            @PathVariable UUID conversationId, @Valid @RequestBody RenameConversationRequest request) {
+        @PathVariable UUID conversationId, @Valid @RequestBody RenameConversationRequest request) {
         CurrentUser user = currentUser.require();
         Conversation renamed = chat.rename(user, access.requireOwnId(user, conversationId), request.title());
         return viewOf(renamed);
     }
+
 
     /** 대화에서 쓸 모델과 effort 를 바꾸고 바뀐 대화 한 줄을 돌려준다. */
     @PutMapping("/conversations/{conversationId}/model")
@@ -220,6 +231,7 @@ public class ChatController {
         Conversation chosen = chat.chooseModel(user, access.requireOwnId(user, conversationId), request.toChoice());
         return viewOf(chosen);
     }
+
 
     /**
      * 그 에이전트의 profile 로 고를 수 있는 모델과 기본값을 돌려준다.
@@ -232,11 +244,13 @@ public class ChatController {
         return ModelOptionsView.from(modelOptions.optionsFor(currentUser.require(), agentCode));
     }
 
+
     @GetMapping("/model-tiers")
     public ModelTierOptions modelTiers(@RequestParam String agentCode) {
         CurrentUser user = currentUser.require();
         return modelTiers.optionsFor(user, agents.requireStartable(user, agentCode));
     }
+
 
     @PutMapping("/model-tiers/default")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -244,27 +258,29 @@ public class ChatController {
         modelTiers.saveUserDefault(currentUser.require(), request.tier());
     }
 
+
     @PutMapping("/model-tiers/group")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateGroupModelTiers(@Valid @RequestBody UpdateGroupModelTiersRequest request) {
         CurrentUser user = currentUser.require();
         modelTiers.saveGroup(
-                user,
-                request.tiers().stream()
-                        .map(tier -> new ModelTierOptions.Tier(
-                                tier.tier(), null, tier.provider(), tier.model(), tier.reasoningEffort()))
-                        .toList(),
-                request.defaultTier());
+            user,
+            request.tiers().stream()
+                .map(tier -> new ModelTierOptions.Tier(
+                    tier.tier(), null, tier.provider(), tier.model(), tier.reasoningEffort()))
+                .toList(),
+            request.defaultTier());
     }
+
 
     @PutMapping("/conversations/{conversationId}/model-tier")
     public ConversationView chooseModelTier(
-            @PathVariable UUID conversationId, @Valid @RequestBody ChooseModelTierRequest request) {
+        @PathVariable UUID conversationId, @Valid @RequestBody ChooseModelTierRequest request) {
         CurrentUser user = currentUser.require();
-        Conversation chosen =
-                chat.chooseModelTier(user, access.requireOwnId(user, conversationId), request.mode(), request.tier());
+        Conversation chosen = chat.chooseModelTier(user, access.requireOwnId(user, conversationId), request.mode(), request.tier());
         return viewOf(chosen);
     }
+
 
     @DeleteMapping("/conversations/{conversationId}")
     public ResponseEntity<Void> delete(@PathVariable UUID conversationId) {
@@ -272,6 +288,7 @@ public class ChatController {
         chat.delete(user, access.requireOwnId(user, conversationId));
         return ResponseEntity.noContent().build();
     }
+
 
     /**
      * 옛 주소의 대화 번호로 공개 식별자를 찾는다.
@@ -281,8 +298,9 @@ public class ChatController {
     @GetMapping("/conversations/by-number/{number}")
     public ConversationRefView byNumber(@PathVariable Long number) {
         return new ConversationRefView(
-                access.requireOwn(currentUser.require(), number).publicId());
+            access.requireOwn(currentUser.require(), number).publicId());
     }
+
 
     /** 대화 한 줄의 에이전트와 작업 이름을 읽어 줄을 만든다. */
     private ConversationView viewOf(Conversation conversation) {
@@ -290,6 +308,7 @@ public class ChatController {
         TaskLabel label = taskId == null ? null : labelsOf(List.of(taskId)).get(taskId);
         return viewOf(conversation, agents.findById(conversation.agentId()).orElse(null), label);
     }
+
 
     /** 작업 번호마다 이름이다. 구현이 없으면 비어 있다. */
     private Map<Long, TaskLabel> labelsOf(Collection<Long> taskIds) {
@@ -301,6 +320,7 @@ public class ChatController {
         return labels;
     }
 
+
     /**
      * 에이전트 행이 없으면({@code agent} 가 null) 에이전트 코드와 이름만 비운 줄을 돌려준다. 작업이 만든 대화가 아니거나 작업 행이
      * 없으면({@code label} 이 null) 작업 칸을 비운다.
@@ -308,20 +328,21 @@ public class ChatController {
     private ConversationView viewOf(Conversation conversation, Agent agent, TaskLabel label) {
         ModelChoice choice = conversation.modelChoice();
         return new ConversationView(
-                conversation.publicId(),
-                conversation.title(),
-                agent == null ? null : agent.code(),
-                agent == null ? null : agent.name(),
-                conversation.updatedAt(),
-                choice.provider(),
-                choice.model(),
-                choice.reasoningEffort(),
-                conversation.modelSelectionMode(),
-                conversation.modelTier(),
-                conversation.purpose(),
-                label == null ? null : label.taskId(),
-                label == null ? null : label.title());
+            conversation.publicId(),
+            conversation.title(),
+            agent == null ? null : agent.code(),
+            agent == null ? null : agent.name(),
+            conversation.updatedAt(),
+            choice.provider(),
+            choice.model(),
+            choice.reasoningEffort(),
+            conversation.modelSelectionMode(),
+            conversation.modelTier(),
+            conversation.purpose(),
+            label == null ? null : label.taskId(),
+            label == null ? null : label.title());
     }
+
 
     /**
      * 대화에 지금 도는 turn 이 있는지 알려 준다. 같은 대화를 연 다른 창이 주기적으로 부른다.
@@ -333,6 +354,7 @@ public class ChatController {
         CurrentUser user = currentUser.require();
         return RunningTurnView.from(chat.running(user, access.requireOwnId(user, conversationId)));
     }
+
 
     @GetMapping("/conversations/{conversationId}/messages")
     public List<MessageView> messages(@PathVariable UUID conversationId) {
@@ -349,31 +371,32 @@ public class ChatController {
         Map<Long, DeliveryState> deliveries = chat.deliveryStates(number);
         Map<Long, SourceReadSummary> sourceReadByMessage = sourceReads.of(history);
         return history.stream()
-                .map(it -> new MessageView(
-                        it.id(),
-                        it.role().name(),
-                        it.content(),
-                        it.senderUserId() == null ? null : senderName,
-                        it.executionId(),
-                        // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
-                        it.executionId() != null && withChildren.contains(it.executionId()),
-                        it.executionId() == null ? null : switched.get(it.executionId()),
-                        it.replacesMessageId(),
-                        it.createdAt(),
-                        attached.getOrDefault(it.id(), List.of()).stream()
-                                .map(AttachmentView::from)
-                                .toList(),
-                        produced.getOrDefault(it.id(), List.of()).stream()
-                                .map(ArtifactView::from)
-                                .toList(),
-                        it.executionId() == null ? null : activity.get(it.executionId()),
-                        it.executionId() == null || statuses.get(it.executionId()) == null
-                                ? null
-                                : statuses.get(it.executionId()).name(),
-                        deliveryOf(it, deliveries),
-                        it.role() == MessageRole.ASSISTANT ? sourceReadByMessage.get(it.id()) : null))
-                .toList();
+            .map(it -> new MessageView(
+                it.id(),
+                it.role().name(),
+                it.content(),
+                it.senderUserId() == null ? null : senderName,
+                it.executionId(),
+                // 사용자 메시지는 실행 번호가 없다. 빈 번호로 묶음을 묻지 않는다.
+                it.executionId() != null && withChildren.contains(it.executionId()),
+                it.executionId() == null ? null : switched.get(it.executionId()),
+                it.replacesMessageId(),
+                it.createdAt(),
+                attached.getOrDefault(it.id(), List.of()).stream()
+                    .map(AttachmentView::from)
+                    .toList(),
+                produced.getOrDefault(it.id(), List.of()).stream()
+                    .map(ArtifactView::from)
+                    .toList(),
+                it.executionId() == null ? null : activity.get(it.executionId()),
+                it.executionId() == null || statuses.get(it.executionId()) == null
+                    ? null
+                    : statuses.get(it.executionId()).name(),
+                deliveryOf(it, deliveries),
+                it.role() == MessageRole.ASSISTANT ? sourceReadByMessage.get(it.id()) : null))
+            .toList();
     }
+
 
     /** 알림 줄이 아니거나 그 줄을 마지막 알림 줄로 가진 묶음이 없으면 null 이다. */
     private static DeliveryView deliveryOf(ChatMessage message, Map<Long, DeliveryState> deliveries) {
@@ -382,7 +405,7 @@ public class ChatController {
         }
         DeliveryState state = deliveries.get(message.id());
         return state == null
-                ? null
-                : new DeliveryView(state.deliveryId(), state.status().name());
+            ? null
+            : new DeliveryView(state.deliveryId(), state.status().name());
     }
 }

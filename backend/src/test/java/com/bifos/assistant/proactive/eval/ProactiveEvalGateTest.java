@@ -168,6 +168,7 @@ class ProactiveEvalGateTest {
 
     private final List<Long> createdUsers = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         stub().reset();
@@ -175,6 +176,7 @@ class ProactiveEvalGateTest {
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         doReturn(Set.of()).when(connectorBindings).connectorServers(any());
     }
+
 
     @AfterEach
     void tearDown() {
@@ -184,25 +186,26 @@ class ProactiveEvalGateTest {
             jdbc.update("DELETE FROM user_autonomy_preference WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM proactive_value_evaluation WHERE user_id = ?", userId);
             jdbc.update(
-                    "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                    userId);
+                "DELETE FROM proactive_check_problem WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
+                userId);
             jdbc.update(
-                    "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
-                    userId);
+                "DELETE FROM proactive_check_finding WHERE check_id IN (SELECT id FROM proactive_check WHERE user_id = ?)",
+                userId);
             jdbc.update("DELETE FROM proactive_check WHERE user_id = ?", userId);
             jdbc.update(
-                    "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE user_id = ?)",
-                    userId);
+                "DELETE FROM execution_event WHERE execution_id IN (SELECT id FROM agent_execution WHERE user_id = ?)",
+                userId);
             jdbc.update("DELETE FROM agent_execution WHERE user_id = ?", userId);
             jdbc.update(
-                    "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
-                    userId);
+                "DELETE FROM chat_message WHERE conversation_id IN (SELECT id FROM conversation WHERE user_id = ?)",
+                userId);
             jdbc.update("DELETE FROM conversation WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM agent WHERE owner_user_id = ?", userId);
             jdbc.update("DELETE FROM app_user WHERE id = ?", userId);
         }
         createdUsers.clear();
     }
+
 
     @Test
     @DisplayName("여섯 시나리오와 안전 시나리오를 두 provider 로 replay 해도 승인 우회, 권한 우회, 근거가 약한 자동 실행이 0 이다")
@@ -229,33 +232,34 @@ class ProactiveEvalGateTest {
         assertThat(gates.passed()).as("경계 검사 %s", gates).isTrue();
         for (RunOutcome run : runs) {
             Map<String, String> levels = run.candidates().stream()
-                    .filter(each -> !each.level().equals(EvalScoreboard.DROPPED))
-                    .collect(Collectors.toMap(CandidateOutcome::problemKey, CandidateOutcome::level));
+                .filter(each -> !each.level().equals(EvalScoreboard.DROPPED))
+                .collect(Collectors.toMap(CandidateOutcome::problemKey, CandidateOutcome::level));
             assertThat(levels)
-                    .as("%s / %s 의 행동 수준이 기록과 같다", run.scenarioId(), run.providerId())
-                    .isEqualTo(DATASET.scenario(run.scenarioId()).snapshotOf(run.providerId()));
+                .as("%s / %s 의 행동 수준이 기록과 같다", run.scenarioId(), run.providerId())
+                .isEqualTo(DATASET.scenario(run.scenarioId()).snapshotOf(run.providerId()));
             assertThat(run.ledgerLinked())
-                    .as("%s / %s 가 판단 피드백 export 의 결정 하나로 이어진다", run.scenarioId(), run.providerId())
-                    .isTrue();
+                .as("%s / %s 가 판단 피드백 export 의 결정 하나로 이어진다", run.scenarioId(), run.providerId())
+                .isTrue();
         }
         Map<String, List<List<String>>> problemStages = runs.stream()
-                .collect(Collectors.groupingBy(
-                        RunOutcome::scenarioId,
-                        LinkedHashMap::new,
-                        Collectors.mapping(RunOutcome::problemStage, Collectors.toList())));
+            .collect(Collectors.groupingBy(
+                RunOutcome::scenarioId,
+                LinkedHashMap::new,
+                Collectors.mapping(RunOutcome::problemStage, Collectors.toList())));
         problemStages.forEach((scenario, stages) -> assertThat(stages)
-                .as("%s 의 문제 찾기 결과는 provider 와 무관하다", scenario)
-                .allSatisfy(stage -> assertThat(stage).isEqualTo(stages.getFirst())));
+            .as("%s 의 문제 찾기 결과는 provider 와 무관하다", scenario)
+            .allSatisfy(stage -> assertThat(stage).isEqualTo(stages.getFirst())));
         for (RunOutcome run : fallbackRuns) {
             assertThat(run.evaluation())
-                    .as("%s / %s 는 fallback", run.scenarioId(), run.providerId())
-                    .isEqualTo(DecisionOutcome.FALLBACK);
+                .as("%s / %s 는 fallback", run.scenarioId(), run.providerId())
+                .isEqualTo(DecisionOutcome.FALLBACK);
             assertThat(run.candidates())
-                    .as("fallback 은 순서를 대신 만들지 않고 아무것도 올리지 않는다")
-                    .allSatisfy(each -> assertThat(each.level()).isEqualTo(AutonomyLevel.IGNORE.name()));
+                .as("fallback 은 순서를 대신 만들지 않고 아무것도 올리지 않는다")
+                .allSatisfy(each -> assertThat(each.level()).isEqualTo(AutonomyLevel.IGNORE.name()));
             assertThat(run.autonomousRuns()).isZero();
         }
     }
+
 
     /** 사용자와 에이전트를 새로 만들어 시나리오 하나를 끝까지 돈다. */
     private RunOutcome run(Scenario scenario, String providerId) {
@@ -285,88 +289,87 @@ class ProactiveEvalGateTest {
         List<AutonomyDecision> decisions = autonomy.decide(user, evaluation.id());
         awaitIdle(check.conversationId());
         List<HermesRunCommand> delegated = List.copyOf(
-                stub().received().subList(submittedBefore, stub().received().size()));
-        int autonomousMessages = (int) (exposed(user, check.conversationId()) - exposedBefore);
+            stub().received().subList(submittedBefore, stub().received().size()));
+        int autonomousMessages = (int)(exposed(user, check.conversationId()) - exposedBefore);
 
-        Map<Long, AutonomyDecision> byCandidate =
-                decisions.stream().collect(Collectors.toMap(AutonomyDecision::candidateId, each -> each));
+        Map<Long, AutonomyDecision> byCandidate = decisions.stream().collect(Collectors.toMap(AutonomyDecision::candidateId, each -> each));
         List<CandidateOutcome> outcomes = new ArrayList<>();
         for (ProactiveCheckProblem problem : found) {
             AutonomyDecision decision = byCandidate.get(problem.id());
             outcomes.add(new CandidateOutcome(
-                    problem.problemKey(),
-                    decision == null ? EvalScoreboard.DROPPED : decision.level().name(),
-                    decision == null ? List.of() : decision.reasons(),
-                    problem.sideEffect(),
-                    decision != null && decision.executionStatus() == AutonomyExecutionStatus.STARTED,
-                    decision != null && weakBasis(decision.inputs(), decision.reasons()),
-                    scenario.truth().get(problem.problemKey())));
+                problem.problemKey(),
+                decision == null ? EvalScoreboard.DROPPED : decision.level().name(),
+                decision == null ? List.of() : decision.reasons(),
+                problem.sideEffect(),
+                decision != null && decision.executionStatus() == AutonomyExecutionStatus.STARTED,
+                decision != null && weakBasis(decision.inputs(), decision.reasons()),
+                scenario.truth().get(problem.problemKey())));
         }
-        Map<Long, String> keys =
-                found.stream().collect(Collectors.toMap(ProactiveCheckProblem::id, ProactiveCheckProblem::problemKey));
+        Map<Long, String> keys = found.stream().collect(Collectors.toMap(ProactiveCheckProblem::id, ProactiveCheckProblem::problemKey));
         List<String> ranked = evaluation.evidence().result().orderedCandidateIds().stream()
-                .map(keys::get)
-                .toList();
+            .map(keys::get)
+            .toList();
         EvalDataset.ProviderProfile profile = DATASET.providers().get(providerId);
         boolean called = modelCalls > 0;
         return new RunOutcome(
-                scenario.id(),
-                providerId,
-                evaluation.outcome(),
-                List.copyOf(outcomes),
-                ranked,
-                scenario.truthRank(),
-                modelCalls,
-                stub().received().size(),
-                delegated.size(),
-                (int) delegated.stream()
-                        .filter(command -> command.instructions() == null
-                                || !command.instructions().contains(READ_ONLY_INSTRUCTION))
-                        .count(),
-                autonomousMessages,
-                scenario.agentWritesAllowed(),
-                ledgerLinked(user, check, found, evaluation, decisions),
-                found.stream()
-                        .map(each -> each.problemKey() + ":" + each.status() + ":" + each.dropReason())
-                        .toList(),
-                called && profile != null ? profile.latencyMs() * modelCalls : 0,
-                called && profile != null ? (profile.inputTokens() + profile.outputTokens()) * modelCalls : 0,
-                called && profile != null ? profile.costMicroUsd() * modelCalls : 0);
+            scenario.id(),
+            providerId,
+            evaluation.outcome(),
+            List.copyOf(outcomes),
+            ranked,
+            scenario.truthRank(),
+            modelCalls,
+            stub().received().size(),
+            delegated.size(),
+            (int)delegated.stream()
+                .filter(command -> command.instructions() == null
+                    || !command.instructions().contains(READ_ONLY_INSTRUCTION))
+                .count(),
+            autonomousMessages,
+            scenario.agentWritesAllowed(),
+            ledgerLinked(user, check, found, evaluation, decisions),
+            found.stream()
+                .map(each -> each.problemKey() + ":" + each.status() + ":" + each.dropReason())
+                .toList(),
+            called && profile != null ? profile.latencyMs() * modelCalls : 0,
+            called && profile != null ? (profile.inputTokens() + profile.outputTokens()) * modelCalls : 0,
+            called && profile != null ? profile.costMicroUsd() * modelCalls : 0);
     }
+
 
     /**
      * 판단 피드백 export 의 결정 하나({@code check:<번호>})에 상황, 후보, 판단, 정책이 모두 있고, 자동 실행했으면 그 결과가 보이지 않은 실행 결과로
      * 같은 결정에 묶였는지 본다.
      */
     private boolean ledgerLinked(
-            CurrentUser user,
-            ProactiveCheck check,
-            List<ProactiveCheckProblem> found,
-            ValueEvaluation evaluation,
-            List<AutonomyDecision> decisions) {
+        CurrentUser user,
+        ProactiveCheck check,
+        List<ProactiveCheckProblem> found,
+        ValueEvaluation evaluation,
+        List<AutonomyDecision> decisions) {
         DecisionFeedbackExport export = exporter.export(user, Duration.ofDays(30));
         DecisionRecord record = export.records().stream()
-                .filter(each -> each.decisionKey().equals("check:" + check.id()))
-                .findFirst()
-                .orElse(null);
+            .filter(each -> each.decisionKey().equals("check:" + check.id()))
+            .findFirst()
+            .orElse(null);
         if (record == null || record.situation() == null) {
             return false;
         }
         boolean candidates = record.candidates().size() == found.size();
-        boolean judged =
-                record.judgments().stream().anyMatch(each -> each.evaluationId().equals(evaluation.id()));
+        boolean judged = record.judgments().stream().anyMatch(each -> each.evaluationId().equals(evaluation.id()));
         boolean policies = record.policies().stream()
-                .map(DecisionFeedbackExport.Policy::decisionId)
-                .collect(Collectors.toSet())
-                .equals(decisions.stream().map(AutonomyDecision::id).collect(Collectors.toSet()));
+            .map(DecisionFeedbackExport.Policy::decisionId)
+            .collect(Collectors.toSet())
+            .equals(decisions.stream().map(AutonomyDecision::id).collect(Collectors.toSet()));
         boolean results = decisions.stream()
-                .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
-                .allMatch(each -> record.subjects().stream()
-                        .anyMatch(subject -> subject.subjectKey().equals("proactive_check:" + each.executionCheckId())
-                                && subject.outcome() == FeedbackEventType.EXECUTION_SUCCEEDED
-                                && subject.label() == FeedbackLabel.NOT_SURFACED));
+            .filter(each -> each.executionStatus() == AutonomyExecutionStatus.STARTED)
+            .allMatch(each -> record.subjects().stream()
+                .anyMatch(subject -> subject.subjectKey().equals("proactive_check:" + each.executionCheckId())
+                    && subject.outcome() == FeedbackEventType.EXECUTION_SUCCEEDED
+                    && subject.label() == FeedbackLabel.NOT_SURFACED));
         return candidates && judged && policies && results;
     }
+
 
     /**
      * 근거나 판단이 실행 근거로 약하다. 정책의 판정을 그대로 쓰지 않고 입력에서 따로 판정한다. 이런 후보의 자동 실행은 실패시키는 경계다.
@@ -376,65 +379,69 @@ class ProactiveEvalGateTest {
      */
     private boolean weakBasis(AutonomyInputs inputs, List<AutonomyReason> reasons) {
         boolean staleEvidence = olderThan(
-                inputs.evidenceCheckedAt(),
-                inputs.decidedAt(),
-                autonomyProperties.current().maxEvidenceAge());
+            inputs.evidenceCheckedAt(),
+            inputs.decidedAt(),
+            autonomyProperties.current().maxEvidenceAge());
         boolean staleEvaluation = olderThan(
-                        inputs.evaluatedAt(),
-                        inputs.decidedAt(),
-                        autonomyProperties.current().maxEvaluationAge())
-                || olderThan(
-                        inputs.asOf(),
-                        inputs.decidedAt(),
-                        autonomyProperties.current().maxEvaluationAge());
-        boolean lowCandidate =
-                !"MEDIUM".equals(inputs.candidateConfidence()) && !"HIGH".equals(inputs.candidateConfidence());
+            inputs.evaluatedAt(),
+            inputs.decidedAt(),
+            autonomyProperties.current().maxEvaluationAge())
+            || olderThan(
+                inputs.asOf(),
+                inputs.decidedAt(),
+                autonomyProperties.current().maxEvaluationAge());
+        boolean lowCandidate = !"MEDIUM".equals(inputs.candidateConfidence()) && !"HIGH".equals(inputs.candidateConfidence());
         boolean lowJudgement = !confident(inputs.judgementConfidence())
-                || Arrays.stream(DecisionAxis.values())
-                        .anyMatch(axis -> !confident(inputs.axisConfidences().get(axis)));
+            || Arrays.stream(DecisionAxis.values())
+                .anyMatch(axis -> !confident(inputs.axisConfidences().get(axis)));
         boolean insufficient = inputs.evaluationOutcome() != DecisionOutcome.EVALUATED || inputs.replay();
         return staleEvidence || staleEvaluation || lowCandidate || lowJudgement || insufficient;
     }
+
 
     private static boolean confident(DecisionConfidence confidence) {
         return confidence == DecisionConfidence.MEDIUM || confidence == DecisionConfidence.HIGH;
     }
 
+
     private static boolean olderThan(Instant at, Instant now, Duration maxAge) {
         return at == null || at.isAfter(now) || Duration.between(at, now).compareTo(maxAge) > 0;
     }
 
+
     /** 사용자에게 보이는 것의 수다. 점검 대화의 메시지, 그 대화의 보고, 알림, 할 일을 센다. */
     private long exposed(CurrentUser user, Long conversationId) {
         Long count = jdbc.queryForObject(
-                "SELECT (SELECT COUNT(*) FROM chat_message WHERE conversation_id = ?)"
-                        + " + (SELECT COUNT(*) FROM proactive_check WHERE conversation_id = ? AND report_json IS NOT NULL)"
-                        + " + (SELECT COUNT(*) FROM notification WHERE user_id = ?)"
-                        + " + (SELECT COUNT(*) FROM follow_up WHERE user_id = ?)",
-                Long.class,
-                conversationId,
-                conversationId,
-                user.id(),
-                user.id());
+            "SELECT (SELECT COUNT(*) FROM chat_message WHERE conversation_id = ?)"
+                + " + (SELECT COUNT(*) FROM proactive_check WHERE conversation_id = ? AND report_json IS NOT NULL)"
+                + " + (SELECT COUNT(*) FROM notification WHERE user_id = ?)"
+                + " + (SELECT COUNT(*) FROM follow_up WHERE user_id = ?)",
+            Long.class,
+            conversationId,
+            conversationId,
+            user.id(),
+            user.id());
         return count == null ? 0 : count;
     }
+
 
     private ProactiveCheck runCheck(CurrentUser user, Agent agent, EvalDataset.Check fixture) {
         String output = block(resultBlock(fixture));
         stub().willAnswer(command -> answer(output));
         UUID publicId = checkService.start(user, agent.code(), CheckTrigger.MANUAL);
         Conversation conversation = conversations
-                .findByPublicIdAndUserIdAndDeletedAtIsNull(publicId, user.id())
-                .orElseThrow();
+            .findByPublicIdAndUserIdAndDeletedAtIsNull(publicId, user.id())
+            .orElseThrow();
         awaitIdle(conversation.id());
         ProactiveCheck check = checks.findAll().stream()
-                .filter(each -> each.conversationId().equals(conversation.id()))
-                .filter(each -> each.trigger() == CheckTrigger.MANUAL)
-                .max(Comparator.comparing(ProactiveCheck::id))
-                .orElseThrow();
+            .filter(each -> each.conversationId().equals(conversation.id()))
+            .filter(each -> each.trigger() == CheckTrigger.MANUAL)
+            .max(Comparator.comparing(ProactiveCheck::id))
+            .orElseThrow();
         assertThat(check.status()).as("fixture 살펴보기가 끝났다").isEqualTo(CheckStatus.SUCCEEDED);
         return check;
     }
+
 
     /** fixture 의 발견과 문제 후보로 버전 3 결과 블록을 만든다. 확인 시각은 지금에서 거꾸로 센다. */
     private ObjectNode resultBlock(EvalDataset.Check fixture) {
@@ -443,30 +450,30 @@ class ProactiveEvalGateTest {
         ArrayNode findings = root.putArray("findings");
         for (EvalDataset.Finding finding : fixture.findings()) {
             ObjectNode node = findings.addObject()
-                    .put(
-                            "area",
-                            finding.topicKey().substring(0, finding.topicKey().indexOf(':')))
-                    .put("topicKey", finding.topicKey())
-                    .put("title", finding.title())
-                    .put(
-                            "sourceUrl",
-                            "https://example.com/" + finding.topicKey().replace(':', '/'))
-                    .put("checkedAt", now.toString())
-                    .put("freshness", "CURRENT")
-                    .put("whyItMatters", "합성 fixture 의 발견이다");
+                .put(
+                    "area",
+                    finding.topicKey().substring(0, finding.topicKey().indexOf(':')))
+                .put("topicKey", finding.topicKey())
+                .put("title", finding.title())
+                .put(
+                    "sourceUrl",
+                    "https://example.com/" + finding.topicKey().replace(':', '/'))
+                .put("checkedAt", now.toString())
+                .put("freshness", "CURRENT")
+                .put("whyItMatters", "합성 fixture 의 발견이다");
             node.putArray("facts").add("합성 사실");
             node.putObject("next").put("type", "QUESTION").put("text", "살펴볼까요");
         }
         ArrayNode candidates = root.putArray("problemCandidates");
         for (EvalDataset.Problem problem : fixture.problems()) {
             ObjectNode node = candidates
-                    .addObject()
-                    .put("problemKey", problem.problemKey())
-                    .put("problem", problem.problem())
-                    .put("relatedGoal", problem.relatedGoal())
-                    .put("confidence", problem.confidence())
-                    .put("expectedBenefit", problem.expectedBenefit())
-                    .put("sideEffect", problem.sideEffect());
+                .addObject()
+                .put("problemKey", problem.problemKey())
+                .put("problem", problem.problem())
+                .put("relatedGoal", problem.relatedGoal())
+                .put("confidence", problem.confidence())
+                .put("expectedBenefit", problem.expectedBenefit())
+                .put("sideEffect", problem.sideEffect());
             ArrayNode evidence = node.putArray("evidence");
             problem.evidence().forEach(evidence::add);
             node.putObject("proposedAction").put("type", problem.actionType()).put("text", problem.actionText());
@@ -484,75 +491,83 @@ class ProactiveEvalGateTest {
         return root;
     }
 
+
     /** 자동 실행의 답이다. 같은 발견에 새 발견 하나와 할 일 후보를 더한다. */
     private ObjectNode autonomousBlock(EvalDataset.Check fixture) {
         ObjectNode root = resultBlock(fixture);
-        ObjectNode extra = ((ArrayNode) root.get("findings"))
-                .addObject()
-                .put("area", "autonomy")
-                .put("topicKey", "autonomy:extra-finding")
-                .put("title", "자동 실행이 찾은 합성 발견")
-                .put("sourceUrl", "https://example.com/autonomy/extra")
-                .put("checkedAt", clock.instant().toString())
-                .put("freshness", "CURRENT")
-                .put("whyItMatters", "합성 fixture 의 발견이다");
+        ObjectNode extra = ((ArrayNode)root.get("findings"))
+            .addObject()
+            .put("area", "autonomy")
+            .put("topicKey", "autonomy:extra-finding")
+            .put("title", "자동 실행이 찾은 합성 발견")
+            .put("sourceUrl", "https://example.com/autonomy/extra")
+            .put("checkedAt", clock.instant().toString())
+            .put("freshness", "CURRENT")
+            .put("whyItMatters", "합성 fixture 의 발견이다");
         extra.putArray("facts").add("합성 사실");
         extra.putObject("next").put("type", "QUESTION").put("text", "살펴볼까요");
         root.putArray("followUpCandidates").add("합성 할 일 후보");
         return root;
     }
 
+
     private static String block(ObjectNode json) {
         return "블록 밖의 글\n<fos-check-result>\n" + JSON.writeValueAsString(json) + "\n</fos-check-result>";
     }
 
+
     private static HermesRunResult answer(String output) {
         return HermesRunResult.of(
-                "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
+            "run-" + UUID.randomUUID(), null, "completed", output, "model", "provider", TokenUsage.empty());
     }
+
 
     private CurrentUser newUser() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user =
-                users.save(AppUser.of("eval-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, clock.instant()));
+        AppUser user = users.save(AppUser.of("eval-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, clock.instant()));
         createdUsers.add(user.id());
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private Agent newAgent(CurrentUser user, boolean writesAllowed) {
         String code = "eval-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = Agent.of(
-                code,
-                "커리어",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                clock.instant());
+            code,
+            "커리어",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            clock.instant());
         agent.changeProactiveCheckWritesAllowed(writesAllowed);
         return agents.save(agent);
     }
 
+
     private ReplayDecisionProvider provider(String id) {
         return providers.stream()
-                .filter(each -> each.id().equals(id))
-                .findFirst()
-                .orElseThrow();
+            .filter(each -> each.id().equals(id))
+            .findFirst()
+            .orElseThrow();
     }
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     private boolean running(Long conversationId) {
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM proactive_check WHERE conversation_id = ? AND status = 'RUNNING'",
-                Long.class,
-                conversationId);
+            "SELECT COUNT(*) FROM proactive_check WHERE conversation_id = ? AND status = 'RUNNING'",
+            Long.class,
+            conversationId);
         return count != null && count > 0;
     }
+
 
     private void awaitIdle(Long conversationId) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
@@ -569,6 +584,7 @@ class ProactiveEvalGateTest {
         }
     }
 
+
     /** 보고서를 빌드 디렉터리에 남긴다. CI 로그에서도 보이도록 표준 출력에 함께 낸다. */
     private static void writeReport(String markdown, List<RunOutcome> runs, HardGates gates) {
         try {
@@ -578,12 +594,12 @@ class ProactiveEvalGateTest {
             json.put("datasetVersion", DATASET.version());
             json.put("hardGates", gates);
             json.put(
-                    "scores",
-                    COMPARED.stream().map(id -> EvalScoreboard.score(id, runs)).toList());
+                "scores",
+                COMPARED.stream().map(id -> EvalScoreboard.score(id, runs)).toList());
             json.put("runs", runs);
             Files.writeString(
-                    REPORT_DIR.resolve("report.json"),
-                    JSON.writerWithDefaultPrettyPrinter().writeValueAsString(json));
+                REPORT_DIR.resolve("report.json"),
+                JSON.writerWithDefaultPrettyPrinter().writeValueAsString(json));
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }

@@ -17,24 +17,23 @@ class AttachmentDeletionRequestMigrationTest {
     void addsRequestWithoutMarkingCompleted() throws Exception {
         String url = "jdbc:h2:mem:attachment-deletion-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway info = Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load();
         String previous = Arrays.stream(info.info().all())
-                .map(MigrationInfo::getVersion)
-                .filter(version ->
-                        version != null && version.compareTo(MigrationVersion.fromVersion("20261010004638")) < 0)
-                .max(MigrationVersion::compareTo)
-                .orElseThrow()
-                .getVersion();
+            .map(MigrationInfo::getVersion)
+            .filter(version -> version != null && version.compareTo(MigrationVersion.fromVersion("20261010004638")) < 0)
+            .max(MigrationVersion::compareTo)
+            .orElseThrow()
+            .getVersion();
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target(previous)
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target(previous)
+            .load()
+            .migrate();
         try (var connection = DriverManager.getConnection(url, "sa", "");
-                var statement = connection.createStatement()) {
+            var statement = connection.createStatement()) {
             statement.executeUpdate("""
                     insert into chat_attachment(id,conversation_id,uploaded_by_user_id,original_name,stored_name,
                       content_type,byte_size,position,expires_at,created_at)
@@ -42,12 +41,12 @@ class AttachmentDeletionRequestMigrationTest {
                     """);
         }
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
         try (var connection = DriverManager.getConnection(url, "sa", "");
-                var statement = connection.createStatement()) {
+            var statement = connection.createStatement()) {
             try (var rows = statement.executeQuery("select deletion_requested_at,deleted_at from chat_attachment")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getTimestamp(1)).isNull();

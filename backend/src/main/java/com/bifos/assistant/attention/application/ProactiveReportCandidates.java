@@ -29,10 +29,12 @@ public class ProactiveReportCandidates implements AttentionCandidates {
     private final OwnConversations conversations;
     private final AgentService agents;
 
+
     @Override
     public Set<CardKey> cards() {
         return Set.of(CardKey.REPORTS);
     }
+
 
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
@@ -41,14 +43,14 @@ public class ProactiveReportCandidates implements AttentionCandidates {
             return List.of();
         }
         Map<Long, Conversation> owned = conversations.activeOf(
-                user, unread.stream().map(UnreadCheckReport::conversationId).toList());
-        Map<Long, Agent> agentsById =
-                agents.byIds(unread.stream().map(UnreadCheckReport::agentId).toList());
+            user, unread.stream().map(UnreadCheckReport::conversationId).toList());
+        Map<Long, Agent> agentsById = agents.byIds(unread.stream().map(UnreadCheckReport::agentId).toList());
         return unread.stream()
-                .filter(check -> owned.containsKey(check.conversationId()))
-                .map(check -> candidate(check, owned.get(check.conversationId()), agentsById.get(check.agentId())))
-                .toList();
+            .filter(check -> owned.containsKey(check.conversationId()))
+            .map(check -> candidate(check, owned.get(check.conversationId()), agentsById.get(check.agentId())))
+            .toList();
     }
+
 
     private static AttentionCandidate candidate(UnreadCheckReport check, Conversation conversation, Agent agent) {
         var report = check.report();
@@ -56,33 +58,33 @@ public class ProactiveReportCandidates implements AttentionCandidates {
         String agentName = agent == null ? null : agent.name();
         String title = agentName == null ? "새 보고" : agentName + "의 새 보고";
         AttentionReport view = new AttentionReport(
-                check.checkId(),
-                agent == null ? null : agent.code(),
-                report.changed(),
-                report.done(),
-                report.evidence(),
-                report.needsApproval(),
-                report.next());
+            check.checkId(),
+            agent == null ? null : agent.code(),
+            report.changed(),
+            report.done(),
+            report.evidence(),
+            report.needsApproval(),
+            report.next());
         return new AttentionCandidate(
-                CardKey.REPORTS,
-                itemKey,
-                AttentionCandidates.stateKey(
-                        AttentionTrigger.PROACTIVE_REPORT_TRIGGER,
-                        check.checkId().toString()),
+            CardKey.REPORTS,
+            itemKey,
+            AttentionCandidates.stateKey(
                 AttentionTrigger.PROACTIVE_REPORT_TRIGGER,
-                false,
-                false,
-                List.of(),
-                AttentionConfidence.CONTROL_PLANE,
-                title,
-                conversation.publicId(),
-                agentName,
-                check.finishedAt() == null ? check.startedAt() : check.finishedAt(),
-                List.of(new AttentionSourceRef("PROACTIVE_CHECK", itemKey, check.finishedAt())),
-                null,
-                null,
-                null,
-                view,
-                null);
+                check.checkId().toString()),
+            AttentionTrigger.PROACTIVE_REPORT_TRIGGER,
+            false,
+            false,
+            List.of(),
+            AttentionConfidence.CONTROL_PLANE,
+            title,
+            conversation.publicId(),
+            agentName,
+            check.finishedAt() == null ? check.startedAt() : check.finishedAt(),
+            List.of(new AttentionSourceRef("PROACTIVE_CHECK", itemKey, check.finishedAt())),
+            null,
+            null,
+            null,
+            view,
+            null);
     }
 }

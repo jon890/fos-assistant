@@ -118,6 +118,7 @@ class MemoryDocumentServiceApiTest {
     private AllowedPerson dadPerson;
     private String dadEmail;
 
+
     @BeforeEach
     void setUp() {
         cleanUp();
@@ -133,6 +134,7 @@ class MemoryDocumentServiceApiTest {
         memories.createDocument(kid, "identity", NAME, "kid 문서", KID_MARK, MemorySensitivity.SENSITIVE);
     }
 
+
     @AfterEach
     void cleanUp() {
         revisionRepository.deleteAll();
@@ -140,23 +142,26 @@ class MemoryDocumentServiceApiTest {
         tokenCollectionRepository.deleteAll();
         tokenRepository.deleteAll();
         people.findAll().stream()
-                .filter(person -> person.email().startsWith("svc-"))
-                .forEach(people::delete);
+            .filter(person -> person.email().startsWith("svc-"))
+            .forEach(people::delete);
         users.findAll().stream().filter(user -> user.email().startsWith("svc-")).forEach(users::delete);
     }
+
 
     private CurrentUser saveUser(String email, String name, UserRole role) {
         AppUser saved = users.save(AppUser.of(email, name, 1L, role, Instant.now()));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), role);
     }
 
+
     private String issue(CurrentUser owner, int days, List<ServiceTokenGrant> grants) {
         return tokens.issue(owner, "e2e", days, grants).rawToken();
     }
 
+
     private HttpResponse<String> get(String path, String bearer, String origin) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
-                .GET();
+            .GET();
         if (bearer != null) {
             builder.header("Authorization", "Bearer " + bearer);
         }
@@ -166,9 +171,11 @@ class MemoryDocumentServiceApiTest {
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+
     private HttpResponse<String> read(String bearer, String collection, String key) throws Exception {
         return get(BASE + collection + "/" + key, bearer, null);
     }
+
 
     /** 응답이 같은지 견줄 때 쓰는 머리말이다. 시각을 담는 머리말은 요청마다 달라 뺀다. */
     private static Map<String, List<String>> stableHeaders(HttpResponse<String> response) {
@@ -181,6 +188,7 @@ class MemoryDocumentServiceApiTest {
         return headers;
     }
 
+
     private void assertSameAsWrongToken(HttpResponse<String> response) throws Exception {
         HttpResponse<String> wrong = read("fos_svc_wrong", "identity", NAME);
         assertThat(response.statusCode()).isEqualTo(401);
@@ -191,12 +199,14 @@ class MemoryDocumentServiceApiTest {
         assertThat(response.headers().firstValue("www-authenticate")).isEmpty();
     }
 
+
     private String lastUsedAt(String bearerHashSource) {
         return jdbc.queryForObject(
-                "SELECT CAST(last_used_at AS VARCHAR) FROM service_token WHERE token_hash = ?",
-                String.class,
-                Sha256.hex(bearerHashSource));
+            "SELECT CAST(last_used_at AS VARCHAR) FROM service_token WHERE token_hash = ?",
+            String.class,
+            Sha256.hex(bearerHashSource));
     }
+
 
     @Test
     @DisplayName("맞는 토큰으로 본문과 판 번호를 읽고 캐시하지 않으며 만료 시각을 알린다")
@@ -214,23 +224,24 @@ class MemoryDocumentServiceApiTest {
         assertThat(body.get("title").asString()).isNotBlank();
         assertThat(body.get("updatedAt").asString()).isNotBlank();
         assertThat(response.headers().firstValue("Cache-Control"))
-                .hasValueSatisfying(value -> assertThat(value).contains("no-store"));
+            .hasValueSatisfying(value -> assertThat(value).contains("no-store"));
         Instant expires = Instant.parse(
-                response.headers().firstValue("X-Service-Token-Expires-At").orElseThrow());
+            response.headers().firstValue("X-Service-Token-Expires-At").orElseThrow());
         assertThat(Duration.between(Instant.now().plus(Duration.ofDays(90)), expires)
-                        .abs())
+            .abs())
                 .isLessThan(Duration.ofMinutes(1));
         assertThat(lastUsedAt(token)).isNotNull();
     }
+
 
     @Test
     @DisplayName("문서를 고치면 판 번호가 오르고 고친 글을 읽는다")
     void readsRevisedDocument() throws Exception {
         String token = issue(dad, 90, IDENTITY);
         Long id = memoryRepository
-                .findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(MemoryScope.USER, dad.id(), "identity", NAME)
-                .orElseThrow()
-                .id();
+            .findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(MemoryScope.USER, dad.id(), "identity", NAME)
+            .orElseThrow()
+            .id();
         memories.reviseDocument(dad, id, "평문-표식-8802", MemorySensitivity.SENSITIVE, 1);
 
         JsonNode body = json.readTree(read(token, "identity", NAME).body());
@@ -238,6 +249,7 @@ class MemoryDocumentServiceApiTest {
         assertThat(body.get("revision").asInt()).isEqualTo(2);
         assertThat(body.get("content").asString()).isEqualTo("평문-표식-8802");
     }
+
 
     @Test
     @DisplayName("토큰이 없거나 틀리거나 폐기되거나 만료되면 모두 같은 401 이다")
@@ -250,26 +262,28 @@ class MemoryDocumentServiceApiTest {
 
         String expired = issue(dad, 90, IDENTITY);
         jdbc.update(
-                "UPDATE service_token SET expires_at = TIMESTAMPADD(DAY, -1, CURRENT_TIMESTAMP(6))"
-                        + " WHERE token_hash = ?",
-                Sha256.hex(expired));
+            "UPDATE service_token SET expires_at = TIMESTAMPADD(DAY, -1, CURRENT_TIMESTAMP(6))"
+                + " WHERE token_hash = ?",
+            Sha256.hex(expired));
         assertSameAsWrongToken(read(expired, "identity", NAME));
     }
+
 
     @Test
     @DisplayName("웹 JWT 를 실어도 서비스 경로는 401 이다")
     void webJwtDoesNotOpenServiceApi() throws Exception {
         Instant now = Instant.now();
         String jwt = Jwts.builder()
-                .subject(dadEmail)
-                .claim("name", "dad")
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(600)))
-                .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
-                .compact();
+            .subject(dadEmail)
+            .claim("name", "dad")
+            .issuedAt(Date.from(now))
+            .expiration(Date.from(now.plusSeconds(600)))
+            .signWith(Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8)))
+            .compact();
 
         assertSameAsWrongToken(read(jwt, "identity", NAME));
     }
+
 
     @Test
     @DisplayName("주인이 허용 목록에서 꺼지면 사건 없이도 401 이고 토큰 줄은 그대로이며 다시 켜면 통한다")
@@ -283,7 +297,7 @@ class MemoryDocumentServiceApiTest {
 
         assertSameAsWrongToken(read(token, "identity", NAME));
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM service_token WHERE revoked_at IS NOT NULL", Long.class))
-                .isZero();
+            .isZero();
         assertThat(lastUsedAt(token)).isEqualTo(usedBefore);
 
         dadPerson.enable();
@@ -291,6 +305,7 @@ class MemoryDocumentServiceApiTest {
 
         assertThat(read(token, "identity", NAME).statusCode()).isEqualTo(200);
     }
+
 
     @Test
     @DisplayName("관리자 경로로 사용자를 끄면 토큰이 폐기되고 다시 켜도 되살아나지 않는다")
@@ -305,15 +320,15 @@ class MemoryDocumentServiceApiTest {
 
         assertSameAsWrongToken(read(token, "identity", NAME));
         assertThat(tokenRepository.findAll())
-                .allSatisfy(row -> assertThat(row.revokedAt()).isNotNull());
+            .allSatisfy(row -> assertThat(row.revokedAt()).isNotNull());
     }
+
 
     @Test
     @DisplayName("허용 목록에 줄이 없는 사용자의 토큰은 401 이다")
     void ownerWithoutAllowListRowIsRejected() throws Exception {
         String email = "svc-stranger-" + UUID.randomUUID() + "@example.com";
-        AllowedPerson row =
-                people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID(), Instant.now()));
+        AllowedPerson row = people.save(AllowedPerson.of(email, "x", "svc-stranger-" + UUID.randomUUID(), Instant.now()));
         CurrentUser stranger = saveUser(email, "x", UserRole.MEMBER);
         String token = issue(stranger, 90, IDENTITY);
         // 발급은 허용된 사용자만 받는다. 허용 목록에서 줄이 사라진 뒤에도 그 토큰이 통하지 않아야 한다
@@ -321,6 +336,7 @@ class MemoryDocumentServiceApiTest {
 
         assertSameAsWrongToken(read(token, "identity", NAME));
     }
+
 
     @Test
     @DisplayName("Origin 이 있으면 맞는 토큰이어도 403 이다")
@@ -331,6 +347,7 @@ class MemoryDocumentServiceApiTest {
         assertThat(response.body()).isEmpty();
     }
 
+
     @Test
     @DisplayName("서비스 토큰으로 사용자 API 를 부르면 403 이다")
     void serviceTokenDoesNotOpenUserApi() throws Exception {
@@ -338,6 +355,7 @@ class MemoryDocumentServiceApiTest {
 
         assertThat(response.statusCode()).isEqualTo(403);
     }
+
 
     @Test
     @DisplayName("없는 문서와 받지 않는 collection 과 민감 허용 없는 민감 문서는 글자까지 같은 404 이다")
@@ -359,18 +377,20 @@ class MemoryDocumentServiceApiTest {
         }
     }
 
+
     @Test
     @DisplayName("같은 이름의 남의 문서는 나오지 않고 내게 없는 이름은 404 이다")
     void neverReturnsOthersDocument() throws Exception {
         String token = issue(dad, 90, IDENTITY);
 
         assertThat(read(token, "identity", NAME).body())
-                .doesNotContain(KID_MARK)
-                .contains(MARK);
+            .doesNotContain(KID_MARK)
+            .contains(MARK);
 
         memories.createDocument(kid, "identity", "kid-only", "kid 만", KID_MARK, MemorySensitivity.NORMAL);
         assertThat(read(token, "identity", "kid-only").statusCode()).isEqualTo(404);
     }
+
 
     @Test
     @DisplayName("서비스 토큰으로는 쓰지 못하고 GROUP 문서는 읽지 못한다")
@@ -387,31 +407,30 @@ class MemoryDocumentServiceApiTest {
 
         for (String method : List.of("POST", "PUT", "PATCH", "DELETE")) {
             HttpRequest request = HttpRequest.newBuilder(
-                            URI.create("http://localhost:" + port + BASE + "identity/" + NAME))
-                    .header("Authorization", "Bearer " + token)
-                    .header("Content-Type", "application/json")
-                    .method(method, HttpRequest.BodyPublishers.ofString("{\"content\":\"x\"}"))
-                    .build();
-            int status =
-                    client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
+                URI.create("http://localhost:" + port + BASE + "identity/" + NAME))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "application/json")
+                .method(method, HttpRequest.BodyPublishers.ofString("{\"content\":\"x\"}"))
+                .build();
+            int status = client.send(request, HttpResponse.BodyHandlers.ofString()).statusCode();
             assertThat(status).as(method).isBetween(400, 499);
         }
         assertThat(json.readTree(read(token, "identity", NAME).body())
-                        .get("revision")
-                        .asInt())
+            .get("revision")
+            .asInt())
                 .isEqualTo(1);
         assertThat(memoryRepository
-                        .findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
-                                MemoryScope.USER, dad.id(), "identity", NAME)
-                        .isPresent())
+            .findByScopeAndOwnerUserIdAndCollectionAndDocumentKey(
+                MemoryScope.USER, dad.id(), "identity", NAME)
+            .isPresent())
                 .isTrue();
     }
+
 
     @Test
     @DisplayName("승인 전인 항목과 문서가 아닌 항목은 서비스가 읽지 못한다")
     void proposedAndNonDocumentEntriesAreHidden() {
-        for (String[] row :
-                new String[][] {{"DOCUMENT", "PROPOSED", "proposed-doc"}, {"MEMORY", "ACCEPTED", "memory-with-key"}}) {
+        for (String[] row : new String[][] {{"DOCUMENT", "PROPOSED", "proposed-doc"}, {"MEMORY", "ACCEPTED", "memory-with-key"}}) {
             jdbc.update("""
                     INSERT INTO memory (scope, owner_user_id, collection, entry_type, document_key, title, content,
                         retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
@@ -419,9 +438,9 @@ class MemoryDocumentServiceApiTest {
                         CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
                     """, dad.id(), row[0], row[2], row[1]);
             assertThatThrownBy(() -> memories.documentForService(
-                            dad.id(), MemoryAccess.of(Set.of("identity"), Set.of("identity")), "identity", row[2]))
+                dad.id(), MemoryAccess.of(Set.of("identity"), Set.of("identity")), "identity", row[2]))
                     .isInstanceOfSatisfying(
-                            ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
+                        ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.MEMORY_NOT_FOUND));
         }
     }
 }

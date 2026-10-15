@@ -28,11 +28,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "attention_control",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_attention_control_item",
-                        columnNames = {"user_id", "card_key", "item_key"}))
+    name = "attention_control",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_attention_control_item",
+        columnNames = {"user_id", "card_key", "item_key"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -71,21 +70,24 @@ public class AttentionControlEntry {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     /** 사용자가 본 상태 {@code stateKey} 가 바뀔 때까지 숨기는 줄이다. */
     public static AttentionControlEntry hide(
-            Long userId, CardKey cardKey, String itemKey, String stateKey, Instant now) {
+        Long userId, CardKey cardKey, String itemKey, String stateKey, Instant now) {
         AttentionControlEntry entry = create(userId, cardKey, itemKey, now);
         entry.rehide(stateKey, now);
         return entry;
     }
 
+
     /** {@code until} 까지 미루는 줄이다. */
     public static AttentionControlEntry snooze(
-            Long userId, CardKey cardKey, String itemKey, Instant until, Instant now) {
+        Long userId, CardKey cardKey, String itemKey, Instant until, Instant now) {
         AttentionControlEntry entry = create(userId, cardKey, itemKey, now);
         entry.resnooze(until, now);
         return entry;
     }
+
 
     /** 같은 줄을 숨기기로 고친다. 미룬 기한은 비운다. */
     public void rehide(String stateKey, Instant now) {
@@ -95,6 +97,7 @@ public class AttentionControlEntry {
         this.updatedAt = micros(now);
     }
 
+
     /** 같은 줄을 미루기로 고친다. 숨긴 상태는 비운다. */
     public void resnooze(Instant until, Instant now) {
         this.action = AttentionAction.SNOOZE;
@@ -102,6 +105,7 @@ public class AttentionControlEntry {
         this.stateKey = null;
         this.updatedAt = micros(now);
     }
+
 
     private static AttentionControlEntry create(Long userId, CardKey cardKey, String itemKey, Instant now) {
         AttentionControlEntry entry = new AttentionControlEntry();
@@ -111,6 +115,7 @@ public class AttentionControlEntry {
         entry.createdAt = micros(now);
         return entry;
     }
+
 
     /** 칸이 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다. */
     private static Instant micros(Instant instant) {

@@ -19,12 +19,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ToolsetVisibilityService {
     private final ToolsetHiddenRepository hidden;
 
+
     @Transactional(readOnly = true)
     public Set<String> hiddenFor(Long groupId) {
         return hidden.findByGroupIdOrderByNameAsc(groupId).stream()
-                .map(ToolsetHidden::name)
-                .collect(Collectors.toSet());
+            .map(ToolsetHidden::name)
+            .collect(Collectors.toSet());
     }
+
 
     @Transactional
     public void save(CurrentUser user, List<String> names) {
@@ -37,8 +39,8 @@ public class ToolsetVisibilityService {
         hidden.deleteByGroupId(user.groupId());
         hidden.flush();
         hidden.saveAll(names.stream()
-                .distinct()
-                .map(name -> ToolsetHidden.of(user.groupId(), name))
-                .toList());
+            .distinct()
+            .map(name -> ToolsetHidden.of(user.groupId(), name))
+            .toList());
     }
 }

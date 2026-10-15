@@ -10,6 +10,7 @@ public interface CdpRelayListener {
      */
     void onFragment(String fragment, boolean last);
 
+
     /** 붙은 뒤에 상대가 닫았거나 연결이 실패했다. 한 번만 온다. {@link CdpRelay#close()} 로 닫았으면 오지 않는다. */
     void onClosed();
 }

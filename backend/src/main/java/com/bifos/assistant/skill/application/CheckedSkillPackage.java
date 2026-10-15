@@ -15,18 +15,19 @@ import java.util.List;
  * @param problems 찾은 문제. 받기의 문제면 그 하나뿐이고, 검사의 문제는 50개까지다
  */
 public record CheckedSkillPackage(
-        String name,
-        String description,
-        String skillMd,
-        List<SkillFile> files,
-        List<String> ignored,
-        List<SkillPackageProblem> problems) {
+    String name,
+    String description,
+    String skillMd,
+    List<SkillFile> files,
+    List<String> ignored,
+    List<SkillPackageProblem> problems) {
 
     public CheckedSkillPackage {
         files = List.copyOf(files);
         ignored = List.copyOf(ignored);
         problems = List.copyOf(problems);
     }
+
 
     /** {@code scripts/} 아래 파일이 있는가. */
     public boolean hasScripts() {

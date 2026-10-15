@@ -30,12 +30,13 @@ public class ExecutionMemoryRefs {
     private static final String MEMORY_REF_PREFIX = "memory:";
     private static final String INLINE = "INLINE";
     private static final Map<String, MemoryUseVia> VIA_BY_SOURCE = Map.of(
-            "MEMORY_ALWAYS", MemoryUseVia.ALWAYS,
-            "MEMORY_FACTS", MemoryUseVia.FACTS,
-            "MEMORY_READ", MemoryUseVia.READ);
+        "MEMORY_ALWAYS", MemoryUseVia.ALWAYS,
+        "MEMORY_FACTS", MemoryUseVia.FACTS,
+        "MEMORY_READ", MemoryUseVia.READ);
 
     private final ExecutionContextSourceRepository contextSources;
     private final AgentExecutionRepository executions;
+
 
     /**
      * 실행마다 기록한 순서로 참조를 낸다. 같은 실행의 같은 항목은 앞의 것 하나만 남기고, 실행 번호 오름차순이다.
@@ -47,24 +48,23 @@ public class ExecutionMemoryRefs {
             return List.of();
         }
         Map<Long, Map<Long, MemoryUseVia>> viaByExecution = new LinkedHashMap<>();
-        for (ExecutionContextSource source :
-                contextSources.findByIdExecutionIdInAndSourceInAndBodyModeOrderByIdExecutionIdAscIdPositionAsc(
-                        executionIds, VIA_BY_SOURCE.keySet(), INLINE)) {
+        for (ExecutionContextSource source : contextSources.findByIdExecutionIdInAndSourceInAndBodyModeOrderByIdExecutionIdAscIdPositionAsc(
+            executionIds, VIA_BY_SOURCE.keySet(), INLINE)) {
             Long memoryId = memoryIdOf(source.sourceRef());
             if (memoryId != null) {
                 viaByExecution
-                        .computeIfAbsent(source.executionId(), id -> new LinkedHashMap<>())
-                        .putIfAbsent(memoryId, VIA_BY_SOURCE.get(source.source()));
+                    .computeIfAbsent(source.executionId(), id -> new LinkedHashMap<>())
+                    .putIfAbsent(memoryId, VIA_BY_SOURCE.get(source.source()));
             }
         }
         Map<Long, Long> agentIds = executions.findAllById(viaByExecution.keySet()).stream()
-                .filter(execution -> execution.agentId() != null)
-                .collect(Collectors.toMap(AgentExecution::id, AgentExecution::agentId));
+            .filter(execution -> execution.agentId() != null)
+            .collect(Collectors.toMap(AgentExecution::id, AgentExecution::agentId));
         List<ExecutionMemoryRef> refs = new ArrayList<>();
-        viaByExecution.forEach((executionId, vias) -> vias.forEach((memoryId, via) ->
-                refs.add(new ExecutionMemoryRef(executionId, agentIds.get(executionId), memoryId, via))));
+        viaByExecution.forEach((executionId, vias) -> vias.forEach((memoryId, via) -> refs.add(new ExecutionMemoryRef(executionId, agentIds.get(executionId), memoryId, via))));
         return refs;
     }
+
 
     private static Long memoryIdOf(String sourceRef) {
         if (!sourceRef.startsWith(MEMORY_REF_PREFIX)) {

@@ -57,8 +57,7 @@ class UsageBreakdownTest {
     private static final String CHORE_CODE = "breakdown-chore";
     private static final String CAREER_MODEL = "example-model";
     private static final String CHORE_MODEL = "example-model-b";
-    private static final Map<String, String> MODEL_BY_AGENT =
-            Map.of(CAREER_CODE, CAREER_MODEL, CHORE_CODE, CHORE_MODEL);
+    private static final Map<String, String> MODEL_BY_AGENT = Map.of(CAREER_CODE, CAREER_MODEL, CHORE_CODE, CHORE_MODEL);
 
     @Autowired
     AgentExecutionRepository executions;
@@ -86,6 +85,7 @@ class UsageBreakdownTest {
     private Agent career;
     private Agent chore;
 
+
     @BeforeEach
     void setUp() {
         executions.deleteAll();
@@ -96,6 +96,7 @@ class UsageBreakdownTest {
         // 묶음 합계는 관리자만 받는다. 대역이어도 관리자 확인은 실제 판정을 타게 한다.
         doCallRealMethod().when(currentUser).requireAdmin();
     }
+
 
     @Test
     @DisplayName("에이전트 둘의 실행이 섞여 있으면 agent 축이 둘로 묶인다")
@@ -119,6 +120,7 @@ class UsageBreakdownTest {
         assertThat(rows.get(1).estimatedCostMicros()).isEqualTo(60_000L);
     }
 
+
     @Test
     @DisplayName("모델 축은 provider 와 모델로 묶는다")
     void modelAxisGroupsByProviderAndModel() {
@@ -130,6 +132,7 @@ class UsageBreakdownTest {
         assertThat(rows).extracting(BreakdownRow::label).containsExactly(CAREER_MODEL, CHORE_MODEL);
         assertThat(rows).extracting(BreakdownRow::detail).containsOnly(PROVIDER);
     }
+
 
     @Test
     @DisplayName("날짜 축은 하루씩 묶고 이른 날부터 준다")
@@ -145,6 +148,7 @@ class UsageBreakdownTest {
         assertThat(rows.getFirst().estimatedCostMicros()).isEqualTo(30_000L);
     }
 
+
     @Test
     @DisplayName("날짜 축도 가족이 사는 곳의 달력으로 하루를 끊는다")
     void dateAxisCutsDayByCalendarOfWhereFamilyLives() {
@@ -155,6 +159,7 @@ class UsageBreakdownTest {
 
         assertThat(rows).extracting(BreakdownRow::key).containsExactly("2026-09-16");
     }
+
 
     @Test
     @DisplayName("에이전트 행이 없는 실행도 agent 축에 번호로 묶이고 이름은 지운 에이전트다")
@@ -176,21 +181,23 @@ class UsageBreakdownTest {
         });
     }
 
+
     @Test
     @DisplayName("도는 중인 실행은 어느 축에도 세어지지 않는다")
     void runningRunIsCountedOnNoAxis() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         executions.save(builder(USER_ID, career, MID_SEPTEMBER.plusSeconds(60))
-                .status(ExecutionStatus.RUNNING)
-                .build());
+            .status(ExecutionStatus.RUNNING)
+            .build());
 
         assertThat(controller.breakdown("agent", MONTH).rows())
-                .singleElement()
-                .satisfies(row -> assertThat(row.executions()).isOne());
+            .singleElement()
+            .satisfies(row -> assertThat(row.executions()).isOne());
         assertThat(controller.breakdown("day", MONTH).rows())
-                .singleElement()
-                .satisfies(row -> assertThat(row.executions()).isOne());
+            .singleElement()
+            .satisfies(row -> assertThat(row.executions()).isOne());
     }
+
 
     @Test
     @DisplayName("모르는 축은 400 으로 거절하고 기본값으로 떨어지지 않는다")
@@ -198,28 +205,30 @@ class UsageBreakdownTest {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
 
         assertThatThrownBy(() -> controller.breakdown("workspace", MONTH))
-                .isInstanceOfSatisfying(ApiException.class, ex -> {
-                    assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED);
-                    assertThat(ex.code().status()).isEqualTo(HttpStatus.BAD_REQUEST);
-                });
+            .isInstanceOfSatisfying(ApiException.class, ex -> {
+                assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED);
+                assertThat(ex.code().status()).isEqualTo(HttpStatus.BAD_REQUEST);
+            });
     }
+
 
     @Test
     @DisplayName("달 형태가 아닌 값도 400 으로 거절한다")
     void rejectsNonMonthFormatWith400Too() {
         assertThatThrownBy(() -> controller.breakdown("agent", "지난달"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
+
 
     @Test
     @DisplayName("남의 실행은 내 합계에 들어가지 않는다")
     void othersRunsAreNotInMyTotals() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
         executions.save(builder(OTHER_USER_ID, career, MID_SEPTEMBER.plusSeconds(60))
-                .cost(new ExecutionCost(99_000_000L, null, "USD", "models.dev@2026-09-17"))
-                .tokens(1_000L, null, 500L, 1_500L)
-                .build());
+            .cost(new ExecutionCost(99_000_000L, null, "USD", "models.dev@2026-09-17"))
+            .tokens(1_000L, null, 500L, 1_500L)
+            .build());
 
         List<BreakdownRow> rows = controller.breakdown("agent", MONTH).rows();
 
@@ -229,6 +238,7 @@ class UsageBreakdownTest {
         });
     }
 
+
     @Test
     @DisplayName("달 경계는 가족이 사는 곳의 달력으로 끊긴다")
     void monthBoundaryIsCutByCalendarOfWhereFamilyLives() {
@@ -237,12 +247,13 @@ class UsageBreakdownTest {
         save(career, Instant.parse("2026-09-30T16:00:00Z"), 20_000L, 100L, null);
 
         assertThat(controller.breakdown("agent", MONTH).rows())
-                .singleElement()
-                .satisfies(row -> assertThat(row.estimatedCostMicros()).isEqualTo(10_000L));
+            .singleElement()
+            .satisfies(row -> assertThat(row.estimatedCostMicros()).isEqualTo(10_000L));
         assertThat(controller.breakdown("agent", "2026-10").rows())
-                .singleElement()
-                .satisfies(row -> assertThat(row.estimatedCostMicros()).isEqualTo(20_000L));
+            .singleElement()
+            .satisfies(row -> assertThat(row.estimatedCostMicros()).isEqualTo(20_000L));
     }
+
 
     @Test
     @DisplayName("지문 축은 지문별로 묶고 실행당 평균을 낼 수 있게 준다")
@@ -262,6 +273,7 @@ class UsageBreakdownTest {
         });
     }
 
+
     @Test
     @DisplayName("지문이 비어 있는 실행은 지문 축에서 통째로 빠진다")
     void runWithEmptyFingerprintDropsWholeFromFingerprintAxis() {
@@ -274,6 +286,7 @@ class UsageBreakdownTest {
         assertThat(rows.getFirst().executions()).isOne();
     }
 
+
     @Test
     @DisplayName("기록이 없는 달은 빈 줄 목록을 준다")
     void monthWithoutRecordsGivesEmptyRowList() {
@@ -281,50 +294,54 @@ class UsageBreakdownTest {
         assertThat(controller.breakdown("fingerprint", "2020-01").rows()).isEmpty();
     }
 
+
     @Test
     @DisplayName("구독 경로만 있는 묶음은 실제 청구액을 0 으로 채우지 않는다")
     void groupWithOnlySubscriptionPathDoesNotFillActualBilledWithZero() {
         save(career, MID_SEPTEMBER, 14_000_000L, 7_000L, null);
 
         assertThat(controller.breakdown("agent", MONTH).rows())
-                .singleElement()
-                .satisfies(row -> assertThat(row.actualCostMicros()).isNull());
+            .singleElement()
+            .satisfies(row -> assertThat(row.actualCostMicros()).isNull());
     }
 
+
     private AgentExecution save(
-            Agent agent, Instant startedAt, Long estimatedMicros, Long contextChars, String fingerprint) {
+        Agent agent, Instant startedAt, Long estimatedMicros, Long contextChars, String fingerprint) {
         return executions.save(builder(USER_ID, agent, startedAt)
-                .tokens(1_000L, null, 500L, 1_500L)
-                .cost(new ExecutionCost(estimatedMicros, null, "USD", "models.dev@2026-09-17"))
-                .contextChars(contextChars)
-                .runtimeFingerprint(fingerprint)
-                .build());
+            .tokens(1_000L, null, 500L, 1_500L)
+            .cost(new ExecutionCost(estimatedMicros, null, "USD", "models.dev@2026-09-17"))
+            .contextChars(contextChars)
+            .runtimeFingerprint(fingerprint)
+            .build());
     }
+
 
     private static AgentExecution.Builder builder(Long userId, Agent agent, Instant startedAt) {
         return AgentExecution.builder()
-                .userId(userId)
-                .conversationId(CONVERSATION_ID)
-                .agentId(agent.id())
-                .profileName(agent.hermesProfile())
-                .provider(PROVIDER)
-                .model(MODEL_BY_AGENT.get(agent.code()))
-                .costMode(agent.costMode())
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(startedAt);
+            .userId(userId)
+            .conversationId(CONVERSATION_ID)
+            .agentId(agent.id())
+            .profileName(agent.hermesProfile())
+            .provider(PROVIDER)
+            .model(MODEL_BY_AGENT.get(agent.code()))
+            .costMode(agent.costMode())
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(startedAt);
     }
+
 
     private Agent agent(String code, String name) {
         return agents.findByCode(code)
-                .orElseGet(() -> agents.save(Agent.of(
-                        code,
-                        name,
-                        code,
-                        "http://127.0.0.1:1/p/" + code,
-                        CostMode.SUBSCRIPTION,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.PRIVATE,
-                        USER_ID,
-                        Instant.now())));
+            .orElseGet(() -> agents.save(Agent.of(
+                code,
+                name,
+                code,
+                "http://127.0.0.1:1/p/" + code,
+                CostMode.SUBSCRIPTION,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID,
+                Instant.now())));
     }
 }

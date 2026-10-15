@@ -23,11 +23,13 @@ public class MediaObservationCleaner {
     private final ChatContentMutationCoordinator mutations;
     private final Clock clock;
 
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void deleteForAttachment(Long conversationId, Long attachmentId) {
         mutations.requireParticipant(conversationId);
         observations.deleteForAttachment(conversationId, attachmentId);
     }
+
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void deleteForConversation(Long conversationId) {
@@ -35,31 +37,33 @@ public class MediaObservationCleaner {
         observations.deleteForConversation(conversationId);
     }
 
+
     @EventListener(ApplicationReadyEvent.class)
     @Scheduled(cron = "${assistant.attachment.cleanup-cron}")
     public void runScheduled() {
         cleanExpired(clock.instant());
     }
 
+
     public int cleanExpired(Instant now) {
         int deleted = 0;
         for (Object[] candidate : observations.findCleanupCandidates(now)) {
-            Long conversationId = (Long) candidate[0];
-            Long attachmentId = (Long) candidate[1];
+            Long conversationId = (Long)candidate[0];
+            Long attachmentId = (Long)candidate[1];
             try {
                 deleted += mutations.run(
-                        (Long) candidate[2],
-                        new ChatContentMutationTarget(conversationId, List.of(attachmentId)),
-                        () -> {
-                            boolean stillBlocked = observations.findCleanupCandidates(now).stream()
-                                    .anyMatch(row -> conversationId.equals(row[0]) && attachmentId.equals(row[1]));
-                            return stillBlocked ? observations.deleteForAttachment(conversationId, attachmentId) : 0;
-                        });
+                    (Long)candidate[2],
+                    new ChatContentMutationTarget(conversationId, List.of(attachmentId)),
+                    () -> {
+                        boolean stillBlocked = observations.findCleanupCandidates(now).stream()
+                            .anyMatch(row -> conversationId.equals(row[0]) && attachmentId.equals(row[1]));
+                        return stillBlocked ? observations.deleteForAttachment(conversationId, attachmentId) : 0;
+                    });
             } catch (RuntimeException ex) {
                 log.warn(
-                        "관찰 정리 실패 attachmentId={} error={}",
-                        attachmentId,
-                        ex.getClass().getSimpleName());
+                    "관찰 정리 실패 attachmentId={} error={}",
+                    attachmentId,
+                    ex.getClass().getSimpleName());
             }
         }
         return deleted;

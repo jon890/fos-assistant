@@ -114,9 +114,11 @@ class UserExecutionLimitDelegationTest {
     private ExecutorService pool;
     private CurrentUser dad;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -136,12 +138,14 @@ class UserExecutionLimitDelegationTest {
         agents.save(agent("limit-flow", ResearchAndBuildFlow.NAME));
     }
 
+
     @AfterEach
     void tearDown() {
         releaseParent.countDown();
         releaseChild.countDown();
         pool.close();
     }
+
 
     @Test
     @DisplayName("부모 turn 과 위임 자식 하나가 자리를 채우면 둘째 위임은 곧바로 BUSY 이고 부모 turn 은 끝까지 돈다")
@@ -186,29 +190,29 @@ class UserExecutionLimitDelegationTest {
 
         assertThat(finished.assistantText()).as("부모 turn 의 답").isEqualTo("부모 답");
         assertThat(stub().received())
-                .as("Hermes 에 간 제출의 글")
-                .extracting(command ->
-                        command.input().contains(PARENT_MARK) || command.input().contains(CHILD_MARK))
-                .containsOnly(true)
-                .hasSize(2);
+            .as("Hermes 에 간 제출의 글")
+            .extracting(command -> command.input().contains(PARENT_MARK) || command.input().contains(CHILD_MARK))
+            .containsOnly(true)
+            .hasSize(2);
     }
+
 
     @Test
     @DisplayName("흐름 단계 둘 가운데 자리가 하나뿐이면 한쪽만 돌고 흐름은 그 단계를 기다린 뒤 USER_BUSY 로 끝난다")
     void flowEndsWithUserBusyAfterWaitingForAdmittedStepWhenOnlyOneSlotRemains() {
         CountDownLatch stepRejected = new CountDownLatch(1);
         doAnswer(invocation -> {
-                    try {
-                        return invocation.callRealMethod();
-                    } catch (ApiException ex) {
-                        if (ex.code() == ErrorCode.USER_BUSY) {
-                            stepRejected.countDown();
-                        }
-                        throw ex;
-                    }
-                })
-                .when(limiter)
-                .admit(any(), any(), any());
+            try {
+                return invocation.callRealMethod();
+            } catch (ApiException ex) {
+                if (ex.code() == ErrorCode.USER_BUSY) {
+                    stepRejected.countDown();
+                }
+                throw ex;
+            }
+        })
+            .when(limiter)
+            .admit(any(), any(), any());
         stub().willAnswer(command -> {
             String input = command.input();
             if (input.contains(CHIEF_MARK)) {
@@ -223,27 +227,28 @@ class UserExecutionLimitDelegationTest {
         });
 
         assertThatThrownBy(() -> chat.send(dad, null, "전기차를 사는 게 나을까?", "limit-flow"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.USER_BUSY);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.USER_BUSY);
 
         List<AgentExecution> rows = executionsOfDad();
         assertThat(rows).as("Chief 와 들어온 단계 하나").hasSize(2);
         assertThat(rows)
-                .filteredOn(row -> row.parentExecutionId() == null)
-                .singleElement()
-                .satisfies(root -> {
-                    assertThat(root.status()).isEqualTo(ExecutionStatus.FAILED);
-                    assertThat(root.errorCode()).isEqualTo(ErrorCode.USER_BUSY.name());
-                });
+            .filteredOn(row -> row.parentExecutionId() == null)
+            .singleElement()
+            .satisfies(root -> {
+                assertThat(root.status()).isEqualTo(ExecutionStatus.FAILED);
+                assertThat(root.errorCode()).isEqualTo(ErrorCode.USER_BUSY.name());
+            });
         assertThat(rows)
-                .filteredOn(row -> row.parentExecutionId() != null)
-                .singleElement()
-                .satisfies(
-                        step -> assertThat(step.status()).as("흐름이 끝나기 전에 끝난 단계").isEqualTo(ExecutionStatus.SUCCEEDED));
+            .filteredOn(row -> row.parentExecutionId() != null)
+            .singleElement()
+            .satisfies(
+                step -> assertThat(step.status()).as("흐름이 끝나기 전에 끝난 단계").isEqualTo(ExecutionStatus.SUCCEEDED));
         assertThat(stub().received()).as("Chief 와 들어온 단계의 제출").hasSize(2);
         assertThat(limiter.used(dad.id())).as("흐름이 끝난 뒤 쥔 자리").isZero();
     }
+
 
     private DelegationResult delegate(AgentExecution origin, String task) {
         String session = "fos-" + UUID.randomUUID();
@@ -251,37 +256,42 @@ class UserExecutionLimitDelegationTest {
         return delegations.delegate(dad, origin, key, "limit-worker", task);
     }
 
+
     private AgentExecution latestExecution() {
         return executions
-                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                .getFirst();
+            .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+            .getFirst();
     }
+
 
     private List<AgentExecution> executionsOfDad() {
         return executions.findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 20));
     }
 
+
     private Agent agent(String code, String flow) {
         Agent agent = Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                dad.id(),
-                Instant.now());
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            dad.id(),
+            Instant.now());
         if (flow != null) {
             agent.assignFlow(flow);
         }
         return agent;
     }
 
+
     private static HermesRunResult completed(String runId, String output) {
         return HermesRunResult.of(
-                runId, "session-" + runId, "completed", output, "model", "provider", TokenUsage.empty());
+            runId, "session-" + runId, "completed", output, "model", "provider", TokenUsage.empty());
     }
+
 
     private static void await(CountDownLatch latch) {
         try {

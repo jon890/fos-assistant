@@ -35,12 +35,14 @@ public final class ConnectorManifests {
         return manifests.stream().filter(ConnectorManifests::accepted).toList();
     }
 
+
     /** 그 번호의 manifest 다. 카탈로그에 없거나 받지 않는 선언이면 빈 값이다. */
     public static Optional<ConnectorManifest> find(HermesConnectorClient connector, String connectorId) {
         return read(connector).stream()
-                .filter(manifest -> manifest.id().equals(connectorId))
-                .findFirst();
+            .filter(manifest -> manifest.id().equals(connectorId))
+            .findFirst();
     }
+
 
     /**
      * manifest 로 열 수 없는 내장 toolset 을 선언한 커넥터와 도구 정책이 하한보다 느슨한 커넥터는 받지 않는다.
@@ -50,7 +52,7 @@ public final class ConnectorManifests {
      */
     static boolean accepted(ConnectorManifest manifest) {
         if (!AgentToolPolicy.allowedForConnector(manifest.toolsets())
-                || (manifest.attachments() && !manifest.toolsets().contains(AgentToolPolicy.VISION))) {
+            || (manifest.attachments() && !manifest.toolsets().contains(AgentToolPolicy.VISION))) {
             log.warn("connector {} declares toolsets a manifest cannot open", manifest.id());
             return false;
         }

@@ -25,6 +25,7 @@ class ConnectorCallLimiterTest {
     private final SteppingClock clock = new SteppingClock(Instant.parse("2026-01-01T00:00:00Z"));
     private final ConnectorCallLimiter limiter = new ConnectorCallLimiter(new ConnectorProperties(1, 10), clock);
 
+
     @Test
     @DisplayName("같은 사용자의 둘째 동시 호출은 action 을 부르지 않고 거절하고 다른 사용자는 받는다")
     void rejectsSecondConcurrentCallOfSameUser() {
@@ -39,17 +40,19 @@ class ConnectorCallLimiterTest {
         assertThat(secondRuns).hasValue(0);
     }
 
+
     @Test
     @DisplayName("action 이 예외를 내도 동시 자리를 돌려줘 다음 호출을 받는다")
     void releasesSlotWhenActionThrows() {
         assertThatThrownBy(() -> limiter.call(USER, () -> {
-                    throw new IllegalStateException("boom");
-                }))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("boom");
+            throw new IllegalStateException("boom");
+        }))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("boom");
 
         assertThat(limiter.call(USER, () -> "next")).isEqualTo("next");
     }
+
 
     @Test
     @DisplayName("60초 안의 열 번은 받고 열한 번째는 거절하며 61초 뒤에는 다시 받는다")
@@ -70,6 +73,7 @@ class ConnectorCallLimiterTest {
         limiter.call(USER, runs::incrementAndGet);
         assertThat(runs).hasValue(11);
     }
+
 
     @Test
     @DisplayName("거절된 호출은 횟수에 들지 않아 계속 눌러도 창이 지나면 풀린다")
@@ -92,33 +96,40 @@ class ConnectorCallLimiterTest {
         assertThat(runs).hasValue(20);
     }
 
+
     private static void assertRateLimited(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RATE_LIMITED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.CONNECTOR_RATE_LIMITED));
     }
+
 
     /** 검사가 시각을 앞으로 옮기는 Clock 이다. */
     private static final class SteppingClock extends Clock {
         private Instant now;
 
+
         private SteppingClock(Instant start) {
             this.now = start;
         }
 
+
         private void advance(Duration amount) {
             now = now.plus(amount);
         }
+
 
         @Override
         public Instant instant() {
             return now;
         }
 
+
         @Override
         public ZoneId getZone() {
             return ZoneOffset.UTC;
         }
+
 
         @Override
         public Clock withZone(ZoneId zone) {

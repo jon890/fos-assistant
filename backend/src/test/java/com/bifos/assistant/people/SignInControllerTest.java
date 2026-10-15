@@ -38,8 +38,7 @@ class SignInControllerTest {
 
     private static final String JWT_SECRET = "test-secret-test-secret-test-secret-test-secret";
     private static final SecretKey KEY = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
-    private static final SecretKey OTHER_KEY =
-            Keys.hmacShaKeyFor("other-secret-other-secret-other-secret-other".getBytes(StandardCharsets.UTF_8));
+    private static final SecretKey OTHER_KEY = Keys.hmacShaKeyFor("other-secret-other-secret-other-secret-other".getBytes(StandardCharsets.UTF_8));
 
     @LocalServerPort
     int port;
@@ -56,12 +55,14 @@ class SignInControllerTest {
     private final HttpClient client = HttpClient.newHttpClient();
     private final JsonMapper json = JsonMapper.builder().build();
 
+
     @BeforeEach
     void setUp() {
         people.deleteAll();
         users.deleteAll();
         people.save(AllowedPerson.of("mom@example.com", "엄마", "mom", Instant.now()));
     }
+
 
     @Test
     @DisplayName("로그인 판정용 토큰은 허용된 사람을 돌려준다")
@@ -75,18 +76,21 @@ class SignInControllerTest {
         assertThat(body.path("hermesProfile").asString()).isEqualTo("mom");
     }
 
+
     @Test
     @DisplayName("토큰이 없으면 거절한다")
     void rejectsWhenTokenIsMissing() throws Exception {
         assertThat(ask(null, "mom@example.com").statusCode()).isEqualTo(401);
     }
 
+
     @Test
     @DisplayName("대화용 토큰으로는 부를 수 없다")
     void cannotBeCalledWithConversationToken() throws Exception {
         assertThat(ask(conversationToken("mom@example.com"), "mom@example.com").statusCode())
-                .isEqualTo(401);
+            .isEqualTo(401);
     }
+
 
     @Test
     @DisplayName("허용되지 않은 주소를 물어도 사용자가 생기지 않는다")
@@ -100,6 +104,7 @@ class SignInControllerTest {
         assertThat(users.count()).isEqualTo(before);
     }
 
+
     @Test
     @DisplayName("빈 주소는 허용 목록에 없는 주소와 같은 답을 받는다")
     void blankAddressGetsSameAnswerAsAddressNotInAllowlist() throws Exception {
@@ -109,11 +114,13 @@ class SignInControllerTest {
         assertThat(json.readTree(response.body()).path("allowed").asBoolean()).isFalse();
     }
 
+
     @Test
     @DisplayName("토큰 검사가 본문 검사보다 먼저 돈다")
     void tokenCheckRunsBeforeBodyCheck() throws Exception {
         assertThat(ask(null, "").statusCode()).isEqualTo(401);
     }
+
 
     @Test
     @DisplayName("로그인 완료는 서버 시각을 기록하고 이전 시각으로 되돌리지 않는다")
@@ -123,39 +130,40 @@ class SignInControllerTest {
 
         assertThat(complete(signInToken(), "MOM@EXAMPLE.COM").statusCode()).isEqualTo(204);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
-                        .orElseThrow()
-                        .lastLoginAt())
+            .orElseThrow()
+            .lastLoginAt())
                 .isEqualTo(first);
 
         Instant second = first.plusSeconds(60);
         clock.set(second);
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
-                        .orElseThrow()
-                        .lastLoginAt())
+            .orElseThrow()
+            .lastLoginAt())
                 .isEqualTo(second);
 
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
-                        .orElseThrow()
-                        .lastLoginAt())
+            .orElseThrow()
+            .lastLoginAt())
                 .isEqualTo(second);
 
         clock.set(first.minusSeconds(60));
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
-                        .orElseThrow()
-                        .lastLoginAt())
+            .orElseThrow()
+            .lastLoginAt())
                 .isEqualTo(second);
 
         clock.set(second.plusSeconds(60));
         assertThat(ask(signInToken(), "mom@example.com").statusCode()).isEqualTo(200);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
-                        .orElseThrow()
-                        .lastLoginAt())
+            .orElseThrow()
+            .lastLoginAt())
                 .isEqualTo(second);
         assertThat(users.count()).isZero();
     }
+
 
     @Test
     @DisplayName("일반 인증 요청은 기록된 로그인 시각을 갱신하지 않는다")
@@ -167,35 +175,35 @@ class SignInControllerTest {
         clock.set(login.plusSeconds(60));
 
         HttpResponse<String> response = client.send(
-                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/me"))
-                        .header("Authorization", "Bearer " + conversationToken("mom@example.com"))
-                        .GET()
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
+            HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/me"))
+                .header("Authorization", "Bearer " + conversationToken("mom@example.com"))
+                .GET()
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(people.findByEmailAndEnabledTrue("mom@example.com")
-                        .orElseThrow()
-                        .lastLoginAt())
+            .orElseThrow()
+            .lastLoginAt())
                 .isEqualTo(login);
     }
+
 
     @Test
     @DisplayName("로그인 완료는 잘못된 토큰과 허용되지 않은 주소를 거절하고 사용자를 만들지 않는다")
     void rejectsInvalidOrDisallowedCompletionWithoutCreatingUser() throws Exception {
         assertThat(complete(null, "mom@example.com").statusCode()).isEqualTo(401);
         assertThat(complete(conversationToken("mom@example.com"), "mom@example.com")
-                        .statusCode())
+            .statusCode())
                 .isEqualTo(401);
         assertThat(complete(forgedSignInToken(), "mom@example.com").statusCode())
-                .isEqualTo(401);
+            .isEqualTo(401);
         assertThat(complete(expiredSignInToken(), "mom@example.com").statusCode())
-                .isEqualTo(401);
+            .isEqualTo(401);
         assertThat(complete(signInToken(), "").statusCode()).isEqualTo(401);
         assertThat(complete(signInToken(), "stranger@example.com").statusCode()).isEqualTo(401);
 
-        AllowedPerson person =
-                people.findByEmailAndEnabledTrue("mom@example.com").orElseThrow();
+        AllowedPerson person = people.findByEmailAndEnabledTrue("mom@example.com").orElseThrow();
         person.disable();
         people.save(person);
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(401);
@@ -203,60 +211,67 @@ class SignInControllerTest {
         assertThat(users.count()).isZero();
     }
 
+
     private HttpResponse<String> ask(String token, String email) throws Exception {
         return request("/api/v1/signin/allowed", token, email);
     }
+
 
     private HttpResponse<String> complete(String token, String email) throws Exception {
         return request("/api/v1/signin/completed", token, email);
     }
 
+
     private HttpResponse<String> request(String path, String token, String email) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString("{\"email\":\"" + email + "\"}"));
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString("{\"email\":\"" + email + "\"}"));
         if (token != null) {
             request.header("Authorization", "Bearer " + token);
         }
         return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
+
     /** 웹 계층이 로그인 판정에만 쓰는 토큰이다. 신원을 담지 않는다. */
     private String signInToken() {
         return Jwts.builder()
-                .claim("purpose", "signin")
-                .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plusSeconds(120)))
-                .signWith(KEY)
-                .compact();
+            .claim("purpose", "signin")
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusSeconds(120)))
+            .signWith(KEY)
+            .compact();
     }
+
 
     /** 대화를 부를 때 쓰는 토큰이다. 서명은 같지만 쓰임새가 다르다. */
     private String conversationToken(String email) {
         return Jwts.builder()
-                .subject(email)
-                .claim("name", email)
-                .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plusSeconds(120)))
-                .signWith(KEY)
-                .compact();
+            .subject(email)
+            .claim("name", email)
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusSeconds(120)))
+            .signWith(KEY)
+            .compact();
     }
+
 
     private String forgedSignInToken() {
         return Jwts.builder()
-                .claim("purpose", "signin")
-                .issuedAt(Date.from(Instant.now()))
-                .expiration(Date.from(Instant.now().plusSeconds(120)))
-                .signWith(OTHER_KEY)
-                .compact();
+            .claim("purpose", "signin")
+            .issuedAt(Date.from(Instant.now()))
+            .expiration(Date.from(Instant.now().plusSeconds(120)))
+            .signWith(OTHER_KEY)
+            .compact();
     }
+
 
     private String expiredSignInToken() {
         return Jwts.builder()
-                .claim("purpose", "signin")
-                .issuedAt(Date.from(Instant.now().minusSeconds(120)))
-                .expiration(Date.from(Instant.now().minusSeconds(60)))
-                .signWith(KEY)
-                .compact();
+            .claim("purpose", "signin")
+            .issuedAt(Date.from(Instant.now().minusSeconds(120)))
+            .expiration(Date.from(Instant.now().minusSeconds(60)))
+            .signWith(KEY)
+            .compact();
     }
 }

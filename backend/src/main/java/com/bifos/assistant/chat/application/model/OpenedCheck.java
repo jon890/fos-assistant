@@ -7,4 +7,5 @@ import com.bifos.assistant.chat.domain.Conversation;
  *
  * @param created 이번에 새로 만들었으면 참이다. 시작이 거절되면 부르는 쪽이 이 대화를 지운다
  */
-public record OpenedCheck(Conversation conversation, boolean created) {}
+public record OpenedCheck(Conversation conversation, boolean created) {
+}

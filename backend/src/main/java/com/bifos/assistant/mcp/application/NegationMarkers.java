@@ -17,13 +17,14 @@ import lombok.NoArgsConstructor;
 final class NegationMarkers {
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
     private static final Pattern MARKER = Pattern.compile(
-            "않|없|아니|아냐|아닌|아님|아닙|(?:^|\\s)못|지못|(?:^|\\s)안(?=$|\\s|먹|해|했|하|돼|되|좋|가|갔|와|왔|맞|마시|마셔|읽|봐|봤|보|싫)");
+        "않|없|아니|아냐|아닌|아님|아닙|(?:^|\\s)못|지못|(?:^|\\s)안(?=$|\\s|먹|해|했|하|돼|되|좋|가|갔|와|왔|맞|마시|마셔|읽|봐|봤|보|싫)");
+
 
     /** 글에 부정 표지가 있는가(ADR-20261008 / memory-remember-guard). NFC 로 맞추고 연속 공백을 하나로 줄여 본다. */
     static boolean present(String text) {
         String normalized = WHITESPACE
-                .matcher(Normalizer.normalize(text, Normalizer.Form.NFC))
-                .replaceAll(" ");
+            .matcher(Normalizer.normalize(text, Normalizer.Form.NFC))
+            .replaceAll(" ");
         return MARKER.matcher(normalized).find();
     }
 }

@@ -32,6 +32,7 @@ class BrowserScreenStreamTest {
                 }
             }
 
+
             @Override
             public void complete() {
                 completions.incrementAndGet();
@@ -54,6 +55,7 @@ class BrowserScreenStreamTest {
         assertThat(stream.send("frame", Map.of())).isFalse();
         assertThat(stream.ping()).isFalse();
     }
+
 
     @Test
     @DisplayName("진행 중인 프레임 쓰기가 곧 끝나면 closed 는 잠깐 기다렸다가 보낸다")

@@ -6,9 +6,12 @@ import java.util.List;
 public interface ChatMessageWrites<T> {
     <S extends T> S save(S message);
 
+
     <S extends T> S saveAndFlush(S message);
 
+
     <S extends T> List<S> saveAll(Iterable<S> messages);
+
 
     <S extends T> List<S> saveAllAndFlush(Iterable<S> messages);
 }

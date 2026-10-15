@@ -13,13 +13,16 @@ public class AutonomyReasonsJsonConverter implements AttributeConverter<List<Aut
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
+
     @Override
     public String convertToDatabaseColumn(List<AutonomyReason> value) {
         return JSON.writeValueAsString(value);
     }
 
+
     @Override
     public List<AutonomyReason> convertToEntityAttribute(String value) {
-        return JSON.readValue(value, new TypeReference<List<AutonomyReason>>() {});
+        return JSON.readValue(value, new TypeReference<List<AutonomyReason>>() {
+        });
     }
 }

@@ -20,6 +20,7 @@ public class WorkspaceAdminController {
     private final WorkspaceUsageService usage;
     private final CurrentUserProvider currentUser;
 
+
     /** 요청할 때 센다. 루트가 설정되지 않아도 200 이고 {@code available} 이 거짓이다. */
     @GetMapping
     public AdminUsageView report() {

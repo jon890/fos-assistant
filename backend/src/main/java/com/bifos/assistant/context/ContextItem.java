@@ -18,33 +18,36 @@ import java.util.List;
  * @param conflictsWith Control Plane 이 구조로 알 수 있는 충돌 상대의 {@code ref}
  */
 public record ContextItem(
-        ContextSource source,
-        String ref,
-        MemoryScope scope,
-        Long ownerUserId,
-        MemorySensitivity sensitivity,
-        ContextTrust trust,
-        Instant asOf,
-        ContextFreshness freshness,
-        ContextBodyMode bodyMode,
-        List<String> conflictsWith,
-        String title,
-        String body) {
+    ContextSource source,
+    String ref,
+    MemoryScope scope,
+    Long ownerUserId,
+    MemorySensitivity sensitivity,
+    ContextTrust trust,
+    Instant asOf,
+    ContextFreshness freshness,
+    ContextBodyMode bodyMode,
+    List<String> conflictsWith,
+    String title,
+    String body) {
 
     public ContextItem {
         conflictsWith = conflictsWith == null ? List.of() : List.copyOf(conflictsWith);
     }
+
 
     /** Memory 한 줄의 참조다. */
     public static String memoryRef(Long id) {
         return "memory:" + id;
     }
 
+
     /** 본문을 싣는 방식만 바꾼 사본이다. */
     public ContextItem withBodyMode(ContextBodyMode mode) {
         return new ContextItem(
-                source, ref, scope, ownerUserId, sensitivity, trust, asOf, freshness, mode, conflictsWith, title, body);
+            source, ref, scope, ownerUserId, sensitivity, trust, asOf, freshness, mode, conflictsWith, title, body);
     }
+
 
     /** 제목과 본문이 로그에 남지 않게 출처와 참조만 낸다. */
     @Override

@@ -18,19 +18,19 @@ import java.util.Objects;
  * @param changedFields {@code EDITED} 에서 바뀐 칸 이름
  */
 public record FeedbackEntry(
-        Long userId,
-        FeedbackSubjectType subjectType,
-        String subjectKey,
-        FeedbackEventType eventType,
-        FeedbackActor actor,
-        Long conversationId,
-        Long originExecutionId,
-        Long sourceCheckId,
-        Long autonomyDecisionId,
-        String subjectVersion,
-        String reasonCode,
-        List<String> changedFields,
-        Instant occurredAt) {
+    Long userId,
+    FeedbackSubjectType subjectType,
+    String subjectKey,
+    FeedbackEventType eventType,
+    FeedbackActor actor,
+    Long conversationId,
+    Long originExecutionId,
+    Long sourceCheckId,
+    Long autonomyDecisionId,
+    String subjectVersion,
+    String reasonCode,
+    List<String> changedFields,
+    Instant occurredAt) {
 
     public FeedbackEntry {
         Objects.requireNonNull(userId, "userId");
@@ -42,169 +42,178 @@ public record FeedbackEntry(
         changedFields = changedFields == null ? List.of() : List.copyOf(changedFields);
     }
 
+
     public static FeedbackEntry of(
-            Long userId,
-            FeedbackSubjectType subjectType,
-            Object subjectId,
-            FeedbackEventType eventType,
-            FeedbackActor actor,
-            Instant occurredAt) {
+        Long userId,
+        FeedbackSubjectType subjectType,
+        Object subjectId,
+        FeedbackEventType eventType,
+        FeedbackActor actor,
+        Instant occurredAt) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectType.key(subjectId),
-                eventType,
-                actor,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(),
-                occurredAt);
+            userId,
+            subjectType,
+            subjectType.key(subjectId),
+            eventType,
+            actor,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            occurredAt);
     }
+
 
     /** 지금 화면의 {@code itemKey} 를 그대로 열쇠로 쓴다. 종류는 열쇠의 머리로 정한다. */
     public static FeedbackEntry ofKey(
-            Long userId,
-            FeedbackSubjectType subjectType,
-            String subjectKey,
-            FeedbackEventType eventType,
-            FeedbackActor actor,
-            Instant occurredAt) {
+        Long userId,
+        FeedbackSubjectType subjectType,
+        String subjectKey,
+        FeedbackEventType eventType,
+        FeedbackActor actor,
+        Instant occurredAt) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(),
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            occurredAt);
     }
+
 
     public FeedbackEntry conversation(Long id) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                id,
-                originExecutionId,
-                sourceCheckId,
-                autonomyDecisionId,
-                subjectVersion,
-                reasonCode,
-                changedFields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            id,
+            originExecutionId,
+            sourceCheckId,
+            autonomyDecisionId,
+            subjectVersion,
+            reasonCode,
+            changedFields,
+            occurredAt);
     }
+
 
     public FeedbackEntry originExecution(Long id) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                conversationId,
-                id,
-                sourceCheckId,
-                autonomyDecisionId,
-                subjectVersion,
-                reasonCode,
-                changedFields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            conversationId,
+            id,
+            sourceCheckId,
+            autonomyDecisionId,
+            subjectVersion,
+            reasonCode,
+            changedFields,
+            occurredAt);
     }
+
 
     public FeedbackEntry sourceCheck(Long id) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                conversationId,
-                originExecutionId,
-                id,
-                autonomyDecisionId,
-                subjectVersion,
-                reasonCode,
-                changedFields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            conversationId,
+            originExecutionId,
+            id,
+            autonomyDecisionId,
+            subjectVersion,
+            reasonCode,
+            changedFields,
+            occurredAt);
     }
+
 
     public FeedbackEntry autonomyDecision(Long id) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                conversationId,
-                originExecutionId,
-                sourceCheckId,
-                id,
-                subjectVersion,
-                reasonCode,
-                changedFields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            conversationId,
+            originExecutionId,
+            sourceCheckId,
+            id,
+            subjectVersion,
+            reasonCode,
+            changedFields,
+            occurredAt);
     }
+
 
     public FeedbackEntry version(String version) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                conversationId,
-                originExecutionId,
-                sourceCheckId,
-                autonomyDecisionId,
-                version,
-                reasonCode,
-                changedFields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            conversationId,
+            originExecutionId,
+            sourceCheckId,
+            autonomyDecisionId,
+            version,
+            reasonCode,
+            changedFields,
+            occurredAt);
     }
+
 
     public FeedbackEntry reason(String code) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                conversationId,
-                originExecutionId,
-                sourceCheckId,
-                autonomyDecisionId,
-                subjectVersion,
-                code,
-                changedFields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            conversationId,
+            originExecutionId,
+            sourceCheckId,
+            autonomyDecisionId,
+            subjectVersion,
+            code,
+            changedFields,
+            occurredAt);
     }
+
 
     public FeedbackEntry changed(List<String> fields) {
         return new FeedbackEntry(
-                userId,
-                subjectType,
-                subjectKey,
-                eventType,
-                actor,
-                conversationId,
-                originExecutionId,
-                sourceCheckId,
-                autonomyDecisionId,
-                subjectVersion,
-                reasonCode,
-                fields,
-                occurredAt);
+            userId,
+            subjectType,
+            subjectKey,
+            eventType,
+            actor,
+            conversationId,
+            originExecutionId,
+            sourceCheckId,
+            autonomyDecisionId,
+            subjectVersion,
+            reasonCode,
+            fields,
+            occurredAt);
     }
 }

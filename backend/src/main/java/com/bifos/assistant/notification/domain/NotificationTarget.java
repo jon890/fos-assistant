@@ -8,7 +8,7 @@ import java.util.UUID;
  *
  * @param type 갈 곳의 종류
  * @param publicId 갈 곳의 공개 식별자. 내부 번호는 화면에 내보내지 않는다. 목록 화면을 가리키는
- *     {@link NotificationTargetType#ADMIN_CONNECTIONS} 만 비운다
+ * {@link NotificationTargetType#ADMIN_CONNECTIONS} 만 비운다
  */
 public record NotificationTarget(NotificationTargetType type, UUID publicId) {
 

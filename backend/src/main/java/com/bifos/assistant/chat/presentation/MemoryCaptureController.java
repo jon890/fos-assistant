@@ -27,14 +27,16 @@ public class MemoryCaptureController {
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
+
     /** 주소의 번호는 대화의 공개 식별자다. 주인의 대화가 아니면 다른 대화 경로와 같은 응답이다. */
     @GetMapping("/chat/conversations/{conversationId}/memory-captures")
     public List<MemoryCaptureView> list(@PathVariable UUID conversationId) {
         CurrentUser user = currentUser.require();
         return captures.capturesOf(user, conversations.requireOwnId(user, conversationId)).stream()
-                .map(MemoryCaptureView::from)
-                .toList();
+            .map(MemoryCaptureView::from)
+            .toList();
     }
+
 
     /** 새로 만든 항목은 지우고 고친 항목은 고치기 전의 판으로 돌린다. */
     @PostMapping("/memory-captures/{id}/undo")

@@ -12,4 +12,5 @@ import java.util.List;
  * @param agents 요청자가 주인이라 이 공간을 함께 쓰는 에이전트
  */
 public record WorkspaceStatus(
-        boolean available, boolean deletable, boolean exists, int runningExecutions, List<WorkspaceAgent> agents) {}
+    boolean available, boolean deletable, boolean exists, int runningExecutions, List<WorkspaceAgent> agents) {
+}

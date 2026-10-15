@@ -40,28 +40,31 @@ class HermesBusyTest {
     private HttpHermesRunsClient client;
     private String baseUrl;
 
+
     @BeforeEach
     void start() throws IOException {
         when(keyStore.resolve("dad")).thenReturn("dad-key");
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/p/dad";
         client = new HttpHermesRunsClient(
-                keyStore,
-                new HermesProperties(
-                        "keys",
-                        "https://hermes-dashboard.example.com",
-                        "test-dashboard-token",
-                        "https://hermes-listener.example.com",
-                        Duration.ofMillis(10),
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(2),
-                        Duration.ofSeconds(2)));
+            keyStore,
+            new HermesProperties(
+                "keys",
+                "https://hermes-dashboard.example.com",
+                "test-dashboard-token",
+                "https://hermes-listener.example.com",
+                Duration.ofMillis(10),
+                Duration.ofSeconds(1),
+                Duration.ofSeconds(2),
+                Duration.ofSeconds(2)));
     }
+
 
     @AfterEach
     void stop() {
         server.stop(0);
     }
+
 
     /** 상태 코드 하나만 내는 대역을 열고, 부른 횟수를 센다. */
     private void respondWith(int status, String body) {
@@ -76,16 +79,18 @@ class HermesBusyTest {
         server.start();
     }
 
+
     @Test
     @DisplayName("실행 제출이 429 를 받으면 붐빈다고 적는다")
     void notesBusyWhenRunSubmitGets429() {
         respondWith(429, RATE_LIMITED);
 
         assertThatThrownBy(() -> client.submit(command()))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_BUSY);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_BUSY);
     }
+
 
     @Test
     @DisplayName("붐빈다는 응답에 다시 보내지 않는다")
@@ -97,16 +102,18 @@ class HermesBusyTest {
         assertThat(calls.get()).isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("다른 실패는 닿지 못한 것으로 남는다")
     void otherFailuresRemainAsUnreachable() {
         respondWith(500, "{\"error\":\"boom\"}");
 
         assertThatThrownBy(() -> client.submit(command()))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("상태 조회가 429 를 받아도 붐빈다고 적는다")
@@ -114,10 +121,11 @@ class HermesBusyTest {
         respondWith(429, RATE_LIMITED);
 
         assertThatThrownBy(() -> client.awaitCompletion(command(), "run-1"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_BUSY);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_BUSY);
     }
+
 
     @Test
     @DisplayName("중간에 끊긴 실행은 기다리지 않고 끝난 것으로 돌려준다")
@@ -131,6 +139,7 @@ class HermesBusyTest {
         assertThat(result.succeeded()).isFalse();
         assertThat(calls.get()).isEqualTo(1);
     }
+
 
     private HermesRunCommand command() {
         return new HermesRunCommand("dad", baseUrl, "안녕", null, null, "openai-codex", "example-model", null);

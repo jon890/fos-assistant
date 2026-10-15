@@ -23,7 +23,8 @@ import tools.jackson.databind.json.JsonMapper;
  * @param fallback 실패하는 provider 로 다시 돌릴 시나리오
  */
 record EvalDataset(
-        int version, String note, Map<String, ProviderProfile> providers, List<Scenario> scenarios, Fallback fallback) {
+    int version, String note, Map<String, ProviderProfile> providers, List<Scenario> scenarios, Fallback fallback) {
+
 
     static final String RESOURCE = "/proactive-eval/scenarios.json";
 
@@ -33,15 +34,16 @@ record EvalDataset(
                 throw new IllegalStateException("fixture 가 없다: " + RESOURCE);
             }
             EvalDataset dataset = JsonMapper.builder()
-                    .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-                    .build()
-                    .readValue(in, EvalDataset.class);
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .build()
+                .readValue(in, EvalDataset.class);
             dataset.requireUniqueProblemKeys();
             return dataset;
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
     }
+
 
     /** 결정적 provider 가 문제 키로 판단 기록을 찾으므로 시나리오 사이에 키가 겹치면 거절한다. 이력의 같은 키는 중복 시나리오의 뜻이다. */
     private void requireUniqueProblemKeys() {
@@ -55,19 +57,21 @@ record EvalDataset(
         }
     }
 
+
     Scenario scenario(String id) {
         return scenarios.stream()
-                .filter(each -> each.id().equals(id))
-                .findFirst()
-                .orElseThrow();
+            .filter(each -> each.id().equals(id))
+            .findFirst()
+            .orElseThrow();
     }
+
 
     /** 이 provider 가 그 문제 키에 남긴 판단 기록과 그 시나리오 안의 순서다. */
     Optional<Recorded> recorded(String providerId, String problemKey) {
         for (Scenario scenario : scenarios) {
             Map<String, Judgement> byKey = scenario.judgements() == null
-                    ? Map.of()
-                    : scenario.judgements().getOrDefault(providerId, new LinkedHashMap<>());
+                ? Map.of()
+                : scenario.judgements().getOrDefault(providerId, new LinkedHashMap<>());
             int rank = 0;
             for (Map.Entry<String, Judgement> entry : byKey.entrySet()) {
                 if (entry.getKey().equals(problemKey)) {
@@ -79,9 +83,11 @@ record EvalDataset(
         return Optional.empty();
     }
 
+
     /** 흉내 비용과 지연이다. 실제 모델을 부르지 않으므로 기록한 값을 그대로 센다. */
     record ProviderProfile(
-            String description, String model, long latencyMs, long inputTokens, long outputTokens, long costMicroUsd) {}
+        String description, String model, long latencyMs, long inputTokens, long outputTokens, long costMicroUsd) {
+    }
 
     /**
      * @param history 같은 점검 대화에서 먼저 돌린 살펴보기. 중복 판정의 바탕이다
@@ -94,44 +100,48 @@ record EvalDataset(
      * @param snapshot provider 마다 문제 키별로 지난번에 나온 행동 수준. 회귀 확인용이다
      */
     record Scenario(
-            String id,
-            String intent,
-            List<Check> history,
-            long historyGapHours,
-            Check check,
-            long decisionDelayHours,
-            boolean agentWritesAllowed,
-            Map<String, Truth> truth,
-            List<String> truthRank,
-            Map<String, LinkedHashMap<String, Judgement>> judgements,
-            Map<String, Map<String, String>> snapshot) {
+        String id,
+        String intent,
+        List<Check> history,
+        long historyGapHours,
+        Check check,
+        long decisionDelayHours,
+        boolean agentWritesAllowed,
+        Map<String, Truth> truth,
+        List<String> truthRank,
+        Map<String, LinkedHashMap<String, Judgement>> judgements,
+        Map<String, Map<String, String>> snapshot) {
 
         List<Check> historyOrEmpty() {
             return history == null ? List.of() : history;
         }
+
 
         Map<String, String> snapshotOf(String providerId) {
             return snapshot == null ? Map.of() : snapshot.getOrDefault(providerId, Map.of());
         }
     }
 
-    record Check(List<Finding> findings, List<Problem> problems) {}
+    record Check(List<Finding> findings, List<Problem> problems) {
+    }
 
     /** 확인 시각은 그 살펴보기의 시각이다. 살펴보기 결과 계약이 지금 확인한 발견만 받기 때문이다. */
-    record Finding(String topicKey, String title) {}
+    record Finding(String topicKey, String title) {
+    }
 
     record Problem(
-            String problemKey,
-            String problem,
-            String relatedGoal,
-            List<String> evidence,
-            String actionType,
-            String actionText,
-            String confidence,
-            String expectedBenefit,
-            String sideEffect,
-            String risk,
-            String changeSinceLast) {}
+        String problemKey,
+        String problem,
+        String relatedGoal,
+        List<String> evidence,
+        String actionType,
+        String actionText,
+        String confidence,
+        String expectedBenefit,
+        String sideEffect,
+        String risk,
+        String changeSinceLast) {
+    }
 
     /**
      * @param allowed 맞는 결과. 행동 수준 이름이거나 문제 찾기가 버렸다는 {@code DROPPED} 다
@@ -141,7 +151,8 @@ record EvalDataset(
      * @param requiresApproval 사람 승인 없이 실행하면 안 되는 후보
      */
     record Truth(
-            List<String> allowed, boolean important, boolean lowValue, boolean duplicate, boolean requiresApproval) {
+        List<String> allowed, boolean important, boolean lowValue, boolean duplicate, boolean requiresApproval) {
+
 
         static final String DROPPED = "DROPPED";
 
@@ -150,9 +161,12 @@ record EvalDataset(
         }
     }
 
-    record Judgement(Map<DecisionAxis, DecisionLevel> axes, DecisionConfidence confidence) {}
+    record Judgement(Map<DecisionAxis, DecisionLevel> axes, DecisionConfidence confidence) {
+    }
 
-    record Recorded(Judgement judgement, int rank) {}
+    record Recorded(Judgement judgement, int rank) {
+    }
 
-    record Fallback(List<String> scenarios, List<String> providers) {}
+    record Fallback(List<String> scenarios, List<String> providers) {
+    }
 }

@@ -29,13 +29,13 @@ class ConversationPublicIdMigrationTest {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
 
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target("22")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target("22")
+            .load()
+            .migrate();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("""
                     INSERT INTO conversation (user_id, title, created_at, updated_at) VALUES
                         (1, '첫 대화', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6)),
@@ -44,15 +44,15 @@ class ConversationPublicIdMigrationTest {
         }
 
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .load()
+            .migrate();
 
         List<UUID> filled = new ArrayList<>();
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("SELECT public_id FROM conversation ORDER BY id")) {
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("SELECT public_id FROM conversation ORDER BY id")) {
             while (rows.next()) {
                 byte[] bytes = rows.getBytes(1);
                 assertThat(bytes).hasSize(16);

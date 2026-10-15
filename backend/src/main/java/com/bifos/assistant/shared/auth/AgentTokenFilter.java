@@ -7,4 +7,5 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>{@code SecurityConfig} 가 구현 패키지를 모른 채 필터 순서에 넣으려고 둔다. 구현은 {@code mcp.presentation} 에 있다.
  */
-public abstract class AgentTokenFilter extends OncePerRequestFilter {}
+public abstract class AgentTokenFilter extends OncePerRequestFilter {
+}

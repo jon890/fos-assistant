@@ -131,9 +131,11 @@ class PendingBeforeDelegationTest {
     private Conversation conversation;
     private AgentExecution root;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -155,23 +157,25 @@ class PendingBeforeDelegationTest {
         worker = agents.save(agent("worker", "조사원", user.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName("dad")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName("dad")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         stub().willReturn(HermesRunResult.of(
-                "run", "session", "completed", "답", "model", "provider", TokenUsage.empty()));
+            "run", "session", "completed", "답", "model", "provider", TokenUsage.empty()));
     }
+
 
     @AfterEach
     void tearDown() {
         awaitAllIdle();
         pendingRows.deleteAll();
     }
+
 
     @Test
     @DisplayName("대기 메시지와 끝난 위임 결과가 함께 있으면 대기 메시지를 먼저 보내고 그 뒤에 결과를 전한다")
@@ -187,24 +191,25 @@ class PendingBeforeDelegationTest {
 
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversation.id());
         assertThat(history)
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.SYSTEM, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.USER, MessageRole.ASSISTANT, MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(history.getFirst().content()).isEqualTo("대기 글");
         assertThat(history.get(2).content()).isEqualTo("조사원 에이전트의 결과가 도착했어요");
         assertThat(stub().received()).hasSize(2);
         assertThat(stub().received().getFirst().input()).endsWith("대기 글");
         assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
-                .isEmpty();
+            .isEmpty();
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("전했다는 표시")
-                .isNotNull();
+            .as("전했다는 표시")
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("대기 줄이 멈춰 있으면 위임 결과의 자동 turn 은 열리고 대기 행은 멈춘 채로 남는다")
     void opensAutoTurnAndKeepsHeldQueueWhenQueueIsHeld() {
         pendingRows.save(ChatPendingMessage.queued(
-                conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
+            conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
         AgentExecution done = delegated();
 
         finished(done);
@@ -212,24 +217,25 @@ class PendingBeforeDelegationTest {
         awaitIdle(conversation.id());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(stub().received()).as("자동 turn 하나만 Hermes 에 갔다").hasSize(1);
         assertThat(stub().received().getFirst().input()).doesNotContain("멈춘 글");
         assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatPendingMessage::held)
-                .containsExactly(true);
+            .extracting(ChatPendingMessage::held)
+            .containsExactly(true);
     }
+
 
     @Test
     @DisplayName("중지로 닫힌 turn 뒤에 대기 줄 알림이 실패해도 위임 결과의 자동 turn 은 열린다")
     void opensAutoTurnEvenWhenHeldNoticeFailsAfterStoppedTurn() {
         // 자동 turn 의 사건은 그대로 나가고, 대기 줄이 멈췄다는 알림만 실패한다.
         doThrow(new IllegalStateException("알림을 보내지 못했다"))
-                .when(hub)
-                .publish(eq(conversation.id()), argThat(event -> event != null && "pending".equals(event.type())));
+            .when(hub)
+            .publish(eq(conversation.id()), argThat(event -> event != null && "pending".equals(event.type())));
         pendingRows.save(ChatPendingMessage.queued(
-                conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
+            conversation.id(), dad.id(), "멈춘 글", true, Instant.parse("2026-09-30T00:00:00Z")));
         AgentExecution done = delegated();
         TurnHandle running = turns.open(dad.id(), conversation.id());
         finished(done);
@@ -240,19 +246,20 @@ class PendingBeforeDelegationTest {
         awaitIdle(conversation.id());
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .as("전했다는 표시")
-                .isNotNull();
+            .as("전했다는 표시")
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("보내려다 실패하고 대기 행을 멈추지도 못하면 한동안 다시 열지 않고 위임 결과는 전한다")
     void backsOffQueuedTurnWhenHoldFailsAndStillDeliversDelegationResult() {
         doThrow(new IllegalStateException("사용자 메시지를 저장하기 전에 실패"))
-                .when(chat)
-                .runPendingMessages(any(), any(), any(), any());
+            .when(chat)
+            .runPendingMessages(any(), any(), any(), any());
         doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
         TurnHandle running = turns.open(dad.id(), conversation.id());
         AgentExecution done = delegated();
@@ -271,33 +278,34 @@ class PendingBeforeDelegationTest {
         }
 
         assertThat(received.stream().filter(event -> "error".equals(event.type())))
-                .as("닫을 때와 뒤이은 호출이 다시 열지 않아 실패 알림은 하나다")
-                .singleElement()
-                .satisfies(error -> assertThat(error.code()).isEqualTo("INTERNAL_ERROR"));
+            .as("닫을 때와 뒤이은 호출이 다시 열지 않아 실패 알림은 하나다")
+            .singleElement()
+            .satisfies(error -> assertThat(error.code()).isEqualTo("INTERNAL_ERROR"));
         assertThat(pendingRows.findByConversationIdOrderByIdAsc(conversation.id()))
-                .as("멈추지 못한 대기 행")
-                .extracting(ChatPendingMessage::held)
-                .containsExactly(false);
+            .as("멈추지 못한 대기 행")
+            .extracting(ChatPendingMessage::held)
+            .containsExactly(false);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::role)
-                .as("그동안에도 위임 결과의 자동 turn 은 열린다")
-                .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
+            .extracting(ChatMessage::role)
+            .as("그동안에도 위임 결과의 자동 turn 은 열린다")
+            .containsExactly(MessageRole.SYSTEM, MessageRole.ASSISTANT);
         assertThat(executions.findById(done.id()).orElseThrow().resultDeliveredAt())
-                .isNotNull();
+            .isNotNull();
     }
+
 
     @Test
     @DisplayName("중지한 turn 의 대기 줄을 멈추지 못해도 실행은 CANCELLED 로 남고 stopped 사건이 온다")
     void recordsCancelledAndSendsStoppedEvenWhenHoldFails() {
         doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
         stub().willReturn(HermesRunResult.of(
-                "run-stop", "session", "cancelled", "절반", "model", "provider", TokenUsage.empty()));
+            "run-stop", "session", "cancelled", "절반", "model", "provider", TokenUsage.empty()));
         stub().beforeAwait(() -> chat.stop(
-                dad,
-                executions
-                        .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                        .getFirst()
-                        .id()));
+            dad,
+            executions
+                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+                .getFirst()
+                .id()));
         List<ChatEvent> relayed = new CopyOnWriteArrayList<>();
 
         chat.stream(dad, conversation.id(), "질문", null, relayed::add);
@@ -306,14 +314,15 @@ class PendingBeforeDelegationTest {
         ChatEvent last = relayed.getLast();
         assertThat(last.type()).as("받은 사건: %s", relayed).isEqualTo("stopped");
         assertThat(executions.findById(last.executionId()).orElseThrow().status())
-                .as("중지한 turn 의 실행 줄")
-                .isEqualTo(ExecutionStatus.CANCELLED);
+            .as("중지한 turn 의 실행 줄")
+            .isEqualTo(ExecutionStatus.CANCELLED);
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .as("멈추기 전까지의 답이 남는다")
-                .containsExactly("질문", "절반");
+            .extracting(ChatMessage::content)
+            .as("멈추기 전까지의 답이 남는다")
+            .containsExactly("질문", "절반");
         assertLockReleased();
     }
+
 
     @Test
     @DisplayName("흐름 turn 을 중지할 때 대기 줄을 멈추지 못해도 stopped 로 끝나고 잠금이 풀린다")
@@ -323,11 +332,11 @@ class PendingBeforeDelegationTest {
         chief.assignFlow(ResearchAndBuildFlow.NAME);
         agents.save(chief);
         stub().beforeAwait(() -> chat.stop(
-                dad,
-                executions
-                        .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                        .getFirst()
-                        .id()));
+            dad,
+            executions
+                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
+                .getFirst()
+                .id()));
         List<ChatEvent> relayed = new CopyOnWriteArrayList<>();
 
         chat.stream(dad, conversation.id(), "질문", null, relayed::add);
@@ -336,73 +345,80 @@ class PendingBeforeDelegationTest {
         ChatEvent last = relayed.getLast();
         assertThat(last.type()).as("받은 사건: %s", relayed).isEqualTo("stopped");
         assertThat(executions.findById(last.executionId()).orElseThrow().status())
-                .as("중지한 흐름 turn 의 루트 실행 줄")
-                .isEqualTo(ExecutionStatus.CANCELLED);
+            .as("중지한 흐름 turn 의 루트 실행 줄")
+            .isEqualTo(ExecutionStatus.CANCELLED);
         assertLockReleased();
     }
+
 
     /** 그 대화에 도는 turn 이 없고 다음 turn 을 열 수 있다. */
     private void assertLockReleased() {
         assertThat(turns.markOf(conversation.id()).running())
-                .as("중지한 turn 의 잠금")
-                .isFalse();
+            .as("중지한 turn 의 잠금")
+            .isFalse();
         TurnHandle next = turns.open(dad.id(), conversation.id());
         turns.close(next);
     }
+
 
     private void finished(AgentExecution execution) {
         publisher.publishEvent(new DelegationFinished(conversation.id(), execution.id()));
     }
 
+
     /** 대화 turn 이 직접 맡긴, 성공으로 끝난 위임 실행 줄을 만든다. */
     private AgentExecution delegated() {
         AgentExecution execution = AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(worker.id())
-                .parentExecutionId(root.id())
-                .rootExecutionId(root.treeRootId())
-                .delegationKey(UUID.randomUUID().toString())
-                .profileName("worker")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build();
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(worker.id())
+            .parentExecutionId(root.id())
+            .rootExecutionId(root.treeRootId())
+            .delegationKey(UUID.randomUUID().toString())
+            .profileName("worker")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build();
         execution.recordOutput("조사 결과");
         return executions.save(execution);
     }
 
+
     private static Agent agent(String code, String name, Long ownerId) {
         return Agent.of(
-                code,
-                name,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                ownerId,
-                Instant.now());
+            code,
+            name,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            ownerId,
+            Instant.now());
     }
+
 
     private void awaitMessages(int count) {
         awaitUntil(
-                "메시지 " + count + "개",
-                () -> messages.findByConversationIdOrderByIdAsc(conversation.id())
-                                .size()
-                        >= count);
+            "메시지 " + count + "개",
+            () -> messages.findByConversationIdOrderByIdAsc(conversation.id())
+                .size() >= count);
     }
+
 
     private void awaitAllIdle() {
         conversations.findAll().forEach(it -> awaitIdle(it.id()));
     }
 
+
     /** 그 대화에 도는 turn 이 없어질 때까지 기다린다. 제한 시간을 넘으면 실패한다. */
     private void awaitIdle(Long conversationId) {
         awaitUntil(
-                "대화 " + conversationId + " 의 turn 종료",
-                () -> !turns.markOf(conversationId).running());
+            "대화 " + conversationId + " 의 turn 종료",
+            () -> !turns.markOf(conversationId).running());
     }
+
 
     private static void awaitUntil(String what, BooleanSupplier condition) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();

@@ -64,18 +64,19 @@ class AgentRunnerSubmitFailureTest {
     private final UserExecutionLimiter limiter = mock(UserExecutionLimiter.class);
     private final CurrentUser user = new CurrentUser(1L, "runner@example.com", "가", 1L, UserRole.MEMBER);
     private final Agent agent = Agent.of(
-            "runner",
-            "실행기",
-            PROFILE,
-            API_BASE_URL,
-            CostMode.API,
-            CredentialScope.DEDICATED,
-            AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
+        "runner",
+        "실행기",
+        PROFILE,
+        API_BASE_URL,
+        CostMode.API,
+        CredentialScope.DEDICATED,
+        AgentVisibility.PRIVATE,
+        1L,
+        Instant.now());
     private final AgentExecution started = mock(AgentExecution.class);
     private final AgentExecution failed = mock(AgentExecution.class);
     private AgentRunner runner;
+
 
     @BeforeEach
     void setUp() {
@@ -86,22 +87,23 @@ class AgentRunnerSubmitFailureTest {
         when(failed.status()).thenReturn(ExecutionStatus.FAILED);
         when(modelTiers.resolve(any(), any(), any())).thenReturn(new ResolvedModelTier(ModelChoice.defaults(), null));
         when(executions.start(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(started);
+            .thenReturn(started);
         when(executions.fail(any(), anyString())).thenReturn(failed);
         runner = new AgentRunner(
-                contextAssembler,
-                hermes,
-                executions,
-                mock(ExecutionEventRecorder.class),
-                mock(ExecutionEventRepository.class),
-                new DelegationOutput(LiveProperties.fixed(
-                        DelegationProperties.class,
-                        new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
-                modelTiers,
-                Clock.systemUTC(),
-                limiter,
-                mock(ProactiveCheckRepository.class));
+            contextAssembler,
+            hermes,
+            executions,
+            mock(ExecutionEventRecorder.class),
+            mock(ExecutionEventRepository.class),
+            new DelegationOutput(LiveProperties.fixed(
+                DelegationProperties.class,
+                new DelegationProperties(2, 4, 16, Duration.ofSeconds(30), 100, Duration.ofSeconds(20)))),
+            modelTiers,
+            Clock.systemUTC(),
+            limiter,
+            mock(ProactiveCheckRepository.class));
     }
+
 
     @Test
     @DisplayName("제출 뒤 run 번호를 적지 못하면 그 run 을 멈추고 FAILED 로 끝낸다")
@@ -120,6 +122,7 @@ class AgentRunnerSubmitFailureTest {
         verify(hermes, never()).awaitCompletion(any(), any());
     }
 
+
     @Test
     @DisplayName("run 을 멈추지 못해도 실행은 FAILED 로 끝난다")
     void endsFailedEvenIfRunCannotBeStopped() {
@@ -132,6 +135,7 @@ class AgentRunnerSubmitFailureTest {
         verify(executions).fail(started, "ORCHESTRATION_STEP_FAILED");
         assertThat(run.result().succeeded()).isFalse();
     }
+
 
     @Test
     @DisplayName("제출 자체가 실패하면 멈출 run 이 없다")
@@ -146,12 +150,13 @@ class AgentRunnerSubmitFailureTest {
         assertThat(run.result().succeeded()).isFalse();
     }
 
+
     @Test
     @DisplayName("기다리다 시간 초과로 끝나면 중지를 아직 보내지 않은 run 으로 사용자 자리를 쥐고 FAILED 로 끝낸다")
     void holdsUserSlotWithoutStopWhenAwaitTimesOut() {
         when(hermes.submit(any())).thenReturn(RUN_ID);
         when(hermes.awaitCompletion(any(), eq(RUN_ID)))
-                .thenThrow(new ApiException(ErrorCode.HERMES_RUN_TIMEOUT, "the agent run did not finish in time"));
+            .thenThrow(new ApiException(ErrorCode.HERMES_RUN_TIMEOUT, "the agent run did not finish in time"));
 
         AgentRun run = run();
 
@@ -160,11 +165,12 @@ class AgentRunnerSubmitFailureTest {
         assertThat(run.result().errorCode()).isEqualTo(ErrorCode.HERMES_RUN_TIMEOUT.name());
     }
 
+
     @Test
     @DisplayName("단계 모델이 catalog에 없으면 chief 실행을 FAILED로 남기고 Hermes에 제출하지 않는다")
     void recordsFailedChiefWhenModelTierCannotBeResolved() {
         when(modelTiers.resolve(any(), any(), any()))
-                .thenThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable"));
+            .thenThrow(new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable"));
 
         AgentRun run = run();
 
@@ -174,18 +180,21 @@ class AgentRunnerSubmitFailureTest {
         assertThat(run.result().errorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED.name());
     }
 
+
     private AgentRun run() {
         return runner.run(
-                user,
-                Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
-                agent,
-                "일",
-                null,
-                null,
-                RunSession.fresh(),
-                execution -> {},
-                (execution, runId) -> {},
-                () -> false,
-                null);
+            user,
+            Conversation.startedBy(user.id(), "대화", 2L, Instant.now()),
+            agent,
+            "일",
+            null,
+            null,
+            RunSession.fresh(),
+            execution -> {
+            },
+            (execution, runId) -> {
+            },
+            () -> false,
+            null);
     }
 }

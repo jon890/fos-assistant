@@ -41,11 +41,13 @@ class RegenerateDeletedAttachmentTest {
     @Autowired
     HermesToolsetClient attachmentTools;
 
+
     @BeforeEach
     void enableOriginalInspectionTool() {
         Mockito.when(attachmentTools.readEnabled(ArgumentMatchers.any(), ArgumentMatchers.any()))
-                .thenReturn(List.of("fos-assistant", "fos-attachments"));
+            .thenReturn(List.of("fos-assistant", "fos-attachments"));
     }
+
 
     @Autowired
     ChatService chat;
@@ -74,6 +76,7 @@ class RegenerateDeletedAttachmentTest {
     @Autowired
     HermesRunsClient hermes;
 
+
     @BeforeEach
     void setUp() {
         stub().reset();
@@ -87,28 +90,29 @@ class RegenerateDeletedAttachmentTest {
         users.flush();
     }
 
+
     @Test
     @DisplayName("지워진 사진은 다시 생성 Hermes 입력에서 뺀다")
     @Transactional
     void dropsRemovedImagesFromRegenerationHermesInput() {
         CurrentUser dad = member();
         stub().willReturnInOrder(
-                        HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
-                        HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
+            HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
+            HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
 
         var first = chat.send(dad, null, "사진을 설명해 줘", "dad");
         var question = messages.findByConversationIdOrderByIdAsc(first.conversationId()).stream()
-                .filter(message -> message.role() == MessageRole.USER)
-                .findFirst()
-                .orElseThrow();
+            .filter(message -> message.role() == MessageRole.USER)
+            .findFirst()
+            .orElseThrow();
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                first.conversationId(),
-                dad.id(),
-                "지운.png",
-                "image/png",
-                1,
-                Instant.now().plusSeconds(1),
-                Instant.now()));
+            first.conversationId(),
+            dad.id(),
+            "지운.png",
+            "image/png",
+            1,
+            Instant.now().plusSeconds(1),
+            Instant.now()));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachments.save(attachment);
         attachments.attachToMessageAtPosition(question.id(), first.conversationId(), attachment.id(), 0);
@@ -116,14 +120,16 @@ class RegenerateDeletedAttachmentTest {
         attachment.markDeleted(Instant.now());
         attachments.save(attachment);
 
-        chat.regenerate(dad, first.conversationId(), event -> {});
+        chat.regenerate(dad, first.conversationId(), event -> {
+        });
 
         assertThat(stub().received()).hasSize(2);
         // 삭제된 참조도 복원해 원본을 볼 수 없는 이유를 명시한다.
         assertThat(stub().received().get(1).input())
-                .contains("attachment_id=" + attachment.id(), "[보관 종료]", "판독 실패")
-                .endsWith("사진을 설명해 줘");
+            .contains("attachment_id=" + attachment.id(), "[보관 종료]", "판독 실패")
+            .endsWith("사진을 설명해 줘");
     }
+
 
     @Test
     @DisplayName("중간 사진을 지워도 다시 생성 입력은 position 순서와 비어 있는 순번을 지킨다")
@@ -131,13 +137,13 @@ class RegenerateDeletedAttachmentTest {
     void regenerationKeepsPositionOrderAndOrdinalGapAfterMiddlePhotoDeletion() {
         CurrentUser dad = member();
         stub().willReturnInOrder(
-                        HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
-                        HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
+            HermesRunResult.of("first", "session", "completed", "첫 답", "m", "p", TokenUsage.empty()),
+            HermesRunResult.of("again", "session", "completed", "새 답", "m", "p", TokenUsage.empty()));
         var first = chat.send(dad, null, "사진을 설명해 줘", "dad");
         var question = messages.findByConversationIdOrderByIdAsc(first.conversationId()).stream()
-                .filter(message -> message.role() == MessageRole.USER)
-                .findFirst()
-                .orElseThrow();
+            .filter(message -> message.role() == MessageRole.USER)
+            .findFirst()
+            .orElseThrow();
 
         ChatAttachment firstPhoto = createAttachment(first.conversationId(), dad, "first.png");
         ChatAttachment middlePhoto = createAttachment(first.conversationId(), dad, "middle.png");
@@ -150,41 +156,45 @@ class RegenerateDeletedAttachmentTest {
         deletedMiddle.markDeleted(Instant.now());
         attachments.save(deletedMiddle);
 
-        chat.regenerate(dad, first.conversationId(), event -> {});
+        chat.regenerate(dad, first.conversationId(), event -> {
+        });
 
         String input = stub().received().get(1).input();
         assertThat(input)
-                .contains("- 1번째 사진: attachment_id=" + lastPhoto.id())
-                .contains("- 3번째 사진: attachment_id=" + firstPhoto.id())
-                .contains("- 2번째 사진: attachment_id=" + deletedMiddle.id(), "[보관 종료]");
+            .contains("- 1번째 사진: attachment_id=" + lastPhoto.id())
+            .contains("- 3번째 사진: attachment_id=" + firstPhoto.id())
+            .contains("- 2번째 사진: attachment_id=" + deletedMiddle.id(), "[보관 종료]");
         assertThat(input.indexOf("attachment_id=" + lastPhoto.id()))
-                .isLessThan(input.indexOf("attachment_id=" + firstPhoto.id()));
+            .isLessThan(input.indexOf("attachment_id=" + firstPhoto.id()));
     }
+
 
     private ChatAttachment createAttachment(Long conversationId, CurrentUser user, String name) {
         ChatAttachment attachment = attachments.save(ChatAttachment.of(
-                conversationId, user.id(), name, "image/png", 1, Instant.now().plusSeconds(1), Instant.now()));
+            conversationId, user.id(), name, "image/png", 1, Instant.now().plusSeconds(1), Instant.now()));
         attachment.nameStoredFile(attachment.id() + ".png");
         attachments.save(attachment);
         return attachment;
     }
 
+
     private CurrentUser member() {
         AppUser user = users.save(AppUser.of("deleted-photo@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(
-                "dad",
-                "dad",
-                "dad",
-                "http://agent-runtime.test/p/dad",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            "dad",
+            "dad",
+            "dad",
+            "http://agent-runtime.test/p/dad",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
 }

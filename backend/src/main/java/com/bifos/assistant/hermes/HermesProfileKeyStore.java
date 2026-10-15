@@ -26,14 +26,15 @@ import org.springframework.stereotype.Component;
 public class HermesProfileKeyStore {
 
     /** 주인만 읽고 쓴다. 이 컨테이너 안의 다른 프로세스에게도 열지 않는다. */
-    private static final FileAttribute<Set<PosixFilePermission>> OWNER_ONLY =
-            PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"));
+    private static final FileAttribute<Set<PosixFilePermission>> OWNER_ONLY = PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"));
 
     private final Path keyDir;
+
 
     public HermesProfileKeyStore(HermesProperties properties) {
         this.keyDir = Path.of(properties.profileKeyDir());
     }
+
 
     public String resolve(String profileName) {
         Path keyFile = keyFile(profileName, ErrorCode.HERMES_PROFILE_KEY_MISSING);
@@ -42,14 +43,15 @@ public class HermesProfileKeyStore {
             key = Files.exists(keyFile) ? Files.readString(keyFile).trim() : "";
         } catch (IOException ex) {
             throw new ApiException(
-                    ErrorCode.HERMES_PROFILE_KEY_MISSING, "cannot read the key for this profile", ex);
+                ErrorCode.HERMES_PROFILE_KEY_MISSING, "cannot read the key for this profile", ex);
         }
         if (key.isEmpty()) {
             throw new ApiException(
-                    ErrorCode.HERMES_PROFILE_KEY_MISSING, "no API key is provisioned for this profile");
+                ErrorCode.HERMES_PROFILE_KEY_MISSING, "no API key is provisioned for this profile");
         }
         return key;
     }
+
 
     /**
      * 그 profile 의 key 파일을 새로 만든다.
@@ -68,12 +70,13 @@ public class HermesProfileKeyStore {
             Files.writeString(keyFile, key);
         } catch (FileAlreadyExistsException ex) {
             throw new ApiException(
-                    ErrorCode.HERMES_PROVISION_FAILED, "a key file for this profile already exists", ex);
+                ErrorCode.HERMES_PROVISION_FAILED, "a key file for this profile already exists", ex);
         } catch (IOException | UnsupportedOperationException ex) {
             throw new ApiException(
-                    ErrorCode.HERMES_PROVISION_FAILED, "cannot write the key for this profile", ex);
+                ErrorCode.HERMES_PROVISION_FAILED, "cannot write the key for this profile", ex);
         }
     }
+
 
     /** 되돌릴 때 쓴다. 파일이 없으면 그냥 지나간다. */
     public void delete(String profileName) {
@@ -82,9 +85,10 @@ public class HermesProfileKeyStore {
             Files.deleteIfExists(keyFile);
         } catch (IOException ex) {
             throw new ApiException(
-                    ErrorCode.HERMES_PROVISION_FAILED, "cannot remove the key for this profile", ex);
+                ErrorCode.HERMES_PROVISION_FAILED, "cannot remove the key for this profile", ex);
         }
     }
+
 
     /**
      * profile 이름이 규칙에 맞는지 보고 key 파일 경로를 만든다.

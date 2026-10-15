@@ -15,11 +15,11 @@ package com.bifos.assistant.usage.domain;
  * @param subscriptionExecutions 구독 경로로 돈 실행 수
  */
 public record MonthlyCostDetail(
-        Long estimatedMicros,
-        Long actualMicros,
-        Long pricedExecutions,
-        Long unpricedExecutions,
-        Long subscriptionExecutions) {
+    Long estimatedMicros,
+    Long actualMicros,
+    Long pricedExecutions,
+    Long unpricedExecutions,
+    Long subscriptionExecutions) {
 
     public MonthlyCostDetail {
         estimatedMicros = estimatedMicros == null ? 0L : estimatedMicros;

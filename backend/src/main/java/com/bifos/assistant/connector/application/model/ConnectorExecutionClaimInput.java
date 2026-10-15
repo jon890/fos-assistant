@@ -8,6 +8,7 @@ public record ConnectorExecutionClaimInput(String ticket, String tool, String ar
         scope = Map.copyOf(scope);
     }
 
+
     @Override
     public String toString() {
         return "ConnectorExecutionClaimInput[redacted]";

@@ -34,14 +34,16 @@ public class PeopleAdminController {
     private final CurrentUserProvider currentUser;
     private final PersonAccessService access;
 
+
     /** 허용 목록 전체를 준다. */
     @GetMapping
     public List<PersonView> list() {
         currentUser.requireAdmin();
         return access.list().stream()
-                .map(entry -> PersonView.of(entry.person(), entry.joined(), entry.lastConversationAt()))
-                .toList();
+            .map(entry -> PersonView.of(entry.person(), entry.joined(), entry.lastConversationAt()))
+            .toList();
     }
+
 
     @PostMapping
     public PersonView create(@Valid @RequestBody CreatePersonRequest request) {
@@ -50,6 +52,7 @@ public class PeopleAdminController {
         // 방금 더한 사람은 아직 로그인하지 않았다. 사용자를 다시 뒤지지 않고 거짓으로 둔다.
         return PersonView.of(person, false, null);
     }
+
 
     /**
      * 들어올 수 있는지를 올리고 내린다.

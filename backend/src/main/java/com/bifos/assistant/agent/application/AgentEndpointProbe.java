@@ -28,6 +28,7 @@ public class AgentEndpointProbe {
     private final RestClient restClient;
     private final HermesProfileKeyStore keyStore;
 
+
     public AgentEndpointProbe(HermesProfileKeyStore keyStore, HermesProperties properties) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
@@ -35,6 +36,7 @@ public class AgentEndpointProbe {
         this.restClient = RestClient.builder().requestFactory(factory).build();
         this.keyStore = keyStore;
     }
+
 
     /**
      * 주소가 200 으로 답하지 않으면 {@link ApiException} 을 던진다.
@@ -50,19 +52,20 @@ public class AgentEndpointProbe {
         int status;
         try {
             status = restClient
-                    .get()
-                    .uri(uri)
-                    .header("Authorization", "Bearer " + apiKey)
-                    .exchange((request, response) -> response.getStatusCode().value());
+                .get()
+                .uri(uri)
+                .header("Authorization", "Bearer " + apiKey)
+                .exchange((request, response) -> response.getStatusCode().value());
         } catch (RuntimeException ex) {
             log.warn("could not reach the new agent address profile={}", profileName, ex);
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "could not reach " + uri + ": " + rootMessage(ex), ex);
         }
         if (status != 200) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "the new address answered " + status + " for " + PROBE_PATH);
+                ErrorCode.VALIDATION_FAILED, "the new address answered " + status + " for " + PROBE_PATH);
         }
     }
+
 
     /** 사용자에게 보일 한 줄을 고른다. 감싸인 예외의 안쪽 메시지가 더 구체적이다. */
     private static String rootMessage(Throwable error) {
@@ -73,6 +76,7 @@ public class AgentEndpointProbe {
         String message = cause.getMessage();
         return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
     }
+
 
     private static String stripTrailingSlash(String value) {
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;

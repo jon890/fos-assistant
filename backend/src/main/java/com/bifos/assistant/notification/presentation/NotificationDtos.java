@@ -22,25 +22,25 @@ public final class NotificationDtos {
      * @param readAt 읽음으로 표시한 시각. 읽지 않았으면 null
      */
     public record NotificationView(
-            UUID id,
-            NotificationKind kind,
-            String title,
-            String body,
-            NotificationTargetType targetType,
-            UUID targetId,
-            Instant createdAt,
-            Instant readAt) {
+        UUID id,
+        NotificationKind kind,
+        String title,
+        String body,
+        NotificationTargetType targetType,
+        UUID targetId,
+        Instant createdAt,
+        Instant readAt) {
 
         public static NotificationView from(Notification notification) {
             return new NotificationView(
-                    notification.publicId(),
-                    notification.kind(),
-                    notification.title(),
-                    notification.body(),
-                    notification.targetType(),
-                    notification.targetPublicId(),
-                    notification.createdAt(),
-                    notification.readAt());
+                notification.publicId(),
+                notification.kind(),
+                notification.title(),
+                notification.body(),
+                notification.targetType(),
+                notification.targetPublicId(),
+                notification.createdAt(),
+                notification.readAt());
         }
     }
 
@@ -52,9 +52,10 @@ public final class NotificationDtos {
 
         public static NotificationPageView from(NotificationPage page) {
             return new NotificationPageView(
-                    page.items().stream().map(NotificationView::from).toList(), page.nextCursor(), page.unreadCount());
+                page.items().stream().map(NotificationView::from).toList(), page.nextCursor(), page.unreadCount());
         }
     }
 
-    public record UnreadCountView(long unreadCount) {}
+    public record UnreadCountView(long unreadCount) {
+    }
 }

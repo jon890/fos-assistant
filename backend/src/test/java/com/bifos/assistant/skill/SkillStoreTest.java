@@ -43,27 +43,31 @@ class SkillStoreTest {
             # 주간 계획
             """;
 
+
     private static SkillStore storeAt(Path root) {
         return new SkillStore(new SkillProperties(root.toString(), AGENT_ROOT + "/", 3, null), Clock.systemUTC());
     }
 
+
     private static PreviousSkillStore previousAt(Path root) {
         return new PreviousSkillStore(
-                new SkillProperties(root.toString(), AGENT_ROOT + "/", 3, null), Clock.systemUTC());
+            new SkillProperties(root.toString(), AGENT_ROOT + "/", 3, null), Clock.systemUTC());
     }
+
 
     private static Map<String, SkillBundle> skills(String... names) {
         LinkedHashMap<String, SkillBundle> result = new LinkedHashMap<>();
         for (String name : names) {
             result.put(
+                name,
+                new SkillBundle(
                     name,
-                    new SkillBundle(
-                            name,
-                            WEEKLY_MD.replace("weekly-plan", name),
-                            List.of(new SkillFile("references/guide.md", "안내 " + name))));
+                    WEEKLY_MD.replace("weekly-plan", name),
+                    List.of(new SkillFile("references/guide.md", "안내 " + name))));
         }
         return result;
     }
+
 
     @Test
     @DisplayName("쓰기는 새 버전을 만들고 표식 전에는 지금 버전이 옛 것이다")
@@ -82,8 +86,8 @@ class SkillStoreTest {
         String second = store.writeVersion(PROFILE, skills("weekly-plan", "shopping"));
         assertThat(second).isGreaterThan(first);
         assertThat(store.currentVersion(PROFILE))
-                .as("둘째에 표식을 쓰기 전까지 첫째가 지금 버전이다")
-                .contains(first);
+            .as("둘째에 표식을 쓰기 전까지 첫째가 지금 버전이다")
+            .contains(first);
         assertThat(store.readCurrent(PROFILE)).containsOnlyKeys("weekly-plan");
 
         store.markPublished(PROFILE, second);
@@ -91,10 +95,11 @@ class SkillStoreTest {
         Map<String, SkillBundle> current = store.readCurrent(PROFILE);
         assertThat(current).containsOnlyKeys("shopping", "weekly-plan");
         assertThat(current.get("shopping").files())
-                .containsExactly(new SkillFile("references/guide.md", "안내 shopping"));
+            .containsExactly(new SkillFile("references/guide.md", "안내 shopping"));
         assertThat(store.agentPath(PROFILE, second)).isEqualTo(AGENT_ROOT + "/" + PROFILE + "/" + second);
         assertThat(store.hasUploadedSkills(PROFILE)).isTrue();
     }
+
 
     @Test
     @DisplayName("표식 없는 버전은 지금 버전보다 새 것만 올린 스킬로 읽고 같은 이름이면 더 새 것을 쓴다")
@@ -108,8 +113,8 @@ class SkillStoreTest {
         store.writeVersion(PROFILE, skills("weekly-plan", "shopping"));
         Map<String, SkillBundle> newer = new LinkedHashMap<>(skills("shopping"));
         newer.put(
-                "shopping",
-                new SkillBundle("shopping", WEEKLY_MD.replace("weekly-plan", "shopping") + "고침", List.of()));
+            "shopping",
+            new SkillBundle("shopping", WEEKLY_MD.replace("weekly-plan", "shopping") + "고침", List.of()));
         store.writeVersion(PROFILE, newer);
 
         Map<String, SkillBundle> pending = store.readPending(PROFILE);
@@ -117,6 +122,7 @@ class SkillStoreTest {
         assertThat(pending.get("shopping").skillMd()).as("같은 이름이면 더 새 버전의 것").endsWith("고침");
         assertThat(store.readCurrent(PROFILE)).containsOnlyKeys("weekly-plan");
     }
+
 
     @Test
     @DisplayName("지금 버전이 없어도 표식 없는 버전에 스킬이 있으면 올린 스킬이 있다고 본다")
@@ -130,6 +136,7 @@ class SkillStoreTest {
         assertThat(store.readPending(PROFILE)).containsOnlyKeys("shopping");
         assertThat(store.hasUploadedSkills(PROFILE)).isTrue();
     }
+
 
     @Test
     @DisplayName("prune 은 표식 있는 최근 3개만 남기고 게시한 버전보다 오래된 표식 없는 것을 지운다")
@@ -151,10 +158,11 @@ class SkillStoreTest {
         assertThat(profileDir.resolve(v4)).exists();
         assertThat(profileDir.resolve(v5)).exists();
         assertThat(profileDir.resolve(newerUnpublished))
-                .as("게시한 버전보다 새 표식 없는 버전은 두지 않는다")
-                .exists();
+            .as("게시한 버전보다 새 표식 없는 버전은 두지 않는다")
+            .exists();
         assertThat(store.currentVersion(PROFILE)).contains(v5);
     }
+
 
     @Test
     @DisplayName("상위 경로와 절대 경로와 루트 밖 경로를 거절한다")
@@ -162,20 +170,20 @@ class SkillStoreTest {
         SkillStore store = storeAt(root);
 
         assertValidation(() -> store.writeVersion(
-                PROFILE,
-                Map.of(
-                        "weekly-plan",
-                        new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("references/../x.md", "x"))))));
+            PROFILE,
+            Map.of(
+                "weekly-plan",
+                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("references/../x.md", "x"))))));
         assertValidation(() -> store.writeVersion(
-                PROFILE,
-                Map.of(
-                        "weekly-plan",
-                        new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("/etc/passwd", "x"))))));
+            PROFILE,
+            Map.of(
+                "weekly-plan",
+                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("/etc/passwd", "x"))))));
         assertValidation(() -> store.writeVersion(
-                PROFILE,
-                Map.of(
-                        "weekly-plan",
-                        new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("bin/run.sh", "x"))))));
+            PROFILE,
+            Map.of(
+                "weekly-plan",
+                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("bin/run.sh", "x"))))));
         assertValidation(() -> store.writeVersion(PROFILE, Map.of("..", new SkillBundle("..", WEEKLY_MD, List.of()))));
         assertValidation(() -> store.writeVersion("../other", skills("weekly-plan")));
         assertValidation(() -> store.currentVersion("/abs"));
@@ -183,6 +191,7 @@ class SkillStoreTest {
         assertValidation(() -> store.deleteAll(".."));
         assertThat(root.resolve(PROFILE)).as("거절한 쓰기는 아무것도 남기지 않는다").doesNotExist();
     }
+
 
     @Test
     @DisplayName("심볼릭 링크는 읽지 않는다")
@@ -192,20 +201,21 @@ class SkillStoreTest {
         Files.writeString(outside.resolve("secret.md"), "밖의 파일");
         Path versionDir = root.resolve(PROFILE).resolve(version);
         Files.createSymbolicLink(
-                versionDir.resolve("weekly-plan").resolve("references").resolve("leak.md"),
-                outside.resolve("secret.md"));
+            versionDir.resolve("weekly-plan").resolve("references").resolve("leak.md"),
+            outside.resolve("secret.md"));
 
         assertThatThrownBy(() -> store.readCurrent(PROFILE))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
 
         Files.delete(versionDir.resolve("weekly-plan").resolve("references").resolve("leak.md"));
         Files.createSymbolicLink(versionDir.resolve("linked"), outside);
 
         assertThatThrownBy(() -> store.readCurrent(PROFILE))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
     }
+
 
     @Test
     @DisplayName("파일은 644 디렉터리는 755 로 쓴다")
@@ -217,18 +227,19 @@ class SkillStoreTest {
 
         for (Path dir : List.of(root.resolve(PROFILE), versionDir, skillDir, skillDir.resolve("references"))) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(dir)))
-                    .as("디렉터리 %s", root.relativize(dir))
-                    .isEqualTo("rwxr-xr-x");
+                .as("디렉터리 %s", root.relativize(dir))
+                .isEqualTo("rwxr-xr-x");
         }
         for (Path file : List.of(
-                skillDir.resolve("SKILL.md"),
-                skillDir.resolve("references/guide.md"),
-                versionDir.resolve(SkillStore.PUBLISHED_MARKER))) {
+            skillDir.resolve("SKILL.md"),
+            skillDir.resolve("references/guide.md"),
+            versionDir.resolve(SkillStore.PUBLISHED_MARKER))) {
             assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(file)))
-                    .as("파일 %s", root.relativize(file))
-                    .isEqualTo("rw-r--r--");
+                .as("파일 %s", root.relativize(file))
+                .isEqualTo("rw-r--r--");
         }
     }
+
 
     @Test
     @DisplayName("discard 와 deleteAll 은 디렉터리를 지우고 없으면 지나간다")
@@ -248,37 +259,39 @@ class SkillStoreTest {
         store.deleteAll(PROFILE);
     }
 
+
     @Test
     @DisplayName("경로 규칙은 맨 위 글 파일과 네 디렉터리 아래 4조각까지를 받고 나머지를 거절한다")
     void filePathRuleAcceptsTopLevelTextAndFourDirectoriesUpToFourSegments() {
         for (String accepted : List.of(
-                "FORMS.md",
-                "notes.TXT",
-                "references/API.md",
-                "scripts/lib/util.py",
-                "assets/a/b/c.txt",
-                "references/" + "a".repeat(95) + "/" + "b".repeat(93))) {
+            "FORMS.md",
+            "notes.TXT",
+            "references/API.md",
+            "scripts/lib/util.py",
+            "assets/a/b/c.txt",
+            "references/" + "a".repeat(95) + "/" + "b".repeat(93))) {
             assertThatCode(() -> SkillFilePaths.requireFilePath(accepted))
-                    .as("받아야 하는 경로 %s", accepted)
-                    .doesNotThrowAnyException();
+                .as("받아야 하는 경로 %s", accepted)
+                .doesNotThrowAnyException();
         }
         for (String rejected : List.of(
-                "notes.py",
-                "SKILL.md",
-                "skill.MD",
-                "references/SKILL.md",
-                "other/x.md",
-                "scripts/a/b/c/d.py",
-                "references/.hidden",
-                "references/../x.md",
-                "references//x.md",
-                "references/" + "a".repeat(101),
-                "references/" + "a".repeat(95) + "/" + "b".repeat(94),
-                "")) {
+            "notes.py",
+            "SKILL.md",
+            "skill.MD",
+            "references/SKILL.md",
+            "other/x.md",
+            "scripts/a/b/c/d.py",
+            "references/.hidden",
+            "references/../x.md",
+            "references//x.md",
+            "references/" + "a".repeat(101),
+            "references/" + "a".repeat(95) + "/" + "b".repeat(94),
+            "")) {
             assertValidation(() -> SkillFilePaths.requireFilePath(rejected));
         }
         assertValidation(() -> SkillFilePaths.requireFilePath(null));
     }
+
 
     @Test
     @DisplayName("파일 묶음은 대소문자만 다른 두 경로와 다른 경로의 디렉터리인 경로를 거절한다")
@@ -286,26 +299,26 @@ class SkillStoreTest {
         assertValidation(() -> SkillFilePaths.requireFileSet(List.of("references/A.md", "references/a.md")));
         assertValidation(() -> SkillFilePaths.requireFileSet(List.of("references/a", "references/a/b.md")));
         assertValidation(() -> SkillFilePaths.requireFileSet(List.of("scripts/lib/util.py", "scripts/LIB")));
-        assertThatCode(() ->
-                        SkillFilePaths.requireFileSet(List.of("references/a.md", "references/ab/c.md", "FORMS.md")))
-                .doesNotThrowAnyException();
+        assertThatCode(() -> SkillFilePaths.requireFileSet(List.of("references/a.md", "references/ab/c.md", "FORMS.md")))
+            .doesNotThrowAnyException();
     }
+
 
     @Test
     @DisplayName("scripts 아래 파일만 755 로 쓰고 중첩 경로의 중간 디렉터리도 755 다")
     void writesScriptsWith755AndNestedDirectoriesWith755(@TempDir Path root) throws IOException {
         SkillStore store = storeAt(root);
         String version = store.writeVersion(
-                PROFILE,
-                Map.of(
-                        "weekly-plan",
-                        new SkillBundle(
-                                "weekly-plan",
-                                WEEKLY_MD,
-                                List.of(
-                                        new SkillFile("scripts/run.sh", "echo"),
-                                        new SkillFile("scripts/lib/util.py", "print()"),
-                                        new SkillFile("references/a.md", "안내")))));
+            PROFILE,
+            Map.of(
+                "weekly-plan",
+                new SkillBundle(
+                    "weekly-plan",
+                    WEEKLY_MD,
+                    List.of(
+                        new SkillFile("scripts/run.sh", "echo"),
+                        new SkillFile("scripts/lib/util.py", "print()"),
+                        new SkillFile("references/a.md", "안내")))));
         Path skillDir = root.resolve(PROFILE).resolve(version).resolve("weekly-plan");
 
         assertThat(permissions(skillDir.resolve("scripts/run.sh"))).isEqualTo("rwxr-xr-x");
@@ -316,16 +329,16 @@ class SkillStoreTest {
         }
     }
 
+
     @Test
     @DisplayName("읽기는 중첩 경로와 맨 위 글 파일을 경로 차례로 읽고 점 파일과 규칙 밖 파일은 읽지 않는다")
     void readsNestedAndTopLevelFilesInPathOrderAndSkipsDotAndOutOfRuleFiles(@TempDir Path root) throws IOException {
         SkillStore store = storeAt(root);
         List<SkillFile> files = List.of(
-                new SkillFile("FORMS.md", "양식"),
-                new SkillFile("assets/a/b/c.txt", "자산"),
-                new SkillFile("scripts/lib/util.py", "print()"));
-        String version =
-                store.writeVersion(PROFILE, Map.of("weekly-plan", new SkillBundle("weekly-plan", WEEKLY_MD, files)));
+            new SkillFile("FORMS.md", "양식"),
+            new SkillFile("assets/a/b/c.txt", "자산"),
+            new SkillFile("scripts/lib/util.py", "print()"));
+        String version = store.writeVersion(PROFILE, Map.of("weekly-plan", new SkillBundle("weekly-plan", WEEKLY_MD, files)));
         store.markPublished(PROFILE, version);
         Path skillDir = root.resolve(PROFILE).resolve(version).resolve("weekly-plan");
         Files.writeString(skillDir.resolve(".published"), "");
@@ -336,10 +349,11 @@ class SkillStoreTest {
         assertThat(store.readCurrent(PROFILE).get("weekly-plan").files()).containsExactlyElementsOf(files);
     }
 
+
     @Test
     @DisplayName("스킬 안의 링크는 경로 규칙 안이든 밖이든 읽기가 INTERNAL ERROR 다")
     void linkInsideSkillIsInternalErrorWhetherInsideOrOutsidePathRule(@TempDir Path root, @TempDir Path outside)
-            throws IOException {
+        throws IOException {
         SkillStore store = storeAt(root);
         String version = published(store);
         Path skillDir = root.resolve(PROFILE).resolve(version).resolve("weekly-plan");
@@ -354,6 +368,7 @@ class SkillStoreTest {
         assertInternalError(() -> store.readCurrent(PROFILE));
     }
 
+
     @Test
     @DisplayName("이전 버전은 쓴 묶음과 시각을 다시 주고 두 번 쓰면 뒤의 것이 남으며 prune 뒤에도 남는다")
     void previousGivesBackBundleAndTimeAndLaterWinsAndSurvivesPrune(@TempDir Path root) {
@@ -363,8 +378,7 @@ class SkillStoreTest {
         SkillStore store = new SkillStore(properties, clock);
         PreviousSkillStore previous = new PreviousSkillStore(properties, clock);
         assertThat(previous.readPrevious(PROFILE, "weekly-plan")).isEmpty();
-        SkillBundle first =
-                new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("scripts/run.sh", "echo 1")));
+        SkillBundle first = new SkillBundle("weekly-plan", WEEKLY_MD, List.of(new SkillFile("scripts/run.sh", "echo 1")));
         SkillBundle second = new SkillBundle("weekly-plan", WEEKLY_MD + "고침", List.of());
 
         previous.writePrevious(PROFILE, first);
@@ -376,27 +390,28 @@ class SkillStoreTest {
         assertThat(previous.readPrevious(PROFILE, "weekly-plan")).contains(new PreviousSkill(second, secondAt));
         assertThat(previous.previousSavedAt(PROFILE, "weekly-plan")).contains(secondAt);
         assertThat(root.resolve(PROFILE)
-                        .resolve(PreviousSkillStore.PREVIOUS_DIR)
-                        .toFile()
-                        .list())
+            .resolve(PreviousSkillStore.PREVIOUS_DIR)
+            .toFile()
+            .list())
                 .as("바꾼 뒤 옮겨 둔 옛것과 임시 디렉터리가 남지 않는다")
                 .containsExactly("weekly-plan");
         assertThat(root.resolve(PROFILE)
-                        .resolve(PreviousSkillStore.PREVIOUS_DIR)
-                        .resolve("weekly-plan/scripts"))
+            .resolve(PreviousSkillStore.PREVIOUS_DIR)
+            .resolve("weekly-plan/scripts"))
                 .as("바뀐 이전 버전에는 첫째의 파일이 없다")
                 .doesNotExist();
 
         String version = published(store);
         store.prune(PROFILE, version);
         assertThat(previous.readPrevious(PROFILE, "weekly-plan"))
-                .as("prune 은 이전 버전을 지우지 않는다")
-                .isPresent();
+            .as("prune 은 이전 버전을 지우지 않는다")
+            .isPresent();
 
         previous.deletePrevious(PROFILE, "weekly-plan");
         assertThat(previous.readPrevious(PROFILE, "weekly-plan")).isEmpty();
         previous.deletePrevious(PROFILE, "weekly-plan");
     }
+
 
     @Test
     @DisplayName("clearVersions 는 버전과 이전 버전과 임시 디렉터리를 지우고 profile 디렉터리를 남긴다")
@@ -416,6 +431,7 @@ class SkillStoreTest {
         store.clearVersions("ua-absent");
     }
 
+
     @Test
     @DisplayName("이전 버전을 쓰면 앞선 쓰기가 남긴 old 와 tmp 디렉터리를 지운다")
     void writePreviousRemovesLeftoverOldAndTempDirectories(@TempDir Path root) throws IOException {
@@ -431,28 +447,29 @@ class SkillStoreTest {
         assertThat(previousRoot.toFile().list()).containsExactly("weekly-plan");
     }
 
+
     @Test
     @DisplayName("이전 버전 시각은 남긴 시각 파일만 읽어 주고 없으면 빈 값이다")
     void previousSavedAtReadsOnlySavedAtFile(@TempDir Path root) throws IOException {
         PreviousSkillStore previous = previousAt(root);
         assertThat(previous.previousSavedAt(PROFILE, "weekly-plan")).isEmpty();
-        Path skillDir =
-                root.resolve(PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR).resolve("weekly-plan");
+        Path skillDir = root.resolve(PROFILE).resolve(PreviousSkillStore.PREVIOUS_DIR).resolve("weekly-plan");
         Files.createDirectories(skillDir);
         Files.writeString(skillDir.resolve(PreviousSkillStore.SAVED_AT), "1791507723004\n");
 
         assertThat(previous.previousSavedAt(PROFILE, "weekly-plan"))
-                .as("SKILL.md 가 없어도 시각은 준다")
-                .contains(Instant.ofEpochMilli(1_791_507_723_004L));
+            .as("SKILL.md 가 없어도 시각은 준다")
+            .contains(Instant.ofEpochMilli(1_791_507_723_004L));
 
         Files.writeString(skillDir.resolve(PreviousSkillStore.SAVED_AT), "어제");
         assertInternalError(() -> previous.previousSavedAt(PROFILE, "weekly-plan"));
     }
 
+
     @Test
     @DisplayName(".previous 가 링크면 deletePrevious 와 clearVersions 가 INTERNAL ERROR 이고 링크 너머를 지우지 않는다")
     void deletePreviousAndClearVersionsRejectLinkedPreviousAndKeepLinkTarget(@TempDir Path root, @TempDir Path outside)
-            throws IOException {
+        throws IOException {
         SkillStore store = storeAt(root);
         PreviousSkillStore previous = previousAt(root);
         published(store);
@@ -469,37 +486,44 @@ class SkillStoreTest {
         assertThat(outsideSkill.resolve("SKILL.md")).as("링크 너머는 그대로다").exists();
         assertThat(Files.isSymbolicLink(previousRoot)).isTrue();
         assertThat(store.currentVersion(PROFILE))
-                .as("거절한 clearVersions 는 버전도 지우지 않는다")
-                .isPresent();
+            .as("거절한 clearVersions 는 버전도 지우지 않는다")
+            .isPresent();
     }
+
 
     private static String permissions(Path path) throws IOException {
         return PosixFilePermissions.toString(Files.getPosixFilePermissions(path));
     }
 
+
     private static void assertInternalError(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.INTERNAL_ERROR));
     }
+
 
     /** 이전 버전을 남긴 시각을 정해 두는 시계다. */
     private static final class MutableClock extends Clock {
         private Instant now;
 
+
         private MutableClock(Instant now) {
             this.now = now;
         }
+
 
         @Override
         public ZoneId getZone() {
             return ZoneOffset.UTC;
         }
 
+
         @Override
         public Clock withZone(ZoneId zone) {
             return this;
         }
+
 
         @Override
         public Instant instant() {
@@ -507,15 +531,17 @@ class SkillStoreTest {
         }
     }
 
+
     private static String published(SkillStore store) {
         String version = store.writeVersion(PROFILE, skills("weekly-plan"));
         store.markPublished(PROFILE, version);
         return version;
     }
 
+
     private static void assertValidation(ThrowingCallable call) {
         assertThatThrownBy(call)
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.VALIDATION_FAILED));
     }
 }

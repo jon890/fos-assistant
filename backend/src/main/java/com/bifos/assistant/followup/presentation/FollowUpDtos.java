@@ -25,7 +25,7 @@ public final class FollowUpDtos {
         @Override
         public String toString() {
             return "CreateFollowUpRequest[dueAt=" + dueAt + ", waiting=" + waiting + ", conversationId="
-                    + conversationId + "]";
+                + conversationId + "]";
         }
     }
 
@@ -34,30 +34,31 @@ public final class FollowUpDtos {
      * @param proposed 에이전트가 제안했는가
      */
     public record FollowUpView(
-            UUID id,
-            String title,
-            String status,
-            Instant dueAt,
-            boolean waiting,
-            UUID conversationId,
-            boolean proposed,
-            Instant createdAt,
-            Instant acceptedAt,
-            Instant closedAt) {
+        UUID id,
+        String title,
+        String status,
+        Instant dueAt,
+        boolean waiting,
+        UUID conversationId,
+        boolean proposed,
+        Instant createdAt,
+        Instant acceptedAt,
+        Instant closedAt) {
 
         public static FollowUpView from(FollowUpSnapshot snapshot) {
             return new FollowUpView(
-                    snapshot.publicId(),
-                    snapshot.title(),
-                    snapshot.status().name(),
-                    snapshot.dueAt(),
-                    snapshot.waiting(),
-                    snapshot.conversationPublicId(),
-                    snapshot.proposed(),
-                    snapshot.createdAt(),
-                    snapshot.acceptedAt(),
-                    snapshot.closedAt());
+                snapshot.publicId(),
+                snapshot.title(),
+                snapshot.status().name(),
+                snapshot.dueAt(),
+                snapshot.waiting(),
+                snapshot.conversationPublicId(),
+                snapshot.proposed(),
+                snapshot.createdAt(),
+                snapshot.acceptedAt(),
+                snapshot.closedAt());
         }
+
 
         /** 제목을 빼고 번호와 상태만 낸다. 제목을 로그에 남기지 않는다. */
         @Override

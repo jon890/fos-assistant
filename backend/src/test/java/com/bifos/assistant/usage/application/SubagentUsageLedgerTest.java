@@ -109,27 +109,29 @@ class SubagentUsageLedgerTest {
     private Instant from;
     private Instant to;
 
+
     @BeforeEach
     void startFromAnEmptyLedger() {
         jobs.deleteAll();
         events.deleteAll();
         executions.deleteAll();
         agent = agents.findByCode(AGENT_CODE)
-                .orElseGet(() -> agents.save(Agent.of(
-                        AGENT_CODE,
-                        "원장 비서",
-                        AGENT_CODE,
-                        "http://127.0.0.1:1/p/" + AGENT_CODE,
-                        CostMode.API,
-                        CredentialScope.SHARED_HOUSEHOLD,
-                        AgentVisibility.PRIVATE,
-                        USER_ID,
-                        Instant.now())));
+            .orElseGet(() -> agents.save(Agent.of(
+                AGENT_CODE,
+                "원장 비서",
+                AGENT_CODE,
+                "http://127.0.0.1:1/p/" + AGENT_CODE,
+                CostMode.API,
+                CredentialScope.SHARED_HOUSEHOLD,
+                AgentVisibility.PRIVATE,
+                USER_ID,
+                Instant.now())));
         // 저장소가 돌려주는 시각과 그대로 견줄 수 있게 저장 정밀도 안쪽으로 자른다.
         now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         from = now.minus(Duration.ofDays(10));
         to = now.plus(Duration.ofHours(1));
     }
+
 
     @Test
     @DisplayName("관측 누락은 자식 수와 금액을 만들지 않고 실행 수로만 세며 과거 실행과 다른 사용자는 뺀다")
@@ -157,8 +159,9 @@ class SubagentUsageLedgerTest {
         parent.finishEventObservation(true);
         executions.save(parent);
         assertThat(summaries.monthly(USER_ID, from, to).observationIncompleteExecutions())
-                .isZero();
+            .isZero();
     }
+
 
     @Test
     @DisplayName("자식이 없으면 합계는 실행만이고 자식 건수는 모두 0 이다")
@@ -166,11 +169,12 @@ class SubagentUsageLedgerTest {
         finishedParent(USER_ID, justFinished());
 
         assertThat(summaries.monthly(USER_ID, from, to))
-                .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0, 0));
+            .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0, 0));
         assertThat(summaries.byAgent(USER_ID, from, to))
-                .singleElement()
-                .satisfies(line -> assertThat(line.subagents()).isZero());
+            .singleElement()
+            .satisfies(line -> assertThat(line.subagents()).isZero());
     }
+
 
     @Test
     @DisplayName("부모와 다른 provider 와 모델로 돈 자식의 금액이 월 합계에 더해진다")
@@ -189,6 +193,7 @@ class SubagentUsageLedgerTest {
         assertThat(summary.unpricedSubagents()).isZero();
     }
 
+
     @Test
     @DisplayName("모델 축에는 자식의 provider 와 모델 줄이 실행 0건으로 따로 생긴다")
     void modelAxisGetsSeparateLineForChildModel() {
@@ -200,23 +205,24 @@ class SubagentUsageLedgerTest {
         assertThat(lines).as("금액이 큰 자식 줄이 앞에 온다").hasSize(2);
         assertThat(lines.get(0).subagents()).isOne();
         assertThat(lines.get(0).cost())
-                .isEqualTo(new CostByModel(
-                        CHILD_PROVIDER,
-                        CHILD_MODEL,
-                        0L,
-                        CHILD_MICROS,
-                        CHILD_MICROS,
-                        CHILD_INPUT,
-                        CHILD_OUTPUT,
-                        null,
-                        parent.startedAt(),
-                        parent.startedAt()));
+            .isEqualTo(new CostByModel(
+                CHILD_PROVIDER,
+                CHILD_MODEL,
+                0L,
+                CHILD_MICROS,
+                CHILD_MICROS,
+                CHILD_INPUT,
+                CHILD_OUTPUT,
+                null,
+                parent.startedAt(),
+                parent.startedAt()));
         assertThat(lines.get(1).subagents()).isZero();
         assertThat(lines.get(1).cost().provider()).isEqualTo(PARENT_PROVIDER);
         assertThat(lines.get(1).cost().model()).isEqualTo(PARENT_MODEL);
         assertThat(lines.get(1).cost().executions()).isOne();
         assertThat(lines.get(1).cost().estimatedMicros()).isEqualTo(PARENT_MICROS);
     }
+
 
     @Test
     @DisplayName("에이전트, 날짜, 지문 축은 부모 줄에 자식의 금액과 토큰을 더한다")
@@ -252,6 +258,7 @@ class SubagentUsageLedgerTest {
         });
     }
 
+
     @Test
     @DisplayName("자식의 cache read 는 cache read 단가로 환산된다")
     void pricesChildCacheReadAtCacheReadRate() {
@@ -260,10 +267,11 @@ class SubagentUsageLedgerTest {
 
         assertThat(job.cacheReadTokens()).isEqualTo(CHILD_CACHE_READ);
         assertThat(job.estimatedCostMicros())
-                .as("입력 전부에 입력 단가를 매긴 값이 아니다")
-                .isEqualTo(CHILD_MICROS)
-                .isNotEqualTo(CHILD_MICROS_AT_FLAT_INPUT_RATE);
+            .as("입력 전부에 입력 단가를 매긴 값이 아니다")
+            .isEqualTo(CHILD_MICROS)
+            .isNotEqualTo(CHILD_MICROS_AT_FLAT_INPUT_RATE);
     }
+
 
     @Test
     @DisplayName("아직 끝나지 않은 자식은 확인 중으로 세고, 끝난 것을 확인하면 합계에 더한다")
@@ -291,6 +299,7 @@ class SubagentUsageLedgerTest {
         assertAskedAgentFor(CHILD);
     }
 
+
     @Test
     @DisplayName("줄이 저장된 채 다시 찾아도 줄은 하나이고 합계에 한 번만 더해진다")
     void rediscoveryAfterRestartKeepsSingleLine() {
@@ -309,6 +318,7 @@ class SubagentUsageLedgerTest {
         assertThat(summary.estimatedMicros()).isEqualTo(PARENT_MICROS + CHILD_MICROS);
     }
 
+
     @Test
     @DisplayName("끝난 줄을 다시 조회해도 합계가 그대로다")
     void repollingRecordedLineKeepsTotal() {
@@ -322,6 +332,7 @@ class SubagentUsageLedgerTest {
         assertThat(before.estimatedMicros()).isEqualTo(PARENT_MICROS + CHILD_MICROS);
     }
 
+
     @Test
     @DisplayName("시작 사건이 둘이고 완료 사건이 이미 와 있어도 줄 하나로 한 번만 더한다")
     void duplicatedEventsStillYieldSingleLine() {
@@ -329,20 +340,20 @@ class SubagentUsageLedgerTest {
         startEvent(parent, 1, CHILD);
         startEvent(parent, 2, CHILD);
         events.save(ExecutionEvent.builder()
-                .executionId(parent.id())
-                .sequence(3)
-                .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
-                .hermesSessionId(CHILD)
-                .model(CHILD_MODEL)
-                .inputTokens(CHILD_INPUT)
-                .outputTokens(CHILD_OUTPUT)
-                .occurredAt(parent.finishedAt())
-                .build());
+            .executionId(parent.id())
+            .sequence(3)
+            .eventType(ExecutionEventType.SUBAGENT_COMPLETED)
+            .hermesSessionId(CHILD)
+            .model(CHILD_MODEL)
+            .inputTokens(CHILD_INPUT)
+            .outputTokens(CHILD_OUTPUT)
+            .occurredAt(parent.finishedAt())
+            .build());
         stubSession(CHILD, pricedUsage(CHILD));
 
         assertThat(summaries.monthly(USER_ID, from, to).pendingSubagents())
-                .as("줄이 생기기 전에도 같은 자식을 한 번만 센다")
-                .isOne();
+            .as("줄이 생기기 전에도 같은 자식을 한 번만 센다")
+            .isOne();
 
         reconciler.discover(now);
         reconciler.poll(onlyJob().id());
@@ -350,13 +361,14 @@ class SubagentUsageLedgerTest {
         assertAskedAgentFor(CHILD);
         assertThat(jobs.findByExecutionIdIn(List.of(parent.id()))).hasSize(1);
         assertThat(events.findByExecutionIdInOrderByExecutionIdAscSequenceAsc(List.of(parent.id())))
-                .filteredOn(event -> event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED)
-                .hasSize(1);
+            .filteredOn(event -> event.eventType() == ExecutionEventType.SUBAGENT_COMPLETED)
+            .hasSize(1);
         MonthlyUsageSummary summary = summaries.monthly(USER_ID, from, to);
         assertThat(summary.pricedSubagents()).isOne();
         assertThat(summary.pendingSubagents()).isZero();
         assertThat(summary.estimatedMicros()).isEqualTo(PARENT_MICROS + CHILD_MICROS);
     }
+
 
     @Test
     @DisplayName("provider 를 읽지 못한 자식은 가격 미확인으로 세고 토큰만 모델 축에 남긴다")
@@ -371,26 +383,26 @@ class SubagentUsageLedgerTest {
         assertThat(summary.pricedSubagents()).isZero();
         assertThat(summary.estimatedMicros()).isEqualTo(PARENT_MICROS);
         assertThat(summaries.byModel(USER_ID, from, to))
-                .filteredOn(line -> line.cost().provider() == null)
-                .singleElement()
-                .satisfies(line -> {
-                    assertThat(line.subagents()).isOne();
-                    assertThat(line.cost().model()).isEqualTo(CHILD_MODEL);
-                    assertThat(line.cost().executions()).isZero();
-                    assertThat(line.cost().inputTokens()).isEqualTo(CHILD_INPUT);
-                    assertThat(line.cost().outputTokens()).isEqualTo(CHILD_OUTPUT);
-                    assertThat(line.cost().estimatedMicros()).as("0 으로 채우지 않는다").isNull();
-                    assertThat(line.cost().actualMicros()).isNull();
-                });
+            .filteredOn(line -> line.cost().provider() == null)
+            .singleElement()
+            .satisfies(line -> {
+                assertThat(line.subagents()).isOne();
+                assertThat(line.cost().model()).isEqualTo(CHILD_MODEL);
+                assertThat(line.cost().executions()).isZero();
+                assertThat(line.cost().inputTokens()).isEqualTo(CHILD_INPUT);
+                assertThat(line.cost().outputTokens()).isEqualTo(CHILD_OUTPUT);
+                assertThat(line.cost().estimatedMicros()).as("0 으로 채우지 않는다").isNull();
+                assertThat(line.cost().actualMicros()).isNull();
+            });
     }
+
 
     @Test
     @DisplayName("기한이 지난 줄은 만료되고 미확인으로 센다")
     void expiredLineIsCountedAsUnconfirmed() {
         AgentExecution parent = finishedParent(USER_ID, finishedLongAgo());
         ExecutionEvent start = startEvent(parent, 1, CHILD);
-        SubagentUsageJob job =
-                jobs.save(SubagentUsageJob.create(parent, start, agent.apiBaseUrl(), parent.finishedAt()));
+        SubagentUsageJob job = jobs.save(SubagentUsageJob.create(parent, start, agent.apiBaseUrl(), parent.finishedAt()));
 
         reconciler.poll(job.id());
 
@@ -401,6 +413,7 @@ class SubagentUsageLedgerTest {
         assertThat(summary.estimatedMicros()).isEqualTo(PARENT_MICROS);
     }
 
+
     @Test
     @DisplayName("줄 없이 부모가 끝난 지 24시간이 지난 자식은 미확인으로 센다")
     void childNeverScheduledWithinWindowIsUnconfirmed() {
@@ -410,12 +423,13 @@ class SubagentUsageLedgerTest {
         reconciler.discover(now);
 
         assertThat(jobs.findByExecutionIdIn(List.of(parent.id())))
-                .as("재조회가 더는 찾지 않는다")
-                .isEmpty();
+            .as("재조회가 더는 찾지 않는다")
+            .isEmpty();
         MonthlyUsageSummary summary = summaries.monthly(USER_ID, from, to);
         assertThat(summary.unconfirmedSubagents()).isOne();
         assertThat(summary.pendingSubagents()).isZero();
     }
+
 
     @Test
     @DisplayName("줄이 아직 없어도 부모가 방금 끝났으면 확인 중으로 센다")
@@ -429,6 +443,7 @@ class SubagentUsageLedgerTest {
         assertThat(summary.unconfirmedSubagents()).isZero();
     }
 
+
     @Test
     @DisplayName("session 없이 온 시작 사건은 미확인으로 센다")
     void sessionlessStartIsUnconfirmed() {
@@ -441,35 +456,37 @@ class SubagentUsageLedgerTest {
         assertThat(summary.pendingSubagents()).isZero();
     }
 
+
     @Test
     @DisplayName("부모가 도는 중이면 그 자식은 어느 건수에도 없다")
     void childrenOfRunningParentAreNotCounted() {
         AgentExecution running = executions.save(execution(USER_ID)
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(now.minusSeconds(30))
-                .build());
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(now.minusSeconds(30))
+            .build());
         startEvent(running, 1, CHILD);
         startEvent(running, 2, null);
 
         assertThat(summaries.monthly(USER_ID, from, to))
-                .isEqualTo(new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+            .isEqualTo(new MonthlyUsageSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
+
 
     @Test
     @DisplayName("agent_delegate 자식은 자기 실행 줄로, native 자식은 원장 줄로 한 번씩 더해진다")
     void delegatedChildAndNativeChildAreEachAddedOnce() {
         AgentExecution parent = finishedParent(USER_ID, justFinished());
         executions.save(execution(USER_ID)
-                .parentExecutionId(parent.id())
-                .rootExecutionId(parent.id())
-                .delegationKey("ledger-delegation-1")
-                .provider("openai")
-                .model("gpt-flat")
-                .status(ExecutionStatus.SUCCEEDED)
-                .tokens(1_000L, null, 500L, 1_500L)
-                .cost(new ExecutionCost(DELEGATED_MICROS, DELEGATED_MICROS, "USD", "models.dev@sample"))
-                .timing(parent.startedAt().plusSeconds(1), parent.finishedAt())
-                .build());
+            .parentExecutionId(parent.id())
+            .rootExecutionId(parent.id())
+            .delegationKey("ledger-delegation-1")
+            .provider("openai")
+            .model("gpt-flat")
+            .status(ExecutionStatus.SUCCEEDED)
+            .tokens(1_000L, null, 500L, 1_500L)
+            .cost(new ExecutionCost(DELEGATED_MICROS, DELEGATED_MICROS, "USD", "models.dev@sample"))
+            .timing(parent.startedAt().plusSeconds(1), parent.finishedAt())
+            .build());
         recordChild(parent, CHILD, pricedUsage(CHILD));
 
         MonthlyUsageSummary summary = summaries.monthly(USER_ID, from, to);
@@ -478,6 +495,7 @@ class SubagentUsageLedgerTest {
         assertThat(summary.pricedExecutions()).isEqualTo(2L);
         assertThat(summary.pricedSubagents()).isOne();
     }
+
 
     @Test
     @DisplayName("다른 사용자의 자식은 내 합계와 건수에 없다")
@@ -489,14 +507,15 @@ class SubagentUsageLedgerTest {
         startEvent(others, 3, null);
 
         assertThat(summaries.monthly(USER_ID, from, to))
-                .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0, 0));
+            .isEqualTo(new MonthlyUsageSummary(PARENT_MICROS, PARENT_MICROS, 1, 0, 0, 0, 0, 0, 0, 0));
         assertThat(summaries.byModel(USER_ID, from, to))
-                .singleElement()
-                .satisfies(line -> assertThat(line.subagents()).isZero());
+            .singleElement()
+            .satisfies(line -> assertThat(line.subagents()).isZero());
         assertThat(summaries.monthly(OTHER_USER_ID, from, to).pricedSubagents())
-                .as("그 자식은 주인의 합계에는 있다")
-                .isOne();
+            .as("그 자식은 주인의 합계에는 있다")
+            .isOne();
     }
+
 
     /** 시작 사건을 남기고 재조회가 줄을 만들어 그 자식의 최종 사용량을 적게 한다. */
     private SubagentUsageJob recordChild(AgentExecution parent, String session, SubagentSessionUsage usage) {
@@ -509,16 +528,18 @@ class SubagentUsageLedgerTest {
         return jobs.findById(job.id()).orElseThrow();
     }
 
+
     /**
      * 자식 session 조회가 모두 그 에이전트의 Hermes 주소와 profile 로, 그 session 을 물었는지 본다. 대역은 session 만 보고 답하므로
      * 주소와 profile 이 틀려도 답이 나온다. 그래서 받은 값을 따로 확인한다.
      */
     private void assertAskedAgentFor(String session) {
         assertThat(hermes.subagentUsageLookups())
-                .as("자식 session 조회가 받은 주소와 profile, session")
-                .isNotEmpty()
-                .containsOnly(new SessionLookup(agent.apiBaseUrl(), agent.hermesProfile(), session));
+            .as("자식 session 조회가 받은 주소와 profile, session")
+            .isNotEmpty()
+            .containsOnly(new SessionLookup(agent.apiBaseUrl(), agent.hermesProfile(), session));
     }
+
 
     private SubagentUsageJob onlyJob() {
         List<SubagentUsageJob> all = jobs.findAll();
@@ -526,69 +547,77 @@ class SubagentUsageLedgerTest {
         return all.getFirst();
     }
 
+
     private void stubSession(String session, SubagentSessionUsage usage) {
         hermes.willReportSubagentUsage(session, usage);
     }
+
 
     /** provider 를 읽었고 이미 끝난 자식의 session 응답이다. */
     private static SubagentSessionUsage pricedUsage(String session) {
         return usage(session, CHILD_PROVIDER, 2.5);
     }
 
+
     private static SubagentSessionUsage usage(String session, String provider, Double endedAt) {
         return new SubagentSessionUsage(
-                session,
-                "subagent",
-                "ledger-parent",
-                CHILD_MODEL,
-                provider,
-                1.0,
-                endedAt,
-                CHILD_PLAIN_INPUT,
-                CHILD_OUTPUT,
-                CHILD_CACHE_READ,
-                CHILD_CACHE_WRITE);
+            session,
+            "subagent",
+            "ledger-parent",
+            CHILD_MODEL,
+            provider,
+            1.0,
+            endedAt,
+            CHILD_PLAIN_INPUT,
+            CHILD_OUTPUT,
+            CHILD_CACHE_READ,
+            CHILD_CACHE_WRITE);
     }
+
 
     private ExecutionEvent startEvent(AgentExecution parent, int sequence, String session) {
         return events.save(ExecutionEvent.builder()
-                .executionId(parent.id())
-                .sequence(sequence)
-                .eventType(ExecutionEventType.SUBAGENT_STARTED)
-                .subagentName("researcher")
-                .hermesSessionId(session)
-                .occurredAt(parent.startedAt())
-                .build());
+            .executionId(parent.id())
+            .sequence(sequence)
+            .eventType(ExecutionEventType.SUBAGENT_STARTED)
+            .subagentName("researcher")
+            .hermesSessionId(session)
+            .occurredAt(parent.startedAt())
+            .build());
     }
+
 
     /** 재조회가 아직 찾는 구간 안에 끝난 부모의 종료 시각이다. */
     private Instant justFinished() {
         return now.minusSeconds(10);
     }
 
+
     /** 재조회가 찾는 24시간이 지나 끝난 부모의 종료 시각이다. */
     private Instant finishedLongAgo() {
         return now.minus(Duration.ofHours(25));
     }
 
+
     private AgentExecution finishedParent(Long userId, Instant finishedAt) {
         return executions.save(execution(userId)
-                .provider(PARENT_PROVIDER)
-                .model(PARENT_MODEL)
-                .status(ExecutionStatus.SUCCEEDED)
-                .tokens(PARENT_INPUT, null, PARENT_OUTPUT, PARENT_INPUT + PARENT_OUTPUT)
-                .cost(new ExecutionCost(PARENT_MICROS, PARENT_MICROS, "USD", "models.dev@sample"))
-                .runtimeFingerprint(FINGERPRINT)
-                .timing(finishedAt.minusSeconds(5), finishedAt)
-                .build());
+            .provider(PARENT_PROVIDER)
+            .model(PARENT_MODEL)
+            .status(ExecutionStatus.SUCCEEDED)
+            .tokens(PARENT_INPUT, null, PARENT_OUTPUT, PARENT_INPUT + PARENT_OUTPUT)
+            .cost(new ExecutionCost(PARENT_MICROS, PARENT_MICROS, "USD", "models.dev@sample"))
+            .runtimeFingerprint(FINGERPRINT)
+            .timing(finishedAt.minusSeconds(5), finishedAt)
+            .build());
     }
+
 
     private AgentExecution.Builder execution(Long userId) {
         return AgentExecution.builder()
-                .userId(userId)
-                .agentId(agent.id())
-                .profileName(agent.hermesProfile())
-                .hermesSessionId("ledger-parent")
-                .costMode(agent.costMode());
+            .userId(userId)
+            .agentId(agent.id())
+            .profileName(agent.hermesProfile())
+            .hermesSessionId("ledger-parent")
+            .costMode(agent.costMode());
     }
 }

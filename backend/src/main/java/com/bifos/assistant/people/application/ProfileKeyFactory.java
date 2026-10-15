@@ -17,6 +17,7 @@ public class ProfileKeyFactory {
 
     private final SecureRandom random = new SecureRandom();
 
+
     public String next() {
         byte[] bytes = new byte[KEY_BYTES];
         random.nextBytes(bytes);

@@ -22,35 +22,39 @@ class UserExecutionPropertiesTest {
         assertThat(smallest.remoteEndMaxWait()).isEqualTo(Duration.ofSeconds(1));
     }
 
+
     @Test
     @DisplayName("한도가 0 이면 기동을 멈춘다")
     void rejectsZeroMaxRunning() {
         assertThatThrownBy(() -> new UserExecutionProperties(0, 0, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("max-running");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("max-running");
     }
+
 
     @Test
     @DisplayName("예비 자리가 음수면 기동을 멈춘다")
     void rejectsNegativeBackgroundReserve() {
         assertThatThrownBy(() -> new UserExecutionProperties(4, -1, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("background-reserve");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("background-reserve");
     }
+
 
     @Test
     @DisplayName("예비 자리가 한도와 같으면 백그라운드 실행이 영영 돌지 못하므로 기동을 멈춘다")
     void rejectsBackgroundReserveEqualToMaxRunning() {
         assertThatThrownBy(() -> new UserExecutionProperties(4, 4, null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("background-reserve");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("background-reserve");
     }
+
 
     @Test
     @DisplayName("원격 종료 상한이 0 이면 기동을 멈춘다")
     void rejectsZeroRemoteEndMaxWait() {
         assertThatThrownBy(() -> new UserExecutionProperties(4, 1, Duration.ZERO))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("remote-end-max-wait");
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("remote-end-max-wait");
     }
 }

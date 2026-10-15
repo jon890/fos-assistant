@@ -30,6 +30,7 @@ public class PersonRegistrar {
     private final HermesProfileProvisioner profiles;
     private final Clock clock;
 
+
     /**
      * 허용 목록에 한 사람을 더하고 그 사람의 Hermes profile 을 만든다.
      *
@@ -54,6 +55,7 @@ public class PersonRegistrar {
         return person;
     }
 
+
     /**
      * 그 profile 이름이 비어 있는지 두 곳에서 본다.
      *
@@ -65,6 +67,7 @@ public class PersonRegistrar {
             throw new ApiException(ErrorCode.PERSON_PROFILE_TAKEN, "this Hermes profile name is already used");
         }
     }
+
 
     /**
      * profile 을 만들지 못했으면 허용 목록 행도 되돌린다.
@@ -80,9 +83,9 @@ public class PersonRegistrar {
             people.delete(person);
         } catch (RuntimeException rollbackFailure) {
             log.error(
-                    "profile 을 만들지 못해 허용 목록 행을 거두려 했으나 그것도 실패했다. 그 주소로 다시 더할 수 없다 email={}",
-                    person.email(),
-                    rollbackFailure);
+                "profile 을 만들지 못해 허용 목록 행을 거두려 했으나 그것도 실패했다. 그 주소로 다시 더할 수 없다 email={}",
+                person.email(),
+                rollbackFailure);
         }
         return failure;
     }

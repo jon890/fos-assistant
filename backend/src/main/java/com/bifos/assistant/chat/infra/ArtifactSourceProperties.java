@@ -10,7 +10,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.artifact.source")
 public record ArtifactSourceProperties(
-        List<String> allowedHosts, Duration connectTimeout, Duration readTimeout, Duration totalTimeout) {
+    List<String> allowedHosts, Duration connectTimeout, Duration readTimeout, Duration totalTimeout) {
+
 
     private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(10);
@@ -20,17 +21,18 @@ public record ArtifactSourceProperties(
         allowedHosts = allowedHosts == null ? List.of() : List.copyOf(allowedHosts);
         for (String host : allowedHosts) {
             if (host == null
-                    || host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")
-                    || !host.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")
-                    || !host.equals(host.toLowerCase(Locale.ROOT))) {
+                || host.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")
+                || !host.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+")
+                || !host.equals(host.toLowerCase(Locale.ROOT))) {
                 throw new IllegalStateException(
-                        "assistant.artifact.source.allowed-hosts must contain lowercase ASCII DNS names");
+                    "assistant.artifact.source.allowed-hosts must contain lowercase ASCII DNS names");
             }
         }
         connectTimeout = positive(connectTimeout, DEFAULT_CONNECT_TIMEOUT, "connect-timeout");
         readTimeout = positive(readTimeout, DEFAULT_READ_TIMEOUT, "read-timeout");
         totalTimeout = positive(totalTimeout, DEFAULT_TOTAL_TIMEOUT, "total-timeout");
     }
+
 
     private static Duration positive(Duration value, Duration defaultValue, String name) {
         Duration result = value == null ? defaultValue : value;

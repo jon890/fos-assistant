@@ -32,17 +32,20 @@ class AgentPortsWiringTest {
 
     private final List<AllowedPerson> saved = new ArrayList<>();
 
+
     @AfterEach
     void tearDown() {
         people.deleteAll(saved);
         saved.clear();
     }
 
+
     @Test
     @DisplayName("profile 을 만들고 거두는 port 는 HermesProfileProvisioner 가 채운다")
     void wiresProfileProvisioningToHermesProfileProvisioner() {
         assertThat(provisioning).isInstanceOf(HermesProfileProvisioner.class);
     }
+
 
     @Test
     @DisplayName("허용 목록에 저장한 profile 이름은 쥐고 있다고 답한다")
@@ -51,9 +54,10 @@ class AgentPortsWiringTest {
         saved.add(people.save(AllowedPerson.of(profile + "@example.com", "x", profile, Instant.now())));
 
         assertThat(reservedProfileNames.reservedByPerson(profile))
-                .as("허용 목록에 저장한 profile %s", profile)
-                .isTrue();
+            .as("허용 목록에 저장한 profile %s", profile)
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("허용 목록에 없는 profile 이름은 쥐고 있지 않다고 답한다")
@@ -61,9 +65,10 @@ class AgentPortsWiringTest {
         String profile = uniqueProfile();
 
         assertThat(reservedProfileNames.reservedByPerson(profile))
-                .as("허용 목록에 없는 profile %s", profile)
-                .isFalse();
+            .as("허용 목록에 없는 profile %s", profile)
+            .isFalse();
     }
+
 
     private static String uniqueProfile() {
         return "ports-" + UUID.randomUUID();

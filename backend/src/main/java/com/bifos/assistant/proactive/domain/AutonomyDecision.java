@@ -29,9 +29,8 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(
-        name = "proactive_autonomy_decision",
-        uniqueConstraints =
-                @UniqueConstraint(name = "uk_proactive_autonomy_decision_execution_key", columnNames = "execution_key"))
+    name = "proactive_autonomy_decision",
+    uniqueConstraints = @UniqueConstraint(name = "uk_proactive_autonomy_decision_execution_key", columnNames = "execution_key"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
@@ -89,17 +88,18 @@ public class AutonomyDecision {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+
     /** {@code EXECUTE} 이면 원천 살펴보기의 실행 키와 {@code PENDING} 을 함께 둔다. */
     public static AutonomyDecision of(
-            Long userId,
-            Long evaluationId,
-            Long candidateId,
-            Long sourceCheckId,
-            AutonomyLevel level,
-            List<AutonomyReason> reasons,
-            AutonomyInputs inputs,
-            int policyVersion,
-            Instant now) {
+        Long userId,
+        Long evaluationId,
+        Long candidateId,
+        Long sourceCheckId,
+        AutonomyLevel level,
+        List<AutonomyReason> reasons,
+        AutonomyInputs inputs,
+        int policyVersion,
+        Instant now) {
         AutonomyDecision row = new AutonomyDecision();
         row.userId = userId;
         row.evaluationId = evaluationId;
@@ -117,10 +117,12 @@ public class AutonomyDecision {
         return row;
     }
 
+
     /** 원천 살펴보기 하나에 자동 실행 하나를 허락하는 키다. */
     public static String executionKey(Long sourceCheckId) {
         return "check:" + sourceCheckId;
     }
+
 
     public void started(Long checkId) {
         requirePending();
@@ -128,15 +130,17 @@ public class AutonomyDecision {
         executionCheckId = checkId;
     }
 
+
     /** @param checkId 시작 경로가 살펴보기 줄을 저장한 뒤 실패했으면 그 줄. 저장 전에 거절됐으면 null */
     public void failed(String errorCode, Long checkId) {
         requirePending();
         executionStatus = AutonomyExecutionStatus.FAILED;
         executionCheckId = checkId;
         executionError = errorCode == null || errorCode.length() <= EXECUTION_ERROR_MAX_LENGTH
-                ? errorCode
-                : errorCode.substring(0, EXECUTION_ERROR_MAX_LENGTH);
+            ? errorCode
+            : errorCode.substring(0, EXECUTION_ERROR_MAX_LENGTH);
     }
+
 
     private void requirePending() {
         if (executionStatus != AutonomyExecutionStatus.PENDING) {

@@ -14,6 +14,7 @@ class MemorySensitiveHintsTest {
         assertThat(MemorySensitiveHints.suspected("종교", "종교는 불교야")).isTrue();
     }
 
+
     @Test
     @DisplayName("낱말은 공백을 뺀 글에서 찾는다")
     void ignoresWhitespaceInsideWords() {
@@ -21,18 +22,21 @@ class MemorySensitiveHintsTest {
         assertThat(MemorySensitiveHints.suspected("결제", "비밀   번호는 따로 적어 둔다")).isTrue();
     }
 
+
     @Test
     @DisplayName("제목에만 민감한 낱말이 있어도 민감해 보인다")
     void suspectsTitleOnly() {
         assertThat(MemorySensitiveHints.suspected("계좌", "국민은행에 있다")).isTrue();
     }
 
+
     @Test
     @DisplayName("메일 주소가 있으면 민감해 보인다")
     void suspectsEmailAddress() {
         assertThat(MemorySensitiveHints.suspected("연락", "메일은 user@example.com 이야"))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("숫자가 여섯 개 이상 이어지면 민감해 보이고 다섯 개면 그렇지 않다")
@@ -40,8 +44,9 @@ class MemorySensitiveHintsTest {
         assertThat(MemorySensitiveHints.suspected("연락", "전화는 010-1234-5678 이야")).isTrue();
         assertThat(MemorySensitiveHints.suspected("우편", "번호는 12345 이야")).isFalse();
         assertThat(MemorySensitiveHints.suspected("날짜", "1일과 2일과 3일과 4일과 5일과 6일"))
-                .isFalse();
+            .isFalse();
     }
+
 
     @Test
     @DisplayName("날짜 모양은 숫자열로 세지 않고 날짜가 아닌 긴 숫자열은 민감해 보인다")
@@ -50,10 +55,11 @@ class MemorySensitiveHintsTest {
         assertThat(MemorySensitiveHints.suspected("기념일", "기념일은 2015.10.08")).isFalse();
         assertThat(MemorySensitiveHints.suspected("통장", "계좌는 110-123-456789")).isTrue();
         assertThat(MemorySensitiveHints.suspected("번호", "번호는 110-123-456789 이야"))
-                .isTrue();
+            .isTrue();
         assertThat(MemorySensitiveHints.suspected("번호", "번호는 1234-56-789012 이야"))
-                .isTrue();
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("흔한 사실과 한 글자가 우연히 겹치는 낱말은 민감해 보이지 않는다")

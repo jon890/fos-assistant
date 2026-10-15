@@ -13,6 +13,7 @@ public class DecisionProfileReadinessClient {
 
     private final HermesProperties properties;
 
+
     public boolean ready(String profile) {
         if (!HermesProfileName.isValid(profile)) {
             return false;
@@ -24,15 +25,15 @@ public class DecisionProfileReadinessClient {
             RestClient client = RestClient.builder().requestFactory(factory).build();
             String baseUrl = properties.dashboardBaseUrl().replaceAll("/+$", "");
             JsonNode result = client.get()
-                    .uri(baseUrl + "/api/profiles/{profile}/decision-readiness", profile)
-                    .header("Authorization", "Bearer " + properties.dashboardToken())
-                    .retrieve()
-                    .body(JsonNode.class);
+                .uri(baseUrl + "/api/profiles/{profile}/decision-readiness", profile)
+                .header("Authorization", "Bearer " + properties.dashboardToken())
+                .retrieve()
+                .body(JsonNode.class);
             return result != null
-                    && result.path("version").isInt()
-                    && result.path("version").asInt() == 1
-                    && result.path("ready").isBoolean()
-                    && result.path("ready").asBoolean();
+                && result.path("version").isInt()
+                && result.path("version").asInt() == 1
+                && result.path("ready").isBoolean()
+                && result.path("ready").asBoolean();
         } catch (RuntimeException ex) {
             return false;
         }

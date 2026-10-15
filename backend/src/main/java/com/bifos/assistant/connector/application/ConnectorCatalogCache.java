@@ -28,19 +28,22 @@ public class ConnectorCatalogCache {
     private RuntimeException failure;
     private Instant failedAt;
 
+
     // 검사가 시각을 고정할 수 있게 Clock 을 받는 생성자를 따로 둔다.
     @Autowired
     public ConnectorCatalogCache(
-            HermesConnectorClient connector, LiveProperties<ConnectorPolicyProperties> properties) {
+        HermesConnectorClient connector, LiveProperties<ConnectorPolicyProperties> properties) {
         this(connector, properties, Clock.systemUTC());
     }
 
+
     public ConnectorCatalogCache(
-            HermesConnectorClient connector, LiveProperties<ConnectorPolicyProperties> properties, Clock clock) {
+        HermesConnectorClient connector, LiveProperties<ConnectorPolicyProperties> properties, Clock clock) {
         this.connector = connector;
         this.properties = properties;
         this.clock = clock;
     }
+
 
     /**
      * 그 번호의 manifest 다. 카탈로그에 없거나 Control Plane 이 받지 않는 선언이면 빈 값이다.
@@ -60,8 +63,8 @@ public class ConnectorCatalogCache {
             }
             try {
                 manifests = connector.readCatalog().stream()
-                        .filter(ConnectorManifests::accepted)
-                        .toList();
+                    .filter(ConnectorManifests::accepted)
+                    .toList();
             } catch (RuntimeException ex) {
                 failure = ex;
                 failedAt = now;
@@ -71,7 +74,7 @@ public class ConnectorCatalogCache {
             readAt = now;
         }
         return manifests.stream()
-                .filter(manifest -> manifest.id().equals(connectorId))
-                .findFirst();
+            .filter(manifest -> manifest.id().equals(connectorId))
+            .findFirst();
     }
 }

@@ -25,15 +25,16 @@ import org.yaml.snakeyaml.resolver.Resolver;
  * @param name 앞머리의 {@code name}. 앞뒤 공백을 뺀 값이다
  * @param description 앞머리의 {@code description}. 앞뒤 공백을 뺀 값이고 화면에 보이는 값이다
  * @param rawDescription 앞머리의 {@code description} 을 문자열로 바꾼 원래 값. 앞뒤를 빼지 않는다.
- *     날짜처럼 보이는 값은 적힌 글자 그대로다. {@link TextTimestampResolver} 를 본다
+ * 날짜처럼 보이는 값은 적힌 글자 그대로다. {@link TextTimestampResolver} 를 본다
  * @param hasBody 닫는 {@code ---} 줄 뒤에 공백이 아닌 글이 있는가
  * @param requestsSecrets 앞머리가 환경 값이나 자격 증명 파일을 요청하는 칸을 가졌는가. 최상위 {@code
  *     required_environment_variables}, {@code required_credential_files}, map 인 {@code setup} 의 {@code
  *     collect_secrets}, map 인 {@code prerequisites} 의 {@code env_vars} 가운데 하나라도 키가 있으면 값과 관계없이
- *     참이다. 파서는 거절하지 않고 저장 검사가 거절한다. 옛 스킬의 설명을 읽는 자리도 이 파서를 쓰기 때문이다
+ * 참이다. 파서는 거절하지 않고 저장 검사가 거절한다. 옛 스킬의 설명을 읽는 자리도 이 파서를 쓰기 때문이다
  */
 public record SkillFrontmatter(
-        String name, String description, String rawDescription, boolean hasBody, boolean requestsSecrets) {
+    String name, String description, String rawDescription, boolean hasBody, boolean requestsSecrets) {
+
 
     private static final String FENCE = "---";
 
@@ -65,11 +66,11 @@ public record SkillFrontmatter(
             // 태그로 임의의 객체를 만들지 않는 생성기다. 사용자가 올린 글을 그대로 읽는 자리라서다.
             LoaderOptions options = new LoaderOptions();
             loaded = new Yaml(
-                            new SafeConstructor(options),
-                            new Representer(new DumperOptions()),
-                            new DumperOptions(),
-                            options,
-                            new TextTimestampResolver())
+                new SafeConstructor(options),
+                new Representer(new DumperOptions()),
+                new DumperOptions(),
+                options,
+                new TextTimestampResolver())
                     .load(yaml);
         } catch (RuntimeException ex) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md frontmatter is not valid YAML", ex);
@@ -88,8 +89,9 @@ public record SkillFrontmatter(
         }
         String body = String.join("\n", Arrays.copyOfRange(lines, end + 1, lines.length));
         return new SkillFrontmatter(
-                name, description, String.valueOf(descriptionValue), !body.isBlank(), requestsSecrets(values));
+            name, description, String.valueOf(descriptionValue), !body.isBlank(), requestsSecrets(values));
     }
+
 
     /**
      * 이미 저장된 {@code SKILL.md} 가 비밀 요청 칸을 가졌는가(ADR-086). 저장 검사가 생기기 전에 올린 스킬을 거르는
@@ -104,14 +106,16 @@ public record SkillFrontmatter(
         }
     }
 
+
     /** Hermes 가 profile 의 환경 값이나 파일을 셸 실행 공간에 넣게 만드는 앞머리 칸이 있는가(ADR-086). */
     private static boolean requestsSecrets(Map<?, ?> values) {
         return values.containsKey("required_environment_variables")
-                || values.containsKey("required_credential_files")
-                || (values.get("setup") instanceof Map<?, ?> setup && setup.containsKey("collect_secrets"))
-                || (values.get("prerequisites") instanceof Map<?, ?> prerequisites
-                        && prerequisites.containsKey("env_vars"));
+            || values.containsKey("required_credential_files")
+            || (values.get("setup") instanceof Map<?, ?> setup && setup.containsKey("collect_secrets"))
+            || (values.get("prerequisites") instanceof Map<?, ?> prerequisites
+                && prerequisites.containsKey("env_vars"));
     }
+
 
     /**
      * Hermes 가 새 스킬을 만들 때 60자 한도에 견주는 설명 글자 수다.
@@ -133,6 +137,7 @@ public record SkillFrontmatter(
         return text.codePointCount(start, end);
     }
 
+
     /**
      * Hermes 가 저장할 때마다 1024자 한도에 견주는 설명 글자 수다.
      *
@@ -143,17 +148,21 @@ public record SkillFrontmatter(
         return rawDescription.codePointCount(0, rawDescription.length());
     }
 
+
     private static boolean isQuote(char value) {
         return value == '\'' || value == '"';
     }
+
 
     private static String textOf(Object value) {
         return value == null ? "" : String.valueOf(value).strip();
     }
 
+
     private static ApiException invalid(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);
     }
+
 
     /**
      * 날짜처럼 보이는 값을 {@link java.util.Date} 로 바꾸지 않고 적힌 글자 그대로 둔다.

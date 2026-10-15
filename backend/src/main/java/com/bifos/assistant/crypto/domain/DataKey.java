@@ -13,23 +13,28 @@ public final class DataKey {
     private final Long userId;
     private final SecretKey secret;
 
+
     public DataKey(Long id, Long userId, SecretKey secret) {
         this.id = id;
         this.userId = userId;
         this.secret = secret;
     }
 
+
     public Long id() {
         return id;
     }
+
 
     public Long userId() {
         return userId;
     }
 
+
     public SecretKey secret() {
         return secret;
     }
+
 
     @Override
     public String toString() {

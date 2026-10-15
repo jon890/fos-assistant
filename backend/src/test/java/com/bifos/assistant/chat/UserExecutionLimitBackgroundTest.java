@@ -127,9 +127,11 @@ class UserExecutionLimitBackgroundTest {
     private Conversation conversation;
     private TurnHandle heldTurn;
 
+
     private StubHermesRunsClient stub() {
-        return (StubHermesRunsClient) hermes;
+        return (StubHermesRunsClient)hermes;
     }
+
 
     @BeforeEach
     void setUp() {
@@ -144,41 +146,42 @@ class UserExecutionLimitBackgroundTest {
         AppUser user = users.save(AppUser.of("background@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         agent = agents.save(Agent.of(
-                "background-dad",
-                "비서",
-                "background-dad",
-                "http://runtime.test",
-                CostMode.API,
-                CredentialScope.DEDICATED,
-                AgentVisibility.PRIVATE,
-                dad.id(),
-                Instant.now()));
+            "background-dad",
+            "비서",
+            "background-dad",
+            "http://runtime.test",
+            CostMode.API,
+            CredentialScope.DEDICATED,
+            AgentVisibility.PRIVATE,
+            dad.id(),
+            Instant.now()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         starters = new StarterSuggestionService(
-                starterProperties,
-                agentService,
-                conversations,
-                messages,
-                hermes,
-                recorder,
-                modelTiers,
-                objectMapper,
-                limiter,
-                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
-                executor);
+            starterProperties,
+            agentService,
+            conversations,
+            messages,
+            hermes,
+            recorder,
+            modelTiers,
+            objectMapper,
+            limiter,
+            Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
+            executor);
         heldTurn = turns.open(dad.id(), conversation.id());
     }
+
 
     @AfterEach
     void tearDown() {
         turns.close(heldTurn);
     }
 
+
     @Test
     @DisplayName("turn 자리 하나를 쥔 사용자의 추천 질문은 줄 없이 건너뛰고 자리가 빈 뒤 다음 읽기에서 만든다")
     void skipsStarterWithoutRowWhileTurnHeldAndBuildsOnNextReadAfterSlotFrees() {
-        stub().willAnswer(command ->
-                HermesRunResult.of("starter-run", null, "completed", PROMPTS, "model", "provider", TokenUsage.empty()));
+        stub().willAnswer(command -> HermesRunResult.of("starter-run", null, "completed", PROMPTS, "model", "provider", TokenUsage.empty()));
 
         starters.read(dad, agent.code());
         executor.awaitAll();
@@ -186,8 +189,8 @@ class UserExecutionLimitBackgroundTest {
         assertThat(executions.findAll()).as("건너뛴 추천의 실행 줄").isEmpty();
         assertThat(stub().received()).as("Hermes 제출").isEmpty();
         assertThat(starters.read(dad, agent.code()).status())
-                .as("실패 시각을 적지 않아 다음 읽기가 다시 만들기를 시작한다")
-                .isEqualTo(StarterStatus.GENERATING);
+            .as("실패 시각을 적지 않아 다음 읽기가 다시 만들기를 시작한다")
+            .isEqualTo(StarterStatus.GENERATING);
         executor.awaitAll();
         assertThat(stub().received()).as("자리가 차 있는 동안의 Hermes 제출").isEmpty();
 
@@ -201,45 +204,49 @@ class UserExecutionLimitBackgroundTest {
         assertThat(stub().received()).as("자리가 빈 뒤의 Hermes 제출").hasSize(1);
     }
 
+
     @Test
     @DisplayName("turn 자리 하나를 쥔 사용자의 Memory 제안은 실행 줄을 만들지 않고 Hermes 에 제출하지 않는다")
     void skipsMemoryProposalWithoutRowWhileTurnHeld() {
         AgentExecution parent = recorder.start(dad, conversation.executionConversation(), agent, null, null, 0L);
         stub().willReturn(HermesRunResult.of(
-                "proposal",
-                "new",
-                "completed",
-                "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}",
-                "model",
-                "provider",
-                TokenUsage.empty()));
+            "proposal",
+            "new",
+            "completed",
+            "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}",
+            "model",
+            "provider",
+            TokenUsage.empty()));
 
         proposer.proposeFrom(
-                dad, conversation.executionConversation(), agent, parent, "국수 이야기", ModelChoice.defaults());
+            dad, conversation.executionConversation(), agent, parent, "국수 이야기", ModelChoice.defaults());
 
         assertThat(executions.findAll())
-                .as("dad 의 실행 줄")
-                .extracting(AgentExecution::id)
-                .containsExactly(parent.id());
+            .as("dad 의 실행 줄")
+            .extracting(AgentExecution::id)
+            .containsExactly(parent.id());
         assertThat(stub().received()).as("Hermes 제출").isEmpty();
         assertThat(memories.findAll()).as("제안").isEmpty();
         assertThat(limiter.used(dad.id())).as("쥔 turn 자리").isEqualTo(1);
     }
 
+
     /** 받은 만들기를 가상 스레드에서 돌리고 끝나기를 기다릴 수 있게 모은다. */
     private static final class TrackingExecutor implements Executor {
         private final List<CompletableFuture<Void>> tasks = new CopyOnWriteArrayList<>();
 
+
         @Override
         public void execute(Runnable command) {
             tasks.add(CompletableFuture.runAsync(
-                    command, runnable -> Thread.ofVirtual().start(runnable)));
+                command, runnable -> Thread.ofVirtual().start(runnable)));
         }
+
 
         void awaitAll() {
             CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new))
-                    .orTimeout(5, TimeUnit.SECONDS)
-                    .join();
+                .orTimeout(5, TimeUnit.SECONDS)
+                .join();
         }
     }
 }

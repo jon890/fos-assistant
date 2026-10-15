@@ -19,6 +19,7 @@ public final class EchoCdpRelayConnector implements CdpRelayConnector {
     private final List<String> fragments = new ArrayList<>();
     private int opened;
 
+
     @Override
     public synchronized CdpRelay open(URI cdp, String kind, String id, CdpRelayListener listener) {
         opened++;
@@ -33,6 +34,7 @@ public final class EchoCdpRelayConnector implements CdpRelayConnector {
                 listener.onFragment(fragment, last);
             }
 
+
             @Override
             public void close() {
                 closed.set(true);
@@ -40,20 +42,24 @@ public final class EchoCdpRelayConnector implements CdpRelayConnector {
         };
     }
 
+
     /** 연 횟수다. */
     public synchronized int opened() {
         return opened;
     }
+
 
     /** 받은 조각이다. 받은 차례대로다. */
     public synchronized List<String> fragments() {
         return List.copyOf(fragments);
     }
 
+
     public synchronized void reset() {
         fragments.clear();
         opened = 0;
     }
+
 
     private synchronized void record(String fragment) {
         fragments.add(fragment);
