@@ -436,6 +436,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 - `provider` 와 `model` 은 Hermes 의 session 이 답한 값이고, 읽지 못하면 요청한 값이다. 기본값으로 보냈고 둘 다 읽지 못하면 비어 있다
 - `reasoning_effort` 가 비면 기본값으로 보낸 것이다. `reasoning_defaults_checked_at` 은 그때 profile 기본값을 정상 응답으로 읽은 시각이고, 조회가 실패하면 비워 다시 시도한다. `reasoning_effort_source` 는 이 칸이 생기기 전의 실행에서 비어 있고 추정해 채우지 않는다
 - `instructions_hash` 는 공통 답변 지침과 Memory 문맥의 지문이다. 본문은 개인 Memory 를 담을 수 있어 저장하지 않는다. `runtime_fingerprint` 는 그 값을 주는 Hermes 경로가 아직 없어 늘 비어 있다
+- 입력·출력 토큰 중 하나라도 누락되면 환산액·실제 청구액·통화·가격표 버전은 비운다. 보고된 토큰과 실행 상태는 보존하며, 월 합계는 이 실행을 `unpricedExecutions`로 센다. 명시적인 0은 누락과 구분하고 캐시 수 누락은 입력 전체에 일반 단가를 적용한다
 - 토큰 칸은 provider 가 알려준 것만 채우고, `actual_cost_micros` 는 구독 경로에서 비어 있다. 금액을 0 으로 채우지 않는다. 0 은 공짜라는 뜻으로 읽히기 때문이다([ADR-014](adr/ADR-014-실제-청구액과-환산액을-나눠-적는다.md))
 
 **`result_delivered_at` 은 위임 실행의 끝난 결과를 부모에게 전한 시각이다.** 비어 있고 `SUCCEEDED` 나 `FAILED` 인 위임 실행이 부모 대화를 깨울 대상이다([ADR-040](adr/ADR-040-위임-결과는-control-plane-이-부모-대화의-다음-turn-을-열어-전한다.md)).
