@@ -7,31 +7,35 @@ import { claimApproval, takeApproval } from "./execution-guard.ts";
 import { prepareTrade, readExpectedOrder, orderPath } from "./prepare-trade.ts";
 import {
   EXECUTION_SCHEMAS,
-  TRADE_OPERATIONS,
+  OPEN_TRADE_TOOLS,
   tradingBody,
   UNKNOWN,
   reject,
   type TradeTool,
 } from "./trading-body.ts";
 
-/** 운영 server에서는 아직 호출하지 않는다. 실제 등록은 테스트 entry만 소유한다. */
+/**
+ * 준비 도구와 `tools`의 실행 도구를 등록한다. 운영 server는 기본값인 주문과 취소만 연다.
+ * 정정은 테스트 entry만 명시해 등록한다.
+ */
 export function registerTradingTools(
   register: RegisterTool,
   client: Tossinvest,
+  tools: readonly [TradeTool, ...TradeTool[]] = OPEN_TRADE_TOOLS,
 ) {
   const authority = takeApproval(client.env);
   register(
     "prepare_trade",
     {
       v: z.literal(1),
-      tool: z.enum(["create_order", "modify_order", "cancel_order"]),
+      tool: z.enum(tools),
       args: z.record(z.string(), z.unknown()),
     },
     { readOnlyHint: true },
     async ({ tool, args }) => prepareTrade(client, tool, args),
   );
 
-  for (const tool of Object.keys(TRADE_OPERATIONS) as TradeTool[]) {
+  for (const tool of tools) {
     register(
       tool,
       EXECUTION_SCHEMAS[tool].shape,

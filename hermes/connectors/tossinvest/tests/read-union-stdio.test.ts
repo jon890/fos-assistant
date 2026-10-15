@@ -61,17 +61,26 @@ for (const entry of ["src/server.ts", "dist/tossinvest-mcp.js"]) {
         }),
       );
       const listed = (await client.listTools()).tools;
-      expect(listed.map(({ name }) => name).sort()).toEqual(readToolNames);
+      // READ 33개는 그대로이고 주문 준비 READ 하나와 실행 FINANCIAL 둘이 따로 있다.
+      const financial = ["cancel_order", "create_order"];
+      const trading = [...financial, "prepare_trade"];
+      expect(
+        listed
+          .map(({ name }) => name)
+          .filter((name) => !trading.includes(name))
+          .sort(),
+      ).toEqual(readToolNames);
       expect(listed.map(({ name }) => name).sort()).toEqual(
         Object.keys(manifest.tools).sort(),
       );
       for (const item of listed) {
         const declared = (manifest.tools as Record<string, any>)[item.name];
-        expect(declared.risk).toBe("READ");
-        expect(declared.approval ?? "none").toBe("none");
+        const read = !financial.includes(item.name);
+        expect(declared.risk).toBe(read ? "READ" : "FINANCIAL");
+        expect(declared.approval ?? "none").toBe(read ? "none" : "always");
         expect(item.description).toBe(declared.description);
         expect(item.description).not.toContain("undefined");
-        expect(item.annotations?.readOnlyHint).toBe(true);
+        expect(item.annotations?.readOnlyHint).toBe(read);
         expect(item.inputSchema.additionalProperties).toBe(false);
       }
       for (const call of readUnionCases) {

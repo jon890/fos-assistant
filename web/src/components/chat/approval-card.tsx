@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Notice } from "@/components/ui/notice";
 import { ContentDraftSaveCard } from "@/components/chat/content-draft-save-card";
+import {
+  approvalBlocked,
+  financialView,
+  FinancialSummaryView,
+} from "@/components/chat/financial-summary";
 import { toolRiskLabel } from "@/lib/connection";
 import {
   approvalArgs,
@@ -157,6 +162,34 @@ function ApprovalArgsView({ action }: { action: ConnectorAction }) {
   );
 }
 
+/** 카드 본문이다. 금융 줄은 요약을, 그 밖의 줄은 인자를 그리고 승인할 수 없는 까닭을 안내한다. */
+function ApprovalContent({ action }: { action: ConnectorAction }) {
+  const { line, summary, closed } = financialView(action);
+  return (
+    <>
+      {line ? (
+        summary ? (
+          <FinancialSummaryView summary={summary} />
+        ) : null
+      ) : (
+        <ApprovalArgsView action={action} />
+      )}
+      {closed ? (
+        <Notice
+          variant="warning"
+          role="status"
+          data-testid="approval-financial-unavailable"
+        >
+          주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.
+        </Notice>
+      ) : null}
+      {action.status === "PENDING" && action.hiddenArgs ? (
+        <HiddenArgsNotice action={action} />
+      ) : null}
+    </>
+  );
+}
+
 /** 「승인하고 묻지 않기」 단추와 기간 메뉴다. */
 function GrantMenu({
   disabled,
@@ -255,8 +288,7 @@ export function ApprovalCard({
     onChanged(null);
   }
 
-  // 사람이 다 읽지 못한 인자로는 승인을 받지 않는다. 서버도 이런 줄의 승인을 실행하지 않고 끝낸다.
-  const blocked = action.status === "PENDING" && action.hiddenArgs;
+  const blocked = approvalBlocked(action);
 
   return (
     <section
@@ -284,8 +316,7 @@ export function ApprovalCard({
           </p>
         </>
       )}
-      <ApprovalArgsView action={action} />
-      {blocked ? <HiddenArgsNotice action={action} /> : null}
+      <ApprovalContent action={action} />
       {action.status === "PENDING" ? (
         <div className="flex flex-wrap items-center gap-2">
           {blocked ? null : (

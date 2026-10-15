@@ -886,8 +886,9 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             self.assertFalse(policy["grant"])
 
     def test_toss_read_union_preserves_descriptions_and_read_policy(self):
-        """조회 합집합 33개를 실제 reader로 읽고 금융 권한 없이 설명을 보존한다."""
+        """조회 합집합 33개를 실제 reader로 읽어 설명을 보존하고, 금융 셋은 주문 준비와 주문, 취소만 둔다."""
         declared = json.loads((ROOT / "connectors/tossinvest/connector.json").read_text())
+        trading = {"prepare_trade": "READ", "create_order": "FINANCIAL", "cancel_order": "FINANCIAL"}
         names = {
             "list_accounts", "get_quotes", "get_holdings", "get_buying_power", "list_orders",
             "get_sellable_quantity", "get_stocks", "list_stocks", "get_stock_warnings",
@@ -899,15 +900,18 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             "get_stock_investor_trading", "get_stock_program_trades", "get_stock_short_selling",
             "get_stock_credit_trades", "get_stock_securities_lending",
         }
-        self.assertEqual(set(declared["tools"]), names)
+        self.assertEqual({name for name in declared["tools"] if name not in trading}, names)
+        self.assertEqual({name: declared["tools"][name]["risk"] for name in trading}, trading)
+        self.assertNotIn("modify_order", declared["tools"])
+        self.assertEqual(declared["execution_guard"]["operations"], {"create_order": "CREATE", "cancel_order": "CANCEL"})
         self.assertTrue(declared["single_binding"])
         self.assertTrue(declared["sandbox_required"])
         self.assertEqual(declared["default_tool_policy"], "deny")
         tools = {"list_scopes": {"risk": "READ"}, **declared["tools"]}
         self.rewrite("connector.json", lambda value: value.update(schema=2, tools=tools))
         policies = self.catalog()[0]["tools"]
-        self.assertEqual(set(policies), names | {"list_scopes"})
-        for name in names:
+        self.assertEqual(set(policies), names | set(trading) | {"list_scopes"})
+        for name in names | {"prepare_trade"}:
             policy = policies[name]
             self.assertEqual(policy["risk"], "READ")
             self.assertEqual(policy["approval"], "none")
@@ -915,6 +919,13 @@ class ConnectorToolPolicyTest(ConnectorGateCase):
             self.assertFalse(policy["outbound"])
             self.assertEqual(policy["description"], declared["tools"][name]["description"])
             self.assertNotIn("undefined", policy["description"])
+        for name in ("create_order", "cancel_order"):
+            policy = policies[name]
+            self.assertEqual((policy["risk"], policy["approval"]), ("FINANCIAL", "always"))
+            self.assertFalse(policy["grant"])
+            self.assertFalse(policy["conversation_grant"])
+            self.assertFalse(policy["outbound"])
+            self.assertEqual(policy["description"], declared["tools"][name]["description"])
         self.rewrite("connector.json", lambda value: value["tools"]["get_order"].update(risk="UNKNOWN"))
         self.assertEqual(self.catalog(), [])
 

@@ -26,6 +26,11 @@ export const TRADE_OPERATIONS = {
   cancel_order: "CANCEL",
 } as const;
 export type TradeTool = keyof typeof TRADE_OPERATIONS;
+/** 운영 server가 등록하는 실행 도구다. 정정은 열지 않는다(ADR-20261013 / financial-order-opening). */
+export const OPEN_TRADE_TOOLS: readonly [TradeTool, ...TradeTool[]] = [
+  "create_order",
+  "cancel_order",
+];
 export type Args = Record<string, any>;
 export function financialOperation(method: "POST" | "DELETE", path: string) {
   const operation = operationFor(method, path);

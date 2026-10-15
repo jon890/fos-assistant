@@ -47,7 +47,8 @@ const manifest = JSON.parse(
 
 async function checkProduction(client: Client, fake: FakeToss) {
   const listed = (await client.listTools()).tools;
-  expect(listed).toHaveLength(33);
+  // READ 33개와 주문 준비 READ 하나, 실행 FINANCIAL 둘이다.
+  expect(listed).toHaveLength(36);
   expect(new Set(listed.map(({ name }) => name))).toEqual(
     new Set(Object.keys(manifest.tools)),
   );
@@ -55,8 +56,16 @@ async function checkProduction(client: Client, fake: FakeToss) {
   for (const item of listed) {
     expect(item.description).toBeDefined();
     expect(item.description).not.toContain("undefined");
-    expect(item.annotations?.readOnlyHint).toBe(true);
+    expect(item.annotations?.readOnlyHint).toBe(
+      manifest.tools[item.name].risk === "READ",
+    );
   }
+  expect(
+    listed
+      .filter((item) => !item.annotations?.readOnlyHint)
+      .map((item) => item.name)
+      .sort(),
+  ).toEqual(["cancel_order", "create_order"]);
   expect(manifest.schema).toBe(2);
   for (const [, name, , detail] of cases) {
     const registered = listed.find((item) => item.name === name)!;

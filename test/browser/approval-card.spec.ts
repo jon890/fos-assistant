@@ -1160,3 +1160,166 @@ test("같은 도구라도 실행 중인 줄과 도구 이름이 없는 줄은 �
       .locator(":scope > [data-testid=approval-card]"),
   ).toHaveCount(3);
 });
+
+/** 합성 값으로 만든 금융 요약이다. */
+function financial(overrides: Record<string, unknown> = {}) {
+  return {
+    available: true,
+    accountSeq: "7",
+    operation: "CREATE",
+    symbol: "TESTCO",
+    market: "US",
+    currency: "USD",
+    side: "BUY",
+    quantity: null,
+    orderAmount: "12.5",
+    price: null,
+    orderType: "MARKET",
+    timeInForce: "DAY",
+    orderId: null,
+    normalization: [],
+    ...overrides,
+  };
+}
+
+function financialAction(
+  index: number,
+  overrides: Record<string, unknown> = {},
+): Action {
+  return action({
+    actionId: `0f0e0d0c-0b0a-4908-8706-0504030202${String(index).padStart(2, "0")}`,
+    connectorId: "tossinvest",
+    toolName: "create_order",
+    title: "주문 넣기",
+    risk: "FINANCIAL",
+    grantAllowed: false,
+    conversationGrantAllowed: false,
+    argsJson: JSON.stringify({ v: 1, tool: "create_order" }),
+    financial: financial(),
+    ...overrides,
+  });
+}
+
+test("금융 줄은 계좌 순번과 종목, 방향, 금액과 통화를 보이고 승인 단추가 있다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "금융 요약 표시 검사",
+    financialAction(0, {
+      financial: financial({
+        normalization: [
+          { field: "orderType", before: null, after: "MARKET" },
+          { field: "symbol", before: "testco", after: "TESTCO" },
+        ],
+      }),
+    }),
+  );
+
+  const summary = page.getByTestId("approval-financial");
+  await expect(summary).toContainText("계좌 순번");
+  await expect(summary).toContainText("7");
+  await expect(summary).toContainText("TESTCO (US)");
+  await expect(summary).toContainText("매수");
+  await expect(summary).toContainText("시장가");
+  await expect(summary).toContainText("12.5 USD");
+  await expect(summary).not.toContainText("주문 번호");
+  await expect(summary).toContainText("입력을 이렇게 바꿨어요");
+  await expect(summary).toContainText("orderType: 없음 → MARKET");
+  await expect(summary).toContainText("symbol: testco → TESTCO");
+  await expect(page.getByTestId("approval-args")).toHaveCount(0);
+  await expect(page.getByTestId("approval-financial-unavailable")).toHaveCount(
+    0,
+  );
+  await expect(page.getByTestId("approval-approve")).toBeEnabled();
+  await expect(page.getByTestId("approval-grant")).toHaveCount(0);
+  await expect(page.getByTestId("approval-conversation-grant")).toHaveCount(0);
+});
+
+test("금융 취소 줄은 주문 번호와 주문 취소를 보인다", async ({ page }) => {
+  await openWith(
+    page,
+    "금융 취소 표시 검사",
+    financialAction(0, {
+      toolName: "cancel_order",
+      financial: financial({
+        operation: "CANCEL",
+        orderId: "ORDER-1",
+        orderAmount: null,
+        quantity: "3",
+        price: "9.75",
+        orderType: "LIMIT",
+        side: "SELL",
+      }),
+    }),
+  );
+
+  const summary = page.getByTestId("approval-financial");
+  await expect(summary).toContainText("주문 취소");
+  await expect(summary).toContainText("ORDER-1");
+  await expect(summary).toContainText("매도");
+  await expect(summary).toContainText("지정가");
+  await expect(summary).toContainText("3주");
+  await expect(summary).toContainText("9.75 USD");
+});
+
+for (const [name, overrides] of [
+  [
+    "요약을 열지 못한 금융 줄은",
+    { financial: financial({ available: false }) },
+  ],
+  ["요약이 빠진 금융 줄은", { financial: null }],
+] as const) {
+  test(`${name} 승인 단추 없이 거절만 남기고 안내를 보인다`, async ({
+    page,
+  }) => {
+    await openWith(page, "금융 요약 없음 검사", financialAction(0, overrides));
+
+    const card = page.getByTestId("approval-card");
+    await expect(card.getByTestId("approval-financial-unavailable")).toHaveText(
+      "주문 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.",
+    );
+    await expect(card.getByTestId("approval-financial")).toHaveCount(0);
+    await expect(card.getByTestId("approval-args")).toHaveCount(0);
+    await expect(card.getByTestId("approval-approve")).toHaveCount(0);
+    await expect(card.getByTestId("approval-reject")).toBeEnabled();
+  });
+}
+
+test("끝나지 않은 금융 줄도 요약을 열지 못하면 인자와 안내 없이 상태만 보인다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "금융 실행 중 검사",
+    financialAction(0, {
+      status: "EXECUTING",
+      financial: financial({ available: false }),
+    }),
+  );
+
+  const card = page.getByTestId("approval-card");
+  await expect(card).toContainText("실행하는 중이에요");
+  await expect(card.getByTestId("approval-financial")).toHaveCount(0);
+  await expect(card.getByTestId("approval-financial-unavailable")).toHaveCount(
+    0,
+  );
+  await expect(card.getByTestId("approval-args")).toHaveCount(0);
+});
+
+test("같은 도구의 금융 PENDING 줄 둘은 묶이지 않고 두 장으로 보인다", async ({
+  page,
+}) => {
+  await openWithMany(page, "금융 묶지 않음 검사", [
+    financialAction(0),
+    financialAction(1),
+  ]);
+
+  await expect(page.getByTestId("approval-group")).toHaveCount(0);
+  await expect(
+    page
+      .getByTestId("approval-list")
+      .locator(":scope > [data-testid=approval-card]"),
+  ).toHaveCount(2);
+  await expect(page.getByTestId("approval-financial")).toHaveCount(2);
+});

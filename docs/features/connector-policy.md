@@ -221,6 +221,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - `schema: 1` 에서 `tool` 이 없는 호출은 승인 필요로 막는다. 다른 서버의 등록 이름은 `schema: 1` 에서도 `UNDECLARED` 로 거절한다
 - 상시 허락은 그 사용자가 그 커넥터의 그 도구에 준 것 가운데 거두지 않았고 기간이 남은 것이다. 선언이 `"grant": false` 인 도구는 남은 허락이 있어도 보지 않는다. 원래 도구 이름을 확인하지 못한 호출은 허락이 없는 것으로 판정한다
 - 대화 허락은 그 실행의 대화와 에이전트에 준 것 가운데 거두지 않았고 기간이 남았고 대화가 지워지지 않은 것이다. 밖으로 나가는 도구는 남은 허락이 있어도 보지 않는다. 대화나 에이전트가 없는 실행은 허락이 없는 것으로 판정한다
+- 커넥터의 `execution_guard.prepare_tool` 을 부른 호출은 판정 전에 금융 준비(`ConnectorFinancialIntake`)로 넘긴다. 같은 `dedupe_key` 의 금융 줄이 이미 있으면 처음 판정을 이르게 돌려주지 않고 같은 길로 보내 같은 승인 번호로 답한다. 인자는 `{v: 1, tool, args}` 로 엄격히 읽고, `tool` 이 선언의 `operations` 에서 `CREATE` 나 `CANCEL` 이며 종류가 `ORDER` 일 때만 넘긴다. 답은 언제나 막힘이고 거절은 어느 검사에 걸렸는지 밝히지 않는다. 살펴보기 트리(`ProactiveCheckGuard.checkOf`, 매일 깨우기 포함) 안의 호출은 넘기지 않고 줄 없이 막는다. 살펴보기가 아닌 일반 예약 작업의 호출은 승인 줄을 만든다([ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md))
 - 먼저 살펴보기 트리(`ProactiveCheckGuard.isCheckTree`)에서는 `READ` 이고 `none` 인 도구만 허용한다. 상시 허락이 있어도 나머지를 거절하고 승인 줄을 만들지 않는다. 사람이 보지 않는 실행에서 승인 요청이 쌓이지 않게 하기 위해서다([ADR-080](../adr/ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md))
 - 같은 호출이 다시 오면 처음 판정을 그대로 돌려준다. 같은 호출인지는 profile, 루트 session, session, `tool_call_id` 로 만든 `dedupe_key` 로 안다
 - `dedupe_key` 가 같아도 `hermes_tool` 이나 인자의 해시가 처음 줄과 다르면 막고 새 줄을 남기지 않는다. 앞의 허용이 다른 도구나 다른 인자에 나가지 않게 한다
@@ -334,6 +335,8 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 커넥터의 줄은 두고 본다
 - 다른 사용자의 줄은 `CONNECTOR_ACTION_NOT_FOUND` 다. 관리자도 같다
 - 대화의 승인 줄 목록과 그 줄의 승인·거절 응답에서 원고 저장 job 이 연결된 줄은 `contentDraft` 요약을 싣는다. 일반 줄은 null 이다. 화면이 응답으로 자기 줄을 바꿔도 원고 카드로 남게 하기 위해서다. 요약의 칸과 화면 동작은 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) 이 갖는다
+- 공개 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 금융 승인(`ConnectorFinancialApproval`)으로 보낸다. 주인이 아니면 없는 줄과 같은 응답을 먼저 내고, 주인이면 상시 허락이나 대화 허락을 보낸 요청을 `VALIDATION_FAILED` 로 거절한다. 그 뒤 금융 승인이 저장한 snapshot 을 다시 검증한다
+- 금융 줄의 응답은 `financial` 요약(계좌 순번, 동작, 종목, 방향, 수량이나 금액, 가격, 통화, 주문 유형, 정규화)을 싣는다. 계좌 순번은 저장 scope 의 값이다. 저장한 내용을 열지 못하면 `available` 이 거짓이고 화면은 승인 단추를 그리지 않는다. 금융 줄이 아니면 null 이다. 금융 줄은 묶지 않고 「모두 승인」 에 넣지 않는다
 - 부른 쪽은 이미 처리된 요청(409 `CONNECTOR_ACTION_NOT_PENDING`)과 승인했지만 실행하지 않은 요청(200 과 끝난 줄의 `status`)을 구분한다
 - 승인은 사용자 행을 먼저, 승인 줄을 다음에 잠그고 `EXECUTING` 으로 커밋한 뒤 트랜잭션 밖에서 실행 경로를 부른다. 연결을 다시 등록하거나 해제하는 쪽, 붙이고 떼는 쪽과 같은 순서라 승인이 본 바인딩은 커밋할 때까지 떼어지지 않는다
 - 사건은 줄을 커밋한 뒤에 낸다. `approval` 사건은 승인 요청 번호만 싣고, 화면은 그 사건을 받으면 승인 줄을 다시 읽는다. 깨우기(`assistant.delegation-wake.enabled`)가 꺼져 있어도 이 사건과 거절, 만료의 알림 줄은 나간다
@@ -391,9 +394,9 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 | 단계 | 네이버 블로그 원고 임시저장 | 토스 주문 | Gmail 보내기와 답장 |
 | --- | --- | --- | --- |
-| 지금 운영 | 열려 있다. connector.json 의 snapshot capability 는 `{compile:true,start:true,status:true}` 다. 배포 뒤 실제 계정 확인은 아래 체크리스트가 갖는다 | 닫혀 있다. FINANCIAL 판정은 `RISK_NOT_OPEN` 이고 커넥터 서버가 주문 도구를 등록하지 않는다. producer 와 금융 승인은 package-private 이다 | 열려 있다 |
+| 지금 운영 | 열려 있다. connector.json 의 snapshot capability 는 `{compile:true,start:true,status:true}` 다. 배포 뒤 실제 계정 확인은 아래 체크리스트가 갖는다 | 열림. 관문의 운영 값(key 파일, 허용 목록, 0 이 아닌 상한)이 채워졌을 때 열린다. 모델이 부른 준비 도구는 금융 준비로 넘어가고, 실행 도구를 직접 부른 호출은 `RISK_NOT_OPEN` 이다 | 열려 있다 |
 | 준비 | `content_draft_preview` 가 원고 revision, 사진 원본 바이트, 바인딩 버전을 고정한 불변 snapshot 을 만든다. 같은 revision 과 권한 지문이면 같은 snapshot 이다. [불변 preview snapshot](content-draft.md#불변-preview-snapshot) | 준비 도구(`READ`, `none`)를 `POST /api/connectors/{id}/prepare` 로 한 번 부르고 원래 인자, 실행 인자, summary, scope 를 암호화한 snapshot 으로 저장한다. [금융 실행 내용의 저장과 검증](#금융-실행-내용의-저장과-검증) | 따로 없다. 모델이 보낸 인자 원문(`args_json`)과 그 해시(`args_sha256`)를 승인 줄에 저장한다. [승인의 불변식](#승인의-불변식) |
-| 승인하는 사람 | 연결 주인이 그 대화의 원고 카드에서 canonical 미리보기와 포함·빠진 사진을 보고 승인한다 | 연결 주인이 그 대화의 승인 카드에서 승인한다. 카드의 summary 와 계좌 표시는 아직 없다 | 연결 주인이 그 대화의 승인 카드에서 받는 사람, 제목, 본문 원문을 보고 승인한다. 가려지는 글이 하나라도 있으면 승인하지 못한다(`hidden_args`) |
+| 승인하는 사람 | 연결 주인이 그 대화의 원고 카드에서 canonical 미리보기와 포함·빠진 사진을 보고 승인한다 | 연결 주인이 그 대화의 승인 카드에서 계좌 순번과 저장 요약을 보고 승인한다. 요약을 열지 못하면 승인하지 못한다 | 연결 주인이 그 대화의 승인 카드에서 받는 사람, 제목, 본문 원문을 보고 승인한다. 가려지는 글이 하나라도 있으면 승인하지 못한다(`hidden_args`) |
 | 상시 허락, 대화 허락 | 둘 다 받지 않는다. 승인 줄을 `always` 로 저장하고 「N건 모두 승인」 에도 넣지 않는다 | 둘 다 받지 않는다. `FINANCIAL` 은 `always` 다 | 둘 다 받지 않는다. `grant: false` 이고 `conversation_grant` 를 선언하지 않는다 |
 | `outbound` | 거짓. 계정 안의 임시저장이다 | 해당 없다. 돈이 움직이는 도구는 `FINANCIAL` 위험도로 따로 닫는다 | 참 |
 | 실행 | 승인이 jobId 를 예약하고 저장 ticket 을 발급해 worker 시작을 최대 한 번 보낸다. worker 는 authorize 의 `start`, 사진마다 `photo`, 저장 클릭 직전 `save` 허가를 받아야 진행한다. [승인과 jobId 예약](content-draft.md#승인과-jobid-예약) | 승인이 실행 ticket 을 발급하고 `executeApproved` 를 한 번 부른다. 커넥터는 주문을 보내기 직전에 claim 으로 ticket 을 한 번 소비한다 | 승인이 줄을 `EXECUTING` 으로 커밋한 뒤 대시보드 `execute` 로 저장한 인자를 한 번 보낸다. ticket 은 없다 |
@@ -420,8 +423,8 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 
 토스 매매 개방은 아래가 모두 채워지고 소유자가 개방을 명시적으로 승인해야 Go 다.
 
-- [ ] [매매 개방 조건](tossinvest-connector.md#매매-개방-조건) 표의 모든 줄이 「있음」 이다. 승인 카드의 summary 와 계좌 표시, 공개 진입점 연결이 이 표에 든다
-- [ ] 첫 개방은 `create_order` 와 `cancel_order` 뿐이다. `modify_order` 와 조건주문 쓰기는 별도 개방이다
+- [x] [매매 개방 조건](tossinvest-connector.md#매매-개방-조건) 표의 모든 줄이 「있음」 이다. 승인 카드의 summary 와 계좌 표시, 공개 진입점 연결이 이 표에 든다
+- [x] 첫 개방은 `create_order` 와 `cancel_order` 뿐이다. `modify_order` 와 조건주문 쓰기는 별도 개방이다
 
 Go 를 낸 뒤 개방 PR 을 배포하고 아래를 확인한다. 어긋나면 [되돌리기](tossinvest-connector.md#되돌리기) 로 닫는다.
 
@@ -439,9 +442,9 @@ Go 를 낸 뒤 개방 PR 을 배포하고 아래를 확인한다. 어긋나면 [
 ## 금융 실행 내용의 저장과 검증
 
 금융 실행 원문과 승인 표시 값을 함께 검증하고 저장하는 모델이다.
-현재 `FINANCIAL`과 `DESTRUCTIVE` 호출은 계속 `RISK_NOT_OPEN`으로 거절하며 상시 허락을 만들지 않는다.
-범용 준비 API와 실행 전용 전달 소비자는 구현했으며 금융 승인 경로와 실제 주문 실행은 아직 구현하지 않았다.
-일회성 ticket의 발급 함수와 claim 인증은 아래 계약으로 구현하며 운영 승인 경로에는 연결하지 않는다.
+실행 도구(`FINANCIAL`)와 `DESTRUCTIVE` 도구의 직접 호출은 계속 `RISK_NOT_OPEN`으로 거절하며 상시 허락을 만들지 않는다.
+금융 실행 도구는 준비 도구 호출만 금융 준비로 넘기고, 실행은 사람이 승인한 뒤 claim 으로만 일어난다.
+일회성 ticket의 발급 함수와 claim 인증은 아래 계약으로 구현하며 공개 승인 경로가 금융 승인으로 부른다.
 저장 컬럼과 수명은 [저장 모델](../../backend/docs/data-schema.md)의 「connector_action_execution」이,
 결정의 근거는 [ADR-20261010 / financial-execution-guard](../adr/ADR-20261010-financial-execution-guard.md)가 갖는다.
 
@@ -652,15 +655,14 @@ HTTP 뒤 DB 상태를 다시 확인한다. 철회·재설치·카탈로그 변�
 PENDING 설치 callback의 `409/pending`은 실패나 READY의 필수 조건으로 바꾸지 않는다.
 설치·상태·probe 결과를 현재 시도의 CAS로 READY에 저장한 뒤 새 nonce로 verified를 확인한다.
 옛 backend의 401·403·404와 guard 누락, SHA·nonce 불일치 및 재시작 뒤 확인 실패는 이전 verified를 되살리지 못한다.
-금융 승인 hook이 없고 아래 producer도 공개 경로에 연결하지 않으므로 FINANCIAL 도구의 exclude와 `RISK_NOT_OPEN`을 유지한다.
+금융 실행 도구는 모델 목록에 두지 않으므로 FINANCIAL 도구의 exclude와 직접 호출의 `RISK_NOT_OPEN`을 유지한다. 모델은 준비 도구만 부른다.
 DESTRUCTIVE 차단, 금융 매번 승인·상시 허락 없음, UNKNOWN 자동 재전송 금지도 유지한다.
 
-### 운영 비활성 금융 snapshot producer
+### 금융 snapshot producer 와 금융 승인
 
 `ConnectorFinancialProducer`와 `ConnectorFinancialApproval`은 package-private Spring 컴포넌트다.
-실제 금융 준비·저장·승인 규칙을 갖지만 controller, MCP hook, 공개 approve, 스케줄러에는 연결하지 않는다.
-테스트는 같은 application 패키지에서 내부 메서드만 호출한다. 공개 정책의 `RISK_NOT_OPEN`과
-plugin의 금융 도구 exclude는 유지하며 별도 허용 정책, featureflag, 상시 허락은 만들지 않는다.
+실제 금융 준비·저장·승인 규칙을 갖는다. 정책 판정의 준비 도구 가로채기와 공개 approve 에 연결했고 스케줄러에는 연결하지 않는다.
+실행 도구의 직접 호출은 `RISK_NOT_OPEN`이고 plugin의 금융 도구 exclude는 유지하며 별도 허용 정책, featureflag, 상시 허락은 만들지 않는다.
 
 요청자의 session 실행과 에이전트 바인딩에서 연결을 고른다. 소유자와 profile, 활성 사용자,
 READ_ONLY 실행 금지, READY와 desiredEnabled, guard의 FINANCIAL/always 선언을 검증한다.
@@ -679,7 +681,8 @@ ticket은 승인 만료와 60초 중 빠른 쪽까지이며 75초는 execute HTT
 금융 실행 전체를 켜고 끄는 설정은 따로 두지 않는다. 허용 목록이 비었거나 상한이 0이면 주문이 거절되고, keyed hash key 파일(`digest-key-file`)을 읽지 못하면 관문 전체가 닫힌다.
 key 파일이 운영에서 금융을 여는 마지막 잠금이다. key를 쓰는 request_key와 해시 단계 없이 금융이 열리지 않게 코드로 막는다.
 준비는 prepare 전에 key 파일과 계좌 허용 목록을, 저장 잠금 아래에서 한 건과 하루 상한을 본다.
-승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌를 본다.
+허용 목록은 계좌와 그 계좌를 쓰는 사용자의 메일을 묶은 항목이다. 세 단계 모두 그 계좌의 항목이 있고 그 메일이 줄 주인의 메일인지 본다. 형식은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다.
+승인은 잠금 아래에서 세 검사를 모두 다시 보고, claim은 ticket 소비 직전에 key 파일과 저장 scope의 계좌와 그 주인을 본다.
 하루 합계는 KST 하루에 승인으로 넘어간 같은 통화의 EXECUTING·SUCCEEDED·UNKNOWN 주문을 센다. 취소는 새로 쓰는 금액이 없어 금액 상한과 하루 합계 밖에 두고 key 파일과 계좌 허용 목록만 본다. 하루 합계에도 금액이 있는 생성만 더한다. 금액을 미리 알 수 없는 시장가 수량 주문과 일반 정정, 조건주문 생성·정정은 거절한다.
 
 `ConnectorFinancialConflicts`는 준비·승인·claim이 함께 쓰는 같은 의도 검사다.
@@ -695,7 +698,7 @@ loopback 금융 목적지에 연결해 검증한다. 테스트 설치 원본은 
 Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·support에 동일하게 연결한다.
 금융 POST와 auth POST, DELETE 및 execute 호출을 따로 센다. 이 검증은 테스트 내부 application 통합이며
 공개 승인 E2E, 운영 활성화, 계정 인증이나 실거래 완료의 증거는 아니다.
-공개 연결과 승인 카드 summary 표시·일괄 승인 제외는 별도 결정 및 보안 리뷰 전까지 보류한다.
+공개 연결과 승인 카드 summary 표시, 일괄 승인 제외는 [ADR-20261013 / financial-order-opening](../adr/ADR-20261013-financial-order-opening.md)이 열었다.
 
 데이터 key가 꺼져 있으면 준비를 시작하지 않고, `content_key_id`가 없는 snapshot은 승인하지 않는다.
 중단된 금융 실행과 오류 상세 없는 execute 실패는 claim 소비 여부로 끝낸다.
@@ -704,8 +707,8 @@ Python의 실제 manifest loader가 계산한 SHA를 catalog·bind.guard·suppor
 증명 사슬과 성공·공식 거절의 판정은 [ADR-20261012 / financial-unsent-proof](../adr/ADR-20261012-financial-unsent-proof.md)가 갖는다.
 
 request_key는 연결 번호 대신 커넥터 이름을 넣는다. 계좌는 실행 원문의 scope 칸으로 들어가므로 같은 사용자가 같은 계좌에 내는 같은 주문은 연결을 다시 등록해도 같은 키다.
-옛 v1 키와는 호환하지 않는다. 운영에 금융 caller가 없어 옛 줄이 없어야 하고, 남았으면 금융 관문이 닫혀 운영자가 먼저 정리한다.
-개방 전 필수 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다. 공개 hook과 승인 경로는 그 개방 PR 전까지 `RISK_NOT_OPEN`으로 막는다.
+옛 v1 키와는 호환하지 않는다. v2 로 올릴 때는 운영에 금융 caller가 없어 옛 v1 줄이 없었다. 남았으면 금융 관문이 닫혀 운영자가 먼저 정리한다.
+개방 조건은 [토스증권 커넥터](tossinvest-connector.md)의 「매매 개방 조건」이 갖는다. 운영 값이 채워지기 전에는 관문이 주문을 거절한다.
 
 모든 승인 줄의 `args_json`과 `result_text`는 기존 사용자 데이터 key로 암호화한다.
 금융은 암호화가 필수이며 일반 쓰기만 암호화가 꺼져 있을 때 평문 호환을 허용한다.

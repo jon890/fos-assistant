@@ -495,25 +495,40 @@ test("DELETE 단일전송 transport의 합성 204·불량204: 조건주문 도�
   }
 });
 
-test("운영 SDK·manifest의 READ 합집합과 금융 비활성을 유지한다", async () => {
+test("운영 SDK·manifest는 주문과 취소만 금융으로 열고 정정은 열지 않는다", async () => {
   const { fake, env, claims } = setup();
   try {
     const manifest = JSON.parse(
       await readFile(resolve(import.meta.dir, "../connector.json"), "utf8"),
     );
-    expect(manifest.execution_guard).toBeUndefined();
+    expect(manifest.execution_guard).toEqual({
+      protocol: "approval-claim-v2",
+      prepare_tool: "prepare_trade",
+      scope_fields: [{ arg: "account_seq", field: "account" }],
+      operations: { create_order: "CREATE", cancel_order: "CANCEL" },
+    });
     expect(manifest.errors.TOSSINVEST_OUTCOME_UNKNOWN).toBe("outcome_unknown");
     expect(
-      Object.values(manifest.tools).every(
-        (policy: any) => policy.risk === "READ",
-      ),
-    ).toBe(true);
+      Object.entries(manifest.tools)
+        .filter(([, policy]: [string, any]) => policy.risk !== "READ")
+        .map(([name]) => name)
+        .sort(),
+    ).toEqual(["cancel_order", "create_order"]);
+    for (const name of ["create_order", "cancel_order"])
+      expect(manifest.tools[name]).toMatchObject({
+        risk: "FINANCIAL",
+        approval: "always",
+        outbound: false,
+      });
+    expect(manifest.tools.modify_order).toBeUndefined();
     await withMcp(
       createTossinvestServer({ apiBase: fake.url, env }),
       async (sdk) => {
-        expect(
-          (await sdk.listTools()).tools.map((item) => item.name).sort(),
-        ).toEqual(Object.keys(manifest.tools).sort());
+        const names = (await sdk.listTools()).tools
+          .map((item) => item.name)
+          .sort();
+        expect(names).toEqual(Object.keys(manifest.tools).sort());
+        expect(names).not.toContain("modify_order");
       },
     );
     expect(fake.requests).toHaveLength(0);

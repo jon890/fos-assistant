@@ -89,15 +89,26 @@ test("production stdio 도구 합집합의 설명·READ 정책과 신규 GET 4�
     expect(new Set(listed.map((entry) => entry.name))).toEqual(
       new Set(Object.keys(connector.tools)),
     );
-    expect(new Set(listed.map((entry) => entry.name))).toEqual(
-      new Set(readToolNames),
-    );
-    expect(listed).toHaveLength(33);
+    // READ 33개는 그대로이고 주문 준비 READ 하나와 실행 FINANCIAL 둘이 따로 있다.
+    const financial = ["cancel_order", "create_order"];
+    expect(
+      new Set(
+        listed
+          .map((entry) => entry.name)
+          .filter(
+            (name) => !financial.includes(name) && name !== "prepare_trade",
+          ),
+      ),
+    ).toEqual(new Set(readToolNames));
+    expect(listed).toHaveLength(36);
     for (const entry of listed) {
+      const read = !financial.includes(entry.name);
       expect(entry.description).toBeTruthy();
       expect(entry.description).not.toContain("undefined");
-      expect(entry.annotations?.readOnlyHint).toBe(true);
-      expect(connector.tools[entry.name].risk).toBe("READ");
+      expect(entry.annotations?.readOnlyHint).toBe(read);
+      expect(connector.tools[entry.name].risk).toBe(
+        read ? "READ" : "FINANCIAL",
+      );
       expect(entry.description).toBe(connector.tools[entry.name].description);
     }
     expect(

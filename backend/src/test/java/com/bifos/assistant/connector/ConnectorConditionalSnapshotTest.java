@@ -216,8 +216,8 @@ class ConnectorConditionalSnapshotTest {
 
     private ConnectorFinancialGate gate(String keyFile) {
         var live = LiveProperties.fixed(ConnectorFinancialProperties.class, new ConnectorFinancialProperties(
-            List.of("000007"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, keyFile));
-        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live));
+            List.of("7:owner@example.test"), BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, keyFile));
+        return new ConnectorFinancialGate(live, actions, contents, cipher, new FinancialDigest(live), users);
     }
 
 

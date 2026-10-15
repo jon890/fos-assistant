@@ -1,5 +1,6 @@
 import type { ToolRisk } from "@/lib/connection";
 import type { ContentDraftSummary } from "@/lib/content-draft-snapshot";
+import type { FinancialSummary } from "@/lib/financial-summary";
 
 export type ConnectorActionStatus =
   | "PENDING"
@@ -50,6 +51,8 @@ export type ConnectorAction = {
   conversationGrantAllowed: boolean;
   /** 원고 저장 job 이 붙은 줄의 요약이다. 일반 줄은 null 이다. */
   contentDraft: ContentDraftSummary | null;
+  /** 금융 줄의 저장 요약이다. 금융 줄이 아니면 null 이다. */
+  financial: FinancialSummary | null;
 };
 
 /** 이 대화에서 계속 허용 중인 도구 한 개다. 화면에는 `title` 을 보인다. */

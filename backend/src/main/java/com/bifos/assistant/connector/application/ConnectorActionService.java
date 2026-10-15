@@ -10,6 +10,7 @@ import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.PendingApproval;
 import com.bifos.assistant.connector.domain.ConnectorConnection;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
+import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
@@ -23,6 +24,8 @@ import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -55,6 +58,8 @@ public class ConnectorActionService {
     private final ConnectorActionDetails details;
     private final ConnectorActionApproval approval;
     private final ConnectorActionLifecycle lifecycle;
+    private final ConnectorActionRepository actions;
+    private final ConnectorFinancialApproval financialApproval;
     private final ConnectorActionSignals signals;
 
 
@@ -79,6 +84,7 @@ public class ConnectorActionService {
         ConversationNotices conversations,
         DecisionFeedbackRecorder feedback,
         ConnectorActionBodies bodies,
+        ConnectorFinancialApproval financialApproval,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
@@ -98,6 +104,7 @@ public class ConnectorActionService {
             conversations,
             feedback,
             bodies,
+            financialApproval,
             transactionManager,
             Clock.systemUTC());
     }
@@ -121,8 +128,11 @@ public class ConnectorActionService {
         ConversationNotices conversations,
         DecisionFeedbackRecorder feedback,
         ConnectorActionBodies bodies,
+        ConnectorFinancialApproval financialApproval,
         PlatformTransactionManager transactionManager,
         Clock clock) {
+        this.actions = actions;
+        this.financialApproval = financialApproval;
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock);
         this.signals = new ConnectorActionSignals(events, notifications, conversations);
@@ -268,9 +278,22 @@ public class ConnectorActionService {
      * 승인하고, 고르면 그 도구를 그 대화에서 계속 허용한다(ADR-20261012 / conversation-grant). 나머지는
      * {@link #approve(CurrentUser, UUID, GrantPeriod)} 와 같다.
      *
+     * <p>저장 위험도가 {@code FINANCIAL} 인 줄은 금융 승인으로 보낸다(ADR-20261013 / financial-order-opening). 남의 줄은 입력을 보기 전에
+     * 없는 줄과 같은 응답이다. 입력 오류를 먼저 내면 그 줄이 있다는 단서가 된다. 금융 줄은 상시 허락도 대화 허락도 받지 않는다.
+     *
      * @param conversationGrant 그 대화에서 계속 허용하는가. {@code grant} 와 함께 줄 수 없다
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
+        var stored = actions.findByPublicId(actionId);
+        if (stored.isPresent() && stored.get().risk() == ToolRisk.FINANCIAL) {
+            if (!user.id().equals(stored.get().userId())) {
+                throw ConnectorActionDetails.notFound();
+            }
+            if (grant != null || conversationGrant) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "financial actions take no grant");
+            }
+            return financialApproval.approve(user, actionId);
+        }
         return approval.approve(user, actionId, grant, conversationGrant);
     }
 

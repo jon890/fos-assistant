@@ -16,11 +16,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
+import com.bifos.assistant.connector.application.ConnectorFinancialSummaries;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
+import com.bifos.assistant.connector.application.model.FinancialActionSummary;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
@@ -68,8 +70,9 @@ class ConnectorActionControllerTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final ContentDraftSaveApproval contentDrafts = mock(ContentDraftSaveApproval.class);
     private final ContentDraftJobs contentDraftJobs = mock(ContentDraftJobs.class);
+    private final ConnectorFinancialSummaries financialSummaries = mock(ConnectorFinancialSummaries.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new ConnectorActionController(service, contentDrafts, contentDraftJobs, conversations, currentUser))
+        new ConnectorActionController(service, contentDrafts, contentDraftJobs, financialSummaries, conversations, currentUser))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -89,8 +92,9 @@ class ConnectorActionControllerTest {
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].length()").value(16))
+            .andExpect(jsonPath("$[0].length()").value(17))
             .andExpect(jsonPath("$[0].contentDraft").isEmpty())
+            .andExpect(jsonPath("$[0].financial").isEmpty())
             .andExpect(jsonPath("$[0].actionId").value(ACTION.toString()))
             .andExpect(jsonPath("$[0].connectorId").value("demo-notes"))
             .andExpect(jsonPath("$[0].toolName").value("write_note"))
@@ -106,6 +110,46 @@ class ConnectorActionControllerTest {
             .andExpect(jsonPath("$[0].hiddenArgs").value(true))
             .andExpect(jsonPath("$[0].argLabels.text").value("내용"))
             .andExpect(jsonPath("$[0].conversationGrantAllowed").value(false));
+    }
+
+
+    @Test
+    @DisplayName("금융 요약은 금융 줄에만 붙고 승인과 거절 응답에도 그 줄의 요약을 붙인다")
+    void attachesFinancialSummaryOnlyToFinancialLines() throws Exception {
+        UUID financialAction = UUID.fromString("019a0000-0000-7000-8000-000000000004");
+        var financialView = new ConnectorActionView(financialAction, "tossinvest", "create_order", "주문 넣기", ToolRisk.FINANCIAL,
+            ActionStatus.PENDING, "{}", null, null, Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-10-02T00:00:00Z"),
+            false, false, Map.of());
+        var summary = new FinancialActionSummary(true, "7", "CREATE", "ABC", "NASDAQ", "USD", "BUY", null, "25", null, "MARKET",
+            "DAY", null, List.of(new FinancialActionSummary.Normalization("timeInForce", null, "DAY")));
+        when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
+        when(service.listForConversation(MEMBER, 42L)).thenReturn(List.of(PENDING, financialView));
+        when(financialSummaries.summaries(MEMBER, List.of(financialAction))).thenReturn(Map.of(financialAction, summary));
+        when(financialSummaries.summaryOf(MEMBER, financialAction)).thenReturn(Optional.of(summary));
+        when(service.approve(MEMBER, financialAction, null, false)).thenReturn(financialView);
+        when(service.reject(MEMBER, financialAction)).thenReturn(financialView);
+        when(service.reject(MEMBER, ACTION)).thenReturn(PENDING);
+
+        mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].financial").isEmpty())
+            .andExpect(jsonPath("$[1].financial.available").value(true))
+            .andExpect(jsonPath("$[1].financial.accountSeq").value("7"))
+            .andExpect(jsonPath("$[1].financial.orderAmount").value("25"))
+            .andExpect(jsonPath("$[1].financial.quantity").isEmpty())
+            .andExpect(jsonPath("$[1].financial.normalization[0].field").value("timeInForce"))
+            .andExpect(jsonPath("$[1].financial.normalization[0].after").value("DAY"));
+        // 금융이 아닌 줄의 번호는 요약 조회에 넘기지 않는다.
+        verify(financialSummaries).summaries(MEMBER, List.of(financialAction));
+        mvc.perform(post("/api/v1/connector-actions/{id}/approve", financialAction))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.financial.accountSeq").value("7"));
+        mvc.perform(post("/api/v1/connector-actions/{id}/reject", financialAction))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.financial.accountSeq").value("7"));
+        mvc.perform(post("/api/v1/connector-actions/{id}/reject", ACTION))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.financial").isEmpty());
     }
 
 

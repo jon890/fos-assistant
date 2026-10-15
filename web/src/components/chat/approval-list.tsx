@@ -28,7 +28,7 @@ type Loaded = { conversationId: string; actions: ConnectorAction[] };
 
 /**
  * 기다리는 줄은 같은 커넥터의 같은 도구끼리 묶는다. 묶음의 자리는 그 도구가 처음 나온 자리다.
- * 실행 중이거나 결과를 모르는 줄과 도구 이름이 없는 줄, 원고 저장 줄은 한 장씩 둔다. 이름 없는 줄을 제목으로 묶으면 다른 도구가
+ * 실행 중이거나 결과를 모르는 줄과 도구 이름이 없는 줄, 원고 저장 줄과 금융 줄은 한 장씩 둔다. 이름 없는 줄을 제목으로 묶으면 다른 도구가
  * 한 묶음에 섞일 수 있다.
  */
 function grouped(
@@ -40,7 +40,9 @@ function grouped(
     if (
       action.status !== "PENDING" ||
       action.toolName === null ||
-      action.contentDraft
+      action.contentDraft ||
+      action.financial != null ||
+      action.risk === "FINANCIAL"
     ) {
       order.push({ key: action.actionId, actions: [action] });
       continue;

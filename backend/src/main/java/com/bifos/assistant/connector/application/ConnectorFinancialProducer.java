@@ -54,7 +54,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 운영 caller가 없는 금융 준비·저장 규칙이다. 공개 정책의 금융 차단은 그대로 둔다. */
+/** 정책 판정이 준비 도구 호출을 넘기는 금융 준비·저장 규칙이다. 실행 도구를 직접 부른 호출의 금융 차단은 그대로 둔다. */
 @Component
 @RequiredArgsConstructor
 class ConnectorFinancialProducer {
@@ -109,7 +109,7 @@ class ConnectorFinancialProducer {
         Map<String, String> scope = new LinkedHashMap<>();
         contract.scopeFields().forEach(field -> scope.put(field.arg(), before.fields().get(field.field())));
         // 허용 목록 밖의 계좌는 토스 읽기도 보내지 않는다.
-        gate.requireAccounts(scope.values());
+        gate.requireAccounts(before.user(), scope.values());
         // prepare는 재호출하지 않는다. DB 잠금과 연결을 놓은 뒤 읽기 전용 HTTP를 한 번 보낸다.
         var prepared = hermes.prepare(profileName, before.connector(), hermesTool, argsJson);
         require(prepared != null && prepared.ok());
@@ -154,7 +154,7 @@ class ConnectorFinancialProducer {
             if (action.conversationId() != null && checkNotifications.allows(origin, now)) {
                 String title = ConnectorActionView.titleOf(ConnectorToolPolicies.find(manifest, toolName));
                 conversations.publicIdOf(action.conversationId()).ifPresent(id -> notifications.notify(action.userId(),
-                    NotificationKind.APPROVAL_REQUESTED, ConnectorPolicyService.APPROVAL_REQUESTED_TITLE,
+                    NotificationKind.APPROVAL_REQUESTED, ConnectorActionSignals.APPROVAL_REQUESTED_TITLE,
                     "「" + title + "」", new NotificationTarget(NotificationTargetType.CONVERSATION, id),
                     action.publicId()));
             }

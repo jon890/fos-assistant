@@ -56,20 +56,24 @@ function setup(options: Record<string, unknown> = {}) {
 }
 
 describe("토스증권 커넥터 계약", () => {
-  test("manifest 의 도구 선언과 서버의 도구 목록이 같고 모두 읽기 전용이다", async () => {
+  test("manifest 의 도구 선언과 서버의 도구 목록이 같고 READ 만 읽기 전용이다", async () => {
     await withMcp(createTossinvestServer({ env: {} }), async (client) => {
       const tools = (await client.listTools()).tools;
       expect(new Set(tools.map((item) => item.name))).toEqual(
         new Set(Object.keys(manifest.tools)),
       );
       for (const item of tools) {
-        expect(item.annotations?.readOnlyHint).toBe(true);
+        const risk =
+          manifest.tools[item.name as keyof typeof manifest.tools].risk;
+        expect(["READ", "FINANCIAL"]).toContain(risk);
+        if (risk === "READ") expect(item.annotations?.readOnlyHint).toBe(true);
+        else {
+          expect(item.annotations?.readOnlyHint).toBe(false);
+          expect(item.annotations?.destructiveHint).toBe(true);
+        }
         expect(item.description?.trim().length).toBeGreaterThan(20);
         expect(item.description).not.toContain("undefined");
         expect(item.description).toBe(manifest.tools[item.name].description);
-        expect(
-          manifest.tools[item.name as keyof typeof manifest.tools].risk,
-        ).toBe("READ");
       }
     });
   });

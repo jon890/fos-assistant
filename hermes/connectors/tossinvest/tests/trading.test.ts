@@ -12,6 +12,7 @@ import {
   type TradeTool,
 } from "../src/trading-body.ts";
 import { CURRENT_OPERATIONS, OPERATIONS } from "../src/api-contract.ts";
+import { createTossinvestServer } from "../src/server.ts";
 import {
   ClaimFixture,
   createTradingFixtureServer,
@@ -493,3 +494,151 @@ for (const [market, currency] of [
     }
   });
 }
+
+// 소수점은 미국 MARKET 금액 주문으로만 열고, USD 가격은 받은 decimal 그대로 둔다.
+const fractional = (args: Record<string, string>) => ({
+  symbol: "ABC",
+  timeInForce: "DAY",
+  ...args,
+});
+for (const [label, args, field, expected, normalization] of [
+  [
+    "미국 MARKET 매도 소수 수량",
+    { side: "SELL", orderType: "MARKET", quantity: "0.1" },
+    "quantity",
+    "0.1",
+    [],
+  ],
+  [
+    "미국 LIMIT 매수 USD 가격",
+    { side: "BUY", orderType: "LIMIT", quantity: "1", price: "12.34" },
+    "price",
+    "12.34",
+    [],
+  ],
+  [
+    "미국 LIMIT 매수 1달러 미만 USD 가격",
+    { side: "BUY", orderType: "LIMIT", quantity: "1", price: "0.1234" },
+    "price",
+    "0.1234",
+    [],
+  ],
+  [
+    "미국 MARKET 매수 금액",
+    { side: "BUY", orderType: "MARKET", orderAmount: "25.50" },
+    "orderAmount",
+    "25.5",
+    [{ field: "orderAmount", before: "25.50", after: "25.5" }],
+  ],
+] as const) {
+  test(`소수점·USD 준비 ${label}: SDK와 운영 서버가 같은 값을 내고 금융 POST 0회`, async () => {
+    const { fake, env } = setup("US");
+    try {
+      const direct = await prepareTrade(
+        new Tossinvest({ apiBase: fake.url, env }),
+        "create_order",
+        fractional(args),
+      );
+      let served: any;
+      await withMcp(
+        createTossinvestServer({ apiBase: fake.url, env: { ...env } }),
+        async (client) => {
+          const response = await tool(client, "prepare_trade", {
+            v: 1,
+            tool: "create_order",
+            args: fractional(args),
+          });
+          expect(response.result.isError).toBeUndefined();
+          served = response.body;
+        },
+      );
+      for (const prepared of [direct, served]) {
+        expect(prepared.executionArgs[field]).toBe(expected);
+        expect(prepared.executionArgs.symbol).toBe("ABC");
+        expect(prepared.summary.normalization).toEqual(normalization);
+        if (field === "orderAmount") {
+          expect(prepared.summary.orderAmount).toBe(expected);
+          expect(prepared.summary.price).toBeNull();
+          expect(prepared.summary.quantity).toBeNull();
+        } else expect(prepared.summary[field]).toBe(expected);
+      }
+      expect(fake.seen("POST", "/api/v1/orders")).toHaveLength(0);
+    } finally {
+      fake.stop();
+    }
+  });
+}
+
+for (const [label, region, args] of [
+  [
+    "미국 LIMIT 매수 소수 수량",
+    "US",
+    { side: "BUY", orderType: "LIMIT", quantity: "0.1", price: "12.34" },
+  ],
+  [
+    "국내 금액 주문",
+    "KR",
+    { side: "BUY", orderType: "MARKET", orderAmount: "10000" },
+  ],
+  [
+    "LIMIT 금액 주문",
+    "US",
+    { side: "BUY", orderType: "LIMIT", orderAmount: "25", price: "12.34" },
+  ],
+] as const) {
+  test(`소수점·금액 준비 거절 ${label}: SDK와 운영 서버 모두 금융 POST 0회`, async () => {
+    const { fake, env } = setup(region);
+    try {
+      await expect(
+        prepareTrade(
+          new Tossinvest({ apiBase: fake.url, env }),
+          "create_order",
+          fractional(args),
+        ),
+      ).rejects.toThrow("TOSSINVEST_INVALID_INPUT");
+      await withMcp(
+        createTossinvestServer({ apiBase: fake.url, env: { ...env } }),
+        async (client) => {
+          const response = await tool(client, "prepare_trade", {
+            v: 1,
+            tool: "create_order",
+            args: fractional(args),
+          });
+          expect(response.result.isError).toBe(true);
+          expect(response.body).toEqual({
+            error: { code: "TOSSINVEST_INVALID_INPUT" },
+          });
+        },
+      );
+      expect(fake.seen("POST", "/api/v1/orders")).toHaveLength(0);
+    } finally {
+      fake.stop();
+    }
+  });
+}
+
+test("운영 서버의 prepare_trade는 정정을 받지 않고 HTTP 0회다", async () => {
+  const { fake, env } = setup("US");
+  try {
+    await withMcp(
+      createTossinvestServer({ apiBase: fake.url, env: { ...env } }),
+      async (client) => {
+        const response = await client.callTool({
+          name: "prepare_trade",
+          arguments: {
+            v: 1,
+            tool: "modify_order",
+            args: model("modify_order"),
+          },
+        });
+        expect(response.isError).toBe(true);
+        expect(
+          (await client.listTools()).tools.map((item) => item.name),
+        ).not.toContain("modify_order");
+      },
+    );
+    expect(fake.requests).toHaveLength(0);
+  } finally {
+    fake.stop();
+  }
+});

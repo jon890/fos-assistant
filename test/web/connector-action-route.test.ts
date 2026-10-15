@@ -294,6 +294,106 @@ test("원고 저장 요약은 계약의 칸만 옮기고 일반 줄은 null 이�
   }
 });
 
+const FINANCIAL = {
+  available: true,
+  accountSeq: "7",
+  operation: "CREATE",
+  symbol: "TESTCO",
+  market: "US",
+  currency: "USD",
+  side: "BUY",
+  quantity: null,
+  orderAmount: "12.5",
+  price: null,
+  orderType: "MARKET",
+  timeInForce: "DAY",
+  orderId: null,
+  normalization: [{ field: "orderType", before: null, after: "MARKET" }],
+};
+
+test("금융 요약은 계약의 칸만 옮기고 금융 줄이 아니면 null 이다", async () => {
+  const { response } = await callRoute("list", [
+    {
+      ...item({}),
+      risk: "FINANCIAL",
+      financial: { ...FINANCIAL, extra: "버릴 칸" },
+    },
+    item({}),
+  ]);
+  const [financial, plain] = await response.json();
+  assert.deepEqual(financial.financial, FINANCIAL);
+  assert.equal(plain.financial, null);
+});
+
+test("열지 못한 금융 요약은 나머지 칸을 비운 채 옮긴다", async () => {
+  const { response } = await callRoute("list", [
+    {
+      ...item({}),
+      risk: "FINANCIAL",
+      financial: { ...FINANCIAL, available: false },
+    },
+  ]);
+  const [row] = await response.json();
+  assert.equal(row.financial.available, false);
+  assert.equal(row.financial.accountSeq, null);
+  assert.equal(row.financial.symbol, null);
+  assert.deepEqual(row.financial.normalization, []);
+});
+
+test("모양이 틀린 금융 요약은 그 줄만 열지 못한 것으로 낮추고 목록과 다른 줄은 그대로 보낸다", async () => {
+  const other = { ...item({}), risk: "FINANCIAL", financial: FINANCIAL };
+  for (const broken of [
+    { accountSeq: "abc" },
+    { accountSeq: "0" },
+    { accountSeq: "07" },
+    { side: "HOLD" },
+    { orderType: "STOP" },
+    { operation: "MODIFY" },
+    { currency: "usd" },
+    { quantity: "1e3" },
+    { orderAmount: "1".repeat(31) },
+    { normalization: "없음" },
+  ]) {
+    const { response } = await callRoute("list", [
+      {
+        ...item({}),
+        risk: "FINANCIAL",
+        financial: { ...FINANCIAL, ...broken },
+      },
+      other,
+    ]);
+    const label = JSON.stringify(broken);
+    assert.equal(response.status, 200, label);
+    const [lowered, kept] = await response.json();
+    assert.deepEqual(
+      lowered.financial,
+      {
+        available: false,
+        accountSeq: null,
+        operation: null,
+        symbol: null,
+        market: null,
+        currency: null,
+        side: null,
+        quantity: null,
+        orderAmount: null,
+        price: null,
+        orderType: null,
+        timeInForce: null,
+        orderId: null,
+        normalization: [],
+      },
+      label,
+    );
+    assert.deepEqual(kept.financial, FINANCIAL, label);
+  }
+  const { response } = await callRoute("list", [
+    { ...item({}), risk: "FINANCIAL", financial: "문자열" },
+  ]);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json())[0].financial.available, false);
+});
+
 test("대화 허락 목록은 번호와 이름과 끝나는 시각, 에이전트 이름만 옮기고, 거두기는 그 대화의 경로로 보낸다", async () => {
   const listed = await callRoute("conversationGrants", [
     {

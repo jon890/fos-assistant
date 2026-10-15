@@ -19,6 +19,7 @@ import {
   type ContentDraftJobStatus,
   type ContentDraftSummary,
 } from "@/lib/content-draft-snapshot";
+import type { FinancialSummary } from "@/lib/financial-summary";
 import { isPublicId } from "@/lib/conversation-id";
 
 /** 브라우저에 그대로 넘기는 오류 코드다. 그 밖의 코드는 `INTERNAL_ERROR` 로 바꾼다. */
@@ -152,6 +153,94 @@ function safeAction(value: unknown): ConnectorAction {
     conversationGrantAllowed: item.conversationGrantAllowed === true,
     contentDraft:
       item.contentDraft == null ? null : safeContentDraft(item.contentDraft),
+    financial: item.financial == null ? null : safeFinancial(item.financial),
+  };
+}
+
+/**
+ * 계좌 순번은 토스가 int64 로 주는 값이라 앞자리 0 이 없다. Control Plane 의 허용 목록은 적은 글자 그대로 견주려고
+ * 앞자리 0 도 받지만, 그런 순번이 카드에 오면 토스가 준 값이 아니므로 그 줄을 승인할 수 없게 낮춘다.
+ */
+const ACCOUNT_SEQ_PATTERN = /^[1-9][0-9]{0,18}$/;
+const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const DECIMAL_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
+
+function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T {
+  const item = text(value);
+  if (!allowed.includes(item as T)) throw new Error();
+  return item as T;
+}
+
+function matching(value: unknown, pattern: RegExp): string {
+  const item = text(value);
+  if (!pattern.test(item)) throw new Error();
+  return item;
+}
+
+/** 수량, 금액, 가격이다. 없으면 null 이고 있으면 30자 이하의 십진 글이다. */
+function nullableDecimal(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const item = matching(value, DECIMAL_PATTERN);
+  if (item.length > 30) throw new Error();
+  return item;
+}
+
+const UNAVAILABLE_FINANCIAL: FinancialSummary = {
+  available: false,
+  accountSeq: null,
+  operation: null,
+  symbol: null,
+  market: null,
+  currency: null,
+  side: null,
+  quantity: null,
+  orderAmount: null,
+  price: null,
+  orderType: null,
+  timeInForce: null,
+  orderId: null,
+  normalization: [],
+};
+
+/**
+ * 금융 요약은 계약의 칸만 옮긴다. 저장한 내용을 열지 못한 줄과 모양이 계약과 다른 줄은 나머지 칸을 모두 비운
+ * `available: false` 로 낮춘다. 던지면 한 줄 때문에 승인 목록 전체가 오류가 되어 다른 줄을 거절하는 길까지 막힌다.
+ * 낮춘 줄은 카드가 승인 단추 없이 거절만 남긴다.
+ */
+function safeFinancial(value: unknown): FinancialSummary {
+  try {
+    return openFinancial(value);
+  } catch {
+    return { ...UNAVAILABLE_FINANCIAL, normalization: [] };
+  }
+}
+
+function openFinancial(value: unknown): FinancialSummary {
+  const item = record(value);
+  if (item.available !== true)
+    return { ...UNAVAILABLE_FINANCIAL, normalization: [] };
+  return {
+    available: true,
+    accountSeq: matching(item.accountSeq, ACCOUNT_SEQ_PATTERN),
+    operation: oneOf(item.operation, ["CREATE", "CANCEL"] as const),
+    symbol: nullableText(item.symbol),
+    market: nullableText(item.market),
+    currency: matching(item.currency, CURRENCY_PATTERN),
+    side: oneOf(item.side, ["BUY", "SELL"] as const),
+    quantity: nullableDecimal(item.quantity),
+    orderAmount: nullableDecimal(item.orderAmount),
+    price: nullableDecimal(item.price),
+    orderType: oneOf(item.orderType, ["LIMIT", "MARKET"] as const),
+    timeInForce: nullableText(item.timeInForce),
+    orderId: nullableText(item.orderId),
+    normalization: list(item.normalization).map((change) => {
+      const entry = record(change);
+      return {
+        field: text(entry.field),
+        before: nullableText(entry.before),
+        after: text(entry.after),
+      };
+    }),
   };
 }
 
