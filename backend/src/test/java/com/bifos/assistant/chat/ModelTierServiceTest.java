@@ -329,8 +329,6 @@ class ModelTierServiceTest {
     }
 
 
-
-
     @Test
     @DisplayName("저장 단계와 에이전트 기본값이 모두 비어 있으면 단계 기록을 남기고 profile 기본값으로 돈다")
     void emptyTierMappingFallsBackToProfileDefault() {

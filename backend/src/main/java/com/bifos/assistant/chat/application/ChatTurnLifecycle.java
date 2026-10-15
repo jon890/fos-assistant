@@ -45,6 +45,7 @@ class ChatTurnLifecycle {
     private final ResultDeliveryRecorder resultDeliveries;
     private final ChatRunEvents chatRunEvents;
 
+
     /**
      * 대화가 고른 값으로 명령과 실행 줄을 만든다. 사용자 메시지는 이미 저장돼 있다.
      *
@@ -54,57 +55,58 @@ class ChatTurnLifecycle {
      * 보내는 session 과 적는 session 이 다르다(ADR-031).
      */
     PendingTurn begin(
-            CurrentUser user,
-            Routed routed,
-            String text,
-            List<HermesImage> images,
-            AssembledContext context,
-            ExecutionContextSnapshot snapshot,
-            ModelChoice choice,
-            ModelTier modelTier,
-            TurnIntent intent,
-            Instant requestReceivedAt,
-            Consumer<ChatEvent> onEvent) {
+        CurrentUser user,
+        Routed routed,
+        String text,
+        List<HermesImage> images,
+        AssembledContext context,
+        ExecutionContextSnapshot snapshot,
+        ModelChoice choice,
+        ModelTier modelTier,
+        TurnIntent intent,
+        Instant requestReceivedAt,
+        Consumer<ChatEvent> onEvent) {
         Conversation conversation = routed.conversation();
         Agent agent = routed.agent();
         RunSession session = sessions.ensure(conversation);
         HermesRunCommand command = new HermesRunCommand(
-                agent.hermesProfile(),
-                agent.apiBaseUrl(),
-                text,
-                TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
-                session.runtimeSessionId(),
-                choice.provider(),
-                choice.model(),
-                choice.reasoningEffort(),
-                images);
+            agent.hermesProfile(),
+            agent.apiBaseUrl(),
+            text,
+            TurnIntent.appendTo(AskFormat.appendTo(context.instructions()), intent),
+            session.runtimeSessionId(),
+            choice.provider(),
+            choice.model(),
+            choice.reasoningEffort(),
+            images);
         AgentExecution execution = executions.start(
-                user,
-                conversation.executionConversation(),
-                agent,
-                null,
-                null,
-                snapshot,
-                choice,
-                null,
-                session.correlationSessionId(),
-                null,
-                modelTier,
-                requestReceivedAt);
+            user,
+            conversation.executionConversation(),
+            agent,
+            null,
+            null,
+            snapshot,
+            choice,
+            null,
+            session.correlationSessionId(),
+            null,
+            modelTier,
+            requestReceivedAt);
         if (intent instanceof TurnIntent.DelegationResults results) {
             attachDeliveryExecution(results.attemptId(), execution.id());
         }
         return new PendingTurn(
-                user,
-                conversation,
-                agent,
-                command,
-                execution,
-                new SequenceCounter(),
-                new StringBuilder(),
-                intent,
-                onEvent);
+            user,
+            conversation,
+            agent,
+            command,
+            execution,
+            new SequenceCounter(),
+            new StringBuilder(),
+            intent,
+            onEvent);
     }
+
 
     /**
      * 먼저 살펴보기 turn 의 실행 줄을 살펴보기에 잇는다.
@@ -123,6 +125,7 @@ class ChatTurnLifecycle {
         }
     }
 
+
     /**
      * 자동 turn 의 전달 시도에 그 turn 의 실행 줄을 잇는다(ADR-075).
      *
@@ -137,13 +140,14 @@ class ChatTurnLifecycle {
         }
     }
 
+
     ChatTurn finish(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
         Instant now = clock.instant();
         pending.conversation().rememberSession(result.sessionId(), now);
         conversationWriter.touchSession(
-                pending.conversation().id(),
-                result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
-                now);
+            pending.conversation().id(),
+            result.sessionId() == null || result.sessionId().isBlank() ? null : result.sessionId(),
+            now);
 
         AgentExecution execution = executions.complete(pending.execution(), pending.agent(), result, requested);
         chatRunEvents.append(pending, ExecutionEventType.RUN_COMPLETED, null);
@@ -154,13 +158,14 @@ class ChatTurnLifecycle {
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
         starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(
-                pending.conversation().id(),
-                pending.conversation().publicId(),
-                execution.id(),
-                answer,
-                message.id(),
-                false);
+            pending.conversation().id(),
+            pending.conversation().publicId(),
+            execution.id(),
+            answer,
+            message.id(),
+            false);
     }
+
 
     /**
      * 먼저 살펴보기 turn 의 답을 {@code check} 가 바꾼 글로 남긴다. 알림 줄이면 {@code system} 사건을 낸다.
@@ -181,8 +186,9 @@ class ChatTurnLifecycle {
             message = messages.save(answerMessage(pending, checked.text(), executionId));
         }
         return new ChatTurn(
-                conversation.id(), conversation.publicId(), executionId, checked.text(), message.id(), false);
+            conversation.id(), conversation.publicId(), executionId, checked.text(), message.id(), false);
     }
+
 
     ChatTurn cancel(PendingTurn pending, HermesRunResult result, ModelChoice requested) {
         AgentExecution execution = executions.cancel(pending.execution(), pending.agent(), result, requested);
@@ -190,8 +196,8 @@ class ChatTurnLifecycle {
         synchronized (pending) {
             chatRunEvents.append(pending, ExecutionEventType.RUN_CANCELLED, null);
             answer = result != null
-                            && result.output() != null
-                            && !result.output().isBlank()
+                && result.output() != null
+                && !result.output().isBlank()
                     ? result.output()
                     : pending.streamed().toString();
         }
@@ -201,9 +207,9 @@ class ChatTurnLifecycle {
             String stopped = proactive.check().stoppedNotice();
             if (!proactive.check().silent()) {
                 ChatMessage notice = messages.save(
-                        ChatMessage.fromSystem(pending.conversation().id(), stopped, clock.instant()));
+                    ChatMessage.fromSystem(pending.conversation().id(), stopped, clock.instant()));
                 pending.onEvent()
-                        .accept(ChatEvent.system(pending.conversation().publicId(), notice.id(), notice.content()));
+                    .accept(ChatEvent.system(pending.conversation().publicId(), notice.id(), notice.content()));
             }
         }
         ChatMessage message = answer.isBlank() ? null : messages.save(answerMessage(pending, answer, execution.id()));
@@ -213,13 +219,14 @@ class ChatTurnLifecycle {
             conversationWriter.touchSession(pending.conversation().id(), result.sessionId(), now);
         }
         return new ChatTurn(
-                pending.conversation().id(),
-                pending.conversation().publicId(),
-                execution.id(),
-                answer,
-                message == null ? null : message.id(),
-                true);
+            pending.conversation().id(),
+            pending.conversation().publicId(),
+            execution.id(),
+            answer,
+            message == null ? null : message.id(),
+            true);
     }
+
 
     /**
      * 사람이 보낸 turn 의 실행에 질문을 잇는다(ADR-20261007 / memory-remember). 잇지 못해도 turn 은 잇는다. 그 실행의 {@code memory_remember} 는 제안으로만
@@ -236,17 +243,19 @@ class ChatTurnLifecycle {
         }
     }
 
+
     ChatMessage answerMessage(PendingTurn pending, String answer, Long executionId) {
         if (pending.intent() instanceof TurnIntent.Regenerate regenerate && regenerate.previousAnswer() != null) {
             return ChatMessage.regeneratedAnswer(
-                    pending.conversation().id(),
-                    answer,
-                    executionId,
-                    regenerate.previousAnswer().id(),
-                    clock.instant());
+                pending.conversation().id(),
+                answer,
+                executionId,
+                regenerate.previousAnswer().id(),
+                clock.instant());
         }
         return ChatMessage.fromAssistant(pending.conversation().id(), answer, executionId, clock.instant());
     }
+
 
     /**
      * 이 turn 이 대화 폴더에 만든 HTML 을 답에 묶고 turn 을 그대로 돌려준다.

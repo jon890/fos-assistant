@@ -33,15 +33,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ModelTierFallbackIntegrationTest {
 
     private static final Agent AGENT = Agent.of(
-            "tier-test",
-            "tier-test",
-            "tier-test",
-            "http://hermes.invalid",
-            CostMode.SUBSCRIPTION,
-            CredentialScope.SHARED_HOUSEHOLD,
-            AgentVisibility.GROUP,
-            null,
-            Instant.now());
+        "tier-test",
+        "tier-test",
+        "tier-test",
+        "http://hermes.invalid",
+        CostMode.SUBSCRIPTION,
+        CredentialScope.SHARED_HOUSEHOLD,
+        AgentVisibility.GROUP,
+        null,
+        Instant.now());
 
     private static final Long GROUP_ID = 9_000_000_002L;
 
@@ -54,15 +54,18 @@ class ModelTierFallbackIntegrationTest {
     @Autowired
     TransactionTemplate transactions;
 
+
     @BeforeEach
     void clearLeftovers() {
         transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
     }
 
+
     @AfterEach
     void cleanUp() {
         transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
     }
+
 
     @Test
     @DisplayName("정의가 없는 신규 그룹은 세 단계 모두 에이전트 기본 모델로 해석하고 정의를 만들지 않는다")
@@ -82,13 +85,14 @@ class ModelTierFallbackIntegrationTest {
         assertThat(definitions.findByGroupIdOrderByTier(GROUP_ID)).isEmpty();
     }
 
+
     @Test
     @DisplayName("비어 있는 기존 seed 단계는 선택 대화에서도 tier 기록을 남기고 profile 기본값으로 해석한다")
     void nullSeedUsesProfileDefaultWhileKeepingTier() {
         definitions.saveAll(List.of(
-                ModelTierDefinition.of(GROUP_ID, ModelTier.FAST, null, null, null),
-                ModelTierDefinition.of(GROUP_ID, ModelTier.BALANCED, null, null, null),
-                ModelTierDefinition.of(GROUP_ID, ModelTier.DEEP, null, null, null)));
+            ModelTierDefinition.of(GROUP_ID, ModelTier.FAST, null, null, null),
+            ModelTierDefinition.of(GROUP_ID, ModelTier.BALANCED, null, null, null),
+            ModelTierDefinition.of(GROUP_ID, ModelTier.DEEP, null, null, null)));
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", GROUP_ID, UserRole.MEMBER);
 
         for (ModelTier tier : ModelTier.values()) {
