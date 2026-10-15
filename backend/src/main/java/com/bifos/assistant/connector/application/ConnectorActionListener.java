@@ -76,6 +76,7 @@ public class ConnectorActionListener {
                 event.actionId(),
                 ex.getClass().getSimpleName());
         }
+        resolveRequested(event);
         deliverClosures(conversationId);
         try {
             // 다음 turn 을 정하는 자리는 하나다(ADR-048). 보낼 대기 메시지를 먼저 보고 결과를 전한다.
@@ -84,6 +85,19 @@ public class ConnectorActionListener {
             log.warn(
                 "승인 결과를 전할 대화를 깨우지 못했다 conversationId={} kind={}",
                 conversationId,
+                ex.getClass().getSimpleName());
+        }
+    }
+
+
+    /** 끝난 승인 줄이 만든 승인 요청 알림을 읽음으로 한다. 실패해도 줄의 처리를 막지 않는다. */
+    private void resolveRequested(ConnectorActionChanged event) {
+        try {
+            ownTransaction.executeWithoutResult(status -> actions.resolveApprovalRequested(event.actionId()));
+        } catch (RuntimeException ex) {
+            log.warn(
+                "승인 요청 알림을 읽음으로 바꾸지 못했다 actionId={} kind={}",
+                event.actionId(),
                 ex.getClass().getSimpleName());
         }
     }
