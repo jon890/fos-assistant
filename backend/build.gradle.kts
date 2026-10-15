@@ -66,8 +66,9 @@ tasks.processTestResources {
 
 tasks.test {
     // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
+    // model-eval 태그는 실제 모델을 부르는 답 판정이고 memoryJudgeEval 이 따로 돌린다.
     useJUnitPlatform {
-        excludeTags("mysql")
+        excludeTags("mysql", "model-eval")
     }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
@@ -110,6 +111,23 @@ tasks.register<Test>("archTest") {
     useJUnitPlatform {
         includeTags("architecture")
     }
+}
+
+/**
+ * 합성 사례로 기억이 답에 반영되는지 모델로 판정한다. 설정 환경 변수가 없으면 그 검사를 건너뛰고 성공으로 끝난다.
+ * 방법과 설정 이름은 docs/features/memory.md 의 「답 판정」 이 갖는다. CI 에서 돌리지 않는다.
+ */
+tasks.register<Test>("memoryJudgeEval") {
+    group = "verification"
+    description = "합성 사례로 기억이 답에 반영되는지 모델로 판정한다. 설정이 없으면 건너뛴다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("model-eval")
+    }
+    maxHeapSize = "1g"
+    // 결과가 밖의 모델에 달려 있어 앞선 결과를 다시 쓰지 않는다.
+    outputs.upToDateWhen { false }
 }
 
 /**

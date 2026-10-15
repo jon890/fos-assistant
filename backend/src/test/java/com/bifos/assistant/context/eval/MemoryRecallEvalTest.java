@@ -3,11 +3,6 @@ package com.bifos.assistant.context.eval;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.agent.domain.AgentMemoryCollection;
-import com.bifos.assistant.agent.domain.type.AgentVisibility;
-import com.bifos.assistant.agent.domain.type.CostMode;
-import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentMemoryCollectionRepository;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.context.AssembledContext;
@@ -16,20 +11,13 @@ import com.bifos.assistant.context.ContextBodyMode;
 import com.bifos.assistant.context.ContextItem;
 import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
-import com.bifos.assistant.context.eval.MemoryEvalDataset.Filler;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Forbidden;
-import com.bifos.assistant.context.eval.MemoryEvalDataset.MemorySeed;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemState;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
-import com.bifos.assistant.memory.domain.MemoryPlacement;
-import com.bifos.assistant.memory.domain.StoredContent;
-import com.bifos.assistant.memory.domain.type.MemoryEntryType;
-import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
-import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -38,7 +26,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,16 +53,10 @@ class MemoryRecallEvalTest {
     private static final MemoryEvalDataset DATASET = MemoryEvalDataset.load();
     private static final Path REPORT_DIR = Path.of("build", "reports", "memory-eval");
     private static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
-    private static final String AGENT_CODE_PREFIX = "memory-eval-";
     private static final String NONE = "none";
     private static final String FACTS_OFF = "factsOff";
     private static final String FACTS_ON = "factsOn";
     private static final String FULL_INJECTION = "fullInjection";
-
-    /** 사용자 번호와 그룹 번호가 다른 시험이나 운영 줄과 겹치지 않게 큰 수에서 시작한다. */
-    private static final long USER_ID_BASE = 910_000L;
-
-    private static final long GROUP_ID_BASE = 920_000L;
 
     @Autowired
     MemoryService memoryService;
@@ -97,17 +79,18 @@ class MemoryRecallEvalTest {
     @Autowired
     TestClock clock;
 
-    private final List<Long> createdAgentIds = new ArrayList<>();
+    private MemoryEvalFixture fixture;
+
+
+    @BeforeEach
+    void setUp() {
+        fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock);
+    }
 
 
     @AfterEach
     void tearDown() {
-        memories.deleteAll();
-        for (Long agentId : createdAgentIds) {
-            jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
-            agents.deleteById(agentId);
-        }
-        createdAgentIds.clear();
+        fixture.tearDown();
     }
 
 
@@ -115,7 +98,7 @@ class MemoryRecallEvalTest {
     @DisplayName("시험 세트 전체를 조립해 지표를 내고 권한 경계 노출이 0 임을 확인한다")
     void measuresRecallAndKeepsBoundary() {
         clock.set(BASE);
-        Map<String, Long> agentIds = createAgents();
+        Map<String, Long> agentIds = fixture.createAgents();
         Map<String, ContextAssembler> assemblers = new LinkedHashMap<>();
         assemblers.put(FACTS_OFF, new ContextAssembler(memoryService, withFactsMaxChars(0), clock));
         assemblers.put(FACTS_ON, new ContextAssembler(memoryService, properties, clock));
@@ -124,11 +107,11 @@ class MemoryRecallEvalTest {
         for (Case each : DATASET.cases()) {
             scoreboard.add(NONE, noneVerdictOf(each));
             assemblers.forEach((mode, modeAssembler) -> {
-                Map<String, Long> ids = seed(each);
-                AssembledContext context = modeAssembler.assemble(userOf(each.asker()), agentIds.get(each.agent()));
+                Map<String, Long> ids = fixture.seed(each);
+                AssembledContext context = modeAssembler.assemble(fixture.userOf(each.asker()), agentIds.get(each.agent()));
                 scoreboard.add(mode, verdictOf(each, ids, context));
             });
-            Map<String, Long> ids = seed(each);
+            Map<String, Long> ids = fixture.seed(each);
             scoreboard.add(FULL_INJECTION, fullInjectionVerdictOf(each, ids, agentIds.get(each.agent())));
         }
 
@@ -314,73 +297,6 @@ class MemoryRecallEvalTest {
     }
 
 
-    /** 사례의 Memory 를 새로 넣고 사례 안의 key 마다 저장된 번호를 돌려준다. */
-    private Map<String, Long> seed(Case each) {
-        memories.deleteAll();
-        Instant now = clock.instant();
-        if (each.filler() != null) {
-            memories.saveAll(fillerOf(each.filler(), now));
-        }
-        Map<String, Long> ids = new HashMap<>();
-        for (MemorySeed seed : each.memories()) {
-            ids.put(seed.key(), memories.save(memoryOf(seed, now)).id());
-        }
-        return ids;
-    }
-
-
-    /** 보조 항목은 사례 항목보다 먼저 넣는다. 번호가 작은 쪽이 먼저 실리므로 사례 항목이 가장 불리한 자리에 선다. */
-    private List<Memory> fillerOf(Filler filler, Instant now) {
-        Instant at = now.minus(Duration.ofDays(filler.updatedDaysAgo()));
-        Long owner = userOf(filler.owner()).id();
-        List<Memory> rows = new ArrayList<>();
-        for (int n = 1; n <= filler.count(); n++) {
-            rows.add(Memory.accepted(
-                MemoryScope.USER,
-                owner,
-                null,
-                "보조 사실 " + n,
-                StoredContent.plain("가".repeat(filler.contentChars())),
-                MemoryPlacement.core(MemoryRetrieval.SEARCH),
-                owner,
-                at));
-        }
-        return rows;
-    }
-
-
-    private Memory memoryOf(MemorySeed seed, Instant now) {
-        Instant at = now.minus(Duration.ofDays(seed.updatedDaysAgo()));
-        StoredContent body = StoredContent.plain(seed.content());
-        MemoryPlacement placement = new MemoryPlacement(seed.collection(), seed.retrieval(), seed.sensitivity());
-        boolean group = seed.scope() == MemoryScope.GROUP;
-        Long ownerId = group ? null : userOf(seed.owner()).id();
-        Long groupId = group ? groupIdOf(seed.group()) : null;
-        if (seed.entryType() == MemoryEntryType.DOCUMENT) {
-            return Memory.document(
-                ownerId, seed.collection(), seed.documentKey(), seed.title(), body, seed.sensitivity(), at);
-        }
-        return switch (seed.status()) {
-            case ACCEPTED ->
-                Memory.accepted(
-                    seed.scope(),
-                    ownerId,
-                    groupId,
-                    seed.title(),
-                    body,
-                    placement,
-                    group ? firstUserIdOfGroup(seed.group()) : ownerId,
-                    at);
-            case PROPOSED -> Memory.proposed(ownerId, seed.title(), body, placement, null, null, at);
-            case REJECTED -> {
-                Memory proposed = Memory.proposed(ownerId, seed.title(), body, placement, null, null, at);
-                proposed.reject(at);
-                yield proposed;
-            }
-        };
-    }
-
-
     private CaseVerdict verdictOf(Case each, Map<String, Long> ids, AssembledContext context) {
         Map<String, Integer> ranks = ranksOf(context.bundle().items());
         List<ItemVerdict> items = new ArrayList<>();
@@ -416,7 +332,7 @@ class MemoryRecallEvalTest {
      * 쓴다. 항상 층 번호 순, 그다음 색인 번호 순으로 늘어놓는다.
      */
     private CaseVerdict fullInjectionVerdictOf(Case each, Map<String, Long> ids, Long agentId) {
-        CurrentUser asker = userOf(each.asker());
+        CurrentUser asker = fixture.userOf(each.asker());
         MemoryAccess access = memoryService.accessOf(agentId);
         List<Memory> visible = new ArrayList<>();
         memoryService.alwaysInjectedFor(asker, access).stream()
@@ -481,59 +397,6 @@ class MemoryRecallEvalTest {
             case TITLE_ONLY -> ItemState.TITLE_ONLY;
             case OMITTED -> ItemState.OMITTED;
         };
-    }
-
-
-    /** 에이전트를 저장하고 시험 세트가 적은 collection 만 받게 한다. 저장하면 딸려 오는 core 줄은 지우고 다시 넣는다. */
-    private Map<String, Long> createAgents() {
-        Map<String, Long> agentIds = new LinkedHashMap<>();
-        for (MemoryEvalDataset.Agent each : DATASET.agents()) {
-            String code = AGENT_CODE_PREFIX + each.key();
-            Long agentId = agents.findByCode(code)
-                .orElseGet(() -> agents.save(Agent.of(
-                    code,
-                    "회수 측정 " + each.key(),
-                    code,
-                    "http://runtime.test/p/" + code,
-                    CostMode.API,
-                    CredentialScope.DEDICATED,
-                    AgentVisibility.GROUP,
-                    null,
-                    BASE)))
-                .id();
-            createdAgentIds.add(agentId);
-            jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
-            each.collections()
-                .forEach(grant -> grants.save(
-                    AgentMemoryCollection.of(agentId, grant.collection(), grant.allowSensitive(), BASE)));
-            agentIds.put(each.key(), agentId);
-        }
-        return agentIds;
-    }
-
-
-    private static CurrentUser userOf(String key) {
-        MemoryEvalDataset.User user = DATASET.user(key);
-        int index = DATASET.users().indexOf(user);
-        return new CurrentUser(USER_ID_BASE + index, key + "@example.com", key, groupIdOf(user.group()), user.role());
-    }
-
-
-    private static Long groupIdOf(String group) {
-        List<String> groups = DATASET.users().stream()
-            .map(MemoryEvalDataset.User::group)
-            .distinct()
-            .toList();
-        return GROUP_ID_BASE + groups.indexOf(group);
-    }
-
-
-    private static Long firstUserIdOfGroup(String group) {
-        return DATASET.users().stream()
-            .filter(user -> user.group().equals(group))
-            .findFirst()
-            .map(user -> userOf(user.key()).id())
-            .orElseThrow();
     }
 
 
