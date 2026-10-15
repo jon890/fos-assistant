@@ -892,7 +892,7 @@ test("새 대화에서 모델을 먼저 고르면 에이전트 카드가 잠기�
   await expectSaved(page);
   await expect(picker(page)).toHaveText("기본 · medium");
   await closeSettings(page);
-  await expect(page.getByRole("radio", { name: "성격 비서" })).toBeDisabled();
+  await expect(page.getByRole("radio", { name: "성격 비서", exact: true })).toBeDisabled();
 
   const uploaded = page.waitForResponse(
     (response) =>

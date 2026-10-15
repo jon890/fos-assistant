@@ -1,6 +1,28 @@
-import { conversationIdOf, expect, test } from "./fixtures.ts";
+import { conversationIdOf, expect, hermesBaseUrl, test } from "./fixtures.ts";
 import { LONG_ACTIVITY_PROBE } from "../e2e/fake-hermes.ts";
 import type { Locator } from "../../web/node_modules/@playwright/test/index.js";
+
+async function pausedToolScript(input: string) {
+  const response = await fetch((await hermesBaseUrl()) + "/__test/script", {
+    method: "POST",
+    body: JSON.stringify({
+      input,
+      output: "자리 고정 검사 답",
+      events: [
+        { event: "tool.started", tool: "fake-tool", preview: "started" },
+        {
+          event: "tool.completed",
+          tool: "fake-tool",
+          duration: 0.1,
+          error: false,
+          preview: "",
+        },
+      ],
+      pause: true,
+    }),
+  });
+  expect(response.ok).toBeTruthy();
+}
 
 test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인다", async ({
   page,
@@ -223,24 +245,33 @@ async function expectBlockBelowName(row: Locator): Promise<void> {
 }
 
 test("진행 중 블록은 답이 없을 때도 답이 흘러나올 때도 비서 이름 아래에 있다", async ({ page, hermes }) => {
-  // 답이 아직 없을 때다. 흐름은 run 이 붙잡힌 동안에도 단계 사건을 먼저 보낸다.
+  // 답이 아직 없을 때다. 일반 실행의 도구 사건만 먼저 보내고 완료를 멈춘다.
+  const pendingInput = "자리 고정 검사";
+  await pausedToolScript(pendingInput);
   await hermes.holdNextRun();
   let released = false;
   try {
-    await sendWithTheFlowAgent(page, "자리 고정 검사");
+    await page.goto("/");
+    await page.getByRole("radio", { name: "브라우저 비서" }).click();
+    await page.getByRole("textbox", { name: "메시지" }).fill(pendingInput);
+    await page.getByRole("button", { name: "보내기" }).click();
     await hermes.waitForHeldRun();
     const pending = page.getByTestId("pending-assistant");
     await expect(pending.locator('[data-testid="activity-block"][data-mode="live"]')).toBeVisible();
     await expect(pending.getByTestId("activity-signal")).toBeVisible();
     await expect(page.getByTestId("assistant-message")).toHaveCount(0);
     await expectBlockBelowName(pending);
+    await hermes.releaseLongActivity();
     await hermes.releaseHeldRun();
     released = true;
     await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last())
       .toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("pending-assistant")).toHaveCount(0);
   } finally {
-    if (!released) await hermes.releaseHeldRun();
+    if (!released) {
+      await hermes.releaseLongActivity();
+      await hermes.releaseHeldRun();
+    }
   }
 
   // 답이 흘러나오는 중이다. 이 입력은 첫 조각을 보낸 뒤 도구 줄을 남기고 기다린다.

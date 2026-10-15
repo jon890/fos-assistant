@@ -76,9 +76,9 @@ test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문�
   await page.goto("/");
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toBeVisible();
 
-  await page.getByRole("radio", { name: "성격 비서" }).click();
+  await page.getByRole("radio", { name: "성격 비서", exact: true }).click();
 
-  await expect(page.getByRole("radio", { name: "성격 비서" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "false");
   await expect(page.getByRole("button", { name: "성격 추천이다", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toHaveCount(0);
@@ -87,14 +87,14 @@ test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문�
 test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르고 보내지 않는다", async ({ page }) => {
   await page.goto("/");
 
-  await composer(page).fill("@성격");
+  await composer(page).fill("@빈");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
-  await expect(list.getByRole("option", { name: /성격 비서/ })).toBeVisible();
+  await expect(list.getByRole("option", { name: "빈 성격 비서", exact: true })).toBeVisible();
   await expect(list.getByRole("option")).toHaveCount(1);
   await composer(page).press("Enter");
 
   await expect(list).toHaveCount(0);
-  await expect(page.getByRole("radio", { name: "성격 비서" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "빈 성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(composer(page)).toHaveValue("");
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page).toHaveURL(/\/$/);
@@ -103,13 +103,13 @@ test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르�
 test("@ 목록이 떠 있을 때 Shift+Enter 는 고르지 않고 줄을 바꾼다", async ({ page }) => {
   await page.goto("/");
 
-  await composer(page).fill("@성격");
+  await composer(page).fill("@빈");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
-  await expect(list.getByRole("option", { name: /성격 비서/ })).toBeVisible();
+  await expect(list.getByRole("option", { name: "빈 성격 비서", exact: true })).toBeVisible();
   await composer(page).press("Shift+Enter");
 
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
-  await expect(composer(page)).toHaveValue("@흐름\n");
+  await expect(composer(page)).toHaveValue("@빈\n");
   await expect(list).toHaveCount(0);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
 });
@@ -348,7 +348,7 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
   // 빈 대화가 생겨도 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
-  const personaCard = page.getByRole("radio", { name: "성격 비서" });
+  const personaCard = page.getByRole("radio", { name: "성격 비서", exact: true });
   await expect(personaCard).toBeDisabled();
   await personaCard.click({ force: true });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");

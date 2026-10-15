@@ -169,13 +169,15 @@ test("도는 중 패널은 사건을 보이고 끝나면 같은 자리에서 트
     await block.getByTestId("activity-toggle").click();
     await block.getByTestId("activity-open-panel").click();
     const panel = page.getByTestId("activity-panel");
-    await expect(panel.locator('[data-kind="tool"]')).toHaveCount(0);
+    const timeline = panel.getByRole("list", { name: "작업 과정" });
+    await expect(timeline.locator('[data-kind="tool"]')).toHaveCount(2);
     await expect(panel.getByTestId("execution-tree")).toHaveCount(0);
     await hermes.releaseHeldRun();
     released = true;
     await expect(panel.getByTestId("execution-tree")).toBeVisible({
       timeout: 30_000,
     });
+    await expect(timeline).toHaveCount(0);
     await expect(panel.getByTestId("execution-tree-link")).toBeVisible();
     expect(
       await page.evaluate(
@@ -364,6 +366,11 @@ test("넓은 폭에서 패널을 Esc 로 닫고 한 번 더 누르면 답이 멈
     "패널이 대화 옆에 붙는 폭에서 검사한다",
   );
   await hermes.holdNextRun();
+  let stopRequests = 0;
+  await page.route("**/api/chat/executions/*/stop", async (route) => {
+    stopRequests += 1;
+    await route.fallback();
+  });
   await send(page, "넓은 폭 패널 Esc 검사");
   await hermes.waitForHeldRun();
   const panel = await openLivePanel(page);
@@ -376,7 +383,11 @@ test("넓은 폭에서 패널을 Esc 로 닫고 한 번 더 누르면 답이 멈
     page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
   ).toBeEnabled();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
+  ).toHaveCount(0);
+  expect(stopRequests, "두 번째 Esc 가 실행 중지 요청을 한 횟수").toBe(1);
 });
 
 test("ADMIN 역할도 대화 화면에서는 도구 줄을 펼쳐도 원본 보기가 없다", async ({ page }) => {
