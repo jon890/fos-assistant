@@ -485,7 +485,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 
 #### 기준 파일
 
-기준 파일은 `backend/src/test/resources/memory-eval/baseline.json` 이고 사례 묶음의 `version` 과 `factsOn` 의 두 값을 담는다. <!-- ref-ignore: 단계 0 의 게이트 구현 커밋이 이 파일을 만들고 이 표기를 지운다 -->
+기준 파일은 `backend/src/test/resources/memory-eval/baseline.json` 이고 사례 묶음의 `version` 과 `factsOn` 의 두 값을 담는다.
 `version` 이 사례 묶음과 다르면 테스트가 실패하고 다시 만드는 명령을 낸다.
 
 ```bash

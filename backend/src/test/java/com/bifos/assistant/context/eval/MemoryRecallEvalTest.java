@@ -23,6 +23,7 @@ import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemState;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.ItemVerdict;
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -40,6 +41,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,8 +66,10 @@ class MemoryRecallEvalTest {
     private static final Path REPORT_DIR = Path.of("build", "reports", "memory-eval");
     private static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
     private static final String AGENT_CODE_PREFIX = "memory-eval-";
+    private static final String NONE = "none";
     private static final String FACTS_OFF = "factsOff";
     private static final String FACTS_ON = "factsOn";
+    private static final String FULL_INJECTION = "fullInjection";
 
     /** 사용자 번호와 그룹 번호가 다른 시험이나 운영 줄과 겹치지 않게 큰 수에서 시작한다. */
     private static final long USER_ID_BASE = 910_000L;
@@ -118,11 +122,14 @@ class MemoryRecallEvalTest {
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
         for (Case each : DATASET.cases()) {
+            scoreboard.add(NONE, noneVerdictOf(each));
             assemblers.forEach((mode, modeAssembler) -> {
                 Map<String, Long> ids = seed(each);
                 AssembledContext context = modeAssembler.assemble(userOf(each.asker()), agentIds.get(each.agent()));
                 scoreboard.add(mode, verdictOf(each, ids, context));
             });
+            Map<String, Long> ids = seed(each);
+            scoreboard.add(FULL_INJECTION, fullInjectionVerdictOf(each, ids, agentIds.get(each.agent())));
         }
 
         String markdown = scoreboard.markdown();
@@ -131,10 +138,17 @@ class MemoryRecallEvalTest {
             .as("권한 경계를 넘어 문맥 묶음에 든 항목(모드 사례 항목 상태)")
             .isEmpty();
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
-        assertThat(scoreboard.metrics(FACTS_OFF, null).cases())
-            .isEqualTo(DATASET.cases().size());
-        assertThat(scoreboard.metrics(FACTS_ON, null).cases())
-            .isEqualTo(DATASET.cases().size());
+        for (String mode : List.of(NONE, FACTS_OFF, FACTS_ON, FULL_INJECTION)) {
+            assertThat(scoreboard.metrics(mode, null).cases()).as(mode).isEqualTo(DATASET.cases().size());
+        }
+        MemoryEvalScoreboard.Metrics factsOn = scoreboard.metrics(FACTS_ON, null);
+        if (Boolean.getBoolean(MemoryEvalBaseline.WRITE_PROPERTY)) {
+            MemoryEvalBaseline.of(DATASET.version(), FACTS_ON, factsOn).write(MemoryEvalBaseline.SOURCE);
+            return;
+        }
+        assertThat(MemoryEvalBaseline.load().violations(DATASET.version(), factsOn))
+            .as("합성 측정이 기준 파일보다 나빠졌다. 절차는 docs/features/memory.md 의 「기준 파일」")
+            .isEmpty();
     }
 
 
@@ -220,8 +234,8 @@ class MemoryRecallEvalTest {
                 "X-01",
                 MemoryEvalDataset.Category.BOUNDARY,
                 List.of(
-                    new ItemVerdict("m1", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.OMITTED),
-                    new ItemVerdict("m2", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.ABSENT)),
+                    new ItemVerdict("m1", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.OMITTED, null),
+                    new ItemVerdict("m2", MemoryEvalDataset.ForbiddenKind.BOUNDARY, ItemState.ABSENT, null)),
                 0,
                 0));
 
@@ -231,6 +245,72 @@ class MemoryRecallEvalTest {
         assertThat(metrics.boundaryExposure()).isEqualTo(1);
         assertThat(scoreboard.boundaryViolations()).containsExactly("factsOff X-01 m1 OMITTED");
         assertThat(scoreboard.markdown()).contains("해당 없음");
+    }
+
+
+    @Test
+    @DisplayName("recall@k 는 본문 항목 다음 제목 항목의 순위로 세고 순위가 없는 항목은 세지 않는다")
+    void countsRecallAtKByRank() {
+        MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(1);
+        scoreboard.add(
+            FACTS_ON,
+            new CaseVerdict(
+                "X-02",
+                MemoryEvalDataset.Category.INFORMATION_EXTRACTION,
+                List.of(
+                    new ItemVerdict("m1", null, ItemState.INLINE, 1),
+                    new ItemVerdict("m2", null, ItemState.TITLE_ONLY, 6),
+                    new ItemVerdict("m3", null, ItemState.OMITTED, null)),
+                0,
+                1));
+
+        MemoryEvalScoreboard.Metrics metrics = scoreboard.metrics(FACTS_ON, null);
+
+        assertThat(metrics.recallAt5().numerator()).isEqualTo(1);
+        assertThat(metrics.recallAt5().denominator()).isEqualTo(3);
+        assertThat(metrics.recallAt10().numerator()).isEqualTo(2);
+        assertThat(ranksOf(List.of(
+            item("memory:1", ContextBodyMode.TITLE_ONLY),
+            item("memory:2", ContextBodyMode.INLINE),
+            item("memory:3", ContextBodyMode.OMITTED))))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("memory:2", 1, "memory:1", 2));
+    }
+
+
+    @Test
+    @DisplayName("기준 파일보다 recall@5 가 낮거나 오기억 노출률이 높거나 버전이 다르면 어긋남을 낸다")
+    void reportsBaselineViolations() {
+        MemoryEvalBaseline baseline = new MemoryEvalBaseline(2, FACTS_ON, 0.5, 0.25);
+
+        assertThat(baseline.violations(2, metricsOf(2, 4, 1, 4))).isEmpty();
+        assertThat(baseline.violations(2, metricsOf(1, 4, 1, 4))).singleElement().asString().contains("recall@5");
+        assertThat(baseline.violations(2, metricsOf(2, 4, 2, 4))).singleElement().asString().contains("오기억 노출률");
+        assertThat(baseline.violations(3, metricsOf(2, 4, 1, 4)))
+            .singleElement()
+            .asString()
+            .contains(MemoryEvalBaseline.WRITE_PROPERTY);
+    }
+
+
+    /** recall@5 와 오기억 노출률만 채운 지표다. */
+    private static MemoryEvalScoreboard.Metrics metricsOf(int recalled, int expected, int exposed, int falseMemories) {
+        MemoryEvalScoreboard.Ratio none = MemoryEvalScoreboard.Ratio.of(0, 0);
+        return new MemoryEvalScoreboard.Metrics(
+            1,
+            none,
+            none,
+            MemoryEvalScoreboard.Ratio.of(recalled, expected),
+            none,
+            MemoryEvalScoreboard.Ratio.of(exposed, falseMemories),
+            0,
+            0,
+            null,
+            0);
+    }
+
+
+    private static ContextItem item(String ref, ContextBodyMode mode) {
+        return new ContextItem(null, ref, null, null, null, null, null, null, mode, List.of(), null, null);
     }
 
 
@@ -302,15 +382,85 @@ class MemoryRecallEvalTest {
 
 
     private CaseVerdict verdictOf(Case each, Map<String, Long> ids, AssembledContext context) {
+        Map<String, Integer> ranks = ranksOf(context.bundle().items());
         List<ItemVerdict> items = new ArrayList<>();
         for (String key : each.expect()) {
-            items.add(new ItemVerdict(key, null, stateOf(ids.get(key), context)));
+            String ref = ContextItem.memoryRef(ids.get(key));
+            items.add(new ItemVerdict(key, null, stateOf(ids.get(key), context), ranks.get(ref)));
         }
         for (Forbidden forbidden : each.forbidden()) {
+            String ref = ContextItem.memoryRef(ids.get(forbidden.memory()));
             items.add(new ItemVerdict(
-                forbidden.memory(), forbidden.kind(), stateOf(ids.get(forbidden.memory()), context)));
+                forbidden.memory(),
+                forbidden.kind(),
+                stateOf(ids.get(forbidden.memory()), context),
+                ranks.get(ref)));
         }
         return new CaseVerdict(each.id(), each.category(), items, context.chars(), context.omittedItems());
+    }
+
+
+    /** 기억을 싣지 않는 아래쪽 기준선이다. 모든 항목이 없다. */
+    private static CaseVerdict noneVerdictOf(Case each) {
+        List<ItemVerdict> items = new ArrayList<>();
+        each.expect().forEach(key -> items.add(new ItemVerdict(key, null, ItemState.ABSENT, null)));
+        each.forbidden()
+            .forEach(forbidden -> items.add(
+                new ItemVerdict(forbidden.memory(), forbidden.kind(), ItemState.ABSENT, null)));
+        return new CaseVerdict(each.id(), each.category(), items, 0, 0);
+    }
+
+
+    /**
+     * 그 에이전트가 볼 수 있는 항목을 예산 없이 모두 본문으로 싣는 위쪽 기준선이다. 권한 조건은 조립과 같은 {@link MemoryService} 의 조회를
+     * 쓴다. 항상 층 번호 순, 그다음 색인 번호 순으로 늘어놓는다.
+     */
+    private CaseVerdict fullInjectionVerdictOf(Case each, Map<String, Long> ids, Long agentId) {
+        CurrentUser asker = userOf(each.asker());
+        MemoryAccess access = memoryService.accessOf(agentId);
+        List<Memory> visible = new ArrayList<>();
+        memoryService.alwaysInjectedFor(asker, access).stream()
+            .sorted(Comparator.comparing(Memory::id))
+            .forEach(visible::add);
+        memoryService.indexedFor(asker, access).stream()
+            .sorted(Comparator.comparing(Memory::id))
+            .forEach(visible::add);
+        Map<Long, Integer> ranks = new HashMap<>();
+        long chars = 0;
+        for (Memory memory : visible) {
+            ranks.putIfAbsent(memory.id(), ranks.size() + 1);
+            chars += ("- [" + memory.id() + "] " + memory.title() + ": " + memory.content()).length() + 1;
+        }
+        List<ItemVerdict> items = new ArrayList<>();
+        for (String key : each.expect()) {
+            items.add(fullInjectionItem(key, null, ranks.get(ids.get(key))));
+        }
+        for (Forbidden forbidden : each.forbidden()) {
+            items.add(fullInjectionItem(forbidden.memory(), forbidden.kind(), ranks.get(ids.get(forbidden.memory()))));
+        }
+        return new CaseVerdict(each.id(), each.category(), items, chars, 0);
+    }
+
+
+    private static ItemVerdict fullInjectionItem(String key, MemoryEvalDataset.ForbiddenKind kind, Integer rank) {
+        return new ItemVerdict(key, kind, rank == null ? ItemState.ABSENT : ItemState.INLINE, rank);
+    }
+
+
+    /**
+     * recall@k 의 순위를 매긴다. {@code INLINE} 항목을 실은 순서대로, 그 뒤에 {@code TITLE_ONLY} 항목을 실은 순서대로 1 부터 센다. 빠진
+     * 항목은 순위가 없다.
+     *
+     * @return 항목 참조마다 순위
+     */
+    static Map<String, Integer> ranksOf(List<ContextItem> items) {
+        Map<String, Integer> ranks = new HashMap<>();
+        for (ContextBodyMode mode : List.of(ContextBodyMode.INLINE, ContextBodyMode.TITLE_ONLY)) {
+            items.stream()
+                .filter(item -> item.bodyMode() == mode)
+                .forEach(item -> ranks.putIfAbsent(item.ref(), ranks.size() + 1));
+        }
+        return ranks;
     }
 
 
