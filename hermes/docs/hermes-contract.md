@@ -704,6 +704,13 @@ API server 는 목록을 만들 때 Hermes 가 아는 provider 가운데 빠진 
 `fallback_providers` 는 목록에 영향을 주지 않는다.
 쿼리는 `refresh` 하나만 읽는다.
 
+**Codex 의 목록은 실제 조회가 실패하면 고정된 대체 목록으로 바뀐다.**
+Hermes v0.21.6 의 `hermes_cli/codex_models.py` 는 `get_codex_model_ids` 에서 Codex 의 실제 목록 조회(timeout 10초)가 실패하거나 빈 답이면 `DEFAULT_CODEX_MODELS` 를 돌려준다.
+대체 목록은 조회 시점의 최신 모델을 담지 않아 최근 추가된 모델이 빠진다.
+응답에는 이것이 대체 목록이라는 표시가 없어 한 번의 응답만으로는 구분할 수 없다.
+같은 profile 의 목록이 몇십 분 사이에 모델 하나 적은 목록이었다가 정상으로 돌아오는 것이 그 모습이다.
+그래서 Control Plane 은 목록에 없다는 사실만으로 실행을 막지 않는다. 정책은 [model-usage](../../docs/features/model-usage.md) 의 「실행 때 목록 대조 정책」 이 갖는다.
+
 다른 경로는 이 목록을 대신하지 못한다.
 `/v1/models` 는 profile 이름만 준다.
 대시보드의 `/api/providers/custom-endpoints` 는 사용자가 더한 endpoint 만 준다.
