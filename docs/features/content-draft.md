@@ -139,7 +139,7 @@ private transport와 preview snapshot 서비스는 합성 원고로 검증한다
 | start 입력 | `{snapshot, jobId, ticket, stamp}`. snapshot은 CompiledSnapshotV1, `stamp.jobId`와 `stamp.snapshotHash`는 jobId·snapshot과 같아야 한다. ticket은 공백 없는 ASCII 1~4,096자 |
 | start 결과 | `{job_id, status, stamp, error_code}`. 시작 확인 전에 끝났으면 그 종료 상태다. 시작 전 거절 code를 같은 응답으로 읽으며 status와 같은 허용 규칙을 쓴다 |
 | status 입력 | `{stamp}`만 받는다 |
-| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다 |
+| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`에 실패 사유가 있으면 `error_reason`이 더해진다. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다. `error_reason`은 `error_code`와 같은 모양(`[a-z][a-z_]{0,63}`)의 고정 코드이고, 허용 밖이거나 없으면 칸을 싣지 않는다. 옛 Control Plane은 모르는 칸을 거절하므로 Control Plane을 먼저 배포한다 |
 | 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}`. 커넥터는 isError 결과의 text 하나로 보내고, plugin은 이 모양만 `ok:true` 결과로 넘기며 다른 isError는 503이다 |
 
 private 서버는 profile을 모르므로 profileHash를 다시 계산하지 않는다. 상태 파일의 stamp와 모든 칸이 같은지만 본다.
@@ -232,7 +232,7 @@ worker 시작 전송과 private 상태 조회, MCP 도구와 REST·화면 연결
 | `ContentDraftSaveRequests` | `ContentDraftSaveRequestView requestSave(CurrentUser user, Long originExecutionId, UUID snapshotId)` |
 | `ContentDraftJobQueries` | `ContentDraftJobView refresh(CurrentUser user, Long conversationId, UUID draftId, UUID snapshotId)`, `ContentDraftJobPage list(CurrentUser user, Long conversationId, UUID beforeSnapshotId, int limit)` |
 | `ContentDraftSaveRequestView` | `UUID snapshotId, UUID actionId, UUID jobId, ContentDraftJobStatus status`, jobId는 승인 전 null |
-| `ContentDraftJobView` | `UUID snapshotId, UUID draftId, long revision, UUID actionId, UUID jobId, ContentDraftJobStatus status, String stage, boolean saveClicked, Instant lastCheckedAt, String errorCode` |
+| `ContentDraftJobView` | `UUID snapshotId, UUID draftId, long revision, UUID actionId, UUID jobId, ContentDraftJobStatus status, String stage, boolean saveClicked, Instant lastCheckedAt, String errorCode, String errorReason` |
 | `ContentDraftJobPage` | `List<ContentDraftJobView> items, UUID nextBeforeSnapshotId`, 페이지 끝이면 cursor null |
 
 requestSave는 호출한 origin이 같은 사용자·대화의 취소되지 않은 실행이고 snapshot의 에이전트와 같은지 먼저 본다.
@@ -334,6 +334,7 @@ CP 검사와 브라우저 클릭을 하나의 원격 트랜잭션이라고 주�
 authorize도 바인딩 버전을 대조하므로 닫은 뒤의 worker는 claim을 받지 못한다.
 원격 호출 동안 DB 잠금을 유지하지 않는다. 응답 뒤 coordinator에서 현재 ACL·binding을 다시 확인하고 승인 줄 → snapshot → job 순서로 잠근다. stamp와 jobId가 정확한 결과만 기록한다.
 `ContentDraftWorkerStatusDecoder`는 소문자 worker 상태를 CP enum으로 명시적으로 옮기며 단계·boolean·수치·종료 시각의 타입을 검사한다. 조회 오류는 `CONTENT_DRAFT_JOB_UNAVAILABLE`이고 기존 상태를 FAILED로 바꾸지 않는다.
+status 응답의 `error_reason`은 선택 칸이다. 있으면 `[a-z][a-z_]{0,63}` 모양만 받고 아니면 응답 전체를 거절하며, 옛 worker처럼 없으면 `errorReason`이 null이다. job은 `error_reason` 컬럼에 보관하고 job 상태와 승인 줄 요약으로 내보낸다. 화면은 알려진 코드를 FAILED 안내 뒤에 사용자 문구로 덧붙이고 모르는 코드는 그리지 않는다. 배포는 Control Plane이 먼저다.
 worker의 `not_found`는 timeout·전송 실패와 다르다. HTTP client가 `ContentDraftJobNotFound`로 따로 알리고, refresh는 start claim이 없으면 FAILED, 있으면 UNKNOWN과 `CONTENT_DRAFT_JOB_NOT_FOUND`로 닫는다. worker는 브라우저를 열기 전에 반드시 start claim을 받으므로 claim이 없으면 저장 클릭도 없고, 늦게 온 worker는 FAILED에서 claim을 받지 못한다.
 시작 전송이 아직 worker에 닿지 않았을 수 있는 승인 뒤 2분 동안의 DISPATCHED job은 `not_found`를 일시 장애로 본다. CP가 닫은 UNKNOWN은 다시 조회하지 않는다.
 늦은 terminal은 UNKNOWN job을 해소할 수 있다. 확정한 SUCCEEDED·FAILED는 덮지 않고 UNKNOWN을 running 응답으로 되돌리지 않는다. save claim 또는 save_clicked 뒤의 실패는 UNKNOWN이다. ConnectorAction은 EXECUTING일 때만 terminal로 바꾸고 기존 UNKNOWN 승인 줄은 유지한다. 일반 실행 정리가 원고 승인 줄을 바꾸지 않으므로 UNKNOWN 승인 줄은 시작 응답을 잃었을 때만 생긴다.

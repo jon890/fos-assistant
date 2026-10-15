@@ -220,7 +220,8 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
                 throw ContentDraftWorkerStatusDecoder.unavailable();
             }
             if (answer != null) {
-                currentJob.observed(answer.status(), answer.stage(), answer.saveClicked(), answer.errorCode(), clock.instant());
+                currentJob.observed(answer.status(), answer.stage(), answer.saveClicked(), answer.errorCode(), answer.errorReason(),
+                    clock.instant());
             } else if (currentJob.awaitingResult()) {
                 // worker 는 브라우저를 열기 전에 반드시 start claim 을 받는다. claim 이 없으면 저장 클릭도 없다.
                 currentJob.close(ContentDraftJob.NOT_FOUND, clock.instant());
@@ -378,7 +379,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
 
     private static ContentDraftActionSummary summary(ContentDraftJobView view, UUID conversationPublicId) {
         return new ContentDraftActionSummary(view.snapshotId(), view.draftId(), view.revision(), conversationPublicId,
-            view.status(), view.stage(), view.saveClicked(), view.errorCode());
+            view.status(), view.stage(), view.saveClicked(), view.errorCode(), view.errorReason());
     }
 
 
@@ -407,7 +408,7 @@ public class ContentDraftJobs implements ContentDraftSaveRequests, ContentDraftJ
             return new ContentDraftJobView(snapshot.publicId(), draft == null ? null : UUID.fromString(draft.publicId()),
                 revision == null ? 0 : revision.revision(), action == null ? null : action.publicId(),
                 job.jobId() == null ? null : UUID.fromString(job.jobId()), status(job, action), job.stage(), job.saveClicked(),
-                job.lastCheckedAt(), job.errorCode());
+                job.lastCheckedAt(), job.errorCode(), job.errorReason());
         }).toList();
     }
 

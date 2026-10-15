@@ -9,5 +9,6 @@ import java.util.UUID;
  * @param conversationId 원래 대화의 공개 ID
  */
 public record ContentDraftActionSummary(UUID snapshotId, UUID draftId, long revision, UUID conversationId,
-    ContentDraftJobStatus status, String stage, boolean saveClicked, String errorCode) {
+    ContentDraftJobStatus status, String stage, boolean saveClicked, String errorCode,
+    String errorReason) {
 }

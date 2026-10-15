@@ -271,6 +271,7 @@ test("원고 저장 요약은 계약의 칸만 옮기고 일반 줄은 null 이�
     stage: "editor",
     saveClicked: false,
     errorCode: null,
+    errorReason: "title_cursor_covered",
     approvedBy: "버릴 칸",
   };
   const { response } = await callRoute("list", [

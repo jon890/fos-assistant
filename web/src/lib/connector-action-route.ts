@@ -265,7 +265,15 @@ function safeContentDraft(value: unknown): ContentDraftSummary {
     stage: nullableText(item.stage),
     saveClicked: item.saveClicked === true,
     errorCode: nullableText(item.errorCode),
+    errorReason: reasonCode(item.errorReason),
   };
+}
+
+/** 실패 사유는 worker 가 정한 고정 코드 모양만 넘긴다. */
+function reasonCode(value: unknown): string | null {
+  return typeof value === "string" && /^[a-z][a-z_]{0,63}$/.test(value)
+    ? value
+    : null;
 }
 
 function grantId(value: unknown): number {

@@ -140,6 +140,7 @@ test("snapshot 과 job 은 세 UUID 경로로만 Control Plane 을 부르고 화
         status: "SAVING",
         stage: "uploading",
         saveClicked: false,
+        errorReason: null,
       },
     ],
   ] as const) {
@@ -175,6 +176,24 @@ test("STALE·삭제·남의 것은 code 를 넘기고 그 밖의 code 와 원문
     const body = await response.json();
     assert.equal(body.code, expected);
     assert.doesNotMatch(body.message, /secret/);
+  }
+});
+
+test("job 의 실패 사유는 고정 코드 모양만 넘기고 그 밖은 null 이다", async () => {
+  const params = { conversationId: ID, draftId: OTHER, snapshotId: ID };
+  for (const [reason, expected] of [
+    ["title_cursor_covered", "title_cursor_covered"],
+    ["Bad Reason /home/secret", null],
+    [3, null],
+    [undefined, null],
+  ] as const) {
+    const ok = {
+      ok: true,
+      status: 200,
+      data: { ...JOB_BODY, errorReason: reason },
+    };
+    const { response } = await callRoute(JOB, params, ok);
+    assert.equal((await response.json()).errorReason, expected);
   }
 });
 
