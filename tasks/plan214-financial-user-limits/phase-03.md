@@ -99,8 +99,9 @@
   - 두 도구가 `tools/list` 에 있다
   - 살펴보기 트리(매일 깨우기 포함)의 `order_limit_change` 호출은 막히고 아무것도 바뀌지 않는다
   - 서명 없는 호출은 거절된다
-- `backend/src/test/java/com/bifos/assistant/connector/application/ConnectorArgumentLabelsPipelineTest.java`: 다시 뽑은 fixture 로 통과한다
+- `ConnectorArgumentLabelsPipelineTest`: 다시 뽑은 fixture 로 통과한다
 - `hermes/tests/test_fos_ctx.py`: 서명하지 못하면 두 도구가 막힌다
+- 도구 목록과 생성자를 단언하는 기존 테스트(`McpToolCatalogTest`, `McpMemoryToolTest`, `McpContentDraftSnapshotsTest`, `McpCallerInvariantTest`, `ConnectorActionControllerTest`)에 두 도구와 새 의존성을 더한다
 
 ## 검증
 
@@ -108,7 +109,7 @@
 cd backend && ./gradlew test --tests '*FinancialLimitChangesTest' --tests '*McpFinancialLimitToolsTest' --tests '*ConnectorArgumentLabelsPipelineTest' --tests '*Financial*' --tests 'com.bifos.assistant.mcp.*'
 cd backend && ./gradlew archTest spotlessCheck checkstyleMain checkstyleTest
 node scripts/checks/check-migration-versions.mjs
-cd hermes && python3 -m pytest tests/test_fos_ctx.py -q
+python3 -m unittest discover -s hermes/tests -p 'test_fos_ctx.py'
 cd web && node --test ../test/web/connector-action-route.test.ts
 scripts/dev/check-local.sh --fast
 ```
@@ -140,3 +141,9 @@ scripts/dev/check-local.sh --fast
 | `docs/features/connector-policy.md` | 수정 |
 | `backend/src/test/java/com/bifos/assistant/connector/application/FinancialLimitChangesTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/mcp/McpFinancialLimitToolsTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/mcp/application/McpToolCatalogTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpContentDraftSnapshotsTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/mcp/McpCallerInvariantTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionControllerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialConnectorTestBase.java` | 수정 |

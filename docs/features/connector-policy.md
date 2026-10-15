@@ -335,6 +335,7 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 상시 허락 목록은 지금 선언이 상시 허락을 닫은 도구의 줄을 내지 않는다. 판정이 그 줄을 보지 않아 효력이 없기 때문이다. 그런 줄은 주기 정리가 거두고, 거둔 줄은 선언이 다시 열려도 되살아나지 않는다. 카탈로그를 읽지 못한 커넥터의 줄은 두고 본다
 - 다른 사용자의 줄은 `CONNECTOR_ACTION_NOT_FOUND` 다. 관리자도 같다
 - 대화의 승인 줄 목록과 그 줄의 승인·거절 응답에서 원고 저장 job 이 연결된 줄은 `contentDraft` 요약을 싣는다. 일반 줄은 null 이다. 화면이 응답으로 자기 줄을 바꿔도 원고 카드로 남게 하기 위해서다. 요약의 칸과 화면 동작은 [원고 MCP 도구와 화면 연결](content-draft.md#mcp-도구와-화면-연결) 이 갖는다
+- 공개 승인 API 는 주문 상한 변경 줄(`financial_limit_change` 가 있는 줄)을 금융 주문 승인보다 먼저 상한 변경 승인(`FinancialLimitChanges`)으로 보낸다. 허락 입력은 `VALIDATION_FAILED` 다([ADR-20261015 / financial-user-limits](../adr/ADR-20261015-financial-user-limits.md))
 - 공개 승인 API 는 저장 위험도가 `FINANCIAL` 인 줄을 금융 승인(`ConnectorFinancialApproval`)으로 보낸다. 주인이 아니면 없는 줄과 같은 응답을 먼저 내고, 주인이면 상시 허락이나 대화 허락을 보낸 요청을 `VALIDATION_FAILED` 로 거절한다. 그 뒤 금융 승인이 저장한 snapshot 을 다시 검증한다
 - 금융 줄의 응답은 `financial` 요약(계좌 순번, 동작, 종목, 방향, 수량이나 금액, 가격, 통화, 주문 유형, 정규화)을 싣는다. 계좌 순번은 저장 scope 의 값이다. 저장한 내용을 열지 못하면 `available` 이 거짓이고 화면은 승인 단추를 그리지 않는다. 금융 줄이 아니면 null 이다. 금융 줄은 묶지 않고 「모두 승인」 에 넣지 않는다
 - 부른 쪽은 이미 처리된 요청(409 `CONNECTOR_ACTION_NOT_PENDING`)과 승인했지만 실행하지 않은 요청(200 과 끝난 줄의 `status`)을 구분한다
