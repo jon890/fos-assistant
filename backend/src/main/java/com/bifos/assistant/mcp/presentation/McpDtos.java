@@ -64,7 +64,6 @@ public final class McpDtos {
         }
     }
 
-
     /** 인자가 없다. 모르는 키는 거절한다. */
     public record OrderLimitReadArguments() {
         static OrderLimitReadArguments from(JsonNode node) {
@@ -74,7 +73,6 @@ public final class McpDtos {
             return new OrderLimitReadArguments();
         }
     }
-
 
     /** 이름은 다섯 상한 가운데 하나이고 값은 0 이상, 소수 6자리까지의 십진 글이다. */
     public record OrderLimitChangeArguments(String name, String value) {

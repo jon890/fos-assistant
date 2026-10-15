@@ -32,9 +32,9 @@ import tools.jackson.databind.node.ObjectNode;
 @Slf4j
 public record McpCallContext(String rootSessionId, String sessionId, String toolCallId) {
 
+
     /** 도구 인자 안에서 이 값이 놓이는 키다. */
     public static final String FIELD = "_fos_ctx";
-
 
     /**
      * profile 플러그인이 모든 도구 인자에 덮어쓴 {@code _fos_ctx} 를 뗀 복사본을 만든다.
@@ -55,6 +55,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
     private static final String HMAC = "HmacSHA256";
     /** {@code sig} 가 받는 모양이다. 하위 에이전트 등록 서명과 커넥터 정책 요청의 서명도 같은 모양이다. */
     public static final Pattern SIGNATURE = Pattern.compile("^[0-9a-f]{64}$");
+
 
     /**
      * {@code _fos_ctx} 를 읽고 서명을 확인한다.
@@ -93,6 +94,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
         return new McpCallContext(rootSessionId, sessionId, toolCallId);
     }
 
+
     /**
      * JSON 정수 1 만 받는다.
      *
@@ -104,6 +106,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
         return version != null && version.isIntegralNumber() && version.canConvertToLong() && version.longValue() == 1L;
     }
 
+
     private static String requireText(String toolName, JsonNode fosCtx, String key) {
         JsonNode value = fosCtx.get(key);
         if (value == null || !value.isTextual() || value.asString().isBlank()) {
@@ -111,6 +114,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
         }
         return value.asString();
     }
+
 
     /**
      * key 는 토큰 해시 문자열의 UTF-8 바이트다. 하위 에이전트 등록 서명도 같은 key 와 계산을 쓴다.
@@ -125,6 +129,7 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
             throw new IllegalStateException("HmacSHA256 is unavailable", ex);
         }
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 이유를 가리지 않고 같다. */
     private static ApiException reject(String toolName, String reason) {

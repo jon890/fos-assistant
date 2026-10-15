@@ -64,8 +64,7 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
     static final String TITLE = "주문 상한 변경";
     /** 카드가 쓰는 정책이다. 커넥터 선언이 아니라 Control Plane 이 정한다. */
     static final ToolPolicy POLICY = new ToolPolicy(ToolRisk.WRITE, ToolApproval.ALWAYS, TITLE, false, Set.of("name", "value"));
-    private static final ToolPolicyDecision DECISION =
-        new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.ALWAYS);
+    private static final ToolPolicyDecision DECISION = new ToolPolicyDecision(ActionDecision.NEEDS_APPROVAL, null, ToolRisk.WRITE, ToolApproval.ALWAYS);
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final FinancialLimitSettings settings;
     private final FinancialOrderLimits limits;
