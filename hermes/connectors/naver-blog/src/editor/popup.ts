@@ -158,12 +158,9 @@ export async function dismissKnownPopup(page: EditorPage) {
  * 닫지 못한 알림은 종류를 `page.popup` 에 남겨 뒤의 실패가 `popup_diagnostics` 로 싣게 한다.
  */
 export async function settleKnownPopup(page: EditorPage) {
-  const found = await probePopup(page);
-  if (!found) return;
+  // 닫지 못한 알림의 진단은 `dismissKnownPopup` 이 읽은 값으로 이미 남긴다. 여기서 다시 읽어 덮지 않는다.
   if (await dismissKnownPopup(page)) {
     // 닫혀 화면이 깨끗해졌으니 알림과 상관없는 뒤의 실패에 지난 진단을 붙이지 않는다.
     page.popup = null;
-    return;
   }
-  page.popup = found.diagnostics;
 }

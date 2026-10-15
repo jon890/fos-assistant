@@ -197,16 +197,18 @@ test("알림 진단은 알려진 단추 이름과 상자 요소 이름만 남긴
   expect(filterPopupDiagnostics("x")).toBeUndefined();
 });
 
-/** `delayMs` 뒤에 합성 알림을 띄운다. 네이버 alert 처럼 `se-popup-dim` 이 화면을 덮는다. */
+/**
+ * 제목에 첫 mousedown 이 올 때 합성 알림을 띄운다. fill 시작의 알림 확인은 이미 지난 뒤라,
+ * 운영에서 난 「시작 확인 뒤, 제목을 누르는 도중에 뜬 알림」 을 재현한다. 네이버 alert 처럼 `se-popup-dim` 이 화면을 덮는다.
+ */
 function latePopup(
   page: EditorPage,
-  delayMs: number,
   buttons: string[],
   closes: string[],
   cls: string,
   text = "synthetic-private-notice",
 ) {
-  return page.js(`setTimeout(() => {
+  return page.js(`document.getElementById('title').addEventListener('mousedown', () => {
     window.clicked = [];
     const dim = document.createElement('div');
     dim.className = 'se-popup-dim se-popup-dim-white'; dim.style.cssText = 'position:fixed;inset:0;z-index:50';
@@ -221,7 +223,7 @@ function latePopup(
       box.append(b);
     }
     document.body.append(dim, box);
-  }, ${delayMs})`);
+  }, {once: true})`);
 }
 
 async function readyTab() {
@@ -239,15 +241,11 @@ test("제목을 누르기 직전에 늦게 뜬 알려진 알림은 닫고 계속
   const page = await readyTab();
   await latePopup(
     page,
-    0,
     ["취소", "확인"],
     ["취소", "확인"],
     "se-popup-container",
     "작성 중인 글이 있습니다. 이어서 작성하시겠습니까?",
   );
-  await page.js(`window.late = true`);
-  // 알림이 뜬 뒤 제목에 커서를 둔다.
-  await page.sleep(0.1);
   const result = await focusField(page, TITLE_SELECTOR, ".se-documentTitle");
   expect(result.focused).toBe(true);
   expect(await clicked(page)).toEqual(["취소"]);
@@ -255,8 +253,7 @@ test("제목을 누르기 직전에 늦게 뜬 알려진 알림은 닫고 계속
 
 test("fill 도중 늦게 뜬 도움말 알림은 닫고 끝까지 넣는다", async () => {
   const page = await readyTab();
-  await latePopup(page, 0, ["닫기"], ["닫기"], "se-help-panel-x");
-  await page.sleep(0.1);
+  await latePopup(page, ["닫기"], ["닫기"], "se-help-panel-x");
   await fill(page, "합성 제목", parseBody("합성 본문"), "synthetic-hash");
   expect(await clicked(page)).toEqual(["닫기"]);
   expect(page.popup).toBeNull();
@@ -264,8 +261,7 @@ test("fill 도중 늦게 뜬 도움말 알림은 닫고 끝까지 넣는다", as
 
 test("모르는 alert 가 제목을 덮으면 누르지 않고 종류와 단추 이름을 남기고 멈춘다", async () => {
   const page = await readyTab();
-  await latePopup(page, 0, ["확인"], ["확인"], "se-popup-container");
-  await page.sleep(0.1);
+  await latePopup(page, ["확인"], ["확인"], "se-popup-container");
   const start = browser.calls.length;
   const error = await fill(
     page,
