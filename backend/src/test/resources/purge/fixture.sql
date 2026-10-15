@@ -55,8 +55,8 @@ VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-
 INSERT INTO hermes_session_binding (id, profile_name, session_id, user_id, origin_execution_id, root_session_id, parent_session_id, created_at)
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00');
 
-INSERT INTO memory (id, scope, owner_user_id, group_id, title, content, always_inject, status, proposed_by_execution_id, created_at, updated_at, collection, entry_type, retrieval, sensitivity, revision)
-VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'PROPOSED', 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 'MEMORY', 'ALWAYS', 'NORMAL', 1);
+INSERT INTO memory (id, scope, owner_user_id, group_id, title, content, always_inject, status, proposed_by_execution_id, accepted_by_user_id, accepted_at, created_at, updated_at, collection, entry_type, retrieval, sensitivity, revision)
+VALUES (900000001, 'USER', 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'ACCEPTED', 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'coverage-900000001', 'MEMORY', 'ALWAYS', 'NORMAL', 1);
 
 INSERT INTO memory_capture (id, memory_id, user_id, conversation_id, execution_id, kind, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'CREATED', '2020-01-01 00:00:00');
@@ -65,7 +65,7 @@ INSERT INTO memory_collection (group_id, collection_key, display_name, sort_orde
 VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 1, '2020-01-01 00:00:00');
 
 INSERT INTO memory_revision (memory_id, revision, change_type, scope, owner_user_id, group_id, collection, entry_type, status, title, content, retrieval, sensitivity, changed_at)
-VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'PROPOSED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', 'NORMAL', '2020-01-01 00:00:00');
+VALUES (900000001, 1, 'UPDATED', 'USER', 900000001, 900000001, 'coverage-900000001', 'MEMORY', 'ACCEPTED', 'coverage-900000001', 'coverage-900000001', 'ALWAYS', 'NORMAL', '2020-01-01 00:00:00');
 
 INSERT INTO model_hidden (id, group_id, provider, model)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001');

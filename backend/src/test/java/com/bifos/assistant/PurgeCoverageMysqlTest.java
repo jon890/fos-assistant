@@ -117,6 +117,9 @@ class PurgeCoverageMysqlTest {
     @Test
     @DisplayName("대화를 지운 뒤 모든 테이블의 삭제·본문 제거·보존과 알려진 공백을 확인한다")
     void coversEveryTableAfterConversationPurge() {
+        assertThat(value("memory", "status")).isEqualTo("ACCEPTED");
+        assertThat(value("memory", "accepted_by_user_id")).isEqualTo(target);
+        assertThat(value("memory", "accepted_at")).isNotNull();
         chat.delete(currentUser(), target);
         assertThat(conversations.purgeDue(NOW)).isEqualTo(1);
 
