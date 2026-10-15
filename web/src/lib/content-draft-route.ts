@@ -101,6 +101,13 @@ export function pickSnapshot(body: unknown) {
   };
 }
 
+/** 실패 사유는 worker 가 정한 고정 코드 모양만 넘긴다. */
+function reasonCode(value: unknown) {
+  return typeof value === "string" && /^[a-z][a-z_]{0,63}$/.test(value)
+    ? value
+    : null;
+}
+
 export function pickJob(body: unknown) {
   const item = record(body);
   if (!Number.isSafeInteger(item.revision)) throw new Error();
@@ -112,6 +119,7 @@ export function pickJob(body: unknown) {
     status: text(item.status),
     stage: typeof item.stage === "string" ? item.stage : null,
     saveClicked: item.saveClicked === true,
+    errorReason: reasonCode(item.errorReason),
   };
 }
 

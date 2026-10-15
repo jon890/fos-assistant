@@ -27,6 +27,8 @@ export type ContentDraftSummary = {
   stage: string | null;
   saveClicked: boolean;
   errorCode: string | null;
+  /** worker 가 알린 실패 사유의 고정 코드다. 문구는 화면이 코드로 고른다. */
+  errorReason: string | null;
 };
 
 type DraftIds = Pick<
@@ -53,7 +55,7 @@ export type ContentDraftSnapshot = {
   omittedAssetIds: string[];
 };
 
-/** Control Plane 이 보관한 job 상태다. 응답의 `jobId` 와 `errorCode` 는 화면이 읽지 않는다. */
+/** Control Plane 이 보관한 job 상태다. 응답의 `jobId` 와 `errorCode` 는 화면이 읽지 않는다. `errorReason` 은 읽는다. */
 export type ContentDraftJob = Omit<
   ContentDraftSummary,
   "conversationId" | "errorCode"

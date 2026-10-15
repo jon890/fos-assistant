@@ -60,6 +60,19 @@ const RESULTS: Partial<
   ],
 };
 
+/** 실패 사유 코드를 사용자 문구로 옮긴다. 모르는 코드는 덧붙이지 않는다. */
+const FAILURE_REASONS: Record<string, string> = {
+  screen_blocked: "네이버 글쓰기 화면에 알림이 떠 있었어요.",
+  title_cursor_covered:
+    "네이버 글쓰기 화면의 다른 요소가 제목 자리를 가리고 있었어요.",
+  body_cursor_covered:
+    "네이버 글쓰기 화면의 다른 요소가 본문 자리를 가리고 있었어요.",
+  title_cursor_failed: "네이버 글쓰기 화면의 제목 자리에 글을 넣지 못했어요.",
+  body_cursor_failed: "네이버 글쓰기 화면의 본문 자리에 글을 넣지 못했어요.",
+  title_mismatch: "네이버 글쓰기 화면에 제목이 맞게 들어가지 않았어요.",
+  body_mismatch: "네이버 글쓰기 화면에 본문이 맞게 들어가지 않았어요.",
+};
+
 /** 저장 기능이 꺼져 실행 없이 거절된 줄이다. 새 미리보기를 만들어도 같은 거절이라 다시 만들라고 하지 않는다. */
 const UNSUPPORTED = [
   "warning",
@@ -282,10 +295,18 @@ export function ContentDraftSaveCard({
 
   const shown =
     status === "PREVIEW_READY" && preview === "gone" ? "STALE" : status;
-  const result =
+  const reason =
+    shown === "FAILED" && draft.errorReason
+      ? FAILURE_REASONS[draft.errorReason]
+      : undefined;
+  const notice =
     shown === "STALE" && preview !== "gone"
       ? staleNotice(draft, actionStatus)
       : RESULTS[shown];
+  const result =
+    notice && reason
+      ? ([notice[0], `${notice[1]} ${reason}`] as const)
+      : notice;
   const loaded = typeof preview === "object" && preview !== null;
 
   return (
