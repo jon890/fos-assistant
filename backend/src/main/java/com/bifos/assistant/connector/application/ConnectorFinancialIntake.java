@@ -10,7 +10,6 @@ import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.proactive.application.ProactiveCheckGuard;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -141,16 +140,11 @@ class ConnectorFinancialIntake {
     static String limitMessage(FinancialLimitExceeded ex) {
         String unit = ex.kind().currency() == null ? "" : " " + ex.kind().currency();
         var message = new StringBuilder("주문이 상한에 걸려 실행하지 않았다. 걸린 상한: ")
-            .append(ex.kind().label()).append(' ').append(plain(ex.limit())).append(unit).append('.');
+            .append(ex.kind().label()).append(' ').append(FinancialOrderLimits.plain(ex.limit())).append(unit).append('.');
         if (ex.remainingToday() != null) {
-            message.append(" 오늘 남은 한도: ").append(plain(ex.remainingToday())).append(unit).append('.');
+            message.append(" 오늘 남은 한도: ").append(FinancialOrderLimits.plain(ex.remainingToday())).append(unit).append('.');
         }
         return message.append(" 사용자에게 알린다. 상한을 바꾸려면 order_limit_change 로 요청한다. 올리기는 사용자의 승인이 있어야 반영된다.")
             .toString();
-    }
-
-
-    private static String plain(BigDecimal value) {
-        return value.signum() == 0 ? "0" : value.stripTrailingZeros().toPlainString();
     }
 }

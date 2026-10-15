@@ -96,6 +96,12 @@ public class FinancialOrderLimits {
     }
 
 
+    /** 금액과 수량을 소수점 뒤 0 을 뺀 십진 글로 바꾼다. */
+    public static String plain(BigDecimal value) {
+        return value.signum() == 0 ? "0" : value.stripTrailingZeros().toPlainString();
+    }
+
+
     /** 사용자 값을 바꾼다. 호출자는 같은 트랜잭션에서 사용자 행을 먼저 잠그고 값을 검사한다. */
     void store(Long userId, FinancialLimitKind kind, BigDecimal value, Instant now) {
         FinancialOrderLimit row = limits.findById(userId).orElseGet(() -> FinancialOrderLimit.of(userId, now));

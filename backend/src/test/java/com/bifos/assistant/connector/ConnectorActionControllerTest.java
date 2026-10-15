@@ -121,7 +121,7 @@ class ConnectorActionControllerTest {
             ActionStatus.PENDING, "{}", null, null, Instant.parse("2026-10-01T00:00:00Z"), Instant.parse("2026-10-02T00:00:00Z"),
             false, false, Map.of());
         var summary = new FinancialActionSummary(true, "7", "CREATE", "ABC", "NASDAQ", "USD", "BUY", null, "25", null, "MARKET",
-            "DAY", null, List.of(new FinancialActionSummary.Normalization("timeInForce", null, "DAY")));
+            "DAY", null, List.of(new FinancialActionSummary.Normalization("timeInForce", null, "DAY")), null);
         when(conversations.requireOwnId(MEMBER, CONVERSATION)).thenReturn(42L);
         when(service.listForConversation(MEMBER, 42L)).thenReturn(List.of(PENDING, financialView));
         when(financialSummaries.summaries(MEMBER, List.of(financialAction))).thenReturn(Map.of(financialAction, summary));

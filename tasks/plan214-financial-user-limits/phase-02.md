@@ -35,7 +35,7 @@
 
 ### 2. 화면용 상한 API
 
-- `backend/src/main/java/com/bifos/assistant/connector/application/FinancialOrderLimits.java` 에 `view(CurrentUser user, Instant now)` 와 `set(CurrentUser user, FinancialLimitKind kind, BigDecimal valueOrNull, Instant now)` 를 더한다.
+- `backend/src/main/java/com/bifos/assistant/connector/application/FinancialLimitSettings.java` 신규에 `view(CurrentUser user, Instant now)` 와 `set(CurrentUser user, FinancialLimitKind kind, BigDecimal valueOrNull, Instant now)` 를 둔다. 계산은 `FinancialOrderLimits` 에 두고 바꾸는 쪽만 나눈다.
   - `available` 은 허용 목록(`ConnectorFinancialProperties.allowedAccounts`)에 그 사용자 메일의 계좌가 있는가다. 없으면 `set` 은 `ErrorCode.FORBIDDEN`.
   - `set` 은 트랜잭션 안에서 사용자 행을 잠그고, 값이 음수이거나 소수 6자리를 넘으면 `VALIDATION_FAILED`, 최대치보다 크면 `FINANCIAL_LIMIT_ABOVE_MAXIMUM` 이다. null 은 사용자 값을 지워 최대치를 따르게 한다.
 - `backend/src/main/java/com/bifos/assistant/connector/application/model/FinancialLimitsView.java` 신규 record: `available`, `limits`(종류마다 `name`, `currency`, `value`, `maximum`, `custom`), `spentToday`, `remainingToday`(둘 다 `KRW`, `USD` 키의 문자열 맵).
@@ -47,8 +47,9 @@
 
 ### 3. 이 phase 를 검증하는 테스트
 
-- `backend/src/test/java/com/bifos/assistant/connector/application/ConnectorFinancialSummariesLimitTest.java` 신규: 달러 매수 카드의 `limits` 가 한 건 상한, 하루 상한, 오늘 쓴 금액, 남은 한도를 싣는다. 취소 카드는 null 이다.
-- `backend/src/test/java/com/bifos/assistant/connector/FinancialLimitControllerTest.java` 신규
+- `backend/src/test/java/com/bifos/assistant/connector/application/FinancialOrderOpeningTest.java` 수정: 달러 매수 카드의 `limits` 가 한 건 상한, 하루 상한, 오늘 쓴 금액, 남은 한도를 싣는다. 취소 카드는 null 이다.
+- `backend/src/test/java/com/bifos/assistant/connector/application/FinancialLimitSettingsTest.java` 신규: 아래 앞의 넷을 서비스에서 본다
+- `backend/src/test/java/com/bifos/assistant/connector/FinancialLimitControllerTest.java` 신규: 경로와 입력 모양, MCP 토큰 거절을 본다
   - 낮추기와 올리기가 바로 반영되고 GET 이 새 값과 `custom=true` 를 읽는다
   - 최대치를 넘는 값은 400 `FINANCIAL_LIMIT_ABOVE_MAXIMUM` 이고 저장되지 않는다
   - null 이면 최대치로 돌아간다
@@ -58,7 +59,7 @@
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*ConnectorFinancialSummariesLimitTest' --tests '*FinancialLimitControllerTest' --tests '*Financial*' --tests '*ConnectorArgumentLabelsPipelineTest'
+cd backend && ./gradlew test --tests '*FinancialLimitSettingsTest' --tests '*FinancialOrderOpeningTest' --tests '*FinancialLimitControllerTest' --tests '*Financial*' --tests '*ConnectorArgumentLabelsPipelineTest'
 cd backend && ./gradlew archTest spotlessCheck checkstyleMain checkstyleTest
 scripts/dev/check-local.sh --fast
 ```
@@ -72,8 +73,12 @@ scripts/dev/check-local.sh --fast
 | `backend/src/main/java/com/bifos/assistant/connector/application/model/FinancialActionSummary.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialSummaries.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/application/FinancialOrderLimits.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/FinancialLimitSettings.java` | 신규 |
+| `backend/src/main/java/com/bifos/assistant/connector/application/ConnectorFinancialIntake.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/ConnectorActionControllerTest.java` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialOrderOpeningTest.java` | 수정 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/financial/FinancialLimitController.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/connector/presentation/financial/FinancialLimitDtos.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/shared/error/ErrorCode.java` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/connector/application/ConnectorFinancialSummariesLimitTest.java` | 신규 |
+| `backend/src/test/java/com/bifos/assistant/connector/application/FinancialLimitSettingsTest.java` | 신규 |
 | `backend/src/test/java/com/bifos/assistant/connector/FinancialLimitControllerTest.java` | 신규 |

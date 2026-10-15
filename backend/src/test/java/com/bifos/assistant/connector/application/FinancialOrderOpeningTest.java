@@ -333,6 +333,24 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("주문 승인 카드 요약은 그 통화의 한 건 상한, 하루 상한, 오늘 쓴 금액과 남은 한도를 싣는다")
+    void summaryCarriesLimitStatus() {
+        OverridableLiveProperties.during(gate, limits("30", "100"));
+        jdbc.update("insert into financial_order_limit (user_id, daily_amount_usd, updated_at) values (?, 50, current_timestamp)", user.id());
+        var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20")));
+        assertThat(publicApproval.approve(user, spent.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        var pending = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("10")));
+        var limits = summaries.summaryOf(user, pending.actionId()).orElseThrow().limits();
+        assertThat(limits.currency()).isEqualTo("USD");
+        assertThat(limits.orderLimit()).isEqualTo("30");
+        assertThat(limits.quantityLimit()).isEqualTo("1000");
+        assertThat(limits.dailyLimit()).isEqualTo("50");
+        assertThat(limits.spentToday()).isEqualTo("20");
+        assertThat(limits.remainingToday()).isEqualTo("30");
+    }
+
+
+    @Test
     @DisplayName("가격 없는 수량 주문은 금액을 미리 알 수 없어 거절한다")
     void marketQuantityOrderWithoutPriceIsRejected() {
         var answer = prepare(UUID.randomUUID().toString(),
