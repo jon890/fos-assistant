@@ -169,6 +169,8 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 판단 피드백 사건(`decision_feedback_event`)은 그 대화의 사건과, 그 사건이 가리키는 제안의 다른 사건까지 지운다. 사용자의 기록이라 대화와 함께 없앤다.
 까닭과 예외는 [`docs/features/proactive.md`](../../docs/features/proactive.md) 의 「보관과 삭제」 가 갖는다.
 그 뒤 정리 작업이 메시지, 첨부와 결과물의 파일과 행, 실행 질문 줄, 실행의 답 본문과 사건의 `detail`, Hermes session 을 지우고 `purged_at` 을 적는다.
+승인 줄과 금융 실행 원장의 본문도 지우되 열린 줄과 당일 금융 합계가 읽는 성공 줄은 본문 삭제를 미룬다.
+이미 purge한 대화도 주기적으로 다시 찾아 지울 수 있는 승인 본문을 정리하므로 `purged_at`과 승인 본문 삭제 시각은 다를 수 있다.
 실행 줄과 사건 줄은 본문 없이 남는다. 사용량 화면은 지운 대화의 실행도 센다. 돈은 이미 나갔다.
 무엇을 언제 지우고 무엇을 기다리는지는 [ADR-20261008 / conversation-purge](adr/ADR-20261008-conversation-purge.md) 가 갖는다.
 
@@ -224,8 +226,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
 | --- | --- |
-| `connector_action` | 도구 인자와 실행 결과 |
-| `connector_action_execution` | 실행 인자와 요약·범위 |
 | `proactive_check` | 점검 보고 |
 | `proactive_check_finding` | 발견 제목과 출처 |
 | `proactive_check_problem` | 문제 본문과 근거 |
@@ -233,6 +233,14 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 공백의 삭제 동작은 바꾸지 않는다. 해당 행이 그대로 남는지도 비교하므로 해소되면 기대값을 다시 정한다.
 새 공백은 분류에 `GAP`과 근거를 명시해야 한다. 본문 없는 사용량·전달·원고 snapshot 이력은 `KEEP`다.
+
+`connector_action`과 `connector_action_execution`은 대화에 묶인 `SCRUB` 대상이다.
+두 줄의 본문과 key 참조만 지우고 상태·시각·도구·위험도·해시·ticket과 중복 방지 식별자는 남긴다.
+검사는 삭제 전 본문과 key가 모두 있었는지 확인하고 나머지 모든 칸과 다른 사용자의 줄을 비교한다.
+`PENDING`, `EXECUTING`, `UNKNOWN`과 KST 당일 승인된 금융 `SUCCEEDED` 줄은 본문을 보존한다.
+지연한 본문과 기존 purge의 남은 본문은 다음 주기에 같은 사용자·대화 잠금과 트랜잭션으로 다시 검사한다.
+상태와 KST 날짜 경계, 롤백도 실제 MySQL 검사가 확인한다.
+자세한 지연 조건은 [커넥터 도구 정책과 승인](../../docs/features/connector-policy.md#대화-삭제-뒤-승인-본문-정리)이 갖는다.
 
 보관 기간 정리는 `AttachmentCleaner`, `ArtifactCleaner`, `MediaObservationCleaner`, `ContentDraftCleaner`가 파일과 관찰·원고 본문을 다룬다.
 `NotificationCleaner`, `AttentionEventCleaner`, `DecisionFeedbackCleaner`는 기간이 지난 기록을 지운다.
@@ -697,6 +705,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - 시스템이 실행하지 않고 끝낸 `REJECTED` 줄은 `error_code` 로 까닭을 남긴다. 값과 뜻은 `ConnectorAction` 의 상수가 갖는다
 - 외래 키는 `user_id` 와 `agent_id` 에만 둔다. 실행과 대화는 지워져도 이 줄을 남긴다. 에이전트 행을 정리해도 `agent_id` 만 비운다. 외부 서비스에 무엇을 쓰려 했고 누가 승인했는지의 이력이기 때문이다
 - 인자와 결과 원문은 주인에게만 보인다. 관리자 목록과 로그에는 싣지 않는다
+- `body_erased_at`은 대화 purge가 본문을 지운 시각이다. `args_json`, `result_text`와 두 key 참조를 NULL로 비운다. 조회는 「본문 삭제됨」을 표시하고 실행 인자를 제공하지 않는다
 
 인자와 결과는 기존 사용자 데이터 key와 `TextCipher`로 각각 암호화한다.
 AAD는 `connector_action:<id>:column:<칸 이름>:user:<user_id>`다.
@@ -728,7 +737,7 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 | `action_id` | BIGINT NOT NULL, PK 및 `connector_action` FK, ON DELETE CASCADE |
 | `connection_id`, `binding_id` | BIGINT NOT NULL, FK가 없는 이력 번호 |
 | `connection_updated_at`, `binding_updated_at` | DATETIME(6) NOT NULL, 준비 당시 각 행의 `updated_at` |
-| `execution_args_json`, `summary_json`, `scope_json` | MEDIUMTEXT NOT NULL, 원문 또는 암호문 |
+| `execution_args_json`, `summary_json`, `scope_json` | MEDIUMTEXT NULL, 원문 또는 암호문. 대화 purge가 지우면 NULL |
 | `content_key_id` | BIGINT NULL, `user_data_key` 식별자, FK 없음 |
 | `execution_args_sha256`, `scope_sha256` | VARCHAR(64) NOT NULL, 암호화 전 UTF-8 원문의 SHA-256 |
 | `request_key` | VARCHAR(64) NOT NULL, 중복 의도 조회용 일반 인덱스 |
@@ -743,6 +752,8 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 연결과 바인딩의 소유자 및 에이전트가 승인 줄과 같아야 한다.
 기존 `connector_action.args_json`과 `args_sha256`은 원래 요청의 중복 판정용으로 남긴다.
 실행 원문과 표시 값, scope 및 두 revision은 저장한 뒤 바꾸지 않는다.
+예외는 대화 purge의 본문 삭제다. 세 본문과 `content_key_id`를 NULL로 비우고 나머지 칸은 보존한다.
+부모 승인 줄의 `body_erased_at`으로 삭제를 구별하며 금융 snapshot 읽기를 거절하고 카드 요약은 `available=false`로 낸다.
 저장 함수는 ticket 식별자와 발급·소비 시각을 NULL로 둔다.
 발급은 세 권한 칸이 모두 NULL일 때 ticket_id와 ticket_expires_at을 한 번만 채운다.
 소비는 같은 미만료 ticket_id이며 consumed_at이 NULL일 때 그 칸을 한 번만 채운다.

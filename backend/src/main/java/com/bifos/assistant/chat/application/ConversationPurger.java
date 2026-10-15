@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -37,8 +38,10 @@ import org.springframework.stereotype.Component;
  * <ol>
  * <li>Hermes 에서 그 대화의 session 을 지운다. 위임한 자식 session 은 Hermes 가 함께 지운다.
  * <li>첨부 파일과 결과물 폴더를 지운다.
- * <li>메시지, 대기 메시지, 첨부와 결과물의 줄, 실행의 본문을 한 트랜잭션으로 지우고 지운 시각을 적는다.
+ * <li>메시지, 대기 메시지, 첨부와 결과물의 줄, 실행과 지울 수 있는 승인의 본문을 한 트랜잭션으로 지우고 지운 시각을 적는다.
  * </ol>
+ *
+ * <p>실행·복구와 당일 금융 상한 계산에 필요한 승인 본문만 보존한다. 이미 purge한 대화에서도 지울 수 있게 된 승인 본문을 다시 정리한다.
  *
  * <p>어느 단계든 실패하면 그 대화는 지운 시각을 적지 않고 남는다. 다음 차례에 처음부터 다시 한다. 이미 지운 session 과 파일은
  * 다시 지워도 그대로 끝난다. 실패가 이어지는 대화는 기다리는 간격을 한 시간까지 두 배씩 늘리고, 그동안 후보에서 빼서 뒤에 지운
@@ -76,6 +79,7 @@ public class ConversationPurger {
     private final ChatContentMutationCoordinator mutations;
     private final MediaObservationCleaner observations;
     private final ContentDraftCleaner drafts;
+    private final ConversationActionPurge actions;
 
     /** 실패한 대화를 다음에 다시 볼 시각과 그때 기다릴 간격, 잇단 실패 수다. */
     private final Map<Long, Backoff> backoffs = new ConcurrentHashMap<>();
@@ -91,15 +95,17 @@ public class ConversationPurger {
     /**
      * 지웠지만 본문이 남은 대화를 지운다. 기다리는 간격 안의 대화는 후보에서 뺀다.
      *
-     * @return 이번 차례에 지운 대화 수
+     * @return 이번 차례에 본문을 정리한 대화 수. 지연한 승인 본문을 지운 대화도 포함한다
      */
     public int purgeDue(Instant now) {
         List<Long> waitingIds = backoffs.entrySet().stream()
             .filter(entry -> now.isBefore(entry.getValue().retryAt()))
             .map(Map.Entry::getKey)
             .toList();
-        List<Long> candidates = conversations.findPurgeCandidates(
-            waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds, PageRequest.of(0, BATCH));
+        List<Long> skipped = waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds;
+        List<Long> candidates = Stream.concat(
+            conversations.findPurgeCandidates(skipped, PageRequest.of(0, BATCH)).stream(),
+            actions.findPurgedCandidates(skipped, BATCH, now).stream()).distinct().limit(BATCH).toList();
         long started = System.nanoTime();
         int purged = 0;
         int waiting = 0;
@@ -165,6 +171,10 @@ public class ConversationPurger {
             return false;
         }
         var target = new ChatContentMutationTarget(conversationId, List.of());
+        if (conversation.deletedAt() != null && conversation.purgedAt() != null) {
+            // 이미 지운 메시지와 파일은 건드리지 않고, 보존 기간이 끝난 승인 본문만 다시 처리한다.
+            return mutations.run(conversation.userId(), target, () -> actions.eraseBodies(conversationId, now) > 0);
+        }
         Conversation prepared = mutations.run(conversation.userId(), target, () -> {
             Conversation current = conversations.findById(conversationId).orElseThrow();
             if (current.deletedAt() == null || current.purgedAt() != null || !executions.settled(conversationId, now)) {
