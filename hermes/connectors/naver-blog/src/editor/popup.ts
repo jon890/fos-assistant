@@ -24,6 +24,8 @@ export type PopupDiagnostics = {
 const MAX_BUTTONS = 8;
 /** 발행이나 저장, 삭제로 이어질 수 있는 단추가 하나라도 있으면 어떤 단추도 누르지 않는다. */
 const RISKY = /발행|저장|등록|게시|공개|삭제|전송|업로드|완료/;
+/** 종류 판정과 단추 검사, 누르기가 같은 상자 하나를 보게 하는 선택자다. */
+const BOX = ".se-popup-container, [role=dialog]";
 
 const q = (value: unknown) => JSON.stringify(value);
 
@@ -37,25 +39,35 @@ const PROBE = `(() => {
     return r.width > 100 && s.display !== "none" && s.visibility !== "hidden";
   });
   if (!dim) return null;
-  const box = document.querySelector(".se-popup-container, [role=dialog]");
-  if (!box) return JSON.stringify({box: null, buttons: [], draft: false, help: false});
+  const box = document.querySelector(${q(BOX)});
+  if (!box) return JSON.stringify({box: null, buttons: [], draft: false, help: false, risky: false});
   const name = e => (e.tagName.toLowerCase() + [...e.classList].slice(0, 2).map(c => "." + c).join(""))
     .replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 80);
   const text = box.innerText.replace(/\\s+/g, " ");
   return JSON.stringify({
     box: name(box),
     buttons: [...box.querySelectorAll("button")].slice(0, ${MAX_BUTTONS}).map(b => b.innerText.trim().slice(0, 20)),
+    // 위험 여부는 단추 전체로 본다. 진단에 싣는 목록만 여덟 개로 자른다.
+    risky: [...box.querySelectorAll("button")].some(b => new RegExp(${q(RISKY.source)}).test(b.innerText)),
     draft: text.includes("작성 중인 글이 있습니다") && text.includes("이어서 작성하시겠습니까"),
     help: /help/i.test(box.className) || /help/i.test(box.id || ""),
   });
 })()`;
 
-type Probe = { box: unknown; buttons: unknown; draft: boolean; help: boolean };
+type Probe = {
+  box: unknown;
+  buttons: unknown;
+  draft: boolean;
+  help: boolean;
+  risky: boolean;
+};
 
 /** 원문 없이 알림의 종류와 단추를 읽는다. 알림이 없으면 `null` 이다. */
-export async function probePopup(
-  page: EditorPage,
-): Promise<{ diagnostics: PopupDiagnostics; labels: string[] } | null> {
+export async function probePopup(page: EditorPage): Promise<{
+  diagnostics: PopupDiagnostics;
+  labels: string[];
+  risky: boolean;
+} | null> {
   const raw = await page.js<string | null>(PROBE);
   if (!raw) return null;
   let probe: Probe;
@@ -69,6 +81,7 @@ export async function probePopup(
     : [];
   return {
     labels,
+    risky: probe.risky !== false,
     diagnostics: {
       kind: probe.draft ? "draft_notice" : probe.help ? "help" : "unknown",
       box:
@@ -122,8 +135,7 @@ export async function dismissKnownPopup(page: EditorPage) {
   if (!found) return false;
   page.popup = found.diagnostics;
   const { kind } = found.diagnostics;
-  if (kind === "unknown" || found.labels.some((label) => RISKY.test(label)))
-    return false;
+  if (kind === "unknown" || found.risky) return false;
   const label =
     kind === "draft_notice"
       ? "취소"
@@ -131,7 +143,7 @@ export async function dismissKnownPopup(page: EditorPage) {
         found.labels.find((l) => l === "확인"));
   if (!label || !found.labels.includes(label)) return false;
   const clicked = await page.mouseClick(
-    `[...document.querySelectorAll(".se-popup button, [role=dialog] button")].find(b => b.innerText.trim() === ${q(label)})`,
+    `[...(document.querySelector(${q(BOX)})?.querySelectorAll("button") ?? [])].find(b => b.innerText.trim() === ${q(label)})`,
   );
   if (!clicked) return false;
   found.diagnostics.dismissed = true;

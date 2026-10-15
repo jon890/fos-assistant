@@ -392,14 +392,23 @@ export function dismissPopup(page: EditorPage, button: string) {
 
 /** 화면을 덮은 알림이 잠깐 뒤에도 남아 있으면 그 글을 돌려준다. 없으면 빈 문자열이다. */
 export async function requireClearScreen(page: EditorPage) {
+  let dismissed = false;
   for (let i = 0; i < 3; i++) {
-    if (!(await blockingPopup(page))) return "";
+    if (!(await blockingPopup(page))) {
+      // 화면이 깨끗하면 알림과 상관없는 뒤의 실패에 지난 알림 진단이 붙지 않게 비운다.
+      page.popup = null;
+      return "";
+    }
     // 알려진 알림은 안전한 쪽으로 한 번만 닫는다. 모르는 알림은 누르지 않고 기다리다 멈춘다.
-    if (i === 0 && (await dismissKnownPopup(page))) continue;
+    if (i === 0 && (await dismissKnownPopup(page))) {
+      dismissed = true;
+      continue;
+    }
     await page.sleep(page.step(0.5));
   }
   const note = await blockingPopup(page);
-  if (note) page.popup = (await probePopup(page))?.diagnostics ?? page.popup;
+  const seen = note ? (await probePopup(page))?.diagnostics : undefined;
+  page.popup = seen ? { ...seen, dismissed } : page.popup;
   return note;
 }
 

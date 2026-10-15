@@ -73,7 +73,7 @@ test("작성 중인 글 알림은 이어 쓰지 않는 쪽(취소)으로만 닫�
   });
   expect(await requireClearScreen(page)).toBe("");
   expect(await clicked(page)).toEqual(["취소"]);
-  expect(page.popup).toMatchObject({ kind: "draft_notice", dismissed: true });
+  expect(page.popup).toBeNull();
 });
 
 test("도움말 알림은 닫기 단추로 닫는다", async () => {
@@ -86,7 +86,7 @@ test("도움말 알림은 닫기 단추로 닫는다", async () => {
   });
   expect(await requireClearScreen(page)).toBe("");
   expect(await clicked(page)).toEqual(["닫기"]);
-  expect(page.popup).toMatchObject({ kind: "help", buttons: ["닫기"] });
+  expect(page.popup).toBeNull();
 });
 
 test("모르는 알림과 발행·저장 단추가 든 알림은 누르지 않고 종류만 남기고 멈춘다", async () => {
@@ -115,6 +115,64 @@ test("모르는 알림과 발행·저장 단추가 든 알림은 누르지 않�
     expect(diagnostics.dismissed).toBe(false);
     expect(JSON.stringify(error.extra)).not.toContain("synthetic-private");
   }
+});
+
+test("눌렀는데도 알림이 남으면 dismissed 를 참으로 남기고 멈춘다", async () => {
+  const page = await tab();
+  await popup(page, {
+    cls: "se-popup-container",
+    text: "작성 중인 글이 있습니다. 이어서 작성하시겠습니까?",
+    buttons: ["취소", "확인"],
+    closes: [],
+  });
+  expect(await requireClearScreen(page)).not.toBe("");
+  expect(await clicked(page)).toEqual(["취소"]);
+  expect(page.popup).toMatchObject({ kind: "draft_notice", dismissed: true });
+});
+
+test("알림을 닫아 화면이 깨끗해지면 뒤의 실패에 지난 알림 진단을 붙이지 않는다", async () => {
+  const page = await tab();
+  await popup(page, {
+    cls: "se-help-panel-x",
+    text: "도움말",
+    buttons: ["닫기"],
+    closes: ["닫기"],
+  });
+  expect(await requireClearScreen(page)).toBe("");
+  expect(page.popup).toBeNull();
+  expect(page.fail("editor_failed", "다른 실패").extra).toEqual({});
+});
+
+test("단추는 검사한 첫 상자 안에서만 찾고 다른 상자의 같은 이름 단추는 누르지 않는다", async () => {
+  const page = await tab();
+  await popup(page, {
+    cls: "se-help-panel-x",
+    text: "도움말",
+    buttons: ["확인"],
+    closes: [],
+  });
+  await page.js(`(() => {
+    const other = document.createElement('div');
+    other.setAttribute('role', 'dialog');
+    other.style.cssText = 'position:fixed;left:400px;top:300px;z-index:70;background:white';
+    const b = document.createElement('button'); b.textContent = '닫기';
+    b.onclick = () => window.clicked.push('other-닫기');
+    other.append(b); document.body.append(other);
+  })()`);
+  await requireClearScreen(page);
+  expect(await clicked(page)).toEqual(["확인"]);
+});
+
+test("아홉 번째 이후의 위험한 단추도 보고 아무것도 누르지 않는다", async () => {
+  const page = await tab();
+  await popup(page, {
+    cls: "se-popup-container",
+    text: "작성 중인 글이 있습니다. 이어서 작성하시겠습니까?",
+    buttons: ["취소", ...Array(8).fill("계속"), "발행"],
+    closes: ["취소"],
+  });
+  expect(await requireClearScreen(page)).not.toBe("");
+  expect(await clicked(page)).toEqual([]);
 });
 
 test("알림 진단은 알려진 단추 이름과 상자 요소 이름만 남긴다", () => {
