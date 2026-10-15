@@ -186,7 +186,6 @@ class ChatRunningTurnTest {
     }
 
 
-
     @Test
     @DisplayName("막히면 넘기지 않고 실패하고 turn이 끝난다")
     void blockedFailsWithoutFallbackAndEndsTurn() {

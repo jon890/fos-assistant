@@ -121,7 +121,6 @@ class EmptyConversationTest {
     }
 
 
-
     private CurrentUser member(String email) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());

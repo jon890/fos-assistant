@@ -379,13 +379,11 @@ class ChatRegenerateTest {
     }
 
 
-
     private static byte[] png() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.write(new BufferedImage(8, 6, BufferedImage.TYPE_INT_RGB), "png", out);
         return out.toByteArray();
     }
-
 
 
     private CurrentUser member(String email, String profileName) {

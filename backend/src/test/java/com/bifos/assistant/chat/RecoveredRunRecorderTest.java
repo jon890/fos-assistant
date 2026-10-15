@@ -383,7 +383,6 @@ class RecoveredRunRecorderTest {
     }
 
 
-
     @Test
     @DisplayName("대화가 없는 그 밖의 실행은 실행 줄과 끝 사건만 남긴다")
     void auxiliaryRunRecordsRowAndEndEventOnly() {

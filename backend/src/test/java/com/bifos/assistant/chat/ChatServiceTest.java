@@ -1324,7 +1324,6 @@ class ChatServiceTest {
     }
 
 
-
     @Test
     @DisplayName("다시 생성도 바꾼 입력을 보내고 그 실행에 COMMAND 이력을 남긴다")
     void regenerationAlsoSendsChangedInputAndRecordsCommandHistory() {

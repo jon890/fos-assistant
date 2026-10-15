@@ -311,9 +311,6 @@ public class AgentExecution {
     }
 
 
-
-
-
     /** 첫 assistant delta를 받은 시각만 보존한다. 본문은 실행 기록에 두지 않는다. */
     public boolean markFirstDelta(Instant at) {
         if (firstDeltaAt == null) {

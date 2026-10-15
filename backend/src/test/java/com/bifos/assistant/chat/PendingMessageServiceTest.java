@@ -489,7 +489,6 @@ class PendingMessageServiceTest {
     }
 
 
-
     @Test
     @DisplayName("남의 대화에는 더하지도 읽지도 못한다")
     void rejectsQueueingAndReadingOthersConversation() {

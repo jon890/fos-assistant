@@ -359,9 +359,6 @@ public class ExecutionRecorder {
     }
 
 
-
-
-
     /** 최초 assistant delta 수신 시각만 남긴다. */
     public void markFirstDelta(AgentExecution execution) {
         if (execution.markFirstDelta(clock.instant())) {

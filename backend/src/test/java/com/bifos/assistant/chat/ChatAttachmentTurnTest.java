@@ -753,7 +753,6 @@ class ChatAttachmentTurnTest {
     }
 
 
-
     @Test
     @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
     void groupAgentOwnedByAnotherUserRejectsPhotos() {
@@ -816,7 +815,6 @@ class ChatAttachmentTurnTest {
             .hasSize(3)
             .allSatisfy(it -> assertThat(it.attachments()).as("message %s", it.id()).isEmpty());
     }
-
 
 
     /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */

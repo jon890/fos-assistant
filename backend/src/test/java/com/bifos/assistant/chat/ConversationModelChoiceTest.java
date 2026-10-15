@@ -284,7 +284,6 @@ class ConversationModelChoiceTest {
     }
 
 
-
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         agents.save(Agent.of(

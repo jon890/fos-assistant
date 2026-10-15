@@ -509,7 +509,6 @@ class RestartReconcilerTest {
     }
 
 
-
     @Test
     @DisplayName("다시 붙은 대화 turn 을 사용자가 멈추면 중지를 보내고 CANCELLED 로 적은 뒤 대기 줄을 멈춘다")
     void userStopOnReattachedTurnCancelsAndHoldsPendingQueue() {
@@ -687,7 +686,6 @@ class RestartReconcilerTest {
         // 남은 줄 수를 두 번 셌다면 한 줄이 정해져도 잠금이 풀리지 않는다.
         awaitIdle(conversation.id());
     }
-
 
 
     @Test

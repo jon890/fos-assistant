@@ -214,9 +214,6 @@ class ExecutionLifecycleTest {
     }
 
 
-
-
-
     @Test
     @DisplayName("같은 instructions 는 같은 해시로 적히고 본문은 어디에도 저장되지 않는다")
     void sameInstructionsGiveSameHashAndBodyIsStoredNowhere() {

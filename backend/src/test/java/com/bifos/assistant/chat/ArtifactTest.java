@@ -254,7 +254,6 @@ class ArtifactTest {
     }
 
 
-
     @Test
     @DisplayName("turn 이 시작하기 전에 있던 HTML 은 묶이지 않는다")
     void doesNotBindHtmlThatExistedBeforeTurnStarted() throws Exception {

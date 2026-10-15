@@ -323,7 +323,6 @@ class PendingBeforeDelegationTest {
     }
 
 
-
     /** 그 대화에 도는 turn 이 없고 다음 turn 을 열 수 있다. */
     private void assertLockReleased() {
         assertThat(turns.markOf(conversation.id()).running())
