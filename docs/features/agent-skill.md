@@ -282,7 +282,7 @@ profile 을 거두지 못하면 에이전트를 지우지 않고 그 오류를 �
 **`orchestration` 은 깨우기 서비스를 직접 부르지 않고 Spring 사건 `DelegationFinished` 만 낸다.** 사건은 `chat` 이 갖고, `chat` 은 `orchestration` 을 import 하지 않는다. 위임 서비스가 `ChatService` 를 부르면 위임이 turn 실행에 얽힌다.
 위임 결과 말고 자동 turn 에 실을 결과는 `AutoTurnResultSource` 의 구현이 낸다. 지금 구현은 승인해 실행한 커넥터 호출의 결과다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md)).
 
-- 깨울지는 대화별 JVM 잠금(`TurnCancellation.open`)을 잡을 수 있는지로 정한다. 잡지 못하면 그 turn 이 닫힐 때 다시 확인하므로 결과를 잃지 않는다. 잠금을 잡은 뒤 결과를 다시 읽는다. 흐름 대화와 꺼진 에이전트는 잠금을 잡기 전에 거른다. 잡은 뒤 빈손으로 닫으면 닫기 리스너가 곧바로 다시 부른다
+- 깨울지는 대화별 JVM 잠금(`TurnCancellation.open`)을 잡을 수 있는지로 정한다. 잡지 못하면 그 turn 이 닫힐 때 다시 확인하므로 결과를 잃지 않는다. 잠금을 잡은 뒤 결과를 다시 읽는다. 꺼지거나 지운 에이전트와 지운 대화는 잠금을 잡기 전에 거른다. 잡은 뒤 빈손으로 닫으면 닫기 리스너가 곧바로 다시 부른다
 - `SYSTEM` 줄 저장, `result_delivered_at` 기록, `conversation.auto_turn_count` 증가, 전달 묶음과 첫 시도 만들기는 한 트랜잭션이다. 그 뒤 turn 이 실패해도 같은 결과로 다시 깨우지 않고, 묶음이 `FAILED` 로 남아 사용자가 다시 전달한다
 - 전하기 전에 실패한 대화는 잠시 다시 열지 않는다. 실패 시각은 메모리에만 두며 서버가 다시 뜨면 사라진다
 - 사용자 turn 은 `done` 이나 `stopped` 를 보낸 뒤 잠금을 닫는다. 그보다 먼저 닫으면 자동 turn 의 사건이 사용자 turn 의 끝보다 먼저 화면에 간다
