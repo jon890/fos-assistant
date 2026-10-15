@@ -39,6 +39,9 @@ async function render(tools: connection.ConnectorTool[]) {
     "@/components/ui/badge": {
       Badge: ({ children }: { children: React.ReactNode }) => children,
     },
+    "@/components/ui/notice": {
+      Notice: ({ children }: { children: React.ReactNode }) => children,
+    },
   };
   vm.runInNewContext(compiled, {
     module,

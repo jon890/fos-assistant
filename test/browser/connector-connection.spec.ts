@@ -439,7 +439,9 @@ test("서비스가 없으면 빈 상태를 보인다", async ({ page }) => {
   await expect(page.getByText("연결할 수 있는 서비스가 없어요")).toBeVisible();
 });
 
-test("옛 가계부 연결 주소는 새 외부 서비스 연결 화면으로 넘어간다", async ({ page }) => {
+test("옛 가계부 연결 주소는 새 외부 서비스 연결 화면으로 넘어간다", async ({
+  page,
+}) => {
   await page.route("**/api/connections/fos-accountbook", (route) =>
     route.fulfill({ status: 404, json: notFound }),
   );
@@ -1169,4 +1171,111 @@ test("연결 확인이 값을 확인하지 못해 거절되면 로그인 링크�
     "서비스에 닿지 못했어요. 잠시 뒤 다시 해 주세요.",
   );
   await expect(alert.getByRole("link")).toHaveCount(0);
+});
+
+const financialConnector = {
+  ...demoConnector,
+  tools: [
+    ...demoConnector.tools,
+    {
+      name: "create_order",
+      title: "주문 넣기",
+      risk: "FINANCIAL",
+      approval: "ALWAYS",
+      grant: false,
+    },
+  ],
+};
+
+const limits = {
+  available: true,
+  limits: [
+    {
+      name: "order_amount_usd",
+      currency: "USD",
+      label: "한 건 달러 금액",
+      value: "300",
+      maximum: "1000",
+      custom: true,
+    },
+    {
+      name: "daily_amount_usd",
+      currency: "USD",
+      label: "하루 달러 합계",
+      value: "1000",
+      maximum: "1000",
+      custom: false,
+    },
+  ],
+  spentToday: { KRW: "0", USD: "250" },
+  remainingToday: { KRW: "300000", USD: "750" },
+};
+
+test("금융 연결 화면은 주문 상한을 보이고, 바꾸면 확인 창에서 확인해야 저장한다", async ({
+  page,
+}) => {
+  await page.route("**/api/connectors", (route) =>
+    route.fulfill({ json: [financialConnector] }),
+  );
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  await page.route("**/api/connector-grants", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route("**/api/financial-limits", (route) =>
+    route.fulfill({ json: limits }),
+  );
+  const saved: unknown[] = [];
+  await page.route("**/api/financial-limits/*", (route) => {
+    saved.push({
+      path: new URL(route.request().url()).pathname,
+      body: route.request().postDataJSON(),
+    });
+    return route.fulfill({
+      json: {
+        ...limits,
+        limits: [{ ...limits.limits[0], value: "500" }, limits.limits[1]],
+      },
+    });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+
+  const section = page.getByTestId("financial-limits");
+  await expect(section).toContainText("주문 상한");
+  await expect(section).toContainText("오늘 남은 한도 300000 KRW · 750 USD");
+  const row = section.getByTestId("financial-limit-order_amount_usd");
+  await row.getByRole("textbox").fill("1200");
+  await expect(row).toContainText("최대치 1000 USD 보다 크게 정할 수 없어요.");
+  await expect(row.getByRole("button", { name: "저장" })).toBeDisabled();
+
+  await row.getByRole("textbox").fill("500");
+  await row.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByText("주문 상한을 바꿀까요?")).toBeVisible();
+  expect(saved).toEqual([]);
+  await page.getByRole("button", { name: "바꾸기" }).click();
+  await expect(page.getByText("주문 상한을 바꿀까요?")).toHaveCount(0);
+  expect(saved).toEqual([
+    { path: "/api/financial-limits/order_amount_usd", body: { value: "500" } },
+  ]);
+});
+
+test("금융 도구가 없는 연결 화면은 주문 상한을 읽지 않는다", async ({
+  page,
+}) => {
+  await page.route(`**/api/connections/${DEMO_ID}`, (route) =>
+    route.fulfill({ json: ready }),
+  );
+  await page.route("**/api/connector-grants", (route) =>
+    route.fulfill({ json: [] }),
+  );
+  let read = false;
+  await page.route("**/api/financial-limits", (route) => {
+    read = true;
+    return route.fulfill({ json: limits });
+  });
+  await page.goto(`/connections/${DEMO_ID}`);
+  await expect(page.getByText("할 수 있는 일")).toBeVisible();
+  await expect(page.getByTestId("financial-limits")).toHaveCount(0);
+  expect(read).toBe(false);
 });

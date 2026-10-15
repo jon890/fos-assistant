@@ -45,6 +45,15 @@ const LABELS: Record<string, Label> = {
     running: "임시저장 승인을 요청하고 있어요",
     done: "임시저장 승인을 요청했어요",
   },
+  order_limit_read: {
+    running: "주문 상한을 읽고 있어요",
+    done: "주문 상한을 읽었어요",
+  },
+  // 올리기는 승인 카드만 만든다. 바꾼 것처럼 읽히지 않게 쓴다.
+  order_limit_change: {
+    running: "주문 상한 변경을 요청하고 있어요",
+    done: "주문 상한 변경을 요청했어요",
+  },
 };
 
 /** 표에 없는 MCP 도구다. 도구 이름 원문을 보이지 않고 연결된 서비스를 썼다고만 알린다. */

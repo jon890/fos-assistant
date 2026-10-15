@@ -1323,3 +1323,103 @@ test("같은 도구의 금융 PENDING 줄 둘은 묶이지 않고 두 장으로 
   ).toHaveCount(2);
   await expect(page.getByTestId("approval-financial")).toHaveCount(2);
 });
+
+test("주문 카드는 오늘 남은 한도를 보이고 넘는 주문이면 어느 상한인지 경고한다", async ({
+  page,
+}) => {
+  const limits = {
+    currency: "USD",
+    orderLimit: "500",
+    quantityLimit: "10",
+    dailyLimit: "100",
+    spentToday: "95",
+    remainingToday: "5",
+  };
+  await openWith(
+    page,
+    "주문 카드 남은 한도 검사",
+    financialAction(0, { financial: financial({ limits }) }),
+  );
+
+  const shown = page.getByTestId("approval-financial-limits");
+  await expect(shown).toContainText("오늘 남은 한도");
+  await expect(shown).toContainText("5 USD");
+  await expect(shown).toContainText("100 USD");
+  await expect(shown).toContainText("이 주문은 오늘 남은 한도를 넘어요.");
+  await expect(page.getByTestId("approval-approve")).toBeEnabled();
+});
+
+/** 합성 값으로 만든 주문 상한 변경 줄이다. */
+function limitChangeAction(
+  index: number,
+  overrides: Record<string, unknown> = {},
+): Action {
+  return action({
+    actionId: `0f0e0d0c-0b0a-4908-8706-0504030203${String(index).padStart(2, "0")}`,
+    connectorId: "tossinvest",
+    toolName: "order_limit_change",
+    title: "주문 상한 변경",
+    risk: "WRITE",
+    grantAllowed: false,
+    conversationGrantAllowed: false,
+    argsJson: JSON.stringify({ name: "order_amount_usd", value: "500" }),
+    // 서버 라우트가 계약을 확인하고 붙이는 표시다.
+    limitChange: {
+      available: true,
+      name: "order_amount_usd",
+      currency: "USD",
+      label: "한 건 달러 금액",
+      previous: "300",
+      requested: "500",
+      maximum: "1000",
+      current: "300",
+    },
+    ...overrides,
+  });
+}
+
+test("상한 변경 카드는 바뀌는 값과 최대치를 보이고 허락 선택지가 없다", async ({
+  page,
+}) => {
+  await openWith(page, "상한 변경 카드 검사", limitChangeAction(0));
+
+  const summary = page.getByTestId("approval-limit-change");
+  await expect(summary).toContainText("한 건 달러 금액");
+  await expect(summary).toContainText("300 USD → 500 USD");
+  await expect(summary).toContainText("1000 USD");
+  await expect(page.getByTestId("approval-args")).toHaveCount(0);
+  await expect(page.getByTestId("approval-approve")).toBeEnabled();
+  await expect(page.getByTestId("approval-grant")).toHaveCount(0);
+  await expect(page.getByTestId("approval-conversation-grant")).toHaveCount(0);
+});
+
+test("상한 변경 줄은 같은 도구여도 묶지 않아 모두 승인에 들지 않는다", async ({
+  page,
+}) => {
+  await openWithMany(page, "상한 변경 묶지 않음 검사", [
+    limitChangeAction(0),
+    limitChangeAction(1),
+  ]);
+
+  await expect(page.getByTestId("approval-group")).toHaveCount(0);
+  await expect(page.getByTestId("approval-approve-all")).toHaveCount(0);
+  await expect(page.getByTestId("approval-limit-change")).toHaveCount(2);
+});
+
+test("모양이 틀린 상한 변경 요약은 승인할 수 없고 거절만 남긴다", async ({
+  page,
+}) => {
+  await openWith(
+    page,
+    "상한 변경 요약 열지 못함 검사",
+    limitChangeAction(0, {
+      limitChange: { available: false, name: "", label: "" },
+    }),
+  );
+
+  await expect(page.getByTestId("approval-financial-unavailable")).toHaveText(
+    "상한 변경 내용을 열지 못해 승인할 수 없어요. 거절만 할 수 있어요.",
+  );
+  await expect(page.getByTestId("approval-approve")).toHaveCount(0);
+  await expect(page.getByTestId("approval-reject")).toBeEnabled();
+});
