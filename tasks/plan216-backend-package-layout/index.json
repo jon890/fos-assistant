@@ -1,5 +1,5 @@
 {
-  "name": "plan215-backend-package-layout",
+  "name": "plan216-backend-package-layout",
   "description": "backend 패키지를 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면을 admin 으로 모은다. 규칙을 먼저 얼리고 기능 단위로 이동만 하는 PR 을 직렬로 낸다",
   "status": "pending",
   "created_at": "2026-10-15",

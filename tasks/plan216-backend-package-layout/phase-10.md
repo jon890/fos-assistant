@@ -60,5 +60,5 @@ git grep -nE 'com\.bifos\.assistant\.(chat|connector|proactive|usage|skill)\.(ap
 ### 4. 알림 문단과 이 계획서를 지운다
 
 `backend/AGENTS.md` 「패키지 배치」 첫머리의 「이동 진행 중」 알림 문단을 지운다.
-`tasks/plan215-backend-package-layout/` 을 이 PR 에서 지운다. 오래 남을 것은 이미 ADR 과 `backend/docs/code-architecture.md` 에 있다.
+`tasks/plan216-backend-package-layout/` 을 이 PR 에서 지운다. 오래 남을 것은 이미 ADR 과 `backend/docs/code-architecture.md` 에 있다.
 이동 중에 알게 된 것이 문서에 없으면 지우기 전에 ADR 의 「결과」 에 옮긴다.
