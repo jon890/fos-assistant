@@ -1,5 +1,6 @@
 import { toolText } from "@/lib/connector-tool-text";
 import { Badge } from "@/components/ui/badge";
+import { Notice } from "@/components/ui/notice";
 import {
   toolBlocked,
   toolPolicyLabel,
@@ -54,5 +55,30 @@ export function ConnectorTools({ tools }: { tools: ConnectorTool[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** 연결 화면의 「할 수 있는 일」 절이다. 서비스가 알려 주지 않은 도구는 쓰지 않는다고 알린다. */
+export function ConnectorToolsSection({
+  tools,
+  undeclaredTools,
+}: {
+  tools: ConnectorTool[];
+  undeclaredTools: number;
+}) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-sm font-semibold">할 수 있는 일</h2>
+      <ConnectorTools tools={tools} />
+      {undeclaredTools > 0 ? (
+        <Notice
+          variant="info"
+          role="status"
+          data-testid="connection-undeclared"
+        >
+          이 서비스가 알려 주지 않은 도구 {undeclaredTools}개는 쓰지 않아요.
+        </Notice>
+      ) : null}
+    </section>
   );
 }
