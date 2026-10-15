@@ -13,12 +13,10 @@ import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
-import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
-import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
@@ -903,9 +901,7 @@ public final class ArchitectureRules {
         ProactiveLoopProperties.class,
         PricingProperties.class,
         MemoryEncryptionProperties.class,
-        ModelTierProperties.class,
         ConnectorPolicyProperties.class,
-        MemoryProposalProperties.class,
         BrowserProperties.class,
         WorkspaceProperties.class);
 

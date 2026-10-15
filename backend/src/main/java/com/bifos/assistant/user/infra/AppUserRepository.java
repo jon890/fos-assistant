@@ -30,10 +30,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     boolean existsByGroupId(Long groupId);
 
 
-    @Query("select distinct u.groupId from AppUser u")
-    List<Long> findDistinctGroupIds();
-
-
     /**
      * 사용자 한 줄을 쓰기 잠금으로 읽는다.
      *

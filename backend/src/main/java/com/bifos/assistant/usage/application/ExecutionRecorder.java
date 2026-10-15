@@ -209,52 +209,6 @@ public class ExecutionRecorder {
     }
 
 
-    /**
-     * 원래 실행에서 이어지는 실행을 RUNNING 으로 만들어 돌려준다. Memory 제안처럼 같은 대화에서 원래 실행의
-     * 값을 이어받아 도는 실행이 쓴다.
-     *
-     * <p>단계는 원래 실행 줄에서 복사하고, effort 출처도 원래 실행 줄에서 읽는다. 대화에서 다시 계산하면 그
-     * 사이 바뀐 대화의 선택이 섞인다. 보낸 effort 가 없으면 출처는 {@code UNKNOWN} 이다. 그래야 완료 뒤
-     * 보완이 그 줄을 찾는다.
-     *
-     * <p>사용자 실행 한도는 백그라운드 실행으로 본다. 사용자 실행 한도에 닿으면 {@code USER_BUSY} 를 던지고 줄을 만들지 않는다. 트랜잭션 밖에서 부른다.
-     *
-     * @param parent 원래 실행. 부모와 루트 실행 번호가 모두 이 실행이다
-     * @param requested 원래 실행이 Hermes 에 보낸 provider, 모델, effort. null 이면 기본값으로 본다
-     */
-    public AgentExecution startInheriting(
-        CurrentUser user,
-        ExecutionConversation conversation,
-        Agent agent,
-        AgentExecution parent,
-        ModelChoice requested) {
-        ModelChoice sent = requested == null ? ModelChoice.defaults() : requested;
-        ReasoningEffortSource source;
-        if (sent.reasoningEffort() == null) {
-            source = ReasoningEffortSource.UNKNOWN;
-        } else if (parent.reasoningEffortSource() == ReasoningEffortSource.AGENT_DEFAULT) {
-            source = ReasoningEffortSource.AGENT_DEFAULT;
-        } else {
-            source = ReasoningEffortSource.REQUESTED;
-        }
-        return record(
-            user,
-            conversation,
-            agent,
-            parent.id(),
-            parent.id(),
-            ExecutionContextSnapshot.ofChars(0L),
-            sent,
-            null,
-            null,
-            null,
-            parent.modelTier(),
-            null,
-            source,
-            ExecutionAdmission.BACKGROUND);
-    }
-
-
     /** 부모가 있으면 자식, 대화만 있으면 대화 turn 의 루트, 둘 다 없으면 백그라운드 실행이다. */
     private ExecutionAdmission admissionOf(
         ExecutionConversation conversation, Long parentExecutionId, Long rootExecutionId) {
