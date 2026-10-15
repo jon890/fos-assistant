@@ -1,5 +1,6 @@
 import type { EditorPage } from "./page.ts";
 import { fieldCandidates, LAYER_DIAGNOSIS_JS } from "./fields.ts";
+import { settleKnownPopup } from "./popup.ts";
 
 type Region = "title" | "body" | "other" | "none";
 export type FocusSample = {
@@ -141,6 +142,8 @@ export async function focusField(
   const diagnostics: FocusDiagnostics = { attempts: 0, samples: [] };
   for (let i = 0; i < bounded(tries, MAX_ATTEMPTS); i++) {
     diagnostics.attempts++;
+    // 글을 넣는 도중에 뜬 알림이 제목이나 본문을 덮을 수 있어 누르기 전마다 알려진 알림을 닫아 본다.
+    await settleKnownPopup(page);
     let current = await probe(page, selector, scope);
     if (current.spot) await page.mouseAt(current.spot.x, current.spot.y);
     await page.sleep(page.step(0.3));
