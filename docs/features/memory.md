@@ -245,7 +245,7 @@ sequenceDiagram
 
 에이전트는 Control Plane MCP 도구 `memory_remember` 로 사람에 관한 오래 쓰일 사실을 남긴다.
 바로 저장(`ACCEPTED`)할지 제안(`PROPOSED`)으로 둘지는 Control Plane 이 실행의 출처로 정한다.
-답변 뒤 별도 모델 호출로 사실을 추출하던 자동 제안기와 `assistant.memory.propose` 설정은 제거했다.
+답변 뒤 별도 모델 호출로 사실을 추출하던 자동 제안기와 그 설정은 제거했다.
 결정과 프롬프트 주입을 막는 근거는 [ADR-20261007 / memory-remember](../adr/ADR-20261007-memory-remember.md) 에, `evidence` 를 판정에서 빼고 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화를 제안으로 내리는 근거는 [ADR-20261008 / memory-remember-guard](../adr/ADR-20261008-memory-remember-guard.md) 에 있다.
 
 #### 도구 계약(Memory)
