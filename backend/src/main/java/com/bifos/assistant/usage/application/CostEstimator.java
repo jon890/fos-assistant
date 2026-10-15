@@ -25,9 +25,11 @@ public class CostEstimator {
 
     private final PriceCatalog catalog;
 
+
     public CostEstimator(PriceCatalog catalog) {
         this.catalog = catalog;
     }
+
 
     public EstimatedCost estimate(String provider, String model, TokenUsage usage) {
         if (usage == null || usage.inputTokens() == null || usage.outputTokens() == null) {
@@ -55,18 +57,18 @@ public class CostEstimator {
 
         // 카탈로그에 캐시 단가가 없는 모델은 캐시 읽기를 할인한다는 근거가 없다. 그래서 그 토큰도 입력
         // 단가로 센다. 공짜로 떨어뜨리지 않는다.
-        BigDecimal cacheRate =
-                price.cacheReadUsdPerMillion() == null ? price.inputUsdPerMillion() : price.cacheReadUsdPerMillion();
+        BigDecimal cacheRate = price.cacheReadUsdPerMillion() == null ? price.inputUsdPerMillion() : price.cacheReadUsdPerMillion();
 
         BigDecimal micros = ModelPrice.microsFor(uncachedTokens, price.inputUsdPerMillion())
-                .add(ModelPrice.microsFor(cachedCharged, cacheRate))
-                .add(ModelPrice.microsFor(outputTokens, price.outputUsdPerMillion()));
+            .add(ModelPrice.microsFor(cachedCharged, cacheRate))
+            .add(ModelPrice.microsFor(outputTokens, price.outputUsdPerMillion()));
 
         return new EstimatedCost(
-                micros.setScale(0, RoundingMode.HALF_UP).longValueExact(),
-                CURRENCY,
-                found.get().version());
+            micros.setScale(0, RoundingMode.HALF_UP).longValueExact(),
+            CURRENCY,
+            found.get().version());
     }
+
 
     /**
      * 환산액과 실제 청구액을 함께 낸다.
@@ -81,6 +83,7 @@ public class CostEstimator {
         Long actualMicros = costMode == CostMode.API ? estimated.micros() : null;
         return new ExecutionCost(estimated.micros(), actualMicros, estimated.currency(), estimated.pricingVersion());
     }
+
 
     private static long nonNegative(Long value) {
         return value == null || value < 0 ? 0 : value;
