@@ -1876,6 +1876,7 @@ Hermes 자체의 예약 작업은 기본 profile의 설정과 cron 저장소를 
 
 v0.21.6(`818c13be1dc4fd28987e1e881a9408224afd4535`)의 [`hermes_cli/config.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/hermes_cli/config.py)의 `load_config`와 `load_config_readonly`는 기본값과 사용자 설정을 합쳐 읽는다.
 [`config_defaults.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/hermes_cli/config_defaults.py)의 `DEFAULT_CONFIG`와 실행 코드에는 `agent.scheduled_tasks.enabled`를 읽는 곳이 없다.
+Hermes v0.21.6 소스 전체에서 키 이름을 검색해 소비자가 없음을 확인했다.
 [`gateway/run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/gateway/run.py)의 `_start_gateway_start_cron_and_housekeeping`도 이 키를 보지 않고 `cron.scheduler_provider.resolve_cron_scheduler`로 실행기를 고른다.
 따라서 이 키는 profile 틀에서 제거했으며 cron 실행기를 끄는 설정으로 취급하지 않는다.
 
