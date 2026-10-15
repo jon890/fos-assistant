@@ -67,8 +67,6 @@ agent:
     - yuanbao
   browser_control:
     enabled: false
-  scheduled_tasks:
-    enabled: false
 
 # Memory lives in the Control Plane database, which injects what the caller may see as
 # per-run instructions. See ADR-003 in the fos-assistant repository.

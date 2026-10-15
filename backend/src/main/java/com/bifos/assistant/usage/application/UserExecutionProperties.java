@@ -8,7 +8,7 @@ import org.springframework.validation.annotation.Validated;
  * 한 사용자가 Hermes 에 동시에 맡길 수 있는 실행의 한도다(ADR-069).
  *
  * @param maxRunning 한 사용자가 동시에 쥘 수 있는 자리 수. turn 자리와 {@code RUNNING} 실행 줄, 원격 종료 확인 자리의 합이다
- * @param backgroundReserve 추천 질문과 Memory 제안이 줄을 만든 뒤에도 남겨 둘 자리 수
+ * @param backgroundReserve 백그라운드 실행이 줄을 만든 뒤에도 남겨 둘 자리 수
  * @param remoteEndMaxWait Hermes 에서 끝났는지 모르는 run 의 자리를 쥐는 상한. null 이면 쓰는 쪽이 {@code hermes.run-timeout} 을 쓴다
  */
 @Validated

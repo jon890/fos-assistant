@@ -50,7 +50,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>그 실행 줄을 이은 전달 시도는 실행 줄을 적는 트랜잭션에서 함께 닫는다(ADR-075). 둘이 함께 적히거나 함께 되돌아간다.
  *
  * <p>Hermes 에 묻고 기다리는 것, turn 잠금, 대기 줄을 멈추는 것은 여기서 하지 않는다. 부르는 쪽이 한다. 다시
- * 붙어 끝난 대화 turn 은 Memory 제안과 추천 질문 갱신을 돌리지 않는다.
+ * 붙어 끝난 대화 turn 은 추천 질문 갱신을 돌리지 않는다.
  */
 @Service
 @Slf4j

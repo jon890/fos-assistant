@@ -62,20 +62,6 @@ assistant:
     model-options-ttl: 10m
     # 지운 대화의 본문을 실제로 지우는 시각. 실패한 대화는 다음 차례에 다시 본다
     purge-cron: "20 * * * * *"
-  model-tiers:
-    # 실행할 때 읽지 않는다. 기동할 때 정의 행이 없는 그룹에 한 번 옮기고, 옮긴 뒤 운영 설정에서 지운다(ADR-054).
-    fast:
-      provider: ${ASSISTANT_MODEL_TIERS_FAST_PROVIDER:}
-      model: ${ASSISTANT_MODEL_TIERS_FAST_MODEL:}
-      reasoning-effort: ${ASSISTANT_MODEL_TIERS_FAST_REASONING_EFFORT:}
-    balanced:
-      provider: ${ASSISTANT_MODEL_TIERS_BALANCED_PROVIDER:}
-      model: ${ASSISTANT_MODEL_TIERS_BALANCED_MODEL:}
-      reasoning-effort: ${ASSISTANT_MODEL_TIERS_BALANCED_REASONING_EFFORT:}
-    deep:
-      provider: ${ASSISTANT_MODEL_TIERS_DEEP_PROVIDER:}
-      model: ${ASSISTANT_MODEL_TIERS_DEEP_MODEL:}
-      reasoning-effort: ${ASSISTANT_MODEL_TIERS_DEEP_REASONING_EFFORT:}
   context:
     max-chars: 8000
     index-budget-ratio: 4
@@ -95,8 +81,6 @@ assistant:
     dek-cache-ttl: 10m
     dek-cache-max-entries: 1000
   memory:
-    propose:
-      enabled: false
     encryption:
       # 민감 Memory 본문을 암호화하는 key 다(ADR-055). 둘 다 비우면 기동은 되고 민감 항목의 저장과 수정, 암호화한 줄의 읽기만 거절한다
       # 새로 쓸 때 쓰는 key 의 id
@@ -120,7 +104,7 @@ assistant:
   user-execution:
     # 한 사용자가 Hermes 에 동시에 맡길 수 있는 실행 수. turn 자리와 RUNNING 실행 줄의 합이다(ADR-069)
     max-running: 4
-    # 추천 질문과 Memory 제안이 돈 뒤에도 남겨 둘 사용자 자리 수
+    # 백그라운드 실행이 돈 뒤에도 남겨 둘 사용자 자리 수
     background-reserve: 1
     # Hermes 에서 끝났는지 모르는 run 의 자리를 쥐는 상한. 비우면 hermes.run-timeout 과 같다
     remote-end-max-wait: ${ASSISTANT_USER_EXECUTION_REMOTE_END_MAX_WAIT:}
