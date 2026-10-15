@@ -1,0 +1,15 @@
+{
+  "name": "plan215-memory-eval-gate",
+  "description": "#310 2단계의 단계 0 — 기억 선별을 바꾸기 전에 합성 측정을 넓혀 악화 금지 게이트로 걸고, 실행 기록에 선택 근거를 남기고, 운영 집계 쿼리와 월 단위 답 판정 하네스의 틀을 만든다",
+  "status": "pending",
+  "created_at": "2026-10-15",
+  "total_phases": 5,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "standard" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" }
+  ]
+}
