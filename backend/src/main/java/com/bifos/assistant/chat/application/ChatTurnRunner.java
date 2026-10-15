@@ -44,6 +44,7 @@ class ChatTurnRunner {
     private final AgentToolService agentTools;
     private final ChatTurnStopper chatTurnStopper;
 
+
     /**
      * 대화가 고른 모델로 turn 하나를 끝낸다.
      *
@@ -59,17 +60,16 @@ class ChatTurnRunner {
      * 만든 뒤 그 실행에 {@code COMMAND} 이력을 남긴다. 저장하는 메시지는 그대로 사용자가 친 글이다.
      */
     ChatTurn runTurn(
-            CurrentUser user,
-            Routed routed,
-            String text,
-            TurnIntent intent,
-            Consumer<ChatEvent> onEvent,
-            boolean streaming,
-            TurnHandle existingHandle) {
+        CurrentUser user,
+        Routed routed,
+        String text,
+        TurnIntent intent,
+        Consumer<ChatEvent> onEvent,
+        boolean streaming,
+        TurnHandle existingHandle) {
         Instant requestReceivedAt = routed.requestReceivedAt();
         Conversation conversation = routed.conversation();
-        List<Long> attachmentIds =
-                routed.attached().stream().map(ChatAttachment::id).toList();
+        List<Long> attachmentIds = routed.attached().stream().map(ChatAttachment::id).toList();
         TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
         try {
@@ -83,34 +83,34 @@ class ChatTurnRunner {
             String input = artifacts.agentPreamble(conversation) + agentInput.text();
             // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
             AssembledContext context = routed.agent().connectorManaged()
-                    ? AssembledContext.empty()
-                    : contextAssembler.assemble(user, routed.agent().id());
+                ? AssembledContext.empty()
+                : contextAssembler.assemble(user, routed.agent().id());
             // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-20261007 / memory-remember)
             context = contextAssembler.withResponseInstructions(
-                    context, !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
+                context, !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
-                    context.chars(),
-                    null,
-                    context.instructionsHash(),
-                    context.omittedItems(),
-                    sourceRefs(context, intent));
+                context.chars(),
+                null,
+                context.instructionsHash(),
+                context.omittedItems(),
+                sourceRefs(context, intent));
 
             ResolvedModelTier resolved;
             try {
                 resolved = modelTiers.resolve(user, conversation, routed.agent());
             } catch (RuntimeException ex) {
                 PendingTurn failed = chatTurnLifecycle.begin(
-                        user,
-                        routed,
-                        input,
-                        agentInput.images(),
-                        context,
-                        snapshot,
-                        ModelChoice.defaults(),
-                        null,
-                        intent,
-                        requestReceivedAt,
-                        onEvent);
+                    user,
+                    routed,
+                    input,
+                    agentInput.images(),
+                    context,
+                    snapshot,
+                    ModelChoice.defaults(),
+                    null,
+                    intent,
+                    requestReceivedAt,
+                    onEvent);
                 String code = ex instanceof ApiException api ? api.code().name() : "MODEL_TIER_RESOLVE_FAILED";
                 executions.fail(failed.execution(), code);
                 chatRunEvents.append(failed, ExecutionEventType.RUN_FAILED, code);
@@ -118,17 +118,17 @@ class ChatTurnRunner {
             }
             ModelChoice choice = resolved.choice();
             PendingTurn pending = chatTurnLifecycle.begin(
-                    user,
-                    routed,
-                    input,
-                    agentInput.images(),
-                    context,
-                    snapshot,
-                    choice,
-                    resolved.tier(),
-                    intent,
-                    requestReceivedAt,
-                    onEvent);
+                user,
+                routed,
+                input,
+                agentInput.images(),
+                context,
+                snapshot,
+                choice,
+                resolved.tier(),
+                intent,
+                requestReceivedAt,
+                onEvent);
             if (command != null) {
                 skillUses.recordCommand(pending.execution().id(), command.name());
             }
@@ -139,11 +139,11 @@ class ChatTurnRunner {
             }
             if (streaming) {
                 onEvent.accept(ChatEvent.started(
-                        conversation.publicId(), pending.execution().id()));
+                    conversation.publicId(), pending.execution().id()));
             }
 
             if (turns.isStopConfirmed(handle)
-                    || turns.shouldStopBeforeSubmit(pending.execution().id())) {
+                || turns.shouldStopBeforeSubmit(pending.execution().id())) {
                 return chatTurnStopper.stoppedTurn(handle, pending, null, choice, startedAt);
             }
             String runId = null;
@@ -155,7 +155,7 @@ class ChatTurnRunner {
                     } catch (RuntimeException ex) {
                         executions.fail(pending.execution(), "ATTACHMENT_INSPECTION_UNAVAILABLE");
                         chatRunEvents.append(
-                                pending, ExecutionEventType.RUN_FAILED, "ATTACHMENT_INSPECTION_UNAVAILABLE");
+                            pending, ExecutionEventType.RUN_FAILED, "ATTACHMENT_INSPECTION_UNAVAILABLE");
                         throw ex;
                     }
                 }
@@ -180,7 +180,7 @@ class ChatTurnRunner {
             }
             if (result.providerBlocked()) {
                 executions.fail(
-                        pending.execution(), pending.agent(), result, choice, ErrorCode.PROVIDER_BLOCKED.name());
+                    pending.execution(), pending.agent(), result, choice, ErrorCode.PROVIDER_BLOCKED.name());
                 chatRunEvents.append(pending, ExecutionEventType.RUN_FAILED, ErrorCode.PROVIDER_BLOCKED.name());
                 throw new ApiException(ErrorCode.PROVIDER_BLOCKED, "every account of the chosen provider is blocked");
             }
@@ -194,6 +194,7 @@ class ChatTurnRunner {
         }
     }
 
+
     /**
      * 흐름으로 도는 turn 을 중계한다.
      *
@@ -201,13 +202,13 @@ class ChatTurnRunner {
      * 없기 때문이다. 흐름은 참조 구현으로만 남긴다(ADR-017).
      */
     ChatTurn runFlow(
-            CurrentUser user,
-            Routed routed,
-            String text,
-            TurnIntent intent,
-            Consumer<ChatEvent> onEvent,
-            boolean streaming,
-            TurnHandle existingHandle) {
+        CurrentUser user,
+        Routed routed,
+        String text,
+        TurnIntent intent,
+        Consumer<ChatEvent> onEvent,
+        boolean streaming,
+        TurnHandle existingHandle) {
         Conversation conversation = routed.conversation();
         TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
         boolean closesHandle = existingHandle == null;
@@ -218,29 +219,29 @@ class ChatTurnRunner {
             Instant startedAt = clock.instant();
             artifactStore.ensureFolder(conversation.id());
             String input = artifacts.agentPreamble(conversation)
-                    + attachments
-                            .agentInput(conversation.id(), routed.attached(), text, false)
-                            .text();
+                + attachments
+                    .agentInput(conversation.id(), routed.attached(), text, false)
+                    .text();
             AtomicReference<Long> rootExecutionId = new AtomicReference<>();
             ChatTurn turn;
             try {
                 turn = routed.flow()
-                        .run(
-                                user,
-                                conversation,
-                                routed.agent(),
-                                text,
-                                input,
-                                intent,
-                                execution -> {
-                                    rootExecutionId.set(execution.id());
-                                    executions.markRequestReceived(execution, routed.requestReceivedAt());
-                                    turns.rekey(handle, execution.id());
-                                    if (streaming) {
-                                        onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
-                                    }
-                                },
-                                onEvent);
+                    .run(
+                        user,
+                        conversation,
+                        routed.agent(),
+                        text,
+                        input,
+                        intent,
+                        execution -> {
+                            rootExecutionId.set(execution.id());
+                            executions.markRequestReceived(execution, routed.requestReceivedAt());
+                            turns.rekey(handle, execution.id());
+                            if (streaming) {
+                                onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
+                            }
+                        },
+                        onEvent);
             } catch (RuntimeException ex) {
                 chatTurnStopper.cancelFlowAndHoldIfStopConfirmed(handle, conversation.id(), rootExecutionId.get());
                 throw ex;
@@ -256,9 +257,9 @@ class ChatTurnRunner {
                     onEvent.accept(ChatEvent.delta(turn.assistantText()));
                 }
                 onEvent.accept(
-                        turn.cancelled()
-                                ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                                : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
+                    turn.cancelled()
+                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
+                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
             }
             return turn;
         } finally {
@@ -268,6 +269,7 @@ class ChatTurnRunner {
         }
     }
 
+
     /**
      * 실행에 남길 문맥 항목의 참조다. 결과를 전하는 turn 이면 Memory 항목 뒤로 입력에 실은 결과 항목을 잇는다(ADR-071).
      *
@@ -275,13 +277,14 @@ class ChatTurnRunner {
      */
     static List<ContextSourceRef> sourceRefs(AssembledContext context, TurnIntent intent) {
         if (!(intent instanceof TurnIntent.DelegationResults results)
-                || results.items().isEmpty()) {
+            || results.items().isEmpty()) {
             return ContextSourceRefs.of(context);
         }
         List<ContextSourceRef> refs = new ArrayList<>(ContextSourceRefs.of(context));
         refs.addAll(ContextSourceRefs.of(results.items()));
         return refs;
     }
+
 
     static String hermesStatus(HermesRunResult result) {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();

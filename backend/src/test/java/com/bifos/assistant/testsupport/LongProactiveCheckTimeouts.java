@@ -17,4 +17,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties({"hermes.run-timeout=30s", "assistant.proactive-check.max-duration=20s"})
-public @interface LongProactiveCheckTimeouts {}
+public @interface LongProactiveCheckTimeouts {
+}

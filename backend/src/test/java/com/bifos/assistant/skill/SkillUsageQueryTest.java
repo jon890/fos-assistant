@@ -126,6 +126,7 @@ class SkillUsageQueryTest {
     private Conversation dadSecond;
     private Conversation kidOnly;
 
+
     @BeforeEach
     void setUp() {
         uses.deleteAll();
@@ -134,15 +135,15 @@ class SkillUsageQueryTest {
         dad = user("usage-dad@example.com", "아빠");
         kid = user("usage-kid@example.com", "아이");
         agent = agents.save(Agent.of(
-                AGENT_CODE,
-                "가족 비서",
-                AGENT_PROFILE,
-                "http://agent-runtime.test/p/family",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                dad.id(),
-                Instant.now()));
+            AGENT_CODE,
+            "가족 비서",
+            AGENT_PROFILE,
+            "http://agent-runtime.test/p/family",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            dad.id(),
+            Instant.now()));
         dadFirst = conversations.save(Conversation.startedBy(dad.id(), "장보기 첫째", agent.id(), Instant.now()));
         dadSecond = conversations.save(Conversation.startedBy(dad.id(), "장보기 둘째", agent.id(), Instant.now()));
         kidOnly = conversations.save(Conversation.startedBy(kid.id(), "아이 장보기", agent.id(), Instant.now()));
@@ -154,41 +155,45 @@ class SkillUsageQueryTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         store.deleteAll(AGENT_PROFILE);
         String version = store.writeVersion(
-                AGENT_PROFILE,
-                Map.of(
-                        "shopping",
-                                new SkillBundle(
-                                        "shopping", "---\nname: shopping\ndescription: 장을 봐요\n---\n장을 봐요", List.of()),
-                        "unused",
-                                new SkillBundle(
-                                        "unused", "---\nname: unused\ndescription: 아직 안 써요\n---\n안내", List.of())));
+            AGENT_PROFILE,
+            Map.of(
+                "shopping",
+                new SkillBundle(
+                    "shopping", "---\nname: shopping\ndescription: 장을 봐요\n---\n장을 봐요", List.of()),
+                "unused",
+                new SkillBundle(
+                    "unused", "---\nname: unused\ndescription: 아직 안 써요\n---\n안내", List.of())));
         store.markPublished(AGENT_PROFILE, version);
         when(skillClient.list(anyString()))
-                .thenReturn(List.of(
-                        new HermesSkill("shopping", "장을 본다", true), new HermesSkill("hermes-help", "Hermes 기본", true)));
+            .thenReturn(List.of(
+                new HermesSkill("shopping", "장을 본다", true), new HermesSkill("hermes-help", "Hermes 기본", true)));
     }
+
 
     private CurrentUser user(String email, String name) {
         AppUser user = users.findByEmail(email)
-                .orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now())));
+            .orElseGet(() -> users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now())));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
+
     private AgentExecution execution(CurrentUser user, Conversation conversation) {
         return executions.save(AgentExecution.builder()
-                .userId(user.id())
-                .conversationId(conversation.id())
-                .agentId(agent.id())
-                .profileName(AGENT_PROFILE)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(user.id())
+            .conversationId(conversation.id())
+            .agentId(agent.id())
+            .profileName(AGENT_PROFILE)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
     }
+
 
     private void use(AgentExecution execution, String skillName, SkillUseSource source, Instant at) {
         uses.save(ExecutionSkillUse.of(execution.id(), skillName, source, at));
     }
+
 
     @Test
     @DisplayName("편집자의 합계는 그 에이전트를 쓴 두 사용자의 호출을 합친다")
@@ -199,6 +204,7 @@ class SkillUsageQueryTest {
         assertThat(byAgent.get("shopping")).isEqualTo(new SkillUsageSummary(3, T3));
     }
 
+
     @Test
     @DisplayName("편집자의 스킬 목록에는 합계가 붙고 호출이 없는 스킬은 0 이다")
     void editorSkillListHasTotalsAndSkillWithoutCallsIsZero() {
@@ -206,11 +212,12 @@ class SkillUsageQueryTest {
 
         assertThat(list.editable()).isTrue();
         assertThat(list.skills())
-                .extracting(SkillListItem::name, SkillListItem::usage)
-                .containsExactly(
-                        tuple("shopping", new SkillUsageSummary(3, T3)),
-                        tuple("unused", new SkillUsageSummary(0, null)));
+            .extracting(SkillListItem::name, SkillListItem::usage)
+            .containsExactly(
+                tuple("shopping", new SkillUsageSummary(3, T3)),
+                tuple("unused", new SkillUsageSummary(0, null)));
     }
+
 
     @Test
     @DisplayName("편집자가 아닌 사용자의 스킬 목록에는 합계가 없다")
@@ -219,9 +226,10 @@ class SkillUsageQueryTest {
 
         assertThat(list.editable()).isFalse();
         assertThat(list.skills())
-                .isNotEmpty()
-                .allSatisfy(item -> assertThat(item.usage()).isNull());
+            .isNotEmpty()
+            .allSatisfy(item -> assertThat(item.usage()).isNull());
     }
+
 
     @Test
     @DisplayName("각 사용자는 자기 호출만 보고 마지막 호출의 대화를 받는다")
@@ -233,11 +241,12 @@ class SkillUsageQueryTest {
 
         // 둘 다 MEMBER 역할이라 에이전트 코드는 비어 온다(ADR-063).
         assertThat(dadView)
-                .containsExactly(
-                        new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
+            .containsExactly(
+                new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 2, T2, dadSecond.publicId()));
         assertThat(kidView)
-                .containsExactly(new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
+            .containsExactly(new UsageDtos.MySkillUsageView(null, "가족 비서", "shopping", 1, T3, kidOnly.publicId()));
     }
+
 
     @Test
     @DisplayName("마지막 호출의 대화를 지웠으면 lastConversationId 가 비고 합계는 남는다")
@@ -253,6 +262,7 @@ class SkillUsageQueryTest {
         });
     }
 
+
     @Test
     @DisplayName("에이전트 행이 없는 호출도 이름 없이 합계에 남는다")
     void callOfAgentWithoutRowStaysInTotalWithoutName() {
@@ -266,13 +276,14 @@ class SkillUsageQueryTest {
         List<UserSkillUsage> usages = query.byUser(dad.id());
 
         assertThat(usages)
-                .extracting(
-                        UserSkillUsage::agentCode,
-                        UserSkillUsage::agentName,
-                        UserSkillUsage::skillName,
-                        UserSkillUsage::count)
-                .containsExactly(tuple(null, null, "purged-skill", 1L), tuple(AGENT_CODE, "가족 비서", "shopping", 2L));
+            .extracting(
+                UserSkillUsage::agentCode,
+                UserSkillUsage::agentName,
+                UserSkillUsage::skillName,
+                UserSkillUsage::count)
+            .containsExactly(tuple(null, null, "purged-skill", 1L), tuple(AGENT_CODE, "가족 비서", "shopping", 2L));
     }
+
 
     @Test
     @DisplayName("호출이 없는 사용자와 에이전트는 빈 결과다")
@@ -281,6 +292,7 @@ class SkillUsageQueryTest {
         assertThat(query.byAgent(9_999L)).isEmpty();
         assertThat(query.skillNamesByExecution(List.of())).isEmpty();
     }
+
 
     @Test
     @DisplayName("실행 목록의 줄마다 그 실행에서 쓴 스킬 이름이 붙는다")
@@ -295,16 +307,17 @@ class SkillUsageQueryTest {
         List<UsageDtos.ExecutionView> page = controller.myExecutions(50);
 
         assertThat(page)
-                .filteredOn(view -> view.id().equals(both.id()))
-                .singleElement()
-                .extracting(UsageDtos.ExecutionView::skillNames)
-                .isEqualTo(List.of("cooking", "shopping"));
+            .filteredOn(view -> view.id().equals(both.id()))
+            .singleElement()
+            .extracting(UsageDtos.ExecutionView::skillNames)
+            .isEqualTo(List.of("cooking", "shopping"));
         assertThat(page)
-                .filteredOn(view -> view.id().equals(none.id()))
-                .singleElement()
-                .extracting(UsageDtos.ExecutionView::skillNames)
-                .isEqualTo(List.of());
+            .filteredOn(view -> view.id().equals(none.id()))
+            .singleElement()
+            .extracting(UsageDtos.ExecutionView::skillNames)
+            .isEqualTo(List.of());
     }
+
 
     @Test
     @DisplayName("한 실행에 같은 이름의 COMMAND 와 MODEL 이 함께 있으면 1회이고 다른 실행이 더해지면 2회다")
@@ -315,22 +328,22 @@ class SkillUsageQueryTest {
 
         assertThat(query.byAgent(agent.id()).get("weekly-plan")).as("에이전트 합계").isEqualTo(new SkillUsageSummary(1, T1));
         assertThat(query.byUser(dad.id()))
-                .filteredOn(usage -> usage.skillName().equals("weekly-plan"))
-                .singleElement()
-                .satisfies(usage -> assertThat(usage.count()).as("사용자 합계").isEqualTo(1));
+            .filteredOn(usage -> usage.skillName().equals("weekly-plan"))
+            .singleElement()
+            .satisfies(usage -> assertThat(usage.count()).as("사용자 합계").isEqualTo(1));
 
         AgentExecution again = execution(dad, dadSecond);
         use(again, "weekly-plan", SkillUseSource.MODEL, T2);
 
         assertThat(query.byAgent(agent.id()).get("weekly-plan"))
-                .as("다른 실행을 더한 에이전트 합계")
-                .isEqualTo(new SkillUsageSummary(2, T2));
+            .as("다른 실행을 더한 에이전트 합계")
+            .isEqualTo(new SkillUsageSummary(2, T2));
         assertThat(query.byUser(dad.id()))
-                .filteredOn(usage -> usage.skillName().equals("weekly-plan"))
-                .singleElement()
-                .satisfies(usage -> {
-                    assertThat(usage.count()).as("다른 실행을 더한 사용자 합계").isEqualTo(2);
-                    assertThat(usage.lastConversationId()).isEqualTo(dadSecond.publicId());
-                });
+            .filteredOn(usage -> usage.skillName().equals("weekly-plan"))
+            .singleElement()
+            .satisfies(usage -> {
+                assertThat(usage.count()).as("다른 실행을 더한 사용자 합계").isEqualTo(2);
+                assertThat(usage.lastConversationId()).isEqualTo(dadSecond.publicId());
+            });
     }
 }

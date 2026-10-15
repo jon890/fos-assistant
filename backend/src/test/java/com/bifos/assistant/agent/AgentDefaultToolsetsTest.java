@@ -39,12 +39,14 @@ class AgentDefaultToolsetsTest {
     private final AgentDefaultToolsets service = new AgentDefaultToolsets(toolsets, skillFiles, connectorBindings);
     private final Agent agent = agent(AgentVisibility.PRIVATE);
 
+
     @BeforeEach
     void setUp() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of("delegation"));
         when(connectorBindings.connectorServers(any())).thenReturn(Set.of());
         when(skillFiles.uploadedRequestingSecrets(anyString())).thenReturn(List.of());
     }
+
 
     @Test
     @DisplayName("실행 공간이 있으면 지금 도구에 기본 도구를 더해 local 금지 쓰기로 쓴다")
@@ -57,12 +59,13 @@ class AgentDefaultToolsetsTest {
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
 
+
     @Test
     @DisplayName("실행 공간이 없으면 셸 계열을 빼고 web 만 더한다")
     void dropsShellToolsetsWhenSandboxUnavailable() {
         doThrow(new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "no sandbox"))
-                .when(toolsets)
-                .writeApiServerInSandbox(anyString(), anyList(), anyString());
+            .when(toolsets)
+            .writeApiServerInSandbox(anyString(), anyList(), anyString());
 
         List<String> written = service.apply(agent, DEFAULTS);
 
@@ -70,30 +73,33 @@ class AgentDefaultToolsetsTest {
         verify(toolsets).writeApiServer(agent.hermesProfile(), written, "u1");
     }
 
+
     @Test
     @DisplayName("셸 계열이 이미 켜진 profile 은 실행 공간이 없을 때 다시 쓰지 않는다")
     void skipsFallbackWhenShellAlreadyEnabledWithoutSandbox() {
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile())).thenReturn(List.of("terminal"));
         doThrow(new ApiException(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, "no sandbox"))
-                .when(toolsets)
-                .writeApiServerInSandbox(anyString(), anyList(), anyString());
+            .when(toolsets)
+            .writeApiServerInSandbox(anyString(), anyList(), anyString());
 
         assertThat(service.apply(agent, DEFAULTS)).isEmpty();
 
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
+
 
     @Test
     @DisplayName("실행 공간이 아닌 까닭의 거절이면 셸 계열을 뺀 쓰기로 넘어가지 않는다")
     void doesNotFallBackOnOtherRejections() {
         doThrow(new ApiException(ErrorCode.CONNECTOR_OPERATION_FAILED, "connector server missing"))
-                .when(toolsets)
-                .writeApiServerInSandbox(anyString(), anyList(), anyString());
+            .when(toolsets)
+            .writeApiServerInSandbox(anyString(), anyList(), anyString());
 
         assertThat(service.apply(agent, DEFAULTS)).isEmpty();
 
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
+
 
     @Test
     @DisplayName("셸 계열이 없는 기본값은 local 금지 칸 없이 쓴다")
@@ -104,6 +110,7 @@ class AgentDefaultToolsetsTest {
         verify(toolsets, never()).writeApiServerInSandbox(anyString(), anyList(), anyString());
     }
 
+
     @Test
     @DisplayName("기본값이 비었으면 Hermes 를 부르지 않는다")
     void doesNothingWhenDefaultsAreEmpty() {
@@ -111,6 +118,7 @@ class AgentDefaultToolsetsTest {
 
         verifyNoInteractions(toolsets);
     }
+
 
     @Test
     @DisplayName("이미 다 켜져 있으면 쓰지 않는다")
@@ -123,17 +131,19 @@ class AgentDefaultToolsetsTest {
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
 
+
     @Test
     @DisplayName("Hermes 가 실패해도 예외를 올리지 않는다")
     void swallowsHermesFailure() {
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
-                .when(toolsets)
-                .writeApiServerInSandbox(anyString(), anyList(), anyString());
+            .when(toolsets)
+            .writeApiServerInSandbox(anyString(), anyList(), anyString());
 
         assertThat(service.apply(agent, DEFAULTS)).isEmpty();
 
         verify(toolsets, never()).writeApiServer(anyString(), anyList(), anyString());
     }
+
 
     @Test
     @DisplayName("그룹 공개 에이전트에는 셸 계열을 켜지 않는다")
@@ -146,6 +156,7 @@ class AgentDefaultToolsetsTest {
         verify(toolsets).writeApiServer(group.hermesProfile(), List.of("delegation", "web", "fos-assistant"), "u1");
     }
 
+
     @Test
     @DisplayName("비밀을 요청하는 올린 스킬이 있으면 셸 계열을 켜지 않는다")
     void dropsShellToolsetsWhenSkillRequestsSecrets() {
@@ -157,6 +168,7 @@ class AgentDefaultToolsetsTest {
         verify(toolsets, never()).writeApiServerInSandbox(anyString(), anyList(), anyString());
     }
 
+
     @Test
     @DisplayName("붙은 커넥터 서버 이름을 목록 끝에 함께 보낸다")
     void keepsConnectorServersInWrittenList() {
@@ -165,19 +177,20 @@ class AgentDefaultToolsetsTest {
         service.apply(agent, List.of("web"));
 
         verify(toolsets)
-                .writeApiServer(agent.hermesProfile(), List.of("delegation", "web", "fos-assistant", "gmail"), "u1");
+            .writeApiServer(agent.hermesProfile(), List.of("delegation", "web", "fos-assistant", "gmail"), "u1");
     }
+
 
     private static Agent agent(AgentVisibility visibility) {
         return Agent.of(
-                "basic",
-                "기본",
-                "basic",
-                "http://listener.test/p/basic",
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                1L,
-                Instant.now());
+            "basic",
+            "기본",
+            "basic",
+            "http://listener.test/p/basic",
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            1L,
+            Instant.now());
     }
 }

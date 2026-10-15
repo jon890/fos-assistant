@@ -20,22 +20,24 @@ import org.junit.jupiter.api.Test;
 class TurnCancellationCloseTest {
 
     private final TurnCancellation turns = new TurnCancellation(
+        mock(HermesRunsClient.class),
+        Duration.ofSeconds(1),
+        new UserExecutionLimiter(
+            LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1000, 0, null)),
+            mock(AgentExecutionRepository.class),
             mock(HermesRunsClient.class),
-            Duration.ofSeconds(1),
-            new UserExecutionLimiter(
-                    LiveProperties.fixed(UserExecutionProperties.class, new UserExecutionProperties(1000, 0, null)),
-                    mock(AgentExecutionRepository.class),
-                    mock(HermesRunsClient.class),
-                    LiveProperties.fixed(
-                            HermesProperties.class,
-                            new HermesProperties(null, null, null, null, null, null, null, null)),
-                    new VirtualThreadBackgroundTasks()),
-            new VirtualThreadBackgroundTasks());
+            LiveProperties.fixed(
+                HermesProperties.class,
+                new HermesProperties(null, null, null, null, null, null, null, null)),
+            new VirtualThreadBackgroundTasks()),
+        new VirtualThreadBackgroundTasks());
+
 
     @AfterEach
     void tearDown() {
         turns.shutdown();
     }
+
 
     @Test
     @DisplayName("turn 을 닫으면 리스너가 stopped 가 거짓인 TurnClosed 를 받는다")
@@ -47,6 +49,7 @@ class TurnCancellationCloseTest {
 
         assertThat(closed).containsExactly(new TurnClosed(10L, false));
     }
+
 
     @Test
     @DisplayName("중지로 표시한 turn 을 닫으면 stopped 가 참이다")
@@ -61,6 +64,7 @@ class TurnCancellationCloseTest {
         assertThat(closed).containsExactly(new TurnClosed(10L, true));
     }
 
+
     @Test
     @DisplayName("리스너가 예외를 던져도 닫기는 끝나고 다음 리스너가 불린다")
     void closeFinishesAndCallsNextListenerWhenListenerThrows() {
@@ -74,6 +78,7 @@ class TurnCancellationCloseTest {
 
         assertThat(closed).containsExactly(new TurnClosed(10L, false));
     }
+
 
     @Test
     @DisplayName("같은 handle 을 두 번 닫아도 리스너는 한 번만 불린다")

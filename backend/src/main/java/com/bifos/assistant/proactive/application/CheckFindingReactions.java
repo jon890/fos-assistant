@@ -52,37 +52,36 @@ public class CheckFindingReactions {
     private final LiveProperties<ProactiveCheckProperties> properties;
     private final Clock clock;
 
+
     /** 요청자의 그 점검 대화에서 요청자의 살펴보기가 「새로 알릴 것」 으로 그린 발견을 오래된 것부터, 지금 반응과 함께 낸다. 남의 대화는 404 다. */
     public List<CheckFindingView> list(CurrentUser user, UUID conversationId) {
         Long conversation = conversations.requireOwnId(user, conversationId);
-        List<ProactiveCheckFinding> rows =
-                findings.findByConversationIdAndKindOrderByIdAsc(conversation, FindingKind.NEW);
+        List<ProactiveCheckFinding> rows = findings.findByConversationIdAndKindOrderByIdAsc(conversation, FindingKind.NEW);
         if (rows.isEmpty()) {
             return List.of();
         }
-        Map<Long, ProactiveCheck> owned =
-                checks
-                        .findAllById(rows.stream()
-                                .map(ProactiveCheckFinding::checkId)
-                                .collect(Collectors.toSet()))
-                        .stream()
-                        .filter(check -> Objects.equals(check.userId(), user.id()))
-                        .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
-        List<ProactiveCheckFinding> visible =
-                rows.stream().filter(row -> owned.containsKey(row.checkId())).toList();
+        Map<Long, ProactiveCheck> owned = checks
+            .findAllById(rows.stream()
+                .map(ProactiveCheckFinding::checkId)
+                .collect(Collectors.toSet()))
+            .stream()
+            .filter(check -> Objects.equals(check.userId(), user.id()))
+            .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
+        List<ProactiveCheckFinding> visible = rows.stream().filter(row -> owned.containsKey(row.checkId())).toList();
         Map<Long, FindingReaction> reactions = current(
-                user.id(), visible.stream().map(ProactiveCheckFinding::id).toList());
+            user.id(), visible.stream().map(ProactiveCheckFinding::id).toList());
         return visible.stream()
-                .map(row -> new CheckFindingView(
-                        row.id(),
-                        row.checkId(),
-                        owned.get(row.checkId()).rootExecutionId(),
-                        row.area(),
-                        row.topicKey(),
-                        row.title(),
-                        reactions.get(row.id())))
-                .toList();
+            .map(row -> new CheckFindingView(
+                row.id(),
+                row.checkId(),
+                owned.get(row.checkId()).rootExecutionId(),
+                row.area(),
+                row.topicKey(),
+                row.title(),
+                reactions.get(row.id())))
+            .toList();
     }
+
 
     /** 「관심 없음」 이 같은 주제를 내리는 기간을 하루 단위로 올림한 값이다. 화면이 단추 아래에 알린다. 1 보다 작지 않다. */
     public long dismissWindowDays() {
@@ -94,6 +93,7 @@ public class CheckFindingReactions {
         return Math.max(1, days);
     }
 
+
     /**
      * 발견 하나에 반응한다. 요청자의 살펴보기가 낸 「새로 알릴 것」 발견만 받는다. 지금 반응과 같으면 사건을 더 남기지 않는다.
      *
@@ -101,15 +101,15 @@ public class CheckFindingReactions {
      */
     public void react(CurrentUser user, Long findingId, FindingReaction reaction) {
         ProactiveCheckFinding finding = findingId == null
-                ? null
-                : findings.findById(findingId)
-                        .filter(row -> row.kind() == FindingKind.NEW)
-                        .orElse(null);
+            ? null
+            : findings.findById(findingId)
+                .filter(row -> row.kind() == FindingKind.NEW)
+                .orElse(null);
         ProactiveCheck check = finding == null
-                ? null
-                : checks.findById(finding.checkId())
-                        .filter(row -> Objects.equals(row.userId(), user.id()))
-                        .orElse(null);
+            ? null
+            : checks.findById(finding.checkId())
+                .filter(row -> Objects.equals(row.userId(), user.id()))
+                .orElse(null);
         if (check == null) {
             throw new ApiException(ErrorCode.PROACTIVE_CHECK_NOT_FOUND, "no such check finding");
         }
@@ -118,6 +118,7 @@ public class CheckFindingReactions {
         }
         feedback.record(entry(check, findingId, reaction.eventType(), FeedbackActor.USER));
     }
+
 
     /** 발견마다 마지막 사용자 반응이다. 반응이 없는 발견은 맵에 없다. */
     public Map<Long, FindingReaction> current(Long userId, Collection<Long> findingIds) {
@@ -129,8 +130,7 @@ public class CheckFindingReactions {
             idsByKey.put(FeedbackSubjectType.CHECK_FINDING.key(id), id);
         }
         Map<Long, FindingReaction> reactions = new HashMap<>();
-        for (FeedbackEvent event :
-                events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(userId, idsByKey.keySet())) {
+        for (FeedbackEvent event : events.findByUserIdAndSubjectKeyInOrderByOccurredAtAscIdAsc(userId, idsByKey.keySet())) {
             FindingReaction reaction = FindingReaction.of(event.eventType());
             if (event.actor() == FeedbackActor.USER && reaction != null) {
                 reactions.put(idsByKey.get(event.subjectKey()), reaction);
@@ -139,6 +139,7 @@ public class CheckFindingReactions {
         return reactions;
     }
 
+
     /** 보고를 보인 살펴보기의 「새로 알릴 것」 발견마다 {@code SURFACED} 를 남긴다. */
     public void surfaced(ProactiveCheck check) {
         for (ProactiveCheckFinding finding : findings.findByCheckIdAndKind(check.id(), FindingKind.NEW)) {
@@ -146,11 +147,12 @@ public class CheckFindingReactions {
         }
     }
 
+
     private FeedbackEntry entry(ProactiveCheck check, Long findingId, FeedbackEventType type, FeedbackActor actor) {
         return FeedbackEntry.of(
-                        check.userId(), FeedbackSubjectType.CHECK_FINDING, findingId, type, actor, clock.instant())
-                .conversation(check.conversationId())
-                .originExecution(check.rootExecutionId())
-                .sourceCheck(check.id());
+            check.userId(), FeedbackSubjectType.CHECK_FINDING, findingId, type, actor, clock.instant())
+            .conversation(check.conversationId())
+            .originExecution(check.rootExecutionId())
+            .sourceCheck(check.id());
     }
 }

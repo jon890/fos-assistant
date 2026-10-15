@@ -32,30 +32,33 @@ class ProactiveCheckWritesMigrationTest {
 
     private String url;
 
+
     @BeforeEach
     void setUp() throws SQLException {
         url = "jdbc:h2:mem:proactive-check-writes-migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         flyway().target(versionBeforeWrites()).load().migrate();
         execute("INSERT INTO app_user (id, email, display_name, group_id, role, created_at)" + " VALUES (" + USER
-                + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
+            + ", 'u@example.com', 'u', 1, 'MEMBER', CURRENT_TIMESTAMP(6))");
         execute(agentRow(AGENT, "a"));
         execute("INSERT INTO conversation (id, public_id, user_id, agent_id, title, created_at, updated_at)"
-                + " VALUES (" + CONVERSATION + ", X'00000000000000000000000000000002', " + USER + ", " + AGENT
-                + ", 'before', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
+            + " VALUES (" + CONVERSATION + ", X'00000000000000000000000000000002', " + USER + ", " + AGENT
+            + ", 'before', CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))");
         execute(checkRow());
         flyway().load().migrate();
     }
+
 
     @Test
     @DisplayName("이미 있던 에이전트와 살펴보기 줄의 쓰기 허용 칸은 거짓이다")
     void fillsExistingRowsWithFalse() throws SQLException {
         assertThat(queryBoolean("SELECT proactive_check_writes_allowed FROM agent WHERE id = " + AGENT))
-                .as("이미 있던 에이전트")
-                .isFalse();
+            .as("이미 있던 에이전트")
+            .isFalse();
         assertThat(queryBoolean("SELECT writes_allowed FROM proactive_check WHERE agent_id = " + AGENT))
-                .as("이미 있던 살펴보기")
-                .isFalse();
+            .as("이미 있던 살펴보기")
+            .isFalse();
     }
+
 
     @Test
     @DisplayName("칸을 적지 않고 새로 넣은 줄도 거짓이다")
@@ -65,16 +68,18 @@ class ProactiveCheckWritesMigrationTest {
         execute(checkRow());
 
         assertThat(queryBoolean("SELECT proactive_check_writes_allowed FROM agent WHERE id = " + OTHER_AGENT))
-                .as("새 에이전트")
-                .isFalse();
+            .as("새 에이전트")
+            .isFalse();
         assertThat(queryBoolean("SELECT writes_allowed FROM proactive_check"))
-                .as("새 살펴보기")
-                .isFalse();
+            .as("새 살펴보기")
+            .isFalse();
     }
+
 
     private FluentConfiguration flyway() {
         return Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration");
     }
+
 
     /** 쓰기 허용 마이그레이션 바로 앞의 버전. 번호를 적지 않고 설명으로 찾는다. */
     private String versionBeforeWrites() {
@@ -89,30 +94,34 @@ class ProactiveCheckWritesMigrationTest {
         return all.get(index - 1).getVersion().getVersion();
     }
 
+
     private static String agentRow(int id, String code) {
         return "INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode,"
-                + " credential_scope, visibility, owner_user_id, enabled, created_at)"
-                + " VALUES (" + id + ", '" + code + "', 'n', '" + code + "', 'http://localhost', 'SUBSCRIPTION',"
-                + " 'SHARED_HOUSEHOLD', 'PRIVATE', " + USER + ", TRUE, CURRENT_TIMESTAMP(6))";
+            + " credential_scope, visibility, owner_user_id, enabled, created_at)"
+            + " VALUES (" + id + ", '" + code + "', 'n', '" + code + "', 'http://localhost', 'SUBSCRIPTION',"
+            + " 'SHARED_HOUSEHOLD', 'PRIVATE', " + USER + ", TRUE, CURRENT_TIMESTAMP(6))";
     }
+
 
     private static String checkRow() {
         return "INSERT INTO proactive_check (user_id, agent_id, conversation_id, trigger_type, status, started_at)"
-                + " VALUES (" + USER + ", " + AGENT + ", " + CONVERSATION
-                + ", 'MANUAL', 'RUNNING', CURRENT_TIMESTAMP(6))";
+            + " VALUES (" + USER + ", " + AGENT + ", " + CONVERSATION
+            + ", 'MANUAL', 'RUNNING', CURRENT_TIMESTAMP(6))";
     }
+
 
     private void execute(String sql) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate(sql);
         }
     }
 
+
     private boolean queryBoolean(String sql) throws SQLException {
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement();
-                ResultSet row = statement.executeQuery(sql)) {
+            Statement statement = connection.createStatement();
+            ResultSet row = statement.executeQuery(sql)) {
             assertThat(row.next()).as("줄: %s", sql).isTrue();
             return row.getBoolean(1);
         }

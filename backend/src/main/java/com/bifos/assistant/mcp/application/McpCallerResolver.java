@@ -41,6 +41,7 @@ public class McpCallerResolver {
     private final AgentRepository agents;
     private final DelegationParentResolver parents;
 
+
     /**
      * @param principal 요청을 인증한 토큰
      * @param toolName 서버 쪽 도구 이름. 서명할 글에 들어간다
@@ -52,11 +53,13 @@ public class McpCallerResolver {
         return resolve(principal, toolName, fosCtx, false);
     }
 
+
     /** 원본 조회 전용이다. hook이 추가 서명한 최상위 사슬만 현재 루트 실행으로 해석한다. */
     @Transactional(readOnly = true)
     public McpCaller resolveAttachmentInspection(McpPrincipal principal, JsonNode fosCtx, boolean topLevel) {
         return resolve(principal, "attachment_inspect", fosCtx, topLevel);
     }
+
 
     private McpCaller resolve(McpPrincipal principal, String toolName, JsonNode fosCtx, boolean topLevel) {
         if (principal == null) {
@@ -64,8 +67,8 @@ public class McpCallerResolver {
         }
         McpCallContext context = McpCallContext.verify(toolName, fosCtx, principal.tokenHash());
         AgentExecution origin = topLevel
-                ? parents.resolve(principal.profileName(), context.rootSessionId())
-                : owners.resolve(principal.profileName(), context.rootSessionId(), context.sessionId());
+            ? parents.resolve(principal.profileName(), context.rootSessionId())
+            : owners.resolve(principal.profileName(), context.rootSessionId(), context.sessionId());
         if (isConnectorAgent(origin.agentId())) {
             throw reject(toolName, "커넥터 에이전트는 Control Plane 도구를 쓰지 못한다");
         }
@@ -73,19 +76,23 @@ public class McpCallerResolver {
         return new McpCaller(current(user), origin, context);
     }
 
+
     /** 에이전트 번호가 없거나 그 행이 없으면 커넥터 에이전트로 보지 않는다. */
     private boolean isConnectorAgent(Long agentId) {
         return agentId != null
-                && agents.findById(agentId).map(Agent::connectorManaged).orElse(false);
+            && agents.findById(agentId).map(Agent::connectorManaged).orElse(false);
     }
+
 
     private Optional<AppUser> findUser(Long userId) {
         return userId == null ? Optional.empty() : users.findById(userId);
     }
 
+
     private static CurrentUser current(AppUser user) {
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 서명 실패와 같다. */
     private static ApiException reject(String toolName, String reason) {

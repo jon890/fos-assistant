@@ -15,6 +15,24 @@ import java.util.List;
  * @param ownerBrowserLoginUrl 사용자 브라우저에서 먼저 로그인할 곳. 선언하지 않았거나 카탈로그에서 빠진 커넥터는 null
  */
 public record ConnectorSummary(
+    String id,
+    String title,
+    String description,
+    ConnectorAppearance appearance,
+    List<ConnectorFieldSummary> fields,
+    List<ConnectorToolSummary> tools,
+    ConnectionStatus myStatus,
+    boolean available,
+    List<BoundAgentSummary> bindings,
+    String ownerBrowserLoginUrl) {
+
+    public ConnectorSummary {
+        bindings = List.copyOf(bindings);
+    }
+
+
+    /** 로그인 안내 주소가 없는 항목이다. */
+    public ConnectorSummary(
         String id,
         String title,
         String description,
@@ -23,24 +41,7 @@ public record ConnectorSummary(
         List<ConnectorToolSummary> tools,
         ConnectionStatus myStatus,
         boolean available,
-        List<BoundAgentSummary> bindings,
-        String ownerBrowserLoginUrl) {
-
-    public ConnectorSummary {
-        bindings = List.copyOf(bindings);
-    }
-
-    /** 로그인 안내 주소가 없는 항목이다. */
-    public ConnectorSummary(
-            String id,
-            String title,
-            String description,
-            ConnectorAppearance appearance,
-            List<ConnectorFieldSummary> fields,
-            List<ConnectorToolSummary> tools,
-            ConnectionStatus myStatus,
-            boolean available,
-            List<BoundAgentSummary> bindings) {
+        List<BoundAgentSummary> bindings) {
         this(id, title, description, appearance, fields, tools, myStatus, available, bindings, null);
     }
 }

@@ -12,8 +12,9 @@ import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
  * @param persistentPreference 오래 가는 선호의 근거인가. 사용자의 마지막 결정이 받아들임인 Memory 제안만 참이다. 받아들인 뒤 되돌리거나 거절했으면 거짓이다
  */
 public record SubjectLabel(
-        FeedbackLabel label,
-        Boolean wantsNow,
-        boolean edited,
-        FeedbackEventType outcome,
-        boolean persistentPreference) {}
+    FeedbackLabel label,
+    Boolean wantsNow,
+    boolean edited,
+    FeedbackEventType outcome,
+    boolean persistentPreference) {
+}

@@ -18,14 +18,17 @@ record NotificationCursor(Instant createdAt, long id) {
 
     private static final char SEPARATOR = '_';
 
+
     static NotificationCursor of(Notification last) {
         return new NotificationCursor(last.createdAt(), last.id());
     }
+
 
     String encode() {
         String raw = createdAt + String.valueOf(SEPARATOR) + id;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
+
 
     /** 읽을 수 없는 값은 {@code VALIDATION_FAILED} 다. */
     static NotificationCursor decode(String encoded) {

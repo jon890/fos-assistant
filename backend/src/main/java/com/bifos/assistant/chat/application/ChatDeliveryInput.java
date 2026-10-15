@@ -47,6 +47,7 @@ class ChatDeliveryInput {
     private final List<AutoTurnResultSource> resultSources;
     private final ContextProperties contextProperties;
 
+
     /**
      * 묶음의 항목을 결과를 낸 쪽의 줄에서 다시 읽어 자동 turn 과 같은 모양의 입력과 결과 항목을 만든다.
      *
@@ -64,8 +65,8 @@ class ChatDeliveryInput {
         for (DeliveryItemRef item : items) {
             if (!ResultDeliveryRecorder.DELEGATION_SOURCE.equals(item.source())) {
                 keysBySource
-                        .computeIfAbsent(item.source(), source -> new ArrayList<>())
-                        .add(item.resultKey());
+                    .computeIfAbsent(item.source(), source -> new ArrayList<>())
+                    .add(item.resultKey());
                 continue;
             }
             try {
@@ -75,35 +76,36 @@ class ChatDeliveryInput {
             }
         }
         Map<Long, AgentExecution> found = executionRepository.findAllById(executionIds).stream()
-                .filter(execution -> user.id().equals(execution.userId())
-                        && conversationId.equals(execution.conversationId())
-                        && (execution.status() == ExecutionStatus.SUCCEEDED
-                                || execution.status() == ExecutionStatus.FAILED))
-                .collect(Collectors.toMap(AgentExecution::id, execution -> execution));
+            .filter(execution -> user.id().equals(execution.userId())
+                && conversationId.equals(execution.conversationId())
+                && (execution.status() == ExecutionStatus.SUCCEEDED
+                    || execution.status() == ExecutionStatus.FAILED))
+            .collect(Collectors.toMap(AgentExecution::id, execution -> execution));
         List<AgentExecution> results = executionIds.stream()
-                .distinct()
-                .map(found::get)
-                .filter(Objects::nonNull)
-                .toList();
+            .distinct()
+            .map(found::get)
+            .filter(Objects::nonNull)
+            .toList();
         List<AutoTurnResult> extras = new ArrayList<>();
         keysBySource.forEach((source, keys) -> resultSources.stream()
-                .filter(candidate -> candidate.source().equals(source))
-                .findFirst()
-                .ifPresentOrElse(
-                        candidate -> extras.addAll(candidate.resultsFor(conversationId, user.id(), keys)),
-                        () -> log.warn("출처 이름에 맞는 결과 구현이 없어 그 항목을 뺀다 source={}", source)));
+            .filter(candidate -> candidate.source().equals(source))
+            .findFirst()
+            .ifPresentOrElse(
+                candidate -> extras.addAll(candidate.resultsFor(conversationId, user.id(), keys)),
+                () -> log.warn("출처 이름에 맞는 결과 구현이 없어 그 항목을 뺀다 source={}", source)));
         if (results.isEmpty() && extras.isEmpty()) {
             throw ResultDeliveryRecorder.notRetryable();
         }
         Map<Long, Agent> resultAgents = resultAgentsOf(results);
         return deliveryInput(
-                results,
-                resultAgents,
-                externalAgentsOf(resultAgents),
-                extras,
-                clock.instant(),
-                contextProperties.resultStaleAfter());
+            results,
+            resultAgents,
+            externalAgentsOf(resultAgents),
+            extras,
+            clock.instant(),
+            contextProperties.resultStaleAfter());
     }
+
 
     /**
      * 결과마다 출처 머리줄을 두고, 답이 있으면 그 아래에 잇는다. 머리줄에는 에이전트 이름, 실행 번호, 상태, 끝난 시각을 적고 실패는
@@ -116,11 +118,11 @@ class ChatDeliveryInput {
      * <p>결과마다 {@code DELEGATION_RESULT} 항목을 하나씩 만든다. 본문은 입력에만 싣고 항목에 두지 않는다.
      */
     static DeliveryInput delegationInput(
-            List<AgentExecution> results,
-            Map<Long, Agent> resultAgents,
-            Set<Long> externalAgents,
-            Instant now,
-            Duration staleAfter) {
+        List<AgentExecution> results,
+        Map<Long, Agent> resultAgents,
+        Set<Long> externalAgents,
+        Instant now,
+        Duration staleAfter) {
         StringBuilder input = new StringBuilder("맡긴 일의 결과가 도착했다.");
         List<ContextItem> items = new ArrayList<>();
         for (AgentExecution result : results) {
@@ -128,9 +130,9 @@ class ChatDeliveryInput {
             ContextItem item = delegationItem(result, external, now, staleAfter);
             items.add(item);
             List<String> fields = new ArrayList<>(List.of(
-                    "에이전트: " + agentName(result, resultAgents),
-                    "실행 번호: " + result.id(),
-                    "상태: " + result.status().name()));
+                "에이전트: " + agentName(result, resultAgents),
+                "실행 번호: " + result.id(),
+                "상태: " + result.status().name()));
             if (result.status() == ExecutionStatus.FAILED) {
                 fields.add("오류: " + result.errorCode());
             }
@@ -142,6 +144,7 @@ class ChatDeliveryInput {
         return new DeliveryInput(input.toString(), items);
     }
 
+
     /**
      * 위임 결과 하나의 문맥 항목이다. 그 사용자와 그 대화의 실행만 오므로 실행 줄의 사용자가 대화 주인이다.
      *
@@ -150,19 +153,20 @@ class ChatDeliveryInput {
     static ContextItem delegationItem(AgentExecution result, boolean external, Instant now, Duration staleAfter) {
         ContextFreshness freshness = ResultHeader.freshnessOf(result.finishedAt(), now, staleAfter);
         return new ContextItem(
-                ContextSource.DELEGATION_RESULT,
-                "execution:" + result.id(),
-                MemoryScope.USER,
-                result.userId(),
-                MemorySensitivity.SENSITIVE,
-                external ? ContextTrust.EXTERNAL : ContextTrust.AGENT,
-                result.finishedAt(),
-                freshness,
-                ContextBodyMode.INLINE,
-                List.of(),
-                null,
-                null);
+            ContextSource.DELEGATION_RESULT,
+            "execution:" + result.id(),
+            MemoryScope.USER,
+            result.userId(),
+            MemorySensitivity.SENSITIVE,
+            external ? ContextTrust.EXTERNAL : ContextTrust.AGENT,
+            result.finishedAt(),
+            freshness,
+            ContextBodyMode.INLINE,
+            List.of(),
+            null,
+            null);
     }
+
 
     /**
      * 자동 turn 과 다시 전달이 함께 쓰는 Hermes 입력과 결과 항목이다. 위임 결과의 단락이 먼저이고, 그 뒤로 그 밖의 결과의 단락을
@@ -171,12 +175,12 @@ class ChatDeliveryInput {
      * @param now 묶음을 만든 시각. 결과의 신선도를 이 시각으로 판정한다
      */
     static DeliveryInput deliveryInput(
-            List<AgentExecution> results,
-            Map<Long, Agent> resultAgents,
-            Set<Long> externalAgents,
-            List<AutoTurnResult> extras,
-            Instant now,
-            Duration staleAfter) {
+        List<AgentExecution> results,
+        Map<Long, Agent> resultAgents,
+        Set<Long> externalAgents,
+        List<AutoTurnResult> extras,
+        Instant now,
+        Duration staleAfter) {
         StringBuilder input = new StringBuilder();
         List<ContextItem> items = new ArrayList<>();
         if (!results.isEmpty()) {
@@ -196,12 +200,14 @@ class ChatDeliveryInput {
         return new DeliveryInput(input.toString(), items);
     }
 
+
     /** 위임 결과를 낸 에이전트들이다. 결과가 없으면 읽지 않는다. */
     Map<Long, Agent> resultAgentsOf(List<AgentExecution> results) {
         return results.isEmpty()
-                ? Map.of()
-                : agents.byIds(results.stream().map(AgentExecution::agentId).toList());
+            ? Map.of()
+            : agents.byIds(results.stream().map(AgentExecution::agentId).toList());
     }
+
 
     /**
      * 답을 외부 글로 감쌀 에이전트다. 옛 연결용 에이전트와 연결이 하나라도 붙은 에이전트다(ADR-20261008 / read-data-flow).
@@ -210,15 +216,17 @@ class ChatDeliveryInput {
      */
     Set<Long> externalAgentsOf(Map<Long, Agent> resultAgents) {
         return resultAgents.values().stream()
-                .filter(agent -> agent.connectorManaged() || bindings.hasBindings(agent.id()))
-                .map(Agent::id)
-                .collect(Collectors.toSet());
+            .filter(agent -> agent.connectorManaged() || bindings.hasBindings(agent.id()))
+            .map(Agent::id)
+            .collect(Collectors.toSet());
     }
+
 
     static boolean isExternalResult(AgentExecution execution, Map<Long, Agent> resultAgents, Set<Long> externalAgents) {
         Agent agent = resultAgents.get(execution.agentId());
         return agent == null || externalAgents.contains(agent.id());
     }
+
 
     static String delegationNotice(List<AgentExecution> results, Map<Long, Agent> resultAgents) {
         String first = agentName(results.getFirst(), resultAgents);
@@ -227,6 +235,7 @@ class ChatDeliveryInput {
         }
         return first + " 외 " + (results.size() - 1) + "개 에이전트의 결과가 도착했어요";
     }
+
 
     /** 에이전트 행이 없으면 실행 줄에 적힌 profile 이름으로 대신한다. */
     static String agentName(AgentExecution execution, Map<Long, Agent> resultAgents) {

@@ -19,30 +19,35 @@ public record MemoryAccess(boolean unrestricted, Set<String> collections, Set<St
         sensitiveCollections = Set.copyOf(sensitiveCollections);
     }
 
+
     /** 아무것도 받지 않는다. 커넥터 에이전트와 에이전트를 알 수 없는 실행이 이것이다. */
     public static MemoryAccess none() {
         return new MemoryAccess(false, Set.of(), Set.of());
     }
+
 
     /** 사용자 본인이 화면에서 보는 범위다. 에이전트의 실행에는 쓰지 않는다. */
     public static MemoryAccess owner() {
         return new MemoryAccess(true, Set.of(), Set.of());
     }
 
+
     public static MemoryAccess of(Set<String> collections, Set<String> sensitiveCollections) {
         return new MemoryAccess(false, collections, sensitiveCollections);
     }
+
 
     /** 받는 것이 하나도 없는가. */
     public boolean isEmpty() {
         return !unrestricted && collections.isEmpty();
     }
 
+
     public boolean allows(String collection, MemorySensitivity sensitivity) {
         if (unrestricted) {
             return true;
         }
         return collections.contains(collection)
-                && (sensitivity == MemorySensitivity.NORMAL || sensitiveCollections.contains(collection));
+            && (sensitivity == MemorySensitivity.NORMAL || sensitiveCollections.contains(collection));
     }
 }

@@ -52,6 +52,7 @@ class HermesDecisionProviderTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private final CurrentUser user = new CurrentUser(41L, "user@example.com", "사용자A", 1L, UserRole.MEMBER);
 
+
     @BeforeEach
     void setUp() {
         when(readiness.ready(PROFILE)).thenReturn(true);
@@ -62,6 +63,7 @@ class HermesDecisionProviderTest {
         when(execution.provider()).thenReturn("actual-provider");
         when(execution.model()).thenReturn("actual-model");
     }
+
 
     @Test
     @DisplayName("새 session 에 후보만 보내고 요청 모델과 실제 모델을 따로 남긴다")
@@ -79,6 +81,7 @@ class HermesDecisionProviderTest {
         assertThat(response.provider().executionId()).isEqualTo(77L);
     }
 
+
     @Test
     @DisplayName("도구 차단을 확인하지 못하면 Hermes 실행을 제출하지 않는다")
     void refusesProfileWhoseReadinessIsNotConfirmed() {
@@ -87,6 +90,7 @@ class HermesDecisionProviderTest {
         verify(hermes, never()).submit(any());
         verify(executions, never()).startSystem(any(), anyString(), any(), any());
     }
+
 
     @Test
     @DisplayName("timeout 은 결과를 비우고 원격이 끝날 때까지 요청자의 실행 자리를 쥔다")
@@ -99,9 +103,10 @@ class HermesDecisionProviderTest {
         assertThat(response.result().failure()).isEqualTo(DecisionFailure.TIMEOUT);
         assertThat(response.result().orderedCandidateIds()).isEmpty();
         verify(limiter)
-                .holdUntilRemoteEnds(user.id(), execution.id(), BASE + "/p/" + PROFILE, PROFILE, "decision-run", false);
+            .holdUntilRemoteEnds(user.id(), execution.id(), BASE + "/p/" + PROFILE, PROFILE, "decision-run", false);
         verify(executions).fail(execution, "DECISION_TIMEOUT");
     }
+
 
     @Test
     @DisplayName("JSON 뒤 다른 글과 잘못된 계약은 원시 응답을 저장하지 않고 거절한다")
@@ -113,6 +118,7 @@ class HermesDecisionProviderTest {
         assertThat(evaluate(Duration.ofSeconds(1)).result().failure()).isEqualTo(DecisionFailure.INVALID_RESULT);
     }
 
+
     @Test
     @DisplayName("응답 전체의 JSON 코드 펜스 한 겹만 벗겨 같은 계약으로 검증한다")
     void acceptsOnlyOneOuterJsonFence() {
@@ -120,52 +126,55 @@ class HermesDecisionProviderTest {
         for (String language : List.of("json", "")) {
             complete("  ```" + language + "\n" + output + "\n```  ");
             assertThat(evaluate(Duration.ofSeconds(1)).result())
-                    .isEqualTo(DecisionFixtures.ordered(DecisionFixtures.state()));
+                .isEqualTo(DecisionFixtures.ordered(DecisionFixtures.state()));
         }
         for (String invalid : List.of(
-                "설명\n```json\n" + output + "\n```",
-                "```json\n" + output + "\n```\n추가 글",
-                "```json\n" + output + "\n```\n```json\n{}\n```",
-                "```json\n" + output + " {}\n```",
-                "```json\nprivate response that is not JSON\n```")) {
+            "설명\n```json\n" + output + "\n```",
+            "```json\n" + output + "\n```\n추가 글",
+            "```json\n" + output + "\n```\n```json\n{}\n```",
+            "```json\n" + output + " {}\n```",
+            "```json\nprivate response that is not JSON\n```")) {
             complete(invalid);
             assertThat(evaluate(Duration.ofSeconds(1)).result().failure()).isEqualTo(DecisionFailure.INVALID_RESULT);
         }
     }
 
+
     @Test
     @DisplayName("provider 오류 본문은 평가 기록으로 복제하지 않는다")
     void storesOnlyFailureCode() {
         when(hermes.awaitCompletion(any(), anyString()))
-                .thenReturn(new HermesRunResult(
-                        "decision-run", "session", "failed", null, null, null, "private error", null));
+            .thenReturn(new HermesRunResult(
+                "decision-run", "session", "failed", null, null, null, "private error", null));
         DecisionResponse response = evaluate(Duration.ofSeconds(1));
         assertThat(response.result().failure()).isEqualTo(DecisionFailure.PROVIDER_FAILED);
         assertThat(json.writeValueAsString(response)).doesNotContain("private error");
         verify(executions).failSystem(eq(execution), any(), anyString(), eq("DECISION_PROVIDER_FAILED"));
     }
 
+
     private void complete(String output) {
         when(hermes.awaitCompletion(any(), anyString()))
-                .thenReturn(HermesRunResult.of("decision-run", "fresh-session", "completed", output, null, null, null));
+            .thenReturn(HermesRunResult.of("decision-run", "fresh-session", "completed", output, null, null, null));
     }
+
 
     private DecisionResponse evaluate(Duration timeout) {
         ValueEvaluationProperties properties = new ValueEvaluationProperties(
-                true, PROFILE, "requested-provider", "requested-model", "high", timeout, CostMode.SUBSCRIPTION);
+            true, PROFILE, "requested-provider", "requested-model", "high", timeout, CostMode.SUBSCRIPTION);
         HermesProperties runtime = new HermesProperties(null, BASE, "synthetic", BASE, null, null, null, null);
         HermesDecisionProvider provider = new HermesDecisionProvider(
-                properties,
-                runtime,
-                hermes,
-                readiness,
-                defaults,
-                visibility,
-                executions,
-                limiter,
-                json,
-                new VirtualThreadBackgroundTasks());
+            properties,
+            runtime,
+            hermes,
+            readiness,
+            defaults,
+            visibility,
+            executions,
+            limiter,
+            json,
+            new VirtualThreadBackgroundTasks());
         return new ValueEvaluator()
-                .evaluate(DecisionFixtures.state(), ValueEvaluator.QUESTIONS, provider, new DecisionRequest(user));
+            .evaluate(DecisionFixtures.state(), ValueEvaluator.QUESTIONS, provider, new DecisionRequest(user));
     }
 }

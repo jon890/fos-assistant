@@ -51,10 +51,12 @@ class WorkspaceAdminControllerTest {
     @Autowired
     Clock clock;
 
+
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
     }
+
 
     @Test
     @DisplayName("MEMBER 역할은 403 이다")
@@ -64,6 +66,7 @@ class WorkspaceAdminControllerTest {
         mvc(root.toString()).perform(get("/api/v1/admin/workspaces")).andExpect(status().isForbidden());
     }
 
+
     @Test
     @DisplayName("관리자는 공간마다 용량을 받고 파일 이름은 응답에 없다")
     void letsAdminReadUsageWithoutFileNames() throws Exception {
@@ -72,17 +75,18 @@ class WorkspaceAdminControllerTest {
         signIn(ADMIN);
 
         mvc(root.toString())
-                .perform(get("/api/v1/admin/workspaces"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.available").value(true))
-                .andExpect(jsonPath("$.spaces.length()").value(1))
-                .andExpect(jsonPath("$.spaces[0].kind").value("USER"))
-                .andExpect(jsonPath("$.spaces[0].id").value(301))
-                .andExpect(jsonPath("$.spaces[0].bytes").value(42))
-                .andExpect(jsonPath("$.spaces[0].entries").value(1))
-                .andExpect(jsonPath("$.spaces[0].partial").value(false))
-                .andExpect(content().string(not(containsString("secret-plan"))));
+            .perform(get("/api/v1/admin/workspaces"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.available").value(true))
+            .andExpect(jsonPath("$.spaces.length()").value(1))
+            .andExpect(jsonPath("$.spaces[0].kind").value("USER"))
+            .andExpect(jsonPath("$.spaces[0].id").value(301))
+            .andExpect(jsonPath("$.spaces[0].bytes").value(42))
+            .andExpect(jsonPath("$.spaces[0].entries").value(1))
+            .andExpect(jsonPath("$.spaces[0].partial").value(false))
+            .andExpect(content().string(not(containsString("secret-plan"))));
     }
+
 
     @Test
     @DisplayName("루트가 비면 관리자에게도 200 과 쓸 수 없음을 준다")
@@ -90,24 +94,26 @@ class WorkspaceAdminControllerTest {
         signIn(ADMIN);
 
         mvc("").perform(get("/api/v1/admin/workspaces"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.available").value(false))
-                .andExpect(jsonPath("$.spaces", empty()));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.available").value(false))
+            .andExpect(jsonPath("$.spaces", empty()));
     }
+
 
     private MockMvc mvc(String rootValue) {
         WorkspaceUsageService service = new WorkspaceUsageService(
-                LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(rootValue, "")),
-                userNames,
-                agents,
-                clock);
+            LiveProperties.fixed(WorkspaceProperties.class, new WorkspaceProperties(rootValue, "")),
+            userNames,
+            agents,
+            clock);
         return MockMvcBuilders.standaloneSetup(new WorkspaceAdminController(service, new CurrentUserProvider()))
-                .setControllerAdvice(new GlobalExceptionHandler())
-                .build();
+            .setControllerAdvice(new GlobalExceptionHandler())
+            .build();
     }
+
 
     private static void signIn(CurrentUser user) {
         SecurityContextHolder.getContext()
-                .setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
+            .setAuthentication(new UsernamePasswordAuthenticationToken(user, null, List.of()));
     }
 }

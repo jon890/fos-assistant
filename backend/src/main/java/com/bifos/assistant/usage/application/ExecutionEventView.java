@@ -11,19 +11,19 @@ import java.time.Instant;
  * 있다.
  */
 public record ExecutionEventView(
-        int sequence,
-        String eventType,
-        String toolName,
-        String subagentName,
-        String hermesSessionId,
-        Long durationMs,
-        Boolean failed,
-        String detail,
-        String model,
-        Long inputTokens,
-        Long outputTokens,
-        Instant occurredAt,
-        String subagentUsageStatus) {
+    int sequence,
+    String eventType,
+    String toolName,
+    String subagentName,
+    String hermesSessionId,
+    Long durationMs,
+    Boolean failed,
+    String detail,
+    String model,
+    Long inputTokens,
+    Long outputTokens,
+    Instant occurredAt,
+    String subagentUsageStatus) {
 
     /**
      * 사건 한 줄을 보는 사람에게 맞춰 옮긴다.
@@ -37,22 +37,23 @@ public record ExecutionEventView(
         return from(event, viewer, null);
     }
 
+
     static ExecutionEventView from(ExecutionEvent event, CurrentUser viewer, String subagentUsageStatus) {
         boolean hidden = event.eventType().isTool() && !ToolDetailPolicy.visibleTo(viewer, event.toolName());
         boolean internal = InternalValuePolicy.visibleTo(viewer);
         return new ExecutionEventView(
-                event.sequence(),
-                event.eventType().name(),
-                event.toolName(),
-                event.subagentName(),
-                event.hermesSessionId(),
-                event.durationMs(),
-                event.failed(),
-                hidden ? null : event.detail(),
-                internal ? event.model() : null,
-                internal ? event.inputTokens() : null,
-                internal ? event.outputTokens() : null,
-                event.occurredAt(),
-                subagentUsageStatus);
+            event.sequence(),
+            event.eventType().name(),
+            event.toolName(),
+            event.subagentName(),
+            event.hermesSessionId(),
+            event.durationMs(),
+            event.failed(),
+            hidden ? null : event.detail(),
+            internal ? event.model() : null,
+            internal ? event.inputTokens() : null,
+            internal ? event.outputTokens() : null,
+            event.occurredAt(),
+            subagentUsageStatus);
     }
 }

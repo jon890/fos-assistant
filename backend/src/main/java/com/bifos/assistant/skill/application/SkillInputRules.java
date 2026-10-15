@@ -28,7 +28,7 @@ final class SkillInputRules {
         }
         if (skillMd.length() > MAX_CHARS_PER_FILE) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "SKILL.md can be at most " + MAX_CHARS_PER_FILE + " characters");
+                ErrorCode.VALIDATION_FAILED, "SKILL.md can be at most " + MAX_CHARS_PER_FILE + " characters");
         }
         SkillFrontmatter frontmatter = SkillFrontmatter.parse(skillMd);
         if (!name.equals(frontmatter.name())) {
@@ -36,8 +36,8 @@ final class SkillInputRules {
         }
         if (frontmatter.rawDescriptionLength() > MAX_DESCRIPTION_CHARS) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "SKILL.md description can be at most " + MAX_DESCRIPTION_CHARS + " characters");
+                ErrorCode.VALIDATION_FAILED,
+                "SKILL.md description can be at most " + MAX_DESCRIPTION_CHARS + " characters");
         }
         if (!frontmatter.hasBody()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "SKILL.md must have content after the frontmatter");
@@ -45,11 +45,12 @@ final class SkillInputRules {
         // Hermes 는 이 칸에 적힌 이름으로 profile 의 환경 값과 파일을 셸 실행 공간에 넣는다(ADR-086).
         if (frontmatter.requestsSecrets()) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "SKILL.md frontmatter must not request environment values or credential files");
+                ErrorCode.VALIDATION_FAILED,
+                "SKILL.md frontmatter must not request environment values or credential files");
         }
         return frontmatter;
     }
+
 
     /**
      * 새 버전에 함께 실리는 기존 스킬 가운데 비밀 요청 칸을 가진 것이 있으면 거절한다(ADR-086). 저장 검사가 생기기 전에
@@ -58,18 +59,19 @@ final class SkillInputRules {
      */
     static void requireNoStoredSecretRequests(Map<String, SkillBundle> next, String saving) {
         List<String> names = next.values().stream()
-                .filter(bundle -> !bundle.name().equals(saving))
-                .filter(bundle -> SkillFrontmatter.storedRequestsSecrets(bundle.skillMd()))
-                .map(SkillBundle::name)
-                .sorted()
-                .toList();
+            .filter(bundle -> !bundle.name().equals(saving))
+            .filter(bundle -> SkillFrontmatter.storedRequestsSecrets(bundle.skillMd()))
+            .map(SkillBundle::name)
+            .sorted()
+            .toList();
         if (!names.isEmpty()) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED,
-                    "uploaded skills request environment values or credential files; fix or delete them first: "
-                            + String.join(", ", names));
+                ErrorCode.VALIDATION_FAILED,
+                "uploaded skills request environment values or credential files; fix or delete them first: "
+                    + String.join(", ", names));
         }
     }
+
 
     /** 경로 규칙과 수와 중복, 다른 경로의 디렉터리인 경로를 본다. 본문이 온 파일은 글자 수도 본다. */
     static List<SkillFileInput> requireFiles(List<SkillFileInput> files) {
@@ -86,13 +88,14 @@ final class SkillInputRules {
             paths.add(input.path());
             if (input.content() != null && input.content().length() > MAX_CHARS_PER_FILE) {
                 throw new ApiException(
-                        ErrorCode.VALIDATION_FAILED,
-                        "a skill file can be at most " + MAX_CHARS_PER_FILE + " characters: " + input.path());
+                    ErrorCode.VALIDATION_FAILED,
+                    "a skill file can be at most " + MAX_CHARS_PER_FILE + " characters: " + input.path());
             }
         }
         SkillFilePaths.requireFileSet(paths);
         return inputs;
     }
+
 
     /** 본문이 빠진 파일을 지금 버전에서 채우고, 채운 뒤의 합계 크기를 본다. */
     static SkillBundle bundleOf(String name, String skillMd, List<SkillFileInput> inputs, SkillBundle current) {
@@ -108,8 +111,8 @@ final class SkillInputRules {
                 content = currentFiles.get(input.path());
                 if (content == null) {
                     throw new ApiException(
-                            ErrorCode.VALIDATION_FAILED,
-                            "no current content to keep for the skill file: " + input.path());
+                        ErrorCode.VALIDATION_FAILED,
+                        "no current content to keep for the skill file: " + input.path());
                 }
             }
             totalBytes += utf8Bytes(content);
@@ -117,10 +120,11 @@ final class SkillInputRules {
         }
         if (totalBytes > MAX_TOTAL_BYTES) {
             throw new ApiException(
-                    ErrorCode.VALIDATION_FAILED, "a skill can be at most " + MAX_TOTAL_BYTES + " bytes in total");
+                ErrorCode.VALIDATION_FAILED, "a skill can be at most " + MAX_TOTAL_BYTES + " bytes in total");
         }
         return new SkillBundle(name, skillMd, files);
     }
+
 
     static long utf8Bytes(String value) {
         return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;

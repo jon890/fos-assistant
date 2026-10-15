@@ -34,23 +34,25 @@ public class SubagentSessionController {
 
     private final SubagentSessionRegistrar registrar;
 
+
     @PostMapping("/internal/hermes/session-bindings/subagent")
     public ResponseEntity<SubagentRegistrationResponse> register(
-            @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
+        @AuthenticationPrincipal Object principal, @RequestBody(required = false) String body) {
         if (!(principal instanceof McpPrincipal mcp)) {
             throw reject("MCP 토큰으로 인증한 요청이 아니다");
         }
         SubagentRegistration registration = SubagentRegistration.verify(read(body), mcp.tokenHash());
         SubagentRegistrationResult result = registrar.register(
-                mcp.profileName(),
-                registration.parentRootSessionId(),
-                registration.parentSessionId(),
-                registration.childSessionId());
+            mcp.profileName(),
+            registration.parentRootSessionId(),
+            registration.parentSessionId(),
+            registration.childSessionId());
         return switch (result) {
             case CREATED -> ResponseEntity.status(HttpStatus.CREATED).body(new SubagentRegistrationResponse("created"));
             case EXISTS -> ResponseEntity.ok(new SubagentRegistrationResponse("exists"));
         };
     }
+
 
     private static JsonNode read(String body) {
         if (body == null || body.isBlank()) {
@@ -62,6 +64,7 @@ public class SubagentSessionController {
             throw reject("본문이 JSON 이 아니다");
         }
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 이유를 가리지 않고 같다. */
     private static ApiException reject(String reason) {

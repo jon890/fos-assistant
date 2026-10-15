@@ -77,14 +77,15 @@ public class FollowUpService {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
+
     // 생성자를 직접 쓴다. 저장만 감싸는 트랜잭션을 여기서 만든다.
     public FollowUpService(
-            FollowUpRepository followUps,
-            ConversationAccess conversations,
-            ConversationPublicIdLookup conversationIds,
-            DecisionFeedbackRecorder feedback,
-            PlatformTransactionManager transactionManager,
-            Clock clock) {
+        FollowUpRepository followUps,
+        ConversationAccess conversations,
+        ConversationPublicIdLookup conversationIds,
+        DecisionFeedbackRecorder feedback,
+        PlatformTransactionManager transactionManager,
+        Clock clock) {
         this.followUps = followUps;
         this.conversations = conversations;
         this.conversationIds = conversationIds;
@@ -93,17 +94,19 @@ public class FollowUpService {
         this.clock = clock;
     }
 
+
     /**
      * 같은 할 일인지 가르는 열쇠다. NFC 로 맞추고, 앞뒤 공백을 지우고, 연속 공백을 하나로 줄이고, 소문자로 바꾼 글의 SHA-256
      * 16진수다. 사람이 더하는 경로와 에이전트가 제안하는 경로가 모두 이 함수를 쓴다.
      */
     public static String titleKey(String title) {
         String normalized = Normalizer.normalize(title, Normalizer.Form.NFC)
-                .strip()
-                .replaceAll("\\s+", " ")
-                .toLowerCase(Locale.ROOT);
+            .strip()
+            .replaceAll("\\s+", " ")
+            .toLowerCase(Locale.ROOT);
         return Sha256.hex(normalized);
     }
+
 
     /**
      * 그 사용자에게 같은 제목의 열린 할 일({@code PROPOSED}, {@code OPEN})이 있는지다. 먼저 살펴보기의 문제 후보가 이미 챙기는 일인지
@@ -115,15 +118,17 @@ public class FollowUpService {
             return false;
         }
         return followUps
-                .findByUserIdAndTitleKeyAndOpenMarker(userId, titleKey(title.strip()), FollowUp.OPEN_MARKER)
-                .isPresent();
+            .findByUserIdAndTitleKeyAndOpenMarker(userId, titleKey(title.strip()), FollowUp.OPEN_MARKER)
+            .isPresent();
     }
+
 
     /** 끝나지 않은 할 일을 만든 순서로 낸다. */
     @Transactional(readOnly = true)
     public List<FollowUpSnapshot> list(CurrentUser user) {
         return openAndProposedOf(user.id());
     }
+
 
     /**
      * 그 사용자의 {@code PROPOSED} 와 {@code OPEN} 을 만든 순서로 낸다. 먼저 알리기의 판정이 읽는다. 연결한 대화를 지웠으면 그 줄의
@@ -134,6 +139,7 @@ public class FollowUpService {
         return snapshots(followUps.findByUserIdAndStatusInOrderByIdAsc(userId, LISTED));
     }
 
+
     /**
      * 사람이 직접 더한다. 바로 {@code OPEN} 이다.
      *
@@ -143,27 +149,27 @@ public class FollowUpService {
     public FollowUpSnapshot create(CurrentUser user, NewFollowUp input) {
         String title = requireTitle(input.title());
         String key = titleKey(title);
-        Long conversationId =
-                input.conversationId() == null ? null : conversations.requireOwnId(user, input.conversationId());
+        Long conversationId = input.conversationId() == null ? null : conversations.requireOwnId(user, input.conversationId());
         Instant now = clock.instant();
         Created result;
         try {
             result = transactions.execute(status -> openTitle(user, key, now)
-                    .orElseGet(() -> new Created(
-                            followUps.saveAndFlush(FollowUp.opened(
-                                    user.id(), conversationId, title, key, input.dueAt(), input.waiting(), now)),
-                            "created")));
+                .orElseGet(() -> new Created(
+                    followUps.saveAndFlush(FollowUp.opened(
+                        user.id(), conversationId, title, key, input.dueAt(), input.waiting(), now)),
+                    "created")));
         } catch (DataIntegrityViolationException ex) {
             // 같은 제목이 동시에 열렸다. 먼저 저장된 줄을 돌려준다.
             result = transactions.execute(status -> openTitle(user, key, now).orElseThrow(() -> ex));
         }
         log.info(
-                "follow-up {} userId={} followUpId={}",
-                result.action(),
-                user.id(),
-                result.followUp().publicId());
+            "follow-up {} userId={} followUpId={}",
+            result.action(),
+            user.id(),
+            result.followUp().publicId());
         return snapshot(result.followUp());
     }
+
 
     /**
      * 에이전트가 대화 중에 할 일을 제안한다. 새 줄은 {@code PROPOSED} 다. 규칙은 {@code docs/features/attention.md} 의 「제안 억제」
@@ -179,7 +185,7 @@ public class FollowUpService {
      * @param dueAt 기한. 없으면 null
      */
     public FollowUpProposalOutcome propose(
-            CurrentUser owner, Long conversationId, Long executionId, String title, Instant dueAt, boolean waiting) {
+        CurrentUser owner, Long conversationId, Long executionId, String title, Instant dueAt, boolean waiting) {
         String stripped = requireTitle(title);
         String key = titleKey(stripped);
         Instant now = clock.instant();
@@ -187,12 +193,12 @@ public class FollowUpService {
         try {
             outcome = transactions.execute(status -> {
                 if (followUps
-                        .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
-                        .isPresent()) {
+                    .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
+                    .isPresent()) {
                     return FollowUpProposalOutcome.DUPLICATE;
                 }
                 if (followUps.existsByConversationIdAndTitleKeyAndStatusAndClosedAtAfter(
-                        conversationId, key, FollowUpStatus.REJECTED, now.minus(REJECTED_COOLDOWN))) {
+                    conversationId, key, FollowUpStatus.REJECTED, now.minus(REJECTED_COOLDOWN))) {
                     return FollowUpProposalOutcome.DECLINED_BEFORE;
                 }
                 if (openProposalCount(owner, conversationId, now) >= MAX_OPEN_PROPOSALS_PER_CONVERSATION) {
@@ -202,7 +208,7 @@ public class FollowUpService {
                     return FollowUpProposalOutcome.TOO_MANY_IN_RUN;
                 }
                 FollowUp saved = followUps.saveAndFlush(
-                        FollowUp.proposed(owner.id(), conversationId, executionId, stripped, key, dueAt, waiting, now));
+                    FollowUp.proposed(owner.id(), conversationId, executionId, stripped, key, dueAt, waiting, now));
                 feedback.record(feedbackOf(saved, FeedbackEventType.SURFACED, FeedbackActor.AGENT, now));
                 return FollowUpProposalOutcome.CREATED;
             });
@@ -210,8 +216,8 @@ public class FollowUpService {
             // 같은 제목이 동시에 열려 유일 제약에 걸렸거나, MySQL 이 같은 유일 키의 동시 삽입을 교착으로 끊었다.
             // 먼저 저장된 줄이 있을 때만 같은 할 일로 답한다. 없으면 다른 까닭의 저장 실패라 그대로 던진다.
             boolean saved = Boolean.TRUE.equals(transactions.execute(status -> followUps
-                    .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
-                    .isPresent()));
+                .findByUserIdAndTitleKeyAndOpenMarker(owner.id(), key, FollowUp.OPEN_MARKER)
+                .isPresent()));
             if (!saved) {
                 throw ex;
             }
@@ -221,14 +227,16 @@ public class FollowUpService {
         return outcome;
     }
 
+
     /** 보통 대화는 모든 열린 제안, 점검 대화는 최근 7일의 제안만 센다. */
     private long openProposalCount(CurrentUser owner, Long conversationId, Instant now) {
         if (conversations.requireOwn(owner, conversationId).purpose() == ConversationPurpose.CHECK) {
             return followUps.countByConversationIdAndStatusAndCreatedAtGreaterThanEqual(
-                    conversationId, FollowUpStatus.PROPOSED, now.minus(CHECK_PROPOSAL_WINDOW));
+                conversationId, FollowUpStatus.PROPOSED, now.minus(CHECK_PROPOSAL_WINDOW));
         }
         return followUps.countByConversationIdAndStatus(conversationId, FollowUpStatus.PROPOSED);
     }
+
 
     /**
      * 끝나지 않은 줄의 제목, 기한, 기다리는 중을 고친다. 바꾼 제목이 같은 사용자의 다른 열린 줄과 같으면 409 다.
@@ -247,11 +255,11 @@ public class FollowUpService {
                 String key = newTitle == null ? followUp.titleKey() : titleKey(newTitle);
                 if (!key.equals(followUp.titleKey())) {
                     followUps
-                            .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
-                            .filter(other -> !other.id().equals(followUp.id()))
-                            .ifPresent(other -> {
-                                throw sameTitleOpen();
-                            });
+                        .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
+                        .filter(other -> !other.id().equals(followUp.id()))
+                        .ifPresent(other -> {
+                            throw sameTitleOpen();
+                        });
                 }
                 Instant dueAt = patch.dueAtPresent() ? patch.dueAt() : followUp.dueAt();
                 boolean waiting = patch.waiting() == null ? followUp.waiting() : patch.waiting();
@@ -260,7 +268,7 @@ public class FollowUpService {
                 FollowUp revised = followUps.saveAndFlush(followUp);
                 if (revised.proposedByAgent() && !changed.isEmpty()) {
                     feedback.record(feedbackOf(revised, FeedbackEventType.EDITED, FeedbackActor.USER, now)
-                            .changed(changed));
+                        .changed(changed));
                 }
                 return revised;
             });
@@ -272,34 +280,39 @@ public class FollowUpService {
         return snapshot(saved);
     }
 
+
     /** 제안을 받아들인다. {@code PROPOSED} 만 받는다. */
     public FollowUpSnapshot accept(CurrentUser user, UUID id) {
         return transition(user, id, "accepted", FollowUpStatus.PROPOSED, FollowUp::accept, FeedbackEventType.ACCEPTED);
     }
+
 
     /** 제안을 거절한다. {@code PROPOSED} 만 받는다. */
     public FollowUpSnapshot reject(CurrentUser user, UUID id) {
         return transition(user, id, "rejected", FollowUpStatus.PROPOSED, FollowUp::reject, FeedbackEventType.REJECTED);
     }
 
+
     /** 끝낸다. {@code OPEN} 만 받는다. 제안에서 온 할 일이면 사용자가 그 일을 해낸 실행 결과로 기록한다. */
     public FollowUpSnapshot done(CurrentUser user, UUID id) {
         return transition(user, id, "done", FollowUpStatus.OPEN, FollowUp::done, FeedbackEventType.EXECUTION_SUCCEEDED);
     }
+
 
     /** 그만둔다. {@code OPEN} 만 받는다. 제안에서 온 할 일이면 받아들인 뒤 그만둔 것으로 기록한다. */
     public FollowUpSnapshot drop(CurrentUser user, UUID id) {
         return transition(user, id, "dropped", FollowUpStatus.OPEN, FollowUp::drop, FeedbackEventType.DISMISSED);
     }
 
+
     /** @param event 제안에서 온 할 일이면 남길 판단 피드백 사건 */
     private FollowUpSnapshot transition(
-            CurrentUser user,
-            UUID id,
-            String action,
-            FollowUpStatus from,
-            BiConsumer<FollowUp, Instant> move,
-            FeedbackEventType event) {
+        CurrentUser user,
+        UUID id,
+        String action,
+        FollowUpStatus from,
+        BiConsumer<FollowUp, Instant> move,
+        FeedbackEventType event) {
         Instant now = clock.instant();
         FollowUp saved = transactions.execute(status -> {
             FollowUp followUp = requireOwn(user, id);
@@ -310,13 +323,14 @@ public class FollowUpService {
             FollowUp moved = followUps.saveAndFlush(followUp);
             if (moved.proposedByAgent()) {
                 feedback.record(
-                        feedbackOf(moved, event, FeedbackActor.USER, now).reason(action.toUpperCase(Locale.ROOT)));
+                    feedbackOf(moved, event, FeedbackActor.USER, now).reason(action.toUpperCase(Locale.ROOT)));
             }
             return moved;
         });
         log.info("follow-up {} userId={} followUpId={}", action, user.id(), saved.publicId());
         return snapshot(saved);
     }
+
 
     /**
      * 같은 제목의 열린 줄을 찾아, {@code PROPOSED} 면 받아들인다. 트랜잭션 안에서 부른다.
@@ -325,38 +339,42 @@ public class FollowUpService {
      */
     private Optional<Created> openTitle(CurrentUser user, String key, Instant now) {
         return followUps
-                .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
-                .map(existing -> {
-                    if (existing.status() != FollowUpStatus.PROPOSED) {
-                        return new Created(existing, "reused");
-                    }
-                    existing.accept(now);
-                    FollowUp accepted = followUps.saveAndFlush(existing);
-                    feedback.record(feedbackOf(accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now)
-                            .reason("DIRECT_CREATE"));
-                    return new Created(accepted, "accepted");
-                });
+            .findByUserIdAndTitleKeyAndOpenMarker(user.id(), key, FollowUp.OPEN_MARKER)
+            .map(existing -> {
+                if (existing.status() != FollowUpStatus.PROPOSED) {
+                    return new Created(existing, "reused");
+                }
+                existing.accept(now);
+                FollowUp accepted = followUps.saveAndFlush(existing);
+                feedback.record(feedbackOf(accepted, FeedbackEventType.ACCEPTED, FeedbackActor.USER, now)
+                    .reason("DIRECT_CREATE"));
+                return new Created(accepted, "accepted");
+            });
     }
+
 
     /**
      * 더하기가 돌려줄 줄과 로그에 적을 동작이다.
      *
      * @param action 새로 만들었으면 {@code created}, 같은 열린 줄을 돌려줬으면 {@code reused}, 제안을 받아들였으면
-     *     {@code accepted}
+     * {@code accepted}
      */
-    private record Created(FollowUp followUp, String action) {}
+    private record Created(FollowUp followUp, String action) {
+    }
+
 
     /**
      * 판단 피드백 사건이다. 열쇠는 지금 화면의 {@code itemKey} 와 같고, 판은 제목 열쇠다. 제목은 담지 않는다. 트랜잭션 안에서 부르면 커밋한
      * 뒤에 남는다.
      */
     private static FeedbackEntry feedbackOf(
-            FollowUp followUp, FeedbackEventType type, FeedbackActor actor, Instant now) {
+        FollowUp followUp, FeedbackEventType type, FeedbackActor actor, Instant now) {
         return FeedbackEntry.of(followUp.userId(), FeedbackSubjectType.FOLLOW_UP, followUp.publicId(), type, actor, now)
-                .conversation(followUp.conversationId())
-                .originExecution(followUp.proposedByExecutionId())
-                .version(followUp.titleKey());
+            .conversation(followUp.conversationId())
+            .originExecution(followUp.proposedByExecutionId())
+            .version(followUp.titleKey());
     }
+
 
     /** 고치기 전과 견주어 바뀐 칸 이름이다. 값은 담지 않는다. */
     private static List<String> changedFields(FollowUp before, String titleKey, Instant dueAt, boolean waiting) {
@@ -373,12 +391,14 @@ public class FollowUpService {
         return changed;
     }
 
+
     /** 주인의 할 일을 잠그고 읽는다. 같은 줄을 바꾸는 요청이 서로 덮지 않게 한다. 트랜잭션 안에서 부른다. */
     private FollowUp requireOwn(CurrentUser user, UUID id) {
         return followUps
-                .findByPublicIdAndUserIdForUpdate(id, user.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.FOLLOW_UP_NOT_FOUND, "no such follow-up"));
+            .findByPublicIdAndUserIdForUpdate(id, user.id())
+            .orElseThrow(() -> new ApiException(ErrorCode.FOLLOW_UP_NOT_FOUND, "no such follow-up"));
     }
+
 
     /** 앞뒤 공백을 지운 제목이다. 비었거나 {@link #TITLE_MAX} 자를 넘으면 400 이다. */
     private static String requireTitle(String title) {
@@ -390,38 +410,42 @@ public class FollowUpService {
         return stripped;
     }
 
+
     private static ApiException notInState() {
         return new ApiException(ErrorCode.FOLLOW_UP_STATE_CONFLICT, "follow-up is not in a state for this action");
     }
+
 
     private static ApiException sameTitleOpen() {
         return new ApiException(ErrorCode.FOLLOW_UP_STATE_CONFLICT, "another open follow-up has this title");
     }
 
+
     private FollowUpSnapshot snapshot(FollowUp followUp) {
         return snapshots(List.of(followUp)).getFirst();
     }
 
+
     /** 대화 번호를 한 번에 공개 식별자로 바꾼다. 지운 대화는 빠지므로 그 줄의 공개 식별자는 null 이다. */
     private List<FollowUpSnapshot> snapshots(List<FollowUp> rows) {
         Map<Long, UUID> publicIds = conversationIds.activePublicIdsOf(rows.stream()
-                .map(FollowUp::conversationId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet()));
+            .map(FollowUp::conversationId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet()));
         return rows.stream()
-                .map(row -> new FollowUpSnapshot(
-                        row.publicId(),
-                        row.conversationId(),
-                        row.conversationId() == null ? null : publicIds.get(row.conversationId()),
-                        row.title(),
-                        row.dueAt(),
-                        row.waiting(),
-                        row.status(),
-                        row.proposedByAgent(),
-                        row.createdAt(),
-                        row.updatedAt(),
-                        row.acceptedAt(),
-                        row.closedAt()))
-                .toList();
+            .map(row -> new FollowUpSnapshot(
+                row.publicId(),
+                row.conversationId(),
+                row.conversationId() == null ? null : publicIds.get(row.conversationId()),
+                row.title(),
+                row.dueAt(),
+                row.waiting(),
+                row.status(),
+                row.proposedByAgent(),
+                row.createdAt(),
+                row.updatedAt(),
+                row.acceptedAt(),
+                row.closedAt()))
+            .toList();
     }
 }

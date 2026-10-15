@@ -20,6 +20,7 @@ class FeedbackEventWriter {
     private final AgentExecutionRepository executions;
     private final FeedbackConversations conversations;
 
+
     /**
      * 부르는 쪽 트랜잭션의 커밋 뒤에도 돌 수 있게 늘 새 트랜잭션을 연다. 묶인 대화를 이미 지웠으면 넣지 않는다. 대화를 지운 뒤 끝난 동작의
      * 사건이 지운 대화에 남지 않게 한다.
@@ -33,28 +34,28 @@ class FeedbackEventWriter {
         events.save(event);
     }
 
+
     /** 실행 번호가 있으면 트리 루트로 바꾸고, 대화를 모르면 그 실행의 대화를 쓴다. */
     private FeedbackEvent toEvent(FeedbackEntry entry) {
-        Optional<AgentExecution> origin =
-                entry.originExecutionId() == null ? Optional.empty() : executions.findById(entry.originExecutionId());
+        Optional<AgentExecution> origin = entry.originExecutionId() == null ? Optional.empty() : executions.findById(entry.originExecutionId());
         // 실행 줄이 없으면 비운다. 없는 번호를 넣으면 FK 에 걸려 사건을 잃는다.
         Long rootExecutionId = origin.map(AgentExecution::treeRootId).orElse(null);
         Long conversationId = entry.conversationId() != null
-                ? entry.conversationId()
-                : origin.map(AgentExecution::conversationId).orElse(null);
+            ? entry.conversationId()
+            : origin.map(AgentExecution::conversationId).orElse(null);
         return FeedbackEvent.of(
-                entry.userId(),
-                entry.subjectType(),
-                entry.subjectKey(),
-                entry.eventType(),
-                entry.actor(),
-                conversationId,
-                rootExecutionId,
-                entry.sourceCheckId(),
-                entry.autonomyDecisionId(),
-                entry.subjectVersion(),
-                entry.reasonCode(),
-                entry.changedFields(),
-                entry.occurredAt());
+            entry.userId(),
+            entry.subjectType(),
+            entry.subjectKey(),
+            entry.eventType(),
+            entry.actor(),
+            conversationId,
+            rootExecutionId,
+            entry.sourceCheckId(),
+            entry.autonomyDecisionId(),
+            entry.subjectVersion(),
+            entry.reasonCode(),
+            entry.changedFields(),
+            entry.occurredAt());
     }
 }

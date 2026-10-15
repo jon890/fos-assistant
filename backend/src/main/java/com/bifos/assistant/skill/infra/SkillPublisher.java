@@ -25,18 +25,22 @@ public class SkillPublisher {
     private final HermesSkillClient skills;
     private final HermesToolsetClient toolsets;
 
+
     public List<HermesSkill> list(String profile) {
         return skills.list(profile);
     }
+
 
     public void toggle(String profile, String name, boolean enabled) {
         skills.toggle(profile, name, enabled);
     }
 
+
     /** 그 에이전트의 API 실행에 {@code skills} toolset 이 켜져 있는가. */
     public boolean skillsToolsetEnabled(Agent agent) {
         return enabledToolsets(agent).contains(AgentToolPolicy.SKILLS);
     }
+
 
     /**
      * 그 경로를 {@code skills.external_dirs} 로 게시한다.
@@ -45,13 +49,13 @@ public class SkillPublisher {
      * 쓴다. 이미 켜져 있거나 빈 목록(마지막 스킬을 지움)을 게시할 때는 도구를 건드리지 않는다.
      *
      * @param connectorServers 그 에이전트에 붙은 커넥터의 MCP 서버 이름. 도구 목록을 쓸 때 함께 보낸다. 빠지면 대시보드가
-     *     거절한다(ADR-083)
+     * 거절한다(ADR-083)
      */
     public void publish(CurrentUser user, Agent agent, List<String> externalDirs, Set<String> connectorServers) {
-        List<String> apiServerToolsets =
-                externalDirs.isEmpty() ? null : toolsetsWithSkills(user, agent, connectorServers);
+        List<String> apiServerToolsets = externalDirs.isEmpty() ? null : toolsetsWithSkills(user, agent, connectorServers);
         skills.publish(agent.hermesProfile(), externalDirs, apiServerToolsets, agent.sandboxOwner());
     }
+
 
     /**
      * {@code scripts/} 가 든 스킬의 버전을 게시한다. 실행 공간이 없는 profile 이면 대시보드가 거절한다.
@@ -62,15 +66,17 @@ public class SkillPublisher {
      * @param connectorServers 그 에이전트에 붙은 커넥터의 MCP 서버 이름
      */
     public void publishWithScripts(
-            CurrentUser user, Agent agent, List<String> externalDirs, Set<String> connectorServers) {
+        CurrentUser user, Agent agent, List<String> externalDirs, Set<String> connectorServers) {
         List<String> requested = requestedWithSkills(user, agent, enabledToolsets(agent), connectorServers);
         skills.publishRequiringSandbox(agent.hermesProfile(), externalDirs, requested, agent.sandboxOwner());
     }
+
 
     /** 그 에이전트의 API 실행에 셸 toolset {@code terminal} 이 켜져 있는가. */
     public boolean terminalEnabled(Agent agent) {
         return enabledToolsets(agent).contains(AgentToolPolicy.TERMINAL);
     }
+
 
     private List<String> toolsetsWithSkills(CurrentUser user, Agent agent, Set<String> connectorServers) {
         List<String> enabled = enabledToolsets(agent);
@@ -80,16 +86,18 @@ public class SkillPublisher {
         return requestedWithSkills(user, agent, enabled, connectorServers);
     }
 
+
     /** 지금 켜진 알려진 도구에 {@code skills} 를 (없으면) 더해 쓸 목록으로 판정한다. */
     private static List<String> requestedWithSkills(
-            CurrentUser user, Agent agent, List<String> enabled, Set<String> connectorServers) {
+        CurrentUser user, Agent agent, List<String> enabled, Set<String> connectorServers) {
         List<String> requested = new ArrayList<>(
-                enabled.stream().filter(AgentToolPolicy::isKnown).toList());
+            enabled.stream().filter(AgentToolPolicy::isKnown).toList());
         if (!requested.contains(AgentToolPolicy.SKILLS)) {
             requested.add(AgentToolPolicy.SKILLS);
         }
         return AgentToolPolicy.requestedForWrite(user, agent, requested, enabled, connectorServers);
     }
+
 
     private List<String> enabledToolsets(Agent agent) {
         return toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());

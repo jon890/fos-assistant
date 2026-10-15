@@ -52,6 +52,7 @@ class PersonRegistrarTest {
     @Autowired
     HermesProfileProvisioner profiles;
 
+
     @BeforeEach
     void setUp() {
         doNothing().when(profiles).provision(any());
@@ -59,6 +60,7 @@ class PersonRegistrarTest {
         people.deleteAll();
         agents.deleteAll();
     }
+
 
     @Test
     @DisplayName("새 사람을 더하면 행이 생기고 profile 이 만들어진다")
@@ -68,10 +70,11 @@ class PersonRegistrarTest {
         verify(profiles).provision(PROFILE);
         assertThat(added.enabled()).isTrue();
         assertThat(people.findByEmailAndEnabledTrue(EMAIL))
-                .get()
-                .extracting(AllowedPerson::displayName, AllowedPerson::hermesProfile)
-                .containsExactly(NAME, PROFILE);
+            .get()
+            .extracting(AllowedPerson::displayName, AllowedPerson::hermesProfile)
+            .containsExactly(NAME, PROFILE);
     }
+
 
     @Test
     @DisplayName("대문자가 섞인 주소도 소문자로 맞춰 넣는다")
@@ -81,20 +84,22 @@ class PersonRegistrarTest {
         assertThat(people.existsByEmail(EMAIL)).isTrue();
     }
 
+
     /** 반만 더해진 사람이 남으면 같은 주소로 다시 더할 수 없고 그 사람은 대화하지도 못한다. */
     @Test
     @DisplayName("profile 만들기가 실패하면 행이 남지 않는다")
     void leavesNoRowWhenProfileCreationFails() {
         doThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"))
-                .when(profiles)
-                .provision(PROFILE);
+            .when(profiles)
+            .provision(PROFILE);
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
         assertThat(people.existsByEmail(EMAIL)).isFalse();
     }
+
 
     @Test
     @DisplayName("이미 쓰는 이메일이면 거절하고 Hermes 를 부르지 않는다")
@@ -102,11 +107,12 @@ class PersonRegistrarTest {
         people.save(AllowedPerson.of(EMAIL, NAME, "already-taken", Instant.now()));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.PERSON_EMAIL_TAKEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.PERSON_EMAIL_TAKEN);
         verify(profiles, never()).provision(any());
     }
+
 
     @Test
     @DisplayName("허용 목록이 이미 쓰는 profile 이름이면 거절하고 Hermes 를 부르지 않는다")
@@ -114,11 +120,12 @@ class PersonRegistrarTest {
         people.save(AllowedPerson.of("uncle@example.com", "삼촌", PROFILE, Instant.now()));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.PERSON_PROFILE_TAKEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.PERSON_PROFILE_TAKEN);
         verify(profiles, never()).provision(any());
     }
+
 
     /**
      * 허용 목록에 없어도 에이전트가 그 profile 을 쓰고 있으면 거절한다.
@@ -130,20 +137,20 @@ class PersonRegistrarTest {
     @DisplayName("에이전트가 이미 쓰는 profile 이름이면 거절한다")
     void rejectsProfileNameAlreadyUsedByAgent() {
         agents.save(Agent.of(
-                "uncle",
-                "삼촌 비서",
-                PROFILE,
-                "https://hermes-listener.example.com/p/" + PROFILE,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.GROUP,
-                null,
-                Instant.now()));
+            "uncle",
+            "삼촌 비서",
+            PROFILE,
+            "https://hermes-listener.example.com/p/" + PROFILE,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.GROUP,
+            null,
+            Instant.now()));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.PERSON_PROFILE_TAKEN);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.PERSON_PROFILE_TAKEN);
         verify(profiles, never()).provision(any());
     }
 }

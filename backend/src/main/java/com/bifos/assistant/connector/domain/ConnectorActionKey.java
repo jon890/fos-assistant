@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.util.Sha256;
 public record ConnectorActionKey(String value) {
     private static final String VERSION_LINE = "v1-connector";
 
+
     /**
      * 다섯 줄을 이 순서로 {@code "\n"} 하나로 이어 SHA-256 을 계산한다.
      *
@@ -20,13 +21,14 @@ public record ConnectorActionKey(String value) {
      */
     public static ConnectorActionKey of(String profileName, String rootSessionId, String sessionId, String toolCallId) {
         return new ConnectorActionKey(Sha256.hex(String.join(
-                "\n",
-                VERSION_LINE,
-                require("profileName", profileName),
-                require("rootSessionId", rootSessionId),
-                require("sessionId", sessionId),
-                require("toolCallId", toolCallId))));
+            "\n",
+            VERSION_LINE,
+            require("profileName", profileName),
+            require("rootSessionId", rootSessionId),
+            require("sessionId", sessionId),
+            require("toolCallId", toolCallId))));
     }
+
 
     private static String require(String name, String part) {
         if (part == null || part.isBlank()) {

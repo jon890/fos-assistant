@@ -36,6 +36,7 @@ class ProactiveCheckInput {
     private final ProactiveCheck check;
     private final ProactiveCheckRun.Deps deps;
 
+
     ProactiveCheckInput(CurrentUser owner, Long agentId, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
         this.owner = owner;
         this.agentId = agentId;
@@ -43,32 +44,33 @@ class ProactiveCheckInput {
         this.deps = deps;
     }
 
+
     String buildInput(Instant now) {
         Long conversationId = check.conversationId();
-        StringBuilder text =
-                new StringBuilder(OPENING).append("\n\n지금 시각: ").append(now).append("\n\n변화 신호\n");
+        StringBuilder text = new StringBuilder(OPENING).append("\n\n지금 시각: ").append(now).append("\n\n변화 신호\n");
         Optional<ProactiveCheck> last = deps.checks()
-                .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
-                        conversationId, CheckStatus.RUNNING);
+            .findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
+                conversationId, CheckStatus.RUNNING);
         if (last.isEmpty()) {
             text.append("- 지난 살펴보기: 처음\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")
-                    .append(UNKNOWN)
-                    .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
-                    .append(UNKNOWN);
+                .append(UNKNOWN)
+                .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
+                .append(UNKNOWN);
         } else {
             ProactiveCheck previous = last.get();
             Instant endedAt = previous.finishedAt();
             text.append("- 지난 살펴보기: ")
-                    .append(endedAt == null ? previous.startedAt() : endedAt)
-                    .append("\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")
-                    .append(userMessagesAfter(endedAt))
-                    .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
-                    .append(memorySignal(previous));
+                .append(endedAt == null ? previous.startedAt() : endedAt)
+                .append("\n- 그 뒤 사용자가 이 대화에 보낸 메시지: ")
+                .append(userMessagesAfter(endedAt))
+                .append("\n- Memory 문맥이 지난 살펴보기와 같은지: ")
+                .append(memorySignal(previous));
         }
         text.append("\n\n최근에 알린 발견\n").append(recentFindings(now));
         text.append("\n\n최근에 받아들인 문제 후보\n").append(recentProblems(now));
         return text.toString();
     }
+
 
     /** 그 시각 뒤 사용자가 점검 대화에 보낸 메시지 수. 시각이 없으면 「모름」 이다. */
     private String userMessagesAfter(Instant after) {
@@ -76,9 +78,10 @@ class ProactiveCheckInput {
             return UNKNOWN;
         }
         return deps.messages()
-                        .countByConversationIdAndRoleAndCreatedAtAfter(check.conversationId(), MessageRole.USER, after)
-                + "개";
+            .countByConversationIdAndRoleAndCreatedAtAfter(check.conversationId(), MessageRole.USER, after)
+            + "개";
     }
+
 
     /**
      * 지난 살펴보기의 루트 실행 줄에 적힌 문맥 지문과 이번 문맥의 지문을 견준다. 이번 지문은 실행 줄을 만들 때와 같은 두 메서드로 조립해
@@ -89,17 +92,18 @@ class ProactiveCheckInput {
             return UNKNOWN;
         }
         String before = deps.executions()
-                .findById(previous.rootExecutionId())
-                .map(AgentExecution::instructionsHash)
-                .orElse(null);
+            .findById(previous.rootExecutionId())
+            .map(AgentExecution::instructionsHash)
+            .orElse(null);
         String current = deps.contextAssembler()
-                .withResponseInstructions(deps.contextAssembler().assemble(owner, agentId))
-                .instructionsHash();
+            .withResponseInstructions(deps.contextAssembler().assemble(owner, agentId))
+            .instructionsHash();
         if (before == null || current == null) {
             return UNKNOWN;
         }
         return before.equals(current) ? "같음" : "바뀜";
     }
+
 
     /**
      * 최근에 알린 발견을 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다.
@@ -111,60 +115,61 @@ class ProactiveCheckInput {
      */
     private String recentFindings(Instant now) {
         List<ProactiveCheckFinding> recent = deps.findings()
-                .findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
-                        check.conversationId(),
-                        FindingKind.NEW,
-                        now.minus(deps.properties().current().digestWindow()),
-                        PageRequest.ofSize(deps.properties().current().digestMaxItems()));
+            .findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
+                check.conversationId(),
+                FindingKind.NEW,
+                now.minus(deps.properties().current().digestWindow()),
+                PageRequest.ofSize(deps.properties().current().digestMaxItems()));
         if (recent.isEmpty()) {
             return NO_RECENT_FINDINGS;
         }
-        Map<Long, ProactiveCheck> checksById =
-                deps
-                        .checks()
-                        .findAllById(recent.stream()
-                                .map(ProactiveCheckFinding::checkId)
-                                .distinct()
-                                .toList())
-                        .stream()
-                        .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
+        Map<Long, ProactiveCheck> checksById = deps
+            .checks()
+            .findAllById(recent.stream()
+                .map(ProactiveCheckFinding::checkId)
+                .distinct()
+                .toList())
+            .stream()
+            .collect(Collectors.toMap(ProactiveCheck::id, Function.identity()));
         Map<Long, FindingReaction> reactions = deps.reactions()
-                .current(
-                        owner.id(),
-                        recent.stream().map(ProactiveCheckFinding::id).toList());
+            .current(
+                owner.id(),
+                recent.stream().map(ProactiveCheckFinding::id).toList());
         Map<Long, String> countsByCheck = new HashMap<>();
         String lines = recent.stream()
-                .map(finding -> "- [" + finding.area() + "] " + orDash(finding.topicKey())
-                        + " · " + orDash(finding.title())
-                        + " · " + orDash(finding.sourceUrl())
-                        + " · 확인 " + (finding.checkedAt() == null ? UNKNOWN : DATE.format(finding.checkedAt()))
-                        + " · 그 뒤 사용자 메시지 "
-                        + countsByCheck.computeIfAbsent(
-                                finding.checkId(),
-                                id -> userMessagesAfter(Optional.ofNullable(checksById.get(id))
-                                        .map(ProactiveCheck::finishedAt)
-                                        .orElse(null)))
-                        + " · 반응 " + reactionLabel(reactions.get(finding.id())))
-                .collect(Collectors.joining("\n"));
+            .map(finding -> "- [" + finding.area() + "] " + orDash(finding.topicKey())
+                + " · " + orDash(finding.title())
+                + " · " + orDash(finding.sourceUrl())
+                + " · 확인 " + (finding.checkedAt() == null ? UNKNOWN : DATE.format(finding.checkedAt()))
+                + " · 그 뒤 사용자 메시지 "
+                + countsByCheck.computeIfAbsent(
+                    finding.checkId(),
+                    id -> userMessagesAfter(Optional.ofNullable(checksById.get(id))
+                        .map(ProactiveCheck::finishedAt)
+                        .orElse(null)))
+                + " · 반응 " + reactionLabel(reactions.get(finding.id())))
+            .collect(Collectors.joining("\n"));
         return ExternalData.wrap(lines);
     }
+
 
     /** 최근에 받아들인 문제 후보를 한 줄씩 적고 {@code <external-data>} 로 감싼다. 모델이 쓴 글에서 온 것이기 때문이다. */
     private String recentProblems(Instant now) {
         List<ProactiveCheckProblem> recent = deps.problems()
-                .findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
-                        check.conversationId(),
-                        ProblemStatus.ACCEPTED,
-                        now.minus(deps.properties().current().digestWindow()),
-                        PageRequest.ofSize(deps.properties().current().digestMaxItems()));
+            .findByConversationIdAndStatusAndCreatedAtAfterOrderByIdDesc(
+                check.conversationId(),
+                ProblemStatus.ACCEPTED,
+                now.minus(deps.properties().current().digestWindow()),
+                PageRequest.ofSize(deps.properties().current().digestMaxItems()));
         if (recent.isEmpty()) {
             return NO_RECENT_PROBLEMS;
         }
         String lines = recent.stream()
-                .map(problem -> "- " + orDash(problem.problemKey()) + " · " + orDash(problem.problem()))
-                .collect(Collectors.joining("\n"));
+            .map(problem -> "- " + orDash(problem.problemKey()) + " · " + orDash(problem.problem()))
+            .collect(Collectors.joining("\n"));
         return ExternalData.wrap(lines);
     }
+
 
     /** 입력에 싣는 지금 반응의 낱말이다. 반응이 없으면 「없음」 이다. */
     private static String reactionLabel(FindingReaction reaction) {
@@ -177,6 +182,7 @@ class ProactiveCheckInput {
             case DISMISSED -> "관심 없음";
         };
     }
+
 
     private static String orDash(String value) {
         return value == null || value.isBlank() ? "-" : value;

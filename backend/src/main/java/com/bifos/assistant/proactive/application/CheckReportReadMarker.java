@@ -14,10 +14,11 @@ public class CheckReportReadMarker implements CheckReportReads {
 
     private final ProactiveCheckRepository checks;
 
+
     @Override
     @Transactional
     public void markRead(Long userId, Long conversationId, Instant now) {
         checks.findByUserIdAndConversationIdAndReportIsNotNullAndReportOpenedAtIsNull(userId, conversationId)
-                .forEach(check -> check.openReport(now));
+            .forEach(check -> check.openReport(now));
     }
 }

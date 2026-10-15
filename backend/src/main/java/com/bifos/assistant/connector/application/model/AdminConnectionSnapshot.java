@@ -10,24 +10,24 @@ import java.time.Instant;
  * @param restartRequiredSince 재시작이 필요해진 가장 늦은 설치 시각. 반영 완료 요청이 이 값을 그대로 돌려보낸다
  */
 public record AdminConnectionSnapshot(
-        String connectorId,
-        Long userId,
-        String displayName,
-        String agentCode,
-        BindingStatus status,
-        boolean restartRequired,
-        Instant restartRequiredSince,
-        int undeclaredTools) {
+    String connectorId,
+    Long userId,
+    String displayName,
+    String agentCode,
+    BindingStatus status,
+    boolean restartRequired,
+    Instant restartRequiredSince,
+    int undeclaredTools) {
 
     public static AdminConnectionSnapshot from(ConnectorBinding binding, String displayName) {
         return new AdminConnectionSnapshot(
-                binding.connection().connectorId(),
-                binding.connection().userId(),
-                displayName,
-                binding.agent().code(),
-                binding.status(),
-                binding.restartRequired(),
-                binding.restartRequiredSince(),
-                binding.connection().undeclaredTools());
+            binding.connection().connectorId(),
+            binding.connection().userId(),
+            displayName,
+            binding.agent().code(),
+            binding.status(),
+            binding.restartRequired(),
+            binding.restartRequiredSince(),
+            binding.connection().undeclaredTools());
     }
 }

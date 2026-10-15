@@ -33,13 +33,12 @@ public class V23__ConversationPublicId extends BaseJavaMigration {
 
         List<Long> ids = new ArrayList<>();
         try (Statement statement = connection.createStatement();
-                ResultSet rows = statement.executeQuery("SELECT id FROM conversation WHERE public_id IS NULL")) {
+            ResultSet rows = statement.executeQuery("SELECT id FROM conversation WHERE public_id IS NULL")) {
             while (rows.next()) {
                 ids.add(rows.getLong(1));
             }
         }
-        try (PreparedStatement update =
-                connection.prepareStatement("UPDATE conversation SET public_id = ? WHERE id = ?")) {
+        try (PreparedStatement update = connection.prepareStatement("UPDATE conversation SET public_id = ? WHERE id = ?")) {
             for (Long id : ids) {
                 update.setBytes(1, bytesOf(UUID.randomUUID()));
                 update.setLong(2, id);
@@ -56,11 +55,12 @@ public class V23__ConversationPublicId extends BaseJavaMigration {
         }
     }
 
+
     /** Hibernate 가 {@code BINARY} 칸에 UUID 를 두는 순서와 같게 앞 8바이트, 뒤 8바이트로 둔다. */
     private static byte[] bytesOf(UUID uuid) {
         return ByteBuffer.allocate(16)
-                .putLong(uuid.getMostSignificantBits())
-                .putLong(uuid.getLeastSignificantBits())
-                .array();
+            .putLong(uuid.getMostSignificantBits())
+            .putLong(uuid.getLeastSignificantBits())
+            .array();
     }
 }

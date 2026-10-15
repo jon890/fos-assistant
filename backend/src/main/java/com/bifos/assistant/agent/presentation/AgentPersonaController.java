@@ -27,14 +27,16 @@ public class AgentPersonaController {
     private final PersonaService personas;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/{code}/persona")
     public PersonaView read(@PathVariable String code) {
         return PersonaView.from(personas.read(currentUser.require(), code));
     }
 
+
     @PutMapping("/{code}/persona")
     public PersonaView write(@PathVariable String code, @Valid @RequestBody WritePersonaRequest request) {
         return PersonaView.from(
-                personas.write(currentUser.require(), code, request.body(), request.baseHash()));
+            personas.write(currentUser.require(), code, request.body(), request.baseHash()));
     }
 }

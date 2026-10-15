@@ -16,10 +16,10 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.connector.policy")
 public record ConnectorPolicyProperties(
-        @DefaultValue("60s") Duration catalogTtl,
-        @DefaultValue("5s") Duration catalogFailureTtl,
-        @DefaultValue("24h") Duration approvalTtl,
-        @DefaultValue("0 * * * * *") String expireCron) {
+    @DefaultValue("60s") Duration catalogTtl,
+    @DefaultValue("5s") Duration catalogFailureTtl,
+    @DefaultValue("24h") Duration approvalTtl,
+    @DefaultValue("0 * * * * *") String expireCron) {
 
     /** 시간 가운데 하나라도 0 이하이면 기동을 멈춘다. 판정마다 대시보드를 읽거나 승인 요청이 만들자마자 만료되는데 기동은 성공해 알아채지 못한다. */
     public ConnectorPolicyProperties {
@@ -28,10 +28,11 @@ public record ConnectorPolicyProperties(
         requirePositive("approval-ttl", approvalTtl);
     }
 
+
     private static void requirePositive(String name, Duration value) {
         if (value == null || value.isZero() || value.isNegative()) {
             throw new IllegalStateException(
-                    "assistant.connector.policy." + name + " must be longer than zero: " + value);
+                "assistant.connector.policy." + name + " must be longer than zero: " + value);
         }
     }
 }

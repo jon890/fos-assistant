@@ -32,13 +32,13 @@ import org.hibernate.type.SqlTypes;
  */
 @Entity
 @Table(
-        name = "task_run",
-        uniqueConstraints = {
-            @UniqueConstraint(name = "uk_task_run_public_id", columnNames = "public_id"),
-            @UniqueConstraint(
-                    name = "uk_task_run_trigger_scheduled",
-                    columnNames = {"trigger_id", "scheduled_for"})
-        })
+    name = "task_run",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_task_run_public_id", columnNames = "public_id"),
+        @UniqueConstraint(
+            name = "uk_task_run_trigger_scheduled",
+            columnNames = {"trigger_id", "scheduled_for"})
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -97,40 +97,46 @@ public class TaskRun {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+
     /** 열기를 기다리는 발화다. */
     public static TaskRun queued(Long taskId, Long triggerId, Long ownerUserId, Instant scheduledFor, Instant now) {
         return created(taskId, triggerId, ownerUserId, scheduledFor, TaskRunStatus.QUEUED, null, now);
     }
 
+
     /** 열지 않고 건너뛴 발화다. 만든 때가 끝난 때다. */
     public static TaskRun skipped(
-            Long taskId, Long triggerId, Long ownerUserId, Instant scheduledFor, TaskRunReason reason, Instant now) {
+        Long taskId, Long triggerId, Long ownerUserId, Instant scheduledFor, TaskRunReason reason, Instant now) {
         TaskRun run = created(
-                taskId,
-                triggerId,
-                ownerUserId,
-                scheduledFor,
-                TaskRunStatus.SKIPPED,
-                Objects.requireNonNull(reason, "reason"),
-                now);
+            taskId,
+            triggerId,
+            ownerUserId,
+            scheduledFor,
+            TaskRunStatus.SKIPPED,
+            Objects.requireNonNull(reason, "reason"),
+            now);
         run.finishedAt = run.createdAt;
         return run;
     }
+
 
     /** 이 발화가 결과를 남길 대화를 적는다. 열지 못해 다음 tick 에 다시 볼 때 같은 대화를 쓴다. */
     public void useConversation(Long conversationId) {
         this.conversationId = Objects.requireNonNull(conversationId, "conversationId");
     }
 
+
     /** 깨우기가 연 먼저 살펴보기 줄을 적는다. */
     public void useProactiveCheck(Long checkId) {
         proactiveCheckId = Objects.requireNonNull(checkId, "checkId");
     }
 
+
     /** 발화가 미리 만든 빈 대화를 지웠을 때만 부른다. */
     public void forgetConversation() {
         this.conversationId = null;
     }
+
 
     /** turn 잠금을 얻어 연다. */
     public void start(Instant now) {
@@ -138,30 +144,36 @@ public class TaskRun {
         this.startedAt = micros(now);
     }
 
+
     /** turn 이 답을 마쳤다. */
     public void succeed(Long executionId, Instant now) {
         finish(TaskRunStatus.SUCCEEDED, null, executionId, now);
     }
+
 
     /** turn 이 답을 마쳤지만 답 전체가 {@code [SILENT]} 라 알릴 것이 없다. */
     public void succeedQuietly(Long executionId, Instant now) {
         finish(TaskRunStatus.SUCCEEDED, TaskRunReason.NOTHING_TO_REPORT, executionId, now);
     }
 
+
     /** 사용자가 turn 을 중지했다. */
     public void cancel(Long executionId, Instant now) {
         finish(TaskRunStatus.CANCELLED, null, executionId, now);
     }
+
 
     /** turn 이 예외로 끝났거나 도는 중에 서버가 다시 시작됐다. */
     public void fail(TaskRunReason reason, Instant now) {
         finish(TaskRunStatus.FAILED, Objects.requireNonNull(reason, "reason"), executionId, now);
     }
 
+
     /** 열지 않고 건너뛴다. */
     public void skip(TaskRunReason reason, Instant now) {
         finish(TaskRunStatus.SKIPPED, Objects.requireNonNull(reason, "reason"), executionId, now);
     }
+
 
     private void finish(TaskRunStatus finalStatus, TaskRunReason why, Long rootExecutionId, Instant now) {
         this.status = finalStatus;
@@ -170,18 +182,20 @@ public class TaskRun {
         this.finishedAt = micros(now);
     }
 
+
     private static Instant micros(Instant instant) {
         return Objects.requireNonNull(instant, "now").truncatedTo(ChronoUnit.MICROS);
     }
 
+
     private static TaskRun created(
-            Long taskId,
-            Long triggerId,
-            Long ownerUserId,
-            Instant scheduledFor,
-            TaskRunStatus status,
-            TaskRunReason reason,
-            Instant now) {
+        Long taskId,
+        Long triggerId,
+        Long ownerUserId,
+        Instant scheduledFor,
+        TaskRunStatus status,
+        TaskRunReason reason,
+        Instant now) {
         TaskRun run = new TaskRun();
         run.taskId = Objects.requireNonNull(taskId, "taskId");
         run.triggerId = Objects.requireNonNull(triggerId, "triggerId");

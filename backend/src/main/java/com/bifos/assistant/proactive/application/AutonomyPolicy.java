@@ -32,15 +32,15 @@ public final class AutonomyPolicy {
 
     private static final List<DecisionAxis> AXES = List.of(DecisionAxis.values());
 
-    private static final Set<DecisionOutcome> JUDGED_OUTCOMES =
-            EnumSet.of(DecisionOutcome.EVALUATED, DecisionOutcome.INSUFFICIENT_EVIDENCE);
+    private static final Set<DecisionOutcome> JUDGED_OUTCOMES = EnumSet.of(DecisionOutcome.EVALUATED, DecisionOutcome.INSUFFICIENT_EVIDENCE);
+
 
     /**
      * 추천 순서대로 받은 후보를 판정한다. {@code EXECUTE} 는 앞에서 처음 받은 후보 하나에만 남기고 나머지는 {@code EXECUTION_TAKEN} 으로
      * {@code SURFACE} 다.
      */
     public static List<AutonomyVerdict> decideAll(
-            List<AutonomyInputs> ordered, Duration maxEvaluationAge, Duration maxEvidenceAge) {
+        List<AutonomyInputs> ordered, Duration maxEvaluationAge, Duration maxEvidenceAge) {
         List<AutonomyVerdict> verdicts = new ArrayList<>();
         boolean taken = false;
         for (AutonomyInputs inputs : ordered) {
@@ -58,6 +58,7 @@ public final class AutonomyPolicy {
         return List.copyOf(verdicts);
     }
 
+
     /** 걸린 까닭을 모두 모은다. 판정 순서와 상관없이 모아 기록이 판정의 근거를 빠짐없이 갖게 한다. */
     static EnumSet<AutonomyReason> reasons(AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge) {
         EnumSet<AutonomyReason> reasons = EnumSet.noneOf(AutonomyReason.class);
@@ -68,6 +69,7 @@ public final class AutonomyPolicy {
         return reasons;
     }
 
+
     private static void addIgnoreReasons(AutonomyInputs in, Set<AutonomyReason> reasons) {
         DecisionLevel benefit = choice(in, DecisionAxis.EXPECTED_BENEFIT);
         if (!in.candidateCurrent()) {
@@ -77,16 +79,17 @@ public final class AutonomyPolicy {
             reasons.add(AutonomyReason.EVALUATION_NOT_USABLE);
         }
         if (benefit == DecisionLevel.LOW
-                && (choice(in, DecisionAxis.URGENCY) == DecisionLevel.LOW
-                        || choice(in, DecisionAxis.GOAL_ALIGNMENT) == DecisionLevel.LOW)) {
+            && (choice(in, DecisionAxis.URGENCY) == DecisionLevel.LOW
+                || choice(in, DecisionAxis.GOAL_ALIGNMENT) == DecisionLevel.LOW)) {
             reasons.add(AutonomyReason.LOW_VALUE);
         }
     }
 
+
     private static void addWeakBasisReasons(
-            AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge, Set<AutonomyReason> reasons) {
+        AutonomyInputs in, Duration maxEvaluationAge, Duration maxEvidenceAge, Set<AutonomyReason> reasons) {
         if (in.evaluationOutcome() == DecisionOutcome.INSUFFICIENT_EVIDENCE
-                || choice(in, DecisionAxis.EVIDENCE_QUALITY) == DecisionLevel.LOW) {
+            || choice(in, DecisionAxis.EVIDENCE_QUALITY) == DecisionLevel.LOW) {
             reasons.add(AutonomyReason.INSUFFICIENT_EVIDENCE);
         }
         if (lowConfidence(in)) {
@@ -96,7 +99,7 @@ public final class AutonomyPolicy {
             reasons.add(AutonomyReason.UNKNOWN_JUDGEMENT);
         }
         if (olderThan(in.evaluatedAt(), in.decidedAt(), maxEvaluationAge)
-                || olderThan(in.asOf(), in.decidedAt(), maxEvaluationAge)) {
+            || olderThan(in.asOf(), in.decidedAt(), maxEvaluationAge)) {
             reasons.add(AutonomyReason.STALE_EVALUATION);
         }
         if (olderThan(in.evidenceCheckedAt(), in.decidedAt(), maxEvidenceAge)) {
@@ -111,6 +114,7 @@ public final class AutonomyPolicy {
             reasons.add(AutonomyReason.ACTION_UNDECLARED);
         }
     }
+
 
     /** 부작용 힌트는 모델이 쓴 값이다. NONE 은 실행 조건의 하나일 뿐이고, 나머지는 모두 승인 쪽으로 보낸다. */
     private static void addApprovalReasons(AutonomyInputs in, Set<AutonomyReason> reasons) {
@@ -128,12 +132,13 @@ public final class AutonomyPolicy {
         }
     }
 
+
     /** 허락에 해당하는 입력은 모두 Control Plane 의 기록이다. */
     private static void addExecutionBlockers(AutonomyInputs in, Set<AutonomyReason> reasons) {
         DecisionLevel goal = choice(in, DecisionAxis.GOAL_ALIGNMENT);
         if (choice(in, DecisionAxis.EXPECTED_BENEFIT) != DecisionLevel.HIGH
-                || goal == DecisionLevel.LOW
-                || goal == DecisionLevel.UNKNOWN) {
+            || goal == DecisionLevel.LOW
+            || goal == DecisionLevel.UNKNOWN) {
             reasons.add(AutonomyReason.VALUE_NOT_HIGH);
         }
         if (choice(in, DecisionAxis.COST) != DecisionLevel.LOW) {
@@ -157,6 +162,7 @@ public final class AutonomyPolicy {
         }
     }
 
+
     /** 앞 묶음에 하나라도 있으면 뒤 묶음을 보지 않는다. 근거가 약한 후보에는 승인을 묻지 않는다. */
     static AutonomyLevel level(Set<AutonomyReason> reasons) {
         if (has(reasons, AutonomyReason.Group.IGNORE)) {
@@ -174,19 +180,21 @@ public final class AutonomyPolicy {
         return AutonomyLevel.EXECUTE;
     }
 
+
     private static boolean has(Set<AutonomyReason> reasons, AutonomyReason.Group group) {
         return reasons.stream().anyMatch(reason -> reason.group() == group);
     }
+
 
     /** 빠진 축은 모르는 것이다. */
     private static DecisionLevel choice(AutonomyInputs in, DecisionAxis axis) {
         return in.choices().getOrDefault(axis, DecisionLevel.UNKNOWN);
     }
 
+
     /** 판단이 없으면 확신을 따지지 않는다. 그때는 {@code EVALUATION_NOT_USABLE} 이 이미 다루지 않음으로 보낸다. */
     private static boolean lowConfidence(AutonomyInputs in) {
-        boolean candidateConfident =
-                "MEDIUM".equals(in.candidateConfidence()) || "HIGH".equals(in.candidateConfidence());
+        boolean candidateConfident = "MEDIUM".equals(in.candidateConfidence()) || "HIGH".equals(in.candidateConfidence());
         if (!candidateConfident) {
             return true;
         }
@@ -194,11 +202,12 @@ public final class AutonomyPolicy {
             return false;
         }
         return in.judgementConfidence() != DecisionConfidence.MEDIUM
-                        && in.judgementConfidence() != DecisionConfidence.HIGH
-                || AXES.stream()
-                        .anyMatch(axis -> in.axisConfidences().get(axis) != DecisionConfidence.MEDIUM
-                                && in.axisConfidences().get(axis) != DecisionConfidence.HIGH);
+            && in.judgementConfidence() != DecisionConfidence.HIGH
+            || AXES.stream()
+                .anyMatch(axis -> in.axisConfidences().get(axis) != DecisionConfidence.MEDIUM
+                    && in.axisConfidences().get(axis) != DecisionConfidence.HIGH);
     }
+
 
     /** 시각이 없으면 오래된 것으로 본다. 기준보다 뒤의 시각도 믿지 않고 오래된 것으로 본다. */
     private static boolean olderThan(Instant at, Instant now, Duration maxAge) {

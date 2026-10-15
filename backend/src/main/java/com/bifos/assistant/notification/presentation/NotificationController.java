@@ -33,22 +33,26 @@ public class NotificationController {
     private final NotificationEventHub hub;
     private final NotificationEventStreams streams;
 
+
     /** 최근 것부터 한 쪽 돌려준다. 다음 쪽은 {@code nextCursor} 를 {@code cursor} 로 넘겨 읽는다. */
     @GetMapping
     public NotificationPageView list(
-            @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
+        @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "30") int limit) {
         return NotificationPageView.from(notifications.page(currentUser.require(), cursor, limit));
     }
+
 
     @PostMapping("/{notificationId}/read")
     public NotificationView read(@PathVariable UUID notificationId) {
         return NotificationView.from(notifications.markRead(currentUser.require(), notificationId));
     }
 
+
     @PostMapping("/read-all")
     public UnreadCountView readAll() {
         return new UnreadCountView(notifications.markAllRead(currentUser.require()));
     }
+
 
     /** 그 사용자의 알림 사건을 받는다. 창마다 구독이 하나다. */
     @GetMapping(path = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

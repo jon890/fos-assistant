@@ -26,6 +26,7 @@ public class HttpHermesSkillClient implements HermesSkillClient {
     private final String token;
     private final SandboxAttachmentDirectory attachmentDirectory;
 
+
     public HttpHermesSkillClient(HermesProperties properties, SandboxAttachmentDirectory attachmentDirectory) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
@@ -36,17 +37,18 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         this.attachmentDirectory = attachmentDirectory;
     }
 
+
     @Override
     public List<HermesSkill> list(String profile) {
         requireValidProfileName(profile);
         try {
             JsonNode response = restClient
-                    .get()
-                    .uri(baseUrl + "/api/skills?profile={profile}", profile)
-                    .header("Authorization", "Bearer " + token)
-                    .accept(MediaType.APPLICATION_JSON)
-                    .retrieve()
-                    .body(JsonNode.class);
+                .get()
+                .uri(baseUrl + "/api/skills?profile={profile}", profile)
+                .header("Authorization", "Bearer " + token)
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(JsonNode.class);
             // 대시보드 `GET /api/skills` 는 항목 배열을 그대로 돌려준다. 스킬이 없는 profile 은 빈 배열이다.
             if (response == null || !response.isArray()) {
                 throw malformedResponse();
@@ -60,9 +62,9 @@ public class HttpHermesSkillClient implements HermesSkillClient {
                 JsonNode enabled = entry.get("enabled");
                 String description = text(entry, "description");
                 result.add(new HermesSkill(
-                        name,
-                        description == null ? "" : description,
-                        enabled == null || !enabled.isBoolean() || enabled.asBoolean()));
+                    name,
+                    description == null ? "" : description,
+                    enabled == null || !enabled.isBoolean() || enabled.asBoolean()));
             }
             return List.copyOf(result);
         } catch (RestClientException ex) {
@@ -71,43 +73,47 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         }
     }
 
+
     @Override
     public void toggle(String profile, String name, boolean enabled) {
         requireValidProfileName(profile);
         try {
             restClient
-                    .put()
-                    .uri(baseUrl + "/api/skills/toggle")
-                    .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("profile", profile, "name", name, "enabled", enabled))
-                    .retrieve()
-                    .toBodilessEntity();
+                .put()
+                .uri(baseUrl + "/api/skills/toggle")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("profile", profile, "name", name, "enabled", enabled))
+                .retrieve()
+                .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes 스킬을 켜거나 끄지 못했다 profile={} skill={}", profile, name, ex);
             throw HermesCallFailure.ofDistinguishingRejection(ex, "could not toggle the Hermes skill");
         }
     }
 
+
     @Override
     public void publish(
-            String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
+        String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
         send(profile, externalDirs, apiServerToolsets, sandboxOwner, false);
     }
 
+
     @Override
     public void publishRequiringSandbox(
-            String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
+        String profile, List<String> externalDirs, List<String> apiServerToolsets, String sandboxOwner) {
         Objects.requireNonNull(apiServerToolsets, "a sandbox-required publish carries the tool list");
         send(profile, externalDirs, apiServerToolsets, sandboxOwner, true);
     }
 
+
     private void send(
-            String profile,
-            List<String> externalDirs,
-            List<String> apiServerToolsets,
-            String sandboxOwner,
-            boolean requireSandbox) {
+        String profile,
+        List<String> externalDirs,
+        List<String> apiServerToolsets,
+        String sandboxOwner,
+        boolean requireSandbox) {
         requireValidProfileName(profile);
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("skills", Map.of("external_dirs", List.copyOf(externalDirs)));
@@ -130,13 +136,13 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         }
         try {
             restClient
-                    .put()
-                    .uri(baseUrl + "/api/config")
-                    .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
-                    .retrieve()
-                    .toBodilessEntity();
+                .put()
+                .uri(baseUrl + "/api/config")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
         } catch (RestClientException ex) {
             log.warn("Hermes 스킬 경로를 게시하지 못했다 profile={} dirs={}", profile, externalDirs.size(), ex);
             // 게시가 거절됐다는 사실을 지켜야 SkillService 가 방금 쓴 버전 디렉터리를 지운다. 오류 코드만 바꾼다.
@@ -148,20 +154,24 @@ public class HttpHermesSkillClient implements HermesSkillClient {
         }
     }
 
+
     private static void requireValidProfileName(String profile) {
         if (!HermesProfileName.isValid(profile)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "profile name is not a valid Hermes profile");
         }
     }
 
+
     private static ApiException malformedResponse() {
         return new ApiException(ErrorCode.HERMES_UNAVAILABLE, "Hermes returned an invalid skill response");
     }
+
 
     private static String text(JsonNode node, String field) {
         JsonNode value = node == null ? null : node.get(field);
         return value == null || !value.isTextual() || value.asText().isBlank() ? null : value.asText();
     }
+
 
     private static String stripTrailingSlash(String url) {
         if (url == null) {

@@ -55,14 +55,16 @@ class AgentControllerLifecycleTest {
     private final KnownFlows flows = mock(KnownFlows.class);
 
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-                    new AgentController(new AgentService(agents), currentUser, lifecycle, flows))
-            .setControllerAdvice(new GlobalExceptionHandler())
-            .build();
+        new AgentController(new AgentService(agents), currentUser, lifecycle, flows))
+        .setControllerAdvice(new GlobalExceptionHandler())
+        .build();
+
 
     @BeforeEach
     void setUp() {
         when(currentUser.require()).thenReturn(KID);
     }
+
 
     @Test
     @DisplayName("만들면 201 과 요청자가 주인인 에이전트를 준다")
@@ -70,43 +72,46 @@ class AgentControllerLifecycleTest {
         when(lifecycle.create(KID, "숙제 도우미", null)).thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
 
         mvc.perform(post("/api/v1/agents")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"숙제 도우미\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value("a0123456789"))
-                .andExpect(jsonPath("$.visibility").value("PRIVATE"))
-                .andExpect(jsonPath("$.starterPrompts").doesNotExist())
-                .andExpect(jsonPath("$.editable").value(true))
-                .andExpect(jsonPath("$.ownedByMe").value(true));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"숙제 도우미\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value("a0123456789"))
+            .andExpect(jsonPath("$.visibility").value("PRIVATE"))
+            .andExpect(jsonPath("$.starterPrompts").doesNotExist())
+            .andExpect(jsonPath("$.editable").value(true))
+            .andExpect(jsonPath("$.ownedByMe").value(true));
     }
+
 
     @Test
     @DisplayName("상한이면 409 AGENT LIMIT REACHED 다")
     void returns409AgentLimitReachedAtLimit() throws Exception {
         when(lifecycle.create(KID, "여섯째", AgentVisibility.GROUP))
-                .thenThrow(new ApiException(ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of 5 was reached"));
+            .thenThrow(new ApiException(ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of 5 was reached"));
 
         mvc.perform(post("/api/v1/agents")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"여섯째\",\"visibility\":\"GROUP\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(ErrorCode.AGENT_LIMIT_REACHED.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"name\":\"여섯째\",\"visibility\":\"GROUP\"}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value(ErrorCode.AGENT_LIMIT_REACHED.name()));
     }
+
 
     @Test
     @DisplayName("공개 범위를 바꾸면 200 과 바뀐 에이전트를 준다")
     void returns200WithUpdatedAgentOnVisibilityChange() throws Exception {
         when(lifecycle.changeVisibility(KID, "a0123456789", AgentVisibility.GROUP))
-                .thenReturn(agent("a0123456789", AgentVisibility.GROUP, KID.id()));
+            .thenReturn(agent("a0123456789", AgentVisibility.GROUP, KID.id()));
 
         mvc.perform(patch("/api/v1/agents/{code}/visibility", "a0123456789")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"visibility\":\"GROUP\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.visibility").value("GROUP"))
-                .andExpect(jsonPath("$.editable").value(true))
-                .andExpect(jsonPath("$.ownedByMe").value(true));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"visibility\":\"GROUP\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.visibility").value("GROUP"))
+            .andExpect(jsonPath("$.editable").value(true))
+            .andExpect(jsonPath("$.ownedByMe").value(true));
     }
+
 
     /** {@code ADMIN} 은 남의 에이전트를 관리하지만 주인은 아니다. 화면이 「다른 사람 것」 을 이 값으로 가른다. */
     @Test
@@ -114,37 +119,40 @@ class AgentControllerLifecycleTest {
     void adminEditingOthersAgentCanManageButIsNotOwner() throws Exception {
         when(currentUser.require()).thenReturn(ADMIN);
         when(lifecycle.changeVisibility(ADMIN, "a0123456789", AgentVisibility.PRIVATE))
-                .thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
+            .thenReturn(agent("a0123456789", AgentVisibility.PRIVATE, KID.id()));
 
         mvc.perform(patch("/api/v1/agents/{code}/visibility", "a0123456789")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"visibility\":\"PRIVATE\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.editable").value(true))
-                .andExpect(jsonPath("$.ownedByMe").value(false));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"visibility\":\"PRIVATE\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.editable").value(true))
+            .andExpect(jsonPath("$.ownedByMe").value(false));
     }
+
 
     @Test
     @DisplayName("공개 범위가 비면 VALIDATION FAILED 이고 서비스를 부르지 않는다")
     void returnsValidationFailedWithoutCallingServiceOnBlankVisibility() throws Exception {
         mvc.perform(patch("/api/v1/agents/{code}/visibility", "a0123456789")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"visibility\":null}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"visibility\":null}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()));
 
         verify(lifecycle, never()).changeVisibility(any(), anyString(), any());
     }
+
 
     @Test
     @DisplayName("지우면 204 이고 본문이 없다")
     void returns204WithoutBodyOnDelete() throws Exception {
         mvc.perform(delete("/api/v1/agents/{code}", "a0123456789"))
-                .andExpect(status().isNoContent())
-                .andExpect(content().string(""));
+            .andExpect(status().isNoContent())
+            .andExpect(content().string(""));
 
         verify(lifecycle).delete(KID, "a0123456789");
     }
+
 
     @Test
     @DisplayName("목록은 요청자 기준으로 관리 가능과 주인 여부를 채운다")
@@ -154,14 +162,15 @@ class AgentControllerLifecycleTest {
         when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(mine, shared));
 
         mvc.perform(get("/api/v1/agents"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("a-mine"))
-                .andExpect(jsonPath("$[0].editable").value(true))
-                .andExpect(jsonPath("$[0].ownedByMe").value(true))
-                .andExpect(jsonPath("$[1].code").value("a-shared"))
-                .andExpect(jsonPath("$[1].editable").value(false))
-                .andExpect(jsonPath("$[1].ownedByMe").value(false));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].code").value("a-mine"))
+            .andExpect(jsonPath("$[0].editable").value(true))
+            .andExpect(jsonPath("$[0].ownedByMe").value(true))
+            .andExpect(jsonPath("$[1].code").value("a-shared"))
+            .andExpect(jsonPath("$[1].editable").value(false))
+            .andExpect(jsonPath("$[1].ownedByMe").value(false));
     }
+
 
     @Test
     @DisplayName("목록은 커넥터 에이전트만 connectorManaged 를 참으로 낸다")
@@ -172,12 +181,13 @@ class AgentControllerLifecycleTest {
         when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(connector, plain));
 
         mvc.perform(get("/api/v1/agents"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].code").value("a-connector"))
-                .andExpect(jsonPath("$[0].connectorManaged").value(true))
-                .andExpect(jsonPath("$[1].code").value("a-plain"))
-                .andExpect(jsonPath("$[1].connectorManaged").value(false));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].code").value("a-connector"))
+            .andExpect(jsonPath("$[0].connectorManaged").value(true))
+            .andExpect(jsonPath("$[1].code").value("a-plain"))
+            .andExpect(jsonPath("$[1].connectorManaged").value(false));
     }
+
 
     @Test
     @DisplayName("목록은 등록된 흐름의 예약 작업을 막고 흐름 이름은 내보내지 않는다")
@@ -189,23 +199,24 @@ class AgentControllerLifecycleTest {
         when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(flowed, plain));
 
         mvc.perform(get("/api/v1/agents"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].runsTasks").value(false))
-                .andExpect(jsonPath("$[0].flow").doesNotExist())
-                .andExpect(jsonPath("$[1].runsTasks").value(true))
-                .andExpect(jsonPath("$[1].flow").doesNotExist());
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].runsTasks").value(false))
+            .andExpect(jsonPath("$[0].flow").doesNotExist())
+            .andExpect(jsonPath("$[1].runsTasks").value(true))
+            .andExpect(jsonPath("$[1].flow").doesNotExist());
     }
+
 
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
         return Agent.of(
-                code,
-                "숙제 도우미",
-                "ua-" + code,
-                "http://agent-runtime.test/p/ua-" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                visibility,
-                ownerUserId,
-                Instant.now());
+            code,
+            "숙제 도우미",
+            "ua-" + code,
+            "http://agent-runtime.test/p/ua-" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            visibility,
+            ownerUserId,
+            Instant.now());
     }
 }

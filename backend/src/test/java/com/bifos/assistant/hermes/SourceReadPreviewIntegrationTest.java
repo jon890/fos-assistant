@@ -32,6 +32,7 @@ class SourceReadPreviewIntegrationTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Clock CLOCK = Clock.fixed(Instant.EPOCH, ZoneOffset.UTC);
 
+
     @Test
     @DisplayName("가려진 긴 원문 미리보기는 요청 URL만 남기고 결과 URL은 남기지 않는다")
     void keepsOnlyRequestedUrlFromRedactedTruncatedPreview() throws Exception {
@@ -46,21 +47,21 @@ class SourceReadPreviewIntegrationTest {
         assertThat(saved.get(1).failed()).isFalse();
         assertThat(saved.get(1).detail()).isEqualTo("[가림]");
         assertThat(summary(saved))
-                .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/hidden")));
+            .isEqualTo(new SourceReadSummary(1, List.of(), 1, true, List.of("https://example.com/hidden")));
     }
+
 
     @Test
     @DisplayName("온전한 원문 미리보기는 같은 저장 경로에서 공개 URL을 보낸다")
     void exposesUrlFromCompletePreview() throws Exception {
-        RunEvent runEvent =
-                HermesRunEventStream.toRunEvent(event(result("https://example.com/visible", "short content")));
-        List<ExecutionEvent> saved =
-                records(HermesRunEventStream.toRunEvent(started("https://example.com/visible")), runEvent);
+        RunEvent runEvent = HermesRunEventStream.toRunEvent(event(result("https://example.com/visible", "short content")));
+        List<ExecutionEvent> saved = records(HermesRunEventStream.toRunEvent(started("https://example.com/visible")), runEvent);
 
         assertThat(saved.get(1).failed()).isFalse();
         assertThat(summary(saved))
-                .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/visible"), 0, true, List.of()));
+            .isEqualTo(new SourceReadSummary(1, List.of("https://example.com/visible"), 0, true, List.of()));
     }
+
 
     private static JsonNode event(String preview) throws Exception {
         return JSON.readTree("""
@@ -68,24 +69,28 @@ class SourceReadPreviewIntegrationTest {
                 """.formatted(JSON.writeValueAsString(preview)));
     }
 
+
     private static JsonNode started(String preview) throws Exception {
         return JSON.readTree("{\"event\":\"tool.started\",\"tool\":\"web_extract\",\"preview\":\"" + preview + "\"}");
     }
 
+
     private static String result(String url, String content) throws Exception {
         return JSON.writeValueAsString(
-                JSON.readTree("""
+            JSON.readTree("""
                 {"results":[{"url":%s,"title":"example title","content":%s,"error":null}]}
                 """.formatted(JSON.writeValueAsString(url), JSON.writeValueAsString(content))));
     }
+
 
     private static List<ExecutionEvent> records(RunEvent... events) throws Exception {
         ExecutionEventRecorder recorder = new ExecutionEventRecorder(mock(SkillUseRecorder.class), CLOCK);
         AgentExecution execution = execution();
         return IntStream.range(0, events.length)
-                .mapToObj(index -> recorder.record(execution, events[index], index + 1))
-                .toList();
+            .mapToObj(index -> recorder.record(execution, events[index], index + 1))
+            .toList();
     }
+
 
     private static SourceReadSummary summary(List<ExecutionEvent> event) throws Exception {
         AgentExecution execution = execution();
@@ -100,17 +105,19 @@ class SourceReadPreviewIntegrationTest {
         return new SourceReadSummaries(executions, events).of(List.of(answer)).get(answer.id());
     }
 
+
     private static AgentExecution execution() throws Exception {
         AgentExecution execution = AgentExecution.builder()
-                .userId(1L)
-                .profileName("profile")
-                .status(ExecutionStatus.RUNNING)
-                .startedAt(Instant.EPOCH)
-                .build();
+            .userId(1L)
+            .profileName("profile")
+            .status(ExecutionStatus.RUNNING)
+            .startedAt(Instant.EPOCH)
+            .build();
         set(execution, "id", 1L);
         set(execution, "eventObservation", EventObservation.OBSERVED);
         return execution;
     }
+
 
     private static void set(Object target, String name, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(name);

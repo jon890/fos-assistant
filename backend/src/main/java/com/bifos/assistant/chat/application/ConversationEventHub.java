@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ConversationEventHub {
 
-    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<ChatEvent>>> subscribers =
-            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<ChatEvent>>> subscribers = new ConcurrentHashMap<>();
+
 
     /**
      * 그 대화의 사건을 받는다. 돌려준 {@code Runnable} 을 부르면 더 받지 않는다.
@@ -35,6 +35,7 @@ public class ConversationEventHub {
         return () -> unsubscribe(conversationId, consumer);
     }
 
+
     /** 그 대화의 모든 구독자에게 보낸다. 보내다 예외가 난 구독자는 끊긴 연결로 보고 뺀다. */
     public void publish(Long conversationId, ChatEvent event) {
         List<Consumer<ChatEvent>> targets = subscribers.get(conversationId);
@@ -50,6 +51,7 @@ public class ConversationEventHub {
             }
         }
     }
+
 
     private void unsubscribe(Long conversationId, Consumer<ChatEvent> consumer) {
         subscribers.computeIfPresent(conversationId, (id, list) -> {

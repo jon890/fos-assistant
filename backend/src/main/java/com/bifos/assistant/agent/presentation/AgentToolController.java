@@ -26,11 +26,13 @@ public class AgentToolController {
     private final AgentToolService tools;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping("/agents/{code}/tools")
     public AgentDtos.ToolsetsView read(@PathVariable String code) {
         CurrentUser user = currentUser.require();
         return view(tools.read(user, agents.requireReadable(user, code)));
     }
+
 
     @PutMapping("/agents/{code}/tools")
     public AgentDtos.ToolsetsView write(@PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
@@ -38,22 +40,25 @@ public class AgentToolController {
         return view(tools.writeReadable(user, code, request.enabled()));
     }
 
+
     @GetMapping("/admin/agents/{code}/tools")
     public AgentDtos.ToolsetsView readAdmin(@PathVariable String code) {
         CurrentUser user = currentUser.requireAdmin();
         return view(tools.readAsAdmin(user, code));
     }
 
+
     @PutMapping("/admin/agents/{code}/tools")
     public AgentDtos.ToolsetsView writeAdmin(
-            @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
+        @PathVariable String code, @Valid @RequestBody UpdateToolsetsRequest request) {
         CurrentUser user = currentUser.requireAdmin();
         return view(tools.writeAsAdmin(user, code, request.enabled()));
     }
 
+
     private static AgentDtos.ToolsetsView view(AgentToolsetsView source) {
         return new AgentDtos.ToolsetsView(
-                source.toolsets().stream().map(ToolsetView::from).toList(), source.unclassifiedEnabled(),
-                source.shellOrFileEnabled(), source.skillsEnabled());
+            source.toolsets().stream().map(ToolsetView::from).toList(), source.unclassifiedEnabled(),
+            source.shellOrFileEnabled(), source.skillsEnabled());
     }
 }

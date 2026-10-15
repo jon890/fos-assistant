@@ -41,10 +41,12 @@ public final class ReplayDecisionProvider implements DecisionProvider {
         INVALID
     }
 
+
     private final String id;
     private final Mode mode;
     private final EvalDataset dataset;
     private final AtomicInteger calls = new AtomicInteger();
+
 
     /**
      * 평가 검사가 쓰는 provider 다. 공통 검사 기반이 빈으로 둔다. 운영의 판단 경로는 provider 를 id 로만 고르므로
@@ -54,7 +56,9 @@ public final class ReplayDecisionProvider implements DecisionProvider {
         return new ReplayDecisionProvider(id, Mode.valueOf(mode), DATASET);
     }
 
+
     private static final EvalDataset DATASET = EvalDataset.load();
+
 
     ReplayDecisionProvider(String id, Mode mode, EvalDataset dataset) {
         this.id = id;
@@ -62,15 +66,18 @@ public final class ReplayDecisionProvider implements DecisionProvider {
         this.dataset = dataset;
     }
 
+
     @Override
     public String id() {
         return id;
     }
 
+
     /** 모델 호출 수다. 후보가 없으면 검사가 provider 를 부르지 않는다. */
     int calls() {
         return calls.get();
     }
+
 
     @Override
     public DecisionResponse evaluate(DecisionState state, List<DecisionQuestion> questions, DecisionRequest request) {
@@ -82,59 +89,63 @@ public final class ReplayDecisionProvider implements DecisionProvider {
             case ERROR -> throw new IllegalStateException("fixture provider failure");
             case INVALID ->
                 response(new DecisionResult(
-                        DecisionOutcome.EVALUATED,
-                        List.of(),
-                        state.candidates().stream()
-                                .map(DecisionCandidate::candidateId)
-                                .toList(),
-                        "후보를 빠뜨린 판단",
-                        null));
+                    DecisionOutcome.EVALUATED,
+                    List.of(),
+                    state.candidates().stream()
+                        .map(DecisionCandidate::candidateId)
+                        .toList(),
+                    "후보를 빠뜨린 판단",
+                    null));
         };
     }
 
+
     private DecisionResponse response(DecisionResult result) {
         String model = dataset.providers().containsKey(id)
-                ? dataset.providers().get(id).model()
-                : id;
+            ? dataset.providers().get(id).model()
+            : id;
         return new DecisionResponse(
-                new DecisionProviderInfo(id, "fixture-1", "fixture", model, "fixture", model, null), result);
+            new DecisionProviderInfo(id, "fixture-1", "fixture", model, "fixture", model, null), result);
     }
+
 
     private DecisionResult replay(DecisionState state, List<DecisionQuestion> questions) {
         List<CandidateJudgement> judgements = new ArrayList<>();
         List<Ranked> ranked = new ArrayList<>();
         for (DecisionCandidate candidate : state.candidates()) {
             EvalDataset.Recorded recorded = dataset.recorded(id, candidate.problemKey())
-                    .orElseThrow(() -> new IllegalStateException("판단 기록이 없다: " + candidate.problemKey()));
+                .orElseThrow(() -> new IllegalStateException("판단 기록이 없다: " + candidate.problemKey()));
             judgements.add(judgement(candidate, recorded.judgement(), questions));
             ranked.add(new Ranked(candidate.candidateId(), recorded.rank()));
         }
         List<Long> ordered = ranked.stream()
-                .sorted(Comparator.comparingInt(Ranked::rank))
-                .map(Ranked::candidateId)
-                .toList();
+            .sorted(Comparator.comparingInt(Ranked::rank))
+            .map(Ranked::candidateId)
+            .toList();
         return new DecisionResult(DecisionOutcome.EVALUATED, judgements, ordered, "fixture 의 판단 기록 순서", null);
     }
 
+
     /** 근거 키는 후보가 가진 것을 그대로 붙인다. 모르는 축은 근거 없이 낮은 확신으로 둔다. */
     private static CandidateJudgement judgement(
-            DecisionCandidate candidate, EvalDataset.Judgement recorded, List<DecisionQuestion> questions) {
-        List<String> evidenceKeys =
-                candidate.evidence().stream().map(ProblemEvidence::topicKey).toList();
+        DecisionCandidate candidate, EvalDataset.Judgement recorded, List<DecisionQuestion> questions) {
+        List<String> evidenceKeys = candidate.evidence().stream().map(ProblemEvidence::topicKey).toList();
         List<AxisJudgement> axes = questions.stream()
-                .map(question -> {
-                    DecisionLevel choice = recorded.axes().getOrDefault(question.axis(), DecisionLevel.UNKNOWN);
-                    boolean unknown = choice == DecisionLevel.UNKNOWN;
-                    return new AxisJudgement(
-                            question.axis(),
-                            choice,
-                            unknown ? DecisionConfidence.LOW : recorded.confidence(),
-                            "fixture 판단",
-                            unknown ? List.of() : evidenceKeys);
-                })
-                .toList();
+            .map(question -> {
+                DecisionLevel choice = recorded.axes().getOrDefault(question.axis(), DecisionLevel.UNKNOWN);
+                boolean unknown = choice == DecisionLevel.UNKNOWN;
+                return new AxisJudgement(
+                    question.axis(),
+                    choice,
+                    unknown ? DecisionConfidence.LOW : recorded.confidence(),
+                    "fixture 판단",
+                    unknown ? List.of() : evidenceKeys);
+            })
+            .toList();
         return new CandidateJudgement(candidate.candidateId(), axes, recorded.confidence(), "fixture 판단");
     }
 
-    private record Ranked(Long candidateId, int rank) {}
+
+    private record Ranked(Long candidateId, int rank) {
+    }
 }

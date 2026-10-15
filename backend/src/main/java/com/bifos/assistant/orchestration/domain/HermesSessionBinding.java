@@ -26,11 +26,10 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "hermes_session_binding",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_hermes_session_binding_session",
-                        columnNames = {"profile_name", "session_id"}))
+    name = "hermes_session_binding",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_hermes_session_binding_session",
+        columnNames = {"profile_name", "session_id"}))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
 public class HermesSessionBinding {
@@ -68,13 +67,14 @@ public class HermesSessionBinding {
     @Getter
     private Instant createdAt;
 
+
     private HermesSessionBinding(
-            String profileName,
-            String sessionId,
-            AgentExecution origin,
-            String rootSessionId,
-            String parentSessionId,
-            Instant now) {
+        String profileName,
+        String sessionId,
+        AgentExecution origin,
+        String rootSessionId,
+        String parentSessionId,
+        Instant now) {
         this.profileName = profileName;
         this.sessionId = sessionId;
         this.userId = origin.userId();
@@ -84,13 +84,14 @@ public class HermesSessionBinding {
         this.createdAt = now;
     }
 
+
     public static HermesSessionBinding of(
-            String profileName,
-            String sessionId,
-            AgentExecution origin,
-            String rootSessionId,
-            String parentSessionId,
-            Instant now) {
+        String profileName,
+        String sessionId,
+        AgentExecution origin,
+        String rootSessionId,
+        String parentSessionId,
+        Instant now) {
         return new HermesSessionBinding(profileName, sessionId, origin, rootSessionId, parentSessionId, now);
     }
 }

@@ -68,10 +68,12 @@ class ProactiveCheckRepositoryTest {
 
     private final List<Long> createdConversations = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         clearProactiveRows();
     }
+
 
     @AfterEach
     void tearDown() {
@@ -79,21 +81,22 @@ class ProactiveCheckRepositoryTest {
         transactions.executeWithoutResult(status -> conversations.deleteAllById(createdConversations));
     }
 
+
     @Test
     @DisplayName("보고 읽음 표시는 소유권을 검사하고 첫 시각과 JSON과 트리 토큰을 유지한다")
     void reportOpeningChecksOwnershipAndKeepsFirstTimestamp() {
         ProactiveCheck check = saveCheck(CONVERSATION, "report-session", 77L);
         CheckReport report = new CheckReport(List.of("변화"), List.of("확인"), List.of(), List.of(), List.of("다음"));
         transactions.executeWithoutResult(status -> checks.findById(check.id())
-                .orElseThrow()
-                .succeed(CheckOutcome.FINDINGS, 1, 0, report, 2, 0, 10, 3, 4, NOW.plusSeconds(10)));
+            .orElseThrow()
+            .succeed(CheckOutcome.FINDINGS, 1, 0, report, 2, 0, 10, 3, 4, NOW.plusSeconds(10)));
         CurrentUser other = new CurrentUser(OTHER_USER, "other@example.com", "다른 사용자", 1L, UserRole.MEMBER);
         CurrentUser owner = new CurrentUser(USER, "owner@example.com", "주인", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> service.openReport(other, check.id()))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        error -> assertThat(error.code()).isEqualTo(ErrorCode.PROACTIVE_CHECK_NOT_FOUND));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                error -> assertThat(error.code()).isEqualTo(ErrorCode.PROACTIVE_CHECK_NOT_FOUND));
         assertThat(checks.findById(check.id()).orElseThrow().reportOpenedAt()).isNull();
 
         service.openReport(owner, check.id());
@@ -108,6 +111,7 @@ class ProactiveCheckRepositoryTest {
         assertThat(stored.treeOutputTokens()).isEqualTo(4);
     }
 
+
     @Test
     @DisplayName("점검 대화 찾기는 지운 대화와 보통 대화와 다른 사용자의 대화를 고르지 않는다")
     void findsOnlyLiveCheckConversationOfThatUserAndAgent() {
@@ -118,12 +122,13 @@ class ProactiveCheckRepositoryTest {
         save(Conversation.startedForCheck(OTHER_USER, "남의 점검", AGENT, NOW));
 
         Optional<Conversation> found = transactions.execute(
-                status -> conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
-                        USER, AGENT, ConversationPurpose.CHECK));
+            status -> conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
+                USER, AGENT, ConversationPurpose.CHECK));
 
         assertThat(found).as("고른 점검 대화").map(Conversation::id).contains(expected.id());
         assertThat(found.orElseThrow().purpose()).isEqualTo(ConversationPurpose.CHECK);
     }
+
 
     @Test
     @DisplayName("점검 대화가 지운 것뿐이면 찾지 못한다")
@@ -133,11 +138,12 @@ class ProactiveCheckRepositoryTest {
         save(Conversation.startedBy(USER, "보통", AGENT, NOW));
 
         Optional<Conversation> found = transactions.execute(
-                status -> conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
-                        USER, AGENT, ConversationPurpose.CHECK));
+            status -> conversations.findFirstByUserIdAndAgentIdAndPurposeAndDeletedAtIsNullOrderByIdDesc(
+                USER, AGENT, ConversationPurpose.CHECK));
 
         assertThat(found).isEmpty();
     }
+
 
     @Test
     @DisplayName("살펴보기 수는 점검 대화와 루트 session 이 모두 같은 줄만 센다")
@@ -150,10 +156,11 @@ class ProactiveCheckRepositoryTest {
         assertThat(count(CONVERSATION, "session-a")).as("같은 대화의 session-a").isEqualTo(2);
         assertThat(count(CONVERSATION, "session-b")).as("같은 대화의 session-b").isEqualTo(1);
         assertThat(count(OTHER_CONVERSATION, "session-a"))
-                .as("다른 대화의 session-a")
-                .isEqualTo(1);
+            .as("다른 대화의 session-a")
+            .isEqualTo(1);
         assertThat(count(CONVERSATION, "session-c")).as("보낸 적 없는 session").isZero();
     }
+
 
     @Test
     @DisplayName("지난 살펴보기는 그 대화에서 넘긴 상태가 아니고 모델 없이 건너뛰지 않은 마지막 줄이다")
@@ -172,13 +179,14 @@ class ProactiveCheckRepositoryTest {
         saveCheck(OTHER_CONVERSATION, "session-a", 13L);
 
         Optional<ProactiveCheck> last = transactions.execute(
-                status -> checks.findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
-                        CONVERSATION, CheckStatus.RUNNING));
+            status -> checks.findFirstByConversationIdAndStatusNotAndSkippedReasonIsNullOrderByIdDesc(
+                CONVERSATION, CheckStatus.RUNNING));
 
         assertThat(last).map(ProactiveCheck::id).contains(finished.id());
         assertThat(last.orElseThrow().outcome()).isEqualTo(CheckOutcome.NOTHING_NEW);
         assertThat(last.orElseThrow().toolCalls()).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("최근 발견 읽기는 그 대화와 종류와 기간으로 거르고 최근 것부터 주제 키와 함께 돌려준다")
@@ -188,35 +196,33 @@ class ProactiveCheckRepositoryTest {
         ProactiveCheck otherCheck = saveCheck(OTHER_CONVERSATION, "session-a", 22L);
         saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-old", after.minusSeconds(1));
         saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-boundary", after);
-        ProactiveCheckFinding first =
-                saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-1", after.plusSeconds(1));
+        ProactiveCheckFinding first = saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-1", after.plusSeconds(1));
         ProactiveCheckFinding second = saveFinding(check, CONVERSATION, FindingKind.NEW, "topic-2", NOW);
         saveFinding(check, CONVERSATION, FindingKind.REFERENCE, "topic-reference", NOW);
         saveFinding(otherCheck, OTHER_CONVERSATION, FindingKind.NEW, "topic-other", NOW);
 
-        List<ProactiveCheckFinding> recent =
-                transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
-                        CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 10)));
-        List<ProactiveCheckFinding> limited =
-                transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
-                        CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 1)));
+        List<ProactiveCheckFinding> recent = transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
+            CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 10)));
+        List<ProactiveCheckFinding> limited = transactions.execute(status -> findings.findByConversationIdAndKindAndCreatedAtAfterOrderByIdDesc(
+            CONVERSATION, FindingKind.NEW, after, PageRequest.of(0, 1)));
         List<ProactiveCheckFinding> notified = transactions.execute(
-                status -> findings.findByConversationIdAndKindAndCreatedAtAfter(CONVERSATION, FindingKind.NEW, after));
+            status -> findings.findByConversationIdAndKindAndCreatedAtAfter(CONVERSATION, FindingKind.NEW, after));
 
         assertThat(recent)
-                .as("기간 안의 NEW 발견. 기간의 시작 시각과 같은 줄은 빠진다")
-                .extracting(ProactiveCheckFinding::id)
-                .containsExactly(second.id(), first.id());
+            .as("기간 안의 NEW 발견. 기간의 시작 시각과 같은 줄은 빠진다")
+            .extracting(ProactiveCheckFinding::id)
+            .containsExactly(second.id(), first.id());
         assertThat(recent).extracting(ProactiveCheckFinding::topicKey).containsExactly("topic-2", "topic-1");
         assertThat(limited)
-                .as("쪽 크기 1")
-                .extracting(ProactiveCheckFinding::topicKey)
-                .containsExactly("topic-2");
+            .as("쪽 크기 1")
+            .extracting(ProactiveCheckFinding::topicKey)
+            .containsExactly("topic-2");
         assertThat(notified)
-                .as("이미 알린 묶음")
-                .extracting(ProactiveCheckFinding::topicKey)
-                .containsExactlyInAnyOrder("topic-1", "topic-2");
+            .as("이미 알린 묶음")
+            .extracting(ProactiveCheckFinding::topicKey)
+            .containsExactlyInAnyOrder("topic-1", "topic-2");
     }
+
 
     @Test
     @DisplayName("발견의 글이 칸 길이를 넘으면 칸 길이까지 잘라 저장한다")
@@ -226,19 +232,18 @@ class ProactiveCheckRepositoryTest {
         // 120번째 글자 자리에서 대리 쌍이 나뉘므로 그 글자를 빼고 119자가 남는다.
         String titleSplittingPair = "가".repeat(119) + surrogatePair;
         ProactiveCheckFinding saved = transactions.execute(status -> findings.save(ProactiveCheckFinding.of(
-                check.id(),
-                CONVERSATION,
-                FindingKind.REFERENCE,
-                FindingReason.NO_SOURCE,
-                "a".repeat(41),
-                "k".repeat(121),
-                titleSplittingPair,
-                "https://example.com/" + "p".repeat(2000),
-                null,
-                NOW)));
+            check.id(),
+            CONVERSATION,
+            FindingKind.REFERENCE,
+            FindingReason.NO_SOURCE,
+            "a".repeat(41),
+            "k".repeat(121),
+            titleSplittingPair,
+            "https://example.com/" + "p".repeat(2000),
+            null,
+            NOW)));
 
-        ProactiveCheckFinding read =
-                transactions.execute(status -> findings.findById(saved.id()).orElseThrow());
+        ProactiveCheckFinding read = transactions.execute(status -> findings.findById(saved.id()).orElseThrow());
 
         assertThat(read.area()).hasSize(40);
         assertThat(read.topicKey()).hasSize(120);
@@ -248,11 +253,13 @@ class ProactiveCheckRepositoryTest {
         assertThat(read.checkedAt()).isNull();
     }
 
+
     private Conversation save(Conversation conversation) {
         Conversation saved = transactions.execute(status -> conversations.save(conversation));
         createdConversations.add(saved.id());
         return saved;
     }
+
 
     private ProactiveCheck saveCheck(long conversationId, String rootSessionId, Long rootExecutionId) {
         ProactiveCheck check = ProactiveCheck.started(USER, AGENT, conversationId, CheckTrigger.MANUAL, false, NOW);
@@ -260,26 +267,29 @@ class ProactiveCheckRepositoryTest {
         return transactions.execute(status -> checks.save(check));
     }
 
+
     private ProactiveCheckFinding saveFinding(
-            ProactiveCheck check, long conversationId, FindingKind kind, String topicKey, Instant createdAt) {
+        ProactiveCheck check, long conversationId, FindingKind kind, String topicKey, Instant createdAt) {
         ProactiveCheckFinding finding = ProactiveCheckFinding.of(
-                check.id(),
-                conversationId,
-                kind,
-                kind == FindingKind.REFERENCE ? FindingReason.REPEATED : null,
-                "trend",
-                topicKey,
-                "제목 " + topicKey,
-                "https://example.com/" + topicKey,
-                createdAt,
-                createdAt);
+            check.id(),
+            conversationId,
+            kind,
+            kind == FindingKind.REFERENCE ? FindingReason.REPEATED : null,
+            "trend",
+            topicKey,
+            "제목 " + topicKey,
+            "https://example.com/" + topicKey,
+            createdAt,
+            createdAt);
         return transactions.execute(status -> findings.save(finding));
     }
 
+
     private long count(long conversationId, String rootSessionId) {
         return transactions.execute(
-                status -> checks.countByConversationIdAndHermesRootSessionId(conversationId, rootSessionId));
+            status -> checks.countByConversationIdAndHermesRootSessionId(conversationId, rootSessionId));
     }
+
 
     private void clearProactiveRows() {
         transactions.executeWithoutResult(status -> {

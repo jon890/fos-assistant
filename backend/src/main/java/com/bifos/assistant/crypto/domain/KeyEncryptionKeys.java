@@ -11,14 +11,18 @@ public interface KeyEncryptionKeys {
     /** KEK 가 설정됐는가. 아니면 새 데이터 key 를 만들지 못하고 감싼 key 를 풀지 못한다. */
     boolean available();
 
+
     /** 새로 감쌀 때 쓰는 KEK 의 id. {@link #available()} 이 거짓이면 빈 글이다 */
     String activeKeyId();
+
 
     /** 그 id 의 KEK 를 갖고 있는가. 옛 KEK 를 목록에서 뺐으면 거짓이다 */
     boolean has(String keyId);
 
+
     /** 데이터 key 를 활성 KEK 로 감싼다. {@code aad} 는 그 key 의 주인을 묶는다 */
     String wrap(byte[] dataKey, byte[] aad);
+
 
     /** 감싼 데이터 key 를 푼다. KEK 가 없거나 주인이 다르면 {@link IllegalStateException} 이다 */
     byte[] unwrap(String keyId, String wrapped, byte[] aad);

@@ -28,40 +28,40 @@ class AgentTokenProfileMigrationTest {
     void v29KeepsOldTokensAndIssuesNewTokensWithOnlyProfile() throws SQLException {
         String url = "jdbc:h2:mem:migration-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target("28")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target("28")
+            .load()
+            .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             statement.executeUpdate("INSERT INTO agent_token (user_id, token_hash, label, created_at) "
-                    + "VALUES (7, 'old-hash', 'old', CURRENT_TIMESTAMP(6))");
+                + "VALUES (7, 'old-hash', 'old', CURRENT_TIMESTAMP(6))");
         }
 
         Flyway.configure()
-                .dataSource(url, "sa", "")
-                .locations("classpath:db/migration")
-                .target("34")
-                .load()
-                .migrate();
+            .dataSource(url, "sa", "")
+            .locations("classpath:db/migration")
+            .target("34")
+            .load()
+            .migrate();
 
         try (Connection connection = DriverManager.getConnection(url, "sa", "");
-                Statement statement = connection.createStatement()) {
+            Statement statement = connection.createStatement()) {
             try (ResultSet rows = statement.executeQuery(
-                    "SELECT user_id, profile_name FROM agent_token WHERE token_hash = 'old-hash'")) {
+                "SELECT user_id, profile_name FROM agent_token WHERE token_hash = 'old-hash'")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getLong("user_id")).isEqualTo(7L);
                 assertThat(rows.getString("profile_name"))
-                        .as("옛 토큰의 profile 은 채우지 않는다")
-                        .isNull();
+                    .as("옛 토큰의 profile 은 채우지 않는다")
+                    .isNull();
             }
 
             statement.executeUpdate("INSERT INTO agent_token (user_id, profile_name, token_hash, label, created_at) "
-                    + "VALUES (NULL, 'shared-group', 'new-hash', 'new', CURRENT_TIMESTAMP(6))");
+                + "VALUES (NULL, 'shared-group', 'new-hash', 'new', CURRENT_TIMESTAMP(6))");
             try (ResultSet rows = statement.executeQuery(
-                    "SELECT user_id, profile_name FROM agent_token WHERE token_hash = 'new-hash'")) {
+                "SELECT user_id, profile_name FROM agent_token WHERE token_hash = 'new-hash'")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getObject("user_id")).isNull();
                 assertThat(rows.getString("profile_name")).isEqualTo("shared-group");

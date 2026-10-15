@@ -77,6 +77,7 @@ public class TaskRunStarter {
     private final Clock clock;
     private final BackgroundTasks backgroundTasks;
 
+
     /**
      * {@code QUEUED} 줄을 예정 시각 순으로 열어 본다. 한 줄의 실패는 그 줄에서 멈추고 다음 줄로 간다.
      *
@@ -97,6 +98,7 @@ public class TaskRunStarter {
         }
         return started;
     }
+
 
     /**
      * 줄 하나를 판정하고, 열 수 있으면 잠금을 얻어 {@code RUNNING} 으로 바꾸고 turn 을 띄운다.
@@ -143,6 +145,7 @@ public class TaskRunStarter {
         return true;
     }
 
+
     /**
      * 줄을 잠그고 다시 읽어 「시작」 표를 차례로 본다. 열 수 없으면 건너뛰고 알린다. 열 수 있으면 대화를 준비해 줄에 적는다.
      *
@@ -178,6 +181,7 @@ public class TaskRunStarter {
         return new Prepared(owner, agentCode, task.kind(), conversationId, task.title(), task.instruction());
     }
 
+
     /** 주인이 그 작업의 에이전트로 대화를 시작할 수 있고 흐름이 붙지 않았는가. 지웠거나 껐으면 false 다. */
     private boolean agentUsable(CurrentUser owner, Task task) {
         Optional<Agent> agent = agents.findById(task.agentId());
@@ -192,6 +196,7 @@ public class TaskRunStarter {
         return !flows.known(agent.get().flow());
     }
 
+
     /** 깨우기 작업은 점검 대화에서 {@code SCHEDULED} 살펴보기를 열고, 일반 예약 대화는 열지 않는다. */
     private boolean startCheck(Long runId, Prepared prepared, Instant now) {
         try {
@@ -201,7 +206,7 @@ public class TaskRunStarter {
             }
             proactiveChecks.startScheduled(prepared.owner(), prepared.agentCode(), check -> {
                 Boolean marked = transactions.execute(
-                        status -> markCheckRunning(runId, check.id(), check.conversationId(), now));
+                    status -> markCheckRunning(runId, check.id(), check.conversationId(), now));
                 if (!Boolean.TRUE.equals(marked)) {
                     throw new IllegalStateException("scheduled proactive check could not link its task run");
                 }
@@ -216,6 +221,7 @@ public class TaskRunStarter {
         return true;
     }
 
+
     /** 끝난 살펴보기의 루트 실행과 결과를 {@code task_run} 에 회복한다. 재기동 뒤에도 다음 tick 이 다시 맞춘다. */
     private void recoverChecks(Instant now) {
         for (TaskRun run : runs.findByStatusAndProactiveCheckIdIsNotNull(TaskRunStatus.RUNNING)) {
@@ -226,6 +232,7 @@ public class TaskRunStarter {
             }
         }
     }
+
 
     private void recoverCheck(Long runId, Instant now) {
         TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
@@ -246,6 +253,7 @@ public class TaskRunStarter {
         notices.announce(tasks.findById(run.taskId()).orElseThrow(), run);
     }
 
+
     private void skipCheck(Long runId, TaskRunReason reason, Instant now) {
         transactions.executeWithoutResult(status -> {
             TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
@@ -256,6 +264,7 @@ public class TaskRunStarter {
             skip(task, run, reason, now);
         });
     }
+
 
     private boolean markCheckRunning(Long runId, Long checkId, Long conversationId, Instant now) {
         TaskRun run = runs.findByIdForUpdate(runId).orElse(null);
@@ -273,6 +282,7 @@ public class TaskRunStarter {
         return true;
     }
 
+
     /**
      * 이 줄이 결과를 남길 대화를 정하고 줄에 적는다.
      *
@@ -283,10 +293,10 @@ public class TaskRunStarter {
      */
     private Long conversationFor(Task task, TaskRun run, Instant now) {
         if (run.conversationId() != null
-                && conversations
-                        .findByIdAndUserIdAndDeletedAtIsNull(run.conversationId(), task.ownerUserId())
-                        .filter(conversation -> conversation.agentId().equals(task.agentId()))
-                        .isPresent()) {
+            && conversations
+                .findByIdAndUserIdAndDeletedAtIsNull(run.conversationId(), task.ownerUserId())
+                .filter(conversation -> conversation.agentId().equals(task.agentId()))
+                .isPresent()) {
             return withTaskTier(task, run.conversationId());
         }
         if (run.conversationId() != null && task.conversationMode() == ConversationMode.NEW_PER_RUN) {
@@ -296,18 +306,19 @@ public class TaskRunStarter {
         if (task.conversationMode() == ConversationMode.SINGLE) {
             conversationId = reusableConversation(task).orElseGet(() -> {
                 Long created = chat.startForTask(task.ownerUserId(), task.agentId(), task.title(), task.id())
-                        .id();
+                    .id();
                 // 잠그지 않고 읽은 task 를 고치면 그 줄 전체를 읽은 때의 값으로 덮는다. 대화 칸만 적는다.
                 tasks.useConversation(task.id(), created, now.truncatedTo(ChronoUnit.MICROS));
                 return created;
             });
         } else {
             conversationId = chat.startForTask(task.ownerUserId(), task.agentId(), task.title(), task.id())
-                    .id();
+                .id();
         }
         run.useConversation(conversationId);
         return withTaskTier(task, conversationId);
     }
+
 
     /**
      * 작업이 단계를 골랐으면 그 대화가 그 단계를 고르게 한다. 비었으면 대화의 선택을 건드리지 않는다.
@@ -324,15 +335,17 @@ public class TaskRunStarter {
         return conversationId;
     }
 
+
     private Optional<Long> reusableConversation(Task task) {
         if (task.conversationId() == null) {
             return Optional.empty();
         }
         return conversations
-                .findByIdAndUserIdAndDeletedAtIsNull(task.conversationId(), task.ownerUserId())
-                .filter(conversation -> conversation.agentId().equals(task.agentId()))
-                .map(Conversation::id);
+            .findByIdAndUserIdAndDeletedAtIsNull(task.conversationId(), task.ownerUserId())
+            .filter(conversation -> conversation.agentId().equals(task.agentId()))
+            .map(Conversation::id);
     }
+
 
     /** 줄과 작업을 차례로 잠그고 다시 읽는다. 아직 {@code QUEUED} 이고 작업이 {@code ACTIVE} 일 때만 {@code RUNNING} 으로 바꾼다. */
     private boolean markRunning(Long runId, Instant now) {
@@ -349,17 +362,18 @@ public class TaskRunStarter {
         return true;
     }
 
+
     /** turn 을 돌리고 결과를 적은 뒤 잠금을 푼다. 결과를 잠금을 풀기 전에 적는다. */
     private void runTurn(Long runId, Prepared prepared, TurnHandle handle) {
         Long conversationId = prepared.conversationId();
         try {
             ChatTurn turn = chat.runScheduledTurn(
-                    prepared.owner(),
-                    conversationId,
-                    handle,
-                    "예약 작업 「" + prepared.title() + "」 을 시작했어요",
-                    prepared.instruction(),
-                    event -> hub.publish(conversationId, event));
+                prepared.owner(),
+                conversationId,
+                handle,
+                "예약 작업 「" + prepared.title() + "」 을 시작했어요",
+                prepared.instruction(),
+                event -> hub.publish(conversationId, event));
             finishSafely(runId, turn.executionId(), turn.assistantText(), turn.cancelled(), false);
         } catch (ApiException ex) {
             log.warn("예약 작업의 turn 이 실패했다 taskRunId={} code={}", runId, ex.code(), ex);
@@ -373,6 +387,7 @@ public class TaskRunStarter {
             turns.close(handle);
         }
     }
+
 
     /**
      * 도는 줄의 결과를 적고 알린다. 적지 못해도 예외를 올리지 않는다. 그 줄은 {@code RUNNING} 으로 남아 다음 기동의 정리가
@@ -400,8 +415,8 @@ public class TaskRunStarter {
                     run.succeedQuietly(executionId, now);
                     // 발화 중에 SINGLE 을 NEW_PER_RUN 으로 바꿔도 작업에 남은 SINGLE 대화는 숨기지 않는다.
                     if (task.conversationMode() == ConversationMode.NEW_PER_RUN
-                            && run.conversationId() != null
-                            && !run.conversationId().equals(task.conversationId())) {
+                        && run.conversationId() != null
+                        && !run.conversationId().equals(task.conversationId())) {
                         chat.hideTaskConversation(run.conversationId(), now);
                     }
                 } else {
@@ -414,6 +429,7 @@ public class TaskRunStarter {
         }
     }
 
+
     /** 쓰지 않은 빈 {@code NEW_PER_RUN} 대화를 정리하고 발화를 건너뛰어 알린다. */
     private void skip(Task task, TaskRun run, TaskRunReason reason, Instant now) {
         if (task.conversationMode() == ConversationMode.NEW_PER_RUN && run.conversationId() != null) {
@@ -425,12 +441,14 @@ public class TaskRunStarter {
         notices.announce(task, run);
     }
 
+
     /** 열 준비가 끝난 줄이다. turn 스레드가 받는다. */
     private record Prepared(
-            CurrentUser owner,
-            String agentCode,
-            TaskKind kind,
-            Long conversationId,
-            String title,
-            String instruction) {}
+        CurrentUser owner,
+        String agentCode,
+        TaskKind kind,
+        Long conversationId,
+        String title,
+        String instruction) {
+    }
 }

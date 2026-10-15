@@ -12,4 +12,5 @@ import com.bifos.assistant.shared.auth.CurrentUser;
  * @param user 살펴보기를 연 사용자
  * @param checkId 끝난 살펴보기
  */
-public record ProactiveCheckSettled(CurrentUser user, Long checkId) {}
+public record ProactiveCheckSettled(CurrentUser user, Long checkId) {
+}

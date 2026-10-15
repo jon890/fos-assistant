@@ -42,16 +42,19 @@ public class ModelHidden {
     @Column(name = "model", nullable = false, length = ModelChoice.MODEL_MAX_LENGTH)
     private String model;
 
+
     private ModelHidden(Long groupId, String provider, String model) {
         this.groupId = groupId;
         this.provider = provider;
         this.model = model;
     }
 
+
     /** @param model null 이면 그 provider 전체를 숨긴다 */
     public static ModelHidden of(Long groupId, String provider, String model) {
         return new ModelHidden(groupId, provider, model == null ? WHOLE_PROVIDER : model);
     }
+
 
     public boolean wholeProvider() {
         return WHOLE_PROVIDER.equals(model);

@@ -29,10 +29,12 @@ class BrowserGatewaySecurityTest {
 
     private final HttpClient client = HttpClient.newHttpClient();
 
+
     @AfterEach
     void tearDown() {
         client.close();
     }
+
 
     @Test
     @DisplayName("JWT 없이 부른 중계 경로는 401 이 아니라 중계의 판정을 받는다")
@@ -43,14 +45,15 @@ class BrowserGatewaySecurityTest {
         assertThat(response.body()).isEmpty();
     }
 
+
     @Test
     @DisplayName("틀린 사용자 토큰이 실려도 중계 경로는 표식으로만 판정한다")
     void ignoresUserTokenOnGateway() throws Exception {
-        HttpResponse<String> response =
-                send(HttpRequest.newBuilder(uri("/json/version")).header("Authorization", "Bearer not-a-jwt"));
+        HttpResponse<String> response = send(HttpRequest.newBuilder(uri("/json/version")).header("Authorization", "Bearer not-a-jwt"));
 
         assertThat(response.statusCode()).isEqualTo(503);
     }
+
 
     @Test
     @DisplayName("받기로 하지 않은 중계 경로는 실제 서버에서도 빈 본문의 404 이다")
@@ -61,9 +64,11 @@ class BrowserGatewaySecurityTest {
         assertThat(response.body()).isEmpty();
     }
 
+
     private URI uri(String path) {
         return URI.create("http://127.0.0.1:" + port + "/internal/browser-gateway/" + TOKEN + path);
     }
+
 
     private HttpResponse<String> send(HttpRequest.Builder request) throws IOException, InterruptedException {
         return client.send(request.GET().build(), HttpResponse.BodyHandlers.ofString());

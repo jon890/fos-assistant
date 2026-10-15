@@ -49,6 +49,7 @@ public class ChatPendingMessage {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+
     private ChatPendingMessage(Long conversationId, Long userId, String content, boolean held, Instant createdAt) {
         this.conversationId = conversationId;
         this.userId = userId;
@@ -57,15 +58,18 @@ public class ChatPendingMessage {
         this.createdAt = createdAt;
     }
 
+
     public static ChatPendingMessage queued(
-            Long conversationId, Long userId, String content, boolean held, Instant createdAt) {
+        Long conversationId, Long userId, String content, boolean held, Instant createdAt) {
         return new ChatPendingMessage(conversationId, userId, content, held, createdAt);
     }
+
 
     /** 받은 순서대로 글을 {@link #SEPARATOR} 로 잇는다. */
     public static String merged(List<ChatPendingMessage> rows) {
         return rows.stream().map(ChatPendingMessage::content).collect(Collectors.joining(SEPARATOR));
     }
+
 
     /**
      * {@code rows} 를 이은 글에 {@code added} 를 더 이었을 때의 길이다.

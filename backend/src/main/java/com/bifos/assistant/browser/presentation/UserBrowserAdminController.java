@@ -27,13 +27,15 @@ public class UserBrowserAdminController {
     private final UserDisplayNameService userNames;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public List<AdminBrowserView> list() {
         currentUser.requireAdmin();
         return browsers.list().stream()
-                .map(browser -> AdminBrowserView.of(browser, userNames.find(browser.userId())))
-                .toList();
+            .map(browser -> AdminBrowserView.of(browser, userNames.find(browser.userId())))
+            .toList();
     }
+
 
     @PostMapping("/{id}/stop")
     public AdminBrowserView stop(@PathVariable Long id) {
@@ -41,6 +43,7 @@ public class UserBrowserAdminController {
         var browser = browsers.stopById(id);
         return AdminBrowserView.of(browser, userNames.find(browser.userId()));
     }
+
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

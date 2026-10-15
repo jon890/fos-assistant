@@ -27,6 +27,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     /** 엔티티 캐시를 거치지 않고 원본 조회 중 실행의 현재 상태를 확인한다. */
     boolean existsByIdAndStatus(Long id, ExecutionStatus status);
 
+
     /** 알 수 없는 자식 수 대신 사건 관측이 빠진 실행을 센다. 과거 UNKNOWN 과 실행 중인 줄은 뺀다. */
     @Query("""
             select count(e) from AgentExecution e
@@ -35,7 +36,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
               and e.eventObservation = 'INCOMPLETE'
             """)
     long countIncompleteEventObservations(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /** 실행 번호들의 에이전트 번호만 읽는다. 기억 목록이 남긴 에이전트를 보일 때 쓴다. */
     @Query("""
@@ -44,9 +46,11 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<ExecutionAgentRef> findAgentRefs(@Param("ids") Collection<Long> ids);
 
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from AgentExecution e where e.id = :id")
     Optional<AgentExecution> lockById(@Param("id") Long id);
+
 
     @Query("""
             select e from AgentExecution e where e.finishedAt >= :since
@@ -56,7 +60,9 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<AgentExecution> findUnknownReasoningDefaults(@Param("since") Instant since, Pageable pageable);
 
+
     List<AgentExecution> findByUserIdOrderByIdDesc(Long userId, Pageable pageable);
+
 
     /**
      * 루트 실행만 낸다.
@@ -65,6 +71,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 본다. 월 비용 합계는 자식을 포함하고, 그 이유는 {@link #sumCostBetween} 이 적는다.
      */
     List<AgentExecution> findByUserIdAndRootExecutionIdIsNullOrderByIdDesc(Long userId, Pageable pageable);
+
 
     /** 시작 시각과 번호를 함께 써서 루트 실행을 안정적으로 다음 쪽부터 읽는다. */
     @Query("""
@@ -76,15 +83,18 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             order by e.startedAt desc, e.id desc
             """)
     List<AgentExecution> findRootExecutionsBefore(
-            @Param("userId") Long userId,
-            @Param("startedAt") Instant startedAt,
-            @Param("id") long id,
-            Pageable pageable);
+        @Param("userId") Long userId,
+        @Param("startedAt") Instant startedAt,
+        @Param("id") long id,
+        Pageable pageable);
+
 
     List<AgentExecution> findByStatus(ExecutionStatus status);
 
+
     /** 사용자 에이전트와 대화에 묶이지 않은 시스템 실행이다. 기동 때 원격 종료를 확인한다. */
     List<AgentExecution> findByAgentIdIsNullAndConversationIdIsNullAndStatus(ExecutionStatus status);
+
 
     /**
      * 그 Hermes session 을 가진 그 profile 의 실행을 상태로 골라 둘까지만 읽는다.
@@ -93,10 +103,12 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      * 하므로 둘이 보이면 더 읽지 않아도 실패가 정해진다. {@code (hermes_session_id, status)} 색인을 탄다.
      */
     List<AgentExecution> findTop2ByHermesSessionIdAndStatusAndProfileName(
-            String hermesSessionId, ExecutionStatus status, String profileName);
+        String hermesSessionId, ExecutionStatus status, String profileName);
+
 
     /** 그 Hermes session 으로 그 상태인 실행이 profile 과 무관하게 하나라도 있는지. 거절 이유를 로그에서 나누려고 쓴다. */
     boolean existsByHermesSessionIdAndStatus(String hermesSessionId, ExecutionStatus status);
+
 
     /**
      * 그 profile 의 실행 줄이 그 Hermes session 을 상태와 무관하게 쓰는지.
@@ -106,8 +118,10 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      */
     boolean existsByProfileNameAndHermesSessionId(String profileName, String hermesSessionId);
 
+
     /** 그 {@code delegation_key} 로 만든 위임 실행이다. 같은 도구 호출이 다시 왔는지 볼 때 쓴다(ADR-032). */
     Optional<AgentExecution> findByDelegationKey(String delegationKey);
+
 
     /**
      * 한 루트 아래에서 그 상태인 위임 실행의 수다. 위임 동시 한도를 셀 때 쓴다.
@@ -116,8 +130,10 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
      */
     long countByRootExecutionIdAndStatusAndDelegationKeyIsNotNull(Long rootExecutionId, ExecutionStatus status);
 
+
     /** 한 루트 아래의 위임 실행 수다. 상태와 무관하게 센다. 먼저 살펴보기 한 번이 맡긴 수를 적을 때 쓴다(ADR-080). */
     long countByRootExecutionIdAndDelegationKeyIsNotNull(Long rootExecutionId);
+
 
     /** 그 사용자의 그 상태인 실행 줄 수다. 대화 turn 의 루트 줄은 turn 자리로 세므로 뺀다(ADR-069). */
     @Query("""
@@ -127,6 +143,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
               and (e.parentExecutionId is not null or e.conversationId is null)
             """)
     long countRunningOutsideTurns(@Param("userId") Long userId, @Param("status") ExecutionStatus status);
+
 
     /**
      * 이 실행의 결과를 부모에게 전했다고 적는다. 이미 적혀 있으면 바꾸지 않고 0 을 돌려준다.
@@ -138,6 +155,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
     @Modifying
     @Query("update AgentExecution e set e.resultDeliveredAt = :at where e.id = :id and e.resultDeliveredAt is null")
     int markResultDelivered(@Param("id") Long id, @Param("at") Instant at);
+
 
     /**
      * 한 루트 아래의 위임 실행 가운데 결과를 전하지 않은 줄을 모두 전했다고 적고 적은 줄 수를 돌려준다.
@@ -155,6 +173,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 and e.resultDeliveredAt is null
             """)
     int markTreeDelivered(@Param("rootExecutionId") Long rootExecutionId, @Param("at") Instant at);
+
 
     /**
      * 그 대화에 아직 전하지 않은 끝난 위임 결과를 오래된 순으로 읽는다.
@@ -175,6 +194,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<AgentExecution> findUndeliveredResults(@Param("conversationId") Long conversationId);
 
+
     /** 아직 전하지 않은 끝난 위임 결과가 있는 대화의 번호다. 조건은 {@link #findUndeliveredResults} 와 같다. */
     @Query("""
             select distinct e.conversationId from AgentExecution e
@@ -187,6 +207,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                     where p.id = e.parentExecutionId and p.parentExecutionId is null)
             """)
     List<Long> findConversationsWithUndeliveredResults();
+
 
     /**
      * 그 사용자의 대화 turn 루트 실행 가운데 {@code since} 뒤에 실패했고 아직 다시 돌려 성공하지 않은 것을 최근 순으로 읽는다.
@@ -209,6 +230,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<AgentExecution> findUnresolvedFailedTurns(@Param("userId") Long userId, @Param("since") Instant since);
 
+
     /**
      * 그 사용자의 위임 실행 가운데 도는 중이거나 {@code finishedSince} 뒤에 끝난 것을 최근 순으로 읽는다.
      *
@@ -223,13 +245,16 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             order by e.id desc
             """)
     List<AgentExecution> findDelegationsForAttention(
-            @Param("userId") Long userId, @Param("finishedSince") Instant finishedSince);
+        @Param("userId") Long userId, @Param("finishedSince") Instant finishedSince);
+
 
     /** 루트와 그 자손을 한 번에 읽는다. 루트 자신은 rootExecutionId 가 null 이라 따로 읽는다. */
     List<AgentExecution> findByRootExecutionId(Long rootExecutionId);
 
+
     /** 여러 답의 자손 실행을 한 번에 읽는다. */
     List<AgentExecution> findByRootExecutionIdIn(Collection<Long> rootExecutionIds);
+
 
     /** 이 번호들 중 자식을 가진 것만 낸다. 목록이 실행마다 세지 않게 한 번에 읽는다. */
     @Query("""
@@ -237,6 +262,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             where e.parentExecutionId in :parentIds
             """)
     List<Long> findParentIdsHavingChildren(@Param("parentIds") Collection<Long> parentIds);
+
 
     /**
      * 한 구간의 환산 금액을 데이터베이스에서 합친다.
@@ -258,6 +284,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     MonthlyCost sumCostBetween(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
+
     /**
      * 환산액과 실제 청구액을 함께 합친다. RUNNING 은 빠진다.
      *
@@ -277,7 +304,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
                 and e.status <> com.bifos.assistant.usage.domain.type.ExecutionStatus.RUNNING
             """)
     MonthlyCostDetail sumCostDetailBetween(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /**
      * 에이전트별 합계. RUNNING 은 빠진다.
@@ -310,7 +338,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             order by sum(coalesce(e.estimatedCostMicros, 0L)) desc, e.agentId asc
             """)
     List<CostByAgent> sumByAgentBetween(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /** 모델과 provider 별 합계. RUNNING 은 빠진다. */
     @Query("""
@@ -332,7 +361,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             order by sum(coalesce(e.estimatedCostMicros, 0L)) desc, e.model asc
             """)
     List<CostByModel> sumByModelBetween(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /**
      * 날짜별 합계. 하루 단위로 묶는다. RUNNING 은 빠진다.
@@ -372,6 +402,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             """)
     List<CostByDay> sumByDayBetween(@Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
 
+
     /**
      * 설정 지문별 합계. 무엇이 달라져서 비용이 움직였는지 본다. RUNNING 은 빠진다.
      *
@@ -397,7 +428,8 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             order by max(e.startedAt) desc, e.runtimeFingerprint asc
             """)
     List<CostByFingerprint> sumByFingerprintBetween(
-            @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+        @Param("userId") Long userId, @Param("from") Instant from, @Param("to") Instant to);
+
 
     /**
      * 대화마다 위임 실행의 결과를 전한 가장 늦은 시각이다. 전한 실행이 없는 대화는 나오지 않는다.
@@ -414,10 +446,12 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
             group by e.conversationId
             """)
     List<ConversationDelivery> findLastDeliveredByConversation(
-            @Param("conversationIds") Collection<Long> conversationIds);
+        @Param("conversationIds") Collection<Long> conversationIds);
+
 
     /** 그 대화에 그 상태의 실행이 있는가. 지운 대화의 정리가 도는 실행을 기다릴 때 쓴다. */
     boolean existsByConversationIdAndStatus(Long conversationId, ExecutionStatus status);
+
 
     /** 그 대화의 실행이 보낸 Hermes session 을 겹치지 않게 읽는다. 지운 대화의 session 을 Hermes 에서 지울 때 쓴다. */
     @Query("""
@@ -426,6 +460,7 @@ public interface AgentExecutionRepository extends JpaRepository<AgentExecution, 
              where e.conversationId = :conversationId and e.hermesSessionId is not null
             """)
     List<ExecutionSessionRef> findSessionRefs(@Param("conversationId") Long conversationId);
+
 
     /** 그 대화 실행의 답 본문을 비운다. 토큰과 금액은 남긴다. 트랜잭션은 {@code ConversationExecutionPurge} 가 연다. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)

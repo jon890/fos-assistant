@@ -34,11 +34,13 @@ final class ArtifactFileWriter {
     private final boolean forceAtomicMoveFallback;
     private final ArtifactAtomicMover atomicMover;
 
+
     ArtifactFileWriter(ArtifactPathPolicy paths, boolean forceAtomicMoveFallback, ArtifactAtomicMover atomicMover) {
         this.paths = paths;
         this.forceAtomicMoveFallback = forceAtomicMoveFallback;
         this.atomicMover = atomicMover;
     }
+
 
     long writeLocked(Long conversationId, String relativePath, byte[] content) {
         Path target = paths.resolveForWrite(conversationId, relativePath);
@@ -67,13 +69,13 @@ final class ArtifactFileWriter {
         }
     }
 
+
     private static void writeWithSecureDirectory(SecureDirectoryStream<Path> directory, Path targetName, byte[] content)
-            throws IOException {
+        throws IOException {
         Path temporaryName = Path.of(".artifact-" + UUID.randomUUID() + ".tmp");
         boolean temporaryCreated = false;
         try {
-            Set<OpenOption> options =
-                    Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
+            Set<OpenOption> options = Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS);
             try (SeekableByteChannel channel = directory.newByteChannel(temporaryName, options)) {
                 temporaryCreated = true;
                 writeFully(channel, content);
@@ -88,13 +90,14 @@ final class ArtifactFileWriter {
         }
     }
 
+
     private static void writeWithAtomicMove(
-            Path parent, Path target, Path folder, byte[] content, ArtifactAtomicMover atomicMover) throws IOException {
+        Path parent, Path target, Path folder, byte[] content, ArtifactAtomicMover atomicMover) throws IOException {
         Path temporary = null;
         try {
             temporary = Files.createTempFile(parent, ".artifact-", ".tmp");
             try (SeekableByteChannel channel = Files.newByteChannel(
-                    temporary, EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
+                temporary, EnumSet.of(StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING))) {
                 writeFully(channel, content);
             }
             verifyParent(parent, folder);
@@ -114,12 +117,14 @@ final class ArtifactFileWriter {
         }
     }
 
+
     private static void writeFully(SeekableByteChannel channel, byte[] content) throws IOException {
         ByteBuffer buffer = ByteBuffer.wrap(content);
         while (buffer.hasRemaining()) {
             channel.write(buffer);
         }
     }
+
 
     private static void deleteSecurely(SecureDirectoryStream<Path> directory, Path temporary) {
         try {
@@ -129,9 +134,11 @@ final class ArtifactFileWriter {
         }
     }
 
+
     static void atomicMove(Path source, Path target) throws IOException {
         Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
+
 
     private static void warnUnsupportedSecureDirectoryOnce() {
         if (UNSUPPORTED_SECURE_DIRECTORY_WARNING_LOGGED.compareAndSet(false, true)) {

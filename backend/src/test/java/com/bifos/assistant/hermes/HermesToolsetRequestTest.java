@@ -38,17 +38,20 @@ class HermesToolsetRequestTest {
     @TempDir
     Path attachmentRoot;
 
-    private record Call(String method, String path, String authorization, String body) {}
+
+    private record Call(String method, String path, String authorization, String body) {
+    }
+
 
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             calls.add(new Call(
-                    exchange.getRequestMethod(),
-                    exchange.getRequestURI().getPath(),
-                    exchange.getRequestHeaders().getFirst("Authorization"),
-                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                exchange.getRequestMethod(),
+                exchange.getRequestURI().getPath(),
+                exchange.getRequestHeaders().getFirst("Authorization"),
+                new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] body = response.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.sendResponseHeaders(status, body.length);
@@ -57,24 +60,26 @@ class HermesToolsetRequestTest {
         });
         server.start();
         HermesProperties properties = new HermesProperties(
-                "keys",
-                baseUrl(),
-                DASHBOARD_TOKEN,
-                "http://listener.test",
-                Duration.ofMillis(10),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1));
+            "keys",
+            baseUrl(),
+            DASHBOARD_TOKEN,
+            "http://listener.test",
+            Duration.ofMillis(10),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1));
         HermesProfileKeyStore keyStore = mock(HermesProfileKeyStore.class);
         when(keyStore.resolve("kid")).thenReturn(PROFILE_KEY);
         client = new HttpHermesToolsetClient(
-                keyStore, properties, new SandboxAttachmentDirectory(attachmentRoot.toString()));
+            keyStore, properties, new SandboxAttachmentDirectory(attachmentRoot.toString()));
     }
+
 
     @AfterEach
     void stop() {
         server.stop(0);
     }
+
 
     @Test
     @DisplayName("대시보드 목록은 기계용 토큰으로 읽는다")
@@ -92,11 +97,12 @@ class HermesToolsetRequestTest {
         });
     }
 
+
     @Test
     @DisplayName("listener 목록은 profile key로 켜진 이름만 읽는다")
     void listenerListReadsOnlyEnabledNamesWithProfileKey() {
         response = "{\"object\":\"list\",\"platform\":\"api_server\",\"data\":["
-                + "{\"name\":\"web\",\"enabled\":true},{\"name\":\"terminal\",\"enabled\":false}]}";
+            + "{\"name\":\"web\",\"enabled\":true},{\"name\":\"terminal\",\"enabled\":false}]}";
 
         assertThat(client.readEnabled(baseUrl() + "/p/kid", "kid")).containsExactly("web");
         assertThat(calls).singleElement().satisfies(call -> {
@@ -105,6 +111,7 @@ class HermesToolsetRequestTest {
             assertThat(call.authorization()).isEqualTo("Bearer " + PROFILE_KEY);
         });
     }
+
 
     @Test
     @DisplayName("API server 목록과 실행 공간 주인을 설정으로 쓴다")
@@ -116,15 +123,16 @@ class HermesToolsetRequestTest {
             assertThat(call.path()).isEqualTo("/api/config");
             assertThat(call.authorization()).isEqualTo("Bearer " + DASHBOARD_TOKEN);
             assertThat(new ObjectMapper().readValue(call.body(), Map.class))
-                    .isEqualTo(Map.of(
-                            "profile",
-                            "kid",
-                            "config",
-                            Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant"))),
-                            "sandbox_owner",
-                            "u7"));
+                .isEqualTo(Map.of(
+                    "profile",
+                    "kid",
+                    "config",
+                    Map.of("platform_toolsets", Map.of("api_server", List.of("web", "fos-assistant"))),
+                    "sandbox_owner",
+                    "u7"));
         });
     }
+
 
     @Test
     @DisplayName("기본 도구 쓰기는 실행 공간이 없으면 local 로 돌리지 말라는 칸을 함께 보낸다")
@@ -132,18 +140,19 @@ class HermesToolsetRequestTest {
         client.writeApiServerInSandbox("kid", List.of("terminal", "fos-assistant"), "u7");
 
         assertThat(calls)
-                .singleElement()
-                .satisfies(call -> assertThat(new ObjectMapper().readValue(call.body(), Map.class))
-                        .isEqualTo(Map.of(
-                                "profile",
-                                "kid",
-                                "config",
-                                Map.of("platform_toolsets", Map.of("api_server", List.of("terminal", "fos-assistant"))),
-                                "sandbox_owner",
-                                "u7",
-                                "require_sandbox",
-                                true)));
+            .singleElement()
+            .satisfies(call -> assertThat(new ObjectMapper().readValue(call.body(), Map.class))
+                .isEqualTo(Map.of(
+                    "profile",
+                    "kid",
+                    "config",
+                    Map.of("platform_toolsets", Map.of("api_server", List.of("terminal", "fos-assistant"))),
+                    "sandbox_owner",
+                    "u7",
+                    "require_sandbox",
+                    true)));
     }
+
 
     @Test
     @DisplayName("409 의 code 가 sandbox_unavailable 이면 실행 공간이 없다는 오류다")
@@ -152,9 +161,10 @@ class HermesToolsetRequestTest {
         response = "{\"detail\":\"sandbox is not configured\",\"code\":\"sandbox_unavailable\"}";
 
         assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE));
     }
+
 
     @Test
     @DisplayName("첨부를 올린 적 없는 주인도 보내기 전에 첨부 디렉터리를 만들어 도구를 저장한다")
@@ -162,9 +172,10 @@ class HermesToolsetRequestTest {
         client.writeApiServer("kid", List.of("vision", "fos-assistant"), "u7");
 
         assertThat(attachmentRoot.resolve("users").resolve(SandboxAttachmentDirectory.key("u7")))
-                .isDirectory();
+            .isDirectory();
         assertThat(calls).hasSize(1);
     }
+
 
     @Test
     @DisplayName("주인의 첨부 디렉터리가 링크이면 Hermes 에 보내지 않고 실행 공간 거절로 멈춘다")
@@ -174,12 +185,13 @@ class HermesToolsetRequestTest {
         Files.createSymbolicLink(users.resolve(SandboxAttachmentDirectory.key("u7")), other);
 
         assertThatThrownBy(() -> client.writeApiServer("kid", List.of("vision"), "u7"))
-                .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
-                    assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
-                    assertThat(ex.status()).isEqualTo(409);
-                });
+            .isInstanceOfSatisfying(HermesRequestRejected.class, ex -> {
+                assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_SANDBOX_UNAVAILABLE);
+                assertThat(ex.status()).isEqualTo(409);
+            });
         assertThat(calls).isEmpty();
     }
+
 
     @Test
     @DisplayName("다른 409 는 detail 에 같은 낱말이 있어도 Hermes 에 닿지 못한 것과 같다")
@@ -188,14 +200,15 @@ class HermesToolsetRequestTest {
         response = "{\"detail\":\"sandbox_unavailable\",\"code\":\"profile_busy\"}";
 
         assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
 
         response = "not json";
         assertThatThrownBy(() -> client.writeApiServer("kid", List.of("terminal"), "u7"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
+
 
     @Test
     @DisplayName("listener 목록이 data 로 감싸지 않은 배열이면 받지 않는다")
@@ -203,10 +216,11 @@ class HermesToolsetRequestTest {
         response = "[{\"name\":\"web\",\"enabled\":true}]";
 
         assertThatThrownBy(() -> client.readEnabled(baseUrl() + "/p/kid", "kid"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("listener가 빈 목록을 성공으로 돌려도 도구가 모두 꺼진 것으로 읽지 않는다")
@@ -214,10 +228,11 @@ class HermesToolsetRequestTest {
         response = "{\"object\":\"list\",\"platform\":\"api_server\",\"data\":[]}";
 
         assertThatThrownBy(() -> client.readEnabled(baseUrl() + "/p/kid", "kid"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
+
 
     private String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort();

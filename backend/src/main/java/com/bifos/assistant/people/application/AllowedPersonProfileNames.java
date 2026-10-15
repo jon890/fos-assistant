@@ -16,6 +16,7 @@ public class AllowedPersonProfileNames implements ReservedProfileNames {
 
     private final AllowedPersonRepository allowedPeople;
 
+
     @Override
     public boolean reservedByPerson(String profileName) {
         return allowedPeople.existsByHermesProfile(profileName);

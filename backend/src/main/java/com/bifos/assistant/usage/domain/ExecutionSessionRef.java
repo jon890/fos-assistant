@@ -7,4 +7,5 @@ package com.bifos.assistant.usage.domain;
  *
  * @param agentId 실행한 에이전트. 에이전트 없이 돈 실행이면 null 이다
  */
-public record ExecutionSessionRef(Long agentId, String profileName, String sessionId) {}
+public record ExecutionSessionRef(Long agentId, String profileName, String sessionId) {
+}

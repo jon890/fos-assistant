@@ -14,13 +14,13 @@ import java.time.Instant;
  * @param fingerprint 실행 당시의 문맥 지문
  */
 public record CostByFingerprint(
-        String fingerprint,
-        Long executions,
-        Long estimatedMicros,
-        Long actualMicros,
-        Long inputTokens,
-        Long outputTokens,
-        Double avgContextChars,
-        Instant firstSeenAt,
-        Instant lastSeenAt) {
+    String fingerprint,
+    Long executions,
+    Long estimatedMicros,
+    Long actualMicros,
+    Long inputTokens,
+    Long outputTokens,
+    Double avgContextChars,
+    Instant firstSeenAt,
+    Instant lastSeenAt) {
 }

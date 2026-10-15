@@ -18,6 +18,7 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.isValid("a".repeat(64))).isTrue();
     }
 
+
     @Test
     @DisplayName("대문자와 공백과 65자와 빈 값과 점으로 시작하는 이름은 맞지 않는다")
     void rejectsUppercaseSpaceTooLongEmptyAndLeadingDot() {
@@ -32,6 +33,7 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.isValid("_x")).isFalse();
     }
 
+
     @Test
     @DisplayName("미리보기가 이름뿐이면 그 이름을, 참고 파일 경로가 붙으면 화살표 앞의 이름을 꺼낸다")
     void extractsNameFromNameOnlyAndNameWithPathPreview() {
@@ -39,6 +41,7 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.fromPreview("shopping → references/list.md")).isEqualTo("shopping");
         assertThat(HermesSkillName.fromPreview("  shopping  ")).isEqualTo("shopping");
     }
+
 
     @Test
     @DisplayName("미리보기의 이름이 규칙에 맞지 않으면 꺼내지 않는다")
@@ -53,6 +56,7 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.fromPreview("→ references/list.md")).isNull();
     }
 
+
     /** Hermes 는 길이 상한을 넘는 미리보기의 앞부분만 남기고 끝에 {@code ...} 을 붙인다. */
     @Test
     @DisplayName("이름 중간에서 잘린 미리보기와 점만 남은 미리보기에서는 이름을 꺼내지 않는다")
@@ -61,8 +65,9 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.fromPreview("a...")).isNull();
         assertThat(HermesSkillName.fromPreview("...")).isNull();
         assertThat(HermesSkillName.fromPreview("weekly-grocery-shopp... → references/list.md"))
-                .isNull();
+            .isNull();
     }
+
 
     @Test
     @DisplayName("파일 경로만 잘린 미리보기에서는 온전한 이름을 꺼낸다")
@@ -70,6 +75,7 @@ class HermesSkillNameTest {
         assertThat(HermesSkillName.fromPreview("shopping → references/li...")).isEqualTo("shopping");
         assertThat(HermesSkillName.fromPreview("shopping →...")).isEqualTo("shopping");
     }
+
 
     @Test
     @DisplayName("잘린 표시는 미리보기에서만 보고 이름 규칙 자체는 바꾸지 않는다")

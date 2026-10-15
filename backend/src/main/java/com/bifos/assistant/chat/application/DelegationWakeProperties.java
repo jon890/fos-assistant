@@ -13,14 +13,14 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.delegation-wake")
 public record DelegationWakeProperties(
-        @DefaultValue("true") boolean enabled,
-        @DefaultValue("10") int maxAutoTurns) {
+    @DefaultValue("true") boolean enabled,
+    @DefaultValue("10") int maxAutoTurns) {
 
     /** 1 미만이면 기동을 멈춘다. 0 이면 결과가 와도 한 번도 열지 않는데 기동은 성공해 알아채지 못한다. */
     public DelegationWakeProperties {
         if (maxAutoTurns < 1) {
             throw new IllegalStateException(
-                    "assistant.delegation-wake.max-auto-turns must be at least 1: " + maxAutoTurns);
+                "assistant.delegation-wake.max-auto-turns must be at least 1: " + maxAutoTurns);
         }
     }
 }

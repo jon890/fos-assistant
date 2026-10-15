@@ -21,6 +21,7 @@ public class AllowedUserResolver implements TokenUserResolver {
     private final SignInRevocation signInRevocation;
     private final UserProvisioningService provisioning;
 
+
     /**
      * 꺼진 주소면 비어 있는 값을, 아니면 {@link UserProvisioningService#resolve} 의 사용자를 돌려준다.
      *
@@ -35,6 +36,7 @@ public class AllowedUserResolver implements TokenUserResolver {
         return Optional.of(provisioning.resolve(email, displayName));
     }
 
+
     /**
      * {@link #resolveAllowed} 의 사용자를 인증 주체로 바꿔 돌려준다. 꺼진 주소면 비어 있는 값이다.
      *
@@ -45,6 +47,6 @@ public class AllowedUserResolver implements TokenUserResolver {
     @Transactional
     public Optional<CurrentUser> resolveCurrentUser(String email, String displayName) {
         return resolveAllowed(email, displayName)
-                .map(user -> new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()));
+            .map(user -> new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role()));
     }
 }

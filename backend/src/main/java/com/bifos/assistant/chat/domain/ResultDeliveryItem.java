@@ -20,12 +20,12 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "result_delivery_item",
-        uniqueConstraints = {
-            @UniqueConstraint(
-                    name = "uk_result_delivery_item_source_key",
-                    columnNames = {"source", "result_key"})
-        })
+    name = "result_delivery_item",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_result_delivery_item_source_key",
+            columnNames = {"source", "result_key"})
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -46,11 +46,13 @@ public class ResultDeliveryItem {
     @Column(name = "result_key", nullable = false, length = 64)
     private String resultKey;
 
+
     private ResultDeliveryItem(Long deliveryId, String source, String resultKey) {
         this.deliveryId = deliveryId;
         this.source = source;
         this.resultKey = resultKey;
     }
+
 
     public static ResultDeliveryItem of(Long deliveryId, String source, String resultKey) {
         return new ResultDeliveryItem(deliveryId, source, resultKey);

@@ -17,6 +17,7 @@ public interface Flow {
     /** {@code agent.flow} 에 적는 이름이다. */
     String name();
 
+
     /**
      * 요청 하나를 끝까지 돌린다.
      *
@@ -24,12 +25,12 @@ public interface Flow {
      * @param onEvent 단계가 시작하고 끝날 때마다 받는다. 한 번에 받는 경로에서는 아무것도 하지 않는다
      */
     ChatTurn run(
-            CurrentUser user,
-            Conversation conversation,
-            Agent agent,
-            String text,
-            String input,
-            TurnIntent intent,
-            Consumer<AgentExecution> onRootStarted,
-            Consumer<ChatEvent> onEvent);
+        CurrentUser user,
+        Conversation conversation,
+        Agent agent,
+        String text,
+        String input,
+        TurnIntent intent,
+        Consumer<AgentExecution> onRootStarted,
+        Consumer<ChatEvent> onEvent);
 }

@@ -50,10 +50,11 @@ public class ExecutionEventRecorder {
      * {@code run.completed} 가 그렇다.
      */
     private static final Map<String, ExecutionEventType> OUR_NAMES = Map.of(
-            "tool.started", ExecutionEventType.TOOL_STARTED,
-            "tool.completed", ExecutionEventType.TOOL_COMPLETED,
-            "subagent.start", ExecutionEventType.SUBAGENT_STARTED,
-            "subagent.complete", ExecutionEventType.SUBAGENT_COMPLETED);
+        "tool.started", ExecutionEventType.TOOL_STARTED,
+        "tool.completed", ExecutionEventType.TOOL_COMPLETED,
+        "subagent.start", ExecutionEventType.SUBAGENT_STARTED,
+        "subagent.complete", ExecutionEventType.SUBAGENT_COMPLETED);
+
 
     /**
      * Hermes 사건 하나를 우리 사건으로 옮긴다.
@@ -72,24 +73,25 @@ public class ExecutionEventRecorder {
             skillUses.recordModel(execution.id(), event.skillName());
         }
         return ExecutionEvent.builder()
-                .executionId(execution.id())
-                .sequence(sequence)
-                .eventType(type)
-                .toolName(type.isTool() ? event.toolName() : null)
-                .subagentName(type.isSubagent() ? subagentName(event) : null)
-                .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
-                .durationMs(event.durationMs())
-                .failed(
-                        type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
-                                ? event.failed()
-                                : null)
-                .detail(type.isSubagent() && event.goal() != null ? event.goal() : event.detail())
-                .model(type.isSubagent() ? event.model() : null)
-                .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
-                .outputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.outputTokens() : null)
-                .occurredAt(clock.instant())
-                .build();
+            .executionId(execution.id())
+            .sequence(sequence)
+            .eventType(type)
+            .toolName(type.isTool() ? event.toolName() : null)
+            .subagentName(type.isSubagent() ? subagentName(event) : null)
+            .hermesSessionId(type.isSubagent() ? event.childSessionId() : null)
+            .durationMs(event.durationMs())
+            .failed(
+                type == ExecutionEventType.TOOL_COMPLETED || type == ExecutionEventType.SUBAGENT_COMPLETED
+                    ? event.failed()
+                    : null)
+            .detail(type.isSubagent() && event.goal() != null ? event.goal() : event.detail())
+            .model(type.isSubagent() ? event.model() : null)
+            .inputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.inputTokens() : null)
+            .outputTokens(type == ExecutionEventType.SUBAGENT_COMPLETED ? event.outputTokens() : null)
+            .occurredAt(clock.instant())
+            .build();
     }
+
 
     private static String subagentName(RunEvent event) {
         String name = event.toolName();
@@ -105,6 +107,7 @@ public class ExecutionEventRecorder {
         return name.length() > 128 ? name.substring(0, 128) : name;
     }
 
+
     /**
      * Hermes 사건을 기다리지 않고 우리가 직접 적는 사건이다.
      *
@@ -112,11 +115,11 @@ public class ExecutionEventRecorder {
      */
     public ExecutionEvent record(AgentExecution execution, ExecutionEventType type, String detail, int sequence) {
         return ExecutionEvent.builder()
-                .executionId(execution.id())
-                .sequence(sequence)
-                .eventType(type)
-                .detail(detail)
-                .occurredAt(clock.instant())
-                .build();
+            .executionId(execution.id())
+            .sequence(sequence)
+            .eventType(type)
+            .detail(detail)
+            .occurredAt(clock.instant())
+            .build();
     }
 }

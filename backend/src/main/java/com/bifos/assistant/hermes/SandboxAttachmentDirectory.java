@@ -29,9 +29,11 @@ public class SandboxAttachmentDirectory {
 
     private final Path root;
 
+
     public SandboxAttachmentDirectory(@Value("${assistant.attachment.root}") String root) {
         this.root = Path.of(root).toAbsolutePath().normalize();
     }
+
 
     /** 주인 문자열의 UTF-8 SHA-256 소문자 64자리다. 비밀값이나 권한이 아니라 경로에 주인을 드러내지 않는 이름이다. */
     public static String key(String owner) {
@@ -40,6 +42,7 @@ public class SandboxAttachmentDirectory {
         }
         return Sha256.hex(owner);
     }
+
 
     /**
      * 주인의 디렉터리를 만들거나 이미 있는 것을 확인한다.
@@ -55,17 +58,17 @@ public class SandboxAttachmentDirectory {
             if (Files.isSymbolicLink(root) || !Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
                 throw new IOException("attachment root is not a plain directory");
             }
-            Path directory =
-                    plainDirectory(plainDirectory(root.resolve("users")).resolve(key));
+            Path directory = plainDirectory(plainDirectory(root.resolve("users")).resolve(key));
             if (!directory
-                    .toRealPath()
-                    .equals(root.toRealPath().resolve("users").resolve(key))) {
+                .toRealPath()
+                .equals(root.toRealPath().resolve("users").resolve(key))) {
                 throw new IOException("attachment directory resolves outside the execution owner");
             }
         } catch (IOException ex) {
             throw new HermesRequestRejected(ErrorCode.AGENT_SANDBOX_UNAVAILABLE, REJECTED_MESSAGE, 409, ex);
         }
     }
+
 
     private static Path plainDirectory(Path path) throws IOException {
         try {

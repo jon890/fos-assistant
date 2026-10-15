@@ -20,8 +20,10 @@ public interface AttentionCandidates {
     /** 이 구현이 후보를 내는 카드다. */
     Set<CardKey> cards();
 
+
     /** 요청자의 원래 기록을 읽어 후보를 낸다. 다른 패키지의 기록을 고치지 않는다. */
     List<AttentionCandidate> read(CurrentUser user, Instant now);
+
 
     /** 상태 지문이다. 재료는 {@code docs/features/attention.md} 「후보와 trigger」 표의 「{@code stateKey} 의 재료」 칸이다. */
     static String stateKey(AttentionTrigger trigger, String material) {

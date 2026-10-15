@@ -27,6 +27,7 @@ class SkillFrontmatterTest {
         assertThat(frontmatter.description()).isEqualTo(sixty);
     }
 
+
     @Test
     @DisplayName("색인 글자 수는 앞뒤 공백을 뺀 뒤 양 끝의 따옴표를 몇 개든 뺀다")
     void indexCharCountTrimsThenStripsAnyNumberOfQuotesAtEnds() {
@@ -40,9 +41,10 @@ class SkillFrontmatterTest {
         assertThat(spaced.indexedDescriptionLength()).as("앞뒤 공백과 따옴표를 뺀 「가나다」").isEqualTo(3);
         assertThat(nested.indexedDescriptionLength()).as("섞인 따옴표를 뺀 「가나다」").isEqualTo(3);
         assertThat(innerSpace.indexedDescriptionLength())
-                .as("따옴표 안쪽 공백은 남는 「 가나다 」")
-                .isEqualTo(5);
+            .as("따옴표 안쪽 공백은 남는 「 가나다 」")
+            .isEqualTo(5);
     }
+
 
     @Test
     @DisplayName("이모지 하나는 한 글자로 센다")
@@ -54,6 +56,7 @@ class SkillFrontmatterTest {
         assertThat(frontmatter.rawDescriptionLength()).isEqualTo(4);
     }
 
+
     @Test
     @DisplayName("원문 설명 글자 수는 앞뒤를 빼지 않는다")
     void originalDescriptionCharCountDoesNotTrim() {
@@ -63,6 +66,7 @@ class SkillFrontmatterTest {
         assertThat(frontmatter.rawDescriptionLength()).isEqualTo(9);
         assertThat(frontmatter.description()).as("화면에 보이는 설명은 앞뒤 공백만 뺀다").isEqualTo("'가나다'");
     }
+
 
     @Test
     @DisplayName("날짜처럼 보이는 설명은 적힌 글자 그대로 세어 60자 한도에 걸리지 않는다")
@@ -74,22 +78,24 @@ class SkillFrontmatterTest {
         assertThat(date.description()).isEqualTo("2024-01-01");
         assertThat(date.rawDescription()).isEqualTo("2024-01-01");
         assertThat(date.indexedDescriptionLength())
-                .isEqualTo(10)
-                .isLessThanOrEqualTo(SkillService.MAX_NEW_DESCRIPTION_CHARS);
+            .isEqualTo(10)
+            .isLessThanOrEqualTo(SkillService.MAX_NEW_DESCRIPTION_CHARS);
         assertThat(dateTime.rawDescription()).isEqualTo("2024-01-01 10:00:00");
         assertThat(dateTime.rawDescriptionLength()).isEqualTo(19);
     }
+
 
     @Test
     @DisplayName("앞머리 뒤에 글이 있으면 본문이 있다")
     void hasBodyWhenTextFollowsFrontmatter() {
         assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "# 본문")).hasBody())
-                .isTrue();
+            .isTrue();
         assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "\n\n  본문은 빈 줄 뒤에 있다"))
-                        .hasBody())
+            .hasBody())
                 .as("빈 줄 뒤의 글도 본문이다")
                 .isTrue();
     }
+
 
     @Test
     @DisplayName("앞머리 뒤가 비었거나 공백과 빈 줄뿐이면 본문이 없고 읽기는 성공한다")
@@ -105,40 +111,43 @@ class SkillFrontmatterTest {
         assertThat(blankAfter.description()).isEqualTo("계획");
     }
 
+
     @Test
     @DisplayName("비밀 요청 칸 네 가지는 값이 비어 있어도 각각 비밀을 요청한 것으로 읽는다")
     void eachSecretRequestFieldCountsEvenWithEmptyValue() {
         assertThat(SkillFrontmatter.parse(skillMd("description: 계획\nrequired_environment_variables: []", "# 본문"))
-                        .requestsSecrets())
+            .requestsSecrets())
                 .as("최상위 required_environment_variables 가 빈 목록이다")
                 .isTrue();
         assertThat(SkillFrontmatter.parse(skillMd("description: 계획\nrequired_credential_files:", "# 본문"))
-                        .requestsSecrets())
+            .requestsSecrets())
                 .as("최상위 required_credential_files 가 null 이다")
                 .isTrue();
         assertThat(SkillFrontmatter.parse(skillMd("description: 계획\nsetup:\n  collect_secrets: []", "# 본문"))
-                        .requestsSecrets())
+            .requestsSecrets())
                 .as("setup map 의 collect_secrets")
                 .isTrue();
         assertThat(SkillFrontmatter.parse(
-                                skillMd("description: 계획\nprerequisites:\n  env_vars:\n    - API_KEY", "# 본문"))
-                        .requestsSecrets())
+            skillMd("description: 계획\nprerequisites:\n  env_vars:\n    - API_KEY", "# 본문"))
+            .requestsSecrets())
                 .as("prerequisites map 의 env_vars")
                 .isTrue();
     }
+
 
     @Test
     @DisplayName("비밀 요청 칸이 없거나 setup 과 prerequisites 에 그 키가 없으면 비밀을 요청하지 않는다")
     void doesNotRequestSecretsWithoutThoseFields() {
         assertThat(SkillFrontmatter.parse(skillMd("description: 계획", "# 본문")).requestsSecrets())
-                .as("이름과 설명만 있다")
-                .isFalse();
+            .as("이름과 설명만 있다")
+            .isFalse();
         assertThat(SkillFrontmatter.parse(skillMd(
-                                "description: 계획\nsetup: collect_secrets\nprerequisites:\n  commands: [curl]", "# 본문"))
-                        .requestsSecrets())
+            "description: 계획\nsetup: collect_secrets\nprerequisites:\n  commands: [curl]", "# 본문"))
+            .requestsSecrets())
                 .as("setup 이 map 이 아니고 prerequisites 에 env_vars 가 없다")
                 .isFalse();
     }
+
 
     private static String skillMd(String descriptionLine, String body) {
         return "---\nname: weekly-plan\n" + descriptionLine + "\n---\n" + body;

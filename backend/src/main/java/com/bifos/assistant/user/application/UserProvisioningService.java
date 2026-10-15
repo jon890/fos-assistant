@@ -29,6 +29,7 @@ public class UserProvisioningService {
     private final FirstSignInListener firstSignIn;
     private final Clock clock;
 
+
     /**
      * 그 메일 주소의 사용자를 찾고, 없으면 만든다.
      *
@@ -45,12 +46,13 @@ public class UserProvisioningService {
         return users.findByEmail(email).orElseGet(() -> createUser(email, displayName));
     }
 
+
     private AppUser createUser(String email, String displayName) {
-        AppUser created =
-                users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole(), clock.instant()));
+        AppUser created = users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole(), clock.instant()));
         firstSignIn.onUserCreated(created, email);
         return created;
     }
+
 
     private UserRole firstUserRole() {
         return users.existsByGroupId(DEFAULT_GROUP_ID) ? UserRole.MEMBER : UserRole.ADMIN;

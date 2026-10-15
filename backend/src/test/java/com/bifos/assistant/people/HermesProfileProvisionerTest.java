@@ -46,26 +46,30 @@ class HermesProfileProvisionerTest {
     private final StubHermesDashboardClient dashboard = new StubHermesDashboardClient();
     private final AgentTokenService tokens = mock(AgentTokenService.class);
 
+
     @BeforeEach
     void setUp() {
         when(tokens.issue(anyString(), anyString())).thenReturn(new IssuedToken(mock(AgentToken.class), RAW_TOKEN));
     }
 
+
     private HermesProfileKeyStore keyStoreAt(Path dir) {
         return new HermesProfileKeyStore(new HermesProperties(
-                dir.toString(),
-                "https://hermes-dashboard.example.com",
-                "test-dashboard-token",
-                "https://hermes-listener.example.com",
-                Duration.ofMillis(10),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1)));
+            dir.toString(),
+            "https://hermes-dashboard.example.com",
+            "test-dashboard-token",
+            "https://hermes-listener.example.com",
+            Duration.ofMillis(10),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1)));
     }
+
 
     private HermesProfileProvisioner provisionerAt(Path dir) {
         return new HermesProfileProvisioner(dashboard, keyStoreAt(dir), new ProfileKeyFactory(), tokens);
     }
+
 
     @Test
     @DisplayName("profile 과 key 파일을 만들고 같은 key 를 env 에 넣는다")
@@ -75,8 +79,9 @@ class HermesProfileProvisionerTest {
         assertThat(dashboard.createdProfiles()).containsExactly(PROFILE);
         assertThat(dir.resolve(PROFILE)).exists();
         assertThat(keyStoreAt(dir).resolve(PROFILE))
-                .isEqualTo(dashboard.env(PROFILE).get("API_SERVER_KEY"));
+            .isEqualTo(dashboard.env(PROFILE).get("API_SERVER_KEY"));
     }
+
 
     @Test
     @DisplayName("env 에 넣는 것은 MCP 토큰과 모델 이름과 key 셋뿐이다")
@@ -85,9 +90,10 @@ class HermesProfileProvisionerTest {
 
         Map<String, String> env = dashboard.env(PROFILE);
         assertThat(env.keySet())
-                .containsExactlyInAnyOrder("MCP_FOS_ASSISTANT_API_KEY", "API_SERVER_MODEL_NAME", "API_SERVER_KEY");
+            .containsExactlyInAnyOrder("MCP_FOS_ASSISTANT_API_KEY", "API_SERVER_MODEL_NAME", "API_SERVER_KEY");
         assertThat(env.get("API_SERVER_MODEL_NAME")).isEqualTo(PROFILE);
     }
+
 
     /**
      * profile 이 만들어지면 MCP 등록이 이미 붙어 있다. 토큰 없는 연결 실패가 쌓이면 Hermes 가 다시 붙는
@@ -100,14 +106,15 @@ class HermesProfileProvisionerTest {
 
         verify(tokens).issue(eq(PROFILE), anyString());
         assertThat(dashboard.envWrites())
-                .extracting(EnvWrite::profile, EnvWrite::key)
-                .containsExactly(
-                        tuple(PROFILE, "MCP_FOS_ASSISTANT_API_KEY"),
-                        tuple(PROFILE, "API_SERVER_MODEL_NAME"),
-                        tuple(PROFILE, "API_SERVER_KEY"));
+            .extracting(EnvWrite::profile, EnvWrite::key)
+            .containsExactly(
+                tuple(PROFILE, "MCP_FOS_ASSISTANT_API_KEY"),
+                tuple(PROFILE, "API_SERVER_MODEL_NAME"),
+                tuple(PROFILE, "API_SERVER_KEY"));
         assertThat(dashboard.env(PROFILE).get("MCP_FOS_ASSISTANT_API_KEY")).isEqualTo(RAW_TOKEN);
         verify(tokens, never()).revokeAllFor(anyString());
     }
+
 
     /**
      * 공유 listener 를 쓰는 profile 이 listener 설정을 가지면 gateway 가 뜰 때 그 profile 을 건너뛴다.
@@ -120,8 +127,9 @@ class HermesProfileProvisionerTest {
         provisionerAt(dir).provision(PROFILE);
 
         assertThat(dashboard.env(PROFILE))
-                .doesNotContainKeys("API_SERVER_ENABLED", "API_SERVER_HOST", "API_SERVER_PORT");
+            .doesNotContainKeys("API_SERVER_ENABLED", "API_SERVER_HOST", "API_SERVER_PORT");
     }
+
 
     @Test
     @DisplayName("이미 있는 이름이면 만들지 않고 그대로 알린다")
@@ -129,12 +137,13 @@ class HermesProfileProvisionerTest {
         dashboard.failOnCreate(() -> new ApiException(ErrorCode.HERMES_PROFILE_EXISTS, "already taken"));
 
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.HERMES_PROFILE_EXISTS);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.HERMES_PROFILE_EXISTS);
         assertThat(dashboard.deletedProfiles()).isEmpty();
         assertThat(dir.resolve(PROFILE)).doesNotExist();
     }
+
 
     @Test
     @DisplayName("env 를 쓰다 실패하면 토큰을 폐기하고 profile 을 거두고 key 파일을 남기지 않는다")
@@ -142,13 +151,14 @@ class HermesProfileProvisionerTest {
         dashboard.failOnPutEnv(() -> new ApiException(ErrorCode.HERMES_UNAVAILABLE, "dashboard is down"));
 
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.HERMES_PROVISION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.HERMES_PROVISION_FAILED);
         verify(tokens).revokeAllFor(PROFILE);
         assertThat(dashboard.deletedProfiles()).containsExactly(PROFILE);
         assertThat(dir.resolve(PROFILE)).doesNotExist();
     }
+
 
     /** 토큰을 폐기하지 못했으면 다 거둔 것이 아니다. 원래 오류를 그대로 올리고 profile 은 그래도 거둔다. */
     @Test
@@ -163,6 +173,7 @@ class HermesProfileProvisionerTest {
         assertThat(dir.resolve(PROFILE)).doesNotExist();
     }
 
+
     @Test
     @DisplayName("거두면 토큰을 profile 보다 먼저 폐기하고 key 파일을 지운다")
     void reclaimRevokesTokenBeforeProfileAndDeletesKeyFile(@TempDir Path dir) {
@@ -171,11 +182,11 @@ class HermesProfileProvisionerTest {
         // 토큰 폐기가 불린 시점에 profile 이 아직 지워지지 않았는지를 그 자리에서 기록한다.
         List<String> deletedWhenRevoked = new ArrayList<>();
         doAnswer(call -> {
-                    deletedWhenRevoked.addAll(dashboard.deletedProfiles());
-                    return null;
-                })
-                .when(tokens)
-                .revokeAllFor(PROFILE);
+            deletedWhenRevoked.addAll(dashboard.deletedProfiles());
+            return null;
+        })
+            .when(tokens)
+            .revokeAllFor(PROFILE);
 
         provisioner.deprovision(PROFILE);
 
@@ -184,6 +195,7 @@ class HermesProfileProvisionerTest {
         assertThat(dashboard.deletedProfiles()).containsExactly(PROFILE);
         assertThat(dir.resolve(PROFILE)).doesNotExist();
     }
+
 
     /** 부르는 쪽이 에이전트를 지우지 않도록 profile 을 지우지 못한 오류를 그대로 올린다. */
     @Test
@@ -198,6 +210,7 @@ class HermesProfileProvisionerTest {
         verify(tokens).revokeAllFor(PROFILE);
     }
 
+
     /**
      * key 파일을 쓰다 실패하면 그 파일까지 거둔다.
      *
@@ -211,12 +224,13 @@ class HermesProfileProvisionerTest {
         Files.writeString(dir.resolve(PROFILE), "앞서 실패해 남아 있던 key");
 
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.HERMES_PROVISION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.HERMES_PROVISION_FAILED);
         assertThat(dashboard.deletedProfiles()).containsExactly(PROFILE);
         assertThat(dir.resolve(PROFILE)).doesNotExist();
     }
+
 
     /** 되돌리기가 하는 일이 이것이다. 막힌 이름을 풀어 같은 이름으로 다시 만들 수 있게 한다. */
     @Test
@@ -230,9 +244,10 @@ class HermesProfileProvisionerTest {
 
         assertThat(dir.resolve(PROFILE)).exists();
         assertThat(keyStoreAt(dir).resolve(PROFILE))
-                .isEqualTo(dashboard.env(PROFILE).get("API_SERVER_KEY"))
-                .isNotEqualTo("앞서 실패해 남아 있던 key");
+            .isEqualTo(dashboard.env(PROFILE).get("API_SERVER_KEY"))
+            .isNotEqualTo("앞서 실패해 남아 있던 key");
     }
+
 
     /** 대시보드를 부르다 실패한 경우에도 같은 이름을 다시 쓸 수 있어야 한다. */
     @Test
@@ -249,6 +264,7 @@ class HermesProfileProvisionerTest {
         assertThat(dashboard.env(PROFILE)).containsKey("API_SERVER_KEY");
     }
 
+
     /** 되돌리기 실패가 원래 원인을 가리면 무엇 때문에 만들지 못했는지 알 수 없게 된다. */
     @Test
     @DisplayName("되돌리기도 실패하면 원래 오류가 올라온다")
@@ -260,6 +276,7 @@ class HermesProfileProvisionerTest {
         assertThatThrownBy(() -> provisionerAt(dir).provision(PROFILE)).isSameAs(original);
     }
 
+
     /**
      * 규칙에 맞지 않는 이름은 key 파일을 쓸 수도 지울 수도 없다.
      *
@@ -270,9 +287,9 @@ class HermesProfileProvisionerTest {
     @DisplayName("key 파일을 거두지 못해도 profile 은 거둔다")
     void reclaimsProfileEvenIfKeyFileCannotBeReclaimed(@TempDir Path dir) {
         assertThatThrownBy(() -> provisionerAt(dir).provision("위로 올라가는 이름"))
-                .isInstanceOf(ApiException.class)
-                .extracting(thrown -> ((ApiException) thrown).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(thrown -> ((ApiException)thrown).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThat(dashboard.deletedProfiles()).containsExactly("위로 올라가는 이름");
     }
 }

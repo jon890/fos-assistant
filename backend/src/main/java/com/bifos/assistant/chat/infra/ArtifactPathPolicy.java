@@ -29,35 +29,38 @@ final class ArtifactPathPolicy {
      * <p>SVG 는 스크립트를 품을 수 있어 받지 않는다.
      */
     private static final Map<String, String> CONTENT_TYPES = Map.of(
-            HTML,
-            "text/html; charset=utf-8",
-            "css",
-            "text/css; charset=utf-8",
-            "png",
-            "image/png",
-            "jpg",
-            "image/jpeg",
-            "jpeg",
-            "image/jpeg",
-            "gif",
-            "image/gif",
-            "webp",
-            "image/webp");
+        HTML,
+        "text/html; charset=utf-8",
+        "css",
+        "text/css; charset=utf-8",
+        "png",
+        "image/png",
+        "jpg",
+        "image/jpeg",
+        "jpeg",
+        "image/jpeg",
+        "gif",
+        "image/gif",
+        "webp",
+        "image/webp");
 
     private final Path root;
+
 
     ArtifactPathPolicy(Path root) {
         this.root = root;
     }
 
+
     static Optional<String> contentTypeOf(String relativePath) {
         return Optional.ofNullable(CONTENT_TYPES.get(extensionOf(relativePath)));
     }
 
+
     Optional<Path> resolveInside(Long conversationId, String relativePath) {
         if (relativePath == null
-                || relativePath.isBlank()
-                || contentTypeOf(relativePath).isEmpty()) {
+            || relativePath.isBlank()
+            || contentTypeOf(relativePath).isEmpty()) {
             return Optional.empty();
         }
         try {
@@ -73,8 +76,8 @@ final class ArtifactPathPolicy {
             Path realFolder = root.toRealPath().resolve(String.valueOf(conversationId));
             Path realFile = folder.resolve(requested).toRealPath();
             if (!realFile.startsWith(realFolder)
-                    || !Files.isRegularFile(realFile)
-                    || contentTypeOf(realFile.getFileName().toString()).isEmpty()) {
+                || !Files.isRegularFile(realFile)
+                || contentTypeOf(realFile.getFileName().toString()).isEmpty()) {
                 return Optional.empty();
             }
             return Optional.of(realFile);
@@ -86,6 +89,7 @@ final class ArtifactPathPolicy {
             return Optional.empty();
         }
     }
+
 
     boolean isMissing(Long conversationId, String relativePath) {
         if (conversationId == null || relativePath == null || relativePath.isBlank() || !Files.isDirectory(root)) {
@@ -111,6 +115,7 @@ final class ArtifactPathPolicy {
         }
     }
 
+
     Path resolveForWrite(Long conversationId, String relativePath) {
         try {
             List<String> parts = writableParts(relativePath);
@@ -129,13 +134,16 @@ final class ArtifactPathPolicy {
         }
     }
 
+
     static void requireWritablePath(String relativePath) {
         writableParts(relativePath);
     }
 
+
     Path folderOf(Long conversationId) {
         return root.resolve(String.valueOf(conversationId));
     }
+
 
     Path checkedConversationFolder(Long conversationId) throws IOException {
         if (conversationId == null) {
@@ -155,13 +163,14 @@ final class ArtifactPathPolicy {
         return realFolder;
     }
 
+
     private static List<String> writableParts(String relativePath) {
         if (relativePath == null
-                || relativePath.isBlank()
-                || relativePath.length() > 500
-                || relativePath.indexOf('\\') >= 0
-                || relativePath.indexOf('\0') >= 0
-                || relativePath.matches("^[A-Za-z]:.*")) {
+            || relativePath.isBlank()
+            || relativePath.length() > 500
+            || relativePath.indexOf('\\') >= 0
+            || relativePath.indexOf('\0') >= 0
+            || relativePath.matches("^[A-Za-z]:.*")) {
             throw validation("artifact path is invalid");
         }
         Path parsed;
@@ -184,6 +193,7 @@ final class ArtifactPathPolicy {
         return parts;
     }
 
+
     private static Path checkedOrCreatedDirectory(Path parent, String name, Path folder) throws IOException {
         Path child = parent.resolve(name);
         if (Files.exists(child, LinkOption.NOFOLLOW_LINKS)) {
@@ -200,6 +210,7 @@ final class ArtifactPathPolicy {
         return realChild;
     }
 
+
     static void verifyParent(Path parent, Path folder) throws IOException {
         if (!Files.isDirectory(parent, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(parent)) {
             throw storeFailure(new IOException("artifact parent is not a directory"));
@@ -210,6 +221,7 @@ final class ArtifactPathPolicy {
         }
     }
 
+
     static void requireOrdinaryTarget(Path target) {
         if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             return;
@@ -219,10 +231,10 @@ final class ArtifactPathPolicy {
         }
     }
 
+
     static void requireOrdinaryTargetInDirectory(SecureDirectoryStream<Path> directory, Path target)
-            throws IOException {
-        BasicFileAttributeView view =
-                directory.getFileAttributeView(target, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+        throws IOException {
+        BasicFileAttributeView view = directory.getFileAttributeView(target, BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
         if (view == null) {
             throw new IOException("could not inspect artifact target");
         }
@@ -236,13 +248,16 @@ final class ArtifactPathPolicy {
         }
     }
 
+
     static ApiException validation(String message) {
         return new ApiException(ErrorCode.VALIDATION_FAILED, message);
     }
 
+
     static ApiException storeFailure(Exception cause) {
         return new ApiException(ErrorCode.INTERNAL_ERROR, "could not store artifact", cause);
     }
+
 
     static String extensionOf(String path) {
         int slash = path.lastIndexOf('/');

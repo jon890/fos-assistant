@@ -12,7 +12,9 @@ import tools.jackson.databind.json.JsonMapper;
 public class ProblemEvidenceJsonConverter implements AttributeConverter<List<ProblemEvidence>, String> {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final TypeReference<List<ProblemEvidence>> TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<ProblemEvidence>> TYPE = new TypeReference<>() {
+    };
+
 
     @Override
     public String convertToDatabaseColumn(List<ProblemEvidence> evidence) {
@@ -22,6 +24,7 @@ public class ProblemEvidenceJsonConverter implements AttributeConverter<List<Pro
             throw new IllegalStateException("cannot write problem evidence", ex);
         }
     }
+
 
     @Override
     public List<ProblemEvidence> convertToEntityAttribute(String json) {

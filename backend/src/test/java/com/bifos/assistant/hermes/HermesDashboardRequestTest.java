@@ -37,17 +37,20 @@ class HermesDashboardRequestTest {
     private int status = 200;
     private String responseBody = "{}";
 
-    private record Call(String method, String path, String authorization, String body) {}
+
+    private record Call(String method, String path, String authorization, String body) {
+    }
+
 
     @BeforeEach
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             calls.add(new Call(
-                    exchange.getRequestMethod(),
-                    exchange.getRequestURI().getPath(),
-                    exchange.getRequestHeaders().getFirst("Authorization"),
-                    new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                exchange.getRequestMethod(),
+                exchange.getRequestURI().getPath(),
+                exchange.getRequestHeaders().getFirst("Authorization"),
+                new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
             byte[] payload = responseBody.getBytes(StandardCharsets.UTF_8);
             // 대시보드는 JSON 으로 답한다. 이 머리글이 없으면 응답을 읽는 호출만 변환기를 찾지 못한다.
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -59,31 +62,36 @@ class HermesDashboardRequestTest {
         client = clientFor(baseUrl());
     }
 
+
     @AfterEach
     void stop() {
         server.stop(0);
     }
 
+
     private String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
+
 
     private void respondWith(int status, String body) {
         this.status = status;
         this.responseBody = body;
     }
 
+
     private HttpHermesDashboardClient clientFor(String baseUrl) {
         return new HttpHermesDashboardClient(new HermesProperties(
-                "keys",
-                baseUrl,
-                TOKEN,
-                "https://hermes-listener.example.com",
-                Duration.ofMillis(10),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1),
-                Duration.ofSeconds(1)));
+            "keys",
+            baseUrl,
+            TOKEN,
+            "https://hermes-listener.example.com",
+            Duration.ofMillis(10),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1),
+            Duration.ofSeconds(1)));
     }
+
 
     @Test
     @DisplayName("profile 을 만들 때 본뜰 profile 을 주지 않고 번들 스킬을 심지 않는다")
@@ -96,9 +104,10 @@ class HermesDashboardRequestTest {
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
             // 칸 순서는 정해져 있지 않으므로 문자열이 아니라 JSON 으로 읽어 비교한다.
             assertThat(new ObjectMapper().readValue(call.body(), Map.class))
-                    .isEqualTo(Map.of("name", "kid", "no_skills", true));
+                .isEqualTo(Map.of("name", "kid", "no_skills", true));
         });
     }
+
 
     @Test
     @DisplayName("환경 값은 profile 과 이름과 값을 함께 싣는다")
@@ -110,11 +119,12 @@ class HermesDashboardRequestTest {
             assertThat(call.path()).isEqualTo("/api/env");
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
             assertThat(call.body())
-                    .contains("\"profile\":\"kid\"")
-                    .contains("\"key\":\"API_SERVER_MODEL_NAME\"")
-                    .contains("\"value\":\"kid\"");
+                .contains("\"profile\":\"kid\"")
+                .contains("\"key\":\"API_SERVER_MODEL_NAME\"")
+                .contains("\"value\":\"kid\"");
         });
     }
+
 
     @Test
     @DisplayName("profile 을 지울 때 그 이름이 경로에 붙는다")
@@ -127,6 +137,7 @@ class HermesDashboardRequestTest {
             assertThat(call.authorization()).isEqualTo("Bearer " + TOKEN);
         });
     }
+
 
     /** 지우다 실패한 뒤 다시 지울 때 끝까지 가려면, 없는 profile 은 이미 지운 것으로 봐야 한다. */
     @Test
@@ -142,16 +153,18 @@ class HermesDashboardRequestTest {
         });
     }
 
+
     @Test
     @DisplayName("profile 을 지우다 500 을 받으면 닿지 못한 것으로 남는다")
     void remainsUnreachableWhenProfileDeleteGets500() {
         respondWith(500, "{\"error\":\"boom\"}");
 
         assertThatThrownBy(() -> client.deleteProfile("kid"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
+
 
     @Test
     @DisplayName("SOUL 을 읽을 때 그 이름이 경로에 붙는다")
@@ -168,6 +181,7 @@ class HermesDashboardRequestTest {
         });
     }
 
+
     @Test
     @DisplayName("SOUL 을 쓸 때 본문이 content 한 칸이다")
     void soulWriteBodyIsSingleContentField() {
@@ -181,20 +195,22 @@ class HermesDashboardRequestTest {
         });
     }
 
+
     @Test
     @DisplayName("규칙에 맞지 않는 profile 이름은 대시보드를 부르지 않는다")
     void doesNotCallDashboardForProfileNameBreakingRule() {
         assertThatThrownBy(() -> client.readSoul("../etc"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThatThrownBy(() -> client.putSoul("Kid/soul", "너는 아빠다"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.VALIDATION_FAILED);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.VALIDATION_FAILED);
 
         assertThat(calls).isEmpty();
     }
+
 
     @Test
     @DisplayName("주소 끝에 빗금이 붙어 있어도 경로가 겹치지 않는다")
@@ -202,9 +218,10 @@ class HermesDashboardRequestTest {
         clientFor(baseUrl() + "/").createProfile("kid");
 
         assertThat(calls)
-                .singleElement()
-                .satisfies(call -> assertThat(call.path()).isEqualTo("/api/profiles"));
+            .singleElement()
+            .satisfies(call -> assertThat(call.path()).isEqualTo("/api/profiles"));
     }
+
 
     @Test
     @DisplayName("이미 쓰이는 이름이면 그것으로 알린다")
@@ -212,10 +229,11 @@ class HermesDashboardRequestTest {
         respondWith(409, "{\"error\":\"profile already exists\"}");
 
         assertThatThrownBy(() -> client.createProfile("kid"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_PROFILE_EXISTS);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_PROFILE_EXISTS);
     }
+
 
     @Test
     @DisplayName("다른 실패는 닿지 못한 것으로 남는다")
@@ -223,8 +241,8 @@ class HermesDashboardRequestTest {
         respondWith(500, "{\"error\":\"boom\"}");
 
         assertThatThrownBy(() -> client.createProfile("kid"))
-                .isInstanceOf(ApiException.class)
-                .extracting(ex -> ((ApiException) ex).code())
-                .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
+            .isInstanceOf(ApiException.class)
+            .extracting(ex -> ((ApiException)ex).code())
+            .isEqualTo(ErrorCode.HERMES_UNAVAILABLE);
     }
 }

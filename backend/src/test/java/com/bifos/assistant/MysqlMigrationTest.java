@@ -40,6 +40,7 @@ class MysqlMigrationTest {
     @Autowired
     private Flyway flyway;
 
+
     @DynamicPropertySource
     static void useMysql(DynamicPropertyRegistry registry) {
         MysqlTestDatabase database = MysqlTestDatabase.create();
@@ -51,12 +52,14 @@ class MysqlMigrationTest {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
     }
 
+
     @Test
     @DisplayName("모든 마이그레이션이 적용되고 남은 것이 없다")
     void appliesEveryMigration() {
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway.info().applied()).isNotEmpty();
     }
+
 
     @Test
     @DisplayName("높은 시각 버전 적용 뒤 늦게 들어온 낮은 시각 버전도 실제 MySQL 에 적용한다")
@@ -71,11 +74,11 @@ class MysqlMigrationTest {
                     ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
                     """);
             Flyway probe = Flyway.configure()
-                    .configuration(flyway.getConfiguration())
-                    .dataSource(database.url(), database.username(), database.password())
-                    // 기존 스키마 검사는 위의 실제 기동이 맡는다. 임시 버전은 미래의 main 버전과도 독립이다.
-                    .locations("filesystem:" + directory)
-                    .load();
+                .configuration(flyway.getConfiguration())
+                .dataSource(database.url(), database.username(), database.password())
+                // 기존 스키마 검사는 위의 실제 기동이 맡는다. 임시 버전은 미래의 main 버전과도 독립이다.
+                .locations("filesystem:" + directory)
+                .load();
             probe.migrate();
             assertThat(probe.info().current().getVersion().getVersion()).isEqualTo("20261007000002");
 
@@ -87,10 +90,9 @@ class MysqlMigrationTest {
             assertThat(probe.migrate().migrationsExecuted).isEqualTo(1);
             probe.validate();
             assertThat(probe.info().pending()).isEmpty();
-            try (var connection =
-                            DriverManager.getConnection(database.url(), database.username(), database.password());
-                    var statement = connection.createStatement();
-                    var rows = statement.executeQuery("SELECT COUNT(*) FROM timestamp_earlier")) {
+            try (var connection = DriverManager.getConnection(database.url(), database.username(), database.password());
+                var statement = connection.createStatement();
+                var rows = statement.executeQuery("SELECT COUNT(*) FROM timestamp_earlier")) {
                 assertThat(rows.next()).isTrue();
                 assertThat(rows.getInt(1)).isZero();
             }
@@ -100,12 +102,13 @@ class MysqlMigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("모든 표와 문자열 칸의 정렬 규칙이 하나다")
     void keepsSingleCollation() {
         assertThat(jdbc.queryForObject("SELECT @@collation_server", String.class))
-                .as("서버 기본 정렬 규칙이 운영과 다르면 이 검사가 마이그레이션을 확인하지 못한다")
-                .isEqualTo(SERVER_COLLATION);
+            .as("서버 기본 정렬 규칙이 운영과 다르면 이 검사가 마이그레이션을 확인하지 못한다")
+            .isEqualTo(SERVER_COLLATION);
 
         List<String> columns = jdbc.queryForList("""
                 SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns

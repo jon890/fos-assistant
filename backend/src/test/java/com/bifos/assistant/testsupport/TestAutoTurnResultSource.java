@@ -23,13 +23,15 @@ public class TestAutoTurnResultSource implements AutoTurnResultSource {
     /** 전한 뒤에도 다시 읽을 수 있게 넣은 결과를 모두 둔다. */
     private final Map<Long, List<AutoTurnResult>> offered = new ConcurrentHashMap<>();
 
+
     /** 그 대화에 전할 결과를 하나 넣는다. */
     public void offer(Long conversationId, AutoTurnResult result) {
         pending.computeIfAbsent(conversationId, id -> new CopyOnWriteArrayList<>())
-                .add(result);
+            .add(result);
         offered.computeIfAbsent(conversationId, id -> new CopyOnWriteArrayList<>())
-                .add(result);
+            .add(result);
     }
+
 
     /** 넣은 결과를 모두 비운다. */
     public void reset() {
@@ -37,36 +39,41 @@ public class TestAutoTurnResultSource implements AutoTurnResultSource {
         offered.clear();
     }
 
+
     @Override
     public String source() {
         return SOURCE;
     }
+
 
     @Override
     public List<AutoTurnResult> undelivered(Long conversationId) {
         return List.copyOf(pending.getOrDefault(conversationId, List.of()));
     }
 
+
     @Override
     public void markDelivered(List<String> keys, Instant now) {
         pending.values().forEach(results -> results.removeIf(result -> keys.contains(result.key())));
     }
 
+
     @Override
     public List<AutoTurnResult> resultsFor(Long conversationId, Long userId, List<String> keys) {
         List<AutoTurnResult> results = offered.getOrDefault(conversationId, List.of());
         return keys.stream()
-                .flatMap(key -> results.stream()
-                        .filter(result -> result.key().equals(key))
-                        .limit(1))
-                .toList();
+            .flatMap(key -> results.stream()
+                .filter(result -> result.key().equals(key))
+                .limit(1))
+            .toList();
     }
+
 
     @Override
     public List<Long> conversationsWithUndelivered() {
         return pending.entrySet().stream()
-                .filter(entry -> !entry.getValue().isEmpty())
-                .map(Map.Entry::getKey)
-                .toList();
+            .filter(entry -> !entry.getValue().isEmpty())
+            .map(Map.Entry::getKey)
+            .toList();
     }
 }

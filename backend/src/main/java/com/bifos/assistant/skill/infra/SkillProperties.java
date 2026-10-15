@@ -11,16 +11,17 @@ import org.springframework.validation.annotation.Validated;
  * 에 있다.
  *
  * @param root 스킬 버전 디렉터리의 루트. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
- *     멈춘다
+ * 멈춘다
  * @param agentRoot 같은 디렉터리를 Hermes 컨테이너에서 보는 경로. {@code skills.external_dirs} 에 이것을
- *     적는다. 비어 있으면 기동을 멈춘다
+ * 적는다. 비어 있으면 기동을 멈춘다
  * @param keepVersions 게시에 성공한 버전 가운데 남겨 두는 수. 되돌릴 때 쓴다
  * @param maxPerAgent 에이전트 하나에 올릴 수 있는 스킬 수. 새 스킬을 만들 때만 본다. Hermes 색인이 커지지
- *     않게 하려는 것이다. 근거는 ADR-034 에 있다
+ * 않게 하려는 것이다. 근거는 ADR-034 에 있다
  */
 @Validated
 @ConfigurationProperties(prefix = "assistant.skill")
 public record SkillProperties(String root, String agentRoot, Integer keepVersions, Integer maxPerAgent) {
+
 
     private static final int DEFAULT_KEEP_VERSIONS = 3;
 

@@ -28,9 +28,11 @@ final class MemoryEvalScoreboard {
     private final int datasetVersion;
     private final Map<String, List<CaseVerdict>> verdictsByMode = new LinkedHashMap<>();
 
+
     MemoryEvalScoreboard(int datasetVersion) {
         this.datasetVersion = datasetVersion;
     }
+
 
     /** 조립 결과의 문맥 묶음에서 읽은 항목의 상태다. */
     enum ItemState {
@@ -79,8 +81,9 @@ final class MemoryEvalScoreboard {
     record Ratio(int numerator, int denominator, Double rate) {
 
         static Ratio of(int numerator, int denominator) {
-            return new Ratio(numerator, denominator, denominator == 0 ? null : (double) numerator / denominator);
+            return new Ratio(numerator, denominator, denominator == 0 ? null : (double)numerator / denominator);
         }
+
 
         String text() {
             if (rate == null) {
@@ -91,7 +94,8 @@ final class MemoryEvalScoreboard {
     }
 
     /** 실행당 Memory 글자 수의 평균과 중앙값과 최댓값이다. */
-    record Chars(double average, double median, long max) {}
+    record Chars(double average, double median, long max) {
+    }
 
     /**
      * 한 모드의 한 범주를 센 지표다.
@@ -106,23 +110,27 @@ final class MemoryEvalScoreboard {
      * @param omittedItems 빠진 항목 수의 합
      */
     record Metrics(
-            int cases,
-            Ratio recallInline,
-            Ratio recallTitleOrBetter,
-            Ratio falseMemoryExposure,
-            int boundaryExposure,
-            int boundaryItems,
-            Chars chars,
-            int omittedItems) {}
+        int cases,
+        Ratio recallInline,
+        Ratio recallTitleOrBetter,
+        Ratio falseMemoryExposure,
+        int boundaryExposure,
+        int boundaryItems,
+        Chars chars,
+        int omittedItems) {
+    }
+
 
     /** 한 모드의 사례 판정을 더한다. 모드는 처음 더한 순서로 보고서의 열이 된다. */
     void add(String mode, CaseVerdict verdict) {
         verdictsByMode.computeIfAbsent(mode, key -> new ArrayList<>()).add(verdict);
     }
 
+
     List<String> modes() {
         return List.copyOf(verdictsByMode.keySet());
     }
+
 
     /**
      * 모드와 범주의 지표다.
@@ -131,43 +139,42 @@ final class MemoryEvalScoreboard {
      */
     Metrics metrics(String mode, Category category) {
         List<CaseVerdict> verdicts = verdictsByMode.getOrDefault(mode, List.of()).stream()
-                .filter(verdict -> category == null || verdict.category() == category)
-                .toList();
-        List<ItemVerdict> items =
-                verdicts.stream().flatMap(verdict -> verdict.items().stream()).toList();
-        List<ItemVerdict> expected =
-                items.stream().filter(ItemVerdict::expected).toList();
+            .filter(verdict -> category == null || verdict.category() == category)
+            .toList();
+        List<ItemVerdict> items = verdicts.stream().flatMap(verdict -> verdict.items().stream()).toList();
+        List<ItemVerdict> expected = items.stream().filter(ItemVerdict::expected).toList();
         List<ItemVerdict> falseMemories = items.stream()
-                .filter(item -> item.forbiddenKind() == ForbiddenKind.SUPERSEDED
-                        || item.forbiddenKind() == ForbiddenKind.DISTRACTOR)
-                .toList();
+            .filter(item -> item.forbiddenKind() == ForbiddenKind.SUPERSEDED
+                || item.forbiddenKind() == ForbiddenKind.DISTRACTOR)
+            .toList();
         List<ItemVerdict> boundaries = items.stream()
-                .filter(item -> item.forbiddenKind() == ForbiddenKind.BOUNDARY)
-                .toList();
+            .filter(item -> item.forbiddenKind() == ForbiddenKind.BOUNDARY)
+            .toList();
         return new Metrics(
-                verdicts.size(),
-                Ratio.of(count(expected, item -> item.state() == ItemState.INLINE), expected.size()),
-                Ratio.of(
-                        count(
-                                expected,
-                                item -> item.state() == ItemState.INLINE || item.state() == ItemState.TITLE_ONLY),
-                        expected.size()),
-                Ratio.of(count(falseMemories, item -> item.state() == ItemState.INLINE), falseMemories.size()),
-                count(boundaries, item -> item.state() != ItemState.ABSENT),
-                boundaries.size(),
-                charsOf(verdicts),
-                verdicts.stream().mapToInt(CaseVerdict::omittedItems).sum());
+            verdicts.size(),
+            Ratio.of(count(expected, item -> item.state() == ItemState.INLINE), expected.size()),
+            Ratio.of(
+                count(
+                    expected,
+                    item -> item.state() == ItemState.INLINE || item.state() == ItemState.TITLE_ONLY),
+                expected.size()),
+            Ratio.of(count(falseMemories, item -> item.state() == ItemState.INLINE), falseMemories.size()),
+            count(boundaries, item -> item.state() != ItemState.ABSENT),
+            boundaries.size(),
+            charsOf(verdicts),
+            verdicts.stream().mapToInt(CaseVerdict::omittedItems).sum());
     }
+
 
     /** 권한 경계를 넘어 묶음에 든 항목을 「모드 사례 id 항목 key 상태」 로 적는다. 비면 경계가 지켜진 것이다. */
     List<String> boundaryViolations() {
         List<String> violations = new ArrayList<>();
         verdictsByMode.forEach((mode, verdicts) -> verdicts.forEach(verdict -> verdict.items().stream()
-                .filter(item -> item.forbiddenKind() == ForbiddenKind.BOUNDARY && item.state() != ItemState.ABSENT)
-                .forEach(item ->
-                        violations.add(mode + " " + verdict.caseId() + " " + item.memory() + " " + item.state()))));
+            .filter(item -> item.forbiddenKind() == ForbiddenKind.BOUNDARY && item.state() != ItemState.ABSENT)
+            .forEach(item -> violations.add(mode + " " + verdict.caseId() + " " + item.memory() + " " + item.state()))));
         return violations;
     }
+
 
     String markdown() {
         StringBuilder out = new StringBuilder(HEADLINE).append("\n\n");
@@ -177,6 +184,7 @@ final class MemoryEvalScoreboard {
         Arrays.stream(Category.values()).forEach(category -> appendSection(out, category.name(), category));
         return out.toString();
     }
+
 
     String json() {
         Map<String, Object> root = new LinkedHashMap<>();
@@ -195,6 +203,7 @@ final class MemoryEvalScoreboard {
         return JSON.writerWithDefaultPrettyPrinter().writeValueAsString(root);
     }
 
+
     private void appendSection(StringBuilder out, String title, Category category) {
         List<String> modes = modes();
         out.append("\n## ").append(title).append("\n\n");
@@ -203,55 +212,57 @@ final class MemoryEvalScoreboard {
         out.append("\n| --- |");
         modes.forEach(mode -> out.append(" --- |"));
         out.append('\n');
-        List<Metrics> columns =
-                modes.stream().map(mode -> metrics(mode, category)).toList();
+        List<Metrics> columns = modes.stream().map(mode -> metrics(mode, category)).toList();
         appendRow(out, "사례 수", columns, metrics -> String.valueOf(metrics.cases()));
         appendRow(out, "회수율(본문)", columns, metrics -> metrics.recallInline().text());
         appendRow(
-                out,
-                "회수율(제목 이상)",
-                columns,
-                metrics -> metrics.recallTitleOrBetter().text());
+            out,
+            "회수율(제목 이상)",
+            columns,
+            metrics -> metrics.recallTitleOrBetter().text());
         appendRow(
-                out,
-                "오기억 노출률",
-                columns,
-                metrics -> metrics.falseMemoryExposure().text());
+            out,
+            "오기억 노출률",
+            columns,
+            metrics -> metrics.falseMemoryExposure().text());
         appendRow(out, "권한 경계 노출", columns, metrics -> metrics.boundaryExposure() + "/" + metrics.boundaryItems());
         appendRow(
-                out,
-                "Memory 글자 수 평균",
-                columns,
-                metrics -> metrics.chars() == null
-                        ? NOT_APPLICABLE
-                        : String.format(Locale.ROOT, "%.1f", metrics.chars().average()));
+            out,
+            "Memory 글자 수 평균",
+            columns,
+            metrics -> metrics.chars() == null
+                ? NOT_APPLICABLE
+                : String.format(Locale.ROOT, "%.1f", metrics.chars().average()));
         appendRow(
-                out,
-                "Memory 글자 수 중앙값",
-                columns,
-                metrics -> metrics.chars() == null
-                        ? NOT_APPLICABLE
-                        : String.format(Locale.ROOT, "%.1f", metrics.chars().median()));
+            out,
+            "Memory 글자 수 중앙값",
+            columns,
+            metrics -> metrics.chars() == null
+                ? NOT_APPLICABLE
+                : String.format(Locale.ROOT, "%.1f", metrics.chars().median()));
         appendRow(
-                out,
-                "Memory 글자 수 최댓값",
-                columns,
-                metrics -> metrics.chars() == null
-                        ? NOT_APPLICABLE
-                        : String.valueOf(metrics.chars().max()));
+            out,
+            "Memory 글자 수 최댓값",
+            columns,
+            metrics -> metrics.chars() == null
+                ? NOT_APPLICABLE
+                : String.valueOf(metrics.chars().max()));
         appendRow(out, "빠진 항목", columns, metrics -> String.valueOf(metrics.omittedItems()));
     }
 
+
     private static void appendRow(
-            StringBuilder out, String label, List<Metrics> columns, Function<Metrics, String> cell) {
+        StringBuilder out, String label, List<Metrics> columns, Function<Metrics, String> cell) {
         out.append("| ").append(label).append(" |");
         columns.forEach(metrics -> out.append(' ').append(cell.apply(metrics)).append(" |"));
         out.append('\n');
     }
 
+
     private static int count(List<ItemVerdict> items, Predicate<ItemVerdict> condition) {
-        return (int) items.stream().filter(condition).count();
+        return (int)items.stream().filter(condition).count();
     }
+
 
     private static Chars charsOf(List<CaseVerdict> verdicts) {
         if (verdicts.isEmpty()) {

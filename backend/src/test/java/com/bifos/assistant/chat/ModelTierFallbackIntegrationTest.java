@@ -46,15 +46,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ModelTierFallbackIntegrationTest {
 
     private static final Agent AGENT = Agent.of(
-            "tier-test",
-            "tier-test",
-            "tier-test",
-            "http://hermes.invalid",
-            CostMode.SUBSCRIPTION,
-            CredentialScope.SHARED_HOUSEHOLD,
-            AgentVisibility.GROUP,
-            null,
-            Instant.now());
+        "tier-test",
+        "tier-test",
+        "tier-test",
+        "http://hermes.invalid",
+        CostMode.SUBSCRIPTION,
+        CredentialScope.SHARED_HOUSEHOLD,
+        AgentVisibility.GROUP,
+        null,
+        Instant.now());
 
     private static final Long GROUP_ID = 9_000_000_002L;
 
@@ -70,15 +70,18 @@ class ModelTierFallbackIntegrationTest {
     @Autowired
     TransactionTemplate transactions;
 
+
     @BeforeEach
     void clearLeftovers() {
         transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
     }
 
+
     @AfterEach
     void cleanUp() {
         transactions.executeWithoutResult(status -> definitions.deleteByGroupId(GROUP_ID));
     }
+
 
     @Test
     @DisplayName("비어 있는 기존 seed 단계는 선택 대화에서도 tier 기록을 남기고 profile 기본값으로 해석한다")
@@ -86,9 +89,9 @@ class ModelTierFallbackIntegrationTest {
         // 기동 때 하던 초기값 옮기기를 비어 있는 mapping 으로 돌린다. 옮길 것이 없어 아무것도 저장하지 않는다
         importer.run(null);
         definitions.saveAll(List.of(
-                ModelTierDefinition.of(GROUP_ID, ModelTier.FAST, null, null, null),
-                ModelTierDefinition.of(GROUP_ID, ModelTier.BALANCED, null, null, null),
-                ModelTierDefinition.of(GROUP_ID, ModelTier.DEEP, null, null, null)));
+            ModelTierDefinition.of(GROUP_ID, ModelTier.FAST, null, null, null),
+            ModelTierDefinition.of(GROUP_ID, ModelTier.BALANCED, null, null, null),
+            ModelTierDefinition.of(GROUP_ID, ModelTier.DEEP, null, null, null)));
         CurrentUser user = new CurrentUser(1L, "member@example.com", "사용자", GROUP_ID, UserRole.MEMBER);
 
         for (ModelTier tier : ModelTier.values()) {

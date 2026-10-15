@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 public class ConnectorCallHistory implements ExecutionConnectorCalls {
     private final ConnectorActionRepository actions;
 
+
     @Override
     public boolean calledBefore(Long rootId, Instant at) {
         try {

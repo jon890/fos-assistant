@@ -7,5 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ToolsetHiddenRepository extends JpaRepository<ToolsetHidden, Long> {
     List<ToolsetHidden> findByGroupIdOrderByNameAsc(Long groupId);
 
+
     void deleteByGroupId(Long groupId);
 }

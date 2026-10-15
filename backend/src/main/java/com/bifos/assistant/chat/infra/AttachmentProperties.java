@@ -11,11 +11,11 @@ import org.springframework.validation.annotation.Validated;
  * 기동이 성공하고, 사진이 컨테이너 안에만 쌓여 에이전트가 보지 못한다. 근거는 ADR-020 에 있다.
  *
  * @param root 사진을 두는 디렉터리 루트. Control Plane 컨테이너에서 보이는 경로다. 비어 있으면 기동을
- *     멈춘다
+ * 멈춘다
  * @param agentRoot 같은 디렉터리를 Hermes 와 실행 컨테이너에서 보는 루트. 정책의 attachment_agent_root 와
- *     같아야 한다. 두 컨테이너가 같은 디렉터리를 다른
- *     마운트 지점으로 볼 수 있어 따로 받는다. 에이전트에게 사진 자리를 알릴 때 이것을 적는다. 비어 있으면
- *     기동을 멈춘다
+ * 같아야 한다. 두 컨테이너가 같은 디렉터리를 다른
+ * 마운트 지점으로 볼 수 있어 따로 받는다. 에이전트에게 사진 자리를 알릴 때 이것을 적는다. 비어 있으면
+ * 기동을 멈춘다
  * @param maxFiles 한 번에 보낼 수 있는 장수
  * @param maxBytes 한 장의 상한
  * @param retentionDays 올린 뒤 파일을 두는 날 수
@@ -23,7 +23,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "assistant.attachment")
 public record AttachmentProperties(
-        String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
+    String root, String agentRoot, Integer maxFiles, Long maxBytes, Integer retentionDays) {
+
 
     private static final int DEFAULT_MAX_FILES = 30;
     private static final long DEFAULT_MAX_BYTES = 20L * 1024 * 1024;

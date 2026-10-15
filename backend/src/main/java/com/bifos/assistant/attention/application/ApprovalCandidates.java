@@ -37,54 +37,55 @@ public class ApprovalCandidates implements AttentionCandidates {
     private final OwnConversations conversations;
     private final AgentService agents;
 
+
     @Override
     public Set<CardKey> cards() {
         return Set.of(CardKey.NEEDS_ME);
     }
 
+
     @Override
     public List<AttentionCandidate> read(CurrentUser user, Instant now) {
         List<PendingApproval> pending = actions.pendingApprovalsOf(user).stream()
-                .filter(approval -> approval.conversationId() != null)
-                .filter(approval ->
-                        approval.expiresAt() != null && approval.expiresAt().isAfter(now))
-                .toList();
+            .filter(approval -> approval.conversationId() != null)
+            .filter(approval -> approval.expiresAt() != null && approval.expiresAt().isAfter(now))
+            .toList();
         if (pending.isEmpty()) {
             return List.of();
         }
         Map<Long, Conversation> owned = conversations.activeOf(
-                user, pending.stream().map(PendingApproval::conversationId).toList());
+            user, pending.stream().map(PendingApproval::conversationId).toList());
         List<PendingApproval> reachable = pending.stream()
-                .filter(approval -> owned.containsKey(approval.conversationId()))
-                .toList();
-        Map<Long, Agent> agentById =
-                agents.byIds(reachable.stream().map(PendingApproval::agentId).toList());
+            .filter(approval -> owned.containsKey(approval.conversationId()))
+            .toList();
+        Map<Long, Agent> agentById = agents.byIds(reachable.stream().map(PendingApproval::agentId).toList());
         return reachable.stream()
-                .map(approval -> candidate(approval, owned.get(approval.conversationId()), agentById, now))
-                .toList();
+            .map(approval -> candidate(approval, owned.get(approval.conversationId()), agentById, now))
+            .toList();
     }
 
+
     private static AttentionCandidate candidate(
-            PendingApproval approval, Conversation conversation, Map<Long, Agent> agentById, Instant now) {
+        PendingApproval approval, Conversation conversation, Map<Long, Agent> agentById, Instant now) {
         Agent agent = agentById.get(approval.agentId());
         String itemKey = "connector_action:" + approval.actionId();
         boolean expiresSoon = !approval.expiresAt().isAfter(now.plus(EXPIRES_SOON_WITHIN));
         return new AttentionCandidate(
-                CardKey.NEEDS_ME,
-                itemKey,
-                AttentionCandidates.stateKey(AttentionTrigger.APPROVAL_PENDING, "PENDING"),
-                AttentionTrigger.APPROVAL_PENDING,
-                false,
-                true,
-                expiresSoon ? List.of(AttentionSignal.EXPIRES_SOON) : List.of(),
-                AttentionConfidence.CONTROL_PLANE,
-                approval.title(),
-                conversation.publicId(),
-                agent == null ? null : agent.name(),
-                approval.createdAt(),
-                List.of(new AttentionSourceRef("APPROVAL_REQUEST", itemKey, approval.createdAt())),
-                null,
-                approval.actionId(),
-                null);
+            CardKey.NEEDS_ME,
+            itemKey,
+            AttentionCandidates.stateKey(AttentionTrigger.APPROVAL_PENDING, "PENDING"),
+            AttentionTrigger.APPROVAL_PENDING,
+            false,
+            true,
+            expiresSoon ? List.of(AttentionSignal.EXPIRES_SOON) : List.of(),
+            AttentionConfidence.CONTROL_PLANE,
+            approval.title(),
+            conversation.publicId(),
+            agent == null ? null : agent.name(),
+            approval.createdAt(),
+            List.of(new AttentionSourceRef("APPROVAL_REQUEST", itemKey, approval.createdAt())),
+            null,
+            approval.actionId(),
+            null);
     }
 }

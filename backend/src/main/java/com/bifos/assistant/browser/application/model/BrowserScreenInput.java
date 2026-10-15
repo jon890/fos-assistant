@@ -12,34 +12,35 @@ import java.util.Map;
  * <p>칸과 범위는 받는 쪽({@code UserBrowserDtos.ScreenInputRequest})이 이미 검사했다.
  */
 public record BrowserScreenInput(
-        Kind kind,
-        String action,
-        double x,
-        double y,
-        int deltaY,
-        String key,
-        String text,
-        String url,
-        String targetId,
-        int width,
-        int height) {
+    Kind kind,
+    String action,
+    double x,
+    double y,
+    int deltaY,
+    String key,
+    String text,
+    String url,
+    String targetId,
+    int width,
+    int height) {
+
 
     /** 받는 특수 키와 그 CDP {@code windowsVirtualKeyCode} 다. 글자는 {@code text} 로 넣는다. */
     public static final Map<String, Integer> KEYS = Map.ofEntries(
-            entry("Enter", 13),
-            entry("Backspace", 8),
-            entry("Tab", 9),
-            entry("Escape", 27),
-            entry("ArrowLeft", 37),
-            entry("ArrowUp", 38),
-            entry("ArrowRight", 39),
-            entry("ArrowDown", 40),
-            entry("Delete", 46),
-            entry("PageUp", 33),
-            entry("PageDown", 34),
-            entry("Home", 36),
-            entry("End", 35),
-            entry("Space", 32));
+        entry("Enter", 13),
+        entry("Backspace", 8),
+        entry("Tab", 9),
+        entry("Escape", 27),
+        entry("ArrowLeft", 37),
+        entry("ArrowUp", 38),
+        entry("ArrowRight", 39),
+        entry("ArrowDown", 40),
+        entry("Delete", 46),
+        entry("PageUp", 33),
+        entry("PageDown", 34),
+        entry("Home", 36),
+        entry("End", 35),
+        entry("Space", 32));
 
     /** 주소의 길이 상한이다. */
     private static final int MAX_URL = 2048;
@@ -58,6 +59,7 @@ public record BrowserScreenInput(
         RESIZE
     }
 
+
     /** 화면이 열 수 있는 주소인가. {@code http} 와 {@code https} 이고 host 가 있어야 한다. */
     public static boolean webUrl(String value) {
         if (value == null || value.isBlank() || value.length() > MAX_URL) {
@@ -67,8 +69,8 @@ public record BrowserScreenInput(
             URI uri = new URI(value);
             String scheme = uri.getScheme();
             return ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))
-                    && uri.getHost() != null
-                    && !uri.getHost().isBlank();
+                && uri.getHost() != null
+                && !uri.getHost().isBlank();
         } catch (URISyntaxException ex) {
             return false;
         }

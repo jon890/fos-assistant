@@ -17,6 +17,7 @@ public final class HermesToolName {
     private static final int HASH_CHARS = 8;
     private static final String OUTSIDE = "[^A-Za-z0-9_]";
 
+
     /** 이은 이름이 상한을 넘으면 앞부분에 {@code _} 와 이름 전체를 SHA-256 한 16진수의 앞 8자를 붙인다. */
     public static String of(String server, String tool) {
         String full = "mcp__" + server.replaceAll(OUTSIDE, "_") + "__" + tool.replaceAll(OUTSIDE, "_");
@@ -24,7 +25,7 @@ public final class HermesToolName {
             return full;
         }
         return full.substring(0, MAX_CHARS - HASH_CHARS - 1)
-                + "_"
-                + Sha256.hex(full).substring(0, HASH_CHARS);
+            + "_"
+            + Sha256.hex(full).substring(0, HASH_CHARS);
     }
 }

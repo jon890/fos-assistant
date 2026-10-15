@@ -26,12 +26,14 @@ public class ModelVisibilityService {
 
     private final ModelHiddenRepository hidden;
 
+
     @Transactional(readOnly = true)
     public HiddenModels hiddenFor(Long groupId) {
         return new HiddenModels(hidden.findByGroupIdOrderByProviderAscModelAsc(groupId).stream()
-                .map(row -> new HiddenModels.Entry(row.provider(), row.wholeProvider() ? null : row.model()))
-                .toList());
+            .map(row -> new HiddenModels.Entry(row.provider(), row.wholeProvider() ? null : row.model()))
+            .toList());
     }
+
 
     /** 명시한 provider 와 모델이 숨겨졌으면 거절한다. 모델을 고르지 않은 선택은 통과한다. */
     @Transactional(readOnly = true)
@@ -43,6 +45,7 @@ public class ModelVisibilityService {
             throw new ApiException(ErrorCode.MODEL_HIDDEN, "the selected model is hidden for this group");
         }
     }
+
 
     /**
      * 숨김 목록 전체를 바꾼다.
@@ -59,26 +62,25 @@ public class ModelVisibilityService {
         Map<String, HiddenModels.Entry> normalized = new LinkedHashMap<>();
         for (HiddenModels.Entry entry : entries) {
             HiddenModels.Entry clean = normalize(entry);
-            String key =
-                    (clean.provider() + "\n" + (clean.model() == null ? "" : clean.model())).toLowerCase(Locale.ROOT);
+            String key = (clean.provider() + "\n" + (clean.model() == null ? "" : clean.model())).toLowerCase(Locale.ROOT);
             normalized.putIfAbsent(key, clean);
         }
         hidden.deleteByGroupId(user.groupId());
         hidden.flush();
         hidden.saveAll(normalized.values().stream()
-                .map(entry -> ModelHidden.of(user.groupId(), entry.provider(), entry.model()))
-                .toList());
+            .map(entry -> ModelHidden.of(user.groupId(), entry.provider(), entry.model()))
+            .toList());
     }
+
 
     private static HiddenModels.Entry normalize(HiddenModels.Entry entry) {
         String provider = entry == null || entry.provider() == null
-                ? ""
-                : entry.provider().strip();
-        String model =
-                entry == null || entry.model() == null ? "" : entry.model().strip();
+            ? ""
+            : entry.provider().strip();
+        String model = entry == null || entry.model() == null ? "" : entry.model().strip();
         if (provider.isEmpty()
-                || provider.length() > ModelChoice.PROVIDER_MAX_LENGTH
-                || model.length() > ModelChoice.MODEL_MAX_LENGTH) {
+            || provider.length() > ModelChoice.PROVIDER_MAX_LENGTH
+            || model.length() > ModelChoice.MODEL_MAX_LENGTH) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "invalid hidden model entry");
         }
         return new HiddenModels.Entry(provider, model.isEmpty() ? null : model);

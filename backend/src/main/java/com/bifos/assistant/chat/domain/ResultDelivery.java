@@ -50,6 +50,7 @@ public class ResultDelivery {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     private ResultDelivery(Long conversationId, DeliveryStatus status, int attemptCount, Instant now) {
         this.conversationId = conversationId;
         this.status = status;
@@ -57,6 +58,7 @@ public class ResultDelivery {
         this.createdAt = now;
         this.updatedAt = now;
     }
+
 
     /** 첫 시도와 함께 여는 묶음이다. */
     public static ResultDelivery opened(Long conversationId, Instant now) {

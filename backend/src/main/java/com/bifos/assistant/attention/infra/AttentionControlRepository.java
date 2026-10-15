@@ -14,7 +14,9 @@ public interface AttentionControlRepository extends JpaRepository<AttentionContr
     /** 그 사용자의 모든 카드의 제어다. 판정이 억제 신호로 쓴다. */
     List<AttentionControlEntry> findByUserId(Long userId);
 
+
     Optional<AttentionControlEntry> findByUserIdAndCardKeyAndItemKey(Long userId, CardKey cardKey, String itemKey);
+
 
     /**
      * 그 사용자의 그 카드의 그 항목의 제어를 지운다.
@@ -27,5 +29,5 @@ public interface AttentionControlRepository extends JpaRepository<AttentionContr
              where c.userId = :userId and c.cardKey = :cardKey and c.itemKey = :itemKey
             """)
     int deleteByUserIdAndCardKeyAndItemKey(
-            @Param("userId") Long userId, @Param("cardKey") CardKey cardKey, @Param("itemKey") String itemKey);
+        @Param("userId") Long userId, @Param("cardKey") CardKey cardKey, @Param("itemKey") String itemKey);
 }

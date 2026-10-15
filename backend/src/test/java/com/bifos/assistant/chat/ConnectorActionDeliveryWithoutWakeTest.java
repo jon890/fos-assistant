@@ -85,46 +85,50 @@ class ConnectorActionDeliveryWithoutWakeTest {
     private Conversation conversation;
     private AgentExecution root;
     private final List<ChatEvent> seen = new CopyOnWriteArrayList<>();
-    private Runnable unsubscribe = () -> {};
+    private Runnable unsubscribe = () -> {
+    };
+
 
     @BeforeEach
     void setUp() {
-        ((StubHermesRunsClient) hermes).reset();
+        ((StubHermesRunsClient)hermes).reset();
         jdbc.update("DELETE FROM connector_action");
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         AppUser user = users.save(
-                AppUser.of("no-wake-" + UUID.randomUUID() + "@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("no-wake-" + UUID.randomUUID() + "@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "no-wake-" + UUID.randomUUID();
         chief = agents.save(Agent.of(
-                code,
-                "비서",
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                user.id(),
-                Instant.now()));
+            code,
+            "비서",
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            user.id(),
+            Instant.now()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", chief.id(), Instant.now()));
         root = executions.save(AgentExecution.builder()
-                .userId(dad.id())
-                .conversationId(conversation.id())
-                .agentId(chief.id())
-                .profileName(code)
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(ExecutionStatus.SUCCEEDED)
-                .startedAt(Instant.now())
-                .build());
+            .userId(dad.id())
+            .conversationId(conversation.id())
+            .agentId(chief.id())
+            .profileName(code)
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(ExecutionStatus.SUCCEEDED)
+            .startedAt(Instant.now())
+            .build());
         seen.clear();
         unsubscribe = hub.subscribe(conversation.id(), seen::add);
     }
+
 
     @AfterEach
     void tearDown() {
         unsubscribe.run();
         jdbc.update("DELETE FROM connector_action");
     }
+
 
     @Test
     @DisplayName("깨우기가 꺼져 있어도 approval 사건과 거절 알림 줄은 나가고 자동 turn 은 열리지 않는다")
@@ -137,13 +141,14 @@ class ConnectorActionDeliveryWithoutWakeTest {
 
         assertThat(seen).extracting(ChatEvent::type).containsExactly("approval", "system", "approval");
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id()))
-                .extracting(ChatMessage::content)
-                .containsExactly("「이름 없는 동작」 요청을 거절했어요");
-        assertThat(((StubHermesRunsClient) hermes).received()).isEmpty();
+            .extracting(ChatMessage::content)
+            .containsExactly("「이름 없는 동작」 요청을 거절했어요");
+        assertThat(((StubHermesRunsClient)hermes).received()).isEmpty();
     }
+
 
     private UUID action(String status, String resultText) {
         return ConnectorActionDeliveryTest.insertAction(
-                jdbc, dad.id(), chief.id(), root.id(), conversation.id(), status, resultText, null);
+            jdbc, dad.id(), chief.id(), root.id(), conversation.id(), status, resultText, null);
     }
 }

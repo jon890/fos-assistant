@@ -83,12 +83,14 @@ class UserExecutionLimiterTest {
     /** 검사마다 새로 만든다. 앞 검사의 조회와 섞이지 않는다. */
     private String runId;
 
+
     @BeforeEach
     void setUp() {
         userId = NEXT_USER_ID.incrementAndGet();
         runId = "run-" + UUID.randomUUID();
         stub.reset();
     }
+
 
     @Test
     @DisplayName("turn 자리 셋을 얻으면 넷째는 USER_BUSY 이고, 하나를 돌려주면 다시 얻는다")
@@ -109,6 +111,7 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("같은 turn 자리를 두 번 돌려줘도 한 번만 줄어든다")
     void releasesSameSlotOnlyOnce() {
@@ -120,6 +123,7 @@ class UserExecutionLimiterTest {
 
         assertThat(limiter.used(userId)).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("백그라운드 turn 두 개 뒤에도 사용자 대화 한 자리는 남고 셋째 깨우기는 거절한다")
@@ -138,6 +142,7 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).isEqualTo(2);
     }
 
+
     @Test
     @DisplayName("매일 깨우기의 위임 자식도 사용자 대화 한 자리를 남긴다")
     void reservesForegroundSlotForScheduledChildren() {
@@ -146,13 +151,14 @@ class UserExecutionLimiterTest {
         limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L));
 
         assertUserBusy(
-                () -> limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L)));
+            () -> limiter.admit(userId, ExecutionAdmission.BACKGROUND_CHILD, () -> saveRunning(userId, 10L, 1L)));
         limiter.acquireTurn(userId);
         assertThat(limiter.used(userId)).isEqualTo(3);
 
         background.release();
         assertThat(limiter.isBackgroundConversation(991L)).isFalse();
     }
+
 
     @Test
     @DisplayName("turn 자리 둘과 자식 줄 하나면 셋째 자식은 USER_BUSY 이고 줄을 만들지 않는다")
@@ -171,6 +177,7 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("대화 turn 의 루트 줄은 자리로 세지 않고 추천 질문 줄은 센다")
     void countsDetachedRowButNotConversationTurnRoot() {
@@ -183,6 +190,7 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).as("추천 질문 줄").isEqualTo(1);
     }
 
+
     @Test
     @DisplayName("끝난 자식 줄은 자리로 세지 않는다")
     void doesNotCountFinishedRows() {
@@ -191,20 +199,21 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).isZero();
     }
 
+
     @Test
     @DisplayName("백그라운드 실행은 예비 자리 하나를 남길 수 있을 때만 통과한다")
     void admitsBackgroundOnlyWhileReserveRemains() {
         limiter.acquireTurn(userId);
 
-        AgentExecution admitted =
-                limiter.admit(userId, ExecutionAdmission.BACKGROUND, () -> saveRunning(userId, null, null));
+        AgentExecution admitted = limiter.admit(userId, ExecutionAdmission.BACKGROUND, () -> saveRunning(userId, null, null));
 
         assertThat(admitted.id()).isNotNull();
         assertThat(limiter.used(userId)).isEqualTo(2);
         assertUserBusy(
-                () -> limiter.admit(userId, ExecutionAdmission.BACKGROUND, () -> saveRunning(userId, null, null)));
+            () -> limiter.admit(userId, ExecutionAdmission.BACKGROUND, () -> saveRunning(userId, null, null)));
         assertThat(limiter.used(userId)).isEqualTo(2);
     }
+
 
     @Test
     @DisplayName("대화 turn 의 루트 줄은 한도를 넘겨도 만든다")
@@ -217,6 +226,7 @@ class UserExecutionLimiterTest {
 
         assertThat(root.id()).isNotNull();
     }
+
 
     @Test
     @DisplayName("기동 정리의 turn 자리는 한도를 넘겨도 얻는다")
@@ -231,6 +241,7 @@ class UserExecutionLimiterTest {
         assertUserBusy(() -> limiter.acquireTurn(userId));
     }
 
+
     @Test
     @DisplayName("한 사용자가 한도에 닿아도 다른 사용자는 자리를 얻는다")
     void keepsLimitPerUser() {
@@ -243,6 +254,7 @@ class UserExecutionLimiterTest {
 
         assertThat(limiter.used(other)).isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("turn 자리와 자식 줄을 나란히 얻어도 합이 한도를 넘지 않는다")
@@ -289,20 +301,22 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("트랜잭션 안에서 자식 줄을 만들려 하면 거절하고 줄을 만들지 않는다")
     void rejectsChildInsideTransaction() {
         AtomicBoolean created = new AtomicBoolean();
 
         assertThatThrownBy(() -> transactions.executeWithoutResult(
-                        status -> limiter.admit(userId, ExecutionAdmission.CHILD, () -> {
-                            created.set(true);
-                            return saveRunning(userId, 10L, 1L);
-                        })))
+            status -> limiter.admit(userId, ExecutionAdmission.CHILD, () -> {
+                created.set(true);
+                return saveRunning(userId, 10L, 1L);
+            })))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(created).as("트랜잭션 안에서 줄을 만들려 했다").isFalse();
         assertThat(limiter.used(userId)).isZero();
     }
+
 
     @Test
     @DisplayName("끝났는지 모르는 run 을 쥐면 자리가 하나 늘고 중지를 한 번 보낸 뒤, 끝났다는 답을 받으면 돌려준다")
@@ -317,6 +331,7 @@ class UserExecutionLimiterTest {
         assertThat(lookupsOf(runId)).as("끝났다는 답까지 물은 수").isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("부르는 쪽이 중지를 이미 보냈으면 다시 보내지 않는다")
     void doesNotSendStopWhenAlreadySent() {
@@ -328,6 +343,7 @@ class UserExecutionLimiterTest {
         assertThat(stub.stopped()).as("보낸 중지").isEmpty();
     }
 
+
     @Test
     @DisplayName("Hermes 가 그 run 을 모른다고 답하면 한 번 묻고 돌려준다")
     void releasesWhenRemoteRunIsUnknown() {
@@ -336,6 +352,7 @@ class UserExecutionLimiterTest {
         awaitUntil(() -> limiter.used(userId) == 0, "모른다는 답을 받고도 자리를 돌려주지 않았다");
         assertThat(lookupsOf(runId)).as("물은 수").isEqualTo(1);
     }
+
 
     @Test
     @DisplayName("Hermes 에 닿지 못하는 동안에는 쥐고, 닿아 끝났다는 답을 받으면 돌려준다")
@@ -349,6 +366,7 @@ class UserExecutionLimiterTest {
         assertThat(lookupsOf(runId)).as("닿지 못한 두 번과 끝났다는 답을 받은 한 번").isEqualTo(3);
     }
 
+
     @Test
     @DisplayName("계속 돌고 있으면 상한까지 쥐었다가 돌려준다")
     void releasesAfterMaxWaitWhileRemoteRunKeepsRunning() {
@@ -361,9 +379,10 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).as("도는 동안 자리").isEqualTo(1);
         awaitUntil(() -> limiter.used(userId) == 0, "상한을 넘기고도 자리를 돌려주지 않았다");
         assertThat(Duration.ofNanos(System.nanoTime() - startedAt))
-                .as("돌려주기까지 걸린 시간")
-                .isGreaterThanOrEqualTo(REMOTE_END_MAX_WAIT);
+            .as("돌려주기까지 걸린 시간")
+            .isGreaterThanOrEqualTo(REMOTE_END_MAX_WAIT);
     }
+
 
     @Test
     @DisplayName("같은 실행 번호로 두 번 쥐어도 자리는 하나만 는다")
@@ -378,6 +397,7 @@ class UserExecutionLimiterTest {
         assertThat(stub.stopped()).as("두 번째 쥐기는 중지를 다시 보내지 않는다").containsExactly(runId);
     }
 
+
     @Test
     @DisplayName("run 번호가 비어 있으면 물을 수 없어 쥐지 않는다")
     void doesNotHoldWithoutRunId() {
@@ -387,6 +407,7 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).isZero();
         assertThat(stub.stopped()).isEmpty();
     }
+
 
     @Test
     @DisplayName("원격 종료 확인 자리를 쥔 동안에는 같은 사용자의 turn 이 그만큼 덜 열린다")
@@ -403,6 +424,7 @@ class UserExecutionLimiterTest {
         assertThat(limiter.used(userId)).as("돌려받은 뒤 남은 turn 자리").isEqualTo(2);
     }
 
+
     /** 그 run 을 모른다고 답하게 해 쥔 자리를 돌려받는다. 확인 스레드가 검사 뒤까지 묻지 않게 한다. */
     private void releaseRemoteRun() {
         int before = limiter.used(userId);
@@ -410,14 +432,17 @@ class UserExecutionLimiterTest {
         awaitUntil(() -> limiter.used(userId) == before - 1, "모른다는 답을 받고도 자리를 돌려주지 않았다");
     }
 
+
     private long lookupsOf(String id) {
         return stub.lookups().stream().filter(id::equals).count();
     }
 
+
     private static HermesRunLookup finished(String id) {
         return HermesRunLookup.finished(
-                HermesRunResult.of(id, "session", "completed", "답", "model", "provider", TokenUsage.empty()));
+            HermesRunResult.of(id, "session", "completed", "답", "model", "provider", TokenUsage.empty()));
     }
+
 
     private static void awaitUntil(BooleanSupplier condition, String failure) {
         long deadline = System.nanoTime() + WAIT_LIMIT.toNanos();
@@ -429,28 +454,32 @@ class UserExecutionLimiterTest {
         }
     }
 
+
     private void assertUserBusy(Runnable action) {
         assertThatThrownBy(action::run)
-                .isInstanceOfSatisfying(
-                        ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
+            .isInstanceOfSatisfying(
+                ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.USER_BUSY));
     }
+
 
     private AgentExecution saveRunning(Long owner, Long conversationId, Long parentExecutionId) {
         return executions.save(row(owner, conversationId, parentExecutionId, ExecutionStatus.RUNNING));
     }
 
+
     private static AgentExecution row(Long owner, Long conversationId, Long parentExecutionId, ExecutionStatus status) {
         return AgentExecution.builder()
-                .userId(owner)
-                .conversationId(conversationId)
-                .parentExecutionId(parentExecutionId)
-                .rootExecutionId(parentExecutionId)
-                .profileName("limit-test")
-                .costMode(CostMode.SUBSCRIPTION)
-                .status(status)
-                .startedAt(Instant.now())
-                .build();
+            .userId(owner)
+            .conversationId(conversationId)
+            .parentExecutionId(parentExecutionId)
+            .rootExecutionId(parentExecutionId)
+            .profileName("limit-test")
+            .costMode(CostMode.SUBSCRIPTION)
+            .status(status)
+            .startedAt(Instant.now())
+            .build();
     }
+
 
     private static void pause() {
         try {

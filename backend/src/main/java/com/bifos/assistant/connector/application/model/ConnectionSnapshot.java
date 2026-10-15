@@ -16,26 +16,27 @@ import java.util.Map;
  * @param undeclaredTools 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 가 선언하지 않은 수
  */
 public record ConnectionSnapshot(
-        String connectorId,
-        ConnectionStatus status,
-        Map<String, String> secretPrefixes,
-        Map<String, String> values,
-        Instant checkedAt,
-        List<BoundAgentSummary> bindings,
-        int undeclaredTools) {
+    String connectorId,
+    ConnectionStatus status,
+    Map<String, String> secretPrefixes,
+    Map<String, String> values,
+    Instant checkedAt,
+    List<BoundAgentSummary> bindings,
+    int undeclaredTools) {
 
     public ConnectionSnapshot {
         bindings = List.copyOf(bindings);
     }
 
+
     public static ConnectionSnapshot from(ConnectorConnection connection, List<ConnectorBinding> bindings) {
         return new ConnectionSnapshot(
-                connection.connectorId(),
-                connection.status(),
-                connection.fields().secretPrefixes(),
-                connection.fields().values(),
-                connection.checkedAt(),
-                bindings.stream().map(BoundAgentSummary::from).toList(),
-                connection.undeclaredTools());
+            connection.connectorId(),
+            connection.status(),
+            connection.fields().secretPrefixes(),
+            connection.fields().values(),
+            connection.checkedAt(),
+            bindings.stream().map(BoundAgentSummary::from).toList(),
+            connection.undeclaredTools());
     }
 }

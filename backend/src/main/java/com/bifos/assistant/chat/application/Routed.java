@@ -13,10 +13,11 @@ import java.util.List;
  * {@code created} 는 이 요청이 새로 만든 대화인지다.
  */
 record Routed(
-        Conversation conversation,
-        Agent agent,
-        Flow flow,
-        List<ChatAttachment> attached,
-        SkillCommand command,
-        Instant requestReceivedAt,
-        boolean created) {}
+    Conversation conversation,
+    Agent agent,
+    Flow flow,
+    List<ChatAttachment> attached,
+    SkillCommand command,
+    Instant requestReceivedAt,
+    boolean created) {
+}

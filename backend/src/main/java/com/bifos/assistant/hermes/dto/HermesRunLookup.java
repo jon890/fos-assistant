@@ -16,13 +16,16 @@ public record HermesRunLookup(State state, HermesRunResult result) {
         NOT_FOUND
     }
 
+
     public static HermesRunLookup running() {
         return new HermesRunLookup(State.RUNNING, null);
     }
 
+
     public static HermesRunLookup finished(HermesRunResult result) {
         return new HermesRunLookup(State.FINISHED, result);
     }
+
 
     public static HermesRunLookup notFound() {
         return new HermesRunLookup(State.NOT_FOUND, null);

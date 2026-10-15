@@ -6,4 +6,5 @@ package com.bifos.assistant.usage.application;
  * @param cost native 자식의 토큰과 금액이 더해진 축 레코드
  * @param subagents 그 줄에 더한 자식 수. 실행 수에는 들지 않는다
  */
-public record BreakdownLine<T>(T cost, long subagents) {}
+public record BreakdownLine<T>(T cost, long subagents) {
+}

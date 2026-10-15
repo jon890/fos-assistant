@@ -34,11 +34,13 @@ public class AttentionEventWriter {
     private final AttentionEventRepository events;
     private final TransactionTemplate transactions;
 
+
     public AttentionEventWriter(AttentionEventRepository events, PlatformTransactionManager transactionManager) {
         this.events = events;
         this.transactions = new TransactionTemplate(transactionManager);
         this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
+
 
     /** 사건 한 줄을 넣는다. 같은 줄이 이미 있으면 넘어간다. */
     public void recordOnce(AttentionEvent event) {
@@ -47,6 +49,7 @@ public class AttentionEventWriter {
             log.warn("attention event failed userId={} count={} kind={}", event.userId(), 1, failure);
         }
     }
+
 
     /**
      * 응답에 실린 항목의 {@code SHOWN} 을 남긴다. 이미 남긴 {@code (itemKey, stateKey, attention)} 은 다시 넣지 않는다.
@@ -62,35 +65,36 @@ public class AttentionEventWriter {
         Set<String> existing;
         try {
             existing = events
-                    .findByUserIdAndEventTypeAndItemKeyInAndStateKeyIn(
-                            userId,
-                            AttentionEventType.SHOWN,
-                            shown.stream().map(AttentionEvent::itemKey).collect(Collectors.toSet()),
-                            shown.stream().map(AttentionEvent::stateKey).collect(Collectors.toSet()))
-                    .stream()
-                    .map(event -> identity(event.itemKey(), event.stateKey(), event.level()))
-                    .collect(Collectors.toSet());
+                .findByUserIdAndEventTypeAndItemKeyInAndStateKeyIn(
+                    userId,
+                    AttentionEventType.SHOWN,
+                    shown.stream().map(AttentionEvent::itemKey).collect(Collectors.toSet()),
+                    shown.stream().map(AttentionEvent::stateKey).collect(Collectors.toSet()))
+                .stream()
+                .map(event -> identity(event.itemKey(), event.stateKey(), event.level()))
+                .collect(Collectors.toSet());
         } catch (RuntimeException ex) {
             log.warn(
-                    "attention event failed userId={} count={} kind={}",
-                    userId,
-                    wanted.size(),
-                    ex.getClass().getSimpleName());
+                "attention event failed userId={} count={} kind={}",
+                userId,
+                wanted.size(),
+                ex.getClass().getSimpleName());
             return;
         }
         List<String> failures = wanted.entrySet().stream()
-                .filter(entry -> !existing.contains(entry.getKey()))
-                .map(entry -> insert(entry.getValue()))
-                .filter(Objects::nonNull)
-                .toList();
+            .filter(entry -> !existing.contains(entry.getKey()))
+            .map(entry -> insert(entry.getValue()))
+            .filter(Objects::nonNull)
+            .toList();
         if (!failures.isEmpty()) {
             log.warn(
-                    "attention event failed userId={} count={} kind={}",
-                    userId,
-                    failures.size(),
-                    String.join(",", new TreeSet<>(failures)));
+                "attention event failed userId={} count={} kind={}",
+                userId,
+                failures.size(),
+                String.join(",", new TreeSet<>(failures)));
         }
     }
+
 
     /**
      * 새 트랜잭션에서 한 줄을 넣는다. 유일 제약에 걸리면 같은 줄이 먼저 들어간 것이라 성공으로 본다.
@@ -107,6 +111,7 @@ public class AttentionEventWriter {
             return ex.getClass().getSimpleName();
         }
     }
+
 
     private static String identity(String itemKey, String stateKey, AttentionLevel level) {
         return itemKey + "|" + stateKey + "|" + level.name();

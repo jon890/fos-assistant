@@ -23,15 +23,17 @@ public class SkillAdminController {
     private final SkillService skills;
     private final CurrentUserProvider currentUser;
 
+
     @GetMapping
     public SkillListView list(@PathVariable String code) {
         return SkillListView.from(skills.adminList(currentUser.requireAdmin(), code));
     }
 
+
     @PutMapping("/{name}/enabled")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void toggle(
-            @PathVariable String code, @PathVariable String name, @Valid @RequestBody ToggleSkillRequest request) {
+        @PathVariable String code, @PathVariable String name, @Valid @RequestBody ToggleSkillRequest request) {
         skills.adminToggle(currentUser.requireAdmin(), code, name, request.enabled());
     }
 }

@@ -90,21 +90,22 @@ public class DelegationWakeService {
     /** 사용자 실행 한도로 미룬 재시도가 걸려 있는 대화다. 한 대화에 예약을 하나만 둔다. */
     private final Set<Long> pendingBusyRetries = ConcurrentHashMap.newKeySet();
 
+
     public DelegationWakeService(
-            LiveProperties<DelegationWakeProperties> properties,
-            TurnCancellation turns,
-            ChatService chat,
-            ConversationEventHub hub,
-            AgentExecutionRepository executions,
-            ConversationRepository conversations,
-            ChatMessageRepository messages,
-            AgentService agents,
-            FlowRegistry flows,
-            AppUserRepository users,
-            List<AutoTurnResultSource> sources,
-            TaskScheduler scheduler,
-            ApplicationEventPublisher events,
-            BackgroundTasks backgroundTasks) {
+        LiveProperties<DelegationWakeProperties> properties,
+        TurnCancellation turns,
+        ChatService chat,
+        ConversationEventHub hub,
+        AgentExecutionRepository executions,
+        ConversationRepository conversations,
+        ChatMessageRepository messages,
+        AgentService agents,
+        FlowRegistry flows,
+        AppUserRepository users,
+        List<AutoTurnResultSource> sources,
+        TaskScheduler scheduler,
+        ApplicationEventPublisher events,
+        BackgroundTasks backgroundTasks) {
         this.properties = properties;
         this.turns = turns;
         this.chat = chat;
@@ -121,6 +122,7 @@ public class DelegationWakeService {
         this.backgroundTasks = backgroundTasks;
     }
 
+
     /** 기동 전에 끝났지만 전하지 못한 결과가 있는 대화를 돌려준다. 이 기능이 꺼져 있으면 비어 있다. */
     public List<Long> conversationsToWake() {
         if (!properties.current().enabled()) {
@@ -131,6 +133,7 @@ public class DelegationWakeService {
         sources.forEach(source -> found.addAll(source.conversationsWithUndelivered()));
         return List.copyOf(found);
     }
+
 
     /**
      * 그 대화에 전할 결과가 있고 turn 이 돌지 않으면 자동 turn 을 새 가상 스레드에서 연다.
@@ -153,9 +156,9 @@ public class DelegationWakeService {
         Conversation conversation = found.get();
         Optional<Agent> agent = agents.findById(conversation.agentId());
         if (agent.isEmpty()
-                || agent.get().isDeleted()
-                || !agent.get().enabled()
-                || flows.find(agent.get().flow()) != null) {
+            || agent.get().isDeleted()
+            || !agent.get().enabled()
+            || flows.find(agent.get().flow()) != null) {
             return;
         }
         Optional<AppUser> user = users.findById(conversation.userId());
@@ -184,16 +187,16 @@ public class DelegationWakeService {
             throw ex;
         }
         busyRetries.remove(conversationId);
-        CurrentUser current =
-                new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+        CurrentUser current = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         try {
             backgroundTasks.start(
-                    "delegation-wake-" + conversationId, () -> runAutoTurn(current, conversationId, handle));
+                "delegation-wake-" + conversationId, () -> runAutoTurn(current, conversationId, handle));
         } catch (RuntimeException | Error ex) {
             log.warn("자동 turn 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
             turns.close(handle);
         }
     }
+
 
     /**
      * 자동 turn 을 돌리고 잠금을 푼다. 푸는 자리에서 닫기 리스너가 그 사이 쌓인 결과를 이어서 연다.
@@ -220,6 +223,7 @@ public class DelegationWakeService {
         }
     }
 
+
     /**
      * 사용자 실행 한도로 거절된 대화의 재시도를 예약한다.
      *
@@ -237,10 +241,10 @@ public class DelegationWakeService {
         Duration delay = retries > MAX_BUSY_RETRIES ? LONG_BUSY_RETRY : FAILURE_BACKOFF.plus(BUSY_RETRY_MARGIN);
         if (retries == MAX_BUSY_RETRIES + 1) {
             log.info(
-                    "사용자 실행 한도로 자동 turn 이 연달아 거절돼 간격을 늘린다 conversationId={} retries={} delay={}",
-                    conversationId,
-                    retries,
-                    delay);
+                "사용자 실행 한도로 자동 turn 이 연달아 거절돼 간격을 늘린다 conversationId={} retries={} delay={}",
+                conversationId,
+                retries,
+                delay);
         }
         try {
             scheduler.schedule(() -> dueAfterUserBusy(conversationId, now), now.plus(delay));
@@ -249,6 +253,7 @@ public class DelegationWakeService {
             log.warn("사용자 실행 한도로 미룬 자동 turn 을 예약하지 못했다 conversationId={}", conversationId, ex);
         }
     }
+
 
     /**
      * 예약한 재시도의 때가 됐다. 새 가상 스레드에서 실패 시각을 지우고 사건을 낸다.
@@ -261,12 +266,13 @@ public class DelegationWakeService {
     private void dueAfterUserBusy(Long conversationId, Instant scheduledAt) {
         try {
             backgroundTasks.start(
-                    "delegation-wake-retry-" + conversationId, () -> retryAfterUserBusy(conversationId, scheduledAt));
+                "delegation-wake-retry-" + conversationId, () -> retryAfterUserBusy(conversationId, scheduledAt));
         } catch (RuntimeException | Error ex) {
             pendingBusyRetries.remove(conversationId);
             log.warn("사용자 실행 한도로 미룬 자동 turn 의 재시도 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
         }
     }
+
 
     /**
      * 예약하며 적은 실패 시각을 지운 뒤 사건을 낸다.
@@ -284,6 +290,7 @@ public class DelegationWakeService {
         }
     }
 
+
     /** 이 turn 이 전하려던 결과가 아직 남아 있으면 실패 시각을 적는다. 전한 뒤의 실패는 같은 결과로 다시 열지 않으므로 적지 않는다. */
     private void rememberFailureIfUndelivered(Long conversationId, Set<String> pending) {
         try {
@@ -297,6 +304,7 @@ public class DelegationWakeService {
             lastFailures.put(conversationId, Instant.now(clock));
         }
     }
+
 
     /**
      * 그 대화에 아직 전하지 않은 결과들의 표식이다. 위임 결과와 다른 쪽이 낸 결과를 함께 본다.
@@ -313,6 +321,7 @@ public class DelegationWakeService {
         return marks;
     }
 
+
     private boolean inFailureBackoff(Long conversationId) {
         Instant failedAt = lastFailures.get(conversationId);
         if (failedAt == null) {
@@ -324,6 +333,7 @@ public class DelegationWakeService {
         lastFailures.remove(conversationId, failedAt);
         return false;
     }
+
 
     /**
      * 한도에 닿았다는 알림 줄을 남긴다. 마지막 줄이 이미 그 알림이면 남기지 않는다.

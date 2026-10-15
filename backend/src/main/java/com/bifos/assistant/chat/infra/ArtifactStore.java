@@ -54,27 +54,32 @@ public class ArtifactStore {
      */
     private final ReentrantLock[] conversationLocks = new ReentrantLock[LOCK_COUNT];
 
+
     @Autowired
     public ArtifactStore(ArtifactProperties properties) {
         this(properties, false, ArtifactFileWriter::atomicMove);
     }
+
 
     /** Linux에서도 링크 재검사와 원자 교체 대체 경로를 검사할 때 쓴다. */
     ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback) {
         this(properties, forceAtomicMoveFallback, ArtifactFileWriter::atomicMove);
     }
 
+
     /** 파일 시스템의 원자 교체 실패를 결정적으로 검사할 때 쓴다. */
     ArtifactStore(ArtifactProperties properties, boolean forceAtomicMoveFallback, ArtifactAtomicMover atomicMover) {
-        this(properties, forceAtomicMoveFallback, atomicMover, conversationId -> {});
+        this(properties, forceAtomicMoveFallback, atomicMover, conversationId -> {
+        });
     }
+
 
     /** 정리가 판정한 뒤 지우기 전에 쓰기가 끼어드는 경우를 결정적으로 검사할 때 쓴다. */
     ArtifactStore(
-            ArtifactProperties properties,
-            boolean forceAtomicMoveFallback,
-            ArtifactAtomicMover atomicMover,
-            ArtifactCleanupProbe cleanupProbe) {
+        ArtifactProperties properties,
+        boolean forceAtomicMoveFallback,
+        ArtifactAtomicMover atomicMover,
+        ArtifactCleanupProbe cleanupProbe) {
         this.root = Path.of(properties.root()).toAbsolutePath().normalize();
         this.paths = new ArtifactPathPolicy(root);
         this.agentRoot = stripTrailingSlash(properties.agentRoot());
@@ -85,10 +90,12 @@ public class ArtifactStore {
         }
     }
 
+
     /** 확장자로 정한 형식. 내주지 않는 확장자면 빈 값이다. 대소문자는 가리지 않는다. */
     public static Optional<String> contentTypeOf(String relativePath) {
         return ArtifactPathPolicy.contentTypeOf(relativePath);
     }
+
 
     /**
      * 대화 폴더를 만든다. 이미 있으면 그대로 둔다.
@@ -105,10 +112,12 @@ public class ArtifactStore {
         return folder;
     }
 
+
     /** 같은 폴더를 Hermes 컨테이너에서 보는 경로. 끝에 {@code /} 를 붙이지 않는다. */
     public String agentFolder(Long conversationId) {
         return agentRoot + "/" + conversationId;
     }
+
 
     /**
      * 마지막으로 바뀐 때가 {@code since} 이후인 {@code .html} 파일을 하위 폴더까지 찾는다.
@@ -124,12 +133,13 @@ public class ArtifactStore {
         List<ArtifactFoundFile> found = new ArrayList<>();
         for (WalkedFile file : regularFilesUnder(folder)) {
             if (HTML.equals(extensionOf(file.path().getFileName().toString()))
-                    && !file.modified().isBefore(since)) {
+                && !file.modified().isBefore(since)) {
                 found.add(new ArtifactFoundFile(relativeOf(folder, file.path()), file.byteSize()));
             }
         }
         return found;
     }
+
 
     /**
      * 대화 폴더 안의 파일을 찾는다. 없거나, 내주지 않는 확장자이거나, 폴더 밖이면 빈 값이다.
@@ -141,6 +151,7 @@ public class ArtifactStore {
     public Optional<Path> resolveInside(Long conversationId, String relativePath) {
         return paths.resolveInside(conversationId, relativePath);
     }
+
 
     /**
      * 그 대화 폴더에 그 경로의 파일이 없다고 확인되면 참이다.
@@ -155,6 +166,7 @@ public class ArtifactStore {
         return paths.isMissing(conversationId, relativePath);
     }
 
+
     /**
      * 결과물을 쓸 최종 경로를 판정하고 필요한 부모 폴더를 만든다.
      *
@@ -165,10 +177,12 @@ public class ArtifactStore {
         return paths.resolveForWrite(conversationId, relativePath);
     }
 
+
     /** 파일 시스템을 열지 않고 결과물 쓰기 경로의 형식과 확장자만 검사한다. */
     public static void requireWritablePath(String relativePath) {
         ArtifactPathPolicy.requireWritablePath(relativePath);
     }
+
 
     /**
      * 검증한 대화 폴더 안에서 임시 파일을 완성한 뒤 원자적으로 바꾼다.
@@ -191,6 +205,7 @@ public class ArtifactStore {
             lock.unlock();
         }
     }
+
 
     /**
      * 대화 폴더마다 마지막으로 바뀐 때가 {@code cutoff} 보다 앞섰는지 보고, 앞섰으면 그 폴더의 파일을 지운다.
@@ -235,6 +250,7 @@ public class ArtifactStore {
         return removed;
     }
 
+
     /**
      * 지운 대화의 결과물 폴더를 통째로 지운다(ADR-20261008 / conversation-purge).
      *
@@ -256,6 +272,7 @@ public class ArtifactStore {
                     return FileVisitResult.CONTINUE;
                 }
 
+
                 @Override
                 public FileVisitResult postVisitDirectory(Path directory, IOException ex) throws IOException {
                     if (ex != null) {
@@ -271,6 +288,7 @@ public class ArtifactStore {
             lock.unlock();
         }
     }
+
 
     /**
      * 잠금을 잡은 채 한 대화 폴더를 판정하고 지운다. 지운 파일은 {@code removed} 에 더한다.
@@ -289,7 +307,7 @@ public class ArtifactStore {
         Set<Path> deleted = new HashSet<>();
         for (WalkedFile file : judged) {
             if (isHtml(file.path())
-                    && !deleteIfStillExpired(conversationId, folder, file.path(), cutoff, deleted, removed)) {
+                && !deleteIfStillExpired(conversationId, folder, file.path(), cutoff, deleted, removed)) {
                 log.info("stopped cleaning an artifact folder, an html file changed conversationId={}", conversationId);
                 return;
             }
@@ -297,18 +315,19 @@ public class ArtifactStore {
         List<WalkedFile> rescanned = regularFilesUnder(folder);
         if (!allBefore(rescanned, cutoff)) {
             log.info(
-                    "stopped cleaning an artifact folder, a file changed before removing the rest conversationId={}",
-                    conversationId);
+                "stopped cleaning an artifact folder, a file changed before removing the rest conversationId={}",
+                conversationId);
             return;
         }
         for (WalkedFile file : rescanned) {
             if (!deleted.contains(file.path())
-                    && !deleteIfStillExpired(conversationId, folder, file.path(), cutoff, deleted, removed)) {
+                && !deleteIfStillExpired(conversationId, folder, file.path(), cutoff, deleted, removed)) {
                 log.info("stopped cleaning an artifact folder, a file changed conversationId={}", conversationId);
                 return;
             }
         }
     }
+
 
     /**
      * 지우기 직전 수정 시각을 다시 읽어 아직 기간을 넘겼을 때만 지운다.
@@ -316,15 +335,14 @@ public class ArtifactStore {
      * @return 기간 안으로 바뀌어 그 폴더의 삭제를 멈춰야 하면 {@code false}
      */
     private static boolean deleteIfStillExpired(
-            Long conversationId,
-            Path folder,
-            Path file,
-            Instant cutoff,
-            Set<Path> deleted,
-            List<ArtifactRemoved> removed) {
+        Long conversationId,
+        Path folder,
+        Path file,
+        Instant cutoff,
+        Set<Path> deleted,
+        List<ArtifactRemoved> removed) {
         try {
-            BasicFileAttributes attributes =
-                    Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
             if (!attributes.lastModifiedTime().toInstant().isBefore(cutoff)) {
                 return false;
             }
@@ -345,21 +363,27 @@ public class ArtifactStore {
         return true;
     }
 
+
     private static boolean allBefore(List<WalkedFile> files, Instant cutoff) {
         return files.stream().allMatch(file -> file.modified().isBefore(cutoff));
     }
 
+
     private static boolean isHtml(Path file) {
         return HTML.equals(extensionOf(file.getFileName().toString()));
     }
+
 
     private ReentrantLock lockOf(Long conversationId) {
         // 대화 번호가 없는 쓰기는 판정에서 거절되지만, 그 전에 잠금을 고르다 실패하지 않게 Objects.hashCode 를 쓴다.
         return conversationLocks[Math.floorMod(Objects.hashCode(conversationId), LOCK_COUNT)];
     }
 
+
     /** 걸음에서 만난 일반 파일 하나와 그때 읽은 속성이다. */
-    private record WalkedFile(Path path, Instant modified, long byteSize) {}
+    private record WalkedFile(Path path, Instant modified, long byteSize) {
+    }
+
 
     /**
      * {@code start} 아래의 일반 파일을 하위 폴더까지 모은다. 심볼릭 링크는 따라가지 않는다.
@@ -374,16 +398,18 @@ public class ArtifactStore {
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
                     if (attributes.isRegularFile()) {
                         files.add(new WalkedFile(
-                                file, attributes.lastModifiedTime().toInstant(), attributes.size()));
+                            file, attributes.lastModifiedTime().toInstant(), attributes.size()));
                     }
                     return FileVisitResult.CONTINUE;
                 }
+
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException ex) {
                     log.warn("could not read an artifact path while walking, skipped", ex);
                     return FileVisitResult.CONTINUE;
                 }
+
 
                 /** 폴더 목록을 읽는 도중 실패해도 그 폴더만 두고 걸음을 이어 간다. */
                 @Override
@@ -401,11 +427,13 @@ public class ArtifactStore {
         return files;
     }
 
+
     private static String relativeOf(Path folder, Path file) {
         return StreamSupport.stream(folder.relativize(file).spliterator(), false)
-                .map(Path::toString)
-                .collect(Collectors.joining("/"));
+            .map(Path::toString)
+            .collect(Collectors.joining("/"));
     }
+
 
     private static Long conversationIdOf(String name) {
         try {
@@ -415,9 +443,11 @@ public class ArtifactStore {
         }
     }
 
+
     static String extensionOf(String path) {
         return ArtifactPathPolicy.extensionOf(path);
     }
+
 
     private static String stripTrailingSlash(String path) {
         String stripped = path.strip();

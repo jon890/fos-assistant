@@ -57,29 +57,31 @@ class BrowserGatewaySocketTest {
     private final Session container = mock(Session.class);
     private NativeWebSocketSession session;
 
+
     @BeforeEach
     void setUp() throws Exception {
         when(gateway.hold(TARGET)).thenReturn(handleCloses::incrementAndGet);
         when(gateway.idleTimeout()).thenReturn(IDLE);
         Map<String, Object> attributes = new ConcurrentHashMap<>(Map.of(
-                BrowserGatewayHandshake.TARGET, TARGET,
-                BrowserGatewayHandshake.KIND, "browser",
-                BrowserGatewayHandshake.TARGET_ID, BROWSER_ID));
+            BrowserGatewayHandshake.TARGET, TARGET,
+            BrowserGatewayHandshake.KIND, "browser",
+            BrowserGatewayHandshake.TARGET_ID, BROWSER_ID));
         session = mock(NativeWebSocketSession.class);
         when(session.getAttributes()).thenReturn(attributes);
         when(session.getNativeSession(Session.class)).thenReturn(container);
         when(session.isOpen()).thenAnswer(invocation -> sessionClosed.get() == null);
         doAnswer(invocation -> sent.add(invocation.getArgument(0)))
-                .when(session)
-                .sendMessage(any());
+            .when(session)
+            .sendMessage(any());
         doAnswer(invocation -> {
-                    sessionClosed.set(invocation.getArgument(0));
-                    sessionCloses.incrementAndGet();
-                    return null;
-                })
-                .when(session)
-                .close(any(CloseStatus.class));
+            sessionClosed.set(invocation.getArgument(0));
+            sessionCloses.incrementAndGet();
+            return null;
+        })
+            .when(session)
+            .close(any(CloseStatus.class));
     }
+
 
     @Test
     @DisplayName("handshake 가 정한 대상에 붙고 양쪽 조각을 그대로 잇는다. 메시지가 끝나면 활동을 기록한다")
@@ -96,11 +98,12 @@ class BrowserGatewaySocketTest {
         assertThat(relays.sent).containsExactly("{\"id\": false", "1} true");
         verify(gateway).touch(TARGET);
         assertThat(sent)
-                .extracting(message -> message.getPayload() + " " + message.isLast())
-                .containsExactly("{\"id\":1, false", "\"result\":{}} true");
+            .extracting(message -> message.getPayload() + " " + message.isLast())
+            .containsExactly("{\"id\":1, false", "\"result\":{}} true");
         assertThat(handleCloses).hasValue(0);
         assertThat(socket.supportsPartialMessages()).isTrue();
     }
+
 
     @Test
     @DisplayName("받은 쪽이 닫힌 뒤 전송 오류가 또 와도 Chrome 쪽과 핸들은 한 번만 닫고, 이미 닫힌 세션은 다시 닫지 않는다")
@@ -114,6 +117,7 @@ class BrowserGatewaySocketTest {
         assertThat(handleCloses).as("핸들 닫힘 수").hasValue(1);
         assertThat(sessionCloses).as("세션 닫힘 수").hasValue(0);
     }
+
 
     @Test
     @DisplayName("전송 오류 뒤에 받은 쪽이 닫혀도 Chrome 쪽과 핸들, 세션을 한 번씩만 닫는다")
@@ -129,6 +133,7 @@ class BrowserGatewaySocketTest {
         assertThat(sessionClosed.get()).isEqualTo(CloseStatus.SERVER_ERROR);
     }
 
+
     @Test
     @DisplayName("열리면 컨테이너 세션의 유휴 시간 제한을 브라우저 유휴 시간으로 둔다")
     void limitsIdleTimeOfSession() throws Exception {
@@ -137,6 +142,7 @@ class BrowserGatewaySocketTest {
         verify(container).setMaxIdleTimeout(IDLE.toMillis());
         assertThat(relays.opened).isNotNull();
     }
+
 
     @Test
     @DisplayName("컨테이너 세션을 꺼내지 못해도 Chrome 쪽에 붙는다")
@@ -148,6 +154,7 @@ class BrowserGatewaySocketTest {
         assertThat(relays.opened).isEqualTo(CDP + " browser " + BROWSER_ID);
         assertThat(sessionCloses).hasValue(0);
     }
+
 
     @Test
     @DisplayName("연결 준비가 실패하면 예외를 던지지 않고 핸들을 닫고 세션을 SERVER_ERROR 로 닫는다")
@@ -162,6 +169,7 @@ class BrowserGatewaySocketTest {
         assertThat(sessionClosed.get()).isEqualTo(CloseStatus.SERVER_ERROR);
     }
 
+
     @Test
     @DisplayName("핸들을 쥐지 못하면 예외를 던지지 않고 세션을 SERVER_ERROR 로 닫는다")
     void closesSessionWhenHoldFails() throws Exception {
@@ -174,6 +182,7 @@ class BrowserGatewaySocketTest {
         assertThat(sessionClosed.get()).isEqualTo(CloseStatus.SERVER_ERROR);
     }
 
+
     @Test
     @DisplayName("Chrome 쪽이 닫히면 받은 쪽을 닫고 핸들을 닫는다")
     void closesSessionWhenChromeCloses() throws Exception {
@@ -184,6 +193,7 @@ class BrowserGatewaySocketTest {
         assertThat(sessionClosed.get()).isEqualTo(CloseStatus.GOING_AWAY);
         assertThat(handleCloses).hasValue(1);
     }
+
 
     @Test
     @DisplayName("한 메시지의 조각 합이 상한과 같으면 넘기고, 넘으면 넘기지 않고 양쪽을 닫는다")
@@ -201,6 +211,7 @@ class BrowserGatewaySocketTest {
         assertThat(handleCloses).hasValue(1);
     }
 
+
     @Test
     @DisplayName("바이너리 메시지가 오면 양쪽을 닫는다")
     void closesOnBinaryMessage() throws Exception {
@@ -213,6 +224,7 @@ class BrowserGatewaySocketTest {
         assertThat(handleCloses).hasValue(1);
     }
 
+
     @Test
     @DisplayName("Chrome 쪽에 붙지 못하면 받은 쪽을 SERVER_ERROR 로 닫고 핸들을 닫는다")
     void closesSessionWhenChromeIsUnreachable() throws Exception {
@@ -223,6 +235,7 @@ class BrowserGatewaySocketTest {
         assertThat(sessionClosed.get()).isEqualTo(CloseStatus.SERVER_ERROR);
         assertThat(handleCloses).hasValue(1);
     }
+
 
     @Test
     @DisplayName("Chrome 쪽 보내기가 실패하면 양쪽을 닫는다")
@@ -238,6 +251,7 @@ class BrowserGatewaySocketTest {
         verify(gateway, never()).touch(TARGET);
     }
 
+
     /** 연 대상과 보낸 조각, 닫힘을 기록하는 Chrome 쪽 대역이다. */
     private static final class FakeRelays implements CdpRelayConnector {
 
@@ -247,6 +261,7 @@ class BrowserGatewaySocketTest {
         final AtomicInteger closes = new AtomicInteger();
         boolean failing;
         boolean failSend;
+
 
         @Override
         public CdpRelay open(URI cdp, String kind, String id, CdpRelayListener relayListener) {
@@ -263,6 +278,7 @@ class BrowserGatewaySocketTest {
                     }
                     sent.add(fragment + " " + last);
                 }
+
 
                 @Override
                 public void close() {

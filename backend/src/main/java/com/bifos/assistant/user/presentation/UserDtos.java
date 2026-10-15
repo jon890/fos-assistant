@@ -16,7 +16,7 @@ public final class UserDtos {
     public record MeView(Long id, String email, String displayName, String role) {
         static MeView from(CurrentUser user) {
             return new MeView(
-                    user.id(), user.email(), user.displayName(), user.role().name());
+                user.id(), user.email(), user.displayName(), user.role().name());
         }
     }
 }

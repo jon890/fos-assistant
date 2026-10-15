@@ -32,6 +32,7 @@ class ProactiveLoopFallbackTest extends ProactiveLoopTestSupport {
     @Autowired
     AutonomyDecisionRepository decisions;
 
+
     @Test
     @DisplayName("provider 를 쓸 수 없으면 시도는 DECIDED, 평가는 FALLBACK, 판정은 모두 IGNORE 이고 알림은 늘지 않는다")
     void decidesWithFallbackWhenProviderUnavailable() throws InterruptedException {
@@ -45,8 +46,7 @@ class ProactiveLoopFallbackTest extends ProactiveLoopTestSupport {
         assertThat(judged).as("평가 줄").hasSize(1);
         ValueEvaluation evaluation = judged.getFirst();
         assertThat(evaluation.outcome()).as("평가 결과").isEqualTo(DecisionOutcome.FALLBACK);
-        List<AutonomyDecision> decided =
-                decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(user.id(), List.of(evaluation.id()));
+        List<AutonomyDecision> decided = decisions.findByUserIdAndEvaluationIdInOrderByIdAsc(user.id(), List.of(evaluation.id()));
         assertThat(decided).as("판정 줄").isNotEmpty();
         assertThat(decided).extracting(AutonomyDecision::level).containsOnly(AutonomyLevel.IGNORE);
         ProactiveLoopRun run = loopRuns.findBySourceCheckId(checkId).orElseThrow();

@@ -11,13 +11,16 @@ import org.springframework.data.jpa.repository.Query;
 public interface MediaObservationRepository extends JpaRepository<MediaObservation, Long> {
     Optional<MediaObservation> findFirstByAttachmentIdOrderByRevisionDesc(Long attachmentId);
 
+
     @Modifying(flushAutomatically = true)
     @Query("delete from MediaObservation o where o.conversationId = :conversationId and o.attachmentId = :attachmentId")
     int deleteForAttachment(Long conversationId, Long attachmentId);
 
+
     @Modifying(flushAutomatically = true)
     @Query("delete from MediaObservation o where o.conversationId = :conversationId")
     int deleteForConversation(Long conversationId);
+
 
     /** 숫자 ID와 최신 주인만 읽는다. 본문은 정리 후보에 싣지 않는다. */
     @Query("""

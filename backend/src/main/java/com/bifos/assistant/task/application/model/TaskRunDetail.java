@@ -8,4 +8,5 @@ import java.util.UUID;
  *
  * @param conversationId 대화가 없으면 null
  */
-public record TaskRunDetail(TaskRun run, UUID conversationId) {}
+public record TaskRunDetail(TaskRun run, UUID conversationId) {
+}

@@ -12,6 +12,7 @@ public enum CheckTrigger {
      */
     AUTONOMY;
 
+
     /** 사람이 지켜보지 않는 실행인가. 사용자 대화 한 자리를 남겨 두는 백그라운드 자리를 쓴다. */
     public boolean unattended() {
         return this != MANUAL;

@@ -37,13 +37,14 @@ public class ProactiveLoopSettingService {
     private final Clock clock;
     private final TransactionTemplate transactions;
 
+
     @Transactional(readOnly = true)
     public LoopSettingView get(CurrentUser user, String agentCode) {
         Agent agent = agents.requireReadable(user, agentCode);
-        ProactiveLoopSetting row =
-                settings.findByUserIdAndAgentId(user.id(), agent.id()).orElse(null);
+        ProactiveLoopSetting row = settings.findByUserIdAndAgentId(user.id(), agent.id()).orElse(null);
         return view(row, clock.instant());
     }
+
 
     /**
      * 설정을 저장한다. 같은 사용자와 에이전트의 처음 저장이 동시에 오면 늦은 쪽이 유일 제약에 걸린다. 그 트랜잭션은 롤백되므로 새 트랜잭션에서 먼저
@@ -53,7 +54,7 @@ public class ProactiveLoopSettingService {
         Agent agent = enabled ? agents.requireStartable(user, agentCode) : agents.requireReadable(user, agentCode);
         if (enabled && !properties.current().enabled() && !alreadyEnabled(user.id(), agent.id())) {
             throw new ApiException(
-                    ErrorCode.PROACTIVE_LOOP_UNAVAILABLE, "this installation does not enable the daily loop");
+                ErrorCode.PROACTIVE_LOOP_UNAVAILABLE, "this installation does not enable the daily loop");
         }
         Instant now = clock.instant();
         if (snoozedUntil != null && snoozedUntil.isAfter(now.plus(MAX_SNOOZE))) {
@@ -68,23 +69,26 @@ public class ProactiveLoopSettingService {
         }
     }
 
+
     /** 이미 켠 줄을 켠 채 두는 요청은 설치 설정이 꺼져 있어도 받는다. 꺼진 줄을 켜는 요청만 막는다. */
     private boolean alreadyEnabled(Long userId, Long agentId) {
         return settings.findByUserIdAndAgentId(userId, agentId)
-                .map(ProactiveLoopSetting::enabled)
-                .orElse(false);
+            .map(ProactiveLoopSetting::enabled)
+            .orElse(false);
     }
+
 
     /** 있으면 바꾸고 없으면 만든다. 유일 제약 위반이 이 트랜잭션 안에서 드러나도록 곧바로 flush 한다. */
     private LoopSettingView save(Long userId, Long agentId, boolean enabled, Instant snooze, Instant now) {
         ProactiveLoopSetting row = settings.findByUserIdAndAgentId(userId, agentId)
-                .map(existing -> {
-                    existing.change(enabled, snooze, now);
-                    return existing;
-                })
-                .orElseGet(() -> ProactiveLoopSetting.of(userId, agentId, enabled, snooze, now));
+            .map(existing -> {
+                existing.change(enabled, snooze, now);
+                return existing;
+            })
+            .orElseGet(() -> ProactiveLoopSetting.of(userId, agentId, enabled, snooze, now));
         return view(settings.saveAndFlush(row), now);
     }
+
 
     private LoopSettingView view(ProactiveLoopSetting row, Instant now) {
         boolean available = properties.current().enabled();

@@ -33,18 +33,20 @@ class ProactiveCheckLimits {
     private Thread timeLimit;
     private int stopAttempts;
 
+
     ProactiveCheckLimits(CurrentUser owner, ProactiveCheck check, ProactiveCheckRun.Deps deps) {
         this.owner = owner;
         this.check = check;
         this.deps = deps;
     }
 
+
     /** 루트 실행을 살펴보기 줄에 적은 뒤 {@code max-duration} 이 지나면 깨는 시간 상한 스레드를 띄운다. */
     void started(Long executionId, String hermesRootSessionId) {
         check.attachRoot(executionId, hermesRootSessionId);
         deps.checks().save(check);
         Thread timer = deps.backgroundTasks()
-                .unstarted("proactive-check-time-limit-" + executionId, () -> awaitTimeLimit(executionId));
+            .unstarted("proactive-check-time-limit-" + executionId, () -> awaitTimeLimit(executionId));
         synchronized (limitLock) {
             if (closed) {
                 return;
@@ -54,12 +56,14 @@ class ProactiveCheckLimits {
         timer.start();
     }
 
+
     /** 스트림을 읽는 스레드에서 불린다. 센 값이 {@code max-tool-calls} 를 넘는 첫 순간 멈춘다. */
     void toolStarted(Long executionId) {
         if (toolCalls.incrementAndGet() > deps.properties().current().maxToolCalls()) {
             limitReached(TOOL_LIMIT, executionId);
         }
     }
+
 
     /** 시간 상한 스레드를 깨워 끝내고, 그 뒤로는 상한에 닿아도 멈추기를 부르지 않는다. 줄을 적기 전에 부른다. */
     void close() {
@@ -73,6 +77,7 @@ class ProactiveCheckLimits {
         }
     }
 
+
     /** {@code max-duration} 만큼 잔 뒤 끝나지 않았으면 멈춘다. {@link #close} 가 깨우면 그대로 끝난다. */
     private void awaitTimeLimit(Long executionId) {
         try {
@@ -83,6 +88,7 @@ class ProactiveCheckLimits {
         limitReached(TIME_LIMIT, executionId);
     }
 
+
     /**
      * 멈춘 까닭을 정하고 가상 스레드에서 멈춘다. 닫혔거나, 이미 까닭이 있거나, 멈추기 시도를 다 썼으면 아무것도 하지 않는다.
      *
@@ -91,9 +97,10 @@ class ProactiveCheckLimits {
     private void limitReached(String reason, Long executionId) {
         if (claimStop(reason)) {
             deps.backgroundTasks()
-                    .start("proactive-check-stop-" + executionId, () -> stopWithRetry(reason, executionId));
+                .start("proactive-check-stop-" + executionId, () -> stopWithRetry(reason, executionId));
         }
     }
+
 
     /**
      * 멈추기 시도 하나를 쓴다. 닫히지 않았고 시도가 남았고 까닭이 비어 있을 때만 까닭을 정하고 참을 돌려준다.
@@ -110,6 +117,7 @@ class ProactiveCheckLimits {
             return true;
         }
     }
+
 
     /**
      * 멈추기를 부르고, 실패하면 정한 까닭을 되돌린 뒤 {@link ProactiveCheckRun#STOP_RETRY_INTERVAL} 뒤에 다시 시도한다. 까닭이 남아 있는 동안 turn 이
@@ -136,9 +144,11 @@ class ProactiveCheckLimits {
         } while (claimStop(reason));
     }
 
+
     String stopReason() {
         return stopReason.get();
     }
+
 
     int toolCalls() {
         return toolCalls.get();

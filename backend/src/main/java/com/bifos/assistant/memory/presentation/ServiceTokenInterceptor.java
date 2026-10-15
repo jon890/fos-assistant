@@ -29,6 +29,7 @@ public class ServiceTokenInterceptor implements HandlerInterceptor {
 
     private final ServiceTokenService tokens;
 
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         // 브라우저에서 부르는 길이 아니다
@@ -38,14 +39,13 @@ public class ServiceTokenInterceptor implements HandlerInterceptor {
         }
         String header = request.getHeader("Authorization");
         if (header == null
-                || !header.startsWith(BEARER)
-                || header.substring(BEARER.length()).isBlank()) {
+            || !header.startsWith(BEARER)
+            || header.substring(BEARER.length()).isBlank()) {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             return false;
         }
         try {
-            ServicePrincipal principal =
-                    tokens.authenticate(header.substring(BEARER.length()).trim());
+            ServicePrincipal principal = tokens.authenticate(header.substring(BEARER.length()).trim());
             request.setAttribute(PRINCIPAL_ATTRIBUTE, principal);
             return true;
         } catch (ApiException e) {

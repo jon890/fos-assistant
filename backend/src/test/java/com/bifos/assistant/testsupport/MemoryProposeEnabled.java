@@ -18,4 +18,5 @@ import java.lang.annotation.Target;
 @Documented
 @Inherited
 @OverrideProperties("assistant.memory.propose.enabled=true")
-public @interface MemoryProposeEnabled {}
+public @interface MemoryProposeEnabled {
+}

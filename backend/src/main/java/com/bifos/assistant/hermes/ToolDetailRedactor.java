@@ -30,23 +30,21 @@ public final class ToolDetailRedactor {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     /** 대시보드 plugin 의 {@code SECRET_ARGUMENT_NAMES} 와 같다. 한쪽을 바꾸면 다른 쪽도 바꾼다. */
     private static final Set<String> SECRET_KEYS = Set.of(
-            "token",
-            "secret",
-            "password",
-            "passwd",
-            "apikey",
-            "authorization",
-            "cookie",
-            "credential",
-            "credentials",
-            "privatekey",
-            "accesskey",
-            "clientsecret");
+        "token",
+        "secret",
+        "password",
+        "passwd",
+        "apikey",
+        "authorization",
+        "cookie",
+        "credential",
+        "credentials",
+        "privatekey",
+        "accesskey",
+        "clientsecret");
 
-    private static final Pattern UUID =
-            Pattern.compile("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
-    private static final Pattern JWT =
-            Pattern.compile("(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
+    private static final Pattern UUID = Pattern.compile("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    private static final Pattern JWT = Pattern.compile("(?<![A-Za-z0-9_-])([A-Za-z0-9_-]+)\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+(?![A-Za-z0-9_-])");
     /** 서비스가 정한 접두사로 비밀이라고 알 수 있는 key 다. 식별자로 선언한 칸에서도 가린다(ADR-089). */
     private static final String PREFIXED_SECRET = "(?i)(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-|AIza)[A-Za-z0-9_-]+";
 
@@ -54,20 +52,22 @@ public final class ToolDetailRedactor {
     private static final Pattern PREFIXED = Pattern.compile("^" + PREFIXED_SECRET);
 
     private static final Pattern TOKEN = Pattern.compile("(?i)Bearer\\s+[^\\s\"'`,;<>}\\]]+"
-            + "|" + PREFIXED_SECRET
-            + "|(?<![A-Za-z0-9])[A-Fa-f0-9]{32,}(?![A-Za-z0-9])"
-            + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9+/]{32,}={0,2}(?![A-Za-z0-9_+/=-])"
-            + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
+        + "|" + PREFIXED_SECRET
+        + "|(?<![A-Za-z0-9])[A-Fa-f0-9]{32,}(?![A-Za-z0-9])"
+        + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9+/]{32,}={0,2}(?![A-Za-z0-9_+/=-])"
+        + "|(?<![A-Za-z0-9_+/=-])[A-Za-z0-9_-]{32,}={0,2}(?![A-Za-z0-9_+/=-])");
     private static final Pattern ASSIGNMENT = Pattern.compile("(?i)([\"']?[A-Za-z][A-Za-z0-9_-]*[\"']?\\s*[:=]\\s*)"
-            + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
+        + "(\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'|[^\\s,;}&]+)");
     /** 식별자로 선언한 칸에서 길이 규칙을 면제받는 값의 모양이다(ADR-089). */
     private static final Pattern IDENTIFIER_VALUE = Pattern.compile("[A-Za-z0-9_-]{1,256}");
 
     private static final Pattern AUTH_HEADER = Pattern.compile("(?im)\\b(authorization|cookie)\\s*[:=]\\s*[^\\r\\n]+");
 
+
     static String redact(String detail, boolean connectorManaged) {
         return redact(detail, connectorManaged, new LinkedHashMap<>());
     }
+
 
     /**
      * 옛 커넥터 에이전트의 실행이면 모두 가리고 아니면 비밀값과 식별자만 가린다. 도구 이름을 모르는 자리가 쓴다.
@@ -78,6 +78,7 @@ public final class ToolDetailRedactor {
         return redact(detail, null, connectorManaged ? ToolDetailScope.ALL : ToolDetailScope.NONE, identifiers);
     }
 
+
     /**
      * 번호표는 실행 하나 동안만 메모리에 두고 저장하거나 다른 실행과 공유하지 않는다.
      *
@@ -85,17 +86,18 @@ public final class ToolDetailRedactor {
      * @param scope 내용을 통째로 가릴 도구의 범위
      */
     public static String redact(
-            String detail, String toolName, ToolDetailScope scope, Map<String, String> identifiers) {
+        String detail, String toolName, ToolDetailScope scope, Map<String, String> identifiers) {
         return redact(detail, toolName, scope, identifiers, false);
     }
 
+
     /** 커넥터 호출 뒤 일반 도구는 원문 대신 받은 내용의 길이만 남긴다. 이름은 사건의 별도 칸에 있다. */
     public static String redact(
-            String detail,
-            String toolName,
-            ToolDetailScope scope,
-            Map<String, String> identifiers,
-            boolean afterConnector) {
+        String detail,
+        String toolName,
+        ToolDetailScope scope,
+        Map<String, String> identifiers,
+        boolean afterConnector) {
         if (detail == null) {
             return null;
         }
@@ -119,6 +121,7 @@ public final class ToolDetailRedactor {
         return redacted.substring(0, end) + "…";
     }
 
+
     /**
      * 사용자가 승인하기 전에 읽는 도구 인자에서 비밀값과 식별자를 가린다.
      *
@@ -129,6 +132,7 @@ public final class ToolDetailRedactor {
     public static String redactArguments(String argsJson) {
         return redactArguments(argsJson, Set.of());
     }
+
 
     /**
      * {@link #redactArguments(String)} 와 같고, 커넥터가 식별자로 선언한 맨 위 칸의 값은 길이와 모양으로 가리지
@@ -143,6 +147,7 @@ public final class ToolDetailRedactor {
         return argsJson == null ? null : redactArgumentsContent(argsJson, identifiers);
     }
 
+
     /**
      * {@link #redactArguments} 가 그 인자에서 무엇이든 가리는가.
      *
@@ -153,6 +158,7 @@ public final class ToolDetailRedactor {
     public static boolean hidesArguments(String argsJson) {
         return hidesArguments(argsJson, Set.of());
     }
+
 
     /**
      * {@link #redactArguments(String, Set)} 가 그 인자에서 무엇이든 가리는가.
@@ -175,6 +181,7 @@ public final class ToolDetailRedactor {
         }
     }
 
+
     /** 승인 카드의 인자를 가린다. 식별자 선언은 맨 위 객체의 칸에만 쓴다. */
     private static String redactArgumentsContent(String argsJson, Set<String> declared) {
         if (declared.isEmpty()) {
@@ -194,10 +201,10 @@ public final class ToolDetailRedactor {
                 String key = entry.getKey();
                 JsonNode value = entry.getValue();
                 JsonNode redacted = declared.contains(key) && !isSecretKey(key) && identifierValue(value)
-                        ? redactIdentifier(value)
-                        : isSecretKey(key)
-                                ? MAPPER.getNodeFactory().stringNode(HIDDEN)
-                                : redactJson(value, KEEP_IDENTIFIERS);
+                    ? redactIdentifier(value)
+                    : isSecretKey(key)
+                        ? MAPPER.getNodeFactory().stringNode(HIDDEN)
+                        : redactJson(value, KEEP_IDENTIFIERS);
                 result.set(redactText(key, KEEP_IDENTIFIERS), redacted);
             });
             return MAPPER.writeValueAsString(result);
@@ -206,6 +213,7 @@ public final class ToolDetailRedactor {
             return HIDDEN;
         }
     }
+
 
     /** 식별자 칸의 값이 면제받는 모양인가. 문자열이거나, 비지 않은 문자열 배열이고 문자열마다 식별자 모양이다. */
     private static boolean identifierValue(JsonNode value) {
@@ -223,6 +231,7 @@ public final class ToolDetailRedactor {
         return true;
     }
 
+
     /** 식별자 모양의 값에서 알려진 접두사의 key 만 가린다. */
     private static JsonNode redactIdentifier(JsonNode value) {
         if (value.isArray()) {
@@ -231,9 +240,10 @@ public final class ToolDetailRedactor {
             return result;
         }
         return PREFIXED.matcher(value.asString()).find()
-                ? MAPPER.getNodeFactory().stringNode(HIDDEN)
-                : value;
+            ? MAPPER.getNodeFactory().stringNode(HIDDEN)
+            : value;
     }
+
 
     private static String redactContent(String detail, Map<String, String> identifiers) {
         String stripped = detail.stripLeading();
@@ -248,13 +258,14 @@ public final class ToolDetailRedactor {
         return redactAssignments(redactText(detail, identifiers));
     }
 
+
     private static JsonNode redactJson(JsonNode node, Map<String, String> identifiers) {
         if (node.isObject()) {
             ObjectNode result = MAPPER.createObjectNode();
             node.properties().forEach(entry -> {
                 JsonNode value = isSecretKey(entry.getKey())
-                        ? MAPPER.getNodeFactory().stringNode(HIDDEN)
-                        : redactJson(entry.getValue(), identifiers);
+                    ? MAPPER.getNodeFactory().stringNode(HIDDEN)
+                    : redactJson(entry.getValue(), identifiers);
                 result.set(redactText(entry.getKey(), identifiers), value);
             });
             return result;
@@ -270,14 +281,16 @@ public final class ToolDetailRedactor {
         return node;
     }
 
+
     private static boolean isSecretKey(String key) {
         String normalized = key.replaceAll("[_-]", "").toLowerCase(Locale.ROOT);
         return SECRET_KEYS.contains(normalized)
-                || normalized.endsWith("token")
-                || normalized.endsWith("secret")
-                || normalized.endsWith("password")
-                || normalized.endsWith("privatekey");
+            || normalized.endsWith("token")
+            || normalized.endsWith("secret")
+            || normalized.endsWith("password")
+            || normalized.endsWith("privatekey");
     }
+
 
     private static String redactAssignments(String text) {
         text = AUTH_HEADER.matcher(text).replaceAll(match -> match.group(1) + ": " + HIDDEN);
@@ -299,6 +312,7 @@ public final class ToolDetailRedactor {
         });
     }
 
+
     private static String redactText(String text, Map<String, String> identifiers) {
         if (identifiers == KEEP_IDENTIFIERS) {
             // UUID 는 긴 토큰 모양에도 걸린다. UUID 사이의 글에서만 토큰을 가린다.
@@ -318,6 +332,7 @@ public final class ToolDetailRedactor {
         });
         return redactTokens(withoutUuids);
     }
+
 
     private static String redactTokens(String text) {
         String withoutJwt = JWT.matcher(text).replaceAll(match -> {

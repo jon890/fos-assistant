@@ -29,6 +29,7 @@ public class ProactiveLoopRecovery implements SmartLifecycle {
     private final Clock clock;
     private volatile boolean running;
 
+
     public void recover() {
         List<ProactiveLoopRun> stale;
         try {
@@ -42,19 +43,21 @@ public class ProactiveLoopRecovery implements SmartLifecycle {
                 close(row.id());
             } catch (RuntimeException ex) {
                 log.warn(
-                        "매일 루프 시도의 기동 복구를 건너뛴다 runId={} error={}",
-                        row.id(),
-                        ex.getClass().getSimpleName());
+                    "매일 루프 시도의 기동 복구를 건너뛴다 runId={} error={}",
+                    row.id(),
+                    ex.getClass().getSimpleName());
             }
         }
     }
 
+
     /** 새 트랜잭션에서 다시 읽어, 그사이 끝나지 않았을 때만 닫는다. */
     private void close(Long runId) {
         transactions.executeWithoutResult(status -> runs.findById(runId)
-                .filter(row -> row.status() == LoopRunStatus.RUNNING)
-                .ifPresent(row -> row.failed(INTERRUPTED, null, clock.instant())));
+            .filter(row -> row.status() == LoopRunStatus.RUNNING)
+            .ifPresent(row -> row.failed(INTERRUPTED, null, clock.instant())));
     }
+
 
     @Override
     public void start() {
@@ -67,15 +70,18 @@ public class ProactiveLoopRecovery implements SmartLifecycle {
         }
     }
 
+
     @Override
     public void stop() {
         running = false;
     }
 
+
     @Override
     public boolean isRunning() {
         return running;
     }
+
 
     @Override
     public int getPhase() {

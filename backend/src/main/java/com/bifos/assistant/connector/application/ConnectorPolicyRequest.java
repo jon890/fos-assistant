@@ -37,7 +37,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Slf4j
 public record ConnectorPolicyRequest(
-        String rootSessionId, String sessionId, String toolCallId, String hermesTool, String tool, String argsJson) {
+    String rootSessionId, String sessionId, String toolCallId, String hermesTool, String tool, String argsJson) {
+
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final String VERSION_LINE = "v1-connector-policy";
@@ -81,14 +82,14 @@ public record ConnectorPolicyRequest(
             throw reject("서명이 소문자 16진수 64자가 아니다");
         }
 
-        String signed =
-                String.join("\n", VERSION_LINE, hermesTool, rootSessionId, sessionId, toolCallId, Sha256.hex(argsJson));
+        String signed = String.join("\n", VERSION_LINE, hermesTool, rootSessionId, sessionId, toolCallId, Sha256.hex(argsJson));
         byte[] expected = McpCallContext.hmac(tokenHash, signed);
         if (!MessageDigest.isEqual(expected, HexFormat.of().parseHex(signature))) {
             throw reject("서명이 맞지 않는다");
         }
         return new ConnectorPolicyRequest(rootSessionId, sessionId, toolCallId, hermesTool, tool, argsJson);
     }
+
 
     private static String requireId(JsonNode body, String key) {
         String value = requireText(body, key);
@@ -98,6 +99,7 @@ public record ConnectorPolicyRequest(
         return value;
     }
 
+
     private static String requireText(JsonNode body, String key) {
         JsonNode value = body.get(key);
         if (value == null || !value.isString() || value.asString().isBlank()) {
@@ -105,6 +107,7 @@ public record ConnectorPolicyRequest(
         }
         return value.asString();
     }
+
 
     /** 없거나 {@code null} 이면 null 이다. 문자열이면 도구 이름 형식이어야 한다. */
     private static String toolOrNull(JsonNode body) {
@@ -118,6 +121,7 @@ public record ConnectorPolicyRequest(
         return value.asString();
     }
 
+
     private static boolean isJsonObject(String text) {
         try {
             return JSON.readTree(text).isObject();
@@ -125,6 +129,7 @@ public record ConnectorPolicyRequest(
             return false;
         }
     }
+
 
     /** 이유는 로그에만 남긴다. 밖으로 나가는 문구는 이유를 가리지 않고 같다. */
     private static ApiException reject(String reason) {

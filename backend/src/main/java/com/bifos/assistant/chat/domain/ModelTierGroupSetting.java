@@ -28,10 +28,12 @@ public class ModelTierGroupSetting {
     @Column(name = "default_tier", length = 16)
     private ModelTier defaultTier;
 
+
     private ModelTierGroupSetting(Long groupId, ModelTier defaultTier) {
         this.groupId = groupId;
         this.defaultTier = defaultTier;
     }
+
 
     public static ModelTierGroupSetting of(Long groupId, ModelTier defaultTier) {
         return new ModelTierGroupSetting(groupId, defaultTier);

@@ -51,25 +51,23 @@ public class SkillPackageCheck {
      * 서비스 접두사로 알 수 있는 key 다. 도구 내용 가리기의 접두사와 같되, {@code task-runner} 같은 낱말 안의 {@code sk-} 를
      * 잡지 않게 앞 경계를 두고 뒤 길이를 20자 이상으로 했다.
      */
-    private static final Pattern PREFIXED_SECRET =
-            Pattern.compile("(?<![A-Za-z0-9_-])(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-|AIza)[A-Za-z0-9_-]{20,}");
+    private static final Pattern PREFIXED_SECRET = Pattern.compile("(?<![A-Za-z0-9_-])(?:sk-|gh[pousr]_|github_pat_|xox[a-z]*-|AIza)[A-Za-z0-9_-]{20,}");
 
     private static final Pattern PRIVATE_KEY_LINE = Pattern.compile("(?m)^-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----");
+
 
     public CheckedSkillPackage check(ReceivedSkillPackage received) {
         if (received.problem() != null) {
             return new CheckedSkillPackage(null, null, null, List.of(), List.of(), List.of(received.problem()));
         }
         Problems problems = new Problems();
-        Map<Boolean, List<SkillPackageEntry>> split =
-                received.entries().stream().collect(Collectors.partitioningBy(entry -> isIgnored(entry.path())));
-        List<String> ignored =
-                split.get(true).stream().map(SkillPackageEntry::path).toList();
+        Map<Boolean, List<SkillPackageEntry>> split = received.entries().stream().collect(Collectors.partitioningBy(entry -> isIgnored(entry.path())));
+        List<String> ignored = split.get(true).stream().map(SkillPackageEntry::path).toList();
         List<SkillPackageEntry> entries = unwrap(split.get(false));
         SkillPackageEntry skillMdEntry = entries.stream()
-                .filter(entry -> entry.path().equals(SKILL_MD))
-                .findFirst()
-                .orElse(null);
+            .filter(entry -> entry.path().equals(SKILL_MD))
+            .findFirst()
+            .orElse(null);
         if (skillMdEntry == null) {
             problems.add(NO_SKILL_MD, null);
             return new CheckedSkillPackage(null, null, null, List.of(), ignored, problems.list);
@@ -106,13 +104,14 @@ public class SkillPackageCheck {
 
         SkillFrontmatter frontmatter = skillMd == null ? null : readFrontmatter(skillMd, problems);
         return new CheckedSkillPackage(
-                frontmatter == null ? null : frontmatter.name(),
-                frontmatter == null ? null : frontmatter.description(),
-                skillMd,
-                files,
-                ignored,
-                problems.list);
+            frontmatter == null ? null : frontmatter.name(),
+            frontmatter == null ? null : frontmatter.description(),
+            skillMd,
+            files,
+            ignored,
+            problems.list);
     }
+
 
     /** 조각 하나라도 {@code .} 으로 시작하거나({@code .DS_Store}, {@code .git/…}) 첫 조각이 {@code __MACOSX} 인 항목이다. */
     private static boolean isIgnored(String path) {
@@ -128,14 +127,15 @@ public class SkillPackageCheck {
         return false;
     }
 
+
     /**
      * 모든 항목이 같은 맨 위 디렉터리 하나 아래에 있으면 그 디렉터리를 한 번 벗긴다. 모든 항목이 두 조각 이상이므로 맨 위
      * {@code SKILL.md} 는 없다. 돌려주는 목록은 경로 차례대로다.
      */
     private static List<SkillPackageEntry> unwrap(List<SkillPackageEntry> entries) {
         List<SkillPackageEntry> sorted = entries.stream()
-                .sorted(Comparator.comparing(SkillPackageEntry::path))
-                .toList();
+            .sorted(Comparator.comparing(SkillPackageEntry::path))
+            .toList();
         if (sorted.isEmpty()) {
             return sorted;
         }
@@ -146,14 +146,16 @@ public class SkillPackageCheck {
             return sorted;
         }
         return sorted.stream()
-                .map(entry -> new SkillPackageEntry(entry.path().substring(prefix.length()), entry.content()))
-                .toList();
+            .map(entry -> new SkillPackageEntry(entry.path().substring(prefix.length()), entry.content()))
+            .toList();
     }
+
 
     private static String firstSegment(String path) {
         int slash = path.indexOf('/');
         return slash < 0 ? path : path.substring(0, slash);
     }
+
 
     /**
      * {@code SKILL.md} 가 아닌 항목 가운데 경로 규칙을 통과한 것을 돌려준다. 맨 위가 아닌 {@code SKILL.md} 와 규칙에 맞지 않는
@@ -181,12 +183,13 @@ public class SkillPackageCheck {
         }
         try {
             SkillFilePaths.requireFileSet(
-                    allowed.stream().map(SkillPackageEntry::path).toList());
+                allowed.stream().map(SkillPackageEntry::path).toList());
         } catch (ApiException e) {
             problems.add(PATH_NOT_ALLOWED, null);
         }
         return allowed;
     }
+
 
     /**
      * 바이트를 어긋남 없는 UTF-8 로 읽는다. 읽히지 않거나 NUL 이 있으면 {@code null} 이고 {@code NOT_TEXT} 를 남긴다. 글자
@@ -196,11 +199,11 @@ public class SkillPackageCheck {
         String text;
         try {
             text = StandardCharsets.UTF_8
-                    .newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(entry.content()))
-                    .toString();
+                .newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(entry.content()))
+                .toString();
         } catch (CharacterCodingException e) {
             problems.add(NOT_TEXT, entry.path());
             return null;
@@ -215,15 +218,17 @@ public class SkillPackageCheck {
         return text;
     }
 
+
     /** 글로 읽힌 파일마다 비밀값처럼 보이는 글이 있으면 그 파일의 {@code SECRET_VALUE} 를 남긴다. */
     private static void findSecretValues(Map<String, String> texts, Problems problems) {
         texts.forEach((path, text) -> {
             if (PREFIXED_SECRET.matcher(text).find()
-                    || PRIVATE_KEY_LINE.matcher(text).find()) {
+                || PRIVATE_KEY_LINE.matcher(text).find()) {
                 problems.add(SECRET_VALUE, path);
             }
         });
     }
+
 
     /** 앞머리를 기존 저장과 같은 규칙으로 본다. 읽지 못하면 {@code null} 이다. */
     private static SkillFrontmatter readFrontmatter(String skillMd, Problems problems) {
@@ -252,10 +257,12 @@ public class SkillPackageCheck {
         return frontmatter;
     }
 
+
     /** 상한까지만 모으는 문제 목록이다. */
     private static final class Problems {
 
         private final List<SkillPackageProblem> list = new ArrayList<>();
+
 
         void add(SkillPackageReason reason, String path) {
             if (list.size() < MAX_PROBLEMS) {

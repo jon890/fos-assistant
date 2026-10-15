@@ -24,12 +24,12 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @Table(
-        name = "result_delivery_attempt",
-        uniqueConstraints = {
-            @UniqueConstraint(
-                    name = "uk_result_delivery_attempt_no",
-                    columnNames = {"delivery_id", "attempt_no"})
-        })
+    name = "result_delivery_attempt",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_result_delivery_attempt_no",
+            columnNames = {"delivery_id", "attempt_no"})
+    })
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -69,6 +69,7 @@ public class ResultDeliveryAttempt {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+
     private ResultDeliveryAttempt(Long deliveryId, int attemptNo, Long noticeMessageId, Instant now) {
         this.deliveryId = deliveryId;
         this.attemptNo = attemptNo;
@@ -76,6 +77,7 @@ public class ResultDeliveryAttempt {
         this.noticeMessageId = noticeMessageId;
         this.startedAt = now;
     }
+
 
     /** 도는 중인 시도다. 실행 줄은 만든 뒤에 잇는다. */
     public static ResultDeliveryAttempt started(Long deliveryId, int attemptNo, Long noticeMessageId, Instant now) {

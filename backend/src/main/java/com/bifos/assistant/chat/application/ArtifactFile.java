@@ -14,12 +14,12 @@ import java.time.Instant;
  * @param lastModified 파일의 수정 시각
  */
 public record ArtifactFile(
-        Long conversationId,
-        String relativePath,
-        Path path,
-        String contentType,
-        long byteSize,
-        Instant lastModified) {
+    Long conversationId,
+    String relativePath,
+    Path path,
+    String contentType,
+    long byteSize,
+    Instant lastModified) {
 
     /**
      * 조건부 요청에 쓰는 약한 검증자다.

@@ -107,10 +107,12 @@ class TaskRunRecoveryTest {
     private final List<Long> createdUsers = new ArrayList<>();
     private final List<Long> createdChecks = new ArrayList<>();
 
+
     @BeforeEach
     void setUp() {
         clean();
     }
+
 
     @AfterEach
     void tearDown() {
@@ -119,16 +121,16 @@ class TaskRunRecoveryTest {
         createdUsers.clear();
     }
 
+
     @Test
     @DisplayName("기동 정리는 RUNNING 줄을 INTERRUPTED 로 닫고 알림 하나를 남기며 QUEUED 줄은 그대로 둔다")
     void closesRunningRunsAndLeavesQueued() {
         Fixture fixture = fixture(NotifyPolicy.ALWAYS);
-        TaskRun running =
-                TaskRun.queued(fixture.task().id(), fixture.trigger().id(), fixture.ownerId(), SCHEDULED, NOW);
+        TaskRun running = TaskRun.queued(fixture.task().id(), fixture.trigger().id(), fixture.ownerId(), SCHEDULED, NOW);
         running.start(NOW);
         running = runs.save(running);
         TaskRun queued = runs.save(TaskRun.queued(
-                fixture.task().id(), fixture.trigger().id(), fixture.ownerId(), SCHEDULED.minusSeconds(60), NOW));
+            fixture.task().id(), fixture.trigger().id(), fixture.ownerId(), SCHEDULED.minusSeconds(60), NOW));
 
         recovery.onReady();
 
@@ -137,8 +139,8 @@ class TaskRunRecoveryTest {
         assertThat(closed.reason()).isEqualTo(TaskRunReason.INTERRUPTED);
         assertThat(closed.finishedAt()).isNotNull();
         assertThat(runs.findById(queued.id()).orElseThrow().status())
-                .as("QUEUED 줄")
-                .isEqualTo(TaskRunStatus.QUEUED);
+            .as("QUEUED 줄")
+            .isEqualTo(TaskRunStatus.QUEUED);
         assertThat(notificationsOf(fixture.ownerId())).singleElement().satisfies(notification -> {
             assertThat(notification.kind()).isEqualTo(NotificationKind.TASK_FAILED);
             assertThat(notification.body()).isEqualTo("서버가 다시 시작돼 실행이 끊겼어요");
@@ -147,6 +149,7 @@ class TaskRunRecoveryTest {
         });
         assertThat(recovery.finished()).isTrue();
     }
+
 
     @Test
     @DisplayName("정리가 끝나기 전에는 일정이 발화를 만들지도 열지도 않고, 끝난 뒤에야 돈다")
@@ -160,8 +163,7 @@ class TaskRunRecoveryTest {
         Task pausedTask = tasks.findById(paused.task().id()).orElseThrow();
         pausedTask.pause(NOW);
         tasks.save(pausedTask);
-        TaskRun waiting =
-                runs.save(TaskRun.queued(paused.task().id(), paused.trigger().id(), paused.ownerId(), SCHEDULED, NOW));
+        TaskRun waiting = runs.save(TaskRun.queued(paused.task().id(), paused.trigger().id(), paused.ownerId(), SCHEDULED, NOW));
         TaskRunRecovery fresh = new TaskRunRecovery(runs, tasks, notices, checks, transactions, fixedClock());
         TaskDispatcher dispatcher = new TaskDispatcher(firing, starter, fresh, fixedClock());
 
@@ -169,20 +171,21 @@ class TaskRunRecoveryTest {
 
         assertThat(runsOf(due.task())).as("정리 전 발화").isEmpty();
         assertThat(runs.findById(waiting.id()).orElseThrow().status())
-                .as("정리 전 QUEUED 줄")
-                .isEqualTo(TaskRunStatus.QUEUED);
+            .as("정리 전 QUEUED 줄")
+            .isEqualTo(TaskRunStatus.QUEUED);
 
         fresh.onReady();
         dispatcher.runScheduled();
 
         assertThat(runsOf(due.task()))
-                .as("정리 뒤 발화")
-                .singleElement()
-                .satisfies(run -> assertThat(run.reason()).isEqualTo(TaskRunReason.AGENT_UNAVAILABLE));
+            .as("정리 뒤 발화")
+            .singleElement()
+            .satisfies(run -> assertThat(run.reason()).isEqualTo(TaskRunReason.AGENT_UNAVAILABLE));
         assertThat(runs.findById(waiting.id()).orElseThrow().reason())
-                .as("정리 뒤 멈춘 작업의 줄")
-                .isEqualTo(TaskRunReason.PAUSED);
+            .as("정리 뒤 멈춘 작업의 줄")
+            .isEqualTo(TaskRunReason.PAUSED);
     }
+
 
     @Test
     @DisplayName("정리가 예외로 끝나도 끝난 것으로 적어 발화기가 돈다")
@@ -196,15 +199,15 @@ class TaskRunRecoveryTest {
         assertThat(failing.finished()).isTrue();
     }
 
+
     @Test
     @DisplayName("기동 정리는 읽지 않은 보고로 끝난 CHECK 발화를 INTERRUPTED 대신 건너뜀으로 회복하고 알리지 않는다")
     void recoversUnreadScheduledCheckWithoutCountingItAsInterrupted() {
         Fixture fixture = fixture(NotifyPolicy.ALWAYS);
         Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger =
-                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
         ProactiveCheck check = ProactiveCheck.started(
-                fixture.ownerId(), fixture.task().agentId(), 999_999L, CheckTrigger.SCHEDULED, false, NOW);
+            fixture.ownerId(), fixture.task().agentId(), 999_999L, CheckTrigger.SCHEDULED, false, NOW);
         check.skip(CheckSkippedReason.UNREAD_REPORT, NOW);
         check = checks.save(check);
         createdChecks.add(check.id());
@@ -220,19 +223,19 @@ class TaskRunRecoveryTest {
         assertThat(recovered.reason()).isEqualTo(TaskRunReason.UNREAD_REPORT);
         assertThat(notificationsOf(fixture.ownerId())).isEmpty();
         assertThat(runs.countByOwnerUserIdAndCreatedAtAfterAndStatusNot(
-                        fixture.ownerId(), NOW.minusSeconds(1), TaskRunStatus.SKIPPED))
+            fixture.ownerId(), NOW.minusSeconds(1), TaskRunStatus.SKIPPED))
                 .isZero();
     }
+
 
     @Test
     @DisplayName("기동 정리는 끝난 CHECK의 루트 실행 번호를 연결한 발화에 회복한다")
     void recoversCompletedCheckWithItsRootExecution() {
         Fixture fixture = fixture(NotifyPolicy.NEVER);
         Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger =
-                triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
         ProactiveCheck check = ProactiveCheck.started(
-                fixture.ownerId(), fixture.task().agentId(), 999_998L, CheckTrigger.SCHEDULED, false, NOW);
+            fixture.ownerId(), fixture.task().agentId(), 999_998L, CheckTrigger.SCHEDULED, false, NOW);
         check.attachRoot(7_777L, "scheduled-session");
         check.succeedInvalid(CheckInvalidReason.EMPTY_ANSWER, 0, 0, NOW);
         check = checks.save(check);
@@ -249,9 +252,11 @@ class TaskRunRecoveryTest {
         assertThat(recovered.executionId()).isEqualTo(7_777L);
     }
 
+
     private static Clock fixedClock() {
         return Clock.fixed(NOW, ZoneOffset.UTC);
     }
+
 
     private Fixture fixture(NotifyPolicy notify) {
         String email = "recovery-" + UUID.randomUUID() + "@example.com";
@@ -259,31 +264,33 @@ class TaskRunRecoveryTest {
         createdUsers.add(owner.id());
         String code = "recovery-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = agents.save(Agent.of(
-                code,
-                code,
-                code,
-                "http://agent-runtime.test/p/" + code,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                owner.id(),
-                NOW));
+            code,
+            code,
+            code,
+            "http://agent-runtime.test/p/" + code,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            owner.id(),
+            NOW));
         Task task = tasks.save(
-                Task.create(owner.id(), agent.id(), "매달 정리", "정리해 줘", ConversationMode.NEW_PER_RUN, notify, NOW));
-        TaskTrigger trigger =
-                triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, SCHEDULED, NOW));
+            Task.create(owner.id(), agent.id(), "매달 정리", "정리해 줘", ConversationMode.NEW_PER_RUN, notify, NOW));
+        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, SCHEDULED, NOW));
         return new Fixture(owner.id(), task, trigger);
     }
 
+
     private List<TaskRun> runsOf(Task task) {
         return runs.findAll().stream()
-                .filter(run -> run.taskId().equals(task.id()))
-                .toList();
+            .filter(run -> run.taskId().equals(task.id()))
+            .toList();
     }
+
 
     private List<Notification> notificationsOf(Long userId) {
         return notifications.findByUserIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0, 100));
     }
+
 
     private void clean() {
         checks.deleteAllById(createdChecks);
@@ -293,5 +300,7 @@ class TaskRunRecoveryTest {
         tasks.deleteAll();
     }
 
-    private record Fixture(Long ownerId, Task task, TaskTrigger trigger) {}
+
+    private record Fixture(Long ownerId, Task task, TaskTrigger trigger) {
+    }
 }

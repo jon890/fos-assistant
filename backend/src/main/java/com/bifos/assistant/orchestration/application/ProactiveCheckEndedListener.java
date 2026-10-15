@@ -16,6 +16,7 @@ public class ProactiveCheckEndedListener {
 
     private final AgentDelegationService delegations;
 
+
     @EventListener
     public void onProactiveCheckEnded(ProactiveCheckEnded event) {
         if (event.rootExecutionId() != null) {

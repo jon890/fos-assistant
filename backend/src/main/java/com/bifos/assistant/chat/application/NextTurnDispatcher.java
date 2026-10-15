@@ -64,10 +64,12 @@ public class NextTurnDispatcher {
     /** 대기 행을 멈추지 못한 대화와 그 시각이다. 메모리에만 두며 서버가 다시 뜨면 사라진다. */
     private final Map<Long, Instant> unheldFailures = new ConcurrentHashMap<>();
 
+
     @PostConstruct
     void listenToTurnClose() {
         turns.addCloseListener(this::onTurnClosed);
     }
+
 
     /**
      * 중지로 닫힌 turn 뒤에는 대기 줄이 멈췄다고 화면에 알린다.
@@ -89,14 +91,16 @@ public class NextTurnDispatcher {
         tryNext(conversationId);
     }
 
+
     private void notifyHeld(Long conversationId) {
         if (pendingMessages.findByConversationIdOrderByIdAsc(conversationId).isEmpty()) {
             return;
         }
         conversations
-                .findById(conversationId)
-                .ifPresent(conversation -> hub.publish(conversationId, ChatEvent.pending(conversation.publicId())));
+            .findById(conversationId)
+            .ifPresent(conversation -> hub.publish(conversationId, ChatEvent.pending(conversation.publicId())));
     }
+
 
     @EventListener
     public void onDelegationFinished(DelegationFinished event) {
@@ -105,6 +109,7 @@ public class NextTurnDispatcher {
         }
     }
 
+
     /** 사용자 실행 한도로 미룬 위임 결과 자동 turn 을 다시 시도한다. {@link DelegationWakeService} 가 예약해 낸다. */
     @EventListener
     public void onWakeRetryDue(WakeRetryDue event) {
@@ -112,6 +117,7 @@ public class NextTurnDispatcher {
             tryNext(event.conversationId());
         }
     }
+
 
     /**
      * 기동 전에 보내지 못한 대기 메시지나 전하지 못한 결과가 있는 대화를 차례로 이어 준다.
@@ -135,12 +141,14 @@ public class NextTurnDispatcher {
         }
     }
 
+
     public void tryNext(Long conversationId) {
         if (tryPending(conversationId)) {
             return;
         }
         wake.tryWake(conversationId);
     }
+
 
     /**
      * 보낼 대기 메시지가 있으면 turn 잠금을 잡고 새 가상 스레드에서 보낸다.
@@ -153,7 +161,7 @@ public class NextTurnDispatcher {
      * 사용자가 화면에서 다시 보낸다.
      *
      * @return 대기 메시지가 이 대화의 다음 turn 을 차지했다. 도는 turn 때문에 잠금을 잡지 못한 때도 참이다. 그
-     *     turn 이 닫힐 때 다시 온다. 사용자 실행 한도로 대기 줄을 멈춘 때도 참이다
+     * turn 이 닫힐 때 다시 온다. 사용자 실행 한도로 대기 줄을 멈춘 때도 참이다
      */
     private boolean tryPending(Long conversationId) {
         List<ChatPendingMessage> rows = pendingMessages.findByConversationIdOrderByIdAsc(conversationId);
@@ -190,17 +198,17 @@ public class NextTurnDispatcher {
             }
             throw ex;
         }
-        CurrentUser current =
-                new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
+        CurrentUser current = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         try {
             backgroundTasks.start(
-                    "pending-turn-" + conversationId, () -> runQueuedTurn(current, conversation, handle, ids));
+                "pending-turn-" + conversationId, () -> runQueuedTurn(current, conversation, handle, ids));
         } catch (RuntimeException | Error ex) {
             log.warn("대기 메시지 turn 스레드를 띄우지 못했다 conversationId={}", conversationId, ex);
             turns.close(handle);
         }
         return true;
     }
+
 
     /**
      * 대기 메시지 turn 을 돌리고 잠금을 푼다.
@@ -227,11 +235,12 @@ public class NextTurnDispatcher {
         }
     }
 
+
     /** 이 turn 이 보내려던 행이 하나라도 남아 있으면 그 대화의 대기 줄을 멈춰 둔다. 보낸 뒤의 실패는 남은 행이 없다. */
     private void holdUnsent(Conversation conversation, List<Long> ids) {
         try {
             boolean unsent = pendingMessages.findByConversationIdOrderByIdAsc(conversation.id()).stream()
-                    .anyMatch(row -> ids.contains(row.id()));
+                .anyMatch(row -> ids.contains(row.id()));
             if (!unsent) {
                 return;
             }
@@ -243,6 +252,7 @@ public class NextTurnDispatcher {
             unheldFailures.put(conversation.id(), Instant.now(clock));
         }
     }
+
 
     private boolean inFailureBackoff(Long conversationId) {
         Instant failedAt = unheldFailures.get(conversationId);

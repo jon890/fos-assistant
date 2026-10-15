@@ -32,38 +32,42 @@ public class AttachmentController {
     private final CurrentUserProvider currentUser;
     private final ConversationAccess access;
 
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AttachmentView upload(@PathVariable UUID conversationId, @RequestParam("file") MultipartFile file) {
         CurrentUser user = currentUser.require();
         ChatAttachment saved = attachments.upload(
-                user,
-                access.requireOwnId(user, conversationId),
-                file.getOriginalFilename(),
-                file.getContentType(),
-                file.getSize(),
-                file);
+            user,
+            access.requireOwnId(user, conversationId),
+            file.getOriginalFilename(),
+            file.getContentType(),
+            file.getSize(),
+            file);
         // 업로드 트랜잭션이 끝난 뒤에 사본을 만든다.
         attachments.prepareSmall(saved);
         return view(saved);
     }
 
+
     @GetMapping("/{attachmentId}")
     public ResponseEntity<InputStreamResource> read(
-            @PathVariable UUID conversationId, @PathVariable Long attachmentId) {
+        @PathVariable UUID conversationId, @PathVariable Long attachmentId) {
         CurrentUser user = currentUser.require();
         AttachmentContent content = attachments.read(user, access.requireOwnId(user, conversationId), attachmentId);
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(content.contentType()))
-                .contentLength(content.byteSize())
-                .cacheControl(CacheControl.empty().cachePrivate())
-                .body(new InputStreamResource(content.body()));
+            .contentType(MediaType.parseMediaType(content.contentType()))
+            .contentLength(content.byteSize())
+            .cacheControl(CacheControl.empty().cachePrivate())
+            .body(new InputStreamResource(content.body()));
     }
+
 
     @DeleteMapping("/{attachmentId}")
     public void delete(@PathVariable UUID conversationId, @PathVariable Long attachmentId) {
         CurrentUser user = currentUser.require();
         attachments.deleteByUser(user, access.requireOwnId(user, conversationId), attachmentId);
     }
+
 
     private static AttachmentView view(ChatAttachment attachment) {
         return AttachmentView.from(attachment);
