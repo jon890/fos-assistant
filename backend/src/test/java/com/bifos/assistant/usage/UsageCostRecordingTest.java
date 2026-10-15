@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** 실행이 끝날 때 금액을 저장하고, 그 저장된 금액만 더해 한 달 합계가 나오는지 본다. */
@@ -315,6 +316,50 @@ class UsageCostRecordingTest {
         assertThat(unpriced.actualCostMicros()).isNull();
         assertThat(cost.subscriptionExecutions()).isZero();
         assertThat(cost.unpricedExecutions()).isEqualTo(1L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SUCCEEDED", "FAILED", "CANCELLED", "SYSTEM"})
+    @DisplayName("완료 경로마다 불완전한 토큰은 보존하고 비용은 월 합계의 미확인 실행으로 센다")
+    void preservesPartialUsageAndCountsUnpricedCompletion(String route) {
+        Agent agent = apiAgent();
+        boolean system = "SYSTEM".equals(route);
+        AgentExecution started = system
+                ? recorder.startSystem(caller(), "system-test", CostMode.API, requested(agent))
+                : recorder.start(caller(), conversation.executionConversation(), agent, null, null, 0L);
+        TokenUsage usage = new TokenUsage(120L, 20L, null, 160L);
+        HermesRunResult result = new HermesRunResult(
+                "partial-run", "partial-session", "FAILED".equals(route) ? "failed" : "completed",
+                "답", PRICED_MODEL, PROVIDER, null, usage, new SessionRuntime(PRICED_MODEL, PROVIDER));
+        AgentExecution finished = switch (route) {
+            case "FAILED" -> recorder.fail(started, agent, result, requested(agent), "FAILED");
+            case "CANCELLED" -> recorder.cancel(started, agent, result, requested(agent));
+            case "SYSTEM" -> recorder.completeSystem(started, result, agent.apiBaseUrl());
+            default -> recorder.complete(started, agent, result, requested(agent));
+        };
+        AgentExecution stored = executions.findById(finished.id()).orElseThrow();
+
+        assertThat(stored.status()).isEqualTo(system ? ExecutionStatus.SUCCEEDED : ExecutionStatus.valueOf(route));
+        assertThat(stored.errorCode()).isEqualTo("FAILED".equals(route) ? "FAILED" : null);
+        assertThat(stored.inputTokens()).isEqualTo(120L);
+        assertThat(stored.cachedInputTokens()).isEqualTo(20L);
+        assertThat(stored.outputTokens()).isNull();
+        assertThat(stored.totalTokens()).isEqualTo(160L);
+        assertThat(stored.estimatedCostMicros()).isNull();
+        assertThat(stored.actualCostMicros()).isNull();
+        assertThat(stored.costCurrency()).isNull();
+        assertThat(stored.pricingVersion()).isNull();
+
+        complete(run(1_000L, null, 500L), agent);
+        Instant from = Instant.now().minusSeconds(3_600);
+        Instant to = Instant.now().plusSeconds(3_600);
+        MonthlyCost cost = executions.sumCostBetween(USER_ID, from, to);
+        MonthlyCostDetail detail = executions.sumCostDetailBetween(USER_ID, from, to);
+        assertThat(cost.totalMicros()).isEqualTo(20_000L);
+        assertThat(cost.pricedExecutions()).isEqualTo(1L);
+        assertThat(cost.unpricedExecutions()).isEqualTo(1L);
+        assertThat(detail.actualMicros()).isEqualTo(20_000L);
+        assertThat(detail.unpricedExecutions()).isEqualTo(1L);
     }
 
     private static CurrentUser caller() {

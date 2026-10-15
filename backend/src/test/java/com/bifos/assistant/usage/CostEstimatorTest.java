@@ -27,6 +27,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * 구독제로 돌고 있어도 화면이 금액을 보이려면 이 환산이 맞아야 한다.
@@ -244,6 +246,27 @@ class CostEstimatorTest {
         assertThat(costs.estimate("provider-b", "shared-model", tokens).pricingVersion())
                 .isEqualTo("b@1");
         assertThat(costs.estimate("provider-c", "shared-model", tokens)).isEqualTo(EstimatedCost.unknown());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"120, , ,", ", , 40,", ", , , 160", "120, , , 160"})
+    @DisplayName("입력이나 출력 토큰이 누락되면 합계가 있어도 금액을 미확인으로 둔다")
+    void leavesCostUnknownWhenRequiredTokensAreMissing(Long input, Long cached, Long output, Long total) {
+        TokenUsage tokens = new TokenUsage(input, cached, output, total);
+
+        assertThat(estimator.estimate("openai", "example-model", tokens)).isEqualTo(EstimatedCost.unknown());
+        for (CostMode mode : CostMode.values()) {
+            assertThat(estimator.estimate("openai", "example-model", tokens, mode))
+                    .isEqualTo(ExecutionCost.unknown());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"120, 0, 600", "0, 40, 1200"})
+    @DisplayName("명시적인 입력 또는 출력 0은 누락과 구분해 환산한다")
+    void pricesExplicitZeroTokens(long input, long output, long expectedMicros) {
+        assertThat(estimator.estimate("openai", "example-model", usage(input, null, output)).micros())
+                .isEqualTo(expectedMicros);
     }
 
     private static TokenUsage usage(Long input, Long cached, Long output) {

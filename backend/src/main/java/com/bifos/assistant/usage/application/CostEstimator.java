@@ -30,7 +30,7 @@ public class CostEstimator {
     }
 
     public EstimatedCost estimate(String provider, String model, TokenUsage usage) {
-        if (usage == null) {
+        if (usage == null || usage.inputTokens() == null || usage.outputTokens() == null) {
             return EstimatedCost.unknown();
         }
         Optional<CatalogPrice> found = catalog.find(provider, model);
