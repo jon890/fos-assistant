@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -20,6 +20,7 @@ import {
   type ContentDraftSnapshot,
   type ContentDraftSummary,
 } from "@/lib/content-draft-snapshot";
+import { FAILURE_REASONS } from "@/lib/content-draft-failure";
 
 /** 화면이 열린 동안 저장 중인 job 을 다시 읽는 간격이다. */
 const POLL_MS = 3000;
@@ -188,8 +189,8 @@ function SnapshotView({
 function useJobPolling(
   polling: boolean,
   { conversationId, draftId, snapshotId }: ContentDraftSummary,
-  /** `useState` 의 setter 라 바뀌지 않는다 */
-  setJob: (status: ContentDraftJobStatus) => void,
+  /** `useCallback([])` 로 만들어 바뀌지 않는다 */
+  setJob: (status: ContentDraftJobStatus, errorReason: string | null) => void,
 ) {
   useEffect(() => {
     if (!polling) return;
@@ -202,8 +203,9 @@ function useJobPolling(
         snapshotId,
       });
       if (stopped) return;
-      if (result.ok) setJob(result.data.status);
-      else if (CONTENT_DRAFT_GONE_CODES.includes(result.code)) setJob("STALE");
+      if (result.ok) setJob(result.data.status, result.data.errorReason);
+      else if (CONTENT_DRAFT_GONE_CODES.includes(result.code))
+        setJob("STALE", null);
       timer = setTimeout(() => void tick(), POLL_MS);
     }
     void tick();
@@ -236,7 +238,15 @@ export function ContentDraftSaveCard({
   onDismiss(): void;
 }) {
   const { conversationId, draftId, snapshotId } = draft;
-  const [job, setJob] = useState<ContentDraftJobStatus | null>(null);
+  const [job, setJobStatus] = useState<ContentDraftJobStatus | null>(null);
+  const [jobReason, setJobReason] = useState<string | null>(null);
+  const setJob = useCallback(
+    (next: ContentDraftJobStatus, reason: string | null) => {
+      setJobStatus(next);
+      setJobReason(reason);
+    },
+    [],
+  );
   const [preview, setPreview] = useState<
     ContentDraftSnapshot | "gone" | "unavailable" | null
   >(null);
@@ -282,10 +292,21 @@ export function ContentDraftSaveCard({
 
   const shown =
     status === "PREVIEW_READY" && preview === "gone" ? "STALE" : status;
-  const result =
+  // 폴링으로 끝난 상태는 그 응답의 사유를, 처음부터 끝난 줄은 요약의 사유를 쓴다.
+  const errorReason =
+    job && !isContentDraftTerminal(base) ? jobReason : draft.errorReason;
+  const reason =
+    shown === "FAILED" && errorReason
+      ? FAILURE_REASONS[errorReason]
+      : undefined;
+  const notice =
     shown === "STALE" && preview !== "gone"
       ? staleNotice(draft, actionStatus)
       : RESULTS[shown];
+  const result =
+    notice && reason
+      ? ([notice[0], `${notice[1]} ${reason}`] as const)
+      : notice;
   const loaded = typeof preview === "object" && preview !== null;
 
   return (

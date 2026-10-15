@@ -132,6 +132,15 @@ const accepted = (state: JobState, stamp: SnapshotStamp) => ({
   error_code: safeErrorCode(state.error?.code),
 });
 
+/**
+ * 실패 사유의 고정 코드. 모르는 모양은 싣지 않는다.
+ * 옛 Control Plane 은 모르는 칸을 거절하므로 사유가 있을 때만 `error_reason` 칸을 더한다. 배포는 Control Plane 이 먼저다.
+ */
+const reasonOf = (state: JobState) => {
+  const reason = safeErrorCode(state.error?.reason);
+  return reason ? { error_reason: reason } : {};
+};
+
 /** 시작 전 거절의 안전한 code. 세션 확인과 잠금의 도구 오류만 이름을 옮긴다. */
 function refusalCode(error: unknown) {
   return error instanceof ToolError
@@ -251,6 +260,7 @@ export function projectStatus(state: JobState, stamp: SnapshotStamp) {
     saved_before: count(result.saved_before),
     saved_after: count(result.saved_after),
     error_code: safeErrorCode(state.error?.code),
+    ...reasonOf(state),
   };
 }
 

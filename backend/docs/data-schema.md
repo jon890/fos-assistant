@@ -52,7 +52,8 @@ snapshot의 모든 칸은 필수이며 공개 UUID와 `(revision_id,binding_id,s
 
 `content_draft_job`은 후속 승인 요청을 위한 최소 이력 표다. preview는 job 행을 만들지 않는다.
 snapshot과 action 참조는 각각 유일하고 필수다. owner·conversation은 후속 목록을 같은 범위로 조회하기 위한 필수 칸이다.
-job ID는 예약 전 NULL이며 값이 있으면 유일하다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code도 처음에는 NULL이다.
+job ID는 예약 전 NULL이며 값이 있으면 유일하다. 승인자·승인 시각·확인 시각·두 claim 시각·stage·error code·error reason도 처음에는 NULL이다.
+`error_reason`은 worker가 status 응답에 `error_reason`으로 알린 실패 사유의 고정 코드(`[a-z][a-z_]{0,63}`)다. 매 조회가 error code와 함께 덮어써 사유가 없으면 비운다. 화면의 글과 요소 이름은 담지 않는다.
 status·생성 시각·save_clicked는 필수이고 save_clicked 기본값은 false다.
 저장 상태는 `ContentDraftJobStatus`가 소유하며 기존 revision 상태와 분리한다.
 job 행은 저장 요청의 PENDING 승인 줄과 같은 트랜잭션에서 만들고, job ID는 승인 때 소문자 정규 UUID로 한 번 예약한다.
