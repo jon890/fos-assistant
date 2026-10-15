@@ -17,6 +17,7 @@ public class McpToolCatalog {
     private final McpMediaObservationTools mediaObservations;
     private final McpContentDraftTools contentDrafts;
     private final McpContentDraftSnapshots contentSnapshots;
+    private final McpFinancialLimitTools financialLimits;
 
 
     public List<Map<String, Object>> tools() {
@@ -152,6 +153,8 @@ public class McpToolCatalog {
             contentDrafts.readDefinition(),
             contentSnapshots.previewDefinition(),
             contentSnapshots.saveDefinition(),
+            financialLimits.readDefinition(),
+            financialLimits.changeDefinition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",

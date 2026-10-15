@@ -6,6 +6,7 @@ import com.bifos.assistant.mcp.application.McpCallContext;
 import com.bifos.assistant.mcp.application.McpCaller;
 import com.bifos.assistant.mcp.application.McpContentDraftSnapshots;
 import com.bifos.assistant.mcp.application.McpContentDraftTools;
+import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
 import com.bifos.assistant.mcp.application.McpPrincipal;
@@ -80,6 +81,7 @@ public class McpController {
     private final McpMediaObservationTools mediaObservations;
     private final McpContentDraftTools contentDrafts;
     private final McpContentDraftSnapshots contentSnapshots;
+    private final McpFinancialLimitTools financialLimits;
     private final ProactiveCheckGuard checkGuard;
     private final BuildProperties buildProperties;
     private final Map<String, ToolHandler> handlers = handlers();
@@ -108,7 +110,11 @@ public class McpController {
             Map.entry(McpContentDraftSnapshots.PREVIEW, (caller, id, args) -> validated(id, args, McpDtos.ContentDraftPreviewArguments::from,
                 value -> this.contentSnapshots.preview(caller, value.draftId(), value.revision(), value.bindingId()))),
             Map.entry(McpContentDraftSnapshots.SAVE, (caller, id, args) -> validated(id, args,
-                McpDtos.ContentDraftSaveArguments::from, value -> this.contentSnapshots.save(caller, value.snapshotId()))));
+                McpDtos.ContentDraftSaveArguments::from, value -> this.contentSnapshots.save(caller, value.snapshotId()))),
+            Map.entry(McpFinancialLimitTools.READ, (caller, id, args) -> validated(id, args,
+                McpDtos.OrderLimitReadArguments::from, value -> this.financialLimits.read(caller))),
+            Map.entry(McpFinancialLimitTools.CHANGE, (caller, id, args) -> validated(id, args,
+                McpDtos.OrderLimitChangeArguments::from, value -> this.financialLimits.change(caller, value.name(), value.value()))));
     }
 
 

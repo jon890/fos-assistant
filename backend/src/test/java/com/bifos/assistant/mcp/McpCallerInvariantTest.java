@@ -149,6 +149,8 @@ class McpCallerInvariantTest {
         arguments.put("content_draft_read", json.createObjectNode());
         arguments.put("content_draft_preview", json.createObjectNode());
         arguments.put("content_draft_save", json.createObjectNode());
+        arguments.put("order_limit_read", json.createObjectNode());
+        arguments.put("order_limit_change", json.createObjectNode().put("name", "order_amount_usd").put("value", "999"));
         return arguments;
     }
 

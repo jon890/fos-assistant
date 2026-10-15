@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorFinancialSummaries;
+import com.bifos.assistant.connector.application.FinancialLimitChanges;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.application.model.ConnectorActionView;
@@ -71,8 +72,9 @@ class ConnectorActionControllerTest {
     private final ContentDraftSaveApproval contentDrafts = mock(ContentDraftSaveApproval.class);
     private final ContentDraftJobs contentDraftJobs = mock(ContentDraftJobs.class);
     private final ConnectorFinancialSummaries financialSummaries = mock(ConnectorFinancialSummaries.class);
+    private final FinancialLimitChanges limitChanges = mock(FinancialLimitChanges.class);
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new ConnectorActionController(service, contentDrafts, contentDraftJobs, financialSummaries, conversations, currentUser))
+        new ConnectorActionController(service, contentDrafts, contentDraftJobs, financialSummaries, limitChanges, conversations, currentUser))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -92,7 +94,7 @@ class ConnectorActionControllerTest {
         mvc.perform(get("/api/v1/chat/conversations/{id}/connector-actions", CONVERSATION))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.length()").value(1))
-            .andExpect(jsonPath("$[0].length()").value(17))
+            .andExpect(jsonPath("$[0].length()").value(18))
             .andExpect(jsonPath("$[0].contentDraft").isEmpty())
             .andExpect(jsonPath("$[0].financial").isEmpty())
             .andExpect(jsonPath("$[0].actionId").value(ACTION.toString()))
