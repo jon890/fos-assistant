@@ -13,7 +13,7 @@ Hermes 는 hook 이 돌려준 `args` 를 원래 인자에 얕게 병합하고 ho
 hook 이 예외를 던지면 호출이 막힌다.
 
 `agent_*` 와 `memory_read`, `artifact_write`, `follow_up_propose`, `memory_remember`,
-`list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save` 는 서명하지 못하면 막는다.
+`list_media_observations`, `record_media_observation`, `content_draft_write`, `content_draft_read`, `content_draft_preview`, `content_draft_save`, `order_limit_read`, `order_limit_change` 는 서명하지 못하면 막는다.
 서버도 서명 없는 호출을 거절하지만, 여기서 막으면 모델이 받는 오류가 원인을 말한다.
 그 밖의 Control Plane 도구는 서명할 수 있으면 붙이고 없으면 원래 인자 그대로 보낸다.
 

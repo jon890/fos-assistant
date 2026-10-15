@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.presentation;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.connector.application.ConnectorActionService;
 import com.bifos.assistant.connector.application.ConnectorFinancialSummaries;
+import com.bifos.assistant.connector.application.FinancialLimitChanges;
 import com.bifos.assistant.connector.application.ContentDraftJobs;
 import com.bifos.assistant.connector.application.ContentDraftSaveApproval;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
@@ -44,6 +45,7 @@ public class ConnectorActionController {
     private final ContentDraftSaveApproval contentDrafts;
     private final ContentDraftJobs contentDraftJobs;
     private final ConnectorFinancialSummaries financialSummaries;
+    private final FinancialLimitChanges limitChanges;
     private final ConversationAccess conversations;
     private final CurrentUserProvider currentUser;
 
@@ -60,8 +62,12 @@ public class ConnectorActionController {
         // 금융 줄은 저장한 snapshot 의 요약을 붙인다. 화면은 요약을 열지 못한 금융 줄에 승인 단추를 그리지 않는다.
         var financial = financialSummaries.summaries(user,
             views.stream().filter(view -> view.risk() == ToolRisk.FINANCIAL).map(view -> view.actionId()).toList());
+        // 주문 상한 변경 줄은 요청한 값과 지금 최대치를 붙인다.
+        var limitChange = limitChanges.summaries(user,
+            views.stream().filter(view -> FinancialLimitChanges.TOOL.equals(view.toolName())).map(view -> view.actionId()).toList());
         return views.stream()
-            .map(view -> ActionView.from(view, summaries.get(view.actionId()), financial.get(view.actionId())))
+            .map(view -> ActionView.from(view, summaries.get(view.actionId()), financial.get(view.actionId()),
+                limitChange.get(view.actionId())))
             .toList();
     }
 
@@ -79,7 +85,8 @@ public class ConnectorActionController {
             return ActionView.from(approved, contentDraftJobs.summaryOf(user, actionId).orElse(null));
         }
         var approved = actions.approve(user, actionId, grant, conversationGrant);
-        return ActionView.from(approved, null, financialSummaries.summaryOf(user, actionId).orElse(null));
+        return ActionView.from(approved, null, financialSummaries.summaryOf(user, actionId).orElse(null),
+            limitChanges.summaryOf(user, actionId).orElse(null));
     }
 
 
@@ -106,7 +113,7 @@ public class ConnectorActionController {
         CurrentUser user = currentUser.require();
         var rejected = actions.reject(user, actionId);
         return ActionView.from(rejected, contentDraftJobs.summaryOf(user, actionId).orElse(null),
-            financialSummaries.summaryOf(user, actionId).orElse(null));
+            financialSummaries.summaryOf(user, actionId).orElse(null), limitChanges.summaryOf(user, actionId).orElse(null));
     }
 
 

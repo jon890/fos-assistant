@@ -5,6 +5,7 @@ import com.bifos.assistant.connector.application.model.ContentDraftActionSummary
 import com.bifos.assistant.connector.application.model.ConnectorConversationGrantView;
 import com.bifos.assistant.connector.application.model.ConnectorGrantView;
 import com.bifos.assistant.connector.application.model.FinancialActionSummary;
+import com.bifos.assistant.connector.application.model.FinancialLimitChangeSummary;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
 import com.bifos.assistant.connector.domain.type.GrantPeriod;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
@@ -30,6 +31,7 @@ public final class ConnectorActionDtos {
      *
      * @param contentDraft 원고 저장 job 이 연결된 줄의 요약. 일반 줄은 null
      * @param financial 금융 줄의 승인 카드 요약. 금융 줄이 아니면 null
+     * @param limitChange 주문 상한 변경 줄의 카드 요약. 그 줄이 아니면 null
      */
     public record ActionView(
         UUID actionId,
@@ -48,7 +50,8 @@ public final class ConnectorActionDtos {
         Map<String, String> argLabels,
         boolean conversationGrantAllowed,
         ContentDraftActionSummary contentDraft,
-        FinancialActionSummary financial) {
+        FinancialActionSummary financial,
+        FinancialLimitChangeSummary limitChange) {
 
         public static ActionView from(ConnectorActionView action) {
             return from(action, null);
@@ -62,6 +65,12 @@ public final class ConnectorActionDtos {
 
         public static ActionView from(
             ConnectorActionView action, ContentDraftActionSummary contentDraft, FinancialActionSummary financial) {
+            return from(action, contentDraft, financial, null);
+        }
+
+
+        public static ActionView from(ConnectorActionView action, ContentDraftActionSummary contentDraft,
+            FinancialActionSummary financial, FinancialLimitChangeSummary limitChange) {
             return new ActionView(
                 action.actionId(),
                 action.connectorId(),
@@ -79,7 +88,8 @@ public final class ConnectorActionDtos {
                 action.argLabels(),
                 action.conversationGrantAllowed(),
                 contentDraft,
-                financial);
+                financial,
+                limitChange);
         }
     }
 

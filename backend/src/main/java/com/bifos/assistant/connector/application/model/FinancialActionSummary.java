@@ -9,6 +9,7 @@ import java.util.List;
  *
  * @param available 저장한 내용을 열어 검증했는가. 거짓이면 나머지 칸은 null 이고 화면은 승인 단추를 그리지 않는다
  * @param accountSeq 실행 scope 의 계좌 순번
+ * @param limits 생성 주문의 그 통화 상한과 오늘 남은 한도. 취소와 열지 못한 줄은 null 이다
  */
 public record FinancialActionSummary(
     boolean available,
@@ -24,7 +25,8 @@ public record FinancialActionSummary(
     String orderType,
     String timeInForce,
     String orderId,
-    List<Normalization> normalization) {
+    List<Normalization> normalization,
+    FinancialLimitStatus limits) {
 
     public FinancialActionSummary {
         normalization = List.copyOf(normalization);
@@ -34,7 +36,7 @@ public record FinancialActionSummary(
     /** 저장한 내용을 열지 못한 줄이다. */
     public static FinancialActionSummary unavailable() {
         return new FinancialActionSummary(false, null, null, null, null, null, null, null, null, null, null, null, null,
-            List.of());
+            List.of(), null);
     }
 
 

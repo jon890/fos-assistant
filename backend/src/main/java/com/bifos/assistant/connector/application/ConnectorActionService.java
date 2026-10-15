@@ -60,6 +60,7 @@ public class ConnectorActionService {
     private final ConnectorActionLifecycle lifecycle;
     private final ConnectorActionRepository actions;
     private final ConnectorFinancialApproval financialApproval;
+    private final FinancialLimitChanges limitChanges;
     private final ConnectorActionSignals signals;
 
 
@@ -85,6 +86,7 @@ public class ConnectorActionService {
         DecisionFeedbackRecorder feedback,
         ConnectorActionBodies bodies,
         ConnectorFinancialApproval financialApproval,
+        FinancialLimitChanges limitChanges,
         PlatformTransactionManager transactionManager) {
         this(
             actions,
@@ -105,6 +107,7 @@ public class ConnectorActionService {
             feedback,
             bodies,
             financialApproval,
+            limitChanges,
             transactionManager,
             Clock.systemUTC());
     }
@@ -129,10 +132,12 @@ public class ConnectorActionService {
         DecisionFeedbackRecorder feedback,
         ConnectorActionBodies bodies,
         ConnectorFinancialApproval financialApproval,
+        FinancialLimitChanges limitChanges,
         PlatformTransactionManager transactionManager,
         Clock clock) {
         this.actions = actions;
         this.financialApproval = financialApproval;
+        this.limitChanges = limitChanges;
         TransactionTemplate transactions = new TransactionTemplate(transactionManager);
         this.details = new ConnectorActionDetails(actions, conversationGrants, catalog, clock);
         this.signals = new ConnectorActionSignals(events, notifications, conversations);
@@ -285,6 +290,16 @@ public class ConnectorActionService {
      */
     public ConnectorActionView approve(CurrentUser user, UUID actionId, GrantPeriod grant, boolean conversationGrant) {
         var stored = actions.findByPublicId(actionId);
+        // 상한 변경 줄은 금융 주문 승인보다 먼저 가른다(ADR-20261015 / financial-user-limits). 허락을 받지 않는다.
+        if (stored.isPresent() && limitChanges.owns(stored.get())) {
+            if (!user.id().equals(stored.get().userId())) {
+                throw ConnectorActionDetails.notFound();
+            }
+            if (grant != null || conversationGrant) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "limit changes take no grant");
+            }
+            return limitChanges.approve(user, actionId);
+        }
         if (stored.isPresent() && stored.get().risk() == ToolRisk.FINANCIAL) {
             if (!user.id().equals(stored.get().userId())) {
                 throw ConnectorActionDetails.notFound();

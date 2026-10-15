@@ -181,6 +181,8 @@ class McpMemoryToolTest {
                 "content_draft_read",
                 "content_draft_preview",
                 "content_draft_save",
+                "order_limit_read",
+                "order_limit_change",
                 "memory_remember",
                 "memory_search");
         JsonNode search = StreamSupport.stream(listed.path("result").path("tools").spliterator(), false)

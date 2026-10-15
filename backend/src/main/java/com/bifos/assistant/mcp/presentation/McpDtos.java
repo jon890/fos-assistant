@@ -2,6 +2,9 @@ package com.bifos.assistant.mcp.presentation;
 
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
+import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
+import com.bifos.assistant.shared.error.ApiException;
+import com.bifos.assistant.shared.error.ErrorCode;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -59,6 +62,37 @@ public final class McpDtos {
             ContentDraftInputReader.fields(node, Set.of("snapshotId"), Set.of());
             return new ContentDraftSaveArguments(draftUuid(node.get("snapshotId")));
         }
+    }
+
+    /** 인자가 없다. 모르는 키는 거절한다. */
+    public record OrderLimitReadArguments() {
+        static OrderLimitReadArguments from(JsonNode node) {
+            if (node == null || !node.isObject() || !node.propertyNames().isEmpty()) {
+                throw invalidOrderLimit();
+            }
+            return new OrderLimitReadArguments();
+        }
+    }
+
+    /** 이름은 다섯 상한 가운데 하나이고 값은 0 이상, 소수 6자리까지의 십진 글이다. */
+    public record OrderLimitChangeArguments(String name, String value) {
+        static OrderLimitChangeArguments from(JsonNode node) {
+            if (node == null || !node.isObject() || !node.propertyNames().equals(Set.of("name", "value"))
+                || !node.get("name").isString() || !node.get("value").isString()) {
+                throw invalidOrderLimit();
+            }
+            String name = node.get("name").stringValue();
+            String value = node.get("value").stringValue();
+            if (!McpFinancialLimitTools.NAMES.contains(name) || !value.matches(McpFinancialLimitTools.DECIMAL)) {
+                throw invalidOrderLimit();
+            }
+            return new OrderLimitChangeArguments(name, value);
+        }
+    }
+
+
+    private static ApiException invalidOrderLimit() {
+        return new ApiException(ErrorCode.VALIDATION_FAILED, "invalid order limit arguments");
     }
 
 

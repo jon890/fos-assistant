@@ -2,12 +2,17 @@ package com.bifos.assistant.connector.application;
 
 import com.bifos.assistant.connector.application.model.FinancialActionSummary;
 import com.bifos.assistant.connector.application.model.FinancialActionSummary.Normalization;
+import com.bifos.assistant.connector.application.model.FinancialLimitStatus;
+import com.bifos.assistant.connector.application.model.FinancialLimitValues;
 import com.bifos.assistant.connector.domain.ConnectorAction;
+import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionExecutionRepository;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.crypto.domain.TextCipher;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,14 +40,18 @@ public class ConnectorFinancialSummaries {
     private final ConnectorActionExecutionRepository contents;
     private final TextCipher cipher;
     private final FinancialDigest digest;
+    private final FinancialOrderLimits limits;
+    private final Clock clock;
 
 
     /** 줄 번호마다의 요약이다. 없거나 남의 줄이거나 금융 줄이 아니면 빠진다. */
     @Transactional(readOnly = true)
     public Map<UUID, FinancialActionSummary> summaries(CurrentUser user, List<UUID> actionIds) {
         var found = new LinkedHashMap<UUID, FinancialActionSummary>();
+        // 상한과 오늘 쓴 금액은 사용자마다 한 번만 읽는다.
+        var usage = new Usage(user.id());
         for (UUID actionId : actionIds) {
-            summaryOf(user, actionId).ifPresent(summary -> found.put(actionId, summary));
+            owned(user, actionId).map(action -> summary(action, usage)).ifPresent(summary -> found.put(actionId, summary));
         }
         return found;
     }
@@ -51,13 +60,17 @@ public class ConnectorFinancialSummaries {
     /** 그 줄의 요약이다. 없거나 남의 줄이거나 금융 줄이 아니면 빈 값이다. */
     @Transactional(readOnly = true)
     public Optional<FinancialActionSummary> summaryOf(CurrentUser user, UUID actionId) {
-        return actions.findByPublicId(actionId)
-            .filter(action -> user.id().equals(action.userId()) && action.risk() == ToolRisk.FINANCIAL)
-            .map(this::summary);
+        return owned(user, actionId).map(action -> summary(action, new Usage(user.id())));
     }
 
 
-    private FinancialActionSummary summary(ConnectorAction action) {
+    private Optional<ConnectorAction> owned(CurrentUser user, UUID actionId) {
+        return actions.findByPublicId(actionId)
+            .filter(action -> user.id().equals(action.userId()) && action.risk() == ToolRisk.FINANCIAL);
+    }
+
+
+    private FinancialActionSummary summary(ConnectorAction action, Usage usage) {
         try {
             var row = contents.findById(action.id()).orElse(null);
             if (row == null) {
@@ -73,14 +86,57 @@ public class ConnectorFinancialSummaries {
             for (JsonNode change : shown.path("normalization")) {
                 changes.add(new Normalization(text(change, "field"), text(change, "before"), text(change, "after")));
             }
+            String currency = text(shown, "currency");
+            var status = "CREATE".equals(text(shown, "operation")) ? usage.status(currency) : null;
             return new FinancialActionSummary(true, scope.properties().iterator().next().getValue().stringValue(),
-                text(shown, "operation"), text(shown, "symbol"), text(shown, "market"), text(shown, "currency"),
+                text(shown, "operation"), text(shown, "symbol"), text(shown, "market"), currency,
                 text(shown, "side"), text(shown, "quantity"), text(shown, "orderAmount"), text(shown, "price"),
-                text(shown, "orderType"), text(shown, "timeInForce"), text(shown, "orderId"), changes);
+                text(shown, "orderType"), text(shown, "timeInForce"), text(shown, "orderId"), changes, status);
         } catch (RuntimeException ex) {
             // 예외 메시지에는 원문이 섞일 수 있어 종류만 남긴다.
             log.warn("금융 승인 요약을 열지 못했다 actionId={} kind={}", action.publicId(), ex.getClass().getSimpleName());
             return FinancialActionSummary.unavailable();
+        }
+    }
+
+
+    /**
+     * 한 사용자의 적용 상한과 오늘 쓴 금액을 처음 쓸 때 한 번 읽는다. 읽지 못하면 카드의 상한 표시만 비우고 요약은 그대로 낸다.
+     * 판정은 승인할 때 서버가 다시 하므로 표시를 비워도 승인이 느슨해지지 않는다.
+     */
+    private final class Usage {
+        private final Long userId;
+        private FinancialLimitValues values;
+        private Map<String, BigDecimal> spent;
+        private boolean failed;
+
+
+        Usage(Long userId) {
+            this.userId = userId;
+        }
+
+
+        FinancialLimitStatus status(String currency) {
+            if (!"KRW".equals(currency) && !"USD".equals(currency)) {
+                return null;
+            }
+            if (values == null && !failed) {
+                try {
+                    values = limits.effective(userId);
+                    spent = limits.spentToday(userId, null, clock.instant());
+                } catch (RuntimeException ex) {
+                    failed = true;
+                    log.warn("금융 승인 카드의 상한을 읽지 못했다 kind={}", ex.getClass().getSimpleName());
+                }
+            }
+            if (failed) {
+                return null;
+            }
+            BigDecimal daily = values.value(FinancialLimitKind.dailyAmount(currency));
+            BigDecimal used = spent.getOrDefault(currency, BigDecimal.ZERO);
+            return new FinancialLimitStatus(currency, FinancialOrderLimits.plain(values.value(FinancialLimitKind.orderAmount(currency))),
+                FinancialOrderLimits.plain(values.value(FinancialLimitKind.ORDER_QUANTITY)), FinancialOrderLimits.plain(daily),
+                FinancialOrderLimits.plain(used), FinancialOrderLimits.plain(daily.subtract(used).max(BigDecimal.ZERO)));
         }
     }
 

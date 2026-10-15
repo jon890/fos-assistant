@@ -12,7 +12,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
-| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
+| 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant`, `financial_order_limit`, `financial_limit_change` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
 | 「판단 피드백 표」 | `decision_feedback_event` |
@@ -729,6 +729,38 @@ action을 지우면 실행 내용도 지운다.
 `revoked_at` 이 비고 `expires_at` 이 지금보다 뒤이고 대화의 `deleted_at` 이 빈 줄만 유효하다. `expires_at` 은 만든 때부터 24시간 뒤다.
 `revoked_at` 은 사용자가 거두었거나, 그 에이전트에서 연결을 뗐거나, 연결을 해제하거나 다시 등록한 시각이다.
 외래 키는 사용자와 대화에 둔다. 대화는 지워도 줄이 남으므로 이 줄도 남는다. 에이전트에는 두지 않는다. 에이전트를 정리하면 바인딩이 지워져 판정이 그 줄까지 가지 않는다.
+
+### financial_order_limit
+
+계좌 주인이 운영 최대치 안에서 정한 주문 상한이다. 사용자마다 한 줄이다.
+근거는 [ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)가 갖는다.
+
+| 컬럼 | 타입과 제약 |
+| --- | --- |
+| `user_id` | BIGINT NOT NULL, PK 및 `app_user` FK |
+| `order_amount_krw`, `order_amount_usd`, `order_quantity`, `daily_amount_krw`, `daily_amount_usd` | DECIMAL(20,6) NULL. 비면 그 상한은 운영 최대치를 따른다 |
+| `updated_at` | DATETIME(6) NOT NULL |
+
+줄이 없으면 다섯 상한이 모두 최대치를 따른다.
+적용하는 값은 이 컬럼과 운영 최대치 가운데 작은 것이다. 운영 최대치가 내려가도 이 컬럼은 고치지 않는다.
+쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠근다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
+
+### financial_limit_change
+
+대화로 올리기를 요청한 상한 변경의 내용이다. 승인 줄 하나에 한 줄이다.
+`order_limit_change` 가 PENDING `connector_action` 과 함께 만들고, 승인하면 `financial_order_limit` 에 반영한다.
+
+| 컬럼 | 타입과 제약 |
+| --- | --- |
+| `action_id` | BIGINT NOT NULL, PK 및 `connector_action` FK, ON DELETE CASCADE |
+| `user_id` | BIGINT NOT NULL, `app_user` FK |
+| `limit_kind` | VARCHAR(32) NOT NULL. `ORDER_AMOUNT_KRW`, `ORDER_AMOUNT_USD`, `ORDER_QUANTITY`, `DAILY_AMOUNT_KRW`, `DAILY_AMOUNT_USD` |
+| `requested_value` | DECIMAL(20,6) NOT NULL. 0 이상 |
+| `previous_value` | DECIMAL(20,6) NOT NULL. 요청할 때 적용하던 상한 |
+| `created_at` | DATETIME(6) NOT NULL |
+
+낮추기와 같은 값, 최대치를 넘는 값은 이 줄을 만들지 않는다.
+승인 줄의 위험도는 `WRITE`, 승인 방식은 `always` 다. 공개 승인 API 는 이 줄이 있는 승인 줄을 상한 변경 승인으로 보낸다.
 
 ## 사용자 브라우저 표
 
