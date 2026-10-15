@@ -289,7 +289,7 @@ export function useConversationEvents({
       liveExpandedRef.current = false;
       setExpandedOnDone(null);
       setStopRequested(false);
-    setFlowIsSlow(false);
+      setFlowIsSlow(false);
     }
     const current = autoTurn.current;
     if (current === null) {
