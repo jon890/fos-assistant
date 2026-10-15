@@ -11,6 +11,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * profile 플러그인이 MCP 도구 인자에 덮어쓴 {@code _fos_ctx} 에서 서명을 확인한 값이다.
@@ -33,6 +34,22 @@ public record McpCallContext(String rootSessionId, String sessionId, String tool
 
     /** 도구 인자 안에서 이 값이 놓이는 키다. */
     public static final String FIELD = "_fos_ctx";
+
+
+    /**
+     * profile 플러그인이 모든 도구 인자에 덮어쓴 {@code _fos_ctx} 를 뗀 복사본을 만든다.
+     *
+     * <p>도구 규격은 그 키를 모르므로 떼지 않으면 {@code artifact_write} 가 모르는 키로 거절한다. Hermes 는
+     * hook 이 더한 키를 도구 규격으로 검증하지 않는다. 받은 노드는 바꾸지 않는다.
+     */
+    public static JsonNode strip(JsonNode arguments) {
+        if (!arguments.has(FIELD)) {
+            return arguments;
+        }
+        ObjectNode copy = ((ObjectNode)arguments).deepCopy();
+        copy.remove(FIELD);
+        return copy;
+    }
 
     private static final String VERSION_LINE = "v1";
     private static final String HMAC = "HmacSHA256";

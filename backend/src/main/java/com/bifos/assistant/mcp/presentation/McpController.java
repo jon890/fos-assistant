@@ -188,7 +188,7 @@ public class McpController {
                 return response(id, tools.notAllowedInCheck());
             }
         }
-        return handler.handle(caller, id, withoutCallContext(arguments));
+        return handler.handle(caller, id, McpCallContext.strip(arguments));
     }
 
 
@@ -207,22 +207,6 @@ public class McpController {
             return false;
         }
         return checkGuard.isCheckConversation(check, UUID.fromString(conversationId.asString()));
-    }
-
-
-    /**
-     * profile 플러그인이 모든 도구 인자에 덮어쓴 {@code _fos_ctx} 를 뗀 복사본을 만든다.
-     *
-     * <p>도구 규격은 그 키를 모르므로 떼지 않으면 {@code artifact_write} 가 모르는 키로 거절한다. Hermes 는
-     * hook 이 더한 키를 도구 규격으로 검증하지 않는다. 받은 노드는 바꾸지 않는다.
-     */
-    private static JsonNode withoutCallContext(JsonNode arguments) {
-        if (!arguments.has(McpCallContext.FIELD)) {
-            return arguments;
-        }
-        ObjectNode copy = ((ObjectNode)arguments).deepCopy();
-        copy.remove(McpCallContext.FIELD);
-        return copy;
     }
 
 
