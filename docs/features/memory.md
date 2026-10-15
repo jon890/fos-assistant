@@ -525,7 +525,7 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 
 ### 운영 집계
 
-운영 데이터베이스에서 읽기만 하고 본문과 제목 컬럼을 읽지 않는다. 쿼리는 `backend/src/test/resources/memory-eval/ops-metrics.sql` 에 `-- name: <이름>` 줄로 나눠 두고, 모두 최근 28일을 센다. 접속과 실행 방법은 운영 저장소가 갖는다. <!-- ref-ignore: 단계 0 의 운영 집계 구현 커밋이 이 파일을 만들고 이 표기를 지운다 -->
+운영 데이터베이스에서 읽기만 하고 본문과 제목 컬럼을 읽지 않는다. 쿼리는 `backend/src/test/resources/memory-eval/ops-metrics.sql` 에 `-- name: <이름>` 줄로 나눠 두고, 모두 최근 28일을 센다. 접속과 실행 방법은 운영 저장소가 갖는다.
 쿼리가 맞는지는 `MemoryOpsMetricsSqlTest` 가 합성 줄을 넣고 확인한다.
 
 | 이름 | 지표 | 읽는 컬럼 | 무엇을 정하는 근거인가 |
