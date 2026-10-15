@@ -7,7 +7,6 @@
     "backend/src/main/java/com/bifos/assistant/chat/application/RestartReconciler.java": 615,
     "backend/src/main/java/com/bifos/assistant/connector/application/ConnectorBindingService.java": 568,
     "backend/src/main/java/com/bifos/assistant/hermes/HttpHermesConnectorClient.java": 569,
-    "backend/src/main/java/com/bifos/assistant/usage/application/ExecutionRecorder.java": 585,
     "backend/src/main/java/com/bifos/assistant/usage/domain/AgentExecution.java": 665,
     "hermes/connectors/naver-blog/src/editor/page.ts": 476,
     "hermes/connectors/naver-blog/src/jobs.ts": 469,

@@ -2,13 +2,11 @@ package com.bifos.assistant;
 
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
-import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.StarterProperties;
 import com.bifos.assistant.connector.application.ConnectorFinancialProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.memory.application.MemoryEncryptionProperties;
-import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.proactive.application.AutonomyProperties;
 import com.bifos.assistant.proactive.application.ProactiveCheckProperties;
@@ -87,12 +85,6 @@ public class LivePropertiesConfig {
 
 
     @Bean
-    public LiveProperties<ModelTierProperties> modelTierPropertiesLive(ModelTierProperties value) {
-        return LiveProperties.fixed(ModelTierProperties.class, value);
-    }
-
-
-    @Bean
     public LiveProperties<ConnectorPolicyProperties> connectorPolicyPropertiesLive(ConnectorPolicyProperties value) {
         return LiveProperties.fixed(ConnectorPolicyProperties.class, value);
     }
@@ -101,12 +93,6 @@ public class LivePropertiesConfig {
     @Bean
     public LiveProperties<ConnectorFinancialProperties> connectorFinancialPropertiesLive(ConnectorFinancialProperties value) {
         return LiveProperties.fixed(ConnectorFinancialProperties.class, value);
-    }
-
-
-    @Bean
-    public LiveProperties<MemoryProposalProperties> memoryProposalPropertiesLive(MemoryProposalProperties value) {
-        return LiveProperties.fixed(MemoryProposalProperties.class, value);
     }
 
 

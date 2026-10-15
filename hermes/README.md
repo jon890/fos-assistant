@@ -140,9 +140,10 @@ docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_m
 그래서 API 경로의 `execute_code` 는 docker 실행 공간에서만 승인 없이 돈다. 셸 위험 명령과 커넥터 승인은 그대로 승인 카드로 간다.
 판정 경로는 [실행 공간](docs/hermes-contract.md) 의 「`execute_code` 의 승인 판정」, 결정은 [ADR-20261008 / execute-code-unattended](docs/adr/ADR-20261008-execute-code-unattended.md) 가 갖는다.
 
-**기존 Hermes 예약 작업은 기본 profile(local)에 남으며 아직 격리되지 않았다.**
-named profile 의 도구 저장은 기본 profile 설정과 예약 작업을 바꾸지 않는다.
-Control Plane 의 예약 작업과 매일 깨우기는 별도 기능이며 각각의 에이전트 profile 을 쓴다.
+**기존 Hermes 예약 작업은 Control Plane 예약 작업으로 이관을 마쳤다.**
+예약 작업과 매일 깨우기는 각각의 에이전트 profile을 쓴다.
+`cronjob` 도구 차단은 유지하며, 쓰이지 않는 예약 설정 키는 profile 틀에서 제거했다.
+키를 제거한 소스 근거는 [Hermes 예약 작업](docs/hermes-contract.md#hermes-예약-작업)이 갖는다.
 적용과 확인, profile 별 실제 값은 `fos-home-infra` 가 갖는다.
 
 ## 검사

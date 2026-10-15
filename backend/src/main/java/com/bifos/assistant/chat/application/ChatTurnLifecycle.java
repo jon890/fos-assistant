@@ -12,7 +12,6 @@ import com.bifos.assistant.context.AssembledContext;
 import com.bifos.assistant.hermes.dto.HermesImage;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
-import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -40,7 +39,6 @@ class ChatTurnLifecycle {
     private final ChatMessageRepository messages;
     private final ExecutionQuestionRepository executionQuestions;
     private final ExecutionRecorder executions;
-    private final MemoryProposer memoryProposer;
     private final StarterSuggestionService starterSuggestions;
     private final ArtifactService artifacts;
     private final Clock clock;
@@ -158,13 +156,6 @@ class ChatTurnLifecycle {
             return finishCheck(pending, proactive.check(), execution.id(), answer);
         }
         ChatMessage message = messages.save(answerMessage(pending, answer, execution.id()));
-        memoryProposer.proposeFrom(
-            pending.user(),
-            pending.conversation().executionConversation(),
-            pending.agent(),
-            execution,
-            answer,
-            requested);
         starterSuggestions.refreshIfStale(pending.user(), pending.agent());
         return new ChatTurn(
             pending.conversation().id(),
@@ -179,7 +170,7 @@ class ChatTurnLifecycle {
     /**
      * 먼저 살펴보기 turn 의 답을 {@code check} 가 바꾼 글로 남긴다. 알림 줄이면 {@code system} 사건을 낸다.
      *
-     * <p>Memory 제안과 추천 질문 갱신을 띄우지 않는다. 사용자의 질문이 없는 turn 이다.
+     * <p>추천 질문 갱신을 띄우지 않는다. 사용자의 질문이 없는 turn 이다.
      */
     ChatTurn finishCheck(PendingTurn pending, CheckTurn check, Long executionId, String output) {
         CheckAnswer checked = check.answer(executionId, output);

@@ -113,7 +113,7 @@ Hermes 에 보낼 session(`runtimeSessionId`)과 실행 줄에 적을 session(`c
 대화 turn 은 대화의 session 을 보내고 대화의 루트 session 을 적는다. 흐름의 하위 실행과 위임 자식은 `RunSession.fresh()` 로 새 session 을 정해 부모의 session 을 잇지 않는다.
 
 **실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
-Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다.
+session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다.
 
 ### MCP 호출의 요청자를 정할 때
 
@@ -135,7 +135,7 @@ Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용�
 | 등록이 있는데 origin 실행이나 그 실행 트리의 루트 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | 등록의 루트 session 이 서명한 루트와 다르다 | 거절한다 |
 | 등록이 없고 그 호출의 session 이 루트와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다 |
-| 등록이 없고 session 이 루트와 같지만 그 루트 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
+| 등록이 없고 session 이 루트와 같지만 그 루트 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
 | 그 루트 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 

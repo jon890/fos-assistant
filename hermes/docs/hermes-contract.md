@@ -1868,8 +1868,18 @@ Hermes의 `DELETE /api/env`는 본문 `{ "profile": "<profile>", "key": "ACCOUNT
 token 파일을 실행 공간에 읽기 전용으로 붙인 profile 의 셸은 그 token 으로 Backend 의 모든 API 를 부를 수 있다.
 읽기 전용 마운트는 token 유출이나 API 쓰기를 막지 않는다.
 
-**Hermes 예약 작업은 기본 profile 의 설정과 cron 저장소를 따른다.** Control Plane 예약 작업으로 옮긴다([ADR-20261008 / cron-to-task](../../docs/adr/ADR-20261008-cron-to-task.md)).
-named profile 저장은 기본 profile 설정과 cron 저장소를 바꾸지 않는다.
+### Hermes 예약 작업
+
+**기존 Hermes 예약 작업은 Control Plane 예약 작업으로 이관을 마쳤다**([ADR-20261008 / cron-to-task](../../docs/adr/ADR-20261008-cron-to-task.md)).
+Hermes 자체의 예약 작업은 기본 profile의 설정과 cron 저장소를 따르며, named profile 저장은 이를 바꾸지 않는다.
+`cronjob` 도구 차단과 본문 없는 cron 진단 계약은 유지한다.
+
+v0.21.6(`818c13be1dc4fd28987e1e881a9408224afd4535`)의 [`hermes_cli/config.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/hermes_cli/config.py)의 `load_config`와 `load_config_readonly`는 기본값과 사용자 설정을 합쳐 읽는다.
+[`config_defaults.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/hermes_cli/config_defaults.py)의 `DEFAULT_CONFIG`와 실행 코드에는 `agent.scheduled_tasks.enabled`를 읽는 곳이 없다.
+Hermes v0.21.6 소스 전체에서 키 이름을 검색해 소비자가 없음을 확인했다.
+[`gateway/run.py`](https://github.com/NousResearch/hermes-agent/blob/818c13be1dc4fd28987e1e881a9408224afd4535/gateway/run.py)의 `_start_gateway_start_cron_and_housekeeping`도 이 키를 보지 않고 `cron.scheduler_provider.resolve_cron_scheduler`로 실행기를 고른다.
+따라서 이 키는 profile 틀에서 제거했으며 cron 실행기를 끄는 설정으로 취급하지 않는다.
+
 예약 작업 이름이나 지시문에 역할 이름을 넣어도 실행 profile 은 바뀌지 않는다.
 script 를 지정한 예약 작업의 subprocess 는 Hermes 프로세스에서 돈다. terminal backend 를 바꾸는 것으로 격리되지 않는다.
 Control Plane 예약 작업과 매일 깨우기는 각 에이전트의 profile 을 쓰는 별도 기능이다.

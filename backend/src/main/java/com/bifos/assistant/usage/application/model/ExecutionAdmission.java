@@ -8,6 +8,6 @@ public enum ExecutionAdmission {
     CHILD,
     /** 매일 깨우기의 위임 자식. 사용자 대화를 위해 적어도 한 자리를 남긴다. */
     BACKGROUND_CHILD,
-    /** 추천 질문과 Memory 제안. 줄을 만든 뒤에도 background-reserve 자리가 남아야 한다 */
+    /** 추천 질문 등의 백그라운드 실행. 줄을 만든 뒤에도 background-reserve 자리가 남아야 한다 */
     BACKGROUND
 }
