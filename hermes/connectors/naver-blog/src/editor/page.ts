@@ -1,6 +1,11 @@
 import { CdpSession, httpJson, wsUrlFor } from "../cdp.ts";
 import { BLOG_ID_PATTERN } from "../session.ts";
 import { EditorError, type EditorErrorCode } from "./editor-error.ts";
+import {
+  dismissKnownPopup,
+  type PopupDiagnostics,
+  probePopup,
+} from "./popup.ts";
 
 export { EditorError, type EditorErrorCode } from "./editor-error.ts";
 export { focus, focusField } from "./focus.ts";
@@ -58,6 +63,8 @@ const q = (value: unknown) => JSON.stringify(value);
 export class EditorPage {
   /** 지금 단계. 실패와 중단이 이 이름으로 알린다. */
   stage = "open";
+  /** 마지막으로 본 화면을 덮은 알림의 종류. 실패가 이것을 `popup_diagnostics` 로 싣는다. */
+  popup: PopupDiagnostics | null = null;
   private readonly autosaveRequestIds = new Set<string>();
 
   /** 이 탭에서 관측을 시작한 뒤 나간 자동저장 요청 수. 주소나 요청 본문은 보관하지 않는다. */
@@ -138,7 +145,14 @@ export class EditorPage {
     message: string,
     extra?: Record<string, unknown>,
   ) {
-    return new EditorError(code, this.stage, message, extra);
+    return new EditorError(
+      code,
+      this.stage,
+      message,
+      this.popup && code === "editor_failed"
+        ? { ...extra, popup_diagnostics: this.popup }
+        : extra,
+    );
   }
 
   throwIfAborted() {
@@ -380,9 +394,13 @@ export function dismissPopup(page: EditorPage, button: string) {
 export async function requireClearScreen(page: EditorPage) {
   for (let i = 0; i < 3; i++) {
     if (!(await blockingPopup(page))) return "";
+    // 알려진 알림은 안전한 쪽으로 한 번만 닫는다. 모르는 알림은 누르지 않고 기다리다 멈춘다.
+    if (i === 0 && (await dismissKnownPopup(page))) continue;
     await page.sleep(page.step(0.5));
   }
-  return blockingPopup(page);
+  const note = await blockingPopup(page);
+  if (note) page.popup = (await probePopup(page))?.diagnostics ?? page.popup;
+  return note;
 }
 
 type Progress = { draftHash?: string; passed?: string[] };

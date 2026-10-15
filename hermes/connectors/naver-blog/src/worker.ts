@@ -20,6 +20,7 @@ import {
 import { EditorError, runDraft, type RunStage } from "./editor/run.ts";
 import { filterFocusDiagnostics } from "./editor/focus.ts";
 import { filterOpenDiagnostics } from "./editor/open-diagnostics.ts";
+import { filterPopupDiagnostics } from "./editor/popup.ts";
 import {
   checkJobDir,
   finishClaimed,
@@ -132,9 +133,11 @@ async function takeInput(dir: string, jobId: string) {
 function errorOf(error: unknown, stage: string): Record<string, unknown> {
   if (error instanceof SnapshotGuardError) return { code: error.code, stage };
   if (error instanceof EditorError) {
-    const { focus_diagnostics, open_diagnostics, ...extra } = error.extra;
+    const { focus_diagnostics, open_diagnostics, popup_diagnostics, ...extra } =
+      error.extra;
     const safe = filterFocusDiagnostics(focus_diagnostics);
     const opening = filterOpenDiagnostics(open_diagnostics);
+    const popup = filterPopupDiagnostics(popup_diagnostics);
     return {
       code: error.code,
       stage: error.stage,
@@ -142,6 +145,7 @@ function errorOf(error: unknown, stage: string): Record<string, unknown> {
       ...extra,
       ...(safe ? { focus_diagnostics: safe } : {}),
       ...(opening ? { open_diagnostics: opening } : {}),
+      ...(popup ? { popup_diagnostics: popup } : {}),
     };
   }
   return { code: "editor_failed", stage };
