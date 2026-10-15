@@ -6,6 +6,7 @@ import static com.bifos.assistant.hermes.dto.ReasoningCapability.Support.UNSUPPO
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -61,6 +62,7 @@ class ModelOptionsServiceTest {
 
     private ModelOptionsService service;
 
+
     @BeforeEach
     void setUp() {
         when(visibility.hiddenFor(1L)).thenReturn(HiddenModels.none());
@@ -69,34 +71,38 @@ class ModelOptionsServiceTest {
         agentOf("kid", "kid-profile", true);
     }
 
+
     private static HermesModelCatalog catalog(String defaultProvider, Provider... providers) {
         return new HermesModelCatalog(defaultProvider, "example-model", List.of(providers));
     }
+
 
     private static Provider provider(String slug, String... models) {
         return new Provider(slug, slug, List.of(models), Map.of());
     }
 
+
     private void agentOf(String code, String profile, boolean enabled) {
         Agent agent = Agent.of(
-                code,
-                code,
-                profile,
-                "http://agent-runtime.test/p/" + profile,
-                CostMode.SUBSCRIPTION,
-                CredentialScope.SHARED_HOUSEHOLD,
-                AgentVisibility.PRIVATE,
-                dad.id(),
-                Instant.now());
+            code,
+            code,
+            profile,
+            "http://agent-runtime.test/p/" + profile,
+            CostMode.SUBSCRIPTION,
+            CredentialScope.SHARED_HOUSEHOLD,
+            AgentVisibility.PRIVATE,
+            dad.id(),
+            Instant.now());
         agent.changeAccess(enabled, AgentVisibility.PRIVATE, dad.id());
         when(agentRepository.findByCode(code)).thenReturn(Optional.of(agent));
     }
+
 
     @Test
     @DisplayName("같은 profile 을 두 번 물으면 Hermes 를 한 번만 부른다")
     void callsHermesOnlyOnceForSameProfileAskedTwice() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
         ModelOptions first = service.optionsFor(dad, "dad");
         ModelOptions second = service.optionsFor(dad, "dad");
@@ -108,12 +114,13 @@ class ModelOptionsServiceTest {
         verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile");
     }
 
+
     @Test
     @DisplayName("들고 있는 시간이 지나기 직전까지는 들고 있고 지나면 다시 부른다")
     void holdsUntilJustBeforeExpiryAndCallsAgainAfter() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
 
         service.optionsFor(dad, "dad");
         clock.advance(TTL.minusSeconds(1));
@@ -125,13 +132,14 @@ class ModelOptionsServiceTest {
         verify(hermes, times(2)).readCatalog(anyString(), anyString());
     }
 
+
     @Test
     @DisplayName("다시 읽다 Hermes 가 실패하면 들고 있던 목록을 돌려주고 1분 동안은 Hermes 를 부르지 않다가 1분이 지나면 다시 읽는다")
     void returnsHeldListWithoutCallingHermesForOneMinuteAfterFailedRereadThenRereads() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
-                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "old")))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "new")));
         service.optionsFor(dad, "dad");
 
         clock.advance(TTL);
@@ -150,11 +158,84 @@ class ModelOptionsServiceTest {
         verify(hermes, times(3)).readCatalog(anyString(), anyString());
     }
 
+
+    @Test
+    @DisplayName("다시 읽기는 들고 있는 시간이 남았어도 Hermes 를 불러 새 목록으로 바꾼다")
+    void refreshBypassesCacheAndReplacesHeldCatalog() {
+        when(hermes.readCatalog(anyString(), anyString()))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "substitute")));
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "substitute", "real")));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.optionsFor(dad, "dad");
+
+        ModelOptions refreshed = service.refreshedOptionsForAgent(1L, agent);
+
+        assertThat(refreshed.providers().get(0).models()).containsExactly("substitute", "real");
+        assertThat(service.optionsFor(dad, "dad").providers().get(0).models()).containsExactly("substitute", "real");
+        verify(hermes, times(1)).readCatalog(anyString(), anyString(), eq(true));
+        verify(hermes, times(1)).readCatalog(anyString(), anyString());
+    }
+
+
+    @Test
+    @DisplayName("다시 읽기는 같은 profile 에 30초 안에 몰려도 Hermes 를 한 번만 부르고 30초가 지나면 다시 읽는다")
+    void refreshIsLimitedToOncePerInterval() {
+        when(hermes.readCatalog(anyString(), anyString()))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.optionsFor(dad, "dad");
+
+        service.refreshedOptionsForAgent(1L, agent);
+        clock.advance(ModelOptionsService.MIN_REFRESH_INTERVAL.minusSeconds(1));
+        service.refreshedOptionsForAgent(1L, agent);
+        verify(hermes, times(1)).readCatalog(anyString(), anyString(), eq(true));
+
+        clock.advance(Duration.ofSeconds(1));
+        service.refreshedOptionsForAgent(1L, agent);
+        verify(hermes, times(2)).readCatalog(anyString(), anyString(), eq(true));
+    }
+
+
+    @Test
+    @DisplayName("다시 읽기가 다른 profile 의 간격에 막히지 않는다")
+    void refreshIntervalIsPerProfile() {
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+        Agent dadAgent = agentRepository.findByCode("dad").orElseThrow();
+        Agent kidAgent = agentRepository.findByCode("kid").orElseThrow();
+
+        service.refreshedOptionsForAgent(1L, dadAgent);
+        service.refreshedOptionsForAgent(1L, kidAgent);
+
+        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/dad-profile", "dad-profile", true);
+        verify(hermes, times(1)).readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile", true);
+    }
+
+
+    @Test
+    @DisplayName("다시 읽다 Hermes 가 실패하면 들고 있던 목록을 돌려준다")
+    void refreshFailureReturnsHeldCatalog() {
+        when(hermes.readCatalog(anyString(), anyString()))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "old")));
+        when(hermes.readCatalog(anyString(), anyString(), eq(true)))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+        Agent agent = agentRepository.findByCode("dad").orElseThrow();
+        service.optionsFor(dad, "dad");
+
+        ModelOptions refreshed = service.refreshedOptionsForAgent(1L, agent);
+
+        assertThat(refreshed.providers().get(0).models()).containsExactly("old");
+    }
+
+
     @Test
     @DisplayName("profile 기본값은 들고 있는 목록에서 읽어 Hermes 를 다시 부르지 않는다")
     void readsProfileDefaultFromHeldCatalog() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
         service.optionsFor(dad, "dad");
 
@@ -164,53 +245,57 @@ class ModelOptionsServiceTest {
         verify(hermes, times(1)).readCatalog(anyString(), anyString());
     }
 
+
     @Test
     @DisplayName("profile 기본값을 다시 읽다 Hermes 가 실패하면 들고 있던 값을 돌려준다")
     void returnsHeldProfileDefaultWhenRereadFails() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
-                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
         service.profileDefaultOf(agent);
 
         clock.advance(TTL);
 
         assertThat(service.profileDefaultOf(agent))
-                .isEqualTo(ModelChoice.stored("openai-codex", "example-model", null));
+            .isEqualTo(ModelChoice.stored("openai-codex", "example-model", null));
         verify(hermes, times(2)).readCatalog(anyString(), anyString());
     }
+
 
     @Test
     @DisplayName("profile 기본값을 한 번도 읽지 못했으면 HERMES UNAVAILABLE 을 삼키지 않는다")
     void profileDefaultThrowsHermesUnavailableWhenNeverRead() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
         Agent agent = agentRepository.findByCode("dad").orElseThrow();
 
         assertThatThrownBy(() -> service.profileDefaultOf(agent))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
     }
+
 
     @Test
     @DisplayName("처음 읽다 실패하면 HERMES UNAVAILABLE 이고 실패를 들고 있지 않는다")
     void firstReadFailureIsHermesUnavailableAndFailureIsNotHeld() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+            .thenThrow(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"))
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
         assertThatThrownBy(() -> service.optionsFor(dad, "dad"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_UNAVAILABLE));
         assertThat(service.optionsFor(dad, "dad").providers()).hasSize(1);
     }
+
 
     @Test
     @DisplayName("다시 읽다 Hermes 가 답하지 않는 것과 다른 까닭으로 실패해도 들고 있던 목록을 돌려준다")
     void returnsHeldListWhenRereadFailsWithOtherErrorCode() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
-                .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")))
+            .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
         service.optionsFor(dad, "dad");
 
         clock.advance(TTL);
@@ -219,23 +304,25 @@ class ModelOptionsServiceTest {
         verify(hermes, times(2)).readCatalog(anyString(), anyString());
     }
 
+
     @Test
     @DisplayName("한 번도 읽지 못한 profile 은 Hermes 가 답하지 않는 것과 다른 까닭의 예외도 그대로 올린다")
     void rethrowsOtherErrorCodeWhenNeverRead() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
+            .thenThrow(new ApiException(ErrorCode.HERMES_PROFILE_KEY_MISSING, "no key"));
 
         assertThatThrownBy(() -> service.optionsFor(dad, "dad"))
-                .isInstanceOfSatisfying(
-                        ApiException.class,
-                        ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_PROFILE_KEY_MISSING));
+            .isInstanceOfSatisfying(
+                ApiException.class,
+                ex -> assertThat(ex.code()).isEqualTo(ErrorCode.HERMES_PROFILE_KEY_MISSING));
     }
+
 
     @Test
     @DisplayName("profile 이 다르면 따로 부른다")
     void callsSeparatelyForDifferentProfile() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
+            .thenReturn(catalog("openai-codex", provider("openai-codex", "a")));
 
         service.optionsFor(dad, "dad");
         service.optionsFor(dad, "kid");
@@ -244,6 +331,7 @@ class ModelOptionsServiceTest {
         verify(hermes).readCatalog("http://agent-runtime.test/p/kid-profile", "kid-profile");
     }
 
+
     @Test
     @DisplayName("agentCode 가 비었거나 없는 에이전트는 AGENT NOT FOUND 이고 Hermes 를 부르지 않는다")
     void blankAgentCodeOrMissingAgentIsAgentNotFoundWithoutCallingHermes() {
@@ -251,12 +339,13 @@ class ModelOptionsServiceTest {
 
         for (String code : new String[] {null, "", "  ", "ghost"}) {
             assertThatThrownBy(() -> service.optionsFor(dad, code))
-                    .as("agentCode=%s", code)
-                    .isInstanceOfSatisfying(
-                            ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
+                .as("agentCode=%s", code)
+                .isInstanceOfSatisfying(
+                    ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         }
         verify(hermes, never()).readCatalog(anyString(), anyString());
     }
+
 
     @Test
     @DisplayName("꺼진 에이전트는 AGENT DISABLED 이고 Hermes 를 부르지 않는다")
@@ -264,73 +353,77 @@ class ModelOptionsServiceTest {
         agentOf("off", "off-profile", false);
 
         assertThatThrownBy(() -> service.optionsFor(dad, "off"))
-                .isInstanceOfSatisfying(
-                        ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_DISABLED));
+            .isInstanceOfSatisfying(
+                ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.AGENT_DISABLED));
         verify(hermes, never()).readCatalog(anyString(), anyString());
     }
+
 
     @Test
     @DisplayName("기본 provider 를 맨 앞에 두고 나머지는 Hermes 가 준 차례를 지킨다")
     void putsDefaultProviderFirstAndKeepsHermesOrderForRest() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog(
-                        "openai-codex", provider("alpha", "a"), provider("openai-codex", "b"), provider("beta", "c")));
+            .thenReturn(catalog(
+                "openai-codex", provider("alpha", "a"), provider("openai-codex", "b"), provider("beta", "c")));
 
         ModelOptions options = service.optionsFor(dad, "dad");
 
         assertThat(options.providers()).extracting(Provider::slug).containsExactly("openai-codex", "alpha", "beta");
     }
 
+
     @Test
     @DisplayName("기본 provider 가 목록에 없으면 Hermes 가 준 차례 그대로다")
     void keepsHermesOrderWhenDefaultProviderNotInList() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog(null, provider("alpha", "a"), provider("beta", "b")));
+            .thenReturn(catalog(null, provider("alpha", "a"), provider("beta", "b")));
 
         assertThat(service.optionsFor(dad, "dad").providers())
-                .extracting(Provider::slug)
-                .containsExactly("alpha", "beta");
+            .extracting(Provider::slug)
+            .containsExactly("alpha", "beta");
     }
+
 
     @Test
     @DisplayName("Hermes 가 밝히지 않은 모델은 참으로 채우지 않고 UNKNOWN 으로 읽는다")
     void leavesUnstatedModelsUnknownInsteadOfTrue() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog(
-                        "openai-codex",
-                        new Provider(
-                                "openai-codex",
-                                "OpenAI Codex",
-                                List.of("example-model", "example-model-mini", "example-model-new"),
-                                Map.of(
-                                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
-                                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
+            .thenReturn(catalog(
+                "openai-codex",
+                new Provider(
+                    "openai-codex",
+                    "OpenAI Codex",
+                    List.of("example-model", "example-model-mini", "example-model-new"),
+                    Map.of(
+                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
 
         Provider provider = service.optionsFor(dad, "dad").providers().get(0);
 
         assertThat(provider.reasoning())
-                .isEqualTo(Map.of(
-                        "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
-                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)));
+            .isEqualTo(Map.of(
+                "example-model", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)));
         assertThat(provider.reasoning().getOrDefault("example-model-new", ReasoningCapability.UNKNOWN_ALL))
-                .isEqualTo(ReasoningCapability.UNKNOWN_ALL);
+            .isEqualTo(ReasoningCapability.UNKNOWN_ALL);
     }
+
 
     @Test
     @DisplayName("숨긴 모델의 reasoning 항목은 표에서 빠진다")
     void dropsReasoningEntriesOfHiddenModels() {
         when(visibility.hiddenFor(1L))
-                .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "example-model-mini"))));
+            .thenReturn(new HiddenModels(List.of(new HiddenModels.Entry("openai-codex", "example-model-mini"))));
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(catalog(
-                        "openai-codex",
-                        new Provider(
-                                "openai-codex",
-                                "OpenAI Codex",
-                                List.of("example-model", "example-model-mini"),
-                                Map.of(
-                                        "example-model", new ReasoningCapability(SUPPORTED, SUPPORTED),
-                                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
+            .thenReturn(catalog(
+                "openai-codex",
+                new Provider(
+                    "openai-codex",
+                    "OpenAI Codex",
+                    List.of("example-model", "example-model-mini"),
+                    Map.of(
+                        "example-model", new ReasoningCapability(SUPPORTED, SUPPORTED),
+                        "example-model-mini", new ReasoningCapability(UNSUPPORTED, UNKNOWN)))));
 
         Provider provider = service.optionsFor(dad, "dad").providers().get(0);
 
@@ -338,69 +431,72 @@ class ModelOptionsServiceTest {
         assertThat(provider.reasoning()).containsOnlyKeys("example-model");
     }
 
+
     @Test
     @DisplayName("none 은 끄기 지원이 SUPPORTED 이고 reasoning 이 UNSUPPORTED 가 아닌 모델에서만 고를 수 있다")
     void allowsNoneOnlyWhereDisableIsSupported() {
         when(hermes.readCatalog(anyString(), anyString()))
-                .thenReturn(new HermesModelCatalog(
-                        "p",
-                        "can-off",
-                        List.of(new Provider(
-                                "p",
-                                "p",
-                                List.of("can-off", "cannot-off", "unsaid-off", "no-reasoning", "unknown-reasoning"),
-                                Map.of(
-                                        "can-off", new ReasoningCapability(SUPPORTED, SUPPORTED),
-                                        "cannot-off", new ReasoningCapability(SUPPORTED, UNSUPPORTED),
-                                        "unsaid-off", new ReasoningCapability(SUPPORTED, UNKNOWN),
-                                        "no-reasoning", new ReasoningCapability(UNSUPPORTED, SUPPORTED),
-                                        "unknown-reasoning", new ReasoningCapability(UNKNOWN, SUPPORTED))))));
+            .thenReturn(new HermesModelCatalog(
+                "p",
+                "can-off",
+                List.of(new Provider(
+                    "p",
+                    "p",
+                    List.of("can-off", "cannot-off", "unsaid-off", "no-reasoning", "unknown-reasoning"),
+                    Map.of(
+                        "can-off", new ReasoningCapability(SUPPORTED, SUPPORTED),
+                        "cannot-off", new ReasoningCapability(SUPPORTED, UNSUPPORTED),
+                        "unsaid-off", new ReasoningCapability(SUPPORTED, UNKNOWN),
+                        "no-reasoning", new ReasoningCapability(UNSUPPORTED, SUPPORTED),
+                        "unknown-reasoning", new ReasoningCapability(UNKNOWN, SUPPORTED))))));
 
         ModelOptions options = service.optionsFor(dad, "dad");
 
         assertThat(options.allowsEffort("p", "can-off", "none"))
-                .as("disable SUPPORTED")
-                .isTrue();
+            .as("disable SUPPORTED")
+            .isTrue();
         assertThat(options.allowsEffort("p", "cannot-off", "none"))
-                .as("disable UNSUPPORTED")
-                .isFalse();
+            .as("disable UNSUPPORTED")
+            .isFalse();
         assertThat(options.allowsEffort("p", "unsaid-off", "none"))
-                .as("disable UNKNOWN")
-                .isFalse();
+            .as("disable UNKNOWN")
+            .isFalse();
         assertThat(options.allowsEffort("p", "no-reasoning", "none"))
-                .as("support UNSUPPORTED")
-                .isFalse();
+            .as("support UNSUPPORTED")
+            .isFalse();
         assertThat(options.allowsEffort("p", "unknown-reasoning", "none"))
-                .as("support UNKNOWN")
-                .isTrue();
+            .as("support UNKNOWN")
+            .isTrue();
         assertThat(options.allowsEffort("p", "missing", "none")).as("목록에 없는 모델").isFalse();
         assertThat(options.allowsEffort("other", "can-off", "none"))
-                .as("다른 provider")
-                .isFalse();
+            .as("다른 provider")
+            .isFalse();
         assertThat(options.allowsEffort(null, null, "none")).as("기본 모델").isTrue();
         assertThat(options.allowsEffort("p", "cannot-off", "low"))
-                .as("none 이 아닌 effort")
-                .isTrue();
+            .as("none 이 아닌 effort")
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("모델을 비운 none 은 기본 모델이 없으면 고를 수 없다")
     void rejectsNoneWithoutAnyModel() {
         ModelOptions options = new ModelOptions(
-                null,
-                null,
-                List.of(new Provider(
-                        "p",
-                        "p",
-                        List.of("can-off"),
-                        Map.of("can-off", new ReasoningCapability(SUPPORTED, SUPPORTED)))),
-                ModelChoice.REASONING_EFFORTS);
+            null,
+            null,
+            List.of(new Provider(
+                "p",
+                "p",
+                List.of("can-off"),
+                Map.of("can-off", new ReasoningCapability(SUPPORTED, SUPPORTED)))),
+            ModelChoice.REASONING_EFFORTS);
 
         assertThat(options.allowsEffort(null, null, "none")).isFalse();
         assertThat(options.allowsEffort(null, "can-off", "none"))
-                .as("provider 를 비우면 그 모델을 가진 provider")
-                .isTrue();
+            .as("provider 를 비우면 그 모델을 가진 provider")
+            .isTrue();
     }
+
 
     @Test
     @DisplayName("reasoningEfforts 는 대화가 고를 수 있는 effort 와 같다")
@@ -410,27 +506,33 @@ class ModelOptionsServiceTest {
         assertThat(service.optionsFor(dad, "dad").reasoningEfforts()).isEqualTo(ModelChoice.REASONING_EFFORTS);
     }
 
+
     /** 시각을 손으로 옮기는 시계다. */
     private static final class MutableClock extends Clock {
         private Instant now;
+
 
         MutableClock(Instant now) {
             this.now = now;
         }
 
+
         void advance(Duration duration) {
             now = now.plus(duration);
         }
+
 
         @Override
         public Instant instant() {
             return now;
         }
 
+
         @Override
         public ZoneId getZone() {
             return ZoneOffset.UTC;
         }
+
 
         @Override
         public Clock withZone(ZoneId zone) {

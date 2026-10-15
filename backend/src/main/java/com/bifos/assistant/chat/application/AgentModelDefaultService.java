@@ -25,6 +25,7 @@ public class AgentModelDefaultService {
     private final ModelOptionsService modelOptions;
     private final ModelVisibilityService visibility;
 
+
     /**
      * 관리 화면이 한 번에 읽는 값이다.
      *
@@ -37,6 +38,7 @@ public class AgentModelDefaultService {
         return new AgentModelSettings(defaultOf(agent), catalogOrNull(agent), visibility.hiddenFor(user.groupId()));
     }
 
+
     /**
      * 기본 모델과 effort 를 저장한다. 세 값을 모두 비우면 profile 의 값으로 돌아간다.
      *
@@ -46,29 +48,53 @@ public class AgentModelDefaultService {
      *
      * @param choice 요청에서 {@link ModelChoice#of} 로 검증해 만든 선택. 모델 없이 effort 만 둘 수 있다
      * @throws ApiException {@code MODEL_HIDDEN}. 그룹이 숨긴 모델일 때. {@code VALIDATION_FAILED}. 그
-     *     에이전트의 목록에 없는 모델이거나, effort 가 {@code none} 인데 그 모델의 끄기 지원이 확인되지 않을 때
+     * 에이전트의 목록에 없는 모델이거나, effort 가 {@code none} 인데 그 모델의 끄기 지원이 확인되지 않을 때
      */
     public ModelChoice save(CurrentUser user, String agentCode, ModelChoice choice) {
         Agent agent = agents.requireForAdmin(user, agentCode);
         if (!choice.usesDefaultModel()) {
             visibility.requireVisible(user.groupId(), choice);
             boolean unchanged = choice.provider().equals(agent.defaultModelProvider())
-                    && choice.model().equals(agent.defaultModel());
-            if (!unchanged
-                    && !modelOptions.optionsForAgent(user.groupId(), agent).offers(choice.provider(), choice.model())) {
+                && choice.model().equals(agent.defaultModel());
+            if (!unchanged && !offered(user, agent, choice)) {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED, "the selected model is unavailable for this agent");
             }
         }
         // none 은 숨김을 적용하지 않은 목록으로 본다. 모델을 비웠으면 그 목록의 기본 모델(profile 의 값)이다.
         if (ModelChoice.EFFORT_NONE.equals(choice.reasoningEffort())
-                && !modelOptions
-                        .unfilteredForAgent(agent)
-                        .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
+            && !modelOptions
+                .unfilteredForAgent(agent)
+                .allowsEffort(choice.provider(), choice.model(), ModelChoice.EFFORT_NONE)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "reasoning cannot be turned off for this model");
         }
         return defaultOf(agents.changeDefaultModel(
-                user, agentCode, choice.provider(), choice.model(), choice.reasoningEffort()));
+            user, agentCode, choice.provider(), choice.model(), choice.reasoningEffort()));
     }
+
+
+    /** 들고 있던 목록에 없으면 캐시를 건너뛰고 한 번 다시 읽어 본다. Hermes 의 대체 목록에는 최근 모델이 빠진다. */
+    private boolean offered(CurrentUser user, Agent agent, ModelChoice choice) {
+        if (modelOptions.optionsForAgent(user.groupId(), agent).offers(choice.provider(), choice.model())) {
+            return true;
+        }
+        log.warn(
+            "기본 모델이 들고 있던 목록에 없어 다시 읽는다 agentCode={} provider={} model={}",
+            agent.code(),
+            choice.provider(),
+            choice.model());
+        boolean offered = modelOptions
+            .refreshedOptionsForAgent(user.groupId(), agent)
+            .offers(choice.provider(), choice.model());
+        if (!offered) {
+            log.warn(
+                "다시 읽어도 기본 모델이 목록에 없어 저장을 거절한다 agentCode={} provider={} model={}",
+                agent.code(),
+                choice.provider(),
+                choice.model());
+        }
+        return offered;
+    }
+
 
     private ModelOptions catalogOrNull(Agent agent) {
         try {
@@ -78,6 +104,7 @@ public class AgentModelDefaultService {
             return null;
         }
     }
+
 
     private static ModelChoice defaultOf(Agent agent) {
         return ModelChoice.stored(agent.defaultModelProvider(), agent.defaultModel(), agent.defaultReasoningEffort());
