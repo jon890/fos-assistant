@@ -64,7 +64,8 @@ class ConnectorActionSignals {
                 NotificationKind.APPROVAL_REQUESTED,
                 APPROVAL_REQUESTED_TITLE,
                 "「" + toolTitle + "」",
-                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
+                new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId),
+                action.publicId()));
     }
 
 
@@ -90,6 +91,15 @@ class ConnectorActionSignals {
                 APPROVAL_EXPIRED_TITLE,
                 "「" + toolTitle + "」",
                 new NotificationTarget(NotificationTargetType.CONVERSATION, conversationId)));
+    }
+
+
+    /**
+     * 끝난 승인 줄의 「승인을 기다리는 요청」 알림을 읽음으로 표시한다. 그 줄이 만든 알림만 바꾸므로 같은 대화의 다른 줄이나
+     * 그 뒤에 생긴 줄의 알림은 건드리지 않는다. 대화가 지워졌어도 바꾼다. 트랜잭션 안에서 부른다.
+     */
+    void resolveRequested(ConnectorAction action) {
+        notifications.resolve(action.userId(), NotificationKind.APPROVAL_REQUESTED, action.publicId());
     }
 
 

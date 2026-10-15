@@ -155,7 +155,8 @@ class ConnectorFinancialProducer {
                 String title = ConnectorActionView.titleOf(ConnectorToolPolicies.find(manifest, toolName));
                 conversations.publicIdOf(action.conversationId()).ifPresent(id -> notifications.notify(action.userId(),
                     NotificationKind.APPROVAL_REQUESTED, ConnectorActionSignals.APPROVAL_REQUESTED_TITLE,
-                    "「" + title + "」", new NotificationTarget(NotificationTargetType.CONVERSATION, id)));
+                    "「" + title + "」", new NotificationTarget(NotificationTargetType.CONVERSATION, id),
+                    action.publicId()));
             }
             new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
             feedback.record(FeedbackEntry.of(action.userId(), FeedbackSubjectType.CONNECTOR_ACTION, action.publicId(),
