@@ -142,7 +142,8 @@ docker `terminal:` 을 쓰는 같은 설정 쓰기에서 `approvals.unattended_m
 
 **기존 Hermes 예약 작업은 Control Plane 예약 작업으로 이관을 마쳤다.**
 예약 작업과 매일 깨우기는 각각의 에이전트 profile을 쓴다.
-`cronjob` 도구 차단은 유지하며, Hermes가 읽지 않는 `agent.scheduled_tasks.enabled`는 profile 틀에서 제거했다.
+`cronjob` 도구 차단은 유지하며, 쓰이지 않는 예약 설정 키는 profile 틀에서 제거했다.
+키를 제거한 소스 근거는 [Hermes 예약 작업](docs/hermes-contract.md#hermes-예약-작업)이 갖는다.
 적용과 확인, profile 별 실제 값은 `fos-home-infra` 가 갖는다.
 
 ## 검사
