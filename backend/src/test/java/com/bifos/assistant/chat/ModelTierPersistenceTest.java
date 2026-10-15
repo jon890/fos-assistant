@@ -76,8 +76,8 @@ class ModelTierPersistenceTest {
     }
 
     @Test
-    @DisplayName("관리자가 비어 있는 세 단계를 저장하면 배포 mapping보다 profile 기본값을 계속 쓴다")
-    void storedFallbackMappingOverridesConfiguredInitialMapping() {
+    @DisplayName("관리자가 비어 있는 세 단계를 저장하면 profile 기본값으로 해석한다")
+    void storedEmptyDefinitionsUseProfileDefaults() {
         CurrentUser admin = new CurrentUser(1L, "admin@example.com", "관리자", GROUP_ID, UserRole.ADMIN);
         List<ModelTierOptions.Tier> fallback = List.of(
                 new ModelTierOptions.Tier(ModelTier.FAST, "빠르게", null, null, null),

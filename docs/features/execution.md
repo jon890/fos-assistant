@@ -278,7 +278,7 @@ SSE 와 실행 기록은 같은 가린 값을 쓰며, 대화의 작업 과정도
 | turn 자리 | 보내기, 다시 생성, 결과 다시 전달, 스킬 커맨드, 대기 메시지 turn, 위임 결과와 커넥터 결과의 자동 turn, 흐름의 Chief, 먼저 살펴보기, 행동 정책의 자동 실행 |
 | turn 자리, 한도를 보지 않는다 | 기동 정리(`RestartReconciler`)가 다시 잡은 대화 turn 과 흐름 turn |
 | 실행 줄 | 흐름의 Researcher, Engineer, Synthesizer, `agent_delegate` 로 맡긴 자식 |
-| 실행 줄, 백그라운드 | Memory 제안, 추천 질문, 문제 후보의 가치 평가와 replay |
+| 실행 줄, 백그라운드 | 추천 질문, 문제 후보의 가치 평가와 replay |
 
 Hermes 를 부르지만 실행을 시작하지 않는 것은 세지 않는다. 커넥터 도구 호출, 실행 조회, 중지, 사용량 재조회가 그렇다.
 Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, Hermes cron, 대시보드나 CLI 에서 직접 연 실행)은 세지 못한다.
@@ -322,7 +322,7 @@ Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, 
 | 실행 줄 | 통과 조건 |
 | --- | --- |
 | 흐름 단계, 위임 자식 | 쥔 자리가 `max-running` 보다 작다 |
-| 추천 질문, Memory 제안 | 줄을 만든 뒤에도 `background-reserve` 만큼 자리가 남는다 |
+| 추천 질문 | 줄을 만든 뒤에도 `background-reserve` 만큼 자리가 남는다 |
 | 매일 깨우기와 그 위임 자식 | 자리를 얻은 뒤에도 `max(1, background-reserve)` 만큼 자리가 남는다 |
 
 매일 깨우기는 사용자 대화 한 자리를 반드시 남기므로 `max-running = 1` 일 때 자리를 얻지 못한다.
@@ -382,7 +382,6 @@ Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, 
 | 흐름 단계 | 그 단계의 실행 줄을 만들지 않는다. 루트 줄을 `USER_BUSY` 로 실패로 적고 turn 은 `USER_BUSY` 로 끝난다 | 같은 안내가 보인다 |
 | `agent_delegate` | 실행 줄을 만들지 않고 `BUSY` 도구 결과를 돌려준다 | 모델이 직접 하거나, 앞의 작업이 끝난 뒤 다시 맡기거나, 실패를 알린다 |
 | 추천 질문 | 실행 줄을 만들지 않는다. 실패 시각도 적지 않아 다음 읽기에서 다시 시도한다 | 추천이 이번에는 바뀌지 않는다 |
-| Memory 제안 | 실행 줄을 만들지 않는다 | 제안이 생기지 않는다 |
 
 **한도로 미룬 자동 turn 은 전달 실패가 아니다.** 미룬 자동 turn 은 대화 잠금을 잡기 전에 거절돼 알림 줄도 전달 묶음도 남기지 않는다. 결과는 전하지 않은 채 남아 위의 재시도가 전한다.
 전달 묶음의 `FAILED` 는 잠금을 잡고 알림 줄을 저장한 뒤의 실패다. 그 묶음은 자동으로 다시 시도하지 않고 사용자가 다시 전달한다([`docs/features/agent-skill.md`](agent-skill.md) 의 「결과 전달이 끝나지 않았을 때」).
@@ -399,7 +398,6 @@ Control Plane 이 제출하지 않는 실행(Hermes native 하위 에이전트, 
 
 `max-running` 이 1 이고 `background-reserve` 가 0 이면 백그라운드 실행이 사용자 turn 과 같은 자리를 다툰다.
 `background-reserve` 를 `max-running` 보다 1 작게 두면 백그라운드 실행은 그 사용자가 쥔 자리가 없을 때만 돈다.
-Memory 제안은 turn 자리를 쥔 채 돌므로 그때는 돌지 않는다.
 
 기본값은 아래를 근거로 정했다.
 

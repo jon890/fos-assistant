@@ -11,7 +11,6 @@ import com.bifos.assistant.chat.infra.ArtifactSourceProperties;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
 import com.bifos.assistant.context.ContextProperties;
 import com.bifos.assistant.hermes.HermesProperties;
-import com.bifos.assistant.memory.application.MemoryProposalProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
 import com.bifos.assistant.shared.auth.AuthProperties;
 import com.bifos.assistant.skill.infra.SkillProperties;
@@ -38,7 +37,6 @@ class ValidatedPropertiesBindingTest {
         DelegationWakeProperties.class,
         ContextProperties.class,
         HermesProperties.class,
-        MemoryProposalProperties.class,
         DelegationProperties.class,
         PeopleProperties.class,
         AuthProperties.class,
@@ -50,7 +48,7 @@ class ValidatedPropertiesBindingTest {
 
 
     @Test
-    @DisplayName("설정 record 열넷은 빈으로 꺼낼 수 있고 프록시가 아닌 record 타입 그대로다")
+    @DisplayName("설정 record 열셋은 빈으로 꺼낼 수 있고 프록시가 아닌 record 타입 그대로다")
     void beansAreBoundWithoutProxy() {
         for (Class<?> type : PROPERTIES_TYPES) {
             assertThat(context.getBeansOfType(type)).hasSize(1);
@@ -61,7 +59,7 @@ class ValidatedPropertiesBindingTest {
 
 
     @Test
-    @DisplayName("설정 record 열넷은 모두 Validated 를 단다")
+    @DisplayName("설정 record 열셋은 모두 Validated 를 단다")
     void everyPropertiesTypeIsValidated() {
         List<String> missing = PROPERTIES_TYPES.stream()
             .filter(type -> !AnnotatedElementUtils.hasAnnotation(type, Validated.class))

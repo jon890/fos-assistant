@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.browser.infra.BrowserProperties;
 import com.bifos.assistant.chat.application.DelegationWakeProperties;
-import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.connector.application.ConnectorPolicyProperties;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.orchestration.application.DelegationProperties;
@@ -46,9 +45,6 @@ class OverridePropertiesTest {
 
     @Autowired
     LiveProperties<BrowserProperties> browser;
-
-    @Autowired
-    LiveProperties<ModelTierProperties> modelTier;
 
     @Test
     @DisplayName("검사 클래스에 단 값이 LiveProperties 의 현재 값이 된다")
@@ -109,26 +105,6 @@ class OverridePropertiesTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("LiveProperties 로 읽지 않는 설정이다: assistant.browser.sweep-interval");
         assertThat(browser.current()).isSameAs(before);
-    }
-
-    @Test
-    @DisplayName("중첩 record 의 칸은 그 아래 칸까지 받고 없는 하위 칸은 실패한다")
-    void followsNestedRecordFields() {
-        ModelTierProperties before = modelTier.current();
-
-        assertThatThrownBy(() ->
-                        IntegrationTestIsolation.apply(context, List.of("assistant.model-tiers.fast.no-such-field=1")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("assistant.model-tiers.fast.no-such-field");
-        assertThat(modelTier.current()).isSameAs(before);
-
-        IntegrationTestIsolation.apply(
-                context,
-                List.of(
-                        "assistant.model-tiers.fast.model=test-model",
-                        "assistant.model-tiers.fast.reasoning-effort=low"));
-
-        assertThat(modelTier.current().fast().model()).isEqualTo("test-model");
     }
 
     @Test

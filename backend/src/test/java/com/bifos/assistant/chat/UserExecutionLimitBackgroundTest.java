@@ -22,19 +22,15 @@ import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
-import com.bifos.assistant.memory.application.MemoryProposer;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.model.domain.ModelChoice;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.config.LiveProperties;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import com.bifos.assistant.testsupport.MemoryProposeEnabled;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
-import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -55,14 +51,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * 추천 질문과 Memory 제안이 사용자 실행 한도에 닿으면 실행 줄 없이 건너뛰는지 본다(ADR-069).
+ * 추천 질문이 사용자 실행 한도에 닿으면 실행 줄 없이 건너뛰는지 본다(ADR-069).
  *
  * <p>한도 2 에 예비 자리 1 이다. turn 자리 하나를 쥔 사용자의 백그라운드 실행은 줄을 만든 뒤 남는 자리가 0 이라 돌지
  * 않는다. 추천 서비스는 {@code StarterSuggestionServiceTest} 처럼 시각과 실행기를 바꿔 끼워 직접 만든다.
  */
 @BackendIntegrationTest
 @SmallExecutionLimit
-@MemoryProposeEnabled
 @OverrideProperties({
     "assistant.user-execution.background-reserve=1",
     "assistant.starters.enabled=true",
@@ -86,9 +81,6 @@ class UserExecutionLimitBackgroundTest {
 
     @Autowired
     ExecutionRecorder recorder;
-
-    @Autowired
-    MemoryProposer proposer;
 
     @Autowired
     UserExecutionLimiter limiter;
@@ -199,31 +191,6 @@ class UserExecutionLimitBackgroundTest {
         assertThat(ready.status()).isEqualTo(StarterStatus.READY);
         assertThat(ready.prompts()).containsExactly("일정 정리해 줘", "장보기 목록 만들어 줘");
         assertThat(stub().received()).as("자리가 빈 뒤의 Hermes 제출").hasSize(1);
-    }
-
-    @Test
-    @DisplayName("turn 자리 하나를 쥔 사용자의 Memory 제안은 실행 줄을 만들지 않고 Hermes 에 제출하지 않는다")
-    void skipsMemoryProposalWithoutRowWhileTurnHeld() {
-        AgentExecution parent = recorder.start(dad, conversation.executionConversation(), agent, null, null, 0L);
-        stub().willReturn(HermesRunResult.of(
-                "proposal",
-                "new",
-                "completed",
-                "{\"title\":\"선호\",\"content\":\"국수는 맵지 않게 먹는다\"}",
-                "model",
-                "provider",
-                TokenUsage.empty()));
-
-        proposer.proposeFrom(
-                dad, conversation.executionConversation(), agent, parent, "국수 이야기", ModelChoice.defaults());
-
-        assertThat(executions.findAll())
-                .as("dad 의 실행 줄")
-                .extracting(AgentExecution::id)
-                .containsExactly(parent.id());
-        assertThat(stub().received()).as("Hermes 제출").isEmpty();
-        assertThat(memories.findAll()).as("제안").isEmpty();
-        assertThat(limiter.used(dad.id())).as("쥔 turn 자리").isEqualTo(1);
     }
 
     /** 받은 만들기를 가상 스레드에서 돌리고 끝나기를 기다릴 수 있게 모은다. */

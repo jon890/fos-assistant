@@ -77,8 +77,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @BackendIntegrationTest
 @LongProactiveCheckTimeouts
 @OverrideProperties({
-    "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS,
-    "assistant.memory.propose.enabled=false"
+    "assistant.proactive-check.max-tool-calls=" + ProactiveCheckLimitTest.MAX_TOOL_CALLS
 })
 class ProactiveCheckLimitTest {
 
