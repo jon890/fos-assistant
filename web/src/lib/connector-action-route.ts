@@ -157,6 +157,10 @@ function safeAction(value: unknown): ConnectorAction {
   };
 }
 
+/**
+ * 계좌 순번은 토스가 int64 로 주는 값이라 앞자리 0 이 없다. Control Plane 의 허용 목록은 적은 글자 그대로 견주려고
+ * 앞자리 0 도 받지만, 그런 순번이 카드에 오면 토스가 준 값이 아니므로 그 줄을 승인할 수 없게 낮춘다.
+ */
 const ACCOUNT_SEQ_PATTERN = /^[1-9][0-9]{0,18}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const DECIMAL_PATTERN = /^[0-9]+(\.[0-9]+)?$/;
