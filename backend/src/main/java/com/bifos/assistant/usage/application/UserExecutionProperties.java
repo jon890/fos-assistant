@@ -25,12 +25,12 @@ public record UserExecutionProperties(int maxRunning, int backgroundReserve, Dur
         }
         if (backgroundReserve < 0 || backgroundReserve >= maxRunning) {
             throw new IllegalStateException(
-                    "assistant.user-execution.background-reserve must be at least 0 and less than max-running: "
-                            + backgroundReserve);
+                "assistant.user-execution.background-reserve must be at least 0 and less than max-running: "
+                    + backgroundReserve);
         }
         if (remoteEndMaxWait != null && (remoteEndMaxWait.isZero() || remoteEndMaxWait.isNegative())) {
             throw new IllegalStateException(
-                    "assistant.user-execution.remote-end-max-wait must be positive: " + remoteEndMaxWait);
+                "assistant.user-execution.remote-end-max-wait must be positive: " + remoteEndMaxWait);
         }
     }
 }

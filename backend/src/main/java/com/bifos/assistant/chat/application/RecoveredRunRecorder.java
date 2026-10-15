@@ -80,6 +80,7 @@ public class RecoveredRunRecorder {
 
     private final Clock clock;
 
+
     /**
      * 끝난 결과를 적는다. 이미 끝난 줄이면 거짓이다.
      *
@@ -91,16 +92,18 @@ public class RecoveredRunRecorder {
      */
     public boolean settle(Long executionId, HermesRunResult result) {
         return finishOnce(
-                executionId,
-                row -> agents.findById(row.agentId())
-                        .map(agent -> settleLocked(row, agent, result))
-                        .orElseGet(() -> failLocked(row, ORPHANED)));
+            executionId,
+            row -> agents.findById(row.agentId())
+                .map(agent -> settleLocked(row, agent, result))
+                .orElseGet(() -> failLocked(row, ORPHANED)));
     }
+
 
     /** Hermes 의 결과 없이 FAILED 로 적는다. 이미 끝난 줄이면 거짓이다. 끝 사건의 detail 은 그 오류 코드다. */
     public boolean failWithout(Long executionId, String errorCode) {
         return finishOnce(executionId, row -> failLocked(row, errorCode));
     }
+
 
     /**
      * 남은 실행의 종류를 정한다.
@@ -121,14 +124,15 @@ public class RecoveredRunRecorder {
         return RecoveredRunKind.AUXILIARY;
     }
 
+
     private boolean rootHasFlow(AgentExecution row) {
         Long rootId = row.treeRootId();
-        Optional<AgentExecution> root =
-                Objects.equals(rootId, row.id()) ? Optional.of(row) : executionRepository.findById(rootId);
+        Optional<AgentExecution> root = Objects.equals(rootId, row.id()) ? Optional.of(row) : executionRepository.findById(rootId);
         return root.flatMap(it -> agents.findById(it.agentId()))
-                .map(agent -> flows.find(agent.flow()) != null)
-                .orElse(false);
+            .map(agent -> flows.find(agent.flow()) != null)
+            .orElse(false);
     }
+
 
     /**
      * 실행 줄을 잠그고 {@code RUNNING} 일 때만 적은 뒤, 트랜잭션이 끝나고 나서 끝 사건과 알림을 낸다.
@@ -138,16 +142,16 @@ public class RecoveredRunRecorder {
     private boolean finishOnce(Long executionId, Function<AgentExecution, Written> write) {
         Written written = transactions.execute(status -> {
             Written locked = executionRepository
-                    .lockById(executionId)
-                    .filter(row -> row.status() == ExecutionStatus.RUNNING)
-                    .map(row -> {
-                        if (row.eventObservation() == EventObservation.OBSERVING) {
-                            row.finishEventObservation(false);
-                        }
-                        return row;
-                    })
-                    .map(write)
-                    .orElse(null);
+                .lockById(executionId)
+                .filter(row -> row.status() == ExecutionStatus.RUNNING)
+                .map(row -> {
+                    if (row.eventObservation() == EventObservation.OBSERVING) {
+                        row.finishEventObservation(false);
+                    }
+                    return row;
+                })
+                .map(write)
+                .orElse(null);
             if (locked != null) {
                 resultDeliveries.finishByExecution(locked.row());
             }
@@ -161,13 +165,14 @@ public class RecoveredRunRecorder {
         if (written.messageId() != null) {
             // 실행 줄은 대화 폴더를 만든 뒤에 생긴다. 그 시작 시각 뒤에 바뀐 HTML 은 모두 이 turn 의 것이다.
             artifacts.recordTurn(
-                    written.row().conversationId(),
-                    written.messageId(),
-                    written.row().startedAt());
+                written.row().conversationId(),
+                written.messageId(),
+                written.row().startedAt());
         }
         announce(written);
         return true;
     }
+
 
     private Written settleLocked(AgentExecution row, Agent agent, HermesRunResult result) {
         RecoveredRunKind kind = kindOf(row);
@@ -184,7 +189,7 @@ public class RecoveredRunRecorder {
             if (isFlowRoot(row, kind)) {
                 AgentExecution saved = executions.fail(row, agent, result, requested, ORPHANED);
                 return new Written(
-                        saved, kind, ExecutionEventType.RUN_FAILED, ORPHANED, null, flowRootNotice(saved, kind, false));
+                    saved, kind, ExecutionEventType.RUN_FAILED, ORPHANED, null, flowRootNotice(saved, kind, false));
             }
             AgentExecution saved = executions.complete(row, agent, result, requested);
             return new Written(saved, kind, ExecutionEventType.RUN_COMPLETED, null, null, null);
@@ -192,16 +197,18 @@ public class RecoveredRunRecorder {
         if (isCancelled(result)) {
             AgentExecution saved = executions.cancel(row, agent, result, requested);
             return new Written(
-                    saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, flowRootNotice(saved, kind, true));
+                saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, flowRootNotice(saved, kind, true));
         }
         String code = errorCodeOf(result);
         AgentExecution saved = executions.fail(row, agent, result, requested, code);
         return new Written(saved, kind, ExecutionEventType.RUN_FAILED, code, null, flowRootNotice(saved, kind, false));
     }
 
+
     private static boolean isFlowRoot(AgentExecution row, RecoveredRunKind kind) {
         return kind == RecoveredRunKind.FLOW && row.parentExecutionId() == null;
     }
+
 
     /**
      * 흐름 turn 의 루트 줄이 끝났을 때 그 대화의 화면에 낼 사건이다. 루트 줄이 아니거나 대화가 없으면 null 이다.
@@ -219,29 +226,30 @@ public class RecoveredRunRecorder {
         return cancelled ? ChatEvent.stopped(conversation.publicId(), null, row.id()) : failureNotice(false);
     }
 
+
     private Written settleChatTurn(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
         Conversation conversation = liveConversation(row);
         if (result.succeeded()) {
             AgentExecution saved = executions.complete(row, agent, result, requested);
             if (conversation == null) {
                 return new Written(
-                        saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_COMPLETED, null, null, null);
+                    saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_COMPLETED, null, null, null);
             }
             Long messageId = saveAnswer(saved, result.output() == null ? "" : result.output());
             conversationWriter.touchSession(conversation.id(), blankToNull(result.sessionId()), clock.instant());
             return new Written(
-                    saved,
-                    RecoveredRunKind.CHAT_TURN,
-                    ExecutionEventType.RUN_COMPLETED,
-                    null,
-                    messageId,
-                    ChatEvent.done(conversation.publicId(), messageId, saved.id()));
+                saved,
+                RecoveredRunKind.CHAT_TURN,
+                ExecutionEventType.RUN_COMPLETED,
+                null,
+                messageId,
+                ChatEvent.done(conversation.publicId(), messageId, saved.id()));
         }
         if (isCancelled(result)) {
             AgentExecution saved = executions.cancel(row, agent, result, requested);
             if (conversation == null) {
                 return new Written(
-                        saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_CANCELLED, null, null, null);
+                    saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_CANCELLED, null, null, null);
             }
             Long messageId = saveAnswer(saved, result.output());
             String sessionId = blankToNull(result.sessionId());
@@ -249,12 +257,12 @@ public class RecoveredRunRecorder {
                 conversationWriter.touchSession(conversation.id(), sessionId, clock.instant());
             }
             return new Written(
-                    saved,
-                    RecoveredRunKind.CHAT_TURN,
-                    ExecutionEventType.RUN_CANCELLED,
-                    null,
-                    messageId,
-                    ChatEvent.stopped(conversation.publicId(), messageId, saved.id()));
+                saved,
+                RecoveredRunKind.CHAT_TURN,
+                ExecutionEventType.RUN_CANCELLED,
+                null,
+                messageId,
+                ChatEvent.stopped(conversation.publicId(), messageId, saved.id()));
         }
         String code = errorCodeOf(result);
         AgentExecution saved = executions.fail(row, agent, result, requested, code);
@@ -262,15 +270,14 @@ public class RecoveredRunRecorder {
         return new Written(saved, RecoveredRunKind.CHAT_TURN, ExecutionEventType.RUN_FAILED, code, null, notice);
     }
 
+
     private Written settleDelegation(AgentExecution row, Agent agent, HermesRunResult result, ModelChoice requested) {
         if (result.succeeded()) {
-            AgentExecution saved =
-                    executions.complete(row, agent, result, requested, delegationOutput.clip(result.output()));
+            AgentExecution saved = executions.complete(row, agent, result, requested, delegationOutput.clip(result.output()));
             return new Written(saved, RecoveredRunKind.DELEGATION, ExecutionEventType.RUN_COMPLETED, null, null, null);
         }
         if (isCancelled(result)) {
-            AgentExecution saved =
-                    executions.cancel(row, agent, result, requested, delegationOutput.partial(result.output()));
+            AgentExecution saved = executions.cancel(row, agent, result, requested, delegationOutput.partial(result.output()));
             return new Written(saved, RecoveredRunKind.DELEGATION, ExecutionEventType.RUN_CANCELLED, null, null, null);
         }
         String code = errorCodeOf(result);
@@ -278,14 +285,16 @@ public class RecoveredRunRecorder {
         return new Written(saved, RecoveredRunKind.DELEGATION, ExecutionEventType.RUN_FAILED, code, null, null);
     }
 
+
     /** Hermes 의 결과 없이 실패로 적는다. 사용량을 적지 않는다. */
     private Written failLocked(AgentExecution row, String errorCode) {
         RecoveredRunKind kind = kindOf(row);
         boolean turnRoot = kind == RecoveredRunKind.CHAT_TURN || isFlowRoot(row, kind);
         ChatEvent notice = turnRoot && liveConversation(row) != null ? failureNotice(false) : null;
         return new Written(
-                executions.fail(row, errorCode), kind, ExecutionEventType.RUN_FAILED, errorCode, null, notice);
+            executions.fail(row, errorCode), kind, ExecutionEventType.RUN_FAILED, errorCode, null, notice);
     }
+
 
     /** 그 실행의 대화다. 대화가 없거나 지워졌으면 null 이고, 그때는 실행 줄만 적는다. */
     private Conversation liveConversation(AgentExecution row) {
@@ -293,10 +302,11 @@ public class RecoveredRunRecorder {
             return null;
         }
         return conversations
-                .findById(row.conversationId())
-                .filter(conversation -> conversation.deletedAt() == null)
-                .orElse(null);
+            .findById(row.conversationId())
+            .filter(conversation -> conversation.deletedAt() == null)
+            .orElse(null);
     }
+
 
     /**
      * 답을 대화에 남기고 그 메시지 번호를 돌려준다. 그 실행의 메시지가 이미 있으면 남기지 않고 null 이다.
@@ -321,15 +331,15 @@ public class RecoveredRunRecorder {
         Long conversationId = row.conversationId();
         Instant now = clock.instant();
         Optional<String> notice = answerGuards.stream()
-                .map(guard -> guard.noticeInsteadOfAnswer(row.id(), row.status()))
-                .flatMap(Optional::stream)
-                .findFirst();
+            .map(guard -> guard.noticeInsteadOfAnswer(row.id(), row.status()))
+            .flatMap(Optional::stream)
+            .findFirst();
         if (notice.isPresent() && notice.get().isEmpty()) {
             return null;
         }
         if (notice.isPresent()) {
             return messages.save(ChatMessage.fromSystem(conversationId, notice.get(), now))
-                    .id();
+                .id();
         }
         if (row.status() == ExecutionStatus.CANCELLED && (answer == null || answer.isBlank())) {
             return null;
@@ -337,22 +347,24 @@ public class RecoveredRunRecorder {
         List<ChatMessage> active = activeMessages(conversationId);
         ChatMessage last = active.isEmpty() ? null : active.getLast();
         ChatMessage message = last != null && last.role() == MessageRole.ASSISTANT
-                ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id(), now)
-                : ChatMessage.fromAssistant(conversationId, answer, row.id(), now);
+            ? ChatMessage.regeneratedAnswer(conversationId, answer, row.id(), last.id(), now)
+            : ChatMessage.fromAssistant(conversationId, answer, row.id(), now);
         return messages.save(message).id();
     }
+
 
     /** 다른 메시지가 대신하지 않은 메시지들이다. {@code ChatService} 가 다시 생성할 답을 고르는 기준과 같다. */
     private List<ChatMessage> activeMessages(Long conversationId) {
         List<ChatMessage> history = messages.findByConversationIdOrderByIdAsc(conversationId);
         Set<Long> replaced = history.stream()
-                .map(ChatMessage::replacesMessageId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+            .map(ChatMessage::replacesMessageId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
         return history.stream()
-                .filter(message -> !replaced.contains(message.id()))
-                .toList();
+            .filter(message -> !replaced.contains(message.id()))
+            .toList();
     }
+
 
     /**
      * 끝 사건을 그 실행의 마지막 순번 다음에 남긴다.
@@ -373,6 +385,7 @@ public class RecoveredRunRecorder {
         }
     }
 
+
     /** 화면과 부모 대화에 끝났음을 알린다. 알리지 못해도 실행 줄은 이미 적혔으므로 로그만 남긴다. */
     private void announce(Written written) {
         AgentExecution row = written.row();
@@ -388,16 +401,19 @@ public class RecoveredRunRecorder {
         }
     }
 
+
     /** 보통 turn 이 실패했을 때 화면에 내는 오류와 같은 코드와 글이다. */
     private static ChatEvent failureNotice(boolean providerBlocked) {
         return providerBlocked
-                ? ChatEvent.error(ErrorCode.PROVIDER_BLOCKED.name(), "every account of the chosen provider is blocked")
-                : ChatEvent.error(ErrorCode.HERMES_RUN_FAILED.name(), "the agent run did not complete");
+            ? ChatEvent.error(ErrorCode.PROVIDER_BLOCKED.name(), "every account of the chosen provider is blocked")
+            : ChatEvent.error(ErrorCode.HERMES_RUN_FAILED.name(), "the agent run did not complete");
     }
+
 
     private static boolean isCancelled(HermesRunResult result) {
         return "cancelled".equalsIgnoreCase(result.status());
     }
+
 
     /** 보통 turn 이 실패한 실행 줄에 적는 것과 같은 오류 코드다. */
     private static String errorCodeOf(HermesRunResult result) {
@@ -407,9 +423,11 @@ public class RecoveredRunRecorder {
         return result.status() == null ? "UNKNOWN" : result.status().toUpperCase();
     }
 
+
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
+
 
     /**
      * 트랜잭션에서 적은 것과 그 뒤에 할 일이다.
@@ -421,10 +439,11 @@ public class RecoveredRunRecorder {
      * @param notice 대화 단위 SSE 로 낼 사건. 내지 않으면 null
      */
     private record Written(
-            AgentExecution row,
-            RecoveredRunKind kind,
-            ExecutionEventType endEvent,
-            String detail,
-            Long messageId,
-            ChatEvent notice) {}
+        AgentExecution row,
+        RecoveredRunKind kind,
+        ExecutionEventType endEvent,
+        String detail,
+        Long messageId,
+        ChatEvent notice) {
+    }
 }

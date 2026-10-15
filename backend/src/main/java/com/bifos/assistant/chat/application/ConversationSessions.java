@@ -25,6 +25,7 @@ public class ConversationSessions {
     private final ConversationRepository conversations;
     private final ConversationWriter conversationWriter;
 
+
     /**
      * 이 turn 에 보낼 session 을 돌려준다. 대화에 없으면 새로 정해 저장한다.
      *
@@ -42,11 +43,12 @@ public class ConversationSessions {
             return sessionOf(conversation);
         }
         Conversation stored = conversations
-                .findById(conversation.id())
-                .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "conversation not found"));
+            .findById(conversation.id())
+            .orElseThrow(() -> new ApiException(ErrorCode.CONVERSATION_NOT_FOUND, "conversation not found"));
         conversation.adoptSessions(stored.hermesSessionId(), stored.hermesRootSessionId());
         return sessionOf(conversation);
     }
+
 
     /**
      * 새 session 을 정해 보낼 session 과 루트 session 을 함께 바꾸고 돌려준다. 그 뒤의 turn 도 새 session 으로 이어진다.
@@ -59,6 +61,7 @@ public class ConversationSessions {
         conversation.assignNewSession(created);
         return sessionOf(conversation);
     }
+
 
     private static RunSession sessionOf(Conversation conversation) {
         return RunSession.ofConversation(conversation.hermesSessionId(), conversation.hermesRootSessionId());
