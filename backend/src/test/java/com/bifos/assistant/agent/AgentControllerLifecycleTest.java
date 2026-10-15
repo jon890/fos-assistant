@@ -16,7 +16,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -52,10 +51,8 @@ class AgentControllerLifecycleTest {
     private final AgentRepository agents = mock(AgentRepository.class);
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
-    private final KnownFlows flows = mock(KnownFlows.class);
-
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(
-        new AgentController(new AgentService(agents), currentUser, lifecycle, flows))
+        new AgentController(new AgentService(agents), currentUser, lifecycle))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
 
@@ -190,23 +187,6 @@ class AgentControllerLifecycleTest {
 
 
     @Test
-    @DisplayName("목록은 등록된 흐름의 예약 작업을 막고 흐름 이름은 내보내지 않는다")
-    void reportsTaskSupportWithoutExposingFlow() throws Exception {
-        Agent flowed = agent("a-flowed", AgentVisibility.PRIVATE, KID.id());
-        flowed.assignFlow("test-flow");
-        Agent plain = agent("a-plain", AgentVisibility.PRIVATE, KID.id());
-        when(flows.known("test-flow")).thenReturn(true);
-        when(agents.findByEnabledTrueOrderByCodeAsc()).thenReturn(List.of(flowed, plain));
-
-        mvc.perform(get("/api/v1/agents"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].runsTasks").value(false))
-            .andExpect(jsonPath("$[0].flow").doesNotExist())
-            .andExpect(jsonPath("$[1].runsTasks").value(true))
-            .andExpect(jsonPath("$[1].flow").doesNotExist());
-    }
-
-
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
         return Agent.of(
             code,

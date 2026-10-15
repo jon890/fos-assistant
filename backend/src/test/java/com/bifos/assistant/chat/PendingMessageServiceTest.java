@@ -31,7 +31,6 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -489,19 +488,6 @@ class PendingMessageServiceTest {
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
     }
 
-
-    @Test
-    @DisplayName("흐름이 붙은 에이전트의 대화는 대기 메시지를 받지 않는다")
-    void rejectsQueueingOnFlowAgentConversation() {
-        Agent flowAgent = agent("flowed", "흐름", dad.id());
-        flowAgent.assignFlow(ResearchAndBuildFlow.NAME);
-        Conversation flowed = conversations.save(
-            Conversation.startedBy(dad.id(), "흐름 대화", agents.save(flowAgent).id(), Instant.now()));
-
-        assertThatCode(() -> pending.enqueue(dad, flowed.id(), "글"), ErrorCode.CONVERSATION_BUSY);
-
-        assertThat(rowsOf(flowed)).isEmpty();
-    }
 
 
     @Test

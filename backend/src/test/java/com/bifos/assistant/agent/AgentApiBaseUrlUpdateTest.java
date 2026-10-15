@@ -22,7 +22,6 @@ import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.config.AgentProperties;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.config.PeopleProperties;
 import com.bifos.assistant.agent.application.ProfileProvisioning;
 import com.bifos.assistant.agent.application.ProfileSkillFiles;
@@ -58,7 +57,6 @@ class AgentApiBaseUrlUpdateTest {
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final HermesToolsetClient hermesToolsets = mock(HermesToolsetClient.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
-    private final KnownFlows flows = mock(KnownFlows.class);
 
     /** 그룹 공개 검사는 실제 서비스가 한다. 도구 목록을 읽는 대역만 이 테스트가 정한다. */
     private final AgentLifecycleService lifecycle = new AgentLifecycleService(
@@ -83,7 +81,6 @@ class AgentApiBaseUrlUpdateTest {
             users,
             lifecycle,
             endpointProbe,
-            flows,
             mock(AgentConnectorBindings.class),
             Clock.systemUTC()),
         currentUser);
@@ -237,7 +234,6 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
             null)))
                 .isInstanceOf(ApiException.class)
                 .extracting(ex -> ((ApiException)ex).code())
@@ -370,8 +366,7 @@ class AgentApiBaseUrlUpdateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            code + "@example.com",
-            null);
+            code + "@example.com");
     }
 
 

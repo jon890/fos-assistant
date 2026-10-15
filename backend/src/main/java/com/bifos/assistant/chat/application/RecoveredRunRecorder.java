@@ -66,7 +66,6 @@ public class RecoveredRunRecorder {
     private final ExecutionEventRecorder eventRecorder;
     private final ExecutionEventRepository executionEvents;
     private final AgentService agents;
-    private final FlowRegistry flows;
     private final ConversationRepository conversations;
     private final ConversationWriter conversationWriter;
     private final ChatMessageRepository messages;
@@ -108,29 +107,16 @@ public class RecoveredRunRecorder {
     /**
      * 남은 실행의 종류를 정한다.
      *
-     * <p>위임 실행을 먼저 본다. 흐름 turn 아래에서 맡긴 위임도 위임 실행으로 적어야 부모 대화에 결과가 전해진다.
-     * 루트 줄이나 그 에이전트를 읽지 못하면 흐름인지 알 수 없으므로 흐름 판정을 건너뛴다.
+     * <p>위임 실행은 부모 대화에 결과를 전하므로 먼저 구분한다.
      */
     public RecoveredRunKind kindOf(AgentExecution row) {
         if (row.delegationKey() != null) {
             return RecoveredRunKind.DELEGATION;
         }
-        if (rootHasFlow(row)) {
-            return RecoveredRunKind.FLOW;
-        }
         if (row.parentExecutionId() == null && row.conversationId() != null) {
             return RecoveredRunKind.CHAT_TURN;
         }
         return RecoveredRunKind.AUXILIARY;
-    }
-
-
-    private boolean rootHasFlow(AgentExecution row) {
-        Long rootId = row.treeRootId();
-        Optional<AgentExecution> root = Objects.equals(rootId, row.id()) ? Optional.of(row) : executionRepository.findById(rootId);
-        return root.flatMap(it -> agents.findById(it.agentId()))
-            .map(agent -> flows.find(agent.flow()) != null)
-            .orElse(false);
     }
 
 
@@ -184,46 +170,17 @@ public class RecoveredRunRecorder {
             return settleDelegation(row, agent, result, requested);
         }
         if (result.succeeded()) {
-            // 흐름의 단계 순서와 합치기는 내려간 프로세스의 메모리에만 있었다. 루트는 성공으로 끝났어도 답을
-            // 합쳐 줄 곳이 없어 실패로 적고 사용량만 남긴다.
-            if (isFlowRoot(row, kind)) {
-                AgentExecution saved = executions.fail(row, agent, result, requested, ORPHANED);
-                return new Written(
-                    saved, kind, ExecutionEventType.RUN_FAILED, ORPHANED, null, flowRootNotice(saved, kind, false));
-            }
             AgentExecution saved = executions.complete(row, agent, result, requested);
             return new Written(saved, kind, ExecutionEventType.RUN_COMPLETED, null, null, null);
         }
         if (isCancelled(result)) {
             AgentExecution saved = executions.cancel(row, agent, result, requested);
             return new Written(
-                saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, flowRootNotice(saved, kind, true));
+                saved, kind, ExecutionEventType.RUN_CANCELLED, null, null, null);
         }
         String code = errorCodeOf(result);
         AgentExecution saved = executions.fail(row, agent, result, requested, code);
-        return new Written(saved, kind, ExecutionEventType.RUN_FAILED, code, null, flowRootNotice(saved, kind, false));
-    }
-
-
-    private static boolean isFlowRoot(AgentExecution row, RecoveredRunKind kind) {
-        return kind == RecoveredRunKind.FLOW && row.parentExecutionId() == null;
-    }
-
-
-    /**
-     * 흐름 turn 의 루트 줄이 끝났을 때 그 대화의 화면에 낼 사건이다. 루트 줄이 아니거나 대화가 없으면 null 이다.
-     *
-     * <p>화면은 이 사건을 받고 「답을 만드는 중」 을 내린다. 흐름은 이어 가지 못하므로 답 없이 끝난다.
-     */
-    private ChatEvent flowRootNotice(AgentExecution row, RecoveredRunKind kind, boolean cancelled) {
-        if (!isFlowRoot(row, kind)) {
-            return null;
-        }
-        Conversation conversation = liveConversation(row);
-        if (conversation == null) {
-            return null;
-        }
-        return cancelled ? ChatEvent.stopped(conversation.publicId(), null, row.id()) : failureNotice(false);
+        return new Written(saved, kind, ExecutionEventType.RUN_FAILED, code, null, null);
     }
 
 
@@ -289,7 +246,7 @@ public class RecoveredRunRecorder {
     /** Hermes 의 결과 없이 실패로 적는다. 사용량을 적지 않는다. */
     private Written failLocked(AgentExecution row, String errorCode) {
         RecoveredRunKind kind = kindOf(row);
-        boolean turnRoot = kind == RecoveredRunKind.CHAT_TURN || isFlowRoot(row, kind);
+        boolean turnRoot = kind == RecoveredRunKind.CHAT_TURN;
         ChatEvent notice = turnRoot && liveConversation(row) != null ? failureNotice(false) : null;
         return new Written(
             executions.fail(row, errorCode), kind, ExecutionEventType.RUN_FAILED, errorCode, null, notice);

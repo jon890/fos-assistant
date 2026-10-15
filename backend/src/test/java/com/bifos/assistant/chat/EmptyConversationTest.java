@@ -121,22 +121,6 @@ class EmptyConversationTest {
     }
 
 
-    @Test
-    @DisplayName("흐름이 붙은 에이전트도 빈 대화를 만든다")
-    void createsEmptyConversationForFlowAgentToo() {
-        CurrentUser dad = member("dad@example.com");
-        Agent flowAgent = agentOf(dad, "flowed");
-        flowAgent.assignFlow("research-and-build");
-        agents.save(flowAgent);
-
-        chat.startEmpty(dad, "flowed");
-
-        assertThat(chat.conversationsOf(dad, null, 100).items()).singleElement().satisfies(it -> {
-            assertThat(it.agentId()).isEqualTo(flowAgent.id());
-            assertThat(it.title()).isEmpty();
-        });
-    }
-
 
     private CurrentUser member(String email) {
         AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));

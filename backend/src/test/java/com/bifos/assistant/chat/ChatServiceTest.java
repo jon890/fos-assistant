@@ -52,7 +52,6 @@ import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.type.ModelTier;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -1324,34 +1323,6 @@ class ChatServiceTest {
         assertThat(executions.count()).isZero();
     }
 
-
-    @Test
-    @DisplayName("흐름이 붙은 에이전트는 커맨드를 해석하지 않고 글 그대로 보낸다")
-    void flowAgentSendsTextAsIsWithoutInterpretingCommands() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        Agent agent = agents.findByCode("dad").orElseThrow();
-        agent.assignFlow(ResearchAndBuildFlow.NAME);
-        agents.save(agent);
-        stub().willAnswer(command -> {
-            if (command.input().contains("조사할 것과 만들 것을 나눈다")) {
-                return answered("chief", "{\"research\":\"자료\",\"build\":\"구현\"}");
-            }
-            return answered("step", "단계 답");
-        });
-
-        ChatTurn turn = chat.send(dad, null, "/shopping 이번 주", "dad");
-
-        assertThat(stub().received())
-            .as("Hermes 에 보낸 것")
-            .isNotEmpty()
-            .allSatisfy(command -> assertThat(command.input()).doesNotContain("skill_view(name="));
-        assertThat(stub().received())
-            .anySatisfy(command -> assertThat(command.input()).contains("/shopping 이번 주"));
-        assertThat(skillUses.count()).as("스킬 이력").isZero();
-        assertThat(messages.findByConversationIdOrderByIdAsc(turn.conversationId()))
-            .first()
-            .satisfies(message -> assertThat(message.content()).isEqualTo("/shopping 이번 주"));
-    }
 
 
     @Test

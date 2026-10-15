@@ -284,27 +284,6 @@ class ConversationModelChoiceTest {
     }
 
 
-    @Test
-    @DisplayName("흐름이 붙은 에이전트의 빈 대화에 모델을 고르고 사진은 보낼 때 거절한다")
-    void choosesModelOnEmptyFlowAgentConversationAndRejectsImagesAtSend() {
-        CurrentUser dad = member("choice-dad");
-        Agent flowed = agents.findByCode("choice-dad").orElseThrow();
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
-
-        Long id = chat.startEmpty(dad, "choice-dad").id();
-        chat.chooseModel(dad, id, new ModelChoice("openrouter", "example-model-small", null));
-        ChatAttachment photo = attachments.upload(dad, id, "a.png", "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
-
-        rejected(() -> chat.send(dad, id, "사진 봐", null, List.of(photo.id())));
-
-        assertThat(conversations.findById(id).orElseThrow().modelChoice())
-            .isEqualTo(new ModelChoice("openrouter", "example-model-small", null));
-        assertThat(messages.findByConversationIdOrderByIdAsc(id)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
-            .isNull();
-    }
-
 
     private CurrentUser member(String name) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));

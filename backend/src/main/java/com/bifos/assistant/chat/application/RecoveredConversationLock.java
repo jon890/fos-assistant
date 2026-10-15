@@ -19,9 +19,6 @@ final class RecoveredConversationLock {
     /** 이 잠금을 함께 쓰는 줄의 실행 번호다. 풀 때 취소로 끝난 줄이 있는지 본다. */
     final List<Long> executionIds = new ArrayList<>();
 
-    /** 루트 줄도 이 잠금으로 정한다. 거짓이면 루트가 이미 끝나고 자식만 돌던 흐름 turn 이다. */
-    boolean rootClaimed;
-
 
     RecoveredConversationLock(Long conversationId, Long executionId, TurnHandle handle) {
         this.conversationId = conversationId;
@@ -34,8 +31,5 @@ final class RecoveredConversationLock {
     void claim(AgentExecution row) {
         remaining++;
         executionIds.add(row.id());
-        if (row.parentExecutionId() == null) {
-            rootClaimed = true;
-        }
     }
 }

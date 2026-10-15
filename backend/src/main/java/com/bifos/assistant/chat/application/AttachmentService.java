@@ -260,11 +260,10 @@ public class AttachmentService {
     /**
      * Hermes 에 보낼 입력을 만든다. 사진이 놓인 자리와 파일 이름, 사진을 어떻게 볼지를 사용자가 쓴 글 앞에 붙인다.
      *
-     * <p>{@code embedImages} 가 참이면 이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣는다. 바이트 예산을 넘으면 모든 사진을
+     * <p>이번 메시지의 사진을 줄인 사본으로 실행 입력에 함께 싣는다. 바이트 예산을 넘으면 모든 사진을
      * 더 작은 긴 변 단계와 낮춘 품질로 줄여 싣는다. 싣지 못한 사진과 지난 사진은 원본 조회 도구로 보게 한다.
      * 모든 보낸 첨부의 번호와 표시 크기를 복원한다. 원본 조회의 권한과 실패 경계는 ADR-20261010 /
-     * attachment-inspect 에 있다. 흐름은 사진을 싣지 않으므로 거짓을 넘긴다.
-     * 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
+     * attachment-inspect 에 있다. 경로는 Hermes 컨테이너에서 보이는 {@code agentRoot} 로 적는다. 파일은 디스크 이름으로만 찾을 수 있고, 올릴 때의
      * 이름은 알아보라고 괄호로만 붙인다. 파일을 올리거나 고치는 도구에는 원본을 쓰라고 함께 적는다.
      *
      * <p>사진마다 이 대화에서 몇 번째 사진인지 붙인다. 디스크 이름은 첨부 번호라 여러 대화에 걸쳐 커지고,
@@ -274,7 +273,7 @@ public class AttachmentService {
      * <p>사진이 없으면 한 글자도 붙이지 않는다. 붙이면 그만큼이 매 실행에 실린다. 저장하는 메시지 본문에는
      * 이것을 쓰지 않는다.
      */
-    public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text, boolean embedImages) {
+    public AgentInput agentInput(Long conversationId, List<ChatAttachment> attached, String text) {
         List<ChatAttachment> sent = allOf(conversationId).stream()
             .filter(it -> it.messageId() != null)
             .toList();
@@ -292,12 +291,12 @@ public class AttachmentService {
         String directory = stripTrailingSlash(properties.agentRoot()) + "/users/"
             + AttachmentStore.userDirectoryKey(ownerUserId) + "/" + conversationId;
         Map<Long, Integer> order = orderInConversation(conversationId);
-        Map<Long, AgentPhoto> prepared = images.photos(attached.stream().filter(this::inspectable).toList(), order, embedImages).stream()
+        Map<Long, AgentPhoto> prepared = images.photos(attached.stream().filter(this::inspectable).toList(), order).stream()
             .collect(Collectors.toMap(AgentPhoto::attachmentId, photo -> photo));
         List<AgentPhoto> photos = attached.stream()
             .map(attachment -> inspectable(attachment) && prepared.containsKey(attachment.id())
                 ? prepared.get(attachment.id())
-                : new AgentPhoto(attachment.id(), order.get(attachment.id()), null, null))
+                : new AgentPhoto(attachment.id(), order.get(attachment.id()), null))
             .toList();
         String files = sent.stream()
             .map(it -> "- " + order.get(it.id()) + "번째 사진: attachment_id=" + it.id()
@@ -310,19 +309,16 @@ public class AttachmentService {
             + directory + "\n"
             + files + "\n"
             + "\n"
-            + photoGuidance(directory, photos, embedImages)
-            + (embedImages
-                ? "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
-                    + "GIF/WebP는 첫 표시 프레임만 본다. 움직임과 뒤 프레임을 확인했다고 답하지 않는다.\n"
-                    + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
-                    + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
-                    + "큰 사진의 위치를 모르면 overview=true로 축소 전체 개요를 먼저 보고 원본 region을 고른다."
-                    + " overview와 region은 함께 쓰지 않는다. 개요만 보고 작은 글자를 읽었다고 하지 않는다.\n"
-                    + "한도 오류는 개요 또는 작은 영역으로 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
-                    + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
-                    + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
-                : "지난 메시지의 사진은 같은 폴더의 {첨부 번호}.small.jpg 를, 없으면 원본을 vision_analyze 로 본다."
-                    + " read_file 로 읽지 않는다.\n")
+            + photoGuidance(photos)
+            + "작은 글자·가격·품번을 묻거나 지난 사진을 다시 물으면 attachment_inspect로 원본을 자동 조회한다.\n"
+            + "GIF/WebP는 첫 표시 프레임만 본다. 움직임과 뒤 프레임을 확인했다고 답하지 않는다.\n"
+            + "attachment_id는 위 참조를 쓰며 한 번에 한 장씩 본다. 큰 원본은 EXIF 표시 원본 좌표"
+            + " region=[x1,y1,x2,y2]로 필요한 영역을 먼저 조회한다. 오른쪽·아래 끝은 제외한다.\n"
+            + "큰 사진의 위치를 모르면 overview=true로 축소 전체 개요를 먼저 보고 원본 region을 고른다."
+            + " overview와 region은 함께 쓰지 않는다. 개요만 보고 작은 글자를 읽었다고 하지 않는다.\n"
+            + "한도 오류는 개요 또는 작은 영역으로 다시 조회한다. 사진마다 최대 3회, 실행 전체 최대 90회다.\n"
+            + "native 이미지가 없거나 만료·삭제·거절이면 보았다고 하지 말고 판독 실패를 알린다."
+            + " 사용자에게 재업로드나 분할 전송을 요구하지 않는다. read_file로 사진을 읽지 않는다.\n"
             + "파일을 올리거나 고치는 도구에는 위 목록의 원본 파일을 쓴다.\n"
             + "사용자에게 사진을 가리킬 때는 파일 이름 대신 몇 번째 사진인지로 적는다.\n"
             + "\n"
@@ -336,10 +332,9 @@ public class AttachmentService {
 
 
     /**
-     * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. {@code embedImages} 가 참이면 싣지 못한 사진의 순번을 한
-     * 줄에 적고 원본 도구로 조회하게 한다. 거짓(흐름)이면 기존 사본 경로 안내를 유지한다.
+     * 이번 메시지의 사진이 몇 장이고, 어느 사진을 실었는지 적는다. 싣지 못한 사진의 순번을 한 줄에 적고 원본 도구로 조회하게 한다.
      */
-    private static String photoGuidance(String directory, List<AgentPhoto> photos, boolean embedImages) {
+    private static String photoGuidance(List<AgentPhoto> photos) {
         StringBuilder guidance = new StringBuilder("사진은 모두 ").append(photos.size()).append("장이다.\n");
         List<AgentPhoto> embedded = photos.stream().filter(AgentPhoto::embedded).toList();
         if (!embedded.isEmpty()) {
@@ -353,27 +348,11 @@ public class AttachmentService {
         if (notEmbedded.isEmpty()) {
             return guidance.toString();
         }
-        if (embedImages) {
-            guidance.append("입력에 싣지 못한 사진: ")
-                .append(notEmbedded.stream()
-                    .map(photo -> photo.ordinal() + "번째")
-                    .collect(Collectors.joining(", ")))
-                .append(" 사진. attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n");
-        } else {
-            guidance.append("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n");
-            for (AgentPhoto photo : notEmbedded) {
-                if (photo.agentFileName() == null) {
-                    continue;
-                }
-                guidance.append("- ")
-                    .append(photo.ordinal())
-                    .append("번째 사진: ")
-                    .append(directory)
-                    .append("/")
-                    .append(photo.agentFileName())
-                    .append("\n");
-            }
-        }
+        guidance.append("입력에 싣지 못한 사진: ")
+            .append(notEmbedded.stream()
+                .map(photo -> photo.ordinal() + "번째")
+                .collect(Collectors.joining(", ")))
+            .append(" 사진. attachment_inspect로 원본을 자동 조회한다. 실패하면 판독하지 못했다고 알린다.\n");
         return guidance.toString();
     }
 

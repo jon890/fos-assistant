@@ -39,7 +39,6 @@ class ChatTurnRouting {
     private final ConversationAccess access;
     private final ChatMessageRepository messages;
     private final AgentService agents;
-    private final FlowRegistry flows;
     private final AttachmentService attachments;
     private final TurnCancellation turns;
     private final TransactionTemplate transactions;
@@ -52,9 +51,6 @@ class ChatTurnRouting {
 
     /**
      * 대화와 에이전트를 정하고 어느 경로로 갈지 고른다.
-     *
-     * <p>에이전트에 {@code flow} 가 적혀 있으면 그 흐름으로 간다. 비어 있으면 지금처럼 Hermes 를 한
-     * 번 부른다. 모르는 이름은 기동할 때 이미 걸러졌다.
      *
      * <p>첨부 판정을 메시지를 저장하기 전에 모두 끝낸다. 첨부는 대화에 올리므로 첨부가 있으면 대화
      * 번호도 있어야 하고, 그것을 대화를 만들기 전에 본다. 거절은 모두 {@code VALIDATION_FAILED} 다.
@@ -81,13 +77,11 @@ class ChatTurnRouting {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        // 흐름은 사진 자리를 덧붙이는 경로를 거치지 않는다. 오류 없이 사진을 버리지 않게 거절한다.
         if (withAttachments && !agent.acceptsAttachments()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "this agent does not accept attachments");
         }
         requireAttachmentOwner(user, agent, withAttachments);
-        Flow flow = flows.find(agent.flow());
-        SkillCommand command = commandOf(agent, flow, text);
+        SkillCommand command = commandOf(agent, text);
         if (existing == null && !limiter.hasTurnRoom(user.id())) {
             throw new ApiException(ErrorCode.USER_BUSY, "this user has reached the concurrent execution limit");
         }
@@ -95,7 +89,7 @@ class ChatTurnRouting {
             ? existing
             : conversations.save(Conversation.startedBy(user.id(), titleFrom(text), agent.id(), clock.instant()));
         List<ChatAttachment> attached = attachments.requireAttachable(conversation.id(), attachmentIds);
-        return new Routed(conversation, agent, flow, attached, command, requestReceivedAt, existing == null);
+        return new Routed(conversation, agent, attached, command, requestReceivedAt, existing == null);
     }
 
 
@@ -130,14 +124,11 @@ class ChatTurnRouting {
     /**
      * 메시지가 스킬 커맨드이면 그 이름이 에이전트의 켜진 스킬인지 확인해 낸다. 근거는 ADR-035 에 있다.
      *
-     * <p>커맨드 모양이 아니거나 흐름이 붙은 에이전트이면 {@code null} 이다. 흐름에는 글을 그대로 보낸다.
+     * <p>커맨드 모양이 아니면 {@code null} 이다.
      * 켜진 스킬 목록을 읽다 Hermes 가 실패하면 그 예외가 그대로 올라간다. 이름을 확인하지 못한 커맨드를
      * 보내지 않는다. 그 에이전트를 쓸 수 있는지는 부르기 전에 이미 판정했으므로 목록을 읽을 때 다시 보지 않는다.
      */
-    SkillCommand commandOf(Agent agent, Flow flow, String text) {
-        if (flow != null) {
-            return null;
-        }
+    SkillCommand commandOf(Agent agent, String text) {
         SkillCommand command = SkillCommand.parse(text).orElse(null);
         if (command == null) {
             return null;
@@ -179,9 +170,8 @@ class ChatTurnRouting {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
         requireAttachmentOwner(user, agent, !attached.isEmpty());
-        Flow flow = flows.find(agent.flow());
         return new Routed(
-            conversation, agent, flow, attached, commandOf(agent, flow, question), requestReceivedAt, false);
+            conversation, agent, attached, commandOf(agent, question), requestReceivedAt, false);
     }
 
 

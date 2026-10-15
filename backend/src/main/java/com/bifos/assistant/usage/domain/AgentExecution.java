@@ -311,12 +311,7 @@ public class AgentExecution {
     }
 
 
-    /** Flow 루트가 먼저 받은 원래 요청 시각을 보존하려고 더 이른 시각만 적는다. */
-    public void markRequestReceived(Instant at) {
-        if (at != null && (requestReceivedAt == null || at.isBefore(requestReceivedAt))) {
-            requestReceivedAt = at;
-        }
-    }
+
 
 
     /** 첫 assistant delta를 받은 시각만 보존한다. 본문은 실행 기록에 두지 않는다. */

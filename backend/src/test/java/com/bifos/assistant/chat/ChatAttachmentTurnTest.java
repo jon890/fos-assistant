@@ -11,14 +11,11 @@ import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
-import com.bifos.assistant.agent.presentation.AgentController;
-import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.chat.application.ArtifactService;
 import com.bifos.assistant.chat.application.AttachmentService;
 import com.bifos.assistant.chat.application.ChatService;
@@ -109,8 +106,6 @@ class ChatAttachmentTurnTest {
     @Autowired
     ChatService chat;
 
-    @Autowired
-    KnownFlows flows;
     /** 결과물 폴더 단락의 문구는 {@code ArtifactTest} 가 글자 그대로 견준다. 여기서는 그 단락을 받아 쓴다. */
     @Autowired
     ArtifactService artifactService;
@@ -758,24 +753,6 @@ class ChatAttachmentTurnTest {
     }
 
 
-    @Test
-    @DisplayName("흐름이 붙은 에이전트의 대화에 첨부를 붙이면 거절하고 저장하지 않는다")
-    void attachingToFlowAgentConversationIsRejectedWithoutSaving() {
-        Agent flowed = agentOf(dad, "flowed");
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
-        Long conversationId = conversations
-            .save(Conversation.startedBy(dad.id(), "흐름 대화", flowed.id(), Instant.now()))
-            .id();
-        ChatAttachment photo = upload(dad, conversationId, "a.png");
-
-        assertRejected(() -> chat.send(dad, conversationId, "사진 봐", null, List.of(photo.id())));
-
-        assertThat(userContentsOf(conversationId)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
-            .isNull();
-    }
-
 
     @Test
     @DisplayName("다른 사용자 소유 그룹 에이전트는 사진을 받지 않고 실행도 시작하지 않는다")
@@ -840,22 +817,6 @@ class ChatAttachmentTurnTest {
             .allSatisfy(it -> assertThat(it.attachments()).as("message %s", it.id()).isEmpty());
     }
 
-
-    @Test
-    @DisplayName("에이전트 목록에서 흐름이 붙은 에이전트만 사진을 받지 않는다")
-    void onlyFlowAgentsInAgentListDoNotAcceptImages() {
-        Agent flowed = agentOf(dad, "flowed");
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
-        CurrentUserProvider provider = mock(CurrentUserProvider.class);
-        when(provider.require()).thenReturn(dad);
-
-        List<AgentView> listed = new AgentController(agentService, provider, agentLifecycle, flows).readable();
-
-        assertThat(listed)
-            .extracting(AgentView::code, AgentView::acceptsAttachments)
-            .containsExactlyInAnyOrder(tuple("dad", true), tuple("flowed", false));
-    }
 
 
     /** 사진 단락보다 앞에 매 turn 붙는 결과물 폴더 단락이다. */

@@ -28,7 +28,6 @@ import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.model.domain.ModelChoice;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
@@ -380,121 +379,6 @@ class ChatRegenerateTest {
     }
 
 
-    @Test
-    @DisplayName("흐름 재생성은 모든 실행의 지시에 문구를 붙이고 답 판을 잇는다")
-    void flowRegenerationAppendsPhraseToAllRunsAndLinksReplyVersion() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(result("first", "첫 답"));
-        Long conversationId = chat.send(dad, null, "질문", "dad").conversationId();
-        Long originalAnswer = messages.findByConversationIdOrderByIdAsc(conversationId)
-            .getLast()
-            .id();
-        enableFlow("dad");
-        flowAnswers();
-        int before = stub().received().size();
-
-        chat.regenerate(dad, conversationId, event -> {
-        });
-
-        List<HermesRunCommand> commands = stub().received().subList(before, stub().received().size());
-        assertThat(commands)
-            .hasSize(4)
-            .allSatisfy(command -> assertThat(command.instructions())
-                .endsWith("사용자가 바로 앞 질문에 대한 답을 다시 받기를 원한다. 앞의 답을 되풀이하지 말고 새로 답한다."));
-        assertThat(messages.findByConversationIdOrderByIdAsc(conversationId)
-            .getLast()
-            .replacesMessageId())
-                .isEqualTo(originalAnswer);
-    }
-
-
-    @Test
-    @DisplayName("흐름으로 바꾼 대화도 이전 질문의 사진 자리를 재생성 입력에 넣는다")
-    void flowConversationRegenerationInputKeepsPreviousImageSlots() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(result("first", "첫 답"));
-        Long conversationId = chat.send(dad, null, "사진 질문", "dad").conversationId();
-        ChatMessage question = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst();
-        ChatAttachment attachment = attachmentRows.save(ChatAttachment.of(
-            conversationId,
-            dad.id(),
-            "image.png",
-            "image/png",
-            1,
-            Instant.now().plus(Duration.ofDays(1)),
-            Instant.now()));
-        attachment.nameStoredFile(attachment.id() + ".png");
-        attachmentRows.save(attachment);
-        attachments.attach(question.id(), conversationId, List.of(attachment.id()));
-        enableFlow("dad");
-        flowAnswers();
-        int before = stub().received().size();
-
-        chat.regenerate(dad, conversationId, event -> {
-        });
-
-        HermesRunCommand chief = stub()
-            .received()
-            .subList(before, stub().received().size())
-            .stream()
-            .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
-            .findFirst()
-            .orElseThrow();
-        assertThat(chief.input()).contains("[이 대화의 사진 참조]", attachment.id() + ".png", "사진 질문");
-    }
-
-
-    @Test
-    @DisplayName("흐름으로 다시 생성하면 사진을 싣지 않고 사본 경로로 안내한다")
-    void flowRegenerationGuidesBySmallCopyPathWithoutEmbedding() throws IOException {
-        CurrentUser dad = member("dad@example.com", "dad");
-        stub().willReturn(result("first", "첫 답"));
-        Long conversationId = chat.send(dad, null, "사진 질문", "dad").conversationId();
-        ChatMessage question = messages.findByConversationIdOrderByIdAsc(conversationId).getFirst();
-        byte[] png = png();
-        ChatAttachment attachment = attachmentRows.save(ChatAttachment.of(
-            conversationId,
-            dad.id(),
-            "image.png",
-            "image/png",
-            png.length,
-            Instant.now().plus(Duration.ofDays(1)),
-            Instant.now()));
-        attachment.nameStoredFile(attachment.id() + ".png");
-        attachmentRows.save(attachment);
-        // 앞선 실행이 같은 번호로 남긴 파일이 있으면 지우고 쓴다.
-        store.delete(attachment);
-        try {
-            store.save(attachment, new ByteArrayInputStream(png));
-            attachments.prepareSmall(attachment);
-            assertThat(store.hasSmall(attachment)).isTrue();
-            attachments.attach(question.id(), conversationId, List.of(attachment.id()));
-            enableFlow("dad");
-            flowAnswers();
-            int before = stub().received().size();
-
-            chat.regenerate(dad, conversationId, event -> {
-            });
-
-            List<HermesRunCommand> flowCommands = stub().received().subList(before, stub().received().size());
-            HermesRunCommand chief = flowCommands.stream()
-                .filter(command -> command.input().contains("조사할 것과 만들 것을 나눈다"))
-                .findFirst()
-                .orElseThrow();
-            assertThat(chief.input())
-                .doesNotContain("이미지로 함께 실은")
-                .contains("싣지 못한 사진은 아래 경로를 답에 필요한 만큼 vision_analyze 로 확인한다.\n")
-                .containsPattern("- 1번째 사진: .*/" + conversationId + "/" + AttachmentStore.smallName(attachment.id())
-                    + "\\n");
-            assertThat(flowCommands)
-                .allSatisfy(command -> assertThat(command.images())
-                    .as("flow command %s", command.profileName())
-                    .isEmpty());
-        } finally {
-            store.delete(attachment);
-        }
-    }
-
 
     private static byte[] png() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -502,28 +386,6 @@ class ChatRegenerateTest {
         return out.toByteArray();
     }
 
-
-    private void enableFlow(String agentCode) {
-        Agent agent = agents.findByCode(agentCode).orElseThrow();
-        agent.assignFlow(ResearchAndBuildFlow.NAME);
-        agents.save(agent);
-    }
-
-
-    private void flowAnswers() {
-        stub().willAnswer(command -> {
-            if (command.input().contains("조사할 것과 만들 것을 나눈다")) {
-                return result("chief", "{\"research\":\"자료\",\"build\":\"구현\"}");
-            }
-            if (command.input().contains("조사해")) {
-                return result("research", "조사 결과");
-            }
-            if (command.input().contains("만든다")) {
-                return result("engineer", "구현 결과");
-            }
-            return result("synthesizer", "합친 답");
-        });
-    }
 
 
     private CurrentUser member(String email, String profileName) {
