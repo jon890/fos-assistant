@@ -36,8 +36,8 @@ import org.springframework.test.context.DynamicPropertySource;
 /**
  * Flyway가 만든 실제 MySQL 스키마에 모든 테이블의 행을 넣고 운영 삭제 경로를 실행한다.
  *
- * <p>FK와 CHECK를 켠 채로 검사하며, 다른 사용자의 행은 전체 칸을 비교한다. 사용자 물리 삭제는 구현되지 않았으므로
- * 접근 해제를 실행한 뒤 알려진 공백과 토큰 폐기를 확인한다. Hermes와 파일 원본은 기존 통합 테스트의 대역을 쓴다.
+ * <p>FK와 CHECK를 켠 채로 검사하며, 보존 대상과 다른 사용자의 행은 전체 칸을 비교한다. 사용자 물리 삭제는 구현되지 않았으므로
+ * 접근 해제를 실행한 뒤 알려진 공백과 토큰 폐기를 확인한다. Hermes는 기존 통합 테스트의 대역을 쓰며 파일 원본은 만들지 않는다.
  */
 @Tag("mysql")
 @BackendIntegrationTest
@@ -165,7 +165,13 @@ class PurgeCoverageMysqlTest {
             .as("%s: %s (%s). 새 공백은 %s에 근거와 함께 명시한다", table.table(), outcome, table.reason(), PurgeTable.RESOURCE)
             .hasSize(outcome == Outcome.DELETE ? 0 : 1);
         switch (outcome) {
-            case DETACH -> assertCleared(table.table(), "agent_id");
+            case KEEP -> assertThat(rows(table, target)).as("%s의 보존 대상은 모든 칸이 유지돼야 한다", table.table())
+                .usingRecursiveComparison().isEqualTo(before.get(table.table()));
+            case DETACH -> {
+                List<String> columns = table.table().equals("decision_feedback_event")
+                    ? List.of("source_check_id", "autonomy_decision_id") : List.of("agent_id");
+                columns.forEach(column -> assertCleared(table.table(), column));
+            }
             case GONE -> {
                 assertThat(value(table.table(), "status")).isEqualTo("GONE");
                 assertCleared(table.table(), "request_hash");

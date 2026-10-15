@@ -194,7 +194,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 `flyway_schema_history`는 Flyway 내부 이력이라 분류에서 뺀다.
 
 `DELETE`는 0행, `KEEP`는 근거가 있는 보존, `GAP`은 별도 결정할 알려진 공백이다.
-`SCRUB`은 본문·session 제거, `DETACH`는 에이전트 참조 해제다.
+`SCRUB`은 본문·session 제거, `DETACH`는 에이전트나 지운 점검의 참조 해제다.
 `GONE`은 원고 생성 상태를 바꾸고 재생에 쓰는 참조를 비우는 계약이다.
 
 새 테이블을 더하면 분류와 [`purge/fixture.sql`](../src/test/resources/purge/fixture.sql)의 데이터를 함께 더한다.
@@ -204,7 +204,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 `PurgeCoverageMysqlTest`는 Flyway로 만든 실제 MySQL에서 모든 분류 테이블에 행을 넣는다.
 삭제 전 대상과 다른 사용자의 행이 모두 있어야 한다.
 사용자 접근 해제, `ChatService.delete` 뒤 `ConversationPurger`, `AgentPurgeWriter.purge`를 실행한다.
-행 삭제, 본문 제거, 참조 해제와 원고 tombstone을 확인하고 다른 사용자의 모든 칸이 같은지도 비교한다.
+행 삭제, 본문 제거, 참조 해제와 원고 tombstone을 확인하며 `KEEP` 대상과 다른 사용자의 모든 칸이 같은지도 비교한다.
 Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검사의 범위 밖이다.
 
 실행은 `backend/`에서 `./gradlew test --tests '*PurgeClassificationTest'`,

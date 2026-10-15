@@ -29,7 +29,7 @@ content_draft_job|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id와 owner_user_id
 content_draft_revision|CONVERSATION|id|GAP|DELETE|KEEP|draft_id FK로 원고에 속한다. 대화 purge가 지운다.
 content_draft_snapshot|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id와 owner_user_id에 속한다. 본문 없는 권한 지문과 참조를 보존하는 계약이다.
 conversation|CONVERSATION|id|GAP|SCRUB|KEEP|user_id에 속한다. 사용량 참조를 남기고 제목과 Hermes session을 비운 뒤 purged_at을 적는다.
-decision_feedback_event|CONVERSATION|id|GAP|DELETE|KEEP|user_id와 conversation_id FK가 있다. ChatService.delete가 제안에 딸린 사건까지 지운다.
+decision_feedback_event|CONVERSATION|id|GAP|DELETE|DETACH|user_id와 conversation_id FK가 있다. 대화 삭제가 사건을 지우고 에이전트 정리는 source_check_id와 autonomy_decision_id FK를 NULL로 비운다.
 execution_context_source|CONVERSATION|execution_id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 주입 본문 없이 출처 참조만 남기는 계약이다.
 execution_event|CONVERSATION|id|GAP|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
 execution_question|CONVERSATION|execution_id|GAP|DELETE|KEEP|execution_id와 message_id로 대화에 속한다. 대화 purge가 지운다.
