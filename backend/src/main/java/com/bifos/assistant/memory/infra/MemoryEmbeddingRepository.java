@@ -36,6 +36,19 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
     List<MemoryEmbeddingSource> findEmbeddableSources();
 
 
+    /** 그 번호 가운데 지금도 임베딩 대상인 항목의 글을 번호 순으로 읽는다. 묶음을 보내기 직전에 다시 읽는 데 쓴다. */
+    @Query("select new com.bifos.assistant.memory.domain.MemoryEmbeddingSource(m.id, m.title, m.content)"
+        + " from Memory m"
+        + " where m.id in :ids"
+        + " and m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
+        + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
+        + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
+        + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
+        + " and m.contentKeyId is null"
+        + " order by m.id")
+    List<MemoryEmbeddingSource> findEmbeddableSourcesByIds(@Param("ids") Collection<Long> ids);
+
+
     /** 저장한 줄의 모델과 지문이다. 벡터는 읽지 않는다. */
     @Query("select new com.bifos.assistant.memory.domain.MemoryEmbeddingStamp(e.memoryId, e.model, e.textFingerprint)"
         + " from MemoryEmbedding e")

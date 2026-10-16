@@ -86,22 +86,29 @@ public class MemoryEmbeddingRefresher {
         int written = 0;
         int batches = 0;
         for (int start = 0; start < pending.size() && batches < properties.maxBatchesPerRun(); start += properties.batchSize()) {
-            List<MemoryEmbeddingSource> batch = pending.subList(start, Math.min(start + properties.batchSize(), pending.size()));
+            List<Long> ids = pending.subList(start, Math.min(start + properties.batchSize(), pending.size())).stream()
+                .map(MemoryEmbeddingSource::memoryId)
+                .toList();
+            // 주기 처음에 읽은 글은 몇 분 지났을 수 있다. 그 사이 민감으로 바뀐 항목의 평문을 보내지 않게 보내기 직전에 다시 읽는다
+            List<MemoryEmbeddingSource> batch = readOnly().execute(status -> embeddings.findEmbeddableSourcesByIds(ids));
+            batches++;
+            if (batch.isEmpty()) {
+                continue;
+            }
             List<float[]> vectors;
             try {
                 vectors = client.embed(batch.stream().map(this::textOf).toList(), properties.batchTimeout());
             } catch (EmbeddingUnavailableException ex) {
                 log.warn("memory embedding refresh stopped exceptionClass={} written={} pending={}",
-                    ex.getClass().getSimpleName(), written, pending.size() - written);
+                    ex.getClass().getSimpleName(), written, Math.max(0, pending.size() - written));
                 break;
             }
             transaction.executeWithoutResult(status -> write(batch, vectors));
             batch.forEach(source -> vectorCache.evict(source.memoryId()));
             written += batch.size();
-            batches++;
         }
         if (removed > 0 || written > 0) {
-            log.info("memory embedding refreshed removed={} written={} pending={}", removed, written, pending.size() - written);
+            log.info("memory embedding refreshed removed={} written={} pending={}", removed, written, Math.max(0, pending.size() - written));
         }
         return written;
     }
@@ -109,9 +116,7 @@ public class MemoryEmbeddingRefresher {
 
     /** 줄이 없거나 모델이나 지문이 다른 대상이다. 번호 순이다. */
     private List<MemoryEmbeddingSource> pending() {
-        TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
-        readOnly.setReadOnly(true);
-        return readOnly.execute(status -> {
+        return readOnly().execute(status -> {
             Map<Long, MemoryEmbeddingStamp> stamps = embeddings.findStamps().stream()
                 .collect(Collectors.toMap(MemoryEmbeddingStamp::memoryId, Function.identity()));
             return embeddings.findEmbeddableSources().stream()
@@ -123,6 +128,13 @@ public class MemoryEmbeddingRefresher {
                 })
                 .toList();
         });
+    }
+
+
+    private TransactionTemplate readOnly() {
+        TransactionTemplate readOnly = new TransactionTemplate(transactionManager);
+        readOnly.setReadOnly(true);
+        return readOnly;
     }
 
 

@@ -143,6 +143,21 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
+    @DisplayName("주기 도중 민감으로 바뀐 항목은 다음 묶음을 보내기 직전에 다시 읽어 보내지 않는다")
+    void rereadsBatchBeforeSendingAndSkipsItemsTurnedSensitive() {
+        memories.create(USER, MemoryScope.USER, "첫째", "첫 본문", false);
+        memories.create(USER, MemoryScope.USER, "둘째", "둘째 본문", false);
+        Memory third = memories.create(USER, MemoryScope.USER, "셋째", "셋째 평문", false);
+        client.onFirstCall(() -> memories.update(USER, third.id(), "셋째 평문", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE));
+
+        assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
+
+        assertThat(client.inputs()).noneMatch(input -> input.contains("셋째"));
+        assertThat(embeddings.findById(third.id())).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("주소나 모델이 비면 임베딩 서비스를 한 번도 부르지 않는다")
     void doesNotCallWhenDisabled() {
         memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
@@ -188,12 +203,16 @@ class MemoryEmbeddingRefresherTest {
         private int calls;
         private int failOn = -1;
         private CountDownLatch blocker;
+        private Runnable firstCall;
 
 
         @Override
         public List<float[]> embed(List<String> batch, Duration timeout) {
             calls++;
             threadNames.add(Thread.currentThread().getName());
+            if (calls == 1 && firstCall != null) {
+                firstCall.run();
+            }
             assertThat(TransactionSynchronizationManager.isActualTransactionActive())
                 .as("임베딩 호출 동안 트랜잭션을 열어 두지 않는다")
                 .isFalse();
@@ -214,6 +233,11 @@ class MemoryEmbeddingRefresherTest {
 
         float[] vectorOf(String text) {
             return new float[] {text.length(), text.hashCode() % 7, 1f};
+        }
+
+
+        void onFirstCall(Runnable action) {
+            firstCall = action;
         }
 
 
