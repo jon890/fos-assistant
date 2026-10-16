@@ -18,15 +18,15 @@
 
 ## 이동 PR 4-1: user, crypto, followup, notification, model, context, feedback, people, task, workspace
 
-- 옮기는 클래스 43개. 추정 변경은 운영 코드 약 300줄이다(상한 1500).
+- 옮기는 클래스 48개. 추정 변경은 운영 코드 약 330줄이다(상한 1500).
 
 ### 이동 표
 
 | 새 패키지 | 옛 패키지 | 클래스 |
 | --- | --- | --- |
-| `context.application` | `context` | ContextAssembler, ContextBudgetWriter, ResultHeader† |
-| `context.application.dto` | `context` | AssembledContext, ContextBodyMode, ContextBundle, ContextFreshness, ContextItem, ContextSource, ContextTrust |
-| `context.config` | `context` | ContextProperties |
+| `context.application` | `context` | ContextAssembler, ContextBudgetWriter, MemoryItems, MemorySearchSection, ResultHeader† |
+| `context.application.dto` | `context` | AssembledContext, ContextBodyMode, ContextBundle, ContextFreshness, ContextItem, ContextSelection, ContextSource, ContextTrust, MemorySearchPlacement |
+| `context.config` | `context` | ContextProperties, MemorySearchSectionProperties |
 | `crypto.config` | `crypto.infra` | DataEncryptionProperties |
 | `feedback.application.dto` | `feedback.application.model` | FeedbackEntry, FeedbackLabel, SubjectLabel |
 | `feedback.application.port` | `feedback.application` | FeedbackConversations |
@@ -71,7 +71,7 @@
 ### 이 PR 의 메모
 
 - `model` 은 `model.domain` 과 `model.domain.type` 이 이미 맞는 모양이라 옮길 것이 없다. 표에 없다.
-- `context` 는 평평한 패키지라 `context.application`(빈), `context.application.dto`(값), `context.config`(`ContextProperties`)로 나눈다. `ResultHeader` 는 public 비빈이다. `context` 루트에서 `context.application` 으로 오며 처음 `APPLICATION_ROOT_HOLDS_ONLY_BEANS` 줄이 생긴다.
+- `context` 는 평평한 패키지라 `context.application`(빈), `context.application.dto`(값), `context.config`(`ContextProperties`, `MemorySearchSectionProperties`)로 나눈다. `ResultHeader` 는 public 비빈이다. `context` 루트에서 `context.application` 으로 오며 처음 `APPLICATION_ROOT_HOLDS_ONLY_BEANS` 줄이 생긴다.
 - `user` 의 `FirstSignInListener`, `SignInRevocation` 같은 인터페이스는 `user.application.port` 로 간다. `people` 이 구현하는 port 라 구현 쪽 import 도 바뀐다.
 - `crypto` 의 `TextCipher`, `KeyEncryptionKeys` 는 `domain` 의 port 라 옮기지 않는다. `UserDataKeyPlacementTest` 의 기대 전체 이름(`crypto.domain.entity.UserDataKey`)은 그대로다.
 - `task` 의 `TaskSchedule`, `workspace` 의 `WorkspacePreviewPolicy` 는 public 비빈이라 `application` 에 남는다.

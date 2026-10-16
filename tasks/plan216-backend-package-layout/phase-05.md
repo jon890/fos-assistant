@@ -18,7 +18,7 @@
 
 ## 이동 PR 5-1: memory, agent
 
-- 옮기는 클래스 36개. 추정 변경은 운영 코드 약 230줄이다(상한 1500).
+- 옮기는 클래스 54개. 추정 변경은 운영 코드 약 320줄이다(상한 1500).
 
 ### 이동 표
 
@@ -31,9 +31,15 @@
 | `agent.application.dto` | `agent.purge.application.model` | AgentPurgeOutcome |
 | `agent.application.port` | `agent.application` | AgentConnectorBindings, AgentConnectorDetacher, ProfileProvisioning, ProfileSkillFiles, ReservedProfileNames |
 | `agent.application.port` | `agent.purge.application` | AgentPurgeParticipant |
-| `memory.application.dto` | `memory.application.model` | AgentMemoryCountScope, AgentMemoryGrantInput, AgentMemorySetting, AgentMemorySettingChange, AgentMemorySettingCollection, CapturedMemory, MemoryAccess, MemoryRememberOutcome, MemoryRememberRequest, MemoryRememberResult, MemorySearchItem, MemorySearchPage, MemorySource |
+| `memory.application` | `memory.application.embedding` | EmbeddingText†, MemoryEmbeddingRefresher, OpenAiCompatibleEmbeddingClient |
+| `memory.application` | `memory.application.relevance` | KeywordScorer, KoreanBigramTokenizer†, MemoryRelevance, MemoryVectorCache, QueryEmbedder |
+| `memory.application.dto` | `memory.application.model` | AgentMemoryCountScope, AgentMemoryGrantInput, AgentMemorySetting, AgentMemorySettingChange, AgentMemorySettingCollection, CapturedMemory, MemoryAccess, MemoryRememberOutcome, MemoryRememberRequest, MemoryRememberResult, MemorySearchCursor, MemorySearchItem, MemorySearchPage, MemorySource |
+| `memory.application.dto` | `memory.application.relevance` | KeywordScore, RelevanceCandidate, RelevanceResult, RelevanceScore |
 | `memory.application.port` | `memory.application` | OmittedMemories |
+| `memory.application.port` | `memory.application.embedding` | EmbeddingClient, EmbeddingRejectedException, EmbeddingUnavailableException |
 | `memory.config` | `memory.application` | MemoryEncryptionProperties |
+| `memory.config` | `memory.application.embedding` | MemoryEmbeddingProperties |
+| `memory.config` | `memory.application.relevance` | MemoryRelevanceProperties |
 
 ### 승격 (package-private → public)
 
@@ -60,7 +66,9 @@
 
 - `memory.domain.entity` 와 `memory.domain.type` 은 옮기지 않는다. 엔티티 배치 규칙(`ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`)과 `MemoryPlacementTest` 는 그대로 통과해야 한다.
 - `MemoryService` 의 private `requireAdmin` 은 그룹 공용 Memory 의 쓰기 권한 판정이다. 이름도 위치도 바꾸지 않는다. `MemoryRepository` 의 JPQL 은 `memory.domain` 을 가리키는데 옮기지 않으므로 고칠 것이 없다.
-- `MemoryEncryptionProperties` 는 `memory.config` 로 간다.
+- 설정 값 셋(`MemoryEncryptionProperties`, `MemoryEmbeddingProperties`, `MemoryRelevanceProperties`)은 `memory.config` 로 간다.
+- `memory` 의 `application.embedding` 과 `application.relevance` 하위 패키지는 없애고 평평하게 둔다. 인터페이스(`EmbeddingClient`)와 그 예외 둘은 `application.port`, 값은 `application.dto`, 나머지는 `application` 이다. `EmbeddingText` 와 `KoreanBigramTokenizer` 는 public 비빈이라 `application` 직하에 남아 기준 파일의 줄이 된다.
+- 기억 단계의 후속 작업이 `memory` 를 계속 고치고 있으면 이 표는 PR 시점에 다시 뽑는다(`move-procedure.md` 의 「시작 조건」).
 - `agent` 의 `application.toolset`, `purge`, `admin`(phase 03 이 이미 비웠다) 하위 패키지는 없애고 평평하게 둔다. 서비스는 모두 `agent.application` 에 둔다.
 - `AGENT_PURGE_CONTRACT_PLACEMENT` 와 `AgentPurgerPlacementTest` 의 기대 전체 이름을 고친다. 대상 선택 조건(`agentPurgeRoles` 가 쓰는 `.agent.purge.` 경계와 `application.model` 리터럴)도 새 구조로 다시 쓴다: `agent.purge.application.AgentPurger` 는 `agent.application.AgentPurger`, `AgentPurgeWriter` 는 `agent.application.AgentPurgeWriter`, `AgentPurgeParticipant` 는 `agent.application.port.AgentPurgeParticipant`, `AgentPurgeOutcome` 은 `agent.application.dto.AgentPurgeOutcome` 이다. fixture 의 `agent.purge.*` 문자열도 새 이름에 맞춘다.
 - `agent.config` 는 옮기지 않는다. `FEATURE_CONFIG_PLACEMENT` 와 `AgentPropertiesPlacementTest` 는 그대로다.
@@ -69,7 +77,7 @@
 
 ## 이동 PR 5-2: hermes
 
-- 옮기는 클래스 64개. 추정 변경은 운영 코드 약 590줄이다(상한 1500).
+- 옮기는 클래스 64개. 추정 변경은 운영 코드 약 580줄이다(상한 1500).
 
 ### 이동 표
 

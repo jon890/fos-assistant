@@ -10,7 +10,7 @@ phase 하나에 PR 이 여러 개일 수 있다. PR 번호 `n-m` 은 각 phase �
   - 고정 흐름: `ResearchAndBuildFlow`, `Flow`, `FlowRegistry`, `KnownFlows`
   - 옛 커넥터 호환: 옛 전용 에이전트의 설치와 확인과 삭제 경로, vault import
   - 작은 것 묶음: `MemoryProposer`, `MemoryProposalProperties`, `ModelTierSeedImporter`, `ModelTierProperties`
-  `git grep -nE 'ServiceToken|ResearchAndBuildFlow|FlowRegistry|KnownFlows|MemoryProposer|MemoryProposalProperties|ModelTierSeedImporter|ModelTierProperties' -- backend/src/main backend/src/test` 가 아무것도 내지 않아야 한다. 나오면 시작하지 않고 코디네이터에 알린다.
+  `git ls-files backend/src/main | grep -E '(ServiceToken|ResearchAndBuildFlow|FlowRegistry|KnownFlows|MemoryProposer|MemoryProposalProperties|ModelTierSeedImporter|ModelTierProperties)'` 가 아무것도 내지 않아야 한다. 나오면 시작하지 않고 코디네이터에 알린다. 서비스 토큰 제거를 확인하는 테스트의 이름은 남아 있어도 된다.
   정리가 지운 클래스는 이동 표에 없다.
 - 앞선 이동 PR 이 머지됐고 최신 main 에서 새 브랜치를 땄다. 이동 PR 은 직렬이다. 둘을 동시에 열지 않는다.
 - 표에 있는데 지금 없는 클래스, 지금 있는데 표에 없는 클래스는 표가 낡은 것이다. 해당 하위 기능의 설명(ADR 의 「하위 기능」 표)으로 자리를 정하고 PR 본문에 적는다.

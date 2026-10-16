@@ -127,7 +127,7 @@
 - 나눈 기능은 루트에 역할 패키지가 없고, 하위 기능은 위 순서의 아래쪽만 쓴다.
 - `admin` 의 모양, 의존 방향, `CurrentUserProvider.requireAdmin` 을 부르는 자리, 모든 관리자 엔드포인트가 `requireAdmin` 을 부르는 것.
 
-규칙의 이름과 판정, 실패 메시지, 얼림 여부는 `ArchitectureRules.java` 의 Javadoc 이 갖는다.
+규칙의 판정과 실패 메시지는 `PackageLayoutRules.java` 가 갖고, 까닭과 예외는 [코드 규칙 목록](../../../docs/code-rules/INDEX.md) 의 rule-70 부터 rule-84 가 갖는다. 얼림 여부는 [`code-architecture.md`](../code-architecture.md) 의 「패키지 배치 규칙」 표가 갖는다.
 
 판정할 수 없는 것은 문서와 `claude-review` 의 기준(`.github/workflows/code-review-prompt.txt`)에 둔다.
 
@@ -138,7 +138,7 @@
 
 ### 맥락
 
-`chat.application` 에 클래스 122개가, `connector.application` 에 63개가 직하로 있다. `proactive` 에 42개, `usage` 에 32개, `skill` 에 30개가 있다.
+`chat.application` 에 클래스 119개가, `connector.application` 에 64개가 직하로 있다. `proactive` 에 42개, `usage` 에 32개, `skill` 에 30개가 있다.
 한 기능의 한 패키지가 이만큼 크면 어느 클래스가 어느 일을 맡는지 이름으로만 찾아야 하고, 하위 일 사이의 의존은 검사할 수 없다.
 
 2026-10-15 에 클래스 의존을 뽑아 하위 기능으로 나눠 보니 다음이 드러났다.
@@ -172,9 +172,9 @@
   - `application.dto` 와 `application.port` 이름이 모든 기능에서 같다.
 - 감당할 것:
   - 이동 PR 이 15개이고 앞뒤의 규칙, 선행 분리, 마무리까지 모두 18개 PR 이다. 이동 PR 은 많은 파일의 `import` 를 바꾸므로 다른 작업의 PR 과 충돌한다. 이동 PR 은 직렬로 짧게 연다.
-  - 한 번에 끊지 못한 것은 기준 파일에 남는다. 하위 기능 사이의 역방향 의존 9건, `application` 직하의 public 비빈 클래스 30개, `admin` 이 기능의 저장소와 엔티티와 domain 값을 쓰는 14건이다.
+  - 한 번에 끊지 못한 것은 기준 파일에 남는다. 하위 기능 사이의 역방향 의존 9건, `application` 직하의 public 비빈 클래스 32개, `admin` 이 기능의 저장소와 엔티티와 domain 값을 쓰는 14건이다.
   - package-private 이던 클래스 11개는 하위 기능이 갈리며 public 이 된다.
-  - JPQL 과 로거 이름의 전체 이름 문자열은 컴파일이 잡지 못한다. 이동하는 클래스가 든 열 개 파일을 이동 PR 이 직접 고친다.
+  - JPQL 과 로거 이름의 전체 이름 문자열은 컴파일이 잡지 못한다. 이동하는 클래스가 든 열한 개 파일을 이동 PR 이 직접 고친다.
   - 파일 길이 기준 목록, 위험 라벨의 경로, 문서의 경로 표기를 이동 PR 이 함께 고친다.
   - 하위 기능 이름은 업무 용어라 나중에 바뀔 수 있다. 바꿀 때는 한 하위 기능을 통째로 옮기는 PR 하나다.
 

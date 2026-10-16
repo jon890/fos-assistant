@@ -1,19 +1,11 @@
 {
   "name": "plan216-backend-package-layout",
-  "description": "backend 패키지를 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면을 admin 으로 모은다. 규칙을 먼저 얼리고 기능 단위로 이동만 하는 PR 을 직렬로 낸다",
+  "description": "backend 패키지를 하위 기능과 역할 두 축으로 나누고 관리자 전용 화면을 admin 으로 모은다. 규칙(PR 1-1)은 이 계획서와 함께 들어갔고, 이어 기능 단위로 이동만 하는 PR 을 직렬로 낸다",
   "status": "pending",
   "created_at": "2026-10-15",
-  "total_phases": 10,
-  "current_phase": 1,
+  "total_phases": 9,
+  "current_phase": 2,
   "phases": [
-    {
-      "number": 1,
-      "file": "phase-01.md",
-      "execution_profile": "standard",
-      "prs": [
-        "1-1"
-      ]
-    },
     {
       "number": 2,
       "file": "phase-02.md",

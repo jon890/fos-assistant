@@ -13,7 +13,7 @@
 ## 컨텍스트
 
 - 앞선 모든 phase 가 머지됐다.
-- 문서 개정은 phase 01 이 적용했다. 이 phase 는 이동 중에 낡은 서술이 남았는지만 본다.
+- 문서 개정은 규칙 PR(1-1)이 적용했다. 이 phase 는 이동 중에 낡은 서술이 남았는지만 본다.
 
 ## 작업 항목
 
@@ -23,7 +23,7 @@
 
 | 규칙 | 남는 줄 | 내용 |
 | --- | --- | --- |
-| `APPLICATION_ROOT_HOLDS_ONLY_BEANS` | 30 | public 이면서 빈이 아닌 클래스. 아래 표 |
+| `APPLICATION_ROOT_HOLDS_ONLY_BEANS` | 32 | public 이면서 빈이 아닌 클래스. 아래 표 |
 | `LAYER_DIRECTION` | 2 | `ConnectorExecutionGuardContract`(dto)가 `ConnectorExecutionSnapshot`(application)을, `CheckedSkillPackage`(dto)가 `SkillFilePaths`(infra)를 쓴다 |
 | `SUB_FEATURES_FOLLOW_ORDER` | 9 | `skill` 2, `chat` 2, `connector` 4, `proactive` 1 |
 | `ADMIN_USES_ONLY_FEATURE_APPLICATION` | 14 | phase 03 의 표 13줄과 `AgentAdminService` 가 port 를 쓰는 1줄 |
@@ -33,7 +33,7 @@
 
 ### 2. 옛 경로가 남은 곳
 
-아래 검색이 아무것도 내지 않아야 한다. 나오면 새 이름으로 고친다. 그런 다음 `ADMIN_USES_ONLY_FEATURE_APPLICATION` 의 옛 이름 허용(`application.model`, `application.toolset`)을 지운다.
+아래 검색이 아무것도 내지 않아야 한다. 나오면 새 이름으로 고친다. 그런 다음 `PackageLayoutRules.TRANSITIONAL_APPLICATION_PACKAGES`(`ADMIN_USES_ONLY_FEATURE_APPLICATION` 의 옛 이름 허용인 `application.model`, `application.toolset`)을 지우고, `rule-5` 와 `rule-81` 문서의 옛 이름 서술도 지운다.
 
 ```bash
 # cwd: 저장소 root
@@ -49,7 +49,7 @@ git grep -nE 'com\.bifos\.assistant\.(chat|connector|proactive|usage|skill)\.(ap
 
 | 남은 줄 | 제안 |
 | --- | --- |
-| `application` 직하의 public 비빈 30개 | 정책과 규칙 함수(`AutonomyPolicy`, `FindingJudgement`, `ProblemJudgement`, `TaskSchedule`, `WorkspacePreviewPolicy`, `FollowUpDueAt`, `FeedbackLabeler`, `ConnectorToolPolicies`, `ConnectorManifests`)는 `domain` 으로 옮긴다. 해시와 키와 변환 함수(`ContentDraftAuthorizationHash`, `ContentDraftSnapshotHash`, `MediaObservationAnalysisKey`, `MpoJpegNormalizer`, `GatewayRewriter`, `AskFormat`, `ResultHeader`, `ContentDraftWorkerStatusDecoder`, `SkillInputRules`, `ConnectorActionDetails`, `ConnectorActionSignals`)는 `domain` 으로 옮기거나 쓰는 빈 하나에 딸린 package-private 으로 낮춘다. 승격하며 public 이 된 뒤 셋은 쓰는 곳이 여러 하위 기능이라 `domain` 이나 `application.dto` 로 옮기는 쪽이 낫다. 값과 예외(`FinancialLimitExceeded`, `TurnHandle`, `TurnRunRef`, `ContextSourceRefs`, `SkillAgentNotice`, `ConnectorExecutionSnapshot`, `MediaPipelineEvents`)는 `application.dto` 나 `domain` 으로 옮긴다. 상태를 가진 것(`TurnSlot`, `BrowserScreenSession`, `ProactiveCheckRun`)은 빈으로 만든다 |
+| `application` 직하의 public 비빈 32개 | 정책과 규칙 함수(`AutonomyPolicy`, `FindingJudgement`, `ProblemJudgement`, `TaskSchedule`, `WorkspacePreviewPolicy`, `FollowUpDueAt`, `FeedbackLabeler`, `ConnectorToolPolicies`, `ConnectorManifests`)는 `domain` 으로 옮긴다. 해시와 키와 변환 함수(`ContentDraftAuthorizationHash`, `ContentDraftSnapshotHash`, `MediaObservationAnalysisKey`, `MpoJpegNormalizer`, `GatewayRewriter`, `AskFormat`, `ResultHeader`, `ContentDraftWorkerStatusDecoder`, `EmbeddingText`, `KoreanBigramTokenizer`, `SkillInputRules`, `ConnectorActionDetails`, `ConnectorActionSignals`)는 `domain` 으로 옮기거나 쓰는 빈 하나에 딸린 package-private 으로 낮춘다. 승격하며 public 이 된 뒤 셋은 쓰는 곳이 여러 하위 기능이라 `domain` 이나 `application.dto` 로 옮기는 쪽이 낫다. 값과 예외(`FinancialLimitExceeded`, `TurnHandle`, `TurnRunRef`, `ContextSourceRefs`, `SkillAgentNotice`, `ConnectorExecutionSnapshot`, `MediaPipelineEvents`)는 `application.dto` 나 `domain` 으로 옮긴다. 상태를 가진 것(`TurnSlot`, `BrowserScreenSession`, `ProactiveCheckRun`)은 빈으로 만든다 |
 | `connector` 의 순서 위반 4줄 | 바인딩을 떼거나 연결을 끊을 때 열린 승인 줄을 처리하는 호출(`ConnectorBindingService`, `ConnectorConnectionService` → `ConnectorActionService`)은 `connector.connection` 에 port 를 두고 `approval` 이 구현한다. `ConnectorActionDetails` 가 쓰는 `FinancialLimitChanges` 의 상수는 `connector.action` 으로 옮긴다. `ConnectorInstallAttempts` 가 부르는 `ConnectorExecutionGuard` 는 port 로 가른다 |
 | `chat` 의 순서 위반 2줄 | `AttachmentCleaner` 가 부르는 `ContentDraftCleaner` 는 `attachment.application.port` 에 정리 참여 인터페이스를 두고 `contentdraft` 가 구현한다(`AgentPurgeParticipant` 와 같은 모양). `MediaPipelineEvents.draftReferenced` 는 `ContentDraftAsset` 대신 첨부 번호와 자리를 받게 한다 |
 | `skill` 의 순서 위반 2줄 | `SkillPackagePreview`, `SkillPackageProblem` 이 `package` 의 타입을 쓴다. 두 값을 `package.application.dto` 로 옮기고 `SkillDtos` 가 그것을 쓰게 한다 |
@@ -59,6 +59,6 @@ git grep -nE 'com\.bifos\.assistant\.(chat|connector|proactive|usage|skill)\.(ap
 
 ### 4. 알림 문단과 이 계획서를 지운다
 
-`backend/AGENTS.md` 「패키지 배치」 첫머리의 「이동 진행 중」 알림 문단을 지운다.
+`backend/AGENTS.md` 「패키지 배치」 첫머리와 `backend/docs/code-architecture.md` 「패키지 배치 규칙」 첫머리의 「이동 진행 중」 알림 문단을 지운다.
 `tasks/plan216-backend-package-layout/` 을 이 PR 에서 지운다. 오래 남을 것은 이미 ADR 과 `backend/docs/code-architecture.md` 에 있다.
 이동 중에 알게 된 것이 문서에 없으면 지우기 전에 ADR 의 「결과」 에 옮긴다.

@@ -59,16 +59,16 @@
 
 ## 이동 PR 8-2: connector.action, approval, financial, contentdraft
 
-- 옮기는 클래스 107개. 추정 변경은 운영 코드 약 750줄이다(상한 1500).
+- 옮기는 클래스 106개. 추정 변경은 운영 코드 약 750줄이다(상한 1500).
 
 ### 이동 표
 
 | 새 패키지 | 옛 패키지 | 클래스 |
 | --- | --- | --- |
-| `connector.action.application` | `connector.application` | ConnectorActionBodyBackfill, ConnectorActionDetails, ConnectorActionSignals |
+| `connector.action.application` | `connector.application` | ConnectorActionBodyBackfill, ConnectorActionDetails, ConnectorActionSignals, ConnectorConversationActionPurge |
 | `connector.action.application.dto` | `connector.application.model` | ConnectorActionChanged, ConnectorActionResult, ConnectorActionView, PendingApproval |
 | `connector.action.domain` | `connector.domain` | ActionDelivery, ConnectorAction, ConnectorActionBodyOpener, ConnectorActionExecution, ConnectorActionKey, ConnectorConversationGrant, ConnectorToolGrant, ToolPolicyDecision |
-| `connector.action.domain.type` | `connector.domain.type` | ActionDecision, ActionDenyReason, ActionStatus, GrantPeriod |
+| `connector.action.domain.type` | `connector.domain.type` | ActionDecision, ActionDenyReason, ActionStatus, FinancialLimitKind, GrantPeriod |
 | `connector.action.infra` | `connector.infra` | ConnectorActionBodies, ConnectorActionExecutionRepository, ConnectorActionLoadListener, ConnectorActionRepository, ConnectorConversationGrantRepository, ConnectorToolGrantRepository |
 | `connector.approval.application` | `connector.application` | ConnectorActionApproval, ConnectorActionExpirer, ConnectorActionLifecycle, ConnectorActionListener, ConnectorActionResultSource, ConnectorActionService, ConnectorActionSweeper, ConnectorAgentPurge, ConnectorApprovalReply, ConnectorCallHistory, ConnectorCheckReportApprovals, ConnectorFinancialApproval, ConnectorFinancialIntake, ConnectorFinancialOutcome, ConnectorFinancialProducer, ConnectorFinancialSummaries, ConnectorGrantLookup, ConnectorPolicyService, ConnectorUnknownResends, FinancialLimitChanges |
 | `connector.approval.application.dto` | `connector.application` | ConnectorPolicyRequest |
@@ -83,9 +83,8 @@
 | `connector.financial.application` | `connector.application.execution` | ConnectorExecutionClaimCodec, ConnectorExecutionClaims, ConnectorExecutionCurrent, ConnectorExecutionGuard, ConnectorExecutionTicket, ConnectorGuardSupport |
 | `connector.financial.application.dto` | `connector.application.model` | ConnectorExecutionCatalog, ConnectorExecutionClaimInput, ConnectorExecutionClaimResult, ConnectorExecutionGuardContract, ConnectorExecutionReadContext, ConnectorExecutionTicketPayload, FinancialLimitStatus, FinancialLimitValues, FinancialLimitsView |
 | `connector.financial.config` | `connector.application` | ConnectorFinancialProperties |
-| `connector.financial.domain` | `connector.domain` | FinancialLimitChange, FinancialOrderLimit |
-| `connector.financial.domain.type` | `connector.domain.type` | FinancialLimitKind |
-| `connector.financial.infra` | `connector.infra` | FinancialLimitChangeRepository, FinancialOrderLimitRepository |
+| `connector.financial.domain` | `connector.domain` | FinancialOrderLimit |
+| `connector.financial.infra` | `connector.infra` | FinancialOrderLimitRepository |
 | `connector.financial.presentation` | `connector.presentation.execution` | ConnectorExecutionClaimController, ConnectorExecutionClaimDtos, ConnectorGuardSupportController |
 | `connector.financial.presentation` | `connector.presentation.financial` | FinancialLimitController, FinancialLimitDtos |
 
@@ -99,7 +98,9 @@
 
 ### 문자열 전체 이름
 
-없다.
+| 파일 | 가리키는 클래스 |
+| --- | --- |
+| `FinancialOrderLimitRepository` | FinancialOrderLimit |
 
 ### 규칙 파일의 import
 
@@ -130,6 +131,8 @@
 
 ### 이 PR 의 메모
 
+- `FinancialLimitKind` 는 `ConnectorAction` 엔티티의 칸 타입이라 `action.domain.type` 에 둔다. 상한 변경 승인 줄이 `ConnectorAction` 에 합쳐지며 `financial` 이 아니라 `action` 이 쓰게 됐다.
+- `ConnectorConversationActionPurge` 는 승인 줄의 본문을 지우는 구현이라 `action` 에 둔다. 인터페이스 `ConversationActionPurge` 는 `chat.purge.application.port` 에 있고(PR 9-4), 위 기능 `connector` 가 구현하는 올바른 방향이다.
 - `ConnectorActionDetails`, `ConnectorActionSignals` 는 `action` 에 두고 `approval`, `contentdraft` 가 쓴다. package-private 이던 것이라 public 이 된다.
 - `ConnectorActionDetails` 가 `FinancialLimitChanges`(`approval`)의 상수를 쓰는 한 줄은 아래가 위를 쓰는 위반이라 기준 파일에 더한다. 상수를 `connector.action` 으로 옮기면 사라지지만 이 PR 이 하지 않는다.
 - `ConnectorBindingService` 와 `ConnectorConnectionService` 가 `ConnectorActionService`(`approval`)를 부른다. 두 줄을 기준 파일에 더한다. 바인딩을 떼거나 연결을 끊을 때 열린 승인 줄을 처리하는 호출이다.

@@ -18,7 +18,7 @@
 
 ## 이동 PR 9-1: chat.conversation, modelchoice, delivery, starter
 
-- 옮기는 클래스 78개. 추정 변경은 운영 코드 약 740줄이다(상한 1500).
+- 옮기는 클래스 78개. 추정 변경은 운영 코드 약 730줄이다(상한 1500).
 
 ### 이동 표
 
@@ -80,7 +80,7 @@
 
 ## 이동 PR 9-2: chat.attachment 와 chat.artifact
 
-- 옮기는 클래스 61개. 추정 변경은 운영 코드 약 430줄이다(상한 1500).
+- 옮기는 클래스 61개. 추정 변경은 운영 코드 약 440줄이다(상한 1500).
 
 ### 이동 표
 
@@ -178,7 +178,7 @@
 
 ## 이동 PR 9-4: chat.turn, nextturn, recovery, purge
 
-- 옮기는 클래스 61개. 추정 변경은 운영 코드 약 320줄이다(상한 1500).
+- 옮기는 클래스 62개. 추정 변경은 운영 코드 약 320줄이다(상한 1500).
 
 ### 이동 표
 
@@ -190,6 +190,7 @@
 | `chat.nextturn.config` | `chat.application` | DelegationWakeProperties |
 | `chat.nextturn.presentation` | `chat.presentation` | PendingMessageController |
 | `chat.purge.application` | `chat.application` | ConversationAgentPurge, ConversationPurgeWriter, ConversationPurger |
+| `chat.purge.application.port` | `chat.application` | ConversationActionPurge |
 | `chat.recovery.application` | `chat.application` | RecoveredConversationLock, RecoveredRunRecorder, RestartReconciler |
 | `chat.recovery.application.dto` | `chat.application.model` | RecoveredRunKind |
 | `chat.recovery.application.port` | `chat.application` | RecoveredAnswerGuard |

@@ -17,7 +17,7 @@
 
 ## 의도 메모
 
-- `admin` 은 최상위 순서의 맨 위다(phase 01 이 `TopLevelPackageOrder` 에 더했다). 어느 기능도 `admin` 을 import 하지 않는다.
+- `admin` 은 최상위 순서의 맨 위다(규칙 PR 이 `TopLevelPackageOrder` 에 더했다). 어느 기능도 `admin` 을 import 하지 않는다.
 - `admin` 은 `application`(필요하면 `application.dto`)과 `presentation` 만 갖는다. `AgentAdminService` 는 `admin.agent.application` 에 둔다.
 - `AgentAdminService` 는 지금 `AgentRepository`, `AppUserRepository`, `Agent` 엔티티를 쓴다. `*AdminDtos` 의 변환 메서드는 엔티티와 domain 값을 받는다. 이동만 하므로 그대로 두고 기준 파일에 얼린다.
 
