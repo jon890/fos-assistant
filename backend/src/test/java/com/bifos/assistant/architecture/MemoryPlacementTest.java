@@ -55,7 +55,7 @@ class MemoryPlacementTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Memory", "MemoryCapture", "MemoryCollection", "MemoryCollectionId", "MemoryRevision", "MemoryRevisionId",
-        })
+    })
     @DisplayName("각 소유 타입의 옛 위치와 다른 기능 이동 및 누락과 중복을 거절한다")
     void rejectsEveryOwnerViolation(String name) throws IOException {
         for (String scenario : new String[] {"old", "other", "missing", "duplicate", "role", "renamed"}) {
