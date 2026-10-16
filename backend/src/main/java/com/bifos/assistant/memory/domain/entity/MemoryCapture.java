@@ -62,6 +62,10 @@ public class MemoryCapture {
     @Column(name = "previous_status", length = 20)
     private MemoryStatus previousStatus;
 
+    /** 기록을 남긴 대화가 그 전에 바깥 글을 읽는 도구를 불렀는가. 승인 카드가 「바깥 글을 읽은 대화에서 나온 제안」 이라고 보인다. */
+    @Column(name = "external_read", nullable = false)
+    private boolean externalRead;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -77,6 +81,7 @@ public class MemoryCapture {
         MemoryCaptureKind kind,
         Integer baseRevision,
         MemoryStatus previousStatus,
+        boolean externalRead,
         Instant now) {
         MemoryCapture capture = new MemoryCapture();
         capture.memoryId = memoryId;
@@ -86,6 +91,7 @@ public class MemoryCapture {
         capture.kind = kind;
         capture.baseRevision = baseRevision;
         capture.previousStatus = previousStatus;
+        capture.externalRead = externalRead;
         capture.createdAt = now;
         return capture;
     }

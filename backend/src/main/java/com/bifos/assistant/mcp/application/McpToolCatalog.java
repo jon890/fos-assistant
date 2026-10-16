@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 public class McpToolCatalog {
     private final LiveProperties<DelegationProperties> delegationProperties;
     private final McpMemoryRemember memoryRemember;
+    private final McpMemoryLink memoryLink;
     private final McpMediaObservationTools mediaObservations;
     private final McpContentDraftTools contentDrafts;
     private final McpContentDraftSnapshots contentSnapshots;
@@ -155,6 +156,7 @@ public class McpToolCatalog {
             contentSnapshots.saveDefinition(),
             financialLimits.readDefinition(),
             financialLimits.changeDefinition(),
+            memoryLink.definition(),
             memoryRemember.definition(),
             Map.of(
                 "name", "memory_search",

@@ -9,6 +9,7 @@ import com.bifos.assistant.mcp.application.McpContentDraftTools;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
 import com.bifos.assistant.mcp.application.McpCallerResolver;
 import com.bifos.assistant.mcp.application.McpMediaObservationTools;
+import com.bifos.assistant.mcp.application.McpMemoryLink;
 import com.bifos.assistant.mcp.application.McpPrincipal;
 import com.bifos.assistant.mcp.application.McpToolService;
 import com.bifos.assistant.mcp.presentation.McpDtos.ArtifactWriteArguments;
@@ -100,6 +101,8 @@ public class McpController {
             Map.entry(AGENT_STOP, this::agentStop),
             Map.entry(FOLLOW_UP_PROPOSE, this::proposeFollowUp),
             Map.entry(MEMORY_REMEMBER, this::remember),
+            Map.entry(McpMemoryLink.TOOL, (caller, id, args) -> validated(id, args, McpDtos.MemoryLinkArguments::from,
+                value -> tools.linkMemory(caller, value.fromId(), value.toId(), value.type(), value.label()))),
             Map.entry(McpMediaObservationTools.LIST, (caller, id, args) -> validated(id, args,
                 MediaObservationListArguments::from, value -> this.mediaObservations.list(caller, value.afterAssetId(), value.limit()))),
             Map.entry(McpMediaObservationTools.RECORD, (caller, id, args) -> validated(id, args,

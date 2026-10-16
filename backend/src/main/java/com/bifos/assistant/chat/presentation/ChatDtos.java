@@ -415,6 +415,7 @@ public final class ChatDtos {
         String content,
         boolean sensitive,
         boolean alwaysInject,
+        boolean externalRead,
         Instant createdAt) {
         static MemoryCaptureView from(CapturedMemory captured) {
             var capture = captured.capture();
@@ -430,6 +431,7 @@ public final class ChatDtos {
                 sensitive || memory.sealed() ? "" : memory.content(),
                 sensitive,
                 memory.alwaysInject(),
+                capture.externalRead(),
                 capture.createdAt());
         }
     }

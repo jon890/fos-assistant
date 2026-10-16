@@ -45,6 +45,7 @@ public class McpMemoryRemember {
     static final Set<String> INTERNAL_TOOLS = Set.of(
         "mcp__fos_assistant__memory_read",
         "mcp__fos_assistant__memory_remember",
+        "mcp__fos_assistant__memory_link",
         "mcp__fos_assistant__follow_up_propose",
         "mcp__fos_assistant__agent_list",
         "mcp__fos_assistant__agent_delegate",
@@ -139,7 +140,10 @@ public class McpMemoryRemember {
         if (collection != null && !MemoryPlacement.isCollectionKey(collection)) {
             return result("collection 은 소문자로 시작하는 key 다.", true);
         }
-        boolean direct = directAllowed(caller, origin, strippedContent);
+        // 조건 4 는 따로 계산해 기록에도 남긴다. 승인 카드가 바깥 글을 읽은 대화의 제안인지 보인다
+        boolean externalRead = origin.conversationId() != null
+            && executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), INTERNAL_TOOLS);
+        boolean direct = !externalRead && directAllowed(caller, origin, strippedContent);
         MemoryRememberResult remembered = memoryCaptures.remember(
             caller.user(),
             access,
@@ -151,7 +155,8 @@ public class McpMemoryRemember {
                 memoryId,
                 origin.id(),
                 origin.conversationId(),
-                direct));
+                direct,
+                externalRead));
         log.info(
             "memory remember userId={} executionId={} direct={} outcome={}",
             caller.user().id(),
@@ -159,7 +164,10 @@ public class McpMemoryRemember {
             direct,
             remembered.outcome());
         return switch (remembered.outcome()) {
-            case REMEMBERED -> result("기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다.", false);
+            case REMEMBERED -> result(
+                "기억했다. 사용자 화면에 「기억했어요」 와 되돌리기가 보인다. 답에서 무엇을 기억했는지 짧게 알린다. 새 기억의 번호는 "
+                    + remembered.memoryId() + " 이다.",
+                false);
             case UPDATED -> result("기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.", false);
             case PROPOSED -> result("제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다.", false);
             case ALREADY_KNOWN -> result("이미 같은 내용을 기억하고 있다. 새로 남기지 않았다.", false);
@@ -182,7 +190,7 @@ public class McpMemoryRemember {
      * memory-remember-guard). 모델이 본문을 다듬어도 되지만 「못 먹는다」 를 「좋아한다」 로 뒤집은 본문은 바로 저장하지 않는다.
      *
      * <p>바깥 글은 대화 단위로 본다. Hermes session 이 앞 turn 의 도구 결과와 맡긴 일의 결과를 이력으로 이어 가므로, 지금
-     * 실행이 바깥 도구를 부르지 않았어도 앞 turn 에서 읽은 글이 이 호출을 시킬 수 있다.
+     * 실행이 바깥 도구를 부르지 않았어도 앞 turn 에서 읽은 글이 이 호출을 시킬 수 있다. 그 판정은 호출한 쪽이 먼저 하고 기록에도 남긴다.
      */
     private boolean directAllowed(McpCaller caller, AgentExecution origin, String content) {
         if (origin.parentExecutionId() != null || origin.conversationId() == null) {
@@ -192,8 +200,7 @@ public class McpMemoryRemember {
         if (question.isEmpty() || NegationMarkers.present(question.get()) != NegationMarkers.present(content)) {
             return false;
         }
-        return !executionEvents.existsOutsideToolStartInConversation(origin.conversationId(), INTERNAL_TOOLS)
-            && !turnQuestions.hasRunWithoutQuestion(origin.conversationId());
+        return !turnQuestions.hasRunWithoutQuestion(origin.conversationId());
     }
 
 

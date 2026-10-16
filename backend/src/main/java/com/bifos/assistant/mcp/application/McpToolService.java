@@ -82,6 +82,7 @@ public class McpToolService {
     private final AgentConnectorBindings bindings;
     private final FollowUpService followUps;
     private final McpMemoryRemember memoryRemember;
+    private final McpMemoryLink memoryLink;
     private final McpToolCatalog catalog;
     private final Clock clock;
 
@@ -282,6 +283,12 @@ public class McpToolService {
             case DECLINED_BEFORE -> result("사용자가 이 할 일을 거절했다. 다시 제안하지 않는다.", true);
             case TOO_MANY_PROPOSALS, TOO_MANY_IN_RUN -> result("이 대화에 받아들이기를 기다리는 제안이 많다. 사용자가 정한 뒤에 제안한다.", true);
         };
+    }
+
+
+    /** {@link McpMemoryLink#link} 에 넘긴다. */
+    public Map<String, Object> linkMemory(McpCaller caller, long fromId, long toId, String type, String label) {
+        return memoryLink.link(caller, fromId, toId, type, label);
     }
 
 

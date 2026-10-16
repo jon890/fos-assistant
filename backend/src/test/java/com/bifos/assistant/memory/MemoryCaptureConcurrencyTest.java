@@ -131,7 +131,7 @@ class MemoryCaptureConcurrencyTest {
         try {
             Future<MemoryRememberResult> remembering = pool.submit(() -> captureService.remember(
                 USER, CORE, new MemoryRememberRequest("산책 시간", ORIGINAL, null,
-                    MemorySensitivity.NORMAL, null, 903L, null, true)));
+                    MemorySensitivity.NORMAL, null, 903L, null, true, false)));
             if (!read.await(20, TimeUnit.SECONDS)) {
                 remembering.get(1, TimeUnit.SECONDS);
                 throw new AssertionError("중복 후보 조회에 도달하지 않았다");

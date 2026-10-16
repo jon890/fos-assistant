@@ -2,6 +2,7 @@ package com.bifos.assistant.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -175,7 +176,7 @@ class McpMemoryRememberToolTest {
 
         JsonNode result = call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"));
 
-        assertThat(text(result)).isEqualTo(REMEMBERED);
+        assertThat(text(result)).startsWith(REMEMBERED);
         assertThat(result.path("isError").asBoolean()).isFalse();
         Memory memory = onlyMemory();
         assertThat(memory.status()).isEqualTo(MemoryStatus.ACCEPTED);
@@ -195,8 +196,8 @@ class McpMemoryRememberToolTest {
     void remembersRefinedContentRegardlessOfEvidence() throws Exception {
         askedInThisTurn();
 
-        assertThat(text(call(remember("취미", "등산을 좋아한다", null)))).isEqualTo(REMEMBERED);
-        assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("취미", "등산을 좋아한다", null)))).startsWith(REMEMBERED);
+        assertThat(text(call(remember("직업", "교사다", "나는 교사야")))).startsWith(REMEMBERED);
 
         assertThat(memoriesOfDad())
             .extracting(Memory::status)
@@ -235,7 +236,7 @@ class McpMemoryRememberToolTest {
     void remembersWhenNegationKept() throws Exception {
         askedInThisTurn("나는 오이를 안 먹어.");
 
-        assertThat(text(call(remember("오이", "오이를 먹지 않는다", null)))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("오이", "오이를 먹지 않는다", null)))).startsWith(REMEMBERED);
 
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
@@ -276,7 +277,7 @@ class McpMemoryRememberToolTest {
     void remembersWhenOnlyQuestionLooksSensitive() throws Exception {
         askedInThisTurn("어제 병원에 다녀왔어. 다른 사람은 홍길동이야.");
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이야", null)))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이야", null)))).startsWith(REMEMBERED);
 
         assertThat(onlyMemory().status()).isEqualTo(MemoryStatus.ACCEPTED);
     }
@@ -310,10 +311,16 @@ class McpMemoryRememberToolTest {
         toolStarted("mcp__fos_assistant__memory_read");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-            .isEqualTo(REMEMBERED);
+            .startsWith(REMEMBERED);
 
         toolStarted("web_search");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
+        assertThat(capturesOfDad())
+            .as("바깥 글을 읽은 뒤의 제안 기록만 externalRead 가 참이다")
+            .extracting(MemoryCapture::kind, MemoryCapture::externalRead)
+            .containsExactlyInAnyOrder(
+                tuple(MemoryCaptureKind.CREATED, false),
+                tuple(MemoryCaptureKind.PROPOSED, true));
     }
 
 
@@ -337,7 +344,7 @@ class McpMemoryRememberToolTest {
         toolStarted("tool_describe");
 
         assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", "다른 사람은 홍길동이야"))))
-            .isEqualTo(REMEMBERED);
+            .startsWith(REMEMBERED);
 
         toolStarted("tool_call");
         assertThat(text(call(remember("사는 곳", "서울에 산다", "홍길동이야")))).isEqualTo(PROPOSED);
@@ -409,7 +416,7 @@ class McpMemoryRememberToolTest {
     void remembersInNewRootRunWithoutLegacyRun() throws Exception {
         String root = askedInNewRootRun();
 
-        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).isEqualTo(REMEMBERED);
+        assertThat(text(call(remember("다른 사람", "다른 사람은 홍길동이다", null), root))).startsWith(REMEMBERED);
     }
 
 

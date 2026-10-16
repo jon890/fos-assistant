@@ -91,6 +91,18 @@ test("memory_remember 는 기억해 두는 말로 보인다", () => {
   );
 });
 
+test("memory_link 는 기억을 잇는 말로 보이고 내용을 보이지 않는다", () => {
+  assert.equal(
+    toolLabel("mcp__fos_assistant__memory_link", true),
+    "기억을 서로 잇고 있어요",
+  );
+  assert.equal(
+    toolLabel("mcp__fos_assistant__memory_link", false),
+    "기억을 서로 이었어요",
+  );
+  assert.equal(isReadableDetail("mcp__fos_assistant__memory_link"), false);
+});
+
 test("memory_search 는 이름을 보여주지 않고 기억을 찾는 말로 보인다", () => {
   for (const name of ["memory_search", "mcp__fos_assistant__memory_search"]) {
     assert.equal(toolLabel(name, true), "기억을 찾고 있어요");
