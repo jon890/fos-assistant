@@ -73,6 +73,19 @@ sequenceDiagram
 - 민감 항목 본문의 완전 삭제
 - `always_inject` 칸 제거
 
+#### 자동 기억 2단계
+
+#310 의 2단계는 기억 사이의 연결과 질문에 맞는 기억을 싣는 것이다. 측정을 먼저 만들고 그 수치로 다음 단계로 간다.
+단계마다 범위와 바뀌는 테이블과 클래스, 완료 조건은 그 ADR 의 「적용 범위」 가 갖는다.
+
+| 단계 | 내용 | 결정 |
+| --- | --- | --- |
+| 0 | 측정 세 층과 악화 금지 게이트, 실행 기록의 선택 근거 컬럼(아래 「Memory 회수 측정」). 서버의 임베딩 지연은 운영 저장소가 재고 결과 수치만 여기 적는다 | [ADR-20261015 / memory-eval-gate](../../backend/docs/adr/ADR-20261015-memory-eval-gate.md) |
+| 1 | 임베딩 서비스와 질문 기반 하이브리드 선별(한국어 키워드와 의미, RRF). 개인 사실 구역은 그대로다 | [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) |
+| 2 | `memory_link` 의 연결과 대체, 외부 글을 읽은 저장의 출처 기록 | [ADR-20261015 / memory-link](../adr/ADR-20261015-memory-link.md) |
+| 3 | 「참고한 기억」 의 「관련 없음」, 「틀림」 단추, 자동 보관 허락 표시(`archivable`), 정비 루프의 제안 모드 | [ADR-20261015 / memory-maintenance](../adr/ADR-20261015-memory-maintenance.md) |
+| 4 | 정비의 자동 전환과 먼저 살펴보기 연결 | 같은 ADR |
+
 ### 기억 화면
 
 `/memory` 의 「기억」 탭은 「검토할 기억」(`PROPOSED`)과 「알고 있는 것」(`ACCEPTED`)을, 「문서」 탭은 문서를 보인다. 문서를 읽지 못하면 탭 없이 기억 목록만 보인다. 맨 아래 접힌 절에서 서비스 토큰을 관리한다.
@@ -412,33 +425,45 @@ Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는�
 
 ## Memory 회수 측정
 
-Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「틀리거나 남의 사실을 싣지 않는가」 를 숫자로 보는 측정 도구다. 합성 측정과 운영 집계 둘로 나눈다.
+Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「틀리거나 남의 사실을 싣지 않는가」 를 숫자로 보는 측정 도구다.
+층은 조립 측정, 답 판정, 운영 집계 셋이고 근거는 [ADR-20261015 / memory-eval-gate](../../backend/docs/adr/ADR-20261015-memory-eval-gate.md) 에 있다.
+측정에 쓰는 글은 모두 지어낸 것이다. 실제 가족 대화와 기억은 어느 층에도 넣지 않는다.
 
 **합성 측정의 숫자는 모델 답의 오기억률이 아니다.** 모델 없이 조립한 글만 보고, 실린 글에 틀린 사실이 있으면 모델이 그것을 쓸 수 있다는 「노출」 을 센다. 보고서 첫 줄과 이 문서가 그렇게 밝힌다.
-운영 집계는 기록 칸만 읽으므로 답이 맞았는지는 알 수 없다.
+운영 집계는 기록 컬럼만 읽으므로 답이 맞았는지는 알 수 없다.
 
 ### 합성 측정
 
 `MemoryRecallEvalTest` 가 CI 의 backend 검사(`./gradlew test`)에 함께 돈다. 결과는 `backend/build/reports/memory-eval/` 의 `report.md` 와 `report.json` 에 남고 표준 출력에도 나온다.
-사례마다 Memory 를 표에 직접 넣고 `ContextAssembler.assemble` 로 조립한 묶음에서 항목마다 상태(`MemoryEvalScoreboard.ItemState`)를 읽는다. Hermes 대역도 모델도 부르지 않아 빠르고 결과가 늘 같다.
-측정 모드는 개인 사실 구역을 끈 `factsOff` 와 운영 기본값의 `factsOn` 둘이고, `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만들어 고른다.
+사례마다 Memory 를 테이블에 직접 넣고 `ContextAssembler.assemble` 로 조립한 묶음에서 항목마다 상태(`MemoryEvalScoreboard.ItemState`)를 읽는다. Hermes 대역도 모델도 부르지 않아 빠르고 결과가 늘 같다.
 
-#### 시험 세트
+| 모드 | 무엇 |
+| --- | --- |
+| `none` | 기억을 싣지 않는다. 아래쪽 기준선이다 |
+| `factsOff` | 개인 사실 구역을 끈 조립. `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만든다 |
+| `factsOn` | 운영 기본값의 조립. 게이트는 이 모드에만 건다 |
+| `fullInjection` | 그 에이전트가 볼 수 있는 항목(`MemoryService.alwaysInjectedFor` 와 `indexedFor`)을 예산 없이 모두 본문으로 싣는다. 위쪽 기준선이다 |
 
-사례 묶음은 `backend/src/test/resources/memory-eval/family-cases.json` 이고 칸의 모양은 `MemoryEvalDataset` 이 갖는다. 실제 사람 이름, 메일, 계정, 금액을 쓰지 않는다. 이 저장소는 공개 저장소다.
-범주는 LongMemEval(arXiv 2410.10813)의 다섯 능력에 권한 경계와 부하를 더했다. 질문을 판정에 쓰지 않으므로 범주는 「그 능력에 필요한 사실이 글에 실리는가」 를 사례로 나누는 이름이다.
+#### 사례 묶음
+
+사례 묶음은 `backend/src/test/resources/memory-eval/family-cases.json` 이고 컬럼의 모양은 `MemoryEvalDataset` 이 갖는다. 실제 사람 이름, 메일, 계정, 금액을 쓰지 않는다. 이 저장소는 공개 저장소다.
+범주는 LongMemEval(arXiv 2410.10813)의 다섯 능력에 권한 경계와 부하, 취향과 놓침을 더했다. 조립 측정은 질문을 판정에 쓰지 않으므로 범주는 「그 능력에 필요한 사실이 글에 실리는가」 를 사례로 나누는 이름이다.
 
 | 범주 | 뜻 |
 | --- | --- |
 | `INFORMATION_EXTRACTION` | 한 번 말한 사실을 다음 대화에서 안다 |
 | `MULTI_SESSION` | 여러 대화에서 나눠 말한 사실을 함께 안다 |
-| `KNOWLEDGE_UPDATE` | 바뀐 사실의 새 값을 안다 |
+| `KNOWLEDGE_UPDATE` | 바뀐 사실의 새 값을 안다. 새 항목의 `supersedes` 가 옛 항목을 가리킨다 |
 | `TEMPORAL` | 최근에 바뀐 사실이 예산 안에 든다 |
 | `ABSTENTION` | 말한 적 없는 것에 엉뚱한 사실이 붙지 않는다 |
 | `BOUNDARY` | 남의 항목과 권한 밖 항목이 실리지 않는다 |
 | `LOAD` | 항목이 많을 때 실리는 글자와 빠지는 항목 |
+| `PREFERENCE` | 선호를 무시하면 답이 어긋나는 질문에 그 선호가 실린다(PrefEval) |
+| `RECALL_GAP` | 지금 구조가 놓치는 사실이다. 본문에만 있고 제목에는 없는 사실, 예산에서 빠지는 항목 |
 
 `forbidden` 의 `BOUNDARY` 항목은 묶음에 있으면 `OMITTED` 여도 실패다. 고르는 단계를 지났다는 뜻이기 때문이다.
+`SUPERSEDED` 로 적은 항목은 같은 사례의 어느 항목이 `supersedes` 로 가리켜야 한다. 연결과 대체가 들어오면 이 값으로 「대체함」 링크를 만든다.
+`judge` 는 답 판정이 쓰는 「예, 아니오」 질문과 기대 답이다. 조립 측정은 읽지 않는다.
 
 #### 지표(Memory 회수 측정)
 
@@ -447,21 +472,71 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | 지표 | 계산 |
 | --- | --- |
 | 회수율(본문), 회수율(제목 이상) | `expect` 항목 가운데 `INLINE` 인 수, `INLINE` 이나 `TITLE_ONLY` 인 수 / `expect` 항목 수 |
+| recall@5, recall@10 | 묶음의 `INLINE` 항목을 실은 순서대로, 그 뒤에 `TITLE_ONLY` 항목을 실은 순서대로 늘어놓은 앞 k 개에 든 `expect` 항목 수 / `expect` 항목 수 |
 | 오기억 노출률 | `SUPERSEDED` 와 `DISTRACTOR` 항목 가운데 `INLINE` 인 수 / 그 항목 수 |
 | 권한 경계 노출 | `BOUNDARY` 항목 가운데 `ABSENT` 가 아닌 수 |
 | 실행당 Memory 글자 수, 빠진 항목 | 조립 결과의 글자 수(공통 답변 지침은 뺀다)와 빠진 항목 수 |
 
-**실패 조건은 권한 경계 노출 하나다.** 어느 모드에서든 0 이 아니면 테스트가 실패한다.
-나머지 지표는 보고서에만 남긴다. 기준선이 아직 없고, 개인 사실 구역이 오기억 노출을 늘리는 것은 알고 고른 비용이기 때문이다([ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md)).
+지금 조립은 질문을 보지 않으므로 recall@k 는 「질문과 무관하게 앞에 놓인 것」 의 비율이다. 질문 기반 선별과 견줄 출발점으로 읽는다.
+
+**실패 조건은 둘이다.**
+
+- 어느 모드에서든 권한 경계 노출이 0 이 아니다
+- `factsOn` 모드의 전체 recall@5 가 기준 파일보다 낮거나, 전체 오기억 노출률이 기준 파일보다 높다
+
+#### 기준 파일
+
+기준 파일은 `backend/src/test/resources/memory-eval/baseline.json` 이고 사례 묶음의 `version` 과 `factsOn` 의 두 값을 담는다.
+`version` 이 사례 묶음과 다르면 테스트가 실패하고 다시 만드는 명령을 낸다.
+
+```bash
+# cwd: backend/
+./gradlew test --tests '*MemoryRecallEvalTest' -PmemoryEval.writeBaseline=true
+```
+
+| 언제 | 누가 | 무엇을 근거로 |
+| --- | --- | --- |
+| 사례를 더하거나 고쳐 `version` 을 올릴 때 | 그 PR 의 작성자 | 사례만 바꾼 상태의 값으로 다시 만든다. PR 본문에 앞뒤 값과 바뀐 범주를 적는다 |
+| 조립을 바꿔 값이 좋아졌을 때 | 그 PR 의 작성자 | 좋아진 값으로 올린다. 다음 변경이 그 값보다 나빠지지 않게 한다 |
+| 조립을 바꿔 값이 나빠졌을 때 | 다시 만들지 않는다 | 나빠진 것을 감수할 까닭이 있으면 ADR 로 남기고 사람이 승인한 뒤에 다시 만든다 |
+
+리뷰는 기준 파일이 바뀐 PR 에서 사례 변경과 조립 변경이 한 커밋에 섞였는지 본다. 섞이면 어느 쪽 때문에 값이 바뀌었는지 가릴 수 없다.
+
+### 답 판정
+
+실린 기억이 답에 반영됐는지를 모델로 재는 하네스다. CI 에서 돌지 않고 기본은 꺼짐이다.
+`backend/` 의 `./gradlew memoryJudgeEval` 이 `model-eval` 태그의 `MemoryJudgeEvalTest` 만 돌린다. 설정이 없으면 그 테스트는 건너뛴다.
+
+- 사례 묶음 가운데 `judge` 가 있는 사례만 쓴다. 사례마다 `factsOn` 조립을 실은 답과 기억 없이 한 답을 하나씩 받는다
+- 답은 OpenAI 호환 chat API 를 직접 불러 받는다. Hermes 를 거치지 않으므로 Hermes 의 시스템 지시는 재현하지 않는다
+- 판정 모델에 `judge` 의 질문을 하나씩 묻고 첫 줄의 `YES`, `NO` 만 읽는다. 그 밖의 답은 판정 불가로 센다
+- 지표는 기억 있음과 없음 각각의 기대 답 일치율, 그 차이, 판정 불가 수, 쓴 호출 수다. 결과는 `backend/build/reports/memory-judge/` 에 남는다
+- 호출 수가 상한에 닿으면 멈추고 보고서에 예산 소진을 적는다
+
+| 환경 변수 | 뜻 |
+| --- | --- |
+| `MEMORY_JUDGE_BASE_URL` | OpenAI 호환 API 의 주소. 없으면 돌지 않는다 |
+| `MEMORY_JUDGE_API_KEY` | 그 API 의 key |
+| `MEMORY_JUDGE_ANSWER_MODEL`, `MEMORY_JUDGE_JUDGE_MODEL` | 답 모델과 판정 모델 |
+| `MEMORY_JUDGE_MAX_CALLS` | 한 번 실행의 호출 상한. 월 예산을 이 값으로 준다 |
+| `MEMORY_JUDGE_MAX_OUTPUT_TOKENS` | 호출 하나의 출력 상한 |
+
+**실제 판정 모델과 월 예산은 사용자가 정한다.** 정하기 전에는 대역 모델 테스트(`MemoryJudgeHarnessTest`)만 돈다.
+판정기를 믿기 전에 사람이 대조한 표본으로 일치도를 한 번 잰다. 판정 모델이나 판정 질문이 바뀌면 이전 결과와 견주지 않는다.
 
 ### 운영 집계
 
-운영 데이터베이스에서 읽기만 하고 본문과 제목 칸을 읽지 않는다. 접속과 실행 방법은 운영 저장소가 갖는다.
+운영 데이터베이스에서 읽기만 하고 본문과 제목 컬럼을 읽지 않는다. 쿼리는 `backend/src/test/resources/memory-eval/ops-metrics.sql` 에 `-- name: <이름>` 줄로 나눠 두고, 모두 최근 28일을 센다. 접속과 실행 방법은 운영 저장소가 갖는다.
+쿼리가 맞는지는 `MemoryOpsMetricsSqlTest` 가 합성 줄을 넣고 확인한다.
 
-| 지표 | 읽는 칸 | 무엇을 정하는 근거인가 |
-| --- | --- | --- |
-| 되돌리기 비율 | `memory_capture` 의 `CREATED`, `UPDATED` 가운데 `undone_at` 이 있는 비율 | 뒤처리 추출(#310 의 4단계)을 켤지 |
-| 바로 저장 대 제안과 제안의 결말 | `memory_capture.kind` 와 그 항목의 `memory.status`. 지운 항목은 줄이 없어 따로 센다 | 바로 저장 판정이 너무 좁거나 넓은지 |
-| 실행당 문맥 글자 수와 빠진 항목 | 대화 루트 실행의 `context_chars`, `context_omitted_items`. `context_chars` 는 공통 답변 지침을 함께 센다 | 예산과 길이 상한 |
-| 층별 항목 수 | `execution_context_source` 의 `MEMORY_` 로 시작하는 `source` 와 `body_mode`. `MEMORY_READ` 는 읽기 성공 수로 읽는다 | 개인 사실 구역의 효과 |
-| `memory_read` 호출률 | 대화 루트 실행 가운데 `memory_read` 의 `TOOL_STARTED` 사건이 있는 비율 | 개인 사실 구역이 이 값을 줄이는지 |
+| 이름 | 지표 | 읽는 컬럼 | 무엇을 정하는 근거인가 |
+| --- | --- | --- | --- |
+| `layer_items` | 층별 항목 수 | `execution_context_source` 의 `MEMORY_` 로 시작하는 `source`, `body_mode`, `selector` | 개인 사실 구역과 선별 규칙의 효과 |
+| `index_read_rate` | 사용률. 색인에 제목으로 실린 항목이 같은 실행에서 읽힌 비율 | `MEMORY_INDEX` 줄과 같은 실행의 `MEMORY_READ` 줄 | 색인 층에 무엇을 올릴지 |
+| `memory_read_call_rate` | `memory_read` 호출률. 대화 루트 실행 가운데 그 도구의 `TOOL_STARTED` 사건이 있는 비율 | `agent_execution`, `execution_event` | 개인 사실 구역과 질문 기반 선별이 이 값을 줄이는지 |
+| `inline_correction_rate` | 정정률. 본문으로 실린 항목 가운데 처음 실린 뒤에 판 기록이 생긴 비율 | `execution_context_source`, `memory_revision.changed_at` | 실리는 기억이 틀린 정도 |
+| `never_loaded_items` | 미사용 항목. 기간 전에 만들었고 보관하지 않은 `ACCEPTED` 항목 가운데 기간 안에 한 번도 실리지 않은 비율 | `memory`, `execution_context_source` | 정비 루프의 보관 후보 |
+| `proposal_outcomes` | 수락률. 제안 기록의 지금 상태별 수. 지운 항목은 따로 센다 | `memory_capture.kind`, `memory.status` | 바로 저장 판정이 너무 좁거나 넓은지 |
+| `undo_rate` | 되돌리기 비율. `CREATED`, `UPDATED` 가운데 `undone_at` 이 있는 비율 | `memory_capture` | 뒤처리 추출을 켤지 |
+| `regenerate_by_memory` | 본문 기억이 실린 답과 아닌 답의 다시 생성 비율 | `chat_message.replaces_message_id`, `execution_context_source` | 기억이 답을 돕는지. 관찰 비교다 |
+| `context_size` | 실행당 문맥 글자 수와 빠진 항목 | 대화 루트 실행의 `context_chars`, `context_omitted_items`. `context_chars` 는 공통 답변 지침을 함께 센다 | 예산과 길이 상한 |

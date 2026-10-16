@@ -49,6 +49,23 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
     @Column(name = "freshness", nullable = false, length = 16)
     private String freshness;
 
+    /** 고른 규칙의 이름과 버전이다. 값의 목록은 {@code context.ContextSelection} 이 갖는다. 선택 근거가 없는 줄은 비어 있다. */
+    @Column(name = "selector", length = 32)
+    private String selector;
+
+    /** 같은 실행의 같은 {@code source} 안에서 고른 순서다. 1 부터 센다. */
+    @Column(name = "selection_rank")
+    private Integer selectionRank;
+
+    @Column(name = "keyword_score")
+    private Double keywordScore;
+
+    @Column(name = "semantic_score")
+    private Double semanticScore;
+
+    @Column(name = "selection_score")
+    private Double selectionScore;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -83,6 +100,30 @@ public class ExecutionContextSource implements Persistable<ExecutionContextSourc
         String freshness,
         Instant createdAt) {
         return new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness, createdAt);
+    }
+
+
+    /** 선택 근거를 함께 남기는 줄이다(ADR-20261015 / memory-eval-gate). 근거가 없는 값은 null 이다. */
+    public static ExecutionContextSource of(
+        Long executionId,
+        int position,
+        String source,
+        String sourceRef,
+        String bodyMode,
+        String freshness,
+        String selector,
+        Integer selectionRank,
+        Double keywordScore,
+        Double semanticScore,
+        Double selectionScore,
+        Instant createdAt) {
+        ExecutionContextSource row = new ExecutionContextSource(executionId, position, source, sourceRef, bodyMode, freshness, createdAt);
+        row.selector = selector;
+        row.selectionRank = selectionRank;
+        row.keywordScore = keywordScore;
+        row.semanticScore = semanticScore;
+        row.selectionScore = selectionScore;
+        return row;
     }
 
 
