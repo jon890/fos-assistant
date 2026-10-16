@@ -37,8 +37,7 @@ public class AgentAdminController {
             request.costMode(),
             request.credentialScope(),
             request.visibility(),
-            request.ownerEmail(),
-            request.flow())));
+            request.ownerEmail())));
     }
 
 

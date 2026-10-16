@@ -190,7 +190,7 @@ test("대기 줄이 가득 차면 글을 되돌린다", async ({ page, hermes })
   await releaseAndSettle(page, hermes, 1);
 });
 
-test("흐름이 붙은 에이전트라 받지 않으면 까닭을 알린다", async ({
+test("대기 메시지를 받지 않으면 까닭을 알린다", async ({
   page,
   hermes,
 }) => {

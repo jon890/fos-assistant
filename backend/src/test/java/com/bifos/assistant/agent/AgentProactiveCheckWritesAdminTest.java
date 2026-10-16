@@ -18,7 +18,6 @@ import com.bifos.assistant.agent.admin.presentation.AgentAdminController;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -73,7 +72,6 @@ class AgentProactiveCheckWritesAdminTest {
             mock(AppUserRepository.class),
             mock(AgentLifecycleService.class),
             mock(AgentEndpointProbe.class),
-            mock(KnownFlows.class),
             mock(AgentConnectorBindings.class),
             Clock.systemUTC()),
         new CurrentUserProvider()))

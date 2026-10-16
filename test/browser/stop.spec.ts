@@ -159,8 +159,13 @@ test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({
   hermes,
 }) => {
   await hermes.holdNextRun();
+  let stopRequests = 0;
+  await page.route("**/api/chat/executions/*/stop", async (route) => {
+    stopRequests += 1;
+    await route.fallback();
+  });
   await page.goto("/");
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await page.getByRole("radio", { name: "브라우저 비서" }).click();
   await page
     .getByRole("textbox", { name: "메시지" })
     .fill("중지 패널 Esc 검사");
@@ -179,10 +184,11 @@ test("작업 과정 패널을 닫는 Esc 가 중지보다 먼저다", async ({
     page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
   ).toBeEnabled();
   await page.keyboard.press("Escape");
-  await expect(page.getByTestId("no-answer")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("stopped-mark")).toBeVisible({ timeout: 30_000 });
   await expect(
     page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
   ).toHaveCount(0);
+  expect(stopRequests, "두 번째 Esc 가 실행 중지 요청을 한 횟수").toBe(1);
 });
 
 test("입력칸에 초점이 있어도 Esc 로 답을 중지한다", async ({

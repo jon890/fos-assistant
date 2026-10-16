@@ -71,7 +71,6 @@ class AgentMemoryCollectionServiceTest {
         assertThat(granted.collections()).containsExactly("core");
         assertThat(granted.sensitiveCollections()).isEmpty();
 
-        agent.assignFlow(null);
         agents.save(agent);
         agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
         assertThat(grants.findByIdAgentId(agent.id())).hasSize(1);
@@ -84,7 +83,6 @@ class AgentMemoryCollectionServiceTest {
         Agent agent = agents.save(agent());
         // 관리자가 core 의 민감 허용을 켰다. 사건이 다시 나가면 이 줄이 거짓으로 덮인다.
         grants.save(AgentMemoryCollection.of(agent.id(), "core", true, NOW));
-        agent.assignFlow(null);
         agents.save(agent);
         agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
         assertThat(service.grantsOf(agent.id()).sensitiveCollections()).containsExactly("core");

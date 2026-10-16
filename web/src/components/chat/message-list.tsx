@@ -31,7 +31,6 @@ type Props = {
   activity: ActivityState | null;
   conversationId: string | null;
   /** 흐름이 오래 걸린다고 한 번 알렸는지 */
-  flowIsSlow: boolean;
   liveExpanded: boolean;
   onLiveExpandedChange(value: boolean): void;
   expandedOnDone: { executionId: number; expanded: boolean } | null;
@@ -46,7 +45,7 @@ type Props = {
   onAnswer?(text: string): void;
   /** 답 아래 결과물 줄을 누르면 옆 패널에 그 파일을 연다 */
   onOpenArtifact(messageId: Turn["id"], path: string, name: string): void;
-  /** 사용자 메시지 맨 앞의 스킬 커맨드를 칩으로 그린다. 흐름이 붙은 에이전트의 대화는 커맨드를 해석하지 않아 거짓이다 */
+  /** 사용자 메시지 맨 앞의 스킬 커맨드를 칩으로 그린다. */
   skillCommandChips: boolean;
   /** 실패하거나 중지한 결과 전달을 다시 전달한다 */
   onRetryDelivery?(deliveryId: number): void;
@@ -72,7 +71,6 @@ export function MessageList({
   sending,
   activity,
   conversationId,
-  flowIsSlow,
   liveExpanded,
   onLiveExpandedChange,
   expandedOnDone,
@@ -187,7 +185,6 @@ export function MessageList({
     <ActivityBlock
       mode="live"
       state={activity}
-      slow={flowIsSlow}
       expanded={liveExpanded}
       onExpandedChange={onLiveExpandedChange}
       onOpenPanel={onOpenLive}

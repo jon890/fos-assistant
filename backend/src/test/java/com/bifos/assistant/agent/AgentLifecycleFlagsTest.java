@@ -248,8 +248,7 @@ class AgentLifecycleFlagsTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            ownerEmail,
-            null);
+            ownerEmail);
     }
 
 

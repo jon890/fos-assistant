@@ -39,7 +39,6 @@ type Context = Pick<
   | "currentExecutionId"
   | "setExecutionId"
   | "setStopRequested"
-  | "setFlowIsSlow"
   | "setTurns"
   | "conversationIdRef"
   | "refresh"
@@ -73,7 +72,6 @@ export function useConversationSend({
   currentExecutionId,
   setExecutionId,
   setStopRequested,
-  setFlowIsSlow,
   setTurns,
   conversationIdRef,
   refresh,
@@ -122,13 +120,11 @@ export function useConversationSend({
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
-    setFlowIsSlow(false);
     const finishFailedActivity = () => {
       if (selectionVersion.current !== version) return;
       setActivity((previous) => previous && failActivity(previous, Date.now()));
       setLiveExpanded(false);
       liveExpandedRef.current = false;
-      setFlowIsSlow(false);
     };
     setTurns((previous) => [
       ...previous,

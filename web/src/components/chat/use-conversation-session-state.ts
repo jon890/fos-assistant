@@ -61,7 +61,6 @@ export function useConversationSessionState({
   const [selectedVersions, setSelectedVersions] = useState<
     Record<number, number>
   >({});
-  const [flowIsSlow, setFlowIsSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [turnError, setTurnError] = useState<string | null>(null);
   /** 점검 대화의 「지금 살펴보기」 요청을 보내고 응답을 기다리는 중이다 */
@@ -166,8 +165,6 @@ export function useConversationSessionState({
     drainingConversationTasks,
     selectedVersions,
     setSelectedVersions,
-    flowIsSlow,
-    setFlowIsSlow,
     error,
     setError,
     turnError,

@@ -79,7 +79,6 @@ const MESSAGES: Record<string, string> = {
     "예약 작업은 10개까지 만들 수 있어요. 쓰지 않는 작업을 지워 주세요.",
   TASK_SCHEDULE_INVALID:
     "실행 시각을 다시 확인해 주세요. 반복 간격은 15분보다 짧을 수 없어요.",
-  TASK_AGENT_NOT_SUPPORTED: "이 에이전트로는 예약 작업을 만들 수 없어요.",
   ATTENTION_ITEM_NOT_FOUND: "이미 사라진 항목이에요. 화면을 다시 열어 주세요.",
   PROACTIVE_LOOP_UNAVAILABLE: "이 설치에서는 아직 쓸 수 없어요.",
   AUTONOMY_DECISION_NOT_FOUND:

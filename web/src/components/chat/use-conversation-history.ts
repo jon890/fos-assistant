@@ -37,7 +37,6 @@ type Context = Pick<
   | "selectionVersion"
   | "setNotFound"
   | "setTurns"
-  | "setFlowIsSlow"
   | "refresh"
   | "setExpandedOnDone"
   | "liveExpandedRef"
@@ -60,7 +59,6 @@ export function useConversationHistory({
   selectionVersion,
   setNotFound,
   setTurns,
-  setFlowIsSlow,
   refresh,
   setExpandedOnDone,
   liveExpandedRef,
@@ -217,7 +215,6 @@ export function useConversationHistory({
     );
     if (outcome.kind === "answered") {
       setActivity(null);
-      setFlowIsSlow(false);
       settleFinishedActivity(outcome.executionId);
       void refresh();
       handlers.onAnswered?.();
@@ -265,7 +262,6 @@ export function useConversationHistory({
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
-    setFlowIsSlow(false);
   }
 
   async function refreshMessages(id: string, version: number): Promise<Turn[]> {

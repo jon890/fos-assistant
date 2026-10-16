@@ -29,7 +29,7 @@
   | --- | --- |
   | C1 | 추천 질문 생성은 `agent` 에서 `chat` 으로 옮긴다. 주소는 그대로 둔다 |
   | C2 | `ModelChoice` 와 `ModelTier` 는 새 최상위 패키지 `model` 의 `domain` 에 둔다. 이번에는 타입만 옮기고 서비스는 `chat` 에 둔다 |
-  | C3 | 흐름의 계약(`Flow`, `FlowRegistry`)은 `chat` 이 갖고 구현은 `orchestration` 이 갖는다 |
+  | C3 | 흐름의 계약(`Flow`, `FlowRegistry`)은 `chat` 이 갖고 구현은 `orchestration` 이 갖는다. 2026-10-15 `ResearchAndBuildFlow` 삭제로 이 항목은 폐기됐다 |
   | C4 | 재기동 뒤 남은 실행을 정리하는 일은 `chat` 에 두고, 위임 결과를 자르는 일만 port 로 받는다 |
   | C5 | profile 만들기는 `people` 이 갖고 `agent` 는 port 로 부른다. 첫 로그인의 첫 에이전트 만들기는 `user` 에서 `people` 로 옮기고 같은 트랜잭션에서 동기로 부른다 |
   | C6 | `ChatService` 는 이 작업에서 나누지 않는다 |

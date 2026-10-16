@@ -195,6 +195,7 @@ class AgentRunnerSubmitFailureTest {
             (execution, runId) -> {
             },
             () -> false,
+            null,
             null);
     }
 }

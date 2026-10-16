@@ -154,13 +154,6 @@ test("activityLabel 은 같은 도구 항목이 도는 중일 때와 끝났을 �
   assert.equal(activityLabel(done), "작업을 했어요");
 });
 
-test("activityLabel 은 도구가 아닌 항목의 이름을 그대로 낸다", () => {
-  const state = applyChatEvent(emptyActivity(0), { type: "step", stepName: "researcher", stepState: "started" });
-
-  assert.equal(state.items[0]!.kind, "step");
-  assert.equal(activityLabel(state.items[0]!), "조사");
-});
-
 test("switched 사건은 글이 있든 비었든 대화의 작업 과정에 줄을 만들지 않는다", () => {
   for (const text of [undefined, null, "", "  ", "다른 모델"]) {
     const state = applyChatEvent(emptyActivity(0), { type: "switched", text });
