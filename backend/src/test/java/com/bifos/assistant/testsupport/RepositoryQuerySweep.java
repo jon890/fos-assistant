@@ -7,6 +7,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -201,6 +202,9 @@ public class RepositoryQuerySweep {
             }
             if (raw == Instant.class) {
                 return FIXED_INSTANT;
+            }
+            if (raw == BigDecimal.class) {
+                return BigDecimal.ONE;
             }
             if (raw == UUID.class) {
                 return FIXED_UUID;

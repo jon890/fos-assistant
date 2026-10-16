@@ -13,8 +13,8 @@ VALUES (900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00
 INSERT INTO allowed_person (id, email, display_name, hermes_profile, enabled, created_at)
 VALUES (900000001, 'coverage-900000001@example.test', 'coverage-900000001', 'coverage-900000001', 1, '2020-01-01 00:00:00');
 
-INSERT INTO app_user (id, email, display_name, group_id, role, created_at)
-VALUES (900000001, 'coverage-900000001@example.test', 'coverage-900000001', 900000001, 'MEMBER', '2020-01-01 00:00:00');
+INSERT INTO app_user (id, email, display_name, group_id, role, created_at, limit_order_amount_krw, limit_updated_at)
+VALUES (900000001, 'coverage-900000001@example.test', 'coverage-900000001', 900000001, 'MEMBER', '2020-01-01 00:00:00', 1, '2020-01-01 00:00:00');
 
 INSERT INTO chat_artifact (id, conversation_id, message_id, path, byte_size, created_at)
 VALUES (900000001, 900000001, 900000001, 'coverage-900000001', 1, '2020-01-01 00:00:00');
@@ -103,8 +103,8 @@ VALUES (900000001, 900000001, 'test', 'coverage-900000001', 'test', '2020-01-01 
 INSERT INTO attention_event (id, user_id, item_key, state_key, trigger_type, attention, event_type, stale, created_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'test', 'test', 1, '2020-01-01 00:00:00');
 
-INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree)
-VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1);
+INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree, limit_kind, limit_requested, limit_previous)
+VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
 
 INSERT INTO connector_connection (id, user_id, connector_id, status, fields, created_at, updated_at, undeclared_tools, vault_stored)
 VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
@@ -123,9 +123,6 @@ VALUES (900000001, UNHEX(LPAD(HEX(900000001), 64, '0')), UNHEX(LPAD(HEX(90000000
 
 INSERT INTO decision_feedback_event (id, user_id, subject_type, subject_key, event_type, actor, contract_version, occurred_at)
 VALUES (900000001, 900000001, 'FOLLOW_UP', 'coverage-900000001', 'SURFACED', 'USER', 1, '2020-01-01 00:00:00');
-
-INSERT INTO financial_order_limit (user_id, updated_at)
-VALUES (900000001, '2020-01-01 00:00:00');
 
 INSERT INTO follow_up (id, public_id, user_id, conversation_id, proposed_by_execution_id, title, title_key, waiting, status, created_at, updated_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 1, 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00');
@@ -168,9 +165,6 @@ VALUES (900000001, 900000001, 900000001, '2020-01-01 00:00:00', '2020-01-01 00:0
 
 INSERT INTO content_draft_revision (id, draft_id, revision, status, schema_version, created_at, body, body_key_id)
 VALUES (900000001, 900000001, 1, 'VALID', 1, '2020-01-01 00:00:00', '암호화 본문 대역', 900000001);
-
-INSERT INTO financial_limit_change (action_id, user_id, limit_kind, requested_value, previous_value, created_at)
-VALUES (900000001, 900000001, 'ORDER_AMOUNT_KRW', 1, 1, '2020-01-01 00:00:00');
 
 INSERT INTO media_observation_request (id, attachment_id, request_id, request_hash, observation_id)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001);
