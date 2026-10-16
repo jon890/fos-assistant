@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 /**
  * 기억 항목의 벡터다. 임베딩 대상은 {@code ACCEPTED}, 꺼내는 방식 {@code SEARCH}, 출처 원문이 아니고, 민감도가 {@code NORMAL} 이며 암호화하지 않은 항목이다.
+ * 효력 있는 대체 연결이 가리키는 항목도 빠진다. 이미 있던 그 항목의 벡터는 다음 주기의 정리가 지운다.
  */
 public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding, Long> {
 
@@ -32,6 +33,9 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
         + " and m.contentKeyId is null"
+        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
         + " order by m.id")
     List<MemoryEmbeddingSource> findEmbeddableSources();
 
@@ -45,6 +49,9 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
         + " and m.contentKeyId is null"
+        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE)"
         + " order by m.id")
     List<MemoryEmbeddingSource> findEmbeddableSourcesByIds(@Param("ids") Collection<Long> ids);
 
@@ -55,13 +62,16 @@ public interface MemoryEmbeddingRepository extends JpaRepository<MemoryEmbedding
     List<MemoryEmbeddingStamp> findStamps();
 
 
-    /** 항목이 없어졌거나 임베딩 대상에서 빠진 줄의 번호다. */
+    /** 항목이 없어졌거나 임베딩 대상에서 빠진 줄의 번호다. 대체된 항목의 줄도 여기 든다. */
     @Query("select e.memoryId from MemoryEmbedding e"
         + " where not exists (select 1 from Memory m where m.id = e.memoryId"
         + " and m.status = com.bifos.assistant.memory.domain.type.MemoryStatus.ACCEPTED"
         + " and m.retrieval = com.bifos.assistant.memory.domain.type.MemoryRetrieval.SEARCH"
         + " and m.entryType <> com.bifos.assistant.memory.domain.type.MemoryEntryType.SOURCE"
         + " and m.sensitivity = com.bifos.assistant.memory.domain.type.MemorySensitivity.NORMAL"
-        + " and m.contentKeyId is null)")
+        + " and m.contentKeyId is null"
+        + " and not exists (select 1 from MemoryLink l where l.toMemoryId = m.id"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.ACTIVE))")
     List<Long> findStaleMemoryIds();
 }

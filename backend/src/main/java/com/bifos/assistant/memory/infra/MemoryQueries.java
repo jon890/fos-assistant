@@ -1,14 +1,19 @@
 package com.bifos.assistant.memory.infra;
 
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
+import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
+import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
+import jakarta.persistence.criteria.CommonAbstractCriteria;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -38,7 +43,8 @@ public final class MemoryQueries {
     /**
      * 에이전트의 실행에 실을 수 있는 항목이다.
      *
-     * <p>볼 수 있는 항목 가운데 승인됐고, 출처 원문이 아니며, 꺼내는 방식이 맞는 것만 고른다. {@code collections} 가
+     * <p>볼 수 있는 항목 가운데 승인됐고, 출처 원문이 아니며, 대체되지 않았고, 꺼내는 방식이 맞는 것만 고른다. 대체됐다는 것은
+     * 효력 있는 {@code SUPERSEDES} 연결이 그 항목을 가리킨다는 뜻이다(ADR-20261015 / memory-link). {@code collections} 가
      * null 이면 collection 과 민감도를 거르지 않는다. 사용자가 자기 목록을 볼 때 쓴다.
      *
      * @param collections 에이전트가 받는 collection. null 이면 거르지 않는다
@@ -55,6 +61,7 @@ public final class MemoryQueries {
                 readable(root, builder, userId, groupId),
                 builder.equal(root.get("status"), MemoryStatus.ACCEPTED),
                 builder.notEqual(root.get("entryType"), MemoryEntryType.SOURCE),
+                notSuperseded(root, query, builder),
                 builder.equal(root.get("retrieval"), retrieval));
             if (collections == null) {
                 return selected;
@@ -65,6 +72,18 @@ public final class MemoryQueries {
                 : builder.or(normal, root.get("collection").in(sensitiveCollections));
             return builder.and(selected, root.get("collection").in(collections), sensitivity);
         };
+    }
+
+
+    /** 대체되지 않은 항목이다. 효력 있는 {@code SUPERSEDES} 연결이 그 항목을 가리키지 않는다. 제안 중인 연결은 아무것도 바꾸지 않는다. */
+    private static Predicate notSuperseded(Root<Memory> root, CommonAbstractCriteria query, CriteriaBuilder builder) {
+        Subquery<Long> superseding = query.subquery(Long.class);
+        Root<MemoryLink> link = superseding.from(MemoryLink.class);
+        superseding.select(link.get("id")).where(
+            builder.equal(link.get("toMemoryId"), root.get("id")),
+            builder.equal(link.get("type"), MemoryLinkType.SUPERSEDES),
+            builder.equal(link.get("status"), MemoryLinkStatus.ACTIVE));
+        return builder.not(builder.exists(superseding));
     }
 
 

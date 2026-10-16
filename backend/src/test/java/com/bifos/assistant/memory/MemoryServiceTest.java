@@ -132,6 +132,21 @@ class MemoryServiceTest {
 
 
     @Test
+    @DisplayName("대체된 항목은 주입과 본문 읽기에서 빠져도 사람이 보는 목록에는 남는다")
+    void keepsSupersededItemInListButNotInInjection() {
+        Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "내용", false);
+        Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "내용", false);
+        MemoryLink link = MemoryLink.proposeSupersede(fresh.id(), old.id(), MemoryLinkOrigin.HUMAN, null, NOW);
+        link.accept(NOW);
+        links.save(link);
+
+        assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).containsExactly(old.id(), fresh.id());
+        assertThat(memories.indexedFor(ADMIN, CORE)).extracting(Memory::id).containsExactly(fresh.id());
+        assertNotFound(() -> memories.bodyFor(ADMIN, CORE, old.id()));
+    }
+
+
+    @Test
     @DisplayName("개인 항목은 주인만 보고 그룹 항목은 같은 그룹이 본다")
     void personalItemsOnlyOwnerSeesAndGroupItemsSameGroupSees() {
         Memory personal = memories.create(ADMIN, MemoryScope.USER, "개인", "내용", false);

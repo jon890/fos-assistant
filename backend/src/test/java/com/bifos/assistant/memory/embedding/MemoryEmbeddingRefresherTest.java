@@ -2,6 +2,7 @@ package com.bifos.assistant.memory.embedding;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.embedding.EmbeddingClient;
 import com.bifos.assistant.memory.application.embedding.EmbeddingRejectedException;
@@ -11,10 +12,13 @@ import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingRefresher
 import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
+import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
+import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -61,6 +65,12 @@ class MemoryEmbeddingRefresherTest {
     TestClock clock;
 
     @Autowired
+    MemoryLinkService linkService;
+
+    @Autowired
+    MemoryLinkRepository links;
+
+    @Autowired
     TrackingBackgroundTasks backgroundTasks;
 
     private final FakeClient client = new FakeClient();
@@ -69,6 +79,7 @@ class MemoryEmbeddingRefresherTest {
     @BeforeEach
     void setUp() {
         embeddings.deleteAll();
+        links.deleteAll();
         repository.deleteAll();
     }
 
@@ -123,6 +134,34 @@ class MemoryEmbeddingRefresherTest {
         assertThat(written).isEqualTo(1);
         assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(edited.id());
         assertThat(embeddings.findById(edited.id()).orElseThrow().textFingerprint()).isNotEqualTo(before);
+    }
+
+
+    @Test
+    @DisplayName("대체된 항목은 줄이 생기지 않고 이미 있던 줄은 다음 주기에 지워지며 대체를 끊으면 다시 생긴다")
+    void skipsAndRemovesSupersededItems() {
+        Memory old = memories.create(USER, MemoryScope.USER, "옛 주소", "서울에 산다", false);
+        Memory fresh = memories.create(USER, MemoryScope.USER, "새 주소", "부산에 산다", false);
+        Memory other = memories.create(USER, MemoryScope.USER, "다른 옛 것", "대체될 메모", false);
+        MemoryLink before = linkService.proposeSupersede(USER, fresh.id(), other.id(), MemoryLinkOrigin.AGENT, null);
+        linkService.accept(USER, before.id());
+        refresher(ENABLED).refreshOnce();
+        assertThat(embeddings.findAll())
+            .extracting(MemoryEmbedding::memoryId)
+            .containsExactlyInAnyOrder(old.id(), fresh.id());
+
+        MemoryLink link = linkService.proposeSupersede(USER, fresh.id(), old.id(), MemoryLinkOrigin.AGENT, null);
+        linkService.accept(USER, link.id());
+        refresher(ENABLED).refreshOnce();
+
+        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(fresh.id());
+
+        linkService.revoke(USER, link.id());
+        refresher(ENABLED).refreshOnce();
+
+        assertThat(embeddings.findAll())
+            .extracting(MemoryEmbedding::memoryId)
+            .containsExactlyInAnyOrder(old.id(), fresh.id());
     }
 
 

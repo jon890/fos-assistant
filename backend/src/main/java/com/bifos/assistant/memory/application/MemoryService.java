@@ -14,10 +14,13 @@ import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
+import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
+import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
+import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryQueries;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
@@ -56,6 +59,7 @@ public class MemoryService {
 
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
+    private final MemoryLinkRepository links;
     private final AgentMemoryCollectionService agentCollections;
     private final MemoryCollectionService collections;
     private final MemoryContentCipher cipher;
@@ -206,12 +210,16 @@ public class MemoryService {
     }
 
 
-    /** 한 항목이 그 접근 범위의 {@code memory_read} 로 읽히는 항목인가. {@link #bodyFor} 가 같은 판정을 쓴다. */
+    /**
+     * 한 항목이 그 접근 범위의 {@code memory_read} 로 읽히는 항목인가. {@link #bodyFor} 가 같은 판정을 쓴다. 대체된 항목은 읽히지 않는다(ADR-20261015
+     * / memory-link).
+     */
     public boolean readableByTool(Memory memory, MemoryAccess access) {
         return memory.status() == MemoryStatus.ACCEPTED
             && memory.retrieval() == MemoryRetrieval.SEARCH
             && memory.entryType() != MemoryEntryType.SOURCE
-            && access.allows(memory.collection(), memory.sensitivity());
+            && access.allows(memory.collection(), memory.sensitivity())
+            && !links.existsByToMemoryIdAndTypeAndStatus(memory.id(), MemoryLinkType.SUPERSEDES, MemoryLinkStatus.ACTIVE);
     }
 
 
