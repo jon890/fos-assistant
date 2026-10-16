@@ -91,7 +91,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261008 / cron-to-task](ADR-20261008-cron-to-task.md) | Hermes cron 자동화는 예약 작업으로 옮기고, 결과는 assistant 안에서만 받는다 | backend, frontend | Accepted. ADR-076 의 예약 작업에 모델 단계와 「보고할 것 없음」 완료를 더한다 |
 | [ADR-20261008 / daily-loop](ADR-20261008-daily-loop.md) | 매일 깨우기가 끝나면 동의한 사용자의 살펴보기 한 번에 가치 평가와 행동 정책을 한 번만 잇는다 | backend, frontend | Accepted. [ADR-20261007 / value-evaluation](ADR-20261007-value-evaluation.md) 의 「살펴보기에서 자동으로 부르지 않는다」 를 매일 깨우기에 한해 바꾸고, ADR-072 와 ADR-074 의 후보 기록과 「내 차례」 항목을 넓힌다 |
 | [ADR-20261008 / default-toolsets](ADR-20261008-default-toolsets.md) | 기본 에이전트는 web 과 셸, 파일, 코드 실행을 켜고 시작하되 셸 계열은 실행 공간이 있을 때만 켠다 | 공통 | Accepted. ADR-086 의 도구 저장에 local 로 돌리지 않는 쓰기를 더한다 |
-| [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다 |
+| [ADR-20261008 / memory-facts](ADR-20261008-memory-facts.md) | 짧은 개인 기억은 본문까지 「개인 사실 구역」에 싣고, 답마다 참고한 기억을 사용자에게 보인다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 「색인에 제목이 실린다」 를 개정하고 ADR-015 에 예외를 둔다. 옛 값과 새 값이 함께 실리는 문제는 [ADR-20261015 / memory-link](ADR-20261015-memory-link.md) 가 푼다 |
 | [ADR-20261008 / memory-remember-guard](ADR-20261008-memory-remember-guard.md) | 바로 저장은 모델이 다듬은 본문도 받고, 부정이 뒤집힌 글과 민감해 보이는 글과 오래된 대화만 제안으로 내린다 | backend, frontend | Accepted. ADR-20261007 / memory-remember 의 바로 저장 조건 2 와 5 를 개정한다 |
 | [ADR-20261008 / read-data-flow](ADR-20261008-read-data-flow.md) | 커넥터 READ 결과는 가는 곳마다 따로 판정하고, 판정하지 못하는 길은 감수로 적는다 | 공통 | Accepted. ADR-083 과 ADR-086 의 「감당할 것」 을 흐름마다 나눠 적는다 |
 | [ADR-20261008 / tool-catalog-visibility](ADR-20261008-tool-catalog-visibility.md) | 관리자는 그룹의 도구 선택 목록을 정하고 숨김은 활성 상태를 바꾸지 않는다 | backend, frontend | Accepted. ADR-029의 도구 조회와 저장에 그룹별 숨김을 더한다 |
@@ -112,6 +112,8 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261013 / financial-order-opening](ADR-20261013-financial-order-opening.md) | 토스 일반 주문의 생성과 취소를 준비 도구 하나로 열고, 계좌는 한 사용자에게만 묶는다 | backend, frontend, hermes | Accepted. ADR-20261010 / financial-execution-guard 와 ADR-20261012 / financial-unsent-proof 위에 선다. ADR-049 의 「`FINANCIAL` 은 wrapper 뒤에 연다」 와 ADR-20261010 / financial-execution-guard 의 「경로를 열지 않는다」 를 일반 주문의 생성과 취소에 한해 개정한다 |
 | [ADR-20261013 / unknown-retry-key](ADR-20261013-unknown-retry-key.md) | 결과를 모르는 승인 실행은 커넥터가 선언한 오류 코드와 재시도 식별자 하나만 에이전트까지 전한다 | backend, hermes | Accepted. ADR-092 의 「`outcome_unknown` 은 객체 항목을 쓸 수 없다」 를 개정한다. ADR-050 의 자동 재전송 금지는 그대로다 |
 | [ADR-20261015 / financial-user-limits](ADR-20261015-financial-user-limits.md) | 주문 상한은 운영 최대치 안에서 계좌 주인이 정하고, 에이전트는 올리기를 승인 카드로만 요청한다 | backend, frontend, hermes | Accepted. ADR-20261013 / financial-order-opening 의 「거절 이유를 밝히지 않는다」 를 상한 거절에 한해 개정한다. 2026-10-16 개정 절이 저장 위치를 `app_user` 와 `connector_action` 의 컬럼으로 바꾼다 |
+| [ADR-20261015 / memory-link](ADR-20261015-memory-link.md) | 기억 사이의 연결은 링크 테이블에 두고, 옛 값은 지우지 않고 「대체함」 링크로 주입에서 뺀다 | backend, frontend | Accepted. 아직 구현하지 않았다. #310 처음 계획의 `fact_kind` 대체와 ADD/UPDATE/NOOP 를 대신한다 |
+| [ADR-20261015 / memory-maintenance](ADR-20261015-memory-maintenance.md) | 기억 정비는 신호를 쌓아 규칙으로 처리하고, 처음 4주는 제안만 기록한 뒤 정밀도를 보고 자동으로 바꾼다 | backend, frontend | Accepted. 아직 구현하지 않았다. ADR-20261007 / decision-feedback 에 「참고한 기억」 단추 사건을 더한다 |
 
 ## 보관
 
