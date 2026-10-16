@@ -176,7 +176,7 @@ Memory 제목 검색과 본문 읽기, 기억 남기기, 결과물 쓰기, 할 �
 | 도구 | 계약을 갖는 곳 |
 | --- | --- |
 | `memory_read` | [`docs/features/memory.md`](memory.md) 의 「Memory 본문을 읽는 길」 |
-| `memory_search` | [`docs/features/memory.md`](memory.md) 의 「제목 검색의 구현 계약」. 현재 origin의 권한으로 제목만 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
+| `memory_search` | [`docs/features/memory.md`](memory.md) 의 「기억 검색의 구현 계약」. 현재 origin의 권한으로 제목과 일반 본문을 관련도 순으로 찾고 검색 오류를 빈 결과로 바꾸지 않는다 |
 | `artifact_write` | 아래 「결과물 쓰기 도구」 |
 | `agent_list`, `agent_delegate`, `agent_status`, `agent_stop` | [`docs/features/agent-skill.md`](agent-skill.md) 의 「다른 에이전트에게 맡기기」 |
 | `follow_up_propose` | [`docs/features/attention.md`](attention.md) 의 「제안 도구」 |

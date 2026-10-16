@@ -4,18 +4,20 @@
 
 covers: `backend/src/main/java/com/bifos/assistant/memory/`, `web/src/components/memory/`, `web/src/app/memory/`, `web/src/components/chat/memory-*`, `web/src/components/chat/use-memory-*`, `web/src/lib/memory-api.ts`, `web/src/lib/memory-capture-api.ts`, `web/src/lib/memory-use-api.ts`, `hermes/plugins/fos-ctx/`
 
-## 제목 검색의 구현 계약
+## 기억 검색의 구현 계약
 
-`memory_search`는 색인 예산에서 빠진 항목도 현재 실행의 권한으로 제목에서 찾는다. 결과 번호로 기존 `memory_read`를 불러 본문을 읽는다. #285의 첫 범위이며 본문 검색과 운영 acceptance는 아직 끝나지 않았다.
+`memory_search`는 색인 예산에서 빠진 항목도 현재 실행의 권한으로 제목과 본문에서 찾아 관련도 순으로 낸다. 결과 번호로 기존 `memory_read`를 불러 본문을 읽는다.
+점수는 매 turn 의 「질문과 관련된 기억」 구역과 같은 것을 쓴다(아래 「범위와 조립」). 근거와 페이지 방식의 까닭은 [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 이 갖는다.
 
-- 기존 MCP 서버가 읽기 전용 `memory_search(query, limit?, after_id?)`를 받는다. `query`는 앞뒤 공백을 뺀 1자부터 200자까지, `limit`는 기본 10, 1부터 50까지이고 `after_id`는 양의 정수다. 모르는 인자와 잘못된 타입, 선택 인자의 null은 기존 MCP의 `-32602`로 거절한다.
-- 첫 범위는 제목의 대소문자를 구별하지 않는 부분 일치다. `%`, `_`, 역슬래시는 검색 문법이 아니라 글자로 다룬다. 본문과 암호문은 검색하지 않는다. 결과는 번호 오름차순이며 `limit + 1`건만 읽어 다음 페이지가 있는지 정한다.
-- 결과는 `{items: [{id, title, revision, updatedAt}], nextAfterId}`다. 다음 페이지가 없으면 `nextAfterId`는 null이다. 총건수와 본문, 소유자, 비밀값, 출처 원문의 식별자를 내지 않는다. 빈 결과는 성공이다.
-- 검색 SQL은 번호·제목·revision·updatedAt만 조회하며 전체 count와 본문·암호문을 읽지 않는다. 기존 권한 조건의 fluent DTO 투영과 `limit + 1`을 사용한다. 검색에만 독립된 읽기 전용 트랜잭션과 2초 제한을 적용한다. 지연·SQL 실패는 호출 실패로 전파되며 HTTP 경계는 내부 원문 없이 500으로 답한다. 빈 검색 결과와 구별된다.
-- 서명한 호출의 origin 실행에서 사용자와 에이전트를 정한다. 매 호출마다 현재 collection 허용을 읽고, DB 질의에 사용자·그룹 범위, `ACCEPTED`, `SEARCH`, `SOURCE` 제외, collection과 민감도 조건을 먼저 건다. 인자나 페이지 번호가 권한을 정하지 못한다.
-- 검색 후 `memory_read(id)`는 현재 권한을 다시 검사한다. 그 사이 삭제·거절·권한 철회가 있으면 기존의 읽을 수 없다는 응답을 준다. 검색은 본문을 읽지 않았으므로 「참고한 기억」에 본문을 읽은 것으로 기록하지 않는다. 본문을 낸 기존 `MEMORY_READ` 기록은 유지한다.
-- 검색 결과와 제목은 `<external-data>`로 감싼다. 일반 이름과 MCP 접두사가 붙은 이름 모두 시작·완료·실패 사건의 detail과 text를 가린다. 로그에는 실행 번호와 결과 개수만 남긴다. 기존 컨텍스트 예산과 기본 조립 결과는 바꾸지 않는다. 도구 설명이 검색 호출 방법을 안내한다.
-- 페이지 사이에 항목이 바뀌면 최신 권한과 제목으로 다시 질의한다. 이미 지난 번호의 새 일치는 처음부터 다시 검색해야 한다. 고정된 자료는 끝까지 누락·중복 없이 탐색한다. 별도 snapshot이나 검색 캐시는 만들지 않는다.
+- 기존 MCP 서버가 읽기 전용 `memory_search(query, limit?, cursor?)`를 받는다. `query`는 앞뒤 공백을 뺀 1자부터 200자까지, `limit`는 기본 10, 1부터 50까지이고 `cursor`는 앞 결과의 `nextCursor` 문자열이다. 모르는 인자와 잘못된 타입, 선택 인자의 null, 읽을 수 없는 커서, 다른 질문에 쓴 커서는 기존 MCP의 `-32602`로 거절한다.
+- 키워드 점수는 제목과 본문을 음절 bi-gram 으로 쪼갠 BM25 다. 민감 항목과 암호화한 항목은 제목만 쓴다. 의미 점수는 임베딩을 켰을 때만 더한다. `%`, `_`, 역슬래시는 검색 문법이 아니라 글자다.
+- 관련 있다고 판정한 항목만 점수 순으로 내고, 점수가 같으면 번호 오름차순이다. 앞에서 200번째까지만 읽는다. 관련 있는 항목이 없으면 빈 결과이고 성공이다.
+- 결과는 `{items: [{id, title, revision, updatedAt}], nextCursor}`다. 다음 페이지가 없으면 `nextCursor`는 null이다. 점수와 총건수, 본문, 소유자, 비밀값, 출처 원문의 식별자를 내지 않는다.
+- 후보 SQL은 번호·제목·revision·updatedAt 과, 민감도가 `NORMAL` 이고 암호화하지 않은 줄의 본문만 읽는다. 암호문은 SQL 이 `NULL` 로 바꿔 앱까지 오지 않는다. 전체 count 를 읽지 않는다. 검색에만 독립된 읽기 전용 트랜잭션과 2초 제한을 적용한다. 지연·SQL 실패는 호출 실패로 전파되며 HTTP 경계는 내부 원문 없이 500으로 답한다. 빈 검색 결과와 구별된다. 질문 임베딩이 지연 예산 안에 오지 않으면 실패가 아니라 키워드 점수만 쓴다.
+- 서명한 호출의 origin 실행에서 사용자와 에이전트를 정한다. 매 호출마다 현재 collection 허용을 읽고, DB 질의에 사용자·그룹 범위, `ACCEPTED`, `SEARCH`, `SOURCE` 제외, collection과 민감도 조건을 먼저 건다. 인자나 커서가 권한을 정하지 못한다.
+- 검색 후 `memory_read(id)`는 현재 권한을 다시 검사한다. 그 사이 삭제·거절·권한 철회가 있으면 기존의 읽을 수 없다는 응답을 준다. 검색은 본문을 내지 않았으므로 「참고한 기억」에 본문을 읽은 것으로 기록하지 않는다. 본문을 낸 기존 `MEMORY_READ` 기록은 유지한다.
+- 검색 결과와 제목은 `<external-data>`로 감싼다. 일반 이름과 MCP 접두사가 붙은 이름 모두 시작·완료·실패 사건의 detail과 text를 가린다. 로그에는 실행 번호와 결과 개수, 고른 규칙 이름만 남긴다. 도구 설명이 검색 호출 방법을 안내한다.
+- 커서는 질문의 지문과 다음 순위만 담는다. 페이지마다 최신 권한과 항목으로 다시 점수를 매긴다. 항목과 임베딩 서비스 상태가 그대로면 끝까지 누락·중복 없이 탐색하고, 그 사이 바뀌면 처음부터 다시 검색한다. 별도 snapshot이나 검색 캐시는 만들지 않는다.
 
 ```mermaid
 sequenceDiagram
@@ -24,8 +26,9 @@ sequenceDiagram
     participant D as Memory DB
     H->>C: memory_search와 서명한 호출 맥락
     C->>C: 현재 실행과 사용자, collection 권한 확인
-    C->>D: 권한 조건과 제목 조건, 번호와 결과 상한
-    D-->>C: 제목과 안전한 참조 또는 빈 목록
+    C->>D: 권한 조건만 건 후보의 번호, 제목, 일반 본문
+    D-->>C: 후보 또는 빈 목록
+    C->>C: 키워드와 의미 점수로 순위를 매기고 커서 위치부터 자른다
     C-->>H: 감싼 검색 결과
     H->>C: memory_read(id)
     C->>C: 현재 권한과 항목 상태 재검사
@@ -36,11 +39,9 @@ sequenceDiagram
     end
 ```
 
-`MemorySearchTest`와 `MemorySearchMysqlTest`는 제목이 모두 일치하는 50/500/5,000건을 만들어 번호 페이지를 끝까지 읽는다. 모든 페이지를 합친 누락과 중복은 0건이다. 타 사용자·다른 그룹·미허용 collection·민감 허용 없음·승인 전·거절·SOURCE·ARCHIVE의 제목 노출도 0건이다. 실제 조립 예산의 `OMITTED` 항목을 검색한 뒤 본문을 읽어야 `MEMORY_READ`가 생기는 것은 `McpMemorySearchToolTest`가 검사한다.
+`MemorySearchTest`와 `MemorySearchMysqlTest`는 권한 경계와 페이지를 검사한다. 타 사용자·다른 그룹·미허용 collection·민감 허용 없음·승인 전·거절·SOURCE·ARCHIVE 항목은 제목에도 본문에도 맞는 질문으로 찾아도 0건이다. 민감 항목의 본문에만 있는 낱말로는 찾지 못한다. 같은 점수의 항목 200건을 만들어 커서로 끝까지 읽은 누락과 중복은 0건이다. 실제 조립 예산의 `OMITTED` 항목을 검색한 뒤 본문을 읽어야 `MEMORY_READ`가 생기는 것은 `McpMemorySearchToolTest`가 검사한다.
 
-제목이 모두 일치하므로 첫 5건의 Recall@5는 각각 0.1/0.01/0.001, 첫 10건의 Recall@10은 0.2/0.02/0.002다. 이는 결과 상한에 따른 회수율이며 관련도 순위의 평가가 아니다. 본문에만 있고 제목에는 없는 질의의 회수율은 0이다. 본문 검색과 실제 opt-in 파일럿은 별도 미완료 항목이다. 새 벡터·Graph 저장소와 대화 검색, 개인 사실의 값 대체는 이 범위에 넣지 않는다.
-
-2026-10-11 로컬 합성 검사에서 첫 10건을 30회 조회한 값이다. 지연은 트랜잭션과 질의를 포함한 서비스 호출 시간이고, 결과 글자 수는 JSON과 외부 데이터 표시까지 센다. 힙은 결과 직렬화를 포함한 검사 프로세스의 전후 차이여서 GC와 다른 검사에 따라 달라진다. 운영 부하나 한 호출의 최대 메모리를 뜻하지 않는다.
+제목 부분 일치만 하던 2026-10-11 의 로컬 합성 검사에서 첫 10건을 30회 조회한 값이다. 본문 검색으로 바꾼 뒤에는 앱이 후보 전체의 점수를 매기므로 다시 잰다. 지연은 트랜잭션과 질의를 포함한 서비스 호출 시간이고, 결과 글자 수는 JSON과 외부 데이터 표시까지 센다. 힙은 결과 직렬화를 포함한 검사 프로세스의 전후 차이여서 GC와 다른 검사에 따라 달라진다. 운영 부하나 한 호출의 최대 메모리를 뜻하지 않는다.
 
 | DB | 자료 수 | p50(ms) | p95(ms) | 결과 글자 수 | 힙 증감(MiB) |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -51,7 +52,7 @@ sequenceDiagram
 | MySQL | 500 | 4.895 | 8.364 | 888 | +7.5 |
 | MySQL | 5,000 | 2.700 | 3.468 | 899 | +7.5 |
 
-번호 자릿수와 DB 시각 표현 때문에 결과 길이는 DB마다 다르다. 별도 MySQL 지연 회귀는 바깥 트랜잭션에 30초 제한을 둬도 검색 JDBC statement의 제한이 2초임을 확인했고, 5초 지연을 넣은 검색은 2,070ms에 실패했다. 네 칸 SELECT와 count·본문 미조회, 다른 조회의 timeout 미변경도 같은 도우미로 검사한다.
+번호 자릿수와 DB 시각 표현 때문에 결과 길이는 DB마다 다르다. 별도 MySQL 지연 회귀는 바깥 트랜잭션에 30초 제한을 둬도 검색 JDBC statement의 제한이 2초임을 확인했고, 5초 지연을 넣은 검색은 2,070ms에 실패했다. 후보 SELECT 의 컬럼과 암호문·count 미조회, 다른 조회의 timeout 미변경도 같은 도우미(`MemorySearchSqlProbe`)로 검사한다.
 
 ## 요구
 
@@ -150,7 +151,8 @@ sequenceDiagram
 - `retrieval` 이 `ALWAYS` 면 항상 층에 본문을, `SEARCH` 면 색인 층에 제목과 번호만 싣는다. `ARCHIVE` 와 종류가 `SOURCE` 인 항목은 싣지 않는다. 짧은 개인 항목은 아래 「개인 사실 구역」 에 본문까지 싣는다
 - `SENSITIVE` 항목은 `ALWAYS` 로 저장하지 못한다. 그래서 민감 본문은 `instructions` 에 실리지 않는다
 - 조립한 Memory 문맥은 `assistant.context.max-chars` 로 제한한다. 들어가지 않는 항목은 그 항목만 빼고 다음 항목을 계속 담는다. **넘친 항목을 잘라서 싣지 않는다.** 잘린 사실은 틀린 사실이 될 수 있다
-- **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 제목과 번호를 찾고 `memory_read` 로 읽을 수 있다
+- **색인 층에 쓸 자리를 먼저 떼어 둔다.** 몫은 `assistant.context.index-budget-ratio` 다. 색인에서 빠진 허용 항목도 `memory_search` 로 찾고 `memory_read` 로 읽을 수 있다
+- 질문이 있는 조립은 개인 사실 구역 뒤에 아래 「질문과 관련된 기억 구역」 을 싣고, 색인은 관련도가 있는 항목을 점수 순으로, 그 뒤에 나머지를 번호 순으로 싣는다. 질문이 없는 조립은 색인을 번호 순으로만 싣는다
 - 빠진 항목 수는 실행의 `context_omitted_items` 에 남기고 `/memory` 목록의 그 항목에 표시를 단다. 대화 화면에는 끼우지 않는다. 목록의 표시는 `assembleForOwner` 가 collection 을 거르지 않고 조립한 결과로 정한다
 - 공통 답변 지침과 Memory 를 합친 글자 수와 지문을 실행의 `context_chars` 와 `instructions_hash` 에 남긴다. turn 전용 지시는 뺀다. Memory 가 없어도 공통 지침의 길이와 지문이 남으므로 Memory 주입 여부는 지문만으로 판단하지 않는다
 - 본문이나 `retrieval` 이나 `sensitivity` 를 고치면 고치기 전의 값을 `memory_revision` 에 남기고 판 번호를 올린다. 지울 때도 마지막 값을 남긴다
@@ -174,6 +176,18 @@ sequenceDiagram
 - 제목과 본문의 줄바꿈은 공백 하나로 바꿔 한 줄로 싣는다. 색인 줄도 같다. 모델이 정한 제목이 지시문에 머리 줄을 끼우지 못하게 하려는 것이다
 - 구역은 색인 몫을 쓰지 않는다. 그래서 색인 전체가 몫 안에 들면 이 구역이 색인을 밀어내지 못한다
 - 실린 항목도 `retrieval` 이 `SEARCH` 라 `memory_read` 로 읽힌다
+
+#### 질문과 관련된 기억 구역
+
+사용자 질문과 관련도가 높은 몇 건을 본문까지 싣는 구역이다(`MEMORY_SEARCH`). 모델이 `memory_search` 를 부르지 않아도 본문에만 있는 사실이 실린다.
+근거는 [ADR-20261015 / memory-hybrid-selection](../../backend/docs/adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
+
+- 질문은 사용자가 보낸 turn(`TurnIntent.Fresh`, `TurnIntent.Regenerate`)의 글과 위임받은 실행의 작업 글이다. 예약 작업, 위임 결과 전달, 먼저 살펴보기 turn 은 질문 없이 조립한다
+- 후보는 개인 사실 구역에 실리지 않은 색인 후보다. 키워드 점수와 의미 점수를 RRF(k=60)로 합친다. 임베딩을 끄거나 질문 임베딩이 지연 예산 안에 오지 않으면 키워드 점수만 쓴다. 어느 규칙으로 골랐는지는 선택 근거의 `selector` 에 남는다
+- 관련 있다는 판정은 키워드 쪽은 질문 토큰 가운데 그 항목에 있는 토큰의 비율, 의미 쪽은 코사인이 각각 설정값 이상인 것이다. 둘 다 아니면 점수가 없다. 관련 항목이 없는 질문에는 이 구역을 싣지 않는다
+- 민감 항목과 암호화한 항목은 제목으로만 점수를 받고 이 구역에 싣지 않는다. 색인에 제목으로 남는다
+- 건수와 항목당 글자 수, 구역 글자 예산은 `assistant.context` 아래의 설정값이다. 항목은 개인 사실 구역처럼 한 줄로 싣고, 넘치는 항목은 자르지 않고 건너뛴다. 이 구역에 실린 항목은 색인에 다시 싣지 않는다
+- 구역이 질문마다 바뀌므로 지시문 지문도 질문마다 바뀐다
 
 #### 에이전트의 실행에 보이는 항목
 
@@ -325,7 +339,7 @@ sequenceDiagram
 대화의 답 아래에 그 답을 만든 실행이 본문을 받은 기억을 모은다. 근거는 [ADR-20261008 / memory-facts](../adr/ADR-20261008-memory-facts.md) 에 있고, 화면은 위 「참고한 기억」 이 갖는다.
 경로와 응답 칸은 `MemoryUseController` 가, 받은 길의 뜻은 `MemoryUseVia` 가 갖는다.
 
-- 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS` 와 `MEMORY_FACTS` 줄, 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
+- 재료는 답 실행의 `execution_context_source` 가운데 본문을 실은 `MEMORY_ALWAYS`, `MEMORY_FACTS`, `MEMORY_SEARCH` 줄, 그리고 `MEMORY_READ` 줄이다. 제목만 실은 `MEMORY_INDEX` 와 빠진 `OMITTED` 는 넣지 않는다
 - 읽은 항목은 지금 권한으로 다시 판정해, 그 실행의 에이전트가 지금도 `memory_read` 로 읽을 수 있는 항목(`MemoryService.readableByTool`)만 넣는다
 - 지금 요청자가 읽을 수 있고 `ACCEPTED` 인 항목만 지금 제목으로 낸다. 지운 항목, 남의 항목, 되돌려 제안으로 돌아간 항목은 뺀다
 - 본문은 싣지 않는다. 민감 항목도 제목만 낸다. 제목은 `/memory` 목록에도 평문으로 보이는 값이다
@@ -354,6 +368,7 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 | --- | --- | --- | --- | --- | --- |
 | `MEMORY_ALWAYS` | `memory` 의 `ALWAYS` | 원래 값. `SENSITIVE` 는 이 층에 오지 못한다 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
+| `MEMORY_SEARCH` | 「질문과 관련된 기억 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
 | `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | 옛 커넥터 에이전트의 답이면 `EXTERNAL`, 아니면 `AGENT` | `INLINE` | 자동 turn 의 `input` |
@@ -435,19 +450,20 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 ### 합성 측정
 
 `MemoryRecallEvalTest` 가 CI 의 backend 검사(`./gradlew test`)에 함께 돈다. 결과는 `backend/build/reports/memory-eval/` 의 `report.md` 와 `report.json` 에 남고 표준 출력에도 나온다.
-사례마다 Memory 를 테이블에 직접 넣고 `ContextAssembler.assemble` 로 조립한 묶음에서 항목마다 상태(`MemoryEvalScoreboard.ItemState`)를 읽는다. Hermes 대역도 모델도 부르지 않아 빠르고 결과가 늘 같다.
+사례마다 Memory 를 테이블에 직접 넣고 `ContextAssembler.assemble` 에 사례의 질문을 넘겨 조립한 묶음에서 항목마다 상태(`MemoryEvalScoreboard.ItemState`)를 읽는다. Hermes 대역도 모델도 부르지 않아 빠르고 결과가 늘 같다.
 
 | 모드 | 무엇 |
 | --- | --- |
 | `none` | 기억을 싣지 않는다. 아래쪽 기준선이다 |
 | `factsOff` | 개인 사실 구역을 끈 조립. `ContextProperties` 만 바꾼 `ContextAssembler` 를 테스트 안에서 따로 만든다 |
-| `factsOn` | 운영 기본값의 조립. 게이트는 이 모드에만 건다 |
+| `questionOff` | 질문을 넘기지 않은 운영 기본값의 조립. 질문 기반 선별이 무엇을 더했는지 견주는 기준선이다 |
+| `factsOn` | 운영 기본값의 조립. 임베딩은 꺼져 있어 키워드 점수만 쓴다. 게이트는 이 모드에만 건다 |
 | `fullInjection` | 그 에이전트가 볼 수 있는 항목(`MemoryService.alwaysInjectedFor` 와 `indexedFor`)을 예산 없이 모두 본문으로 싣는다. 위쪽 기준선이다 |
 
 #### 사례 묶음
 
 사례 묶음은 `backend/src/test/resources/memory-eval/family-cases.json` 이고 컬럼의 모양은 `MemoryEvalDataset` 이 갖는다. 실제 사람 이름, 메일, 계정, 금액을 쓰지 않는다. 이 저장소는 공개 저장소다.
-범주는 LongMemEval(arXiv 2410.10813)의 다섯 능력에 권한 경계와 부하, 취향과 놓침을 더했다. 조립 측정은 질문을 판정에 쓰지 않으므로 범주는 「그 능력에 필요한 사실이 글에 실리는가」 를 사례로 나누는 이름이다.
+범주는 LongMemEval(arXiv 2410.10813)의 다섯 능력에 권한 경계와 부하, 취향과 놓침을 더했다. 조립 측정은 질문으로 조립하지만 판정은 실린 항목의 상태로만 하므로, 범주는 「그 능력에 필요한 사실이 글에 실리는가」 를 사례로 나누는 이름이다.
 
 | 범주 | 뜻 |
 | --- | --- |
@@ -477,12 +493,14 @@ Memory 를 바꿀 때마다 「다음 대화에서 알고 있는가」 와 「�
 | 권한 경계 노출 | `BOUNDARY` 항목 가운데 `ABSENT` 가 아닌 수 |
 | 실행당 Memory 글자 수, 빠진 항목 | 조립 결과의 글자 수(공통 답변 지침은 뺀다)와 빠진 항목 수 |
 
-지금 조립은 질문을 보지 않으므로 recall@k 는 「질문과 무관하게 앞에 놓인 것」 의 비율이다. 질문 기반 선별과 견줄 출발점으로 읽는다.
+`questionOff` 의 recall@k 는 「질문과 무관하게 앞에 놓인 것」 의 비율이다. 질문 기반 선별과 견줄 출발점으로 읽는다.
+임베딩을 켠 조립은 CI 에서 재지 않는다. 임베딩 서비스를 띄운 개발 머신에서 `./gradlew memoryEmbeddingEval` 이 같은 사례 묶음으로 `hybrid` 모드를 재고 보고서만 남긴다. 모델 후보를 견줄 때 쓴다.
 
 **실패 조건은 둘이다.**
 
 - 어느 모드에서든 권한 경계 노출이 0 이 아니다
 - `factsOn` 모드의 전체 recall@5 가 기준 파일보다 낮거나, 전체 오기억 노출률이 기준 파일보다 높다
+- `factsOn` 모드의 `RECALL_GAP` recall@5 가 `questionOff` 보다 높지 않다
 
 #### 기준 파일
 
