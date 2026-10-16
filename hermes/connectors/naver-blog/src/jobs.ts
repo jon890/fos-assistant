@@ -58,24 +58,21 @@ const INPUT_FILE = /^([0-9a-f-]{36})\.input\.json$/;
 const FINISHED_FILE = /^([0-9a-f-]{36})\.finished$/;
 /**
  * 쓰다 남은 임시 파일과 되돌리지 못한 묵은 잠금. 만든 프로세스가 지우기 전에 죽었으면 남는다.
- * `<상태 파일>.<uuid>.tmp`, `categories-<hash>.json.<uuid>.tmp`, `lock-<hash>.<uuid>.stale`, `lock-<hash>.stale-<job_id>` 다.
+ * `<상태 파일>.<uuid>.tmp`, `lock-<hash>.<uuid>.stale`, `lock-<hash>.stale-<job_id>` 다.
  */
 const ORPHAN_FILE =
-  /^(?:[0-9a-f-]{36}\.json\.[0-9a-f-]{36}\.tmp|categories-[0-9a-f]{16}\.json\.[0-9a-f-]{36}\.tmp|lock-[0-9a-f]{16}\.(?:[0-9a-f-]{36}\.stale|stale-[0-9a-f-]{36}))$/;
+  /^(?:[0-9a-f-]{36}\.json\.[0-9a-f-]{36}\.tmp|lock-[0-9a-f]{16}\.(?:[0-9a-f-]{36}\.stale|stale-[0-9a-f-]{36}))$/;
 
 const isFinished = (status: JobStatus) => status !== "running";
 const unavailable = () => new ToolError("NAVER_BLOG_UNAVAILABLE");
 
-export const stateFile = (dir: string, jobId: string) =>
-  join(dir, `${jobId}.json`);
-export const inputFile = (dir: string, jobId: string) =>
-  join(dir, `${jobId}.input.json`);
+export const stateFile = (dir: string, jobId: string) => join(dir, `${jobId}.json`);
+export const inputFile = (dir: string, jobId: string) => join(dir, `${jobId}.input.json`);
 /**
  * 작업을 끝낼 권리 표시. 작업 프로세스와 묵은 작업을 정리하는 쪽은 서로 다른 프로세스라
  * 이 파일을 먼저 만든 쪽만 끝난 상태를 쓰고, 작업 프로세스는 이 파일이 있으면 더 쓰지 않는다.
  */
-export const finishedFile = (dir: string, jobId: string) =>
-  join(dir, `${jobId}.finished`);
+export const finishedFile = (dir: string, jobId: string) => join(dir, `${jobId}.finished`);
 
 /** 블로그마다 하나인 잠금 파일. 중계 주소는 바인딩마다 달라 같은 브라우저도 여러 주소로 온다. */
 export function lockFile(dir: string, blogId: string) {
@@ -129,8 +126,7 @@ export async function cleanupJobDir(dir: string, now = Date.now()) {
     if (FINISHED_FILE.test(name) || ORPHAN_FILE.test(name)) {
       const path = join(dir, name);
       const info = await stat(path).catch(() => null);
-      if (info && now - info.mtimeMs > KEEP_MS)
-        await unlink(path).catch(() => {});
+      if (info && now - info.mtimeMs > KEEP_MS) await unlink(path).catch(() => {});
       continue;
     }
     const stateMatch = STATE_FILE.exec(name);
@@ -154,14 +150,9 @@ export async function cleanupJobDir(dir: string, now = Date.now()) {
 }
 
 /** 상태 파일을 읽는다. 없거나 깨졌으면 `null`. */
-export async function readState(
-  dir: string,
-  jobId: string,
-): Promise<JobState | null> {
+export async function readState(dir: string, jobId: string): Promise<JobState | null> {
   try {
-    return JSON.parse(
-      await readFile(stateFile(dir, jobId), "utf8"),
-    ) as JobState;
+    return JSON.parse(await readFile(stateFile(dir, jobId), "utf8")) as JobState;
   } catch {
     return null;
   }
@@ -230,15 +221,11 @@ export async function writeInput(dir: string, jobId: string, input: unknown) {
 const queues = new Map<string, Promise<unknown>>();
 
 function queued<T>(path: string, task: () => Promise<T>): Promise<T> {
-  const work = (queues.get(path) ?? Promise.resolve())
-    .catch(() => {})
-    .then(task);
+  const work = (queues.get(path) ?? Promise.resolve()).catch(() => {}).then(task);
   queues.set(path, work);
-  void work
-    .finally(() => {
-      if (queues.get(path) === work) queues.delete(path);
-    })
-    .catch(() => {});
+  void work.finally(() => {
+    if (queues.get(path) === work) queues.delete(path);
+  }).catch(() => {});
   return work;
 }
 
@@ -269,11 +256,7 @@ export function updateState(
   const path = stateFile(dir, jobId);
   return queued(path, async () => {
     const current = await readState(dir, jobId);
-    if (
-      !current ||
-      isFinished(current.status) ||
-      (await finishClaimed(dir, jobId))
-    )
+    if (!current || isFinished(current.status) || (await finishClaimed(dir, jobId)))
       return current;
     const next = { ...current, ...patch };
     // 확인과 쓰기 사이는 프로세스 사이에서 잠기지 않는다. 그 틈에 정리가 끝냄 표시를 만들고 끝난 상태를 쓰면
@@ -354,11 +337,7 @@ export function finishState(
  * 살아 있는 작업 프로세스도 없다고 답하기 때문이다. 그 대신 작업 프로세스가 죽었다는 판정이 최대 30초 늦어진다.
  * 상태 파일이나 `pid` 가 아직 없으면 `createdAt` 에서 10초 안일 때만 살아 있다.
  */
-export function jobAlive(
-  state: JobState | null,
-  createdAt: number,
-  now = Date.now(),
-) {
+export function jobAlive(state: JobState | null, createdAt: number, now = Date.now()) {
   if (state && isFinished(state.status)) return false;
   if (!state || state.pid == null) return now - createdAt < STARTING_MS;
   return (
@@ -380,9 +359,7 @@ export function finishStale(dir: string, state: JobState) {
 
 type LockBody = { job_id?: unknown; created_at?: unknown };
 
-export async function readLock(
-  path: string,
-): Promise<{ jobId: string | null; createdAt: number } | null> {
+export async function readLock(path: string): Promise<{ jobId: string | null; createdAt: number } | null> {
   let raw: string;
   let modified: number;
   try {
@@ -429,17 +406,14 @@ export async function acquireLock(dir: string, blogId: string, jobId: string) {
       await createLock(path, jobId);
       return;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST")
-        throw unavailable();
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw unavailable();
     }
     const lock = await readLock(path);
     if (!lock) continue;
-    const holder =
-      lock.jobId && JOB_ID_PATTERN.test(lock.jobId)
-        ? await readState(dir, lock.jobId)
-        : null;
-    if (jobAlive(holder, lock.createdAt))
-      throw new ToolError("NAVER_BLOG_BUSY");
+    const holder = lock.jobId && JOB_ID_PATTERN.test(lock.jobId)
+      ? await readState(dir, lock.jobId)
+      : null;
+    if (jobAlive(holder, lock.createdAt)) throw new ToolError("NAVER_BLOG_BUSY");
     if (holder && !isFinished(holder.status)) await finishStale(dir, holder);
     await removeStaleLock(path, lock.jobId);
   }

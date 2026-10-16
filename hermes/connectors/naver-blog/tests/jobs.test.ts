@@ -71,10 +71,7 @@ function running(jobId: string, overrides: Partial<JobState> = {}): JobState {
 async function ageLock(dir: string, blogId: string, jobId: string) {
   await writeFile(
     lockFile(dir, blogId),
-    JSON.stringify({
-      job_id: jobId,
-      created_at: new Date(Date.now() - 60_000).toISOString(),
-    }),
+    JSON.stringify({ job_id: jobId, created_at: new Date(Date.now() - 60_000).toISOString() }),
   );
 }
 
@@ -108,18 +105,11 @@ test("잠금을 만든 프로세스가 끝나도 작업 프로세스가 살아 �
   expect(await creator.exited).toBe(0);
   const worker = Bun.spawn([process.execPath, "-e", "await Bun.sleep(30000)"]);
   cleanups.push(() => worker.kill());
-  await updateState(dir, first, {
-    pid: worker.pid,
-    heartbeat_at: new Date().toISOString(),
-  });
+  await updateState(dir, first, { pid: worker.pid, heartbeat_at: new Date().toISOString() });
   await ageLock(dir, BLOG_A, first);
 
-  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe(
-    "NAVER_BLOG_BUSY",
-  );
-  expect(await errorCode(acquireLock(dir, BLOG_B, randomUUID()))).toBe(
-    "resolved",
-  );
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
+  expect(await errorCode(acquireLock(dir, BLOG_B, randomUUID()))).toBe("resolved");
   expect((await readState(dir, first))?.status).toBe("running");
 });
 
@@ -130,17 +120,11 @@ test("pid 가 없는 프로세스여도 방금 갱신한 작업은 살아 있어
   await acquireLock(dir, BLOG_A, first);
   await createState(
     dir,
-    running(first, {
-      stage: "photos",
-      pid: await deadPid(),
-      heartbeat_at: new Date().toISOString(),
-    }),
+    running(first, { stage: "photos", pid: await deadPid(), heartbeat_at: new Date().toISOString() }),
   );
   await ageLock(dir, BLOG_A, first);
 
-  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe(
-    "NAVER_BLOG_BUSY",
-  );
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
   expect((await readState(dir, first))?.status).toBe("running");
 });
 
@@ -149,11 +133,7 @@ test("jobAlive 는 pid 가 있는 작업을 마지막 갱신에서 30초 안이�
   const at = (ms: number) => new Date(now - ms).toISOString();
   const pid = await deadPid();
   const job = (heartbeatAgo: number, startedAgo = 60_000) =>
-    running(randomUUID(), {
-      pid,
-      heartbeat_at: at(heartbeatAgo),
-      started_at: at(startedAgo),
-    });
+    running(randomUUID(), { pid, heartbeat_at: at(heartbeatAgo), started_at: at(startedAgo) });
 
   expect(jobAlive(job(0), 0, now)).toBe(true);
   expect(jobAlive(job(29_999), 0, now)).toBe(true);
@@ -169,11 +149,7 @@ test("30초 넘게 갱신하지 않은 작업의 잠금은 묵은 잠금으로 �
   await acquireLock(dir, BLOG_A, first);
   await createState(
     dir,
-    running(first, {
-      stage: "photos",
-      pid: await deadPid(),
-      heartbeat_at: staleHeartbeat(),
-    }),
+    running(first, { stage: "photos", pid: await deadPid(), heartbeat_at: staleHeartbeat() }),
   );
   await ageLock(dir, BLOG_A, first);
   const second = randomUUID();
@@ -184,9 +160,7 @@ test("30초 넘게 갱신하지 않은 작업의 잠금은 묵은 잠금으로 �
   expect(stale?.status).toBe("failed");
   expect(stale?.error).toEqual({ code: "timeout", stage: "photos" });
   expect(stale?.finished_at).not.toBeNull();
-  expect(JSON.parse(await readFile(lockFile(dir, BLOG_A), "utf8")).job_id).toBe(
-    second,
-  );
+  expect(JSON.parse(await readFile(lockFile(dir, BLOG_A), "utf8")).job_id).toBe(second);
 });
 
 test("저장 단추를 누른 뒤 사라진 작업은 unknown 으로 끝난다", async () => {
@@ -216,9 +190,7 @@ test("대소문자만 다른 두 블로그 아이디는 같은 잠금을 써서 
   await acquireLock(dir, "Example-Blog", randomUUID());
 
   expect(lockFile(dir, "EXAMPLE-BLOG")).toBe(lockFile(dir, "example-blog"));
-  expect(await errorCode(acquireLock(dir, "example-blog", randomUUID()))).toBe(
-    "NAVER_BLOG_BUSY",
-  );
+  expect(await errorCode(acquireLock(dir, "example-blog", randomUUID()))).toBe("NAVER_BLOG_BUSY");
 });
 
 test("pid 를 적기 전의 잠금은 만든 지 10초 안이면 살아 있다", async () => {
@@ -226,14 +198,10 @@ test("pid 를 적기 전의 잠금은 만든 지 10초 안이면 살아 있다",
   const first = randomUUID();
   await acquireLock(dir, BLOG_A, first);
 
-  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe(
-    "NAVER_BLOG_BUSY",
-  );
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("NAVER_BLOG_BUSY");
 
   await ageLock(dir, BLOG_A, first);
-  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe(
-    "resolved",
-  );
+  expect(await errorCode(acquireLock(dir, BLOG_A, randomUUID()))).toBe("resolved");
 });
 
 test("succeeded 로 끝난 상태 위에 정리가 timeout 을 쓰려 해도 그대로다", async () => {
@@ -279,19 +247,11 @@ test("끝난 지 24시간이 지난 상태 파일과 끝냄 표시, 끝난 작�
   const recent = randomUUID();
   const active = randomUUID();
   const finishedAt = (ago: number) => new Date(Date.now() - ago).toISOString();
-  await createState(dir, {
-    ...running(old),
-    status: "failed",
-    finished_at: finishedAt(day + 60_000),
-  });
+  await createState(dir, { ...running(old), status: "failed", finished_at: finishedAt(day + 60_000) });
   await writeFile(finishedFile(dir, old), "");
   const oldTime = new Date(Date.now() - day - 60_000);
   await utimes(finishedFile(dir, old), oldTime, oldTime);
-  await createState(dir, {
-    ...running(recent),
-    status: "succeeded",
-    finished_at: finishedAt(day - 60_000),
-  });
+  await createState(dir, { ...running(recent), status: "succeeded", finished_at: finishedAt(day - 60_000) });
   await writeFile(finishedFile(dir, recent), "");
   await writeInput(dir, recent, { title: "남은 사본" });
   await createState(dir, running(active, { started_at: finishedAt(2 * day) }));
@@ -300,12 +260,7 @@ test("끝난 지 24시간이 지난 상태 파일과 끝냄 표시, 끝난 작�
   await cleanupJobDir(dir);
 
   expect((await readdir(dir)).sort()).toEqual(
-    [
-      `${active}.input.json`,
-      `${active}.json`,
-      `${recent}.finished`,
-      `${recent}.json`,
-    ].sort(),
+    [`${active}.input.json`, `${active}.json`, `${recent}.finished`, `${recent}.json`].sort(),
   );
 });
 
@@ -323,22 +278,13 @@ test("이미 있는 상태 파일 위에 createState 는 EEXIST 로 실패하고
 test("정리가 끝냄 표시를 먼저 만들면 작업 프로세스의 heartbeat 와 끝내기가 그 결과를 덮지 못한다", async () => {
   const dir = await jobDir();
   const jobId = randomUUID();
-  const snapshot = running(jobId, {
-    stage: "photos",
-    pid: 1,
-    heartbeat_at: new Date().toISOString(),
-  });
+  const snapshot = running(jobId, { stage: "photos", pid: 1, heartbeat_at: new Date().toISOString() });
   await createState(dir, snapshot);
   // 다른 프로세스의 정리가 끝냄 표시를 만들었고, 아직 상태는 쓰지 않은 순간.
   await writeFile(finishedFile(dir, jobId), "");
 
-  const heartbeat = await updateState(dir, jobId, {
-    heartbeat_at: "2026-01-01T00:00:00.000Z",
-  });
-  const finished = await finishState(dir, jobId, {
-    status: "succeeded",
-    result: { saved_after: 4 },
-  });
+  const heartbeat = await updateState(dir, jobId, { heartbeat_at: "2026-01-01T00:00:00.000Z" });
+  const finished = await finishState(dir, jobId, { status: "succeeded", result: { saved_after: 4 } });
 
   expect(heartbeat).toEqual(snapshot);
   expect(finished).toEqual(snapshot);
@@ -348,18 +294,11 @@ test("정리가 끝냄 표시를 먼저 만들면 작업 프로세스의 heartbe
 test("끝냄 표시를 만든 정리가 쓴 timeout 위에 작업 프로세스의 heartbeat 가 running 을 되살리지 못한다", async () => {
   const dir = await jobDir();
   const jobId = randomUUID();
-  const snapshot = running(jobId, {
-    stage: "photos",
-    pid: 1,
-    heartbeat_at: new Date().toISOString(),
-  });
+  const snapshot = running(jobId, { stage: "photos", pid: 1, heartbeat_at: new Date().toISOString() });
   await createState(dir, snapshot);
 
   await finishStale(dir, snapshot);
-  await updateState(dir, jobId, {
-    heartbeat_at: new Date().toISOString(),
-    stage: "components",
-  });
+  await updateState(dir, jobId, { heartbeat_at: new Date().toISOString(), stage: "components" });
   await finishState(dir, jobId, { status: "succeeded" });
 
   const state = await readState(dir, jobId);
@@ -380,9 +319,7 @@ test("묵은 잠금 정리는 판정한 뒤 다른 job_id 로 다시 만들어�
   await removeStaleLock(lockFile(dir, BLOG_A), stale);
 
   expect(await readFile(lockFile(dir, BLOG_A), "utf8")).toBe(before);
-  expect(await readdir(dir)).toEqual([
-    lockFile(dir, BLOG_A).slice(dir.length + 1),
-  ]);
+  expect(await readdir(dir)).toEqual([lockFile(dir, BLOG_A).slice(dir.length + 1)]);
 
   await removeStaleLock(lockFile(dir, BLOG_A), fresh);
   expect(await readdir(dir)).toEqual([]);
@@ -397,10 +334,7 @@ test("끝냄 표시를 만들고 10초 넘게 상태를 쓰지 않았으면 그 
   const abandoned = new Date(Date.now() - 11_000);
   await utimes(finishedFile(dir, jobId), abandoned, abandoned);
 
-  const finished = await finishState(dir, jobId, {
-    status: "succeeded",
-    result: { saved_after: 4 },
-  });
+  const finished = await finishState(dir, jobId, { status: "succeeded", result: { saved_after: 4 } });
 
   expect(finished?.status).toBe("succeeded");
   expect(await readState(dir, jobId)).toMatchObject({
@@ -416,12 +350,11 @@ test("24시간이 지난 고아 임시 파일과 되돌리지 못한 잠금만 �
   const lock = lockFile(dir, BLOG_A).slice(dir.length + 1);
   const jobId = randomUUID();
   const oldTemporary = `${randomUUID()}.json.${randomUUID()}.tmp`;
-  const oldCategories = `categories-0123456789abcdef.json.${randomUUID()}.tmp`;
   const oldStale = `${lock}.${randomUUID()}.stale`;
   const oldKept = `${lock}.stale-${randomUUID()}`;
   const recentKept = `${lock}.stale-${jobId}`;
   const oldTime = new Date(Date.now() - day - 60_000);
-  for (const name of [oldTemporary, oldCategories, oldStale, oldKept]) {
+  for (const name of [oldTemporary, oldStale, oldKept]) {
     await writeFile(join(dir, name), JSON.stringify({ job_id: randomUUID() }));
     await utimes(join(dir, name), oldTime, oldTime);
   }
@@ -449,18 +382,12 @@ test("작업 상태 파일에는 초안 본문과 사진 디렉터리가 없다"
     photo_dir: photoDir,
   });
   const snapshots: string[] = [];
-  const read = async () =>
-    snapshots.push(await readFile(stateFile(dir, jobId), "utf8"));
+  const read = async () => snapshots.push(await readFile(stateFile(dir, jobId), "utf8"));
 
   await runWorker(stateFile(dir, jobId), {
     env: { NAVER_BLOG_BROWSER_URL: BROWSER_URL, NAVER_BLOG_ID: BLOG_A },
     runDraft: async (_env, _blocks, _input, onStage) => {
-      for (const stage of [
-        "open",
-        "fill",
-        "save",
-        "save_clicking",
-      ] as RunStage[]) {
+      for (const stage of ["open", "fill", "save", "save_clicking"] as RunStage[]) {
         await onStage(stage);
         await read();
       }
