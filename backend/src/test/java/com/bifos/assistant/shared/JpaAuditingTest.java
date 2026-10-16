@@ -18,6 +18,7 @@ import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.people.domain.AllowedPerson;
+import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.usage.domain.ExecutionContextSource;
 import com.bifos.assistant.connector.infra.FinancialOrderLimitRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -58,6 +59,8 @@ class JpaAuditingTest {
 
     @Autowired
     AppUserRepository users;
+    @Autowired
+    AllowedPersonRepository allowedPeople;
     @Autowired
     TestClock clock;
     @Autowired
@@ -194,10 +197,12 @@ class JpaAuditingTest {
         entityManager.flush();
         Instant before = person.updatedAt();
         clock.set(LATER.plusSeconds(60));
-        entityManager.createQuery("update AllowedPerson p set p.lastLoginAt = :at where p.id = :id")
-            .setParameter("at", micros(LATER.plusSeconds(60))).setParameter("id", person.id()).executeUpdate();
+        Instant loginAt = micros(LATER.plusSeconds(60));
+        assertThat(allowedPeople.updateLastLoginAtIfNewer(person.email(), loginAt)).isEqualTo(1);
         entityManager.clear();
-        assertThat(entityManager.find(AllowedPerson.class, person.id()).updatedAt()).isEqualTo(before);
+        AllowedPerson loggedIn = allowedPeople.findById(person.id()).orElseThrow();
+        assertThat(loggedIn.lastLoginAt()).isEqualTo(loginAt);
+        assertThat(loggedIn.updatedAt()).isEqualTo(before);
     }
 
 
