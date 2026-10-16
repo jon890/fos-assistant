@@ -90,7 +90,7 @@
 | [rule-76](rule-76.md) | 하위 기능은 같은 기능의 아래 하위 기능만 쓴다. | [SUB_FEATURES_FOLLOW_ORDER](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-77](rule-77.md) | 하위 기능으로 나눈 기능은 루트에 역할 패키지를 두지 않는다. | [SPLIT_FEATURES_HAVE_NO_ROOT_ROLES](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-78](rule-78.md) | 운영 클래스의 단순 이름은 겹치지 않는다. | [SIMPLE_CLASS_NAMES_ARE_UNIQUE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
-| [rule-79](rule-79.md) | admin은 하위 기능 아래에 application과 presentation만 둔다. | [ADMIN_PACKAGE_SHAPE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-79](rule-79.md) | admin은 하위 기능 아래에 application, application.dto, presentation만 둔다. | [ADMIN_PACKAGE_SHAPE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-80](rule-80.md) | 기능은 admin을 쓰지 않는다. | [FEATURES_DO_NOT_DEPEND_ON_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-81](rule-81.md) | admin은 기능의 application과 application.dto만 쓴다. | [ADMIN_USES_ONLY_FEATURE_APPLICATION](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
 | [rule-82](rule-82.md) | admin의 엔드포인트는 requireAdmin을 부른다. | [ADMIN_ENDPOINTS_REQUIRE_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |

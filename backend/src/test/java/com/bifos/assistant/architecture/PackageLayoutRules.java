@@ -398,11 +398,11 @@ final class PackageLayoutRules {
                         && Set.of("application", "application.dto", "presentation").contains(below);
                     if (!allowed) {
                         report(item, events, item.getName() + " 는 admin 에 있지만 허용된 패키지가 아니다. "
-                            + "admin 은 application 과 presentation 만 갖는다. 엔티티와 저장소와 설정은 기능이 갖는다.");
+                            + "admin 은 application, application.dto, presentation 만 갖는다. 엔티티와 저장소와 설정은 기능이 갖는다.");
                     }
                 }
             })
-            .as("admin 은 하위 기능 아래에 application 과 presentation 만 둔다");
+            .as("admin 은 하위 기능 아래에 application, application.dto, presentation 만 둔다");
     }
 
 

@@ -1,6 +1,6 @@
 # rule-79
 
-admin은 하위 기능 아래에 application과 presentation만 둔다.
+admin은 하위 기능 아래에 application, application.dto, presentation만 둔다.
 
 검사: [ADMIN_PACKAGE_SHAPE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java)
 
