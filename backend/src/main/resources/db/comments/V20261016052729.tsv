@@ -124,6 +124,12 @@ app_user	group_id	사용자가 속한 그룹 번호
 app_user	role	그룹 역할 ADMIN 관리자 또는 MEMBER 일반 사용자
 app_user	created_at	첫 로그인으로 사용자를 만든 시각
 app_user	model_default_tier	사용자가 고른 기본 모델 단계, NULL이면 그룹 기본값 사용
+app_user	limit_order_amount_krw	주문 1건당 금액 상한 KRW, NULL이면 운영 최대치 적용, 0이면 원화 주문 차단
+app_user	limit_order_amount_usd	주문 1건당 금액 상한 USD, NULL이면 운영 최대치 적용, 0이면 달러 주문 차단
+app_user	limit_order_quantity	주문 1건당 수량 상한, NULL이면 운영 최대치 적용, 0이면 주문 차단
+app_user	limit_daily_amount_krw	하루 누적 주문 금액 상한 KRW, NULL이면 운영 최대치 적용, 0이면 원화 주문 차단
+app_user	limit_daily_amount_usd	하루 누적 주문 금액 상한 USD, NULL이면 운영 최대치 적용, 0이면 달러 주문 차단
+app_user	limit_updated_at	주문 상한 다섯 값 중 하나라도 마지막으로 바꾼 시각, 한 번도 바꾸지 않았으면 NULL
 attention_control	*	지금 화면 카드 항목에 대한 사용자별 숨기기와 미루기 설정
 attention_control	id	제어 설정 내부 번호
 attention_control	user_id	제어 설정의 사용자 번호
@@ -212,6 +218,9 @@ connector_action	created_at	호출 판정 기록 시각
 connector_action	check_tree	먼저 살펴보기 실행 트리에서 나온 호출인지 여부
 connector_action	args_key_id	인자 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문 또는 인자 없음
 connector_action	result_key_id	결과 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문 또는 결과 없음
+connector_action	limit_kind	상한 변경 종류 ORDER_AMOUNT_KRW 원화 금액, ORDER_AMOUNT_USD 달러 금액, ORDER_QUANTITY 수량, DAILY_AMOUNT_KRW 원화 일일 합계, DAILY_AMOUNT_USD 달러 일일 합계, 상한 변경 승인이 아니면 NULL
+connector_action	limit_requested	상한 변경 승인에서 요청한 0 이상의 값, 단위는 limit_kind에 따르며 상한 변경 승인이 아니면 NULL
+connector_action	limit_previous	상한 변경 승인 요청 당시 적용하던 0 이상의 상한, 단위는 limit_kind에 따르며 상한 변경 승인이 아니면 NULL
 connector_action_execution	*	승인한 커넥터 실행의 불변 검증 내용과 일회성 권한 상태
 connector_action_execution	action_id	승인 커넥터 호출 번호이자 이 표의 기본 키
 connector_action_execution	connection_id	실행 당시 커넥터 연결 번호
@@ -420,21 +429,6 @@ execution_skill_use	execution_id	skill을 사용한 실행 내부 식별자
 execution_skill_use	skill_name	사용한 skill 이름
 execution_skill_use	source	skill을 선택한 출처
 execution_skill_use	occurred_at	skill 사용을 기록한 시각
-financial_limit_change	*	금융 주문 한도 변경 승인에 딸린 이전값과 요청값 이력
-financial_limit_change	action_id	한도 변경을 승인한 connector action 내부 식별자
-financial_limit_change	user_id	한도를 소유한 사용자 내부 식별자
-financial_limit_change	limit_kind	변경한 한도 종류
-financial_limit_change	requested_value	요청한 한도 값, limit_kind가 정한 단위
-financial_limit_change	previous_value	변경 전 한도 값, limit_kind가 정한 단위
-financial_limit_change	created_at	변경 요청을 기록한 시각
-financial_order_limit	*	사용자별 금융 주문과 일일 누적 금액의 상한
-financial_order_limit	user_id	한도를 소유한 사용자 내부 식별자
-financial_order_limit	order_amount_krw	주문 1건당 금액 상한(원), NULL이면 운영 최대치 적용
-financial_order_limit	order_amount_usd	주문 1건당 금액 상한(USD), NULL이면 운영 최대치 적용
-financial_order_limit	order_quantity	주문 1건당 수량 상한, NULL이면 운영 최대치 적용
-financial_order_limit	daily_amount_krw	하루 누적 주문 금액 상한(원), NULL이면 운영 최대치 적용
-financial_order_limit	daily_amount_usd	하루 누적 주문 금액 상한(USD), NULL이면 운영 최대치 적용
-financial_order_limit	updated_at	한도를 마지막으로 바꾼 시각
 follow_up	*	사용자가 처리하거나 완료를 기다리는 할 일을 보존하는 표
 follow_up	id	할 일 내부 식별자
 follow_up	public_id	외부 API에 노출하는 할 일 UUID
