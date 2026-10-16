@@ -35,6 +35,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** 가짜 임베딩 서비스로 의미 점수가 조립에 쓰이고, 서비스가 실패하거나 꺼지면 키워드로 물러나는지 확인한다. */
 @BackendIntegrationTest
@@ -197,6 +198,9 @@ class ContextAssemblerHybridTest {
         @Override
         public List<float[]> embed(List<String> inputs, Duration timeout) {
             calls++;
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                .as("임베딩 호출 동안 트랜잭션을 열어 두지 않는다")
+                .isFalse();
             if (failing) {
                 throw new EmbeddingUnavailableException("fake failure");
             }
