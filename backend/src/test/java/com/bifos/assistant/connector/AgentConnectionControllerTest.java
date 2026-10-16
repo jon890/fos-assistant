@@ -125,8 +125,6 @@ class AgentConnectionControllerTest {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
-        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
-            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
             .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
