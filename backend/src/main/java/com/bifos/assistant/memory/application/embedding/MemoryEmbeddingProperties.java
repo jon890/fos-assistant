@@ -8,7 +8,8 @@ import org.springframework.validation.annotation.Validated;
 /**
  * 기억 임베딩 서비스와 채우는 작업의 설정이다(ADR-20261015 / memory-hybrid-selection).
  *
- * <p>{@code baseUrl} 과 {@code model} 이 모두 있어야 켜진다. 둘 중 하나라도 비면 임베딩을 부르지 않고 키워드 점수만 쓴다. 임베딩 서비스는 자체 서버의
+ * <p>{@code baseUrl} 과 {@code model} 이 모두 있어야 켜진다. 둘 중 하나라도 비면 임베딩을 부르지 않고 키워드 점수만 쓴다. {@code application.yml} 은 모델에
+ * 운영 기본 이름을 두므로 주소가 켜고 끄는 값이다. 임베딩 서비스는 자체 서버의
  * 로컬 모델이라 API key 를 두지 않는다. 운영 값은 이 저장소에 적지 않는다.
  *
  * @param baseUrl OpenAI 호환 {@code POST /v1/embeddings} 를 받는 주소. 끝의 {@code /v1/embeddings} 는 붙이지 않는다

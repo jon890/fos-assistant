@@ -102,16 +102,17 @@ assistant:
       # 키워드 순위와 의미 순위를 합치는 RRF 의 k
       rrf-k: 60
     embedding:
-      # OpenAI 호환 POST /v1/embeddings 를 받는 주소와 모델이다. 둘 중 하나라도 비면 임베딩을 끄고 키워드 점수만 쓴다
+      # OpenAI 호환 POST /v1/embeddings 를 받는 주소와 모델이다. 주소가 비면 임베딩을 끄고 키워드 점수만 쓴다
       base-url: ${MEMORY_EMBEDDING_BASE_URL:}
-      model: ${MEMORY_EMBEDDING_MODEL:}
+      # 운영 모델은 BGE-M3 의 int8 ONNX 다(1024차원, 서비스가 1024토큰에서 자른다). 모델을 바꾸면 벡터를 모두 다시 채운다
+      model: ${MEMORY_EMBEDDING_MODEL:onnx-community/bge-m3-ONNX}
       # 질문 하나를 임베딩할 때 기다리는 상한. 넘으면 키워드 점수만 쓴다
       query-timeout: 400ms
       # 채우는 작업이 묶음 하나를 기다리는 상한과 묶음 크기, 한 번에 보내는 묶음 수
       batch-timeout: 30s
       batch-size: 16
       max-batches-per-run: 16
-      # 임베딩할 제목과 본문의 최대 글자 수
+      # 임베딩할 제목과 본문의 최대 글자 수. 서비스가 1024토큰에서 다시 자르므로 그보다 긴 뒤쪽은 의미 점수에 들지 않는다
       max-text-chars: 4000
       # 채우는 작업이 끝나고 다음 작업까지 쉬는 시간
       refresh-delay: 60s
