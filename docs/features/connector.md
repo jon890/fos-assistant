@@ -394,7 +394,7 @@ support POST와 다른 경로는 금융 계수에 넣지 않으며, 독립 loopb
 ### 재시작
 
 이미 떠 있는 MCP 프로세스는 env 파일이 바뀌어도 옛 값을 쓴다.
-어느 설치가 `restart_required`, `plugin_updated`, `reload_pending` 을 돌려받는지는 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 두 설치 표가 갖는다.
+바인딩 설치가 `restart_required`, `plugin_updated`, `reload_pending` 을 돌려받는 조건은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 커넥터 표가 갖는다.
 profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭은 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 의 「대안 기각」 이 갖는다.
 
 - 공유 gateway 재시작은 사용자 요청에서 실행하지 않는다
@@ -410,41 +410,39 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 검증과 옛 응답 호환은 [승인 인자 표시 이름](connector-policy.md#승인-인자-표시-이름)이 갖는다.
 
 Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의 커넥터 경로에 기대는 약속이다.
-경로마다의 요청과 응답, 두 설치 방식의 차이, 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.
+경로마다의 요청과 응답, 바인딩 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.
 
-설치는 두 가지다. 커넥터마다 만든 전용 profile 에 하는 **옛 설치**와, 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치**다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
-`PUT /api/connectors` 는 본문에 `bind` 칸이 없으면 옛 설치를 한다. 그래서 새 칸을 모르는 옛 Control Plane 과 함께 돈다.
+설치는 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치** 하나다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+`PUT /api/connectors` 는 `enabled: true` 일 때 `bind: {vault}` 를 반드시 받고, 없거나 모양이 맞지 않으면 400 이다. `enabled: false` 는 `bind` 없이 그 바인딩을 뗀다.
 
 - `call` 은 `options.tool` 과 `verify.tool` 만 받고 디스크에 쓰지 않는다. 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다
 - `call` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
-- Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정한다. env 이름은 Control Plane 의 응답에 담지 않는다
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [커넥터 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
 - Control Plane은 웹에 `readmeUrl`, `linkKind`를 전달한다. 옛 응답의 README 주소는 null이고, `link_kind`가 없거나 `project`가 아니면 `service`로 읽는다. 목록 카드와 상세 머리는 `link`를 「공식 사이트」 또는 「프로젝트 GitHub」로, `readmeUrl`을 「커넥터 README」로 표시하고 각각 새 탭으로 연다
-- 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 `attachments` 와 같이 카탈로그 읽기를 실패로 다룬다
+- 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 카탈로그 읽기를 실패로 다룬다
 - 카탈로그의 `unknown_errors` 는 `outcome_unknown` 코드마다 선언한 `retry_key` 이름이나 null 이다. 없거나 모양이 틀리면 어느 코드도 받지 않는 것으로 읽고 커넥터는 카탈로그에 남긴다([ADR-20261013 / unknown-retry-key](../adr/ADR-20261013-unknown-retry-key.md))
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `enabled: false` 를 받고 그 기록이 참조하던 env 를 지운다. 소유 기록도 없으면 끌 것이 없어 `changed: false` 로 성공한다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
-- `GET /api/connectors` 는 설치하지 않은 커넥터를 `isolated` 로 답하므로 `mode` 는 설치한 항목의 값만 읽는다. 목록에 없는 커넥터는 설치 안 됨으로 읽는다
+- `GET /api/connectors` 의 `mode` 는 설치 여부와 관계없이 `bind` 다. 목록에 없는 커넥터는 설치 안 됨으로 읽는다
 - 커넥터 표식만 있는 profile 의 떼기는 소유 기록에 그 항목이 없어도 `changed: false` 로 답한다. 다시 보낸 떼기가 401 로 실패하면 Control Plane 의 바인딩 행이 지워지지 않기 때문이다
 
 **도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
 토큰으로 부른 `PUT /api/config` 가 `platform_toolsets` 를 보내면, 소유 기록의 바인딩 항목이 설치한 서버 이름이 요청의 `api_server` 목록에 모두 있어야 한다. 하나라도 빠지면 409 다.
 Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길을 남기지 않는다.
-그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청과 옛 설치 profile 은 이 검사를 하지 않는다.
+그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청은 이 검사를 하지 않는다.
 
 ### 바인딩 설치
 
-`PUT /api/connectors` 의 본문에 `bind: {vault}` 를 더하면 그 보관 파일의 값으로 그 profile 에 커넥터를 붙인다.
+`PUT /api/connectors` 의 `enabled: true` 요청은 `bind: {vault}` 의 보관 파일 값으로 그 profile 에 커넥터를 붙인다.
 그 profile 의 Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
 
 받는 profile 의 조건이다. 하나라도 어기면 409 이고 파일이 하나도 바뀌지 않는다. 표식이 없으면 401 이다.
 
 - `platform_toolsets.api_server` 목록이 있고 그 안에 Control Plane MCP 가 있다. 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고, MCP 이름이 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막히기 때문이다
 - `fos-ctx` 가 켜져 있다. 설치는 plugin 파일만 맞추고 profile 의 plugin 설정은 쓰지 않으므로, 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다. 이 조건은 새로 붙일 때만 본다. 이미 붙은 커넥터의 재설치는 받고, 그 바인딩은 `policy_hook` 이 거짓이라 `PENDING` 에 남는다
-- 옛 설치 항목이 없다. 반대로 바인딩 항목이나 뗀 서버 기록이 있는 profile 은 옛 설치를 받지 않는다
 - 커넥터의 env 이름, 서버 이름, 스킬 디렉터리가 그 커넥터의 소유 기록 없이 이미 있거나 다른 것과 겹치지 않는다
 - manifest 가 `sandbox_required` 를 선언했으면 그 profile 이 실행 공간 정책에 있다. 아니면 409 `sandbox_unavailable` 이다. 다시 설치할 때도 보므로 정책에서 빠진 profile 의 바인딩은 그때 `PENDING` 이 된다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
 
-보관 파일의 키 가운데 지금 칸 선언에 없는 것은 버린다. 칸을 뺀 커넥터의 옛 연결도 연결 확인으로 다시 설치되게 하려는 것이다. 남은 값이 칸 선언과 맞지 않으면 400 이다.
+보관 파일의 키 가운데 지금 칸 선언에 없는 것은 버린다. 칸을 뺀 커넥터의 연결도 연결 확인으로 다시 설치되게 하려는 것이다. 남은 값이 칸 선언과 맞지 않으면 400 이다.
 
 Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 싣는다. 재설치도 같다.
 보내기 전에 그 주인의 첨부 디렉터리를 최선 노력으로 만들고, 만들지 못해도 요청을 보낸다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 막히지 않게 하려는 것이다.
