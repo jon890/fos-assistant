@@ -103,9 +103,9 @@ public class MemoryRelevance {
         double leftNorm = 0;
         double rightNorm = 0;
         for (int i = 0; i < left.length; i++) {
-            dot += (double) left[i] * right[i];
-            leftNorm += (double) left[i] * left[i];
-            rightNorm += (double) right[i] * right[i];
+            dot += (double)left[i] * right[i];
+            leftNorm += (double)left[i] * left[i];
+            rightNorm += (double)right[i] * right[i];
         }
         return leftNorm == 0 || rightNorm == 0 ? 0 : dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
     }

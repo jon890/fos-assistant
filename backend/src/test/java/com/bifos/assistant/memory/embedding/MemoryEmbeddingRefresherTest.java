@@ -35,8 +35,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 class MemoryEmbeddingRefresherTest {
 
     private static final CurrentUser USER = new CurrentUser(1L, "user1@example.com", "user1", 10L, UserRole.ADMIN);
-    private static final MemoryEmbeddingProperties ENABLED =
-        new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, 2, 16, null, null);
+    private static final MemoryEmbeddingProperties ENABLED = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, 2, 16, null, null);
 
     @Autowired
     MemoryService memories;

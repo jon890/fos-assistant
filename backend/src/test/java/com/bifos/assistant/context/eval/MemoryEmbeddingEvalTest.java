@@ -152,7 +152,7 @@ class MemoryEmbeddingEvalTest {
                 "질문 임베딩 지연(%d건): p50 %.1fms, p95 %.1fms\n",
                 queryMillis.size(),
                 queryMillis.get(queryMillis.size() / 2),
-                queryMillis.get(Math.min(queryMillis.size() - 1, (int) Math.ceil(queryMillis.size() * 0.95) - 1)));
+                queryMillis.get(Math.min(queryMillis.size() - 1, (int)Math.ceil(queryMillis.size() * 0.95) - 1)));
         String markdown = "모델 " + model + "\n\n" + latency + "\n" + scoreboard.markdown();
         write(model, markdown);
         assertThat(scoreboard.boundaryViolations()).as("권한 경계를 넘어 문맥 묶음에 든 항목").isEmpty();

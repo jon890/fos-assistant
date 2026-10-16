@@ -41,8 +41,7 @@ class ContextAssemblerHybridTest {
 
     private static final CurrentUser ADMIN = new CurrentUser(1L, "user1@example.com", "user1", 10L, UserRole.ADMIN);
     private static final String AGENT_CODE = "context-hybrid-test";
-    private static final MemoryEmbeddingProperties ENABLED =
-        new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+    private static final MemoryEmbeddingProperties ENABLED = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
     private static final String QUESTION = "바퀴 언제 바꿨지";
 
     @Autowired
@@ -167,7 +166,7 @@ class ContextAssemblerHybridTest {
     private void refresh() {
         new MemoryEmbeddingRefresher(
             ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), clock)
-            .refreshOnce();
+                .refreshOnce();
     }
 
 

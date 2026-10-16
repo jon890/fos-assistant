@@ -179,7 +179,7 @@ public class MemorySearchTest {
         CurrentUser noGroup = new CurrentUser(USER.id(), USER.email(), USER.displayName(), null, USER.role());
         assertThat(search(noGroup, CORE, "일치", 10).items())
             .extracting(MemorySearchItem::id)
-            .containsExactly(own.id());        // 모든 항목에 질문과 같은 벡터를 넣어도 경계 밖 항목은 의미 점수로도 나오지 않는다
+            .containsExactly(own.id()); // 모든 항목에 질문과 같은 벡터를 넣어도 경계 밖 항목은 의미 점수로도 나오지 않는다
         float[] query = {1f, 0f};
         for (Memory each : repository.findAll()) {
             embedEverything(each, query);
@@ -187,10 +187,10 @@ public class MemorySearchTest {
         for (Memory excluded : hidden) {
             assertThat(memories.searchFor(USER, CORE, excluded.title(), 50, MemorySearchCursor.first(excluded.title()), Optional.of(query))
                 .items())
-                .as("벡터를 넣은 " + excluded.title())
-                .extracting(MemorySearchItem::id)
-                .doesNotContainAnyElementsOf(hidden.stream().map(Memory::id).toList())
-                .containsExactlyInAnyOrder(own.id(), group.id());
+                    .as("벡터를 넣은 " + excluded.title())
+                    .extracting(MemorySearchItem::id)
+                    .doesNotContainAnyElementsOf(hidden.stream().map(Memory::id).toList())
+                    .containsExactlyInAnyOrder(own.id(), group.id());
         }
         embeddings.deleteAll();
     }

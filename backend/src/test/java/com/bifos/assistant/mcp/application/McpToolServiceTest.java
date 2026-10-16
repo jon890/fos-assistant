@@ -88,8 +88,7 @@ class McpToolServiceTest {
     @Test
     @DisplayName("기억 검색은 질문 임베딩을 먼저 만들어 넘기고 임베딩이 실패하면 빈 벡터로 키워드 검색을 한다")
     void embedsQuestionBeforeSearchAndFallsBackOnFailure() {
-        MemoryEmbeddingProperties enabled =
-            new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+        MemoryEmbeddingProperties enabled = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
         when(memories.searchFor(any(), any(), any(), anyInt(), any(), any()))
             .thenReturn(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_HYBRID));
         MemorySearchCursor cursor = MemorySearchCursor.first("바퀴 언제 바꿨지");

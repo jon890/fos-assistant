@@ -27,8 +27,7 @@ import org.mockito.Mockito;
 /** 가짜 벡터로 키워드 순위와 의미 순위를 RRF 로 합치는 계산을 확인한다. 실제 모델은 부르지 않는다. */
 class MemoryRelevanceTest {
 
-    private static final MemoryEmbeddingProperties EMBEDDING =
-        new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+    private static final MemoryEmbeddingProperties EMBEDDING = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
     private static final float[] QUERY = {1f, 0f, 0f};
 
     private final List<MemoryEmbedding> stored = new ArrayList<>();
