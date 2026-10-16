@@ -62,6 +62,26 @@ class MysqlMigrationTest {
 
 
     @Test
+    @DisplayName("모든 애플리케이션 테이블과 컬럼에 COMMENT가 있다")
+    void requiresCommentsOnEveryTableAndColumn() {
+        List<String> tables = jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+                  AND table_name <> 'flyway_schema_history' AND TRIM(table_comment) = ''
+                ORDER BY table_name
+                """, String.class);
+        List<String> columns = jdbc.queryForList("""
+                SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name <> 'flyway_schema_history'
+                  AND TRIM(column_comment) = ''
+                ORDER BY table_name, ordinal_position
+                """, String.class);
+        assertThat(tables).as("테이블 COMMENT 누락: 새 마이그레이션에서 COMMENT 를 달라").isEmpty();
+        assertThat(columns).as("컬럼 COMMENT 누락: 새 마이그레이션에서 COMMENT 를 달라").isEmpty();
+    }
+
+
+    @Test
     @DisplayName("에이전트 표에서 폐기한 Java Flow 컬럼을 제거한다")
     void removesRetiredAgentFlowColumn() {
         // Hibernate validate는 남은 여분 컬럼을 거절하지 않으므로 DROP 결과를 직접 확인한다.
