@@ -44,7 +44,8 @@ MemoryCollection은 생성 전용, Agent/AppUser/AllowedPerson은 생성·변경
 새 SQL 파일 이름의 버전은 작성 순간 UTC 시각으로 정하고 `__add_entity_audit_updated_at.sql`로 끝낸다.
 기존 마이그레이션은 고치지 않는다. 추가 SQL은 ADR의 세 nullable DATETIME(6) 칸만 가진다.
 AppUserRepository.updateModelDefaultTier는 시각 인자를 받고 실제 값이 달라질 때 updatedAt과 값을 함께 갱신한다.
-ModelTierService가 기존 Clock의 MICROS 값을 넘기게 한다. AllowedPerson의 로그인 bulk는 updatedAt을 건드리지 않는다.
+ModelTierService가 기존 Clock의 MICROS 값을 넘기게 한다. 갱신 수 0은 사용자 존재 여부로 no-op과 사용자 없음 오류를 구분한다.
+AllowedPerson의 로그인 bulk는 updatedAt을 건드리지 않는다.
 
 ### 3. 저장과 마이그레이션을 검사한다
 

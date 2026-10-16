@@ -67,7 +67,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 
 | 경로 | 시각 책임 |
 | --- | --- |
-| `AppUserRepository.updateModelDefaultTier` | `ModelTierService`가 기존 `Clock`의 MICROS 시각을 인자로 넘기고 JPQL이 `updatedAt`도 갱신한다. 같은 tier 또는 둘 다 NULL이면 UPDATE하지 않는다 |
+| `AppUserRepository.updateModelDefaultTier` | `ModelTierService`가 기존 `Clock`의 MICROS 시각을 인자로 넘기고 JPQL이 `updatedAt`도 갱신한다. 같은 tier 또는 둘 다 NULL이면 UPDATE하지 않는다. 갱신 수가 0이면 사용자 존재 여부를 확인해 no-op과 존재하지 않는 사용자를 구분한다 |
 | `AllowedPersonRepository.updateLastLoginAtIfNewer` | 로그인 시각만 조건부 갱신한다. 관리 설정 변경 시각인 `updatedAt`은 움직이지 않는다 |
 | `ConversationRepository`의 bulk 갱신 | 기존 인자와 조건을 보존한다 |
 | `ResultDeliveryRepository`의 상태·attempt 갱신 | 기존 시각 인자를 보존한다 |
