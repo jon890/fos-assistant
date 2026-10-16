@@ -1274,7 +1274,7 @@ class HttpHermesConnectorClientTest {
     }
 
 
-    @DisplayName("설치 목록의 mode 가 bind 일 때 읽는다")
+    @DisplayName("설치 목록은 bind 방식만 읽고 누락되거나 다른 방식은 거절한다")
     @Test
     void readsBindInstallMode() {
         String url = BASE + "/api/connectors?profile=user-demo";
@@ -1282,7 +1282,14 @@ class HttpHermesConnectorClientTest {
             + "\"configured\":true";
         server.expect(requestTo(url))
             .andRespond(withSuccess(head + ",\"mode\":\"bind\"}]}", MediaType.APPLICATION_JSON));
+        for (String mode : List.of("", ",\"mode\":\"isolated\"", ",\"mode\":false")) {
+            server.expect(requestTo(url))
+                .andRespond(withSuccess(head + mode + "}]}", MediaType.APPLICATION_JSON));
+        }
         assertThat(client.readConnector(PROFILE, DEMO).mode()).isEqualTo(HermesConnectorClient.MODE_BIND);
+        for (int attempt = 0; attempt < 3; attempt++) {
+            assertThatThrownBy(() -> client.readConnector(PROFILE, DEMO)).isInstanceOf(IllegalStateException.class);
+        }
         server.verify();
     }
 
