@@ -2,7 +2,6 @@ package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -80,8 +79,6 @@ class ConnectorBindingServiceLockTest {
         List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
         2,
         List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
         List.of());
@@ -132,8 +129,6 @@ class ConnectorBindingServiceLockTest {
             .thenReturn(CallResult.success(MAPPER.readTree("{\"ok\":true}")));
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(true, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
             .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));

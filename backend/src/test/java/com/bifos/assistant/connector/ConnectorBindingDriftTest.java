@@ -91,12 +91,10 @@ class ConnectorBindingDriftTest {
         List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
         2,
         List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)),
         List.of());
-    private static final ConnectorManifest PLAIN_MANIFEST = new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", List.of(), false, 1, List.of());
+    private static final ConnectorManifest PLAIN_MANIFEST = new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", 1, List.of());
     /** 반영 맞추기의 설치 판정을 통과하는 설치 상태다. */
     private static final ConnectorState INSTALLED = new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND);
     /** manifest 가 바뀌어 그 커넥터 항목만 {@code configured} 가 거짓인 설치 상태다. */

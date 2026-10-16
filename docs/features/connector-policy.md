@@ -6,7 +6,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 
 ## 요구
 
-- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 남아 있는 옛 커넥터 에이전트도 같다
+- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
 - 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))
@@ -172,14 +172,9 @@ Hermes 는 MCP 도구를 `mcp__<서버>__<도구>` 로 등록하면서 글자를
 등록 이름에서 원래 이름을 되찾을 수 없으므로, 설치가 대응을 그 profile 의 `.fos-connector-tools.json` 에 적는다. 형식은 `hermes/plugins/dashboard-profile-api/connector_state.py` 가 갖는다.
 hook 은 `prefix` 로 그 호출이 어느 커넥터 서버의 것인지만 알고, 원래 도구 이름은 `tools` 에서만 찾는다. 이 파일이 있는 profile 에서만 hook 이 커넥터 도구 호출을 묻는다.
 
-`isolated` 칸이 그 profile 의 설치 방식을 적는다. 칸이 없으면 참으로 읽으므로 옛 파일은 바꾸지 않아도 된다. 칸이 있는데 boolean 이 아니면 hook 은 파일을 읽지 못한 것으로 본다.
+대시보드 plugin 이 만드는 대응 파일은 항상 `"isolated": false` 를 싣는다. 이는 일반 에이전트의 profile 에 커넥터를 붙인 바인딩 설치를 뜻하며, `servers` 에는 소유 기록의 모든 서버와 뗀 서버 기록의 서버를 싣는다. manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다.
 
-| `isolated` | 쓰는 설치 | `servers` 에 싣는 것 |
-| --- | --- | --- |
-| 없음(`true` 와 같다) | 옛 설치. 커넥터마다 만든 전용 profile 이다 | 운영 목록에 있고 manifest 를 읽을 수 있는 커넥터의 서버 |
-| `false` | 바인딩 설치. 일반 에이전트의 profile 에 커넥터를 붙인 것이다 | 소유 기록의 모든 서버와 뗀 서버 기록의 서버. manifest 를 읽지 못한 서버는 빈 `tools` 로 싣는다 |
-
-hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루는지는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
+`fos-ctx` 는 `isolated` 가 없으면 호환을 위해 `true` 로 읽고, `true` 또는 누락인 파일에서는 대응에 없는 MCP 도구와 `execute_code` 를 차단한다. 칸이 boolean 이 아니면 대응을 읽지 못한 것으로 처리해 MCP 도구, `execute_code`, 첨부 검사 도구를 차단한다. 이 호환·차단 규칙은 현행 설치 방식이 아니며, plugin 이 만드는 파일의 `false` 와 구별한다. 세 경우의 hook 처리는 [`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md) 의 「커넥터 도구 호출을 묻는다」 가 갖는다.
 
 **바인딩 profile 에서 대응에 실리지 않은 커넥터 서버는 판정 없이 나간다.**
 그래서 manifest 를 읽지 못했거나 소유 기록의 서버 이름이나 실행 정의가 지금 manifest 와 다른 서버도 소유 기록의 이름으로 빈 `tools` 와 함께 싣는다. Control Plane 은 그 서버의 도구를 선언 없는 도구로 막는다.
@@ -191,7 +186,6 @@ hook 이 두 방식에서 대응에 없는 도구와 결과를 어떻게 다루�
 - 같은 커넥터를 같은 서버 이름으로 다시 붙이면 기록에서 지운다. 같은 서버 이름을 지금 붙은 커넥터가 쓰면 붙은 쪽의 도구를 싣는다
 - 기록에는 만료가 없다. gateway 를 재시작한 뒤에는 떼기 전에 시작한 실행이 남지 않으므로 운영자가 지워도 된다
 - 운영자가 뗀 서버와 같은 이름의 MCP 서버를 직접 등록하려면 먼저 기록에서 그 항목을 지운다. 남겨 두면 그 서버의 도구가 모두 판정에서 막힌다
-- 뗀 서버 기록만 남은 profile 도 바인딩 profile 이라 옛 설치를 받지 않는다
 - 실행 공간을 적용하지 않은 profile 에서는 터미널이나 파일 도구가 이 파일을 고칠 수 있다. 실행 공간을 적용한 profile 의 컨테이너에는 이 파일이 없다([ADR-086](../adr/ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md)). 이 위험은 ADR-083 의 「감당할 것」 에 있다
 
 #### 도구 호출 판정

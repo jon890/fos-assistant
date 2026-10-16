@@ -1,8 +1,8 @@
 -- 삭제 전 모든 테이블에 한 행씩 넣는다. 900000001은 검사마다 고유 번호로 치환한다.
 -- nullable FK는 참조 대상 삽입 뒤 연결한다. FK 검사와 CHECK는 끄지 않는다.
 
-INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at, profile_managed, connector_managed, connector_attachments, proactive_check_writes_allowed)
-VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'http://agent-runtime.test', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 900000001, 1, '2020-01-01 00:00:00', 0, 0, 0, 1);
+INSERT INTO agent (id, code, name, hermes_profile, api_base_url, cost_mode, credential_scope, visibility, owner_user_id, enabled, created_at, profile_managed, proactive_check_writes_allowed)
+VALUES (900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', 'http://agent-runtime.test', 'SUBSCRIPTION', 'SHARED_HOUSEHOLD', 'PRIVATE', 900000001, 1, '2020-01-01 00:00:00', 0, 1);
 
 INSERT INTO agent_execution (id, user_id, conversation_id, agent_id, profile_name, cost_mode, status, input_tokens, output_tokens, estimated_cost_micros, started_at, output_text, event_observation)
 VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'SUBSCRIPTION', 'SUCCEEDED', 17, 23, 123, '2020-01-01 00:00:00', '지워야 할 실행 본문', 'coverage-900000001');
@@ -106,8 +106,8 @@ VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'cover
 INSERT INTO connector_action (id, public_id, user_id, connector_id, hermes_tool, decision, passed, status, origin_execution_id, conversation_id, dedupe_key, args_json, args_sha256, result_text, created_at, check_tree, limit_kind, limit_requested, limit_previous)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 'coverage-900000001', 'coverage-900000001', 'ALLOWED', 1, 'EXECUTED', 900000001, 900000001, 'coverage-900000001', '{"private":"지울 인자"}', 'coverage-900000001', '지울 결과', '2020-01-01 00:00:00', 1, 'ORDER_AMOUNT_KRW', 1, 1);
 
-INSERT INTO connector_connection (id, user_id, connector_id, status, fields, restart_required, desired_enabled, created_at, updated_at, undeclared_tools, vault_stored)
-VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', 'coverage-900000001', 1, 1, '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
+INSERT INTO connector_connection (id, user_id, connector_id, status, fields, created_at, updated_at, undeclared_tools, vault_stored)
+VALUES (900000001, 900000001, 'coverage-900000001', 'CONNECTED', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 1, 1);
 
 INSERT INTO connector_conversation_grant (id, user_id, conversation_id, agent_id, connector_id, tool_name, action_id, expires_at, created_at)
 VALUES (900000001, 900000001, 900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 900000001, '2099-01-01 00:00:00', '2020-01-01 00:00:00');
@@ -197,7 +197,6 @@ INSERT INTO task_run (id, public_id, task_id, trigger_id, owner_user_id, schedul
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, '2020-01-01 00:00:00', 'coverage-900000001', 900000001, 900000001, '2020-01-01 00:00:00');
 
 UPDATE connector_action SET agent_id = 900000001 WHERE id = 900000001;
-UPDATE connector_connection SET agent_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET conversation_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET origin_execution_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET source_check_id = 900000001 WHERE id = 900000001;

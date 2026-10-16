@@ -88,11 +88,8 @@ class AgentToolServiceTest {
 
 
     @Test
-    @DisplayName("커넥터와 공유 profile에는 원본 조회를 자동 제공하지 않는다")
-    void connectorAndSharedProfilesAreNotGivenOriginalInspection() {
-        Agent isolated = mock(Agent.class);
-        when(isolated.connectorManaged()).thenReturn(true);
-        service.ensureAttachmentInspection(isolated);
+    @DisplayName("공유 profile에는 원본 조회를 자동 제공하지 않는다")
+    void sharedProfilesAreNotGivenOriginalInspection() {
         Agent shared = mock(Agent.class);
         when(shared.acceptsAttachments()).thenReturn(false);
         service.ensureAttachmentInspection(shared);

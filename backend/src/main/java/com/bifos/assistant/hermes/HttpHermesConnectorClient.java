@@ -161,21 +161,6 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
     }
 
 
-    @Override
-    public void importVault(String vault, String connectorId, String profile) {
-        JsonNode body = request(() -> client.post()
-            .uri(baseUrl + VAULT_PATH + "/import")
-            .header(AUTHORIZATION, bearer())
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of(VAULT, vault, CONNECTOR, connectorId, PROFILE, profile))
-            .retrieve()
-            .body(JsonNode.class));
-        if (!requiredBoolean(body, "ok")) {
-            throw new IllegalStateException();
-        }
-    }
-
-
     /**
      * 성공 응답만 결과로 읽는다. 시간 초과, 끊긴 연결, 서버 오류, 읽을 수 없는 본문은 실행됐는지 알 수 없는 것이다.
      *
@@ -227,23 +212,6 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         } catch (JacksonException ex) {
             return null;
         }
-    }
-
-
-    @Override
-    public InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner) {
-        // 끄는 요청은 실행 공간을 열지 않으므로 첨부 디렉터리 문제로 막지 않는다.
-        if (enabled) {
-            attachmentDirectory.ensure(sandboxOwner);
-        }
-        JsonNode body = request(() -> client.put()
-            .uri(baseUrl + "/api/connectors")
-            .header(AUTHORIZATION, bearer())
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(Map.of(PROFILE, profile, PLUGIN, connectorId, ENABLED, enabled, "sandbox_owner", sandboxOwner))
-            .retrieve()
-            .body(JsonNode.class));
-        return installResult(body, profile, connectorId, enabled);
     }
 
 
@@ -355,26 +323,27 @@ public class HttpHermesConnectorClient implements HermesConnectorClient {
         if (connectors == null || !connectors.isArray()) {
             throw new IllegalStateException();
         }
-        // 옛 대시보드 plugin 은 이 칸을 내지 않는다. JSON true 일 때만 참이다.
         JsonNode hook = response.get("policy_hook");
         boolean policyHook = hook != null && hook.isBoolean() && hook.asBoolean();
         for (JsonNode item : connectors) {
             if (connectorId.equals(text(item, PLUGIN))) {
-                // 옛 대시보드 plugin 은 방식을 내지 않는다. 그때는 옛 설치뿐이었다.
-                String mode = text(item, "mode");
+                String mode = requiredText(item, "mode");
+                if (!MODE_BIND.equals(mode)) {
+                    throw new IllegalStateException();
+                }
                 return new ConnectorState(
                     profile,
                     requiredBoolean(item, ENABLED),
                     requiredBoolean(item, "configured"),
                     false,
                     policyHook,
-                    mode == null ? MODE_ISOLATED : mode,
+                    mode,
                     HttpHermesConnectorGuard.supportState(item.get("execution_guard")));
             }
         }
         // 대시보드는 운영 목록에도 없고 소유 기록도 없는 plugin 을 목록에 넣지 않는다. 설치되지 않은 것이다.
         // 응답 모양이 틀린 것은 위에서 예외로 끝났으므로 여기 오는 것은 모양이 맞는 응답뿐이다.
-        return new ConnectorState(profile, false, false, false, policyHook, MODE_ISOLATED);
+        return new ConnectorState(profile, false, false, false, policyHook, MODE_BIND);
     }
 
 

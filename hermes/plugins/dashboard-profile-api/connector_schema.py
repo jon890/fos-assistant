@@ -17,11 +17,8 @@ CONNECTOR_COMMAND_ENV = "FOS_ASSISTANT_CONNECTOR_COMMAND"
 CONNECTOR_STATE = ".fos-connectors.json"
 
 
-# 소유 기록 항목의 설치 방식이다. 칸이 없으면 옛 설치다.
+# 소유 기록 항목이 명시해야 하는 설치 방식이다.
 BIND_MODE = "bind"
-
-
-ISOLATED_MODE = "isolated"
 
 
 CONNECTOR_SKILL_PARTS = ("references", "templates")
@@ -104,7 +101,6 @@ RETRY_VALUE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
 
 # `connector.json` 의 `toolsets` 가 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구만 둔다(ADR-044).
 # 셸, 파일, 기억, 스킬, 위임 도구는 manifest 로 열리지 않는다.
-CONNECTOR_TOOLSETS = frozenset({"vision"})
 
 
 # `connector.json` 의 `schema: 2` 가 도구마다 선언하는 위험도와 승인 방식이다(ADR-049).
@@ -154,7 +150,6 @@ HERMES_TOOL_PREFIX_MAX_CHARS = 40
 
 
 # 설치가 연결용 profile 의 `SOUL.md` 에 쓰는 스킬 본문의 상한이다. Control Plane 의 성격 본문 상한과 같다.
-CONNECTOR_PERSONA_MAX_CHARS = 8000
 
 
 # `.mcp.json` 의 인자가 plugin 디렉터리를 가리키는 자리다. 그 밖의 치환은 받지 않는다.

@@ -30,8 +30,6 @@ DEMO_CONNECTOR = ROOT / "tests/fixtures/demo-connector"
 DEMO = "demo-notes"
 DEMO_BASE = "http://demo.test/base"
 # 앞선 판의 plugin 이 이름으로 알던 커넥터다. 그 판이 남긴 소유 기록을 인정하는지 보는 검사만 쓴다.
-LEGACY = "fos-accountbook"
-LEGACY_BASE = "http://legacy.test/base"
 # 바인딩 설치 검사가 시험 커넥터와 함께 붙이는 두 번째 커넥터다. 시험 커넥터를 복사해 이름과 env 이름만 바꾼다.
 OTHER = "other-notes"
 OTHER_BASE = "http://other.test/base"
@@ -39,7 +37,6 @@ OTHER_BASE = "http://other.test/base"
 DEMO_VALUE = "demo_ok_0123456789"
 OTHER_VALUE = "other_1234"
 VAULT = "/api/connector-vault"
-VAULT_IMPORT = "/api/connector-vault/import"
 
 # 설정이 없을 때 API 경로가 떨어지는 복합 toolset 을 줄여 흉내 낸다.
 WIDE_TOOLSETS = {"code_execution", "delegation", "file", "memory", "terminal", "web"}
@@ -301,13 +298,21 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.addCleanup(environ.stop)
 
     def connector_fixture(self):
-        """시험 커넥터를 운영 목록에 올리고 관리 profile 하나를 만든다."""
-        self.make_profile("alice")
-        self.plugin._apply_template("alice")
-        root = self.root.parent / "demo-connector"
-        shutil.copytree(DEMO_CONNECTOR, root)
-        self.connector_environment({DEMO: {"root": str(root), "env": {"DEMO_BASE": DEMO_BASE}}})
-        return root
+        """일반 바인딩 설치를 검증할 커넥터 하나와 vault를 준비한다."""
+        demo, _ = self.bind_fixture()
+        roots = json.loads(os.environ["FOS_ASSISTANT_CONNECTOR_ROOTS"])
+        roots.pop(OTHER)
+        patch = mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(roots)})
+        patch.start()
+        self.addCleanup(patch.stop)
+        return demo
+
+    def binding_install(self, enabled=True, **overrides):
+        body = {"profile": "alice", "plugin": DEMO, "enabled": enabled, "sandbox_owner": "user-1"}
+        if enabled:
+            body["bind"] = {"vault": "c1"}
+        body.update(overrides)
+        return self.request("/api/connectors", "PUT", token="valid", full_response=True, body=body)
 
     def connector(self, enabled=True, **overrides):
         return self.request("/api/connectors", "PUT", token="valid", full_response=True, body={
@@ -368,58 +373,6 @@ class ProfileApiRouteTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIs(response.body["plugin_updated"], True)
         self.assertEqual(written[-1], "__init__.py")
-
-    def legacy_fixture(self):
-        """앞선 판의 plugin 이 설치한 profile 이다. 소유 기록과 서버 정의가 그 판이 쓴 모양 그대로다.
-
-        앞선 판은 커넥터 하나를 이름으로 알았다. 그 이름과 env 이름은 이 호환 검사에만 둔다.
-        """
-        self.make_profile("alice")
-        self.plugin._apply_template("alice")
-        root = self.root.parent / "legacy-connector"
-        (root / ".claude-plugin").mkdir(parents=True)
-        (root / "skills").mkdir()
-        (root / "dist").mkdir()
-        (root / "dist/accountbook-mcp.js").write_text("// fixture", encoding="utf-8")
-        (root / ".claude-plugin/plugin.json").write_text(
-            json.dumps({"name": LEGACY, "skills": "./skills"}), encoding="utf-8")
-        (root / ".mcp.json").write_text(json.dumps({"mcpServers": {"accountbook": {
-            "command": "bun", "args": ["${CLAUDE_PLUGIN_ROOT}/dist/accountbook-mcp.js"],
-            "env": {"ACCOUNTBOOK_API_BASE_URL": "${ACCOUNTBOOK_API_BASE_URL}",
-                    "ACCOUNTBOOK_API_TOKEN": "${ACCOUNTBOOK_API_TOKEN}",
-                    "ACCOUNTBOOK_FAMILY_UUID": "${ACCOUNTBOOK_FAMILY_UUID:-}"},
-        }}}), encoding="utf-8")
-        (root / "connector.json").write_text(json.dumps({
-            "schema": 1, "id": LEGACY, "title": "가계부", "description": "호환 검사용",
-            "fields": [
-                {"key": "token", "env": "ACCOUNTBOOK_API_TOKEN", "label": "연동 토큰", "secret": True,
-                 "required": True},
-                {"key": "family", "env": "ACCOUNTBOOK_FAMILY_UUID", "label": "가족", "required": False,
-                 "options": {"tool": "list_families", "items": "families", "value": "uuid", "label": "name"}},
-            ],
-            "verify": {"tool": "list_families"},
-            "operator_env": ["ACCOUNTBOOK_API_BASE_URL"],
-            "errors": {"ACCOUNTBOOK_UNAUTHORIZED": "credential_rejected"},
-        }), encoding="utf-8")
-        self.connector_environment(
-            {LEGACY: {"root": str(root), "env": {"ACCOUNTBOOK_API_BASE_URL": LEGACY_BASE}}})
-        # 앞선 판의 설치가 남긴 것이다. 운영자 env 를 참조로 갖고, 고르지 않은 가족은 빈 값이고, 서버 이름 칸이 없다.
-        server = {"command": self.connector_command, "args": [str(root / "dist/accountbook-mcp.js")],
-                  "env": {"ACCOUNTBOOK_API_BASE_URL": "${ACCOUNTBOOK_API_BASE_URL}",
-                          "ACCOUNTBOOK_API_TOKEN": "${ACCOUNTBOOK_API_TOKEN}",
-                          "ACCOUNTBOOK_FAMILY_UUID": ""},
-                  "enabled": True}
-        path = self.root / "alice/config.yaml"
-        config = yaml.safe_load(path.read_text(encoding="utf-8"))
-        config["mcp_servers"]["accountbook"] = server
-        config["platform_toolsets"]["api_server"].append("accountbook")
-        path.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
-        (self.root / "alice/.fos-connectors.json").write_text(
-            json.dumps({LEGACY: {"server": server, "allowlist_added": True}}) + "\n", encoding="utf-8")
-        (self.root / "alice/.env").write_text(
-            "ACCOUNTBOOK_API_BASE_URL=%s\nACCOUNTBOOK_API_TOKEN=legacy-token\nOTHER=keep\n" % LEGACY_BASE,
-            encoding="utf-8")
-        return server
 
     def other_connector(self):
         """시험 커넥터를 복사해 이름, 서버 이름, env 이름, 스킬 이름을 바꾼 두 번째 커넥터를 만든다."""

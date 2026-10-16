@@ -71,19 +71,6 @@ class ProactiveScheduleServiceTest {
 
 
     @Test
-    @DisplayName("지원하지 않는 에이전트의 일정 조회는 Hermes 도구 목록을 호출하지 않는다")
-    void unsupportedAgentReturnsBlockerWithoutHermesCalls() {
-        when(agents.requireReadable(user, "connector")).thenReturn(agent);
-        when(readiness.check(agent))
-            .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
-
-        assertThat(service(false).get(user, "connector").blockers())
-            .containsExactly(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED));
-        verifyNoInteractions(toolsets);
-    }
-
-
-    @Test
     @DisplayName("격리 실행 공간이 없고 터미널 도구가 켜져 있으면 매일 깨우기를 켜지 못한다")
     void rejectsEnablingScheduleWhenTerminalIsEnabledWithoutIsolation() {
         ProactiveScheduleService service = service(false);
@@ -133,11 +120,11 @@ class ProactiveScheduleServiceTest {
 
 
     @Test
-    @DisplayName("격리 설정을 켜도 다른 매일 깨우기 차단 사유는 유지한다")
+    @DisplayName("격리 설정을 켜도 스킬이 없는 에이전트의 매일 깨우기 차단 사유는 유지한다")
     void retainsReadinessBlockerWhenIsolationIsConfirmed() {
         when(agents.requireStartable(user, "career")).thenReturn(agent);
         when(readiness.check(agent))
-            .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED))));
+            .thenReturn(new CheckReadiness(List.of(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING))));
 
         assertThat(service(true).schedulingAvailable(user, "career")).isFalse();
         verifyNoInteractions(toolsets);

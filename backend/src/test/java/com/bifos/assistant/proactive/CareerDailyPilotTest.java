@@ -234,7 +234,7 @@ class CareerDailyPilotTest {
         assertThat(firstCommand.input()).contains("- 지난 살펴보기: 처음").contains("최근에 알린 발견이 없다.");
         assertThat(firstCommand.instructions())
             .as("붙은 커리어 커넥터를 직접 부르고 읽기만 하라는 지시")
-            .contains("- 연결한 서비스의 도구는 직접 부른다.")
+            .contains("- 필요한 도구는 직접 부르고 다른 에이전트에 맡기지 않는다.")
             .contains("- 이번 실행은 읽기만 한다.");
         ChatMessage discovery = lastMessage(first);
         assertThat(discovery.role()).isEqualTo(MessageRole.ASSISTANT);

@@ -421,32 +421,6 @@ class ChatServiceTest {
 
 
     @Test
-    @DisplayName("커넥터 대화는 Memory 없이 공통 표 지침을 보내고 길이와 해시를 기록한다")
-    void sendsNoMemoryToHermesForConnectorAgentTurn() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        Agent connector = agents.findAll().getFirst();
-        connector.markConnectorManaged();
-        agents.save(connector);
-        memories.create(dad, MemoryScope.USER, "선호", "국수는 맵지 않게 먹는다", true);
-        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-
-        ChatTurn turn = chat.send(dad, null, "저녁 메뉴", "dad");
-
-        String instructions = stub().received().getFirst().instructions();
-        assertThat(instructions)
-            .as("커넥터 에이전트의 turn 이 Hermes 에 보낸 instructions")
-            .doesNotContain("국수는 맵지 않게 먹는다")
-            .contains("GFM", "구분 줄")
-            .endsWith("\n\n" + AskFormat.GUIDE);
-        String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + AskFormat.GUIDE));
-        AgentExecution execution = executions.findById(turn.executionId()).orElseThrow();
-        assertThat(execution.contextChars()).isEqualTo(commonInstructions.length());
-        assertThat(execution.instructionsHash())
-            .isEqualTo(new AssembledContext(commonInstructions, commonInstructions.length()).instructionsHash());
-    }
-
-
-    @Test
     @DisplayName("일반 에이전트의 turn 은 붙은 커넥터 서버의 도구만 가리는 범위로 사건 스트림을 연다")
     void opensEventStreamHidingOnlyAttachedConnectorTools() {
         CurrentUser dad = member("dad@example.com", "dad");
@@ -557,23 +531,6 @@ class ChatServiceTest {
             .isEqualTo(EventObservation.INCOMPLETE);
         assertThat(typesOf(eventsOf(turn.executionId())))
             .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
-    }
-
-
-    @Test
-    @DisplayName("옛 커넥터 에이전트의 turn 은 모든 도구를 가리는 범위로 사건 스트림을 연다")
-    void opensEventStreamHidingAllToolsForLegacyConnectorAgent() {
-        CurrentUser dad = member("dad@example.com", "dad");
-        Agent legacy = agents.findByCode("dad").orElseThrow();
-        legacy.markConnectorManaged();
-        agents.save(legacy);
-        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
-        hermesStreams(new RunEvent("run.completed", null, null, null, null, null));
-
-        chat.stream(dad, null, "메모 찾아 줘", "dad", event -> {
-        });
-
-        verify(eventStream, timeout(5000)).open(any(), any(), any(), any(), any(), argThat(ToolDetailScope::hideAll));
     }
 
 
