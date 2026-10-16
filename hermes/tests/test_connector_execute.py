@@ -55,7 +55,7 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
         self.install(PROFILE)
         self.addCleanup(self.assert_no_child_left)
 
-    def install(self, name, token=call_base.OK_TOKEN, managed=True, installed=True, host=False, bind=False):
+    def install(self, name, token=call_base.OK_TOKEN, managed=True, installed=True, host=False, bind=True):
         """커넥터를 설치한 profile 의 파일을 만든다. 표식과 소유 기록은 빼고 만들 수 있다.
 
         `host` 는 운영자가 사람이 만든 profile 에 두는 커넥터 표식이고, `bind` 는 소유 기록을 바인딩 항목으로 둔다.
@@ -77,15 +77,15 @@ class ConnectorExecuteTest(base.ConnectorGateCase):
             (profile / self.plugin.CONNECTOR_STATE).write_text(json.dumps({base.DEMO: entry}), encoding="utf-8")
 
     def test_binding_on_a_profile_with_only_the_connector_marker_runs(self):
-        """커넥터 표식만 있는 profile 에서 바인딩 항목은 실행하고, 옛 항목이나 표식 없는 profile 은 401 이다."""
+        """커넥터 표식만 있는 profile 에서는 바인딩만 실행하고, 구형 기록과 표식 없는 profile 은 거절한다."""
         self.install("human", managed=False, host=True, bind=True)
-        self.install("human-old", managed=False, host=True)
+        self.install("human-old", managed=False, host=True, bind=False)
         self.install("plain", managed=False, bind=True)
         status, body = self.execute(args={"text": "안녕"}, profile="human")
         self.assertEqual(status, 200, body)
         self.assertEqual(body, {"ok": True, "result": {"written": True, "text": "안녕", "token": "demo"}})
         with patch_plugin(self.plugin, "_run_connector_execute") as runner:
-            self.assertEqual(self.execute(profile="human-old")[0], 401)
+            self.assertEqual(self.execute(profile="human-old"), UNAVAILABLE)
             self.assertEqual(self.execute(profile="plain")[0], 401)
             runner.assert_not_called()
         # 관리 표식이 있는 profile 은 바인딩 항목도 실행한다.

@@ -1,103 +1,28 @@
-import { conversationIdOf, expect, test, FLOW_AGENT_CODE } from "./fixtures.ts";
+import { conversationIdOf, expect, hermesBaseUrl, test } from "./fixtures.ts";
 import { LONG_ACTIVITY_PROBE } from "../e2e/fake-hermes.ts";
-import type { Locator, Page } from "../../web/node_modules/@playwright/test/index.js";
+import type { Locator } from "../../web/node_modules/@playwright/test/index.js";
 
-/** 흐름 에이전트로 새 대화를 열고 한 마디를 보낸다. */
-async function sendWithTheFlowAgent(page: Page, text: string): Promise<void> {
-  await page.goto("/");
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
-  await page.getByRole("textbox", { name: "메시지" }).fill(text);
-  await page.getByRole("button", { name: "보내기" }).click();
+async function pausedToolScript(input: string) {
+  const response = await fetch((await hermesBaseUrl()) + "/__test/script", {
+    method: "POST",
+    body: JSON.stringify({
+      input,
+      output: "자리 고정 검사 답",
+      events: [
+        { event: "tool.started", tool: "fake-tool", preview: "started" },
+        {
+          event: "tool.completed",
+          tool: "fake-tool",
+          duration: 0.1,
+          error: false,
+          preview: "",
+        },
+      ],
+      pause: true,
+    }),
+  });
+  expect(response.ok).toBeTruthy();
 }
-
-test("흐름 중에는 도착한 단계만 보이고 끝난 답에 작업 과정이 남는다", async ({
-  page,
-  hermes,
-}) => {
-  await hermes.holdNextRun();
-  let released = false;
-  try {
-    await sendWithTheFlowAgent(page, "전기차를 사는 게 나을까?");
-    await hermes.waitForHeldRun();
-
-    const block = page.locator(
-      '[data-testid="activity-block"][data-mode="live"]',
-    );
-    await expect(block).toBeVisible();
-    await block.getByTestId("activity-toggle").click();
-    await expect(block.locator('[data-step="chief"]')).toHaveAttribute(
-      "data-state",
-      "running",
-    );
-    await expect(block.locator('[data-step="synthesizer"]')).toHaveCount(0);
-    expect(
-      await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth -
-          document.documentElement.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(0);
-
-    await hermes.releaseHeldRun();
-    released = true;
-    await expect(page.getByTestId("assistant-message").last()).toBeVisible({
-      timeout: 30_000,
-    });
-    const saved = page
-      .locator('[data-testid="activity-block"][data-mode="saved"]')
-      .last();
-    await expect(saved).toBeVisible();
-    await expect(saved.getByTestId("activity-toggle")).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await page.reload();
-    await expect(saved).toBeVisible();
-    await expect(saved).toContainText("작업 과정");
-    await saved.getByTestId("activity-toggle").click();
-    await expect(saved.locator('[data-kind="subagent"]')).toHaveCount(3);
-    await saved.getByTestId("activity-open-panel").click();
-    await expect(
-      page.getByTestId("activity-panel").getByTestId("flow-tree-link"),
-    ).toBeVisible();
-    await page
-      .getByTestId("activity-panel")
-      .getByTestId("flow-tree-link")
-      .click();
-    await expect(page).toHaveURL(/\/executions\/\d+$/);
-  } finally {
-    if (!released) await hermes.releaseHeldRun();
-  }
-});
-
-test("실패한 단계만 실패로 보이고 오지 않은 단계는 그리지 않는다", async ({
-  page,
-}) => {
-  await sendWithTheFlowAgent(page, "흐름 계약 위반 검사");
-  const block = page.locator(
-    '[data-testid="activity-block"][data-mode="live"]',
-  );
-  await expect(block).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId("turn-error")).toBeVisible({ timeout: 30_000 });
-  await expect(block.getByTestId("activity-toggle")).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
-  const stoppedTitle = await block.getByTestId("activity-toggle").textContent();
-  await page.waitForTimeout(1_200);
-  expect(await block.getByTestId("activity-toggle").textContent()).toBe(
-    stoppedTitle,
-  );
-  await block.getByTestId("activity-toggle").click();
-  await expect(block.locator('[data-step="chief"]')).toHaveAttribute(
-    "data-state",
-    "failed",
-    { timeout: 30_000 },
-  );
-  await expect(block.locator('[data-step="researcher"]')).toHaveCount(0);
-  await expect(block.locator('[data-step="engineer"]')).toHaveCount(0);
-  await expect(block.locator('[data-step="synthesizer"]')).toHaveCount(0);
-});
 
 test("연결이 끊기면 실패 줄은 남고 자식의 결과 누락을 보인다", async ({
   page,
@@ -250,7 +175,6 @@ test("일반 대화에는 단계 없이 도구 줄이 남고 읽기 실패를 �
   await page.unroute("**/api/usage/executions/*/tree");
   await block.getByRole("button", { name: "다시 읽기" }).click();
   await expect(block.locator('[data-kind="tool"]')).toHaveCount(2);
-  await expect(block.locator('[data-kind="step"]')).toHaveCount(0);
   expect(
     await page.evaluate(
       () =>
@@ -321,24 +245,33 @@ async function expectBlockBelowName(row: Locator): Promise<void> {
 }
 
 test("진행 중 블록은 답이 없을 때도 답이 흘러나올 때도 비서 이름 아래에 있다", async ({ page, hermes }) => {
-  // 답이 아직 없을 때다. 흐름은 run 이 붙잡힌 동안에도 단계 사건을 먼저 보낸다.
+  // 답이 아직 없을 때다. 일반 실행의 도구 사건만 먼저 보내고 완료를 멈춘다.
+  const pendingInput = "자리 고정 검사";
+  await pausedToolScript(pendingInput);
   await hermes.holdNextRun();
   let released = false;
   try {
-    await sendWithTheFlowAgent(page, "자리 고정 검사");
+    await page.goto("/");
+    await page.getByRole("radio", { name: "브라우저 비서" }).click();
+    await page.getByRole("textbox", { name: "메시지" }).fill(pendingInput);
+    await page.getByRole("button", { name: "보내기" }).click();
     await hermes.waitForHeldRun();
     const pending = page.getByTestId("pending-assistant");
     await expect(pending.locator('[data-testid="activity-block"][data-mode="live"]')).toBeVisible();
     await expect(pending.getByTestId("activity-signal")).toBeVisible();
     await expect(page.getByTestId("assistant-message")).toHaveCount(0);
     await expectBlockBelowName(pending);
+    await hermes.releaseLongActivity();
     await hermes.releaseHeldRun();
     released = true;
     await expect(page.locator('[data-testid="activity-block"][data-mode="saved"]').last())
       .toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("pending-assistant")).toHaveCount(0);
   } finally {
-    if (!released) await hermes.releaseHeldRun();
+    if (!released) {
+      await hermes.releaseLongActivity();
+      await hermes.releaseHeldRun();
+    }
   }
 
   // 답이 흘러나오는 중이다. 이 입력은 첫 조각을 보낸 뒤 도구 줄을 남기고 기다린다.
@@ -421,13 +354,4 @@ test("기다림 점이 있던 자리에 답이 들어와 얼굴과 첫 줄이 �
   } finally {
     if (!released) await hermes.releaseHeldRun();
   }
-});
-
-test("흐름 에이전트의 코드가 바뀌면 이 검사가 먼저 알린다", async ({ page }) => {
-  const agents = await page.request.get("/api/agents");
-  expect(agents.ok()).toBeTruthy();
-  const codes = ((await agents.json()) as { code: string }[]).map(
-    (agent) => agent.code,
-  );
-  expect(codes).toContain(FLOW_AGENT_CODE);
 });

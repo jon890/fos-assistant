@@ -463,10 +463,10 @@ public class AttachmentDeletionBarrierTest {
             ErrorCode.ATTACHMENT_GONE);
         assertCode(() -> service.inspectOverview(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
         assertCode(() -> service.validateInspection(owner, conversation.id(), photo.id()), ErrorCode.ATTACHMENT_GONE);
-        assertThat(service.agentInput(conversation.id(), List.of(photo), "본문", true)
+        assertThat(service.agentInput(conversation.id(), List.of(photo), "본문")
             .images())
                 .isEmpty();
-        assertThat(service.agentInput(conversation.id(), List.of(photo), "본문", true)
+        assertThat(service.agentInput(conversation.id(), List.of(photo), "본문")
             .text())
                 .contains("사진은 모두 1장")
                 .doesNotContain("파일=" + photo.storedName());

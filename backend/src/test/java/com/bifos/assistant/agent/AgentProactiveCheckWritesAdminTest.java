@@ -18,7 +18,6 @@ import com.bifos.assistant.agent.admin.presentation.AgentAdminController;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -73,7 +72,6 @@ class AgentProactiveCheckWritesAdminTest {
             mock(AppUserRepository.class),
             mock(AgentLifecycleService.class),
             mock(AgentEndpointProbe.class),
-            mock(KnownFlows.class),
             mock(AgentConnectorBindings.class),
             Clock.systemUTC()),
         new CurrentUserProvider()))
@@ -182,7 +180,6 @@ class AgentProactiveCheckWritesAdminTest {
             .andExpect(jsonPath("$.credentialScope").value("SHARED_HOUSEHOLD"))
             .andExpect(jsonPath("$.visibility").value("GROUP"))
             .andExpect(jsonPath("$.enabled").value(true))
-            .andExpect(jsonPath("$.connectorManaged").value(false))
             .andExpect(jsonPath("$.proactiveCheckWritesAllowed").value(false));
         when(agents.findAll()).thenReturn(List.of(agent));
         mvc.perform(get(COLLECTION_PATH))
@@ -202,21 +199,6 @@ class AgentProactiveCheckWritesAdminTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         verifyNoInteractions(agents);
-    }
-
-
-    @Test
-    @DisplayName("커넥터 에이전트에는 쓰기 허용 값을 저장하지 않는다")
-    void connectorAgentNeverStoresWrites() throws Exception {
-        signIn(ADMIN);
-        agent.markConnectorManaged();
-
-        send("{\"enabled\":true,\"visibility\":\"PRIVATE\",\"proactiveCheckWritesAllowed\":true}")
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-        assertThat(agent.proactiveCheckWritesAllowed()).isFalse();
-        verify(agents, never()).save(any(Agent.class));
     }
 
 

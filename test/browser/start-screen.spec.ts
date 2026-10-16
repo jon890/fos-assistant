@@ -1,5 +1,5 @@
 import { FAKE_STARTER_PROMPTS } from "../e2e/fake-hermes.ts";
-import { CONVERSATION_URL, expect, FLOW_AGENT_CODE, test } from "./fixtures.ts";
+import { CONVERSATION_URL, expect, PERSONA_AGENT_CODE, test } from "./fixtures.ts";
 import type { Locator, Page } from "../../web/node_modules/@playwright/test/index.js";
 
 /** 실제로 디코딩되는 1x1 PNG 다. 저장소에 이미지를 넣지 않으려고 바이트로 만들어 쓴다. */
@@ -70,31 +70,31 @@ test("추천 질문을 누르면 그 글로 바로 보내고 입력창의 글은
 test("다른 에이전트 카드를 누르면 그 에이전트의 추천 질문으로 바뀐다", async ({ page }) => {
   // 가짜 Hermes 가 모든 profile 에 같은 추천을 답하므로 에이전트마다 다른 추천은 응답을 정해 준다.
   await page.route(STARTERS_PATTERN, async (route) => {
-    const own = route.request().url().includes(`/agents/${FLOW_AGENT_CODE}/`) ? "흐름 추천이다" : "브라우저 추천이다";
+    const own = route.request().url().includes(`/agents/${PERSONA_AGENT_CODE}/`) ? "성격 추천이다" : "브라우저 추천이다";
     await route.fulfill({ json: { prompts: [own], status: "READY" } });
   });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toBeVisible();
 
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
+  await page.getByRole("radio", { name: "성격 비서", exact: true }).click();
 
-  await expect(page.getByRole("radio", { name: "흐름 비서" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByRole("button", { name: "흐름 추천이다", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "성격 추천이다", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "브라우저 추천이다", exact: true })).toHaveCount(0);
 });
 
 test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르고 보내지 않는다", async ({ page }) => {
   await page.goto("/");
 
-  await composer(page).fill("@흐름");
+  await composer(page).fill("@빈");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
-  await expect(list.getByRole("option", { name: /흐름 비서/ })).toBeVisible();
+  await expect(list.getByRole("option", { name: "빈 성격 비서", exact: true })).toBeVisible();
   await expect(list.getByRole("option")).toHaveCount(1);
   await composer(page).press("Enter");
 
   await expect(list).toHaveCount(0);
-  await expect(page.getByRole("radio", { name: "흐름 비서" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("radio", { name: "빈 성격 비서", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(composer(page)).toHaveValue("");
   await expect(page.getByTestId("user-message")).toHaveCount(0);
   await expect(page).toHaveURL(/\/$/);
@@ -103,13 +103,13 @@ test("@ 뒤에 이름을 치고 Enter 를 누르면 그 에이전트를 고르�
 test("@ 목록이 떠 있을 때 Shift+Enter 는 고르지 않고 줄을 바꾼다", async ({ page }) => {
   await page.goto("/");
 
-  await composer(page).fill("@흐름");
+  await composer(page).fill("@빈");
   const list = page.getByRole("listbox", { name: "에이전트 고르기" });
-  await expect(list.getByRole("option", { name: /흐름 비서/ })).toBeVisible();
+  await expect(list.getByRole("option", { name: "빈 성격 비서", exact: true })).toBeVisible();
   await composer(page).press("Shift+Enter");
 
   await expect(page.getByRole("radio", { name: "브라우저 비서" })).toHaveAttribute("aria-checked", "true");
-  await expect(composer(page)).toHaveValue("@흐름\n");
+  await expect(composer(page)).toHaveValue("@빈\n");
   await expect(list).toHaveCount(0);
   await expect(page.getByTestId("user-message")).toHaveCount(0);
 });
@@ -217,7 +217,7 @@ test("재시도 연속 누름은 한 요청이며 실패하면 다시 읽을 수
 
 for (const result of ["실패", "빈 목록", "다른 에이전트", "객체 응답", "null 응답"] as const) {
   test(`기존 빈 대화는 목록 ${result}에도 에이전트와 글을 유지한다`, async ({ page }) => {
-    const created = await page.request.post("/api/chat/conversations", { data: { agentCode: FLOW_AGENT_CODE } });
+    const created = await page.request.post("/api/chat/conversations", { data: { agentCode: PERSONA_AGENT_CODE } });
     expect(created.ok()).toBeTruthy();
     const { conversationId } = await created.json() as { conversationId: string };
     await page.route("**/api/agents", (route) => route.fulfill(
@@ -239,7 +239,7 @@ for (const result of ["실패", "빈 목록", "다른 에이전트", "객체 응
       await page.getByRole("button", { name: "보내기" }).click();
       await expect(page.getByTestId("assistant-message").last()).toBeVisible({ timeout: 30_000 });
       const conversations = await (await page.request.get("/api/chat/conversations")).json();
-      expect(conversations.items.find((item: { id: string }) => item.id === conversationId).agentCode).toBe(FLOW_AGENT_CODE);
+      expect(conversations.items.find((item: { id: string }) => item.id === conversationId).agentCode).toBe(PERSONA_AGENT_CODE);
     } finally {
       await page.request.delete(`/api/chat/conversations/${conversationId}`);
     }
@@ -348,11 +348,11 @@ test("새 대화에서 사진을 먼저 올리면 카드와 @ 목록이 잠긴�
   // 빈 대화가 생겨도 메시지가 없는 동안은 새 대화 화면 모양 그대로다.
   await expect(page).toHaveURL(CONVERSATION_URL);
   await expect(page.getByRole("heading", { level: 1, name: /무엇을 도와드릴까요\?$/ })).toBeVisible();
-  const flowCard = page.getByRole("radio", { name: "흐름 비서" });
-  await expect(flowCard).toBeDisabled();
-  await flowCard.click({ force: true });
+  const personaCard = page.getByRole("radio", { name: "성격 비서", exact: true });
+  await expect(personaCard).toBeDisabled();
+  await personaCard.click({ force: true });
   await expect(browserCard).toHaveAttribute("aria-checked", "true");
-  await expect(flowCard).toHaveAttribute("aria-checked", "false");
+  await expect(personaCard).toHaveAttribute("aria-checked", "false");
 
   await composer(page).fill("@");
   await expect(composer(page)).toHaveValue("@");

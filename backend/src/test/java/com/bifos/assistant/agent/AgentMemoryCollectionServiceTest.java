@@ -71,7 +71,6 @@ class AgentMemoryCollectionServiceTest {
         assertThat(granted.collections()).containsExactly("core");
         assertThat(granted.sensitiveCollections()).isEmpty();
 
-        agent.assignFlow(null);
         agents.save(agent);
         agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
         assertThat(grants.findByIdAgentId(agent.id())).hasSize(1);
@@ -84,7 +83,6 @@ class AgentMemoryCollectionServiceTest {
         Agent agent = agents.save(agent());
         // 관리자가 core 의 민감 허용을 켰다. 사건이 다시 나가면 이 줄이 거짓으로 덮인다.
         grants.save(AgentMemoryCollection.of(agent.id(), "core", true, NOW));
-        agent.assignFlow(null);
         agents.save(agent);
         agents.saveAndFlush(agents.findById(agent.id()).orElseThrow());
         assertThat(service.grantsOf(agent.id()).sensitiveCollections()).containsExactly("core");
@@ -116,23 +114,6 @@ class AgentMemoryCollectionServiceTest {
 
         assertThat(granted.collections()).containsExactlyInAnyOrder("core", "career", "identity");
         assertThat(granted.sensitiveCollections()).containsExactly("identity");
-    }
-
-
-    @Test
-    @DisplayName("커넥터 에이전트는 저장할 때 아무것도 받지 않고 줄이 있어도 받지 않는다")
-    void connectorAgentsReceiveNothingEvenWithRows() {
-        Agent connector = agent();
-        connector.markConnectorManaged();
-        Agent saved = agents.save(connector);
-
-        assertThat(grants.findByIdAgentId(saved.id())).isEmpty();
-        assertThat(service.grantsOf(saved.id()).collections()).isEmpty();
-
-        grants.save(AgentMemoryCollection.of(saved.id(), "core", true, NOW));
-        AgentMemoryGrants granted = service.grantsOf(saved.id());
-        assertThat(granted.collections()).isEmpty();
-        assertThat(granted.sensitiveCollections()).isEmpty();
     }
 
 
@@ -329,29 +310,18 @@ class AgentMemoryCollectionServiceTest {
 
 
     @Test
-    @DisplayName("옛 커넥터 에이전트와 지운 에이전트는 바꾸지 못한다")
-    void rejectsConnectorAndDeletedAgents() {
-        Agent connector = agent();
-        connector.markConnectorManaged();
-        Agent savedConnector = agents.save(connector);
+    @DisplayName("지운 에이전트는 바꾸지 못한다")
+    void rejectsDeletedAgents() {
         Agent deleted = agent();
         deleted.markDeleted(NOW);
         Agent savedDeleted = agents.save(deleted);
 
-        assertThatThrownBy(() -> service.replace(savedConnector.id(), Map.of("core", false), LISTED, ADMIN_ID))
-            .isInstanceOfSatisfying(
-                ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FORBIDDEN));
-        assertThatThrownBy(() -> service.requireEditableAgent(savedConnector.code()))
-            .isInstanceOfSatisfying(
-                ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThatThrownBy(() -> service.replace(savedDeleted.id(), Map.of("core", false), LISTED, ADMIN_ID))
             .isInstanceOfSatisfying(
                 ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThatThrownBy(() -> service.requireEditableAgent(savedDeleted.code()))
             .isInstanceOfSatisfying(
                 ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
-        assertThat(grants.findByIdAgentId(savedConnector.id())).isEmpty();
-        assertThat(service.recentChangesOf(savedConnector.id())).isEmpty();
         assertThat(service.recentChangesOf(savedDeleted.id())).isEmpty();
     }
 

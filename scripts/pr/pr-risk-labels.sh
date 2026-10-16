@@ -20,7 +20,9 @@ deploy=0
 while IFS= read -r path; do
   [ -z "$path" ] && continue
   case "$path" in
-    backend/src/main/resources/db/migration/*)
+    backend/src/main/resources/db/migration/* | \
+    backend/src/main/java/db/migration/* | \
+    backend/src/main/resources/db/comments/*)
       migration=1 ;;
   esac
   case "$path" in

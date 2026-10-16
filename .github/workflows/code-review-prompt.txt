@@ -61,20 +61,27 @@ FINDING_END
 
 ### 지침에서 특히 볼 곳
 
-| 무엇 | 어디가 정하는가 |
+규칙의 까닭과 예외는 `docs/code-rules/INDEX.md`에서 찾는다. 실행 조건을 리뷰 문서에 복제하지 않는다.
+
+| 검토 대상 | 규칙 |
 | --- | --- |
-| 공개 저장소에 적지 않는 것 | `AGENTS.md` 「공개 저장소」 |
-| 실행할 profile 은 요청자의 바인딩에서만 꺼낸다. 요청 본문이 profile 이나 credential 을 정하지 못한다 | `AGENTS.md` 「지켜야 할 것」, ADR-017 |
-| 남의 대화, 실행, 기억, 첨부는 없는 것과 같은 응답을 준다 | `docs/features/chat.md` 의 「대화와 실행 사건」, `docs/features/attachment.md` 의 「사진 첨부」 |
-| Memory 접근은 Control Plane 이 정한다. 비밀값을 데이터베이스에 넣지 않는다. 실행 기록은 실패해도 남긴다 | `AGENTS.md` 「지켜야 할 것」 |
-| 엔티티를 바꾸면 마이그레이션도 바꾼다. 이미 적용된 마이그레이션 파일을 고치지 않는다. 번호가 겹치지 않는다 | `backend/AGENTS.md` 「엔티티와 마이그레이션은 따로 논다」, `AGENTS.md` 「용어」 |
-| 요청과 응답 모양은 `*Dtos.java` 에 둔다. Jackson 3 은 `tools.jackson` 이다 | `backend/AGENTS.md` |
-| 브라우저는 Control Plane 토큰을 갖지 않는다. 새 API 는 `app/api/` 의 서버 라우트를 거친다 | `web/AGENTS.md` |
-| 인라인 `style={{` 를 쓰지 않는다(주석 단 예외만). 색과 간격은 테마 토큰으로. 브랜드 색을 본문 글자에 쓰지 않는다 | `web/AGENTS.md` 「색과 간격은 테마 토큰이 소유한다」 |
-| 에이전트의 답에 든 HTML 을 그대로 그리지 않는다 | `web/AGENTS.md`, ADR-009 |
-| 운영 코드에 시험용 문을 만들지 않는다 | `web/AGENTS.md` |
-| 코드와 문서가 계획서(`tasks/planNNN`)를 번호로 가리키지 않는다 | `AGENTS.md` 「tasks 는 구현 문서만 담는다」 |
-| 주석과 Javadoc 은 한국어다. 가족 한 사람은 「사용자」 이고 「구성원」 이라 쓰지 않는다 | `AGENTS.md` 「용어」 「코드 주석은 한국어로 쓴다」 |
+| 기존 위반과 기준 갱신 | rule-34 (`docs/code-rules/rule-34.md`), rule-45 (`docs/code-rules/rule-45.md`) |
+| 공개 정보와 권한 | rule-46 (`docs/code-rules/rule-46.md`), rule-47 (`docs/code-rules/rule-47.md`), rule-48 (`docs/code-rules/rule-48.md`), rule-49 (`docs/code-rules/rule-49.md`) |
+| 스키마와 MySQL 쿼리 | rule-50 (`docs/code-rules/rule-50.md`), rule-51 (`docs/code-rules/rule-51.md`) |
+| 용어·주석·문서 수명 | rule-52 (`docs/code-rules/rule-52.md`), rule-53 (`docs/code-rules/rule-53.md`) |
+| 서버 HTTP와 테스트 설정 | rule-54 (`docs/code-rules/rule-54.md`) |
+| 브라우저 API 경계 | rule-55 (`docs/code-rules/rule-55.md`) |
+| 테마·외부 본문·화면 문구 | rule-56 (`docs/code-rules/rule-56.md`), rule-57 (`docs/code-rules/rule-57.md`), rule-58 (`docs/code-rules/rule-58.md`) |
+| Node import와 브라우저 테스트 | rule-59 (`docs/code-rules/rule-59.md`), rule-60 (`docs/code-rules/rule-60.md`), rule-61 (`docs/code-rules/rule-61.md`), rule-62 (`docs/code-rules/rule-62.md`) |
+| Hermes 변경과 호환성 | rule-63 (`docs/code-rules/rule-63.md`), rule-64 (`docs/code-rules/rule-64.md`), rule-65 (`docs/code-rules/rule-65.md`), rule-66 (`docs/code-rules/rule-66.md`), rule-67 (`docs/code-rules/rule-67.md`) |
+| 동시 갱신과 입력 수명 | rule-68 (`docs/code-rules/rule-68.md`), rule-69 (`docs/code-rules/rule-69.md`) |
+
+### 테이블과 판단 구조
+
+새 `CREATE TABLE`과 새 판단용 enum은 아래 질문으로 검토한다. 지침 위반은 P3를 기본으로 하되, 실제 결함의 영향이 있으면 위 「등급」에 따라 판단한다.
+
+- 새 테이블이 본체와 1:N 관계이거나, 바뀌지 않아야 하는 감사 기록이거나, 본체와 수명이 다른가? 단순한 1:1 값이면 본체 컬럼과 전용 `UPDATE`로 처리하는가? 기준은 `backend/docs/data-schema.md`의 「테이블을 추가하는 기준」이 갖는다.
+- 새 판단용 enum이나 판단 분류 컬럼은 Control Plane의 안전 판정에 필요한가? 나머지 판단을 모델 출력의 자유 칸이나 JSON으로 받을 수 있는가? 기준은 `docs/code-architecture.md`의 「모델 판단을 구조로 정하는 범위」가 갖는다.
 
 ### 위험 라벨
 
@@ -91,19 +98,11 @@ FINDING_END
 
 요약 `body` 의 첫 평가 줄 아래에 `위험 라벨: ...` 한 줄을 그대로 옮겨 적는다.
 
-### 지침이 아직 덮지 않은 것
+### 실제 회귀를 확인할 규칙
 
-아래는 이 저장소에서 실제로 났던 결함이다. 함께 본다.
-
-| 무엇 | 어떻게 드러나는가 |
-| --- | --- |
-| 가짜 Hermes 가 실제와 다른 모양을 보낸다 | 테스트는 통과하는데 운영에서 동작하지 않는다. `test/e2e/fake-hermes.ts`와 `test/e2e/fake-hermes/` 아래 모듈이 Hermes 가 실제로 주는 칸과 다르게 답하도록 바뀐 곳을 본다 |
-| 동시에 도는 요청의 차례 가정 | 중지와 제출처럼 두 스레드가 같은 실행을 다룰 때, 시도 하나의 성패로 전체 결과를 정한다. 테스트가 한 차례만 재현한다 |
-| 요청 시작에 읽은 엔티티를 끝에서 통째로 저장한다 | 그 사이 다른 요청이 바꾼 값(지운 표시, 바꾼 이름)이 옛 값으로 덮인다 |
-| 화면의 상태가 조건부로 DOM 에 들어간다 | 마우스를 올리거나 이력을 다시 읽을 때 요소가 생기며 레이아웃이 밀린다 |
-| 부모를 갈아 끼워 입력창이 새로 만들어진다 | 올려 둔 사진이 unmount 정리로 지워진다 |
-| 검사가 타이밍에 기댄다 | 고정된 대기 시간, 한 폭에서만 우연히 통과하는 단언, 워크트리 둘이 같은 임시 파일과 포트를 쓰는 것 |
-| 문서와 코드의 서술 불일치 | `docs/` 나 ADR 이 코드보다 앞서거나 뒤처진다. ADR 을 지우고 대체 표시를 남기지 않는다 |
+fake Hermes의 실제 응답 모양은 rule-64, 요청 경합과 오래된 엔티티 덮어쓰기는 rule-68을 본다.
+레이아웃 이동과 입력창 재생성은 rule-69, 타이밍에 기대는 테스트는 rule-60을 본다.
+문서와 구현의 차이 및 ADR 대체 표시는 rule-53에 연결해 검토한다.
 
 ### 지적하지 않는 것
 

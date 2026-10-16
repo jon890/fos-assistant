@@ -22,14 +22,12 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.domain.AgentExecution;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -47,16 +45,11 @@ import org.springframework.data.domain.PageRequest;
 /**
  * 같은 대화를 연 다른 창이 도는 turn 을 알아보는 조회를 본다.
  *
- * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 흐름은 루트 줄이 끝난 뒤에도 자식이
- * 돌기 때문이다. 가짜 Hermes 가 결과를 돌려주기 전에 조회해 turn 이 도는 순간을 붙잡는다.
+ * <p>도는지는 실행 줄의 상태가 아니라 메모리 표시로 판정해야 한다. 가짜 Hermes 가 결과를 돌려주기 전에
+ * 조회해 turn 이 도는 순간을 붙잡는다.
  */
 @BackendIntegrationTest
 class ChatRunningTurnTest {
-
-    /** 흐름의 Chief 에게 준 지시에만 들어 있는 말이다. 대역이 이것으로 단계를 가려낸다. */
-    private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
-
-    private static final String SPLIT_JSON = "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}";
 
     @Autowired
     ChatService chat;
@@ -108,11 +101,6 @@ class ChatRunningTurnTest {
 
 
     private CurrentUser member(String name) {
-        return member(name, null);
-    }
-
-
-    private CurrentUser member(String name, String flow) {
         AppUser user = users.save(AppUser.of(name + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
         Agent agent = Agent.of(
             name,
@@ -124,9 +112,6 @@ class ChatRunningTurnTest {
             AgentVisibility.PRIVATE,
             user.id(),
             Instant.now());
-        if (flow != null) {
-            agent.assignFlow(flow);
-        }
         agents.save(agent);
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -197,49 +182,6 @@ class ChatRunningTurnTest {
         } finally {
             turns.close(handle);
         }
-    }
-
-
-    @Test
-    @DisplayName("흐름에서 Chief가 끝나 루트 줄이 SUCCEEDED여도 자식이 도는 동안은 루트 번호로 돈다고 답한다")
-    void reportsRunningWithRootIdWhileChildRunsEvenIfRootRowSucceeded() {
-        CurrentUser dad = member("flow-dad", ResearchAndBuildFlow.NAME);
-        AtomicReference<RunningTurn> whileChildRuns = new AtomicReference<>();
-        AtomicReference<ExecutionStatus> rootStatus = new AtomicReference<>();
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        stub().willAnswer(command -> {
-            String input = command.input();
-            if (input.contains(CHIEF_MARK)) {
-                return completed("run-chief", SPLIT_JSON);
-            }
-            if (input.contains("조사해")) {
-                // 자식 단계는 다른 스레드에서 돈다. 여기서 난 실패는 따로 담아 본 스레드에서 단언한다.
-                try {
-                    AgentExecution child = latestExecution(dad);
-                    RunningTurn running = chat.running(dad, child.conversationId());
-                    whileChildRuns.set(running);
-                    rootStatus.set(executions
-                        .findById(running.executionId())
-                        .orElseThrow()
-                        .status());
-                } catch (Throwable ex) {
-                    failure.set(ex);
-                }
-                return completed("run-researcher", "조사한 것");
-            }
-            if (input.contains("만든다")) {
-                return completed("run-engineer", "만든 것");
-            }
-            return completed("run-synthesizer", "합친 답");
-        });
-
-        ChatTurn turn = chat.send(dad, null, "보조금 비교해 줘", "flow-dad");
-
-        assertThat(failure.get()).isNull();
-        assertThat(rootStatus.get()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        assertThat(whileChildRuns.get().running()).isTrue();
-        assertThat(whileChildRuns.get().executionId()).isEqualTo(turn.executionId());
-        assertThat(chat.running(dad, turn.conversationId()).running()).isFalse();
     }
 
 

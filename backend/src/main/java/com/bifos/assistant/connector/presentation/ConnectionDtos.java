@@ -237,7 +237,7 @@ public final class ConnectionDtos {
     /**
      * 에이전트 하나의 연결 목록이다. 주인에게만 낸다. env 이름, 보관 파일 이름, 서버 이름은 담지 않는다.
      *
-     * @param blockedReason 붙일 수 없는 까닭. 붙일 수 있으면 null 이다. {@code AGENT_NOT_PRIVATE} 나 {@code LEGACY_AGENT}
+     * @param blockedReason 붙일 수 없는 까닭. 붙일 수 있으면 null 이다. {@code AGENT_NOT_PRIVATE}
      */
     public record AgentConnectionsResponse(List<AgentConnectionResponse> connections, String blockedReason) {
         static AgentConnectionsResponse from(AgentConnectionsView value) {

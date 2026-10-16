@@ -51,7 +51,7 @@ sequenceDiagram
     C-->>W: 답
 ```
 
-## 두 방향과 두 토큰
+## 두 방향의 인증
 
 요청이 한 방향으로만 흐르지 않는다.
 Control Plane 이 Hermes 를 부르고, Hermes 가 다시 Control Plane 을 부른다.
@@ -81,14 +81,11 @@ flowchart LR
 | ① | 웹 → Control Plane | 짧은 수명 JWT | 이 사람이 로그인했다 |
 | ② | Control Plane → Hermes | `API_SERVER_KEY` | 이 profile 을 쓸 자격이 있다 |
 | ③ | Hermes → Control Plane | `agent_token` | 이 요청이 어느 profile 에서 왔다 |
-| ④ | 다른 서비스 → Control Plane | 서비스 토큰 | 이 요청이 어느 사용자의 문서를 읽을 수 있다 |
 
 **①은 사용자를 정하고 ③은 profile 만 정한다.**
 ①은 요청마다 새로 만들어 저장하지 않는다. ③은 한 번 발급해 폐기할 때까지 쓰고 해시만 저장한다.
 ①을 받을 때마다 Control Plane 이 그 사용자가 허용 목록에서 꺼졌는지 확인한다. 흐름은 [`docs/features/users.md`](users.md#사용자를-껐을-때) 의 「사용자를 껐을 때」 가 갖는다.
 ②도 profile 만 정한다. 어느 사용자의 실행인지는 Control Plane 이 알고 Hermes 에게 알리지 않는다.
-④는 사용자 한 사람과 받는 collection 을 정하고, 실행 없이 읽는 유일한 길이다. 그 사용자가 허용 목록에서 꺼지면 통하지 않는다.
-
 **요청 본문에 사용자를 적게 하면 모델이 그것을 바꿀 수 있다.**
 ③도 사용자를 정하지 못한다. GROUP 에이전트는 여러 사용자가 같은 profile 을 쓰고, MCP 연결과 그 토큰은 profile 에 하나다.
 그래서 사용자는 Control Plane 이 이미 기록한 실행에서 꺼낸다. 아래 「MCP 호출의 요청자를 정할 때」 가 그 판정이다.
@@ -113,7 +110,7 @@ Hermes 에 보낼 session(`runtimeSessionId`)과 실행 줄에 적을 session(`c
 대화 turn 은 대화의 session 을 보내고 대화의 루트 session 을 적는다. 흐름의 하위 실행과 위임 자식은 `RunSession.fresh()` 로 새 session 을 정해 부모의 session 을 잇지 않는다.
 
 **실행 줄에 session 을 적는 실행만 요청자가 될 수 있다.**
-Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다.
+session이 없는 실행 안에서는 사용자가 걸린 도구를 쓸 수 없다.
 
 ### MCP 호출의 요청자를 정할 때
 
@@ -135,7 +132,7 @@ Memory 제안은 session 을 적지 않으므로 그 실행 안에서는 사용�
 | 등록이 있는데 origin 실행이나 그 실행 트리의 루트 실행이 `CANCELLED` 다 | 거절한다. 사용자가 turn 이나 흐름을 중지해도 Hermes 하위 에이전트는 계속 돌 수 있어서다. Control Plane MCP 도구만 막고, 하위 에이전트의 Hermes 자체 도구와 run 은 멈추지 못한다([ADR-037](../../backend/docs/adr/ADR-037-hermes-하위-에이전트-session-의-주인은-만들-때-등록한-줄로-정한다.md)) |
 | 등록의 루트 session 이 서명한 루트와 다르다 | 거절한다 |
 | 등록이 없고 그 호출의 session 이 루트와 다르다 | 거절한다. 등록이 빠진 하위 에이전트와 `compression.in_place: false` 로 교체된 최상위 session 이 여기 온다. 둘을 나눌 수 없어 추측하지 않는다 |
-| 등록이 없고 session 이 루트와 같지만 그 루트 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Memory 제안 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
+| 등록이 없고 session 이 루트와 같지만 그 루트 session 으로 도는 실행이 없다 | 거절한다. 끝난 실행, Control Plane 이 시작하지 않은 run(Hermes cron, 다른 채팅 플랫폼 gateway)이 여기 온다. 요청자를 알 수 없어서다 |
 | 그 루트 session 으로 도는 실행이 다른 profile 의 것이다 | 거절한다 |
 | 도는 실행이 둘 이상이다 | 거절한다. 가장 최근 것을 고르지 않는다 |
 

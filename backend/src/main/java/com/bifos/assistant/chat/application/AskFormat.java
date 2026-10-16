@@ -39,7 +39,7 @@ public final class AskFormat {
             """.stripTrailing();
 
 
-    /** 사용자가 직접 답하는 대화의 instructions 에 안내를 붙인다. 흐름의 Chief 와 자식에게는 붙이지 않는다. */
+    /** 사용자가 직접 답하는 대화의 instructions 에 안내를 붙인다. */
     static String appendTo(String instructions) {
         return instructions == null || instructions.isBlank() ? GUIDE : instructions + "\n\n" + GUIDE;
     }

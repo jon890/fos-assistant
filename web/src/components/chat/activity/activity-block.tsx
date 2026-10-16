@@ -53,7 +53,6 @@ type Props =
   | {
       mode: "live";
       state: ActivityState;
-      slow: boolean;
       expanded: boolean;
       onExpandedChange(value: boolean): void;
       onOpenPanel?(): void;
@@ -207,15 +206,6 @@ export function ActivityBlock(props: Props) {
           )}
         />
       </button>
-      {live && props.slow && props.state.endedAt === null ? (
-        <p
-          data-testid="flow-slow-notice"
-          className="px-3 pb-2 text-xs text-muted-foreground"
-        >
-          오래 걸릴 수 있어요. 이 화면을 떠나도 실행은 계속돼요. 나중에 대화를
-          다시 열면 저장된 답을 볼 수 있어요.
-        </p>
-      ) : null}
       {/* 높이가 움직이도록 접힌 동안에도 그려 둔다. 접힌 내용에는 초점과 화면 읽기가 닿지 않게 한다. */}
       <div className="collapsible" data-open={expanded}>
         <div aria-hidden={!expanded} inert={!expanded}>

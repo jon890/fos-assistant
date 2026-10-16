@@ -40,11 +40,11 @@ public class AgentToolService {
     /** 사진이 있는 일반 turn 제출 전에 기존 profile에도 원본 조회 도구를 자동 제공한다. */
     @Transactional
     public void ensureAttachmentInspection(Agent agent) {
-        if (agent.connectorManaged() || !agent.acceptsAttachments()) {
+        if (!agent.acceptsAttachments()) {
             return;
         }
         agent = requireAgentForUpdate(agent.code());
-        if (agent.connectorManaged() || !agent.acceptsAttachments()) {
+        if (!agent.acceptsAttachments()) {
             return;
         }
         List<String> enabled = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile());
@@ -253,9 +253,6 @@ public class AgentToolService {
 
 
     private static void requireOwnerOrAdmin(CurrentUser user, Agent agent) {
-        if (agent.connectorManaged()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "connector-managed agent toolsets cannot be changed here");
-        }
         if (!user.isAdmin() && !Objects.equals(user.id(), agent.ownerUserId())) {
             throw new ApiException(ErrorCode.FORBIDDEN, "only the agent owner can read or change toolsets");
         }

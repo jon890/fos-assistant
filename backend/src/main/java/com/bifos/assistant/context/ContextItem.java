@@ -16,6 +16,7 @@ import java.util.List;
  * @param ownerUserId {@code USER} 항목의 주인. {@code GROUP} 이면 비어 있다
  * @param asOf 그 내용이 참이던 시각
  * @param conflictsWith Control Plane 이 구조로 알 수 있는 충돌 상대의 {@code ref}
+ * @param selection 그 항목을 고른 규칙과 순위. Memory 조립이 채우고 그 밖은 null 이다
  */
 public record ContextItem(
     ContextSource source,
@@ -29,10 +30,31 @@ public record ContextItem(
     ContextBodyMode bodyMode,
     List<String> conflictsWith,
     String title,
-    String body) {
+    String body,
+    ContextSelection selection) {
 
     public ContextItem {
         conflictsWith = conflictsWith == null ? List.of() : List.copyOf(conflictsWith);
+    }
+
+
+    /** 선택 근거가 없는 항목이다. 결과 항목과 조립 도중의 Memory 항목이 쓴다. */
+    public ContextItem(
+        ContextSource source,
+        String ref,
+        MemoryScope scope,
+        Long ownerUserId,
+        MemorySensitivity sensitivity,
+        ContextTrust trust,
+        Instant asOf,
+        ContextFreshness freshness,
+        ContextBodyMode bodyMode,
+        List<String> conflictsWith,
+        String title,
+        String body) {
+        this(
+            source, ref, scope, ownerUserId, sensitivity, trust, asOf, freshness, bodyMode, conflictsWith, title, body,
+            null);
     }
 
 
@@ -45,7 +67,16 @@ public record ContextItem(
     /** 본문을 싣는 방식만 바꾼 사본이다. */
     public ContextItem withBodyMode(ContextBodyMode mode) {
         return new ContextItem(
-            source, ref, scope, ownerUserId, sensitivity, trust, asOf, freshness, mode, conflictsWith, title, body);
+            source, ref, scope, ownerUserId, sensitivity, trust, asOf, freshness, mode, conflictsWith, title, body,
+            selection);
+    }
+
+
+    /** 선택 근거만 바꾼 사본이다. */
+    public ContextItem withSelection(ContextSelection value) {
+        return new ContextItem(
+            source, ref, scope, ownerUserId, sensitivity, trust, asOf, freshness, bodyMode, conflictsWith, title, body,
+            value);
     }
 
 

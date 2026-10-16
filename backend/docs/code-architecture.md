@@ -1,7 +1,8 @@
 # backend 패키지
 
 Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 규칙을 갖는다.
-방향 규칙은 `ArchitectureRules.java` 가 강제하고, 이 파일은 규칙마다 그 검사의 이름을 적는다.
+방향 규칙은 `ArchitectureRules.java` 가 강제하고, 까닭과 예외는 [코드 규칙 목록](../../docs/code-rules/INDEX.md)에서 찾는다.
+이 파일은 모듈 책임과 흐름, 검사 실행 및 기준 갱신 절차를 갖는다.
 
 ## 관찰 연결의 모듈 배치
 
@@ -57,14 +58,14 @@ native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 �
 | `model` | 모델 선택을 담는 값과 모델 단계 값. 서비스는 아직 `chat` 에 있다 |
 | `agent` | 에이전트 등록과 사용자의 만들기·지우기, 공개 범위, Hermes profile 연결, 페르소나, 도구, 에이전트가 받는 Memory collection |
 | `hermes` | Runs API 호출과 profile key 조회, 대시보드 호출 |
-| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 흐름의 계약과 등록, 첨부 관찰 revision과 요청 alias |
+| `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 첨부 관찰 revision과 요청 alias |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/features/execution.md`](../../docs/features/execution.md)) |
 | `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
-| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
+| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
 | `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
-| `orchestration` | 흐름의 구현과 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
+| `orchestration` | 자식 실행, MCP `agent_*` 위임의 시작과 조회와 중지, 하위 에이전트 session 등록 |
 | `skill` | 올린 스킬의 읽기와 쓰기, 스킬 zip 묶음의 받기와 검사, 미리보기와 올리기, 버전 디렉터리, Hermes 에 게시, 스킬 목록과 호출 이력 조회 |
 | `connector` | 커넥터 카탈로그, 사용자별 연결, 에이전트에 연결을 붙이는 바인딩, 커넥터 도구 호출의 판정과 기록 |
 | `task` | 예약 작업과 시각, 발화 기록, 발화기와 예약 turn 시작([`docs/features/schedule.md`](../../docs/features/schedule.md)) |
@@ -220,8 +221,7 @@ domain과 infra는 admin을 import하지 않는다.
 entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
 entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
 
-`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`,
-`ServiceToken`, `ServiceTokenCollection`과 복합 ID 세 타입을 소유한다.
+`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`과 복합 ID 두 타입을 소유한다.
 기존 타입은 운영 루트 전체에서 top-level 이름 또는 표 계약으로 선택하며 각 기대 수는 1이다.
 다른 기능 이동, 표를 유지한 이름 변경, 누락과 중복도 같은 두 규칙으로 거절한다.
 새 memory 엔티티와 실제 영속 ID에도 위 배치 규칙을 적용한다.
@@ -266,7 +266,6 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 | `AgentConnectorDetacher` | `detachAll`. 그 에이전트의 바인딩을 모두 뗀다 | `ConnectorBindingService` | 에이전트 지우기 |
 | `AgentPurgeParticipant` | 지운 에이전트를 정리할 때 바인딩을 지우고, 연결과 승인 줄의 `agent_id` 를 비운다 | `ConnectorAgentPurge` | 지운 에이전트 정리 |
 
-옛 커넥터 에이전트가 남아 있는 동안 그 실행에는 Memory 문맥을 주지 않는다. `ChatService` 와 `AgentRunner` 가 `Agent.connectorManaged()` 를 보고 빈 문맥으로 돌린다. `AgentMemoryCollectionService` 도 옛 커넥터 에이전트에 받는 collection 을 주지 않는다. `McpCallerResolver` 는 origin 실행의 에이전트가 옛 커넥터 에이전트이면 Control Plane MCP 호출을 거절한다([ADR-045](adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md)). 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않는다.
 웹은 `components/connector`와 `app/connections`, `app/connections/[id]`, 대응 서버 라우트가 맡는다. 입력 칸은 manifest 의 `fields` 로 그린다.
 특정 서비스 이름이 코드에 들어왔는지는 `test/unit/connector-neutral.test.ts` 가 보고, 예외도 그 시험이 갖는다.
 계약은 [커넥터 연결](../../docs/features/connector.md)에 있다.
@@ -302,7 +301,7 @@ entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 pr
 
 `ChatService`는 일반·예약·살펴보기·대기 메시지·다시 생성 turn의 종료 사건을 `ChatTurnCompletion`으로 만든다.
 이 helper는 저장을 마친 `ChatTurn`의 취소 여부와 식별자만 읽어 `done` 또는 `stopped`를 고른다.
-사건을 보내는 시점과 잠금을 닫는 순서는 `ChatService`가 유지하고, 흐름 실행의 종료 사건은 `ChatTurnRunner`가 보낸다.
+사건을 보내는 시점과 잠금을 닫는 순서는 `ChatService`가 유지하고, 종료 사건은 `ChatTurnCompletion.eventOf`로 만든다.
 
 실행 기록의 공개 메서드는 `ExecutionRecorder`에 둔다. 시작과 실행 한도, 문맥 출처, 관측 상태와 시각 표시는 이 서비스가 맡는다.
 `ExecutionCompletionRecorder`는 완료·실패·취소 때 실제 provider와 모델, 사용량, 당시 가격과 버전, 종료 상태와 답을 같은 실행 줄에 저장한다.

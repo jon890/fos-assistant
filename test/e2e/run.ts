@@ -48,7 +48,6 @@ import { interimScenario } from "./scenarios/interim.ts";
 import { stopScenario } from "./scenarios/stop.ts";
 import { E2E_STREAM_HEARTBEAT, streamHeartbeatScenario } from "./scenarios/stream-heartbeat.ts";
 import { regenerateScenario } from "./scenarios/regenerate.ts";
-import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { busyScenario } from "./scenarios/busy.ts";
 import { attentionScenario } from "./scenarios/attention.ts";
@@ -102,7 +101,7 @@ const SCENARIOS: readonly Scenario[] = [
   authScenario,
   signInScenario,
   peopleScenario,
-  // 서비스 토큰은 주인이 허용 목록에 켜져 있어야 통하므로 aunt 가 허용 목록에 들어온 뒤에 둔다.
+  // 사용자 접근 해제와 복구를 확인하므로 aunt를 허용 목록에 더한 뒤에 둔다.
   // 문서를 지우고 끝나고 대화 turn 과 에이전트를 만들지 않아 뒤 시나리오의 Memory 주입과 사용량 세기에 걸리지 않는다.
   memoryDocumentScenario,
   // 대화 turn 을 돌리지 않고 들인 항목을 지우고 끝나므로 뒤 시나리오의 Memory 주입과 사용량 세기에 걸리지 않는다.
@@ -125,7 +124,6 @@ const SCENARIOS: readonly Scenario[] = [
   stopScenario,
   streamHeartbeatScenario,
   regenerateScenario,
-  orchestrationScenario,
   chatAttachmentScenario,
   artifactScenario,
   mcpPrincipalScenario,
@@ -222,7 +220,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, CONTENT_DRAFT_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, CONTENT_DRAFT_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -382,7 +380,6 @@ async function main(): Promise<void> {
     console.log("== fake Hermes 기동");
     hermes = await startFakeHermes({
       [DAD_BINDING.profileName]: PROFILE_KEY,
-      [FLOW_BINDING.profileName]: PROFILE_KEY,
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
       [FOLLOW_UP_MCP_PROFILE]: PROFILE_KEY,

@@ -19,7 +19,7 @@ covers: `backend/src/main/java/com/bifos/assistant/proactive/`, `backend/src/mai
 
 ### 먼저 살펴보기 절
 
-에이전트 상세의 절이다. `components/agent/agent-proactive-check-section.tsx` 가 그리고 `GET /api/v1/agents/{code}/proactive-check` 가 상태를 준다. 옛 커넥터 에이전트에는 그리지 않는다.
+에이전트 상세의 절이다. `components/agent/agent-proactive-check-section.tsx` 가 그리고 `GET /api/v1/agents/{code}/proactive-check` 가 상태를 준다.
 상태를 읽지 못하면 절 안에 실패 문구만 그린다. 그래도 끝의 「매일 깨우기」 소절(`agent-proactive-schedule-section.tsx`)은 실패 문구 아래에 그린다.
 시작할 수 없으면 단추를 끄고 까닭마다 할 일을 보인다. toolset 이 걸렸으면 끌 toolset 의 이름을 보인다.
 시작이 `USER_BUSY`, `CONVERSATION_BUSY` 로 거절되면 끝난 뒤 다시 누르라고 안내하고, `PROACTIVE_CHECK_UNAVAILABLE` 이면 상태를 다시 읽어 까닭을 그린다.
@@ -115,7 +115,7 @@ sequenceDiagram
 
 ### 시작 전 점검
 
-`ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다. `AGENT_NOT_SUPPORTED` 면 스킬과 toolset 은 보지 않고 Hermes 를 부르지 않는다.
+`ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다.
 
 사진이 있는 일반 turn에서 자동 추가하는 내부 `fos-attachments`도 읽기 전용과 쓰기 허용 모두 받는다.
 이 도구는 현재 실행의 같은 대화에서 보낸 사진만 읽으며 사용자 설정에 노출하지 않는다.
@@ -148,8 +148,7 @@ sequenceDiagram
 모델이 쓴 글에서 온 발견과 문제 후보는 `<external-data>` 로 감싼다. 다른 대화의 내용은 싣지 않는다.
 까닭은 ADR-080, [ADR-093](../../backend/docs/adr/ADR-093-문제-찾기는-살펴보기-결과의-문제-후보로-받고-control-plane-이-근거와-중복을-결정적으로-검사한다.md), [ADR-20261008 / check-finding-reaction](../adr/ADR-20261008-check-finding-reaction.md) 이 갖는다.
 그 위에 모든 살펴보기에 같은 지시가 붙는다. 글은 `ProactiveCheckInstructions` 가 갖는다.
-경계 줄은 쓰기 허용이, 연결 줄은 시작할 때 붙은 연결이 있었는지가 고른다. 살펴보기 도중에 붙이거나 떼도 지시는 바뀌지 않는다.
-붙은 연결이 없으면 연결한 서비스의 에이전트에 맡기라고 지시한다. 붙기 전의 에이전트와 고치기 전의 분야 지침이 지금처럼 돌게 하기 위해서다.
+경계 줄은 쓰기 허용이 고른다. 모든 살펴보기는 필요한 도구를 직접 부르고 다른 에이전트에 맡기지 말라는 같은 지시를 받는다.
 
 ### 대화에 남는 것
 
@@ -166,21 +165,21 @@ sequenceDiagram
 
 **답 조각은 화면으로 흘리지 않는다.** 모델의 답은 결과 블록의 JSON 이 섞인 글이라 그대로 보이면 읽을 수 없다. 도구와 하위 에이전트 사건은 흘린다.
 멈춘 살펴보기는 그때까지의 답을 남기지 않는다. 검사하지 않은 글이 대화에 남지 않게 하기 위해서다.
-사용자의 질문이 없는 turn 이라 Memory 제안과 추천 질문 갱신을 띄우지 않고, `auto_turn_count` 와 대화 제목도 바꾸지 않는다.
+사용자의 질문이 없는 turn 이라 추천 질문 갱신을 띄우지 않고, `auto_turn_count` 와 대화 제목도 바꾸지 않는다.
 
 ### 읽기 경계
 
 무엇을 막는지는 ADR-080 의 경계 표가, 쓰기 도구를 허용한 경계는 ADR-082 가 갖는다.
 판정은 커넥터 도구가 `ConnectorPolicyService.decide`, Control Plane MCP 가 `McpController`, 위임이 `AgentDelegationService.delegate` 에서 한다. 위임은 그 살펴보기가 이미 끝났는지를 실행 직전에 한 번 더 본다.
 살펴보기 트리인지는 `ProactiveCheckGuard.isCheckTree(AgentExecution)` 가, 쓰기 허용인지는 `ProactiveCheckGuard.checkOf` 로 한 번 읽은 살펴보기 줄의 `writes_allowed` 가 정한다.
-붙은 커넥터 도구를 직접 부른 호출도, 옛 커넥터 에이전트의 위임 자식 실행도 트리 루트(`AgentExecution.treeRootId()`)가 살펴보기 turn 이다. 그래서 커넥터 판정은 두 경우를 같은 기준으로 막는다.
+붙은 커넥터 도구를 직접 부른 호출은 트리 루트(`AgentExecution.treeRootId()`)가 살펴보기 turn 이다. 그래서 커넥터 판정은 이 호출에도 같은 기준으로 막는다.
 
 ### 상한
 
 키와 기본값은 `ProactiveCheckProperties` 가 갖는다.
 시간 `max-duration` 이나 도구 호출 `max-tool-calls` 를 넘으면 `ChatService.stop` 으로 그 turn 과 자식을 멈추고 `CHECK_TIME_LIMIT`, `CHECK_TOOL_LIMIT` 을 적는다.
 위임 `max-delegations` 를 넘으면 도구 결과 `CHECK_LIMIT` 을 주고, 모델이 직접 하거나 그만둔다.
-도구 호출은 살펴보기 turn 자신의 `tool.started` 만 센다. 옛 커넥터 에이전트 안의 호출은 위임 수와 `hermes.run-timeout` 이 묶는다.
+도구 호출은 살펴보기 turn 자신의 `tool.started` 만 센다.
 
 **상한 중지가 실패하면 멈춘 까닭을 되돌리고 다시 시도한다.** 횟수와 간격은 `ProactiveCheckRun.STOP_ATTEMPTS` 와 `ProactiveCheckRun.STOP_RETRY_INTERVAL` 이 갖는다.
 까닭이 비어 있는 동안 turn 이 예외로 끝나면 `STOPPED` 가 아니라 그 오류 코드의 `FAILED` 로 적는다. 멈추지 못한 turn 을 상한으로 멈췄다고 적지 않기 위해서다.

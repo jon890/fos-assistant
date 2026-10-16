@@ -25,7 +25,7 @@ public final class AgentToolPolicy {
      */
     public static final String SKILLS = "skills";
     /**
-     * 사진을 읽는 toolset 이다. 사진을 받는 커넥터는 이것을 함께 선언한다(ADR-044).
+     * 사진을 읽는 toolset 이다.
      */
     public static final String VISION = "vision";
     /**
@@ -70,10 +70,6 @@ public final class AgentToolPolicy {
      * 사용자별 실행 공간에서 도는 toolset 이다. 켜진 동안은 주인을 바꾸지 못한다(ADR-086).
      */
     private static final Set<String> SANDBOX_TOOLSETS = Set.of("terminal", "file", "code_execution", "vision", "image_gen", "video_gen");
-    /**
-     * 커넥터 manifest 가 연결용 에이전트에 열 수 있는 내장 toolset 이다. 읽기 전용 이미지 도구뿐이다(ADR-044).
-     */
-    private static final Set<String> CONNECTOR_TOOLSETS = Set.of(AgentToolPolicy.VISION);
 
     private static final Set<String> CONFIGURABLE_TOOLSETS;
 
@@ -175,21 +171,12 @@ public final class AgentToolPolicy {
                 ErrorCode.AGENT_TOOLS_REQUIRE_PRIVATE, "shell and file toolsets require a private agent");
         }
         result.add(CONTROL_PLANE_MCP);
-        if (!agent.connectorManaged()
-            && agent.acceptsAttachments()
+        if (agent.acceptsAttachments()
             && currentlyEnabled.contains(ATTACHMENT_INSPECTION)) {
             result.add(ATTACHMENT_INSPECTION);
         }
         result.addAll(connectorServers);
         return List.copyOf(result);
-    }
-
-
-    /**
-     * 커넥터가 선언한 toolset 이 모두 manifest 로 열 수 있는 것인가.
-     */
-    public static boolean allowedForConnector(List<String> declared) {
-        return CONNECTOR_TOOLSETS.containsAll(declared);
     }
 
 

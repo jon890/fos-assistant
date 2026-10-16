@@ -47,6 +47,8 @@ from .connector_state import (
     _entry_field_env,
     _entry_manifest_mismatches,
     _remove_backup_env_copies,
+    _recoverable_server,
+    _restore_binding_files,
     _skill_tree_files,
     _tool_map_bytes,
 )
@@ -197,8 +199,6 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
         name = manifest["mcp_server"]
         if owned is not None and owned["mcp_server"] != name:
             raise FileExistsError("설치한 MCP 서버 이름이 지금 connector 와 다르다")
-        if name in servers and (not owned or servers[name] != owned["server"]):
-            raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
         if owned and name not in servers:
             raise FileExistsError("설치한 MCP 서버가 밖에서 지워졌다")
         field_env = [field["env"] for field in manifest["fields"]]
@@ -235,6 +235,9 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 owner_browser if isinstance(owner_browser, str) and OWNER_BROWSER_VALUE_RE.fullmatch(owner_browser)
                 else "")
         previous = servers.get(name)
+        if name in servers and (not owned or (
+                previous != owned["server"] and not _recoverable_server(previous, owned["server"], server))):
+            raise FileExistsError("운영자가 등록하거나 바꾼 MCP 서버가 있다")
         servers[name] = server
         allowed = [item for item in allowed if item != "no_mcp"]
         if name not in allowed:
@@ -258,7 +261,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                        != [line for line in kept if _env_line_key(line) in field_env])
         # 뗀 뒤 같은 이름을 다시 붙이면 gateway 는 이름이 계속 있다고 보고 옛 연결을 쥘 수 있다.
         # 뗀 뒤에는 옛 정의와 견줄 수 없으므로 기록을 지우기 전에 재시작을 요구한다.
-        restart = (previous is not None and (previous != server or env_changed)) or name in detached.values()
+        restart = (previous is not None and (previous != server or env_changed
+                   or (owned is not None and previous != owned["server"]))) or name in detached.values()
         skills = sorted(manifest["skills"])
         for skill in skills:
             if (skills_dir / skill).exists() and skill not in previous_skills:
@@ -354,6 +358,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 raise FileExistsError("profile 설정이 밖에서 바뀌었다")
             if current == value:
                 continue
+            # 교체 직후 예외가 나도 복원 후보에 남긴다. 실제 값은 복원할 때 다시 견준다.
+            written.append(path)
             if value is None:
                 path.unlink()
             else:
@@ -366,19 +372,8 @@ def _connector_bind_config(profile_dir: pathlib.Path, plugin: str, enabled: bool
                 _atomic_private_write(path, value)
                 if shared(path):
                     os.chmod(path, 0o644)
-            written.append(path)
     except Exception:
-        for path in reversed(written):
-            # 이 요청이 쓴 값일 때만 복원한다. 바깥의 새 수정은 덮어쓰지 않는다.
-            if (path.read_bytes() if path.exists() else None) != targets[path]:
-                continue
-            value = originals[path]
-            if value is None:
-                path.unlink(missing_ok=True)
-            else:
-                _atomic_private_write(path, value)
-                if shared(path):
-                    os.chmod(path, 0o644)
+        _restore_binding_files(written, originals, targets, shared)
         for directory in reversed(created_dirs):
             # 이 요청이 만든 디렉터리만 지운다. 그 사이 밖에서 무엇이 생겼으면 비어 있지 않아 남는다.
             try:

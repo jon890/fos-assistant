@@ -24,8 +24,7 @@ public final class AgentAdminDtos {
         @NotNull CostMode costMode,
         @NotNull CredentialScope credentialScope,
         @NotNull AgentVisibility visibility,
-        String ownerEmail,
-        @Pattern(regexp = "[a-z0-9][a-z0-9-]{0,63}") String flow) {
+        String ownerEmail) {
     }
 
     /**
@@ -63,8 +62,6 @@ public final class AgentAdminDtos {
         String visibility,
         Long ownerUserId,
         boolean enabled,
-        String flow,
-        boolean connectorManaged,
         boolean proactiveCheckWritesAllowed) {
         static AdminAgentView from(Agent agent) {
             return new AdminAgentView(
@@ -78,8 +75,6 @@ public final class AgentAdminDtos {
                 agent.visibility().name(),
                 agent.ownerUserId(),
                 agent.enabled(),
-                agent.flow(),
-                agent.connectorManaged(),
                 agent.proactiveCheckWritesAllowed());
         }
     }

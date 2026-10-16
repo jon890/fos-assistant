@@ -14,9 +14,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * V54 가 서비스 토큰 표를 만들고 해시의 유일성과 사용자 외래 키를 지키는지 본다(ADR-056).
+ * V54의 과거 서비스 토큰 표 생성과 해시 유일성, 사용자 외래 키 계약만 확인한다.
  *
- * <p>다른 검사들은 엔티티로 스키마를 만들어 이 제약을 지나지 않는다.
+ * <p>현재 서비스 토큰 기능은 폐기됐지만 새 설치가 V54를 계속 거치므로 당시 마이그레이션의 제약 검사는 유지한다.
+ * 최종 스키마에서 표 제거와 사용자·기억 보존은 {@link ServiceTokenRemovalMigrationTest}가 확인한다.
  */
 class ServiceTokenMigrationTest {
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 코드 규칙: rule-43. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 """실제 저장소 Gradle 설정으로 JDT 포맷 계약을 검사한다. python3 test/spotless-jdt.test.py"""
 from pathlib import Path
 import shutil

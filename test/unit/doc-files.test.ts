@@ -1,3 +1,4 @@
+// 코드 규칙: rule-53. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -42,6 +43,8 @@ export function problemOf(file: string): string | undefined {
   if (inDocs) {
     const rest = inDocs[2];
     if (rest.startsWith("images/")) return undefined;
+    // rule-53: 규칙 번호와 목록의 대응은 rule-index.test.ts가 확인한다.
+    if (!inDocs[1] && /^code-rules\/(?:INDEX|rule-[1-9]\d*)\.md$/.test(rest)) return undefined;
     if (!inDocs[1] && rest.startsWith("features/")) {
       const name = rest.slice("features/".length);
       if (!FEATURE_DOC.test(name)) return "docs/features/ 아래에는 소문자 영문과 숫자, 하이픈 이름의 .md 만 둔다";
@@ -93,5 +96,14 @@ test("모듈 docs 의 정해진 이름과 예외는 통과하고 새 주제 파�
 test("코드 옆 README 와 스킬, 계획서는 docs 밖에 둘 수 있다", () => {
   for (const file of ["README.md", "README.ko.md", "hermes/plugins/fos-ctx/README.md", "backend/gradle/README.md", "hermes/AGENTS.md", "hermes/connectors/gmail/skills/mail/SKILL.md", "tasks/plan1-x/phase-01.md"]) {
     assert.equal(problemOf(file), undefined, file);
+  }
+});
+
+test("규칙 문서는 루트의 INDEX와 양의 정수 번호 파일만 허용한다", () => {
+  for (const file of ["docs/code-rules/INDEX.md", "docs/code-rules/rule-1.md", "docs/code-rules/rule-120.md"]) {
+    assert.equal(problemOf(file), undefined, file);
+  }
+  for (const file of ["docs/code-rules/index.md", "docs/code-rules/rule-0.md", "docs/code-rules/rule-01.md", "docs/code-rules/rule-x.md", "docs/code-rules/notes.md", "docs/code-rules/sub/rule-1.md", "backend/docs/code-rules/rule-1.md", "web/docs/code-rules/INDEX.md", "hermes/docs/code-rules/rule-1.md"]) {
+    assert.notEqual(problemOf(file), undefined, file);
   }
 });

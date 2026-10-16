@@ -75,16 +75,6 @@ public class Agent {
     @Getter
     private boolean enabled;
 
-    /**
-     * 이 에이전트를 묶어 둔 다중 에이전트 흐름의 이름. 비어 있으면 Hermes 를 한 번 부른다.
-     *
-     * <p>모르는 이름이 적혀 있으면 기동할 때 {@code FlowRegistry} 가 실패시킨다. 잘못 적힌 이름을
-     * 사용자가 그 에이전트를 고를 때 알게 되면 늦기 때문이다.
-     */
-    @Column(name = "flow", length = 64)
-    @Getter
-    private String flow;
-
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -97,20 +87,6 @@ public class Agent {
     @Column(name = "profile_managed", nullable = false)
     @Getter
     private boolean profileManaged;
-
-    @Column(name = "connector_managed", nullable = false)
-    @Getter
-    private boolean connectorManaged;
-
-    /**
-     * 참이면 이 연결용 에이전트가 사진을 받는다. 커넥터의 선언과 도구 확인을 합친 값이다.
-     *
-     * <p>선언은 대시보드가 내는 manifest 에 있고 이 엔티티는 Hermes 를 부르지 못한다. 그래서 연결 흐름이 여기
-     * 적는다. 선언이 참이고 연결 확인이나 관리자 반영 완료가 선언한 toolset 이 실제로 켜진 것을 확인했을 때만
-     * 참이다. 등록 직후와 {@code READY} 가 아닌 연결은 늘 거짓이다(ADR-044).
-     */
-    @Column(name = "connector_attachments", nullable = false)
-    private boolean connectorAttachments;
 
     /**
      * 「먼저 살펴보기에 쓰기 도구 허용」 이다. 관리자만 바꾼다(ADR-082).
@@ -242,24 +218,6 @@ public class Agent {
 
 
     /**
-     * connector 가 만든 에이전트는 일반 설정 화면에서 바꾸지 않는다.
-     */
-    public void markConnectorManaged() {
-        this.connectorManaged = true;
-    }
-
-
-    /**
-     * 연결용 에이전트가 사진을 받는지 적는다. 연결용 에이전트에만 뜻이 있다.
-     *
-     * <p>manifest 의 선언을 그대로 옮기지 않는다. 선언과 도구 확인이 모두 참일 때만 참을 넘긴다.
-     */
-    public void acceptConnectorAttachments(boolean accepted) {
-        this.connectorAttachments = accepted;
-    }
-
-
-    /**
      * 지운 에이전트로 적고 끈다.
      *
      * <p>꺼 두는 것은 {@code enabled} 만 보는 곳에서도 새 대화가 시작되지 않게 하기 위해서다.
@@ -276,26 +234,15 @@ public class Agent {
 
 
     /**
-     * 흐름 이름을 붙이거나 뗀다. 빈 문자열은 비운 것과 같게 본다.
-     */
-    public void assignFlow(String flow) {
-        this.flow = flow == null || flow.isBlank() ? null : flow.strip();
-    }
-
-
-    /**
      * 이 에이전트의 대화에 사진을 붙일 수 있다.
      *
      * <p>주인이 있는 비공개 에이전트만 받는다. 공유 에이전트는 실행 요청자와 고정 첨부 mount 의 주인이 다를 수 있다.
-     * 흐름은 Hermes 를 한 번 부르는 경로를 거치지 않아 사진이 놓인 자리를 입력에 덧붙일 수 없다. 그래서
-     * 흐름이 붙은 에이전트는 받지 않는다. 연결용 에이전트는 그 커넥터가 사진을 받는다고 선언했고 선언한 toolset 이 켜진 것이 확인됐을 때만 받는다.
-     * 받을지 판정하는 곳은 모두 이 메서드를 부른다.
+     * 받을지 판정하는 곳은 모두 이 메서드를
+     * 부른다.
      */
     public boolean acceptsAttachments() {
         return visibility == AgentVisibility.PRIVATE
-            && ownerUserId != null
-            && (!connectorManaged || connectorAttachments)
-            && (flow == null || flow.isBlank());
+            && ownerUserId != null;
     }
 
 

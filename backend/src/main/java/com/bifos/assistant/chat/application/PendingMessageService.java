@@ -33,7 +33,6 @@ public class PendingMessageService {
 
     private final ConversationAccess access;
     private final AgentService agents;
-    private final FlowRegistry flows;
     private final ChatPendingMessageRepository pendingMessages;
     private final ConversationEventHub hub;
     private final NextTurnDispatcher dispatcher;
@@ -106,7 +105,7 @@ public class PendingMessageService {
     }
 
 
-    /** 보통 보내기와 같은 순서와 메시지로 거절한다. 흐름이 붙은 에이전트는 대기 메시지를 받지 않는다. */
+    /** 보통 보내기와 같은 순서와 메시지로 거절한다. */
     private void requireQueueable(Conversation conversation) {
         Agent agent = agents.requireById(conversation.agentId());
         if (agent.isDeleted()) {
@@ -115,9 +114,7 @@ public class PendingMessageService {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        if (flows.find(agent.flow()) != null) {
-            throw new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation does not take queued messages");
-        }
+
     }
 
 

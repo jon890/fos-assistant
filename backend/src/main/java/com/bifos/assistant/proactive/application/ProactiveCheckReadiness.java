@@ -56,11 +56,6 @@ public class ProactiveCheckReadiness {
         if (!properties.current().enabled()) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.DISABLED));
         }
-        // 커넥터 에이전트와 흐름이 붙은 에이전트는 살펴보기를 하지 않으므로 Hermes 를 부를 까닭이 없다.
-        if (agent.connectorManaged() || (agent.flow() != null && !agent.flow().isBlank())) {
-            blockers.add(CheckBlocker.of(CheckBlockerCode.AGENT_NOT_SUPPORTED));
-            return new CheckReadiness(blockers);
-        }
         if (!skills.enabledNames(agent).contains(SKILL_NAME)) {
             blockers.add(CheckBlocker.of(CheckBlockerCode.SKILL_MISSING));
         }

@@ -36,7 +36,7 @@ export type Props = {
   mention?: { agents: AgentView[]; onPick(code: string): void };
   /**
    * 입력칸 맨 앞에 `/` 를 치면 이 스킬 이름 목록을 띄운다. 비었으면 스킬이 없다고 알린다.
-   * 흐름이 붙은 에이전트이거나 목록을 아직 읽지 못했으면 주지 않고, 그때는 목록을 띄우지 않는다.
+   * 목록을 아직 읽지 못했으면 주지 않고, 그때는 목록을 띄우지 않는다.
    */
   skillNames?: string[];
   /**

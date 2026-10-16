@@ -75,7 +75,7 @@ public class AgentExecution {
      * <p>대화 turn 은 그 대화의 루트 session 을 적는다. 압축 교체로 Hermes 에 보낸 session 이 바뀌어도
      * MCP {@code agent_*} 호출이 들고 오는 서명한 루트 session 으로 이 실행을 찾게 하기 위해서다
      * (ADR-031). 루트가 없는 옛 대화는 보낸 session 을 적는다. 흐름의 하위 실행은 Control Plane 이 정한
-     * {@code fos-<uuid>} 이고, Memory 제안은 비어 있다.
+     * {@code fos-<uuid>} 이고, 과거 Memory 제안 실행은 비어 있다.
      */
     @Column(name = "hermes_session_id", length = 128)
     private String hermesSessionId;
@@ -307,14 +307,6 @@ public class AgentExecution {
         if (submittedAt == null) {
             submittedAt = at;
             eventObservation = EventObservation.INCOMPLETE;
-        }
-    }
-
-
-    /** Flow 루트가 먼저 받은 원래 요청 시각을 보존하려고 더 이른 시각만 적는다. */
-    public void markRequestReceived(Instant at) {
-        if (at != null && (requestReceivedAt == null || at.isBefore(requestReceivedAt))) {
-            requestReceivedAt = at;
         }
     }
 

@@ -38,7 +38,7 @@ import org.springframework.stereotype.Service;
 /**
  * 에이전트 하나를 한 번 돌리고 실행 한 줄을 남긴다.
  *
- * <p>흐름의 첫 단계와 그 아래 단계가 같은 경로를 쓰게 하려고 여기 모았다. 부모와 루트를 정하는 것은
+ * <p>하위 에이전트 실행을 같은 경로로 기록한다. 부모와 루트를 정하는 것은
  * 부르는 쪽이고, 이 클래스는 받은 번호를 그대로 적는다. 요청자를 확인하고 에이전트를 고르는 것도
  * 부르는 쪽이 한다. 경계를 지키는 규칙은 {@link ChildExecutionRunner} 가 갖는다.
  *
@@ -49,7 +49,7 @@ import org.springframework.stereotype.Service;
  * 그 사이에 바뀐 권한이 반영되지 않는다. 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045).
  *
  * <p>실패를 예외로 올리지 않는다. 실행 줄을 FAILED 로 갱신하고 {@link ChildResult} 로 돌려준다.
- * 나란히 도는 다른 단계를 중간에 끊지 않기 위해서다.
+ * 부르는 쪽이 다른 실행을 중간에 끊지 않고 결과를 처리할 수 있게 한다.
  */
 @Service
 @Slf4j
@@ -72,53 +72,6 @@ public class AgentRunner {
 
 
     /**
-     * 실행 하나를 끝까지 돌린다.
-     *
-     * <p>실행 문맥 뒤에 turn 에만 적용하는 지시를 덧붙인다. 실행 기록의 문맥 값은 덧붙이기 전 값이다.
-     *
-     * @param user 이 실행의 주인. 부르는 쪽이 부모에게서 그대로 가져온다
-     * @param conversation 이 실행이 속한 대화
-     * @param agent 실행할 에이전트. 요청자가 쓸 수 있는 것만 여기 들어온다
-     * @param task 이 실행에만 주는 지시
-     * @param parentExecutionId 이 실행을 부른 실행. 루트이면 null
-     * @param rootExecutionId 이 실행이 속한 트리의 루트. 루트 자신이면 null
-     * @param session Hermes 에 보낼 session 과 실행 줄에 제출하기 전에 적을 session. 대화의 첫 단계는 압축 교체 뒤에
-     * 보내는 session 이 바뀌어도 그 대화의 루트 session 을 적어야 하고(ADR-031), 하위 실행은 새
-     * {@code fos-<uuid>} 를 보내고 적는다
-     * @param onStarted 실행 줄이 생긴 직후 호출한다
-     * @param onSubmitted 실행 줄과 Hermes run 번호가 모두 생긴 직후 호출한다
-     * @param cancelled 참이면 실행을 멈춘다
-     * @param instructionAddition 실행 문맥 뒤에 붙일 지시. 없으면 null
-     */
-    public AgentRun run(
-        CurrentUser user,
-        Conversation conversation,
-        Agent agent,
-        String task,
-        Long parentExecutionId,
-        Long rootExecutionId,
-        RunSession session,
-        Consumer<AgentExecution> onStarted,
-        BiConsumer<AgentExecution, String> onSubmitted,
-        BooleanSupplier cancelled,
-        String instructionAddition) {
-        return run(
-            user,
-            conversation,
-            agent,
-            task,
-            parentExecutionId,
-            rootExecutionId,
-            session,
-            onStarted,
-            onSubmitted,
-            cancelled,
-            instructionAddition,
-            null);
-    }
-
-
-    /**
      * 실행 하나를 끝까지 돌리며 실행 줄에 {@code delegation_key} 를 처음부터 적는다.
      *
      * <p>키가 있으면 다른 에이전트에게 맡긴 실행이다. 성공하면 답을 {@link DelegationProperties#outputMaxChars()}
@@ -126,7 +79,7 @@ public class AgentRunner {
      * CANCELLED 와 함께 적고, 받은 답이 없으면 비워 둔다. 부르는 쪽은 이 결과를 기다리지 않고
      * {@code agent_status} 가 그 줄을 읽는다. 같은 키의 줄이 이미 있으면 실행 줄 저장이 예외로 올라온다.
      *
-     * @param delegationKey 위임이 아니면 null 이다. 나머지 인자는 11개 인자 판과 같다
+     * @param delegationKey 실행 줄에 함께 적을 위임 키. 위임이 아니면 null이다
      */
     public AgentRun run(
         CurrentUser user,
@@ -142,9 +95,8 @@ public class AgentRunner {
         String instructionAddition,
         DelegationKey delegationKey) {
         Instant requestReceivedAt = clock.instant();
-        AssembledContext context = agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id());
-        boolean rememberAllowed = !agent.connectorManaged()
-            && (rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId));
+        AssembledContext context = contextAssembler.assemble(user, agent.id());
+        boolean rememberAllowed = rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId);
         context = contextAssembler.withResponseInstructions(context, rememberAllowed);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
             context.chars(),
@@ -266,7 +218,7 @@ public class AgentRunner {
         String code = ex instanceof ApiException api ? api.code().name() : UNKNOWN_ERROR;
         AgentExecution failed = executions.fail(execution, code);
         append(failed, ExecutionEventType.RUN_FAILED, code, sequence);
-        log.warn("흐름의 한 단계가 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
+        log.warn("하위 에이전트 실행이 실패했다 executionId={} errorCode={}", failed.id(), code, ex);
         return new AgentRun(failed, ChildResult.failed(failed.id(), code), null);
     }
 

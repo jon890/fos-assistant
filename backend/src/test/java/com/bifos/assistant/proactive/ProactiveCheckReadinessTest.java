@@ -2,7 +2,6 @@ package com.bifos.assistant.proactive;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
@@ -122,30 +121,6 @@ class ProactiveCheckReadinessTest {
 
 
     @Test
-    @DisplayName("커넥터 에이전트는 Hermes 를 부르지 않고 AGENT_NOT_SUPPORTED 다")
-    void connectorAgentIsNotSupportedWithoutCallingHermes() {
-        agent.markConnectorManaged();
-
-        CheckReadiness result = readiness(true).check(agent);
-
-        assertThat(codes(result)).as("막는 까닭").containsExactly(CheckBlockerCode.AGENT_NOT_SUPPORTED);
-        verifyNoInteractions(toolsets, skills);
-    }
-
-
-    @Test
-    @DisplayName("흐름이 붙은 에이전트도 Hermes 를 부르지 않고 AGENT_NOT_SUPPORTED 다")
-    void flowAgentIsNotSupportedWithoutCallingHermes() {
-        agent.assignFlow("planner");
-
-        CheckReadiness result = readiness(true).check(agent);
-
-        assertThat(codes(result)).as("막는 까닭").containsExactly(CheckBlockerCode.AGENT_NOT_SUPPORTED);
-        verifyNoInteractions(toolsets, skills);
-    }
-
-
-    @Test
     @DisplayName("설정을 끄면 다른 조건이 모두 맞아도 DISABLED 다")
     void disabledBlocksEvenWhenEverythingElseIsReady() {
         enabled(List.of("web", "skills", "fos-assistant"), Set.of("proactive-check"));
@@ -260,16 +235,4 @@ class ProactiveCheckReadinessTest {
         assertThat(writes.blockers()).as("쓰기 허용").containsExactly(expected);
     }
 
-
-    @Test
-    @DisplayName("연결이 붙은 에이전트라도 옛 커넥터 에이전트는 AGENT_NOT_SUPPORTED 다")
-    void legacyConnectorAgentIsStillNotSupportedEvenWithBindings() {
-        agent.markConnectorManaged();
-        when(connectorBindings.connectorServers(agent.id())).thenReturn(Set.of("career"));
-
-        CheckReadiness result = readiness(true).check(agent);
-
-        assertThat(codes(result)).as("막는 까닭").containsExactly(CheckBlockerCode.AGENT_NOT_SUPPORTED);
-        verifyNoInteractions(toolsets, skills);
-    }
 }

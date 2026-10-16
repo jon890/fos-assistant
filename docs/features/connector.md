@@ -50,7 +50,7 @@ Hermes 의 `tool_descriptions` 와 `tool_summaries` 는 정책과 분리하고 �
 | 바인딩 | 그 에이전트의 profile 에 바인딩 방식으로 설치가 켜져 있고 configured 이며, `policy_hook` 이 참이고, MCP probe 가 도구를 냈고, 재시작 대기도 반영 예정도 아니다. probe 는 공유 gateway 의 실제 실행 확인을 대신하지 않는다 |
 
 커넥터 도구는 연결과 바인딩이 모두 `READY` 일 때만 판정을 통과한다.
-바인딩 상태는 에이전트를 켜거나 끄지 않으므로 그 에이전트의 다른 도구는 그대로 돈다. 예외는 「옛 커넥터 에이전트」 다.
+바인딩 상태는 에이전트를 켜거나 끄지 않으므로 그 에이전트의 다른 도구는 그대로 돈다.
 
 ### 화면
 
@@ -64,7 +64,6 @@ Hermes 의 `tool_descriptions` 와 `tool_summaries` 는 정책과 분리하고 �
 | 붙일 수 있다 | 연결마다 「붙이기」 나 「떼기」. 붙었고 바인딩이 `READY` 이며 재시작 대기가 아니면 「붙음」, 아니면 「반영 대기」 |
 | 연결이 아직 준비되지 않았다 | 「붙이기」 없이 외부 서비스 연결 화면에서 연결을 확인하라는 안내 |
 | 그룹에 공개된 에이전트다 | 「붙이기」 와 「외부 서비스 연결하기」 없이 비공개 에이전트에만 붙일 수 있다는 안내. 비공개로 되돌리면 다시 붙일 수 있다 |
-| 옛 커넥터 에이전트다 | 성격 자리에 쓰던 에이전트에 연결을 붙인 뒤 이 에이전트를 지우라는 안내. 도구, 연결, 스킬, 먼저 살펴보기 절을 그리지 않고 공개와 삭제 절은 삭제만 남긴다 |
 | 커넥터에 스킬이 있는데 `skills` 도구가 꺼져 있다 | 지침을 쓰려면 스킬 도구를 켜라는 안내. 붙이기는 `skills` 를 켜지 않는다([ADR-029](../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md)) |
 
 「붙이기」 는 확인 창을 거친다. 실패하면 창이 남아 까닭을 보인다.
@@ -112,7 +111,7 @@ READ 데이터의 인터넷 전파 위험은 [커넥터 도구 정책](connector
 | 연결됐고 쓰는 에이전트가 없다. 또는 `?agent=<번호>` 의 에이전트에 아직 붙지 않았다 | 이 서비스를 쓸 에이전트 |
 | 「붙인 에이전트」 의 「쓸 에이전트 고르기」 나 「다른 에이전트에도 붙이기」 를 눌렀다 | 같다 |
 
-- 후보는 내 에이전트 가운데 옛 커넥터 에이전트를 뺀 것이다. 순서는 `?agent=` 의 에이전트, 붙일 수 있는 것, 이미 붙은 것, 그룹 공개 순서다
+- 후보는 내 에이전트다. 순서는 `?agent=` 의 에이전트, 붙일 수 있는 것, 이미 붙은 것, 그룹 공개 순서다
 - 그룹 공개 에이전트는 단추 대신 나만 쓰는 에이전트로 바꾸면 붙일 수 있다고 안내한다
 - 붙일 수 있는 에이전트가 없으면 「에이전트 만들기」(`/agents?new=1`)를 둔다. 「나중에」 는 영역을 닫는다
 - 「이 에이전트에서 쓰기」 는 그 에이전트의 도구를 먼저 읽는다. 셸, 파일, 코드 실행 도구가 켜졌거나 도구를 읽지 못했으면 에이전트 화면과 같은 확인 창을 거치고, 아니면 바로 붙인다
@@ -122,7 +121,7 @@ READ 데이터의 인터넷 전파 위험은 [커넥터 도구 정책](connector
 ### 에이전트 사용 시작 안내
 
 에이전트 상세는 성격 뒤에 연결 절과 도구 절을 차례로 그린다. 읽지 못한 절도 같은 순서다.
-주인과 관리자의 권한, 옛 커넥터 에이전트에 숨기는 절은 그대로 유지한다.
+주인과 관리자의 권한은 그대로 유지한다.
 
 붙은 연결은 제목과 도구 수 아래에 `boundReadiness({status, restartRequired})`의 안내를 보인다.
 
@@ -208,8 +207,7 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | 등록 | 보관 파일 쓰기가 실패한다 | 연결을 `PENDING` 으로 커밋하고 `CONNECTOR_OPERATION_FAILED` |
 | 등록 | 붙은 바인딩이 있다 | 바인딩마다 설치를 다시 보낸다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있으므로 재시작 대기가 된다. 하나가 실패해도 연결은 저장하고 그 바인딩만 `PENDING` 이다 |
 | 확인 | 해제된 연결이다. 확인 도구를 부르는 사이 해제된 것도 같다 | 아무것도 바꾸지 않는다 |
-| 확인 | 값이 아직 보관 파일에 없는 옛 연결이다 | 옛 커넥터 에이전트의 profile 에서 `POST /api/connector-vault/import` 로 값을 옮긴다. 옮기지 못하면 확인 도구를 부르지 않고 상태를 그대로 둔다 |
-| 확인 | 보관 파일에 값이 없고 옮겨 올 옛 바인딩도 없다 | 연결을 `PENDING` 으로 커밋하고 `CONNECTOR_NOT_CONNECTED`. 값을 다시 등록해야 한다. 카탈로그에서 빠진 커넥터는 다시 등록할 수 없어 오류 없이 `PENDING` 이다 |
+| 확인 | 보관 파일에 값이 없다 | 연결을 `PENDING` 으로 커밋하고 `CONNECTOR_NOT_CONNECTED`. 값을 다시 등록해야 한다. 카탈로그에서 빠진 커넥터는 다시 등록할 수 없어 오류 없이 `PENDING` 이다 |
 | 확인 | 확인 도구가 실패한다 | 연결을 `PENDING` 으로 커밋하고 공통 어휘의 오류로 끝낸다. 바인딩은 건드리지 않는다 |
 | 확인 | 통과한다 | 연결을 `READY` 로(카탈로그에서 빠진 커넥터는 `PENDING`) 두고 붙은 바인딩마다 「바인딩의 반영 맞추기」 를 한다. 바인딩의 외부 호출이 실패하면 그 바인딩만 `PENDING` 으로 커밋하고 `CONNECTOR_OPERATION_FAILED` |
 | 해제 | 정상 | 붙은 바인딩을 모두 떼고 보관 파일을 지운다. 연결은 `DISCONNECTED` 로 두고 칸 값을 비우며, 행은 이력을 위해 남긴다 |
@@ -224,7 +222,6 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | --- | --- |
 | 이미 붙어 있다 | 지금 상태를 돌려준다 |
 | 읽을 수 없는 에이전트다. 읽을 수 있어도 주인이 아니다 | `AGENT_NOT_FOUND`, `FORBIDDEN` |
-| 옛 커넥터 에이전트다 | `VALIDATION_FAILED` |
 | 에이전트가 `PRIVATE` 가 아니다 | `AGENT_CONNECTIONS_REQUIRE_PRIVATE` |
 | 내 연결이 `READY` 가 아니거나 값이 보관 파일에 없다 | `CONNECTOR_NOT_CONNECTED` |
 | 커넥터가 카탈로그에 없다 | `CONNECTOR_NOT_FOUND` |
@@ -241,7 +238,6 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 
 떼기는 이렇게 갈린다.
 
-- 옛 커넥터 에이전트에서는 떼지 않고 `VALIDATION_FAILED` 로 거절한다. 그 에이전트를 지우면 바인딩이 함께 떨어진다
 - 붙어 있지 않으면 아무것도 하지 않는다
 - 그 에이전트가 판정한 `PENDING` 승인 줄을 `REJECTED`(`connection_changed`)로 끝낸다. 그 줄이 `EXECUTING` 이면 `CONNECTOR_ACTION_EXECUTING` 으로 거절한다. 상시 허락은 사용자와 커넥터에 묶여 같은 연결을 붙인 다른 에이전트에도 걸리므로 둔다
 - 외부 호출이 실패하면 `CONNECTOR_OPERATION_FAILED` 로 끝나고 트랜잭션이 되돌려져 행이 남는다
@@ -256,7 +252,6 @@ Control Plane 은 도구 목록을 직접 쓰지 않는다. 바인딩 설치가 
 | 주인이나 관리자가 지운다 | 주인의 사용자 행, 에이전트 행 차례로 잠근다. 주인이 그 사이 바뀌었으면 `AGENT_BUSY` | 바인딩을 모두 뗀 뒤 profile 을 거둔다. 떼거나 거두다 실패하면 지우지 않고 그 오류를 돌려준다 |
 
 사람이 만든 profile 은 지워도 거두지 않는다. 그래서 지우기가 먼저 떼지 않으면 그 profile 에 커넥터 서버와 값이 남는다.
-지우는 에이전트가 옛 커넥터 에이전트이고 그 연결의 값이 아직 보관 파일에 없으면, 떼기 전에 보관 파일로 값을 옮긴다. 옮기지 못하면 지우지 않는다. 그 에이전트가 값을 가진 유일한 곳이기 때문이다.
 
 ### 바인딩의 반영 맞추기
 
@@ -399,7 +394,7 @@ support POST와 다른 경로는 금융 계수에 넣지 않으며, 독립 loopb
 ### 재시작
 
 이미 떠 있는 MCP 프로세스는 env 파일이 바뀌어도 옛 값을 쓴다.
-어느 설치가 `restart_required`, `plugin_updated`, `reload_pending` 을 돌려받는지는 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 두 설치 표가 갖는다.
+바인딩 설치가 `restart_required`, `plugin_updated`, `reload_pending` 을 돌려받는 조건은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 커넥터 표가 갖는다.
 profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭은 [ADR-20261007 / connector-live-reload](../adr/ADR-20261007-connector-live-reload.md) 의 「대안 기각」 이 갖는다.
 
 - 공유 gateway 재시작은 사용자 요청에서 실행하지 않는다
@@ -415,41 +410,39 @@ profile 하나의 MCP 를 다시 붙이는 다른 경로를 쓰지 않는 까닭
 검증과 옛 응답 호환은 [승인 인자 표시 이름](connector-policy.md#승인-인자-표시-이름)이 갖는다.
 
 Control Plane 이 대시보드 plugin(`hermes/plugins/dashboard-profile-api`)의 커넥터 경로에 기대는 약속이다.
-경로마다의 요청과 응답, 두 설치 방식의 차이, 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.
+경로마다의 요청과 응답, 바인딩 표식은 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 과 그 아래 「커넥터」 가 갖는다. 카탈로그를 읽는 쪽은 `HttpHermesConnectorClient` 다.
 
-설치는 두 가지다. 커넥터마다 만든 전용 profile 에 하는 **옛 설치**와, 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치**다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
-`PUT /api/connectors` 는 본문에 `bind` 칸이 없으면 옛 설치를 한다. 그래서 새 칸을 모르는 옛 Control Plane 과 함께 돈다.
+설치는 일반 에이전트의 profile 에 연결을 붙이는 **바인딩 설치** 하나다([ADR-083](../adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)).
+`PUT /api/connectors` 는 `enabled: true` 일 때 `bind: {vault}` 를 반드시 받고, 없거나 모양이 맞지 않으면 400 이다. `enabled: false` 는 `bind` 없이 그 바인딩을 뗀다.
 
 - `call` 은 `options.tool` 과 `verify.tool` 만 받고 디스크에 쓰지 않는다. 칸 값은 본문의 `values` 나 보관 파일 가운데 정확히 하나에서 온다
 - `call` 의 시간 제한과 동시 한도는 `CONNECTOR_CALL_TIMEOUT_SECONDS`, `CONNECTOR_CALL_LIMIT` 이다. 넘거나 차 있으면 기다리지 않고 `unavailable` 이다
-- Control Plane 은 카탈로그의 `fields[].env` 로 `PUT /api/env` 의 key 를 정한다. env 이름은 Control Plane 의 응답에 담지 않는다
 - 카탈로그의 `icon`, `link`, `readme_url`은 Control Plane이 [커넥터 만들기](../../hermes/connectors/README.md)의 「아이콘과 링크」 규칙으로 다시 검사하고, 어긋난 칸만 null로 읽는다
 - Control Plane은 웹에 `readmeUrl`, `linkKind`를 전달한다. 옛 응답의 README 주소는 null이고, `link_kind`가 없거나 `project`가 아니면 `service`로 읽는다. 목록 카드와 상세 머리는 `link`를 「공식 사이트」 또는 「프로젝트 GitHub」로, `readmeUrl`을 「커넥터 README」로 표시하고 각각 새 탭으로 연다
-- 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 `attachments` 와 같이 카탈로그 읽기를 실패로 다룬다
+- 카탈로그의 `single_binding` 이 없으면 거짓으로 읽고, boolean 이 아니면 카탈로그 읽기를 실패로 다룬다
 - 카탈로그의 `unknown_errors` 는 `outcome_unknown` 코드마다 선언한 `retry_key` 이름이나 null 이다. 없거나 모양이 틀리면 어느 코드도 받지 않는 것으로 읽고 커넥터는 카탈로그에 남긴다([ADR-20261013 / unknown-retry-key](../adr/ADR-20261013-unknown-retry-key.md))
 - 운영 목록에서 빠진 커넥터도 그 profile 에 소유 기록이 남아 있으면 `enabled: false` 를 받고 그 기록이 참조하던 env 를 지운다. 소유 기록도 없으면 끌 것이 없어 `changed: false` 로 성공한다. 카탈로그에서 빠진 연결의 해제와 반영 완료가 끝까지 가게 하기 위해서다
-- `GET /api/connectors` 는 설치하지 않은 커넥터를 `isolated` 로 답하므로 `mode` 는 설치한 항목의 값만 읽는다. 목록에 없는 커넥터는 설치 안 됨으로 읽는다
+- `GET /api/connectors` 의 `mode` 는 설치 여부와 관계없이 `bind` 다. 목록에 없는 커넥터는 설치 안 됨으로 읽는다
 - 커넥터 표식만 있는 profile 의 떼기는 소유 기록에 그 항목이 없어도 `changed: false` 로 답한다. 다시 보낸 떼기가 401 로 실패하면 Control Plane 의 바인딩 행이 지워지지 않기 때문이다
 
 **도구 목록은 설치와 Control Plane 의 도구 저장이 나눠 쓴다.**
 토큰으로 부른 `PUT /api/config` 가 `platform_toolsets` 를 보내면, 소유 기록의 바인딩 항목이 설치한 서버 이름이 요청의 `api_server` 목록에 모두 있어야 한다. 하나라도 빠지면 409 다.
 Hermes 처리기가 목록을 통째로 바꾸므로 조용히 지워지는 길을 남기지 않는다.
-그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청과 옛 설치 profile 은 이 검사를 하지 않는다.
+그래서 Control Plane 의 도구 저장과 스킬 게시는 붙은 커넥터 서버 이름을 함께 보낸다. 스킬 경로만 쓰는 요청은 이 검사를 하지 않는다.
 
 ### 바인딩 설치
 
-`PUT /api/connectors` 의 본문에 `bind: {vault}` 를 더하면 그 보관 파일의 값으로 그 profile 에 커넥터를 붙인다.
+`PUT /api/connectors` 의 `enabled: true` 요청은 `bind: {vault}` 의 보관 파일 값으로 그 profile 에 커넥터를 붙인다.
 그 profile 의 Control Plane MCP 등록, 다른 도구 이름, `SOUL.md` 는 건드리지 않는다.
 
 받는 profile 의 조건이다. 하나라도 어기면 409 이고 파일이 하나도 바뀌지 않는다. 표식이 없으면 401 이다.
 
 - `platform_toolsets.api_server` 목록이 있고 그 안에 Control Plane MCP 가 있다. 목록이 없는 profile 에 이름 하나만 든 목록을 만들면 내장 도구와 Control Plane MCP 가 모두 닫히고, MCP 이름이 없던 목록에 이름을 더하면 운영자의 다른 MCP 서버가 막히기 때문이다
 - `fos-ctx` 가 켜져 있다. 설치는 plugin 파일만 맞추고 profile 의 plugin 설정은 쓰지 않으므로, 꺼진 profile 에 붙이면 도구 호출이 판정 없이 나간다. 이 조건은 새로 붙일 때만 본다. 이미 붙은 커넥터의 재설치는 받고, 그 바인딩은 `policy_hook` 이 거짓이라 `PENDING` 에 남는다
-- 옛 설치 항목이 없다. 반대로 바인딩 항목이나 뗀 서버 기록이 있는 profile 은 옛 설치를 받지 않는다
 - 커넥터의 env 이름, 서버 이름, 스킬 디렉터리가 그 커넥터의 소유 기록 없이 이미 있거나 다른 것과 겹치지 않는다
 - manifest 가 `sandbox_required` 를 선언했으면 그 profile 이 실행 공간 정책에 있다. 아니면 409 `sandbox_unavailable` 이다. 다시 설치할 때도 보므로 정책에서 빠진 profile 의 바인딩은 그때 `PENDING` 이 된다([ADR-20261008 / connector-binding-guards](../adr/ADR-20261008-connector-binding-guards.md))
 
-보관 파일의 키 가운데 지금 칸 선언에 없는 것은 버린다. 칸을 뺀 커넥터의 옛 연결도 연결 확인으로 다시 설치되게 하려는 것이다. 남은 값이 칸 선언과 맞지 않으면 400 이다.
+보관 파일의 키 가운데 지금 칸 선언에 없는 것은 버린다. 칸을 뺀 커넥터의 연결도 연결 확인으로 다시 설치되게 하려는 것이다. 남은 값이 칸 선언과 맞지 않으면 400 이다.
 
 Control Plane 은 바인딩 설치 요청에 그 에이전트의 `sandbox_owner` 를 늘 싣는다. 재설치도 같다.
 보내기 전에 그 주인의 첨부 디렉터리를 최선 노력으로 만들고, 만들지 못해도 요청을 보낸다. 첨부를 선언하지 않은 커넥터의 붙이기가 첨부 루트 문제로 막히지 않게 하려는 것이다.
@@ -473,49 +466,8 @@ manifest 가 선언한 주인 env 는 plugin 이 서버 정의에 직접 넣는�
 
 연결의 칸 값의 원본은 대시보드 plugin 이 연결마다 하나씩 두는 보관 파일이다.
 Control Plane DB 에는 비밀이 아닌 칸 값과 비밀 칸의 앞부분만 둔다.
-경로와 형식, 세 경로(`PUT`, `DELETE`, `POST .../import`)의 검사는 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
+경로와 형식, `PUT`·`DELETE` 경로의 검사는 [`hermes/plugins/dashboard-profile-api/README.md`](../../hermes/plugins/dashboard-profile-api/README.md) 의 「커넥터」 가 갖는다.
 바인딩 설치도 같은 profile 쓰기 잠금 안에서 보관 파일을 읽으므로 그 사이에 값이 바뀌지 않는다.
-
-## 옛 커넥터 에이전트
-
-바인딩이 생기기 전에는 연결을 처음 등록할 때 커넥터마다 전용 profile 과 비공개 에이전트를 만들었다([ADR-039](../../backend/docs/adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)). `agent.connector_managed` 가 참인 에이전트다.
-이제 새로 만들지 않는다. 마이그레이션이 해제되지 않은 옛 연결마다 그 에이전트와의 바인딩을 만들었으므로, 옛 에이전트도 바인딩 하나로 읽힌다.
-이미 있는 것은 사용자가 옮긴 뒤 지울 때까지 아래 규칙으로 돈다.
-
-- 일반 편집 경로로 공개 범위, 주인, 도구, 성격, 스킬을 바꾸지 못한다. 다른 연결을 붙이지 못하고 자기 연결을 떼지 못한다
-- 사용자당 에이전트 상한 계산에서 빠진다
-- 그 바인딩만 에이전트를 켜고 끈다. `READY` 가 되면 켜고, `PENDING` 이 되면 끄고 사진 받기를 내린다
-- 값을 바꾸면 보관 파일과 함께 그 profile 의 `.env` 에 칸마다 직접 쓴다. 해제는 칸마다 지운 뒤 설치를 끄고 에이전트를 끈다
-- 연결 확인과 관리자 반영 완료는 설치가 꺼져 있거나 `desired_enabled` 가 거짓이면 다시 보내지 않는다. 옛 설치는 늘 `restart_required: true` 로 답하므로 `plugin_updated` 가 참일 때만 재시작 대기로 둔다. 켜진 내장 도구가 manifest 의 `toolsets` 와 같아야 `READY` 다
-- 닿는 범위는 [ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md) 가 갖는다. 연결을 붙인 일반 에이전트에는 이 경계가 걸리지 않고, 그 에이전트가 감당하는 것은 ADR-083 의 「감당할 것」 에 있다
-- 위임 결과를 `<external-data>` 로 감싸는 규칙은 [`docs/features/agent-skill.md`](agent-skill.md) 의 「위임 결과가 도착했을 때」 가 갖는다
-- `mcp_servers` 의 Control Plane MCP 등록 제거는 이미 떠 있는 gateway 에 재시작 전까지 남을 수 있다. 그동안에도 도구 목록이 그 서버를 막고 Control Plane 이 호출을 거절한다
-
-옛 설치는 plugin 의 스킬 본문을 그 profile 의 `SOUL.md` 에 쓴다. `skills` toolset 은 스킬을 고치는 도구까지 열기 때문이다([ADR-039](../../backend/docs/adr/ADR-039-외부-서비스-연결은-사용자별-전용-에이전트로-실행한다.md)).
-
-- 스킬 디렉터리 바로 아래 항목이나 `SKILL.md` 가 심볼릭 링크이거나, 앞머리가 닫히지 않았거나, 합친 본문이 Control Plane 의 성격 본문 상한을 넘으면 그 커넥터를 카탈로그에 내지 않는다. 링크가 plugin 밖을 가리키면 그 내용이 지침으로 들어가기 때문이다. 카탈로그를 읽을 때 모든 커넥터에 이 본문을 계산하므로 바인딩으로도 나오지 않는다
-- 대시보드는 옛 설치 profile 과 다른 관리 profile 을 구분하지 못한다. Control Plane 이 옛 커넥터 에이전트의 profile 에만 옛 설치를 보낸다
-- 해제는 `SOUL.md` 를 지우지 않는다. 본문은 카탈로그 응답과 로그에 싣지 않는다
-
-**사진**은 manifest 의 `attachments` 가 참이고 그 바인딩이 `READY` 로 확인됐을 때만 받는다.
-Control Plane 은 선언한 toolset 이 실제로 켜진 것을 본 뒤에만 `agent.connector_attachments` 를 참으로 두고, `Agent.acceptsAttachments` 가 그 열을 본다. 사진 단추는 있는데 이미지 도구가 없는 상태를 만들지 않기 위해서다.
-옛 설치와 재설치 요청은 `sandbox_owner` 를 싣고, 그 주인의 첨부 디렉터리를 만들 수 없거나 링크이면 보내지 않고 409 로 멈춘다. 실패는 `PENDING` 과 `CONNECTOR_OPERATION_FAILED` 로 남는다.
-사용자별 mount 는 [사진 첨부](attachment.md) 와 [ADR-091](../adr/ADR-091-사진-첨부는-사용자별로-저장하고-실행-공간에는-그-사용자만-붙인다.md) 이 갖는다.
-연결을 붙인 에이전트의 사진 받기와 내장 도구는 그 에이전트의 설정이 정하고, manifest 의 `toolsets` 와 `attachments` 를 적용하지 않는다.
-
-### 옮겨 가기
-
-사용자마다 연결마다 한다. 끊김이 없고, 옛 에이전트를 지우기 전까지 되돌릴 수 있다.
-
-1. 「외부 서비스 연결」 화면에서 연결 확인을 누른다. 옛 에이전트의 profile 에 있던 값이 보관 파일로 옮겨진다. 이 확인은 옛 profile 에 설치를 다시 보내므로, 그 profile 의 `fos-ctx` 가 묶음과 다르면 옛 에이전트가 재시작 대기로 꺼진다. 3단계의 재시작과 함께 하면 한 번으로 끝난다
-2. 원래 쓰던 에이전트의 상세에서 그 연결을 붙인다
-3. 바인딩이 재시작 대기면 관리자가 공유 gateway 를 재시작하고 반영 완료를 누른다
-4. 그 에이전트로 커넥터 도구를 한 번 불러 본다. 쓰기 도구는 승인 카드가 뜨는지 본다
-5. 옛 에이전트를 지운다. 지우기가 그 바인딩을 떼고 profile 을 거둔다
-
-5 전에는 새 바인딩을 떼면 옛 에이전트로 그대로 쓴다. 5 뒤에는 다시 붙이면 된다. 값은 보관 파일에 남아 있다.
-먼저 살펴보기를 쓰는 분야는 그 분야 패키지의 `proactive-check` 스킬을 붙은 커넥터 도구가 있으면 직접 부르고 없으면 옛 연결 에이전트에 맡기도록 먼저 고친 뒤 옮긴다([`docs/features/proactive.md`](proactive.md)).
-모든 옛 에이전트가 지워지면 격리 경로의 코드와 `connector_connection` 의 쓰지 않는 칸을 지운다.
 
 ## MCP SDK 계약
 

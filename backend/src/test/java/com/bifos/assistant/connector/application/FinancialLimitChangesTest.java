@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** 에이전트가 대화로 주문 상한을 바꾸는 길이다. 낮추기는 바로, 올리기는 승인 카드를 거쳐야만 반영된다. */
 class FinancialLimitChangesTest extends FinancialConnectorTestBase {
@@ -181,6 +182,26 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
 
 
     @Test
+    @DisplayName("승인 줄의 종류와 요청 값, 이전 값은 엔티티를 고쳐 저장해도, 승인한 뒤에도 바뀌지 않는다")
+    void limitFieldsAreImmutable() {
+        changes.change(user, origin, "order_amount_usd", "300");
+        UUID actionId = UUID.fromString((String)changes.change(user, origin, "order_amount_usd", "500").get("actionId"));
+        tx().executeWithoutResult(status -> {
+            var action = actions.findByPublicId(actionId).orElseThrow();
+            assertThatThrownBy(() -> action.recordLimitChange(FinancialLimitKind.DAILY_AMOUNT_USD, BigDecimal.TEN, BigDecimal.ONE))
+                .isInstanceOf(IllegalStateException.class);
+            ReflectionTestUtils.setField(action, "limitKind", FinancialLimitKind.DAILY_AMOUNT_USD);
+            ReflectionTestUtils.setField(action, "limitRequested", new BigDecimal("999"));
+            ReflectionTestUtils.setField(action, "limitPrevious", BigDecimal.ONE);
+        });
+        assertThat(limitColumns(actionId)).containsExactly("ORDER_AMOUNT_USD", "500", "300");
+        assertThat(publicApproval.approve(user, actionId, null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
+        assertThat(usd()).isEqualByComparingTo("500");
+        assertThat(limitColumns(actionId)).containsExactly("ORDER_AMOUNT_USD", "500", "300");
+    }
+
+
+    @Test
     @DisplayName("허용 목록에 계좌가 없는 사용자는 바꾸지 못하고 읽기는 available 이 거짓이다")
     void userWithoutAccountCannotChange() {
         OverridableLiveProperties.during(gate, new ConnectorFinancialProperties(List.of(), new BigDecimal("100000"),
@@ -192,6 +213,12 @@ class FinancialLimitChangesTest extends FinancialConnectorTestBase {
 
     private BigDecimal usd() {
         return limits.effective(user.id()).value(FinancialLimitKind.ORDER_AMOUNT_USD);
+    }
+
+
+    private List<String> limitColumns(UUID actionId) {
+        return actions.findByPublicId(actionId).map(action -> List.of(action.limitKind().name(),
+            FinancialOrderLimits.plain(action.limitRequested()), FinancialOrderLimits.plain(action.limitPrevious()))).orElseThrow();
     }
 
 

@@ -67,7 +67,7 @@ export function ActivityPanel({ target, onClose }: Props) {
       {executionId !== null ? (
         <Link
           href={`/executions/${executionId}`}
-          data-testid="flow-tree-link"
+          data-testid="execution-tree-link"
           className="shrink-0 text-xs text-muted-foreground underline underline-offset-4"
         >
           전체 화면으로 보기

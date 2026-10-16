@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.domain;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.shared.util.Sha256;
@@ -17,7 +18,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -59,6 +62,7 @@ public class ConnectorAction {
 
     public static final String UNREADABLE_ARGS = "읽을 수 없는 인자입니다.";
     public static final String UNREADABLE_RESULT = "읽을 수 없는 결과입니다.";
+    public static final String BODY_ERASED = "본문 삭제됨";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -181,8 +185,28 @@ public class ConnectorAction {
     @Column(name = "result_delivered_at")
     private Instant resultDeliveredAt;
 
+    /** 대화 purge에서 인자와 결과 및 실행 snapshot 본문을 지운 시각이다. 감사 칸은 남긴다. */
+    @Column(name = "body_erased_at")
+    private Instant bodyErasedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    /**
+     * 주문 상한 변경 승인 줄만 채운다(ADR-20261015 / financial-user-limits). 서버가 줄을 만들 때 적고 바꾸지 않는다.
+     * 공개 승인 API 는 이 컬럼이 있는 줄만 상한 변경 승인으로 보낸다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "limit_kind", length = 32, updatable = false)
+    private FinancialLimitKind limitKind;
+
+    /** 상한 변경 승인 줄에서 요청한 값이다. 바꾸지 않는다. */
+    @Column(name = "limit_requested", precision = 20, scale = 6, updatable = false)
+    private BigDecimal limitRequested;
+
+    /** 상한 변경 승인 줄을 만들 때 적용하던 상한이다. 카드가 바뀌기 전 값을 보인다. 바꾸지 않는다. */
+    @Column(name = "limit_previous", precision = 20, scale = 6, updatable = false)
+    private BigDecimal limitPrevious;
 
 
     /**
@@ -220,6 +244,17 @@ public class ConnectorAction {
         action.argsSha256 = argsSha256;
         action.createdAt = now;
         return action;
+    }
+
+
+    /** 주문 상한 변경 승인 줄이라고 적는다. 저장하기 전에만 부른다. 저장한 뒤의 컬럼은 고치기에서 빠져 바뀌지 않는다. */
+    public void recordLimitChange(FinancialLimitKind kind, BigDecimal requested, BigDecimal previous) {
+        if (id != null || limitKind != null) {
+            throw new IllegalStateException("limit change is recorded only once before insert");
+        }
+        this.limitKind = Objects.requireNonNull(kind);
+        this.limitRequested = Objects.requireNonNull(requested);
+        this.limitPrevious = Objects.requireNonNull(previous);
     }
 
 
@@ -325,12 +360,15 @@ public class ConnectorAction {
 
     /** 이 도구에 상시 허락을 줄 수 있는가. 늘 승인을 받는 도구와 원래 이름을 모르는 호출에는 주지 못한다. */
     public boolean grantAllowed() {
-        return approvalMode == ToolApproval.REQUIRED && toolName != null;
+        return bodyErasedAt == null && approvalMode == ToolApproval.REQUIRED && toolName != null;
     }
 
 
     /** 본문 접근은 모두 이 두 접근자를 거친다. 암호문은 처음 꺼낼 때만 푼다. */
     public String argsJson() {
+        if (bodyErasedAt != null) {
+            return BODY_ERASED;
+        }
         if (argsKeyId == null) {
             return storedArgsJson;
         }
@@ -350,6 +388,9 @@ public class ConnectorAction {
 
     /** 금융 줄처럼 저장 해시를 keyed hash 로 적은 줄은 그 함수로 대조한다. */
     public Optional<String> executableArgs(UnaryOperator<String> hash) {
+        if (bodyErasedAt != null) {
+            return Optional.empty();
+        }
         String plain = argsJson();
         if (plain == null || UNREADABLE_ARGS.equals(plain) || !hash.apply(plain).equals(argsSha256)) {
             return Optional.empty();
@@ -359,6 +400,9 @@ public class ConnectorAction {
 
 
     public String resultText() {
+        if (bodyErasedAt != null) {
+            return BODY_ERASED;
+        }
         if (resultKeyId == null) {
             return storedResultText;
         }

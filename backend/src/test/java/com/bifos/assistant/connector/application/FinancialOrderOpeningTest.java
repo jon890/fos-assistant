@@ -317,7 +317,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     void limitRejectionNamesLimitAndRemaining() {
         OverridableLiveProperties.during(gate, limits("30", "100"));
         // 운영 하루 최대치는 100 이고 사용자는 40 으로 낮췄다.
-        jdbc.update("insert into financial_order_limit (user_id, daily_amount_usd, updated_at) values (?, 40, current_timestamp)", user.id());
+        jdbc.update("update app_user set limit_daily_amount_usd = 40, limit_updated_at = current_timestamp where id = ?", user.id());
         var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("25")));
         assertThat(publicApproval.approve(user, spent.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
         var over = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20")));
@@ -336,7 +336,7 @@ class FinancialOrderOpeningTest extends FinancialConnectorTestBase {
     @DisplayName("주문 승인 카드 요약은 그 통화의 한 건 상한, 하루 상한, 오늘 쓴 금액과 남은 한도를 싣는다")
     void summaryCarriesLimitStatus() {
         OverridableLiveProperties.during(gate, limits("30", "100"));
-        jdbc.update("insert into financial_order_limit (user_id, daily_amount_usd, updated_at) values (?, 50, current_timestamp)", user.id());
+        jdbc.update("update app_user set limit_daily_amount_usd = 50, limit_updated_at = current_timestamp where id = ?", user.id());
         var spent = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("20")));
         assertThat(publicApproval.approve(user, spent.actionId(), null, false).status()).isEqualTo(ActionStatus.SUCCEEDED);
         var pending = prepare(UUID.randomUUID().toString(), trade("create_order", amountOrder("10")));

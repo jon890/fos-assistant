@@ -2,10 +2,7 @@ package com.bifos.assistant.chat.application;
 
 import com.bifos.assistant.agent.application.AgentService;
 import com.bifos.assistant.agent.domain.Agent;
-import com.bifos.assistant.chat.application.model.RecoveredRunKind;
-import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatPendingMessageRepository;
-import com.bifos.assistant.chat.infra.ConversationRepository;
 import com.bifos.assistant.hermes.HermesProperties;
 import com.bifos.assistant.hermes.HermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunLookup;
@@ -41,7 +38,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 기동할 때 {@code RUNNING} 으로 남은 실행을 Hermes 에 물어 정한다(ADR-061).
  *
  * <p>두 단계로 돈다. <b>잡기</b>({@link #claim})는 웹 서버가 요청을 받기 전에 끝난다. 남은 줄을 읽고 대화 turn 의
- * 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다. <b>묻기</b>({@link #reconcile})는
+ * 루트 줄마다 그 대화의 turn 잠금을 잡는다. Hermes 를 부르지 않는다. <b>묻기</b>({@link #reconcile})는
  * 애플리케이션이 다 뜬 뒤에 돈다. 줄을 적거나 잠금을 풀면 {@link NextTurnDispatcher} 가 turn 을 여는데, 그것은 다 뜬 뒤여야 하기 때문이다.
  *
  * <p>여기서는 turn 을 열지 않는다. 잠금을 풀면 닫기 리스너가 다음 turn 을 정한다. 위임 실행과 그 밖의 실행은 자기
@@ -80,8 +77,6 @@ public class RestartReconciler implements SmartLifecycle {
     private final ChatPendingMessageRepository pendingMessages;
     private final TransactionTemplate transactions;
     private final Clock clock;
-    private final ConversationRepository conversations;
-    private final ConversationEventHub hub;
     private final UserExecutionLimiter limiter;
     private final BackgroundTasks backgroundTasks;
 
@@ -200,7 +195,7 @@ public class RestartReconciler implements SmartLifecycle {
 
 
     /**
-     * {@code RUNNING} 줄을 읽어 기억하고, 대화 turn 과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡는다.
+     * {@code RUNNING} 줄을 읽어 기억하고, 대화 turn 의 루트 줄마다 그 대화의 turn 잠금을 잡는다.
      *
      * <p>Hermes 를 부르지 않고 실행 줄을 고치지 않는다. 이미 기억했거나 정하고 있는 줄은 건너뛴다. 부른 시각까지
      * 시작한 줄이 모두 대상이다.
@@ -309,7 +304,7 @@ public class RestartReconciler implements SmartLifecycle {
                 log.warn("다른 turn 이 잠금을 쥐고 있어 잡지 못했다 conversationId={} executionId={}", row.conversationId(), row.id());
                 return null;
             }
-            // 흐름 turn 의 자식 줄이면 루트 실행 번호를 붙인다. 사용자의 중지와 running 경로가 루트 번호로 찾는다.
+            // 사용자의 중지와 running 경로가 루트 실행 번호로 찾는다.
             lock = new RecoveredConversationLock(row.conversationId(), row.treeRootId(), handle);
         }
         Long markedExecutionId = lock.executionId;
@@ -338,19 +333,14 @@ public class RestartReconciler implements SmartLifecycle {
 
 
     /**
-     * 그 대화의 Hermes session 으로 도는 줄인지 본다. 대화 turn 의 루트 줄, 흐름 turn 의 루트 줄과 그 자식 줄이다.
-     *
-     * <p>흐름 turn 은 루트 줄이 끝난 뒤에도 자식이 돈다. 그 자식이 정해지기 전에 새 turn 이 열리면 안 된다. 위임
-     * 실행은 자기 session 으로 돌아 잠금을 잡지 않는다.
+     * 그 대화의 Hermes session 으로 도는 루트 줄인지 본다.
+     * 위임 실행은 자기 session 으로 돌아 잠금을 잡지 않는다.
      */
     private boolean holdsConversation(AgentExecution row) {
         if (row.hermesRunId() == null || row.conversationId() == null) {
             return false;
         }
-        if (row.parentExecutionId() == null) {
-            return true;
-        }
-        return row.delegationKey() == null && recorder.kindOf(row) == RecoveredRunKind.FLOW;
+        return row.parentExecutionId() == null;
     }
 
 
@@ -409,8 +399,6 @@ public class RestartReconciler implements SmartLifecycle {
         long deadline = System.nanoTime() + maxWait.toNanos();
         boolean reached = false;
         boolean finished = false;
-        boolean stopSent = false;
-        RecoveredRunKind kind = null;
         Duration pollInterval = hermesProperties.current().pollInterval();
         Duration interval = pollInterval;
         while (true) {
@@ -434,13 +422,6 @@ public class RestartReconciler implements SmartLifecycle {
                     return;
                 }
                 interval = pollInterval;
-                if (kind == null) {
-                    kind = recorder.kindOf(row);
-                }
-                // 흐름의 단계 순서는 내려간 프로세스의 메모리에만 있었다. 이어 갈 수 없으므로 멈추고 끝난 상태만 적는다.
-                if (kind == RecoveredRunKind.FLOW && !stopSent) {
-                    stopSent = sendStop(agent, row);
-                }
             } catch (RuntimeException ex) {
                 if (halted(epoch)) {
                     return;
@@ -524,16 +505,12 @@ public class RestartReconciler implements SmartLifecycle {
      * <p>사용자가 중지를 요청했고 이 잠금에 걸린 줄 가운데 취소로 끝난 것이 있으면 풀기 전에 대기 줄을 멈춘다. 풀고
      * 나서 멈추면 그 사이 닫기 리스너가 아직 멈추지 않은 행으로 turn 을 연다. 대기 줄이 멈췄다는 알림은 닫기
      * 리스너가 낸다.
-     *
-     * <p>루트 줄이 이미 끝나고 자식만 돌던 흐름 turn 이면 여기서 화면에 끝났음을 알린다. 루트 줄을 함께 정했으면
-     * {@link RecoveredRunRecorder} 가 이미 알렸으므로 내지 않는다.
      */
     private void release(RecoveredConversationLock lock) {
         if (lock == null) {
             return;
         }
         List<Long> executionIds;
-        boolean rootClaimed;
         synchronized (this) {
             lock.remaining--;
             if (lock.remaining > 0) {
@@ -541,13 +518,11 @@ public class RestartReconciler implements SmartLifecycle {
             }
             locks.remove(lock.conversationId, lock);
             executionIds = List.copyOf(lock.executionIds);
-            rootClaimed = lock.rootClaimed;
         }
         TurnHandle handle = lock.handle;
-        boolean stopped = false;
         try {
             // 중지가 확정됐는지가 아니라 요청됐는지를 본다. 중지를 보낸 뒤 확정하기 전에 취소 결과를 먼저 적을 수 있다.
-            stopped = handle.cancelled().get() && anyCancelled(executionIds);
+            boolean stopped = handle.cancelled().get() && anyCancelled(executionIds);
             if (stopped) {
                 turns.markStopped(handle);
                 transactions.executeWithoutResult(status -> pendingMessages.markHeld(lock.conversationId, true));
@@ -555,38 +530,13 @@ public class RestartReconciler implements SmartLifecycle {
         } catch (RuntimeException ex) {
             log.warn("중지한 turn 의 대기 줄을 멈춰 두지 못했다 conversationId={}", lock.conversationId, ex);
         }
-        try {
-            if (!rootClaimed) {
-                announceFlowEnded(lock, stopped);
-            }
-        } catch (RuntimeException ex) {
-            log.warn("자식만 돌던 흐름 turn 이 끝났음을 알리지 못했다 conversationId={}", lock.conversationId, ex);
-        } finally {
-            turns.markFinished(handle);
-            turns.close(handle);
-        }
+        turns.markFinished(handle);
+        turns.close(handle);
     }
 
 
     private boolean anyCancelled(List<Long> executionIds) {
         return executions.findAllById(executionIds).stream().anyMatch(row -> row.status() == ExecutionStatus.CANCELLED);
-    }
-
-
-    /** 화면이 「답을 만드는 중」 을 내리도록 알린다. 흐름은 이어 가지 못하므로 답 없이 끝난다. 지운 대화에는 내지 않는다. */
-    private void announceFlowEnded(RecoveredConversationLock lock, boolean stopped) {
-        Conversation conversation = conversations
-            .findById(lock.conversationId)
-            .filter(found -> found.deletedAt() == null)
-            .orElse(null);
-        if (conversation == null) {
-            return;
-        }
-        hub.publish(
-            lock.conversationId,
-            stopped
-                ? ChatEvent.stopped(conversation.publicId(), null, lock.executionId)
-                : ChatEvent.error(ErrorCode.HERMES_RUN_FAILED.name(), "the agent run did not complete"));
     }
 
 

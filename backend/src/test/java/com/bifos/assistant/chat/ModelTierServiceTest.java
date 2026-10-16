@@ -19,7 +19,6 @@ import com.bifos.assistant.chat.application.HiddenModels;
 import com.bifos.assistant.chat.application.ModelOptions;
 import com.bifos.assistant.chat.application.ModelOptionsService;
 import com.bifos.assistant.chat.application.ModelTierOptions;
-import com.bifos.assistant.chat.application.ModelTierProperties;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.ModelVisibilityService;
 import com.bifos.assistant.chat.application.ResolvedModelTier;
@@ -327,35 +326,6 @@ class ModelTierServiceTest {
                 .extracting(error -> ((ApiException)error).code())
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
         verify(definitions, never()).saveAll(any());
-    }
-
-
-    @Test
-    @DisplayName("배포 단계 설정은 provider만 또는 model만 채운 부분 mapping으로 기동하지 못한다")
-    void rejectsPartialConfiguredTierMapping() {
-        assertThatThrownBy(() -> new ModelTierProperties.Tier("openai-codex", null, null))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("model and reasoning-effort");
-        assertThatThrownBy(() -> new ModelTierProperties.Tier(null, "example-fast", null))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("model and reasoning-effort");
-    }
-
-
-    @Test
-    @DisplayName("배포 단계 설정은 지원하지 않는 effort와 칸 길이를 넘는 값을 기동 전에 거절한다")
-    void rejectsInvalidConfiguredTierValues() {
-        assertThatThrownBy(() -> new ModelTierProperties.Tier(null, "example-fast", "banana"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("reasoning-effort");
-        assertThatThrownBy(() -> new ModelTierProperties.Tier(
-            "p".repeat(ModelChoice.PROVIDER_MAX_LENGTH + 1), "example-fast", "low"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("provider");
-        assertThatThrownBy(
-            () -> new ModelTierProperties.Tier(null, "m".repeat(ModelChoice.MODEL_MAX_LENGTH + 1), "low"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("model");
     }
 
 
