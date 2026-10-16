@@ -101,7 +101,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * backend 의 구조 규칙이다. 문서는 규칙을 이 클래스의 상수 이름으로 가리킨다.
+ * backend 의 구조 규칙이다. 규범과 까닭은 docs/code-rules가, 실행 조건은 이 클래스가 갖는다.
  *
  * <p>규칙의 {@code as(...)} 설명이 기준 파일의 열쇠다. 설명을 바꾸면 그 규칙을 다시 얼린다.
  * 기준 파일을 갱신하는 방법은 {@code backend/docs/code-architecture.md} 의 「구조 규칙의 기준 파일」 절에 있다.
@@ -109,10 +109,7 @@ import org.springframework.web.bind.annotation.RestController;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ArchitectureRules {
 
-    /**
-     * MemoryCollection.createdAt 하나만 auditing 을 쓰며 listener, provider 와 Clock 선언이 빠지지 않는다.
-     * 실제 callback 시각과 마이크로초 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
-     */
+    /** rule-1: 까닭과 예외는 docs/code-rules/rule-1.md를 본다. */
     public static final ArchRule AUDITING_LISTENERS_AND_CLOCK = classes()
         .should(new ArchCondition<JavaClass>("MemoryCollection.createdAt 의 auditing listener 와 Clock 선언을 지킨다") {
             private int entities;
@@ -214,34 +211,21 @@ public final class ArchitectureRules {
     /** Spring 의 {@code Transactional} 을 import 하므로 Jakarta 쪽은 이 상수에서만 전체 이름으로 쓴다. */
     private static final Class<? extends Annotation> JAKARTA_TRANSACTIONAL = jakarta.transaction.Transactional.class; // 전체 이름 허용: Spring 과 Jakarta 의 Transactional 이름이 같다
 
-    /**
-     * 최상위 패키지 사이의 간선이 순환에 속하지 않는다. {@code shared} 는 그래프에서 뺀다.
-     *
-     * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」 의 {@code mcp} 와 {@code orchestration} 문단.
-     */
+    /** rule-2: 까닭과 예외는 docs/code-rules/rule-2.md를 본다. */
     public static final ArchRule TOP_LEVEL_PACKAGES_FREE_OF_CYCLES = classes()
         .that()
         .resideInAPackage("com.bifos.assistant..")
         .should(new TopLevelPackageCycles())
         .as("최상위 패키지 사이의 간선은 순환에 속하지 않는다");
 
-    /**
-     * 최상위 패키지는 층 순서에서 자기보다 아래에 있는 패키지만 쓴다. 순서에 없는 최상위 패키지도 위반이다.
-     * {@code shared} 는 그래프에서 뺀다. 순서는 {@code TopLevelPackageOrder.ORDER} 가 갖는다.
-     *
-     * <p>근거: {@code backend/docs/code-architecture.md} 「최상위 패키지의 층 순서」, ADR-068.
-     */
+    /** rule-3: 까닭과 예외는 docs/code-rules/rule-3.md를 본다. */
     public static final ArchRule TOP_LEVEL_PACKAGES_FOLLOW_LAYER_ORDER = classes()
         .that()
         .resideInAPackage("com.bifos.assistant..")
         .should(new TopLevelPackageOrder())
         .as("최상위 패키지는 층 순서의 아래쪽만 쓴다");
 
-    /**
-     * {@code shared} 는 다른 최상위 패키지에 의존하지 않는다.
-     *
-     * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」 의 {@code shared/auth}, {@code shared/error} 책임.
-     */
+    /** rule-4: 까닭과 예외는 docs/code-rules/rule-4.md를 본다. */
     public static final ArchRule SHARED_DOES_NOT_DEPEND_ON_DOMAINS = noClasses()
         .that()
         .resideInAPackage("com.bifos.assistant.shared..")
@@ -250,13 +234,7 @@ public final class ArchitectureRules {
             .and(resideOutsideOfPackage("com.bifos.assistant.shared..")))
         .as("shared 는 다른 최상위 패키지에 의존하지 않는다");
 
-    /**
-     * 도메인 안은 {@code presentation} 에서 {@code application} 을 거쳐 {@code infra} 와 {@code domain} 으로 흐른다.
-     * 아래 층이 위 층을 쓰는 것과 {@code presentation} 이 {@code infra} 를 바로 쓰는 것을 막는다.
-     * 컨트롤러가 저장소를 바로 쓰면 권한 확인과 트랜잭션 경계를 서비스가 갖지 못한다.
-     *
-     * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」.
-     */
+    /** rule-5: 까닭과 예외는 docs/code-rules/rule-5.md를 본다. */
     public static final ArchRule LAYER_DIRECTION = layeredArchitecture()
         .consideringOnlyDependenciesInLayers()
         .layer("presentation")
@@ -277,12 +255,7 @@ public final class ArchitectureRules {
         .mayOnlyBeAccessedByLayers("presentation", "application", "infra")
         .as("층은 presentation 에서 application 을 거쳐 infra 와 domain 으로 흐른다");
 
-    /**
-     * {@code domain} 은 웹 계층의 타입에 의존하지 않는다.
-     * Spring Web, HTTP, Servlet 타입과 {@code presentation} 을 쓰지 않는다.
-     *
-     * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」.
-     */
+    /** rule-6: 까닭과 예외는 docs/code-rules/rule-6.md를 본다. */
     public static final ArchRule DOMAIN_DOES_NOT_DEPEND_ON_WEB = noClasses()
         .that()
         .resideInAPackage("com.bifos.assistant..domain..")
@@ -295,13 +268,13 @@ public final class ArchitectureRules {
             "com.bifos.assistant..presentation..")
         .as("domain 은 웹 계층에 의존하지 않는다");
 
-    /** 관리자 서비스와 명령은 지정한 application 소유 경계에 각각 하나씩 있고 저장 타입을 갖지 않는다. */
+    /** rule-7: 까닭과 예외는 docs/code-rules/rule-7.md를 본다. */
     public static final ArchRule AGENT_ADMIN_APPLICATION_PLACEMENT = agentAdminApplicationPlacement("com.bifos.assistant");
 
-    /** 관리자 HTTP 계약은 지정한 presentation 에 각각 하나씩 있고 모든 mapped 메서드가 requireAdmin 을 부른다. */
+    /** rule-8: 까닭과 예외는 docs/code-rules/rule-8.md를 본다. */
     public static final ArchRule AGENT_ADMIN_HTTP_CONTRACT = agentAdminHttpContract("com.bifos.assistant");
 
-    /** 지연 정리 실행·참여 port·결과는 purge 소유 경계에 각각 하나씩 두고 역할과 의존 방향을 지킨다. */
+    /** rule-9: 까닭과 예외는 docs/code-rules/rule-9.md를 본다. */
     public static final ArchRule AGENT_PURGE_CONTRACT_PLACEMENT = agentPurgeContractPlacement("com.bifos.assistant");
 
 
@@ -572,12 +545,7 @@ public final class ArchitectureRules {
     }
 
 
-    /**
-     * {@code orchestration} 은 {@code mcp} 에 의존하지 않는다.
-     *
-     * <p>근거: {@code backend/docs/code-architecture.md} 「backend 패키지」 의
-     * 「{@code mcp} 는 {@code orchestration} 을 부르고, {@code orchestration} 은 {@code mcp} 를 import 하지 않는다」.
-     */
+    /** rule-10: 까닭과 예외는 docs/code-rules/rule-10.md를 본다. */
     public static final ArchRule ORCHESTRATION_DOES_NOT_DEPEND_ON_MCP = noClasses()
         .that()
         .resideInAPackage("com.bifos.assistant.orchestration..")
@@ -586,13 +554,7 @@ public final class ArchitectureRules {
         .resideInAPackage("com.bifos.assistant.mcp..")
         .as("orchestration 은 mcp 에 의존하지 않는다");
 
-    /**
-     * {@code mcp} 는 Hermes 를 부르는 타입에 의존하지 않는다.
-     * 이름이 {@code Client} 로 끝나는 타입과 {@code HermesRunEventStream}, {@code HermesProfileKeyStore} 가 대상이다.
-     * {@code hermes.HermesProfileName} 같은 이름 규칙 값은 허용한다.
-     *
-     * <p>근거: {@code docs/features/agent-skill.md} 「다른 에이전트에게 맡기기」 의 「MCP 쪽은 Hermes 를 부르지 않는다」.
-     */
+    /** rule-11: 까닭과 예외는 docs/code-rules/rule-11.md를 본다. */
     public static final ArchRule MCP_DOES_NOT_CALL_HERMES = noClasses()
         .that()
         .resideInAPackage("com.bifos.assistant.mcp..")
@@ -603,11 +565,7 @@ public final class ArchitectureRules {
                 .or(simpleName("HermesProfileKeyStore"))))
         .as("mcp 는 Hermes 를 부르는 타입에 의존하지 않는다");
 
-    /**
-     * {@code orchestration} 은 {@code ChatService} 에 의존하지 않는다.
-     *
-     * <p>근거: {@code docs/features/chat.md} 「중지」 의 「{@code ChatService} 와 흐름이 서로를 부르지 않게」.
-     */
+    /** rule-12: 까닭과 예외는 docs/code-rules/rule-12.md를 본다. */
     public static final ArchRule ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE = noClasses()
         .that()
         .resideInAPackage("com.bifos.assistant.orchestration..")
@@ -616,12 +574,7 @@ public final class ArchitectureRules {
         .haveFullyQualifiedName("com.bifos.assistant.chat.application.ChatService")
         .as("orchestration 은 ChatService 에 의존하지 않는다");
 
-    /**
-     * {@code hermes} 는 {@code people} 에 의존하지 않는다.
-     *
-     * <p>근거: {@code docs/features/users.md} 「사용자를 더할 때」 의
-     * 「{@code hermes} 는 부르는 방법만 알고 순서를 모른다」.
-     */
+    /** rule-13: 까닭과 예외는 docs/code-rules/rule-13.md를 본다. */
     public static final ArchRule HERMES_DOES_NOT_DEPEND_ON_PEOPLE = noClasses()
         .that()
         .resideInAPackage("com.bifos.assistant.hermes..")
@@ -630,23 +583,14 @@ public final class ArchitectureRules {
         .resideInAPackage("com.bifos.assistant.people..")
         .as("hermes 는 people 에 의존하지 않는다");
 
-    /**
-     * Jackson 2 의 {@code core} 와 {@code databind} 를 쓰지 않는다.
-     * {@code com.fasterxml.jackson.annotation} 은 Jackson 3 도 쓰므로 허용한다.
-     *
-     * <p>근거: {@code backend/AGENTS.md} 「기술 주의점」 의 「Spring Boot 4 는 Jackson 3 을 쓴다」.
-     */
+    /** rule-14: 까닭과 예외는 docs/code-rules/rule-14.md를 본다. */
     public static final ArchRule NO_JACKSON_2_DATABIND = noClasses()
         .should()
         .dependOnClassesThat()
         .resideInAnyPackage("com.fasterxml.jackson.core..", "com.fasterxml.jackson.databind..")
         .as("Jackson 2 의 core 와 databind 에 의존하지 않는다");
 
-    /**
-     * 컨트롤러 안에 record 를 두지 않는다.
-     *
-     * <p>근거: {@code backend/AGENTS.md} 「데이터 클래스는 컨트롤러 안에 두지 않는다」.
-     */
+    /** rule-15: 까닭과 예외는 docs/code-rules/rule-15.md를 본다. */
     public static final ArchRule CONTROLLERS_HAVE_NO_NESTED_RECORDS = classes()
         .that()
         .areRecords()
@@ -656,13 +600,7 @@ public final class ArchitectureRules {
         .allowEmptyShould(true)
         .as("컨트롤러 안에 record 를 두지 않는다");
 
-    /**
-     * {@code @Test} 와 {@code @ParameterizedTest} 메서드에는 {@code @DisplayName} 이 붙는다.
-     * 메서드 이름은 영문 camelCase 이고, 테스트 보고서에 보이는 한국어 문장은 {@code @DisplayName} 이 갖는다.
-     * 테스트 클래스만 읽는다.
-     *
-     * <p>근거: {@code backend/AGENTS.md} 「테스트」 의 「테스트 이름」.
-     */
+    /** rule-16: 까닭과 예외는 docs/code-rules/rule-16.md를 본다. */
     public static final ArchRule TEST_METHODS_HAVE_DISPLAY_NAME = methods()
         .that()
         .areAnnotatedWith(Test.class)
@@ -708,15 +646,7 @@ public final class ArchitectureRules {
     /** 메서드에 붙으면 컨텍스트를 나누거나 닫는 주석의 전체 이름이다. */
     private static final List<String> CONTEXT_SPLITTING_METHOD_ANNOTATIONS = List.of(DynamicPropertySource.class.getName(), DirtiesContext.class.getName());
 
-    /**
-     * {@code testsupport} 밖의 검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다. 대상 주석은 클래스와 중첩 클래스는
-     * {@link #CONTEXT_SPLITTING_CLASS_ANNOTATIONS}, 필드는 {@link #CONTEXT_SPLITTING_FIELD_ANNOTATIONS}, 메서드는
-     * {@link #CONTEXT_SPLITTING_METHOD_ANNOTATIONS} 가 갖는다. 중첩 {@code TestConfiguration} 클래스는 따로 가져오지 않아도 Spring
-     * Boot 가 찾아 컨텍스트를 나눈다. 테스트 클래스만 읽는다. MySQL 검사({@code @Tag("mysql")} 이 붙었거나 그것을 상속한 클래스와 그 중첩 클래스)는 따로 띄우므로 뺀다.
-     * 이름은 보지 않는다. 이름에 {@code Mysql} 을 넣는 것만으로 이 규칙을 피하지 못하게 한다.
-     *
-     * <p>근거: ADR-20261007 / test-context-base. 검사 클래스마다 선언이 다르면 컨텍스트가 늘고, 닫힌 컨텍스트가 힙을 붙잡는다.
-     */
+    /** rule-17: 까닭과 예외는 docs/code-rules/rule-17.md를 본다. */
     public static final ArchRule TESTS_DO_NOT_SPLIT_CONTEXT = classes()
         .that(resideOutsideOfPackage("com.bifos.assistant.testsupport.."))
         .and(notMysqlTest())
@@ -724,12 +654,7 @@ public final class ArchitectureRules {
         .allowEmptyShould(true)
         .as("검사 클래스는 Spring 컨텍스트를 나누는 선언을 두지 않는다");
 
-    /**
-     * {@code application} 밖의 클래스와 메서드에는 {@code @Transactional} 을 붙이지 않는다.
-     * Spring 과 Jakarta 의 두 {@code @Transactional} 을 모두 막는다.
-     *
-     * <p>근거: 트랜잭션 경계는 유스케이스를 아는 층이 정한다. 컨트롤러와 저장소에 두면 경계가 둘로 갈린다.
-     */
+    /** rule-18: 까닭과 예외는 docs/code-rules/rule-18.md를 본다. */
     public static final ArchRule TRANSACTIONAL_ONLY_IN_APPLICATION = CompositeArchRule.of(noClasses()
         .that()
         .resideOutsideOfPackage("..application..")
@@ -754,19 +679,10 @@ public final class ArchitectureRules {
             .beAnnotatedWith(JAKARTA_TRANSACTIONAL))
         .as("Transactional 은 application 안에서만 쓴다");
 
-    /**
-     * {@code Instant.now()} 를 직접 부르지 않는다.
-     * {@code Clock} 을 받는 {@code Instant.now(Clock)} 은 허용한다.
-     *
-     * <p>근거: 시각을 주입받아야 테스트가 시각을 고정한다.
-     */
+    /** rule-19: 까닭과 예외는 docs/code-rules/rule-19.md를 본다. */
     public static final ArchRule NO_DIRECT_INSTANT_NOW = noClasses().should().callMethod(Instant.class, "now").as("Instant.now() 를 직접 부르지 않는다");
 
-    /**
-     * {@code MessageDigest.getInstance} 는 {@code shared.util.Sha256} 만 부른다.
-     *
-     * <p>근거: 해시 구현을 한 곳에 둔다.
-     */
+    /** rule-20: 까닭과 예외는 docs/code-rules/rule-20.md를 본다. */
     public static final ArchRule MESSAGE_DIGEST_ONLY_IN_SHA256 = noClasses()
         .that()
         .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.util.Sha256")
@@ -774,13 +690,7 @@ public final class ArchitectureRules {
         .callMethod(MessageDigest.class, "getInstance", String.class)
         .as("MessageDigest.getInstance 는 Sha256 만 부른다");
 
-    /**
-     * 가상 스레드를 직접 띄우는 {@code Thread.ofVirtual()} 과 {@code Thread.startVirtualThread} 는
-     * {@code shared.concurrent.VirtualThreadBackgroundTasks} 와 HTTP 연결에 묶인 {@code ChatEventStreams},
-     * {@code NotificationEventStreams} 만 부른다. 요청 밖 작업은 {@code BackgroundTasks} 로 띄운다.
-     *
-     * <p>근거: ADR-20261007 / background-tasks. 직접 띄운 스레드는 검사가 끝날 때 기다리지 못한다.
-     */
+    /** rule-21: 까닭과 예외는 docs/code-rules/rule-21.md를 본다. */
     public static final ArchRule VIRTUAL_THREADS_ONLY_THROUGH_BACKGROUND_TASKS = CompositeArchRule.of(noClasses()
         .that()
         .doNotHaveFullyQualifiedName("com.bifos.assistant.shared.concurrent.VirtualThreadBackgroundTasks")
@@ -803,25 +713,18 @@ public final class ArchitectureRules {
             .callMethod(Thread.class, "startVirtualThread", Runnable.class))
         .as("가상 스레드는 BackgroundTasks 와 SSE 연결만 직접 띄운다");
 
-    /** 직접 만든 실행기는 종료를 기다리는 BackgroundTasks의 수명 관리 경계를 우회한다. */
+    /** rule-22: 까닭과 예외는 docs/code-rules/rule-22.md를 본다. */
     public static final ArchRule NO_UNMANAGED_VIRTUAL_THREAD_EXECUTORS = noClasses()
         .should()
         .callMethod(Executors.class, "newVirtualThreadPerTaskExecutor")
         .as("가상 스레드 실행기는 직접 만들지 않는다");
 
-    /**
-     * 에이전트 설정 두 타입의 이름·prefix·개수와 config 역할을 raw 검사한다.
-     * 옛 package 복귀와 누락도 선택 범위에서 빠지지 않는다. 다른 기능의 배치는 검사하지 않는다.
-     */
+    /** rule-23: 까닭과 예외는 docs/code-rules/rule-23.md를 본다. */
     public static final ArchRule FEATURE_CONFIG_PLACEMENT = classes()
         .should(new AgentConfigPlacement())
         .as("에이전트 설정은 agent.config에 유일하게 있고 config에는 설정만 둔다");
 
-    /**
-     * {@code @ConfigurationProperties} 클래스에는 {@code @Validated} 도 붙는다.
-     *
-     * <p>근거: 잘못된 설정은 기동에서 멈춘다.
-     */
+    /** rule-24: 까닭과 예외는 docs/code-rules/rule-24.md를 본다. */
     public static final ArchRule CONFIGURATION_PROPERTIES_ARE_VALIDATED = classes()
         .that()
         .areAnnotatedWith(ConfigurationProperties.class)
@@ -830,13 +733,7 @@ public final class ArchitectureRules {
         .allowEmptyShould(true)
         .as("ConfigurationProperties 클래스에는 Validated 가 붙는다");
 
-    /**
-     * 서비스({@code @Service}, {@code @Component}, {@code @Repository})와 {@code infra} 안의 중첩 타입은
-     * {@code private} 이다. 익명 클래스와 지역 클래스는 대상이 아니다.
-     * 서비스가 돌려주는 모델은 서비스 파일 밖으로 뺀다. 캐시 키 같은 구현 세부는 {@code private} 으로 둔다.
-     *
-     * <p>근거: 서비스가 돌려주는 모델을 서비스 안에 두면 그 모델을 쓰는 쪽이 서비스를 import 하게 된다.
-     */
+    /** rule-25: 까닭과 예외는 docs/code-rules/rule-25.md를 본다. */
     public static final ArchRule SERVICES_DO_NOT_EXPOSE_NESTED_TYPES = classes()
         .that()
         .areMemberClasses()
@@ -846,13 +743,7 @@ public final class ArchitectureRules {
         .allowEmptyShould(true)
         .as("서비스와 infra 안의 중첩 타입은 private 이다");
 
-    /**
-     * 엔티티의 {@code @Enumerated} 필드 타입은 {@code ..domain.type..} 에 둔다.
-     * 저장되지 않는 서비스 결과와 화면용 enum 은 {@code <기능>.application.model} 에 두고,
-     * {@code ErrorCode} 는 {@code shared.error} 에 둔다. 이 둘은 규칙으로 검사하지 않는다.
-     *
-     * <p>근거: 저장되는 값은 바꾸면 마이그레이션을 판단해야 하므로 한곳에 모아 보이게 한다.
-     */
+    /** rule-26: 까닭과 예외는 docs/code-rules/rule-26.md를 본다. */
     public static final ArchRule ENUMERATED_FIELDS_USE_DOMAIN_TYPE = fields().that()
         .areAnnotatedWith(Enumerated.class)
         .and()
@@ -863,11 +754,7 @@ public final class ArchitectureRules {
         .allowEmptyShould(true)
         .as("Enumerated 필드의 타입은 domain.type 에 있다");
 
-    /**
-     * {@code ..domain.type..} 의 클래스는 {@code application}, {@code infra}, {@code presentation} 에 의존하지 않는다.
-     *
-     * <p>근거: 저장되는 enum 은 가장 아래 층이다.
-     */
+    /** rule-27: 까닭과 예외는 docs/code-rules/rule-27.md를 본다. */
     public static final ArchRule DOMAIN_TYPE_DEPENDS_ON_NOTHING_ABOVE = noClasses()
         .that()
         .resideInAPackage("..domain.type..")
@@ -901,13 +788,7 @@ public final class ArchitectureRules {
     /** {@code HermesProperties} 가운데 {@code LiveProperties} 로 읽는 칸이다. */
     private static final Set<String> HERMES_LIVE_ACCESSORS = Set.of("runTimeout", "pollInterval");
 
-    /**
-     * 실행 중에 쓰는 설정 record 를 생성자 인자나 필드로 갖는 운영 클래스는 {@code LivePropertiesConfig} 뿐이다.
-     * 다른 클래스는 {@code LiveProperties<그 record>} 를 주입받아 쓸 때마다 {@code current()} 를 읽는다.
-     * 예외는 기동 때 두 설정을 견주는 {@code ProactiveCheckProperties$RunTimeoutCheck} 다.
-     *
-     * <p>근거: ADR-20261007 / live-properties. record 를 필드로 쥐면 검사가 바꾼 값을 보지 못한다.
-     */
+    /** rule-28: 까닭과 예외는 docs/code-rules/rule-28.md를 본다. */
     public static final ArchRule LIVE_SETTINGS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
         .that()
         .doNotHaveFullyQualifiedName(LIVE_PROPERTIES_CONFIG)
@@ -916,13 +797,7 @@ public final class ArchitectureRules {
         .should(notHoldAny(LIVE_SETTINGS))
         .as("실행 중에 쓰는 설정 record 는 LivePropertiesConfig 만 주입받는다");
 
-    /**
-     * {@code HermesProperties} 를 생성자 인자나 필드로 갖고 {@code runTimeout()} 이나 {@code pollInterval()} 을 부르는 운영 클래스는
-     * 실제 Hermes 클라이언트 {@code HermesRunEventStream}, {@code HttpHermesRunsClient} 와 기동 검사
-     * {@code ProactiveCheckProperties$RunTimeoutCheck} 뿐이다. 다른 사용처는 {@code LiveProperties<HermesProperties>} 로 읽는다.
-     *
-     * <p>근거: ADR-20261007 / live-properties. 두 클라이언트는 HTTP 클라이언트를 만들 때 한 번 읽고, 통합 검사가 대역으로 바꾼다.
-     */
+    /** rule-29: 까닭과 예외는 docs/code-rules/rule-29.md를 본다. */
     public static final ArchRule HERMES_TIMEOUTS_ONLY_THROUGH_LIVE_PROPERTIES = classes()
         .that()
         .doNotHaveFullyQualifiedName("com.bifos.assistant.hermes.HermesRunEventStream")
@@ -933,10 +808,10 @@ public final class ArchitectureRules {
         .should(notReadHermesTimeoutsFromInjectedProperties())
         .as("hermes 의 runTimeout 과 pollInterval 은 LiveProperties 로 읽는다");
 
-    /** crypto 와 memory 의 저장 타입은 정확한 소유 domain.entity 에 하나씩 둔다. */
+    /** rule-30: 까닭과 예외는 docs/code-rules/rule-30.md를 본다. */
     public static final ArchRule ENTITIES_IN_OWNED_ENTITY_PACKAGE = entitiesInOwnedEntityPackage("com.bifos.assistant");
 
-    /** 영속 ID 는 소유 엔티티와 같은 패키지에 두고 정책과 projection 은 entity 에 두지 않는다. */
+    /** rule-31: 까닭과 예외는 docs/code-rules/rule-31.md를 본다. */
     public static final ArchRule EMBEDDED_IDS_WITH_ENTITIES = embeddedIdsWithEntities("com.bifos.assistant");
 
     private static final Map<String, Map<String, String>> OWNED_PERSISTENT_TYPES = Map.of(

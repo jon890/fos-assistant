@@ -190,7 +190,9 @@ VALUES (900000001, 900000001, 900000001, 900000001, 900000001, 'test', '{}', '{}
 INSERT INTO task_run (id, public_id, task_id, trigger_id, owner_user_id, scheduled_for, status, conversation_id, execution_id, created_at)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 900000001, '2020-01-01 00:00:00', 'coverage-900000001', 900000001, 900000001, '2020-01-01 00:00:00');
 
-UPDATE connector_action SET agent_id = 900000001 WHERE id = 900000001;
+UPDATE connector_action SET agent_id = 900000001, status = 'SUCCEEDED', risk = 'WRITE' WHERE id = 900000001;
+UPDATE connector_action SET args_key_id = 900000001, result_key_id = 900000001 WHERE id = 900000001;
+UPDATE connector_action_execution SET content_key_id = 900000001 WHERE action_id = 900000001;
 UPDATE decision_feedback_event SET conversation_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET origin_execution_id = 900000001 WHERE id = 900000001;
 UPDATE decision_feedback_event SET source_check_id = 900000001 WHERE id = 900000001;

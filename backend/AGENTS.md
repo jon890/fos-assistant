@@ -10,88 +10,21 @@ Control Plane 이다. Spring Boot 4 와 MySQL 을 쓴다.
 - 표와 칸: [`backend/docs/data-schema.md`](docs/data-schema.md)
 - Hermes 호출: [`hermes/docs/hermes-contract.md`](../hermes/docs/hermes-contract.md)
 
-## 패키지 배치
+## 변경 전에 고를 규칙
 
-층 방향은 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 가 갖는다.
-검사: `ArchitectureRules.LAYER_DIRECTION`
-
-`application`의 서비스는 목적에 따라 하위 패키지로 묶는다.
-에이전트 도구 서비스는 `agent.application.toolset`에 두고,
-외부에서 쓰는 공개 반환 타입은 `agent.application.model`에 둔다.
-
-`agent.config`는 `AgentProperties`와 첫 에이전트 생성 정책인 `PeopleProperties`를 소유한다.
-설정 prefix는 각각 `assistant.agents`, `assistant.people`로 유지한다.
-서비스는 `application`, 공개 서비스 값은 `application.model`, HTTP 요청과 응답은 `presentation`에 둔다.
-설정 package에는 서비스, 저장소, 컨트롤러, 영속 타입, 일반 DTO와 enum을 두지 않는다.
-두 소유 설정 record 안의 중첩 값 record는 허용한다.
-검사: `ArchitectureRules.FEATURE_CONFIG_PLACEMENT`가 현재 두 설정과 `agent.config`만 기준 파일 없이 검사한다.
-
-### crypto의 영속 타입
-
-`UserDataKey`와 새 crypto 엔티티는 `crypto.domain.entity`에 둔다.
-`@EmbeddedId`의 필드와 getter, 영속 상속 선언에 적용되는 `@IdClass`의 실제 타입도 소유 엔티티와 같은 패키지에 둔다.
-정책과 port는 `crypto.domain`에 남기고 projection과 enum은 entity에 두지 않는다.
-entity 하위 패키지와 공개 중첩 DTO, model, enum, config, policy도 금지한다.
-예외는 private 비영속 구현 값뿐이며 참조되지 않은 `@Embeddable`은 영속 ID가 아니다.
-검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`.
-
-### memory의 영속 타입
-
-엔티티 네 타입과 복합 ID 두 타입은 `memory.domain.entity`에 둔다.
-`MemoryPlacement`, `StoredContent`, projection과 event는 `memory.domain`에 남기고
-저장 enum은 `memory.domain.type`에 둔다. 새 엔티티와 실제 영속 ID에도 crypto와 같은 역할 규칙을 적용한다.
-기존 여섯 타입은 전체 운영 루트에서 이름 또는 표 계약으로 선택해 정확한 소유 패키지와 각 기대 수 1을 검사한다.
-검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`, `MemoryPlacementTest`.
-
-### 데이터 클래스는 컨트롤러 안에 두지 않는다
-
-**`presentation` 의 요청과 응답 모양은 그 패키지의 `*Dtos.java` 하나에 모은다.**
-컨트롤러 파일에는 경로와 권한과 흐름만 남긴다.
-record 가 컨트롤러 안에 있으면 그 파일이 길어지고, 같은 모양을 다른 컨트롤러가 쓸 때
-컨트롤러를 import 하게 된다.
-검사: `ArchitectureRules.CONTROLLERS_HAVE_NO_NESTED_RECORDS`
-
-한 패키지에 컨트롤러가 여럿이어도 `*Dtos.java` 는 하나다.
-`agent.presentation`은 `AgentDtos`를 쓰고,
-관리 등록·목록·수정은 `agent.admin.presentation`의 `AgentAdminDtos`를 쓴다.
-
-### 관리자 등록 업무
-
-수동 profile 등록과 변경은 `agent.admin.application.AgentAdminService`가 맡는다.
-등록·변경 명령은 그 아래 `application.model`에 둔다.
-HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 모으며,
-각 mapped 메서드는 `CurrentUserProvider.requireAdmin`을 호출한다.
-검사: `ArchitectureRules.AGENT_ADMIN_APPLICATION_PLACEMENT`, `ArchitectureRules.AGENT_ADMIN_HTTP_CONTRACT`
-
-이 소유 타입은 운영 루트 전체에서 이름으로 찾고 기대 FQN과 대상 수 1을 강제한다.
-누락·중복·빈 선택도 실패하며 기존 위반 기준 파일을 쓰지 않는다.
-공유 lifecycle과 기본 모델, endpoint probe와 영속 타입은 기존 위치를 유지한다.
-
-### 에이전트 지연 정리
-
-정리 실행과 writer 및 참여 port는 `agent.purge.application`에,
-정리 결과 enum은 그 아래 `application.model`에 둔다.
-참여 구현은 각 기능에 남기고 정리 실행이 구현 기능을 import하지 않는다.
-`AgentProperties`는 `agent.config`에, profile 회수 port는 `agent.application`에 둔다.
-검사: `ArchitectureRules.AGENT_PURGE_CONTRACT_PLACEMENT`
-전체 운영 루트의 top-level 이름과 기대 FQN·각 대상 수 1을 검사하며 누락·중복·빈 선택도 실패한다.
-정리 하위 기능의 역할과 방향은 기존 기준 파일 없이 raw 검사한다.
-
-`application` 과 `domain` 은 타입 하나에 파일 하나다.
-
-예외는 **그 타입 밖에서 쓰이지 않는 값**이다.
-`ModelPrice.ContextTier` 처럼 바깥 record 의 일부인 것은 그 안에 둔다.
-이 예외는 기계로 판정할 수 없어 리뷰에서 본다.
-
-## 기술 주의점
-
-- **Spring Boot 4 는 Jackson 3 을 쓴다.**
-  `com.fasterxml.jackson` 이 아니라 `tools.jackson` 을 import 한다.
-  검사: `ArchitectureRules.NO_JACKSON_2_DATABIND`
-- **`RestClient.Builder` 는 자동 구성되지 않는다.**
-  `RestClient.builder()` 로 직접 만들고 timeout 을 준다.
-- **`src/test/resources/application-test.yml` 은 test profile 전용이다.**
-  `application.yml` 이라는 이름으로 두면 `smokeRun` 이 실제 설정 대신 이 파일을 읽는다.
+| 변경 대상 | 규칙 |
+| --- | --- |
+| 패키지와 의존 방향 | [rule-2](../docs/code-rules/rule-2.md), [rule-3](../docs/code-rules/rule-3.md), [rule-4](../docs/code-rules/rule-4.md), [rule-5](../docs/code-rules/rule-5.md), [rule-6](../docs/code-rules/rule-6.md), [rule-10](../docs/code-rules/rule-10.md), [rule-11](../docs/code-rules/rule-11.md), [rule-12](../docs/code-rules/rule-12.md), [rule-13](../docs/code-rules/rule-13.md) |
+| 관리자 등록과 정리 | [rule-7](../docs/code-rules/rule-7.md), [rule-8](../docs/code-rules/rule-8.md), [rule-9](../docs/code-rules/rule-9.md) |
+| 데이터 클래스와 저장 타입 | [rule-15](../docs/code-rules/rule-15.md), [rule-25](../docs/code-rules/rule-25.md), [rule-26](../docs/code-rules/rule-26.md), [rule-27](../docs/code-rules/rule-27.md), [rule-30](../docs/code-rules/rule-30.md), [rule-31](../docs/code-rules/rule-31.md) |
+| 설정과 검증 | [rule-23](../docs/code-rules/rule-23.md), [rule-24](../docs/code-rules/rule-24.md), [rule-28](../docs/code-rules/rule-28.md), [rule-29](../docs/code-rules/rule-29.md) |
+| auditing과 시각 | [rule-1](../docs/code-rules/rule-1.md), [rule-19](../docs/code-rules/rule-19.md) |
+| 트랜잭션과 백그라운드 작업 | [rule-18](../docs/code-rules/rule-18.md), [rule-20](../docs/code-rules/rule-20.md), [rule-21](../docs/code-rules/rule-21.md), [rule-22](../docs/code-rules/rule-22.md) |
+| Jackson과 HTTP 및 테스트 설정 | [rule-14](../docs/code-rules/rule-14.md), [rule-54](../docs/code-rules/rule-54.md) |
+| 코드 모양과 경고 | [rule-32](../docs/code-rules/rule-32.md), [rule-33](../docs/code-rules/rule-33.md), [rule-34](../docs/code-rules/rule-34.md), [rule-35](../docs/code-rules/rule-35.md), [rule-36](../docs/code-rules/rule-36.md), [rule-37](../docs/code-rules/rule-37.md), [rule-38](../docs/code-rules/rule-38.md), [rule-39](../docs/code-rules/rule-39.md), [rule-40](../docs/code-rules/rule-40.md), [rule-41](../docs/code-rules/rule-41.md), [rule-42](../docs/code-rules/rule-42.md) |
+| 마이그레이션과 MySQL 쿼리 | [rule-50](../docs/code-rules/rule-50.md), [rule-51](../docs/code-rules/rule-51.md) |
+| 테스트 이름과 공유 컨텍스트 | [rule-16](../docs/code-rules/rule-16.md), [rule-17](../docs/code-rules/rule-17.md) |
+| 한국어 주석과 문서 | [rule-52](../docs/code-rules/rule-52.md) |
 
 ## 품질 검사
 
@@ -102,27 +35,14 @@ HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 
 
 ## 구조 규칙
 
-패키지 구조 규칙은 `src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java` 가 갖는다.
-`./gradlew test` 가 다른 테스트와 함께 검사하고, `./gradlew archTest` 는 구조 규칙만 검사한다.
-규칙을 도구 설정으로 두는 근거는 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 에 있다.
-
-규칙의 이름과 뜻은 `ArchitectureRules.java` 의 Javadoc 이 갖는다.
-순환과 층 순서 규칙이 위반을 세는 방식은 `TopLevelPackageCycles`, `TopLevelPackageOrder` 의 Javadoc 이 갖고,
-층 순서는 [`backend/docs/code-architecture.md`](docs/code-architecture.md) 의 「최상위 패키지의 층 순서」 가 갖는다.
-
-### enum 은 저장 여부로 둘 곳을 정한다
-
-| 종류 | 위치 |
-| --- | --- |
-| 엔티티에 `@Enumerated` 로 저장되는 enum | `<기능>.domain.type` |
-| 저장되지 않는 서비스 결과와 화면용 enum | `<기능>.application.model` |
-| `ErrorCode` | `shared.error` 에 그대로 둔다 |
-
-저장되지 않는 enum 과 `ErrorCode` 는 리뷰에서 본다.
+실행 조건은 `src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java`가 갖는다.
+까닭과 예외는 [코드 규칙 목록](../docs/code-rules/INDEX.md)에서 번호로 찾는다.
+`./gradlew test`가 다른 테스트와 함께 검사하고 `./gradlew archTest`는 구조 규칙만 검사한다.
+순환과 층 순서의 집계 구현은 `TopLevelPackageCycles`, `TopLevelPackageOrder`에서 확인한다.
 
 ## 코드 규칙
 
-코드 모양 규칙은 Gradle 내장 `checkstyle` 플러그인의 Checkstyle 이 확인한다. 규칙과 까닭은 `config/checkstyle/checkstyle.xml` 의 주석이 갖는다.
+코드 모양 규칙은 Gradle 내장 `checkstyle` 플러그인의 Checkstyle 이 확인한다. 실행 조건은 `config/checkstyle/checkstyle.xml`이, 까닭과 예외는 [rule-32](../docs/code-rules/rule-32.md)부터 [rule-42](../docs/code-rules/rule-42.md)가 갖는다.
 `./gradlew test` 에는 걸리지 않으므로 따로 돌린다.
 
 ```bash
@@ -132,7 +52,7 @@ HTTP 컨트롤러와 세 요청·응답 record는 `agent.admin.presentation`에 
 
 ### 자동으로 고치기
 
-기계적으로 고칠 수 있는 Checkstyle 위반은 OpenRewrite 레시피와 포매터가 이 순서로 고친다.
+자동으로 고칠 수 있는 Checkstyle 위반은 OpenRewrite 레시피와 포매터가 이 순서로 고친다.
 
 ```bash
 # cwd: backend/
@@ -164,10 +84,7 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 
 전체 포맷 커밋을 `git blame`에서 제외하려면 저장소 루트에서 `git config blame.ignoreRevsFile .git-blame-ignore-revs`를 실행한다.
 
-**기능 변경과 포맷은 다른 커밋으로 나눈다.**
-먼저 기능을 고쳐 커밋하고, 그 뒤 `./gradlew spotlessApply` 결과를 따로 커밋한다.
-한 커밋에 섞으면 리뷰에서 기능 변경이 포맷 변경에 묻힌다.
-선택 까닭은 [ADR-042](../docs/adr/ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) 의 대안 기각 항목에 있다.
+포맷 범위와 커밋 분리는 [rule-43](../docs/code-rules/rule-43.md), 파일 길이는 [rule-44](../docs/code-rules/rule-44.md), 기존 위반 기준은 [rule-45](../docs/code-rules/rule-45.md)를 따른다.
 
 ## JPA auditing 범위
 
@@ -177,63 +94,18 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 실행: `./gradlew archTest`와 `./gradlew test --tests '*MemoryCollectionAuditingTest'`.
 MySQL 검사는 루트의 `scripts/checks/check-mysql-migration.sh --tests '*MemoryCollectionAuditingMysqlTest'`로 돌린다.
 
-## 엔티티와 마이그레이션은 따로 논다
+## MySQL 검사
 
-`./gradlew test` 는 엔티티로 스키마를 만들고 운영은 Flyway 가 만든 스키마를 검증한다.
-**그래서 둘이 어긋나도 `./gradlew test` 는 통과한다.**
-그 어긋남은 `scripts/checks/check-mysql-migration.sh` 의 `MysqlMigrationTest` 가 Flyway 로 만든 스키마를 `ddl-auto: validate` 로 확인한다.
-
-엔티티를 바꾸면 마이그레이션도 함께 바꾼다. 둘이 어긋나면 운영 기동이 실패한다.
-`@Lob` 문자열은 `columnDefinition` 으로 길이를 정한다.
-
-새 파일의 버전 규칙은 [`backend/docs/data-schema.md`](docs/data-schema.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
-
-**다만 마이그레이션 검사는 모든 마이그레이션을 H2 의 MySQL 모드에서 돌린다.**
-`GroupRenameMigrationTest` 같은 `*MigrationTest` 가 그렇다.
-그래서 마이그레이션 SQL 은 MySQL 과 H2 에 함께 있는 함수만 쓴다.
-`RANDOM_BYTES` 처럼 H2 에 없는 함수가 필요하면 `db.migration` 패키지에 Java 마이그레이션으로 쓴다.
-`V23__ConversationPublicId` 가 그 본보기다.
-
-H2 가 통과해도 MySQL 에서 실패할 수 있다. DDL 과 DML 을 나누는 규칙, 정렬 규칙, 실제 MySQL 검사는
-[`backend/docs/data-schema.md`](docs/data-schema.md) 의 「마이그레이션 작성 규칙」 이 갖는다.
-실제 MySQL 검사는 Docker 가 있어야 돈다.
-
-## 저장소 쿼리는 실제 MySQL 에서도 실행한다
-
-다른 테스트는 H2 에서 돌아 MySQL 만 거절하는 쿼리를 통과시킨다.
-
-`RepositoryQueryMysqlTest` 가 Flyway 로 만든 실제 MySQL 스키마에서 모든 저장소 인터페이스가 선언한 메서드를 한 번씩 실행한다.
-
-- **저장소에 메서드를 더하면 따로 할 일이 없다.** 검사가 저장소 빈을 스스로 찾는다
-- 인자를 만들지 못하는 타입이 나오면 검사가 실패한다. 건너뛰게 하지 말고 `RepositoryQuerySweep` 에 그 타입의 값을 더한다
-- **저장소 인터페이스 밖에서 쿼리를 만들면 그 쿼리를 `RepositoryQueryMysqlTest` 에 직접 더한다.**
-  `Specification`, `EntityManager`, `JdbcTemplate` 이 그렇다. 지금은 `MemoryQueries` 의 조건 셋이 그렇게 들어 있다
+마이그레이션 변경은 [rule-50](../docs/code-rules/rule-50.md), 저장소 쿼리 변경은 [rule-51](../docs/code-rules/rule-51.md)을 읽는다.
+실제 MySQL 검사는 Docker가 있어야 돈다.
+버전 규칙과 DDL·DML 분리, 실행 방법은 [`data-schema.md`](docs/data-schema.md)의 「마이그레이션 작성 규칙」이 갖는다.
 
 ## 실행 기록
 
-`agent_execution` 의 `RUNNING` 줄을 목록과 비용 합계에서 다루는 방법은 [ADR-011](docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md) 과 [ADR-004](docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md) 가 갖는다.
+실행 기록의 보존은 [rule-49](../docs/code-rules/rule-49.md)를 따른다.
+실행 상태와 비용 합계의 의미는 [ADR-011](docs/adr/ADR-011-실행은-시작할-때-기록하고-끝날-때-갱신한다.md)과 [ADR-004](docs/adr/ADR-004-구독제에서도-api-가격으로-환산해-보인다.md)가 갖는다.
 
-## 테스트
+## 테스트와 주석
 
-**`gradlew` 는 `backend/` 안에 있다.** 저장소 루트에서 `./gradlew` 를 부르면 없다.
-
-### 테스트 이름
-
-**한국어 문장은 `@DisplayName` 에 쓴다.** 메서드 이름의 모양은 Checkstyle 의 `MethodName` 이 확인한다.
-테스트 보고서에는 `@DisplayName` 의 문장이 보이고, 메서드 이름은 코드에서 무엇을 확인하는지 드러낸다.
-이름은 동사로 시작한다. 예: `assemblesGroupAndUserItemsInLayerOrder`.
-검사: `ArchitectureRules.TEST_METHODS_HAVE_DISPLAY_NAME`
-
-- `@Test` 와 `@ParameterizedTest` 메서드에 `@DisplayName` 을 단다.
-- `@BeforeEach` 같은 준비 메서드와 정리 메서드는 `setUp`, `tearDown` 관례 이름을 쓰고 `@DisplayName` 을 달지 않는다.
-  한 클래스에 여럿이면 하는 일을 이름에 담는다.
-- 보조 메서드는 영문 camelCase 로 짓고 `@DisplayName` 을 달지 않는다.
-- 테스트 클래스에는 `@DisplayName` 을 달지 않는다. 클래스 이름이 이미 영문이다.
-
-## 주석
-
-주석 언어는 루트 [`AGENTS.md`](../AGENTS.md) 의 「코드 주석은 한국어로 쓴다」 가 정한다.
-
-영어로 남아 있던 주석은 그 파일을 고칠 때 함께 옮긴다.
-한 번에 전부 옮기려고 별도 커밋을 만들지 않는다.
-읽는 사람이 diff 에서 무엇이 바뀌었는지 놓친다.
+`gradlew`는 `backend/` 안에 있다.
+테스트 이름은 [rule-16](../docs/code-rules/rule-16.md), 주석의 언어와 기존 영어 주석 정리는 [rule-52](../docs/code-rules/rule-52.md)를 따른다.
