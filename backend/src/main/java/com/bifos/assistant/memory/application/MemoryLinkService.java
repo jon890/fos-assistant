@@ -8,6 +8,7 @@ import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryLinkOrigin;
 import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
 import com.bifos.assistant.memory.domain.type.MemoryLinkType;
+import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryLinkRepository;
@@ -202,13 +203,14 @@ public class MemoryLinkService {
 
 
     /**
-     * 한 항목이 그 에이전트의 실행이 연결할 수 있는 항목인가. 요청자가 볼 수 있는 {@code ACCEPTED} 항목이고, 출처 원문이 아니고, 실행이 받는
-     * collection 과 민감도 안이며, 대체되지 않았어야 한다. 에이전트는 지시문과 검색에서 본 항목만 잇는다.
+     * 한 항목이 그 에이전트의 실행이 연결할 수 있는 항목인가. 요청자가 볼 수 있는 {@code ACCEPTED} 항목이고, 출처 원문도 보관한 항목도 아니고,
+     * 실행이 받는 collection 과 민감도 안이며, 대체되지 않았어야 한다. 에이전트는 지시문과 검색에서 본 항목만 잇는다.
      */
     public boolean visibleToAgent(CurrentUser user, MemoryAccess access, Long memoryId) {
         Memory memory = memories.findById(memoryId).orElse(null);
         return memory != null
             && endpoint(user, memory)
+            && memory.retrieval() != MemoryRetrieval.ARCHIVE
             && access.allows(memory.collection(), memory.sensitivity())
             && !isSuperseded(memoryId);
     }

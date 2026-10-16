@@ -286,7 +286,7 @@ sequenceDiagram
 에이전트는 Control Plane MCP 도구 `memory_link(from_id, to_id, type, label?)` 로 링크를 건다.
 
 - `type` 은 `SUPERSEDES` 나 `RELATED` 다. `label` 은 200자까지의 자유 글이고 `RELATED` 에만 받는다
-- 두 번호는 그 실행이 볼 수 있는 항목이어야 한다(`memory_read` 와 같은 권한). 볼 수 없거나 조건을 어기면 없는 항목과 같은 결과 글을 낸다
+- 두 번호는 그 실행이 볼 수 있는 항목이어야 한다(`memory_read` 와 같은 권한). 보관(`ARCHIVE`)한 항목과 대체된 항목도 잇지 못한다. 볼 수 없거나 조건을 어기면 없는 항목과 같은 결과 글을 낸다
 - 결과 글은 「대체 제안으로 남겼습니다. 사용자가 받아들여야 바뀝니다」 나 「연결했습니다」 다. 사용자와 범위를 인자로 받지 않는다
 - 한 실행이 맺는 링크는 10개까지다(`McpMemoryLink.PER_EXECUTION_MAX`). 먼저 살펴보기 트리에서는 받지 않는다
 - `memory_remember` 가 바로 저장하면 결과 글에 새 기억의 번호가 실린다. 모델은 그 번호를 `from_id` 로 쓴다

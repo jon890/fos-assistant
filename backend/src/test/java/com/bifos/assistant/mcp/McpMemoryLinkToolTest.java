@@ -204,7 +204,7 @@ class McpMemoryLinkToolTest {
 
 
     @Test
-    @DisplayName("볼 수 없는 항목과 다른 범위와 승인 전 항목과 받지 않는 collection 은 같은 오류 글이고 결과와 로그에 제목과 본문이 없다")
+    @DisplayName("볼 수 없는 항목과 다른 범위와 승인 전 항목과 받지 않는 collection 과 보관한 항목은 같은 오류 글이고 결과와 로그에 제목과 본문이 없다")
     void refusesUnlinkablePairsWithSameText() throws Exception {
         Memory mine = memories.create(user, MemoryScope.USER, OLD_TITLE, OLD_BODY, false);
         Memory group = memories.create(user, MemoryScope.GROUP, "그룹 항목", "그룹 본문", false);
@@ -212,12 +212,14 @@ class McpMemoryLinkToolTest {
         Memory proposal = memories.proposeUser(user, "제안 항목", "제안 본문", null);
         Memory career = memories.create(
             user, MemoryScope.USER, "경력", "경력 본문", "career", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
+        Memory archived = memories.create(
+            user, MemoryScope.USER, "보관한 것", "보관 본문", "core", MemoryRetrieval.ARCHIVE, MemorySensitivity.NORMAL);
         Logger logger = (Logger)LoggerFactory.getLogger("com.bifos.assistant");
         ListAppender<ILoggingEvent> logs = new ListAppender<>();
         logs.start();
         logger.addAppender(logs);
         try {
-            for (Long target : List.of(group.id(), foreign.id(), proposal.id(), career.id(), 999_999_999L)) {
+            for (Long target : List.of(group.id(), foreign.id(), proposal.id(), career.id(), archived.id(), 999_999_999L)) {
                 JsonNode result = call(link(mine.id(), target, "RELATED"));
                 assertThat(result.path("isError").asBoolean()).as("대상 %s", target).isTrue();
                 assertThat(text(result)).isEqualTo(UNLINKABLE);
