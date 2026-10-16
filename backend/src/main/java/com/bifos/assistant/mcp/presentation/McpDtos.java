@@ -3,8 +3,10 @@ package com.bifos.assistant.mcp.presentation;
 import com.bifos.assistant.chat.application.MediaObservationInputReader;
 import com.bifos.assistant.chat.application.ContentDraftInputReader;
 import com.bifos.assistant.mcp.application.McpFinancialLimitTools;
+import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -150,21 +152,28 @@ public final class McpDtos {
     public record MemoryReadArguments(Long id) {
     }
 
-    /** 검색어를 로그에 남기지 않는 제목 검색 인자다. */
-    public record MemorySearchArguments(String query, int limit, Long afterId) {
-        static MemorySearchArguments from(JsonNode arguments) {
+    /** 검색어를 로그에 남기지 않는 기억 검색 인자다. 제목과 일반 본문을 관련도 순으로 찾는다. */
+    public record MemorySearchArguments(String query, int limit, MemorySearchCursor cursor) {
+        /**
+         * 질문이 비었거나 200자를 넘거나, 커서를 읽을 수 없거나 다른 질문의 커서면 빈 값이다. 커서가 없으면 첫 페이지다.
+         */
+        static Optional<MemorySearchArguments> from(JsonNode arguments) {
+            String query = arguments.get("query").asString().strip();
+            if (query.isEmpty() || query.codePointCount(0, query.length()) > 200) {
+                return Optional.empty();
+            }
             JsonNode limit = arguments.get("limit");
-            JsonNode after = arguments.get("after_id");
-            return new MemorySearchArguments(
-                arguments.get("query").asString().strip(),
-                limit == null ? 10 : limit.intValue(),
-                after == null ? null : after.longValue());
+            JsonNode cursor = arguments.get("cursor");
+            Optional<MemorySearchCursor> position = cursor == null
+                ? Optional.of(MemorySearchCursor.first(query))
+                : MemorySearchCursor.parse(cursor.asString()).filter(parsed -> parsed.matches(query));
+            return position.map(value -> new MemorySearchArguments(query, limit == null ? 10 : limit.intValue(), value));
         }
 
 
         @Override
         public String toString() {
-            return "MemorySearchArguments[limit=" + limit + ", afterId=" + afterId + "]";
+            return "MemorySearchArguments[limit=" + limit + ", offset=" + cursor.offset() + "]";
         }
     }
 

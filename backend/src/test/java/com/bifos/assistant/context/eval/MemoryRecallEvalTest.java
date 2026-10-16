@@ -10,6 +10,7 @@ import com.bifos.assistant.context.ContextAssembler;
 import com.bifos.assistant.context.ContextBodyMode;
 import com.bifos.assistant.context.ContextItem;
 import com.bifos.assistant.context.ContextProperties;
+import com.bifos.assistant.context.ContextSource;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Case;
 import com.bifos.assistant.context.eval.MemoryEvalDataset.Forbidden;
 import com.bifos.assistant.context.eval.MemoryEvalScoreboard.CaseVerdict;
@@ -22,6 +23,7 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -44,8 +46,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 가상 가족 시험 세트를 {@link ContextAssembler} 로 조립해 Memory 회수를 측정한다. 방법과 지표는 {@code docs/features/memory.md} 의
  * 「합성 측정」 이 갖는다.
  *
- * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출 하나이고, 나머지 지표는
- * 보고서에만 남긴다.
+ * <p>모델도 Hermes 대역도 부르지 않는다. 조립한 문맥 묶음에서 항목마다 상태를 읽어 판정한다. 실패 조건은 권한 경계 노출, 기준 파일보다 나빠진
+ * 지표, 질문을 넘긴 조립의 {@code RECALL_GAP} recall@5 가 질문을 넘기지 않은 조립보다 높지 않은 것이다. 나머지 지표는 보고서에만 남긴다.
  */
 @BackendIntegrationTest
 class MemoryRecallEvalTest {
@@ -54,6 +56,7 @@ class MemoryRecallEvalTest {
     private static final Path REPORT_DIR = Path.of("build", "reports", "memory-eval");
     private static final Instant BASE = Instant.parse("2026-11-02T00:00:00Z");
     private static final String NONE = "none";
+    private static final String QUESTION_OFF = "questionOff";
     private static final String FACTS_OFF = "factsOff";
     private static final String FACTS_ON = "factsOn";
     private static final String FULL_INJECTION = "fullInjection";
@@ -99,16 +102,21 @@ class MemoryRecallEvalTest {
     void measuresRecallAndKeepsBoundary() {
         clock.set(BASE);
         Map<String, Long> agentIds = fixture.createAgents();
-        Map<String, ContextAssembler> assemblers = new LinkedHashMap<>();
-        assemblers.put(FACTS_OFF, new ContextAssembler(memoryService, withFactsMaxChars(0), clock));
-        assemblers.put(FACTS_ON, new ContextAssembler(memoryService, properties, clock));
+        ContextAssembler factsOn = TestContextAssemblers.of(memoryService, properties, clock);
+        ContextAssembler factsOff = TestContextAssemblers.of(memoryService, withFactsMaxChars(0), clock);
+        // questionOff 는 질문을 넘기지 않는 지금까지의 조립이다. 질문으로 고른 구역이 놓친 사례를 줄였는지 견준다
+        Map<String, Assembly> assemblies = new LinkedHashMap<>();
+        assemblies.put(QUESTION_OFF, (user, agentId, question) -> factsOn.assemble(user, agentId));
+        assemblies.put(FACTS_OFF, factsOff::assemble);
+        assemblies.put(FACTS_ON, factsOn::assemble);
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(DATASET.version());
 
         for (Case each : DATASET.cases()) {
             scoreboard.add(NONE, noneVerdictOf(each));
-            assemblers.forEach((mode, modeAssembler) -> {
+            assemblies.forEach((mode, assembly) -> {
                 Map<String, Long> ids = fixture.seed(each);
-                AssembledContext context = modeAssembler.assemble(fixture.userOf(each.asker()), agentIds.get(each.agent()));
+                AssembledContext context = assembly.assemble(
+                    fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
                 scoreboard.add(mode, verdictOf(each, ids, context));
             });
             Map<String, Long> ids = fixture.seed(each);
@@ -121,17 +129,30 @@ class MemoryRecallEvalTest {
             .as("권한 경계를 넘어 문맥 묶음에 든 항목(모드 사례 항목 상태)")
             .isEmpty();
         assertThat(markdown).startsWith(MemoryEvalScoreboard.HEADLINE);
-        for (String mode : List.of(NONE, FACTS_OFF, FACTS_ON, FULL_INJECTION)) {
+        for (String mode : List.of(NONE, QUESTION_OFF, FACTS_OFF, FACTS_ON, FULL_INJECTION)) {
             assertThat(scoreboard.metrics(mode, null).cases()).as(mode).isEqualTo(DATASET.cases().size());
         }
-        MemoryEvalScoreboard.Metrics factsOn = scoreboard.metrics(FACTS_ON, null);
+        Double gapWithQuestion = scoreboard.metrics(FACTS_ON, MemoryEvalDataset.Category.RECALL_GAP).recallAt5().rate();
+        Double gapWithoutQuestion = scoreboard.metrics(QUESTION_OFF, MemoryEvalDataset.Category.RECALL_GAP).recallAt5().rate();
+        assertThat(gapWithQuestion)
+            .as("RECALL_GAP recall@5: factsOn=%s questionOff=%s", gapWithQuestion, gapWithoutQuestion)
+            .isNotNull()
+            .isGreaterThan(gapWithoutQuestion);
+        MemoryEvalScoreboard.Metrics factsOnMetrics = scoreboard.metrics(FACTS_ON, null);
         if (Boolean.getBoolean(MemoryEvalBaseline.WRITE_PROPERTY)) {
-            MemoryEvalBaseline.of(DATASET.version(), FACTS_ON, factsOn).write(MemoryEvalBaseline.SOURCE);
+            MemoryEvalBaseline.of(DATASET.version(), FACTS_ON, factsOnMetrics).write(MemoryEvalBaseline.SOURCE);
             return;
         }
-        assertThat(MemoryEvalBaseline.load().violations(DATASET.version(), factsOn))
+        assertThat(MemoryEvalBaseline.load().violations(DATASET.version(), factsOnMetrics))
             .as("합성 측정이 기준 파일보다 나빠졌다. 절차는 docs/features/memory.md 의 「기준 파일」")
             .isEmpty();
+    }
+
+
+    /** 모드 하나의 조립이다. 질문을 쓰지 않는 모드는 받은 질문을 버린다. */
+    @FunctionalInterface
+    private interface Assembly {
+        AssembledContext assemble(CurrentUser user, Long agentId, String question);
     }
 
 
@@ -232,7 +253,7 @@ class MemoryRecallEvalTest {
 
 
     @Test
-    @DisplayName("recall@k 는 본문 항목 다음 제목 항목의 순위로 세고 순위가 없는 항목은 세지 않는다")
+    @DisplayName("recall@k 는 질문으로 고른 항목, 나머지 본문 항목, 제목 항목의 순위로 세고 순위가 없는 항목은 세지 않는다")
     void countsRecallAtKByRank() {
         MemoryEvalScoreboard scoreboard = new MemoryEvalScoreboard(1);
         scoreboard.add(
@@ -257,6 +278,11 @@ class MemoryRecallEvalTest {
             item("memory:2", ContextBodyMode.INLINE),
             item("memory:3", ContextBodyMode.OMITTED))))
                 .containsExactlyInAnyOrderEntriesOf(Map.of("memory:2", 1, "memory:1", 2));
+        assertThat(ranksOf(List.of(
+            item("memory:1", ContextBodyMode.TITLE_ONLY),
+            item("memory:2", ContextBodyMode.INLINE),
+            item(ContextSource.MEMORY_SEARCH, "memory:4", ContextBodyMode.INLINE))))
+                .containsExactlyInAnyOrderEntriesOf(Map.of("memory:4", 1, "memory:2", 2, "memory:1", 3));
     }
 
 
@@ -293,7 +319,12 @@ class MemoryRecallEvalTest {
 
 
     private static ContextItem item(String ref, ContextBodyMode mode) {
-        return new ContextItem(null, ref, null, null, null, null, null, null, mode, List.of(), null, null);
+        return item(null, ref, mode);
+    }
+
+
+    private static ContextItem item(ContextSource source, String ref, ContextBodyMode mode) {
+        return new ContextItem(source, ref, null, null, null, null, null, null, mode, List.of(), null, null);
     }
 
 
@@ -364,13 +395,19 @@ class MemoryRecallEvalTest {
 
 
     /**
-     * recall@k 의 순위를 매긴다. {@code INLINE} 항목을 실은 순서대로, 그 뒤에 {@code TITLE_ONLY} 항목을 실은 순서대로 1 부터 센다. 빠진
-     * 항목은 순위가 없다.
+     * recall@k 의 순위를 매긴다. 질문으로 고른 {@code MEMORY_SEARCH} 항목을 실은 순서대로, 그 뒤에 나머지 {@code INLINE} 항목을, 그 뒤에
+     * {@code TITLE_ONLY} 항목을 실은 순서대로 1 부터 센다. 빠진 항목은 순위가 없다.
+     *
+     * <p>질문으로 고른 항목을 앞에 두는 것은 그 구역이 관련도 순으로 고른 유일한 본문이라서다. 개인 사실 구역은 질문과 무관하게 최근 순으로 고르므로,
+     * 실은 차례대로 세면 사실이 많은 사람의 질문 관련 항목이 늘 5 위 밖으로 밀린다.
      *
      * @return 항목 참조마다 순위
      */
     static Map<String, Integer> ranksOf(List<ContextItem> items) {
         Map<String, Integer> ranks = new HashMap<>();
+        items.stream()
+            .filter(item -> item.source() == ContextSource.MEMORY_SEARCH && item.bodyMode() == ContextBodyMode.INLINE)
+            .forEach(item -> ranks.putIfAbsent(item.ref(), ranks.size() + 1));
         for (ContextBodyMode mode : List.of(ContextBodyMode.INLINE, ContextBodyMode.TITLE_ONLY)) {
             items.stream()
                 .filter(item -> item.bodyMode() == mode)

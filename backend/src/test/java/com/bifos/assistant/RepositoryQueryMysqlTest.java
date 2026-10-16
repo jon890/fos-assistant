@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.bifos.assistant.chat.AttachmentDeletionBarrierTest;
-import com.bifos.assistant.memory.application.model.MemorySearchItem;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.infra.MemoryQueries;
+import com.bifos.assistant.memory.infra.MemorySearchCandidates;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.testsupport.MysqlTestDatabase;
 import com.bifos.assistant.testsupport.RepositoryQuerySweep;
@@ -29,7 +29,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.repository.Repository;
 import org.springframework.test.context.ActiveProfiles;
@@ -64,6 +63,9 @@ class RepositoryQueryMysqlTest {
 
     @Autowired
     private MemoryRepository memoryRepository;
+
+    @Autowired
+    private MemorySearchCandidates searchCandidates;
 
     private RepositoryQuerySweep.Result result;
 
@@ -149,13 +151,10 @@ class RepositoryQueryMysqlTest {
                 .as("%d번째 조건", i + 1)
                 .doesNotThrowAnyException();
         }
-        assertThatCode(() -> memoryRepository.findBy(
-            MemoryQueries.searchFor(1L, 1L, Set.of("core"), Set.of(), "%_\\", 1L),
-            query -> query.as(MemorySearchItem.class)
-                .sortBy(Sort.by("id"))
-                .limit(11)
-                .all()))
-                    .doesNotThrowAnyException();
+        assertThatCode(() -> searchCandidates.candidatesFor(1L, 1L, Set.of("core"), Set.of()))
+            .doesNotThrowAnyException();
+        assertThatCode(() -> searchCandidates.candidatesFor(1L, null, null, Set.of()))
+            .doesNotThrowAnyException();
     }
 
 

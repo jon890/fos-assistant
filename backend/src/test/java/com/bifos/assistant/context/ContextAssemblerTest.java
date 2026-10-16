@@ -19,6 +19,7 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.util.Sha256;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -848,7 +849,7 @@ class ContextAssemblerTest {
 
     /** 개인 사실 구역 예산만 바꾼 조립기다. 나머지 설정은 운영 바인딩 값을 쓴다. */
     private ContextAssembler assemblerWithFactsBudget(int factsMaxChars) {
-        return new ContextAssembler(
+        return TestContextAssemblers.of(
             memories,
             new ContextProperties(
                 properties.maxChars(),

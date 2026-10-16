@@ -262,7 +262,7 @@ class ResultDeliveryRecordTest {
         doThrow(new IllegalStateException("문맥을 조립하지 못했다"))
             .doCallRealMethod()
             .when(contextAssembler)
-            .assemble(any(), any());
+            .assemble(any(), any(), any());
         AgentExecution done = delegated(ExecutionStatus.SUCCEEDED, "조사 결과");
 
         finished(done);

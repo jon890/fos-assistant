@@ -80,7 +80,7 @@ class AgentRunnerSubmitFailureTest {
 
     @BeforeEach
     void setUp() {
-        when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(null, 0));
+        when(contextAssembler.assemble(eq(user), any(), any())).thenReturn(new AssembledContext(null, 0));
         when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(failed.id()).thenReturn(3L);

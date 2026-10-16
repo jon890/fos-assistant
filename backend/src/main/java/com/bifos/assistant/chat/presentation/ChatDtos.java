@@ -436,7 +436,7 @@ public final class ChatDtos {
 
     /**
      * 대화의 답 아래에 접어 보일 참고한 기억 하나다(ADR-20261008 / memory-facts).
-     * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code READ} 이고 본문은 싣지 않는다.
+     * <p>{@code via} 는 {@code ALWAYS}, {@code FACTS}, {@code SEARCH}, {@code READ} 이고 본문은 싣지 않는다.
      */
     public record MemoryUseView(Long executionId, Long memoryId, String title, String scope, String via) {
         static MemoryUseView from(MemoryUse use) {

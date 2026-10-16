@@ -9,7 +9,7 @@ type Use = {
   memoryId: number;
   title: string;
   scope: "USER" | "GROUP";
-  via: "ALWAYS" | "FACTS" | "READ";
+  via: "ALWAYS" | "FACTS" | "SEARCH" | "READ";
 };
 
 /**
@@ -78,6 +78,20 @@ function threeUses(executionId: number): Use[] {
   ];
 }
 
+/** 세 줄 뒤에 질문으로 찾은 기억 한 줄을 더한다. */
+function fourUses(executionId: number): Use[] {
+  return [
+    ...threeUses(executionId),
+    {
+      executionId,
+      memoryId: 91,
+      title: "자동차 관리",
+      scope: "USER",
+      via: "SEARCH",
+    },
+  ];
+}
+
 /** 대화가 그려졌는지 본다. 질문과 답이 모두 보여야 한다. */
 async function waitForConversation(page: Page, label: string) {
   await expect(page.getByTestId("user-message")).toContainText(label);
@@ -99,12 +113,12 @@ test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처
   await emptyCaptures(page, conversationId);
   await page.route(
     `**/api/chat/conversations/${conversationId}/memory-uses`,
-    (route: Route) => route.fulfill({ json: threeUses(executionId) }),
+    (route: Route) => route.fulfill({ json: fourUses(executionId) }),
   );
   await page.goto(`/chat/${conversationId}`);
 
   const toggle = page.getByTestId("memory-uses-toggle");
-  await expect(toggle).toHaveText("참고한 기억 3개");
+  await expect(toggle).toHaveText("참고한 기억 4개");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByTestId("memory-use")).toHaveCount(0);
 
@@ -112,7 +126,7 @@ test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처
 
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   const items = page.getByTestId("memory-use");
-  await expect(items).toHaveCount(3);
+  await expect(items).toHaveCount(4);
   await expect(items.nth(0)).toContainText("딸 이름");
   await expect(items.nth(0)).toContainText("기억한 사실");
   await expect(items.nth(1)).toContainText("우리 집 규칙");
@@ -120,6 +134,8 @@ test("답 아래에 참고한 기억을 접어 두고 펼치면 제목과 출처
   await expect(items.nth(1)).toContainText("그룹");
   await expect(items.nth(2)).toContainText("경력 요약");
   await expect(items.nth(2)).toContainText("찾아 읽음");
+  await expect(items.nth(3)).toContainText("자동차 관리");
+  await expect(items.nth(3)).toContainText("질문으로 찾은 기억");
   await expect(items.nth(0)).not.toContainText("그룹");
   const link = page
     .getByTestId("memory-uses")

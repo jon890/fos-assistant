@@ -221,7 +221,7 @@ record MemoryEvalDataset(int version, String note, List<User> users, List<Agent>
 
     /**
      * @param id 사례 번호
-     * @param question 사람이 읽으라고 둔 질문. 판정에 쓰지 않는다
+     * @param question 사례의 질문. 조립에 넘기고 판정에는 쓰지 않는다
      * @param filler 판정 대상이 아닌 보조 항목
      * @param expect 답에 필요한 Memory 의 key
      * @param forbidden 실리면 안 되는 Memory

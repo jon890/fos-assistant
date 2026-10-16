@@ -133,6 +133,19 @@ class MemoryUseServiceTest {
 
 
     @Test
+    @DisplayName("질문과 관련된 기억 구역에 본문까지 실린 항목은 질문으로 찾은 길로 나온다")
+    void listsSearchSectionItemsAsSearchVia() {
+        Memory found = memory(dad, MemoryScope.USER, "자동차 관리", "타이어는 작년 11월에 갈았다", MemoryRetrieval.SEARCH);
+        AgentExecution run = answeredRun(conversation, true);
+        source(run, 0, "MEMORY_SEARCH", found, "INLINE");
+
+        assertThat(service.usesOf(dad, conversation.id()))
+            .extracting(MemoryUse::memoryId, MemoryUse::via)
+            .containsExactly(tuple(found.id(), MemoryUseVia.SEARCH));
+    }
+
+
+    @Test
     @DisplayName("같은 항목이 실렸고 읽히기도 했으면 앞의 실린 것 하나만 나온다")
     void keepsOnlyTheFirstWhenLoadedAndReadBoth() {
         Memory fact = memory(dad, MemoryScope.USER, "딸 이름", "딸 이름은 하나다", MemoryRetrieval.SEARCH);

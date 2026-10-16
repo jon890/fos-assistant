@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -75,7 +76,7 @@ class AgentRunnerConnectorContextTest {
 
     @BeforeEach
     void setUp() {
-        when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
+        when(contextAssembler.assemble(eq(user), any(), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
         when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
@@ -139,11 +140,11 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("일반 에이전트의 실행은 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
+    @DisplayName("일반 에이전트의 실행은 작업 글을 질문으로 넘겨 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
     void sendsAssembledMemoryForOrdinaryAgent() {
         run(agent(), ADDITION, null);
 
-        verify(contextAssembler).assemble(eq(user), any());
+        verify(contextAssembler).assemble(eq(user), any(), eq("일"));
         String instructions = submitted().instructions();
         assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
@@ -151,7 +152,7 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("살펴보기 트리의 자식은 Memory 를 읽되 기억을 남기는 지침은 받지 않는다")
+    @DisplayName("살펴보기 트리의 자식은 질문 없이 Memory 를 읽고 기억을 남기는 지침은 받지 않는다")
     void excludesRememberInstructionsFromProactiveChild() {
         when(proactiveChecks.existsByRootExecutionId(10L)).thenReturn(true);
 
@@ -172,6 +173,7 @@ class AgentRunnerConnectorContextTest {
             null);
 
         assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");
+        verify(contextAssembler).assemble(eq(user), any(), isNull());
         verify(contextAssembler).withResponseInstructions(any(), eq(false));
     }
 
@@ -184,7 +186,7 @@ class AgentRunnerConnectorContextTest {
 
         AgentRun run = run(agent, null, key);
 
-        verify(contextAssembler).assemble(eq(user), any());
+        verify(contextAssembler).assemble(eq(user), any(), any());
         assertThat(submitted().instructions()).contains("GFM", MEMORY);
         verify(executions).complete(same(started), same(agent), any(), any(), eq(ANSWER));
         assertThat(run.execution()).isSameAs(completed);

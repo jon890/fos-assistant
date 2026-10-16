@@ -13,6 +13,7 @@ import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -84,7 +85,7 @@ class MemoryJudgeEvalTest {
         clock.set(BASE);
         fixture = new MemoryEvalFixture(DATASET, memories, agents, grants, jdbc, clock);
         Map<String, Long> agentIds = fixture.createAgents();
-        ContextAssembler assembler = new ContextAssembler(memoryService, properties, clock);
+        ContextAssembler assembler = TestContextAssemblers.of(memoryService, properties, clock);
         String withoutMemory = assembler.withResponseInstructions(AssembledContext.empty()).instructions();
         List<JudgeInput> inputs = new ArrayList<>();
         for (Case each : DATASET.cases()) {
@@ -92,7 +93,7 @@ class MemoryJudgeEvalTest {
                 continue;
             }
             fixture.seed(each);
-            AssembledContext context = assembler.assemble(fixture.userOf(each.asker()), agentIds.get(each.agent()));
+            AssembledContext context = assembler.assemble(fixture.userOf(each.asker()), agentIds.get(each.agent()), each.question());
             inputs.add(new JudgeInput(
                 each.id(),
                 each.question(),

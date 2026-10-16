@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchItem;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
+import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
@@ -35,7 +37,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
-/** 실제 repository의 제목 검색, 권한 경계와 SQL 투영을 확인한다. 원문은 출력하지 않는다. */
+/** 실제 repository의 관련도 검색, 권한 경계, 커서와 SQL 투영을 확인한다. 원문은 출력하지 않는다. */
 @BackendIntegrationTest
 public class MemorySearchTest {
     static final CurrentUser USER = new CurrentUser(811L, "search@example.test", "검색 검사", 10L, UserRole.ADMIN);
@@ -69,12 +71,12 @@ public class MemorySearchTest {
 
 
     @Test
-    @DisplayName("권한 상태 종류와 꺼내는 방식 밖의 항목은 제목도 검색되지 않는다")
+    @DisplayName("권한 상태 종류와 꺼내는 방식 밖의 항목은 제목과 본문에 질문 낱말이 있어도 검색되지 않는다")
     void excludesEveryUnreadableBoundary() {
         Memory own = save(
             "일치 개인", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL);
         Memory group = save(
-            "일치 그룹",
+            "일치 공유",
             MemoryScope.GROUP,
             null,
             USER.groupId(),
@@ -82,10 +84,10 @@ public class MemorySearchTest {
             MemoryRetrieval.SEARCH,
             MemorySensitivity.NORMAL);
         List<Memory> hidden = List.of(
-            save("다른 사용자", MemoryScope.USER, 812L, null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
-            save("다른 그룹", MemoryScope.GROUP, null, 20L, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            save("다른 사용자 경계", MemoryScope.USER, 812L, null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
+            save("다른 그룹 경계", MemoryScope.GROUP, null, 20L, "core", MemoryRetrieval.SEARCH, MemorySensitivity.NORMAL),
             save(
-                "다른 collection",
+                "다른 collection 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
@@ -93,16 +95,16 @@ public class MemorySearchTest {
                 MemoryRetrieval.SEARCH,
                 MemorySensitivity.NORMAL),
             save(
-                "민감 제한",
+                "민감 제한 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
                 "core",
                 MemoryRetrieval.SEARCH,
                 MemorySensitivity.SENSITIVE),
-            repository.save(Memory.proposedUser(USER.id(), "승인 전", "합성", 1L, null, NOW)),
+            repository.save(Memory.proposedUser(USER.id(), "승인 전 경계", "합성", 1L, null, NOW)),
             save(
-                "거절됨",
+                "거절됨 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
@@ -110,7 +112,7 @@ public class MemorySearchTest {
                 MemoryRetrieval.SEARCH,
                 MemorySensitivity.NORMAL),
             save(
-                "출처 원문",
+                "출처 원문 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
@@ -118,7 +120,7 @@ public class MemorySearchTest {
                 MemoryRetrieval.SEARCH,
                 MemorySensitivity.NORMAL),
             save(
-                "보관됨",
+                "보관됨 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
@@ -126,7 +128,7 @@ public class MemorySearchTest {
                 MemoryRetrieval.ARCHIVE,
                 MemorySensitivity.NORMAL),
             save(
-                "항상 주입",
+                "항상 주입 경계",
                 MemoryScope.USER,
                 USER.id(),
                 null,
@@ -139,48 +141,62 @@ public class MemorySearchTest {
         jdbc.update(
             "UPDATE memory SET entry_type = 'SOURCE' WHERE id = ?",
             hidden.get(6).id());
-        assertThat(memories.searchFor(USER, CORE, "일치", 50, null).items())
+        // 경계 밖 항목의 본문에도 제목과 같은 낱말을 둔다. 민감 항목은 암호문 표시를 지워 평문 본문이 남은 어긋난 줄로 둔다
+        for (Memory excluded : hidden) {
+            jdbc.update("UPDATE memory SET content = ? WHERE id = ?", excluded.title() + " 본문", excluded.id());
+        }
+        jdbc.update("UPDATE memory SET content_key_id = NULL WHERE id = ?", hidden.get(3).id());
+        assertThat(search(USER, CORE, "일치", 50).items())
             .extracting(MemorySearchItem::id)
             .containsExactly(own.id(), group.id());
         for (Memory excluded : hidden) {
-            assertThat(memories.searchFor(USER, CORE, excluded.title(), 50, null)
-                .items())
-                    .isEmpty();
+            assertThat(search(USER, CORE, excluded.title(), 50).items())
+                .as(excluded.title())
+                .isEmpty();
         }
-        assertThat(memories.searchFor(USER, MemoryAccess.none(), "일치", 10, null).items())
+        assertThat(search(USER, MemoryAccess.none(), "일치", 10).items())
             .isEmpty();
-        assertThat(memories.searchFor(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "민감 제한", 10, null)
-            .items())
-                .extracting(MemorySearchItem::id)
-                .containsExactly(hidden.get(3).id());
+        MemoryAccess sensitive = MemoryAccess.of(Set.of("core"), Set.of("core"));
+        assertThat(search(USER, sensitive, "민감 제한", 10).items())
+            .extracting(MemorySearchItem::id)
+            .containsExactly(hidden.get(3).id());
+        jdbc.update("UPDATE memory SET content = '혈액형 기록' WHERE id = ?", hidden.get(3).id());
+        assertThat(search(USER, sensitive, "혈액형 기록", 10).items())
+            .as("민감 항목의 본문에만 있는 낱말")
+            .isEmpty();
         CurrentUser noGroup = new CurrentUser(USER.id(), USER.email(), USER.displayName(), null, USER.role());
-        assertThat(memories.searchFor(noGroup, CORE, "일치", 10, null).items())
+        assertThat(search(noGroup, CORE, "일치", 10).items())
             .extracting(MemorySearchItem::id)
             .containsExactly(own.id());
     }
 
 
     @Test
-    @DisplayName("퍼센트 밑줄 역슬래시는 글자이며 한글과 대소문자와 빈 결과를 처리한다")
-    void treatsLikeMetacharactersLiterally() {
-        for (String title : List.of("100% 합성", "a_b 합성", "a\\b 합성", "일반 한글", "Mixed CASE 합성")) {
+    @DisplayName("퍼센트 밑줄 역슬래시는 낱말을 가를 뿐이며 한글과 대소문자와 빈 결과와 잘못된 인자를 처리한다")
+    void treatsLikeMetacharactersAsSeparators() {
+        for (String title : List.of("100% 합성", "a_b 합성", "일반 한글", "Mixed CASE 합성")) {
             save(title);
         }
-        for (String query : List.of("%", "_", "\\", "한글", "  mixed case  ")) {
-            assertThat(memories.searchFor(USER, CORE, query, 10, null).items()).hasSize(1);
+        for (String query : List.of("%", "_", "\\")) {
+            assertThat(search(USER, CORE, query, 10)).isEqualTo(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
         }
-        assertThat(memories.searchFor(USER, CORE, "불일치", 10, null)).isEqualTo(new MemorySearchPage(List.of(), null));
+        for (String query : List.of("100%", "한글", "  mixed case  ")) {
+            assertThat(search(USER, CORE, query, 10).items()).as(query).hasSize(1);
+        }
+        assertThat(search(USER, CORE, "불일치", 10)).isEqualTo(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
         for (String invalid : List.of(" ", "가".repeat(201))) {
-            assertThatThrownBy(() -> memories.searchFor(USER, CORE, invalid, 10, null))
+            assertThatThrownBy(() -> memories.searchFor(USER, CORE, invalid, 10, MemorySearchCursor.first(invalid)))
                 .isInstanceOf(RuntimeException.class);
         }
-        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 51, null)).isInstanceOf(RuntimeException.class);
-        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, 0L)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> search(USER, CORE, "합성", 51)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, null)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, MemorySearchCursor.first("다른 질문")))
+            .isInstanceOf(RuntimeException.class);
     }
 
 
     @Test
-    @DisplayName("검색은 큰 평문과 암호문 없이 네 칸과 limit만 읽고 외부 timeout을 물려받지 않는다")
+    @DisplayName("검색은 암호문 없이 다섯 칸만 읽고 본문은 일반 줄에서만 고르며 외부 timeout을 물려받지 않는다")
     void selectsOnlySearchFieldsWithinIndependentTimeout() {
         Memory plain = repository.save(Memory.accepted(
             MemoryScope.USER,
@@ -191,15 +207,23 @@ public class MemorySearchTest {
             MemoryPlacement.core(MemoryRetrieval.SEARCH),
             USER.id(),
             NOW));
-        save("합성 암호문", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
+        Memory sealed = save(
+            "합성 암호문", MemoryScope.USER, USER.id(), null, "core", MemoryRetrieval.SEARCH, MemorySensitivity.SENSITIVE);
         MemorySearchSqlProbe.capture();
         TransactionTemplate outer = new TransactionTemplate(transactionManager);
         outer.setTimeout(30);
         MemorySearchPage page = outer.execute(
-            status -> memories.searchFor(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 1, null));
-        assertThat(page.items()).extracting(MemorySearchItem::id).containsExactly(plain.id());
-        assertThat(page.nextAfterId()).isEqualTo(plain.id());
+            status -> search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 1));
+        // 본문이 짧은 쪽의 BM25 가 높다
+        assertThat(page.items()).extracting(MemorySearchItem::id).containsExactly(sealed.id());
+        assertThat(page.nextCursor()).isNotNull();
+        assertThat(MemorySearchCursor.parse(page.nextCursor())).hasValue(new MemorySearchCursor(MemorySearchCursor.fingerprintOf("합성"), 1));
         assertProjectionAndTimeout();
+        MemorySearchSqlProbe.reset();
+        MemorySearchSqlProbe.capture();
+        assertThat(search(USER, MemoryAccess.of(Set.of("core"), Set.of("core")), "합성", 1, page.nextCursor()).items())
+            .extracting(MemorySearchItem::id)
+            .containsExactly(plain.id());
         MemorySearchSqlProbe.reset();
         MemorySearchSqlProbe.capture();
         repository.findAll();
@@ -208,8 +232,41 @@ public class MemorySearchTest {
 
 
     @Test
-    @DisplayName("50 500 5000건 자료의 모든 번호 페이지는 순서 중복 누락 없이 제목 정답에 닿는다")
-    void measuresSyntheticRecallAndPages() {
+    @DisplayName("같은 점수의 항목은 커서로 끝까지 누락과 중복 없이 읽고 200번째에서 끝난다")
+    void pagesEqualScoresUntilMaxRank() {
+        for (int count : List.of(200, 250)) {
+            repository.deleteAll();
+            List<Memory> input = new ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                input.add(Memory.accepted(
+                    MemoryScope.USER,
+                    USER.id(),
+                    null,
+                    "같은 점수 항목",
+                    StoredContent.plain("같은 본문"),
+                    MemoryPlacement.core(MemoryRetrieval.SEARCH),
+                    USER.id(),
+                    NOW));
+            }
+            List<Long> expected = repository.saveAll(input).stream().map(Memory::id).sorted().toList();
+            List<Long> actual = new ArrayList<>();
+            String cursor = null;
+            do {
+                MemorySearchPage page = search(USER, CORE, "같은 점수", 50, cursor);
+                assertThat(page.items()).hasSizeLessThanOrEqualTo(50);
+                actual.addAll(page.items().stream().map(MemorySearchItem::id).toList());
+                cursor = page.nextCursor();
+            } while (cursor != null);
+            assertThat(actual).as("%d건", count)
+                .doesNotHaveDuplicates()
+                .containsExactlyElementsOf(expected.subList(0, MemorySearchCursor.MAX_RANK));
+        }
+    }
+
+
+    @Test
+    @DisplayName("50 500 5000건 자료에서 본문에만 있는 사실을 첫 결과로 찾고 지연을 잰다")
+    void measuresSyntheticRecallAndLatency() {
         for (int count : List.of(50, 500, 5000)) {
             repository.deleteAll();
             List<Memory> input = new ArrayList<>();
@@ -224,43 +281,29 @@ public class MemorySearchTest {
                     USER.id(),
                     NOW));
             }
-            List<Long> expected = repository.saveAll(input).stream().map(Memory::id).toList();
-            List<Long> actual = new ArrayList<>();
-            Long after = null;
-            do {
-                MemorySearchPage page = memories.searchFor(USER, CORE, "합성 색인", 50, after);
-                assertThat(page.items()).hasSizeLessThanOrEqualTo(50);
-                actual.addAll(page.items().stream().map(MemorySearchItem::id).toList());
-                after = page.nextAfterId();
-            } while (after != null);
-            assertThat(actual).containsExactlyElementsOf(expected).doesNotHaveDuplicates();
+            List<Long> saved = repository.saveAll(input).stream().map(Memory::id).toList();
+            Long target = saved.get(count / 2);
+            jdbc.update("UPDATE memory SET content = ? WHERE id = ?", "타이어는 작년 11월에 네 짝을 갈았다", target);
             List<Double> elapsed = new ArrayList<>();
             long heapBefore = usedHeap();
             int chars = 0;
             for (int i = 0; i < 30; i++) {
                 long started = System.nanoTime();
-                MemorySearchPage page = memories.searchFor(USER, CORE, "합성 색인", 10, null);
+                MemorySearchPage page = search(USER, CORE, "타이어 언제 갈았지", 10);
                 elapsed.add((System.nanoTime() - started) / 1_000_000.0);
                 chars = ExternalData.wrap(JsonMapper.builder().build().writeValueAsString(page))
                     .length();
-                assertThat(page.items())
-                    .extracting(MemorySearchItem::id)
-                    .containsExactlyElementsOf(expected.subList(0, 10));
+                assertThat(page.items()).extracting(MemorySearchItem::id).containsExactly(target);
             }
             long heapDelta = usedHeap() - heapBefore;
-            double recall5 = memories.searchFor(USER, CORE, "합성 색인", 5, null).items().size() / (double)count;
-            double recall10 = 10.0 / count;
-            assertThat(recall5).isEqualTo(5.0 / count);
-            assertThat(memories.searchFor(USER, CORE, "본문에만 있는 단어", 10, null).items())
-                .isEmpty();
+            MemorySearchPage bodyOnly = search(USER, CORE, "본문에만 있는 단어", 10);
+            assertThat(bodyOnly.items()).hasSize(10);
+            assertThat(bodyOnly.nextCursor()).isNotNull();
             elapsed.sort(Comparator.naturalOrder());
             System.out.printf(
                 Locale.ROOT,
-                "memory-search count=%d recall@5=%.4f recall@10=%.4f miss@10=%.4f pageMiss=0.0000 resultChars=%d p50ms=%.3f p95ms=%.3f heapDelta=%d bodyOnlyRecall=0%n",
+                "memory-search count=%d bodyOnlyRecall@1=1.0000 resultChars=%d p50ms=%.3f p95ms=%.3f heapDelta=%d%n",
                 count,
-                recall5,
-                recall10,
-                1 - recall10,
                 chars,
                 elapsed.get(14),
                 elapsed.get(28),
@@ -270,20 +313,33 @@ public class MemorySearchTest {
 
 
     @Test
-    @DisplayName("페이지 사이의 삭제는 다음 페이지에 반영되고 지난 번호의 새 일치는 재검색으로 찾는다")
+    @DisplayName("페이지 사이의 삭제는 다음 페이지에 반영되고 바뀐 항목은 처음부터 다시 찾는다")
     void usesCurrentRowsBetweenPages() {
         Memory earlier = save("이전 항목");
-        Memory first = save("대상 하나");
-        Memory second = save("대상 둘");
-        MemorySearchPage page = memories.searchFor(USER, CORE, "대상", 1, null);
-        assertThat(page.nextAfterId()).isEqualTo(first.id());
+        Memory first = save("대상 첫째");
+        Memory second = save("대상 둘째");
+        MemorySearchPage page = search(USER, CORE, "대상", 1);
+        assertThat(page.items()).extracting(MemorySearchItem::id).containsExactly(first.id());
         repository.deleteById(second.id());
+        assertThat(search(USER, CORE, "대상", 1, page.nextCursor()))
+            .isEqualTo(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
         jdbc.update("UPDATE memory SET title = '대상 추가' WHERE id = ?", earlier.id());
-        assertThat(memories.searchFor(USER, CORE, "대상", 1, page.nextAfterId()).items())
-            .isEmpty();
-        assertThat(memories.searchFor(USER, CORE, "대상", 10, null).items())
+        assertThat(search(USER, CORE, "대상", 10).items())
             .extracting(MemorySearchItem::id)
             .containsExactly(earlier.id(), first.id());
+    }
+
+
+    MemorySearchPage search(CurrentUser user, MemoryAccess access, String query, int limit) {
+        return memories.searchFor(user, access, query, limit, MemorySearchCursor.first(query.strip()));
+    }
+
+
+    MemorySearchPage search(CurrentUser user, MemoryAccess access, String query, int limit, String cursor) {
+        MemorySearchCursor position = cursor == null
+            ? MemorySearchCursor.first(query.strip())
+            : MemorySearchCursor.parse(cursor).orElseThrow();
+        return memories.searchFor(user, access, query, limit, position);
     }
 
 
@@ -319,13 +375,17 @@ public class MemorySearchTest {
         assertThat(MemorySearchSqlProbe.selects()).hasSize(1);
         String select = MemorySearchSqlProbe.selects().getFirst();
         String fields = select.substring(0, select.indexOf(" from "));
-        assertThat(fields.split(",")).hasSize(4);
+        assertThat(fields.split(",")).hasSize(5);
+        String caseExpression = fields.substring(fields.indexOf("case "), fields.indexOf(" end") + " end".length());
         assertThat(fields)
-            .contains(".id", ".title", ".revision", ".updated_at")
-            .doesNotContain("content", "owner", "count(", "key_id");
+            .contains(".id", ".title", ".revision", ".updated_at", "case ")
+            .doesNotContain("owner", "count(");
+        assertThat(caseExpression).contains("content_key_id", "sensitivity", ".content");
+        assertThat(fields.replace(caseExpression, ""))
+            .as("case 밖의 칸")
+            .doesNotContain("content", "key_id");
         assertThat(select)
             .contains("order by")
-            .containsAnyOf("fetch first", "limit")
             .doesNotContain("count(");
         assertThat(MemorySearchSqlProbe.timeout()).isBetween(1, 2);
         assertThat(MemorySearchSqlProbe.readOnly()).isTrue();

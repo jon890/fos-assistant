@@ -8,7 +8,9 @@ package com.bifos.assistant.context;
  * <ul>
  * <li>{@value #ALWAYS_BY_ID}: 항상 층. 그룹 항목 다음 개인 항목을 범위마다 번호 순으로 싣는다
  * <li>{@value #FACTS_RECENT}: 개인 사실 구역. 최근에 고친 순으로 고르고 번호 순으로 싣는다
- * <li>{@value #INDEX_BY_ID}: 색인 층. 번호 순으로 싣는다
+ * <li>{@value #INDEX_BY_ID}: 색인 층. 번호 순으로 싣는다. 질문이 있으면 점수가 없는 항목에 붙고, 점수가 있는 항목 뒤에 번호 순으로 싣는다
+ * <li>{@value #SEARCH_KEYWORD}: 질문과 관련된 기억 구역. 키워드 점수 순으로 고르고 그 차례로 싣는다. 순위는 관련 있는 항목 전체 안의 차례다
+ * <li>{@value #INDEX_KEYWORD}: 색인 층 가운데 키워드 점수가 있는 항목. 구역에 싣지 못한 항목을 점수 순으로 색인 맨 앞에 싣는다
  * </ul>
  *
  * @param selector 고른 규칙의 이름과 버전. 32자 이하다
@@ -26,6 +28,19 @@ public record ContextSelection(String selector, int rank, Double keywordScore, D
     public static final String FACTS_RECENT = "facts-recent-v1";
 
     public static final String INDEX_BY_ID = "index-id-v1";
+
+    public static final String SEARCH_KEYWORD = "search-keyword-v1";
+
+    public static final String INDEX_KEYWORD = "index-keyword-v1";
+
+    /** 질문과 관련된 기억 구역의 규칙에 짝지은 색인의 규칙이다. */
+    static String indexSelectorOf(String searchSelector) {
+        if (SEARCH_KEYWORD.equals(searchSelector)) {
+            return INDEX_KEYWORD;
+        }
+        throw new IllegalArgumentException("unknown search selector: " + searchSelector);
+    }
+
 
     /** 점수 없이 순서만으로 고른 근거다. */
     public static ContextSelection ranked(String selector, int rank) {
