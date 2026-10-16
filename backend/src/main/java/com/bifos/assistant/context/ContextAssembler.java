@@ -231,7 +231,7 @@ public class ContextAssembler implements OmittedMemories {
                 memory.title(),
                 memory.content(),
                 memoryFreshness(memory, now))
-                    .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
+                .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
             if (builder.appendIfFits(FACTS_HEADER, MemoryItems.inlineLine(memory), item)) {
                 placed.add(memory.id());
             } else {

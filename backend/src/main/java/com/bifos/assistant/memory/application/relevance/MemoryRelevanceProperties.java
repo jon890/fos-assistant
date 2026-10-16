@@ -25,10 +25,10 @@ public record MemoryRelevanceProperties(
     @DecimalMin("0") @DecimalMax("1") Double semanticMinSimilarity,
     @Min(1) Integer rrfK) {
 
+
     private static final double DEFAULT_KEYWORD_MIN_COVERAGE = 0.3;
     private static final double DEFAULT_SEMANTIC_MIN_SIMILARITY = 0.5;
     private static final int DEFAULT_RRF_K = 60;
-
 
     public MemoryRelevanceProperties {
         keywordMinCoverage = ratio("keyword-min-coverage", keywordMinCoverage, DEFAULT_KEYWORD_MIN_COVERAGE);
