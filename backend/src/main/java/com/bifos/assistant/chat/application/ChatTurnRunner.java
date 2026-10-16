@@ -192,17 +192,17 @@ class ChatTurnRunner {
     }
 
 
-    /**
-     * 실행에 남길 문맥 항목의 참조다. 결과를 전하는 turn 이면 Memory 항목 뒤로 입력에 실은 결과 항목을 잇는다(ADR-071).
-     *
-     * <p>커넥터 에이전트의 turn 은 Memory 항목이 없어 결과 항목만 남는다.
-     */
     /** 질문과 관련된 기억을 고를 글이다. 사용자가 보낸 turn 과 그 다시 생성만 글을 넘긴다. */
     static String questionOf(TurnIntent intent, String text) {
         return intent instanceof TurnIntent.Fresh || intent instanceof TurnIntent.Regenerate ? text : null;
     }
 
 
+    /**
+     * 실행에 남길 문맥 항목의 참조다. 결과를 전하는 turn 이면 Memory 항목 뒤로 입력에 실은 결과 항목을 잇는다(ADR-071).
+     *
+     * <p>커넥터 에이전트의 turn 은 Memory 항목이 없어 결과 항목만 남는다.
+     */
     static List<ContextSourceRef> sourceRefs(AssembledContext context, TurnIntent intent) {
         if (!(intent instanceof TurnIntent.DelegationResults results)
             || results.items().isEmpty()) {
