@@ -50,7 +50,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * Flyway가 만든 실제 MySQL 스키마에 모든 테이블의 행을 넣고 운영 삭제 경로를 실행한다.
  *
  * <p>FK와 CHECK를 켠 채로 검사하며, 보존 대상과 다른 사용자의 행은 전체 칸을 비교한다. 사용자 물리 삭제는 구현되지 않았으므로
- * 접근 해제를 실행한 뒤 알려진 공백과 토큰 폐기를 확인한다. Hermes는 기존 통합 테스트의 대역을 쓰며 파일 원본은 만들지 않는다.
+ * 접근 해제를 실행한 뒤 알려진 공백을 확인한다. Hermes는 기존 통합 테스트의 대역을 쓰며 파일 원본은 만들지 않는다.
  */
 @Tag("mysql")
 @BackendIntegrationTest
@@ -129,15 +129,14 @@ class PurgeCoverageMysqlTest {
 
 
     @Test
-    @DisplayName("접근 해제는 서비스 토큰을 폐기하지만 사용자 purge의 알려진 공백은 남는다")
-    void recordsMissingUserPurgeAndRevokesAccess() {
+    @DisplayName("접근 해제 뒤 사용자 purge의 알려진 공백은 남는다")
+    void recordsMissingUserPurge() {
         people.setEnabled(target, false);
 
         for (PurgeTable table : tables) {
             assertOutcome(table, table.user());
         }
         assertThat(value("allowed_person", "enabled")).isEqualTo(false);
-        assertThat(value("service_token", "revoked_at")).isNotNull();
         assertOtherUntouched();
     }
 

@@ -189,13 +189,13 @@ class ControlPlaneJwtFilterTest {
 
 
     @Test
-    @DisplayName("서비스 토큰 경로는 건너뛰고 서비스 토큰 관리 경로는 웹 JWT 로 해석한다")
-    void serviceApiSkipsButServiceTokenManagementDoesNot() {
+    @DisplayName("폐기한 서비스 문서와 토큰 관리 경로도 웹 JWT 필터를 거친다")
+    void filtersRetiredServiceAndTokenManagementPaths() {
         ControlPlaneJwtFilter filter = filter(mock(TokenUserResolver.class));
 
         assertThat(filter.shouldNotFilter(
             new MockHttpServletRequest("GET", "/api/v1/service/memory-documents/identity/x")))
-                .isTrue();
+                .isFalse();
         assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/v1/service-tokens")))
             .isFalse();
     }

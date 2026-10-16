@@ -145,9 +145,6 @@ VALUES (900000001, 900000001, 1, 'coverage-900000001', 900000001, '2020-01-01 00
 INSERT INTO result_delivery_item (id, delivery_id, source, result_key)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001');
 
-INSERT INTO service_token (id, user_id, token_hash, label, created_at, expires_at)
-VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2099-01-01 00:00:00');
-
 INSERT INTO task (id, public_id, owner_user_id, agent_id, title, state, conversation_mode, conversation_id, notify, created_at, updated_at, kind)
 VALUES (900000001, UNHEX(LPAD(HEX(900000001), 32, '0')), 900000001, 900000001, 'coverage-900000001', 'ACTIVE', 'NEW_PER_RUN', 900000001, 'ALWAYS', '2020-01-01 00:00:00', '2020-01-01 00:00:00', 'TURN');
 
@@ -180,9 +177,6 @@ VALUES (900000001, 900000001, 900000001, 'test', '2020-01-01 00:00:00');
 
 INSERT INTO proactive_value_evaluation (id, check_id, user_id, outcome, evidence_json, created_at)
 VALUES (900000001, 900000001, 900000001, 'RUNNING', '{"private":"지울 평가 근거"}', '2020-01-01 00:00:00');
-
-INSERT INTO service_token_collection (token_id, collection, allow_sensitive)
-VALUES (900000001, 'coverage-900000001', 1);
 
 INSERT INTO task_trigger (id, task_id, type, time_zone, missed_policy, created_at, updated_at)
 VALUES (900000001, 900000001, 'coverage-900000001', 'coverage-900000001', 'coverage-900000001', '2020-01-01 00:00:00', '2020-01-01 00:00:00');

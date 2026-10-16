@@ -45,7 +45,6 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-053](ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md) | 에이전트는 허용된 collection 의 Memory 만 받는다 | Accepted. ADR-012 가 기각한 에이전트별 구분을 뒤집는다 |
 | [ADR-054](ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md) | 에이전트 기본 모델과 모델 숨김은 Control Plane DB 가 갖는다 | Accepted. ADR-030 의 「기본값은 Hermes profile 이 갖는다」 를 대체한다 |
 | [ADR-055](ADR-055-민감-memory-본문은-저장할-때-암호화하고-key-는-환경-변수로-받는다.md) | 민감 Memory 본문은 저장할 때 암호화하고 key 는 환경 변수로 받는다 | Accepted. ADR-052 의 「민감 본문은 평문」 부분을 대체한다 |
-| [ADR-056](ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | Accepted. ADR-053 이 미룬 서비스 토큰을 정한다 |
 | [ADR-061](ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) | 재기동 때 남은 실행은 Hermes 에 물어 정하고 도는 실행에는 다시 붙는다 | Accepted. ADR-011 의 기동 정리 부분을 대체한다 |
 | [ADR-062](ADR-062-native-하위-에이전트-사용량은-재조회-작업-줄을-원장으로-넓혀-합계에-더한다.md) | native 하위 에이전트 사용량은 재조회 작업 줄을 원장으로 넓혀 합계에 더한다 | Accepted. ADR-016 이 「자식 토큰을 잃는다」 고 한 부분을 native 자식에 한해 메운다. 자식 provider 를 읽는 길은 ADR-067 이 대체한다 |
 | [ADR-067](ADR-067-native-하위-에이전트의-provider-는-대시보드-plugin-이-session-저장소에서-읽어-준다.md) | native 하위 에이전트의 provider 는 대시보드 plugin 이 session 저장소에서 읽어 준다 | Accepted. ADR-062 의 「session 응답이 provider 를 주지 않는 동안 native 자식은 모두 가격 미확인」 을 메운다 |
@@ -83,3 +82,4 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | --- | --- | --- |
 | [ADR-006](archive/ADR-006-작업-영역은-읽기-전용-의존이고-공개-범위는-기본값이-없다.md) | 작업 영역은 읽기 전용 의존이고 공개 범위는 기본값이 없다 | Superseded ([ADR-010](ADR-010-작업-영역을-제거하고-에이전트가-그-자리를-갖는다.md)) |
 | [ADR-016](archive/ADR-016-다중-에이전트-조율은-control-plane이-맡는다.md) | 다중 에이전트 조율은 Control Plane이 맡는다 | Superseded ([ADR-017](../../../docs/adr/ADR-017-무엇을-할지는-hermes-가-정하고-control-plane-은-경계만-갖는다.md)) |
+| [ADR-056](archive/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md) | 다른 서비스는 사용자에 묶인 서비스 토큰으로 문서를 읽기만 한다 | Retired. 2026-10-15 사용자 결정으로 발급 2건을 모두 취소했고, 2026-10-05 뒤 사용이 없어 기능 전체를 제거한다 |
