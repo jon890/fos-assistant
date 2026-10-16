@@ -1,0 +1,15 @@
+{
+  "name": "plan218-memory-question-selection",
+  "description": "매 turn 질문으로 기억을 골라 본문까지 싣고 memory_search 를 본문과 관련도 순으로 바꾼다. 키워드 BM25 를 먼저, 임베딩과 RRF 를 그 위에 얹는다",
+  "status": "pending",
+  "created_at": "2026-10-16",
+  "total_phases": 5,
+  "current_phase": 1,
+  "phases": [
+    { "number": 1, "file": "phase-01.md", "execution_profile": "standard" },
+    { "number": 2, "file": "phase-02.md", "execution_profile": "deep" },
+    { "number": 3, "file": "phase-03.md", "execution_profile": "deep" },
+    { "number": 4, "file": "phase-04.md", "execution_profile": "standard" },
+    { "number": 5, "file": "phase-05.md", "execution_profile": "deep" }
+  ]
+}
