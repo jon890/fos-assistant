@@ -147,7 +147,13 @@ class JpaAuditingTest {
             assertThat(merged.createdAt()).isEqualTo(micros(CREATED));
         }
         entityManager.flush();
-        assertThat(changed).extracting(AuditedEntity::updatedAt).containsOnly(micros(LATER));
+        entityManager.clear();
+        assertThat(changed).allSatisfy(row -> {
+            Object id = entityManager.getEntityManagerFactory().getPersistenceUnitUtil().getIdentifier(row);
+            AuditedEntity loaded = entityManager.find(row.getClass(), id);
+            assertThat(loaded.createdAt()).isEqualTo(micros(CREATED));
+            assertThat(loaded.updatedAt()).isEqualTo(micros(LATER));
+        });
     }
 
 
