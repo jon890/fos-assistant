@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.memory.application.MemoryService;
 import com.bifos.assistant.memory.application.embedding.EmbeddingClient;
+import com.bifos.assistant.memory.application.embedding.EmbeddingRejectedException;
 import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingRefresher;
@@ -158,6 +159,21 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
+    @DisplayName("서비스가 거절하는 항목은 한 건씩 다시 보내 그 항목만 건너뛰고 뒤 항목을 채운다")
+    void skipsRejectedItemWithoutBlockingTheRest() {
+        Memory poison = memories.create(USER, MemoryScope.USER, "거절될 글", "서비스가 받지 않는 본문", false);
+        Memory next = memories.create(USER, MemoryScope.USER, "다음 글", "보통 본문", false);
+        Memory last = memories.create(USER, MemoryScope.USER, "마지막 글", "보통 본문", false);
+        client.reject("받지 않는");
+
+        assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
+
+        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactlyInAnyOrder(next.id(), last.id());
+        assertThat(embeddings.findById(poison.id())).isEmpty();
+    }
+
+
+    @Test
     @DisplayName("주소나 모델이 비면 임베딩 서비스를 한 번도 부르지 않는다")
     void doesNotCallWhenDisabled() {
         memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
@@ -204,6 +220,7 @@ class MemoryEmbeddingRefresherTest {
         private int failOn = -1;
         private CountDownLatch blocker;
         private Runnable firstCall;
+        private String rejected;
 
 
         @Override
@@ -223,6 +240,9 @@ class MemoryEmbeddingRefresherTest {
                     Thread.currentThread().interrupt();
                 }
             }
+            if (rejected != null && batch.stream().anyMatch(text -> text.contains(rejected))) {
+                throw new EmbeddingRejectedException("fake rejection");
+            }
             if (calls == failOn) {
                 throw new EmbeddingUnavailableException("fake failure");
             }
@@ -233,6 +253,11 @@ class MemoryEmbeddingRefresherTest {
 
         float[] vectorOf(String text) {
             return new float[] {text.length(), text.hashCode() % 7, 1f};
+        }
+
+
+        void reject(String text) {
+            rejected = text;
         }
 
 

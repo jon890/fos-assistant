@@ -7,6 +7,7 @@ import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -95,17 +96,14 @@ public class MemoryEmbeddingRefresher {
             if (batch.isEmpty()) {
                 continue;
             }
-            List<float[]> vectors;
-            try {
-                vectors = client.embed(batch.stream().map(this::textOf).toList(), properties.batchTimeout());
-            } catch (EmbeddingUnavailableException ex) {
-                log.warn("memory embedding refresh stopped exceptionClass={} written={} pending={}",
-                    ex.getClass().getSimpleName(), written, Math.max(0, pending.size() - written));
+            Embedded embedded = embedBatch(batch);
+            if (embedded == null) {
+                log.warn("memory embedding refresh stopped written={} pending={}", written, Math.max(0, pending.size() - written));
                 break;
             }
-            transaction.executeWithoutResult(status -> write(batch, vectors));
-            batch.forEach(source -> vectorCache.evict(source.memoryId()));
-            written += batch.size();
+            transaction.executeWithoutResult(status -> write(embedded.sources(), embedded.vectors()));
+            embedded.sources().forEach(source -> vectorCache.evict(source.memoryId()));
+            written += embedded.sources().size();
         }
         if (removed > 0 || written > 0) {
             log.info("memory embedding refreshed removed={} written={} pending={}", removed, written, Math.max(0, pending.size() - written));
@@ -128,6 +126,50 @@ public class MemoryEmbeddingRefresher {
                 })
                 .toList();
         });
+    }
+
+
+    /**
+     * 묶음을 한 번에 보낸다. 거절되면 한 건씩 다시 보내 거절한 항목만 건너뛴다. 거절한 글이 하나라도 있으면 묶음 전체가 거절되므로, 그 항목이 뒤 항목을
+     * 막지 않게 하려는 것이다.
+     *
+     * @return 받아들인 항목과 그 벡터. 서비스가 거절이 아닌 이유로 실패하면 null 이고, 그 주기를 끝낸다
+     */
+    private Embedded embedBatch(List<MemoryEmbeddingSource> batch) {
+        try {
+            return new Embedded(batch, client.embed(batch.stream().map(this::textOf).toList(), properties.batchTimeout()));
+        } catch (EmbeddingRejectedException ex) {
+            return embedEach(batch);
+        } catch (EmbeddingUnavailableException ex) {
+            log.warn("memory embedding batch failed exceptionClass={}", ex.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+
+    /**
+     * 묶음을 한 건씩 보낸다. 거절한 항목은 번호만 남기고 건너뛴다.
+     *
+     * @return 받아들인 항목과 그 벡터. 서비스가 거절이 아닌 이유로 실패하면 null 이고, 그 주기를 끝낸다
+     */
+    private Embedded embedEach(List<MemoryEmbeddingSource> batch) {
+        List<MemoryEmbeddingSource> sources = new ArrayList<>();
+        List<float[]> vectors = new ArrayList<>();
+        for (MemoryEmbeddingSource source : batch) {
+            try {
+                vectors.add(client.embed(List.of(textOf(source)), properties.batchTimeout()).getFirst());
+                sources.add(source);
+            } catch (EmbeddingRejectedException ex) {
+                log.warn("memory embedding skipped a rejected item memoryId={}", source.memoryId());
+            } catch (EmbeddingUnavailableException ex) {
+                return null;
+            }
+        }
+        return new Embedded(sources, vectors);
+    }
+
+
+    private record Embedded(List<MemoryEmbeddingSource> sources, List<float[]> vectors) {
     }
 
 

@@ -56,6 +56,9 @@ public class OpenAiCompatibleEmbeddingClient implements EmbeddingClient {
         } catch (IllegalArgumentException ex) {
             throw new EmbeddingUnavailableException("embedding endpoint is invalid", ex);
         }
+        if (response.statusCode() / 100 == 4) {
+            throw new EmbeddingRejectedException("embedding service rejected the request with status " + response.statusCode());
+        }
         if (response.statusCode() / 100 != 2) {
             throw new EmbeddingUnavailableException("embedding service answered status " + response.statusCode());
         }

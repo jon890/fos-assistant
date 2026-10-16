@@ -3,6 +3,7 @@ package com.bifos.assistant.memory.embedding;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.bifos.assistant.memory.application.embedding.EmbeddingRejectedException;
 import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.embedding.OpenAiCompatibleEmbeddingClient;
@@ -59,6 +60,9 @@ class OpenAiCompatibleEmbeddingClientTest {
     @DisplayName("500 답과 개수가 다른 답과 차원이 섞인 답과 늦은 답은 모두 임베딩 실패다")
     void failsOnErrorStatusCountMismatchMixedDimensionsAndTimeout() throws IOException {
         assertUnavailable(clientAnswering(500, "{}", null, null, Duration.ZERO), Duration.ofSeconds(2));
+        tearDown();
+        OpenAiCompatibleEmbeddingClient rejecting = clientAnswering(413, "{}", null, null, Duration.ZERO);
+        assertThatThrownBy(() -> rejecting.embed(List.of("첫 글"), Duration.ofSeconds(2))).isInstanceOf(EmbeddingRejectedException.class);
         tearDown();
         assertUnavailable(
             clientAnswering(200, "{\"data\":[{\"index\":0,\"embedding\":[1.0]}]}", null, null, Duration.ZERO), Duration.ofSeconds(2));
