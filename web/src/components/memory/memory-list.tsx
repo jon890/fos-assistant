@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { fetchMemories } from "@/lib/memory-api";
+import {
+  fetchPendingSupersedes,
+  type SupersedeProposal,
+} from "@/lib/memory-link-api";
 import { MEMORY_MANUAL_CREATE } from "@/lib/memory-features";
 import type { MemorySourceFields } from "@/lib/memory-source";
 import {
@@ -14,6 +18,7 @@ import {
 import { MemoryForm } from "./memory-form";
 import { MemoryItem } from "./memory-item";
 import { MemoryProposal } from "./memory-proposal";
+import { MemorySupersedeProposal } from "./memory-supersede-proposal";
 import { MemoryTabs, type MemoryTab } from "./memory-tabs";
 
 export type Memory = MemorySourceFields & {
@@ -27,6 +32,12 @@ export type Memory = MemorySourceFields & {
   status: "PROPOSED" | "ACCEPTED" | "REJECTED";
   sensitive?: boolean;
   omittedFromContext?: boolean;
+  /** 이 기억을 대신한 기억이다. 대체된 기억은 다음 대화부터 쓰이지 않는다. 제목은 볼 수 없으면 null 이다. */
+  supersededBy?: {
+    linkId: number;
+    memoryId: number | null;
+    title: string | null;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -41,12 +52,15 @@ function byRecent(left: Memory, right: Memory): number {
 
 export function MemoryList({
   initialMemories,
+  initialSupersedes = [],
   isAdmin,
   currentUserId,
   readAt,
   documents,
 }: {
   initialMemories: Memory[];
+  /** 받아들이거나 거절할 대체 제안이다. 읽지 못했으면 빈 목록이다. */
+  initialSupersedes?: SupersedeProposal[];
   isAdmin: boolean;
   currentUserId?: number;
   /** 서버가 목록을 읽은 시각이다. 서버와 브라우저가 같은 상대 시각을 그리도록 지금 시각 대신 쓴다 */
@@ -55,6 +69,7 @@ export function MemoryList({
   documents?: React.ReactNode;
 }) {
   const [memories, setMemories] = useState(initialMemories);
+  const [supersedes, setSupersedes] = useState(initialSupersedes);
   const [tab, setTab] = useState<MemoryTab>("memory");
   const [filter, setFilter] = useState<MemoryFilter>("ALL");
   /** 펼친 줄이다. 한 번에 하나만 펼친다. */
@@ -64,7 +79,12 @@ export function MemoryList({
     () => new Set(initialMemories.map((memory) => memory.id)),
   );
   async function reload() {
-    const response = await fetchMemories();
+    const [response, pending] = await Promise.all([
+      fetchMemories(),
+      fetchPendingSupersedes().catch(() => null),
+    ]);
+    if (pending?.ok)
+      setSupersedes((await pending.json()) as SupersedeProposal[]);
     if (response.ok) {
       const next = (await response.json()) as Memory[];
       setMemories(next);
@@ -92,19 +112,26 @@ export function MemoryList({
       {MEMORY_MANUAL_CREATE ? (
         <MemoryForm isAdmin={isAdmin} onCreated={reload} />
       ) : null}
-      {proposals.length > 0 ? (
+      {proposals.length + supersedes.length > 0 ? (
         <section className="mb-8" aria-labelledby="memory-review-heading">
           <div className="mb-1 flex items-center gap-2">
             <h2 id="memory-review-heading" className="text-lg font-semibold">
               검토할 기억
             </h2>
-            <Badge variant="info">{proposals.length}</Badge>
+            <Badge variant="info">{proposals.length + supersedes.length}</Badge>
           </div>
           <p className="mb-3 text-sm text-muted-foreground">
             에이전트가 기억해도 될지 물어본 것이에요. 눌러서 내용을 보고
             받아들이거나 거절해 주세요.
           </p>
           <ul className="grid gap-2">
+            {supersedes.map((proposal) => (
+              <MemorySupersedeProposal
+                key={`link-${proposal.id}`}
+                proposal={proposal}
+                onChanged={reload}
+              />
+            ))}
             {proposals.map((memory) => (
               <MemoryProposal
                 key={memory.id}

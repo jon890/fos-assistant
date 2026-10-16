@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.application;
 
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.model.SupersedeProposal;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryLink;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
@@ -19,12 +20,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -171,14 +176,31 @@ public class MemoryLinkService {
     }
 
 
-    /** 요청자가 받아들이거나 거절할 수 있는 대체 제안이다. 개인 항목은 주인, 그룹 항목은 그룹의 {@code ADMIN} 이 받는다. */
-    public List<MemoryLink> pendingSupersedesFor(CurrentUser user) {
+    /**
+     * 요청자가 받아들이거나 거절할 수 있는 대체 제안을 양 끝 항목과 함께 낸다. 개인 항목은 주인, 그룹 항목은 그룹의 {@code ADMIN} 이 받는다.
+     * 새 항목이 그 사이에 볼 수 없게 된 제안은 받아들일 수 없으므로 뺀다.
+     */
+    public List<SupersedeProposal> pendingSupersedesFor(CurrentUser user) {
         List<MemoryLink> pending = new ArrayList<>(links.findProposedSupersedesOfOwner(user.id()));
         if (user.isAdmin() && user.groupId() != null) {
             pending.addAll(links.findProposedSupersedesOfGroup(user.groupId()));
         }
-        pending.sort(Comparator.comparing(MemoryLink::id));
-        return pending;
+        if (pending.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> ids = new HashSet<>();
+        pending.forEach(link -> {
+            ids.add(link.fromMemoryId());
+            ids.add(link.toMemoryId());
+        });
+        Map<Long, Memory> byId = memories.findAllById(ids).stream()
+            .collect(Collectors.toMap(Memory::id, Function.identity()));
+        return pending.stream()
+            .sorted(Comparator.comparing(MemoryLink::id))
+            .filter(link -> byId.containsKey(link.fromMemoryId()) && byId.containsKey(link.toMemoryId()))
+            .filter(link -> linkable(user, byId.get(link.fromMemoryId()), byId.get(link.toMemoryId())))
+            .map(link -> new SupersedeProposal(link, byId.get(link.fromMemoryId()), byId.get(link.toMemoryId())))
+            .toList();
     }
 
 

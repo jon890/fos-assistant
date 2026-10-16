@@ -2,6 +2,7 @@ package com.bifos.assistant.memory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.bifos.assistant.memory.application.MemoryLinkService;
 import com.bifos.assistant.memory.application.MemoryService;
@@ -74,7 +75,7 @@ class MemoryLinkServiceTest {
         assertThat(proposed.toMemoryId()).isEqualTo(old.id());
         assertThat(proposed.createdByExecutionId()).isEqualTo(7L);
         assertThat(linkService.isSuperseded(old.id())).as("제안만으로는 대체되지 않는다").isFalse();
-        assertThat(linkService.pendingSupersedesFor(ADMIN)).extracting(MemoryLink::id).containsExactly(proposed.id());
+        assertThat(linkService.pendingSupersedesFor(ADMIN)).extracting(p -> p.link().id()).containsExactly(proposed.id());
 
         linkService.accept(ADMIN, proposed.id());
 
@@ -170,8 +171,8 @@ class MemoryLinkServiceTest {
             .isInstanceOfSatisfying(ApiException.class, ex -> assertThat(ex.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThat(linkService.pendingSupersedesFor(MEMBER)).isEmpty();
         assertThat(linkService.pendingSupersedesFor(ADMIN))
-            .extracting(MemoryLink::id)
-            .containsExactly(personal.id(), group.id());
+            .extracting(p -> p.link().id(), p -> p.newMemory().title(), p -> p.oldMemory().title())
+            .containsExactly(tuple(personal.id(), "새", "옛"), tuple(group.id(), "그룹 새", "그룹 옛"));
 
         linkService.accept(ADMIN, group.id());
 
