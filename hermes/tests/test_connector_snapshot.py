@@ -58,7 +58,7 @@ class ConnectorSnapshotTest(base.ConnectorGateCase):
         self.args = {"canonicalDraft": {**self.golden["draft"], "blocks": []}, "resolvedAssets": []}
         self.body = {"profile": "alice", "operation": "compile", "args": self.args}
 
-    def install_state(self, bind=False):
+    def install_state(self, bind=True):
         manifest = self.plugin._connector_manifest(base.DEMO)
         self.assertIsNotNone(manifest)
         entry = {"server": self.plugin._connector_server(manifest), "allowlist_added": True,

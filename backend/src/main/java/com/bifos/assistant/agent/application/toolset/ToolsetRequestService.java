@@ -209,7 +209,6 @@ public class ToolsetRequestService {
     private String ineligible(Agent agent, Long requester, Long groupId, String toolset) {
         AppUser owner = users.findById(requester).orElse(null);
         if (agent.isDeleted()
-            || agent.connectorManaged()
             || !Objects.equals(agent.ownerUserId(), requester)
             || owner == null
             || !Objects.equals(owner.groupId(), groupId)
@@ -240,7 +239,7 @@ public class ToolsetRequestService {
 
 
     private static void requireOwner(CurrentUser user, Agent agent) {
-        if (agent.isDeleted() || agent.connectorManaged() || !Objects.equals(user.id(), agent.ownerUserId())) {
+        if (agent.isDeleted() || !Objects.equals(user.id(), agent.ownerUserId())) {
             throw notFound();
         }
     }

@@ -284,8 +284,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `hermes_profile` 은 호스트의 key 파일 이름과 같다
 - `api_base_url` 을 설정 하나가 아니라 에이전트마다 둔다. 공유 listener 에서도 profile 마다 접두가 다르고, profile 마다 다른 노드를 가리킬 수 있어야 하기 때문이다
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
-- `connector_managed` 는 바인딩이 생기기 전의 옛 커넥터 에이전트를 표시하고, 지금은 새로 참이 되지 않는다. 규칙은 [커넥터 연결](../../docs/features/connector.md) 의 「옛 커넥터 에이전트」 가 갖는다
-- `connector_attachments` 는 그 옛 커넥터 에이전트가 사진을 받는지다. 커넥터가 선언한 toolset 이 켜진 것을 확인했을 때만 참이다
 - `default_model_provider` 와 `default_model` 은 함께 채우거나 함께 비운다. `default_reasoning_effort` 는 혼자 둘 수 있다
 
 **모델과 effort 는 대화가 고르고, 고르지 않으면 에이전트 기본 모델로 돈다.** 기본 모델 세 칸이 모두 비면 그 profile 의 값으로 돈다. 막힌 계정을 쉬게 하는 것은 Hermes 가 한다([ADR-030](adr/ADR-030-모델과-effort-는-대화가-고르고-기본값은-hermes-profile-이-갖는다.md), [ADR-054](adr/ADR-054-에이전트-기본-모델과-모델-숨김은-control-plane-db-가-갖는다.md)).
@@ -545,7 +543,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 
 실행 하나가 도는 동안 일어난 일을 우리 이름으로 옮겨 적은 것이다. Hermes 가 보낸 원래 payload 를 통째로 넣지 않는다.
 `tool_name` 은 붙은 커넥터 서버의 도구면 Hermes 등록 이름 `mcp__<서버>__<도구>` 다.
-`detail` 은 도구 사건이면 비밀값과 UUID 를 가린 뒤 저장하고(ADR-047), 응답에는 ADR-038 이 정한 사람에게만 싣는다. 옛 커넥터 에이전트의 도구 내용과, 다른 에이전트에 붙은 커넥터 서버의 도구 내용은 전체를 가린다.
+`detail` 은 도구 사건이면 비밀값과 UUID 를 가린 뒤 저장하고(ADR-047), 응답에는 ADR-038 이 정한 사람에게만 싣는다. 에이전트에 붙은 커넥터 서버의 도구 내용은 전체를 가린다.
 **`subagent_name`은 이름, `subagent_id`, `goal` 순서로 채운다.** 이름이 없는 사건의 `preview` 에서 이름처럼 보이는 글자를 뽑아 채우지 않는다. 그것이 실제 이름인지 우리가 만든 것인지 구분할 수 없기 때문이다.
 **`hermes_session_id`, `model`, 토큰은 SSE 또는 종료된 자식 session 조회에서 확인한 값이다.** 어느 칸이 오는지는 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「자식 토큰을 SSE 로 받을 수 있다」 가 갖는다. 싣지 않는 버전에서는 이 칸들이 비고 `detail` 에 `preview` 가 들어간다.
 이 토큰은 화면이 하위 에이전트가 무엇을 썼는지 보이는 데만 쓰고 사용량 합계에 더하지 않는다.
@@ -587,6 +585,16 @@ Control Plane 이 다시 떠도 등록 줄은 그대로라, 이미 등록한 하
 실행 하나에 실은 문맥 항목의 참조다. 어느 답에 어느 기록이 들어갔는지 나중에 찾으려고 남기고, 제목과 본문은 남기지 않는다.
 조립한 항목은 실행 줄을 만들 때 한 번에 적고, `memory_read` 가 본문을 내 준 항목은 실행 중에 `MEMORY_READ` 줄로 덧붙인다([`docs/features/memory.md`](../../docs/features/memory.md) 의 「본문을 읽으면 남는 기록」).
 `OMITTED` 줄은 자리가 없어 빠진 Memory 항목이거나 결과를 알 수 없어 본문을 싣지 않은 승인 결과다. `source` 가 `MEMORY_` 로 시작하는 `OMITTED` 줄의 수는 `agent_execution.context_omitted_items` 와 같다.
+
+선택 근거 컬럼은 Memory 항목을 어떤 규칙이 몇 번째로 골랐는지 남긴다. 근거는 [ADR-20261015 / memory-eval-gate](adr/ADR-20261015-memory-eval-gate.md) 에 있다. 모두 비어 있을 수 있고, 컬럼을 더하기 전의 줄과 Memory 가 아닌 줄은 비어 있다.
+
+| 컬럼 | 뜻 |
+| --- | --- |
+| `selector` | 고른 규칙의 이름과 버전. 값의 목록과 뜻은 `ContextSelection` 의 Javadoc 이 갖는다. `MEMORY_READ` 줄은 비어 있다 |
+| `selection_rank` | 같은 실행의 같은 `source` 안에서 고른 순서. 1 부터 센다. `OMITTED` 줄도 순서를 받는다 |
+| `keyword_score`, `semantic_score`, `selection_score` | 키워드 점수, 의미 점수, 합친 점수. 점수 없이 고르는 규칙은 비워 둔다 |
+
+사용 신호(읽혔는가, 고쳐졌는가, 관련 없다고 눌렀는가)는 이 테이블의 컬럼으로 두지 않는다. 이 테이블은 넣기만 하고, 그 신호는 실행 뒤에 온다.
 실행 줄을 지우지 않으므로 이 줄도 지우지 않는다.
 
 ## Memory 표
@@ -650,7 +658,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 
 에이전트가 받는 collection 하나가 한 줄이다([ADR-053](adr/ADR-053-에이전트는-허용된-collection-의-memory-만-받는다.md)).
 **줄이 하나도 없는 에이전트는 Memory 를 받지 않는다.**
-에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다. 옛 커넥터 에이전트에는 넣지 않고, 줄이 있어도 옛 커넥터 에이전트는 받지 않는다.
+에이전트를 처음 저장할 때 `core` 한 줄을 민감 허용 없이 넣는다.
 그 뒤에는 `ADMIN` 이 관리자 영역에서 줄을 더하고 빼고 민감 허용을 바꾼다. `created_at` 은 그 collection 을 붙인 시각이고, 민감 허용만 바꾸면 그대로 둔다.
 
 ### agent_memory_collection_change
@@ -687,8 +695,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `undeclared_tools` 는 마지막 확인에서 MCP 서버가 낸 도구 가운데 manifest 의 `tools` 에 없던 수다. `vault_stored` 는 칸 값을 대시보드 plugin 의 보관 파일에 둔 적이 있는가다
 - 해제해도 행은 남기고 `fields` 를 빈 `values` 와 빈 `secretPrefixes` 로 비운다. 지우는 경로는 없다
 
-`agent_id`, `restart_required`, `desired_enabled` 는 바인딩([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md))이 생기며 쓰지 않는 칸이 됐다.
-이전 이미지로 되돌릴 때를 위해 남겨 두고, 칸을 지우는 마이그레이션은 옛 커넥터 에이전트를 정리할 때 둔다. 엔티티는 두 boolean 칸을 매핑하지 않고 `agent_id` 는 읽기 전용(`legacyAgentId`)으로만 매핑해, 새 행에서 `agent_id` 는 비고 두 boolean 칸은 거짓이다. 옛 값은 지운 에이전트를 정리할 때만 비운다. `agent_id` 의 유일 제약과 FK 는 남아 있고, 비어 있는 값은 유일 제약에 걸리지 않는다.
+옛 전용 에이전트의 이관을 마쳐 `agent_id`, `restart_required`, `desired_enabled`와 관련 FK·유일 색인을 제거했다([ADR-083](../../docs/adr/ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md)). 연결 행과 바인딩은 유지한다.
 
 ### agent_connector_binding
 
@@ -699,7 +706,7 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 - `install_attempt_id`는 nullable `BINARY(16)` UUID다. 설치 시작을 커밋할 때 새 값으로 바꾸고 현재 시도의 결과만 한 번 적용한 뒤 비운다. 기존 행은 null로 유지하며 상태를 바꾸거나 값을 채우는 마이그레이션은 하지 않는다
 - `restart_required` 는 재시작이 profile 마다 필요하므로 연결이 아니라 여기에 둔다. `restart_required_since` 는 재시작이 필요해진 가장 늦은 설치 시각이고, 관리자가 재시작한 뒤에 다시 설치가 있었으면 반영 완료가 대기를 풀지 않게 하려고 둔다
 - `apply_due_at` 은 재시작 없이 MCP 설정 맞추기 주기가 반영할 설치를 보냈을 때의 반영 예정 시각이다. 지나면 Control Plane 이 이 칸을 비우고 반영 맞추기를 스스로 한 번 돌린다([ADR-20261007 / connector-live-reload](../../docs/adr/ADR-20261007-connector-live-reload.md))
-- 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 옛 커넥터 에이전트의 바인딩만 그 에이전트를 켜고 끈다
+- 떼면 행을 지운다. 떼기는 재시작을 기다리지 않아 남길 상태가 없고, 이력은 `connector_action` 이 갖는다. 바인딩은 에이전트의 사용 여부를 바꾸지 않는다
 
 ### connector_action
 

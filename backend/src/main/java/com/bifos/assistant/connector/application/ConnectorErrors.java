@@ -35,7 +35,7 @@ final class ConnectorErrors {
             case CALL_FAILED -> new ConnectorOperationFailure();
             case NOT_INSTALLED, POLICY_HOOK_OFF ->
                 new ApiException(ErrorCode.CONNECTOR_INSTALL_MISMATCH, "the installed connector does not match");
-            case PROBE_FAILED, NO_TOOLS, TOOLSETS_DIFFER ->
+            case PROBE_FAILED, NO_TOOLS ->
                 new ApiException(ErrorCode.CONNECTOR_TOOLS_UNVERIFIED, "the connector tools could not be verified");
             case APPLY_SCHEDULED ->
                 new ApiException(ErrorCode.CONNECTOR_APPLY_SCHEDULED, "the connector is still being applied");

@@ -4,13 +4,13 @@ import json
 import os
 import types
 from plugin_loading import patch_plugin
-from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE, OTHER, OTHER_VALUE, VAULT, VAULT_IMPORT
+from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE, OTHER, OTHER_VALUE, VAULT
 import dashboard_profile_api_support as support
 
 
 class ProfileApiConnectorVaultTest(support.ProfileApiRouteTest):
-    def test_vault_files_are_written_deleted_and_imported_without_echoing_values(self):
-        """보관 파일을 쓰고 지우고 옮긴다. 형식 오류와 필수 칸 누락은 400 이고 응답에 값이 없다."""
+    def test_vault_files_are_written_and_deleted_without_echoing_values(self):
+        """보관 파일을 쓰고 지운다. 형식 오류와 필수 칸 누락은 400 이고 응답에 값이 없다."""
         self.bind_fixture()
         directory = self.hermes_root / "connector-vault"
         self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
@@ -55,23 +55,6 @@ class ProfileApiConnectorVaultTest(support.ProfileApiRouteTest):
         self.assertFalse((directory / "c3.json").exists())
         self.assertEqual(self.vault("DELETE", vault="c3").body, {"changed": False})
         self.assertEqual(self.vault("DELETE", vault="c3", connector=DEMO).status_code, 400)
-
-        # 옛 설치의 관리 profile 에서 칸 값을 옮긴다. 빈 선택 칸은 넣지 않는다.
-        self.make_profile("bob")
-        self.plugin._apply_template("bob")
-        (self.root / "bob/.env").write_text("DEMO_TOKEN=%s\nDEMO_SCOPE=\nOTHER=keep\n" % DEMO_VALUE, encoding="utf-8")
-        self.assertEqual(self.connector(profile="bob").status_code, 200)
-        imported = self.vault("POST", VAULT_IMPORT, vault="c5", connector=DEMO, profile="bob")
-        self.assertEqual((imported.status_code, imported.body), (200, {"ok": True}))
-        self.assertEqual(json.loads((directory / "c5.json").read_text()),
-                         {"v": 1, "connector": DEMO, "values": {"token": DEMO_VALUE}})
-        (self.root / "bob/.env").write_text("DEMO_SCOPE=a\n", encoding="utf-8")
-        missing = self.vault("POST", VAULT_IMPORT, vault="c6", connector=DEMO, profile="bob")
-        self.assertEqual(missing.status_code, 400)
-        self.assertFalse((directory / "c6.json").exists())
-        self.assertEqual(self.vault("POST", VAULT_IMPORT, vault="c6", connector=DEMO, profile="owner").status_code, 401)
-        self.assertEqual(self.vault("POST", VAULT_IMPORT, vault="c6", connector=OTHER, profile="bob").status_code, 404)
-        self.assertEqual(self.vault("POST", VAULT_IMPORT, vault="c6", connector=DEMO, profile="nobody").status_code, 404)
 
     def test_connector_without_fields_is_bound_with_an_empty_vault(self):
         """칸이 없는 커넥터는 카탈로그에 오르고, 빈 `values` 의 보관 파일로 확인 도구를 부르고 바인딩 설치가 된다."""

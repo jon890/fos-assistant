@@ -10,8 +10,6 @@ import tools.jackson.databind.JsonNode;
  *
  * @param verifyTool 등록 전에 후보 값으로 부르는 확인 도구
  * @param mcpServer 설치가 그 profile 에 더하는 MCP 서버 이름
- * @param toolsets 연결용 에이전트에 켤 내장 toolset 이름. 선언하지 않았으면 빈 목록
- * @param attachments 참이면 연결용 에이전트의 대화가 사진을 받는다
  * @param schema manifest 의 판. 2 부터 도구마다 정책을 선언한다
  * @param tools 도구마다의 정책 선언. 카탈로그가 내지 않았으면 빈 목록
  * @param skills 바인딩 설치가 그 profile 에 복사할 스킬 이름. 옛 대시보드 plugin 은 내지 않고, 없으면 빈 목록
@@ -31,8 +29,6 @@ public record ConnectorManifest(
     List<ConnectorField> fields,
     String verifyTool,
     String mcpServer,
-    List<String> toolsets,
-    boolean attachments,
     int schema,
     List<ConnectorTool> tools,
     List<String> skills,
@@ -49,7 +45,6 @@ public record ConnectorManifest(
         description = description == null ? "" : description;
         unknownErrors = unknownErrors == null ? ConnectorUnknownErrors.NONE : unknownErrors;
         fields = List.copyOf(fields);
-        toolsets = List.copyOf(toolsets);
         tools = List.copyOf(tools);
         skills = List.copyOf(skills);
         appearance = appearance == null ? ConnectorAppearance.NONE : appearance;
@@ -58,11 +53,11 @@ public record ConnectorManifest(
 
     /** 결과 불명 선언을 모르는 기존 생성자다. 누락은 어느 코드도 받지 않는 것이다. */
     public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
-        String verifyTool, String mcpServer, List<String> toolsets, boolean attachments, int schema,
+        String verifyTool, String mcpServer, int schema,
         List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
         boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256,
         ConnectorSnapshotDeclaration snapshot) {
-        this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, skills,
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, skills,
             appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, snapshot,
             ConnectorUnknownErrors.NONE);
     }
@@ -70,10 +65,10 @@ public record ConnectorManifest(
 
     /** snapshot 선언을 모르는 기존 생성자다. 누락은 미지원이다. */
     public ConnectorManifest(String id, String title, String description, List<ConnectorField> fields,
-        String verifyTool, String mcpServer, List<String> toolsets, boolean attachments, int schema,
+        String verifyTool, String mcpServer, int schema,
         List<ConnectorTool> tools, List<String> skills, ConnectorAppearance appearance, boolean singleBinding,
         boolean ownerBrowser, String ownerBrowserLoginUrl, JsonNode executionGuard, String executionGuardManifestSha256) {
-        this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, skills,
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, skills,
             appearance, singleBinding, ownerBrowser, ownerBrowserLoginUrl, executionGuard, executionGuardManifestSha256, null);
     }
 
@@ -86,8 +81,6 @@ public record ConnectorManifest(
         List<ConnectorField> fields,
         String verifyTool,
         String mcpServer,
-        List<String> toolsets,
-        boolean attachments,
         int schema,
         List<ConnectorTool> tools,
         List<String> skills,
@@ -103,8 +96,6 @@ public record ConnectorManifest(
             fields,
             verifyTool,
             mcpServer,
-            toolsets,
-            attachments,
             schema,
             tools,
             skills,
@@ -125,8 +116,6 @@ public record ConnectorManifest(
         List<ConnectorField> fields,
         String verifyTool,
         String mcpServer,
-        List<String> toolsets,
-        boolean attachments,
         int schema,
         List<ConnectorTool> tools,
         List<String> skills,
@@ -141,8 +130,6 @@ public record ConnectorManifest(
             fields,
             verifyTool,
             mcpServer,
-            toolsets,
-            attachments,
             schema,
             tools,
             skills,
@@ -162,8 +149,6 @@ public record ConnectorManifest(
         List<ConnectorField> fields,
         String verifyTool,
         String mcpServer,
-        List<String> toolsets,
-        boolean attachments,
         int schema,
         List<ConnectorTool> tools,
         List<String> skills,
@@ -175,8 +160,6 @@ public record ConnectorManifest(
             fields,
             verifyTool,
             mcpServer,
-            toolsets,
-            attachments,
             schema,
             tools,
             skills,
@@ -195,8 +178,6 @@ public record ConnectorManifest(
         List<ConnectorField> fields,
         String verifyTool,
         String mcpServer,
-        List<String> toolsets,
-        boolean attachments,
         int schema,
         List<ConnectorTool> tools,
         List<String> skills) {
@@ -207,8 +188,6 @@ public record ConnectorManifest(
             fields,
             verifyTool,
             mcpServer,
-            toolsets,
-            attachments,
             schema,
             tools,
             skills,
@@ -224,10 +203,8 @@ public record ConnectorManifest(
         List<ConnectorField> fields,
         String verifyTool,
         String mcpServer,
-        List<String> toolsets,
-        boolean attachments,
         int schema,
         List<ConnectorTool> tools) {
-        this(id, title, description, fields, verifyTool, mcpServer, toolsets, attachments, schema, tools, List.of());
+        this(id, title, description, fields, verifyTool, mcpServer, schema, tools, List.of());
     }
 }

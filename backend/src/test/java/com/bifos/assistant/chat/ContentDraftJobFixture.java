@@ -210,7 +210,7 @@ public abstract class ContentDraftJobFixture extends ContentDraftFixture {
         var tools = List.of(new ConnectorTool("verify", "READ", "none", null, null),
             new ConnectorTool("save_draft", "WRITE", "required", "임시저장", null));
         when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest(CONNECTOR, "검사", "", List.of(), "verify", CONNECTOR,
-            List.of(), false, 2, tools, List.of(), null, false, false, null, null, null, declaration)));
+            2, tools, List.of(), null, false, false, null, null, null, declaration)));
         try {
             var field = cache.getClass().getDeclaredField("readAt");
             field.setAccessible(true);

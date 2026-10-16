@@ -64,8 +64,6 @@ class ConnectorBindingGatewayOffTest {
         List.of(),
         "ping",
         "browser",
-        List.of(),
-        false,
         1,
         List.of(),
         List.of(),

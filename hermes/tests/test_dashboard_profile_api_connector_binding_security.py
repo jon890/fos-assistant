@@ -48,14 +48,8 @@ class ProfileApiConnectorBindingSecurityTest(support.ProfileApiRouteTest):
         before = self.tree("alice")
         refused(self.bind(OTHER, "c3"), 409)
         # 바인딩이 있는 profile 에 옛 설치를 보내도 거절한다.
-        refused(self.connector(plugin=OTHER), 409)
+        refused(self.connector(plugin=OTHER), 400)
 
-        # 옛 설치가 있는 profile 에 바인딩을 보내면 거절한다.
-        self.make_profile("bob")
-        self.plugin._apply_template("bob")
-        self.assertEqual(self.connector(profile="bob").status_code, 200)
-        before = self.tree("bob")
-        refused(self.bind(OTHER, "c2", profile="bob"), 409, "bob")
         # 표식이 없는 profile 은 401 이다.
         before = self.tree("owner")
         refused(self.bind(profile="owner"), 401, "owner")

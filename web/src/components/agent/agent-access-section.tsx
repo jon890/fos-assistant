@@ -33,8 +33,6 @@ type Props = {
   listHref: string;
   /** 공개 범위를 바꾼 요청이 성공하면 바뀐 값으로 부른다. 그 범위에 따라 달라지는 이웃 절이 받는다. */
   onVisibilityChange(visibility: Visibility): void;
-  /** 예전 방식의 연결 에이전트다. 공개 범위는 바꾸지 못하고 지우기만 한다. */
-  connectorManaged?: boolean;
 };
 
 type Action = "group" | "private" | "delete";
@@ -121,7 +119,6 @@ export function AgentAccessSection({
   visibility,
   listHref,
   onVisibilityChange,
-  connectorManaged = false,
 }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState<Action | null>(null);
@@ -188,9 +185,7 @@ export function AgentAccessSection({
         <div>
           <h2 className="font-semibold">공개와 삭제</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {connectorManaged
-              ? "이 에이전트를 지울 수 있어요."
-              : "그룹에 공개하거나 에이전트를 지울 수 있어요."}
+            그룹에 공개하거나 에이전트를 지울 수 있어요.
           </p>
         </div>
         <Badge variant="outline">
@@ -203,24 +198,22 @@ export function AgentAccessSection({
         </Notice>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
-        {connectorManaged ? null : (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy}
-            loading={pending === "private"}
-            loadingText="바꾸는 중"
-            onClick={() =>
-              visibility === PRIVATE_VISIBILITY
-                ? setConfirming("group")
-                : void changeVisibility(PRIVATE_VISIBILITY, "private")
-            }
-          >
-            {visibility === PRIVATE_VISIBILITY
-              ? "그룹 공개로 변경"
-              : "나만으로 변경"}
-          </Button>
-        )}
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          loading={pending === "private"}
+          loadingText="바꾸는 중"
+          onClick={() =>
+            visibility === PRIVATE_VISIBILITY
+              ? setConfirming("group")
+              : void changeVisibility(PRIVATE_VISIBILITY, "private")
+          }
+        >
+          {visibility === PRIVATE_VISIBILITY
+            ? "그룹 공개로 변경"
+            : "나만으로 변경"}
+        </Button>
         <Button
           size="sm"
           variant="ghost"

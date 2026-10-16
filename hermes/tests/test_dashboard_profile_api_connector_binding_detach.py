@@ -55,7 +55,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         self.assertIn("mcp__other__list_scopes", self.tool_map()["servers"]["other"]["tools"])
         self.assertEqual((self.root / "alice/SOUL.md").read_text(encoding="utf-8"), "사용자의 성격\n")
         self.assertEqual(self.status_of()["connectors"], [
-            {"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"},
+            {"plugin": DEMO, "enabled": False, "configured": False, "mode": "bind"},
             {"plugin": OTHER, "enabled": True, "configured": True, "mode": "bind"}])
 
         # 마지막 바인딩을 떼도 대응 파일은 뗀 서버를 빈 `tools` 로 싣고 남는다. 목록은 붙이기 전으로 돌아간다.
@@ -212,7 +212,7 @@ class ProfileApiConnectorBindingDetachTest(support.ProfileApiRouteTest):
         # 다시 보낸 떼기는 바꾸지 않고, 뗀 기록이 남은 profile 에는 옛 설치를 하지 않는다.
         before = self.tree("alice")
         self.assertIs(self.bind(DEMO, enabled=False).body["changed"], False)
-        self.assertEqual(self.connector().status_code, 409)
+        self.assertEqual(self.connector().status_code, 400)
         self.assertEqual(self.tree("alice"), before)
 
         # 같은 이름을 다시 붙이면 gateway 가 옛 연결을 쥐고 있을 수 있어 재시작을 기다린다.

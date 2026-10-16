@@ -163,9 +163,6 @@ class AgentPurgeWriterTest {
         assertThat(connections.findById(attached.connectionId()))
             .as("연결은 사용자의 것이라 남는다")
             .isPresent();
-        assertThat(connectionAgentId(attached.connectionId()))
-            .as("연결의 옛 에이전트 칸은 비운다")
-            .isNull();
         assertThat(conversations.findById(attached.conversationId())).isPresent();
         assertThat(executions.findById(attached.executionId())).isPresent();
     }
@@ -217,7 +214,6 @@ class AgentPurgeWriterTest {
             .get()
             .extracting(ConnectorAction::agentId)
             .isEqualTo(agent.id());
-        assertThat(connectionAgentId(attached.connectionId())).isEqualTo(agent.id());
 
         transactions.executeWithoutResult(status -> conversations.markPurged(attached.conversationId(), NOW));
         AgentPurgeOutcome purged = writer.purge(agent.id(), CUTOFF);
@@ -235,7 +231,6 @@ class AgentPurgeWriterTest {
         toolsetRequests.saveAndFlush(AgentToolsetRequest.of(1L, agent.id(), owner.id(), "image_gen", NOW));
 
         ConnectorConnection connection = connections.saveAndFlush(ConnectorConnection.pending(owner.id(), "demo-mail", NOW));
-        jdbc.update("UPDATE connector_connection SET agent_id = ? WHERE id = ?", agent.id(), connection.id());
         bindings.saveAndFlush(ConnectorBinding.pending(agent, connection, "demo-mail", NOW));
 
         Conversation conversation = conversations.saveAndFlush(Conversation.startedBy(owner.id(), "남는 대화", agent.id(), NOW));
@@ -292,11 +287,6 @@ class AgentPurgeWriterTest {
         Long count = jdbc.queryForObject(
             "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?", Long.class, agent.id());
         return count == null ? 0 : count;
-    }
-
-
-    Long connectionAgentId(Long connectionId) {
-        return jdbc.queryForObject("SELECT agent_id FROM connector_connection WHERE id = ?", Long.class, connectionId);
     }
 
 

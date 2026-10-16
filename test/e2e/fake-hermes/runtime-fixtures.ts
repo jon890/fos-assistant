@@ -139,8 +139,6 @@ export const CONNECTORS_PATH = "/api/connectors";
 /** 연결의 칸 값을 연결마다 하나씩 두는 보관 파일 경로다. 이름 규칙은 plugin 과 같다. */
 export const CONNECTOR_VAULT_PATH = "/api/connector-vault";
 
-export const CONNECTOR_VAULT_IMPORT_PATH = "/api/connector-vault/import";
-
 export const VAULT_NAME = /^c[1-9][0-9]{0,18}$/;
 
 export const MCP_SERVER_TEST_PATH = /^\/api\/mcp\/servers\/([a-z0-9-]+)\/test$/;

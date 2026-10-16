@@ -62,7 +62,6 @@ public final class AgentAdminDtos {
         String visibility,
         Long ownerUserId,
         boolean enabled,
-        boolean connectorManaged,
         boolean proactiveCheckWritesAllowed) {
         static AdminAgentView from(Agent agent) {
             return new AdminAgentView(
@@ -76,7 +75,6 @@ public final class AgentAdminDtos {
                 agent.visibility().name(),
                 agent.ownerUserId(),
                 agent.enabled(),
-                agent.connectorManaged(),
                 agent.proactiveCheckWritesAllowed());
         }
     }

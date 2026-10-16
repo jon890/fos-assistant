@@ -11,8 +11,6 @@ package com.bifos.assistant.connector.domain;
  * @param userId 바인딩의 연결 사용자 번호. 붙이기 규칙으로 에이전트 주인과 같다
  * @param profile 에이전트의 Hermes profile
  * @param connectorId 연결의 커넥터 id
- * @param legacy 옛 커넥터 에이전트의 바인딩인가. 설치 판정이 바인딩 방식을 보지 않는다
  */
-public record ReadyBinding(
-    Long bindingId, Long agentId, Long userId, String profile, String connectorId, boolean legacy) {
+public record ReadyBinding(Long bindingId, Long agentId, Long userId, String profile, String connectorId) {
 }
