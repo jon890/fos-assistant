@@ -159,7 +159,7 @@ public class McpToolCatalog {
             Map.of(
                 "name", "memory_search",
                 "description",
-                "색인에 없는 기억도 현재 실행의 권한으로 제목에서 찾는다. query는 제목의 일부이며 본문은 검색하지 않는다. 결과의 id로 memory_read를 불러 본문을 읽는다. nextAfterId가 있으면 after_id에 넣어 다음 페이지를 읽는다.",
+                "색인에 없는 기억도 현재 실행의 권한으로 제목과 본문에서 찾아 관련도 순으로 낸다. 결과의 id로 memory_read를 불러 본문을 읽는다. nextCursor가 있으면 cursor에 넣어 다음 페이지를 읽는다.",
                 "inputSchema",
                 Map.of(
                     "type",
@@ -173,7 +173,7 @@ public class McpToolCatalog {
                         Map.of(
                             "type", "integer", "minimum", 1, "maximum", 50,
                             "default", 10),
-                        "after_id", Map.of("type", "integer", "minimum", 1)),
+                        "cursor", Map.of("type", "string", "minLength", 1, "maxLength", 200)),
                     "required",
                     List.of("query"))));
     }

@@ -245,23 +245,23 @@ public class McpController {
     /** 검색 범위는 origin 실행에서만 정한다. null과 모르는 키는 인자 오류다. */
     private Map<String, Object> searchMemory(McpCaller caller, JsonNode id, JsonNode arguments) {
         JsonNode limit = arguments.get("limit");
-        JsonNode after = arguments.get("after_id");
-        if (!Set.of("query", "limit", "after_id").containsAll(arguments.propertyNames())
+        JsonNode cursor = arguments.get("cursor");
+        if (!Set.of("query", "limit", "cursor").containsAll(arguments.propertyNames())
             || !text(arguments, "query")
             || (limit != null
                 && (!limit.isIntegralNumber()
                     || !limit.canConvertToInt()
                     || limit.intValue() < 1
                     || limit.intValue() > 50))
-            || (after != null
-                && (!after.isIntegralNumber() || !after.canConvertToLong() || after.longValue() <= 0))) {
+            || (cursor != null && !cursor.isString())) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        MemorySearchArguments value = MemorySearchArguments.from(arguments);
-        if (value.query().isEmpty() || value.query().codePointCount(0, value.query().length()) > 200) {
+        Optional<MemorySearchArguments> parsed = MemorySearchArguments.from(arguments);
+        if (parsed.isEmpty()) {
             return invalidParams(id, INVALID_ARGUMENTS);
         }
-        return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.afterId()));
+        MemorySearchArguments value = parsed.get();
+        return response(id, tools.searchMemory(caller, value.query(), value.limit(), value.cursor()));
     }
 
 

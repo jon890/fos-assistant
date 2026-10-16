@@ -454,7 +454,7 @@ export const memoryScenario: Scenario = {
         };
       };
       const found = await mcp("memory_search", { query: "누락 검색 표식" });
-      expect(!found.result.isError, "누락 항목의 제목 검색이 실패했다");
+      expect(!found.result.isError, "누락 항목의 검색이 실패했다");
       const wrapped = found.result.content[0]!.text;
       expect(
         wrapped.includes("<external-data>\n") &&
@@ -466,16 +466,16 @@ export const memoryScenario: Scenario = {
           wrapped.indexOf("<external-data>\n") + "<external-data>\n".length,
           wrapped.lastIndexOf("\n</external-data>"),
         ),
-      ) as { items: { id: number }[]; nextAfterId: number | null };
+      ) as { items: { id: number }[]; nextCursor: string | null };
       expect(
         data.items.length === 1 &&
           data.items[0]?.id === target.id &&
-          data.nextAfterId === null,
+          data.nextCursor === null,
         "누락 항목 검색 결과나 마지막 페이지가 다르다",
       );
       expect(
         !wrapped.includes(target.content),
-        "제목 검색이 본문까지 반환했다",
+        "검색이 본문까지 반환했다",
       );
       const read = await mcp("memory_read", { id: target.id });
       expect(

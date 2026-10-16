@@ -6,6 +6,7 @@ import com.bifos.assistant.feedback.application.DecisionFeedbackRecorder;
 import com.bifos.assistant.feedback.domain.type.FeedbackActor;
 import com.bifos.assistant.feedback.domain.type.FeedbackEventType;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryCollection;
@@ -59,7 +60,7 @@ public class MemoryService {
     private final MemoryCollectionService collections;
     private final MemoryContentCipher cipher;
     private final MemoryRevisionWriter revisionWriter;
-    private final MemoryTitleSearch titleSearch;
+    private final MemoryRelevanceSearch relevanceSearch;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -202,10 +203,10 @@ public class MemoryService {
     }
 
 
-    /** 제목을 찾는다. 외부 트랜잭션과 분리해 검색 statement에만 2초 제한을 적용한다. */
+    /** 제목과 일반 본문에서 관련도 순으로 찾는다. 외부 트랜잭션과 분리해 검색 statement에만 2초 제한을 적용한다. */
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 2)
-    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, Long afterId) {
-        return titleSearch.searchFor(user, access, query, limit, afterId);
+    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, MemorySearchCursor cursor) {
+        return relevanceSearch.searchFor(user, access, query, limit, cursor);
     }
 
 
