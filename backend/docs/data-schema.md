@@ -11,7 +11,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 | 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
-| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
+| 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture`, `memory_embedding` |
 | 「커넥터 표」 | `connector_connection`, `agent_connector_binding`, `connector_action`, `connector_action_execution`, `connector_tool_grant`, `connector_conversation_grant` |
 | 「할 일과 먼저 알리기 표」 | `follow_up`, `attention_control`, `attention_event` |
 | 「알림 표」 | `notification` |
@@ -208,6 +208,7 @@ H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 
 하위 에이전트 session 등록(`hermes_session_binding`)도 지우지 않는다. 실행 기록과 함께 남는다.
 
 Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision` 에 `DELETED` 로 남기므로 본문은 그 표에 남는다. 민감 항목의 판은 암호문으로 남는다.
+그 항목의 벡터(`memory_embedding`)는 같은 트랜잭션에서 지운다.
 화면의 삭제는 목록과 주입에서 빼는 것이고, 본문을 완전히 없애는 길은 아직 없다.
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
@@ -694,6 +695,16 @@ V47 이전 버전으로 되돌린 동안 옛 코드가 쓴 줄은 다시 올리�
 `CREATED` 를 되돌릴 때 항목의 판이 `base_revision` 이 아니면, `UPDATED` 를 되돌릴 때 `base_revision + 1` 이 아니면 그 뒤에 사람이 다시 고친 것이라 되돌리지 않는다.
 `previous_status` 가 `PROPOSED` 인 기록을 되돌리면 항목을 보존하며 승인 정보도 지워 제안 상태로 돌린다.
 기존 제안의 수락은 중복 후보의 번호만 조회한 뒤 항목을 쓰기 잠금으로 처음 읽는다. 중복 키를 다시 확인하고, 현재 `revision`을 `base_revision`에 남겨 동시에 커밋된 사용자 수정도 보존한다.
+
+### memory_embedding
+
+임베딩 대상 항목 하나의 벡터 한 줄이다. 질문과의 의미 점수를 앱이 전수 계산하는 데 쓴다. 근거는 [ADR-20261015 / memory-hybrid-selection](adr/ADR-20261015-memory-hybrid-selection.md) 에 있다.
+
+- 기본 키는 `memory_id` 다. 항목 하나에 벡터는 하나다. 모델을 바꾸면 같은 줄을 새 모델의 값으로 덮어쓴다. 모델마다 줄을 두지 않는 것은 한 번에 한 모델만 쓰기 때문이다
+- `model` 은 임베딩 서비스에 보낸 모델 이름, `dimensions` 는 벡터의 차원, `vector` 는 float32 를 little-endian 으로 이어 붙인 값이다. 길이는 `dimensions × 4` 바이트다. 운영의 BGE-M3 는 1024차원이라 한 줄이 4KiB 다
+- `text_fingerprint` 는 모델 이름과 임베딩한 글(제목과 본문)을 함께 넣은 SHA-256 이다. 지금 글과 지금 설정의 모델로 낸 지문과 다르면 그 줄은 낡은 것이고, 조립은 그 벡터를 쓰지 않는다
+- 대상은 `ACCEPTED`, `SEARCH`, 민감도 `NORMAL`, 암호화하지 않은 항목이다. 민감 항목은 임베딩하지 않는다. 대상에서 빠진 항목의 줄은 임베딩을 채우는 작업(`MemoryEmbeddingRefresher`)이 다음 주기에 지운다
+- 제목과 본문을 남기지 않는다. 벡터에서 글을 그대로 되살릴 수는 없지만 글에서 나온 값이므로 항목과 함께 지운다. `memory_id` 에 외래 키를 걸지 않고, `MemoryService.delete` 가 같은 트랜잭션에서 그 줄을 지운다. 채우는 작업은 쓰기 직전에 대상인지 다시 확인한다. 그 확인과 거의 같은 때 지운 항목의 줄이 남으면 다음 주기의 정리가 지운다
 
 
 

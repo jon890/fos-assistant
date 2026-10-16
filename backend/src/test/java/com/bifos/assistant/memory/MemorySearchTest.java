@@ -4,17 +4,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.embedding.EmbeddingText;
+import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
 import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchItem;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
+import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
+import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
@@ -26,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,10 +62,21 @@ public class MemorySearchTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    MemoryEmbeddingRepository embeddings;
+
+    @Autowired
+    MemoryEmbeddingProperties embeddingProperties;
+
+    @Autowired
+    MemoryVectorCache vectorCache;
+
 
     @BeforeEach
     void setUp() {
         MemorySearchSqlProbe.reset();
+        embeddings.deleteAll();
+        vectorCache.clear();
         repository.deleteAll();
     }
 
@@ -167,7 +184,30 @@ public class MemorySearchTest {
         CurrentUser noGroup = new CurrentUser(USER.id(), USER.email(), USER.displayName(), null, USER.role());
         assertThat(search(noGroup, CORE, "일치", 10).items())
             .extracting(MemorySearchItem::id)
-            .containsExactly(own.id());
+            .containsExactly(own.id()); // 모든 항목에 질문과 같은 벡터를 넣어도 경계 밖 항목은 의미 점수로도 나오지 않는다
+        float[] query = {1f, 0f};
+        for (Memory each : repository.findAll()) {
+            embedEverything(each, query);
+        }
+        for (Memory excluded : hidden) {
+            assertThat(memories.searchFor(USER, CORE, excluded.title(), 50, MemorySearchCursor.first(excluded.title()), Optional.of(query))
+                .items())
+                    .as("벡터를 넣은 " + excluded.title())
+                    .extracting(MemorySearchItem::id)
+                    .doesNotContainAnyElementsOf(hidden.stream().map(Memory::id).toList())
+                    .containsExactlyInAnyOrder(own.id(), group.id());
+        }
+        embeddings.deleteAll();
+        vectorCache.clear();
+    }
+
+
+    /** 지금 글의 지문으로 벡터 줄을 넣는다. 검사 설정은 임베딩이 꺼져 있어 모델 이름이 빈 값이다. */
+    private void embedEverything(Memory memory, float[] vector) {
+        String content = jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, memory.id());
+        String text = EmbeddingText.of(memory.title(), content, embeddingProperties.maxTextChars());
+        embeddings.save(MemoryEmbedding.of(
+            memory.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), vector, NOW));
     }
 
 
@@ -185,12 +225,12 @@ public class MemorySearchTest {
         }
         assertThat(search(USER, CORE, "불일치", 10)).isEqualTo(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
         for (String invalid : List.of(" ", "가".repeat(201))) {
-            assertThatThrownBy(() -> memories.searchFor(USER, CORE, invalid, 10, MemorySearchCursor.first(invalid)))
+            assertThatThrownBy(() -> memories.searchFor(USER, CORE, invalid, 10, MemorySearchCursor.first(invalid), Optional.empty()))
                 .isInstanceOf(RuntimeException.class);
         }
         assertThatThrownBy(() -> search(USER, CORE, "합성", 51)).isInstanceOf(RuntimeException.class);
-        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, null)).isInstanceOf(RuntimeException.class);
-        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, MemorySearchCursor.first("다른 질문")))
+        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, null, Optional.empty())).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "합성", 10, MemorySearchCursor.first("다른 질문"), Optional.empty()))
             .isInstanceOf(RuntimeException.class);
     }
 
@@ -313,6 +353,20 @@ public class MemorySearchTest {
 
 
     @Test
+    @DisplayName("합쳐 매긴 검색의 다음 페이지를 키워드로만 매기게 되면 순위가 달라지므로 거절한다")
+    void rejectsPageWhenRankingRuleChanges() {
+        save("대상 첫째");
+        save("대상 둘째");
+        MemorySearchCursor hybridNext = new MemorySearchCursor(MemorySearchCursor.fingerprintOf("대상"), 1, true);
+
+        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "대상", 1, hybridNext, Optional.empty()))
+            .isInstanceOf(RuntimeException.class);
+        assertThat(search(USER, CORE, "대상", 1).nextCursor())
+            .satisfies(next -> assertThat(MemorySearchCursor.parse(next).orElseThrow().hybrid()).isFalse());
+    }
+
+
+    @Test
     @DisplayName("페이지 사이의 삭제는 다음 페이지에 반영되고 바뀐 항목은 처음부터 다시 찾는다")
     void usesCurrentRowsBetweenPages() {
         Memory earlier = save("이전 항목");
@@ -331,7 +385,7 @@ public class MemorySearchTest {
 
 
     MemorySearchPage search(CurrentUser user, MemoryAccess access, String query, int limit) {
-        return memories.searchFor(user, access, query, limit, MemorySearchCursor.first(query.strip()));
+        return memories.searchFor(user, access, query, limit, MemorySearchCursor.first(query.strip()), Optional.empty());
     }
 
 
@@ -339,7 +393,7 @@ public class MemorySearchTest {
         MemorySearchCursor position = cursor == null
             ? MemorySearchCursor.first(query.strip())
             : MemorySearchCursor.parse(cursor).orElseThrow();
-        return memories.searchFor(user, access, query, limit, position);
+        return memories.searchFor(user, access, query, limit, position, Optional.empty());
     }
 
 

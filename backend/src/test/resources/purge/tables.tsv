@@ -41,6 +41,7 @@ media_observation_request|CONVERSATION|id|GAP|DELETE|KEEP|observation_id FK로 �
 memory|USER|id|GAP|KEEP|KEEP|owner_user_id 또는 group_id에 속한다. 개인 기억을 넣어 검사하며 대화 삭제가 승인된 기억을 지우지 않는다.
 memory_capture|CONVERSATION|id|GAP|KEEP|KEEP|user_id와 conversation_id에 속한다. 기억 항목 삭제 뒤에도 기억한 기록을 남기는 계약이다.
 memory_collection|GLOBAL|group_id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 기억 영역이다. 사용자 한 사람의 삭제 대상이 아니다.
+memory_embedding|USER|memory_id|GAP|KEEP|KEEP|memory_id로 기억 항목에 속한다. 항목을 지우면 같은 트랜잭션에서 지운다.
 memory_revision|USER|memory_id|GAP|KEEP|KEEP|memory_id와 owner_user_id 또는 group_id에 속한다. 기억 변경·삭제 이력은 별도로 보존한다.
 model_hidden|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 모델 설정이다.
 model_tier_definition|GLOBAL|id|KEEP|KEEP|KEEP|group_id로 나눈 그룹 공용 모델 단계 설정이다.

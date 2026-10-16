@@ -68,8 +68,9 @@ tasks.processTestResources {
 tasks.test {
     // mysql 태그는 실제 MySQL 서버가 있어야 돈다. 마이그레이션 검사와 저장소 쿼리 검사가 그 태그이고 mysqlMigrationTest 가 따로 돌린다.
     // model-eval 태그는 실제 모델을 부르는 답 판정이고 memoryJudgeEval 이 따로 돌린다.
+    // embedding-eval 태그는 실제 임베딩 서비스를 부르는 회수 측정이고 memoryEmbeddingEval 이 따로 돌린다.
     useJUnitPlatform {
-        excludeTags("mysql", "model-eval")
+        excludeTags("mysql", "model-eval", "embedding-eval")
     }
     // 전체 검사가 함께 보존하는 Spring 문맥은 기본 512MB 힙에 들어가지 않는다.
     maxHeapSize = "1g"
@@ -128,6 +129,19 @@ tasks.register<Test>("memoryJudgeEval") {
     }
     maxHeapSize = "1g"
     // 결과가 밖의 모델에 달려 있어 앞선 결과를 다시 쓰지 않는다.
+    outputs.upToDateWhen { false }
+}
+
+tasks.register<Test>("memoryEmbeddingEval") {
+    group = "verification"
+    description = "실제 임베딩 서비스로 사례 묶음을 하이브리드로 조립해 지표를 남긴다. 주소와 모델이 없으면 건너뛴다."
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    useJUnitPlatform {
+        includeTags("embedding-eval")
+    }
+    maxHeapSize = "1g"
+    // 결과가 밖의 임베딩 서비스에 달려 있어 앞선 결과를 다시 쓰지 않는다.
     outputs.upToDateWhen { false }
 }
 
