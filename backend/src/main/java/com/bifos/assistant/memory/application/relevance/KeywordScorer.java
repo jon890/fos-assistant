@@ -34,7 +34,7 @@ public class KeywordScorer {
         Map<String, Integer> documentFrequency = new HashMap<>();
         long totalLength = 0;
         for (RelevanceCandidate candidate : candidates) {
-            Map<String, Integer> counts = KoreanBigramTokenizer.termCounts(documentOf(candidate));
+            Map<String, Integer> counts = KoreanBigramTokenizer.documentTermCounts(documentOf(candidate));
             documents.add(counts);
             totalLength += counts.values().stream().mapToInt(Integer::intValue).sum();
             for (String token : queryTokens) {
