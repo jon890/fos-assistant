@@ -392,7 +392,8 @@ export const memoryScenario: Scenario = {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          text: "색인 누락 제목 검색 검사",
+          // 질문이 검색할 항목과 낱말을 나누면 질문과 관련된 기억 구역이나 색인 앞자리에 올라 빠지지 않는다
+          text: "오늘 저녁 메뉴 추천",
           agentCode: "dad",
         }),
       });
