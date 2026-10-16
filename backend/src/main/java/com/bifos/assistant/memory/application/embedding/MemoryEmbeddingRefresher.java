@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * 임베딩 대상 항목의 벡터를 채우고 낡은 줄을 지운다(ADR-20261015 / memory-hybrid-selection).
  *
  * <p>한 번에 대상이 아닌 줄과 항목이 없어진 줄을 지우고, 줄이 없거나 지문이 다른 대상을 번호 순으로 {@code batchSize} 씩
- * {@code maxBatchesPerRun} 묶음까지 임베딩한다. 묶음 하나가 실패하면 그 주기를 끝내고 다음 주기에 다시 한다. 임베딩 호출 동안 트랜잭션을 열어 두지
+ * {@code maxBatchesPerRun} 묶음까지 임베딩한다. 묶음이 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛰고, 그것도 모두 실패하면 그 주기를 끝내고 다음 주기에 다시 한다. 임베딩 호출 동안 트랜잭션을 열어 두지
  * 않는다. 로그에는 건수와 예외 클래스 이름만 남긴다.
  */
 @Slf4j
@@ -130,42 +130,42 @@ public class MemoryEmbeddingRefresher {
 
 
     /**
-     * 묶음을 한 번에 보낸다. 거절되면 한 건씩 다시 보내 거절한 항목만 건너뛴다. 거절한 글이 하나라도 있으면 묶음 전체가 거절되므로, 그 항목이 뒤 항목을
-     * 막지 않게 하려는 것이다.
+     * 묶음을 한 번에 보낸다. 실패하면 한 건씩 다시 보내 실패한 항목만 건너뛴다. 대상은 번호 순이라, 늘 실패하는 글이나 늦는 묶음이 앞에 있으면 뒤 항목이
+     * 끝내 채워지지 않기 때문이다. 건너뛴 항목은 다음 주기에 다시 본다.
      *
-     * @return 받아들인 항목과 그 벡터. 서비스가 거절이 아닌 이유로 실패하면 null 이고, 그 주기를 끝낸다
+     * @return 받아들인 항목과 그 벡터. 한 건씩 보낸 것까지 모두 실패하면 서비스가 내려간 것으로 보고 null 을 내며, 그 주기를 끝낸다
      */
     private Embedded embedBatch(List<MemoryEmbeddingSource> batch) {
         try {
             return new Embedded(batch, client.embed(batch.stream().map(this::textOf).toList(), properties.batchTimeout()));
-        } catch (EmbeddingRejectedException ex) {
-            return embedEach(batch);
         } catch (EmbeddingUnavailableException ex) {
-            log.warn("memory embedding batch failed exceptionClass={}", ex.getClass().getSimpleName());
-            return null;
+            log.warn("memory embedding batch failed, retrying one by one exceptionClass={} size={}", ex.getClass().getSimpleName(), batch.size());
+            if (batch.size() == 1) {
+                return ex instanceof EmbeddingRejectedException ? new Embedded(List.of(), List.of()) : null;
+            }
+            return embedEach(batch);
         }
     }
 
 
-    /**
-     * 묶음을 한 건씩 보낸다. 거절한 항목은 번호만 남기고 건너뛴다.
-     *
-     * @return 받아들인 항목과 그 벡터. 서비스가 거절이 아닌 이유로 실패하면 null 이고, 그 주기를 끝낸다
-     */
+    /** 묶음을 한 건씩 보낸다. 실패한 항목은 번호만 남기고 건너뛴다. 모두 실패하면 null 이다. */
     private Embedded embedEach(List<MemoryEmbeddingSource> batch) {
         List<MemoryEmbeddingSource> sources = new ArrayList<>();
         List<float[]> vectors = new ArrayList<>();
+        boolean reached = false;
         for (MemoryEmbeddingSource source : batch) {
             try {
                 vectors.add(client.embed(List.of(textOf(source)), properties.batchTimeout()).getFirst());
                 sources.add(source);
+                reached = true;
             } catch (EmbeddingRejectedException ex) {
+                reached = true;
                 log.warn("memory embedding skipped a rejected item memoryId={}", source.memoryId());
             } catch (EmbeddingUnavailableException ex) {
-                return null;
+                log.warn("memory embedding skipped a failed item memoryId={} exceptionClass={}", source.memoryId(), ex.getClass().getSimpleName());
             }
         }
-        return new Embedded(sources, vectors);
+        return reached ? new Embedded(sources, vectors) : null;
     }
 
 

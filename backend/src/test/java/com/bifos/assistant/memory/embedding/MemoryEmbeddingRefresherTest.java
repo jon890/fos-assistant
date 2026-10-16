@@ -127,19 +127,36 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
-    @DisplayName("묶음 하나가 실패하면 그 주기의 나머지 묶음을 부르지 않고 다음 주기에 이어 채운다")
-    void stopsRunOnFailureAndResumesNextRun() {
+    @DisplayName("서비스가 내려가 묶음과 한 건씩 다시 보낸 것이 모두 실패하면 그 주기를 끝내고 다음 주기에 이어 채운다")
+    void stopsRunWhenServiceIsDownAndResumesNextRun() {
         for (int i = 0; i < 5; i++) {
             memories.create(USER, MemoryScope.USER, "항목 " + i, "본문 " + i, false);
         }
-        client.failOnCall(2);
+        client.failFromCall(2);
 
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
-        assertThat(client.calls()).isEqualTo(2);
+        // 둘째 묶음 하나와 그 두 항목을 한 건씩 보낸 둘. 셋째 묶음은 부르지 않는다
+        assertThat(client.calls()).isEqualTo(4);
         assertThat(embeddings.count()).isEqualTo(2);
 
+        client.failFromCall(-1);
         assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(3);
         assertThat(embeddings.count()).isEqualTo(5);
+    }
+
+
+    @Test
+    @DisplayName("늘 늦거나 서버 오류를 내는 항목이 앞 묶음에 있어도 한 건씩 다시 보내 뒤 항목을 채운다")
+    void skipsItemThatAlwaysFailsWithoutBlockingTheRest() {
+        Memory slow = memories.create(USER, MemoryScope.USER, "늘 늦는 글", "서버가 끝내지 못하는 본문", false);
+        Memory next = memories.create(USER, MemoryScope.USER, "다음 글", "보통 본문", false);
+        Memory last = memories.create(USER, MemoryScope.USER, "마지막 글", "보통 본문", false);
+        client.failOn("끝내지 못하는");
+
+        assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(2);
+
+        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactlyInAnyOrder(next.id(), last.id());
+        assertThat(embeddings.findById(slow.id())).isEmpty();
     }
 
 
@@ -217,10 +234,11 @@ class MemoryEmbeddingRefresherTest {
         private final List<String> inputs = new ArrayList<>();
         private final List<String> threadNames = new ArrayList<>();
         private int calls;
-        private int failOn = -1;
         private CountDownLatch blocker;
         private Runnable firstCall;
         private String rejected;
+        private String unavailable;
+        private int failFrom = -1;
 
 
         @Override
@@ -243,8 +261,11 @@ class MemoryEmbeddingRefresherTest {
             if (rejected != null && batch.stream().anyMatch(text -> text.contains(rejected))) {
                 throw new EmbeddingRejectedException("fake rejection");
             }
-            if (calls == failOn) {
-                throw new EmbeddingUnavailableException("fake failure");
+            if (unavailable != null && batch.stream().anyMatch(text -> text.contains(unavailable))) {
+                throw new EmbeddingUnavailableException("fake timeout");
+            }
+            if (failFrom > 0 && calls >= failFrom) {
+                throw new EmbeddingUnavailableException("fake outage");
             }
             inputs.addAll(batch);
             return batch.stream().map(this::vectorOf).toList();
@@ -253,6 +274,16 @@ class MemoryEmbeddingRefresherTest {
 
         float[] vectorOf(String text) {
             return new float[] {text.length(), text.hashCode() % 7, 1f};
+        }
+
+
+        void failOn(String text) {
+            unavailable = text;
+        }
+
+
+        void failFromCall(int call) {
+            failFrom = call;
         }
 
 
@@ -273,11 +304,6 @@ class MemoryEmbeddingRefresherTest {
 
         List<String> threadNames() {
             return List.copyOf(threadNames);
-        }
-
-
-        void failOnCall(int call) {
-            failOn = call;
         }
 
 
