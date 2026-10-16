@@ -152,7 +152,7 @@ public final class McpDtos {
     public record MemoryReadArguments(Long id) {
     }
 
-    /** 검색어를 로그에 남기지 않는 제목 검색 인자다. */
+    /** 검색어를 로그에 남기지 않는 기억 검색 인자다. 제목과 일반 본문을 관련도 순으로 찾는다. */
     public record MemorySearchArguments(String query, int limit, MemorySearchCursor cursor) {
         /**
          * 질문이 비었거나 200자를 넘거나, 커서를 읽을 수 없거나 다른 질문의 커서면 빈 값이다. 커서가 없으면 첫 페이지다.
