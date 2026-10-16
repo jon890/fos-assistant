@@ -763,7 +763,7 @@ JSON 검증 계약은 [커넥터 도구 정책과 승인](../../docs/features/co
 `ConnectorExecutionSnapshot.capture`가 연결의 공개 칸과 실행 args, 표시 값을 검증한 뒤 저장할 내용을 만든다.
 읽을 때 protocol이 `approval-claim-v2`와 다르면 거절한다. 열린 v1 줄(PENDING, EXECUTING, UNKNOWN)이 남아 있으면 금융 관문이 닫힌다.
 연결과 바인딩의 소유자 및 에이전트가 승인 줄과 같아야 한다.
-기존 `connector_action.args_json`과 `args_sha256`은 원래 요청의 중복 판정용으로 남긴다.
+대화 purge 뒤에도 `connector_action.args_sha256`과 `dedupe_key`는 원래 요청의 중복 판정용으로 남긴다.
 실행 원문과 표시 값, scope 및 두 revision은 저장한 뒤 바꾸지 않는다.
 예외는 대화 purge의 본문 삭제다. 세 본문과 `content_key_id`를 NULL로 비우고 나머지 칸은 보존한다.
 부모 승인 줄의 `body_erased_at`으로 삭제를 구별하며 금융 snapshot 읽기를 거절하고 카드 요약은 `available=false`로 낸다.
