@@ -81,3 +81,18 @@
 | [rule-67](rule-67.md) | 운영값은 설치 묶음과 환경에서 받고 코드에 고정하지 않는다. | [공개 정보](../../scripts/checks/check-public-safe.sh), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-68](rule-68.md) | 동시 변경은 조건부 갱신으로 보호하고 오래된 엔티티를 통째로 덮어쓰지 않는다. | [위임 경합 회귀](../../backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceRaceTest.java), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-69](rule-69.md) | 화면 갱신은 입력 상태와 레이아웃을 불필요하게 다시 만들지 않는다. | [입력 상태 회귀](../../test/browser/composer-send-flow.spec.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
+| [rule-70](rule-70.md) | application 직하에는 Spring 빈만 둔다. | [APPLICATION_ROOT_HOLDS_ONLY_BEANS](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-71](rule-71.md) | application 아래 하위 패키지는 dto와 port뿐이다. | [APPLICATION_SUBPACKAGES_ARE_DTO_AND_PORT](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-72](rule-72.md) | port 패키지에는 인터페이스와 그 예외만 둔다. | [PORT_PACKAGE_HOLDS_ONLY_INTERFACES](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-73](rule-73.md) | dto 패키지에는 값만 둔다. | [DTO_PACKAGE_HOLDS_ONLY_VALUES](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-74](rule-74.md) | ConfigurationProperties는 config 패키지에 둔다. | [CONFIGURATION_PROPERTIES_IN_CONFIG](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-75](rule-75.md) | application 직하의 클래스는 25개를 넘지 않는다. | [APPLICATION_PACKAGE_SIZE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-76](rule-76.md) | 하위 기능은 같은 기능의 아래 하위 기능만 쓴다. | [SUB_FEATURES_FOLLOW_ORDER](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-77](rule-77.md) | 하위 기능으로 나눈 기능은 루트에 역할 패키지를 두지 않는다. | [SPLIT_FEATURES_HAVE_NO_ROOT_ROLES](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-78](rule-78.md) | 운영 클래스의 단순 이름은 겹치지 않는다. | [SIMPLE_CLASS_NAMES_ARE_UNIQUE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-79](rule-79.md) | admin은 하위 기능 아래에 application과 presentation만 둔다. | [ADMIN_PACKAGE_SHAPE](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-80](rule-80.md) | 기능은 admin을 쓰지 않는다. | [FEATURES_DO_NOT_DEPEND_ON_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-81](rule-81.md) | admin은 기능의 application과 application.dto만 쓴다. | [ADMIN_USES_ONLY_FEATURE_APPLICATION](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-82](rule-82.md) | admin의 엔드포인트는 requireAdmin을 부른다. | [ADMIN_ENDPOINTS_REQUIRE_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-83](rule-83.md) | requireAdmin은 admin 안에서만 부른다. | [REQUIRE_ADMIN_ONLY_IN_ADMIN](../../backend/src/test/java/com/bifos/assistant/architecture/ArchitectureRules.java) |
+| [rule-84](rule-84.md) | 하위 기능과 admin의 경계, dto와 도우미의 소속은 리뷰가 판단한다. | [리뷰](../../.github/workflows/code-review-prompt.txt) |
