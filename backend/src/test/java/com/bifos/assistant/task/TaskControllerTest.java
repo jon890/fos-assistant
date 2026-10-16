@@ -83,7 +83,7 @@ class TaskControllerTest {
     void setUp() {
         clean();
         String email = "task-api-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, "작업 주인", 1L, UserRole.MEMBER, BASE));
+        AppUser user = users.save(AppUser.of(email, "작업 주인", 1L, UserRole.MEMBER));
         when(currentUser.require())
             .thenReturn(new CurrentUser(user.id(), user.email(), user.displayName(), 1L, UserRole.MEMBER));
         String code = "task-api-" + UUID.randomUUID().toString().substring(0, 8);
@@ -95,8 +95,7 @@ class TaskControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            BASE));
+            user.id()));
         mvc = MockMvcBuilders.standaloneSetup(new TaskController(currentUser, service))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();

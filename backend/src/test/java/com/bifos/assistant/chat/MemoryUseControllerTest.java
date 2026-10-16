@@ -113,7 +113,7 @@ class MemoryUseControllerTest {
             "fos-" + UUID.randomUUID());
         messages.save(ChatMessage.fromAssistant(conversation.id(), "답", run.id(), Instant.now()));
         contextSources.save(ExecutionContextSource.of(
-            run.id(), 0, "MEMORY_FACTS", "memory:" + memory.id(), "INLINE", "FRESH", Instant.now()));
+            run.id(), 0, "MEMORY_FACTS", "memory:" + memory.id(), "INLINE", "FRESH"));
         when(currentUser.require()).thenReturn(dad);
     }
 

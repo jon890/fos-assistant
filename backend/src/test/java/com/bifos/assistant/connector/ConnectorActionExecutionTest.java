@@ -215,8 +215,7 @@ class ConnectorActionExecutionTest {
             value(sample, "name").startsWith("normalization-integrity-")
                 ? historicalRequestKey(sample, action, binding)
                 : "0".repeat(64),
-            ConnectorExecutionSnapshot.PROTOCOL,
-            NOW));
+            ConnectorExecutionSnapshot.PROTOCOL));
         em.clear();
         ConnectorAction reloaded = actions.findById(action.id()).orElseThrow();
         ConnectorActionExecution row = contents.findById(action.id()).orElseThrow();
@@ -777,7 +776,7 @@ class ConnectorActionExecutionTest {
 
 
     private Fixture fixture() {
-        AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER));
         Agent agent = agents.saveAndFlush(Agent.of(
             "execution-" + UUID.randomUUID(),
             "검사용 에이전트",
@@ -786,8 +785,7 @@ class ConnectorActionExecutionTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            NOW));
+            user.id()));
         ConnectorConnection connection = ConnectorConnection.pending(user.id(), "demo-financial", NOW);
         connection.connected(new ConnectionFields(Map.of("account", "000007"), Map.of("secret", "fake")), NOW);
         connection.ready(NOW);

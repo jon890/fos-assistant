@@ -42,7 +42,7 @@ public class DataKeyWriter {
         byte[] dataKey = new byte[KEY_BYTES];
         RANDOM.nextBytes(dataKey);
         String wrapped = keks.wrap(dataKey, UserDataKey.wrapBinding(userId));
-        return keys.saveAndFlush(UserDataKey.wrapped(userId, keks.activeKeyId(), wrapped, clock.instant()));
+        return keys.saveAndFlush(UserDataKey.wrapped(userId, keks.activeKeyId(), wrapped));
     }
 
 

@@ -602,7 +602,7 @@ class PendingMessageServiceTest {
 
 
     private CurrentUser signedUp(String email, String name) {
-        AppUser user = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(email, name, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -616,8 +616,7 @@ class PendingMessageServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ownerId,
-            Instant.now());
+            ownerId);
     }
 
 

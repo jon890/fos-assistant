@@ -19,7 +19,6 @@ import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,8 +39,7 @@ class ModelTierFallbackIntegrationTest {
         CostMode.SUBSCRIPTION,
         CredentialScope.SHARED_HOUSEHOLD,
         AgentVisibility.GROUP,
-        null,
-        Instant.now());
+        null);
 
     private static final Long GROUP_ID = 9_000_000_002L;
 

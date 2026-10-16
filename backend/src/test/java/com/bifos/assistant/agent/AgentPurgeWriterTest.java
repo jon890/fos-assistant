@@ -124,7 +124,7 @@ class AgentPurgeWriterTest {
     @BeforeEach
     void setUp() {
         String email = "agent-purge-" + UUID.randomUUID() + "@example.test";
-        owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         String code = "purge-" + UUID.randomUUID().toString().substring(0, 8);
         agent = agents.save(Agent.of(
             code,
@@ -134,8 +134,7 @@ class AgentPurgeWriterTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
     }
 
 
@@ -225,7 +224,7 @@ class AgentPurgeWriterTest {
 
     /** 에이전트를 가리키는 표마다 한 줄씩 만든다. 지우지 않은 대화 하나와 그 대화의 실행 하나도 만든다. */
     Attached attachEverything() {
-        collections.saveAndFlush(AgentMemoryCollection.of(agent.id(), "core", false, NOW));
+        collections.saveAndFlush(AgentMemoryCollection.of(agent.id(), "core", false));
         collectionChanges.saveAndFlush(AgentMemoryCollectionChange.of(
             agent.id(), "core", AgentMemoryCollectionChangeType.GRANTED, false, owner.id(), NOW));
         toolsetRequests.saveAndFlush(AgentToolsetRequest.of(1L, agent.id(), owner.id(), "image_gen", NOW));

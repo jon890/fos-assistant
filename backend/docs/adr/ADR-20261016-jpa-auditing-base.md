@@ -33,12 +33,13 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 기존 NOT NULL인 변경 시각은 `@AttributeOverride`로 NOT NULL 매핑을 유지한다.
 이번에 추가하는 세 변경 시각만 NULL을 허용한다. 생성 전용 base를 쓰는 불변 기록에는 변경 시각을 추가하지 않는다.
 
-### 기존 created_at 46개 엔티티의 전수 판정
+### created_at 45개 엔티티의 전수 판정
 
-2026-10-16 설계 시점의 운영 엔티티 46개를 생성 시각과 변경 시각으로 나눠 판정한다.
+기억 단계 1과 사용자 금융 상한 이관을 반영한 운영 엔티티 45개를 생성 시각과 변경 시각으로 나눠 판정한다.
 `C`는 순수 저장 생성 시각만 base로 옮기고, `C+U`는 순수 저장 생성·변경 시각을 모두 옮긴다.
 `제외`는 createdAt 자체가 업무 시각이므로 어느 base도 상속하지 않는다.
-판정 결과는 생성 전용 27개, 생성·변경 6개, 제외 13개이며 auditing 대상은 33개다.
+판정 결과는 생성 전용 25개, 생성·변경 7개, 제외 13개이며 auditing 대상은 32개다.
+기존 46개에서 ServiceToken과 FinancialLimitChange는 삭제됐고 MemoryEmbedding이 추가됐다.
 변경 시각이 없던 엔티티에 새 updated_at을 추가하는 대상은 Agent/AppUser/AllowedPerson 세 개뿐이다.
 「없음」은 UPDATE bulk가 없다는 뜻이며 DELETE bulk는 callback 대상이 아니다.
 
@@ -68,12 +69,12 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `conversation` / `Conversation` | C: 대화 행의 최초 저장만 자동화 | U는 활동·목록 정렬 시각. rename/touch/delete bulk 인자 유지 |
 | `execution_context_source` / `ExecutionContextSource` | C: 문맥 참조 행의 저장 시각. freshness는 별도 snapshot 속성 | 복합 ID와 Persistable의 insert 우선·중복 PK 거절 유지 |
 | `execution_question` / `ExecutionQuestion` | C: 실행 안의 질문 식별 행 저장 시각 | UPDATE bulk 없음 |
-| `financial_limit_change` / `FinancialLimitChange` | C: 승인 action에 딸린 불변 변경 요청 행의 저장 시각 | actionId 지정 ID. 승인·상한 적용 시각을 이 C로 대체하지 않음 |
 | `follow_up` / `FollowUp` | 제외: 할 일 제안 시각. FollowUpAttentionSource가 C와 U로 제안·최신 상태의 신호를 구성 | U와 dueAt/acceptedAt/closedAt도 명시 전달 |
 | `hermes_session_binding` / `HermesSessionBinding` | C: session과 최초 실행의 불변 대응 행 저장 시각 | session 재등록은 기존 행 재사용. UPDATE bulk 없음 |
 | `media_observation` / `MediaObservation` | 제외: 관찰 revision 시각. MediaObservationService가 C에서 15분 유효기간을 계산 | C와 expiresAt 유지 |
 | `memory` / `Memory` | C: 문서 본체의 최초 저장만 자동화 | U/acceptedAt은 문서 변경·수락의 업무 시각. revision.changedAt은 별도로 보존 |
 | `memory_capture` / `MemoryCapture` | C: 기억하기·되돌리기 참조 행의 저장 시각. 되돌림 비교는 baseRevision이 담당 | undoneAt은 명시 전달 |
+| `memory_embedding` / `MemoryEmbedding` | C+U: 벡터 행의 저장·교체 시각. 문서 revision과 지문은 별도 속성 | memoryId 지정 ID. 기존 행을 읽어 replace하고 신규 ID만 save/merge |
 | `memory_collection` / `MemoryCollection` | C: collection 행의 최초 저장. 현재 auditing 대상 | 복합 ID saveAll의 merge 반환값 사용 |
 | `notification` / `Notification` | C: 알림 원장 행의 저장 시각. 커서와 오래된 행 정리는 이 저장 순서를 사용 | readAt 및 읽음 bulk 유지. 원인의 발생 시각을 대체하지 않음 |
 | `proactive_autonomy_decision` / `AutonomyDecision` | 제외: 평가와 판정의 동일 배치 시각. AutonomyPolicyService가 평가 C를 전달 | C 명시 전달. 재설계와 무관하게 현재 업무 계약 보존 |
@@ -82,7 +83,6 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | `proactive_loop_run` / `ProactiveLoopRun` | 제외: 루프 시작 시각을 C에 기록하며 finishedAt과 실행 수명을 이룸 | 수명·재시도 시각 유지 |
 | `proactive_value_evaluation` / `ValueEvaluation` | 제외: 같은 평가 배치의 동일 시각. ValueEvaluationOverviews가 C의 동등성으로 최신 묶음을 선택 | 한 배치의 같은 Clock 인자 유지 |
 | `result_delivery` / `ResultDelivery` | C: 결과 전달 묶음 행의 저장 시각 | U는 전달 상태의 업무 시각. 상태·attempt bulk 인자 유지 |
-| `service_token` / `ServiceToken` | C: 서비스 토큰 행의 저장 시각 | expiresAt/lastUsedAt/revokedAt 및 사용·폐기 bulk 유지 |
 | `subagent_usage_job` / `SubagentUsageJob` | 제외: 사용량 대조 큐의 수락 시각. C+120초로 실패 조건을 계산 | nextAttemptAt/expiresAt/recordedAt 유지 |
 | `task` / `Task` | C+U: 예약 작업 설정 행의 저장 시각. 실행 수명은 TaskRun이 담당 | archivedAt은 명시 전달. 대화 연결 bulk는 U 명시 |
 | `task_run` / `TaskRun` | 제외: 실행 큐 수락 시각. TaskRunStarter가 C+startTimeout으로 시작 제한을 판정 | scheduledFor/startedAt/finishedAt 유지 |
@@ -98,7 +98,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 ### 복합 키와 지정 ID
 
 `MemoryCollection`, `AgentMemoryCollection`, `ExecutionContextSource`는 복합 ID,
-`FinancialLimitChange`는 actionId를 직접 지정한다. base는 ID와 Persistable 정책을 소유하지 않는다.
+`MemoryEmbedding`은 memoryId를 직접 지정한다. base는 ID와 Persistable 정책을 소유하지 않는다.
 새 복합 ID를 save/merge할 때는 반환된 managed 객체를 사용하고, 기존 DB 객체의 detach/merge에서는 C를 보존한다.
 `AgentMemoryCollectionService.replace`는 현재 행을 먼저 읽어 민감 허용만 고치므로 C를 유지한다.
 삭제한 권한을 다시 붙이면 새 행의 C가 생긴다. `ExecutionContextSource`의 isNew와 PostLoad/PostPersist 정책을 유지해 같은 position의 재삽입을 PK 오류로 거절한다.
@@ -129,7 +129,7 @@ rollback한 행과 변경은 DB에 남지 않는다. 기존 행의 생성 시각
 | 전수 표에서 제외한 createdAt 전체 | 메시지·승인·제안·주의 사건, 평가 배치, revision, 큐·실행 수명 |
 
 시각이 없는 하위 행이나 재설계 예정 proactive 표에 새 감사 칸을 일괄 추가하지 않는다.
-전수 표 밖에서 created_at이 없는 21개 엔티티는 base를 상속하지 않는다.
+전수 표 밖에서 created_at이 없는 19개 엔티티는 base를 상속하지 않는다.
 금융 상한은 사용자 본체로 옮기는 #551의 결과를 사용하며 별도 금융 상한 표에 칸을 더하지 않는다.
 
 ### 기존 행과 bulk 갱신
@@ -144,6 +144,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 | 경로 | 시각 책임 |
 | --- | --- |
 | `AppUserRepository.updateModelDefaultTier` | `ModelTierService`가 기존 `Clock`의 MICROS 시각을 인자로 넘기고 JPQL이 `updatedAt`도 갱신한다. 같은 tier 또는 둘 다 NULL이면 UPDATE하지 않는다. 갱신 수가 0이면 사용자 존재 여부를 확인해 no-op과 존재하지 않는 사용자를 구분한다 |
+| `FinancialOrderLimitRepository.store` | limit_updated_at은 기존 업무 시각으로 남기고 감사 updated_at은 별도 MICROS 인자로 함께 갱신한다 |
 | `AllowedPersonRepository.updateLastLoginAtIfNewer` | 로그인 시각만 조건부 갱신한다. 관리 설정 변경 시각인 `updatedAt`은 움직이지 않는다 |
 | `ConversationRepository`의 bulk 갱신 | 기존 인자와 조건을 보존한다 |
 | `ResultDeliveryRepository`의 상태·attempt 갱신 | 기존 시각 인자를 보존한다 |
@@ -151,7 +152,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않는다.
 | `ContentDraftJobRepository`의 claim 갱신 | 기존 claim 시각과 조건을 보존한다 |
 | `ContentDraftRepository`, `ContentDraftRevisionRepository` | 현재 revision·만료·파기 상태를 조건부 갱신한다. 생성 C는 보존한다 |
 | `ChatAttachmentRepository`, `ChatPendingMessageRepository` | 삭제 요청·삭제 시각과 held 상태만 갱신한다. 큐 수락 C는 보존한다 |
-| `ConnectorConversationGrantRepository`, `ServiceTokenRepository`, `AgentTokenRepository` | 허락·토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
+| `ConnectorConversationGrantRepository`, `AgentTokenRepository` | 허락·토큰의 사용·폐기 시각을 명시적으로 갱신한다. C만 가진 불변 생성 기록에 U를 더하지 않는다 |
 | `NotificationRepository`의 읽음 갱신 | readAt만 갱신하고 생성 C는 보존한다 |
 
 감사 대상의 새 bulk 경로는 같은 트랜잭션에서 업무 값과 감사 시각을 함께 갱신해야 한다.
@@ -163,7 +164,7 @@ bulk 뒤에는 기존 영속성 문맥의 오래된 값을 다시 저장해 덮�
 설정과 provider는 각각 하나만 허용한다. 누락·중복·다른 상속·업무 필드나 getter의 annotation도 실패시킨다.
 `Auditable`, `AbstractAuditable`, `@CreatedBy`, `@LastModifiedBy`는 계속 거절한다.
 기존 MemoryCollection의 callback·merge·rollback 검사를 유지하고 모든 적용 엔티티의 생성 및 C+U 대상의 변경·no-op과 bulk 검사를 더한다.
-전수 표의 46개 createdAt 선택 수를 검사해 누락·추가를 발견하면 표와 판정을 함께 고치게 한다.
+전수 표의 45개 createdAt 선택 수를 검사해 누락·추가를 발견하면 표와 판정을 함께 고치게 한다.
 생성 전용 엔티티가 AuditedEntity를 상속하거나 불필요한 updated_at을 얻으면 구조·스키마 검사에서 실패한다.
 업무 시각 제외 목록은 필드와 getter의 annotation, 상속으로 유입되는 auditing을 모두 거절한다.
 H2와 실제 MySQL에서 ORM 및 JDBC 재조회 값이 MICROS로 같아야 한다.

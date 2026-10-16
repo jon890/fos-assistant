@@ -276,6 +276,15 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 
 실제로 들어온 적이 있는 사용자다. 그룹의 첫 사용자가 `ADMIN` 이 되고 그 뒤로는 `MEMBER` 다. `model_default_tier` 가 비면 그룹 기본값을 따른다.
 
+#### 저장 감사 시각
+
+`agent`, `app_user`, `allowed_person`의 `updated_at`은 `DATETIME(6) NULL`이다.
+기록을 시작하기 전 행은 마지막 변경 시점을 모르므로 NULL을 보존하며 생성 시각이나 배포 시각으로 채우지 않는다.
+새 행과 첫 실제 변경부터 JPA auditing 또는 명시적인 bulk 시각이 채운다. 조회와 no-op은 바꾸지 않는다.
+기존 `created_at`은 변경하지 않고 DB 기본값과 ON UPDATE도 두지 않는다.
+순수 저장 시각의 전체 범위와 업무 시각의 제외 목록은
+[ADR-20261016 / jpa-auditing-base](adr/ADR-20261016-jpa-auditing-base.md)가 갖는다.
+
 #### 주문 상한 컬럼
 
 `limit_` 로 시작하는 컬럼은 계좌 주인이 운영 최대치 안에서 정한 금융 주문 상한이다. 근거는 [ADR-20261015 / financial-user-limits](../../docs/adr/ADR-20261015-financial-user-limits.md)가 갖는다.
@@ -288,6 +297,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 적용하는 값은 이 컬럼과 운영 최대치 가운데 작은 것이다. 운영 최대치가 내려가도 이 컬럼은 고치지 않는다.
 **이 컬럼은 전용 `UPDATE` 로만 바꾼다.** `AppUser` 엔티티는 이 컬럼을 넣기와 고치기에서 빼므로, 먼저 읽어 둔 사용자를 나중에 저장해도 상한을 옛 값으로 덮지 않는다. 읽기도 엔티티를 거치지 않는 전용 쿼리로 한다.
 쓰는 쪽은 같은 트랜잭션에서 그 사용자의 `app_user` 행을 먼저 잠그고 다시 읽은 뒤 쓴다. 금융 준비와 금융 승인이 같은 행을 잠그고 상한을 읽는다.
+전용 금융 UPDATE는 `limit_updated_at`과 일반 감사 `updated_at`을 함께 적는다. 두 칸의 의미를 합치지 않는다.
 
 ### allowed_person
 

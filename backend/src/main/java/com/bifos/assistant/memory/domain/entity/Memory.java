@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
@@ -37,7 +38,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Memory {
+public class Memory extends CreatedAtEntity {
 
     /** 따로 정하지 않은 항목이 가는 collection 이다. 기존 Memory 가 모두 여기 있다. */
     public static final String DEFAULT_COLLECTION = "core";
@@ -116,8 +117,6 @@ public class Memory {
     @Column(name = "accepted_at")
     private Instant acceptedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
@@ -146,7 +145,6 @@ public class Memory {
         this.revision = 1;
         this.status = status;
         this.proposedByExecutionId = proposedByExecutionId;
-        this.createdAt = now;
         this.updatedAt = now;
     }
 

@@ -221,7 +221,7 @@ class ConnectorDeliveryRetryTest {
             .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
         awaitCatalogReadable();
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         chief = agents.save(agent("dad", "비서", user.id()));
         // 승인 줄은 판정한 실행의 에이전트(chief)에 붙은 바인딩의 profile 에서 실행한다.
@@ -340,7 +340,7 @@ class ConnectorDeliveryRetryTest {
     @Test
     @DisplayName("다른 사용자의 승인 줄 열쇠와 UUID 가 아닌 열쇠는 다시 읽지 않는다")
     void readsOnlyOwnActionsByKey() {
-        AppUser mom = users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser mom = users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER));
         UUID momsAction = insertAction(mom.id(), "SUCCEEDED", "{\"saved\":true}");
         UUID dadsAction = insertAction(dad.id(), "SUCCEEDED", "{\"saved\":true}");
 
@@ -418,8 +418,7 @@ class ConnectorDeliveryRetryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ownerId,
-            Instant.now());
+            ownerId);
     }
 
 

@@ -16,7 +16,6 @@ import com.bifos.assistant.memory.application.relevance.RelevanceResult;
 import com.bifos.assistant.memory.application.relevance.RelevanceScore;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -135,7 +134,7 @@ class MemoryRelevanceTest {
     private void store(RelevanceCandidate candidate, float[] vector) {
         String text = EmbeddingText.of(candidate.title(), candidate.plainBody(), EMBEDDING.maxTextChars());
         stored.add(MemoryEmbedding.of(
-            candidate.memoryId(), EMBEDDING.model(), EmbeddingText.fingerprint(EMBEDDING.model(), text), vector, Instant.EPOCH));
+            candidate.memoryId(), EMBEDDING.model(), EmbeddingText.fingerprint(EMBEDDING.model(), text), vector));
     }
 
 

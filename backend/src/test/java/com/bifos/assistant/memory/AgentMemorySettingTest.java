@@ -208,7 +208,7 @@ class AgentMemorySettingTest {
     @DisplayName("목록에 없는 받는 collection 은 key 이름으로 뒤에 붙이고 그대로 둘 수 있다")
     void appendsGrantedCollectionsOutsideTheListAndKeepsThem() {
         Agent agent = agent(AgentVisibility.PRIVATE, owner.id());
-        grants.save(AgentMemoryCollection.of(agent.id(), "legacy-notes", false, NOW));
+        grants.save(AgentMemoryCollection.of(agent.id(), "legacy-notes", false));
 
         AgentMemorySettingView view = controller.replace(
             agent.code(),
@@ -298,7 +298,7 @@ class AgentMemorySettingTest {
 
 
     private AppUser user(String displayName, UserRole role) {
-        AppUser saved = users.save(AppUser.of("user-" + UUID.randomUUID() + "@example.com", displayName, groupId, role, NOW));
+        AppUser saved = users.save(AppUser.of("user-" + UUID.randomUUID() + "@example.com", displayName, groupId, role));
         userIds.add(saved.id());
         return saved;
     }
@@ -314,8 +314,7 @@ class AgentMemorySettingTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             visibility,
-            ownerUserId,
-            NOW));
+            ownerUserId));
         agentIds.add(saved.id());
         return saved;
     }

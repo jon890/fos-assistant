@@ -363,7 +363,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
     void otherUserCannotApproveFinancialAction() {
         var requested = request();
         var other = tx().execute(status -> users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "다른 사람", 1L,
-            UserRole.MEMBER, now)));
+            UserRole.MEMBER)));
         var stranger = new CurrentUser(other.id(), other.email(), "다른 사람", 1L, UserRole.MEMBER);
         assertThatThrownBy(() -> approval.approve(stranger, requested.actionId())).isInstanceOf(ApiException.class);
         assertRejectedBeforeTransmission(requested.actionId());
@@ -384,7 +384,7 @@ class FinancialConnectorProducerRoundTripTest extends FinancialConnectorProducer
                 profile + "-moved", bindingId);
             default -> {
                 var other = tx().execute(status -> users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "새 주인", 1L,
-                    UserRole.MEMBER, now)));
+                    UserRole.MEMBER)));
                 jdbc.update("update agent set owner_user_id = ? where id = (select agent_id from agent_connector_binding where id = ?)",
                     other.id(), bindingId);
             }

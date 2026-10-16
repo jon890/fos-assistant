@@ -37,19 +37,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
-import java.time.Clock;
-import java.util.Arrays;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.annotation.CreatedBy;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedBy;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.auditing.DateTimeProvider;
-import org.springframework.data.domain.Auditable;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.IdClass;
@@ -110,96 +98,7 @@ import org.springframework.web.bind.annotation.RestController;
 public final class ArchitectureRules {
 
     /** rule-1: 까닭과 예외는 docs/code-rules/rule-1.md를 본다. */
-    public static final ArchRule AUDITING_LISTENERS_AND_CLOCK = classes()
-        .should(new ArchCondition<JavaClass>("MemoryCollection.createdAt 의 auditing listener 와 Clock 선언을 지킨다") {
-            private int entities;
-            private int configs;
-            private int providers;
-
-
-            @Override
-            public void init(Collection<JavaClass> allClasses) {
-                entities = 0;
-                configs = 0;
-                providers = 0;
-            }
-
-
-            @Override
-            public void check(JavaClass type, ConditionEvents events) {
-                boolean collection = type.getSimpleName().equals("MemoryCollection")
-                    || (type.isAnnotatedWith(Table.class)
-                        && type.getAnnotationOfType(Table.class).name().equals("memory_collection"));
-                if (collection) {
-                    entities++;
-                    require(type, type.getName().equals("com.bifos.assistant.memory.domain.entity.MemoryCollection")
-                        && type.isAnnotatedWith(Entity.class), "MemoryCollection 선택과 Entity 선언", events);
-                    require(type, type.isAnnotatedWith(EntityListeners.class)
-                        && Arrays.asList(type.getAnnotationOfType(EntityListeners.class).value())
-                            .equals(List.of(AuditingEntityListener.class)),
-                        "EntityListeners 선언", events);
-                    Optional<JavaField> created = type.tryGetField("createdAt");
-                    require(type, created.isPresent() && created.get().getRawType().isEquivalentTo(Instant.class)
-                        && created.get().isAnnotatedWith(CreatedDate.class), "createdAt Instant 와 CreatedDate", events);
-                }
-                if (!collection) {
-                    require(type, !type.isAnnotatedWith(EntityListeners.class)
-                        || Arrays.stream((JavaClass[])type.getAnnotationOfType(EntityListeners.class.getName())
-                            .getProperties().get("value"))
-                            .noneMatch(listener -> listener.isEquivalentTo(AuditingEntityListener.class)),
-                        "허용하지 않은 AuditingEntityListener 선언", events);
-                    require(type, !type.isAssignableTo(Auditable.class),
-                        "허용하지 않은 Auditable 구현 또는 상속", events);
-                }
-                for (JavaField field : type.getFields()) {
-                    boolean allowed = collection && field.getName().equals("createdAt");
-                    require(type, (!field.isAnnotatedWith(CreatedDate.class) || allowed)
-                        && !field.isAnnotatedWith(LastModifiedDate.class)
-                        && !field.isAnnotatedWith(CreatedBy.class)
-                        && !field.isAnnotatedWith(LastModifiedBy.class), "허용하지 않은 auditing field " + field.getFullName(), events);
-                }
-                for (JavaMethod method : type.getMethods()) {
-                    require(type, !method.isAnnotatedWith(CreatedDate.class)
-                        && !method.isAnnotatedWith(LastModifiedDate.class)
-                        && !method.isAnnotatedWith(CreatedBy.class)
-                        && !method.isAnnotatedWith(LastModifiedBy.class), "허용하지 않은 auditing getter " + method.getFullName(), events);
-                    if (method.isAnnotatedWith(Bean.class)) {
-                        Bean bean = method.getAnnotationOfType(Bean.class);
-                        boolean named = Arrays.asList(bean.value()).contains("auditingDateTimeProvider")
-                            || Arrays.asList(bean.name()).contains("auditingDateTimeProvider")
-                            || (bean.value().length == 0 && bean.name().length == 0
-                                && method.getName().equals("auditingDateTimeProvider"));
-                        if (named) {
-                            providers++;
-                            require(type, type.getSimpleName().equals("JpaAuditingConfig")
-                                && method.getRawReturnType().isEquivalentTo(DateTimeProvider.class)
-                                && method.getRawParameterTypes().size() == 1
-                                && method.getRawParameterTypes().getFirst().isEquivalentTo(Clock.class),
-                                "auditingDateTimeProvider Bean 반환과 Clock 인자", events);
-                        }
-                    }
-                }
-                if (type.getSimpleName().equals("JpaAuditingConfig") || type.isAnnotatedWith(EnableJpaAuditing.class)) {
-                    configs++;
-                    require(type, type.getName().equals("com.bifos.assistant.shared.config.JpaAuditingConfig")
-                        && type.isAnnotatedWith(Configuration.class)
-                        && type.isAnnotatedWith(EnableJpaAuditing.class)
-                        && type.getAnnotationOfType(EnableJpaAuditing.class).dateTimeProviderRef()
-                            .equals("auditingDateTimeProvider"),
-                        "JpaAuditingConfig providerRef 선언", events);
-                }
-            }
-
-
-            @Override
-            public void finish(ConditionEvents events) {
-                if (entities != 1 || configs != 1 || providers != 1) {
-                    events.add(SimpleConditionEvent.violated("auditing", "MemoryCollection / JpaAuditingConfig / auditingDateTimeProvider 선택 수는 각각 1: "
-                        + entities + " / " + configs + " / " + providers));
-                }
-            }
-        });
-
+    public static final ArchRule AUDITING_LISTENERS_AND_CLOCK = JpaAuditingRules.rule();
 
     private static void require(JavaClass type, boolean valid, String detail, ConditionEvents events) {
         if (!valid) {

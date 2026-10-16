@@ -1,5 +1,6 @@
 package com.bifos.assistant.notification.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.notification.domain.type.NotificationKind;
 import com.bifos.assistant.notification.domain.type.NotificationTargetType;
 import jakarta.persistence.Column;
@@ -36,7 +37,7 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Notification {
+public class Notification extends CreatedAtEntity {
 
     /** {@code title} 칸의 길이다. 넘으면 잘라 저장한다. */
     public static final int TITLE_MAX = 200;
@@ -94,8 +95,6 @@ public class Notification {
     private UUID sourcePublicId;
 
     /** 칸이 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다. */
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     /** 읽음으로 표시한 시각이다. 비면 읽지 않았다. {@code createdAt} 처럼 마이크로초까지만 둔다. */
     @Column(name = "read_at")
@@ -108,7 +107,7 @@ public class Notification {
      * @param target 누르면 갈 곳. 갈 곳이 없으면 null
      */
     public static Notification of(
-        Long userId, NotificationKind kind, String title, String body, NotificationTarget target, Instant now) {
+        Long userId, NotificationKind kind, String title, String body, NotificationTarget target) {
         Notification notification = new Notification();
         notification.userId = Objects.requireNonNull(userId, "userId");
         notification.kind = Objects.requireNonNull(kind, "kind");
@@ -118,7 +117,6 @@ public class Notification {
             notification.targetType = target.type();
             notification.targetPublicId = target.publicId();
         }
-        notification.createdAt = Objects.requireNonNull(now, "now").truncatedTo(ChronoUnit.MICROS);
         return notification;
     }
 

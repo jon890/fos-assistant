@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.chat.domain.type.DeliveryStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,7 +27,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ResultDelivery {
+public class ResultDelivery extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,8 +44,6 @@ public class ResultDelivery {
     @Column(name = "attempt_count", nullable = false)
     private int attemptCount;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     /** 상태가 바뀐 시각이다. */
     @Column(name = "updated_at", nullable = false)
@@ -55,7 +54,6 @@ public class ResultDelivery {
         this.conversationId = conversationId;
         this.status = status;
         this.attemptCount = attemptCount;
-        this.createdAt = now;
         this.updatedAt = now;
     }
 

@@ -194,7 +194,7 @@ class ResultDeliveryRetryTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = currentUser(user);
         chief = agents.save(agent("dad", "비서", user.id()));
         worker = agents.save(agent("worker", "조사원", user.id()));
@@ -461,7 +461,7 @@ class ResultDeliveryRetryTest {
     @DisplayName("남의 대화이면 CONVERSATION_NOT_FOUND, 같은 사용자의 다른 대화 번호이면 DELIVERY_NOT_FOUND 다")
     void hidesDeliveryOfOtherConversation() {
         ResultDelivery delivery = failedDelivery(delegated(ExecutionStatus.SUCCEEDED, "조사 결과"));
-        CurrentUser mom = currentUser(users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER, Instant.now())));
+        CurrentUser mom = currentUser(users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER)));
         Conversation other = conversations.save(Conversation.startedBy(dad.id(), "다른 대화", chief.id(), Instant.now()));
 
         assertCode(
@@ -477,7 +477,7 @@ class ResultDeliveryRetryTest {
     @DisplayName("대화의 에이전트를 더 읽을 수 없으면 AGENT_NOT_FOUND, 꺼졌으면 AGENT_DISABLED 이고 묶음과 제출은 그대로다")
     void rejectsRetryWhenAgentIsNoLongerUsable() {
         ResultDelivery delivery = failedDelivery(delegated(ExecutionStatus.SUCCEEDED, "조사 결과"));
-        AppUser mom = users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser mom = users.save(AppUser.of("mom@example.com", "mom", 1L, UserRole.MEMBER));
         int submitted = stub().received().size();
 
         chief.changeAccess(true, AgentVisibility.PRIVATE, mom.id());
@@ -687,8 +687,7 @@ class ResultDeliveryRetryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ownerId,
-            Instant.now());
+            ownerId);
     }
 
 

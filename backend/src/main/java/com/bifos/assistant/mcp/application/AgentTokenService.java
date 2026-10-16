@@ -45,7 +45,7 @@ public class AgentTokenService {
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        AgentToken saved = tokens.save(AgentToken.issueFor(profileName, hash(raw), label, clock.instant()));
+        AgentToken saved = tokens.save(AgentToken.issueFor(profileName, hash(raw), label));
         return new IssuedToken(saved, raw);
     }
 

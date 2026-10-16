@@ -524,7 +524,7 @@ class ProactiveEvalGateTest {
 
     private CurrentUser newUser() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(AppUser.of("eval-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, clock.instant()));
+        AppUser user = users.save(AppUser.of("eval-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER));
         createdUsers.add(user.id());
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -540,8 +540,7 @@ class ProactiveEvalGateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            clock.instant());
+            user.id());
         agent.changeProactiveCheckWritesAllowed(writesAllowed);
         return agents.save(agent);
     }

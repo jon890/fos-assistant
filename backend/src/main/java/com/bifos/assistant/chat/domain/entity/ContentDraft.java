@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -18,7 +19,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ContentDraft {
+public class ContentDraft extends CreatedAtEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,19 +36,16 @@ public class ContentDraft {
     @Column(name = "current_revision", nullable = false)
     private long currentRevision;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
 
-    public ContentDraft(String publicId, Long conversationId, Long ownerUserId, Instant now, Instant expiresAt) {
+    public ContentDraft(String publicId, Long conversationId, Long ownerUserId, Instant expiresAt) {
         this.publicId = publicId;
         this.conversationId = conversationId;
         this.ownerUserId = ownerUserId;
         this.currentRevision = 1;
-        this.createdAt = now;
         this.expiresAt = expiresAt;
     }
 }

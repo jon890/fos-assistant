@@ -30,8 +30,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.lang.reflect.RecordComponent;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -72,8 +70,7 @@ class AgentProactiveCheckWritesAdminTest {
             mock(AppUserRepository.class),
             mock(AgentLifecycleService.class),
             mock(AgentEndpointProbe.class),
-            mock(AgentConnectorBindings.class),
-            Clock.systemUTC()),
+            mock(AgentConnectorBindings.class)),
         new CurrentUserProvider()))
         .setControllerAdvice(new GlobalExceptionHandler())
         .build();
@@ -91,8 +88,7 @@ class AgentProactiveCheckWritesAdminTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ADMIN.id(),
-            Instant.parse("2026-10-01T00:00:00Z"));
+            ADMIN.id());
         when(agents.findByCodeForUpdate("career")).thenAnswer(call -> Optional.of(agent));
         when(agents.save(any(Agent.class))).thenAnswer(call -> call.getArgument(0));
     }

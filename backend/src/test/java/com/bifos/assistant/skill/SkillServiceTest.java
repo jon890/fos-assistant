@@ -1266,8 +1266,7 @@ class SkillServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            ownerId,
-            Instant.now());
+            ownerId);
     }
 
 

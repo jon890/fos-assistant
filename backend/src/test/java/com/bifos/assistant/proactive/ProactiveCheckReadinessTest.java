@@ -56,8 +56,7 @@ class ProactiveCheckReadinessTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            NOW);
+            1L);
     }
 
 

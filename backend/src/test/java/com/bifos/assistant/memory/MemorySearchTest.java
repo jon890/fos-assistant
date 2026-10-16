@@ -207,7 +207,7 @@ public class MemorySearchTest {
         String content = jdbc.queryForObject("SELECT content FROM memory WHERE id = ?", String.class, memory.id());
         String text = EmbeddingText.of(memory.title(), content, embeddingProperties.maxTextChars());
         embeddings.save(MemoryEmbedding.of(
-            memory.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), vector, NOW));
+            memory.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), vector));
     }
 
 

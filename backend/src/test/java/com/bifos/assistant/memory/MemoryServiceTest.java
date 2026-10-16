@@ -91,12 +91,12 @@ class MemoryServiceTest {
     void deletesEmbeddingWithMemory() {
         Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
         Memory kept = memories.create(ADMIN, MemoryScope.USER, "남길 항목", "내용", false);
-        embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}, NOW));
+        embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}));
 
         RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용");
         String text = EmbeddingText.of("지울 항목", "내용", embeddingProperties.maxTextChars());
         embeddings.save(MemoryEmbedding.of(
-            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}, NOW));
+            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}));
         assertThat(vectorCache.vectorsFor(List.of(candidate))).containsKey(deleted.id());
 
         memories.delete(ADMIN, deleted.id());

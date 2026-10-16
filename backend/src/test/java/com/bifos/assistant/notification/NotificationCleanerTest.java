@@ -70,7 +70,7 @@ class NotificationCleanerTest {
 
 
     private Notification stored(Instant createdAt, boolean read) {
-        Notification notification = Notification.of(USER, NotificationKind.APPROVAL_EXPIRED, "승인 요청이 만료됐어요", "", null, createdAt);
+        Notification notification = Notification.of(USER, NotificationKind.APPROVAL_EXPIRED, "승인 요청이 만료됐어요", "", null);
         if (read) {
             notification.markRead(createdAt.plusSeconds(60));
         }

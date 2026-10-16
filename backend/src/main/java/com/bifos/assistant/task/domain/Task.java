@@ -1,10 +1,12 @@
 package com.bifos.assistant.task.domain;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.model.domain.type.ModelTier;
 import com.bifos.assistant.task.domain.type.ConversationMode;
 import com.bifos.assistant.task.domain.type.NotifyPolicy;
 import com.bifos.assistant.task.domain.type.TaskKind;
 import com.bifos.assistant.task.domain.type.TaskState;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -35,11 +37,12 @@ import org.hibernate.type.SqlTypes;
  * <p>시각 칸은 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다.
  */
 @Entity
+@AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false))
 @Table(name = "task", uniqueConstraints = @UniqueConstraint(name = "uk_task_public_id", columnNames = "public_id"))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Task {
+public class Task extends AuditedEntity {
 
     /** {@code title} 칸의 길이다. */
     public static final int TITLE_MAX = 100;
@@ -96,11 +99,6 @@ public class Task {
     @Column(name = "model_tier", length = 16)
     private ModelTier modelTier;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
 
     /** 지운 시각. {@code state} 가 {@code ARCHIVED} 일 때만 찬다. */
     @Column(name = "archived_at")
@@ -114,20 +112,18 @@ public class Task {
         String title,
         String instruction,
         ConversationMode mode,
-        NotifyPolicy notify,
-        Instant now) {
+        NotifyPolicy notify) {
         Task task = new Task();
         task.ownerUserId = Objects.requireNonNull(ownerUserId, "ownerUserId");
         task.kind = TaskKind.TURN;
         task.state = TaskState.ACTIVE;
-        task.createdAt = micros(now);
-        task.apply(agentId, title, instruction, mode, notify, now);
+        task.apply(agentId, title, instruction, mode, notify);
         return task;
     }
 
 
     /** 에이전트 하나의 매일 깨우기 설정이다. */
-    public static Task check(Long ownerUserId, Long agentId, String title, Instant now) {
+    public static Task check(Long ownerUserId, Long agentId, String title) {
         Task task = new Task();
         task.ownerUserId = Objects.requireNonNull(ownerUserId, "ownerUserId");
         task.agentId = Objects.requireNonNull(agentId, "agentId");
@@ -137,36 +133,32 @@ public class Task {
         task.state = TaskState.ACTIVE;
         task.conversationMode = ConversationMode.SINGLE;
         task.notifyPolicy = NotifyPolicy.NEVER;
-        task.createdAt = micros(now);
-        task.updatedAt = task.createdAt;
         return task;
     }
 
 
     /** 매일 깨우기의 켜짐 상태를 바꾼다. */
-    public void changeCheckEnabled(boolean enabled, Instant now) {
+    public void changeCheckEnabled(boolean enabled) {
         if (kind != TaskKind.CHECK) {
             throw new IllegalStateException("only CHECK tasks can change the proactive schedule");
         }
         state = enabled ? TaskState.ACTIVE : TaskState.PAUSED;
-        updatedAt = micros(now);
     }
 
 
     /** 에이전트, 이름, 지시, 대화 방식, 알림을 고친다. 시각은 {@link TaskTrigger} 가 고친다. */
     public void edit(
-        Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify, Instant now) {
-        apply(agentId, title, instruction, mode, notify, now);
+        Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify) {
+        apply(agentId, title, instruction, mode, notify);
     }
 
 
     /** 모델 단계를 고른다. null 이면 단계를 지운다. {@code TURN} 작업만 고를 수 있다. */
-    public void chooseModelTier(ModelTier tier, Instant now) {
+    public void chooseModelTier(ModelTier tier) {
         if (kind != TaskKind.TURN) {
             throw new IllegalStateException("only TURN tasks can choose a model tier");
         }
         modelTier = tier;
-        updatedAt = micros(now);
     }
 
 
@@ -175,12 +167,11 @@ public class Task {
      *
      * @return 바꿨으면 true
      */
-    public boolean pause(Instant now) {
+    public boolean pause() {
         if (state != TaskState.ACTIVE) {
             return false;
         }
         state = TaskState.PAUSED;
-        updatedAt = micros(now);
         return true;
     }
 
@@ -190,12 +181,11 @@ public class Task {
      *
      * @return 바꿨으면 true
      */
-    public boolean resume(Instant now) {
+    public boolean resume() {
         if (state != TaskState.PAUSED) {
             return false;
         }
         state = TaskState.ACTIVE;
-        updatedAt = micros(now);
         return true;
     }
 
@@ -207,7 +197,6 @@ public class Task {
         }
         state = TaskState.ARCHIVED;
         archivedAt = micros(now);
-        updatedAt = archivedAt;
     }
 
 
@@ -217,13 +206,12 @@ public class Task {
 
 
     private void apply(
-        Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify, Instant now) {
+        Long agentId, String title, String instruction, ConversationMode mode, NotifyPolicy notify) {
         this.agentId = Objects.requireNonNull(agentId, "agentId");
         this.title = Objects.requireNonNull(title, "title");
         this.instruction = Objects.requireNonNull(instruction, "instruction");
         this.conversationMode = Objects.requireNonNull(mode, "mode");
         this.notifyPolicy = Objects.requireNonNull(notify, "notify");
-        this.updatedAt = micros(now);
     }
 
 

@@ -1,5 +1,7 @@
 package com.bifos.assistant.chat.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
+
 import com.bifos.assistant.chat.domain.type.ConversationPurpose;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.model.domain.ModelChoice;
@@ -30,7 +32,7 @@ import org.hibernate.type.SqlTypes;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class Conversation {
+public class Conversation extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -127,8 +129,6 @@ public class Conversation {
     @Getter
     private Long taskId;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     @Getter
@@ -159,8 +159,7 @@ public class Conversation {
         this.title = title;
         this.agentId = agentId;
         this.purpose = purpose;
-        this.createdAt = now;
-        this.updatedAt = this.createdAt;
+        this.updatedAt = now;
     }
 
 

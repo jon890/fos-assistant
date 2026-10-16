@@ -151,8 +151,7 @@ public class AttachmentService {
             displayName(originalName),
             normalizedType,
             byteSize,
-            now.plus(Duration.ofDays(properties.retentionDays())),
-            now));
+            now.plus(Duration.ofDays(properties.retentionDays()))));
         attachment.nameStoredFile(AttachmentStore.storedName(attachment.id(), extension));
 
         try (InputStream in = jpeg == null ? body.getInputStream() : new ByteArrayInputStream(jpeg)) {

@@ -161,7 +161,7 @@ class TaskRunRecoveryTest {
         agents.save(agent);
         Fixture paused = fixture(NotifyPolicy.NEVER);
         Task pausedTask = tasks.findById(paused.task().id()).orElseThrow();
-        pausedTask.pause(NOW);
+        pausedTask.pause();
         tasks.save(pausedTask);
         TaskRun waiting = runs.save(TaskRun.queued(paused.task().id(), paused.trigger().id(), paused.ownerId(), SCHEDULED, NOW));
         TaskRunRecovery fresh = new TaskRunRecovery(runs, tasks, notices, checks, transactions, fixedClock());
@@ -204,8 +204,8 @@ class TaskRunRecoveryTest {
     @DisplayName("기동 정리는 읽지 않은 보고로 끝난 CHECK 발화를 INTERRUPTED 대신 건너뜀으로 회복하고 알리지 않는다")
     void recoversUnreadScheduledCheckWithoutCountingItAsInterrupted() {
         Fixture fixture = fixture(NotifyPolicy.ALWAYS);
-        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기"));
+        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED));
         ProactiveCheck check = ProactiveCheck.started(
             fixture.ownerId(), fixture.task().agentId(), 999_999L, CheckTrigger.SCHEDULED, false, NOW);
         check.skip(CheckSkippedReason.UNREAD_REPORT, NOW);
@@ -232,8 +232,8 @@ class TaskRunRecoveryTest {
     @DisplayName("기동 정리는 끝난 CHECK의 루트 실행 번호를 연결한 발화에 회복한다")
     void recoversCompletedCheckWithItsRootExecution() {
         Fixture fixture = fixture(NotifyPolicy.NEVER);
-        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        Task checkTask = tasks.save(Task.check(fixture.ownerId(), fixture.task().agentId(), "매일 먼저 살펴보기"));
+        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED));
         ProactiveCheck check = ProactiveCheck.started(
             fixture.ownerId(), fixture.task().agentId(), 999_998L, CheckTrigger.SCHEDULED, false, NOW);
         check.attachRoot(7_777L, "scheduled-session");
@@ -260,7 +260,7 @@ class TaskRunRecoveryTest {
 
     private Fixture fixture(NotifyPolicy notify) {
         String email = "recovery-" + UUID.randomUUID() + "@example.com";
-        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(owner.id());
         String code = "recovery-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = agents.save(Agent.of(
@@ -271,11 +271,10 @@ class TaskRunRecoveryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
         Task task = tasks.save(
-            Task.create(owner.id(), agent.id(), "매달 정리", "정리해 줘", ConversationMode.NEW_PER_RUN, notify, NOW));
-        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, SCHEDULED, NOW));
+            Task.create(owner.id(), agent.id(), "매달 정리", "정리해 줘", ConversationMode.NEW_PER_RUN, notify));
+        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, SCHEDULED));
         return new Fixture(owner.id(), task, trigger);
     }
 

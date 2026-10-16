@@ -110,8 +110,8 @@ class McpPrincipalTest {
         memoryRepository.deleteAll();
         tokenRepository.deleteAll();
         users.deleteAll();
-        userA = users.save(AppUser.of("principal-a@example.com", "가", 1L, UserRole.MEMBER, Instant.now()));
-        userB = users.save(AppUser.of("principal-b@example.com", "나", 1L, UserRole.MEMBER, Instant.now()));
+        userA = users.save(AppUser.of("principal-a@example.com", "가", 1L, UserRole.MEMBER));
+        userB = users.save(AppUser.of("principal-b@example.com", "나", 1L, UserRole.MEMBER));
         sharedToken = tokens.issue(SHARED, "shared").rawToken();
         privateAToken = tokens.issue(PRIVATE_A, "private").rawToken();
         memoryA = memories.create(current(userA), MemoryScope.USER, "색인 가", "가의 본문", false);

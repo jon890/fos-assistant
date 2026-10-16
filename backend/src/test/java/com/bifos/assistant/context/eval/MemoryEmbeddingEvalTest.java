@@ -126,7 +126,7 @@ class MemoryEmbeddingEvalTest {
             return vectors;
         };
         MemoryVectorCache cache = new MemoryVectorCache(embeddings, settings);
-        MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(settings, timed, embeddings, transactionManager, cache, backgroundTasks, clock);
+        MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(settings, timed, embeddings, transactionManager, cache, backgroundTasks);
         MemorySearchSection hybridSection = new MemorySearchSection(
             new MemoryRelevance(new KeywordScorer(), MemoryRelevanceProperties.defaults(), cache),
             MemorySearchSectionProperties.defaults(),

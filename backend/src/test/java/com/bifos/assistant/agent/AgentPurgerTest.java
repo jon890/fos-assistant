@@ -66,7 +66,7 @@ class AgentPurgerTest {
     @BeforeEach
     void setUp() {
         String email = "agent-purger-" + UUID.randomUUID() + "@example.test";
-        owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
     }
 
 
@@ -169,8 +169,7 @@ class AgentPurgerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW.minus(Duration.ofDays(30)));
+            owner.id());
         if (managed) {
             agent.markManagedProfile();
         }

@@ -155,7 +155,7 @@ public class ContentDraftService {
         request = creationRequests.saveAndFlush(new ContentDraftCreationRequest(context.creationKey(requestId),
             context.creationIdentityKey(requestId), context.ownerUserId(), context.conversationId(), context.profileName(),
             context.originExecutionId(), context.rootExecutionId(), context.rootSessionId(), requestId.toString(), hash,
-            id.toString(), clock.instant().truncatedTo(ChronoUnit.MICROS)));
+            id.toString()));
         saveCall(context, request);
         return readLocked(user, context.conversationId(), draft, null);
     }
@@ -169,9 +169,9 @@ public class ContentDraftService {
 
     private ContentDraft createLocked(CurrentUser user, Long conversationId, UUID id, ContentDraftInput input) {
         var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        var draft = new ContentDraft(id.toString(), conversationId, user.id(), now, now.plus(Duration.ofDays(30)));
+        var draft = new ContentDraft(id.toString(), conversationId, user.id(), now.plus(Duration.ofDays(30)));
         var prepared = references.prepare(draft, input.blocks());
-        draft = new ContentDraft(id.toString(), conversationId, user.id(), now, references.expiry(prepared, draft.expiresAt()));
+        draft = new ContentDraft(id.toString(), conversationId, user.id(), references.expiry(prepared, draft.expiresAt()));
         save(draft, 1, input, prepared);
         return draft;
     }

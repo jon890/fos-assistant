@@ -305,7 +305,7 @@ class TaskRunStarterTest {
         starter.startQueued(NOW);
         Long conversationId = runs.findById(run.id()).orElseThrow().conversationId();
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
-        task.pause(NOW);
+        task.pause();
         tasks.save(task);
         heldSlots.forEach(TurnSlot::release);
         heldSlots.clear();
@@ -378,11 +378,10 @@ class TaskRunStarterTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            fixture.owner().id(),
-            NOW));
+            fixture.owner().id()));
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
         task.edit(
-            replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy(), NOW);
+            replacement.id(), task.title(), task.instruction(), task.conversationMode(), task.notifyPolicy());
         tasks.save(task);
         heldSlots.forEach(TurnSlot::release);
         heldSlots.clear();
@@ -479,7 +478,7 @@ class TaskRunStarterTest {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
         AllowedPerson person = AllowedPerson.of(
-            fixture.owner().email(), "owner", fixture.owner().email(), NOW);
+            fixture.owner().email(), "owner", fixture.owner().email());
         person.disable();
         people.save(person);
 
@@ -502,7 +501,7 @@ class TaskRunStarterTest {
         Fixture fixture = fixture(ConversationMode.NEW_PER_RUN, NotifyPolicy.ALWAYS);
         TaskRun run = queued(fixture, SCHEDULED, NOW);
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
-        task.pause(NOW);
+        task.pause();
         tasks.save(task);
 
         starter.startQueued(NOW);
@@ -566,7 +565,7 @@ class TaskRunStarterTest {
                 assertThat(opened.await(10, TimeUnit.SECONDS)).isTrue();
                 newUserTransaction().executeWithoutResult(status -> {
                     Task task = tasks.findByIdForUpdate(fixture.task().id()).orElseThrow();
-                    task.pause(NOW);
+                    task.pause();
                     tasks.flush();
                     locked.countDown();
                     try {
@@ -691,8 +690,8 @@ class TaskRunStarterTest {
     @DisplayName("CHECK 발화는 점검 대화에서 SCHEDULED 살펴보기를 열고 task_run에 점검과 루트 실행을 연결한다")
     void startsScheduledCheckAndRecoversItsResult() {
         Fixture fixture = fixture(ConversationMode.SINGLE, NotifyPolicy.NEVER);
-        Task checkTask = tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기", NOW));
-        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED, NOW));
+        Task checkTask = tasks.save(Task.check(fixture.owner().id(), fixture.task().agentId(), "매일 먼저 살펴보기"));
+        TaskTrigger checkTrigger = triggers.save(TaskTrigger.cron(checkTask.id(), "0 9 * * *", SEOUL, MissedPolicy.SKIP, SCHEDULED));
         TaskRun run = runs.save(TaskRun.queued(
             checkTask.id(), checkTrigger.id(), fixture.owner().id(), SCHEDULED, NOW));
         stub().willReturn(HermesRunResult.of(
@@ -746,9 +745,8 @@ class TaskRunStarterTest {
                     renamed,
                     task.instruction(),
                     task.conversationMode(),
-                    task.notifyPolicy(),
-                    edited);
-                task.pause(edited);
+                    task.notifyPolicy());
+                task.pause();
             });
             return invocation.callRealMethod();
         })
@@ -929,7 +927,7 @@ class TaskRunStarterTest {
     /** 다시 읽은 작업에 단계를 고른다. fixture 의 분리된 객체를 저장하면 merge 가 다른 칸을 그 때의 값으로 덮는다. */
     private void chooseTier(Fixture fixture, ModelTier tier) {
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
-        task.chooseModelTier(tier, NOW);
+        task.chooseModelTier(tier);
         tasks.save(task);
     }
 
@@ -1016,7 +1014,7 @@ class TaskRunStarterTest {
 
     private Fixture fixture(ConversationMode mode, NotifyPolicy notify) {
         String email = "starter-" + UUID.randomUUID() + "@example.com";
-        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser owner = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(owner.id());
         String code = "starter-" + UUID.randomUUID().toString().substring(0, 8);
         Agent agent = agents.save(Agent.of(
@@ -1027,11 +1025,10 @@ class TaskRunStarterTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
-        Task task = tasks.save(Task.create(owner.id(), agent.id(), TITLE, INSTRUCTION, mode, notify, NOW));
+            owner.id()));
+        Task task = tasks.save(Task.create(owner.id(), agent.id(), TITLE, INSTRUCTION, mode, notify));
         TaskTrigger trigger = triggers.save(TaskTrigger.cron(
-            task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, Instant.parse("2026-12-01T00:00:00Z"), NOW));
+            task.id(), "0 9 1 * *", SEOUL, MissedPolicy.RUN_ONCE, Instant.parse("2026-12-01T00:00:00Z")));
         return new Fixture(owner, task, trigger);
     }
 

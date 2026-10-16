@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.connector.domain.type.ConnectionStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -34,7 +35,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ConnectorConnection {
+public class ConnectorConnection extends CreatedAtEntity {
     /** {@code fields} 열의 크기다. 저장할 JSON 텍스트가 이보다 길면 등록을 받지 않는다. */
     public static final int FIELDS_LENGTH = 4000;
 
@@ -67,8 +68,6 @@ public class ConnectorConnection {
     @Column(name = "undeclared_tools", nullable = false)
     private int undeclaredTools;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
@@ -79,7 +78,6 @@ public class ConnectorConnection {
         this.connectorId = connectorId;
         this.status = ConnectionStatus.PENDING;
         this.fields = ConnectionFields.empty();
-        this.createdAt = now;
         this.updatedAt = now;
     }
 

@@ -79,8 +79,7 @@ class CheckConversationsTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            NOW));
+            user.id()));
         createdAgents.add(agent.id());
     }
 

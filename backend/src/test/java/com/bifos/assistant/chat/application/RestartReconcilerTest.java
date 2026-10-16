@@ -173,7 +173,7 @@ class RestartReconcilerTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("reconcile-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("reconcile-dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         chief = agents.save(agent("dad", "비서"));
         worker = agents.save(agent("worker", "조사원"));
@@ -814,8 +814,7 @@ class RestartReconcilerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            dad.id(),
-            Instant.now());
+            dad.id());
     }
 
 

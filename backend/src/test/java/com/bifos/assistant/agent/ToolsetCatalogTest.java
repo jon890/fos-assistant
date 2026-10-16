@@ -18,7 +18,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -43,8 +42,7 @@ class ToolsetCatalogTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
+            1L);
         agent.changeAccess(false, AgentVisibility.PRIVATE, 1L);
         when(visibility.hiddenFor(1L)).thenReturn(Set.of("spotify", "discord"));
         when(toolsets.readCatalog())
@@ -81,8 +79,7 @@ class ToolsetCatalogTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now());
+            null);
         when(agents.findByDeletedAtIsNullOrderByCodeAsc())
             .thenReturn(List.of(agent));
         when(toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()))

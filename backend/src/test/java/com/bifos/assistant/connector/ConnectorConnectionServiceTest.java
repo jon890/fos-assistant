@@ -1215,8 +1215,7 @@ class ConnectorConnectionServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW);
+            owner.id());
         return agents.save(agent);
     }
 
@@ -1242,7 +1241,7 @@ class ConnectorConnectionServiceTest {
 
     private CurrentUser user(UserRole role, long groupId) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved = users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("connector-" + suffix + "@example.com", suffix, groupId, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

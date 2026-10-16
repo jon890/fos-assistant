@@ -1,5 +1,6 @@
 package com.bifos.assistant.user.domain;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -17,7 +18,7 @@ import lombok.experimental.Accessors;
 @Entity
 @Table(name = "app_user")
 @Accessors(fluent = true)
-public class AppUser {
+public class AppUser extends AuditedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -41,8 +42,6 @@ public class AppUser {
     @Getter
     private UserRole role;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     @Column(name = "model_default_tier", length = 16)
     @Getter
@@ -74,17 +73,16 @@ public class AppUser {
     protected AppUser() {}
 
 
-    private AppUser(String email, String displayName, Long groupId, UserRole role, Instant now) {
+    private AppUser(String email, String displayName, Long groupId, UserRole role) {
         this.email = email;
         this.displayName = displayName;
         this.groupId = groupId;
         this.role = role;
-        this.createdAt = now;
     }
 
 
-    public static AppUser of(String email, String displayName, Long groupId, UserRole role, Instant now) {
-        return new AppUser(email, displayName, groupId, role, now);
+    public static AppUser of(String email, String displayName, Long groupId, UserRole role) {
+        return new AppUser(email, displayName, groupId, role);
     }
 
 

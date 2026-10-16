@@ -170,13 +170,13 @@ abstract class FinancialConnectorTestBase {
         String sha = client.readCatalog().getFirst().executionGuardManifestSha256();
         tx().executeWithoutResult(status -> {
             String id = UUID.randomUUID().toString();
-            var owner = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER, now));
+            var owner = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER));
             profile = "producer-" + id;
             session = "fos-" + id;
             user = new CurrentUser(owner.id(), owner.email(), "검사 주인", 1L, UserRole.MEMBER);
-            people.saveAndFlush(AllowedPerson.of(owner.email(), "검사 주인", profile, now));
+            people.saveAndFlush(AllowedPerson.of(owner.email(), "검사 주인", profile));
             var agent = agents.saveAndFlush(Agent.of("producer-" + id, "검사", profile, "http://localhost",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id(), now));
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, owner.id()));
             var connection = ConnectorConnection.pending(owner.id(), "tossinvest", now);
             connection.connected(new ConnectionFields(Map.of("account", "7"), Map.of()), now);
             connection.ready(now);
@@ -252,7 +252,7 @@ abstract class FinancialConnectorTestBase {
 
     Long otherUser() {
         return tx().execute(status -> users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "다른 사람", 1L,
-            UserRole.MEMBER, now))).id();
+            UserRole.MEMBER))).id();
     }
 
 

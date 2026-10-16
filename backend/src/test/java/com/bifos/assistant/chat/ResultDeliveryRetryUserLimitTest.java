@@ -148,7 +148,7 @@ class ResultDeliveryRetryUserLimitTest {
         memories.deleteAll();
         users.deleteAll();
 
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         Agent chief = agents.save(agent("dad", "비서", user.id()));
         worker = agents.save(agent("worker", "조사원", user.id()));
@@ -264,8 +264,7 @@ class ResultDeliveryRetryUserLimitTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ownerId,
-            Instant.now());
+            ownerId);
     }
 
 

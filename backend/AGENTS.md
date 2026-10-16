@@ -89,10 +89,10 @@ main/test Java 전체를 확인하거나 적용할 때는 위 명령에 `-Pforma
 ## JPA auditing 범위
 
 계약은 [`code-architecture.md`의 「JPA 생성 시각」](docs/code-architecture.md#jpa-생성-시각)이 갖는다.
-검사: `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`, `MemoryCollectionAuditingPlacementTest`,
-`MemoryCollectionAuditingTest`, `MemoryCollectionAuditingMysqlTest`.
-실행: `./gradlew archTest`와 `./gradlew test --tests '*MemoryCollectionAuditingTest'`.
-MySQL 검사는 루트의 `scripts/checks/check-mysql-migration.sh --tests '*MemoryCollectionAuditingMysqlTest'`로 돌린다.
+검사: `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`, `JpaAuditingPlacementTest`,
+`JpaAuditingTest`, `JpaAuditingMysqlTest`, `JpaAuditingMigrationTest`와 기존 MemoryCollection 저장 검사.
+실행: `./gradlew archTest`와 `./gradlew test --tests '*JpaAuditingTest' --tests '*JpaAuditingMigrationTest' --tests '*MemoryCollectionAuditingTest'`.
+MySQL 검사는 루트의 `scripts/checks/check-mysql-migration.sh --tests '*JpaAuditingMysqlTest' --tests '*MemoryCollectionAuditingMysqlTest'`로 돌린다.
 
 ## MySQL 검사
 

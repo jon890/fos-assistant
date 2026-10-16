@@ -136,8 +136,7 @@ class ConnectorBindingTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            1L,
-            CREATED);
+            1L);
         return agent;
     }
 

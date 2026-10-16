@@ -1,5 +1,6 @@
 package com.bifos.assistant.crypto.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -21,7 +22,7 @@ import lombok.experimental.Accessors;
 @Table(name = "user_data_key")
 @Accessors(fluent = true)
 @Getter
-public class UserDataKey {
+public class UserDataKey extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,8 +38,6 @@ public class UserDataKey {
     @Column(name = "wrapped_key", nullable = false, length = 255)
     private String wrappedKey;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     /** 마지막으로 다른 KEK 로 다시 감싼 시각. 만든 뒤 한 번도 바꾸지 않았으면 비어 있다 */
     @Column(name = "rewrapped_at")
@@ -48,16 +47,15 @@ public class UserDataKey {
     protected UserDataKey() {}
 
 
-    private UserDataKey(Long userId, String kekId, String wrappedKey, Instant now) {
+    private UserDataKey(Long userId, String kekId, String wrappedKey) {
         this.userId = userId;
         this.kekId = kekId;
         this.wrappedKey = wrappedKey;
-        this.createdAt = now;
     }
 
 
-    public static UserDataKey wrapped(Long userId, String kekId, String wrappedKey, Instant now) {
-        return new UserDataKey(userId, kekId, wrappedKey, now);
+    public static UserDataKey wrapped(Long userId, String kekId, String wrappedKey) {
+        return new UserDataKey(userId, kekId, wrappedKey);
     }
 
 

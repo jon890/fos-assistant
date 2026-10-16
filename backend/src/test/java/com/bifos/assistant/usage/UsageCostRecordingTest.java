@@ -415,8 +415,7 @@ class UsageCostRecordingTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 
 
@@ -429,8 +428,7 @@ class UsageCostRecordingTest {
             CostMode.API,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 
 
@@ -444,8 +442,7 @@ class UsageCostRecordingTest {
             CostMode.API,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 
 

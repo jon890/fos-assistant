@@ -219,8 +219,7 @@ class AgentRunnerConnectorContextTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            1L,
-            Instant.now());
+            1L);
     }
 
 

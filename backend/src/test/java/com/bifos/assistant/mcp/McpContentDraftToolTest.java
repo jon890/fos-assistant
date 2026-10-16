@@ -110,8 +110,8 @@ class McpContentDraftToolTest {
     @BeforeEach
     void prepare() {
         clock.set(Instant.parse("2026-10-10T01:00:00Z"));
-        owner = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "원고 주인", 1L, UserRole.MEMBER, clock.instant()));
-        people.save(AllowedPerson.of(owner.email(), "원고 주인", PROFILE, clock.instant()));
+        owner = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "원고 주인", 1L, UserRole.MEMBER));
+        people.save(AllowedPerson.of(owner.email(), "원고 주인", PROFILE));
         var agent = McpCallSigner.agentFor(agents, PROFILE);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "원고", agent.id(), clock.instant()));
         token = tokens.issue(PROFILE, "원고 시험").rawToken();

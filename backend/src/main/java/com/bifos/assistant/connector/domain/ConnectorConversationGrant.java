@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -32,7 +33,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ConnectorConversationGrant {
+public class ConnectorConversationGrant extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -62,15 +63,13 @@ public class ConnectorConversationGrant {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     /** 사용자가 거두었거나, 연결을 해제하거나 다시 등록했거나, 에이전트에서 연결을 뗀 시각이다. */
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
 
-    public static ConnectorConversationGrant of(ConnectorAction action, Instant expiresAt, Instant now) {
+    public static ConnectorConversationGrant of(ConnectorAction action, Instant expiresAt) {
         ConnectorConversationGrant grant = new ConnectorConversationGrant();
         grant.userId = action.userId();
         grant.conversationId = action.conversationId();
@@ -79,7 +78,6 @@ public class ConnectorConversationGrant {
         grant.toolName = action.toolName();
         grant.actionId = action.id();
         grant.expiresAt = expiresAt;
-        grant.createdAt = now;
         return grant;
     }
 

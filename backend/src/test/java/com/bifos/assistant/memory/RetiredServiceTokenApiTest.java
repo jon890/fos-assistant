@@ -15,7 +15,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,8 +56,8 @@ class RetiredServiceTokenApiTest {
     void setUp() {
         String suffix = UUID.randomUUID().toString();
         String email = "retired-service-" + suffix + "@example.com";
-        person = people.save(AllowedPerson.of(email, "사용자", "retired-" + suffix, Instant.now()));
-        user = users.save(AppUser.of(email, "사용자", 9_970_001L, UserRole.MEMBER, Instant.now()));
+        person = people.save(AllowedPerson.of(email, "사용자", "retired-" + suffix));
+        user = users.save(AppUser.of(email, "사용자", 9_970_001L, UserRole.MEMBER));
         jwt = Jwts.builder().subject(email).signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8))).compact();
     }
 

@@ -570,7 +570,7 @@ abstract class ObservationFixture {
 
 
     CurrentUser user() {
-        AppUser row = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "주인", 1L, UserRole.MEMBER, NOW));
+        AppUser row = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "주인", 1L, UserRole.MEMBER));
         Path directory = Path.of(properties.root(), "users", AttachmentStore.userDirectoryKey(row.id()));
         if (Files.exists(directory)) {
             try (var paths = Files.walk(directory)) {

@@ -105,8 +105,7 @@ class NotificationControllerTest {
             NotificationKind.APPROVAL_REQUESTED,
             "승인을 기다리는 요청이 있어요",
             "「메모 쓰기」",
-            new NotificationTarget(NotificationTargetType.CONVERSATION, conversation),
-            CREATED_AT));
+            new NotificationTarget(NotificationTargetType.CONVERSATION, conversation)));
 
         JsonNode page = body(mvc.perform(get("/api/v1/notifications")).andReturn().getResponse(), 200);
 
@@ -216,7 +215,7 @@ class NotificationControllerTest {
 
     private Notification stored() {
         return notifications.save(
-            Notification.of(USER, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null, CREATED_AT));
+            Notification.of(USER, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null));
     }
 
 

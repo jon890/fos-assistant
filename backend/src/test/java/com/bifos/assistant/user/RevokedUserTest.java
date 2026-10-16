@@ -11,7 +11,6 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.application.AllowedUserResolver;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +55,7 @@ class RevokedUserTest {
 
 
     private AllowedPerson saveDisabledPerson() {
-        AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now());
+        AllowedPerson person = AllowedPerson.of(EMAIL, NAME, PROFILE);
         person.disable();
         return people.save(person);
     }
@@ -90,7 +89,7 @@ class RevokedUserTest {
     @Test
     @DisplayName("켜진 줄이 있는 주소는 사용자가 생긴다")
     void createsUserForEnabledAddress() {
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
 
         Optional<AppUser> resolved = resolver.resolveAllowed(EMAIL, NAME);
 
@@ -112,7 +111,7 @@ class RevokedUserTest {
     @Test
     @DisplayName("이미 들어온 사용자의 줄을 끄면 막히고 다시 켜면 같은 사용자가 돌아온다")
     void blocksJoinedUserWhenDisabledAndReturnsSameUserWhenEnabledAgain() {
-        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
         AppUser joined = resolver.resolveAllowed(EMAIL, NAME).orElseThrow();
 
         person.disable();
@@ -131,7 +130,7 @@ class RevokedUserTest {
     @Test
     @DisplayName("허용된 주소는 저장된 사용자와 칸이 같은 CurrentUser 를 받는다")
     void resolvesCurrentUserMatchingStoredUserForEnabledAddress() {
-        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, PROFILE));
 
         Optional<CurrentUser> resolved = resolver.resolveCurrentUser(EMAIL, NAME);
 

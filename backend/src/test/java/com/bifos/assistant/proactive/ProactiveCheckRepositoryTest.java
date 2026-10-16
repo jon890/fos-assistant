@@ -240,8 +240,7 @@ class ProactiveCheckRepositoryTest {
             "k".repeat(121),
             titleSplittingPair,
             "https://example.com/" + "p".repeat(2000),
-            null,
-            NOW)));
+            null)));
 
         ProactiveCheckFinding read = transactions.execute(status -> findings.findById(saved.id()).orElseThrow());
 
@@ -279,7 +278,6 @@ class ProactiveCheckRepositoryTest {
             topicKey,
             "제목 " + topicKey,
             "https://example.com/" + topicKey,
-            createdAt,
             createdAt);
         return transactions.execute(status -> findings.save(finding));
     }

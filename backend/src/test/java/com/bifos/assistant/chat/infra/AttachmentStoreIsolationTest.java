@@ -251,8 +251,7 @@ class AttachmentStoreIsolationTest {
             "photo.png",
             "image/png",
             1,
-            Instant.now().plusSeconds(3600),
-            Instant.now());
+            Instant.now().plusSeconds(3600));
         ReflectionTestUtils.setField(attachment, "id", id);
         attachment.nameStoredFile(id + ".png");
         return attachment;

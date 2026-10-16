@@ -27,7 +27,7 @@ public interface FinancialOrderLimitRepository extends Repository<AppUser, Long>
     @Modifying(flushAutomatically = true)
     @Query(nativeQuery = true, value = "UPDATE app_user SET limit_order_amount_krw = :orderAmountKrw, "
         + "limit_order_amount_usd = :orderAmountUsd, limit_order_quantity = :orderQuantity, "
-        + "limit_daily_amount_krw = :dailyAmountKrw, limit_daily_amount_usd = :dailyAmountUsd, limit_updated_at = :now "
+        + "limit_daily_amount_krw = :dailyAmountKrw, limit_daily_amount_usd = :dailyAmountUsd, limit_updated_at = :now, updated_at = :auditedAt "
         + "WHERE id = :userId")
     int store(
         @Param("userId") Long userId,
@@ -36,5 +36,6 @@ public interface FinancialOrderLimitRepository extends Repository<AppUser, Long>
         @Param("orderQuantity") BigDecimal orderQuantity,
         @Param("dailyAmountKrw") BigDecimal dailyAmountKrw,
         @Param("dailyAmountUsd") BigDecimal dailyAmountUsd,
-        @Param("now") Instant now);
+        @Param("now") Instant now,
+        @Param("auditedAt") Instant auditedAt);
 }

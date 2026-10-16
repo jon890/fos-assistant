@@ -213,7 +213,7 @@ class FinancialConnectorProducerTest extends FinancialConnectorTestBase {
             }
             // 허용 목록 행을 지운 채 두면 같은 context를 쓰는 살펴보기 테스트가 전체 실행에서 실패한다.
             if (disallowed) {
-                people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile, now));
+                people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile));
             }
         }
         assertThat(actions.count()).isEqualTo(count);
