@@ -293,20 +293,24 @@ class PackageLayoutRulesTest {
         PackageLayoutRules.adminEndpointsRequireAdmin(ROOT).check(compile(
             "shared.auth.CurrentUserProvider", provider,
             "admin.agent.presentation.C", """
-                @org.springframework.web.bind.annotation.RestController
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+                @RestController
                 public class C {
                     $ROOT.shared.auth.CurrentUserProvider users;
-                    @org.springframework.web.bind.annotation.GetMapping("/a") public String direct() { users.requireAdmin(); return ""; }
-                    @org.springframework.web.bind.annotation.GetMapping("/b") public String viaHelper() { admin(); return ""; }
+                    @GetMapping("/a") public String direct() { users.requireAdmin(); return ""; }
+                    @GetMapping("/b") public String viaHelper() { admin(); return ""; }
                     private void admin() { users.requireAdmin(); }
                 }
                 """));
         String report = failure(PackageLayoutRules.adminEndpointsRequireAdmin(ROOT), compile(
             "shared.auth.CurrentUserProvider", provider,
             "admin.agent.presentation.C", """
-                @org.springframework.web.bind.annotation.RestController
+                import org.springframework.web.bind.annotation.GetMapping;
+                import org.springframework.web.bind.annotation.RestController;
+                @RestController
                 public class C {
-                    @org.springframework.web.bind.annotation.GetMapping("/a") public String open() { return ""; }
+                    @GetMapping("/a") public String open() { return ""; }
                 }
                 """));
         assertThat(report).contains(
