@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
  */
 public record MemorySearchCursor(String queryFingerprint, int offset, boolean hybrid) {
 
+
     /** 앞에서 이 순위까지만 읽는다. */
     public static final int MAX_RANK = 200;
 
@@ -26,7 +27,6 @@ public record MemorySearchCursor(String queryFingerprint, int offset, boolean hy
     private static final Pattern FINGERPRINT = Pattern.compile("[0-9a-f]{16}");
     /** v1 은 키워드만으로 매기던 때의 커서다. 그대로 읽고 키워드로 잇는다. */
     private static final Pattern ENCODED = Pattern.compile("(?:v1:([0-9a-f]{16}):([0-9]{1,3}))|(?:v2:([0-9a-f]{16}):([0-9]{1,3}):([kh]))");
-
 
     /** 키워드만으로 매긴 페이지의 위치다. */
     public MemorySearchCursor(String queryFingerprint, int offset) {

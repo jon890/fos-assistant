@@ -108,8 +108,7 @@ class MemoryRelevanceTest {
     @DisplayName("질문 임베딩은 항목과 같은 글자 수 상한에서 잘라 보낸다")
     void truncatesLongQuestionBeforeEmbedding() {
         List<String> sent = new ArrayList<>();
-        MemoryEmbeddingProperties small =
-            new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, 10, null);
+        MemoryEmbeddingProperties small = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, 10, null);
         QueryEmbedder embedder = new QueryEmbedder(small, (inputs, timeout) -> {
             sent.addAll(inputs);
             return List.of(new float[] {1f});

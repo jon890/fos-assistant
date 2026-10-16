@@ -110,8 +110,7 @@ class McpToolServiceTest {
     @Test
     @DisplayName("키워드만으로 매긴 검색의 다음 페이지는 질문을 임베딩하지 않는다")
     void skipsQueryEmbeddingForKeywordContinuation() {
-        MemoryEmbeddingProperties enabled =
-            new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+        MemoryEmbeddingProperties enabled = new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
         when(memories.searchFor(any(), any(), any(), anyInt(), any(), any()))
             .thenReturn(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
         List<String> embedded = new ArrayList<>();
