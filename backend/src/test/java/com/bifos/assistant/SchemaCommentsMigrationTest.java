@@ -50,14 +50,7 @@ class SchemaCommentsMigrationTest {
                 .outOfOrder(true).target(COMMENTS_VERSION).load().migrate();
 
             assertThat(definitions(connection, mysql)).isEqualTo(before);
-            try (var rows = connection.getMetaData().getColumns(connection.getCatalog(), mysql ? null : "PUBLIC", null, null)) {
-                while (rows.next()) {
-                    if (!"flyway_schema_history".equalsIgnoreCase(rows.getString("TABLE_NAME"))) {
-                        assertThat(rows.getString("REMARKS")).as("COMMENT: %s.%s", rows.getString("TABLE_NAME"), rows.getString("COLUMN_NAME"))
-                            .isNotBlank();
-                    }
-                }
-            }
+            assertAllColumnComments(connection, mysql);
             if (mysql) {
                 assertThat(mysqlDefinitions(connection)).isEqualTo(ddlBefore);
             }
@@ -93,8 +86,23 @@ class SchemaCommentsMigrationTest {
             Flyway.configure().dataSource(database[0], database[1], database[2]).locations("classpath:db/migration")
                 .outOfOrder(true).target(COMMENTS_VERSION).load().migrate();
             boolean mysql = "MySQL".equals(connection.getMetaData().getDatabaseProductName());
-            assertThat(comment(connection, "agent", "name", mysql)).isNotBlank();
+            assertAllColumnComments(connection, mysql);
         }
+    }
+
+
+    private static void assertAllColumnComments(Connection connection, boolean mysql) throws SQLException {
+        int checked = 0;
+        try (var rows = connection.getMetaData().getColumns(connection.getCatalog(), mysql ? null : "PUBLIC", null, null)) {
+            while (rows.next()) {
+                if (!"flyway_schema_history".equalsIgnoreCase(rows.getString("TABLE_NAME"))) {
+                    assertThat(rows.getString("REMARKS")).as("COMMENT: %s.%s", rows.getString("TABLE_NAME"), rows.getString("COLUMN_NAME"))
+                        .isNotBlank();
+                    checked++;
+                }
+            }
+        }
+        assertThat(checked).isPositive();
     }
 
 
