@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { withWriteTab, type ReadOptions } from "./drafts.ts";
 import { readCategories } from "./editor/settings.ts";
@@ -27,16 +27,19 @@ export function listCategories(env: Env, options: ReadOptions = {}) {
   return withWriteTab(env, options, async (page, blogId, notice) => {
     if (notice) throw new ToolError("NAVER_BLOG_EDITOR_IN_USE");
     const categories = await readCategories(page);
+    let temporary: string | null = null;
     try {
       const file = cacheFile(await openJobDir(env), blogId);
+      temporary = `${file}.${randomUUID()}.tmp`;
       await writeFile(
-        `${file}.tmp`,
+        temporary,
         JSON.stringify({ read_at: Date.now(), categories }),
         { mode: 0o600 },
       );
-      await rename(`${file}.tmp`, file);
+      await rename(temporary, file);
     } catch {
       // 목록을 남기지 못해도 읽은 결과는 돌려준다. 막는 검사만 건너뛴다.
+      if (temporary) await unlink(temporary).catch(() => {});
     }
     return { count: categories.length, categories };
   });

@@ -164,3 +164,33 @@ test("원고 compile 은 목록에 없는 카테고리면 승인 카드 전에 �
   expect((await compile("일상")).isError).not.toBe(true);
   expect((await compile("미분류")).isError).toBe(true);
 });
+
+test("덮어쓰기는 카테고리를 바꾼 경우에만 목록과 대조한다", async () => {
+  const { env } = await setup();
+  await listCategories(env, TIMES);
+  const base = { title: "제목", category: "옛날", tags: [], body: "본문" };
+  const render = async (category: string) => {
+    const result = await callTool(createServer(env), "render_draft", {
+      ...base,
+      body: "본문을 고친다",
+      category,
+      base,
+      artifact_path: "index.html",
+    });
+    return JSON.parse((result.content as Array<{ text: string }>)[0]!.text)
+      .problems as string[];
+  };
+
+  // 그대로 두면 기존 글의 이름이 목록에 없어도 막지 않는다.
+  expect(await render("옛날")).toEqual([]);
+  expect(await render("미분류")).toHaveLength(1);
+  expect(await render("일상")).toEqual([]);
+});
+
+test("목록 파일은 임시 파일을 남기지 않는다", async () => {
+  const { env, jobDir } = await setup();
+  await listCategories(env, TIMES);
+  expect(
+    (await readdir(jobDir)).filter((name) => name.endsWith(".tmp")),
+  ).toEqual([]);
+});

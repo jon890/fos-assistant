@@ -86,7 +86,7 @@ MCP 서버 이름은 `naver-blog` 다.
 
 | 곳 | 목록에 없는 이름이면 |
 | --- | --- |
-| `render_draft`(새 글. `base` 가 있는 덮어쓰기는 대조하지 않는다) | `html` 없이 `problems` 에 있는 카테고리 이름을 담는다 |
+| `render_draft`(새 글. `base` 가 있는 덮어쓰기는 카테고리를 바꾼 경우만 대조한다) | `html` 없이 `problems` 에 있는 카테고리 이름을 담는다 |
 | 원고 snapshot 의 `compile` | 계약을 어긴 초안과 같이 거절해 snapshot 도 승인 카드도 만들지 않는다. 거절 사유는 Control Plane 에 전하지 않으므로 에이전트는 `render_draft` 의 `problems` 로 까닭을 읽는다 |
 
 목록을 읽은 적이 없거나 30분이 지났으면 막지 않는다. 그 사이 사용자가 카테고리를 만들 수 있어서다. 그때는 저장 작업의 `category_not_found` 가 마지막으로 막는다.
