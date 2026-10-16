@@ -115,7 +115,7 @@ sequenceDiagram
 
 ### 시작 전 점검
 
-`ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다. `AGENT_NOT_SUPPORTED` 면 스킬과 toolset 은 보지 않고 Hermes 를 부르지 않는다.
+`ProactiveCheckReadiness` 가 까닭을 차례로 보고 걸린 것을 모두 모은다.
 
 사진이 있는 일반 turn에서 자동 추가하는 내부 `fos-attachments`도 읽기 전용과 쓰기 허용 모두 받는다.
 이 도구는 현재 실행의 같은 대화에서 보낸 사진만 읽으며 사용자 설정에 노출하지 않는다.
