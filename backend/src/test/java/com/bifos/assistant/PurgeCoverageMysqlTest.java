@@ -255,6 +255,37 @@ class PurgeCoverageMysqlTest {
 
 
     @Test
+    @DisplayName("실행 중인 삭제 대화가 배치를 채워도 이미 purge한 대화의 승인 본문을 정리한다")
+    void retriesActionBodiesWhenRunningConversationsFillBatch() {
+        chat.delete(currentUser(), target);
+        jdbc.update("UPDATE conversation SET purged_at = ? WHERE id = ?", Timestamp.from(NOW.minusSeconds(60)), target);
+        long first = IDS.getAndAdd(50);
+        try {
+            for (long id = first; id < first + 50; id++) {
+                jdbc.update("""
+                        INSERT INTO conversation (id, user_id, agent_id, title, created_at, updated_at, public_id, deleted_at)
+                        VALUES (?, ?, ?, '실행 중인 대화', ?, ?, UNHEX(LPAD(HEX(?), 32, '0')), ?)
+                        """, id, target, target, Timestamp.from(NOW), Timestamp.from(NOW), id, Timestamp.from(NOW));
+                jdbc.update("""
+                        INSERT INTO agent_execution (id, user_id, conversation_id, agent_id, profile_name, cost_mode, status, started_at)
+                        VALUES (?, ?, ?, ?, 'purge-batch-test', 'SUBSCRIPTION', 'RUNNING', ?)
+                        """, id, target, id, target, Timestamp.from(NOW));
+            }
+
+            assertThat(conversations.purgeDue(NOW)).isEqualTo(1);
+            assertOutcome(classified("connector_action"), Outcome.SCRUB);
+            assertOutcome(classified("connector_action_execution"), Outcome.SCRUB);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM conversation WHERE id >= ? AND id < ? AND purged_at IS NULL",
+                Integer.class, first, first + 50)).isEqualTo(50);
+            assertOtherUntouched();
+        } finally {
+            jdbc.update("DELETE FROM agent_execution WHERE id >= ? AND id < ?", first, first + 50);
+            jdbc.update("DELETE FROM conversation WHERE id >= ? AND id < ?", first, first + 50);
+        }
+    }
+
+
+    @Test
     @DisplayName("본문 삭제의 뒤 단계가 실패하면 삭제 표시와 두 테이블의 본문을 모두 롤백한다")
     void rollsBackBothActionBodiesTogether() {
         chat.delete(currentUser(), target);

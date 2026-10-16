@@ -52,7 +52,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ConversationPurger {
 
-    /** 한 차례에 보는 대화 수다. 지운 순서대로 본다. */
+    /** 한 차례에 보는 대화 수다. 승인 본문 재처리에 절반까지 먼저 배정한다. */
     private static final int BATCH = 50;
 
     /** 한 차례에 쓰는 시간의 상한이다. 정리는 다른 주기 작업과 scheduler 스레드 하나를 함께 쓴다. */
@@ -103,9 +103,10 @@ public class ConversationPurger {
             .map(Map.Entry::getKey)
             .toList();
         List<Long> skipped = waitingIds.isEmpty() ? NONE_SKIPPED : waitingIds;
+        List<Long> retried = actions.findPurgedCandidates(skipped, BATCH / 2, now);
         List<Long> candidates = Stream.concat(
-            conversations.findPurgeCandidates(skipped, PageRequest.of(0, BATCH)).stream(),
-            actions.findPurgedCandidates(skipped, BATCH, now).stream()).distinct().limit(BATCH).toList();
+            retried.stream(),
+            conversations.findPurgeCandidates(skipped, PageRequest.of(0, BATCH - retried.size())).stream()).distinct().toList();
         long started = System.nanoTime();
         int purged = 0;
         int waiting = 0;
