@@ -94,9 +94,7 @@ public class Notification extends CreatedAtEntity {
     @Column(name = "source_public_id", columnDefinition = "BINARY(16)")
     private UUID sourcePublicId;
 
-    /** 칸이 {@code DATETIME(6)} 이라 마이크로초까지만 둔다. 메모리의 값과 DB 에서 다시 읽은 값이 같아야 한다. */
-
-    /** 읽음으로 표시한 시각이다. 비면 읽지 않았다. {@code createdAt} 처럼 마이크로초까지만 둔다. */
+    /** 읽음으로 표시한 시각이다. 비면 읽지 않았다. {@code DATETIME(6)} 칸에 맞춰 마이크로초까지만 둔다. */
     @Column(name = "read_at")
     private Instant readAt;
 
