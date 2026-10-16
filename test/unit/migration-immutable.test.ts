@@ -1,3 +1,4 @@
+// 코드 규칙: rule-50. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";

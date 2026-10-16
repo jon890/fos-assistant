@@ -1,7 +1,8 @@
 # backend 패키지
 
 Control Plane 의 패키지마다 맡는 책임과 패키지 사이의 방향 규칙을 갖는다.
-방향 규칙은 `ArchitectureRules.java` 가 강제하고, 이 파일은 규칙마다 그 검사의 이름을 적는다.
+방향 규칙은 `ArchitectureRules.java` 가 강제하고, 까닭과 예외는 [코드 규칙 목록](../../docs/code-rules/INDEX.md)에서 찾는다.
+이 파일은 모듈 책임과 흐름, 검사 실행 및 기준 갱신 절차를 갖는다.
 
 ## 관찰 연결의 모듈 배치
 

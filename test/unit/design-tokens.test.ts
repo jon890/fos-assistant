@@ -1,3 +1,4 @@
+// 코드 규칙: rule-56. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// 코드 규칙: rule-50. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 // main 에 없던 SQL 은 UTC 시각 버전을 쓴다. 기존 파일의 체크섬 검사는 별도로 유지한다.
 import { execFileSync } from "node:child_process";
 import { readdirSync } from "node:fs";
