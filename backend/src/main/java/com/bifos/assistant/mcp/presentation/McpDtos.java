@@ -94,12 +94,13 @@ public final class McpDtos {
         }
     }
 
-
     /**
      * {@code memory_link} 의 인자다. 두 번호와 종류, {@code RELATED} 에만 받는 label 이다. 모르는 키, 잘못된 타입, 범위 밖 값은 인자 오류다.
      * 사용자와 범위는 인자로 받지 않는다.
      */
     public record MemoryLinkArguments(long fromId, long toId, String type, String label) {
+
+
         private static final Set<String> FIELDS = Set.of("from_id", "to_id", "type", "label");
         private static final Set<String> TYPES = Set.of(McpMemoryLink.SUPERSEDES, McpMemoryLink.RELATED);
 
