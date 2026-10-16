@@ -204,31 +204,32 @@ connector_action	status	승인 실행 상태 PENDING 대기, EXECUTING 실행 �
 connector_action	origin_execution_id	호출을 만든 원래 실행 번호
 connector_action	conversation_id	호출이 나온 대화 번호, 대화 밖 실행이면 NULL
 connector_action	dedupe_key	같은 도구 호출을 합치는 SHA-256 중복 방지 키
-connector_action	args_json	승인한 호출 인자 JSON, args_key_id가 있으면 암호문이고 승인 줄이 아니면 NULL
+connector_action	args_json	승인한 호출 인자 JSON, args_key_id가 있으면 암호문이고 승인 줄이 아니거나 대화 purge로 지웠으면 NULL
 connector_action	args_sha256	호출 인자 원문의 SHA-256 해시
 connector_action	expires_at	승인 대기 만료 시각, 승인 대기가 아니면 NULL
 connector_action	decided_at	승인 또는 거절 결정 시각, 아직 결정하지 않으면 NULL
 connector_action	executed_at	커넥터 실행 완료 시각, 아직 실행하지 않으면 NULL
-connector_action	result_text	커넥터 실행 결과, result_key_id가 있으면 암호문이고 결과가 없으면 NULL
+connector_action	result_text	커넥터 실행 결과, result_key_id가 있으면 암호문이고 결과가 없거나 대화 purge로 지웠으면 NULL
 connector_action	error_code	실행하지 않은 거절 또는 실패 코드, 없으면 NULL
 connector_action	result_delivered_at	실행 결과를 에이전트나 대화에 전달한 시각, 미전달이면 NULL
 connector_action	created_at	호출 판정 기록 시각
 connector_action	check_tree	먼저 살펴보기 실행 트리에서 나온 호출인지 여부
-connector_action	args_key_id	인자 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문 또는 인자 없음
-connector_action	result_key_id	결과 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문 또는 결과 없음
+connector_action	args_key_id	인자 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문이거나 인자가 없거나 대화 purge로 지워짐
+connector_action	result_key_id	결과 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문이거나 결과가 없거나 대화 purge로 지워짐
 connector_action	limit_kind	상한 변경 종류 ORDER_AMOUNT_KRW 원화 금액, ORDER_AMOUNT_USD 달러 금액, ORDER_QUANTITY 수량, DAILY_AMOUNT_KRW 원화 일일 합계, DAILY_AMOUNT_USD 달러 일일 합계, 상한 변경 승인이 아니면 NULL
 connector_action	limit_requested	상한 변경 승인에서 요청한 0 이상의 값, 단위는 limit_kind에 따르며 상한 변경 승인이 아니면 NULL
 connector_action	limit_previous	상한 변경 승인 요청 당시 적용하던 0 이상의 상한, 단위는 limit_kind에 따르며 상한 변경 승인이 아니면 NULL
-connector_action_execution	*	승인한 커넥터 실행의 불변 검증 내용과 일회성 권한 상태
+connector_action	body_erased_at	대화 purge가 승인 인자와 결과 및 암호화 key 참조를 지운 시각, 아직 지우지 않았으면 NULL
+connector_action_execution	*	승인한 커넥터 실행의 검증 내용과 일회성 권한 상태
 connector_action_execution	action_id	승인 커넥터 호출 번호이자 이 표의 기본 키
 connector_action_execution	connection_id	실행 당시 커넥터 연결 번호
 connector_action_execution	binding_id	실행 당시 에이전트 바인딩 번호
 connector_action_execution	connection_updated_at	실행 당시 연결 설정 마지막 변경 시각
 connector_action_execution	binding_updated_at	실행 당시 바인딩 설정 마지막 변경 시각
-connector_action_execution	execution_args_json	검증한 실행 인자 JSON, content_key_id가 있으면 암호문
-connector_action_execution	summary_json	실행 요약 JSON, content_key_id가 있으면 암호문
-connector_action_execution	scope_json	권한 범위 JSON, content_key_id가 있으면 암호문
-connector_action_execution	content_key_id	세 JSON 본문 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문
+connector_action_execution	execution_args_json	검증한 실행 인자 JSON, content_key_id가 있으면 암호문이고 대화 purge로 지웠으면 NULL
+connector_action_execution	summary_json	실행 요약 JSON, content_key_id가 있으면 암호문이고 대화 purge로 지웠으면 NULL
+connector_action_execution	scope_json	권한 범위 JSON, content_key_id가 있으면 암호문이고 대화 purge로 지웠으면 NULL
+connector_action_execution	content_key_id	세 JSON 본문 암호화에 쓴 사용자 데이터 key 번호, NULL이면 호환 평문이거나 대화 purge로 지워짐
 connector_action_execution	execution_args_sha256	실행 인자 원문의 SHA-256 해시
 connector_action_execution	scope_sha256	권한 범위 원문의 SHA-256 해시
 connector_action_execution	request_key	실행 요청을 구분하는 고유 키
