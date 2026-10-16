@@ -150,7 +150,7 @@ scripts/checks/check-mysql-migration.sh
 ```
 
 Docker 로 일회용 MySQL 8.4 를 운영처럼 `--collation-server=utf8mb4_unicode_ci` 로 띄우고 `@Tag("mysql")` 이 붙은 검사를 모두 돌린다. CI 의 `backend` job 도 이 스크립트를 돌린다.
-저장소 쿼리 검사는 [`backend/AGENTS.md`](../AGENTS.md) 의 「저장소 쿼리는 실제 MySQL 에서도 실행한다」 가 갖는다.
+저장소 쿼리 검사는 [rule-51](../../docs/code-rules/rule-51.md)이 갖는다.
 **줄을 넣거나 고치는 마이그레이션을 쓰면 그 검사를 실제 MySQL 에서도 돌린다.**
 H2 용 `*MigrationTest` 가 데이터베이스를 만드는 메서드를 열어 두고, `mysql` 태그를 단 하위 클래스가 `MysqlTestDatabase` 로 바꿔 끼운다. `SubagentUsageLedgerMysqlMigrationTest` 가 본보기다.
 
