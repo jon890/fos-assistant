@@ -7,8 +7,8 @@ const SCRIPT = new URL("../../scripts/pr/pr-risk-labels.sh", import.meta.url).pa
 test("SQL과 Java 마이그레이션 및 COMMENT 리소스에는 마이그레이션 위험 라벨이 붙는다", () => {
   for (const path of [
     "backend/src/main/resources/db/migration/V1__fixture.sql",
-    "backend/src/main/java/db/migration/V20261016052729__SchemaComments.java",
-    "backend/src/main/resources/db/comments/V20261016052729.tsv",
+    "backend/src/main/java/db/migration/V20261016075220__SchemaComments.java",
+    "backend/src/main/resources/db/comments/V20261016075220.tsv",
   ]) {
     assert.deepEqual(labelsFor(path), ["위험:마이그레이션"]);
   }

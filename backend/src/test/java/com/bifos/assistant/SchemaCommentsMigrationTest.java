@@ -19,7 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class SchemaCommentsMigrationTest {
-    private static final String COMMENTS_VERSION = "20261016052729";
+    private static final String COMMENTS_VERSION = "20261016075220";
 
 
     String[] createDatabase() {

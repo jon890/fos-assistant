@@ -38,7 +38,7 @@ test("적용된 마이그레이션 파일은 내용이 바뀌지 않는다", () 
 
 test("잠근 COMMENT 리소스의 수정과 삭제도 기존 SQL 파일과 함께 검사한다", () => {
   const directory = mkdtempSync(join(tmpdir(), "schema-comments-immutable-"));
-  const resource = "comments/V20261016052729.tsv";
+  const resource = "comments/V20261016075220.tsv";
   try {
     mkdirSync(join(directory, "migration"));
     mkdirSync(join(directory, "comments"));
@@ -52,9 +52,9 @@ test("잠근 COMMENT 리소스의 수정과 삭제도 기존 SQL 파일과 함�
     };
     assertLockedFiles(locked, directory);
     writeFileSync(join(directory, resource), tsv.replace("검사", "바꾼"));
-    assert.throws(() => assertLockedFiles(locked, directory), /마이그레이션이 바뀌었다.*comments\/V20261016052729.tsv/);
+    assert.throws(() => assertLockedFiles(locked, directory), /마이그레이션이 바뀌었다.*comments\/V20261016075220.tsv/);
     unlinkSync(join(directory, resource));
-    assert.throws(() => assertLockedFiles(locked, directory), /마이그레이션이 사라졌다.*comments\/V20261016052729.tsv/);
+    assert.throws(() => assertLockedFiles(locked, directory), /마이그레이션이 사라졌다.*comments\/V20261016075220.tsv/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

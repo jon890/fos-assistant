@@ -18,8 +18,8 @@ import org.flywaydb.core.api.migration.Context;
  * 현재 컬럼 정의를 보존하면서 테이블과 컬럼에 한국어 설명을 단다.
  * MySQL은 SHOW CREATE TABLE의 정의를 그대로 쓰고, H2는 COMMENT ON을 쓴다.
  */
-public class V20261016052729__SchemaComments extends BaseJavaMigration {
-    private static final String RESOURCE = "/db/comments/V20261016052729.tsv";
+public class V20261016075220__SchemaComments extends BaseJavaMigration {
+    private static final String RESOURCE = "/db/comments/V20261016075220.tsv";
 
 
     @Override
@@ -150,7 +150,7 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
 
 
     private static byte[] readResource() {
-        try (var input = V20261016052729__SchemaComments.class.getResourceAsStream(RESOURCE)) {
+        try (var input = V20261016075220__SchemaComments.class.getResourceAsStream(RESOURCE)) {
             if (input == null) {
                 throw new IllegalStateException("스키마 COMMENT 목록이 없다: " + RESOURCE);
             }

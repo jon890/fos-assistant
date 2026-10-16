@@ -12,8 +12,6 @@ agent	enabled	에이전트 사용 가능 여부
 agent	created_at	에이전트 생성 시각
 agent	profile_managed	Control Plane이 profile 생성과 삭제를 관리하는지 여부
 agent	deleted_at	삭제 요청 시각, NULL이면 삭제되지 않음
-agent	connector_managed	옛 커넥터 에이전트 표시 여부
-agent	connector_attachments	옛 커넥터 에이전트의 사진 입력 가능 여부
 agent	default_model_provider	기본 모델 provider, default_model과 함께 NULL이거나 설정됨
 agent	default_model	기본 모델 이름, default_model_provider와 함께 NULL이거나 설정됨
 agent	default_reasoning_effort	기본 reasoning effort, NULL이면 profile 기본값 사용
@@ -244,11 +242,8 @@ connector_connection	*	사용자가 커넥터 하나에 연결한 계정의 현�
 connector_connection	id	커넥터 연결 내부 번호
 connector_connection	user_id	연결을 소유한 사용자 번호
 connector_connection	connector_id	연결한 커넥터 식별자
-connector_connection	agent_id	옛 커넥터 에이전트 번호, 바인딩 방식 연결이면 NULL
 connector_connection	status	연결 상태 PENDING 확인 대기, READY 사용 가능 또는 DISCONNECTED 해제됨
 connector_connection	fields	커넥터가 요구하는 연결 필드 JSON, 비밀값은 저장하지 않음
-connector_connection	restart_required	연결 반영을 위해 profile 재시작이 필요한지 여부
-connector_connection	desired_enabled	사용자가 원하는 연결 활성 상태
 connector_connection	checked_at	마지막 연결 상태 확인 시각, 아직 확인하지 않으면 NULL
 connector_connection	created_at	연결 생성 시각
 connector_connection	updated_at	연결 상태 마지막 변경 시각

@@ -149,8 +149,8 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 운영 환경의 값과 비밀값을 COMMENT에 넣지 않는다.
 이미 적용된 설명을 고칠 때도 새 마이그레이션을 만든다.
 
-기존 스키마의 설명은 Java 마이그레이션 `V20261016052729__SchemaComments`와
-전용 리소스 `backend/src/main/resources/db/comments/V20261016052729.tsv`가 추가한다.
+기존 스키마의 설명은 Java 마이그레이션 `V20261016075220__SchemaComments`와
+전용 리소스 `backend/src/main/resources/db/comments/V20261016075220.tsv`가 추가한다.
 리소스의 각 줄은 테이블, 컬럼, 설명을 탭으로 구분하고 컬럼이 `*`이면 테이블 설명이다.
 리소스도 Flyway 체크섬에 포함하므로 적용한 뒤 수정하지 않는다.
 운영 배포 뒤 `test/unit/migration-checksums.json`에 `comments/파일명.tsv`와 SHA-256을 등록한다.
