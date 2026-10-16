@@ -59,10 +59,13 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
             if (columns.isEmpty()) {
                 continue;
             }
+            boolean commentTable = needsTableComment(connection, metadataName, mysql);
             if (mysql) {
-                commentMysql(connection, name, table.getValue(), columns);
+                commentMysql(connection, name, table.getValue(), columns, commentTable);
             } else {
-                execute(connection, "COMMENT ON TABLE " + quoted(name) + " IS " + literal(table.getValue().get("*")));
+                if (commentTable) {
+                    execute(connection, "COMMENT ON TABLE " + quoted(name) + " IS " + literal(table.getValue().get("*")));
+                }
                 for (var column : table.getValue().entrySet()) {
                     String existing = columns.get(column.getKey());
                     if (columns.containsKey(column.getKey()) && (existing == null || existing.isBlank())) {
@@ -75,9 +78,11 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
 
 
     private static void commentMysql(Connection connection, String table, Map<String, String> descriptions,
-        Map<String, String> existingComments) throws SQLException {
+        Map<String, String> existingComments, boolean commentTable) throws SQLException {
         List<String> clauses = new ArrayList<>();
-        clauses.add("COMMENT = " + literal(descriptions.get("*")));
+        if (commentTable) {
+            clauses.add("COMMENT = " + literal(descriptions.get("*")));
+        }
         long expected = existingComments.entrySet().stream()
             .filter(column -> descriptions.containsKey(column.getKey()))
             .filter(column -> column.getValue() == null || column.getValue().isBlank())
@@ -102,11 +107,26 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
                 clauses.add("MODIFY COLUMN " + definition + " COMMENT " + literal(description));
             }
         }
-        if (clauses.size() != expected + 1) {
+        if (clauses.size() != expected + (commentTable ? 1 : 0)) {
             throw new SQLException("SHOW CREATE TABLE에서 COMMENT 대상 컬럼을 모두 찾지 못했다: " + table);
         }
         // 컬럼을 하나씩 ALTER하지 않고 테이블마다 ALTER를 한 번만 실행한다.
-        execute(connection, "ALTER TABLE " + quoted(table) + " " + String.join(", ", clauses));
+        if (!clauses.isEmpty()) {
+            execute(connection, "ALTER TABLE " + quoted(table) + " " + String.join(", ", clauses));
+        }
+    }
+
+
+    private static boolean needsTableComment(Connection connection, String table, boolean mysql) throws SQLException {
+        try (var rows = connection.getMetaData().getTables(connection.getCatalog(), mysql ? null : "PUBLIC", table, null)) {
+            while (rows.next()) {
+                if (table.equalsIgnoreCase(rows.getString("TABLE_NAME"))) {
+                    String comment = rows.getString("REMARKS");
+                    return comment == null || comment.isBlank();
+                }
+            }
+        }
+        throw new SQLException("COMMENT 대상 테이블의 메타데이터가 없다: " + table);
     }
 
 

@@ -40,6 +40,9 @@ class SchemaCommentsMigrationTest {
             execute(connection, mysql
                 ? "ALTER TABLE agent MODIFY COLUMN code VARCHAR(64) NOT NULL COMMENT '이미 있는 설명'"
                 : "COMMENT ON COLUMN agent.code IS '이미 있는 설명'");
+            execute(connection, mysql
+                ? "ALTER TABLE agent COMMENT='이미 있는 테이블 설명'"
+                : "COMMENT ON TABLE agent IS '이미 있는 테이블 설명'");
             Map<String, List<String>> before = definitions(connection, mysql);
             Map<String, String> ddlBefore = mysql ? mysqlDefinitions(connection) : Map.of();
 
@@ -59,6 +62,10 @@ class SchemaCommentsMigrationTest {
                 assertThat(mysqlDefinitions(connection)).isEqualTo(ddlBefore);
             }
             assertThat(comment(connection, "agent", "code", mysql)).isEqualTo("이미 있는 설명");
+            try (var rows = connection.getMetaData().getTables(connection.getCatalog(), mysql ? null : "PUBLIC", mysql ? "agent" : "AGENT", null)) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getString("REMARKS")).isEqualTo("이미 있는 테이블 설명");
+            }
             assertThat(comment(connection, "task", "check_owner_user_id", mysql)).contains("CHECK");
             try (var statement = connection.createStatement();
                 var rows = statement.executeQuery("SELECT owner_user_id,check_owner_user_id,check_agent_id,instruction FROM task WHERE id=991")) {
