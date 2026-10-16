@@ -3,6 +3,7 @@ package com.bifos.assistant.connector.domain;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
 import com.bifos.assistant.connector.domain.type.ActionDenyReason;
 import com.bifos.assistant.connector.domain.type.ActionStatus;
+import com.bifos.assistant.connector.domain.type.FinancialLimitKind;
 import com.bifos.assistant.connector.domain.type.ToolApproval;
 import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.shared.util.Sha256;
@@ -17,7 +18,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -189,6 +192,22 @@ public class ConnectorAction {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * 주문 상한 변경 승인 줄만 채운다(ADR-20261015 / financial-user-limits). 서버가 줄을 만들 때 적고 바꾸지 않는다.
+     * 공개 승인 API 는 이 컬럼이 있는 줄만 상한 변경 승인으로 보낸다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "limit_kind", length = 32, updatable = false)
+    private FinancialLimitKind limitKind;
+
+    /** 상한 변경 승인 줄에서 요청한 값이다. 바꾸지 않는다. */
+    @Column(name = "limit_requested", precision = 20, scale = 6, updatable = false)
+    private BigDecimal limitRequested;
+
+    /** 상한 변경 승인 줄을 만들 때 적용하던 상한이다. 카드가 바뀌기 전 값을 보인다. 바꾸지 않는다. */
+    @Column(name = "limit_previous", precision = 20, scale = 6, updatable = false)
+    private BigDecimal limitPrevious;
+
 
     /**
      * 판정 한 줄이다. 인자 원문과 승인 상태는 담지 않는다.
@@ -225,6 +244,17 @@ public class ConnectorAction {
         action.argsSha256 = argsSha256;
         action.createdAt = now;
         return action;
+    }
+
+
+    /** 주문 상한 변경 승인 줄이라고 적는다. 저장하기 전에만 부른다. 저장한 뒤의 컬럼은 고치기에서 빠져 바뀌지 않는다. */
+    public void recordLimitChange(FinancialLimitKind kind, BigDecimal requested, BigDecimal previous) {
+        if (id != null || limitKind != null) {
+            throw new IllegalStateException("limit change is recorded only once before insert");
+        }
+        this.limitKind = Objects.requireNonNull(kind);
+        this.limitRequested = Objects.requireNonNull(requested);
+        this.limitPrevious = Objects.requireNonNull(previous);
     }
 
 

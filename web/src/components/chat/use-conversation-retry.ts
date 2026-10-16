@@ -33,7 +33,6 @@ type Context = Pick<
   | "currentExecutionId"
   | "setExecutionId"
   | "setStopRequested"
-  | "setFlowIsSlow"
   | "setTurns"
   | "refresh"
   | "setDeliveryRetrying"
@@ -64,7 +63,6 @@ export function useConversationRetry({
   currentExecutionId,
   setExecutionId,
   setStopRequested,
-  setFlowIsSlow,
   setTurns,
   refresh,
   setDeliveryRetrying,
@@ -99,7 +97,6 @@ export function useConversationRetry({
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
-    setFlowIsSlow(false);
     try {
       const response = await regenerateLatestAnswer(conversationId);
       if (!response.ok) {
@@ -201,7 +198,6 @@ export function useConversationRetry({
     } finally {
       if (selectionVersion.current === version && !handedOff) {
         setSending(false);
-        setFlowIsSlow(false);
       }
       void finishSentTurn(pendingId);
     }
@@ -235,7 +231,6 @@ export function useConversationRetry({
     currentExecutionId.current = null;
     setExecutionId(null);
     setStopRequested(false);
-    setFlowIsSlow(false);
     try {
       const response = await requestDeliveryRetry(conversationId, deliveryId);
       if (!response.ok) {
@@ -352,7 +347,6 @@ export function useConversationRetry({
     } finally {
       if (selectionVersion.current === version && !handedOff) {
         setSending(false);
-        setFlowIsSlow(false);
       }
       setDeliveryRetrying(false);
       void finishSentTurn(pendingId);

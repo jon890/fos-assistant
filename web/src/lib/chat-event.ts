@@ -15,7 +15,6 @@ export type ChatEvent = {
     | "interim"
     | "tool"
     | "subagent"
-    | "step"
     | "switched"
     | "reset"
     | "done"
@@ -36,8 +35,6 @@ export type ChatEvent = {
   executionId?: number | null;
   code?: string | null;
   message?: string | null;
-  stepName?: string | null;
-  stepState?: "started" | "completed" | "failed" | null;
   phase?: "started" | "completed" | null;
   durationMs?: number | null;
   failed?: boolean | null;

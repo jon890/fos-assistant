@@ -41,7 +41,6 @@ class ChatDeliveryTurns {
     private final AgentService agents;
     private final AgentExecutionRepository executionRepository;
     private final ExecutionDeliveryWriter deliveryWriter;
-    private final FlowRegistry flows;
     private final TurnCancellation turns;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -98,12 +97,6 @@ class ChatDeliveryTurns {
             clock.instant(),
             contextProperties.resultStaleAfter());
         Routed routed = chatTurnRouting.route(owner, conversationId, delivery.input(), null, List.of());
-        if (routed.flow() != null) {
-            // 흐름은 이 입력을 받을 자리가 없다. 깨우는 쪽이 이미 거르므로 그 사이 흐름이 붙은 경우뿐이다.
-            // 깨우는 쪽이 거르는 것과 별개로 남긴다. 거르기와 잠금 사이에 에이전트의 흐름이 바뀌어도 흐름에 이 입력을 보내지 않는다.
-            log.warn("흐름이 붙은 대화라 맡긴 일의 결과를 전하지 않는다 conversationId={}", conversationId);
-            return;
-        }
         Long attemptId = recordDelivery(routed.conversation(), results, notices, deliveries, onEvent);
         runDeliveryTurn(
             owner,
@@ -141,18 +134,12 @@ class ChatDeliveryTurns {
         if (!agent.enabled()) {
             throw new ApiException(ErrorCode.AGENT_DISABLED, "this agent is disabled");
         }
-        if (flows.find(agent.flow()) != null) {
-            throw ResultDeliveryRecorder.notRetryable();
-        }
+
         // 사용자 실행 한도에 닿으면 USER_BUSY 가 그대로 올라간다. 묶음을 바꾸지 않고 다시 시도를 예약하지 않는다.
         TurnHandle handle = turns.open(user.id(), conversation.id());
         try {
             DeliveryInput delivery = chatDeliveryInput.retryInput(user, conversation.id(), resultDeliveries.itemsOf(deliveryId));
             Routed routed = chatTurnRouting.route(user, conversation.id(), delivery.input(), null, List.of());
-            // 잠금 전에 본 에이전트는 그 사이 바뀌었을 수 있다. 자동 turn 이 잠금 뒤 흐름을 다시 거르는 것과 같다.
-            if (routed.flow() != null) {
-                throw ResultDeliveryRecorder.notRetryable();
-            }
             if (!routed.agent().isReadableBy(user.id())) {
                 throw new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent");
             }

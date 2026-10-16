@@ -20,7 +20,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -79,7 +78,7 @@ class ChatTurnRunner {
             artifactStore.ensureFolder(conversation.id());
             SkillCommand command = routed.command();
             String asked = command == null ? text : command.hermesInput();
-            AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked, true);
+            AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked);
             String input = artifacts.agentPreamble(conversation) + agentInput.text();
             // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
             AssembledContext context = routed.agent().connectorManaged()
@@ -187,81 +186,6 @@ class ChatTurnRunner {
             executions.fail(pending.execution(), pending.agent(), result, choice, hermesStatus(result));
             chatRunEvents.append(pending, ExecutionEventType.RUN_FAILED, hermesStatus(result));
             throw new ApiException(ErrorCode.HERMES_RUN_FAILED, "the agent run did not complete");
-        } finally {
-            if (closesHandle) {
-                turns.close(handle);
-            }
-        }
-    }
-
-
-    /**
-     * 흐름으로 도는 turn 을 중계한다.
-     *
-     * <p>흐름은 단계 사건만 흘리고 답은 끝난 뒤에 한 번에 온다. 중간 단계의 답까지 흘리면 읽을 수
-     * 없기 때문이다. 흐름은 참조 구현으로만 남긴다(ADR-017).
-     */
-    ChatTurn runFlow(
-        CurrentUser user,
-        Routed routed,
-        String text,
-        TurnIntent intent,
-        Consumer<ChatEvent> onEvent,
-        boolean streaming,
-        TurnHandle existingHandle) {
-        Conversation conversation = routed.conversation();
-        TurnHandle handle = existingHandle == null ? chatTurnRouting.openTurn(user, routed) : existingHandle;
-        boolean closesHandle = existingHandle == null;
-        try {
-            if (intent instanceof TurnIntent.Fresh) {
-                chatTurnRouting.fillBlankTitle(conversation, text);
-            }
-            Instant startedAt = clock.instant();
-            artifactStore.ensureFolder(conversation.id());
-            String input = artifacts.agentPreamble(conversation)
-                + attachments
-                    .agentInput(conversation.id(), routed.attached(), text, false)
-                    .text();
-            AtomicReference<Long> rootExecutionId = new AtomicReference<>();
-            ChatTurn turn;
-            try {
-                turn = routed.flow()
-                    .run(
-                        user,
-                        conversation,
-                        routed.agent(),
-                        text,
-                        input,
-                        intent,
-                        execution -> {
-                            rootExecutionId.set(execution.id());
-                            executions.markRequestReceived(execution, routed.requestReceivedAt());
-                            turns.rekey(handle, execution.id());
-                            if (streaming) {
-                                onEvent.accept(ChatEvent.started(conversation.publicId(), execution.id()));
-                            }
-                        },
-                        onEvent);
-            } catch (RuntimeException ex) {
-                chatTurnStopper.cancelFlowAndHoldIfStopConfirmed(handle, conversation.id(), rootExecutionId.get());
-                throw ex;
-            }
-            if (!turn.cancelled()) {
-                turns.markFinished(handle);
-                chatTurnLifecycle.recorded(turn, startedAt);
-            } else {
-                chatTurnStopper.recordStoppedFlow(handle, turn, startedAt);
-            }
-            if (streaming) {
-                if (!turn.cancelled()) {
-                    onEvent.accept(ChatEvent.delta(turn.assistantText()));
-                }
-                onEvent.accept(
-                    turn.cancelled()
-                        ? ChatEvent.stopped(turn.conversationPublicId(), turn.messageId(), turn.executionId())
-                        : ChatEvent.done(turn.conversationPublicId(), turn.messageId(), turn.executionId()));
-            }
-            return turn;
         } finally {
             if (closesHandle) {
                 turns.close(handle);

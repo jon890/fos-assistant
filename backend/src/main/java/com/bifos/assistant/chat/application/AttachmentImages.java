@@ -126,8 +126,8 @@ public class AttachmentImages {
     /**
      * 보내는 메시지의 사진마다 에이전트에게 어떻게 보일지를 첨부 순서대로 정한다.
      *
-     * <p>{@code embed} 가 참이면 사본이 없는 사진은 디코딩 차례를 {@link #SEND_WAIT_SECONDS} 초까지 기다려 한 번 만들어
-     * 본다. 사본을 만들 때와 다시 줄일 때의 대기는 이 호출을 시작한 때부터 {@link #SEND_DEADLINE_SECONDS} 초 안으로 줄인다.
+     * <p>사본이 없는 사진은 디코딩 차례를 {@link #SEND_WAIT_SECONDS} 초까지 기다려 한 번 만든다. 사본을 만들 때와 다시 줄일 때의
+     * 대기는 이 호출을 시작한 때부터 {@link #SEND_DEADLINE_SECONDS} 초 안으로 줄인다.
      * 사본을 읽고 크기를 안 사진을 모두 같은 긴 변 단계({@link #LONG_SIDES})로 싣는다. 가장 큰 단계부터 보고,
      * {@code data:} 주소 길이 합이 {@link #MAX_ENCODED_BYTES} 를 넘으면
      * 한 단계 내린다. 가장 작은 단계에서도 넘치면 JPEG 품질을 {@link #SMALLEST_QUALITIES} 차례로 낮춘다. 1600 단계는 사본을
@@ -137,16 +137,13 @@ public class AttachmentImages {
      * 작아도 싣지 않는다. 화면 순서와 실린 순서를 같게 두기 위해서다. 싣지 못한 사진도 사본을 만들어 둔다. 다음 메시지에서
      * 지난 메시지의 사진으로 볼 사본이 있어야 한다. 싣지 못한 사진은 지시문이 싣지 못했다고 안내한다.
      *
-     * <p>{@code embed} 가 거짓이면 사본을 만들지도 싣지도 않고, 있는 사본만 본다.
-     *
      * <p>사진 한 장의 실패는 삼킨다. 사본을 읽지 못하거나, 사본의 크기를 모르거나, 다시 줄이지 못한 사진은 싣지 않고 지시문이
-     * 싣지 못했다고 안내한다. {@link AgentPhoto#agentFileName()} 은 흐름 경로의 안내에 쓴다.
+     * 싣지 못했다고 안내한다.
      *
      * @param order 첨부 번호마다 그 대화에서 몇 번째 사진인지. 보낸 사진은 모두 들어 있어야 한다
      */
-    public List<AgentPhoto> photos(List<ChatAttachment> attached, Map<Long, Integer> order, boolean embed) {
+    public List<AgentPhoto> photos(List<ChatAttachment> attached, Map<Long, Integer> order) {
         List<Integer> ordinals = new ArrayList<>(attached.size());
-        List<String> agentFileNames = new ArrayList<>(attached.size());
         List<Candidate> candidates = new ArrayList<>();
         long deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(SEND_DEADLINE_SECONDS);
         for (ChatAttachment attachment : attached) {
@@ -154,10 +151,8 @@ public class AttachmentImages {
             if (ordinal == null) {
                 throw new IllegalStateException("attachment " + attachment.id() + " is not bound to a message");
             }
-            boolean small = embed
-                ? prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime()))
-                : hasSmallQuietly(attachment);
-            if (small && embed) {
+            boolean small = prepareSmall(attachment, sendWaitNanos(deadlineNanos, System.nanoTime()));
+            if (small) {
                 byte[] copy = readSmallQuietly(attachment);
                 small = copy != null;
                 int index = ordinals.size();
@@ -167,15 +162,14 @@ public class AttachmentImages {
                 }
             }
             ordinals.add(ordinal);
-            agentFileNames.add(small ? AttachmentStore.smallName(attachment.id()) : attachment.storedName());
         }
         String[] dataUrls = new String[attached.size()];
         embedCandidates(candidates, dataUrls, deadlineNanos);
         List<AgentPhoto> photos = new ArrayList<>(attached.size());
         for (int i = 0; i < attached.size(); i++) {
-            photos.add(new AgentPhoto(attached.get(i).id(), ordinals.get(i), agentFileNames.get(i), dataUrls[i]));
+            photos.add(new AgentPhoto(attached.get(i).id(), ordinals.get(i), dataUrls[i]));
         }
-        if (embed && !attached.isEmpty()) {
+        if (!attached.isEmpty()) {
             MediaPipelineEvents.embedded(attached.getFirst().conversationId(), photos);
         }
         return photos;
@@ -319,19 +313,6 @@ public class AttachmentImages {
     private static void place(List<Candidate> candidates, List<String> admitted, String[] dataUrls) {
         for (int i = 0; i < candidates.size(); i++) {
             dataUrls[candidates.get(i).index()] = admitted.get(i);
-        }
-    }
-
-
-    private boolean hasSmallQuietly(ChatAttachment attachment) {
-        try {
-            return store.hasSmall(attachment);
-        } catch (RuntimeException ex) {
-            log.warn(
-                "could not check the small copy attachmentId={} error={}",
-                attachment.id(),
-                ex.getClass().getSimpleName());
-            return false;
         }
     }
 

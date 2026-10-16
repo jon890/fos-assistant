@@ -34,8 +34,6 @@ execution_context_source|CONVERSATION|execution_id|GAP|KEEP|KEEP|execution_id로
 execution_event|CONVERSATION|id|GAP|SCRUB|KEEP|execution_id로 실행에 속한다. 실행 사건과 사용량은 남기고 detail을 비운다.
 execution_question|CONVERSATION|execution_id|GAP|DELETE|KEEP|execution_id와 message_id로 대화에 속한다. 대화 purge가 지운다.
 execution_skill_use|CONVERSATION|id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 스킬 사용 이력을 남긴다.
-financial_limit_change|USER|action_id|GAP|KEEP|KEEP|user_id와 action_id FK가 있다. 사용자가 바꾼 금융 한도의 수치 이력을 보존한다.
-financial_order_limit|USER|user_id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
 follow_up|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화 참조에 FK를 두지 않고 사용자의 할 일을 남기는 계약이다.
 hermes_session_binding|CONVERSATION|id|GAP|KEEP|KEEP|user_id와 origin_execution_id에 속한다. session 소유권 참조는 실행 기록과 함께 남기는 계약이다.
 media_observation|CONVERSATION|id|GAP|DELETE|KEEP|attachment_id FK와 conversation_id에 속한다. 대화 purge가 관찰 본문을 지운다.

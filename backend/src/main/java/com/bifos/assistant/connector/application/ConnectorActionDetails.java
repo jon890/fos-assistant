@@ -219,8 +219,7 @@ class ConnectorActionDetails {
     /** @param manifest 그 줄의 커넥터 manifest. 읽지 못했으면 빈 값 */
     static ConnectorActionView view(ConnectorAction action, Optional<ConnectorManifest> manifest) {
         // 상한 변경 줄은 커넥터 도구가 아니라 선언이 없다. 제목과 식별자는 Control Plane 이 정한 정책에서 받는다.
-        boolean limitChange = FinancialLimitChanges.TOOL.equals(action.toolName())
-            && FinancialLimitChanges.HERMES_TOOL.equals(action.hermesTool());
+        boolean limitChange = FinancialLimitChanges.owns(action);
         return ConnectorActionView.from(
             action,
             limitChange ? Optional.of(FinancialLimitChanges.POLICY)

@@ -4,6 +4,5 @@ package com.bifos.assistant.chat.application.model;
 public enum RecoveredRunKind {
     CHAT_TURN,
     DELEGATION,
-    FLOW,
     AUXILIARY
 }

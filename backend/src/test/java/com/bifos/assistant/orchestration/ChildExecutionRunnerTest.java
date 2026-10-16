@@ -29,6 +29,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.usage.application.ExecutionRecorder;
 import com.bifos.assistant.usage.domain.AgentExecution;
+import com.bifos.assistant.usage.domain.DelegationKey;
 import com.bifos.assistant.usage.domain.type.ExecutionEventType;
 import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
@@ -161,6 +162,29 @@ class ChildExecutionRunnerTest {
     }
 
 
+    private ChildResult child(
+        CurrentUser user,
+        Conversation conversation,
+        AgentExecution parent,
+        String agentCode,
+        String task) {
+        String callId = "call-" + System.nanoTime();
+        DelegationKey key = DelegationKey.of(parent.profileName(), "session", "session", callId);
+        return children.delegate(
+            user,
+            conversation,
+            parent,
+            children.startableAgent(user, agentCode),
+            task,
+            key,
+            execution -> {
+            },
+            (execution, runId) -> {
+            },
+            () -> false);
+    }
+
+
     @Test
     @DisplayName("자식 실행이 부모를 가리키며 SUCCEEDED로 남는다")
     void childRunPointsToParentAndLeavesSucceeded() {
@@ -169,7 +193,7 @@ class ChildExecutionRunnerTest {
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "조사 결과"));
 
-        ChildResult result = children.run(dad, conversation, parent, "child-dad", "이것을 조사해라");
+        ChildResult result = child(dad, conversation, parent, "child-dad", "이것을 조사해라");
 
         assertThat(result.succeeded()).isTrue();
         assertThat(result.output()).isEqualTo("조사 결과");
@@ -209,7 +233,7 @@ class ChildExecutionRunnerTest {
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "조사 결과"));
 
-        ChildResult result = children.run(dad, conversation, parent, "child-mom", "이것을 조사해라");
+        ChildResult result = child(dad, conversation, parent, "child-mom", "이것을 조사해라");
 
         assertThat(stub().received()).singleElement().satisfies(command -> {
             assertThat(command.profileName()).isEqualTo("child-mom");
@@ -241,7 +265,7 @@ class ChildExecutionRunnerTest {
             HermesRunResult.PROVIDER_AUTH_FAILED_PREFIX + " no account",
             TokenUsage.empty()));
 
-        ChildResult result = children.run(dad, conversation, parent, "child-dad", "이것을 조사해라");
+        ChildResult result = child(dad, conversation, parent, "child-dad", "이것을 조사해라");
 
         assertThat(result.succeeded()).isFalse();
         assertThat(result.errorCode()).isEqualTo("PROVIDER_BLOCKED");
@@ -254,24 +278,6 @@ class ChildExecutionRunnerTest {
 
 
     @Test
-    @DisplayName("자식이 다시 자식을 부르면 ORCHESTRATION DEPTH EXCEEDED다")
-    void childCallingChildIsOrchestrationDepthExceeded() {
-        CurrentUser dad = member("child-dad@example.com", "child-dad");
-        Conversation conversation = conversationOf(dad, "child-dad");
-        AgentExecution parent = parentOf(dad, conversation, "child-dad");
-        stub().willReturn(completed("run-child", "조사 결과"));
-        ChildResult child = children.run(dad, conversation, parent, "child-dad", "이것을 조사해라");
-        AgentExecution asParent = executions.findById(child.executionId()).orElseThrow();
-
-        assertThatThrownBy(() -> children.run(dad, conversation, asParent, "child-dad", "더 파고들어라"))
-            .isInstanceOf(ApiException.class)
-            .extracting(ex -> ((ApiException)ex).code())
-            .isEqualTo(ErrorCode.ORCHESTRATION_DEPTH_EXCEEDED);
-        assertThat(executions.count()).isEqualTo(2);
-    }
-
-
-    @Test
     @DisplayName("경계1 자식의 userId가 부모와 같다")
     void boundary1ChildUserIdEqualsParents() {
         CurrentUser dad = member("child-dad@example.com", "child-dad");
@@ -279,7 +285,7 @@ class ChildExecutionRunnerTest {
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "답"));
 
-        ChildResult result = children.run(dad, conversation, parent, "child-dad", "지시");
+        ChildResult result = child(dad, conversation, parent, "child-dad", "지시");
 
         assertThat(executions.findById(result.executionId()).orElseThrow().userId())
             .isEqualTo(parent.userId())
@@ -295,7 +301,7 @@ class ChildExecutionRunnerTest {
         Conversation conversation = conversationOf(dad, "child-dad");
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
 
-        assertThatThrownBy(() -> children.run(dad, conversation, parent, "child-mom", "지시"))
+        assertThatThrownBy(() -> child(dad, conversation, parent, "child-mom", "지시"))
             .isInstanceOf(ApiException.class)
             .extracting(ex -> ((ApiException)ex).code())
             .isEqualTo(ErrorCode.AGENT_NOT_FOUND);
@@ -314,7 +320,7 @@ class ChildExecutionRunnerTest {
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "답"));
 
-        children.run(dad, conversation, parent, "child-dad", "지시");
+        child(dad, conversation, parent, "child-dad", "지시");
 
         String instructions = stub().received().getFirst().instructions();
         assertThat(instructions).contains("아빠는 국수를 맵지 않게 먹는다");
@@ -333,7 +339,7 @@ class ChildExecutionRunnerTest {
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willFail(new ApiException(ErrorCode.HERMES_UNAVAILABLE, "down"));
 
-        ChildResult result = children.run(dad, conversation, parent, "child-dad", "지시");
+        ChildResult result = child(dad, conversation, parent, "child-dad", "지시");
 
         assertThat(result.succeeded()).isFalse();
         assertThat(result.errorCode()).isEqualTo("HERMES_UNAVAILABLE");
@@ -353,7 +359,7 @@ class ChildExecutionRunnerTest {
         AgentExecution parent = parentOf(dad, conversation, "child-dad");
         stub().willReturn(completed("run-child", "중간 산출물"));
 
-        ChildResult result = children.run(dad, conversation, parent, "child-dad", "지시");
+        ChildResult result = child(dad, conversation, parent, "child-dad", "지시");
 
         assertThat(messages.findByConversationIdOrderByIdAsc(conversation.id())).isEmpty();
         assertThat(

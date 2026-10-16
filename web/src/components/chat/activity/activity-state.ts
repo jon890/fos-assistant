@@ -7,7 +7,7 @@ import { subagentLabel } from "../../../lib/format.ts";
 import { toolLabel } from "../../../lib/tool-label.ts";
 import { interimKey } from "../turn-stream-text.ts";
 
-export type ActivityItemKind = "tool" | "subagent" | "step" | "interim";
+export type ActivityItemKind = "tool" | "subagent" | "interim";
 export type ActivityItemState =
   "running" | "done" | "failed" | "stopped" | "unfinished" | "result-missing";
 
@@ -28,13 +28,6 @@ export type ActivityState = {
   items: ActivityItem[];
   startedAt: number;
   endedAt: number | null;
-};
-
-export const STEP_LABELS: Record<string, string> = {
-  chief: "정리",
-  researcher: "조사",
-  engineer: "구현",
-  synthesizer: "합치기",
 };
 
 /** 항목이 화면에 보이는 문장이다. 도구는 그리는 때 정해 도는 중과 끝남의 말이 다르다. */
@@ -233,39 +226,6 @@ export function applyChatEvent(
         ...state,
         items: finish(items, "subagent", event.subagentId ?? null, event),
       };
-  }
-  if (event.type === "step" && event.stepName && event.stepState) {
-    const index = items.findIndex(
-      (item) => item.kind === "step" && item.pairKey === event.stepName,
-    );
-    if (index < 0 || event.stepState === "started")
-      return {
-        ...state,
-        items: append(items, {
-          kind: "step",
-          name: STEP_LABELS[event.stepName] ?? event.stepName,
-          detail: null,
-          model: null,
-          inputTokens: null,
-          outputTokens: null,
-          durationMs: null,
-          state:
-            event.stepState === "failed"
-              ? "failed"
-              : event.stepState === "completed"
-                ? "done"
-                : "running",
-          pairKey: event.stepName,
-        }),
-      };
-    return {
-      ...state,
-      items: items.map((item, position) =>
-        position === index
-          ? { ...item, state: event.stepState === "failed" ? "failed" : "done" }
-          : item,
-      ),
-    };
   }
   // 모델이 바뀐 사건(`switched`)은 대화의 작업 과정에 줄을 만들지 않는다. 관리자 영역의 실행 상세만 보인다.
   return state;

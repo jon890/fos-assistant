@@ -6,10 +6,7 @@ import { readEventStream } from "@/lib/stream";
 import { openConversationEvents } from "@/lib/chat-api";
 import type { ChatEvent } from "@/lib/chat-event";
 import { ConversationSessionProps } from "./conversation-session-types";
-import {
-  EVENTS_RECONNECT_MS,
-  SLOW_FLOW_MS,
-} from "./conversation-session-helpers";
+import { EVENTS_RECONNECT_MS } from "./conversation-session-helpers";
 import type { ConversationSessionState } from "./use-conversation-session-state";
 import type { ConversationEvents } from "./use-conversation-events";
 import type { ConversationControls } from "./use-conversation-controls";
@@ -23,9 +20,6 @@ type Context = Pick<
   | "sending"
   | "currentExecutionId"
   | "stopRequested"
-  | "activity"
-  | "flowIsSlow"
-  | "setFlowIsSlow"
 > &
   Pick<ConversationSessionProps, "conversationId"> &
   Pick<
@@ -42,9 +36,6 @@ export function useConversationEffects({
   sending,
   currentExecutionId,
   stopRequested,
-  activity,
-  flowIsSlow,
-  setFlowIsSlow,
   conversationId,
   runConversationTask,
   resumeAfterReconnect,
@@ -126,19 +117,6 @@ export function useConversationEffects({
     return () => window.removeEventListener("keydown", onEscape);
   }, [panelTarget, sending, stopRequested]);
 
-  /**
-   * 흐름이 시작되고 2분이 지나면 한 번 알린다.
-   *
-   * <p>첫 단계 사건이 올 때 재기 시작한다. 그전에는 이 turn 이 흐름인지 알 수 없다.
-   */
-  const flowActive =
-    activity?.items.some((item) => item.kind === "step") ?? false;
-
-  useEffect(() => {
-    if (!flowActive || flowIsSlow) return;
-    const timer = setTimeout(() => setFlowIsSlow(true), SLOW_FLOW_MS);
-    return () => clearTimeout(timer);
-  }, [flowActive, flowIsSlow]);
   return {};
 }
 export type ConversationEffects = ReturnType<typeof useConversationEffects>;
