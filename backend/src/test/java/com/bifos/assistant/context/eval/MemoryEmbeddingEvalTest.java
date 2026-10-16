@@ -22,6 +22,7 @@ import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.testsupport.TestContextAssemblers;
@@ -90,6 +91,9 @@ class MemoryEmbeddingEvalTest {
     @Autowired
     TestClock clock;
 
+    @Autowired
+    BackgroundTasks backgroundTasks;
+
     private MemoryEvalFixture fixture;
 
 
@@ -122,7 +126,7 @@ class MemoryEmbeddingEvalTest {
             return vectors;
         };
         MemoryVectorCache cache = new MemoryVectorCache(embeddings, settings);
-        MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(settings, timed, embeddings, transactionManager, cache, clock);
+        MemoryEmbeddingRefresher refresher = new MemoryEmbeddingRefresher(settings, timed, embeddings, transactionManager, cache, backgroundTasks, clock);
         MemorySearchSection hybridSection = new MemorySearchSection(
             new MemoryRelevance(new KeywordScorer(), MemoryRelevanceProperties.defaults(), cache),
             MemorySearchSectionProperties.defaults(),

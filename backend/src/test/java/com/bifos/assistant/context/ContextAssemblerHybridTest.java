@@ -22,6 +22,7 @@ import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
@@ -64,6 +65,9 @@ class ContextAssemblerHybridTest {
 
     @Autowired
     TestClock clock;
+
+    @Autowired
+    BackgroundTasks backgroundTasks;
 
     private final TopicClient client = new TopicClient();
     private Long agentId;
@@ -165,7 +169,7 @@ class ContextAssemblerHybridTest {
 
     private void refresh() {
         new MemoryEmbeddingRefresher(
-            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), clock)
+            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), backgroundTasks, clock)
                 .refreshOnce();
     }
 

@@ -19,9 +19,12 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
+import com.bifos.assistant.testsupport.TrackingBackgroundTasks;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** 임베딩 대상만 벡터를 채우고 대상에서 빠진 줄을 지우는지 가짜 임베딩 서비스로 확인한다. */
 @BackendIntegrationTest
@@ -54,6 +58,9 @@ class MemoryEmbeddingRefresherTest {
 
     @Autowired
     TestClock clock;
+
+    @Autowired
+    TrackingBackgroundTasks backgroundTasks;
 
     private final FakeClient client = new FakeClient();
 
@@ -148,9 +155,28 @@ class MemoryEmbeddingRefresherTest {
     }
 
 
+    @Test
+    @DisplayName("일정 실행은 스케줄러 스레드가 아니라 가상 스레드에서 돌고 앞 주기가 끝나기 전에는 다시 띄우지 않는다")
+    void runsScheduledRefreshOffSchedulerThreadOnce() throws InterruptedException {
+        memories.create(USER, MemoryScope.USER, "타이어", "작년 11월에 갈았다", false);
+        CountDownLatch release = new CountDownLatch(1);
+        client.blockUntil(release);
+        MemoryEmbeddingRefresher refresher = refresher(ENABLED);
+
+        refresher.refresh();
+        refresher.refresh();
+        release.countDown();
+        backgroundTasks.awaitIdle(Duration.ofSeconds(10));
+
+        assertThat(client.calls()).isEqualTo(1);
+        assertThat(client.threadNames()).allMatch(name -> name.startsWith("memory-embedding-refresh"));
+        assertThat(embeddings.count()).isEqualTo(1);
+    }
+
+
     private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties) {
         return new MemoryEmbeddingRefresher(
-            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), clock);
+            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), backgroundTasks, clock);
     }
 
 
@@ -158,13 +184,26 @@ class MemoryEmbeddingRefresherTest {
     private static final class FakeClient implements EmbeddingClient {
 
         private final List<String> inputs = new ArrayList<>();
+        private final List<String> threadNames = new ArrayList<>();
         private int calls;
         private int failOn = -1;
+        private CountDownLatch blocker;
 
 
         @Override
         public List<float[]> embed(List<String> batch, Duration timeout) {
             calls++;
+            threadNames.add(Thread.currentThread().getName());
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive())
+                .as("임베딩 호출 동안 트랜잭션을 열어 두지 않는다")
+                .isFalse();
+            if (blocker != null) {
+                try {
+                    blocker.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
             if (calls == failOn) {
                 throw new EmbeddingUnavailableException("fake failure");
             }
@@ -175,6 +214,16 @@ class MemoryEmbeddingRefresherTest {
 
         float[] vectorOf(String text) {
             return new float[] {text.length(), text.hashCode() % 7, 1f};
+        }
+
+
+        void blockUntil(CountDownLatch latch) {
+            blocker = latch;
+        }
+
+
+        List<String> threadNames() {
+            return List.copyOf(threadNames);
         }
 
 

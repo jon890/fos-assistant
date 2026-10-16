@@ -5,10 +5,12 @@ import com.bifos.assistant.memory.domain.MemoryEmbeddingSource;
 import com.bifos.assistant.memory.domain.MemoryEmbeddingStamp;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
+import com.bifos.assistant.shared.concurrent.BackgroundTasks;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -35,17 +37,32 @@ public class MemoryEmbeddingRefresher {
     private final MemoryEmbeddingRepository embeddings;
     private final PlatformTransactionManager transactionManager;
     private final MemoryVectorCache vectorCache;
+    private final BackgroundTasks backgroundTasks;
     private final Clock clock;
+    private final AtomicBoolean running = new AtomicBoolean();
 
 
-    /** 끝난 뒤 {@code refresh-delay} 만큼 쉬고 다시 돈다. 꺼져 있으면 바로 끝난다. */
+    /**
+     * {@code refresh-delay} 마다 한 주기를 가상 스레드에서 띄운다. 꺼져 있거나 앞 주기가 아직 돌면 아무것도 하지 않는다.
+     *
+     * <p>임베딩 호출은 묶음마다 수십 초까지 걸릴 수 있어, 다른 일정과 함께 쓰는 스케줄러 스레드에서 돌리지 않는다.
+     */
     @Scheduled(
         fixedDelayString = "${assistant.memory.embedding.refresh-delay}",
         initialDelayString = "${assistant.memory.embedding.refresh-delay}")
     public void refresh() {
-        if (properties.enabled()) {
-            refreshOnce();
+        if (!properties.enabled() || !running.compareAndSet(false, true)) {
+            return;
         }
+        backgroundTasks.start("memory-embedding-refresh", () -> {
+            try {
+                refreshOnce();
+            } catch (RuntimeException ex) {
+                log.warn("memory embedding refresh failed exceptionClass={}", ex.getClass().getSimpleName());
+            } finally {
+                running.set(false);
+            }
+        });
     }
 
 
