@@ -54,6 +54,8 @@ public enum ErrorCode {
      * 덮어쓴다(ADR-055).
      */
     MEMORY_SENSITIVE_NOT_EDITABLE(HttpStatus.CONFLICT),
+    /** 그 기억 연결의 지금 상태에서 허용하지 않는 전이다. 이미 받아들였거나 끊은 줄을 다시 받아들이는 경우다(ADR-20261015 / memory-link). */
+    MEMORY_LINK_STATE_CONFLICT(HttpStatus.CONFLICT),
     AGENT_DISABLED(HttpStatus.CONFLICT),
     /** 다른 요청이 같은 에이전트 설정을 바꾸고 있어 잠금 대기 시간이 지났다. */
     AGENT_BUSY(HttpStatus.CONFLICT),

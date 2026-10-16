@@ -9,6 +9,7 @@ import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
+import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -27,6 +28,7 @@ class MemoryRevisionWriter {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryEmbeddingRepository embeddings;
+    private final MemoryLinkRepository links;
     private final MemoryVectorCache vectorCache;
     private final MemoryContentCipher cipher;
     private final Clock clock;
@@ -50,10 +52,13 @@ class MemoryRevisionWriter {
     }
 
 
-    /** 지우기 전에 마지막 값을 판으로 남기고 그 항목의 벡터를 지운다. 벡터는 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다. */
+    /**
+     * 지우기 전에 마지막 값을 판으로 남기고 그 항목의 벡터와 연결을 지운다. 둘 다 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다.
+     */
     void beforeDelete(CurrentUser user, Memory memory) {
         revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
         embeddings.deleteByMemoryId(memory.id());
+        links.deleteByMemoryId(memory.id());
         vectorCache.evict(memory.id());
     }
 

@@ -1,0 +1,56 @@
+package com.bifos.assistant.memory.infra;
+
+import com.bifos.assistant.memory.domain.entity.MemoryLink;
+import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
+import com.bifos.assistant.memory.domain.type.MemoryLinkType;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+/** 기억 사이의 연결이다. 「대체됨」 판정은 {@code (to_memory_id, type, status)} 색인을 쓴다. */
+public interface MemoryLinkRepository extends JpaRepository<MemoryLink, Long> {
+
+    Optional<MemoryLink> findByFromMemoryIdAndToMemoryIdAndType(Long fromMemoryId, Long toMemoryId, MemoryLinkType type);
+
+
+    boolean existsByToMemoryIdAndTypeAndStatus(Long toMemoryId, MemoryLinkType type, MemoryLinkStatus status);
+
+
+    List<MemoryLink> findByToMemoryIdInAndTypeAndStatus(
+        Collection<Long> toMemoryIds, MemoryLinkType type, MemoryLinkStatus status);
+
+
+    long countByCreatedByExecutionId(Long executionId);
+
+
+    /** 그 사용자가 주인인 개인 항목을 옛 항목으로 둔 대체 제안이다. */
+    @Query("select l from MemoryLink l, Memory m"
+        + " where m.id = l.toMemoryId"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.PROPOSED"
+        + " and m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.USER"
+        + " and m.ownerUserId = :userId"
+        + " order by l.id")
+    List<MemoryLink> findProposedSupersedesOfOwner(@Param("userId") Long userId);
+
+
+    /** 그 그룹의 항목을 옛 항목으로 둔 대체 제안이다. 받아들일 수 있는 사람은 그룹의 {@code ADMIN} 이다. */
+    @Query("select l from MemoryLink l, Memory m"
+        + " where m.id = l.toMemoryId"
+        + " and l.type = com.bifos.assistant.memory.domain.type.MemoryLinkType.SUPERSEDES"
+        + " and l.status = com.bifos.assistant.memory.domain.type.MemoryLinkStatus.PROPOSED"
+        + " and m.scope = com.bifos.assistant.memory.domain.type.MemoryScope.GROUP"
+        + " and m.groupId = :groupId"
+        + " order by l.id")
+    List<MemoryLink> findProposedSupersedesOfGroup(@Param("groupId") Long groupId);
+
+
+    /** 항목을 지울 때 같은 트랜잭션에서 그 항목을 한쪽 끝으로 둔 줄을 모두 지운다. */
+    @Modifying
+    @Query("delete from MemoryLink l where l.fromMemoryId = :id or l.toMemoryId = :id")
+    void deleteByMemoryId(@Param("id") Long id);
+}
