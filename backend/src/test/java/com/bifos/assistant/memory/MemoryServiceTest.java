@@ -98,12 +98,12 @@ class MemoryServiceTest {
     void deletesEmbeddingWithMemory() {
         Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
         Memory kept = memories.create(ADMIN, MemoryScope.USER, "남길 항목", "내용", false);
-        embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}, NOW));
+        embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}));
 
         RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용");
         String text = EmbeddingText.of("지울 항목", "내용", embeddingProperties.maxTextChars());
         embeddings.save(MemoryEmbedding.of(
-            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}, NOW));
+            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}));
         assertThat(vectorCache.vectorsFor(List.of(candidate))).containsKey(deleted.id());
 
         memories.delete(ADMIN, deleted.id());
@@ -121,9 +121,9 @@ class MemoryServiceTest {
         Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
         Memory a = memories.create(ADMIN, MemoryScope.USER, "가", "내용", false);
         Memory b = memories.create(ADMIN, MemoryScope.USER, "나", "내용", false);
-        links.save(MemoryLink.proposeSupersede(deleted.id(), a.id(), MemoryLinkOrigin.AGENT, null, NOW));
-        links.save(MemoryLink.proposeSupersede(b.id(), deleted.id(), MemoryLinkOrigin.AGENT, null, NOW));
-        MemoryLink kept = links.save(MemoryLink.related(a.id(), b.id(), null, MemoryLinkOrigin.AGENT, null, null, NOW));
+        links.save(MemoryLink.proposeSupersede(deleted.id(), a.id(), MemoryLinkOrigin.AGENT, null));
+        links.save(MemoryLink.proposeSupersede(b.id(), deleted.id(), MemoryLinkOrigin.AGENT, null));
+        MemoryLink kept = links.save(MemoryLink.related(a.id(), b.id(), null, MemoryLinkOrigin.AGENT, null, null));
 
         memories.delete(ADMIN, deleted.id());
 
@@ -136,8 +136,8 @@ class MemoryServiceTest {
     void keepsSupersededItemInListButNotInInjection() {
         Memory old = memories.create(ADMIN, MemoryScope.USER, "옛", "내용", false);
         Memory fresh = memories.create(ADMIN, MemoryScope.USER, "새", "내용", false);
-        MemoryLink link = MemoryLink.proposeSupersede(fresh.id(), old.id(), MemoryLinkOrigin.HUMAN, null, NOW);
-        link.accept(NOW);
+        MemoryLink link = MemoryLink.proposeSupersede(fresh.id(), old.id(), MemoryLinkOrigin.HUMAN, null);
+        link.accept();
         links.save(link);
 
         assertThat(memories.readableBy(ADMIN)).extracting(Memory::id).containsExactly(old.id(), fresh.id());

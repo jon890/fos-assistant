@@ -39,7 +39,6 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -120,12 +119,12 @@ class McpMemorySearchToolTest {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         repository.deleteAll();
         AppUser owner = users.save(AppUser.of(
-            "search-" + UUID.randomUUID() + "@example.test", "검색 검사", 10L, UserRole.ADMIN, Instant.now()));
+            "search-" + UUID.randomUUID() + "@example.test", "검색 검사", 10L, UserRole.ADMIN));
         user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         token = tokens.issue(PROFILE, "합성 검사").rawToken();
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, user.id(), 1L, PROFILE, root);
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
         mvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();
@@ -206,7 +205,7 @@ class McpMemorySearchToolTest {
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))
             .path("items"))
                 .isEmpty();
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
         jdbc.update("UPDATE memory SET status = 'REJECTED' WHERE id = ?", memory.id());
         assertUnavailable(memory.id());
         jdbc.update("UPDATE memory SET status = 'ACCEPTED' WHERE id = ?", memory.id());

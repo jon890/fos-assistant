@@ -123,8 +123,7 @@ class CheckFindingReactionsTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            now));
+            owner.id()));
         ownerConversation = conversations.save(Conversation.startedForCheck(owner.id(), "합성 살펴보기", agent.id(), now));
         otherConversation = conversations.save(Conversation.startedForCheck(other.id(), "합성 살펴보기", agent.id(), now));
 
@@ -338,7 +337,6 @@ class CheckFindingReactionsTest {
             topicKey,
             title,
             kind == FindingKind.NEW ? "https://example.com/" + UUID.randomUUID() : null,
-            now,
             now));
     }
 
@@ -403,7 +401,7 @@ class CheckFindingReactionsTest {
 
     private CurrentUser member(Instant now) {
         String email = "check-finding-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, now));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 }

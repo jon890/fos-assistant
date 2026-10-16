@@ -123,7 +123,7 @@ class TaskFiringTest {
         Fixture fixture = monthly(MissedPolicy.RUN_ONCE, NOVEMBER_FIRST);
         firing.fireDue(NOW);
         TaskTrigger rewound = triggers.findById(fixture.trigger().id()).orElseThrow();
-        rewound.moveNext(NOVEMBER_FIRST, NOW);
+        rewound.moveNext(NOVEMBER_FIRST);
         triggers.save(rewound);
 
         int created = firing.fireDue(NOW);
@@ -187,7 +187,7 @@ class TaskFiringTest {
     void doesNotFirePausedTask() {
         Fixture fixture = monthly(MissedPolicy.RUN_ONCE, NOVEMBER_FIRST);
         Task task = tasks.findById(fixture.task().id()).orElseThrow();
-        task.pause(NOW);
+        task.pause();
         tasks.save(task);
 
         int created = firing.fireDue(NOW);
@@ -253,7 +253,7 @@ class TaskFiringTest {
         AppUser owner = owner();
         Agent agent = agentOf(owner);
         Task task = tasks.save(task(owner, agent, NotifyPolicy.ALWAYS));
-        TaskTrigger trigger = triggers.save(TaskTrigger.once(task.id(), NOVEMBER_FIRST, SEOUL, MissedPolicy.RUN_ONCE, NOW));
+        TaskTrigger trigger = triggers.save(TaskTrigger.once(task.id(), NOVEMBER_FIRST, SEOUL, MissedPolicy.RUN_ONCE));
 
         firing.fireDue(NOW);
         firing.fireDue(NOW.plus(Duration.ofDays(1)));
@@ -284,7 +284,7 @@ class TaskFiringTest {
         AppUser owner = owner();
         Agent agent = agentOf(owner);
         Task task = tasks.save(task(owner, agent, NotifyPolicy.ALWAYS));
-        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, missed, nextFireAt, NOW));
+        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 1 * *", SEOUL, missed, nextFireAt));
         return new Fixture(task, trigger);
     }
 
@@ -294,20 +294,20 @@ class TaskFiringTest {
         AppUser owner = owner();
         Agent agent = agentOf(owner);
         Task task = tasks.save(task(owner, agent, NotifyPolicy.ALWAYS));
-        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", SEOUL, missed, NOVEMBER_FIRST, NOW));
+        TaskTrigger trigger = triggers.save(TaskTrigger.cron(task.id(), "0 9 * * *", SEOUL, missed, NOVEMBER_FIRST));
         return new Fixture(task, trigger);
     }
 
 
     private static Task task(AppUser owner, Agent agent, NotifyPolicy notify) {
         return Task.create(
-            owner.id(), agent.id(), "매달 정리", "지난달 기록을 보고 정리해 줘", ConversationMode.NEW_PER_RUN, notify, NOW);
+            owner.id(), agent.id(), "매달 정리", "지난달 기록을 보고 정리해 줘", ConversationMode.NEW_PER_RUN, notify);
     }
 
 
     private AppUser owner() {
         String email = "firing-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(user.id());
         return user;
     }
@@ -323,8 +323,7 @@ class TaskFiringTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
     }
 
 

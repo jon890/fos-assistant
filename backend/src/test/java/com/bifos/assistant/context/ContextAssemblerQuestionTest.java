@@ -22,7 +22,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import com.bifos.assistant.testsupport.TestContextAssemblers;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -82,11 +81,10 @@ class ContextAssemblerQuestionTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                null,
-                Instant.now())))
+                null)))
             .id();
         if (grants.findById(new AgentMemoryCollectionId(agentId, HEALTH)).isEmpty()) {
-            grants.save(AgentMemoryCollection.of(agentId, HEALTH, true, Instant.now()));
+            grants.save(AgentMemoryCollection.of(agentId, HEALTH, true));
         }
     }
 

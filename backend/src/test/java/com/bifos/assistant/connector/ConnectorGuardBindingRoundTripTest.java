@@ -132,10 +132,10 @@ class ConnectorGuardBindingRoundTripTest {
             new ConnectorCallLimiter(new ConnectorProperties(2, 1000), clock), approvals, tokens, clock);
         target = new TransactionTemplate(manager).execute(status -> {
             String email = UUID.randomUUID() + "@example.test";
-            var user = users.saveAndFlush(AppUser.of(email, "검사 주인", 1L, UserRole.MEMBER, NOW));
-            people.saveAndFlush(AllowedPerson.of(email, "검사 주인", "alice", NOW));
+            var user = users.saveAndFlush(AppUser.of(email, "검사 주인", 1L, UserRole.MEMBER));
+            people.saveAndFlush(AllowedPerson.of(email, "검사 주인", "alice"));
             var agent = agents.saveAndFlush(Agent.of("guard-" + UUID.randomUUID(), "검사", "alice", "http://localhost",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id(), NOW));
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
             var connection = ConnectorConnection.pending(user.id(), CONNECTOR, NOW);
             connection.connected(new ConnectionFields(Map.of("scope", "000007"), Map.of()), NOW);
             connection.ready(NOW);

@@ -3,6 +3,7 @@ package com.bifos.assistant.user.infra;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.domain.AppUser;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -42,7 +43,12 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     Optional<AppUser> findByIdForUpdate(@Param("id") Long id);
 
 
-    @Modifying
-    @Query("update AppUser u set u.modelDefaultTier = :tier where u.id = :userId")
-    int updateModelDefaultTier(@Param("userId") Long userId, @Param("tier") String tier);
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            update AppUser u set u.modelDefaultTier = :tier, u.updatedAt = :at
+            where u.id = :userId and (u.modelDefaultTier <> :tier
+                or (u.modelDefaultTier is null and :tier is not null)
+                or (u.modelDefaultTier is not null and :tier is null))
+            """)
+    int updateModelDefaultTier(@Param("userId") Long userId, @Param("tier") String tier, @Param("at") Instant at);
 }

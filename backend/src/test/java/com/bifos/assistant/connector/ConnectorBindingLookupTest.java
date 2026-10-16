@@ -123,14 +123,13 @@ class ConnectorBindingLookupTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW);
+            owner.id());
         return agents.save(agent);
     }
 
 
     private AppUser user() {
         String suffix = UUID.randomUUID().toString();
-        return users.save(AppUser.of("lookup-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER, NOW));
+        return users.save(AppUser.of("lookup-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER));
     }
 }

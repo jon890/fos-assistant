@@ -194,7 +194,7 @@ class FinancialLimitSettingsTest {
 
 
     private CurrentUser user() {
-        var saved = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "상한 검사", 1L, UserRole.MEMBER, NOW));
+        var saved = users.saveAndFlush(AppUser.of(UUID.randomUUID() + "@example.test", "상한 검사", 1L, UserRole.MEMBER));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), 1L, UserRole.MEMBER);
     }
 }

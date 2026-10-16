@@ -15,7 +15,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -140,7 +139,6 @@ class McpCallerResolverTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 }

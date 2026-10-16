@@ -21,7 +21,6 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.hermes.HermesToolsetClient;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -190,7 +189,6 @@ class AgentDefaultToolsetsTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            1L,
-            Instant.now());
+            1L);
     }
 }

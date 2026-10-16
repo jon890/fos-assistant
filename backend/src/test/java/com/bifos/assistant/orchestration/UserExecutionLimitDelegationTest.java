@@ -30,7 +30,6 @@ import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -119,7 +118,7 @@ class UserExecutionLimitDelegationTest {
         memories.deleteAll();
         users.deleteAll();
         pool = Executors.newVirtualThreadPerTaskExecutor();
-        AppUser user = users.save(AppUser.of("limit-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("limit-dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         agents.save(agent("limit-chief"));
         agents.save(agent("limit-worker"));
@@ -212,8 +211,7 @@ class UserExecutionLimitDelegationTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            dad.id(),
-            Instant.now());
+            dad.id());
         return agent;
     }
 

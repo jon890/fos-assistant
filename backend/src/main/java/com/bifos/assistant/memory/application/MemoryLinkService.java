@@ -16,7 +16,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -65,13 +64,12 @@ public class MemoryLinkService {
     public MemoryLink proposeSupersede(
         CurrentUser user, Long newId, Long oldId, MemoryLinkOrigin origin, Long executionId) {
         requireLinkable(user, newId, oldId);
-        Instant now = clock.instant();
         return upsert(
             newId,
             oldId,
             MemoryLinkType.SUPERSEDES,
-            () -> MemoryLink.proposeSupersede(newId, oldId, origin, executionId, now),
-            link -> link.reopen(null, origin, null, executionId, now));
+            () -> MemoryLink.proposeSupersede(newId, oldId, origin, executionId),
+            link -> link.reopen(null, origin, null, executionId));
     }
 
 
@@ -87,14 +85,13 @@ public class MemoryLinkService {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "a link label is too long");
         }
         requireLinkable(user, a, b);
-        Instant now = clock.instant();
         String trimmed = label == null || label.isBlank() ? null : label.strip();
         return upsert(
             Math.min(a, b),
             Math.max(a, b),
             MemoryLinkType.RELATED,
-            () -> MemoryLink.related(a, b, trimmed, origin, score, executionId, now),
-            link -> link.reopen(trimmed, origin, score, executionId, now));
+            () -> MemoryLink.related(a, b, trimmed, origin, score, executionId),
+            link -> link.reopen(trimmed, origin, score, executionId));
     }
 
 
@@ -116,7 +113,7 @@ public class MemoryLinkService {
         if (from == null || to == null || !linkable(user, from, to)) {
             throw stateConflict();
         }
-        link.accept(clock.instant());
+        link.accept();
         log.info("memory link accepted linkId={} userId={}", link.id(), user.id());
         return links.save(link);
     }

@@ -104,7 +104,7 @@ class ProactiveCheckRecoveryTest {
     void setUp() {
         stub().reset();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        user = users.save(AppUser.of("recovery-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER, STARTED));
+        user = users.save(AppUser.of("recovery-" + suffix + "@example.com", "복구", 1L, UserRole.MEMBER));
         agent = agents.save(agent("recovery-" + suffix, false));
         connector = agents.save(agent("recovery-connector-" + suffix, true));
         conversation = conversations.save(Conversation.startedForCheck(user.id(), "먼저 살펴보기 · 커리어", agent.id(), STARTED));
@@ -284,8 +284,7 @@ class ProactiveCheckRecoveryTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            STARTED);
+            user.id());
         return created;
     }
 }

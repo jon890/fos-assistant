@@ -84,8 +84,7 @@ class ProactiveLoopSettingTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            OWNER.id(),
-            NOW));
+            OWNER.id()));
     }
 
 

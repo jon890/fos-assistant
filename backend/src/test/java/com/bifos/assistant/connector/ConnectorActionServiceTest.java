@@ -407,7 +407,7 @@ class ConnectorActionServiceTest {
         when(connector.execute(anyString(), anyString(), anyString(), anyString()))
             .thenReturn(CallResult.success(JSON.readTree("{\"saved\":true}")));
 
-        owner = users.save(AppUser.of("action-owner@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
+        owner = users.save(AppUser.of("action-owner@example.com", "주인", 1L, UserRole.MEMBER));
         me = currentUser(owner);
         agent = Agent.of(
             "action-" + UUID.randomUUID(),
@@ -417,8 +417,7 @@ class ConnectorActionServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now());
+            owner.id());
 
         agent = agents.save(agent);
         root = "fos-" + UUID.randomUUID();
@@ -868,9 +867,9 @@ class ConnectorActionServiceTest {
     void othersAndAdminsCannotDecide() {
         UUID actionId = ask(WRITE, ARGS).actionId();
         CurrentUser other = currentUser(
-            users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.MEMBER, Instant.now())));
+            users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.MEMBER)));
         CurrentUser admin = currentUser(
-            users.save(AppUser.of("action-admin@example.com", "관리자", 1L, UserRole.ADMIN, Instant.now())));
+            users.save(AppUser.of("action-admin@example.com", "관리자", 1L, UserRole.ADMIN)));
 
         assertCode(() -> service.approve(other, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
         assertCode(() -> service.approve(admin, actionId, null), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
@@ -964,7 +963,8 @@ class ConnectorActionServiceTest {
             .extracting(ConnectorGrantView::connectorId, ConnectorGrantView::toolName)
             .containsExactly(tuple(DEMO, WRITE));
         ConnectorToolGrant stored = grants.findAll().get(0);
-        assertThat(Duration.between(stored.createdAt(), stored.expiresAt())).isEqualTo(Duration.ofHours(1));
+        Instant decidedAt = actions.findByPublicId(actionId).orElseThrow().decidedAt();
+        assertThat(stored.expiresAt()).isEqualTo(decidedAt.plus(Duration.ofHours(1)));
     }
 
 
@@ -988,7 +988,7 @@ class ConnectorActionServiceTest {
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         Long grantId = service.grants(me).get(0).grantId();
         CurrentUser other = currentUser(
-            users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.ADMIN, Instant.now())));
+            users.save(AppUser.of("action-other@example.com", "다른 사람", 1L, UserRole.ADMIN)));
 
         assertCode(() -> service.revokeGrant(other, grantId), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
         assertCode(() -> service.revokeGrant(me, grantId + 1000), ErrorCode.CONNECTOR_ACTION_NOT_FOUND);
@@ -1340,7 +1340,7 @@ class ConnectorActionServiceTest {
     void closedGrantIsRevokedAndStaysRevokedWhenDeclarationReopens() {
         service.approve(me, ask(WRITE, ARGS).actionId(), GrantPeriod.DAYS_30);
         Instant now = Instant.now();
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "other_note", now.plus(Duration.ofDays(1)), now));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "other_note", now.plus(Duration.ofDays(1))));
         catalogBecomes(manifest(List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
             new ConnectorTool(WRITE, "WRITE", "required", "메모 쓰기", Boolean.FALSE),
@@ -1386,13 +1386,13 @@ class ConnectorActionServiceTest {
     void closedGrantSweepLeavesUnknownAndFinishedLinesAlone() {
         // DB 칸이 마이크로초까지라 나노초가 남은 시각은 저장한 뒤 읽으면 달라진다.
         Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
-        ConnectorToolGrant revoked = ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now);
+        ConnectorToolGrant revoked = ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)));
         Instant earlier = now.minus(Duration.ofHours(1));
         revoked.revoke(earlier);
         grants.save(revoked);
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.minusSeconds(1), now.minus(Duration.ofDays(1))));
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "removed_note", now.plus(Duration.ofDays(1)), now));
-        grants.save(ConnectorToolGrant.of(owner.id(), "other-connector", MAIL, now.plus(Duration.ofDays(1)), now));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.minusSeconds(1)));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, "removed_note", now.plus(Duration.ofDays(1))));
+        grants.save(ConnectorToolGrant.of(owner.id(), "other-connector", MAIL, now.plus(Duration.ofDays(1))));
 
         assertThat(service.revokeClosedGrants(now)).isZero();
 
@@ -1403,7 +1403,7 @@ class ConnectorActionServiceTest {
             .as("처음 거둔 시각을 그대로 둔다")
             .isEqualTo(earlier);
 
-        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1)), now));
+        grants.save(ConnectorToolGrant.of(owner.id(), DEMO, MAIL, now.plus(Duration.ofDays(1))));
         ConnectorCatalogTimes.expire();
         when(connector.readCatalog()).thenThrow(new IllegalStateException());
         assertThat(service.revokeClosedGrants(now)).as("카탈로그를 읽지 못했다").isZero();
@@ -1480,8 +1480,7 @@ class ConnectorActionServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
         bind(other, connections.findByUserIdAndConnectorId(owner.id(), DEMO).orElseThrow(), true);
         String otherRoot = "fos-" + UUID.randomUUID();
         executions.save(AgentExecution.builder()

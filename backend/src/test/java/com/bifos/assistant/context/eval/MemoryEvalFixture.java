@@ -186,14 +186,13 @@ final class MemoryEvalFixture {
                     CostMode.API,
                     CredentialScope.DEDICATED,
                     AgentVisibility.GROUP,
-                    null,
-                    AGENT_CREATED_AT)))
+                    null)))
                 .id();
             createdAgentIds.add(agentId);
             jdbc.update("DELETE FROM agent_memory_collection WHERE agent_id = ?", agentId);
             each.collections()
                 .forEach(grant -> grants.save(
-                    AgentMemoryCollection.of(agentId, grant.collection(), grant.allowSensitive(), AGENT_CREATED_AT)));
+                    AgentMemoryCollection.of(agentId, grant.collection(), grant.allowSensitive())));
             agentIds.put(each.key(), agentId);
         }
         return agentIds;

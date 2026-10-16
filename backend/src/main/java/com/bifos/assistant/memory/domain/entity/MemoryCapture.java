@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import jakarta.persistence.Column;
@@ -27,7 +28,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemoryCapture {
+public class MemoryCapture extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,9 +67,6 @@ public class MemoryCapture {
     @Column(name = "external_read", nullable = false)
     private boolean externalRead;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     @Column(name = "undone_at")
     private Instant undoneAt;
 
@@ -81,8 +79,7 @@ public class MemoryCapture {
         MemoryCaptureKind kind,
         Integer baseRevision,
         MemoryStatus previousStatus,
-        boolean externalRead,
-        Instant now) {
+        boolean externalRead) {
         MemoryCapture capture = new MemoryCapture();
         capture.memoryId = memoryId;
         capture.userId = userId;
@@ -92,7 +89,6 @@ public class MemoryCapture {
         capture.baseRevision = baseRevision;
         capture.previousStatus = previousStatus;
         capture.externalRead = externalRead;
-        capture.createdAt = now;
         return capture;
     }
 

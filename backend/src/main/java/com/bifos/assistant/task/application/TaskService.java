@@ -81,13 +81,13 @@ public class TaskService {
         Agent agent = requireAgent(user, input.agentCode());
         Schedule schedule = validated(input.schedule(), now);
         Task task = tasks.save(Task.create(
-            user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now));
-        task.chooseModelTier(input.modelTier(), now);
+            user.id(), agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input)));
+        task.chooseModelTier(input.modelTier());
         MissedPolicy missed = missedOf(input);
         TaskTrigger trigger = triggers.save(
             schedule.type() == TriggerType.CRON
-                ? TaskTrigger.cron(task.id(), schedule.cron(), schedule.zone(), missed, schedule.next(), now)
-                : TaskTrigger.once(task.id(), schedule.fireAt(), schedule.zone(), missed, now));
+                ? TaskTrigger.cron(task.id(), schedule.cron(), schedule.zone(), missed, schedule.next())
+                : TaskTrigger.once(task.id(), schedule.fireAt(), schedule.zone(), missed));
         return new TaskDetail(task, trigger, agent);
     }
 
@@ -104,16 +104,16 @@ public class TaskService {
         Task task = requireTaskForUpdate(user, taskId);
         TaskTrigger trigger = requireTrigger(task);
         Agent agent = requireAgent(user, input.agentCode());
-        task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input), now);
-        task.chooseModelTier(input.modelTier(), now);
+        task.edit(agent.id(), title(input.title()), input.instruction(), modeOf(input), notifyOf(input));
+        task.chooseModelTier(input.modelTier());
         if (!sameSchedule(trigger, input.schedule())) {
             Schedule schedule = validated(input.schedule(), now);
             trigger.reschedule(
-                schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next(), now);
+                schedule.type(), schedule.cron(), schedule.fireAt(), schedule.zone(), schedule.next());
         }
         MissedPolicy missed = missedOf(input);
         if (trigger.missedPolicy() != missed) {
-            trigger.changeMissedPolicy(missed, now);
+            trigger.changeMissedPolicy(missed);
         }
         return new TaskDetail(task, trigger, agent);
     }
@@ -123,7 +123,7 @@ public class TaskService {
     @Transactional
     public TaskDetail pause(CurrentUser user, UUID taskId) {
         Task task = requireTaskForUpdate(user, taskId);
-        task.pause(clock.instant());
+        task.pause();
         return detailOf(task, requireTrigger(task));
     }
 
@@ -139,8 +139,8 @@ public class TaskService {
         Instant now = clock.instant();
         Task task = requireTaskForUpdate(user, taskId);
         TaskTrigger trigger = requireTrigger(task);
-        if (task.resume(now)) {
-            trigger.moveNext(nextOf(trigger, now), now);
+        if (task.resume()) {
+            trigger.moveNext(nextOf(trigger, now));
         }
         return detailOf(task, trigger);
     }

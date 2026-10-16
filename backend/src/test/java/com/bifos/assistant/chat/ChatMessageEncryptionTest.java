@@ -213,6 +213,6 @@ class ChatMessageEncryptionTest {
 
     private AppUser user() {
         String email = "cipher-" + UUID.randomUUID() + "@example.test";
-        return users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        return users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
     }
 }

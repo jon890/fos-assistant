@@ -111,8 +111,7 @@ class ProactiveCheckResults {
                 each.finding().topicKey(),
                 Objects.requireNonNullElse(each.finding().title(), ""),
                 each.sourceUrl(),
-                each.checkedAt(),
-                now))
+                each.checkedAt()))
             .toList();
         pendingProblems = block.problemCandidates().isEmpty() || judged.isEmpty()
             ? List.of()
@@ -123,7 +122,7 @@ class ProactiveCheckResults {
                     now.minus(deps.properties().current().digestWindow())),
                 title -> deps.followUps().hasOpenWithTitle(owner.id(), title))
                 .stream()
-                .map(each -> problemRow(each, now))
+                .map(this::problemRow)
                 .toList();
         if (check.trigger() == CheckTrigger.SCHEDULED
             && newFindings == 0
@@ -162,7 +161,7 @@ class ProactiveCheckResults {
 
 
     /** 검사한 후보 하나를 줄로 만든다. 행동이 없으면 그 칸을 비운다. */
-    private ProactiveCheckProblem problemRow(JudgedProblem judged, Instant now) {
+    private ProactiveCheckProblem problemRow(JudgedProblem judged) {
         CheckResultBlock.ProblemCandidate candidate = judged.candidate();
         CheckResultBlock.Next action = candidate.proposedAction();
         return ProactiveCheckProblem.of(
@@ -181,8 +180,7 @@ class ProactiveCheckResults {
             candidate.risk(),
             candidate.changeSinceLast(),
             judged.evidence(),
-            judged.evidenceCheckedAt(),
-            now);
+            judged.evidenceCheckedAt());
     }
 
 

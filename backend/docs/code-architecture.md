@@ -21,23 +21,33 @@ MCP의 처리는 도구 분기 전에 적용되며 공통 예외 로그에 원�
 
 ## JPA 생성 시각
 
-`memory.domain.entity.MemoryCollection.createdAt` 하나에 `@CreatedDate`와 `@EntityListeners(AuditingEntityListener.class)`를 둔다.
-`shared.config.JpaAuditingConfig`는 `@EnableJpaAuditing(dateTimeProviderRef="auditingDateTimeProvider")`로 활성화한다.
-같은 이름의 `DateTimeProvider` 빈은 기존 `Clock`을 주입받고 `Instant`를 `ChronoUnit.MICROS`로 잘라 돌려준다.
-운영 시계와 공용 검사 시계의 빈은 추가하지 않는다. 이 선언과 대상의 정확한 개수는 baseline 없는
-`ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`이 검사한다. 실제 callback과 정밀도는 H2 및 MySQL 저장 검사가 확인한다.
-설정·provider 선언과 대상 엔티티는 각각 하나다. 다른 필드·getter의 auditing annotation과 `@LastModifiedDate`는 허용하지 않는다.
-다른 운영 타입의 `AuditingEntityListener` 선언과 Spring Data `Auditable` 구현·상속도 거절한다.
-`AbstractAuditable` 상속도 여기에 포함한다. 기존 JPA 업무 시각과 다른 listener는 그대로 허용한다.
+순수 저장 시각은 `shared.domain.CreatedAtEntity`와 `AuditedEntity`의 JPA auditing으로 기록한다.
+생성 전용은 25개, 생성·변경은 8개다. 엔티티별 적용과 업무 시각 제외 판정은
+[ADR-20261016 / jpa-auditing-base](adr/ADR-20261016-jpa-auditing-base.md)가 소유한다.
+base는 id·권한·행위자를 갖지 않는다. 생성 전용 엔티티에 변경 시각을 추가하지 않는다.
 
-`defaultsFor(groupId)`가 만든 객체는 생성 시각이 null이다. 복합 ID로 `saveAll`이 merge할 때는 반환된 managed 객체를 사용한다.
-`PrePersist` 시각과 트랜잭션 commit 완료 시각은 다르다. rollback하면 시각이 채워졌어도 행은 남지 않는다.
-서비스는 기존 목록이 있으면 새 기본 객체를 만들지 않는다. DB에서 읽은 기존 객체의 detach/merge와 no-op은 기존 생성 시각을 유지한다.
-생성 시각이 null인 기본 객체를 이미 존재하는 ID에 merge하는 경우는 서비스 계약에 포함하지 않는다.
+기존 `shared.config.JpaAuditingConfig`의 `auditingDateTimeProvider`만 쓴다.
+주입된 `Clock`에서 읽은 `Instant`를 `ChronoUnit.MICROS`로 자르며, 새 시계 빈이나 AuditorAware를 두지 않는다.
+새 객체의 감사 시각은 저장 전 NULL이다. persist/flush callback은 commit 완료 시각과 다르며 rollback하면 DB에 남지 않는다.
+일반 dirty update에서 C는 보존하고 U만 바뀐다. 조회·no-op·기존 detached 객체의 merge는 C를 보존한다.
+복합 ID와 지정 ID의 신규 merge에서는 반환된 managed 객체를 사용한다.
+DB에 있는 ID에 C가 NULL인 새 factory 객체를 merge하는 경로는 허용하지 않는다.
 
-다른 엔티티 및 `MemoryRevision.changedAt`, `AgentMemoryCollectionChange.changedAt` 같은 업무 시각은 전달받은 값을 유지한다.
-native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 시각을 정한다. 기존 마이그레이션은 수정하지 않는다.
-[Spring Data auditing](https://docs.spring.io/spring-data/jpa/reference/auditing.html)의 엔티티별 listener와 provider 설정을 따른다.
+대화 활동·커넥터 권한 snapshot·revision·사건·큐 수명 시각은 기존 인자로 전달한다.
+생성 C만 자동화한 Conversation·ConnectorConnection·ConnectorBinding·Memory·ResultDelivery·UserBrowser의 U는 업무 필드로 남는다.
+생성 시각을 기준으로 목록을 읽는 커서와 기간 정리는 저장 시각을 계속 사용한다. 별도의 사건 발생 시각을 이 값으로 바꾸지 않는다.
+
+JPQL/native bulk는 listener를 거치지 않는다. AppUser 모델 기본값, 사용자 금융 상한, Task 대화 연결 bulk는 U를 직접 기록한다.
+금융 `limit_updated_at`은 별도 업무 값이며 감사 `updated_at`만 MICROS로 맞춘다.
+AllowedPerson 로그인 bulk는 lastLoginAt만 갱신하며 관리자 설정의 U를 움직이지 않는다.
+나머지 생성 전용 엔티티의 사용·폐기·삭제·claim bulk는 각 업무 시각만 바꾸고 C를 보존한다.
+목록과 각 쓰기 경계는 위 ADR의 bulk 표가 갖는다.
+
+검사는 기준 파일 없는 `ArchitectureRules.AUDITING_LISTENERS_AND_CLOCK`과 `JpaAuditingPlacementTest`가 맡는다.
+두 base, 엔티티별 상속, 46개 created_at 판정, 설정·provider 각 1개와 업무 필드·getter의 annotation 금지를 확인한다.
+`Auditable`와 actor auditing도 거절한다. 실제 callback·생성 보존·변경·no-op·bulk·rollback과 ORM/JDBC 정밀도는
+`JpaAuditingTest`, `JpaAuditingMysqlTest`, 기존 `MemoryCollectionAuditingTest`와 MySQL 하위 클래스가 확인한다.
+`JpaAuditingMigrationTest`는 빈 DB 전체 적용과 기존 행 업그레이드에서 과거 U의 NULL을 확인한다.
 
 ## 패키지와 책임
 

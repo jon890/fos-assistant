@@ -60,7 +60,7 @@ class SignInControllerTest {
     void setUp() {
         people.deleteAll();
         users.deleteAll();
-        people.save(AllowedPerson.of("mom@example.com", "엄마", "mom", Instant.now()));
+        people.save(AllowedPerson.of("mom@example.com", "엄마", "mom"));
     }
 
 
@@ -171,7 +171,7 @@ class SignInControllerTest {
         Instant login = Instant.parse("2026-10-08T01:00:00Z");
         clock.set(login);
         assertThat(complete(signInToken(), "mom@example.com").statusCode()).isEqualTo(204);
-        users.save(AppUser.of("mom@example.com", "사용자", 1L, UserRole.MEMBER, login));
+        users.save(AppUser.of("mom@example.com", "사용자", 1L, UserRole.MEMBER));
         clock.set(login.plusSeconds(60));
 
         HttpResponse<String> response = client.send(

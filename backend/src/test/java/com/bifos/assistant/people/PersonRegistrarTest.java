@@ -20,7 +20,6 @@ import com.bifos.assistant.people.infra.AllowedPersonRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -104,7 +103,7 @@ class PersonRegistrarTest {
     @Test
     @DisplayName("이미 쓰는 이메일이면 거절하고 Hermes 를 부르지 않는다")
     void rejectsAlreadyUsedEmailWithoutCallingHermes() {
-        people.save(AllowedPerson.of(EMAIL, NAME, "already-taken", Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, NAME, "already-taken"));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
             .isInstanceOf(ApiException.class)
@@ -117,7 +116,7 @@ class PersonRegistrarTest {
     @Test
     @DisplayName("허용 목록이 이미 쓰는 profile 이름이면 거절하고 Hermes 를 부르지 않는다")
     void rejectsProfileNameUsedByAllowlistWithoutCallingHermes() {
-        people.save(AllowedPerson.of("uncle@example.com", "삼촌", PROFILE, Instant.now()));
+        people.save(AllowedPerson.of("uncle@example.com", "삼촌", PROFILE));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
             .isInstanceOf(ApiException.class)
@@ -144,8 +143,7 @@ class PersonRegistrarTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now()));
+            null));
 
         assertThatThrownBy(() -> registrar.register(EMAIL, NAME, PROFILE))
             .isInstanceOf(ApiException.class)

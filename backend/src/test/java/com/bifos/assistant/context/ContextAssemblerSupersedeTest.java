@@ -18,7 +18,6 @@ import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,8 +65,7 @@ class ContextAssemblerSupersedeTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                null,
-                Instant.now())))
+                null)))
             .id();
     }
 

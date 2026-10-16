@@ -1,12 +1,13 @@
 package com.bifos.assistant.memory.domain.entity;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,11 +20,12 @@ import lombok.experimental.Accessors;
  * 모델이 바뀌면 지문이 달라져 다음 채우기가 바꾼다.
  */
 @Entity
+@AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false))
 @Table(name = "memory_embedding")
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemoryEmbedding {
+public class MemoryEmbedding extends AuditedEntity {
 
     @Id
     @Column(name = "memory_id")
@@ -42,24 +44,17 @@ public class MemoryEmbedding {
     @Column(nullable = false, columnDefinition = "BLOB")
     private byte[] vector;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
-
-    public static MemoryEmbedding of(Long memoryId, String model, byte[] fingerprint, float[] vector, Instant now) {
+    public static MemoryEmbedding of(Long memoryId, String model, byte[] fingerprint, float[] vector) {
         MemoryEmbedding embedding = new MemoryEmbedding();
         embedding.memoryId = memoryId;
-        embedding.createdAt = now;
-        embedding.replace(model, fingerprint, vector, now);
+        embedding.replace(model, fingerprint, vector);
         return embedding;
     }
 
 
     /** 다른 모델이나 바뀐 글의 벡터로 바꾼다. */
-    public void replace(String model, byte[] fingerprint, float[] vector, Instant now) {
+    public void replace(String model, byte[] fingerprint, float[] vector) {
         this.model = model;
         this.textFingerprint = fingerprint.clone();
         this.dimensions = vector.length;
@@ -68,7 +63,6 @@ public class MemoryEmbedding {
             buffer.putFloat(value);
         }
         this.vector = buffer.array();
-        this.updatedAt = now;
     }
 
 

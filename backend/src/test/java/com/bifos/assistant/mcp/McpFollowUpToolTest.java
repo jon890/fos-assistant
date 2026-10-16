@@ -100,7 +100,7 @@ class McpFollowUpToolTest {
     void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
         String email = "mcp-follow-up-" + UUID.randomUUID() + "@example.com";
-        dad = users.save(AppUser.of(email, "아빠", 1L, UserRole.ADMIN, Instant.now()));
+        dad = users.save(AppUser.of(email, "아빠", 1L, UserRole.ADMIN));
         createdUsers.add(dad.id());
         dadToken = tokens.issue(PROFILE, "follow-up").rawToken();
         Agent agent = McpCallSigner.agentFor(agents, PROFILE);

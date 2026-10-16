@@ -6,7 +6,6 @@ import com.bifos.assistant.memory.domain.MemoryEmbeddingStamp;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.infra.MemoryEmbeddingRepository;
 import com.bifos.assistant.shared.concurrent.BackgroundTasks;
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,7 +39,6 @@ public class MemoryEmbeddingRefresher {
     private final PlatformTransactionManager transactionManager;
     private final MemoryVectorCache vectorCache;
     private final BackgroundTasks backgroundTasks;
-    private final Clock clock;
     private final AtomicBoolean running = new AtomicBoolean();
 
 
@@ -205,9 +203,9 @@ public class MemoryEmbeddingRefresher {
             byte[] fingerprint = EmbeddingText.fingerprint(properties.model(), textOf(source));
             MemoryEmbedding row = existing.get(source.memoryId());
             if (row == null) {
-                embeddings.save(MemoryEmbedding.of(source.memoryId(), properties.model(), fingerprint, vectors.get(i), clock.instant()));
+                embeddings.save(MemoryEmbedding.of(source.memoryId(), properties.model(), fingerprint, vectors.get(i)));
             } else {
-                row.replace(properties.model(), fingerprint, vectors.get(i), clock.instant());
+                row.replace(properties.model(), fingerprint, vectors.get(i));
             }
         }
         return count;

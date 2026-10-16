@@ -135,7 +135,7 @@ class UserExecutionLimitBackgroundTest {
         agents.deleteAll();
         memories.deleteAll();
         users.deleteAll();
-        AppUser user = users.save(AppUser.of("background@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("background@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         agent = agents.save(Agent.of(
             "background-dad",
@@ -145,8 +145,7 @@ class UserExecutionLimitBackgroundTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            dad.id(),
-            Instant.now()));
+            dad.id()));
         conversation = conversations.save(Conversation.startedBy(dad.id(), "대화", agent.id(), Instant.now()));
         starters = new StarterSuggestionService(
             starterProperties,

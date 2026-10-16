@@ -114,7 +114,7 @@ class ConversationMissingAgentTest {
             mock(SourceReadSummaries.class)))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
-        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("dad@example.com", "dad", 1L, UserRole.MEMBER));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         when(currentUser.require()).thenReturn(dad);
     }
@@ -129,8 +129,7 @@ class ConversationMissingAgentTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            dad.id(),
-            Instant.now()));
+            dad.id()));
     }
 
 

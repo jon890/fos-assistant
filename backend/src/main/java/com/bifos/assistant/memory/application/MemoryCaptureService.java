@@ -307,8 +307,7 @@ public class MemoryCaptureService {
             kind,
             base,
             previousStatus,
-            request.externalRead(),
-            clock.instant()));
+            request.externalRead()));
         log.info(
             "memory captured userId={} memoryId={} executionId={} kind={}",
             user.id(),

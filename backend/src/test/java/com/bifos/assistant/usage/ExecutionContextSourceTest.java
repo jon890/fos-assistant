@@ -122,7 +122,7 @@ class ExecutionContextSourceTest {
             null,
             null,
             new ExecutionContextSnapshot(120L, null, null, 0, sources));
-        new ExecutionContextSourceWriter(contextSources, transactionManager, clock)
+        new ExecutionContextSourceWriter(contextSources, transactionManager)
             .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9202", "INLINE", "UNKNOWN"));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
@@ -166,7 +166,7 @@ class ExecutionContextSourceTest {
             clock,
             executions,
             limiter,
-            new ExecutionContextSourceWriter(failing, transactionManager, clock),
+            new ExecutionContextSourceWriter(failing, transactionManager),
             completion);
 
         AgentExecution execution = start(swapped, adminUser());
@@ -209,7 +209,7 @@ class ExecutionContextSourceTest {
         // 처음 읽은 마지막 position 은 다른 호출이 줄을 넣기 전 값이다. 그 다음 읽기는 실제 값을 본다
         ExecutionContextSourceRepository racing = racingRepository(execution.id(), 1, true);
 
-        new ExecutionContextSourceWriter(racing, transactionManager, clock)
+        new ExecutionContextSourceWriter(racing, transactionManager)
             .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9104", "INLINE", "UNKNOWN"));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
@@ -229,7 +229,7 @@ class ExecutionContextSourceTest {
         AgentExecution execution = start(recorder, adminUser());
         ExecutionContextSourceRepository racing = racingRepository(execution.id(), 0, false);
 
-        new ExecutionContextSourceWriter(racing, transactionManager, clock)
+        new ExecutionContextSourceWriter(racing, transactionManager)
             .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9104", "INLINE", "UNKNOWN"));
 
         assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
@@ -313,7 +313,6 @@ class ExecutionContextSourceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 }

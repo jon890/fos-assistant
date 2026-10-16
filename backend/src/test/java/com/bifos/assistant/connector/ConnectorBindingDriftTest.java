@@ -49,7 +49,6 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -172,7 +171,7 @@ class ConnectorBindingDriftTest {
         revokedAdmin = user(UserRole.ADMIN);
         transactions.executeWithoutResult(status -> {
             AllowedPerson person = people.save(
-                AllowedPerson.of(revokedAdmin.email(), "사용자", "revoked-" + revokedAdmin.id(), Instant.now()));
+                AllowedPerson.of(revokedAdmin.email(), "사용자", "revoked-" + revokedAdmin.id()));
             person.disable();
             people.saveAndFlush(person);
         });
@@ -472,8 +471,7 @@ class ConnectorBindingDriftTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            Instant.now()));
+            user.id()));
     }
 
 
@@ -485,6 +483,6 @@ class ConnectorBindingDriftTest {
 
     private AppUser user(UserRole role) {
         String suffix = UUID.randomUUID().toString();
-        return users.save(AppUser.of("drift-" + suffix + "@example.com", suffix, GROUP, role, Instant.now()));
+        return users.save(AppUser.of("drift-" + suffix + "@example.com", suffix, GROUP, role));
     }
 }

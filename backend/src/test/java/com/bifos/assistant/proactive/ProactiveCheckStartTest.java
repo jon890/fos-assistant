@@ -395,7 +395,7 @@ class ProactiveCheckStartTest {
 
     private CurrentUser user(String name) {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser saved = users.save(AppUser.of(name + "-" + suffix + "@example.com", name, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved = users.save(AppUser.of(name + "-" + suffix + "@example.com", name, 1L, UserRole.MEMBER));
         createdUsers.add(saved.id());
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
@@ -411,8 +411,7 @@ class ProactiveCheckStartTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            user.id(),
-            Instant.now()));
+            user.id()));
         createdAgents.add(saved.id());
         return saved;
     }

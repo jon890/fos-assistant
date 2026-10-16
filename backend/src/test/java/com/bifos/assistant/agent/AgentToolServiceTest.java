@@ -26,7 +26,6 @@ import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -60,8 +59,7 @@ class AgentToolServiceTest {
         CostMode.SUBSCRIPTION,
         CredentialScope.SHARED_HOUSEHOLD,
         AgentVisibility.PRIVATE,
-        1L,
-        Instant.now());
+        1L);
 
 
     @BeforeEach
@@ -142,8 +140,7 @@ class AgentToolServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now());
+            null);
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.write(reader, groupAgent, List.of()))
@@ -174,8 +171,7 @@ class AgentToolServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now());
+            null);
         CurrentUser reader = new CurrentUser(2L, "reader@example.com", "읽는 사람", 1L, UserRole.MEMBER);
 
         assertThatThrownBy(() -> isolatedService.read(reader, groupAgent))

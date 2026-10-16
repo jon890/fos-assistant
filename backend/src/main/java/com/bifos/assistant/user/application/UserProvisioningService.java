@@ -3,7 +3,6 @@ package com.bifos.assistant.user.application;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +26,6 @@ public class UserProvisioningService {
 
     private final AppUserRepository users;
     private final FirstSignInListener firstSignIn;
-    private final Clock clock;
 
 
     /**
@@ -48,7 +46,7 @@ public class UserProvisioningService {
 
 
     private AppUser createUser(String email, String displayName) {
-        AppUser created = users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole(), clock.instant()));
+        AppUser created = users.save(AppUser.of(email, displayName, DEFAULT_GROUP_ID, firstUserRole()));
         firstSignIn.onUserCreated(created, email);
         return created;
     }

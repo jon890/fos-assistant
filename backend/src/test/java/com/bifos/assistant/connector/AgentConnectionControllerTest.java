@@ -43,7 +43,6 @@ import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -277,14 +276,13 @@ class AgentConnectionControllerTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
     }
 
 
     private CurrentUser user(UserRole role) {
         String suffix = UUID.randomUUID().toString();
-        AppUser saved = users.save(AppUser.of("agent-connection-" + suffix + "@example.com", suffix, 1L, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of("agent-connection-" + suffix + "@example.com", suffix, 1L, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

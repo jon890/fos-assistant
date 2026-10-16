@@ -11,7 +11,6 @@ import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +30,6 @@ public class AgentAdminService {
     private final AgentLifecycleService lifecycle;
     private final AgentEndpointProbe endpointProbe;
     private final AgentConnectorBindings connectorBindings;
-    private final Clock clock;
 
 
     @Transactional
@@ -53,8 +51,7 @@ public class AgentAdminService {
             command.costMode(),
             command.credentialScope(),
             command.visibility(),
-            ownerId,
-            clock.instant());
+            ownerId);
         return agents.save(agent);
     }
 

@@ -19,7 +19,6 @@ import java.net.http.HttpResponse;
 import java.net.http.WebSocket;
 import java.net.http.WebSocketHandshakeException;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -75,8 +74,8 @@ class BrowserGatewaySocketIntegrationTest {
     @BeforeEach
     void setUp() {
         clean();
-        people.save(AllowedPerson.of(EMAIL, "x", "browser-gateway-socket", Instant.now()));
-        AppUser user = users.save(AppUser.of(EMAIL, "x", 1L, UserRole.MEMBER, Instant.now()));
+        people.save(AllowedPerson.of(EMAIL, "x", "browser-gateway-socket"));
+        AppUser user = users.save(AppUser.of(EMAIL, "x", 1L, UserRole.MEMBER));
         String address = tokens.callAddress(user.id()).orElseThrow();
         token = address.substring(address.lastIndexOf('/') + 1);
     }

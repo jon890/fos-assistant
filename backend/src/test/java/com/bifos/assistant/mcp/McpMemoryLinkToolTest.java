@@ -128,9 +128,9 @@ class McpMemoryLinkToolTest {
         links.deleteAll();
         repository.deleteAll();
         AppUser owner = users.save(AppUser.of(
-            "link-" + UUID.randomUUID() + "@example.test", "연결 검사", 10L, UserRole.ADMIN, Instant.now()));
+            "link-" + UUID.randomUUID() + "@example.test", "연결 검사", 10L, UserRole.ADMIN));
         AppUser stranger = users.save(AppUser.of(
-            "link-other-" + UUID.randomUUID() + "@example.test", "다른 사람", 10L, UserRole.MEMBER, Instant.now()));
+            "link-other-" + UUID.randomUUID() + "@example.test", "다른 사람", 10L, UserRole.MEMBER));
         user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), owner.groupId(), owner.role());
         other = new CurrentUser(
             stranger.id(), stranger.email(), stranger.displayName(), stranger.groupId(), stranger.role());
@@ -139,7 +139,7 @@ class McpMemoryLinkToolTest {
         conversation = conversations.save(Conversation.startedBy(user.id(), "연결 검사 대화", agent.id(), Instant.now()));
         root = McpCallSigner.newRoot();
         run = McpCallSigner.running(executions, agents, user.id(), conversation.id(), PROFILE, root);
-        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false, Instant.now()));
+        grants.save(AgentMemoryCollection.of(run.agentId(), "core", false));
         mvc = MockMvcBuilders.webAppContextSetup(context)
             .apply(springSecurity())
             .build();

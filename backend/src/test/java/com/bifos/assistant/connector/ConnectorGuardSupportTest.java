@@ -191,7 +191,7 @@ class ConnectorGuardSupportTest {
         Fixture f = fixture();
         Long usersBefore = jdbc.queryForObject("select count(*) from app_user", Long.class);
         var profileToken = profileTokens.saveAndFlush(AgentToken.issueFor(
-            f.profile(), Sha256.hex("test-profile-bearer"), "support 인증 검사", NOW));
+            f.profile(), Sha256.hex("test-profile-bearer"), "support 인증 검사"));
         String jwt = Jwts.builder().subject(f.email())
             .signWith(Keys.hmacShaKeyFor(auth.jwtSecret().getBytes(StandardCharsets.UTF_8))).compact();
         var vector = JSON.readTree(Files.readString(Path.of("../test/resources/financial-ticket-v1.json")));
@@ -366,10 +366,10 @@ class ConnectorGuardSupportTest {
         return new TransactionTemplate(manager).execute(status -> {
             String id = UUID.randomUUID().toString();
             String profile = "support-" + id;
-            var user = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER, NOW));
-            people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile, NOW));
+            var user = users.saveAndFlush(AppUser.of(id + "@example.test", "검사 주인", 1L, UserRole.MEMBER));
+            people.saveAndFlush(AllowedPerson.of(user.email(), "검사 주인", profile));
             var agent = agents.saveAndFlush(Agent.of("support-" + id, "검사", profile, "http://localhost",
-                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id(), NOW));
+                CostMode.SUBSCRIPTION, CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, user.id()));
             var connection = ConnectorConnection.pending(user.id(), "demo-financial", NOW);
             connection.connected(new ConnectionFields(Map.of("account", "000007"), Map.of()), NOW);
             connection.ready(NOW);

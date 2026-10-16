@@ -13,7 +13,6 @@ import com.bifos.assistant.testsupport.FakeBrowserRuntime;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -73,8 +72,8 @@ class UserBrowserAccessRevokedTest {
     @Test
     @DisplayName("사용자를 끄면 그 사용자의 켜진 브라우저가 STOPPED 가 되고 컨테이너가 지워진다")
     void stopsBrowserWhenAccessRevoked() {
-        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, "x", "browser-revoked", Instant.now()));
-        AppUser user = users.save(AppUser.of(EMAIL, "x", 1L, UserRole.MEMBER, Instant.now()));
+        AllowedPerson person = people.save(AllowedPerson.of(EMAIL, "x", "browser-revoked"));
+        AppUser user = users.save(AppUser.of(EMAIL, "x", 1L, UserRole.MEMBER));
         browsers.create(user.id());
         assertThat(browsers.start(user.id()).status()).isEqualTo(UserBrowserStatus.RUNNING);
 

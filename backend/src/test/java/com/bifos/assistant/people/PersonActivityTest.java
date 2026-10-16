@@ -93,9 +93,9 @@ class PersonActivityTest {
     @Test
     @DisplayName("사용자가 보낸 마지막 메시지만 활동 시각으로 모은다")
     void findsLastUserMessageBySenderRatherThanConversationOwner() {
-        AllowedPerson allowed = people.save(AllowedPerson.of("activity@example.com", "사용자", "activity", Instant.EPOCH));
-        AppUser user = users.save(AppUser.of("ACTIVITY@example.com", "사용자", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser owner = users.save(AppUser.of("owner@example.com", "대화 주인", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AllowedPerson allowed = people.save(AllowedPerson.of("activity@example.com", "사용자", "activity"));
+        AppUser user = users.save(AppUser.of("ACTIVITY@example.com", "사용자", 1L, UserRole.MEMBER));
+        AppUser owner = users.save(AppUser.of("owner@example.com", "대화 주인", 1L, UserRole.MEMBER));
         Instant first = Instant.parse("2026-10-08T01:00:00Z");
         Instant last = Instant.parse("2026-10-08T02:00:00Z");
         Conversation firstConversation = conversations.save(Conversation.startedBy(owner.id(), "첫 대화", null, first));
@@ -118,7 +118,7 @@ class PersonActivityTest {
     @Test
     @DisplayName("대화가 없는 아직 로그인하지 않은 사람은 활동 시각이 비어 있다")
     void returnsNullActivityForPersonWithoutUser() {
-        AllowedPerson allowed = people.save(AllowedPerson.of("new@example.com", "새 사용자", "new-user", Instant.EPOCH));
+        AllowedPerson allowed = people.save(AllowedPerson.of("new@example.com", "새 사용자", "new-user"));
 
         PersonAccess result = access.list().stream()
             .filter(entry -> entry.person().id().equals(allowed.id()))
@@ -133,18 +133,18 @@ class PersonActivityTest {
     @Test
     @DisplayName("가입 여부와 상태와 정규화가 달라도 사용자 메시지의 가장 최근 시각을 붙인다")
     void assemblesActivityForJoinedDisabledAndNormalizedUsers() {
-        AllowedPerson inactive = people.save(AllowedPerson.of("inactive@example.com", "미가입", "inactive", Instant.EPOCH));
-        AllowedPerson joined = people.save(AllowedPerson.of("joined@example.com", "가입", "joined", Instant.EPOCH));
-        AllowedPerson noMessage = people.save(AllowedPerson.of("no-message@example.com", "무대화", "no-message", Instant.EPOCH));
-        AllowedPerson disabled = people.save(AllowedPerson.of("disabled@example.com", "꺼짐", "disabled", Instant.EPOCH));
+        AllowedPerson inactive = people.save(AllowedPerson.of("inactive@example.com", "미가입", "inactive"));
+        AllowedPerson joined = people.save(AllowedPerson.of("joined@example.com", "가입", "joined"));
+        AllowedPerson noMessage = people.save(AllowedPerson.of("no-message@example.com", "무대화", "no-message"));
+        AllowedPerson disabled = people.save(AllowedPerson.of("disabled@example.com", "꺼짐", "disabled"));
         disabled.disable();
         people.save(disabled);
-        AllowedPerson duplicate = people.save(AllowedPerson.of("duplicate@example.com", "중복", "duplicate", Instant.EPOCH));
-        AppUser joinedUser = users.save(AppUser.of("JOINED@example.com", "가입", 1L, UserRole.MEMBER, Instant.EPOCH));
-        users.save(AppUser.of("NO-MESSAGE@example.com", "무대화", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser disabledUser = users.save(AppUser.of("disabled@example.com", "꺼짐", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser duplicateOld = users.save(AppUser.of("DUPLICATE@example.com", "중복A", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AppUser duplicateNew = users.save(AppUser.of("duplicate@example.com", "중복B", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AllowedPerson duplicate = people.save(AllowedPerson.of("duplicate@example.com", "중복", "duplicate"));
+        AppUser joinedUser = users.save(AppUser.of("JOINED@example.com", "가입", 1L, UserRole.MEMBER));
+        users.save(AppUser.of("NO-MESSAGE@example.com", "무대화", 1L, UserRole.MEMBER));
+        AppUser disabledUser = users.save(AppUser.of("disabled@example.com", "꺼짐", 1L, UserRole.MEMBER));
+        AppUser duplicateOld = users.save(AppUser.of("DUPLICATE@example.com", "중복A", 1L, UserRole.MEMBER));
+        AppUser duplicateNew = users.save(AppUser.of("duplicate@example.com", "중복B", 1L, UserRole.MEMBER));
         Instant old = Instant.parse("2026-10-08T01:00:00Z");
         Instant recent = old.plusSeconds(60);
         Conversation conversation = conversations.save(Conversation.startedBy(joinedUser.id(), "활동", null, old));
@@ -179,9 +179,9 @@ class PersonActivityTest {
     @Test
     @DisplayName("관리자 목록과 추가와 변경 응답은 활동 시각 null을 내보내고 MEMBER는 거절한다")
     void exposesNullableActivityOnlyToAdmin() throws Exception {
-        AppUser admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN, Instant.EPOCH));
-        AppUser member = users.save(AppUser.of("member@example.com", "사용자", 1L, UserRole.MEMBER, Instant.EPOCH));
-        AllowedPerson existing = people.save(AllowedPerson.of("existing@example.com", "기존", "existing", Instant.EPOCH));
+        AppUser admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN));
+        AppUser member = users.save(AppUser.of("member@example.com", "사용자", 1L, UserRole.MEMBER));
+        AllowedPerson existing = people.save(AllowedPerson.of("existing@example.com", "기존", "existing"));
 
         HttpResponse<String> listed = api("GET", "/api/v1/admin/people", token(admin), null);
         assertThat(listed.statusCode()).isEqualTo(200);
@@ -217,9 +217,9 @@ class PersonActivityTest {
     @Test
     @DisplayName("관리자 목록과 변경 응답은 기록된 두 활동 시각을 ISO 형식으로 준다")
     void exposesRecordedActivityToAdminAsIsoInstants() throws Exception {
-        AppUser admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN, Instant.EPOCH));
-        AllowedPerson person = people.save(AllowedPerson.of("active@example.com", "사용자", "active", Instant.EPOCH));
-        AppUser user = users.save(AppUser.of(person.email(), "사용자", 1L, UserRole.MEMBER, Instant.EPOCH));
+        AppUser admin = users.save(AppUser.of("admin@example.com", "관리자", 1L, UserRole.ADMIN));
+        AllowedPerson person = people.save(AllowedPerson.of("active@example.com", "사용자", "active"));
+        AppUser user = users.save(AppUser.of(person.email(), "사용자", 1L, UserRole.MEMBER));
         Instant login = Instant.parse("2026-10-08T01:00:00Z");
         Instant conversationAt = login.plusSeconds(60);
         clock.set(login);
@@ -244,7 +244,7 @@ class PersonActivityTest {
     @Test
     @DisplayName("관리자 변경에 오래된 허용 목록 행을 저장해도 로그인 시각은 유지한다")
     void preservesLoginTimeWhenAdminSavesStalePerson() {
-        AllowedPerson person = people.save(AllowedPerson.of("stale@example.com", "사용자", "stale", Instant.EPOCH));
+        AllowedPerson person = people.save(AllowedPerson.of("stale@example.com", "사용자", "stale"));
         AllowedPerson staleDisable = people.findById(person.id()).orElseThrow();
         Instant firstLogin = Instant.parse("2026-10-08T01:00:00Z");
         clock.set(firstLogin);
@@ -285,8 +285,8 @@ class PersonActivityTest {
         Instant now = Instant.parse("2026-10-08T03:00:00Z");
         for (int index = 0; index < count; index++) {
             String email = "list-" + index + "@example.com";
-            people.save(AllowedPerson.of(email, "사용자", "list-" + index, now));
-            AppUser user = users.save(AppUser.of(email, "사용자", 1L, UserRole.MEMBER, now));
+            people.save(AllowedPerson.of(email, "사용자", "list-" + index));
+            AppUser user = users.save(AppUser.of(email, "사용자", 1L, UserRole.MEMBER));
             Conversation conversation = conversations.save(Conversation.startedBy(user.id(), "목록", null, now));
             messages.save(ChatMessage.fromUser(conversation.id(), user.id(), "message", now));
         }

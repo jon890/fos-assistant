@@ -96,7 +96,7 @@ public class TaskFiring {
             scheduled = latest == null ? scheduled : latest;
         }
         Instant next = cron == null ? null : TaskSchedule.nextAfter(cron, zone, now);
-        trigger.advance(scheduled, next, now);
+        trigger.advance(scheduled, next);
         if (runs.existsByTriggerIdAndScheduledFor(trigger.id(), scheduled)) {
             return false;
         }

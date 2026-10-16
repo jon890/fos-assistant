@@ -157,7 +157,7 @@ class AgentDelegationServiceTest {
         }
         users.findByEmail(EMAIL).ifPresent(users::delete);
         users.findByEmail(OTHER_EMAIL).ifPresent(users::delete);
-        AppUser saved = users.save(AppUser.of(EMAIL, "가", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved = users.save(AppUser.of(EMAIL, "가", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         Agent worker = agents.save(Agent.of(
             WORKER,
@@ -167,8 +167,7 @@ class AgentDelegationServiceTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            saved.id(),
-            Instant.now()));
+            saved.id()));
         conversation = conversations.save(Conversation.startedBy(saved.id(), "맡기기", worker.id(), Instant.now()));
         root = "fos-" + UUID.randomUUID();
         origin = turn(root);
@@ -531,7 +530,7 @@ class AgentDelegationServiceTest {
         holdUntilStopped();
         DelegationResult started = delegate("남이 멈추려는 일");
         AppUser other = users.findByEmail(OTHER_EMAIL)
-            .orElseGet(() -> users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER, Instant.now())));
+            .orElseGet(() -> users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER)));
         CurrentUser otherUser = new CurrentUser(other.id(), other.email(), other.displayName(), other.groupId(), other.role());
         Conversation otherConversation = conversations.save(Conversation.startedBy(user.id(), "다른 대화", conversation.agentId(), Instant.now()));
         AgentExecution otherConversationTurn = executions.save(AgentExecution.builder()
@@ -659,7 +658,7 @@ class AgentDelegationServiceTest {
     @Test
     @DisplayName("살펴보기 트리에서 다른 사용자의 비공개 에이전트는 AGENT UNAVAILABLE 이다")
     void checkTreeKeepsAgentUnavailableForOtherUsersConnectorAgent() {
-        AppUser other = users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser other = users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER));
         connectorAgent(OTHER_CONNECTOR, other.id());
         AgentExecution checkTurn = checkTurn();
 
@@ -863,8 +862,7 @@ class AgentDelegationServiceTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            ownerUserId,
-            Instant.now());
+            ownerUserId);
         return agents.save(agent);
     }
 

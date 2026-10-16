@@ -162,7 +162,7 @@ class ProactiveCheckLimitTest {
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        AppUser user = users.save(AppUser.of("limit-" + suffix + "@example.com", "한도", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of("limit-" + suffix + "@example.com", "한도", 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "limit-" + suffix;
         agent = agents.save(Agent.of(
@@ -173,8 +173,7 @@ class ProactiveCheckLimitTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
         conversation = conversations.save(
             Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
     }

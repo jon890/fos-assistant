@@ -13,6 +13,7 @@ import com.bifos.assistant.shared.config.LiveProperties;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -110,6 +111,6 @@ public class FinancialOrderLimits {
         FinancialOrderLimit row = limits.findByUserId(userId).orElseThrow(() -> new IllegalStateException("no user"))
             .with(kind, value);
         limits.store(userId, row.orderAmountKrw(), row.orderAmountUsd(), row.orderQuantity(), row.dailyAmountKrw(),
-            row.dailyAmountUsd(), now);
+            row.dailyAmountUsd(), now, now.truncatedTo(ChronoUnit.MICROS));
     }
 }
