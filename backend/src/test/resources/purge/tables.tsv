@@ -16,9 +16,9 @@ chat_artifact|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id에 속한다. Conv
 chat_attachment|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id와 uploaded_by_user_id에 속한다. 대화 purge가 행을 지운다.
 chat_message|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id에 속한다. 대화 purge가 본문 행을 지운다.
 chat_pending_message|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id와 user_id에 속한다. 대화 삭제 즉시 지운다.
-connector_action|CONVERSATION|id|GAP|GAP|DETACH|user_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 args_json과 result_text가 남는다.
-connector_action_execution|CONVERSATION|action_id|GAP|GAP|KEEP|action_id FK로 승인에 속한다. 알려진 공백: 대화 purge 뒤 실행 인자와 요약·범위가 남는다.
-connector_connection|USER|id|GAP|KEEP|DETACH|user_id FK에 속한다. 연결은 사용자 소유라 남기고 에이전트 참조만 비운다.
+connector_action|CONVERSATION|id|GAP|SCRUB|DETACH|user_id FK와 conversation_id에 속한다. 대화 purge는 인자·결과와 key만 지우고 감사와 금융 상한 변경 칸은 남긴다.
+connector_action_execution|CONVERSATION|action_id|GAP|SCRUB|KEEP|action_id FK로 승인에 속한다. 대화 purge는 실행 인자·요약·범위와 key만 지우고 해시와 ticket·중복 방지 칸은 남긴다.
+connector_connection|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 연결은 사용자 소유라 에이전트 정리와 무관하게 보존한다.
 connector_conversation_grant|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id FK가 있다. 삭제된 대화와 붙지 않은 에이전트의 권한은 읽기에서 거절하며 행은 만료 이력으로 남긴다.
 connector_tool_grant|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
 content_draft|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id FK와 owner_user_id에 속한다. 대화 purge가 지운다.
@@ -57,8 +57,6 @@ proactive_value_evaluation|AGENT|id|GAP|GAP|DELETE|check_id FK로 점검에 속�
 result_delivery|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id에 속한다. 결과 본문 없이 전달 상태와 시도 횟수만 보존한다.
 result_delivery_attempt|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 결과 본문 없이 시도 상태와 실행 참조만 남긴다.
 result_delivery_item|CONVERSATION|id|GAP|KEEP|KEEP|delivery_id FK로 전달에 속한다. 결과 본문 없이 출처와 결과 식별자만 남긴다.
-service_token|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 접근 해제는 revoked_at을 적으며 발급 이력 행은 남긴다.
-service_token_collection|USER|token_id|GAP|KEEP|KEEP|token_id FK로 서비스 토큰에 속한다. 폐기한 토큰의 권한 이력도 남는다.
 subagent_usage_job|CONVERSATION|id|GAP|KEEP|KEEP|execution_id로 실행에 속한다. 본문 없이 자식 사용량 원장을 보존한다.
 task|USER|id|GAP|KEEP|KEEP|owner_user_id FK가 있다. 대화와 에이전트 참조에 FK를 두지 않고 사용자의 예약 작업을 남긴다.
 task_run|USER|id|GAP|KEEP|KEEP|task_id와 trigger_id FK로 예약 작업에 속한다. 발화 이력을 보존한다.

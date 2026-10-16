@@ -1,3 +1,4 @@
+// 코드 규칙: rule-69. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import { expect, test } from "./fixtures.ts";
 import type {
   Page,

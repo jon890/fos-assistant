@@ -634,11 +634,14 @@ class DelegationWakeServiceTest {
     }
 
 
-    /** 커넥터 연결이 만든 에이전트다. 이 에이전트의 답은 외부 서비스의 글을 담는다. */
+    /** 연결이 붙은 일반 에이전트다. 이 에이전트의 답은 외부 서비스의 글을 담는다. */
     private Agent connectorAgent() {
         Agent connector = agent("connector", "연결", dad.id());
-        connector.markConnectorManaged();
-        return agents.save(connector);
+        connector = agents.save(connector);
+        ConnectorConnection boundConnection = connections.save(ConnectorConnection.pending(dad.id(), "demo-mail", Instant.now()));
+        ConnectorBinding savedBinding = bindings.save(ConnectorBinding.pending(connector, boundConnection, "mail", Instant.now()));
+        boundBinding = new BoundIds(savedBinding.id(), boundConnection.id());
+        return connector;
     }
 
 

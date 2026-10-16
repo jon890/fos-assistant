@@ -34,7 +34,7 @@ public class KeywordScorer {
         Map<String, Integer> documentFrequency = new HashMap<>();
         long totalLength = 0;
         for (RelevanceCandidate candidate : candidates) {
-            Map<String, Integer> counts = KoreanBigramTokenizer.termCounts(documentOf(candidate));
+            Map<String, Integer> counts = KoreanBigramTokenizer.documentTermCounts(documentOf(candidate));
             documents.add(counts);
             totalLength += counts.values().stream().mapToInt(Integer::intValue).sum();
             for (String token : queryTokens) {
@@ -44,7 +44,7 @@ public class KeywordScorer {
             }
         }
         int n = candidates.size();
-        double averageLength = Math.max(1.0, (double) totalLength / n);
+        double averageLength = Math.max(1.0, (double)totalLength / n);
         List<KeywordScore> scores = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             Map<String, Integer> counts = documents.get(i);
@@ -61,7 +61,7 @@ public class KeywordScorer {
                 double idf = Math.log(1 + (n - df + 0.5) / (df + 0.5));
                 bm25 += idf * frequency * (K1 + 1) / (frequency + K1 * (1 - B + B * length / averageLength));
             }
-            double coverage = (double) matched / queryTokens.size();
+            double coverage = (double)matched / queryTokens.size();
             if (matched > 0 && coverage >= minCoverage) {
                 scores.add(new KeywordScore(candidates.get(i).memoryId(), bm25, coverage));
             }

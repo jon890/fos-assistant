@@ -8,11 +8,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
-import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -71,7 +69,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -153,10 +150,6 @@ class ProactiveCheckTurnTest {
     @Autowired
     HermesToolsetClient toolsets;
 
-    /** 에이전트에 붙은 커넥터 서버를 대역으로 둔다. 연결을 붙이는 검사만 값을 정하고 나머지는 붙은 연결이 없다. */
-    @Autowired
-    AgentConnectorBindings connectorBindings;
-
     /** 켜진 스킬 목록을 대역으로 둔다. */
     @Autowired
     HermesSkillClient skillClient;
@@ -177,9 +170,6 @@ class ProactiveCheckTurnTest {
     @BeforeEach
     void setUp() {
         stub().reset();
-        doReturn(false).when(connectorBindings).hasBindings(any());
-        doReturn(Set.of()).when(connectorBindings).connectorServers(any());
-        doReturn(Set.of()).when(connectorBindings).connectorToolPrefixes(any());
         when(toolsets.readEnabled(anyString(), anyString())).thenReturn(List.of("web", "skills", "fos-assistant"));
         when(skillClient.list(anyString())).thenReturn(List.of(new HermesSkill("proactive-check", "살펴보기", true)));
         String suffix = UUID.randomUUID().toString().substring(0, 8);
@@ -414,33 +404,17 @@ class ProactiveCheckTurnTest {
 
 
     @Test
-    @DisplayName("연결이 붙은 에이전트의 살펴보기 지시는 연결한 서비스의 도구를 직접 부르게 하고 위임 줄을 싣지 않는다")
-    void instructsDirectCallsWhenConnectorsAreBound() {
-        doReturn(Set.of("career")).when(connectorBindings).connectorServers(agent.id());
-        when(toolsets.readEnabled(anyString(), anyString()))
-            .thenReturn(List.of("web", "skills", "fos-assistant", "career"));
+    @DisplayName("붙은 연결이 없는 에이전트의 살펴보기도 도구를 직접 부르고 다른 에이전트에 맡기지 않는다")
+    void instructsDirectCallsWithoutDelegationWhenNoConnectorIsBound() {
         stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
 
         runCheck();
 
         assertThat(stub().received().getLast().instructions())
-            .contains("- 연결한 서비스의 도구는 직접 부른다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.")
+            .contains("- 필요한 도구는 직접 부르고 다른 에이전트에 맡기지 않는다. 읽기만 하는 실행에서는 조회 도구만 쓸 수 있다.")
             .doesNotContain("agent_status")
             .doesNotContain("wait_seconds")
             .contains("이번 실행은 읽기만 한다");
-    }
-
-
-    @Test
-    @DisplayName("붙은 연결이 없는 에이전트의 살펴보기 지시는 지금의 위임 줄 그대로다")
-    void keepsDelegationLineWhenNoConnectorIsBound() {
-        stub().willAnswer(command -> answer(block("{\"version\":1,\"outcome\":\"NOTHING_NEW\"}")));
-
-        runCheck();
-
-        assertThat(stub().received().getLast().instructions())
-            .contains("- 다른 에이전트에는 연결한 서비스의 에이전트에만 필요한 질의를 맡기고, agent_status 의 wait_seconds 로 기다린다.")
-            .doesNotContain("연결한 서비스의 도구는 직접 부른다");
     }
 
 

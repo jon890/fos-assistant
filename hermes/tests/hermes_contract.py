@@ -1,3 +1,4 @@
+# 코드 규칙: rule-64. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 """plugin과 runtime addon이 기대는 Hermes 내부 지점을 한곳에 선언한다.
 
 이 plugin 은 공개 확장점만으로는 열 수 없는 자리를 쓴다(ADR-088).
@@ -362,7 +363,6 @@ OWN_ROUTES = frozenset({
     ("POST", "/api/connectors/{}/execute"),
     ("PUT", "/api/connector-vault"),
     ("DELETE", "/api/connector-vault"),
-    ("POST", "/api/connector-vault/import"),
     ("GET", "/api/profiles/{}/model-defaults"),
     ("GET", "/api/profiles/{}/sessions/{}/provider"),
 })

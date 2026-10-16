@@ -210,10 +210,8 @@ Hermes 쪽을 먼저 지우고 우리 표를 나중에 지운다. 반대로 하�
 
 `ACCESS_REVOKED` 는 이 판정만 내는 코드다. 세션이 없을 때 웹이 만드는 `UNAUTHENTICATED` 와 달라, 웹이 세션을 지울지 이 코드로 판단한다.
 
-`/mcp` 와 `/internal/hermes/` 아래 경로, `/internal/browser-gateway/` 아래 경로, 서비스 토큰 경로, 두 로그인 경로는 이 필터를 지나지 않는다.
+`/mcp` 와 `/internal/hermes/` 아래 경로, `/internal/browser-gateway/` 아래 경로, 두 로그인 경로는 이 필터를 지나지 않는다.
 브라우저 중계의 허용 목록 확인은 중계가 직접 한다([`docs/features/user-browser.md`](user-browser.md) 의 「중계」).
-서비스 토큰은 주인이 켜져 있는지 따로 확인한다([`docs/features/memory.md`](memory.md)).
-
 #### 아무도 없을 때
 
 허용 목록이 비면 아무도 로그인하지 못한다.

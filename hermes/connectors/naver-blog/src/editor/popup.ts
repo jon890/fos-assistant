@@ -151,3 +151,16 @@ export async function dismissKnownPopup(page: EditorPage) {
   await page.sleep(page.step(0.5));
   return true;
 }
+
+/**
+ * 글을 넣는 도중에 뜬 알림을 누르기 전에 한 번 닫아 본다. 알림이 없으면 아무것도 하지 않는다.
+ * 닫는 규칙은 `dismissKnownPopup` 과 같아서 모르는 알림과 위험한 단추가 든 알림은 누르지 않는다.
+ * 닫지 못한 알림은 종류를 `page.popup` 에 남겨 뒤의 실패가 `popup_diagnostics` 로 싣게 한다.
+ */
+export async function settleKnownPopup(page: EditorPage) {
+  // 닫지 못한 알림의 진단은 `dismissKnownPopup` 이 읽은 값으로 이미 남긴다. 여기서 다시 읽어 덮지 않는다.
+  if (await dismissKnownPopup(page)) {
+    // 닫혀 화면이 깨끗해졌으니 알림과 상관없는 뒤의 실패에 지난 진단을 붙이지 않는다.
+    page.popup = null;
+  }
+}

@@ -65,7 +65,6 @@ public final class AgentDtos {
      * @param editable 요청자가 이 에이전트를 관리할 수 있다. 주인과 {@code ADMIN} 이다. 화면이 공개와 삭제를
      * 보일지 이 값으로 정한다
      * @param ownedByMe 요청자가 이 에이전트의 주인이다
-     * @param connectorManaged 커넥터 연결이 만든 에이전트다. 화면이 도구와 스킬 편집을 그리지 않는다
      */
     public record AgentView(
         String code,
@@ -73,8 +72,7 @@ public final class AgentDtos {
         String visibility,
         boolean acceptsAttachments,
         boolean editable,
-        boolean ownedByMe,
-        boolean connectorManaged) {
+        boolean ownedByMe) {
         static AgentView from(Agent agent, boolean editable, boolean ownedByMe) {
             return new AgentView(
                 agent.code(),
@@ -82,8 +80,7 @@ public final class AgentDtos {
                 agent.visibility().name(),
                 agent.acceptsAttachments(),
                 editable,
-                ownedByMe,
-                agent.connectorManaged());
+                ownedByMe);
         }
     }
 

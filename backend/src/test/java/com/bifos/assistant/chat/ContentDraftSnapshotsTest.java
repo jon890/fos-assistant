@@ -122,8 +122,8 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
             Map.of("compile", true, "start", false, "status", false));
         when(catalog.readCatalog()).thenAnswer(call -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test", List.of(),
-                false, 1, List.of(), List.of(), null, false, false, null, null, null, declaration));
+            return List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test",
+                1, List.of(), List.of(), null, false, false, null, null, null, declaration));
         });
         doAnswer(call -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
@@ -380,8 +380,8 @@ class ContentDraftSnapshotsTest extends ContentDraftFixture {
     void recoversAfterPolicyChangeAndRequiresCallerComparison() throws Exception {
         var first = preview();
         var prepared = bindingAccess.prepare(owner, binding.agent().id(), binding.id());
-        when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test", List.of(),
-            false, 1, List.of(), List.of(), null, false, false, null, null, null,
+        when(catalog.readCatalog()).thenReturn(List.of(new ConnectorManifest("snapshot-test", "검사", "", List.of(), "verify", "snapshot-test",
+            1, List.of(), List.of(), null, false, false, null, null, null,
             new ConnectorSnapshotDeclaration("content-snapshot-v1", "compile_changed", "start_snapshot", "status_snapshot",
                 Map.of("compile", true, "start", false, "status", false)))));
         var field = cache.getClass().getDeclaredField("readAt");

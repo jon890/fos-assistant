@@ -118,23 +118,6 @@ class AgentMemoryCollectionServiceTest {
 
 
     @Test
-    @DisplayName("커넥터 에이전트는 저장할 때 아무것도 받지 않고 줄이 있어도 받지 않는다")
-    void connectorAgentsReceiveNothingEvenWithRows() {
-        Agent connector = agent();
-        connector.markConnectorManaged();
-        Agent saved = agents.save(connector);
-
-        assertThat(grants.findByIdAgentId(saved.id())).isEmpty();
-        assertThat(service.grantsOf(saved.id()).collections()).isEmpty();
-
-        grants.save(AgentMemoryCollection.of(saved.id(), "core", true, NOW));
-        AgentMemoryGrants granted = service.grantsOf(saved.id());
-        assertThat(granted.collections()).isEmpty();
-        assertThat(granted.sensitiveCollections()).isEmpty();
-    }
-
-
-    @Test
     @DisplayName("없는 에이전트와 에이전트가 없는 실행은 아무것도 받지 않는다")
     void unknownAgentsReceiveNothing() {
         assertThat(service.grantsOf(9_999_999L).collections()).isEmpty();
@@ -327,29 +310,18 @@ class AgentMemoryCollectionServiceTest {
 
 
     @Test
-    @DisplayName("옛 커넥터 에이전트와 지운 에이전트는 바꾸지 못한다")
-    void rejectsConnectorAndDeletedAgents() {
-        Agent connector = agent();
-        connector.markConnectorManaged();
-        Agent savedConnector = agents.save(connector);
+    @DisplayName("지운 에이전트는 바꾸지 못한다")
+    void rejectsDeletedAgents() {
         Agent deleted = agent();
         deleted.markDeleted(NOW);
         Agent savedDeleted = agents.save(deleted);
 
-        assertThatThrownBy(() -> service.replace(savedConnector.id(), Map.of("core", false), LISTED, ADMIN_ID))
-            .isInstanceOfSatisfying(
-                ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FORBIDDEN));
-        assertThatThrownBy(() -> service.requireEditableAgent(savedConnector.code()))
-            .isInstanceOfSatisfying(
-                ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.FORBIDDEN));
         assertThatThrownBy(() -> service.replace(savedDeleted.id(), Map.of("core", false), LISTED, ADMIN_ID))
             .isInstanceOfSatisfying(
                 ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
         assertThatThrownBy(() -> service.requireEditableAgent(savedDeleted.code()))
             .isInstanceOfSatisfying(
                 ApiException.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.AGENT_NOT_FOUND));
-        assertThat(grants.findByIdAgentId(savedConnector.id())).isEmpty();
-        assertThat(service.recentChangesOf(savedConnector.id())).isEmpty();
         assertThat(service.recentChangesOf(savedDeleted.id())).isEmpty();
     }
 

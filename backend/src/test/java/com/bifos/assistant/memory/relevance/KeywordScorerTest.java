@@ -59,6 +59,19 @@ class KeywordScorerTest {
 
 
     @Test
+    @DisplayName("한 글자로 묻는 질문은 그 글자를 담은 낱말을 찾는다")
+    void findsSingleCharacterQueryInsideLongerWords() {
+        List<RelevanceCandidate> candidates = List.of(
+            new RelevanceCandidate(1L, "혈압약 복용 시간", null),
+            new RelevanceCandidate(2L, "장보기", "우유와 계란"));
+
+        assertThat(scorer.score("약", candidates, 0.3)).extracting(KeywordScore::memoryId).containsExactly(1L);
+        assertThat(KoreanBigramTokenizer.documentTermCounts("혈압약")).containsKeys("혈압", "압약", "혈", "압", "약");
+        assertThat(KoreanBigramTokenizer.tokens("혈압약")).containsExactly("혈압", "압약");
+    }
+
+
+    @Test
     @DisplayName("공통 토큰이 coverage 아래인 항목은 빠진다")
     void dropsCandidatesBelowCoverage() {
         List<RelevanceCandidate> candidates = List.of(

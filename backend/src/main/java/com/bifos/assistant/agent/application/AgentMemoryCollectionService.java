@@ -52,7 +52,7 @@ public class AgentMemoryCollectionService {
     @Transactional(readOnly = true)
     public AgentMemoryGrants grantsOf(Long agentId) {
         Optional<Agent> agent = agentId == null ? Optional.empty() : agents.findById(agentId);
-        if (agent.isEmpty() || agent.get().connectorManaged()) {
+        if (agent.isEmpty()) {
             return AgentMemoryGrants.none();
         }
         List<AgentMemoryCollection> rows = grants.findByIdAgentId(agentId);
@@ -66,7 +66,7 @@ public class AgentMemoryCollectionService {
 
 
     /**
-     * 새로 저장한 에이전트에 기본 collection 을 준다. 커넥터 에이전트에는 주지 않는다.
+     * 새로 저장한 에이전트에 기본 collection 을 준다.
      *
      * <p>저장을 부른 쪽의 트랜잭션 안에서 돈다. 에이전트 저장이 되돌려지면 이 줄도 함께 되돌려진다.
      */
@@ -74,9 +74,6 @@ public class AgentMemoryCollectionService {
     @Transactional
     public void grantDefaultCollection(AgentCreated created) {
         Agent agent = created.agent();
-        if (agent.connectorManaged()) {
-            return;
-        }
         grants.save(
             AgentMemoryCollection.of(agent.id(), AgentMemoryCollection.DEFAULT_COLLECTION, false, clock.instant()));
     }
@@ -85,7 +82,7 @@ public class AgentMemoryCollectionService {
     /**
      * 관리자가 받는 collection 을 바꿀 수 있는 에이전트를 찾는다.
      *
-     * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 커넥터 에이전트면 {@code FORBIDDEN}
+     * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}
      */
     @Transactional(readOnly = true)
     public Agent requireEditableAgent(String code) {
@@ -120,7 +117,7 @@ public class AgentMemoryCollectionService {
      * @param next 받을 collection 과 그 민감 허용 전체다. 비어 있으면 모두 뗀다
      * @param listedCollections 그룹의 collection 목록 key 다. 지금 받는 줄의 key 는 목록에 없어도 둘 수 있다
      * @param changedByUserId 바꾸는 관리자다
-     * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 커넥터 에이전트면 {@code FORBIDDEN}, 목록에도 지금
+     * @throws ApiException 없거나 지운 에이전트면 {@code AGENT_NOT_FOUND}, 목록에도 지금
      * 줄에도 없는 collection 이 있으면 {@code VALIDATION_FAILED}
      */
     @Transactional
@@ -190,9 +187,6 @@ public class AgentMemoryCollectionService {
     private static Agent requireEditable(Optional<Agent> found) {
         Agent agent = found.filter(a -> !a.isDeleted())
             .orElseThrow(() -> new ApiException(ErrorCode.AGENT_NOT_FOUND, "no such agent"));
-        if (agent.connectorManaged()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "connector-managed agents receive no memory");
-        }
         return agent;
     }
 }

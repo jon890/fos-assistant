@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 허용 목록에 켜져 있는 사용자인지 로그인 판정({@link SignInPolicy})으로 답한다.
  *
- * <p>{@code memory} 가 {@code people} 을 쓰지 않게 하려고 {@code shared.auth} 의 인터페이스로 나눴다(ADR-056).
+ * <p>다른 기능이 {@code people}을 직접 쓰지 않도록 {@code shared.auth}의 접근 판정 인터페이스를 구현한다(ADR-059).
  */
 @Component
 @RequiredArgsConstructor

@@ -47,10 +47,15 @@ public class MemorySearchSection {
      *
      * @param question 질문. null 이거나 공백뿐이면 구역을 싣지 않고 색인은 번호 순이다
      * @param candidates 개인 사실 구역에 실리지 않은 색인 후보
+     * @param indexOnly 점수는 받되 구역에 싣지 않고 색인에 둘 항목 번호
      * @param freshness 항목의 신선도
      */
     MemorySearchPlacement place(
-        String question, List<Memory> candidates, ContextBudgetWriter builder, Function<Memory, ContextFreshness> freshness) {
+        String question,
+        List<Memory> candidates,
+        Set<Long> indexOnly,
+        ContextBudgetWriter builder,
+        Function<Memory, ContextFreshness> freshness) {
         if (question == null || question.isBlank() || candidates.isEmpty() || properties.maxItems() == 0) {
             return MemorySearchPlacement.byId(candidates);
         }
@@ -66,7 +71,7 @@ public class MemorySearchSection {
         for (int i = 0; i < result.ranked().size() && placed.size() < properties.maxItems(); i++) {
             RelevanceScore score = result.ranked().get(i);
             Memory memory = byId.get(score.memoryId());
-            if (!plain(memory) || memory.content().length() > properties.itemMaxChars()) {
+            if (indexOnly.contains(memory.id()) || !plain(memory) || memory.content().length() > properties.itemMaxChars()) {
                 continue;
             }
             String line = MemoryItems.inlineLine(memory);

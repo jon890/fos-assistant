@@ -16,6 +16,7 @@ import {
   requireClearScreen,
   setStage,
 } from "./page.ts";
+import { settleKnownPopup } from "./popup.ts";
 import { imagePlaceholder } from "./text.ts";
 
 export const PHOTO_BUTTON = "button.se-image-toolbar-button";
@@ -254,6 +255,7 @@ export async function photos(
         throw new SnapshotGuardError("photo_mismatch");
       await guard.authorizePhoto(entry.position);
     }
+    await settleKnownPopup(page);
     if (!(await focusPlaceholder(page, imagePlaceholder(block))))
       throw failed(number, "사진 자리를 찾지 못했다");
     const before = await imageCount(page);

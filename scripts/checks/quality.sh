@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 코드 규칙: rule-45. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 # backend 와 web 의 품질 검사를 한 번에 돌리거나 기계가 고칠 수 있는 것을 고친다.
 #
 #   scripts/checks/quality.sh check  파일을 바꾸지 않고 검사한다. backend 와 web 을 모두 돌린 뒤 하나라도 실패하면 1 로 끝난다.

@@ -175,8 +175,9 @@ public class ContextAssembler implements OmittedMemories {
         appendAlways(builder, USER_HEADER, always, MemoryScope.USER, now);
         Set<Long> facts = appendFacts(builder, indexed, now);
         List<Memory> afterFacts = indexed.stream().filter(memory -> !facts.contains(memory.id())).toList();
+        // 다른 범위에 같은 이름의 짝이 있는 문서는 구역에 싣지 않는다. 한 줄 형식에는 충돌 표시를 붙일 자리가 없어 색인에 둔다
         MemorySearchPlacement search = searchSection.place(
-            question, afterFacts, builder, memory -> memoryFreshness(memory, now));
+            question, afterFacts, sameNameDocuments(afterFacts).keySet(), builder, memory -> memoryFreshness(memory, now));
         builder.limit(maxChars);
         appendIndex(builder, search, sameNameDocuments(search.indexOrder()), now);
         return withSelections(builder.build());
@@ -231,7 +232,7 @@ public class ContextAssembler implements OmittedMemories {
                 memory.title(),
                 memory.content(),
                 memoryFreshness(memory, now))
-                    .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
+                .withSelection(ContextSelection.ranked(ContextSelection.FACTS_RECENT, chosenRanks.get(memory.id())));
             if (builder.appendIfFits(FACTS_HEADER, MemoryItems.inlineLine(memory), item)) {
                 placed.add(memory.id());
             } else {

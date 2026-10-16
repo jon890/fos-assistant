@@ -139,7 +139,7 @@ private transport와 preview snapshot 서비스는 합성 원고로 검증한다
 | start 입력 | `{snapshot, jobId, ticket, stamp}`. snapshot은 CompiledSnapshotV1, `stamp.jobId`와 `stamp.snapshotHash`는 jobId·snapshot과 같아야 한다. ticket은 공백 없는 ASCII 1~4,096자 |
 | start 결과 | `{job_id, status, stamp, error_code}`. 시작 확인 전에 끝났으면 그 종료 상태다. 시작 전 거절 code를 같은 응답으로 읽으며 status와 같은 허용 규칙을 쓴다 |
 | status 입력 | `{stamp}`만 받는다 |
-| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`에 실패 사유가 있으면 `error_reason`이 더해진다. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다. `error_reason`은 `error_code`와 같은 모양(`[a-z][a-z_]{0,63}`)의 고정 코드이고, 허용 밖이거나 없으면 칸을 싣지 않는다. 옛 Control Plane은 모르는 칸을 거절하므로 Control Plane을 먼저 배포한다 |
+| status 결과 | `{job_id, stamp, status, stage, save_clicked, finished_at, saved_before, saved_after, error_code}`에 실패 사유가 있으면 `error_reason`이 더해진다. 허용 밖의 stage·code와 succeeded 밖의 저장 수는 null이다. `error_reason`은 `error_code`와 같은 모양(`[a-z][a-z_]{0,63}`)의 고정 코드이고, 허용 밖이거나 없으면 칸을 싣지 않는다. Control Plane의 decoder와 Hermes 플러그인의 `connector_snapshot_job.py`가 둘 다 같은 규칙으로 이 칸을 선택으로 받는다. 둘 중 하나라도 모르면 키 집합이 다르다며 응답 전체를 거절하므로 Control Plane과 플러그인을 먼저 배포하고 커넥터를 나중에 배포한다 |
 | 오류 | 결과 없는 `{"error": invalid_input / not_found / start_unknown / unavailable}`. 커넥터는 isError 결과의 text 하나로 보내고, plugin은 이 모양만 `ok:true` 결과로 넘기며 다른 isError는 503이다 |
 
 private 서버는 profile을 모르므로 profileHash를 다시 계산하지 않는다. 상태 파일의 stamp와 모든 칸이 같은지만 본다.

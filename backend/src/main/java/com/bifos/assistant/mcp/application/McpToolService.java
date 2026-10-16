@@ -345,13 +345,13 @@ public class McpToolService {
     }
 
 
-    /** 옛 연결용 에이전트나 연결이 붙은 에이전트의 실행이거나, 에이전트를 찾지 못한 실행이다(ADR-20261008 / read-data-flow). */
+    /** 연결이 붙은 에이전트의 실행이거나, 에이전트를 찾지 못한 실행이다(ADR-20261008 / read-data-flow). */
     private boolean isExternalResult(AgentExecution execution) {
         if (execution.agentId() == null) {
             return true;
         }
         return agents.findById(execution.agentId())
-            .map(agent -> agent.connectorManaged() || bindings.hasBindings(agent.id()))
+            .map(agent -> bindings.hasBindings(agent.id()))
             .orElse(true);
     }
 

@@ -1,3 +1,4 @@
+// 코드 규칙: rule-53. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

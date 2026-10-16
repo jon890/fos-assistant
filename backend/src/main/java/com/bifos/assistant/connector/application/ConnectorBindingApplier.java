@@ -203,7 +203,7 @@ public class ConnectorBindingApplier {
             ResyncOutcome reason;
             try {
                 reason = ConnectorBindingInstalls.notInstalledReason(
-                    connector.readConnector(candidate.profile(), candidate.connectorId()), candidate.legacy());
+                    connector.readConnector(candidate.profile(), candidate.connectorId()));
             } catch (RuntimeException ex) {
                 ConnectorBindingInstalls.warn("drift-check", candidate.connectorId(), ex);
                 continue;

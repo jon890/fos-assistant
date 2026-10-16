@@ -1,3 +1,4 @@
+// 코드 규칙: rule-43. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption

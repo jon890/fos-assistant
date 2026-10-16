@@ -18,11 +18,10 @@ Control Plane 이 이 경로들을 부르는 순서와 뜻은 부르는 쪽 문�
 | `GET /api/connectors/catalog` | 운영 목록에 있고 검증을 통과한 커넥터의 manifest 를 낸다 | 없음 | `[{id, schema, title, description, icon, link, readme_url, link_kind, fields[], verify, mcp_server, toolsets, attachments, single_binding, tools, skills, owner_browser, owner_browser_login_url, unknown_errors}]`. 아래 「카탈로그 응답」 이 칸을 갖는다 | |
 | `POST /api/connectors/<id>/call` | 후보 값이나 보관 파일의 값으로 그 커넥터의 선택지 도구나 확인 도구를 한 번 부른다 | `{tool, values}` 또는 `{tool, vault}`. 둘 가운데 정확히 하나다. 사용자 브라우저를 쓰는 커넥터면 Control Plane 이 `owner_browser` 를 더한다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 400 그 커넥터의 보관 파일이 없다 |
 | `POST /api/connectors/<id>/execute` | Control Plane 이 승인한 호출을 그 profile 의 값과 받은 인자로 한 번 실행한다 | `{profile, hermes_tool, args}`. 중계 주소는 본문으로 받지 않고 설치한 서버 정의에서 읽는다 | `{ok: true, result}` 또는 `{ok: false, error: <공통 어휘>}` | 504 실행됐는지 모른다 |
-| `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. `mode` 는 `bind` 나 `isolated` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
-| `PUT /api/connectors` | profile 에 커넥터를 설치하고 제거한다 | `{profile, plugin, enabled, sandbox_owner?, owner_browser?}`. 바인딩 설치는 `bind: {vault}` 를 더하고 Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터의 바인딩 설치와 사진 도구를 여는 옛 설치는 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 커넥터는 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다. `owner_browser_env` 를 선언한 커넥터의 바인딩 설치에는 Control Plane 이 `owner_browser`(그 바인딩의 중계 주소, 중계가 꺼졌으면 빈 값)를 더하고 plugin 이 그 값을 서버 정의에 넣는다. 선언하지 않은 커넥터는 이 값을 쓰지 않는다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. `reload_pending` 은 바인딩 설치만 참이 될 수 있다. 옛 설치는 서버 등록과 함께 그 profile 의 API 도구 목록과 `SOUL.md` 를 다시 쓴다. 사진 도구를 여는 옛 설치는 `terminal:` 과 함께 `approvals.unattended_mode` 도 맞춘다. 바인딩 설치는 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다, `owner_browser` 가 문자열이 아니거나 중계 주소 모양이 아니다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 커넥터의 바인딩 설치인데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 싣지 않는다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
+| `GET /api/connectors?profile=<p>` | 커넥터의 상태를 읽는다 | query `profile` | `{profile, policy_hook, connectors: [{plugin, enabled, configured, mode}]}`. 설치된 항목의 `mode` 는 항상 `bind` 다 | 401 관리 표식과 커넥터 표식이 모두 없다 |
+| `PUT /api/connectors` | profile 에 커넥터를 붙이고 뗀다 | `enabled: true` 는 `{profile, plugin, enabled: true, bind: {vault}, sandbox_owner?, owner_browser?}` 이며 `bind.vault` 가 필수다. Control Plane 이 그 에이전트의 `sandbox_owner` 를 함께 보낸다. `owner_attachments_env` 를 선언한 커넥터는 `sandbox_owner` 가 필요하다. `owner_output_env` 를 선언한 커넥터는 `sandbox_owner` 와 `connector_output_root` 가 있고 profile 이 정책에 등록됐을 때만 출력 디렉터리를 받고, 아니면 빈 값으로 붙는다. 떼면 그 디렉터리를 지운다. `owner_browser_env` 를 선언한 커넥터에는 Control Plane 이 `owner_browser`(그 바인딩의 중계 주소, 중계가 꺼졌으면 빈 값)를 더하고 plugin 이 그 값을 서버 정의에 넣는다. 선언하지 않은 커넥터는 이 값을 쓰지 않는다. `enabled: false` 는 `{profile, plugin, enabled: false}` 로 바인딩을 뗀다 | `{profile, plugin, enabled, changed, restart_required, plugin_updated, reload_pending}`. 서버 이름만 더하고 뺀다 | 400 보관 파일이 없거나 다른 커넥터의 것이다, `enabled: true` 인데 `bind.vault` 가 없거나 `owner_browser` 가 문자열이 아니거나 중계 주소 모양이 아니다. 401 표식. 409 운영자 설정과 충돌한다, 사진 도구에 실행 공간 정책이나 등록 profile 이 없다, `owner_attachments_env` 를 선언한 커넥터에 실행 공간 정책이 없거나 그 주인의 첨부 디렉터리를 링크 없이 확인하지 못했다, `sandbox_required` 를 선언한 커넥터를 붙이는데 profile 이 실행 공간 정책에 없다. 실행 공간 사유의 409 는 본문 `code` 가 `sandbox_unavailable` 이고, 운영자 설정 충돌은 그 `code` 를 싣지 않는다. 400 그 커넥터에 `sandbox_owner` 가 없다 |
 | `PUT /api/connector-vault` | 연결의 칸 값을 보관 파일 하나에 쓴다 | `{vault, connector, values}`. `values` 는 `fields[].key` 를 키로 한 값이다 | `{ok: true}` | 400 형식, 운영 목록에 없는 커넥터, 칸 선언과 맞지 않는 값. 409 같은 이름의 보관 파일이 다른 커넥터의 것이다 |
 | `DELETE /api/connector-vault` | 보관 파일 하나를 지운다 | `{vault}` | `{changed}`. 없었으면 `false` 다 | 400 형식 |
-| `POST /api/connector-vault/import` | 그 커넥터를 옛 설치한 관리 profile 의 `.env` 에서 칸 값을 보관 파일로 옮긴다 | `{vault, connector, profile}` | `{ok: true}` | 400 필수 칸이 비었다. 401 관리 표식이 없다. 404 없는 profile, 설치하지 않은 커넥터. 409 다른 커넥터의 보관 파일 |
 | `POST /api/mcp/servers/<서버>/test?profile=<p>` | 그 profile 에 설치한 커넥터의 MCP 서버만 probe 한다 | 없음 | `{ok, tools: [{name}]}` | |
 | `GET /api/tools/toolsets` | 도구 이름과 설명을 읽는다 | 없음 | 200 | |
 | `PUT /api/config` (도구) | 지정한 profile 의 API 도구 목록을 쓴다. `terminal`, `file`, `code_execution`, `vision`, `image_gen`, `video_gen` 가운데 하나라도 있으면 profile 의 `terminal:` 을 실행 공간 설정으로 다시 쓴다. 같은 쓰기에서 `approvals.unattended_mode` 를 docker 면 `approve` 로 두고 local 이면 지운다(「셸 실행 공간」) | `{profile, config: {platform_toolsets: {api_server: [...]}}, sandbox_owner?, require_sandbox?}`. `sandbox_owner` 는 `^[a-z][a-z0-9-]{0,63}$` 이고 실행 공간 도구를 켜는 등록 profile 에서 필수다. `require_sandbox` 는 참 거짓 값이고, 참이면 정책에 없는 profile 의 셸 도구 저장을 local 로 돌리지 않고 409 `sandbox_unavailable` 로 거절한다. Control Plane 의 기본 도구 적용이 보낸다 | 200 | [ADR-029](../../../backend/docs/adr/ADR-029-에이전트-도구는-control-plane-이-등급으로-판정하고-hermes-설정-api-로-쓴다.md) 그대로. 409 소유 기록의 바인딩 서버 이름이 목록에 빠졌다 |
@@ -151,7 +150,7 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 - 도구가 `errors` 표에서 `outcome_unknown` 인 코드로 실패해도 504 로 답한다. 본문은 `{detail, code}` 이고, 그 코드가 `retry_key` 를 선언했으면 `retry: {<retry_key>: <값>}` 을 더한다([ADR-20261013 / unknown-retry-key](../../../docs/adr/ADR-20261013-unknown-retry-key.md)). `call` 에서는 그 코드를 `unavailable` 로 돌려준다
 - 요청과 응답은 [커넥터 연결](../../../docs/features/connector-policy.md) 의 「커넥터 승인」 이 소유한다. 근거는 [ADR-050](../../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md) 에 있다
 
-**소유 기록 `.fos-connectors.json` 은 설치할 때의 서버 정의를 갖는다.** 옛 설치는 요청마다 지금의 manifest 와 같은지 검증한다. 아래 표는 옛 설치의 판정이다.
+**소유 기록 `.fos-connectors.json` 은 바인딩할 때의 서버 정의를 갖는다.**
 
 | 상태 | 설치한 적 없는 profile | 이미 설치한 profile |
 | --- | --- | --- |
@@ -174,23 +173,15 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 이때 `restart_required: true`로 답한다. gateway가 옛 서버를 쥐고 있을 수 있기 때문이다.
 소유 기록 부재나 command, args, env, enabled, 다른 tools 설정의 차이는 계속 409다.
 연결 확인과 관리자 반영 완료의 재설치·재시작 대기 흐름은 [커넥터 설치](../../../docs/features/connector.md) 의 「바인딩의 반영 맞추기」 가 갖는다.
-**운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.** 옛 설치의 값을 바꿔야 하면 바꾸기 전에 설치한 커넥터를 제거한다.
+**운영은 환경 변수를 먼저 준 뒤 plugin 을 올린다.**
 
-**설치는 두 가지다.** 소유 기록 항목의 `mode` 가 방식을 적는다. 칸이 없으면 옛 설치다.
-한 profile 에 두 방식을 섞지 않는다. 섞으려는 설치는 409 다. 옛 설치는 Control Plane MCP 등록을 지우는데 바인딩 설치는 그 등록이 있어야 하기 때문이다.
+**커넥터는 바인딩으로만 붙인다.** 관리 표식이나 커넥터 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile 이 받는다. `enabled: true` 요청은 보관 파일의 값을 profile `.env` 에 복사하고 서버 이름만 더한다. 다른 API 도구와 Control Plane MCP 등록은 그대로 두며, 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다.
 
-| | 옛 설치(`isolated`) | 바인딩 설치(`bind`) |
-| --- | --- | --- |
-| 받는 profile | 관리 표식이 있는 profile | 관리 표식이나 커넥터 표식이 있고, `platform_toolsets.api_server` 목록에 Control Plane MCP 가 있고, `fos-ctx` 가 켜진 profile |
-| 칸 값 | Control Plane 이 `PUT /api/env` 로 그 profile `.env` 에 쓴다 | 설치가 보관 파일의 값을 그 profile `.env` 로 복사한다 |
-| API 도구 목록 | 설치한 커넥터의 서버 이름과 선언한 `toolsets` 로 통째로 다시 쓴다 | 서버 이름만 더하고 뺀다. 다른 이름은 그대로 둔다 |
-| Control Plane MCP 등록 | 지운다 | 그대로 둔다 |
-| 지침 | 스킬 본문을 `SOUL.md` 에 쓴다 | 스킬 디렉터리를 그 profile 의 `skills/` 로 복사한다. `SOUL.md` 는 읽지도 쓰지도 않는다 |
-| 대응 파일 | `isolated` 칸 없이 쓴다 | `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다 |
-| 설치의 `restart_required` | 지금과 같다 | 이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 설치는 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../../../docs/adr/ADR-20261007-connector-live-reload.md)) |
-| 떼기의 `restart_required` | 지금과 같다 | 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다 |
-| `reload_pending` | 늘 거짓이다 | 바뀐 것이 있고 `restart_required` 와 `plugin_updated` 가 모두 거짓이면 참이다. `plugin_updated` 가 참이면 그것만으로 재시작을 기다린다 |
-| 스킬 색인 표식 | 쓰지 않는다 | 스킬 파일을 바꾼 설치는 `skills.disabled` 에서 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. gateway 가 그 profile 의 스킬 색인을 새로 만든다. 다른 이름은 그대로 두고, 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓴다. 고칠 수 없는 모양이면 붙이기는 409 이고 떼기는 표식 없이 뗀다 |
+대응 파일은 `isolated: false` 를 싣고 소유 기록의 모든 서버와 뗀 서버 기록 `.fos-connector-detached.json` 의 서버를 싣는다.
+이미 있던 서버의 정의나 그 서버의 `.env` 값이 바뀌었거나, 뗀 서버 기록에 남은 이름을 다시 붙이면 붙이기의 `restart_required` 가 참이다. 공유 gateway 의 MCP 설정 맞추기는 이름만 비교해 같은 이름을 다시 연결하지 않는다. 뗀 기록에 없는 새 이름, 스킬, 이름 대응만 바뀐 붙이기는 `restart_required` 가 거짓이고 `reload_pending` 이 참이다([ADR-20261007 / connector-live-reload](../../../docs/adr/ADR-20261007-connector-live-reload.md)).
+바인딩을 떼면 `restart_required` 는 거짓이고, 바뀐 것이 있으면 `reload_pending` 이 참이다. 도구 목록에서 이름을 빼므로 다음 실행부터 막힌다. 떼기 전에 시작한 실행의 호출은 대응에 남은 서버로 판정이 막는다.
+`reload_pending` 은 바뀐 것이 있고 `restart_required` 와 `plugin_updated` 가 모두 거짓일 때 참이다. `plugin_updated` 가 참이면 그것만으로 재시작을 기다린다.
+스킬 파일을 바꾼 붙이기는 `skills.disabled` 에서 `fos-skill-index-` 로 시작하는 항목을 빼고 새 표식 하나를 더한다. gateway 가 그 profile 의 스킬 색인을 새로 만든다. 다른 이름은 그대로 두고, 문자열이면 Hermes 가 읽는 대로 목록으로 바꿔 쓴다. 고칠 수 없는 모양이면 붙이기는 409 이고 떼기는 표식 없이 뗀다.
 
 **보관 파일은 연결의 칸 값을 연결마다 하나씩 둔다.**
 대시보드의 HERMES_HOME 아래 `connector-vault/<vault>.json` 이고, 디렉터리는 700, 파일은 600 이다.
@@ -199,12 +190,12 @@ provider credential 은 이 토큰으로 쓰지 못한다.
 값과 경로는 응답, 로그, 예외 메시지, 설정 백업에 싣지 않는다. 쓰기와 지우기는 profile 쓰기 잠금 안에서 하고, 바인딩 설치도 같은 잠금 안에서 보관 파일을 읽는다.
 
 **커넥터 표식 `.fos-connector-host` 는 사람이 만든 profile 이 바인딩 설치를 받는다는 표시다.**
-운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 옛 설치와 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
+운영자가 그 profile 에 두고 plugin 은 쓰지 않는다. 표식만 있는 profile 은 바인딩 설치와 떼기, 상태 조회, probe, 바인딩 항목의 실행만 받는다. 소유 기록에 없는 커넥터의 떼기도 바인딩 떼기로 받아 `changed: false` 로 답한다. 커넥터 칸 key 의 `PUT /api/env`, `DELETE /api/env` 는 401 이다. 바인딩의 env 는 설치와 떼기가 쓰고 지운다.
 
 설치와 제거는 Hermes 등록 이름과 원래 도구 이름의 대응을 그 profile 의 `.fos-connector-tools.json` 에 다시 쓰고, 설치는 `approval: always` 인 도구를 서버 정의의 `tools.exclude` 에 넣고 profile 의 `fos-ctx` 를 묶음의 판으로 맞춘 뒤 파일이 바뀌었는지를 `plugin_updated` 로 답한다.
 `GET /api/connectors` 는 `policy_hook` 을 함께 낸다. `fos-ctx` 가 켜져 있고 묶음의 판과 같고 대응 파일의 모양(서버 목록, `connector`, `prefix`)이 지금 manifest 로 계산한 것과 맞을 때만 참이다. 서버 정의의 `tools.exclude` 와 대응 파일의 서버별 `tools` 가 어긋나면 그 커넥터 항목만 `configured` 가 거짓이며, 조건은 [커넥터 도구 정책](../../../docs/features/connector-policy.md) 의 「hook 이 켜져 있는지」 가 갖는다.
 
-**한 배포 동안 옛 Control Plane 의 호출과 옛 소유 기록의 필드 모양·운영자 env 표현을 받는다**([ADR-041](../../../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)). 옛 설치는 실행 정의의 command·args 가 지금 manifest 와 다른 기록을 받지 않는다. 바인딩은 위 재설치 경로로 새 정의를 적용한다.
+**한 배포 동안 옛 소유 기록의 필드 모양·운영자 env 표현을 받는다**([ADR-041](../../../docs/adr/ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md)). 바인딩은 위 재설치 경로로 새 정의를 적용한다.
 
 - 옛 기록은 운영자 env 를 `${이름}` 참조로 갖고 MCP 서버 이름 칸이 없다. 운영자 env 는 그 참조와 지금의 직접 값을 같다고 본다. 다음 설치 요청이 기록을 새 모양으로 다시 쓴다
 - 운영자 env 이름의 `PUT /api/env` 와 `DELETE /api/env` 는 성공으로 답하고 아무것도 쓰지 않는다

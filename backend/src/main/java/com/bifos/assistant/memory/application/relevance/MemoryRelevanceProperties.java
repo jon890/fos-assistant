@@ -12,7 +12,7 @@ import org.springframework.validation.annotation.Validated;
  * <p>{@code keywordMinCoverage} 는 질문 토큰 가운데 항목에 있어야 하는 토큰의 비율이다. 비어 있으면 0.3 이다.
  *
  * <p>{@code semanticMinSimilarity} 는 질문 벡터와 항목 벡터의 코사인이 이 값 이상일 때 의미로 관련 있다고 보는 기준이다. 모델마다 척도가
- * 달라 {@code memoryEmbeddingEval} 의 결과로 정한다. 비어 있으면 0.5 다.
+ * 달라 실제 모델로 잰 회수 측정의 결과로 정한다. 비어 있으면 0.5 다.
  *
  * <p>{@code rrfK} 는 키워드 순위와 의미 순위를 합치는 RRF 의 k 다. 비어 있으면 60 이다.
  *
@@ -25,10 +25,10 @@ public record MemoryRelevanceProperties(
     @DecimalMin("0") @DecimalMax("1") Double semanticMinSimilarity,
     @Min(1) Integer rrfK) {
 
+
     private static final double DEFAULT_KEYWORD_MIN_COVERAGE = 0.3;
     private static final double DEFAULT_SEMANTIC_MIN_SIMILARITY = 0.5;
     private static final int DEFAULT_RRF_K = 60;
-
 
     public MemoryRelevanceProperties {
         keywordMinCoverage = ratio("keyword-min-coverage", keywordMinCoverage, DEFAULT_KEYWORD_MIN_COVERAGE);

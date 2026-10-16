@@ -17,10 +17,10 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "assistant.context.search")
 public record MemorySearchSectionProperties(@Min(0) Integer maxItems, @Min(0) Integer itemMaxChars, @Min(0) Integer maxChars) {
 
+
     private static final int DEFAULT_MAX_ITEMS = 3;
     private static final int DEFAULT_ITEM_MAX_CHARS = 600;
     private static final int DEFAULT_MAX_CHARS = 1_500;
-
 
     public MemorySearchSectionProperties {
         maxItems = maxItems == null ? DEFAULT_MAX_ITEMS : maxItems;

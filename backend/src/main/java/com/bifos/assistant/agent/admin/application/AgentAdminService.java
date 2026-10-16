@@ -76,9 +76,6 @@ public class AgentAdminService {
     @Transactional
     public Agent update(String code, AgentUpdateCommand command) {
         Agent agent = requireAgentForUpdate(code);
-        if (agent.connectorManaged()) {
-            throw new ApiException(ErrorCode.FORBIDDEN, "connector-managed agents cannot be edited here");
-        }
         // 주인은 공개 범위와 별개다(ADR-033). 새 주인을 주지 않으면 그룹으로 바꿔도 지금 주인이 남는다.
         Long ownerId = command.ownerEmail() == null || command.ownerEmail().isBlank()
             ? agent.ownerUserId()

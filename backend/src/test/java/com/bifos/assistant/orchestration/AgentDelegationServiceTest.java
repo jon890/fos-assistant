@@ -1,8 +1,6 @@
 package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -91,7 +89,7 @@ class AgentDelegationServiceTest {
     private static final int MAX_CHECK_DELEGATIONS = 2;
     /** 요청자의 커넥터 에이전트다. 살펴보기 트리에서 맡길 수 있는 유일한 곳이다. */
     private static final String CONNECTOR = "delegation-connector";
-    /** 다른 사용자의 비공개 커넥터 에이전트다. */
+    /** 다른 사용자의 비공개 에이전트다. */
     private static final String OTHER_CONNECTOR = "delegation-other-connector";
 
     @Autowired
@@ -659,7 +657,7 @@ class AgentDelegationServiceTest {
 
 
     @Test
-    @DisplayName("살펴보기 트리에서 다른 사용자의 비공개 커넥터 에이전트는 지금처럼 AGENT UNAVAILABLE 이다")
+    @DisplayName("살펴보기 트리에서 다른 사용자의 비공개 에이전트는 AGENT UNAVAILABLE 이다")
     void checkTreeKeepsAgentUnavailableForOtherUsersConnectorAgent() {
         AppUser other = users.save(AppUser.of(OTHER_EMAIL, "나", 1L, UserRole.MEMBER, Instant.now()));
         connectorAgent(OTHER_CONNECTOR, other.id());
@@ -669,28 +667,6 @@ class AgentDelegationServiceTest {
 
         assertThat(result.failure()).as("결과: %s", result).isEqualTo(DelegationResult.Failure.AGENT_UNAVAILABLE);
         assertThat(executions.findByRootExecutionId(checkTurn.id())).isEmpty();
-    }
-
-
-    @Test
-    @DisplayName("살펴보기 트리에서 자기 커넥터 에이전트에는 max delegations 번까지 맡기고 끝난 자식도 세어 그다음은 CHECK LIMIT 이다")
-    void checkTreeDelegatesToOwnConnectorUpToMaxThenCheckLimit() throws Exception {
-        stub().willAnswer(command -> completed(command, "읽은 결과"));
-        connectorAgent(CONNECTOR, user.id());
-        AgentExecution checkTurn = checkTurn();
-
-        for (int i = 0; i < MAX_CHECK_DELEGATIONS; i++) {
-            String task = "읽어 와 " + i;
-            DelegationResult accepted = acceptedWithin(Duration.ofSeconds(5), () -> delegateFrom(checkTurn, CONNECTOR, task));
-            assertThat(awaitFinished(accepted.executionId()).status()).isEqualTo(ExecutionStatus.SUCCEEDED);
-        }
-        DelegationResult over = delegateFrom(checkTurn, CONNECTOR, "한 번 더 읽어 와");
-
-        assertThat(over.failure()).as("결과: %s", over).isEqualTo(DelegationResult.Failure.CHECK_LIMIT);
-        assertThat(executions.findByRootExecutionId(checkTurn.id()))
-            .as("만든 자식은 상한만큼이고 모두 끝났다")
-            .hasSize(MAX_CHECK_DELEGATIONS)
-            .allMatch(child -> child.status() == ExecutionStatus.SUCCEEDED);
     }
 
 
@@ -710,8 +686,8 @@ class AgentDelegationServiceTest {
 
 
     @Test
-    @DisplayName("살펴보기가 RUNNING 이 아니면 자기 커넥터 에이전트에도 맡기지 않고 CHECK LIMIT 이다")
-    void checkTreeRejectsDelegationAsCheckLimitWhenCheckIsNotRunning() {
+    @DisplayName("끝난 살펴보기 트리에서는 다른 에이전트에 맡기지 않는다")
+    void checkTreeRejectsDelegationWhenCheckIsNotRunning() {
         connectorAgent(CONNECTOR, user.id());
         Instant now = Instant.parse("2026-09-30T00:05:00Z");
         List<Consumer<ProactiveCheck>> endings = List.of(
@@ -728,7 +704,7 @@ class AgentDelegationServiceTest {
             ProactiveCheck ended = checks.findByRootExecutionId(checkTurn.id()).orElseThrow();
             assertThat(result.failure())
                 .as("살펴보기 상태 %s, 까닭 %s", ended.status(), ended.errorCode())
-                .isEqualTo(DelegationResult.Failure.CHECK_LIMIT);
+                .isEqualTo(DelegationResult.Failure.CHECK_TARGET);
             assertThat(executions.findByRootExecutionId(checkTurn.id())).isEmpty();
         }
         assertThat(stub().received()).isEmpty();
@@ -736,40 +712,17 @@ class AgentDelegationServiceTest {
 
 
     @Test
-    @DisplayName("루트 잠금 안의 판정 뒤 실행 줄을 만들기 전에 살펴보기가 끝나면 줄을 만들지 않고 CHECK LIMIT 이다")
-    void checkTreeRejectsAsCheckLimitWhenCheckEndsBeforeRowIsCreated() {
-        connectorAgent(CONNECTOR, user.id());
-        AgentExecution checkTurn = checkTurn();
-        doAnswer(invocation -> {
-            Object running = invocation.callRealMethod();
-            // 루트 잠금 안의 판정이 RUNNING 을 본 직후 살펴보기가 끝난다.
-            ProactiveCheck check = checks.findByRootExecutionId(checkTurn.id()).orElseThrow();
-            check.stop("CHECK_TIME_LIMIT", 0, 0, Instant.parse("2026-09-30T00:05:00Z"));
-            checks.save(check);
-            return running;
-        })
-            .doCallRealMethod()
-            .when(checkGuard)
-            .checkOf(any());
-
-        DelegationResult result = delegateFrom(checkTurn, CONNECTOR, "끝나는 살펴보기에서 맡긴다");
-
-        assertThat(result.failure()).as("결과: %s", result).isEqualTo(DelegationResult.Failure.CHECK_LIMIT);
-        assertThat(executions.findByRootExecutionId(checkTurn.id())).as("만든 자식").isEmpty();
-        assertThat(stub().received()).isEmpty();
-    }
-
-
-    @Test
     @DisplayName("살펴보기 트리에서 기다릴 시간을 주면 그 사이 끝난 위임 실행의 결과를 한 번에 받는다")
     void statusWithWaitReturnsResultOfRunThatEndsMeanwhile() throws Exception {
-        connectorAgent(CONNECTOR, user.id());
-        AgentExecution checkTurn = checkTurn();
+        AgentExecution checkTurn = origin;
         stub().willAnswer(command -> completed(command, "기다린 답"));
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch awaiting = holdUntil(release);
-        DelegationResult started = delegateFrom(checkTurn, CONNECTOR, "기다려 받을 일");
+        DelegationResult started = delegateFrom(checkTurn, WORKER, "기다려 받을 일");
         await(awaiting);
+        // 기존 자식의 조회 계약이다. 새 살펴보기에서 위임하는 경로는 열지 않는다.
+        attachCheck(checkTurn, check -> {
+        });
         assertThat(delegations
             .status(user, checkTurn, started.executionId(), Duration.ZERO)
             .orElseThrow()
@@ -816,13 +769,15 @@ class AgentDelegationServiceTest {
     @Test
     @DisplayName("살펴보기 트리에서 기다릴 시간이 상한을 넘으면 상한까지만 기다리고 그때의 RUNNING 을 준다")
     void statusWaitIsCappedAtStatusWaitMax() throws Exception {
-        connectorAgent(CONNECTOR, user.id());
-        AgentExecution checkTurn = checkTurn();
+        AgentExecution checkTurn = origin;
         stub().willAnswer(command -> completed(command, "늦은 답"));
         CountDownLatch release = new CountDownLatch(1);
         CountDownLatch awaiting = holdUntil(release);
-        DelegationResult started = delegateFrom(checkTurn, CONNECTOR, "오래 걸리는 일");
+        DelegationResult started = delegateFrom(checkTurn, WORKER, "오래 걸리는 일");
         await(awaiting);
+        // 기존 자식의 조회 계약이다. 새 살펴보기에서 위임하는 경로는 열지 않는다.
+        attachCheck(checkTurn, check -> {
+        });
 
         long before = System.nanoTime();
         AgentExecution read = delegations
@@ -878,6 +833,12 @@ class AgentDelegationServiceTest {
     /** {@code ending} 으로 살펴보기 줄의 상태를 바꿔 저장한 살펴보기 turn 이다. */
     private AgentExecution checkTurn(Consumer<ProactiveCheck> ending) {
         AgentExecution checkTurn = turn("fos-" + UUID.randomUUID());
+        return attachCheck(checkTurn, ending);
+    }
+
+
+    /** 기존 실행에 살펴보기 기록을 붙인다. */
+    private AgentExecution attachCheck(AgentExecution checkTurn, Consumer<ProactiveCheck> ending) {
         ProactiveCheck check = ProactiveCheck.started(
             user.id(),
             agents.findByCode(WORKER).orElseThrow().id(),
@@ -892,7 +853,7 @@ class AgentDelegationServiceTest {
     }
 
 
-    /** {@code ownerUserId} 의 비공개 커넥터 에이전트다. */
+    /** {@code ownerUserId} 의 비공개 에이전트다. */
     private Agent connectorAgent(String code, Long ownerUserId) {
         Agent agent = Agent.of(
             code,
@@ -904,7 +865,6 @@ class AgentDelegationServiceTest {
             AgentVisibility.PRIVATE,
             ownerUserId,
             Instant.now());
-        agent.markConnectorManaged();
         return agents.save(agent);
     }
 

@@ -56,7 +56,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-027](ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) | 에이전트가 만든 HTML 은 대화별 폴더에 두고 스크립트 없이 보인다 | backend, frontend | Accepted |
 | [ADR-038](ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md) | 도구의 명령 원문은 관리자에게만 보내고 사용자에게는 사람 말로 보인다 | backend, frontend | Accepted. 원문 저장과 관리자 원문 보기는 ADR-047 이 대체한다 |
 | [ADR-041](ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md) | Hermes 에 설치하는 plugin 과 profile 틀은 이 저장소가 소유한다 | 공통 | Accepted |
-| [ADR-042](ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) | 코드 품질 규칙은 도구 설정이 갖고 기존 위반은 기준 파일에 둔다 | 공통 | Accepted. ADR-005 가 미룬 Checkstyle 을 넣는다 |
+| [ADR-042](ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) | 코드 품질 규칙은 도구 설정이 갖고 기존 위반은 기준 파일에 둔다 | 공통 | Accepted. ADR-005 가 미룬 Checkstyle 을 넣는다. 설명 소유권은 [ADR-20261016 / code-rules](ADR-20261016-code-rules.md)가 보완한다 |
 | [ADR-048](ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) | 응답 중에 보낸 메시지는 Control Plane 이 쌓아 두고 다음 turn 으로 합쳐 보낸다 | backend, frontend | Accepted. ADR-040 의 다음 turn 을 여는 자리를 함께 쓴다 |
 | [ADR-057](ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) | 문서는 사람이 화면에서 직접 쓰고 고친다 | backend, frontend | Accepted. ADR-012 의 승인 원칙을 문서에 적용한다 |
 | [ADR-059](ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) | 꺼진 사용자는 Control Plane 이 요청마다 막고 웹이 세션을 끊는다 | backend, frontend | Accepted |
@@ -71,7 +71,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-078](ADR-078-예약-작업의-결과는-실행마다-새-대화가-기본이고-목록은-작업으로-묶는다.md) | 예약 작업의 결과는 실행마다 새 대화가 기본이고 목록은 작업으로 묶는다 | backend, frontend | Accepted. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
 | [ADR-080](ADR-080-먼저-살펴보기는-점검-대화의-turn-하나로-돌고-읽기-경계를-control-plane-이-강제한다.md) | 먼저 살펴보기는 점검 대화의 turn 하나로 돌고 읽기 경계를 Control Plane 이 강제한다 | backend, frontend | Accepted. ADR-040 의 「부모는 맡긴 뒤 기다리지 않는다」 에 살펴보기 트리의 예외를 둔다. 맡길 곳을 커넥터 에이전트로 한정한 부분은 ADR-083 이 대체한다. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
 | [ADR-082](ADR-082-먼저-살펴보기의-쓰기-도구는-관리자가-에이전트마다-켜고-커넥터-쓰기는-승인-카드로-보낸다.md) | 먼저 살펴보기의 쓰기 도구는 관리자가 에이전트마다 켜고, 커넥터 쓰기는 승인 카드로 보낸다 | backend, frontend | Accepted. 켠 에이전트에 한해 ADR-080 의 읽기 경계를 넓힌다. 맡길 곳을 커넥터 에이전트로 한정한 부분은 ADR-083 이 대체한다. 매일 깨우기에 맞춘 개정은 ADR-085 가 한다 |
-| [ADR-083](ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) | 커넥터는 사용자가 한 번 연결하고 자기 에이전트에 여럿 붙여 그 에이전트가 도구를 직접 부른다 | 공통 | Accepted. 새 연결에 대해 ADR-039, ADR-044, ADR-045 를, 커넥터 에이전트 부분에 대해 ADR-029, ADR-049, ADR-080, ADR-082 를 대체한다. 처음 붙이기와 스킬 변경의 재시작 대기는 [ADR-20261007 / connector-live-reload](ADR-20261007-connector-live-reload.md) 가 대체한다. `single_binding` 을 선언한 커넥터의 연결이 에이전트 하나에만 붙는다는 예외는 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 가 둔다 |
+| [ADR-083](ADR-083-커넥터는-사용자가-한-번-연결하고-자기-에이전트에-여럿-붙여-그-에이전트가-도구를-직접-부른다.md) | 커넥터는 사용자가 한 번 연결하고 자기 에이전트에 여럿 붙여 그 에이전트가 도구를 직접 부른다 | 공통 | Accepted. 새 연결에 대해 ADR-039, ADR-044, ADR-045 를, 커넥터 에이전트 부분에 대해 ADR-029, ADR-049, ADR-080, ADR-082 를 대체한다. 2026-10-15 사용자 결정으로 운영 연결 6개가 모두 `vault_stored` 이고 `connectorManaged` 에이전트가 없음을 확인한 뒤 옛 에이전트와 vault import 호환을 폐기했다. 처음 붙이기와 스킬 변경의 재시작 대기는 [ADR-20261007 / connector-live-reload](ADR-20261007-connector-live-reload.md) 가 대체한다. `single_binding` 을 선언한 커넥터의 연결이 에이전트 하나에만 붙는다는 예외는 [ADR-20261008 / connector-binding-guards](ADR-20261008-connector-binding-guards.md) 가 둔다 |
 | [ADR-085](ADR-085-매일-깨우기는-예약-작업을-다시-쓰고-다섯-칸-보고를-지금-화면에-올린다.md) | 매일 깨우기는 예약 작업을 다시 쓰고 다섯 칸 보고를 지금 화면에 올린다 | backend, frontend | Accepted. ADR-074, 076, 078, 079, 080, 081, 082 의 매일 깨우기와 보고 계약을 개정한다 |
 | [ADR-086](ADR-086-셸과-파일-도구는-사용자별-docker-실행-공간에서만-돈다.md) | 셸과 파일 도구는 사용자별 docker 실행 공간에서만 돈다 | backend, frontend, hermes | Accepted. 운영 정책에 등록한 profile 에만 적용한다. ADR-082 의 남는 위험을 사용자 실행 공간 안으로 줄인다. ADR-029 의 「파일 접근을 격리하지 않는다」 전제는 실행 공간이 적용된 profile 에서 바뀐다. 사진 첨부를 실행 공간에 붙이는 방식은 ADR-091 이 정한다 |
 | [ADR-089](ADR-089-커넥터는-식별자-인자를-선언하고-승인-카드는-그-값을-길이로-가리지-않는다.md) | 커넥터는 식별자 인자를 선언하고 승인 카드는 그 값을 길이로 가리지 않는다 | backend, frontend, hermes | Accepted. ADR-065 의 「가려진 인자」 에 커넥터 선언으로만 받는 예외를 더한다 |
@@ -114,6 +114,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261015 / financial-user-limits](ADR-20261015-financial-user-limits.md) | 주문 상한은 운영 최대치 안에서 계좌 주인이 정하고, 에이전트는 올리기를 승인 카드로만 요청한다 | backend, frontend, hermes | Accepted. ADR-20261013 / financial-order-opening 의 「거절 이유를 밝히지 않는다」 를 상한 거절에 한해 개정한다. 2026-10-16 개정 절이 저장 위치를 `app_user` 와 `connector_action` 의 컬럼으로 바꾼다 |
 | [ADR-20261015 / memory-link](ADR-20261015-memory-link.md) | 기억 사이의 연결은 링크 테이블에 두고, 옛 값은 지우지 않고 「대체함」 링크로 주입에서 뺀다 | backend, frontend | Accepted. 아직 구현하지 않았다. #310 처음 계획의 `fact_kind` 대체와 ADD/UPDATE/NOOP 를 대신한다 |
 | [ADR-20261015 / memory-maintenance](ADR-20261015-memory-maintenance.md) | 기억 정비는 신호를 쌓아 규칙으로 처리하고, 처음 4주는 제안만 기록한 뒤 정밀도를 보고 자동으로 바꾼다 | backend, frontend | Accepted. 아직 구현하지 않았다. ADR-20261007 / decision-feedback 에 「참고한 기억」 단추 사건을 더한다 |
+| [ADR-20261016 / code-rules](ADR-20261016-code-rules.md) | 규칙의 까닭과 예외는 번호 문서가, 실행 조건은 검사 코드가 갖는다 | 공통 | Accepted. ADR-042의 설명 소유권과 ADR-20261009 / docs-per-module의 문서 배치 예외를 보완한다 |
 
 ## 보관
 

@@ -68,10 +68,10 @@ class ConnectorConnectionTest {
 
 
     @Test
-    @DisplayName("연결의 메서드는 바인딩으로 붙은 옛 커넥터 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
+    @DisplayName("연결의 메서드는 바인딩으로 붙은 에이전트를 켜거나 끄지 않고 사진 받기도 바꾸지 않는다")
     void connectionMethodsLeaveAgentUntouched() {
         Agent enabled = agent();
-        enabled.acceptConnectorAttachments(true);
+
         ConnectorConnection connection = ConnectorConnection.pending(1L, "demo-notes", CREATED);
         ConnectorBinding.pending(enabled, connection, "demo", CREATED);
 
@@ -120,7 +120,7 @@ class ConnectorConnectionTest {
             AgentVisibility.PRIVATE,
             1L,
             Instant.now());
-        agent.markConnectorManaged();
+
         return agent;
     }
 

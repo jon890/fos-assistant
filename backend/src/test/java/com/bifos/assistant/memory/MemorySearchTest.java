@@ -350,8 +350,8 @@ public class MemorySearchTest {
     @DisplayName("페이지 사이의 삭제는 다음 페이지에 반영되고 바뀐 항목은 처음부터 다시 찾는다")
     void usesCurrentRowsBetweenPages() {
         Memory earlier = save("이전 항목");
-        Memory first = save("대상 하나");
-        Memory second = save("대상 둘");
+        Memory first = save("대상 첫째");
+        Memory second = save("대상 둘째");
         MemorySearchPage page = search(USER, CORE, "대상", 1);
         assertThat(page.items()).extracting(MemorySearchItem::id).containsExactly(first.id());
         repository.deleteById(second.id());

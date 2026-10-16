@@ -18,7 +18,6 @@ import {
   CONNECTORS_PATH,
   CONNECTOR_CATALOG_PATH,
   CONNECTOR_VAULT_PATH,
-  CONNECTOR_VAULT_IMPORT_PATH,
   CONNECTOR_CALL_PATH,
   CONNECTOR_EXECUTE_PATH,
   MCP_SERVER_TEST_PATH,
@@ -49,7 +48,7 @@ export function createDashboard(state: FakeHermesState, bindings: ReturnType<typ
     const isDashboardPath = path === PROFILES_PATH || path === ENV_PATH || path === TOOLSET_CATALOG_PATH
       || path === CONFIG_PATH || path === SKILLS_PATH || path === SKILL_TOGGLE_PATH || profileMatch !== null
       || path === CONNECTORS_PATH || path === CONNECTOR_CATALOG_PATH
-      || path === CONNECTOR_VAULT_PATH || path === CONNECTOR_VAULT_IMPORT_PATH
+      || path === CONNECTOR_VAULT_PATH
       || CONNECTOR_CALL_PATH.test(path) || CONNECTOR_EXECUTE_PATH.test(path) || MCP_SERVER_TEST_PATH.test(path)
       || CONNECTOR_SNAPSHOT_PATH.test(path);
     if (!isDashboardPath) return false;
