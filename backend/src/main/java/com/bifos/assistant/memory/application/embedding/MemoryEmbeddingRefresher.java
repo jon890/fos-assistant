@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -101,9 +102,9 @@ public class MemoryEmbeddingRefresher {
                 log.warn("memory embedding refresh stopped written={} pending={}", written, Math.max(0, pending.size() - written));
                 break;
             }
-            transaction.executeWithoutResult(status -> write(embedded.sources(), embedded.vectors()));
+            Integer stored = transaction.execute(status -> write(embedded.sources(), embedded.vectors()));
             embedded.sources().forEach(source -> vectorCache.evict(source.memoryId()));
-            written += embedded.sources().size();
+            written += stored == null ? 0 : stored;
         }
         if (removed > 0 || written > 0) {
             log.info("memory embedding refreshed removed={} written={} pending={}", removed, written, Math.max(0, pending.size() - written));
@@ -180,12 +181,27 @@ public class MemoryEmbeddingRefresher {
     }
 
 
-    private void write(List<MemoryEmbeddingSource> batch, List<float[]> vectors) {
-        Map<Long, MemoryEmbedding> existing = embeddings.findByMemoryIdIn(batch.stream().map(MemoryEmbeddingSource::memoryId).toList())
+    /**
+     * 임베딩한 벡터를 넣거나 바꾼다. 임베딩을 기다리는 동안 지워졌거나 대상에서 빠진 항목은 쓰지 않는다. 그 확인 뒤에 지운 항목의 줄이 남으면 다음 주기의 정리가
+     * 지운다.
+     *
+     * @return 넣거나 바꾼 줄 수
+     */
+    private int write(List<MemoryEmbeddingSource> batch, List<float[]> vectors) {
+        List<Long> ids = batch.stream().map(MemoryEmbeddingSource::memoryId).toList();
+        Set<Long> stillEligible = embeddings.findEmbeddableSourcesByIds(ids).stream()
+            .map(MemoryEmbeddingSource::memoryId)
+            .collect(Collectors.toSet());
+        Map<Long, MemoryEmbedding> existing = embeddings.findByMemoryIdIn(ids)
             .stream()
             .collect(Collectors.toMap(MemoryEmbedding::memoryId, Function.identity()));
+        int count = 0;
         for (int i = 0; i < batch.size(); i++) {
             MemoryEmbeddingSource source = batch.get(i);
+            if (!stillEligible.contains(source.memoryId())) {
+                continue;
+            }
+            count++;
             byte[] fingerprint = EmbeddingText.fingerprint(properties.model(), textOf(source));
             MemoryEmbedding row = existing.get(source.memoryId());
             if (row == null) {
@@ -194,6 +210,7 @@ public class MemoryEmbeddingRefresher {
                 row.replace(properties.model(), fingerprint, vectors.get(i), clock.instant());
             }
         }
+        return count;
     }
 
 

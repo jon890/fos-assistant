@@ -176,6 +176,19 @@ class MemoryEmbeddingRefresherTest {
 
 
     @Test
+    @DisplayName("임베딩을 기다리는 동안 지운 항목의 벡터 줄은 넣지 않는다")
+    void doesNotWriteVectorOfItemDeletedWhileEmbedding() {
+        Memory kept = memories.create(USER, MemoryScope.USER, "남길 글", "보통 본문", false);
+        Memory deleted = memories.create(USER, MemoryScope.USER, "지울 글", "곧 지운다", false);
+        client.onFirstCall(() -> memories.delete(USER, deleted.id()));
+
+        assertThat(refresher(ENABLED).refreshOnce()).isEqualTo(1);
+
+        assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(kept.id());
+    }
+
+
+    @Test
     @DisplayName("서비스가 거절하는 항목은 한 건씩 다시 보내 그 항목만 건너뛰고 뒤 항목을 채운다")
     void skipsRejectedItemWithoutBlockingTheRest() {
         Memory poison = memories.create(USER, MemoryScope.USER, "거절될 글", "서비스가 받지 않는 본문", false);
