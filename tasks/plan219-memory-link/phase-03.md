@@ -1,84 +1,71 @@
-# Phase 03. memory_link 도구와 외부 글 기록
+# Phase 03. 조립의 한 단계 이웃 확장 (PR 2b)
 
 **Execution profile**: deep
 
 ## 목표
 
-에이전트가 `memory_link` 로 대체 제안과 `RELATED` 연결을 건다. `memory_remember` 의 기록에 그 대화가 바깥 글을 읽었는지 남긴다.
+개인 사실 구역과 「질문과 관련된 기억」 구역에 본문으로 실린 항목의 `ACTIVE` `RELATED` 이웃을 그 구역의 남은 예산 안에서 본문으로 싣는다(`MEMORY_LINK`). 넘치면 색인에 제목으로 둔다.
 
-**범위 외**: 코드가 후보를 찾는 것(phase 06), 화면(phase 04).
+**범위 외**: 두 단계 이상 탐색(ADR 「대안 기각」), 먼저 살펴보기 연결(단계 4).
 
 ## 컨텍스트
 
-**근거 문서**: `docs/features/memory.md` 의 「기억 사이의 연결」(도구 계약)과 「바로 저장 판정」 의 조건 4, `hermes/plugins/fos-ctx/README.md` 의 서명 필수 도구 목록.
+**근거 문서**: ADR 「결정」 의 「조립은 실린 항목에서 한 단계만 이웃을 더한다」, `docs/features/memory.md` 의 「개인 사실 구역」, 「질문과 관련된 기억 구역」, 「답마다 참고한 기억」, 「참여하는 source」.
 
-- 도구 길: `mcp/application/McpToolCatalog`(정의) → `mcp/presentation/McpController`(인자 검사, `handlers` 맵, 살펴보기 트리 제한 `CHECK_TREE_TOOLS`) → `McpDtos`(인자 record) → 처리 클래스. `memory_remember` 의 본보기는 `mcp/application/McpMemoryRemember`
-- 조건 4: `McpMemoryRemember.directAllowed` 의 `executionEvents.existsOutsideToolStartInConversation(conversationId, INTERNAL_TOOLS)`. 지금 조건 5 와 `&&` 로 묶여 있다
-- 기록: `MemoryCaptureService.record` 와 `MemoryRememberRequest`, `chat/presentation/ChatDtos.MemoryCaptureView`
-- 서명 필수: `hermes/plugins/fos-ctx/hooks.py` 의 `REQUIRED_TOOLS`, `hermes/tests/test_fos_ctx.py`, README 의 목록 셋, `hermes/docs/hermes-contract.md` 의 자식 호출 목록
-- 실행 사건 가리기: `hermes/HermesRunEventStream` 의 `MEMORY_REMEMBER_TOOL_SUFFIX` 와 같은 자리
+- 조립: `context/ContextAssembler.assemble`(private) 의 `appendFacts` 와 `searchSection.place` 뒤. `ContextAssembler.java` 는 425줄이라 확장은 새 클래스 `context/MemoryLinkSection.java` 에 둔다
+- 이웃 후보는 같은 권한 조건(`MemoryQueries.injectable`)을 지난 색인 후보 가운데 실린 항목과 `ACTIVE` `RELATED` 로 이어진 것뿐이다. 새 쿼리를 만들지 않고 이미 읽은 `indexed` 목록에서 고른다
+- 「참고한 기억」: `usage/application/ExecutionMemoryRefs.VIA_BY_SOURCE`, `MemoryUseVia`, `web/src/components/chat/memory-use-list.tsx`, `execution-detail.tsx` 의 `CONTEXT_SOURCE_LABELS`
 
 ## 작업 항목
 
-### 1. `McpMemoryLink.java` 신규
+### 1. source 와 선택 규칙
 
-- `mcp/application/McpMemoryLink.java` 신규: `link(McpCaller, Long fromId, Long toId, MemoryLinkType, String label)`. origin 실행의 사용자와 에이전트의 `MemoryAccess` 로 두 항목을 `memory_read` 와 같은 권한으로 확인한 뒤 `MemoryLinkService.proposeSupersede` 나 `relate` 를 부른다(`origin=AGENT`, 실행 번호). 한 실행의 링크 수 상한 `PER_EXECUTION_MAX = 10`. 볼 수 없는 항목과 규칙 위반은 같은 결과 글 「연결할 수 없는 기억입니다.」(`isError=true`)
+- `ContextSource.MEMORY_LINK`, `ContextSelection.LINK_RELATED = "link-related-v1"`(실린 항목의 이웃, 링크 점수 순)
 
-### 2. `McpToolCatalog` 의 도구 정의
+### 2. `MemoryLinkSection` 신규
 
-- `McpToolCatalog` 에 `memory_link` 정의: `from_id`, `to_id`(정수), `type`(`SUPERSEDES`, `RELATED`), `label`(문자열, 200자 이하, 선택). 설명은 「대체는 새 기억이 옛 기억을 대신한다는 제안이고 사용자가 받아들여야 바뀐다. 관련은 바로 연결된다. 연결의 뜻은 label 에 적는다.」
+- `MemoryLinkSection.place(placedIds, candidates, builder, freshness)`: 이웃마다 그 구역과 같은 한 줄 형식으로 남은 예산 안에서 싣는다. 머리 줄 「연결된 기억」. 민감하거나 암호화한 이웃은 본문을 싣지 않고 색인에 둔다. 이미 실린 항목은 다시 싣지 않는다
 
-### 3. `McpController` 의 인자 검사
+### 3. 「참고한 기억」 과 화면 이름
 
-- `McpController`: 받는 키를 `from_id`, `to_id`, `type`, `label` 로 검사하고(모르는 키, 잘못된 타입, 범위 밖 값은 -32602), 살펴보기 트리에서는 `notAllowedInCheck` 다
+- `MemoryUseVia.LINK`(「연결된 기억」), web 의 이름 표 두 곳, `ops-metrics.sql` 의 본문 source 목록에 `MEMORY_LINK`
 
-### 4. 외부 글 기록(`external_read`)
+### 4. 지시문 지문
 
-- `McpMemoryRemember.directAllowed` 에서 조건 4 의 값을 따로 계산해 `MemoryRememberRequest.externalRead` 로 넘기고, `MemoryCaptureService.record` 가 `MemoryCapture.externalRead` 에 적는다. `MemoryCaptureView` 에 `externalRead` 를 더한다
+- 질문 없는 조립의 지시문 지문은 링크가 없으면 지금과 같아야 한다. 링크가 있으면 개인 사실 구역의 이웃도 실리므로 지문이 바뀐다(문서에 적는다)
 
-### 5. fos-ctx 와 실행 사건 가리기
+### 5. 측정
 
-- fos-ctx: `REQUIRED_TOOLS` 와 README 목록, `test_fos_ctx.py` 의 목록에 `memory_link` 를 더한다. `HermesRunEventStream` 이 `memory_link` 의 시작 사건과 끝 사건 `detail` 을 비운다. `hermes-contract.md` 의 자식 호출 목록에 더한다
+- 측정: `MemoryEvalFixture` 가 사례 묶음의 `related`(새 필드, 선택)를 `ACTIVE` `RELATED` 로 만든다. `MULTI_SESSION` 사례에 이어진 사실 쌍을 두 개 더하고 사례 묶음 `version` 을 올린다
 
-### 6. 기억 지침의 한 줄
+### 6. 이 phase 를 검증하는 테스트
 
-- `ContextAssembler.MEMORY_INSTRUCTIONS` 에 한 줄: 「사용자가 말한 새 사실이 기억한 옛 사실을 대신하면 새 사실을 남긴 뒤 memory_link 로 SUPERSEDES 를 건다. 사용자가 옛 사실을 직접 정정하면 memory_id 로 고친다.」
-
-### 7. 이 phase 를 검증하는 테스트
-
-- `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryLinkToolTest.java` 신규: 대체 제안은 `PROPOSED` 이고 주입이 바뀌지 않는다. `RELATED` 는 `ACTIVE` 이고 `label` 이 남는다. 볼 수 없는 항목, 다른 범위, `PROPOSED` 항목은 같은 오류 글이다. 인자 오류는 -32602, 상한을 넘으면 오류 글, 살펴보기 트리에서는 막는다. 결과와 로그에 제목과 본문이 없다
-- `McpMemoryToolTest` 에 schema 의 인자 이름
-- `McpMemoryRememberTest`(또는 그 동작을 검사하는 기존 테스트)에 바깥 도구를 부른 대화의 제안 기록이 `externalRead=true` 이고, 그렇지 않은 바로 저장 기록은 거짓인 경우
-- `hermes/tests/test_fos_ctx.py` 가 새 도구를 서명 필수로 안다
-- `HermesRunEventStreamTest`(있는 테스트)에 `memory_link` 사건의 `detail` 이 비는 경우
+- `ContextAssemblerLinkTest`: 실린 항목의 이웃이 본문으로 실리고 근거가 `link-related-v1` 이다. 예산을 넘는 이웃은 색인에 남는다. 대체된 이웃, 권한 밖 이웃, 민감 이웃은 본문으로 실리지 않는다. 두 단계 떨어진 항목은 실리지 않는다
+- `MemoryUseServiceTest` 에 `via=LINK`, `test/browser/memory-use.spec.ts` 에 「연결된 기억」
+- `MemoryRecallEvalTest`: `MULTI_SESSION` recall@5 가 링크 없이보다 높다. 기준 파일을 다시 만든다
 
 ## 검증
 
 ```bash
-cd backend && ./gradlew test --tests '*McpMemoryLinkToolTest' --tests '*McpMemoryToolTest' --tests '*McpMemoryRemember*' --tests '*HermesRunEventStream*' --tests '*MemoryCapture*'
-cd hermes && python3 -m pytest tests/test_fos_ctx.py -q
-cd backend && ./gradlew archTest checkstyleMain checkstyleTest
+cd backend && ./gradlew test --tests '*ContextAssemblerLinkTest' --tests '*ContextAssemblerTest' --tests '*ContextAssemblerQuestionTest' --tests '*MemoryUseServiceTest' --tests '*MemoryRecallEvalTest'
+cd web && npm run lint && npm run typecheck && npm run test:browser -- memory-use
+node scripts/checks/check-file-length.mjs
 ```
-
-기대: 모두 통과.
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |---|---|
-| `backend/src/main/java/com/bifos/assistant/mcp/application/McpMemoryLink.java` | 신규 |
-| `backend/src/main/java/com/bifos/assistant/mcp/application/McpToolCatalog.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpController.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/mcp/presentation/McpDtos.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/mcp/application/McpMemoryRemember.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/memory/application/model/MemoryRememberRequest.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/memory/application/MemoryCaptureService.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/chat/presentation/ChatDtos.java` | 수정 |
-| `backend/src/main/java/com/bifos/assistant/hermes/HermesRunEventStream.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/context/MemoryLinkSection.java` | 신규 |
 | `backend/src/main/java/com/bifos/assistant/context/ContextAssembler.java` | 수정 |
-| `hermes/plugins/fos-ctx/hooks.py` | 수정 |
-| `hermes/plugins/fos-ctx/README.md` | 수정 |
-| `hermes/docs/hermes-contract.md` | 수정 |
-| `hermes/tests/test_fos_ctx.py` | 수정 |
-| `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryLinkToolTest.java` | 신규 |
-| `backend/src/test/java/com/bifos/assistant/mcp/McpMemoryToolTest.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/context/ContextSource.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/context/ContextSelection.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/application/model/MemoryUseVia.java` | 수정 |
+| `backend/src/main/java/com/bifos/assistant/usage/application/ExecutionMemoryRefs.java` | 수정 |
+| `web/src/components/chat/memory-use-list.tsx` | 수정 |
+| `web/src/components/execution/execution-detail.tsx` | 수정 |
+| `web/src/lib/memory-use-api.ts` | 수정 |
+| `backend/src/test/resources/memory-eval/ops-metrics.sql` | 수정 |
+| `backend/src/test/resources/memory-eval/family-cases.json` | 수정 |
+| `backend/src/test/java/com/bifos/assistant/context/ContextAssemblerLinkTest.java` | 신규 |
+| `test/browser/memory-use.spec.ts` | 수정 |
