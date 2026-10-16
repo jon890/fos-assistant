@@ -78,7 +78,7 @@ class AgentRunnerConnectorContextTest {
 
     @BeforeEach
     void setUp() {
-        when(contextAssembler.assemble(eq(user), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
+        when(contextAssembler.assemble(eq(user), any(), any())).thenReturn(new AssembledContext(MEMORY, MEMORY.length()));
         when(contextAssembler.withResponseInstructions(any(), anyBoolean())).thenCallRealMethod();
         when(started.id()).thenReturn(3L);
         when(completed.id()).thenReturn(3L);
@@ -146,7 +146,7 @@ class AgentRunnerConnectorContextTest {
     void sendsOnlyInstructionAdditionForConnectorAgent() {
         run(connectorAgent(), ADDITION, null);
 
-        verify(contextAssembler, never()).assemble(any(), any());
+        verify(contextAssembler, never()).assemble(any(), any(), any());
         String instructions = submitted().instructions();
         assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY).endsWith("\n\n" + ADDITION);
         String commonInstructions = instructions.substring(0, instructions.indexOf("\n\n" + ADDITION));
@@ -162,7 +162,7 @@ class AgentRunnerConnectorContextTest {
     void sendsNoInstructionsForConnectorAgentWithoutAddition() {
         run(connectorAgent(), null, null);
 
-        verify(contextAssembler, never()).assemble(any(), any());
+        verify(contextAssembler, never()).assemble(any(), any(), any());
         String instructions = submitted().instructions();
         assertThat(instructions).contains("GFM", "구분 줄").doesNotContain(MEMORY);
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length());
@@ -170,11 +170,11 @@ class AgentRunnerConnectorContextTest {
 
 
     @Test
-    @DisplayName("일반 에이전트의 실행은 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
+    @DisplayName("일반 에이전트의 실행은 작업 글을 질문으로 넘겨 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
     void sendsAssembledMemoryForOrdinaryAgent() {
         run(agent(), ADDITION, null);
 
-        verify(contextAssembler).assemble(eq(user), any());
+        verify(contextAssembler).assemble(eq(user), any(), eq("일"));
         String instructions = submitted().instructions();
         assertThat(instructions).contains("GFM", MEMORY).endsWith("\n\n" + ADDITION);
         assertThat(recordedSnapshot().contextChars()).isEqualTo(instructions.length() - ("\n\n" + ADDITION).length());
@@ -215,7 +215,7 @@ class AgentRunnerConnectorContextTest {
 
         AgentRun run = run(agent, null, key);
 
-        verify(contextAssembler, never()).assemble(any(), any());
+        verify(contextAssembler, never()).assemble(any(), any(), any());
         assertThat(submitted().instructions()).contains("GFM", "구분 줄").doesNotContain(MEMORY);
         verify(executions).complete(same(started), same(agent), any(), any(), eq(ANSWER));
         assertThat(run.execution()).isSameAs(completed);

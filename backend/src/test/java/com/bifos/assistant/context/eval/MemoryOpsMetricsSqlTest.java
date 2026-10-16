@@ -101,6 +101,7 @@ class MemoryOpsMetricsSqlTest {
         assertThat(delta(before, after, "layer_items", "MEMORY_INDEX|TITLE_ONLY|index-id-v1", "items")).isEqualTo(2);
         assertThat(delta(before, after, "layer_items", "MEMORY_FACTS|INLINE|facts-recent-v1", "items")).isEqualTo(1);
         assertThat(delta(before, after, "layer_items", "MEMORY_READ|INLINE|null", "items")).isEqualTo(1);
+        assertThat(delta(before, after, "layer_items", "MEMORY_SEARCH|INLINE|search-keyword-v1", "items")).isEqualTo(1);
 
         assertThat(delta(before, after, "index_read_rate", "", "indexed_items")).isEqualTo(2);
         assertThat(delta(before, after, "index_read_rate", "", "read_items")).isEqualTo(1);
@@ -108,7 +109,8 @@ class MemoryOpsMetricsSqlTest {
         assertThat(delta(before, after, "memory_read_call_rate", "", "root_executions")).isEqualTo(2);
         assertThat(delta(before, after, "memory_read_call_rate", "", "with_memory_read")).isEqualTo(1);
 
-        assertThat(delta(before, after, "inline_correction_rate", "", "inline_items")).isEqualTo(2);
+        // 질문과 관련된 기억 구역에 실린 unreadMemory 도 본문을 실은 항목으로 센다
+        assertThat(delta(before, after, "inline_correction_rate", "", "inline_items")).isEqualTo(3);
         assertThat(delta(before, after, "inline_correction_rate", "", "corrected_items")).isEqualTo(1);
 
         assertThat(delta(before, after, "never_loaded_items", "", "eligible_items")).isEqualTo(3);
@@ -158,6 +160,7 @@ class MemoryOpsMetricsSqlTest {
         source(rootWithRead, 0, "MEMORY_INDEX", readMemory, "TITLE_ONLY", "index-id-v1", in);
         source(rootWithRead, 1, "MEMORY_INDEX", unreadMemory, "TITLE_ONLY", "index-id-v1", in);
         source(rootWithRead, 2, "MEMORY_READ", readMemory, "INLINE", null, in);
+        source(rootWithRead, 3, "MEMORY_SEARCH", unreadMemory, "INLINE", "search-keyword-v1", in);
         source(root, 0, "MEMORY_FACTS", correctedMemory, "INLINE", "facts-recent-v1", in);
         source(root, 1, "OTHER_SOURCE", steadyMemory, "INLINE", null, in);
         source(oldRoot, 0, "MEMORY_ALWAYS", steadyMemory, "INLINE", "always-id-v1", out);

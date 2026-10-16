@@ -70,6 +70,13 @@ assistant:
     facts-max-chars: 2000
     # 개인 사실 구역 후보가 될 수 있는 본문의 최대 글자 수다
     facts-item-max-chars: 200
+    search:
+      # 질문과 관련된 기억 구역에 싣는 항목 수. 0 이면 구역을 끈다
+      max-items: 3
+      # 질문과 관련된 기억 구역 후보가 될 수 있는 본문의 최대 글자 수다
+      item-max-chars: 600
+      # 머리 줄과 구분 줄까지 센 질문과 관련된 기억 구역의 예산이다
+      max-chars: 1500
   data-encryption:
     # 사용자 본문을 저장할 때 암호화하는 KEK 목록 파일과 새로 감쌀 KEK 의 id(ADR-20261008 / data-encryption).
     # 둘 다 비우면 새 대화 본문을 평문으로 저장한다. 값과 파일의 자리는 운영 설정이 정한다

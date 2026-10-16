@@ -33,6 +33,7 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionContextSourceRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import com.bifos.assistant.testsupport.TestContextAssemblers;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -128,7 +129,7 @@ class McpMemorySearchToolTest {
     @DisplayName("작은 조립 예산으로 빠진 항목을 검색한 뒤 읽어야 MEMORY_READ 한 줄을 남긴다")
     void discoversActuallyOmittedItemAndRecordsOnlySuccessfulRead() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
-        ContextAssembler small = new ContextAssembler(
+        ContextAssembler small = TestContextAssemblers.of(
             memories, new ContextProperties(32, 4, null, null, Map.of(), 0, 200), Clock.systemUTC());
         AssembledContext assembled = small.assemble(user, run.agentId());
         assertThat(assembled.omittedMemoryIds()).containsExactly(memory.id());

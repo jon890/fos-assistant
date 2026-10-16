@@ -421,6 +421,32 @@ class ChatServiceTest {
 
 
     @Test
+    @DisplayName("사용자 turn 은 질문과 관련된 기억 줄과 근거를 실행에 남기고 예약 작업 turn 은 남기지 않는다")
+    void recordsSearchSourceOnlyForUserTurn() {
+        CurrentUser dad = member("dad@example.com", "dad");
+        // 본문이 개인 사실 구역의 상한(200자)을 넘어 그 구역의 후보가 아니다
+        Memory tires = memories.create(
+            dad, MemoryScope.USER, "자동차 관리", "타이어는 작년 11월에 네 짝을 모두 갈았다. " + "차".repeat(200), false);
+        stub().willReturn(HermesRunResult.of("run-1", "sess-1", "completed", "네", "dad", null, TokenUsage.empty()));
+
+        ChatTurn turn = chat.send(dad, null, "타이어 언제 갈았지", "dad");
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(turn.executionId()))
+            .filteredOn(row -> row.source().equals("MEMORY_SEARCH"))
+            .extracting(ExecutionContextSource::sourceRef, ExecutionContextSource::bodyMode, ExecutionContextSource::selector)
+            .containsExactly(tuple("memory:" + tires.id(), "INLINE", "search-keyword-v1"));
+
+        ChatTurn scheduled = chat.runScheduledTurn(dad, turn.conversationId(), null, "예약 작업", "타이어 언제 갈았지", event -> {
+        });
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(scheduled.executionId()))
+            .extracting(ExecutionContextSource::source)
+            .doesNotContain("MEMORY_SEARCH")
+            .contains("MEMORY_INDEX");
+    }
+
+
+    @Test
     @DisplayName("커넥터 대화는 Memory 없이 공통 표 지침을 보내고 길이와 해시를 기록한다")
     void sendsNoMemoryToHermesForConnectorAgentTurn() {
         CurrentUser dad = member("dad@example.com", "dad");
