@@ -6,7 +6,6 @@ import com.bifos.assistant.connector.application.model.FinancialLimitChangeSumma
 import com.bifos.assistant.connector.application.model.FinancialLimitsView;
 import com.bifos.assistant.connector.domain.ConnectorAction;
 import com.bifos.assistant.connector.domain.ConnectorBinding;
-import com.bifos.assistant.connector.domain.FinancialLimitChange;
 import com.bifos.assistant.connector.domain.ToolPolicy;
 import com.bifos.assistant.connector.domain.ToolPolicyDecision;
 import com.bifos.assistant.connector.domain.type.ActionDecision;
@@ -19,7 +18,6 @@ import com.bifos.assistant.connector.domain.type.ToolRisk;
 import com.bifos.assistant.connector.infra.ConnectorActionBodies;
 import com.bifos.assistant.connector.infra.ConnectorActionRepository;
 import com.bifos.assistant.connector.infra.ConnectorBindingRepository;
-import com.bifos.assistant.connector.infra.FinancialLimitChangeRepository;
 import com.bifos.assistant.mcp.application.FinancialLimitRequests;
 import com.bifos.assistant.notification.application.NotificationService;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -48,8 +46,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 에이전트가 대화로 주문 상한을 바꾸는 길과 그 승인이다(ADR-20261015 / financial-user-limits).
  *
- * <p>낮추기와 같은 값은 바로 반영한다. 더 닫히는 쪽이라 승인이 없어도 주문이 늘지 않는다. 올리기는 PENDING 승인 줄과 딸린 줄만
- * 만들고, 계좌 주인이 카드에서 승인해야 반영한다. 에이전트가 승인 없이 상한을 올리는 길은 이 클래스에 없다.
+ * <p>낮추기와 같은 값은 바로 반영한다. 더 닫히는 쪽이라 승인이 없어도 주문이 늘지 않는다. 올리기는 종류와 요청 값, 이전 값을 적은
+ * PENDING 승인 줄만 만들고, 계좌 주인이 카드에서 승인해야 반영한다. 에이전트가 승인 없이 상한을 올리는 길은 이 클래스에 없다.
  *
  * <p>승인 줄의 위험도는 {@code WRITE} 다. {@code FINANCIAL} 로 두면 금융 관문의 하루 합계가 실행 내용이 없는 이 줄을 열지 못해 모든
  * 주문을 닫는다. 승인 방식은 {@code always} 라 상시 허락과 대화 허락이 없다.
@@ -73,7 +71,6 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
     private final ConnectorCatalogCache catalog;
     private final AgentExecutionRepository executions;
     private final ConnectorActionRepository actions;
-    private final FinancialLimitChangeRepository changes;
     private final ConnectorActionBodies bodies;
     private final LiveProperties<ConnectorPolicyProperties> policy;
     private final ApplicationEventPublisher events;
@@ -151,9 +148,9 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
         var action = ConnectorAction.decided(binding.get().connection(), origin.agentId(), origin, HERMES_TOOL, TOOL, DECISION,
             false, dedupeKey, Sha256.hex(argsJson), now);
         action.awaitApproval(now.plus(policy.current().approvalTtl()));
+        action.recordLimitChange(kind, requested, current);
         actions.saveAndFlush(action);
         bodies.sealArgs(action, argsJson);
-        changes.saveAndFlush(FinancialLimitChange.of(action.id(), user.id(), kind, requested, current, now));
         var signals = new ConnectorActionSignals(events, notifications, conversations);
         if (action.conversationId() != null) {
             signals.notifyRequested(action, TITLE);
@@ -163,9 +160,12 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
     }
 
 
-    /** 그 줄이 상한 변경 승인 줄인가. */
-    boolean owns(ConnectorAction action) {
-        return TOOL.equals(action.toolName()) && HERMES_TOOL.equals(action.hermesTool()) && changes.existsById(action.id());
+    /**
+     * 그 줄이 상한 변경 승인 줄인가. 도구 이름과 함께, 서버가 줄을 만들 때만 적는 {@code limit_kind} 를 본다.
+     * 커넥터가 같은 이름의 도구를 선언해도 그 줄에는 이 컬럼이 없어 상한 변경 승인으로 가지 않는다.
+     */
+    static boolean owns(ConnectorAction action) {
+        return TOOL.equals(action.toolName()) && HERMES_TOOL.equals(action.hermesTool()) && action.limitKind() != null;
     }
 
 
@@ -184,16 +184,19 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
         if (action.status() != ActionStatus.PENDING || !action.expiresAt().isAfter(now)) {
             throw new ApiException(ErrorCode.CONNECTOR_ACTION_NOT_PENDING, "limit change is not pending");
         }
-        var change = changes.findById(action.id()).orElseThrow(ConnectorActionDetails::notFound);
+        if (!owns(action)) {
+            throw ConnectorActionDetails.notFound();
+        }
+        var kind = action.limitKind();
         var values = limits.effective(user.id());
         action.beginExecution(now);
-        String requested = FinancialOrderLimits.plain(change.requestedValue());
-        if (change.requestedValue().compareTo(values.maximum(change.limitKind())) > 0) {
-            bodies.fail(action, ErrorCode.FINANCIAL_LIMIT_ABOVE_MAXIMUM.name(), change.limitKind().label() + " 상한 " + requested
-                + " 이 지금 최대치 " + FinancialOrderLimits.plain(values.maximum(change.limitKind())) + " 보다 커서 바꾸지 않았다", now);
+        String requested = FinancialOrderLimits.plain(action.limitRequested());
+        if (action.limitRequested().compareTo(values.maximum(kind)) > 0) {
+            bodies.fail(action, ErrorCode.FINANCIAL_LIMIT_ABOVE_MAXIMUM.name(), kind.label() + " 상한 " + requested
+                + " 이 지금 최대치 " + FinancialOrderLimits.plain(values.maximum(kind)) + " 보다 커서 바꾸지 않았다", now);
         } else {
-            limits.store(user.id(), change.limitKind(), change.requestedValue(), now);
-            bodies.succeed(action, change.limitKind().label() + " 상한을 " + requested + " 으로 바꿨다", now);
+            limits.store(user.id(), kind, action.limitRequested(), now);
+            bodies.succeed(action, kind.label() + " 상한을 " + requested + " 으로 바꿨다", now);
         }
         new ConnectorActionSignals(events, notifications, conversations).publishAfterCommit(List.of(action));
         return ConnectorActionDetails.view(action, Optional.empty());
@@ -215,13 +218,12 @@ public class FinancialLimitChanges implements FinancialLimitRequests {
     @Transactional(readOnly = true)
     public Optional<FinancialLimitChangeSummary> summaryOf(CurrentUser user, UUID actionId) {
         return actions.findByPublicId(actionId)
-            .filter(action -> user.id().equals(action.userId()) && TOOL.equals(action.toolName()))
-            .flatMap(action -> changes.findById(action.id()))
-            .map(change -> {
+            .filter(action -> user.id().equals(action.userId()) && owns(action))
+            .map(action -> {
                 var values = limits.effective(user.id());
-                var kind = change.limitKind();
+                var kind = action.limitKind();
                 return new FinancialLimitChangeSummary(kind.apiName(), kind.currency(), kind.label(),
-                    FinancialOrderLimits.plain(change.previousValue()), FinancialOrderLimits.plain(change.requestedValue()),
+                    FinancialOrderLimits.plain(action.limitPrevious()), FinancialOrderLimits.plain(action.limitRequested()),
                     FinancialOrderLimits.plain(values.maximum(kind)), FinancialOrderLimits.plain(values.value(kind)));
             });
     }
