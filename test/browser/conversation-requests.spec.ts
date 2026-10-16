@@ -1,3 +1,4 @@
+// 코드 규칙: rule-61. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import { CONVERSATION_URL, expect, test } from "./fixtures.ts";
 import type { Page, Request } from "../../web/node_modules/@playwright/test/index.js";
 

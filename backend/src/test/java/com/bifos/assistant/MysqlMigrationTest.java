@@ -1,3 +1,4 @@
+// 코드 규칙: rule-50. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 package com.bifos.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
