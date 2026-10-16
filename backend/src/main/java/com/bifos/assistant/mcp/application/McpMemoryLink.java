@@ -75,7 +75,7 @@ public class McpMemoryLink {
      * 두 항목을 잇고 그 결과를 한 줄 글로 돌려준다. 볼 수 없는 항목과 규칙을 어긴 쌍은 까닭을 가리지 않고 같은 글이다. 다르게 답하면 볼 수 없는 항목이
      * 있다는 것이 새어 나간다.
      *
-     * @param type {@link #SUPERSEDES} 나 {@link #RELATED}. 인자 검사가 이미 거른 값이다
+     * @param type {@link #SUPERSEDES} 나 {@link #RELATED}. 인자 검사를 이미 지난 값이다
      * @param label {@code RELATED} 의 뜻. 없으면 null
      */
     Map<String, Object> link(McpCaller caller, long fromId, long toId, String type, String label) {

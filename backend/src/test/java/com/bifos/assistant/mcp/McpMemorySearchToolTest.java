@@ -190,7 +190,7 @@ class McpMemorySearchToolTest {
 
 
     @Test
-    @DisplayName("검색 뒤에도 권한 철회 거절 대체 삭제를 검사하고 판이 바뀌면 최신 본문을 읽는다")
+    @DisplayName("검색 뒤에도 권한 철회 거절 대체 삭제를 검사하고 버전이 바뀌면 최신 본문을 읽는다")
     void rechecksReadPermissionsAndReturnsCurrentRevision() throws Exception {
         Memory memory = memories.create(user, MemoryScope.USER, TITLE, BODY, false);
         assertThat(searchData(call("memory_search", arguments().put("query", QUERY)))

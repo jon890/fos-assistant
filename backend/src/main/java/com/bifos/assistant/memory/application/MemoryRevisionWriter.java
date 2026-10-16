@@ -53,7 +53,7 @@ class MemoryRevisionWriter {
 
 
     /**
-     * 지우기 전에 마지막 값을 판으로 남기고 그 항목의 벡터와 연결을 지운다. 둘 다 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다.
+     * 지우기 전에 마지막 값을 버전으로 남기고 그 항목의 벡터와 연결을 지운다. 둘 다 외래 키가 없어 서비스가 같은 트랜잭션에서 지운다.
      */
     void beforeDelete(CurrentUser user, Memory memory) {
         revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
