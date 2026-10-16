@@ -110,6 +110,38 @@ class ExecutionContextSourceTest {
 
 
     @Test
+    @DisplayName("선택 근거를 실은 참조는 다섯 칸을 함께 남기고 근거 없는 참조와 덧붙인 MEMORY_READ 줄은 비워 둔다")
+    void storesSelectionColumnsOnlyWhenPresent() {
+        List<ContextSourceRef> sources = List.of(
+            new ContextSourceRef("MEMORY_FACTS", "memory:9201", "INLINE", "FRESH", "facts-recent-v1", 1, 0.5, 0.25, 0.75),
+            new ContextSourceRef("MEMORY_INDEX", "memory:9202", "TITLE_ONLY", "FRESH"));
+        AgentExecution execution = recorder.start(
+            adminUser(),
+            conversation.executionConversation(),
+            agent(),
+            null,
+            null,
+            new ExecutionContextSnapshot(120L, null, null, 0, sources));
+        new ExecutionContextSourceWriter(contextSources, transactionManager, clock)
+            .append(execution.id(), new ContextSourceRef("MEMORY_READ", "memory:9202", "INLINE", "UNKNOWN"));
+
+        assertThat(contextSources.findByIdExecutionIdOrderByIdPositionAsc(execution.id()))
+            .as("실행 %s 에 남은 선택 근거", execution.id())
+            .extracting(
+                ExecutionContextSource::source,
+                ExecutionContextSource::selector,
+                ExecutionContextSource::selectionRank,
+                ExecutionContextSource::keywordScore,
+                ExecutionContextSource::semanticScore,
+                ExecutionContextSource::selectionScore)
+            .containsExactly(
+                tuple("MEMORY_FACTS", "facts-recent-v1", 1, 0.5, 0.25, 0.75),
+                tuple("MEMORY_INDEX", null, null, null, null, null),
+                tuple("MEMORY_READ", null, null, null, null, null));
+    }
+
+
+    @Test
     @DisplayName("참조가 없는 스냅숏이면 아무 줄도 남기지 않는다")
     void storesNothingWhenSnapshotHasNoSources() {
         AgentExecution execution = recorder.start(
