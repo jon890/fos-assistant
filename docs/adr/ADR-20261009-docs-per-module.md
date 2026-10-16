@@ -25,6 +25,7 @@
 
 | 예외 | 까닭 |
 | --- | --- |
+| `docs/code-rules/INDEX.md`, `docs/code-rules/rule-N.md` | 고정 번호로 규범·까닭·예외와 기존 검사를 잇는다. 루트의 이 두 이름 형식만 허용하며 소유권은 [ADR-20261016 / code-rules](ADR-20261016-code-rules.md)가 정한다 |
 | `docs/privacy.md` | 바깥 주소가 고정이다. Google OAuth 동의 화면이 이 경로를 가리킨다 |
 | `hermes/docs/hermes-contract.md` | 우리 모듈이 아니라 upstream Hermes 의 동작이다. `hermes/tests/hermes_contract.py` 와 짝이고 Hermes 를 올릴 때만 바뀐다 |
 | 코드 옆 README(`hermes/README.md`, plugin 의 README, `hermes/connectors/` 의 README 등) | 그 디렉터리를 고치는 PR 의 diff 에 함께 보인다 |

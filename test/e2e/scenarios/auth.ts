@@ -1,3 +1,4 @@
+// 코드 규칙: rule-47, rule-49. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 /** 누가 들어올 수 있고 누가 막히는지를 본다. */
 import { call, expectStatus, step, type Scenario } from "../harness.ts";
 

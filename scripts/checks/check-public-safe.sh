@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 코드 규칙: rule-46, rule-67. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 # 공개 저장소에 적으면 안 되는 운영 정보가 들어갔는지 검사한다.
 #
 # 판정 기준은 AGENTS.md 의 「공개 저장소」 절이 소유한다.

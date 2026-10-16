@@ -56,7 +56,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-027](ADR-027-에이전트가-만든-html-은-대화별-폴더에-두고-스크립트-없이-보인다.md) | 에이전트가 만든 HTML 은 대화별 폴더에 두고 스크립트 없이 보인다 | backend, frontend | Accepted |
 | [ADR-038](ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md) | 도구의 명령 원문은 관리자에게만 보내고 사용자에게는 사람 말로 보인다 | backend, frontend | Accepted. 원문 저장과 관리자 원문 보기는 ADR-047 이 대체한다 |
 | [ADR-041](ADR-041-hermes-에-설치하는-plugin-과-profile-틀은-이-저장소가-소유한다.md) | Hermes 에 설치하는 plugin 과 profile 틀은 이 저장소가 소유한다 | 공통 | Accepted |
-| [ADR-042](ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) | 코드 품질 규칙은 도구 설정이 갖고 기존 위반은 기준 파일에 둔다 | 공통 | Accepted. ADR-005 가 미룬 Checkstyle 을 넣는다 |
+| [ADR-042](ADR-042-코드-품질-규칙은-도구-설정이-갖고-기존-위반은-기준-파일에-둔다.md) | 코드 품질 규칙은 도구 설정이 갖고 기존 위반은 기준 파일에 둔다 | 공통 | Accepted. ADR-005 가 미룬 Checkstyle 을 넣는다. 설명 소유권은 [ADR-20261016 / code-rules](ADR-20261016-code-rules.md)가 보완한다 |
 | [ADR-048](ADR-048-응답-중에-보낸-메시지는-control-plane-이-쌓아-두고-다음-turn-으로-합쳐-보낸다.md) | 응답 중에 보낸 메시지는 Control Plane 이 쌓아 두고 다음 turn 으로 합쳐 보낸다 | backend, frontend | Accepted. ADR-040 의 다음 turn 을 여는 자리를 함께 쓴다 |
 | [ADR-057](ADR-057-문서는-사람이-화면에서-직접-쓰고-고친다.md) | 문서는 사람이 화면에서 직접 쓰고 고친다 | backend, frontend | Accepted. ADR-012 의 승인 원칙을 문서에 적용한다 |
 | [ADR-059](ADR-059-꺼진-사용자는-control-plane-이-요청마다-막고-웹이-세션을-끊는다.md) | 꺼진 사용자는 Control Plane 이 요청마다 막고 웹이 세션을 끊는다 | backend, frontend | Accepted |
@@ -112,6 +112,7 @@ ADR 끼리의 링크와 문서의 링크는 옮기는 커밋에서 함께 고친
 | [ADR-20261013 / financial-order-opening](ADR-20261013-financial-order-opening.md) | 토스 일반 주문의 생성과 취소를 준비 도구 하나로 열고, 계좌는 한 사용자에게만 묶는다 | backend, frontend, hermes | Accepted. ADR-20261010 / financial-execution-guard 와 ADR-20261012 / financial-unsent-proof 위에 선다. ADR-049 의 「`FINANCIAL` 은 wrapper 뒤에 연다」 와 ADR-20261010 / financial-execution-guard 의 「경로를 열지 않는다」 를 일반 주문의 생성과 취소에 한해 개정한다 |
 | [ADR-20261013 / unknown-retry-key](ADR-20261013-unknown-retry-key.md) | 결과를 모르는 승인 실행은 커넥터가 선언한 오류 코드와 재시도 식별자 하나만 에이전트까지 전한다 | backend, hermes | Accepted. ADR-092 의 「`outcome_unknown` 은 객체 항목을 쓸 수 없다」 를 개정한다. ADR-050 의 자동 재전송 금지는 그대로다 |
 | [ADR-20261015 / financial-user-limits](ADR-20261015-financial-user-limits.md) | 주문 상한은 운영 최대치 안에서 계좌 주인이 정하고, 에이전트는 올리기를 승인 카드로만 요청한다 | backend, frontend, hermes | Accepted. ADR-20261013 / financial-order-opening 의 「거절 이유를 밝히지 않는다」 를 상한 거절에 한해 개정한다 |
+| [ADR-20261016 / code-rules](ADR-20261016-code-rules.md) | 규칙의 까닭과 예외는 번호 문서가, 실행 조건은 검사 코드가 갖는다 | 공통 | Accepted. ADR-042의 설명 소유권과 ADR-20261009 / docs-per-module의 문서 배치 예외를 보완한다 |
 
 ## 보관
 

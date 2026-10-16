@@ -1,3 +1,4 @@
+// 코드 규칙: rule-48. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
