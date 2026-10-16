@@ -194,6 +194,26 @@ class ContextAssemblerQuestionTest {
 
 
     @Test
+    @DisplayName("다른 범위에 같은 이름의 짝이 있는 문서는 질문에 맞아도 구역에 싣지 않고 색인에 충돌 표시와 함께 둔다")
+    void keepsSameNameDocumentsInIndexWithConflictMarks() {
+        Long personal = insertDocument("USER", ADMIN.id(), null, "peanut-note", "땅콩 들어간 음식 메모");
+        Long shared = insertDocument("GROUP", null, ADMIN.groupId(), "peanut-note", "땅콩 들어간 음식 메모");
+
+        AssembledContext result = assembler.assemble(ADMIN, agentId, PEANUT_QUESTION);
+
+        assertThat(result.instructions()).doesNotContain(SEARCH_HEADER);
+        assertThat(section(result, INDEX_HEADER))
+            .contains(
+                "- [" + personal + "] 땅콩 들어간 음식 메모 (같은 이름의 그룹 문서 [" + shared + "] 가 있다)",
+                "- [" + shared + "] 땅콩 들어간 음식 메모 (같은 이름의 개인 문서 [" + personal + "] 가 있다)");
+        assertThat(result.bundle().items())
+            .filteredOn(item -> item.source() == ContextSource.MEMORY_INDEX)
+            .extracting(item -> item.selection().selector())
+            .containsOnly(ContextSelection.INDEX_KEYWORD);
+    }
+
+
+    @Test
     @DisplayName("질문이 없거나 공백뿐인 조립은 지금까지와 같은 지시문 지문을 낸다")
     void keepsInstructionsHashWithoutQuestion() {
         group("아이 간식 주의", "둘째는 땅콩 알레르기라 땅콩 들어간 음식은 먹으면 안 된다");
@@ -210,6 +230,19 @@ class ContextAssemblerQuestionTest {
     /** 그룹 항목은 개인 사실 구역의 후보가 아니어서 질문 구역만 본다. */
     private Memory group(String title, String content) {
         return memories.create(ADMIN, MemoryScope.GROUP, title, content, false);
+    }
+
+
+    /** 문서를 저장소에 바로 넣는다. 그룹 문서는 서비스로 만들 수 없어 테이블에 직접 쓴다. */
+    private Long insertDocument(String scope, Long ownerUserId, Long groupId, String documentKey, String title) {
+        jdbc.update("""
+                INSERT INTO memory (scope, owner_user_id, group_id, collection, entry_type, document_key, title,
+                    content, retrieval, always_inject, sensitivity, revision, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'core', 'DOCUMENT', ?, ?, '땅콩 들어간 음식은 먹지 않는다', 'SEARCH', FALSE, 'NORMAL', 1, 'ACCEPTED',
+                    CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+                """, scope, ownerUserId, groupId, documentKey, title);
+        return jdbc.queryForObject(
+            "SELECT id FROM memory WHERE scope = ? AND document_key = ?", Long.class, scope, documentKey);
     }
 
 
