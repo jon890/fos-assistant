@@ -2,7 +2,7 @@
 
 동시 변경은 조건부 갱신으로 보호하고 오래된 엔티티를 통째로 덮어쓰지 않는다.
 
-검사: [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [위임 경합 회귀](../../backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceRaceTest.java), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 

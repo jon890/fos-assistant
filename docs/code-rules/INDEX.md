@@ -58,9 +58,9 @@
 | [rule-44](rule-44.md) | 파일 길이 상한과 기존 위반 기준을 지킨다. | [파일 길이](../../scripts/checks/check-file-length.mjs) |
 | [rule-45](rule-45.md) | 기준 파일은 기존 위반을 줄이는 목록으로만 쓴다. | [기준 파일 관리](../../scripts/checks/quality.sh), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-46](rule-46.md) | 공개 저장소에는 환경 운영값과 비밀을 꺼내는 방법을 적지 않는다. | [공개 정보](../../scripts/checks/check-public-safe.sh), [리뷰](../../.github/workflows/code-review-prompt.txt) |
-| [rule-47](rule-47.md) | 실행 profile은 요청자의 바인딩에서만 고른다. | [인증 회귀](../../test/e2e/scenarios/auth.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
+| [rule-47](rule-47.md) | 실행 profile은 요청자의 바인딩에서만 고른다. | [요청자 바인딩](../../test/e2e/scenarios/binding.ts), [대화의 profile 유지](../../test/e2e/scenarios/chat.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-48](rule-48.md) | Memory 권한은 Control Plane이 정하고 비밀 원문은 DB에 두지 않는다. | [기억 비밀값 회귀](../../test/unit/memory-secrecy.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
-| [rule-49](rule-49.md) | 남의 자료는 없는 것과 같은 응답을 주며 실패 실행도 남긴다. | [접근 거절 회귀](../../test/e2e/scenarios/auth.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
+| [rule-49](rule-49.md) | 남의 자료는 없는 것과 같은 응답을 주며 실패 실행도 남긴다. | [남의 대화 접근 거절](../../test/e2e/scenarios/chat.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-50](rule-50.md) | 엔티티와 Flyway를 같이 바꾸고 적용된 마이그레이션은 수정하지 않는다. | [MySQL 마이그레이션](../../backend/src/test/java/com/bifos/assistant/MysqlMigrationTest.java), [적용 파일 불변](../../test/unit/migration-immutable.test.ts), [마이그레이션 버전](../../scripts/checks/check-migration-versions.mjs), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-51](rule-51.md) | 저장소 쿼리는 실제 MySQL에서도 실행한다. | [MySQL 저장소 쿼리](../../backend/src/test/java/com/bifos/assistant/RepositoryQueryMysqlTest.java), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-52](rule-52.md) | 주석·문서·도메인 용어는 저장소 언어 규칙을 따른다. | [문서 참조](../../test/unit/doc-code-references.test.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |
@@ -77,7 +77,7 @@
 | [rule-63](rule-63.md) | Hermes core를 고치기 전에 plugin·profile·API 경계를 쓴다. | [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-64](rule-64.md) | 새 Hermes 내부 의존은 같은 변경에 계약 테스트로 선언한다. | [Hermes 계약](../../hermes/tests/hermes_contract.py), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-65](rule-65.md) | plugin은 서비스 이름을 모르고 connector만 서비스별 동작을 갖는다. | [서비스 중립](../../test/unit/connector-neutral.test.ts) |
-| [rule-66](rule-66.md) | plugin은 전환 배포 동안 이전 Control Plane 호출을 받는다. | [리뷰](../../.github/workflows/code-review-prompt.txt) |
+| [rule-66](rule-66.md) | plugin은 전환 배포 동안 이전 Control Plane 호출을 받는다. | [이전 호출 호환](../../hermes/tests/test_dashboard_profile_api_connector_install_legacy.py), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-67](rule-67.md) | 운영값은 설치 묶음과 환경에서 받고 코드에 고정하지 않는다. | [공개 정보](../../scripts/checks/check-public-safe.sh), [리뷰](../../.github/workflows/code-review-prompt.txt) |
-| [rule-68](rule-68.md) | 동시 변경은 조건부 갱신으로 보호하고 오래된 엔티티를 통째로 덮어쓰지 않는다. | [리뷰](../../.github/workflows/code-review-prompt.txt) |
+| [rule-68](rule-68.md) | 동시 변경은 조건부 갱신으로 보호하고 오래된 엔티티를 통째로 덮어쓰지 않는다. | [위임 경합 회귀](../../backend/src/test/java/com/bifos/assistant/orchestration/AgentDelegationServiceRaceTest.java), [리뷰](../../.github/workflows/code-review-prompt.txt) |
 | [rule-69](rule-69.md) | 화면 갱신은 입력 상태와 레이아웃을 불필요하게 다시 만들지 않는다. | [입력 상태 회귀](../../test/browser/composer-send-flow.spec.ts), [리뷰](../../.github/workflows/code-review-prompt.txt) |

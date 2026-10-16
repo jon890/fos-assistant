@@ -1,3 +1,4 @@
+// 코드 규칙: rule-47. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 /** 실행할 profile 은 요청자가 고른 에이전트에서만 나온다는 것을 본다. */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 

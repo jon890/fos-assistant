@@ -2,7 +2,7 @@
 
 plugin은 전환 배포 동안 이전 Control Plane 호출을 받는다.
 
-검사: [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [이전 호출 호환](../../hermes/tests/test_dashboard_profile_api_connector_install_legacy.py), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 

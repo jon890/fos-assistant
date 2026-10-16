@@ -1,3 +1,4 @@
+// 코드 규칙: rule-47, rule-49. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 /** 대화 한 번이 Hermes 까지 갔다 오고, 남의 대화는 읽히지 않는 것을 본다. */
 import { call, expect, expectStatus, step, type Scenario } from "../harness.ts";
 import { ASK_GUIDE_HEADER } from "../fake-hermes.ts";

@@ -1,3 +1,4 @@
+# 코드 규칙: rule-66. 까닭과 예외는 docs/code-rules/INDEX.md를 본다.
 """dashboard-profile-api 의 connector_install_legacy 분기를 검사한다."""
 
 import json

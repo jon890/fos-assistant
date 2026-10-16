@@ -2,7 +2,7 @@
 
 남의 자료는 없는 것과 같은 응답을 주며 실패 실행도 남긴다.
 
-검사: [접근 거절 회귀](../../test/e2e/scenarios/auth.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [남의 대화 접근 거절](../../test/e2e/scenarios/chat.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 

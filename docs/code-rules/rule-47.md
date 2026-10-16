@@ -2,7 +2,7 @@
 
 실행 profile은 요청자의 바인딩에서만 고른다.
 
-검사: [인증 회귀](../../test/e2e/scenarios/auth.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
+검사: [요청자 바인딩](../../test/e2e/scenarios/binding.ts), [대화의 profile 유지](../../test/e2e/scenarios/chat.ts), [리뷰](../../.github/workflows/code-review-prompt.txt)
 
 ## 까닭
 
@@ -15,5 +15,5 @@
 
 ## 이 저장소의 사례
 
-[auth.ts](../../test/e2e/scenarios/auth.ts)에서 확인한다.
-auth 시나리오는 인증과 사용자 접근 경계의 회귀를 확인한다.
+[binding.ts](../../test/e2e/scenarios/binding.ts)에서 확인한다.
+binding 시나리오는 없는 에이전트를 거절하고 chat 시나리오는 처음 선택한 profile을 유지하는지 확인한다.
