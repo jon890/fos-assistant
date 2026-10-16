@@ -77,12 +77,6 @@ export async function openDocumentTab(page: Page) {
   await page.getByRole("tab", { name: "문서" }).click();
 }
 
-/** 기억 화면을 열고 아래에 접어 둔 「문서 읽기 토큰」 을 펼친다. */
-export async function openMemoryAdvanced(page: Page) {
-  await page.goto("/memory");
-  await page.locator("summary", { hasText: "문서 읽기 토큰" }).click();
-}
-
 export async function expectNoHorizontalOverflow(page: Page) {
   const viewportWidth = page.viewportSize()?.width;
   expect(viewportWidth).toBeDefined();

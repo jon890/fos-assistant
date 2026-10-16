@@ -117,6 +117,23 @@ class MysqlMigrationTest {
 
 
     @Test
+    @DisplayName("폐기한 서비스 토큰 표 둘을 제거하고 기억과 에이전트 토큰 표는 보존한다")
+    void removesServiceTokenTablesAndKeepsMemoryAndAgentTokens() {
+        assertThat(jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('service_token', 'service_token_collection')
+                """, String.class)).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name IN ('memory', 'memory_collection', 'agent_memory_collection', 'agent_token')
+                """, String.class)).containsExactlyInAnyOrder(
+            "memory", "memory_collection", "agent_memory_collection", "agent_token");
+    }
+
+
+    @Test
     @DisplayName("높은 시각 버전 적용 뒤 늦게 들어온 낮은 시각 버전도 실제 MySQL 에 적용한다")
     void appliesLateTimestampMigration(@TempDir Path directory) throws IOException, SQLException {
         assertThat(flyway.getConfiguration().isOutOfOrder()).isTrue();

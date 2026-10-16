@@ -75,7 +75,7 @@ public class MemoryDocumentController {
     }
 
 
-    /** 문서 폼과 서비스 토큰 발급이 고를 collection 목록이다. */
+    /** 문서 폼에서 고를 collection 목록이다. */
     @GetMapping("/memory-collections")
     public List<CollectionView> collections() {
         return memories.collectionsFor(currentUser.require()).stream()

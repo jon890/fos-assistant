@@ -8,7 +8,7 @@ MySQL 8.4 에 둔다. 표와 칸, 타입, 색인(index)은 마이그레이션 `b
 
 | 절 | 표 |
 | --- | --- |
-| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token`, `service_token`, `service_token_collection` |
+| 「사용자와 에이전트 표」 | `app_user`, `allowed_person`, `agent`, `model_tier_definition`, `model_tier_group_setting`, `model_hidden`, `toolset_hidden`, `agent_toolset_request`, `agent_token` |
 | 「대화 표」 | `conversation`, `chat_message`, `chat_pending_message`, `chat_attachment`, `media_observation`, `media_observation_request`, `chat_artifact`, `result_delivery`, `result_delivery_item`, `result_delivery_attempt`, `execution_question` |
 | 「실행 표」 | `agent_execution`, `execution_event`, `subagent_usage_job`, `execution_skill_use`, `hermes_session_binding`, `execution_context_source` |
 | 「Memory 표」 | `memory`, `memory_revision`, `memory_collection`, `agent_memory_collection`, `agent_memory_collection_change`, `memory_capture` |
@@ -212,9 +212,7 @@ Memory 는 줄을 지운다. 지우기 전에 마지막 값을 `memory_revision`
 기억 기록(`memory_capture`)은 항목을 지워도 남는다. 대화는 항목이 없는 기록을 그리지 않는다. 되돌린 기록은 `undone_at` 을 적고 남긴다.
 에이전트를 지워도 `agent_memory_collection` 의 줄은 에이전트 행과 함께 7일 동안 남는다. 지운 에이전트는 실행되지 않으므로 그 줄을 읽는 자리가 없다.
 그 변경 기록(`agent_memory_collection_change`)도 그동안 남는다. 누가 언제 민감 허용을 열었는지가 남아야 한다. 에이전트 행을 정리할 때 둘을 함께 지운다.
-서비스 토큰은 폐기해도 줄이 남는다. 언제까지 쓰였는지가 남아야 한다.
-
-허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내린다. 그 사람의 서비스 토큰은 모두 폐기하고 브라우저는 멈춘다.
+허용 목록에서 빼는 것도 지우지 않고 `enabled` 를 내리며 그 사람의 브라우저는 멈춘다.
 그 사람의 `app_user` 와 실행 기록은 그대로 둔다.
 그 사람의 Hermes profile 도 지우지 않는다. 다시 들일 때 그것을 다시 만들지 않아도 된다.
 
@@ -247,7 +245,7 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 저장소 root에서 `scripts/checks/check-mysql-migration.sh --tests '*PurgeCoverageMysqlTest'`다.
 
 현재 알려진 공백은 사용자 물리 삭제 경로 전체와 다음 대화 purge 대상이다.
-접근 해제는 서비스 토큰을 폐기하지만 사용자와 개인 데이터는 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
+접근 해제는 사용자와 개인 데이터를 지우지 않으므로 사용자 삭제 검사로 대신하지 않는다.
 
 | 테이블 | 대화 purge 뒤 남는 내용 |
 | --- | --- |
@@ -345,17 +343,6 @@ Hermes 가 Control Plane 의 MCP 도구를 부를 때 쓰는 장기 토큰이다
 **토큰은 어느 profile 이 부르는지만 증명한다. 사용자를 정하지 않는다.** 요청자는 서명한 `_fos_ctx` 로 찾은 origin 실행의 `user_id` 다([ADR-032](adr/ADR-032-mcp-토큰은-profile-을-증명하고-실제-사용자는-부모-실행에서-정한다.md)).
 `profile_name` 이 빈 줄은 profile 을 묶기 전에 폐기된 옛 토큰뿐이고 인증에서 거절한다. 바꿔 끼우는 동안 옛 토큰과 새 토큰이 함께 쓰여 `profile_name` 에 유일 제약을 두지 않는다.
 한 번 묶은 profile 은 바꾸지 않는다. 다른 profile 에 쓰려면 새로 발급한다.
-
-### service_token
-
-다른 서비스가 사용자의 Memory 문서를 읽을 때 쓰는 토큰이다([ADR-056](adr/ADR-056-다른-서비스는-사용자에-묶인-서비스-토큰으로-문서를-읽기만-한다.md)). 원문은 발급 응답에서 한 번만 내고 해시만 저장한다.
-**`agent_token` 과 달리 사용자 한 사람에 묶인다.** 그 사용자 본인만 발급하고 폐기한다. 관리자도 다른 사용자의 토큰을 발급하거나 폐기하지 못한다.
-`expires_at` 은 발급할 때 정하고 고치지 않는다. `last_used_at` 은 거절한 요청에서는 적지 않는다.
-인증할 때도 주인이 지금 허용 목록에 켜져 있는지 본다. 허용 목록에서 끌 때의 폐기가 한 번 실패해도 끈 사용자의 토큰이 통하지 않게 하기 위해서다.
-
-### service_token_collection
-
-서비스 토큰이 받는 collection 하나가 한 줄이다. `agent_memory_collection` 과 같은 뜻이고 같은 세 조건으로 판정한다.
 
 ## 대화 표
 

@@ -58,8 +58,7 @@ public class PeopleAdminController {
      * 들어올 수 있는지를 올리고 내린다.
      *
      * <p>내려도 이미 만들어진 에이전트는 그대로 둔다. 그 사람이 남은 토큰으로 대화를 이어갈 수 있다는
-     * 뜻이다. 막으려면 그 에이전트도 함께 내려야 한다. 그 사람의 서비스 토큰은 끄는 저장과 한 트랜잭션에서 모두
-     * 폐기한다. 폐기가 실패하면 끄기도 되돌아간다. 다시 올려도 되살아나지 않는다(ADR-056).
+     * 뜻이다. 막으려면 그 에이전트도 함께 내려야 한다. 사용자 JWT는 매 요청 허용 목록을 확인해 거절한다(ADR-059).
      */
     @PatchMapping("/{id}")
     public PersonView update(@PathVariable Long id, @Valid @RequestBody UpdatePersonRequest request) {

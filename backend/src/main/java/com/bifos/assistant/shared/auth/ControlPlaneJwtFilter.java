@@ -40,7 +40,6 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 public class ControlPlaneJwtFilter extends OncePerRequestFilter {
     private static final String BEARER = "Bearer ";
-    private static final String SERVICE_API_PREFIX = "/api/v1/service/";
     private static final String BROWSER_GATEWAY_PREFIX = "/internal/browser-gateway/";
 
     /**
@@ -51,7 +50,7 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
      * 장기 토큰을 쓰는 다른 인증 경계다. {@code /api/v1/signin/} 아래는 아직
      * 사용자가 없는 시점에 돌므로 여기를 지나면 안 된다. 이 필터는 토큰을 받으면 그 자리에서
      * {@code app_user} 를 만들고, 그러면 허용되지 않은 주소로도 사용자가 생긴다. 그 경로는 토큰을
-     * 스스로 검사한다. {@code /api/v1/service/} 아래는 서비스 토큰을 쓰는 다른 인증 경계다(ADR-056).
+     * 스스로 검사한다.
      * {@code /internal/browser-gateway/} 아래는 커넥터가 부르는 브라우저 중계이고, 경로에 든 접근 표식이 인증이다. 하위 경로가 많아
      * 접두사로 건너뛴다.
      *
@@ -98,7 +97,6 @@ public class ControlPlaneJwtFilter extends OncePerRequestFilter {
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/claim".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/connector-executions/support".equals(uri))
             || ("POST".equals(request.getMethod()) && "/internal/content-draft-jobs/authorize".equals(uri))
-            || uri.startsWith(SERVICE_API_PREFIX)
             || uri.startsWith(BROWSER_GATEWAY_PREFIX);
     }
 
