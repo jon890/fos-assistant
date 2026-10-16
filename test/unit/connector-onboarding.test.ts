@@ -14,17 +14,16 @@ function agent(code: string, overrides: Partial<AgentView> = {}): AgentView {
     acceptsAttachments: true,
     editable: true,
     ownedByMe: true,
-    connectorManaged: false,
     ...overrides,
   };
 }
 
-test("남의 에이전트와 예전 방식의 연결 에이전트는 후보에서 뺀다", () => {
+test("남의 에이전트는 후보에서 뺀다", () => {
   const choices = agentChoices(
     [
       agent("mine"),
       agent("shared", { ownedByMe: false, visibility: "GROUP" }),
-      agent("legacy", { connectorManaged: true }),
+      agent("other", { ownedByMe: false }),
     ],
     [],
     null,
@@ -66,10 +65,7 @@ test("붙일 수 있는 것, 붙은 것, 그룹 공개 순서로 두고 보던 �
   const preferred = agentChoices(agents, bindings, "second");
   assert.equal(preferred[0].code, "second");
   assert.equal(preferred[0].preferred, true);
-  assert.equal(
-    preferred.filter((choice) => choice.preferred).length,
-    1,
-  );
+  assert.equal(preferred.filter((choice) => choice.preferred).length, 1);
 });
 
 test("붙인 직후 언제 쓸 수 있는지 알린다", () => {

@@ -151,10 +151,6 @@ public class ProactiveScheduleService {
     private List<CheckBlocker> blockers(Agent agent) {
         CheckReadiness checked = readiness.check(agent);
         List<CheckBlocker> blockers = new ArrayList<>(checked.blockers());
-        boolean unsupported = blockers.stream().anyMatch(blocker -> blocker.code() == CheckBlockerCode.AGENT_NOT_SUPPORTED);
-        if (unsupported) {
-            return List.copyOf(blockers);
-        }
         if (!properties.isolatedExecutionEnabled()) {
             List<String> unsafe = toolsets.readEnabled(agent.apiBaseUrl(), agent.hermesProfile()).stream()
                 .filter(ISOLATION_REQUIRED_TOOLSETS::contains)

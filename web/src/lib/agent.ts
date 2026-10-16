@@ -9,8 +9,6 @@ export type AdminAgent = {
   visibility: "PRIVATE" | "GROUP";
   ownerUserId: number | null;
   enabled: boolean;
-  /** 외부 서비스 연결 화면이 소유하므로 일반 에이전트 편집 화면에서 바꾸지 않는다. */
-  connectorManaged: boolean;
   /** 「먼저 살펴보기에 쓰기 도구 허용」. 관리자만 바꾸고 관리자 응답에만 온다(ADR-082) */
   proactiveCheckWritesAllowed: boolean;
 };
@@ -26,8 +24,6 @@ export type AgentView = {
   editable: boolean;
   /** 요청자가 이 에이전트의 주인이다 */
   ownedByMe: boolean;
-  /** 커넥터 연결이 만든 에이전트다. 도구와 스킬 편집을 그리지 않는다 */
-  connectorManaged: boolean;
 };
 
 /** 한 에이전트의 성격이다. 본문은 데이터베이스가 아니라 Hermes 의 `SOUL.md` 가 갖는다 */

@@ -313,31 +313,6 @@ export async function bindDemoConnector(
   };
 }
 
-/**
- * 그 사용자의 예전 방식 연결 에이전트를 만들고 에이전트 번호(화면 주소의 코드)를 돌려준다.
- *
- * <p>연결 등록은 더는 이런 에이전트를 만들지 않으므로 검사에서만 뜨는 경로로 만든다. 그 사용자의 시험 커넥터 연결도
- * `READY` 가 된다. 검사가 끝나면 에이전트를 지우고 연결을 해제한다.
- */
-export async function createLegacyConnectorAgent(
-  email: string,
-): Promise<string> {
-  const response = await callAs(
-    email,
-    "POST",
-    "/api/v1/test-support/connector/legacy-agent",
-    { email, connectorId: DEMO_CONNECTOR.id },
-  );
-  if (!response.ok)
-    throw new Error(
-      `예전 방식의 연결 에이전트를 만들지 못했다: ${response.status} ${await response.text()}`,
-    );
-  const { code } = (await response.json()) as { code?: unknown };
-  if (typeof code !== "string")
-    throw new Error("예전 방식의 연결 에이전트 번호가 없다");
-  return code;
-}
-
 export async function setSession(
   context: BrowserContext,
   user: { email: string; name: string },

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -12,7 +11,6 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -123,8 +121,6 @@ class ConnectorBindingServiceTest {
         List.of(new ConnectorField("token", "DEMO_TOKEN", "토큰", "", true, true, null, null)),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
         2,
         List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
@@ -138,8 +134,6 @@ class ConnectorBindingServiceTest {
         DEMO_MANIFEST.fields(),
         "list_scopes",
         "single",
-        List.of(),
-        false,
         2,
         DEMO_MANIFEST.tools(),
         List.of(),
@@ -148,7 +142,7 @@ class ConnectorBindingServiceTest {
         false,
         null);
     /** 입력 칸이 없는 일반 MCP 서버다. */
-    private static final ConnectorManifest PLAIN_MANIFEST = new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", List.of(), false, 1, List.of());
+    private static final ConnectorManifest PLAIN_MANIFEST = new ConnectorManifest(PLAIN, "칸 없는 서버", "", List.of(), "ping", "plain", 1, List.of());
     /** 붙일 때 스킬을 하나 설치하는 커넥터다. */
     private static final ConnectorManifest SKILLED_MANIFEST = new ConnectorManifest(
         SKILLED,
@@ -157,8 +151,6 @@ class ConnectorBindingServiceTest {
         List.of(),
         "ping",
         "skilled",
-        List.of(),
-        false,
         1,
         List.of(),
         List.of("demo-guide"));
@@ -170,8 +162,6 @@ class ConnectorBindingServiceTest {
         List.of(),
         "ping",
         "browser",
-        List.of(),
-        false,
         1,
         List.of(),
         List.of(),
@@ -237,8 +227,6 @@ class ConnectorBindingServiceTest {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-            .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
             .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));
         when(connector.probe(anyString(), anyString())).thenReturn(new ProbeResult(true, List.of("list_scopes")));
@@ -551,17 +539,13 @@ class ConnectorBindingServiceTest {
 
     @Test
     @DisplayName("그룹 공개 에이전트, 옛 커넥터 에이전트, 연결되지 않은 연결은 각자의 오류 코드로 붙지 않는다")
-    void refusesGroupAgentLegacyAgentAndUnconnectedConnection() {
+    void refusesGroupAgentAndUnconnectedConnection() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent groupAgent = agent(owner, AgentVisibility.GROUP);
-        Agent legacy = agent(owner, AgentVisibility.PRIVATE);
-        legacy.markConnectorManaged();
-        agents.save(legacy);
         Agent ordinary = agent(owner, AgentVisibility.PRIVATE);
 
         assertCode(() -> service.bind(owner, groupAgent.code(), DEMO), ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE);
-        assertCode(() -> service.bind(owner, legacy.code(), DEMO), ErrorCode.VALIDATION_FAILED);
         assertCode(() -> service.bind(owner, ordinary.code(), PLAIN), ErrorCode.CONNECTOR_NOT_CONNECTED);
         connectionService.disconnect(owner, DEMO);
         assertCode(() -> service.bind(owner, ordinary.code(), DEMO), ErrorCode.CONNECTOR_NOT_CONNECTED);
@@ -891,19 +875,15 @@ class ConnectorBindingServiceTest {
 
 
     @Test
-    @DisplayName("그 에이전트의 승인 실행이 돌고 있으면 CONNECTOR_ACTION_EXECUTING 이고 떼지 않으며, 옛 에이전트의 바인딩은 떼지 않는다")
-    void unbindRefusesWhileExecutingAndForLegacyAgent() {
+    @DisplayName("그 에이전트의 승인 실행이 돌고 있으면 CONNECTOR_ACTION_EXECUTING 이고 떼지 않는다")
+    void unbindRefusesWhileExecuting() {
         CurrentUser owner = user(UserRole.MEMBER, 1L);
         connect(owner, DEMO, VALUES);
         Agent agent = agent(owner, AgentVisibility.PRIVATE);
         service.bind(owner, agent.code(), DEMO);
         action(owner, agent, "EXECUTING");
-        Agent legacy = agent(owner, AgentVisibility.PRIVATE);
-        legacy.markConnectorManaged();
-        agents.save(legacy);
 
         assertCode(() -> service.unbind(owner, agent.code(), DEMO), ErrorCode.CONNECTOR_ACTION_EXECUTING);
-        assertCode(() -> service.unbind(owner, legacy.code(), DEMO), ErrorCode.VALIDATION_FAILED);
 
         assertThat(bindings.count()).isEqualTo(1);
         verify(connector, never()).unbindConnector(anyString(), anyString());
@@ -1212,40 +1192,6 @@ class ConnectorBindingServiceTest {
         assertThat(unbound.get(2)).isEqualTo(unbound.get(1));
         assertThat(bindings.count()).isZero();
         verify(connector, times(1)).deleteVault(connection.vault());
-    }
-
-
-    @Test
-    @DisplayName("옛 커넥터 에이전트의 바인딩을 모두 떼면 값을 먼저 보관 파일로 옮기고, 옮기지 못하면 떼지 않는다")
-    void detachAllImportsLegacyValuesFirst() {
-        CurrentUser owner = user(UserRole.MEMBER, 1L);
-        Agent legacy = agent(owner, AgentVisibility.PRIVATE);
-        legacy.markConnectorManaged();
-        agents.save(legacy);
-        ConnectorConnection connection = ConnectorConnection.pending(owner.id(), DEMO, Instant.now());
-        connection.ready(Instant.now());
-        connection = connections.save(connection);
-        ConnectorBinding binding = ConnectorBinding.pending(legacy, connection, null, Instant.now());
-        binding.installed(false, Instant.now());
-        bindings.save(binding);
-        doThrow(new IllegalStateException()).when(connector).importVault(anyString(), anyString(), anyString());
-
-        assertThatThrownBy(() -> service.detachAll(legacy)).isInstanceOf(ConnectorOperationFailure.class);
-
-        assertThat(bindings.count()).isEqualTo(1);
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
-
-        clearInvocations(connector);
-        doNothing().when(connector).importVault(anyString(), anyString(), anyString());
-        service.detachAll(legacy);
-
-        InOrder order = inOrder(connector);
-        order.verify(connector).importVault(connection.vault(), DEMO, legacy.hermesProfile());
-        order.verify(connector).deleteEnv(legacy.hermesProfile(), "DEMO_TOKEN");
-        order.verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
-        assertThat(bindings.count()).isZero();
-        assertThat(connections.findById(connection.id()).orElseThrow().vaultStored())
-            .isTrue();
     }
 
 

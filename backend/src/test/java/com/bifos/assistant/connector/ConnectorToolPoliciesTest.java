@@ -255,8 +255,6 @@ class ConnectorToolPoliciesTest {
                     new ConnectorFieldOptions("list_scopes", "scopes", "id", "name", true))),
             "check",
             "demo",
-            List.of(),
-            false,
             schema,
             List.of(tools));
     }

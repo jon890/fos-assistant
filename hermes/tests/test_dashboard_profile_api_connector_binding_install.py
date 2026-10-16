@@ -377,14 +377,14 @@ class ProfileApiConnectorBindingInstallTest(support.ProfileApiRouteTest):
         self.assertIs(self.status_of()["policy_hook"], False)
 
     def test_profile_with_only_the_connector_marker_takes_bindings_only(self):
-        """커넥터 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치, 떼기가 되고 옛 설치는 401 이다."""
+        """커넥터 표식만 있는 사람이 만든 profile 은 조회, 바인딩 설치와 떼기만 받는다."""
         self.bind_fixture()
         self.host_profile()
 
         self.assertEqual(self.status_of("human")["connectors"][0],
-                         {"plugin": DEMO, "enabled": False, "configured": False, "mode": "isolated"})
+                         {"plugin": DEMO, "enabled": False, "configured": False, "mode": "bind"})
         before = self.tree("human")
-        self.assertEqual(self.connector(profile="human").status_code, 401)
+        self.assertEqual(self.connector(profile="human").status_code, 400)
         self.assertEqual(self.tree("human"), before)
 
         installed = self.bind(profile="human")

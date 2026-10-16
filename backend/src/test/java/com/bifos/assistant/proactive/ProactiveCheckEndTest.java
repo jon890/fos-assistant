@@ -14,6 +14,7 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
 import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.chat.application.NextTurnDispatcher;
 import com.bifos.assistant.chat.application.TurnCancellation;
+import com.bifos.assistant.chat.application.DelegationFinished;
 import com.bifos.assistant.chat.domain.ChatMessage;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.infra.ChatMessageRepository;
@@ -27,7 +28,8 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
-import com.bifos.assistant.orchestration.application.DelegationResult;
+import com.bifos.assistant.orchestration.application.ChildExecutionRunner;
+import com.bifos.assistant.orchestration.domain.ChildResult;
 import com.bifos.assistant.proactive.application.ProactiveCheckEnded;
 import com.bifos.assistant.proactive.application.ProactiveCheckService;
 import com.bifos.assistant.proactive.domain.ProactiveCheck;
@@ -53,6 +55,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -124,6 +129,9 @@ class ProactiveCheckEndTest {
     @Autowired
     AgentDelegationService delegations;
 
+    @Autowired
+    ChildExecutionRunner childRunner;
+
     /** 실제 Hermes 를 부르지 않도록 켜진 toolset 을 대역으로 둔다. */
     @Autowired
     HermesToolsetClient toolsets;
@@ -157,7 +165,7 @@ class ProactiveCheckEndTest {
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         agent = agents.save(agent("end-" + suffix, "커리어"));
         Agent connected = agent("end-connector-" + suffix, "채용 연결");
-        connected.markConnectorManaged();
+
         connector = agents.save(connected);
         conversation = conversations.save(
             Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));
@@ -213,25 +221,41 @@ class ProactiveCheckEndTest {
 
 
     @Test
-    @DisplayName("이 서버가 돌리는 위임 자식이 살펴보기가 끝난 뒤 SUCCEEDED 로 끝나도 전달 표시가 남고 자동 turn 이 열리지 않는다")
-    void opensNoAutoTurnWhenInProcessChildSucceedsAfterCheckEnds() {
+    @DisplayName("살펴보기 종료 전에 이미 접수된 위임 자식이 뒤늦게 SUCCEEDED 로 끝나도 전달 표시가 남고 자동 turn 이 열리지 않는다")
+    void opensNoAutoTurnWhenInProcessChildSucceedsAfterCheckEnds() throws Exception {
         String task = "합성 채용 공고 목록을 읽어 줘";
         AtomicBoolean checkTurnAwaiting = new AtomicBoolean();
         AtomicReference<Long> childId = new AtomicReference<>();
+        CountDownLatch childSubmitted = new CountDownLatch(1);
+        CompletableFuture<ChildResult> childFinished = new CompletableFuture<>();
         stub().beforeAwait(() -> {
             if (checkTurnAwaiting.compareAndSet(false, true)) {
-                // 살펴보기 turn 이 커넥터 에이전트에 맡긴다. agent_delegate 가 부르는 자리다.
+                // 이미 접수한 옛 실행이 점검 turn 이 끝난 뒤에도 Hermes 에서 돌아가는 경계를 재현한다.
                 AgentExecution origin = executions
                     .findById(turns.markOf(conversation.id()).executionId())
                     .orElseThrow();
                 String session = origin.hermesSessionId();
-                DelegationResult started = delegations.delegate(
-                    owner,
-                    origin,
-                    DelegationKey.of(agent.hermesProfile(), session, session, "call_" + UUID.randomUUID()),
-                    connector.code(),
-                    task);
-                childId.set(started.executionId());
+                Thread.startVirtualThread(() -> {
+                    try {
+                        ChildResult result = childRunner.delegate(
+                            owner,
+                            conversation,
+                            origin,
+                            childRunner.startableAgent(owner, connector.code()),
+                            task,
+                            DelegationKey.of(agent.hermesProfile(), session, session, "call_" + UUID.randomUUID()),
+                            execution -> childId.set(execution.id()),
+                            (execution, runId) -> childSubmitted.countDown(),
+                            () -> false);
+                        publisher.publishEvent(new DelegationFinished(conversation.id(), result.executionId()));
+                        childFinished.complete(result);
+                    } catch (Throwable error) {
+                        childFinished.completeExceptionally(error);
+                    } finally {
+                        childSubmitted.countDown();
+                    }
+                });
+                waitUntil(() -> childSubmitted.getCount() == 0, "위임 자식이 Hermes 에 제출된다");
                 return;
             }
             // 맡긴 자식은 살펴보기가 끝나 잠금이 풀릴 때까지 Hermes 에서 돈다.
@@ -250,6 +274,7 @@ class ProactiveCheckEndTest {
             () -> childId.get() != null
                 && executions.findById(childId.get()).orElseThrow().status() != ExecutionStatus.RUNNING,
             "맡긴 자식이 끝난다");
+        assertThat(childFinished.get(WAIT_LIMIT.toSeconds(), TimeUnit.SECONDS).succeeded()).isTrue();
 
         AgentExecution child = executions.findById(childId.get()).orElseThrow();
         assertThat(child.status()).isEqualTo(ExecutionStatus.SUCCEEDED);

@@ -23,8 +23,6 @@ public enum ResyncOutcome {
     PROBE_FAILED,
     /** probe 가 도구를 하나도 내지 않았다. */
     NO_TOOLS,
-    /** 옛 바인딩의 켜진 내장 도구가 manifest 의 선언과 다르다. */
-    TOOLSETS_DIFFER,
     /** 외부 호출이 실패했다. 단계와 예외 종류를 경고로 남긴다. */
     CALL_FAILED
 }
