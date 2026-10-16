@@ -71,6 +71,12 @@ public class MemoryVectorCache {
     }
 
 
+    /** 모두 비운다. 저장한 줄을 한꺼번에 지운 테스트가 쓴다. */
+    public void clear() {
+        cache.clear();
+    }
+
+
     private record Cached(String model, byte[] fingerprint, float[] vector) {
     }
 }

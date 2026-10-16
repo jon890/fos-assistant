@@ -11,6 +11,7 @@ import com.bifos.assistant.memory.application.model.MemorySearchCursor;
 import com.bifos.assistant.memory.application.model.MemorySearchItem;
 import com.bifos.assistant.memory.application.model.MemorySearchPage;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
@@ -67,11 +68,15 @@ public class MemorySearchTest {
     @Autowired
     MemoryEmbeddingProperties embeddingProperties;
 
+    @Autowired
+    MemoryVectorCache vectorCache;
+
 
     @BeforeEach
     void setUp() {
         MemorySearchSqlProbe.reset();
         embeddings.deleteAll();
+        vectorCache.clear();
         repository.deleteAll();
     }
 
@@ -193,6 +198,7 @@ public class MemorySearchTest {
                     .containsExactlyInAnyOrder(own.id(), group.id());
         }
         embeddings.deleteAll();
+        vectorCache.clear();
     }
 
 

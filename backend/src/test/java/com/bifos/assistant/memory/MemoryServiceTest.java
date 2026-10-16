@@ -4,7 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.bifos.assistant.memory.application.MemoryService;
+import com.bifos.assistant.memory.application.embedding.EmbeddingText;
+import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import com.bifos.assistant.memory.application.model.MemoryAccess;
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
+import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.entity.MemoryEmbedding;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
@@ -68,6 +72,12 @@ class MemoryServiceTest {
     @Autowired
     MemoryEmbeddingRepository embeddings;
 
+    @Autowired
+    MemoryEmbeddingProperties embeddingProperties;
+
+    @Autowired
+    MemoryVectorCache vectorCache;
+
 
     @BeforeEach
     void setUp() {
@@ -81,13 +91,20 @@ class MemoryServiceTest {
     void deletesEmbeddingWithMemory() {
         Memory deleted = memories.create(ADMIN, MemoryScope.USER, "지울 항목", "내용", false);
         Memory kept = memories.create(ADMIN, MemoryScope.USER, "남길 항목", "내용", false);
-        embeddings.save(MemoryEmbedding.of(deleted.id(), "test-model", new byte[32], new float[] {1f}, NOW));
         embeddings.save(MemoryEmbedding.of(kept.id(), "test-model", new byte[32], new float[] {1f}, NOW));
+
+        RelevanceCandidate candidate = new RelevanceCandidate(deleted.id(), "지울 항목", "내용");
+        String text = EmbeddingText.of("지울 항목", "내용", embeddingProperties.maxTextChars());
+        embeddings.save(MemoryEmbedding.of(
+            deleted.id(), embeddingProperties.model(), EmbeddingText.fingerprint(embeddingProperties.model(), text), new float[] {1f}, NOW));
+        assertThat(vectorCache.vectorsFor(List.of(candidate))).containsKey(deleted.id());
 
         memories.delete(ADMIN, deleted.id());
 
         assertThat(embeddings.findAll()).extracting(MemoryEmbedding::memoryId).containsExactly(kept.id());
+        assertThat(vectorCache.vectorsFor(List.of(candidate))).as("지운 항목의 벡터는 캐시에서도 빠진다").isEmpty();
         embeddings.deleteAll();
+        vectorCache.clear();
     }
 
 

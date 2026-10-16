@@ -1,5 +1,6 @@
 package com.bifos.assistant.memory.application;
 
+import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
 import com.bifos.assistant.memory.domain.entity.Memory;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
@@ -26,6 +27,7 @@ class MemoryRevisionWriter {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryEmbeddingRepository embeddings;
+    private final MemoryVectorCache vectorCache;
     private final MemoryContentCipher cipher;
     private final Clock clock;
 
@@ -52,6 +54,7 @@ class MemoryRevisionWriter {
     void beforeDelete(CurrentUser user, Memory memory) {
         revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
         embeddings.deleteByMemoryId(memory.id());
+        vectorCache.evict(memory.id());
     }
 
 
