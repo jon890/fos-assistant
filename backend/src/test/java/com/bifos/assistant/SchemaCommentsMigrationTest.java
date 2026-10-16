@@ -21,9 +21,11 @@ import org.junit.jupiter.api.Test;
 class SchemaCommentsMigrationTest {
     private static final String COMMENTS_VERSION = "20261016052729";
 
+
     String[] createDatabase() {
         return new String[] {"jdbc:h2:mem:comments-" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", ""};
     }
+
 
     @Test
     @DisplayName("COMMENT를 달아도 기존 컬럼 정의와 데이터와 생성 컬럼 유일 제약을 보존한다")
@@ -72,6 +74,7 @@ class SchemaCommentsMigrationTest {
         }
     }
 
+
     @Test
     @DisplayName("낮은 시각 버전이 늦게 적용돼도 이미 지운 테이블과 컬럼은 건너뛴다")
     void skipsTablesAndColumnsAlreadyRemovedByLaterMigrations() throws Exception {
@@ -87,6 +90,7 @@ class SchemaCommentsMigrationTest {
         }
     }
 
+
     private static void migrateBeforeComments(String[] database) {
         var configuration = Flyway.configure().dataSource(database[0], database[1], database[2]).locations("classpath:db/migration")
             .outOfOrder(true);
@@ -97,11 +101,13 @@ class SchemaCommentsMigrationTest {
         configuration.target(previous).load().migrate();
     }
 
+
     private static String taskInsert(long id) {
         return "INSERT INTO task(id,public_id,owner_user_id,agent_id,title,instruction,state,conversation_mode,notify,created_at,updated_at,kind) VALUES("
             + id + ",X'" + String.format("%032x", id)
             + "',991,991,'검사 예약',NULL,'ACTIVE','SINGLE','ALWAYS',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'CHECK')";
     }
+
 
     private static Map<String, List<String>> definitions(Connection connection, boolean mysql) throws SQLException {
         var result = new LinkedHashMap<String, List<String>>();
@@ -122,6 +128,7 @@ class SchemaCommentsMigrationTest {
         return result;
     }
 
+
     private static Map<String, String> mysqlDefinitions(Connection connection) throws SQLException {
         var result = new LinkedHashMap<String, String>();
         List<String> tables = new ArrayList<>();
@@ -141,6 +148,7 @@ class SchemaCommentsMigrationTest {
         return result;
     }
 
+
     private static String comment(Connection connection, String table, String column, boolean mysql) throws SQLException {
         try (var statement = connection.prepareStatement(mysql
             ? "SELECT column_comment FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name=? AND column_name=?"
@@ -153,6 +161,7 @@ class SchemaCommentsMigrationTest {
             }
         }
     }
+
 
     private static void execute(Connection connection, String sql) throws SQLException {
         try (var statement = connection.createStatement()) {

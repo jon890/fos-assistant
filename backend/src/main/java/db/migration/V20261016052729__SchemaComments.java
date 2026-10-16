@@ -21,17 +21,20 @@ import org.flywaydb.core.api.migration.Context;
 public class V20261016052729__SchemaComments extends BaseJavaMigration {
     private static final String RESOURCE = "/db/comments/V20261016052729.tsv";
 
+
     @Override
     public Integer getChecksum() {
         var checksum = new CRC32();
         checksum.update(readResource());
-        return (int) checksum.getValue();
+        return (int)checksum.getValue();
     }
+
 
     @Override
     public boolean canExecuteInTransaction() {
         return false;
     }
+
 
     @Override
     public void migrate(Context context) throws SQLException {
@@ -70,6 +73,7 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
         }
     }
 
+
     private static void commentMysql(Connection connection, String table, Map<String, String> descriptions,
         Map<String, String> existingComments) throws SQLException {
         List<String> clauses = new ArrayList<>();
@@ -105,6 +109,7 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
         execute(connection, "ALTER TABLE " + quoted(table) + " " + String.join(", ", clauses));
     }
 
+
     private static Map<String, Map<String, String>> descriptions() {
         var result = new LinkedHashMap<String, Map<String, String>>();
         for (String line : new String(readResource(), StandardCharsets.UTF_8).lines().toList()) {
@@ -123,6 +128,7 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
         return result;
     }
 
+
     private static byte[] readResource() {
         try (var input = V20261016052729__SchemaComments.class.getResourceAsStream(RESOURCE)) {
             if (input == null) {
@@ -134,13 +140,16 @@ public class V20261016052729__SchemaComments extends BaseJavaMigration {
         }
     }
 
+
     private static String quoted(String identifier) {
         return "`" + identifier + "`";
     }
 
+
     private static String literal(String text) {
         return "'" + text.replace("'", "''") + "'";
     }
+
 
     private static void execute(Connection connection, String sql) throws SQLException {
         try (var statement = connection.createStatement()) {
