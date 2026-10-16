@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { categoryProblem } from "./categories.ts";
 import { compileContentDraft } from "./content-compiler.ts";
 import {
   canonicalDraftV1Schema,
@@ -110,6 +111,9 @@ export function createSnapshotServer(
         env[ATTACHMENT_DIR_ENV],
       );
       if (rendered.problems.length) throw new Error("CONTENT_SNAPSHOT_INVALID");
+      // 블로그에 없는 카테고리는 승인 카드가 뜨기 전에 여기서 막는다.
+      if (await categoryProblem(env, snapshot.payload.category))
+        throw new Error("CONTENT_SNAPSHOT_INVALID");
       return answer(snapshot);
     } catch {
       return failed();
