@@ -99,6 +99,8 @@ public class MemoryLinkService {
     /**
      * 대체 제안을 받아들인다. 옛 항목이 이미 다른 줄로 대체됐어도 두 줄을 함께 둔다. 「대체됨」 은 하나라도 있으면 참이다.
      *
+     * <p>새 항목이 이미 대체됐으면 받아들이지 않는다. 서로를 대체하는 두 제안을 모두 받아들이면 두 항목이 함께 주입에서 사라진다.
+     *
      * @throws ApiException 없는 줄과 볼 수 없는 줄은 MEMORY_NOT_FOUND, 그룹 항목을 {@code MEMBER} 가 받아들이면 FORBIDDEN, 제안이
      * 아니거나 양 끝이 더는 연결할 수 없는 항목이면 MEMORY_LINK_STATE_CONFLICT
      */
@@ -111,7 +113,7 @@ public class MemoryLinkService {
         // 제안을 남긴 뒤 새 항목이 지워지거나 범위가 달라졌을 수 있다. 받아들이는 트랜잭션 안에서 다시 본다
         Memory from = memories.findById(link.fromMemoryId()).orElse(null);
         Memory to = memories.findById(link.toMemoryId()).orElse(null);
-        if (from == null || to == null || !linkable(user, from, to)) {
+        if (from == null || to == null || !linkable(user, from, to) || isSuperseded(from.id())) {
             throw stateConflict();
         }
         link.accept();
@@ -176,7 +178,7 @@ public class MemoryLinkService {
 
     /**
      * 요청자가 받아들이거나 거절할 수 있는 대체 제안을 양 끝 항목과 함께 낸다. 개인 항목은 주인, 그룹 항목은 그룹의 {@code ADMIN} 이 받는다.
-     * 새 항목이 그 사이에 볼 수 없게 된 제안은 받아들일 수 없으므로 뺀다.
+     * 새 항목이 그 사이에 볼 수 없게 됐거나 대체된 제안은 받아들일 수 없으므로 뺀다.
      */
     public List<SupersedeProposal> pendingSupersedesFor(CurrentUser user) {
         List<MemoryLink> pending = new ArrayList<>(links.findProposedSupersedesOfOwner(user.id()));
@@ -193,10 +195,12 @@ public class MemoryLinkService {
         });
         Map<Long, Memory> byId = memories.findAllById(ids).stream()
             .collect(Collectors.toMap(Memory::id, Function.identity()));
+        Map<Long, MemoryLink> superseded = supersededBy(ids);
         return pending.stream()
             .sorted(Comparator.comparing(MemoryLink::id))
             .filter(link -> byId.containsKey(link.fromMemoryId()) && byId.containsKey(link.toMemoryId()))
             .filter(link -> linkable(user, byId.get(link.fromMemoryId()), byId.get(link.toMemoryId())))
+            .filter(link -> !superseded.containsKey(link.fromMemoryId()))
             .map(link -> new SupersedeProposal(link, byId.get(link.fromMemoryId()), byId.get(link.toMemoryId())))
             .toList();
     }

@@ -235,6 +235,23 @@ class MemoryLinkServiceTest {
 
 
     @Test
+    @DisplayName("서로를 대체하는 두 제안 가운데 하나를 받아들이면 다른 하나는 목록에서 빠지고 받아들일 수 없다")
+    void refusesSupersedeCycle() {
+        Memory a = memories.create(ADMIN, MemoryScope.USER, "가", "1", false);
+        Memory b = memories.create(ADMIN, MemoryScope.USER, "나", "2", false);
+        MemoryLink aOverB = linkService.proposeSupersede(ADMIN, a.id(), b.id(), MemoryLinkOrigin.AGENT, 1L);
+        MemoryLink bOverA = linkService.proposeSupersede(ADMIN, b.id(), a.id(), MemoryLinkOrigin.AGENT, 2L);
+
+        linkService.accept(ADMIN, aOverB.id());
+
+        assertThat(linkService.pendingSupersedesFor(ADMIN)).isEmpty();
+        assertConflict(() -> linkService.accept(ADMIN, bOverA.id()));
+        assertThat(linkService.isSuperseded(a.id())).isFalse();
+        assertThat(linkService.isSuperseded(b.id())).isTrue();
+    }
+
+
+    @Test
     @DisplayName("같은 제안에 받아들이기와 거절이 함께 오면 하나만 이기고 다른 하나는 상태 충돌이다")
     void decidesConcurrentAcceptAndRejectOnce() throws Exception {
         for (int round = 0; round < 5; round++) {
