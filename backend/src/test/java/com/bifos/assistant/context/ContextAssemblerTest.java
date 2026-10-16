@@ -359,24 +359,10 @@ class ContextAssemblerTest {
 
 
     @Test
-    @DisplayName("커넥터 에이전트와 모르는 에이전트와 에이전트가 없는 실행은 Memory 를 하나도 받지 않는다")
-    void connectorAndUnknownAgentsReceiveNoMemory() {
+    @DisplayName("모르는 에이전트와 에이전트가 없는 실행은 Memory 를 하나도 받지 않는다")
+    void unknownAgentsReceiveNoMemory() {
         memories.create(ADMIN, MemoryScope.GROUP, "그룹 제목", "그룹 내용", true);
         memories.create(ADMIN, MemoryScope.USER, "개인 제목", "개인 내용", false);
-        Agent connector = Agent.of(
-            "context-connector-" + System.nanoTime(),
-            "연결",
-            "context-connector-" + System.nanoTime(),
-            "http://runtime.test/p/connector",
-            CostMode.API,
-            CredentialScope.DEDICATED,
-            AgentVisibility.PRIVATE,
-            ADMIN.id(),
-            Instant.now());
-        connector.markConnectorManaged();
-        Long connectorId = agents.save(connector).id();
-
-        assertThat(assembler.assemble(ADMIN, connectorId)).isEqualTo(AssembledContext.empty());
         assertThat(assembler.assemble(ADMIN, 9_999_999L)).isEqualTo(AssembledContext.empty());
         assertThat(assembler.assemble(ADMIN, null)).isEqualTo(AssembledContext.empty());
         assertThat(assembler.assemble(ADMIN, agentId).instructions()).contains("그룹 내용", "개인 제목");

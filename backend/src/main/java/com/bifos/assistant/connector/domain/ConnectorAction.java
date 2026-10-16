@@ -62,6 +62,7 @@ public class ConnectorAction {
 
     public static final String UNREADABLE_ARGS = "읽을 수 없는 인자입니다.";
     public static final String UNREADABLE_RESULT = "읽을 수 없는 결과입니다.";
+    public static final String BODY_ERASED = "본문 삭제됨";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -183,6 +184,10 @@ public class ConnectorAction {
 
     @Column(name = "result_delivered_at")
     private Instant resultDeliveredAt;
+
+    /** 대화 purge에서 인자와 결과 및 실행 snapshot 본문을 지운 시각이다. 감사 칸은 남긴다. */
+    @Column(name = "body_erased_at")
+    private Instant bodyErasedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -355,12 +360,15 @@ public class ConnectorAction {
 
     /** 이 도구에 상시 허락을 줄 수 있는가. 늘 승인을 받는 도구와 원래 이름을 모르는 호출에는 주지 못한다. */
     public boolean grantAllowed() {
-        return approvalMode == ToolApproval.REQUIRED && toolName != null;
+        return bodyErasedAt == null && approvalMode == ToolApproval.REQUIRED && toolName != null;
     }
 
 
     /** 본문 접근은 모두 이 두 접근자를 거친다. 암호문은 처음 꺼낼 때만 푼다. */
     public String argsJson() {
+        if (bodyErasedAt != null) {
+            return BODY_ERASED;
+        }
         if (argsKeyId == null) {
             return storedArgsJson;
         }
@@ -380,6 +388,9 @@ public class ConnectorAction {
 
     /** 금융 줄처럼 저장 해시를 keyed hash 로 적은 줄은 그 함수로 대조한다. */
     public Optional<String> executableArgs(UnaryOperator<String> hash) {
+        if (bodyErasedAt != null) {
+            return Optional.empty();
+        }
         String plain = argsJson();
         if (plain == null || UNREADABLE_ARGS.equals(plain) || !hash.apply(plain).equals(argsSha256)) {
             return Optional.empty();
@@ -389,6 +400,9 @@ public class ConnectorAction {
 
 
     public String resultText() {
+        if (bodyErasedAt != null) {
+            return BODY_ERASED;
+        }
         if (resultKeyId == null) {
             return storedResultText;
         }

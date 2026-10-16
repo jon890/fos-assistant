@@ -1,4 +1,4 @@
-"""커넥터 스킬의 지침 본문과 profile 에 복사할 파일을 읽는다."""
+"""profile에 복사할 커넥터 스킬 파일을 읽는다."""
 
 from __future__ import annotations
 
@@ -11,43 +11,10 @@ from .common import (
 )
 
 from .connector_schema import (
-    CONNECTOR_PERSONA_MAX_CHARS,
     CONNECTOR_SKILL_MAX_CHARS,
     CONNECTOR_SKILL_MAX_FILES,
     CONNECTOR_SKILL_PARTS,
 )
-
-
-def _connector_persona(skill_dirs: list) -> str | None:
-    """스킬 디렉터리들의 `<스킬>/SKILL.md` 본문을 이름 순으로 이어 붙인다. 스킬이 없으면 None 이다.
-
-    `SKILL.md` 밖의 파일은 읽지 않는다. 스킬 디렉터리나 `SKILL.md` 가 링크이면 읽지 않고 예외를 낸다.
-    링크가 plugin 밖의 파일을 가리키면 그 내용이 모델의 지침으로 들어가기 때문이다.
-    앞머리(frontmatter)는 뗀다. 합친 본문이 상한을 넘으면 예외다. 본문은 로그에 싣지 않는다.
-    """
-    bodies = []
-    for directory in skill_dirs:
-        for skill in sorted(directory.iterdir()):
-            source = skill / "SKILL.md"
-            if skill.is_symlink() or source.is_symlink():
-                raise ValueError("스킬 디렉터리나 SKILL.md 가 링크다")
-            if not skill.is_dir() or not source.is_file():
-                continue
-            # BOM 과 CRLF 가 있어도 앞머리를 알아보게 맞춘다.
-            text = source.read_text(encoding="utf-8-sig").replace("\r\n", "\n")
-            if text.startswith("---\n"):
-                head, separator, rest = text[4:].partition("\n---\n")
-                if not separator:
-                    raise ValueError("SKILL.md 의 앞머리가 닫히지 않았다")
-                text = rest
-            if text.strip():
-                bodies.append(text.strip())
-    if not bodies:
-        return None
-    persona = "\n\n".join(bodies) + "\n"
-    if len(persona) > CONNECTOR_PERSONA_MAX_CHARS:
-        raise ValueError("스킬 본문이 %d자를 넘는다" % CONNECTOR_PERSONA_MAX_CHARS)
-    return persona
 
 
 def _skill_name(skill_md: str, fallback: str) -> str:

@@ -41,7 +41,7 @@ type Props = {
   tools: Loaded<{ initialTools: AgentToolsView; admin: boolean }> | null;
   /** 스킬 절을 그리지 않으면 null 이다. 관리자가 다른 사람의 비공개 에이전트를 열 때다. */
   skills: Loaded<SkillListView> | null;
-  /** 먼저 살펴보기 절을 그리지 않으면 null 이다. 예전 방식의 연결 에이전트와, 관리자가 읽지 못하는 다른 사람의 비공개 에이전트다. */
+  /** 먼저 살펴보기 절을 그리지 않으면 null 이다. 관리자가 읽지 못하는 다른 사람의 비공개 에이전트다. */
   proactiveCheck: Loaded<ProactiveCheckStatus> | null;
   /** 가치 평가 절을 그리지 않으면 null 이다. 관리자 영역에서 먼저 살펴보기 절을 그릴 때만 읽는다. */
   valueEvaluation?: Loaded<EvaluationOverview> | null;
@@ -52,8 +52,6 @@ type Props = {
   /** 요청자가 이 에이전트의 공개 범위를 바꾸고 지울 수 있으면 참이다. 「공개와 삭제」 절을 그릴지 정한다. */
   canManageAccess: boolean;
   adminError: string | null;
-  /** 예전 방식의 연결 에이전트면 일반 편집 절을 숨기고 지우기만 남긴다. */
-  connectorManaged?: boolean;
   /** 에이전트를 지운 뒤 돌아갈 목록 주소다. */
   listHref: string;
   /** 이 에이전트와 새 대화를 여는 주소다. 요청자가 대화할 수 있는 에이전트일 때만 있다. */
@@ -98,7 +96,6 @@ export function AgentDetailBody({
   adminAgent,
   canManageAccess,
   adminError,
-  connectorManaged = false,
   listHref,
   chatHref = null,
 }: Props) {
@@ -150,15 +147,7 @@ export function AgentDetailBody({
               </Notice>
             </div>
           ) : null}
-          {connectorManaged ? (
-            <div className="mx-auto w-full max-w-2xl">
-              <h1 className="mb-4 text-xl font-semibold">{name}</h1>
-              <Notice variant="info">
-                예전 방식의 연결 에이전트예요. 쓰던 에이전트에 이 연결을 붙인 뒤
-                이 에이전트를 지워 주세요.
-              </Notice>
-            </div>
-          ) : persona.ok ? (
+          {persona.ok ? (
             <PersonaEditor
               code={code}
               name={name}
@@ -174,7 +163,7 @@ export function AgentDetailBody({
           )}
         </>
       )}
-      {connectorManaged || connections === null ? null : connections.ok ? (
+      {connections === null ? null : connections.ok ? (
         <AgentConnectionsSection
           code={code}
           initialConnections={connections.data.connections}
@@ -194,7 +183,7 @@ export function AgentDetailBody({
           </Notice>
         </section>
       )}
-      {connectorManaged || tools === null ? null : tools.ok ? (
+      {tools === null ? null : tools.ok ? (
         <AgentToolsSection
           code={code}
           initialTools={tools.data.initialTools}
@@ -214,7 +203,7 @@ export function AgentDetailBody({
           </Notice>
         </section>
       )}
-      {connectorManaged || skills === null ? null : skills.ok ? (
+      {skills === null ? null : skills.ok ? (
         <AgentSkillsSection code={code} initialSkills={skills.data} />
       ) : (
         <section
@@ -227,8 +216,7 @@ export function AgentDetailBody({
           </Notice>
         </section>
       )}
-      {connectorManaged ||
-      proactiveCheck === null ? null : proactiveCheck.ok ? (
+      {proactiveCheck === null ? null : proactiveCheck.ok ? (
         <AgentProactiveCheckSection
           code={code}
           initialStatus={proactiveCheck.data}
@@ -245,8 +233,7 @@ export function AgentDetailBody({
           <AgentProactiveScheduleSection code={code} />
         </section>
       )}
-      {connectorManaged ||
-      valueEvaluation === null ? null : valueEvaluation.ok ? (
+      {valueEvaluation === null ? null : valueEvaluation.ok ? (
         <AgentValueEvaluationSection initialOverview={valueEvaluation.data} />
       ) : (
         <section
@@ -271,7 +258,6 @@ export function AgentDetailBody({
           visibility={visibility}
           listHref={listHref}
           onVisibilityChange={(next) => void changeVisibility(next)}
-          connectorManaged={connectorManaged}
         />
       ) : null}
     </>

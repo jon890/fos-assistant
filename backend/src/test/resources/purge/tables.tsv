@@ -16,9 +16,9 @@ chat_artifact|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id에 속한다. Conv
 chat_attachment|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id와 uploaded_by_user_id에 속한다. 대화 purge가 행을 지운다.
 chat_message|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id에 속한다. 대화 purge가 본문 행을 지운다.
 chat_pending_message|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id와 user_id에 속한다. 대화 삭제 즉시 지운다.
-connector_action|CONVERSATION|id|GAP|GAP|DETACH|user_id FK와 conversation_id에 속한다. 알려진 공백: 대화 purge 뒤 args_json과 result_text가 남는다.
-connector_action_execution|CONVERSATION|action_id|GAP|GAP|KEEP|action_id FK로 승인에 속한다. 알려진 공백: 대화 purge 뒤 실행 인자와 요약·범위가 남는다.
-connector_connection|USER|id|GAP|KEEP|DETACH|user_id FK에 속한다. 연결은 사용자 소유라 남기고 에이전트 참조만 비운다.
+connector_action|CONVERSATION|id|GAP|SCRUB|DETACH|user_id FK와 conversation_id에 속한다. 대화 purge는 인자·결과와 key만 지우고 감사와 금융 상한 변경 칸은 남긴다.
+connector_action_execution|CONVERSATION|action_id|GAP|SCRUB|KEEP|action_id FK로 승인에 속한다. 대화 purge는 실행 인자·요약·범위와 key만 지우고 해시와 ticket·중복 방지 칸은 남긴다.
+connector_connection|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 연결은 사용자 소유라 에이전트 정리와 무관하게 보존한다.
 connector_conversation_grant|CONVERSATION|id|GAP|KEEP|KEEP|conversation_id FK가 있다. 삭제된 대화와 붙지 않은 에이전트의 권한은 읽기에서 거절하며 행은 만료 이력으로 남긴다.
 connector_tool_grant|USER|id|GAP|KEEP|KEEP|user_id FK에 속한다. 대화와 에이전트 하나에 종속되지 않는다.
 content_draft|CONVERSATION|id|GAP|DELETE|KEEP|conversation_id FK와 owner_user_id에 속한다. 대화 purge가 지운다.

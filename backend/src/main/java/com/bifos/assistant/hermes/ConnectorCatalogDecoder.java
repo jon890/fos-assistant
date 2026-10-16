@@ -39,8 +39,6 @@ final class ConnectorCatalogDecoder {
             fields,
             requiredText(item.get("verify"), "tool"),
             requiredText(item, "mcp_server"),
-            names(item.get("toolsets")),
-            optionalBoolean(item, "attachments", false),
             readable ? schema(schema) : SCHEMA_UNREADABLE,
             readable ? ConnectorCatalogTools.read(tools) : List.of(),
             names(item.get("skills")),
@@ -73,7 +71,7 @@ final class ConnectorCatalogDecoder {
     }
 
 
-    /** 이름 목록 칸({@code toolsets}, {@code skills})을 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다. */
+    /** 스킬 이름 목록을 읽는다. 옛 대시보드 plugin 은 이 칸을 내지 않고, 없으면 빈 목록이다. */
     private static List<String> names(JsonNode declared) {
         if (declared == null || declared.isNull()) {
             return List.of();

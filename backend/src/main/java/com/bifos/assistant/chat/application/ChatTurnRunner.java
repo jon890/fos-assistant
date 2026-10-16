@@ -80,14 +80,11 @@ class ChatTurnRunner {
             String asked = command == null ? text : command.hermesInput();
             AgentInput agentInput = attachments.agentInput(conversation.id(), routed.attached(), asked);
             String input = artifacts.agentPreamble(conversation) + agentInput.text();
-            // 커넥터 에이전트의 실행에는 Memory 문맥을 주지 않는다(ADR-045). turn 지시는 그대로 붙는다.
             // 사용자가 보낸 글만 질문으로 넘긴다. 자동 turn 의 글은 Control Plane 이 정한 것이라 기억을 고르는 데 쓰지 않는다
-            AssembledContext context = routed.agent().connectorManaged()
-                ? AssembledContext.empty()
-                : contextAssembler.assemble(user, routed.agent().id(), questionOf(intent, text));
+            AssembledContext context = contextAssembler.assemble(user, routed.agent().id(), questionOf(intent, text));
             // 먼저 살펴보기는 memory_remember 를 받지 않으므로 기억 지침도 싣지 않는다(ADR-080, ADR-20261007 / memory-remember)
             context = contextAssembler.withResponseInstructions(
-                context, !routed.agent().connectorManaged() && !(intent instanceof TurnIntent.ProactiveCheck));
+                context, !(intent instanceof TurnIntent.ProactiveCheck));
             ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
                 context.chars(),
                 null,

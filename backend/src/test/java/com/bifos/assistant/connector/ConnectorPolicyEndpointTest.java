@@ -107,8 +107,6 @@ class ConnectorPolicyEndpointTest {
         List.of(),
         "read_inbox",
         "mail",
-        List.of(),
-        false,
         2,
         List.of(new ConnectorTool("read_inbox", "READ", "none", null, null)));
 
@@ -185,7 +183,7 @@ class ConnectorPolicyEndpointTest {
             AgentVisibility.PRIVATE,
             owner.id(),
             Instant.now());
-        agent.markConnectorManaged();
+
         agent = agents.save(agent);
         token = tokens.issue(PROFILE, "owner").rawToken();
         root = "fos-" + UUID.randomUUID();
@@ -1259,7 +1257,7 @@ class ConnectorPolicyEndpointTest {
 
     private static ConnectorManifest manifest(int schema, List<ConnectorTool> tools) {
         return new ConnectorManifest(
-            DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", List.of(), false, schema, tools);
+            DEMO, "검사용 메모", "", List.of(), "list_scopes", "demo", schema, tools);
     }
 
 

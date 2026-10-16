@@ -433,7 +433,7 @@ token provider 하나만 있어도 이 조건을 채운다.
 
 Hermes 대시보드 앞에는 우리 대시보드 plugin 이 있다. plugin 은 이 저장소의 [`hermes/plugins/dashboard-profile-api/`](../plugins/dashboard-profile-api) 에 있고, 서비스 토큰으로 오는 요청을 정해 둔 경로로만 받는다.
 2026-09-29 에 정했다. 사용자의 에이전트 만들기와 스킬([ADR-033](../../backend/docs/adr/ADR-033-사용자가-에이전트를-만들고-공개해도-만든-사람이-관리한다.md), [ADR-034](../../backend/docs/adr/ADR-034-올린-스킬은-control-plane-이-버전-디렉터리에-쓰고-hermes-는-읽기만-한다.md))이 이 계약에 기댄다.
-경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
+경로마다의 요청과 응답과 인증은 [`hermes/plugins/dashboard-profile-api/README.md`](../plugins/dashboard-profile-api/README.md) 의 「dashboard-profile-api 가 여는 것」 표가 갖는다. 커넥터 API는 상태 조회 `GET /api/connectors`, 바인딩을 붙이거나 떼는 `PUT /api/connectors`, 보관 파일의 `PUT DELETE /api/connector-vault`만 둔다. 붙이기는 `enabled: true`와 `bind: {vault}`를 함께 보내고, 떼기는 `enabled: false`로 보낸다. 커넥터 경로를 Control Plane 이 쓰는 방법은 [커넥터 설치](../../docs/features/connector.md) 의 「대시보드 plugin 계약」 이 갖는다.
 이 절은 그 경로를 지날 때 Hermes 가 어떻게 동작하는지만 적는다.
 
 **틀이 MCP 와 서명 plugin 을 붙인다.** `POST /api/profiles` 본문의 `mcp_servers` 는 쓰지 않는다. plugin 이 처리 뒤에 설정 틀로 `config.yaml` 전체를 다시 써서, 본문으로 넣은 등록이 사라진다.
@@ -1817,7 +1817,7 @@ MCP 서버의 실제 등록 도구 목록을 열거하지 않는다.
 `GET /api/mcp/servers`도 저장된 설정의 요약이다.
 [MCP 대시보드 API](https://github.com/NousResearch/hermes-agent/blob/v2026.9.14/hermes_cli/web_routers/mcp.py)가 근거다.
 
-probe 성공과 설치 응답의 재시작 불필요를 연결 준비 판정에 쓸 수 있다.
+probe 성공과 바인딩 응답의 `restart_required: false`, `reload_pending: false`를 함께 연결 준비 판정에 쓸 수 있다. `restart_required`가 참이면 같은 이름의 기존 MCP 연결을 다시 만들려 gateway 재시작을 기다리고, `reload_pending`이 참이면 gateway의 다음 설정 맞추기 주기를 기다린다.
 이 판정은 공유 gateway의 요청 profile에서 실제로 등록된 도구를 확인한 결과와 다르다.
 실제 가계부 도구와 Control Plane MCP 도구를 호출하는 운영 확인이 따로 필요하다.
 gateway 재시작은 다른 profile의 실행에도 영향을 주므로 요청 처리에서 자동 실행하지 않는다.

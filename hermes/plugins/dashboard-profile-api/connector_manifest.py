@@ -36,13 +36,11 @@ from .connector_schema import (
     BIND_MODE,
     CONNECTOR_COMMAND_ENV,
     CONNECTOR_ID_RE,
-    CONNECTOR_PERSONA_MAX_CHARS,
     CONNECTOR_ROOTS_ENV,
     CONNECTOR_SKILL_MAX_CHARS,
     CONNECTOR_SKILL_MAX_FILES,
     CONNECTOR_SKILL_PARTS,
     CONNECTOR_STATE,
-    CONNECTOR_TOOLSETS,
     ENV_NAME_RE,
     ERROR_CODE_RE,
     ERROR_DETAILS_MAX,
@@ -51,7 +49,6 @@ from .connector_schema import (
     FIELD_KEY_RE,
     HERMES_TOOL_NAME_MAX_CHARS,
     HERMES_TOOL_PREFIX_MAX_CHARS,
-    ISOLATED_MODE,
     OUTCOME_UNKNOWN,
     OWNER_ATTACHMENTS_ENV_RE,
     OWNER_ATTACHMENTS_VALUE_RE,
@@ -76,7 +73,6 @@ from .connector_owner_env import (
 )
 
 from .connector_skills import (
-    _connector_persona,
     _connector_skills,
     _skill_name,
 )
@@ -145,14 +141,6 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         # 조용히 무시하면 비밀이 필요한 커넥터의 확인이 까닭 없이 실패한다. 받지 못하는 칸임을 밝힌다(ADR-046).
         raise ValueError("operator_secrets 는 아직 지원하지 않는다")
     errors, error_contracts = _connector_errors(declared.get("errors", {}))
-    toolsets = declared.get("toolsets", [])
-    if (not isinstance(toolsets, list) or any(not isinstance(name, str) for name in toolsets)
-            or len(set(toolsets)) != len(toolsets) or set(toolsets) - CONNECTOR_TOOLSETS):
-        raise ValueError("toolsets 는 허용한 내장 toolset 이름의 겹치지 않는 목록이다")
-    attachments = declared.get("attachments", False)
-    if not isinstance(attachments, bool) or (attachments and "vision" not in toolsets):
-        raise ValueError("attachments 는 boolean 이고 참이면 toolsets 에 vision 이 있어야 한다")
-
     mcp = _read_connector_json(root, ".mcp.json")
     if not isinstance(mcp, dict):
         raise ValueError("MCP manifest 는 객체여야 한다")
@@ -211,7 +199,6 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         if not path.resolve().is_relative_to(root) or not path.is_dir() or path.resolve() != path.absolute():
             raise ValueError("스킬은 plugin 안의 링크 없는 디렉터리여야 한다")
         skill_dirs.append(path.resolve())
-    persona = _connector_persona(skill_dirs)
     installed_skills = _connector_skills(skill_dirs)
 
     env = {name: "${%s}" % name for name in server["env"]}
@@ -249,10 +236,7 @@ def _load_connector(connector_id: str, entry: dict) -> dict:
         "optional_env": optional_env,
         "errors": errors,
         "error_contracts": error_contracts,
-        "toolsets": list(toolsets),
-        "attachments": attachments,
         **_connector_binding_flags(declared),
-        "persona": persona,
         "skills": installed_skills,
         # 대시보드가 `call` 로 부를 수 있는 도구다. 도구 정책인 `tools` 와 뜻이 다르다.
         "call_tools": frozenset({verify["tool"]} | option_tools),
@@ -295,9 +279,9 @@ def _connector_env_keys() -> tuple[frozenset, frozenset]:
     return frozenset(fields), frozenset(operator - fields)
 
 
-def _entry_mode(entry) -> str:
-    """소유 기록 항목의 설치 방식이다. 칸이 없으면 옛 설치다."""
-    return entry.get("mode", ISOLATED_MODE) if isinstance(entry, dict) else ISOLATED_MODE
+def _entry_mode(entry) -> str | None:
+    """소유 기록 항목의 설치 방식이다."""
+    return entry.get("mode") if isinstance(entry, dict) else None
 
 
 def _server_matches(manifest: dict, server: dict) -> bool:
@@ -348,7 +332,6 @@ def _connector_catalog_response():
           "description": manifest["description"], "icon": manifest["icon"], "link": manifest["link"],
           "readme_url": manifest["readme_url"], "link_kind": manifest["link_kind"],
           "fields": manifest["fields"], "verify": manifest["verify"], "mcp_server": manifest["mcp_server"],
-          "toolsets": manifest["toolsets"], "attachments": manifest["attachments"],
           "owner_browser": manifest["owner_browser_env"] is not None,
           "owner_browser_login_url": manifest["owner_browser_login_url"],
           "single_binding": manifest["single_binding"], "skills": sorted(manifest["skills"]),

@@ -67,7 +67,8 @@ class ConnectorActionExecutionMigrationTest {
             }
             assertThat(nullable).hasSize(18);
             for (String name : new String[] {
-                "CONTENT_KEY_ID", "SUPERSEDES_UNKNOWN_ACTION_ID", "TICKET_ID", "TICKET_EXPIRES_AT", "CONSUMED_AT"
+                "CONTENT_KEY_ID", "SUPERSEDES_UNKNOWN_ACTION_ID", "TICKET_ID", "TICKET_EXPIRES_AT", "CONSUMED_AT",
+                "EXECUTION_ARGS_JSON", "SUMMARY_JSON", "SCOPE_JSON"
             }) {
                 assertThat(nullable.get(name)).as(name).isEqualTo(DatabaseMetaData.columnNullable);
             }
@@ -77,9 +78,6 @@ class ConnectorActionExecutionMigrationTest {
                 "BINDING_ID",
                 "CONNECTION_UPDATED_AT",
                 "BINDING_UPDATED_AT",
-                "EXECUTION_ARGS_JSON",
-                "SUMMARY_JSON",
-                "SCOPE_JSON",
                 "EXECUTION_ARGS_SHA256",
                 "SCOPE_SHA256",
                 "REQUEST_KEY",
@@ -162,10 +160,16 @@ class ConnectorActionExecutionMigrationTest {
 
 
     @Test
-    @DisplayName("필수 본문과 두 revision의 NULL은 거절한다")
-    void mandatoryValuesCannotBeNull() {
-        for (String value : new String[] {"'{}'", "CURRENT_TIMESTAMP(6)"}) {
-            assertThatThrownBy(() -> execute(row(1, "NULL", "NULL").replace(value, "NULL")))
+    @DisplayName("purge용 본문 NULL은 허용하고 revision과 해시 등 감사 칸의 NULL은 거절한다")
+    void allowsErasedBodiesButRejectsMissingAuditValues() throws SQLException {
+        execute(row(1, "NULL", "NULL"));
+        execute("UPDATE connector_action_execution"
+            + " SET execution_args_json = NULL, summary_json = NULL, scope_json = NULL, content_key_id = NULL WHERE action_id = 1");
+        assertThat(count()).isEqualTo(1);
+        for (String column : new String[] {
+            "connection_updated_at", "binding_updated_at", "created_at", "execution_args_sha256", "scope_sha256", "request_key", "protocol"
+        }) {
+            assertThatThrownBy(() -> execute("UPDATE connector_action_execution SET " + column + " = NULL WHERE action_id = 1"))
                 .isInstanceOf(SQLException.class);
         }
     }

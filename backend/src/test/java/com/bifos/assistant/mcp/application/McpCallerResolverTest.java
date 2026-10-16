@@ -1,7 +1,6 @@
 package com.bifos.assistant.mcp.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -9,13 +8,10 @@ import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
-import com.bifos.assistant.agent.infra.AgentRepository;
 import com.bifos.assistant.mcp.McpCallSigner;
 import com.bifos.assistant.orchestration.application.DelegationParentResolver;
 import com.bifos.assistant.orchestration.application.SessionOwnerResolver;
 import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
@@ -44,11 +40,10 @@ class McpCallerResolverTest {
 
     private final SessionOwnerResolver owners = mock(SessionOwnerResolver.class);
     private final AppUserRepository users = mock(AppUserRepository.class);
-    private final AgentRepository agents = mock(AgentRepository.class);
     private final AgentExecution origin = mock(AgentExecution.class);
     private final McpPrincipal principal = new McpPrincipal(1L, PROFILE, AgentTokenService.hash(TOKEN));
     private final DelegationParentResolver parents = mock(DelegationParentResolver.class);
-    private final McpCallerResolver resolver = new McpCallerResolver(owners, users, agents, parents);
+    private final McpCallerResolver resolver = new McpCallerResolver(owners, users, parents);
 
 
     @BeforeEach
@@ -100,25 +95,8 @@ class McpCallerResolverTest {
 
 
     @Test
-    @DisplayName("origin 실행의 에이전트가 커넥터 에이전트이면 MCP_CALL_CONTEXT_INVALID 로 거절한다")
-    void rejectsCallFromConnectorAgentRun() {
-        Agent connector = agent();
-        connector.markConnectorManaged();
-        when(agents.findById(AGENT_ID)).thenReturn(Optional.of(connector));
-
-        assertThatThrownBy(() -> resolver.resolve(principal, TOOL, signedContext()))
-            .isInstanceOfSatisfying(
-                ApiException.class,
-                ex -> assertThat(ex.code())
-                    .as("커넥터 에이전트의 호출을 거절한 코드")
-                    .isEqualTo(ErrorCode.MCP_CALL_CONTEXT_INVALID));
-    }
-
-
-    @Test
     @DisplayName("origin 실행의 에이전트가 일반 에이전트이면 요청자는 origin 실행의 사용자다")
     void resolvesOriginUserForOrdinaryAgentRun() {
-        when(agents.findById(AGENT_ID)).thenReturn(Optional.of(agent()));
 
         McpCaller caller = resolver.resolve(principal, TOOL, signedContext());
 
@@ -130,7 +108,6 @@ class McpCallerResolverTest {
     @Test
     @DisplayName("origin 실행의 에이전트 행이 없으면 거절하지 않는다")
     void doesNotRejectWhenAgentRowIsMissing() {
-        when(agents.findById(AGENT_ID)).thenReturn(Optional.empty());
 
         McpCaller caller = resolver.resolve(principal, TOOL, signedContext());
 

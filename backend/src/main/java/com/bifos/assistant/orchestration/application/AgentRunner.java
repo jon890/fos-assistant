@@ -95,9 +95,8 @@ public class AgentRunner {
         String instructionAddition,
         DelegationKey delegationKey) {
         Instant requestReceivedAt = clock.instant();
-        AssembledContext context = agent.connectorManaged() ? AssembledContext.empty() : contextAssembler.assemble(user, agent.id(), task);
-        boolean rememberAllowed = !agent.connectorManaged()
-            && (rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId));
+        AssembledContext context = contextAssembler.assemble(user, agent.id(), task);
+        boolean rememberAllowed = rootExecutionId == null || !proactiveChecks.existsByRootExecutionId(rootExecutionId);
         context = contextAssembler.withResponseInstructions(context, rememberAllowed);
         ExecutionContextSnapshot snapshot = new ExecutionContextSnapshot(
             context.chars(),

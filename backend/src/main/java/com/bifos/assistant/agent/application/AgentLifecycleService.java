@@ -281,7 +281,7 @@ public class AgentLifecycleService {
     private void requireBelowLimit(CurrentUser user) {
         users.findByIdForUpdate(user.id())
             .orElseThrow(() -> new ApiException(ErrorCode.UNAUTHENTICATED, "sign in first"));
-        if (agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(user.id()) >= properties.maxPerUser()) {
+        if (agents.countByOwnerUserIdAndDeletedAtIsNull(user.id()) >= properties.maxPerUser()) {
             throw new ApiException(
                 ErrorCode.AGENT_LIMIT_REACHED, "an agent limit of " + properties.maxPerUser() + " was reached");
         }

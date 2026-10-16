@@ -19,8 +19,8 @@ export type AgentConnectionView = {
   skills: string[];
 };
 
-/** 붙일 수 없는 에이전트의 까닭이다. 그룹 공개 에이전트와 예전 방식의 연결 에이전트다. */
-export type AgentConnectionBlock = "AGENT_NOT_PRIVATE" | "LEGACY_AGENT";
+/** 붙일 수 없는 에이전트의 까닭이다. 연결은 비공개 에이전트에만 붙인다. */
+export type AgentConnectionBlock = "AGENT_NOT_PRIVATE";
 
 export type AgentConnectionsList = {
   connections: AgentConnectionView[];

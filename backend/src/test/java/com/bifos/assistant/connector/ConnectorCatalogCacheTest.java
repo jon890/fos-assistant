@@ -83,8 +83,6 @@ class ConnectorCatalogCacheTest {
             List.of(),
             "list_scopes",
             "demo",
-            List.of(),
-            false,
             2,
             List.of(
                 new ConnectorTool("list_scopes", "READ", "none", null, null),
@@ -137,8 +135,6 @@ class ConnectorCatalogCacheTest {
             List.of(),
             "list_scopes",
             "demo",
-            List.of(),
-            false,
             2,
             List.of(new ConnectorTool("list_scopes", "READ", "none", null, null)));
     }

@@ -54,7 +54,6 @@ from .common import (
 from .connector_install import (
     PROBE_ROUTE_RE,
     _check_connector_probe,
-    _connector_config,
     _connector_request,
 )
 
@@ -271,19 +270,6 @@ def _install_gate() -> bool:
                 state_path = get_profile_dir(body["profile"]) / CONNECTOR_STATE
                 state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
                 installed = [manifest for manifest in owners if manifest["id"] in state]
-                for manifest in installed:
-                    # 바인딩 설치의 env 는 설치 묶음이 쓰므로 옛 설치만 다시 쓴다.
-                    if (body["key"] not in manifest["optional_env"]
-                            or (isinstance(state, dict) and _entry_mode(state[manifest["id"]]) == BIND_MODE)):
-                        continue
-                    try:
-                        # 비운 선택 칸의 명시적 빈 값도 갱신한다. 재시작만으로는 바뀌지 않는다.
-                        await asyncio.to_thread(
-                            _connector_config, get_profile_dir(body["profile"]), manifest["id"], True)
-                    except FileExistsError:
-                        return _rejected("환경 변수는 저장했지만 connector 설정과 충돌한다", 409)
-                    except (ValueError, OSError, KeyError, TypeError):
-                        return _rejected("환경 변수는 저장했지만 connector 설정을 갱신하지 못했다", 503)
                 # 삭제와 교체는 떠 있는 stdio 자식의 env 를 바꾸지 못한다.
                 return JSONResponse({"profile": body["profile"], "key": body["key"],
                                      "restart_required": bool(installed)}, status_code=200)

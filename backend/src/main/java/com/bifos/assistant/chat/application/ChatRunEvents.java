@@ -139,13 +139,9 @@ class ChatRunEvents {
 
 
     /**
-     * 실행 기록에서 내용을 통째로 가릴 도구다. 옛 커넥터 에이전트는 모두 가리고, 다른 에이전트는 붙은 커넥터 서버의 도구만
-     * 가린다(ADR-083). 호출 이력은 relay 에서 트리 전체를 대상으로 붙인다.
+     * 실행 기록에서 내용을 통째로 가릴 도구다. 붙은 커넥터 서버의 도구를 가린다(ADR-083). 호출 이력은 relay 에서 트리 전체를 대상으로 붙인다.
      */
     ToolDetailScope toolDetailScope(Agent agent) {
-        if (agent.connectorManaged()) {
-            return ToolDetailScope.ALL;
-        }
         return ToolDetailScope.prefixes(connectorBindings.connectorToolPrefixes(agent.id()));
     }
 

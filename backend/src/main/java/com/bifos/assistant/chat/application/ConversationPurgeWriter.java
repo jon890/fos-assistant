@@ -36,6 +36,7 @@ class ConversationPurgeWriter {
     private final ChatArtifactRepository artifacts;
     private final ExecutionQuestionRepository questions;
     private final ConversationExecutionPurge executions;
+    private final ConversationActionPurge actions;
     private final ChatContentMutationCoordinator mutations;
     private final ContentDraftRepository drafts;
     private final ContentDraftCreationRequestRepository creationRequests;
@@ -67,6 +68,7 @@ class ConversationPurgeWriter {
         messages.clearReplacesOf(conversationId);
         messages.deleteAllOf(conversationId);
         executions.eraseBodies(conversationId);
+        actions.eraseBodies(conversationId, now);
         return conversations.markPurged(conversationId, now) == 1;
     }
 }
