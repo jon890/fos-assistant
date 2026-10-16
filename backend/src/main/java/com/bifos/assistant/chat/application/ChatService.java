@@ -81,10 +81,6 @@ public class ChatService {
     public ChatTurn send(
         CurrentUser user, Long conversationId, String text, String agentCode, List<Long> attachmentIds) {
         Routed routed = chatTurnRouting.route(user, conversationId, text, agentCode, attachmentIds);
-        if (routed.flow() != null) {
-            return chatTurnRunner.runFlow(user, routed, text, new TurnIntent.Fresh(), event -> {
-            }, false, null);
-        }
         return chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), event -> {
         }, false, null);
     }
@@ -108,10 +104,6 @@ public class ChatService {
         // 닫아야 클라이언트가 이 turn 의 끝을 자동 turn 의 시작보다 먼저 받는다.
         TurnHandle handle = chatTurnRouting.openTurn(user, routed);
         try {
-            if (routed.flow() != null) {
-                chatTurnRunner.runFlow(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
-                return;
-            }
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, text, new TurnIntent.Fresh(), onEvent, true, handle);
             onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
@@ -180,7 +172,6 @@ public class ChatService {
      * @param notice 지시 앞에 대화에 남기는 알림 줄의 글
      * @param instruction 사용자 메시지로 남기고 Hermes 에 보내는 작업의 지시
      * @param onEvent 알림 줄, 사용자 메시지, {@code started}, 답 조각, {@code done} 이나 {@code stopped} 를 받는다
-     * @throws ApiException 대화의 에이전트에 흐름이 붙었으면 {@code TASK_AGENT_NOT_SUPPORTED}
      */
     public ChatTurn runScheduledTurn(
         CurrentUser owner,
@@ -190,10 +181,6 @@ public class ChatService {
         String instruction,
         Consumer<ChatEvent> onEvent) {
         Routed routed = chatTurnRouting.route(owner, conversationId, instruction, null, List.of());
-        if (routed.flow() != null) {
-            // 흐름은 지시를 흐름 안에서 저장해 알림 줄과 한 트랜잭션으로 묶을 수 없다. 작업을 만들 때 이미 거른다.
-            throw new ApiException(ErrorCode.TASK_AGENT_NOT_SUPPORTED, "an agent with a flow cannot run a task");
-        }
         ChatTurn turn = chatTurnRunner.runTurn(
             owner, routed, instruction, new TurnIntent.Scheduled(notice), onEvent, true, handle);
         onEvent.accept(ChatTurnCompletion.eventOf(turn));
@@ -205,7 +192,7 @@ public class ChatService {
      * 먼저 살펴보기 turn 하나를 돌린다(ADR-080). 살펴보기만의 일은 {@code check} 가 맡는다.
      *
      * <p>부르는 쪽이 그 대화의 turn 잠금을 이미 잡았다. 입력은 한 번만 만들어 라우팅과 turn 에 같은 값을 넘긴다.
-     * 흐름이 붙은 대화면 {@code PROACTIVE_CHECK_UNAVAILABLE} 로 거절한다. session 을 바꿀 차례면 turn 을 열기 전에 바꾼다.
+     * session 을 바꿀 차례면 turn 을 열기 전에 바꾼다.
      *
      * <p>질문 대신 시작 알림 줄을 남기고, 답 조각은 흘리지 않는다. 성공한 답은 {@code check} 가 바꾼 글로 남기고, 멈추면
      * 그때까지의 답 대신 멈춤 알림 줄만 남긴다. 추천 질문 갱신, 자동 turn 수, 제목은 건드리지 않는다. 실패는
@@ -218,10 +205,6 @@ public class ChatService {
         CurrentUser owner, Long conversationId, TurnHandle handle, CheckTurn check, Consumer<ChatEvent> onEvent) {
         String input = check.input();
         Routed routed = chatTurnRouting.route(owner, conversationId, input, null, List.of());
-        if (routed.flow() != null) {
-            throw new ApiException(
-                ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "an agent with a flow does not run a proactive check");
-        }
         if (check.renewSession()) {
             sessions.renew(routed.conversation());
         }
@@ -252,11 +235,6 @@ public class ChatService {
             }
             String text = ChatPendingMessage.merged(rows);
             Routed routed = chatTurnRouting.route(owner, conversationId, text, null, List.of());
-            if (routed.flow() != null) {
-                // 흐름은 질문을 흐름 안에서 저장해 대기 행 삭제와 한 트랜잭션으로 묶을 수 없다. 더할 때 이미 거르므로
-                // 그 뒤에 흐름이 붙은 경우뿐이다.
-                throw new ApiException(ErrorCode.CONVERSATION_BUSY, "this conversation does not take queued messages");
-            }
             List<Long> ids = rows.stream().map(ChatPendingMessage::id).toList();
             try {
                 ChatTurn turn = chatTurnRunner.runTurn(owner, routed, text, new TurnIntent.Fresh(ids), onEvent, true, handle);
@@ -300,10 +278,6 @@ public class ChatService {
                 .toList();
             Routed routed = chatTurnRouting.routeExisting(user, conversation, attached, question.content(), requestReceivedAt);
             TurnIntent intent = new TurnIntent.Regenerate(previousAnswer, question);
-            if (routed.flow() != null) {
-                chatTurnRunner.runFlow(user, routed, question.content(), intent, onEvent, true, handle);
-                return;
-            }
             ChatTurn turn = chatTurnRunner.runTurn(user, routed, question.content(), intent, onEvent, true, handle);
             onEvent.accept(ChatTurnCompletion.eventOf(turn));
         } finally {
@@ -385,7 +359,7 @@ public class ChatService {
      * 대화에 지금 도는 turn 을 알려 준다.
      *
      * <p>주인 확인을 표시보다 먼저 한다. 남의 대화에 도는 turn 이 있는지 새지 않게 하려는 것이다.
-     * 도는지는 실행 줄의 상태가 아니라 메모리 표시로 본다. 흐름은 루트 줄이 끝난 뒤에도 자식이 돈다.
+     * 도는지는 실행 줄의 상태가 아니라 turn 잠금의 메모리 표시로 본다.
      */
     @Transactional(readOnly = true)
     public RunningTurn running(CurrentUser user, Long conversationId) {
@@ -469,8 +443,8 @@ public class ChatService {
     /**
      * 메시지 없이 제목이 빈 대화를 만든다.
      *
-     * <p>사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다. 모델은 흐름이 붙은
-     * 에이전트에서도 고르므로 에이전트를 쓸 수 있는지만 본다. 사진을 받지 않는 에이전트는 보낼 때 거절한다.
+     * <p>사진을 먼저 올리거나 첫 메시지 전에 모델을 고르려면 대화가 먼저 있어야 한다. 에이전트를 쓸 수 있는지
+     * 확인하며 사진을 받지 않는 에이전트는 보낼 때 거절한다.
      * 제목은 첫 메시지가 정한다.
      */
     public Conversation startEmpty(CurrentUser user, String agentCode) {

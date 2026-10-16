@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.bifos.assistant.chat.application.AttachmentCleaner;
 import com.bifos.assistant.chat.application.ContentDraftCleaner;
-import com.bifos.assistant.chat.application.FlowRegistry;
 import com.bifos.assistant.chat.application.MediaObservationCleaner;
 import com.bifos.assistant.connector.application.ConnectorActionSweeper;
 import com.bifos.assistant.connector.application.ConnectorActionBodyBackfill;
@@ -38,8 +37,6 @@ import org.springframework.transaction.PlatformTransactionManager;
  * {@code none} 으로 두어 검증 없이 문맥을 띄운다. 그 결과 V57 뒤에 생긴 표의 쿼리는 없는 표 오류로 실패한다. 그 실패는 이 검사가
  * 보려는 것이 아니므로 실패 전체를 단언하지 않고, 정렬 규칙이 섞인 두 메서드가 실패 목록에 있고 그 실패가 오류 1267 인지만 본다.
  *
- * <p>같은 까닭으로 기동할 때 에이전트 표를 읽는 {@link FlowRegistry} 를 대역으로 둔다. V57 뒤에 {@code agent} 에 더한 칸이 있어
- * 그 읽기가 없는 칸 오류로 문맥을 띄우지 못한다.
  */
 @Tag("mysql")
 @SpringBootTest
@@ -66,10 +63,6 @@ class CollationMixQueryMysqlTest {
 
     @Autowired
     private Flyway flyway;
-
-    /** 기동할 때의 흐름 이름 확인을 건너뛴다. 까닭은 클래스 설명에 있다. */
-    @MockitoBean
-    private FlowRegistry flowRegistry;
 
     /** V57 에는 가치 평가 표가 없어 현재 실행의 기동 복구를 실행하지 않는다. */
     @MockitoBean

@@ -419,35 +419,6 @@ test("이미지가 아닌 파일은 고르기에서 걸린다", async ({ page },
   await expect(page.getByTestId("attachment-previews")).toHaveCount(0);
 });
 
-test("흐름이 붙은 에이전트의 대화에는 사진 단추가 없다", async ({
-  page,
-}, testInfo) => {
-  // 방금 만든 대화가 아니라, 흐름 에이전트로 이미 만들어진 기존 대화를 목록에서 열어 확인한다.
-  await openNewConversation(page, testInfo);
-  await page.getByRole("radio", { name: "흐름 비서" }).click();
-  const text = `흐름 대화 사진 단추 검사 ${testInfo.project.name}`;
-  await page.getByRole("textbox", { name: "메시지" }).fill(text);
-  await page.getByRole("button", { name: "보내기" }).click();
-  await expect(page.getByTestId("assistant-message").last()).toBeVisible({
-    timeout: 30_000,
-  });
-
-  await page.reload();
-  await openConversationListDrawer(page);
-  await page
-    .getByRole("complementary", { name: "사이드바" })
-    .getByRole("link", { name: new RegExp(text) })
-    .first()
-    .click();
-
-  await expect(page.getByRole("button", { name: "보내기" })).toBeVisible();
-  // 보내기는 답이 오는 동안에도 보인다. 답이 끝난 것은 중지가 사라진 것으로 본다.
-  await expect(
-    page.getByTestId("composer-shell").getByRole("button", { name: "중지" }),
-  ).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "사진 첨부" })).toBeHidden();
-});
-
 test("보관 기간이 지난 첨부는 자리를 남기고 알린다", async ({
   page,
 }, testInfo) => {

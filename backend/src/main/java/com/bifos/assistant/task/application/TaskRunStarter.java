@@ -1,7 +1,6 @@
 package com.bifos.assistant.task.application;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ChatEvent;
 import com.bifos.assistant.chat.application.ChatService;
@@ -63,7 +62,6 @@ public class TaskRunStarter {
     private final AppUserRepository users;
     private final SignInRevocation revocation;
     private final AgentService agents;
-    private final KnownFlows flows;
     private final ConversationRepository conversations;
     private final ChatService chat;
     private final TurnCancellation turns;
@@ -182,7 +180,7 @@ public class TaskRunStarter {
     }
 
 
-    /** 주인이 그 작업의 에이전트로 대화를 시작할 수 있고 흐름이 붙지 않았는가. 지웠거나 껐으면 false 다. */
+    /** 주인이 그 작업의 에이전트로 대화를 시작할 수 있는가. 지웠거나 껐으면 false 다. */
     private boolean agentUsable(CurrentUser owner, Task task) {
         Optional<Agent> agent = agents.findById(task.agentId());
         if (agent.isEmpty() || agent.get().isDeleted()) {
@@ -193,7 +191,7 @@ public class TaskRunStarter {
         } catch (ApiException ex) {
             return false;
         }
-        return !flows.known(agent.get().flow());
+        return true;
     }
 
 

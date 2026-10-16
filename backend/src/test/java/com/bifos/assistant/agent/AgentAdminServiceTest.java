@@ -17,7 +17,6 @@ import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
@@ -44,10 +43,9 @@ class AgentAdminServiceTest {
     private final AppUserRepository users = mock(AppUserRepository.class);
     private final AgentLifecycleService lifecycle = mock(AgentLifecycleService.class);
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
-    private final KnownFlows flows = mock(KnownFlows.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
 
-    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, flows, connectorBindings, Clock.systemUTC());
+    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, connectorBindings, Clock.systemUTC());
 
 
     @BeforeEach
@@ -222,7 +220,6 @@ class AgentAdminServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
             null);
     }
 }

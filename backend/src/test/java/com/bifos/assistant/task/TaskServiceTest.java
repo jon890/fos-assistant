@@ -196,20 +196,16 @@ class TaskServiceTest {
 
 
     @Test
-    @DisplayName("꺼진 에이전트는 AGENT_DISABLED, 흐름 에이전트는 TASK_AGENT_NOT_SUPPORTED, 남의 비공개 에이전트는 AGENT_NOT_FOUND 다")
+    @DisplayName("꺼진 에이전트는 AGENT_DISABLED, 남의 비공개 에이전트는 AGENT_NOT_FOUND 다")
     void rejectsUnusableAgents() {
         CurrentUser owner = member();
         CurrentUser other = member();
         Agent off = agentOf(owner, AgentVisibility.PRIVATE);
         off.changeAccess(false, AgentVisibility.PRIVATE, owner.id());
         agents.save(off);
-        Agent flowed = agentOf(owner, AgentVisibility.PRIVATE);
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
         Agent othersPrivate = agentOf(other, AgentVisibility.PRIVATE);
 
         assertCode(() -> service.create(owner, cron("꺼짐", off, "0 9 * * *")), ErrorCode.AGENT_DISABLED);
-        assertCode(() -> service.create(owner, cron("흐름", flowed, "0 9 * * *")), ErrorCode.TASK_AGENT_NOT_SUPPORTED);
         assertCode(() -> service.create(owner, cron("남의 것", othersPrivate, "0 9 * * *")), ErrorCode.AGENT_NOT_FOUND);
     }
 
@@ -425,7 +421,7 @@ class TaskServiceTest {
 
     private TaskInput monthly(String title, CurrentUser owner) {
         Agent agent = agents.findAll().stream()
-            .filter(it -> owner.id().equals(it.ownerUserId()) && it.enabled() && it.flow() == null)
+            .filter(it -> owner.id().equals(it.ownerUserId()) && it.enabled())
             .findFirst()
             .orElseThrow();
         return cron(title, agent, "0 9 1 * *");

@@ -2,7 +2,6 @@ package com.bifos.assistant.agent.presentation;
 
 import com.bifos.assistant.agent.application.AgentLifecycleService;
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.presentation.AgentDtos.AgentView;
 import com.bifos.assistant.agent.presentation.AgentDtos.ChangeVisibilityRequest;
@@ -31,7 +30,6 @@ public class AgentController {
     private final AgentService agents;
     private final CurrentUserProvider currentUser;
     private final AgentLifecycleService lifecycle;
-    private final KnownFlows flows;
 
 
     /** 요청자가 쓸 수 있는 에이전트를 준다. 추천 질문은 에이전트마다 따로 읽는다. */
@@ -71,7 +69,6 @@ public class AgentController {
         return AgentView.from(
             agent,
             agents.isEditableBy(user, agent),
-            Objects.equals(agent.ownerUserId(), user.id()),
-            !flows.known(agent.flow()));
+            Objects.equals(agent.ownerUserId(), user.id()));
     }
 }

@@ -10,7 +10,6 @@ import com.bifos.assistant.agent.domain.type.CredentialScope;
  * <p>값의 모양 검증은 요청 DTO 가 끝낸다. 여기에는 검증 애너테이션을 달지 않는다.
  *
  * @param ownerEmail 주인의 메일 주소. 비어 있으면 그룹 공개 에이전트는 주인 없이 둔다
- * @param flow 흐름 이름. 비어 있으면 흐름을 두지 않는다
  */
 public record AgentCreateCommand(
     String code,
@@ -20,6 +19,5 @@ public record AgentCreateCommand(
     CostMode costMode,
     CredentialScope credentialScope,
     AgentVisibility visibility,
-    String ownerEmail,
-    String flow) {
+    String ownerEmail) {
 }

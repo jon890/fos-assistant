@@ -237,7 +237,7 @@ class ChatConversationQueries {
      * 대화에 지금 도는 turn 을 알려 준다.
      *
      * <p>주인 확인을 표시보다 먼저 한다. 남의 대화에 도는 turn 이 있는지 새지 않게 하려는 것이다.
-     * 도는지는 실행 줄의 상태가 아니라 메모리 표시로 본다. 흐름은 루트 줄이 끝난 뒤에도 자식이 돈다.
+     * 도는지는 실행 줄의 상태가 아니라 turn 잠금의 메모리 표시로 본다.
      */
     RunningTurn running(CurrentUser user, Long conversationId) {
         Conversation conversation = access.requireOwn(user, conversationId);

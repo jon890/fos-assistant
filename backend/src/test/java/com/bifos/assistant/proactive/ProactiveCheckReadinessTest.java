@@ -134,18 +134,6 @@ class ProactiveCheckReadinessTest {
 
 
     @Test
-    @DisplayName("흐름이 붙은 에이전트도 Hermes 를 부르지 않고 AGENT_NOT_SUPPORTED 다")
-    void flowAgentIsNotSupportedWithoutCallingHermes() {
-        agent.assignFlow("planner");
-
-        CheckReadiness result = readiness(true).check(agent);
-
-        assertThat(codes(result)).as("막는 까닭").containsExactly(CheckBlockerCode.AGENT_NOT_SUPPORTED);
-        verifyNoInteractions(toolsets, skills);
-    }
-
-
-    @Test
     @DisplayName("설정을 끄면 다른 조건이 모두 맞아도 DISABLED 다")
     void disabledBlocksEvenWhenEverythingElseIsReady() {
         enabled(List.of("web", "skills", "fos-assistant"), Set.of("proactive-check"));

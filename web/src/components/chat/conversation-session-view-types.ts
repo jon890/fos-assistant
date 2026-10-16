@@ -17,7 +17,6 @@ export type Props = Pick<
   | "turns"
   | "sending"
   | "activity"
-  | "flowIsSlow"
   | "liveExpanded"
   | "liveExpandedRef"
   | "setLiveExpanded"
@@ -70,6 +69,7 @@ export type Props = Pick<
     agentMissing: boolean;
     currentAgent: AgentView | undefined;
     startScreen: boolean;
+    skillCommandsEnabled: boolean;
     skillNames: string[] | undefined;
     starters: ReturnType<typeof useStarterSuggestions>;
   };

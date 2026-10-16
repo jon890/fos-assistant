@@ -16,7 +16,6 @@ import com.bifos.assistant.chat.application.ChatService;
 import com.bifos.assistant.chat.application.ConversationAccess;
 import com.bifos.assistant.chat.application.ModelTierService;
 import com.bifos.assistant.chat.application.SourceReadSummaries;
-import com.bifos.assistant.chat.domain.ChatAttachment;
 import com.bifos.assistant.chat.domain.Conversation;
 import com.bifos.assistant.chat.domain.type.ModelSelectionMode;
 import com.bifos.assistant.chat.infra.AttachmentProperties;
@@ -56,7 +55,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** 대화마다 고르는 모델과 effort 를 저장하고 돌려주는 것을 확인한다. 실행이 그 값을 쓰는 것은 따로 본다. */
@@ -281,28 +279,6 @@ class ConversationModelChoiceTest {
         assertThat(conversations.findById(dadsId).orElseThrow().modelChoice()).isEqualTo(ModelChoice.defaults());
         assertThat(conversations.findById(deletedId).orElseThrow().modelChoice())
             .isEqualTo(ModelChoice.defaults());
-    }
-
-
-    @Test
-    @DisplayName("흐름이 붙은 에이전트의 빈 대화에 모델을 고르고 사진은 보낼 때 거절한다")
-    void choosesModelOnEmptyFlowAgentConversationAndRejectsImagesAtSend() {
-        CurrentUser dad = member("choice-dad");
-        Agent flowed = agents.findByCode("choice-dad").orElseThrow();
-        flowed.assignFlow("research-and-build");
-        agents.save(flowed);
-
-        Long id = chat.startEmpty(dad, "choice-dad").id();
-        chat.chooseModel(dad, id, new ModelChoice("openrouter", "example-model-small", null));
-        ChatAttachment photo = attachments.upload(dad, id, "a.png", "image/png", IMAGE.length, new ByteArrayResource(IMAGE));
-
-        rejected(() -> chat.send(dad, id, "사진 봐", null, List.of(photo.id())));
-
-        assertThat(conversations.findById(id).orElseThrow().modelChoice())
-            .isEqualTo(new ModelChoice("openrouter", "example-model-small", null));
-        assertThat(messages.findByConversationIdOrderByIdAsc(id)).isEmpty();
-        assertThat(attachmentRows.findById(photo.id()).orElseThrow().messageId())
-            .isNull();
     }
 
 

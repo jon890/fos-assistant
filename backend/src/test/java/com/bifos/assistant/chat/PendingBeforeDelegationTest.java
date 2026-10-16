@@ -34,7 +34,6 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
@@ -320,33 +319,6 @@ class PendingBeforeDelegationTest {
             .extracting(ChatMessage::content)
             .as("멈추기 전까지의 답이 남는다")
             .containsExactly("질문", "절반");
-        assertLockReleased();
-    }
-
-
-    @Test
-    @DisplayName("흐름 turn 을 중지할 때 대기 줄을 멈추지 못해도 stopped 로 끝나고 잠금이 풀린다")
-    void flowTurnEndsStoppedAndReleasesLockEvenWhenHoldFails() {
-        doThrow(new IllegalStateException("대기 행을 멈추지 못했다")).when(pendingRows).markHeld(any(), eq(true));
-        Agent chief = agents.findById(conversation.agentId()).orElseThrow();
-        chief.assignFlow(ResearchAndBuildFlow.NAME);
-        agents.save(chief);
-        stub().beforeAwait(() -> chat.stop(
-            dad,
-            executions
-                .findByUserIdOrderByIdDesc(dad.id(), PageRequest.of(0, 1))
-                .getFirst()
-                .id()));
-        List<ChatEvent> relayed = new CopyOnWriteArrayList<>();
-
-        chat.stream(dad, conversation.id(), "질문", null, relayed::add);
-        awaitIdle(conversation.id());
-
-        ChatEvent last = relayed.getLast();
-        assertThat(last.type()).as("받은 사건: %s", relayed).isEqualTo("stopped");
-        assertThat(executions.findById(last.executionId()).orElseThrow().status())
-            .as("중지한 흐름 turn 의 루트 실행 줄")
-            .isEqualTo(ExecutionStatus.CANCELLED);
         assertLockReleased();
     }
 

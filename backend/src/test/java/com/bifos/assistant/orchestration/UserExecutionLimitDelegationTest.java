@@ -1,9 +1,6 @@
 package com.bifos.assistant.orchestration;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
@@ -21,17 +18,13 @@ import com.bifos.assistant.hermes.dto.TokenUsage;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.orchestration.application.AgentDelegationService;
 import com.bifos.assistant.orchestration.application.DelegationResult;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
-import com.bifos.assistant.shared.error.ApiException;
-import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.SmallExecutionLimit;
 import com.bifos.assistant.usage.application.UserExecutionLimiter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import com.bifos.assistant.usage.domain.DelegationKey;
-import com.bifos.assistant.usage.domain.type.ExecutionStatus;
 import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
@@ -53,7 +46,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 
 /**
- * 위임 자식과 흐름 단계가 사용자 실행 한도에 닿으면 기다리지 않고 거절되는지 본다(ADR-069).
+ * 위임 자식이 사용자 실행 한도에 닿으면 기다리지 않고 거절되는지 본다(ADR-069).
  *
  * <p>한도를 2 로 둔다. 부모 turn 이 자리 하나를 쥔 채 자식 자리를 기다리는 교착이 없어야 한다. 붙잡는 것은 그 실행의 글을
  * 담은 제출만이다.
@@ -70,11 +63,6 @@ class UserExecutionLimitDelegationTest {
 
     private static final String PARENT_MARK = "부모 turn";
     private static final String CHILD_MARK = "맡긴 첫 일";
-
-    /** 흐름의 Chief 에게 준 지시에만 들어 있는 말이다. 대역이 이것으로 단계를 가려낸다. */
-    private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
-
-    private static final String SPLIT_JSON = "{\"research\":\"전기차 보조금\",\"build\":\"비교 표\"}";
 
     @Autowired
     ChatService chat;
@@ -133,9 +121,8 @@ class UserExecutionLimitDelegationTest {
         pool = Executors.newVirtualThreadPerTaskExecutor();
         AppUser user = users.save(AppUser.of("limit-dad@example.com", "dad", 1L, UserRole.MEMBER, Instant.now()));
         dad = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
-        agents.save(agent("limit-chief", null));
-        agents.save(agent("limit-worker", null));
-        agents.save(agent("limit-flow", ResearchAndBuildFlow.NAME));
+        agents.save(agent("limit-chief"));
+        agents.save(agent("limit-worker"));
     }
 
 
@@ -197,59 +184,6 @@ class UserExecutionLimitDelegationTest {
     }
 
 
-    @Test
-    @DisplayName("흐름 단계 둘 가운데 자리가 하나뿐이면 한쪽만 돌고 흐름은 그 단계를 기다린 뒤 USER_BUSY 로 끝난다")
-    void flowEndsWithUserBusyAfterWaitingForAdmittedStepWhenOnlyOneSlotRemains() {
-        CountDownLatch stepRejected = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            try {
-                return invocation.callRealMethod();
-            } catch (ApiException ex) {
-                if (ex.code() == ErrorCode.USER_BUSY) {
-                    stepRejected.countDown();
-                }
-                throw ex;
-            }
-        })
-            .when(limiter)
-            .admit(any(), any(), any());
-        stub().willAnswer(command -> {
-            String input = command.input();
-            if (input.contains(CHIEF_MARK)) {
-                return completed("run-chief", SPLIT_JSON);
-            }
-            if (input.contains("조사해") || input.contains("만든다")) {
-                // 들어온 단계는 다른 단계가 거절될 때까지 끝나지 않는다. 먼저 끝나면 그 자리가 다른 단계에 돌아간다.
-                await(stepRejected);
-                return completed("run-step", "단계 답");
-            }
-            return completed("run-synthesizer", "합친 답");
-        });
-
-        assertThatThrownBy(() -> chat.send(dad, null, "전기차를 사는 게 나을까?", "limit-flow"))
-            .isInstanceOf(ApiException.class)
-            .extracting(ex -> ((ApiException)ex).code())
-            .isEqualTo(ErrorCode.USER_BUSY);
-
-        List<AgentExecution> rows = executionsOfDad();
-        assertThat(rows).as("Chief 와 들어온 단계 하나").hasSize(2);
-        assertThat(rows)
-            .filteredOn(row -> row.parentExecutionId() == null)
-            .singleElement()
-            .satisfies(root -> {
-                assertThat(root.status()).isEqualTo(ExecutionStatus.FAILED);
-                assertThat(root.errorCode()).isEqualTo(ErrorCode.USER_BUSY.name());
-            });
-        assertThat(rows)
-            .filteredOn(row -> row.parentExecutionId() != null)
-            .singleElement()
-            .satisfies(
-                step -> assertThat(step.status()).as("흐름이 끝나기 전에 끝난 단계").isEqualTo(ExecutionStatus.SUCCEEDED));
-        assertThat(stub().received()).as("Chief 와 들어온 단계의 제출").hasSize(2);
-        assertThat(limiter.used(dad.id())).as("흐름이 끝난 뒤 쥔 자리").isZero();
-    }
-
-
     private DelegationResult delegate(AgentExecution origin, String task) {
         String session = "fos-" + UUID.randomUUID();
         DelegationKey key = DelegationKey.of(origin.profileName(), session, session, "call_" + UUID.randomUUID());
@@ -269,7 +203,7 @@ class UserExecutionLimitDelegationTest {
     }
 
 
-    private Agent agent(String code, String flow) {
+    private Agent agent(String code) {
         Agent agent = Agent.of(
             code,
             code,
@@ -280,9 +214,6 @@ class UserExecutionLimitDelegationTest {
             AgentVisibility.PRIVATE,
             dad.id(),
             Instant.now());
-        if (flow != null) {
-            agent.assignFlow(flow);
-        }
         return agent;
     }
 

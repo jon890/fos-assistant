@@ -24,7 +24,6 @@ export function ConversationSessionView({
   turns,
   sending,
   activity,
-  flowIsSlow,
   liveExpanded,
   liveExpandedRef,
   setLiveExpanded,
@@ -74,6 +73,7 @@ export function ConversationSessionView({
   agentMissing,
   currentAgent,
   startScreen,
+  skillCommandsEnabled,
   skillNames,
   starters,
 }: Props) {
@@ -166,7 +166,6 @@ export function ConversationSessionView({
             sending={sending}
             activity={activity}
             conversationId={conversationId}
-            flowIsSlow={flowIsSlow}
             liveExpanded={liveExpanded}
             onLiveExpandedChange={(value) => {
               liveExpandedRef.current = value;
@@ -190,8 +189,8 @@ export function ConversationSessionView({
             onOpenArtifact={(messageId, path, name) =>
               setPanelTarget({ kind: "artifact", messageId, path, name })
             }
-            // 에이전트 목록을 읽기 전이거나 목록에 없는 에이전트의 대화는 흐름인지 모르므로 칩을 붙이지 않는다.
-            skillCommandChips={currentAgent?.acceptsAttachments === true}
+            // 목록과 칩은 같은 지원 여부를 쓴다. 에이전트 행을 모르면 둘 다 보이지 않는다.
+            skillCommandChips={skillCommandsEnabled}
             selectedVersions={selectedVersions}
             onVersionChange={(slotId, index) =>
               setSelectedVersions((previous) => ({

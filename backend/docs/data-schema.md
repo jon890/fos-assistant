@@ -263,7 +263,6 @@ Hermes는 대역을 쓰며 실제 파일 원본과 외부 서비스는 이 검�
 - `hermes_profile` 은 호스트의 key 파일 이름과 같다
 - `api_base_url` 을 설정 하나가 아니라 에이전트마다 둔다. 공유 listener 에서도 profile 마다 접두가 다르고, profile 마다 다른 노드를 가리킬 수 있어야 하기 때문이다
 - `profile_managed` 가 참이면 Control Plane 이 그 profile 을 만들었고, 에이전트를 지울 때 profile 까지 지운다
-- `flow` 가 비어 있으면 Hermes 를 한 번 부른다
 - `connector_managed` 는 바인딩이 생기기 전의 옛 커넥터 에이전트를 표시하고, 지금은 새로 참이 되지 않는다. 규칙은 [커넥터 연결](../../docs/features/connector.md) 의 「옛 커넥터 에이전트」 가 갖는다
 - `connector_attachments` 는 그 옛 커넥터 에이전트가 사진을 받는지다. 커넥터가 선언한 toolset 이 켜진 것을 확인했을 때만 참이다
 - `default_model_provider` 와 `default_model` 은 함께 채우거나 함께 비운다. `default_reasoning_effort` 는 혼자 둘 수 있다
@@ -507,7 +506,7 @@ RepositoryQueryMysqlTest는 저장소 SQL을 실행하며 값과 경쟁은 별�
 | 경우 | 값 |
 | --- | --- |
 | Hermes 에 제출하지 않는 합성 루트 | `UNKNOWN` |
-| 사건을 수집하지 않는 흐름 단계와 FOS 위임 | `INCOMPLETE` 로 남는다 |
+| 사건을 수집하지 않는 FOS 위임 | `INCOMPLETE` 로 남는다 |
 | 종료 사건을 받고 스트림이 정상으로 닫혔다 | `OBSERVED` |
 | 종료 사건 없는 조기 EOF, 읽기나 사건 저장 실패, 대기 상한이나 중지 유예 종료 | `INCOMPLETE`. 뒤늦은 스트림 종료로 지우지 않는다 |
 | 기동할 때 `OBSERVING` 으로 남았다 | `INCOMPLETE` 로 바꾸고 답과 확인한 사용량은 보존한다 |

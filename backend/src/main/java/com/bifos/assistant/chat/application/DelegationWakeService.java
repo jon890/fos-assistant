@@ -76,7 +76,6 @@ public class DelegationWakeService {
     private final ConversationRepository conversations;
     private final ChatMessageRepository messages;
     private final AgentService agents;
-    private final FlowRegistry flows;
     private final AppUserRepository users;
     private final List<AutoTurnResultSource> sources;
     private final TaskScheduler scheduler;
@@ -100,7 +99,6 @@ public class DelegationWakeService {
         ConversationRepository conversations,
         ChatMessageRepository messages,
         AgentService agents,
-        FlowRegistry flows,
         AppUserRepository users,
         List<AutoTurnResultSource> sources,
         TaskScheduler scheduler,
@@ -114,7 +112,6 @@ public class DelegationWakeService {
         this.conversations = conversations;
         this.messages = messages;
         this.agents = agents;
-        this.flows = flows;
         this.users = users;
         this.sources = List.copyOf(sources);
         this.scheduler = scheduler;
@@ -138,7 +135,7 @@ public class DelegationWakeService {
     /**
      * 그 대화에 전할 결과가 있고 turn 이 돌지 않으면 자동 turn 을 새 가상 스레드에서 연다.
      *
-     * <p>흐름 대화, 꺼지거나 지운 에이전트, 지운 대화는 잠금을 잡기 전에 거른다. 잡은 뒤 아무것도 남기지 않고 닫으면
+     * <p>꺼지거나 지운 에이전트, 지운 대화는 잠금을 잡기 전에 거른다. 잡은 뒤 아무것도 남기지 않고 닫으면
      * 닫기 리스너가 곧바로 다시 불러 끝없이 돈다. 거른 결과는 실행 줄에 그대로 남는다.
      */
     public void tryWake(Long conversationId) {
@@ -157,8 +154,7 @@ public class DelegationWakeService {
         Optional<Agent> agent = agents.findById(conversation.agentId());
         if (agent.isEmpty()
             || agent.get().isDeleted()
-            || !agent.get().enabled()
-            || flows.find(agent.get().flow()) != null) {
+            || !agent.get().enabled()) {
             return;
         }
         Optional<AppUser> user = users.findById(conversation.userId());

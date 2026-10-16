@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>호출한 session 의 등록이 있으면 그 줄의 origin 실행이다. origin 실행이 끝났어도 쓰되, origin 실행이나 그
  * 실행 트리의 루트 실행이 {@code CANCELLED} 면 거절한다. 하위 에이전트는 부모 turn 이 끝난 뒤에도 돌 수 있고, 그때
  * 최근 실행을 고르면 다른 turn 이나 다른 사용자로 돈다. 중지해도 그 하위 에이전트는 계속 돌 수 있어, 사용자가 멈춘
- * turn 의 권한을 쓰지 못하게 막는다. 흐름의 자식은 제 session 으로 돌아 origin 이 되고, 흐름을 멈출 때 이미 끝난
+ * turn 의 권한을 쓰지 못하게 막는다. 위임한 자식은 제 session 으로 돌아 origin 이 되고, 루트 turn 을 멈출 때 이미 끝난
  * 자식은 {@code CANCELLED} 가 되지 않으므로 루트도 본다. 루트와 origin 사이의 중간 실행은 보지 않는다.
  * {@code FAILED} 는 서버가 다시 떠 끝낸 경우가 섞여 있어 그대로 쓴다.
  * 등록이 없으면 호출한 session 이 루트 session 과 같을 때만 루트에서 도는 실행 하나를 찾는다. 둘이 다른데 등록이

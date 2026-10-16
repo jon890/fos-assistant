@@ -85,8 +85,6 @@ sequenceDiagram
 보내는 동안에는 단추 폭을 그대로 두고 회전 표시와 지금 하는 일을 보이며 `aria-busy` 를 켠다.
 
 답이 흘러나오는 동안에는 글자가 늘어나는 것 자체가 진행이라 회전 표시를 따로 두지 않는다.
-흐름이 `SLOW_FLOW_MS` 를 넘기면, 화면을 떠나도 실행은 계속 돌고 다시 열면 저장된 답이 보인다고 한 번만 알린다.
-
 ## 새 대화 화면
 
 인사 아래에는 지금 볼 것이 있을 때만 「확인할 것 N건」 을 보인다([`docs/features/attention.md`](attention.md) 의 「주소와 들어오는 길」).
@@ -234,7 +232,7 @@ Hermes wire의 상세 계약과 확인 범위는 [Hermes 계약](../../hermes/do
 **실행은 답을 기다리지 않는다.** 답을 보내는 순간 끝나 있고, 답은 다음 turn 으로 온다.
 그래서 기다리는 상태와 시간 제한이 없다. 카드를 무시하고 입력창에 다른 글을 보내도 된다.
 
-형식 안내는 사용자가 직접 답하는 대화 실행에만 붙는다. 흐름의 Chief 와 자식에게는 붙이지 않는다.
+형식 안내는 사용자가 직접 답하는 대화 실행에만 붙는다. 위임한 자식에게는 붙이지 않는다.
 실행 기록의 `context_chars` 와 `instructions_hash` 는 공통 답변 지침과 Memory 문맥을 대상으로 하고, 이 형식 안내는 제외한다.
 
 ### 질문 카드가 갈리는 지점
@@ -337,15 +335,15 @@ Hermes 에 보낼 때 비어 있는 모델과 effort 는 `/v1/runs` 에서 빼�
 `activity` 요약은 답을 만든 실행과 그 아래 자식 실행의 `execution_event` 를 실행 번호 목록으로 한 번에 센다. 대화 하나를 열 때 질의가 답 수만큼 늘지 않게 한다.
 
 - `toolCount` 는 시작과 끝 사건 수 가운데 큰 값이다. 한쪽이 빠져 와도 줄지 않게 한다.
-- `subagentCount` 는 하위 에이전트 사건 수와 자식 실행 수를 더한다. 흐름으로 돈 답은 사건 없이 자식 실행만 남아, 더하지 않으면 요약이 0 이 되고 블록이 사라진다. 둘 다 남긴 하위 에이전트는 두 번 센다. 과거 Memory 제안 실행은 세지 않는다.
-- `durationMs` 는 루트가 시작한 때부터 트리에서 가장 늦게 끝난 실행까지다. 흐름은 Chief 가 끝난 뒤에도 돈다.
+- `subagentCount` 는 하위 에이전트 사건 수와 자식 실행 수를 더한다. 둘 다 남긴 하위 에이전트는 두 번 센다. 과거 Memory 제안 실행은 세지 않는다.
+- `durationMs` 는 루트가 시작한 때부터 트리에서 가장 늦게 끝난 실행까지다.
 - 예전에 provider 가 막혀 다음 모델로 넘어간 turn 은 막힌 시도의 사건을 넣지 않는다. 지금은 Control Plane 이 provider 를 넘기지 않아 이런 줄이 새로 생기지 않는다.
 
 ### 화면으로 보내는 사건
 
 사건의 종류와 싣는 칸은 `ChatEvent` 의 생성 함수가 갖는다. 화면은 이 값만 알고 Hermes 의 원래 사건 이름을 읽지 않는다.
 
-**`started` 는 흐름으로 도는 turn 에서도 루트 실행의 번호를 싣는다.**
+**`started` 는 대화 turn 의 루트 실행 번호를 싣는다.**
 중지는 루트 번호로 보내고 Control Plane 이 그 아래를 찾아 멈춘다. 화면은 마지막으로 받은 `started` 의 번호를 쓴다.
 
 **도구의 명령 원문은 저장은 그대로 하되 `ADMIN` 역할에게만 보낸다**([ADR-038](../adr/ADR-038-도구의-명령-원문은-관리자에게만-보내고-사용자에게는-사람-말로-보인다.md)).
@@ -438,7 +436,6 @@ turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 행을 지우지 않고 대
 | 취소하는 사이에 이미 보내졌다 | `PENDING_MESSAGE_NOT_FOUND`. 그 글은 이미 사용자 메시지로 저장됐으므로 입력창에 되돌리지 않는다 |
 | 상한을 넘는다(`PendingMessageService`) | `PENDING_QUEUE_FULL`. 저장하지 않고 글을 입력창에 되돌린다 |
 | 새 대화의 빈 대화를 만들고 있다 | 보내기를 막는다. 대화 식별자를 확보한 뒤 첫 turn을 보내며, 답이 도는 동안에는 대기 메시지를 받는다 |
-| 흐름이 붙은 에이전트의 대화다 | `CONVERSATION_BUSY` 로 거절하고 글은 입력창에 남긴다. 흐름은 질문을 흐름 안에서 저장해 대기 행 삭제와 한 트랜잭션으로 묶을 수 없다 |
 | 보낼 대기 메시지와 끝난 위임 결과가 함께 있다 | 대기 메시지를 먼저 보낸다. 그 turn 이 닫힌 뒤 위임 결과를 전한다 |
 | 대화를 지운다 | 그 대화의 대기 행을 함께 지운다 |
 
@@ -447,15 +444,15 @@ turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 행을 지우지 않고 대
 ### 중지
 
 `chat/application` 의 `TurnCancellation` 이 도는 turn 마다 루트 실행 번호를 열쇠로 중지 표시를 하나 갖는다.
-중지 경로가 그 표시를 세우고, 흐름은 자식을 시작하기 전과 합치기 전에 그것을 본다.
-`ChatService` 와 흐름이 서로를 부르지 않게 표시를 따로 둔다. 검사는 `ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE` 다.
+중지 경로가 그 표시를 세운다.
+`ChatService` 와 위임 실행이 서로를 부르지 않게 표시를 따로 둔다. 검사는 `ArchitectureRules.ORCHESTRATION_DOES_NOT_CALL_CHAT_SERVICE` 다.
 
 | 규칙 | 까닭 |
 | --- | --- |
-| 등록과 해제는 `ChatService` 만 한다. 흐름 경로도, 한 번에 받는 경로도 등록한다 | 등록되지 않은 turn 은 중지도 `CONVERSATION_BUSY` 도 받지 못한다 |
+| 등록과 해제는 `ChatService` 만 한다. 스트리밍 경로와 한 번에 받는 경로도 등록한다 | 등록되지 않은 turn 은 중지도 `CONVERSATION_BUSY` 도 받지 못한다 |
 | 같은 대화에 도는 turn 이 있는지 보는 것과 등록하는 것을 한 번에 한다 | 둘 사이에 다시 생성 두 개가 함께 들어오면 같은 답을 가리키는 판이 둘 생긴다 |
 | `open` 은 대화에 도는 turn 을 먼저 보고, 그다음 사용자의 turn 자리([`docs/features/execution.md`](execution.md) 의 「세는 방법」)를 얻고, 마지막에 대화 잠금을 잡는다. 자리를 얻다 `USER_BUSY` 가 나면 그 대화에 도는 turn 이 생겼는지 한 번 더 본다 | 같은 대화를 두 요청이 함께 열 때 진 쪽이 `CONVERSATION_BUSY` 를 받아 대기 메시지로 들어가게 한다. 잠금을 잡았다가 되돌리는 순서로 두면 되돌린 잠금이 닫기 리스너를 부르지 않아, 닫힐 때를 기다린 깨우기가 다음 계기까지 미뤄진다 |
-| Hermes 에 제출한 직후 run 번호를 등록한다. `AgentRunner` 는 제출 뒤 부르는 콜백으로 알린다 | 흐름의 Chief 는 `AgentRunner` 안에서 제출된다. 알리지 않으면 Chief 를 멈출 수 없다 |
+| Hermes 에 제출한 직후 run 번호를 등록한다. `AgentRunner` 는 제출 뒤 부르는 콜백으로 알린다 | 대화 실행을 중지할 수 있다 |
 | run 을 등록할 때 이미 중지 표시가 서 있으면 그 자리에서 중지를 보낸다 | `started` 뒤 제출 전에 들어온 중지가 사라지지 않게 한다 |
 | run 마다 중지를 보냈는지 적는다. 다시 부르면 보내지 못한 run 에만 다시 보낸다 | 보내다 실패한 뒤 다시 눌러도 아무 일이 없으면 안 된다 |
 | 중지를 보낸 뒤 스트림이 `assistant.chat.stop-stream-grace` 안에 끝나지 않으면 Control Plane 이 스트림을 닫고 상태 조회로 넘어간다 | 취소된 run 의 스트림이 닫히는지 실제 Hermes 로 확인하지 못했다 |
@@ -466,7 +463,6 @@ turn 잠금을 열 때 `USER_BUSY` 가 오면 대기 행을 지우지 않고 대
 turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으로만 멈춘다.
 
 **중지할 수 있는지를 실행 줄의 상태로 판정하지 않는다.**
-흐름으로 도는 turn 은 Chief 가 끝나면 루트 줄이 `SUCCEEDED` 가 되고 그 뒤에 자식이 돈다. 줄 상태로 보면 자식이 도는 동안 중지를 거절하게 된다.
 그래서 이 프로세스에 등록된 도는 turn 이 그 번호를 루트로 갖는지로 본다.
 멈춘 turn 의 루트 줄은 이미 `SUCCEEDED` 였어도 `CANCELLED` 로 덮어쓰고, 토큰과 비용은 그대로 둔다.
 멈춘 자리까지의 답은 남긴다([ADR-021](../../backend/docs/adr/ADR-021-중지한-답은-멈춘-자리까지-남긴다.md)).
@@ -479,7 +475,7 @@ turn 이 끝난 뒤에 맡긴 자식은 붙일 표시가 없어 `agent_stop` 으
 turn 이 중지로 끝나면 `ChatTurnStopper` 가 `TurnCancellation.markStopped` 를 적고 그 대화의 대기 행을 모두 멈춘다.
 잠금을 푼 뒤 종료 리스너에서 멈추면 그 사이 다른 스레드의 `tryNext` 가 아직 멈추지 않은 행으로 turn 을 연다.
 **사용자가 중지를 확정한 실행은 `RUNNING` 으로 남지 않는다.**
-중지가 확정된 turn 이 예외로 끝나면 실행 줄이 아직 끝나지 않았을 때 취소로 적고(이미 `FAILED` 면 그대로 둔다), 그 뒤 대기 행을 멈춘다. 흐름 turn 도 같다.
+중지가 확정된 turn 이 예외로 끝나면 실행 줄이 아직 끝나지 않았을 때 취소로 적고(이미 `FAILED` 면 그대로 둔다), 그 뒤 대기 행을 멈춘다.
 멈춤이나 `pending` 알림이 실패해도 경고 로그만 남기고 그 turn 은 `stopped` 로 끝나며, 잠금 해제와 `tryNext` 를 막지 않는다.
 
 **표시는 한 프로세스의 메모리에 있다.** Control Plane 이 하나라서 그것으로 된다. 둘 이상으로 늘리면 이 표시를 데이터베이스로 옮겨야 한다.
@@ -500,7 +496,7 @@ turn 이 중지로 끝나면 `ChatTurnStopper` 가 `TurnCancellation.markStopped
 ### 기동할 때 남은 실행 정리
 
 이전 프로세스가 남긴 `RUNNING` 실행을 Hermes 에 물어 정하고, 도는 실행에는 다시 붙는다.
-Hermes 의 답마다 적는 상태와 `error_code`, 흐름 turn 에 붙지 않는 까닭, 기다리는 상한, 서버 한 대 전제는 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 이 갖는다.
+Hermes 의 답마다 적는 상태와 `error_code`, 기다리는 상한, 서버 한 대 전제는 [ADR-061](../../backend/docs/adr/ADR-061-재기동-때-남은-실행은-hermes-에-물어-정하고-도는-실행에는-다시-붙는다.md) 이 갖는다.
 Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/docs/hermes-contract.md`](../../hermes/docs/hermes-contract.md) 의 「실행 조회가 답하는 기간」 이 갖는다.
 `RUNNING` 으로 남은 예약 발화(`task_run`)는 다시 돌리지 않고 닫는다([`docs/features/schedule.md`](schedule.md) 의 「기동할 때」).
 `RestartReconciler` 가 정하고 `RecoveredRunRecorder` 가 적는다. 켜고 끄는 값과 기다리는 상한은 `RestartReconcileProperties` 가 갖는다.
@@ -511,7 +507,7 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/doc
 
 그 뒤 `RestartReconciler` 가 두 단계로 돈다.
 
-1. **잡기.** 웹 서버가 요청을 받기 전에, run 번호가 있는 대화 turn 의 루트 줄과 흐름 turn 의 줄마다 그 대화의 turn 잠금을 잡고 실행 번호와 run 을 표시에 붙인다. 이미 Hermes 에서 도는 실행이라 이 잠금은 사용자 실행 한도를 보지 않는다.
+1. **잡기.** 웹 서버가 요청을 받기 전에, run 번호가 있는 대화 turn 의 루트 줄마다 그 대화의 turn 잠금을 잡고 실행 번호와 run 을 표시에 붙인다. 이미 Hermes 에서 도는 실행이라 이 잠금은 사용자 실행 한도를 보지 않는다.
 2. **묻기.** `ApplicationReadyEvent` 에서 `NextTurnDispatcher` 의 기동 뒤 깨우기보다 먼저 시작한다. 실행마다 가상 스레드 하나가 Hermes 에 끝날 때까지 묻고, 줄을 적은 뒤 잡은 잠금을 푼다.
 
 `ApplicationReadyEvent` 에서 잡으면 그 사이 들어온 보내기가 같은 Hermes session 에 turn 을 하나 더 열므로, 잡기는 웹 서버를 여는 lifecycle 보다 앞선 phase 의 `SmartLifecycle` 에서 한다.
@@ -521,10 +517,9 @@ Hermes 의 실행 조회가 무엇을 얼마 동안 답하는지는 [`hermes/doc
 
 | 실행 | 판정 | 끝났을 때 적는 것 | 아직 돌 때 |
 | --- | --- | --- | --- |
-| 대화 turn | 부모가 없고 대화가 있다. 그 에이전트에 흐름이 없다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. `RecoveredAnswerGuard` 가 답 대신 알림 줄을 정하면 그 줄만 남긴다. 먼저 살펴보기 turn 이 그렇다([`docs/features/proactive.md`](proactive.md) 의 「끝날 때」). 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
+| 대화 turn | 부모가 없고 대화가 있다 | 실행 줄, `ASSISTANT` 메시지, 대화의 session. `RecoveredAnswerGuard` 가 답 대신 알림 줄을 정하면 그 줄만 남긴다. 먼저 살펴보기 turn 이 그렇다([`docs/features/proactive.md`](proactive.md) 의 「끝날 때」). 그 실행이 시작한 뒤 대화 폴더에 생긴 HTML 을 답에 묶는다. 대화 단위 SSE 로 `done`, `stopped`, `error` 가운데 하나를 낸다 | 다시 붙는다. 그 대화의 turn 잠금을 쥔다 |
 | 위임 실행 | `delegation_key` 가 있다 | 실행 줄과 `output_text` 와 끝 사건. `DelegationFinished` 를 낸다 | 다시 붙는다. 잠금은 잡지 않는다 |
-| 흐름 turn 과 그 자식 | 루트 실행의 에이전트에 흐름이 있다 | 실행 줄과 끝 사건. 루트는 성공으로 끝났어도 `FAILED`(`ORPHANED`) 로 적고 사용량은 남긴다. 루트가 끝나면 대화 단위 SSE 로 `error` 나 `stopped` 를 낸다. 자식만 돌던 turn 은 잠금을 풀 때 한 번 낸다 | 중지를 보내고 끝난 상태를 기다린다. 그 대화의 turn 잠금을 쥔다. 루트 줄이 이미 끝나고 자식만 도는 때에도 쥔다 |
-| 그 밖의 실행(추천 질문, 과거 Memory 제안) | 위 셋이 아니다 | 실행 줄과 끝 사건만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
+| 그 밖의 실행(추천 질문, 과거 Memory 제안) | 위 두 경우가 아니다 | 실행 줄과 끝 사건만 적는다. 답은 쓰지 않는다 | 다시 붙는다. 잠금은 잡지 않는다 |
 
 위임 답은 보통 위임과 같이 `assistant.delegation.output-max-chars` 까지 자른다.
 대화 turn 의 답은 그 대화의 마지막 메시지가 `ASSISTANT` 이면 그 답을 다시 생성한 것으로 적는다. 다시 생성은 질문을 새로 저장하지 않기 때문이다.
