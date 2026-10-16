@@ -19,7 +19,6 @@ import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,7 +68,7 @@ public class ConnectorInstallAttempts {
 
     /** 시작 트랜잭션 안에서 바인딩의 새 시도와 HTTP에 필요한 값을 함께 캡처한다. */
     public ConnectorBindingAttempt begin(
-        ConnectorBinding binding, Optional<ConnectorManifest> manifest, Map<String, String> values,
+        ConnectorBinding binding, Optional<ConnectorManifest> manifest,
         boolean checkInstallation, boolean afterRestart, boolean replaceValues, Instant now) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("installation preparation requires a transaction");
@@ -105,7 +104,6 @@ public class ConnectorInstallAttempts {
                 waiting = ResyncOutcome.APPLY_SCHEDULED;
             }
         }
-        boolean desired = binding.desiredEnabled();
         UUID attemptId = UUID.randomUUID();
         if (waiting == null) {
             binding.beginInstall(attemptId, now);
@@ -119,11 +117,8 @@ public class ConnectorInstallAttempts {
             agent.hermesProfile(), agent.apiBaseUrl(), agent.credentialScope(), agent.sandboxOwner(),
             connection.connectorId(), protocol, manifestSha, connection.vault(),
             declared == null ? null : installs.ownerBrowser(binding, declared), binding.mcpServer(),
-            agent.connectorManaged(), desired, binding.restartRequired(), checkInstallation, replaceValues,
-            declared != null && declared.attachments(), waiting,
-            declared == null ? List.of() : declared.fields(),
-            declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList(),
-            declared == null ? List.of() : declared.toolsets(), values);
+            binding.restartRequired(), checkInstallation, replaceValues, waiting,
+            declared == null ? List.of() : declared.tools().stream().map(ConnectorTool::name).toList());
     }
 
 
@@ -184,8 +179,7 @@ public class ConnectorInstallAttempts {
             || !Objects.equals(agent.apiBaseUrl(), attempt.apiBaseUrl())
             || !Objects.equals(agent.sandboxOwner(), attempt.sandboxOwner())
             || agent.credentialScope() != attempt.credentialScope()
-            || agent.connectorManaged() != attempt.legacy()
-            || (!attempt.legacy() && agent.visibility() != AgentVisibility.PRIVATE)) {
+            || agent.visibility() != AgentVisibility.PRIVATE) {
             return null;
         }
         ConnectorBinding binding = bindings.findById(attempt.bindingId()).orElse(null);

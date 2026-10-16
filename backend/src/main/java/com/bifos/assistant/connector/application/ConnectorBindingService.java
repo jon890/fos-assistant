@@ -21,7 +21,6 @@ import com.bifos.assistant.hermes.ConnectorProfileRejected;
 import com.bifos.assistant.hermes.ConnectorSandboxUnavailable;
 import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesSkillClient.HermesSkill;
-import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.error.ApiException;
@@ -54,9 +53,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 반영 완료, 예약 확인은 사용자 행을 먼저, 에이전트 행을 다음에 잠근다. 공개 범위 변경과 관리자 수정도 같은 에이전트 행을
  * 잠그므로 동시에 와도 한쪽이 다른 쪽의 커밋을 보고 판정한다.
  *
- * <p>옛 커넥터 에이전트({@code Agent.connectorManaged()})의 바인딩은 그 에이전트가 지워질 때까지 옛 방식으로 다룬다. 값은
- * 그 profile 의 {@code .env} 에 직접 쓰고 설치는 바인딩 칸 없이 보내며 사진 받기와 내장 도구 선언도 그대로 본다. 설치 외부 호출은
- * 시작 상태를 커밋한 뒤 트랜잭션 밖에서 한다. 순서와 실패 처리는 {@code docs/features/connector.md} 가 갖는다.
+ * <p>설치 외부 호출은 시작 상태를 커밋한 뒤 트랜잭션 밖에서 한다. 순서와 실패 처리는
+ * {@code docs/features/connector.md}가 갖는다.
  *
  * <p>{@link #reinstall}, {@link #detach}, {@link #resync} 는 연결 서비스가 자기 트랜잭션 안에서 부르는 단계다. 프록시를
  * 거쳐 부르므로 public 으로 둔다.
@@ -65,7 +63,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ConnectorBindingService implements AgentConnectorDetacher {
     private static final String STEP_DETACH = "detach";
-    private static final String STEP_VAULT_IMPORT = "vault-import";
 
     private final ConnectorBindingRepository bindings;
     private final ConnectorConnectionRepository connections;
@@ -197,10 +194,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         Optional<ConnectorManifest> manifest, String profile, Set<String> taken) {
         lockUser(user.id());
         Agent agent = requireOwned(user, agentCode, true);
-        if (agent.connectorManaged()) {
-            throw new ApiException(
-                ErrorCode.VALIDATION_FAILED, "a legacy connection agent cannot take other connections");
-        }
         if (agent.visibility() != AgentVisibility.PRIVATE) {
             throw new ApiException(
                 ErrorCode.AGENT_CONNECTIONS_REQUIRE_PRIVATE, "connections can be attached to a private agent only");
@@ -226,7 +219,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         }
         Instant now = now();
         ConnectorBinding binding = bindings.save(ConnectorBinding.pending(agent, connection, declared.mcpServer(), now));
-        return new Bound(null, attempts.begin(binding, manifest, Map.of(), false, false, false, now));
+        return new Bound(null, attempts.begin(binding, manifest, false, false, false, now));
     }
 
 
@@ -234,16 +227,12 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * 내 에이전트에서 연결을 뗀다. 붙어 있지 않으면 아무것도 하지 않는다.
      *
      * <p>그 에이전트가 판정한 승인 줄만 끝낸다. 상시 허락은 사용자와 커넥터에 묶여 다른 에이전트의 바인딩에도 걸리므로 두고,
-     * 떼기는 도구 목록에서 이름을 빼므로 재시작을 기다리지 않는다. 옛 커넥터 에이전트의 바인딩은 떼지 않고 그 에이전트를 지운다.
+     * 떼기는 도구 목록에서 이름을 빼므로 재시작을 기다리지 않는다.
      */
     @Transactional
     public void unbind(CurrentUser user, String agentCode, String connectorId) {
         lockUser(user.id());
         Agent agent = requireOwned(user, agentCode, true);
-        if (agent.connectorManaged()) {
-            throw new ApiException(
-                ErrorCode.VALIDATION_FAILED, "delete the legacy connection agent instead of detaching it");
-        }
         Optional<ConnectorConnection> connection = connections.findByUserIdAndConnectorId(user.id(), connectorId);
         Optional<ConnectorBinding> binding = connection.flatMap(found -> bindings.findByAgentIdAndConnectionId(agent.id(), found.id()));
         if (binding.isEmpty()) {
@@ -251,7 +240,7 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
         }
         approvals.rejectPendingFor(connection.get(), agent.id(), now());
         try {
-            detach(binding.get(), Optional.empty());
+            detach(binding.get());
         } catch (RuntimeException ex) {
             ConnectorBindingInstalls.warn(STEP_DETACH, connectorId, ex);
             throw new ConnectorOperationFailure();
@@ -333,15 +322,14 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             throw new ApiException(
                 ErrorCode.CONNECTOR_RESTART_AGAIN, "the connection was installed again after the restart");
         }
-        return new Confirmed(attempts.begin(binding, manifest, Map.of(), true, true, false, now()), manifest.orElse(null));
+        return new Confirmed(attempts.begin(binding, manifest, true, true, false, now()), manifest.orElse(null));
     }
 
 
     /**
      * 그 에이전트의 바인딩을 모두 뗀다.
      *
-     * <p>옛 커넥터 에이전트의 바인딩이 그 연결의 값을 가진 유일한 곳이면 먼저 보관 파일로 옮긴다. 옮기지 못하면 지우지 않는다.
-     * 그 뒤 profile 에서 떼고 행을 지운다. 뒤의 삭제가 실패해 트랜잭션이 되돌려지면 행은 남고 profile 에서는 떼어진 상태다.
+     * <p>profile 에서 떼고 행을 지운다. 뒤의 삭제가 실패해 트랜잭션이 되돌려지면 행은 남고 profile 에서는 떼어진 상태다.
      * 다음 연결 확인이 설치가 configured 가 아닌 것을 보고 그 바인딩을 {@code PENDING} 으로 둔다.
      */
     @Override
@@ -351,24 +339,8 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
             ConnectorConnection connection = binding.connection();
             String connectorId = connection.connectorId();
             approvals.rejectPendingFor(connection, agent.id(), now());
-            Optional<ConnectorManifest> manifest = Optional.empty();
-            if (binding.agent().connectorManaged()) {
-                if (!connection.vaultStored()) {
-                    try {
-                        connector.importVault(
-                            connection.vault(), connectorId, binding.agent().hermesProfile());
-                    } catch (RuntimeException ex) {
-                        ConnectorBindingInstalls.warn(STEP_VAULT_IMPORT, connectorId, ex);
-                        throw new ConnectorOperationFailure();
-                    }
-                    connection.markVaultStored();
-                    connections.save(connection);
-                }
-                // 옛 설치는 env 이름을 manifest 로 지운다. 카탈로그에서 빠졌으면 대시보드가 소유 기록으로 지운다.
-                manifest = ConnectorManifests.find(connector, connectorId);
-            }
             try {
-                detach(binding, manifest);
+                detach(binding);
             } catch (RuntimeException ex) {
                 ConnectorBindingInstalls.warn(STEP_DETACH, connectorId, ex);
                 throw new ConnectorOperationFailure();
@@ -380,13 +352,12 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /**
      * 값을 바꾼 연결의 바인딩에 다시 보낼 설치를 준비한다. 연결 등록의 시작 트랜잭션 안에서 부른다.
      *
-     * <p>일반 바인딩은 대시보드가 보관 파일에서 값을 다시 복사한다. 옛 바인딩은 받은 값을 지금처럼 그 profile 의 {@code .env}
-     * 에 쓰도록 입력을 캡처한다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있으므로 결과 단계에서 재시작 필요를 누적하고 {@code PENDING} 으로 둔다.
+     * <p>대시보드가 보관 파일에서 값을 다시 복사한다. 떠 있는 MCP 프로세스는 옛 값을 쥐고 있으므로 결과 단계에서 재시작 필요를 누적하고 {@code PENDING} 으로 둔다.
      *
      * @return 시작 트랜잭션이 커밋할 불변 설치 입력
      */
-    public ConnectorBindingAttempt reinstall(ConnectorBinding binding, ConnectorManifest manifest, Map<String, String> accepted) {
-        return attempts.begin(binding, Optional.of(manifest), accepted, false, false, true, now());
+    public ConnectorBindingAttempt reinstall(ConnectorBinding binding, ConnectorManifest manifest) {
+        return attempts.begin(binding, Optional.of(manifest), false, false, true, now());
     }
 
 
@@ -400,23 +371,13 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
     /**
      * 바인딩을 profile 에서 떼고 행을 지운다. 외부 호출이 실패하면 예외를 그대로 던지고 행은 남는다.
      *
-     * <p>옛 바인딩은 지금처럼 env 를 지우고 설치를 끈 뒤 그 에이전트를 끈다. 카탈로그에서 빠진 커넥터는 env 이름을 모르므로
-     * 설치만 끄고 env 는 대시보드가 소유 기록으로 지운다.
+     * <p>카탈로그에서 빠진 커넥터도 대시보드가 소유 기록으로 서버와 env를 지운다.
      */
-    public void detach(ConnectorBinding binding, Optional<ConnectorManifest> manifest) {
+    public void detach(ConnectorBinding binding) {
         Agent agent = binding.agent();
         String profile = agent.hermesProfile();
         String connectorId = binding.connection().connectorId();
-        if (agent.connectorManaged()) {
-            for (ConnectorField field : manifest.map(ConnectorManifest::fields).orElse(List.of())) {
-                connector.deleteEnv(profile, field.env());
-            }
-            connector.putConnector(profile, connectorId, false, agent.sandboxOwner());
-            // 옛 에이전트는 이 바인딩 하나로 돈다. 끄고 사진 받기를 내린다.
-            binding.pending(now());
-        } else {
-            connector.unbindConnector(profile, connectorId);
-        }
+        connector.unbindConnector(profile, connectorId);
         bindings.delete(binding);
     }
 
@@ -430,18 +391,14 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
      * 적는다. 둘 다 {@code PENDING} 으로 돌아간다. 카탈로그에서 빠진 커넥터는 서버를 확인할 수 없어 다시 보내지 않고
      * {@code PENDING} 이다.
      *
-     * <p>일반 바인딩은 설치가 켜져 있고 configured 이며 정책 hook 이 켜져 있고 바인딩 방식이며 probe 가 도구를 낼 때 쓸 수 있다.
+     * <p>바인딩은 설치가 켜져 있고 configured 이며 정책 hook 이 켜져 있고 바인딩 방식이며 probe 가 도구를 낼 때 쓸 수 있다.
      * 켜진 내장 도구는 보지 않는다. 그 에이전트의 도구는 주인이 정한다. 바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고
      * 답한다.
-     *
-     * <p>옛 바인딩은 지금 판정 그대로다. 설치가 꺼져 있으면 다시 보내지 않는다. 옛 설치는 설치된 커넥터에 늘 재시작이 필요하다고
-     * 답하므로 그 값은 쓰지 않고 hook plugin 파일이 바뀌었을 때만 재시작 대기로 둔다. 켜진 내장 도구가 manifest 의 선언과 같아야
-     * 하고, 쓸 수 있을 때만 선언한 사진 받기를 옮긴다.
      *
      * @return 시작 트랜잭션이 커밋할 불변 설치 입력. 외부 호출과 결과 대조는 {@link #execute}가 한다
      */
     public ConnectorBindingAttempt resync(ConnectorBinding binding, Optional<ConnectorManifest> manifest, boolean afterRestart) {
-        return attempts.begin(binding, manifest, Map.of(), true, afterRestart, false, now());
+        return attempts.begin(binding, manifest, true, afterRestart, false, now());
     }
 
 
@@ -506,9 +463,6 @@ public class ConnectorBindingService implements AgentConnectorDetacher {
 
 
     private static String blockedReason(Agent agent) {
-        if (agent.connectorManaged()) {
-            return AgentConnectionsView.LEGACY_AGENT;
-        }
         return agent.visibility() == AgentVisibility.PRIVATE ? null : AgentConnectionsView.AGENT_NOT_PRIVATE;
     }
 

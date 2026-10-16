@@ -137,6 +137,38 @@ class ConnectorBindingMigrationTest {
     }
 
 
+    @Test
+    @DisplayName("옛 연결 컬럼을 지워도 연결의 값과 바인딩 상태를 보존한다")
+    void droppingLegacyColumnsPreservesConnectionsAndBindings() throws SQLException {
+        List<Binding> first = bindingsOf(901);
+        List<Binding> second = bindingsOf(902);
+        List<String> connectionsBefore = connectionValues();
+
+        migrate("20261016053119");
+
+        assertThat(connectionValues()).isEqualTo(connectionsBefore);
+        assertThat(bindingsOf(901)).isEqualTo(first);
+        assertThat(bindingsOf(902)).isEqualTo(second);
+        assertThat(bindingsOf(903)).isEmpty();
+        assertThat(count("SELECT COUNT(*) FROM connector_connection")).isEqualTo(3);
+        assertThat(count("SELECT COUNT(*) FROM agent_connector_binding")).isEqualTo(2);
+    }
+
+
+    private List<String> connectionValues() throws SQLException {
+        List<String> result = new ArrayList<>();
+        try (Connection connection = connect();
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery("SELECT user_id, connector_id, status, fields FROM connector_connection ORDER BY id")) {
+            while (rows.next()) {
+                result.add(rows.getLong("user_id") + ":" + rows.getString("connector_id")
+                    + ":" + rows.getString("status") + ":" + rows.getString("fields"));
+            }
+        }
+        return result;
+    }
+
+
     private void seed() throws SQLException {
         try (Connection connection = connect();
             Statement statement = connection.createStatement()) {

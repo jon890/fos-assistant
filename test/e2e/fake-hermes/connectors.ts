@@ -2,7 +2,6 @@ import { type FakeConnectorField, type FakeConnector, type FakeHermesState } fro
 import { type ServerResponse } from "node:http";
 import { send } from "./lifecycle.ts";
 import { SANDBOX_OWNER_PATTERN, CONTROL_PLANE_MCP } from "./runtime-fixtures.ts";
-import { join } from "node:path";
 
 /**
  * 대역이 카탈로그로 내는 시험 커넥터다. 선언 모양은 plugin 이 읽는 `connector.json` 과 같고, 카탈로그 응답에는
@@ -25,9 +24,6 @@ export const DEMO_CONNECTOR = {
   ],
   verify: { tool: "list_scopes" },
   mcp_server: "demo",
-  // manifest 가 선언한 내장 toolset 이다. 설치가 도구 목록에서 서버 이름 다음에 둔다.
-  toolsets: [] as string[],
-  attachments: false,
   // 도구마다의 정책이다. 확인 도구이자 선택지 도구인 `list_scopes` 는 읽기 전용이고 승인이 없다.
   // `grant` 는 대시보드 plugin 이 기본값을 채워 내는 값이다. 승인이 `required` 인 도구만 참이다.
   // `outbound` 도 기본값을 채워 낸다. 밖으로 나간다고 선언한 도구만 참이다.
@@ -68,8 +64,6 @@ export const AGENDA_CONNECTOR = {
   fields: [] as FakeConnectorField[],
   verify: { tool: "list_events" },
   mcp_server: "agenda",
-  toolsets: [] as string[],
-  attachments: false,
   tools: {
     list_events: { risk: "READ", approval: "none", grant: false, outbound: false },
     add_event: { risk: "WRITE", approval: "required", title: "일정 쓰기", grant: true, outbound: false },
@@ -90,8 +84,6 @@ export const SNAPSHOT_CONNECTOR = {
   fields: [] as FakeConnectorField[],
   verify: { tool: "list_drafts" },
   mcp_server: "snapshot",
-  toolsets: [] as string[],
-  attachments: false,
   tools: {
     list_drafts: { risk: "READ", approval: "none", grant: false, outbound: false },
     save_draft: { risk: "WRITE", approval: "required", title: "검사용 임시저장", grant: false, outbound: false },
@@ -105,7 +97,7 @@ export const SNAPSHOT_CONNECTOR = {
   },
 };
 
-/** 카탈로그에 내는 커넥터들이다. 옛 설치(`isolated`)와 보관 파일 가져오기는 첫째 커넥터만 흉내 낸다. */
+/** 카탈로그에 내는 커넥터들이다. */
 export const FAKE_CONNECTORS: readonly FakeConnector[] = [DEMO_CONNECTOR, AGENDA_CONNECTOR];
 
 /** 지금 카탈로그에 보이는 커넥터들이다. snapshot 커넥터는 켠 동안만 더한다. */
@@ -216,9 +208,8 @@ export function createBindings(state: FakeHermesState) {
       answer(true, false, true);
       return;
     }
-    // 바인딩 항목이 있는 profile 은 옛 설치를 받지 않는다.
     if (bind === undefined) {
-      send(response, 409, { error: "this profile has bound connectors" });
+      send(response, 400, { error: "bind is required for an enabled connector" });
       return;
     }
     // Control Plane 은 바인딩 설치에 그 에이전트의 `sandbox_owner` 를 늘 싣는다(ADR-20261007 connector-owner-attachments). 빠지거나 모양이 틀리면 거절한다.
@@ -231,9 +222,8 @@ export function createBindings(state: FakeHermesState) {
       send(response, 400, { error: "no such vault for this connector" });
       return;
     }
-    // 도구 목록이 없거나 Control Plane MCP 가 없는 목록, 어느 커넥터든 옛 설치가 있는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
-    if (toolsets === undefined || !toolsets.includes(CONTROL_PLANE_MCP)
-        || (state.installedConnectors.get(profile)?.size ?? 0) > 0) {
+    // 도구 목록이 없거나 Control Plane MCP 가 없는 profile 은 파일을 하나도 바꾸지 않고 거절한다.
+    if (toolsets === undefined || !toolsets.includes(CONTROL_PLANE_MCP)) {
       send(response, 409, { error: "the profile conflicts with this connector" });
       return;
     }

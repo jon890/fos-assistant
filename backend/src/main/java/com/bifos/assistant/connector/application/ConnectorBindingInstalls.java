@@ -12,11 +12,8 @@ import com.bifos.assistant.hermes.HermesConnectorClient;
 import com.bifos.assistant.hermes.HermesConnectorClient.ConnectorState;
 import com.bifos.assistant.hermes.HermesConnectorClient.InstallResult;
 import com.bifos.assistant.hermes.HermesConnectorClient.ProbeResult;
-import com.bifos.assistant.hermes.HermesToolsetClient;
-import com.bifos.assistant.hermes.dto.ConnectorField;
 import com.bifos.assistant.hermes.dto.ConnectorManifest;
 import java.time.Instant;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,22 +31,17 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class ConnectorBindingInstalls {
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final String STEP_ENV = "env";
     private static final String STEP_INSTALL = "install";
     private static final String STEP_INSTALL_STATE = "install-state";
     private static final String STEP_PROBE = "probe";
 
     private final HermesConnectorClient connector;
-    private final HermesToolsetClient toolsets;
     private final ConnectorBindingProperties properties;
     private final BrowserGatewayTokens tokens;
 
 
     /** 설치를 그 방식대로 한 번 보내고 대시보드의 답을 돌려준다. 엔티티를 외부 호출로 넘기지 않는다. */
     private InstallResult sendAgain(ConnectorBindingAttempt attempt) {
-        if (attempt.legacy()) {
-            return connector.putConnector(attempt.profile(), attempt.connectorId(), true, attempt.sandboxOwner());
-        }
         if (attempt.guardProtocol() != null) {
             var guard = JSON.createObjectNode().put("v", 1).put("protocol", attempt.guardProtocol())
                 .put("bindingId", attempt.bindingId().toString()).put("connectionId", attempt.connectionId().toString())
@@ -77,21 +69,19 @@ public class ConnectorBindingInstalls {
     /**
      * 설치 결과를 바인딩에 적는다. 바인딩은 {@code PENDING} 이 된다.
      *
-     * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 옛 설치는 설치된 커넥터에 늘 필요하다고 답하므로 그 값은
-     * 쓰지 않고 hook plugin 파일이 바뀌었는지만 본다. 재시작이 필요 없는 바인딩 설치가 {@code reload_pending} 이면 반영 예정
-     * 시각을 지금에서 {@code assistant.connector.binding.apply-delay} 뒤로 적는다(ADR-20261007 / connector-live-reload).
-     * 옛 설치의 판정은 바꾸지 않는다.
+     * <p>바인딩 설치는 바뀐 것이 있을 때만 재시작이 필요하다고 답한다. 재시작이 필요 없는 바인딩 설치가 {@code reload_pending} 이면
+     * 반영 예정 시각을 지금에서 {@code assistant.connector.binding.apply-delay} 뒤로 적는다(ADR-20261007 / connector-live-reload).
      *
      * @return 재시작이나 반영 예정을 기다려야 해 지금 반영을 확인할 수 없는가
      */
-    private boolean record(ConnectorBinding binding, InstallResult installed, boolean legacy, Instant now) {
-        boolean restart = legacy ? installed.pluginUpdated() : installed.restartRequired() || installed.pluginUpdated();
+    private boolean record(ConnectorBinding binding, InstallResult installed, Instant now) {
+        boolean restart = installed.restartRequired() || installed.pluginUpdated();
         binding.installed(restart, now);
         // 재시작 대기는 관리자 반영 완료가 푼다. 남은 반영 예정 시각이 그 반영 완료를 막지 않게 비우고, 새로 잡지도 않는다.
         if (restart) {
             binding.clearApplyDue();
         }
-        boolean scheduled = !legacy && !binding.restartRequired() && installed.reloadPending();
+        boolean scheduled = !binding.restartRequired() && installed.reloadPending();
         if (scheduled) {
             binding.scheduleApply(now.plus(properties.applyDelay()));
         }
@@ -102,16 +92,8 @@ public class ConnectorBindingInstalls {
     /** 현재 시도에만 설치와 probe 결과를 적는다. 이 단계는 연결의 revision을 바꾸지 않는다. */
     void record(ConnectorBinding binding, ConnectorBindingAttempt attempt, ConnectorInstallResult result) {
         Instant now = binding.updatedAt().isAfter(attempt.startedAt()) ? binding.updatedAt() : attempt.startedAt();
-        if (attempt.legacy() && attempt.checkInstallation() && result.installNotSent()) {
-            binding.restoreInstallIntent(attempt.desiredEnabled());
-        }
         if (result.installed() != null) {
-            if (attempt.legacy() && attempt.replaceValues()) {
-                binding.installed(result.envRestart() || result.installed().restartRequired()
-                    || result.installed().pluginUpdated(), now);
-            } else {
-                record(binding, result.installed(), attempt.legacy(), now);
-            }
+            record(binding, result.installed(), now);
         }
         if (result.undeclaredTools() != null) {
             binding.connection().recordUndeclaredTools(result.undeclaredTools());
@@ -121,9 +103,6 @@ public class ConnectorBindingInstalls {
         } else {
             binding.pending(now);
         }
-        if (attempt.legacy() && attempt.checkInstallation()) {
-            binding.agent().acceptConnectorAttachments(result.outcome() == ResyncOutcome.READY && attempt.attachments());
-        }
     }
 
 
@@ -132,9 +111,8 @@ public class ConnectorBindingInstalls {
      *
      * @return 반영됐으면 {@code READY}, {@code policy_hook} 만 거짓이면 {@code POLICY_HOOK_OFF}, 그 밖은 {@code NOT_INSTALLED}
      */
-    static ResyncOutcome notInstalledReason(ConnectorState state, boolean legacy) {
-        boolean installed = state.configured()
-            && (legacy || (state.enabled() && HermesConnectorClient.MODE_BIND.equals(state.mode())));
+    static ResyncOutcome notInstalledReason(ConnectorState state) {
+        boolean installed = state.configured() && state.enabled() && HermesConnectorClient.MODE_BIND.equals(state.mode());
         if (!installed) {
             return ResyncOutcome.NOT_INSTALLED;
         }
@@ -143,7 +121,7 @@ public class ConnectorBindingInstalls {
 
 
     /**
-     * 설치와 반영 확인을 실행한다. 일반 바인딩의 도구 선택과 옛 설치의 내장 toolset 판정은 기존 계약을 따른다.
+     * 바인딩 설치와 반영 확인을 실행한다.
      *
      * <p>새 붙이기의 명시적 거절만 호출자에게 넘겨 해당 시도의 행을 지우게 한다. 그 밖의 실패는 결과로 돌려주고,
      * 실패 단계와 커넥터 번호와 예외 종류만 경고로 남긴다. 예외 메시지와 원격 응답은 남기지 않는다.
@@ -153,45 +131,24 @@ public class ConnectorBindingInstalls {
             throw new IllegalStateException("installation HTTP requires no transaction");
         }
         if (attempt.waiting() != null) {
-            return new ConnectorInstallResult(null, false, attempt.waiting(), null, true);
+            return new ConnectorInstallResult(null, attempt.waiting(), null);
         }
         String step = STEP_INSTALL_STATE;
         InstallResult installed = null;
-        boolean installSent = false;
         try {
-            if (attempt.checkInstallation() && attempt.legacy()
-                && (!attempt.desiredEnabled()
-                    || !connector.readConnector(attempt.profile(), attempt.connectorId()).enabled())) {
-                return new ConnectorInstallResult(null, false, ResyncOutcome.NOT_INSTALLED, null, true);
-            }
-            boolean envRestart = false;
-            if (attempt.legacy() && attempt.replaceValues()) {
-                step = STEP_ENV;
-                for (ConnectorField field : attempt.fields()) {
-                    String value = attempt.values().get(field.key());
-                    // 비운 선택 칸은 앞선 등록이 남긴 값을 지운다.
-                    envRestart |= value == null ? connector.deleteEnv(attempt.profile(), field.env())
-                        : connector.putEnv(attempt.profile(), field.env(), value);
-                }
-            }
             step = STEP_INSTALL;
-            installSent = true;
             installed = sendAgain(attempt);
-            boolean restart = attempt.legacy() ? installed.pluginUpdated()
-                : installed.restartRequired() || installed.pluginUpdated();
-            if (attempt.legacy() && attempt.replaceValues()) {
-                restart |= envRestart || installed.restartRequired();
-            }
-            boolean scheduled = !attempt.legacy() && !restart && !attempt.restartRequired() && installed.reloadPending();
+            boolean restart = installed.restartRequired() || installed.pluginUpdated();
+            boolean scheduled = !restart && !attempt.restartRequired() && installed.reloadPending();
             ResyncOutcome outcome = restart ? ResyncOutcome.RESTART_PENDING
                 : scheduled ? ResyncOutcome.APPLY_SCHEDULED : ResyncOutcome.NOT_INSTALLED;
             if (!attempt.checkInstallation() || restart || scheduled) {
-                return new ConnectorInstallResult(installed, envRestart, outcome, null, false);
+                return new ConnectorInstallResult(installed, outcome, null);
             }
             step = STEP_INSTALL_STATE;
-            outcome = notInstalledReason(connector.readConnector(attempt.profile(), attempt.connectorId()), attempt.legacy());
+            outcome = notInstalledReason(connector.readConnector(attempt.profile(), attempt.connectorId()));
             if (outcome != ResyncOutcome.READY) {
-                return new ConnectorInstallResult(installed, false, outcome, null, false);
+                return new ConnectorInstallResult(installed, outcome, null);
             }
             step = STEP_PROBE;
             ProbeResult probe = connector.probe(attempt.profile(), attempt.mcpServer());
@@ -200,20 +157,17 @@ public class ConnectorBindingInstalls {
                 outcome = ResyncOutcome.PROBE_FAILED;
             } else if (probe.tools().isEmpty()) {
                 outcome = ResyncOutcome.NO_TOOLS;
-            } else if (attempt.legacy() && !Set.copyOf(attempt.toolsets())
-                .equals(Set.copyOf(toolsets.readEnabled(attempt.apiBaseUrl(), attempt.profile())))) {
-                outcome = ResyncOutcome.TOOLSETS_DIFFER;
             }
-            return new ConnectorInstallResult(installed, false, outcome, undeclared, false);
+            return new ConnectorInstallResult(installed, outcome, undeclared);
         } catch (ConnectorSandboxUnavailable | ConnectorInstallConflict | ConnectorProfileRejected ex) {
             if (!attempt.checkInstallation() && !attempt.replaceValues()) {
                 throw ex;
             }
             warn(step, attempt.connectorId(), ex);
-            return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null, !installSent);
+            return new ConnectorInstallResult(installed, ResyncOutcome.CALL_FAILED, null);
         } catch (RuntimeException ex) {
             warn(step, attempt.connectorId(), ex);
-            return new ConnectorInstallResult(installed, false, ResyncOutcome.CALL_FAILED, null, !installSent);
+            return new ConnectorInstallResult(installed, ResyncOutcome.CALL_FAILED, null);
         }
     }
 

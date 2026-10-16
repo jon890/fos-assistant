@@ -4,18 +4,24 @@ import json
 import os
 import pathlib
 from unittest import mock
-from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE, VAULT_IMPORT
+from dashboard_profile_api_support import DEMO, DEMO_BASE, DEMO_VALUE
 import dashboard_profile_api_support as support
 
 
 class ProfileApiEnvTest(support.ProfileApiRouteTest):
-    def test_installed_connector_is_blocked_when_operator_env_value_changes(self):
-        """설치한 뒤 운영 목록의 운영자 env 값이 바뀌면 소유 기록과 달라 상태 조회가 503 이다."""
+    def test_installed_connector_is_out_of_date_when_operator_env_value_changes(self):
+        """설치 뒤 운영자 env 값이 바뀌면 상태는 설치 어긋남을 보이고 다시 붙이면 맞춘다."""
         root = self.connector_fixture()
-        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.binding_install().status_code, 200)
         changed = {DEMO: {"root": str(root), "env": {"DEMO_BASE": DEMO_BASE + "/other"}}}
         with mock.patch.dict(os.environ, {"FOS_ASSISTANT_CONNECTOR_ROOTS": json.dumps(changed)}):
-            self.assertEqual(self.connector_status().status_code, 503)
+            status = self.connector_status()
+            self.assertEqual(status.status_code, 200)
+            self.assertEqual(status.body["connectors"], [
+                {"plugin": DEMO, "enabled": True, "configured": False, "mode": "bind"},
+            ])
+            self.assertEqual(self.binding_install().status_code, 200)
+            self.assertTrue(self.connector_status().body["connectors"][0]["configured"])
         self.assertEqual(self.connector_status().status_code, 200)
 
     def test_connector_write_removes_env_copies_left_by_older_version(self):
@@ -24,18 +30,18 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
         stale = self.root / "alice/connector-backups/1/.env"
         stale.parent.mkdir(parents=True)
         stale.write_text("DEMO_TOKEN=demo_secret_value_0123456789\n", encoding="utf-8")
-        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.binding_install().status_code, 200)
         self.assertFalse(stale.exists())
         self.assertEqual(list((self.root / "alice/connector-backups").glob("*/.env")), [])
 
     def test_unchanged_connector_install_still_removes_old_env_copies(self):
         """이미 설치되어 바뀔 것이 없는 요청도 이전 판이 백업에 남긴 `.env` 사본을 지운다."""
         self.connector_fixture()
-        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.binding_install().status_code, 200)
         stale = self.root / "alice/connector-backups/1/.env"
         stale.parent.mkdir(parents=True)
         stale.write_text("DEMO_TOKEN=demo_secret_value_0123456789\n", encoding="utf-8")
-        repeated = self.connector()
+        repeated = self.binding_install()
         self.assertEqual(repeated.status_code, 200)
         self.assertFalse(repeated.body["changed"])
         self.assertFalse(stale.exists())
@@ -55,10 +61,11 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
             return unlink(target, *args, **kwargs)
 
         with mock.patch.object(pathlib.Path, "unlink", autospec=True, side_effect=failing_unlink):
-            response = self.connector()
+            response = self.binding_install()
         self.assertEqual(response.status_code, 200)
         self.assertTrue(stale.exists())
-        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"], ["demo"])
+        self.assertEqual(self.alice_config()["platform_toolsets"]["api_server"],
+                         ["delegation", "fos-assistant", "terminal", "demo"])
 
     def test_connector_env_delete_preserves_other_credentials(self):
         """커넥터 칸의 환경 변수 삭제는 AI credential 과 Control Plane 토큰을 지우지 않는다."""
@@ -85,7 +92,7 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
     def test_operator_env_write_is_answered_without_writing(self):
         """운영자 env 이름의 쓰기와 지우기는 성공으로 답하고 profile `.env` 를 바꾸지 않는다."""
         self.connector_fixture()
-        self.connector()
+        self.binding_install()
         env = self.root / "alice/.env"
         env.write_text("DEMO_TOKEN=demo_ok_0123456789\n", encoding="utf-8")
         for method, body in (("PUT", {"profile": "alice", "key": "DEMO_BASE", "value": "http://changed.test"}),
@@ -99,38 +106,38 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
         self.assertEqual(self.request("/api/env", "PUT", token="valid", body={
             "profile": "owner", "key": "DEMO_BASE", "value": "x"}), 401)
 
-    def test_connector_env_update_reports_live_process_restart_without_echoing_token(self):
-        """토큰 교체는 설치한 자식의 재시작을 알리고 응답에 토큰 원문을 싣지 않는다."""
+    def test_connector_env_update_does_not_reinstall_a_bound_connector(self):
+        """연결 칸을 직접 바꿔도 vault 바인딩을 다시 설치하지 않고 값은 응답에 싣지 않는다."""
         self.connector_fixture()
         body = {"profile": "alice", "key": "DEMO_TOKEN", "value": "demo_ok_0123456789"}
         response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.body["restart_required"])
-        self.connector()
+        self.binding_install()
         response = self.request("/api/env", "PUT", token="valid", full_response=True, body=body)
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.body["restart_required"])
+        self.assertFalse(response.body["restart_required"])
         self.assertNotIn("demo_ok_0123456789", json.dumps(response.body))
         self.assertEqual(self.request("/api/env", "PUT", token="valid", body={**body, "profile": "owner"}), 401)
 
     def test_optional_field_updates_explicit_empty_env(self):
         """선택 칸을 채우고 비우면 MCP 설정의 변수 참조와 빈 값이 함께 바뀐다."""
         self.connector_fixture()
-        self.connector()
+        self.binding_install()
         self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
         response = self.request("/api/env", "PUT", token="valid", body={
             "profile": "alice", "key": "DEMO_SCOPE", "value": "a"})
         self.assertEqual(response, 200)
-        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "${DEMO_SCOPE}")
+        self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
         self.assertEqual(self.request("/api/env", "DELETE", token="valid", body={
             "profile": "alice", "key": "DEMO_SCOPE"}), 200)
         self.assertEqual(self.alice_config()["mcp_servers"]["demo"]["env"]["DEMO_SCOPE"], "")
         self.assertEqual(self.connector_probe(), 204)
 
-    def test_optional_field_update_restores_the_profile_plugin_and_asks_for_restart(self):
-        """선택 칸을 쓰는 요청도 hook plugin 을 묶음의 판으로 되돌리고 재시작이 필요하다고 답한다."""
+    def test_optional_field_update_does_not_reinstall_the_bound_plugin(self):
+        """연결 칸의 직접 변경은 bound plugin 을 다시 쓰지 않지만 재시작 표시는 낸다."""
         self.connector_fixture()
-        self.assertEqual(self.connector().status_code, 200)
+        self.assertEqual(self.binding_install().status_code, 200)
         installed = self.root / "alice/plugins/fos-ctx/__init__.py"
         bundled = (self.profile_plugins / "fos-ctx/__init__.py").read_bytes()
         installed.write_bytes(bundled + b"# changed\n")
@@ -138,12 +145,12 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
             "profile": "alice", "key": "DEMO_SCOPE", "value": "a"})
         self.assertEqual(response.status_code, 200)
         self.assertIs(response.body["restart_required"], True)
-        self.assertEqual(installed.read_bytes(), bundled)
+        self.assertEqual(installed.read_bytes(), bundled + b"# changed\n")
         self.assertEqual(installed.stat().st_mode & 0o777, 0o644)
-        self.assertIs(self.policy_hook(), True)
+        self.assertIs(self.policy_hook(), False)
 
-    def test_values_with_quotes_and_backslashes_round_trip_through_vault_binding_and_import(self):
-        """`"` 와 `\\` 가 든 값은 보관 파일에서 바인딩 `.env` 로 쓰인 뒤 실행과 옮기기가 같은 값으로 읽는다."""
+    def test_values_with_quotes_and_backslashes_round_trip_through_vault_binding(self):
+        """`"` 와 `\\` 가 든 값은 보관 파일에서 바인딩 `.env` 로 같은 값으로 쓰인다."""
         self.bind_fixture()
         tricky = 'a "quoted" path\\to\\ dir #1'
         self.assertEqual(self.vault("PUT", vault="c1", connector=DEMO,
@@ -154,12 +161,6 @@ class ProfileApiEnvTest(support.ProfileApiRouteTest):
         self.assertIn('DEMO_SCOPE="', env_text)
         self.assertEqual(self.plugin._env_value(env_text, "DEMO_SCOPE"), tricky)
         self.assertEqual(self.plugin._env_value(env_text, "DEMO_TOKEN"), DEMO_VALUE)
-        # 옮기기는 그 profile 의 `.env` 를 읽어 새 보관 파일을 만든다. 처음 보관한 값과 같아야 한다.
-        imported = self.vault("POST", VAULT_IMPORT, vault="c7", connector=DEMO, profile="alice")
-        self.assertEqual(imported.status_code, 200, imported.body)
-        self.assertEqual(json.loads((self.hermes_root / "connector-vault/c7.json").read_text())["values"],
-                         {"token": DEMO_VALUE, "scope": tricky})
-
     def test_env_value_reads_what_env_line_writes(self):
         """`_env_value` 는 `_env_line` 의 역이고 `export` 꼴과 `=` 둘레의 공백과 작은따옴표도 읽는다."""
         for value in ('plain', 'a "b" c', 'back\\slash', 'end\\', '"', "it's #hash", ""):

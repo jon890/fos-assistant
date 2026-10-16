@@ -36,21 +36,15 @@ export function createFakeHermesState(
   const souls = new Map<string, string>();
   /** profile 이름과 그 profile 에 게시된 `skills.external_dirs` 다. */
   const externalDirs = new Map<string, string[]>();
-  /** profile 이름과 그 profile 에 설치된 커넥터 id 들이다. */
-  const installedConnectors = new Map<string, Set<string>>();
   const connectorRequests: string[] = [];
-  /** 설치가 정책 hook 을 지금 판으로 맞춘 profile 이다. 설치한 적이 없는 profile 의 hook 은 꺼져 있다. */
+  /** 바인딩 설치가 정책 hook 을 지금 판으로 맞춘 profile 이다. 설치한 적이 없는 profile 의 hook 은 꺼져 있다. */
   const policyHookInstalled = new Set<string>();
   /** 설치해도 정책 hook 이 고쳐지지 않게 둔 profile 이다. */
   const policyHookOff = new Set<string>();
   const connectorEnvNames = new Set(FAKE_CONNECTORS.flatMap((connector) => connector.fields.map((field) => field.env)));
   /** 보관 파일 이름과 그 커넥터와 칸 값이다. 값은 메모리에만 두고 어느 응답에도 싣지 않는다. */
   const vaults = new Map<string, { connector: string; values: Record<string, string> }>();
-  /**
-   * profile 이름과 그 profile 에 바인딩 설치한 커넥터 id 와 보관 파일 이름이다.
-   *
-   * <p>`installedConnectors` 는 옛 설치(소유 기록의 `isolated`)만 갖는다. 한 profile 에 두 방식이 함께 있지 않다.
-   */
+  /** profile 이름과 그 profile 에 바인딩 설치한 커넥터 id 와 보관 파일 이름이다. */
   const boundConnectors = new Map<string, Map<string, string>>();
   /** 대시보드로 만들지 않은 profile 의 `.env` 다. 바인딩 설치가 칸 값을 여기 쓴다. */
   const hostEnv = new Map<string, Record<string, string>>();
@@ -120,7 +114,6 @@ export function createFakeHermesState(
     apiServerToolsets,
     souls,
     externalDirs,
-    installedConnectors,
     connectorRequests: connectorRequests as string[],
     policyHookInstalled,
     policyHookOff,
@@ -232,7 +225,6 @@ export type FakeConnector = {
   fields: readonly FakeConnectorField[];
   verify: { tool: string };
   mcp_server: string;
-  toolsets: readonly string[];
   tools: Record<string, unknown>;
 };
 
@@ -350,8 +342,8 @@ export type FakeHermes = {
   apiServerToolsetsOf(name: string): string[] | undefined;
   /**
    * 커넥터 경로로 받은 요청을 받은 순서대로 적은 줄이다. `call <도구>`, `env put <profile> <key>`,
-   * `env delete <profile> <key>`, `toolsets <profile>`, `install <profile> <on|off>`, `probe <profile>`,
-   * `bind <profile>`, `unbind <profile>`, `vault put`, `vault delete`, `vault import <profile>` 이다.
+   * `env delete <profile> <key>`, `toolsets <profile>`, `probe <profile>`, `bind <profile>`, `unbind <profile>`,
+   * `vault put`, `vault delete` 이다.
    * 비밀 값과 보관 파일 이름은 적지 않는다.
    */
   connectorRequests(): readonly string[];

@@ -40,7 +40,7 @@ public class AgentDefaultToolsets {
      * @return Hermes 에 쓴 목록. 쓸 것이 없었거나 쓰지 못했으면 빈 목록이다
      */
     public List<String> apply(Agent agent, List<String> defaults) {
-        if (defaults.isEmpty() || agent.connectorManaged()) {
+        if (defaults.isEmpty()) {
             return List.of();
         }
         try {

@@ -185,8 +185,8 @@ sequenceDiagram
 | collection | 그 에이전트가 받는 collection 인가(`agent_memory_collection` 의 줄) |
 | 민감도 | `SENSITIVE` 면 그 collection 의 `allow_sensitive` 가 참인가 |
 
-- 줄이 하나도 없는 에이전트, 찾지 못한 에이전트, 에이전트가 없는 실행, 옛 커넥터 에이전트는 아무것도 받지 않는다. 옛 커넥터 에이전트의 실행은 Memory 문맥을 조립하지 않는다([ADR-045](../../backend/docs/adr/ADR-045-커넥터-에이전트는-자기-mcp-서버만-받고-memory-와-control-plane-도구를-받지-않는다.md))
-- 새 에이전트에는 `AgentCreated` 사건으로 `core` 한 줄을 넣는다. 에이전트를 만드는 경로가 셋이라 경로마다 넣지 않고 이 사건 하나로 넣는다. 옛 커넥터 에이전트에는 넣지 않는다
+- 줄이 하나도 없는 에이전트, 찾지 못한 에이전트, 에이전트가 없는 실행은 아무것도 받지 않는다
+- 새 에이전트에는 `AgentCreated` 사건으로 `core` 한 줄을 넣는다. 에이전트를 만드는 경로가 셋이라 경로마다 넣지 않고 이 사건 하나로 넣는다
 - 위임받은 에이전트는 자기 허용으로 판정한다. 부르는 쪽의 허용을 물려받지 않는다
 - `ContextAssembler` 는 에이전트를 번호로 받는다. `context` 패키지가 `agent` 를 쓰면 패키지 순환이 하나 늘기 때문이다. `memory` 는 `OmittedMemories` port 로 빠진 항목을 받아 `context` 를 import 하지 않는다
 
@@ -200,7 +200,6 @@ sequenceDiagram
 | --- | --- |
 | `ADMIN` 이 아니다 | `FORBIDDEN` |
 | 없거나 지운 에이전트다 | `AGENT_NOT_FOUND` |
-| 옛 커넥터 에이전트다 | `FORBIDDEN`. 줄이 있어도 받지 않으므로 바꾸지 않는다 |
 | 그룹 목록에도 지금 받는 줄에도 없는 collection, 같은 collection 이 둘, 상한을 넘는 목록 | `VALIDATION_FAILED` |
 | 바뀐 것이 없다 | 아무것도 쓰지 않고 지금 값을 낸다 |
 | 두 관리자가 동시에 저장한다 | 에이전트 행 잠금을 기다려 하나씩 돈다. 나중 저장이 이기고 기록은 둘 다 남는다. 잠금 읽기가 트랜잭션의 첫 읽기라 나중 저장은 앞 저장이 커밋한 줄을 보고 비교한다 |
@@ -228,7 +227,6 @@ sequenceDiagram
 | 받지 않는 collection 의 항목, 허용받지 않은 민감 항목 | 같은 응답이다 |
 | 승인 전인 항목, 항상 층에 이미 실린 항목, 보관한 항목, 출처 원문 | 같은 응답이다 |
 | origin 실행에 에이전트가 없거나 그 에이전트를 찾지 못한다 | 같은 응답이다. 받는 collection 이 없다 |
-| origin 실행의 에이전트가 옛 커넥터 에이전트다 | 요청자 판정에서 먼저 거절한다. 호출 맥락을 확인할 수 없다는 응답이다 |
 | 위임받아 도는 에이전트가 읽는다 | 그 에이전트의 허용으로 판정한다 |
 
 #### Memory 를 고치고 지울 때
@@ -270,11 +268,11 @@ sequenceDiagram
 - `memory_id` 는 같은 사실을 고칠 기존 항목 번호이고, 지시문의 개인 사실 구역이나 색인에 있는 번호다
 - `sensitive` 가 참이면 늘 제안이고 본문은 암호문으로 저장한다
 - 꺼내는 방식은 `SEARCH` 로 고정한다. 항상 싣기는 사람이 `/memory` 에서 켠다
-- 먼저 살펴보기 트리에서는 받지 않는다. 옛 커넥터 에이전트의 실행은 요청자 판정에서 먼저 거절한다
+- 먼저 살펴보기 트리에서는 받지 않는다
 - **fos-ctx 가 이 도구를 서명 필수로 안다.**
 - **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 인자에 사람에 관한 사실이 실린다
 
-이 도구를 받는 실행의 공통 답변 지침 뒤에는 「# 기억」 절(`ContextAssembler.MEMORY_INSTRUCTIONS`)을 싣는다. 옛 커넥터 에이전트와 먼저 살펴보기 turn 은 싣지 않는다.
+이 도구를 받는 실행의 공통 답변 지침 뒤에는 「# 기억」 절(`ContextAssembler.MEMORY_INSTRUCTIONS`)을 싣는다. 먼저 살펴보기 turn 은 싣지 않는다.
 
 #### 바로 저장 판정
 
@@ -356,7 +354,7 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 | `MEMORY_FACTS` | 「개인 사실 구역」 에 실린 항목 | `NORMAL` 만 | `USER_APPROVED` | `INLINE` | 대화 turn 의 `instructions` |
 | `MEMORY_INDEX` | `memory` 의 `SEARCH` | 원래 값 | `USER_APPROVED` | `TITLE_ONLY` | 대화 turn 의 `instructions` |
 | `MEMORY_READ` | `memory_read` 가 본문을 내 준 항목 | 묶음 항목이 아니다 | 묶음 항목이 아니다 | `INLINE` | 도구 처리가 `execution_context_source` 에만 덧붙인다 |
-| `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | 옛 커넥터 에이전트의 답이면 `EXTERNAL`, 아니면 `AGENT` | `INLINE` | 자동 turn 의 `input` |
+| `DELEGATION_RESULT` | 아직 전하지 않은 위임 실행의 `output_text`(`AgentExecutionRepository.findUndeliveredResults`) | `SENSITIVE` | `AGENT` | `INLINE` | 자동 turn 의 `input` |
 | `CONNECTOR_RESULT` | `connector_action` 의 `result_text` | `SENSITIVE` | `EXTERNAL` | `INLINE`. `UNKNOWN` 이면 `OMITTED` | 자동 turn 의 `input` |
 | `EXECUTION_STATE` | `agent_execution` 의 상태와 시각 | `NORMAL` | `CONTROL_PLANE` | 본문이 없다 | 지금 화면과 먼저 알리기 |
 | `FOLLOW_UP` | `follow_up` | `SENSITIVE` | 사람이 받아들였으면 `USER_APPROVED`, 제안이면 `AGENT` | `TITLE_ONLY` | 지금 화면과 먼저 알리기 |
@@ -370,7 +368,7 @@ Control Plane 이 여러 기록에서 모은 문맥의 항목 모델, source 마
 일정 같은 커넥터 데이터는 연결을 붙인 에이전트가 turn 안에서 직접 부른 도구의 결과로 들어오고, 묶음을 거치지 않고 `fos-ctx` 가 `<external-data>` 로 감싼다([`hermes/plugins/fos-ctx/README.md`](../../hermes/plugins/fos-ctx/README.md)).
 일정 커넥터가 생기면 그 결과를 읽는 source 를 이 표에 더한다.
 
-**옛 커넥터 에이전트의 실행에는 묶음을 주지 않는다.** 연결을 붙인 일반 에이전트는 보통 에이전트와 같은 묶음을 받는다.
+연결을 붙인 에이전트도 보통 에이전트와 같은 묶음을 받는다.
 
 ### Hermes 에 넘기는 형식
 
@@ -418,10 +416,8 @@ Control Plane 이 구조로 알 수 있는 충돌만 `conflictsWith` 에 적는�
 
 | 상황 | 기대 |
 | --- | --- |
-| 기억 「주간 회의는 화요일 10시」(`MEMORY_ALWAYS`)와 옛 커넥터 에이전트의 위임 결과 「수요일로 옮겨졌다」(`DELEGATION_RESULT`, `EXTERNAL`)가 어긋난다 | 결과에 출처 머리줄과 `<external-data>` 가 붙고 Memory 는 그대로다. 답은 두 출처를 함께 말하고 기억을 바꿀지 묻는다 |
 | 승인한 호출의 결과(`CONNECTOR_RESULT`)를 몇 시간 뒤 다시 전한다 | 머리줄에 오래됨이 붙는다. 같은 승인 줄은 다시 실행되지 않고(ADR-050) 결과 글만 다시 싣는다 |
 | 민감 문서 하나와 같은 이름의 개인 문서, 그룹 문서가 있다 | 민감 문서는 민감 허용을 받는 에이전트에만 제목으로 오른다. 두 문서는 따로 오르고 서로를 가리키는 충돌 표시가 붙는다. 받지 않는 에이전트에는 오르지 않고, 빠진 수는 로그에 개수로만 남는다 |
-| 옛 커넥터 에이전트와 대화를 시작한다 | Memory 항목이 하나도 실리지 않는다. 연결을 붙인 일반 에이전트는 자기 collection 에 따라 실린다 |
 
 ## Memory 회수 측정
 

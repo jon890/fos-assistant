@@ -74,6 +74,29 @@ class MysqlMigrationTest {
 
 
     @Test
+    @DisplayName("옛 커넥터 에이전트 컬럼과 연결의 제약을 제거하고 바인딩 제약은 유지한다")
+    void removesLegacyConnectorColumnsAndConstraints() {
+        assertThat(jdbc.queryForList("""
+                SELECT CONCAT(table_name, '.', column_name) FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND ((table_name = 'agent' AND column_name IN ('connector_managed', 'connector_attachments'))
+                    OR (table_name = 'connector_connection' AND column_name IN ('agent_id', 'restart_required', 'desired_enabled')))
+                """, String.class)).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT constraint_name FROM information_schema.table_constraints
+                WHERE constraint_schema = DATABASE() AND table_name = 'connector_connection'
+                  AND constraint_name IN ('fk_connector_connection_agent', 'uk_connector_connection_agent')
+                """, String.class)).isEmpty();
+        assertThat(jdbc.queryForList("""
+                SELECT constraint_name FROM information_schema.table_constraints
+                WHERE constraint_schema = DATABASE() AND table_name = 'agent_connector_binding'
+                  AND constraint_type = 'FOREIGN KEY'
+                """, String.class)).containsExactlyInAnyOrder(
+            "fk_agent_connector_binding_agent", "fk_agent_connector_binding_connection");
+    }
+
+
+    @Test
     @DisplayName("높은 시각 버전 적용 뒤 늦게 들어온 낮은 시각 버전도 실제 MySQL 에 적용한다")
     void appliesLateTimestampMigration(@TempDir Path directory) throws IOException, SQLException {
         assertThat(flyway.getConfiguration().isOutOfOrder()).isTrue();

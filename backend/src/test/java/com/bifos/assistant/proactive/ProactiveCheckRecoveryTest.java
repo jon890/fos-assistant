@@ -246,7 +246,7 @@ class ProactiveCheckRecoveryTest {
     }
 
 
-    /** 그 살펴보기 turn 이 커넥터 에이전트에 맡긴 위임 자식이다. */
+    /** 그 살펴보기 turn이 과거에 맡긴 위임 자식이다. */
     private AgentExecution child(AgentExecution root, ExecutionStatus status) {
         AgentExecution child = AgentExecution.builder()
             .userId(user.id())
@@ -275,10 +275,10 @@ class ProactiveCheckRecoveryTest {
     }
 
 
-    private Agent agent(String code, boolean connectorManaged) {
+    private Agent agent(String code, boolean childAgent) {
         Agent created = Agent.of(
             code,
-            connectorManaged ? "채용 연결" : "커리어",
+            childAgent ? "과거 위임 대상" : "커리어",
             code,
             "http://agent-runtime.test/p/" + code,
             CostMode.SUBSCRIPTION,
@@ -286,9 +286,6 @@ class ProactiveCheckRecoveryTest {
             AgentVisibility.PRIVATE,
             user.id(),
             STARTED);
-        if (connectorManaged) {
-            created.markConnectorManaged();
-        }
         return created;
     }
 }

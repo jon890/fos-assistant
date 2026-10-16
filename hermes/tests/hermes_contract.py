@@ -363,7 +363,6 @@ OWN_ROUTES = frozenset({
     ("POST", "/api/connectors/{}/execute"),
     ("PUT", "/api/connector-vault"),
     ("DELETE", "/api/connector-vault"),
-    ("POST", "/api/connector-vault/import"),
     ("GET", "/api/profiles/{}/model-defaults"),
     ("GET", "/api/profiles/{}/sessions/{}/provider"),
 })

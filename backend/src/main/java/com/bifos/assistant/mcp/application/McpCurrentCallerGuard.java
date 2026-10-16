@@ -46,7 +46,6 @@ public class McpCurrentCallerGuard {
             var agent = agents.findById(origin.agentId()).orElseThrow(McpCurrentCallerGuard::invalidContext);
             if (agent.isDeleted()
                 || !agent.enabled()
-                || agent.connectorManaged()
                 || !agent.isReadableBy(origin.userId())
                 || !origin.profileName().equals(agent.hermesProfile())) {
                 throw invalidContext();

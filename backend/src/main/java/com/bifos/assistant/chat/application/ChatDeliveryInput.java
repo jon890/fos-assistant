@@ -210,13 +210,13 @@ class ChatDeliveryInput {
 
 
     /**
-     * 답을 외부 글로 감쌀 에이전트다. 옛 연결용 에이전트와 연결이 하나라도 붙은 에이전트다(ADR-20261008 / read-data-flow).
+     * 답을 외부 글로 감쌀 에이전트다. 연결이 하나라도 붙은 에이전트다(ADR-20261008 / read-data-flow).
      *
      * <p>지금 붙은 연결로 정한다. 실행이 끝난 뒤 연결을 뗐으면 감싸지 않는다.
      */
     Set<Long> externalAgentsOf(Map<Long, Agent> resultAgents) {
         return resultAgents.values().stream()
-            .filter(agent -> agent.connectorManaged() || bindings.hasBindings(agent.id()))
+            .filter(agent -> bindings.hasBindings(agent.id()))
             .map(Agent::id)
             .collect(Collectors.toSet());
     }
