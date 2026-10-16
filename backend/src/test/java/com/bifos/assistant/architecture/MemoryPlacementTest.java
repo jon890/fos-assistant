@@ -23,16 +23,16 @@ class MemoryPlacementTest {
     private static final String ENTITY = ROOT + ".memory.domain.entity";
     private static final Map<String, String> TABLES = Map.of(
         "Memory", "memory", "MemoryCapture", "memory_capture", "MemoryCollection", "memory_collection",
-        "MemoryRevision", "memory_revision", "ServiceToken", "service_token", "ServiceTokenCollection", "service_token_collection");
+        "MemoryRevision", "memory_revision");
     private static final Map<String, String> IDS = Map.of(
-        "MemoryCollection", "MemoryCollectionId", "MemoryRevision", "MemoryRevisionId", "ServiceTokenCollection", "ServiceTokenCollectionId");
+        "MemoryCollection", "MemoryCollectionId", "MemoryRevision", "MemoryRevisionId");
 
     @TempDir
     Path temporary;
 
 
     @Test
-    @DisplayName("운영 아홉 저장 타입과 실제 ID 연결을 기준 파일 없이 검사한다")
+    @DisplayName("운영 여섯 저장 타입과 실제 ID 연결을 기준 파일 없이 검사한다")
     void checksProductionPlacement() {
         ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE.check(ArchitectureRulesTest.MAIN);
         ArchitectureRules.EMBEDDED_IDS_WITH_ENTITIES.check(ArchitectureRulesTest.MAIN);
@@ -47,7 +47,7 @@ class MemoryPlacementTest {
         sources.put(ROOT + ".memory.domain.Event", source(ROOT + ".memory.domain", "Event"));
         sources.put(ROOT + ".memory.infra.Projection", source(ROOT + ".memory.infra", "Projection"));
         sources.put(ROOT + ".other.domain.Other", entity(ROOT + ".other.domain", "Other", "other", ""));
-        JavaClasses fixture = compile("valid", sources, 13);
+        JavaClasses fixture = compile("valid", sources, 10);
         ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").check(fixture);
         ArchitectureRules.embeddedIdsWithEntities(ROOT, "memory").check(fixture);
     }
@@ -55,7 +55,7 @@ class MemoryPlacementTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"Memory", "MemoryCapture", "MemoryCollection", "MemoryCollectionId", "MemoryRevision", "MemoryRevisionId",
-        "ServiceToken", "ServiceTokenCollection", "ServiceTokenCollectionId"})
+        })
     @DisplayName("각 소유 타입의 옛 위치와 다른 기능 이동 및 누락과 중복을 거절한다")
     void rejectsEveryOwnerViolation(String name) throws IOException {
         for (String scenario : new String[] {"old", "other", "missing", "duplicate", "role", "renamed"}) {
@@ -82,7 +82,7 @@ class MemoryPlacementTest {
                     : "@jakarta.persistence.EmbeddedId " + destination + "." + name + " id;";
                 sources.replaceAll((key, value) -> value.replace(oldReference, newReference));
             }
-            JavaClasses fixture = compile(name + scenario, sources, scenario.equals("missing") ? 8 : scenario.equals("duplicate") ? 10 : 9);
+            JavaClasses fixture = compile(name + scenario, sources, scenario.equals("missing") ? 5 : scenario.equals("duplicate") ? 7 : 6);
             assertThat(ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").evaluate(fixture).getFailureReport().toString())
                 .as(name + " " + scenario).contains("ENTITIES_IN_OWNED_ENTITY_PACKAGE", ROOT, movedName);
         }
@@ -94,7 +94,7 @@ class MemoryPlacementTest {
     void rejectsEmptySelections() throws IOException {
         JavaClasses fixture = compile("emptySelection", Map.of(ROOT + ".Empty", source(ROOT, "Empty")), 1);
         assertThat(ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").evaluate(fixture).getFailureReport().getDetails())
-            .hasSize(15);
+            .hasSize(10);
         JavaClasses empty = new ClassFileImporter().importClasses();
         assertThat(empty).isEmpty();
         assertThatThrownBy(() -> ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").check(empty))
@@ -105,7 +105,7 @@ class MemoryPlacementTest {
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"MemoryCollection", "MemoryRevision", "ServiceTokenCollection"})
+    @ValueSource(strings = {"MemoryCollection", "MemoryRevision"})
     @DisplayName("실제 EmbeddedId가 다른 패키지에 남으면 소유 엔티티와 ID를 함께 보고한다")
     void rejectsSeparatedEmbeddedIds(String name) throws IOException {
         Map<String, String> sources = owners();
@@ -114,7 +114,7 @@ class MemoryPlacementTest {
         sources.remove(ENTITY + "." + id);
         sources.put(old + "." + id, "package " + old + "; @jakarta.persistence.Embeddable public class " + id + " {}");
         sources.put(ENTITY + "." + name, entity(ENTITY, name, TABLES.get(name), "@jakarta.persistence.EmbeddedId " + old + "." + id + " id;"));
-        JavaClasses fixture = compile(name, sources, 9);
+        JavaClasses fixture = compile(name, sources, 6);
         assertThat(ArchitectureRules.embeddedIdsWithEntities(ROOT, "memory").evaluate(fixture).getFailureReport().toString())
             .contains("EMBEDDED_IDS_WITH_ENTITIES", ENTITY + "." + name, old + "." + id);
     }
@@ -131,7 +131,7 @@ class MemoryPlacementTest {
             body = body.replace("public class", "@jakarta.persistence.Embeddable public class");
         }
         sources.put(ENTITY + "." + name, body);
-        JavaClasses fixture = compile(name, sources, 10);
+        JavaClasses fixture = compile(name, sources, 7);
         ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").check(fixture);
         assertThat(ArchitectureRules.embeddedIdsWithEntities(ROOT, "memory").evaluate(fixture).getFailureReport().toString())
             .contains("EMBEDDED_IDS_WITH_ENTITIES", ENTITY + "." + name);
@@ -145,7 +145,7 @@ class MemoryPlacementTest {
         Map<String, String> sources = owners();
         String misplaced = ROOT + ".memory" + suffix;
         sources.put(misplaced + ".Extra", entity(misplaced, "Extra", "extra", ""));
-        JavaClasses fixture = compile("extra", sources, 10);
+        JavaClasses fixture = compile("extra", sources, 7);
         assertThat(ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").evaluate(fixture).getFailureReport().toString())
             .contains("ENTITIES_IN_OWNED_ENTITY_PACKAGE", misplaced + ".Extra");
     }
@@ -157,7 +157,7 @@ class MemoryPlacementTest {
         Map<String, String> sources = owners();
         sources.put(ROOT + ".other.Outer", "package " + ROOT + ".other; public class Outer { "
             + "@jakarta.persistence.Entity @jakarta.persistence.Table(name=\"memory\") public static class Copy {} }");
-        JavaClasses fixture = compile("nested", sources, 11);
+        JavaClasses fixture = compile("nested", sources, 8);
         assertThat(ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").evaluate(fixture).getFailureReport().toString())
             .contains(ROOT + ".other.Outer$Copy", "memory Table 기대 수 1, 실제 2");
     }
@@ -170,7 +170,7 @@ class MemoryPlacementTest {
         sources.put(ENTITY + ".Extra", entity(ENTITY, "Extra", "extra",
             "@jakarta.persistence.EmbeddedId ExtraId id; private static class Value {}"));
         sources.put(ENTITY + ".ExtraId", "package " + ENTITY + "; @jakarta.persistence.Embeddable public class ExtraId {}");
-        JavaClasses fixture = compile("extension", sources, 12);
+        JavaClasses fixture = compile("extension", sources, 9);
         ArchitectureRules.entitiesInOwnedEntityPackage(ROOT, "memory").check(fixture);
         ArchitectureRules.embeddedIdsWithEntities(ROOT, "memory").check(fixture);
     }

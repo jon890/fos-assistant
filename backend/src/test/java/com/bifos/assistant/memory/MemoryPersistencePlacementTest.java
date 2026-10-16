@@ -8,15 +8,10 @@ import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.entity.MemoryCollectionId;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
-import com.bifos.assistant.memory.domain.entity.ServiceToken;
-import com.bifos.assistant.memory.domain.entity.ServiceTokenCollection;
-import com.bifos.assistant.memory.domain.entity.ServiceTokenCollectionId;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
 import com.bifos.assistant.memory.infra.MemoryCollectionRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
-import com.bifos.assistant.memory.infra.ServiceTokenCollectionRepository;
-import com.bifos.assistant.memory.infra.ServiceTokenRepository;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
@@ -44,9 +39,7 @@ class MemoryPersistencePlacementTest {
         assertPersistence(repositories, MemoryCapture.class, Long.class, MemoryCaptureRepository.class);
         assertPersistence(repositories, MemoryCollection.class, MemoryCollectionId.class, MemoryCollectionRepository.class);
         assertPersistence(repositories, MemoryRevision.class, MemoryRevisionId.class, MemoryRevisionRepository.class);
-        assertPersistence(repositories, ServiceToken.class, Long.class, ServiceTokenRepository.class);
-        assertPersistence(repositories, ServiceTokenCollection.class, ServiceTokenCollectionId.class, ServiceTokenCollectionRepository.class);
-        for (Class<?> idType : new Class<?>[] {MemoryCollectionId.class, MemoryRevisionId.class, ServiceTokenCollectionId.class}) {
+        for (Class<?> idType : new Class<?>[] {MemoryCollectionId.class, MemoryRevisionId.class}) {
             assertThat(entityManager.getMetamodel().embeddable(idType).getJavaType()).isEqualTo(idType);
         }
     }

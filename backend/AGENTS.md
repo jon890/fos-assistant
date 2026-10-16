@@ -37,10 +37,10 @@ entity 하위 패키지와 공개 중첩 DTO, model, enum, config, policy도 금
 
 ### memory의 영속 타입
 
-엔티티 여섯 타입과 복합 ID 세 타입은 `memory.domain.entity`에 둔다.
+엔티티 네 타입과 복합 ID 두 타입은 `memory.domain.entity`에 둔다.
 `MemoryPlacement`, `StoredContent`, projection과 event는 `memory.domain`에 남기고
 저장 enum은 `memory.domain.type`에 둔다. 새 엔티티와 실제 영속 ID에도 crypto와 같은 역할 규칙을 적용한다.
-기존 아홉 타입은 전체 운영 루트에서 이름 또는 표 계약으로 선택해 정확한 소유 패키지와 각 기대 수 1을 검사한다.
+기존 여섯 타입은 전체 운영 루트에서 이름 또는 표 계약으로 선택해 정확한 소유 패키지와 각 기대 수 1을 검사한다.
 검사: `ArchitectureRules.ENTITIES_IN_OWNED_ENTITY_PACKAGE`, `EMBEDDED_IDS_WITH_ENTITIES`, `MemoryPlacementTest`.
 
 ### 데이터 클래스는 컨트롤러 안에 두지 않는다

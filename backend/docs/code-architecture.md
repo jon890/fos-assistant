@@ -60,7 +60,7 @@ native SQL과 JPQL bulk는 listener를 거치지 않으므로 SQL 작성자가 �
 | `chat` | 대화, 메시지, 한 번의 실행 흐름, 대화의 모델 선택, 추천 질문 생성, 첨부 관찰 revision과 요청 alias |
 | `usage` | 실행 기록, 실행 사건, 비용 환산, 사용량 조회, 사용자 실행 한도([`docs/features/execution.md`](../../docs/features/execution.md)) |
 | `feedback` | 제안에 대한 사용자 반응과 실행 결과의 사건 저장, 대화 삭제와 보관 기간의 정리, 반응 읽기 규칙([`docs/features/proactive.md`](../../docs/features/proactive.md)). 위 패키지가 부르기만 하고 이 패키지는 그 패키지를 모른다 |
-| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 서비스 토큰, 다른 서비스의 문서 읽기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
+| `memory` | 개인과 그룹 공용 Memory, 제안과 승인, 판 기록, 그룹의 collection 목록, 에이전트의 실행에 보이는 항목 판정, 문서 쓰기와 고치기, 기존 개인 지식의 들이기, 관리자의 에이전트 collection 설정과 빠진 항목 수 |
 | `context` | 실행에 넣을 `instructions` 조립과 문맥 묶음의 항목 모델 |
 | `mcp` | Memory 본문 조회, 결과물 쓰기와 할 일 제안 도구의 인자 검사, 장기 토큰 인증과 profile 묶기, 요청자 판정 |
 | `people` | 로그인 허용 목록과 사람을 더하는 흐름, 첫 로그인에 그 사람의 에이전트 만들기 |
@@ -220,8 +220,7 @@ domain과 infra는 admin을 import하지 않는다.
 entity 하위 패키지는 만들지 않고 정책과 projection, event, DTO, model, enum, config는
 entity 패키지의 공개 중첩 타입으로도 두지 않는다. 예외는 private 비영속 구현 값뿐이다.
 
-`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`,
-`ServiceToken`, `ServiceTokenCollection`과 복합 ID 세 타입을 소유한다.
+`memory.domain.entity`는 `Memory`, `MemoryCapture`, `MemoryCollection`, `MemoryRevision`과 복합 ID 세 타입을 소유한다.
 기존 타입은 운영 루트 전체에서 top-level 이름 또는 표 계약으로 선택하며 각 기대 수는 1이다.
 다른 기능 이동, 표를 유지한 이름 변경, 누락과 중복도 같은 두 규칙으로 거절한다.
 새 memory 엔티티와 실제 영속 ID에도 위 배치 규칙을 적용한다.
