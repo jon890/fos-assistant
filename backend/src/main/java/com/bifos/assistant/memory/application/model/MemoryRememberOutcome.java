@@ -10,6 +10,11 @@ public enum MemoryRememberOutcome {
     PROPOSED,
     /** 같은 제목과 본문이 이미 저장돼 있다. */
     ALREADY_KNOWN,
+    /**
+     * 같은 제목과 본문이 저장돼 있지만 다른 기억이 대체해 실리지 않는다. 사용자가 기억 화면에서 대체를 되돌려야 다시 실린다(ADR-20261015 /
+     * memory-link).
+     */
+    SUPERSEDED_BEFORE,
     /** 같은 제목과 본문의 제안이 이미 있다. */
     ALREADY_PROPOSED,
     /** 같은 제목과 본문을 사용자가 거절했다. */

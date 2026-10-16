@@ -17,11 +17,14 @@ import com.bifos.assistant.memory.domain.entity.MemoryRevisionId;
 import com.bifos.assistant.memory.domain.StoredContent;
 import com.bifos.assistant.memory.domain.type.MemoryCaptureKind;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
+import com.bifos.assistant.memory.domain.type.MemoryLinkStatus;
+import com.bifos.assistant.memory.domain.type.MemoryLinkType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
 import com.bifos.assistant.memory.domain.type.MemorySensitivity;
 import com.bifos.assistant.memory.domain.type.MemoryStatus;
 import com.bifos.assistant.memory.infra.MemoryCaptureRepository;
+import com.bifos.assistant.memory.infra.MemoryLinkRepository;
 import com.bifos.assistant.memory.infra.MemoryRepository;
 import com.bifos.assistant.memory.infra.MemoryRevisionRepository;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -59,6 +62,7 @@ public class MemoryCaptureService {
     private final MemoryRepository memories;
     private final MemoryRevisionRepository revisions;
     private final MemoryCaptureRepository captures;
+    private final MemoryLinkRepository links;
     private final DecisionFeedbackRecorder feedback;
     private final Clock clock;
 
@@ -240,7 +244,7 @@ public class MemoryCaptureService {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_NEEDS_CONFIRMATION);
         }
         Optional<Memory> found = memories.findByIdForUpdate(request.memoryId());
-        if (found.isEmpty() || !updatable(user, access, found.get())) {
+        if (found.isEmpty() || !updatable(user, access, found.get()) || superseded(found.get())) {
             return MemoryRememberResult.of(MemoryRememberOutcome.UPDATE_TARGET_NOT_FOUND);
         }
         Memory memory = found.get();
@@ -272,7 +276,9 @@ public class MemoryCaptureService {
     private MemoryRememberResult existingOutcome(
         CurrentUser user, Memory existing, boolean direct, MemoryRememberRequest request) {
         return switch (existing.status()) {
-            case ACCEPTED -> new MemoryRememberResult(MemoryRememberOutcome.ALREADY_KNOWN, existing.id());
+            case ACCEPTED -> new MemoryRememberResult(
+                superseded(existing) ? MemoryRememberOutcome.SUPERSEDED_BEFORE : MemoryRememberOutcome.ALREADY_KNOWN,
+                existing.id());
             case REJECTED -> new MemoryRememberResult(MemoryRememberOutcome.REJECTED_BEFORE, existing.id());
             case PROPOSED -> {
                 if (!direct) {
@@ -283,6 +289,12 @@ public class MemoryCaptureService {
                 yield new MemoryRememberResult(MemoryRememberOutcome.REMEMBERED, memory.id());
             }
         };
+    }
+
+
+    /** 효력 있는 대체 연결이 이 항목을 가리킨다. 그 항목은 실리지 않으므로 같은 사실로 보거나 고칠 대상으로 삼지 않는다. */
+    private boolean superseded(Memory memory) {
+        return links.existsByToMemoryIdAndTypeAndStatus(memory.id(), MemoryLinkType.SUPERSEDES, MemoryLinkStatus.ACTIVE);
     }
 
 

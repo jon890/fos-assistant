@@ -171,6 +171,10 @@ public class McpMemoryRemember {
             case UPDATED -> result("기존 기억을 고쳤다. 이전 값은 이력에 남았다. 답에서 무엇을 바꿨는지 짧게 알린다.", false);
             case PROPOSED -> result("제안으로 남겼다. 사용자가 받아들여야 기억한다. 답에서 아직 승인 전이라는 것을 알린다.", false);
             case ALREADY_KNOWN -> result("이미 같은 내용을 기억하고 있다. 새로 남기지 않았다.", false);
+            case SUPERSEDED_BEFORE -> result(
+                "같은 내용의 기억이 있지만 다른 기억이 대신하고 있어 쓰이지 않는다. 새로 남기지 않았다. "
+                    + "사용자에게 기억 화면에서 대체를 되돌릴지 묻는다.",
+                true);
             case ALREADY_PROPOSED -> result("같은 제안이 이미 있다. 사용자가 받아들이기를 기다린다.", false);
             case REJECTED_BEFORE -> result("사용자가 이 내용을 거절했다. 다시 남기지 않는다.", true);
             case TOO_MANY -> result("이번 답에서 이미 3개를 남겼다. 더 남기지 않는다.", true);
