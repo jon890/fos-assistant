@@ -153,6 +153,8 @@ MySQL 의 DDL 은 되돌려지지 않는다.
 전용 리소스 `backend/src/main/resources/db/comments/V20261016052729.tsv`가 추가한다.
 리소스의 각 줄은 테이블, 컬럼, 설명을 탭으로 구분하고 컬럼이 `*`이면 테이블 설명이다.
 리소스도 Flyway 체크섬에 포함하므로 적용한 뒤 수정하지 않는다.
+운영 배포 뒤 `test/unit/migration-checksums.json`에 `comments/파일명.tsv`와 SHA-256을 등록한다.
+`migration-immutable.test.ts`가 기존 SQL 파일과 함께 수정과 삭제를 막는다.
 MySQL은 `SHOW CREATE TABLE`의 컬럼 정의를 그대로 사용해 테이블마다 한 번의 `ALTER TABLE`로 묶는다.
 MySQL 8.4에서는 CHECK 제약이 참조하는 컬럼의 COMMENT 변경도 `INPLACE`를 거절할 수 있다.
 알고리즘은 MySQL이 고르며 `COPY`로 처리하는 테이블은 데이터를 복사하는 동안 쓰기가 막힌다.
