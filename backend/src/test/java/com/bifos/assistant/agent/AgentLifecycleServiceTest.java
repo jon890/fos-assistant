@@ -225,8 +225,6 @@ class AgentLifecycleServiceTest {
     }
 
 
-
-
     /**
      * 같은 사람이 두 번 눌러도 상한을 넘지 않는다.
      *
@@ -603,8 +601,6 @@ class AgentLifecycleServiceTest {
         assertThat(bindingRows.existsByAgentId(created.id())).isTrue();
         assertThat(agents.findByCode(created.code()).orElseThrow().isDeleted()).isFalse();
     }
-
-
 
 
     @Test

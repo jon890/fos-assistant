@@ -127,8 +127,6 @@ public class ConnectorBinding {
     }
 
 
-
-
     /** 시작 트랜잭션이 새 시도를 적고 설치 중인 바인딩을 실행 대상에서 내린다. */
     public void beginInstall(UUID attemptId, Instant now) {
         this.desiredEnabled = false;
@@ -205,6 +203,5 @@ public class ConnectorBinding {
     public void markRestartRequired(boolean restartRequired) {
         this.restartRequired = this.restartRequired || restartRequired;
     }
-
 
 }

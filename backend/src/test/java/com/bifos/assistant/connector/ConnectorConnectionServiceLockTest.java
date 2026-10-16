@@ -556,12 +556,6 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
-
-
-
-
-
-
     @ParameterizedTest
     @ValueSource(strings = {"confirm", "scheduled", "drift"})
     @DisplayName("철회된 주인의 관리자 확인과 예약과 드리프트는 설치 시작과 외부 설치를 보내지 않는다")

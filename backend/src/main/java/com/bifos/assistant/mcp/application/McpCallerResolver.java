@@ -69,7 +69,6 @@ public class McpCallerResolver {
 
     /** 에이전트 번호가 없거나 그 행이 없으면 커넥터 에이전트로 보지 않는다. */
 
-
     private Optional<AppUser> findUser(Long userId) {
         return userId == null ? Optional.empty() : users.findById(userId);
     }

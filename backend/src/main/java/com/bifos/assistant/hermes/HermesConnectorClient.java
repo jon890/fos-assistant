@@ -18,6 +18,7 @@ public interface HermesConnectorClient {
     /** 바인딩 설치의 방식 이름이다. 소유 기록의 {@code mode} 와 같다. */
     String MODE_BIND = "bind";
 
+
     /**
      * 그 profile 의 설치 상태다.
      *
@@ -100,6 +101,7 @@ public interface HermesConnectorClient {
      * @return 지운 것이 있었는가. 없었으면 거짓이다
      */
     boolean deleteVault(String vault);
+
 
     /**
      * 승인한 호출을 한 번 실행한다. 결과를 알 수 없으면 {@link ConnectorExecutionUnknown} 을 던진다.

@@ -117,8 +117,6 @@ class AgentMemoryCollectionServiceTest {
     }
 
 
-
-
     @Test
     @DisplayName("없는 에이전트와 에이전트가 없는 실행은 아무것도 받지 않는다")
     void unknownAgentsReceiveNothing() {

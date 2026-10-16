@@ -290,8 +290,6 @@ class AgentPurgeWriterTest {
     }
 
 
-
-
     record Attached(Long connectionId, Long actionId, Long conversationId, Long executionId, Long checkId) {
     }
 }

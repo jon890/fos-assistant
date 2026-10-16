@@ -670,8 +670,6 @@ class AgentDelegationServiceTest {
     }
 
 
-
-
     @Test
     @DisplayName("보통 turn 은 일반 에이전트에 살펴보기 상한보다 많이 맡길 수 있다")
     void ordinaryTurnDelegatesToOrdinaryAgentBeyondCheckLimit() throws Exception {
@@ -711,8 +709,6 @@ class AgentDelegationServiceTest {
         }
         assertThat(stub().received()).isEmpty();
     }
-
-
 
 
     @Test

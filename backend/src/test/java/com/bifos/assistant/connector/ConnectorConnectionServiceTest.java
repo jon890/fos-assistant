@@ -815,10 +815,6 @@ class ConnectorConnectionServiceTest {
     }
 
 
-
-
-
-
     @Test
     @DisplayName("붙은 바인딩은 연결 확인이 설치를 다시 보내 바인딩 방식으로 설치되고 probe 가 도구를 낼 때만 READY 다")
     void checkResyncsBoundBindingByModeAndProbe() {
@@ -978,8 +974,6 @@ class ConnectorConnectionServiceTest {
         assertThat(checked.status()).isEqualTo(ConnectionStatus.PENDING);
         assertThat(checked.bindings()).extracting(BoundAgentSummary::status).containsExactly(BindingStatus.PENDING);
     }
-
-
 
 
     @Test

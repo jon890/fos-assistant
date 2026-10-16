@@ -20,8 +20,6 @@ class ConnectorBindingTest {
     private static final Instant LATEST = Instant.parse("2026-01-03T00:00:00Z");
 
 
-
-
     @Test
     @DisplayName("일반 에이전트의 바인딩은 상태가 바뀌어도 에이전트의 enabled 를 바꾸지 않는다")
     void ordinaryAgentEnabledIsUntouched() {

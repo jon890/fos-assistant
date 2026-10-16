@@ -138,10 +138,6 @@ class AgentRunnerConnectorContextTest {
     }
 
 
-
-
-
-
     @Test
     @DisplayName("일반 에이전트의 실행은 Memory 를 조립해 덧붙인 지시 앞에 보낸다")
     void sendsAssembledMemoryForOrdinaryAgent() {
@@ -210,8 +206,6 @@ class AgentRunnerConnectorContextTest {
             .start(any(), any(), any(), any(), any(), snapshot.capture(), any(), any(), any(), any(), any(), any());
         return snapshot.getValue();
     }
-
-
 
 
     private static Agent agent() {

@@ -1195,8 +1195,6 @@ class ConnectorBindingServiceTest {
     }
 
 
-
-
     /** 관리자 목록이 보인 그 바인딩의 재시작 대기 시작 시각이다. */
     private Instant shownTo(CurrentUser admin) {
         List<AdminConnectionSnapshot> listed = connectionService.listForAdmin(admin);

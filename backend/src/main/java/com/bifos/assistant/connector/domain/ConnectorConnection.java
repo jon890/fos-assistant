@@ -73,6 +73,7 @@ public class ConnectorConnection {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+
     private ConnectorConnection(Long userId, String connectorId, Instant now) {
         this.userId = userId;
         this.connectorId = connectorId;

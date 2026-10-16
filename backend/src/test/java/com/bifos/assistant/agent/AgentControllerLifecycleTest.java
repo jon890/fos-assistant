@@ -169,8 +169,6 @@ class AgentControllerLifecycleTest {
     }
 
 
-
-
     private static Agent agent(String code, AgentVisibility visibility, Long ownerUserId) {
         return Agent.of(
             code,

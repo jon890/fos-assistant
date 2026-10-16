@@ -420,8 +420,6 @@ class ChatServiceTest {
     }
 
 
-
-
     @Test
     @DisplayName("일반 에이전트의 turn 은 붙은 커넥터 서버의 도구만 가리는 범위로 사건 스트림을 연다")
     void opensEventStreamHidingOnlyAttachedConnectorTools() {
@@ -534,8 +532,6 @@ class ChatServiceTest {
         assertThat(typesOf(eventsOf(turn.executionId())))
             .containsExactly(ExecutionEventType.RUN_STARTED, ExecutionEventType.RUN_COMPLETED);
     }
-
-
 
 
     @Test

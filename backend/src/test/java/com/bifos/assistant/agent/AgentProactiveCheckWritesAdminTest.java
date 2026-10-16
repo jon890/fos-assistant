@@ -202,8 +202,6 @@ class AgentProactiveCheckWritesAdminTest {
     }
 
 
-
-
     @Test
     @DisplayName("사용자에게 가는 에이전트 응답에는 쓰기 허용 칸이 없다")
     void userAgentViewHasNoWritesField() {

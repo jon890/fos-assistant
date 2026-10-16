@@ -14,7 +14,6 @@ public record AgentConnectionsView(List<AgentConnectionView> connections, String
     public static final String AGENT_NOT_PRIVATE = "AGENT_NOT_PRIVATE";
 
 
-
     public AgentConnectionsView {
         connections = List.copyOf(connections);
     }

@@ -120,8 +120,6 @@ class ProactiveCheckReadinessTest {
     }
 
 
-
-
     @Test
     @DisplayName("설정을 끄면 다른 조건이 모두 맞아도 DISABLED 다")
     void disabledBlocksEvenWhenEverythingElseIsReady() {
@@ -236,6 +234,5 @@ class ProactiveCheckReadinessTest {
         assertThat(readOnly.blockers()).as("읽기 전용").containsExactly(expected);
         assertThat(writes.blockers()).as("쓰기 허용").containsExactly(expected);
     }
-
 
 }

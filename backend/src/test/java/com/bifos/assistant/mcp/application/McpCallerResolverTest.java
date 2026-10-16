@@ -94,8 +94,6 @@ class McpCallerResolverTest {
     }
 
 
-
-
     @Test
     @DisplayName("origin 실행의 에이전트가 일반 에이전트이면 요청자는 origin 실행의 사용자다")
     void resolvesOriginUserForOrdinaryAgentRun() {
