@@ -10,6 +10,7 @@ import com.bifos.assistant.memory.application.relevance.KeywordScorer;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevance;
 import com.bifos.assistant.memory.application.relevance.MemoryRelevanceProperties;
 import com.bifos.assistant.memory.application.relevance.MemoryVectorCache;
+import com.bifos.assistant.memory.application.relevance.QueryEmbedder;
 import com.bifos.assistant.memory.application.relevance.RelevanceCandidate;
 import com.bifos.assistant.memory.application.relevance.RelevanceResult;
 import com.bifos.assistant.memory.application.relevance.RelevanceScore;
@@ -100,6 +101,22 @@ class MemoryRelevanceTest {
         assertThat(relevance.score("바퀴 언제 바꿨지", Optional.of(QUERY), List.of(tires)).ranked())
             .extracting(RelevanceScore::memoryId)
             .containsExactly(1L);
+    }
+
+
+    @Test
+    @DisplayName("질문 임베딩은 항목과 같은 글자 수 상한에서 잘라 보낸다")
+    void truncatesLongQuestionBeforeEmbedding() {
+        List<String> sent = new ArrayList<>();
+        MemoryEmbeddingProperties small =
+            new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, 10, null);
+        QueryEmbedder embedder = new QueryEmbedder(small, (inputs, timeout) -> {
+            sent.addAll(inputs);
+            return List.of(new float[] {1f});
+        });
+
+        assertThat(embedder.embed("가".repeat(30))).isPresent();
+        assertThat(sent).containsExactly("가".repeat(10));
     }
 
 

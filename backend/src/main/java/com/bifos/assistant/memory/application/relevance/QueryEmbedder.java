@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.application.relevance;
 
 import com.bifos.assistant.memory.application.embedding.EmbeddingClient;
+import com.bifos.assistant.memory.application.embedding.EmbeddingText;
 import com.bifos.assistant.memory.application.embedding.EmbeddingUnavailableException;
 import com.bifos.assistant.memory.application.embedding.MemoryEmbeddingProperties;
 import java.util.List;
@@ -32,7 +33,9 @@ public class QueryEmbedder {
             return Optional.empty();
         }
         try {
-            return Optional.of(client.embed(List.of(question.strip()), properties.queryTimeout()).getFirst());
+            // 위임 작업 글은 길 수 있다. 항목을 임베딩할 때와 같은 상한에서 자른다
+            String text = EmbeddingText.of(question.strip(), null, properties.maxTextChars());
+            return Optional.of(client.embed(List.of(text), properties.queryTimeout()).getFirst());
         } catch (EmbeddingUnavailableException ex) {
             log.warn("memory query embedding fell back to keywords exceptionClass={}", ex.getClass().getSimpleName());
             return Optional.empty();
