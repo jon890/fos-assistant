@@ -88,6 +88,22 @@ class MemoryRelevanceTest {
 
 
     @Test
+    @DisplayName("캐시에 옛 지문의 벡터가 들어가 있어도 저장소의 줄이 바뀌면 다음 계산에서 다시 읽어 쓴다")
+    void reloadsVectorWhenCachedFingerprintIsStale() {
+        RelevanceCandidate tires = candidate(1L, "자동차 관리", "타이어는 올해 3월에 갈았다");
+        store(candidate(1L, "자동차 관리", "타이어는 작년 11월에 갈았다"), new float[] {1f, 0f, 0f});
+        assertThat(relevance.score("바퀴 언제 바꿨지", Optional.of(QUERY), List.of(tires)).ranked()).isEmpty();
+
+        stored.clear();
+        store(tires, new float[] {1f, 0f, 0f});
+
+        assertThat(relevance.score("바퀴 언제 바꿨지", Optional.of(QUERY), List.of(tires)).ranked())
+            .extracting(RelevanceScore::memoryId)
+            .containsExactly(1L);
+    }
+
+
+    @Test
     @DisplayName("규칙 이름은 조립의 선택 근거와 같은 값이다")
     void sharesSelectorsWithContextSelection() {
         assertThat(MemoryRelevance.SEARCH_HYBRID).isEqualTo(ContextSelection.SEARCH_HYBRID);

@@ -37,12 +37,13 @@ public class MemoryVectorCache {
                 fingerprints.put(candidate.memoryId(), EmbeddingText.fingerprint(properties.model(), text));
             }
         }
+        // 캐시의 지문이 지금 글과 다르면 없는 것으로 보고 다시 읽는다. 채우는 작업이 줄을 바꾼 뒤에 옛 줄을 캐시에 넣은 경우도 여기서 바로잡힌다
         List<Long> missing = new ArrayList<>();
-        for (Long memoryId : fingerprints.keySet()) {
-            if (!cache.containsKey(memoryId)) {
+        fingerprints.forEach((memoryId, fingerprint) -> {
+            if (!matches(cache.get(memoryId), fingerprint)) {
                 missing.add(memoryId);
             }
-        }
+        });
         if (!missing.isEmpty()) {
             for (MemoryEmbedding row : embeddings.findByMemoryIdIn(missing)) {
                 cache.put(row.memoryId(), new Cached(row.model(), row.textFingerprint(), row.vector()));
@@ -51,11 +52,16 @@ public class MemoryVectorCache {
         Map<Long, float[]> vectors = new HashMap<>();
         fingerprints.forEach((memoryId, fingerprint) -> {
             Cached cached = cache.get(memoryId);
-            if (cached != null && cached.model().equals(properties.model()) && Arrays.equals(cached.fingerprint(), fingerprint)) {
+            if (matches(cached, fingerprint)) {
                 vectors.put(memoryId, cached.vector());
             }
         });
         return vectors;
+    }
+
+
+    private boolean matches(Cached cached, byte[] fingerprint) {
+        return cached != null && cached.model().equals(properties.model()) && Arrays.equals(cached.fingerprint(), fingerprint);
     }
 
 
