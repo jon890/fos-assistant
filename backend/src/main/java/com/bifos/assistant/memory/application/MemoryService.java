@@ -13,7 +13,6 @@ import com.bifos.assistant.memory.domain.entity.MemoryCollection;
 import com.bifos.assistant.memory.domain.MemoryPlacement;
 import com.bifos.assistant.memory.domain.entity.MemoryRevision;
 import com.bifos.assistant.memory.domain.StoredContent;
-import com.bifos.assistant.memory.domain.type.MemoryChangeType;
 import com.bifos.assistant.memory.domain.type.MemoryEntryType;
 import com.bifos.assistant.memory.domain.type.MemoryRetrieval;
 import com.bifos.assistant.memory.domain.type.MemoryScope;
@@ -28,6 +27,7 @@ import com.bifos.assistant.shared.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -205,8 +205,8 @@ public class MemoryService {
 
     /** 제목과 일반 본문에서 관련도 순으로 찾는다. 외부 트랜잭션과 분리해 검색 statement에만 2초 제한을 적용한다. */
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, timeout = 2)
-    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, MemorySearchCursor cursor) {
-        return relevanceSearch.searchFor(user, access, query, limit, cursor);
+    public MemorySearchPage searchFor(CurrentUser user, MemoryAccess access, String query, int limit, MemorySearchCursor cursor, Optional<float[]> queryVector) {
+        return relevanceSearch.searchFor(user, access, query, limit, cursor, queryVector);
     }
 
 
@@ -349,11 +349,11 @@ public class MemoryService {
     }
 
 
-    /** 항목을 지운다. 마지막 값을 판으로 남긴 뒤 줄을 지운다. */
+    /** 항목을 지운다. 마지막 값을 판으로 남기고 그 벡터를 지운 뒤 줄을 지운다. */
     @Transactional
     public void delete(CurrentUser user, Long id) {
         Memory memory = requireWritableForUpdate(user, id);
-        revisions.save(MemoryRevision.of(memory, MemoryChangeType.DELETED, user.id(), null, clock.instant()));
+        revisionWriter.beforeDelete(user, memory);
         memories.delete(memory);
     }
 

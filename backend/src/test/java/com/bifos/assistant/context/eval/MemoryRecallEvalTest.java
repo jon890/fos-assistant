@@ -328,7 +328,7 @@ class MemoryRecallEvalTest {
     }
 
 
-    private CaseVerdict verdictOf(Case each, Map<String, Long> ids, AssembledContext context) {
+    static CaseVerdict verdictOf(Case each, Map<String, Long> ids, AssembledContext context) {
         Map<String, Integer> ranks = ranksOf(context.bundle().items());
         List<ItemVerdict> items = new ArrayList<>();
         for (String key : each.expect()) {

@@ -101,6 +101,20 @@ assistant:
       semantic-min-similarity: 0.5
       # 키워드 순위와 의미 순위를 합치는 RRF 의 k
       rrf-k: 60
+    embedding:
+      # OpenAI 호환 POST /v1/embeddings 를 받는 주소와 모델이다. 둘 중 하나라도 비면 임베딩을 끄고 키워드 점수만 쓴다
+      base-url: ${MEMORY_EMBEDDING_BASE_URL:}
+      model: ${MEMORY_EMBEDDING_MODEL:}
+      # 질문 하나를 임베딩할 때 기다리는 상한. 넘으면 키워드 점수만 쓴다
+      query-timeout: 400ms
+      # 채우는 작업이 묶음 하나를 기다리는 상한과 묶음 크기, 한 번에 보내는 묶음 수
+      batch-timeout: 30s
+      batch-size: 16
+      max-batches-per-run: 16
+      # 임베딩할 제목과 본문의 최대 글자 수
+      max-text-chars: 4000
+      # 채우는 작업이 끝나고 다음 작업까지 쉬는 시간
+      refresh-delay: 60s
   delegation:
     # 새 자식이 가질 수 있는 가장 깊은 깊이. 사용자가 부른 실행이 0 이다
     max-depth: 2
