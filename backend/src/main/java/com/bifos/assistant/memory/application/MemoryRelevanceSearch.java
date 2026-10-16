@@ -62,7 +62,12 @@ class MemoryRelevanceSearch {
             .map(score -> byId.get(score.memoryId()))
             .map(each -> new MemorySearchItem(each.id(), each.title(), each.revision(), each.updatedAt()))
             .toList();
-        String next = end < ranked ? new MemorySearchCursor(cursor.queryFingerprint(), end).encode() : null;
+        boolean hybrid = MemoryRelevance.SEARCH_HYBRID.equals(result.selector());
+        if (cursor.offset() > 0 && cursor.hybrid() != hybrid) {
+            // 앞 페이지와 다른 규칙으로 매기면 순위가 달라져 항목이 빠지거나 겹친다
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "memory search ranking changed between pages");
+        }
+        String next = end < ranked ? new MemorySearchCursor(cursor.queryFingerprint(), end, hybrid).encode() : null;
         return new MemorySearchPage(items, next, result.selector());
     }
 }

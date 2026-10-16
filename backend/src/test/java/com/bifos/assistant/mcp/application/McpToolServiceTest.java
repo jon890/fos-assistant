@@ -34,6 +34,7 @@ import com.bifos.assistant.usage.application.ExecutionContextSourceWriter;
 import com.bifos.assistant.usage.application.ExecutionDeliveryWriter;
 import com.bifos.assistant.usage.domain.AgentExecution;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -103,6 +104,26 @@ class McpToolServiceTest {
         verify(memories, times(2)).searchFor(any(), any(), eq("바퀴 언제 바꿨지"), eq(10), eq(cursor), vectors.capture());
         assertThat(vectors.getAllValues().get(0)).hasValueSatisfying(vector -> assertThat(vector).containsExactly(1f, 0f));
         assertThat(vectors.getAllValues().get(1)).isEmpty();
+    }
+
+
+    @Test
+    @DisplayName("키워드만으로 매긴 검색의 다음 페이지는 질문을 임베딩하지 않는다")
+    void skipsQueryEmbeddingForKeywordContinuation() {
+        MemoryEmbeddingProperties enabled =
+            new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null);
+        when(memories.searchFor(any(), any(), any(), anyInt(), any(), any()))
+            .thenReturn(new MemorySearchPage(List.of(), null, MemoryRelevance.SEARCH_KEYWORD));
+        List<String> embedded = new ArrayList<>();
+        MemorySearchCursor keywordNext = new MemorySearchCursor(MemorySearchCursor.fingerprintOf("바퀴"), 10, false);
+
+        toolsWith(new QueryEmbedder(enabled, (inputs, timeout) -> {
+            embedded.addAll(inputs);
+            return List.of(new float[] {1f});
+        })).searchMemory(caller, "바퀴", 10, keywordNext);
+
+        assertThat(embedded).isEmpty();
+        verify(memories).searchFor(any(), any(), eq("바퀴"), eq(10), eq(keywordNext), eq(Optional.empty()));
     }
 
 

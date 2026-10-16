@@ -28,6 +28,21 @@ class MemorySearchCursorTest {
 
 
     @Test
+    @DisplayName("합쳐 매긴 검색의 커서는 규칙을 담고 옛 v1 커서는 키워드로 읽는다")
+    void carriesRankingRuleAndReadsOldCursorsAsKeyword() {
+        String fingerprint = MemorySearchCursor.fingerprintOf("질문");
+        MemorySearchCursor hybrid = new MemorySearchCursor(fingerprint, 10, true);
+
+        assertThat(MemorySearchCursor.parse(hybrid.encode())).hasValue(hybrid);
+        assertThat(MemorySearchCursor.parse(encode("v1:" + fingerprint + ":10"))).hasValue(new MemorySearchCursor(fingerprint, 10, false));
+        assertThat(MemorySearchCursor.parse(encode("v2:" + fingerprint + ":10:x"))).isEmpty();
+        assertThat(hybrid.needsQueryVector()).isTrue();
+        assertThat(new MemorySearchCursor(fingerprint, 10, false).needsQueryVector()).isFalse();
+        assertThat(MemorySearchCursor.first("질문").needsQueryVector()).isTrue();
+    }
+
+
+    @Test
     @DisplayName("지문은 SHA-256 앞 16 hex 이다")
     void fingerprintsWithSixteenHex() {
         assertThat(MemorySearchCursor.fingerprintOf("")).isEqualTo("e3b0c44298fc1c14");

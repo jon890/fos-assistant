@@ -347,6 +347,20 @@ public class MemorySearchTest {
 
 
     @Test
+    @DisplayName("합쳐 매긴 검색의 다음 페이지를 키워드로만 매기게 되면 순위가 달라지므로 거절한다")
+    void rejectsPageWhenRankingRuleChanges() {
+        save("대상 첫째");
+        save("대상 둘째");
+        MemorySearchCursor hybridNext = new MemorySearchCursor(MemorySearchCursor.fingerprintOf("대상"), 1, true);
+
+        assertThatThrownBy(() -> memories.searchFor(USER, CORE, "대상", 1, hybridNext, Optional.empty()))
+            .isInstanceOf(RuntimeException.class);
+        assertThat(search(USER, CORE, "대상", 1).nextCursor())
+            .satisfies(next -> assertThat(MemorySearchCursor.parse(next).orElseThrow().hybrid()).isFalse());
+    }
+
+
+    @Test
     @DisplayName("페이지 사이의 삭제는 다음 페이지에 반영되고 바뀐 항목은 처음부터 다시 찾는다")
     void usesCurrentRowsBetweenPages() {
         Memory earlier = save("이전 항목");
