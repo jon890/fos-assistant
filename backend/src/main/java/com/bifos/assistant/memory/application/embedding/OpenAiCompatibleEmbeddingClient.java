@@ -38,13 +38,13 @@ public class OpenAiCompatibleEmbeddingClient implements EmbeddingClient {
         if (inputs.isEmpty()) {
             return List.of();
         }
-        HttpRequest request = HttpRequest.newBuilder(URI.create(stripSlash(properties.baseUrl()) + "/v1/embeddings"))
-            .timeout(timeout)
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("model", properties.model(), "input", inputs))))
-            .build();
         HttpResponse<String> response;
         try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(stripSlash(properties.baseUrl()) + "/v1/embeddings"))
+                .timeout(timeout)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(Map.of("model", properties.model(), "input", inputs))))
+                .build();
             response = http.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (HttpTimeoutException ex) {
             throw new EmbeddingUnavailableException("embedding request timed out", ex);

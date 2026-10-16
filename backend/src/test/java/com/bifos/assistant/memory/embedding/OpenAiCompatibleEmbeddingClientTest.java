@@ -87,6 +87,19 @@ class OpenAiCompatibleEmbeddingClientTest {
     }
 
 
+    @Test
+    @DisplayName("http 나 https 가 아닌 주소는 기동에서 거절하고 빈 주소는 꺼짐이다")
+    void rejectsMalformedBaseUrlAtStartup() {
+        assertThatThrownBy(() -> new MemoryEmbeddingProperties("embedding.test:8080", "test-model", null, null, null, null, null, null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageNotContaining("embedding.test");
+        assertThatThrownBy(() -> new MemoryEmbeddingProperties("ftp://embedding.test", "test-model", null, null, null, null, null, null))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThat(new MemoryEmbeddingProperties("", "test-model", null, null, null, null, null, null).enabled()).isFalse();
+        assertThat(new MemoryEmbeddingProperties("http://embedding.test", "test-model", null, null, null, null, null, null).enabled()).isTrue();
+    }
+
+
     private static void assertUnavailable(OpenAiCompatibleEmbeddingClient client, Duration timeout) {
         assertThatThrownBy(() -> client.embed(List.of("첫 글", "둘째 글"), timeout))
             .isInstanceOf(EmbeddingUnavailableException.class)

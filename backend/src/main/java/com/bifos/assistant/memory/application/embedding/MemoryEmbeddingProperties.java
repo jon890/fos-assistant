@@ -1,6 +1,7 @@
 package com.bifos.assistant.memory.application.embedding;
 
 import jakarta.validation.constraints.Min;
+import java.net.URI;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -42,6 +43,20 @@ public record MemoryEmbeddingProperties(
         maxBatchesPerRun = maxBatchesPerRun == null ? 16 : maxBatchesPerRun;
         maxTextChars = maxTextChars == null ? 4_000 : maxTextChars;
         refreshDelay = positiveOr(refreshDelay, Duration.ofSeconds(60));
+        if (!baseUrl.isEmpty() && !httpUrl(baseUrl)) {
+            // 주소가 틀리면 모든 질문의 임베딩이 실패한다. 값은 운영 설정이라 메시지에 넣지 않는다
+            throw new IllegalArgumentException("memory embedding: base-url 은 http 나 https 주소여야 한다");
+        }
+    }
+
+
+    private static boolean httpUrl(String value) {
+        try {
+            URI uri = URI.create(value);
+            return ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) && uri.getHost() != null;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
 
