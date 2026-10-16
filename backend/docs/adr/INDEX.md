@@ -72,6 +72,7 @@ Control Plane(`backend/`) 한 층의 코드가 지키는 결정이다.
 | [ADR-20261010 / media-observation-storage](ADR-20261010-media-observation-storage.md) | 관찰은 암호화한 불변 revision과 영속 요청 alias로 저장하고 첨부와 함께 지운다 | Accepted |
 | [ADR-20261011 / media-observation-cache](ADR-20261011-media-observation-cache.md) | 현재 최신 MODEL 완료 결과를 분석 조건으로 재사용하고 새 요청 alias만 저장한다 | Accepted |
 | [ADR-20261013 / financial-digest-key-rotation](ADR-20261013-financial-digest-key-rotation.md) | 금융 해시 key 를 바꾸면 이전 key 의 열린 줄이 끝날 때까지 금융 관문을 닫는다 | Accepted |
+| [ADR-20261016 / jpa-auditing-base](ADR-20261016-jpa-auditing-base.md) | 저장 시각은 공통 base에서 기록하고 업무 시각은 명시적으로 전달한다 | Accepted |
 
 ## 보관
 
