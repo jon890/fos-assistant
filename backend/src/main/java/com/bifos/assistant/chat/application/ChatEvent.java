@@ -10,8 +10,6 @@ import java.util.UUID;
  * 대화 한 turn 이 도는 동안 화면으로 보내는 사건이다.
  *
  * @param conversationId 대화의 공개 식별자. 대화 번호는 화면에 내보내지 않는다
- * @param stepName 흐름의 단계 이름. 단계 사건이 아니면 null
- * @param stepState {@code started}, {@code completed}, {@code failed} 셋이다. 단계 사건이 아니면 null
  * @param phase 도구나 하위 에이전트 사건의 시작 또는 완료 단계
  * @param durationMs 완료 사건의 걸린 시간
  * @param failed 완료 사건의 실패 여부
@@ -34,8 +32,6 @@ public record ChatEvent(
     Long executionId,
     String code,
     String message,
-    String stepName,
-    String stepState,
     String phase,
     Long durationMs,
     Boolean failed,
@@ -49,17 +45,16 @@ public record ChatEvent(
     String interimId) {
 
     public ChatEvent(String type, String text, String toolName, String detail, UUID conversationId,
-        Long messageId, Long executionId, String code, String message, String stepName, String stepState,
+        Long messageId, Long executionId, String code, String message,
         String phase, Long durationMs, Boolean failed, String subagentId, String goal, String model,
         Long inputTokens, Long outputTokens) {
-        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, stepName,
-            stepState, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null);
+        this(type, text, toolName, detail, conversationId, messageId, executionId, code, message, phase, durationMs, failed, subagentId, goal, model, inputTokens, outputTokens, null, null, null);
     }
 
 
     /** 저장하지 않는 중간 안내와 확인된 직전 delta 구간의 UTF-16 길이다. */
     public static ChatEvent interim(String text, Boolean alreadyStreamed, int streamedPrefixLength, String interimId) {
-        return new ChatEvent("interim", text, null, null, null, null, null, null, null, null, null,
+        return new ChatEvent("interim", text, null, null, null, null, null, null, null,
             null, null, null, null, null, null, null, null, alreadyStreamed, streamedPrefixLength, interimId);
     }
 
@@ -70,12 +65,12 @@ public record ChatEvent(
 
     public static ChatEvent delta(String text) {
         return new ChatEvent(
-            "delta", text, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            "delta", text, null, null, null, null, null, null, null, null, null, null, null, null, null,
             null, null);
     }
 
 
-    /** 이 turn 의 실행 줄이 만들어졌다. 흐름이면 루트 실행의 번호다. */
+    /** 이 turn 의 루트 실행 줄이 만들어졌다. */
     public static ChatEvent started(UUID conversationId, Long executionId) {
         return new ChatEvent(
             "started",
@@ -85,8 +80,6 @@ public record ChatEvent(
             conversationId,
             null,
             executionId,
-            null,
-            null,
             null,
             null,
             null,
@@ -106,8 +99,6 @@ public record ChatEvent(
             null,
             toolName,
             detail,
-            null,
-            null,
             null,
             null,
             null,
@@ -164,8 +155,6 @@ public record ChatEvent(
             executionId,
             code,
             message,
-            stepName,
-            stepState,
             phase,
             durationMs,
             failed,
@@ -199,8 +188,6 @@ public record ChatEvent(
             null,
             null,
             null,
-            null,
-            null,
             phase,
             durationMs,
             failed,
@@ -209,14 +196,6 @@ public record ChatEvent(
             model,
             inputTokens,
             outputTokens);
-    }
-
-
-    /** 흐름의 한 단계가 시작되거나 끝났다. */
-    public static ChatEvent step(String stepName, String state) {
-        return new ChatEvent(
-            "step", null, null, null, null, null, null, null, null, stepName, state, null, null, null, null, null,
-            null, null, null);
     }
 
 
@@ -243,8 +222,6 @@ public record ChatEvent(
             null,
             null,
             null,
-            null,
-            null,
             null);
     }
 
@@ -256,7 +233,7 @@ public record ChatEvent(
      */
     public static ChatEvent reset() {
         return new ChatEvent(
-            "reset", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            "reset", null, null, null, null, null, null, null, null, null, null, null, null, null, null,
             null, null);
     }
 
@@ -270,8 +247,6 @@ public record ChatEvent(
             conversationId,
             messageId,
             executionId,
-            null,
-            null,
             null,
             null,
             null,
@@ -303,8 +278,6 @@ public record ChatEvent(
             null,
             null,
             null,
-            null,
-            null,
             null);
     }
 
@@ -323,8 +296,6 @@ public record ChatEvent(
             null,
             conversationId,
             messageId,
-            null,
-            null,
             null,
             null,
             null,
@@ -364,8 +335,6 @@ public record ChatEvent(
             null,
             null,
             null,
-            null,
-            null,
             null);
     }
 
@@ -384,8 +353,6 @@ public record ChatEvent(
             null,
             conversationId,
             messageId,
-            null,
-            null,
             null,
             null,
             null,
@@ -419,15 +386,13 @@ public record ChatEvent(
             null,
             null,
             null,
-            null,
-            null,
             null);
     }
 
 
     public static ChatEvent error(String code, String message) {
         return new ChatEvent(
-            "error", null, null, null, null, null, null, code, message, null, null, null, null, null, null, null,
+            "error", null, null, null, null, null, null, code, message, null, null, null, null, null,
             null, null, null);
     }
 }

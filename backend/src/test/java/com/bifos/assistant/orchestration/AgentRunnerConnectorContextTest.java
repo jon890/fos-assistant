@@ -199,6 +199,7 @@ class AgentRunnerConnectorContextTest {
             (execution, runId) -> {
             },
             () -> false,
+            null,
             null);
 
         assertThat(submitted().instructions()).contains("GFM", MEMORY).doesNotContain("memory_remember");

@@ -30,7 +30,6 @@ test("관리자 에이전트 목록에서 등록한 에이전트가 보인다", 
     visibility: "PRIVATE",
     ownerUserId: 1,
     enabled: true,
-    flow: null,
   };
   await page.route(/\/api\/admin\/agents(?:\?.*)?$/, async (route) => {
     if (route.request().method() === "POST") return route.fulfill({ status: 201, json: registered });

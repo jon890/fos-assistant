@@ -29,7 +29,6 @@ import com.bifos.assistant.hermes.StubHermesRunsClient;
 import com.bifos.assistant.hermes.dto.HermesRunCommand;
 import com.bifos.assistant.hermes.dto.HermesRunResult;
 import com.bifos.assistant.hermes.dto.TokenUsage;
-import com.bifos.assistant.orchestration.application.ResearchAndBuildFlow;
 import com.bifos.assistant.shared.auth.CurrentUser;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.skill.application.SkillAgentNotice;
@@ -97,7 +96,6 @@ class ArtifactTest {
     private static final String CSP = "sandbox allow-same-origin allow-popups allow-popups-to-escape-sandbox; "
         + "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; "
         + "form-action 'none'";
-    private static final String CHIEF_MARK = "조사할 것과 만들 것을 나눈다";
     private static final String HTML = "<!doctype html><title>초안</title><p>초안</p>";
 
     @LocalServerPort
@@ -172,7 +170,7 @@ class ArtifactTest {
         root = Path.of(properties.root()).toAbsolutePath();
         deleteTree(root);
         dad = member("artifact-dad@example.com");
-        agentOf(dad, "dad", null);
+        agentOf(dad, "dad");
     }
 
 
@@ -253,52 +251,6 @@ class ArtifactTest {
             .asString()
             .contains("[스킬 관리]\n")
             .contains("skill_manage 로 스킬을 만들거나 고치지 않는다.");
-    }
-
-
-    @Test
-    @DisplayName("흐름 turn 의 하위 실행으로 간 입력에도 스킬 관리 단락이 들어 있다")
-    void flowChildRunInputContainsSkillManagementParagraph() {
-        CurrentUser mom = member("artifact-mom@example.com");
-        agentOf(mom, "flow-mom", ResearchAndBuildFlow.NAME);
-        stub().willAnswer(command -> command.input().contains(CHIEF_MARK)
-            ? completed("run-chief", "{\"research\":\"보조금을 조사해\",\"build\":\"표를 만든다\"}")
-            : completed("run-child", "단계 답"));
-
-        chat.send(mom, null, "보조금 비교해 줘", "flow-mom");
-
-        assertThat(stub().received())
-            .extracting(HermesRunCommand::input)
-            .isNotEmpty()
-            .allSatisfy(
-                input -> assertThat(input).contains("[스킬 관리]\n").contains("skill_manage 로 스킬을 만들거나 고치지 않는다."));
-    }
-
-
-    @Test
-    @DisplayName("흐름 turn 의 하위 실행으로 간 입력은 모두 결과물 폴더 단락으로 시작한다")
-    void flowChildRunInputsAllStartWithOutputFolderParagraph() {
-        CurrentUser mom = member("artifact-mom@example.com");
-        agentOf(mom, "flow-mom", ResearchAndBuildFlow.NAME);
-        stub().willAnswer(command -> command.input().contains(CHIEF_MARK)
-            ? completed("run-chief", "{\"research\":\"보조금을 조사해\",\"build\":\"표를 만든다\"}")
-            : completed("run-child", "단계 답"));
-
-        chat.send(mom, null, "보조금 비교해 줘", "flow-mom");
-
-        Long conversationId = executions.findAll().getFirst().conversationId();
-        Conversation conversation = conversations.findById(conversationId).orElseThrow();
-        String preamble = artifactService.agentPreamble(conversation);
-        List<String> inputs = stub().received().stream().map(HermesRunCommand::input).toList();
-        List<String> children = inputs.stream().filter(input -> !input.contains(CHIEF_MARK)).toList();
-        assertThat(children)
-            .as("Researcher, Engineer, Synthesizer")
-            .hasSize(3)
-            .allSatisfy(input -> assertThat(input).startsWith(preamble));
-        assertThat(inputs)
-            .filteredOn(input -> input.contains(CHIEF_MARK))
-            .singleElement()
-            .satisfies(chief -> assertThat(chief).contains(preamble));
     }
 
 
@@ -540,7 +492,7 @@ class ArtifactTest {
     @DisplayName("남의 대화의 파일은 CONVERSATION NOT FOUND 다")
     void otherUsersConversationFileIsConversationNotFound() throws Exception {
         CurrentUser kid = member("artifact-kid@example.com");
-        agentOf(kid, "kid", null);
+        agentOf(kid, "kid");
         Conversation theirs = chat.startEmpty(kid, "kid");
         writeAt(theirs.id(), "a/index.html", HTML, Instant.now());
 
@@ -637,7 +589,7 @@ class ArtifactTest {
         writeAt(conversation.id(), "a/index.html", HTML, Instant.now());
         String etag = header(file(conversation, "a/index.html"), "ETag");
         CurrentUser kid = member("artifact-kid@example.com");
-        agentOf(kid, "kid", null);
+        agentOf(kid, "kid");
 
         HttpResponse<String> response = file(conversation, "a/index.html", kid, "If-None-Match", etag);
 
@@ -1012,7 +964,7 @@ class ArtifactTest {
     }
 
 
-    private void agentOf(CurrentUser owner, String code, String flow) {
+    private void agentOf(CurrentUser owner, String code) {
         Agent agent = Agent.of(
             code,
             code,
@@ -1023,9 +975,6 @@ class ArtifactTest {
             AgentVisibility.PRIVATE,
             owner.id(),
             Instant.now());
-        if (flow != null) {
-            agent.assignFlow(flow);
-        }
         agents.save(agent);
     }
 

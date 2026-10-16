@@ -352,9 +352,7 @@ class ConnectorFinancialGateTest {
 
 
     private void own(FinancialLimitKind kind, String value) {
-        var row = FinancialOrderLimit.of(9L, NOW);
-        row.set(kind, new BigDecimal(value), NOW);
-        when(rows.findById(9L)).thenReturn(Optional.of(row));
+        when(rows.findByUserId(9L)).thenReturn(Optional.of(FinancialOrderLimit.NONE.with(kind, new BigDecimal(value))));
     }
 
 

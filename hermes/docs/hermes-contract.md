@@ -1133,11 +1133,9 @@ Control Plane 이 권한을 확인한 에이전트에서 profile 과 접두와 k
 `gateway.max_concurrent_sessions` 는 다른 것이다.
 그쪽은 platform 대화 turn 을 제한하고 `/v1/runs` 에는 걸리지 않는다.
 
-**에이전트를 나눈 한 턴이 같은 순간에 쓰는 자리는 최대 2 이고, 나누지 않은 대화는 1 이다.**
-`ResearchAndBuildFlow` 는 한 턴을 Chief, Researcher 와 Engineer, Synthesizer 의 세 단계로 나눈다.
-Control Plane 이 앞 단계의 실행이 끝난 뒤에 다음 단계를 띄우므로 단계끼리 겹치지 않는다.
+대화 실행 하나는 자리 하나를 쓴다.
+에이전트가 `agent_delegate` 로 자식을 맡기면 부모와 자식이 같은 listener의 한도를 함께 쓴다.
 부모가 자식을 기다리는 동안에는 자리를 잡지 않는다.
-둘이 겹치는 것은 Researcher 와 Engineer 뿐이다.
 
 ### 한도 위에 thread pool 이 하나 더 있다
 

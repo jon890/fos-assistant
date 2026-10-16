@@ -47,9 +47,6 @@ const WORKSPACE_CONTROL_PATH = join(
   `fos-assistant-browser-workspace-${RUN_ID}.root`,
 );
 
-/** 흐름이 붙은 에이전트의 코드다. 흐름 검사가 이 코드로 대화를 시작한다. */
-export const FLOW_AGENT_CODE = "browserflow";
-
 /** 막힌 모델을 고른 대화를 검사하는 전용이다. 여기서만 막힌 provider 를 만든다. */
 export const SWITCH_AGENT_CODE = "browserswitch";
 
@@ -91,7 +88,6 @@ export function conversationIdOf(url: string): string {
 /** profile 이름과 그 profile 의 key 다. 가짜 Hermes 와 key 디렉터리가 같은 표를 쓴다. */
 const PROFILE_KEYS: Record<string, string> = {
   browser: "browser-profile-key",
-  browserflow: "browser-flow-profile-key",
   browserswitch: "browser-switch-profile-key",
   browserpersona: "browser-persona-profile-key",
   browserpersonagroup: "browser-persona-group-profile-key",
@@ -467,15 +463,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       code: "browser",
       name: "브라우저 비서",
       profile: "browser",
-      flow: null,
-      visibility: "PRIVATE" as const,
-    },
-    // 흐름 검사 전용이다. 하나만 두면 흐름이 붙지 않은 대화를 함께 검사할 수 없다.
-    {
-      code: FLOW_AGENT_CODE,
-      name: "흐름 비서",
-      profile: "browserflow",
-      flow: "research-and-build",
       visibility: "PRIVATE" as const,
     },
     // 막힘 검사 전용이다. 다른 검사가 쓰는 에이전트와 섞이지 않게 나눈다.
@@ -483,7 +470,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       code: SWITCH_AGENT_CODE,
       name: "막힘 비서",
       profile: "browserswitch",
-      flow: null,
       visibility: "PRIVATE" as const,
     },
     // 성격을 읽고 쓰는 검사 전용이다. 주인이 TEST_EMAIL 이라 admin 세션이 언제나 고칠 수 있다.
@@ -491,7 +477,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       code: PERSONA_AGENT_CODE,
       name: "성격 비서",
       profile: "browserpersona",
-      flow: null,
       visibility: "PRIVATE" as const,
     },
     // 그룹에 공개할 에이전트다. 검사가 실행 중에만 GROUP 으로 바꿨다 되돌린다. 여기서 바로 GROUP 으로
@@ -501,7 +486,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       code: PERSONA_GROUP_AGENT_CODE,
       name: "그룹 성격 비서",
       profile: "browserpersonagroup",
-      flow: null,
       visibility: "PRIVATE" as const,
     },
     // 본문이 비어 있는 채로 두는 검사 전용이다.
@@ -509,7 +493,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
       code: PERSONA_EMPTY_AGENT_CODE,
       name: "빈 성격 비서",
       profile: "browserpersonaempty",
-      flow: null,
       visibility: "PRIVATE" as const,
     },
   ]) {
@@ -530,7 +513,6 @@ async function seedAgents(hermesBaseUrl: string): Promise<void> {
           credentialScope: "SHARED_HOUSEHOLD",
           visibility: agent.visibility,
           ownerEmail: agent.visibility === "PRIVATE" ? TEST_EMAIL : null,
-          flow: agent.flow,
         }),
       },
     );

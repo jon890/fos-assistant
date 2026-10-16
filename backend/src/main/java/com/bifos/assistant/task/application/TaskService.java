@@ -1,7 +1,6 @@
 package com.bifos.assistant.task.application;
 
 import com.bifos.assistant.agent.application.AgentService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.chat.application.ConversationPublicIdLookup;
 import com.bifos.assistant.shared.auth.CurrentUser;
@@ -60,7 +59,6 @@ public class TaskService {
     private final TaskRunRepository runs;
     private final AppUserRepository users;
     private final AgentService agents;
-    private final KnownFlows flows;
     private final ConversationPublicIdLookup conversations;
     private final TaskProperties properties;
     private final Clock clock;
@@ -229,12 +227,9 @@ public class TaskService {
     }
 
 
-    /** 주인이 대화를 시작할 수 있는 에이전트여야 한다. 흐름이 붙은 에이전트는 받지 않는다. */
+    /** 주인이 대화를 시작할 수 있는 에이전트여야 한다. */
     private Agent requireAgent(CurrentUser user, String agentCode) {
         Agent agent = agents.requireStartable(user, agentCode);
-        if (flows.known(agent.flow())) {
-            throw new ApiException(ErrorCode.TASK_AGENT_NOT_SUPPORTED, "an agent with a flow cannot run a task");
-        }
         return agent;
     }
 

@@ -47,9 +47,9 @@ class MediaPipelineEventsTest {
     @DisplayName("실행 입력 사건은 실은 사진의 자리와 싣지 못한 첨부 번호만 남긴다")
     void embeddedRecordsPositionsAndMissingIdsOnly() {
         MediaPipelineEvents.embedded(7L, List.of(
-            new AgentPhoto(11L, 1, "11.small.jpg", "data:image/jpeg;base64,/9j/SECRET"),
-            new AgentPhoto(12L, 2, "secret-name.jpg", null),
-            new AgentPhoto(13L, 3, "13.small.jpg", "data:image/jpeg;base64,/9j/OTHER")));
+            new AgentPhoto(11L, 1, "data:image/jpeg;base64,/9j/SECRET"),
+            new AgentPhoto(12L, 2, null),
+            new AgentPhoto(13L, 3, "data:image/jpeg;base64,/9j/OTHER")));
 
         JsonNode event = onlyEvent();
         assertThat(event.path("stage").asString()).isEqualTo("embedded");
@@ -58,7 +58,7 @@ class MediaPipelineEventsTest {
         assertThat(event.path("assets").get(1).path("assetId").asString()).isEqualTo("13");
         assertThat(event.path("assets").get(1).path("position").asInt()).isEqualTo(1);
         assertThat(event.path("missing").get(0).asString()).isEqualTo("12");
-        assertThat(logs.list.getFirst().getFormattedMessage()).doesNotContain("SECRET", "OTHER", "secret-name", "data:");
+        assertThat(logs.list.getFirst().getFormattedMessage()).doesNotContain("SECRET", "OTHER", "data:");
     }
 
 

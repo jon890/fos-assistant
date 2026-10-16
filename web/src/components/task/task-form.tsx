@@ -27,7 +27,7 @@ import {
 const DEFAULT_TIME_ZONE = "Asia/Seoul";
 const INSTRUCTION_MAX = 8000;
 
-type AgentOption = { code: string; name: string; runsTasks?: boolean };
+type AgentOption = { code: string; name: string };
 
 const KIND_LABELS: Record<ScheduleChoice["kind"], string> = {
   daily: "매일",
@@ -111,9 +111,8 @@ export function TaskForm({
       .then((response) => (response.ok ? response.json() : []))
       .then((data: AgentOption[]) => {
         if (cancelled) return;
-        const taskAgents = data.filter((agent) => agent.runsTasks !== false);
-        setAgents(taskAgents);
-        setAgentCode((current) => current || taskAgents[0]?.code || "");
+        setAgents(data);
+        setAgentCode((current) => current || data[0]?.code || "");
       })
       .catch(() => {
         if (!cancelled) setAgents([]);

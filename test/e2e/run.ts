@@ -48,7 +48,6 @@ import { interimScenario } from "./scenarios/interim.ts";
 import { stopScenario } from "./scenarios/stop.ts";
 import { E2E_STREAM_HEARTBEAT, streamHeartbeatScenario } from "./scenarios/stream-heartbeat.ts";
 import { regenerateScenario } from "./scenarios/regenerate.ts";
-import { orchestrationScenario, FLOW_BINDING } from "./scenarios/orchestration.ts";
 import { modelSelectionScenario } from "./scenarios/model-selection.ts";
 import { busyScenario } from "./scenarios/busy.ts";
 import { attentionScenario } from "./scenarios/attention.ts";
@@ -125,7 +124,6 @@ const SCENARIOS: readonly Scenario[] = [
   stopScenario,
   streamHeartbeatScenario,
   regenerateScenario,
-  orchestrationScenario,
   chatAttachmentScenario,
   artifactScenario,
   mcpPrincipalScenario,
@@ -222,7 +220,7 @@ async function makeSkillRoot(work: string): Promise<string> {
 async function writeProfileKeys(work: string): Promise<string> {
   const keyDir = join(work, "keys");
   await mkdir(keyDir, { recursive: true });
-  for (const profileName of [DAD_BINDING.profileName, FLOW_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, CONTENT_DRAFT_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
+  for (const profileName of [DAD_BINDING.profileName, AGENT_TOOLS_PROFILE, MCP_PRINCIPAL_PROFILE, FOLLOW_UP_MCP_PROFILE, MEMORY_REMEMBER_MCP_PROFILE, NATIVE_DELEGATION_PROFILE, MEDIA_OBSERVATION_PROFILE, CONTENT_DRAFT_PROFILE, DELEGATION_PROFILE, CHAT_QUEUE_PROFILE]) {
     const keyFile = join(keyDir, profileName);
     await writeFile(keyFile, PROFILE_KEY);
     await chmod(keyFile, 0o600);
@@ -382,7 +380,6 @@ async function main(): Promise<void> {
     console.log("== fake Hermes 기동");
     hermes = await startFakeHermes({
       [DAD_BINDING.profileName]: PROFILE_KEY,
-      [FLOW_BINDING.profileName]: PROFILE_KEY,
       [AGENT_TOOLS_PROFILE]: PROFILE_KEY,
       [MCP_PRINCIPAL_PROFILE]: PROFILE_KEY,
       [FOLLOW_UP_MCP_PROFILE]: PROFILE_KEY,

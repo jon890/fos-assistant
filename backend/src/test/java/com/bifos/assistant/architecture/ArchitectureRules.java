@@ -803,18 +803,11 @@ public final class ArchitectureRules {
             .callMethod(Thread.class, "startVirtualThread", Runnable.class))
         .as("가상 스레드는 BackgroundTasks 와 SSE 연결만 직접 띄운다");
 
-    /**
-     * {@code Executors.newVirtualThreadPerTaskExecutor()} 는 {@code ResearchAndBuildFlow} 만 부른다.
-     * 그 흐름은 {@code try} 블록이 닫힐 때 실행기가 작업을 모두 기다린다.
-     *
-     * <p>근거: ADR-20261007 / background-tasks. 블록 밖으로 살아 남는 실행기는 검사가 끝날 때 기다리지 못한다.
-     */
-    public static final ArchRule VIRTUAL_THREAD_EXECUTOR_ONLY_IN_RESEARCH_AND_BUILD_FLOW = noClasses()
-        .that()
-        .doNotHaveFullyQualifiedName("com.bifos.assistant.orchestration.application.ResearchAndBuildFlow")
+    /** 직접 만든 실행기는 종료를 기다리는 BackgroundTasks의 수명 관리 경계를 우회한다. */
+    public static final ArchRule NO_UNMANAGED_VIRTUAL_THREAD_EXECUTORS = noClasses()
         .should()
         .callMethod(Executors.class, "newVirtualThreadPerTaskExecutor")
-        .as("Executors.newVirtualThreadPerTaskExecutor 는 ResearchAndBuildFlow 만 부른다");
+        .as("가상 스레드 실행기는 직접 만들지 않는다");
 
     /**
      * 에이전트 설정 두 타입의 이름·prefix·개수와 config 역할을 raw 검사한다.

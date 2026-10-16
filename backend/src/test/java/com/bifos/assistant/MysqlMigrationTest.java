@@ -62,6 +62,17 @@ class MysqlMigrationTest {
 
 
     @Test
+    @DisplayName("에이전트 표에서 폐기한 Java Flow 컬럼을 제거한다")
+    void removesRetiredAgentFlowColumn() {
+        // Hibernate validate는 남은 여분 컬럼을 거절하지 않으므로 DROP 결과를 직접 확인한다.
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'agent' AND column_name = 'flow'
+                """, Long.class)).isZero();
+    }
+
+
+    @Test
     @DisplayName("높은 시각 버전 적용 뒤 늦게 들어온 낮은 시각 버전도 실제 MySQL 에 적용한다")
     void appliesLateTimestampMigration(@TempDir Path directory) throws IOException, SQLException {
         assertThat(flyway.getConfiguration().isOutOfOrder()).isTrue();

@@ -5,7 +5,6 @@ import com.bifos.assistant.agent.admin.application.model.AgentUpdateCommand;
 import com.bifos.assistant.agent.application.AgentConnectorBindings;
 import com.bifos.assistant.agent.application.AgentEndpointProbe;
 import com.bifos.assistant.agent.application.AgentLifecycleService;
-import com.bifos.assistant.agent.application.KnownFlows;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.infra.AgentRepository;
@@ -31,7 +30,6 @@ public class AgentAdminService {
     private final AppUserRepository users;
     private final AgentLifecycleService lifecycle;
     private final AgentEndpointProbe endpointProbe;
-    private final KnownFlows flows;
     private final AgentConnectorBindings connectorBindings;
     private final Clock clock;
 
@@ -57,7 +55,6 @@ public class AgentAdminService {
             command.visibility(),
             ownerId,
             clock.instant());
-        agent.assignFlow(requireKnownFlow(command.flow()));
         return agents.save(agent);
     }
 
@@ -116,20 +113,6 @@ public class AgentAdminService {
             agent.changeProactiveCheckWritesAllowed(command.proactiveCheckWritesAllowed());
         }
         return agents.save(agent);
-    }
-
-
-    /**
-     * 모르는 흐름 이름을 저장하지 못하게 막는다.
-     *
-     * <p>기동할 때도 같은 것을 확인한다. 여기서 막는 것은 이미 도는 서버를 다음 기동에서 세우지 않기
-     * 위해서다.
-     */
-    private String requireKnownFlow(String flow) {
-        if (flow == null || flow.isBlank() || flows.known(flow)) {
-            return flow;
-        }
-        throw new ApiException(ErrorCode.VALIDATION_FAILED, "no such flow");
     }
 
 
