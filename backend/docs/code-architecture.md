@@ -563,7 +563,8 @@ Checkstyle의 `FileLength`와 ESLint의 `max-lines`는 이 검사로 대체한�
 `MemoryRevisionWriter`는 판 저장과 민감 본문 암호화, 배치 검증과 제안 중복 키 계산을 맡는다.
 writer는 facade의 트랜잭션 안에서 동작한다. 새 본문을 먼저 암호화한 뒤 이전 값을 판으로 저장하고,
 민감하게 고칠 때만 flush와 과거 평문 판의 봉인을 거쳐 현재 본문을 저장한다.
-`MemoryTitleSearch`는 제목 검색의 입력 검사와 repository 조회를 맡는다. repository만 주입받고
+`MemoryRelevanceSearch`는 기억 검색의 입력 검사와 관련도 점수, 커서 위치에서 자르기를 맡는다.
+권한 조건을 건 후보 SQL은 `memory.infra`의 `MemorySearchCandidates`가 맡는다. 둘 다
 `MemoryService.searchFor`의 읽기 전용 `REQUIRES_NEW`, 2초 제한 트랜잭션 안에서 실행한다.
 MCP 호출은 공개 facade의 Spring proxy를 거치므로 바깥 트랜잭션의 제한을 물려받지 않는다.
 외부 호출자는 기존 facade를 그대로 사용한다.
