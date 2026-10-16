@@ -6,7 +6,7 @@ covers: `backend/src/main/java/com/bifos/assistant/connector/`, `web/src/compone
 
 ## 요구
 
-- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md)). 남아 있는 옛 커넥터 에이전트도 같다
+- 연결을 붙인 에이전트의 커넥터 도구 호출은 그 profile 의 `fos-ctx` hook 이 Control Plane 에 묻고 판정을 받은 뒤에만 나간다([ADR-049](../../backend/docs/adr/ADR-049-커넥터-도구-호출은-profile-plugin-의-hook-이-control-plane-에-물어-판정한다.md))
 - 위험도와 승인 방식은 plugin 이 도구마다 선언하고, 판정은 Control Plane 이 한다. 모델의 인자와 서버의 `readOnlyHint` 는 판정에 들어가지 않는다
 - 승인이 필요한 호출은 막고 승인 줄로 저장한다. 사용자가 그 대화의 승인 카드에서 승인하면 Control Plane 이 저장한 인자로 한 번 실행하고 결과를 그 대화로 전한다([ADR-050](../../backend/docs/adr/ADR-050-커넥터-쓰기는-control-plane-이-승인-줄을-저장하고-승인한-인자로-한-번만-실행한다.md))
 - 사용자는 승인 방식이 `required` 인 도구에 상시 허락을 줄 수 있다. 밖으로 나가는 도구는 상시 허락을 닫는다([ADR-065](../adr/ADR-065-외부로-나가는-도구는-상시-허락을-닫는-선언을-둔다.md))

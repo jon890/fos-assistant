@@ -189,7 +189,7 @@ class AgentLifecycleServiceTest {
         assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
 
         verifyNoInteractions(dashboard);
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id()))
             .isEqualTo(5);
     }
 
@@ -203,7 +203,7 @@ class AgentLifecycleServiceTest {
         Agent created = create(admin, "여섯째", null);
 
         assertThat(created.ownerUserId()).isEqualTo(admin.id());
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(admin.id()))
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(admin.id()))
             .isEqualTo(6);
     }
 
@@ -220,27 +220,11 @@ class AgentLifecycleServiceTest {
         Agent created = create(kid, "다시 다섯째", null);
 
         assertThat(created.ownerUserId()).isEqualTo(kid.id());
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id()))
             .isEqualTo(5);
     }
 
 
-    @Test
-    @DisplayName("예전 방식의 연결 에이전트는 상한에 세지 않아 넷과 그것을 가진 사용자가 다섯째를 만든다")
-    void legacyConnectorAgentsDoNotCountTowardLimit() {
-        CurrentUser kid = member();
-        seedAgents(kid, 4);
-        Agent legacy = seedAgents(kid, 1).get(0);
-        legacy.markConnectorManaged();
-        agents.save(legacy);
-
-        Agent created = create(kid, "다섯째", null);
-
-        assertThat(created.connectorManaged()).isFalse();
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
-            .isEqualTo(5);
-        assertCode(() -> lifecycle.create(kid, "여섯째", null), ErrorCode.AGENT_LIMIT_REACHED);
-    }
 
 
     /**
@@ -281,7 +265,7 @@ class AgentLifecycleServiceTest {
                 .as("%d번째 동시 만들기의 결과", round)
                 .filteredOn(outcome -> outcome == ErrorCode.AGENT_LIMIT_REACHED)
                 .hasSize(1);
-            assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+            assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id()))
                 .as("%d번째 동시 만들기 뒤의 에이전트 수", round)
                 .isEqualTo(5);
         }
@@ -313,7 +297,7 @@ class AgentLifecycleServiceTest {
             .isNotEmpty()
             .allSatisfy(token -> assertThat(token.revokedAt()).isNotNull());
         assertThat(agents.existsByHermesProfile(profile)).isFalse();
-        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(kid.id()))
+        assertThat(agents.countByOwnerUserIdAndDeletedAtIsNull(kid.id()))
             .isZero();
     }
 
@@ -621,23 +605,6 @@ class AgentLifecycleServiceTest {
     }
 
 
-    @Test
-    @DisplayName("옛 커넥터 에이전트는 고치지 못해도 주인이 지울 수 있고 지우면 그 바인딩을 뗀다")
-    void ownerDeletesLegacyConnectorAgent() {
-        CurrentUser kid = member();
-        Agent legacy = seedAgents(kid, 1).get(0);
-        legacy.markConnectorManaged();
-        legacy = agents.save(legacy);
-        bind(legacy, readyConnection(kid));
-        String code = legacy.code();
-
-        assertCode(() -> lifecycle.changeVisibility(kid, code, AgentVisibility.GROUP), ErrorCode.FORBIDDEN);
-        lifecycle.delete(kid, code);
-
-        verify(connector).putConnector(legacy.hermesProfile(), DEMO, false, legacy.sandboxOwner());
-        assertThat(bindingRows.existsByAgentId(legacy.id())).isFalse();
-        assertThat(agents.findByCode(code).orElseThrow().isDeleted()).isTrue();
-    }
 
 
     @Test

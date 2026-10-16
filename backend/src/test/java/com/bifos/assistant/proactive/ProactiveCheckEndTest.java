@@ -157,7 +157,7 @@ class ProactiveCheckEndTest {
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         agent = agents.save(agent("end-" + suffix, "커리어"));
         Agent connected = agent("end-connector-" + suffix, "채용 연결");
-        connected.markConnectorManaged();
+
         connector = agents.save(connected);
         conversation = conversations.save(
             Conversation.startedForCheck(owner.id(), "먼저 살펴보기 · 커리어", agent.id(), Instant.now()));

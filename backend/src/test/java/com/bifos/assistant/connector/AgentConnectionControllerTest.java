@@ -1,7 +1,6 @@
 package com.bifos.assistant.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -78,8 +77,6 @@ class AgentConnectionControllerTest {
         List.of(new ConnectorField("token", ENV_NAME, "토큰", "", true, true, null, null)),
         "list_scopes",
         SERVER_NAME,
-        List.of(),
-        false,
         2,
         List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
@@ -128,7 +125,7 @@ class AgentConnectionControllerTest {
         when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(true, false));
         when(connector.unbindConnector(anyString(), anyString())).thenReturn(new InstallResult(false, false));
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
+        when(connector.bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class)))
             .thenReturn(new InstallResult(false, false));
         when(connector.readConnector(anyString(), anyString()))
             .thenReturn(new ConnectorState("p", true, true, false, true, HermesConnectorClient.MODE_BIND));

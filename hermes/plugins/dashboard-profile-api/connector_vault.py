@@ -6,19 +6,14 @@ import os
 import pathlib
 import re
 from .common import (
-    MANAGED_MARKER,
     _atomic_private_write,
-    _env_value,
     _json_object,
-    _missing_profile,
-    _profile_rejection,
     _rejected,
     logger,
 )
 
 from .connector_manifest import (
     CONNECTOR_ID_RE,
-    CONNECTOR_STATE,
     _connector_manifest,
     _connector_roots,
 )
@@ -29,8 +24,7 @@ CONNECTOR_VAULT_DIR = "connector-vault"
 # 보관 파일 이름이다. Control Plane 의 연결 id 앞에 `c` 를 붙인다. 경로 조각으로 쓰기 전에 본다.
 VAULT_ID_RE = re.compile(r"^c[1-9][0-9]{0,18}$")
 VAULT_PATH = "/api/connector-vault"
-VAULT_IMPORT_PATH = "/api/connector-vault/import"
-VAULT_ROUTES = frozenset({(VAULT_PATH, "PUT"), (VAULT_PATH, "DELETE"), (VAULT_IMPORT_PATH, "POST")})
+VAULT_ROUTES = frozenset({(VAULT_PATH, "PUT"), (VAULT_PATH, "DELETE")})
 
 
 def _vault_dir() -> pathlib.Path:
@@ -104,14 +98,13 @@ def _vault_values(manifest: dict, values) -> dict | None:
 
 
 async def _connector_vault_request(request):
-    """보관 파일을 쓰고 지우고, 관리 profile 의 `.env` 에서 옮긴다. 값과 경로를 응답과 로그에 싣지 않는다."""
+    """보관 파일을 쓰고 지운다. 값과 경로를 응답과 로그에 싣지 않는다."""
     from starlette.responses import JSONResponse
 
     path = request.url.path
     method = request.method.upper()
     body = await _json_object(request)
-    expected = {(VAULT_PATH, "PUT"): {"vault", "connector", "values"}, (VAULT_PATH, "DELETE"): {"vault"},
-                (VAULT_IMPORT_PATH, "POST"): {"vault", "connector", "profile"}}[(path, method)]
+    expected = {(VAULT_PATH, "PUT"): {"vault", "connector", "values"}, (VAULT_PATH, "DELETE"): {"vault"}}[(path, method)]
     if (body is None or set(body) != expected
             or not isinstance(body["vault"], str) or not VAULT_ID_RE.match(body["vault"])
             or ("connector" in body and (not isinstance(body["connector"], str)
@@ -133,35 +126,9 @@ async def _connector_vault_request(request):
         manifest = _connector_manifest(connector) if connector in _connector_roots() else None
         if manifest is None:
             return _rejected("쓸 수 있는 connector 가 아니다")
-        if method == "PUT":
-            values = _vault_values(manifest, body["values"])
-            if values is None:
-                return _rejected("칸 값이 그 connector 의 칸 선언과 맞지 않는다")
-        else:
-            rejected = _profile_rejection(body["profile"], request)
-            if rejected is not None:
-                return rejected
-            missing = _missing_profile(body["profile"])
-            if missing is not None:
-                return missing
-            from hermes_cli.profiles import get_profile_dir
-            profile_dir = get_profile_dir(body["profile"])
-            if not (profile_dir / MANAGED_MARKER).is_file():
-                return _rejected("관리 표식이 없는 profile 이다", 401)
-            state_path = profile_dir / CONNECTOR_STATE
-            state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.is_file() else {}
-            if not isinstance(state, dict) or connector not in state:
-                return _rejected("설치하지 않은 connector 다", 404)
-            env_path = profile_dir / ".env"
-            if env_path.is_symlink():
-                raise ValueError("profile 의 .env 가 링크다")
-            env_text = env_path.read_text(encoding="utf-8") if env_path.is_file() else ""
-            # 빈 선택 칸은 넣지 않는다. 필수 칸이 비면 아래 검사가 거절한다.
-            values = _vault_values(manifest, {field["key"]: _env_value(env_text, field["env"])
-                                              for field in manifest["fields"]
-                                              if _env_value(env_text, field["env"])})
-            if values is None:
-                return _rejected("profile 의 값이 그 connector 의 칸 선언과 맞지 않는다")
+        values = _vault_values(manifest, body["values"])
+        if values is None:
+            return _rejected("칸 값이 그 connector 의 칸 선언과 맞지 않는다")
         await asyncio.to_thread(_write_vault, vault, connector, values)
         return JSONResponse({"ok": True}, status_code=200)
     except FileExistsError:

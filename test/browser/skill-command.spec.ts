@@ -187,35 +187,6 @@ test.describe("스킬을 올린 에이전트", () => {
     ).toBeVisible();
   });
 
-  test("사진을 받는 옛 커넥터 에이전트는 스킬 목록과 커맨드 칩을 함께 숨긴다", async ({
-    page,
-  }) => {
-    await page.route("**/api/agents", async (route) => {
-      const response = await route.fetch();
-      const agents = await response.json();
-      await route.fulfill({
-        response,
-        json: agents.map((agent: { code: string }) =>
-          agent.code === SKILL_AGENT_CODE
-            ? { ...agent, connectorManaged: true, acceptsAttachments: true }
-            : agent,
-        ),
-      });
-    });
-    await startWith(page, SKILL_AGENT_NAME);
-    const input = composer(page);
-    await input.fill("/");
-    await expect(skillList(page)).toHaveCount(0);
-    await input.fill(`/${NAME} 연결 계획`);
-    await input.press("Enter");
-    const message = page.getByTestId("user-message").last();
-    await expect(message.locator("p")).toHaveText(`/${NAME} 연결 계획`);
-    await expect(message.getByTestId("skill-chip")).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: "답 다시 만들기" }),
-    ).toBeVisible();
-  });
-
   test("목록에서 숨긴 기본 스킬도 이름을 직접 입력하면 커맨드로 실행한다", async ({
     page,
   }) => {

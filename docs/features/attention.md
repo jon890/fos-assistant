@@ -314,7 +314,6 @@ Control Plane MCP 서버가 `follow_up_propose` 를 둔다. 먼저 살펴보기 
 판정 자리는 [`docs/features/mcp.md`](mcp.md) 의 「Control Plane MCP」 가, 도구 정의와 결과 글은 `McpToolService.tools` 와 `McpToolService.proposeFollowUp` 이, `due_at` 형식은 `FollowUpDueAt` 이 갖는다.
 
 - **주인과 대화는 호출의 origin 실행에서 정한다.** `McpCallerResolver` 가 찾은 origin 실행의 `user_id` 가 주인이고 `conversation_id` 가 대화다. 인자로 받지 않는다. 대화가 없는 실행에서 부르면 거절한다
-- 옛 커넥터 에이전트는 이 도구를 받지 못한다(ADR-045). 연결을 붙인 일반 에이전트는 부를 수 있다
 - **fos-ctx 가 이 도구를 서명 필수로 안다.** `hermes/plugins/fos-ctx/hooks.py` 의 `REQUIRED_TOOLS` 에 넣는다
 - **실행 사건에 이 도구의 인자와 결과를 남기지 않는다.** `HermesRunEventStream` 이 시작 사건과 끝 사건의 `detail` 을 비운다. 남기면 관리자가 실행 기록에서 남의 할 일 제목을 읽는다
 - 값이 틀린 인자에는 `isError` 와 무엇이 틀렸는지 한 줄로 답한다. 모델이 고쳐 다시 부를 수 있게 하려는 것이다

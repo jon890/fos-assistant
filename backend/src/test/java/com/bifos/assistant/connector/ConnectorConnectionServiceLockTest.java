@@ -3,11 +3,9 @@ package com.bifos.assistant.connector;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -27,7 +25,6 @@ import com.bifos.assistant.connector.application.ConnectorBindingApplier;
 import com.bifos.assistant.connector.application.ConnectorInstallAttempts;
 import com.bifos.assistant.connector.application.execution.ConnectorExecutionGuard;
 import com.bifos.assistant.connector.application.ConnectorPolicyService;
-import com.bifos.assistant.connector.application.model.ConnectorOperationFailure;
 import com.bifos.assistant.connector.application.model.ConnectorBindingAttempt;
 import com.bifos.assistant.connector.application.model.ConnectorInstallResult;
 import com.bifos.assistant.connector.application.model.ResyncOutcome;
@@ -88,7 +85,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** 실제 서비스와 DB에서 설치 시작의 커밋과 늦은 응답의 CAS를 본다. 대시보드 호출만 공용 mock으로 멈춘다. */
 class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest {
     private static final InstallResult INSTALLED = new InstallResult(false, false);
-    private static final ConnectorInstallResult READY = new ConnectorInstallResult(INSTALLED, false, ResyncOutcome.READY, 0, false);
+    private static final ConnectorInstallResult READY = new ConnectorInstallResult(INSTALLED, ResyncOutcome.READY, 0);
 
     @Autowired
     ConnectorInstallAttempts attempts;
@@ -378,8 +375,8 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
 
 
     @ParameterizedTest
-    @ValueSource(strings = {"hermes_profile", "credential_scope", "owner_user_id"})
-    @DisplayName("결과의 profile과 credential과 소유자가 현재 값과 다르면 READY로 올리지 않는다")
+    @ValueSource(strings = {"hermes_profile", "credential_scope", "owner_user_id", "visibility"})
+    @DisplayName("결과의 profile과 credential·소유자·공개 범위가 현재 값과 다르면 READY로 올리지 않는다")
     void discardsChangedInstallContext(String column) throws Exception {
         Target target = readyTarget();
         ConnectorBindingAttempt attempt = capture(target);
@@ -387,6 +384,8 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             jdbc.update("UPDATE agent SET hermes_profile = ? WHERE id = ?", "changed-" + target.agent().id(), target.agent().id());
         } else if (column.equals("credential_scope")) {
             jdbc.update("UPDATE agent SET credential_scope = 'DEDICATED' WHERE id = ?", target.agent().id());
+        } else if (column.equals("visibility")) {
+            jdbc.update("UPDATE agent SET visibility = 'GROUP' WHERE id = ?", target.agent().id());
         } else {
             CurrentUser next = user(UserRole.MEMBER, 1L);
             jdbc.update("UPDATE agent SET owner_user_id = ? WHERE id = ?", next.id(), target.agent().id());
@@ -557,73 +556,10 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
     }
 
 
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    @DisplayName("옛 바인딩은 설치 전 조회 실패와 꺼진 설치 뒤에도 의도를 보존하고 다음 확인으로 복구한다")
-    void preservesLegacyIntentBeforeInstall(boolean readFailure) throws Exception {
-        Target target = readyTarget();
-        transactions.executeWithoutResult(status -> agents.findById(target.agent().id()).orElseThrow().markConnectorManaged());
-        allowCheck();
-        AtomicInteger installsSent = new AtomicInteger();
-        doAnswer(invocation -> {
-            assertNoTransaction();
-            assertThat(observe(target.bindingId()).desired()).isFalse();
-            installsSent.incrementAndGet();
-            return INSTALLED;
-        }).when(connector).putConnector(anyString(), anyString(), anyBoolean(), anyString());
-        when(connector.readConnector(anyString(), anyString())).thenAnswer(invocation -> {
-            assertNoTransaction();
-            if (readFailure) {
-                throw new IllegalStateException("installation read failed");
-            }
-            return new ConnectorState("p", false, true, false, true, "legacy");
-        });
-        if (readFailure) {
-            assertThatThrownBy(() -> requests.check(target.owner(), DEMO)).isInstanceOf(ConnectorOperationFailure.class);
-        } else {
-            requests.check(target.owner(), DEMO);
-        }
-        assertThat(observe(target.bindingId()).desired()).isTrue();
-        assertThat(observe(target.bindingId()).status()).isEqualTo("PENDING");
-        assertThat(installsSent).hasValue(0);
-        doReturn(new ConnectorState("p", true, true, false, true, "legacy"))
-            .when(connector).readConnector(anyString(), anyString());
-        requests.check(target.owner(), DEMO);
-        assertThat(installsSent).hasValue(1);
-        assertThat(observe(target.bindingId()).status()).isEqualTo("READY");
-        assertThat(observe(target.bindingId()).desired()).isTrue();
-    }
 
 
-    @Test
-    @DisplayName("옛 READY 바인딩의 꺼진 설치를 드리프트가 보아도 의도를 보존하고 다음 확인이 복구한다")
-    void preservesLegacyIntentAfterDrift() {
-        Target target = readyTarget();
-        transactions.executeWithoutResult(status -> agents.findById(target.agent().id()).orElseThrow().markConnectorManaged());
-        when(connector.readConnector(anyString(), anyString()))
-            .thenReturn(new ConnectorState("p", false, false, false, true, "legacy"));
-        assertThat(applier.resyncDrifted()).isEqualTo(1);
-        assertThat(bindings.findById(target.bindingId()).orElseThrow().desiredEnabled()).isTrue();
-        assertThat(bindings.findById(target.bindingId()).orElseThrow().status()).isEqualTo(BindingStatus.PENDING);
-        allowCheck();
-        when(connector.readConnector(anyString(), anyString()))
-            .thenReturn(new ConnectorState("p", true, true, false, true, "legacy"));
-        requests.check(target.owner(), DEMO);
-        assertThat(bindings.findById(target.bindingId()).orElseThrow().status()).isEqualTo(BindingStatus.READY);
-    }
 
 
-    @Test
-    @DisplayName("옛 바인딩의 설치 요청 자체가 실패하면 낮춘 의도를 유지한다")
-    void keepsLegacyDisabledAfterInstallWasSent() {
-        Target target = readyTarget();
-        transactions.executeWithoutResult(status -> agents.findById(target.agent().id()).orElseThrow().markConnectorManaged());
-        when(connector.putConnector(anyString(), anyString(), anyBoolean(), anyString()))
-            .thenThrow(new IllegalStateException("install response lost"));
-        assertThat(attempts.execute(capture(target))).contains(ResyncOutcome.CALL_FAILED);
-        assertThat(bindings.findById(target.bindingId()).orElseThrow().desiredEnabled()).isFalse();
-        assertThat(bindings.findById(target.bindingId()).orElseThrow().status()).isEqualTo(BindingStatus.PENDING);
-    }
 
 
     @ParameterizedTest
@@ -657,7 +593,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
             assertThat(applier.resyncDrifted()).isZero();
         }
         verify(connector, never()).bindConnector(anyString(), anyString(), anyString(), anyString(), nullable(String.class));
-        verify(connector, never()).putConnector(anyString(), anyString(), anyBoolean(), anyString());
+
         assertThat(observe(target.bindingId())).isEqualTo(before);
     }
 
@@ -677,7 +613,7 @@ class ConnectorConnectionServiceLockTest extends ConnectorBindingServiceLockTest
         return attempts.start(() -> {
             attempts.lockOwner(target.owner().id());
             agents.findByIdForUpdate(target.agent().id()).orElseThrow();
-            return attempts.begin(bindings.findById(target.bindingId()).orElseThrow(), Optional.of(DEMO_MANIFEST), Map.of(), true, false, false, clock.instant());
+            return attempts.begin(bindings.findById(target.bindingId()).orElseThrow(), Optional.of(DEMO_MANIFEST), true, false, false, clock.instant());
         });
     }
 

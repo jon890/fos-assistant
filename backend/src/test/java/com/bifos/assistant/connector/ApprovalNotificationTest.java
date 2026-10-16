@@ -84,8 +84,6 @@ class ApprovalNotificationTest {
         List.of(),
         "list_scopes",
         "demo",
-        List.of(),
-        false,
         2,
         List.of(
             new ConnectorTool("list_scopes", "READ", "none", null, null),
@@ -168,7 +166,7 @@ class ApprovalNotificationTest {
             AgentVisibility.PRIVATE,
             owner.id(),
             Instant.now());
-        agent.markConnectorManaged();
+
         agent = agents.save(agent);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "승인 대화", agent.id(), Instant.now()));
         root = startRun(conversation.id());

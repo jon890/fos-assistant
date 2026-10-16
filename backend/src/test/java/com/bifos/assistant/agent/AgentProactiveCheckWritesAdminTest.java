@@ -180,7 +180,6 @@ class AgentProactiveCheckWritesAdminTest {
             .andExpect(jsonPath("$.credentialScope").value("SHARED_HOUSEHOLD"))
             .andExpect(jsonPath("$.visibility").value("GROUP"))
             .andExpect(jsonPath("$.enabled").value(true))
-            .andExpect(jsonPath("$.connectorManaged").value(false))
             .andExpect(jsonPath("$.proactiveCheckWritesAllowed").value(false));
         when(agents.findAll()).thenReturn(List.of(agent));
         mvc.perform(get(COLLECTION_PATH))
@@ -203,19 +202,6 @@ class AgentProactiveCheckWritesAdminTest {
     }
 
 
-    @Test
-    @DisplayName("커넥터 에이전트에는 쓰기 허용 값을 저장하지 않는다")
-    void connectorAgentNeverStoresWrites() throws Exception {
-        signIn(ADMIN);
-        agent.markConnectorManaged();
-
-        send("{\"enabled\":true,\"visibility\":\"PRIVATE\",\"proactiveCheckWritesAllowed\":true}")
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
-
-        assertThat(agent.proactiveCheckWritesAllowed()).isFalse();
-        verify(agents, never()).save(any(Agent.class));
-    }
 
 
     @Test

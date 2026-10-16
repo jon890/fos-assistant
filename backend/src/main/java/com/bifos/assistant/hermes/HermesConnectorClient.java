@@ -18,16 +18,11 @@ public interface HermesConnectorClient {
     /** 바인딩 설치의 방식 이름이다. 소유 기록의 {@code mode} 와 같다. */
     String MODE_BIND = "bind";
 
-    /** 커넥터 전용 profile 에 한 옛 설치의 방식 이름이다. 대시보드가 방식을 내지 않으면 이것으로 읽는다. */
-    String MODE_ISOLATED = "isolated";
-
-
     /**
      * 그 profile 의 설치 상태다.
      *
      * @param policyHook 그 profile 의 도구 호출이 정책 판정을 거치는가. 대시보드가 참이라고 답했을 때만 참이다
-     * @param mode 설치 방식. {@link #MODE_BIND} 나 {@link #MODE_ISOLATED} 다. 설치하지 않았거나 옛 대시보드 plugin 이
-     * 내지 않았으면 {@link #MODE_ISOLATED} 다
+     * @param mode 설치 방식. {@link #MODE_BIND} 여야 한다
      */
     record ConnectorState(
         String profile,
@@ -106,11 +101,6 @@ public interface HermesConnectorClient {
      */
     boolean deleteVault(String vault);
 
-
-    /** 그 커넥터를 옛 설치한 profile 의 {@code .env} 에서 칸 값을 읽어 보관 파일에 쓴다. */
-    void importVault(String vault, String connectorId, String profile);
-
-
     /**
      * 승인한 호출을 한 번 실행한다. 결과를 알 수 없으면 {@link ConnectorExecutionUnknown} 을 던진다.
      *
@@ -133,15 +123,6 @@ public interface HermesConnectorClient {
         String profile, String connectorId, String hermesTool, ConnectorApprovedExecution execution) {
         return CallResult.failure(ConnectorCallError.UNAVAILABLE);
     }
-
-
-    /**
-     * 커넥터 전용 profile 에 옛 방식으로 설치하거나 끈다. 바인딩 칸 없이 보낸다.
-     *
-     * <p>설치하는 사진 도구도 신뢰한 에이전트 주인의 격리 실행 공간을 쓴다(ADR-091). 켜는 요청은 보내기 전에 그 주인의 첨부
-     * 디렉터리를 만들고, 만들지 못하면 {@link HermesRequestRejected} 를 던진다.
-     */
-    InstallResult putConnector(String profile, String connectorId, boolean enabled, String sandboxOwner);
 
 
     /**

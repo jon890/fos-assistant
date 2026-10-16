@@ -40,14 +40,13 @@ public class ProactiveCheckRun implements CheckTurn {
     static final String PREAMBLE = ProactiveCheckInstructions.PREAMBLE;
     static final String READ_ONLY_RULE = ProactiveCheckInstructions.READ_ONLY_RULE;
     static final String WRITES_RULE = ProactiveCheckInstructions.WRITES_RULE;
-    static final String DELEGATE_RULE = ProactiveCheckInstructions.DELEGATE_RULE;
     static final String DIRECT_RULE = ProactiveCheckInstructions.DIRECT_RULE;
     static final String COMMON_RULES = ProactiveCheckInstructions.COMMON_RULES;
 
 
-    /** 경계 줄과 연결 줄을 골라 지시를 만든다. */
-    static String instructions(boolean writesAllowed, boolean directConnectors) {
-        return ProactiveCheckInstructions.instructions(writesAllowed, directConnectors);
+    /** 경계 줄을 골라 지시를 만든다. */
+    static String instructions(boolean writesAllowed) {
+        return ProactiveCheckInstructions.instructions(writesAllowed);
     }
 
 
@@ -79,7 +78,6 @@ public class ProactiveCheckRun implements CheckTurn {
 
     private final ProactiveCheck check;
     private final boolean renewSession;
-    private final boolean directConnectors;
     private final Deps deps;
     private final ProactiveCheckInput checkInput;
     private final ProactiveCheckResults results;
@@ -120,18 +118,15 @@ public class ProactiveCheckRun implements CheckTurn {
     /**
      * @param check 이미 저장한 {@code RUNNING} 살펴보기 줄
      * @param renewSession 이번 살펴보기를 새 session 으로 보낼지
-     * @param directConnectors 시작할 때 그 에이전트에 붙은 연결이 있었는지. 있으면 지시가 연결한 서비스의 도구를 직접 부르게 한다
      */
     ProactiveCheckRun(
         CurrentUser owner,
         Long agentId,
         ProactiveCheck check,
         boolean renewSession,
-        boolean directConnectors,
         Deps deps) {
         this.check = check;
         this.renewSession = renewSession;
-        this.directConnectors = directConnectors;
         this.deps = deps;
         this.checkInput = new ProactiveCheckInput(owner, agentId, check, deps);
         this.results = new ProactiveCheckResults(owner, check, deps);
@@ -139,10 +134,10 @@ public class ProactiveCheckRun implements CheckTurn {
     }
 
 
-    /** 시작할 때 옮겨 적은 쓰기 허용 값과 붙은 연결 유무로 지시를 고른다. 에이전트 칸과 바인딩을 다시 읽지 않는다. */
+    /** 시작할 때 옮겨 적은 쓰기 허용 값으로 지시를 고른다. */
     @Override
     public String instructions() {
-        return instructions(check.writesAllowed(), directConnectors);
+        return instructions(check.writesAllowed());
     }
 
 

@@ -309,7 +309,7 @@ function safeAdmin(value: unknown) {
   };
 }
 
-const BLOCKED_REASONS = ["AGENT_NOT_PRIVATE", "LEGACY_AGENT"];
+const BLOCKED_REASONS = ["AGENT_NOT_PRIVATE"];
 
 function safeAgentConnections(value: unknown) {
   const item = record(value);

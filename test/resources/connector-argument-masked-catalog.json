@@ -36,8 +36,6 @@
       "tool": "verify"
     },
     "mcp_server": "demo",
-    "toolsets": [],
-    "attachments": false,
     "owner_browser": false,
     "owner_browser_login_url": null,
     "single_binding": false,

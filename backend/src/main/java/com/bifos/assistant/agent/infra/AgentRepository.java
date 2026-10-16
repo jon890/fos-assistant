@@ -24,7 +24,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     List<Agent> findByEnabledTrueOrderByCodeAsc();
 
 
-    List<Agent> findByDeletedAtIsNullAndConnectorManagedFalseOrderByCodeAsc();
+    List<Agent> findByDeletedAtIsNullOrderByCodeAsc();
 
 
     /**
@@ -69,7 +69,7 @@ public interface AgentRepository extends JpaRepository<Agent, Long> {
     /**
      * 그 사용자가 주인인 지우지 않은 에이전트 수다. 사용자당 상한을 이 수로 센다. 커넥터 연결용 에이전트는 세지 않는다.
      */
-    long countByOwnerUserIdAndDeletedAtIsNullAndConnectorManagedFalse(Long ownerUserId);
+    long countByOwnerUserIdAndDeletedAtIsNull(Long ownerUserId);
 
 
     /**
