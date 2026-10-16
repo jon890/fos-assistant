@@ -1,6 +1,6 @@
 {
   "name": "plan217-jpa-auditing-base",
-  "description": "저장 시각의 공통 JPA auditing과 빠진 변경 시각 세 칸을 적용한다",
+  "description": "46개 엔티티를 판정해 순수 저장 시각 33개를 공통 JPA auditing으로 옮기고 변경 시각 세 칸을 추가한다",
   "status": "pending",
   "created_at": "2026-10-16",
   "total_phases": 1,
