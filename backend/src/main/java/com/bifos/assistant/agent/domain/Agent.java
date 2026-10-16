@@ -1,5 +1,6 @@
 package com.bifos.assistant.agent.domain;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.agent.domain.type.AgentVisibility;
 import com.bifos.assistant.agent.domain.type.CostMode;
 import com.bifos.assistant.agent.domain.type.CredentialScope;
@@ -29,7 +30,7 @@ import org.springframework.data.domain.DomainEvents;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Accessors(fluent = true)
-public class Agent {
+public class Agent extends AuditedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -74,9 +75,6 @@ public class Agent {
     @Column(nullable = false)
     @Getter
     private boolean enabled;
-
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     /**
      * 참이면 Control Plane 이 이 에이전트의 profile 을 만들었다.
@@ -146,8 +144,7 @@ public class Agent {
         CostMode costMode,
         CredentialScope credentialScope,
         AgentVisibility visibility,
-        Long ownerUserId,
-        Instant now) {
+        Long ownerUserId) {
         this.code = code;
         this.name = name;
         this.hermesProfile = hermesProfile;
@@ -157,7 +154,6 @@ public class Agent {
         this.visibility = visibility;
         this.ownerUserId = ownerUserId;
         this.enabled = true;
-        this.createdAt = now;
         this.created = true;
     }
 
@@ -187,10 +183,9 @@ public class Agent {
         CostMode costMode,
         CredentialScope credentialScope,
         AgentVisibility visibility,
-        Long ownerUserId,
-        Instant now) {
+        Long ownerUserId) {
         return new Agent(
-            code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId, now);
+            code, name, hermesProfile, apiBaseUrl, costMode, credentialScope, visibility, ownerUserId);
     }
 
 

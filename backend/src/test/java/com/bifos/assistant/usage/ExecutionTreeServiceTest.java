@@ -89,8 +89,7 @@ class ExecutionTreeServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                OWNER_ID,
-                Instant.now())));
+                OWNER_ID)));
     }
 
 
@@ -177,8 +176,7 @@ class ExecutionTreeServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            OWNER_ID,
-            Instant.now()));
+            OWNER_ID));
         AgentExecution child = executions.save(AgentExecution.builder()
             .userId(OWNER_ID)
             .agentId(gone.id())

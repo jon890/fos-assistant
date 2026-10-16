@@ -79,7 +79,7 @@ class SubagentUsageSchedulingTest {
         executions.deleteAll();
         Agent agent = agents.findByCode("scheduling-test").orElseGet(() -> agents.save(Agent.of(
             "scheduling-test", "시각 검사", "scheduling-test", "http://runtime", CostMode.API,
-            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 4501L, TICK)));
+            CredentialScope.SHARED_HOUSEHOLD, AgentVisibility.PRIVATE, 4501L)));
         Instant finished = TICK.minusSeconds(5).plusMillis(13);
         parent = executions.save(AgentExecution.builder()
             .userId(4501L).agentId(agent.id()).profileName(agent.hermesProfile())

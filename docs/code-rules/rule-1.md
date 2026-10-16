@@ -10,7 +10,9 @@ auditing은 허용된 필드와 기존 Clock provider만 쓴다.
 
 ## 예외와 검토 범위
 
-MemoryCollection.createdAt만 허용한다.
+CreatedAtEntity/AuditedEntity의 순수 저장 시각만 허용한다. 엔티티별 상속과 업무 시각 제외 목록은
+[ADR-20261016 / jpa-auditing-base](../../backend/docs/adr/ADR-20261016-jpa-auditing-base.md)가 갖는다.
+callback을 거치지 않는 JPQL/native bulk는 시각을 명시적으로 갱신한다.
 실제 callback과 마이크로초 정밀도는 H2와 MySQL 저장 테스트가 함께 확인한다.
 
 ## 이 저장소의 사례

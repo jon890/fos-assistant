@@ -225,7 +225,6 @@ class MemoryFreshnessTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER.id(),
-            NOW);
+            USER.id());
     }
 }

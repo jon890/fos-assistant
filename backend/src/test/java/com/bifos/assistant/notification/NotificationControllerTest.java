@@ -22,6 +22,7 @@ import com.bifos.assistant.shared.auth.CurrentUserProvider;
 import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.shared.error.GlobalExceptionHandler;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
+import com.bifos.assistant.testsupport.TestClock;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -65,6 +66,9 @@ class NotificationControllerTest {
     @Autowired
     PlatformTransactionManager transactionManager;
 
+    @Autowired
+    TestClock contextClock;
+
     private final CurrentUserProvider currentUser = mock(CurrentUserProvider.class);
     private final JsonMapper json = JsonMapper.builder().build();
     private final List<MvcResult> streams = new ArrayList<>();
@@ -74,6 +78,7 @@ class NotificationControllerTest {
     @BeforeEach
     void setUp() {
         notifications.deleteAll();
+        contextClock.set(CREATED_AT);
         when(currentUser.require())
             .thenReturn(new CurrentUser(USER, "notice@example.com", "알림 받는 사람", 1L, UserRole.MEMBER));
         mvc = MockMvcBuilders.standaloneSetup(new NotificationController(
@@ -105,8 +110,7 @@ class NotificationControllerTest {
             NotificationKind.APPROVAL_REQUESTED,
             "승인을 기다리는 요청이 있어요",
             "「메모 쓰기」",
-            new NotificationTarget(NotificationTargetType.CONVERSATION, conversation),
-            CREATED_AT));
+            new NotificationTarget(NotificationTargetType.CONVERSATION, conversation)));
 
         JsonNode page = body(mvc.perform(get("/api/v1/notifications")).andReturn().getResponse(), 200);
 
@@ -216,7 +220,7 @@ class NotificationControllerTest {
 
     private Notification stored() {
         return notifications.save(
-            Notification.of(USER, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null, CREATED_AT));
+            Notification.of(USER, NotificationKind.APPROVAL_REQUESTED, "제목", "본문", null));
     }
 
 

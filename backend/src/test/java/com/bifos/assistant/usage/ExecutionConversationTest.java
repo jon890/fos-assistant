@@ -141,7 +141,6 @@ class ExecutionConversationTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            USER_ID,
-            Instant.now());
+            USER_ID);
     }
 }

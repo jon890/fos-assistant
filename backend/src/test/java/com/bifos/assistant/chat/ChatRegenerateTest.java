@@ -384,7 +384,7 @@ class ChatRegenerateTest {
 
 
     private CurrentUser member(String email, String profileName) {
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, Instant.now()));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         agents.save(Agent.of(
             profileName,
             profileName,
@@ -393,8 +393,7 @@ class ChatRegenerateTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            user.id(),
-            Instant.now()));
+            user.id()));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 

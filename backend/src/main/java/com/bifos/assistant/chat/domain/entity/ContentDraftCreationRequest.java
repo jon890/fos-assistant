@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.chat.domain.type.ContentDraftCreationStatus;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
@@ -10,7 +11,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,7 +25,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ContentDraftCreationRequest {
+public class ContentDraftCreationRequest extends CreatedAtEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -67,11 +67,8 @@ public class ContentDraftCreationRequest {
     @Column(name = "status", nullable = false, columnDefinition = "VARCHAR(16)")
     private ContentDraftCreationStatus status;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
-
-    public ContentDraftCreationRequest(byte[] creationKey, byte[] identityKey, Long ownerUserId, Long conversationId, String profileName, Long originExecutionId, Long rootExecutionId, String rootSessionId, String requestId, byte[] requestHash, String draftPublicId, Instant createdAt) {
+    public ContentDraftCreationRequest(byte[] creationKey, byte[] identityKey, Long ownerUserId, Long conversationId, String profileName, Long originExecutionId, Long rootExecutionId, String rootSessionId, String requestId, byte[] requestHash, String draftPublicId) {
         this.creationKey = creationKey;
         this.identityKey = identityKey;
         this.ownerUserId = ownerUserId;
@@ -83,7 +80,6 @@ public class ContentDraftCreationRequest {
         this.requestId = requestId;
         this.requestHash = requestHash;
         this.draftPublicId = draftPublicId;
-        this.createdAt = createdAt;
         this.status = ContentDraftCreationStatus.CREATED;
     }
 

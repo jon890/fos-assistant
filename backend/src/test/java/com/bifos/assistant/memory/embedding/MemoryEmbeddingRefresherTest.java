@@ -237,7 +237,7 @@ class MemoryEmbeddingRefresherTest {
 
     private MemoryEmbeddingRefresher refresher(MemoryEmbeddingProperties properties) {
         return new MemoryEmbeddingRefresher(
-            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), backgroundTasks, clock);
+            properties, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, properties), backgroundTasks);
     }
 
 

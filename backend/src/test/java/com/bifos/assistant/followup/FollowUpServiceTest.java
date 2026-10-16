@@ -315,7 +315,7 @@ class FollowUpServiceTest {
 
     private CurrentUser member() {
         String email = "follow-up-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(user.id());
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -331,8 +331,7 @@ class FollowUpServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
         return conversations.save(Conversation.startedBy(owner.id(), "할 일 검사 대화", agent.id(), NOW));
     }
 }

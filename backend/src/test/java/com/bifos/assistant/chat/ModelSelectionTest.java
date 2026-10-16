@@ -45,7 +45,6 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.usage.infra.ExecutionEventRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -161,7 +160,7 @@ class ModelSelectionTest {
         agents.findByCode(AGENT_CODE).ifPresent(agents::delete);
         users.findByEmail("selection@example.com").ifPresent(users::delete);
 
-        AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser saved = users.save(AppUser.of("selection@example.com", "고름", 1L, UserRole.MEMBER));
         user = new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
         agents.save(Agent.of(
             AGENT_CODE,
@@ -171,8 +170,7 @@ class ModelSelectionTest {
             CostMode.API,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            saved.id(),
-            Instant.now()));
+            saved.id()));
     }
 
 

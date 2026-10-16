@@ -79,8 +79,8 @@ class SubagentSessionRegistrarTest {
             jdbc.update("DELETE FROM conversation WHERE user_id = ?", user.id());
             users.delete(user);
         }));
-        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER, Instant.now()));
-        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER, Instant.now()));
+        dad = users.save(AppUser.of(MY_EMAILS.get(0), "아빠", 1L, UserRole.MEMBER));
+        kid = users.save(AppUser.of(MY_EMAILS.get(1), "아이", 1L, UserRole.MEMBER));
         root = newRoot();
         dadRun = McpCallSigner.running(executions, dad.id(), CONVERSATION_ID, PROFILE_A, root);
     }

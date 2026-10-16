@@ -33,7 +33,6 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.OverrideProperties;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -147,15 +146,14 @@ class ConnectorBindingGatewayOffTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now()));
+            owner.id()));
     }
 
 
     private CurrentUser user() {
         String suffix = UUID.randomUUID().toString();
         AppUser saved = users.save(
-            AppUser.of("gateway-off-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("gateway-off-" + suffix + "@example.com", suffix, 1L, UserRole.MEMBER));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 }

@@ -26,8 +26,6 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
-import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +43,7 @@ class AgentAdminServiceTest {
     private final AgentEndpointProbe endpointProbe = mock(AgentEndpointProbe.class);
     private final AgentConnectorBindings connectorBindings = mock(AgentConnectorBindings.class);
 
-    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, connectorBindings, Clock.systemUTC());
+    private final AgentAdminService service = new AgentAdminService(agents, users, lifecycle, endpointProbe, connectorBindings);
 
 
     @BeforeEach
@@ -199,8 +197,7 @@ class AgentAdminServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            ownerId,
-            Instant.now());
+            ownerId);
         when(agents.findByCodeForUpdate("dad")).thenReturn(Optional.of(agent));
         return agent;
     }

@@ -124,8 +124,7 @@ class SubagentUsageLedgerTest {
                 CostMode.API,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                USER_ID,
-                Instant.now())));
+                USER_ID)));
         // 저장소가 돌려주는 시각과 그대로 견줄 수 있게 저장 정밀도 안쪽으로 자른다.
         now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
         from = now.minus(Duration.ofDays(10));

@@ -43,7 +43,6 @@ import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -365,8 +364,7 @@ class SkillPackageServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            OWNER.id(),
-            Instant.now());
+            OWNER.id());
     }
 
 

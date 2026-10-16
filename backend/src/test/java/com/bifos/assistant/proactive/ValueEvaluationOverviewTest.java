@@ -307,8 +307,7 @@ class ValueEvaluationOverviewTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            admin.id(),
-            now()));
+            admin.id()));
         createdAgents.add(saved.id());
         return saved;
     }
@@ -360,7 +359,6 @@ class ValueEvaluationOverviewTest {
             null,
             null,
             List.of(new ProblemEvidence(key, "https://docs.example.com/" + key, now.minusSeconds(60))),
-            now.minusSeconds(60),
-            now));
+            now.minusSeconds(60)));
     }
 }

@@ -86,17 +86,17 @@ public class ProactiveScheduleService {
                 ErrorCode.PROACTIVE_CHECK_UNAVAILABLE, "this agent cannot schedule a proactive check now");
         }
         if (task == null) {
-            task = tasks.save(Task.check(user.id(), agent.id(), CHECK_TITLE, now));
-            triggers.save(TaskTrigger.cron(task.id(), cron, zone, MissedPolicy.SKIP, next, now));
+            task = tasks.save(Task.check(user.id(), agent.id(), CHECK_TITLE));
+            triggers.save(TaskTrigger.cron(task.id(), cron, zone, MissedPolicy.SKIP, next));
         } else {
             TaskTrigger trigger = requireTrigger(task);
-            trigger.reschedule(TriggerType.CRON, cron, null, zone, next, now);
-            trigger.changeMissedPolicy(MissedPolicy.SKIP, now);
+            trigger.reschedule(TriggerType.CRON, cron, null, zone, next);
+            trigger.changeMissedPolicy(MissedPolicy.SKIP);
         }
         if (enabled) {
-            task.changeCheckEnabled(true, now);
+            task.changeCheckEnabled(true);
         } else {
-            task.changeCheckEnabled(false, now);
+            task.changeCheckEnabled(false);
         }
         TaskTrigger trigger = task == null ? null : requireTrigger(task);
         return view(user, agent, task, trigger, checkedBlockers);

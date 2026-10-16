@@ -81,8 +81,7 @@ class ContextAssemblerTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                null,
-                Instant.now())))
+                null)))
             .id();
     }
 

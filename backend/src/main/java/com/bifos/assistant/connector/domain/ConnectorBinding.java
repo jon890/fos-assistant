@@ -1,5 +1,6 @@
 package com.bifos.assistant.connector.domain;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import com.bifos.assistant.agent.domain.Agent;
 import com.bifos.assistant.connector.domain.type.BindingStatus;
 import jakarta.persistence.Column;
@@ -42,7 +43,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ConnectorBinding {
+public class ConnectorBinding extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -99,9 +100,6 @@ public class ConnectorBinding {
     @Column(name = "checked_at")
     private Instant checkedAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -111,7 +109,6 @@ public class ConnectorBinding {
         this.connection = connection;
         this.mcpServer = mcpServer;
         this.status = BindingStatus.PENDING;
-        this.createdAt = now;
         this.updatedAt = now;
     }
 

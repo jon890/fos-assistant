@@ -332,6 +332,6 @@ class MemoryUseServiceTest {
 
     private void sourceRef(AgentExecution run, int position, String source, String ref, String bodyMode) {
         contextSources.save(
-            ExecutionContextSource.of(run.id(), position, source, ref, bodyMode, "FRESH", Instant.now()));
+            ExecutionContextSource.of(run.id(), position, source, ref, bodyMode, "FRESH"));
     }
 }

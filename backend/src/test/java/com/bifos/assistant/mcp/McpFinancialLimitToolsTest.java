@@ -81,7 +81,7 @@ class McpFinancialLimitToolsTest {
     @BeforeEach
     void setUp() {
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
-        owner = users.save(AppUser.of("mcp-order-limit-" + UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER, Instant.now()));
+        owner = users.save(AppUser.of("mcp-order-limit-" + UUID.randomUUID() + "@example.com", "주인", 1L, UserRole.MEMBER));
         token = tokens.issue(PROFILE, "order-limit").rawToken();
         Agent agent = McpCallSigner.agentFor(agents, PROFILE);
         conversation = conversations.save(Conversation.startedBy(owner.id(), "상한 검사 대화", agent.id(), Instant.now()));

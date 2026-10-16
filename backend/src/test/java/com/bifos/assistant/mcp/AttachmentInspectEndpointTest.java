@@ -97,7 +97,7 @@ class AttachmentInspectEndpointTest {
             }
         }
         McpCallSigner.clearRuns(jdbc, List.of(PROFILE));
-        AppUser owner = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "사용자", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser owner = users.save(AppUser.of(UUID.randomUUID() + "@example.test", "사용자", 1L, UserRole.MEMBER));
         user = new CurrentUser(owner.id(), owner.email(), owner.displayName(), 1L, UserRole.MEMBER);
         conversation = conversations.save(Conversation.startedBy(user.id(), "사진", null, Instant.now()));
         token = tokens.issue(PROFILE, "검사").rawToken();

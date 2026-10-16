@@ -442,7 +442,7 @@ class FollowUpAttentionSourceTest {
 
     private CurrentUser member() {
         String email = "follow-up-attention-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         createdUsers.add(user.id());
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
@@ -458,8 +458,7 @@ class FollowUpAttentionSourceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            NOW));
+            owner.id()));
     }
 
 

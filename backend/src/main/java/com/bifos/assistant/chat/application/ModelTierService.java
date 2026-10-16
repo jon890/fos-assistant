@@ -14,6 +14,8 @@ import com.bifos.assistant.shared.error.ApiException;
 import com.bifos.assistant.shared.error.ErrorCode;
 import com.bifos.assistant.usage.application.InternalValuePolicy;
 import com.bifos.assistant.user.infra.AppUserRepository;
+import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +50,7 @@ public class ModelTierService {
     private final AppUserRepository users;
     private final ModelOptionsService modelOptions;
     private final ModelVisibilityService visibility;
+    private final Clock clock;
 
 
     /**
@@ -103,7 +106,8 @@ public class ModelTierService {
 
     @Transactional
     public void saveUserDefault(CurrentUser user, ModelTier tier) {
-        if (users.updateModelDefaultTier(user.id(), tier == null ? null : tier.name()) == 0) {
+        if (users.updateModelDefaultTier(user.id(), tier == null ? null : tier.name(), clock.instant().truncatedTo(ChronoUnit.MICROS)) == 0
+            && !users.existsById(user.id())) {
             throw new ApiException(ErrorCode.FORBIDDEN, "the signed-in user does not exist");
         }
     }

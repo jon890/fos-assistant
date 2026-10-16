@@ -1,5 +1,6 @@
 package com.bifos.assistant.chat.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -23,7 +24,7 @@ import java.util.UUID;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ContentDraftSnapshot {
+public class ContentDraftSnapshot extends CreatedAtEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -76,14 +77,11 @@ public class ContentDraftSnapshot {
     @Column(name = "authorization_fingerprint", nullable = false, columnDefinition = "CHAR(64)")
     private String authorizationFingerprint;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
 
-    public ContentDraftSnapshot(UUID publicId, Long revisionId, Long ownerUserId, Long conversationId, Long originExecutionId, Long agentId, Long connectionId, Long bindingId, Instant connectionUpdatedAt, Instant bindingUpdatedAt, String policyFingerprint, int schemaVersion, String compilerVersion, String payloadFingerprint, String snapshotHash, String authorizationFingerprint, Instant createdAt, Instant expiresAt) {
+    public ContentDraftSnapshot(UUID publicId, Long revisionId, Long ownerUserId, Long conversationId, Long originExecutionId, Long agentId, Long connectionId, Long bindingId, Instant connectionUpdatedAt, Instant bindingUpdatedAt, String policyFingerprint, int schemaVersion, String compilerVersion, String payloadFingerprint, String snapshotHash, String authorizationFingerprint, Instant expiresAt) {
         this.publicId = publicId;
         this.revisionId = revisionId;
         this.ownerUserId = ownerUserId;
@@ -100,7 +98,6 @@ public class ContentDraftSnapshot {
         this.payloadFingerprint = payloadFingerprint;
         this.snapshotHash = snapshotHash;
         this.authorizationFingerprint = authorizationFingerprint;
-        this.createdAt = createdAt;
         this.expiresAt = expiresAt;
     }
 }

@@ -389,8 +389,7 @@ class AgentLifecycleServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now()));
+            null));
 
         Agent changed = lifecycle.changeVisibility(administrator, code, AgentVisibility.PRIVATE);
 
@@ -638,8 +637,7 @@ class AgentLifecycleServiceTest {
                 CostMode.SUBSCRIPTION,
                 CredentialScope.SHARED_HOUSEHOLD,
                 AgentVisibility.PRIVATE,
-                owner.id(),
-                Instant.now())));
+                owner.id())));
         }
         return seeded;
     }
@@ -672,7 +670,7 @@ class AgentLifecycleServiceTest {
 
     private CurrentUser user(UserRole role) {
         String email = "lifecycle-" + UUID.randomUUID() + "@example.com";
-        AppUser saved = users.save(AppUser.of(email, email, 1L, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of(email, email, 1L, role));
         return new CurrentUser(saved.id(), email, email, 1L, role);
     }
 

@@ -211,7 +211,7 @@ class DailyLoopPilotTest {
             .orElseThrow();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         AppUser user = users.save(
-            AppUser.of("daily-loop-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER, ENABLED_AT));
+            AppUser.of("daily-loop-" + suffix + "@example.com", "사용자A", 1L, UserRole.MEMBER));
         owner = new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
         String code = "career-" + suffix;
         agent = agents.save(Agent.of(
@@ -222,8 +222,7 @@ class DailyLoopPilotTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            ENABLED_AT));
+            owner.id()));
     }
 
 

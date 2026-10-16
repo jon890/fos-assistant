@@ -106,7 +106,7 @@ class McpArtifactWriteToolTest {
         tokenRows.deleteAll();
         conversations.deleteAll();
         users.deleteAll();
-        dad = users.save(AppUser.of("mcp-artifact-dad@example.com", "아빠", 1L, UserRole.ADMIN, Instant.now()));
+        dad = users.save(AppUser.of("mcp-artifact-dad@example.com", "아빠", 1L, UserRole.ADMIN));
         dadToken = tokens.issue(PROFILE, "dad").rawToken();
         dadRoot = McpCallSigner.newRoot();
         dadRun = McpCallSigner.running(executions, dad.id(), 1L, PROFILE, dadRoot);
@@ -183,7 +183,7 @@ class McpArtifactWriteToolTest {
     void registeredSubagentWritesOnlyToItsUsersConversationAfterParentEnds() throws Exception {
         Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         AppUser kid = users.save(
-            AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+            AppUser.of("mcp-artifact-subagent-kid@example.com", "아이", 1L, UserRole.MEMBER));
         Conversation kids = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
         String subagent = "하위-" + UUID.randomUUID();
         registrar.register(PROFILE, dadRoot, dadRoot, subagent);
@@ -271,7 +271,7 @@ class McpArtifactWriteToolTest {
     @DisplayName("잘못된 인자와 소유하지 않은 대화는 서로 다른 계약으로 거절한다")
     void rejectsBadArgumentsAndUnownedConversationWithDifferentContracts() throws Exception {
         Conversation own = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
-        AppUser kid = users.save(AppUser.of("mcp-artifact-kid@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser kid = users.save(AppUser.of("mcp-artifact-kid@example.com", "아이", 1L, UserRole.MEMBER));
         Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
 
         assertThat(body(raw(
@@ -394,7 +394,7 @@ class McpArtifactWriteToolTest {
         Conversation active = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         Conversation deleted = conversations.save(Conversation.startedBy(dad.id(), "", null, Instant.now()));
         conversationWriter.deleteIfActive(deleted.id(), dad.id(), Instant.now());
-        AppUser kid = users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER, Instant.now()));
+        AppUser kid = users.save(AppUser.of("mcp-artifact-owner@example.com", "아이", 1L, UserRole.MEMBER));
         Conversation other = conversations.save(Conversation.startedBy(kid.id(), "", null, Instant.now()));
 
         JsonNode missing = body(call(dadToken, UUID.randomUUID().toString(), "a.html", "x"))

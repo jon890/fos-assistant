@@ -1,5 +1,6 @@
 package com.bifos.assistant.people.domain;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -23,7 +24,7 @@ import lombok.experimental.Accessors;
 @Entity
 @Table(name = "allowed_person")
 @Accessors(fluent = true)
-public class AllowedPerson {
+public class AllowedPerson extends AuditedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,10 +47,6 @@ public class AllowedPerson {
     @Getter
     private boolean enabled;
 
-    @Column(name = "created_at", nullable = false)
-    @Getter
-    private Instant createdAt;
-
     /** 로그인 완료 기록만 조건부 갱신하므로 관리자 변경이 이 값을 덮어쓰지 않는다. */
     @Column(name = "last_login_at", updatable = false)
     @Getter
@@ -59,17 +56,16 @@ public class AllowedPerson {
     protected AllowedPerson() {}
 
 
-    private AllowedPerson(String email, String displayName, String hermesProfile, Instant now) {
+    private AllowedPerson(String email, String displayName, String hermesProfile) {
         this.email = normalizeEmail(email);
         this.displayName = displayName;
         this.hermesProfile = hermesProfile;
         this.enabled = true;
-        this.createdAt = now;
     }
 
 
-    public static AllowedPerson of(String email, String displayName, String hermesProfile, Instant now) {
-        return new AllowedPerson(email, displayName, hermesProfile, now);
+    public static AllowedPerson of(String email, String displayName, String hermesProfile) {
+        return new AllowedPerson(email, displayName, hermesProfile);
     }
 
 

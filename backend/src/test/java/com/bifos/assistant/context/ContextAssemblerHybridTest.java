@@ -27,7 +27,6 @@ import com.bifos.assistant.shared.domain.type.UserRole;
 import com.bifos.assistant.testsupport.BackendIntegrationTest;
 import com.bifos.assistant.testsupport.TestClock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,8 +86,7 @@ class ContextAssemblerHybridTest {
                 CostMode.API,
                 CredentialScope.DEDICATED,
                 AgentVisibility.GROUP,
-                null,
-                Instant.now())))
+                null)))
             .id();
     }
 
@@ -170,7 +168,7 @@ class ContextAssemblerHybridTest {
 
     private void refresh() {
         new MemoryEmbeddingRefresher(
-            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), backgroundTasks, clock)
+            ENABLED, client, embeddings, transactionManager, new MemoryVectorCache(embeddings, ENABLED), backgroundTasks)
                 .refreshOnce();
     }
 

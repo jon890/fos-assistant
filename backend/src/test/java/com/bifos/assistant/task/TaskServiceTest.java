@@ -302,7 +302,7 @@ class TaskServiceTest {
         LocalDateTime fireAt = LocalDateTime.parse("2026-10-04T12:00");
         TaskDetail created = service.create(owner, once("한 번", agent, fireAt));
         TaskTrigger trigger = triggers.findByTaskId(created.task().id()).orElseThrow();
-        trigger.advance(trigger.fireAt(), null, Instant.parse("2026-10-04T03:00:00Z"));
+        trigger.advance(trigger.fireAt(), null);
         triggers.save(trigger);
         clock.set(Instant.parse("2026-10-05T00:00:00Z"));
 
@@ -350,9 +350,9 @@ class TaskServiceTest {
     @Test
     @DisplayName("매일 깨우기 작업은 모델 단계를 고를 수 없다")
     void rejectsModelTierForCheckTask() {
-        Task check = Task.check(1L, 1L, "매일 깨우기", NOW);
+        Task check = Task.check(1L, 1L, "매일 깨우기");
 
-        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.FAST, NOW)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> check.chooseModelTier(ModelTier.FAST)).isInstanceOf(IllegalStateException.class);
         assertThat(check.modelTier()).isNull();
     }
 
@@ -469,7 +469,7 @@ class TaskServiceTest {
 
     private CurrentUser member() {
         String email = "task-" + UUID.randomUUID() + "@example.com";
-        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER, NOW));
+        AppUser user = users.save(AppUser.of(email, email, 1L, UserRole.MEMBER));
         return new CurrentUser(user.id(), user.email(), user.displayName(), user.groupId(), user.role());
     }
 
@@ -484,8 +484,7 @@ class TaskServiceTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             visibility,
-            owner.id(),
-            NOW));
+            owner.id()));
     }
 
 

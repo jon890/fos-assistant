@@ -26,7 +26,7 @@ class UserBrowserTest {
         assertThat(browser.userId()).isEqualTo(7L);
         assertThat(browser.profileKey()).isEqualTo(KEY);
         assertThat(browser.containerId()).isNull();
-        assertThat(browser.createdAt()).isEqualTo(NOW);
+        assertThat(browser.createdAt()).isNull();
     }
 
 

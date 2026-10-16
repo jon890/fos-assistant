@@ -1,18 +1,15 @@
 package com.bifos.assistant.memory.domain.entity;
 
+import com.bifos.assistant.shared.domain.CreatedAtEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
  * 그룹이 쓰는 collection 하나다(ADR-052).
@@ -22,11 +19,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
  */
 @Entity
 @Table(name = "memory_collection")
-@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class MemoryCollection {
+public class MemoryCollection extends CreatedAtEntity {
 
     /** 그룹마다 처음부터 두는 collection 의 key 다. 순서가 화면 순서다. */
     public static final List<String> DEFAULT_KEYS = List.of("core", "career", "learning", "health", "finance", "home", "identity");
@@ -41,10 +37,6 @@ public class MemoryCollection {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
-
-    @CreatedDate
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
 
     private MemoryCollection(Long groupId, String key, String displayName, int sortOrder) {

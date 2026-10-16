@@ -228,8 +228,7 @@ class AgentToolServiceAccessTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.GROUP,
-            null,
-            Instant.now()));
+            null));
         stubHermesApplying(agent, "web");
 
         agentTools.writeAsAdmin(administrator, agent.code(), List.of("web"));
@@ -283,7 +282,7 @@ class AgentToolServiceAccessTest {
 
     private CurrentUser user(UserRole role) {
         String email = "tool-access-" + UUID.randomUUID() + "@example.com";
-        AppUser saved = users.save(AppUser.of(email, email, 1L, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of(email, email, 1L, role));
         createdUserIds.add(saved.id());
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
@@ -305,7 +304,6 @@ class AgentToolServiceAccessTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            agentOwner.id(),
-            Instant.now());
+            agentOwner.id());
     }
 }

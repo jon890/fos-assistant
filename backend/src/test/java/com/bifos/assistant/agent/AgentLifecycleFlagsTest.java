@@ -262,7 +262,7 @@ class AgentLifecycleFlagsTest {
 
     private CurrentUser user(UserRole role) {
         String email = randomEmail();
-        AppUser saved = users.save(AppUser.of(email, email, 1L, role, Instant.now()));
+        AppUser saved = users.save(AppUser.of(email, email, 1L, role));
         return new CurrentUser(saved.id(), saved.email(), saved.displayName(), saved.groupId(), saved.role());
     }
 
@@ -287,8 +287,7 @@ class AgentLifecycleFlagsTest {
             CostMode.SUBSCRIPTION,
             CredentialScope.SHARED_HOUSEHOLD,
             AgentVisibility.PRIVATE,
-            owner.id(),
-            Instant.now());
+            owner.id());
     }
 
 

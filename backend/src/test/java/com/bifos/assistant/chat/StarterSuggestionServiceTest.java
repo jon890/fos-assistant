@@ -146,8 +146,7 @@ class StarterSuggestionServiceTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.GROUP,
-            DAD.id(),
-            Instant.now()));
+            DAD.id()));
         service = new StarterSuggestionService(
             properties,
             agentService,
@@ -301,8 +300,7 @@ class StarterSuggestionServiceTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.GROUP,
-            DAD.id(),
-            Instant.now()));
+            DAD.id()));
         conversationOf(DAD, other, "다른 에이전트와 나눈 질문");
         answerWith(json(FOUR));
 
@@ -630,8 +628,7 @@ class StarterSuggestionServiceTest {
             CostMode.API,
             CredentialScope.DEDICATED,
             AgentVisibility.PRIVATE,
-            DAD.id(),
-            Instant.now()));
+            DAD.id()));
         answerWith(json(FOUR));
 
         assertThatThrownBy(() -> service.read(KID, "starter-private"))

@@ -178,8 +178,7 @@ public final class ConnectorExecutionSnapshot {
             digest.of("execution_args_json", executionArgsJson),
             digest.of("scope_json", scopeJson),
             key,
-            PROTOCOL,
-            now);
+            PROTOCOL);
     }
 
 

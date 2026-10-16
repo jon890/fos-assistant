@@ -1,7 +1,9 @@
 package com.bifos.assistant.attention.domain;
 
+import com.bifos.assistant.shared.domain.AuditedEntity;
 import com.bifos.assistant.attention.domain.type.AttentionAction;
 import com.bifos.assistant.attention.domain.type.CardKey;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -27,6 +29,7 @@ import lombok.experimental.Accessors;
  * {@code AttentionControl} 과 이름이 겹치지 않게 {@code Entry} 를 붙였다.
  */
 @Entity
+@AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false))
 @Table(
     name = "attention_control",
     uniqueConstraints = @UniqueConstraint(
@@ -35,7 +38,7 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class AttentionControlEntry {
+public class AttentionControlEntry extends AuditedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -64,55 +67,46 @@ public class AttentionControlEntry {
     @Column(name = "until_at")
     private Instant untilAt;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
 
     /** 사용자가 본 상태 {@code stateKey} 가 바뀔 때까지 숨기는 줄이다. */
     public static AttentionControlEntry hide(
-        Long userId, CardKey cardKey, String itemKey, String stateKey, Instant now) {
-        AttentionControlEntry entry = create(userId, cardKey, itemKey, now);
-        entry.rehide(stateKey, now);
+        Long userId, CardKey cardKey, String itemKey, String stateKey) {
+        AttentionControlEntry entry = create(userId, cardKey, itemKey);
+        entry.rehide(stateKey);
         return entry;
     }
 
 
     /** {@code until} 까지 미루는 줄이다. */
     public static AttentionControlEntry snooze(
-        Long userId, CardKey cardKey, String itemKey, Instant until, Instant now) {
-        AttentionControlEntry entry = create(userId, cardKey, itemKey, now);
-        entry.resnooze(until, now);
+        Long userId, CardKey cardKey, String itemKey, Instant until) {
+        AttentionControlEntry entry = create(userId, cardKey, itemKey);
+        entry.resnooze(until);
         return entry;
     }
 
 
     /** 같은 줄을 숨기기로 고친다. 미룬 기한은 비운다. */
-    public void rehide(String stateKey, Instant now) {
+    public void rehide(String stateKey) {
         this.action = AttentionAction.HIDE;
         this.stateKey = Objects.requireNonNull(stateKey, "stateKey");
         this.untilAt = null;
-        this.updatedAt = micros(now);
     }
 
 
     /** 같은 줄을 미루기로 고친다. 숨긴 상태는 비운다. */
-    public void resnooze(Instant until, Instant now) {
+    public void resnooze(Instant until) {
         this.action = AttentionAction.SNOOZE;
         this.untilAt = micros(Objects.requireNonNull(until, "until"));
         this.stateKey = null;
-        this.updatedAt = micros(now);
     }
 
 
-    private static AttentionControlEntry create(Long userId, CardKey cardKey, String itemKey, Instant now) {
+    private static AttentionControlEntry create(Long userId, CardKey cardKey, String itemKey) {
         AttentionControlEntry entry = new AttentionControlEntry();
         entry.userId = Objects.requireNonNull(userId, "userId");
         entry.cardKey = Objects.requireNonNull(cardKey, "cardKey");
         entry.itemKey = Objects.requireNonNull(itemKey, "itemKey");
-        entry.createdAt = micros(now);
         return entry;
     }
 

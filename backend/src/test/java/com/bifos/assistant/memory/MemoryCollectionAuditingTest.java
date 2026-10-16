@@ -142,7 +142,7 @@ class MemoryCollectionAuditingTest {
             entityManager.persist(memory);
             MemoryRevision revision = MemoryRevision.of(memory, MemoryChangeType.UPDATED, 1L, "변경", Instant.EPOCH);
             Agent agent = Agent.of("auditing-business-time", "시각 검사", "auditing-business-time",
-                "http://runtime.test", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.GROUP, null, CREATED);
+                "http://runtime.test", CostMode.API, CredentialScope.DEDICATED, AgentVisibility.GROUP, null);
             entityManager.persist(agent);
             AgentMemoryCollectionChange change = AgentMemoryCollectionChange.of(agent.id(), "core",
                 AgentMemoryCollectionChangeType.GRANTED, false, 1L, Instant.EPOCH);
