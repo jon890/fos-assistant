@@ -39,6 +39,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | --- | --- | --- | --- | --- | --- | --- |
 | `session_status` | `READ` | 없음 | | | | 브라우저에 붙는지와 네이버 로그인 쿠키가 있는지 본다 |
 | `list_drafts` | `READ` | 없음 | | | | 임시저장 글의 번호, 제목, 고친 시각을 읽는다 |
+| `list_categories` | `READ` | 없음 | | | | 블로그의 카테고리 이름을 읽는다. 항목을 고르지 않고 글도 저장하지 않는다 |
 | `read_draft` | `WRITE` | 매번 필요 | 줄 수 없다 | 줄 수 있다 | 임시저장 글 불러오기 | 글을 편집기에 불러와 읽는다. 불러오면서 자동저장이 발생할 수 있다 |
 | `render_draft` | `READ` | 없음 | | | | 초안을 검사하고 미리보기나 수동 등록용 HTML 을 돌려준다. 아무것도 쓰지 않는다 |
 | `save_draft` | `WRITE` | 필요 | 줄 수 있다 | 줄 수 없다 | 네이버 블로그에 임시저장 | 초안을 검사하고 임시저장 작업을 시작한다 |
@@ -47,7 +48,7 @@ MCP 서버 이름은 `naver-blog` 다.
 
 분류의 까닭이다.
 
-- READ 도구 넷 중 상태 확인은 쿠키 이름만 보고 탭을 열지 않는다. 목록은 글쓰기 화면을 새 탭에 열지만 글을 불러오지 않는다. 미리보기는 커넥터 안에서 글을 만들 뿐이다. 작업 상태는 커넥터가 남긴 작업 파일만 읽는다
+- READ 도구 중 상태 확인은 쿠키 이름만 보고 탭을 열지 않는다. 목록은 글쓰기 화면을 새 탭에 열지만 글을 불러오지 않는다. 미리보기는 커넥터 안에서 글을 만들 뿐이다. 작업 상태는 커넥터가 남긴 작업 파일만 읽는다
 - 글 읽기는 편집기에 글을 불러오므로 자동저장이 발생할 수 있다. 기존 실측에서는 임시저장 글과 그 수가 바뀌지 않았지만 무부작용을 보장하지 못해 WRITE 로 분류한다. 승인 방식은 `required`, `grant: false`, `outbound: false`, `conversation_grant: true` 다. READ 전용 실행은 거절하고 상시 허락이 있어도 매번 확인받는다
 - 읽기 도구는 「작성 중인 글이 있습니다」 알림을 닫지 않는다. 「취소」 가 사용자가 쓰던 자동저장본을 버릴 수 있어서다
 - 임시저장은 계정 안의 쓰기다. 임시저장 글은 그 계정 주인만 보고 네이버에서 지울 수 있다. 밖으로 나가지 않으므로 `"outbound": false` 이고 상시 허락을 줄 수 있다. Gmail 의 초안 만들기와 같은 분류다
@@ -66,10 +67,30 @@ MCP 서버 이름은 `naver-blog` 다.
 | `session_status` | 없음 | `{browser: "connected", logged_in: true, blog_id}`. 로그인 쿠키가 없으면 `NAVER_BLOG_LOGIN_REQUIRED` 로 실패한다 |
 | `render_draft` | 아래 「초안」 의 다섯 칸, `base`(덮어쓸 때 `read_draft` 가 준 `title`, `category`, `tags`, `body`, 선택), `photo_notes`(사진 번호를 키로 한 사진 설명, 선택), `artifact_path`(결과물 폴더 안의 `index.html` 이나 `<폴더>/index.html`, 폴더는 세 단계까지), `kind`(`preview` 나 `package`, 기본 `preview`) | `{problems: [], html, assets}`. 초안이 계약을 어기면 `html` 없이 `problems` 에 어긋난 자리를 문장으로 담는다. `assets` 는 미리보기가 부르는 스티커 그림을 결과물 폴더에 받아 둘 `[{path, source_url}]` 이다. `base` 를 주면 `changes` 와 `base_revision` 이 더 온다(아래 「임시저장 글 덮어쓰기」) |
 | `list_drafts` | 없음 | `{count, drafts: [{draft_id, title, saved_at}], autosave_requests}`. 네이버 목록의 차례 그대로이고 앞의 200개까지, 제목은 200자까지다. `draft_id` 는 숫자로 된 글자, `saved_at` 은 ISO 시각이고 읽지 못하면 `null` 이다 |
+| `list_categories` | 없음 | `{count, categories: [이름]}`. 발행 설정의 카테고리 목록에 보이는 차례 그대로이고 200개까지다. 넘으면 잘린 목록을 주지 않고 `NAVER_BLOG_UNAVAILABLE` 이다. 아래 「카테고리 목록과 사전 검사」 를 본다 |
 | `read_draft` | `draft_id` | `{draft_id, revision, title, category, tags, body, photos, photo_count, photos_truncated, autosave_check, autosave_requests}`. 아래 「임시저장 글 읽기」 를 본다 |
 | `save_draft` | 아래 「초안」 의 다섯 칸 | `{job_id, status}`. `job_id` 는 UUID 고, `status` 는 시작 확인 때 읽은 `running`, `succeeded`, `failed`, `unknown` 중 하나다 |
 | `overwrite_draft` | `draft_id`(`read_draft` 와 같은 모양), `revision`(16자리 16진수), `changes`(1자에서 100,000자), `title`, `category`, `tags`, `body` | `{job_id, status}`. 상태는 `save_draft` 와 같다. 아래 「임시저장 글 덮어쓰기」 를 본다 |
 | `draft_job` | `job_id`, `wait_seconds`(0~50, 기본 45) | 아래 「작업」 의 상태 |
+
+## 카테고리 목록과 사전 검사
+
+새 글의 `category` 는 블로그에 이미 있는 이름이어야 한다. 없으면 저장 작업이 편집기에서 `category_not_found` 로 끝나지만, 그때는 승인 카드가 이미 지나간 뒤다.
+그래서 `list_categories` 가 블로그의 실제 카테고리 이름을 읽어 에이전트가 원고를 만들 때 고르게 하고, 목록에 없는 이름은 승인 카드 전에 막는다.
+
+`list_categories` 는 글쓰기 화면을 새 탭에 열어 발행 설정의 카테고리 목록을 펼쳐 이름만 읽고 탭을 닫는다.
+항목을 누르지 않고 저장 단추와 발행 단추도 누르지 않는다. 같은 블로그에 살아 있는 저장 작업이 있으면 `NAVER_BLOG_BUSY`, 「작성 중인 글이 있습니다」 알림이 떠 있으면 알림을 닫지 않고 `NAVER_BLOG_EDITOR_IN_USE` 다.
+
+읽은 목록은 작업 디렉터리에 블로그마다 하나인 파일로 남긴다. 이름과 읽은 시각만 담는다.
+이 목록이 **30분 안**에 읽은 것이면 두 곳이 새 글의 카테고리를 대조한다.
+
+| 곳 | 목록에 없는 이름이면 |
+| --- | --- |
+| `render_draft`(새 글. `base` 가 있는 덮어쓰기는 대조하지 않는다) | `html` 없이 `problems` 에 있는 카테고리 이름을 담는다 |
+| 원고 snapshot 의 `compile` | 계약을 어긴 초안과 같이 거절해 snapshot 도 승인 카드도 만들지 않는다. 거절 사유는 Control Plane 에 전하지 않으므로 에이전트는 `render_draft` 의 `problems` 로 까닭을 읽는다 |
+
+목록을 읽은 적이 없거나 30분이 지났으면 막지 않는다. 그 사이 사용자가 카테고리를 만들 수 있어서다. 그때는 저장 작업의 `category_not_found` 가 마지막으로 막는다.
+편집기에서 카테고리 항목을 고르는 화면 동작은 저장 작업과 같은 선택자를 쓰고, 목록을 펼쳐 읽는 이 도구의 실제 계정 동작은 아직 실측하지 않았다.
 
 ## 임시저장 글 읽기
 
@@ -230,7 +251,7 @@ MCP 서버 이름은 `naver-blog` 다.
 | 칸 | 모양 | 뜻 |
 | --- | --- | --- |
 | `title` | 글자, 1~100자 | 제목 |
-| `category` | 글자, 1~50자 | 블로그에 이미 있는 카테고리 이름. 없으면 작업이 `category_not_found` 로 끝나고 있는 카테고리 이름을 돌려준다 |
+| `category` | 글자, 1~50자 | 블로그에 이미 있는 카테고리 이름. `list_categories` 가 읽은 이름 가운데 하나를 쓴다. 없으면 작업이 `category_not_found` 로 끝나고 있는 카테고리 이름을 돌려준다 |
 | `tags` | 글자 배열, 0~30개. 하나에 1~30자, `#` 과 쉼표 없이 | 발행 설정의 태그 |
 | `body` | 글자, 20,000자까지 | 본문. 한 줄이 편집기의 한 문단이다. 아래 지시 줄은 구성요소가 된다 |
 | `photo_dir` | 절대 경로. 사진 지시가 있을 때 필수 | 대화 입력의 `[이번 메시지에 올린 사진]` 이 적은 디렉터리. 바인딩 주인의 첨부 디렉터리 아래여야 한다 |
