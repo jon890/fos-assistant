@@ -13,6 +13,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -29,7 +30,11 @@ import lombok.experimental.Accessors;
  */
 @Entity
 @AttributeOverride(name = "updatedAt", column = @Column(name = "updated_at", nullable = false))
-@Table(name = "memory_link")
+@Table(
+    name = "memory_link",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_memory_link_pair",
+        columnNames = {"from_memory_id", "to_memory_id", "type"}))
 @Getter
 @Accessors(fluent = true)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)

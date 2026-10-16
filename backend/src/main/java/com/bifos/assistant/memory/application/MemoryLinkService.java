@@ -234,7 +234,8 @@ public class MemoryLinkService {
         Consumer<MemoryLink> reopen) {
         MemoryLink existing = links.findByFromMemoryIdAndToMemoryIdAndType(from, to, type).orElse(null);
         if (existing == null) {
-            MemoryLink created = links.save(create.get());
+            // 같은 쌍을 함께 만들면 유일 제약이 여기서 DataIntegrityViolationException 으로 막는다. 부르는 쪽이 새 트랜잭션에서 다시 읽는다
+            MemoryLink created = links.saveAndFlush(create.get());
             log.info("memory link created linkId={} type={} origin={}", created.id(), type, created.origin());
             return created;
         }

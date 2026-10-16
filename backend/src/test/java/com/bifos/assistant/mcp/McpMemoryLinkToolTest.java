@@ -39,9 +39,15 @@ import com.bifos.assistant.usage.infra.AgentExecutionRepository;
 import com.bifos.assistant.user.domain.AppUser;
 import com.bifos.assistant.user.infra.AppUserRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -269,6 +275,36 @@ class McpMemoryLinkToolTest {
             assertThat(response.path("error").path("code").asInt()).as("인자 %s", arguments).isEqualTo(-32602);
         }
         assertThat(links.count()).isZero();
+    }
+
+
+    @Test
+    @DisplayName("같은 연결을 함께 두 번 불러도 둘 다 결과 글을 받고 줄은 하나다")
+    void keepsOneRowForConcurrentSameLink() throws Exception {
+        for (int round = 0; round < 5; round++) {
+            Memory a = memories.create(user, MemoryScope.USER, "동시 가 " + round, "본문", false);
+            Memory b = memories.create(user, MemoryScope.USER, "동시 나 " + round, "본문", false);
+            CountDownLatch start = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                List<Future<JsonNode>> calls = new ArrayList<>();
+                for (int n = 0; n < 2; n++) {
+                    calls.add(pool.submit(() -> {
+                        start.await();
+                        return call(link(a.id(), b.id(), "RELATED"));
+                    }));
+                }
+                start.countDown();
+                for (Future<JsonNode> each : calls) {
+                    JsonNode result = each.get(20, TimeUnit.SECONDS);
+                    assertThat(text(result)).as("라운드 %s: %s", round, result).isEqualTo("연결했습니다.");
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+            assertThat(links.findByFromMemoryIdAndToMemoryIdAndType(a.id(), b.id(), MemoryLinkType.RELATED)).isPresent();
+        }
+        assertThat(links.count()).isEqualTo(5);
     }
 
 

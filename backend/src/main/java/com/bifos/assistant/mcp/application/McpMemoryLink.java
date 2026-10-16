@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -90,9 +91,14 @@ public class McpMemoryLink {
         }
         MemoryLink linked;
         try {
-            linked = SUPERSEDES.equals(type)
-                ? links.proposeSupersede(caller.user(), fromId, toId, MemoryLinkOrigin.AGENT, origin.id())
-                : links.relate(caller.user(), fromId, toId, label, MemoryLinkOrigin.AGENT, null, origin.id());
+            linked = linkOnce(caller, origin, fromId, toId, type, label);
+        } catch (DataIntegrityViolationException ex) {
+            // 같은 쌍을 함께 맺은 다른 호출이 먼저 넣었다. 그 트랜잭션은 끝났으므로 다시 부르면 그 줄을 읽어 돌려준다
+            try {
+                linked = linkOnce(caller, origin, fromId, toId, type, label);
+            } catch (ApiException retryEx) {
+                return result(UNLINKABLE, true);
+            }
         } catch (ApiException ex) {
             return result(UNLINKABLE, true);
         }
@@ -109,5 +115,13 @@ public class McpMemoryLink {
         return linked.status() == MemoryLinkStatus.ACTIVE
             ? result("이미 사용자가 받아들인 대체입니다.", false)
             : result("대체 제안으로 남겼습니다. 사용자가 받아들여야 바뀝니다. 답에서 아직 승인 전이라는 것을 알립니다.", false);
+    }
+
+
+    private MemoryLink linkOnce(
+        McpCaller caller, AgentExecution origin, long fromId, long toId, String type, String label) {
+        return SUPERSEDES.equals(type)
+            ? links.proposeSupersede(caller.user(), fromId, toId, MemoryLinkOrigin.AGENT, origin.id())
+            : links.relate(caller.user(), fromId, toId, label, MemoryLinkOrigin.AGENT, null, origin.id());
     }
 }
