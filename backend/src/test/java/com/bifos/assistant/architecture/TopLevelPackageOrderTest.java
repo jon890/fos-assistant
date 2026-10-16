@@ -41,6 +41,14 @@ class TopLevelPackageOrderTest {
 
 
     @Test
+    @DisplayName("admin 은 순서의 맨 위라서 기능이 admin 을 쓰면 위반이다")
+    void reportsFeatureUsingAdmin() {
+        assertThat(TopLevelPackageOrder.violations("workspace", List.of("admin")))
+            .containsExactly("workspace -> admin 는 층 순서를 거스른다");
+    }
+
+
+    @Test
     @DisplayName("순서에 없는 패키지는 순서에 없다는 한 줄만 낸다")
     void reportsPackageMissingFromOrder() {
         assertThat(TopLevelPackageOrder.violations("billing", List.of("user"))).containsExactly("billing 는 층 순서에 없다");
@@ -59,15 +67,15 @@ class TopLevelPackageOrderTest {
     void allowsTopPackageToUseEveryOtherPackage() {
         List<String> others = TopLevelPackageOrder.ORDER.subList(0, TopLevelPackageOrder.ORDER.size() - 1);
 
-        assertThat(others).hasSize(21);
-        assertThat(TopLevelPackageOrder.violations("workspace", others)).isEmpty();
+        assertThat(others).hasSize(22);
+        assertThat(TopLevelPackageOrder.violations("admin", others)).isEmpty();
     }
 
 
     @Test
-    @DisplayName("층 순서는 겹치는 이름 없이 스물둘이다")
-    void orderHasTwentyTwoDistinctPackages() {
-        assertThat(TopLevelPackageOrder.ORDER).hasSize(22);
-        assertThat(new HashSet<>(TopLevelPackageOrder.ORDER)).hasSize(22);
+    @DisplayName("층 순서는 겹치는 이름 없이 스물셋이다")
+    void orderHasTwentyThreeDistinctPackages() {
+        assertThat(TopLevelPackageOrder.ORDER).hasSize(23);
+        assertThat(new HashSet<>(TopLevelPackageOrder.ORDER)).hasSize(23);
     }
 }

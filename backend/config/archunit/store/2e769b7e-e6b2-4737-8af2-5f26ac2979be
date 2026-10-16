@@ -1,0 +1,5 @@
+com.bifos.assistant.chat.application 는 application 직하의 클래스가 상한(25)을 넘었다. 값과 인터페이스는 dto 와 port 로 옮기고, 그래도 넘으면 하위 기능으로 나눈다.
+com.bifos.assistant.connector.application 는 application 직하의 클래스가 상한(25)을 넘었다. 값과 인터페이스는 dto 와 port 로 옮기고, 그래도 넘으면 하위 기능으로 나눈다.
+com.bifos.assistant.proactive.application 는 application 직하의 클래스가 상한(25)을 넘었다. 값과 인터페이스는 dto 와 port 로 옮기고, 그래도 넘으면 하위 기능으로 나눈다.
+com.bifos.assistant.skill.application 는 application 직하의 클래스가 상한(25)을 넘었다. 값과 인터페이스는 dto 와 port 로 옮기고, 그래도 넘으면 하위 기능으로 나눈다.
+com.bifos.assistant.usage.application 는 application 직하의 클래스가 상한(25)을 넘었다. 값과 인터페이스는 dto 와 port 로 옮기고, 그래도 넘으면 하위 기능으로 나눈다.
